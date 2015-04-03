@@ -1,105 +1,195 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri,  3 Apr 2015 21:44:49 +0200
-Subject: [PATCH v4 08/11] ARM: efm32: move into multiplatform
+Date: Fri,  3 Apr 2015 21:44:51 +0200
+Subject: [PATCH v4 10/11] ARM: dts: add support for Vybrid running on Cortex-M4
 In-Reply-To: <1428090292-21693-1-git-send-email-stefan@agner.ch>
 References: <1428090292-21693-1-git-send-email-stefan@agner.ch>
-Message-ID: <1428090292-21693-9-git-send-email-stefan@agner.ch>
+Message-ID: <1428090292-21693-11-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+This adds an initial device tree to run Linux on the Cortex-M4 on
+the Vybrid based Colibri VF61 module.
 
-Since the multiplatform configuration can support no-MMU kernels now,
-there is nothing stopping us from moving the efm32 platform in there
-as well. This introduces a new ARCH_MULTI_V7M CPU architecture selection
-option, since v7-M is incompatible with v7-A, and we can have either
-of the two enabled for multiplatform, but not both at the same time.
-
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/Kconfig                 | 33 ++++++++++++++-------------------
- arch/arm/configs/efm32_defconfig |  2 ++
- 2 files changed, 16 insertions(+), 19 deletions(-)
+ arch/arm/boot/dts/Makefile            |  1 +
+ arch/arm/boot/dts/vf610m4-colibri.dts | 98 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/vf610m4.dtsi        | 50 ++++++++++++++++++
+ 3 files changed, 149 insertions(+)
+ create mode 100644 arch/arm/boot/dts/vf610m4-colibri.dts
+ create mode 100644 arch/arm/boot/dts/vf610m4.dtsi
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 636cb3f..51d1750 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -316,7 +316,7 @@ config ARCH_MULTIPLATFORM
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
- 	select MIGHT_HAVE_PCI
--	select MULTI_IRQ_HANDLER
-+	select MULTI_IRQ_HANDLER if !ARCH_MULTI_V7M
- 	select SPARSE_IRQ
- 	select USE_OF
- 
-@@ -402,24 +402,6 @@ config ARCH_EBSA110
- 	  Ethernet interface, two PCMCIA sockets, two serial ports and a
- 	  parallel port.
- 
--config ARCH_EFM32
--	bool "Energy Micro efm32"
--	depends on !MMU
--	select ARCH_REQUIRE_GPIOLIB
--	select ARM_NVIC
--	select AUTO_ZRELADDR
--	select CLKSRC_OF
--	select COMMON_CLK
--	select CPU_V7M
--	select GENERIC_CLOCKEVENTS
--	select NO_DMA
--	select NO_IOPORT_MAP
--	select SPARSE_IRQ
--	select USE_OF
--	help
--	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
--	  processors.
--
- config ARCH_EP93XX
- 	bool "EP93xx-based"
- 	select ARCH_HAS_HOLES_MEMORYMODEL
-@@ -780,6 +762,13 @@ menu "Multiple platform selection"
- 
- comment "CPU Core family selection"
- 
-+config ARCH_MULTI_V7M
-+	bool "ARMv7-M based platforms (Cortex-M)"
-+	depends on !MMU && !(ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7)
-+	select CPU_V7M
-+	select ARM_NVIC
-+	select NO_IOPORT_MAP
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a1c776b..3a6ff9f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -309,6 +309,7 @@ dtb-$(CONFIG_SOC_LS1021A) += \
+ dtb-$(CONFIG_SOC_VF610) += \
+ 	vf500-colibri-eval-v3.dtb \
+ 	vf610-colibri-eval-v3.dtb \
++	vf610m4-colibri.dtb \
+ 	vf610-cosmic.dtb \
+ 	vf610-twr.dtb
+ dtb-$(CONFIG_ARCH_MXS) += \
+diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
+new file mode 100644
+index 0000000..acd6cb5
+--- /dev/null
++++ b/arch/arm/boot/dts/vf610m4-colibri.dts
+@@ -0,0 +1,98 @@
++/*
++ * Device tree for Colibri VF61 Cortex-M4 support
++ *
++ * Copyright (C) 2015 Stefan Agner
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
- config ARCH_MULTI_V4
- 	bool "ARMv4 based platforms (FA526)"
- 	depends on !ARCH_MULTI_V6_V7 && MMU
-@@ -836,6 +825,12 @@ config ARCH_VIRT
- 	select ARM_PSCI
- 	select HAVE_ARM_ARCH_TIMER
- 
-+config ARCH_EFM32
-+	bool "Energy Micro efm32" if ARCH_MULTI_V7M
-+	help
-+	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
-+	  processors.
++/dts-v1/;
++#include "vf610m4.dtsi"
 +
- #
- # This is sorted alphabetically by mach-* pathname.  However, plat-*
- # Kconfigs may be included either alphabetically (according to the
-diff --git a/arch/arm/configs/efm32_defconfig b/arch/arm/configs/efm32_defconfig
-index c4c17e3..f58cb28 100644
---- a/arch/arm/configs/efm32_defconfig
-+++ b/arch/arm/configs/efm32_defconfig
-@@ -16,6 +16,8 @@ CONFIG_EMBEDDED=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- # CONFIG_MMU is not set
-+# CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_MULTI_V7M=y
- CONFIG_ARCH_EFM32=y
- CONFIG_SET_MEM_PARAM=y
- CONFIG_DRAM_BASE=0x88000000
++/ {
++	model = "VF610 Cortex-M4";
++	compatible = "fsl,vf610m4";
++
++	chosen {
++		bootargs = "console=ttyLP2,115200 clk_ignore_unused init=/linuxrc rw";
++	};
++
++	memory {
++		reg = <0x8c000000 0x3000000>;
++	};
++};
++
++&gpio0 {
++	status = "disabled";
++};
++
++&gpio1 {
++	status = "disabled";
++};
++
++&gpio2 {
++	status = "disabled";
++};
++
++&gpio3 {
++	status = "disabled";
++};
++
++&gpio4 {
++	status = "disabled";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
++
++&iomuxc {
++	vf610-colibri {
++		pinctrl_uart2: uart2grp {
++			fsl,pins = <
++				VF610_PAD_PTD0__UART2_TX		0x21a2
++				VF610_PAD_PTD1__UART2_RX		0x21a1
++				VF610_PAD_PTD2__UART2_RTS		0x21a2
++				VF610_PAD_PTD3__UART2_CTS		0x21a1
++			>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/vf610m4.dtsi b/arch/arm/boot/dts/vf610m4.dtsi
+new file mode 100644
+index 0000000..9ffe2eb
+--- /dev/null
++++ b/arch/arm/boot/dts/vf610m4.dtsi
+@@ -0,0 +1,50 @@
++/*
++ * Device tree for VF6xx Cortex-M4 support
++ *
++ * Copyright (C) 2015 Stefan Agner
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "armv7-m.dtsi"
++#include "vfxxx.dtsi"
++
++&mscm_ir {
++	interrupt-parent = <&nvic>;
++};
 -- 
 2.3.5
