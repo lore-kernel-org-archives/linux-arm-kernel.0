@@ -1,129 +1,87 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 3 Apr 2015 17:25:53 +0800
-Subject: [PATCH v9 19/30] powerpc/pci: Use pci_scan_host_bridge() for
- simplicity
+Date: Fri, 3 Apr 2015 17:25:52 +0800
+Subject: [PATCH v9 18/30] ia64/PCI: Refine pci_acpi_scan_root() with generic
+ pci_host_bridge
 In-Reply-To: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
 References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1428053164-28277-21-git-send-email-wangyijing@huawei.com>
+Message-ID: <1428053164-28277-20-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we could use pci_scan_host_bridge() to scan
-pci buses, provide powerpc specific pci_host_bridge_ops.
+From: Yijing Wang <wangyijing0307@gmail.com>
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-CC: linuxppc-dev at lists.ozlabs.org
+CC: Tony Luck <tony.luck@intel.com>
+CC: Fenghua Yu <fenghua.yu@intel.com>
+CC: linux-ia64 at vger.kernel.org
 ---
- arch/powerpc/kernel/pci-common.c |   62 +++++++++++++++++++++++--------------
- 1 files changed, 38 insertions(+), 24 deletions(-)
+ arch/ia64/pci/pci.c |   34 +++++++++++++++++++---------------
+ 1 files changed, 19 insertions(+), 15 deletions(-)
 
-diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
-index 2c58200..50b32f6 100644
---- a/arch/powerpc/kernel/pci-common.c
-+++ b/arch/powerpc/kernel/pci-common.c
-@@ -773,6 +773,29 @@ void pcibios_set_root_bus_speed(struct pci_host_bridge *bridge)
- 		return ppc_md.pcibios_set_root_bus_speed(bridge);
+diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+index c642bc8..95dc43b 100644
+--- a/arch/ia64/pci/pci.c
++++ b/arch/ia64/pci/pci.c
+@@ -420,6 +420,19 @@ probe_pci_root_info(struct pci_root_info *info, struct acpi_device *device,
+ 	return 0;
  }
  
-+static int pci_host_scan_bus(struct pci_host_bridge *host)
++static int pci_host_bridge_prepare(struct pci_host_bridge *bridge)
 +{
-+	int mode = PCI_PROBE_NORMAL;
-+	struct pci_bus *bus = host->bus;
-+	struct pci_controller *hose = dev_get_drvdata(&host->dev);
++	struct pci_controller *controller = bridge->bus->sysdata;
 +
-+	/* Get probe mode and perform scan */
-+	if (hose->dn && ppc_md.pci_probe_mode)
-+		mode = ppc_md.pci_probe_mode(bus);
-+
-+	pr_debug("    probe mode: %d\n", mode);
-+	if (mode == PCI_PROBE_DEVTREE)
-+		of_scan_bus(hose->dn, bus);
-+
-+	if (mode == PCI_PROBE_NORMAL) {
-+		pci_bus_update_busn_res_end(bus, 255);
-+		hose->last_busno = pci_scan_child_bus(bus);
-+		pci_bus_update_busn_res_end(bus, hose->last_busno);
-+	}
-+
-+	return pci_bus_child_max_busnr(bus);
++	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
++	return 0;
 +}
 +
- /* This header fixup will do the resource fixup for all devices as they are
-  * probed, but not for bridge ranges
-  */
-@@ -1585,6 +1608,11 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
- 	return of_node_get(hose->dn);
- }
- 
 +static struct pci_host_bridge_ops pci_host_ops = {
-+	.set_root_bus_speed = pcibios_set_root_bus_speed,
-+	.scan_bus = pci_host_scan_bus,
++	.pci_ops = &pci_root_ops,
++	.prepare = pci_host_bridge_prepare,
 +};
 +
- /**
-  * pci_scan_phb - Given a pci_controller, setup and scan the PCI bus
-  * @hose: Pointer to the PCI host controller instance structure
-@@ -1592,9 +1620,8 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
- void pcibios_scan_phb(struct pci_controller *hose)
+ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
  {
- 	LIST_HEAD(resources);
--	struct pci_bus *bus;
+ 	struct acpi_device *device = root->device;
+@@ -428,7 +441,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	struct pci_controller *controller;
+ 	struct pci_root_info *info = NULL;
+ 	int busnum = root->secondary.start;
+-	struct pci_bus *pbus;
 +	struct pci_host_bridge *host;
- 	struct device_node *node = hose->dn;
--	int mode;
+ 	int ret;
  
- 	pr_debug("PCI: Scanning PHB %s\n", of_node_full_name(node));
- 
-@@ -1609,30 +1636,17 @@ void pcibios_scan_phb(struct pci_controller *hose)
- 	hose->busn.flags = IORESOURCE_BUS;
- 	pci_add_resource(&resources, &hose->busn);
- 
-+	pci_host_ops.pci_ops = hose->ops;
- 	/* Create an empty bus for the toplevel */
--	bus = pci_create_root_bus(hose->parent, hose->global_number,
--			hose->first_busno, hose->ops, hose, &resources);
--	if (bus == NULL) {
--		pr_err("Failed to create bus for PCI domain %04x\n",
--			hose->global_number);
-+	host = pci_scan_host_bridge(hose->parent, hose->global_number,
-+			hose->first_busno, hose, &resources, &pci_host_ops);
-+	if (host == NULL) {
-+		pr_err("Failed to create host bridge for pci%04x:%02x\n",
-+			hose->global_number, hose->first_busno);
- 		pci_free_resource_list(&resources);
- 		return;
+ 	controller = alloc_pci_controller(domain);
+@@ -465,26 +478,17 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	 * should handle the case here, but it appears that IA64 hasn't
+ 	 * such quirk. So we just ignore the case now.
+ 	 */
+-	pbus = pci_create_root_bus(NULL, domain, bus, &pci_root_ops,
+-			controller, &info->resources);
+-	if (!pbus) {
++	host = pci_scan_host_bridge(NULL, domain, bus, controller,
++			&info->resources, &pci_host_ops);
++	if (!host) {
+ 		pci_free_resource_list(&info->resources);
+ 		__release_pci_root_info(info);
+ 		return NULL;
  	}
--	hose->bus = bus;
--
--	/* Get probe mode and perform scan */
--	mode = PCI_PROBE_NORMAL;
--	if (node && ppc_md.pci_probe_mode)
--		mode = ppc_md.pci_probe_mode(bus);
--	pr_debug("    probe mode: %d\n", mode);
--	if (mode == PCI_PROBE_DEVTREE)
--		of_scan_bus(node, bus);
--
--	if (mode == PCI_PROBE_NORMAL) {
--		pci_bus_update_busn_res_end(bus, 255);
--		hose->last_busno = pci_scan_child_bus(bus);
--		pci_bus_update_busn_res_end(bus, hose->last_busno);
--	}
-+	hose->bus = host->bus;
  
- 	/* Platform gets a chance to do some global fixups before
- 	 * we proceed to resource allocation
-@@ -1641,9 +1655,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
- 		ppc_md.pcibios_fixup_phb(hose);
- 
- 	/* Configure PCI Express settings */
--	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-+	if (host->bus && !pci_has_flag(PCI_PROBE_ONLY)) {
- 		struct pci_bus *child;
--		list_for_each_entry(child, &bus->children, node)
-+		list_for_each_entry(child, &host->bus->children, node)
- 			pcie_bus_configure_settings(child);
- 	}
+-	pci_set_host_bridge_release(to_pci_host_bridge(pbus->bridge),
++	pci_set_host_bridge_release(host,
+ 			release_pci_root_info, info);
+-	pci_scan_child_bus(pbus);
+-	return pbus;
+-}
+-
+-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+-{
+-	struct pci_controller *controller = bridge->bus->sysdata;
+-
+-	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
+-	return 0;
++	return host->bus;
  }
+ 
+ void pcibios_fixup_device_resources(struct pci_dev *dev)
 -- 
 1.7.1
