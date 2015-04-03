@@ -1,42 +1,57 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 3 Apr 2015 10:35:56 +0200
-Subject: [PATCH 1/2] ARM: EXYNOS: Get current parent clock for power
- domain on/off
-In-Reply-To: <551E4B85.1000903@samsung.com>
-References: <1427961979-29477-1-git-send-email-k.kozlowski@samsung.com>
- <551D362B.90901@collabora.co.uk>
- <CAJKOXPc1dfHAaUQd+3HDhNwQW8xYDeoYFgN6QMkmQPEnLGtG-A@mail.gmail.com>
- <551E4B85.1000903@samsung.com>
-Message-ID: <CAJKOXPcqSk3oaqdsW3LLzQCmL09+pZa5qb9tSBMiJMq_ZLSByQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 3 Apr 2015 10:43:40 +0200
+Subject: [PATCH] ARM: at91/dt: sama5d3 xplained: add phy address for macb1
+In-Reply-To: <1427792170-13162-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1427792170-13162-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <551E52BC.3040702@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-03 10:12 GMT+02:00 Andrzej Hajda <a.hajda@samsung.com>:
-> On 04/02/2015 02:44 PM, Krzysztof Kozlowski wrote:
->> 2015-04-02 14:29 GMT+02:00 Javier Martinez Canillas
->> <javier.martinez@collabora.co.uk>:
->>> Hello Krzysztof,
->>>
->>> On 04/02/2015 10:06 AM, Krzysztof Kozlowski wrote:
->>>> Using a fixed (by DTS) parent for clocks when turning on the power domain
->>>> may introduce issues in other drivers. For example when such driver
->>>> changes the parent during runtime and expects that he is the only place
->>>> of such change.
->>>>
->>>> Do not rely entirely on DTS providing the fixed parent for such clocks.
->>>> Instead if "pclkN" clock name is missing, grab a current parent of clock
->>>> with clk_get_parent().
->
-> Hi Krzysztof,
->
-> I wonder if it wouldn't be better to drop entirely pclks. Power domains
-> should save/restore its previous state, setting fixed parents on domain
-> resume can fool drivers as you described earlier.
+Le 31/03/2015 10:56, Nicolas Ferre a ?crit :
+> After 57a38effa598 (net: phy: micrel: disable broadcast for KSZ8081/KSZ8091)
+> the macb1 interface refuses to work properly because it tries
+> to cling to address 0 which isn't able to communicate in broadcast with
+> the mac anymore. The micrel phy on the board is actually configured
+> to show up at address 1.
+> Adding the phy node and its real address fixes the issue.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Johan Hovold <johan@kernel.org>
+> Cc: <stable@vger.kernel.org> #3.19
+> ---
 
-I wanted to preserve full backward compatibility (including behaviour
-compatibility). However I can't find valid reason to switch to some
-fixed clock after powering up domain so if there are not objections I
-will drop pclk entirely.
+Arnd, Olof, Kevin,
 
-Thanks!
-Krzysztof
+It seems late but, is it possible to queue this patch as a 4.0 fixes?
+
+Without it, the 10/100 Ethernet on sama5d3 doesn't work if it's not used
+by u-boot previously.
+
+Bye,
+
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> index fec1fca2ad66..6c4bc53cbf4e 100644
+> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> @@ -167,7 +167,13 @@
+>  
+>  			macb1: ethernet at f802c000 {
+>  				phy-mode = "rmii";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+>  				status = "okay";
+> +
+> +				ethernet-phy at 1 {
+> +					reg = <0x1>;
+> +				};
+>  			};
+>  
+>  			dbgu: serial at ffffee00 {
+> 
+
+
+-- 
+Nicolas Ferre
