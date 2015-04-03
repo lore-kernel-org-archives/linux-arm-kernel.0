@@ -1,46 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 14:54:45 -0700
-Subject: [GIT PULL] ARM: mvebu: dt changes for v4.1 (round 3)
-In-Reply-To: <551D03AE.4010105@free-electrons.com>
-References: <551D03AE.4010105@free-electrons.com>
-Message-ID: <20150403215445.GR23023@localhost>
+Date: Fri, 3 Apr 2015 14:56:07 -0700
+Subject: [PATCH] ARM: at91/dt: sama5d3 xplained: add phy address for macb1
+In-Reply-To: <20150403205507.GH23023@localhost>
+References: <1427792170-13162-1-git-send-email-nicolas.ferre@atmel.com>
+ <551E52BC.3040702@atmel.com> <20150403205507.GH23023@localhost>
+Message-ID: <20150403215607.GS23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 02, 2015 at 10:54:06AM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Fri, Apr 03, 2015 at 01:55:07PM -0700, Olof Johansson wrote:
+> On Fri, Apr 03, 2015 at 10:43:40AM +0200, Nicolas Ferre wrote:
+> > Le 31/03/2015 10:56, Nicolas Ferre a ?crit :
+> > > After 57a38effa598 (net: phy: micrel: disable broadcast for KSZ8081/KSZ8091)
+> > > the macb1 interface refuses to work properly because it tries
+> > > to cling to address 0 which isn't able to communicate in broadcast with
+> > > the mac anymore. The micrel phy on the board is actually configured
+> > > to show up at address 1.
+> > > Adding the phy node and its real address fixes the issue.
+> > > 
+> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > Cc: Johan Hovold <johan@kernel.org>
+> > > Cc: <stable@vger.kernel.org> #3.19
+> > > ---
+> > 
+> > Arnd, Olof, Kevin,
+> > 
+> > It seems late but, is it possible to queue this patch as a 4.0 fixes?
+> > 
+> > Without it, the 10/100 Ethernet on sama5d3 doesn't work if it's not used
+> > by u-boot previously.
 > 
-> Here is the third pull request for dt for mvebu for v4.1.
-> By the way you didn't pull the second one I sent 10 days
-> ago. If you prefer I can delete the tags mvebu-dt-4.1-2
-> and mvebu-dt-4.1-3. And create a new one gathering the
-> content of the both.
-> 
-> Gregory
-> The following changes since commit 7776ab70d75ff9857343e44e428744d81c30ce1b:
-> 
->   ARM: mvebu: armada-385-ap: Enable USB3 port (2015-03-18 11:55:49 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.1-3
-> 
-> for you to fetch changes up to 292a3546b9eb20bf5a292f4e55dd1a027424669f:
-> 
->   ARM: mvebu: Conform L2CC node with ePAPR specification by adding cache-level (2015-03-19 11:07:47 +0100)
-> 
-> ----------------------------------------------------------------
-> mvebu dt changes for v4.1 (part #3)
-> 
-> These changes have no influence on the kernel behavior (except
-> removing a warning message), but they allow to have a better
-> representation of the hardware.
-> 
-> - conform L2CC node with ePAPR specification by adding cache-level
-> - remove cpuclk resources overlapping coredivclk registers on Armada XP
-> 
+> Sure, resend it to arm at kernel.org.
 
+Nevermind, I ended up picking it up from the list. Applied.
 
-Thanks, merged.
 
 -Olof
