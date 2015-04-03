@@ -1,31 +1,113 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sat, 4 Apr 2015 00:39:33 +0300
-Subject: [PATCHv6] media: i2c/adp1653: Documentation for devicetree
- support for adp1653
-In-Reply-To: <20150403202624.GA4308@amd>
-References: <20150402143846.GA11687@amd> <20150402203417.GA6336@amd>
- <20150403083353.GA21070@amd>
- <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
- <20150403202624.GA4308@amd>
-Message-ID: <20150403213933.GP20756@valkosipuli.retiisi.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 04 Apr 2015 00:44:35 +0300
+Subject: [PATCH 07/14] media: omap3isp: remove unused clkdev
+In-Reply-To: <E1Ye59O-0001BJ-Gq@rmk-PC.arm.linux.org.uk>
+References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
+ <E1Ye59O-0001BJ-Gq@rmk-PC.arm.linux.org.uk>
+Message-ID: <36620233.VbNiGUfDRt@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 10:26:24PM +0200, Pavel Machek wrote:
-> > > +  - power-gpios: Reference to the GPIO that controls the power for the chip.
-> > 
-> > You're using power-gpios in documentation only.
+Hi Russell,
+
+Thank you for the patch;
+
+On Friday 03 April 2015 18:12:58 Russell King wrote:
+> No merged platform supplies xclks via platform data.  As we want to
+> slightly change the clkdev interface, rather than fixing this unused
+> code, remove it instead.
 > 
-> Which is ok, because generic code adds "-gpios" itself.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Do you think you need this part:
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-+       if (!of_find_property(node, "gpios", NULL)) {                           
-+               dev_err(&client->dev, "No gpio node\n");                        
-+               return -EINVAL;                                                 
-+       }                                                                       
+with one caveat though : it conflicts with patches queued for v4.1 in the 
+media tree. I'll post a rebased version in a reply to your e-mail. How would 
+you like to handle the conflict ?
 
+> ---
+>  drivers/media/platform/omap3isp/isp.c | 18 ------------------
+>  drivers/media/platform/omap3isp/isp.h |  1 -
+>  include/media/omap3isp.h              |  6 ------
+>  3 files changed, 25 deletions(-)
+> 
+> diff --git a/drivers/media/platform/omap3isp/isp.c
+> b/drivers/media/platform/omap3isp/isp.c index deca80903c3a..4d8078b9d010
+> 100644
+> --- a/drivers/media/platform/omap3isp/isp.c
+> +++ b/drivers/media/platform/omap3isp/isp.c
+> @@ -281,7 +281,6 @@ static const struct clk_init_data isp_xclk_init_data = {
+> 
+>  static int isp_xclk_init(struct isp_device *isp)
+>  {
+> -	struct isp_platform_data *pdata = isp->pdata;
+>  	struct clk_init_data init;
+>  	unsigned int i;
+> 
+> @@ -311,20 +310,6 @@ static int isp_xclk_init(struct isp_device *isp)
+>  		xclk->clk = clk_register(NULL, &xclk->hw);
+>  		if (IS_ERR(xclk->clk))
+>  			return PTR_ERR(xclk->clk);
+> -
+> -		if (pdata->xclks[i].con_id == NULL &&
+> -		    pdata->xclks[i].dev_id == NULL)
+> -			continue;
+> -
+> -		xclk->lookup = kzalloc(sizeof(*xclk->lookup), GFP_KERNEL);
+> -		if (xclk->lookup == NULL)
+> -			return -ENOMEM;
+> -
+> -		xclk->lookup->con_id = pdata->xclks[i].con_id;
+> -		xclk->lookup->dev_id = pdata->xclks[i].dev_id;
+> -		xclk->lookup->clk = xclk->clk;
+> -
+> -		clkdev_add(xclk->lookup);
+>  	}
+> 
+>  	return 0;
+> @@ -339,9 +324,6 @@ static void isp_xclk_cleanup(struct isp_device *isp)
+> 
+>  		if (!IS_ERR(xclk->clk))
+>  			clk_unregister(xclk->clk);
+> -
+> -		if (xclk->lookup)
+> -			clkdev_drop(xclk->lookup);
+>  	}
+>  }
+> 
+> diff --git a/drivers/media/platform/omap3isp/isp.h
+> b/drivers/media/platform/omap3isp/isp.h index cfdfc8714b6b..d41c98bbdfe7
+> 100644
+> --- a/drivers/media/platform/omap3isp/isp.h
+> +++ b/drivers/media/platform/omap3isp/isp.h
+> @@ -122,7 +122,6 @@ enum isp_xclk_id {
+>  struct isp_xclk {
+>  	struct isp_device *isp;
+>  	struct clk_hw hw;
+> -	struct clk_lookup *lookup;
+>  	struct clk *clk;
+>  	enum isp_xclk_id id;
+> 
+> diff --git a/include/media/omap3isp.h b/include/media/omap3isp.h
+> index 398279dd1922..a9798525d01e 100644
+> --- a/include/media/omap3isp.h
+> +++ b/include/media/omap3isp.h
+> @@ -152,13 +152,7 @@ struct isp_v4l2_subdevs_group {
+>  	} bus; /* gcc < 4.6.0 chokes on anonymous union initializers */
+>  };
+> 
+> -struct isp_platform_xclk {
+> -	const char *dev_id;
+> -	const char *con_id;
+> -};
+> -
+>  struct isp_platform_data {
+> -	struct isp_platform_xclk xclks[2];
+>  	struct isp_v4l2_subdevs_group *subdevs;
+>  	void (*set_constraints)(struct isp_device *isp, bool enable);
+>  };
 
 -- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Regards,
+
+Laurent Pinchart
