@@ -1,109 +1,50 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Thu, 2 Apr 2015 19:59:53 -0700
-Subject: Build regression in next-20150331
-In-Reply-To: <20150402082917.GS23123@twins.programming.kicks-ass.net>
-References: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
- <2720045.6sPXjyyvfF@vostro.rjw.lan>
- <CANMBJr76ap0qL+yxrwe5ECWRgFRgbtdKNBGoSd8SOzrhzDjTrg@mail.gmail.com>
- <2863807.lxHPvZ2AsE@vostro.rjw.lan>
- <20150402082917.GS23123@twins.programming.kicks-ass.net>
-Message-ID: <CANMBJr4T5T6tFM+SPs9btc_qBRdMPL0QA4R_d1XXk7VBDqq_MA@mail.gmail.com>
+From: liu.y.victor@gmail.com (Liu Ying)
+Date: Fri, 3 Apr 2015 11:28:18 +0800
+Subject: [PATCH RFC v9 09/20] drm/dsi: Add a helper to get bits per pixel
+ of MIPI DSI pixel format
+In-Reply-To: <1425380860.3146.49.camel@pengutronix.de>
+References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
+ <1423720903-24806-10-git-send-email-Ying.Liu@freescale.com>
+ <1425380860.3146.49.camel@pengutronix.de>
+Message-ID: <CA+8Hj80iRz6RTtzOiYvSPmgiR4w6X+hBukXgBkZz3o6+Z4RecA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 April 2015 at 01:29, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Wed, Apr 01, 2015 at 11:46:10PM +0200, Rafael J. Wysocki wrote:
->
->> > > ---
->> > >  kernel/time/tick-internal.h |    2 ++
->> > >  1 file changed, 2 insertions(+)
->> > >
->> > > Index: linux-pm/kernel/time/tick-internal.h
->> > > ===================================================================
->> > > --- linux-pm.orig/kernel/time/tick-internal.h
->> > > +++ linux-pm/kernel/time/tick-internal.h
->> > > @@ -110,7 +110,9 @@ static inline int tick_broadcast_update_
->> > >  /* Set the periodic handler in non broadcast mode */
->> > >  static inline void tick_set_periodic_handler(struct clock_event_device *dev, int broadcast)
->> > >  {
->> > > +#ifdef CONFIG_GENERIC_CLOCKEVENTS
->> > >         dev->event_handler = tick_handle_periodic;
->> > > +#endif
->> > >  }
->> > >  #endif /* !BROADCAST */
->
->> Peter, do you think the above is acceptable or do I need to do anything more
->> sophisticated to fix this?  [The alternative would be probably to prepare an
->> empty definition of tick_handle_periodic() for CONFIG_GENERIC_CLOCKEVENTS and
->> move the definition of struct clock_event_device from under that Kconfig
->> option.]
->
->
-> Does not something like the below make more sense? The entire broadcast
-> thing doesn't make sense if we don't have generic_clockevents.
->
-> Should we wrap more in generic_clockevents there?
->
-> ---
->  kernel/time/tick-internal.h |    2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
-> index 2a1563a..5569e65 100644
-> --- a/kernel/time/tick-internal.h
-> +++ b/kernel/time/tick-internal.h
-> @@ -81,6 +81,7 @@ static inline int tick_check_oneshot_change(int allow_nohz) { return 0; }
->  #endif /* !TICK_ONESHOT */
->
->  /* Broadcasting support */
-> +#ifdef CONFIG_GENERIC_CLOCKEVENTS
->  #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
->  extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
->  extern void tick_install_broadcast_device(struct clock_event_device *dev);
-> @@ -114,6 +115,7 @@ static inline void tick_set_periodic_handler(struct clock_event_device *dev, int
->         dev->event_handler = tick_handle_periodic;
->  }
->  #endif /* !BROADCAST */
-> +#endif /* GENERIC */
->
->  /* Functions related to oneshot broadcasting */
->  #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && defined(CONFIG_TICK_ONESHOT)
+Hi Thierry,
 
-Tested-by: Tyler Baker <tyler.baker@linaro.org>
+2015-03-03 19:07 GMT+08:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> Hi,
+>
+> Am Donnerstag, den 12.02.2015, 14:01 +0800 schrieb Liu Ying:
+>> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+>> ---
+>> v8->v9:
+>>  * Rebase onto the imx-drm/next branch of Philipp Zabel's open git repository.
+>
+> I can't test this myself for lack of hardware, but I see no further
+> issues with patches 09 - 13 except for the use of
+> imx_drm_encoder_get_mux_id. I'll either rebase my patches that remove it
+> or fix it up when applying.
+>
+> Thierry, may I take these patches through imx-drm, or would you rather I
+> waited for you to pick up the drm/dsi and drm/bridge patches?
 
-Looks good to me.
+Gentle ping.  What's your opinion on the patches Philipp mentioned?
 
-Applied on top of next-20150402[0]:
+Regards,
+Liu Ying
 
----
- kernel/time/tick-internal.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> regards
+> Philipp
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
-index 2a1563a..e332bb4 100644
---- a/kernel/time/tick-internal.h
-+++ b/kernel/time/tick-internal.h
-@@ -81,6 +81,7 @@ static inline int tick_check_oneshot_change(int
-allow_nohz) { return 0; }
- #endif /* !TICK_ONESHOT */
 
- /* Broadcasting support */
-+#ifdef CONFIG_GENERIC_CLOCKEVENTS
- #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
- extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
- extern void tick_install_broadcast_device(struct clock_event_device *dev);
-@@ -114,7 +115,7 @@ static inline void
-tick_set_periodic_handler(struct clock_event_device *dev, int
-  dev->event_handler = tick_handle_periodic;
- }
- #endif /* !BROADCAST */
-+#endif /* GENERIC */
- /* Functions related to oneshot broadcasting */
- #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) &&
-defined(CONFIG_TICK_ONESHOT)
- extern void tick_broadcast_setup_oneshot(struct clock_event_device *bc);
----
 
-Tyler
-
-[0] http://kernelci.org/build/tbaker/kernel/v4.0-rc6-8742-g76c8cce3+gcc-linaro-4.9-2015.02/
+-- 
+Best Regards,
+Liu Ying
