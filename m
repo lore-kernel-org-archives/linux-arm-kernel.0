@@ -1,50 +1,33 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 2 Apr 2015 23:39:53 -0500
-Subject: [PATCH 2/7] ARM: socfpga: disable the sdmmc,
- and uart nodes in the base arria10
+Date: Thu, 2 Apr 2015 23:39:54 -0500
+Subject: [PATCH 3/7] ARM: socfpga: dts: enable UART1 for the debug uart
 In-Reply-To: <1428035998-27542-1-git-send-email-dinguyen@opensource.altera.com>
 References: <1428035998-27542-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1428035998-27542-3-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1428035998-27542-4-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Add status = "disabled" in the base DTSI for Arria10.  The SDMMC and uart
-nodes should be enabled in the appropriate board file.
+Arria10 devkit is using UART1 for the debug uart port.
 
 Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- arch/arm/boot/dts/socfpga_arria10.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/socfpga_arria10_socdk.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 69d616a..d843609 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -268,6 +268,7 @@
- 			reg = <0xff808000 0x1000>;
- 			interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
- 			fifo-depth = <0x400>;
-+			status = "disabled";
+diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dts b/arch/arm/boot/dts/socfpga_arria10_socdk.dts
+index 3015ce8..addec61 100755
+--- a/arch/arm/boot/dts/socfpga_arria10_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dts
+@@ -41,7 +41,7 @@
+ 			};
  		};
  
- 		ocram: sram at ffe00000 {
-@@ -324,6 +325,7 @@
- 			interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
-+			status = "disabled";
+-		serial0 at ffc02000 {
++		serial1 at ffc02100 {
+ 			status = "okay";
  		};
- 
- 		uart1: serial1 at ffc02100 {
-@@ -332,6 +334,7 @@
- 			interrupts = <0 111 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
-+			status = "disabled";
- 		};
- 
- 		usbphy0: usbphy at 0 {
+ 	};
 -- 
 2.2.1
