@@ -1,40 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 10:53:34 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.1
-In-Reply-To: <cover.1426813316.git.horms+renesas@verge.net.au>
-References: <cover.1426813316.git.horms+renesas@verge.net.au>
-Message-ID: <20150403175334.GG23023@localhost>
+Date: Fri, 3 Apr 2015 10:55:00 -0700
+Subject: [GIT PULL] ARM: mvebu: defconfig changes for v4.1 (round 2)
+In-Reply-To: <550BED07.6070809@free-electrons.com>
+References: <550BED07.6070809@free-electrons.com>
+Message-ID: <20150403175500.GH23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 10:07:28AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Mar 20, 2015 at 10:48:55AM +0100, Gregory CLEMENT wrote:
+> Hi,
 > 
-> Please consider these Renesas ARM based SoC defconfig updates for v4.1.
+> Here is the second pull request for defconfig for mvebu for v4.1
 > 
+> Gregory
 > 
-> I have been holding off on this for a while as the patches to
-> enable multiplatform builds for the bockw and ape6evm boards only
-> really make sense with the following two pull requests applied.
-> Please consider those pull requests first.
+> The following changes since commit f224b572dcc86017d793c047c92c8479f5a6ae14:
 > 
-> * Renesas ARM Based SoC r8a73a4 CCF and Multiplatform Updates for v4.1
-> * Renesas ARM Based SoC sh73a0 Multiplatform Updates for v4.1
-> 
-> 
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+>   ARM: mvebu: enable Armada 39x in mvebu_v7_defconfig (2015-03-04 15:44:29 +0100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.1
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.1-2
 > 
-> for you to fetch changes up to bb3ab878a29a3879669bb922bebce87b9a9af755:
+> for you to fetch changes up to 76b21e300c508edf2fc9bf27e314821ee46fcfec:
 > 
->   ARM: shmobile: Enable bockw board in multiplatform defconfig (2015-03-05 09:20:26 +0900)
+>   ARM: mvebu: Enable perf support in mvebu_v7_defconfig (2015-03-20 10:04:47 +0100)
 
 Merged, thanks.
-
 
 -Olof
