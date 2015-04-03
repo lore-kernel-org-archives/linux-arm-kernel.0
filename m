@@ -1,49 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Apr 2015 21:09:31 +0100
-Subject: [PATCH v4 07/11] ARM: allow MULTIPLATFORM with !MMU
-In-Reply-To: <1428090292-21693-8-git-send-email-stefan@agner.ch>
-References: <1428090292-21693-1-git-send-email-stefan@agner.ch>
- <1428090292-21693-8-git-send-email-stefan@agner.ch>
-Message-ID: <20150403200931.GD13898@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 3 Apr 2015 13:11:22 -0700
+Subject: [GIT PULL] wireless wl12xx and omap device tree changes for v4.1
+In-Reply-To: <20150325214050.GA31346@atomide.com>
+References: <20150325214050.GA31346@atomide.com>
+Message-ID: <20150403201122.GW23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 09:44:48PM +0200, Stefan Agner wrote:
-> In order to support SoC with heterogenous CPU architectures (such
-> as Freescale Vybrid/i.MXSX) it is preferable to use the same
-> architecture (ARCH_MXC in this case) for the MMU enabled and !MMU
-> CPU. Hence allow to select MULTIPLATFORM even without MMU.
+Hi,
+
+On Wed, Mar 25, 2015 at 02:40:51PM -0700, Tony Lindgren wrote:
+> The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/Kconfig | 21 ++++++++++-----------
->  1 file changed, 10 insertions(+), 11 deletions(-)
+>   Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 9f1f09a..636cb3f 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -230,7 +230,7 @@ config VECTORS_BASE
->  	  in size.
->  
->  config ARM_PATCH_PHYS_VIRT
-> -	bool "Patch physical to virtual translations at runtime" if EMBEDDED
-> +	bool "Patch physical to virtual translations at runtime" if EMBEDDED || (ARCH_MULTIPLATFORM && MMU)
->  	default y
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/wl12xx-dt
+> 
+> for you to fetch changes up to 83c3a7d4ac7fdc29a64bf9a5467a36b4c72a1eed:
+> 
+>   wlcore: remove wl12xx_platform_data (2015-03-24 09:48:14 -0700)
+> 
+> ----------------------------------------------------------------
+> Wireless and omap changes to make wl12xx driver to use device tree
+> data instead of platform data from Eliad Peller <eliad@wizery.com>:
+> 
+> - Add device-tree support to the wlcore (wl12xx/wl18xx) driver.
+> 
+> - Update the current users to use the bindings instead of pdata-quirks.
+> 
+> - Finally, remove the deprecated wl12xx_platform_data struct
+> 
+> Note that da850 board file code that still uses the platform data,
+> but we have da850.dtsi that can be used instead. So it was decided
+> that we should try to remove the wl12xx support from the da850
+> board file as suggested by Sekhar Nori <nsekhar@ti.com>. As it's
+> the last patch in the series, the last patch can be simply reverted
+> if needed.
+> 
+> As this series touches quite a bit of arch code, it was suggested
+> by Kalle Valo <kvalo@codeaurora.org> that the whole series should
+> be merged via the arm-soc tree.
 
-This makes no sense.  Multiplatform MMU _requires_ this feature, so why
-offer it to the user when multiplatform is enabled _and_ MMU is enabled?
+I'm happy to merge this, but -rc4 is newer than anything else we have. Can you
+respin on -rc2? Unless there's a need for -rc4, of course.
 
-Patch 7817/1 in the patch system tried doing something like you're trying
-to do here - I wonder whether you've reviewed the mailing list for
-previous discussions.
 
-Given that it's Easter, I'm not going to re-state what I said last time
-this came up, but instead leave you to do some research.  For example,
-reading message id <20130819232411.GX23006@n2100.arm.linux.org.uk>...
+Thanks,
 
-Thanks.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+-Olof
