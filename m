@@ -1,43 +1,31 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri,  3 Apr 2015 21:44:42 +0200
-Subject: [PATCH v4 01/11] genirq: generic chip: support hierarchy domain
+Date: Fri,  3 Apr 2015 21:44:45 +0200
+Subject: [PATCH v4 04/11] ARM: ARMv7M: define size of vector table for Vybrid
 In-Reply-To: <1428090292-21693-1-git-send-email-stefan@agner.ch>
 References: <1428090292-21693-1-git-send-email-stefan@agner.ch>
-Message-ID: <1428090292-21693-2-git-send-email-stefan@agner.ch>
+Message-ID: <1428090292-21693-5-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new helper function irq_domain_set_info to make sure the
-function irq_domain_set_hwirq_and_chip is being called, which is
-crucial to save irqdomain specific data to irq_data.
+Vybrids has 112 peripherial interrupts which can be routed to the
+Cortex-M4's NVIC interrupt controller.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- kernel/irq/generic-chip.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-index 61024e8..15b370d 100644
---- a/kernel/irq/generic-chip.c
-+++ b/kernel/irq/generic-chip.c
-@@ -360,7 +360,7 @@ static struct lock_class_key irq_nested_lock_class;
- int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
- 			 irq_hw_number_t hw_irq)
- {
--	struct irq_data *data = irq_get_irq_data(virq);
-+	struct irq_data *data = irq_domain_get_irq_data(d, virq);
- 	struct irq_domain_chip_generic *dgc = d->gc;
- 	struct irq_chip_generic *gc;
- 	struct irq_chip_type *ct;
-@@ -405,8 +405,7 @@ int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
- 	else
- 		data->mask = 1 << idx;
- 
--	irq_set_chip_and_handler(virq, chip, ct->handler);
--	irq_set_chip_data(virq, gc);
-+	irq_domain_set_info(d, virq, hw_irq, chip, gc, ct->handler, NULL, NULL);
- 	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
- 	return 0;
- }
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 16d077e..8eebc0d 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -609,6 +609,7 @@ config CPUV7M_NUM_IRQ
+ 	depends on CPU_V7M
+ 	default 90 if ARCH_STM32
+ 	default 38 if ARCH_EFM32
++	default 112 if SOC_VF610
+ 	default 240
+ 	help
+ 	  This option indicates the number of interrupts connected to the NVIC.
 -- 
 2.3.5
