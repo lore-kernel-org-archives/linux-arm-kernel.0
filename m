@@ -1,41 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Apr 2015 18:07:57 +0100
-Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
- complex dependencies
-In-Reply-To: <CAMuHMdVhX-MrFxeW5j98NLaQQtJ+DToxkz2Z1+SRSs7YF27RDw@mail.gmail.com>
-References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
- <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
- <20150403125727.GT10964@mwanda>
- <CAMuHMdVhX-MrFxeW5j98NLaQQtJ+DToxkz2Z1+SRSs7YF27RDw@mail.gmail.com>
-Message-ID: <20150403170757.GB13898@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 3 Apr 2015 12:09:16 -0500
+Subject: [PATCH v5 03/15] dt-bindings: Document the ARM System timer
+ bindings
+In-Reply-To: <1428080481-18591-4-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1428080481-18591-4-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <CAL_JsqJUG4gh7nqVukfFU-kkF=QBbsinF6e+Bh35WDLRbj84qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 03:27:40PM +0200, Geert Uytterhoeven wrote:
-> On Fri, Apr 3, 2015 at 2:57 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
-> >> +     error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
-> >> +     if (error)
-> >> +             pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
-> >> +             return error;
-> >
-> > Missing curly braces.  Also it's weird that don't we need a clk_put()
-> > on the error patch as well as the success path?
-> 
-> Thanks!
-> 
-> So it worked only by accident: with the new per-user struct clk instances
-> clk_put() must not be called if clk_register_clkdev() succeeded.
+On Fri, Apr 3, 2015 at 12:01 PM, Maxime Coquelin
+<mcoquelin.stm32@gmail.com> wrote:
+> This adds documentation of device tree bindings for the
+> ARM System timer.
+>
+> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-Yes, that's because the per-user struct clk messed quite a lot of things
-up - the patches were /not/ well tested before they went in.
+Acked-by: Rob Herring <robh@kernel.org>
 
-That's no excuse to work around the breakage they caused though.
-
-That said, I never did post the work I did earlier this month to fix the
-problems in clkdev which those patches caused... so, I guess it's time
-to post them and rush them in for the 4.1 merge window...  (frankly, the
-per-user struct clk patches should've been reverted.)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> ---
+>  .../devicetree/bindings/arm/armv7m_systick.txt     | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/armv7m_systick.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/armv7m_systick.txt b/Documentation/devicetree/bindings/arm/armv7m_systick.txt
+> new file mode 100644
+> index 0000000..7cf4a24
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/armv7m_systick.txt
+> @@ -0,0 +1,26 @@
+> +* ARMv7M System Timer
+> +
+> +ARMv7-M includes a system timer, known as SysTick. Current driver only
+> +implements the clocksource feature.
+> +
+> +Required properties:
+> +- compatible     : Should be "arm,armv7m-systick"
+> +- reg            : The address range of the timer
+> +
+> +Required clocking property, have to be one of:
+> +- clocks         : The input clock of the timer
+> +- clock-frequency : The rate in HZ in input of the ARM SysTick
+> +
+> +Examples:
+> +
+> +systick: timer at e000e010 {
+> +       compatible = "arm,armv7m-systick";
+> +       reg = <0xe000e010 0x10>;
+> +       clocks = <&clk_systick>;
+> +};
+> +
+> +systick: timer at e000e010 {
+> +       compatible = "arm,armv7m-systick";
+> +       reg = <0xe000e010 0x10>;
+> +       clock-frequency = <90000000>;
+> +};
+> --
+> 1.9.1
+>
