@@ -1,35 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 13:55:07 -0700
-Subject: [PATCH] ARM: at91/dt: sama5d3 xplained: add phy address for macb1
-In-Reply-To: <551E52BC.3040702@atmel.com>
-References: <1427792170-13162-1-git-send-email-nicolas.ferre@atmel.com>
- <551E52BC.3040702@atmel.com>
-Message-ID: <20150403205507.GH23023@localhost>
+Date: Fri, 3 Apr 2015 13:56:03 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.0
+In-Reply-To: <551D02F3.9020905@free-electrons.com>
+References: <551D02F3.9020905@free-electrons.com>
+Message-ID: <20150403205603.GI23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 10:43:40AM +0200, Nicolas Ferre wrote:
-> Le 31/03/2015 10:56, Nicolas Ferre a ?crit :
-> > After 57a38effa598 (net: phy: micrel: disable broadcast for KSZ8081/KSZ8091)
-> > the macb1 interface refuses to work properly because it tries
-> > to cling to address 0 which isn't able to communicate in broadcast with
-> > the mac anymore. The micrel phy on the board is actually configured
-> > to show up at address 1.
-> > Adding the phy node and its real address fixes the issue.
-> > 
-> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > Cc: Johan Hovold <johan@kernel.org>
-> > Cc: <stable@vger.kernel.org> #3.19
-> > ---
+On Thu, Apr 02, 2015 at 10:50:59AM +0200, Gregory CLEMENT wrote:
+> Hi,
 > 
-> Arnd, Olof, Kevin,
+> Here is the first pull request for fixes for mvebu for v4.0.
+> It comes pretty late because I was waiting for feedback on it and
+> I forgot it :/
 > 
-> It seems late but, is it possible to queue this patch as a 4.0 fixes?
+> There is only one commit but which fixes a real problem: when CPU idle
+> is activated on Armada 38x, the system becomes instable on heavy load.
 > 
-> Without it, the 10/100 Ethernet on sama5d3 doesn't work if it's not used
-> by u-boot previously.
+> Gregory
+> 
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> 
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.0
+> 
+> for you to fetch changes up to 548ae94c1cc7fc120848757249b9a542b1080ffb:
+> 
+>   ARM: mvebu: Disable CPU Idle on Armada 38x (2015-03-31 18:47:33 +0200)
 
-Sure, resend it to arm at kernel.org.
+Merged.
 
 
 -Olof
