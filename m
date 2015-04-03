@@ -1,35 +1,39 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Fri, 3 Apr 2015 11:33:06 +0800
-Subject: Questions about the L2 cache (PL310) optimization
-Message-ID: <CAB4PhKf3Fr3fOC73EGBvmX9tt2pDUnTs5KsnpMQBXfgpym=Qbw@mail.gmail.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Thu, 2 Apr 2015 23:39:51 -0500
+Subject: [PATCH 0/7] ARM: socfpga: Add support for Arria10 devkit
+Message-ID: <1428035998-27542-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-I have seen the following log when boot up on my board: 4-Cortex A9 with PL310:
+Hi,
 
-[    0.000000] L2C-310 enabling early BRESP for Cortex-A9
+This patchset enables and tidy up support for the Arria10 devkit. Along with
+this patchset and the patch for enabling clocks on the Arria10, the devkit
+can boot Linux.
 
-[    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
+Dinh Nguyen (7):
+  ARM: socfpga: add cpu1-start-addr for Arria 10
+  ARM: socfpga: disable the sdmmc, and uart nodes in the base arria10
+  ARM: socfpga: dts: enable UART1 for the debug uart
+  ARM: socfpga: rename socdk board file to socdk_sdmmc
+  ARM: socfpga: Add support for UART1 debug uart for earlyprintk
+  ARM: socfpga: remove the need to map uart_io_desc
+  Documentation: DT bindings: add doc for Altera's SoCFPGA platform
 
-[    0.000000] L2C-310 ID prefetch enabled, offset 1 lines
+ Documentation/devicetree/bindings/arm/altera.txt   | 14 ++++++++++++
+ arch/arm/Kconfig.debug                             | 25 +++++++++++++++------
+ arch/arm/boot/dts/Makefile                         |  2 +-
+ arch/arm/boot/dts/socfpga_arria10.dtsi             |  4 ++++
+ ...rria10_socdk.dts => socfpga_arria10_socdk.dtsi} |  6 ++---
+ arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts  | 26 ++++++++++++++++++++++
+ arch/arm/mach-socfpga/socfpga.c                    |  9 --------
+ 7 files changed, 65 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera.txt
+ rename arch/arm/boot/dts/{socfpga_arria10_socdk.dts => socfpga_arria10_socdk.dtsi} (92%)
+ mode change 100755 => 100644
+ create mode 100644 arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts
 
-[    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
-
-[    0.000000] L2C-310 cache controller enabled, 16 ways, 1024 kB
-
-[    0.000000] L2C-310: CACHE_ID 0x410000c7, AUX_CTRL 0x76070001
-
-
-I have the following questions:
-
-- The prefetch offset set to 1 line,  why not set to high value say
-0xf. According to      ARM: PL310 r3p2 TRM:
-   You must only use the Prefetch offset values of 0-7, 15, 23, and 31 for these
-    bits. The L2C-310 does not support the other values.
--  Do you have seen performance boost for the BRESP and FLZ?
-
-Appreciated if you have some comments.
-
-Jason Liu
+-- 
+2.2.1
