@@ -1,38 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 14:56:07 -0700
-Subject: [PATCH] ARM: at91/dt: sama5d3 xplained: add phy address for macb1
-In-Reply-To: <20150403205507.GH23023@localhost>
-References: <1427792170-13162-1-git-send-email-nicolas.ferre@atmel.com>
- <551E52BC.3040702@atmel.com> <20150403205507.GH23023@localhost>
-Message-ID: <20150403215607.GS23023@localhost>
+Date: Fri, 3 Apr 2015 14:57:15 -0700
+Subject: [GIT PULL 1/5] Samsung non-critical-fixes for v4.1
+In-Reply-To: <551C35DA.6070003@kernel.org>
+References: <551C35DA.6070003@kernel.org>
+Message-ID: <20150403215715.GT23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 01:55:07PM -0700, Olof Johansson wrote:
-> On Fri, Apr 03, 2015 at 10:43:40AM +0200, Nicolas Ferre wrote:
-> > Le 31/03/2015 10:56, Nicolas Ferre a ?crit :
-> > > After 57a38effa598 (net: phy: micrel: disable broadcast for KSZ8081/KSZ8091)
-> > > the macb1 interface refuses to work properly because it tries
-> > > to cling to address 0 which isn't able to communicate in broadcast with
-> > > the mac anymore. The micrel phy on the board is actually configured
-> > > to show up at address 1.
-> > > Adding the phy node and its real address fixes the issue.
-> > > 
-> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > Cc: Johan Hovold <johan@kernel.org>
-> > > Cc: <stable@vger.kernel.org> #3.19
-> > > ---
-> > 
-> > Arnd, Olof, Kevin,
-> > 
-> > It seems late but, is it possible to queue this patch as a 4.0 fixes?
-> > 
-> > Without it, the 10/100 Ethernet on sama5d3 doesn't work if it's not used
-> > by u-boot previously.
+On Thu, Apr 02, 2015 at 03:15:54AM +0900, Kukjin Kim wrote:
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 > 
-> Sure, resend it to arm at kernel.org.
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-fixes-v4.1
+> 
+> for you to fetch changes up to a11176e65b8727158bc355ca0cb00bf70cd69e48:
+> 
+>   ARM: S3C24XX: avoid a Kconfig warning (2015-02-27 05:50:25 +0900)
+> 
+> ----------------------------------------------------------------
+> Samsung non-critical fixes for v4.1
+> 
+> - mostly trivial build fixes with random configurations
+>   from Arnd Bergmann
+> 
+>   for s3c24xx:
+>   avoid a Kconfig warning and fix header file inclusions,
+>   and fix building without PM_SLEEP and use SAMSUNG_WAKEMASK
+> 
+>   for s3c64xx:
+>   fix __initdata section mismatch and add I2C dependencies,
+>   and fix building with PM_SLEEP
 
-Nevermind, I ended up picking it up from the list. Applied.
+Merged, thanks.
 
 
 -Olof
