@@ -1,60 +1,41 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 3 Apr 2015 17:25:58 +0800
-Subject: [PATCH v9 24/30] PCI/tegra: Remove redundant tegra_pcie_scan_bus()
+Date: Fri, 3 Apr 2015 17:25:59 +0800
+Subject: [PATCH v9 25/30] PCI/designware: Use pci_scan_root_bus() for
+ simplicity
 In-Reply-To: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
 References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1428053164-28277-26-git-send-email-wangyijing@huawei.com>
+Message-ID: <1428053164-28277-27-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now pci_scan_root_bus() is almost similar to
-pci_create_root_bus() + pci_scan_child_bus().
-So we could use common pci_scan_root_bus() in
-pci_common_init_dev() to scan pci busses.
-tegra_pcie_scan_bus() is redundant, remove it.
+Use pci_scan_root_bus() instead of pci_create_root_bus() +
+pci_scan_child_bus() for simplicity.
 
-Tested-by: Thierry Reding <treding@nvidia.com>
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
-CC: Thierry Reding <thierry.reding@gmail.com>
-CC: linux-tegra at vger.kernel.org
+CC: Mohit Kumar <mohit.kumar@st.com>
+CC: Jingoo Han <jg1.han@samsung.com>
 ---
- drivers/pci/host/pci-tegra.c |   16 ----------------
- 1 files changed, 0 insertions(+), 16 deletions(-)
+ drivers/pci/host/pcie-designware.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 94e9362..10c0571 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -630,21 +630,6 @@ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
- 	return irq;
- }
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 93778b9..3d7d6fb 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -728,13 +728,11 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+ 	struct pcie_port *pp = sys_to_pcie(sys);
  
--static struct pci_bus *tegra_pcie_scan_bus(int nr, struct pci_sys_data *sys)
--{
--	struct tegra_pcie *pcie = sys_to_pcie(sys);
--	struct pci_bus *bus;
--
--	bus = pci_create_root_bus(pcie->dev, -1, sys->busnr, &tegra_pcie_ops,
--			sys, &sys->resources);
--	if (!bus)
--		return NULL;
--
+ 	pp->root_bus_nr = sys->busnr;
+-	bus = pci_create_root_bus(pp->dev, -1, sys->busnr,
++	bus = pci_scan_root_bus(pp->dev, -1, sys->busnr,
+ 				  &dw_pcie_ops, sys, &sys->resources);
+ 	if (!bus)
+ 		return NULL;
+ 
 -	pci_scan_child_bus(bus);
 -
--	return bus;
--}
--
- static irqreturn_t tegra_pcie_isr(int irq, void *arg)
- {
- 	const char *err_msg[] = {
-@@ -1831,7 +1816,6 @@ static int tegra_pcie_enable(struct tegra_pcie *pcie)
- 	hw.private_data = (void **)&pcie;
- 	hw.setup = tegra_pcie_setup;
- 	hw.map_irq = tegra_pcie_map_irq;
--	hw.scan = tegra_pcie_scan_bus;
- 	hw.ops = &tegra_pcie_ops;
+ 	if (bus && pp->ops->scan_bus)
+ 		pp->ops->scan_bus(pp);
  
- 	pci_common_init_dev(pcie->dev, &hw);
 -- 
 1.7.1
