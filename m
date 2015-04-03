@@ -1,39 +1,66 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 03 Apr 2015 18:13:34 +0100
-Subject: [PATCH 14/14] clk: s2mps11: use clkdev_create()
-In-Reply-To: <20150403171149.GC13898@n2100.arm.linux.org.uk>
-References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
-Message-ID: <E1Ye59y-0001Bq-DQ@rmk-PC.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 3 Apr 2015 12:14:20 -0500
+Subject: [PATCH v5 09/15] dt-bindings: Document the STM32 USART bindings
+In-Reply-To: <1428080481-18591-10-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1428080481-18591-10-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <CAL_JsqKioFc65Gng0FbOOBCspwxr1-bdy1kShKRM24XyALPmOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clkdev_create() is a shorter way to write clkdev_alloc() followed by
-clkdev_add().  Use this instead.
+On Fri, Apr 3, 2015 at 12:01 PM, Maxime Coquelin
+<mcoquelin.stm32@gmail.com> wrote:
+> This adds documentation of device tree bindings for the
+> STM32 USART
+>
+> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+>  .../devicetree/bindings/serial/st,stm32-usart.txt  | 32 ++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+>
+> diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+> new file mode 100644
+> index 0000000..090a3a4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+> @@ -0,0 +1,32 @@
+> +* STMicroelectronics STM32 USART
+> +
+> +Required properties:
+> +- compatible: Can be either "st,stm32-usart" or "st,stm32-uart" depending on
+> +whether the device supports synchronous mode.
+> +- reg: The address and length of the peripheral registers space
+> +- interrupts: The interrupt line of the USART instance
+> +- clocks: The input clock of the USART instance
+> +
+> +Optional properties:
+> +- pinctrl: The reference on the pins configuration
+> +- st,hw-flow-ctrl: bool flag to enable hardware flow control.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/clk/clk-s2mps11.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+We already have "auto-flow-control" for 8250. Does that work for you?
 
-diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-index bfa1e64e267d..9b13a303d3f8 100644
---- a/drivers/clk/clk-s2mps11.c
-+++ b/drivers/clk/clk-s2mps11.c
-@@ -242,14 +242,12 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 			goto err_reg;
- 		}
- 
--		s2mps11_clk->lookup = clkdev_alloc(s2mps11_clk->clk,
-+		s2mps11_clk->lookup = clkdev_create(s2mps11_clk->clk,
- 					s2mps11_name(s2mps11_clk), NULL);
- 		if (!s2mps11_clk->lookup) {
- 			ret = -ENOMEM;
- 			goto err_lup;
- 		}
--
--		clkdev_add(s2mps11_clk->lookup);
- 	}
- 
- 	for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
--- 
-1.8.3.1
+> +
+> +Examples:
+> +usart4: serial at 40004c00 {
+> +       compatible = "st,stm32-uart";
+> +       reg = <0x40004c00 0x400>;
+> +       interrupts = <52>;
+> +       clocks = <&clk_pclk1>;
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_usart4>;
+> +};
+> +
+> +usart2: serial at 40004400 {
+> +       compatible = "st,stm32-usart", "st,stm32-uart";
+> +       reg = <0x40004400 0x400>;
+> +       interrupts = <38>;
+> +       clocks = <&clk_pclk1>;
+> +       st,hw-flow-ctrl;
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_usart2 &pinctrl_usart2_rtscts>;
+> +};
+> --
+> 1.9.1
+>
