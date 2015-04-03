@@ -1,17 +1,22 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 3 Apr 2015 16:24:24 +0200
-Subject: Build regression in next-20150331
-In-Reply-To: <2449654.mrTjPJtNze@vostro.rjw.lan>
-References: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
- <20150402082917.GS23123@twins.programming.kicks-ass.net>
- <CANMBJr4T5T6tFM+SPs9btc_qBRdMPL0QA4R_d1XXk7VBDqq_MA@mail.gmail.com>
- <2449654.mrTjPJtNze@vostro.rjw.lan>
-Message-ID: <20150403142424.GJ27490@worktop.programming.kicks-ass.net>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 3 Apr 2015 16:28:59 +0200
+Subject: [PATCH 2/6] selftest/kdbus: enable cross compilation
+In-Reply-To: <1427930420-4762-3-git-send-email-tyler.baker@linaro.org>
+References: <1427930420-4762-1-git-send-email-tyler.baker@linaro.org>
+ <1427930420-4762-3-git-send-email-tyler.baker@linaro.org>
+Message-ID: <20150403142859.GA4579@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 01:07:19PM +0200, Rafael J. Wysocki wrote:
-> Peter, I'm assiming that you'll make sure this goes into tip/timers/core.
+On Wed, Apr 01, 2015 at 04:20:16PM -0700, Tyler Baker wrote:
+> Use the CC variable instead of hard coding gcc and include lib.mk.
+> 
+> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> Acked-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+>  tools/testing/selftests/kdbus/Makefile | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 
-I'll double check, but I think Ingo did a similar thing when he applied
-your patches.
+Applied to my kdbus branch, thanks.
+
+greg k-h
