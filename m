@@ -1,97 +1,84 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 3 Apr 2015 19:54:57 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: OMAP DRA7xx display-related hwmod data
- changes for v4.1
-Message-ID: <alpine.DEB.2.02.1504031953150.19540@utopia.booyaka.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Apr 2015 21:57:51 +0200
+Subject: [PATCH v2 2/4] staging/nvec: reimplement on top of tegra i2c
+ driver
+In-Reply-To: <1427745615-5428-3-git-send-email-danindrey@mail.ru>
+References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
+ <1427745615-5428-3-git-send-email-danindrey@mail.ru>
+Message-ID: <20150403195751.GD2016@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+> +/**
+> + * nvec_slave_cb - I2C slave callback
+> + *
+> + * This callback fills our RX buffers and empties our TX
+> + * buffers. This uses a finite state machine.
+> + */
+> +static int nvec_slave_cb(struct i2c_client *client,
+> +		enum i2c_slave_event event, u8 *val)
+> +{
+> +	struct nvec_chip *nvec = i2c_get_clientdata(client);
+> +
+> +	switch (event) {
+> +	case I2C_SLAVE_WRITE_REQUESTED:
+> +		/* Alloc new msg only if prev transaction finished */
+> +		if (nvec->state == ST_NONE)
+> +			nvec->rx = nvec_msg_alloc(nvec, NVEC_MSG_RX);
+> +
+> +		/* Should not happen in a normal world */
+> +		if (unlikely(nvec->rx == NULL)) {
+> +			nvec->state = ST_NONE;
+> +			return -1;
+> +		}
+> +		nvec->rx->pos = 0;
+> +
+> +		if (client->addr != ((*val) >> 1)) {
 
-Hi Tony
+Uh, I2C_SLAVE_WRITE_REQUESTED should not use val.
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> +			dev_err(&client->dev,
+> +				"received address 0x%02x, expected 0x%02x\n",
+> +				((*val) >> 1), client->addr);
+> +			return -1;
+> +		}
+> +		nvec->state = ST_TRANS_START;
+> +		break;
+> +
+...
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> +	case I2C_SLAVE_READ_PROCESSED:
+> +		if (nvec->state != ST_RX &&
+> +		    nvec->state != ST_TX) {
+> +			dev_err(&client->dev,
+> +				"unexpected read: state %d\n",
+> +				nvec->state);
+> +			return -1;
+> +		}
+> +
+> +		if (!nvec->tx || nvec->tx->pos >= nvec->tx->size) {
+> +			dev_err(nvec->dev,
+> +				"tx buffer underflow on %p (%u > %u)\n",
+> +				nvec->tx,
+> +				(uint) (nvec->tx ? nvec->tx->pos : 0),
+> +				(uint) (nvec->tx ? nvec->tx->size : 0));
+> +			nvec->state = ST_NONE;
+> +			break;
+> +		}
+> +
+> +		nvec->state = ST_TX;
+> +		*val = nvec->tx->data[nvec->tx->pos++];
 
-are available in the git repository at:
+Are you sure you want to increase the pointer here? Remember that this
+byte is requested but might not be sent out if the remote master stops
+the transfer after the previous byte using NACK instead of ACK.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.1/omap-hwmod-b
-
-for you to fetch changes up to 0d75ebdd3230b3d085812df80ec54138828cc76a:
-
-  ARM: DRA7: hwmod: set DSS submodule parent hwmods (2015-04-03 13:15:07 -0600)
-
-- ----------------------------------------------------------------
-OMAP DRA7xx display-related hwmod data changes for v4.1
-
-Add DMM hwmod data for DRA7xx, and set the parent hwmods fields
-appropriately for the DRA7xx DSS submodules as we've done for
-other OMAP devices.
-
-Note that I do not have a DRA7xx board, and thus cannot boot-test
-these patches.
-
-Basic build, boot, and PM idle test logs are available at:
-
-http://www.pwsan.com/omap/testlogs/omap-hwmod-b-for-v4.1/20150403123702/
-
-- ----------------------------------------------------------------
-Tomi Valkeinen (2):
-      ARM: DRA7: hwmod: add DMM hwmod description
-      ARM: DRA7: hwmod: set DSS submodule parent hwmods
-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 32 +++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
-
-
-
-vmlinux object size
-(delta in bytes from test_v4.0-rc1 (c517d838eb7d07bbe9507871fab3931deccff539)):
-   text     data      bss    total  kernel
-      0        0        0        0  omap1_defconfig
-      0        0        0        0  omap1_defconfig_1510innovator_only
-      0        0        0        0  omap1_defconfig_5912osk_only
-      0     +192        0     +192  multi_v7_defconfig
-      0     +216        0     +216  omap2plus_defconfig
-      0        0        0        0  omap2plus_defconfig_2430sdp_only
-      0        0        0        0  omap2plus_defconfig_am33xx_only
-      0        0        0        0  omap2plus_defconfig_am43xx_only
-      0     +224        0     +224  omap2plus_defconfig_cpupm
-      0     +192        0     +192  omap2plus_defconfig_dra7xx_only
-      0        0        0        0  omap2plus_defconfig_n800_multi_omap2xxx
-      0        0        0        0  omap2plus_defconfig_n800_only_a
-      0     +192        0     +192  omap2plus_defconfig_no_pm
-      0        0        0        0  omap2plus_defconfig_omap2_4_only
-      0        0        0        0  omap2plus_defconfig_omap3_4_only
-      0        0        0        0  omap2plus_defconfig_omap5_only
-      0        0        0        0  rmk_omap3430_ldp_allnoconfig
-      0        0        0        0  rmk_omap3430_ldp_oldconfig
-     +8        0       -8        0  rmk_omap4430_sdp_allnoconfig
-      0        0        0        0  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v4.0-rc1 (c517d838eb7d07bbe9507871fab3931deccff539))
-  avail  rsrvd   high  freed  board          kconfig
-    -4k     4k      .      .  4460pandaes    omap2plus_defconfig
-   -12k    12k      .      .  4460varsomom   omap2plus_defconfig
-    -4k     4k      .      .  5430es2sbct54  omap2plus_defconfig
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJVHu+NAAoJEMePsQ0LvSpLdvcP/A2Vh1CtCdVWA95K+QovF4uG
-aC+ZSMXkjrr7Widr28wtfjMYvO3N6UW5uzoPcbgrWQOEMNa/9qMYXRWd/KIL8nOP
-Hoy2NZy2y5p3j+GRsnSTftSuyXcpvSUvvSRUFxR/o0LNwo+HuNjNJ+tuenFDqZUy
-LIp8AUn+4bu0WlXVJsq1aDOZdI+nvmHifvMEIjAXQM38QaXdP8xDDdaaPiNPnznT
-a9TsOPzSrkXfrS4q+QtaVtWoc6LlAtPTqO9Ss+xRpxTU/67DLIf6zQBnBuH6ZwHL
-vV3J97IC97CIg7KYzYrGfT3KjBx307R7Yo0pK6lVbRgJVG9ZweJEnZa332+tlJ1z
-neiZ5pS4JZv4tXpB3TpTSe1QRUBMyNCecvSVsJQ4zL1IiFYsqI360selASPaQCrI
-xKZZOVBl3H23MxDtob7AfS2sv34m9aqGuT7KNMPjBlwkRuAyx6kE1ZmZNSyMgtts
-wJmTkklx15HV4BrnT18Y4w8CmTQCVEzQFRDqGoVPCL/UVK/0VefxAvDmjFNwMVck
-JjXN9TAfbOp6zXwS/AwhdjtSZEHOSETeKbh2rOEp90mWV0kYgFTZf303AmAsIu+S
-TwKeMrT3Zby+2WNzMu8kV/RjHRbxamO2GE8exWZCnZqwn8wqIw0Y8McelFyBre8F
-A4Niw8T1XPDR6XYY3tij
-=Tutb
------END PGP SIGNATURE-----
+> +		break;
+> +
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150403/69aaf73d/attachment.sig>
