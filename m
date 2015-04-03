@@ -1,136 +1,77 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 3 Apr 2015 17:32:14 +0800
-Subject: [PATCH] PCI: Save sysdata in pci_host_bridge drvdata
-In-Reply-To: <1428053164-28277-2-git-send-email-wangyijing@huawei.com>
-References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
- <1428053164-28277-2-git-send-email-wangyijing@huawei.com>
-Message-ID: <551E5E1E.6050209@huawei.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 03 Apr 2015 11:33:54 +0200
+Subject: [PATCH v2 1/2] ARM: EXYNOS: Get current parent clock for power domain
+ on/off
+Message-ID: <1428053635-10855-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore this one, it is the same as [PATCH v9 11/30] PCI: Save sysdata in pci_host_bridge drvdata.
+Using a fixed (by DTS) parent for clocks when turning on the power domain
+may introduce issues in other drivers. For example when such driver
+changes the parent during runtime and expects that he is the only place
+of such change.
 
-Thanks!
-Yijing.
+Do not rely on DTS providing the fixed parent for such clocks. Instead
+before switching domain off, grab a current parent of a clock with
+clk_get_parent().
 
-On 2015/4/3 17:25, Yijing Wang wrote:
-> Save platform specific sysdata in pci_host_bridge
-> drvdata, host bridge specific operation need to
-> access it before the pci bus creation.
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> ---
->  drivers/pci/host-bridge.c |    3 ++-
->  drivers/pci/pci.h         |    2 +-
->  drivers/pci/probe.c       |   20 ++++++++++----------
->  3 files changed, 13 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> index dffb345..98047c6 100644
-> --- a/drivers/pci/host-bridge.c
-> +++ b/drivers/pci/host-bridge.c
-> @@ -63,7 +63,7 @@ static bool pci_host_busn_res_overlap(
->  
->  struct pci_host_bridge *pci_create_host_bridge(
->  		struct device *parent, int domain, int bus,
-> -		struct list_head *resources)
-> +		void *sysdata, struct list_head *resources)
->  {
->  	int error;
->  	struct pci_host_bridge *host, *tmp;
-> @@ -101,6 +101,7 @@ struct pci_host_bridge *pci_create_host_bridge(
->  	mutex_unlock(&pci_host_mutex);
->  
->  	host->dev.release = pci_release_host_bridge_dev;
-> +	dev_set_drvdata(&host->dev, sysdata);
->  	dev_set_name(&host->dev, "pci%04x:%02x",
->  			host->domain, bus);
->  
-> diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-> index 886d72f..aa8dff6 100644
-> --- a/drivers/pci/pci.h
-> +++ b/drivers/pci/pci.h
-> @@ -335,7 +335,7 @@ static inline void pci_host_assign_domain_nr(struct pci_host_bridge *host)
->  #endif
->  
->  struct pci_host_bridge *pci_create_host_bridge(struct device *parent,
-> -		int domain, int bus, struct list_head *resources);
-> +		int domain, int bus, void *sysdata, struct list_head *resources);
->  void pci_free_host_bridge(struct pci_host_bridge *host);
->  
->  static inline int pci_host_first_busnr(struct pci_host_bridge *host)
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 8517d1b..0ac2bf6 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1865,8 +1865,7 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
->  }
->  
->  static struct pci_bus *__pci_create_root_bus(
-> -		struct pci_host_bridge *bridge, struct pci_ops *ops,
-> -		void *sysdata)
-> +		struct pci_host_bridge *bridge, struct pci_ops *ops)
->  {
->  	int error;
->  	struct pci_bus *b;
-> @@ -1882,7 +1881,7 @@ static struct pci_bus *__pci_create_root_bus(
->  	if (!b)
->  		return NULL;
->  
-> -	b->sysdata = sysdata;
-> +	b->sysdata = dev_get_drvdata(&bridge->dev);
->  	b->ops = ops;
->  	b->number = b->busn_res.start =
->  		pci_host_first_busnr(bridge);
-> @@ -1956,11 +1955,12 @@ struct pci_bus *pci_create_root_bus(struct device *parent,
->  {
->  	struct pci_host_bridge *host;
->  
-> -	host = pci_create_host_bridge(parent, domain, bus, resources);
-> +	host = pci_create_host_bridge(parent, domain, bus,
-> +			sysdata, resources);
->  	if (!host)
->  		return NULL;
->  
-> -	host->bus = __pci_create_root_bus(host, ops, sysdata);
-> +	host->bus = __pci_create_root_bus(host, ops);
->  	if (!host->bus)
->  		pci_free_host_bridge(host);
->  
-> @@ -2037,13 +2037,12 @@ void pci_bus_release_busn_res(struct pci_bus *b)
->  }
->  
->  static struct pci_bus *__pci_scan_root_bus(
-> -		struct pci_host_bridge *host, struct pci_ops *ops,
-> -		void *sysdata)
-> +		struct pci_host_bridge *host, struct pci_ops *ops)
->  {
->  	struct pci_bus *b;
->  	int max;
->  
-> -	b = __pci_create_root_bus(host, ops, sysdata);
-> +	b = __pci_create_root_bus(host, ops);
->  	if (!b)
->  		return NULL;
->  
-> @@ -2064,11 +2063,12 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int domain,
->  {
->  	struct pci_host_bridge *host;
->  
-> -	host = pci_create_host_bridge(parent, domain, bus, resources);
-> +	host = pci_create_host_bridge(parent, domain, bus,
-> +			sysdata, resources);
->  	if (!host)
->  		return NULL;
->  
-> -	host->bus = __pci_scan_root_bus(host, ops, sysdata);
-> +	host->bus = __pci_scan_root_bus(host, ops);
->  	if (!host->bus)
->  		pci_free_host_bridge(host);
->  
-> 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
+---
 
+Changes since v1:
+1. Drop "pclk" bindings entirely as suggested by Andrzej Hajda.
+   This was significant change so I did not add Javier's
+   reviewed/tested tags.
+---
+ Documentation/devicetree/bindings/arm/exynos/power_domain.txt | 7 ++++---
+ arch/arm/mach-exynos/pm_domains.c                             | 9 ++-------
+ 2 files changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+index 5da38c5ed476..e151057d92f0 100644
+--- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
++++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+@@ -19,9 +19,10 @@ Optional Properties:
+ 	domains.
+ - clock-names: The following clocks can be specified:
+ 	- oscclk: Oscillator clock.
+-	- pclkN, clkN: Pairs of parent of input clock and input clock to the
+-		devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
+-		are supported currently.
++	- clkN: Input clocks to the devices in this power domain. These clocks
++		will be reparented to oscclk before swithing power domain off.
++		Their original parent will be brought back after turning on
++		the domain. Maximum of 4 clocks (N = 0 to 3) are supported.
+ 	- asbN: Clocks required by asynchronous bridges (ASB) present in
+ 		the power domain. These clock should be enabled during power
+ 		domain on/off operations.
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index cbe56b35aea0..056e0a09f381 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -62,6 +62,7 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+ 		for (i = 0; i < MAX_CLK_PER_DOMAIN; i++) {
+ 			if (IS_ERR(pd->clk[i]))
+ 				break;
++			pd->pclk[i] = clk_get_parent(pd->clk[i]);
+ 			if (clk_set_parent(pd->clk[i], pd->oscclk))
+ 				pr_err("%s: error setting oscclk as parent to clock %d\n",
+ 						pd->name, i);
+@@ -161,13 +162,7 @@ static __init int exynos4_pm_init_power_domain(void)
+ 			pd->clk[i] = clk_get(dev, clk_name);
+ 			if (IS_ERR(pd->clk[i]))
+ 				break;
+-			snprintf(clk_name, sizeof(clk_name), "pclk%d", i);
+-			pd->pclk[i] = clk_get(dev, clk_name);
+-			if (IS_ERR(pd->pclk[i])) {
+-				clk_put(pd->clk[i]);
+-				pd->clk[i] = ERR_PTR(-EINVAL);
+-				break;
+-			}
++			pd->pclk[i] = clk_get_parent(pd->clk[i]);
+ 		}
+ 
+ 		if (IS_ERR(pd->clk[0]))
 -- 
-Thanks!
-Yijing
+1.9.1
