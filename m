@@ -1,61 +1,36 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 2 Apr 2015 23:40:53 -0500
-Subject: [PATCH 1/3] clk: socfpga: update clk.h so for Arria10 platform to use
-In-Reply-To: <1428036055-27607-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1428036055-27607-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1428036055-27607-2-git-send-email-dinguyen@opensource.altera.com>
+Date: Thu, 2 Apr 2015 23:40:52 -0500
+Subject: [PATCH 0/3] clk: socfpga: Add clock driver for Arria10
+Message-ID: <1428036055-27607-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-There are 5 possible parent clocks for the SoCFPGA Arria10. Move the define
-SYSMGR_SDMMC_CTRL_SET and streq() to clk.h so that the Arria clock driver
-can use.
+Hi,
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- drivers/clk/socfpga/clk-gate.c | 4 ----
- drivers/clk/socfpga/clk.h      | 6 +++++-
- 2 files changed, 5 insertions(+), 5 deletions(-)
+This patch series add the clock driver for the Arria10 platform. Although the
+Arria10 SoC's clock framework has some similarities the Cyclone/Arria 5, the
+differences are enough to warrant it's own driver, rather than polluting the
+existing driver with platform lookups.
 
-diff --git a/drivers/clk/socfpga/clk-gate.c b/drivers/clk/socfpga/clk-gate.c
-index dd3a78c..607ab35 100644
---- a/drivers/clk/socfpga/clk-gate.c
-+++ b/drivers/clk/socfpga/clk-gate.c
-@@ -32,14 +32,10 @@
- #define SOCFPGA_MMC_CLK			"sdmmc_clk"
- #define SOCFPGA_GPIO_DB_CLK_OFFSET	0xA8
- 
--#define streq(a, b) (strcmp((a), (b)) == 0)
--
- #define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
- 
- /* SDMMC Group for System Manager defines */
- #define SYSMGR_SDMMCGRP_CTRL_OFFSET    0x108
--#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel) \
--	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
- 
- static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
- {
-diff --git a/drivers/clk/socfpga/clk.h b/drivers/clk/socfpga/clk.h
-index d291f60..b09a5d5 100644
---- a/drivers/clk/socfpga/clk.h
-+++ b/drivers/clk/socfpga/clk.h
-@@ -26,9 +26,13 @@
- #define CLKMGR_L4SRC		0x70
- #define CLKMGR_PERPLL_SRC	0xAC
- 
--#define SOCFPGA_MAX_PARENTS		3
-+#define SOCFPGA_MAX_PARENTS		5
- #define div_mask(width) ((1 << (width)) - 1)
- 
-+#define streq(a, b) (strcmp((a), (b)) == 0)
-+#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel) \
-+	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
-+
- extern void __iomem *clk_mgr_base_addr;
- 
- void __init socfpga_pll_init(struct device_node *node);
+Dinh Nguyen (3):
+  clk: socfpga: update clk.h so for Arria10 platform to use
+  clk: socfpga: add a clock driver for the Arria 10 platform
+  ARM: socfpga: dts: add clocks to the Arria10 platform
+
+ arch/arm/boot/dts/socfpga_arria10.dtsi | 298 ++++++++++++++++++++++++++++++++-
+ drivers/clk/socfpga/Makefile           |   1 +
+ drivers/clk/socfpga/clk-gate-a10.c     | 187 +++++++++++++++++++++
+ drivers/clk/socfpga/clk-gate.c         |   4 -
+ drivers/clk/socfpga/clk-periph-a10.c   | 131 +++++++++++++++
+ drivers/clk/socfpga/clk-pll-a10.c      | 132 +++++++++++++++
+ drivers/clk/socfpga/clk.c              |   7 +-
+ drivers/clk/socfpga/clk.h              |  10 +-
+ 8 files changed, 760 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/clk/socfpga/clk-gate-a10.c
+ create mode 100644 drivers/clk/socfpga/clk-periph-a10.c
+ create mode 100644 drivers/clk/socfpga/clk-pll-a10.c
+
 -- 
 2.2.1
