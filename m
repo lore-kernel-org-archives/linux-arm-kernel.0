@@ -1,31 +1,20 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 3 Apr 2015 22:23:41 +0300
-Subject: [PATCH 1/3] ARM: pxa: add gpio-charger configuration on poodle
-In-Reply-To: <874moxt42l.fsf@free.fr>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 03 Apr 2015 21:29:44 +0200
+Subject: [PATCH 3/3] ARM: pxa: declare battery device on poodle
+In-Reply-To: <1427711971-8164-3-git-send-email-dbaryshkov@gmail.com> (Dmitry
+ Eremin-Solenikov's message of "Mon, 30 Mar 2015 13:39:31 +0300")
 References: <1427711971-8164-1-git-send-email-dbaryshkov@gmail.com>
- <874moxt42l.fsf@free.fr>
-Message-ID: <CALT56yOwU2Lu2y1NDiD45KBm=FSm_V+m_0VbN1D5Gfcz7Xd7Pg@mail.gmail.com>
+ <1427711971-8164-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <87wq1trown.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-03 22:16 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
-> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
->
->> Add declration of gpio-charger device for Sharp SL-5600 poodle device.
-> Typo here ^.
->
-> And I'd like in the commit message to know :
->  - is it the main battery charger (I could look into the code, I know, but I'd
->    like it to be in the commit message anyway) ?
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
 
-I'll add it to v2.
+> Declare a battery platform device for SL-5600 (poodle) platform.
+Why ? Is there a driver for it ? I didn't found any in driver/power.
 
->  - was it successfully tested on Sharp SL-5600 ?
+Cheers.
 
-:)) I wouldn't dare to submit a code that wasn't tested on hw w/o
-special notice.
-
-
--- 
-With best wishes
-Dmitry
+--
+Robert
