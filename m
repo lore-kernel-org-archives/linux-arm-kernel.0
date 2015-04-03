@@ -1,86 +1,67 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 3 Apr 2015 10:20:44 -0500
-Subject: [PATCH v4 0/9] PCI: MMCONFIG clean up
-In-Reply-To: <551E825F.9060304@linaro.org>
-References: <1426083169-8698-1-git-send-email-tomasz.nowicki@linaro.org>
- <551E825F.9060304@linaro.org>
-Message-ID: <CAErSpo6DVe1U701M5Nqkd_HHPtK54f5odoqsKQ0aSdD4hUtYsA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 03 Apr 2015 17:38:43 +0200
+Subject: [PATCH 4/5] irqchip: armada-370-xp: Allow using wakeup source
+In-Reply-To: <20150403142922.GL24598@io.lakedaemon.net>
+References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
+ <1427724278-12379-5-git-send-email-gregory.clement@free-electrons.com>
+ <20150402232316.GJ24598@io.lakedaemon.net>
+ <551E3EA3.8010409@free-electrons.com>
+ <20150403142922.GL24598@io.lakedaemon.net>
+Message-ID: <551EB403.9030607@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 3, 2015 at 7:06 AM, Tomasz Nowicki
-<tomasz.nowicki@linaro.org> wrote:
-> Hi Bjorn,
->
-> Any comments before I post next version ?
+On 03/04/2015 16:29, Jason Cooper wrote:
+> On Fri, Apr 03, 2015 at 09:17:55AM +0200, Gregory CLEMENT wrote:
+>> Hi Jason,
+>>
+>> On 03/04/2015 01:23, Jason Cooper wrote:
+>>> On Mon, Mar 30, 2015 at 04:04:37PM +0200, Gregory CLEMENT wrote:
+>>>> On the Armada 370/XP SoCs, in standby mode the SoC stay powered and it
+>>>> is possible to wake-up from any interrupt sources. This patch adds
+>>>> flag to the MPIC irqchip driver to let linux know this.
+>>>>
+>>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>> ---
+>>>>  drivers/irqchip/irq-armada-370-xp.c | 1 +
+>>>>  1 file changed, 1 insertion(+)
+>>>
+>>> Applied to irqchip/mvebu
+>>
+>> Thanks!
+>>
+>> Do you agree to take also the patch 3?
+> 
+> hmmm...
+> 
+>> It modifies a file in mach-mvebu (board-v7.c) but it depends on a patch
+>> located in irqchip: "irqchip: gic: Add an entry point to set up irqchip flags"
+> 
+> Yeah, I saw that.  Do you forsee any merge conflicts with mvebu?  The reason I
 
-Nope.  I've been on vacation for a week and am just trying to catch
-up.  Haven't had time to do any more than build-test your v4 series.
+There is only two patches which modify the same file, but they don't touch the
+same chunk. So the only impact would be the line numbers which could not be
+different. In order to be sure I've just tried to apply first this patch and then
+these 2 other ones: there was no problem at all.
 
-Bjorn
+> ask is that it looks like I'm going to be sending directly to Linus this
+> cycle.  I'd really prefer to hold off a cycle on that patch.  I'm not
+> 100% certain my second PR (stacked domain/DT break) is going to get
+> accepted.  Which is what this patch depends on.
+> 
+> thoughts?
 
-> On 11.03.2015 15:12, Tomasz Nowicki wrote:
->>
->> MCFG ACPI table and PCI ECAM standard have no arch dependencies so it can
->> be
->> used across all architectures. Currently MMCONFIG related code resides in
->> arch/x86 directories. This patch set is going to isolate non-architecture
->> specific code and make it accessible for all architectures.
->>
->> v3 -> v4 changes:
->> - bug fixes after kbuild test robot report
->>      - add asm/io.h header for ecam.c
->>      - rename mmcfg -> ecam for drivers/xen/pci.c and
->> arch/x86/pci/numachip.c
->> - rework Kconfig logic
->>
->> v2 -> v3 changes:
->> - rebase patch set v2 to v4.0-rc1
->>
->> v1 -> v2 changes:
->> - use generic readb/readw etc. accessors instead of AMD Fam10h workaround
->> - separate ACPI and ECAM code
->> - improve ECAM code naming
->>
->> Tomasz Nowicki (9):
->>    x86, pci: Clean up comment about buggy MMIO config space access for
->>      AMD Fam10h CPUs.
->>    x86, pci: Abstract PCI config accessors and use AMD Fam10h workaround
->>      exclusively.
->>    x86, pci: Reorder logic of pci_mmconfig_insert() function
->>    x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
->>      out of arch/x86/ directory
->>    pci, acpi, mcfg: Provide generic implementation of MCFG code
->>      initialization.
->>    x86, pci: mmconfig_{32,64}.c code refactoring - remove code
->>      duplication.
->>    x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
->>      driver.
->>    pci, acpi, mcfg: Share ACPI PCI config space accessors.
->>    pci, ecam: Improve naming for ecam.c content and areas where it is
->>      used.
->>
->>   arch/x86/Kconfig               |   4 +
->>   arch/x86/include/asm/pci_x86.h |  34 +---
->>   arch/x86/pci/Makefile          |   5 +-
->>   arch/x86/pci/acpi.c            |   3 +-
->>   arch/x86/pci/mmconfig-shared.c | 346
->> +++++++++++----------------------------
->>   arch/x86/pci/mmconfig_32.c     |  47 ++----
->>   arch/x86/pci/mmconfig_64.c     | 153 ------------------
->>   arch/x86/pci/numachip.c        |  29 +---
->>   drivers/acpi/Makefile          |   1 +
->>   drivers/acpi/mcfg.c            | 121 ++++++++++++++
->>   drivers/pci/Kconfig            |  10 ++
->>   drivers/pci/Makefile           |   5 +
->>   drivers/pci/ecam.c             | 358
->> +++++++++++++++++++++++++++++++++++++++++
->>   drivers/xen/pci.c              |   7 +-
->>   include/linux/ecam.h           |  56 +++++++
->>   15 files changed, 679 insertions(+), 500 deletions(-)
->>   delete mode 100644 arch/x86/pci/mmconfig_64.c
->>   create mode 100644 drivers/acpi/mcfg.c
->>   create mode 100644 drivers/pci/ecam.c
->>   create mode 100644 include/linux/ecam.h
->>
->
+This patch can wait if needed as this patch alone is not enough to to be able
+to use standby and I am not sure at all that I the other part of the series will
+be merged in 4.1.
+
+
+Thanks,
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
