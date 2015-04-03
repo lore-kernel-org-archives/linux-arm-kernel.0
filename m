@@ -1,37 +1,47 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Fri,  3 Apr 2015 19:01:21 +0200
-Subject: [PATCH v5 15/15] MAINTAINERS: Add entry for STM32 MCUs
-In-Reply-To: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1428080481-18591-16-git-send-email-mcoquelin.stm32@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Apr 2015 18:04:08 +0100
+Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
+ complex dependencies
+In-Reply-To: <20150403125727.GT10964@mwanda>
+References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
+ <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
+ <20150403125727.GT10964@mwanda>
+Message-ID: <20150403170407.GA13898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a MAINTAINER entry covering all STM32 machine and drivers files.
+On Fri, Apr 03, 2015 at 03:57:27PM +0300, Dan Carpenter wrote:
+> On Fri, Apr 03, 2015 at 02:42:02PM +0200, Geert Uytterhoeven wrote:
+> > +int __init board_staging_register_clock(const struct board_staging_clk *bsc)
+> > +{
+> > +	struct clk *clk;
+> > +	int error;
+> > +
+> > +	pr_debug("Registering clock %s for con_id %s dev_id %s\n", bsc->clk,
+> > +		 bsc->con_id, bsc->dev_id);
+> > +	clk = clk_get(NULL, bsc->clk);
+> > +	if (IS_ERR(clk)) {
+> > +		error = PTR_ERR(clk);
+> > +		pr_err("Failed to get clock %s (%d)\n", bsc->clk, error);
+> > +		return error;
+> > +	}
+> > +
+> > +	error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
+> > +	if (error)
+> > +		pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
+> > +		return error;
+> 
+> Missing curly braces.  Also it's weird that don't we need a clk_put()
+> on the error patch as well as the success path?
 
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+What's also concerning is that this is an abuse of this.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddc5a8c..08c08c4 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1467,6 +1467,14 @@ F:	drivers/usb/host/ehci-st.c
- F:	drivers/usb/host/ohci-st.c
- F:	drivers/ata/ahci_st.c
- 
-+ARM/STM32 ARCHITECTURE
-+M:	Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
-+N:	stm32
-+F:	drivers/clocksource/armv7m_systick.c
-+
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+clk_register_clkdev() is supposed to be used with clocks created with
+the CCF functions, it's not for creating aliases.
+
+We have clk_add_alias() which does *everything* that this function does,
+only in a less buggy way.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
