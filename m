@@ -1,118 +1,64 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 03 Apr 2015 13:07:19 +0200
-Subject: Build regression in next-20150331
-In-Reply-To: <CANMBJr4T5T6tFM+SPs9btc_qBRdMPL0QA4R_d1XXk7VBDqq_MA@mail.gmail.com>
-References: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
- <20150402082917.GS23123@twins.programming.kicks-ass.net>
- <CANMBJr4T5T6tFM+SPs9btc_qBRdMPL0QA4R_d1XXk7VBDqq_MA@mail.gmail.com>
-Message-ID: <2449654.mrTjPJtNze@vostro.rjw.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Apr 2015 11:53:45 +0100
+Subject: [RFC] mixture of cleanups to cache-v7.S
+In-Reply-To: <20150403100848.GZ24899@n2100.arm.linux.org.uk>
+References: <20150402224947.GX24899@n2100.arm.linux.org.uk>
+ <20150402225759.GY24899@n2100.arm.linux.org.uk>
+ <20150403100848.GZ24899@n2100.arm.linux.org.uk>
+Message-ID: <20150403105345.GA24899@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 02, 2015 07:59:53 PM Tyler Baker wrote:
-> On 2 April 2015 at 01:29, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Wed, Apr 01, 2015 at 11:46:10PM +0200, Rafael J. Wysocki wrote:
-> >
-> >> > > ---
-> >> > >  kernel/time/tick-internal.h |    2 ++
-> >> > >  1 file changed, 2 insertions(+)
-> >> > >
-> >> > > Index: linux-pm/kernel/time/tick-internal.h
-> >> > > ===================================================================
-> >> > > --- linux-pm.orig/kernel/time/tick-internal.h
-> >> > > +++ linux-pm/kernel/time/tick-internal.h
-> >> > > @@ -110,7 +110,9 @@ static inline int tick_broadcast_update_
-> >> > >  /* Set the periodic handler in non broadcast mode */
-> >> > >  static inline void tick_set_periodic_handler(struct clock_event_device *dev, int broadcast)
-> >> > >  {
-> >> > > +#ifdef CONFIG_GENERIC_CLOCKEVENTS
-> >> > >         dev->event_handler = tick_handle_periodic;
-> >> > > +#endif
-> >> > >  }
-> >> > >  #endif /* !BROADCAST */
-> >
-> >> Peter, do you think the above is acceptable or do I need to do anything more
-> >> sophisticated to fix this?  [The alternative would be probably to prepare an
-> >> empty definition of tick_handle_periodic() for CONFIG_GENERIC_CLOCKEVENTS and
-> >> move the definition of struct clock_event_device from under that Kconfig
-> >> option.]
-> >
-> >
-> > Does not something like the below make more sense? The entire broadcast
-> > thing doesn't make sense if we don't have generic_clockevents.
-> >
-> > Should we wrap more in generic_clockevents there?
-> >
-> > ---
-> >  kernel/time/tick-internal.h |    2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
-> > index 2a1563a..5569e65 100644
-> > --- a/kernel/time/tick-internal.h
-> > +++ b/kernel/time/tick-internal.h
-> > @@ -81,6 +81,7 @@ static inline int tick_check_oneshot_change(int allow_nohz) { return 0; }
-> >  #endif /* !TICK_ONESHOT */
-> >
-> >  /* Broadcasting support */
-> > +#ifdef CONFIG_GENERIC_CLOCKEVENTS
-> >  #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-> >  extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
-> >  extern void tick_install_broadcast_device(struct clock_event_device *dev);
-> > @@ -114,6 +115,7 @@ static inline void tick_set_periodic_handler(struct clock_event_device *dev, int
-> >         dev->event_handler = tick_handle_periodic;
-> >  }
-> >  #endif /* !BROADCAST */
-> > +#endif /* GENERIC */
-> >
-> >  /* Functions related to oneshot broadcasting */
-> >  #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && defined(CONFIG_TICK_ONESHOT)
+On Fri, Apr 03, 2015 at 11:08:48AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 02, 2015 at 11:57:59PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Apr 02, 2015 at 11:49:47PM +0100, Russell King - ARM Linux wrote:
+> > > Several cleanups are in the patch below... I'll separate them out, but
+> > > I'd like to hear comments on them.  Basically:
+> > > 
+> > > 1. cache-v7.S is built for ARMv7 CPUs, so there's no reason not to
+> > >    use movw and movt when loading large constants, rather than using
+> > >    "ldr rd,=constant"
+> > > 
+> > > 2. we can do a much more efficient check for the errata in
+> > >    v7_flush_dcache_louis than we were doing - rather than putting the
+> > >    work-around code in the fast path, we can re-organise this such that
+> > >    we only try to run the workaround code if the LoU field is zero.
+> > > 
+> > > 3. shift the bitfield we want to extract in the CLIDR to the appropriate
+> > >    bit position prior to masking; this reduces the complexity of the
+> > >    code, particularly with the SMP differences in v7_flush_dcache_louis.
+> > > 
+> > > 4. pre-shift the Cortex A9 MIDR value to be checked, and shift the
+> > >    actual MIDR to lose the bottom four revision bits.
+> > > 
+> > > 5. as the v7_flush_dcache_louis code is more optimal, I see no reason not
+> > >    to enable this workaround by default now - if people really want it to
+> > >    be disabled, they can still choose that option.  This is in addition
+> > >    to Versatile Express enabling it.  Given the memory corrupting abilities
+> > >    of not having this errata enabled, I think it's only sane that it's
+> > >    something that should be encouraged to be enabled, even though it only
+> > >    affects r0pX CPUs.
+> > > 
+> > > One obvious issue comes up here though - in the case that the LoU bits
+> > > are validly zero, we merely return from v7_flush_dcache_louis with no
+> > > DSB or ISB.  However v7_flush_dcache_all always has a DSB or ISB at the
+> > > end, even if LoC is zero.  Is this an intentional difference, or should
+> > > v7_flush_dcache_louis always end with a DSB+ISB ?
+> > 
+> > I should point out that if the DSB+ISB is needed, then the code can
+> > instead become as below - basically, we just move the CLIDR into the
+> > appropriate position and call start_flush_levels, which does the DMB,
+> > applies the mask to extract the appropriate field, and then decides
+> > whether it has any levels to process.
 > 
-> Tested-by: Tyler Baker <tyler.baker@linaro.org>
-> 
-> Looks good to me.
-> 
-> Applied on top of next-20150402[0]:
+> I've now tested this patch on the Versatile Express and SDP4430, and
+> both seem to work fine with the patch below.
 
-Cool, so FWIW
-
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-
-Peter, I'm assiming that you'll make sure this goes into tip/timers/core.
-
-> ---
->  kernel/time/tick-internal.h | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
-> index 2a1563a..e332bb4 100644
-> --- a/kernel/time/tick-internal.h
-> +++ b/kernel/time/tick-internal.h
-> @@ -81,6 +81,7 @@ static inline int tick_check_oneshot_change(int
-> allow_nohz) { return 0; }
->  #endif /* !TICK_ONESHOT */
-> 
->  /* Broadcasting support */
-> +#ifdef CONFIG_GENERIC_CLOCKEVENTS
->  #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
->  extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
->  extern void tick_install_broadcast_device(struct clock_event_device *dev);
-> @@ -114,7 +115,7 @@ static inline void
-> tick_set_periodic_handler(struct clock_event_device *dev, int
->   dev->event_handler = tick_handle_periodic;
->  }
->  #endif /* !BROADCAST */
-> +#endif /* GENERIC */
->  /* Functions related to oneshot broadcasting */
->  #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) &&
-> defined(CONFIG_TICK_ONESHOT)
->  extern void tick_broadcast_setup_oneshot(struct clock_event_device *bc);
-> ---
-> 
-> Tyler
-> 
-> [0] http://kernelci.org/build/tbaker/kernel/v4.0-rc6-8742-g76c8cce3+gcc-linaro-4.9-2015.02/
+Here's the patches broken out.  My intention is to put the first five,
+which should be entirely non-contravercial, into my for-next branch.
+The last two, I'll wait until I hear back from you after the Easter
+break.
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
