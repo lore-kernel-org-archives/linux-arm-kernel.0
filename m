@@ -1,349 +1,243 @@
-From: Chaotian.Jing@mediatek.com (=?utf-8?B?Q2hhb3RpYW4gSmluZyAo5LqV5pyd5aSpKQ==?=)
-Date: Fri, 3 Apr 2015 08:27:45 +0000
-Subject: =?utf-8?B?562U5aSNOiBbUEFUQ0ggdjIgMy81XSBtbWM6IG1lZGlhdGVrOiBBZGQgUE0g?=
- =?utf-8?Q?support_for_MMC_driver?=
-In-Reply-To: <CAPDyKFqA=9mgzGkeBjkMxr3jhqxnEYov_4rf=OfdQ7_rAHicyw@mail.gmail.com>
-References: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
- <1426562035-16709-4-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFqA=9mgzGkeBjkMxr3jhqxnEYov_4rf=OfdQ7_rAHicyw@mail.gmail.com>
-Message-ID: <B077351396223C4F8FE8C4C13672A9CA609796EC@mtkmbs33n1>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 3 Apr 2015 10:33:53 +0200
+Subject: [PATCHv5] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20150402203417.GA6336@amd>
+References: <20150402143846.GA11687@amd>
+ <20150402203417.GA6336@amd>
+Message-ID: <20150403083353.GA21070@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ulf,
 
-Thanks for your review,
-Please help to check my comments:
+We are moving to device tree support on OMAP3, but that currently
+breaks ADP1653 driver. This adds device tree support, plus required
+documentation.
 
-> -----????-----
-> ???: Ulf Hansson [mailto:ulf.hansson at linaro.org]
-> ????: 2015?3?31? 22:47
-> ???: Chaotian Jing (???)
-> ??: Rob Herring; Matthias Brugger; Chris Ball; Mark Rutland; JamesJJ Liao
-> (???); srv_heupstream; Arnd Bergmann; devicetree at vger.kernel.org;
-> HONGZHOU Yang; Catalin Marinas; linux-mmc; Will Deacon;
-> linux-kernel at vger.kernel.org; linux-gpio at vger.kernel.org; Sascha Hauer;
-> Yingjoe Chen (???); Eddie Huang (???); Bin Zhang (??);
-> linux-arm-kernel at lists.infradead.org; linux-mediatek at lists.infradead.org
-> ??: Re: [PATCH v2 3/5] mmc: mediatek: Add PM support for MMC driver
-> 
-> On 17 March 2015 at 04:13, Chaotian Jing <chaotian.jing@mediatek.com>
-> wrote:
-> > Add PM support for Mediatek MMC driver
-> >
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  drivers/mmc/host/mtk-sd.c | 94
-> > ++++++++++++++++++++++++++++++++++++++++++++++-
-> >  1 file changed, 93 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> > index 86c999b..e02f6a6 100644
-> > --- a/drivers/mmc/host/mtk-sd.c
-> > +++ b/drivers/mmc/host/mtk-sd.c
-> > @@ -21,6 +21,7 @@
-> >  #include <linux/of_irq.h>
-> >  #include <linux/of_gpio.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/pm_runtime.h>
-> >  #include <linux/regulator/consumer.h>  #include <linux/spinlock.h>
-> >
-> > @@ -223,6 +224,7 @@
-> >  #define MSDC_OCR_AVAIL      (MMC_VDD_28_29 | MMC_VDD_29_30
-> \
-> >                 | MMC_VDD_30_31 | MMC_VDD_31_32 |
-> MMC_VDD_32_33)
-> >
-> > +#define MTK_MMC_AUTOSUSPEND_DELAY      500
-> >  #define CMD_TIMEOUT         (HZ/10 * 5)        /* 100ms x5 */
-> >  #define DAT_TIMEOUT         (HZ    * 5)        /* 1000ms x5 */
-> >
-> > @@ -535,6 +537,38 @@ static void msdc_set_mclk(struct msdc_host *host,
-> int ddr, u32 hz)
-> >         dev_dbg(host->dev, "sclk: %d, ddr: %d\n", host->sclk, ddr);  }
-> >
-> > +#ifdef CONFIG_PM
-> 
-> I suggest you move this complete code snippets within the ifdefs for where the
-> runtime PM callbacks is implemented.
-> 
-I will remove the CONFIG_PM, because that if the kernel config do not enable CONFIG_PM, it still need do gate/ungate clock.
-> > +static int msdc_gate_clock(struct msdc_host *host) {
-> > +       int ret = 0;
-> > +       unsigned long flags;
-> > +
-> > +       spin_lock_irqsave(&host->lock, flags);
-> > +       /* disable SD/MMC/SDIO bus clock */
-> > +       sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_MODE,
-> MSDC_MS);
-> 
-> This seems like it also belongs in the ->set_ios() function, when the rate
-> requested by the core is zero!? Maybe that's already dealt with?
-Yes, but it is not the same, the set_ios() set the bus clock to 0, only need set the MODE to MSDC_MS.
-But the gate clock will gate the source clock of MSDC host, when the host is idle, runtime pm will gate it, but the ios->clock is not 0.
-> 
-> > +       /* turn off SDHC functional clock */
-> > +       clk_disable(host->src_clk);
-> 
-> Change to clk_disable_unprepare() and move it outside the spin_lock.
-> 
-OK, will fix it at next revision.
-> > +       spin_unlock_irqrestore(&host->lock, flags);
-> > +       return ret;
-> > +}
-> > +
-> > +static void msdc_ungate_clock(struct msdc_host *host) {
-> > +       unsigned long flags;
-> > +
-> > +       spin_lock_irqsave(&host->lock, flags);
-> > +       clk_enable(host->src_clk);
-> 
-> Change to clk_prepare_enable() and move it outside the spin_lock.
-> 
-OK, will fix it at next revision,
-> > +       /* enable SD/MMC/SDIO bus clock:
-> > +        * it will be automatically gated when the bus is idle
-> > +        * (set MSDC_CFG_CKPDN bit to have it always on)
-> > +        */
-> > +       sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_MODE,
-> MSDC_SDMMC);
-> > +       while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
-> > +               cpu_relax();
-> 
-> I guess you already have this piece of code in ->set_ios() in some form!?
-> 
-> What's missing here is a kind of a save/restore mechanism of the clock. You
-> need to save the value for the clock in msdc_ungate_clock() and restore the
-> clock here. Else you might end up ungating the clock when it actually should
-> remain gated.
-> 
-When we ungate the clock or change the frequency of the clock, both need wait the clock stable.
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+ 
+---
 
-> > +       spin_unlock_irqrestore(&host->lock, flags); } #endif
-> > +
-> >  static inline u32 msdc_cmd_find_resp(struct msdc_host *host,
-> >                 struct mmc_request *mrq, struct mmc_command *cmd)
-> {
-> > @@ -702,6 +736,9 @@ static void msdc_request_done(struct msdc_host
-> *host, struct mmc_request *mrq)
-> >         if (mrq->data)
-> >                 msdc_unprepare_data(host, mrq);
-> >         mmc_request_done(host->mmc, mrq);
-> > +
-> > +       pm_runtime_mark_last_busy(host->dev);
-> > +       pm_runtime_put_autosuspend(host->dev);
-> >  }
-> >
-> >  /* returns true if command is fully handled; returns false otherwise
-> > */ @@ -863,6 +900,8 @@ static void msdc_ops_request(struct mmc_host
-> *mmc, struct mmc_request *mrq)
-> >         }
-> >         spin_unlock_irqrestore(&host->lock, flags);
-> >
-> > +       pm_runtime_get_sync(host->dev);
-> > +
-> >         if (mrq->data)
-> >                 msdc_prepare_data(host, mrq);
-> >
-> > @@ -1003,6 +1042,8 @@ static int msdc_ops_switch_volt(struct mmc_host
-> > *mmc, struct mmc_ios *ios)
-> >
-> >         if (!IS_ERR(mmc->supply.vqmmc)) {
-> >
-> > +               pm_runtime_get_sync(host->dev);
-> > +
-> >                 if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
-> >                         min_uv = 3300000;
-> >                         max_uv = 3300000; @@ -1011,6 +1052,9 @@
-> static
-> > int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
-> >                         max_uv = 1800000;
-> >                 } else {
-> >                         dev_err(host->dev, "Unsupported signal
-> > voltage!\n");
-> > +
-> > +                       pm_runtime_mark_last_busy(host->dev);
-> > +                       pm_runtime_put_autosuspend(host->dev);
-> >                         return -EINVAL;
-> 
-> I suggest to assign a local "ret" variable which value you can return at the end
-> of this function. Thus you won't need to duplicate the
-> pm_runtime*() calls.
-> 
-OK, will fix at next revision.
-> >                 }
-> >
-> > @@ -1022,6 +1066,8 @@ static int msdc_ops_switch_volt(struct mmc_host
-> *mmc, struct mmc_ios *ios)
-> >                 }
-> >         }
-> >
-> > +       pm_runtime_mark_last_busy(host->dev);
-> > +       pm_runtime_put_autosuspend(host->dev);
-> >         return ret;
-> >  }
-> >
-> > @@ -1186,6 +1232,8 @@ static void msdc_ops_set_ios(struct mmc_host
-> *mmc, struct mmc_ios *ios)
-> >         int ret;
-> >         u32 ddr = 0;
-> >
-> > +       pm_runtime_get_sync(host->dev);
-> > +
-> >         if (ios->timing == MMC_TIMING_UHS_DDR50)
-> >                 ddr = 1;
-> >
-> > @@ -1230,6 +1278,9 @@ static void msdc_ops_set_ios(struct mmc_host
-> > *mmc, struct mmc_ios *ios)
-> >
-> >         if (host->mclk != ios->clock || host->ddr != ddr)
-> >                 msdc_set_mclk(host, ddr, ios->clock);
-> > +
-> > +       pm_runtime_mark_last_busy(host->dev);
-> > +       pm_runtime_put_autosuspend(host->dev);
-> >  }
-> >
-> >  static struct mmc_host_ops mt_msdc_ops = { @@ -1341,6 +1392,11 @@
-> > static int msdc_drv_probe(struct platform_device *pdev)
-> >         platform_set_drvdata(pdev, mmc);
-> >         clk_prepare(host->src_clk);
-> >
-> > +       pm_runtime_enable(host->dev);
-> > +       pm_runtime_get_sync(host->dev);
-> > +       pm_runtime_set_autosuspend_delay(host->dev,
-> MTK_MMC_AUTOSUSPEND_DELAY);
-> > +       pm_runtime_use_autosuspend(host->dev);
-> 
-> This shall be changed to the following:
-> 
-Ok, will fix it.
-> pm_runtime_set_active();
-> pm_runtime_set_autosuspend_delay(host->dev,
-> MTK_MMC_AUTOSUSPEND_DELAY);
-> pm_runtime_use_autosuspend(host->dev);
-> pm_runtime_enable(host->dev);
-> 
-> ... and to simplify error handling, move it just prior mmc_add_host().
-> 	
-Will fix it at next revision.
-> > +
-> >         ret = devm_request_irq(&pdev->dev, (unsigned int) host->irq,
-> msdc_irq,
-> >                 IRQF_TRIGGER_LOW | IRQF_ONESHOT, pdev->name,
-> host);
-> >         if (ret)
-> > @@ -1348,10 +1404,15 @@ static int msdc_drv_probe(struct
-> > platform_device *pdev)
-> >
-> >         ret = mmc_add_host(mmc);
-> >         if (ret)
-> > -               goto release;
-> > +               goto end;
-> >
-> > +       pm_runtime_mark_last_busy(host->dev);
-> > +       pm_runtime_put_autosuspend(host->dev);
-> 
-> According to above, remove these pm_runtime_*() calls.
-> 
-Okay.
-> >         return 0;
-> >
-> > +end:
-> > +       pm_runtime_put_sync(host->dev);
-> 
-> According to above, remove the pm_runtime_put_sync().
-> Will remove it at next revision,
-> > +       pm_runtime_disable(host->dev);
-> >  release:
-> >         platform_set_drvdata(pdev, NULL);
-> >         msdc_deinit_hw(host);
-> > @@ -1364,6 +1425,7 @@ release_mem:
-> >                 dma_free_coherent(&pdev->dev,
-> >                         MAX_BD_NUM * sizeof(struct
-> mt_bdma_desc),
-> >                         host->dma.bd, host->dma.bd_addr);
-> > +
-> >  host_free:
-> >         mmc_free_host(mmc);
-> >
-> > @@ -1378,10 +1440,14 @@ static int msdc_drv_remove(struct
-> platform_device *pdev)
-> >         mmc = platform_get_drvdata(pdev);
-> >         host = mmc_priv(mmc);
-> >
-> > +       pm_runtime_get_sync(host->dev);
-> > +
-> >         platform_set_drvdata(pdev, NULL);
-> >         mmc_remove_host(host->mmc);
-> >         msdc_deinit_hw(host);
-> >
-> > +       pm_runtime_put_sync(host->dev);
-> 
-> Change to pm_runtime_put_noidle() and reverse the order of the call to
-> pm_runtime_disable().
-> 
-Ok. Will fix it at next revision,
-> > +       pm_runtime_disable(host->dev);
-> >         dma_free_coherent(&pdev->dev,
-> >                         MAX_GPD_NUM * sizeof(struct
-> mt_gpdma_desc),
-> >                         host->dma.gpd, host->dma.gpd_addr); @@
-> -1393,6
-> > +1459,31 @@ static int msdc_drv_remove(struct platform_device *pdev)
-> >         return 0;
-> >  }
-> >
-> > +#ifdef CONFIG_PM
-> > +static int msdc_runtime_suspend(struct device *dev) {
-> > +       int ret = 0;
-> > +       struct mmc_host *mmc = dev_get_drvdata(dev);
-> > +       struct msdc_host *host = mmc_priv(mmc);
-> > +
-> > +       ret = msdc_gate_clock(host);
-> > +       return ret;
-> > +}
-> > +
-> > +static int msdc_runtime_resume(struct device *dev) {
-> > +       struct mmc_host *mmc = dev_get_drvdata(dev);
-> > +       struct msdc_host *host = mmc_priv(mmc);
-> > +
-> > +       msdc_ungate_clock(host);
-> > +       return 0;
-> > +}
-> > +#endif
-> > +
-> > +static const struct dev_pm_ops msdc_dev_pm_ops = {
-> > +       SET_RUNTIME_PM_OPS(msdc_runtime_suspend,
-> msdc_runtime_resume,
-> > +NULL) };
-> > +
-> >  static const struct of_device_id msdc_of_ids[] = {
-> >         {   .compatible = "mediatek,mt8135-mmc", },
-> >         {}
-> > @@ -1404,6 +1495,7 @@ static struct platform_driver mt_msdc_driver = {
-> >         .driver = {
-> >                 .name = "mtk-msdc",
-> >                 .of_match_table = msdc_of_ids,
-> > +               .pm = &msdc_dev_pm_ops,
-> >         },
-> >  };
-> >
-> > --
-> > 1.8.1.1.dirty
-> >
-> 
-> Kind regards
-> Uffe
+Switched to gpiod_, as requested by Javier.
 
-************* Email Confidentiality Notice ********************
-The information contained in this e-mail message (including any 
-attachments) may be confidential, proprietary, privileged, or otherwise
-exempt from disclosure under applicable laws. It is intended to be 
-conveyed only to the designated recipient(s). Any use, dissemination, 
-distribution, printing, retaining or copying of this e-mail (including its 
-attachments) by unintended recipient(s) is strictly prohibited and may 
-be unlawful. If you are not an intended recipient of this e-mail, or believe 
-that you have received this e-mail in error, please notify the sender 
-immediately (by replying to this e-mail), delete any and all copies of 
-this e-mail (including any attachments) from your system, and do not
-disclose the content of this e-mail to any other person. Thank you!
+Please apply,
+  							Pavel
+
+diff --git a/Documentation/devicetree/bindings/media/i2c/adp1653.txt b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
+new file mode 100644
+index 0000000..da9934a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
+@@ -0,0 +1,37 @@
++* Analog Devices ADP1653 flash LED driver
++
++Required Properties:
++
++  - compatible: Must contain be "adi,adp1653"
++
++  - reg: I2C slave address
++
++  - power-gpios: Reference to the GPIO that controls the power for the chip.
++
++There are two LED outputs available - flash and indicator. One LED is
++represented by one child node, nodes need to be named "flash" and "indicator".
++
++Required properties of the LED child node:
++- max-microamp : see Documentation/devicetree/bindings/leds/common.txt
++
++Required properties of the flash LED child node:
++
++- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
++- flash-timeout-us : see Documentation/devicetree/bindings/leds/common.txt
++
++Example:
++
++	adp1653: led-controller at 30 {
++		compatible = "adi,adp1653";
++		reg = <0x30>;
++		power-gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
++
++		flash {
++			flash-timeout-us = <500000>;
++			flash-max-microamp = <320000>;
++			max-microamp = <50000>;
++		};
++		indicator {
++			max-microamp = <17500>;
++		};
++	};
+diff --git a/drivers/media/i2c/adp1653.c b/drivers/media/i2c/adp1653.c
+index 873fe19..ba7f43d 100644
+--- a/drivers/media/i2c/adp1653.c
++++ b/drivers/media/i2c/adp1653.c
+@@ -8,6 +8,7 @@
+  * Contributors:
+  *	Sakari Ailus <sakari.ailus@iki.fi>
+  *	Tuukka Toivonen <tuukkat76@gmail.com>
++ *	Pavel Machek <pavel@ucw.cz>
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License
+@@ -34,6 +35,8 @@
+ #include <linux/module.h>
+ #include <linux/i2c.h>
+ #include <linux/slab.h>
++#include <linux/of_gpio.h>
++#include <linux/gpio.h>
+ #include <media/adp1653.h>
+ #include <media/v4l2-device.h>
+ 
+@@ -306,9 +309,17 @@ adp1653_init_device(struct adp1653_flash *flash)
+ static int
+ __adp1653_set_power(struct adp1653_flash *flash, int on)
+ {
+-	int ret;
++	int ret = 0;
++
++	if (flash->platform_data->power) {
++		ret = flash->platform_data->power(&flash->subdev, on);
++	} else {
++		gpiod_set_value(flash->platform_data->power_gpio, on);
++		if (on)
++			/* Some delay is apparently required. */
++			udelay(20);
++	}
+ 
+-	ret = flash->platform_data->power(&flash->subdev, on);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -316,8 +327,13 @@ __adp1653_set_power(struct adp1653_flash *flash, int on)
+ 		return 0;
+ 
+ 	ret = adp1653_init_device(flash);
+-	if (ret < 0)
++	if (ret >= 0)
++		return ret;
++
++	if (flash->platform_data->power)
+ 		flash->platform_data->power(&flash->subdev, 0);
++	else
++		gpiod_set_value(flash->platform_data->power_gpio, 0);
+ 
+ 	return ret;
+ }
+@@ -407,21 +423,75 @@ static int adp1653_resume(struct device *dev)
+ 
+ #endif /* CONFIG_PM */
+ 
++static int adp1653_of_init(struct i2c_client *client,
++			   struct adp1653_flash *flash,
++			   struct device_node *node)
++{
++	u32 val;
++	struct adp1653_platform_data *pd;
++	struct device_node *child;
++
++	if (!node)
++		return -EINVAL;
++
++	pd = devm_kzalloc(&client->dev, sizeof(*pd), GFP_KERNEL);
++	if (!pd)
++		return -ENOMEM;
++	flash->platform_data = pd;
++
++	child = of_get_child_by_name(node, "flash");
++	if (!child)
++		return -EINVAL;
++	if (of_property_read_u32(child, "flash-timeout-microsec", &val))
++		return -EINVAL;
++
++	pd->max_flash_timeout = val;
++	if (of_property_read_u32(child, "flash-max-microamp", &val))
++		return -EINVAL;
++	pd->max_flash_intensity = val/1000;
++
++	if (of_property_read_u32(child, "max-microamp", &val))
++		return -EINVAL;
++	pd->max_torch_intensity = val/1000;
++
++	child = of_get_child_by_name(node, "indicator");
++	if (!child)
++		return -EINVAL;
++	if (of_property_read_u32(child, "max-microamp", &val))
++		return -EINVAL;
++	pd->max_indicator_intensity = val;
++
++	if (!of_find_property(node, "gpios", NULL)) {
++		dev_err(&client->dev, "No gpio node\n");
++		return -EINVAL;
++	}
++
++	pd->power_gpio = devm_gpiod_get(&client->dev, "power");
++	if (!pd->power_gpio) {
++		dev_err(&client->dev, "Error getting GPIO\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++
+ static int adp1653_probe(struct i2c_client *client,
+ 			 const struct i2c_device_id *devid)
+ {
+ 	struct adp1653_flash *flash;
+ 	int ret;
+ 
+-	/* we couldn't work without platform data */
+-	if (client->dev.platform_data == NULL)
+-		return -ENODEV;
+-
+ 	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
+ 	if (flash == NULL)
+ 		return -ENOMEM;
+ 
+ 	flash->platform_data = client->dev.platform_data;
++	if (client->dev.of_node) {
++		ret = adp1653_of_init(client, flash, client->dev.of_node);
++		if (ret)
++			return ret;
++	}
+ 
+ 	mutex_init(&flash->power_lock);
+ 
+@@ -442,6 +512,7 @@ static int adp1653_probe(struct i2c_client *client,
+ 	return 0;
+ 
+ free_and_quit:
++	dev_err(&client->dev, "adp1653: failed to register device\n");
+ 	v4l2_ctrl_handler_free(&flash->ctrls);
+ 	return ret;
+ }
+@@ -464,7 +535,7 @@ static const struct i2c_device_id adp1653_id_table[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, adp1653_id_table);
+ 
+-static struct dev_pm_ops adp1653_pm_ops = {
++static const struct dev_pm_ops adp1653_pm_ops = {
+ 	.suspend	= adp1653_suspend,
+ 	.resume		= adp1653_resume,
+ };
+diff --git a/include/media/adp1653.h b/include/media/adp1653.h
+index 1d9b48a..34b505e 100644
+--- a/include/media/adp1653.h
++++ b/include/media/adp1653.h
+@@ -100,9 +100,11 @@ struct adp1653_platform_data {
+ 	int (*power)(struct v4l2_subdev *sd, int on);
+ 
+ 	u32 max_flash_timeout;		/* flash light timeout in us */
+-	u32 max_flash_intensity;	/* led intensity, flash mode */
+-	u32 max_torch_intensity;	/* led intensity, torch mode */
+-	u32 max_indicator_intensity;	/* indicator led intensity */
++	u32 max_flash_intensity;	/* led intensity, flash mode, mA */
++	u32 max_torch_intensity;	/* led intensity, torch mode, mA */
++	u32 max_indicator_intensity;	/* indicator led intensity, uA */
++
++	struct gpio_desc *power_gpio;	/* for device-tree based boot */
+ };
+ 
+ #define to_adp1653_flash(sd)	container_of(sd, struct adp1653_flash, subdev)
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
