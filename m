@@ -1,64 +1,75 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 03 Apr 2015 11:33:55 +0200
-Subject: [PATCH v2 2/2] ARM: dts: Use last parent for clocks during power
- domain on/off
-In-Reply-To: <1428053635-10855-1-git-send-email-k.kozlowski@samsung.com>
-References: <1428053635-10855-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1428053635-10855-2-git-send-email-k.kozlowski@samsung.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 3 Apr 2015 17:25:47 +0800
+Subject: [PATCH v9 13/30] PCI: Move pcibios_root_bridge_prepare() to
+ pci_create_host_bridge()
+In-Reply-To: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
+References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1428053164-28277-15-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace fixed parent with last parent (obtained with clk_get_parent())
-of clocks for devices in mfc and disp power domains. This should improve
-behavior if such clocks were reparented by the drivers and new parents
-are different than those specified in DTS.
+Move pcibios_root_bridge_prepare() to pci_create_host_bridge().
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
+ drivers/pci/host-bridge.c |   16 +++++++++++++---
+ drivers/pci/probe.c       |    3 ---
+ 2 files changed, 13 insertions(+), 6 deletions(-)
 
-Changes since v1:
-1. Add Javier's reviewed/tested tags. Thanks!
----
- arch/arm/boot/dts/exynos5420.dtsi | 13 ++++---------
- 1 file changed, 4 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index c7a44ee0ce06..b9b99305991b 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -264,9 +264,8 @@
- 	mfc_pd: power-domain at 10044060 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044060 0x20>;
--		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK333>,
--			<&clock CLK_MOUT_USER_ACLK333>;
--		clock-names = "oscclk", "pclk0", "clk0";
-+		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_USER_ACLK333>;
-+		clock-names = "oscclk", "clk0";
- 		#power-domain-cells = <0>;
- 	};
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index 98047c6..8733b19 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -92,9 +92,7 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 			pr_warn("pci host bridge pci%04x:%02x exist\n",
+ 					host->domain, bus);
+ 			mutex_unlock(&pci_host_mutex);
+-			pci_free_resource_list(&host->windows);
+-			kfree(host);
+-			return NULL;
++			goto free_res;
+ 		}
+ 	}
+ 	list_add_tail(&host->list, &pci_host_bridge_list);
+@@ -105,6 +103,10 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 	dev_set_name(&host->dev, "pci%04x:%02x",
+ 			host->domain, bus);
  
-@@ -280,16 +279,12 @@
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x100440C0 0x20>;
- 		#power-domain-cells = <0>;
--		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK200>,
-+		clocks = <&clock CLK_FIN_PLL>,
- 			 <&clock CLK_MOUT_USER_ACLK200_DISP1>,
--			 <&clock CLK_MOUT_SW_ACLK300>,
- 			 <&clock CLK_MOUT_USER_ACLK300_DISP1>,
--			 <&clock CLK_MOUT_SW_ACLK400>,
- 			 <&clock CLK_MOUT_USER_ACLK400_DISP1>,
- 			 <&clock CLK_FIMD1>, <&clock CLK_MIXER>;
--		clock-names = "oscclk", "pclk0", "clk0",
--			      "pclk1", "clk1", "pclk2", "clk2",
--			      "asb0", "asb1";
-+		clock-names = "oscclk", "clk0", "clk1", "clk2", "asb0", "asb1";
- 	};
++	error = pcibios_root_bridge_prepare(host);
++	if (error)
++		goto list_del;
++
+ 	error = device_register(&host->dev);
+ 	if (error) {
+ 		put_device(&host->dev);
+@@ -112,6 +114,14 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 	}
  
- 	pinctrl_0: pinctrl at 13400000 {
+ 	return host;
++list_del:
++	mutex_lock(&pci_host_mutex);
++	list_del(&host->list);
++	mutex_unlock(&pci_host_mutex);
++free_res:
++	pci_free_resource_list(&host->windows);
++	kfree(host);
++	return NULL;
+ }
+ 
+ void pci_free_host_bridge(struct pci_host_bridge *host)
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 418a426..ee17d9a 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1893,9 +1893,6 @@ static struct pci_bus *__pci_create_root_bus(
+ 
+ 	bridge->bus = b;
+ 	b->bridge = get_device(&bridge->dev);
+-	error = pcibios_root_bridge_prepare(bridge);
+-	if (error)
+-		goto put_dev;
+ 
+ 	pcibios_set_root_bus_speed(bridge);
+ 	device_enable_async_suspend(b->bridge);
 -- 
-1.9.1
+1.7.1
