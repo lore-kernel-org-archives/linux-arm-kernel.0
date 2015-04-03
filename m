@@ -1,97 +1,97 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 03 Apr 2015 18:43:46 +0200
-Subject: [PATCH 3/6] clk: samsung: exynos4: add cpu clock configuration data
- and instantiate cpu clock
+Date: Fri, 03 Apr 2015 18:43:47 +0200
+Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
+ property
 In-Reply-To: <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
 References: <'@samsung.com>
  <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1428079429-4252-4-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1428079429-4252-5-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-With the addition of the new Samsung specific cpu-clock type, the
-arm clock can be represented as a cpu-clock type. Add the CPU clock
-configuration data and instantiate the CPU clock type for Exynos4210.
+For Exynos4210 platforms, add CPU operating points and CPU
+regulator supply properties for migrating from Exynos specific
+cpufreq driver to using generic cpufreq driver.
 
 Changes by Bartlomiej:
-- fixed issue with wrong dividers being setup by Common Clock Framework
-  (by an addition of CLK_RECALC_NEW_RATES clock flag to mout_apll clock,
-  without this change cpufreq-dt driver showed ~10 mA larger energy
-  consumption when compared to cpufreq-exynos one when "performance"
-  cpufreq governor was used on Exynos4210 SoC based Origen board), this
-  was probably meant to be workarounded by use of CLK_GET_RATE_NOCACHE
-  and CLK_DIVIDER_READ_ONLY clock flags in the original patchset (in
-  "[PATCH v12 6/6] clk: samsung: remove unused clock aliases and update
-  clock flags") but using these flags is not sufficient to fix the issue
-  observed
 - removed Exynos5250 and Exynos5420 support for now
 
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Doug Anderson <dianders@chromium.org>
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Cc: Andreas Faerber <afaerber@suse.de>
+Cc: Sachin Kamat <sachin.kamat@linaro.org>
+Cc: Andreas Farber <afaerber@suse.de>
 Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos4.c |   24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos4210-origen.dts         |    4 ++++
+ arch/arm/boot/dts/exynos4210-trats.dts          |    4 ++++
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 ++++
+ arch/arm/boot/dts/exynos4210.dtsi               |   12 ++++++++++++
+ 4 files changed, 24 insertions(+)
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index 714d6ba..cae2c048 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -19,6 +19,7 @@
- #include <linux/syscore_ops.h>
- 
- #include "clk.h"
-+#include "clk-cpu.h"
- 
- /* Exynos4 clock controller register offsets */
- #define SRC_LEFTBUS		0x4200
-@@ -534,7 +535,8 @@ static struct samsung_fixed_factor_clock exynos4x12_fixed_factor_clks[] __initda
- /* list of mux clocks supported in all exynos4 soc's */
- static struct samsung_mux_clock exynos4_mux_clks[] __initdata = {
- 	MUX_FA(CLK_MOUT_APLL, "mout_apll", mout_apll_p, SRC_CPU, 0, 1,
--			CLK_SET_RATE_PARENT, 0, "mout_apll"),
-+			CLK_SET_RATE_PARENT | CLK_RECALC_NEW_RATES, 0,
-+			"mout_apll"),
- 	MUX(CLK_MOUT_HDMI, "mout_hdmi", mout_hdmi_p, SRC_TV, 0, 1),
- 	MUX(0, "mout_mfc1", sclk_evpll_p, SRC_MFC, 4, 1),
- 	MUX(0, "mout_mfc", mout_mfc_p, SRC_MFC, 8, 1),
-@@ -1378,6 +1380,22 @@ static void __init exynos4x12_core_down_clock(void)
- 	__raw_writel(0x0, reg_base + E4X12_PWR_CTRL2);
- }
- 
-+#define E4210_CPU_DIV0(apll, pclk_dbg, atb, periph, corem1, corem0)	\
-+		(((apll) << 24) | ((pclk_dbg) << 20) | ((atb) << 16) |	\
-+		((periph) << 12) | ((corem1) << 8) | ((corem0) <<  4))
-+#define E4210_CPU_DIV1(hpm, copy)					\
-+		(((hpm) << 4) | ((copy) << 0))
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index b811461..5b0941f 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -335,3 +335,7 @@
+ 		};
+ 	};
+ };
 +
-+static const struct exynos_cpuclk_cfg_data e4210_armclk_d[] __initconst = {
-+	{ 1200000, E4210_CPU_DIV0(7, 1, 4, 3, 7, 3), E4210_CPU_DIV1(0, 5), },
-+	{ 1000000, E4210_CPU_DIV0(7, 1, 4, 3, 7, 3), E4210_CPU_DIV1(0, 4), },
-+	{  800000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
-+	{  500000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
-+	{  400000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
-+	{  200000, E4210_CPU_DIV0(0, 1, 1, 1, 3, 1), E4210_CPU_DIV1(0, 3), },
-+	{  0 },
++&cpu0 {
++	cpu0-supply = <&buck1_reg>;
 +};
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index 32c5fd8..9b5bdd0 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -483,3 +483,7 @@
+ 		};
+ 	};
+ };
 +
- /* register exynos4 clocks */
- static void __init exynos4_clk_init(struct device_node *np,
- 				    enum exynos4_soc soc)
-@@ -1455,6 +1473,10 @@ static void __init exynos4_clk_init(struct device_node *np,
- 		samsung_clk_register_fixed_factor(ctx,
- 			exynos4210_fixed_factor_clks,
- 			ARRAY_SIZE(exynos4210_fixed_factor_clks));
-+		exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-+			mout_core_p4210[0], mout_core_p4210[1], 0x14200,
-+			e4210_armclk_d, ARRAY_SIZE(e4210_armclk_d),
-+			CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1);
- 	} else {
- 		samsung_clk_register_mux(ctx, exynos4x12_mux_clks,
- 			ARRAY_SIZE(exynos4x12_mux_clks));
++&cpu0 {
++	cpu0-supply = <&varm_breg>;
++};
+diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+index d4f2b11..5bf74da 100644
+--- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
++++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+@@ -567,3 +567,7 @@
+ &mdma1 {
+ 	reg = <0x12840000 0x1000>;
+ };
++
++&cpu0 {
++	cpu0-supply = <&vdd_arm_reg>;
++};
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index be89f83..df075e64 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -40,6 +40,18 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0x900>;
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu";
++			clock-latency = <160000>;
++
++			operating-points = <
++				1200000 1250000
++				1000000 1150000
++				800000	1075000
++				500000	975000
++				400000	975000
++				200000	950000
++			>;
+ 			cooling-min-level = <4>;
+ 			cooling-max-level = <2>;
+ 			#cooling-cells = <2>; /* min followed by max */
 -- 
 1.7.9.5
