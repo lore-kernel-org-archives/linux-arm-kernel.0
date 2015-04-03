@@ -1,58 +1,46 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 03 Apr 2015 14:53:55 -0700
-Subject: [PATCH v18 01/11] ARM: qcom: Add Subsystem Power Manager (SPM)
- driver
-In-Reply-To: <1427315136-44321-2-git-send-email-lina.iyer@linaro.org> (Lina
- Iyer's message of "Wed, 25 Mar 2015 14:25:26 -0600")
-References: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
- <1427315136-44321-2-git-send-email-lina.iyer@linaro.org>
-Message-ID: <7hlhi8280c.fsf@deeprootsystems.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 3 Apr 2015 14:54:45 -0700
+Subject: [GIT PULL] ARM: mvebu: dt changes for v4.1 (round 3)
+In-Reply-To: <551D03AE.4010105@free-electrons.com>
+References: <551D03AE.4010105@free-electrons.com>
+Message-ID: <20150403215445.GR23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lina Iyer <lina.iyer@linaro.org> writes:
+On Thu, Apr 02, 2015 at 10:54:06AM +0200, Gregory CLEMENT wrote:
+> Hi,
+> 
+> Here is the third pull request for dt for mvebu for v4.1.
+> By the way you didn't pull the second one I sent 10 days
+> ago. If you prefer I can delete the tags mvebu-dt-4.1-2
+> and mvebu-dt-4.1-3. And create a new one gathering the
+> content of the both.
+> 
+> Gregory
+> The following changes since commit 7776ab70d75ff9857343e44e428744d81c30ce1b:
+> 
+>   ARM: mvebu: armada-385-ap: Enable USB3 port (2015-03-18 11:55:49 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.1-3
+> 
+> for you to fetch changes up to 292a3546b9eb20bf5a292f4e55dd1a027424669f:
+> 
+>   ARM: mvebu: Conform L2CC node with ePAPR specification by adding cache-level (2015-03-19 11:07:47 +0100)
+> 
+> ----------------------------------------------------------------
+> mvebu dt changes for v4.1 (part #3)
+> 
+> These changes have no influence on the kernel behavior (except
+> removing a warning message), but they allow to have a better
+> representation of the hardware.
+> 
+> - conform L2CC node with ePAPR specification by adding cache-level
+> - remove cpuclk resources overlapping coredivclk registers on Armada XP
+> 
 
-> SPM is a hardware block that controls the peripheral logic surrounding
-> the application cores (cpu/l$). When the core executes WFI instruction,
-> the SPM takes over the putting the core in low power state as
-> configured. The wake up for the SPM is an interrupt at the GIC, which
-> then completes the rest of low power mode sequence and brings the core
-> out of low power mode.
->
-> The SPM has a set of control registers that configure the SPMs
-> individually based on the type of the core and the runtime conditions.
-> SPM is a finite state machine block to which a sequence is provided and
-> it interprets the bytes and executes them in sequence. Each low power
-> mode that the core can enter into is provided to the SPM as a sequence.
->
-> Configure the SPM to set the core (cpu or L2) into its low power mode,
-> the index of the first command in the sequence is set in the SPM_CTL
-> register. When the core executes ARM wfi instruction, it triggers the
-> SPM state machine to start executing from that index. The SPM state
-> machine waits until the interrupt occurs and starts executing the rest
-> of the sequence until it hits the end of the sequence. The end of the
-> sequence jumps the core out of its low power mode.
->
-> Add support for an idle driver to set up the SPM to place the core in
-> Standby or Standalone power collapse mode when the core is idle.
->
-> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
-> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
-> Original tree available at -
-> git://codeaurora.org/quic/la/kernel/msm-3.10.git
->
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+Thanks, merged.
 
-and also tested on qcom-apq8064-ifc6410 and
-qcom-msm8974-sony-xperia-honami and saw the various states being entered
-on all CPUs.
-
-Tested-by: Kevin Hilman <khilman@linaro.org>
-
-Kevin
+-Olof
