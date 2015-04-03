@@ -1,43 +1,61 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 2 Apr 2015 23:39:58 -0500
-Subject: [PATCH 7/7] Documentation: DT bindings: add doc for Altera's SoCFPGA
- platform
-In-Reply-To: <1428035998-27542-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1428035998-27542-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1428035998-27542-8-git-send-email-dinguyen@opensource.altera.com>
+Date: Thu, 2 Apr 2015 23:40:53 -0500
+Subject: [PATCH 1/3] clk: socfpga: update clk.h so for Arria10 platform to use
+In-Reply-To: <1428036055-27607-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1428036055-27607-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1428036055-27607-2-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Document "altr,socfpga-cyclone5", "altr,socfpga-arria5", and
-"altr,socfpga-arria10".
+There are 5 possible parent clocks for the SoCFPGA Arria10. Move the define
+SYSMGR_SDMMC_CTRL_SET and streq() to clk.h so that the Arria clock driver
+can use.
 
 Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- Documentation/devicetree/bindings/arm/altera.txt | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/altera.txt
+ drivers/clk/socfpga/clk-gate.c | 4 ----
+ drivers/clk/socfpga/clk.h      | 6 +++++-
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/altera.txt b/Documentation/devicetree/bindings/arm/altera.txt
-new file mode 100644
-index 0000000..558735a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/altera.txt
-@@ -0,0 +1,14 @@
-+Altera's SoCFPGA platform device tree bindings
-+---------------------------------------------
+diff --git a/drivers/clk/socfpga/clk-gate.c b/drivers/clk/socfpga/clk-gate.c
+index dd3a78c..607ab35 100644
+--- a/drivers/clk/socfpga/clk-gate.c
++++ b/drivers/clk/socfpga/clk-gate.c
+@@ -32,14 +32,10 @@
+ #define SOCFPGA_MMC_CLK			"sdmmc_clk"
+ #define SOCFPGA_GPIO_DB_CLK_OFFSET	0xA8
+ 
+-#define streq(a, b) (strcmp((a), (b)) == 0)
+-
+ #define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
+ 
+ /* SDMMC Group for System Manager defines */
+ #define SYSMGR_SDMMCGRP_CTRL_OFFSET    0x108
+-#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel) \
+-	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
+ 
+ static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
+ {
+diff --git a/drivers/clk/socfpga/clk.h b/drivers/clk/socfpga/clk.h
+index d291f60..b09a5d5 100644
+--- a/drivers/clk/socfpga/clk.h
++++ b/drivers/clk/socfpga/clk.h
+@@ -26,9 +26,13 @@
+ #define CLKMGR_L4SRC		0x70
+ #define CLKMGR_PERPLL_SRC	0xAC
+ 
+-#define SOCFPGA_MAX_PARENTS		3
++#define SOCFPGA_MAX_PARENTS		5
+ #define div_mask(width) ((1 << (width)) - 1)
+ 
++#define streq(a, b) (strcmp((a), (b)) == 0)
++#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel) \
++	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
 +
-+Boards with Cyclone 5 SoC:
-+Required root node properties:
-+compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+
-+Boards with Arria 5 SoC:
-+Required root node properties:
-+compatible = "altr,socfpga-arria5", "altr,socfpga";
-+
-+Boards with Arria 10 SoC:
-+Required root node properties:
-+compatible = "altr,socfpga-arria10", "altr,socfpga";
+ extern void __iomem *clk_mgr_base_addr;
+ 
+ void __init socfpga_pll_init(struct device_node *node);
 -- 
 2.2.1
