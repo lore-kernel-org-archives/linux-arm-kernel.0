@@ -1,60 +1,103 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 3 Apr 2015 11:22:46 -0500
-Subject: [GIT PULL] qcom SoC changes for v4.1
-In-Reply-To: <551D9BF6.2070502@codeaurora.org>
-References: <alpine.DEB.2.02.1503161601450.30317@galak-ubuntu.qualcomm.com>
- <CAP71WjzKSRRSVLcwpZTaQOYp2uziP7=J=E=3bHAzCjui-ZqbYQ@mail.gmail.com>
- <42F2C5A0-5231-4D4B-95EE-7BC173A14768@codeaurora.org>
- <551D9BF6.2070502@codeaurora.org>
-Message-ID: <20150403162246.GA426@qualcomm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 03 Apr 2015 19:24:45 +0300
+Subject: [PATCH/RFC 0/6] staging: board: armadillo800eva: Board staging
+ for sh_mobile_lcdc_fb
+In-Reply-To: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
+References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <3984477.UtBUTfcozK@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 02, 2015 at 12:43:50PM -0700, Stephen Boyd wrote:
-> On 04/02/15 12:25, Kumar Gala wrote:
-> > On Apr 2, 2015, at 3:37 AM, Nicolas Dechesne <nicolas.dechesne@linaro.org> wrote:
-> >
-> >> Andy, Kumar,
-> >>
-> >> On Mon, Mar 16, 2015 at 10:03 PM, Kumar Gala <galak@codeaurora.org> wrote:
-> >>> Andy Gross (1):
-> >>>      soc: qcom: gsbi: Add support for ADM CRCI muxing
-> >> this commit seems to break the boot on IFC6410, it was initially
-> >> reported on kernelci.org, see report and bootlog [1].
-> >>
-> >> running git bisect led me to:
-> >>
-> >> e5fdad68d47ed344832b7ca4e18b2e9708d8141e is the first bad commit
-> >> commit e5fdad68d47ed344832b7ca4e18b2e9708d8141e
-> >> Author: Andy Gross <agross@codeaurora.org>
-> >> Date:   Mon Feb 9 16:01:06 2015 -0600
-> >>
-> >>    soc: qcom: gsbi: Add support for ADM CRCI muxing
-> >>
-> >>    This patch adds automatic configuration for the ADM CRCI muxing required to
-> >>    support DMA operations for GSBI clients.  The GSBI mode and
-> >> instance determine
-> >>    the correct TCSR ADM CRCI MUX value that must be programmed so that the DMA
-> >>    works properly.
-> >>
-> >>    Signed-off-by: Andy Gross <agross@codeaurora.org>
-> >>    Signed-off-by: Kumar Gala <galak@codeaurora.org>
-> >>
-> >>
-> >> [1] http://kernelci.org/boot/all/job/arm-soc/kernel/v4.0-rc4-354-ga0690e6586df/
-> > I think we need to associated DT updates.
-> >
-> >
+Hello Geert,
+
+Thank you for the patches.
+
+On Friday 03 April 2015 14:41:57 Geert Uytterhoeven wrote:
+> 	Hi all,
 > 
-> What about this patch squashed on top? Just guessing but I suspect we
-> don't care about cell-index if we're not doing the tcsr stuff. Also, I
-> imagine we could get rid of cell-index entirely if we matched against
-> the address of the gsbi instead.
+> This RFC patch series adds board staging support for r8a7740/armadillo.
+> For now this supports only the frame buffer device for the on-board LCD.
 
-Except that the GSBI5 base address changes from chip to chip.
+I've started adding DT support to the shmob-lcdc driver, but I have no board 
+to test it on. My Armadillo is gone, and KZM9G is unusable with DT + LCDC at 
+the moment as the LCDC interrupt is connected to the legacy interrupt 
+controller only, not the GIC. Would you be able to test a patch set ? And if 
+you want to implement support for the KZM9G legacy interrupt controller in DT, 
+please go for it :-)
 
+> The goal is to complete the move to ARM multiplatform kernels for all
+> shmobile platforms, and drop the existing board files
+> (arch/arm/mach-shmobile/board-*).
+> 
+> The board staging area was introduced last year to allow continuous
+> upstream in-tree development and integration of platform devices. It
+> helps developers integrate devices as platform devices for device
+> drivers that only provide platform device bindings.  This in turn allows
+> for incremental development of both hardware feature support and DT
+> binding work in parallel.
+> 
+> This series consists of 4 parts:
+>   - Patch 1 re-enables compilation of the board staging area, which was
+>     disabled after a compile breakage, but has been fixed in the mean
+>     time,
+>   - Path 2 moves initialization of staging board code to an earlier
+>     moment, as currently it happens after unused PM domains are powered
+>     down,
+>   - Patches 3 and 4 (hopefully) fix the existing kzm9d board staging
+>     code, which was presumably broken by commit 9a1091ef0017c40a
+>     ("irqchip: gic: Support hierarchy irq domain."),
+>   - Patches 5 and 6 add support for registering platform devices with
+>     complex dependencies (clocks, pinctrl, gpios, PM domains), and add
+>     armadillo board staging code for enabling a frame buffer on the
+>     on-board LCD.
+> 
+> Questions:
+>   - Are there other devices from board-armadillo.c that work fine in
+>     armadillo-legacy, and that we want to add?
+>     I think this is the list of devices lacking DT support and/or
+>     missing in DTS:
+>       - renesas_usbhs (does this work? the platform device is
+> 	instantiated conditionally, but the condition (gpio state) is
+> 	never true?)
+>       - sh-mobile-hdmi/sh_mobile_lcdc_fb.1 (this seems to be broken in
+> 	-legacy?)
+
+HDMI is broken in legacy, we can thus drop it.
+
+>       - sdhi1 (we do have sdhi0)
+>       - mmcif
+>       - soc-camera-pdrv/sh_mobile_ceu
+>       - ipmmu
+>       - sh-dma-engine (this will probably never get DT support)
+> 
+>   - What about support for other boards (kzm9g, bockw, marzen)?
+
+At this point it becomes a budget question, we can certainly port them to DT, 
+but it might not make sense to spend time on that. I'll let Magnus chime in.
+
+> This was tested on r8a7740/armadillo.
+> This was not tested on emev2/kzm9d, due to lack of hardware.
+> 
+> Thanks for your comments!
+> 
+> Geert Uytterhoeven (6):
+>   Revert "staging: board: disable as it breaks the build"
+>   [RFC] staging: board: Initialize staging board code earlier
+>   [RFC] staging: board: Add support for translating hwirq to virq numbers
+>   [RFC] staging: board: kzm9d: Translate hwirq numbers to virq numbers
+>   [RFC] staging: board: Add support for devices with complex dependencies
+>   [RFC] staging: board: armadillo800eva: Board staging for sh_mobile_lcdc_fb
+> 
+>  drivers/staging/board/Kconfig           |   1 -
+>  drivers/staging/board/Makefile          |   3 +-
+>  drivers/staging/board/armadillo800eva.c | 124 ++++++++++++++++++++++++++++
+>  drivers/staging/board/board.c           | 142 +++++++++++++++++++++++++++++
+>  drivers/staging/board/board.h           |  38 ++++++++-
+>  drivers/staging/board/kzm9d.c           |  10 ++-
+>  6 files changed, 313 insertions(+), 5 deletions(-)
+>  create mode 100644 drivers/staging/board/armadillo800eva.c
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+
+Laurent Pinchart
