@@ -1,51 +1,42 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 3 Apr 2015 21:17:05 +0800
-Subject: [PATCH] PCI: versatile: don't check resource with
- devm_ioremap_resource
-Message-ID: <1428067025-543-1-git-send-email-jszhang@marvell.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 3 Apr 2015 15:27:40 +0200
+Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
+ complex dependencies
+In-Reply-To: <20150403125727.GT10964@mwanda>
+References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
+ <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
+ <20150403125727.GT10964@mwanda>
+Message-ID: <CAMuHMdVhX-MrFxeW5j98NLaQQtJ+DToxkz2Z1+SRSs7YF27RDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_ioremap_resource does sanity checks on the given resource. No need
-to duplicate this in the driver. And we should check whether
-devm_ioremap_resource() succeeds or not.
+On Fri, Apr 3, 2015 at 2:57 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
+>> +     error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
+>> +     if (error)
+>> +             pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
+>> +             return error;
+>
+> Missing curly braces.  Also it's weird that don't we need a clk_put()
+> on the error patch as well as the success path?
 
-This patch fixes all of these two trival issues.
+Thanks!
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/pci/host/pci-versatile.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+So it worked only by accident: with the new per-user struct clk instances
+clk_put() must not be called if clk_register_clkdev() succeeded.
 
-diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
-index 464bf49..ba5eab1 100644
---- a/drivers/pci/host/pci-versatile.c
-+++ b/drivers/pci/host/pci-versatile.c
-@@ -138,19 +138,19 @@ static int versatile_pci_probe(struct platform_device *pdev)
- 	LIST_HEAD(pci_res);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res)
--		return -ENODEV;
- 	versatile_pci_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(versatile_pci_base))
-+		return PTR_ERR(versatile_pci_base);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	if (!res)
--		return -ENODEV;
- 	versatile_cfg_base[0] = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(versatile_cfg_base[0]))
-+		return PTR_ERR(versatile_cfg_base[0]);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
--	if (!res)
--		return -ENODEV;
- 	versatile_cfg_base[1] = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(versatile_cfg_base[1]))
-+		return PTR_ERR(versatile_cfg_base[1]);
- 
- 	ret = versatile_pci_parse_request_of_pci_ranges(&pdev->dev, &pci_res);
- 	if (ret)
--- 
-2.1.4
+Will call clk_put() only if it failed.
+
+>> +
+>> +     clk_put(clk);
+>> +     return 0;
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
