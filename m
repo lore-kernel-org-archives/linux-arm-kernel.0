@@ -1,52 +1,80 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri,  3 Apr 2015 23:16:01 +0200
-Subject: [PATCH 0/6] pinctrl and gpio drivers for NXP LPC18xx family
-Message-ID: <1428095767-6286-1-git-send-email-manabian@gmail.com>
+Date: Fri,  3 Apr 2015 23:16:03 +0200
+Subject: [PATCH 2/6] doc: dt: add documentation for lpc1850-scu pinctrl driver
+In-Reply-To: <1428095767-6286-1-git-send-email-manabian@gmail.com>
+References: <1428095767-6286-1-git-send-email-manabian@gmail.com>
+Message-ID: <1428095767-6286-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds drivers for pinctrl and gpio on NXP LPC18xx/43xx
-devices. Patchset is based on Linus master 4.0-rc6.
-
-The pinctrl driver uses the generic muxing and properties DT bindings as
-described in pinctrl-bindings.txt. There is still two TODOs left in the
-pinctrl driver regarding property control of special usb1 pins but I would
-like it merged regardless of this. Support will be added once I get USB up
-and running on the MCU.
-
-There is no gpio irq support in this patch set, this will come at a later
-time.
-
-The two last patches depend on two other patch sets and are only included
-to show the DT bindings in actual use.
-
-Other LPC18xx patches:
-Base support: http://marc.info/?l=linux-arm-kernel&m=142792344110733&w=2
-Clk support: http://marc.info/?l=linux-arm-kernel&m=142800699801335&w=2
-
-Joachim Eastwood (6):
-  pinctrl: add lpc18xx pinctrl driver
-  doc: dt: add documentation for lpc1850-scu pinctrl driver
-  gpio: add lpc18xx gpio driver
-  doc: dt: add documentation for lpc1850-gpio driver
-  ARM: dts: lpc18xx: add pinctrl and gpio nodes
-  ARM: dts: lpc4357-ea4357: add pinctrl and uart0 muxing
-
- .../devicetree/bindings/gpio/nxp,lpc1850-gpio.txt  |   23 +
- .../bindings/pinctrl/nxp,lpc1850-scu.txt           |   57 +
- arch/arm/boot/dts/lpc18xx.dtsi                     |   57 +
- arch/arm/boot/dts/lpc4357-ea4357.dts               |   19 +
- drivers/gpio/Kconfig                               |    8 +
- drivers/gpio/Makefile                              |    1 +
- drivers/gpio/gpio-lpc18xx.c                        |  191 ++++
- drivers/pinctrl/Kconfig                            |    8 +
- drivers/pinctrl/Makefile                           |    1 +
- drivers/pinctrl/pinctrl-lpc18xx.c                  | 1145 ++++++++++++++++++++
- 10 files changed, 1510 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/nxp,lpc1850-gpio.txt
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ .../bindings/pinctrl/nxp,lpc1850-scu.txt           | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pinctrl/nxp,lpc1850-scu.txt
- create mode 100644 drivers/gpio/gpio-lpc18xx.c
- create mode 100644 drivers/pinctrl/pinctrl-lpc18xx.c
 
+diff --git a/Documentation/devicetree/bindings/pinctrl/nxp,lpc1850-scu.txt b/Documentation/devicetree/bindings/pinctrl/nxp,lpc1850-scu.txt
+new file mode 100644
+index 000000000000..b75eaa2517eb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/nxp,lpc1850-scu.txt
+@@ -0,0 +1,57 @@
++NXP LPC18xx/43xx SCU pin controller Device Tree Bindings
++--------------------------------------------------------
++
++Required properties:
++- compatible		: Should be "nxp,lpc1850-scu"
++- reg			: Address and length of the register set for the device
++- clocks		: Clock specifier (see clock bindings for details)
++
++The lpc1850-scu driver uses the generic pin multiplexing and generic pin
++configuration documented in pinctrl-bindings.txt.
++
++The following generic nodes are supported:
++ - function
++ - pins
++ - bias-disable
++ - bias-pull-up
++ - bias-pull-down
++ - drive-strength
++ - input-enable
++ - input-disable
++ - input-schmitt-enable
++ - input-schmitt-disable
++ - slew-rate
++
++Not all pins support all properties so either refer to the NXP 1850/4350
++user manual or the pin table in the pinctrl-lpc18xx driver for supported
++pin properties.
++
++Example:
++pinctrl: scu at 40086000 {
++	compatible = "nxp,lpc1850-scu";
++	reg = <0x40086000 0x1000>;
++	clocks = <&ccu1 CLK_CPU_SCU>;
++
++	i2c0_pins: i2c0-pins {
++		i2c0_pins_cfg {
++			pins = "i2c0_scl", "i2c0_sda";
++			function = "i2c0";
++			input-enable;
++		};
++	};
++
++	uart0_pins: uart0-pins {
++		uart0_rx_cfg {
++			pins = "pf_11";
++			function = "uart0";
++			bias-disable;
++			input-enable;
++		};
++
++		uart0_tx_cfg {
++			pins = "pf_10";
++			function = "uart0";
++			bias-disable;
++		};
++	};
++};
 -- 
 1.8.0
