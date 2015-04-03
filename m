@@ -1,130 +1,171 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  3 Apr 2015 14:42:00 +0200
-Subject: [PATCH/RFC 3/6] staging: board: Add support for translating hwirq to
- virq numbers
+Date: Fri,  3 Apr 2015 14:42:02 +0200
+Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with complex
+ dependencies
 In-Reply-To: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
 References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1428064923-24950-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of commit 9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq
-domain."), GIC IRQ numbers are virtual, breaking hardcoded hardware IRQ
-numbers in platform device resources.
+Add support for easy registering of one ore more platform devices that
+may:
+  - need clocks that are described in DT,
+  - need pin control configuration,
+  - rely on a configured GPIO,
+  - be part of a PM Domain.
 
-Add support for translating hardware IRQ numbers to virtual IRQ numbers,
-and fixing up platform device resources with hardcoded IRQ numbers.
-
-Add a copyright header, including the original author.
+All these dependencies are optional.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/staging/board/board.c | 66 +++++++++++++++++++++++++++++++++++++++++++
- drivers/staging/board/board.h |  5 ++++
- 2 files changed, 71 insertions(+)
+ drivers/staging/board/board.c | 76 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/staging/board/board.h | 31 ++++++++++++++++++
+ 2 files changed, 107 insertions(+)
 
 diff --git a/drivers/staging/board/board.c b/drivers/staging/board/board.c
-index d5a6abc845191c93..b84ac2837a20bf06 100644
+index b84ac2837a20bf06..da2469e2d4262fac 100644
 --- a/drivers/staging/board/board.c
 +++ b/drivers/staging/board/board.c
-@@ -1,10 +1,27 @@
-+/*
-+ * Copyright (C) 2014 Magnus Damm
-+ * Copyright (C) 2015 Glider bvba
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#define pr_fmt(fmt)	"board_staging: "  fmt
-+
+@@ -9,6 +9,9 @@
+ 
+ #define pr_fmt(fmt)	"board_staging: "  fmt
+ 
++#include <linux/clk.h>
++#include <linux/clkdev.h>
++#include <linux/gpio.h>
  #include <linux/init.h>
-+#include <linux/irq.h>
+ #include <linux/irq.h>
  #include <linux/device.h>
- #include <linux/kernel.h>
+@@ -16,6 +19,9 @@
  #include <linux/of.h>
  #include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+
+ #include <linux/of_irq.h>
++#include <linux/pinctrl/machine.h>
++#include <linux/platform_device.h>
++#include <linux/pm_domain.h>
+ 
  #include "board.h"
  
-+static struct device_node *irqc_node __initdata;
-+static unsigned int irqc_base __initdata;
-+
- static bool find_by_address(u64 base_address)
- {
- 	struct device_node *dn = of_find_all_nodes(NULL);
-@@ -38,3 +55,52 @@ bool __init board_staging_dt_node_available(const struct resource *resource,
- 
- 	return false; /* Nothing found */
+@@ -104,3 +110,73 @@ void __init board_staging_fixup_irq_resources(struct resource *res,
+ 			res[i].start = virq;
+ 		}
  }
 +
-+int __init board_staging_setup_hwirq_xlate(const char *irqc_match,
-+					   unsigned int base)
++int __init board_staging_register_clock(const struct board_staging_clk *bsc)
 +{
-+	irqc_node = of_find_compatible_node(NULL, NULL, irqc_match);
++	struct clk *clk;
++	int error;
 +
-+	WARN_ON(!irqc_node);
-+	if (!irqc_node)
-+		return -ENOENT;
++	pr_debug("Registering clock %s for con_id %s dev_id %s\n", bsc->clk,
++		 bsc->con_id, bsc->dev_id);
++	clk = clk_get(NULL, bsc->clk);
++	if (IS_ERR(clk)) {
++		error = PTR_ERR(clk);
++		pr_err("Failed to get clock %s (%d)\n", bsc->clk, error);
++		return error;
++	}
 +
-+	irqc_base = base;
++	error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
++	if (error)
++		pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
++		return error;
++
++	clk_put(clk);
 +	return 0;
 +}
 +
-+static unsigned int __init xlate_hwirq(unsigned int hwirq)
++int __init board_staging_register_device(const struct board_staging_dev *dev)
 +{
-+	struct of_phandle_args irq_data;
-+	unsigned int irq;
++	struct platform_device *pdev = dev->pdev;
++	unsigned int i;
++	int error;
 +
-+	if (!irqc_node)
-+		return hwirq;
++	pr_debug("Trying to register device %s\n", pdev->name);
++	if (board_staging_dt_node_available(pdev->resource,
++					    pdev->num_resources)) {
++		pr_warn("Skipping %s, already in DT\n", pdev->name);
++		return -EEXIST;
++	}
 +
-+	irq_data.np = irqc_node;
-+	irq_data.args_count = 3;
-+	irq_data.args[0] = 0;
-+	irq_data.args[1] = hwirq - irqc_base;
-+	irq_data.args[2] = IRQ_TYPE_LEVEL_HIGH;
++	board_staging_fixup_irq_resources(pdev->resource, pdev->num_resources);
 +
-+	irq = irq_create_of_mapping(&irq_data);
-+	if (WARN_ON(!irq))
-+		irq = hwirq;
++	for (i = 0; i < dev->nclocks; i++)
++		board_staging_register_clock(&dev->clocks[i]);
 +
-+	return irq;
++	if (dev->npinmaps)
++		pinctrl_register_mappings(dev->pinmaps, dev->npinmaps);
++
++	for (i = 0; i < dev->ngpios; i++)
++		gpio_request_one(dev->gpios[i].gpio, dev->gpios[i].flags,
++				 pdev->name);
++
++	error = platform_device_register(pdev);
++	if (error) {
++		pr_err("Failed to register device %s (%d)\n", pdev->name,
++		       error);
++		return error;
++	}
++
++	if (dev->domain)
++		__pm_genpd_name_add_device(dev->domain, &pdev->dev, NULL);
++
++	return error;
 +}
 +
-+void __init board_staging_fixup_irq_resources(struct resource *res,
-+					      unsigned int nres)
++void __init board_staging_register_devices(const struct board_staging_dev *devs,
++					   unsigned int ndevs)
 +{
 +	unsigned int i;
 +
-+	for (i = 0; i < nres; i++)
-+		if (res[i].flags == IORESOURCE_IRQ) {
-+			unsigned int hwirq = res[i].start;
-+			unsigned int virq = xlate_hwirq(hwirq);
-+
-+			pr_debug("hwirq %u -> virq %u\n", hwirq, virq);
-+			res[i].start = virq;
-+		}
++	for (i = 0; i < ndevs; i++)
++		board_staging_register_device(&devs[i]);
 +}
 diff --git a/drivers/staging/board/board.h b/drivers/staging/board/board.h
-index e9c914985d4acb36..4cedc3c46e287eb7 100644
+index 4cedc3c46e287eb7..7aaa0f7d6fafb9e5 100644
 --- a/drivers/staging/board/board.h
 +++ b/drivers/staging/board/board.h
-@@ -1,10 +1,15 @@
- #ifndef __BOARD_H__
- #define __BOARD_H__
-+
+@@ -4,12 +4,43 @@
  #include <linux/init.h>
  #include <linux/of.h>
  
-+struct resource;
++struct board_staging_clk {
++	const char *clk;
++	const char *con_id;
++	const char *dev_id;
++};
 +
++struct board_staging_gpio {
++	unsigned int gpio;
++	unsigned long flags;	/* See GPIOF_* */
++};
++
++struct board_staging_dev {
++	/* Platform Device */
++	struct platform_device *pdev;
++	/* Clocks (optional) */
++	const struct board_staging_clk *clocks;
++	unsigned int nclocks;
++	/* Pin Control Maps (optional) */
++	const struct pinctrl_map *pinmaps;
++	unsigned int npinmaps;
++	/* GPIOs (optional) */
++	const struct board_staging_gpio *gpios;
++	unsigned int ngpios;
++	/* PM Domain (optional) */
++	const char *domain;
++};
++
+ struct resource;
+ 
  bool board_staging_dt_node_available(const struct resource *resource,
  				     unsigned int num_resources);
-+int board_staging_setup_hwirq_xlate(const char *irqc_match, unsigned int base);
-+void board_staging_fixup_irq_resources(struct resource *res, unsigned int nres);
+ int board_staging_setup_hwirq_xlate(const char *irqc_match, unsigned int base);
+ void board_staging_fixup_irq_resources(struct resource *res, unsigned int nres);
++int board_staging_register_clock(const struct board_staging_clk *bsc);
++int board_staging_register_device(const struct board_staging_dev *dev);
++void board_staging_register_devices(const struct board_staging_dev *devs,
++				    unsigned int ndevs);
  
  #define board_staging(str, fn)			\
  static int __init runtime_board_check(void)	\
