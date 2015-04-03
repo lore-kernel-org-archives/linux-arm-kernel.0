@@ -1,30 +1,60 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sat, 4 Apr 2015 01:14:04 +0300
-Subject: [PATCH v5 08/15] clockevents/drivers: Add STM32 Timer driver
-In-Reply-To: <CAHp75VfPn_+sg_1iR_CdR2KuTyWcR+SKFsuHCbCkCKB0Oeqgfg@mail.gmail.com>
-References: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1428080481-18591-9-git-send-email-mcoquelin.stm32@gmail.com>
- <CAHp75VfPn_+sg_1iR_CdR2KuTyWcR+SKFsuHCbCkCKB0Oeqgfg@mail.gmail.com>
-Message-ID: <CAHp75Ve+2UUyPAM6ZnYLXaLNOaEA4DGnY6y=VCQxZpdo+cYBfw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 3 Apr 2015 15:12:30 -0700
+Subject: [GIT PULL] wireless wl12xx and omap device tree changes for v4.1
+In-Reply-To: <20150403202201.GX23023@localhost>
+References: <20150325214050.GA31346@atomide.com>
+ <20150403201122.GW23023@localhost>
+ <20150403202201.GX23023@localhost>
+Message-ID: <20150403221230.GW10805@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 4, 2015 at 1:09 AM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Fri, Apr 3, 2015 at 8:01 PM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
->> STM32 MCUs feature 16 and 32 bits general purpose timers with prescalers.
->> The drivers detects whether the time is 16 or 32 bits, and applies a
->> 1024 prescaler value if it is 16 bits.
+* Olof Johansson <olof@lixom.net> [150403 13:22]:
+> On Fri, Apr 03, 2015 at 01:11:22PM -0700, Olof Johansson wrote:
+> > Hi,
+> > 
+> > On Wed, Mar 25, 2015 at 02:40:51PM -0700, Tony Lindgren wrote:
+> > > The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
+> > > 
+> > >   Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/wl12xx-dt
+> > > 
+> > > for you to fetch changes up to 83c3a7d4ac7fdc29a64bf9a5467a36b4c72a1eed:
+> > > 
+> > >   wlcore: remove wl12xx_platform_data (2015-03-24 09:48:14 -0700)
+> > > 
+> > > ----------------------------------------------------------------
+> > > Wireless and omap changes to make wl12xx driver to use device tree
+> > > data instead of platform data from Eliad Peller <eliad@wizery.com>:
+> > > 
+> > > - Add device-tree support to the wlcore (wl12xx/wl18xx) driver.
+> > > 
+> > > - Update the current users to use the bindings instead of pdata-quirks.
+> > > 
+> > > - Finally, remove the deprecated wl12xx_platform_data struct
+> > > 
+> > > Note that da850 board file code that still uses the platform data,
+> > > but we have da850.dtsi that can be used instead. So it was decided
+> > > that we should try to remove the wl12xx support from the da850
+> > > board file as suggested by Sekhar Nori <nsekhar@ti.com>. As it's
+> > > the last patch in the series, the last patch can be simply reverted
+> > > if needed.
+> > > 
+> > > As this series touches quite a bit of arch code, it was suggested
+> > > by Kalle Valo <kvalo@codeaurora.org> that the whole series should
+> > > be merged via the arm-soc tree.
+> > 
+> > I'm happy to merge this, but -rc4 is newer than anything else we have. Can you
+> > respin on -rc2? Unless there's a need for -rc4, of course.
+> 
+> Nevermind, we've already got -rc4 elsewhere, so I'll just catch this branch up
+> too.
 
-[]
+OK thanks that avoids basing on a non -rc tag and merge conflicts.
 
->> +               pr_err("failed to get clock for clockevent (%d)\n", ret);
->
-> Why not dev_err(); ?
+Regards,
 
-Understood, because it's device tree with lack of something like of_err();
-
--- 
-With Best Regards,
-Andy Shevchenko
+Tony
