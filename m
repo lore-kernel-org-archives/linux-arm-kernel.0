@@ -1,69 +1,86 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 3 Apr 2015 17:25:49 +0800
-Subject: [PATCH v9 15/30] PCI: Introduce new scan function
- pci_scan_host_bridge()
+Date: Fri, 3 Apr 2015 17:25:54 +0800
+Subject: [PATCH v9 20/30] PCI: Remove pcibios_root_bridge_prepare() and
+ pcibos_set_root_bus_speed()
 In-Reply-To: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
 References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1428053164-28277-17-git-send-email-wangyijing@huawei.com>
+Message-ID: <1428053164-28277-22-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce new scan function pci_scan_host_bridge() to
-support host bridge drivers that need to provide platform
-own pci_host_bridge_ops.
+Now no one use weak pcibios_root_bridge_prepare() and
+pcibios_set_root_bus_speed, we could clean up them.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/probe.c |   22 ++++++++++++++++++++++
- include/linux/pci.h |    3 +++
- 2 files changed, 25 insertions(+), 0 deletions(-)
+ drivers/pci/host-bridge.c |    4 ----
+ drivers/pci/probe.c       |   18 +-----------------
+ include/linux/pci.h       |    2 --
+ 3 files changed, 1 insertions(+), 23 deletions(-)
 
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index f2639f7..832e1c3 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -110,10 +110,6 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 			goto list_del;
+ 	}
+ 
+-	error = pcibios_root_bridge_prepare(host);
+-	if (error)
+-		goto list_del;
+-
+ 	error = device_register(&host->dev);
+ 	if (error) {
+ 		put_device(&host->dev);
 diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 36dfee0..b3d9b1b 100644
+index b3d9b1b..7796bf8 100644
 --- a/drivers/pci/probe.c
 +++ b/drivers/pci/probe.c
-@@ -2064,6 +2064,28 @@ static struct pci_bus *__pci_scan_root_bus(
- 	return b;
+@@ -1844,22 +1844,6 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
  }
+ EXPORT_SYMBOL_GPL(pci_scan_child_bus);
  
-+struct pci_host_bridge *pci_scan_host_bridge(
-+		struct device *parent, int domain, int bus,
-+		void *sysdata, struct list_head *resources,
-+		struct pci_host_bridge_ops *ops)
-+{
-+	struct pci_host_bridge *host;
+-/**
+- * pcibios_root_bridge_prepare - Platform-specific host bridge setup.
+- * @bridge: Host bridge to set up.
+- *
+- * Default empty implementation.  Replace with an architecture-specific setup
+- * routine, if necessary.
+- */
+-int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+-{
+-	return 0;
+-}
+-
+-void __weak pcibios_set_root_bus_speed(struct pci_host_bridge *bridge)
+-{
+-}
+-
+ void __weak pcibios_add_bus(struct pci_bus *bus)
+ {
+ }
+@@ -1896,7 +1880,7 @@ static struct pci_bus *__pci_create_root_bus(
+ 
+ 	if (bridge->ops && bridge->ops->set_root_bus_speed)
+ 		bridge->ops->set_root_bus_speed(bridge);
+-	pcibios_set_root_bus_speed(bridge);
 +
-+	host = pci_create_host_bridge(parent, domain, bus, sysdata,
-+			resources, ops);
-+	if (!host)
-+		return NULL;
-+
-+	host->bus = __pci_scan_root_bus(host, ops->pci_ops);
-+	if (!host->bus) {
-+		pci_free_host_bridge(host);
-+		return NULL;
-+	}
-+
-+	return host;
-+}
-+EXPORT_SYMBOL(pci_scan_host_bridge);
-+
- struct pci_bus *pci_scan_root_bus(struct device *parent, int domain,
- 		int bus, struct pci_ops *ops, void *sysdata,
- 		struct list_head *resources)
+ 	device_enable_async_suspend(b->bridge);
+ 	pci_set_bus_of_node(b);
+ 
 diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 2702a51..7f4f182 100644
+index 0b921d6..61e0853 100644
 --- a/include/linux/pci.h
 +++ b/include/linux/pci.h
-@@ -793,6 +793,9 @@ void pci_bus_release_busn_res(struct pci_bus *b);
- struct pci_bus *pci_scan_root_bus(struct device *parent, int domain, int bus,
- 					     struct pci_ops *ops, void *sysdata,
- 					     struct list_head *resources);
-+struct pci_host_bridge *pci_scan_host_bridge(struct device *parent, int domain,
-+		int bus, void *sysdata, struct list_head *resources,
-+		struct pci_host_bridge_ops *ops);
- struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
- 				int busnr);
- void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
+@@ -426,8 +426,6 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+ 		     void (*release_fn)(struct pci_host_bridge *),
+ 		     void *release_data);
+ 
+-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
+-
+ /*
+  * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
+  * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
 -- 
 1.7.1
