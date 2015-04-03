@@ -1,139 +1,109 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 3 Apr 2015 02:48:23 +0300
-Subject: [PATCHv3] media: i2c/adp1653: devicetree support for adp1653
-In-Reply-To: <20150402203043.GB29963@amd>
-References: <20150402143846.GA11687@amd>
- <20150402161453.GH20756@valkosipuli.retiisi.org.uk>
- <20150402203043.GB29963@amd>
-Message-ID: <20150402234823.GI20756@valkosipuli.retiisi.org.uk>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Thu, 2 Apr 2015 19:59:53 -0700
+Subject: Build regression in next-20150331
+In-Reply-To: <20150402082917.GS23123@twins.programming.kicks-ass.net>
+References: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
+ <2720045.6sPXjyyvfF@vostro.rjw.lan>
+ <CANMBJr76ap0qL+yxrwe5ECWRgFRgbtdKNBGoSd8SOzrhzDjTrg@mail.gmail.com>
+ <2863807.lxHPvZ2AsE@vostro.rjw.lan>
+ <20150402082917.GS23123@twins.programming.kicks-ass.net>
+Message-ID: <CANMBJr4T5T6tFM+SPs9btc_qBRdMPL0QA4R_d1XXk7VBDqq_MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+On 2 April 2015 at 01:29, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Wed, Apr 01, 2015 at 11:46:10PM +0200, Rafael J. Wysocki wrote:
+>
+>> > > ---
+>> > >  kernel/time/tick-internal.h |    2 ++
+>> > >  1 file changed, 2 insertions(+)
+>> > >
+>> > > Index: linux-pm/kernel/time/tick-internal.h
+>> > > ===================================================================
+>> > > --- linux-pm.orig/kernel/time/tick-internal.h
+>> > > +++ linux-pm/kernel/time/tick-internal.h
+>> > > @@ -110,7 +110,9 @@ static inline int tick_broadcast_update_
+>> > >  /* Set the periodic handler in non broadcast mode */
+>> > >  static inline void tick_set_periodic_handler(struct clock_event_device *dev, int broadcast)
+>> > >  {
+>> > > +#ifdef CONFIG_GENERIC_CLOCKEVENTS
+>> > >         dev->event_handler = tick_handle_periodic;
+>> > > +#endif
+>> > >  }
+>> > >  #endif /* !BROADCAST */
+>
+>> Peter, do you think the above is acceptable or do I need to do anything more
+>> sophisticated to fix this?  [The alternative would be probably to prepare an
+>> empty definition of tick_handle_periodic() for CONFIG_GENERIC_CLOCKEVENTS and
+>> move the definition of struct clock_event_device from under that Kconfig
+>> option.]
+>
+>
+> Does not something like the below make more sense? The entire broadcast
+> thing doesn't make sense if we don't have generic_clockevents.
+>
+> Should we wrap more in generic_clockevents there?
+>
+> ---
+>  kernel/time/tick-internal.h |    2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
+> index 2a1563a..5569e65 100644
+> --- a/kernel/time/tick-internal.h
+> +++ b/kernel/time/tick-internal.h
+> @@ -81,6 +81,7 @@ static inline int tick_check_oneshot_change(int allow_nohz) { return 0; }
+>  #endif /* !TICK_ONESHOT */
+>
+>  /* Broadcasting support */
+> +#ifdef CONFIG_GENERIC_CLOCKEVENTS
+>  #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+>  extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
+>  extern void tick_install_broadcast_device(struct clock_event_device *dev);
+> @@ -114,6 +115,7 @@ static inline void tick_set_periodic_handler(struct clock_event_device *dev, int
+>         dev->event_handler = tick_handle_periodic;
+>  }
+>  #endif /* !BROADCAST */
+> +#endif /* GENERIC */
+>
+>  /* Functions related to oneshot broadcasting */
+>  #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && defined(CONFIG_TICK_ONESHOT)
 
-On Thu, Apr 02, 2015 at 10:30:44PM +0200, Pavel Machek wrote:
-> Hi!
-> 
-> > Hi Pawel,
-> > 
-> > My apologies for the very late reply.
-> > 
-> > On Thu, Apr 02, 2015 at 04:38:46PM +0200, Pavel Machek wrote:
-> > > 
-> > > 
-> > > We are moving to device tree support on OMAP3, but that currently
-> > > breaks ADP1653 driver. This adds device tree support, plus required
-> > > documentation.
-> > > 
-> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > > 
-> > > ---
-> > > 
-> > > I'm not sure if it is device tree or media framework, either everyone
-> > > waits for someone else, or noone really cares.
-> > 
-> > Neither. Some people are unfortuantely very busy with many other things as
-> > well. :-P
-> 
-> Well.. Being busy is ok. Nitpicking is also ok. But both at the same
-> time... is not good. 
+Tested-by: Tyler Baker <tyler.baker@linaro.org>
 
-Good. Then we should be fine. :-)
+Looks good to me.
 
-> 
-> > > Andrew, can you just merge it?
-> > > 
-> > > Please apply,
-> > 
-> > Please wait just a while.
-> > 
-> > I think we can merge this eventually through the linux-media tree, but
-> > please first see the comments below.
-> > 
-> 
-> > > +Required properties of the flash LED child node:
-> > > +
-> > > +- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
-> > > +- flash-timeout-us : see Documentation/devicetree/bindings/leds/common.txt
-> > 
-> > The documentation says that the maximum value is used if these values are
-> > not specified. I think I'd make these optional.
-> 
-> I'd rather not: when you make a typo in dts, it would supply maximum
-> available current, potentially damaging the LED. You will not be able
-> to tell brightness difference with naked eye...
+Applied on top of next-20150402[0]:
 
-Fine for me.
+---
+ kernel/time/tick-internal.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> > >  __adp1653_set_power(struct adp1653_flash *flash, int on)
-> > >  {
-> > > -	int ret;
-> > > +	int ret = 0;
-> > > +
-> > > +	if (flash->platform_data->power) {
-> > > +		ret = flash->platform_data->power(&flash->subdev, on);
-> > 
-> > The power() callback should be dropped. It's controlling a GPIO. But that
-> > can be done later on. The alternative is a patch before this one.
-> 
-> I'd prefer to do it later; we want to keep functionality on N900
-> without DTS, too.
+diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
+index 2a1563a..e332bb4 100644
+--- a/kernel/time/tick-internal.h
++++ b/kernel/time/tick-internal.h
+@@ -81,6 +81,7 @@ static inline int tick_check_oneshot_change(int
+allow_nohz) { return 0; }
+ #endif /* !TICK_ONESHOT */
 
-Fine as well.
+ /* Broadcasting support */
++#ifdef CONFIG_GENERIC_CLOCKEVENTS
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+ extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
+ extern void tick_install_broadcast_device(struct clock_event_device *dev);
+@@ -114,7 +115,7 @@ static inline void
+tick_set_periodic_handler(struct clock_event_device *dev, int
+  dev->event_handler = tick_handle_periodic;
+ }
+ #endif /* !BROADCAST */
++#endif /* GENERIC */
+ /* Functions related to oneshot broadcasting */
+ #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) &&
+defined(CONFIG_TICK_ONESHOT)
+ extern void tick_broadcast_setup_oneshot(struct clock_event_device *bc);
+---
 
-> > >  	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
-> > >  	if (flash == NULL)
-> > >  		return -ENOMEM;
-> > >  
-> > >  	flash->platform_data = client->dev.platform_data;
-> > > +	if (!flash->platform_data) {
-> > 
-> > I'd check whether dev->of_node is non-NULL instead.
-> 
-> Ok.
-> 
-> > > @@ -438,10 +510,10 @@ static int adp1653_probe(struct i2c_client *client,
-> > >  		goto free_and_quit;
-> > >  
-> > >  	flash->subdev.entity.type = MEDIA_ENT_T_V4L2_SUBDEV_FLASH;
-> > > -
-> > 
-> > I rather liked the newline here. Please don't remove it. :-)
-> 
-> Ok.
-> 
-> > > @@ -464,7 +536,7 @@ static const struct i2c_device_id adp1653_id_table[] = {
-> > >  };
-> > >  MODULE_DEVICE_TABLE(i2c, adp1653_id_table);
-> > >  
-> > > -static struct dev_pm_ops adp1653_pm_ops = {
-> > > +static const struct dev_pm_ops adp1653_pm_ops = {
-> > >  	.suspend	= adp1653_suspend,
-> > >  	.resume		= adp1653_resume,
-> > >  };
-> > >  
-> > > 
-> > 
-> > A corresponding change to the N900 dts would be very nice.
-> 
-> Corresponding change to the dts will come in separate patch. Or do you
-> have n900 for testing?
+Tyler
 
-Yes, it should be a separate patch, I agree.
-
-I do have one but I can't say when I'd have time to test it. I'm fine with
-you having tested it though.
-
-> > I think you're missing change to adp1653_i2c_driver.driver.of_match_table.
-> 
-> It actually worked for me, which means device tree somehow does it
-> magic.
-
-By magic? :-) It probably just ends up comparing the device and the driver
-names. How about adding the of_match_table?
-
--- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+[0] http://kernelci.org/build/tbaker/kernel/v4.0-rc6-8742-g76c8cce3+gcc-linaro-4.9-2015.02/
