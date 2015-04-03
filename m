@@ -1,45 +1,51 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri,  3 Apr 2015 15:06:47 +0200
-Subject: [PATCH v2 2/4] Documentation: bindings: document the Berlin ADC driver
-In-Reply-To: <1428066409-30392-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1428066409-30392-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1428066409-30392-3-git-send-email-antoine.tenart@free-electrons.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 3 Apr 2015 21:17:05 +0800
+Subject: [PATCH] PCI: versatile: don't check resource with
+ devm_ioremap_resource
+Message-ID: <1428067025-543-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the addition of a Berlin ADC driver, this patch adds the
-corresponding bindings documentation.
+devm_ioremap_resource does sanity checks on the given resource. No need
+to duplicate this in the driver. And we should check whether
+devm_ioremap_resource() succeeds or not.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+This patch fixes all of these two trival issues.
+
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- .../devicetree/bindings/iio/adc/berlin2_adc.txt       | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt
+ drivers/pci/host/pci-versatile.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt b/Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt
-new file mode 100644
-index 000000000000..908334c6b07f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt
-@@ -0,0 +1,19 @@
-+* Berlin Analog to Digital Converter (ADC)
-+
-+The Berlin ADC has 8 channels, with one connected to a temperature sensor.
-+It is part of the system controller register set. The ADC node should be a
-+sub-node of the system controller node.
-+
-+Required properties:
-+- compatible: must be "marvell,berlin2-adc"
-+- interrupts: the interrupts for the ADC and the temperature sensor
-+- interrupt-names: should be "adc" and "tsen"
-+
-+Example:
-+
-+adc: adc {
-+	compatible = "marvell,berlin2-adc";
-+	interrupt-parent = <&sic>;
-+	interrupts = <12>, <14>;
-+	interrupt-names = "adc", "tsen";
-+};
+diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
+index 464bf49..ba5eab1 100644
+--- a/drivers/pci/host/pci-versatile.c
++++ b/drivers/pci/host/pci-versatile.c
+@@ -138,19 +138,19 @@ static int versatile_pci_probe(struct platform_device *pdev)
+ 	LIST_HEAD(pci_res);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res)
+-		return -ENODEV;
+ 	versatile_pci_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(versatile_pci_base))
++		return PTR_ERR(versatile_pci_base);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	if (!res)
+-		return -ENODEV;
+ 	versatile_cfg_base[0] = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(versatile_cfg_base[0]))
++		return PTR_ERR(versatile_cfg_base[0]);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+-	if (!res)
+-		return -ENODEV;
+ 	versatile_cfg_base[1] = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(versatile_cfg_base[1]))
++		return PTR_ERR(versatile_cfg_base[1]);
+ 
+ 	ret = versatile_pci_parse_request_of_pci_ranges(&pdev->dev, &pci_res);
+ 	if (ret)
 -- 
-2.3.4
+2.1.4
