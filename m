@@ -1,21 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 14:50:16 -0700
-Subject: [GIT PULL] ARM: mediatek: soc updates for v4.1
-In-Reply-To: <CABuKBeJcRv_dGwL7qHSpSewwpmVuDvhon4JNcreYBaZ9z1E1Mw@mail.gmail.com>
-References: <CABuKBeJcRv_dGwL7qHSpSewwpmVuDvhon4JNcreYBaZ9z1E1Mw@mail.gmail.com>
-Message-ID: <20150403215016.GO23023@localhost>
+Date: Fri, 3 Apr 2015 14:52:24 -0700
+Subject: [GIT PULL] Samsung 2nd fixes for v4.0
+In-Reply-To: <551C29AB.7030306@kernel.org>
+References: <551C29AB.7030306@kernel.org>
+Message-ID: <20150403215224.GP23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 04:57:55PM +0200, Matthias Brugger wrote:
-> Hi Arnd and Olof,
+On Thu, Apr 02, 2015 at 02:23:55AM +0900, Kukjin Kim wrote:
+> Hi Arnd, Olof, Kevin,
 > 
-> please pull the following changes.
+> Here is 2nd Samsung fixes for v4.0 and it fixes arm allmodconfig build
+> breakage and exynos5250-spring lid, power-pin and mmc nodes dt updates.
+> 
+> Please pull and sorry for pretty late pull-request for v4.0.
 > 
 > Thanks,
-> Matthias
+> Kukjin
 > 
-> ---
 > 
 > The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 > 
@@ -23,14 +25,15 @@ On Mon, Mar 30, 2015 at 04:57:55PM +0200, Matthias Brugger wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/mbgg/linux-mediatek.git tags/v4.0-next-soc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-fixes-2
 > 
-> for you to fetch changes up to 1f022d84bd193ec88b01c6d2cb5b6647cb20a02f:
+> for you to fetch changes up to cfdda3535f87e752780ca18a57d13db58f6a6913:
 > 
->   soc: mediatek: Add PMIC wrapper for MT8135 and MT8173 SoCs
-> (2015-03-30 12:25:40 +0200)
+>   ARM: EXYNOS: Fix build breakage cpuidle on !SMP (2015-03-18 03:26:11
+> +0900)
 
-Thanks, merged into next/drivers.
+Merged.
 
 
 -Olof
