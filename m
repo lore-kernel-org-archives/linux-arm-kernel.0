@@ -1,48 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 3 Apr 2015 22:31:35 +0200
-Subject: [GIT PULL] Allwinner DT additions for 4.1
-In-Reply-To: <20150403200541.GU23023@localhost>
-References: <20150325212124.GA17842@lukather>
- <20150403200331.GT23023@localhost>
- <20150403200541.GU23023@localhost>
-Message-ID: <20150403203135.GG14618@lukather>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 3 Apr 2015 13:40:16 -0700
+Subject: [GIT PULL] arm-cci PMU updates for 4.1
+In-Reply-To: <20150327172500.GO1562@arm.com>
+References: <20150327172500.GO1562@arm.com>
+Message-ID: <20150403204016.GB23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 01:05:41PM -0700, Olof Johansson wrote:
-> > > There is mostly:
-> > >   - The end of the DT relicensing. All our DT should now be under the dual
-> > >     X11/GPL license.
-> > >   - Convertion of all the DT to a label based syntax, instead of duplicating
-> > >     the tree like was done before.
-> > 
-> > Ugh. This is a huge amount of churn just for the sake of it. It's much
-> > better if these kind of conversions happen over time as the files are
-> > touched for other reasons.
-> > 
-> > I've merged branches like these before, but I was grumpy when I did those too.
-> > 
-> > Anyway, I've merged it for now.
+On Fri, Mar 27, 2015 at 05:25:00PM +0000, Will Deacon wrote:
+> Hi Olof, Arnd,
 > 
-> Ugh. Causes merge conflicts with your own fixes. Not even going to try to fix
-> this up.
+> Please can you pull the following ARM CCI PMU updates for 4.1? Suzuki
+> has reworked parts of the existing driver so that it can be used on CPUs
+> booting in non-secure mode (i.e. ARM64 systems) and also make it easier
+> to port over to new IP, such as CCI-500.
+> 
+> It's coming via me as $ARM_PERF_GUY, but Nico has Acked the core driver
+> (non-PMU) changes. Note that these have been in next for a bit, but I
+> can drop the branch once you've pulled.
+> 
+> Cheers,
+> 
+> Will
+> 
+> --->8
+> 
+> The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
+> 
+>   Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tags/arm-perf-4.1
+> 
+> for you to fetch changes up to 874c571414d5617f4042298986b6a826816ee885:
+> 
+>   arm-cci: Fix CCI PMU event validation (2015-03-27 13:45:02 +0000)
 
-Does that mean that you droped the entire pull request?
+Merged now. The Kconfig merge was a bit messy since someone decided to sort the
+file, and Stephen will see that too (cc:d here).
 
-The merge is quite trivial, and is in linux-next, if that can help:
-6bcf44d5edfb1eaf1db56ac71742767517f6a0d0.
 
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150403/403cdc5c/attachment.sig>
+-Olof
