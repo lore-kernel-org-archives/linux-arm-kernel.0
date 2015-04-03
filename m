@@ -1,95 +1,38 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 03 Apr 2015 18:12:58 +0100
-Subject: [PATCH 07/14] media: omap3isp: remove unused clkdev
+Date: Fri, 03 Apr 2015 18:13:08 +0100
+Subject: [PATCH 09/14] ARM: lpc32xx: convert to use clkdev_add_table()
 In-Reply-To: <20150403171149.GC13898@n2100.arm.linux.org.uk>
 References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
-Message-ID: <E1Ye59O-0001BJ-Gq@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Ye59Y-0001BV-NY@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No merged platform supplies xclks via platform data.  As we want to
-slightly change the clkdev interface, rather than fixing this unused
-code, remove it instead.
+We have always had an efficient way of registering a table of clock
+lookups - it's called clkdev_add_table().  However, some people seem
+to really love writing inefficient and unnecessary code.
+
+Convert LPC32xx to use the correct interface.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/media/platform/omap3isp/isp.c | 18 ------------------
- drivers/media/platform/omap3isp/isp.h |  1 -
- include/media/omap3isp.h              |  6 ------
- 3 files changed, 25 deletions(-)
+ arch/arm/mach-lpc32xx/clock.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
-index deca80903c3a..4d8078b9d010 100644
---- a/drivers/media/platform/omap3isp/isp.c
-+++ b/drivers/media/platform/omap3isp/isp.c
-@@ -281,7 +281,6 @@ static const struct clk_init_data isp_xclk_init_data = {
+diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
+index dd5d6f532e8c..661c8f4b2310 100644
+--- a/arch/arm/mach-lpc32xx/clock.c
++++ b/arch/arm/mach-lpc32xx/clock.c
+@@ -1238,10 +1238,7 @@ static struct clk_lookup lookups[] = {
  
- static int isp_xclk_init(struct isp_device *isp)
+ static int __init clk_init(void)
  {
--	struct isp_platform_data *pdata = isp->pdata;
- 	struct clk_init_data init;
- 	unsigned int i;
- 
-@@ -311,20 +310,6 @@ static int isp_xclk_init(struct isp_device *isp)
- 		xclk->clk = clk_register(NULL, &xclk->hw);
- 		if (IS_ERR(xclk->clk))
- 			return PTR_ERR(xclk->clk);
+-	int i;
 -
--		if (pdata->xclks[i].con_id == NULL &&
--		    pdata->xclks[i].dev_id == NULL)
--			continue;
--
--		xclk->lookup = kzalloc(sizeof(*xclk->lookup), GFP_KERNEL);
--		if (xclk->lookup == NULL)
--			return -ENOMEM;
--
--		xclk->lookup->con_id = pdata->xclks[i].con_id;
--		xclk->lookup->dev_id = pdata->xclks[i].dev_id;
--		xclk->lookup->clk = xclk->clk;
--
--		clkdev_add(xclk->lookup);
- 	}
+-	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+-		clkdev_add(&lookups[i]);
++	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
  
- 	return 0;
-@@ -339,9 +324,6 @@ static void isp_xclk_cleanup(struct isp_device *isp)
- 
- 		if (!IS_ERR(xclk->clk))
- 			clk_unregister(xclk->clk);
--
--		if (xclk->lookup)
--			clkdev_drop(xclk->lookup);
- 	}
- }
- 
-diff --git a/drivers/media/platform/omap3isp/isp.h b/drivers/media/platform/omap3isp/isp.h
-index cfdfc8714b6b..d41c98bbdfe7 100644
---- a/drivers/media/platform/omap3isp/isp.h
-+++ b/drivers/media/platform/omap3isp/isp.h
-@@ -122,7 +122,6 @@ enum isp_xclk_id {
- struct isp_xclk {
- 	struct isp_device *isp;
- 	struct clk_hw hw;
--	struct clk_lookup *lookup;
- 	struct clk *clk;
- 	enum isp_xclk_id id;
- 
-diff --git a/include/media/omap3isp.h b/include/media/omap3isp.h
-index 398279dd1922..a9798525d01e 100644
---- a/include/media/omap3isp.h
-+++ b/include/media/omap3isp.h
-@@ -152,13 +152,7 @@ struct isp_v4l2_subdevs_group {
- 	} bus; /* gcc < 4.6.0 chokes on anonymous union initializers */
- };
- 
--struct isp_platform_xclk {
--	const char *dev_id;
--	const char *con_id;
--};
--
- struct isp_platform_data {
--	struct isp_platform_xclk xclks[2];
- 	struct isp_v4l2_subdevs_group *subdevs;
- 	void (*set_constraints)(struct isp_device *isp, bool enable);
- };
+ 	/*
+ 	 * Setup muxed SYSCLK for HCLK PLL base -this selects the
 -- 
 1.8.3.1
