@@ -1,42 +1,82 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 3 Apr 2015 15:27:40 +0200
-Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
- complex dependencies
-In-Reply-To: <20150403125727.GT10964@mwanda>
-References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
- <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
- <20150403125727.GT10964@mwanda>
-Message-ID: <CAMuHMdVhX-MrFxeW5j98NLaQQtJ+DToxkz2Z1+SRSs7YF27RDw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 3 Apr 2015 19:11:52 +0530
+Subject: [PATCH v2 1/3] phy: phy-core: allow specifying supply at port
+ level
+In-Reply-To: <1427921457-18235-2-git-send-email-arun.ramamurthy@broadcom.com>
+References: <1427921457-18235-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1427921457-18235-2-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <551E98A0.4000106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 3, 2015 at 2:57 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
->> +     error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
->> +     if (error)
->> +             pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
->> +             return error;
+
+
+On Thursday 02 April 2015 02:20 AM, Arun Ramamurthy wrote:
+> From: Dmitry Torokhov <dtor@chromium.org>
 >
-> Missing curly braces.  Also it's weird that don't we need a clk_put()
-> on the error patch as well as the success path?
+> Multi-port phy's may have per-port power supplies. Let's change phy core
+> to first attempt to look up the supply at the port level, and then, if
+> not found, check parent device.
 
-Thanks!
+This commit log is no longer valid.
 
-So it worked only by accident: with the new per-user struct clk instances
-clk_put() must not be called if clk_register_clkdev() succeeded.
+-Kishon
 
-Will call clk_put() only if it failed.
-
->> +
->> +     clk_put(clk);
->> +     return 0;
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+> Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
+> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>   drivers/phy/phy-core.c | 23 ++++++++++-------------
+>   1 file changed, 10 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index 3791838..c7aa297 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -651,16 +651,6 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+>   		goto free_phy;
+>   	}
+>
+> -	/* phy-supply */
+> -	phy->pwr = regulator_get_optional(dev, "phy");
+> -	if (IS_ERR(phy->pwr)) {
+> -		if (PTR_ERR(phy->pwr) == -EPROBE_DEFER) {
+> -			ret = -EPROBE_DEFER;
+> -			goto free_ida;
+> -		}
+> -		phy->pwr = NULL;
+> -	}
+> -
+>   	device_initialize(&phy->dev);
+>   	mutex_init(&phy->mutex);
+>
+> @@ -674,6 +664,16 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+>   	if (ret)
+>   		goto put_dev;
+>
+> +	/* phy-supply */
+> +	phy->pwr = regulator_get_optional(&phy->dev, "phy");
+> +	if (IS_ERR(phy->pwr)) {
+> +		ret = PTR_ERR(phy->pwr);
+> +		if (ret == -EPROBE_DEFER)
+> +			goto put_dev;
+> +
+> +		phy->pwr = NULL;
+> +	}
+> +
+>   	ret = device_add(&phy->dev);
+>   	if (ret)
+>   		goto put_dev;
+> @@ -689,9 +689,6 @@ put_dev:
+>   	put_device(&phy->dev);  /* calls phy_release() which frees resources */
+>   	return ERR_PTR(ret);
+>
+> -free_ida:
+> -	ida_simple_remove(&phy_ida, phy->id);
+> -
+>   free_phy:
+>   	kfree(phy);
+>   	return ERR_PTR(ret);
+>
