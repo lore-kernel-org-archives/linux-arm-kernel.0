@@ -1,107 +1,27 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat,  4 Apr 2015 00:45:02 +0300
-Subject: [PATCH v1.1 07/14] media: omap3isp: remove unused clkdev
-Message-ID: <1428097502-19593-1-git-send-email-laurent.pinchart@ideasonboard.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 3 Apr 2015 14:46:49 -0700
+Subject: [GIT PULL 4/4] ARM: imx: defconfig updates for 4.1
+In-Reply-To: <CAAQ0ZWQPckdOfC_HyP8s4pp66Nx_QbsLBFEmF=d2d6vTY-59Og@mail.gmail.com>
+References: <CAAQ0ZWQPckdOfC_HyP8s4pp66Nx_QbsLBFEmF=d2d6vTY-59Og@mail.gmail.com>
+Message-ID: <20150403214649.GL23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+On Mon, Mar 30, 2015 at 10:02:59PM +0800, Shawn Guo wrote:
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> 
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+> tags/imx-defconfig-4.1
+> 
+> for you to fetch changes up to bfc6dc138ef01a65365834dcf251b95ace9969b7:
+> 
+>   ARM: imx_v6_v7_defconfig: Enable Bluetooth support (2015-03-16 16:11:23 +0800)
 
-No merged platform supplies xclks via platform data.  As we want to
-slightly change the clkdev interface, rather than fixing this unused
-code, remove it instead.
+Thanks, merged.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- drivers/media/platform/omap3isp/isp.c | 24 ------------------------
- drivers/media/platform/omap3isp/isp.h |  1 -
- include/media/omap3isp.h              |  6 ------
- 3 files changed, 31 deletions(-)
 
-In case this would be helpful, I've rebased the original patch on top of the
-linuxtv master branch scheduled for merge in v4.1.
-
-diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
-index ff51c4f..18d0a87 100644
---- a/drivers/media/platform/omap3isp/isp.c
-+++ b/drivers/media/platform/omap3isp/isp.c
-@@ -304,7 +304,6 @@ static struct clk *isp_xclk_src_get(struct of_phandle_args *clkspec, void *data)
- 
- static int isp_xclk_init(struct isp_device *isp)
- {
--	struct isp_platform_data *pdata = isp->pdata;
- 	struct device_node *np = isp->dev->of_node;
- 	struct clk_init_data init;
- 	unsigned int i;
-@@ -335,26 +334,6 @@ static int isp_xclk_init(struct isp_device *isp)
- 		xclk->clk = clk_register(NULL, &xclk->hw);
- 		if (IS_ERR(xclk->clk))
- 			return PTR_ERR(xclk->clk);
--
--		/* When instantiated from DT we don't need to register clock
--		 * aliases.
--		 */
--		if (np)
--			continue;
--
--		if (!pdata || (pdata->xclks[i].con_id == NULL &&
--			       pdata->xclks[i].dev_id == NULL))
--			continue;
--
--		xclk->lookup = kzalloc(sizeof(*xclk->lookup), GFP_KERNEL);
--		if (xclk->lookup == NULL)
--			return -ENOMEM;
--
--		xclk->lookup->con_id = pdata->xclks[i].con_id;
--		xclk->lookup->dev_id = pdata->xclks[i].dev_id;
--		xclk->lookup->clk = xclk->clk;
--
--		clkdev_add(xclk->lookup);
- 	}
- 
- 	if (np)
-@@ -376,9 +355,6 @@ static void isp_xclk_cleanup(struct isp_device *isp)
- 
- 		if (!IS_ERR(xclk->clk))
- 			clk_unregister(xclk->clk);
--
--		if (xclk->lookup)
--			clkdev_drop(xclk->lookup);
- 	}
- }
- 
-diff --git a/drivers/media/platform/omap3isp/isp.h b/drivers/media/platform/omap3isp/isp.h
-index 431224e..e579943 100644
---- a/drivers/media/platform/omap3isp/isp.h
-+++ b/drivers/media/platform/omap3isp/isp.h
-@@ -132,7 +132,6 @@ enum isp_xclk_id {
- struct isp_xclk {
- 	struct isp_device *isp;
- 	struct clk_hw hw;
--	struct clk_lookup *lookup;
- 	struct clk *clk;
- 	enum isp_xclk_id id;
- 
-diff --git a/include/media/omap3isp.h b/include/media/omap3isp.h
-index 0f0c08b..048f8f9 100644
---- a/include/media/omap3isp.h
-+++ b/include/media/omap3isp.h
-@@ -150,13 +150,7 @@ struct isp_platform_subdev {
- 	struct isp_bus_cfg *bus;
- };
- 
--struct isp_platform_xclk {
--	const char *dev_id;
--	const char *con_id;
--};
--
- struct isp_platform_data {
--	struct isp_platform_xclk xclks[2];
- 	struct isp_platform_subdev *subdevs;
- 	void (*set_constraints)(struct isp_device *isp, bool enable);
- };
--- 
-Regards,
-
-Laurent Pinchart
+-Olof
