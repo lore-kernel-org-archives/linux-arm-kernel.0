@@ -1,27 +1,24 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 14:46:49 -0700
-Subject: [GIT PULL 4/4] ARM: imx: defconfig updates for 4.1
-In-Reply-To: <CAAQ0ZWQPckdOfC_HyP8s4pp66Nx_QbsLBFEmF=d2d6vTY-59Og@mail.gmail.com>
-References: <CAAQ0ZWQPckdOfC_HyP8s4pp66Nx_QbsLBFEmF=d2d6vTY-59Og@mail.gmail.com>
-Message-ID: <20150403214649.GL23023@localhost>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Sat, 4 Apr 2015 00:46:33 +0300
+Subject: [PATCH v1.1 07/14] media: omap3isp: remove unused clkdev
+In-Reply-To: <1428097502-19593-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1428097502-19593-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <20150403214633.GQ20756@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 10:02:59PM +0800, Shawn Guo wrote:
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+On Sat, Apr 04, 2015 at 12:45:02AM +0300, Laurent Pinchart wrote:
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> No merged platform supplies xclks via platform data.  As we want to
+> slightly change the clkdev interface, rather than fixing this unused
+> code, remove it instead.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
-> tags/imx-defconfig-4.1
-> 
-> for you to fetch changes up to bfc6dc138ef01a65365834dcf251b95ace9969b7:
-> 
->   ARM: imx_v6_v7_defconfig: Enable Bluetooth support (2015-03-16 16:11:23 +0800)
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Thanks, merged.
+Acked-by: Sakari Ailus <sakari.ailus@iki.fi>
 
-
--Olof
+-- 
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
