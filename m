@@ -1,119 +1,117 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 03 Apr 2015 18:12:37 +0100
-Subject: [PATCH 03/14] clkdev: get rid of redundant clk_add_alias() prototype
- in linux/clk.h
+Date: Fri, 03 Apr 2015 18:12:48 +0100
+Subject: [PATCH 05/14] clkdev: use clk_hw internally
 In-Reply-To: <20150403171149.GC13898@n2100.arm.linux.org.uk>
 References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
-Message-ID: <E1Ye593-0001B1-W4@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Ye59E-0001BB-7z@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_add_alias() is provided by clkdev, and is not part of the clk API.
-Howver, it is prototyped in two locations: linux/clkdev.h and
-linux/clk.h.  This is a mess.  Get rid of the redundant and unnecessary
-version in linux/clk.h.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-davinci/da850.c        |  1 +
- arch/arm/mach-omap1/board-nokia770.c |  2 +-
- arch/arm/mach-pxa/eseries.c          |  1 +
- arch/arm/mach-pxa/lubbock.c          |  1 +
- arch/arm/mach-pxa/tosa.c             |  1 +
- include/linux/clk.h                  | 13 -------------
- 6 files changed, 5 insertions(+), 14 deletions(-)
+ drivers/clk/clkdev.c   | 24 ++++++++++++++++--------
+ include/linux/clkdev.h |  1 +
+ 2 files changed, 17 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 45ce065e7170..3b8740c083c4 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -11,6 +11,7 @@
-  * is licensed "as is" without any warranty of any kind, whether express
-  * or implied.
-  */
-+#include <linux/clkdev.h>
- #include <linux/gpio.h>
- #include <linux/init.h>
- #include <linux/clk.h>
-diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
-index 85089d821982..3bc59390a943 100644
---- a/arch/arm/mach-omap1/board-nokia770.c
-+++ b/arch/arm/mach-omap1/board-nokia770.c
-@@ -7,6 +7,7 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/clkdev.h>
- #include <linux/irq.h>
- #include <linux/gpio.h>
- #include <linux/kernel.h>
-@@ -14,7 +15,6 @@
- #include <linux/mutex.h>
- #include <linux/platform_device.h>
- #include <linux/input.h>
--#include <linux/clk.h>
- #include <linux/omapfb.h>
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 5d7746d19445..8e676eafc823 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -205,7 +205,7 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id)
+ 	if (!cl)
+ 		goto out;
  
- #include <linux/spi/spi.h>
-diff --git a/arch/arm/mach-pxa/eseries.c b/arch/arm/mach-pxa/eseries.c
-index cfb864173ce3..4427bf26ea47 100644
---- a/arch/arm/mach-pxa/eseries.c
-+++ b/arch/arm/mach-pxa/eseries.c
-@@ -10,6 +10,7 @@
-  *
-  */
+-	clk = __clk_create_clk(__clk_get_hw(cl->clk), dev_id, con_id);
++	clk = __clk_create_clk(cl->clk_hw, dev_id, con_id);
+ 	if (IS_ERR(clk))
+ 		goto out;
  
-+#include <linux/clkdev.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/gpio.h>
-diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
-index d8a1be619f21..235f2d9318c1 100644
---- a/arch/arm/mach-pxa/lubbock.c
-+++ b/arch/arm/mach-pxa/lubbock.c
-@@ -11,6 +11,7 @@
-  *  it under the terms of the GNU General Public License version 2 as
-  *  published by the Free Software Foundation.
-  */
-+#include <linux/clkdev.h>
- #include <linux/gpio.h>
- #include <linux/module.h>
- #include <linux/kernel.h>
-diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
-index 7780d1faa06f..92e56d8a24d8 100644
---- a/arch/arm/mach-pxa/tosa.c
-+++ b/arch/arm/mach-pxa/tosa.c
-@@ -12,6 +12,7 @@
-  *
-  */
- 
-+#include <linux/clkdev.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index d1ac9f3ab24b..c94a34a8a1b3 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -467,19 +467,6 @@ static inline void clk_disable_unprepare(struct clk *clk)
- 	clk_unprepare(clk);
+@@ -243,18 +243,26 @@ void clk_put(struct clk *clk)
  }
+ EXPORT_SYMBOL(clk_put);
  
--/**
-- * clk_add_alias - add a new clock alias
-- * @alias: name for clock alias
-- * @alias_dev_name: device name
-- * @id: platform specific clock name
-- * @dev: device
-- *
-- * Allows using generic clock names for drivers by adding a new alias.
-- * Assumes clkdev, see clkdev.h for more info.
-- */
--int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
--			struct device *dev);
--
- struct device_node;
- struct of_phandle_args;
+-void clkdev_add(struct clk_lookup *cl)
++static void __clkdev_add(struct clk_lookup *cl)
+ {
+ 	mutex_lock(&clocks_mutex);
+ 	list_add_tail(&cl->node, &clocks);
+ 	mutex_unlock(&clocks_mutex);
+ }
++
++void clkdev_add(struct clk_lookup *cl)
++{
++	if (!cl->clk_hw)
++		cl->clk_hw = __clk_get_hw(cl->clk);
++	__clkdev_add(cl);
++}
+ EXPORT_SYMBOL(clkdev_add);
  
+ void clkdev_add_table(struct clk_lookup *cl, size_t num)
+ {
+ 	mutex_lock(&clocks_mutex);
+ 	while (num--) {
++		cl->clk_hw = __clk_get_hw(cl->clk);
+ 		list_add_tail(&cl->node, &clocks);
+ 		cl++;
+ 	}
+@@ -271,7 +279,7 @@ struct clk_lookup_alloc {
+ };
+ 
+ static struct clk_lookup * __init_refok
+-vclkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt,
++vclkdev_alloc(struct clk_hw *hw, const char *con_id, const char *dev_fmt,
+ 	va_list ap)
+ {
+ 	struct clk_lookup_alloc *cla;
+@@ -280,7 +288,7 @@ vclkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt,
+ 	if (!cla)
+ 		return NULL;
+ 
+-	cla->cl.clk = clk;
++	cla->cl.clk_hw = hw;
+ 	if (con_id) {
+ 		strlcpy(cla->con_id, con_id, sizeof(cla->con_id));
+ 		cla->cl.con_id = cla->con_id;
+@@ -301,7 +309,7 @@ clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+ 	va_list ap;
+ 
+ 	va_start(ap, dev_fmt);
+-	cl = vclkdev_alloc(clk, con_id, dev_fmt, ap);
++	cl = vclkdev_alloc(__clk_get_hw(clk), con_id, dev_fmt, ap);
+ 	va_end(ap);
+ 
+ 	return cl;
+@@ -362,7 +370,7 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
+ 		return PTR_ERR(clk);
+ 
+ 	va_start(ap, dev_fmt);
+-	cl = vclkdev_alloc(clk, con_id, dev_fmt, ap);
++	cl = vclkdev_alloc(__clk_get_hw(clk), con_id, dev_fmt, ap);
+ 	va_end(ap);
+ 
+ 	if (!cl)
+@@ -393,8 +401,8 @@ int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num)
+ 		return PTR_ERR(clk);
+ 
+ 	for (i = 0; i < num; i++, cl++) {
+-		cl->clk = clk;
+-		clkdev_add(cl);
++		cl->clk_hw = __clk_get_hw(clk);
++		__clkdev_add(cl);
+ 	}
+ 
+ 	return 0;
+diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
+index eb9b38a79b43..cd93b215e3af 100644
+--- a/include/linux/clkdev.h
++++ b/include/linux/clkdev.h
+@@ -22,6 +22,7 @@ struct clk_lookup {
+ 	const char		*dev_id;
+ 	const char		*con_id;
+ 	struct clk		*clk;
++	struct clk_hw		*clk_hw;
+ };
+ 
+ #define CLKDEV_INIT(d, n, c)	\
 -- 
 1.8.3.1
