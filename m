@@ -1,68 +1,107 @@
 From: b52261@freescale.com (Jianwei Wang)
-Date: Fri, 3 Apr 2015 17:35:55 +0800
-Subject: [PATCH v4 0/4] drm/layerscape: Add Freescale DCU DRM driver 
-Message-ID: <1428053759-3129-1-git-send-email-b52261@freescale.com>
+Date: Fri, 3 Apr 2015 17:35:57 +0800
+Subject: [PATCH v4 2/4] arm/layerscape/ls1021a: DCU pixel clock control
+In-Reply-To: <1428053759-3129-1-git-send-email-b52261@freescale.com>
+References: <1428053759-3129-1-git-send-email-b52261@freescale.com>
+Message-ID: <1428053759-3129-3-git-send-email-b52261@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-@Daniel,
-Do you have any other comments for this driver?
+Enable DCU pixel clock when platform devices initinalizing and
+provide enable and disable pixel clock functions for drm driver
 
-@Stefan,
-Please help test this driver on vybrid if possible, I have test it on vybrid twr board.
+Signed-off-by: Alison Wang <b18965@freescale.com>
+Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+Signed-off-by: Jianwei Wang <b52261@freescale.com>
+---
+ arch/arm/mach-imx/mach-ls1021a.c | 36 ++++++++++++++++++++++++++++++++++++
+ include/linux/fsl/dcu.h          | 22 ++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
+ create mode 100644 include/linux/fsl/dcu.h
 
-If anyone has any objections, please let me know.
-
-Changed in V4:
--This version doesn't have functionality changed. Just a minor adjustment.
-
-Changed in V3:
-- Test driver on Vybrid board and add compatible string
-- Remove unused functions
-- set default crtc for encoder
-- replace legacy functions with atomic help functions
-- Set the unique name of the DRM device
-- Implement irq handle function for vblank interrupt
-
-Changed in v2:
-- Add atomic support
-- Modify bindings file
-- Rename node for compatibility
-- Move platform related code out for compatibility
-
-Added in v1:
-- Add support for DCU display controller on the Freescale LS102x SoCs.
-- Create a primary plane, a fb created for fbdev, a crtc, a connector for TFT LCD panel, an encoder.
-
-
- .../devicetree/bindings/drm/fsl/fsl,dcu.txt        |  50 ++++
- drivers/gpu/drm/Kconfig                            |   2 +
- drivers/gpu/drm/Makefile                           |   1 +
- drivers/gpu/drm/fsl/Kconfig                        |  17 ++
- drivers/gpu/drm/fsl/Makefile                       |   7 +
- drivers/gpu/drm/fsl/fsl_dcu_drm_connector.c        | 194 ++++++++++++
- drivers/gpu/drm/fsl/fsl_dcu_drm_connector.h        |  30 ++
- drivers/gpu/drm/fsl/fsl_dcu_drm_crtc.c             | 165 +++++++++++
- drivers/gpu/drm/fsl/fsl_dcu_drm_crtc.h             |  26 ++
- drivers/gpu/drm/fsl/fsl_dcu_drm_drv.c              | 329 +++++++++++++++++++++
- drivers/gpu/drm/fsl/fsl_dcu_drm_drv.h              | 210 +++++++++++++
- drivers/gpu/drm/fsl/fsl_dcu_drm_fbdev.c            |  26 ++
- drivers/gpu/drm/fsl/fsl_dcu_drm_kms.c              |  42 +++
- drivers/gpu/drm/fsl/fsl_dcu_drm_kms.h              |  17 ++
- drivers/gpu/drm/fsl/fsl_dcu_drm_plane.c            | 192 ++++++++++++
- drivers/gpu/drm/fsl/fsl_dcu_drm_plane.h            |  23 ++
- 16 files changed, 1331 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/drm/fsl/fsl,dcu.txt
- create mode 100644 drivers/gpu/drm/fsl/Kconfig
- create mode 100644 drivers/gpu/drm/fsl/Makefile
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_connector.c
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_connector.h
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_crtc.c
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_crtc.h
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_drv.c
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_drv.h
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_fbdev.c
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_kms.c
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_kms.h
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_plane.c
- create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_plane.h
+diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
+index b89c858..4fb346d 100644
+--- a/arch/arm/mach-imx/mach-ls1021a.c
++++ b/arch/arm/mach-imx/mach-ls1021a.c
+@@ -8,9 +8,44 @@
+  */
+ 
+ #include <asm/mach/arch.h>
++#include <linux/of_platform.h>
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
++#include <linux/fsl/dcu.h>
+ 
+ #include "common.h"
+ 
++void dcu_pixclk_disable(void)
++{
++	struct regmap *scfg_regmap;
++
++	scfg_regmap = syscon_regmap_lookup_by_compatible("fsl,ls1021a-scfg");
++	if (IS_ERR(scfg_regmap)) {
++		pr_err("No syscfg phandle specified\n");
++		return;
++	}
++
++	regmap_write(scfg_regmap, SCFG_PIXCLKCR, PXCK_DISABLE);
++}
++
++void dcu_pixclk_enable(void)
++{
++	struct regmap *scfg_regmap;
++
++	scfg_regmap = syscon_regmap_lookup_by_compatible("fsl,ls1021a-scfg");
++	if (IS_ERR(scfg_regmap)) {
++		pr_err("No syscfg phandle specified\n");
++		return;
++	}
++
++	regmap_write(scfg_regmap, SCFG_PIXCLKCR, PXCK_ENABLE);
++}
++
++static void __init ls1021a_init_machine(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	dcu_pixclk_enable();
++}
+ static const char * const ls1021a_dt_compat[] __initconst = {
+ 	"fsl,ls1021a",
+ 	NULL,
+@@ -18,5 +53,6 @@ static const char * const ls1021a_dt_compat[] __initconst = {
+ 
+ DT_MACHINE_START(LS1021A, "Freescale LS1021A")
+ 	.smp		= smp_ops(ls1021a_smp_ops),
++	.init_machine	= ls1021a_init_machine,
+ 	.dt_compat	= ls1021a_dt_compat,
+ MACHINE_END
+diff --git a/include/linux/fsl/dcu.h b/include/linux/fsl/dcu.h
+new file mode 100644
+index 0000000..1873057
+--- /dev/null
++++ b/include/linux/fsl/dcu.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright 2015 Freescale Semiconductor, Inc.
++ *
++ * Freescale DCU drm device driver
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __FSL_DCU_H__
++#define __FSL_DCU_H__
++
++#define SCFG_PIXCLKCR			0x28
++#define PXCK_ENABLE			BIT(31)
++#define PXCK_DISABLE			0
++
++void dcu_pixclk_enable(void);
++void dcu_pixclk_disable(void);
++
++#endif /* __FSL_DCU_H__ */
+-- 
+2.1.0.27.g96db324
