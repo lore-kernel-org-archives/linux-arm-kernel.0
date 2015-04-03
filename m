@@ -1,88 +1,149 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 3 Apr 2015 17:25:51 +0800
-Subject: [PATCH v9 17/30] x86/PCI: Refine pci_acpi_scan_root() with generic
- pci_host_bridge
+Date: Fri, 3 Apr 2015 17:25:44 +0800
+Subject: [PATCH v9 10/30] PCI: Introduce pci_host_bridge_list to manage host
+ bridges
 In-Reply-To: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
 References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1428053164-28277-19-git-send-email-wangyijing@huawei.com>
+Message-ID: <1428053164-28277-12-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: x86 at kernel.org
----
- arch/x86/pci/acpi.c |   37 +++++++++++++++++++++----------------
- 1 files changed, 21 insertions(+), 16 deletions(-)
+Introduce pci_host_bridge_list to manage pci host
+bridges in system, this make us have the ability
+to check whether the new host would conflict with
+existing one. Then we could remove bus alreay exist
+check in __pci_create_root_bus().
 
-diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-index d2655d5..877acaf 100644
---- a/arch/x86/pci/acpi.c
-+++ b/arch/x86/pci/acpi.c
-@@ -349,6 +349,19 @@ static void probe_pci_root_info(struct pci_root_info *info,
- 			entry->res->name = info->name;
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ drivers/pci/host-bridge.c |   41 ++++++++++++++++++++++++++++++++++++++++-
+ drivers/pci/probe.c       |    9 +--------
+ include/linux/pci.h       |    1 +
+ 3 files changed, 42 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index 1a9834b..dffb345 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -8,6 +8,9 @@
+ 
+ #include "pci.h"
+ 
++static LIST_HEAD(pci_host_bridge_list);
++static DEFINE_MUTEX(pci_host_mutex);
++
+ static void pci_release_host_bridge_dev(struct device *dev)
+ {
+ 	struct pci_host_bridge *bridge = to_pci_host_bridge(dev);
+@@ -41,12 +44,29 @@ static void pci_host_update_busn_res(
+ 	pci_add_resource(resources, &host->busn_res);
  }
  
-+static int pci_host_bridge_prepare(struct pci_host_bridge *bridge)
++static bool pci_host_busn_res_overlap(
++		struct pci_host_bridge *new, struct pci_host_bridge *old)
 +{
-+	struct pci_sysdata *sd = dev_get_drvdata(&bridge->dev);
++	struct resource_entry *entry;
++	struct resource *res1 = NULL, *res2 = NULL;
 +
-+	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
-+	return 0;
++	resource_list_for_each_entry(entry, &old->windows)
++		if (entry->res->flags & IORESOURCE_BUS)
++			res1 = entry->res;
++
++	resource_list_for_each_entry(entry, &new->windows)
++		if (entry->res->flags & IORESOURCE_BUS)
++			res2 = entry->res;
++
++	return resource_overlaps(res1, res2);
 +}
 +
-+static struct pci_host_bridge_ops pci_host_ops = {
-+	.pci_ops = &pci_root_ops,
-+	.prepare = pci_host_bridge_prepare,
-+};
-+
- struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ struct pci_host_bridge *pci_create_host_bridge(
+ 		struct device *parent, int domain, int bus,
+ 		struct list_head *resources)
  {
- 	struct acpi_device *device = root->device;
-@@ -359,6 +372,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	LIST_HEAD(crs_res);
- 	LIST_HEAD(resources);
- 	struct pci_bus *bus;
-+	struct pci_host_bridge *host = NULL;
- 	struct pci_sysdata *sd;
- 	int node;
+ 	int error;
+-	struct pci_host_bridge *host;
++	struct pci_host_bridge *host, *tmp;
+ 	struct resource_entry *window, *n;
  
-@@ -425,14 +439,13 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 
- 		if (!setup_mcfg_map(info, domain, (u8)root->secondary.start,
- 				    (u8)root->secondary.end, root->mcfg_addr))
--			bus = pci_create_root_bus(NULL, domain, busnum,
--					&pci_root_ops, sd, &resources);
--
--		if (bus) {
--			pci_scan_child_bus(bus);
--			pci_set_host_bridge_release(
--				to_pci_host_bridge(bus->bridge),
--				release_pci_root_info, info);
-+			host = pci_scan_host_bridge(NULL, domain, busnum, sd,
-+					&resources, &pci_host_ops);
+ 	host = kzalloc(sizeof(*host), GFP_KERNEL);
+@@ -65,6 +85,21 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 	 */
+ 	host->domain = domain;
+ 	pci_host_assign_domain_nr(host);
++	mutex_lock(&pci_host_mutex);
++	list_for_each_entry(tmp, &pci_host_bridge_list, list) {
++		if (tmp->domain == host->domain
++			  && pci_host_busn_res_overlap(host, tmp)) {
++			pr_warn("pci host bridge pci%04x:%02x exist\n",
++					host->domain, bus);
++			mutex_unlock(&pci_host_mutex);
++			pci_free_resource_list(&host->windows);
++			kfree(host);
++			return NULL;
++		}
++	}
++	list_add_tail(&host->list, &pci_host_bridge_list);
++	mutex_unlock(&pci_host_mutex);
 +
-+		if (host) {
-+			bus = host->bus;
-+			pci_set_host_bridge_release(host,
-+					release_pci_root_info, info);
- 		} else {
- 			resource_list_free(&resources);
- 			teardown_mcfg_map(info);
-@@ -455,14 +468,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	return bus;
+ 	host->dev.release = pci_release_host_bridge_dev;
+ 	dev_set_name(&host->dev, "pci%04x:%02x",
+ 			host->domain, bus);
+@@ -80,6 +115,10 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 
+ void pci_free_host_bridge(struct pci_host_bridge *host)
+ {
++	mutex_lock(&pci_host_mutex);
++	list_del(&host->list);
++	mutex_unlock(&pci_host_mutex);
++
+ 	device_unregister(&host->dev);
  }
  
--int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
--{
--	struct pci_sysdata *sd = bridge->bus->sysdata;
--
--	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
--	return 0;
--}
--
- int __init pci_acpi_init(void)
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 25ac741..8517d1b 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1869,7 +1869,7 @@ static struct pci_bus *__pci_create_root_bus(
+ 		void *sysdata)
  {
- 	struct pci_dev *dev = NULL;
+ 	int error;
+-	struct pci_bus *b, *b2;
++	struct pci_bus *b;
+ 	struct resource_entry *window;
+ 	struct device *parent;
+ 	struct resource *res;
+@@ -1887,12 +1887,6 @@ static struct pci_bus *__pci_create_root_bus(
+ 	b->number = b->busn_res.start =
+ 		pci_host_first_busnr(bridge);
+ 	pci_bus_assign_domain_nr(b, parent);
+-	b2 = pci_find_bus(pci_domain_nr(b), b->number);
+-	if (b2) {
+-		/* If we already got to this bus through a different bridge, ignore it */
+-		dev_dbg(&b2->dev, "bus already known\n");
+-		goto err_out;
+-	}
+ 
+ 	bridge->bus = b;
+ 	b->bridge = get_device(&bridge->dev);
+@@ -1952,7 +1946,6 @@ static struct pci_bus *__pci_create_root_bus(
+ 
+ put_dev:
+ 	put_device(&bridge->dev);
+-err_out:
+ 	kfree(b);
+ 	return NULL;
+ }
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index f189dfb..91cba01 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -407,6 +407,7 @@ struct pci_host_bridge {
+ 	/* we use default bus resource if no bus resource provided */
+ 	struct resource busn_res;
+ 	struct list_head windows;	/* resource_entry */
++	struct list_head list;
+ 	void (*release_fn)(struct pci_host_bridge *);
+ 	void *release_data;
+ };
 -- 
 1.7.1
