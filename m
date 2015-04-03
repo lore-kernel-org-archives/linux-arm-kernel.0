@@ -1,77 +1,69 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 3 Apr 2015 17:25:55 +0800
-Subject: [PATCH v9 21/30] sparc/PCI: Use pci_scan_host_bridge() for simplicity
+Date: Fri, 3 Apr 2015 17:25:56 +0800
+Subject: [PATCH v9 22/30] parisc/PCI: Use pci_scan_root_bus() for simplicity
 In-Reply-To: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
 References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1428053164-28277-23-git-send-email-wangyijing@huawei.com>
+Message-ID: <1428053164-28277-24-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we could use pci_scan_host_bridge() to scan
-pci buses, provide sparc specific pci_host_bridge_ops.
+From: Yijing Wang <wangyijing0307@gmail.com>
+
+Now pci_bus_add_devices() has been ripped out
+from pci_scan_root_bus(), we could use pci_scan_root_bus()
+instead of pci_create_root_bus() + pci_scan_child_bus()
+for simplicity.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: "David S. Miller" <davem@davemloft.net>
-CC: sparclinux at vger.kernel.org
+CC: "James E.J. Bottomley" <jejb@parisc-linux.org>
+CC: linux-parisc at vger.kernel.org
 ---
- arch/sparc/kernel/pci.c |   28 ++++++++++++++++++++++------
- 1 files changed, 22 insertions(+), 6 deletions(-)
+ drivers/parisc/dino.c    |    4 ++--
+ drivers/parisc/lba_pci.c |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
-index e40e456..fa95a1d 100644
---- a/arch/sparc/kernel/pci.c
-+++ b/arch/sparc/kernel/pci.c
-@@ -650,12 +650,27 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
- 		pci_claim_bus_resources(child_bus);
- }
- 
-+static int pci_host_of_scan_bus(
-+		struct pci_host_bridge *host)
-+{
-+	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
-+	struct device_node *node = pbm->op->dev.of_node;
-+
-+	pci_of_scan_bus(pbm, node, host->bus);
-+	return pci_bus_child_max_busnr(host->bus);
-+}
-+
-+static struct pci_host_bridge_ops pci_host_ops = {
-+	.scan_bus = pci_host_of_scan_bus,
-+};
-+
- struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
- 				 struct device *parent)
- {
- 	LIST_HEAD(resources);
- 	struct device_node *node = pbm->op->dev.of_node;
- 	struct pci_bus *bus;
-+	struct pci_host_bridge *host;
- 
- 	printk("PCI: Scanning PBM %s\n", node->full_name);
- 
-@@ -667,16 +682,17 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
- 	pbm->busn.end	= pbm->pci_last_busno;
- 	pbm->busn.flags	= IORESOURCE_BUS;
- 	pci_add_resource(&resources, &pbm->busn);
--	bus = pci_create_root_bus(parent, pbm->index, pbm->pci_first_busno,
--			pbm->pci_ops, pbm, &resources);
--	if (!bus) {
--		printk(KERN_ERR "Failed to create bus for %s\n",
--		       node->full_name);
-+	pci_host_ops.pci_ops = pbm->pci_ops;
-+	host = pci_scan_host_bridge(parent, pbm->index, pbm->pci_first_busno,
-+			pbm, &resources, &pci_host_ops);
-+	if (!host) {
-+		pr_err("Failed to create host bridge pci%04x:%02x for %s\n",
-+		       pbm->index, pbm->pci_first_busno, node->full_name);
- 		pci_free_resource_list(&resources);
- 		return NULL;
+diff --git a/drivers/parisc/dino.c b/drivers/parisc/dino.c
+index f375252..146c3ff 100644
+--- a/drivers/parisc/dino.c
++++ b/drivers/parisc/dino.c
+@@ -985,7 +985,7 @@ static int __init dino_probe(struct parisc_device *dev)
+ 	** It's not used to avoid chicken/egg problems
+ 	** with configuration accessor functions.
+ 	*/
+-	dino_dev->hba.hba_bus = bus = pci_create_root_bus(&dev->dev,
++	dino_dev->hba.hba_bus = bus = pci_scan_root_bus(&dev->dev,
+ 			 0, dino_current_bus, &dino_cfg_ops, NULL, &resources);
+ 	if (!bus) {
+ 		printk(KERN_ERR "ERROR: failed to scan PCI bus on %s (duplicate bus number %d?)\n",
+@@ -996,7 +996,7 @@ static int __init dino_probe(struct parisc_device *dev)
+ 		return 0;
  	}
  
--	pci_of_scan_bus(pbm, node, bus);
-+	bus = host->bus;
- 	pci_bus_register_of_sysfs(bus);
+-	max = pci_scan_child_bus(bus);
++	max = pci_bus_child_max_busnr(bus);
+ 	pci_bus_update_busn_res_end(bus, max);
  
- 	pci_claim_bus_resources(bus);
+ 	/* This code *depends* on scanning being single threaded
+diff --git a/drivers/parisc/lba_pci.c b/drivers/parisc/lba_pci.c
+index 2949030..b630364 100644
+--- a/drivers/parisc/lba_pci.c
++++ b/drivers/parisc/lba_pci.c
+@@ -1563,14 +1563,14 @@ lba_driver_probe(struct parisc_device *dev)
+ 
+ 	dev->dev.platform_data = lba_dev;
+ 	lba_bus = lba_dev->hba.hba_bus =
+-		pci_create_root_bus(&dev->dev, 0, lba_dev->hba.bus_num.start,
++		pci_scan_root_bus(&dev->dev, 0, lba_dev->hba.bus_num.start,
+ 				    cfg_ops, NULL, &resources);
+ 	if (!lba_bus) {
+ 		pci_free_resource_list(&resources);
+ 		return 0;
+ 	}
+ 
+-	max = pci_scan_child_bus(lba_bus);
++	max = pci_bus_child_max_busnr(lba_bus);
+ 
+ 	/* This is in lieu of calling pci_assign_unassigned_resources() */
+ 	if (is_pdc_pat()) {
 -- 
 1.7.1
