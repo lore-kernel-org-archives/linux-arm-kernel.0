@@ -1,36 +1,389 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 2 Apr 2015 23:40:52 -0500
-Subject: [PATCH 0/3] clk: socfpga: Add clock driver for Arria10
-Message-ID: <1428036055-27607-1-git-send-email-dinguyen@opensource.altera.com>
+Date: Thu, 2 Apr 2015 23:40:55 -0500
+Subject: [PATCH 3/3] ARM: socfpga: dts: add clocks to the Arria10 platform
+In-Reply-To: <1428036055-27607-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1428036055-27607-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1428036055-27607-4-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Hi,
+Add all the clock nodes for the Arria10 platform. At the same time, update
+the peripherals with their respective clocks property.
 
-This patch series add the clock driver for the Arria10 platform. Although the
-Arria10 SoC's clock framework has some similarities the Cyclone/Arria 5, the
-differences are enough to warrant it's own driver, rather than polluting the
-existing driver with platform lookups.
-
-Dinh Nguyen (3):
-  clk: socfpga: update clk.h so for Arria10 platform to use
-  clk: socfpga: add a clock driver for the Arria 10 platform
-  ARM: socfpga: dts: add clocks to the Arria10 platform
-
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
  arch/arm/boot/dts/socfpga_arria10.dtsi | 298 ++++++++++++++++++++++++++++++++-
- drivers/clk/socfpga/Makefile           |   1 +
- drivers/clk/socfpga/clk-gate-a10.c     | 187 +++++++++++++++++++++
- drivers/clk/socfpga/clk-gate.c         |   4 -
- drivers/clk/socfpga/clk-periph-a10.c   | 131 +++++++++++++++
- drivers/clk/socfpga/clk-pll-a10.c      | 132 +++++++++++++++
- drivers/clk/socfpga/clk.c              |   7 +-
- drivers/clk/socfpga/clk.h              |  10 +-
- 8 files changed, 760 insertions(+), 10 deletions(-)
- create mode 100644 drivers/clk/socfpga/clk-gate-a10.c
- create mode 100644 drivers/clk/socfpga/clk-periph-a10.c
- create mode 100644 drivers/clk/socfpga/clk-pll-a10.c
+ 1 file changed, 294 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+index 8a05c47..341cb28 100644
+--- a/arch/arm/boot/dts/socfpga_arria10.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+@@ -98,6 +98,21 @@
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+ 
++					cb_intosc_hs_div2_clk: cb_intosc_hs_div2_clk {
++						#clock-cells = <0>;
++						compatible = "fixed-clock";
++					};
++
++					cb_intosc_ls_clk: cb_intosc_ls_clk {
++						#clock-cells = <0>;
++						compatible = "fixed-clock";
++					};
++
++					f2s_free_clk: f2s_free_clk {
++						#clock-cells = <0>;
++						compatible = "fixed-clock";
++					};
++
+ 					osc1: osc1 {
+ 						#clock-cells = <0>;
+ 						compatible = "fixed-clock";
+@@ -107,16 +122,279 @@
+ 						#address-cells = <1>;
+ 						#size-cells = <0>;
+ 						#clock-cells = <0>;
+-						compatible = "altr,socfpga-pll-clock";
+-						clocks = <&osc1>;
++						compatible = "altr,socfpga-a10-pll-clock";
++						clocks = <&osc1>, <&cb_intosc_ls_clk>,
++							 <&f2s_free_clk>;
++						reg = <0x40>;
++
++						main_mpu_base_clk: main_mpu_base_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&main_pll>;
++							div-reg = <0x140 0 11>;
++						};
++
++						main_noc_base_clk: main_noc_base_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&main_pll>;
++							div-reg = <0x144 0 11>;
++						};
++
++						main_emaca_clk: main_emaca_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&main_pll>;
++							reg = <0x68>;
++						};
++
++						main_emacb_clk: main_emacb_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&main_pll>;
++							reg = <0x6C>;
++						};
++
++						main_emac_ptp_clk: main_emac_ptp_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&main_pll>;
++							reg = <0x70>;
++						};
++
++						main_gpio_db_clk: main_gpio_db_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&main_pll>;
++							reg = <0x74>;
++						};
++
++						main_sdmmc_clk: main_sdmmc_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk"
++;
++							clocks = <&main_pll>;
++							reg = <0x78>;
++						};
++
++						main_s2f_usr0_clk: main_s2f_usr0_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&main_pll>;
++							reg = <0x7C>;
++						};
++
++						main_s2f_usr1_clk: main_s2f_usr1_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&main_pll>;
++							reg = <0x80>;
++						};
++
++						main_hmc_pll_ref_clk: main_hmc_pll_ref_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&main_pll>;
++							reg = <0x84>;
++						};
++
++						main_periph_ref_clk: main_periph_ref_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&main_pll>;
++							reg = <0x9C>;
++						};
+ 					};
+ 
+ 					periph_pll: periph_pll {
+ 						#address-cells = <1>;
+ 						#size-cells = <0>;
+ 						#clock-cells = <0>;
+-						compatible = "altr,socfpga-pll-clock";
+-						clocks = <&osc1>;
++						compatible = "altr,socfpga-a10-pll-clock";
++						clocks = <&osc1>, <&cb_intosc_ls_clk>,
++							 <&f2s_free_clk>, <&main_periph_ref_clk>;
++						reg = <0xC0>;
++
++						peri_mpu_base_clk: peri_mpu_base_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&periph_pll>;
++							div-reg = <0x140 16 11>;
++						};
++
++						peri_noc_base_clk: peri_noc_base_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&periph_pll>;
++							div-reg = <0x144 16 11>;
++						};
++
++						peri_emaca_clk: peri_emaca_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&periph_pll>;
++							reg = <0xE8>;
++						};
++
++						peri_emacb_clk: peri_emacb_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&periph_pll>;
++							reg = <0xEC>;
++						};
++
++						peri_emac_ptp_clk: peri_emac_ptp_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&periph_pll>;
++							reg = <0xF0>;
++						};
++
++						peri_gpio_db_clk: peri_gpio_db_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&periph_pll>;
++							reg = <0xF4>;
++						};
++
++						peri_sdmmc_clk: peri_sdmmc_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&periph_pll>;
++							reg = <0xF8>;
++						};
++
++						peri_s2f_usr0_clk: peri_s2f_usr0_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&periph_pll>;
++							reg = <0xFC>;
++						};
++
++						peri_s2f_usr1_clk: peri_s2f_usr1_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&periph_pll>;
++							reg = <0x100>;
++						};
++
++						peri_hmc_pll_ref_clk: peri_hmc_pll_ref_clk {
++							#clock-cells = <0>;
++							compatible = "altr,socfpga-a10-perip-clk";
++							clocks = <&periph_pll>;
++							reg = <0x104>;
++						};
++					};
++
++					mpu_free_clk: mpu_free_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-perip-clk";
++						clocks = <&main_mpu_base_clk>, <&peri_mpu_base_clk>,
++							 <&osc1>, <&cb_intosc_hs_div2_clk>,
++							 <&f2s_free_clk>;
++						reg = <0x60>;
++					};
++
++					noc_free_clk: noc_free_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-perip-clk";
++						clocks = <&main_noc_base_clk>, <&peri_noc_base_clk>,
++							 <&osc1>, <&cb_intosc_hs_div2_clk>,
++							 <&f2s_free_clk>;
++						reg = <0x64>;
++					};
++
++					s2f_user1_free_clk: s2f_user1_free_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-perip-clk";
++						clocks = <&main_s2f_usr1_clk>, <&peri_s2f_usr1_clk>,
++							 <&osc1>, <&cb_intosc_hs_div2_clk>,
++							 <&f2s_free_clk>;
++						reg = <0x104>;
++					};
++
++					sdmmc_free_clk: sdmmc_free_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-perip-clk";
++						clocks = <&main_sdmmc_clk>, <&peri_sdmmc_clk>,
++							 <&osc1>, <&cb_intosc_hs_div2_clk>,
++							 <&f2s_free_clk>;
++						fixed-divider = <4>;
++						reg = <0xF8>;
++					};
++
++					l4_main_clk: l4_main_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-gate-clk";
++						clocks = <&noc_free_clk>;
++						div-reg = <0xA8 0 2>;
++						clk-gate = <0x48 1>;
++					};
++
++					l4_mp_clk: l4_mp_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-gate-clk";
++						clocks = <&noc_free_clk>;
++						div-reg = <0xA8 8 2>;
++						clk-gate = <0x48 2>;
++					};
++
++					l4_sp_clk: l4_sp_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-gate-clk";
++						clocks = <&noc_free_clk>;
++						div-reg = <0xA8 16 2>;
++						clk-gate = <0x48 3>;
++					};
++
++					mpu_periph_clk: mpu_periph_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-gate-clk";
++						clocks = <&mpu_free_clk>;
++						fixed-divider = <4>;
++						clk-gate = <0x48 0>;
++					};
++
++					sdmmc_clk: sdmmc_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-gate-clk";
++						clocks = <&sdmmc_free_clk>;
++						clk-gate = <0xC8 5>;
++					};
++
++					qspi_clk: qspi_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-gate-clk";
++						clocks = <&l4_main_clk>;
++						clk-gate = <0xC8 11>;
++					};
++
++					nand_clk: nand_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-gate-clk";
++						clocks = <&l4_mp_clk>;
++						clk-gate = <0xC8 10>;
++					};
++
++					spi_m_clk: spi_m_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-gate-clk";
++						clocks = <&l4_main_clk>;
++						clk-gate = <0xC8 9>;
++					};
++
++					usb_clk: usb_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-gate-clk";
++						clocks = <&l4_mp_clk>;
++						clk-gate = <0xC8 8>;
++					};
++
++					s2f_usr1_clk: s2f_usr1_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-a10-gate-clk";
++						clocks = <&peri_s2f_usr1_clk>;
++						clk-gate = <0xC8 6>;
+ 					};
+ 				};
+ 		};
+@@ -268,6 +546,8 @@
+ 			reg = <0xff808000 0x1000>;
+ 			interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
+ 			fifo-depth = <0x400>;
++			clocks = <&l4_mp_clk>, <&sdmmc_free_clk>;
++			clock-names = "biu", "ciu";
+ 		};
+ 
+ 		ocram: sram at ffe00000 {
+@@ -291,24 +571,31 @@
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xffffc600 0x100>;
+ 			interrupts = <1 13 0xf04>;
++			clocks = <&mpu_periph_clk>;
+ 		};
+ 
+ 		timer0: timer0 at ffc02700 {
+ 			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 115 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffc02700 0x100>;
++			clocks = <&l4_sp_clk>;
++			clock-names = "timer";
+ 		};
+ 
+ 		timer1: timer1 at ffc02800 {
+ 			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffc02800 0x100>;
++			clocks = <&l4_sp_clk>;
++			clock-names = "timer";
+ 		};
+ 
+ 		timer2: timer2 at ffd00000 {
+ 			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 117 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffd00000 0x100>;
++			clocks = <&l4_sp_clk>;
++			clock-names = "timer";
+ 		};
+ 
+ 		timer3: timer3 at ffd00100 {
+@@ -331,6 +618,7 @@
+ 			interrupts = <0 111 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
++			clocks = <&l4_sp_clk>;
+ 		};
+ 
+ 		usbphy0: usbphy at 0 {
+@@ -343,6 +631,8 @@
+ 			compatible = "snps,dwc2";
+ 			reg = <0xffb00000 0xffff>;
+ 			interrupts = <0 95 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&usb_clk>;
++			clock-names = "otg";
+ 			phys = <&usbphy0>;
+ 			phy-names = "usb2-phy";
+ 			status = "disabled";
 -- 
 2.2.1
