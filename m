@@ -1,72 +1,74 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 13:34:12 -0700
-Subject: [GIT PULL] qcom dt changes for 4.1
-In-Reply-To: <alpine.DEB.2.02.1503271147110.17719@galak-ubuntu.qualcomm.com>
-References: <alpine.DEB.2.02.1503271147110.17719@galak-ubuntu.qualcomm.com>
-Message-ID: <20150403203412.GA23023@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 3 Apr 2015 22:34:33 +0200
+Subject: [GIT PULL] Allwinner DT additions for 4.1
+In-Reply-To: <20150403200331.GT23023@localhost>
+References: <20150325212124.GA17842@lukather>
+ <20150403200331.GT23023@localhost>
+Message-ID: <20150403203433.GH14618@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Apr 03, 2015 at 01:03:31PM -0700, Olof Johansson wrote:
+> Hi,
+> 
+> On Wed, Mar 25, 2015 at 02:21:24PM -0700, Maxime Ripard wrote:
+> > Hi Arnd, Kevin, Olof,
+> > 
+> > This is the usual pull request for the Allwinner DT changes.
+> > 
+> > This branch is merging the clock branch I sent to mike to remove some
+> > bisection and dependency issues.
+> 
+> We normally prefer to see the external branch sent as a separate pull request,
+> and Mike should have been cc:d on it.
 
-On Fri, Mar 27, 2015 at 11:49:26AM -0500, Kumar Gala wrote:
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-4.1
-> 
-> for you to fetch changes up to 1be95ed01c190ca74677798348306a50ad0d46c1:
-> 
->   ARM: dts: qcom: Add idle state device nodes for 8064 (2015-03-25 16:38:16 -0500)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based Device Tree Updates for v4.1
-> 
-> * Updated GIC binding to include Qualcomm GIC compatible
-> * Added binding and updated dts for TCSR (Top Control and Status Register)
-> * Added LCC clocks to IPQ8064/APQ8064/MSM8960 device trees
-> * Added LPASS support to IPQ8064 device tree
-> * Added SPMI PMIC & device support to APQ8084 and MSM8974
-> * Added support for MSM8916/APQ8016 SoC (64-bit) and MTP8916/SBC8016 boards
-> * Added support for qcom,saw2 & qcom,idle-states on MSM8974/APQ8084/APQ8064
-> 
-> ----------------------------------------------------------------
-> Andy Gross (5):
->       mfd: qcom,tcsr: Add device tree binding for TCSR
->       arm: dts: qcom: Add TCSR support for APQ8064
->       arm: dts: qcom: Add TCSR support for IPQ8064
->       arm: dts: qcom: Add TCSR support for MSM8660
->       arm: dts: qcom: Add TCSR support for MSM8960
-> 
-> Georgi Djakov (1):
->       dt-bindings: Add #defines for MSM8916 clocks and resets
-> 
-> Ivan T. Ivanov (3):
->       arm: dts: qcom: Add SPMI PMIC Arbiter nodes for APQ8084 and MSM8974
->       arm: dts: qcom: Add 8x74 chipset SPMI PMIC's nodes
->       arm: dts: qcom: Add APQ8084 chipset SPMI PMIC's nodes
-> 
-> Kenneth Westfield (1):
->       arm: dts: qcom: Add LPASS Audio HW to IPQ8064 device tree
-> 
-> Kumar Gala (4):
->       arm: qcom: dts: gic: add compatible string for Qualcomm MSM GICs
->       arm: dts: qcom: Add LCC nodes
->       arm64: dts: Add Qualcomm MSM8916 SoC and evaluation board dts
->       arm64: dts: Add Qualcomm APQ8016 SBC evaluation board dts
+There was a separate pull request to Mike, that he pulled.
 
-We are still merging 64-bit material in a separate branch. Since you're mixing
-contents here it means that conflicts between the two percolate all the way up
-to our pull requests to Linus.
+> > The following changes since commit f1017969661dd33ead5ba7c3f4a0793c6611441a:
+> > 
+> >   clk: sunxi: Add pll6 / 4 clock output to sun4i-a10-pll6 (2015-03-25 11:46:41 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.1
+> > 
+> > for you to fetch changes up to b4f8a14b1262c7e965d6f2412cf7295fbaef0d6f:
+> > 
+> >   ARM: dts: sunxi: Update ahb clocks for sun5i and sun7i (2015-03-25 11:50:09 -0700)
+> > 
+> > ----------------------------------------------------------------
+> > Allwinner DT additions for 4.1, take 1
+> > 
+> > All the device tree related changes for the 4.1 merge window.
+> > 
+> > It has a rather big diffstat, because of a lot of mechanical and harmless
+> > changes, as described below.
+> > 
+> > There is mostly:
+> >   - The end of the DT relicensing. All our DT should now be under the dual
+> >     X11/GPL license.
+> >   - Convertion of all the DT to a label based syntax, instead of duplicating
+> >     the tree like was done before.
+> 
+> Ugh. This is a huge amount of churn just for the sake of it. It's much
+> better if these kind of conversions happen over time as the files are
+> touched for other reasons.
 
-I've cherry-picked the branch contents here instead, so I've picked up the
-contents but spread across next/dt and next/arm64. Please keep them separate in
-the future so we can merge branches instead.
+That was actually asked by Arnd.
 
+I'm fine with dropping the changes, but that's not a really good
+signal to send after asking for boring refactorings like this one.
 
-Thanks,
+Maxime
 
--Olof
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150403/c91e91ac/attachment.sig>
