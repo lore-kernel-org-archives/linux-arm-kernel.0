@@ -1,44 +1,31 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Fri, 3 Apr 2015 14:21:48 -0500
-Subject: ARM errata 430973 on multi platform kernels (was: OMAP3-N900: Add
- microphone bias voltages)
-In-Reply-To: <20150403183942.GV10805@atomide.com>
-References: <1425236828-28349-1-git-send-email-jarkko.nikula@bitmer.com>
- <55197A12.1050009@bitmer.com> <20150330164237.GJ10805@atomide.com>
- <55198BA4.5010207@bitmer.com> <20150330175051.GK10805@atomide.com>
- <20150331123233.GA15103@earth> <20150401194734.GT10805@atomide.com>
- <20150403163553.GA16247@earth> <20150403183942.GV10805@atomide.com>
-Message-ID: <CAOCHtYjCtmJNrkD0x78bm9b7hNvTKsZD2C2m5N=nR7p73R4zcg@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 3 Apr 2015 22:23:41 +0300
+Subject: [PATCH 1/3] ARM: pxa: add gpio-charger configuration on poodle
+In-Reply-To: <874moxt42l.fsf@free.fr>
+References: <1427711971-8164-1-git-send-email-dbaryshkov@gmail.com>
+ <874moxt42l.fsf@free.fr>
+Message-ID: <CALT56yOwU2Lu2y1NDiD45KBm=FSm_V+m_0VbN1D5Gfcz7Xd7Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> And yes, for armhf userland one gets random oopses at least on the
->> Nokia N900. AFAIK this is not true for all ARMv7 processors
->> (especially non omaps), though.
->>
->> > http://www.spinics.net/lists/linux-omap/msg108511.html
->> >
->> > See also 5c86c5339c56 ("ARM: omap2plus_defconfig: Enable ARM erratum
->> > 430973 for omap3").
->>
->> For me the random oopses occur without this config flag and are
->> fixed by it. The workaround is not very suitable for multi platform
->> kernels, though, since its enabled also for unaffected platforms.
->>
->> As far as I can see the CONFIG_ARM_ERRATA_430973 flag is checked
->> in proc-v7.S and in proc-v7-2level.S. I think the first file is
->> irrelevant, since it can be fixed later (see workaround in
->> nokia_n900_legacy_init in pdata-quirks.c).
+2015-04-03 22:16 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
+> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
 >
-> Yes so it seems, and the bootloaders should really set it. It's
-> also disabled for multiplatform builds.
+>> Add declration of gpio-charger device for Sharp SL-5600 poodle device.
+> Typo here ^.
+>
+> And I'd like in the commit message to know :
+>  - is it the main battery charger (I could look into the code, I know, but I'd
+>    like it to be in the commit message anyway) ?
 
-These are now done in u-boot as of: v2015.04-rc4
+I'll add it to v2.
 
-http://git.denx.de/?p=u-boot.git;a=commit;h=c6f90e1418a84fe5fa463b38403bd1845cb6a59c
+>  - was it successfully tested on Sharp SL-5600 ?
 
-Regards,
+:)) I wouldn't dare to submit a code that wasn't tested on hw w/o
+special notice.
+
 
 -- 
-Robert Nelson
-https://rcn-ee.com/
+With best wishes
+Dmitry
