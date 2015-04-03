@@ -1,37 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 13:56:03 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.0
-In-Reply-To: <551D02F3.9020905@free-electrons.com>
-References: <551D02F3.9020905@free-electrons.com>
-Message-ID: <20150403205603.GI23023@localhost>
+Date: Fri, 3 Apr 2015 13:57:06 -0700
+Subject: [GIT PULL 1/4] ARM: imx: cleanup for 4.1
+In-Reply-To: <CAAQ0ZWQXUJ0O+WBojuoTscW0L1tAGxR3JWYL0=7Jaej5D7zGJw@mail.gmail.com>
+References: <CAAQ0ZWQXUJ0O+WBojuoTscW0L1tAGxR3JWYL0=7Jaej5D7zGJw@mail.gmail.com>
+Message-ID: <20150403205706.GJ23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 02, 2015 at 10:50:59AM +0200, Gregory CLEMENT wrote:
-> Hi,
-> 
-> Here is the first pull request for fixes for mvebu for v4.0.
-> It comes pretty late because I was waiting for feedback on it and
-> I forgot it :/
-> 
-> There is only one commit but which fixes a real problem: when CPU idle
-> is activated on Armada 38x, the system becomes instable on heavy load.
-> 
-> Gregory
-> 
+On Mon, Mar 30, 2015 at 10:02:09PM +0800, Shawn Guo wrote:
 > The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 > 
 >   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.0
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+> tags/imx-cleanup-4.1
 > 
-> for you to fetch changes up to 548ae94c1cc7fc120848757249b9a542b1080ffb:
+> for you to fetch changes up to dc98b0cb6175016f31c8ef1685dd0d69476aa495:
 > 
->   ARM: mvebu: Disable CPU Idle on Armada 38x (2015-03-31 18:47:33 +0200)
+>   ARM: imx_v4_v5_defconfig: Remove CONFIG_MACH_MX25_3DS (2015-03-13
+> 22:14:59 +0800)
+> 
+> ----------------------------------------------------------------
+> The i.MX cleanup for v4.1:
+>  - Convert i.MX25 to be a DT only platform and remove the code that is
+>    only used by non-DT support
+>  - A couple trivial cleanup on iomux-v3 code
 
-Merged.
+Nice cleanup. Merged, thanks.
 
 
 -Olof
