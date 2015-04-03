@@ -1,112 +1,68 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 3 Apr 2015 17:26:04 +0800
-Subject: [PATCH v9 30/30] PCI: Clean up CONFIG_PCI_DOMAINS_GENERIC
-In-Reply-To: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
-References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1428053164-28277-32-git-send-email-wangyijing@huawei.com>
+From: b52261@freescale.com (Jianwei Wang)
+Date: Fri, 3 Apr 2015 17:35:55 +0800
+Subject: [PATCH v4 0/4] drm/layerscape: Add Freescale DCU DRM driver 
+Message-ID: <1428053759-3129-1-git-send-email-b52261@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we could clean up CONFIG_PCI_DOMAINS_GENERIC.
+@Daniel,
+Do you have any other comments for this driver?
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- arch/arm/Kconfig          |    3 ---
- arch/arm64/Kconfig        |    3 ---
- drivers/pci/host-bridge.c |   11 ++++++-----
- drivers/pci/pci.c         |    2 --
- 4 files changed, 6 insertions(+), 13 deletions(-)
+@Stefan,
+Please help test this driver on vybrid if possible, I have test it on vybrid twr board.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9f1f09a..b5dab6c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1283,9 +1283,6 @@ config PCI_DOMAINS
- 	bool
- 	depends on PCI
- 
--config PCI_DOMAINS_GENERIC
--	def_bool PCI_DOMAINS
--
- config PCI_NANOENGINE
- 	bool "BSE nanoEngine PCI support"
- 	depends on SA1100_NANOENGINE
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1b8e973..4b1cc27 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -242,9 +242,6 @@ config PCI
- config PCI_DOMAINS
- 	def_bool PCI
- 
--config PCI_DOMAINS_GENERIC
--	def_bool PCI
--
- config PCI_SYSCALL
- 	def_bool PCI
- 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index f193136..eb901b2 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -4,6 +4,8 @@
- 
- #include <linux/kernel.h>
- #include <linux/pci.h>
-+#include <linux/of_pci.h>
-+#include <linux/of.h>
- #include <linux/module.h>
- 
- #include "pci.h"
-@@ -82,12 +84,13 @@ struct pci_host_bridge *pci_create_host_bridge(
- 	resource_list_for_each_entry_safe(window, n, resources)
- 		list_move_tail(&window->node, &host->windows);
- 	/*
--	 * If support CONFIG_PCI_DOMAINS_GENERIC, use
-+	 * If domain == -1, we need to use
- 	 * pci_host_assign_domain_nr() to update domain
- 	 * number.
- 	 */
- 	host->domain = domain;
--	pci_host_assign_domain_nr(host);
-+	if (host->domain == -1)
-+		pci_host_assign_domain_nr(host);
- 	mutex_lock(&pci_host_mutex);
- 	list_for_each_entry(tmp, &pci_host_bridge_list, list) {
- 		if (tmp->domain == host->domain
-@@ -169,7 +172,6 @@ int pci_get_new_domain_nr(void)
- 	return atomic_inc_return(&__domain_nr);
- }
- 
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
- static int pci_assign_domain_nr(struct device *dev)
- {
- 	static int use_dt_domains = -1;
-@@ -215,11 +217,10 @@ static int pci_assign_domain_nr(struct device *dev)
- 	return domain;
- }
- #endif
--#endif
- 
- static void pci_host_assign_domain_nr(struct pci_host_bridge *host)
- {
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
-+#ifdef CONFIG_PCI_DOMAINS
- 	host->domain = pci_assign_domain_nr(host->dev.parent);
- #endif
- }
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 044801c..5b18429 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -10,8 +10,6 @@
- #include <linux/kernel.h>
- #include <linux/delay.h>
- #include <linux/init.h>
--#include <linux/of.h>
--#include <linux/of_pci.h>
- #include <linux/pci.h>
- #include <linux/pm.h>
- #include <linux/slab.h>
--- 
-1.7.1
+If anyone has any objections, please let me know.
+
+Changed in V4:
+-This version doesn't have functionality changed. Just a minor adjustment.
+
+Changed in V3:
+- Test driver on Vybrid board and add compatible string
+- Remove unused functions
+- set default crtc for encoder
+- replace legacy functions with atomic help functions
+- Set the unique name of the DRM device
+- Implement irq handle function for vblank interrupt
+
+Changed in v2:
+- Add atomic support
+- Modify bindings file
+- Rename node for compatibility
+- Move platform related code out for compatibility
+
+Added in v1:
+- Add support for DCU display controller on the Freescale LS102x SoCs.
+- Create a primary plane, a fb created for fbdev, a crtc, a connector for TFT LCD panel, an encoder.
+
+
+ .../devicetree/bindings/drm/fsl/fsl,dcu.txt        |  50 ++++
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/fsl/Kconfig                        |  17 ++
+ drivers/gpu/drm/fsl/Makefile                       |   7 +
+ drivers/gpu/drm/fsl/fsl_dcu_drm_connector.c        | 194 ++++++++++++
+ drivers/gpu/drm/fsl/fsl_dcu_drm_connector.h        |  30 ++
+ drivers/gpu/drm/fsl/fsl_dcu_drm_crtc.c             | 165 +++++++++++
+ drivers/gpu/drm/fsl/fsl_dcu_drm_crtc.h             |  26 ++
+ drivers/gpu/drm/fsl/fsl_dcu_drm_drv.c              | 329 +++++++++++++++++++++
+ drivers/gpu/drm/fsl/fsl_dcu_drm_drv.h              | 210 +++++++++++++
+ drivers/gpu/drm/fsl/fsl_dcu_drm_fbdev.c            |  26 ++
+ drivers/gpu/drm/fsl/fsl_dcu_drm_kms.c              |  42 +++
+ drivers/gpu/drm/fsl/fsl_dcu_drm_kms.h              |  17 ++
+ drivers/gpu/drm/fsl/fsl_dcu_drm_plane.c            | 192 ++++++++++++
+ drivers/gpu/drm/fsl/fsl_dcu_drm_plane.h            |  23 ++
+ 16 files changed, 1331 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/drm/fsl/fsl,dcu.txt
+ create mode 100644 drivers/gpu/drm/fsl/Kconfig
+ create mode 100644 drivers/gpu/drm/fsl/Makefile
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_connector.c
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_connector.h
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_crtc.c
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_crtc.h
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_drv.c
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_drv.h
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_fbdev.c
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_kms.c
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_kms.h
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_plane.c
+ create mode 100644 drivers/gpu/drm/fsl/fsl_dcu_drm_plane.h
