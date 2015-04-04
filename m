@@ -1,24 +1,166 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 4 Apr 2015 15:39:47 +0200
-Subject: [PATCH 1/2] ARM: dts: sun7i: Add dts file for the Orangepi SBC
-In-Reply-To: <1428137994-18343-1-git-send-email-hdegoede@redhat.com>
-References: <1428137994-18343-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150404133947.GN14618@lukather>
+Date: Sat, 4 Apr 2015 16:06:47 +0200
+Subject: [PATCH 2/2] sunxi: a20-LIME2 define board specific operating
+ points
+In-Reply-To: <551F9E99.9060307@gmail.com>
+References: <55143D0D.6030104@gmail.com> <20150330231704.GB23664@lukather>
+ <551F9E99.9060307@gmail.com>
+Message-ID: <20150404140647.GO14618@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 04, 2015 at 10:59:53AM +0200, Hans de Goede wrote:
-> The Orangepi is a development board using the Allwinner A20 SoC, with 1G RAM,
-> microsd slot, HDMI, 1Gbit ethernet, USB wifi, Micro USB (otg), sata, 4 USB A
-> ports, ir receiver and a headphones jack.
+On Sat, Apr 04, 2015 at 09:19:37AM +0100, Iain Paton wrote:
+> On 31/03/15 00:17, Maxime Ripard wrote:
+> > On Thu, Mar 26, 2015 at 05:08:29PM +0000, Iain Paton wrote:
+> >> these settings override the inappropriate ones in the dtsi with the
+> >> manufacturers provided settings from their 3.4.x fex file for this board
+> > 
+> > Inappropriate how?
 > 
-> Also see:
-> http://linux-sunxi.org/Xunlong_Orange_Pi
-> http://www.orangepi.org/
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> inappropriate in that the dtsi sets values that cause the board to lockup 
+> or to be unstable
 
-Merged these two patches. Thanks!
+And it's the whole point of it. If the DTSI sets inappropriate values
+that locks up your system, then it's because the board uses this
+regulator. If the board uses it, appropriate values must be defined in
+the board DTS.
+
+> > I'd rather have a better common operating points set and change that
+> > to accomodate all boards, rather than duplicating that information
+> > everywhere.
+> 
+> then anything that you have common needs to cope with the worst cases 
+> for *all* boards, to the detriment of anything that's capable of doing
+> better. i.e. the smallest most conservative subset.
+> 
+> Whether we like it or not, stuff like this is simply going to end up 
+> being board specific. You can't easily deal with cases like a particular 
+> PCB design requiring an extra 0.05v due to a too-thin trace somewhere 
+> without having board-specific knowledge.
+> 
+> So rather than us, as software people, trying to second guess the board 
+> designers, I believe we should simply use the settings they provide if 
+> we have them in the fex files. Likely the manufacturer has tested those 
+> settings on a much larger number of boards than we'll ever be able to do.
+
+Except that everything happening with cpufreq is internal to the
+SoC. So unless you can back up the fact that different revisions of
+the SoC *need* different OPPs, then no, we're going to have the same
+for each and every board.
+
+> The default settings for a board need to be reliable for everyone.
+
+Exactly. And the FEX files have been shown wrong already on that.
+
+> >> +	#cooling-cells = <2>;
+> > 
+> > This is also defined in the DTSI.
+> 
+> Yes, exactly. The point being to completely isolate the board from changes 
+> to this section of the dtsi.
+> 
+> To further illustrate, let's take a look at the sun7i opp table in your 
+> sunxi/for-next tree
+> 
+> /* kHz    uV */
+> 960000  1400000
+> 912000  1400000
+> 864000  1300000
+> 720000  1200000
+> 528000  1100000
+> 312000  1000000
+> 144000  900000
+> 
+> Comparing to the 38 A20 fex files in https://github.com/linux-sunxi/sunxi-boards 
+> as of today
+> 
+> boot_freq: 912=37, 1008=1
+> max_freq: 1200=1, 1008=10, 912=27
+> min_freq: 720MHz=7, 408MHz=3, 60MHz=28
+
+Again, the FEX files have been proven wrong several times on this
+already, so using them as argument is not really meaningful in any
+way.
+
+> The dvfs section doesn't define 960MHz in any of the 38 files, so that entry 
+> is pure conjecture and likely not properly tested by any of the manufacturers.
+
+That's true. Feel free to edit the DTSI.
+
+> On the voltage front:
+> 912MHz: 1425=7, 1400=27, 1350=4
+> 864MHz: 1350=7, 1300=27, 1250=4
+> 720MHz: 1300=1, 1250=7,  1200=30
+> 528MHz: 1150=8, 1100=30
+> 312MHz: 1100=8, 1050=27, 1000=3
+> 
+> 144MHz is only defined for 12 out of 38 boards
+> 144MHz: 1050=9, 1000=3
+> 
+> There are additional settings at 792MHz and 624MHz in the fex files, both
+> defined by 26 out of 38 boards.
+> 
+> 1008MHz @ 1450 is defined by all 38.
+
+And has been proven not reliable on some. Do you want to come back on
+that "properly tested by any of the manufacturers" argument?
+
+> To come to a generic subset, we need to exclude things as follows
+> 1. anything greater than the lowest max_freq
+> 2. anything less than the highest min_freq
+> 3. anything less than the highest required voltage at a given frequency
+> 
+> That leaves us with this:
+> 
+> /* kHz    uV */
+> 912000  1425000
+> 864000  1350000
+> 720000  1300000
+> 
+> Even then, we can't guarantee those three will be safe or reliable for
+> everything. The A20 datasheet gives 1.4v as the absolute maximum which 
+> means we need to remove the 912MHz completely as some devices require 
+> overvolting to reach it and that may be unsafe for the rest.
+> 
+> So a generic dtsi subset is limited to
+> 
+> /* kHz    uV */
+> 864000  1350000
+> 720000  1300000
+> 
+> as that's the subset that covers all devices we have data on and doesn't
+> involve overclocking, overvolting, undervolting, operating outside AllWinner
+> SoC ratings, outside device manufacturer specified settings, and doesn't
+> require any board specific knowledge.
+> 
+> So in the case of a generic, not board-specific, dtsi file most of what's 
+> currently in the dtsi is inappropriate for a large proportion of devices.
+> The commonality is tiny, without board specific knowledge we can't do any 
+> better.
+> 
+> While we can be relatively confident the remaining two settings will work on 
+> almost all boards, confidence in the other settings is at best uncertain.
+> I certainly have little interest in 7.9% at 312MHz, or 0% at 144MHz
+> possibility of success. 
+> While the faster speeds aren't quite so bad, you're still suggesting that 
+> 18-21% of boards having problems is ok. 
+> Sorry, thats simply not acceptable.
+
+Indeed, and that's not what I'm suggesting at all. What I do suggest
+is to figure out a set of OPPs that are known to be working for
+everyone.
+
+Do you really feel like sunxi is so special and soooo different from
+any other ARM SoC, running on virtually any ARM board on earth but
+sunxi, properly tested (by properly, I do mean properly.), shipped
+into products, and actually using a common set of OPPs?
+
+> I hope this explains my point of view and why I believe this data to be 
+> board specific stuff that belongs in the boards dts file and not in the dtsi.
+
+I guess we do have a very different point of view. Yours is "just
+trust whatever the fex file tells us", mine is "fex file is going to
+be wrong/incomplete, let's figure out our own".
 
 Maxime
 
@@ -32,4 +174,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150404/6448e8b1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150404/2eedc9fb/attachment.sig>
