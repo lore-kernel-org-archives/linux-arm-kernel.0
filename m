@@ -1,125 +1,131 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 4 Apr 2015 10:16:56 +0200
-Subject: [PATCH v4 3/6] Documentation: DT: Document twl4030-madc-battery
- bindings
-In-Reply-To: <D659872E-E276-4E00-BAFC-1E461EDA1FA7@goldelico.com>
-References: <1426022847-30912-1-git-send-email-marek@goldelico.com>
- <1426022847-30912-4-git-send-email-marek@goldelico.com>
- <20150311152414.GX5264@atomide.com>
- <844740CD-C95B-4411-A2C8-4906F58DBEE8@goldelico.com>
- <20150311164442.GA5264@atomide.com> <20150331072643.GB30788@amd>
- <BC5A7447-CAD7-4CCE-8F08-8CEFBB5C6905@goldelico.com>
- <20150401201605.GA11421@amd>
- <D659872E-E276-4E00-BAFC-1E461EDA1FA7@goldelico.com>
-Message-ID: <20150404081655.GD31064@amd>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Sat, 04 Apr 2015 09:19:37 +0100
+Subject: [PATCH 2/2] sunxi: a20-LIME2 define board specific operating
+ points
+In-Reply-To: <20150330231704.GB23664@lukather>
+References: <55143D0D.6030104@gmail.com> <20150330231704.GB23664@lukather>
+Message-ID: <551F9E99.9060307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >> Please propose your own code doing that so that we can test if it is
-> >> better.
-> > 
-> > So, how does this look?
-> > 
-> > It looks to me like you have cca 0.1 Ohm resistance in your system,
+On 31/03/15 00:17, Maxime Ripard wrote:
+> On Thu, Mar 26, 2015 at 05:08:29PM +0000, Iain Paton wrote:
+>> these settings override the inappropriate ones in the dtsi with the
+>> manufacturers provided settings from their 3.4.x fex file for this board
 > 
-> This is completely unknown.
+> Inappropriate how?
+
+inappropriate in that the dtsi sets values that cause the board to lockup 
+or to be unstable
+
+> I'd rather have a better common operating points set and change that
+> to accomodate all boards, rather than duplicating that information
+> everywhere.
+
+then anything that you have common needs to cope with the worst cases 
+for *all* boards, to the detriment of anything that's capable of doing
+better. i.e. the smallest most conservative subset.
+
+Whether we like it or not, stuff like this is simply going to end up 
+being board specific. You can't easily deal with cases like a particular 
+PCB design requiring an extra 0.05v due to a too-thin trace somewhere 
+without having board-specific knowledge.
+
+So rather than us, as software people, trying to second guess the board 
+designers, I believe we should simply use the settings they provide if 
+we have them in the fex files. Likely the manufacturer has tested those 
+settings on a much larger number of boards than we'll ever be able to do.
+
+The default settings for a board need to be reliable for everyone.
+
+>> +	#cooling-cells = <2>;
 > 
-> > and are using cca 75mA while discharging, and charge by cca 1.4A.
-> 
-> Where do you get these figures from?
+> This is also defined in the DTSI.
 
-Least squares fitting of my coefficients to your tables.
+Yes, exactly. The point being to completely isolate the board from changes 
+to this section of the dtsi.
 
-> A GTA04 board discharges usually between 50 and 400 mA (depending on activities)
-> and if you turn on WiFi, it will be up to 600 mA. If you use 3G it can draw even more
-> during operation.
+To further illustrate, let's take a look at the sun7i opp table in your 
+sunxi/for-next tree
 
-How big battery do you have? According to least squares fitting,
-assuming maximum charge of .46A, you were taking about 25mA when
-doing the discharge test.
+/* kHz    uV */
+960000  1400000
+912000  1400000
+864000  1300000
+720000  1200000
+528000  1100000
+312000  1000000
+144000  900000
 
-> Total current going in is 500-800 mA (depending on USB negotiations) and this is
-> split into system operation and charging current. So 1.4A charging current is not
-> possible. Rather 200-500 mA.
-> 
-> So it might be that the battery is discharged although the system is connected
-> to a charger.
+Comparing to the 38 A20 fex files in https://github.com/linux-sunxi/sunxi-boards 
+as of today
 
-Yah, and your battery meter will be wrong in such case, as will be
-mine, because they are based on same information. The thing is, mine
-can be improved without adding more tables. 
+boot_freq: 912=37, 1008=1
+max_freq: 1200=1, 1008=10, 912=27
+min_freq: 720MHz=7, 408MHz=3, 60MHz=28
 
-> > It is tricky to do a good job near 0%... or anywhere else. See for
-> > example
-> > 
-> > http://cseweb.ucsd.edu/~trosing/lectures/battery.pdf
-> > 
-> > You start a call, percentage goes down, end a call, it will go
-> > back up. I'm pretty sure you will not be able to make a call with "5%"
-> > indication from your code at low battery temperature (say -10C).
-> 
-> The whole system is heating up a little, so that you never have -10C for the
-> battery.
+The dvfs section doesn't define 960MHz in any of the 38 files, so that entry 
+is pure conjecture and likely not properly tested by any of the manufacturers.
 
-Umm. When not calling, your phone should not heat itself up. And you
-definitely can power it down, leave it in outer pocket, then power it
-up. It is actually something people do when they want to preserve battery...
+On the voltage front:
+912MHz: 1425=7, 1400=27, 1350=4
+864MHz: 1350=7, 1300=27, 1250=4
+720MHz: 1300=1, 1250=7,  1200=30
+528MHz: 1150=8, 1100=30
+312MHz: 1100=8, 1050=27, 1000=3
 
-> I think you are trying to solve situations that don?t exist in practice.
-> 
-> And AFAIK, the GTA04 board is the only user of this driver in case the battery
-> has no built-in fuel gauge. So why improve it beyond what the GTA04
-> users need?
+144MHz is only defined for 12 out of 38 boards
+144MHz: 1050=9, 1000=3
 
-Because then other users can share the same code, and because you
-avoid big ugly tables in dts.
+There are additional settings at 792MHz and 624MHz in the fex files, both
+defined by 26 out of 38 boards.
 
-> I repeat myself: this driver is not built for highest precision because there are
-> better methods (fuel gauge chip). These might not be available so this fall-back
-> driver has been built.
-> 
-> It is definitively better than no driver and worse than the optimum.
+1008MHz @ 1450 is defined by all 38.
 
-And my email suggested solution better than your driver, so why not
-just use it?
+To come to a generic subset, we need to exclude things as follows
+1. anything greater than the lowest max_freq
+2. anything less than the highest min_freq
+3. anything less than the highest required voltage at a given frequency
+
+That leaves us with this:
+
+/* kHz    uV */
+912000  1425000
+864000  1350000
+720000  1300000
+
+Even then, we can't guarantee those three will be safe or reliable for
+everything. The A20 datasheet gives 1.4v as the absolute maximum which 
+means we need to remove the 912MHz completely as some devices require 
+overvolting to reach it and that may be unsafe for the rest.
+
+So a generic dtsi subset is limited to
+
+/* kHz    uV */
+864000  1350000
+720000  1300000
+
+as that's the subset that covers all devices we have data on and doesn't
+involve overclocking, overvolting, undervolting, operating outside AllWinner
+SoC ratings, outside device manufacturer specified settings, and doesn't
+require any board specific knowledge.
+
+So in the case of a generic, not board-specific, dtsi file most of what's 
+currently in the dtsi is inappropriate for a large proportion of devices.
+The commonality is tiny, without board specific knowledge we can't do any 
+better.
+
+While we can be relatively confident the remaining two settings will work on 
+almost all boards, confidence in the other settings is at best uncertain.
+I certainly have little interest in 7.9% at 312MHz, or 0% at 144MHz
+possibility of success. 
+While the faster speeds aren't quite so bad, you're still suggesting that 
+18-21% of boards having problems is ok. 
+Sorry, thats simply not acceptable.
 
 
-> > #perc = percent(volt)
-> > compute(charging, 1)
-> > compute(discharging, 0)
-> 
-> Please explain what you calculate here. Especially what ?Badness? is?
+I hope this explains my point of view and why I believe this data to be 
+board specific stuff that belongs in the boards dts file and not in the dtsi.
 
-Badness is error in least squares method.
-
-Here are updated tables:
-
-pavel at duo:~/g/tui/ofone$ ./liion_maps
-Charging
-Voltage  4.2 V ; table  100 %  internal voltage 4.18 V current 0.078 A computed  97 %
-Voltage  4.1 V ; table  75 %  internal voltage 4.08 V current 0.078 A computed  87 %
-Voltage  4.0 V ; table  55 %  internal voltage 3.93 V current 0.233 A computed  69 %
-Voltage  3.9 V ; table  25 %  internal voltage 3.76 V current 0.467 A computed  26 %
-Voltage  3.8 V ; table  5 %  internal voltage 3.66 V current 0.467 A computed  3 %
-Voltage  3.7 V ; table  2 %  internal voltage 3.56 V current 0.467 A computed  2 %
-Voltage  3.6 V ; table  1 %  internal voltage 3.46 V current 0.467 A computed  1 %
-Voltage  3.3 V ; table  0 %  internal voltage 3.16 V current 0.467 A computed  -1 %
-Badness  395.4861761427434
-Discharging
-Voltage  4.2 V ; table  100 %  internal voltage 4.21 V current -0.025 A computed  100 %
-Voltage  4.1 V ; table  95 %  internal voltage 4.11 V current -0.025 A computed  91 %
-Voltage  4.0 V ; table  70 %  internal voltage 4.01 V current -0.025 A computed  79 %
-Voltage  3.8 V ; table  50 %  internal voltage 3.81 V current -0.025 A computed  46 %
-Voltage  3.7 V ; table  10 %  internal voltage 3.71 V current -0.025 A computed  3 %
-Voltage  3.6 V ; table  5 %  internal voltage 3.61 V current -0.025 A computed  2 %
-Voltage  3.3 V ; table  0 %  internal voltage 3.31 V current -0.025 A computed  0 %
-Badness  171.69576218433212
-pavel at duo:~/g/tui/ofone$ python
-
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Rgds,
+Iain
