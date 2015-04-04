@@ -1,63 +1,92 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Sat, 4 Apr 2015 13:09:24 -0600
-Subject: [PATCH v18 01/11] ARM: qcom: Add Subsystem Power Manager (SPM)
- driver
-In-Reply-To: <7hlhi8280c.fsf@deeprootsystems.com>
-References: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
- <1427315136-44321-2-git-send-email-lina.iyer@linaro.org>
- <7hlhi8280c.fsf@deeprootsystems.com>
-Message-ID: <20150404190924.GB24500@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 4 Apr 2015 14:48:59 -0500
+Subject: [PATCH 1/3] PCI: Introduce pci_bus_addr_t
+In-Reply-To: <CAErSpo55rpO6SNeY57zZ8ah0PJ3eY+-L92vUJwYiRn4tCfLtJg@mail.gmail.com>
+References: <1427857069-6789-1-git-send-email-yinghai@kernel.org>
+ <1427857069-6789-2-git-send-email-yinghai@kernel.org>
+ <20150403193234.GD10892@google.com>
+ <20150403205201.GF10892@google.com>
+ <CAE9FiQVqAEvoLDRZMcNFki0gLMQiyQd2VYivjAh1teRGeuNwBw@mail.gmail.com>
+ <CAErSpo55rpO6SNeY57zZ8ah0PJ3eY+-L92vUJwYiRn4tCfLtJg@mail.gmail.com>
+Message-ID: <CAL_JsqJyH==8OtkcU8_P4_47U6qe6FYqj-WUZ20_Y+iC_OF4_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03 2015 at 15:54 -0600, Kevin Hilman wrote:
->Lina Iyer <lina.iyer@linaro.org> writes:
+On Sat, Apr 4, 2015 at 7:46 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Fri, Apr 3, 2015 at 10:34 PM, Yinghai Lu <yinghai@kernel.org> wrote:
+>> On Fri, Apr 3, 2015 at 1:52 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>>> [+cc Sam (commented on previous versions), Russell, linux-arm-kernel, Ralf,
+>>> linux-mips, Ben, linuxppc-dev, x86]
+>>>
+>>> On Fri, Apr 03, 2015 at 02:32:34PM -0500, Bjorn Helgaas wrote:
+>>>> On Tue, Mar 31, 2015 at 07:57:47PM -0700, Yinghai Lu wrote:
+>>>> > David Ahern found commit d63e2e1f3df9 ("sparc/PCI: Clip bridge windows
+>>>> > to fit in upstream windows") broke booting on sparc/T5-8.
+>>>> >
+>>>> > In the boot log, there is
+>>>> >   pci 0000:06:00.0: reg 0x184: can't handle BAR above 4GB (bus address
+>>>> >   0x110204000)
+>>>> > but that only could happen when dma_addr_t is 32-bit.
+>>>> >
+>>>> > According to David Miller, all DMA occurs behind an IOMMU and these
+>>>> > IOMMUs only support 32-bit addressing, therefore dma_addr_t is
+>>>> > 32-bit on sparc64.
+>>>> >
+>>>> > Let's introduce pci_bus_addr_t instead of using dma_addr_t,
+>>>> > and pci_bus_addr_t will be 64-bit on 64-bit platform or X86_PAE.
+>>>> >
+>>>> > Fixes: commit d63e2e1f3df9 ("sparc/PCI: Clip bridge windows to fit in upstream windows")
+>>>> > Fixes: commit 23b13bc76f35 ("PCI: Fail safely if we can't handle BARs larger than 4GB")
+>>>> > Link: http://lkml.kernel.org/r/CAE9FiQU1gJY1LYrxs+ma5LCTEEe4xmtjRG0aXJ9K_Tsu+m9Wuw at mail.gmail.com
+>>>> > Reported-by: David Ahern <david.ahern@oracle.com>
+>>>> > Tested-by: David Ahern <david.ahern@oracle.com>
+>>>> > Signed-off-by: Yinghai Lu <yinghai@kernel.org>
+>>>> > Cc: <stable@vger.kernel.org> #3.19
+>>>> > ---
+>>>> >  drivers/pci/Kconfig |  4 ++++
+>>>> >  drivers/pci/bus.c   | 10 +++++-----
+>>>> >  drivers/pci/probe.c | 12 ++++++------
+>>>> >  include/linux/pci.h | 12 +++++++++---
+>>>> >  4 files changed, 24 insertions(+), 14 deletions(-)
+>>>> >
+>>>> > diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+>>>> > index 7a8f1c5..6a5a269 100644
+>>>> > --- a/drivers/pci/Kconfig
+>>>> > +++ b/drivers/pci/Kconfig
+>>>> > @@ -1,6 +1,10 @@
+>>>> >  #
+>>>> >  # PCI configuration
+>>>> >  #
+>>>> > +config PCI_BUS_ADDR_T_64BIT
+>>>> > +   def_bool y if (64BIT || X86_PAE)
+>>>> > +   depends on PCI
+>>>>
+>>>> We're going to use pci_bus_addr_t in some places where we previously used
+>>>> dma_addr_t, which means pci_bus_addr_t should be at least as large as
+>>>> dma_addr_t.  Can you enforce that directly, e.g., with something like this?
+>>>>
+>>>>     def_bool y if (ARCH_DMA_ADDR_T_64BIT || 64BIT || X86_PAE)
+>>
+>> then should use
+>>
+>> def_bool y if (ARCH_DMA_ADDR_T_64BIT || 64BIT)
 >
->> SPM is a hardware block that controls the peripheral logic surrounding
->> the application cores (cpu/l$). When the core executes WFI instruction,
->> the SPM takes over the putting the core in low power state as
->> configured. The wake up for the SPM is an interrupt at the GIC, which
->> then completes the rest of low power mode sequence and brings the core
->> out of low power mode.
->>
->> The SPM has a set of control registers that configure the SPMs
->> individually based on the type of the core and the runtime conditions.
->> SPM is a finite state machine block to which a sequence is provided and
->> it interprets the bytes and executes them in sequence. Each low power
->> mode that the core can enter into is provided to the SPM as a sequence.
->>
->> Configure the SPM to set the core (cpu or L2) into its low power mode,
->> the index of the first command in the sequence is set in the SPM_CTL
->> register. When the core executes ARM wfi instruction, it triggers the
->> SPM state machine to start executing from that index. The SPM state
->> machine waits until the interrupt occurs and starts executing the rest
->> of the sequence until it hits the end of the sequence. The end of the
->> sequence jumps the core out of its low power mode.
->>
->> Add support for an idle driver to set up the SPM to place the core in
->> Standby or Standalone power collapse mode when the core is idle.
->>
->> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
->> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
->> Original tree available at -
->> git://codeaurora.org/quic/la/kernel/msm-3.10.git
->>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Kevin Hilman <khilman@linaro.org>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> OK, would you mind updating this series, incorporating the doc
+> updates, and reposting it?
 >
->Acked-by: Kevin Hilman <khilman@linaro.org>
->
->and also tested on qcom-apq8064-ifc6410 and
->qcom-msm8974-sony-xperia-honami and saw the various states being entered
->on all CPUs.
+> I think there's still an unresolved question about the OF parsing code.
 
-Thanks Kevin.
+Got a pointer to what that is? I'll take a guess. Generally, we make
+the parsing code independent of the kernel addr sizes and use u64
+types. The DT sizes and kernel sizes are not always aligned. For
+example, an LPAE capable platform running a non-LPAE kernel build.
 
+Rob
 
 >
->Tested-by: Kevin Hilman <khilman@linaro.org>
+> Bjorn
 >
->Kevin
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
