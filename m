@@ -1,36 +1,63 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 4 Apr 2015 19:54:01 +0100
-Subject: [PATCH] sunxi: a10-lime: add regulator nodes
-In-Reply-To: <551FE1A8.9060709@redhat.com>
-References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
- <55169622.5070007@gmail.com> <20150330222311.GY23664@lukather>
- <CABxcv=nCROiQ2COrTmnwvhtSJzh83BWKaxgn0EkFuwW8HqSiQw@mail.gmail.com>
- <20150404123302.GY6023@sirena.org.uk>
- <20150404125645.GK14618@lukather> <551FE1A8.9060709@redhat.com>
-Message-ID: <20150404185401.GB6023@sirena.org.uk>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Sat, 4 Apr 2015 13:09:24 -0600
+Subject: [PATCH v18 01/11] ARM: qcom: Add Subsystem Power Manager (SPM)
+ driver
+In-Reply-To: <7hlhi8280c.fsf@deeprootsystems.com>
+References: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
+ <1427315136-44321-2-git-send-email-lina.iyer@linaro.org>
+ <7hlhi8280c.fsf@deeprootsystems.com>
+Message-ID: <20150404190924.GB24500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 04, 2015 at 03:05:44PM +0200, Hans de Goede wrote:
-> On 04-04-15 14:56, Maxime Ripard wrote:
+On Fri, Apr 03 2015 at 15:54 -0600, Kevin Hilman wrote:
+>Lina Iyer <lina.iyer@linaro.org> writes:
+>
+>> SPM is a hardware block that controls the peripheral logic surrounding
+>> the application cores (cpu/l$). When the core executes WFI instruction,
+>> the SPM takes over the putting the core in low power state as
+>> configured. The wake up for the SPM is an interrupt at the GIC, which
+>> then completes the rest of low power mode sequence and brings the core
+>> out of low power mode.
+>>
+>> The SPM has a set of control registers that configure the SPMs
+>> individually based on the type of the core and the runtime conditions.
+>> SPM is a finite state machine block to which a sequence is provided and
+>> it interprets the bytes and executes them in sequence. Each low power
+>> mode that the core can enter into is provided to the SPM as a sequence.
+>>
+>> Configure the SPM to set the core (cpu or L2) into its low power mode,
+>> the index of the first command in the sequence is set in the SPM_CTL
+>> register. When the core executes ARM wfi instruction, it triggers the
+>> SPM state machine to start executing from that index. The SPM state
+>> machine waits until the interrupt occurs and starts executing the rest
+>> of the sequence until it hits the end of the sequence. The end of the
+>> sequence jumps the core out of its low power mode.
+>>
+>> Add support for an idle driver to set up the SPM to place the core in
+>> Standby or Standalone power collapse mode when the core is idle.
+>>
+>> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
+>> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
+>> Original tree available at -
+>> git://codeaurora.org/quic/la/kernel/msm-3.10.git
+>>
+>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Kevin Hilman <khilman@linaro.org>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>
+>Acked-by: Kevin Hilman <khilman@linaro.org>
+>
+>and also tested on qcom-apq8064-ifc6410 and
+>qcom-msm8974-sony-xperia-honami and saw the various states being entered
+>on all CPUs.
 
-> >What I do see though, is that if we drop the DTSI, all our
-> >boards will have to define all the PMIC regulators, even if they're
-> >not used at all on the board, just to have the right behaviour. And
-> >that's clearly a no-go for me.
+Thanks Kevin.
 
-> Right the advantage of the dtsi is that it lasts ALL regulators,
-> so that unused ones actually get turned off, where as a dts not using
-> the dtsi and only containing those it actually uses will result in
-> the unused regulators being untouched (since they are not listed)
-> rather then turned off.
 
-Like I said in reply to Maxim a .dtsi does not seem the place to do this
-- if it's safe to do it we should be doing it in the core code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150404/0006e92a/attachment.sig>
+>
+>Tested-by: Kevin Hilman <khilman@linaro.org>
+>
+>Kevin
