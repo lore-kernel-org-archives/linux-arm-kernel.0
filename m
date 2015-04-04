@@ -1,70 +1,124 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 4 Apr 2015 14:56:45 +0200
-Subject: [PATCH] sunxi: a10-lime: add regulator nodes
-In-Reply-To: <20150404123302.GY6023@sirena.org.uk>
-References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
- <55169622.5070007@gmail.com> <20150330222311.GY23664@lukather>
- <CABxcv=nCROiQ2COrTmnwvhtSJzh83BWKaxgn0EkFuwW8HqSiQw@mail.gmail.com>
- <20150404123302.GY6023@sirena.org.uk>
-Message-ID: <20150404125645.GK14618@lukather>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 04 Apr 2015 15:00:10 +0200
+Subject: [PATCH 1/2] ARM: dts: sun7i: Add dts file for the Orangepi SBC
+In-Reply-To: <20150404124754.GJ14618@lukather>
+References: <1428137994-18343-1-git-send-email-hdegoede@redhat.com>
+ <20150404124754.GJ14618@lukather>
+Message-ID: <551FE05A.6000108@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi,
 
-On Sat, Apr 04, 2015 at 01:33:02PM +0100, Mark Brown wrote:
-> On Sat, Apr 04, 2015 at 02:18:12PM +0200, Javier Martinez Canillas wrote:
-> > On Tue, Mar 31, 2015 at 12:23 AM, Maxime Ripard
-> 
-> > > No, it's defining which regulators are provided by the regulator, and
-> > > the voltage boundaries they have. It doesn't make any assumption with
-> > > regards to what is connected to what, and if a particular regulator is
-> > > connected to something. That's something that the board DTS should
-> > > describe as accurately as possible.
-> 
-> This is broken - think about what this means.  If you are defining a
-> voltage (or any other constraint) you're saying that it's safe to use on
-> a given board. If you provide a voltage constraint saying that the
-> maximum allowable range for a voltage regulator is safe.  That's
-> unlikely to be true on any given board, usually only a limited set of
-> regulators can vary voltages at runtime safely at all and then rarely
-> over their full supported range.  Similarly for other constraints, for
-> example allowing a regulator to be disabled when there are driverless
-> things (or drivers without regulator support or mappings for that board)
-> relying on it is going to break.
-> 
-> Providing a list of the regulators is safe but not really doing a huge
-> amount.
-> 
-> Note that I've not seen the original patch so it's possible it's doing
-> something different.
+On 04-04-15 14:47, Maxime Ripard wrote:
+> Hi Hans,
+>
+> On Sat, Apr 04, 2015 at 10:59:53AM +0200, Hans de Goede wrote:
+>> The Orangepi is a development board using the Allwinner A20 SoC, with 1G RAM,
+>> microsd slot, HDMI, 1Gbit ethernet, USB wifi, Micro USB (otg), sata, 4 USB A
+>> ports, ir receiver and a headphones jack.
+>>
+>> Also see:
+>> http://linux-sunxi.org/Xunlong_Orange_Pi
+>> http://www.orangepi.org/
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   arch/arm/boot/dts/Makefile               |   1 +
+>>   arch/arm/boot/dts/sun7i-a20-orangepi.dts | 229 +++++++++++++++++++++++++++++++
+>>   2 files changed, 230 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/sun7i-a20-orangepi.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 2426f0a..d9b609d 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -551,6 +551,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>>   	sun7i-a20-olinuxino-lime.dtb \
+>>   	sun7i-a20-olinuxino-lime2.dtb \
+>>   	sun7i-a20-olinuxino-micro.dtb \
+>> +	sun7i-a20-orangepi.dtb \
+>>   	sun7i-a20-pcduino3.dtb \
+>>   	sun7i-a20-pcduino3-nano.dtb \
+>>   	sun7i-a20-wexler-tab7200.dtb
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-orangepi.dts b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
+>> new file mode 100644
+>> index 0000000..2ef79b7
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
+>> @@ -0,0 +1,229 @@
+>> +/*
+>> + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
+>> + *
+>> + * Hans de Goede <hdegoede@redhat.com>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + *     You should have received a copy of the GNU General Public
+>> + *     License along with this file; if not, write to the Free
+>> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>> + *     MA 02110-1301 USA
+>> + *
+>> + * Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "sun7i-a20.dtsi"
+>> +#include "sunxi-common-regulators.dtsi"
+>> +
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +#include <dt-bindings/interrupt-controller/irq.h>
+>> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>> +
+>> +/ {
+>> +	model = "Orange Pi";
+>> +	compatible = "xunlong,orangepi", "allwinner,sun7i-a20";
+>> +
+>> +	aliases {
+>> +		serial0 = &uart0;
+>> +	};
+>
+> This should have a matching /chosen/stdout-path property.
+>
+> The rest of the patch is fine, I can apply it and add the property, if
+> that's ok for you.
 
-If this model is broken, then I don't see how the full regulator
-support is not broken.
+Yes that ok with me.
 
-Our PMIC DTSI sets up the regulators with the ranges supported by the
-PMIC. We have two cases then:
-  - Either the regulator is not used on the board, and it will be
-    disabled by the framework.
-  - Or the regulator is actually used on the board, it will be defined
-    in the DTS, possibly with additional constraints.
+Thanks,
 
-I really don't see how your above comments apply to that
-situation. What I do see though, is that if we drop the DTSI, all our
-boards will have to define all the PMIC regulators, even if they're
-not used at all on the board, just to have the right behaviour. And
-that's clearly a no-go for me.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150404/7c372f6e/attachment.sig>
+Hans
