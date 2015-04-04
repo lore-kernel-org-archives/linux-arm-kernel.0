@@ -1,80 +1,100 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 04 Apr 2015 13:06:23 +0200
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Sat, 4 Apr 2015 14:18:12 +0200
 Subject: [PATCH] sunxi: a10-lime: add regulator nodes
-In-Reply-To: <551FBD45.3060503@gmail.com>
+In-Reply-To: <20150330222311.GY23664@lukather>
 References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
  <55169622.5070007@gmail.com> <20150330222311.GY23664@lukather>
- <551FBD45.3060503@gmail.com>
-Message-ID: <551FC5AF.3040601@redhat.com>
+Message-ID: <CABxcv=nCROiQ2COrTmnwvhtSJzh83BWKaxgn0EkFuwW8HqSiQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[adding Mark Brown and Stephen Warren to cc list]
 
-On 04-04-15 12:30, Iain Paton wrote:
-> On 30/03/15 23:23, Maxime Ripard wrote:
+Hello,
+
+On Tue, Mar 31, 2015 at 12:23 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sat, Mar 28, 2015 at 11:53:06AM +0000, Iain Paton wrote:
+>> On 27/03/15 11:02, Hans de Goede wrote:
+>> > Hi Iain,
+>> >
+>> > On 27-03-15 11:58, Iain Paton wrote:
+>> >> add pmic regulator definitions matching the manufacturers 3.4.x fex
+>> >> file.
+>> >>
+>> >> Signed-off-by: Iain Paton <ipaton0@gmail.com>
+>> >> ---
+>> >>
+>> >> As this file belongs to Hans and he decided not to use axp209.dtsi in
+>> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315612.html
+>> >> then I won't add it here.
+>> >
+>> > That was because using it was breaking stuff, but now that we know better
+>> > which regulators are used for what, and which one we most add an always-on;
+>> > property too, I would greatly prefer you to acually use axp209.dtsi, see
+>> > e.g. the sun5i-a13-utoo-p66.dts file where I'm using it.
+>> >
+>> > Can you please respin this patch using axp209.dtsi?
+>> >
+>> > Also please do not add nodes for unused regulators, like the ldo-s for the csi-s.
+>>
+>> You would prefer that the csi is broken on the lime then?
 >
->> CSI is not usable (no driver for it), neither it is actually used by
->> default on the lime, so disabling the regulator is the right thing to
->> do.
+> CSI is not usable (no driver for it), neither it is actually used by
+> default on the lime, so disabling the regulator is the right thing to
+> do.
 >
-> My userspace code works just fine, until the regulator gets turned off.
-
-So you've userspace code to use the csi interface? Cool! Any chance you
-can publish this somewhere. I've writing v4l2 drivers for the csi
-on the sunxi SoCs somewhere (low) on my todo list.
-
-> Anyway, I don't have the patience Hans showed with the simplefb stuff.
-> So consider yourselves successful in wearing me down. I'm done debating
-> any of this. One less contributor to linux-sunxi for you to worry about,
-> I won't bother you anymore.
-
-I'm sorry to hear that, it would have helped tremendously here if
-you had explained that you actually have a camera sensor hooked up
-and are using that with an upstream kernel right from the start.
-
-As I've hopefully shown when merging your u-boot patches we certainly
-welcome you as a contributor, and I do hope you will keep contributing
-in the future.
-
-As for this specific patch I'm still of the opinion that your original
-patch is not the right way forward, we are using axp209.dtsi with all
-new boards and we are slowly moving existing boards over too.
-
-Note that it is only a matter of time until someone does submit
-a patch which follows the standard way of doing things for sunxi
-boards and then your camera sensors will stop working.
-
-Recent kernel support something known as devicetree overlays which
-I believe is the way forward with this, what we would like to see
-for cases like this one is to have a patch in the main dts which
-works as Maxime and I requested, and then use a dts overlay to
-enable ldo3 and ldo4 for your specific situation. This solution
-should also be future proof, since as said someone will make the
-requested changes eventually as we plan to move all boards to
-using axp209.dtsi and not enabling unnecessary regulators.
-
-You will likely object to me labeling the ldo3 and ldo4 regulators
-as unnecessary but think this through for a moment Olimex has
-sold thousands of lime boards, how much of those do you think
-will have camera sensors attached? For the default upstream
-dts file we need to do what is right for the normal / default
-use case here. And for people who have special hardware /
-daughtboards attached that is exactly what devicetree overlays
-are designed to handle.
-
-Regards,
-
-Hans
-
-
-
-
+>> Unlike the cubieboards, ldo3 & ldo4 really are used on the olimex
+>> boards. So it seems that as yet you still don't know enough about
+>> which regulators are used, or you wouldn't be asking for that.
 >
->> Too bad.
+> They are not used. They are connected to something that is not usable
+> in itself, so leaving them enabled is just useless.
 >
-> For who?
+>> That's the major disadvantage of axp209.dtsi, the regulator node
+>> isn't describing the pmic at all. Instead it's describing the stuff
+>> connected to the pmic outputs, which is undeniably board specific
+>> and therefore totally unsuitable for a generic file. Leading to
+>> every board needing to override everything regardless.
 >
-> Rgds,
-> Iain
+> No, it's defining which regulators are provided by the regulator, and
+> the voltage boundaries they have. It doesn't make any assumption with
+> regards to what is connected to what, and if a particular regulator is
+> connected to something. That's something that the board DTS should
+> describe as accurately as possible.
 >
+>> So no, I'm not going to respin the patch. I strongly believe using
+>> axp209.dtsi is the wrong thing to do here.  If that means the patch
+>> doesn't make it in, then so be it.
+>
+> Too bad.
+>
+
+I'm not familiar with the sunxi platform but just wanted to mention
+that AFAIK Mark Brown thinks that generic PMIC .dtsi files describing
+regulators is not a good idea. At least he nacked [0] when I tried to
+do something similar to avoid having duplicated DTS fragments for the
+tps65090 PMU used in the Exynos Chromebooks. But I've added him as cc
+in case I misunderstood something.
+
+Stephen Warren (cc'ed too) also said that those files are not very
+useful [1] since are largely content free and the regulators
+description would have to be duplicated in the DTS anyways since that
+information is very board specific. Which is the point that Ian makes
+for not using the axp209.dtsi.
+
+The only two platforms that have included .dtsi for PMICs are sunxi
+and omap (i.e: twl4030.dtsi) but Mark said that at least in the case
+of the twl4030 pmic, the .dtsi is broken [0].
+
+As I said, I'm not particularly interested in sunxi but I think it is
+good to have consistency on how things are done across the different
+platforms.
+
+> Maxime
+
+Best regards,
+Javier
+
+[0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/278983.html
+[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279265.html
