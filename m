@@ -1,131 +1,271 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Sat, 04 Apr 2015 09:19:37 +0100
-Subject: [PATCH 2/2] sunxi: a20-LIME2 define board specific operating
- points
-In-Reply-To: <20150330231704.GB23664@lukather>
-References: <55143D0D.6030104@gmail.com> <20150330231704.GB23664@lukather>
-Message-ID: <551F9E99.9060307@gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat,  4 Apr 2015 10:59:53 +0200
+Subject: [PATCH 1/2] ARM: dts: sun7i: Add dts file for the Orangepi SBC
+Message-ID: <1428137994-18343-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/15 00:17, Maxime Ripard wrote:
-> On Thu, Mar 26, 2015 at 05:08:29PM +0000, Iain Paton wrote:
->> these settings override the inappropriate ones in the dtsi with the
->> manufacturers provided settings from their 3.4.x fex file for this board
-> 
-> Inappropriate how?
+The Orangepi is a development board using the Allwinner A20 SoC, with 1G RAM,
+microsd slot, HDMI, 1Gbit ethernet, USB wifi, Micro USB (otg), sata, 4 USB A
+ports, ir receiver and a headphones jack.
 
-inappropriate in that the dtsi sets values that cause the board to lockup 
-or to be unstable
+Also see:
+http://linux-sunxi.org/Xunlong_Orange_Pi
+http://www.orangepi.org/
 
-> I'd rather have a better common operating points set and change that
-> to accomodate all boards, rather than duplicating that information
-> everywhere.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/sun7i-a20-orangepi.dts | 229 +++++++++++++++++++++++++++++++
+ 2 files changed, 230 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-orangepi.dts
 
-then anything that you have common needs to cope with the worst cases 
-for *all* boards, to the detriment of anything that's capable of doing
-better. i.e. the smallest most conservative subset.
-
-Whether we like it or not, stuff like this is simply going to end up 
-being board specific. You can't easily deal with cases like a particular 
-PCB design requiring an extra 0.05v due to a too-thin trace somewhere 
-without having board-specific knowledge.
-
-So rather than us, as software people, trying to second guess the board 
-designers, I believe we should simply use the settings they provide if 
-we have them in the fex files. Likely the manufacturer has tested those 
-settings on a much larger number of boards than we'll ever be able to do.
-
-The default settings for a board need to be reliable for everyone.
-
->> +	#cooling-cells = <2>;
-> 
-> This is also defined in the DTSI.
-
-Yes, exactly. The point being to completely isolate the board from changes 
-to this section of the dtsi.
-
-To further illustrate, let's take a look at the sun7i opp table in your 
-sunxi/for-next tree
-
-/* kHz    uV */
-960000  1400000
-912000  1400000
-864000  1300000
-720000  1200000
-528000  1100000
-312000  1000000
-144000  900000
-
-Comparing to the 38 A20 fex files in https://github.com/linux-sunxi/sunxi-boards 
-as of today
-
-boot_freq: 912=37, 1008=1
-max_freq: 1200=1, 1008=10, 912=27
-min_freq: 720MHz=7, 408MHz=3, 60MHz=28
-
-The dvfs section doesn't define 960MHz in any of the 38 files, so that entry 
-is pure conjecture and likely not properly tested by any of the manufacturers.
-
-On the voltage front:
-912MHz: 1425=7, 1400=27, 1350=4
-864MHz: 1350=7, 1300=27, 1250=4
-720MHz: 1300=1, 1250=7,  1200=30
-528MHz: 1150=8, 1100=30
-312MHz: 1100=8, 1050=27, 1000=3
-
-144MHz is only defined for 12 out of 38 boards
-144MHz: 1050=9, 1000=3
-
-There are additional settings at 792MHz and 624MHz in the fex files, both
-defined by 26 out of 38 boards.
-
-1008MHz @ 1450 is defined by all 38.
-
-To come to a generic subset, we need to exclude things as follows
-1. anything greater than the lowest max_freq
-2. anything less than the highest min_freq
-3. anything less than the highest required voltage at a given frequency
-
-That leaves us with this:
-
-/* kHz    uV */
-912000  1425000
-864000  1350000
-720000  1300000
-
-Even then, we can't guarantee those three will be safe or reliable for
-everything. The A20 datasheet gives 1.4v as the absolute maximum which 
-means we need to remove the 912MHz completely as some devices require 
-overvolting to reach it and that may be unsafe for the rest.
-
-So a generic dtsi subset is limited to
-
-/* kHz    uV */
-864000  1350000
-720000  1300000
-
-as that's the subset that covers all devices we have data on and doesn't
-involve overclocking, overvolting, undervolting, operating outside AllWinner
-SoC ratings, outside device manufacturer specified settings, and doesn't
-require any board specific knowledge.
-
-So in the case of a generic, not board-specific, dtsi file most of what's 
-currently in the dtsi is inappropriate for a large proportion of devices.
-The commonality is tiny, without board specific knowledge we can't do any 
-better.
-
-While we can be relatively confident the remaining two settings will work on 
-almost all boards, confidence in the other settings is at best uncertain.
-I certainly have little interest in 7.9% at 312MHz, or 0% at 144MHz
-possibility of success. 
-While the faster speeds aren't quite so bad, you're still suggesting that 
-18-21% of boards having problems is ok. 
-Sorry, thats simply not acceptable.
-
-
-I hope this explains my point of view and why I believe this data to be 
-board specific stuff that belongs in the boards dts file and not in the dtsi.
-
-Rgds,
-Iain
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2426f0a..d9b609d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -551,6 +551,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-olinuxino-lime.dtb \
+ 	sun7i-a20-olinuxino-lime2.dtb \
+ 	sun7i-a20-olinuxino-micro.dtb \
++	sun7i-a20-orangepi.dtb \
+ 	sun7i-a20-pcduino3.dtb \
+ 	sun7i-a20-pcduino3-nano.dtb \
+ 	sun7i-a20-wexler-tab7200.dtb
+diff --git a/arch/arm/boot/dts/sun7i-a20-orangepi.dts b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
+new file mode 100644
+index 0000000..2ef79b7
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
+@@ -0,0 +1,229 @@
++/*
++ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
++ *
++ * Hans de Goede <hdegoede@redhat.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun7i-a20.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Orange Pi";
++	compatible = "xunlong,orangepi", "allwinner,sun7i-a20";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_orangepi>;
++
++		green {
++			label = "orangepi:green:usr";
++			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>; /* PH24 */
++		};
++	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gmac_power_pin_orangepi>;
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
++	};
++};
++
++&ahci {
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_pins_rgmii_a>;
++	phy = <&phy1>;
++	phy-mode = "rgmii";
++	phy-supply = <&reg_gmac_3v3>;
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++#include "axp209.dtsi"
++
++&ir0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir0_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_orangepi>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
++	cd-inverted;
++	status = "okay";
++};
++
++&pio {
++	mmc0_cd_pin_orangepi: mmc0_cd_pin at 0 {
++		allwinner,pins = "PH10";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	usb2_vbus_pin_bananapro: usb2_vbus_pin at 0 {
++		allwinner,pins = "PH22";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	gmac_power_pin_orangepi: gmac_power_pin at 0 {
++		allwinner,pins = "PH23";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	led_pins_orangepi: led_pins at 0 {
++		allwinner,pins = "PH24";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	usb1_vbus_pin_bananapro: usb1_vbus_pin at 0 {
++		allwinner,pins = "PH26";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-pll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_usb1_vbus {
++	pinctrl-0 = <&usb1_vbus_pin_bananapro>;
++	gpio = <&pio 7 26 GPIO_ACTIVE_HIGH>; /* PH26 */
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	pinctrl-0 = <&usb2_vbus_pin_bananapro>;
++	gpio = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
+-- 
+2.3.4
