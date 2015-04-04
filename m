@@ -1,57 +1,43 @@
-From: v1ron@v1ros.org (Roman Volkov)
-Date: Sat, 4 Apr 2015 15:27:20 +0300
-Subject: [PATCH v3 0/2] WM8505/WM8650 DT fixes for SD card controller
-In-Reply-To: <20150301233911.2352ce48@v1ron-s7>
-References: <1423130878-3894-1-git-send-email-v1ron@v1ros.org>
- <1425226007-2757-1-git-send-email-rvolkov@v1ros.org>
- <2119510.55A8Br1LeL@wuerfel> <20150301233911.2352ce48@v1ron-s7>
-Message-ID: <20150404152720.1059e741@v1ron-s7>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 4 Apr 2015 13:33:02 +0100
+Subject: [PATCH] sunxi: a10-lime: add regulator nodes
+In-Reply-To: <CABxcv=nCROiQ2COrTmnwvhtSJzh83BWKaxgn0EkFuwW8HqSiQw@mail.gmail.com>
+References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
+ <55169622.5070007@gmail.com> <20150330222311.GY23664@lukather>
+ <CABxcv=nCROiQ2COrTmnwvhtSJzh83BWKaxgn0EkFuwW8HqSiQw@mail.gmail.com>
+Message-ID: <20150404123302.GY6023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? Sun, 1 Mar 2015 23:39:11 +0300
-Roman Volkov <rvolkov@v1ros.org> ?????:
+On Sat, Apr 04, 2015 at 02:18:12PM +0200, Javier Martinez Canillas wrote:
+> On Tue, Mar 31, 2015 at 12:23 AM, Maxime Ripard
 
-> ? Sun, 01 Mar 2015 20:52:55 +0100
-> Arnd Bergmann <arnd@arndb.de> ?????:
-> 
-> > On Sunday 01 March 2015 19:06:45 Roman Volkov wrote:
-> > > This patch set enables SD controller support for WM8650 and
-> > > fixes minor errors in WM8505 Device Tree file.
-> > > 
-> > > Changes in v3:
-> > > 1. Add minor fixes for WM8505 SDHC node
-> > > 
-> > > Tested on both WM8505 and WM8650.
-> > > 
-> > > Roman Volkov (2):
-> > >   dts: vt8500: Add SDHC node to DTS file for WM8650
-> > >   dts: vt8500: Fix errors in SDHC node for WM8505
-> > > 
-> > >  arch/arm/boot/dts/wm8505.dtsi | 4 ++--
-> > >  arch/arm/boot/dts/wm8650.dtsi | 9 +++++++++
-> > >  2 files changed, 11 insertions(+), 2 deletions(-)
-> > > 
-> > > -- 
-> > > Hi maintainers, I see my previous versions were not applied. Could
-> > > this little patch set be applied for the linux-next? I don't think
-> > > this is new functionality, this must be considered as bugfix for
-> > > existing Device Tree.
-> > > 
-> > > Any other suggestions?
-> > 
-> > According to the MAINTAINERS file, Tony Prisk should be the person
-> > to pick them up, but he was not the recipient of the mail.
-> > 
-> > 	Arnd
-> 
-> Thanks for the tip. Tony probably need to add these files to his list
-> of maintained files. get_maintainer.pl doesn't mention him.
-> 
-> Roman
+> > No, it's defining which regulators are provided by the regulator, and
+> > the voltage boundaries they have. It doesn't make any assumption with
+> > regards to what is connected to what, and if a particular regulator is
+> > connected to something. That's something that the board DTS should
+> > describe as accurately as possible.
 
-Arnd,
+This is broken - think about what this means.  If you are defining a
+voltage (or any other constraint) you're saying that it's safe to use on
+a given board.  If you provide a voltage constraint saying that the
+maximum allowable range for a voltage regulator is safe.  That's
+unlikely to be true on any given board, usually only a limited set of
+regulators can vary voltages at runtime safely at all and then rarely
+over their full supported range.  Similarly for other constraints, for
+example allowing a regulator to be disabled when there are driverless
+things (or drivers without regulator support or mappings for that board)
+relying on it is going to break.
 
-No response yet from Tony for over a month.
+Providing a list of the regulators is safe but not really doing a huge
+amount.
 
-Roman
+Note that I've not seen the original patch so it's possible it's doing
+something different.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150404/a64ae418/attachment-0001.sig>
