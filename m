@@ -1,34 +1,145 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sat, 4 Apr 2015 23:03:07 +0300
-Subject: [PATCHv6] media: i2c/adp1653: Documentation for devicetree
- support for adp1653
-In-Reply-To: <20150404171116.GA15025@Nokia-N900>
-References: <20150402143846.GA11687@amd> <20150402203417.GA6336@amd>
- <20150403083353.GA21070@amd>
- <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
- <20150403202624.GA4308@amd>
- <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
- <20150404074337.GA31064@amd>
- <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
- <20150404171116.GA15025@Nokia-N900>
-Message-ID: <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 05 Apr 2015 00:04:29 +0200
+Subject: [PATCH] tty: serial: Add const to struct
+ =?UTF-8?Q?uart=5Fops=20declarations?=
+In-Reply-To: <1428169665.2775.53.camel@perches.com>
+References: <1428169665.2775.53.camel@perches.com>
+Message-ID: <a938a0e86638588e5ccff85771fa3b95@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 04, 2015 at 07:11:16PM +0200, Pavel Machek wrote:
-> Hi!
+Hi Joe,
+
+See comment below...
+
+On 2015-04-04 19:47, Joe Perches wrote:
+> These structs can be const, so make them const.
 > 
-> > enable-gpios: Specifier of the GPIO connected to EN pin
-> > 
-> > I can make the changes if you're ok with that, otherwise please send v7. Then
-> > I'll apply that to my tree.
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
 > 
-> I'm ok with that.
+> Done with:
+> sed -r -i -e 's/\bstruct\s+uart_ops\s+(\w+)\s*=\s*/const struct
+> uart_ops \1 = /g' drivers/tty/serial/*.c
+> 
+> Compiled x86 only, not cross-compiled.  Untested.
+> 
+>  drivers/tty/serial/21285.c                  | 2 +-
+>  drivers/tty/serial/altera_jtaguart.c        | 2 +-
+>  drivers/tty/serial/altera_uart.c            | 2 +-
+>  drivers/tty/serial/amba-pl010.c             | 2 +-
+>  drivers/tty/serial/amba-pl011.c             | 2 +-
+>  drivers/tty/serial/apbuart.c                | 2 +-
+>  drivers/tty/serial/ar933x_uart.c            | 2 +-
+>  drivers/tty/serial/arc_uart.c               | 2 +-
+>  drivers/tty/serial/atmel_serial.c           | 2 +-
+>  drivers/tty/serial/bcm63xx_uart.c           | 2 +-
+>  drivers/tty/serial/bfin_sport_uart.c        | 2 +-
+>  drivers/tty/serial/bfin_uart.c              | 2 +-
+>  drivers/tty/serial/cpm_uart/cpm_uart_core.c | 2 +-
+>  drivers/tty/serial/dz.c                     | 2 +-
+>  drivers/tty/serial/efm32-uart.c             | 2 +-
+>  drivers/tty/serial/fsl_lpuart.c             | 4 ++--
+>  drivers/tty/serial/icom.c                   | 2 +-
+>  drivers/tty/serial/imx.c                    | 2 +-
+>  drivers/tty/serial/ioc3_serial.c            | 2 +-
+>  drivers/tty/serial/ioc4_serial.c            | 2 +-
+>  drivers/tty/serial/ip22zilog.c              | 2 +-
+>  drivers/tty/serial/jsm/jsm_tty.c            | 2 +-
+>  drivers/tty/serial/lantiq.c                 | 2 +-
+>  drivers/tty/serial/lpc32xx_hs.c             | 2 +-
+>  drivers/tty/serial/m32r_sio.c               | 2 +-
+>  drivers/tty/serial/max3100.c                | 2 +-
+>  drivers/tty/serial/men_z135_uart.c          | 2 +-
+>  drivers/tty/serial/meson_uart.c             | 2 +-
+>  drivers/tty/serial/mpc52xx_uart.c           | 2 +-
+>  drivers/tty/serial/mpsc.c                   | 2 +-
+>  drivers/tty/serial/msm_serial.c             | 2 +-
+>  drivers/tty/serial/mux.c                    | 2 +-
+>  drivers/tty/serial/mxs-auart.c              | 2 +-
+>  drivers/tty/serial/netx-serial.c            | 2 +-
+>  drivers/tty/serial/nwpserial.c              | 2 +-
+>  drivers/tty/serial/omap-serial.c            | 2 +-
+>  drivers/tty/serial/pch_uart.c               | 2 +-
+>  drivers/tty/serial/pmac_zilog.c             | 2 +-
+>  drivers/tty/serial/pnx8xxx_uart.c           | 2 +-
+>  drivers/tty/serial/pxa.c                    | 2 +-
+>  drivers/tty/serial/sa1100.c                 | 2 +-
+>  drivers/tty/serial/samsung.c                | 2 +-
+>  drivers/tty/serial/serial-tegra.c           | 2 +-
+>  drivers/tty/serial/serial_ks8695.c          | 2 +-
+>  drivers/tty/serial/serial_txx9.c            | 2 +-
+>  drivers/tty/serial/sh-sci.c                 | 2 +-
+>  drivers/tty/serial/sirfsoc_uart.c           | 2 +-
+>  drivers/tty/serial/sn_console.c             | 2 +-
+>  drivers/tty/serial/sprd_serial.c            | 2 +-
+>  drivers/tty/serial/st-asc.c                 | 2 +-
+>  drivers/tty/serial/sunhv.c                  | 2 +-
+>  drivers/tty/serial/sunsab.c                 | 2 +-
+>  drivers/tty/serial/sunsu.c                  | 2 +-
+>  drivers/tty/serial/sunzilog.c               | 2 +-
+>  drivers/tty/serial/timbuart.c               | 2 +-
+>  drivers/tty/serial/uartlite.c               | 2 +-
+>  drivers/tty/serial/ucc_uart.c               | 2 +-
+>  drivers/tty/serial/vr41xx_siu.c             | 2 +-
+>  drivers/tty/serial/vt8500_serial.c          | 2 +-
+>  drivers/tty/serial/xilinx_uartps.c          | 2 +-
+>  drivers/tty/serial/zs.c                     | 2 +-
+>  61 files changed, 62 insertions(+), 62 deletions(-)
+> 
 
-Thanks. The patch is applied here:
+<snip>
 
-	git://linuxtv.org/sailus/media_tree.git, branch adp1653
+> --- a/drivers/tty/serial/efm32-uart.c
+> +++ b/drivers/tty/serial/efm32-uart.c
+> @@ -487,7 +487,7 @@ static int efm32_uart_verify_port(struct uart_port *port,
+>  	return ret;
+>  }
+>  
+> -static struct uart_ops efm32_uart_pops = {
+> +static const struct uart_ops efm32_uart_pops = {
+>  	.tx_empty = efm32_uart_tx_empty,
+>  	.set_mctrl = efm32_uart_set_mctrl,
+>  	.get_mctrl = efm32_uart_get_mctrl,
+> diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+> index 08ce76f..738b5c4 100644
+> --- a/drivers/tty/serial/fsl_lpuart.c
+> +++ b/drivers/tty/serial/fsl_lpuart.c
+> @@ -1494,7 +1494,7 @@ static int lpuart_verify_port(struct uart_port
+> *port, struct serial_struct *ser)
+>  	return ret;
+>  }
+>  
+> -static struct uart_ops lpuart_pops = {
+> +static const const struct uart_ops lpuart_pops = {
 
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Something went wrong in this driver, const is twice...
+
+Probably because we have two struct uart_ops in one driver?
+
+>  	.tx_empty	= lpuart_tx_empty,
+>  	.set_mctrl	= lpuart_set_mctrl,
+>  	.get_mctrl	= lpuart_get_mctrl,
+> @@ -1513,7 +1513,7 @@ static struct uart_ops lpuart_pops = {
+>  	.flush_buffer	= lpuart_flush_buffer,
+>  };
+>  
+> -static struct uart_ops lpuart32_pops = {
+> +static const const struct uart_ops lpuart32_pops = {
+>  	.tx_empty	= lpuart32_tx_empty,
+>  	.set_mctrl	= lpuart32_set_mctrl,
+>  	.get_mctrl	= lpuart32_get_mctrl,
+> diff --git a/drivers/tty/serial/icom.c b/drivers/tty/serial/icom.c
+> index 45fc323..3915443 100644
+> --- a/drivers/tty/serial/icom.c
+> +++ b/drivers/tty/serial/icom.c
+> @@ -1287,7 +1287,7 @@ static void icom_config_port(struct uart_port
+> *port, int flags)
+>  	port->type = PORT_ICOM;
+>  }
+>  
+
+<snip>
+
+--
+Stefan
