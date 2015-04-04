@@ -1,100 +1,50 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 04 Apr 2015 15:45:42 +0900
-Subject: [GIT PULL 4/5] Samsung arm64 DT updates for v4.1
-In-Reply-To: <20150403220214.GW23023@localhost>
-References: <551C3617.5040306@kernel.org> <20150403220214.GW23023@localhost>
-Message-ID: <014c01d06ea2$fa9d6240$efd826c0$@kernel.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Sat, 4 Apr 2015 08:47:31 +0200
+Subject: [GIT PULL 2/5] Samsung defconfig udpates for v4.1
+In-Reply-To: <551C35F6.1090602@kernel.org>
+References: <551C35F6.1090602@kernel.org>
+Message-ID: <CABxcv=kHPaJE4WGUHsgBPnFpT4aYqiodHVnTn+AccUhu3Te-Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> On Thu, Apr 02, 2015 at 03:16:55AM +0900, Kukjin Kim wrote:
-> > The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> >
-> >   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/samsung-dt-64
-> >
-> > for you to fetch changes up to 423c716151e254e42650ad78b30c2cd782c6f654:
-> >
-> >   arm64: dts: Add thermal-zones dt node for exynos5433 (2015-03-27
-> > 02:13:43 +0900)
-> >
-> > ----------------------------------------------------------------
-> > Samsung arm64 DT updates for v4.1
-> >
-> > - add new SoC for arm64 based exynos5433 SoC
-> >   : exynos5433 - Octa cores for big.LITTLE architecture
-> >   (Quad Cortex-A57 big and Quad Cortex-A53 LITTLE cores)
-> >
-> >   : added thermal-zones, TMU sensor and I2S dt nodes
-> >   : added ADMA, RTC, ADC, PMU, SPI/PDMA and MSHC dt nodes
-> >   : added pinctrl, HS-I2C, Serial and basic system dt nodes
-> >
-> > ----------------------------------------------------------------
-> > Chanwoo Choi (6):
-> >       arm64: dts: Add dts files for 64-bit Exynos5433 SoC
-> >       arm64: dts: Add SPI/PDMA dt node for exynos5433
-> >       arm64: dts: Add PMU dt node for exynos5433
-> >       arm64: dts: Add RTC and ADC dt node for exynos5433
-> >       arm64: dts: Add TMU sensor dt node for exynos5433
-> >       arm64: dts: Add thermal-zones dt node for exynos5433
-> >
-> > Inha Song (2):
-> >       arm64: dts: Add ADMA dt node for exynos5433
-> >       arm64: dts: Add I2S dt node for exynos5433
-> >
-> > Jaehoon Chung (1):
-> >       arm64: dts: Add MSHC dt node for exynos5433
-> >
-> >  .../devicetree/bindings/arm/samsung/pmu.txt        |   1 +
-> >  arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi | 698 +++++++++++++++
-> >  .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |  22 +
-> >  arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     | 231 +++++
-> >  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 931
-> > +++++++++++++++++++++
-> >  5 files changed, 1883 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
-> >  create mode 100644
-> > arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
-> >  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-> >  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> 
-+ Chanwoo, Mike
+Hello Kukjin,
 
-Hi Olof,
+On Wed, Apr 1, 2015 at 8:16 PM, Kukjin Kim <kgene@kernel.org> wrote:
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+>
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-defconfig
+>
+> for you to fetch changes up to bb84296ae52da844c9cab81e0197152a69f2f841:
+>
+>   ARM: exynos_defconfig: Enable HDMI support (2015-03-27 02:00:09 +0900)
+>
+> ----------------------------------------------------------------
+> Samsung defconfig updates for v4.1
+>
+> - update exynos-defconfig
+>   : enable HDMI, CPUidle, ChromeOS EC chardev driver
+>     and thermal emulation, Marvell WiFi-Ex, CPUfreq,
+>     and support for NFS rootfs
+>   : remove EXYNOS_THERMAL_CORE define
+>     and disable IOMMU support until support it
+>
+> ----------------------------------------------------------------
+> Javier Martinez Canillas (5):
+>       ARM: exynos_defconfig: Disable IOMMU support
 
-Thanks for your taking other pull-requests :-)
+As I mentioned before, this also is needed for 4.0-rc to have display
+working on at least Exynos5420 Peach Pit and Exynos5800 Peach Pi
+Chromebooks but I saw that it is not included in your "Samsung 2nd
+fixes for v4.0" git pull [0].
 
-> How do you even build these dts files? How did you test this branch before
-> you sent it to us?
-> 
-Yeah, your pointing out is exact. In my side, I've tested with 1) creating
-exynos5433-smdk5433 board dt file and 2) adding ARCH_EXYNOS5433 config in
-arch/arm64 and 3) including 5433 related clk tree, actually in linux-next.
-Sorry for missing the explaining in my pull-request.
+Maybe it can be sent directly to arm at kernel.org?
 
-For 1), I've talked to Chanwoo about that and he is not ready to post its
-board dt now and I want actual board dt for mass product would be better
-in mainline. Maybe need some time...
+Best regards,
+Javier
 
-For 2), we can add regarding updates for exynos-64 Kconfig/Makefile including
-Arnd's suggestion to collapse all exynos-64 config entries in arm64/Kconfig
-_later_, because current the exynos5433 dt has a dependency with 1) and clk
-tree to support exynos5433 SoC.
-
-For 3), same as For 2). Additionally as you know tipically arm-soc and clk
-trees could have dependencies when new SoC supporting is added.
-
-> Not merged.
-> 
-Yeah, I agreed why you didn't. In this case, how do you think about adding
-support new SoC then adding board dt including above changes later?
-
-Thanks,
-Kukjin
+[0]: http://www.spinics.net/lists/arm-kernel/msg410078.html
