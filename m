@@ -1,53 +1,29 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 04 Apr 2015 12:25:56 +0200
-Subject: [PATCH v2 3/4] ARM: berlin: add an ADC node for the BG2Q
-In-Reply-To: <1428066409-30392-4-git-send-email-antoine.tenart@free-electrons.com>
-References: <1428066409-30392-1-git-send-email-antoine.tenart@free-electrons.com>
- <1428066409-30392-4-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <551FBC34.4070501@gmail.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Sat, 04 Apr 2015 11:30:29 +0100
+Subject: [PATCH] sunxi: a10-lime: add regulator nodes
+In-Reply-To: <20150330222311.GY23664@lukather>
+References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
+ <55169622.5070007@gmail.com> <20150330222311.GY23664@lukather>
+Message-ID: <551FBD45.3060503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.04.2015 15:06, Antoine Tenart wrote:
-> This patch adds the ADC node for the Berlin BG2Q, using the newly added
-> Berlin IIO ADC driver.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->   arch/arm/boot/dts/berlin2q.dtsi | 8 ++++++++
->   1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> index 187d056f7ad2..72b1c969a99d 100644
-> --- a/arch/arm/boot/dts/berlin2q.dtsi
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> @@ -565,6 +565,14 @@
->   						function = "twsi3";
->   					};
->   				};
-> +
-> +				adc: adc {
-> +					compatible = "marvell,berlin2-adc";
-> +					interrupt-parent = <&sic>;
-> +					interrupts = <12>, <14>;
-> +					interrupt-names = "adc", "tsen";
-> +					status = "disabled";
-> +				};
+On 30/03/15 23:23, Maxime Ripard wrote:
 
-Antoine,
+> CSI is not usable (no driver for it), neither it is actually used by
+> default on the lime, so disabling the regulator is the right thing to
+> do.
 
-nit: there is no gated clock for the ADC, I guess we can just always
-enable it. That will save you the last patch of the series.
+My userspace code works just fine, until the regulator gets turned off.
 
-BTW, I have the strong feeling that moving berlin's clk drivers to
-regmap will block any subsequent patches you are preparing. How about
-we target the next merge window for moving the clk node but not the
-drivers (except of_iomap of the _parent's_ reg property) and push the
-less controversal patches (pinctrl, reset) with regmap/syscon forward?
+Anyway, I don't have the patience Hans showed with the simplefb stuff.
+So consider yourselves successful in wearing me down. I'm done debating 
+any of this. One less contributor to linux-sunxi for you to worry about, 
+I won't bother you anymore.
 
-Sebastian
+> Too bad.
 
->   			};
->
->   			sic: interrupt-controller at e000 {
->
+For who?  
+
+Rgds,
+Iain
