@@ -1,72 +1,31 @@
-From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Sun,  5 Apr 2015 01:55:12 +0900
-Subject: [PATCH v2] ARM: shmobile: r8a7791: Remove MSIOF address from device
- tree
-Message-ID: <1428166512-2936-1-git-send-email-ykaneko0929@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 4 Apr 2015 19:11:16 +0200
+Subject: [PATCHv6] media: i2c/adp1653: Documentation for devicetree
+ support for adp1653
+In-Reply-To: <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
+References: <20150402143846.GA11687@amd> <20150402203417.GA6336@amd>
+ <20150403083353.GA21070@amd>
+ <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
+ <20150403202624.GA4308@amd>
+ <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
+ <20150404074337.GA31064@amd>
+ <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
+Message-ID: <20150404171116.GA15025@Nokia-N900>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+Hi!
 
-MSIOF Base Address H'E6xx can be accessed by CPU and DMAC.
-MSIOF Base Address H'E7xx for DMAC was removed from H/W manual.
+> enable-gpios: Specifier of the GPIO connected to EN pin
+> 
+> I can make the changes if you're ok with that, otherwise please send v7. Then
+> I'll apply that to my tree.
 
-Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
----
+I'm ok with that.
 
-This patch is based on devel branch of Simon Horman's renesas tree.
+Thanks,
+						Pavel
 
-v2 [Yoshihiro Kaneko]
-* Update the binding documentation
-
- Documentation/devicetree/bindings/spi/sh-msiof.txt | 2 +-
- arch/arm/boot/dts/r8a7791.dtsi                     | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/spi/sh-msiof.txt b/Documentation/devicetree/bindings/spi/sh-msiof.txt
-index 4c388bb..8f77144 100644
---- a/Documentation/devicetree/bindings/spi/sh-msiof.txt
-+++ b/Documentation/devicetree/bindings/spi/sh-msiof.txt
-@@ -60,7 +60,7 @@ Example:
- 
- 	msiof0: spi at e6e20000 {
- 		compatible = "renesas,msiof-r8a7791";
--		reg = <0 0xe6e20000 0 0x0064>, <0 0xe7e20000 0 0x0064>;
-+		reg = <0 0xe6e20000 0 0x0064>;
- 		interrupts = <0 156 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7791_CLK_MSIOF0>;
- 		dmas = <&dmac0 0x51>, <&dmac0 0x52>;
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 4696062..3e9f824 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1288,7 +1288,7 @@
- 
- 	msiof0: spi at e6e20000 {
- 		compatible = "renesas,msiof-r8a7791";
--		reg = <0 0xe6e20000 0 0x0064>, <0 0xe7e20000 0 0x0064>;
-+		reg = <0 0xe6e20000 0 0x0064>;
- 		interrupts = <0 156 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7791_CLK_MSIOF0>;
- 		dmas = <&dmac0 0x51>, <&dmac0 0x52>;
-@@ -1300,7 +1300,7 @@
- 
- 	msiof1: spi at e6e10000 {
- 		compatible = "renesas,msiof-r8a7791";
--		reg = <0 0xe6e10000 0 0x0064>, <0 0xe7e10000 0 0x0064>;
-+		reg = <0 0xe6e10000 0 0x0064>;
- 		interrupts = <0 157 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7791_CLK_MSIOF1>;
- 		dmas = <&dmac0 0x55>, <&dmac0 0x56>;
-@@ -1312,7 +1312,7 @@
- 
- 	msiof2: spi at e6e00000 {
- 		compatible = "renesas,msiof-r8a7791";
--		reg = <0 0xe6e00000 0 0x0064>, <0 0xe7e00000 0 0x0064>;
-+		reg = <0 0xe6e00000 0 0x0064>;
- 		interrupts = <0 158 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7791_CLK_MSIOF2>;
- 		dmas = <&dmac0 0x41>, <&dmac0 0x42>;
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
