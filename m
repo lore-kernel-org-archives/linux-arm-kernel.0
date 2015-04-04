@@ -1,77 +1,128 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sat, 4 Apr 2015 07:46:47 -0500
-Subject: [PATCH 1/3] PCI: Introduce pci_bus_addr_t
-In-Reply-To: <CAE9FiQVqAEvoLDRZMcNFki0gLMQiyQd2VYivjAh1teRGeuNwBw@mail.gmail.com>
-References: <1427857069-6789-1-git-send-email-yinghai@kernel.org>
- <1427857069-6789-2-git-send-email-yinghai@kernel.org>
- <20150403193234.GD10892@google.com>
- <20150403205201.GF10892@google.com>
- <CAE9FiQVqAEvoLDRZMcNFki0gLMQiyQd2VYivjAh1teRGeuNwBw@mail.gmail.com>
-Message-ID: <CAErSpo55rpO6SNeY57zZ8ah0PJ3eY+-L92vUJwYiRn4tCfLtJg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 4 Apr 2015 14:47:54 +0200
+Subject: [PATCH 1/2] ARM: dts: sun7i: Add dts file for the Orangepi SBC
+In-Reply-To: <1428137994-18343-1-git-send-email-hdegoede@redhat.com>
+References: <1428137994-18343-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150404124754.GJ14618@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 3, 2015 at 10:34 PM, Yinghai Lu <yinghai@kernel.org> wrote:
-> On Fri, Apr 3, 2015 at 1:52 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
->> [+cc Sam (commented on previous versions), Russell, linux-arm-kernel, Ralf,
->> linux-mips, Ben, linuxppc-dev, x86]
->>
->> On Fri, Apr 03, 2015 at 02:32:34PM -0500, Bjorn Helgaas wrote:
->>> On Tue, Mar 31, 2015 at 07:57:47PM -0700, Yinghai Lu wrote:
->>> > David Ahern found commit d63e2e1f3df9 ("sparc/PCI: Clip bridge windows
->>> > to fit in upstream windows") broke booting on sparc/T5-8.
->>> >
->>> > In the boot log, there is
->>> >   pci 0000:06:00.0: reg 0x184: can't handle BAR above 4GB (bus address
->>> >   0x110204000)
->>> > but that only could happen when dma_addr_t is 32-bit.
->>> >
->>> > According to David Miller, all DMA occurs behind an IOMMU and these
->>> > IOMMUs only support 32-bit addressing, therefore dma_addr_t is
->>> > 32-bit on sparc64.
->>> >
->>> > Let's introduce pci_bus_addr_t instead of using dma_addr_t,
->>> > and pci_bus_addr_t will be 64-bit on 64-bit platform or X86_PAE.
->>> >
->>> > Fixes: commit d63e2e1f3df9 ("sparc/PCI: Clip bridge windows to fit in upstream windows")
->>> > Fixes: commit 23b13bc76f35 ("PCI: Fail safely if we can't handle BARs larger than 4GB")
->>> > Link: http://lkml.kernel.org/r/CAE9FiQU1gJY1LYrxs+ma5LCTEEe4xmtjRG0aXJ9K_Tsu+m9Wuw at mail.gmail.com
->>> > Reported-by: David Ahern <david.ahern@oracle.com>
->>> > Tested-by: David Ahern <david.ahern@oracle.com>
->>> > Signed-off-by: Yinghai Lu <yinghai@kernel.org>
->>> > Cc: <stable@vger.kernel.org> #3.19
->>> > ---
->>> >  drivers/pci/Kconfig |  4 ++++
->>> >  drivers/pci/bus.c   | 10 +++++-----
->>> >  drivers/pci/probe.c | 12 ++++++------
->>> >  include/linux/pci.h | 12 +++++++++---
->>> >  4 files changed, 24 insertions(+), 14 deletions(-)
->>> >
->>> > diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
->>> > index 7a8f1c5..6a5a269 100644
->>> > --- a/drivers/pci/Kconfig
->>> > +++ b/drivers/pci/Kconfig
->>> > @@ -1,6 +1,10 @@
->>> >  #
->>> >  # PCI configuration
->>> >  #
->>> > +config PCI_BUS_ADDR_T_64BIT
->>> > +   def_bool y if (64BIT || X86_PAE)
->>> > +   depends on PCI
->>>
->>> We're going to use pci_bus_addr_t in some places where we previously used
->>> dma_addr_t, which means pci_bus_addr_t should be at least as large as
->>> dma_addr_t.  Can you enforce that directly, e.g., with something like this?
->>>
->>>     def_bool y if (ARCH_DMA_ADDR_T_64BIT || 64BIT || X86_PAE)
->
-> then should use
->
-> def_bool y if (ARCH_DMA_ADDR_T_64BIT || 64BIT)
+Hi Hans,
 
-OK, would you mind updating this series, incorporating the doc
-updates, and reposting it?
+On Sat, Apr 04, 2015 at 10:59:53AM +0200, Hans de Goede wrote:
+> The Orangepi is a development board using the Allwinner A20 SoC, with 1G RAM,
+> microsd slot, HDMI, 1Gbit ethernet, USB wifi, Micro USB (otg), sata, 4 USB A
+> ports, ir receiver and a headphones jack.
+> 
+> Also see:
+> http://linux-sunxi.org/Xunlong_Orange_Pi
+> http://www.orangepi.org/
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/Makefile               |   1 +
+>  arch/arm/boot/dts/sun7i-a20-orangepi.dts | 229 +++++++++++++++++++++++++++++++
+>  2 files changed, 230 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-orangepi.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 2426f0a..d9b609d 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -551,6 +551,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>  	sun7i-a20-olinuxino-lime.dtb \
+>  	sun7i-a20-olinuxino-lime2.dtb \
+>  	sun7i-a20-olinuxino-micro.dtb \
+> +	sun7i-a20-orangepi.dtb \
+>  	sun7i-a20-pcduino3.dtb \
+>  	sun7i-a20-pcduino3-nano.dtb \
+>  	sun7i-a20-wexler-tab7200.dtb
+> diff --git a/arch/arm/boot/dts/sun7i-a20-orangepi.dts b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
+> new file mode 100644
+> index 0000000..2ef79b7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
+> @@ -0,0 +1,229 @@
+> +/*
+> + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
+> + *
+> + * Hans de Goede <hdegoede@redhat.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *     You should have received a copy of the GNU General Public
+> + *     License along with this file; if not, write to the Free
+> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> + *     MA 02110-1301 USA
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun7i-a20.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> +	model = "Orange Pi";
+> +	compatible = "xunlong,orangepi", "allwinner,sun7i-a20";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
 
-I think there's still an unresolved question about the OF parsing code.
+This should have a matching /chosen/stdout-path property.
 
-Bjorn
+The rest of the patch is fine, I can apply it and add the property, if
+that's ok for you.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150404/c0339267/attachment.sig>
