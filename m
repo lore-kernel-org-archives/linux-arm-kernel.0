@@ -1,44 +1,185 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sat, 4 Apr 2015 14:45:48 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d3 xplained: add phy address for macb1
-In-Reply-To: <20150403215607.GS23023@localhost>
-References: <1427792170-13162-1-git-send-email-nicolas.ferre@atmel.com>
- <551E52BC.3040702@atmel.com> <20150403205507.GH23023@localhost>
- <20150403215607.GS23023@localhost>
-Message-ID: <551FDCFC.4070806@atmel.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 04 Apr 2015 15:46:52 +0300
+Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
+ complex dependencies
+In-Reply-To: <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
+References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
+ <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <34835209.cQQp4PEGGk@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/04/2015 23:56, Olof Johansson a ?crit :
-> On Fri, Apr 03, 2015 at 01:55:07PM -0700, Olof Johansson wrote:
->> On Fri, Apr 03, 2015 at 10:43:40AM +0200, Nicolas Ferre wrote:
->>> Le 31/03/2015 10:56, Nicolas Ferre a ?crit :
->>>> After 57a38effa598 (net: phy: micrel: disable broadcast for KSZ8081/KSZ8091)
->>>> the macb1 interface refuses to work properly because it tries
->>>> to cling to address 0 which isn't able to communicate in broadcast with
->>>> the mac anymore. The micrel phy on the board is actually configured
->>>> to show up at address 1.
->>>> Adding the phy node and its real address fixes the issue.
->>>>
->>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>>> Cc: Johan Hovold <johan@kernel.org>
->>>> Cc: <stable@vger.kernel.org> #3.19
->>>> ---
->>>
->>> Arnd, Olof, Kevin,
->>>
->>> It seems late but, is it possible to queue this patch as a 4.0 fixes?
->>>
->>> Without it, the 10/100 Ethernet on sama5d3 doesn't work if it's not used
->>> by u-boot previously.
->>
->> Sure, resend it to arm at kernel.org.
->
-> Nevermind, I ended up picking it up from the list. Applied.
+Hi Geert,
 
-Cool: thanks Olof!
+Thank you for the patch.
 
-Bye,
+On Friday 03 April 2015 14:42:02 Geert Uytterhoeven wrote:
+> Add support for easy registering of one ore more platform devices that
+> may:
+>   - need clocks that are described in DT,
+>   - need pin control configuration,
+>   - rely on a configured GPIO,
+>   - be part of a PM Domain.
+> 
+> All these dependencies are optional.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  drivers/staging/board/board.c | 76 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/staging/board/board.h | 31 ++++++++++++++++++
+>  2 files changed, 107 insertions(+)
+> 
+> diff --git a/drivers/staging/board/board.c b/drivers/staging/board/board.c
+> index b84ac2837a20bf06..da2469e2d4262fac 100644
+> --- a/drivers/staging/board/board.c
+> +++ b/drivers/staging/board/board.c
+> @@ -9,6 +9,9 @@
+> 
+>  #define pr_fmt(fmt)	"board_staging: "  fmt
+> 
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/gpio.h>
+>  #include <linux/init.h>
+>  #include <linux/irq.h>
+>  #include <linux/device.h>
+> @@ -16,6 +19,9 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+> +#include <linux/pinctrl/machine.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_domain.h>
+> 
+>  #include "board.h"
+> 
+> @@ -104,3 +110,73 @@ void __init board_staging_fixup_irq_resources(struct
+> resource *res, res[i].start = virq;
+>  		}
+>  }
+> +
+> +int __init board_staging_register_clock(const struct board_staging_clk
+> *bsc) +{
+> +	struct clk *clk;
+> +	int error;
+> +
+> +	pr_debug("Registering clock %s for con_id %s dev_id %s\n", bsc->clk,
+> +		 bsc->con_id, bsc->dev_id);
+> +	clk = clk_get(NULL, bsc->clk);
+> +	if (IS_ERR(clk)) {
+> +		error = PTR_ERR(clk);
+> +		pr_err("Failed to get clock %s (%d)\n", bsc->clk, error);
+> +		return error;
+> +	}
+> +
+> +	error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
+> +	if (error)
+> +		pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
+> +		return error;
+> +
+> +	clk_put(clk);
+> +	return 0;
+> +}
+> +
+> +int __init board_staging_register_device(const struct board_staging_dev
+> *dev) +{
+> +	struct platform_device *pdev = dev->pdev;
+> +	unsigned int i;
+> +	int error;
+> +
+> +	pr_debug("Trying to register device %s\n", pdev->name);
+> +	if (board_staging_dt_node_available(pdev->resource,
+> +					    pdev->num_resources)) {
+> +		pr_warn("Skipping %s, already in DT\n", pdev->name);
+> +		return -EEXIST;
+> +	}
+> +
+> +	board_staging_fixup_irq_resources(pdev->resource, pdev->num_resources);
+> +
+> +	for (i = 0; i < dev->nclocks; i++)
+> +		board_staging_register_clock(&dev->clocks[i]);
+> +
+> +	if (dev->npinmaps)
+> +		pinctrl_register_mappings(dev->pinmaps, dev->npinmaps);
+> +
+> +	for (i = 0; i < dev->ngpios; i++)
+> +		gpio_request_one(dev->gpios[i].gpio, dev->gpios[i].flags,
+> +				 pdev->name);
+
+Aren't GPIO numbers dynamic too in DT-based systems ? Beside, shouldn't it be 
+the responsibility of the drievr to request the GPIOs it needs ?
+
+> +	error = platform_device_register(pdev);
+> +	if (error) {
+> +		pr_err("Failed to register device %s (%d)\n", pdev->name,
+> +		       error);
+> +		return error;
+> +	}
+> +
+> +	if (dev->domain)
+> +		__pm_genpd_name_add_device(dev->domain, &pdev->dev, NULL);
+> +
+> +	return error;
+> +}
+> +
+> +void __init board_staging_register_devices(const struct board_staging_dev
+> *devs, +					   unsigned int ndevs)
+> +{
+> +	unsigned int i;
+> +
+> +	for (i = 0; i < ndevs; i++)
+> +		board_staging_register_device(&devs[i]);
+> +}
+> diff --git a/drivers/staging/board/board.h b/drivers/staging/board/board.h
+> index 4cedc3c46e287eb7..7aaa0f7d6fafb9e5 100644
+> --- a/drivers/staging/board/board.h
+> +++ b/drivers/staging/board/board.h
+> @@ -4,12 +4,43 @@
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+> 
+> +struct board_staging_clk {
+> +	const char *clk;
+> +	const char *con_id;
+> +	const char *dev_id;
+> +};
+> +
+> +struct board_staging_gpio {
+> +	unsigned int gpio;
+> +	unsigned long flags;	/* See GPIOF_* */
+> +};
+> +
+> +struct board_staging_dev {
+> +	/* Platform Device */
+> +	struct platform_device *pdev;
+> +	/* Clocks (optional) */
+> +	const struct board_staging_clk *clocks;
+> +	unsigned int nclocks;
+> +	/* Pin Control Maps (optional) */
+> +	const struct pinctrl_map *pinmaps;
+> +	unsigned int npinmaps;
+> +	/* GPIOs (optional) */
+> +	const struct board_staging_gpio *gpios;
+> +	unsigned int ngpios;
+> +	/* PM Domain (optional) */
+> +	const char *domain;
+> +};
+> +
+>  struct resource;
+> 
+>  bool board_staging_dt_node_available(const struct resource *resource,
+>  				     unsigned int num_resources);
+>  int board_staging_setup_hwirq_xlate(const char *irqc_match, unsigned int
+> base); void board_staging_fixup_irq_resources(struct resource *res,
+> unsigned int nres); +int board_staging_register_clock(const struct
+> board_staging_clk *bsc); +int board_staging_register_device(const struct
+> board_staging_dev *dev); +void board_staging_register_devices(const struct
+> board_staging_dev *devs, +				    unsigned int ndevs);
+> 
+>  #define board_staging(str, fn)			\
+>  static int __init runtime_board_check(void)	\
 
 -- 
-Nicolas Ferre
+Regards,
+
+Laurent Pinchart
