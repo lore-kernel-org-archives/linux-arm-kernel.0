@@ -1,71 +1,78 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Sat, 4 Apr 2015 13:14:31 +0000
-Subject: [PATCH] i2c: cadence: Handling Slave monitor mode
-In-Reply-To: <20150402202909.GA3501@katana>
-References: <BL2FFO11FD05378650E02EA6549B4DF50E8030@BL2FFO11FD053.protection.gbl>
- <20150327153713.GC27238@katana>
- <CAFcVECKaLBvOVvTca87-oTue5nF_pek_0msFZDD8y4yuCHW2EA@mail.gmail.com>
- <20150402202909.GA3501@katana>
-Message-ID: <9ef3c612-b803-4937-bb21-0fac03969f39@BN1AFFO11FD037.protection.gbl>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 04 Apr 2015 15:21:41 +0200
+Subject: [PATCH v2] ARM: dts: sun5i: Enable touchscreen on Utoo P66
+In-Reply-To: <20150404124458.GI14618@lukather>
+References: <1427902177-26526-1-git-send-email-hdegoede@redhat.com>
+ <20150404124458.GI14618@lukather>
+Message-ID: <551FE565.6050800@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Hi,
 
+On 04-04-15 14:44, Maxime Ripard wrote:
+> Hi Hans,
+>
+> On Wed, Apr 01, 2015 at 05:29:37PM +0200, Hans de Goede wrote:
+>> Add a node for the chipone-icn8318 touchscreen found on the Utoo P66 tablet.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2:
+>> -Fix touchscreen node name
+>> ---
+>>   arch/arm/boot/dts/sun5i-a13-utoo-p66.dts | 22 ++++++++++++++++++++++
+>>   1 file changed, 22 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+>> index 9108ecd..00bdf28 100644
+>> --- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+>> +++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+>> @@ -50,6 +50,7 @@
+>>   #include "sunxi-common-regulators.dtsi"
+>>   #include <dt-bindings/gpio/gpio.h>
+>>   #include <dt-bindings/input/input.h>
+>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>   #include <dt-bindings/pinctrl/sun4i-a10.h>
+>>
+>>   / {
+>> @@ -93,6 +94,20 @@
+>>   	pinctrl-0 = <&i2c1_pins_a>;
+>>   	status = "okay";
+>>
+>> +	icn8318: touchscreen at 40 {
+>> +		compatible = "chipone,icn8318";
+>> +		reg = <0x40>;
+>> +		interrupt-parent = <&pio>;
+>> +		interrupts = <9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
+>
+> I don't think you sent a reply to this comment, but this should really
+> be in a pinctrl node so that no one else can request the pin and
+> change its muxing and it shows up in debugfs.
 
-> -----Original Message-----
-> From: Wolfram Sang [mailto:wsa at the-dreams.de]
-> Sent: Friday, April 03, 2015 1:59 AM
-> To: Harini Katakam
-> Cc: Nava kishore Manne; Michal Simek; Soren Brinkmann; linux-arm-
-> kernel at lists.infradead.org; linux-i2c at vger.kernel.org; linux-
-> kernel at vger.kernel.org; Anirudha Sarangi; Srikanth Vemula; Nava kishore
-> Manne
-> Subject: Re: [PATCH] i2c: cadence: Handling Slave monitor mode
->
->
-> > >> In slave monitor mode, the I2C interface is set up as a master and
-> > >> continues to attempt a transfer to a particular slave until the
-> > >> slave device responds with an ACK.
-> > >>
-> > >> Added this feature for zero length transfers enable the controller
-> > >> for slave monitor interrupt and get the status. Disable the slave
-> > >> monitor mode feature upon successful handling.
-> > >>
-> > >> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> > >> Acked-by: Harini Katakam <harinik@xilinx.com>
-> > >
-> > > I am not sure this is going to work.
-> > >
-> > > How often is this access tried when there is no device? It should be
-> > > tried only once.
-> >
-> > Once slave monitor is enabled in the host controller, it retries till
-> > there's an ACK or slave monitor is disabled. The SW wont be involved
-> > and need not
->
-> So, it is kind of flooding the bus until the timeout? That is not a single zero
-> byte message.
->
-It will not flooding the bus until the timeout. Once it fails to access the bus it will be ideal for 15 clock cycles. Master again retrying to access the
-Slave immediately after the 15 clock cycles (There is a register in the controller to set the retry value min: 0 cycles, max: 16 cycles).This process will repeat until
-The software timeout will happen (1000msec).
+I did reply to that comment on v1 of this patch:
+
+"""
+That is not necessary when specifying a gpio interrupt through the
+irq chip (rather then through a gpios property), the mux is automatically
+set to irq by the kernel when requesting the irq.
+
+Also note that we must use the interrupts notation here as this is specified
+by the i2c client bindings. None of the other boards using i2c + oob irq
+pins specifies a pinmux for the irq pin either.
+"""
+
+I've just double checked and I cannot (quickly) find any existing devicetree
+files using interrupts = <foo> combined with pinctrl for i2c clients.
+
+If you look in e.g. arch/arm/boot/dts/exynos4210-trats.dts and
+arch/arm/boot/dts/exynos4412-trats2.dts you will see the same pattern of
+using interrupts = <foo> pointing to a gpio without using pinctrl
+
+And we already to the same for sdio oob interrupts in sun7i-a20-cubietruck.dts
+and arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts, so I vote for being consistent
+here and not using pinctrl for the irq pin here either.
 
 Regards,
-Navakishore.
-> > be interrupted in this gap. The way this feature works in the
-> > controller though, I'm afraid there's no way to distinguish between no
-> slave/ busy slave.
-> > The out is the software timeout in that case.
-> > Please suggest how to use this feature better.
->
-> I suggest to not use the feature and accept that this device cannot do zero
-> byte length messages.
->
-> Thanks,
->
->    Wolfram
 
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Hans
