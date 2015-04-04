@@ -1,64 +1,53 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sat, 4 Apr 2015 13:24:36 +0300
-Subject: [PATCHv6] media: i2c/adp1653: Documentation for devicetree
- support for adp1653
-In-Reply-To: <20150404074337.GA31064@amd>
-References: <20150402143846.GA11687@amd> <20150402203417.GA6336@amd>
- <20150403083353.GA21070@amd>
- <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
- <20150403202624.GA4308@amd>
- <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
- <20150404074337.GA31064@amd>
-Message-ID: <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 04 Apr 2015 12:25:56 +0200
+Subject: [PATCH v2 3/4] ARM: berlin: add an ADC node for the BG2Q
+In-Reply-To: <1428066409-30392-4-git-send-email-antoine.tenart@free-electrons.com>
+References: <1428066409-30392-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1428066409-30392-4-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <551FBC34.4070501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On Sat, Apr 04, 2015 at 09:43:37AM +0200, Pavel Machek wrote:
-> 
-> Documentation for adp1653 binding.
-
-s/binding/bindings/
-
-> 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> 
+On 03.04.2015 15:06, Antoine Tenart wrote:
+> This patch adds the ADC node for the Berlin BG2Q, using the newly added
+> Berlin IIO ADC driver.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 > ---
-> 
-> Please apply.
-> 
-> Sorry, wrong version of patch was sent last time.
-> 									Pavel
-> 
-> diff --git a/Documentation/devicetree/bindings/media/i2c/adp1653.txt b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
-> new file mode 100644
-> index 0000000..4607ce3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
-> @@ -0,0 +1,37 @@
-> +* Analog Devices ADP1653 flash LED driver
+>   arch/arm/boot/dts/berlin2q.dtsi | 8 ++++++++
+>   1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> index 187d056f7ad2..72b1c969a99d 100644
+> --- a/arch/arm/boot/dts/berlin2q.dtsi
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -565,6 +565,14 @@
+>   						function = "twsi3";
+>   					};
+>   				};
 > +
-> +Required Properties:
-> +
-> +  - compatible: Must contain be "adi,adp1653"
+> +				adc: adc {
+> +					compatible = "marvell,berlin2-adc";
+> +					interrupt-parent = <&sic>;
+> +					interrupts = <12>, <14>;
+> +					interrupt-names = "adc", "tsen";
+> +					status = "disabled";
+> +				};
 
-s/be //
+Antoine,
 
-> +
-> +  - reg: I2C slave address
-> +
-> +  - enable-gpios: Reference to the GPIO that controls the power for the chip.
+nit: there is no gated clock for the ADC, I guess we can just always
+enable it. That will save you the last patch of the series.
 
-How about:
+BTW, I have the strong feeling that moving berlin's clk drivers to
+regmap will block any subsequent patches you are preparing. How about
+we target the next merge window for moving the clk node but not the
+drivers (except of_iomap of the _parent's_ reg property) and push the
+less controversal patches (pinctrl, reset) with regmap/syscon forward?
 
-enable-gpios: Specifier of the GPIO connected to EN pin
+Sebastian
 
-I can make the changes if you're ok with that, otherwise please send v7. Then
-I'll apply that to my tree.
-
--- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+>   			};
+>
+>   			sic: interrupt-controller at e000 {
+>
