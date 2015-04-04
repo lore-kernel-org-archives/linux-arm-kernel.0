@@ -1,49 +1,72 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 4 Apr 2015 02:17:29 +0200
-Subject: [PATCH 10/14] ARM: orion: use clkdev_create()
-In-Reply-To: <E1Ye59d-0001BZ-Sv@rmk-PC.arm.linux.org.uk>
-References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
- <E1Ye59d-0001BZ-Sv@rmk-PC.arm.linux.org.uk>
-Message-ID: <20150404001729.GA14824@lunn.ch>
+From: yinghai@kernel.org (Yinghai Lu)
+Date: Fri, 3 Apr 2015 20:34:52 -0700
+Subject: [PATCH 1/3] PCI: Introduce pci_bus_addr_t
+In-Reply-To: <20150403205201.GF10892@google.com>
+References: <1427857069-6789-1-git-send-email-yinghai@kernel.org>
+ <1427857069-6789-2-git-send-email-yinghai@kernel.org>
+ <20150403193234.GD10892@google.com>
+ <20150403205201.GF10892@google.com>
+Message-ID: <CAE9FiQVqAEvoLDRZMcNFki0gLMQiyQd2VYivjAh1teRGeuNwBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 06:13:13PM +0100, Russell King wrote:
-> clkdev_create() is a shorter way to write clkdev_alloc() followed by
-> clkdev_add().  Use this instead.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Fri, Apr 3, 2015 at 1:52 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> [+cc Sam (commented on previous versions), Russell, linux-arm-kernel, Ralf,
+> linux-mips, Ben, linuxppc-dev, x86]
+>
+> On Fri, Apr 03, 2015 at 02:32:34PM -0500, Bjorn Helgaas wrote:
+>> On Tue, Mar 31, 2015 at 07:57:47PM -0700, Yinghai Lu wrote:
+>> > David Ahern found commit d63e2e1f3df9 ("sparc/PCI: Clip bridge windows
+>> > to fit in upstream windows") broke booting on sparc/T5-8.
+>> >
+>> > In the boot log, there is
+>> >   pci 0000:06:00.0: reg 0x184: can't handle BAR above 4GB (bus address
+>> >   0x110204000)
+>> > but that only could happen when dma_addr_t is 32-bit.
+>> >
+>> > According to David Miller, all DMA occurs behind an IOMMU and these
+>> > IOMMUs only support 32-bit addressing, therefore dma_addr_t is
+>> > 32-bit on sparc64.
+>> >
+>> > Let's introduce pci_bus_addr_t instead of using dma_addr_t,
+>> > and pci_bus_addr_t will be 64-bit on 64-bit platform or X86_PAE.
+>> >
+>> > Fixes: commit d63e2e1f3df9 ("sparc/PCI: Clip bridge windows to fit in upstream windows")
+>> > Fixes: commit 23b13bc76f35 ("PCI: Fail safely if we can't handle BARs larger than 4GB")
+>> > Link: http://lkml.kernel.org/r/CAE9FiQU1gJY1LYrxs+ma5LCTEEe4xmtjRG0aXJ9K_Tsu+m9Wuw at mail.gmail.com
+>> > Reported-by: David Ahern <david.ahern@oracle.com>
+>> > Tested-by: David Ahern <david.ahern@oracle.com>
+>> > Signed-off-by: Yinghai Lu <yinghai@kernel.org>
+>> > Cc: <stable@vger.kernel.org> #3.19
+>> > ---
+>> >  drivers/pci/Kconfig |  4 ++++
+>> >  drivers/pci/bus.c   | 10 +++++-----
+>> >  drivers/pci/probe.c | 12 ++++++------
+>> >  include/linux/pci.h | 12 +++++++++---
+>> >  4 files changed, 24 insertions(+), 14 deletions(-)
+>> >
+>> > diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+>> > index 7a8f1c5..6a5a269 100644
+>> > --- a/drivers/pci/Kconfig
+>> > +++ b/drivers/pci/Kconfig
+>> > @@ -1,6 +1,10 @@
+>> >  #
+>> >  # PCI configuration
+>> >  #
+>> > +config PCI_BUS_ADDR_T_64BIT
+>> > +   def_bool y if (64BIT || X86_PAE)
+>> > +   depends on PCI
+>>
+>> We're going to use pci_bus_addr_t in some places where we previously used
+>> dma_addr_t, which means pci_bus_addr_t should be at least as large as
+>> dma_addr_t.  Can you enforce that directly, e.g., with something like this?
+>>
+>>     def_bool y if (ARCH_DMA_ADDR_T_64BIT || 64BIT || X86_PAE)
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+then should use
 
-	  Andrew
+def_bool y if (ARCH_DMA_ADDR_T_64BIT || 64BIT)
 
-> ---
->  arch/arm/plat-orion/common.c | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-> index f5b00f41c4f6..2235081a04ee 100644
-> --- a/arch/arm/plat-orion/common.c
-> +++ b/arch/arm/plat-orion/common.c
-> @@ -28,11 +28,7 @@
->  void __init orion_clkdev_add(const char *con_id, const char *dev_id,
->  			     struct clk *clk)
->  {
-> -	struct clk_lookup *cl;
-> -
-> -	cl = clkdev_alloc(clk, con_id, dev_id);
-> -	if (cl)
-> -		clkdev_add(cl);
-> +	clkdev_create(clk, con_id, "%s", dev_id);
->  }
->  
->  /* Create clkdev entries for all orion platforms except kirkwood.
-> -- 
-> 1.8.3.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks
+
+Yinghai
