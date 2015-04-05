@@ -1,40 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sun, 5 Apr 2015 22:26:15 +0200
-Subject: [GIT PULL] at91: clocksource-driver for 4.1 #2
-In-Reply-To: <20150403180556.GK23023@localhost>
-References: <20150403180556.GK23023@localhost>
-Message-ID: <1428265575-11257-1-git-send-email-nicolas.ferre@atmel.com>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Mon, 06 Apr 2015 00:08:08 +0300
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
+References: <55197A12.1050009@bitmer.com> <20150330164237.GJ10805@atomide.com>
+ <55198BA4.5010207@bitmer.com> <20150330175051.GK10805@atomide.com>
+ <20150331123233.GA15103@earth> <20150401194734.GT10805@atomide.com>
+ <20150403163553.GA16247@earth> <551F0F50.1030701@gmail.com>
+ <20150403221517.GX10805@atomide.com> <551F186B.90608@gmail.com>
+ <20150403225212.GY10805@atomide.com>
+ <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
+ <5520E2EE.4080302@gmail.com>
+ <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
+Message-ID: <5521A438.1070008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
 
-This is the patch that was extracted from my previous pull request and that
-would go on top of your at91/clocksource-driver branch.
 
-Thanks, best regards,
+On  5.04.2015 19:50, Matthijs van Duin wrote:
+> On 5 April 2015 at 09:23, Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> wrote:
+>> Though I wonder why SMC is needed to write ACR on non-HS devices. A simple
+>> MRC should suffice, unless I miss something.
+>
+> Public-world access to ACR varies per bit:
+> bit 1 (L2EN) is documented as banked, but at least on r3p2 turns out
+> to be common r/w.
+> bits 30-31 are secure read-only and public RAZ.
+> remaining bits are secure read/write and public read-only.
+>
+> The net effect is that doing an MRC from public world will only modify
+> the L2EN bit.
+>
+> There's no bit in the non-secure access control register to affect all
+> of this, so GP vs HS doesn't matter here (from a CPU point of view; it
+> may matter for the availability of SM calls obviously).
+>
+> Matthijs
+>
 
-The following changes since commit 8590ca655a19f9e124b52bfbf28f14eb16a05bec:
+But then the first part(setting the IBE bit in ACR to 1) of the errata 
+workaround is wrong, as it uses a plain MCR to set the IBE bit, see 
+http://lxr.free-electrons.com/source/arch/arm/mm/proc-v7.S#L340. Which 
+is weird, given that the workaround was posted by ARM iirc.
 
-  ARM: at91: remove useless include (2015-03-16 17:03:08 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-clocksource-driver2
-
-for you to fetch changes up to 7ab7ef741a467e7af50c9b7446ec992bec9ea6a7:
-
-  clocksource: atmel-st: select MFD_SYSCON (2015-04-05 22:19:50 +0200)
-
-----------------------------------------------------------------
-A fix for the ST clocksource driver Kconfig option
-
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      clocksource: atmel-st: select MFD_SYSCON
-
- drivers/clocksource/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
--- 
-Nicolas Ferre
+Ivo
