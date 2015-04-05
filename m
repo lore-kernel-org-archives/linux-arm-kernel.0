@@ -1,36 +1,34 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 5 Apr 2015 11:00:56 +0200
-Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
- complex dependencies
-In-Reply-To: <34835209.cQQp4PEGGk@avalon>
-References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
- <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
- <34835209.cQQp4PEGGk@avalon>
-Message-ID: <CAMuHMdWsc=2QvKfpYmN=M6As_KWENW2nhSqa8ajkZrQFe+dCPw@mail.gmail.com>
+Date: Sun, 5 Apr 2015 11:04:56 +0200
+Subject: [PATCH 00/14] Fix fallout from per-user struct clk patches
+In-Reply-To: <20150403171149.GC13898@n2100.arm.linux.org.uk>
+References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdWue2Pw15j_2ikhSQWxOMGLLO4ojmmyxSvZ=9YwD_+14w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Russell,
 
-On Sat, Apr 4, 2015 at 2:46 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> +     for (i = 0; i < dev->ngpios; i++)
->> +             gpio_request_one(dev->gpios[i].gpio, dev->gpios[i].flags,
->> +                              pdev->name);
+On Fri, Apr 3, 2015 at 7:11 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Sorry for posting this soo close to the 4.1 merge window, I had
+> completely forgotten about this chunk of work I did earlier this
+> month.
 >
-> Aren't GPIO numbers dynamic too in DT-based systems ? Beside, shouldn't it be
+> The per-user struct clk patches rather badly broke clkdev and
+> various other places.  This was reported, but was forgotten about.
+> Really, the per-user clk stuff should've been reverted, but we've
+> lived with it far too long for that.
+>
+> So, our only other option is to now rush these patches into 4.1
+> and hope for the best.
+>
+> The series cleans up quite a number of places too...
 
-Apparently not, as the old legacy number still works, and it doesn't work
-without.
+Thanks for your patches!
 
-> the responsibility of the drievr to request the GPIOs it needs ?
-
-As far as I understand it, on Armadillo this is used more for platform
-configuration than for device configuration, as it affects multiple devices
-(the comment says DBGMD/LCDC0/FSIA MUX).
-
-I guess I could use a "gpio-hog" subnode in DT instead, but then we're already
-implementing the conversion to DT ;-)
+Can you please tell which are critical fixes for regressions, and which are
+cleanups? It's not so obvious to me from the patch descriptions.
 
 Gr{oetje,eeting}s,
 
