@@ -1,54 +1,36 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 5 Apr 2015 10:55:06 +0200
+Date: Sun, 5 Apr 2015 11:00:56 +0200
 Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
  complex dependencies
-In-Reply-To: <20150403170407.GA13898@n2100.arm.linux.org.uk>
+In-Reply-To: <34835209.cQQp4PEGGk@avalon>
 References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
  <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
- <20150403125727.GT10964@mwanda>
- <20150403170407.GA13898@n2100.arm.linux.org.uk>
-Message-ID: <CAMuHMdWmuh5f9QAaJdp_W2oVpGgJM1TX3AUntYtkTkVJnhFg5A@mail.gmail.com>
+ <34835209.cQQp4PEGGk@avalon>
+Message-ID: <CAMuHMdWsc=2QvKfpYmN=M6As_KWENW2nhSqa8ajkZrQFe+dCPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Laurent,
 
-On Fri, Apr 3, 2015 at 7:04 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 03, 2015 at 03:57:27PM +0300, Dan Carpenter wrote:
->> On Fri, Apr 03, 2015 at 02:42:02PM +0200, Geert Uytterhoeven wrote:
->> > +int __init board_staging_register_clock(const struct board_staging_clk *bsc)
->> > +{
->> > +   struct clk *clk;
->> > +   int error;
->> > +
->> > +   pr_debug("Registering clock %s for con_id %s dev_id %s\n", bsc->clk,
->> > +            bsc->con_id, bsc->dev_id);
->> > +   clk = clk_get(NULL, bsc->clk);
->> > +   if (IS_ERR(clk)) {
->> > +           error = PTR_ERR(clk);
->> > +           pr_err("Failed to get clock %s (%d)\n", bsc->clk, error);
->> > +           return error;
->> > +   }
->> > +
->> > +   error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
->> > +   if (error)
->> > +           pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
->> > +           return error;
->>
->> Missing curly braces.  Also it's weird that don't we need a clk_put()
->> on the error patch as well as the success path?
+On Sat, Apr 4, 2015 at 2:46 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+>> +     for (i = 0; i < dev->ngpios; i++)
+>> +             gpio_request_one(dev->gpios[i].gpio, dev->gpios[i].flags,
+>> +                              pdev->name);
 >
-> What's also concerning is that this is an abuse of this.
->
-> clk_register_clkdev() is supposed to be used with clocks created with
-> the CCF functions, it's not for creating aliases.
->
-> We have clk_add_alias() which does *everything* that this function does,
-> only in a less buggy way.
+> Aren't GPIO numbers dynamic too in DT-based systems ? Beside, shouldn't it be
 
-Thanks, I didn't know about clk_add_alias(). I had based the above on long gone
-code under arch/arm/mach-shmobile to use platform devices with CCF.
+Apparently not, as the old legacy number still works, and it doesn't work
+without.
+
+> the responsibility of the drievr to request the GPIOs it needs ?
+
+As far as I understand it, on Armadillo this is used more for platform
+configuration than for device configuration, as it affects multiple devices
+(the comment says DBGMD/LCDC0/FSIA MUX).
+
+I guess I could use a "gpio-hog" subnode in DT instead, but then we're already
+implementing the conversion to DT ;-)
 
 Gr{oetje,eeting}s,
 
