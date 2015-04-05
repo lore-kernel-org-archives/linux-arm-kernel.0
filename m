@@ -1,14 +1,14 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 5 Apr 2015 10:46:33 +0200
-Subject: [PATCH repost] ARM: shmobile: r8a7790: Remove MSIOF address from
+Date: Sun, 5 Apr 2015 10:47:01 +0200
+Subject: [PATCH v2] ARM: shmobile: r8a7791: Remove MSIOF address from
  device tree
-In-Reply-To: <1428166471-2897-1-git-send-email-ykaneko0929@gmail.com>
-References: <1428166471-2897-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <CAMuHMdW40S4rU-wkrJDHDw_ThFdChEa+HEyXYHJ3AAH1TwUiVw@mail.gmail.com>
+In-Reply-To: <1428166512-2936-1-git-send-email-ykaneko0929@gmail.com>
+References: <1428166512-2936-1-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <CAMuHMdVH19ZncC0dMbO8-rCzN6MkOVWfiSKLDAnsqW6_Z_pw1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 4, 2015 at 6:54 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+On Sat, Apr 4, 2015 at 6:55 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
 > From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
 >
 > MSIOF Base Address H'E6xx can be accessed by CPU and DMAC.
