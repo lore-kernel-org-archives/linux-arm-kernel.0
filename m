@@ -1,23 +1,54 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 5 Apr 2015 10:47:01 +0200
-Subject: [PATCH v2] ARM: shmobile: r8a7791: Remove MSIOF address from
- device tree
-In-Reply-To: <1428166512-2936-1-git-send-email-ykaneko0929@gmail.com>
-References: <1428166512-2936-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <CAMuHMdVH19ZncC0dMbO8-rCzN6MkOVWfiSKLDAnsqW6_Z_pw1Q@mail.gmail.com>
+Date: Sun, 5 Apr 2015 10:55:06 +0200
+Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
+ complex dependencies
+In-Reply-To: <20150403170407.GA13898@n2100.arm.linux.org.uk>
+References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
+ <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
+ <20150403125727.GT10964@mwanda>
+ <20150403170407.GA13898@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdWmuh5f9QAaJdp_W2oVpGgJM1TX3AUntYtkTkVJnhFg5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 4, 2015 at 6:55 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
->
-> MSIOF Base Address H'E6xx can be accessed by CPU and DMAC.
-> MSIOF Base Address H'E7xx for DMAC was removed from H/W manual.
->
-> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Hi Russell,
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Fri, Apr 3, 2015 at 7:04 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Apr 03, 2015 at 03:57:27PM +0300, Dan Carpenter wrote:
+>> On Fri, Apr 03, 2015 at 02:42:02PM +0200, Geert Uytterhoeven wrote:
+>> > +int __init board_staging_register_clock(const struct board_staging_clk *bsc)
+>> > +{
+>> > +   struct clk *clk;
+>> > +   int error;
+>> > +
+>> > +   pr_debug("Registering clock %s for con_id %s dev_id %s\n", bsc->clk,
+>> > +            bsc->con_id, bsc->dev_id);
+>> > +   clk = clk_get(NULL, bsc->clk);
+>> > +   if (IS_ERR(clk)) {
+>> > +           error = PTR_ERR(clk);
+>> > +           pr_err("Failed to get clock %s (%d)\n", bsc->clk, error);
+>> > +           return error;
+>> > +   }
+>> > +
+>> > +   error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
+>> > +   if (error)
+>> > +           pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
+>> > +           return error;
+>>
+>> Missing curly braces.  Also it's weird that don't we need a clk_put()
+>> on the error patch as well as the success path?
+>
+> What's also concerning is that this is an abuse of this.
+>
+> clk_register_clkdev() is supposed to be used with clocks created with
+> the CCF functions, it's not for creating aliases.
+>
+> We have clk_add_alias() which does *everything* that this function does,
+> only in a less buggy way.
+
+Thanks, I didn't know about clk_add_alias(). I had based the above on long gone
+code under arch/arm/mach-shmobile to use platform devices with CCF.
 
 Gr{oetje,eeting}s,
 
