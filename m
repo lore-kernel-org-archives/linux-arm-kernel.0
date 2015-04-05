@@ -1,46 +1,37 @@
 From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Sun, 05 Apr 2015 15:43:53 +0300
-Subject: [PATCH v2 2/3] ARM: dts: alpine: add internal pci
-Message-ID: <55212e09.RH2EglWE3maYKEXN%tsahee@annapurnalabs.com>
+Date: Sun, 05 Apr 2015 15:43:56 +0300
+Subject: [PATCH v2 3/3] ARM: multi_v7_defconfig: enable alpine platform
+Message-ID: <55212e0c.XlZX3XeU2wCa/MNm%tsahee@annapurnalabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device-tree entry for the internal pci bus on Alpine.
-Alpine's on-chip devices appear as pci devices on this bus.
+The PCI driver is required for SATA device probe on Alpine platform,
+so it cannot be modular.
 
 Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
 ---
- arch/arm/boot/dts/alpine.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
-index 519f58c..9af2d60 100644
---- a/arch/arm/boot/dts/alpine.dtsi
-+++ b/arch/arm/boot/dts/alpine.dtsi
-@@ -137,5 +137,24 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 		};
-+
-+		/* Internal PCIe Controller */
-+		pcie-internal at 0xfbc00000 {
-+			compatible = "pci-host-ecam-generic";
-+			device_type = "pci";
-+			#size-cells = <2>;
-+			#address-cells = <3>;
-+			#interrupt-cells = <1>;
-+			reg = <0x0 0xfbc00000 0x0 0x100000>;
-+			interrupt-map-mask = <0xf800 0 0 7>;
-+			/* Add legacy interrupts for SATA devices only */
-+			interrupt-map =	<0x4000 0 0 1 &gic 0 43 4>,
-+					<0x4800 0 0 1 &gic 0 44 4>;
-+
-+			/* 32 bit non prefetchable memory space */
-+			ranges = <0x02000000 0x0 0xfe000000 0x0 0xfe000000 0x0 0x1000000>;
-+
-+			bus-range = <0x00 0x00>;
-+		};
- 	};
- };
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 48dfe88..ab86655 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -12,6 +12,7 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_CMDLINE_PARTITION=y
+ CONFIG_ARCH_VIRT=y
++CONFIG_ARCH_ALPINE=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_375=y
+@@ -92,6 +93,7 @@ CONFIG_ARCH_WM8850=y
+ CONFIG_ARCH_ZYNQ=y
+ CONFIG_TRUSTED_FOUNDATIONS=y
+ CONFIG_PCI=y
++CONFIG_PCI_HOST_GENERIC=y
+ CONFIG_PCI_KEYSTONE=y
+ CONFIG_PCI_MSI=y
+ CONFIG_PCI_MVEBU=y
 -- 
 1.9.1
