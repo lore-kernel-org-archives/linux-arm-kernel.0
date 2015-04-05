@@ -1,50 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 5 Apr 2015 09:06:45 +0100
-Subject: Two new breakages since Thursday
-Message-ID: <20150405080645.GE13898@n2100.arm.linux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 5 Apr 2015 10:46:33 +0200
+Subject: [PATCH repost] ARM: shmobile: r8a7790: Remove MSIOF address from
+ device tree
+In-Reply-To: <1428166471-2897-1-git-send-email-ykaneko0929@gmail.com>
+References: <1428166471-2897-1-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <CAMuHMdW40S4rU-wkrJDHDw_ThFdChEa+HEyXYHJ3AAH1TwUiVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two new breakages have appeared since Thursday.  The first affects both
-ARM and ARM64 builds (a missing file), the second only ARM builds.
+On Sat, Apr 4, 2015 at 6:54 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+>
+> MSIOF Base Address H'E6xx can be accessed by CPU and DMAC.
+> MSIOF Base Address H'E7xx for DMAC was removed from H/W manual.
+>
+> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 
-arch/arm64/boot/dts/mediatek/mt8173-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
-arch/arm/boot/dts/mt8135-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
-arch/arm/mach-at91/pm_suspend.S:143: Error: selected processor does not support ARM mode `dsb'
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-ARM64 breaks on a defconfig build, ARM breaks with these errors on
-an allmodconfig build.
+Gr{oetje,eeting}s,
 
-The first two are due to the mediatek patches merged via the arm-soc
-tree.  The second is due to:
+                        Geert
 
-commit 20567658b8f010eea287087bfdbeb25757801aed
-Author: Wenyou Yang <wenyou.yang@atmel.com>
-Date:   Mon Mar 9 11:53:46 2015 +0800
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-    ARM: at91/pm_suspend: add the WFI instruction support for ARMv7
-
-which looks to me like completely the wrong solution:
-
-+       .macro at91_cpu_idle
-+
-+#if defined(CONFIG_CPU_V7)
-+       mov     tmp1, #AT91_PMC_PCK
-+       str     tmp1, [pmc, #AT91_PMC_SCDR]
-+
-+       dsb
-+
-+       wfi             @ Wait For Interrupt
-+#else
-+       mcr     p15, 0, tmp1, c7, c0, 4
-+#endif
-+
-+       .endm
-
-So, if we build a kernel with ARMc6 and ARMv7 CPUs, AT91 ends up using
-ARMv7-only instructions in this function, which will cause an illegal
-instruction exception on ARMv6 CPUs.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
