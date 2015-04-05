@@ -1,41 +1,50 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Sun, 05 Apr 2015 10:23:26 +0300
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
-References: <55197A12.1050009@bitmer.com> <20150330164237.GJ10805@atomide.com>
- <55198BA4.5010207@bitmer.com> <20150330175051.GK10805@atomide.com>
- <20150331123233.GA15103@earth> <20150401194734.GT10805@atomide.com>
- <20150403163553.GA16247@earth> <551F0F50.1030701@gmail.com>
- <20150403221517.GX10805@atomide.com> <551F186B.90608@gmail.com>
- <20150403225212.GY10805@atomide.com>
- <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
-Message-ID: <5520E2EE.4080302@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 5 Apr 2015 09:06:45 +0100
+Subject: Two new breakages since Thursday
+Message-ID: <20150405080645.GE13898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Two new breakages have appeared since Thursday.  The first affects both
+ARM and ARM64 builds (a missing file), the second only ARM builds.
 
+arch/arm64/boot/dts/mediatek/mt8173-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
+arch/arm/boot/dts/mt8135-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
+arch/arm/mach-at91/pm_suspend.S:143: Error: selected processor does not support ARM mode `dsb'
 
-On  5.04.2015 07:13, Matthijs van Duin wrote:
-> I would actually suggest clearing IBE if it set on Cortex-A8 r2 or
-> later processors and a secure monitor call is available to do so
-> (there is on the DM814x and AM335x, dunno about the 37xx), also for
-> performance reasons: BTB invalidates are quite expensive instructions
-> (when enabled).
+ARM64 breaks on a defconfig build, ARM breaks with these errors on
+an allmodconfig build.
 
-There is (or should be) SM call, it is explained in 36xx TRM(SWPU177AA) 
-as well, 26.4.1, "Booting Overview". Though I wonder why SMC is needed 
-to write ACR on non-HS devices. A simple MRC should suffice, unless I 
-miss something.
+The first two are due to the mediatek patches merged via the arm-soc
+tree.  The second is due to:
 
-Clearing the IBE bit on devices that don't need erratum 430973 
-workaround, along with enabling that workaround in kernel is the best 
-approach IMO. That way we will gain both stability on cores that need 
-the workaround (like on N900 and the other devices with p1) and won't 
-lose performance on cores that are not affected.
+commit 20567658b8f010eea287087bfdbeb25757801aed
+Author: Wenyou Yang <wenyou.yang@atmel.com>
+Date:   Mon Mar 9 11:53:46 2015 +0800
 
->
-> Matthijs
->
+    ARM: at91/pm_suspend: add the WFI instruction support for ARMv7
 
-Regards,
-Ivo
+which looks to me like completely the wrong solution:
+
++       .macro at91_cpu_idle
++
++#if defined(CONFIG_CPU_V7)
++       mov     tmp1, #AT91_PMC_PCK
++       str     tmp1, [pmc, #AT91_PMC_SCDR]
++
++       dsb
++
++       wfi             @ Wait For Interrupt
++#else
++       mcr     p15, 0, tmp1, c7, c0, 4
++#endif
++
++       .endm
+
+So, if we build a kernel with ARMc6 and ARMv7 CPUs, AT91 ends up using
+ARMv7-only instructions in this function, which will cause an illegal
+instruction exception on ARMv6 CPUs.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
