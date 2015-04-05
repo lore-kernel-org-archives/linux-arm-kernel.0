@@ -1,34 +1,189 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 5 Apr 2015 15:20:34 +0100
-Subject: [PATCH 07/14] media: omap3isp: remove unused clkdev
-In-Reply-To: <36620233.VbNiGUfDRt@avalon>
-References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
- <E1Ye59O-0001BJ-Gq@rmk-PC.arm.linux.org.uk>
- <36620233.VbNiGUfDRt@avalon>
-Message-ID: <20150405142034.GG4027@n2100.arm.linux.org.uk>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Sun, 05 Apr 2015 17:57:09 +0200
+Subject: [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
+In-Reply-To: <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
+References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+ <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
+Message-ID: <s5ha8ymy3e2.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 04, 2015 at 12:44:35AM +0300, Laurent Pinchart wrote:
-> Hi Russell,
+At Thu, 02 Apr 2015 10:22:06 +0100,
+Russell King wrote:
 > 
-> Thank you for the patch;
+> Add a helper for the EDID like data structure, which is typically passed
+> from a HDMI adapter to its associated audio driver.  This informs the
+> audio driver of the capabilities of the attached HDMI sink.
 > 
-> On Friday 03 April 2015 18:12:58 Russell King wrote:
-> > No merged platform supplies xclks via platform data.  As we want to
-> > slightly change the clkdev interface, rather than fixing this unused
-> > code, remove it instead.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  include/sound/pcm_drm_eld.h |  6 +++
+>  sound/core/Kconfig          |  3 ++
+>  sound/core/Makefile         |  1 +
+>  sound/core/pcm_drm_eld.c    | 92 +++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 102 insertions(+)
+>  create mode 100644 include/sound/pcm_drm_eld.h
+>  create mode 100644 sound/core/pcm_drm_eld.c
 > 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
-> with one caveat though : it conflicts with patches queued for v4.1 in the 
-> media tree. I'll post a rebased version in a reply to your e-mail. How would 
-> you like to handle the conflict ?
+> diff --git a/include/sound/pcm_drm_eld.h b/include/sound/pcm_drm_eld.h
+> new file mode 100644
+> index 000000000000..93357b25d2e2
+> --- /dev/null
+> +++ b/include/sound/pcm_drm_eld.h
+> @@ -0,0 +1,6 @@
+> +#ifndef __SOUND_PCM_DRM_ELD_H
+> +#define __SOUND_PCM_DRM_ELD_H
+> +
+> +int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void *eld);
+> +
+> +#endif
 
-How bad is the conflict?
+IMO, a single line of function declaration can be merged to
+sound/pcm.h.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+
+> diff --git a/sound/core/Kconfig b/sound/core/Kconfig
+> index 313f22e9d929..b534c8a6046b 100644
+> --- a/sound/core/Kconfig
+> +++ b/sound/core/Kconfig
+> @@ -6,6 +6,9 @@ config SND_PCM
+>  	tristate
+>  	select SND_TIMER
+>  
+> +config SND_PCM_ELD
+> +	bool
+
+I don't mind much adding this one, but a new Kconfig is always a
+question.  I'd like to hear other's opinion, too.
+
+>  config SND_DMAENGINE_PCM
+>  	tristate
+>  
+> diff --git a/sound/core/Makefile b/sound/core/Makefile
+> index 4daf2f58261c..591b49157b4d 100644
+> --- a/sound/core/Makefile
+> +++ b/sound/core/Makefile
+> @@ -13,6 +13,7 @@ snd-$(CONFIG_SND_JACK)	  += jack.o
+>  snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
+>  		pcm_memory.o memalloc.o
+>  snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
+> +snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
+>  
+>  # for trace-points
+>  CFLAGS_pcm_lib.o := -I$(src)
+> diff --git a/sound/core/pcm_drm_eld.c b/sound/core/pcm_drm_eld.c
+> new file mode 100644
+> index 000000000000..47d9b60435fe
+> --- /dev/null
+> +++ b/sound/core/pcm_drm_eld.c
+> @@ -0,0 +1,92 @@
+> +/*
+> + *  PCM DRM helpers
+> + *
+> + *   This program is free software; you can redistribute it and/or modify
+> + *   it under the terms of the GNU General Public License version 2 as
+> + *   published by the Free Software Foundation.
+> + */
+> +#include <linux/export.h>
+> +#include <drm/drm_edid.h>
+> +#include <sound/pcm.h>
+> +#include <sound/pcm_drm_eld.h>
+> +
+> +static const unsigned int eld_rates[] = {
+> +	32000,
+> +	44100,
+> +	48000,
+> +	88200,
+> +	96000,
+> +	176400,
+> +	192000,
+> +};
+> +
+> +static int eld_limit_rates(struct snd_pcm_hw_params *params,
+> +			   struct snd_pcm_hw_rule *rule)
+> +{
+> +	struct snd_interval *r = hw_param_interval(params, rule->var);
+> +	struct snd_interval *c;
+> +	unsigned int rate_mask = 7, i;
+> +	const u8 *sad, *eld = rule->private;
+> +
+> +	sad = drm_eld_sad(eld);
+> +	if (sad) {
+> +		c = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+> +
+> +		for (i = drm_eld_sad_count(eld); i > 0; i--, sad += 3) {
+> +			unsigned channels = 1 + (sad[0] & 7);
+> +
+> +			/*
+> +			 * Exclude SADs which do not include the
+> +			 * requested number of channels.
+> +			 */
+> +			if (c->min <= channels)
+> +				rate_mask |= sad[1];
+> +		}
+> +printk("%s: r %d-%d c %d-%d m %x\n", __func__, r->min, r->max, c->min, c->max, rate_mask);
+
+I guess this will be removed in the final version? ;)
+
+> +	}
+> +
+> +	return snd_interval_list(r, ARRAY_SIZE(eld_rates), eld_rates,
+> +				 rate_mask);
+> +}
+> +
+> +static int eld_limit_channels(struct snd_pcm_hw_params *params,
+> +			      struct snd_pcm_hw_rule *rule)
+> +{
+> +	struct snd_interval *var = hw_param_interval(params, rule->var);
+> +	struct snd_interval t = { .min = 1, .max = 2, .integer = 1, };
+> +	unsigned int i;
+> +	const u8 *sad, *eld = rule->private;
+> +
+> +	sad = drm_eld_sad(eld);
+> +	if (sad) {
+> +		for (i = drm_eld_sad_count(eld); i > 0; i--, sad += 3) {
+> +			switch (sad[0] & 0x78) {
+> +			case 0x08:
+> +				t.max = max(t.max, (sad[0] & 7) + 1u);
+> +				break;
+
+What about the minimal channel?
+
+Ideally, we should either give a list of channel numbers or process
+the hw_constraints dynamically to narrow the min/max matching with the
+eld.
+
+
+thanks,
+
+Takashi
+
+> +			}
+> +		}
+> +	}
+> +
+> +	return snd_interval_refine(var, &t);
+> +}
+> +
+> +int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void *eld)
+> +{
+> +	int ret;
+> +
+> +	ret = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+> +				  eld_limit_rates, eld,
+> +				  SNDRV_PCM_HW_PARAM_RATE,
+> +				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+> +				  eld_limit_channels, eld,
+> +				  SNDRV_PCM_HW_PARAM_CHANNELS,
+> +				  SNDRV_PCM_HW_PARAM_RATE, -1);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(snd_pcm_hw_constraint_eld);
+> -- 
+> 1.8.3.1
+> 
