@@ -1,45 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 05 Apr 2015 23:06:20 +0300
-Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
- complex dependencies
-In-Reply-To: <CAMuHMdWsc=2QvKfpYmN=M6As_KWENW2nhSqa8ajkZrQFe+dCPw@mail.gmail.com>
-References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
- <34835209.cQQp4PEGGk@avalon>
- <CAMuHMdWsc=2QvKfpYmN=M6As_KWENW2nhSqa8ajkZrQFe+dCPw@mail.gmail.com>
-Message-ID: <2722685.XFRaAHH9GQ@avalon>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Sun, 5 Apr 2015 22:17:23 +0200
+Subject: [GIT PULL] at91: cleanup for 4.1 #4 (bis)
+In-Reply-To: <20150403180556.GK23023@localhost>
+References: <20150403180556.GK23023@localhost>
+Message-ID: <1428265043-10366-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Arnd, Olof, Kevin,
 
-On Sunday 05 April 2015 11:00:56 Geert Uytterhoeven wrote:
-> On Sat, Apr 4, 2015 at 2:46 PM, Laurent Pinchart wrote:
-> >> +     for (i = 0; i < dev->ngpios; i++)
-> >> +             gpio_request_one(dev->gpios[i].gpio, dev->gpios[i].flags,
-> >> +                              pdev->name);
-> > 
-> > Aren't GPIO numbers dynamic too in DT-based systems ? Beside, shouldn't it
-> > be
->
-> Apparently not, as the old legacy number still works, and it doesn't work
-> without.
+This is a re-spin of my 4th "cleanup" pull-request following the comments made
+by Olof.  So, now these patches about PM are based on the "at91-cleanup2" that
+you would merge in your next/cleanup branch.
 
-I think we're just lucky there that the SoC main GPIO controller gets 
-registered first and starts counting GPIOs with a zero offset.
- 
-> > the responsibility of the drievr to request the GPIOs it needs ?
-> 
-> As far as I understand it, on Armadillo this is used more for platform
-> configuration than for device configuration, as it affects multiple devices
-> (the comment says DBGMD/LCDC0/FSIA MUX).
-> 
-> I guess I could use a "gpio-hog" subnode in DT instead, but then we're
-> already implementing the conversion to DT ;-)
+I'm preparing another pull-request for the other patch that would stack on our
+at91/clocksource-driver branch.
 
-But that's the goal :-) I'd rather move GPIO and pinctrl to DT directly as we 
-already have the infrastructure to do so.
+Thanks for your advice, bye.
+
+The following changes since commit 598e085590fc5ac1fecff00e842a8a6c2ae010e5:
+
+  ARM: at91: remove old setup (2015-03-13 18:01:10 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup4_bis
+
+for you to fetch changes up to 2e57dc087c27b8b0bd4a9e5f2c6f28f3cd0b47ff:
+
+  ARM: at91/pm: move AT91_MEMCTRL_* to pm.h (2015-04-05 21:59:52 +0200)
+
+----------------------------------------------------------------
+Fourth batch of cleanup for 4.1:
+- 1 issues revealed by the kbuild test robot fixed
+- move of some functions and macros into relevant files to be able to
+  streamline the at91 specific header afterwards
+
+----------------------------------------------------------------
+Alexandre Belloni (3):
+      ARM: at91: fix pm_suspend.S compilation when ARMv6 is selected
+      ARM: at91/pm: move the standby functions to pm.c
+      ARM: at91/pm: move AT91_MEMCTRL_* to pm.h
+
+ arch/arm/mach-at91/Makefile                 |  3 +
+ arch/arm/mach-at91/include/mach/at91_ramc.h |  4 --
+ arch/arm/mach-at91/pm.c                     | 89 ++++++++++++++++++++++++++
+ arch/arm/mach-at91/pm.h                     | 96 ++---------------------------
+ 4 files changed, 96 insertions(+), 96 deletions(-)
 
 -- 
-Regards,
-
-Laurent Pinchart
+Nicolas Ferre
