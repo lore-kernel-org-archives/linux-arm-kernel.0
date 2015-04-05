@@ -1,32 +1,35 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sat, 4 Apr 2015 22:25:03 -0500
-Subject: [PATCH 1/3] PCI: Introduce pci_bus_addr_t
-In-Reply-To: <CAL_JsqJyH==8OtkcU8_P4_47U6qe6FYqj-WUZ20_Y+iC_OF4_w@mail.gmail.com>
-References: <1427857069-6789-1-git-send-email-yinghai@kernel.org>
- <1427857069-6789-2-git-send-email-yinghai@kernel.org>
- <20150403193234.GD10892@google.com>
- <20150403205201.GF10892@google.com>
- <CAE9FiQVqAEvoLDRZMcNFki0gLMQiyQd2VYivjAh1teRGeuNwBw@mail.gmail.com>
- <CAErSpo55rpO6SNeY57zZ8ah0PJ3eY+-L92vUJwYiRn4tCfLtJg@mail.gmail.com>
- <CAL_JsqJyH==8OtkcU8_P4_47U6qe6FYqj-WUZ20_Y+iC_OF4_w@mail.gmail.com>
-Message-ID: <CAErSpo4cw2MSPmrur_QFMwnH01qf0XMfBEAyZ2f+HrUOGEXyjw@mail.gmail.com>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Sun, 5 Apr 2015 06:13:47 +0200
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <20150403225212.GY10805@atomide.com>
+References: <55197A12.1050009@bitmer.com> <20150330164237.GJ10805@atomide.com>
+ <55198BA4.5010207@bitmer.com> <20150330175051.GK10805@atomide.com>
+ <20150331123233.GA15103@earth> <20150401194734.GT10805@atomide.com>
+ <20150403163553.GA16247@earth> <551F0F50.1030701@gmail.com>
+ <20150403221517.GX10805@atomide.com> <551F186B.90608@gmail.com>
+ <20150403225212.GY10805@atomide.com>
+Message-ID: <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 4, 2015 at 2:48 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Sat, Apr 4, 2015 at 7:46 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+On 4 April 2015 at 00:52, Tony Lindgren <tony@atomide.com> wrote:
+> Right, it affects n900 for sure. My point is that it also seems to
+> affect 37xx versions not listed to suffer from this issue.
 
->> I think there's still an unresolved question about the OF parsing code.
->
-> Got a pointer to what that is? I'll take a guess. Generally, we make
-> the parsing code independent of the kernel addr sizes and use u64
-> types. The DT sizes and kernel sizes are not always aligned. For
-> example, an LPAE capable platform running a non-LPAE kernel build.
+They shouldn't... erratum 430973 only affected Cortex-A8 r1, and the
+dm37xx should have an r3p2 right?
 
-Yep: http://lkml.kernel.org/r/1427857069-6789-3-git-send-email-yinghai at kernel.org
+A word of caution though: at least on the DM814x and AM335x, secure
+ROM sets bit 6 (IBE) in the Auxiliary Control Register, thereby
+enabling BTB invalidate instructions (which normally execute as nops).
+This is presumably a leftover of the erratum 430973 workaround, but it
+means there is a risk of running afoul of erratum 687067 if BTB
+invalidate by MVA instructions are actually used.
 
-Yinghai made a change to the sparc OF parsing code.  The question is
-whether a similar change should be made to clones of that code (two
-others in arch/sparc, one in arch/powerpc, and one in drivers/of).
+I would actually suggest clearing IBE if it set on Cortex-A8 r2 or
+later processors and a secure monitor call is available to do so
+(there is on the DM814x and AM335x, dunno about the 37xx), also for
+performance reasons: BTB invalidates are quite expensive instructions
+(when enabled).
 
-Bjorn
+Matthijs
