@@ -1,24 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 5 Apr 2015 12:12:19 +0200
-Subject: Two new breakages since Thursday
-In-Reply-To: <20150405080645.GE13898@n2100.arm.linux.org.uk>
-References: <20150405080645.GE13898@n2100.arm.linux.org.uk>
-Message-ID: <20150405101219.GS20669@piout.net>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sun,  5 Apr 2015 14:06:34 +0200
+Subject: [PATCH 14/16] soc: ti: knav_qmss_queue: fix error return code
+In-Reply-To: <1428235596-4757-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1428235596-4757-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1428235596-4757-15-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Return a negative error code on failure.
 
-On 05/04/2015 at 09:06:45 +0100, Russell King - ARM Linux wrote :
-> So, if we build a kernel with ARMc6 and ARMv7 CPUs, AT91 ends up using
-> ARMv7-only instructions in this function, which will cause an illegal
-> instruction exception on ARMv6 CPUs.
-> 
+A simplified version of the semantic match that finds this problem is as
+follows: (http://coccinelle.lip6.fr/)
 
-A fix has been pushed to the at91 tree but has not been pulled in
-arm-soc yet.
+// <smpl>
+@@
+identifier ret; expression e1,e2;
+@@
+(
+if (\(ret < 0\|ret != 0\))
+ { ... return ret; }
+|
+ret = 0
+)
+... when != ret = e1
+    when != &ret
+*if(...)
+{
+  ... when != ret = e2
+      when forall
+ return ret;
+}
+// </smpl>
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+ drivers/soc/ti/knav_qmss_queue.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 6d8646d..822ead8 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -1768,6 +1768,7 @@ static int knav_queue_probe(struct platform_device *pdev)
+ 	regions =  of_get_child_by_name(node, "descriptor-regions");
+ 	if (!regions) {
+ 		dev_err(dev, "descriptor-regions not specified\n");
++		ret = -ENODEV;
+ 		goto err;
+ 	}
+ 	ret = knav_queue_setup_regions(kdev, regions);
