@@ -1,28 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sun, 5 Apr 2015 21:50:16 +0200
-Subject: Two new breakages since Thursday
-In-Reply-To: <20150405101219.GS20669@piout.net>
-References: <20150405080645.GE13898@n2100.arm.linux.org.uk>
- <20150405101219.GS20669@piout.net>
-Message-ID: <552191F8.3010007@atmel.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 05 Apr 2015 23:06:20 +0300
+Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
+ complex dependencies
+In-Reply-To: <CAMuHMdWsc=2QvKfpYmN=M6As_KWENW2nhSqa8ajkZrQFe+dCPw@mail.gmail.com>
+References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
+ <34835209.cQQp4PEGGk@avalon>
+ <CAMuHMdWsc=2QvKfpYmN=M6As_KWENW2nhSqa8ajkZrQFe+dCPw@mail.gmail.com>
+Message-ID: <2722685.XFRaAHH9GQ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/04/2015 12:12, Alexandre Belloni a ?crit :
-> Hi,
-> 
-> On 05/04/2015 at 09:06:45 +0100, Russell King - ARM Linux wrote :
->> So, if we build a kernel with ARMc6 and ARMv7 CPUs, AT91 ends up using
->> ARMv7-only instructions in this function, which will cause an illegal
->> instruction exception on ARMv6 CPUs.
->>
-> 
-> A fix has been pushed to the at91 tree but has not been pulled in
-> arm-soc yet.
+Hi Geert,
 
-Yes, I'll try to re-spin my pull requests soon so that it can be merged
-quickly.
+On Sunday 05 April 2015 11:00:56 Geert Uytterhoeven wrote:
+> On Sat, Apr 4, 2015 at 2:46 PM, Laurent Pinchart wrote:
+> >> +     for (i = 0; i < dev->ngpios; i++)
+> >> +             gpio_request_one(dev->gpios[i].gpio, dev->gpios[i].flags,
+> >> +                              pdev->name);
+> > 
+> > Aren't GPIO numbers dynamic too in DT-based systems ? Beside, shouldn't it
+> > be
+>
+> Apparently not, as the old legacy number still works, and it doesn't work
+> without.
 
-Thanks for the "heads up". Bye,
+I think we're just lucky there that the SoC main GPIO controller gets 
+registered first and starts counting GPIOs with a zero offset.
+ 
+> > the responsibility of the drievr to request the GPIOs it needs ?
+> 
+> As far as I understand it, on Armadillo this is used more for platform
+> configuration than for device configuration, as it affects multiple devices
+> (the comment says DBGMD/LCDC0/FSIA MUX).
+> 
+> I guess I could use a "gpio-hog" subnode in DT instead, but then we're
+> already implementing the conversion to DT ;-)
+
+But that's the goal :-) I'd rather move GPIO and pinctrl to DT directly as we 
+already have the infrastructure to do so.
+
 -- 
-Nicolas Ferre
+Regards,
+
+Laurent Pinchart
