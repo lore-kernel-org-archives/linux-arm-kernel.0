@@ -1,61 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 5 Apr 2015 23:44:55 +0100
-Subject: [PATCH v4 07/11] ARM: allow MULTIPLATFORM with !MMU
-In-Reply-To: <24394c50bcd8000c21aca0360fd20b6f@agner.ch>
-References: <1428090292-21693-1-git-send-email-stefan@agner.ch>
- <1428090292-21693-8-git-send-email-stefan@agner.ch>
- <20150403200931.GD13898@n2100.arm.linux.org.uk>
- <1f84d767d3bb8a8c470a26064cba454e@agner.ch>
- <20150405161014.GG13898@n2100.arm.linux.org.uk>
- <24394c50bcd8000c21aca0360fd20b6f@agner.ch>
-Message-ID: <20150405224455.GB12732@n2100.arm.linux.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 06 Apr 2015 01:09:06 +0200
+Subject: [PATCH V2] tty: serial: Add const to struct
+ =?UTF-8?Q?uart=5Fops=20declarations?=
+In-Reply-To: <1428258294.2775.69.camel@perches.com>
+References: <1428169665.2775.53.camel@perches.com>
+ <a938a0e86638588e5ccff85771fa3b95@agner.ch>
+ <1428258294.2775.69.camel@perches.com>
+Message-ID: <d55b1a1240db66ae651cb99cd713694a@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 12:19:43AM +0200, Stefan Agner wrote:
-> On 2015-04-05 18:10, Russell King - ARM Linux wrote:
-> > config ARM_SINGLE_ARMV7M
-> > 	bool "ARM architecture v7M compliant (Cortex-M0/M3/M4) SoC"
-> > 	depends on !MMU
-> > 	select ARM_NVIC
-> > 	... etc ...
+On 2015-04-05 20:24, Joe Perches wrote:
+> Still compiled only x86 and not cross-compiled or tested.
+
+Cross-compiled with multi_v7_defconfig
+
 > 
-> I guess that would be ARCH_SINGLE_ARMV7M?
+>  drivers/tty/serial/21285.c                  | 2 +-
+>  drivers/tty/serial/altera_jtaguart.c        | 2 +-
+>  drivers/tty/serial/altera_uart.c            | 2 +-
+>  drivers/tty/serial/amba-pl010.c             | 2 +-
+>  drivers/tty/serial/amba-pl011.c             | 2 +-
+>  drivers/tty/serial/apbuart.c                | 2 +-
+>  drivers/tty/serial/ar933x_uart.c            | 2 +-
+>  drivers/tty/serial/arc_uart.c               | 2 +-
+>  drivers/tty/serial/atmel_serial.c           | 2 +-
+>  drivers/tty/serial/bcm63xx_uart.c           | 2 +-
+>  drivers/tty/serial/bfin_sport_uart.c        | 2 +-
+>  drivers/tty/serial/bfin_uart.c              | 2 +-
+>  drivers/tty/serial/cpm_uart/cpm_uart_core.c | 2 +-
+>  drivers/tty/serial/dz.c                     | 2 +-
+>  drivers/tty/serial/efm32-uart.c             | 2 +-
+>  drivers/tty/serial/fsl_lpuart.c             | 4 ++--
 
-No, I meant ARM_SINGLE_xxx
+Tested that driver on actual hardware, looks fine.
 
-> > which then allows a /multiplatform/ v7M kernel to be built, allowing the
-> > selection of EFM32, SOC_VF610, and any other v7M compliant SoC.
-> 
-> In my view, that wouldn't end up being much different than what that
-> patchset is doing:
+>  drivers/tty/serial/icom.c                   | 2 +-
+>  drivers/tty/serial/imx.c                    | 2 +-
+>  drivers/tty/serial/ioc3_serial.c            | 2 +-
+>  drivers/tty/serial/ioc4_serial.c            | 2 +-
+>  drivers/tty/serial/ip22zilog.c              | 2 +-
+>  drivers/tty/serial/jsm/jsm_tty.c            | 2 +-
+>  drivers/tty/serial/lantiq.c                 | 2 +-
+>  drivers/tty/serial/lpc32xx_hs.c             | 2 +-
+>  drivers/tty/serial/m32r_sio.c               | 2 +-
+>  drivers/tty/serial/max3100.c                | 2 +-
+>  drivers/tty/serial/men_z135_uart.c          | 2 +-
+>  drivers/tty/serial/meson_uart.c             | 2 +-
+>  drivers/tty/serial/mpc52xx_uart.c           | 2 +-
+>  drivers/tty/serial/mpsc.c                   | 2 +-
+>  drivers/tty/serial/msm_serial.c             | 2 +-
+>  drivers/tty/serial/mux.c                    | 2 +-
+>  drivers/tty/serial/mxs-auart.c              | 2 +-
+>  drivers/tty/serial/netx-serial.c            | 2 +-
+>  drivers/tty/serial/nwpserial.c              | 2 +-
+>  drivers/tty/serial/omap-serial.c            | 2 +-
+>  drivers/tty/serial/pch_uart.c               | 2 +-
+>  drivers/tty/serial/pmac_zilog.c             | 2 +-
+>  drivers/tty/serial/pnx8xxx_uart.c           | 2 +-
+>  drivers/tty/serial/pxa.c                    | 2 +-
+>  drivers/tty/serial/sa1100.c                 | 2 +-
+>  drivers/tty/serial/samsung.c                | 2 +-
 
-It's different.  It's different because we are _not_ enabling multiplatform.
-Multiplatform brings with it all the MMU-full stuff that we don't want on
-!MMU.
+This driver seems to alter the startup function on initialization:
 
-You're thinking far too specifically about V7M here.  We have other !MMU
-CPUs, such as ARM946 and ARM940 which are older generation mmuless CPUs.
+  CC      drivers/video/of_display_timing.o
+../drivers/tty/serial/samsung.c: In function 's3c24xx_serial_init_port':
+../drivers/tty/serial/samsung.c:1702:3: error: assignment of member
+'startup' in read-only object
+   s3c24xx_serial_ops.startup = s3c64xx_serial_startup;
+   ^
 
-The problem with the ARCH_MULTI_V7M approach is that they're V4T and V5
-CPUs, and we _really_ don't want to enable ARCH_MULTI_V4T and
-ARCH_MULTI_V5.  If we did that, we'll allow _every_ V4T and V5
-multiplatform to be selected, whether they're compatible with nommu
-or not - and whether they're compatible with each other or not.
+>  drivers/tty/serial/serial-tegra.c           | 2 +-
+>  drivers/tty/serial/serial_ks8695.c          | 2 +-
+>  drivers/tty/serial/serial_txx9.c            | 2 +-
+>  drivers/tty/serial/sh-sci.c                 | 2 +-
+>  drivers/tty/serial/sirfsoc_uart.c           | 2 +-
+>  drivers/tty/serial/sn_console.c             | 2 +-
+>  drivers/tty/serial/sprd_serial.c            | 2 +-
+>  drivers/tty/serial/st-asc.c                 | 2 +-
+>  drivers/tty/serial/sunhv.c                  | 2 +-
+>  drivers/tty/serial/sunsab.c                 | 2 +-
+>  drivers/tty/serial/sunsu.c                  | 2 +-
+>  drivers/tty/serial/sunzilog.c               | 2 +-
+>  drivers/tty/serial/timbuart.c               | 2 +-
+>  drivers/tty/serial/uartlite.c               | 2 +-
+>  drivers/tty/serial/ucc_uart.c               | 2 +-
+>  drivers/tty/serial/vr41xx_siu.c             | 2 +-
+>  drivers/tty/serial/vt8500_serial.c          | 2 +-
+>  drivers/tty/serial/xilinx_uartps.c          | 2 +-
+>  drivers/tty/serial/zs.c                     | 2 +-
+>  61 files changed, 62 insertions(+), 62 deletions(-)
 
-So, that kind of solution _doesn't_ scale to what we _once_ already
-allowed.
+That is the only thing which popped up with multi_v7_defconfig.
 
-> As far as I can tell, this is already the case with that patchset.
-
-What I'm trying to do here is to fix the cockup that the multiplatform
-conversion has created with previous generation noMMU and restore it
-back to where it should be without excluding the newer stuff from it.
-
-What you're interested in is just the newer stuff.  You're approaching
-the problem from a different angle and thinking that your solution is
-the best.  I'm saying it has deficiencies.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+--
+Stefan
