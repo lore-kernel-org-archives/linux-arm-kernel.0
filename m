@@ -1,48 +1,45 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 5 Apr 2015 15:39:34 +0200
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
-References: <55198BA4.5010207@bitmer.com> <20150330175051.GK10805@atomide.com>
- <20150331123233.GA15103@earth> <20150401194734.GT10805@atomide.com>
- <20150403163553.GA16247@earth> <551F0F50.1030701@gmail.com>
- <20150403221517.GX10805@atomide.com> <551F186B.90608@gmail.com>
- <20150403225212.GY10805@atomide.com>
- <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
-Message-ID: <20150405133934.GC9186@earth>
+Date: Sun, 5 Apr 2015 15:45:28 +0200
+Subject: ARM errata 430973 on multi platform kernels (was: OMAP3-N900:
+ Add microphone bias voltages)
+In-Reply-To: <201504051526.14575@pali>
+References: <1425236828-28349-1-git-send-email-jarkko.nikula@bitmer.com>
+ <CAOCHtYjCtmJNrkD0x78bm9b7hNvTKsZD2C2m5N=nR7p73R4zcg@mail.gmail.com>
+ <20150405130045.GB9186@earth> <201504051526.14575@pali>
+Message-ID: <20150405134528.GD9186@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, Apr 05, 2015 at 06:13:47AM +0200, Matthijs van Duin wrote:
-> On 4 April 2015 at 00:52, Tony Lindgren <tony@atomide.com> wrote:
-> > Right, it affects n900 for sure. My point is that it also seems to
-> > affect 37xx versions not listed to suffer from this issue.
+On Sun, Apr 05, 2015 at 03:26:14PM +0200, Pali Roh?r wrote:
+> > > > Yes so it seems, and the bootloaders should really set it.
+> > > > It's also disabled for multiplatform builds.
+> > > 
+> > > These are now done in u-boot as of: v2015.04-rc4
+> > > 
+> > > http://git.denx.de/?p=u-boot.git;a=commit;h=c6f90e1418a84fe5
+> > > fa463b38403bd1845cb6a59c
+> > 
+> > Seems like "include/configs/nokia_rx51.h" has been forgotten.
+> > Note, that the kernel must still be able to enable the bit
+> > itself (in case NOLO is used without u-boot).
 > 
-> They shouldn't... erratum 430973 only affected Cortex-A8 r1, and the
-> dm37xx should have an r3p2 right?
+> You must not expect that bootloader set something. Nokia N900 has 
+> closed and signed bootloader which cannot be easily replaced and 
+> or fixed.
 > 
-> A word of caution though: at least on the DM814x and AM335x, secure
-> ROM sets bit 6 (IBE) in the Auxiliary Control Register, thereby
-> enabling BTB invalidate instructions (which normally execute as nops).
-> This is presumably a leftover of the erratum 430973 workaround, but it
-> means there is a risk of running afoul of erratum 687067 if BTB
-> invalidate by MVA instructions are actually used.
-> 
-> I would actually suggest clearing IBE if it set on Cortex-A8 r2 or
-> later processors and a secure monitor call is available to do so
-> (there is on the DM814x and AM335x, dunno about the 37xx), also for
-> performance reasons: BTB invalidates are quite expensive instructions
-> (when enabled).
+> For N900 there is U-Boot but it does not support lot of things 
+> (load kernel via usb or serial) so for developers it is better to 
+> use original Nokia bootloader.
 
-So if I understand the issue correct, it would be ok to enable the
-430973 workaround in cpu_v7_switch_mm for arm multiplatform kernels
-(mcr p15, 0, r2, c7, c5, 6 @ flush BTAC/BTB). On unaffected
-Cortex-A8 platforms the IBE bit should be unset (resulting in a nop
-instead of the BTB flush).
+Yes, I'm aware of that. I think having the IBE bit set in u-boot has
+advantages nevertheless. I think the kernel can't enable the bit
+sufficiently early if its compiled in thumb-mode itself
+(CONFIG_THUMB2_KERNEL).
 
-So assuming, that the same is true for non Cortex-A8 platforms: Can
-the workaround simply be enabled by default if CPU_V7 is selected?
+So I suggest to enable the IBE bit in the kernel (that part is
+already done) *and* in u-boot.
 
 -- Sebastian
 -------------- next part --------------
@@ -51,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150405/5a89f92c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150405/40f70460/attachment.sig>
