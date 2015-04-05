@@ -1,46 +1,97 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Mon, 06 Apr 2015 00:08:08 +0300
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
-References: <55197A12.1050009@bitmer.com> <20150330164237.GJ10805@atomide.com>
- <55198BA4.5010207@bitmer.com> <20150330175051.GK10805@atomide.com>
- <20150331123233.GA15103@earth> <20150401194734.GT10805@atomide.com>
- <20150403163553.GA16247@earth> <551F0F50.1030701@gmail.com>
- <20150403221517.GX10805@atomide.com> <551F186B.90608@gmail.com>
- <20150403225212.GY10805@atomide.com>
- <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
- <5520E2EE.4080302@gmail.com>
- <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
-Message-ID: <5521A438.1070008@gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 06 Apr 2015 00:19:43 +0200
+Subject: [PATCH v4 07/11] ARM: allow MULTIPLATFORM with !MMU
+In-Reply-To: <20150405161014.GG13898@n2100.arm.linux.org.uk>
+References: <1428090292-21693-1-git-send-email-stefan@agner.ch>
+ <1428090292-21693-8-git-send-email-stefan@agner.ch>
+ <20150403200931.GD13898@n2100.arm.linux.org.uk>
+ <1f84d767d3bb8a8c470a26064cba454e@agner.ch>
+ <20150405161014.GG13898@n2100.arm.linux.org.uk>
+Message-ID: <24394c50bcd8000c21aca0360fd20b6f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2015-04-05 18:10, Russell King - ARM Linux wrote:
+> On Sat, Apr 04, 2015 at 01:56:20AM +0200, Stefan Agner wrote:
+>> On 2015-04-03 22:09, Russell King - ARM Linux wrote:
+>> > On Fri, Apr 03, 2015 at 09:44:48PM +0200, Stefan Agner wrote:
+>> >> In order to support SoC with heterogenous CPU architectures (such
+>> >> as Freescale Vybrid/i.MXSX) it is preferable to use the same
+>> >> architecture (ARCH_MXC in this case) for the MMU enabled and !MMU
+>> >> CPU. Hence allow to select MULTIPLATFORM even without MMU.
+>> >>
+>> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> >> ---
+>> >>  arch/arm/Kconfig | 21 ++++++++++-----------
+>> >>  1 file changed, 10 insertions(+), 11 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> >> index 9f1f09a..636cb3f 100644
+>> >> --- a/arch/arm/Kconfig
+>> >> +++ b/arch/arm/Kconfig
+>> >> @@ -230,7 +230,7 @@ config VECTORS_BASE
+>> >>  	  in size.
+>> >>
+>> >>  config ARM_PATCH_PHYS_VIRT
+>> >> -	bool "Patch physical to virtual translations at runtime" if EMBEDDED
+>> >> +	bool "Patch physical to virtual translations at runtime" if EMBEDDED || (ARCH_MULTIPLATFORM && MMU)
+>> >>  	default y
+>> >
+>> > This makes no sense.  Multiplatform MMU _requires_ this feature, so why
+>> > offer it to the user when multiplatform is enabled _and_ MMU is enabled?
+>>
+>> I see, this is plain wrong. Will replace that with a select ... if MMU
+>> in multiplatform.
+> 
+> I think what I'd like to see is, in the top level choice:
+> 
+> config ARM_SINGLE_ARMV7M
+> 	bool "ARM architecture v7M compliant (Cortex-M0/M3/M4) SoC"
+> 	depends on !MMU
+> 	select ARM_NVIC
+> 	... etc ...
 
+I guess that would be ARCH_SINGLE_ARMV7M?
 
-On  5.04.2015 19:50, Matthijs van Duin wrote:
-> On 5 April 2015 at 09:23, Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> wrote:
->> Though I wonder why SMC is needed to write ACR on non-HS devices. A simple
->> MRC should suffice, unless I miss something.
->
-> Public-world access to ACR varies per bit:
-> bit 1 (L2EN) is documented as banked, but at least on r3p2 turns out
-> to be common r/w.
-> bits 30-31 are secure read-only and public RAZ.
-> remaining bits are secure read/write and public read-only.
->
-> The net effect is that doing an MRC from public world will only modify
-> the L2EN bit.
->
-> There's no bit in the non-secure access control register to affect all
-> of this, so GP vs HS doesn't matter here (from a CPU point of view; it
-> may matter for the availability of SM calls obviously).
->
-> Matthijs
->
+> 
+> which then allows a /multiplatform/ v7M kernel to be built, allowing the
+> selection of EFM32, SOC_VF610, and any other v7M compliant SoC.
 
-But then the first part(setting the IBE bit in ACR to 1) of the errata 
-workaround is wrong, as it uses a plain MCR to set the IBE bit, see 
-http://lxr.free-electrons.com/source/arch/arm/mm/proc-v7.S#L340. Which 
-is weird, given that the workaround was posted by ARM iirc.
+In my view, that wouldn't end up being much different than what that
+patchset is doing:
+With the introduction of ARCH_MULTI_V7M, we add something like a top
+level v7M compliant selection. Due to the !MMU dependencies of all other
+CPU families the family selection is minimal (when selecting !MMU):
 
-Ivo
+    *** CPU Core family selection *** 
+[*] ARMv7-M based platforms (Cortex-M)
+
+And since ARCH_MULTI_V7M is not part of ARCH_MULTI_V6_V7 or anything,
+the whole SoC selection contains only sensible SoC's without further
+changes (also within the i.MX family, currently only "Vybrid Family
+VF610 support" is selectable):
+
+[ ] MMU-based Paged Memory Management Support                       
+    ARM system type (Allow multiple platforms to be selected)  ---> 
+    Multiple platform selection  --->                               
+[*] Energy Micro efm32                                              
+[*] Freescale i.MX family  --->    
+    *** Processor Type ***
+...
+
+> So, it's very similar to multiplatform in the sense that several SoCs
+> can be built together, but we preserve the need not to build
+> incompatible stuff together.
+
+As far as I can tell, this is already the case with that patchset.
+
+The differences boil down to on which level we split the v7M CPU
+selection apart: On ARCH_* level or ARCH_MULTI_* level. Given that we
+allow a multiplatform _v7M kernel, the latter sounds more natural to
+me...
+
+Are there arguments to split v7M CPU selection apart on ARCH_* level
+which I don't see?
+
+--
+Stefan
