@@ -1,39 +1,33 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 5 Apr 2015 15:13:39 +0100
-Subject: [PATCH 00/14] Fix fallout from per-user struct clk patches
-In-Reply-To: <CAMuHMdWue2Pw15j_2ikhSQWxOMGLLO4ojmmyxSvZ=9YwD_+14w@mail.gmail.com>
+Date: Sun, 5 Apr 2015 15:20:34 +0100
+Subject: [PATCH 07/14] media: omap3isp: remove unused clkdev
+In-Reply-To: <36620233.VbNiGUfDRt@avalon>
 References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
- <CAMuHMdWue2Pw15j_2ikhSQWxOMGLLO4ojmmyxSvZ=9YwD_+14w@mail.gmail.com>
-Message-ID: <20150405141339.GF4027@n2100.arm.linux.org.uk>
+ <E1Ye59O-0001BJ-Gq@rmk-PC.arm.linux.org.uk>
+ <36620233.VbNiGUfDRt@avalon>
+Message-ID: <20150405142034.GG4027@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 05, 2015 at 11:04:56AM +0200, Geert Uytterhoeven wrote:
+On Sat, Apr 04, 2015 at 12:44:35AM +0300, Laurent Pinchart wrote:
 > Hi Russell,
 > 
-> On Fri, Apr 3, 2015 at 7:11 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Sorry for posting this soo close to the 4.1 merge window, I had
-> > completely forgotten about this chunk of work I did earlier this
-> > month.
-> >
-> > The per-user struct clk patches rather badly broke clkdev and
-> > various other places.  This was reported, but was forgotten about.
-> > Really, the per-user clk stuff should've been reverted, but we've
-> > lived with it far too long for that.
-> >
-> > So, our only other option is to now rush these patches into 4.1
-> > and hope for the best.
-> >
-> > The series cleans up quite a number of places too...
+> Thank you for the patch;
 > 
-> Thanks for your patches!
+> On Friday 03 April 2015 18:12:58 Russell King wrote:
+> > No merged platform supplies xclks via platform data.  As we want to
+> > slightly change the clkdev interface, rather than fixing this unused
+> > code, remove it instead.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> Can you please tell which are critical fixes for regressions, and which are
-> cleanups? It's not so obvious to me from the patch descriptions.
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> 
+> with one caveat though : it conflicts with patches queued for v4.1 in the 
+> media tree. I'll post a rebased version in a reply to your e-mail. How would 
+> you like to handle the conflict ?
 
-The 5th one is the most important as far as fixing the regression caused
-by the per-user clk patches.
+How bad is the conflict?
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
