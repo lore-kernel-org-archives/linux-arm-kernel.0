@@ -1,55 +1,84 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Mon,  6 Apr 2015 22:28:11 +0200
-Subject: [PATCH 00/11] ARM: dts: Refactor Exynos4 boards for phandle notation
-Message-ID: <1428352102-12855-1-git-send-email-k.kozlowski.k@gmail.com>
+Date: Mon,  6 Apr 2015 22:28:13 +0200
+Subject: [PATCH 02/11] ARM: dts: Use phandle notation for overriding nodes in
+ Exynos4210
+In-Reply-To: <1428352102-12855-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1428352102-12855-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1428352102-12855-3-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The phandle notation reduces possible mistakes when overriding nodes.
 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+---
+ arch/arm/boot/dts/exynos4210.dtsi | 43 +++++++++++++++++++--------------------
+ 1 file changed, 21 insertions(+), 22 deletions(-)
 
-The phandle notation reduces possible mistakes when overriding nodes
-by child board files and reduces duplication of addresses.
-
-The patchset refactors Exynos4 boards to use the phandle way.
-
-Tested by comparison of decompiled DTB for each commit.
-
-The same refactoring for Exynos5 is on the way.
-
-
-Best regards,
-Krzysztof
-
-Krzysztof Kozlowski (11):
-  ARM: dts: Add labels to nodes used in Exynos4 based DTS
-  ARM: dts: Use phandle notation for overriding nodes in Exynos4210
-  ARM: dts: Use phandle notation for overriding nodes in Exynos4210
-    Origen
-  ARM: dts: Use phandle notation for overriding nodes in SMDKv310
-  ARM: dts: Use phandle notation for overriding nodes in Trats
-  ARM: dts: Use phandle notation for overriding nodes in Exynos4212
-  ARM: dts: Use phandle notation for overriding nodes in Exynos4x12
-  ARM: dts: Use phandle notation for overriding nodes in Exynos4412
-  ARM: dts: Use phandle notation for overriding nodes in Odroid
-  ARM: dts: Use phandle notation for overriding nodes in SMDK4412
-  ARM: dts: Use phandle notation for overriding nodes in Trats2
-
- arch/arm/boot/dts/exynos4.dtsi                  |   22 +-
- arch/arm/boot/dts/exynos4210-origen.dts         |  418 +++----
- arch/arm/boot/dts/exynos4210-pinctrl.dtsi       |    6 +-
- arch/arm/boot/dts/exynos4210-smdkv310.dts       |  280 ++---
- arch/arm/boot/dts/exynos4210-trats.dts          |  592 +++++-----
- arch/arm/boot/dts/exynos4210.dtsi               |   49 +-
- arch/arm/boot/dts/exynos4212.dtsi               |   12 +-
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  728 ++++++-------
- arch/arm/boot/dts/exynos4412-odroidx.dts        |   16 +-
- arch/arm/boot/dts/exynos4412-smdk4412.dts       |  210 ++--
- arch/arm/boot/dts/exynos4412-trats2.dts         | 1331 ++++++++++++-----------
- arch/arm/boot/dts/exynos4412.dtsi               |   20 +-
- arch/arm/boot/dts/exynos4x12-pinctrl.dtsi       |    8 +-
- arch/arm/boot/dts/exynos4x12.dtsi               |  212 ++--
- 14 files changed, 1952 insertions(+), 1952 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index 76b84852f29c..a9a55304e31a 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -52,16 +52,6 @@
+ 		};
+ 	};
+ 
+-	pmu_system_controller: system-controller at 10020000 {
+-		clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
+-				"clkout4", "clkout8", "clkout9";
+-		clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
+-			<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
+-			<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>,
+-			<&clock CLK_XUSBXTI>;
+-		#clock-cells = <1>;
+-	};
+-
+ 	sysram: sysram at 02020000 {
+ 		compatible = "mmio-sram";
+ 		reg = <0x02020000 0x20000>;
+@@ -95,18 +85,6 @@
+ 		arm,data-latency = <2 2 1>;
+ 	};
+ 
+-	gic: interrupt-controller at 10490000 {
+-		cpu-offset = <0x8000>;
+-	};
+-
+-	combiner: interrupt-controller at 10440000 {
+-		samsung,combiner-nr = <16>;
+-		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+-			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
+-			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+-			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
+-	};
+-
+ 	mct: mct at 10050000 {
+ 		compatible = "samsung,exynos4210-mct";
+ 		reg = <0x10050000 0x800>;
+@@ -245,3 +223,24 @@
+ 		status = "disabled";
+ 	};
+ };
++
++&gic {
++	cpu-offset = <0x8000>;
++};
++
++&combiner {
++	samsung,combiner-nr = <16>;
++	interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
++		     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
++		     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
++		     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
++};
++
++&pmu_system_controller {
++	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
++			"clkout4", "clkout8", "clkout9";
++	clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
++		<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
++		<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>, <&clock CLK_XUSBXTI>;
++	#clock-cells = <1>;
++};
 -- 
 2.1.0
