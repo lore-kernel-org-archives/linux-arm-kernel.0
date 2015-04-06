@@ -1,216 +1,37 @@
-From: grygorii.strashko@linaro.org (grygorii.strashko at linaro.org)
-Date: Mon,  6 Apr 2015 15:38:41 +0300
-Subject: [PATCH v4 3/3] i2c: davinci: use ICPFUNC to toggle I2C as gpio for
- bus recovery
-In-Reply-To: <1428323921-25832-1-git-send-email-grygorii.strashko@linaro.org>
-References: <1428323921-25832-1-git-send-email-grygorii.strashko@linaro.org>
-Message-ID: <1428323921-25832-4-git-send-email-grygorii.strashko@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 6 Apr 2015 08:05:33 -0500
+Subject: [PATCH 1/3] PCI: Introduce pci_bus_addr_t
+In-Reply-To: <CAErSpo4cw2MSPmrur_QFMwnH01qf0XMfBEAyZ2f+HrUOGEXyjw@mail.gmail.com>
+References: <1427857069-6789-1-git-send-email-yinghai@kernel.org>
+ <1427857069-6789-2-git-send-email-yinghai@kernel.org>
+ <20150403193234.GD10892@google.com>
+ <20150403205201.GF10892@google.com>
+ <CAE9FiQVqAEvoLDRZMcNFki0gLMQiyQd2VYivjAh1teRGeuNwBw@mail.gmail.com>
+ <CAErSpo55rpO6SNeY57zZ8ah0PJ3eY+-L92vUJwYiRn4tCfLtJg@mail.gmail.com>
+ <CAL_JsqJyH==8OtkcU8_P4_47U6qe6FYqj-WUZ20_Y+iC_OF4_w@mail.gmail.com>
+ <CAErSpo4cw2MSPmrur_QFMwnH01qf0XMfBEAyZ2f+HrUOGEXyjw@mail.gmail.com>
+Message-ID: <CAL_JsqLhteW8p1B7DrRzWzC_0UNYOKAU-yu2UhWRcb8PZ9AEnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+On Sat, Apr 4, 2015 at 10:25 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Sat, Apr 4, 2015 at 2:48 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> On Sat, Apr 4, 2015 at 7:46 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>
+>>> I think there's still an unresolved question about the OF parsing code.
+>>
+>> Got a pointer to what that is? I'll take a guess. Generally, we make
+>> the parsing code independent of the kernel addr sizes and use u64
+>> types. The DT sizes and kernel sizes are not always aligned. For
+>> example, an LPAE capable platform running a non-LPAE kernel build.
+>
+> Yep: http://lkml.kernel.org/r/1427857069-6789-3-git-send-email-yinghai at kernel.org
+>
+> Yinghai made a change to the sparc OF parsing code.  The question is
+> whether a similar change should be made to clones of that code (two
+> others in arch/sparc, one in arch/powerpc, and one in drivers/of).
 
-Having a board where the I2C bus locks up occasionally made it clear
-that the bus recovery in the i2c-davinci driver will only work on
-some boards, because on regular boards, this will only toggle GPIO
-lines that aren't muxed to the actual pins.
+Yes, it appears to me that is needed. At least the drivers/of/ code
+does not distinguish 32 and 64 bit ATM.
 
-The I2C controller on SoCs like da850 (and da830), Keystone 2 has the
-built-in capability to bit-bang its lines by using the ICPFUNC registers
-of the i2c controller.
-Implement the suggested procedure by toggling SCL and checking SDA using
-the ICPFUNC registers of the I2C controller when present. Allow platforms
-to indicate the presence of the ICPFUNC registers with a has_pfunc platform
-data flag and add optional DT property "ti,has-pfunc" to indicate
-the same in DT.
-
-CC: Sekhar Nori <nsekhar@ti.com>
-CC: Kevin Hilman <khilman@deeprootsystems.com>
-CC: Santosh Shilimkar <ssantosh@kernel.org>
-CC: Murali Karicheri <m-karicheri2@ti.com>
-CC: Mike Looijmans <info@milosoftware.com>
-CC: <devicetree@vger.kernel.org>
-Reviewed-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-Tested-by: Michael Lawnick <michael.lawnick@nokia.com>
-Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
-Signed-off-by: Mike Looijmans <milo-software@users.sourceforge.net>
-[grygorii.strashko at ti.com: combined patches from Ben Gardiner and
-Mike Looijmans and reimplemented ICPFUNC bus recovery using I2C
-bus recovery infrastructure]
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- .../devicetree/bindings/i2c/i2c-davinci.txt        |   3 +
- drivers/i2c/busses/i2c-davinci.c                   | 102 ++++++++++++++++++++-
- include/linux/platform_data/i2c-davinci.h          |   1 +
- 3 files changed, 105 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-davinci.txt b/Documentation/devicetree/bindings/i2c/i2c-davinci.txt
-index 2dc935b..a4e1cbc 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-davinci.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-davinci.txt
-@@ -10,6 +10,9 @@ Required properties:
- Recommended properties :
- - interrupts : standard interrupt property.
- - clock-frequency : desired I2C bus clock frequency in Hz.
-+- ti,has-pfunc: boolean; if defined, it indicates that SoC supports PFUNC
-+	registers. PFUNC registers allow to switch I2C pins to function as
-+	GPIOs, so they can by toggled manually.
- 
- Example (enbw_cmc board):
- 	i2c at 1c22000 {
-diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-index 54819fb..4788a32 100644
---- a/drivers/i2c/busses/i2c-davinci.c
-+++ b/drivers/i2c/busses/i2c-davinci.c
-@@ -60,6 +60,12 @@
- #define DAVINCI_I2C_IVR_REG	0x28
- #define DAVINCI_I2C_EMDR_REG	0x2c
- #define DAVINCI_I2C_PSC_REG	0x30
-+#define DAVINCI_I2C_FUNC_REG	0x48
-+#define DAVINCI_I2C_DIR_REG	0x4c
-+#define DAVINCI_I2C_DIN_REG	0x50
-+#define DAVINCI_I2C_DOUT_REG	0x54
-+#define DAVINCI_I2C_DSET_REG	0x58
-+#define DAVINCI_I2C_DCLR_REG	0x5c
- 
- #define DAVINCI_I2C_IVR_AAS	0x07
- #define DAVINCI_I2C_IVR_SCD	0x06
-@@ -93,6 +99,29 @@
- #define DAVINCI_I2C_IMR_NACK	BIT(1)
- #define DAVINCI_I2C_IMR_AL	BIT(0)
- 
-+/* set SDA and SCL as GPIO */
-+#define DAVINCI_I2C_FUNC_PFUNC0	BIT(0)
-+
-+/* set SCL as output when used as GPIO*/
-+#define DAVINCI_I2C_DIR_PDIR0	BIT(0)
-+/* set SDA as output when used as GPIO*/
-+#define DAVINCI_I2C_DIR_PDIR1	BIT(1)
-+
-+/* read SCL GPIO level */
-+#define DAVINCI_I2C_DIN_PDIN0 BIT(0)
-+/* read SDA GPIO level */
-+#define DAVINCI_I2C_DIN_PDIN1 BIT(1)
-+
-+/*set the SCL GPIO high */
-+#define DAVINCI_I2C_DSET_PDSET0	BIT(0)
-+/*set the SDA GPIO high */
-+#define DAVINCI_I2C_DSET_PDSET1	BIT(1)
-+
-+/* set the SCL GPIO low */
-+#define DAVINCI_I2C_DCLR_PDCLR0	BIT(0)
-+/* set the SDA GPIO low */
-+#define DAVINCI_I2C_DCLR_PDCLR1	BIT(1)
-+
- struct davinci_i2c_dev {
- 	struct device           *dev;
- 	void __iomem		*base;
-@@ -253,6 +282,71 @@ static struct i2c_bus_recovery_info davinci_i2c_gpio_recovery_info = {
- 	.unprepare_recovery = davinci_i2c_unprepare_recovery,
- };
- 
-+static void davinci_i2c_set_scl(struct i2c_adapter *adap, int val)
-+{
-+	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
-+
-+	if (val)
-+		davinci_i2c_write_reg(dev, DAVINCI_I2C_DSET_REG,
-+				      DAVINCI_I2C_DSET_PDSET0);
-+	else
-+		davinci_i2c_write_reg(dev, DAVINCI_I2C_DCLR_REG,
-+				      DAVINCI_I2C_DCLR_PDCLR0);
-+}
-+
-+static int davinci_i2c_get_scl(struct i2c_adapter *adap)
-+{
-+	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
-+	int val;
-+
-+	/* read the state of SCL */
-+	val = davinci_i2c_read_reg(dev, DAVINCI_I2C_DIN_REG);
-+	return val & DAVINCI_I2C_DIN_PDIN0;
-+}
-+
-+static int davinci_i2c_get_sda(struct i2c_adapter *adap)
-+{
-+	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
-+	int val;
-+
-+	/* read the state of SDA */
-+	val = davinci_i2c_read_reg(dev, DAVINCI_I2C_DIN_REG);
-+	return val & DAVINCI_I2C_DIN_PDIN1;
-+}
-+
-+static void davinci_i2c_scl_prepare_recovery(struct i2c_adapter *adap)
-+{
-+	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
-+
-+	davinci_i2c_prepare_recovery(adap);
-+
-+	/* SCL output, SDA input */
-+	davinci_i2c_write_reg(dev, DAVINCI_I2C_DIR_REG, DAVINCI_I2C_DIR_PDIR0);
-+
-+	/* change to GPIO mode */
-+	davinci_i2c_write_reg(dev, DAVINCI_I2C_FUNC_REG,
-+			      DAVINCI_I2C_FUNC_PFUNC0);
-+}
-+
-+static void davinci_i2c_scl_unprepare_recovery(struct i2c_adapter *adap)
-+{
-+	struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
-+
-+	/* change back to I2C mode */
-+	davinci_i2c_write_reg(dev, DAVINCI_I2C_FUNC_REG, 0);
-+
-+	davinci_i2c_unprepare_recovery(adap);
-+}
-+
-+static struct i2c_bus_recovery_info davinci_i2c_scl_recovery_info = {
-+	.recover_bus = i2c_generic_scl_recovery,
-+	.set_scl = davinci_i2c_set_scl,
-+	.get_scl = davinci_i2c_get_scl,
-+	.get_sda = davinci_i2c_get_sda,
-+	.prepare_recovery = davinci_i2c_scl_prepare_recovery,
-+	.unprepare_recovery = davinci_i2c_scl_unprepare_recovery,
-+};
-+
- /*
-  * Waiting for bus not busy
-  */
-@@ -660,6 +754,10 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- 		if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
- 			&prop))
- 			dev->pdata->bus_freq = prop / 1000;
-+
-+		dev->pdata->has_pfunc =
-+			of_property_read_bool(pdev->dev.of_node,
-+					      "ti,has-pfunc");
- 	} else if (!dev->pdata) {
- 		dev->pdata = &davinci_i2c_platform_data_default;
- 	}
-@@ -701,7 +799,9 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- 	adap->timeout = DAVINCI_I2C_TIMEOUT;
- 	adap->dev.of_node = pdev->dev.of_node;
- 
--	if (dev->pdata->scl_pin) {
-+	if (dev->pdata->has_pfunc)
-+		adap->bus_recovery_info = &davinci_i2c_scl_recovery_info;
-+	else if (dev->pdata->scl_pin) {
- 		adap->bus_recovery_info = &davinci_i2c_gpio_recovery_info;
- 		adap->bus_recovery_info->scl_gpio = dev->pdata->scl_pin;
- 		adap->bus_recovery_info->sda_gpio = dev->pdata->sda_pin;
-diff --git a/include/linux/platform_data/i2c-davinci.h b/include/linux/platform_data/i2c-davinci.h
-index 2312d19..89fd347 100644
---- a/include/linux/platform_data/i2c-davinci.h
-+++ b/include/linux/platform_data/i2c-davinci.h
-@@ -18,6 +18,7 @@ struct davinci_i2c_platform_data {
- 	unsigned int	bus_delay;	/* post-transaction delay (usec) */
- 	unsigned int    sda_pin;        /* GPIO pin ID to use for SDA */
- 	unsigned int    scl_pin;        /* GPIO pin ID to use for SCL */
-+	bool		has_pfunc;	/*chip has a ICPFUNC register */
- };
- 
- /* for board setup code */
--- 
-1.9.1
+Rob
