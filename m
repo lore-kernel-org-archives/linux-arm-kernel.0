@@ -1,92 +1,84 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 6 Apr 2015 09:11:05 -0500
-Subject: [PATCH v4 05/10] eeprom: Add bindings for simple eeprom framework
-In-Reply-To: <20150406133208.GH30984@beef>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1427752679-17261-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20150406133208.GH30984@beef>
-Message-ID: <CAL_Jsq++9pyJMLXssgyz2WRU4e7ikT_6FwzWMo1fKS82FJvEyg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 6 Apr 2015 14:46:47 +0000
+Subject: irqchip heirarchy DT "break" series awareness?
+Message-ID: <20150406144647.GC7873@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 6, 2015 at 8:32 AM, Matt Porter <mporter@konsulko.com> wrote:
-> On Mon, Mar 30, 2015 at 10:57:59PM +0100, Srinivas Kandagatla wrote:
->> This patch adds bindings for simple eeprom framework which allows eeprom
->> consumers to talk to eeprom providers to get access to eeprom cell data.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> [Maxime Ripard: intial version of eeprom framework]
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>  .../devicetree/bindings/eeprom/eeprom.txt          | 58 ++++++++++++++++++++++
->>  1 file changed, 58 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
->>
->> diff --git a/Documentation/devicetree/bindings/eeprom/eeprom.txt b/Documentation/devicetree/bindings/eeprom/eeprom.txt
->> new file mode 100644
->> index 0000000..fb71d46
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/eeprom/eeprom.txt
->> @@ -0,0 +1,58 @@
->> += EEPROM Data Device Tree Bindings =
->> +
->> +This binding is intended to represent the location of hardware
->> +configuration data stored in EEPROMs.
->> +
->> +On a significant proportion of boards, the manufacturer has stored
->> +some data on an EEPROM-like device, for the OS to be able to retrieve
->> +these information and act upon it. Obviously, the OS has to know
->> +about where to retrieve these data from, and where they are stored on
->> +the storage device.
->
-> Since this binding (and the kernel framework supporting it) describes
-> non-volatile memory devices other than EEPROMs (e.g. EFuses) it should
-> be named more generically like "nvmem".
->
->> +
->> +This document is here to document this.
->> +
->> += Data providers =
->> +Contains bindings specific to provider drivers and data cells as children
->> +to this node.
->> +
->> += Data cells =
->> +These are the child nodes of the provider which contain data cell
->> +information like offset and size in eeprom provider.
->> +
->> +Required properties:
->> +reg: specifies the offset in byte within that storage device, and the length
->> +     in bytes of the data we care about.
->> +     There could be more then one offset-length pairs in this property.
->> +
->> +Optional properties:
->> +As required by specific data parsers/interpreters.
->
-> The generic binding could really use a "read-only" property here as this
-> is a common hardware attribute for many nvmem devices. A serial EEPROM
-> commonly has a write protect pin which may be hard-wired such that the
-> hardware description should reflect that. An EFuse is typically blown with
-> the required information at manufacturing time (for an end product case)
-> and would be marked with the "read-only" flag.
->
-> Having this optional flag in the generic binding would allow the
-> framework to hint to consumers about the inability to write to the
-> provided region.
+Arnd, Olof, others,
 
-This could get fairly complex if you wanted to describe grouping of WP
-regions which could have different layout than the fields here. This
-may be better left as a device property listing addr & size pairs.
-However, there is the notion of s/w "read-only" which means the OS
-should not allow write access. The MTD partition binding supports this
-with the "read-only" property.
+Have you been following Marc's irqchip series(es) leveraging stacked
+domains to remove the abuse of gic_arch_extn ?
 
-> The framework sysfs attributes provide a userspace EEPROM consumer where
-> it would be useful information to know that a data provider region is
-> read only rather than having the exported writeable attribute simply
-> fail a write cycle. This would allow the consumer to be aware that a
-> failed write (if even attempted) is expected if the data provider
-> advertised itself as read-only.
+  Tegra LIC
+  https://lkml.kernel.org/r/1426088583-15097-1-git-send-email-marc.zyngier at arm.com
 
-You could distinguish with RW versus RO file attributes.
+  OMAP Crossbar
+  https://lkml.kernel.org/r/1426088629-15377-1-git-send-email-marc.zyngier at arm.com
 
-Rob
+  Exynos PM
+  https://lkml.kernel.org/r/1426088693-15724-1-git-send-email-marc.zyngier at arm.com
+
+  shmobile, ux500, zynq irq_set_wake
+  https://lkml.kernel.org/r/1426088737-15817-1-git-send-email-marc.zyngier at arm.com
+
+  imx6 was taken by Shawn
+  https://lkml.kernel.org/r/1426262737-32762-1-git-send-email-marc.zyngier at arm.com
+
+You can find the patches in one series per branch at:
+
+  git://git.infradead.org/users/jcooper/linux.git irqchip/stacked-tegra
+  git://git.infradead.org/users/jcooper/linux.git irqchip/stacked-omap
+  git://git.infradead.org/users/jcooper/linux.git irqchip/stacked-exynos
+  git://git.infradead.org/users/jcooper/linux.git irqchip/stacked-irq_set_wake
+
+I ask because with Thomas' (tglx) absence, it looks like I'm going to be
+sending the pull request directly to Linus.  This has increased my
+pucker factor a bit. :-)
+
+The logistical stuff is in order.  It'll be my second pull request, and
+it'll only contain the changes relevant.  The whole set has gone through
+several rounds of review.  All the arm sub-arch maintainers have either
+taken the part relevant to them, Acked me taking them, or failed to
+object while they've been in linux-next for several weeks now.
+
+My concern is the DT ABI stability problem.  In short, we fucked up.
+When we added several of the irqchip bindings, we designed them based on
+the Linux implementation (gic_arch_extn).  *Not* by describing the
+hardware.
+
+Marc's series undoes this in the best way possible.  He changes the DT
+bindings to actually describe the hardware, which then gets modeled in
+stacked domains quite well.
+
+This causes two problems:
+
+ 1) Upgrade kernel, but not DTB.
+
+	System will boot, and print a big fat warning that
+	suspend/resume will not work until the DTB is upgraded.
+
+ 2) Upgrade DTB, but not kernel.
+
+	System will fail to boot.
+
+In light of Thomas Petazonni's well-researched talk at ELC:
+
+  "The Device Tree as a stable ABI: a fairy tale?"
+  http://events.linuxfoundation.org/sites/events/files/slides/petazzoni-dt-as-stable-abi-fairy-tale.pdf
+
+I'm confident that #2 won't be an issue.  Distro's and OEMs seem to have
+worked around the instability by keeping the dtb tied to the kernel
+version.
+
+And, on the off chance that end users upgrade their kernel, say, by
+building mainline, there's a very clear warning that tells them exactly
+what to do:  Upgrade the dtb as well.
+
+Do you foresee any problem with this?  Is there anything I haven't
+considered?  Or extra information I'll need to present in my pull
+request?
+
+thx,
+
+Jason.
