@@ -1,31 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 6 Apr 2015 14:45:41 +0100
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 06 Apr 2015 08:53:36 -0500
 Subject: LDP: next-20150402: twl4030 regression?
-In-Reply-To: <5522886D.5050409@ti.com>
-References: <5522886D.5050409@ti.com>
-Message-ID: <20150406134541.GE6023@sirena.org.uk>
+In-Reply-To: <20150406134541.GE6023@sirena.org.uk>
+References: <5522886D.5050409@ti.com> <20150406134541.GE6023@sirena.org.uk>
+Message-ID: <55228FE0.2040702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 08:21:49AM -0500, Nishanth Menon wrote:
+On 04/06/2015 08:45 AM, Mark Brown wrote:
+> On Mon, Apr 06, 2015 at 08:21:49AM -0500, Nishanth Menon wrote:
+> 
+>> https://github.com/nmenon/kernel-test-logs/blob/next-20150401/omap2plus_defconfig/ldp.txt
+>> looks clean, but
+> 
+>> https://github.com/nmenon/kernel-test-logs/blob/next-20150402/omap2plus_defconfig/ldp.txt#L488
+>> seems to have picked up a regression in the regulator driver.
+> 
+> Please provide actual bug reports if you're trying to report something -
 
-> https://github.com/nmenon/kernel-test-logs/blob/next-20150401/omap2plus_defconfig/ldp.txt
-> looks clean, but
+Apologies, I should have been a little more clear.
 
-> https://github.com/nmenon/kernel-test-logs/blob/next-20150402/omap2plus_defconfig/ldp.txt#L488
-> seems to have picked up a regression in the regulator driver.
+> at least a description of the problem you're seeing and some attempt at
 
-Please provide actual bug reports if you're trying to report something -
-at least a description of the problem you're seeing and some attempt at
-analysis.  For example say what the test was, and if there's logs paste
-the relevant section into the e-mail.  Just randomly pasting a couple of
-web links in and saying "there's a problem" isn't helpful.
+Test was a simple boot test. There seems to be a lockdep reported at the
+very least in the log provided (see
+https://github.com/nmenon/kernel-test-logs/blob/next-20150402/omap2plus_defconfig/ldp.txt#L488
+).
 
-Please also CC people responsible for relevant drivers and systems.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/cd790810/attachment.sig>
+> analysis.  For example say what the test was, and if there's logs paste
+> the relevant section into the e-mail.  Just randomly pasting a couple of
+> web links in and saying "there's a problem" isn't helpful.
+
+Not sure if folks have already seen this or not - clicking the link
+should show the lockdep report straight out of the box.. I am thinking
+that is a problem... but I might be subjective here :)
+
+> 
+> Please also CC people responsible for relevant drivers and systems.
+> 
+
+Only quick change I could see was in regulator core, Will try to dig
+more at this later today. I dont see the filesystem mounted either, but
+that could be something else.
+
+--
+Regards,
+Nishanth Menon
