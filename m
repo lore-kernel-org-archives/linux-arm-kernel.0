@@ -1,111 +1,84 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Mon, 06 Apr 2015 20:14:23 +0300
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150406154037.GI18048@atomide.com>
-References: <551F0F50.1030701@gmail.com> <20150403221517.GX10805@atomide.com>
- <551F186B.90608@gmail.com> <20150403225212.GY10805@atomide.com>
- <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
- <5520E2EE.4080302@gmail.com>
- <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
- <5521A438.1070008@gmail.com>
- <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
- <20150406151939.GG18048@atomide.com> <20150406154037.GI18048@atomide.com>
-Message-ID: <5522BEEF.2000405@gmail.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Mon, 6 Apr 2015 10:19:45 -0700
+Subject: [PATCH v3] ARM: smp: Only expose /sys/.../cpuX/online if
+ hotpluggable
+In-Reply-To: <20150219221456.GC617@verge.net.au>
+References: <1423874574-3494-1-git-send-email-sboyd@codeaurora.org>
+ <20150218222731.GC24177@verge.net.au>
+ <54E51FFD.7080506@codeaurora.org>
+ <20150219221456.GC617@verge.net.au>
+Message-ID: <CANMBJr5-0dnVJ_gSBhOuyqmm7MnYLTKbTetezZnzucdxjNEVEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On  6.04.2015 18:40, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [150406 08:24]:
->> * Matthijs van Duin <matthijsvanduin@gmail.com> [150405 16:53]:
->>> Cortex-A8 errata doc states in its workaround for erratum 430973:
->>>
->>>> By default, the BTB Invalidate instruction is treated as a NOP on Cortex-A8.
->>>> However, it is possible to enable the BTB Invalidate instruction such that it
->>>> actually does a full invalidate of the BTB by setting the IBE bit (bit 6) in
->>>> the CP15 Auxiliary Control Register. As a consequence of erratum 687067, the
->>>> L1 System Array Debug Register should be cleared to 0 before the IBE bit is
->>>> set using the following code sequence:
->>>> MOV r1, #0
->>>> MCR p15, 0, r1, c15, c1, 0            ; write instruction data 0 register
->>>> MRC p15, 0, R1, c1, c0, 1             ; read Aux Ctl Register
->>>> ORR R1, R1 #(1 << 6)                  ; set IBE to 1
->>>> MCR p15, 0, R1, c1, c0, 1             ; write Aux Ctl Register
->>>> The above code needs to be executed in Secure state. ARM Limited recommends
->>>> that this code is added to the boot monitor.
->>>
->>> The 430973 workaround code in proc-v7.S will do absolutely nothing if
->>> executed in non-secure state. Ditto for the 458693 workaround, and the
->>> 460075 workaround should trigger an undefined instruction exception.
->>> Maybe linux is started in secure mode on some targets and this code
->>> was written for one of those?
+On 19 February 2015 at 14:14, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Feb 18, 2015 at 03:27:57PM -0800, Stephen Boyd wrote:
+>> On 02/18/15 14:27, Simon Horman wrote:
+>> > On Fri, Feb 13, 2015 at 04:42:54PM -0800, Stephen Boyd wrote:
+>> >> Writes to /sys/.../cpuX/online fail if we determine the platform
+>> >> doesn't support hotplug for that CPU. Furthermore, if the cpu_die
+>> >> op isn't specified the system hangs when we try to offline a CPU
+>> >> and it comes right back online unexpectedly. Let's figure this
+>> >> stuff out before we make the sysfs nodes so that the online file
+>> >> doesn't even exist if it isn't (at least sometimes) possible to
+>> >> hotplug the CPU.
+>> >>
+>> >> Add a new cpu_can_disable op and repoint all cpu_disable
+>> >> implementations at it because all current users use the op to
+>> >> indicate if a CPU can be hotplugged or not in a static fashion.
+>> >> With PSCI we may need to introduce a cpu_disable op so that the
+>> >> secure OS can be migrated off the CPU we're trying to hotplug.
+>> >> In this case, the cpu_can_disable op will indicate that all CPUs
+>> >> are hotpluggable by returning 1, but the cpu_disable op will make
+>> >> a PSCI migration call and occasionally fail, denying the hotplug
+>> >> of a CPU. This shouldn't be any worse than x86 where we may
+>> >> indicate that all CPUs are hotpluggable but occasionally we can't
+>> >> offline a CPU due to check_irq_vectors_for_cpu_disable() failing
+>> >> to find a CPU to move vectors to.
+>> >>
+>> >> Cc: Mark Rutland <mark.rutland@arm.com>
+>> >> Cc: Nicolas Pitre <nico@linaro.org>
+>> >> Cc: Dave Martin <Dave.Martin@arm.com>
+>> >> Cc: Simon Horman <horms@verge.net.au>
+>> >> Cc: Magnus Damm <magnus.damm@gmail.com>
+>> >> Cc: <linux-sh@vger.kernel.org>
+>> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> >> ---
+>> >>
+>> >> Changes since v2:
+>> >>  * Left cpu_disable op in place
+>> >>  * Split out shmobile function deletion
+>> >>
+>> >>  arch/arm/common/mcpm_platsmp.c       | 12 ++++--------
+>> >>  arch/arm/include/asm/smp.h           | 10 ++++++++++
+>> >>  arch/arm/kernel/setup.c              |  2 +-
+>> >>  arch/arm/kernel/smp.c                | 15 ++++++++++++++-
+>> >>  arch/arm/mach-shmobile/common.h      |  2 +-
+>> >>  arch/arm/mach-shmobile/platsmp.c     |  4 ++--
+>> >>  arch/arm/mach-shmobile/smp-r8a7790.c |  2 +-
+>> >>  arch/arm/mach-shmobile/smp-r8a7791.c |  2 +-
+>> >>  arch/arm/mach-shmobile/smp-sh73a0.c  |  2 +-
+>> >>  9 files changed, 35 insertions(+), 16 deletions(-)
+>> > I think it would make sense to separate the ARM-core changes
+>> > from the mach-shmobile integration changes.
 >>
->> That's only for HS omaps, for those we currently only do it in the
->> nokia_n900_legacy_init that calls rx51_secure_update_aux_cr.
->>
->>> I scanned DM814x secure ROM for any (ARM or Thumb) write to
->>> Instruction L1 System Array Debug Register 0, but I found none, hence
->>> my warning to watch out for erratum 687067.
->>
->> OK
->>
->>> Adding the full set of BTB invalidates while making sure IBE is
->>> disabled on sufficiently recent Cortex-A8 revisions would be optimal
->>> for the Cortex-A8. But, apparently (based on the description of the
->>> ARMv7 CPUID registers) there are also processors which only require
->>> BTB invalidates when code is modified, but not when context-switching,
->>> so there may be performance considerations there...
->>
->> Attempting to summarize all that's been discussed.. It sounds like we
->> need the following implemented:
->>
->> 1. For cortex-a8 revisions affected by 458693, we can do a custom
->>     cpu_v7_switch_mm function that always does flush BTAC/BTB.
->>
->> 2. For HS cortex-a8 processors other than n900 affected by 458693,
->>     we need to implement functions similar to rx51_secure_update_aux_cr,
->>     the bootrom on n900 is different from TI HS omaps so the SMC call
->>     numbering may be different.
->>
->> 3. For later cortex-a8 processors not affected by 458693, we need
->>     to clear IBE bit to avoid erratum 687067.
+>> Are you saying two (three?) patches to add the op, and then move over
+>> each struct smp_operations? It's all going through rmk's tree so I'll
+>> leave that up to him.
 >
-> Oops sorry, wrong numbers for errata above.. s/458693/430973/, here's
-> a better version:
+> I'm also happy to let RMK to decide what he thinks is best.
+
+Apologies for bringing up an older thread, but was this change ever
+picked up? I recently hit this issue when I was running the kselftest
+suite (specifically the cpu-hotplug test case) on the ARM boards from
+kernelci.org. I don't see it in -next so I've tested the core changes
+and confirmed it the fixes the cpu-hotplug behavior on platforms that
+do not support it.
+
 >
-> 1. For cortex-a8 revisions affected by 430973, we can do a custom
->     cpu_v7_switch_mm function that always does flush BTAC/BTB.
->
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Why custom function, if IBE bit is zero, BTB invalidate instruction is a 
-NOP. Do you think that "mcr p15, 0, r2, c7, c5, 6" executed as a NOP 
-will put so much overhead, that it deserves a custom function?
-
-> 2. For HS cortex-a8 processors other than n900 affected by 430973,
->     we need to implement functions similar to rx51_secure_update_aux_cr,
->     the bootrom on n900 is different from TI HS omaps so the SMC call
->     numbering may be different.
->
-> 3. For later cortex-a8 processors not affected by 430973, we need
->     to clear IBE bit to avoid erratum 687067.
->
-
-Maybe it should be implemented something like:
-
-1. if Cortex-A8, always execute invalidate BTB instruction in
-    cpu_v7_switch_mm
-
-2. For Cortex-A8 revisions affected by 430973, set IBE bit to 1, set it
-    to 0 for all others. That should happen as soon as possible,
-    otherwise kernel may crash on affected revisions if thumb-
-    compiled.
-
-> Regards,
->
-> Tony
->
-
-Regards,
-
-Ivo
+- Tyler
