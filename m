@@ -1,48 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 6 Apr 2015 17:19:39 +0100
-Subject: [PATCH 2/2] ASoC: add core audio driver for Broadcom Cygnus SOC.
-In-Reply-To: <551D8EB6.1050004@broadcom.com>
-References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
- <1427771784-29950-3-git-send-email-sbranden@broadcom.com>
- <20150331064209.GD2869@sirena.org.uk>
- <551D8EB6.1050004@broadcom.com>
-Message-ID: <20150406161939.GJ6023@sirena.org.uk>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Mon, 06 Apr 2015 19:28:12 +0300
+Subject: [PATCH v3 4/5] i2c: davinci: use bus recovery infrastructure
+In-Reply-To: <20150406160930.GA937@katana>
+References: <1417448047-15236-1-git-send-email-grygorii.strashko@ti.com>
+ <1417448047-15236-5-git-send-email-grygorii.strashko@ti.com>
+ <20150318203151.GA12072@katana> <550C67D6.3080909@linaro.org>
+ <20150403201846.GH2016@katana> <55228613.2060607@linaro.org>
+ <20150406160930.GA937@katana>
+Message-ID: <5522B41C.40107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 02, 2015 at 11:47:18AM -0700, Lori Hikichi wrote:
-> On 15-03-30 11:42 PM, Mark Brown wrote:
+On 04/06/2015 07:09 PM, Wolfram Sang wrote:
+>
+>>>> Of course,  i2c_davinci_wait_bus_not_busy() has to be fixed first
+>>>> as proposed by Alexander Sverdlin here:
+>>>>    https://patchwork.ozlabs.org/patch/448994/.
+>>>
+>>> Okay, good that you said it. So I'll give his patch series priority over
+>>> this one.
+>>
+>>
+>> Sorry, but this series already mises few merge windows and it has a lot
+>> of revied-by and tested-by, so could we proceed please?
+>>
+>> Re-based & re-sent http://www.spinics.net/lists/arm-kernel/msg410810.html
+>
+> ??? Didn't you say above that Alexaders's patch is needed first?
+>
 
-> >>+config SND_SOC_CYGNUS
-> >>+	tristate "SoC platform audio for Broadcom Cygnus chips"
-> >>+	depends on ARCH_BCM_CYGNUS || COMPILE_TEST
-> >>+	default ARCH_BCM_CYGNUS
+Sorry for misunderstanding.
 
-> Okay.
+I said that if We'd like to continue and optimize more recovery path
+then yes - Alexaders's patch will be needed (patch 2 from his series
+[PATCH 2/3] i2c: davinci: Refactor i2c_davinci_wait_bus_not_busy(), 
+which, in turn need to be rebased as the first one in his series and 
+re-send). And in my opinion all such improvements could be done by 
+subsequent patches.
 
-You don't need to reply to every single comment, the general assumption
-will be that if there's no other followup all review comments will be
-addressed.  It's better to just reply to things where there's something
-more detailed to say, if you explicitly reply to everything then that
-makes it easier for actual replies to be missed since there's a lot of
-there's a lot of the mail that's just going to be skipped through.
-
-> >>+static void ringbuf_inc(void __iomem *audio_io, bool is_playback,
-> >>+			const struct ringbuf_regs *p_rbuf)
-
-> >So it looks like we're getting an interrupt per period and we have to
-> >manually advance to the next one?
-
-> Yes.
-
-OK, so that seems fragile - what happens if we're slightly late
-processing an interrupt or miss one entirely?  Most hardware has some
-way to read back the current position which tends to be more reliable,
-is that not an option here?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/f7e5d81d/attachment.sig>
+-- 
+regards,
+-grygorii
