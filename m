@@ -1,166 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 06 Apr 2015 11:45:44 +0100
-Subject: [PATCH/RFC 3/6] staging: board: Add support for translating hwirq
- to virq numbers
-In-Reply-To: <1428064923-24950-4-git-send-email-geert+renesas@glider.be>
-References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
- <1428064923-24950-4-git-send-email-geert+renesas@glider.be>
-Message-ID: <7a82f5d435aaaf8d121233769a77943c@www.loen.fr>
+From: grygorii.strashko@linaro.org (grygorii.strashko at linaro.org)
+Date: Mon,  6 Apr 2015 15:38:38 +0300
+Subject: [PATCH v4 0/3] i2c: davinci improvements and fixes
+Message-ID: <1428323921-25832-1-git-send-email-grygorii.strashko@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-04-03 13:42, Geert Uytterhoeven wrote:
-> As of commit 9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq
-> domain."), GIC IRQ numbers are virtual, breaking hardcoded hardware 
-> IRQ
-> numbers in platform device resources.
->
-> Add support for translating hardware IRQ numbers to virtual IRQ 
-> numbers,
-> and fixing up platform device resources with hardcoded IRQ numbers.
->
-> Add a copyright header, including the original author.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  drivers/staging/board/board.c | 66
-> +++++++++++++++++++++++++++++++++++++++++++
->  drivers/staging/board/board.h |  5 ++++
->  2 files changed, 71 insertions(+)
->
-> diff --git a/drivers/staging/board/board.c 
-> b/drivers/staging/board/board.c
-> index d5a6abc845191c93..b84ac2837a20bf06 100644
-> --- a/drivers/staging/board/board.c
-> +++ b/drivers/staging/board/board.c
-> @@ -1,10 +1,27 @@
-> +/*
-> + * Copyright (C) 2014 Magnus Damm
-> + * Copyright (C) 2015 Glider bvba
-> + *
-> + * This file is subject to the terms and conditions of the GNU
-> General Public
-> + * License.  See the file "COPYING" in the main directory of this 
-> archive
-> + * for more details.
-> + */
-> +
-> +#define pr_fmt(fmt)	"board_staging: "  fmt
-> +
->  #include <linux/init.h>
-> +#include <linux/irq.h>
->  #include <linux/device.h>
->  #include <linux/kernel.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +
->  #include "board.h"
->
-> +static struct device_node *irqc_node __initdata;
-> +static unsigned int irqc_base __initdata;
-> +
->  static bool find_by_address(u64 base_address)
->  {
->  	struct device_node *dn = of_find_all_nodes(NULL);
-> @@ -38,3 +55,52 @@ bool __init board_staging_dt_node_available(const
-> struct resource *resource,
->
->  	return false; /* Nothing found */
->  }
-> +
-> +int __init board_staging_setup_hwirq_xlate(const char *irqc_match,
-> +					   unsigned int base)
-> +{
-> +	irqc_node = of_find_compatible_node(NULL, NULL, irqc_match);
-> +
-> +	WARN_ON(!irqc_node);
-> +	if (!irqc_node)
-> +		return -ENOENT;
-> +
-> +	irqc_base = base;
-> +	return 0;
-> +}
+From: Grygorii Strashko <grygorii.strashko@linaro.org>
 
-And what happens when you have multiple (cascaded) interrupt 
-controllers, each wanting to register with this translation service? You 
-should at least check that nobody has been here before.
+This series converts driver to use I2C bus recovery infrastructure and
+adds Davinci I2C bus recovery mechanizm based on using ICPFUNC registers.
+These patches are combination of two patches from Ben Gardiner [1] and
+Mike Looijmans [2] which i've reworked to use I2C bus recovery infrastructure
 
-> +static unsigned int __init xlate_hwirq(unsigned int hwirq)
-> +{
-> +	struct of_phandle_args irq_data;
-> +	unsigned int irq;
-> +
-> +	if (!irqc_node)
-> +		return hwirq;
-> +
-> +	irq_data.np = irqc_node;
-> +	irq_data.args_count = 3;
-> +	irq_data.args[0] = 0;
-> +	irq_data.args[1] = hwirq - irqc_base;
-> +	irq_data.args[2] = IRQ_TYPE_LEVEL_HIGH;
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/047305.html
+"[PATCH 0/6] i2c-davinci gpio pulsed SCL recovery with ICPFUNC"
+[2] https://lkml.org/lkml/2014/2/28/133
+"[PATCH] i2c-davinci: Implement a bus recovery that actually works"
 
-And what happens for edge interrupts? Or LEVEL_LOW? This is very much 
-GIC specific (3 args...). How does it work with non-GIC interrupt 
-controllers?
+Changes in v4:
+- no changes, re-besed on top of i2c/for-next, K4.1
 
-> +
-> +	irq = irq_create_of_mapping(&irq_data);
-> +	if (WARN_ON(!irq))
-> +		irq = hwirq;
-> +
-> +	return irq;
-> +}
-> +
-> +void __init board_staging_fixup_irq_resources(struct resource *res,
-> +					      unsigned int nres)
-> +{
-> +	unsigned int i;
-> +
-> +	for (i = 0; i < nres; i++)
-> +		if (res[i].flags == IORESOURCE_IRQ) {
-> +			unsigned int hwirq = res[i].start;
-> +			unsigned int virq = xlate_hwirq(hwirq);
-> +
-> +			pr_debug("hwirq %u -> virq %u\n", hwirq, virq);
-> +			res[i].start = virq;
-> +		}
-> +}
-> diff --git a/drivers/staging/board/board.h 
-> b/drivers/staging/board/board.h
-> index e9c914985d4acb36..4cedc3c46e287eb7 100644
-> --- a/drivers/staging/board/board.h
-> +++ b/drivers/staging/board/board.h
-> @@ -1,10 +1,15 @@
->  #ifndef __BOARD_H__
->  #define __BOARD_H__
-> +
->  #include <linux/init.h>
->  #include <linux/of.h>
->
-> +struct resource;
-> +
->  bool board_staging_dt_node_available(const struct resource 
-> *resource,
->  				     unsigned int num_resources);
-> +int board_staging_setup_hwirq_xlate(const char *irqc_match, unsigned
-> int base);
-> +void board_staging_fixup_irq_resources(struct resource *res,
-> unsigned int nres);
->
->  #define board_staging(str, fn)			\
->  static int __init runtime_board_check(void)	\
+Changes in v3:
+- minor comments applied
 
-It won't surprise you that I don't really like this approach. It is 
-controller-specific, restrictive, and allows platform code to continue 
-doing something that is essentially wrong. Should this code ever move 
-out of staging, it should depend on CONFIG_BROKEN, because this is 
-essentially what it is - support code for broken systems. I'd also 
-welcome moving parts of the OMAP4/5 code to such CONFIG_BROKEN 
-dependency.
+Changes in v2:
+- patch 1: error handling improved
+- patch 2: commit message updated
+- patch 4: minor comments applied
+- patch 5: added new optional DT property "ti,has-pfunc"
 
-Thanks,
+Links
+v3: http://www.spinics.net/lists/linux-i2c/msg17835.html
+v2: https://lkml.org/lkml/2014/11/26/252
+v1: http://www.spinics.net/lists/linux-i2c/msg17601.html
 
-         M.
+CC: Sekhar Nori <nsekhar@ti.com>
+CC: Kevin Hilman <khilman@deeprootsystems.com>
+CC: Santosh Shilimkar <ssantosh@kernel.org>
+CC: Murali Karicheri <m-karicheri2@ti.com>
+CC: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+
+Grygorii Strashko (3):
+  i2c: recovery: change input parameter to i2c_adapter for prepare/unprepare_recovery
+  i2c: davinci: use bus recovery infrastructure
+  i2c: davinci: use ICPFUNC to toggle I2C as gpio for bus recovery
+
+ .../devicetree/bindings/i2c/i2c-davinci.txt        |   3 +
+ drivers/i2c/busses/i2c-davinci.c                   | 177 ++++++++++++++++-----
+ drivers/i2c/i2c-core.c                             |   4 +-
+ include/linux/i2c.h                                |   4 +-
+ include/linux/platform_data/i2c-davinci.h          |   1 +
+ 5 files changed, 144 insertions(+), 45 deletions(-)
+
 -- 
-Fast, cheap, reliable. Pick two.
+1.9.1
