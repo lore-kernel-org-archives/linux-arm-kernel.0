@@ -1,27 +1,65 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 6 Apr 2015 19:45:15 +0200
-Subject: [PATCH v4 6/6] power: twl4030_madc_battery: Add missing
- MODULE_ALIAS
-In-Reply-To: <1426022847-30912-7-git-send-email-marek@goldelico.com>
-References: <1426022847-30912-1-git-send-email-marek@goldelico.com>
- <1426022847-30912-7-git-send-email-marek@goldelico.com>
-Message-ID: <20150406174515.GF18145@earth>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 6 Apr 2015 10:42:45 -0700
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <5522BEEF.2000405@gmail.com>
+References: <551F186B.90608@gmail.com> <20150403225212.GY10805@atomide.com>
+ <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
+ <5520E2EE.4080302@gmail.com>
+ <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
+ <5521A438.1070008@gmail.com>
+ <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com>
+ <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
+Message-ID: <20150406174245.GJ18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [150406 10:15]:
+> On  6.04.2015 18:40, Tony Lindgren wrote:
+> >
+> >Oops sorry, wrong numbers for errata above.. s/458693/430973/, here's
+> >a better version:
+> >
+> >1. For cortex-a8 revisions affected by 430973, we can do a custom
+> >    cpu_v7_switch_mm function that always does flush BTAC/BTB.
+> >
+> 
+> Why custom function, if IBE bit is zero, BTB invalidate instruction is a
+> NOP. Do you think that "mcr p15, 0, r2, c7, c5, 6" executed as a NOP will
+> put so much overhead, that it deserves a custom function?
 
-On Tue, Mar 10, 2015 at 10:27:27PM +0100, Marek Belisko wrote:
-> Without MODULE_ALIAS twl4030_madc_battery won't get loaded
-> automatically.
+Hmm but it still seems to do something also on cortex-a8 r3p2 that
+is supposedly not affected by 430973.. Based on my tests so far, at least
+armhf running cpuburn-a8 in the background and doing apt-get update
+segfaults constantly without flush BTAC/BTB. This seems to be the case
+no matter how the aux ctrl reg bits are set.. This should be reproducable
+on any pandboard xm BTW.
+ 
+> >2. For HS cortex-a8 processors other than n900 affected by 430973,
+> >    we need to implement functions similar to rx51_secure_update_aux_cr,
+> >    the bootrom on n900 is different from TI HS omaps so the SMC call
+> >    numbering may be different.
+> >
+> >3. For later cortex-a8 processors not affected by 430973, we need
+> >    to clear IBE bit to avoid erratum 687067.
+> >
+> 
+> Maybe it should be implemented something like:
+> 
+> 1. if Cortex-A8, always execute invalidate BTB instruction in
+>    cpu_v7_switch_mm
 
-Thanks, pulled.
+This part still seems to need more investigating for why it's still
+needed also r3p2 as I describe above. Otherwise we may be hiding some
+other bug.
+ 
+> 2. For Cortex-A8 revisions affected by 430973, set IBE bit to 1, set it
+>    to 0 for all others. That should happen as soon as possible,
+>    otherwise kernel may crash on affected revisions if thumb-
+>    compiled.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/2c379b67/attachment.sig>
+Yes this makes sense.
+
+Regards,
+
+Tony
