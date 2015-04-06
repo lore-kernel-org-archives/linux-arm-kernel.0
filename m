@@ -1,52 +1,39 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Mon, 6 Apr 2015 01:52:05 +0200
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <5521A438.1070008@gmail.com>
-References: <55197A12.1050009@bitmer.com> <20150330164237.GJ10805@atomide.com>
- <55198BA4.5010207@bitmer.com> <20150330175051.GK10805@atomide.com>
- <20150331123233.GA15103@earth> <20150401194734.GT10805@atomide.com>
- <20150403163553.GA16247@earth> <551F0F50.1030701@gmail.com>
- <20150403221517.GX10805@atomide.com> <551F186B.90608@gmail.com>
- <20150403225212.GY10805@atomide.com>
- <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
- <5520E2EE.4080302@gmail.com>
- <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
- <5521A438.1070008@gmail.com>
-Message-ID: <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 05 Apr 2015 17:16:14 -0700
+Subject: [PATCH V2] tty: serial: Add const to struct uart_ops declarations
+In-Reply-To: <d55b1a1240db66ae651cb99cd713694a@agner.ch>
+References: <1428169665.2775.53.camel@perches.com>
+ <a938a0e86638588e5ccff85771fa3b95@agner.ch>
+ <1428258294.2775.69.camel@perches.com>
+ <d55b1a1240db66ae651cb99cd713694a@agner.ch>
+Message-ID: <1428279374.2775.78.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cortex-A8 errata doc states in its workaround for erratum 430973:
+On Mon, 2015-04-06 at 01:09 +0200, Stefan Agner wrote:
+> On 2015-04-05 20:24, Joe Perches wrote:
+> > Still compiled only x86 and not cross-compiled or tested.
+> 
+> Cross-compiled with multi_v7_defconfig
+[]
+> >  drivers/tty/serial/fsl_lpuart.c             | 4 ++--
+> 
+> Tested that driver on actual hardware, looks fine.
 
-> By default, the BTB Invalidate instruction is treated as a NOP on Cortex-A8.
-> However, it is possible to enable the BTB Invalidate instruction such that it
-> actually does a full invalidate of the BTB by setting the IBE bit (bit 6) in
-> the CP15 Auxiliary Control Register. As a consequence of erratum 687067, the
-> L1 System Array Debug Register should be cleared to 0 before the IBE bit is
-> set using the following code sequence:
-> MOV r1, #0
-> MCR p15, 0, r1, c15, c1, 0            ; write instruction data 0 register
-> MRC p15, 0, R1, c1, c0, 1             ; read Aux Ctl Register
-> ORR R1, R1 #(1 << 6)                  ; set IBE to 1
-> MCR p15, 0, R1, c1, c0, 1             ; write Aux Ctl Register
-> The above code needs to be executed in Secure state. ARM Limited recommends
-> that this code is added to the boot monitor.
+> This driver seems to alter the startup function on initialization:
+> 
+>   CC      drivers/video/of_display_timing.o
+> ../drivers/tty/serial/samsung.c: In function 's3c24xx_serial_init_port':
+> ../drivers/tty/serial/samsung.c:1702:3: error: assignment of member
+> 'startup' in read-only object
+>    s3c24xx_serial_ops.startup = s3c64xx_serial_startup;
+>    ^
 
-The 430973 workaround code in proc-v7.S will do absolutely nothing if
-executed in non-secure state. Ditto for the 458693 workaround, and the
-460075 workaround should trigger an undefined instruction exception.
-Maybe linux is started in secure mode on some targets and this code
-was written for one of those?
+Thanks Stefan.  Then that one can't be const.
 
-I scanned DM814x secure ROM for any (ARM or Thumb) write to
-Instruction L1 System Array Debug Register 0, but I found none, hence
-my warning to watch out for erratum 687067.
+> That is the only thing which popped up with multi_v7_defconfig.
 
-Adding the full set of BTB invalidates while making sure IBE is
-disabled on sufficiently recent Cortex-A8 revisions would be optimal
-for the Cortex-A8. But, apparently (based on the description of the
-ARMv7 CPUID registers) there are also processors which only require
-BTB invalidates when code is modified, but not when context-switching,
-so there may be performance considerations there...
+I appreciate the testing.
 
-Matthijs
+Greg, Jiri, I'll resend with this fixed in a week or so
+after waiting for any other comment or sign of brokenness.
