@@ -1,48 +1,35 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 06 Apr 2015 11:33:53 +0200
-Subject: [PATCH v4 07/11] ARM: allow MULTIPLATFORM with !MMU
-In-Reply-To: <20150406085443.GD12732@n2100.arm.linux.org.uk>
-References: <1428090292-21693-1-git-send-email-stefan@agner.ch>
- <1428090292-21693-8-git-send-email-stefan@agner.ch>
- <20150403200931.GD13898@n2100.arm.linux.org.uk>
- <1f84d767d3bb8a8c470a26064cba454e@agner.ch>
- <20150405161014.GG13898@n2100.arm.linux.org.uk>
- <24394c50bcd8000c21aca0360fd20b6f@agner.ch>
- <20150405224455.GB12732@n2100.arm.linux.org.uk>
- <58bb3fd4f9e9b3acc7f8b83bd6664177@agner.ch>
- <20150406081523.GC12732@n2100.arm.linux.org.uk>
- <8737db3eea65563054df98c932870590@agner.ch>
- <20150406085443.GD12732@n2100.arm.linux.org.uk>
-Message-ID: <f2b85e294afb55fdca85a16e6ad6c13c@agner.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 6 Apr 2015 10:58:03 +0100
+Subject: [PATCH 0/2] Cygnus Audio Driver
+In-Reply-To: <551EEAF8.7050108@broadcom.com>
+References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+ <20150331064338.GE2869@sirena.org.uk>
+ <551EEAF8.7050108@broadcom.com>
+Message-ID: <20150406095803.GD6023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-04-06 10:54, Russell King - ARM Linux wrote:
-> On Mon, Apr 06, 2015 at 10:38:10AM +0200, Stefan Agner wrote:
->> We already prevent a kernel image which mixes V4/V4T/V5 and V6/V7. And
->> so we would do with V7M too. Just because it's in multiplatform doesn't
->> mean we need to mix things up.
-> 
-> I don't think you're getting what I'm saying at all... :(
+On Fri, Apr 03, 2015 at 12:33:12PM -0700, Scott Branden wrote:
+> On 15-03-30 11:43 PM, Mark Brown wrote:
+> >On Mon, Mar 30, 2015 at 08:16:22PM -0700, Scott Branden wrote:
 
-It's not that I don't get it. I'm just arguing against it.
+> >>The audio PLL is embedded in the audio block and only used
+> >>by the audio block. The audio PLL registers are also in the middle of
+> >>the audio register map.
 
-IMHO, it's wrong to create a parallel universe for v7M multiplatform...
+> >When you say it's only used by the audio block do you mean to say that
+> >the audio block exposes no clock signals other than the bit and frame
+> >clocks?
 
-Multiplatform as I understand it is mainly about selecting multiple SoC
-_platforms_ but not necessarily multiple CPU platforms. It happens to
-work well for V6/V7, but does not for others, and preventing
-multiselection for incompatible CPU platforms is the way to prevent
-creating such images.
+> The audio block exposes the MCLK in addition to the bit and frame clock.
 
-> Please read the first bit of my replies again, where I say that we do
-> _not_ want to remove the !MMU dependency from multiplatform.  This is
-> something I feel _very_ strongly about, and something which I've written
-> about many times on this list.
-
-Ok, I don't have such a strong feel for multiplatform, it just feels a
-bit better to me. I need a top level ARCH which is able to live with
-!MMU. Will try the ARCH_SINGLE_ARMV7M approach then.
-
---
-Stefan
+OK, then it's going to need to be a clock provider at some point - the
+clock will be going into external devices which are going to need to be
+able to interact with the clock (for example, to get the rate).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/9c025e98/attachment.sig>
