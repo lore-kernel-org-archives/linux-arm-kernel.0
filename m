@@ -1,34 +1,68 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 06 Apr 2015 12:04:21 -0700
-Subject: [PATCH 03/14] clkdev: get rid of redundant clk_add_alias()
- prototype in linux/clk.h
-In-Reply-To: <87lhi8rrmd.fsf@free.fr>
+Date: Mon, 06 Apr 2015 13:18:55 -0700
+Subject: [PATCH 05/14] clkdev: use clk_hw internally
+In-Reply-To: <E1Ye59E-0001BB-7z@rmk-PC.arm.linux.org.uk>
 References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
- <E1Ye593-0001B1-W4@rmk-PC.arm.linux.org.uk> <87lhi8rrmd.fsf@free.fr>
-Message-ID: <5522D8B5.7050205@codeaurora.org>
+ <E1Ye59E-0001BB-7z@rmk-PC.arm.linux.org.uk>
+Message-ID: <5522EA2F.1090003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/15 05:43, Robert Jarzmik wrote:
-> Russell King <rmk+kernel@arm.linux.org.uk> writes:
->
->> clk_add_alias() is provided by clkdev, and is not part of the clk API.
->> Howver, it is prototyped in two locations: linux/clkdev.h and
->> linux/clk.h.  This is a mess.  Get rid of the redundant and unnecessary
->> version in linux/clk.h.
->>
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> Actually, this serie fixes a regression I've seen in linux-next, and which was
-> triggering the Oops in [1] on lubbock. With your serie, the kernel boots fine.
->
->
+On 04/03/15 10:12, Russell King wrote:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Is this with the lubbock_defconfig? Is it a regression in 4.0-rc series
-or is it due to some pending -next patches interacting with the per-user
-clock patches? It looks like the latter because __clk_get_hw() should be
-inlined on lubbock_defconfig where CONFIG_COMMON_CLK=n.
+Some commit text would be nice for us 5 years from now when we wonder
+why this patch was applied.
+
+I suspect the commit text would go like this:
+
+clk_add_alias() calls clk_get() followed by clk_put() but in between
+those two calls it saves away the struct clk pointer to a clk_lookup
+structure. This leaves the 'clk' member of the clk_lookup pointing at
+freed memory on configurations where CONFIG_COMMON_CLK=y. This is a
+problem because clk_get_sys() will eventually try to dereference the
+freed pointer by calling __clk_get_hw() on it. Fix this by saving away
+the struct clk_hw pointer instead of the struct clk pointer so that when
+we try to create a per-user struct clk in clk_get_sys() we don't
+dereference a junk pointer.
+
+Now the question is does any of this matter for the 4.0 release. From
+what I can tell, the answer is no.
+
+$ git grep 'clk_add_alias' v4.0-rc6
+v4.0-rc6:arch/arm/mach-davinci/da850.c:         clk_add_alias("async", da850_cpufreq_device.name,
+v4.0-rc6:arch/arm/mach-omap1/board-nokia770.c:  clk_add_alias("hwa_sys_ck", NULL, "bclk", NULL);
+v4.0-rc6:arch/arm/mach-pxa/eseries.c:   clk_add_alias("CLK_CK48M", e740_t7l66xb_device.name,
+v4.0-rc6:arch/arm/mach-pxa/eseries.c:   clk_add_alias("CLK_CK3P6MI", e750_tc6393xb_device.name,
+v4.0-rc6:arch/arm/mach-pxa/eseries.c:   clk_add_alias("CLK_CK3P6MI", e800_tc6393xb_device.name,
+v4.0-rc6:arch/arm/mach-pxa/lubbock.c:   clk_add_alias("SA1111_CLK", NULL, "GPIO11_CLK", NULL);
+v4.0-rc6:arch/arm/mach-pxa/tosa.c:      clk_add_alias("CLK_CK3P6MI", tc6393xb_device.name, "GPIO11_CLK", NULL);
+v4.0-rc6:arch/mips/alchemy/common/clock.c:                      clk_add_alias(t->alias, NULL, t->base, NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("wdt", NULL, "ahb", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("uart", NULL, "ahb", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("wdt", NULL, "ahb", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("uart", NULL, "ahb", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("wdt", NULL, "ahb", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("uart", NULL, "ahb", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("wdt", NULL, "ahb", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("uart", NULL, "ref", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("wdt", NULL, "ref", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("uart", NULL, "ref", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("wdt", NULL, "ref", NULL);
+v4.0-rc6:arch/mips/ath79/clock.c:       clk_add_alias("uart", NULL, "ref", NULL);
+v4.0-rc6:arch/sh/kernel/cpu/clock-cpg.c:        clk_add_alias("fck", "sh-tmu-sh3.0", "peripheral_clk", NULL);
+v4.0-rc6:arch/sh/kernel/cpu/clock-cpg.c:        clk_add_alias("fck", "sh-tmu.0", "peripheral_clk", NULL);
+v4.0-rc6:arch/sh/kernel/cpu/clock-cpg.c:        clk_add_alias("fck", "sh-tmu.1", "peripheral_clk", NULL);
+v4.0-rc6:arch/sh/kernel/cpu/clock-cpg.c:        clk_add_alias("fck", "sh-tmu.2", "peripheral_clk", NULL);
+v4.0-rc6:arch/sh/kernel/cpu/clock-cpg.c:        clk_add_alias("fck", "sh-mtu2", "peripheral_clk", NULL);
+v4.0-rc6:arch/sh/kernel/cpu/clock-cpg.c:        clk_add_alias("fck", "sh-cmt-16.0", "peripheral_clk", NULL);
+v4.0-rc6:arch/sh/kernel/cpu/clock-cpg.c:        clk_add_alias("fck", "sh-cmt-32.0", "peripheral_clk", NULL);
+v4.0-rc6:arch/sh/kernel/cpu/clock-cpg.c:        clk_add_alias("sci_ick", NULL, "peripheral_clk", NULL);
+
+All of these architectures and platforms have CONFIG_COMMON_CLK=n, so
+there doesn't seem to be any regression that these patches are fixing.
+That isn't to say the patches are bad, just that they aren't urgent for
+the upcoming release.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
