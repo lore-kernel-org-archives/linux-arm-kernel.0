@@ -1,110 +1,111 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 6 Apr 2015 18:44:28 +0200
-Subject: [PATCH] power: add poodle battery driver
-In-Reply-To: <1427714679-27472-1-git-send-email-dbaryshkov@gmail.com>
-References: <1427714679-27472-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20150406164428.GB18145@earth>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Mon, 06 Apr 2015 20:14:23 +0300
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <20150406154037.GI18048@atomide.com>
+References: <551F0F50.1030701@gmail.com> <20150403221517.GX10805@atomide.com>
+ <551F186B.90608@gmail.com> <20150403225212.GY10805@atomide.com>
+ <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
+ <5520E2EE.4080302@gmail.com>
+ <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
+ <5521A438.1070008@gmail.com>
+ <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com> <20150406154037.GI18048@atomide.com>
+Message-ID: <5522BEEF.2000405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
 
-On Mon, Mar 30, 2015 at 02:24:39PM +0300, Dmitry Eremin-Solenikov wrote:
-> Add a driver supporting battery charging on Sharp SL-5600 (poodle).
-> Voltage and temperature readings are provided through add7846 hwmon
-> interface. Battery voltage is in1_input (mV) and temp in in0_input
-> (values unknown, but should be less than 2441).
 
-You may want to convert add7846 to iio interface, which can be
-exposed via hwmon and requested by other kernel drivers (e.g. this
-one).
+On  6.04.2015 18:40, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [150406 08:24]:
+>> * Matthijs van Duin <matthijsvanduin@gmail.com> [150405 16:53]:
+>>> Cortex-A8 errata doc states in its workaround for erratum 430973:
+>>>
+>>>> By default, the BTB Invalidate instruction is treated as a NOP on Cortex-A8.
+>>>> However, it is possible to enable the BTB Invalidate instruction such that it
+>>>> actually does a full invalidate of the BTB by setting the IBE bit (bit 6) in
+>>>> the CP15 Auxiliary Control Register. As a consequence of erratum 687067, the
+>>>> L1 System Array Debug Register should be cleared to 0 before the IBE bit is
+>>>> set using the following code sequence:
+>>>> MOV r1, #0
+>>>> MCR p15, 0, r1, c15, c1, 0            ; write instruction data 0 register
+>>>> MRC p15, 0, R1, c1, c0, 1             ; read Aux Ctl Register
+>>>> ORR R1, R1 #(1 << 6)                  ; set IBE to 1
+>>>> MCR p15, 0, R1, c1, c0, 1             ; write Aux Ctl Register
+>>>> The above code needs to be executed in Secure state. ARM Limited recommends
+>>>> that this code is added to the boot monitor.
+>>>
+>>> The 430973 workaround code in proc-v7.S will do absolutely nothing if
+>>> executed in non-secure state. Ditto for the 458693 workaround, and the
+>>> 460075 workaround should trigger an undefined instruction exception.
+>>> Maybe linux is started in secure mode on some targets and this code
+>>> was written for one of those?
+>>
+>> That's only for HS omaps, for those we currently only do it in the
+>> nokia_n900_legacy_init that calls rx51_secure_update_aux_cr.
+>>
+>>> I scanned DM814x secure ROM for any (ARM or Thumb) write to
+>>> Instruction L1 System Array Debug Register 0, but I found none, hence
+>>> my warning to watch out for erratum 687067.
+>>
+>> OK
+>>
+>>> Adding the full set of BTB invalidates while making sure IBE is
+>>> disabled on sufficiently recent Cortex-A8 revisions would be optimal
+>>> for the Cortex-A8. But, apparently (based on the description of the
+>>> ARMv7 CPUID registers) there are also processors which only require
+>>> BTB invalidates when code is modified, but not when context-switching,
+>>> so there may be performance considerations there...
+>>
+>> Attempting to summarize all that's been discussed.. It sounds like we
+>> need the following implemented:
+>>
+>> 1. For cortex-a8 revisions affected by 458693, we can do a custom
+>>     cpu_v7_switch_mm function that always does flush BTAC/BTB.
+>>
+>> 2. For HS cortex-a8 processors other than n900 affected by 458693,
+>>     we need to implement functions similar to rx51_secure_update_aux_cr,
+>>     the bootrom on n900 is different from TI HS omaps so the SMC call
+>>     numbering may be different.
+>>
+>> 3. For later cortex-a8 processors not affected by 458693, we need
+>>     to clear IBE bit to avoid erratum 687067.
+>
+> Oops sorry, wrong numbers for errata above.. s/458693/430973/, here's
+> a better version:
+>
+> 1. For cortex-a8 revisions affected by 430973, we can do a custom
+>     cpu_v7_switch_mm function that always does flush BTAC/BTB.
+>
 
-> [...]
-> +struct poodle_bat {
-> +	int status;
-> +	struct power_supply psy;
-> +
-> +	struct mutex work_lock; /* protects data */
-> +
-> +	bool (*is_present)(struct poodle_bat *bat);
-> +	int technology;
+Why custom function, if IBE bit is zero, BTB invalidate instruction is a 
+NOP. Do you think that "mcr p15, 0, r2, c7, c5, 6" executed as a NOP 
+will put so much overhead, that it deserves a custom function?
 
-why do you need this for a static type? You can simply set the type
-directly in the get_property function?
+> 2. For HS cortex-a8 processors other than n900 affected by 430973,
+>     we need to implement functions similar to rx51_secure_update_aux_cr,
+>     the bootrom on n900 is different from TI HS omaps so the SMC call
+>     numbering may be different.
+>
+> 3. For later cortex-a8 processors not affected by 430973, we need
+>     to clear IBE bit to avoid erratum 687067.
+>
 
-> +};
+Maybe it should be implemented something like:
 
-> [...]
+1. if Cortex-A8, always execute invalidate BTB instruction in
+    cpu_v7_switch_mm
 
-> +static struct gpio poodle_batt_gpios[] = {
-> +	{ POODLE_GPIO_BAT_COVER,    GPIOF_IN,		"main battery cover" },
-> +	{ POODLE_GPIO_CHRG_FULL,    GPIOF_IN,		"main battery full" },
-> +	{ POODLE_GPIO_JK_B,	    GPIOF_OUT_INIT_LOW,	"main charge on" },
-> +	{ POODLE_GPIO_CHRG_ON,	    GPIOF_OUT_INIT_LOW,	"main charge on" },
-> +	{ POODLE_GPIO_BYPASS_ON,    GPIOF_OUT_INIT_LOW,	"main charge bypass" },
-> +	/* on for now */
-> +	{ POODLE_GPIO_ADC_TEMP_ON,  GPIOF_OUT_INIT_HIGH, "main battery temp" },
-> +};
+2. For Cortex-A8 revisions affected by 430973, set IBE bit to 1, set it
+    to 0 for all others. That should happen as soon as possible,
+    otherwise kernel may crash on affected revisions if thumb-
+    compiled.
 
-I would prefer if you use the "new" gpiod interface, see
-include/linux/gpio/consumer.h
+> Regards,
+>
+> Tony
+>
 
-This obviously refers to the whole driver.
+Regards,
 
-> [...]
-
-> +static int poodle_battery_probe(struct platform_device *dev)
-> +{
-> +	int ret;
-> +
-> +	ret = gpio_request_array(poodle_batt_gpios,
-> +				 ARRAY_SIZE(poodle_batt_gpios));
-> +	if (ret)
-> +		return ret;
-> +
-> +	mutex_init(&poodle_bat_main.work_lock);
-> +
-> +	INIT_WORK(&bat_work, poodle_bat_work);
-> +
-> +	ret = power_supply_register(&dev->dev, &poodle_bat_main.psy);
-> +	if (ret)
-> +		goto err_psy_reg_main;
-
-we have devm_power_supply_register() now.
-
-> +	ret = devm_request_irq(&dev->dev, gpio_to_irq(POODLE_GPIO_CHRG_FULL),
-> +				poodle_bat_gpio_isr,
-> +				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-> +				"main full", NULL);
-> +	if (ret)
-> +		goto err_psy_irq;
-> +
-> +	ret = devm_request_irq(&dev->dev, gpio_to_irq(POODLE_GPIO_BAT_COVER),
-> +				poodle_bat_gpio_isr,
-> +				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-> +				"battery cover", NULL);
-> +	if (ret)
-> +		goto err_psy_irq;
-> +
-> +	return 0;
-> +
-> +err_psy_irq:
-> +	power_supply_unregister(&poodle_bat_main.psy);
-> +
-> +	cancel_work_sync(&bat_work);
-> +err_psy_reg_main:
-> +	gpio_free_array(poodle_batt_gpios, ARRAY_SIZE(poodle_batt_gpios));
-> +
-> +	return ret;
-> +}
-
-> [...]
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/9d42b504/attachment.sig>
+Ivo
