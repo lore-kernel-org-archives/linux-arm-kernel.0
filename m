@@ -1,84 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 6 Apr 2015 14:46:47 +0000
-Subject: irqchip heirarchy DT "break" series awareness?
-Message-ID: <20150406144647.GC7873@io.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 6 Apr 2015 16:01:27 +0100
+Subject: LDP: next-20150402: twl4030 regression?
+In-Reply-To: <20150406135829.GH4027@n2100.arm.linux.org.uk>
+References: <5522886D.5050409@ti.com> <20150406134541.GE6023@sirena.org.uk>
+ <55228FE0.2040702@ti.com>
+ <20150406135829.GH4027@n2100.arm.linux.org.uk>
+Message-ID: <20150406150127.GF6023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, others,
+On Mon, Apr 06, 2015 at 02:58:29PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Apr 06, 2015 at 08:53:36AM -0500, Nishanth Menon wrote:
 
-Have you been following Marc's irqchip series(es) leveraging stacked
-domains to remove the abuse of gic_arch_extn ?
+> > > at least a description of the problem you're seeing and some attempt at
 
-  Tegra LIC
-  https://lkml.kernel.org/r/1426088583-15097-1-git-send-email-marc.zyngier at arm.com
+> > Test was a simple boot test. There seems to be a lockdep reported at the
+> > very least in the log provided (see
+> > https://github.com/nmenon/kernel-test-logs/blob/next-20150402/omap2plus_defconfig/ldp.txt#L488
+> > ).
 
-  OMAP Crossbar
-  https://lkml.kernel.org/r/1426088629-15377-1-git-send-email-marc.zyngier at arm.com
+> I think what Mark is trying to say is to include a fuller description of
+> the problem, and don't expect people to fire up their web browser to get
+> a basic overview of what the problem is.
 
-  Exynos PM
-  https://lkml.kernel.org/r/1426088693-15724-1-git-send-email-marc.zyngier at arm.com
+Yes, indeed.  I hadn't actually opened the links, I might've got round
+to it later on.
 
-  shmobile, ux500, zynq irq_set_wake
-  https://lkml.kernel.org/r/1426088737-15817-1-git-send-email-marc.zyngier at arm.com
+> My guess is that the problem _appears_ to be that someone's added a call
+> to debug_check_no_locks_held() into schedule_hrtimeout_range_clock()
+> without considering what this means.
 
-  imx6 was taken by Shawn
-  https://lkml.kernel.org/r/1426262737-32762-1-git-send-email-marc.zyngier at arm.com
+> What it means is that you can't now use usleep_range() from within any
+> driver probe function - which is absolutely absurd.
 
-You can find the patches in one series per branch at:
-
-  git://git.infradead.org/users/jcooper/linux.git irqchip/stacked-tegra
-  git://git.infradead.org/users/jcooper/linux.git irqchip/stacked-omap
-  git://git.infradead.org/users/jcooper/linux.git irqchip/stacked-exynos
-  git://git.infradead.org/users/jcooper/linux.git irqchip/stacked-irq_set_wake
-
-I ask because with Thomas' (tglx) absence, it looks like I'm going to be
-sending the pull request directly to Linus.  This has increased my
-pucker factor a bit. :-)
-
-The logistical stuff is in order.  It'll be my second pull request, and
-it'll only contain the changes relevant.  The whole set has gone through
-several rounds of review.  All the arm sub-arch maintainers have either
-taken the part relevant to them, Acked me taking them, or failed to
-object while they've been in linux-next for several weeks now.
-
-My concern is the DT ABI stability problem.  In short, we fucked up.
-When we added several of the irqchip bindings, we designed them based on
-the Linux implementation (gic_arch_extn).  *Not* by describing the
-hardware.
-
-Marc's series undoes this in the best way possible.  He changes the DT
-bindings to actually describe the hardware, which then gets modeled in
-stacked domains quite well.
-
-This causes two problems:
-
- 1) Upgrade kernel, but not DTB.
-
-	System will boot, and print a big fat warning that
-	suspend/resume will not work until the DTB is upgraded.
-
- 2) Upgrade DTB, but not kernel.
-
-	System will fail to boot.
-
-In light of Thomas Petazonni's well-researched talk at ELC:
-
-  "The Device Tree as a stable ABI: a fairy tale?"
-  http://events.linuxfoundation.org/sites/events/files/slides/petazzoni-dt-as-stable-abi-fairy-tale.pdf
-
-I'm confident that #2 won't be an issue.  Distro's and OEMs seem to have
-worked around the instability by keeping the dtb tied to the kernel
-version.
-
-And, on the off chance that end users upgrade their kernel, say, by
-building mainline, there's a very clear warning that tells them exactly
-what to do:  Upgrade the dtb as well.
-
-Do you foresee any problem with this?  Is there anything I haven't
-considered?  Or extra information I'll need to present in my pull
-request?
-
-thx,
-
-Jason.
+I can't think of any regulator side changes which might be relevant in
+that period.  It's possible that there might be something in the MFD I
+guess.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/12c26bd7/attachment.sig>
