@@ -1,45 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Apr 2015 14:58:29 +0100
-Subject: LDP: next-20150402: twl4030 regression?
-In-Reply-To: <55228FE0.2040702@ti.com>
-References: <5522886D.5050409@ti.com> <20150406134541.GE6023@sirena.org.uk>
- <55228FE0.2040702@ti.com>
-Message-ID: <20150406135829.GH4027@n2100.arm.linux.org.uk>
+From: mporter@konsulko.com (Matt Porter)
+Date: Mon, 6 Apr 2015 10:03:55 -0400
+Subject: [PATCH v2 1/2] dt-bindings: Document the hi6220 thermal sensor
+ bindings
+In-Reply-To: <1427785162-15172-2-git-send-email-kong.kongxinwei@hisilicon.com>
+References: <1427785162-15172-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <1427785162-15172-2-git-send-email-kong.kongxinwei@hisilicon.com>
+Message-ID: <20150406140355.GI30984@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 08:53:36AM -0500, Nishanth Menon wrote:
-> On 04/06/2015 08:45 AM, Mark Brown wrote:
-> > On Mon, Apr 06, 2015 at 08:21:49AM -0500, Nishanth Menon wrote:
-> > 
-> >> https://github.com/nmenon/kernel-test-logs/blob/next-20150401/omap2plus_defconfig/ldp.txt
-> >> looks clean, but
-> > 
-> >> https://github.com/nmenon/kernel-test-logs/blob/next-20150402/omap2plus_defconfig/ldp.txt#L488
-> >> seems to have picked up a regression in the regulator driver.
-> > 
-> > Please provide actual bug reports if you're trying to report something -
+On Tue, Mar 31, 2015 at 02:59:21PM +0800, Xinwei Kong wrote:
+> From: kongxinwei <kong.kongxinwei@hisilicon.com>
 > 
-> Apologies, I should have been a little more clear.
+> This adds documentation of device tree bindings for the
+> thermal sensor controller of hi6220 SoC.
 > 
-> > at least a description of the problem you're seeing and some attempt at
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
+> ---
+>  .../bindings/thermal/hisilicon-thermal.txt         | 45 ++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
 > 
-> Test was a simple boot test. There seems to be a lockdep reported at the
-> very least in the log provided (see
-> https://github.com/nmenon/kernel-test-logs/blob/next-20150402/omap2plus_defconfig/ldp.txt#L488
-> ).
+> diff --git a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+> new file mode 100644
+> index 0000000..ceb6e2e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+> @@ -0,0 +1,45 @@
+> +* Hisilicon Thermal
+> +
+> +This driver is for hi6220 SoC which contain 4 thermal sensor.
+> +
+> +	1. sensor 0: local sensor;
+> +	2. sensor 1: remote sensor for ACPU cluster 1;
+> +	3. sensor 2: remote sensor for ACPU cluster 2;
+> +	4. sensor 3: remote sensor for GPU.
+> +
+> +Every sensor use one child node to represent it, so thermal sensor include
+> +parent node and four child node. The parent node describe common feature and
+> +child node describe private feature for thermal sensor;
+> +
+> +** Required properties :
+> +
+> +- compatible: "hisilicon,tsensor".
+> +- reg: physical base address of thermal sensor and length of memory mapped
+> +  region.
+> +- interrupt: The interrupt number to the cpu. Defines the interrupt used
+> +  by SOCTHERM.
+> +- clock-names: Input clock name, should be 'thermal_clk'.
+> +- clocks: phandles for clock specified in "clock-names" property.
+> +- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
+> +
+> +** Required properties for child nodes :
+> +
+> +- hisilicon,tsensor-id: the index of thermal sensor and use it to distinguish
+> +  thermal sensor. For example: <0> stands for local sensor; <1> stands for
+> +  acpu1 sensor;
 
-I think what Mark is trying to say is to include a fuller description of
-the problem, and don't expect people to fire up their web browser to get
-a basic overview of what the problem is.
+Please show an example illustrating why this property is needed. The
+example below doesn't show any per sensor properties aside from the
+sensor id. Other bindings with a similar sub-sensor hardware design like
+tegra-soctherm and rockchip-thermal don't have a need for a vendor
+specific property like this. Their drivers simply iterate over an id
+index during thermal sensor registration.
 
-My guess is that the problem _appears_ to be that someone's added a call
-to debug_check_no_locks_held() into schedule_hrtimeout_range_clock()
-without considering what this means.
+-Matt
 
-What it means is that you can't now use usleep_range() from within any
-driver probe function - which is absolutely absurd.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> +
+> +Example :
+> +
+> +	tsensor: tsensor at 0,f7030700 {
+> +		compatible = "hisilicon,tsensor";
+> +		reg = <0x0 0xf7030700 0x0 0x1000>;
+> +		interrupts = <0 7 0x4>;
+> +		clocks = <&clock_sys HI6220_TSENSOR_CLK>;
+> +		clock-names = "thermal_clk";
+> +		#thermal-sensor-cells = <1>;
+> +
+> +		local_sensor {
+> +			hisilicon,tsensor-id = <0>;
+> +		}
+> +		.......
+> +	}
+> -- 
+> 1.9.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
