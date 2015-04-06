@@ -1,59 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Apr 2015 08:24:03 -0700
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150405133934.GC9186@earth>
-References: <20150330175051.GK10805@atomide.com> <20150331123233.GA15103@earth>
- <20150401194734.GT10805@atomide.com> <20150403163553.GA16247@earth>
- <551F0F50.1030701@gmail.com> <20150403221517.GX10805@atomide.com>
- <551F186B.90608@gmail.com> <20150403225212.GY10805@atomide.com>
- <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
- <20150405133934.GC9186@earth>
-Message-ID: <20150406152402.GH18048@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 6 Apr 2015 10:27:50 -0500
+Subject: LDP: next-20150402: twl4030 regression?
+In-Reply-To: <5522A391.6080503@ti.com>
+References: <5522886D.5050409@ti.com> <20150406134541.GE6023@sirena.org.uk>
+ <55228FE0.2040702@ti.com>
+ <20150406135829.GH4027@n2100.arm.linux.org.uk>
+ <20150406150127.GF6023@sirena.org.uk> <5522A391.6080503@ti.com>
+Message-ID: <20150406152750.GE11160@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@kernel.org> [150405 06:40]:
-> Hi,
+Hi,
+
+On Mon, Apr 06, 2015 at 10:17:37AM -0500, Nishanth Menon wrote:
+> On 04/06/2015 10:01 AM, Mark Brown wrote:
+> > On Mon, Apr 06, 2015 at 02:58:29PM +0100, Russell King - ARM Linux wrote:
+> >> On Mon, Apr 06, 2015 at 08:53:36AM -0500, Nishanth Menon wrote:
+> > 
+> >>>> at least a description of the problem you're seeing and some attempt at
+> > 
+> >>> Test was a simple boot test. There seems to be a lockdep reported at the
+> >>> very least in the log provided (see
+> >>> https://github.com/nmenon/kernel-test-logs/blob/next-20150402/omap2plus_defconfig/ldp.txt#L488
+> >>> ).
+> > 
+> >> I think what Mark is trying to say is to include a fuller description of
+> >> the problem, and don't expect people to fire up their web browser to get
+> >> a basic overview of what the problem is.
+> > 
+> > Yes, indeed.  I hadn't actually opened the links, I might've got round
+> > to it later on.
+> > 
+> >> My guess is that the problem _appears_ to be that someone's added a call
+> >> to debug_check_no_locks_held() into schedule_hrtimeout_range_clock()
+> >> without considering what this means.
+> > 
+> >> What it means is that you can't now use usleep_range() from within any
+> >> driver probe function - which is absolutely absurd.
+> > 
+> > I can't think of any regulator side changes which might be relevant in
+> > that period.  It's possible that there might be something in the MFD I
+> > guess.
+> > 
 > 
-> On Sun, Apr 05, 2015 at 06:13:47AM +0200, Matthijs van Duin wrote:
-> > On 4 April 2015 at 00:52, Tony Lindgren <tony@atomide.com> wrote:
-> > > Right, it affects n900 for sure. My point is that it also seems to
-> > > affect 37xx versions not listed to suffer from this issue.
-> > 
-> > They shouldn't... erratum 430973 only affected Cortex-A8 r1, and the
-> > dm37xx should have an r3p2 right?
-> > 
-> > A word of caution though: at least on the DM814x and AM335x, secure
-> > ROM sets bit 6 (IBE) in the Auxiliary Control Register, thereby
-> > enabling BTB invalidate instructions (which normally execute as nops).
-> > This is presumably a leftover of the erratum 430973 workaround, but it
-> > means there is a risk of running afoul of erratum 687067 if BTB
-> > invalidate by MVA instructions are actually used.
-> > 
-> > I would actually suggest clearing IBE if it set on Cortex-A8 r2 or
-> > later processors and a secure monitor call is available to do so
-> > (there is on the DM814x and AM335x, dunno about the 37xx), also for
-> > performance reasons: BTB invalidates are quite expensive instructions
-> > (when enabled).
+> Ran a few tests since my original email..
 > 
-> So if I understand the issue correct, it would be ok to enable the
-> 430973 workaround in cpu_v7_switch_mm for arm multiplatform kernels
-> (mcr p15, 0, r2, c7, c5, 6 @ flush BTAC/BTB). On unaffected
-> Cortex-A8 platforms the IBE bit should be unset (resulting in a nop
-> instead of the BTB flush).
+> 6261b06de565baafa590e58a531a1a5522cea0b6 ("regulator: Defer lookup of
+> supply to regulator_get") was the only patch that was introduced in
+> the interval. there seems nothing in mfd either.
+> 
+> I still have the following in my log.. trying to further down.
 
-Well we only want to enable for cortex-a8 revisions affected by
-430973, so a custom cpu_v7_switch_mm seems like the way to go there.
+I noticed a similar warning with AM437x SK
 
-And then we need checks for clearing IBE for unaffected cortex-a8
-revisions. I'll check to today if I have IBE bit set on the systems
-where I'm seeing issues that should not be affected by 430973.
- 
-> So assuming, that the same is true for non Cortex-A8 platforms: Can
-> the workaround simply be enabled by default if CPU_V7 is selected?
-
-It should be enabled conditionally.
-
-Regards,
-
-Tony
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/47f7341e/attachment.sig>
