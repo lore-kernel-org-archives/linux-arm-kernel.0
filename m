@@ -1,94 +1,92 @@
-From: mporter@konsulko.com (Matt Porter)
-Date: Mon, 6 Apr 2015 10:03:55 -0400
-Subject: [PATCH v2 1/2] dt-bindings: Document the hi6220 thermal sensor
- bindings
-In-Reply-To: <1427785162-15172-2-git-send-email-kong.kongxinwei@hisilicon.com>
-References: <1427785162-15172-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1427785162-15172-2-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <20150406140355.GI30984@beef>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 6 Apr 2015 09:11:05 -0500
+Subject: [PATCH v4 05/10] eeprom: Add bindings for simple eeprom framework
+In-Reply-To: <20150406133208.GH30984@beef>
+References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427752679-17261-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150406133208.GH30984@beef>
+Message-ID: <CAL_Jsq++9pyJMLXssgyz2WRU4e7ikT_6FwzWMo1fKS82FJvEyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 02:59:21PM +0800, Xinwei Kong wrote:
-> From: kongxinwei <kong.kongxinwei@hisilicon.com>
-> 
-> This adds documentation of device tree bindings for the
-> thermal sensor controller of hi6220 SoC.
-> 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
-> ---
->  .../bindings/thermal/hisilicon-thermal.txt         | 45 ++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-> new file mode 100644
-> index 0000000..ceb6e2e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-> @@ -0,0 +1,45 @@
-> +* Hisilicon Thermal
-> +
-> +This driver is for hi6220 SoC which contain 4 thermal sensor.
-> +
-> +	1. sensor 0: local sensor;
-> +	2. sensor 1: remote sensor for ACPU cluster 1;
-> +	3. sensor 2: remote sensor for ACPU cluster 2;
-> +	4. sensor 3: remote sensor for GPU.
-> +
-> +Every sensor use one child node to represent it, so thermal sensor include
-> +parent node and four child node. The parent node describe common feature and
-> +child node describe private feature for thermal sensor;
-> +
-> +** Required properties :
-> +
-> +- compatible: "hisilicon,tsensor".
-> +- reg: physical base address of thermal sensor and length of memory mapped
-> +  region.
-> +- interrupt: The interrupt number to the cpu. Defines the interrupt used
-> +  by SOCTHERM.
-> +- clock-names: Input clock name, should be 'thermal_clk'.
-> +- clocks: phandles for clock specified in "clock-names" property.
-> +- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
-> +
-> +** Required properties for child nodes :
-> +
-> +- hisilicon,tsensor-id: the index of thermal sensor and use it to distinguish
-> +  thermal sensor. For example: <0> stands for local sensor; <1> stands for
-> +  acpu1 sensor;
+On Mon, Apr 6, 2015 at 8:32 AM, Matt Porter <mporter@konsulko.com> wrote:
+> On Mon, Mar 30, 2015 at 10:57:59PM +0100, Srinivas Kandagatla wrote:
+>> This patch adds bindings for simple eeprom framework which allows eeprom
+>> consumers to talk to eeprom providers to get access to eeprom cell data.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> [Maxime Ripard: intial version of eeprom framework]
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>  .../devicetree/bindings/eeprom/eeprom.txt          | 58 ++++++++++++++++++++++
+>>  1 file changed, 58 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/eeprom/eeprom.txt b/Documentation/devicetree/bindings/eeprom/eeprom.txt
+>> new file mode 100644
+>> index 0000000..fb71d46
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/eeprom/eeprom.txt
+>> @@ -0,0 +1,58 @@
+>> += EEPROM Data Device Tree Bindings =
+>> +
+>> +This binding is intended to represent the location of hardware
+>> +configuration data stored in EEPROMs.
+>> +
+>> +On a significant proportion of boards, the manufacturer has stored
+>> +some data on an EEPROM-like device, for the OS to be able to retrieve
+>> +these information and act upon it. Obviously, the OS has to know
+>> +about where to retrieve these data from, and where they are stored on
+>> +the storage device.
+>
+> Since this binding (and the kernel framework supporting it) describes
+> non-volatile memory devices other than EEPROMs (e.g. EFuses) it should
+> be named more generically like "nvmem".
+>
+>> +
+>> +This document is here to document this.
+>> +
+>> += Data providers =
+>> +Contains bindings specific to provider drivers and data cells as children
+>> +to this node.
+>> +
+>> += Data cells =
+>> +These are the child nodes of the provider which contain data cell
+>> +information like offset and size in eeprom provider.
+>> +
+>> +Required properties:
+>> +reg: specifies the offset in byte within that storage device, and the length
+>> +     in bytes of the data we care about.
+>> +     There could be more then one offset-length pairs in this property.
+>> +
+>> +Optional properties:
+>> +As required by specific data parsers/interpreters.
+>
+> The generic binding could really use a "read-only" property here as this
+> is a common hardware attribute for many nvmem devices. A serial EEPROM
+> commonly has a write protect pin which may be hard-wired such that the
+> hardware description should reflect that. An EFuse is typically blown with
+> the required information at manufacturing time (for an end product case)
+> and would be marked with the "read-only" flag.
+>
+> Having this optional flag in the generic binding would allow the
+> framework to hint to consumers about the inability to write to the
+> provided region.
 
-Please show an example illustrating why this property is needed. The
-example below doesn't show any per sensor properties aside from the
-sensor id. Other bindings with a similar sub-sensor hardware design like
-tegra-soctherm and rockchip-thermal don't have a need for a vendor
-specific property like this. Their drivers simply iterate over an id
-index during thermal sensor registration.
+This could get fairly complex if you wanted to describe grouping of WP
+regions which could have different layout than the fields here. This
+may be better left as a device property listing addr & size pairs.
+However, there is the notion of s/w "read-only" which means the OS
+should not allow write access. The MTD partition binding supports this
+with the "read-only" property.
 
--Matt
+> The framework sysfs attributes provide a userspace EEPROM consumer where
+> it would be useful information to know that a data provider region is
+> read only rather than having the exported writeable attribute simply
+> fail a write cycle. This would allow the consumer to be aware that a
+> failed write (if even attempted) is expected if the data provider
+> advertised itself as read-only.
 
-> +
-> +Example :
-> +
-> +	tsensor: tsensor at 0,f7030700 {
-> +		compatible = "hisilicon,tsensor";
-> +		reg = <0x0 0xf7030700 0x0 0x1000>;
-> +		interrupts = <0 7 0x4>;
-> +		clocks = <&clock_sys HI6220_TSENSOR_CLK>;
-> +		clock-names = "thermal_clk";
-> +		#thermal-sensor-cells = <1>;
-> +
-> +		local_sensor {
-> +			hisilicon,tsensor-id = <0>;
-> +		}
-> +		.......
-> +	}
-> -- 
-> 1.9.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+You could distinguish with RW versus RO file attributes.
+
+Rob
