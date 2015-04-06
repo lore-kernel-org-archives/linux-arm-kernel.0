@@ -1,61 +1,63 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Mon, 06 Apr 2015 15:49:02 +0900
-Subject: [GIT PULL 2/5] Samsung defconfig udpates for v4.1
-In-Reply-To: <CABxcv=kHPaJE4WGUHsgBPnFpT4aYqiodHVnTn+AccUhu3Te-Jw@mail.gmail.com>
-References: <551C35F6.1090602@kernel.org>
- <CABxcv=kHPaJE4WGUHsgBPnFpT4aYqiodHVnTn+AccUhu3Te-Jw@mail.gmail.com>
-Message-ID: <023d01d07035$c499b650$4dcd22f0$@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 6 Apr 2015 09:29:43 +0200
+Subject: [PATCH] crypto/arm: accelerated SHA-512 using ARM generic ASM and
+ NEON
+In-Reply-To: <55180706.9030104@openssl.org>
+References: <1427527726-25022-1-git-send-email-ard.biesheuvel@linaro.org>
+ <55180706.9030104@openssl.org>
+Message-ID: <CAKv+Gu-AOg6Wd1o_1_=ic8rhADKv7CpgSvWLHNy2C=1qm7xwiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
-> 
-> Hello Kukjin,
-> 
-Hi,
+On 29 March 2015 at 16:07, Andy Polyakov <appro@openssl.org> wrote:
+>> This updates the SHA-512 NEON module with the faster and more
+>> versatile implementation from the OpenSSL project. It consists
+>> of both a NEON and a generic ASM version of the core SHA-512
+>> transform, where the NEON version reverts to the ASM version
+>> when invoked in non-process context.
+>>
+>> Performance relative to the generic implementation (measured
+>> using tcrypt.ko mode=306 sec=1 running on a Cortex-A57 under
+>> KVM):
+>>
+>>       input size      block size      asm     neon    old neon
+>>
+>>       8192            8192            1.51    3.51    2.69
+>
+> One should keep in mind that improvement coefficients vary greatly from
+> platform to platform. Normally you *should* observe higher coefficients
+> in asm column and *can* observe smaller differences between "neon" and
+> "old neon". BTW, 1.51 is unexpectedly low, I wonder which compiler
+> version stands for 1.0?
 
-> On Wed, Apr 1, 2015 at 8:16 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> > The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> >
-> >   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/samsung-defconfig
-> >
-> > for you to fetch changes up to bb84296ae52da844c9cab81e0197152a69f2f841:
-> >
-> >   ARM: exynos_defconfig: Enable HDMI support (2015-03-27 02:00:09 +0900)
-> >
-> > ----------------------------------------------------------------
-> > Samsung defconfig updates for v4.1
-> >
-> > - update exynos-defconfig
-> >   : enable HDMI, CPUidle, ChromeOS EC chardev driver
-> >     and thermal emulation, Marvell WiFi-Ex, CPUfreq,
-> >     and support for NFS rootfs
-> >   : remove EXYNOS_THERMAL_CORE define
-> >     and disable IOMMU support until support it
-> >
-> > ----------------------------------------------------------------
-> > Javier Martinez Canillas (5):
-> >       ARM: exynos_defconfig: Disable IOMMU support
-> 
-> As I mentioned before, this also is needed for 4.0-rc to have display
-> working on at least Exynos5420 Peach Pit and Exynos5800 Peach Pi
-> Chromebooks but I saw that it is not included in your "Samsung 2nd
-> fixes for v4.0" git pull [0].
-> 
-Yeah, you're right. The 'disabling IOMMU' should be queued for 4.0-rc but I've
-missed. Sorry about that. As you know, the branch has been queued for 4.1
-already so if we send it even the one patch for 4.0-rc, it will cause conflict.
+This was Linaro GCC 4.9
 
-So I think would be better if we could send it to stable after 4.1-rc1? If you
-agree, I'll.
+> Nor can I replicate difference between "neon"
+> and "old neon", I get smaller difference, 17%, on Cortex-A57. Well, I'm
+> comparing in user-land, but it shouldn't be that significant at large
+> blocks...
+>
 
-> Maybe it can be sent directly to arm at kernel.org?
-> 
-I don't think so because of above reason...
+That is a bit surprising, indeed. The primary difference is that this
+executes under a 32-bit kernel, whereas your testing uses 32-bit
+OpenSSL under a 64-bit kernel in 32-bit compatibility mode. I can't
+really explain how that should make a difference at all, but it's
+worth to be noted.
 
-- Kukjin
+
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>
+>> This should get the same treatment as Sami's sha56 version: I would like
+>> to wait until the OpenSSL source file hits the upstream repository so that
+>> I can refer to its sha1 hash in the commit log.
+>
+> Update is committed as
+> http://git.openssl.org/gitweb/?p=openssl.git;a=commitdiff;h=b1a5d1c652086257930a1f62ae51c9cdee654b2c.
+> Note that the file I've initially sent privately was a little bit off.
+> Sorry about that. But that little bit is just a commentary update that
+> adds performance result for Cortex-A15. So that kernel patch as
+> originally posted is 100% functionally equivalent.
+>
+
+Thanks.
