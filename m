@@ -1,150 +1,164 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 06 Apr 2015 15:37:37 -0700
-Subject: [PATCH v2 07/17] soc: tegra: pmc: Add generic PM domain support
-In-Reply-To: <1426162518-7405-8-git-send-email-vinceh@nvidia.com> (Vince Hsu's
- message of "Thu, 12 Mar 2015 20:15:08 +0800")
-References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
- <1426162518-7405-8-git-send-email-vinceh@nvidia.com>
-Message-ID: <7h1tjwx4r2.fsf@deeprootsystems.com>
+From: dja@axtens.net (Daniel Axtens)
+Date: Tue, 07 Apr 2015 09:35:34 +1000
+Subject: [PATCH v9 19/30] powerpc/pci: Use pci_scan_host_bridge() for
+ simplicity
+In-Reply-To: <1428053164-28277-21-git-send-email-wangyijing@huawei.com>
+References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
+ <1428053164-28277-21-git-send-email-wangyijing@huawei.com>
+Message-ID: <1428363334.22268.9.camel@axtens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vince,
+I've been looking at this patch series for a while now, and I now
+believe it's ready on the PowerPC side.
 
-Vince Hsu <vinceh@nvidia.com> writes:
+I was originally concerned that it would break odd corner cases,
+particularly where similar code appears (namely kernel/pci_hotplug.c and
+kernel/pci_of_scan.c). However, upon further examination, talking with
+Yijing, and some testing, I'm now convinced that it is indeed restricted
+to the generic code, and doesn't change behaviour.
 
-> From: Thierry Reding <treding@nvidia.com>
->
-> The PM domains are populated from DT, and the PM domain consumer devices are
-> also bound to their relevant PM domains by DT.
->
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> [vinceh: make changes based on Thierry and Peter's suggestions]
-> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
+This is both a plus and a minus: because it's currently restricted to
+generic code, I'm confident it works, but the down side is that it
+doesn't yet simplify our arch-specific complexity. We'll need to do some
+more work on our side to reap the full benefits.
+
+I tested this entire series on a PowerNV machine, including doing EEH
+injection to trigger PCI hotplug:
+Tested-by: Daniel Axtens <dja@axtens.net>
+For completeness, it would be good to test it on Cell, as they are the
+only remaining user of pci_of_scan.c
+
+In conclusion, this patch is
+Reviewed-by: Daniel Axtens <dja@axtens.net>
+
+Regards,
+Daniel Axtens
+
+
+On Fri, 2015-04-03 at 17:25 +0800, Yijing Wang wrote:
+> Now we could use pci_scan_host_bridge() to scan
+> pci buses, provide powerpc specific pci_host_bridge_ops.
+> 
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> CC: linuxppc-dev at lists.ozlabs.org
 > ---
-> v2: revise comment in tegra_powergate_remove_clamping()
->     address Alex's comments
-
-Sorry for the late review..., somehow I just noticed this while
-reviewing some other PM domain support.
-
-It's nice to see this migrating to PM domains.  Some comments below...
-
-[...]
-
->  /**
->   * struct tegra_pmc - NVIDIA Tegra PMC
-> + * @dev: pointer to parent device
->   * @base: pointer to I/O remapped register region
->   * @clk: pointer to pclk clock
-> + * @soc: SoC-specific data
->   * @rate: currently configured rate of pclk
->   * @suspend_mode: lowest suspend mode available
->   * @cpu_good_time: CPU power good time (in microseconds)
-> @@ -126,7 +158,9 @@ struct tegra_pmc_soc {
->   * @cpu_pwr_good_en: CPU power good signal is enabled
->   * @lp0_vec_phys: physical base address of the LP0 warm boot code
->   * @lp0_vec_size: size of the LP0 warm boot code
-> + * @powergates: list of power gates
->   * @powergates_lock: mutex for power gate register access
-> + * @nb: bus notifier for generic power domains
+>  arch/powerpc/kernel/pci-common.c |   62 +++++++++++++++++++++++--------------
+>  1 files changed, 38 insertions(+), 24 deletions(-)
+> 
+> diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+> index 2c58200..50b32f6 100644
+> --- a/arch/powerpc/kernel/pci-common.c
+> +++ b/arch/powerpc/kernel/pci-common.c
+> @@ -773,6 +773,29 @@ void pcibios_set_root_bus_speed(struct pci_host_bridge *bridge)
+>  		return ppc_md.pcibios_set_root_bus_speed(bridge);
+>  }
+>  
+> +static int pci_host_scan_bus(struct pci_host_bridge *host)
+> +{
+> +	int mode = PCI_PROBE_NORMAL;
+> +	struct pci_bus *bus = host->bus;
+> +	struct pci_controller *hose = dev_get_drvdata(&host->dev);
+> +
+> +	/* Get probe mode and perform scan */
+> +	if (hose->dn && ppc_md.pci_probe_mode)
+> +		mode = ppc_md.pci_probe_mode(bus);
+> +
+> +	pr_debug("    probe mode: %d\n", mode);
+> +	if (mode == PCI_PROBE_DEVTREE)
+> +		of_scan_bus(hose->dn, bus);
+> +
+> +	if (mode == PCI_PROBE_NORMAL) {
+> +		pci_bus_update_busn_res_end(bus, 255);
+> +		hose->last_busno = pci_scan_child_bus(bus);
+> +		pci_bus_update_busn_res_end(bus, hose->last_busno);
+> +	}
+> +
+> +	return pci_bus_child_max_busnr(bus);
+> +}
+> +
+>  /* This header fixup will do the resource fixup for all devices as they are
+>   * probed, but not for bridge ranges
 >   */
->  struct tegra_pmc {
->  	struct device *dev;
-> @@ -150,7 +184,12 @@ struct tegra_pmc {
->  	u32 lp0_vec_phys;
->  	u32 lp0_vec_size;
+> @@ -1585,6 +1608,11 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+>  	return of_node_get(hose->dn);
+>  }
 >  
-> +	struct tegra_powergate *powergates;
->  	struct mutex powergates_lock;
-> +	struct notifier_block nb;
-
-I don't see these notifiers used anywhere in this series.  What is the
-intended use here?   There have been some other discussions about how to
-do this more generically for  PM domains[1], so I'd prefer not to see this
-in SoC specific PM domains.  In this case, it appears unused, so should
-be fine to drop (for now.)
-
-[...]
-
-> +static int tegra_pmc_powergate_power_off(struct generic_pm_domain *domain)
-> +{
-> +	struct tegra_powergate *powergate = to_powergate(domain);
-> +	struct tegra_pmc *pmc = powergate->pmc;
-> +	int err;
+> +static struct pci_host_bridge_ops pci_host_ops = {
+> +	.set_root_bus_speed = pcibios_set_root_bus_speed,
+> +	.scan_bus = pci_host_scan_bus,
+> +};
 > +
-> +	dev_dbg(pmc->dev, "> %s(domain=%p)\n", __func__, domain);
-> +	dev_dbg(pmc->dev, "  name: %s\n", domain->name);
-> +
-> +	/* never turn off these partitions */
-> +	switch (powergate->id) {
-> +	case TEGRA_POWERGATE_CPU:
-> +	case TEGRA_POWERGATE_CPU1:
-> +	case TEGRA_POWERGATE_CPU2:
-> +	case TEGRA_POWERGATE_CPU3:
-> +	case TEGRA_POWERGATE_CPU0:
-> +	case TEGRA_POWERGATE_C0NC:
-> +	case TEGRA_POWERGATE_IRAM:
-> +		dev_dbg(pmc->dev, "not disabling always-on partition %s\n",
-> +			domain->name);
-> +		err = -EINVAL;
-> +		goto out;
-> +	}
-
-You're re-inventing the per-device QoS flag: PM_QOS_FLAG_NO_POWER_OFF
-which could be used here to prevent ->power_off from ever being called.
-
-Alternately, if this really a static configuraion, why even register the
-->power_off hook for these domains in the first place?
-
-[...]
-
-> +static int tegra_pmc_powergate_init_subdomain(struct tegra_pmc *pmc)
-> +{
-> +	struct tegra_powergate *powergate;
-> +
-> +	list_for_each_entry(powergate, &pmc->powergate_list, head) {
-> +		struct device_node *pdn;
-> +		struct tegra_powergate *parent = NULL;
-> +		struct tegra_powergate *temp;
-> +		int err;
-> +
-> +		pdn = of_parse_phandle(powergate->of_node, "depend-on", 0);
-> +		if (!pdn)
-> +			continue;
-
-I'm not really following the need for the "depend-on" property here.
-
-Looking at the example .dtsi files in this series, it seems to me what
-is being described is nested hardware power domains, which genpd already
-supports.  Any reason you're not using that build-in support?
-
-[...]
-
-> @@ -831,12 +1405,19 @@ static int tegra_pmc_probe(struct platform_device *pdev)
+>  /**
+>   * pci_scan_phb - Given a pci_controller, setup and scan the PCI bus
+>   * @hose: Pointer to the PCI host controller instance structure
+> @@ -1592,9 +1620,8 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+>  void pcibios_scan_phb(struct pci_controller *hose)
+>  {
+>  	LIST_HEAD(resources);
+> -	struct pci_bus *bus;
+> +	struct pci_host_bridge *host;
+>  	struct device_node *node = hose->dn;
+> -	int mode;
 >  
->  	tegra_pmc_init_tsense_reset(pmc);
+>  	pr_debug("PCI: Scanning PHB %s\n", of_node_full_name(node));
 >  
-> +	if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
-> +		err = tegra_powergate_init(pmc);
-> +		if (err < 0)
-> +			return err;
-> +	}
-
-On many SoCs there's some special handling for the !CONFIG_PM case here
-such that all the PM domains are enabled by default in case they are not
-enabled by the bootloader.
-
->  	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
->  		err = tegra_powergate_debugfs_init();
->  		if (err < 0)
->  			return err;
+> @@ -1609,30 +1636,17 @@ void pcibios_scan_phb(struct pci_controller *hose)
+>  	hose->busn.flags = IORESOURCE_BUS;
+>  	pci_add_resource(&resources, &hose->busn);
+>  
+> +	pci_host_ops.pci_ops = hose->ops;
+>  	/* Create an empty bus for the toplevel */
+> -	bus = pci_create_root_bus(hose->parent, hose->global_number,
+> -			hose->first_busno, hose->ops, hose, &resources);
+> -	if (bus == NULL) {
+> -		pr_err("Failed to create bus for PCI domain %04x\n",
+> -			hose->global_number);
+> +	host = pci_scan_host_bridge(hose->parent, hose->global_number,
+> +			hose->first_busno, hose, &resources, &pci_host_ops);
+> +	if (host == NULL) {
+> +		pr_err("Failed to create host bridge for pci%04x:%02x\n",
+> +			hose->global_number, hose->first_busno);
+>  		pci_free_resource_list(&resources);
+>  		return;
 >  	}
+> -	hose->bus = bus;
+> -
+> -	/* Get probe mode and perform scan */
+> -	mode = PCI_PROBE_NORMAL;
+> -	if (node && ppc_md.pci_probe_mode)
+> -		mode = ppc_md.pci_probe_mode(bus);
+> -	pr_debug("    probe mode: %d\n", mode);
+> -	if (mode == PCI_PROBE_DEVTREE)
+> -		of_scan_bus(node, bus);
+> -
+> -	if (mode == PCI_PROBE_NORMAL) {
+> -		pci_bus_update_busn_res_end(bus, 255);
+> -		hose->last_busno = pci_scan_child_bus(bus);
+> -		pci_bus_update_busn_res_end(bus, hose->last_busno);
+> -	}
+> +	hose->bus = host->bus;
 >  
-> +	dev_dbg(&pdev->dev, "< %s()\n", __func__);
->  	return 0;
+>  	/* Platform gets a chance to do some global fixups before
+>  	 * we proceed to resource allocation
+> @@ -1641,9 +1655,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
+>  		ppc_md.pcibios_fixup_phb(hose);
+>  
+>  	/* Configure PCI Express settings */
+> -	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+> +	if (host->bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>  		struct pci_bus *child;
+> -		list_for_each_entry(child, &bus->children, node)
+> +		list_for_each_entry(child, &host->bus->children, node)
+>  			pcie_bus_configure_settings(child);
+>  	}
 >  }
 
-Kevin
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/299345.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 860 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/d367c4b8/attachment.sig>
