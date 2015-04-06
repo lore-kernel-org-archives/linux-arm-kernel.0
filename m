@@ -1,39 +1,23 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 05 Apr 2015 17:16:14 -0700
-Subject: [PATCH V2] tty: serial: Add const to struct uart_ops declarations
-In-Reply-To: <d55b1a1240db66ae651cb99cd713694a@agner.ch>
-References: <1428169665.2775.53.camel@perches.com>
- <a938a0e86638588e5ccff85771fa3b95@agner.ch>
- <1428258294.2775.69.camel@perches.com>
- <d55b1a1240db66ae651cb99cd713694a@agner.ch>
-Message-ID: <1428279374.2775.78.camel@perches.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 5 Apr 2015 21:21:50 -0300
+Subject: [PATCH] ARM: dts: hummingboard: Remove unneeded 'fsl,
+ mode' property
+In-Reply-To: <20150401162500.GD24899@n2100.arm.linux.org.uk>
+References: <1427889825-4349-1-git-send-email-festevam@gmail.com>
+ <20150401162500.GD24899@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5AXdVkybvWJ8PHp8wZMuRAScPxBBH9Zuca7z7PObhQk_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-04-06 at 01:09 +0200, Stefan Agner wrote:
-> On 2015-04-05 20:24, Joe Perches wrote:
-> > Still compiled only x86 and not cross-compiled or tested.
-> 
-> Cross-compiled with multi_v7_defconfig
-[]
-> >  drivers/tty/serial/fsl_lpuart.c             | 4 ++--
-> 
-> Tested that driver on actual hardware, looks fine.
+Hi Russell,
 
-> This driver seems to alter the startup function on initialization:
-> 
->   CC      drivers/video/of_display_timing.o
-> ../drivers/tty/serial/samsung.c: In function 's3c24xx_serial_init_port':
-> ../drivers/tty/serial/samsung.c:1702:3: error: assignment of member
-> 'startup' in read-only object
->    s3c24xx_serial_ops.startup = s3c64xx_serial_startup;
->    ^
+On Wed, Apr 1, 2015 at 1:25 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Thanks Stefan.  Then that one can't be const.
+> Has this been tested at all?
 
-> That is the only thing which popped up with multi_v7_defconfig.
+Yes, it works fine on my imx6q-hummingboard.
 
-I appreciate the testing.
+Regards,
 
-Greg, Jiri, I'll resend with this fixed in a week or so
-after waiting for any other comment or sign of brokenness.
+Fabio Estevam
