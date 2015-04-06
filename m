@@ -1,40 +1,27 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Sun, 05 Apr 2015 19:03:15 -0700
-Subject: [PATCH 14/16] soc: ti: knav_qmss_queue: fix error return code
-In-Reply-To: <1428235596-4757-15-git-send-email-Julia.Lawall@lip6.fr>
-References: <1428235596-4757-1-git-send-email-Julia.Lawall@lip6.fr>
- <1428235596-4757-15-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <5521E963.5080903@oracle.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 6 Apr 2015 11:20:48 +0530
+Subject: [PATCH 03/14] clkdev: get rid of redundant clk_add_alias()
+ prototype in linux/clk.h
+In-Reply-To: <E1Ye593-0001B1-W4@rmk-PC.arm.linux.org.uk>
+References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
+ <E1Ye593-0001B1-W4@rmk-PC.arm.linux.org.uk>
+Message-ID: <55221EB8.7080403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/5/15 5:06 AM, Julia Lawall wrote:
-> Return a negative error code on failure.
->
-> A simplified version of the semantic match that finds this problem is as
-> follows: (http://coccinelle.lip6.fr/)
->
-> // <smpl>
-> @@
-> identifier ret; expression e1,e2;
-> @@
-> (
-> if (\(ret < 0\|ret != 0\))
->   { ... return ret; }
-> |
-> ret = 0
-> )
-> ... when != ret = e1
->      when != &ret
-> *if(...)
-> {
->    ... when != ret = e2
->        when forall
->   return ret;
-> }
-> // </smpl>
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
->
+On Friday 03 April 2015 10:42 PM, Russell King wrote:
+> clk_add_alias() is provided by clkdev, and is not part of the clk API.
+> Howver, it is prototyped in two locations: linux/clkdev.h and
+> linux/clk.h.  This is a mess.  Get rid of the redundant and unnecessary
+> version in linux/clk.h.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+>  arch/arm/mach-davinci/da850.c        |  1 +
+
+For the DaVinci change:
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
