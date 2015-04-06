@@ -1,21 +1,35 @@
-From: mwp@mwp.id.au (Mark Williams)
-Date: Tue, 7 Apr 2015 01:25:33 +0930
-Subject: imx/mxs dcp memcpy access?
-Message-ID: <CA+OkyLRBAEgC6pBVP6Ay008eU05DW7jZzV=5af-EEyqx6NEa0g@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 6 Apr 2015 18:09:30 +0200
+Subject: [PATCH v3 4/5] i2c: davinci: use bus recovery infrastructure
+In-Reply-To: <55228613.2060607@linaro.org>
+References: <1417448047-15236-1-git-send-email-grygorii.strashko@ti.com>
+ <1417448047-15236-5-git-send-email-grygorii.strashko@ti.com>
+ <20150318203151.GA12072@katana> <550C67D6.3080909@linaro.org>
+ <20150403201846.GH2016@katana> <55228613.2060607@linaro.org>
+Message-ID: <20150406160930.GA937@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings all,
 
-First, my apologies is this isn't the correct place to be asking this.
+> >> Of course,  i2c_davinci_wait_bus_not_busy() has to be fixed first
+> >> as proposed by Alexander Sverdlin here:
+> >>   https://patchwork.ozlabs.org/patch/448994/.
+> > 
+> > Okay, good that you said it. So I'll give his patch series priority over
+> > this one.
+> 
+> 
+> Sorry, but this series already mises few merge windows and it has a lot
+> of revied-by and tested-by, so could we proceed please?
+> 
+> Re-based & re-sent http://www.spinics.net/lists/arm-kernel/msg410810.html
 
-I'm developing software running on a iMX28 SoC.
-At the moment large'ish memcpy's are using up a decent amount of processor time.
+??? Didn't you say above that Alexaders's patch is needed first?
 
-Ive noticed in the "i.MX28 Applications Processor Reference Manual"
-that the iMX28's DCP provides a memcpy function.
-It appears this is used in some way by the mxs crypto functions in the kernel.
-Is there any way i can gain access/use the dcp memcpy from userspace?
-
-Thanks in advance,
-Mark Williams.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/06916040/attachment.sig>
