@@ -1,69 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Apr 2015 11:13:09 +0100
-Subject: [PATCH v4 07/11] ARM: allow MULTIPLATFORM with !MMU
-In-Reply-To: <f2b85e294afb55fdca85a16e6ad6c13c@agner.ch>
-References: <20150403200931.GD13898@n2100.arm.linux.org.uk>
- <1f84d767d3bb8a8c470a26064cba454e@agner.ch>
- <20150405161014.GG13898@n2100.arm.linux.org.uk>
- <24394c50bcd8000c21aca0360fd20b6f@agner.ch>
- <20150405224455.GB12732@n2100.arm.linux.org.uk>
- <58bb3fd4f9e9b3acc7f8b83bd6664177@agner.ch>
- <20150406081523.GC12732@n2100.arm.linux.org.uk>
- <8737db3eea65563054df98c932870590@agner.ch>
- <20150406085443.GD12732@n2100.arm.linux.org.uk>
- <f2b85e294afb55fdca85a16e6ad6c13c@agner.ch>
-Message-ID: <20150406101309.GE12732@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 06 Apr 2015 11:23:14 +0100
+Subject: [PATCH/RFC 0/6] staging: board: armadillo800eva: Board staging
+ for =?UTF-8?Q?sh=5Fmobile=5Flcdc=5Ffb?=
+In-Reply-To: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
+References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <9cb05c4e687de35ada0b83fe816393c8@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 11:33:53AM +0200, Stefan Agner wrote:
-> On 2015-04-06 10:54, Russell King - ARM Linux wrote:
-> > On Mon, Apr 06, 2015 at 10:38:10AM +0200, Stefan Agner wrote:
-> >> We already prevent a kernel image which mixes V4/V4T/V5 and V6/V7. And
-> >> so we would do with V7M too. Just because it's in multiplatform doesn't
-> >> mean we need to mix things up.
-> > 
-> > I don't think you're getting what I'm saying at all... :(
-> 
-> It's not that I don't get it. I'm just arguing against it.
-> 
-> IMHO, it's wrong to create a parallel universe for v7M multiplatform...
-> 
-> Multiplatform as I understand it is mainly about selecting multiple SoC
-> _platforms_ but not necessarily multiple CPU platforms. It happens to
-> work well for V6/V7, but does not for others, and preventing
-> multiselection for incompatible CPU platforms is the way to prevent
-> creating such images.
+Hi Geert,
 
-Let's be clear: I'm _not_ arguing against being able to select multiple
-SoC platforms at all.  I'm merely arguing about how it should be done.
+On 2015-04-03 13:41, Geert Uytterhoeven wrote:
+> Hi all,
+>
+> This RFC patch series adds board staging support for 
+> r8a7740/armadillo.
+> For now this supports only the frame buffer device for the on-board 
+> LCD.
+> The goal is to complete the move to ARM multiplatform kernels for all
+> shmobile platforms, and drop the existing board files
+> (arch/arm/mach-shmobile/board-*).
+>
+> The board staging area was introduced last year to allow continuous
+> upstream in-tree development and integration of platform devices. It
+> helps developers integrate devices as platform devices for device
+> drivers that only provide platform device bindings.  This in turn 
+> allows
+> for incremental development of both hardware feature support and DT
+> binding work in parallel.
+>
+> This series consists of 4 parts:
+>   - Patch 1 re-enables compilation of the board staging area, which 
+> was
+>     disabled after a compile breakage, but has been fixed in the mean
+>     time,
+>   - Path 2 moves initialization of staging board code to an earlier
+>     moment, as currently it happens after unused PM domains are 
+> powered
+>     down,
+>   - Patches 3 and 4 (hopefully) fix the existing kzm9d board staging
+>     code, which was presumably broken by commit 9a1091ef0017c40a
+>     ("irqchip: gic: Support hierarchy irq domain."),
 
-What I'm saying, is that MULTIPLATFORM itself does _not_ work for all
-noMMU platforms.  Yes, it _may_ work for V7M, but it doesn't work for
-previous generation stuff - and that's confusing.
+Please allow me a semantic correction here: this commit never broke 
+anything. It merely revealed how platform code (OMAP, iMX6, shmobile) 
+abused the irq_domain subsystem, hoping to get away with only a partial 
+conversion to DT. The platform code itself was broken from the moment it 
+used DT to discover its interrupt controller.
 
-Let's look at what needs to happen to make V7M work the way you're
-suggesting:
-* Add "depends on !MMU" to all the existing ARCH_MULTI_* symbols.
-* Append "if MMU" to the selection of ARM_PATCH_PHYS_VIRT and
-  AUTO_ZRELADDR in multiplatform.
+The truth is, it is not possible to sanely convert bits of a platform 
+to DT. The changes creep into all the subsystems, and doing it in stages 
+requires tons of ugly hacks (and I've written my share of them).
 
-We then have the problem for the older generation noMMU stuff.  Should
-we stuff into the multiplatform architecture options for selecting the
-older generation noMMU _platforms_ into the "CPU Core family selection"
-menu?  That's clearly wrong because they're not "CPU Cores".
+That being said, I'm off reviewing these two matches.
 
-So, we have to find somewhere else to put the older generation stuff,
-and by doing so, that causes confusion, because we now have to select
-multiplatform for one group of noMMU implementations, and _not_
-select it for another group of noMMU implementations.
+Thanks,
 
-Imagine yourself writing up a document describing how to configure the
-kernel for all noMMU platforms which will be read by many people with
-varying degrees of English comprehension across the world, and how you
-would describe to them, such that they clearly understood, how to
-choose the right options.
-
+         M.
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Fast, cheap, reliable. Pick two.
