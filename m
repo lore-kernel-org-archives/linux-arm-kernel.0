@@ -1,129 +1,70 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 7 Apr 2015 15:34:30 +0300
-Subject: [PATCH] power: add poodle battery driver
-In-Reply-To: <20150406164428.GB18145@earth>
-References: <1427714679-27472-1-git-send-email-dbaryshkov@gmail.com>
- <20150406164428.GB18145@earth>
-Message-ID: <CALT56yOH-rc1RG=xQhcGT-FKJz7D9qKd+rO+8s4PdYrK0weCGQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 7 Apr 2015 12:40:16 +0000
+Subject: irqchip heirarchy DT "break" series awareness?
+In-Reply-To: <20150407115922.5d4c6233@free-electrons.com>
+References: <20150406144647.GC7873@io.lakedaemon.net>
+ <20150407115922.5d4c6233@free-electrons.com>
+Message-ID: <20150407124016.GD7873@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hey Thomas,
 
-2015-04-06 19:44 GMT+03:00, Sebastian Reichel <sre@kernel.org>:
-> Hi Dmitry,
->
-> On Mon, Mar 30, 2015 at 02:24:39PM +0300, Dmitry Eremin-Solenikov wrote:
->> Add a driver supporting battery charging on Sharp SL-5600 (poodle).
->> Voltage and temperature readings are provided through add7846 hwmon
->> interface. Battery voltage is in1_input (mV) and temp in in0_input
->> (values unknown, but should be less than 2441).
->
-> You may want to convert add7846 to iio interface, which can be
-> exposed via hwmon and requested by other kernel drivers (e.g. this
-> one).
+On Tue, Apr 07, 2015 at 11:59:22AM +0200, Thomas Petazzoni wrote:
+> Jason,
+> 
+> On Mon, 6 Apr 2015 14:46:47 +0000, Jason Cooper wrote:
+> 
+> > This causes two problems:
+> > 
+> >  1) Upgrade kernel, but not DTB.
+> > 
+> > 	System will boot, and print a big fat warning that
+> > 	suspend/resume will not work until the DTB is upgraded.
+> > 
+> >  2) Upgrade DTB, but not kernel.
+> > 
+> > 	System will fail to boot.
+> 
+> (2) has never been something that has ever planned of being guaranteed,
+> as far as I know. Only (1) is the supposed consequence of DT ABI
+> stability, but definitely not (2), so I'm unsure why you even mention
+> (2).
 
-This needs a more careful thought. I have several devices in mind,
-which provide touchscreen + ADC interfaces, where ADC is used
-for battery voltage and temperature sensing. Sometimes additional
-GPIOs are in play. Thus I'd like for now to sustain from changing
-ads7846 driver. Or, at least to delay such changes, iff there will be
-no real design/ideas how to handle such devices in a generic enough
-way.
+Because my goal here was to give *every* possible chance for an
+objection.  Hence, "dt" and "break" in the subject line, sent to the
+devicetree ML.  Also, Marc mentioned the possibility in at least the
+cover letter of each of his series.  I don't want anything hidden.
 
->
->> [...]
->> +struct poodle_bat {
->> + int status;
->> + struct power_supply psy;
->> +
->> + struct mutex work_lock; /* protects data */
->> +
->> + bool (*is_present)(struct poodle_bat *bat);
->> + int technology;
->
-> why do you need this for a static type? You can simply set the type
-> directly in the get_property function?
+But you are absolutely correct.  (2) was never guaranteed, and it's also
+highly improbable as well.  See below.
 
-ack
+> > In light of Thomas Petazonni's well-researched talk at ELC:
+> > 
+> >   "The Device Tree as a stable ABI: a fairy tale?"
+> >   http://events.linuxfoundation.org/sites/events/files/slides/petazzoni-dt-as-stable-abi-fairy-tale.pdf
+> > 
+> > I'm confident that #2 won't be an issue.  Distro's and OEMs seem to have
+> > worked around the instability by keeping the dtb tied to the kernel
+> > version.
+> 
+> I'm glad you raised my slides as an argument in a DT ABI stability
+> discussion :-)
+> 
+> However, my slides are definitely not about #2 (which as said earlier,
+> was never planned to be something we should worry about), but really
+> about #1.
 
->
->> +};
->
->> [...]
->
->> +static struct gpio poodle_batt_gpios[] = {
->> + { POODLE_GPIO_BAT_COVER,    GPIOF_IN, "main battery cover" },
->> + { POODLE_GPIO_CHRG_FULL,    GPIOF_IN, "main battery full" },
->> + { POODLE_GPIO_JK_B,    GPIOF_OUT_INIT_LOW, "main charge on" },
->> + { POODLE_GPIO_CHRG_ON,    GPIOF_OUT_INIT_LOW, "main charge on" },
->> + { POODLE_GPIO_BYPASS_ON,    GPIOF_OUT_INIT_LOW, "main charge bypass" },
->> + /* on for now */
->> + { POODLE_GPIO_ADC_TEMP_ON,  GPIOF_OUT_INIT_HIGH, "main battery temp" },
->> +};
->
-> I would prefer if you use the "new" gpiod interface, see
-> include/linux/gpio/consumer.h
->
-> This obviously refers to the whole driver.
->
->> [...]
->
->> +static int poodle_battery_probe(struct platform_device *dev)
->> +{
->> + int ret;
->> +
->> + ret = gpio_request_array(poodle_batt_gpios,
->> + ARRAY_SIZE(poodle_batt_gpios));
->> + if (ret)
->> + return ret;
->> +
->> + mutex_init(&poodle_bat_main.work_lock);
->> +
->> + INIT_WORK(&bat_work, poodle_bat_work);
->> +
->> + ret = power_supply_register(&dev->dev, &poodle_bat_main.psy);
->> + if (ret)
->> + goto err_psy_reg_main;
->
-> we have devm_power_supply_register() now.
+I was referring to the slide where you mention that distros and vendors
+have tied the dtbs to the kernel versions (Slide 23/27, "Usefulness").
+I should have been more specific when taking something out of context.
+:-P
 
-Not so sure about it. I'd like to cancel work after unregistering power_supply.
-I think I'll even switch from devm_request_irq back to request_irq to be able
-to cancel IRQs before canceling work.
+My point, not well made, was that everyone has decided to slave the
+upgrade of the dtb to the upgrade of the kernel.  There is no 'apt-get
+armv7-dtbs' that has no dependency structure on a kernel package.  So we
+agree, (2) was never guaranteed, and isn't probable either.
 
->> + ret = devm_request_irq(&dev->dev, gpio_to_irq(POODLE_GPIO_CHRG_FULL),
->> + poodle_bat_gpio_isr,
->> + IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
->> + "main full", NULL);
->> + if (ret)
->> + goto err_psy_irq;
->> +
->> + ret = devm_request_irq(&dev->dev, gpio_to_irq(POODLE_GPIO_BAT_COVER),
->> + poodle_bat_gpio_isr,
->> + IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
->> + "battery cover", NULL);
->> + if (ret)
->> + goto err_psy_irq;
->> +
->> + return 0;
->> +
->> +err_psy_irq:
->> + power_supply_unregister(&poodle_bat_main.psy);
->> +
->> + cancel_work_sync(&bat_work);
->> +err_psy_reg_main:
->> + gpio_free_array(poodle_batt_gpios, ARRAY_SIZE(poodle_batt_gpios));
->> +
->> + return ret;
->> +}
->
->> [...]
->
-> -- Sebastian
->
+thx,
 
-
--- 
-With best wishes
-Dmitry
+Jason.
