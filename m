@@ -1,48 +1,65 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 7 Apr 2015 21:45:01 +0200
-Subject: [PATCH] ARM: at91/dt: add support for kizbox2.
-In-Reply-To: <1428416031-30765-2-git-send-email-g.portay@overkiz.com>
-References: <1428416031-30765-1-git-send-email-g.portay@overkiz.com>
- <1428416031-30765-2-git-send-email-g.portay@overkiz.com>
-Message-ID: <20150407214501.3189230a@bbrezillon>
+From: mporter@konsulko.com (Matt Porter)
+Date: Tue, 7 Apr 2015 15:46:36 -0400
+Subject: [PATCH v4 05/10] eeprom: Add bindings for simple eeprom framework
+In-Reply-To: <55241BF2.4050609@linaro.org>
+References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427752679-17261-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150406133208.GH30984@beef>
+ <CAL_Jsq++9pyJMLXssgyz2WRU4e7ikT_6FwzWMo1fKS82FJvEyg@mail.gmail.com>
+ <20150406150442.GA26319@beef> <55241575.7040809@linaro.org>
+ <20150407174624.GO6023@sirena.org.uk> <55241BF2.4050609@linaro.org>
+Message-ID: <20150407194636.GB6662@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  7 Apr 2015 16:13:51 +0200
-Ga?l PORTAY <g.portay@overkiz.com> wrote:
-
-> Add DT file for Kizbox 2 board.
-> This board is based on Atmel's SAMA5D31 Cortex-A5 SoC.
+On Tue, Apr 07, 2015 at 07:03:30PM +0100, Srinivas Kandagatla wrote:
 > 
-> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
-> ---
->  arch/arm/boot/dts/Makefile         |   1 +
->  arch/arm/boot/dts/at91-kizbox2.dts | 223 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 224 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91-kizbox2.dts
 > 
+> On 07/04/15 18:46, Mark Brown wrote:
+> >On Tue, Apr 07, 2015 at 06:35:49PM +0100, Srinivas Kandagatla wrote:
+> >>On 06/04/15 16:04, Matt Porter wrote:
+> >>>On Mon, Apr 06, 2015 at 09:11:05AM -0500, Rob Herring wrote:
+> >
+> >>>>>The generic binding could really use a "read-only" property here as this
+> >>>>>is a common hardware attribute for many nvmem devices. A serial EEPROM
+> >
+> >>Correct me If am wrong.
+> >
+> >>Regarding write protection/read-only, regmap already has provisions to
+> >>support this feature. regmap would bail out with errors if any attempt to
+> >>write to non-writable regions. It all depends on the data providers how they
+> >>setup the regmap and the bindings for those are specific individual data
+> >>providers I think.
+> >
+> >There is the ability to flag read/write permissions in regmap but I
+> >think there's some suggestion that this should be exposed to userspace
+> >so that it's easier for it to handle things rather than just writing
+> >then coping with any errors.
+> 
+> Yes, That's possible if the data provider use the "read-only" generic
+> binding like MTD partitions which the eeprom framwork could use to set the
+> binary file mode appropriately.
 
-[...]
+Right, that's what Rob suggested as to how it should be exposed to
+userspace. I think Mark is suggesting that it can also be done by
+returning appropriately fine-grained error codes from a writeable
+attribute.
 
-> +/dts-v1/;
-> +#include "sama5d31.dtsi"
-> +#include "sama5d3_emac.dtsi"
-> +#include <dt-bindings/pwm/pwm.h>
-> +
-> +/ {
-> +	model = "Overkiz Kizbox 2";
-> +	compatible = "overkiz,kizbox2", "atmel,sama5d31ek", "atmel,sama5d31", "atmel,sama5d3", "atmel,sama5";
+Just to clarify here, I brought this up because if we only allow
+the writes to fail, there's not necessarily not enough information
+available to know if they failed due to a real error (perhaps write
+cycles for the underlying nvmem device have been exhausted) or is
+it simply that the underlying device has been hardware write protected
+(such as as the write protect pin hardwired that way or it's an OTP
+device). The client, whether userspace or otherwise is going to need
+to know this information to make informed policy decisions.
 
-Oh, and as Alexandre noticed in your other patch series, you should
-just define:
+-Matt
 
-	compatible = "overkiz,kizbox2", "atmel,sama5d31", "atmel,sama5d3", "atmel,sama5";
-
-
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> "read-only" property seems to be more generic for all types of data
+> providers.
+> 
+> I will give it a try and document this in the bindings too in next version.
+> 
+> --srini
+> >
