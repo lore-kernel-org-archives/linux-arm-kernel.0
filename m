@@ -1,49 +1,44 @@
-From: g.portay@overkiz.com (g.portay at overkiz.com)
-Date: Tue, 07 Apr 2015 21:40:56 +0200
-Subject: [PATCH 1/2] ARM: at91/dt: sam9x5: add pinctrl for pwm0
-In-Reply-To: <20150407192231.GW20669@piout.net>
-References: <1428415884-30662-1-git-send-email-g.portay@overkiz.com>
- <1428415884-30662-2-git-send-email-g.portay@overkiz.com>
- <20150407192231.GW20669@piout.net>
-Message-ID: <8817d74520bc99a9ee01fe303dc335cd@overkiz.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 7 Apr 2015 21:41:40 +0200
+Subject: [PATCH] ARM: at91/dt: add support for kizbox2.
+In-Reply-To: <1428416031-30765-2-git-send-email-g.portay@overkiz.com>
+References: <1428416031-30765-1-git-send-email-g.portay@overkiz.com>
+ <1428416031-30765-2-git-send-email-g.portay@overkiz.com>
+Message-ID: <20150407214140.254f9940@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-04-07 21:22, Alexandre Belloni wrote:
-> Hi Ga?l,
+Hi Ga?l,
+
+On Tue,  7 Apr 2015 16:13:51 +0200
+Ga?l PORTAY <g.portay@overkiz.com> wrote:
+
+> Add DT file for Kizbox 2 board.
+> This board is based on Atmel's SAMA5D31 Cortex-A5 SoC.
 > 
-> On 07/04/2015 at 16:11:23 +0200, Ga?l PORTAY wrote :
->> Defines the pinctrl configurations for PWM0.
->> 
->> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
->> ---
->>  arch/arm/boot/dts/at91sam9x5.dtsi | 46 
->> +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 46 insertions(+)
->> 
->> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi 
->> b/arch/arm/boot/dts/at91sam9x5.dtsi
->> index d221179..08ed53d 100644
->> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
->> @@ -463,6 +463,52 @@
->>  					};
->>  				};
->> 
->> +				pwm0 {
->> +					pinctrl_pwm0_pwm0_0: pwm0_pwm0-0 {
->> +						atmel,pins =
->> +							<AT91_PIOB 11 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB11 periph 
->> B */
->                                            please drop those useless
-> comments --^
-> 
-> Else, I'm fine with that patch.
+> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+> ---
 
-I do think so... I added them for consistency only... I will drop them 
-in v2.
+[...]
 
-Do you want I drop all those kind of comments (of the whole file) as 
-well ?
+> +
+> +			pmc: pmc at fffffc00 {
+> +				main: mainck {
+> +					clock-frequency = <12000000>;
 
-Thanks for your review.
+The main clock driver has been reworked in 3.16, and this
+clock-frequency property is no longer needed (this value is taken
+from the main_xtal definition).
+
+Apart from that this patch looks good to me:
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
