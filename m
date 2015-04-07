@@ -1,64 +1,69 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 07 Apr 2015 18:14:50 +0200
-Subject: [GIT PULL 0/5] arm/arm64: KVM: Fixes for KVM for 4.0-rc5
-In-Reply-To: <1426510503-27995-1-git-send-email-christoffer.dall@linaro.org>
-References: <1426510503-27995-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <5524027A.3090507@redhat.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Tue, 07 Apr 2015 19:16:47 +0300
+Subject: [PATCH] ARM: dts: imx: imx6q uart2 pin mux correction
+In-Reply-To: <CAPvN=VTSMxtjs6QQ=VFPCDgJ3LJ2xfC+Ryh-rXU4-xnqk+i67w@mail.gmail.com>
+References: <CAPvN=VTSMxtjs6QQ=VFPCDgJ3LJ2xfC+Ryh-rXU4-xnqk+i67w@mail.gmail.com>
+Message-ID: <552402EF.9050004@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Robert,
 
+On 10.03.2015 15:45, Robert Smigielski wrote:
+> This patch contains a correction to the file imx6q-pinfunc.h for the
+> definition of the UART2 GPIO pin mux setting.
+> 
+> Issue found when testing UART2 configured as the console in Linux
+> GPIO_7 is a transmit pin not a transmit and receive pin
+> GPIO_8 is a receive pin not a transmit and receive pin
+> 
+> Verified the correction with Freescale in posting to the Freescale
+> forum https://community.freescale.com/thread/343349
+> 
+> commit c383bbb4d17037435305858f488db7ae17dc1c85
+> Author: robert.smigielski <robert.smigielski@timesys.com>
+> Date:   Fri Mar 6 11:53:20 2015 -0500
+> 
+>     UART2 Tx and Rx values corrected based on IMX6Q datasheet
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h
+> b/arch/arm/boot/dts/imx6q-pinfunc.h
+> index c68c21d..4d4cc49 100644
+> --- a/arch/arm/boot/dts/imx6q-pinfunc.h
+> +++ b/arch/arm/boot/dts/imx6q-pinfunc.h
+> @@ -696,8 +696,7 @@
+>  #define MX6QDL_PAD_GPIO_7__ECSPI5_RDY               0x240 0x610 0x000 0x1 0x0
+>  #define MX6QDL_PAD_GPIO_7__EPIT1_OUT                0x240 0x610 0x000 0x2 0x0
+>  #define MX6QDL_PAD_GPIO_7__FLEXCAN1_TX              0x240 0x610 0x000 0x3 0x0
+> -#define MX6QDL_PAD_GPIO_7__UART2_TX_DATA            0x240 0x610 0x000 0x4 0x0
+> -#define MX6QDL_PAD_GPIO_7__UART2_RX_DATA            0x240 0x610 0x928 0x4 0x2
+> +#define MX6QDL_PAD_GPIO_7__UART2_TX_DATA            0x240 0x610 0x928 0x4 0x2
 
-On 16/03/2015 13:54, Christoffer Dall wrote:
-> Hi Marcelo and Paolo,
-> 
-> Please pull the following fixes for KVM/ARM for 4.0-rc5.
-> 
-> They fix page refcounting issues in our Stage-2 page table management code, a
-> missing unlock in a gicv3 error path, and a race that can cause lost interrupts
-> if signals are pending just prior to entering the guest.
-> 
-> The following changes since commit bfb8fb4775d3397908ae3a7ff65807097d81d713:
-> 
->   Merge tag 'kvm-s390-master-20150303' of git://git.kernel.org/pub/scm/linux/kernel/git/kvms390/linux (2015-03-05 14:42:48 -0300)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-fixes-4.0-rc5
-> 
-> for you to fetch changes up to ae705930fca6322600690df9dc1c7d0516145a93:
-> 
->   arm/arm64: KVM: Keep elrsr/aisr in sync with software model (2015-03-14 13:42:07 +0100)
-> 
-> 
-> Thanks,
-> -Christoffer
-> 
-> ---
-> 
-> Christoffer Dall (1):
->   arm/arm64: KVM: Keep elrsr/aisr in sync with software model
-> 
-> Marc Zyngier (3):
->   arm64: KVM: Fix stage-2 PGD allocation to have per-page refcounting
->   arm64: KVM: Do not use pgd_index to index stage-2 pgd
->   arm64: KVM: Fix outdated comment about VTCR_EL2.PS
-> 
-> Wei Yongjun (1):
->   arm/arm64: KVM: fix missing unlock on error in kvm_vgic_create()
-> 
->  arch/arm/include/asm/kvm_mmu.h   | 13 ++++---
->  arch/arm/kvm/mmu.c               | 75 ++++++++++++++++++++++++++++------------
->  arch/arm64/include/asm/kvm_arm.h |  5 +--
->  arch/arm64/include/asm/kvm_mmu.h | 48 ++++---------------------
->  include/kvm/arm_vgic.h           |  1 +
->  virt/kvm/arm/vgic-v2.c           |  8 +++++
->  virt/kvm/arm/vgic-v3.c           |  8 +++++
->  virt/kvm/arm/vgic.c              | 22 ++++++++++--
->  8 files changed, 105 insertions(+), 75 deletions(-)
+the introduction of non-zero input register for UART TX pin is valid
+only for UART2 in DTE mode, so in my opinion only removal of
+MX6QDL_PAD_GPIO_7__UART2_RX_DATA and MX6QDL_PAD_GPIO_8__UART2_TX_DATA is
+needed here. Otherwise you get a conflict within
+IOMUXC_UART2_UART_RX_DATA_SELECT_INPUT between invalid in DCE
+UART2_TX_DATA and valid in DCE UART2_RX_DATA configuration.
+
+FWIW even currently defined MX6QDL_PAD_GPIO_7__UART2_RX_DATA and
+MX6QDL_PAD_GPIO_8__UART2_TX_DATA are correct in DTE mode, but I think it
+is better to preserve the proper pin function names, so no objections if
+these two definitions are removed for sake of clarity.
+
+>  #define MX6QDL_PAD_GPIO_7__GPIO1_IO07               0x240 0x610 0x000 0x5 0x0
+>  #define MX6QDL_PAD_GPIO_7__SPDIF_LOCK               0x240 0x610 0x000 0x6 0x0
+>  #define MX6QDL_PAD_GPIO_7__USB_OTG_HOST_MODE        0x240 0x610 0x000 0x7 0x0
+> @@ -706,7 +705,6 @@
+>  #define MX6QDL_PAD_GPIO_8__EPIT2_OUT                0x244 0x614 0x000 0x2 0x0
+>  #define MX6QDL_PAD_GPIO_8__FLEXCAN1_RX              0x244 0x614 0x7e4 0x3 0x1
+>  #define MX6QDL_PAD_GPIO_8__UART2_RX_DATA            0x244 0x614 0x928 0x4 0x3
+> -#define MX6QDL_PAD_GPIO_8__UART2_TX_DATA            0x244 0x614 0x000 0x4 0x0
+>  #define MX6QDL_PAD_GPIO_8__GPIO1_IO08               0x244 0x614 0x000 0x5 0x0
+>  #define MX6QDL_PAD_GPIO_8__SPDIF_SR_CLK             0x244 0x614 0x000 0x6 0x0
+>  #define MX6QDL_PAD_GPIO_8__USB_OTG_PWR_CTL_WAKE     0x244 0x614 0x000 0x7 0x0
 > 
 
-I pulled this into kvm/next now.  The conflict in virt/kvm/arm/vgic-v3.c
-is internal to the KVM tree, so I'll take care of the resolution myself.
-
-Paolo
+--
+With best wishes,
+Vladimir
