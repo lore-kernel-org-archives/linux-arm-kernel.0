@@ -1,84 +1,173 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 07 Apr 2015 15:20:05 +0200
-Subject: [PATCH 10/14] ARM: orion: use clkdev_create()
-In-Reply-To: <20150404001729.GA14824@lunn.ch>
-References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
- <E1Ye59d-0001BZ-Sv@rmk-PC.arm.linux.org.uk> <20150404001729.GA14824@lunn.ch>
-Message-ID: <5523D985.60800@free-electrons.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 07 Apr 2015 22:32:06 +0900
+Subject: [RFT PATCHv2] drm/exynos: Enable DP clock to fix display on
+ Exynos5250 and other
+In-Reply-To: <1427472488-21454-1-git-send-email-k.kozlowski@samsung.com>
+References: <1427472488-21454-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5523DC56.6030108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew, Russell,
-
-On 04/04/2015 02:17, Andrew Lunn wrote:
-> On Fri, Apr 03, 2015 at 06:13:13PM +0100, Russell King wrote:
->> clkdev_create() is a shorter way to write clkdev_alloc() followed by
->> clkdev_add().  Use this instead.
->>
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 2015? 03? 28? 01:08, Krzysztof Kozlowski wrote:
+> After adding display power domain for Exynos5250 in commit
+> 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
+> display on Chromebook Snow and others stopped working after boot.
 > 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
+> The reason for this suggested Andrzej Hajda: the DP clock was disabled.
+> This clock is required by Display Port and is enabled by bootloader.
+> However when FIMD driver probing was deferred, the display power domain
+> was turned off. This effectively reset the value of DP clock enable
+> register.
 
-This change makes sens however what about Thomas' comment: removing
-orion_clkdev_add() entirely and directly using lkdev_create() all over
-the place:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/327294.html
-
-Then what would be the path for this patch?
-
-As there is a dependency on the 6th patch of this series: "clkdev: add
-clkdev_create() helper" which should be merged through the clk tree, I
-think the best option is that this patch would be also managed by the
-clk tree maintainer (I added them in CC).
-
+Applied.
 
 Thanks,
-
-Gregory
-
+Inki Dae
 
 > 
-> 	  Andrew
+> When exynos-dp is later probed, the clock is not enabled and display is
+> not properly configured:
 > 
->> ---
->>  arch/arm/plat-orion/common.c | 6 +-----
->>  1 file changed, 1 insertion(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
->> index f5b00f41c4f6..2235081a04ee 100644
->> --- a/arch/arm/plat-orion/common.c
->> +++ b/arch/arm/plat-orion/common.c
->> @@ -28,11 +28,7 @@
->>  void __init orion_clkdev_add(const char *con_id, const char *dev_id,
->>  			     struct clk *clk)
->>  {
->> -	struct clk_lookup *cl;
->> -
->> -	cl = clkdev_alloc(clk, con_id, dev_id);
->> -	if (cl)
->> -		clkdev_add(cl);
->> +	clkdev_create(clk, con_id, "%s", dev_id);
->>  }
->>  
->>  /* Create clkdev entries for all orion platforms except kirkwood.
->> -- 
->> 1.8.3.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
+> exynos-dp 145b0000.dp-controller: unable to config video
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
+> Cc: <stable@vger.kernel.org>
 > 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> ---
+> 
+> This should fix issue reported by Javier [1][2].
+> 
+> Tested on Chromebook Snow (Exynos 5250). More testing would be great,
+> especially on other Exynos 5xxx products.
+> 
+> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/43889
+> [2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/400290
+> 
+> Changes since v1:
+> 1. Added missing exynos_drm_fimd.h.
+> ---
+>  drivers/gpu/drm/exynos/exynos_dp_core.c  | 10 ++++++++++
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.c | 19 +++++++++++++++++++
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.h | 15 +++++++++++++++
+>  include/video/samsung_fimd.h             |  6 ++++++
+>  4 files changed, 50 insertions(+)
+>  create mode 100644 drivers/gpu/drm/exynos/exynos_drm_fimd.h
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
+> index bf17a60b40ed..1dbfba58f909 100644
+> --- a/drivers/gpu/drm/exynos/exynos_dp_core.c
+> +++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
+> @@ -32,10 +32,16 @@
+>  #include <drm/bridge/ptn3460.h>
+>  
+>  #include "exynos_dp_core.h"
+> +#include "exynos_drm_fimd.h"
+>  
+>  #define ctx_from_connector(c)	container_of(c, struct exynos_dp_device, \
+>  					connector)
+>  
+> +static inline struct exynos_drm_crtc *dp_to_crtc(struct exynos_dp_device *dp)
+> +{
+> +	return to_exynos_crtc(dp->encoder->crtc);
+> +}
+> +
+>  static inline struct exynos_dp_device *
+>  display_to_dp(struct exynos_drm_display *d)
+>  {
+> @@ -1070,6 +1076,8 @@ static void exynos_dp_poweron(struct exynos_dp_device *dp)
+>  		}
+>  	}
+>  
+> +	fimd_dp_clock_enable(dp_to_crtc(dp), true);
+> +
+>  	clk_prepare_enable(dp->clock);
+>  	exynos_dp_phy_init(dp);
+>  	exynos_dp_init_dp(dp);
+> @@ -1094,6 +1102,8 @@ static void exynos_dp_poweroff(struct exynos_dp_device *dp)
+>  	exynos_dp_phy_exit(dp);
+>  	clk_disable_unprepare(dp->clock);
+>  
+> +	fimd_dp_clock_enable(dp_to_crtc(dp), false);
+> +
+>  	if (dp->panel) {
+>  		if (drm_panel_unprepare(dp->panel))
+>  			DRM_ERROR("failed to turnoff the panel\n");
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> index c300e22da8ac..bdf0818dc8f5 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> @@ -32,6 +32,7 @@
+>  #include "exynos_drm_fbdev.h"
+>  #include "exynos_drm_crtc.h"
+>  #include "exynos_drm_iommu.h"
+> +#include "exynos_drm_fimd.h"
+>  
+>  /*
+>   * FIMD stands for Fully Interactive Mobile Display and
+> @@ -1231,6 +1232,24 @@ static int fimd_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable)
+> +{
+> +	struct fimd_context *ctx = crtc->ctx;
+> +	u32 val;
+> +
+> +	/*
+> +	 * Only Exynos 5250, 5260, 5410 and 542x requires enabling DP/MIE
+> +	 * clock. On these SoCs the bootloader may enable it but any
+> +	 * power domain off/on will reset it to disable state.
+> +	 */
+> +	if (ctx->driver_data != &exynos5_fimd_driver_data)
+> +		return;
+> +
+> +	val = enable ? DP_MIE_CLK_DP_ENABLE : DP_MIE_CLK_DISABLE;
+> +	writel(DP_MIE_CLK_DP_ENABLE, ctx->regs + DP_MIE_CLKCON);
+> +}
+> +EXPORT_SYMBOL_GPL(fimd_dp_clock_enable);
+> +
+>  struct platform_driver fimd_driver = {
+>  	.probe		= fimd_probe,
+>  	.remove		= fimd_remove,
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.h b/drivers/gpu/drm/exynos/exynos_drm_fimd.h
+> new file mode 100644
+> index 000000000000..b4fcaa568456
+> --- /dev/null
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.h
+> @@ -0,0 +1,15 @@
+> +/*
+> + * Copyright (c) 2015 Samsung Electronics Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + */
+> +
+> +#ifndef _EXYNOS_DRM_FIMD_H_
+> +#define _EXYNOS_DRM_FIMD_H_
+> +
+> +extern void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable);
+> +
+> +#endif /* _EXYNOS_DRM_FIMD_H_ */
+> diff --git a/include/video/samsung_fimd.h b/include/video/samsung_fimd.h
+> index a20e4a3a8b15..847a0a2b399c 100644
+> --- a/include/video/samsung_fimd.h
+> +++ b/include/video/samsung_fimd.h
+> @@ -436,6 +436,12 @@
+>  #define BLENDCON_NEW_8BIT_ALPHA_VALUE		(1 << 0)
+>  #define BLENDCON_NEW_4BIT_ALPHA_VALUE		(0 << 0)
+>  
+> +/* Display port clock control */
+> +#define DP_MIE_CLKCON				0x27c
+> +#define DP_MIE_CLK_DISABLE			0x0
+> +#define DP_MIE_CLK_DP_ENABLE			0x2
+> +#define DP_MIE_CLK_MIE_ENABLE			0x3
+> +
+>  /* Notes on per-window bpp settings
+>   *
+>   * Value	Win0	 Win1	  Win2	   Win3	    Win 4
+> 
