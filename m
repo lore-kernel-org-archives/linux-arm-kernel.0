@@ -1,53 +1,62 @@
 From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Tue, 7 Apr 2015 18:40:51 +0800
-Subject: [PATCH v3 1/2] dt-bindings: Document the hi6220 thermal sensor
- bindings
-In-Reply-To: <1428403252-8208-1-git-send-email-kong.kongxinwei@hisilicon.com>
-References: <1428403252-8208-1-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <1428403252-8208-2-git-send-email-kong.kongxinwei@hisilicon.com>
+Date: Tue, 7 Apr 2015 18:40:50 +0800
+Subject: [PATCH v3 0/2] 96boards: add thermal senor support to hikey board
+Message-ID: <1428403252-8208-1-git-send-email-kong.kongxinwei@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: kongxinwei <kong.kongxinwei@hisilicon.com>
 
-This adds documentation of device tree bindings for the
-thermal sensor controller of hi6220 SoC.
+Thank you all for giving this v2 patches stages some comments. Here is v3
+patches and address all the issues raised as part of v2 review.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
----
- .../bindings/thermal/hisilicon-thermal.txt         | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+The Linaro connect introduce 96boards series in Hong Kong,The HiKey board
+is the first board to be certified 96Boards Consumer Edition compatible.
+This board is based on the HiSilicon SoC. you can get more information
+from https://www.96boards.org.
+
+The hisilicon SoC contains thermal module, this thermal module has 4 sensors,
+
+	- sensor 0: local sensor;
+	- sensor 1: remote sensor for ACPU cluster 1;
+	- sensor 2: remote sensor for ACPU cluster 2;
+	- sensor 3: remote sensor for GPU;
+
+It can obtain this device temperature by operating this hardware. The new
+sensor driver satisfies thermal framework and to realize the ACPU ,GPU and
+so on to cool function.
+
+Changes v0->v1;
+* Delete this hi6220 dtsi.
+* Fix documentation and error checks.
+* Modify this driver which makes use of kernel to decide how to dynamically
+  bind the interrupt to hottest sensor.
+* Delete "sensor-thres-temp" property and read thermal_zone trips points
+  replace of it.
+* Delete "sensor-reset-temp" property and define the fixed value replace
+  of it.
+
+Changes v1->v2;
+* change patch's position between binding document and driver file
+* clean up some regiser for enabling thermal sensor
+* use mutex lock to replace the spin lock
+
+Changes v2->v3;
+* delete sensor id property in binding document 
+* fix sensor driver to satisfy sensor register after deleting sensor id
+  property
+
+kongxinwei (2):
+  dt-bindings: Document the hi6220 thermal sensor bindings
+  thermal: hisilicon: add new hisilicon thermal sensor driver
+
+ .../bindings/thermal/hisilicon-thermal.txt         |  23 ++
+ drivers/thermal/Kconfig                            |   8 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/hisi_thermal.c                     | 438 +++++++++++++++++++++
+ 4 files changed, 470 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+ create mode 100644 drivers/thermal/hisi_thermal.c
 
-diff --git a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-new file mode 100644
-index 0000000..b2a349f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-@@ -0,0 +1,23 @@
-+* Temperature Sensor on hisilicon SoCs
-+
-+** Required properties :
-+
-+- compatible: "hisilicon,tsensor".
-+- reg: physical base address of thermal sensor and length of memory mapped
-+  region.
-+- interrupt: The interrupt number to the cpu. Defines the interrupt used
-+  by SOCTHERM.
-+- clock-names: Input clock name, should be 'thermal_clk'.
-+- clocks: phandles for clock specified in "clock-names" property.
-+- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
-+
-+Example :
-+
-+	tsensor: tsensor at 0,f7030700 {
-+		compatible = "hisilicon,tsensor";
-+		reg = <0x0 0xf7030700 0x0 0x1000>;
-+		interrupts = <0 7 0x4>;
-+		clocks = <&clock_sys HI6220_TSENSOR_CLK>;
-+		clock-names = "thermal_clk";
-+		#thermal-sensor-cells = <1>;
-+	}
 -- 
 1.9.1
