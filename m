@@ -1,63 +1,78 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 7 Apr 2015 14:46:34 +0200
-Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
- enabled during suspend
-In-Reply-To: <5523C5F5.6000604@collabora.co.uk>
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
- <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
- <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
- <551976F1.1000605@collabora.co.uk>
- <CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>
- <551AFCCE.4050404@collabora.co.uk> <551BD07E.2090506@samsung.com>
- <551BDA0A.7010704@collabora.co.uk> <551C2B6D.4010001@samsung.com>
- <551C71A5.1070903@collabora.co.uk>
- <CAM4voakS8PnatqRTW5gkD0NNKD9gW9Tuv5p-ekxFhKN5NcuBCQ@mail.gmail.com>
- <5523B878.8040304@collabora.co.uk>
- <5523C5F5.6000604@collabora.co.uk>
-Message-ID: <CA+Ln22FrvQQ_pX7ELG-jYriGkQHmtX3aUHYqsc_-CRXcc4zxbg@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 7 Apr 2015 14:42:09 +0200
+Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
+In-Reply-To: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
+References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
+Message-ID: <20150407124209.GA12633@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-07 13:56 GMT+02:00 Javier Martinez Canillas
-<javier.martinez@collabora.co.uk>:
-> So I disabled the sss clock before trying a S2R:
->
-> # devmem 0x10018800 32 0xFFFFFFFB
-> (CLK_SSS in CLK_GATE_IP_G2D is gated)
->
-> and S2R worked anyways but I see that CLK_GATE_IP_G2D is reset to
-> its default value on S2R so maybe that is why it works anyways?
+On Tue, Apr 07, 2015 at 12:34:30PM +0900, Masahiro Yamada wrote:
+> Hello experts,
+> I hope this is the correct ML to ask this question.
+> 
+> I am struggling to port Linux-4.0-rc7 onto my SoC/board,
+> based on ARM cortex-A9 (single CPU), but the kernel fails to boot
+> with the error:
+> "not syncing: Attempted to kill init! exitcode=0x00000004"
+> 
+> 
+> I want to use NS16550-compatible UART, Global Timer, and GIC.
+> I wrote a simple device tree source for my own board like this:
+> 
+> ------------------>8------------------------------
+> /dts-v1/;
+> /include/ "skeleton.dtsi"
+> 
+> / {
+>         compatible = "socionext,ph1-ld4";
+> 
+>         memory {
+>                 device_type = "memory";
+>                 reg = <0x80000000 0x20000000>;
+>         };
+> 
+>         chosen {
+>                 bootargs = "root=/dev/ram0 console=ttyS0,115200";
+>         };
+> 
+>         aliases {
+>                 serial0 = &uart0;
+>         };
+> 
+>         cpus {
+>                 #size-cells = <0>;
+>                 #address-cells = <1>;
+> 
+>                 cpu at 0 {
+>                         device_type = "cpu";
+>                         compatible = "arm,cortex-a9";
+>                         reg = <0>;
+>                 };
+>         };
+> 
+>         clocks {
+> [    0.000000] Virtual kernel memory layout:
+> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+> [    0.000000]     vmalloc : 0xe0800000 - 0xff000000   ( 488 MB)
+> [    0.000000]     lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
+> [    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+> [    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+> [    0.000000]       .text : 0xc0208000 - 0xc0d03b7c   (11247 kB)
+> [    0.000000]       .init : 0xc0d04000 - 0xc0dce000   ( 808 kB)
+> [    0.000000]       .data : 0xc0dce000 - 0xc0ecbde0   (1016 kB)
+> [    0.000000]        .bss : 0xc0ecbde0 - 0xc0f1aee8   ( 317 kB)
+> [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+> [    0.000000] Hierarchical RCU implementation.
+> [    0.000000]  Additional per-CPU info printed with stalls.
+> [    0.000000]  RCU restricting CPUs from NR_CPUS=16 to nr_cpu_ids=1.
+> [    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+> [    0.000000] NR_IRQS:16 nr_irqs:16 16
+> [    0.000000] GIC CPU mask not found - kernel will fail to boot.
+> [    0.000000] GIC CPU mask not found - kernel will fail to boot.
 
-Does the driver restore its value on resume (i.e. has it in the
-save/restore array)? Remember that suspend causes all clock registers
-to be reset. Then some of them will be configured by the lowest
-bootloader stage after wake-up reset, but the kernel needs to restore
-all of them.
+I assume you have seen this, have taken a deeper look, and know it is
+not your issue?
 
->
-> # devmem 0x10018800
-> 0xFFFFFFFF (all CLK_GATE_IP_G2D clocks enabled including CLK_SSS)
->
-> Does this shed any more light? Could the problem be that the sss
-> clock parent (aclk266_g2d) is gated during S2R? Is the SSS module
-> required for S2R or is just that CLK_SSS prevents the parent to
-> be gated and so it is another red herring?
-
-Does the board use secure firmware? If yes, it might require to do
-some encryption on suspend, so if the firmware is broken and doesn't
-control the clock itself, it might need the SSS clock to be running,
-when the SLEEP SMC operation is called.
-
-Anyway, I just realized that Exynos4 also need several clocks to be
-ungated on suspend and this is handled by code [1] based on arrays
-[2].
-
-[1] http://lxr.free-electrons.com/source/drivers/clk/samsung/clk-exynos4.c#L309
-[2] http://lxr.free-electrons.com/source/drivers/clk/samsung/clk-exynos4.c#L276
-
-Could this method work for your case as well? There would be no need
-to call any clock API at all, just low level register writes, which is
-okay, since this is a low level driver anyway.
-
-Best regards,
-Tomasz
+    Andrew
