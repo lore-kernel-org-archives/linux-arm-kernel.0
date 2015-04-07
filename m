@@ -1,34 +1,34 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 7 Apr 2015 00:06:40 -0500
-Subject: [PATCH V2 2/6] i2c: qup: Add V2 tags support
-In-Reply-To: <1428345067-21878-3-git-send-email-sricharan@codeaurora.org>
-References: <1428345067-21878-1-git-send-email-sricharan@codeaurora.org>
- <1428345067-21878-3-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20150407050640.GB9225@qualcomm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue,  7 Apr 2015 07:57:32 +0200
+Subject: [PATCH] mmc: sdhci-of-arasan: Call OF parsing for MMC
+Message-ID: <35949221633dcbb490c3c28b8099c5be00cb9730.1428386249.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 12:01:03AM +0530, Sricharan R wrote:
+Also check MMC OF properties. The controller supports MMC too.
 
-<snip>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-> +static u32 qup_i2c_send_data(struct qup_i2c_dev *qup, int tlen, u8 *tbuf,
-> +			     int dlen, u8 *dbuf)
-> +{
-> +	u32 val = 0, idx = 0, pos = 0, i = 0, t;
-> +	int  len = tlen + dlen;
-> +	u8 *buf = tbuf;
-> +
-> +	while (len > 0) {
-> +		if (qup_i2c_wait_ready(qup, QUP_OUT_FULL, 0, 4)) {
+ drivers/mmc/host/sdhci-of-arasan.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-Instead of 0 and 4 can we use some #defines?  This applies for all of the
-i2c_wait_ready calls
-
-<snip>
-
-
+diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+index bcb51e9..b8cfac1 100644
+--- a/drivers/mmc/host/sdhci-of-arasan.c
++++ b/drivers/mmc/host/sdhci-of-arasan.c
+@@ -173,6 +173,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+ 	pltfm_host->priv = sdhci_arasan;
+ 	pltfm_host->clk = clk_xin;
+ 
++	ret = mmc_of_parse(host->mmc);
++	if (ret) {
++		dev_err(&pdev->dev, "parsing dt failed (%u)\n", ret);
++		goto clk_disable_all;
++	}
++
+ 	ret = sdhci_add_host(host);
+ 	if (ret)
+ 		goto err_pltfm_free;
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.7.2.3
