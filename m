@@ -1,12 +1,14 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 7 Apr 2015 11:57:31 -0700
+Date: Tue, 7 Apr 2015 12:09:08 -0700
 Subject: [PATCHv2] ti-soc-thermal: implement omap3 support
 In-Reply-To: <20150402144907.GB11687@amd>
 References: <20150103114632.GA21883@amd> <20150118202447.GA29014@amd>
  <20150331084234.GA11712@amd> <20150402144907.GB11687@amd>
-Message-ID: <20150407185718.GA4203@localhost.localdomain>
+Message-ID: <20150407190907.GB4203@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi Pavel,
 
 On Thu, Apr 02, 2015 at 04:49:07PM +0200, Pavel Machek wrote:
 > 
@@ -20,6 +22,15 @@ On Thu, Apr 02, 2015 at 04:49:07PM +0200, Pavel Machek wrote:
 > 
 > Patch is against thermal linus tree, please apply so that it has
 > chance for 4.1.
+
+I thought of accepting this one the way it and amending the message
+myself, but you missed the DT example. 
+
+Actually it is bests, as I already mention, that you send the patch
+together with the DT changes too. 
+
+Can you please resend this one with the following (minor) changes:
+
 > 
 > v2: fixed min/max temp
 > 
@@ -180,12 +191,12 @@ On Thu, Apr 02, 2015 at 04:49:07PM +0200, Pavel Machek wrote:
 > +	if (TI_BANDGAP_HAS(bgp, UNRELIABLE))
 > +		dev_warn(&pdev->dev,
 > +			 "OMAP3 thermal sensor is unreliable and normally unneccessary\n");
-		For now we have only one unreliable sensor. But once one
-		is in, I am pretty sure other people will ask for more
-		:-). Therefore, I am accepting this patch but with the
-		message like this:
+
+1. Change this message to be more generic:
+
 +		dev_warn(&pdev->dev,
 +			 "This OMAP thermal sensor is unreliable. You've been warned\n");
+
 
 > +
 >  	if (TI_BANDGAP_HAS(bgp, TSHUT)) {
@@ -241,6 +252,13 @@ On Thu, Apr 02, 2015 at 04:49:07PM +0200, Pavel Machek wrote:
 >    - "ti,omap4430-bandgap" : for OMAP4430 bandgap
 >    - "ti,omap4460-bandgap" : for OMAP4460 bandgap
 >    - "ti,omap4470-bandgap" : for OMAP4470 bandgap
+
+2. Add an example of OMAP3 configuration in the example section.
+You have forgotten to add an example. Please send a version that fully
+updates the documentation.
+
+3. Also send the proposed DT changes in a separated patch so we can
+review everything together. And test too.
 > 
 > 
 > -- 
@@ -252,4 +270,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/bbfc4998/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/e7a35ea2/attachment.sig>
