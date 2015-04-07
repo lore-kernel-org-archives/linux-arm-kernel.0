@@ -1,66 +1,64 @@
-From: howard.chen@linaro.org (Howard Chen)
-Date: Tue,  7 Apr 2015 16:05:05 +0800
-Subject: [PATCH v2] ARM: dts: mt8173: support arm64 cpuidle-dt
-Message-ID: <1428393905-32166-1-git-send-email-howard.chen@linaro.org>
+From: vincent.cw.yang@gmail.com (Vincent Yang)
+Date: Tue, 7 Apr 2015 16:14:20 +0800
+Subject: [GIT PULL] Support for Fujitsu MB86S7X SoCs
+In-Reply-To: <20150402005029.GH8137@localhost>
+References: <CAKR0VNJdCEEoM8mqFrc-teQ-q=DopGisos16+uKt=ky2mRjF8g@mail.gmail.com>
+ <20150402005029.GH8137@localhost>
+Message-ID: <CAKR0VNKg6MuqjTqU-ExV5g_HAadEZNasNH0wGFj5_Wee6T-esg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an idle-states node to describe the mt8173 idle states and
-also adds references to the idle-states node in all CPU nodes.
+2015-04-02 8:50 GMT+08:00 Olof Johansson <olof@lixom.net>:
+> Hi Vincent,
+>
+> On Wed, Mar 18, 2015 at 02:44:30PM +0900, Vincent Yang wrote:
+>> Hi Arnd and Olof,
+>>
+>> Please consider pulling in these patches for series of Fujitsu SoC
+>> based around variations of 2xCA7+2xCA15 big.LITTLE architecture.
+>>
+>> The MHU driver is already queued in Mailbox tree.
+>>
+>> Thanks,
+>>
+>> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+>>
+>>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+>> s7x-arch-pull
+>>
+>> for you to fetch changes up to 9cf417fee0bbea9296791fa9a15ab289307bb26a:
+>>
+>>   ARM: MB86S7x: Add configs (2015-03-17 11:22:40 +0530)
+>
+> Please use signed tags when you send pull requests (and ideally, please get
+> your GPG key signed by people at the next Linaro Connect or other event where
+> you will get in contact with other kernel developers).
+>
+> I started looking at this patch set, and it's adding global include file
+> contents for things that should only exist under the drivers/soc/ directory,
+> i.e. internal driver defines, etc -- it shouldn't be exposed to the kernel as
+> a whole.
+>
+> I'll find the individual patches where they were posted and comment on those
+> directly.
+>
+> As far as applying the code -- initial platforms like these usually go in
+> through different branches so applying them directly makes sense for us. Once
+> you're up and rolling as a maintainer you'll get a hang of what we want to see
+> grouped in the different branches and pull requests will be easier to handle.
 
-Signed-off-by: Howard Chen <howard.chen@linaro.org>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Thanks a lot for your review and guidance!
+We look forward to your comments.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 8554ec3..0d31a34 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -48,6 +48,8 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53";
- 			reg = <0x000>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -55,6 +57,7 @@
- 			compatible = "arm,cortex-a53";
- 			reg = <0x001>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0>;
- 		};
- 
- 		cpu2: cpu at 100 {
-@@ -62,6 +65,7 @@
- 			compatible = "arm,cortex-a57";
- 			reg = <0x100>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0>;
- 		};
- 
- 		cpu3: cpu at 101 {
-@@ -69,6 +73,19 @@
- 			compatible = "arm,cortex-a57";
- 			reg = <0x101>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0>;
-+		};
-+
-+		idle-states {
-+			entry-method = "arm,psci";
-+
-+			CPU_SLEEP_0: cpu-sleep-0 {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <639>;
-+				exit-latency-us = <328>;
-+				min-residency-us = <1088>;
-+			};
- 		};
- 	};
- 
--- 
-1.9.1
+Kind regards
+Vincent
+
+>
+>
+> Thanks,
+>
+> -Olof
