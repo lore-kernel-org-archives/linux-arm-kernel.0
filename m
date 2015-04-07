@@ -1,43 +1,78 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 7 Apr 2015 11:28:33 -0700
-Subject: [PATCH] arm: dts: rk3288: Enable Cortex-A12 HW PMU events
-In-Reply-To: <1428429159-24102-1-git-send-email-sonnyrao@chromium.org>
-References: <1428429159-24102-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <CAD=FV=XNJwz+KOquKPgRrRVSZjJ_YbxzfJFsu=3Qhve7ZjY0dw@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 7 Apr 2015 11:35:51 -0700
+Subject: [PATCH 4/5] phy: add Broadcom SATA3 PHY driver for Broadcom STB
+ SoCs
+In-Reply-To: <5523742F.2060105@ti.com>
+References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
+ <1426728222-8197-4-git-send-email-computersforpeace@gmail.com>
+ <55132FD0.2000103@ti.com> <20150328002844.GA32500@ld-irv-0074>
+ <551A3844.6060806@ti.com> <20150402022822.GE32500@ld-irv-0074>
+ <5523742F.2060105@ti.com>
+Message-ID: <20150407183551.GL32500@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Apr 07, 2015 at 11:37:43AM +0530, Kishon Vijay Abraham I wrote:
+> On Thursday 02 April 2015 07:58 AM, Brian Norris wrote:
+> >On Tue, Mar 31, 2015 at 11:31:40AM +0530, Kishon Vijay Abraham I wrote:
+> >>On Saturday 28 March 2015 05:58 AM, Brian Norris wrote:
+> >>>On Thu, Mar 26, 2015 at 03:29:44AM +0530, Kishon Vijay Abraham I wrote:
+> >>>>On Thursday 19 March 2015 06:53 AM, Brian Norris wrote:
+> >>>>>+static struct phy *brcm_sata_phy_xlate(struct device *dev,
+> >>>>>+				       struct of_phandle_args *args)
+> >>>>>+{
+> >>>>>+	struct brcm_sata_phy *priv = dev_get_drvdata(dev);
+> >>>>>+	int i = args->args[0];
+> >>>>>+
+> >>>>>+	if (i >= MAX_PORTS || !priv->phys[i].phy) {
+> >>>>>+		dev_err(dev, "invalid phy: %d\n", i);
+> >>>>>+		return ERR_PTR(-ENODEV);
+> >>>>>+	}
+> >>>>>+
+> >>>>>+	return priv->phys[i].phy;
+> >>>>>+}
+> >>>>
+> >>>>this xlate is not required at all if the controller device tree node has
+> >>>>phandle to the phy node (sub node) instead of the phy provider device tree
+> >>>>node.
+> >>>
+> >>>That doesn't match any convention I see in existing SATA phy bindings,
+> >>>nor do I see how the existing of_phy_simple_xlate() would support this,
+> >>>unless I instantiate a device for each port's PHY. If I adjust the
+> >>>device tree as you suggest, and use of_phy_simple_xlate() instead of
+> >>>this, of_phy_get() can't find the PHY provider, because the provider is
+> >>>registered to the parent, not the subnode.
+> >>
+> >>The phy core should still be able to get the PHY provider.
+> >>See this in of_phy_provider_lookup
+> >>                 for_each_child_of_node(phy_provider->dev->of_node, child)
+> >>                         if (child == node)
+> >>                                 return phy_provider;
+> >
+> >That just searches for children of the node. It doesn't walk parent
+> >nodes.
+> 
+> okay.. in your phy_create pass the np of the PHYs (sub-node pointer
+> to phy provider).
 
-On Tue, Apr 7, 2015 at 10:52 AM, Sonny Rao <sonnyrao@chromium.org> wrote:
-> This adds the dts node for the PMU with the correct PMUIRQ interrupts
-> for each core.
->
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> ---
->  arch/arm/boot/dts/rk3288.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 165968d..8253abb 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -44,6 +44,14 @@
->                 spi2 = &spi2;
->         };
->
-> +       arm-pmu {
-> +               compatible = "arm,cortex-a12-pmu";
-> +               interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
-> +                            <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
-> +                            <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
-> +                            <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
-> +       };
-> +
+Ah, I see. I completely passed over the 2nd parameter to phy_create()...
+Thanks for the tip.
 
-As per discussion with Rockchip: these numbers don't actually match
-the TRM, but apparently the TRM is wrong.
+> >>Can you post your device tree node here?
+> >
+> >You mean patch 5?
+> >
+> >https://lkml.org/lkml/2015/3/18/937
+> >
+> >>>
+> >>>Can you elaborate on your suggestion?
+> 
+> Change the dt node to something like below..
 
-Since these numbers work and the numbers came from Rockchip:
+[snip]
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+Yes, that worked. Thanks.
+
+OK, I'll fix this up and send out v2 shortly.
+
+Brian
