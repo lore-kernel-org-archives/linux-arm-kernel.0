@@ -1,155 +1,125 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 6 Apr 2015 19:27:52 -0700
-Subject: [PATCH 07/13] thermal: of: streamline .get_temp callbacks
-In-Reply-To: <1427385240-6086-8-git-send-email-s.hauer@pengutronix.de>
+Date: Mon, 6 Apr 2015 19:40:28 -0700
+Subject: [PATCH 12/13] thermal: Add support for hardware-tracked trip
+ points
+In-Reply-To: <1427385240-6086-13-git-send-email-s.hauer@pengutronix.de>
 References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-8-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150407022750.GF4648@localhost.localdomain>
+ <1427385240-6086-13-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150407024027.GG4648@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 04:53:54PM +0100, Sascha Hauer wrote:
-> In the thermal framework it was decided that temperatures can't
-> be negative, so let the .get_temp callback in struct
-> thermal_zone_of_device_ops take an unsigned long pointer for
-> the temperature like the .get_temp callback in
-> struct thermal_zone_device_ops does.
-
-This change is required. However, better we move to the direction of
-using signed type for temperature. However, we want to have int instead
-of long though.
-
+On Thu, Mar 26, 2015 at 04:53:59PM +0100, Sascha Hauer wrote:
+> This adds support for hardware-tracked trip points to the device tree
+> thermal sensor framework.
+> 
+> The framework supports an arbitrary number of trip points. Whenever
+> the current temperature is updated, the trip points immediately
+> below and above the current temperature are found. A .set_trips
+> callback is then called with the temperatures. If there is no trip
+> point above or below the current temperature, the passed trip
+> temperature will be ULONG_MAX or 0 respectively. In this callback,
+> the driver should program the hardware such that it is notified
+> when either of these trip points are triggered. When a trip point
+> is triggered, the driver should call `thermal_zone_device_update'
+> for the respective thermal zone. This will cause the trip points
+> to be updated again.
+> 
+> If .set_trips is not implemented, the framework behaves as before.
+> 
+> This patch is based on an earlier version from Mikko Perttunen
+> <mikko.perttunen@kapsi.fi>
 > 
 > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
->  drivers/hwmon/lm75.c                               | 2 +-
->  drivers/hwmon/ntc_thermistor.c                     | 2 +-
->  drivers/hwmon/tmp102.c                             | 2 +-
->  drivers/input/touchscreen/sun4i-ts.c               | 2 +-
->  drivers/thermal/rockchip_thermal.c                 | 2 +-
->  drivers/thermal/samsung/exynos_tmu.c               | 2 +-
->  drivers/thermal/tegra_soctherm.c                   | 2 +-
->  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 2 +-
->  include/linux/thermal.h                            | 2 +-
->  9 files changed, 9 insertions(+), 9 deletions(-)
+>  drivers/thermal/thermal_core.c | 41 +++++++++++++++++++++++++++++++++++++++++
+>  include/linux/thermal.h        |  3 +++
+>  2 files changed, 44 insertions(+)
 > 
-> diff --git a/drivers/hwmon/lm75.c b/drivers/hwmon/lm75.c
-> index fe41d5a..9df3ca3 100644
-> --- a/drivers/hwmon/lm75.c
-> +++ b/drivers/hwmon/lm75.c
-> @@ -104,7 +104,7 @@ static inline long lm75_reg_to_mc(s16 temp, u8 resolution)
->  
->  /* sysfs attributes for hwmon */
->  
-> -static int lm75_read_temp(void *dev, long *temp)
-> +static int lm75_read_temp(void *dev, unsigned long *temp)
->  {
->  	struct lm75_data *data = lm75_update_device(dev);
->  
-> diff --git a/drivers/hwmon/ntc_thermistor.c b/drivers/hwmon/ntc_thermistor.c
-> index 112e4d4..12cb333 100644
-> --- a/drivers/hwmon/ntc_thermistor.c
-> +++ b/drivers/hwmon/ntc_thermistor.c
-> @@ -430,7 +430,7 @@ static int ntc_thermistor_get_ohm(struct ntc_data *data)
->  	return -EINVAL;
+> diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+> index dcdf45e..7138f8f 100644
+> --- a/drivers/thermal/thermal_core.c
+> +++ b/drivers/thermal/thermal_core.c
+> @@ -434,6 +434,45 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
 >  }
+>  EXPORT_SYMBOL_GPL(thermal_zone_get_temp);
 >  
-> -static int ntc_read_temp(void *dev, long *temp)
-> +static int ntc_read_temp(void *dev, unsigned long *temp)
+> +static void thermal_zone_set_trips(struct thermal_zone_device *tz)
+> +{
+> +	unsigned long low = 0;
+> +	unsigned long high = ULONG_MAX;
+> +	unsigned long trip_temp, hysteresis;
+> +	unsigned long temp = tz->temperature;
+> +	int i;
+> +
+> +	if (!tz->ops->set_trips)
+> +		return;
+> +
+> +	/* No need to change trip points */
+> +	if (temp > tz->prev_low_trip && temp < tz->prev_high_trip)
+> +		return;
+> +
+> +	for (i = 0; i < tz->trips; i++) {
+> +		unsigned long trip_low;
+> +
+> +		tz->ops->get_trip_temp(tz, i, &trip_temp);
+> +		tz->ops->get_trip_hyst(tz, i, &hysteresis);
+> +
+> +		trip_low = trip_temp - hysteresis;
+> +
+> +		if (trip_low < temp && trip_low > low)
+> +			low = trip_low;
+> +
+> +		if (trip_temp > temp && trip_temp < high)
+> +			high = trip_temp;
+> +	}
+> +
+> +	tz->prev_low_trip = low;
+> +	tz->prev_high_trip = high;
+> +
+> +	dev_dbg(&tz->device, "new temperature boundaries: %lu < x < %lu\n",
+> +			low, high);
+> +
+> +	tz->ops->set_trips(tz, low, high);
+> +}
+> +
+>  void thermal_zone_device_update(struct thermal_zone_device *tz)
 >  {
->  	struct ntc_data *data = dev_get_drvdata(dev);
->  	int ohm;
-> diff --git a/drivers/hwmon/tmp102.c b/drivers/hwmon/tmp102.c
-> index 9da2735..25bd72b 100644
-> --- a/drivers/hwmon/tmp102.c
-> +++ b/drivers/hwmon/tmp102.c
-> @@ -98,7 +98,7 @@ static struct tmp102 *tmp102_update_device(struct device *dev)
->  	return tmp102;
+>  	int count;
+> @@ -460,6 +499,8 @@ void thermal_zone_device_update(struct thermal_zone_device *tz)
+>  	dev_dbg(&tz->device, "last_temperature=%lu, current_temperature=%lu\n",
+>  				tz->last_temperature, tz->temperature);
+>  
+> +	thermal_zone_set_trips(tz);
+
+Do we need to lock the tz->lock to perform this operation of setting the
+hardware trip points?
+
+> +
+>  	for (count = 0; count < tz->trips; count++)
+>  		handle_thermal_trip(tz, count);
 >  }
->  
-> -static int tmp102_read_temp(void *dev, long *temp)
-> +static int tmp102_read_temp(void *dev, unsigned long *temp)
->  {
->  	struct tmp102 *tmp102 = tmp102_update_device(dev);
->  
-> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-> index b93a28b..26a7cf5 100644
-> --- a/drivers/input/touchscreen/sun4i-ts.c
-> +++ b/drivers/input/touchscreen/sun4i-ts.c
-> @@ -198,7 +198,7 @@ static int sun4i_get_temp(const struct sun4i_ts_data *ts, long *temp)
->  	return 0;
->  }
->  
-> -static int sun4i_get_tz_temp(void *data, long *temp)
-> +static int sun4i_get_tz_temp(void *data, unsigned long *temp)
->  {
->  	return sun4i_get_temp(data, temp);
->  }
-> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> index 3aa46ac..67dfc67 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -366,7 +366,7 @@ static irqreturn_t rockchip_thermal_alarm_irq_thread(int irq, void *dev)
->  	return IRQ_HANDLED;
->  }
->  
-> -static int rockchip_thermal_get_temp(void *_sensor, long *out_temp)
-> +static int rockchip_thermal_get_temp(void *_sensor, unsigned long *out_temp)
->  {
->  	struct rockchip_thermal_sensor *sensor = _sensor;
->  	struct rockchip_thermal_data *thermal = sensor->thermal;
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> index 1d30b09..5f721f2 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -713,7 +713,7 @@ static void exynos7_tmu_control(struct platform_device *pdev, bool on)
->  	writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
->  }
->  
-> -static int exynos_get_temp(void *p, long *temp)
-> +static int exynos_get_temp(void *p, unsigned long *temp)
->  {
->  	struct exynos_tmu_data *data = p;
->  
-> diff --git a/drivers/thermal/tegra_soctherm.c b/drivers/thermal/tegra_soctherm.c
-> index 9197fc0..1c4e455 100644
-> --- a/drivers/thermal/tegra_soctherm.c
-> +++ b/drivers/thermal/tegra_soctherm.c
-> @@ -306,7 +306,7 @@ static long translate_temp(u16 val)
->  	return t;
->  }
->  
-> -static int tegra_thermctl_get_temp(void *data, long *out_temp)
-> +static int tegra_thermctl_get_temp(void *data, unsigned long *out_temp)
->  {
->  	struct tegra_thermctl_zone *zone = data;
->  	u32 val;
-> diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-> index 7f8e5f3..f480a01 100644
-> --- a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-> +++ b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-> @@ -76,7 +76,7 @@ static inline int ti_thermal_hotspot_temperature(int t, int s, int c)
->  
->  /* thermal zone ops */
->  /* Get temperature callback function for thermal zone*/
-> -static inline int __ti_thermal_get_temp(void *devdata, long *temp)
-> +static inline int __ti_thermal_get_temp(void *devdata, unsigned long *temp)
->  {
->  	struct thermal_zone_device *pcb_tz = NULL;
->  	struct ti_thermal_data *data = devdata;
 > diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-> index ba2e29a..2f77091 100644
+> index ac2897c..b870702 100644
 > --- a/include/linux/thermal.h
 > +++ b/include/linux/thermal.h
-> @@ -272,7 +272,7 @@ struct thermal_genl_event {
->   *		   temperature.
->   */
->  struct thermal_zone_of_device_ops {
-> -	int (*get_temp)(void *, long *);
-> +	int (*get_temp)(void *, unsigned long *);
->  	int (*get_trend)(void *, int trend, enum thermal_trend *);
->  	int (*set_emul_temp)(void *, unsigned long);
->  };
+> @@ -87,6 +87,7 @@ struct thermal_zone_device_ops {
+>  	int (*unbind) (struct thermal_zone_device *,
+>  		       struct thermal_cooling_device *);
+>  	int (*get_temp) (struct thermal_zone_device *, unsigned long *);
+> +	int (*set_trips) (struct thermal_zone_device *, unsigned long, unsigned long);
+>  	int (*get_mode) (struct thermal_zone_device *,
+>  			 enum thermal_device_mode *);
+>  	int (*set_mode) (struct thermal_zone_device *,
+> @@ -183,6 +184,8 @@ struct thermal_zone_device {
+>  	unsigned long temperature;
+>  	unsigned long last_temperature;
+>  	unsigned long emul_temperature;
+> +	unsigned long prev_low_trip;
+> +	unsigned long prev_high_trip;
+>  	int passive;
+>  	unsigned int forced_passive;
+>  	const struct thermal_zone_device_ops *ops;
 > -- 
 > 2.1.4
 > 
@@ -159,4 +129,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/fac001a2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/d4723b2a/attachment.sig>
