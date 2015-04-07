@@ -1,42 +1,23 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 07 Apr 2015 12:42:52 +0300
-Subject: [PATCH 07/14] media: omap3isp: remove unused clkdev
-In-Reply-To: <20150405142034.GG4027@n2100.arm.linux.org.uk>
-References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
- <36620233.VbNiGUfDRt@avalon> <20150405142034.GG4027@n2100.arm.linux.org.uk>
-Message-ID: <1894989.AGoQvgsks0@avalon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Apr 2015 11:43:22 +0200
+Subject: [PATCH v3 2/3] documentation: Extend pinctrl docs for Meson8b
+In-Reply-To: <1426800852-1235-3-git-send-email-carlo@caione.org>
+References: <1426800852-1235-1-git-send-email-carlo@caione.org>
+ <1426800852-1235-3-git-send-email-carlo@caione.org>
+Message-ID: <CACRpkdap4kfepO=wbUJ4zDEnt9oEBBz9ry12OVYyzMjkQxuR4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Thu, Mar 19, 2015 at 10:34 PM, Carlo Caione <carlo@caione.org> wrote:
 
-On Sunday 05 April 2015 15:20:34 Russell King - ARM Linux wrote:
-> On Sat, Apr 04, 2015 at 12:44:35AM +0300, Laurent Pinchart wrote:
-> > Hi Russell,
-> > 
-> > Thank you for the patch;
-> > 
-> > On Friday 03 April 2015 18:12:58 Russell King wrote:
-> > > No merged platform supplies xclks via platform data.  As we want to
-> > > slightly change the clkdev interface, rather than fixing this unused
-> > > code, remove it instead.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > 
-> > with one caveat though : it conflicts with patches queued for v4.1 in the
-> > media tree. I'll post a rebased version in a reply to your e-mail. How
-> > would you like to handle the conflict ?
-> 
-> How bad is the conflict?
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> Add the compatible string for Meson8b in Meson pinctrl documentation
+> and add new information for Meson8b in source code comments.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
 
-It's not too bad, it's mostly a context-related conflict. There are two 
-additional lines to remove (plus the associated comment) from isp_xclk_init(), 
-as your patch makes a loop now terminate with if (condition) continue;. Those 
-two lines could be removed later, keeping them doesn't break anything.
+Patch applied with Beniamino's ACK.
 
--- 
-Regards,
-
-Laurent Pinchart
+Yours,
+Linus Walleij
