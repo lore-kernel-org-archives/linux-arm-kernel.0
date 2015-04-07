@@ -1,70 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 7 Apr 2015 12:40:16 +0000
-Subject: irqchip heirarchy DT "break" series awareness?
-In-Reply-To: <20150407115922.5d4c6233@free-electrons.com>
-References: <20150406144647.GC7873@io.lakedaemon.net>
- <20150407115922.5d4c6233@free-electrons.com>
-Message-ID: <20150407124016.GD7873@io.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Apr 2015 13:42:25 +0100
+Subject: [PATCH 03/14] clkdev: get rid of redundant clk_add_alias()
+ prototype in linux/clk.h
+In-Reply-To: <5522D8B5.7050205@codeaurora.org>
+References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
+ <E1Ye593-0001B1-W4@rmk-PC.arm.linux.org.uk>
+ <87lhi8rrmd.fsf@free.fr> <5522D8B5.7050205@codeaurora.org>
+Message-ID: <20150407124225.GI4027@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Thomas,
-
-On Tue, Apr 07, 2015 at 11:59:22AM +0200, Thomas Petazzoni wrote:
-> Jason,
+On Mon, Apr 06, 2015 at 12:04:21PM -0700, Stephen Boyd wrote:
+> On 04/04/15 05:43, Robert Jarzmik wrote:
+> > Russell King <rmk+kernel@arm.linux.org.uk> writes:
+> >
+> >> clk_add_alias() is provided by clkdev, and is not part of the clk API.
+> >> Howver, it is prototyped in two locations: linux/clkdev.h and
+> >> linux/clk.h.  This is a mess.  Get rid of the redundant and unnecessary
+> >> version in linux/clk.h.
+> >>
+> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> >
+> > Actually, this serie fixes a regression I've seen in linux-next, and which was
+> > triggering the Oops in [1] on lubbock. With your serie, the kernel boots fine.
+> >
+> >
 > 
-> On Mon, 6 Apr 2015 14:46:47 +0000, Jason Cooper wrote:
-> 
-> > This causes two problems:
-> > 
-> >  1) Upgrade kernel, but not DTB.
-> > 
-> > 	System will boot, and print a big fat warning that
-> > 	suspend/resume will not work until the DTB is upgraded.
-> > 
-> >  2) Upgrade DTB, but not kernel.
-> > 
-> > 	System will fail to boot.
-> 
-> (2) has never been something that has ever planned of being guaranteed,
-> as far as I know. Only (1) is the supposed consequence of DT ABI
-> stability, but definitely not (2), so I'm unsure why you even mention
-> (2).
+> Is this with the lubbock_defconfig? Is it a regression in 4.0-rc series
+> or is it due to some pending -next patches interacting with the per-user
+> clock patches? It looks like the latter because __clk_get_hw() should be
+> inlined on lubbock_defconfig where CONFIG_COMMON_CLK=n.
 
-Because my goal here was to give *every* possible chance for an
-objection.  Hence, "dt" and "break" in the subject line, sent to the
-devicetree ML.  Also, Marc mentioned the possibility in at least the
-cover letter of each of his series.  I don't want anything hidden.
+It's a regression with anything that uses clk_add_alias() or which
+open codes the aliasing of clocks, or registration of clocks into
+clkdev.  It's quite nasty.
 
-But you are absolutely correct.  (2) was never guaranteed, and it's also
-highly improbable as well.  See below.
+The problem is that the way you updated clkdev, by adding __clk_get_hw()
+at clk_get() time, the struct clk which we're passing in there could
+well have been already clk_put()'d, and therefore freed, and no longer
+valid.
 
-> > In light of Thomas Petazonni's well-researched talk at ELC:
-> > 
-> >   "The Device Tree as a stable ABI: a fairy tale?"
-> >   http://events.linuxfoundation.org/sites/events/files/slides/petazzoni-dt-as-stable-abi-fairy-tale.pdf
-> > 
-> > I'm confident that #2 won't be an issue.  Distro's and OEMs seem to have
-> > worked around the instability by keeping the dtb tied to the kernel
-> > version.
-> 
-> I'm glad you raised my slides as an argument in a DT ABI stability
-> discussion :-)
-> 
-> However, my slides are definitely not about #2 (which as said earlier,
-> was never planned to be something we should worry about), but really
-> about #1.
+It's a regression ever since the per-user clk patches went in, caused
+_entirely_ by those patches.
 
-I was referring to the slide where you mention that distros and vendors
-have tied the dtbs to the kernel versions (Slide 23/27, "Usefulness").
-I should have been more specific when taking something out of context.
-:-P
-
-My point, not well made, was that everyone has decided to slave the
-upgrade of the dtb to the upgrade of the kernel.  There is no 'apt-get
-armv7-dtbs' that has no dependency structure on a kernel package.  So we
-agree, (2) was never guaranteed, and isn't probable either.
-
-thx,
-
-Jason.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
