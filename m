@@ -1,244 +1,132 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue,  7 Apr 2015 16:38:03 +0100
-Subject: [RESEND PATCH 4.0-rc5 v19 6/6] ARM: Add support for on-demand
- backtrace of other CPUs
-In-Reply-To: <1428421083-9137-1-git-send-email-daniel.thompson@linaro.org>
-References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
- <1428421083-9137-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1428421083-9137-7-git-send-email-daniel.thompson@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Apr 2015 08:44:05 -0700
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <20150407152207.GM18048@atomide.com>
+References: <5520E2EE.4080302@gmail.com>
+ <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
+ <5521A438.1070008@gmail.com>
+ <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com>
+ <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
+ <20150406174245.GJ18048@atomide.com>
+ <20150407135713.GL4027@n2100.arm.linux.org.uk>
+ <20150407152207.GM18048@atomide.com>
+Message-ID: <20150407154404.GN18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replicate the x86 code to trigger a backtrace using an NMI and hook
-it up to IPI on ARM.
+* Tony Lindgren <tony@atomide.com> [150407 08:27]:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150407 06:58]:
+> > 
+> > Well, one thing we can do is to tweak the proc-v7*.S such that we detect
+> > Cortex-A8 separately, and only execute the BTB flush for CA8 processors
+> > if the errata is enabled.  Something like this (untested):
+> > 
+> > --- a/arch/arm/mm/proc-v7.S
+> > +++ b/arch/arm/mm/proc-v7.S
+> > @@ -527,6 +545,16 @@ __v7_ca9mp_proc_info:
+> >  	__v7_proc __v7_ca9mp_proc_info, __v7_ca9mp_setup, proc_fns = ca9mp_processor_functions
+> >  	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
+> >  
+> > +	/*
+> > +	 * ARM Ltd. Cortex A8 processor.
+> > +	 */
+> > +	.type	__v7_ca8_proc_info, #object
+> > +__v7_ca8_proc_info:
+> > +	.long	0x410fc080
+> > +	.long	0xff0ffff0
+> > +	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
+> > +	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
+> > +
+> >  #endif	/* CONFIG_ARM_LPAE */
+> >  
+> >  	/*
+> 
+> Works for me. The above needs the following fix folded in to build:
+> 
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -532,7 +532,7 @@ __v7_ca9mp_proc_info:
+>  __v7_ca8_proc_info:
+>  	.long	0x410fc080
+>  	.long	0xff0ffff0
+> -	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
+> +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
+>  	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
+>  
+>  #endif	/* CONFIG_ARM_LPAE */
 
-The code differs slightly from the code on x86 because, on ARM, we do
-now know at compile time whether a platform is capable of supporting FIQ.
-We must avoid using an IPI to request a backtrace from the CPU on which
-the backtrace was requested if interrupts are disabled and fall back to
-generating it directly.
+And then on top of that patch, we can fix the sefaulting issues with the
+following, what do you guys think?
 
-In addition the implementation of arch_trigger_all_cpu_backtrace() the
-patch also includes a few small items of plumbing that must be hooked
-up for the new code to work.
+Regards,
 
-Credit:
-  Russell King provided the initial prototype implementing this feature
-  for ARM. Today the patch has been reworked and, mostly, rewriten to
-  keep it aligned with x86. However this patch does still include some
-  code from Russell's original prototype.
+Tony
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Steven Rostedt <rostedt@goodmis.org>
----
- arch/arm/Kconfig               |  1 +
- arch/arm/include/asm/hardirq.h |  2 +-
- arch/arm/include/asm/irq.h     |  5 +++
- arch/arm/include/asm/smp.h     |  3 ++
- arch/arm/kernel/smp.c          | 81 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/traps.c        |  3 ++
- 6 files changed, 94 insertions(+), 1 deletion(-)
+8< --------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 7 Apr 2015 07:52:39 -0700
+Subject: [PATCH] ARM: mm: Fix Cortex-A8 erratum 430973 segfaults for bootloaders and multiarch
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9f1f09a2bc9b..f3c95a44945d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -76,6 +76,7 @@ config ARM
- 	select OLD_SIGACTION
- 	select OLD_SIGSUSPEND3
- 	select PERF_USE_VMALLOC
-+	select PRINTK_NMI_BACKTRACE
- 	select RTC_LIB
- 	select SYS_SUPPORTS_APM_EMULATION
- 	# Above selects are sorted alphabetically; please add new ones
-diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index fe3ea776dc34..5df33e30ae1b 100644
---- a/arch/arm/include/asm/hardirq.h
-+++ b/arch/arm/include/asm/hardirq.h
-@@ -5,7 +5,7 @@
- #include <linux/threads.h>
- #include <asm/irq.h>
- 
--#define NR_IPI	8
-+#define NR_IPI	9
- 
- typedef struct {
- 	unsigned int __softirq_pending;
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index 53c15dec7af6..be1d07d59ee9 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+Looks like apps can be made to segfault easily on armhf distros
+just by running cpuburn-a8 in the background, then starting apt
+get update unless erratum 430973 workaround is enabled. This happens
+on r3p2 also, which has 430973 fixed in hardware.
+
+Turns out the reason for this is some bootloaders incorrectly
+setting the auxilary register IBE bit, which probably causes us
+to hit erratum 687067 on Cortex-A8 later than r1p2.
+
+Now that Cortex-A8 has it's own cpu_ca8_switch_mm, we can fix these
+issues:
+
+1. If the bootloader incorrectly sets the IBE bit in the auxilary
+   control register for Cortex-A8 revisions with 430973 fixed
+   in hardware, we need to call flush BTAC/BTB to avoid segfaults
+   probably caused by erratum 687067. So let's flush BTAC/BTB
+   unconditionally for Cortex-A8. It won't do anything unless the
+   IBE bit is set.
+
+2. We can and should now keep 430973 enabled for multiarch builds
+   as it no longer causes issues with Cortex-A9 as we have a separate
+   cpu_ca8_switch_mm.
+
+Note that SoCs probably should also add checks and print warnings
+for the misconfigured IBE bit depending on the Cortex-A8 revision
+so the bootloaders can be fixed Cortex-A8 revisions later than
+r1p2 to not set the IBE bit.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -36,14 +36,16 @@
+  *
+  *	It is assumed that:
+  *	- we are not using split page tables
++ *
++ *	Note that we always need to flush BTAC/BTB if IBE is set
++ *	even on Cortex-A8 revisions not affected by 430973.
++ *	If IBE is not set, the flush BTAC/BTB won't do anything.
+  */
+ ENTRY(cpu_ca8_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mov	r2, #0
+-#ifdef CONFIG_ARM_ERRATA_430973
+ 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
  #endif
+-#endif
+ ENTRY(cpu_v7_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mmid	r1, r1				@ get mm->context.id
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -352,7 +352,7 @@ __v7_setup:
+ 	ldr	r10, =0x00000c08		@ Cortex-A8 primary part number
+ 	teq	r0, r10
+ 	bne	2f
+-#if defined(CONFIG_ARM_ERRATA_430973) && !defined(CONFIG_ARCH_MULTIPLATFORM)
++#if defined(CONFIG_ARM_ERRATA_430973)
  
-+#ifdef CONFIG_SMP
-+extern void arch_trigger_all_cpu_backtrace(bool);
-+#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
-+#endif
-+
- #endif
- 
- #endif
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 18f5a554134f..b076584ac0fa 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -18,6 +18,8 @@
- # error "<asm/smp.h> included in non-SMP build"
- #endif
- 
-+#define SMP_IPI_FIQ_MASK 0x0100
-+
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-@@ -79,6 +81,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
- 
-+extern void ipi_cpu_backtrace(struct pt_regs *regs);
- extern int register_ipi_completion(struct completion *completion, int cpu);
- 
- struct smp_operations {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 86ef244c5a24..7eb6241e99d1 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -26,6 +26,7 @@
- #include <linux/completion.h>
- #include <linux/cpufreq.h>
- #include <linux/irq_work.h>
-+#include <linux/seq_buf.h>
- 
- #include <linux/atomic.h>
- #include <asm/smp.h>
-@@ -72,6 +73,7 @@ enum ipi_msg_type {
- 	IPI_CPU_STOP,
- 	IPI_IRQ_WORK,
- 	IPI_COMPLETION,
-+	IPI_CPU_BACKTRACE,
- };
- 
- static DECLARE_COMPLETION(cpu_running);
-@@ -456,6 +458,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
- 	S(IPI_CPU_STOP, "CPU stop interrupts"),
- 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
- 	S(IPI_COMPLETION, "completion interrupts"),
-+	S(IPI_CPU_BACKTRACE, "backtrace interrupts"),
- };
- 
- static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
-@@ -570,6 +573,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-+	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
-+
- 	if ((unsigned)ipinr < NR_IPI) {
- 		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-@@ -623,6 +628,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		irq_exit();
- 		break;
- 
-+	case IPI_CPU_BACKTRACE:
-+		irq_enter();
-+		ipi_cpu_backtrace(regs);
-+		irq_exit();
-+		break;
-+
- 	default:
- 		pr_crit("CPU%u: Unknown IPI message 0x%x\n",
- 		        cpu, ipinr);
-@@ -717,3 +728,73 @@ static int __init register_cpufreq_notifier(void)
- core_initcall(register_cpufreq_notifier);
- 
- #endif
-+
-+/* For reliability, we're prepared to waste bits here. */
-+static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
-+
-+void arch_trigger_all_cpu_backtrace(bool include_self)
-+{
-+	int i;
-+	int this_cpu = get_cpu();
-+
-+	if (0 != printk_nmi_backtrace_prepare()) {
-+		/*
-+		 * If there is already an nmi printk sequence in
-+		 * progress then just give up...
-+		 */
-+		put_cpu();
-+		return;
-+	}
-+
-+	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-+
-+	/*
-+	 * If irqs are disabled on the current processor and
-+	 * IPI_CPU_BACKTRACE is delivered using IRQ then we aren't be able to
-+	 * react to IPI_CPU_BACKTRACE until we leave this function. This
-+	 * would force us to get stuck and, eventually, timeout. We avoid
-+	 * the timeout (and the resulting failure to print useful information)
-+	 * by calling the backtrace logic directly whenever irqs are disabled.
-+	 */
-+	if (include_self && irqs_disabled()) {
-+		ipi_cpu_backtrace(in_interrupt() ? get_irq_regs() : NULL);
-+		include_self = false;
-+	}
-+
-+	if (!include_self)
-+		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
-+
-+	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-+		pr_info("Sending FIQ to %s CPUs:\n",
-+			(include_self ? "all" : "other"));
-+		smp_cross_call(to_cpumask(backtrace_mask), IPI_CPU_BACKTRACE);
-+	}
-+
-+	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
-+	for (i = 0; i < 10 * 1000; i++) {
-+		if (cpumask_empty(to_cpumask(backtrace_mask)))
-+			break;
-+		mdelay(1);
-+		touch_softlockup_watchdog();
-+	}
-+
-+	printk_nmi_backtrace_complete();
-+	put_cpu();
-+}
-+
-+void ipi_cpu_backtrace(struct pt_regs *regs)
-+{
-+	int cpu = smp_processor_id();
-+
-+	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-+		printk_nmi_backtrace_this_cpu_begin();
-+		pr_warn("FIQ backtrace for cpu %d\n", cpu);
-+		if (regs != NULL)
-+			show_regs(regs);
-+		else
-+			dump_stack();
-+		printk_nmi_backtrace_this_cpu_end();
-+
-+		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-+	}
-+}
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index b35e220ae1b1..1836415b8a5c 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- #ifdef CONFIG_ARM_GIC
- 	gic_handle_fiq_ipi();
- #endif
-+#ifdef CONFIG_SMP
-+	ipi_cpu_backtrace(regs);
-+#endif
- 
- 	nmi_exit();
- 
--- 
-2.1.0
+ 	teq	r5, #0x00100000			@ only present in r1p*
+ 	mrceq	p15, 0, r10, c1, c0, 1		@ read aux control register
