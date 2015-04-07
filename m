@@ -1,78 +1,66 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 6 Apr 2015 20:29:49 -0700
-Subject: [PATCH 10/13] thermal: Make struct thermal_zone_device_ops const
-In-Reply-To: <1427385240-6086-11-git-send-email-s.hauer@pengutronix.de>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-11-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150407032948.GN4648@localhost.localdomain>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 7 Apr 2015 03:31:03 +0000
+Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
+In-Reply-To: <20150405160203.GF13898@n2100.arm.linux.org.uk>
+References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <20150405160203.GF13898@n2100.arm.linux.org.uk>
+Message-ID: <HK2PR06MB05619EB06ED9EA52495B06038AFD0@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 04:53:57PM +0100, Sascha Hauer wrote:
-> Now that the of thermal support no longer changes the
-> thermal_zone_device_ops it can be const again.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/thermal/thermal_core.c | 2 +-
->  include/linux/thermal.h        | 6 +++---
+> We have had something that worked very well for this kind of stuff for many many years - that
+> is the top level choice statement where the multi-platform option can be found.
 
-I believe this change deserves to be done together with the required driver 
-updates on those parts that calls this function.
 
->  2 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-> index acf00b5..dcdf45e 100644
-> --- a/drivers/thermal/thermal_core.c
-> +++ b/drivers/thermal/thermal_core.c
-> @@ -1455,7 +1455,7 @@ static void remove_trip_attrs(struct thermal_zone_device *tz)
->   */
->  struct thermal_zone_device *thermal_zone_device_register(const char *type,
->  	int trips, int mask, void *devdata,
-> -	struct thermal_zone_device_ops *ops,
-> +	const struct thermal_zone_device_ops *ops,
->  	const struct thermal_zone_params *tzp,
->  	int passive_delay, int polling_delay)
->  {
-> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-> index 2f77091..ac2897c 100644
-> --- a/include/linux/thermal.h
-> +++ b/include/linux/thermal.h
-> @@ -185,7 +185,7 @@ struct thermal_zone_device {
->  	unsigned long emul_temperature;
->  	int passive;
->  	unsigned int forced_passive;
-> -	struct thermal_zone_device_ops *ops;
-> +	const struct thermal_zone_device_ops *ops;
->  	const struct thermal_zone_params *tzp;
->  	struct thermal_governor *governor;
->  	struct list_head thermal_instances;
-> @@ -317,7 +317,7 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
->  
->  #if IS_ENABLED(CONFIG_THERMAL)
->  struct thermal_zone_device *thermal_zone_device_register(const char *, int, int,
-> -		void *, struct thermal_zone_device_ops *,
-> +		void *, const struct thermal_zone_device_ops *,
->  		const struct thermal_zone_params *, int, int);
->  void thermal_zone_device_unregister(struct thermal_zone_device *);
->  
-> @@ -345,7 +345,7 @@ void thermal_notify_framework(struct thermal_zone_device *, int);
->  #else
->  static inline struct thermal_zone_device *thermal_zone_device_register(
->  	const char *type, int trips, int mask, void *devdata,
-> -	struct thermal_zone_device_ops *ops,
-> +	const struct thermal_zone_device_ops *ops,
->  	const struct thermal_zone_params *tzp,
->  	int passive_delay, int polling_delay)
->  { return ERR_PTR(-ENODEV); }
-> -- 
-> 2.1.4
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/ca99de30/attachment.sig>
+In arch/arm/Kconfig, there is already a
+config ARCH_SHMOBILE_LEGACY
+	bool "Renesas ARM SoCs (non-multiplatform)"
+	select ARCH_SHMOBILE
+
+But, that will only get you to a limited number of systems to choose from.
+
+
+The system I want (ARCH_R7S72100), in arch/arm/mach-shmobile/Kconfig is buried inside
+if ARCH_SHMOBILE_MULTI
+. . .
+. . .
+config ARCH_R7S72100
+	bool "RZ/A1H (R7S72100)"
+	select SYS_SUPPORTS_SH_MTU2
+. . .
+. . .
+endif
+
+
+Hence, I can't select ARCH_R7S72100 without first selecting multi-platform.
+
+So, to not break multi-platform, but still allow single builds (and not
+break anyone's existing config files), we'd have to go back to the way
+it was, which was having duplicate ARCH entries in:
+
+if ARCH_SHMOBILE_MULTI
+. . .
+. . .
+endif
+
+ and
+
+if ARCH_SHMOBILE_LEGACY
+. . .
+. . .
+endif
+
+However, this idea conflicts with Arnd's statement:
+
+> a) building a kernel for a single machine while CONFIG_ARCH_MULTIPLATFORM is
+>    enabled
+>
+> I have patches to make ARCH_MULTIPLATFORM always enabled on all ARMv6/v7 (snip)
+>
+> This means that I would definitely want to see XIP_KERNEL being possible on your machine with a)
+
+
+I must be missing something, but the only way to have it show up in the menu under multi-platform and single-platform is to duplicate the ARCH_xxx entry.
+
+
+Chris
