@@ -1,29 +1,69 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 7 Apr 2015 22:05:08 +0200
-Subject: [PATCH 1/2] ARM: at91/dt: sam9x5: add pinctrl for pwm0
-In-Reply-To: <8817d74520bc99a9ee01fe303dc335cd@overkiz.com>
-References: <1428415884-30662-1-git-send-email-g.portay@overkiz.com>
- <1428415884-30662-2-git-send-email-g.portay@overkiz.com>
- <20150407192231.GW20669@piout.net>
- <8817d74520bc99a9ee01fe303dc335cd@overkiz.com>
-Message-ID: <20150407200508.GY20669@piout.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 7 Apr 2015 13:05:43 -0700
+Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <20150320112828.GF2869@sirena.org.uk>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+ <1426112117-18220-2-git-send-email-dianders@chromium.org>
+ <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
+ <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
+ <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
+ <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
+ <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
+ <20150319113646.GQ2869@sirena.org.uk>
+ <CAPDyKFroe9N3j9oMWKknH5huv7j8fkrBr5UKjjp190hkqNsNRg@mail.gmail.com>
+ <20150320112828.GF2869@sirena.org.uk>
+Message-ID: <CAD=FV=WpDE_iEFWFw094WBfBH2TgRi+1OGk3E3qQ3t1EfyrnJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/2015 at 21:40:56 +0200, g.portay at overkiz.com wrote :
-> >
-> >Else, I'm fine with that patch.
-> 
-> I do think so... I added them for consistency only... I will drop them in
-> v2.
-> 
-> Do you want I drop all those kind of comments (of the whole file) as well ?
-> 
+Hi,
 
-I don't think it is necessary to do that change for the whole file yet,
-let's just avoid adding more.
+On Fri, Mar 20, 2015 at 4:28 AM, Mark Brown <broonie@kernel.org> wrote:
+> As previously discussed the problem is that there can be a *lot* of
+> voltages on a modern regulator with fine grained voltage steps and
+> tolerances are also used for things like cpufreq where we care about
+> performance.  We need something that doesn't require a linear scan of
+> possible values.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Finally getting back to this (sorry for the delay!).  I tried
+modifying my patches to keep using the simple implementation of
+regulator_set_voltage_tol() but to take two tolerances (lower and
+upper).  ...but when I thought about it I decided it wasn't enough.  I
+think that doing a proper implementation of
+regulator_set_voltage_tol() is going to be a requirement for getting
+the MMC core changes posted.
+
+Specifically, I think the right implementation for the MMC core's 3.3V
+signaling is something like this:
+
+  /*
+   * Bus operating conditions say that card should accept input
+   * between (0.625 * VDD) and (VDD + 0.3), so we'll use those
+   * as tolerances.
+   */
+  return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
+       vmmc_voltage, vmmc_voltage * 375 / 1000, 300000);
+
+Ulf says he has a board where vmmc is 3.4V and the max vqmmc is 2.9V.
+If we think about that board, we'll end up calling
+regulator_set_voltage_tol() with a lower/upper tolerance of 1.275V and
+.3V.
+
+Extending the current simple implementation of
+regulator_set_voltage_tol() to take an upper and lower, that will
+translate to first trying to set the voltage to 3.4V - 3.7V, which
+will fail.  We'll then try to set the voltage to 2.125V - 3.7V.
+Presumably that will end up picking 2.125V, which is really non-ideal
+compared to 2.9V and it seems likely to cause some cards to start
+failing.
+
+Mark: I know you said you were considering writing a better
+regulator_set_voltage_tol() yourself, but I don't know if you've
+already started work on it.
+
+I'm expecting to maybe have time to take a crack at it in a few weeks
+if you haven't already done it by then.
+
+Thanks!
+
+-Doug
