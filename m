@@ -1,73 +1,135 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 7 Apr 2015 17:40:24 +0200
-Subject: [PATCH] power: add poodle battery driver
-In-Reply-To: <CALT56yOH-rc1RG=xQhcGT-FKJz7D9qKd+rO+8s4PdYrK0weCGQ@mail.gmail.com>
-References: <1427714679-27472-1-git-send-email-dbaryshkov@gmail.com>
- <20150406164428.GB18145@earth>
- <CALT56yOH-rc1RG=xQhcGT-FKJz7D9qKd+rO+8s4PdYrK0weCGQ@mail.gmail.com>
-Message-ID: <20150407154023.GA23823@earth>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue,  7 Apr 2015 16:37:59 +0100
+Subject: [RESEND PATCH 4.0-rc5 v19 2/6] irqchip: gic: Make gic_raise_softirq
+ FIQ-safe
+In-Reply-To: <1428421083-9137-1-git-send-email-daniel.thompson@linaro.org>
+References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
+ <1428421083-9137-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1428421083-9137-3-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It is currently possible for FIQ handlers to re-enter gic_raise_softirq()
+and lock up.
 
-On Tue, Apr 07, 2015 at 03:34:30PM +0300, Dmitry Eremin-Solenikov wrote:
-> > On Mon, Mar 30, 2015 at 02:24:39PM +0300, Dmitry Eremin-Solenikov wrote:
-> >> Add a driver supporting battery charging on Sharp SL-5600 (poodle).
-> >> Voltage and temperature readings are provided through add7846 hwmon
-> >> interface. Battery voltage is in1_input (mV) and temp in in0_input
-> >> (values unknown, but should be less than 2441).
-> >
-> > You may want to convert add7846 to iio interface, which can be
-> > exposed via hwmon and requested by other kernel drivers (e.g. this
-> > one).
-> 
-> This needs a more careful thought. I have several devices in mind,
-> which provide touchscreen + ADC interfaces, where ADC is used
-> for battery voltage and temperature sensing. Sometimes additional
-> GPIOs are in play. Thus I'd like for now to sustain from changing
-> ads7846 driver. Or, at least to delay such changes, iff there will be
-> no real design/ideas how to handle such devices in a generic enough
-> way.
+    	gic_raise_softirq()
+	   lock(x);
+-~-> FIQ
+        handle_fiq()
+	   gic_raise_softirq()
+	      lock(x);		<-- Lockup
 
-If you have more of these devices it's even more appealing to use
-the IIO interface. You can basically keep the touchscreen part of
-the ads7846 driver and replace hwmon with IIO. Then other kernel
-drivers can request an IIO channel, but you are still able to use
-hwmon interface from userspace via iio-hwmon.
+arch/arm/ uses IPIs to implement arch_irq_work_raise(), thus this issue
+renders it difficult for FIQ handlers to safely defer work to less
+restrictive calling contexts.
 
-> [...]
+This patch fixes the problem by converting the cpu_map_migration_lock
+into a rwlock making it safe to re-enter the function.
 
-> >> +static int poodle_battery_probe(struct platform_device *dev)
-> >> +{
-> >> + int ret;
-> >> +
-> >> + ret = gpio_request_array(poodle_batt_gpios,
-> >> + ARRAY_SIZE(poodle_batt_gpios));
-> >> + if (ret)
-> >> + return ret;
-> >> +
-> >> + mutex_init(&poodle_bat_main.work_lock);
-> >> +
-> >> + INIT_WORK(&bat_work, poodle_bat_work);
-> >> +
-> >> + ret = power_supply_register(&dev->dev, &poodle_bat_main.psy);
-> >> + if (ret)
-> >> + goto err_psy_reg_main;
-> >
-> > we have devm_power_supply_register() now.
-> 
-> Not so sure about it. I'd like to cancel work after unregistering power_supply.
-> I think I'll even switch from devm_request_irq back to request_irq to be able
-> to cancel IRQs before canceling work.
+Note that having made it safe to re-enter gic_raise_softirq() we no
+longer need to mask interrupts during gic_raise_softirq() because the
+b.L migration is always performed from task context.
 
-Why?
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ drivers/irqchip/irq-gic.c | 38 +++++++++++++++++++++++++-------------
+ 1 file changed, 25 insertions(+), 13 deletions(-)
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/fa506729/attachment.sig>
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index a181b836d5ea..578ffc5ec087 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -75,22 +75,25 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+ /*
+  * This lock is used by the big.LITTLE migration code to ensure no IPIs
+  * can be pended on the old core after the map has been updated.
++ *
++ * This lock may be locked for reading from both IRQ and FIQ handlers
++ * and therefore must not be locked for writing when these are enabled.
+  */
+ #ifdef CONFIG_BL_SWITCHER
+-static DEFINE_RAW_SPINLOCK(cpu_map_migration_lock);
++static DEFINE_RWLOCK(cpu_map_migration_lock);
+ 
+-static inline void gic_migration_lock(unsigned long *flags)
++static inline void gic_migration_lock(void)
+ {
+-	raw_spin_lock_irqsave(&cpu_map_migration_lock, *flags);
++	read_lock(&cpu_map_migration_lock);
+ }
+ 
+-static inline void gic_migration_unlock(unsigned long flags)
++static inline void gic_migration_unlock(void)
+ {
+-	raw_spin_unlock_irqrestore(&cpu_map_migration_lock, flags);
++	read_unlock(&cpu_map_migration_lock);
+ }
+ #else
+-static inline void gic_migration_lock(unsigned long *flags) {}
+-static inline void gic_migration_unlock(unsigned long flags) {}
++static inline void gic_migration_lock(void) {}
++static inline void gic_migration_unlock(void) {}
+ #endif
+ 
+ /*
+@@ -647,12 +650,20 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
+ #endif
+ 
+ #ifdef CONFIG_SMP
++/*
++ * Raise the specified IPI on all cpus set in mask.
++ *
++ * This function is safe to call from all calling contexts, including
++ * FIQ handlers. It relies on gic_migration_lock() being multiply acquirable
++ * to avoid deadlocks when the function is re-entered at different
++ * exception levels.
++ */
+ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ {
+ 	int cpu;
+-	unsigned long flags, map = 0;
++	unsigned long map = 0;
+ 
+-	gic_migration_lock(&flags);
++	gic_migration_lock();
+ 
+ 	/* Convert our logical CPU mask into a physical one. */
+ 	for_each_cpu(cpu, mask)
+@@ -667,7 +678,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	/* this always happens on GIC0 */
+ 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+ 
+-	gic_migration_unlock(flags);
++	gic_migration_unlock();
+ }
+ #endif
+ 
+@@ -715,7 +726,8 @@ int gic_get_cpu_id(unsigned int cpu)
+  * Migrate all peripheral interrupts with a target matching the current CPU
+  * to the interface corresponding to @new_cpu_id.  The CPU interface mapping
+  * is also updated.  Targets to other CPU interfaces are unchanged.
+- * This must be called with IRQs locally disabled.
++ * This must be called from a task context and with IRQ and FIQ locally
++ * disabled.
+  */
+ void gic_migrate_target(unsigned int new_cpu_id)
+ {
+@@ -746,9 +758,9 @@ void gic_migrate_target(unsigned int new_cpu_id)
+ 	 * pending on the old cpu static. That means we can defer the
+ 	 * migration until after we have released the irq_controller_lock.
+ 	 */
+-	raw_spin_lock(&cpu_map_migration_lock);
++	write_lock(&cpu_map_migration_lock);
+ 	gic_cpu_map[cpu] = 1 << new_cpu_id;
+-	raw_spin_unlock(&cpu_map_migration_lock);
++	write_unlock(&cpu_map_migration_lock);
+ 
+ 	/*
+ 	 * Find all the peripheral interrupts targetting the current
+-- 
+2.1.0
