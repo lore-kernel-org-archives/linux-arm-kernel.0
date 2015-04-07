@@ -1,73 +1,87 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 6 Apr 2015 19:23:08 -0700
-Subject: [PATCH 05/13] thermal: inline only once used function
-In-Reply-To: <1427385240-6086-6-git-send-email-s.hauer@pengutronix.de>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-6-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150407022307.GE4648@localhost.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 6 Apr 2015 19:23:13 -0700
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
+References: <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
+ <5520E2EE.4080302@gmail.com>
+ <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
+ <5521A438.1070008@gmail.com>
+ <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com>
+ <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
+ <20150406174245.GJ18048@atomide.com>
+ <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
+Message-ID: <20150407022312.GK18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 04:53:52PM +0100, Sascha Hauer wrote:
-> Inline update_temperature into its only caller to make the code
-> more readable.
-
-I am not sure I understand how this is improving readability, can you
-please elaborate?
-
-The way it is now it is more modular at least.
-
+* Matthijs van Duin <matthijsvanduin@gmail.com> [150406 11:15]:
+> * Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [150406 10:15]:
+> > Why custom function, if IBE bit is zero, BTB invalidate instruction is a
+> > NOP. Do you think that "mcr p15, 0, r2, c7, c5, 6" executed as a NOP will
+> > put so much overhead, that it deserves a custom function?
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/thermal/thermal_core.c | 16 +++++-----------
->  1 file changed, 5 insertions(+), 11 deletions(-)
+> Executing them as nop is Cortex-A8 specific. On other ARMv7 CPUs, BTB
+> invalidation on context switch may be unnecessary yet expensive.
 > 
-> diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-> index ebca854..6d0fdad 100644
-> --- a/drivers/thermal/thermal_core.c
-> +++ b/drivers/thermal/thermal_core.c
-> @@ -431,11 +431,15 @@ exit:
->  }
->  EXPORT_SYMBOL_GPL(thermal_zone_get_temp);
->  
-> -static void update_temperature(struct thermal_zone_device *tz)
-> +void thermal_zone_device_update(struct thermal_zone_device *tz)
->  {
-> +	int count;
->  	unsigned long temp;
->  	int ret;
->  
-> +	if (!tz->ops->get_temp)
-> +		return;
-> +
->  	ret = thermal_zone_get_temp(tz, &temp);
->  	if (ret) {
->  		dev_warn(&tz->device, "failed to read out thermal zone %d\n",
-> @@ -451,16 +455,6 @@ static void update_temperature(struct thermal_zone_device *tz)
->  	trace_thermal_temperature(tz);
->  	dev_dbg(&tz->device, "last_temperature=%lu, current_temperature=%lu\n",
->  				tz->last_temperature, tz->temperature);
-> -}
-> -
-> -void thermal_zone_device_update(struct thermal_zone_device *tz)
-> -{
-> -	int count;
-> -
-> -	if (!tz->ops->get_temp)
-> -		return;
-> -
-> -	update_temperature(tz);
->  
->  	for (count = 0; count < tz->trips; count++)
->  		handle_thermal_trip(tz, count);
-> -- 
-> 2.1.4
+> In general I think you'll want a version with and one without BTB
+> flushing, and select depending on CPUID (ID_MMFR1, bits 28-31), with
+> overrides for known processor issues (i.e. the cortex-a8 has a wrong
+> value there in all cases: it reports value 2, while it should be
+> treated as 1 or 4 depending on cpu revision).
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/9e258001/attachment.sig>
+> 
+> On 6 April 2015 at 19:42, Tony Lindgren <tony@atomide.com> wrote:
+> > Hmm but it still seems to do something also on cortex-a8 r3p2 that
+> > is supposedly not affected by 430973.. Based on my tests so far, at least
+> > armhf running cpuburn-a8 in the background and doing apt-get update
+> > segfaults constantly without flush BTAC/BTB. This seems to be the case
+> > no matter how the aux ctrl reg bits are set..
+> 
+> That sounds.... really odd.  The TRM is fairly explicit about BTB
+> flush executing as nop when IBE is not set. Of course the TRM is not
+> exactly flawless, but still...
+
+Oops, sorry user error.. I was trying to clear IBE as a banked register
+like L2 enable bit and of course it did not get cleared.. Clearing it
+with a smc call really clears it. And in that case my test case seems to
+work reliably on r3p2 without erratum 430973 enabled. 
+
+Anyways, if the bootloader enables IBE bit, then the kernel must also
+always enable the erratum 430973 flush BTAC/BTB parts on all cortex-a8.
+
+Or else the kernel must clear the IBE bit based on the version, which
+may be trickier with all the SoC and vendor specific smc calls.
+ 
+> >> 2. For Cortex-A8 revisions affected by 430973, set IBE bit to 1, set it
+> >>    to 0 for all others.
+> 
+> Note btw that erratum 687067 affects *all* Cortex-A8 revisions, so
+> there's a bit of a catch-22 there. The proper workaround for it
+> (zeroing some particular debug register) can only be done in secure
+> privileged mode, and there's no straightforward way to check whether
+> this has been done.
+> 
+> However, it only affects BTB invalidate by MVA, afaik BTB invalidate
+> all is safe.
+
+I'm now thinking the kernel should just always set the 430973 specific
+cpu_v7_switch_mm for all cortex-a8 if IBE bit is set. That avoids
+the whole mess of early SoC detection and smc calls. And if IBE bit
+is not set, then we jsut use the rgular cpu_v7_switch_mm.
+
+This will work as long as we can read the aux ctrl register IBE
+bit using mrc, which I believe is the case for all cortex-a8 based
+omap variants.
+ 
+> >>  That should happen as soon as possible,
+> >>  otherwise kernel may crash on affected revisions if thumb-compiled.
+> 
+> The right place to do this to be honest would be in the bootloader,
+> but I guess that's not always convenient to arrange...
+
+Yeah I agree.
+
+Regards,
+
+Tony
