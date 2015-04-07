@@ -1,110 +1,168 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  7 Apr 2015 16:45:02 +0200
-Subject: [PATCH v3 2/9] Documentation: bindings: move the Berlin clock
- documentation
+Date: Tue,  7 Apr 2015 16:45:04 +0200
+Subject: [PATCH v3 4/9] ARM: berlin: rework the clock node for BG2CD
 In-Reply-To: <1428417909-27378-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1428417909-27378-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1428417909-27378-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1428417909-27378-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin clock documentation was part of the Marvell Berlin SoC
-documentation because the Berlin clock configuration was inside the
-chip controller. With the recent rework of the chip and system
-controller handling (now all sub-devices of the soc and system
-controller nodes are registred with simple-mfd, and each device has its
-own sub-node), the documentation of the Berlin clock driver can be moved
-to the generic clock documentation directory.
+With the introduction of the Berlin mfd controller driver, all drivers
+previously sharing the chip and system controller nodes now have their
+own sub-node.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- .../devicetree/bindings/arm/marvell,berlin.txt     | 27 +++----------------
- .../devicetree/bindings/clock/marvell,berlin.txt   | 31 ++++++++++++++++++++++
- 2 files changed, 35 insertions(+), 23 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/marvell,berlin.txt
+ arch/arm/boot/dts/berlin2cd.dtsi | 39 ++++++++++++++++++++++-----------------
+ 1 file changed, 22 insertions(+), 17 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-index ece73c6ad973..4a8ff8e14cb7 100644
---- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-@@ -75,37 +75,18 @@ Required properties:
- 		"simple-mfd", "syscon"
- - reg: address and length of the system control register set
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index 4bca01ee94d6..240bfe24ae83 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -53,7 +53,7 @@
+ 		sdhci0: sdhci at ab0000 {
+ 			compatible = "mrvl,pxav3-mmc";
+ 			reg = <0xab0000 0x200>;
+-			clocks = <&chip CLKID_SDIO0XIN>, <&chip CLKID_SDIO0>;
++			clocks = <&chip_clk CLKID_SDIO0XIN>, <&chip_clk CLKID_SDIO0>;
+ 			clock-names = "io", "core";
+ 			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+@@ -77,7 +77,7 @@
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xad0600 0x20>;
+ 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
+-			clocks = <&chip CLKID_TWD>;
++			clocks = <&chip_clk CLKID_TWD>;
+ 		};
  
--* Clock provider binding
--
--As clock related registers are spread among the chip control registers, the
--chip control node also provides the clocks. Marvell Berlin2 (BG2, BG2CD, BG2Q)
--SoCs share the same IP for PLLs and clocks, with some minor differences in
--features and register layout.
--
--Required properties:
--- #clock-cells: shall be set to 1
--- clocks: clock specifiers referencing the core clock input clocks
--- clock-names: array of strings describing the input clock specifiers above.
--    Allowed clock-names for the reference clocks are
--      "refclk" for the SoCs osciallator input on all SoCs,
--    and SoC-specific input clocks for
--      BG2/BG2CD: "video_ext0" for the external video clock input
--
--Clocks provided by core clocks shall be referenced by a clock specifier
--indexing one of the provided clocks. Refer to dt-bindings/clock/berlin<soc>.h
--for the corresponding index mapping.
--
- Example:
+ 		usb_phy0: usb-phy at b74000 {
+@@ -99,7 +99,7 @@
+ 		eth1: ethernet at b90000 {
+ 			compatible = "marvell,pxa168-eth";
+ 			reg = <0xb90000 0x10000>;
+-			clocks = <&chip CLKID_GETH1>;
++			clocks = <&chip_clk CLKID_GETH1>;
+ 			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+ 			/* set by bootloader */
+ 			local-mac-address = [00 00 00 00 00 00];
+@@ -117,7 +117,7 @@
+ 		eth0: ethernet at e50000 {
+ 			compatible = "marvell,pxa168-eth";
+ 			reg = <0xe50000 0x10000>;
+-			clocks = <&chip CLKID_GETH0>;
++			clocks = <&chip_clk CLKID_GETH0>;
+ 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 			/* set by bootloader */
+ 			local-mac-address = [00 00 00 00 00 00];
+@@ -216,7 +216,7 @@
+ 				compatible = "snps,dw-apb-timer";
+ 				reg = <0x2c00 0x14>;
+ 				interrupts = <8>;
+-				clocks = <&chip CLKID_CFG>;
++				clocks = <&chip_clk CLKID_CFG>;
+ 				clock-names = "timer";
+ 				status = "okay";
+ 			};
+@@ -225,7 +225,7 @@
+ 				compatible = "snps,dw-apb-timer";
+ 				reg = <0x2c14 0x14>;
+ 				interrupts = <9>;
+-				clocks = <&chip CLKID_CFG>;
++				clocks = <&chip_clk CLKID_CFG>;
+ 				clock-names = "timer";
+ 				status = "okay";
+ 			};
+@@ -234,7 +234,7 @@
+ 				compatible = "snps,dw-apb-timer";
+ 				reg = <0x2c28 0x14>;
+ 				interrupts = <10>;
+-				clocks = <&chip CLKID_CFG>;
++				clocks = <&chip_clk CLKID_CFG>;
+ 				clock-names = "timer";
+ 				status = "disabled";
+ 			};
+@@ -243,7 +243,7 @@
+ 				compatible = "snps,dw-apb-timer";
+ 				reg = <0x2c3c 0x14>;
+ 				interrupts = <11>;
+-				clocks = <&chip CLKID_CFG>;
++				clocks = <&chip_clk CLKID_CFG>;
+ 				clock-names = "timer";
+ 				status = "disabled";
+ 			};
+@@ -252,7 +252,7 @@
+ 				compatible = "snps,dw-apb-timer";
+ 				reg = <0x2c50 0x14>;
+ 				interrupts = <12>;
+-				clocks = <&chip CLKID_CFG>;
++				clocks = <&chip_clk CLKID_CFG>;
+ 				clock-names = "timer";
+ 				status = "disabled";
+ 			};
+@@ -261,7 +261,7 @@
+ 				compatible = "snps,dw-apb-timer";
+ 				reg = <0x2c64 0x14>;
+ 				interrupts = <13>;
+-				clocks = <&chip CLKID_CFG>;
++				clocks = <&chip_clk CLKID_CFG>;
+ 				clock-names = "timer";
+ 				status = "disabled";
+ 			};
+@@ -270,7 +270,7 @@
+ 				compatible = "snps,dw-apb-timer";
+ 				reg = <0x2c78 0x14>;
+ 				interrupts = <14>;
+-				clocks = <&chip CLKID_CFG>;
++				clocks = <&chip_clk CLKID_CFG>;
+ 				clock-names = "timer";
+ 				status = "disabled";
+ 			};
+@@ -279,7 +279,7 @@
+ 				compatible = "snps,dw-apb-timer";
+ 				reg = <0x2c8c 0x14>;
+ 				interrupts = <15>;
+-				clocks = <&chip CLKID_CFG>;
++				clocks = <&chip_clk CLKID_CFG>;
+ 				clock-names = "timer";
+ 				status = "disabled";
+ 			};
+@@ -297,9 +297,14 @@
+ 		chip: chip-controller at ea0000 {
+ 			compatible = "marvell,berlin2cd-chip-ctrl", "simple-mfd", "syscon";
+ 			reg = <0xea0000 0x400>;
+-			#clock-cells = <1>;
+-			clocks = <&refclk>;
+-			clock-names = "refclk";
++
++			chip_clk: clock {
++				compatible = "marvell,berlin2-clk";
++
++				#clock-cells = <1>;
++				clocks = <&refclk>;
++				clock-names = "refclk";
++			};
  
- chip: chip-control at ea0000 {
- 	compatible = "marvell,berlin2-chip-ctrl", "simple-mfd", "syscon";
--	#clock-cells = <1>;
- 	reg = <0xea0000 0x400>;
--	clocks = <&refclk>, <&externaldev 0>;
--	clock-names = "refclk", "video_ext0";
-+
-+	/* sub-device nodes */
- };
- 
- sysctrl: system-controller at d000 {
- 	compatible = "marvell,berlin2-system-ctrl", "simple-mfd", "syscon";
- 	reg = <0xd000 0x100>;
-+
-+	/* sub-device nodes */
- };
-diff --git a/Documentation/devicetree/bindings/clock/marvell,berlin.txt b/Documentation/devicetree/bindings/clock/marvell,berlin.txt
-new file mode 100644
-index 000000000000..c611c495f3ff
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/marvell,berlin.txt
-@@ -0,0 +1,31 @@
-+Device Tree Clock bindings for Marvell Berlin
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Clock related registers are spread among the chip control registers. Berlin
-+clock node should be a sub-node of the chip controller node. Marvell Berlin2
-+(BG2, BG2CD, BG2Q) SoCs share the same IP for PLLs and clocks, with some
-+minor differences in features and register layout.
-+
-+Required properties:
-+- compatible: must be "marvell,berlin2-clk" or "marvell,berlin2q-clk"
-+- #clock-cells: must be 1
-+- clocks: must be the input parent clock phandle
-+- clock-names: name of the input parent clock
-+	Allowed clock-names for the reference clocks are
-+	"refclk" for the SoCs oscillator input on all SoCs,
-+	and SoC-specific input clocks for
-+	BG2/BG2CD: "video_ext0" for the external video clock input
-+
-+
-+Example:
-+
-+chip_clk: clock {
-+	compatible = "marvell,berlin2q-clk";
-+
-+	#clock-cells = <1>;
-+	clocks = <&refclk>;
-+	clock-names = "refclk";
-+};
+ 			soc_pinctrl: pin-controller {
+ 				compatible = "marvell,berlin2cd-soc-pinctrl";
+@@ -320,7 +325,7 @@
+ 			compatible = "chipidea,usb2";
+ 			reg = <0xed0000 0x200>;
+ 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&chip CLKID_USB0>;
++			clocks = <&chip_clk CLKID_USB0>;
+ 			phys = <&usb_phy0>;
+ 			phy-names = "usb-phy";
+ 			status = "disabled";
+@@ -330,7 +335,7 @@
+ 			compatible = "chipidea,usb2";
+ 			reg = <0xee0000 0x200>;
+ 			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&chip CLKID_USB1>;
++			clocks = <&chip_clk CLKID_USB1>;
+ 			phys = <&usb_phy1>;
+ 			phy-names = "usb-phy";
+ 			status = "disabled";
 -- 
 2.3.5
