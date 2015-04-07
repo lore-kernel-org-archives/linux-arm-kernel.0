@@ -1,48 +1,34 @@
 From: leilei.zhao@atmel.com (Leilei Zhao)
-Date: Tue, 7 Apr 2015 17:45:05 +0800
-Subject: [PATCH 04/10] crypto: atmel-sha: fix sg list management
+Date: Tue, 7 Apr 2015 17:45:06 +0800
+Subject: [PATCH 05/10] crypto: atmel-sha: initialize spinlock in probe
 In-Reply-To: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
 References: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
-Message-ID: <1428399911-23325-5-git-send-email-leilei.zhao@atmel.com>
+Message-ID: <1428399911-23325-6-git-send-email-leilei.zhao@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having a zero length sg doesn't mean it is the end of the sg list. This
-case happens when calculating HMAC of IPSec packet.
+Kernel will report "BUG: spinlock lockup suspected on CPU#0"
+when CONFIG_DEBUG_SPINLOCK is enabled in kernel config and the
+spinlock is used at the first time. It's caused by uninitialized
+spinlock, so just initialize it in probe.
 
 Signed-off-by: Leilei Zhao <leilei.zhao@atmel.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/crypto/atmel-sha.c |   16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ drivers/crypto/atmel-sha.c |    1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
-index b471bbe..9fb8af1 100644
+index 9fb8af1..6430f6a 100644
 --- a/drivers/crypto/atmel-sha.c
 +++ b/drivers/crypto/atmel-sha.c
-@@ -163,8 +163,20 @@ static size_t atmel_sha_append_sg(struct atmel_sha_reqctx *ctx)
- 		count = min(ctx->sg->length - ctx->offset, ctx->total);
- 		count = min(count, ctx->buflen - ctx->bufcnt);
+@@ -1367,6 +1367,7 @@ static int atmel_sha_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, sha_dd);
  
--		if (count <= 0)
--			break;
-+		if (count <= 0) {
-+			/*
-+			* Check if count <= 0 because the buffer is full or
-+			* because the sg length is 0. In the latest case,
-+			* check if there is another sg in the list, a 0 length
-+			* sg doesn't necessarily mean the end of the sg list.
-+			*/
-+			if ((ctx->sg->length == 0) && !sg_is_last(ctx->sg)) {
-+				ctx->sg = sg_next(ctx->sg);
-+				continue;
-+			} else {
-+				break;
-+			}
-+		}
+ 	INIT_LIST_HEAD(&sha_dd->list);
++	spin_lock_init(&sha_dd->lock);
  
- 		scatterwalk_map_and_copy(ctx->buffer + ctx->bufcnt, ctx->sg,
- 			ctx->offset, count, 0);
+ 	tasklet_init(&sha_dd->done_task, atmel_sha_done_task,
+ 					(unsigned long)sha_dd);
 -- 
 1.7.9.5
