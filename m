@@ -1,10 +1,10 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  7 Apr 2015 16:45:08 +0200
-Subject: [PATCH v3 8/9] ARM: berlin: remove useless chip and system ctrl
- compatibles in BG2CD
+Date: Tue,  7 Apr 2015 16:45:06 +0200
+Subject: [PATCH v3 6/9] Documentation: bindings: update the berlin chip and
+ system ctrl doc
 In-Reply-To: <1428417909-27378-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1428417909-27378-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1428417909-27378-9-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1428417909-27378-7-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,30 +13,54 @@ system controllers is done, their dedicated compatible can be removed.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2cd.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/marvell,berlin.txt | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 240bfe24ae83..7dff8497606b 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -295,7 +295,7 @@
- 		};
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+index 4a8ff8e14cb7..b76838ab4f51 100644
+--- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
++++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+@@ -50,11 +50,7 @@ different functions which are described below.
  
- 		chip: chip-controller at ea0000 {
--			compatible = "marvell,berlin2cd-chip-ctrl", "simple-mfd", "syscon";
-+			compatible = "simple-mfd", "syscon";
- 			reg = <0xea0000 0x400>;
+ Required properties:
+ - compatible:
+-	* the first value should be one of:
+-		"marvell,berlin2-chip-ctrl" for BG2
+-		"marvell,berlin2cd-chip-ctrl" for BG2CD
+-		"marvell,berlin2q-chip-ctrl" for BG2Q
+-	* the second and third values must be:
++	* the first and second values must be:
+ 		"simple-mfd", "syscon"
+ - reg: address and length of following register sets for
+   BG2/BG2CD: chip control register set
+@@ -67,25 +63,21 @@ individual registers dealing with pinmux, padmux, and reset.
  
- 			chip_clk: clock {
-@@ -402,7 +402,7 @@
- 			};
+ Required properties:
+ - compatible:
+-	* the first value should be one of:
+-		"marvell,berlin2-system-ctrl" for BG2
+-		"marvell,berlin2cd-system-ctrl" for BG2CD
+-		"marvell,berlin2q-system-ctrl" for BG2Q
+-	* the second and third values must be:
++	* the first and second values must be:
+ 		"simple-mfd", "syscon"
+ - reg: address and length of the system control register set
  
- 			sysctrl: system-controller at d000 {
--				compatible = "marvell,berlin2cd-system-ctrl", "simple-mfd", "syscon";
-+				compatible = "simple-mfd", "syscon";
- 				reg = <0xd000 0x100>;
+ Example:
  
- 				sys_pinctrl: pin-controller {
+ chip: chip-control at ea0000 {
+-	compatible = "marvell,berlin2-chip-ctrl", "simple-mfd", "syscon";
++	compatible = "simple-mfd", "syscon";
+ 	reg = <0xea0000 0x400>;
+ 
+ 	/* sub-device nodes */
+ };
+ 
+ sysctrl: system-controller at d000 {
+-	compatible = "marvell,berlin2-system-ctrl", "simple-mfd", "syscon";
++	compatible = "simple-mfd", "syscon";
+ 	reg = <0xd000 0x100>;
+ 
+ 	/* sub-device nodes */
 -- 
 2.3.5
