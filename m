@@ -1,78 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 7 Apr 2015 14:42:09 +0200
-Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
-In-Reply-To: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
-References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
-Message-ID: <20150407124209.GA12633@lunn.ch>
+From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
+Date: Tue, 7 Apr 2015 12:46:46 +0000
+Subject: [PATCH V2] tty: serial: Add const to struct uart_ops declarations
+References: <1428169665.2775.53.camel@perches.com>
+ <a938a0e86638588e5ccff85771fa3b95@agner.ch>
+ <1428258294.2775.69.camel@perches.com>
+Message-ID: <C2D7FE5348E1B147BCA15975FBA2307566598FD3@IN01WEMBXB.internal.synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 12:34:30PM +0900, Masahiro Yamada wrote:
-> Hello experts,
-> I hope this is the correct ML to ask this question.
-> 
-> I am struggling to port Linux-4.0-rc7 onto my SoC/board,
-> based on ARM cortex-A9 (single CPU), but the kernel fails to boot
-> with the error:
-> "not syncing: Attempted to kill init! exitcode=0x00000004"
-> 
-> 
-> I want to use NS16550-compatible UART, Global Timer, and GIC.
-> I wrote a simple device tree source for my own board like this:
-> 
-> ------------------>8------------------------------
-> /dts-v1/;
-> /include/ "skeleton.dtsi"
-> 
-> / {
->         compatible = "socionext,ph1-ld4";
-> 
->         memory {
->                 device_type = "memory";
->                 reg = <0x80000000 0x20000000>;
->         };
-> 
->         chosen {
->                 bootargs = "root=/dev/ram0 console=ttyS0,115200";
->         };
-> 
->         aliases {
->                 serial0 = &uart0;
->         };
-> 
->         cpus {
->                 #size-cells = <0>;
->                 #address-cells = <1>;
-> 
->                 cpu at 0 {
->                         device_type = "cpu";
->                         compatible = "arm,cortex-a9";
->                         reg = <0>;
->                 };
->         };
-> 
->         clocks {
-> [    0.000000] Virtual kernel memory layout:
-> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-> [    0.000000]     vmalloc : 0xe0800000 - 0xff000000   ( 488 MB)
-> [    0.000000]     lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
-> [    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-> [    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-> [    0.000000]       .text : 0xc0208000 - 0xc0d03b7c   (11247 kB)
-> [    0.000000]       .init : 0xc0d04000 - 0xc0dce000   ( 808 kB)
-> [    0.000000]       .data : 0xc0dce000 - 0xc0ecbde0   (1016 kB)
-> [    0.000000]        .bss : 0xc0ecbde0 - 0xc0f1aee8   ( 317 kB)
-> [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
-> [    0.000000] Hierarchical RCU implementation.
-> [    0.000000]  Additional per-CPU info printed with stalls.
-> [    0.000000]  RCU restricting CPUs from NR_CPUS=16 to nr_cpu_ids=1.
-> [    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
-> [    0.000000] NR_IRQS:16 nr_irqs:16 16
-> [    0.000000] GIC CPU mask not found - kernel will fail to boot.
-> [    0.000000] GIC CPU mask not found - kernel will fail to boot.
+On Sunday 05 April 2015 11:55 PM, Joe Perches wrote:
 
-I assume you have seen this, have taken a deeper look, and know it is
-not your issue?
+These structs can be const, so make them const.
 
-    Andrew
+Miscellanea:
+
+o Add static to struct uart_ops declaration in bfin_sport_uart
+
+Signed-off-by: Joe Perches <joe@perches.com><mailto:joe@perches.com>
+---
+On Sun, 2015-04-05 at 00:04 +0200, Stefan Agner wrote:
+
+
+> On 2015-04-04 19:47, Joe Perches wrote:
+
+
+> > Done with:
+> > sed -r -i -e 's/\bstruct\s+uart_ops\s+(\w+)\s*=\s*/const struct
+> > uart_ops \1 = /g' drivers/tty/serial/*.c
+
+
+[]
+
+
+> +++ b/drivers/tty/serial/fsl_lpuart.c
+> Something went wrong in this driver, const is twice...
+
+
+Apologies, thanks for noticing.
+The sed was mistakenly done twice on that file.
+
+V2:
+
+o Fix duplicate const in fsl_lpuart.c
+o Add static to drivers/tty/serial/bfin_sport_uart.c
+
+Still compiled only x86 and not cross-compiled or tested.
+
+ drivers/tty/serial/21285.c                  | 2 +-
+ drivers/tty/serial/altera_jtaguart.c        | 2 +-
+ drivers/tty/serial/altera_uart.c            | 2 +-
+ drivers/tty/serial/amba-pl010.c             | 2 +-
+ drivers/tty/serial/amba-pl011.c             | 2 +-
+ drivers/tty/serial/apbuart.c                | 2 +-
+ drivers/tty/serial/ar933x_uart.c            | 2 +-
+ drivers/tty/serial/arc_uart.c               | 2 +-
+
+Acked-by: Vineet Gupta <vgupta@synopsys.com><mailto:vgupta@synopsys.com> # for arc_uart
+
+Th,
+-Vineet
