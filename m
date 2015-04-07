@@ -1,46 +1,45 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 07 Apr 2015 17:43:33 +0100
-Subject: [GIT PULL] arm-cci PMU updates for 4.1
-In-Reply-To: <20150403204016.GB23023@localhost>
-References: <20150327172500.GO1562@arm.com> <20150403204016.GB23023@localhost>
-Message-ID: <55240935.9060900@arm.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Tue, 07 Apr 2015 18:51:56 +0200
+Subject: [PATCH v6 10/15] serial: stm32-usart: Add STM32 USART Driver
+In-Reply-To: <1428424234-28572-11-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1428424234-28572-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1428424234-28572-11-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <55240B2C.3020102@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/15 21:40, Olof Johansson wrote:
-> On Fri, Mar 27, 2015 at 05:25:00PM +0000, Will Deacon wrote:
->> Hi Olof, Arnd,
->>
->> Please can you pull the following ARM CCI PMU updates for 4.1? Suzuki
->> has reworked parts of the existing driver so that it can be used on CPUs
->> booting in non-secure mode (i.e. ARM64 systems) and also make it easier
->> to port over to new IP, such as CCI-500.
->>
->> It's coming via me as $ARM_PERF_GUY, but Nico has Acked the core driver
->> (non-PMU) changes. Note that these have been in next for a bit, but I
->> can drop the branch once you've pulled.
->>
->> Cheers,
->>
->> Will
->>
->> --->8
->>
->> The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
->>
->>    Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tags/arm-perf-4.1
->>
->> for you to fetch changes up to 874c571414d5617f4042298986b6a826816ee885:
->>
->>    arm-cci: Fix CCI PMU event validation (2015-03-27 13:45:02 +0000)
->
-> Merged now. The Kconfig merge was a bit messy since someone decided to sort the
-> file, and Stephen will see that too (cc:d here).
->
-Tested the CCI PMU on the for-next branch, works well. Thanks Olof.
+Am 07.04.2015 um 18:30 schrieb Maxime Coquelin:
+> This drivers adds support to the STM32 USART controller, which is a
+> standard serial driver.
+> 
+> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+>  drivers/tty/serial/Kconfig       |  17 +
+>  drivers/tty/serial/Makefile      |   1 +
+>  drivers/tty/serial/stm32-usart.c | 735 +++++++++++++++++++++++++++++++++++++++
+>  include/uapi/linux/serial_core.h |   3 +
+>  4 files changed, 756 insertions(+)
+>  create mode 100644 drivers/tty/serial/stm32-usart.c
+[...]
+> diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
+> new file mode 100644
+> index 0000000..4adc430
+> --- /dev/null
+> +++ b/drivers/tty/serial/stm32-usart.c
+[...]
+> +#define DRIVER_NAME "stm32-usart"
+> +#define STM32_SERIAL_NAME "ttyS"
 
-Suzuki
+I'm surprised no one has complained about ttyS yet. Doesn't that need to
+be unique, such as ttySTM (efm32 uses ttyefm), to avoid clashes between
+serial drivers? ttyS was exclusive to the 8250 driver, I thought.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
