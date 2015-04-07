@@ -1,41 +1,24 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 7 Apr 2015 13:47:58 +0200
-Subject: [PATCH v11]: clk: Add common clock support for Mediatek MT8135
- and MT8173
-In-Reply-To: <1427825817-26773-1-git-send-email-s.hauer@pengutronix.de>
-References: <1427825817-26773-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CABuKBeJ256HBLP+3WB+acNbMonGknQJgWBnGjEx1VWecWc-Y5g@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 7 Apr 2015 19:49:02 +0800
+Subject: [PATCH] pinctrl: at91: convert __raw to endian agnostic IO
+In-Reply-To: <CACRpkdY26txvV92SePv02EdX6TOcTBn9uWPX08gC2oAi7XGs0A@mail.gmail.com>
+References: <1427372329-26005-1-git-send-email-ben.dooks@codethink.co.uk>
+ <CACRpkdY26txvV92SePv02EdX6TOcTBn9uWPX08gC2oAi7XGs0A@mail.gmail.com>
+Message-ID: <A0B30D6A-11E5-4D5D-AA0F-9AC807431459@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
 
+> On Apr 7, 2015, at 5:06 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+> On Thu, Mar 26, 2015 at 1:18 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> 
+>> Use endian agnostic _relaxed IO accessors instead of the __raw ones.
+>> 
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> 
+> Uncontroversial. Applied with Nicolas' ACK.
+I ack the whole series so yes
 
-2015-03-31 20:16 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
->
-> The following changes since commit 9eccca0843205f87c00404b663188b88eb248051:
->
->   Linux 4.0-rc3 (2015-03-08 16:09:09 -0700)
->
-> are available in the git repository at:
->
->   git://git.pengutronix.de/git/imx/linux-2.6.git tags/v4.0-clk-mediatek-v11
->
-> for you to fetch changes up to ae9129219143cfdefe8b3a463deb8c5cb8955525:
->
->   dt-bindings: ARM: Mediatek: Document devicetree bindings for clock/reset controllers (2015-03-31 20:08:46 +0200)
->
-> ----------------------------------------------------------------
-> This patchset contains the initial common clock support for Mediatek SoCs.
-> Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes
-> and clock gates.
-
-I tried the patch set on my mt8135 eval board. I used the dts bindings
-from a former version of this set [1], but it does not boot the board
-(based on v4.0-rc7).
-Do you have any hint, what is happening, or are the bindings wrong?
-
-Best regards,
-Matthias
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/322813.html
+Best Regards,
+J.
