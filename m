@@ -1,44 +1,130 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 7 Apr 2015 12:19:42 -0400
-Subject: [RESEND PATCH 4.0-rc5 v19 5/6] x86/nmi: Use common printk
- functions
-In-Reply-To: <1428421083-9137-6-git-send-email-daniel.thompson@linaro.org>
-References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
- <1428421083-9137-1-git-send-email-daniel.thompson@linaro.org>
- <1428421083-9137-6-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20150407121942.627d2165@gandalf.local.home>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue,  7 Apr 2015 18:30:19 +0200
+Subject: [PATCH v6 00/15] Add support to STMicroelectronics STM32 family
+Message-ID: <1428424234-28572-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  7 Apr 2015 16:38:02 +0100
-Daniel Thompson <daniel.thompson@linaro.org> wrote:
+This sixth round adds minor fixes to USART driver, and adds some Acks.
 
-  
->  void arch_trigger_all_cpu_backtrace(bool include_self)
->  {
-> -	struct nmi_seq_buf *s;
-> -	int len;
-> -	int cpu;
->  	int i;
->  	int this_cpu = get_cpu();
->  
-> -	if (test_and_set_bit(0, &backtrace_flag)) {
-> +	if (0 != printk_nmi_backtrace_prepare()) {
+STM32 MCUs are Cortex-M CPU, used in various applications (consumer
+electronics, industrial applications, hobbyists...).
+Datasheets, user and programming manuals are publicly available on
+STMicroelectronics website.
 
-Not sure what the others think, but I hate this polish notation for
-compares. One does not say "if zero does not equal
-printk_nmi_backtrace_prepare()", they say "if
-printk_nmi_backtrace_prepare() does not return zero".
+With this series applied, the STM32F419 Discovery can boot succesfully.
 
-And the reason for polish notation is to prevent the:
+Changes since v5:
+-----------------
+ - Change st,hw-flow-ctrl property to auto-flow-control (Rob)
+ - Constify stm32_uart_ops (Joe)
+ - Propagate request_irq error in USART driver (Andy)
+ - Applies Acked-by and Reviewed-by (Rob, Peter)
 
-	if (x = 0)
+Changes since v4:
+-----------------
+ - Cosmetic changes in USART driver (Andy)
+ - Apply Acks on reset driver & bindings (Philipp & Rob)
 
-mistake. Which gcc warns about anyway. Also, this doesn't even pertain
-to this code because:
+Changes since v3:
+-----------------
+ - Fix and simplify error path in ARMv7-M Systick driver (Daniel)
+ - Improve reset bindings documentation (Philipp)
+ - Fix trailing lines anf typos in reset driver & doc (Philipp & Chanwoo)
+ - Fix MODULE_LICENCE in USART driver (Paul)
+ - Refactor USART baudrate calculation (Peter & Andy)
+ - Fix error path in USART init (Peter & Russell)
+ - Fix HW flow control in USART driver (Peter)
+ - Fix serial port type number to unused one (Peter)
+ - Applies Chanwoo's Tested-by on the series
 
-	if (printk_nmi_backtrace_prepare() = 0)
+Changes since v2:
+-----------------
+ - Remove pinctrl driver from the series. 
+ - Remove reset_controller_of_init(), and reset the timers in the bootloader
+ - Add HW flow contrl property for serial driver
+ - Lots of changes in the DTS file, as per Andreas recommendations
+ - Some Kconfig clean-ups
+ - Adapt the config to be compatible with Andreas' bootwrapper, except UART port.
+ - Various fixes in documentation
 
-would fail to compile.
+Changes since v1:
+-----------------
+ - Move bindings documentation in their own patches (Andreas)
+ - Rename ARM System timer to armv7m-systick (Rob)
+ - Add clock-frequency property handling in armv7m-systick (Rob)
+ - Re-factor the reset controllers into a single controller (Philipp)
+ - Add kerneldoc to reset_controller_of_init (Philipp)
+ - Add named constants in include/dt-bindings/reset/ (Philipp)
+ - Make pinctrl driver to depend on ARCH_STM32 or COMPILE_TEST (Geert)
+ - Introduce CPUV7M_NUM_IRQ config flag to indicate the number of interrupts
+supported by the MCU, in order to limit memory waste in vectors' table (Uwe)
 
--- Steve
+Maxime Coquelin (15):
+  scripts: link-vmlinux: Don't pass page offset to kallsyms if XIP
+    Kernel
+  ARM: ARMv7-M: Enlarge vector table up to 256 entries
+  dt-bindings: Document the ARM System timer bindings
+  clocksource/drivers: Add ARM System timer driver
+  dt-bindings: Document the STM32 reset bindings
+  drivers: reset: Add STM32 reset driver
+  dt-bindings: Document the STM32 timer bindings
+  clockevents/drivers: Add STM32 Timer driver
+  dt-bindings: Document the STM32 USART bindings
+  serial: stm32-usart: Add STM32 USART Driver
+  ARM: Add STM32 family machine
+  ARM: dts: Add ARM System timer as clockevent in armv7m
+  ARM: dts: Introduce STM32F429 MCU
+  ARM: configs: Add STM32 defconfig
+  MAINTAINERS: Add entry for STM32 MCUs
+
+ Documentation/arm/stm32/overview.txt               |  32 +
+ Documentation/arm/stm32/stm32f429-overview.txt     |  22 +
+ .../devicetree/bindings/arm/armv7m_systick.txt     |  26 +
+ .../devicetree/bindings/reset/st,stm32-rcc.txt     | 107 +++
+ .../devicetree/bindings/serial/st,stm32-usart.txt  |  32 +
+ .../devicetree/bindings/timer/st,stm32-timer.txt   |  22 +
+ MAINTAINERS                                        |   8 +
+ arch/arm/Kconfig                                   |  18 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/armv7-m.dtsi                     |   6 +
+ arch/arm/boot/dts/stm32f429-disco.dts              |  71 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   | 226 +++++++
+ arch/arm/configs/stm32_defconfig                   |  71 ++
+ arch/arm/kernel/entry-v7m.S                        |  13 +-
+ arch/arm/mach-stm32/Makefile                       |   1 +
+ arch/arm/mach-stm32/Makefile.boot                  |   3 +
+ arch/arm/mach-stm32/board-dt.c                     |  19 +
+ arch/arm/mm/Kconfig                                |  15 +
+ drivers/clocksource/Kconfig                        |  15 +
+ drivers/clocksource/Makefile                       |   2 +
+ drivers/clocksource/armv7m_systick.c               |  79 +++
+ drivers/clocksource/timer-stm32.c                  | 184 ++++++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-stm32.c                        | 124 ++++
+ drivers/tty/serial/Kconfig                         |  17 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/stm32-usart.c                   | 735 +++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |   3 +
+ scripts/link-vmlinux.sh                            |   2 +-
+ 30 files changed, 1852 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/arm/stm32/overview.txt
+ create mode 100644 Documentation/arm/stm32/stm32f429-overview.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/armv7m_systick.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/st,stm32-timer.txt
+ create mode 100644 arch/arm/boot/dts/stm32f429-disco.dts
+ create mode 100644 arch/arm/boot/dts/stm32f429.dtsi
+ create mode 100644 arch/arm/configs/stm32_defconfig
+ create mode 100644 arch/arm/mach-stm32/Makefile
+ create mode 100644 arch/arm/mach-stm32/Makefile.boot
+ create mode 100644 arch/arm/mach-stm32/board-dt.c
+ create mode 100644 drivers/clocksource/armv7m_systick.c
+ create mode 100644 drivers/clocksource/timer-stm32.c
+ create mode 100644 drivers/reset/reset-stm32.c
+ create mode 100644 drivers/tty/serial/stm32-usart.c
+
+-- 
+1.9.1
