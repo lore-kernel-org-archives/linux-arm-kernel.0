@@ -1,68 +1,86 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  7 Apr 2015 19:43:57 +0100
-Subject: [PATCH v6 2/4] ARM: sti: stih410-clocks: Identify critical clocks as
- always-on
+Date: Tue,  7 Apr 2015 19:43:58 +0100
+Subject: [PATCH v6 3/4] clk: Provide always-on clock support
 In-Reply-To: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
 References: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1428432239-4114-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1428432239-4114-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Lots of platforms contain clocks which if turned off would prove fatal.
-The only way to recover is to restart the board(s).  This driver takes
-references to clocks which are required to be always-on.  The common
-clk framework will then take references to them.  This way they will
-not be turned off during the clk_disabled_unused() procedure.
-
-In this patch we are identifying clocks, which if gated would render
-the STiH410 development board unserviceable.
+The only way to recover from these catastrophic failures is to restart
+the board(s).  Now, when a clock provider is registered with the
+framework it is possible for a list of always-on clocks to be supplied
+which must be kept ungated.  Each clock mentioned in the newly
+introduced 'clock-always-on' will be clk_prepare_enable()d where the
+normal references will be taken.  This will prevent the common clk
+framework from attempting to gate them during the clk_disable_unused()
+and disable_clock() procedures.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih410-clock.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/clk/clk-conf.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
-index 6b5803a..e1dd9b2 100644
---- a/arch/arm/boot/dts/stih410-clock.dtsi
-+++ b/arch/arm/boot/dts/stih410-clock.dtsi
-@@ -103,6 +103,7 @@
- 				clocks = <&clk_sysin>;
+diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
+index aad4796..a07aced 100644
+--- a/drivers/clk/clk-conf.c
++++ b/drivers/clk/clk-conf.c
+@@ -116,6 +116,43 @@ static int __set_clk_rates(struct device_node *node, bool clk_supplier)
+ 	return 0;
+ }
  
- 				clock-output-names = "clk-s-a0-pll-ofd-0";
-+				clock-always-on = <0>; /* clk-s-a0-pll-ofd-0 */
- 			};
- 
- 			clk_s_a0_flexgen: clk-s-a0-flexgen {
-@@ -115,6 +116,8 @@
- 
- 				clock-output-names = "clk-ic-lmi0",
- 						     "clk-ic-lmi1";
++static int __set_clk_always_on(struct device_node *node, bool clk_supplier)
++{
++	struct of_phandle_args clkspec;
++	struct clk *clk;
++	struct property	*prop;
++	const __be32 *cur;
++	uint32_t index;
++	int ret;
 +
-+				clock-always-on = <CLK_IC_LMI0>;
- 			};
- 		};
- 
-@@ -142,6 +145,7 @@
- 				clocks = <&clk_sysin>;
- 
- 				clock-output-names = "clk-s-c0-pll0-odf-0";
-+				clock-always-on = <0>; /* clk-s-c0-pll0-odf-0 */
- 			};
- 
- 			clk_s_c0_pll1: clk-s-c0-pll1 {
-@@ -204,6 +208,12 @@
- 						     "clk-clust-hades",
- 						     "clk-hwpe-hades",
- 						     "clk-fc-hades";
++	if (!clk_supplier)
++		return 0;
 +
-+				clock-always-on = <CLK_ICN_CPU>,
-+						  <CLK_TX_ICN_DMU>,
-+						  <CLK_EXT2F_A9>,
-+						  <CLK_ICN_LMI>,
-+						  <CLK_ICN_SBC>;
- 			};
- 		};
++	of_property_for_each_u32(node, "clock-always-on", prop, cur, index) {
++		clkspec.np = node;
++		clkspec.args_count = 1;
++		clkspec.args[0] = index;
++
++		clk = of_clk_get_from_provider(&clkspec);
++		if (IS_ERR(clk)) {
++			pr_err("clk: couldn't get clock %u for %s\n",
++				index, node->full_name);
++			return PTR_ERR(clk);
++		}
++
++		ret = clk_prepare_enable(clk);
++		if (ret) {
++			pr_err("Failed to enable clock %u for %s: %d\n",
++			       index, node->full_name, ret);
++			return ret;
++		}
++
++		pr_debug("Setting clock as always-on %pC\n", clk);
++	}
++
++	return 0;
++}
++
+ /**
+  * of_clk_set_defaults() - parse and set assigned clocks configuration
+  * @node: device node to apply clock settings for
+@@ -139,6 +176,10 @@ int of_clk_set_defaults(struct device_node *node, bool clk_supplier)
+ 	if (rc < 0)
+ 		return rc;
  
+-	return __set_clk_rates(node, clk_supplier);
++	rc = __set_clk_rates(node, clk_supplier);
++	if (rc < 0)
++		return rc;
++
++	return __set_clk_always_on(node, clk_supplier);
+ }
+ EXPORT_SYMBOL_GPL(of_clk_set_defaults);
 -- 
 1.9.1
