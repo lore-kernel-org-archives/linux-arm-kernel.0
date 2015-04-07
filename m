@@ -1,100 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 8 Apr 2015 08:44:48 +0100
-Subject: [PATCH v2 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
- termination driver
-In-Reply-To: <CADaLNDnhbR+i3b7X2zE7Fyou55Pu8qv-6QxpnRf4hqfq=0XyJQ@mail.gmail.com>
-References: <cover.1425497218.git.dhdang@apm.com>
- <ca98e05f8a8dabdc6cc5b6e8c3ce50cf4e900fac.1425497218.git.dhdang@apm.com>
- <5509BE7C.1000901@arm.com>
- <CADaLNDn0V8F27Yu1-j8H0Dw2t-Ac04TZcbtsg++ALdB4orXrUQ@mail.gmail.com>
- <5509C951.30402@arm.com>
- <CADaLNDnhbR+i3b7X2zE7Fyou55Pu8qv-6QxpnRf4hqfq=0XyJQ@mail.gmail.com>
-Message-ID: <20150408084448.5f0793b7@why.wild-wind.fr.eu.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 7 Apr 2015 21:17:46 +0200
+Subject: [PATCH v6 4/4] clk: dt: Introduce binding for always-on clock
+ support
+In-Reply-To: <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
+References: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
+ <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150407191746.GA26727@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Apr 2015 20:56:48 +0100
-Duc Dang <dhdang@apm.com> wrote:
+Hi Lee,
 
-Hi Duc,
-
-> On Wed, Mar 18, 2015 at 11:52 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On 18/03/15 18:29, Duc Dang wrote:
-> >> On Wed, Mar 18, 2015 at 11:05 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >>> On 04/03/15 19:39, Duc Dang wrote:
-> >>>> X-Gene v1 SOC supports total 2688 MSI/MSIX vectors coalesced into
-> >>>> 16 HW IRQ lines.
-> >>>>
-> >>>> Signed-off-by: Duc Dang <dhdang@apm.com>
-> >>>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> >>>
-> >>> I just had a quick look at this, and this seems to be going in the exact
-> >>> opposite direction compared to what we now have on arm64, where we move
-> >>> away from using struct msi_controller for most thing, and implement PCI
-> >>> MSI/MSIX in a generic way, using MSI domains.
-> >>>
-> >>> I suggest you have a look at how GICv2m and GICv3 ITS implement the MSI
-> >>> support. You can also have a look at what I did for the Tegra MSI
-> >>> controller in this patch:
-> >>>
-> >>> https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/kill-msi-controller&id=83b3602fcee7972b9d549ed729b56ec28de16081
-> >>>
-> >>> Eventually, the plan is to kill msi_controller entirely, so introducing
-> >>> new drivers that rely on it is not something I'm eager to see.
-> >>
-> >> Thanks, Marc.
-> >>
-> >>  X-Gene 1 MSI is handled by separate MSI controller block, so its
-> >> driver implementation is different from GICv2m and GICv3. I will refer
-> >
-> > It will certainly be different in the sense that you won't use a stacked
-> > domain on top of the GIC. But what I want to see is the use of a generic
-> > pci_msi_domain on top of an irq_domain, just like we have on v2m and v3.
-> > Thomas has also been vocal enough about that in the past, and x86 is
-> > going down that road as well.
-> >
-> >> to what you did for Tegra MSI, but I don't see your latest changes in
-> >> 4.0-rc4. Is the change you made for Tegra MSI going to mainline soon?
-> >
-> > Not yet. As you can see in this branch, this relies on some other
-> > cleanups. But you can already convert most of your driver and put it in
-> > the shape that matches what we have for v2m and v3. Once the required
-> > cleanups are in, I'll remove the last traces of msi_controller myself if
-> > necessary.
-> >
+On Tue, Apr 07, 2015 at 07:43:59PM +0100, Lee Jones wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  .../devicetree/bindings/clock/clock-bindings.txt   | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
 > 
-> Hi Marc, Bjorn,
-> 
-> I follow Marc's suggestion and convert my X-Gene 1 MSI driver to
-> remove msi_controller struct and use generic pci_msi_domain on top of
-> an irq_domain. The code requires Marc's changes in
-> irq/kill-msi-controller branch to be compiled and function correctly,
-> so I plan to post the patch on top of Marc's tree. Please let me know
-> if you think I should have different approach to post this patch.
+> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> index 06fc6d5..daf3323 100644
+> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> @@ -44,6 +44,44 @@ For example:
+>    clocks by index. The names should reflect the clock output signal
+>    names for the device.
+>  
+> +clock-always-on:    Some hardware contains bunches of clocks which must never be
+> +		    turned off.  If drivers a) fail to obtain a reference to any
+> +		    of these or b) give up a previously obtained reference
+> +		    during suspend, the common clk framework will attempt to
+> +		    disable them and a platform can fail irrecoverably as a
+> +		    result.  Usually the only way to recover from these failures
+> +		    is to reboot.
+> +
+> +		    To avoid either of these two scenarios from catastrophically
+> +		    disabling an otherwise perfectly healthy running system,
+> +		    clocks can be identified as always-on using this property
+> +		    from inside a clocksource's node.
 
-I don't think you should rely on this branch just yet (this is why I
-suggested matching what we currently have for GICv2m and v3). Keeping
-msi_controller is fine at the moment, even if we only use to store the
-MSI domain. If and when this series makes it to mainline, I'll go over
-the individual drivers to convert them to the new scheme, just like I
-did for GIC and Tegra.
+Isn't "clocksource" here way too similar to, I don't know, the
+clocksource framework? Wouln't clock provider be better?
 
-> Another question I have is when do you plan to roll out this hierarchy
-> irq domain implementation for MSI, as I see some of Marc's changes to
-> kill msi_controller structure and implement MSI irq domain still does
-> not get into Bjorn's tree.
+> +
+> +		    This property is not to be abused.  It is only to be used to
+> +		    protect platforms from being crippled by gated clocks, not
+> +		    as a convenience function to avoid using the framework
+> +		    correctly inside device drivers.
 
-I'm still tinkering with it (I have some long standing comments from
-Bjorn to address), and I'm working on non-PCI MSI support at the moment.
+Disregarding what's stated here, I'm pretty sure that this will
+actually happen. Where do you place the cursor?
 
-But the core MSI irq domain stuff is already in (this is what GICv2m
-and GICv3 ITS are using), and this should be an easy thing to convert
-your code.
+Should we create a new driver for our RAM controller, or do we want to
+use clock-always-on?
 
-Please let me know if I can be of any help.
+Do we really want to enforce this if we ever gain a driver that would
+actually be able to manage its clock (like do we want the CPU clock to
+never *ever* be gated just because we don't have a cpuidle/hotplug
+driver yet?)
 
-Thanks,
+Have you seen the numerous NAK on such approach Mike did?
 
-	M.
+Maxime
+
 -- 
-Without deviation from the norm, progress is not possible.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/dc94b180/attachment.sig>
