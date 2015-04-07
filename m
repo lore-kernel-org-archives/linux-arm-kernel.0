@@ -1,84 +1,23 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Apr 2015 08:37:28 +0100
-Subject: [PATCH 1/2] mfd: sec: Fix RTC alarm interrupt number on S2MPS11
-In-Reply-To: <1427985376-20420-2-git-send-email-k.kozlowski@samsung.com>
-References: <1427985376-20420-1-git-send-email-k.kozlowski@samsung.com>
- <1427985376-20420-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20150407073728.GH3461@x1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Apr 2015 09:41:19 +0200
+Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
+In-Reply-To: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
+References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
+Message-ID: <3196164.8b31S2QWFd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 02 Apr 2015, Krzysztof Kozlowski wrote:
-
-> The RTC on S2MPS11 is the same as S2MPS14. However interrupt numbers of
-> RTC alarms 0 and 1 were inversed between these two devices. So when
-> rtc-s5m driver requested S2MPS14_IRQ_RTCA0 interrupt, it matched to
-> S2MPS11_IRQ_RTCA1, not RTCA0.
+On Tuesday 07 April 2015 12:34:30 Masahiro Yamada wrote:
 > 
-> Fix this by using consistent RTC alarm interrupt numbers and adding a
-> BUILD_BUG_ON for future generations.
+> What is the cause of the kernel panic?  How to fix it?
+> Any hint is very appreciated.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/mfd/sec-irq.c           | 14 ++++++++++----
->  include/linux/mfd/samsung/irq.h |  2 +-
->  2 files changed, 11 insertions(+), 5 deletions(-)
 
-Applied, thanks.
+Cortex-A9 usually need to set up the L2 Cache controller, and you
+don't have a node for that.
 
-> diff --git a/drivers/mfd/sec-irq.c b/drivers/mfd/sec-irq.c
-> index ba86a918c2da..806fa8dbb22d 100644
-> --- a/drivers/mfd/sec-irq.c
-> +++ b/drivers/mfd/sec-irq.c
-> @@ -61,14 +61,14 @@ static const struct regmap_irq s2mps11_irqs[] = {
->  		.reg_offset = 1,
->  		.mask = S2MPS11_IRQ_RTC60S_MASK,
->  	},
-> -	[S2MPS11_IRQ_RTCA0] = {
-> -		.reg_offset = 1,
-> -		.mask = S2MPS11_IRQ_RTCA0_MASK,
-> -	},
->  	[S2MPS11_IRQ_RTCA1] = {
->  		.reg_offset = 1,
->  		.mask = S2MPS11_IRQ_RTCA1_MASK,
->  	},
-> +	[S2MPS11_IRQ_RTCA0] = {
-> +		.reg_offset = 1,
-> +		.mask = S2MPS11_IRQ_RTCA0_MASK,
-> +	},
->  	[S2MPS11_IRQ_SMPL] = {
->  		.reg_offset = 1,
->  		.mask = S2MPS11_IRQ_SMPL_MASK,
-> @@ -484,6 +484,12 @@ int sec_irq_init(struct sec_pmic_dev *sec_pmic)
->  		return ret;
->  	}
->  
-> +	/*
-> +	 * The rtc-s5m driver requests S2MPS14_IRQ_RTCA0 also for S2MPS11
-> +	 * so the interrupt number must be consistent.
-> +	 */
-> +	BUILD_BUG_ON(((enum s2mps14_irq)S2MPS11_IRQ_RTCA0) != S2MPS14_IRQ_RTCA0);
-> +
->  	return 0;
->  }
->  
-> diff --git a/include/linux/mfd/samsung/irq.h b/include/linux/mfd/samsung/irq.h
-> index f35af7361b60..667aa40486dd 100644
-> --- a/include/linux/mfd/samsung/irq.h
-> +++ b/include/linux/mfd/samsung/irq.h
-> @@ -74,8 +74,8 @@ enum s2mps11_irq {
->  	S2MPS11_IRQ_MRB,
->  
->  	S2MPS11_IRQ_RTC60S,
-> -	S2MPS11_IRQ_RTCA0,
->  	S2MPS11_IRQ_RTCA1,
-> +	S2MPS11_IRQ_RTCA0,
->  	S2MPS11_IRQ_SMPL,
->  	S2MPS11_IRQ_RTC1S,
->  	S2MPS11_IRQ_WTSR,
+Can you try adding a DT node for it? You may also have to specify
+the overrides for its aux control register in DT if that is not
+set up right by the boot loader or the power-on defaults.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
