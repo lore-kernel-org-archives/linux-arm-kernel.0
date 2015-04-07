@@ -1,24 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 7 Apr 2015 23:29:01 +0200
-Subject: [PATCH 3.18-stable v2] ARM: mvebu: do not register custom DMA
- operations when coherency is disabled
-In-Reply-To: <20150407231638.0993cb16@free-electrons.com>
-References: <1426157892-1705-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150407231638.0993cb16@free-electrons.com>
-Message-ID: <20150407212901.GB21006@lunn.ch>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 07 Apr 2015 23:37:30 +0200
+Subject: [PATCH v4 4/4] ARM: dts: Specify VMMC and VQMMC on rk3288-evb
+In-Reply-To: <10565603.LCTpLmy44N@phil>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+ <1426112117-18220-4-git-send-email-dianders@chromium.org>
+ <10565603.LCTpLmy44N@phil>
+Message-ID: <1457117.iiJ36z7dmV@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 11:16:38PM +0200, Thomas Petazzoni wrote:
-> Hello,
+Am Donnerstag, 12. M?rz 2015, 00:30:14 schrieb Heiko Stuebner:
+> Am Mittwoch, 11. M?rz 2015, 15:15:17 schrieb Doug Anderson:
+> > Specifying these rails should eventually let us do UHS.
+> > 
+> > Signed-off-by: Doug Anderson <dianders@chromium.org>
 > 
-> Any reason why this patch hasn't been included in 3.18-stable? It is
-> a very important patch fixing a major regression. What needs to be done
-> to get it merged in 3.18 ?
+> This one looks good to me and I'll take it into my dts branch.
+> 
+> But due to the deferal issue fixed in patch1, I'll wait a bit for patch1
+> hopefully getting applied, so that we have a "clean" behaviour when
+> everything reaches linux-next.
 
-Hi Thomas
+looks like patch1 made it into the mmc tree [0], which was the prequisite for 
+this one. Therefore applied to my dts branch.
 
-It looks to have the right tags, so you should probably take it up
-with the 3.18 maintainer, Sasha Levin.
 
-     Andrew
+Heiko
+
+
+[0] 
+https://git.linaro.org/people/ulf.hansson/mmc.git/commit/b793f658b194edfe5e1d86aaeace01a7b03c68f9
