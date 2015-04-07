@@ -1,35 +1,79 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 7 Apr 2015 13:17:40 -0700
-Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid
- ICE in gcc 4.7.3
-In-Reply-To: <CAMAWPa_YEJDQc=_60_sPqzwLYN8Yefzcko_rydxrt8oOCq20gw@mail.gmail.com>
-References: <20150324004537.GA24816@verge.net.au>
- <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
- <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
- <20150326133631.GB2805@arm.com>
- <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
- <20150327002554.GA5527@verge.net.au>
- <20150327100612.GB1562@arm.com>
- <7hbnj99epe.fsf@deeprootsystems.com>
- <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
- <7h8uec95t2.fsf@deeprootsystems.com>
- <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
- <551BBEC5.7070801@arm.com>
- <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
- <7hwq1v4iq4.fsf@deeprootsystems.com>
- <CAMAWPa_YEJDQc=_60_sPqzwLYN8Yefzcko_rydxrt8oOCq20gw@mail.gmail.com>
-Message-ID: <20150407131740.ac8a856537fecb1b5d142f5f@linux-foundation.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 7 Apr 2015 15:32:02 -0500
+Subject: [PATCH v6 4/4] clk: dt: Introduce binding for always-on clock
+ support
+In-Reply-To: <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
+References: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
+ <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAL_JsqJW7O=p3dUCw6A+J_x=PtHa6=GuS87hZORBermkDWDKLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Apr 2015 10:57:52 -0700 Kevin Hilman <khilman@kernel.org> wrote:
+On Tue, Apr 7, 2015 at 1:43 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> > The diff below[2] on top of yours compiles fine here and at least covers
-> > the compilers I *know* to trigger the ICE.
-> 
-> I see my fix in your mmots since last Thurs (4/2), but it's not in
-> mmotm (last updated today) so today's linux-next still has the ICE for
-> anything other than gcc-4.7.3.   Just checking to see when you plan to
-> update mmotm.
+Please use get_maintainers.pl in the future.
 
-It should all be there today?
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+>  .../devicetree/bindings/clock/clock-bindings.txt   | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> index 06fc6d5..daf3323 100644
+> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> @@ -44,6 +44,44 @@ For example:
+>    clocks by index. The names should reflect the clock output signal
+>    names for the device.
+>
+> +clock-always-on:    Some hardware contains bunches of clocks which must never be
+> +                   turned off.  If drivers a) fail to obtain a reference to any
+> +                   of these or b) give up a previously obtained reference
+> +                   during suspend, the common clk framework will attempt to
+> +                   disable them and a platform can fail irrecoverably as a
+> +                   result.  Usually the only way to recover from these failures
+> +                   is to reboot.
+> +
+> +                   To avoid either of these two scenarios from catastrophically
+> +                   disabling an otherwise perfectly healthy running system,
+> +                   clocks can be identified as always-on using this property
+> +                   from inside a clocksource's node.
+> +
+> +                   This property is not to be abused.  It is only to be used to
+> +                   protect platforms from being crippled by gated clocks, not
+> +                   as a convenience function to avoid using the framework
+> +                   correctly inside device drivers.
+> +
+> +                   Expected values are hardware clock indices.  If the
+> +                   clock-indices property (see below) is used, then supplied
+> +                   values must correspond to one of the listed identifiers.
+> +                   Using the clock-indices example below, hardware clock <2>
+> +                   is missing, therefore it is considered invalid to then
+> +                   list clock <2> as an always-on clock.
+> +
+> +For example:
+> +
+> +    oscillator {
+> +        #clock-cells = <1>;
+> +        clock-output-names = "ckil", "ckih";
+> +        clock-always-on = <0>, <1>;
+> +    };
+> +
+> +- this node defines a device with two clock outputs, just as in the
+> +  example above.  The only difference being that 'ckil' and 'ckih'
+> +  are now identified as an always-on clocks, so the framework will
+> +  know to never attempt to gate them.
+> +
+>  clock-indices:    If the identifying number for the clocks in the node
+>                    is not linear from zero, then this allows the mapping of
+>                    identifiers into the clock-output-names array.
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
