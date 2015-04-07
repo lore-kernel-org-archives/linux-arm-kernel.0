@@ -1,79 +1,78 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 7 Apr 2015 15:32:02 -0500
-Subject: [PATCH v6 4/4] clk: dt: Introduce binding for always-on clock
- support
-In-Reply-To: <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
-References: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
- <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAL_JsqJW7O=p3dUCw6A+J_x=PtHa6=GuS87hZORBermkDWDKLA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 7 Apr 2015 23:16:38 +0200
+Subject: [PATCH 3.18-stable v2] ARM: mvebu: do not register custom DMA
+ operations when coherency is disabled
+In-Reply-To: <1426157892-1705-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1426157892-1705-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150407231638.0993cb16@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 7, 2015 at 1:43 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Hello,
 
-Please use get_maintainers.pl in the future.
+Any reason why this patch hasn't been included in 3.18-stable? It is
+a very important patch fixing a major regression. What needs to be done
+to get it merged in 3.18 ?
 
-Acked-by: Rob Herring <robh@kernel.org>
+Thanks,
 
+Thomas
+
+On Thu, 12 Mar 2015 11:58:12 +0100, Thomas Petazzoni wrote:
+> This patch is a partial backport of commit ef01c6c36bb8 ("ARM: mvebu:
+> remove Armada 375 Z1 workaround for I/O coherency"). This commit was
+> merged in v3.19, so kernel versions later than v3.19 are not affected
+> by the problem that this commit fixes.
+> 
+> It does not make a lot of sense to backport this commit entirely,
+> since it is mainly removing some no longer useful code. However, this
+> commit is also making sure that the bus_register_notifier that
+> register the custom DMA operations that should be used for HW I/O
+> coherency does not get registered when said HW I/O coherency is not
+> enabled.
+> 
+> This is particularly critical since we have decided to disable HW I/O
+> coherency completely in all kernels < 4.0, to be on the safe side,
+> while experimenting a new implementation of the HW I/O coherency in >=
+> 4.0.
+> 
+> Without this commit, kernels earlier than 3.18 have the custom DMA
+> operations normally used for HW I/O coherency registered (they don't
+> do cache maintenance operations), while HW I/O coherency is
+> disabled. It essentially causes every DMA transfer to transfer
+> garbage.
+> 
+> The issue fixed by this commit was introduced by 5ab5afd8ba83 ("ARM:
+> mvebu: implement Armada 375 coherency workaround"), but it was not
+> visible until now since it didn't cause any problem when HW I/O
+> coherency is enabled.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: <stable@vger.kernel.org> v3.16..v3.18
 > ---
->  .../devicetree/bindings/clock/clock-bindings.txt   | 38 ++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> index 06fc6d5..daf3323 100644
-> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> @@ -44,6 +44,44 @@ For example:
->    clocks by index. The names should reflect the clock output signal
->    names for the device.
->
-> +clock-always-on:    Some hardware contains bunches of clocks which must never be
-> +                   turned off.  If drivers a) fail to obtain a reference to any
-> +                   of these or b) give up a previously obtained reference
-> +                   during suspend, the common clk framework will attempt to
-> +                   disable them and a platform can fail irrecoverably as a
-> +                   result.  Usually the only way to recover from these failures
-> +                   is to reboot.
-> +
-> +                   To avoid either of these two scenarios from catastrophically
-> +                   disabling an otherwise perfectly healthy running system,
-> +                   clocks can be identified as always-on using this property
-> +                   from inside a clocksource's node.
-> +
-> +                   This property is not to be abused.  It is only to be used to
-> +                   protect platforms from being crippled by gated clocks, not
-> +                   as a convenience function to avoid using the framework
-> +                   correctly inside device drivers.
-> +
-> +                   Expected values are hardware clock indices.  If the
-> +                   clock-indices property (see below) is used, then supplied
-> +                   values must correspond to one of the listed identifiers.
-> +                   Using the clock-indices example below, hardware clock <2>
-> +                   is missing, therefore it is considered invalid to then
-> +                   list clock <2> as an always-on clock.
-> +
-> +For example:
-> +
-> +    oscillator {
-> +        #clock-cells = <1>;
-> +        clock-output-names = "ckil", "ckih";
-> +        clock-always-on = <0>, <1>;
-> +    };
-> +
-> +- this node defines a device with two clock outputs, just as in the
-> +  example above.  The only difference being that 'ckil' and 'ckih'
-> +  are now identified as an always-on clocks, so the framework will
-> +  know to never attempt to gate them.
-> +
->  clock-indices:    If the identifying number for the clocks in the node
->                    is not linear from zero, then this allows the mapping of
->                    identifiers into the clock-output-names array.
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  arch/arm/mach-mvebu/coherency.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> index 2ffccd4..01efe13 100644
+> --- a/arch/arm/mach-mvebu/coherency.c
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -448,8 +448,9 @@ static int __init coherency_late_init(void)
+>  			armada_375_coherency_init_wa();
+>  	}
+>  
+> -	bus_register_notifier(&platform_bus_type,
+> -			      &mvebu_hwcc_nb);
+> +	if (coherency_available())
+> +		bus_register_notifier(&platform_bus_type,
+> +				      &mvebu_hwcc_nb);
+>  
+>  	return 0;
+>  }
+
+
+
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
