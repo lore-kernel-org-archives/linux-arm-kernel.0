@@ -1,87 +1,162 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Apr 2015 19:23:13 -0700
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
-References: <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
- <5520E2EE.4080302@gmail.com>
- <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
- <5521A438.1070008@gmail.com>
- <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
- <20150406151939.GG18048@atomide.com>
- <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
- <20150406174245.GJ18048@atomide.com>
- <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
-Message-ID: <20150407022312.GK18048@atomide.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Mon, 6 Apr 2015 19:27:52 -0700
+Subject: [PATCH 07/13] thermal: of: streamline .get_temp callbacks
+In-Reply-To: <1427385240-6086-8-git-send-email-s.hauer@pengutronix.de>
+References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+ <1427385240-6086-8-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150407022750.GF4648@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [150406 11:15]:
-> * Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [150406 10:15]:
-> > Why custom function, if IBE bit is zero, BTB invalidate instruction is a
-> > NOP. Do you think that "mcr p15, 0, r2, c7, c5, 6" executed as a NOP will
-> > put so much overhead, that it deserves a custom function?
-> 
-> Executing them as nop is Cortex-A8 specific. On other ARMv7 CPUs, BTB
-> invalidation on context switch may be unnecessary yet expensive.
-> 
-> In general I think you'll want a version with and one without BTB
-> flushing, and select depending on CPUID (ID_MMFR1, bits 28-31), with
-> overrides for known processor issues (i.e. the cortex-a8 has a wrong
-> value there in all cases: it reports value 2, while it should be
-> treated as 1 or 4 depending on cpu revision).
-> 
-> 
-> On 6 April 2015 at 19:42, Tony Lindgren <tony@atomide.com> wrote:
-> > Hmm but it still seems to do something also on cortex-a8 r3p2 that
-> > is supposedly not affected by 430973.. Based on my tests so far, at least
-> > armhf running cpuburn-a8 in the background and doing apt-get update
-> > segfaults constantly without flush BTAC/BTB. This seems to be the case
-> > no matter how the aux ctrl reg bits are set..
-> 
-> That sounds.... really odd.  The TRM is fairly explicit about BTB
-> flush executing as nop when IBE is not set. Of course the TRM is not
-> exactly flawless, but still...
+On Thu, Mar 26, 2015 at 04:53:54PM +0100, Sascha Hauer wrote:
+> In the thermal framework it was decided that temperatures can't
+> be negative, so let the .get_temp callback in struct
+> thermal_zone_of_device_ops take an unsigned long pointer for
+> the temperature like the .get_temp callback in
+> struct thermal_zone_device_ops does.
 
-Oops, sorry user error.. I was trying to clear IBE as a banked register
-like L2 enable bit and of course it did not get cleared.. Clearing it
-with a smc call really clears it. And in that case my test case seems to
-work reliably on r3p2 without erratum 430973 enabled. 
+This change is required. However, better we move to the direction of
+using signed type for temperature. However, we want to have int instead
+of long though.
 
-Anyways, if the bootloader enables IBE bit, then the kernel must also
-always enable the erratum 430973 flush BTAC/BTB parts on all cortex-a8.
-
-Or else the kernel must clear the IBE bit based on the version, which
-may be trickier with all the SoC and vendor specific smc calls.
- 
-> >> 2. For Cortex-A8 revisions affected by 430973, set IBE bit to 1, set it
-> >>    to 0 for all others.
 > 
-> Note btw that erratum 687067 affects *all* Cortex-A8 revisions, so
-> there's a bit of a catch-22 there. The proper workaround for it
-> (zeroing some particular debug register) can only be done in secure
-> privileged mode, and there's no straightforward way to check whether
-> this has been done.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/hwmon/lm75.c                               | 2 +-
+>  drivers/hwmon/ntc_thermistor.c                     | 2 +-
+>  drivers/hwmon/tmp102.c                             | 2 +-
+>  drivers/input/touchscreen/sun4i-ts.c               | 2 +-
+>  drivers/thermal/rockchip_thermal.c                 | 2 +-
+>  drivers/thermal/samsung/exynos_tmu.c               | 2 +-
+>  drivers/thermal/tegra_soctherm.c                   | 2 +-
+>  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 2 +-
+>  include/linux/thermal.h                            | 2 +-
+>  9 files changed, 9 insertions(+), 9 deletions(-)
 > 
-> However, it only affects BTB invalidate by MVA, afaik BTB invalidate
-> all is safe.
-
-I'm now thinking the kernel should just always set the 430973 specific
-cpu_v7_switch_mm for all cortex-a8 if IBE bit is set. That avoids
-the whole mess of early SoC detection and smc calls. And if IBE bit
-is not set, then we jsut use the rgular cpu_v7_switch_mm.
-
-This will work as long as we can read the aux ctrl register IBE
-bit using mrc, which I believe is the case for all cortex-a8 based
-omap variants.
- 
-> >>  That should happen as soon as possible,
-> >>  otherwise kernel may crash on affected revisions if thumb-compiled.
+> diff --git a/drivers/hwmon/lm75.c b/drivers/hwmon/lm75.c
+> index fe41d5a..9df3ca3 100644
+> --- a/drivers/hwmon/lm75.c
+> +++ b/drivers/hwmon/lm75.c
+> @@ -104,7 +104,7 @@ static inline long lm75_reg_to_mc(s16 temp, u8 resolution)
+>  
+>  /* sysfs attributes for hwmon */
+>  
+> -static int lm75_read_temp(void *dev, long *temp)
+> +static int lm75_read_temp(void *dev, unsigned long *temp)
+>  {
+>  	struct lm75_data *data = lm75_update_device(dev);
+>  
+> diff --git a/drivers/hwmon/ntc_thermistor.c b/drivers/hwmon/ntc_thermistor.c
+> index 112e4d4..12cb333 100644
+> --- a/drivers/hwmon/ntc_thermistor.c
+> +++ b/drivers/hwmon/ntc_thermistor.c
+> @@ -430,7 +430,7 @@ static int ntc_thermistor_get_ohm(struct ntc_data *data)
+>  	return -EINVAL;
+>  }
+>  
+> -static int ntc_read_temp(void *dev, long *temp)
+> +static int ntc_read_temp(void *dev, unsigned long *temp)
+>  {
+>  	struct ntc_data *data = dev_get_drvdata(dev);
+>  	int ohm;
+> diff --git a/drivers/hwmon/tmp102.c b/drivers/hwmon/tmp102.c
+> index 9da2735..25bd72b 100644
+> --- a/drivers/hwmon/tmp102.c
+> +++ b/drivers/hwmon/tmp102.c
+> @@ -98,7 +98,7 @@ static struct tmp102 *tmp102_update_device(struct device *dev)
+>  	return tmp102;
+>  }
+>  
+> -static int tmp102_read_temp(void *dev, long *temp)
+> +static int tmp102_read_temp(void *dev, unsigned long *temp)
+>  {
+>  	struct tmp102 *tmp102 = tmp102_update_device(dev);
+>  
+> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+> index b93a28b..26a7cf5 100644
+> --- a/drivers/input/touchscreen/sun4i-ts.c
+> +++ b/drivers/input/touchscreen/sun4i-ts.c
+> @@ -198,7 +198,7 @@ static int sun4i_get_temp(const struct sun4i_ts_data *ts, long *temp)
+>  	return 0;
+>  }
+>  
+> -static int sun4i_get_tz_temp(void *data, long *temp)
+> +static int sun4i_get_tz_temp(void *data, unsigned long *temp)
+>  {
+>  	return sun4i_get_temp(data, temp);
+>  }
+> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+> index 3aa46ac..67dfc67 100644
+> --- a/drivers/thermal/rockchip_thermal.c
+> +++ b/drivers/thermal/rockchip_thermal.c
+> @@ -366,7 +366,7 @@ static irqreturn_t rockchip_thermal_alarm_irq_thread(int irq, void *dev)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static int rockchip_thermal_get_temp(void *_sensor, long *out_temp)
+> +static int rockchip_thermal_get_temp(void *_sensor, unsigned long *out_temp)
+>  {
+>  	struct rockchip_thermal_sensor *sensor = _sensor;
+>  	struct rockchip_thermal_data *thermal = sensor->thermal;
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index 1d30b09..5f721f2 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -713,7 +713,7 @@ static void exynos7_tmu_control(struct platform_device *pdev, bool on)
+>  	writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
+>  }
+>  
+> -static int exynos_get_temp(void *p, long *temp)
+> +static int exynos_get_temp(void *p, unsigned long *temp)
+>  {
+>  	struct exynos_tmu_data *data = p;
+>  
+> diff --git a/drivers/thermal/tegra_soctherm.c b/drivers/thermal/tegra_soctherm.c
+> index 9197fc0..1c4e455 100644
+> --- a/drivers/thermal/tegra_soctherm.c
+> +++ b/drivers/thermal/tegra_soctherm.c
+> @@ -306,7 +306,7 @@ static long translate_temp(u16 val)
+>  	return t;
+>  }
+>  
+> -static int tegra_thermctl_get_temp(void *data, long *out_temp)
+> +static int tegra_thermctl_get_temp(void *data, unsigned long *out_temp)
+>  {
+>  	struct tegra_thermctl_zone *zone = data;
+>  	u32 val;
+> diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+> index 7f8e5f3..f480a01 100644
+> --- a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+> +++ b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+> @@ -76,7 +76,7 @@ static inline int ti_thermal_hotspot_temperature(int t, int s, int c)
+>  
+>  /* thermal zone ops */
+>  /* Get temperature callback function for thermal zone*/
+> -static inline int __ti_thermal_get_temp(void *devdata, long *temp)
+> +static inline int __ti_thermal_get_temp(void *devdata, unsigned long *temp)
+>  {
+>  	struct thermal_zone_device *pcb_tz = NULL;
+>  	struct ti_thermal_data *data = devdata;
+> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+> index ba2e29a..2f77091 100644
+> --- a/include/linux/thermal.h
+> +++ b/include/linux/thermal.h
+> @@ -272,7 +272,7 @@ struct thermal_genl_event {
+>   *		   temperature.
+>   */
+>  struct thermal_zone_of_device_ops {
+> -	int (*get_temp)(void *, long *);
+> +	int (*get_temp)(void *, unsigned long *);
+>  	int (*get_trend)(void *, int trend, enum thermal_trend *);
+>  	int (*set_emul_temp)(void *, unsigned long);
+>  };
+> -- 
+> 2.1.4
 > 
-> The right place to do this to be honest would be in the bootloader,
-> but I guess that's not always convenient to arrange...
-
-Yeah I agree.
-
-Regards,
-
-Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/fac001a2/attachment.sig>
