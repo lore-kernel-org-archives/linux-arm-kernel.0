@@ -1,69 +1,179 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 7 Apr 2015 13:05:43 -0700
-Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <20150320112828.GF2869@sirena.org.uk>
-References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
- <1426112117-18220-2-git-send-email-dianders@chromium.org>
- <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
- <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
- <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
- <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
- <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
- <20150319113646.GQ2869@sirena.org.uk>
- <CAPDyKFroe9N3j9oMWKknH5huv7j8fkrBr5UKjjp190hkqNsNRg@mail.gmail.com>
- <20150320112828.GF2869@sirena.org.uk>
-Message-ID: <CAD=FV=WpDE_iEFWFw094WBfBH2TgRi+1OGk3E3qQ3t1EfyrnJA@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 07 Apr 2015 21:09:38 +0100
+Subject: [PATCH v4 04/10] eeprom: Add a simple EEPROM framework for eeprom
+ consumers
+In-Reply-To: <20150407184533.GA10278@codeaurora.org>
+References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427752670-17219-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150407184533.GA10278@codeaurora.org>
+Message-ID: <55243982.7020907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thanks Stephen for review,
 
-On Fri, Mar 20, 2015 at 4:28 AM, Mark Brown <broonie@kernel.org> wrote:
-> As previously discussed the problem is that there can be a *lot* of
-> voltages on a modern regulator with fine grained voltage steps and
-> tolerances are also used for things like cpufreq where we care about
-> performance.  We need something that doesn't require a linear scan of
-> possible values.
+On 07/04/15 19:45, Stephen Boyd wrote:
+> On 03/30, Srinivas Kandagatla wrote:
+>> @@ -130,6 +138,37 @@ static struct class eeprom_class = {
+>>   	.dev_release	= eeprom_release,
+>>   };
+>>
+>> +static int of_eeprom_match(struct device *dev, const void *eeprom_np)
+>> +{
+>> +	return dev->of_node == eeprom_np;
+>> +}
+>> +
+>> +static struct eeprom_device *of_eeprom_find(struct device_node *eeprom_np)
+>> +{
+>> +	struct device *d;
+>> +
+>> +	if (!eeprom_np)
+>> +		return NULL;
+>> +
+>> +	d = class_find_device(&eeprom_class, NULL, eeprom_np, of_eeprom_match);
+>> +
+>> +	return d ? to_eeprom(d) : NULL;
+>> +}
+>> +
+>> +static int eeprom_match(struct device *dev, const void *data)
+>> +{
+>> +	return !strcmp(dev_name(dev), (const char *)data);
+>
+> Is this cast necessary?
+May be an over do here, I will fix it.
+>
+>> +}
+>> +
+>> +static struct eeprom_device *eeprom_find(const char *name)
+>> +{
+>> +	struct device *d;
+>> +
+>> +	d = class_find_device(&eeprom_class, NULL, (void *)name, eeprom_match);
+>
+> Is this cast necessary?
 
-Finally getting back to this (sorry for the delay!).  I tried
-modifying my patches to keep using the simple implementation of
-regulator_set_voltage_tol() but to take two tolerances (lower and
-upper).  ...but when I thought about it I decided it wasn't enough.  I
-think that doing a proper implementation of
-regulator_set_voltage_tol() is going to be a requirement for getting
-the MMC core changes posted.
+I Will fix it in next version.
+>
+>> +
+>> +	return d ? to_eeprom(d) : NULL;
+>> +}
+>> +
+>>   /**
+>>    * eeprom_register(): Register a eeprom device for given eeprom.
+>>    * Also creates an binary entry in /sys/class/eeprom/name-id/eeprom
+>> +
+>> +/**
+>> + * eeprom_cell_get(): Get eeprom cell of device form a given eeprom name
+>
+> s/form/from/
 
-Specifically, I think the right implementation for the MMC core's 3.3V
-signaling is something like this:
+Will fix this in next version.
+>
+>> + * and blocks.
+>> + *
+>> + * @ename: eeprom device name that needs to be looked-up.
+>> + * @blocks: eeprom blocks containing offset and length information.
+>> + * @nblocks: number of eeprom blocks.
+>> + *
+>> + * The return value will be an ERR_PTR() on error or a valid pointer
+>> + * to a struct eeprom_cell.  The eeprom_cell will be freed by the
+>> + * eeprom_cell_put().
+>> + */
+>> +struct eeprom_cell *eeprom_cell_get(const char *ename,
+>> +				    struct eeprom_block *blocks, int nblocks)
+>> +{
+>> +	return __eeprom_cell_get(NULL, ename, blocks, nblocks);
+>> +}
+>> +EXPORT_SYMBOL_GPL(eeprom_cell_get);
+>> +
+>> +/**
+>> + * of_eeprom_cell_get(): Get eeprom cell of device form a given index
+>
+> s/form/from/
+>
+Ok,
+>> + *
+>> + * @dev node: Device tree node that uses the eeprom cell
+>> +
+>> +#ifndef _LINUX_EEPROM_CONSUMER_H
+>> +#define _LINUX_EEPROM_CONSUMER_H
+>> +
+>> +struct eeprom_cell;
+>> +
+>> +struct eeprom_block {
+>> +	loff_t offset;
+>> +	size_t count;
+>> +};
+>> +#if IS_ENABLED(CONFIG_EEPROM)
+>> +struct eeprom_cell *eeprom_cell_get(const char *ename,
+>> +				    struct eeprom_block *blocks, int nblocks);
+>> +void eeprom_cell_put(struct eeprom_cell *cell);
+>> +char *eeprom_cell_read(struct eeprom_cell *cell, ssize_t *len);
+>> +int eeprom_cell_write(struct eeprom_cell *cell, const char *buf, ssize_t len);
+> [...]
+>> +
+>> +#if IS_ENABLED(CONFIG_EEPROM) && IS_ENABLED(CONFIG_OF)
+>> +struct eeprom_cell *of_eeprom_cell_get(struct device_node *dev,
+>> +				       const char *property);
+>> +#else
+>> +static inline struct eeprom_cell *of_eeprom_cell_get(struct device_node *np,
+>> +						     const char *property)
+>> +{
+>> +	return ERR_PTR(-ENOSYS);
+>> +}
+>> +#endif
+>> +#endif  /* ifndef _LINUX_EEPROM_CONSUMER_H */
+>
+> Do you have an overview of how to use these APIs? Maybe some
+> Documentation/ is in order? I'm mostly interested in how the
+> blocks array is supposed to work and how this hooks up to drivers
+> that are using DT.
 
-  /*
-   * Bus operating conditions say that card should accept input
-   * between (0.625 * VDD) and (VDD + 0.3), so we'll use those
-   * as tolerances.
-   */
-  return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
-       vmmc_voltage, vmmc_voltage * 375 / 1000, 300000);
+Only doc ATM is function level kernel doc in c file.
+May be I can explain you for now and I will try to add some 
+documentation with some usage examples in next version.
 
-Ulf says he has a board where vmmc is 3.4V and the max vqmmc is 2.9V.
-If we think about that board, we'll end up calling
-regulator_set_voltage_tol() with a lower/upper tolerance of 1.275V and
-.3V.
+eeprom block array is just another way intended to get hold of eeprom 
+content for non-DT providers/consumers, but DT consumers/providers can 
+also use it. As of today SOC/mach level code could use it as well.
 
-Extending the current simple implementation of
-regulator_set_voltage_tol() to take an upper and lower, that will
-translate to first trying to set the voltage to 3.4V - 3.7V, which
-will fail.  We'll then try to set the voltage to 2.125V - 3.7V.
-Presumably that will end up picking 2.125V, which is really non-ideal
-compared to 2.9V and it seems likely to cause some cards to start
-failing.
+In eeprom_cell_get() case the lookup of provider is done based on 
+provider name, this provider name is generally supplied by all the 
+providers (both DT/non DT).
 
-Mark: I know you said you were considering writing a better
-regulator_set_voltage_tol() yourself, but I don't know if you've
-already started work on it.
+for example in qfprom case,
+provider is registered from DT with eeprom config containing a unique name:
+static struct eeprom_config econfig = {
+	.name = "qfprom",
+	.id = 0,
+};
 
-I'm expecting to maybe have time to take a crack at it in a few weeks
-if you haven't already done it by then.
+In the consumer case, the tsens driver could do some like in non DT way:
 
-Thanks!
+	struct eeprom_block blocks[4] ={
+		{
+		.offset = 0x404,
+		.count = 0x4,
+		},
+		{
+		.offset = 0x408,
+		.count = 0x4,
+		},
+		{
+		.offset = 0x40c,
+		.count = 0x4,
+		},
+		{
+		.offset = 0x410,
+		.count = 0x4,
+		},
+	};
+	calib_cell = eeprom_cell_get("qfprom0", blocks, 4);
 
--Doug
+
+Or in DT way
+calib_cell  = of_eeprom_cell_get(np, "calib");
+
+
+--srini
+>
