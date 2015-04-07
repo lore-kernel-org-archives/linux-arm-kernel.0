@@ -1,84 +1,71 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  7 Apr 2015 16:45:01 +0200
-Subject: [PATCH v3 1/9] clk: berlin: move to a dedicated sub-node
-In-Reply-To: <1428417909-27378-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1428417909-27378-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1428417909-27378-2-git-send-email-antoine.tenart@free-electrons.com>
+Date: Tue,  7 Apr 2015 16:45:00 +0200
+Subject: [PATCH v3 0/9] ARM: berlin: refactor the clock
+Message-ID: <1428417909-27378-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin clock driver was sharing a DT node with the pin controller
-and the reset driver. All these devices are now sub-nodes of the chip
-controller. This patch rework the Berlin clock driver to allow moving
-the Berlin clock DT bindings into their own sub-node of the chip
-controller node.
+Hi,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- drivers/clk/berlin/bg2.c  | 7 +++----
- drivers/clk/berlin/bg2q.c | 7 ++++---
- 2 files changed, 7 insertions(+), 7 deletions(-)
+Since v2, this series has changed a lot. We postponed the introduction
+of regmap into the Berlin clock driver (and some parts of the clock
+framework) to first take care of the Berlin DT reorganisation of the
+chip and system controllers.
 
-diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
-index 515fb133495c..3bfb3aede9f4 100644
---- a/drivers/clk/berlin/bg2.c
-+++ b/drivers/clk/berlin/bg2.c
-@@ -502,12 +502,13 @@ static const struct berlin2_gate_data bg2_gates[] __initconst = {
- 
- static void __init berlin2_clock_setup(struct device_node *np)
- {
-+	struct device_node *parent_np = of_get_parent(np);
- 	const char *parent_names[9];
- 	struct clk *clk;
- 	u8 avpll_flags = 0;
- 	int n;
- 
--	gbase = of_iomap(np, 0);
-+	gbase = of_iomap(parent_np, 0);
- 	if (!gbase)
- 		return;
- 
-@@ -685,7 +686,5 @@ static void __init berlin2_clock_setup(struct device_node *np)
- bg2_fail:
- 	iounmap(gbase);
- }
--CLK_OF_DECLARE(berlin2_clock, "marvell,berlin2-chip-ctrl",
--	       berlin2_clock_setup);
--CLK_OF_DECLARE(berlin2cd_clock, "marvell,berlin2cd-chip-ctrl",
-+CLK_OF_DECLARE(berlin2_clock, "marvell,berlin2-clk",
- 	       berlin2_clock_setup);
-diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
-index 440ef81ab15c..72a50ded145a 100644
---- a/drivers/clk/berlin/bg2q.c
-+++ b/drivers/clk/berlin/bg2q.c
-@@ -290,18 +290,19 @@ static const struct berlin2_gate_data bg2q_gates[] __initconst = {
- 
- static void __init berlin2q_clock_setup(struct device_node *np)
- {
-+	struct device_node *parent_np = of_get_parent(np);
- 	const char *parent_names[9];
- 	struct clk *clk;
- 	int n;
- 
--	gbase = of_iomap(np, 0);
-+	gbase = of_iomap(parent_np, 0);
- 	if (!gbase) {
- 		pr_err("%s: Unable to map global base\n", np->full_name);
- 		return;
- 	}
- 
- 	/* BG2Q CPU PLL is not part of global registers */
--	cpupll_base = of_iomap(np, 1);
-+	cpupll_base = of_iomap(parent_np, 1);
- 	if (!cpupll_base) {
- 		pr_err("%s: Unable to map cpupll base\n", np->full_name);
- 		iounmap(gbase);
-@@ -384,5 +385,5 @@ bg2q_fail:
- 	iounmap(cpupll_base);
- 	iounmap(gbase);
- }
--CLK_OF_DECLARE(berlin2q_clock, "marvell,berlin2q-chip-ctrl",
-+CLK_OF_DECLARE(berlin2q_clock, "marvell,berlin2q-clk",
- 	       berlin2q_clock_setup);
+Marvell Berlin SoCs have a chip control register set providing several
+individual registers dealing with various controllers (pinctrl, reset,
+clk). This chip controller is described by a single DT node since the
+individual registers are spread among the chip control register bank.
+
+Marvell Berlin also have a system control register set providing several
+individual registers for pinctrl or adc.
+
+A series was sent[1] to correctly handle these two nodes, by using
+simple-mfd. The series converted the existing pin-controller and reset
+drivers to take the changes into account.
+
+This series moves the clock DT bindings into their own sub-node of the
+chip controller node, and make minor changes into the Berlin clock
+driver to take this change into account.
+
+This series has been tested on the Marvell Berlin BG2Q DMP.
+
+This series is based on v4.0-rc1 and [1].
+
+Thanks!
+
+Antoine
+
+[1] https://lkml.org/lkml/2015/3/6/511
+
+Changes since v2:
+	- Removed all regmap related changes and kept only minor
+	  needed changes in the Berlin clock driver.
+
+Changes since v1:
+        - Rebased of top of the new version of [1].
+	- Removed now useless chip and system ctrl compatibles.
+
+Antoine Tenart (9):
+  clk: berlin: move to a dedicated sub-node
+  Documentation: bindings: move the Berlin clock documentation
+  ARM: berlin: rework the clock node for BG2
+  ARM: berlin: rework the clock node for BG2CD
+  ARM: berlin: rework the clock node for BG2Q
+  Documentation: bindings: update the berlin chip and system ctrl doc
+  ARM: berlin: remove useless chip and system ctrl compatibles in BG2
+  ARM: berlin: remove useless chip and system ctrl compatibles in BG2CD
+  ARM: berlin: remove useless chip and system ctrl compatibles in BG2Q
+
+ .../devicetree/bindings/arm/marvell,berlin.txt     | 43 +++-------------
+ .../devicetree/bindings/clock/marvell,berlin.txt   | 31 ++++++++++++
+ arch/arm/boot/dts/berlin2.dtsi                     | 47 ++++++++++--------
+ arch/arm/boot/dts/berlin2cd.dtsi                   | 43 ++++++++--------
+ arch/arm/boot/dts/berlin2q.dtsi                    | 57 ++++++++++++----------
+ drivers/clk/berlin/bg2.c                           |  7 ++-
+ drivers/clk/berlin/bg2q.c                          |  7 +--
+ 7 files changed, 127 insertions(+), 108 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/marvell,berlin.txt
+
 -- 
 2.3.5
