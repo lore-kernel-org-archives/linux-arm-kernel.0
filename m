@@ -1,47 +1,101 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Apr 2015 15:01:17 +0100
-Subject: [PATCH 10/14] ARM: orion: use clkdev_create()
-In-Reply-To: <5523D985.60800@free-electrons.com>
-References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
- <E1Ye59d-0001BZ-Sv@rmk-PC.arm.linux.org.uk>
- <20150404001729.GA14824@lunn.ch>
- <5523D985.60800@free-electrons.com>
-Message-ID: <20150407140117.GN4027@n2100.arm.linux.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 7 Apr 2015 16:01:46 +0200
+Subject: [PATCH v2 2/5] mmc: mediatek: Add Mediatek MMC driver
+In-Reply-To: <1426562035-16709-3-git-send-email-chaotian.jing@mediatek.com>
+References: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
+ <1426562035-16709-3-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CABuKBe+MFHJO8GXRg5KYs2t+j6U4Ynv_hCeW0YQCrS_eZ-fuLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 03:20:05PM +0200, Gregory CLEMENT wrote:
-> Hi Andrew, Russell,
-> 
-> On 04/04/2015 02:17, Andrew Lunn wrote:
-> > On Fri, Apr 03, 2015 at 06:13:13PM +0100, Russell King wrote:
-> >> clkdev_create() is a shorter way to write clkdev_alloc() followed by
-> >> clkdev_add().  Use this instead.
-> >>
-> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > Acked-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> This change makes sens however what about Thomas' comment: removing
-> orion_clkdev_add() entirely and directly using lkdev_create() all over
-> the place:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/327294.html
-> 
-> Then what would be the path for this patch?
-> 
-> As there is a dependency on the 6th patch of this series: "clkdev: add
-> clkdev_create() helper" which should be merged through the clk tree, I
-> think the best option is that this patch would be also managed by the
-> clk tree maintainer (I added them in CC).
+2015-03-17 4:13 GMT+01:00 Chaotian Jing <chaotian.jing@mediatek.com>:
+> Add Mediatek MMC driver code
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/host/Kconfig  |    8 +
+>  drivers/mmc/host/Makefile |    1 +
+>  drivers/mmc/host/mtk-sd.c | 1412 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 1421 insertions(+)
+>  create mode 100644 drivers/mmc/host/mtk-sd.c
+>
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 61ac63a..8b64377 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -768,3 +768,11 @@ config MMC_TOSHIBA_PCI
+>         tristate "Toshiba Type A SD/MMC Card Interface Driver"
+>         depends on PCI
+>         help
+> +
+> +config MMC_MTK
+> +       tristate "MediaTek SD/MMC Card Interface support"
+> +       help
+> +         This selects the MediaTek(R) Secure digital and Multimedia card Interface.
+> +         If you have a machine with a integrated SD/MMC card reader, say Y or M here.
+> +         This is needed if support for any SD/SDIO/MMC devices is required.
+> +         If unsure, say N.
+> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+> index 6a7cfe0..161b3e4 100644
+> --- a/drivers/mmc/host/Makefile
+> +++ b/drivers/mmc/host/Makefile
+> @@ -20,6 +20,7 @@ obj-$(CONFIG_MMC_SDHCI_F_SDH30)       += sdhci_f_sdh30.o
+>  obj-$(CONFIG_MMC_SDHCI_SPEAR)  += sdhci-spear.o
+>  obj-$(CONFIG_MMC_WBSD)         += wbsd.o
+>  obj-$(CONFIG_MMC_AU1X)         += au1xmmc.o
+> +obj-$(CONFIG_MMC_MTK)           += mtk-sd.o
+>  obj-$(CONFIG_MMC_OMAP)         += omap.o
+>  obj-$(CONFIG_MMC_OMAP_HS)      += omap_hsmmc.o
+>  obj-$(CONFIG_MMC_ATMELMCI)     += atmel-mci.o
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> new file mode 100644
+> index 0000000..86c999b
+> --- /dev/null
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -0,0 +1,1412 @@
+> +/*
+> + * Copyright (c) 2014-2015 MediaTek Inc.
+> + * Author: Chaotian.Jing <chaotian.jing@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/ioport.h>
+> +#include <linux/irq.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/spinlock.h>
+> +
+> +#include <linux/mmc/card.h>
+> +#include <linux/mmc/core.h>
+> +#include <linux/mmc/host.h>
+> +#include <linux/mmc/mmc.h>
+> +#include <linux/mmc/sd.h>
+> +#include <linux/mmc/sdio.h>
+> +
+> +#define MAX_GPD_NUM         (1 + 1)    /* one null gpd */
+> +#define MAX_BD_NUM          1024
+> +#define MAX_BD_PER_GPD      MAX_BD_NUM
 
-Let me remind people that clkdev is *NOT* part of clk, and that I'm the
-maintainer for clkdev.
+This looks strange.
+Why don't you define MAX_GPD_NUM as two?
+Why do you define MAX_BD_PER_GPD when it is the same as MAX_BD_NUM?
 
-I'm getting rather pissed off with people taking work away from me, even
-when I'm named in the MAINTAINERS file.  These patches are going through
-my tree unless there's a good reason for them not to.  They are _not_
-going through the clk tree.
+Cheers,
+Matthias
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+motzblog.wordpress.com
