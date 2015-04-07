@@ -1,48 +1,49 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Apr 2015 13:42:25 +0100
-Subject: [PATCH 03/14] clkdev: get rid of redundant clk_add_alias()
- prototype in linux/clk.h
-In-Reply-To: <5522D8B5.7050205@codeaurora.org>
+Date: Tue, 7 Apr 2015 13:45:36 +0100
+Subject: [PATCH 07/14] media: omap3isp: remove unused clkdev
+In-Reply-To: <1894989.AGoQvgsks0@avalon>
 References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
- <E1Ye593-0001B1-W4@rmk-PC.arm.linux.org.uk>
- <87lhi8rrmd.fsf@free.fr> <5522D8B5.7050205@codeaurora.org>
-Message-ID: <20150407124225.GI4027@n2100.arm.linux.org.uk>
+ <36620233.VbNiGUfDRt@avalon>
+ <20150405142034.GG4027@n2100.arm.linux.org.uk>
+ <1894989.AGoQvgsks0@avalon>
+Message-ID: <20150407124536.GK4027@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 12:04:21PM -0700, Stephen Boyd wrote:
-> On 04/04/15 05:43, Robert Jarzmik wrote:
-> > Russell King <rmk+kernel@arm.linux.org.uk> writes:
-> >
-> >> clk_add_alias() is provided by clkdev, and is not part of the clk API.
-> >> Howver, it is prototyped in two locations: linux/clkdev.h and
-> >> linux/clk.h.  This is a mess.  Get rid of the redundant and unnecessary
-> >> version in linux/clk.h.
-> >>
-> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> >
-> > Actually, this serie fixes a regression I've seen in linux-next, and which was
-> > triggering the Oops in [1] on lubbock. With your serie, the kernel boots fine.
-> >
-> >
+On Tue, Apr 07, 2015 at 12:42:52PM +0300, Laurent Pinchart wrote:
+> Hello Russell,
 > 
-> Is this with the lubbock_defconfig? Is it a regression in 4.0-rc series
-> or is it due to some pending -next patches interacting with the per-user
-> clock patches? It looks like the latter because __clk_get_hw() should be
-> inlined on lubbock_defconfig where CONFIG_COMMON_CLK=n.
+> On Sunday 05 April 2015 15:20:34 Russell King - ARM Linux wrote:
+> > On Sat, Apr 04, 2015 at 12:44:35AM +0300, Laurent Pinchart wrote:
+> > > Hi Russell,
+> > > 
+> > > Thank you for the patch;
+> > > 
+> > > On Friday 03 April 2015 18:12:58 Russell King wrote:
+> > > > No merged platform supplies xclks via platform data.  As we want to
+> > > > slightly change the clkdev interface, rather than fixing this unused
+> > > > code, remove it instead.
+> > > > 
+> > > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > 
+> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > 
+> > > with one caveat though : it conflicts with patches queued for v4.1 in the
+> > > media tree. I'll post a rebased version in a reply to your e-mail. How
+> > > would you like to handle the conflict ?
+> > 
+> > How bad is the conflict?
+> 
+> It's not too bad, it's mostly a context-related conflict. There are two 
+> additional lines to remove (plus the associated comment) from isp_xclk_init(), 
+> as your patch makes a loop now terminate with if (condition) continue;. Those 
+> two lines could be removed later, keeping them doesn't break anything.
 
-It's a regression with anything that uses clk_add_alias() or which
-open codes the aliasing of clocks, or registration of clocks into
-clkdev.  It's quite nasty.
-
-The problem is that the way you updated clkdev, by adding __clk_get_hw()
-at clk_get() time, the struct clk which we're passing in there could
-well have been already clk_put()'d, and therefore freed, and no longer
-valid.
-
-It's a regression ever since the per-user clk patches went in, caused
-_entirely_ by those patches.
+I think it's fine to take it through the media tree as the series doesn't
+have any dependencies on this patch.  It was merely attempting to get rid
+of stuff so that we could move closer to clkdev dealing with a clk_hw
+rather than a struct clk - but I never made it that far with the series.
+Maybe at a later date... :)
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
