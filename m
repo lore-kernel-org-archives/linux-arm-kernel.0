@@ -1,21 +1,38 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Tue, 7 Apr 2015 09:49:57 +0200
-Subject: [PATCH V2] tty: serial: Add const to struct uart_ops declarations
-In-Reply-To: <1428258294.2775.69.camel@perches.com>
-References: <1428169665.2775.53.camel@perches.com>
- <a938a0e86638588e5ccff85771fa3b95@agner.ch>
- <1428258294.2775.69.camel@perches.com>
-Message-ID: <20150407074957.GA25696@distanz.ch>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 7 Apr 2015 17:22:32 +0900
+Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
+In-Reply-To: <3196164.8b31S2QWFd@wuerfel>
+References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
+ <3196164.8b31S2QWFd@wuerfel>
+Message-ID: <CAK7LNATkYVwT337okeW=c1NjyxB4ovXKSNzxtTwk7XXGN45z7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-04-05 at 20:24:54 +0200, Joe Perches <joe@perches.com> wrote:
+Hi Arnd,
 
-[...]
+Thanks for your comment!
 
->  drivers/tty/serial/altera_jtaguart.c        | 2 +-
->  drivers/tty/serial/altera_uart.c            | 2 +-
+2015-04-07 16:41 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 07 April 2015 12:34:30 Masahiro Yamada wrote:
+>>
+>> What is the cause of the kernel panic?  How to fix it?
+>> Any hint is very appreciated.
+>>
+>
+> Cortex-A9 usually need to set up the L2 Cache controller, and you
+> don't have a node for that.
+>
+> Can you try adding a DT node for it? You may also have to specify
+> the overrides for its aux control register in DT if that is not
+> set up right by the boot loader or the power-on defaults.
 
-For these two drivers:
+I have not checked the L2 (outer) cache yet.
 
-Acked-by: Tobias Klauser <tklauser@distanz.ch>
+The L2 cache on our SoC is not a famous IP, but our own implementation.
+I will have to implement L2 code as well as the device tree node.
+Is there any workaround to boot Linux without L2 cache?
+
+
+-- 
+Best Regards
+Masahiro Yamada
