@@ -1,46 +1,39 @@
-From: leilei.zhao@atmel.com (Leilei Zhao)
-Date: Tue, 7 Apr 2015 17:45:04 +0800
-Subject: [PATCH 03/10] crypto: atmel-sha: correct the way data are split
-In-Reply-To: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
-References: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
-Message-ID: <1428399911-23325-4-git-send-email-leilei.zhao@atmel.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 07 Apr 2015 11:48:47 +0200
+Subject: [PATCH v2 1/2] ARM: EXYNOS: Get current parent clock for power
+ domain on/off
+In-Reply-To: <1428053635-10855-1-git-send-email-k.kozlowski@samsung.com>
+References: <1428053635-10855-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5523A7FF.2030700@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+Hello Krzysztof,
 
-When a hash is requested on data bigger than the buffer allocated by the
-SHA driver, the way DMA transfers are performed is quite strange:
-The buffer is filled at each update request. When full, a DMA transfer
-is done. On next update request, another DMA transfer is done. Then we
-wait to have a full buffer (or the end of the data) to perform the dma
-transfer. Such a situation lead sometimes, on SAMA5D4, to a case where
-dma transfer is finished but the data ready irq never comes. Moreover
-hash was incorrect in this case.
+On 04/03/2015 11:33 AM, Krzysztof Kozlowski wrote:
+> Using a fixed (by DTS) parent for clocks when turning on the power domain
+> may introduce issues in other drivers. For example when such driver
+> changes the parent during runtime and expects that he is the only place
+> of such change.
+> 
+> Do not rely on DTS providing the fixed parent for such clocks. Instead
+> before switching domain off, grab a current parent of a clock with
+> clk_get_parent().
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> ---
+> 
+> Changes since v1:
+> 1. Drop "pclk" bindings entirely as suggested by Andrzej Hajda.
+>    This was significant change so I did not add Javier's
+>    reviewed/tested tags.
 
-With this patch, dma transfers are only performed when the buffer is
-full or when there is no more data. So it removes the transfer whose size
-is equal the update size after the full buffer transmission.
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Signed-off-by: Leilei Zhao <leilei.zhao@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/crypto/atmel-sha.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+on an Exynos5420 Peach Pit Chromebook:
 
-diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
-index d092313..b471bbe 100644
---- a/drivers/crypto/atmel-sha.c
-+++ b/drivers/crypto/atmel-sha.c
-@@ -529,7 +529,7 @@ static int atmel_sha_update_dma_slow(struct atmel_sha_dev *dd)
- 	if (final)
- 		atmel_sha_fill_padding(ctx, 0);
- 
--	if (final || (ctx->bufcnt == ctx->buflen && ctx->total)) {
-+	if (final || (ctx->bufcnt == ctx->buflen)) {
- 		count = ctx->bufcnt;
- 		ctx->bufcnt = 0;
- 		return atmel_sha_xmit_dma_map(dd, ctx, count, final);
--- 
-1.7.9.5
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Best regards,
+Javier
