@@ -1,47 +1,41 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 7 Apr 2015 11:46:10 +0200
-Subject: linux-next: build failure after merge of the arm-soc tree
-In-Reply-To: <CACRpkdZE0JB0xBENNPhi6g4Su5ZuZA0wf1mi8xzbLeKm3rOYjA@mail.gmail.com>
-References: <20150407111217.2b2cf440@canb.auug.org.au>
- <CABuKBe+iBfmxHat3Ezinpd-85CA5m1f2gYydk=uW4SwABQ-0Wg@mail.gmail.com>
- <CACRpkdZE0JB0xBENNPhi6g4Su5ZuZA0wf1mi8xzbLeKm3rOYjA@mail.gmail.com>
-Message-ID: <CABuKBeLXgbty1wG=ZUNVfxmahD3zb+yMz2CtZ5kQtJeH1xVmRA@mail.gmail.com>
+From: leilei.zhao@atmel.com (Leilei Zhao)
+Date: Tue, 7 Apr 2015 17:45:01 +0800
+Subject: [PATCH 00/10] crypto: at91: add support for SAMA5D4 and fix related
+ bugs
+Message-ID: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-07 11:28 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, Apr 7, 2015 at 10:43 AM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
->> 2015-04-07 3:12 GMT+02:00 Stephen Rothwell <sfr@canb.auug.org.au>:
->>> Hi all,
->>>
->>> After merging the arm-soc tree, today's linux-next build (arm
->>> multi_v7_defconfig) failed like this:
->>>
->>> In file included from arch/arm/boot/dts/mt8135.dtsi:18:0,
->>>                  from arch/arm/boot/dts/mt8135-evbp1.dts:16:
->>> arch/arm/boot/dts/mt8135-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
->>>  #include <dt-bindings/pinctrl/mt65xx.h>
->>>                                         ^
->>>
->>> Caused by commit e6f219b8ec5e ("ARM: dts: mt8135: Add pinctrl/GPIO/EINT
->>> node for mt8135").
->>
->> This will be fixed as soon as Linus pinctrl for-next branch got merged [1].
->
-> Hm that's unfortunate, we do not rely on merge orders.
->
-> Either the ARM SoC tree needs to pull in the pinctrl commit
-> or I need to carry this patch in the pinctrl tree.
->
-> Is this sufficiently stand-alone to be merged into my tree
-> or do you need to go by the former approach?
+The series of patches add crypto driver for SAMA5D4 and 
+fix some bugs about Atmel crypto driver:
+ - Add new IP version for AES and SHA.
+ - The spinlock is not initialized before using.
+ - Fix sg list management to avoid crash if there is a zero length sg in list.
+ - The max burst size in DMA configuration is out of range.
+ - The result of AES periodically goes wrong with performance test in OpenSSH.
+ - Fix a hangup issue in driver's internal buffer process.
 
-It's a standalone patch, so for me it is fine if you merge the patch
-into your tree.
+The patches were made from herbert/crypto-2.6.git repository, and tested on a
+SAMA5D4EK board and also did regression tests on SAMA5D3EK.
 
-Thanks,
-Matthias
+Leilei Zhao (9):
+  crypto: atmel-aes: add new version
+  crypto: atmel-sha: add new version
+  crypto: atmel-sha: fix sg list management
+  crypto: atmel-sha: initialize spinlock in probe
+  crypto: atmel-sha: correct the max burst size
+  crypto: atmel-tdes: initialize spinlock in probe
+  crypto: atmel-aes: initialize spinlock in probe
+  crypto: atmel-aes: sync the buf used in DMA or CPU
+  crypto: atmel-aes: correct usage of dma_sync_* API
+
+Ludovic Desroches (1):
+  crypto: atmel-sha: correct the way data are split
+
+ drivers/crypto/atmel-aes.c  |   24 +++++++++++++++++++-----
+ drivers/crypto/atmel-sha.c  |   35 ++++++++++++++++++++++++-----------
+ drivers/crypto/atmel-tdes.c |    1 +
+ 3 files changed, 44 insertions(+), 16 deletions(-)
 
 -- 
-motzblog.wordpress.com
+1.7.9.5
