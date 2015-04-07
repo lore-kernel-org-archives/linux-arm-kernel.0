@@ -1,68 +1,30 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 07 Apr 2015 16:20:39 +0200
-Subject: [PATCH 10/14] ARM: orion: use clkdev_create()
-In-Reply-To: <20150407140117.GN4027@n2100.arm.linux.org.uk>
-References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
- <E1Ye59d-0001BZ-Sv@rmk-PC.arm.linux.org.uk> <20150404001729.GA14824@lunn.ch>
- <5523D985.60800@free-electrons.com>
- <20150407140117.GN4027@n2100.arm.linux.org.uk>
-Message-ID: <5523E7B7.9010005@free-electrons.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 07 Apr 2015 16:26:29 +0200
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
+ enabled during suspend
+In-Reply-To: <CAM4voanig_BQrEKGA0YYX_80Gvbtmau3zwz7mQUKtvNMCO-LuQ@mail.gmail.com>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>	<1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>	<CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>	<551976F1.1000605@collabora.co.uk>	<CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>	<551AFCCE.4050404@collabora.co.uk>	<551BD07E.2090506@samsung.com>	<551BDA0A.7010704@collabora.co.uk>	<551C2B6D.4010001@samsung.com>	<551C71A5.1070903@collabora.co.uk>	<CAM4voakS8PnatqRTW5gkD0NNKD9gW9Tuv5p-ekxFhKN5NcuBCQ@mail.gmail.com>	<5523B878.8040304@collabora.co.uk>
+ <CAM4voanig_BQrEKGA0YYX_80Gvbtmau3zwz7mQUKtvNMCO-LuQ@mail.gmail.com>
+Message-ID: <5523E915.5070203@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hello Abhilash,
 
-On 07/04/2015 16:01, Russell King - ARM Linux wrote:
-> On Tue, Apr 07, 2015 at 03:20:05PM +0200, Gregory CLEMENT wrote:
->> Hi Andrew, Russell,
->>
->> On 04/04/2015 02:17, Andrew Lunn wrote:
->>> On Fri, Apr 03, 2015 at 06:13:13PM +0100, Russell King wrote:
->>>> clkdev_create() is a shorter way to write clkdev_alloc() followed by
->>>> clkdev_add().  Use this instead.
->>>>
->>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>>
->>> Acked-by: Andrew Lunn <andrew@lunn.ch>
->>
->> This change makes sens however what about Thomas' comment: removing
->> orion_clkdev_add() entirely and directly using lkdev_create() all over
->> the place:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/327294.html
->>
->> Then what would be the path for this patch?
->>
->> As there is a dependency on the 6th patch of this series: "clkdev: add
->> clkdev_create() helper" which should be merged through the clk tree, I
->> think the best option is that this patch would be also managed by the
->> clk tree maintainer (I added them in CC).
+On 04/07/2015 04:11 PM, Abhilash Kesavan wrote:
 > 
-> Let me remind people that clkdev is *NOT* part of clk, and that I'm the
-> maintainer for clkdev.
+> Yes, though it increasingly looks like aclk266_g2d needs to stay ON
+> and we should use your patch that keeps it enabled prior to suspend.
+>
 
-Sorry for the confusion, I quickly had a look on the MAINTAINERS file and
-didn't realized that the drivers/clk/clkdev.c file was not part of clk
-(even if actually it was mentioned).
+Indeed, could you please give me some feedback on the latest RFC patch
+I shared [0] on this thread according to Tomasz comments?
+ 
+> Regards,
+> Abhilash
+>>
 
-> 
-> I'm getting rather pissed off with people taking work away from me, even
-> when I'm named in the MAINTAINERS file.  These patches are going through
-> my tree unless there's a good reason for them not to.  They are _not_
-> going through the clk tree.
+Thanks a lot and best regards,
+Javier
 
-So, as you are going to take care of all the patches it is even simpler.
-You can take this one too: in mvebu there is no change on this file for
-this release so there won't be any conflict.
-
-Thanks,
-
-Gregory
-
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+[0]: https://lkml.org/lkml/2015/4/7/537
