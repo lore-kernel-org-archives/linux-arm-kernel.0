@@ -1,133 +1,34 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 6 Apr 2015 21:27:28 -0700
-Subject: [PATCH v2 1/2] dt-bindings: Document the hi6220 thermal sensor
- bindings
-In-Reply-To: <5523530E.3000400@hisilicon.com>
-References: <1427785162-15172-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1427785162-15172-2-git-send-email-kong.kongxinwei@hisilicon.com>
- <20150406140355.GI30984@beef> <5523530E.3000400@hisilicon.com>
-Message-ID: <20150407042727.GA30242@localhost.localdomain>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 7 Apr 2015 00:06:40 -0500
+Subject: [PATCH V2 2/6] i2c: qup: Add V2 tags support
+In-Reply-To: <1428345067-21878-3-git-send-email-sricharan@codeaurora.org>
+References: <1428345067-21878-1-git-send-email-sricharan@codeaurora.org>
+ <1428345067-21878-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20150407050640.GB9225@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 11:46:22AM +0800, Xinwei Kong wrote:
-> 
-> 
-> On 2015/4/6 22:03, Matt Porter wrote:
-> > On Tue, Mar 31, 2015 at 02:59:21PM +0800, Xinwei Kong wrote:
-> >> From: kongxinwei <kong.kongxinwei@hisilicon.com>
-> >>
-> >> This adds documentation of device tree bindings for the
-> >> thermal sensor controller of hi6220 SoC.
-> >>
-> >> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> >> Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
-> >> ---
-> >>  .../bindings/thermal/hisilicon-thermal.txt         | 45 ++++++++++++++++++++++
-> >>  1 file changed, 45 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-> >> new file mode 100644
-> >> index 0000000..ceb6e2e
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-> >> @@ -0,0 +1,45 @@
-> >> +* Hisilicon Thermal
-> >> +
-> >> +This driver is for hi6220 SoC which contain 4 thermal sensor.
-> >> +
-> >> +	1. sensor 0: local sensor;
-> >> +	2. sensor 1: remote sensor for ACPU cluster 1;
-> >> +	3. sensor 2: remote sensor for ACPU cluster 2;
-> >> +	4. sensor 3: remote sensor for GPU.
-> >> +
-> >> +Every sensor use one child node to represent it, so thermal sensor include
-> >> +parent node and four child node. The parent node describe common feature and
-> >> +child node describe private feature for thermal sensor;
-> >> +
-> >> +** Required properties :
-> >> +
-> >> +- compatible: "hisilicon,tsensor".
-> >> +- reg: physical base address of thermal sensor and length of memory mapped
-> >> +  region.
-> >> +- interrupt: The interrupt number to the cpu. Defines the interrupt used
-> >> +  by SOCTHERM.
-> >> +- clock-names: Input clock name, should be 'thermal_clk'.
-> >> +- clocks: phandles for clock specified in "clock-names" property.
-> >> +- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
-> >> +
-> >> +** Required properties for child nodes :
-> >> +
-> >> +- hisilicon,tsensor-id: the index of thermal sensor and use it to distinguish
-> >> +  thermal sensor. For example: <0> stands for local sensor; <1> stands for
-> >> +  acpu1 sensor;
-> > 
-> > Please show an example illustrating why this property is needed. The
-> > example below doesn't show any per sensor properties aside from the
-> > sensor id. Other bindings with a similar sub-sensor hardware design like
-> > tegra-soctherm and rockchip-thermal don't have a need for a vendor
-> > specific property like this. Their drivers simply iterate over an id
-> > index during thermal sensor registration.
-> > 
-> > -Matt
-> > 
-> Thermal Ip of hisilicon SoC can get four module temperature--local sensor, ACPU0
-> sensor, ACPU1 sensor and gpu sensor. In order to use these sensors, this driver
-> will make use of sensor id to distinguish sensor in using process.
-> 
-> These four sensors only get one sensor temperature at the same times. Because
-> these sensor commonly use the same register by setting diff value to enable one
-> sensor. howerver, sensor id is key flag for these diff sensor modules.
-> 
-> If deleting sensor id, this driver will define some value which set diff sensor
-> regitser and it difficult to understand sensor register operation.
+On Tue, Apr 07, 2015 at 12:01:03AM +0530, Sricharan R wrote:
 
-The above still do not explain why you need a specific property.
+<snip>
 
-Could you please check
-Documentation/devicetree/bindings/thermal/thermal.txt file?
+> +static u32 qup_i2c_send_data(struct qup_i2c_dev *qup, int tlen, u8 *tbuf,
+> +			     int dlen, u8 *dbuf)
+> +{
+> +	u32 val = 0, idx = 0, pos = 0, i = 0, t;
+> +	int  len = tlen + dlen;
+> +	u8 *buf = tbuf;
+> +
+> +	while (len > 0) {
+> +		if (qup_i2c_wait_ready(qup, QUP_OUT_FULL, 0, 4)) {
 
-There are several examples there on how to define DT nodes for the exact
-case you describe above.
+Instead of 0 and 4 can we use some #defines?  This applies for all of the
+i2c_wait_ready calls
 
-> 
-> Thanks
-> Xinwei
-> 
-> >> +
-> >> +Example :
-> >> +
-> >> +	tsensor: tsensor at 0,f7030700 {
-> >> +		compatible = "hisilicon,tsensor";
-> >> +		reg = <0x0 0xf7030700 0x0 0x1000>;
-> >> +		interrupts = <0 7 0x4>;
-> >> +		clocks = <&clock_sys HI6220_TSENSOR_CLK>;
-> >> +		clock-names = "thermal_clk";
-> >> +		#thermal-sensor-cells = <1>;
-> >> +
-> >> +		local_sensor {
-> >> +			hisilicon,tsensor-id = <0>;
-> >> +		}
-> >> +		.......
-> >> +	}
-> >> -- 
-> >> 1.9.1
-> >>
-> >>
-> >>
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> > .
-> > 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/96d545f0/attachment.sig>
+<snip>
+
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
