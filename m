@@ -1,63 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Apr 2015 11:25:27 +0100
-Subject: [PATCH v7 1/9] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <551DD321.6030707@samsung.com>
-References: <1426637856-3730-1-git-send-email-cw00.choi@samsung.com>
- <1426637856-3730-2-git-send-email-cw00.choi@samsung.com>
- <20150330160940.GA13731@leverpostej> <5519E2B6.2030905@samsung.com>
- <20150402173558.GB30669@leverpostej> <551DD321.6030707@samsung.com>
-Message-ID: <20150407102523.GA23190@leverpostej>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 07 Apr 2015 12:25:34 +0200
+Subject: [PATCH v2 3/4] ARM: berlin: add an ADC node for the BG2Q
+In-Reply-To: <20150407102011.GA19914@kwain>
+References: <1428066409-30392-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1428066409-30392-4-git-send-email-antoine.tenart@free-electrons.com>
+ <551FBC34.4070501@gmail.com> <20150407102011.GA19914@kwain>
+Message-ID: <5523B09E.4050703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>> I'm very worried about adding a DT that's known broken, especially when
-> >>> we have no idea as to if/when the FW will be fixed judging from prior
-> >>> replies.
-> >>
-> >> As I replied, I can not fix the FW because I don't have any code of FW.
-> > 
-> > Surely you are able to contact those who do?
-> > 
-> >> I don't have any solution to fix it on Linux kernel level.
-> >>
-> >> So, If you agree, I can add the comment of CPU0 hotplug issue on DT file.
-> > 
-> > I disagree. I do not want to add a DT that is known to be broken;
-> > especially when we have no idea how to fix it. It creates long-term
-> > maintenance pain for everyone, and marginal gain for few. A comment does
-> > nothing to aid the end-user.
-> > 
-> > So NAK to the PSCI node and PSCI enable method in this dts until we
-> > either have a working firmware, or a reasonable mechanism to handle the
-> > deficiency.
-> 
-> There is only CPU0 hotplug issue. Excpet CPU{1-7} are well working.
+On 07.04.2015 12:20, Antoine Tenart wrote:
+> On Sat, Apr 04, 2015 at 12:25:56PM +0200, Sebastian Hesselbarth wrote:
+>> On 03.04.2015 15:06, Antoine Tenart wrote:
+>>> This patch adds the ADC node for the Berlin BG2Q, using the newly added
+>>> Berlin IIO ADC driver.
+>>>
+>>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>>> ---
+>>>   arch/arm/boot/dts/berlin2q.dtsi | 8 ++++++++
+>>>   1 file changed, 8 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+>>> index 187d056f7ad2..72b1c969a99d 100644
+>>> --- a/arch/arm/boot/dts/berlin2q.dtsi
+>>> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+>>> @@ -565,6 +565,14 @@
+>>>   						function = "twsi3";
+>>>   					};
+>>>   				};
+>>> +
+>>> +				adc: adc {
+>>> +					compatible = "marvell,berlin2-adc";
+>>> +					interrupt-parent = <&sic>;
+>>> +					interrupts = <12>, <14>;
+>>> +					interrupt-names = "adc", "tsen";
+>>> +					status = "disabled";
+>>> +				};
+>>
+>> nit: there is no gated clock for the ADC, I guess we can just always
+>> enable it. That will save you the last patch of the series.
+>
+> Sure, we can just drop the last patch (and the status property).
 
-I understand that, but the issue with CPU0 is still a blocker from my
-PoV.
+Ok.
 
-> To fix this issue, we must need the help of firmware developer.
-> But, We never get the any help.
+>> BTW, I have the strong feeling that moving berlin's clk drivers to
+>> regmap will block any subsequent patches you are preparing. How about
+>> we target the next merge window for moving the clk node but not the
+>> drivers (except of_iomap of the _parent's_ reg property) and push the
+>> less controversal patches (pinctrl, reset) with regmap/syscon forward?
+>
+> The entire clock rework series does not affect this ADC series or any
+> other on going series. It can be merged latter, without breaking
+> anything. I just realized I mentioned the clock rework series as a
+> dependency in the cover letter of this series but it is not, my bad.
+>
+> So, we can target the next merge window for all series but the clock
+> rework. In addition to this, I can send a series moving the clock node,
+> with minor modifications to the driver so we have a proper dt. And then
+> we can see if moving to a regmap aware clock driver can be done.
+>
+> To sum up:
+> - chip/system controller series can be pushed
 
-Previously you said that you did not have access to the source code
-rather than not having help from the relevant firmware engineers. I take
-it you have informed them of the issue with CPU0?
+Ok, I'll pick it up once 4.0 drops.
 
-> Also, as I mentioned on previous mail, all Exynos SoCs can not turn
-> off the CPU0. I've never seen Exynos SoC that CP0 hotplug is possible.
+> - this ADC series too, as it does not depend on the clock rework (as
+>    soon as we have the needed acked-by)
 
-While that may be the case, PSCI is a more generic standard, and it is
-used on systems where CPU0 can be hot unplugged. So Exynos-specific
-details cannot dictate how the kernel PSCI driver should behave.
+Ok, once the ACKs are there, I'll pick it up too.
 
-Is there a particular reason that CPU0 cannot be hotplugged?
+> - I need to make a new series to move the clock node
 
-In PSCI 0.2 and later it's possible to determine whether a trusted OS
-prohibits a core from being hotplugged, but this mechanism doesn't exist
-in earlier versions. I am not averse to adding a property to PSCI 0.1
-to mark a CPU as not being hotpluggable if there is a fundamental reason
-(i.e. not simply a bug) for this being the case.
+Great.
 
-Thanks,
-Mark.
+> - the clock driver rework series can live in parallel
+
+Good.
+
+> Agreed?
+
+Definitely :)
+
+Sebastian
