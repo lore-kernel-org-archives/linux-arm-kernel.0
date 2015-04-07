@@ -1,60 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 7 Apr 2015 10:13:26 +0100
-Subject: linux-next: manual merge of the arm64 tree with the arm-soc tree
-In-Reply-To: <20150407114600.14a3ecc8@canb.auug.org.au>
-References: <20150407114600.14a3ecc8@canb.auug.org.au>
-Message-ID: <20150407091325.GA32558@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Apr 2015 11:28:22 +0200
+Subject: linux-next: build failure after merge of the arm-soc tree
+In-Reply-To: <CABuKBe+iBfmxHat3Ezinpd-85CA5m1f2gYydk=uW4SwABQ-0Wg@mail.gmail.com>
+References: <20150407111217.2b2cf440@canb.auug.org.au>
+ <CABuKBe+iBfmxHat3Ezinpd-85CA5m1f2gYydk=uW4SwABQ-0Wg@mail.gmail.com>
+Message-ID: <CACRpkdZE0JB0xBENNPhi6g4Su5ZuZA0wf1mi8xzbLeKm3rOYjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Tue, Apr 7, 2015 at 10:43 AM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> 2015-04-07 3:12 GMT+02:00 Stephen Rothwell <sfr@canb.auug.org.au>:
+>> Hi all,
+>>
+>> After merging the arm-soc tree, today's linux-next build (arm
+>> multi_v7_defconfig) failed like this:
+>>
+>> In file included from arch/arm/boot/dts/mt8135.dtsi:18:0,
+>>                  from arch/arm/boot/dts/mt8135-evbp1.dts:16:
+>> arch/arm/boot/dts/mt8135-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
+>>  #include <dt-bindings/pinctrl/mt65xx.h>
+>>                                         ^
+>>
+>> Caused by commit e6f219b8ec5e ("ARM: dts: mt8135: Add pinctrl/GPIO/EINT
+>> node for mt8135").
+>
+> This will be fixed as soon as Linus pinctrl for-next branch got merged [1].
 
-On Tue, Apr 07, 2015 at 11:46:00AM +1000, Stephen Rothwell wrote:
-> diff --cc arch/arm64/configs/defconfig
-> index 96bba367f80c,e07896c819ef..000000000000
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@@ -31,10 -31,12 +31,14 @@@ CONFIG_MODULES=
->   CONFIG_MODULE_UNLOAD=y
->   # CONFIG_BLK_DEV_BSG is not set
->   # CONFIG_IOSCHED_DEADLINE is not set
-> + CONFIG_ARCH_EXYNOS7=y
->   CONFIG_ARCH_FSL_LS2085A=y
->   CONFIG_ARCH_MEDIATEK=y
->  +CONFIG_ARCH_QCOM=y
->  +CONFIG_ARCH_SPRD=y
-> + CONFIG_ARCH_SEATTLE=y
-> + CONFIG_ARCH_TEGRA=y
-> + CONFIG_ARCH_TEGRA_132_SOC=y
->   CONFIG_ARCH_THUNDER=y
->   CONFIG_ARCH_VEXPRESS=y
->   CONFIG_ARCH_XGENE=y
-> @@@ -105,9 -104,10 +111,11 @@@ CONFIG_VIRTIO_CONSOLE=
->   # CONFIG_HW_RANDOM is not set
->   CONFIG_SPI=y
->   CONFIG_SPI_PL022=y
->  +CONFIG_PINCTRL_MSM8916=y
->   CONFIG_GPIO_PL061=y
->   CONFIG_GPIO_XGENE=y
-> + CONFIG_POWER_RESET_XGENE=y
-> + CONFIG_POWER_RESET_SYSCON=y
->   # CONFIG_HWMON is not set
->   CONFIG_REGULATOR=y
->   CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> @@@ -133,10 -133,9 +141,11 @@@ CONFIG_MMC_SPI=
->   CONFIG_RTC_CLASS=y
->   CONFIG_RTC_DRV_EFI=y
->   CONFIG_RTC_DRV_XGENE=y
-> + CONFIG_VIRTIO_PCI=y
->   CONFIG_VIRTIO_BALLOON=y
->   CONFIG_VIRTIO_MMIO=y
->  +CONFIG_COMMON_CLK_QCOM=y
->  +CONFIG_MSM_GCC_8916=y
->   # CONFIG_IOMMU_SUPPORT is not set
->   CONFIG_PHY_XGENE=y
->   CONFIG_EXT2_FS=y
+Hm that's unfortunate, we do not rely on merge orders.
 
-It looks fine. Thanks.
+Either the ARM SoC tree needs to pull in the pinctrl commit
+or I need to carry this patch in the pinctrl tree.
 
--- 
-Catalin
+Is this sufficiently stand-alone to be merged into my tree
+or do you need to go by the former approach?
+
+Yours,
+Linus Walleij
