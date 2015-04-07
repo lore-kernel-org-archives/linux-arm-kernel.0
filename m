@@ -1,45 +1,142 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 7 Apr 2015 05:12:33 +0200
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150407022312.GK18048@atomide.com>
-References: <5520E2EE.4080302@gmail.com>
- <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
- <5521A438.1070008@gmail.com>
- <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
- <20150406151939.GG18048@atomide.com>
- <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
- <20150406174245.GJ18048@atomide.com>
- <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
- <20150407022312.GK18048@atomide.com>
-Message-ID: <20150407031233.GA16189@earth>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Mon, 6 Apr 2015 20:19:52 -0700
+Subject: [PATCH 06/13] thermal: streamline get_trend callbacks
+In-Reply-To: <1427385240-6086-7-git-send-email-s.hauer@pengutronix.de>
+References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+ <1427385240-6086-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150407031950.GK4648@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 26, 2015 at 04:53:53PM +0100, Sascha Hauer wrote:
+> The .get_trend callback in struct thermal_zone_device_ops has the prototype:
+> 
+> 	int (*get_trend) (struct thermal_zone_device *, int,
+> 			  enum thermal_trend *);
+> 
+> whereas the .get_trend callback in struct thermal_zone_of_device_ops has:
+> 
+> 	int (*get_trend)(void *, long *);
+> 
+> Streamline both prototypes and add the trip argument to the OF callback
+> aswell and use enum thermal_trend * instead of an integer pointer.
+> 
+> While the OF prototype may be the better one, this should be decided at
+> framework level and not on OF level.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/thermal/of-thermal.c                       | 11 +---------
+>  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 25 +++++++---------------
+>  include/linux/thermal.h                            |  2 +-
+>  3 files changed, 10 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
+> index 668fb1b..b39e22f 100644
+> --- a/drivers/thermal/of-thermal.c
+> +++ b/drivers/thermal/of-thermal.c
+> @@ -187,24 +187,15 @@ static int of_thermal_get_trend(struct thermal_zone_device *tz, int trip,
+>  				enum thermal_trend *trend)
+>  {
+>  	struct __thermal_zone *data = tz->devdata;
+> -	long dev_trend;
+>  	int r;
+>  
+>  	if (!data->ops->get_trend)
+>  		return -EINVAL;
+>  
+> -	r = data->ops->get_trend(data->sensor_data, &dev_trend);
+> +	r = data->ops->get_trend(data->sensor_data, trip, trend);
+>  	if (r)
+>  		return r;
+>  
+> -	/* TODO: These intervals might have some thresholds, but in core code */
+> -	if (dev_trend > 0)
+> -		*trend = THERMAL_TREND_RAISING;
+> -	else if (dev_trend < 0)
+> -		*trend = THERMAL_TREND_DROPPING;
+> -	else
+> -		*trend = THERMAL_TREND_STABLE;
+> -
+>  	return 0;
+>  }
+>  
+> diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+> index a38c175..7f8e5f3 100644
+> --- a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+> +++ b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+> @@ -238,7 +238,7 @@ static int ti_thermal_get_trip_temp(struct thermal_zone_device *thermal,
+>  	return 0;
+>  }
+>  
+> -static int __ti_thermal_get_trend(void *p, long *trend)
+> +static int __ti_thermal_get_trend(void *p, int trip, enum thermal_trend *trend)
+>  {
+>  	struct ti_thermal_data *data = p;
+>  	struct ti_bandgap *bgp;
+> @@ -251,22 +251,6 @@ static int __ti_thermal_get_trend(void *p, long *trend)
+>  	if (ret)
+>  		return ret;
+>  
+> -	*trend = tr;
+> -
+> -	return 0;
+> -}
+> -
+> -/* Get the temperature trend callback functions for thermal zone */
+> -static int ti_thermal_get_trend(struct thermal_zone_device *thermal,
+> -				int trip, enum thermal_trend *trend)
+> -{
+> -	int ret;
+> -	long tr;
+> -
+> -	ret = __ti_thermal_get_trend(thermal->devdata, &tr);
+> -	if (ret)
+> -		return ret;
+> -
+>  	if (tr > 0)
+>  		*trend = THERMAL_TREND_RAISING;
+>  	else if (tr < 0)
+> @@ -277,6 +261,13 @@ static int ti_thermal_get_trend(struct thermal_zone_device *thermal,
+>  	return 0;
+>  }
+>  
+> +/* Get the temperature trend callback functions for thermal zone */
+> +static int ti_thermal_get_trend(struct thermal_zone_device *thermal,
+> +				int trip, enum thermal_trend *trend)
+> +{
+> +	return __ti_thermal_get_trend(thermal->devdata, trip, trend);
+> +}
+> +
+>  /* Get critical temperature callback functions for thermal zone */
+>  static int ti_thermal_get_crit_temp(struct thermal_zone_device *thermal,
+>  				    unsigned long *temp)
+> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+> index db6c12b..ba2e29a 100644
+> --- a/include/linux/thermal.h
+> +++ b/include/linux/thermal.h
+> @@ -273,7 +273,7 @@ struct thermal_genl_event {
+>   */
+>  struct thermal_zone_of_device_ops {
+>  	int (*get_temp)(void *, long *);
+> -	int (*get_trend)(void *, long *);
+> +	int (*get_trend)(void *, int trend, enum thermal_trend *);
 
-On Mon, Apr 06, 2015 at 07:23:13PM -0700, Tony Lindgren wrote:
-> I'm now thinking the kernel should just always set the 430973 specific
-> cpu_v7_switch_mm for all cortex-a8 if IBE bit is set. That avoids
-> the whole mess of early SoC detection and smc calls. And if IBE bit
-> is not set, then we just use the regular cpu_v7_switch_mm.
->
-> This will work as long as we can read the aux ctrl register IBE
-> bit using mrc, which I believe is the case for all cortex-a8 based
-> omap variants.
+Could you please keep the kernel doc entry up to date?
 
-If I understood it correctly we can simply call the BTB flush on
-cortex-a8 if IBE bit is not set, since it would be translated as
-nop.
 
-So it should be safe to include the call on all cortex-a8 based
-cpus. We may need a non-BTB-flushing function for non-cortex-a8
-based cpus, though.
+Apart from that, looks good to me.
 
--- Sebastian
+>  	int (*set_emul_temp)(void *, unsigned long);
+>  };
+>  
+> -- 
+> 2.1.4
+> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/aec425aa/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/71e18521/attachment.sig>
