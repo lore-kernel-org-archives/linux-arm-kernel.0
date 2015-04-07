@@ -1,49 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Apr 2015 15:56:35 +0100
-Subject: [PATCH v4] ARM: smp: Only expose /sys/.../cpuX/online if
- hotpluggable
-In-Reply-To: <1428351853-5844-1-git-send-email-sboyd@codeaurora.org>
-References: <1428351853-5844-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150407145635.GI12732@n2100.arm.linux.org.uk>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 07 Apr 2015 17:00:29 +0200
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
+ enabled during suspend
+In-Reply-To: <CAM4voamV-TcyqXSu7_HeQvd2aEUXpkjbJ14Otb_MLFMEO_1Vbg@mail.gmail.com>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>	<1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>	<CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>	<551976F1.1000605@collabora.co.uk>	<CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>	<551AFCCE.4050404@collabora.co.uk>	<551BD07E.2090506@samsung.com>	<551BDA0A.7010704@collabora.co.uk>	<551C2B6D.4010001@samsung.com>	<551C71A5.1070903@collabora.co.uk>	<CAM4voakS8PnatqRTW5gkD0NNKD9gW9Tuv5p-ekxFhKN5NcuBCQ@mail.gmail.com>	<5523B878.8040304@collabora.co.uk>	<5523C5F5.6000604@collabora.co.uk>	<CA+Ln22FrvQQ_pX7ELG-jYriGkQHmtX3aUHYqsc_-CRXcc4zxbg@mail.gmail.com>	<5523E5A9.4080302@collabora.co.uk>
+ <CAM4voamV-TcyqXSu7_HeQvd2aEUXpkjbJ14Otb_MLFMEO_1Vbg@mail.gmail.com>
+Message-ID: <5523F10D.20801@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 01:24:13PM -0700, Stephen Boyd wrote:
-> Writes to /sys/.../cpuX/online fail if we determine the platform
-> doesn't support hotplug for that CPU. Furthermore, if the cpu_die
-> op isn't specified the system hangs when we try to offline a CPU
-> and it comes right back online unexpectedly. Let's figure this
-> stuff out before we make the sysfs nodes so that the online file
-> doesn't even exist if it isn't (at least sometimes) possible to
-> hotplug the CPU.
-> 
-> Add a new 'cpu_can_disable' op and repoint all 'cpu_disable'
-> implementations at it because all implementers use the op to
-> indicate if a CPU can be hotplugged or not in a static fashion.
-> With PSCI we may need to add a 'cpu_disable' op so that the
-> secure OS can be migrated off the CPU we're trying to hotplug.
-> In this case, the 'cpu_can_disable' op will indicate that all
-> CPUs are hotpluggable by returning true, but the 'cpu_disable' op
-> will make a PSCI migration call and occasionally fail, denying
-> the hotplug of a CPU. This shouldn't be any worse than x86 where
-> we may indicate that all CPUs are hotpluggable but occasionally
-> we can't offline a CPU due to check_irq_vectors_for_cpu_disable()
-> failing to find a CPU to move vectors to.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: <linux-sh@vger.kernel.org>
-> Cc: Tyler Baker <tyler.baker@linaro.org>
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Hello Abhilash,
 
-I think this is fine, but I'd like to see some acks for it.  As it's
-mostly core ARM stuff, it should be merged through my tree unless there
-is a known conflict with arm-soc.  Thanks.
+On 04/07/2015 04:38 PM, Abhilash Kesavan wrote:
+>>
+>> [0]
+>> From 78aa551ebcb9a4a7ae9d5581c33e0c0f19fe5ad6 Mon Sep 17 00:00:00 2001
+>> From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Date: Tue, 7 Apr 2015 15:53:27 +0200
+>> Subject: [RFC PATCH] clk: exynos5420: Restore GATE_BUS_TOP on suspend
+>>
+>> Commit ae43b3289186 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power
+>> Management support v12") added pm support for the pl330 dma driver but
+>> it makes the clock for the Exynos5420 MDMA0 DMA controller to be gated
+>> during suspend and this in turn makes its parent clock aclk266_g2d to
+>> be gated. But the clock needs to be ungated prior suspend to allow the
+>> system to be suspend and resumed correctly.
+>>
+>> Add GATE_BUS_TOP register to the list of registers to be restored when
+>> the system enters into a suspend state so aclk266_g2d will be ungated.
+>>
+>> Thanks to Abhilash Kesavan for figuring out that this was the issue.
+>>
+>> Fixes: ae43b32 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12")
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>  drivers/clk/samsung/clk-exynos5420.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+>> index 07d666cc6a29..bea4a173eef5 100644
+>> --- a/drivers/clk/samsung/clk-exynos5420.c
+>> +++ b/drivers/clk/samsung/clk-exynos5420.c
+>> @@ -271,6 +271,7 @@ static const struct samsung_clk_reg_dump exynos5420_set_clksrc[] = {
+>>         { .offset = SRC_MASK_PERIC0,            .value = 0x11111110, },
+>>         { .offset = SRC_MASK_PERIC1,            .value = 0x11111100, },
+>>         { .offset = SRC_MASK_ISP,               .value = 0x11111000, },
+>> +       { .offset = GATE_BUS_TOP,               .value = 0xffffffff, },
+>>         { .offset = GATE_BUS_DISP1,             .value = 0xffffffff, },
+>>         { .offset = GATE_IP_PERIC,              .value = 0xffffffff, },
+>>  };
+> 
+> While there could be a concern that we are ungating all the clocks in
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Yes, I mentioned that but OTOH it will be even more dangerous to gate
+clocks that should remain enabled so I used the register default values.
+
+> BUS_TOP, this looks like the least intrusive fix for the issue. Tested
+> this on Peach Pi, S2R works fine.
+>
+
+Thanks a lot for testing, does it mean I can add your Tested-by then when
+posting it as a proper patch? I'll wait for Tomasz to comment before though.
+ 
+> Thanks,
+> Abhilash
+> 
+
+Best regards,
+Javier
