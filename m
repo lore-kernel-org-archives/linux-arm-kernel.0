@@ -1,78 +1,67 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 7 Apr 2015 23:16:38 +0200
-Subject: [PATCH 3.18-stable v2] ARM: mvebu: do not register custom DMA
- operations when coherency is disabled
-In-Reply-To: <1426157892-1705-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1426157892-1705-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20150407231638.0993cb16@free-electrons.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 7 Apr 2015 23:28:55 +0200
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
+ enabled during suspend
+In-Reply-To: <5523E5A9.4080302@collabora.co.uk>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
+ <551976F1.1000605@collabora.co.uk>
+ <CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>
+ <551AFCCE.4050404@collabora.co.uk> <551BD07E.2090506@samsung.com>
+ <551BDA0A.7010704@collabora.co.uk> <551C2B6D.4010001@samsung.com>
+ <551C71A5.1070903@collabora.co.uk>
+ <CAM4voakS8PnatqRTW5gkD0NNKD9gW9Tuv5p-ekxFhKN5NcuBCQ@mail.gmail.com>
+ <5523B878.8040304@collabora.co.uk>
+ <5523C5F5.6000604@collabora.co.uk>
+ <CA+Ln22FrvQQ_pX7ELG-jYriGkQHmtX3aUHYqsc_-CRXcc4zxbg@mail.gmail.com>
+ <5523E5A9.4080302@collabora.co.uk>
+Message-ID: <CA+Ln22EZn5+4zyAqH+WZXcnAr5EWNf4BHgG8rBY5ApS677N8fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Any reason why this patch hasn't been included in 3.18-stable? It is
-a very important patch fixing a major regression. What needs to be done
-to get it merged in 3.18 ?
-
-Thanks,
-
-Thomas
-
-On Thu, 12 Mar 2015 11:58:12 +0100, Thomas Petazzoni wrote:
-> This patch is a partial backport of commit ef01c6c36bb8 ("ARM: mvebu:
-> remove Armada 375 Z1 workaround for I/O coherency"). This commit was
-> merged in v3.19, so kernel versions later than v3.19 are not affected
-> by the problem that this commit fixes.
-> 
-> It does not make a lot of sense to backport this commit entirely,
-> since it is mainly removing some no longer useful code. However, this
-> commit is also making sure that the bus_register_notifier that
-> register the custom DMA operations that should be used for HW I/O
-> coherency does not get registered when said HW I/O coherency is not
-> enabled.
-> 
-> This is particularly critical since we have decided to disable HW I/O
-> coherency completely in all kernels < 4.0, to be on the safe side,
-> while experimenting a new implementation of the HW I/O coherency in >=
-> 4.0.
-> 
-> Without this commit, kernels earlier than 3.18 have the custom DMA
-> operations normally used for HW I/O coherency registered (they don't
-> do cache maintenance operations), while HW I/O coherency is
-> disabled. It essentially causes every DMA transfer to transfer
-> garbage.
-> 
-> The issue fixed by this commit was introduced by 5ab5afd8ba83 ("ARM:
-> mvebu: implement Armada 375 coherency workaround"), but it was not
-> visible until now since it didn't cause any problem when HW I/O
-> coherency is enabled.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: <stable@vger.kernel.org> v3.16..v3.18
+2015-04-07 16:11 GMT+02:00 Javier Martinez Canillas
+<javier.martinez@collabora.co.uk>:
+> From 78aa551ebcb9a4a7ae9d5581c33e0c0f19fe5ad6 Mon Sep 17 00:00:00 2001
+> From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Date: Tue, 7 Apr 2015 15:53:27 +0200
+> Subject: [RFC PATCH] clk: exynos5420: Restore GATE_BUS_TOP on suspend
+>
+> Commit ae43b3289186 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power
+> Management support v12") added pm support for the pl330 dma driver but
+> it makes the clock for the Exynos5420 MDMA0 DMA controller to be gated
+> during suspend and this in turn makes its parent clock aclk266_g2d to
+> be gated. But the clock needs to be ungated prior suspend to allow the
+> system to be suspend and resumed correctly.
+>
+> Add GATE_BUS_TOP register to the list of registers to be restored when
+> the system enters into a suspend state so aclk266_g2d will be ungated.
+>
+> Thanks to Abhilash Kesavan for figuring out that this was the issue.
+>
+> Fixes: ae43b32 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12")
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > ---
->  arch/arm/mach-mvebu/coherency.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-> index 2ffccd4..01efe13 100644
-> --- a/arch/arm/mach-mvebu/coherency.c
-> +++ b/arch/arm/mach-mvebu/coherency.c
-> @@ -448,8 +448,9 @@ static int __init coherency_late_init(void)
->  			armada_375_coherency_init_wa();
->  	}
->  
-> -	bus_register_notifier(&platform_bus_type,
-> -			      &mvebu_hwcc_nb);
-> +	if (coherency_available())
-> +		bus_register_notifier(&platform_bus_type,
-> +				      &mvebu_hwcc_nb);
->  
->  	return 0;
->  }
+>  drivers/clk/samsung/clk-exynos5420.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 07d666cc6a29..bea4a173eef5 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -271,6 +271,7 @@ static const struct samsung_clk_reg_dump exynos5420_set_clksrc[] = {
+>         { .offset = SRC_MASK_PERIC0,            .value = 0x11111110, },
+>         { .offset = SRC_MASK_PERIC1,            .value = 0x11111100, },
+>         { .offset = SRC_MASK_ISP,               .value = 0x11111000, },
+> +       { .offset = GATE_BUS_TOP,               .value = 0xffffffff, },
+>         { .offset = GATE_BUS_DISP1,             .value = 0xffffffff, },
+>         { .offset = GATE_IP_PERIC,              .value = 0xffffffff, },
+>  };
+> --
+> 2.1.4
 
+Looks good to me. You can consider this Acked-by, as long as Sylwester
+is not opposed to this approach.
 
-
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best regards,
+Tomasz
