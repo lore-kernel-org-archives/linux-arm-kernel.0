@@ -1,35 +1,31 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 7 Apr 2015 11:02:22 +0200
-Subject: [PATCH 0/2] Kbuild: kallsyms: update suffix ignore logic
-In-Reply-To: <1427721632-11665-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1427721632-11665-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu-HkK96hz7zKQeJfeh2YiRY+qGaWkQdrSn0=n+P0qeHZQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Apr 2015 11:03:31 +0200
+Subject: [PATCH 1/5] MFD/OF: document MFD devices and handle simple-mfd
+In-Reply-To: <20150328134157.000A3C40AE0@trevor.secretlab.ca>
+References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
+ <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
+ <20150328134157.000A3C40AE0@trevor.secretlab.ca>
+Message-ID: <CACRpkdYC_xG90bqnsog_C67WfBi1bcwki1DeN_jozmu5RTW89w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 March 2015 at 15:20, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Two patches that update the kallsyms ignore logic.
->
-> Patch #1 adds logic to introduce symbols whose names end in (or equal)
-> "_veneer". This prevent kallsyms generation errors on large ARM kernels
-> where the emitted veneers will be different between the first and second
-> pass, due to the fact that the size of the kallsyms region itself pushes
-> the .text and .init.text sections further apart during the second pass.
->
-> Patch #2 removes the handling of the "gcc[0-9]_compiled." symbol. It was
-> only ever emitted by GCC v2.x which we don't support anymore anyway.
->
-> This series is a followup to ' [RFC PATCH 0/2] ARM large kernels'
-> (http://thread.gmane.org/gmane.linux.kbuild.devel/13065), but the
-> other issue addressed by patch #2 of that series will be deferred
-> for now.
->
-> Ard Biesheuvel (2):
->   Kbuild: kallsyms: ignore veneers emitted by the ARM linker
->   Kbuild: kallsyms: drop special handling of pre-3.0 GCC symbols
->
->  scripts/kallsyms.c | 29 ++++++++++++++++++++---------
->  1 file changed, 20 insertions(+), 9 deletions(-)
->
+On Sat, Mar 28, 2015 at 2:41 PM, Grant Likely <grant.likely@linaro.org> wrote:
 
-Ping?
+> However, I think this is going to lead to a future problem. It solves
+> the immediate case of getting an MFD device to be auto populated when
+> the kernel doesn't need to immediately do something. However, I can
+> forsee a situation where the device can be supported by simple-mfd, but
+> at some point it is discovered that better features can be enabled if
+> the mfd device has a proper driver.
+
+For the general case where access to the MFD needs some mediation
+or marshalling yes, I think this is theoretically possible.
+
+For the most common MMIO case where the MFD devide is a syscon,
+it is not so likely. Or rather extremelt unlikely.
+
+We could restrict the use cases to strictly syscon/MMIO MFD devices
+but it would just be a documentation fix.
+
+Yours,
+Linus Walleij
