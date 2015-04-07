@@ -1,65 +1,67 @@
-From: mporter@konsulko.com (Matt Porter)
-Date: Tue, 7 Apr 2015 15:46:36 -0400
-Subject: [PATCH v4 05/10] eeprom: Add bindings for simple eeprom framework
-In-Reply-To: <55241BF2.4050609@linaro.org>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1427752679-17261-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20150406133208.GH30984@beef>
- <CAL_Jsq++9pyJMLXssgyz2WRU4e7ikT_6FwzWMo1fKS82FJvEyg@mail.gmail.com>
- <20150406150442.GA26319@beef> <55241575.7040809@linaro.org>
- <20150407174624.GO6023@sirena.org.uk> <55241BF2.4050609@linaro.org>
-Message-ID: <20150407194636.GB6662@beef>
+From: g.portay@overkiz.com (g.portay at overkiz.com)
+Date: Tue, 07 Apr 2015 21:49:53 +0200
+Subject: [PATCH 2/2] ARM: at91/dt: add support for kizboxmini.
+In-Reply-To: <20150407193215.GX20669@piout.net>
+References: <1428415884-30662-1-git-send-email-g.portay@overkiz.com>
+ <1428415884-30662-3-git-send-email-g.portay@overkiz.com>
+ <20150407193215.GX20669@piout.net>
+Message-ID: <3444dbb78295d8750dcacc9daba26a83@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 07:03:30PM +0100, Srinivas Kandagatla wrote:
+On 2015-04-07 21:32, Alexandre Belloni wrote:
+> Hi,
 > 
+> On 07/04/2015 at 16:11:24 +0200, Ga?l PORTAY wrote :
+>> Add DT file for Kizbox mini board.
+>> This board is based on Atmel's AT91SAM9G25 SoC.
+>> 
+>> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile            |   1 +
+>>  arch/arm/boot/dts/at91-kizboxmini.dts | 129 
+>> ++++++++++++++++++++++++++++++++++
+>>  2 files changed, 130 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
+>> 
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index a1c776b..9c11888 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -30,6 +30,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+>>  	at91sam9rlek.dtb \
+>>  	at91-ariag25.dtb \
+>>  	at91-cosino_mega2560.dtb \
+>> +	at91-kizboxmini.dtb \
+>>  	at91sam9g15ek.dtb \
+>>  	at91sam9g25ek.dtb \
+>>  	at91sam9g35ek.dtb \
+>> diff --git a/arch/arm/boot/dts/at91-kizboxmini.dts 
+>> b/arch/arm/boot/dts/at91-kizboxmini.dts
+>> new file mode 100644
+>> index 0000000..191576c
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/at91-kizboxmini.dts
+>> @@ -0,0 +1,129 @@
+>> +/*
+>> + * at91-kizboxmini.dts - Device Tree file for Overkiz Kizbox mini 
+>> board
+>> + *
+>> + * Copyright (C) 2014 Ga?l PORTAY <g.portay@overkiz.com>
+>> + *
+>> + * Licensed under GPLv2 or later.
+>> + */
+>> +/dts-v1/;
+>> +#include "at91sam9g25.dtsi"
+>> +#include "at91sam9x5.dtsi"
+>> +#include <dt-bindings/pwm/pwm.h>
+>> +
+>> +/ {
+>> +	model = "Overkiz Kizbox mini";
+>> +	compatible = "overkiz,kizboxmini", "atmel,at91sam9g25ek", 
+>> "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
 > 
-> On 07/04/15 18:46, Mark Brown wrote:
-> >On Tue, Apr 07, 2015 at 06:35:49PM +0100, Srinivas Kandagatla wrote:
-> >>On 06/04/15 16:04, Matt Porter wrote:
-> >>>On Mon, Apr 06, 2015 at 09:11:05AM -0500, Rob Herring wrote:
-> >
-> >>>>>The generic binding could really use a "read-only" property here as this
-> >>>>>is a common hardware attribute for many nvmem devices. A serial EEPROM
-> >
-> >>Correct me If am wrong.
-> >
-> >>Regarding write protection/read-only, regmap already has provisions to
-> >>support this feature. regmap would bail out with errors if any attempt to
-> >>write to non-writable regions. It all depends on the data providers how they
-> >>setup the regmap and the bindings for those are specific individual data
-> >>providers I think.
-> >
-> >There is the ability to flag read/write permissions in regmap but I
-> >think there's some suggestion that this should be exposed to userspace
-> >so that it's easier for it to handle things rather than just writing
-> >then coping with any errors.
-> 
-> Yes, That's possible if the data provider use the "read-only" generic
-> binding like MTD partitions which the eeprom framwork could use to set the
-> binary file mode appropriately.
+> I would remove "atmel,at91sam9g25ek" and "atmel,at91sam9x5ek". However,
+> you could use "atmel,at91sam9g25".
 
-Right, that's what Rob suggested as to how it should be exposed to
-userspace. I think Mark is suggesting that it can also be done by
-returning appropriately fine-grained error codes from a writeable
-attribute.
-
-Just to clarify here, I brought this up because if we only allow
-the writes to fail, there's not necessarily not enough information
-available to know if they failed due to a real error (perhaps write
-cycles for the underlying nvmem device have been exhausted) or is
-it simply that the underlying device has been hardware write protected
-(such as as the write protect pin hardwired that way or it's an OTP
-device). The client, whether userspace or otherwise is going to need
-to know this information to make informed policy decisions.
-
--Matt
-
-> "read-only" property seems to be more generic for all types of data
-> providers.
-> 
-> I will give it a try and document this in the bindings too in next version.
-> 
-> --srini
-> >
+I guess your right...
