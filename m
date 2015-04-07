@@ -1,30 +1,53 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 07 Apr 2015 16:26:29 +0200
-Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
- enabled during suspend
-In-Reply-To: <CAM4voanig_BQrEKGA0YYX_80Gvbtmau3zwz7mQUKtvNMCO-LuQ@mail.gmail.com>
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>	<1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>	<CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>	<551976F1.1000605@collabora.co.uk>	<CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>	<551AFCCE.4050404@collabora.co.uk>	<551BD07E.2090506@samsung.com>	<551BDA0A.7010704@collabora.co.uk>	<551C2B6D.4010001@samsung.com>	<551C71A5.1070903@collabora.co.uk>	<CAM4voakS8PnatqRTW5gkD0NNKD9gW9Tuv5p-ekxFhKN5NcuBCQ@mail.gmail.com>	<5523B878.8040304@collabora.co.uk>
- <CAM4voanig_BQrEKGA0YYX_80Gvbtmau3zwz7mQUKtvNMCO-LuQ@mail.gmail.com>
-Message-ID: <5523E915.5070203@collabora.co.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 07 Apr 2015 17:38:41 +0300
+Subject: [PATCH 07/14] media: omap3isp: remove unused clkdev
+In-Reply-To: <20150407124536.GK4027@n2100.arm.linux.org.uk>
+References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
+ <1894989.AGoQvgsks0@avalon> <20150407124536.GK4027@n2100.arm.linux.org.uk>
+Message-ID: <1734484.Zgs1aYnH8A@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Abhilash,
+Hi Russell,
 
-On 04/07/2015 04:11 PM, Abhilash Kesavan wrote:
-> 
-> Yes, though it increasingly looks like aclk266_g2d needs to stay ON
-> and we should use your patch that keeps it enabled prior to suspend.
+On Tuesday 07 April 2015 13:45:36 Russell King - ARM Linux wrote:
+> On Tue, Apr 07, 2015 at 12:42:52PM +0300, Laurent Pinchart wrote:
+> > On Sunday 05 April 2015 15:20:34 Russell King - ARM Linux wrote:
+> > > On Sat, Apr 04, 2015 at 12:44:35AM +0300, Laurent Pinchart wrote:
+> > > > Hi Russell,
+> > > > 
+> > > > Thank you for the patch;
+> > > > 
+> > > > On Friday 03 April 2015 18:12:58 Russell King wrote:
+> > > > > No merged platform supplies xclks via platform data.  As we want to
+> > > > > slightly change the clkdev interface, rather than fixing this unused
+> > > > > code, remove it instead.
+> > > > > 
+> > > > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > > 
+> > > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > > 
+> > > > with one caveat though : it conflicts with patches queued for v4.1 in
+> > > > the media tree. I'll post a rebased version in a reply to your e-mail.
+> > > > How would you like to handle the conflict ?
+> > > 
+> > > How bad is the conflict?
+> > 
+> > It's not too bad, it's mostly a context-related conflict. There are two
+> > additional lines to remove (plus the associated comment) from
+> > isp_xclk_init(), as your patch makes a loop now terminate with if
+> > (condition) continue;. Those two lines could be removed later, keeping
+> > them doesn't break anything.
 >
+> I think it's fine to take it through the media tree as the series doesn't
+> have any dependencies on this patch.  It was merely attempting to get rid
+> of stuff so that we could move closer to clkdev dealing with a clk_hw
+> rather than a struct clk - but I never made it that far with the series.
+> Maybe at a later date... :)
 
-Indeed, could you please give me some feedback on the latest RFC patch
-I shared [0] on this thread according to Tomasz comments?
- 
-> Regards,
-> Abhilash
->>
+:-) I'll take the patch and send a pull request.
 
-Thanks a lot and best regards,
-Javier
+-- 
+Regards,
 
-[0]: https://lkml.org/lkml/2015/4/7/537
+Laurent Pinchart
