@@ -1,229 +1,95 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  7 Apr 2015 16:45:05 +0200
-Subject: [PATCH v3 5/9] ARM: berlin: rework the clock node for BG2Q
-In-Reply-To: <1428417909-27378-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1428417909-27378-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1428417909-27378-6-git-send-email-antoine.tenart@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Apr 2015 07:48:26 -0700
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <CAALWOA8m9Gqv2ZL6ibWrWRBGsGBG2tpbutzVrwOjRpKCQ=mXXA@mail.gmail.com>
+References: <5521A438.1070008@gmail.com>
+ <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com>
+ <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
+ <20150406174245.GJ18048@atomide.com>
+ <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
+ <20150407022312.GK18048@atomide.com> <20150407031233.GA16189@earth>
+ <CAALWOA8m9Gqv2ZL6ibWrWRBGsGBG2tpbutzVrwOjRpKCQ=mXXA@mail.gmail.com>
+Message-ID: <20150407144826.GL18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of the Berlin mfd controller driver, all drivers
-previously sharing the chip and system controller nodes now have their
-own sub-node.
+* Matthijs van Duin <matthijsvanduin@gmail.com> [150406 20:50]:
+> On 7 April 2015 at 04:23, Tony Lindgren <tony@atomide.com> wrote:
+> > Oops, sorry user error.. I was trying to clear IBE as a banked register
+> > like L2 enable bit and of course it did not get cleared.. Clearing it
+> > with a smc call really clears it. And in that case my test case seems to
+> > work reliably on r3p2 without erratum 430973 enabled.
+> 
+> So if I understand correctly, you actually had crashes which only
+> occurred with IBE enabled and the 430973 workaround disabled?
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 53 ++++++++++++++++++++++-------------------
- 1 file changed, 29 insertions(+), 24 deletions(-)
+That's right. It seems to happen at least with r3p2 that has 430973
+fixed. 
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 006d382d44ff..9000eb2ebc45 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -74,7 +74,7 @@
- 		sdhci0: sdhci at ab0000 {
- 			compatible = "mrvl,pxav3-mmc";
- 			reg = <0xab0000 0x200>;
--			clocks = <&chip CLKID_SDIO1XIN>;
-+			clocks = <&chip_clk CLKID_SDIO1XIN>;
- 			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
- 			status = "disabled";
- 		};
-@@ -82,7 +82,7 @@
- 		sdhci1: sdhci at ab0800 {
- 			compatible = "mrvl,pxav3-mmc";
- 			reg = <0xab0800 0x200>;
--			clocks = <&chip CLKID_SDIO1XIN>;
-+			clocks = <&chip_clk CLKID_SDIO1XIN>;
- 			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
- 			status = "disabled";
- 		};
-@@ -91,7 +91,7 @@
- 			compatible = "mrvl,pxav3-mmc";
- 			reg = <0xab1000 0x200>;
- 			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_NFC_ECC>, <&chip CLKID_NFC>;
-+			clocks = <&chip_clk CLKID_NFC_ECC>, <&chip_clk CLKID_NFC>;
- 			clock-names = "io", "core";
- 			status = "disabled";
- 		};
-@@ -112,7 +112,7 @@
- 		local-timer at ad0600 {
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0xad0600 0x20>;
--			clocks = <&chip CLKID_TWD>;
-+			clocks = <&chip_clk CLKID_TWD>;
- 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		};
+> That's quite interesting, since it seems to me that can only be the
+> result of erratum 687067, which means
+> 1. secrom indeed fails to implement the 687067 workaround.
+> 2. "BTB invalidate by MVA" is used somewhere in the kernel.
+> The 430973 workaround would likely conceal this problem due to
+> regularly flushing the whole BTB, but I'm not sure how wise it is to
+> rely on that...
+
+Yes it seems to be hidden behind 430973. Anyways, we can print some
+warnings in the kernel for incorrect revision and IBE handling.
  
-@@ -135,7 +135,7 @@
- 			compatible = "chipidea,usb2";
- 			reg = <0xa30000 0x10000>;
- 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_USB2>;
-+			clocks = <&chip_clk CLKID_USB2>;
- 			phys = <&usb_phy2>;
- 			phy-names = "usb-phy";
- 			status = "disabled";
-@@ -153,14 +153,14 @@
- 			compatible = "marvell,berlin2-usb-phy";
- 			reg = <0xb78000 0x128>;
- 			#phy-cells = <0>;
--			resets = <&chip 0x104 13>;
-+			resets = <&chip_rst 0x104 13>;
- 			status = "disabled";
- 		};
+> > I'm now thinking the kernel should just always set the 430973 specific
+> > cpu_v7_switch_mm for all cortex-a8 if IBE bit is set.
+> 
+> And simply take the performance hit if secrom bogusly sets it and the
+> bootloader doesn't fix it?
+
+Yes it seems Russell's patch should do that for cortex-a8.
  
- 		eth0: ethernet at b90000 {
- 			compatible = "marvell,pxa168-eth";
- 			reg = <0xb90000 0x10000>;
--			clocks = <&chip CLKID_GETH0>;
-+			clocks = <&chip_clk CLKID_GETH0>;
- 			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
- 			/* set by bootloader */
- 			local-mac-address = [00 00 00 00 00 00];
-@@ -267,7 +267,7 @@
- 				reg = <0x1400 0x100>;
- 				interrupt-parent = <&aic>;
- 				interrupts = <4>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				pinctrl-0 = <&twsi0_pmux>;
- 				pinctrl-names = "default";
- 				status = "disabled";
-@@ -280,7 +280,7 @@
- 				reg = <0x1800 0x100>;
- 				interrupt-parent = <&aic>;
- 				interrupts = <5>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				pinctrl-0 = <&twsi1_pmux>;
- 				pinctrl-names = "default";
- 				status = "disabled";
-@@ -289,7 +289,7 @@
- 			timer0: timer at 2c00 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c00 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				interrupts = <8>;
- 			};
-@@ -297,14 +297,14 @@
- 			timer1: timer at 2c14 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c14 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 			};
+> Sounds reasonable enough to me, given how platform-specific the
+> appropriate auxcr config is, as well as the means by which it can be
+> changed.
+
+Right, we have quite a few combinations already for omap3.. 34xx/36xx,
+HS/GP, TI vs Nokia bootrom.. Just proves how useless all these
+"security" "features" are in the long run :) They will just keep
+biting people over and over in the long run even if not used.
  
- 			timer2: timer at 2c28 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c28 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -312,7 +312,7 @@
- 			timer3: timer at 2c3c {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c3c 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -320,7 +320,7 @@
- 			timer4: timer at 2c50 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c50 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -328,7 +328,7 @@
- 			timer5: timer at 2c64 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c64 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -336,7 +336,7 @@
- 			timer6: timer at 2c78 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c78 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -344,7 +344,7 @@
- 			timer7: timer at 2c8c {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c8c 0x14>;
--				clocks = <&chip CLKID_CFG>;
-+				clocks = <&chip_clk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -362,9 +362,14 @@
- 		chip: chip-controller at ea0000 {
- 			compatible = "marvell,berlin2q-chip-ctrl", "simple-mfd", "syscon";
- 			reg = <0xea0000 0x400>, <0xdd0170 0x10>;
--			#clock-cells = <1>;
--			clocks = <&refclk>;
--			clock-names = "refclk";
-+
-+			chip_clk: clock {
-+				compatible = "marvell,berlin2q-clk";
-+
-+				#clock-cells = <1>;
-+				clocks = <&refclk>;
-+				clock-names = "refclk";
-+			};
+> There's more secrom misconfiguration that the bootloader should fix
+> anyhow to make optimal use of the processor...
+
+Yeah. 
  
- 			soc_pinctrl: pin-controller {
- 				compatible = "marvell,berlin2q-soc-pinctrl";
-@@ -390,7 +395,7 @@
- 			compatible = "marvell,berlin2q-ahci", "generic-ahci";
- 			reg = <0xe90000 0x1000>;
- 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_SATA>;
-+			clocks = <&chip_clk CLKID_SATA>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+> > This will work as long as we can read the aux ctrl register IBE
+> > bit using mrc, which I believe is the case for all cortex-a8 based
+> > omap variants.
+> 
+> Aux control is always readable, only write is an issue.
+
+OK, hopefully that's the case for 36xx HS version too.. I recall some
+registers reading as zero on N9 but hopefully not for the aux control
+register.
  
-@@ -410,7 +415,7 @@
- 		sata_phy: phy at e900a0 {
- 			compatible = "marvell,berlin2q-sata-phy";
- 			reg = <0xe900a0 0x200>;
--			clocks = <&chip CLKID_SATA>;
-+			clocks = <&chip_clk CLKID_SATA>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			#phy-cells = <1>;
-@@ -429,7 +434,7 @@
- 			compatible = "chipidea,usb2";
- 			reg = <0xed0000 0x10000>;
- 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_USB0>;
-+			clocks = <&chip_clk CLKID_USB0>;
- 			phys = <&usb_phy0>;
- 			phy-names = "usb-phy";
- 			status = "disabled";
-@@ -439,7 +444,7 @@
- 			compatible = "chipidea,usb2";
- 			reg = <0xee0000 0x10000>;
- 			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_USB1>;
-+			clocks = <&chip_clk CLKID_USB1>;
- 			phys = <&usb_phy1>;
- 			phy-names = "usb-phy";
- 			status = "disabled";
--- 
-2.3.5
+> On 7 April 2015 at 05:12, Sebastian Reichel <sre@kernel.org> wrote:
+> > If I understood it correctly we can simply call the BTB flush on
+> > cortex-a8 if IBE bit is not set, since it would be translated as
+> > nop.
+> 
+> Indeed you can safely use the BTB-flushing context switch on any cortex-a8.
+> 
+> There's still value in checking if IBE is set on r2p1 or later, and if
+> so emit a warning about suboptimal performance.
+> 
+> > So it should be safe to include the call on all cortex-a8 based
+> > cpus. We may need a non-BTB-flushing function for non-cortex-a8
+> > based cpus, though.
+> 
+> I just looked it up, apparently BTB-flushing on context switch is not
+> needed architecturally in ARMv7 (though it was in ARMv6), so that
+> version should probably indeed only be used for the cortex-a8.
+
+OK
+
+Regards,
+
+Tony
