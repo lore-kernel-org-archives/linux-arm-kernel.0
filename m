@@ -1,37 +1,41 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue,  7 Apr 2015 18:30:34 +0200
-Subject: [PATCH v6 15/15] MAINTAINERS: Add entry for STM32 MCUs
-In-Reply-To: <1428424234-28572-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1428424234-28572-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1428424234-28572-16-git-send-email-mcoquelin.stm32@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 7 Apr 2015 16:33:35 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: OMAP DRA7xx display-related hwmod data
+ changes for v4.1
+In-Reply-To: <5523C971.1030904@ti.com>
+References: <alpine.DEB.2.02.1504031953150.19540@utopia.booyaka.com>
+ <20150403230833.GB18048@atomide.com> <5523C971.1030904@ti.com>
+Message-ID: <alpine.DEB.2.02.1504071630050.19540@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a MAINTAINER entry covering all STM32 machine and drivers files.
+On Tue, 7 Apr 2015, Tomi Valkeinen wrote:
 
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> Hi,
+> 
+> No, don't pull this, it doesn't work.
+> 
+> Paul, the hwmod patch cannot be picked from the DRA7 DSS series. We have
+> the problem with the DES HDCP clock, without that clock we will see
+> WARNINGs when booting if the "set DSS submodule parent hwmods" is applied.
+> 
+> We do see some errors when booting even with the current mainline,
+> caused by not having that clock enabled:
+> 
+> [    0.194524] omap_hwmod: dss_core: _wait_target_disable failed
+> [    0.194540] omap_hwmod: dss_core: _wait_target_ready failed: -16
+> [    0.194554] omap_hwmod: dss_core: cannot be enabled for reset (3)
+> [    0.197143] omap_hwmod: dss_dispc: _wait_target_ready failed: -16
+> [    0.197156] omap_hwmod: dss_dispc: cannot be enabled for reset (3)
+> [    0.199745] omap_hwmod: dss_hdmi: _wait_target_ready failed: -16
+> [    0.199759] omap_hwmod: dss_hdmi: cannot be enabled for reset (3)
+> 
+> But that's still much less spam than the above plus ~4 WARNs.
+> 
+> I'd rather merge the DRA7 DSS patches in one go, to avoid issues related
+> to the HDPC clock.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddc5a8c..08c08c4 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1467,6 +1467,14 @@ F:	drivers/usb/host/ehci-st.c
- F:	drivers/usb/host/ohci-st.c
- F:	drivers/ata/ahci_st.c
- 
-+ARM/STM32 ARCHITECTURE
-+M:	Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
-+N:	stm32
-+F:	drivers/clocksource/armv7m_systick.c
-+
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-1.9.1
+OK, sorry for the misunderstanding.
+
+
+- Paul
