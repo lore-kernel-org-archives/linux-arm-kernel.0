@@ -1,48 +1,27 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 07 Apr 2015 13:05:39 -0400
-Subject: [PATCH v6 10/15] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <55240B2C.3020102@suse.de>
-References: <1428424234-28572-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1428424234-28572-11-git-send-email-mcoquelin.stm32@gmail.com>
- <55240B2C.3020102@suse.de>
-Message-ID: <55240E63.3040502@hurleysoftware.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Tue, 7 Apr 2015 10:08:38 -0700
+Subject: Build regression in next-20150331
+In-Reply-To: <20150403142424.GJ27490@worktop.programming.kicks-ass.net>
+References: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
+ <20150402082917.GS23123@twins.programming.kicks-ass.net>
+ <CANMBJr4T5T6tFM+SPs9btc_qBRdMPL0QA4R_d1XXk7VBDqq_MA@mail.gmail.com>
+ <2449654.mrTjPJtNze@vostro.rjw.lan>
+ <20150403142424.GJ27490@worktop.programming.kicks-ass.net>
+Message-ID: <CANMBJr44G6rBQ34u7cQ+rypeRXGtiGaAU-dG5Oimr6kUhz0K+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+On 3 April 2015 at 07:24, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, Apr 03, 2015 at 01:07:19PM +0200, Rafael J. Wysocki wrote:
+>> Peter, I'm assiming that you'll make sure this goes into tip/timers/core.
+>
+> I'll double check, but I think Ingo did a similar thing when he applied
+> your patches.
 
-On 04/07/2015 12:51 PM, Andreas F?rber wrote:
-> Am 07.04.2015 um 18:30 schrieb Maxime Coquelin:
->> This drivers adds support to the STM32 USART controller, which is a
->> standard serial driver.
->>
->> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> ---
->>  drivers/tty/serial/Kconfig       |  17 +
->>  drivers/tty/serial/Makefile      |   1 +
->>  drivers/tty/serial/stm32-usart.c | 735 +++++++++++++++++++++++++++++++++++++++
->>  include/uapi/linux/serial_core.h |   3 +
->>  4 files changed, 756 insertions(+)
->>  create mode 100644 drivers/tty/serial/stm32-usart.c
-> [...]
->> diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
->> new file mode 100644
->> index 0000000..4adc430
->> --- /dev/null
->> +++ b/drivers/tty/serial/stm32-usart.c
-> [...]
->> +#define DRIVER_NAME "stm32-usart"
->> +#define STM32_SERIAL_NAME "ttyS"
-> 
-> I'm surprised no one has complained about ttyS yet. Doesn't that need to
-> be unique, such as ttySTM (efm32 uses ttyefm), to avoid clashes between
-> serial drivers? ttyS was exclusive to the 8250 driver, I thought.
+Fix has been included next-20150407, this build regression is resolved[0].
 
-As long as this platform doesn't support 8250 h/w, I don't care; and
-by the time this platform is ready for multiconfig, I'll have ttyS
-coexistence fixed.
+Thanks,
 
-Regards,
-Peter Hurley
+Tyler
+
+[0] http://kernelci.org/build/next/kernel/next-20150407/
