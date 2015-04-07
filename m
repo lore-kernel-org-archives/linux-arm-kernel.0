@@ -1,70 +1,35 @@
 From: leilei.zhao@atmel.com (Leilei Zhao)
-Date: Tue, 7 Apr 2015 17:45:10 +0800
-Subject: [PATCH 09/10] crypto: atmel-aes: sync the buf used in DMA or CPU
+Date: Tue, 7 Apr 2015 17:45:11 +0800
+Subject: [PATCH 10/10] crypto: atmel-aes: correct usage of dma_sync_* API
 In-Reply-To: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
 References: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
-Message-ID: <1428399911-23325-10-git-send-email-leilei.zhao@atmel.com>
+Message-ID: <1428399911-23325-11-git-send-email-leilei.zhao@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The input buffer and output buffer are mapped for DMA transfer
-in Atmel AES driver. But they are also be used by CPU when
-the requested crypt length is not bigger than the threshold
-value 16. The buffers will be cached in cache line when CPU
-accessed them. When DMA uses the buffers again, the memory
-can happened to be flushed by cache while DMA starts transfer.
-
-So using API dma_sync_single_for_device and dma_sync_single_for_cpu
-in DMA to ensure DMA coherence and CPU always access the correct
-value. This fix the issue that the encrypted result periodically goes
-wrong when doing performance test with OpenSSH.
+The output buffer is used for CPU access, so
+the API should be dma_sync_single_for_cpu which
+makes the cache line invalid in order to reload
+the value in memory.
 
 Signed-off-by: Leilei Zhao <leilei.zhao@atmel.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/crypto/atmel-aes.c |   16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+ drivers/crypto/atmel-aes.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index f0532ab..9bd3437 100644
+index 9bd3437..aa84623 100644
 --- a/drivers/crypto/atmel-aes.c
 +++ b/drivers/crypto/atmel-aes.c
-@@ -315,10 +315,10 @@ static int atmel_aes_crypt_dma(struct atmel_aes_dev *dd,
+@@ -627,7 +627,7 @@ static int atmel_aes_crypt_dma_stop(struct atmel_aes_dev *dd)
+ 			dma_unmap_sg(dd->dev, dd->out_sg, 1, DMA_FROM_DEVICE);
+ 			dma_unmap_sg(dd->dev, dd->in_sg, 1, DMA_TO_DEVICE);
+ 		} else {
+-			dma_sync_single_for_device(dd->dev, dd->dma_addr_out,
++			dma_sync_single_for_cpu(dd->dev, dd->dma_addr_out,
+ 				dd->dma_size, DMA_FROM_DEVICE);
  
- 	dd->dma_size = length;
- 
--	if (!(dd->flags & AES_FLAGS_FAST)) {
--		dma_sync_single_for_device(dd->dev, dma_addr_in, length,
--					   DMA_TO_DEVICE);
--	}
-+	dma_sync_single_for_device(dd->dev, dma_addr_in, length,
-+				   DMA_TO_DEVICE);
-+	dma_sync_single_for_device(dd->dev, dma_addr_out, length,
-+				   DMA_FROM_DEVICE);
- 
- 	if (dd->flags & AES_FLAGS_CFB8) {
- 		dd->dma_lch_in.dma_conf.dst_addr_width =
-@@ -391,6 +391,11 @@ static int atmel_aes_crypt_cpu_start(struct atmel_aes_dev *dd)
- {
- 	dd->flags &= ~AES_FLAGS_DMA;
- 
-+	dma_sync_single_for_cpu(dd->dev, dd->dma_addr_in,
-+				dd->dma_size, DMA_TO_DEVICE);
-+	dma_sync_single_for_cpu(dd->dev, dd->dma_addr_out,
-+				dd->dma_size, DMA_FROM_DEVICE);
-+
- 	/* use cache buffers */
- 	dd->nb_in_sg = atmel_aes_sg_length(dd->req, dd->in_sg);
- 	if (!dd->nb_in_sg)
-@@ -459,6 +464,9 @@ static int atmel_aes_crypt_dma_start(struct atmel_aes_dev *dd)
- 		dd->flags |= AES_FLAGS_FAST;
- 
- 	} else {
-+		dma_sync_single_for_cpu(dd->dev, dd->dma_addr_in,
-+					dd->dma_size, DMA_TO_DEVICE);
-+
- 		/* use cache buffers */
- 		count = atmel_aes_sg_copy(&dd->in_sg, &dd->in_offset,
- 				dd->buf_in, dd->buflen, dd->total, 0);
+ 			/* copy data */
 -- 
 1.7.9.5
