@@ -1,39 +1,48 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 07 Apr 2015 11:48:47 +0200
-Subject: [PATCH v2 1/2] ARM: EXYNOS: Get current parent clock for power
- domain on/off
-In-Reply-To: <1428053635-10855-1-git-send-email-k.kozlowski@samsung.com>
-References: <1428053635-10855-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5523A7FF.2030700@collabora.co.uk>
+From: leilei.zhao@atmel.com (Leilei Zhao)
+Date: Tue, 7 Apr 2015 17:45:05 +0800
+Subject: [PATCH 04/10] crypto: atmel-sha: fix sg list management
+In-Reply-To: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
+References: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
+Message-ID: <1428399911-23325-5-git-send-email-leilei.zhao@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Having a zero length sg doesn't mean it is the end of the sg list. This
+case happens when calculating HMAC of IPSec packet.
 
-On 04/03/2015 11:33 AM, Krzysztof Kozlowski wrote:
-> Using a fixed (by DTS) parent for clocks when turning on the power domain
-> may introduce issues in other drivers. For example when such driver
-> changes the parent during runtime and expects that he is the only place
-> of such change.
-> 
-> Do not rely on DTS providing the fixed parent for such clocks. Instead
-> before switching domain off, grab a current parent of a clock with
-> clk_get_parent().
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> ---
-> 
-> Changes since v1:
-> 1. Drop "pclk" bindings entirely as suggested by Andrzej Hajda.
->    This was significant change so I did not add Javier's
->    reviewed/tested tags.
+Signed-off-by: Leilei Zhao <leilei.zhao@atmel.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/crypto/atmel-sha.c |   16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-on an Exynos5420 Peach Pit Chromebook:
-
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
+index b471bbe..9fb8af1 100644
+--- a/drivers/crypto/atmel-sha.c
++++ b/drivers/crypto/atmel-sha.c
+@@ -163,8 +163,20 @@ static size_t atmel_sha_append_sg(struct atmel_sha_reqctx *ctx)
+ 		count = min(ctx->sg->length - ctx->offset, ctx->total);
+ 		count = min(count, ctx->buflen - ctx->bufcnt);
+ 
+-		if (count <= 0)
+-			break;
++		if (count <= 0) {
++			/*
++			* Check if count <= 0 because the buffer is full or
++			* because the sg length is 0. In the latest case,
++			* check if there is another sg in the list, a 0 length
++			* sg doesn't necessarily mean the end of the sg list.
++			*/
++			if ((ctx->sg->length == 0) && !sg_is_last(ctx->sg)) {
++				ctx->sg = sg_next(ctx->sg);
++				continue;
++			} else {
++				break;
++			}
++		}
+ 
+ 		scatterwalk_map_and_copy(ctx->buffer + ctx->bufcnt, ctx->sg,
+ 			ctx->offset, count, 0);
+-- 
+1.7.9.5
