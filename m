@@ -1,39 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 7 Apr 2015 15:07:32 +0200
-Subject: [PATCH 1/2] input: keypad: tc3589x: localize platform data
-In-Reply-To: <20150327164744.GA17364@dtor-ws>
-References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
- <1426776765-18812-2-git-send-email-linus.walleij@linaro.org>
- <20150319163856.GF30732@dtor-ws> <20150327164744.GA17364@dtor-ws>
-Message-ID: <CACRpkdY+o+uddX-r_oZsmeH6PyjhgUveaUHAV+Wg5tDPHEcxkw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 7 Apr 2015 13:08:38 +0000
+Subject: [PATCHv2] ARM: mvebu: use 0xf1000000 as internal registers on
+ Armada 370 DB
+In-Reply-To: <1428409383-15922-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1428409383-15922-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150407130837.GF7873@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 5:47 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
+On Tue, Apr 07, 2015 at 02:23:03PM +0200, Thomas Petazzoni wrote:
+> All Marvell EBU SoCs (Kirkwood, Dove, Orion, Armada) have the
+> capability of changing the location of their internal registers (i.e
+> the registers for most hardware blocks inside the SoC). When coming
+> out of reset, the internal registers are mapped at 0xd0000000, but
+> since years and years, the tradition has been to have the internal
+> registers remapped at 0xf1000000 by the bootloader, and Linux has
+> since then assumed that the internal registers for the SoC were
+> located at 0xf1000000 on Kirkwood, Dove, Orion, etc. Linux has never
+> been aware that those registers are remappable (and there is no way to
+> know where they are mapped at runtime, since the register to configure
+> the address of the registers is itself within the internal registers).
+> 
+> Then came the Armada 370 and Armada XP, in which some of the very
+> early silicon steppings had an issue, which forced to use 0xd0000000:
+> the SoC was no longer working properly when the internal registers
+> were remapped at 0xf1000000. This issue is only affecting very early
+> silicon steppings and production steppings are not affected: the issue
+> has been fixed in between.
+> 
+> Since what we (Free Electrons) used to do the initial submission of
+> the Armada 370 and Armada XP platforms was evaluation boards with
+> those very early steppings, we submitted Device Tree that assumed the
+> internal registers were mapped at 0xd0000000. This is the case for
+> Armada 370 DB, Armada XP DB and Armada XP GP.
+> 
+> However, in practice, since Marvell has been shipping the evaluation
+> boards with production steppings of the SoC, they are shipping those
+> boards with bootloaders that remap the registers to 0xf1000000. We
+> have already changed this internal register address to 0xf1000000 for
+> the Armada XP DB in commit 82066bdb5a75 and for the Armada XP GP in
+> commit 91ed32200e6e (both merged in v3.15).
+> 
+> We only recently got our hand on an Armada 370 DB with a production
+> stepping of the SoC, which uses a bootloader that remaps internal
+> registers at 0xf1000000. Therefore, this commit aligns the Armada 370
+> DB to be like the Armada XP DB and Armada XP GP: assume that the
+> internal registers are mapped at 0xf1000000.
+> 
+> We would like to stress out the fact that the usage of 0xd0000000 as
+> the internal register base address was a temporary workaround for
+> early steppings deficiencies, and that the real long-term solution is
+> the usage of 0xf1000000. Having 0xd0000000 is an *accident* in the
+> life of the Marvell platform support in the kernel, as is confirmed by
+> the usage of 0xf1000000 in all previous Marvell platforms (Dove,
+> Kirkwood, Orion).
+> 
+> There are unfortunately a number of commercial devices that continue
+> to use 0xd0000000 even though they use production steppings of the
+> SoC, simply because the vendors of such devices have never bothered
+> using a more recent bootloader version from Marvell. There is not much
+> we can do about it, and we plan on keeping 0xd0000000 in the Device
+> Tree of such devices.
+> 
+> The main reason for remapping the internal registers at 0xf1000000
+> instead of 0xd0000000 is that it leaves more space in the 0 -> 4 GB
+> part of the physical address space for RAM. With registers at
+> 0xd0000000, all RAM between 0xd0000000 to 0xffffffff is lost because
+> it's covered by the I/O registers.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> Changes since v1:
+>  - Improved commit log.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-db.dts | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 
-> Hmm, just noticed an issue:
->
->> >
->> >     keypad = kzalloc(sizeof(struct tc_keypad), GFP_KERNEL);
->> > +   keypad->board = tc3589x_keypad_of_probe(&pdev->dev);
->> > +   if (IS_ERR(keypad->board)) {
->> > +           dev_err(&pdev->dev, "invalid keypad platform data\n");
->> > +           return PTR_ERR(keypad->board);
->> > +   }
->> > +
->> >     input = input_allocate_device();
->> >     if (!keypad || !input) {
->> >             dev_err(&pdev->dev, "failed to allocate keypad memory\n");
->
-> You slid of prasing right in between memory allocation and checking if
-> it succeeded, so there is a potential oops and memory leak now.
->
-> I want to commit the version of the patch below, holler if you disagree.
-> Note that I reverted much of plat -> board renames to keep the patch
-> small.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Sorry. The new version looks fine. Reviewed-by.
+thx,
 
-Yours,
-Linus Walleij
+Jason.
