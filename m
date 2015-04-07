@@ -1,31 +1,31 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  7 Apr 2015 10:51:50 +0200
-Subject: [PATCH v3 02/16] crypto: sha256: implement base layer for SHA-256
+Date: Tue,  7 Apr 2015 10:51:51 +0200
+Subject: [PATCH v3 03/16] crypto: sha512: implement base layer for SHA-512
 In-Reply-To: <1428396724-19962-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1428396724-19962-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1428396724-19962-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1428396724-19962-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 To reduce the number of copies of boilerplate code throughout
-the tree, this patch implements generic glue for the SHA-256
+the tree, this patch implements generic glue for the SHA-512
 algorithm. This allows a specific arch or hardware implementation
 to only implement the special handling that it needs.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- include/crypto/sha256_base.h | 144 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 144 insertions(+)
- create mode 100644 include/crypto/sha256_base.h
+ include/crypto/sha512_base.h | 147 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 147 insertions(+)
+ create mode 100644 include/crypto/sha512_base.h
 
-diff --git a/include/crypto/sha256_base.h b/include/crypto/sha256_base.h
+diff --git a/include/crypto/sha512_base.h b/include/crypto/sha512_base.h
 new file mode 100644
-index 000000000000..237d549b4093
+index 000000000000..44351f781dce
 --- /dev/null
-+++ b/include/crypto/sha256_base.h
-@@ -0,0 +1,144 @@
++++ b/include/crypto/sha512_base.h
+@@ -0,0 +1,147 @@
 +/*
-+ * sha256_base.h - core logic for SHA-256 implementations
++ * sha512_base.h - core logic for SHA-512 implementations
 + *
 + * Copyright (C) 2015 Linaro Ltd <ard.biesheuvel@linaro.org>
 + *
@@ -41,89 +41,91 @@ index 000000000000..237d549b4093
 +
 +#include <asm/unaligned.h>
 +
-+typedef void (sha256_block_fn)(int blocks, u8 const *src, u32 *state,
++typedef void (sha512_block_fn)(int blocks, u8 const *src, u64 *state,
 +			       const u8 *head, void *p);
 +
-+static inline int sha224_base_init(struct shash_desc *desc)
++static inline int sha384_base_init(struct shash_desc *desc)
 +{
-+	struct sha256_state *sctx = shash_desc_ctx(desc);
++	struct sha512_state *sctx = shash_desc_ctx(desc);
 +
-+	sctx->state[0] = SHA224_H0;
-+	sctx->state[1] = SHA224_H1;
-+	sctx->state[2] = SHA224_H2;
-+	sctx->state[3] = SHA224_H3;
-+	sctx->state[4] = SHA224_H4;
-+	sctx->state[5] = SHA224_H5;
-+	sctx->state[6] = SHA224_H6;
-+	sctx->state[7] = SHA224_H7;
-+	sctx->count = 0;
++	sctx->state[0] = SHA384_H0;
++	sctx->state[1] = SHA384_H1;
++	sctx->state[2] = SHA384_H2;
++	sctx->state[3] = SHA384_H3;
++	sctx->state[4] = SHA384_H4;
++	sctx->state[5] = SHA384_H5;
++	sctx->state[6] = SHA384_H6;
++	sctx->state[7] = SHA384_H7;
++	sctx->count[0] = sctx->count[1] = 0;
 +
 +	return 0;
 +}
 +
-+static inline int sha256_base_init(struct shash_desc *desc)
++static inline int sha512_base_init(struct shash_desc *desc)
 +{
-+	struct sha256_state *sctx = shash_desc_ctx(desc);
++	struct sha512_state *sctx = shash_desc_ctx(desc);
 +
-+	sctx->state[0] = SHA256_H0;
-+	sctx->state[1] = SHA256_H1;
-+	sctx->state[2] = SHA256_H2;
-+	sctx->state[3] = SHA256_H3;
-+	sctx->state[4] = SHA256_H4;
-+	sctx->state[5] = SHA256_H5;
-+	sctx->state[6] = SHA256_H6;
-+	sctx->state[7] = SHA256_H7;
-+	sctx->count = 0;
++	sctx->state[0] = SHA512_H0;
++	sctx->state[1] = SHA512_H1;
++	sctx->state[2] = SHA512_H2;
++	sctx->state[3] = SHA512_H3;
++	sctx->state[4] = SHA512_H4;
++	sctx->state[5] = SHA512_H5;
++	sctx->state[6] = SHA512_H6;
++	sctx->state[7] = SHA512_H7;
++	sctx->count[0] = sctx->count[1] = 0;
 +
 +	return 0;
 +}
 +
-+static inline int sha256_base_export(struct shash_desc *desc, void *out)
++static inline int sha512_base_export(struct shash_desc *desc, void *out)
 +{
-+	struct sha256_state *sctx = shash_desc_ctx(desc);
-+	struct sha256_state *dst = out;
++	struct sha512_state *sctx = shash_desc_ctx(desc);
++	struct sha512_state *dst = out;
 +
 +	*dst = *sctx;
 +
 +	return 0;
 +}
 +
-+static inline int sha256_base_import(struct shash_desc *desc, const void *in)
++static inline int sha512_base_import(struct shash_desc *desc, const void *in)
 +{
-+	struct sha256_state *sctx = shash_desc_ctx(desc);
-+	struct sha256_state const *src = in;
++	struct sha512_state *sctx = shash_desc_ctx(desc);
++	struct sha512_state const *src = in;
 +
 +	*sctx = *src;
 +
 +	return 0;
 +}
 +
-+static inline int sha256_base_do_update(struct shash_desc *desc, const u8 *data,
++static inline int sha512_base_do_update(struct shash_desc *desc, const u8 *data,
 +					unsigned int len,
-+					sha256_block_fn *block_fn, void *p)
++					sha512_block_fn *block_fn, void *p)
 +{
-+	struct sha256_state *sctx = shash_desc_ctx(desc);
-+	unsigned int partial = sctx->count % SHA256_BLOCK_SIZE;
++	struct sha512_state *sctx = shash_desc_ctx(desc);
++	unsigned int partial = sctx->count[0] % SHA512_BLOCK_SIZE;
 +
-+	sctx->count += len;
++	sctx->count[0] += len;
++	if (sctx->count[0] < len)
++		sctx->count[1]++;
 +
-+	if (unlikely((partial + len) >= SHA256_BLOCK_SIZE)) {
++	if (unlikely((partial + len) >= SHA512_BLOCK_SIZE)) {
 +		int blocks;
 +
 +		if (partial) {
-+			int p = SHA256_BLOCK_SIZE - partial;
++			int p = SHA512_BLOCK_SIZE - partial;
 +
 +			memcpy(sctx->buf + partial, data, p);
 +			data += p;
 +			len -= p;
 +		}
 +
-+		blocks = len / SHA256_BLOCK_SIZE;
-+		len %= SHA256_BLOCK_SIZE;
++		blocks = len / SHA512_BLOCK_SIZE;
++		len %= SHA512_BLOCK_SIZE;
 +
 +		block_fn(blocks, data, sctx->state,
 +			 partial ? sctx->buf : NULL, p);
-+		data += blocks * SHA256_BLOCK_SIZE;
++		data += blocks * SHA512_BLOCK_SIZE;
 +		partial = 0;
 +	}
 +	if (len)
@@ -132,40 +134,41 @@ index 000000000000..237d549b4093
 +	return 0;
 +}
 +
-+static inline int sha256_base_do_finalize(struct shash_desc *desc,
-+					  sha256_block_fn *block_fn, void *p)
++static inline int sha512_base_do_finalize(struct shash_desc *desc,
++				   sha512_block_fn *block_fn, void *p)
 +{
-+	const int bit_offset = SHA256_BLOCK_SIZE - sizeof(__be64);
-+	struct sha256_state *sctx = shash_desc_ctx(desc);
++	const int bit_offset = SHA512_BLOCK_SIZE - sizeof(__be64[2]);
++	struct sha512_state *sctx = shash_desc_ctx(desc);
 +	__be64 *bits = (__be64 *)(sctx->buf + bit_offset);
-+	unsigned int partial = sctx->count % SHA256_BLOCK_SIZE;
++	unsigned int partial = sctx->count[0] % SHA512_BLOCK_SIZE;
 +
 +	sctx->buf[partial++] = 0x80;
 +	if (partial > bit_offset) {
-+		memset(sctx->buf + partial, 0x0, SHA256_BLOCK_SIZE - partial);
++		memset(sctx->buf + partial, 0x0, SHA512_BLOCK_SIZE - partial);
 +		partial = 0;
 +
 +		block_fn(1, sctx->buf, sctx->state, NULL, p);
 +	}
 +
 +	memset(sctx->buf + partial, 0x0, bit_offset - partial);
-+	*bits = cpu_to_be64(sctx->count << 3);
++	bits[0] = cpu_to_be64(sctx->count[1] << 3 | sctx->count[0] >> 61);
++	bits[1] = cpu_to_be64(sctx->count[0] << 3);
 +	block_fn(1, sctx->buf, sctx->state, NULL, p);
 +
 +	return 0;
 +}
 +
-+static inline int sha256_base_finish(struct shash_desc *desc, u8 *out)
++static inline int sha512_base_finish(struct shash_desc *desc, u8 *out)
 +{
 +	unsigned int digest_size = crypto_shash_digestsize(desc->tfm);
-+	struct sha256_state *sctx = shash_desc_ctx(desc);
-+	__be32 *digest = (__be32 *)out;
++	struct sha512_state *sctx = shash_desc_ctx(desc);
++	__be64 *digest = (__be64 *)out;
 +	int i;
 +
-+	for (i = 0; digest_size > 0; i++, digest_size -= sizeof(__be32))
-+		put_unaligned_be32(sctx->state[i], digest++);
++	for (i = 0; digest_size > 0; i++, digest_size -= sizeof(__be64))
++		put_unaligned_be64(sctx->state[i], digest++);
 +
-+	*sctx = (struct sha256_state){};
++	*sctx = (struct sha512_state){};
 +	return 0;
 +}
 -- 
