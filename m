@@ -1,72 +1,133 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Tue, 7 Apr 2015 05:49:29 +0200
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150407031233.GA16189@earth>
-References: <5520E2EE.4080302@gmail.com>
- <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
- <5521A438.1070008@gmail.com>
- <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
- <20150406151939.GG18048@atomide.com> <20150406154037.GI18048@atomide.com>
- <5522BEEF.2000405@gmail.com> <20150406174245.GJ18048@atomide.com>
- <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
- <20150407022312.GK18048@atomide.com> <20150407031233.GA16189@earth>
-Message-ID: <CAALWOA8m9Gqv2ZL6ibWrWRBGsGBG2tpbutzVrwOjRpKCQ=mXXA@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Mon, 6 Apr 2015 21:27:28 -0700
+Subject: [PATCH v2 1/2] dt-bindings: Document the hi6220 thermal sensor
+ bindings
+In-Reply-To: <5523530E.3000400@hisilicon.com>
+References: <1427785162-15172-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <1427785162-15172-2-git-send-email-kong.kongxinwei@hisilicon.com>
+ <20150406140355.GI30984@beef> <5523530E.3000400@hisilicon.com>
+Message-ID: <20150407042727.GA30242@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 April 2015 at 04:23, Tony Lindgren <tony@atomide.com> wrote:
-> Oops, sorry user error.. I was trying to clear IBE as a banked register
-> like L2 enable bit and of course it did not get cleared.. Clearing it
-> with a smc call really clears it. And in that case my test case seems to
-> work reliably on r3p2 without erratum 430973 enabled.
+On Tue, Apr 07, 2015 at 11:46:22AM +0800, Xinwei Kong wrote:
+> 
+> 
+> On 2015/4/6 22:03, Matt Porter wrote:
+> > On Tue, Mar 31, 2015 at 02:59:21PM +0800, Xinwei Kong wrote:
+> >> From: kongxinwei <kong.kongxinwei@hisilicon.com>
+> >>
+> >> This adds documentation of device tree bindings for the
+> >> thermal sensor controller of hi6220 SoC.
+> >>
+> >> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> >> Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
+> >> ---
+> >>  .../bindings/thermal/hisilicon-thermal.txt         | 45 ++++++++++++++++++++++
+> >>  1 file changed, 45 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+> >> new file mode 100644
+> >> index 0000000..ceb6e2e
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+> >> @@ -0,0 +1,45 @@
+> >> +* Hisilicon Thermal
+> >> +
+> >> +This driver is for hi6220 SoC which contain 4 thermal sensor.
+> >> +
+> >> +	1. sensor 0: local sensor;
+> >> +	2. sensor 1: remote sensor for ACPU cluster 1;
+> >> +	3. sensor 2: remote sensor for ACPU cluster 2;
+> >> +	4. sensor 3: remote sensor for GPU.
+> >> +
+> >> +Every sensor use one child node to represent it, so thermal sensor include
+> >> +parent node and four child node. The parent node describe common feature and
+> >> +child node describe private feature for thermal sensor;
+> >> +
+> >> +** Required properties :
+> >> +
+> >> +- compatible: "hisilicon,tsensor".
+> >> +- reg: physical base address of thermal sensor and length of memory mapped
+> >> +  region.
+> >> +- interrupt: The interrupt number to the cpu. Defines the interrupt used
+> >> +  by SOCTHERM.
+> >> +- clock-names: Input clock name, should be 'thermal_clk'.
+> >> +- clocks: phandles for clock specified in "clock-names" property.
+> >> +- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
+> >> +
+> >> +** Required properties for child nodes :
+> >> +
+> >> +- hisilicon,tsensor-id: the index of thermal sensor and use it to distinguish
+> >> +  thermal sensor. For example: <0> stands for local sensor; <1> stands for
+> >> +  acpu1 sensor;
+> > 
+> > Please show an example illustrating why this property is needed. The
+> > example below doesn't show any per sensor properties aside from the
+> > sensor id. Other bindings with a similar sub-sensor hardware design like
+> > tegra-soctherm and rockchip-thermal don't have a need for a vendor
+> > specific property like this. Their drivers simply iterate over an id
+> > index during thermal sensor registration.
+> > 
+> > -Matt
+> > 
+> Thermal Ip of hisilicon SoC can get four module temperature--local sensor, ACPU0
+> sensor, ACPU1 sensor and gpu sensor. In order to use these sensors, this driver
+> will make use of sensor id to distinguish sensor in using process.
+> 
+> These four sensors only get one sensor temperature at the same times. Because
+> these sensor commonly use the same register by setting diff value to enable one
+> sensor. howerver, sensor id is key flag for these diff sensor modules.
+> 
+> If deleting sensor id, this driver will define some value which set diff sensor
+> regitser and it difficult to understand sensor register operation.
 
-So if I understand correctly, you actually had crashes which only
-occurred with IBE enabled and the 430973 workaround disabled?  That's
-quite interesting, since it seems to me that can only be the result of
-erratum 687067, which means
-1. secrom indeed fails to implement the 687067 workaround.
-2. "BTB invalidate by MVA" is used somewhere in the kernel.
-The 430973 workaround would likely conceal this problem due to
-regularly flushing the whole BTB, but I'm not sure how wise it is to
-rely on that...
+The above still do not explain why you need a specific property.
 
+Could you please check
+Documentation/devicetree/bindings/thermal/thermal.txt file?
 
-> I'm now thinking the kernel should just always set the 430973 specific
-> cpu_v7_switch_mm for all cortex-a8 if IBE bit is set.
+There are several examples there on how to define DT nodes for the exact
+case you describe above.
 
-And simply take the performance hit if secrom bogusly sets it and the
-bootloader doesn't fix it?
-
-Sounds reasonable enough to me, given how platform-specific the
-appropriate auxcr config is, as well as the means by which it can be
-changed.
-
-There's more secrom misconfiguration that the bootloader should fix
-anyhow to make optimal use of the processor...
-
-
-> This will work as long as we can read the aux ctrl register IBE
-> bit using mrc, which I believe is the case for all cortex-a8 based
-> omap variants.
-
-Aux control is always readable, only write is an issue.
-
-On 7 April 2015 at 05:12, Sebastian Reichel <sre@kernel.org> wrote:
-> If I understood it correctly we can simply call the BTB flush on
-> cortex-a8 if IBE bit is not set, since it would be translated as
-> nop.
-
-Indeed you can safely use the BTB-flushing context switch on any cortex-a8.
-
-There's still value in checking if IBE is set on r2p1 or later, and if
-so emit a warning about suboptimal performance.
-
-> So it should be safe to include the call on all cortex-a8 based
-> cpus. We may need a non-BTB-flushing function for non-cortex-a8
-> based cpus, though.
-
-I just looked it up, apparently BTB-flushing on context switch is not
-needed architecturally in ARMv7 (though it was in ARMv6), so that
-version should probably indeed only be used for the cortex-a8.
-
-Matthijs
+> 
+> Thanks
+> Xinwei
+> 
+> >> +
+> >> +Example :
+> >> +
+> >> +	tsensor: tsensor at 0,f7030700 {
+> >> +		compatible = "hisilicon,tsensor";
+> >> +		reg = <0x0 0xf7030700 0x0 0x1000>;
+> >> +		interrupts = <0 7 0x4>;
+> >> +		clocks = <&clock_sys HI6220_TSENSOR_CLK>;
+> >> +		clock-names = "thermal_clk";
+> >> +		#thermal-sensor-cells = <1>;
+> >> +
+> >> +		local_sensor {
+> >> +			hisilicon,tsensor-id = <0>;
+> >> +		}
+> >> +		.......
+> >> +	}
+> >> -- 
+> >> 1.9.1
+> >>
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> > .
+> > 
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/96d545f0/attachment.sig>
