@@ -1,76 +1,36 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 7 Apr 2015 12:20:11 +0200
-Subject: [PATCH v2 3/4] ARM: berlin: add an ADC node for the BG2Q
-In-Reply-To: <551FBC34.4070501@gmail.com>
-References: <1428066409-30392-1-git-send-email-antoine.tenart@free-electrons.com>
- <1428066409-30392-4-git-send-email-antoine.tenart@free-electrons.com>
- <551FBC34.4070501@gmail.com>
-Message-ID: <20150407102011.GA19914@kwain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 07 Apr 2015 11:21:35 +0100
+Subject: irqchip heirarchy DT "break" series awareness?
+In-Reply-To: <20150407115922.5d4c6233@free-electrons.com>
+References: <20150406144647.GC7873@io.lakedaemon.net>
+ <20150407115922.5d4c6233@free-electrons.com>
+Message-ID: <5523AFAF.6040000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+Hi Thomas,
 
-On Sat, Apr 04, 2015 at 12:25:56PM +0200, Sebastian Hesselbarth wrote:
-> On 03.04.2015 15:06, Antoine Tenart wrote:
-> >This patch adds the ADC node for the Berlin BG2Q, using the newly added
-> >Berlin IIO ADC driver.
-> >
-> >Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> >---
-> >  arch/arm/boot/dts/berlin2q.dtsi | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> >
-> >diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> >index 187d056f7ad2..72b1c969a99d 100644
-> >--- a/arch/arm/boot/dts/berlin2q.dtsi
-> >+++ b/arch/arm/boot/dts/berlin2q.dtsi
-> >@@ -565,6 +565,14 @@
-> >  						function = "twsi3";
-> >  					};
-> >  				};
-> >+
-> >+				adc: adc {
-> >+					compatible = "marvell,berlin2-adc";
-> >+					interrupt-parent = <&sic>;
-> >+					interrupts = <12>, <14>;
-> >+					interrupt-names = "adc", "tsen";
-> >+					status = "disabled";
-> >+				};
-> 
-> nit: there is no gated clock for the ADC, I guess we can just always
-> enable it. That will save you the last patch of the series.
+On 07/04/15 10:59, Thomas Petazzoni wrote:
 
-Sure, we can just drop the last patch (and the status property).
+> But the point of the slides stand: even for a piece of hardware as
+> well-documented as the GIC, as widely used as the GIC, with as many
+> bright and smart engineers looking into it, the community has not been
+> able to put out a DT binding that can be kept stable. How can we expect
+> such a DT binding stability to occur for undocumented hardware, or
+> SoC-specific hardware blocks that are definitely a lot less used than
+> the GIC ?
 
-> BTW, I have the strong feeling that moving berlin's clk drivers to
-> regmap will block any subsequent patches you are preparing. How about
-> we target the next merge window for moving the clk node but not the
-> drivers (except of_iomap of the _parent's_ reg property) and push the
-> less controversal patches (pinctrl, reset) with regmap/syscon forward?
+The problem at hand is not so much the GIC itself, but the fact that
+only the GIC was described in DT. The GIC binding is unchanged, but some
+additional hardware is now described.
 
-The entire clock rework series does not affect this ADC series or any
-other on going series. It can be merged latter, without breaking
-anything. I just realized I mentioned the clock rework series as a
-dependency in the cover letter of this series but it is not, my bad.
+If the relationship between the GIC and the shadow interrupt controllers
+had been described, we would have avoided breaking the compatibility. I
+guess it was too tempting to reuse pre-DT mechanisms and to forget about
+this entirely.
 
-So, we can target the next merge window for all series but the clock
-rework. In addition to this, I can send a series moving the clock node,
-with minor modifications to the driver so we have a proper dt. And then
-we can see if moving to a regmap aware clock driver can be done.
+Thanks,
 
-To sum up:
-- chip/system controller series can be pushed
-- this ADC series too, as it does not depend on the clock rework (as
-  soon as we have the needed acked-by)
-- I need to make a new series to move the clock node
-- the clock driver rework series can live in parallel
-
-Agreed?
-
-Antoine
-
+	M.
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
