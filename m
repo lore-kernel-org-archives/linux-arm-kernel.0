@@ -1,54 +1,41 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 08 Apr 2015 01:34:24 +0200
-Subject: [PATCH 2/2] ARM: dts: rockchip: enable tsadc on rk3288 boards
-In-Reply-To: <1464569.rLOrpbGREu@diego>
-References: <1464569.rLOrpbGREu@diego>
-Message-ID: <2306443.Xj290TNvSf@diego>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 7 Apr 2015 16:36:14 -0700
+Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid
+ ICE in gcc 4.7.3
+In-Reply-To: <7hiod7o6xb.fsf@deeprootsystems.com>
+References: <20150324004537.GA24816@verge.net.au>
+ <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
+ <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
+ <20150326133631.GB2805@arm.com>
+ <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
+ <20150327002554.GA5527@verge.net.au>
+ <20150327100612.GB1562@arm.com>
+ <7hbnj99epe.fsf@deeprootsystems.com>
+ <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
+ <7h8uec95t2.fsf@deeprootsystems.com>
+ <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
+ <551BBEC5.7070801@arm.com>
+ <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
+ <7hwq1v4iq4.fsf@deeprootsystems.com>
+ <CAMAWPa_YEJDQc=_60_sPqzwLYN8Yefzcko_rydxrt8oOCq20gw@mail.gmail.com>
+ <20150407131740.ac8a856537fecb1b5d142f5f@linux-foundation.org>
+ <7hpp7fo92b.fsf@deeprootsystems.com>
+ <20150407155310.a3e9dfb6d929a968c4bfc286@linux-foundation.org>
+ <7hiod7o6xb.fsf@deeprootsystems.com>
+Message-ID: <20150407163614.1f0ec880cecd681dcd271295@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tsadc is used to read cpu and gpu temperatures. Also enable it on the
-other rk3288 boards beside the evb using the cru reset settings.
+On Tue, 07 Apr 2015 16:27:44 -0700 Kevin Hilman <khilman@kernel.org> wrote:
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-firefly.dtsi | 6 ++++++
- arch/arm/boot/dts/rk3288-popmetal.dts | 6 ++++++
- 2 files changed, 12 insertions(+)
+> >> > It should all be there today?
+> >> 
+> >> Nope.  
+> >
+> > huh, I swear I did an mmotm yesterday.
+> 
+> Well, based on the timestamp of the mmotm dir on ozlabs, it appears you
+> did.  That's why I was confused why the gcc-473 patches from mmots aren't
+> there.
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index a3b1fc4..0b42372 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -465,6 +465,12 @@
- 	status = "okay";
- };
- 
-+&tsadc {
-+	rockchip,hw-tshut-mode = <0>;
-+	rockchip,hw-tshut-polarity = <0>;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_xfer>, <&uart0_cts>, <&uart0_rts>;
-diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts b/arch/arm/boot/dts/rk3288-popmetal.dts
-index d081f0e..d582811 100644
---- a/arch/arm/boot/dts/rk3288-popmetal.dts
-+++ b/arch/arm/boot/dts/rk3288-popmetal.dts
-@@ -406,6 +406,12 @@
- 	};
- };
- 
-+&tsadc {
-+	rockchip,hw-tshut-mode = <0>;
-+	rockchip,hw-tshut-polarity = <0>;
-+	status = "okay";
-+};
-+
- &vopb {
- 	status = "okay";
- };
--- 
-2.1.4
+Things look a bit better now.
