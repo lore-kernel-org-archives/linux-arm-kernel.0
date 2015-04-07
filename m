@@ -1,77 +1,60 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 8 Apr 2015 06:27:14 +0800
-Subject: [GIT PULL 3/4] ARM: imx: device tree updates for 4.1
-In-Reply-To: <CAAQ0ZWTPqbqk5VwWGQvJ7NbmOy58YOzK4Jv76jEPNL961tpviw@mail.gmail.com>
-References: <CAAQ0ZWTPqbqk5VwWGQvJ7NbmOy58YOzK4Jv76jEPNL961tpviw@mail.gmail.com>
-Message-ID: <20150407222712.GA4543@dragon>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 07 Apr 2015 15:41:32 -0700
+Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid ICE
+ in gcc 4.7.3
+In-Reply-To: <20150407131740.ac8a856537fecb1b5d142f5f@linux-foundation.org>
+ (Andrew Morton's message of "Tue, 7 Apr 2015 13:17:40 -0700")
+References: <20150324004537.GA24816@verge.net.au>
+ <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
+ <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
+ <20150326133631.GB2805@arm.com>
+ <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
+ <20150327002554.GA5527@verge.net.au> <20150327100612.GB1562@arm.com>
+ <7hbnj99epe.fsf@deeprootsystems.com>
+ <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
+ <7h8uec95t2.fsf@deeprootsystems.com>
+ <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
+ <551BBEC5.7070801@arm.com>
+ <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
+ <7hwq1v4iq4.fsf@deeprootsystems.com>
+ <CAMAWPa_YEJDQc=_60_sPqzwLYN8Yefzcko_rydxrt8oOCq20gw@mail.gmail.com>
+ <20150407131740.ac8a856537fecb1b5d142f5f@linux-foundation.org>
+Message-ID: <7hpp7fo92b.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 10:02:44PM +0800, Shawn Guo wrote:
-> Arnd, Olof,
-> 
-> Because of the DT ABI agreement, device tree branch should generally
-> be able to go alone without any dependencies.  But for this release,
-> i.MX community have agreed to break the old DTBs to adopt
-> stacked/hierarchy irq domains for i.MX GPC and Vybrid MSCM controller.
-> And we included a couple of branches as the merge base for this imx/dt
-> pull request, including Jason's irqchip/vybrid branch, to resolve some
-> merge conflicts and maintain the run-time dependency.
-> 
-> Jason,
-> 
-> As we talked, please keep your irqchip/vybrid branch stable.  Thanks.
-> 
-> Shawn
-> 
-> 
-> The following changes since commit c5455f708b968dc462a292ba99da0d17100461d8:
-> 
->   Merge remote-tracking branch 'jcooper/irqchip/vybrid' into imx/dt
-> (2015-03-30 16:37:21 +0800)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
-> tags/imx-dt-4.1
-> 
-> for you to fetch changes up to 8e047c120fb2ccb7b7aba8f5e9224e463f86bebc:
-> 
->   ARM: dts: hummingboard: add sgtl5000 support for Hummingboard Pro
-> (2015-03-30 20:57:42 +0800)
-> 
-> ----------------------------------------------------------------
-> The i.MX device tree updates for 4.1:
->  - Convert GPC controller to use stacked interrupt domains
->  - Add power domain descriptions for i.MX6 platforms
->  - Improve i.MX25 pin function defines
->  - Disable PWM devices in <soc>.dtsi by default and enable it at board
->    level dts where the device is actually available.
->  - Define labels for SNVS RTC device to ease the board description,
->    where an external RTC is available.
->  - Add dr_mode host setting to all i.MX host-only USB instances
->  - Support Miscellaneous System Control Module (MSCM) for VF610
->  - Add initial i.MX6SL WaRP Board support
->  - Add i.MX6SX SDB revision B board support
->  - A bunch of imx28-apf28dev board updates, including gpio polarity
->    correction and CAN, AUART device support.
->  - SolidRun iMX6 platform updates: dual-license of GPLv2/X11, PWM
->    setup, PCF8523 RTC, GPIO key and SGTL5000 audio support.
->  - A number of random device additions for boards: SPI and CAN for
->    vf-colibri, MAX7310 GPIO expander for imx6qdl-sabreauto and LCD
->    support for imx25-pdk.
-> 
-> Note: Branch imx/cleanup was merged as the base to solve conflict on
-> imx25 iomux header.  Branch imx/soc was merged as the base to solve
-> conflict on arch/arm/mach-imx/gpc.c.  And Jason Cooper's irqchip/vybrid
-> branch was pulled into the base as a run-time dependency.
-> 
-> ----------------------------------------------------------------
+Andrew Morton <akpm@linux-foundation.org> writes:
 
-Hi Olof,
+> On Tue, 7 Apr 2015 10:57:52 -0700 Kevin Hilman <khilman@kernel.org> wrote:
+>
+>> > The diff below[2] on top of yours compiles fine here and at least covers
+>> > the compilers I *know* to trigger the ICE.
+>> 
+>> I see my fix in your mmots since last Thurs (4/2), but it's not in
+>> mmotm (last updated today) so today's linux-next still has the ICE for
+>> anything other than gcc-4.7.3.   Just checking to see when you plan to
+>> update mmotm.
+>
+> It should all be there today?
 
-I have seen you pulled all other 3 requests except this one.  Anything
-wrong with it?
+Nope.  
 
-Shawn
+In mmotm, only the original patch plus your first fix is there:
+
+$ curl -sO http://www.ozlabs.org/~akpm/mmotm/broken-out.tar.gz
+$ tar -tavf broken-out.tar.gz |grep gcc-473
+-rw-r----- akpm/eng       1838 2015-04-01 14:41 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473.patch
+-rw-r----- akpm/eng       1309 2015-04-01 14:41 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473-fix.patch
+
+but in mmots, the additional ptch from me, plus another comment fixup
+from you are also there:
+
+$ curl -sO http://www.ozlabs.org/~akpm/mmots/broken-out.tar.gz
+$ tar -tavf broken-out.tar.gz |grep gcc-473
+-rw-r----- akpm/eng       1882 2015-04-06 16:24 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473.patch
+-rw-r----- akpm/eng       1271 2015-04-06 16:24 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473-fix.patch
+-rw-r----- akpm/eng       1382 2015-04-06 16:24 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473-fix-fix.patch
+-rw-r----- akpm/eng        968 2015-04-06 16:24 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473-fix-fix-fix.patch
+
+
+Kevin
