@@ -1,117 +1,151 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  7 Apr 2015 10:51:48 +0200
-Subject: [PATCH v3 00/16] crypto: SHA glue code consolidation
-Message-ID: <1428396724-19962-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Tue,  7 Apr 2015 10:51:49 +0200
+Subject: [PATCH v3 01/16] crypto: sha1: implement base layer for SHA-1
+In-Reply-To: <1428396724-19962-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1428396724-19962-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1428396724-19962-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+To reduce the number of copies of boilerplate code throughout
+the tree, this patch implements generic glue for the SHA-1
+algorithm. This allows a specific arch or hardware implementation
+to only implement the special handling that it needs.
 
-This is v3 of what is now a complete glue code consolidation series
-for generic, x86, arm and arm64 implementations of SHA-1, SHA-224/256
-and SHA-384/512.
-
-The purpose is to have a single, canonical implementation of the core
-logic that gets reused by all versions of the algorithm. Note that this
-is not about saving space in the binary, but about ensuring that the same
-code is used everywhere, reducing the maintenance burden.
-
-The base layer implements all the update and finalization logic around
-the block transforms, where the prototypes of the latter look something
-like this:
-
-typedef void (shaXXX_block_fn)(int blocks, u8 const *src, uXX *state,
-                             const u8 *head, void *p);
-
-The block implementation should process the head block first, then
-process the requested number of block starting at 'src'. The generic
-pointer 'p' is passed down from the do_update/do_finalize() versions;
-this is used for instance by the ARM64 implementations to indicate to
-the core ASM implementation that it should finalize the digest, which
-it will do only if the input was a round multiple of the block size.
-The generic pointer is used here as a means of conveying that information
-back and forth.
-
-Note that the base functions prototypes are all 'returning int' but
-they all return 0. They should be invoked as tail calls where possible
-to eliminate some of the function call overhead. If that is not possible,
-the return values can be safely ignored.
-
-Changes since v2:
-- Replace the base modules with header files containing static inlines that
-  implement the core logic. This avoids introducing new modules or new
-  inter-module dependencies, and gives the compiler the opportunity for
-  optimization.
-- Now includes new glue fo the existing SHA-1 NEON module and Sami's new
-  SHA-224/256 ASM+NEON module
-- Use direct assigments instead of memcpy() to set the initial state (as is
-  done in many of the call sites of the various init functions that are being
-  converted by this series)
-
-Changes since v1 (RFC):
-- prefixed globally visible generic symbols with crypto_
-- added SHA-1 base layer
-- updated init code to only set the initial constants and clear the
-  count, clearing the buffer is unnecessary [Markus]
-- favor the small update path in crypto_sha_XXX_base_do_update() [Markus]
-- update crypto_sha_XXX_do_finalize() to use memset() on the buffer directly
-  rather than copying a statically allocated padding buffer into it
-  [Markus]
-- moved a bunch of existing arm and x86 implementations to use the new base
-  layers
-
-Note: looking at the generated asm (for arm64), I noticed that the memcpy/memset
-invocations with compile time constant src and len arguments (which includes
-the empty struct assignments) are eliminated completely, and replaced by
-direct loads and stores. Hopefully this addresses the concern raised by Markus
-regarding this.
-
-Ard Biesheuvel (16):
-  crypto: sha1: implement base layer for SHA-1
-  crypto: sha256: implement base layer for SHA-256
-  crypto: sha512: implement base layer for SHA-512
-  crypto: sha1-generic: move to generic glue implementation
-  crypto: sha256-generic: move to generic glue implementation
-  crypto: sha512-generic: move to generic glue implementation
-  crypto/arm: move SHA-1 ARM asm implementation to base layer
-  crypto/arm: move SHA-1 NEON implementation to base layer
-  crypto/arm: move SHA-1 ARMv8 implementation to base layer
-  crypto/arm: move SHA-224/256 ASM/NEON implementation to base layer
-  crypto/arm: move SHA-224/256 ARMv8 implementation to base layer
-  crypto/arm64: move SHA-1 ARMv8 implementation to base layer
-  crypto/arm64: move SHA-224/256 ARMv8 implementation to base layer
-  crypto/x86: move SHA-1 SSSE3 implementation to base layer
-  crypto/x86: move SHA-224/256 SSSE3 implementation to base layer
-  crypto/x86: move SHA-384/512 SSSE3 implementation to base layer
-
- arch/arm/crypto/Kconfig                  |   3 +-
- arch/arm/crypto/sha1-ce-glue.c           | 111 +++++-----------
- arch/arm/{include/asm => }/crypto/sha1.h |   3 +
- arch/arm/crypto/sha1_glue.c              | 116 ++++-------------
- arch/arm/crypto/sha1_neon_glue.c         | 139 +++++---------------
- arch/arm/crypto/sha2-ce-glue.c           | 154 ++++++-----------------
- arch/arm/crypto/sha256_glue.c            | 174 +++++--------------------
- arch/arm/crypto/sha256_glue.h            |  17 +--
- arch/arm/crypto/sha256_neon_glue.c       | 144 +++++++--------------
- arch/arm64/crypto/sha1-ce-core.S         |  11 +-
- arch/arm64/crypto/sha1-ce-glue.c         | 133 ++++----------------
- arch/arm64/crypto/sha2-ce-core.S         |  11 +-
- arch/arm64/crypto/sha2-ce-glue.c         | 209 +++++--------------------------
- arch/x86/crypto/sha1_ssse3_glue.c        | 136 +++++---------------
- arch/x86/crypto/sha256_ssse3_glue.c      | 184 ++++++---------------------
- arch/x86/crypto/sha512_ssse3_glue.c      | 193 ++++++----------------------
- crypto/sha1_generic.c                    | 108 +++++-----------
- crypto/sha256_generic.c                  | 140 +++++----------------
- crypto/sha512_generic.c                  | 127 ++++---------------
- include/crypto/sha.h                     |   9 ++
- include/crypto/sha1_base.h               | 123 ++++++++++++++++++
- include/crypto/sha256_base.h             | 144 +++++++++++++++++++++
- include/crypto/sha512_base.h             | 147 ++++++++++++++++++++++
- 23 files changed, 880 insertions(+), 1656 deletions(-)
- rename arch/arm/{include/asm => }/crypto/sha1.h (67%)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ include/crypto/sha1_base.h | 123 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 123 insertions(+)
  create mode 100644 include/crypto/sha1_base.h
- create mode 100644 include/crypto/sha256_base.h
- create mode 100644 include/crypto/sha512_base.h
 
+diff --git a/include/crypto/sha1_base.h b/include/crypto/sha1_base.h
+new file mode 100644
+index 000000000000..919db0920203
+--- /dev/null
++++ b/include/crypto/sha1_base.h
+@@ -0,0 +1,123 @@
++/*
++ * sha1_base.h - core logic for SHA-1 implementations
++ *
++ * Copyright (C) 2015 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <crypto/internal/hash.h>
++#include <crypto/sha.h>
++#include <linux/crypto.h>
++#include <linux/module.h>
++
++#include <asm/unaligned.h>
++
++typedef void (sha1_block_fn)(int blocks, u8 const *src, u32 *state,
++			     const u8 *head, void *p);
++
++static inline int sha1_base_init(struct shash_desc *desc)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++
++	sctx->state[0] = SHA1_H0;
++	sctx->state[1] = SHA1_H1;
++	sctx->state[2] = SHA1_H2;
++	sctx->state[3] = SHA1_H3;
++	sctx->state[4] = SHA1_H4;
++ 	sctx->count = 0;
++
++	return 0;
++}
++
++static inline int sha1_base_export(struct shash_desc *desc, void *out)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	struct sha1_state *dst = out;
++
++	*dst = *sctx;
++
++	return 0;
++}
++
++static inline int sha1_base_import(struct shash_desc *desc, const void *in)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	struct sha1_state const *src = in;
++
++	*sctx = *src;
++
++	return 0;
++}
++
++static inline int sha1_base_do_update(struct shash_desc *desc, const u8 *data,
++				      unsigned int len, sha1_block_fn *block_fn,
++				      void *p)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
++
++	sctx->count += len;
++
++	if (unlikely((partial + len) >= SHA1_BLOCK_SIZE)) {
++		int blocks;
++
++		if (partial) {
++			int p = SHA1_BLOCK_SIZE - partial;
++
++			memcpy(sctx->buffer + partial, data, p);
++			data += p;
++			len -= p;
++		}
++
++		blocks = len / SHA1_BLOCK_SIZE;
++		len %= SHA1_BLOCK_SIZE;
++
++		block_fn(blocks, data, sctx->state,
++			 partial ? sctx->buffer : NULL, p);
++		data += blocks * SHA1_BLOCK_SIZE;
++		partial = 0;
++	}
++	if (len)
++		memcpy(sctx->buffer + partial, data, len);
++
++	return 0;
++}
++
++static inline int sha1_base_do_finalize(struct shash_desc *desc,
++					sha1_block_fn *block_fn, void *p)
++{
++	const int bit_offset = SHA1_BLOCK_SIZE - sizeof(__be64);
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	__be64 *bits = (__be64 *)(sctx->buffer + bit_offset);
++	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
++
++	sctx->buffer[partial++] = 0x80;
++	if (partial > bit_offset) {
++		memset(sctx->buffer + partial, 0x0, SHA1_BLOCK_SIZE - partial);
++		partial = 0;
++
++		block_fn(1, sctx->buffer, sctx->state, NULL, p);
++	}
++
++	memset(sctx->buffer + partial, 0x0, bit_offset - partial);
++	*bits = cpu_to_be64(sctx->count << 3);
++	block_fn(1, sctx->buffer, sctx->state, NULL, p);
++
++	return 0;
++}
++
++static inline int sha1_base_finish(struct shash_desc *desc, u8 *out)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	__be32 *digest = (__be32 *)out;
++	int i;
++
++	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], digest++);
++
++	*sctx = (struct sha1_state){};
++	return 0;
++}
 -- 
 1.8.3.2
