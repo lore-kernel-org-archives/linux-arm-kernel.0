@@ -1,60 +1,74 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 07 Apr 2015 15:41:32 -0700
-Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid ICE
- in gcc 4.7.3
-In-Reply-To: <20150407131740.ac8a856537fecb1b5d142f5f@linux-foundation.org>
- (Andrew Morton's message of "Tue, 7 Apr 2015 13:17:40 -0700")
-References: <20150324004537.GA24816@verge.net.au>
- <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
- <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
- <20150326133631.GB2805@arm.com>
- <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
- <20150327002554.GA5527@verge.net.au> <20150327100612.GB1562@arm.com>
- <7hbnj99epe.fsf@deeprootsystems.com>
- <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
- <7h8uec95t2.fsf@deeprootsystems.com>
- <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
- <551BBEC5.7070801@arm.com>
- <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
- <7hwq1v4iq4.fsf@deeprootsystems.com>
- <CAMAWPa_YEJDQc=_60_sPqzwLYN8Yefzcko_rydxrt8oOCq20gw@mail.gmail.com>
- <20150407131740.ac8a856537fecb1b5d142f5f@linux-foundation.org>
-Message-ID: <7hpp7fo92b.fsf@deeprootsystems.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 7 Apr 2015 17:42:43 -0500
+Subject: [PATCH v9 08/30] PCI: Update pci_host_bridge bus resource
+In-Reply-To: <1428053164-28277-10-git-send-email-wangyijing@huawei.com>
+References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
+ <1428053164-28277-10-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150407224243.GL10892@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Morton <akpm@linux-foundation.org> writes:
+On Fri, Apr 03, 2015 at 05:25:42PM +0800, Yijing Wang wrote:
+> From: Yijing Wang <wangyijing0307@gmail.com>
+> 
+> Sometimes, the bus resource start number is not equal to
+> root bus number. For example, in pci_scan_bus(), we always
+> add the default bus resource which start bus number is 0,
+> but the root bus number callers given may != 0, so
+> we need to update pci_host_bridge bus resource, because we
+> would check whether host bridge bus resoruce is confict
+> in later patch.
 
-> On Tue, 7 Apr 2015 10:57:52 -0700 Kevin Hilman <khilman@kernel.org> wrote:
->
->> > The diff below[2] on top of yours compiles fine here and at least covers
->> > the compilers I *know* to trigger the ICE.
->> 
->> I see my fix in your mmots since last Thurs (4/2), but it's not in
->> mmotm (last updated today) so today's linux-next still has the ICE for
->> anything other than gcc-4.7.3.   Just checking to see when you plan to
->> update mmotm.
->
-> It should all be there today?
+It's true that pci_scan_bus() always inserts [bus 00-ff].  But I think
+that's completely bogus.  The caller of pci_scan_bus() supplies a root bus
+number X.  Any bus numbers below X are useless as far as this host bridge
+is concerned, and it's pointless to include them in the range inserted by
+pci_scan_bus().
 
-Nope.  
+I think we'd be better off if we forced every pci_scan_bus() caller to
+supply a real non-overlapping bus number range.  We probably can't do that
+easily because the arch knows the beginning bus number, but some don't know
+how to figure out the ending bus number.
 
-In mmotm, only the original patch plus your first fix is there:
+Do we have a per-domain structure that tracks the bus numbers in use in the
+domain?  It seems like if we had one, we could use that to approximate the
+end.  For example, if the arch scans three root buses, at bus 00, bus 40,
+and bus 80, we could start with the first one at [bus 00-ff], and when we
+scan the one at bus 40, we could either report a conflict (if the bus 00
+tree included a bus 40) or reduce the first range to [bus 00-3f].
 
-$ curl -sO http://www.ozlabs.org/~akpm/mmotm/broken-out.tar.gz
-$ tar -tavf broken-out.tar.gz |grep gcc-473
--rw-r----- akpm/eng       1838 2015-04-01 14:41 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473.patch
--rw-r----- akpm/eng       1309 2015-04-01 14:41 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473-fix.patch
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> ---
+>  drivers/pci/host-bridge.c |    5 ++++-
+>  1 files changed, 4 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> index ecc1a7c..1a9834b 100644
+> --- a/drivers/pci/host-bridge.c
+> +++ b/drivers/pci/host-bridge.c
+> @@ -26,8 +26,11 @@ static void pci_host_update_busn_res(
+>  	struct resource_entry *window;
+>  
+>  	resource_list_for_each_entry(window, resources)
+> -		if (window->res->flags & IORESOURCE_BUS)
+> +		if (window->res->flags & IORESOURCE_BUS) {
+> +			if (bus > window->res->start)
+> +				window->res->start = bus;
 
-but in mmots, the additional ptch from me, plus another comment fixup
-from you are also there:
+I see what you're trying to do here, but I think this is the wrong place to
+do it.  I'd rather figure out a way to insert something other than
+busn_resource in pci_scan_bus().  That probably means we need to
+dynamically allocate a new busn_res struct.
 
-$ curl -sO http://www.ozlabs.org/~akpm/mmots/broken-out.tar.gz
-$ tar -tavf broken-out.tar.gz |grep gcc-473
--rw-r----- akpm/eng       1882 2015-04-06 16:24 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473.patch
--rw-r----- akpm/eng       1271 2015-04-06 16:24 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473-fix.patch
--rw-r----- akpm/eng       1382 2015-04-06 16:24 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473-fix-fix.patch
--rw-r----- akpm/eng        968 2015-04-06 16:24 broken-out/mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473-fix-fix-fix.patch
-
-
-Kevin
+>  			return;
+> +		}
+>  
+>  	pr_info(
+>  	 "No busn resource found for pci%04x:%02x, will use [bus %02x-ff]\n",
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
