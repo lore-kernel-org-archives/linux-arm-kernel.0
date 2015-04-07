@@ -1,158 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 7 Apr 2015 11:45:33 -0700
-Subject: [PATCH v4 04/10] eeprom: Add a simple EEPROM framework for
- eeprom consumers
-In-Reply-To: <1427752670-17219-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1427752670-17219-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150407184533.GA10278@codeaurora.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 07 Apr 2015 11:51:53 -0700
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
+ enabled during suspend
+In-Reply-To: <5523E5A9.4080302@collabora.co.uk> (Javier Martinez Canillas's
+ message of "Tue, 07 Apr 2015 16:11:53 +0200")
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
+ <551976F1.1000605@collabora.co.uk>
+ <CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>
+ <551AFCCE.4050404@collabora.co.uk> <551BD07E.2090506@samsung.com>
+ <551BDA0A.7010704@collabora.co.uk> <551C2B6D.4010001@samsung.com>
+ <551C71A5.1070903@collabora.co.uk>
+ <CAM4voakS8PnatqRTW5gkD0NNKD9gW9Tuv5p-ekxFhKN5NcuBCQ@mail.gmail.com>
+ <5523B878.8040304@collabora.co.uk> <5523C5F5.6000604@collabora.co.uk>
+ <CA+Ln22FrvQQ_pX7ELG-jYriGkQHmtX3aUHYqsc_-CRXcc4zxbg@mail.gmail.com>
+ <5523E5A9.4080302@collabora.co.uk>
+Message-ID: <7hlhi3py9i.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30, Srinivas Kandagatla wrote:
-> @@ -130,6 +138,37 @@ static struct class eeprom_class = {
->  	.dev_release	= eeprom_release,
->  };
->  
-> +static int of_eeprom_match(struct device *dev, const void *eeprom_np)
-> +{
-> +	return dev->of_node == eeprom_np;
-> +}
-> +
-> +static struct eeprom_device *of_eeprom_find(struct device_node *eeprom_np)
-> +{
-> +	struct device *d;
-> +
-> +	if (!eeprom_np)
-> +		return NULL;
-> +
-> +	d = class_find_device(&eeprom_class, NULL, eeprom_np, of_eeprom_match);
-> +
-> +	return d ? to_eeprom(d) : NULL;
-> +}
-> +
-> +static int eeprom_match(struct device *dev, const void *data)
-> +{
-> +	return !strcmp(dev_name(dev), (const char *)data);
+Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
 
-Is this cast necessary?
-
-> +}
-> +
-> +static struct eeprom_device *eeprom_find(const char *name)
-> +{
-> +	struct device *d;
-> +
-> +	d = class_find_device(&eeprom_class, NULL, (void *)name, eeprom_match);
-
-Is this cast necessary?
-
-> +
-> +	return d ? to_eeprom(d) : NULL;
-> +}
-> +
->  /**
->   * eeprom_register(): Register a eeprom device for given eeprom.
->   * Also creates an binary entry in /sys/class/eeprom/name-id/eeprom
-> +
-> +/**
-> + * eeprom_cell_get(): Get eeprom cell of device form a given eeprom name
-
-s/form/from/
-
-> + * and blocks.
-> + *
-> + * @ename: eeprom device name that needs to be looked-up.
-> + * @blocks: eeprom blocks containing offset and length information.
-> + * @nblocks: number of eeprom blocks.
-> + *
-> + * The return value will be an ERR_PTR() on error or a valid pointer
-> + * to a struct eeprom_cell.  The eeprom_cell will be freed by the
-> + * eeprom_cell_put().
-> + */
-> +struct eeprom_cell *eeprom_cell_get(const char *ename,
-> +				    struct eeprom_block *blocks, int nblocks)
-> +{
-> +	return __eeprom_cell_get(NULL, ename, blocks, nblocks);
-> +}
-> +EXPORT_SYMBOL_GPL(eeprom_cell_get);
-> +
-> +/**
-> + * of_eeprom_cell_get(): Get eeprom cell of device form a given index
-
-s/form/from/
-
-> + *
-> + * @dev node: Device tree node that uses the eeprom cell
-> + * @index: eeprom index in eeproms property.
-> + *
-> + * The return value will be an ERR_PTR() on error or a valid pointer
-> + * to a struct eeprom_cell.  The eeprom_cell will be freed by the
-> + * eeprom_cell_put().
-> + */
-> +struct eeprom_cell *of_eeprom_cell_get(struct device_node *np, const char *name)
-> +{
-> +	struct device_node *cell_np;
-> +
-> +	cell_np = of_parse_phandle(np, name, 0);
-> +	if (!cell_np)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	return __eeprom_cell_get(cell_np, NULL, NULL, 0);
-> +}
-> +EXPORT_SYMBOL_GPL(of_eeprom_cell_get);
-> +
-> diff --git a/include/linux/eeprom-consumer.h b/include/linux/eeprom-consumer.h
-> new file mode 100644
-> index 0000000..effa417
-> --- /dev/null
-> +++ b/include/linux/eeprom-consumer.h
-> @@ -0,0 +1,61 @@
-> +/*
-> + * EEPROM framework consumer.
-> + *
-> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> + * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef _LINUX_EEPROM_CONSUMER_H
-> +#define _LINUX_EEPROM_CONSUMER_H
-> +
-> +struct eeprom_cell;
-> +
-> +struct eeprom_block {
-> +	loff_t offset;
-> +	size_t count;
-> +};
-> +#if IS_ENABLED(CONFIG_EEPROM)
-> +struct eeprom_cell *eeprom_cell_get(const char *ename,
-> +				    struct eeprom_block *blocks, int nblocks);
-> +void eeprom_cell_put(struct eeprom_cell *cell);
-> +char *eeprom_cell_read(struct eeprom_cell *cell, ssize_t *len);
-> +int eeprom_cell_write(struct eeprom_cell *cell, const char *buf, ssize_t len);
 [...]
-> +
-> +#if IS_ENABLED(CONFIG_EEPROM) && IS_ENABLED(CONFIG_OF)
-> +struct eeprom_cell *of_eeprom_cell_get(struct device_node *dev,
-> +				       const char *property);
-> +#else
-> +static inline struct eeprom_cell *of_eeprom_cell_get(struct device_node *np,
-> +						     const char *property)
-> +{
-> +	return ERR_PTR(-ENOSYS);
-> +}
-> +#endif
-> +#endif  /* ifndef _LINUX_EEPROM_CONSUMER_H */
 
-Do you have an overview of how to use these APIs? Maybe some
-Documentation/ is in order? I'm mostly interested in how the
-blocks array is supposed to work and how this hooks up to drivers
-that are using DT.
+> Yes, the following patch [0] is enough to make S2R working. If you think
+> that is correct then I'll post it as a proper patch then.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+[...]
+
+> [0]
+> From 78aa551ebcb9a4a7ae9d5581c33e0c0f19fe5ad6 Mon Sep 17 00:00:00 2001
+> From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Date: Tue, 7 Apr 2015 15:53:27 +0200
+> Subject: [RFC PATCH] clk: exynos5420: Restore GATE_BUS_TOP on suspend
+>
+> Commit ae43b3289186 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power
+> Management support v12") added pm support for the pl330 dma driver but
+> it makes the clock for the Exynos5420 MDMA0 DMA controller to be gated
+> during suspend and this in turn makes its parent clock aclk266_g2d to
+> be gated. But the clock needs to be ungated prior suspend to allow the
+> system to be suspend and resumed correctly.
+>
+> Add GATE_BUS_TOP register to the list of registers to be restored when
+> the system enters into a suspend state so aclk266_g2d will be ungated.
+>
+> Thanks to Abhilash Kesavan for figuring out that this was the issue.
+>
+> Fixes: ae43b32 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12")
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+on exynos5800-peach-pi
+
+Kevin
