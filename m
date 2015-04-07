@@ -1,23 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Apr 2015 09:41:19 +0200
-Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
-In-Reply-To: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
-References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
-Message-ID: <3196164.8b31S2QWFd@wuerfel>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 7 Apr 2015 09:56:42 +0200
+Subject: [PATCH v5 10/15] serial: stm32-usart: Add STM32 USART Driver
+In-Reply-To: <1428083006.13180.35.camel@perches.com>
+References: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1428080481-18591-11-git-send-email-mcoquelin.stm32@gmail.com>
+ <1428083006.13180.35.camel@perches.com>
+Message-ID: <CALszF6CFBm5jJUF95K=6_gRHijSk3Addpw13_q3Li-i8fqP6tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 April 2015 12:34:30 Masahiro Yamada wrote:
-> 
-> What is the cause of the kernel panic?  How to fix it?
-> Any hint is very appreciated.
-> 
+2015-04-03 19:43 GMT+02:00 Joe Perches <joe@perches.com>:
+> On Fri, 2015-04-03 at 19:01 +0200, Maxime Coquelin wrote:
+>> This drivers adds support to the STM32 USART controller, which is a
+>> standard serial driver.
+>
+> trivia:
+>
+>> diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
+> []
+>> +static struct uart_ops stm32_uart_ops = {
+>
+> could be const
 
-Cortex-A9 usually need to set up the L2 Cache controller, and you
-don't have a node for that.
+i would even say, should be const.
 
-Can you try adding a DT node for it? You may also have to specify
-the overrides for its aux control register in DT if that is not
-set up right by the boot loader or the power-on defaults.
+>
+> and it could be updated in a separate patch later too.
+>
 
-	Arnd
+Nope, I will send another version anyway, so it will be part of the v6.
+
+Thanks for the review,
+Maxime
