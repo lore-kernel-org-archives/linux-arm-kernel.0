@@ -1,31 +1,46 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Apr 2015 14:58:42 +0100
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
-References: <CAALWOA-h5SdnGhbckJ+x0efijmNaQxX-8ULjn_J=mCb-UJMeoQ@mail.gmail.com>
- <5520E2EE.4080302@gmail.com>
- <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
- <5521A438.1070008@gmail.com>
- <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
- <20150406151939.GG18048@atomide.com>
- <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
- <20150406174245.GJ18048@atomide.com>
- <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
-Message-ID: <20150407135841.GM4027@n2100.arm.linux.org.uk>
+Date: Tue, 7 Apr 2015 15:01:17 +0100
+Subject: [PATCH 10/14] ARM: orion: use clkdev_create()
+In-Reply-To: <5523D985.60800@free-electrons.com>
+References: <20150403171149.GC13898@n2100.arm.linux.org.uk>
+ <E1Ye59d-0001BZ-Sv@rmk-PC.arm.linux.org.uk>
+ <20150404001729.GA14824@lunn.ch>
+ <5523D985.60800@free-electrons.com>
+Message-ID: <20150407140117.GN4027@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 08:14:30PM +0200, Matthijs van Duin wrote:
-> * Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [150406 10:15]:
-> > Why custom function, if IBE bit is zero, BTB invalidate instruction is a
-> > NOP. Do you think that "mcr p15, 0, r2, c7, c5, 6" executed as a NOP will
-> > put so much overhead, that it deserves a custom function?
+On Tue, Apr 07, 2015 at 03:20:05PM +0200, Gregory CLEMENT wrote:
+> Hi Andrew, Russell,
 > 
-> Executing them as nop is Cortex-A8 specific. On other ARMv7 CPUs, BTB
-> invalidation on context switch may be unnecessary yet expensive.
+> On 04/04/2015 02:17, Andrew Lunn wrote:
+> > On Fri, Apr 03, 2015 at 06:13:13PM +0100, Russell King wrote:
+> >> clkdev_create() is a shorter way to write clkdev_alloc() followed by
+> >> clkdev_add().  Use this instead.
+> >>
+> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > Acked-by: Andrew Lunn <andrew@lunn.ch>
+> 
+> This change makes sens however what about Thomas' comment: removing
+> orion_clkdev_add() entirely and directly using lkdev_create() all over
+> the place:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/327294.html
+> 
+> Then what would be the path for this patch?
+> 
+> As there is a dependency on the 6th patch of this series: "clkdev: add
+> clkdev_create() helper" which should be merged through the clk tree, I
+> think the best option is that this patch would be also managed by the
+> clk tree maintainer (I added them in CC).
 
-That can be solved (see the patch I just posted) so I wouldn't worry
-too much about that issue.
+Let me remind people that clkdev is *NOT* part of clk, and that I'm the
+maintainer for clkdev.
+
+I'm getting rather pissed off with people taking work away from me, even
+when I'm named in the MAINTAINERS file.  These patches are going through
+my tree unless there's a good reason for them not to.  They are _not_
+going through the clk tree.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
