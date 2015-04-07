@@ -1,33 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 7 Apr 2015 11:00:47 +0200
-Subject: [PATCH 1/5] MFD/OF: document MFD devices and handle simple-mfd
-In-Reply-To: <CAOesGMhz6WPweQFXfPhTO6Pz5L4Z1Si6YGiCRCiFD9B5qB9tVw@mail.gmail.com>
-References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
- <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
- <CAOesGMhz6WPweQFXfPhTO6Pz5L4Z1Si6YGiCRCiFD9B5qB9tVw@mail.gmail.com>
-Message-ID: <CACRpkdZzT1p-a2uReWeYn12D8e5nyBRE4ovJ6GuqEdFB3AdGHw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 7 Apr 2015 11:02:22 +0200
+Subject: [PATCH 0/2] Kbuild: kallsyms: update suffix ignore logic
+In-Reply-To: <1427721632-11665-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1427721632-11665-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu-HkK96hz7zKQeJfeh2YiRY+qGaWkQdrSn0=n+P0qeHZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 3, 2015 at 8:34 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Mar 3, 2015 at 1:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On 30 March 2015 at 15:20, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Two patches that update the kallsyms ignore logic.
 >
->> +
->> +foo at 1000 {
->> +               compatible = "syscon", "simple-mfd";
->> +               reg = <0x010000 0x1000>;
->> +
->> +               led at 08.0 {
+> Patch #1 adds logic to introduce symbols whose names end in (or equal)
+> "_veneer". This prevent kallsyms generation errors on large ARM kernels
+> where the emitted veneers will be different between the first and second
+> pass, due to the fact that the size of the kallsyms region itself pushes
+> the .text and .init.text sections further apart during the second pass.
 >
-> This doesn't seem to be a typo, you're using a period in the unit
-> address. I've never seen that done before, usually commas are used
-> instead.
+> Patch #2 removes the handling of the "gcc[0-9]_compiled." symbol. It was
+> only ever emitted by GCC v2.x which we don't support anymore anyway.
 >
-> Was there a reason for going with period?
+> This series is a followup to ' [RFC PATCH 0/2] ARM large kernels'
+> (http://thread.gmane.org/gmane.linux.kbuild.devel/13065), but the
+> other issue addressed by patch #2 of that series will be deferred
+> for now.
+>
+> Ard Biesheuvel (2):
+>   Kbuild: kallsyms: ignore veneers emitted by the ARM linker
+>   Kbuild: kallsyms: drop special handling of pre-3.0 GCC symbols
+>
+>  scripts/kallsyms.c | 29 ++++++++++++++++++++---------
+>  1 file changed, 20 insertions(+), 9 deletions(-)
+>
 
-It was the suggested syntax from DT binding maintainer Rob Herring in
-July last year:
-http://marc.info/?l=linux-arm-kernel&m=140629736615939&w=2
-
-Yours,
-Linus Walleij
+Ping?
