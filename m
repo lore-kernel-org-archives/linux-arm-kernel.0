@@ -1,86 +1,65 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  7 Apr 2015 19:43:58 +0100
-Subject: [PATCH v6 3/4] clk: Provide always-on clock support
+Date: Tue,  7 Apr 2015 19:43:59 +0100
+Subject: [PATCH v6 4/4] clk: dt: Introduce binding for always-on clock support
 In-Reply-To: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
 References: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1428432239-4114-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lots of platforms contain clocks which if turned off would prove fatal.
-The only way to recover from these catastrophic failures is to restart
-the board(s).  Now, when a clock provider is registered with the
-framework it is possible for a list of always-on clocks to be supplied
-which must be kept ungated.  Each clock mentioned in the newly
-introduced 'clock-always-on' will be clk_prepare_enable()d where the
-normal references will be taken.  This will prevent the common clk
-framework from attempting to gate them during the clk_disable_unused()
-and disable_clock() procedures.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/clk/clk-conf.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 42 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/clock/clock-bindings.txt   | 38 ++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
-index aad4796..a07aced 100644
---- a/drivers/clk/clk-conf.c
-+++ b/drivers/clk/clk-conf.c
-@@ -116,6 +116,43 @@ static int __set_clk_rates(struct device_node *node, bool clk_supplier)
- 	return 0;
- }
+diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+index 06fc6d5..daf3323 100644
+--- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
++++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+@@ -44,6 +44,44 @@ For example:
+   clocks by index. The names should reflect the clock output signal
+   names for the device.
  
-+static int __set_clk_always_on(struct device_node *node, bool clk_supplier)
-+{
-+	struct of_phandle_args clkspec;
-+	struct clk *clk;
-+	struct property	*prop;
-+	const __be32 *cur;
-+	uint32_t index;
-+	int ret;
++clock-always-on:    Some hardware contains bunches of clocks which must never be
++		    turned off.  If drivers a) fail to obtain a reference to any
++		    of these or b) give up a previously obtained reference
++		    during suspend, the common clk framework will attempt to
++		    disable them and a platform can fail irrecoverably as a
++		    result.  Usually the only way to recover from these failures
++		    is to reboot.
 +
-+	if (!clk_supplier)
-+		return 0;
++		    To avoid either of these two scenarios from catastrophically
++		    disabling an otherwise perfectly healthy running system,
++		    clocks can be identified as always-on using this property
++		    from inside a clocksource's node.
 +
-+	of_property_for_each_u32(node, "clock-always-on", prop, cur, index) {
-+		clkspec.np = node;
-+		clkspec.args_count = 1;
-+		clkspec.args[0] = index;
++		    This property is not to be abused.  It is only to be used to
++		    protect platforms from being crippled by gated clocks, not
++		    as a convenience function to avoid using the framework
++		    correctly inside device drivers.
 +
-+		clk = of_clk_get_from_provider(&clkspec);
-+		if (IS_ERR(clk)) {
-+			pr_err("clk: couldn't get clock %u for %s\n",
-+				index, node->full_name);
-+			return PTR_ERR(clk);
-+		}
++		    Expected values are hardware clock indices.  If the
++		    clock-indices property (see below) is used, then supplied
++		    values must correspond to one of the listed identifiers.
++		    Using the clock-indices example below, hardware clock <2>
++		    is missing, therefore it is considered invalid to then
++		    list clock <2> as an always-on clock.
 +
-+		ret = clk_prepare_enable(clk);
-+		if (ret) {
-+			pr_err("Failed to enable clock %u for %s: %d\n",
-+			       index, node->full_name, ret);
-+			return ret;
-+		}
++For example:
 +
-+		pr_debug("Setting clock as always-on %pC\n", clk);
-+	}
++    oscillator {
++        #clock-cells = <1>;
++        clock-output-names = "ckil", "ckih";
++        clock-always-on = <0>, <1>;
++    };
 +
-+	return 0;
-+}
++- this node defines a device with two clock outputs, just as in the
++  example above.  The only difference being that 'ckil' and 'ckih'
++  are now identified as an always-on clocks, so the framework will
++  know to never attempt to gate them.
 +
- /**
-  * of_clk_set_defaults() - parse and set assigned clocks configuration
-  * @node: device node to apply clock settings for
-@@ -139,6 +176,10 @@ int of_clk_set_defaults(struct device_node *node, bool clk_supplier)
- 	if (rc < 0)
- 		return rc;
- 
--	return __set_clk_rates(node, clk_supplier);
-+	rc = __set_clk_rates(node, clk_supplier);
-+	if (rc < 0)
-+		return rc;
-+
-+	return __set_clk_always_on(node, clk_supplier);
- }
- EXPORT_SYMBOL_GPL(of_clk_set_defaults);
+ clock-indices:	   If the identifying number for the clocks in the node
+ 		   is not linear from zero, then this allows the mapping of
+ 		   identifiers into the clock-output-names array.
 -- 
 1.9.1
