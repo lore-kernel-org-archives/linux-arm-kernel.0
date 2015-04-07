@@ -1,51 +1,169 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 6 Apr 2015 19:56:32 -0700
-Subject: [PATCH 03/13] thermal: remove useless call to
- thermal_zone_device_set_polling
-In-Reply-To: <1427385240-6086-4-git-send-email-s.hauer@pengutronix.de>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150407025630.GJ4648@localhost.localdomain>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 7 Apr 2015 10:52:26 +0800
+Subject: [PATCH v9 19/30] powerpc/pci: Use pci_scan_host_bridge() for
+ simplicity
+In-Reply-To: <1428363334.22268.9.camel@axtens.net>
+References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>	
+ <1428053164-28277-21-git-send-email-wangyijing@huawei.com>
+ <1428363334.22268.9.camel@axtens.net>
+Message-ID: <5523466A.3090500@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 04:53:50PM +0100, Sascha Hauer wrote:
-> When the thermal zone has no get_temp callback then thermal_zone_device_register()
-> calls thermal_zone_device_set_polling() with a polling delay of 0. This
-> only cancels the poll_queue. Since the poll_queue hasn't been scheduled this
-> is a no-op. Remove it.
+On 2015/4/7 7:35, Daniel Axtens wrote:
+> I've been looking at this patch series for a while now, and I now
+> believe it's ready on the PowerPC side.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-This seams reasonable to me:
-
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
-
-> ---
->  drivers/thermal/thermal_core.c | 3 ---
->  1 file changed, 3 deletions(-)
+> I was originally concerned that it would break odd corner cases,
+> particularly where similar code appears (namely kernel/pci_hotplug.c and
+> kernel/pci_of_scan.c). However, upon further examination, talking with
+> Yijing, and some testing, I'm now convinced that it is indeed restricted
+> to the generic code, and doesn't change behaviour.
 > 
-> diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-> index c735ac4c..dcea909 100644
-> --- a/drivers/thermal/thermal_core.c
-> +++ b/drivers/thermal/thermal_core.c
-> @@ -1571,9 +1571,6 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
->  
->  	INIT_DELAYED_WORK(&(tz->poll_queue), thermal_zone_device_check);
->  
-> -	if (!tz->ops->get_temp)
-> -		thermal_zone_device_set_polling(tz, 0);
-> -
->  	thermal_zone_device_update(tz);
->  
->  	return tz;
-> -- 
-> 2.1.4
+> This is both a plus and a minus: because it's currently restricted to
+> generic code, I'm confident it works, but the down side is that it
+> doesn't yet simplify our arch-specific complexity. We'll need to do some
+> more work on our side to reap the full benefits.
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/6f8bf09a/attachment-0001.sig>
+> I tested this entire series on a PowerNV machine, including doing EEH
+> injection to trigger PCI hotplug:
+> Tested-by: Daniel Axtens <dja@axtens.net>
+> For completeness, it would be good to test it on Cell, as they are the
+> only remaining user of pci_of_scan.c
+> 
+> In conclusion, this patch is
+> Reviewed-by: Daniel Axtens <dja@axtens.net>
+> 
+
+
+Thanks very much for your test and review.
+
+Thanks!
+Yijing.
+
+> 
+> 
+> On Fri, 2015-04-03 at 17:25 +0800, Yijing Wang wrote:
+>> Now we could use pci_scan_host_bridge() to scan
+>> pci buses, provide powerpc specific pci_host_bridge_ops.
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>> CC: linuxppc-dev at lists.ozlabs.org
+>> ---
+>>  arch/powerpc/kernel/pci-common.c |   62 +++++++++++++++++++++++--------------
+>>  1 files changed, 38 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+>> index 2c58200..50b32f6 100644
+>> --- a/arch/powerpc/kernel/pci-common.c
+>> +++ b/arch/powerpc/kernel/pci-common.c
+>> @@ -773,6 +773,29 @@ void pcibios_set_root_bus_speed(struct pci_host_bridge *bridge)
+>>  		return ppc_md.pcibios_set_root_bus_speed(bridge);
+>>  }
+>>  
+>> +static int pci_host_scan_bus(struct pci_host_bridge *host)
+>> +{
+>> +	int mode = PCI_PROBE_NORMAL;
+>> +	struct pci_bus *bus = host->bus;
+>> +	struct pci_controller *hose = dev_get_drvdata(&host->dev);
+>> +
+>> +	/* Get probe mode and perform scan */
+>> +	if (hose->dn && ppc_md.pci_probe_mode)
+>> +		mode = ppc_md.pci_probe_mode(bus);
+>> +
+>> +	pr_debug("    probe mode: %d\n", mode);
+>> +	if (mode == PCI_PROBE_DEVTREE)
+>> +		of_scan_bus(hose->dn, bus);
+>> +
+>> +	if (mode == PCI_PROBE_NORMAL) {
+>> +		pci_bus_update_busn_res_end(bus, 255);
+>> +		hose->last_busno = pci_scan_child_bus(bus);
+>> +		pci_bus_update_busn_res_end(bus, hose->last_busno);
+>> +	}
+>> +
+>> +	return pci_bus_child_max_busnr(bus);
+>> +}
+>> +
+>>  /* This header fixup will do the resource fixup for all devices as they are
+>>   * probed, but not for bridge ranges
+>>   */
+>> @@ -1585,6 +1608,11 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+>>  	return of_node_get(hose->dn);
+>>  }
+>>  
+>> +static struct pci_host_bridge_ops pci_host_ops = {
+>> +	.set_root_bus_speed = pcibios_set_root_bus_speed,
+>> +	.scan_bus = pci_host_scan_bus,
+>> +};
+>> +
+>>  /**
+>>   * pci_scan_phb - Given a pci_controller, setup and scan the PCI bus
+>>   * @hose: Pointer to the PCI host controller instance structure
+>> @@ -1592,9 +1620,8 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+>>  void pcibios_scan_phb(struct pci_controller *hose)
+>>  {
+>>  	LIST_HEAD(resources);
+>> -	struct pci_bus *bus;
+>> +	struct pci_host_bridge *host;
+>>  	struct device_node *node = hose->dn;
+>> -	int mode;
+>>  
+>>  	pr_debug("PCI: Scanning PHB %s\n", of_node_full_name(node));
+>>  
+>> @@ -1609,30 +1636,17 @@ void pcibios_scan_phb(struct pci_controller *hose)
+>>  	hose->busn.flags = IORESOURCE_BUS;
+>>  	pci_add_resource(&resources, &hose->busn);
+>>  
+>> +	pci_host_ops.pci_ops = hose->ops;
+>>  	/* Create an empty bus for the toplevel */
+>> -	bus = pci_create_root_bus(hose->parent, hose->global_number,
+>> -			hose->first_busno, hose->ops, hose, &resources);
+>> -	if (bus == NULL) {
+>> -		pr_err("Failed to create bus for PCI domain %04x\n",
+>> -			hose->global_number);
+>> +	host = pci_scan_host_bridge(hose->parent, hose->global_number,
+>> +			hose->first_busno, hose, &resources, &pci_host_ops);
+>> +	if (host == NULL) {
+>> +		pr_err("Failed to create host bridge for pci%04x:%02x\n",
+>> +			hose->global_number, hose->first_busno);
+>>  		pci_free_resource_list(&resources);
+>>  		return;
+>>  	}
+>> -	hose->bus = bus;
+>> -
+>> -	/* Get probe mode and perform scan */
+>> -	mode = PCI_PROBE_NORMAL;
+>> -	if (node && ppc_md.pci_probe_mode)
+>> -		mode = ppc_md.pci_probe_mode(bus);
+>> -	pr_debug("    probe mode: %d\n", mode);
+>> -	if (mode == PCI_PROBE_DEVTREE)
+>> -		of_scan_bus(node, bus);
+>> -
+>> -	if (mode == PCI_PROBE_NORMAL) {
+>> -		pci_bus_update_busn_res_end(bus, 255);
+>> -		hose->last_busno = pci_scan_child_bus(bus);
+>> -		pci_bus_update_busn_res_end(bus, hose->last_busno);
+>> -	}
+>> +	hose->bus = host->bus;
+>>  
+>>  	/* Platform gets a chance to do some global fixups before
+>>  	 * we proceed to resource allocation
+>> @@ -1641,9 +1655,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
+>>  		ppc_md.pcibios_fixup_phb(hose);
+>>  
+>>  	/* Configure PCI Express settings */
+>> -	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>> +	if (host->bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>>  		struct pci_bus *child;
+>> -		list_for_each_entry(child, &bus->children, node)
+>> +		list_for_each_entry(child, &host->bus->children, node)
+>>  			pcie_bus_configure_settings(child);
+>>  	}
+>>  }
+> 
+
+
+-- 
+Thanks!
+Yijing
