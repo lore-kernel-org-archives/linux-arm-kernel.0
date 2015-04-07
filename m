@@ -1,19 +1,89 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 07 Apr 2015 23:38:43 +0200
-Subject: [PATCH] arm: dts: rk3288: Enable Cortex-A12 HW PMU events
-In-Reply-To: <1428429159-24102-1-git-send-email-sonnyrao@chromium.org>
-References: <1428429159-24102-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <24213385.vvDEJ0zGbq@diego>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 7 Apr 2015 16:38:39 -0500
+Subject: [PATCH v9 06/30] PCI: Separate pci_host_bridge creation out of
+ pci_create_root_bus()
+In-Reply-To: <1428053164-28277-8-git-send-email-wangyijing@huawei.com>
+References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
+ <1428053164-28277-8-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150407213839.GJ10892@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 7. April 2015, 10:52:39 schrieb Sonny Rao:
-> This adds the dts node for the PMU with the correct PMUIRQ interrupts
-> for each core.
+On Fri, Apr 03, 2015 at 05:25:40PM +0800, Yijing Wang wrote:
+> This patch separate pci_host_bridge creation out
+> of pci_create_root_bus(), and try to make a generic
+> pci_host_bridge, then we could make it hold host
+> bridge specific operations like
+> pcibios_root_bridge_prepare(). The changes are
+> transparent to platform host bridge drivers.
 > 
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> ---
+>  drivers/pci/host-bridge.c |   52 +++++++++++++++++++++
+>  drivers/pci/pci.h         |    3 +
+>  drivers/pci/probe.c       |  113 +++++++++++++++++++++------------------------
+>  3 files changed, 108 insertions(+), 60 deletions(-)
+> 
+> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> index 39b2dbe..7d52a0a 100644
+> --- a/drivers/pci/host-bridge.c
+> +++ b/drivers/pci/host-bridge.c
+> @@ -8,6 +8,58 @@
+>  
+>  #include "pci.h"
+>  
+> +static void pci_release_host_bridge_dev(struct device *dev)
+> +{
+> +	struct pci_host_bridge *bridge = to_pci_host_bridge(dev);
+> +
+> +	if (bridge->release_fn)
+> +		bridge->release_fn(bridge);
+> +
+> +	pci_free_resource_list(&bridge->windows);
+> +	kfree(bridge);
+> +}
+> +
+> +struct pci_host_bridge *pci_create_host_bridge(
+> +		struct device *parent, int domain, int bus,
+> +		struct list_head *resources)
+> +{
+> +	int error;
+> +	struct pci_host_bridge *host;
+> +	struct resource_entry *window, *n;
+> +
+> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
+> +	if (!host)
+> +		return NULL;
+> +
+> +	host->dev.parent = parent;
+> +	INIT_LIST_HEAD(&host->windows);
+> +	resource_list_for_each_entry_safe(window, n, resources)
+> +		list_move_tail(&window->node, &host->windows);
+> +	/*
+> +	 * If support CONFIG_PCI_DOMAINS_GENERIC, use
+> +	 * pci_host_assign_domain_nr() to update domain
+> +	 * number.
+> +	 */
+> +	host->domain = domain;
+> +	pci_host_assign_domain_nr(host);
 
-looks good, applied to my dts branch
+I think it's a bit confusing that there's another "host->domain ="
+assignment buried inside pci_host_assign_domain_nr(), so the first
+assignment is overwritten when CONFIG_PCI_DOMAINS_GENERIC is set.
 
+Can you do something like this instead:
 
-Heiko
+  int pci_host_assign_domain_nr(struct pci_host_bridge *host, int domain)
+  {
+  #ifdef CONFIG_PCI_DOMAINS_GENERIC
+    host->domain = pci_assign_domain_nr(host->dev.parent);
+  #else
+    host->domain = domain;
+  #endif
+  }
+
+Then the alternatives (CONFIG_PCI_DOMAINS_GENERIC=y and
+CONFIG_PCI_DOMAINS_GENERIC being unset) are close together and right at the
+#ifdef CONFIG_PCI_DOMAINS_GENERIC, so no extra comments are needed.
+
+Bjorn
