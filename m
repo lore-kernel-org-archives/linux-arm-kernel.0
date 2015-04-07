@@ -1,195 +1,71 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 6 Apr 2015 18:45:48 -0700
-Subject: [PATCH 01/13] thermal: Make temperatures consistently unsigned
- long
-In-Reply-To: <1427385240-6086-2-git-send-email-s.hauer@pengutronix.de>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150407014546.GA4648@localhost.localdomain>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 7 Apr 2015 11:46:00 +1000
+Subject: linux-next: manual merge of the arm64 tree with the arm-soc tree
+Message-ID: <20150407114600.14a3ecc8@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 04:53:48PM +0100, Sascha Hauer wrote:
-> The thermal framework uses int, long and unsigned long for temperatures
-> in millicelsius. The majority of functions uses unsigned long, so change
-> the remaining functions to use this type aswell.
+Hi Catalin,
 
-I believe it make sense to change all to be int. int covers for the
-required temperature range. 
+Today's linux-next merge of the arm64 tree got a conflict in
+arch/arm64/configs/defconfig between commit d7f64a44356c ("arm64: qcom:
+Add support for Qualcomm MSM8916 SoC") from the arm-soc tree and commit
+475bfd3d67fa ("arm64: defconfig: updates for 4.1") from the arm64 tree.
 
-Rui is just introducing the concept of invalid temp, which is below 0 K.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/thermal/thermal_core.c | 10 +++++-----
->  include/linux/thermal.h        |  6 +++---
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-This change is not that straight forward as it looks like. 
-
-In order to standardize this, apart from the thermal core
-we will need to make drivers aware of the change too.
-That will require changing the thermal zone device ops and all its
-users, for the trip temperature, temperature, and hysteresis cases.
-
->  2 files changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-> index 174d3bc..0e4ad7c 100644
-> --- a/drivers/thermal/thermal_core.c
-> +++ b/drivers/thermal/thermal_core.c
-> @@ -378,7 +378,7 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
->  
->  	if (trip_type == THERMAL_TRIP_CRITICAL) {
->  		dev_emerg(&tz->device,
-> -			  "critical temperature reached(%d C),shutting down\n",
-> +			  "critical temperature reached(%lu C),shutting down\n",
->  			  tz->temperature / 1000);
->  		orderly_poweroff(true);
->  	}
-> @@ -453,7 +453,7 @@ EXPORT_SYMBOL_GPL(thermal_zone_get_temp);
->  
->  static void update_temperature(struct thermal_zone_device *tz)
->  {
-> -	long temp;
-> +	unsigned long temp;
->  	int ret;
->  
->  	ret = thermal_zone_get_temp(tz, &temp);
-> @@ -469,7 +469,7 @@ static void update_temperature(struct thermal_zone_device *tz)
->  	mutex_unlock(&tz->lock);
->  
->  	trace_thermal_temperature(tz);
-> -	dev_dbg(&tz->device, "last_temperature=%d, current_temperature=%d\n",
-> +	dev_dbg(&tz->device, "last_temperature=%lu, current_temperature=%lu\n",
->  				tz->last_temperature, tz->temperature);
->  }
->  
-> @@ -512,7 +512,7 @@ static ssize_t
->  temp_show(struct device *dev, struct device_attribute *attr, char *buf)
->  {
->  	struct thermal_zone_device *tz = to_thermal_zone(dev);
-> -	long temperature;
-> +	unsigned long temperature;
->  	int ret;
->  
->  	ret = thermal_zone_get_temp(tz, &temperature);
-> @@ -520,7 +520,7 @@ temp_show(struct device *dev, struct device_attribute *attr, char *buf)
->  	if (ret)
->  		return ret;
->  
-> -	return sprintf(buf, "%ld\n", temperature);
-> +	return sprintf(buf, "%lu\n", temperature);
->  }
->  
->  static ssize_t
-> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-> index 5eac316..db6c12b 100644
-> --- a/include/linux/thermal.h
-> +++ b/include/linux/thermal.h
-> @@ -180,9 +180,9 @@ struct thermal_zone_device {
->  	int trips;
->  	int passive_delay;
->  	int polling_delay;
-> -	int temperature;
-> -	int last_temperature;
-> -	int emul_temperature;
-> +	unsigned long temperature;
-> +	unsigned long last_temperature;
-> +	unsigned long emul_temperature;
->  	int passive;
->  	unsigned int forced_passive;
->  	struct thermal_zone_device_ops *ops;
-
-Something like the following would be required to do a standardization.
-Of course, the code below requires changing drivers too:
-
-diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-index 6bbe11c..84c9777 100644
---- a/include/linux/thermal.h
-+++ b/include/linux/thermal.h
-@@ -92,7 +92,7 @@ struct thermal_zone_device_ops {
- 		     struct thermal_cooling_device *);
- 	int (*unbind) (struct thermal_zone_device *,
- 		       struct thermal_cooling_device *);
--	int (*get_temp) (struct thermal_zone_device *, unsigned long *);
-+	int (*get_temp) (struct thermal_zone_device *, int *);
- 	int (*get_mode) (struct thermal_zone_device *,
- 			 enum thermal_device_mode *);
- 	int (*set_mode) (struct thermal_zone_device *,
-@@ -100,15 +100,15 @@ struct thermal_zone_device_ops {
- 	int (*get_trip_type) (struct thermal_zone_device *, int,
- 		enum thermal_trip_type *);
- 	int (*get_trip_temp) (struct thermal_zone_device *, int,
--			      unsigned long *);
-+			      int *);
- 	int (*set_trip_temp) (struct thermal_zone_device *, int,
--			      unsigned long);
-+			      int);
- 	int (*get_trip_hyst) (struct thermal_zone_device *, int,
--			      unsigned long *);
-+			      int *);
- 	int (*set_trip_hyst) (struct thermal_zone_device *, int,
--			      unsigned long);
--	int (*get_crit_temp) (struct thermal_zone_device *, unsigned long *);
--	int (*set_emul_temp) (struct thermal_zone_device *, unsigned long);
-+			      int);
-+	int (*get_crit_temp) (struct thermal_zone_device *, int *);
-+	int (*set_emul_temp) (struct thermal_zone_device *, int);
- 	int (*get_trend) (struct thermal_zone_device *, int,
- 			  enum thermal_trend *);
- 	int (*notify) (struct thermal_zone_device *, int,
-@@ -321,9 +321,9 @@ struct thermal_genl_event {
-  *		   temperature.
-  */
- struct thermal_zone_of_device_ops {
--	int (*get_temp)(void *, long *);
--	int (*get_trend)(void *, long *);
--	int (*set_emul_temp)(void *, unsigned long);
-+	int (*get_temp)(void *, int *);
-+	int (*get_trend)(void *, int *);
-+	int (*set_emul_temp)(void *, int);
- };
- 
- /**
-@@ -336,8 +336,8 @@ struct thermal_zone_of_device_ops {
- 
- struct thermal_trip {
- 	struct device_node *np;
--	unsigned long int temperature;
--	unsigned long int hysteresis;
-+	int temperature;
-+	int hysteresis;
- 	enum thermal_trip_type type;
- };
- 
-@@ -395,7 +395,7 @@ thermal_of_cooling_device_register(struct device_node *np, char *, void *,
- 				   const struct thermal_cooling_device_ops *);
- void thermal_cooling_device_unregister(struct thermal_cooling_device *);
- struct thermal_zone_device *thermal_zone_get_zone_by_name(const char *name);
--int thermal_zone_get_temp(struct thermal_zone_device *tz, unsigned long *temp);
-+int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp);
- 
- int get_tz_trend(struct thermal_zone_device *, int);
- struct thermal_instance *get_thermal_instance(struct thermal_zone_device *,
-@@ -446,7 +446,7 @@ static inline struct thermal_zone_device *thermal_zone_get_zone_by_name(
- 		const char *name)
- { return ERR_PTR(-ENODEV); }
- static inline int thermal_zone_get_temp(
--		struct thermal_zone_device *tz, unsigned long *temp)
-+		struct thermal_zone_device *tz, int *temp)
- { return -ENODEV; }
- static inline int get_tz_trend(struct thermal_zone_device *tz, int trip)
- { return -ENODEV; }
-
-
-> -- 
-> 2.1.4
-> 
+diff --cc arch/arm64/configs/defconfig
+index 96bba367f80c,e07896c819ef..000000000000
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@@ -31,10 -31,12 +31,14 @@@ CONFIG_MODULES=
+  CONFIG_MODULE_UNLOAD=y
+  # CONFIG_BLK_DEV_BSG is not set
+  # CONFIG_IOSCHED_DEADLINE is not set
++ CONFIG_ARCH_EXYNOS7=y
+  CONFIG_ARCH_FSL_LS2085A=y
+  CONFIG_ARCH_MEDIATEK=y
+ +CONFIG_ARCH_QCOM=y
+ +CONFIG_ARCH_SPRD=y
++ CONFIG_ARCH_SEATTLE=y
++ CONFIG_ARCH_TEGRA=y
++ CONFIG_ARCH_TEGRA_132_SOC=y
+  CONFIG_ARCH_THUNDER=y
+  CONFIG_ARCH_VEXPRESS=y
+  CONFIG_ARCH_XGENE=y
+@@@ -105,9 -104,10 +111,11 @@@ CONFIG_VIRTIO_CONSOLE=
+  # CONFIG_HW_RANDOM is not set
+  CONFIG_SPI=y
+  CONFIG_SPI_PL022=y
+ +CONFIG_PINCTRL_MSM8916=y
+  CONFIG_GPIO_PL061=y
+  CONFIG_GPIO_XGENE=y
++ CONFIG_POWER_RESET_XGENE=y
++ CONFIG_POWER_RESET_SYSCON=y
+  # CONFIG_HWMON is not set
+  CONFIG_REGULATOR=y
+  CONFIG_REGULATOR_FIXED_VOLTAGE=y
+@@@ -133,10 -133,9 +141,11 @@@ CONFIG_MMC_SPI=
+  CONFIG_RTC_CLASS=y
+  CONFIG_RTC_DRV_EFI=y
+  CONFIG_RTC_DRV_XGENE=y
++ CONFIG_VIRTIO_PCI=y
+  CONFIG_VIRTIO_BALLOON=y
+  CONFIG_VIRTIO_MMIO=y
+ +CONFIG_COMMON_CLK_QCOM=y
+ +CONFIG_MSM_GCC_8916=y
+  # CONFIG_IOMMU_SUPPORT is not set
+  CONFIG_PHY_XGENE=y
+  CONFIG_EXT2_FS=y
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150406/f80c7d4d/attachment-0001.sig>
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/bef86d2d/attachment.sig>
