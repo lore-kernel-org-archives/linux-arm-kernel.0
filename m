@@ -1,144 +1,77 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 7 Apr 2015 17:25:41 -0500
-Subject: [PATCH v9 07/30] PCI: Add default bus resource in pci_host_bridge
-In-Reply-To: <1428053164-28277-9-git-send-email-wangyijing@huawei.com>
-References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
- <1428053164-28277-9-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150407222541.GK10892@google.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 8 Apr 2015 06:27:14 +0800
+Subject: [GIT PULL 3/4] ARM: imx: device tree updates for 4.1
+In-Reply-To: <CAAQ0ZWTPqbqk5VwWGQvJ7NbmOy58YOzK4Jv76jEPNL961tpviw@mail.gmail.com>
+References: <CAAQ0ZWTPqbqk5VwWGQvJ7NbmOy58YOzK4Jv76jEPNL961tpviw@mail.gmail.com>
+Message-ID: <20150407222712.GA4543@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 05:25:41PM +0800, Yijing Wang wrote:
-> If there is no busn resource provided for pci_scan_root_bus(),
-> we would insert a default bus resource (root_bus_number, 255)
-> in root bus, and update the max bus number we found after
-> pci_scan_child_bus(). We also need to hold the default bus
-> resource in pci_host_bridge, then we could identify whether
-> the new pci host bridge conflict with existing one.
+On Mon, Mar 30, 2015 at 10:02:44PM +0800, Shawn Guo wrote:
+> Arnd, Olof,
 > 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> ---
->  drivers/pci/host-bridge.c |   20 ++++++++++++++++++++
->  drivers/pci/probe.c       |   26 ++++++++++----------------
->  include/linux/pci.h       |    2 ++
->  3 files changed, 32 insertions(+), 16 deletions(-)
+> Because of the DT ABI agreement, device tree branch should generally
+> be able to go alone without any dependencies.  But for this release,
+> i.MX community have agreed to break the old DTBs to adopt
+> stacked/hierarchy irq domains for i.MX GPC and Vybrid MSCM controller.
+> And we included a couple of branches as the merge base for this imx/dt
+> pull request, including Jason's irqchip/vybrid branch, to resolve some
+> merge conflicts and maintain the run-time dependency.
 > 
-> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> index 7d52a0a..ecc1a7c 100644
-> --- a/drivers/pci/host-bridge.c
-> +++ b/drivers/pci/host-bridge.c
-> @@ -19,6 +19,25 @@ static void pci_release_host_bridge_dev(struct device *dev)
->  	kfree(bridge);
->  }
->  
-> +static void pci_host_update_busn_res(
-> +		struct pci_host_bridge *host, int bus,
-> +		struct list_head *resources)
-> +{
-> +	struct resource_entry *window;
-> +
-> +	resource_list_for_each_entry(window, resources)
-> +		if (window->res->flags & IORESOURCE_BUS)
-> +			return;
-> +
-> +	pr_info(
-> +	 "No busn resource found for pci%04x:%02x, will use [bus %02x-ff]\n",
-> +		host->domain, bus, bus);
-> +	host->busn_res.flags = IORESOURCE_BUS;
-> +	host->busn_res.start = bus;
-> +	host->busn_res.end = 255;
-> +	pci_add_resource(resources, &host->busn_res);
-> +}
-> +
->  struct pci_host_bridge *pci_create_host_bridge(
->  		struct device *parent, int domain, int bus,
->  		struct list_head *resources)
-> @@ -33,6 +52,7 @@ struct pci_host_bridge *pci_create_host_bridge(
->  
->  	host->dev.parent = parent;
->  	INIT_LIST_HEAD(&host->windows);
-> +	pci_host_update_busn_res(host, bus, resources);
->  	resource_list_for_each_entry_safe(window, n, resources)
->  		list_move_tail(&window->node, &host->windows);
->  	/*
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 9bc4784..d5a12d9 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -2022,6 +2022,12 @@ int pci_bus_update_busn_res_end(struct pci_bus *b, int bus_max)
->  	return ret;
->  }
->  
-> +static void pci_host_update_busn_res_end(
-> +		struct pci_host_bridge *host, int max)
-> +{
-> +	host->busn_res.end = max;
-> +}
-> +
->  void pci_bus_release_busn_res(struct pci_bus *b)
->  {
->  	struct resource *res = &b->busn_res;
-> @@ -2040,32 +2046,20 @@ static struct pci_bus *__pci_scan_root_bus(int bus,
->  		struct pci_host_bridge *host, struct pci_ops *ops,
->  		void *sysdata)
->  {
-> -	struct resource_entry *window;
-> -	bool found = false;
->  	struct pci_bus *b;
->  	int max;
->  
-> -	resource_list_for_each_entry(window, &host->windows)
-> -		if (window->res->flags & IORESOURCE_BUS) {
-> -			found = true;
-> -			break;
-> -		}
-> -
->  	b = __pci_create_root_bus(bus, host, ops, sysdata);
->  	if (!b)
->  		return NULL;
->  
-> -	if (!found) {
-> -		dev_info(&b->dev,
-> -		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-> -			bus);
-> -		pci_bus_insert_busn_res(b, bus, 255);
-> -	}
-> -
->  	max = pci_scan_child_bus(b);
->  
-> -	if (!found)
-> +	/* If default busn resource used, update the max bus number */
-> +	if (host->busn_res.flags & IORESOURCE_BUS) {
-> +		pci_host_update_busn_res_end(host, max);
->  		pci_bus_update_busn_res_end(b, max);
-> +	}
->  
->  	return b;
->  }
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 1542df8..f189dfb 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -404,6 +404,8 @@ struct pci_host_bridge {
->  	int domain;
->  	struct device dev;
->  	struct pci_bus *bus;		/* root bus */
-> +	/* we use default bus resource if no bus resource provided */
-> +	struct resource busn_res;
-
-I don't understand the need for another busn_res here.  The host bridge bus
-range should be identical to the root bus range.  Having two copies will
-confuse things.
-
-And apparently this host->busn_res is only filled in if the arch doesn't
-provide a busn resource?
-
-To check for conflicts between host bridges, can you iterate through the
-existing ones and check the range of their root buses?
-
->  	struct list_head windows;	/* resource_entry */
->  	void (*release_fn)(struct pci_host_bridge *);
->  	void *release_data;
-> -- 
-> 1.7.1
+> Jason,
 > 
+> As we talked, please keep your irqchip/vybrid branch stable.  Thanks.
+> 
+> Shawn
+> 
+> 
+> The following changes since commit c5455f708b968dc462a292ba99da0d17100461d8:
+> 
+>   Merge remote-tracking branch 'jcooper/irqchip/vybrid' into imx/dt
+> (2015-03-30 16:37:21 +0800)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+> tags/imx-dt-4.1
+> 
+> for you to fetch changes up to 8e047c120fb2ccb7b7aba8f5e9224e463f86bebc:
+> 
+>   ARM: dts: hummingboard: add sgtl5000 support for Hummingboard Pro
+> (2015-03-30 20:57:42 +0800)
+> 
+> ----------------------------------------------------------------
+> The i.MX device tree updates for 4.1:
+>  - Convert GPC controller to use stacked interrupt domains
+>  - Add power domain descriptions for i.MX6 platforms
+>  - Improve i.MX25 pin function defines
+>  - Disable PWM devices in <soc>.dtsi by default and enable it at board
+>    level dts where the device is actually available.
+>  - Define labels for SNVS RTC device to ease the board description,
+>    where an external RTC is available.
+>  - Add dr_mode host setting to all i.MX host-only USB instances
+>  - Support Miscellaneous System Control Module (MSCM) for VF610
+>  - Add initial i.MX6SL WaRP Board support
+>  - Add i.MX6SX SDB revision B board support
+>  - A bunch of imx28-apf28dev board updates, including gpio polarity
+>    correction and CAN, AUART device support.
+>  - SolidRun iMX6 platform updates: dual-license of GPLv2/X11, PWM
+>    setup, PCF8523 RTC, GPIO key and SGTL5000 audio support.
+>  - A number of random device additions for boards: SPI and CAN for
+>    vf-colibri, MAX7310 GPIO expander for imx6qdl-sabreauto and LCD
+>    support for imx25-pdk.
+> 
+> Note: Branch imx/cleanup was merged as the base to solve conflict on
+> imx25 iomux header.  Branch imx/soc was merged as the base to solve
+> conflict on arch/arm/mach-imx/gpc.c.  And Jason Cooper's irqchip/vybrid
+> branch was pulled into the base as a run-time dependency.
+> 
+> ----------------------------------------------------------------
+
+Hi Olof,
+
+I have seen you pulled all other 3 requests except this one.  Anything
+wrong with it?
+
+Shawn
