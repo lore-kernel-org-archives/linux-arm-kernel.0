@@ -1,41 +1,52 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Tue, 07 Apr 2015 13:19:58 +0200
-Subject: [PATCH 0/2] Kbuild: kallsyms: update suffix ignore logic
-In-Reply-To: <CAKv+Gu-HkK96hz7zKQeJfeh2YiRY+qGaWkQdrSn0=n+P0qeHZQ@mail.gmail.com>
-References: <1427721632-11665-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu-HkK96hz7zKQeJfeh2YiRY+qGaWkQdrSn0=n+P0qeHZQ@mail.gmail.com>
-Message-ID: <5523BD5E.8000300@suse.cz>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Tue, 07 Apr 2015 13:37:01 +0200
+Subject: [PATCH v2 0/4] arm: tegra: implement NVEC driver using tegrai2c.
+In-Reply-To: <20150403194635.GC2016@katana>
+References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
+ <20150403194635.GC2016@katana>
+Message-ID: <1549160.njMIY2NVTi@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 7.4.2015 v 11:02 Ard Biesheuvel napsal(a):
-> On 30 March 2015 at 15:20, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> Two patches that update the kallsyms ignore logic.
->>
->> Patch #1 adds logic to introduce symbols whose names end in (or equal)
->> "_veneer". This prevent kallsyms generation errors on large ARM kernels
->> where the emitted veneers will be different between the first and second
->> pass, due to the fact that the size of the kallsyms region itself pushes
->> the .text and .init.text sections further apart during the second pass.
->>
->> Patch #2 removes the handling of the "gcc[0-9]_compiled." symbol. It was
->> only ever emitted by GCC v2.x which we don't support anymore anyway.
->>
->> This series is a followup to ' [RFC PATCH 0/2] ARM large kernels'
->> (http://thread.gmane.org/gmane.linux.kbuild.devel/13065), but the
->> other issue addressed by patch #2 of that series will be deferred
->> for now.
->>
->> Ard Biesheuvel (2):
->>   Kbuild: kallsyms: ignore veneers emitted by the ARM linker
->>   Kbuild: kallsyms: drop special handling of pre-3.0 GCC symbols
->>
->>  scripts/kallsyms.c | 29 ++++++++++++++++++++---------
->>  1 file changed, 20 insertions(+), 9 deletions(-)
->>
+Hi Wolfram,
+
+Am Freitag, 3. April 2015, 21:46:35 schrieb Wolfram Sang:
+> On Mon, Mar 30, 2015 at 11:00:11PM +0300, Andrey Danin wrote:
+> > NVEC driver contains code to manage tegra i2c controller in slave mode.
+> > I2C slave support was implemented in linux kernel. The goal of this
+> > patch serie is to implement I2C slave mode in tegra drived and rework
+> > NVEC driver to use it.
 > 
-> Ping?
+> Thanks. Looks pretty good already. If being I2C slave was the reason for
+> this driver being in staging, we soon need to think of a proper place
+> outside staging.
 
-Applied to kbuild.git#kbuild.
+yes, moving the low level i2c functions out to the bus driver was our major 
+concern. But there are still some minor things left before before we can move 
+out of staging.
 
-Michal
+One thing where we need your help as a I2C maintainer is how to represent an 
+i2c slave device using device-tree. You may remember our discussion in the 
+past from here [1] where you suggested to just make a slave client by its 
+compatible name. Stephen Warren from NVIDIA raised some concerns about this 
+solution because it may not be appropriate in all possible future cases (which 
+is what a proper device-tree representation should take care off). He instead 
+suggested to mark a slave client by adding some flag to the reg property, to 
+be able to handle a situation where both master client and slave client have 
+the same i2c bus address forming a loopback (e.g. for testing purpose) on the 
+same bus. More details here [2].
+
+I hope with this post I can join the different discussions somehow so we are 
+able to find a common sense which is acceptable for all.
+
+Marc
+
+[1] http://lkml.iu.edu/hypermail/linux/kernel/1409.1/03446.html
+[2] https://lists.launchpad.net/ac100/msg01361.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/330e1c96/attachment.sig>
