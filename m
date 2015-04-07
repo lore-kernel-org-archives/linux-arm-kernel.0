@@ -1,179 +1,35 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 07 Apr 2015 21:09:38 +0100
-Subject: [PATCH v4 04/10] eeprom: Add a simple EEPROM framework for eeprom
- consumers
-In-Reply-To: <20150407184533.GA10278@codeaurora.org>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1427752670-17219-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20150407184533.GA10278@codeaurora.org>
-Message-ID: <55243982.7020907@linaro.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 7 Apr 2015 13:17:40 -0700
+Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid
+ ICE in gcc 4.7.3
+In-Reply-To: <CAMAWPa_YEJDQc=_60_sPqzwLYN8Yefzcko_rydxrt8oOCq20gw@mail.gmail.com>
+References: <20150324004537.GA24816@verge.net.au>
+ <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
+ <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
+ <20150326133631.GB2805@arm.com>
+ <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
+ <20150327002554.GA5527@verge.net.au>
+ <20150327100612.GB1562@arm.com>
+ <7hbnj99epe.fsf@deeprootsystems.com>
+ <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
+ <7h8uec95t2.fsf@deeprootsystems.com>
+ <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
+ <551BBEC5.7070801@arm.com>
+ <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
+ <7hwq1v4iq4.fsf@deeprootsystems.com>
+ <CAMAWPa_YEJDQc=_60_sPqzwLYN8Yefzcko_rydxrt8oOCq20gw@mail.gmail.com>
+Message-ID: <20150407131740.ac8a856537fecb1b5d142f5f@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Stephen for review,
+On Tue, 7 Apr 2015 10:57:52 -0700 Kevin Hilman <khilman@kernel.org> wrote:
 
-On 07/04/15 19:45, Stephen Boyd wrote:
-> On 03/30, Srinivas Kandagatla wrote:
->> @@ -130,6 +138,37 @@ static struct class eeprom_class = {
->>   	.dev_release	= eeprom_release,
->>   };
->>
->> +static int of_eeprom_match(struct device *dev, const void *eeprom_np)
->> +{
->> +	return dev->of_node == eeprom_np;
->> +}
->> +
->> +static struct eeprom_device *of_eeprom_find(struct device_node *eeprom_np)
->> +{
->> +	struct device *d;
->> +
->> +	if (!eeprom_np)
->> +		return NULL;
->> +
->> +	d = class_find_device(&eeprom_class, NULL, eeprom_np, of_eeprom_match);
->> +
->> +	return d ? to_eeprom(d) : NULL;
->> +}
->> +
->> +static int eeprom_match(struct device *dev, const void *data)
->> +{
->> +	return !strcmp(dev_name(dev), (const char *)data);
->
-> Is this cast necessary?
-May be an over do here, I will fix it.
->
->> +}
->> +
->> +static struct eeprom_device *eeprom_find(const char *name)
->> +{
->> +	struct device *d;
->> +
->> +	d = class_find_device(&eeprom_class, NULL, (void *)name, eeprom_match);
->
-> Is this cast necessary?
+> > The diff below[2] on top of yours compiles fine here and at least covers
+> > the compilers I *know* to trigger the ICE.
+> 
+> I see my fix in your mmots since last Thurs (4/2), but it's not in
+> mmotm (last updated today) so today's linux-next still has the ICE for
+> anything other than gcc-4.7.3.   Just checking to see when you plan to
+> update mmotm.
 
-I Will fix it in next version.
->
->> +
->> +	return d ? to_eeprom(d) : NULL;
->> +}
->> +
->>   /**
->>    * eeprom_register(): Register a eeprom device for given eeprom.
->>    * Also creates an binary entry in /sys/class/eeprom/name-id/eeprom
->> +
->> +/**
->> + * eeprom_cell_get(): Get eeprom cell of device form a given eeprom name
->
-> s/form/from/
-
-Will fix this in next version.
->
->> + * and blocks.
->> + *
->> + * @ename: eeprom device name that needs to be looked-up.
->> + * @blocks: eeprom blocks containing offset and length information.
->> + * @nblocks: number of eeprom blocks.
->> + *
->> + * The return value will be an ERR_PTR() on error or a valid pointer
->> + * to a struct eeprom_cell.  The eeprom_cell will be freed by the
->> + * eeprom_cell_put().
->> + */
->> +struct eeprom_cell *eeprom_cell_get(const char *ename,
->> +				    struct eeprom_block *blocks, int nblocks)
->> +{
->> +	return __eeprom_cell_get(NULL, ename, blocks, nblocks);
->> +}
->> +EXPORT_SYMBOL_GPL(eeprom_cell_get);
->> +
->> +/**
->> + * of_eeprom_cell_get(): Get eeprom cell of device form a given index
->
-> s/form/from/
->
-Ok,
->> + *
->> + * @dev node: Device tree node that uses the eeprom cell
->> +
->> +#ifndef _LINUX_EEPROM_CONSUMER_H
->> +#define _LINUX_EEPROM_CONSUMER_H
->> +
->> +struct eeprom_cell;
->> +
->> +struct eeprom_block {
->> +	loff_t offset;
->> +	size_t count;
->> +};
->> +#if IS_ENABLED(CONFIG_EEPROM)
->> +struct eeprom_cell *eeprom_cell_get(const char *ename,
->> +				    struct eeprom_block *blocks, int nblocks);
->> +void eeprom_cell_put(struct eeprom_cell *cell);
->> +char *eeprom_cell_read(struct eeprom_cell *cell, ssize_t *len);
->> +int eeprom_cell_write(struct eeprom_cell *cell, const char *buf, ssize_t len);
-> [...]
->> +
->> +#if IS_ENABLED(CONFIG_EEPROM) && IS_ENABLED(CONFIG_OF)
->> +struct eeprom_cell *of_eeprom_cell_get(struct device_node *dev,
->> +				       const char *property);
->> +#else
->> +static inline struct eeprom_cell *of_eeprom_cell_get(struct device_node *np,
->> +						     const char *property)
->> +{
->> +	return ERR_PTR(-ENOSYS);
->> +}
->> +#endif
->> +#endif  /* ifndef _LINUX_EEPROM_CONSUMER_H */
->
-> Do you have an overview of how to use these APIs? Maybe some
-> Documentation/ is in order? I'm mostly interested in how the
-> blocks array is supposed to work and how this hooks up to drivers
-> that are using DT.
-
-Only doc ATM is function level kernel doc in c file.
-May be I can explain you for now and I will try to add some 
-documentation with some usage examples in next version.
-
-eeprom block array is just another way intended to get hold of eeprom 
-content for non-DT providers/consumers, but DT consumers/providers can 
-also use it. As of today SOC/mach level code could use it as well.
-
-In eeprom_cell_get() case the lookup of provider is done based on 
-provider name, this provider name is generally supplied by all the 
-providers (both DT/non DT).
-
-for example in qfprom case,
-provider is registered from DT with eeprom config containing a unique name:
-static struct eeprom_config econfig = {
-	.name = "qfprom",
-	.id = 0,
-};
-
-In the consumer case, the tsens driver could do some like in non DT way:
-
-	struct eeprom_block blocks[4] ={
-		{
-		.offset = 0x404,
-		.count = 0x4,
-		},
-		{
-		.offset = 0x408,
-		.count = 0x4,
-		},
-		{
-		.offset = 0x40c,
-		.count = 0x4,
-		},
-		{
-		.offset = 0x410,
-		.count = 0x4,
-		},
-	};
-	calib_cell = eeprom_cell_get("qfprom0", blocks, 4);
-
-
-Or in DT way
-calib_cell  = of_eeprom_cell_get(np, "calib");
-
-
---srini
->
+It should all be there today?
