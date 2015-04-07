@@ -1,102 +1,219 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Apr 2015 12:17:57 +0200
-Subject: [PATCH] sunxi: a10-lime: add regulator nodes
-In-Reply-To: <20150404184716.GZ6023@sirena.org.uk>
-References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
- <55169622.5070007@gmail.com> <20150330222311.GY23664@lukather>
- <CABxcv=nCROiQ2COrTmnwvhtSJzh83BWKaxgn0EkFuwW8HqSiQw@mail.gmail.com>
- <20150404123302.GY6023@sirena.org.uk>
- <20150404125645.GK14618@lukather>
- <20150404184716.GZ6023@sirena.org.uk>
-Message-ID: <20150407101757.GC15823@lukather>
+Date: Tue, 7 Apr 2015 11:38:38 +0200
+Subject: [GIT PULL] Allwinner DT changes for 4.1, bis
+Message-ID: <20150407093838.GA27828@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 04, 2015 at 07:47:16PM +0100, Mark Brown wrote:
-> On Sat, Apr 04, 2015 at 02:56:45PM +0200, Maxime Ripard wrote:
-> > On Sat, Apr 04, 2015 at 01:33:02PM +0100, Mark Brown wrote:
-> 
-> > > This is broken - think about what this means.  If you are defining a
-> > > voltage (or any other constraint) you're saying that it's safe to use on
-> > > a given board. If you provide a voltage constraint saying that the
-> > > maximum allowable range for a voltage regulator is safe.  That's
-> > > unlikely to be true on any given board, usually only a limited set of
-> > > regulators can vary voltages at runtime safely at all and then rarely
-> > > over their full supported range.  Similarly for other constraints, for
-> > > example allowing a regulator to be disabled when there are driverless
-> > > things (or drivers without regulator support or mappings for that board)
-> > > relying on it is going to break.
-> 
-> > If this model is broken, then I don't see how the full regulator
-> > support is not broken.
-> 
-> > Our PMIC DTSI sets up the regulators with the ranges supported by the
-> > PMIC. We have two cases then:
-> >   - Either the regulator is not used on the board, and it will be
-> >     disabled by the framework.
-> 
-> Or the regulator is used by some passive component on the board that
-> doesn't appear in DT (or some driver that doesn't yet have DT support
-> doesn't claim the regulator) and it gets switched off.  Or we power it
-> off and then later discover that we've been placing physical stress on
-> the system.
+Hi Arnd, Kevin, Olof,
 
-Isn't that what the regulator-always-on property is here for?
+Since my previous DT pull request apparently got dropped, here is the
+new iteration of it.
 
-> >   - Or the regulator is actually used on the board, it will be defined
-> >     in the DTS, possibly with additional constraints.
-> 
-> Especially for voltage range constraints you're assuming that every
-> system integrator will get everything right from their initial attempt
-> to power up Linux onwards and will anticipate future enhancements to the
-> drivers which try to vary voltages.  For any given design you can pretty
-> much guarantee that the electrical engineers would not approve of
-> software making use of the maximum allowable voltage variation but that
-> is what you're proposing to enable.  That is clearly not a sensible or
-> reasonable default, the best we can do is just not vary the voltage and
-> let the system integrator say if it's safe to do so.
-> 
-> Just listing the regulators is less likely to be an issue, it's more
-> just not particularly useful than anything else, though it can
-> potentially cause long term stresses too.
+The patches that introduced the dependency on the clock branch got
+dropped, and will be sent as part of a later rc, since they qualify as
+fixes, and this branch has been rebased on top of my fixes branch for
+4.0 to remove any merge conflict.
 
-My bad, that's actually just what we are doing, plus defining the
-regulators that are at a fixed voltage and can't be disabled.
+These patches have all been in linux-next since the day they got
+merged, so even though the pull request is now quite late, they have
+been merge, build and boot tested extensively now.
 
-> Providing .dtsis for reference designs can make sense, if there's a
-> widely cloned board with lots of common design elements then reusing
-> that .dtsi is fine but clearly that .dtsi isn't going to enable the full
-> flexibility of the regulators since there will be constraints from that
-> reference design.
-
-That PMIC is used with various SoCs, so that's not really an
-option. And especially when it comes to regulators, I don't think
-there's really a pattern that emerged yet...
-
-> > I really don't see how your above comments apply to that
-> > situation. What I do see though, is that if we drop the DTSI, all our
-> > boards will have to define all the PMIC regulators, even if they're
-> > not used at all on the board, just to have the right behaviour. And
-> > that's clearly a no-go for me.
-> 
-> Nothing else is safe.  Remember, if we get this wrong we risk system
-> instability and at worst physical damage to the system either in rare
-> cases immediately due to getting something badly wrong or more likely
-> from long term electrical stresses.  If what you were proposing were
-> safe then we should still not be enumerating everything in device trees,
-> we should just be enabling all operations for every regulator in the
-> system by default.  The fact that you have to override this should be a
-> warning sign that you shouldn't be doing it.
-
-Well, we're doing low level stuff and (from experience) things like a
-poor muxing option can cause physical damage too, and we don't have
-any kind of protection or policy against that.
-
-So, what do you suggest for the kernel to have a behaviour independant
-of what the bootloader state was, without adding a lot of churn in
-each and every DTS?
-
+Thanks,
 Maxime
+
+The following changes since commit 370a9b5fb04a0d5cc7b7699c788616d6976f4476:
+
+  ARM: dts: sunxi: Remove overclocked/overvoltaged OPP (2015-03-24 14:50:38 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.1-bis
+
+for you to fetch changes up to 16abf5f87a7a427fc188c3f79a4be7f0de9693bb:
+
+  ARM: dts: sun7i: Add dts file for the Orangepi mini SBC (2015-04-07 09:46:56 +0200)
+
+----------------------------------------------------------------
+Allwinner DT additions for 4.1, bis
+
+All the device tree related changes for the 4.1 merge window.
+
+It has a rather big diffstat, because of a lot of mechanical and harmless
+changes, as described below.
+
+There is mostly:
+  - The end of the DT relicensing. All our DT should now be under the dual
+    X11/GPL license.
+  - Convertion of all the DT to a label based syntax, instead of duplicating
+    the tree like was done before.
+  - Rework of the A10s and A13 DTSI to share the common devices
+  - CPUfreq support for the A31
+  - A few drivers enablings: A80 USB, the A31 PMIC, A31 and A23 arch timers,
+    SRAM controller for the sun4i/sun5i/sun7i, etc.
+  - A few new boards : cubieboard4, mele i7, utoo p66, auxtex t004, pcduino3
+    nano, gemei G9, orange pi, orange pi mini
+
+----------------------------------------------------------------
+Adam Sampson (1):
+      ARM: dts: sun7i: Add dts file for pcDuino 3 Nano board
+
+Aleksei Mamlin (2):
+      ARM: dts: sun7i: Add dts file for Wexler TAB7200
+      dt-bindings: Add vendor-prefix for Wexler
+
+Boris BREZILLON (1):
+      ARM: dts: sun6i: add p2wi controller node to dtsi
+
+Chen-Yu Tsai (16):
+      ARM: dts: sun9i: Add usb clock nodes to a80 dtsi
+      ARM: dts: sun9i: Add usb phy nodes to a80 dtsi
+      ARM: dts: sun9i: Add USB host controller nodes to a80 dtsi
+      ARM: dts: sun9i: Enable USB support on A80 Optimus board
+      ARM: dts: sun6i: hummingbird: Enable IR receiver
+      ARM: dts: sun6i: hummingbird: Enable P2WI controller
+      ARM: dts: sun6i: hummingbird: Add AXP221 PMIC device node
+      ARM: dts: sun6i: hummingbird: Add AXP221 regulator nodes
+      ARM: dts: sun6i: Add pinmux settings for mmc1 to dtsi
+      ARM: dts: sun6i: hummingbird: Enable the onboard WiFi module
+      ARM: dts: sun8i: Enable ARM architected timer on A23
+      ARM: dts: sun9i: Enable ARM architected timer on A80
+      ARM: dts: sun9i: optimus: Switch to phy core regulator bindings for usb phys
+      ARM: dts: sun6i: Add cpu clock reference and operating points to dtsi
+      ARM: dts: sun6i: Add cpu thermal zones to dtsi
+      ARM: sun8i: dt: Enable A23 SMP support
+
+Hans de Goede (14):
+      ARM: dts: sun4i: Enable tablet keys on Chuwi V7 CW0825
+      ARM: dts: sun5i: Stop using different compatibles for ehci/ohci on a13 vs a10s
+      ARM: dts: sun5i: Add mmc2 pinmux settings
+      ARM: dts: sun5i: Add new Auxtek-t004 board
+      ARM: dts: sun5i: Add new Utoo P66 board
+      ARM: dts: sunxi: Adjust touchscreen compatible for sun5i and later
+      ARM: dts: sunxi: Add address- and size-cells properties to the mmc ctrl nodes
+      ARM: dts: sun7i: Add OOB irq support to boards with broadcom sdio wifi
+      ARM: dts: sun6i: csq cs908 dts cleanup
+      ARM: dts: sun5i: Add broken-hpi property for Utoo-P66 eMMC
+      ARM: dts: sun4i: Add A10 SRAM and SRAM controller
+      ARM: dts: sun5i: Add A13 and A10s SRAM and SRAM controller
+      ARM: dts: sun7i: Add dts file for the Orangepi SBC
+      ARM: dts: sun7i: Add dts file for the Orangepi mini SBC
+
+Marcus Cooper (1):
+      ARM: sun6i: dt: Add new Mele I7 device
+
+Maxime Ripard (36):
+      ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
+      ARM: sun5i: Relicense the A10s/A13 DTSI under GPLv2/X11
+      ARM: sun7i: hummingbird: Relicense the device tree under GPLv2/X11
+      ARM: sun7i: olinuxino micro: Relicense the device tree under GPLv2/X11
+      ARM: sun5i: Add a DTSI common to A10s and A13
+      ARM: sun5i: a13: Move to the common sun5i DTSI
+      ARM: sun5i: a10s: Move to the common sun5i DTSI
+      ARM: sun4i: a1000: Convert to DT label based syntax
+      ARM: sun4i: ba10 tvbox: Convert to DT label based syntax
+      ARM: sun4i: cubieboard: Convert to DT label based syntax
+      ARM: sun4i: hackberry: Convert to DT label based syntax
+      ARM: sun4i: inet97fv2: Convert to DT label based syntax
+      ARM: sun4i: mini xplus: Convert to DT label based syntax
+      ARM: sun4i: olinuxino lime: Convert to DT label based syntax
+      ARM: sun4i: pcduino: Convert to DT label based syntax
+      ARM: sun5i: a10s: olinuxino micro: Convert to DT label based syntax
+      ARM: sun5i: a10s: r7 tv dongle: Convert to DT label based syntax
+      ARM: sun5i: a13: hsg h702: Convert to DT label based syntax
+      ARM: sun5i: a13: olinuxino micro: Convert to DT label based syntax
+      ARM: sun5i: a13: olinuxino: Convert to DT label based syntax
+      ARM: sun6i: app4 evb1: Convert to DT label based syntax
+      ARM: sun6i: colombus: Convert to DT label based syntax
+      ARM: sun6i: m9: Convert to DT label based syntax
+      ARM: sun7i: bananapi: Convert to DT label based syntax
+      ARM: sun7i: cubieboard2: Convert to DT label based syntax
+      ARM: sun7i: cubietruck: Convert to DT label based syntax
+      ARM: sun7i: hummingbird: Convert to DT label based syntax
+      ARM: sun7i: i12 tvbox: Convert to DT label based syntax
+      ARM: sun7i: m3: Convert to DT label based syntax
+      ARM: sun7i: olinuxino lime: Convert to DT label based syntax
+      ARM: sun7i: olinuxino lime2: Convert to DT label based syntax
+      ARM: sun7i: olinuxino micro: Convert to DT label based syntax
+      ARM: sun7i: pcduino3: Convert to DT label based syntax
+      ARM: sun8i: ippo q8h v5: Convert to DT label based syntax
+      ARM: sunxi: DT: Add stdout-path property
+      ARM: dts: sun7i: Add A20 SRAM and SRAM controller
+
+Priit Laes (1):
+      ARM: dts: sun4i: Add initial dts for Gemei G9 tablet
+
+Tyler Baker (2):
+      ARM: dts: add vendor prefix for cubietech
+      ARM: dts: add cubietech cubieboard4
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |  21 +-
+ arch/arm/boot/dts/sun4i-a10-a1000.dts              | 202 +++----
+ arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts         | 176 +++---
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts    |  35 ++
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         | 216 +++----
+ arch/arm/boot/dts/sun4i-a10-gemei-g9.dts           | 176 ++++++
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts          | 191 +++----
+ arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts       |   8 +
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts          | 118 ++--
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts          |   8 +
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts         | 144 ++---
+ arch/arm/boot/dts/sun4i-a10-mk802.dts              |   8 +
+ arch/arm/boot/dts/sun4i-a10-mk802ii.dts            |   8 +
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts     | 219 ++++----
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts            | 180 +++---
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |  88 ++-
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts       | 159 ++++++
+ arch/arm/boot/dts/sun5i-a10s-mk802.dts             |   8 +
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts   | 319 +++++------
+ arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts      | 134 ++---
+ arch/arm/boot/dts/sun5i-a10s.dtsi                  | 620 +++------------------
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts           | 138 ++---
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts    | 150 ++---
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          | 240 ++++----
+ arch/arm/boot/dts/sun5i-a13-utoo-p66.dts           | 209 +++++++
+ arch/arm/boot/dts/sun5i-a13.dtsi                   | 594 +++-----------------
+ arch/arm/boot/dts/sun5i.dtsi                       | 611 ++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts          |  58 +-
+ arch/arm/boot/dts/sun6i-a31-colombus.dts           | 140 ++---
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts        | 103 +++-
+ arch/arm/boot/dts/sun6i-a31-i7.dts                 | 154 +++++
+ arch/arm/boot/dts/sun6i-a31-m9.dts                 | 154 ++---
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |  84 ++-
+ arch/arm/boot/dts/sun6i-a31s-cs908.dts             |  43 +-
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts           | 264 ++++-----
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts          |  10 +
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        | 200 +++----
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         | 326 +++++------
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts        | 430 +++++++-------
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts          | 262 ++++-----
+ arch/arm/boot/dts/sun7i-a20-m3.dts                 | 186 ++++---
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts     | 192 +++----
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    | 296 +++++-----
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    | 414 +++++++-------
+ arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts      | 255 +++++++++
+ arch/arm/boot/dts/sun7i-a20-orangepi.dts           | 233 ++++++++
+ arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts      | 199 +++++++
+ arch/arm/boot/dts/sun7i-a20-pcduino3.dts           | 212 +++----
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts     | 188 +++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |  44 +-
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts        | 112 ++--
+ arch/arm/boot/dts/sun8i-a23.dtsi                   |  22 +
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        |  99 ++++
+ arch/arm/boot/dts/sun9i-a80-optimus.dts            |  67 ++-
+ arch/arm/boot/dts/sun9i-a80.dtsi                   | 132 +++++
+ 56 files changed, 6015 insertions(+), 3846 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
+ create mode 100644 arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts
+ create mode 100644 arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+ create mode 100644 arch/arm/boot/dts/sun5i.dtsi
+ create mode 100644 arch/arm/boot/dts/sun6i-a31-i7.dts
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-orangepi.dts
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+ create mode 100644 arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
 
 -- 
 Maxime Ripard, Free Electrons
@@ -108,4 +225,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/f828df80/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/c95996ea/attachment-0001.sig>
