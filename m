@@ -1,75 +1,196 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 7 Apr 2015 10:57:52 -0700
-Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid ICE
- in gcc 4.7.3
-In-Reply-To: <7hwq1v4iq4.fsf@deeprootsystems.com>
-References: <20150324004537.GA24816@verge.net.au>
- <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
- <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
- <20150326133631.GB2805@arm.com>
- <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
- <20150327002554.GA5527@verge.net.au>
- <20150327100612.GB1562@arm.com>
- <7hbnj99epe.fsf@deeprootsystems.com>
- <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
- <7h8uec95t2.fsf@deeprootsystems.com>
- <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
- <551BBEC5.7070801@arm.com>
- <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
- <7hwq1v4iq4.fsf@deeprootsystems.com>
-Message-ID: <CAMAWPa_YEJDQc=_60_sPqzwLYN8Yefzcko_rydxrt8oOCq20gw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 07 Apr 2015 10:58:00 -0700
+Subject: [PATCH v4] ARM: smp: Only expose /sys/.../cpuX/online if
+ hotpluggable
+In-Reply-To: <CANMBJr4OrCL61Z__Xy2ZRj9zUS=nsj3iNezB1dpc-154buXr7A@mail.gmail.com>
+References: <1428351853-5844-1-git-send-email-sboyd@codeaurora.org>
+ <CANMBJr4OrCL61Z__Xy2ZRj9zUS=nsj3iNezB1dpc-154buXr7A@mail.gmail.com>
+Message-ID: <55241AA8.8060208@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Wed, Apr 1, 2015 at 2:54 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Andrew Morton <akpm@linux-foundation.org> writes:
+On 04/07/15 09:18, Tyler Baker wrote:
+> Hi Stephen,
 >
->> On Wed, 01 Apr 2015 10:47:49 +0100 Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 6 April 2015 at 13:24, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> Writes to /sys/.../cpuX/online fail if we determine the platform
+>> doesn't support hotplug for that CPU. Furthermore, if the cpu_die
+>> op isn't specified the system hangs when we try to offline a CPU
+>> and it comes right back online unexpectedly. Let's figure this
+>> stuff out before we make the sysfs nodes so that the online file
+>> doesn't even exist if it isn't (at least sometimes) possible to
+>> hotplug the CPU.
 >>
->>> > -static int unmap_and_move(new_page_t get_new_page, free_page_t put_new_page,
->>> > -                  unsigned long private, struct page *page, int force,
->>> > -                  enum migrate_mode mode)
->>> > +static noinline int unmap_and_move(new_page_t get_new_page,
->>> > +                             free_page_t put_new_page,
->>> > +                             unsigned long private, struct page *page,
->>> > +                             int force, enum migrate_mode mode)
->>> >  {
->>> >    int rc = 0;
->>> >    int *result = NULL;
->>> >
->>>
->>> Ouch. That's really ugly. And on 32bit ARM, we end-up spilling half of
->>> the parameters on the stack, which is not going to help performance
->>> either (not that this would be useful on 32bit ARM anyway...).
->>>
->>> Any chance you could make this dependent on some compiler detection
->>> mechanism?
+>> Add a new 'cpu_can_disable' op and repoint all 'cpu_disable'
+>> implementations at it because all implementers use the op to
+>> indicate if a CPU can be hotplugged or not in a static fashion.
+>> With PSCI we may need to add a 'cpu_disable' op so that the
+>> secure OS can be migrated off the CPU we're trying to hotplug.
+>> In this case, the 'cpu_can_disable' op will indicate that all
+>> CPUs are hotpluggable by returning true, but the 'cpu_disable' op
+>> will make a PSCI migration call and occasionally fail, denying
+>> the hotplug of a CPU. This shouldn't be any worse than x86 where
+>> we may indicate that all CPUs are hotpluggable but occasionally
+>> we can't offline a CPU due to check_irq_vectors_for_cpu_disable()
+>> failing to find a CPU to move vectors to.
 >>
->> With my arm compiler (gcc-4.4.4) the patch makes no difference -
->> unmap_and_move() isn't being inlined anyway.
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Nicolas Pitre <nico@linaro.org>
+>> Cc: Dave Martin <Dave.Martin@arm.com>
+>> Cc: Simon Horman <horms@verge.net.au>
+>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>> Cc: <linux-sh@vger.kernel.org>
+>> Cc: Tyler Baker <tyler.baker@linaro.org>
+>> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
 >>
->> How does this look?
+>> Changes since v3:
+>>  * Return bool instead of int from 'cpu_can_disable' op
 >>
->> Kevin, could you please retest?  I might have fat-fingered something...
+>> Changes since v2:
+>>  * Left cpu_disable op in place
+>>  * Split out shmobile function deletion
+>>
+>>  arch/arm/common/mcpm_platsmp.c       | 12 ++++--------
+>>  arch/arm/include/asm/smp.h           | 10 ++++++++++
+>>  arch/arm/kernel/setup.c              |  2 +-
+>>  arch/arm/kernel/smp.c                | 15 ++++++++++++++-
+>>  arch/arm/mach-shmobile/common.h      |  2 +-
+>>  arch/arm/mach-shmobile/platsmp.c     |  4 ++--
+>>  arch/arm/mach-shmobile/smp-r8a7790.c |  2 +-
+>>  arch/arm/mach-shmobile/smp-r8a7791.c |  2 +-
+>>  arch/arm/mach-shmobile/smp-sh73a0.c  |  2 +-
+>>  9 files changed, 35 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
+>> index 92e54d7c6f46..2b25b6038f66 100644
+>> --- a/arch/arm/common/mcpm_platsmp.c
+>> +++ b/arch/arm/common/mcpm_platsmp.c
+>> @@ -65,14 +65,10 @@ static int mcpm_cpu_kill(unsigned int cpu)
+>>         return !mcpm_wait_for_cpu_powerdown(pcpu, pcluster);
+>>  }
+>>
+>> -static int mcpm_cpu_disable(unsigned int cpu)
+>> +static bool mcpm_cpu_can_disable(unsigned int cpu)
+>>  {
+>> -       /*
+>> -        * We assume all CPUs may be shut down.
+>> -        * This would be the hook to use for eventual Secure
+>> -        * OS migration requests as described in the PSCI spec.
+>> -        */
+>> -       return 0;
+>> +       /* We assume all CPUs may be shut down. */
+>> +       return true;
+>>  }
+>>
+>>  static void mcpm_cpu_die(unsigned int cpu)
+>> @@ -92,7 +88,7 @@ static struct smp_operations __initdata mcpm_smp_ops = {
+>>         .smp_secondary_init     = mcpm_secondary_init,
+>>  #ifdef CONFIG_HOTPLUG_CPU
+>>         .cpu_kill               = mcpm_cpu_kill,
+>> -       .cpu_disable            = mcpm_cpu_disable,
+>> +       .cpu_can_disable        = mcpm_cpu_can_disable,
+>>         .cpu_die                = mcpm_cpu_die,
+>>  #endif
+>>  };
+>> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+>> index 18f5a554134f..e15856a1a380 100644
+>> --- a/arch/arm/include/asm/smp.h
+>> +++ b/arch/arm/include/asm/smp.h
+>> @@ -104,6 +104,7 @@ struct smp_operations {
+>>  #ifdef CONFIG_HOTPLUG_CPU
+>>         int  (*cpu_kill)(unsigned int cpu);
+>>         void (*cpu_die)(unsigned int cpu);
+>> +       bool  (*cpu_can_disable)(unsigned int cpu);
+>>         int  (*cpu_disable)(unsigned int cpu);
+>>  #endif
+>>  #endif
+>> @@ -123,4 +124,13 @@ struct of_cpu_method {
+>>   */
+>>  extern void smp_set_ops(struct smp_operations *);
+>>
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +extern int platform_can_hotplug_cpu(unsigned int cpu);
+>> +#else
+>> +static inline int platform_can_hotplug_cpu(unsigned int cpu)
+>> +{
+>> +       return 0;
+>> +}
+>> +#endif
+>> +
+>>  #endif /* ifndef __ASM_ARM_SMP_H */
+>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> index 6c777e908a24..955d45d0f70c 100644
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>> @@ -992,7 +992,7 @@ static int __init topology_init(void)
+>>
+>>         for_each_possible_cpu(cpu) {
+>>                 struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
+>> -               cpuinfo->cpu.hotpluggable = 1;
+>> +               cpuinfo->cpu.hotpluggable = platform_can_hotplug_cpu(cpu);
+>>                 register_cpu(&cpuinfo->cpu, cpu);
+>>         }
+>>
+> When I tested this patch before I only tried building
+> multi_v7_defconfig (which built fine) however I've added this patch to
+> my to-build branch and sent it through the CI loop. It appears that
+> there quite a few build errors on the other defconfigs[0][1].
 >
-> Your patch on top of Geert's still compiles fine for me with gcc-4.7.3.
-> However, I'm not sure how specific we can be on the versions.
+> ../arch/arm/kernel/setup.c: In function 'topology_init':
+> ../arch/arm/kernel/setup.c:977:3: error: implicit declaration of
+> function 'platform_can_hotplug_cpu'
+> [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+> make[2]: *** [arch/arm/kernel/setup.o] Error 1
 >
-> /me goes to test a few more compilers...   OK...
->
-> ICE: 4.7.1, 4.7.3, 4.8.3
-> OK: 4.6.3, 4.9.2, 4.9.3
->
-> The diff below[2] on top of yours compiles fine here and at least covers
-> the compilers I *know* to trigger the ICE.
 
-I see my fix in your mmots since last Thurs (4/2), but it's not in
-mmotm (last updated today) so today's linux-next still has the ICE for
-anything other than gcc-4.7.3.   Just checking to see when you plan to
-update mmotm.
+Ah right. asm/smp.h is not included unless CONFIG_SMP=y. We can move it
+into smp_plat.h. I'll wait to see if there any other comments before
+sending an update.
 
-Thanks,
+---8<---
 
-Kevin
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index e15856a1a380..2563453d7b37 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -124,13 +124,4 @@ struct of_cpu_method {
+  */
+ extern void smp_set_ops(struct smp_operations *);
+ 
+-#ifdef CONFIG_HOTPLUG_CPU
+-extern int platform_can_hotplug_cpu(unsigned int cpu);
+-#else
+-static inline int platform_can_hotplug_cpu(unsigned int cpu)
+-{
+-	return 0;
+-}
+-#endif
+-
+ #endif /* ifndef __ASM_ARM_SMP_H */
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index 0ad7d490ee6f..ebadc9956ffc 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -106,4 +106,13 @@ static inline u32 mpidr_hash_size(void)
+ 
+ extern int platform_can_cpu_hotplug(void);
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++extern int platform_can_hotplug_cpu(unsigned int cpu);
++#else
++static inline int platform_can_hotplug_cpu(unsigned int cpu)
++{
++	return 0;
++}
++#endif
++
+ #endif
+
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
