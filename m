@@ -1,66 +1,64 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 7 Apr 2015 14:26:56 -0500
-Subject: [PATCH v6 09/15] dt-bindings: Document the STM32 USART bindings
-In-Reply-To: <1428424234-28572-10-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1428424234-28572-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1428424234-28572-10-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <CAL_JsqKiCDrwNq6CiWZvE0kiFT3v9sxvrrK62-JBRMSCvB5PHQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 7 Apr 2015 21:32:15 +0200
+Subject: [PATCH 2/2] ARM: at91/dt: add support for kizboxmini.
+In-Reply-To: <1428415884-30662-3-git-send-email-g.portay@overkiz.com>
+References: <1428415884-30662-1-git-send-email-g.portay@overkiz.com>
+ <1428415884-30662-3-git-send-email-g.portay@overkiz.com>
+Message-ID: <20150407193215.GX20669@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 7, 2015 at 11:30 AM, Maxime Coquelin
-<mcoquelin.stm32@gmail.com> wrote:
-> This adds documentation of device tree bindings for the
-> STM32 USART
->
-> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Hi,
 
-Acked-by: Rob Herring <robh@kernel.org>
-
+On 07/04/2015 at 16:11:24 +0200, Ga?l PORTAY wrote :
+> Add DT file for Kizbox mini board.
+> This board is based on Atmel's AT91SAM9G25 SoC.
+> 
+> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
 > ---
->  .../devicetree/bindings/serial/st,stm32-usart.txt  | 32 ++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/serial/st,stm32-usart.txt
->
-> diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+>  arch/arm/boot/dts/Makefile            |   1 +
+>  arch/arm/boot/dts/at91-kizboxmini.dts | 129 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 130 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index a1c776b..9c11888 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -30,6 +30,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+>  	at91sam9rlek.dtb \
+>  	at91-ariag25.dtb \
+>  	at91-cosino_mega2560.dtb \
+> +	at91-kizboxmini.dtb \
+>  	at91sam9g15ek.dtb \
+>  	at91sam9g25ek.dtb \
+>  	at91sam9g35ek.dtb \
+> diff --git a/arch/arm/boot/dts/at91-kizboxmini.dts b/arch/arm/boot/dts/at91-kizboxmini.dts
 > new file mode 100644
-> index 0000000..8480a76
+> index 0000000..191576c
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-> @@ -0,0 +1,32 @@
-> +* STMicroelectronics STM32 USART
+> +++ b/arch/arm/boot/dts/at91-kizboxmini.dts
+> @@ -0,0 +1,129 @@
+> +/*
+> + * at91-kizboxmini.dts - Device Tree file for Overkiz Kizbox mini board
+> + *
+> + * Copyright (C) 2014 Ga?l PORTAY <g.portay@overkiz.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +/dts-v1/;
+> +#include "at91sam9g25.dtsi"
+> +#include "at91sam9x5.dtsi"
+> +#include <dt-bindings/pwm/pwm.h>
 > +
-> +Required properties:
-> +- compatible: Can be either "st,stm32-usart" or "st,stm32-uart" depending on
-> +whether the device supports synchronous mode.
-> +- reg: The address and length of the peripheral registers space
-> +- interrupts: The interrupt line of the USART instance
-> +- clocks: The input clock of the USART instance
-> +
-> +Optional properties:
-> +- pinctrl: The reference on the pins configuration
-> +- auto-flow-control: bool flag to enable hardware flow control.
-> +
-> +Examples:
-> +usart4: serial at 40004c00 {
-> +       compatible = "st,stm32-uart";
-> +       reg = <0x40004c00 0x400>;
-> +       interrupts = <52>;
-> +       clocks = <&clk_pclk1>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usart4>;
-> +};
-> +
-> +usart2: serial at 40004400 {
-> +       compatible = "st,stm32-usart", "st,stm32-uart";
-> +       reg = <0x40004400 0x400>;
-> +       interrupts = <38>;
-> +       clocks = <&clk_pclk1>;
-> +       auto-flow-control;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usart2 &pinctrl_usart2_rtscts>;
-> +};
-> --
-> 1.9.1
->
+> +/ {
+> +	model = "Overkiz Kizbox mini";
+> +	compatible = "overkiz,kizboxmini", "atmel,at91sam9g25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+
+I would remove "atmel,at91sam9g25ek" and "atmel,at91sam9x5ek". However,
+you could use "atmel,at91sam9g25".
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
