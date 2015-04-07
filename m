@@ -1,126 +1,119 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 7 Apr 2015 14:45:59 +0200
-Subject: [PATCHv2] ARM: mvebu: use 0xf1000000 as internal registers on
- Armada 370 DB
-In-Reply-To: <1428409383-15922-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1428409383-15922-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20150407124559.GB12633@lunn.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 7 Apr 2015 09:54:36 -0300
+Subject: [PATCH v2 1/2] ARM: dts: imx6: factor out pinmux for edm1 module
+In-Reply-To: <1425831960-10259-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1425831960-10259-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <CAOMZO5BG-9O949dXpp+MaR3ezgWmVxesz4mXWknbyHvGakxavA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 02:23:03PM +0200, Thomas Petazzoni wrote:
-> All Marvell EBU SoCs (Kirkwood, Dove, Orion, Armada) have the
-> capability of changing the location of their internal registers (i.e
-> the registers for most hardware blocks inside the SoC). When coming
-> out of reset, the internal registers are mapped at 0xd0000000, but
-> since years and years, the tradition has been to have the internal
-> registers remapped at 0xf1000000 by the bootloader, and Linux has
-> since then assumed that the internal registers for the SoC were
-> located at 0xf1000000 on Kirkwood, Dove, Orion, etc. Linux has never
-> been aware that those registers are remappable (and there is no way to
-> know where they are mapped at runtime, since the register to configure
-> the address of the registers is itself within the internal registers).
-> 
-> Then came the Armada 370 and Armada XP, in which some of the very
-> early silicon steppings had an issue, which forced to use 0xd0000000:
-> the SoC was no longer working properly when the internal registers
-> were remapped at 0xf1000000. This issue is only affecting very early
-> silicon steppings and production steppings are not affected: the issue
-> has been fixed in between.
-> 
-> Since what we (Free Electrons) used to do the initial submission of
-> the Armada 370 and Armada XP platforms was evaluation boards with
-> those very early steppings, we submitted Device Tree that assumed the
-> internal registers were mapped at 0xd0000000. This is the case for
-> Armada 370 DB, Armada XP DB and Armada XP GP.
-> 
-> However, in practice, since Marvell has been shipping the evaluation
-> boards with production steppings of the SoC, they are shipping those
-> boards with bootloaders that remap the registers to 0xf1000000. We
-> have already changed this internal register address to 0xf1000000 for
-> the Armada XP DB in commit 82066bdb5a75 and for the Armada XP GP in
-> commit 91ed32200e6e (both merged in v3.15).
-> 
-> We only recently got our hand on an Armada 370 DB with a production
-> stepping of the SoC, which uses a bootloader that remaps internal
-> registers at 0xf1000000. Therefore, this commit aligns the Armada 370
-> DB to be like the Armada XP DB and Armada XP GP: assume that the
-> internal registers are mapped at 0xf1000000.
-> 
-> We would like to stress out the fact that the usage of 0xd0000000 as
-> the internal register base address was a temporary workaround for
-> early steppings deficiencies, and that the real long-term solution is
-> the usage of 0xf1000000. Having 0xd0000000 is an *accident* in the
-> life of the Marvell platform support in the kernel, as is confirmed by
-> the usage of 0xf1000000 in all previous Marvell platforms (Dove,
-> Kirkwood, Orion).
-> 
-> There are unfortunately a number of commercial devices that continue
-> to use 0xd0000000 even though they use production steppings of the
-> SoC, simply because the vendors of such devices have never bothered
-> using a more recent bootloader version from Marvell. There is not much
-> we can do about it, and we plan on keeping 0xd0000000 in the Device
-> Tree of such devices.
-> 
-> The main reason for remapping the internal registers at 0xf1000000
-> instead of 0xd0000000 is that it leaves more space in the 0 -> 4 GB
-> part of the physical address space for RAM. With registers at
-> 0xd0000000, all RAM between 0xd0000000 to 0xffffffff is lost because
-> it's covered by the I/O registers.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Hi Michael,
 
-Hi Thomas
+On Sun, Mar 8, 2015 at 1:25 PM, Michael Grzeschik
+<m.grzeschik@pengutronix.de> wrote:
+> Thw Wandboard is using the EDM1-CF-IMX6 module which is
+> defined under the edm standard.
+>
+> http://www.edm-standard.org/
+>
+> As this module is used on more boards this patch moves the default
+> pinmux settings into the special file imx6qdl-edm1.dtsi.
+>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 
-Thanks for the extended Change Log.
+Sorry for the delay in testing your patch.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Wandboard does not seem very happy about it:
 
-	  Andrew
+[    7.372909] turning off the locking correctness validator.
+[    7.378430] CPU: 3 PID: 0 Comm: swapper/3 Not tainted
+4.0.0-rc3-10351-g94a600d-dirty #6
+[    7.386460] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[    7.393011] Backtrace:
+[    7.395554] [<80011f0c>] (dump_backtrace) from [<800120a8>]
+(show_stack+0x18/0x1c)
+[    7.403150]  r6:812a8bac r5:00000000 r4:00000000 r3:00000000
+[    7.408983] [<80012090>] (show_stack) from [<80731764>]
+(dump_stack+0x88/0xa4)
+[    7.416256] [<807316dc>] (dump_stack) from [<80062094>]
+(__lock_acquire+0x1858/0x1b84)
+[    7.424198]  r5:00000000 r4:ee0a7e48
+[    7.427870] [<8006083c>] (__lock_acquire) from [<800628ac>]
+(lock_acquire+0x74/0x94)
+[    7.435631]  r10:8007aa28 r9:00000000 r8:00000000 r7:00000001
+r6:8007aa28 r5:60000113
+[    7.443574]  r4:00000000
+[    7.446153] [<80062838>] (lock_acquire) from [<8007aa90>]
+(call_timer_fn+0x68/0xfc)
+[    7.453818]  r7:00000100 r6:00000000 r5:00000001 r4:ee0a7e48
+[    7.459578] [<8007aa28>] (call_timer_fn) from [<8007b3ec>]
+(run_timer_softirq+0x1c4/0x264)
+[    7.467850]  r10:80a5a100 r8:00000000 r7:00000000 r6:ee0a7e88
+r5:ee02e000 r4:ed8b0894
+[    7.475806] [<8007b228>] (run_timer_softirq) from [<8002d97c>]
+(__do_softirq+0x138/0x2c4)
+[    7.483991]  r10:80a5a080 r9:00000100 r8:00000001 r7:80a5a080
+r6:00000001 r5:80a5a084
+[    7.491932]  r4:000000a0
+[    7.494499] [<8002d844>] (__do_softirq) from [<8002de50>]
+(irq_exit+0xc4/0x138)
+[    7.501816]  r10:ee008000 r9:80a5a9c8 r8:00000001 r7:00000000
+r6:80a54d7c r5:80a5aaf8
+[    7.509758]  r4:00000000
+[    7.512330] [<8002dd8c>] (irq_exit) from [<8006c920>]
+(__handle_domain_irq+0x74/0xe4)
+[    7.520168]  r4:00000000 r3:00000133
+[    7.523800] [<8006c8ac>] (__handle_domain_irq) from [<80008798>]
+(gic_handle_irq+0x28/0x68)
+[    7.532159]  r10:8073d49c r8:f4000100 r7:80a5ac6c r6:ee0a7f70
+r5:0000000d r4:f400010c
+[    7.540109] [<80008770>] (gic_handle_irq) from [<80012be4>]
+(__irq_svc+0x44/0x5c)
+[    7.547604] Exception stack(0xee0a7f70 to 0xee0a7fb8)
+[    7.552671] 7f60:                                     00000001
+00000001 00000000 80020720
+[    7.560862] 7f80: 00000000 80a5a97c 80ab9671 00000001 80ab9671
+80a5a9c8 8073d49c ee0a7fc4
+[    7.569052] 7fa0: ee0a7f88 ee0a7fb8 800631a4 8000f8e0 20000113 ffffffff
+[    7.575674]  r8:80ab9671 r7:ee0a7fa4 r6:ffffffff r5:20000113
+r4:8000f8e0 r3:ee076b40
+[    7.583544] [<8000f8b8>] (arch_cpu_idle) from [<8005c524>]
+(cpu_startup_entry+0x154/0x1b8)
+[    7.591829] [<8005c3d0>] (cpu_startup_entry) from [<80014d94>]
+(secondary_start_kernel+0x120/0x13c)
+[    7.600882]  r7:80ab9c20 r3:ee076b40
+[    7.604516] [<80014c74>] (secondary_start_kernel) from [<10008864>]
+(0x10008864)
+[    7.611921]  r5:00000015 r4:7e08806a
+[    7.615577] Unable to handle kernel NULL pointer dereference at
+virtual address 00000000
+[    7.623703] pgd = 80004000
+[    7.626441] [00000000] *pgd=00000000
+[    7.630072] Internal error: Oops: 80000005 [#1] SMP ARM
+[    7.632780] brcmfmac: _brcmf_set_multicast_list: Setting
+BRCMF_C_SET_PROMISC failed, -52
+[    7.634175] brcmfmac: _brcmf_set_multicast_list: Setting
+BRCMF_C_SET_PROMISC failed, -52
+[    7.651495] Sending DHCP requests .
+[    7.654993] Modules linked in:
+[    7.658060] CPU: 3 PID: 0 Comm: swapper/3 Not tainted
+4.0.0-rc3-10351-g94a600d-dirty #6
+[    7.666071] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[    7.672607] task: ee076b40 ti: ee0a6000 task.ti: ee0a6000
+[    7.678013] PC is at 0x0
+[    7.680559] LR is at call_timer_fn+0x70/0xfc
+[    7.684839] pc : [<00000000>]    lr : [<8007aa98>]    psr: 60000113
+[    7.684839] sp : ee0a7e38  ip : ee0a7c4c  fp : ee0a7e7c
+[    7.696324] r10: 8007aa28  r9 : 00000000  r8 : 00000000
+[    7.701557] r7 : 00000100  r6 : 00000000  r5 : 00000001  r4 : ee0a7e48
+[    7.708092] r3 : ee076b40  r2 : ee0a7e00  r1 : ee0a7bbc  r0 : 00000000
+[    7.714630] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
+Segment kernel
+[    7.721946] Control: 10c5387d  Table: 1000404a  DAC: 00000015
+[    7.727699] Process swapper/3 (pid: 0, stack limit = 0xee0a6210)
 
-> ---
-> Changes since v1:
->  - Improved commit log.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-370-db.dts | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-> index e993c46..dede3e7 100644
-> --- a/arch/arm/boot/dts/armada-370-db.dts
-> +++ b/arch/arm/boot/dts/armada-370-db.dts
-> @@ -45,6 +45,15 @@
->   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->   *     OTHER DEALINGS IN THE SOFTWARE.
-> + *
-> + * Note: this Device Tree assumes that the bootloader has remapped the
-> + * internal registers to 0xf1000000 (instead of the default
-> + * 0xd0000000). The 0xf1000000 is the default used by the recent,
-> + * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-> + * boards were delivered with an older version of the bootloader that
-> + * left internal registers mapped at 0xd0000000. If you are in this
-> + * situation, you should either update your bootloader (preferred
-> + * solution) or the below Device Tree should be adjusted.
->   */
->  
->  /dts-v1/;
-> @@ -64,7 +73,7 @@
->  	};
->  
->  	soc {
-> -		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
->  			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
->  
->  		internal-regs {
-> -- 
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+With your patch removed these issues do not happen.
+
+Regards,
+
+Fabio Estevam
