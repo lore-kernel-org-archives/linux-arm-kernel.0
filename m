@@ -1,499 +1,165 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Tue, 7 Apr 2015 18:40:52 +0800
-Subject: [PATCH v3 2/2] thermal: hisilicon: add new hisilicon thermal sensor
- driver
-In-Reply-To: <1428403252-8208-1-git-send-email-kong.kongxinwei@hisilicon.com>
-References: <1428403252-8208-1-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <1428403252-8208-3-git-send-email-kong.kongxinwei@hisilicon.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 07 Apr 2015 12:59:04 +0200
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
+ enabled during suspend
+In-Reply-To: <CAM4voakS8PnatqRTW5gkD0NNKD9gW9Tuv5p-ekxFhKN5NcuBCQ@mail.gmail.com>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>	<1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>	<CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>	<551976F1.1000605@collabora.co.uk>	<CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>	<551AFCCE.4050404@collabora.co.uk>	<551BD07E.2090506@samsung.com>	<551BDA0A.7010704@collabora.co.uk>	<551C2B6D.4010001@samsung.com>	<551C71A5.1070903@collabora.co.uk>
+ <CAM4voakS8PnatqRTW5gkD0NNKD9gW9Tuv5p-ekxFhKN5NcuBCQ@mail.gmail.com>
+Message-ID: <5523B878.8040304@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: kongxinwei <kong.kongxinwei@hisilicon.com>
+Hello Abhilash,
 
-This patch adds the support for hisilicon thermal sensor, within
-hisilicon SoC. there will register sensors for thermal framework
-and use device tree to bind cooling device.
+On 04/02/2015 02:22 PM, Abhilash Kesavan wrote:
+> Hi,
+> 
+> On Thu, Apr 2, 2015 at 4:01 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> Hello Sylwester,
+>>
+>> On 04/01/2015 07:31 PM, Sylwester Nawrocki wrote:
+>>> On 01/04/15 13:44, Javier Martinez Canillas wrote:
+>>>> On 04/01/2015 01:03 PM, Sylwester Nawrocki wrote:
+>>>>> It's not clear what subsystems affect state of the CG_STATUSx registers, it
+>>>>> would be good if we could get more information on that. They are in the PMU
+>>>>> block and are related to LPI (Low Power Interface handshaking), but what
+>>>>> subsystems/peripheral blocks exactly are associated with them it's not clear
+>>>>> from the documentation.
+>>>>
+>>>> Yes, I've been looking at the docs again and found out a couple of things:
+>>>>
+>>>> * Each GC_STATUSx register bit is associated with an IP hw block
+>>>> * Some LPI_MASKx registers maps exactly with the GC_STATUSx (i.e: 0 and 1)
+>>>>   and others maps only partially (i.e: LPI_MASK2 and GC_STATUS2)
+>>>
+>>> The CG_STATUSx and LPI_MASKx bits meaning is not matching according to
+>>> documentation I have. I guess you've got something newer than REV0.00?
+>>>
+>>
+>> My Exynos5420 UM is Revision 1.00 dated February 2014 and GC_STATUS0 bits
+>> maps LPI_MASK0 with the exception of bit 16 (NR3D) that is not mentioned
+>> in GC_STATUS0, there is a hole between 15 (DIS) and 17 (FIMC_SCALERP).
+>>
+>> GC_STATUS1 maps exactly with LPI_MASK1 and GC_STATUS2 and LPI_MASK2 have
+>> the same bits from 0 to 5 and then differ from there.
+>>
+>>>> So it is related to LPI as you said and both LPI_MASKx and GC_STATUSx are
+>>>> part of the PMU register address space.
+>>>>
+>>>> In the particular case of aclk266_g2d, the doc says that the clock can only
+>>>> be gated when CG_STATUS0[20] and CG_STATUS0[21] are 0. These are associated
+>>>> with the SSS and SSS_SLIM respectively which AFAIU are crypto h/w modules.
+>>>
+>>> In my Exynos5420 UM ACLK_266_G2D is associated with CG_STATUS0 register
+>>> bits 22, 21, which in turn correspond to NR3D and DIS IP blocks, i.e.
+>>> the camera subsystem. Such a dependency would be rather surprising.
+>>>
+>>
+>> Sorry, it was a typo error and I actually meant CG_STATUS0 21 and 22 but
+>> these correspond in the documentation I've to 21 (SSS) and 22 (SSS_SLIM).
+>>
+>> As I mentioned before, DIS correspond to CG_STATUS0 15 and NR3D doesn't
+>> have a corresponding bit in CG_STATUS0. But I don't know if that is an
+>> error in the doc I've since is suspicious that is the only difference
+>> between LPI_MASK0 and CG_STATUS0.
+>>
+>>>>> I think it's essential to understand what triggers changes in CG_STATUSx
+>>>>> registers, before we start checking their value in the clock driver.
+>>>>>
+>>>>
+>>>> Indeed, we should really understand what the status on these registers
+>>>> means. Also is not clear from the docs how much time should be waited,
+>>>> how long until giving up, etc.
+>>>
+>>> Exactly, I checked some kernels from http://opensource.samsung.com
+>>> (e.g. SM-N900_JB_Opensource.zip) for CG_STATUSx, but I didn't find anything
+>>> related to these registers yet, except the address macro definitions
+>>> and debug traces in the power domains driver.
+>>>
+>>
+>> Yes, I also looked in the ChromiumOS v3.8 kernel but didn't find anything.
+>>
+>>>>> Also it might be that there are indeed some clocks which must stay enabled
+>>>>> over suspend/resume cycle, then the approach with enabling/disabling clocks
+>>>>> in the clock driver might not be such a hack as it looks at first sight.
+>>>>>
+>>>>
+>>>> Having a clock driver to both a provider and consumer feels hacky to me as
+>>>> well but I didn't find a better way to solve this issue... another option
+>>>> is to have this workaround to solve the S2R issue while we figure out what
+>>>> the the state in the CG_STATUSx really mean.
+>>>
+>>> Let's try to diagnose the issue best we can, then we would choose the most
+>>> accurate bug fix.
+>>>
+>>
+>> Sounds good to me.
+> 
+> Based on the earlier comments I was trying to isolate if:
+> 1) s2r fails because we gate aclk266_g2d (but it is one of those
+> clocks that needs to be always on prior to suspend).
+> 2) s2r fails because we gate aclk266_g2d when CG_STATUS0[21:20] bits
+> are not 0 (thus not following the spec).
+> 
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
----
- drivers/thermal/Kconfig        |   8 +
- drivers/thermal/Makefile       |   1 +
- drivers/thermal/hisi_thermal.c | 438 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 447 insertions(+)
- create mode 100644 drivers/thermal/hisi_thermal.c
+Thanks a lot for continue looking at this. I didn't have time to dig
+deeper on this since last week.
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index af40db0..81aee01 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -136,6 +136,14 @@ config THERMAL_EMULATION
- 	  because userland can easily disable the thermal policy by simply
- 	  flooding this sysfs node with low temperature values.
- 
-+config HISI_THERMAL
-+	tristate "Hisilicon thermal driver"
-+	depends on ARCH_HISI && CPU_THERMAL && OF
-+	help
-+	  Enable this to plug hisilicon's thermal sensor driver into the Linux
-+	  thermal framework. cpufreq is used as the cooling device to throttle
-+	  CPUs when the passive trip is crossed.
-+
- config IMX_THERMAL
- 	tristate "Temperature sensor driver for Freescale i.MX SoCs"
- 	depends on CPU_THERMAL
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index fa0dc48..08ae7ac 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -39,3 +39,4 @@ obj-$(CONFIG_TI_SOC_THERMAL)	+= ti-soc-thermal/
- obj-$(CONFIG_INT340X_THERMAL)  += int340x_thermal/
- obj-$(CONFIG_ST_THERMAL)	+= st/
- obj-$(CONFIG_TEGRA_SOCTHERM)	+= tegra_soctherm.o
-+obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
-diff --git a/drivers/thermal/hisi_thermal.c b/drivers/thermal/hisi_thermal.c
-new file mode 100644
-index 0000000..50ffb45
---- /dev/null
-+++ b/drivers/thermal/hisi_thermal.c
-@@ -0,0 +1,438 @@
-+/*
-+ * Hisilicon thermal sensor driver
-+ *
-+ * Copyright (c) 2014-2015 Hisilicon Limited.
-+ * Copyright (c) 2014-2015 Linaro Limited.
-+ *
-+ * Xinwei Kong <kong.kongxinwei@hisilicon.com>
-+ * Leo Yan <leo.yan@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/cpu_cooling.h>
-+#include <linux/cpufreq.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+#include <linux/thermal.h>
-+#include <linux/types.h>
-+
-+#include "thermal_core.h"
-+
-+#define TEMP0_LAG			(0x0)
-+#define TEMP0_TH			(0x4)
-+#define TEMP0_RST_TH			(0x8)
-+#define TEMP0_CFG			(0xC)
-+#define TEMP0_EN			(0x10)
-+#define TEMP0_INT_EN			(0x14)
-+#define TEMP0_INT_CLR			(0x18)
-+#define TEMP0_RST_MSK			(0x1C)
-+#define TEMP0_RAW_INT			(0x20)
-+#define TEMP0_MSK_INT			(0x24)
-+#define TEMP0_VALUE			(0x28)
-+
-+#define HISI_TEMP_BASE			(-60)
-+#define HISI_TEMP_RESET		(100000)
-+#define HISI_TEMP_PASSIVE		(85000)
-+
-+#define HISI_MAX_SENSORS		4
-+
-+struct hisi_thermal_sensor {
-+	struct hisi_thermal_data *thermal;
-+	struct thermal_zone_device *tzd;
-+	const struct thermal_trip *trip;
-+
-+	uint32_t id;
-+	uint32_t thres_temp;
-+	uint32_t reset_temp;
-+};
-+
-+struct hisi_thermal_data {
-+	struct mutex thermal_lock;
-+	struct platform_device *pdev;
-+	struct clk *clk;
-+
-+	int irq, irq_bind_sensor;
-+	bool irq_enabled;
-+
-+	unsigned int sensors_num;
-+	long sensor_temp[HISI_MAX_SENSORS];
-+	struct hisi_thermal_sensor sensors[HISI_MAX_SENSORS];
-+
-+	void __iomem *regs;
-+};
-+
-+/* in millicelsius */
-+static inline int _step_to_temp(int step)
-+{
-+	/*
-+	 * Every step equals (1 * 200) / 255 celsius, and finally
-+	 * need convert to millicelsius.
-+	 */
-+	return (HISI_TEMP_BASE + (step * 200 / 255)) * 1000;
-+}
-+
-+static inline int _temp_to_step(int temp)
-+{
-+	return ((temp / 1000 - HISI_TEMP_BASE) * 255 / 200);
-+}
-+
-+static long hisi_thermal_get_sensor_temp(struct hisi_thermal_data *data,
-+					 struct hisi_thermal_sensor *sensor)
-+{
-+	int val;
-+
-+	mutex_lock(&data->thermal_lock);
-+
-+	/* disable interrupt */
-+	writel(0x0, data->regs + TEMP0_INT_EN);
-+	writel(0x1, data->regs + TEMP0_INT_CLR);
-+
-+	/* disable module firstly */
-+	writel(0x0, data->regs + TEMP0_EN);
-+
-+	/* select sensor id */
-+	writel((sensor->id << 12), data->regs + TEMP0_CFG);
-+
-+	/* enable module */
-+	writel(0x1, data->regs + TEMP0_EN);
-+
-+	msleep(5);
-+
-+	val = readl(data->regs + TEMP0_VALUE);
-+	val = _step_to_temp(val);
-+
-+	/* adjust for negative value */
-+	val = (val < 0) ? 0 : val;
-+
-+	mutex_unlock(&data->thermal_lock);
-+
-+	return val;
-+}
-+
-+static void hisi_thermal_bind_irq(struct hisi_thermal_data *data)
-+{
-+	struct hisi_thermal_sensor *sensor;
-+
-+	sensor = &data->sensors[data->irq_bind_sensor];
-+
-+	mutex_lock(&data->thermal_lock);
-+
-+	/* setting the hdak time */
-+	writel(0x0, data->regs + TEMP0_CFG);
-+
-+	/* disable module firstly */
-+	writel(0x0, data->regs + TEMP0_RST_MSK);
-+	writel(0x0, data->regs + TEMP0_EN);
-+
-+	/* select sensor id */
-+	writel((sensor->id << 12), data->regs + TEMP0_CFG);
-+
-+	/* enable for interrupt */
-+	writel(_temp_to_step(sensor->thres_temp)
-+			| 0x0FFFFFF00, data->regs + TEMP0_TH);
-+
-+	writel(_temp_to_step(HISI_TEMP_RESET), data->regs + TEMP0_RST_TH);
-+
-+	/* enable module */
-+	writel(0x1, data->regs + TEMP0_RST_MSK);
-+	writel(0x1, data->regs + TEMP0_EN);
-+
-+	writel(0x0, data->regs + TEMP0_INT_CLR);
-+	writel(0x1, data->regs + TEMP0_INT_EN);
-+	msleep(5);
-+
-+	mutex_unlock(&data->thermal_lock);
-+
-+}
-+
-+static void hisi_thermal_enable_sensor(struct hisi_thermal_data *data)
-+{
-+	hisi_thermal_bind_irq(data);
-+}
-+
-+static void hisi_thermal_disable_sensor(struct hisi_thermal_data *data)
-+{
-+
-+	mutex_lock(&data->thermal_lock);
-+
-+	/* disable sensor module */
-+	writel(0x0, data->regs + TEMP0_INT_EN);
-+	writel(0x0, data->regs + TEMP0_RST_MSK);
-+	writel(0x0, data->regs + TEMP0_EN);
-+
-+	mutex_unlock(&data->thermal_lock);
-+
-+}
-+
-+static int hisi_thermal_get_temp(void *_sensor, long *temp)
-+{
-+	struct hisi_thermal_sensor *sensor = _sensor;
-+	struct hisi_thermal_data *data = sensor->thermal;
-+
-+	int sensor_id = 0, i;
-+	long max_temp = 0;
-+
-+	*temp = hisi_thermal_get_sensor_temp(data, sensor);
-+
-+	data->sensor_temp[sensor->id] = *temp;
-+
-+	for (i = 0; i < HISI_MAX_SENSORS; i++) {
-+		if (data->sensor_temp[i] >= max_temp) {
-+			max_temp = data->sensor_temp[i];
-+			sensor_id = i;
-+		}
-+	}
-+
-+	data->irq_bind_sensor = sensor_id;
-+
-+	dev_dbg(&data->pdev->dev, "id=%d, irq=%d, temp=%ld, thres=%d\n",
-+		sensor->id, data->irq_enabled, *temp, sensor->thres_temp);
-+	/*
-+	 * Bind irq to sensor for two cases:
-+	 *   Reenable alarm IRQ if temperature below threshold;
-+	 *   if irq has been enabled, always set it;
-+	 */
-+	if (!data->irq_enabled && max_temp < sensor->thres_temp) {
-+		data->irq_enabled = true;
-+		hisi_thermal_bind_irq(data);
-+		enable_irq(data->irq);
-+	} else if (data->irq_enabled)
-+		hisi_thermal_bind_irq(data);
-+
-+	return 0;
-+}
-+
-+static struct thermal_zone_of_device_ops hisi_of_thermal_ops = {
-+	.get_temp = hisi_thermal_get_temp,
-+};
-+
-+static irqreturn_t hisi_thermal_alarm_irq(int irq, void *dev)
-+{
-+	struct hisi_thermal_data *data = dev;
-+
-+	disable_irq_nosync(irq);
-+	data->irq_enabled = false;
-+
-+	return IRQ_WAKE_THREAD;
-+}
-+
-+static irqreturn_t hisi_thermal_alarm_irq_thread(int irq, void *dev)
-+{
-+	struct hisi_thermal_data *data = dev;
-+	struct hisi_thermal_sensor *sensor;
-+	int i;
-+
-+	sensor = &data->sensors[data->irq_bind_sensor];
-+
-+	dev_crit(&data->pdev->dev, "THERMAL ALARM: T > %d\n",
-+		 sensor->thres_temp / 1000);
-+
-+	for (i = 0; i < data->sensors_num; i++)
-+		thermal_zone_device_update(data->sensors[i].tzd);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int hisi_thermal_register_sensor(struct platform_device *pdev,
-+					struct hisi_thermal_data *data,
-+					struct hisi_thermal_sensor *sensor,
-+					int index)
-+{
-+	int ret, i;
-+
-+	sensor->id = index;
-+	sensor->thermal = data;
-+
-+	sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev, sensor->id,
-+				sensor, &hisi_of_thermal_ops);
-+	if (IS_ERR(sensor->tzd)) {
-+		ret = PTR_ERR(sensor->tzd);
-+		dev_err(&pdev->dev, "failed to register sensor id %d: %d\n",
-+			sensor->id, ret);
-+		return ret;
-+	}
-+
-+	sensor->trip = of_thermal_get_trip_points(sensor->tzd);
-+
-+	for (i = 0; i < of_thermal_get_ntrips(sensor->tzd); i++) {
-+		if (sensor->trip[i].type == THERMAL_TRIP_PASSIVE) {
-+			sensor->thres_temp = sensor->trip[i].temperature;
-+			break;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id of_hisi_thermal_match[] = {
-+	{ .compatible = "hisilicon,tsensor" },
-+	{ /* end */ }
-+};
-+MODULE_DEVICE_TABLE(of, of_hisi_thermal_match);
-+
-+static void hisi_thermal_toggle_sensor(struct hisi_thermal_sensor *sensor,
-+				       bool on)
-+{
-+	struct thermal_zone_device *tzd = sensor->tzd;
-+
-+	tzd->ops->set_mode(tzd,
-+		on ? THERMAL_DEVICE_ENABLED : THERMAL_DEVICE_DISABLED);
-+}
-+
-+static int hisi_thermal_probe(struct platform_device *pdev)
-+{
-+	struct hisi_thermal_data *data;
-+	struct resource *res;
-+	int i;
-+	int ret;
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	mutex_init(&data->thermal_lock);
-+	data->pdev = pdev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	data->regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(data->regs)) {
-+		dev_err(&pdev->dev, "failed to get io address\n");
-+		return PTR_ERR(data->regs);
-+	}
-+
-+	data->irq = platform_get_irq(pdev, 0);
-+	if (data->irq < 0)
-+		return data->irq;
-+
-+	ret = devm_request_threaded_irq(&pdev->dev, data->irq,
-+			hisi_thermal_alarm_irq, hisi_thermal_alarm_irq_thread,
-+			0, "hisi_thermal", data);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to request alarm irq: %d\n", ret);
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, data);
-+
-+	data->clk = devm_clk_get(&pdev->dev, "thermal_clk");
-+	if (IS_ERR(data->clk)) {
-+		ret = PTR_ERR(data->clk);
-+		if (ret != -EPROBE_DEFER)
-+			dev_err(&pdev->dev,
-+				"failed to get thermal clk: %d\n", ret);
-+		return ret;
-+	}
-+
-+	/* enable clock for thermal */
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
-+		return ret;
-+	}
-+
-+	for (i = 0; i < HISI_MAX_SENSORS; ++i) {
-+		ret = hisi_thermal_register_sensor(pdev, data,
-+					&data->sensors[i], i);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+			"failed to register thermal sensor: %d\n", ret);
-+			goto err_get_sensor_data;
-+			return ret;
-+		}
-+	}
-+
-+	hisi_thermal_enable_sensor(data);
-+	data->irq_enabled = true;
-+
-+	for (i = 0; i < data->sensors_num; i++)
-+		hisi_thermal_toggle_sensor(&data->sensors[i], true);
-+
-+	return 0;
-+
-+err_get_sensor_data:
-+	clk_disable_unprepare(data->clk);
-+	return ret;
-+}
-+
-+static int hisi_thermal_remove(struct platform_device *pdev)
-+{
-+	struct hisi_thermal_data *data = platform_get_drvdata(pdev);
-+	int i;
-+
-+	for (i = 0; i < data->sensors_num; i++) {
-+		struct hisi_thermal_sensor *sensor = &data->sensors[i];
-+
-+		hisi_thermal_toggle_sensor(sensor, false);
-+		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
-+	}
-+
-+	hisi_thermal_disable_sensor(data);
-+	clk_disable_unprepare(data->clk);
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int hisi_thermal_suspend(struct device *dev)
-+{
-+	struct hisi_thermal_data *data = dev_get_drvdata(dev);
-+
-+	hisi_thermal_disable_sensor(data);
-+	data->irq_enabled = false;
-+
-+	clk_disable_unprepare(data->clk);
-+
-+	return 0;
-+}
-+
-+static int hisi_thermal_resume(struct device *dev)
-+{
-+	struct hisi_thermal_data *data = dev_get_drvdata(dev);
-+
-+	clk_prepare_enable(data->clk);
-+
-+	data->irq_enabled = true;
-+	hisi_thermal_enable_sensor(data);
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(hisi_thermal_pm_ops,
-+			 hisi_thermal_suspend, hisi_thermal_resume);
-+
-+static struct platform_driver hisi_thermal_driver = {
-+	.driver = {
-+		.name	= "hisi_thermal",
-+		.owner  = THIS_MODULE,
-+		.pm	= &hisi_thermal_pm_ops,
-+		.of_match_table = of_hisi_thermal_match,
-+	},
-+	.probe		= hisi_thermal_probe,
-+	.remove		= hisi_thermal_remove,
-+};
-+
-+module_platform_driver(hisi_thermal_driver);
-+
-+MODULE_AUTHOR("Xinwei Kong <kong.kongxinwei@hisilicon.com>");
-+MODULE_AUTHOR("Leo Yan <leo.yan@linaro.org>");
-+MODULE_DESCRIPTION("Hisilicon thermal driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+> As I did not have access to the hardware guys who could possibly
+> confirm 1), I decided to
+> a) find a configuration where CG_STATUS0 allows gating of the
+> aclk266_g2d clock (i.e. CG_STATUS0[22:21] are 0).
+> b) disable the aclk266_g2d clock using such a configuration.
+> c) check s2r.
+> 
+> I found a configuration [1] which gave the following after boot-up:
+
+I think you forgot the reference for [1] right? Since with latest
+linux-next (20150402) I got:
+
+> # devmem 0x10040914
+> 0xFD800014 (CG_STATUS0[22:21] is 0)
+
+# devmem 0x10040914
+0xFFE00000 (CG_STATUS0[22:21] is 1)
+
+> # devmem 0x10020700
+> 0xC6F8DE9F (aclk266_g2d is enabled)
+>
+> At this point s2r works.
+> 
+> I rebooted the board with the same config as above and then disabled
+> aclk266_g2d.
+> 
+> # devmem 0x10020700 32 0xC6F8DE9D
+> # devmem 0x10020700
+> 0xC6F8DE9D (aclk266_g2d is disabled)
+> # devmem 0x10040914
+> 0xFD800014
+> 
+> and tried s2r - It fails.
+>
+> From the results, disabling the clock seems to cause the issue rather
+> than the CG_STATUS violation. This is all a little confusing, so
+> please let me know if I have missed something.
+>
+
+So IIUC the CG_STATUS0 bits were a red herring and the real problem
+is that the aclk266_g2d needs to be enabled during suspend (although
+we still don't know why).
+
+It seems were are at a dead end now. Without being able to ask the HW
+Samsung folks we would never know what's going on here...
+
+I can re-post my patches to keep aclk266_g2d enabled during suspend
+in the clk driver if that is the least bad option. But it would be
+great to solve this issue otherwise S2R will remain to be broken for
+Exynos5420 which will be really sad.
+
+> Regards,
+> Abhilash
+> 
+
+Best regards,
+Javier
