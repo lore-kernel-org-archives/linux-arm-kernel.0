@@ -1,9 +1,9 @@
 From: leilei.zhao@atmel.com (Leilei Zhao)
-Date: Tue, 7 Apr 2015 17:45:08 +0800
-Subject: [PATCH 07/10] crypto: atmel-tdes: initialize spinlock in probe
+Date: Tue, 7 Apr 2015 17:45:09 +0800
+Subject: [PATCH 08/10] crypto: atmel-aes: initialize spinlock in probe
 In-Reply-To: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
 References: <1428399911-23325-1-git-send-email-leilei.zhao@atmel.com>
-Message-ID: <1428399911-23325-8-git-send-email-leilei.zhao@atmel.com>
+Message-ID: <1428399911-23325-9-git-send-email-leilei.zhao@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,20 +15,20 @@ spinlock, so just initialize it in probe.
 Signed-off-by: Leilei Zhao <leilei.zhao@atmel.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/crypto/atmel-tdes.c |    1 +
+ drivers/crypto/atmel-aes.c |    1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/crypto/atmel-tdes.c b/drivers/crypto/atmel-tdes.c
-index 258772d..3517e2a 100644
---- a/drivers/crypto/atmel-tdes.c
-+++ b/drivers/crypto/atmel-tdes.c
-@@ -1370,6 +1370,7 @@ static int atmel_tdes_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, tdes_dd);
+diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
+index ddea772..f0532ab 100644
+--- a/drivers/crypto/atmel-aes.c
++++ b/drivers/crypto/atmel-aes.c
+@@ -1341,6 +1341,7 @@ static int atmel_aes_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, aes_dd);
  
- 	INIT_LIST_HEAD(&tdes_dd->list);
-+	spin_lock_init(&tdes_dd->lock);
+ 	INIT_LIST_HEAD(&aes_dd->list);
++	spin_lock_init(&aes_dd->lock);
  
- 	tasklet_init(&tdes_dd->done_task, atmel_tdes_done_task,
- 					(unsigned long)tdes_dd);
+ 	tasklet_init(&aes_dd->done_task, atmel_aes_done_task,
+ 					(unsigned long)aes_dd);
 -- 
 1.7.9.5
