@@ -1,39 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Apr 2015 18:46:24 +0100
-Subject: [PATCH v4 05/10] eeprom: Add bindings for simple eeprom framework
-In-Reply-To: <55241575.7040809@linaro.org>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1427752679-17261-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20150406133208.GH30984@beef>
- <CAL_Jsq++9pyJMLXssgyz2WRU4e7ikT_6FwzWMo1fKS82FJvEyg@mail.gmail.com>
- <20150406150442.GA26319@beef> <55241575.7040809@linaro.org>
-Message-ID: <20150407174624.GO6023@sirena.org.uk>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Tue,  7 Apr 2015 10:52:39 -0700
+Subject: [PATCH] arm: dts: rk3288: Enable Cortex-A12 HW PMU events
+Message-ID: <1428429159-24102-1-git-send-email-sonnyrao@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 06:35:49PM +0100, Srinivas Kandagatla wrote:
-> On 06/04/15 16:04, Matt Porter wrote:
-> >On Mon, Apr 06, 2015 at 09:11:05AM -0500, Rob Herring wrote:
+This adds the dts node for the PMU with the correct PMUIRQ interrupts
+for each core.
 
-> >>>The generic binding could really use a "read-only" property here as this
-> >>>is a common hardware attribute for many nvmem devices. A serial EEPROM
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-> Correct me If am wrong.
-
-> Regarding write protection/read-only, regmap already has provisions to
-> support this feature. regmap would bail out with errors if any attempt to
-> write to non-writable regions. It all depends on the data providers how they
-> setup the regmap and the bindings for those are specific individual data
-> providers I think.
-
-There is the ability to flag read/write permissions in regmap but I
-think there's some suggestion that this should be exposed to userspace
-so that it's easier for it to handle things rather than just writing
-then coping with any errors.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/3464d172/attachment.sig>
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 165968d..8253abb 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -44,6 +44,14 @@
+ 		spi2 = &spi2;
+ 	};
+ 
++	arm-pmu {
++		compatible = "arm,cortex-a12-pmu";
++		interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-- 
+2.2.0.rc0.207.ga3a616c
