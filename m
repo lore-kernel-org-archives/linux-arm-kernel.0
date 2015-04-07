@@ -1,110 +1,73 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue,  7 Apr 2015 16:37:58 +0100
-Subject: [RESEND PATCH 4.0-rc5 v19 1/6] irqchip: gic: Optimize locking in
- gic_raise_softirq
-In-Reply-To: <1428421083-9137-1-git-send-email-daniel.thompson@linaro.org>
-References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
- <1428421083-9137-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1428421083-9137-2-git-send-email-daniel.thompson@linaro.org>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 7 Apr 2015 17:40:24 +0200
+Subject: [PATCH] power: add poodle battery driver
+In-Reply-To: <CALT56yOH-rc1RG=xQhcGT-FKJz7D9qKd+rO+8s4PdYrK0weCGQ@mail.gmail.com>
+References: <1427714679-27472-1-git-send-email-dbaryshkov@gmail.com>
+ <20150406164428.GB18145@earth>
+ <CALT56yOH-rc1RG=xQhcGT-FKJz7D9qKd+rO+8s4PdYrK0weCGQ@mail.gmail.com>
+Message-ID: <20150407154023.GA23823@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently gic_raise_softirq() is locked using upon irq_controller_lock.
-This lock is primarily used to make register read-modify-write sequences
-atomic but gic_raise_softirq() uses it instead to ensure that the
-big.LITTLE migration logic can figure out when it is safe to migrate
-interrupts between physical cores.
+Hi,
 
-This is sub-optimal in closely related ways:
+On Tue, Apr 07, 2015 at 03:34:30PM +0300, Dmitry Eremin-Solenikov wrote:
+> > On Mon, Mar 30, 2015 at 02:24:39PM +0300, Dmitry Eremin-Solenikov wrote:
+> >> Add a driver supporting battery charging on Sharp SL-5600 (poodle).
+> >> Voltage and temperature readings are provided through add7846 hwmon
+> >> interface. Battery voltage is in1_input (mV) and temp in in0_input
+> >> (values unknown, but should be less than 2441).
+> >
+> > You may want to convert add7846 to iio interface, which can be
+> > exposed via hwmon and requested by other kernel drivers (e.g. this
+> > one).
+> 
+> This needs a more careful thought. I have several devices in mind,
+> which provide touchscreen + ADC interfaces, where ADC is used
+> for battery voltage and temperature sensing. Sometimes additional
+> GPIOs are in play. Thus I'd like for now to sustain from changing
+> ads7846 driver. Or, at least to delay such changes, iff there will be
+> no real design/ideas how to handle such devices in a generic enough
+> way.
 
-1. No locking at all is required on systems where the b.L switcher is
-   not configured.
+If you have more of these devices it's even more appealing to use
+the IIO interface. You can basically keep the touchscreen part of
+the ads7846 driver and replace hwmon with IIO. Then other kernel
+drivers can request an IIO channel, but you are still able to use
+hwmon interface from userspace via iio-hwmon.
 
-2. Finer grain locking can be used on systems where the b.L switcher is
-   present.
+> [...]
 
-This patch resolves both of the above by introducing a separate finer
-grain lock and providing conditionally compiled inlines to lock/unlock
-it.
+> >> +static int poodle_battery_probe(struct platform_device *dev)
+> >> +{
+> >> + int ret;
+> >> +
+> >> + ret = gpio_request_array(poodle_batt_gpios,
+> >> + ARRAY_SIZE(poodle_batt_gpios));
+> >> + if (ret)
+> >> + return ret;
+> >> +
+> >> + mutex_init(&poodle_bat_main.work_lock);
+> >> +
+> >> + INIT_WORK(&bat_work, poodle_bat_work);
+> >> +
+> >> + ret = power_supply_register(&dev->dev, &poodle_bat_main.psy);
+> >> + if (ret)
+> >> + goto err_psy_reg_main;
+> >
+> > we have devm_power_supply_register() now.
+> 
+> Not so sure about it. I'd like to cancel work after unregistering power_supply.
+> I think I'll even switch from devm_request_irq back to request_irq to be able
+> to cancel IRQs before canceling work.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- drivers/irqchip/irq-gic.c | 36 +++++++++++++++++++++++++++++++++---
- 1 file changed, 33 insertions(+), 3 deletions(-)
+Why?
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 471e1cdc1933..a181b836d5ea 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -73,6 +73,27 @@ struct gic_chip_data {
- static DEFINE_RAW_SPINLOCK(irq_controller_lock);
- 
- /*
-+ * This lock is used by the big.LITTLE migration code to ensure no IPIs
-+ * can be pended on the old core after the map has been updated.
-+ */
-+#ifdef CONFIG_BL_SWITCHER
-+static DEFINE_RAW_SPINLOCK(cpu_map_migration_lock);
-+
-+static inline void gic_migration_lock(unsigned long *flags)
-+{
-+	raw_spin_lock_irqsave(&cpu_map_migration_lock, *flags);
-+}
-+
-+static inline void gic_migration_unlock(unsigned long flags)
-+{
-+	raw_spin_unlock_irqrestore(&cpu_map_migration_lock, flags);
-+}
-+#else
-+static inline void gic_migration_lock(unsigned long *flags) {}
-+static inline void gic_migration_unlock(unsigned long flags) {}
-+#endif
-+
-+/*
-  * The GIC mapping of CPU interfaces does not necessarily match
-  * the logical CPU numbering.  Let's use a mapping as returned
-  * by the GIC itself.
-@@ -631,7 +652,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	int cpu;
- 	unsigned long flags, map = 0;
- 
--	raw_spin_lock_irqsave(&irq_controller_lock, flags);
-+	gic_migration_lock(&flags);
- 
- 	/* Convert our logical CPU mask into a physical one. */
- 	for_each_cpu(cpu, mask)
-@@ -646,7 +667,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	/* this always happens on GIC0 */
- 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
- 
--	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
-+	gic_migration_unlock(flags);
- }
- #endif
- 
-@@ -717,8 +738,17 @@ void gic_migrate_target(unsigned int new_cpu_id)
- 
- 	raw_spin_lock(&irq_controller_lock);
- 
--	/* Update the target interface for this logical CPU */
-+	/*
-+	 * Update the target interface for this logical CPU
-+	 *
-+	 * From the point we release the cpu_map_migration_lock any new
-+	 * SGIs will be pended on the new cpu which makes the set of SGIs
-+	 * pending on the old cpu static. That means we can defer the
-+	 * migration until after we have released the irq_controller_lock.
-+	 */
-+	raw_spin_lock(&cpu_map_migration_lock);
- 	gic_cpu_map[cpu] = 1 << new_cpu_id;
-+	raw_spin_unlock(&cpu_map_migration_lock);
- 
- 	/*
- 	 * Find all the peripheral interrupts targetting the current
--- 
-2.1.0
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150407/fa506729/attachment.sig>
