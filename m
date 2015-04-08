@@ -1,168 +1,87 @@
-From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
-Date: Wed,  8 Apr 2015 10:10:51 +0200
-Subject: [PATCH v2 2/2] ARM: at91/dt: add support for kizboxmini
-In-Reply-To: <1428480651-5963-1-git-send-email-g.portay@overkiz.com>
-References: <1428480651-5963-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <1428480651-5963-3-git-send-email-g.portay@overkiz.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 8 Apr 2015 09:14:50 +0100
+Subject: [PATCH v6 4/4] clk: dt: Introduce binding for always-on clock
+ support
+In-Reply-To: <20150407191746.GA26727@lukather>
+References: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
+ <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
+ <20150407191746.GA26727@lukather>
+Message-ID: <20150408081450.GB5162@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT file for Kizbox mini board.
-This board is based on Atmel's AT91SAM9G25 SoC.
+On Tue, 07 Apr 2015, Maxime Ripard wrote:
+> On Tue, Apr 07, 2015 at 07:43:59PM +0100, Lee Jones wrote:
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  .../devicetree/bindings/clock/clock-bindings.txt   | 38 ++++++++++++++++++++++
+> >  1 file changed, 38 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > index 06fc6d5..daf3323 100644
+> > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > @@ -44,6 +44,44 @@ For example:
+> >    clocks by index. The names should reflect the clock output signal
+> >    names for the device.
+> >  
+> > +clock-always-on:    Some hardware contains bunches of clocks which must never be
+> > +		    turned off.  If drivers a) fail to obtain a reference to any
+> > +		    of these or b) give up a previously obtained reference
+> > +		    during suspend, the common clk framework will attempt to
+> > +		    disable them and a platform can fail irrecoverably as a
+> > +		    result.  Usually the only way to recover from these failures
+> > +		    is to reboot.
+> > +
+> > +		    To avoid either of these two scenarios from catastrophically
+> > +		    disabling an otherwise perfectly healthy running system,
+> > +		    clocks can be identified as always-on using this property
+> > +		    from inside a clocksource's node.
+> 
+> Isn't "clocksource" here way too similar to, I don't know, the
+> clocksource framework? Wouln't clock provider be better?
 
-Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
----
- arch/arm/boot/dts/Makefile            |   1 +
- arch/arm/boot/dts/at91-kizboxmini.dts | 129 ++++++++++++++++++++++++++++++++++
- 2 files changed, 130 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
+Yes, I think you're right.  Stephen also mentioned it.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b..9c11888 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -30,6 +30,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
- 	at91sam9rlek.dtb \
- 	at91-ariag25.dtb \
- 	at91-cosino_mega2560.dtb \
-+	at91-kizboxmini.dtb \
- 	at91sam9g15ek.dtb \
- 	at91sam9g25ek.dtb \
- 	at91sam9g35ek.dtb \
-diff --git a/arch/arm/boot/dts/at91-kizboxmini.dts b/arch/arm/boot/dts/at91-kizboxmini.dts
-new file mode 100644
-index 0000000..b25cae4
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-kizboxmini.dts
-@@ -0,0 +1,129 @@
-+/*
-+ * at91-kizboxmini.dts - Device Tree file for Overkiz Kizbox mini board
-+ *
-+ * Copyright (C) 2014 Ga?l PORTAY <g.portay@overkiz.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+#include "at91sam9g25.dtsi"
-+#include "at91sam9x5.dtsi"
-+#include <dt-bindings/pwm/pwm.h>
-+
-+/ {
-+	model = "Overkiz Kizbox mini";
-+	compatible = "overkiz,kizboxmini", "atmel,at91sam9g25", "atmel,at91sam9x5", "atmel,at91sam9";
-+
-+	chosen {
-+		bootargs = "ubi.mtd=ubi";
-+		linux,stdout-path = &dbgu;
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x8000000>;
-+	};
-+
-+	clocks {
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			usart0: serial at f801c000 {
-+				status = "okay";
-+			};
-+
-+			macb0: ethernet at f802c000 {
-+				phy-mode = "rmii";
-+				status = "okay";
-+			};
-+
-+			pwm0: pwm at f8034000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_pwm0_pwm0_1
-+					     &pinctrl_pwm0_pwm1_1>;
-+				status = "okay";
-+			};
-+
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
-+			watchdog at fffffe40 {
-+				status = "okay";
-+			};
-+		};
-+
-+		usb0: ohci at 00600000 {
-+			status = "okay";
-+		};
-+
-+		usb1: ehci at 00700000 {
-+			status = "okay";
-+		};
-+
-+		nand0: nand at 40000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "hw";
-+			atmel,has-pmecc;
-+			atmel,pmecc-cap = <4>;
-+			atmel,pmecc-sector-size = <512>;
-+			nand-on-flash-bbt;
-+			status = "okay";
-+
-+			bootstrap at 0 {
-+				label = "bootstrap";
-+				reg = <0x0 0x20000>;
-+			};
-+
-+			ubi at 20000 {
-+				label = "ubi";
-+				reg = <0x20000 0x7fe0000>;
-+			};
-+		};
-+	};
-+
-+	pwm_leds {
-+		compatible = "pwm-leds";
-+
-+		green {
-+			label = "pwm:green:user";
-+			pwms = <&pwm0 0 10000000 0>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		red {
-+			label = "pwm:red:user";
-+			pwms = <&pwm0 1 10000000 0>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		prog {
-+			label = "PB_PROG";
-+			gpios = <&pioC 17 GPIO_ACTIVE_LOW>;
-+			linux,code = <0x102>;
-+			gpio-key,wakeup;
-+		};
-+
-+		reset {
-+			label = "PB_RST";
-+			gpios = <&pioC 16 GPIO_ACTIVE_LOW>;
-+			linux,code = <0x100>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+};
+> > +
+> > +		    This property is not to be abused.  It is only to be used to
+> > +		    protect platforms from being crippled by gated clocks, not
+> > +		    as a convenience function to avoid using the framework
+> > +		    correctly inside device drivers.
+> 
+> Disregarding what's stated here, I'm pretty sure that this will
+> actually happen. Where do you place the cursor?
+
+That's up to Mike.
+
+> Should we create a new driver for our RAM controller, or do we want to
+> use clock-always-on?
+
+I would say that if all the driver did was to enable clocks, then you
+should use this instead.  This binding was designed specifically for
+that purpose.
+
+However, if the aforementioned driver clock can be safely gated, then
+it should not be an always-on clock.
+
+> Do we really want to enforce this if we ever gain a driver that would
+> actually be able to manage its clock (like do we want the CPU clock to
+> never *ever* be gated just because we don't have a cpuidle/hotplug
+> driver yet?)
+
+As I've just mentioned, if a clock 'can' be turned off, this binding
+should never be used.  Situations where using always-on as a stop-gap
+due to a lack of current functionality is what the paragraph above is
+trying to mitigate.
+
+> Have you seen the numerous NAK on such approach Mike did?
+
+I haven't, but the folks reviewing previous versions have.  Do you
+have something specific in mind that you'd like to bring to my
+attention?
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
