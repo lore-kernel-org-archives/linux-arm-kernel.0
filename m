@@ -1,37 +1,25 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed,  8 Apr 2015 23:47:52 +0100
-Subject: [PATCH] coresight: etb10: Fix check for bogus buffer depth
-Message-ID: <1428533272-23375-1-git-send-email-broonie@kernel.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 8 Apr 2015 19:52:33 -0300
+Subject: [PATCH] ARM: dts: imx23-olinuxino: Add i2c support
+In-Reply-To: <1158701263.68321.1428531175931.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+References: <1428515100-1496-1-git-send-email-harald@ccbib.org>
+ <1158701263.68321.1428531175931.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+Message-ID: <CAOMZO5A1LFD7V+MXfe2dVbV3GU9AQ0qRXHH5ez7gDcn+Q7qjYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We attempt to sanity check the buffer depth reported by the hardware by
-making sure it is not less than zero however this check will never be true
-since the buffer depth is stored in an unsigned integer. Instead change
-the check to look for the top bit being set which was the intention.
+Hi Stefan,
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
+On Wed, Apr 8, 2015 at 7:12 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-This depends on the patch I sent earlier today for context though
-there's no direct dependency (and this check isn't sufficient to catch
-the fault I'm seeing).
+> AFAIK the iMX233-OLinuXino-MICRO don't have a UEXT connector. Maybe we reached
+> the point
+> to make dts files for every Olinuxino board. In that case we could also handle
+> the USB Host / Peripherial issue.
 
- drivers/hwtracing/coresight/coresight-etb10.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Yes, I agree. it would be better to split the dts files for the
+olinuxino variants.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 46eb9f88a29f..2a77d83130e6 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -457,7 +457,7 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
- 	drvdata->buffer_depth = etb_get_buffer_depth(drvdata);
- 	clk_disable_unprepare(drvdata->clk);
- 
--	if (drvdata->buffer_depth < 0)
-+	if (drvdata->buffer_depth & 0x80000000)
- 		return -EINVAL;
- 
- 	drvdata->buf = devm_kzalloc(dev,
--- 
-2.1.4
+Regards,
+
+Fabio Estevam
