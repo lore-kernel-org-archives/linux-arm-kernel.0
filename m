@@ -1,48 +1,54 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed,  8 Apr 2015 14:21:24 -0400
-Subject: [PATCH] drivers: CCI: fix used_mask init in validate_group()
-Message-ID: <1428517284-7951-1-git-send-email-msalter@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 8 Apr 2015 19:54:20 +0100
+Subject: [PATCH 0/2] Cygnus Audio Driver
+In-Reply-To: <55249258.1020907@broadcom.com>
+References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+ <20150331064338.GE2869@sirena.org.uk>
+ <551EEAF8.7050108@broadcom.com>
+ <20150406095803.GD6023@sirena.org.uk>
+ <55249258.1020907@broadcom.com>
+Message-ID: <20150408185420.GH6023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in validate_group(), there is a static initializer
-for fake_pmu.used_mask which is based on CPU_BITS_NONE but
-the used_mask array size is based on CCI_PMU_MAX_HW_EVENTS.
-CCI_PMU_MAX_HW_EVENTS is not based on NR_CPUS, so CPU_BITS_NONE
-is not correct and will cause a build failure if NR_CPUS
-is set high enough to make CPU_BITS_NONE larger than used_mask.
-This patch changes the used_mask initialization to be runtime
-based on the actual size of the array.
+On Tue, Apr 07, 2015 at 07:28:40PM -0700, Lori Hikichi wrote:
+> On 15-04-06 02:58 AM, Mark Brown wrote:
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- drivers/bus/arm-cci.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+> >OK, then it's going to need to be a clock provider at some point - the
+> >clock will be going into external devices which are going to need to be
+> >able to interact with the clock (for example, to get the rate).
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 84fd660..1d83072 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -679,13 +679,13 @@ static int
- validate_group(struct perf_event *event)
- {
- 	struct perf_event *sibling, *leader = event->group_leader;
--	struct cci_pmu_hw_events fake_pmu = {
--		/*
--		 * Initialise the fake PMU. We only need to populate the
--		 * used_mask for the purposes of validation.
--		 */
--		.used_mask = CPU_BITS_NONE,
--	};
-+	struct cci_pmu_hw_events fake_pmu;
-+
-+	/*
-+	 * Initialise the fake PMU. We only need to populate the
-+	 * used_mask for the purposes of validation.
-+	 */
-+	memset(fake_pmu.used_mask, 0, sizeof(fake_pmu.used_mask));
- 
- 	if (!validate_event(&fake_pmu, leader))
- 		return -EINVAL;
--- 
-1.9.3
+> Currently, the ASoC machine driver is responsible for requesting a certain
+> frequency of MCLK be generated from our driver and then also sending the
+> frequency information along to the external device (codec).
+> This is done via the snd_soc_dai_set_sysclk.  That is the only clock
+> interaction we have needed for the core part of the driver.  For enhanced
+
+I have some passing familiarity with ASoC...  if you look at newer
+drivers, especially those for DT systems, you'll see that we're
+transitioning CODEC drivers to use the clock API for their clocks since
+this makes integrating with both generic ASoC things like simple card
+and non-ASoC clocks.
+
+> features, we also have the need to make minor adjustments (tweaks) to the
+> PLL.  The tweaks are used to make the PLLs output frequency match as closely
+> as possible to a true reference frequency. As such, we would like to provide
+> the finest adjustment resolution as possible. The clocking framework only
+> seems to allow for a 1 Hz adjustment. This limitation and the fact that no
+> other device seems to need to interact directly will the PLL are why we have
+> not put it in the clocking framework.
+
+That's going to be an issue no matter where you put the control - the
+ASoC specific clocking APIs don't have any control here either.  I don't
+know if we want to add the functionality for doing very fine grained
+adjustments into the clock API or not (the use cases seem limited though
+I'm sure they exist), though I do think we should have that discussion
+if only to confirm, but that's a separate thing to how we expose any
+userspace control - the clock API is a kernel internal thing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150408/b5efcdbf/attachment.sig>
