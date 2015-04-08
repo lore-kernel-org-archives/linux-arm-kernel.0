@@ -1,108 +1,41 @@
-From: chaotian.jing@mediatek.com (chaotian.jing)
-Date: Wed, 8 Apr 2015 14:39:19 +0800
-Subject: [PATCH v2 2/5] mmc: mediatek: Add Mediatek MMC driver
-In-Reply-To: <CABuKBe+MFHJO8GXRg5KYs2t+j6U4Ynv_hCeW0YQCrS_eZ-fuLA@mail.gmail.com>
-References: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
- <1426562035-16709-3-git-send-email-chaotian.jing@mediatek.com>
- <CABuKBe+MFHJO8GXRg5KYs2t+j6U4Ynv_hCeW0YQCrS_eZ-fuLA@mail.gmail.com>
-Message-ID: <1428475159.15142.3.camel@mhfsdcap03>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 8 Apr 2015 15:45:28 +0900
+Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
+In-Reply-To: <CAKKYfmEAckXkgJTWbVJ5kFD2tkyb8q5OB-jdZr_YYbNj+9m_LQ@mail.gmail.com>
+References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
+ <20150407124209.GA12633@lunn.ch>
+ <CAKKYfmEAckXkgJTWbVJ5kFD2tkyb8q5OB-jdZr_YYbNj+9m_LQ@mail.gmail.com>
+Message-ID: <CAK7LNAS=ee4j0COJGj70y6zRs6+_99JcX8GFerCbgt5me3rBLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Matthias,
+Hi Dennis,
 
-Thanks for your review!
-Please help to check my comment.
-On Tue, 2015-04-07 at 16:01 +0200, Matthias Brugger wrote:
-> 2015-03-17 4:13 GMT+01:00 Chaotian Jing <chaotian.jing@mediatek.com>:
-> > Add Mediatek MMC driver code
-> >
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  drivers/mmc/host/Kconfig  |    8 +
-> >  drivers/mmc/host/Makefile |    1 +
-> >  drivers/mmc/host/mtk-sd.c | 1412 +++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 1421 insertions(+)
-> >  create mode 100644 drivers/mmc/host/mtk-sd.c
-> >
-> > diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> > index 61ac63a..8b64377 100644
-> > --- a/drivers/mmc/host/Kconfig
-> > +++ b/drivers/mmc/host/Kconfig
-> > @@ -768,3 +768,11 @@ config MMC_TOSHIBA_PCI
-> >         tristate "Toshiba Type A SD/MMC Card Interface Driver"
-> >         depends on PCI
-> >         help
-> > +
-> > +config MMC_MTK
-> > +       tristate "MediaTek SD/MMC Card Interface support"
-> > +       help
-> > +         This selects the MediaTek(R) Secure digital and Multimedia card Interface.
-> > +         If you have a machine with a integrated SD/MMC card reader, say Y or M here.
-> > +         This is needed if support for any SD/SDIO/MMC devices is required.
-> > +         If unsure, say N.
-> > diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-> > index 6a7cfe0..161b3e4 100644
-> > --- a/drivers/mmc/host/Makefile
-> > +++ b/drivers/mmc/host/Makefile
-> > @@ -20,6 +20,7 @@ obj-$(CONFIG_MMC_SDHCI_F_SDH30)       += sdhci_f_sdh30.o
-> >  obj-$(CONFIG_MMC_SDHCI_SPEAR)  += sdhci-spear.o
-> >  obj-$(CONFIG_MMC_WBSD)         += wbsd.o
-> >  obj-$(CONFIG_MMC_AU1X)         += au1xmmc.o
-> > +obj-$(CONFIG_MMC_MTK)           += mtk-sd.o
-> >  obj-$(CONFIG_MMC_OMAP)         += omap.o
-> >  obj-$(CONFIG_MMC_OMAP_HS)      += omap_hsmmc.o
-> >  obj-$(CONFIG_MMC_ATMELMCI)     += atmel-mci.o
-> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> > new file mode 100644
-> > index 0000000..86c999b
-> > --- /dev/null
-> > +++ b/drivers/mmc/host/mtk-sd.c
-> > @@ -0,0 +1,1412 @@
-> > +/*
-> > + * Copyright (c) 2014-2015 MediaTek Inc.
-> > + * Author: Chaotian.Jing <chaotian.jing@mediatek.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/dma-mapping.h>
-> > +#include <linux/ioport.h>
-> > +#include <linux/irq.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/of_gpio.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/regulator/consumer.h>
-> > +#include <linux/spinlock.h>
-> > +
-> > +#include <linux/mmc/card.h>
-> > +#include <linux/mmc/core.h>
-> > +#include <linux/mmc/host.h>
-> > +#include <linux/mmc/mmc.h>
-> > +#include <linux/mmc/sd.h>
-> > +#include <linux/mmc/sdio.h>
-> > +
-> > +#define MAX_GPD_NUM         (1 + 1)    /* one null gpd */
-> > +#define MAX_BD_NUM          1024
-> > +#define MAX_BD_PER_GPD      MAX_BD_NUM
-> 
-> This looks strange.
-> Why don't you define MAX_GPD_NUM as two?
-> Why do you define MAX_BD_PER_GPD when it is the same as MAX_BD_NUM?
-> 
-In fact, the second GPD is useless now, I will remove the define of
-MAX_GPD_NUM and MAX_BD_PER_GPD.
+2015-04-07 23:09 GMT+09:00 Dennis Mungai <dmngaie@gmail.com>:
+> Hello Masahiro,
+>
+> Please see this patch here on the LKML:
+>
+> https://lkml.org/lkml/2013/7/12/173
+>
+> signed off by Stephen Boyd <sboyd@codeaurora.org>
+>
+> This may be related to the problem you're having.
+>
+> Regards,
+>
+> Dennis.
 
-> Cheers,
-> Matthias
-> 
+
+Thanks for this information.
+
+My target SoC has a single ARM core, so
+I guess I can ignore the false alarm
+"GIC CPU mask not found - kernel will fail to boot".
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
