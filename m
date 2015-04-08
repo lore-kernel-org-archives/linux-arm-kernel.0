@@ -1,114 +1,50 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 08 Apr 2015 16:36:31 -0700
-Subject: [PATCH 3/8] clk: Constify pointers to parent names in init data
-In-Reply-To: <1428499339-29569-4-git-send-email-k.kozlowski@samsung.com>
-References: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
- <1428499339-29569-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5525BB7F.7070609@codeaurora.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 8 Apr 2015 18:56:26 -0500
+Subject: [PATCH 1/2] ARM: dts: am57xx-beagle-x15: Fix IRQ type for mcp7941x
+In-Reply-To: <1428537387-18776-1-git-send-email-nm@ti.com>
+References: <1428537387-18776-1-git-send-email-nm@ti.com>
+Message-ID: <1428537387-18776-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/15 06:22, Krzysztof Kozlowski wrote:
-> The 'parent_names' member of 'clk_init_data' is not modified so it can
-> be made as an array of const pointers to constant strings.
->
-> Some drivers (e.g. arch/mips/alchemy/common/clock.c) already pass such
-> data.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 
-Sascha sent a similar patch a few days ago.
+The interrupt polarity provided in devicetree is used to configure
+the interrupt controller(ARM GIC), however, it seems that we have an
+inverter at the GIC boundary inside AM57xx which inverts the signal
+input from sys_irq external interrupt source.
 
-http://lkml.kernel.org/r/1427825817-26773-2-git-send-email-s.hauer at pengutronix.de
+Further, as per GIC distributor TRM,
+http://infocenter.arm.com/help/topic/com.arm.doc.ddi0438d/BGBHIACJ.html#BABJFCFB
+ARM GIC distributor does not support IRQ trigger type
+IRQ_TYPE_LEVEL_LOW, and only rising or level high signals.
 
+However, for some reason, the current configuration(which gets ignored
+by GIC driver) functions on some platforms, however, on few platforms
+results in infinite interrupts hogging the system down.
 
->  drivers/clk/clk-composite.c  |  2 +-
->  drivers/clk/clk-mux.c        |  8 ++++----
->  include/linux/clk-provider.h | 12 ++++++------
->  3 files changed, 11 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-> index 956b7e54fa1c..077f4c7148f1 100644
-> --- a/drivers/clk/clk-composite.c
-> +++ b/drivers/clk/clk-composite.c
-> @@ -188,7 +188,7 @@ static void clk_composite_disable(struct clk_hw *hw)
->  }
->  
->  struct clk *clk_register_composite(struct device *dev, const char *name,
-> -			const char **parent_names, int num_parents,
-> +			const char * const *parent_names, int num_parents,
->  			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
->  			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
->  			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> index 69a094c3783d..962e2a056381 100644
-> --- a/drivers/clk/clk-mux.c
-> +++ b/drivers/clk/clk-mux.c
-> @@ -114,8 +114,8 @@ const struct clk_ops clk_mux_ro_ops = {
->  EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
->  
->  struct clk *clk_register_mux_table(struct device *dev, const char *name,
-> -		const char **parent_names, u8 num_parents, unsigned long flags,
-> -		void __iomem *reg, u8 shift, u32 mask,
-> +		const char * const *parent_names, u8 num_parents,
-> +		unsigned long flags, void __iomem *reg, u8 shift, u32 mask,
->  		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
->  {
->  	struct clk_mux *mux;
-> @@ -166,8 +166,8 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
->  EXPORT_SYMBOL_GPL(clk_register_mux_table);
->  
->  struct clk *clk_register_mux(struct device *dev, const char *name,
-> -		const char **parent_names, u8 num_parents, unsigned long flags,
-> -		void __iomem *reg, u8 shift, u8 width,
-> +		const char * const *parent_names, u8 num_parents,
-> +		unsigned long flags, void __iomem *reg, u8 shift, u8 width,
->  		u8 clk_mux_flags, spinlock_t *lock)
->  {
->  	u32 mask = BIT(width) - 1;
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 28abf1badb40..0bf0308963da 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -209,7 +209,7 @@ struct clk_ops {
->  struct clk_init_data {
->  	const char		*name;
->  	const struct clk_ops	*ops;
-> -	const char		**parent_names;
-> +	const char * const	*parent_names;
->  	u8			num_parents;
->  	unsigned long		flags;
->  };
-> @@ -426,13 +426,13 @@ extern const struct clk_ops clk_mux_ops;
->  extern const struct clk_ops clk_mux_ro_ops;
->  
->  struct clk *clk_register_mux(struct device *dev, const char *name,
-> -		const char **parent_names, u8 num_parents, unsigned long flags,
-> -		void __iomem *reg, u8 shift, u8 width,
-> +		const char * const *parent_names, u8 num_parents,
-> +		unsigned long flags, void __iomem *reg, u8 shift, u8 width,
->  		u8 clk_mux_flags, spinlock_t *lock);
->  
->  struct clk *clk_register_mux_table(struct device *dev, const char *name,
-> -		const char **parent_names, u8 num_parents, unsigned long flags,
-> -		void __iomem *reg, u8 shift, u32 mask,
-> +		const char * const *parent_names, u8 num_parents,
-> +		unsigned long flags, void __iomem *reg, u8 shift, u32 mask,
->  		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
->  
->  void clk_unregister_mux(struct clk *clk);
-> @@ -518,7 +518,7 @@ struct clk_composite {
->  };
->  
->  struct clk *clk_register_composite(struct device *dev, const char *name,
-> -		const char **parent_names, int num_parents,
-> +		const char * const *parent_names, int num_parents,
->  		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
->  		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
->  		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+Switch over to rising edge for GIC configuration which is also aligned
+with trigger point from the RTC chip and the internal inversion.
 
+Fixes: 5a0f93c6576a ("ARM: dts: Add am57xx-beagle-x15")
+Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/boot/dts/am57xx-beagle-x15.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index fe141c47d647..57279e3b439b 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -455,7 +455,7 @@
+ 	mcp_rtc: rtc at 6f {
+ 		compatible = "microchip,mcp7941x";
+ 		reg = <0x6f>;
+-		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_LOW>;  /* IRQ_SYS_1N */
++		interrupts = <GIC_SPI 2 IRQ_TYPE_EDGE_RISING>;  /* IRQ_SYS_1N */
+ 
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&mcp79410_pins_default>;
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.7.9.5
