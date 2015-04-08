@@ -1,27 +1,52 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 08 Apr 2015 07:36:26 +0200
-Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
- enabled during suspend
-In-Reply-To: <CA+Ln22EZn5+4zyAqH+WZXcnAr5EWNf4BHgG8rBY5ApS677N8fA@mail.gmail.com>
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>	<1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>	<CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>	<551976F1.1000605@collabora.co.uk>	<CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>	<551AFCCE.4050404@collabora.co.uk>	<551BD07E.2090506@samsung.com>	<551BDA0A.7010704@collabora.co.uk>	<551C2B6D.4010001@samsung.com>	<551C71A5.1070903@collabora.co.uk>	<CAM4voakS8PnatqRTW5gkD0NNKD9gW9Tuv5p-ekxFhKN5NcuBCQ@mail.gmail.com>	<5523B878.8040304@collabora.co.uk>	<5523C5F5.6000604@collabora.co.uk>	<CA+Ln22FrvQQ_pX7ELG-jYriGkQHmtX3aUHYqsc_-CRXcc4zxbg@mail.gmail.com>	<5523E5A9.4080302@collabora.co.uk>
- <CA+Ln22EZn5+4zyAqH+WZXcnAr5EWNf4BHgG8rBY5ApS677N8fA@mail.gmail.com>
-Message-ID: <5524BE5A.2040407@collabora.co.uk>
+From: pratyush.anand@gmail.com (Pratyush Anand)
+Date: Wed, 8 Apr 2015 11:37:04 +0530
+Subject: [PATCH v5 3/6] arm64: Kprobes with single stepping support
+In-Reply-To: <1424214701-4899-4-git-send-email-dave.long@linaro.org>
+References: <1424214701-4899-1-git-send-email-dave.long@linaro.org>
+ <1424214701-4899-4-git-send-email-dave.long@linaro.org>
+Message-ID: <CAHM4w1=84w40VCKyEtGfqYEziZaqgRWG6O7TGn+w1CeQuPyVPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tomasz,
+Hi Dave,
 
-On 04/07/2015 11:28 PM, Tomasz Figa wrote:
-> 
-> Looks good to me. You can consider this Acked-by, as long as Sylwester
-> is not opposed to this approach.
+On Wed, Feb 18, 2015 at 4:41 AM, David Long <dave.long@linaro.org> wrote:
+>
+> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+>
+> Add support for basic kernel probes(kprobes) and jump probes
+> (jprobes) for ARM64.
 >
 
-Thanks a lot, I've posted it as a proper patch now.
- 
-> Best regards,
-> Tomasz
->
+[...]
 
-Best regards,
-Javier
+>
+> +#ifdef CONFIG_KPROBES
+> +static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
+> +{
+> +       int ret = 0;
+> +
+> +       /* kprobe_running() needs smp_processor_id() */
+> +       if (!user_mode(regs)) {
+> +               preempt_disable();
+> +               if (kprobe_running() && kprobe_fault_handler(regs, esr))
+> +                       ret = 1;
+> +               preempt_enable();
+> +       }
+> +
+> +       return ret;
+> +}
+> +#else
+> +static inline int notify_page_fault(struct pt_regs *regs)
+
+Please fix this definition in next revision, other wise there would be
+a build error
+if CONFIG_KPROBES is not defined.
+
+
+should be:
+
++static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
+
+
+~Pratyush
