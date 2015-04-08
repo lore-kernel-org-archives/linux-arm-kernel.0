@@ -1,26 +1,53 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 8 Apr 2015 21:19:16 +0800
-Subject: [PATCH v3 01/16] crypto: sha1: implement base layer for SHA-1
-In-Reply-To: <1428396724-19962-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1428396724-19962-1-git-send-email-ard.biesheuvel@linaro.org>
- <1428396724-19962-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150408131916.GA29646@gondor.apana.org.au>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 08 Apr 2015 15:22:11 +0200
+Subject: [PATCH 0/8] clk: Minor cleanups
+Message-ID: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 10:51:49AM +0200, Ard Biesheuvel wrote:
->
-> +typedef void (sha1_block_fn)(int blocks, u8 const *src, u32 *state,
-> +			     const u8 *head, void *p);
+Hi,
 
-Does this really need five arguments? First of all we can get rid
-of head by just calling this function twice.  The last argument
-appears to only be used by arm64 where it is simply another way
-of saying (sctx->count + len) % SHA_BLOCK_SIZE != 0.  So why not
-get rid of it and just use the conditional?
 
-Cheers,
+Small cleanups for different clock drivers.
+
+The first two patches are independent.
+
+Rest of the patches (these related to constifying parent names)
+depend on the third patch: "clk: Constify pointers to parent
+names in init data".
+
+
+Tested on Arndale Octa (Exynos5420) and Trats2 (Exynos4412). Other
+drivers (and MIPS related) only compile tested plus some static
+checkers.
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (8):
+  clk: rockchip: Staticize file-scope declarations
+  clk: exynos: Staticize file-scope declarations
+  clk: Constify pointers to parent names in init data
+  clk: tegra: Fix duplicate const for parent names
+  clk: cdce706: Constify parent names in clock init data
+  clk: sirf: Constify parent names in clock init data
+  clk: ls1x: Fix duplicate const for parent names
+  MIPS: Alchemy: Remove unneeded cast removing const
+
+ arch/mips/alchemy/common/clock.c     |  6 +--
+ drivers/clk/clk-cdce706.c            |  4 +-
+ drivers/clk/clk-composite.c          |  2 +-
+ drivers/clk/clk-ls1x.c               |  6 +--
+ drivers/clk/clk-mux.c                |  8 ++--
+ drivers/clk/rockchip/clk-rk3188.c    |  2 +-
+ drivers/clk/rockchip/clk-rk3288.c    |  2 +-
+ drivers/clk/samsung/clk-exynos5260.c | 74 ++++++++++++++++++------------------
+ drivers/clk/samsung/clk-exynos5420.c | 10 ++---
+ drivers/clk/sirf/clk-common.c        | 12 +++---
+ drivers/clk/tegra/clk-emc.c          |  2 +-
+ include/linux/clk-provider.h         | 12 +++---
+ 12 files changed, 70 insertions(+), 70 deletions(-)
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.9.1
