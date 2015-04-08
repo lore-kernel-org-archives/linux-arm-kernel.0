@@ -1,43 +1,46 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 08 Apr 2015 11:23:20 +0100
-Subject: [RESEND PATCH 4.0-rc5 v19 3/6] irqchip: gic: Introduce plumbing
- for IPI FIQ
-In-Reply-To: <088d01d071d4$cddd9240$6998b6c0$@alibaba-inc.com>
-References: <088701d071d3$ec642a90$c52c7fb0$@alibaba-inc.com>
- <088d01d071d4$cddd9240$6998b6c0$@alibaba-inc.com>
-Message-ID: <55250198.1010808@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 8 Apr 2015 11:32:22 +0100
+Subject: [Query] Direction of adding arm64 support to PCIe designware
+ driver
+In-Reply-To: <20150403174621.02681f0d@xhacker>
+References: <20150403174621.02681f0d@xhacker>
+Message-ID: <20150408103222.GB22376@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/15 09:19, Hillf Danton wrote:
->> +/*
->> + * Fully acknowledge (both ack and eoi) any outstanding FIQ-based IPI,
->> + * otherwise do nothing.
->> + */
->> +void gic_handle_fiq_ipi(void)
->> +{
->> +	struct gic_chip_data *gic = &gic_data[0];
->> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
->> +	unsigned long irqstat, irqnr;
->> +
->> +	if (WARN_ON(!in_nmi()))
->> +		return;
->> +
->> +	while ((1u << readl_relaxed(cpu_base + GIC_CPU_HIGHPRI)) &
->> +	       SMP_IPI_FIQ_MASK) {
->> +		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
->> +		writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
->> +
->> +		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
->> +		WARN_RATELIMIT(irqnr > 16,
->> +			       "Unexpected irqnr %lu (bad prioritization?)\n",
->
-> Help more if s/Unexpected/Unexpected FIQ/ ?
+Hi Jisheng,
 
-The GIC logic to prioritize interrupts is independent of the logic to 
-route interrupt sources to IRQ or FIQ. Thus if this code acknowledges an 
-unexpected interrupt source then we really don't know whether it is an 
-IRQ or a FIQ so we cannot accurately describe this is an unexpected FIQ.
+On Fri, Apr 03, 2015 at 10:46:21AM +0100, Jisheng Zhang wrote:
+> Hi all,
+> 
+> Currently, the pci designware driver still lacks of arm64 support and I noticed
+> that many works are done to achieve this goal.
+> 
+> Some patches are merged and some are under discussion. And Per my understanding, 
+> even w/ these patches merged, the driver still doesn't support arm64. Could you
+> please kindly point out the direction to add arm64 support to the PCIe
+> designware driver?
 
-If there is bad prioritization then we cannot predict what type of 
-interrupt INTACK will give use.
+We should remove pci_sys_data dependency since ARM depends on that.
+I removed it from a couple of places already (eg pci_mmap_page_range).
+
+Now, pcibios_align_resource and pcibios_msi_controller need patching.
+
+I have a patch for pcibios_align_resource() (I am waiting for Yijing
+Wang series to get merged so that we can move the align_resource
+function pointer in the host bridge):
+
+https://lkml.org/lkml/2015/4/3/171
+
+For MSI, code converted to use CONFIG_PCI_MSI_IRQ_DOMAIN should
+not need pcibios_msi_controller ARM function, but if we still compile
+that function in we do need pci_sys_data on ARM, so we have to have
+it even if it can be dead code in some platforms, I have to vet all
+ARM PCI host controllers to check, but removing it would break MSI
+support.
+
+Does it help ? MSIs are the most important change required,
+align_resource() pointer can be sorted out easily once Yijing's
+code gets in.
+
+Lorenzo
