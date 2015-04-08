@@ -1,86 +1,58 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed,  8 Apr 2015 12:54:38 +0200
-Subject: [PATCH] ARM: tegra: cpuidle: implement cpuidle_state.enter_freeze()
-Message-ID: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 08 Apr 2015 07:01:05 -0400
+Subject: [PATCH v5 3/6] arm64: Kprobes with single stepping support
+In-Reply-To: <CAHM4w1=84w40VCKyEtGfqYEziZaqgRWG6O7TGn+w1CeQuPyVPg@mail.gmail.com>
+References: <1424214701-4899-1-git-send-email-dave.long@linaro.org>	<1424214701-4899-4-git-send-email-dave.long@linaro.org>
+ <CAHM4w1=84w40VCKyEtGfqYEziZaqgRWG6O7TGn+w1CeQuPyVPg@mail.gmail.com>
+Message-ID: <55250A71.6060200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This callback is expected to do the same as enter() only that all
-non-wakeup IRQs are expected to be disabled.
+On 04/08/15 02:07, Pratyush Anand wrote:
+> Hi Dave,
+>
+> On Wed, Feb 18, 2015 at 4:41 AM, David Long <dave.long@linaro.org> wrote:
+>>
+>> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+>>
+>> Add support for basic kernel probes(kprobes) and jump probes
+>> (jprobes) for ARM64.
+>>
+>
+> [...]
+>
+>>
+>> +#ifdef CONFIG_KPROBES
+>> +static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
+>> +{
+>> +       int ret = 0;
+>> +
+>> +       /* kprobe_running() needs smp_processor_id() */
+>> +       if (!user_mode(regs)) {
+>> +               preempt_disable();
+>> +               if (kprobe_running() && kprobe_fault_handler(regs, esr))
+>> +                       ret = 1;
+>> +               preempt_enable();
+>> +       }
+>> +
+>> +       return ret;
+>> +}
+>> +#else
+>> +static inline int notify_page_fault(struct pt_regs *regs)
+>
+> Please fix this definition in next revision, other wise there would be
+> a build error
+> if CONFIG_KPROBES is not defined.
+>
+>
+> should be:
+>
+> +static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
+>
+>
+> ~Pratyush
+>
 
-It will be called when the system goes to suspend-to-idle and will
-reduce power usage because CPUs won't be awaken for unnecessary IRQs.
+Yes, the fix is already in the v6 version I'm working on.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
----
- arch/arm/mach-tegra/cpuidle-tegra114.c | 31 ++++++++++++++++++++++++-------
- 1 file changed, 24 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
-index f2b586d..ef06001 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra114.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
-@@ -39,28 +39,44 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
- 				    struct cpuidle_driver *drv,
- 				    int index)
- {
--	local_fiq_disable();
--
- 	tegra_set_cpu_in_lp2();
- 	cpu_pm_enter();
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
--
- 	call_firmware_op(prepare_idle);
- 
- 	/* Do suspend by ourselves if the firmware does not implement it */
- 	if (call_firmware_op(do_idle, 0) == -ENOSYS)
- 		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
- 
--	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
--
- 	cpu_pm_exit();
- 	tegra_clear_cpu_in_lp2();
- 
-+	return index;
-+}
-+
-+static int tegra114_idle_enter(struct cpuidle_device *dev,
-+			       struct cpuidle_driver *drv,
-+			       int index)
-+{
-+	local_fiq_disable();
-+
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-+
-+	index = tegra114_idle_power_down(dev, drv, index);
-+
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-+
- 	local_fiq_enable();
- 
- 	return index;
- }
-+
-+static void tegra114_idle_enter_freeze(struct cpuidle_device *dev,
-+				       struct cpuidle_driver *drv,
-+				       int index)
-+{
-+	tegra114_idle_power_down(dev, drv, index);
-+}
- #endif
- 
- static struct cpuidle_driver tegra_idle_driver = {
-@@ -71,7 +87,8 @@ static struct cpuidle_driver tegra_idle_driver = {
- 		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
- #ifdef CONFIG_PM_SLEEP
- 		[1] = {
--			.enter			= tegra114_idle_power_down,
-+			.enter			= tegra114_idle_enter,
-+			.enter_freeze		= tegra114_idle_enter_freeze,
- 			.exit_latency		= 500,
- 			.target_residency	= 1000,
- 			.power_usage		= 0,
--- 
-2.3.4
+-dl
