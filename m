@@ -1,96 +1,77 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 8 Apr 2015 08:32:14 -0700
-Subject: [PATCH 6/6] hwmon: pwm-fan: Update the duty cycle inorder to
- control the pwm-fan
-In-Reply-To: <20150408104415.07e1c821@amdc2363>
-References: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
- <1427387955-5129-7-git-send-email-linux.amoon@gmail.com>
- <20150408104415.07e1c821@amdc2363>
-Message-ID: <20150408153214.GA15942@roeck-us.net>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 08 Apr 2015 16:39:03 +0100
+Subject: [PATCH v2 01/10] drivers: PL011: avoid potential unregister_driver
+ call
+In-Reply-To: <20150312104258.GI8656@n2100.arm.linux.org.uk>
+References: <1425491994-23913-1-git-send-email-andre.przywara@arm.com>
+ <1425491994-23913-2-git-send-email-andre.przywara@arm.com>
+ <20150312104258.GI8656@n2100.arm.linux.org.uk>
+Message-ID: <55254B97.6050704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 08, 2015 at 10:44:15AM +0200, Lukasz Majewski wrote:
-> Hi Anand,
+Hi Russell,
+
+On 12/03/15 10:42, Russell King - ARM Linux wrote:
+> On Wed, Mar 04, 2015 at 05:59:45PM +0000, Andre Przywara wrote:
+>> Although we care about not unregistering the driver if there are
+>> still ports connected during the .remove callback, we do miss this
+>> check in the pl011_probe function. So if the current port allocation
+>> fails, but there are other ports already registered, we will kill
+>> those.
+>> So factor out the port removal into a separate function and use that
+>> in the probe function, too.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  drivers/tty/serial/amba-pl011.c |   38 +++++++++++++++++++++-----------------
+>>  1 file changed, 21 insertions(+), 17 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+>> index 92783fc..961f9b0 100644
+>> --- a/drivers/tty/serial/amba-pl011.c
+>> +++ b/drivers/tty/serial/amba-pl011.c
+>> @@ -2235,6 +2235,24 @@ static int pl011_probe_dt_alias(int index, struct device *dev)
+>>  	return ret;
+>>  }
+>>  
+>> +/* unregisters the driver also if no more ports are left */
+>> +static void pl011_unregister_port(struct uart_amba_port *uap)
+>> +{
+>> +	int i;
+>> +	bool busy = false;
+>> +
+>> +	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
+>> +		if (amba_ports[i] == uap)
+>> +			amba_ports[i] = NULL;
+>> +		else if (amba_ports[i])
+>> +			busy = true;
+>> +	}
+>> +	pl011_dma_remove(uap);
+>> +	if (!busy)
+>> +		uart_unregister_driver(&amba_reg);
+>> +}
 > 
-> > Below changes depend on following patch.
-> > https://patchwork.kernel.org/patch/5944061/
-> > 
-> > Update the pwm_config with duty then update the pwm_disable
-> > to poweroff the cpu fan.
-> > 
+> This is still racy, as I pointed out at the time this crap was dreamt
+> up.
+> 
+> There is _no_ locking between an individual driver's ->probe or ->remove
+> functions being called concurrently for different devices.  The only
+> locking which the driver model guarantees is that a single struct device
+> can only be probed by one driver at a time.
+> 
+> Multiple struct device's can be in-progress of ->probe or ->remove
+> simultaneously.
 
-Unfortunately, the patch does not include an explanation why it is needed.
+OK, I see.
 
-The original code presumably did not update the duty cycle because
-pwm was about to be disabled anyway. That kind of made sense to me.
-Updating the duty cycle to 0 just to disable the pwm channel right
-afterwards does not immediately make sense.
+> However, this isn't your bug to solve... it's those who were proponents
+> of this crap approach.
 
-Given that, I would expect to see a rationale here. Why is this patch needed ?
-Does it fix a bug ? If yes, pelase describe the bug. If not, what is the
-purpose of this patch ?
-
-Maybe that is all explained in patch 0/6, which I was not copied on. Even
-if so, the reationale will be needed in the changelog to explain to future
-developers why this change was made.
+Does that mean you want me to drop this patch? It isn't strictly
+necessary for my series. So do you want to postpone a fix until later
+when there is a real solution (tm) for this issue or shall I include
+this still in my series for fixing at least half of the issue?
 
 Thanks,
-Guenter
-
-> > Tested on OdroidXU3 board.
-> > 
-> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> > ---
-> >  drivers/hwmon/pwm-fan.c | 10 ++++------
-> >  1 file changed, 4 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
-> > index 7c83dc4..f25c841 100644
-> > --- a/drivers/hwmon/pwm-fan.c
-> > +++ b/drivers/hwmon/pwm-fan.c
-> > @@ -44,26 +44,24 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx,
-> > unsigned long pwm) int ret = 0;
-> >  
-> >  	mutex_lock(&ctx->lock);
-> > +
-
-[ please refrain from unnecessary whitespace changes ]
-
-> >  	if (ctx->pwm_value == pwm)
-> >  		goto exit_set_pwm_err;
-> >  
-> > -	if (pwm == 0) {
-> > -		pwm_disable(ctx->pwm);
-> > -		goto exit_set_pwm;
-> > -	}
-> > -
-> >  	duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
-> >  	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
-> >  	if (ret)
-> >  		goto exit_set_pwm_err;
-> >  
-> > +	if (pwm == 0)
-> > +		pwm_disable(ctx->pwm);
-> > +
-> >  	if (ctx->pwm_value == 0) {
-> >  		ret = pwm_enable(ctx->pwm);
-> >  		if (ret)
-> >  			goto exit_set_pwm_err;
-> >  	}
-> >  
-> > -exit_set_pwm:
-> >  	ctx->pwm_value = pwm;
-> >  exit_set_pwm_err:
-> >  	mutex_unlock(&ctx->lock);
-> 
-> Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
-> 
-> BTW: I've added Guenter to CC.
-> 
-> -- 
-> Best regards,
-> 
-> Lukasz Majewski
-> 
-> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Andre.
