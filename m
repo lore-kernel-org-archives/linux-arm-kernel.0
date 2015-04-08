@@ -1,53 +1,103 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Apr 2015 15:22:11 +0200
-Subject: [PATCH 0/8] clk: Minor cleanups
-Message-ID: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
+Date: Wed, 08 Apr 2015 15:22:14 +0200
+Subject: [PATCH 3/8] clk: Constify pointers to parent names in init data
+In-Reply-To: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
+References: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1428499339-29569-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The 'parent_names' member of 'clk_init_data' is not modified so it can
+be made as an array of const pointers to constant strings.
 
+Some drivers (e.g. arch/mips/alchemy/common/clock.c) already pass such
+data.
 
-Small cleanups for different clock drivers.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/clk/clk-composite.c  |  2 +-
+ drivers/clk/clk-mux.c        |  8 ++++----
+ include/linux/clk-provider.h | 12 ++++++------
+ 3 files changed, 11 insertions(+), 11 deletions(-)
 
-The first two patches are independent.
-
-Rest of the patches (these related to constifying parent names)
-depend on the third patch: "clk: Constify pointers to parent
-names in init data".
-
-
-Tested on Arndale Octa (Exynos5420) and Trats2 (Exynos4412). Other
-drivers (and MIPS related) only compile tested plus some static
-checkers.
-
-Best regards,
-Krzysztof
-
-
-Krzysztof Kozlowski (8):
-  clk: rockchip: Staticize file-scope declarations
-  clk: exynos: Staticize file-scope declarations
-  clk: Constify pointers to parent names in init data
-  clk: tegra: Fix duplicate const for parent names
-  clk: cdce706: Constify parent names in clock init data
-  clk: sirf: Constify parent names in clock init data
-  clk: ls1x: Fix duplicate const for parent names
-  MIPS: Alchemy: Remove unneeded cast removing const
-
- arch/mips/alchemy/common/clock.c     |  6 +--
- drivers/clk/clk-cdce706.c            |  4 +-
- drivers/clk/clk-composite.c          |  2 +-
- drivers/clk/clk-ls1x.c               |  6 +--
- drivers/clk/clk-mux.c                |  8 ++--
- drivers/clk/rockchip/clk-rk3188.c    |  2 +-
- drivers/clk/rockchip/clk-rk3288.c    |  2 +-
- drivers/clk/samsung/clk-exynos5260.c | 74 ++++++++++++++++++------------------
- drivers/clk/samsung/clk-exynos5420.c | 10 ++---
- drivers/clk/sirf/clk-common.c        | 12 +++---
- drivers/clk/tegra/clk-emc.c          |  2 +-
- include/linux/clk-provider.h         | 12 +++---
- 12 files changed, 70 insertions(+), 70 deletions(-)
-
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index 956b7e54fa1c..077f4c7148f1 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -188,7 +188,7 @@ static void clk_composite_disable(struct clk_hw *hw)
+ }
+ 
+ struct clk *clk_register_composite(struct device *dev, const char *name,
+-			const char **parent_names, int num_parents,
++			const char * const *parent_names, int num_parents,
+ 			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+ 			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
+ 			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 69a094c3783d..962e2a056381 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -114,8 +114,8 @@ const struct clk_ops clk_mux_ro_ops = {
+ EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
+ 
+ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+-		const char **parent_names, u8 num_parents, unsigned long flags,
+-		void __iomem *reg, u8 shift, u32 mask,
++		const char * const *parent_names, u8 num_parents,
++		unsigned long flags, void __iomem *reg, u8 shift, u32 mask,
+ 		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
+ {
+ 	struct clk_mux *mux;
+@@ -166,8 +166,8 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ EXPORT_SYMBOL_GPL(clk_register_mux_table);
+ 
+ struct clk *clk_register_mux(struct device *dev, const char *name,
+-		const char **parent_names, u8 num_parents, unsigned long flags,
+-		void __iomem *reg, u8 shift, u8 width,
++		const char * const *parent_names, u8 num_parents,
++		unsigned long flags, void __iomem *reg, u8 shift, u8 width,
+ 		u8 clk_mux_flags, spinlock_t *lock)
+ {
+ 	u32 mask = BIT(width) - 1;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 28abf1badb40..0bf0308963da 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -209,7 +209,7 @@ struct clk_ops {
+ struct clk_init_data {
+ 	const char		*name;
+ 	const struct clk_ops	*ops;
+-	const char		**parent_names;
++	const char * const	*parent_names;
+ 	u8			num_parents;
+ 	unsigned long		flags;
+ };
+@@ -426,13 +426,13 @@ extern const struct clk_ops clk_mux_ops;
+ extern const struct clk_ops clk_mux_ro_ops;
+ 
+ struct clk *clk_register_mux(struct device *dev, const char *name,
+-		const char **parent_names, u8 num_parents, unsigned long flags,
+-		void __iomem *reg, u8 shift, u8 width,
++		const char * const *parent_names, u8 num_parents,
++		unsigned long flags, void __iomem *reg, u8 shift, u8 width,
+ 		u8 clk_mux_flags, spinlock_t *lock);
+ 
+ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+-		const char **parent_names, u8 num_parents, unsigned long flags,
+-		void __iomem *reg, u8 shift, u32 mask,
++		const char * const *parent_names, u8 num_parents,
++		unsigned long flags, void __iomem *reg, u8 shift, u32 mask,
+ 		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
+ 
+ void clk_unregister_mux(struct clk *clk);
+@@ -518,7 +518,7 @@ struct clk_composite {
+ };
+ 
+ struct clk *clk_register_composite(struct device *dev, const char *name,
+-		const char **parent_names, int num_parents,
++		const char * const *parent_names, int num_parents,
+ 		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+ 		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
+ 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
 -- 
 1.9.1
