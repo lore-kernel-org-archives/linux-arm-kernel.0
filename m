@@ -1,45 +1,136 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 8 Apr 2015 10:48:47 -0700
-Subject: [PATCH v4 1/3] genirq: Allow the irqchip state of an IRQ to be
- save/restored
-In-Reply-To: <1426676484-21812-2-git-send-email-marc.zyngier@arm.com>
-References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
- <1426676484-21812-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAJAp7Ogq+4Km=H1o3q3M8F1ntMo3nf=Xt92HSW0N+3OeVaGbSw@mail.gmail.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 8 Apr 2015 23:19:43 +0530
+Subject: [PATCH 6/6] hwmon: pwm-fan: Update the duty cycle inorder to
+ control the pwm-fan
+In-Reply-To: <20150408165351.GA22846@roeck-us.net>
+References: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
+ <1427387955-5129-7-git-send-email-linux.amoon@gmail.com>
+ <20150408104415.07e1c821@amdc2363>
+ <20150408153214.GA15942@roeck-us.net>
+ <CANAwSgSD52sDpP7NH2hhiZX-=LZF6Qo-X3enqsqM+5XAMfyP=Q@mail.gmail.com>
+ <20150408165351.GA22846@roeck-us.net>
+Message-ID: <CANAwSgQbNV9QZ2bFGk6g+RyWW6f5iW4e8ii_5rJ4srv02L=L_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 4:01 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> There is a number of cases where a kernel subsystem may want to
-> introspect the state of an interrupt at the irqchip level:
->
-> - When a peripheral is shared between virtual machines,
->   its interrupt state becomes part of the guest's state,
->   and must be switched accordingly. KVM on arm/arm64 requires
->   this for its guest-visible timer
-> - Some GPIO controllers seem to require peeking into the
->   interrupt controller they are connected to to report
->   their internal state
->
-> This seem to be a pattern that is common enough for the core code
-> to try and support this without too many horrible hacks. Introduce
-> a pair of accessors (irq_get_irqchip_state/irq_set_irqchip_state)
-> to retrieve the bits that can be of interest to another subsystem:
-> pending, active, and masked.
->
-> - irq_get_irqchip_state returns the state of the interrupt according
->   to a parameter set to IRQCHIP_STATE_PENDING, IRQCHIP_STATE_ACTIVE,
->   IRQCHIP_STATE_MASKED or IRQCHIP_STATE_LINE_LEVEL.
-> - irq_set_irqchip_state similarly sets the state of the interrupt.
->
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Tested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
+Hi Guenter,
 
-Sorry for bothering you Thomas, but we have a couple of driver for the
-Qualcomm platforms that depends on this patch (the line level part).
-Could you please have a look at it?
+Sorry my blunder mistake. Sorry for the noise.
 
-Thanks,
-Bjorn
+I just tested with spiking this patch and my observation and testing
+were wrong we can skip this patch.
+
+I will send an v2 patch series removing the patch 5 and patch 6.
+
+With correct dts changes.
+
+Thanks for pointing my mistake.
+
+-Anand Moon
+
+On 8 April 2015 at 22:23, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Wed, Apr 08, 2015 at 09:32:05PM +0530, Anand Moon wrote:
+>> Hi Guenter,
+>>
+>> Initially the board bootup the cooling level state is 0.
+>> So update the duty cycle and this power off the fan.
+>> As their is no state change the fan will not spin.
+>>
+>> Once the temperature sensor is reached to alert temperature it changes state.
+>> With the state change the fan cools the CPU and then stop's
+>>
+>> I have observed this state change with tmon utility in linux/tools/thermal/tmon/
+>>
+> Sorry, I am missing something. I still don't see what problem you are fixing
+> with this patch. What behavior is wrong with the current code, and how does your
+> patch fix it ?
+>
+> Guenter
+>
+>> -Anand Moon
+>>
+>> On 8 April 2015 at 21:02, Guenter Roeck <linux@roeck-us.net> wrote:
+>> > On Wed, Apr 08, 2015 at 10:44:15AM +0200, Lukasz Majewski wrote:
+>> >> Hi Anand,
+>> >>
+>> >> > Below changes depend on following patch.
+>> >> > https://patchwork.kernel.org/patch/5944061/
+>> >> >
+>> >> > Update the pwm_config with duty then update the pwm_disable
+>> >> > to poweroff the cpu fan.
+>> >> >
+>> >
+>> > Unfortunately, the patch does not include an explanation why it is needed.
+>> >
+>> > The original code presumably did not update the duty cycle because
+>> > pwm was about to be disabled anyway. That kind of made sense to me.
+>> > Updating the duty cycle to 0 just to disable the pwm channel right
+>> > afterwards does not immediately make sense.
+>> >
+>> > Given that, I would expect to see a rationale here. Why is this patch needed ?
+>> > Does it fix a bug ? If yes, pelase describe the bug. If not, what is the
+>> > purpose of this patch ?
+>> >
+>> > Maybe that is all explained in patch 0/6, which I was not copied on. Even
+>> > if so, the reationale will be needed in the changelog to explain to future
+>> > developers why this change was made.
+>> >
+>> > Thanks,
+>> > Guenter
+>> >
+>> >> > Tested on OdroidXU3 board.
+>> >> >
+>> >> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>> >> > ---
+>> >> >  drivers/hwmon/pwm-fan.c | 10 ++++------
+>> >> >  1 file changed, 4 insertions(+), 6 deletions(-)
+>> >> >
+>> >> > diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
+>> >> > index 7c83dc4..f25c841 100644
+>> >> > --- a/drivers/hwmon/pwm-fan.c
+>> >> > +++ b/drivers/hwmon/pwm-fan.c
+>> >> > @@ -44,26 +44,24 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx,
+>> >> > unsigned long pwm) int ret = 0;
+>> >> >
+>> >> >     mutex_lock(&ctx->lock);
+>> >> > +
+>> >
+>> > [ please refrain from unnecessary whitespace changes ]
+>> >
+>> >> >     if (ctx->pwm_value == pwm)
+>> >> >             goto exit_set_pwm_err;
+>> >> >
+>> >> > -   if (pwm == 0) {
+>> >> > -           pwm_disable(ctx->pwm);
+>> >> > -           goto exit_set_pwm;
+>> >> > -   }
+>> >> > -
+>> >> >     duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
+>> >> >     ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
+>> >> >     if (ret)
+>> >> >             goto exit_set_pwm_err;
+>> >> >
+>> >> > +   if (pwm == 0)
+>> >> > +           pwm_disable(ctx->pwm);
+>> >> > +
+>> >> >     if (ctx->pwm_value == 0) {
+>> >> >             ret = pwm_enable(ctx->pwm);
+>> >> >             if (ret)
+>> >> >                     goto exit_set_pwm_err;
+>> >> >     }
+>> >> >
+>> >> > -exit_set_pwm:
+>> >> >     ctx->pwm_value = pwm;
+>> >> >  exit_set_pwm_err:
+>> >> >     mutex_unlock(&ctx->lock);
+>> >>
+>> >> Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
+>> >>
+>> >> BTW: I've added Guenter to CC.
+>> >>
+>> >> --
+>> >> Best regards,
+>> >>
+>> >> Lukasz Majewski
+>> >>
+>> >> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
