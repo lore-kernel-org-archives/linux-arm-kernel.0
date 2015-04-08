@@ -1,128 +1,49 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 08 Apr 2015 16:39:41 +0200
-Subject: [PATCHv2] ARM: mvebu: use 0xf1000000 as internal registers on
- Armada 370 DB
-In-Reply-To: <1428409383-15922-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1428409383-15922-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <55253DAD.6040608@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 8 Apr 2015 16:49:46 +0200
+Subject: linux-next: build failure after merge of the arm-soc tree
+In-Reply-To: <2111946.bc0NbpO0Gp@wuerfel>
+References: <20150407111217.2b2cf440@canb.auug.org.au>
+ <CABuKBe+iBfmxHat3Ezinpd-85CA5m1f2gYydk=uW4SwABQ-0Wg@mail.gmail.com>
+ <CACRpkdZE0JB0xBENNPhi6g4Su5ZuZA0wf1mi8xzbLeKm3rOYjA@mail.gmail.com>
+ <2111946.bc0NbpO0Gp@wuerfel>
+Message-ID: <CACRpkdYmnEsVkfw64ihMP6BHK3+R0eiYqzHbEM1-hBcau1Nwwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/2015 14:23, Thomas Petazzoni wrote:
-> All Marvell EBU SoCs (Kirkwood, Dove, Orion, Armada) have the
-> capability of changing the location of their internal registers (i.e
-> the registers for most hardware blocks inside the SoC). When coming
-> out of reset, the internal registers are mapped at 0xd0000000, but
-> since years and years, the tradition has been to have the internal
-> registers remapped at 0xf1000000 by the bootloader, and Linux has
-> since then assumed that the internal registers for the SoC were
-> located at 0xf1000000 on Kirkwood, Dove, Orion, etc. Linux has never
-> been aware that those registers are remappable (and there is no way to
-> know where they are mapped at runtime, since the register to configure
-> the address of the registers is itself within the internal registers).
-> 
-> Then came the Armada 370 and Armada XP, in which some of the very
-> early silicon steppings had an issue, which forced to use 0xd0000000:
-> the SoC was no longer working properly when the internal registers
-> were remapped at 0xf1000000. This issue is only affecting very early
-> silicon steppings and production steppings are not affected: the issue
-> has been fixed in between.
-> 
-> Since what we (Free Electrons) used to do the initial submission of
-> the Armada 370 and Armada XP platforms was evaluation boards with
-> those very early steppings, we submitted Device Tree that assumed the
-> internal registers were mapped at 0xd0000000. This is the case for
-> Armada 370 DB, Armada XP DB and Armada XP GP.
-> 
-> However, in practice, since Marvell has been shipping the evaluation
-> boards with production steppings of the SoC, they are shipping those
-> boards with bootloaders that remap the registers to 0xf1000000. We
-> have already changed this internal register address to 0xf1000000 for
-> the Armada XP DB in commit 82066bdb5a75 and for the Armada XP GP in
-> commit 91ed32200e6e (both merged in v3.15).
-> 
-> We only recently got our hand on an Armada 370 DB with a production
-> stepping of the SoC, which uses a bootloader that remaps internal
-> registers at 0xf1000000. Therefore, this commit aligns the Armada 370
-> DB to be like the Armada XP DB and Armada XP GP: assume that the
-> internal registers are mapped at 0xf1000000.
-> 
-> We would like to stress out the fact that the usage of 0xd0000000 as
-> the internal register base address was a temporary workaround for
-> early steppings deficiencies, and that the real long-term solution is
-> the usage of 0xf1000000. Having 0xd0000000 is an *accident* in the
-> life of the Marvell platform support in the kernel, as is confirmed by
-> the usage of 0xf1000000 in all previous Marvell platforms (Dove,
-> Kirkwood, Orion).
-> 
-> There are unfortunately a number of commercial devices that continue
-> to use 0xd0000000 even though they use production steppings of the
-> SoC, simply because the vendors of such devices have never bothered
-> using a more recent bootloader version from Marvell. There is not much
-> we can do about it, and we plan on keeping 0xd0000000 in the Device
-> Tree of such devices.
-> 
-> The main reason for remapping the internal registers at 0xf1000000
-> instead of 0xd0000000 is that it leaves more space in the 0 -> 4 GB
-> part of the physical address space for RAM. With registers at
-> 0xd0000000, all RAM between 0xd0000000 to 0xffffffff is lost because
-> it's covered by the I/O registers.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Tue, Apr 7, 2015 at 2:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 07 April 2015 11:28:22 Linus Walleij wrote:
+>> On Tue, Apr 7, 2015 at 10:43 AM, Matthias Brugger
+>> <matthias.bgg@gmail.com> wrote:
+>> > 2015-04-07 3:12 GMT+02:00 Stephen Rothwell <sfr@canb.auug.org.au>:
+>> >> Hi all,
+>> >>
+>> >> After merging the arm-soc tree, today's linux-next build (arm
+>> >> multi_v7_defconfig) failed like this:
+>> >>
+>> >> In file included from arch/arm/boot/dts/mt8135.dtsi:18:0,
+>> >>                  from arch/arm/boot/dts/mt8135-evbp1.dts:16:
+>> >> arch/arm/boot/dts/mt8135-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
+>> >>  #include <dt-bindings/pinctrl/mt65xx.h>
+>> >>                                         ^
+>> >>
+>> >> Caused by commit e6f219b8ec5e ("ARM: dts: mt8135: Add pinctrl/GPIO/EINT
+>> >> node for mt8135").
+>> >
+>> > This will be fixed as soon as Linus pinctrl for-next branch got merged [1].
+>>
+>> Hm that's unfortunate, we do not rely on merge orders.
+>>
+>> Either the ARM SoC tree needs to pull in the pinctrl commit
+>> or I need to carry this patch in the pinctrl tree.
+>>
+>> Is this sufficiently stand-alone to be merged into my tree
+>> or do you need to go by the former approach?
+>
+> Let's just delay this patch to another merge window. You can add the
+> driver now, and we should just revert the DT node addition in arm-soc,
+> and then we'll add it in 4.2, or come up with a better solution.
 
+OK. I'm not applying it then.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-and applied on mvebu/fixes
-
-Thanks,
-
-Gregory
-
-
-> ---
-> Changes since v1:
->  - Improved commit log.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-370-db.dts | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-> index e993c46..dede3e7 100644
-> --- a/arch/arm/boot/dts/armada-370-db.dts
-> +++ b/arch/arm/boot/dts/armada-370-db.dts
-> @@ -45,6 +45,15 @@
->   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->   *     OTHER DEALINGS IN THE SOFTWARE.
-> + *
-> + * Note: this Device Tree assumes that the bootloader has remapped the
-> + * internal registers to 0xf1000000 (instead of the default
-> + * 0xd0000000). The 0xf1000000 is the default used by the recent,
-> + * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-> + * boards were delivered with an older version of the bootloader that
-> + * left internal registers mapped at 0xd0000000. If you are in this
-> + * situation, you should either update your bootloader (preferred
-> + * solution) or the below Device Tree should be adjusted.
->   */
->  
->  /dts-v1/;
-> @@ -64,7 +73,7 @@
->  	};
->  
->  	soc {
-> -		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
->  			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
->  
->  		internal-regs {
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yours,
+Linus Walleij
