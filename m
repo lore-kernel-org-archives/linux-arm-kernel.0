@@ -1,76 +1,72 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 08 Apr 2015 13:27:39 +0100
-Subject: [RFC PATCH 0/7] Pseudo-NMI for arm64 using ICC_PMR_EL1 (GICv3)
-In-Reply-To: <551C0EE2.2040800@arm.com>
-References: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
- <20150320154544.GC4725@e103592.cambridge.arm.com>
- <55105FD9.5010909@linaro.org>
- <20150401151541.GC3602@e103592.cambridge.arm.com> <551C0EE2.2040800@arm.com>
-Message-ID: <55251EBB.3000106@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 8 Apr 2015 13:35:06 +0100
+Subject: [PATCH] sunxi: a10-lime: add regulator nodes
+In-Reply-To: <20150407101757.GC15823@lukather>
+References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
+ <55169622.5070007@gmail.com> <20150330222311.GY23664@lukather>
+ <CABxcv=nCROiQ2COrTmnwvhtSJzh83BWKaxgn0EkFuwW8HqSiQw@mail.gmail.com>
+ <20150404123302.GY6023@sirena.org.uk>
+ <20150404125645.GK14618@lukather>
+ <20150404184716.GZ6023@sirena.org.uk>
+ <20150407101757.GC15823@lukather>
+Message-ID: <20150408123506.GY6023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/15 16:29, Marc Zyngier wrote:
-> On 01/04/15 16:15, Dave P Martin wrote:
->> Apologies for the slow reply... :/
->>
->> Anyway,
->>
->> On Mon, Mar 23, 2015 at 06:47:53PM +0000, Daniel Thompson wrote:
->>> On 20/03/15 15:45, Dave Martin wrote:
->>>> On Wed, Mar 18, 2015 at 02:20:21PM +0000, Daniel Thompson wrote:
->>>>> This patchset provides a pseudo-NMI for arm64 kernels by reimplementing
->>>>> the irqflags macros to modify the GIC PMR (the priority mask register is
->>>>> accessible as a system register on GICv3 and later) rather than the
->>>>> PSR. The pseudo-NMI changes are support by a prototype implementation of
->>>>> arch_trigger_all_cpu_backtrace that allows the new code to be exercised.
->>
->> Minor nit: the "pseudo NMI" terminology could lead to confusion if
->> something more closely resembling a real NMI comes along.
->>
->> I'll have to have a think, but nothing comes to mind right now...
->>
->> [...]
->>
->>>>>   3. Requires GICv3+ hardware together with firmware support to enable
->>>>>      GICv3 features at EL3. If CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS is
->>>>>      enabled the kernel will not boot on older hardware. It will be hard
->>>>>      to diagnose because we will crash very early in the boot (i.e.
->>>>>      before the call to start_kernel). Auto-detection might be possible
->>>>>      but the performance and code size cost of adding conditional code to
->>>>>      the irqflags macros probably makes it impractical. As such it may
->>>>>      never be possible to remove this limitation (although it might be
->>>>>      possible to find a way to survive long enough to panic and show the
->>>>>      results on the console).
->>>>
->>>> This can (and should) be done via patching -- otherwise we risk breaking
->>>> single kernel image for GICv2+v3.
->>>
->>> Do you mean real patching (hunting down all those inlines and
->>> rewrite them) or simply implementing irqflags with an ops table? If
->>> the former I didn't look at this because I didn't release we could
->>> do that...
->>
->> A generic patching framework was introduced by Andre Przywara in this
->> patch:
->>
->> e039ee4 arm64: add alternative runtime patching
->>
->> I believe you should be able to use this to patch between DAIF and
->> ICC_PMR accesses.
->>
->> You should be able to find examples of this framework being used by
->> grepping.  I've not played with it myself yet.
->
-> To follow-up on this, I have a few patches queued that use the runtime
-> patching code to deal with GICv3 in KVM:
->
-> http://thread.gmane.org/gmane.comp.emulators.kvm.arm.devel/616
->
-> The first few patches are already queued for v4.1, and the rest should
-> follow shortly after.
+On Tue, Apr 07, 2015 at 12:17:57PM +0200, Maxime Ripard wrote:
+> On Sat, Apr 04, 2015 at 07:47:16PM +0100, Mark Brown wrote:
 
-Thanks (both).
+> > Or the regulator is used by some passive component on the board that
+> > doesn't appear in DT (or some driver that doesn't yet have DT support
+> > doesn't claim the regulator) and it gets switched off.  Or we power it
+> > off and then later discover that we've been placing physical stress on
+> > the system.
 
-That's really helpful: links for that sort of thing are not easily 
-googleable (things like kpatch floods the results).
+> Isn't that what the regulator-always-on property is here for?
+
+Only if it's actually added by someone after having looked at the
+system...
+
+> > Providing .dtsis for reference designs can make sense, if there's a
+> > widely cloned board with lots of common design elements then reusing
+> > that .dtsi is fine but clearly that .dtsi isn't going to enable the full
+> > flexibility of the regulators since there will be constraints from that
+> > reference design.
+
+> That PMIC is used with various SoCs, so that's not really an
+> option. And especially when it comes to regulators, I don't think
+> there's really a pattern that emerged yet...
+
+I'm not sure you saw the "reference design" part of the above?
+
+> > Nothing else is safe.  Remember, if we get this wrong we risk system
+> > instability and at worst physical damage to the system either in rare
+> > cases immediately due to getting something badly wrong or more likely
+> > from long term electrical stresses.  If what you were proposing were
+> > safe then we should still not be enumerating everything in device trees,
+> > we should just be enabling all operations for every regulator in the
+> > system by default.  The fact that you have to override this should be a
+> > warning sign that you shouldn't be doing it.
+
+> Well, we're doing low level stuff and (from experience) things like a
+> poor muxing option can cause physical damage too, and we don't have
+> any kind of protection or policy against that.
+
+Does the pinmux code actively go in and do things without being
+explicitly configured?
+
+> So, what do you suggest for the kernel to have a behaviour independant
+> of what the bootloader state was, without adding a lot of churn in
+> each and every DTS?
+
+Well, I'm fairly happy with the current state.  I think having some sort
+of board level property saying that undescribed regulators can be
+enabled and disabled (which I think is all that this is really doing)
+might be a viable solution?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150408/37e07606/attachment.sig>
