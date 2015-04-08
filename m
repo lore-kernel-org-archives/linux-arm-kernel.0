@@ -1,115 +1,58 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 8 Apr 2015 12:55:46 +0100
-Subject: [PATCH] ARM: tegra: cpuidle: implement
- cpuidle_state.enter_freeze()
-In-Reply-To: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150408115546.GA24271@red-moon>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 08 Apr 2015 14:00:01 +0200
+Subject: [PATCH v2 1/9] ata: at91: use syscon to configure the smc
+In-Reply-To: <20150408111335.GZ20669@piout.net>
+References: <1427138955-3617-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <2936706.hVbBP0ExQQ@amdc1032> <20150408111335.GZ20669@piout.net>
+Message-ID: <3156869.zFaIKVVpHK@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 08, 2015 at 11:54:38AM +0100, Tomeu Vizoso wrote:
-> This callback is expected to do the same as enter() only that all
-> non-wakeup IRQs are expected to be disabled.
-
-This is not true or at least it is misworded. The enter_freeze() function
-is expected to return from the state with IRQs disabled at CPU level, or
-put it differently it must not re-enable IRQs while executing since the
-tick is frozen.
-
-> It will be called when the system goes to suspend-to-idle and will
-> reduce power usage because CPUs won't be awaken for unnecessary IRQs.
+On Wednesday, April 08, 2015 01:13:35 PM Alexandre Belloni wrote:
+> Hi,
 > 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> ---
->  arch/arm/mach-tegra/cpuidle-tegra114.c | 31 ++++++++++++++++++++++++-------
->  1 file changed, 24 insertions(+), 7 deletions(-)
+> On 08/04/2015 at 13:04:19 +0200, Bartlomiej Zolnierkiewicz wrote :
+> > On Monday, March 23, 2015 08:29:07 PM Alexandre Belloni wrote:
+> > > Use syscon/regmap to configure the smc. This allows to avoid using
+> > > at91sam9_smc.h and to compile the driver in a multiplatform configuration.
+> > > 
+> > > The driver will still not probe until the proper DT bindings are added. That
+> > > binding will include an atmel,smc property that is a phandle to the SMC the CF
+> > > controller is connected to.
+> > 
+> > If the driver is currently working fine in !ARCH_MULTIPLATFORM
+> > configuration then this patch will make it non-functional until
+> > atmel,smc property is added to DT.  To prevent this and preserve
+> > bisectability the patchset should first add atmel,smc property
+> > and then convert pata_at91 driver to use it.
+> > 
 > 
-> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
-> index f2b586d..ef06001 100644
-> --- a/arch/arm/mach-tegra/cpuidle-tegra114.c
-> +++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
-> @@ -39,28 +39,44 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
->  				    struct cpuidle_driver *drv,
->  				    int index)
->  {
-> -	local_fiq_disable();
-> -
->  	tegra_set_cpu_in_lp2();
->  	cpu_pm_enter();
->  
-> -	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-> -
->  	call_firmware_op(prepare_idle);
->  
->  	/* Do suspend by ourselves if the firmware does not implement it */
->  	if (call_firmware_op(do_idle, 0) == -ENOSYS)
->  		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
->  
-> -	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-> -
->  	cpu_pm_exit();
->  	tegra_clear_cpu_in_lp2();
->  
-> +	return index;
-> +}
-> +
-> +static int tegra114_idle_enter(struct cpuidle_device *dev,
-> +			       struct cpuidle_driver *drv,
-> +			       int index)
-> +{
-> +	local_fiq_disable();
-> +
-> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-> +
-> +	index = tegra114_idle_power_down(dev, drv, index);
-> +
-> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-> +
->  	local_fiq_enable();
->  
->  	return index;
->  }
-> +
-> +static void tegra114_idle_enter_freeze(struct cpuidle_device *dev,
-> +				       struct cpuidle_driver *drv,
-> +				       int index)
-> +{
-> +	tegra114_idle_power_down(dev, drv, index);
+> Starting with 4.1, it will not be possible to use the driver anyway as
+> all the platforms using it have switched to multiplatform. This patch
+> makes it compilable again.
 
-Cool. So if the problem is FIQs, you don't disabled them on entry
-which means you enter the "frozen" state with FIQs enabled and tick frozen,
-unless I am missing something.
+Hmm.  It seems that it was your commit which did the switch without
+converting all at91 specific code to be multiplatform ready first:
 
-The question here is: are we allowed to enable FIQs before returning
-from an enter_freeze() call (and to enter it with FIQs enabled) ?
+    From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+    Date: Fri, 13 Mar 2015 22:57:18 +0100
+    Subject: ARM: at91: switch to multiplatform
 
-If we are not your code here certainly does not solve the issue, since
-it does _not_ disable FIQs upon enter_freeze call anyway.
+    Switch AT91 to multiplatform as all SoCs are properly handled.
 
-Lorenzo
+    Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+    Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> +}
->  #endif
->  
->  static struct cpuidle_driver tegra_idle_driver = {
-> @@ -71,7 +87,8 @@ static struct cpuidle_driver tegra_idle_driver = {
->  		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
->  #ifdef CONFIG_PM_SLEEP
->  		[1] = {
-> -			.enter			= tegra114_idle_power_down,
-> +			.enter			= tegra114_idle_enter,
-> +			.enter_freeze		= tegra114_idle_enter_freeze,
->  			.exit_latency		= 500,
->  			.target_residency	= 1000,
->  			.power_usage		= 0,
-> -- 
-> 2.3.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+?
+
+> Anyway, it seems that there is little interest in that driver and nobody
+> I contacted has access to a board which can be used to test this.
+
+If there are no users then probably the driver can be removed but this
+something that platform Maintainers should decide on.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
