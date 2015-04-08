@@ -1,27 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 8 Apr 2015 18:09:49 +0100
-Subject: [PATCH v3] ASoC: max98090: add shutdown callback for max98090
-In-Reply-To: <1428491156-31803-1-git-send-email-wxt@rock-chips.com>
-References: <1428491156-31803-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <20150408170949.GD6023@sirena.org.uk>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 08 Apr 2015 10:14:19 -0700
+Subject: [PATCH 0/6] arm64 kexec kernel patches V8
+In-Reply-To: <55250E2A.80106@arm.com>
+References: <cover.1426793116.git.geoff@infradead.org> <55250E2A.80106@arm.com>
+Message-ID: <1428513259.11876.5.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 08, 2015 at 07:05:56PM +0800, Caesar Wang wrote:
-> To fix pop noise when shutdown,the pop noise during shutdown
-> is the pmic cutoff power of codec without any notice.
+Hi,
 
-Applied, thanks.  
+On Wed, 2015-04-08 at 12:16 +0100, Suzuki K. Poulose wrote:
+> Btw, I get the following build failure for kexec-tools master branch, 
+> with Linaro tool chain (crosstool-NG linaro-1.13.1-4.9-2014.09 - Linaro 
+> GCC 4.9-2014.09 )
+> 
+>   $ ./configure --host=aarch64-linux-gnu
+>   [...]
+>   $ make -j4
+> kexec/arch/arm64/kexec-arm64.c: In function ?machine_verify_elf_rel?:
+> kexec/arch/arm64/kexec-arm64.c:970:29: error: ?EM_AARCH64? undeclared 
 
-Please do make an effort to only send patches to relevant people -
-sending people patches that aren't relevant to them adds to the volume
-of mail they have to handle which can get in the way of things that need
-the attention.  For example I'm not sure why the dri-devel list is on
-this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150408/205c6ef6/attachment.sig>
+I guess that toolchain is using some ancient headers.  As a workaround
+you can use configure CPPFLAGS='-DEM_AARCH64=183'.
+
+-Geoff
