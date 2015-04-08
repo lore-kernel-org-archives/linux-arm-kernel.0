@@ -1,69 +1,43 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed,  8 Apr 2015 18:18:31 +0800
-Subject: [PATCH v2] ASoC: max98090: add shutdown callback for max98090
-Message-ID: <1428488311-27237-1-git-send-email-wxt@rock-chips.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 08 Apr 2015 11:23:20 +0100
+Subject: [RESEND PATCH 4.0-rc5 v19 3/6] irqchip: gic: Introduce plumbing
+ for IPI FIQ
+In-Reply-To: <088d01d071d4$cddd9240$6998b6c0$@alibaba-inc.com>
+References: <088701d071d3$ec642a90$c52c7fb0$@alibaba-inc.com>
+ <088d01d071d4$cddd9240$6998b6c0$@alibaba-inc.com>
+Message-ID: <55250198.1010808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To fix pop noise when shutdown,the pop noise during shutdown
-is the pmic cutoff power of codec without any notice.
+On 08/04/15 09:19, Hillf Danton wrote:
+>> +/*
+>> + * Fully acknowledge (both ack and eoi) any outstanding FIQ-based IPI,
+>> + * otherwise do nothing.
+>> + */
+>> +void gic_handle_fiq_ipi(void)
+>> +{
+>> +	struct gic_chip_data *gic = &gic_data[0];
+>> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
+>> +	unsigned long irqstat, irqnr;
+>> +
+>> +	if (WARN_ON(!in_nmi()))
+>> +		return;
+>> +
+>> +	while ((1u << readl_relaxed(cpu_base + GIC_CPU_HIGHPRI)) &
+>> +	       SMP_IPI_FIQ_MASK) {
+>> +		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+>> +		writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
+>> +
+>> +		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
+>> +		WARN_RATELIMIT(irqnr > 16,
+>> +			       "Unexpected irqnr %lu (bad prioritization?)\n",
+>
+> Help more if s/Unexpected/Unexpected FIQ/ ?
 
-Signed-off-by: jay.xu <xjq@rock-chips.com>
-Signed-off-by: zhengxing <zhengxing@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+The GIC logic to prioritize interrupts is independent of the logic to 
+route interrupt sources to IRQ or FIQ. Thus if this code acknowledges an 
+unexpected interrupt source then we really don't know whether it is an 
+IRQ or a FIQ so we cannot accurately describe this is an unexpected FIQ.
 
-Serien-cc: linux-kernel at vger.kernel.org
-Serien-cc: devicetree at vger.kernel.org
-Serien-cc: dianders at chromium.org
-
----
-
-Changes in v2:
-- remove the dev_info(..)
-- fix the comment style
-- add the max98090_i2c_shutdown() in remove() fuction
-
- sound/soc/codecs/max98090.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/sound/soc/codecs/max98090.c b/sound/soc/codecs/max98090.c
-index b112b1c..e59013a 100644
---- a/sound/soc/codecs/max98090.c
-+++ b/sound/soc/codecs/max98090.c
-@@ -2607,10 +2607,26 @@ err_enable:
- 
- static int max98090_i2c_remove(struct i2c_client *client)
- {
-+	max98090_i2c_shutdown(client);
- 	snd_soc_unregister_codec(&client->dev);
- 	return 0;
- }
- 
-+static void max98090_i2c_shutdown(struct i2c_client *i2c)
-+{
-+	struct max98090_priv *max98090 = dev_get_drvdata(&i2c->dev);
-+
-+	/*
-+	 * Enable volume smoothing, disable zero cross.  This will cause
-+	 * a quick 40ms ramp to mute on shutdown.
-+	 */
-+	regmap_write(max98090->regmap,
-+		M98090_REG_LEVEL_CONTROL, M98090_VSENN_MASK);
-+	regmap_write(max98090->regmap,
-+		M98090_REG_DEVICE_SHUTDOWN, 0x00);
-+	msleep(40);
-+}
-+
- #ifdef CONFIG_PM
- static int max98090_runtime_resume(struct device *dev)
- {
-@@ -2697,6 +2713,7 @@ static struct i2c_driver max98090_i2c_driver = {
- 	},
- 	.probe  = max98090_i2c_probe,
- 	.remove = max98090_i2c_remove,
-+	.shutdown = max98090_i2c_shutdown,
- 	.id_table = max98090_i2c_id,
- };
- 
--- 
-1.9.1
+If there is bad prioritization then we cannot predict what type of 
+interrupt INTACK will give use.
