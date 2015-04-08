@@ -1,185 +1,91 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 8 Apr 2015 16:14:52 +0300
-Subject: [PATCH v4 8/8] ARM: DTS: dra7x: Integrate sDMA crossbar
-In-Reply-To: <1428498892-28471-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1428498892-28471-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1428498892-28471-9-git-send-email-peter.ujfalusi@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  8 Apr 2015 10:17:44 -0300
+Subject: [PATCH v3] mmc: sdhci-esdhc-imx: Call mmc_of_parse()
+Message-ID: <1428499065-25544-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sDMA requests are routed through the DMA crossbar and without the
-crossbar only peripherals using DMA request 0-127 can be used.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Currently it is not possible to use 'mmc-pwrseq-simple' property with this
+driver because mmc_of_parse() is never called.
+
+mmc_of_parse() calls mmc_pwrseq_alloc() that manages MMC power sequence and
+allows passing GPIOs in the devicetree to properly power/reset the Wifi
+chipset.
+
+When using mmc_of_parse() we no longer need to have custom code to request
+card-detect and write-protect pins, as this can now be handled by the mmc
+core.
+
+Tested on a imx6sl-warp board where BT/Wifi is functional and also on a
+imx6q-sabresd.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 57 ++++++++++++++++++++++++++-------------------
- 1 file changed, 33 insertions(+), 24 deletions(-)
+Change since v2:
+- Use mmc_of_parse() and remove custom code to retrieve CD/WP GPIOs.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 5332b57b4950..a2f4aa01984f 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -303,6 +303,15 @@
- 			dma-requests = <127>;
- 		};
+ drivers/mmc/host/sdhci-esdhc-imx.c | 38 ++++++--------------------------------
+ 1 file changed, 6 insertions(+), 32 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 7ee8312..82f512d 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -1013,40 +1013,9 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 					host->mmc->parent->platform_data);
+ 	}
  
-+		sdma_xbar: dma-router at 4a002b78 {
-+			compatible = "ti,dra7-dma-crossbar";
-+			reg = <0x4a002b78 0xfc>;
-+			#dma-cells = <1>;
-+			dma-requests = <205>;
-+			ti,dma-safe-map = <0>;
-+			dma-masters = <&sdma>;
-+		};
+-	/* write_protect */
+-	if (boarddata->wp_type == ESDHC_WP_GPIO) {
+-		err = mmc_gpio_request_ro(host->mmc, boarddata->wp_gpio);
+-		if (err) {
+-			dev_err(mmc_dev(host->mmc),
+-				"failed to request write-protect gpio!\n");
+-			goto disable_clk;
+-		}
+-		host->mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+-	}
+-
+ 	/* card_detect */
+-	switch (boarddata->cd_type) {
+-	case ESDHC_CD_GPIO:
+-		err = mmc_gpio_request_cd(host->mmc, boarddata->cd_gpio, 0);
+-		if (err) {
+-			dev_err(mmc_dev(host->mmc),
+-				"failed to request card-detect gpio!\n");
+-			goto disable_clk;
+-		}
+-		/* fall through */
+-
+-	case ESDHC_CD_CONTROLLER:
+-		/* we have a working card_detect back */
++	if (boarddata->cd_type == ESDHC_CD_CONTROLLER)
+ 		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+-		break;
+-
+-	case ESDHC_CD_PERMANENT:
+-		host->mmc->caps |= MMC_CAP_NONREMOVABLE;
+-		break;
+-
+-	case ESDHC_CD_NONE:
+-		break;
+-	}
+ 
+ 	switch (boarddata->max_bus_width) {
+ 	case 8:
+@@ -1079,6 +1048,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 		host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
+ 	}
+ 
++	/* call to generic mmc_of_parse to support additional capabilities */
++	err = mmc_of_parse(host->mmc);
++	if (err)
++		goto disable_clk;
 +
- 		gpio1: gpio at 4ae10000 {
- 			compatible = "ti,omap4-gpio";
- 			reg = <0x4ae10000 0x200>;
-@@ -398,7 +407,7 @@
- 			ti,hwmods = "uart1";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
--			dmas = <&sdma 49>, <&sdma 50>;
-+			dmas = <&sdma_xbar 49>, <&sdma_xbar 50>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -409,7 +418,7 @@
- 			ti,hwmods = "uart2";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
--			dmas = <&sdma 51>, <&sdma 52>;
-+			dmas = <&sdma_xbar 51>, <&sdma_xbar 52>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -420,7 +429,7 @@
- 			ti,hwmods = "uart3";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
--			dmas = <&sdma 53>, <&sdma 54>;
-+			dmas = <&sdma_xbar 53>, <&sdma_xbar 54>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -431,7 +440,7 @@
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
-                         status = "disabled";
--			dmas = <&sdma 55>, <&sdma 56>;
-+			dmas = <&sdma_xbar 55>, <&sdma_xbar 56>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -442,7 +451,7 @@
- 			ti,hwmods = "uart5";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
--			dmas = <&sdma 63>, <&sdma 64>;
-+			dmas = <&sdma_xbar 63>, <&sdma_xbar 64>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -453,7 +462,7 @@
- 			ti,hwmods = "uart6";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
--			dmas = <&sdma 79>, <&sdma 80>;
-+			dmas = <&sdma_xbar 79>, <&sdma_xbar 80>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -862,7 +871,7 @@
- 			ti,hwmods = "mmc1";
- 			ti,dual-volt;
- 			ti,needs-special-reset;
--			dmas = <&sdma 61>, <&sdma 62>;
-+			dmas = <&sdma_xbar 61>, <&sdma_xbar 62>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 			pbias-supply = <&pbias_mmc_reg>;
-@@ -874,7 +883,7 @@
- 			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc2";
- 			ti,needs-special-reset;
--			dmas = <&sdma 47>, <&sdma 48>;
-+			dmas = <&sdma_xbar 47>, <&sdma_xbar 48>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 		};
-@@ -885,7 +894,7 @@
- 			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc3";
- 			ti,needs-special-reset;
--			dmas = <&sdma 77>, <&sdma 78>;
-+			dmas = <&sdma_xbar 77>, <&sdma_xbar 78>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 		};
-@@ -896,7 +905,7 @@
- 			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc4";
- 			ti,needs-special-reset;
--			dmas = <&sdma 57>, <&sdma 58>;
-+			dmas = <&sdma_xbar 57>, <&sdma_xbar 58>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 		};
-@@ -1041,14 +1050,14 @@
- 			#size-cells = <0>;
- 			ti,hwmods = "mcspi1";
- 			ti,spi-num-cs = <4>;
--			dmas = <&sdma 35>,
--			       <&sdma 36>,
--			       <&sdma 37>,
--			       <&sdma 38>,
--			       <&sdma 39>,
--			       <&sdma 40>,
--			       <&sdma 41>,
--			       <&sdma 42>;
-+			dmas = <&sdma_xbar 35>,
-+			       <&sdma_xbar 36>,
-+			       <&sdma_xbar 37>,
-+			       <&sdma_xbar 38>,
-+			       <&sdma_xbar 39>,
-+			       <&sdma_xbar 40>,
-+			       <&sdma_xbar 41>,
-+			       <&sdma_xbar 42>;
- 			dma-names = "tx0", "rx0", "tx1", "rx1",
- 				    "tx2", "rx2", "tx3", "rx3";
- 			status = "disabled";
-@@ -1062,10 +1071,10 @@
- 			#size-cells = <0>;
- 			ti,hwmods = "mcspi2";
- 			ti,spi-num-cs = <2>;
--			dmas = <&sdma 43>,
--			       <&sdma 44>,
--			       <&sdma 45>,
--			       <&sdma 46>;
-+			dmas = <&sdma_xbar 43>,
-+			       <&sdma_xbar 44>,
-+			       <&sdma_xbar 45>,
-+			       <&sdma_xbar 46>;
- 			dma-names = "tx0", "rx0", "tx1", "rx1";
- 			status = "disabled";
- 		};
-@@ -1078,7 +1087,7 @@
- 			#size-cells = <0>;
- 			ti,hwmods = "mcspi3";
- 			ti,spi-num-cs = <2>;
--			dmas = <&sdma 15>, <&sdma 16>;
-+			dmas = <&sdma_xbar 15>, <&sdma_xbar 16>;
- 			dma-names = "tx0", "rx0";
- 			status = "disabled";
- 		};
-@@ -1091,7 +1100,7 @@
- 			#size-cells = <0>;
- 			ti,hwmods = "mcspi4";
- 			ti,spi-num-cs = <1>;
--			dmas = <&sdma 70>, <&sdma 71>;
-+			dmas = <&sdma_xbar 70>, <&sdma_xbar 71>;
- 			dma-names = "tx0", "rx0";
- 			status = "disabled";
- 		};
+ 	err = sdhci_add_host(host);
+ 	if (err)
+ 		goto disable_clk;
 -- 
-2.3.5
+1.9.1
