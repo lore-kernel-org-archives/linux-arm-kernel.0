@@ -1,41 +1,36 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Apr 2015 15:22:16 +0200
-Subject: [PATCH 5/8] clk: cdce706: Constify parent names in clock init data
+Date: Wed, 08 Apr 2015 15:22:18 +0200
+Subject: [PATCH 7/8] clk: ls1x: Fix duplicate const for parent names
 In-Reply-To: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
 References: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1428499339-29569-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1428499339-29569-8-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The array of parent names can be made as array of const pointers to
+Replace duplicated const keyword with proper array of const pointers to
 const strings.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/clk/clk-cdce706.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/clk-ls1x.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/clk-cdce706.c b/drivers/clk/clk-cdce706.c
-index b8e4f8a822e9..8a2dfd0012f3 100644
---- a/drivers/clk/clk-cdce706.c
-+++ b/drivers/clk/clk-cdce706.c
-@@ -94,7 +94,7 @@ static const char * const cdce706_source_name[] = {
- 	"clk_in0", "clk_in1",
- };
+diff --git a/drivers/clk/clk-ls1x.c b/drivers/clk/clk-ls1x.c
+index ca80103ac188..d4c61985f448 100644
+--- a/drivers/clk/clk-ls1x.c
++++ b/drivers/clk/clk-ls1x.c
+@@ -80,9 +80,9 @@ static struct clk *__init clk_register_pll(struct device *dev,
+ 	return clk;
+ }
  
--static const char *cdce706_clkin_name[] = {
-+static const char * const cdce706_clkin_name[] = {
- 	"clk_in",
- };
+-static const char const *cpu_parents[] = { "cpu_clk_div", "osc_33m_clk", };
+-static const char const *ahb_parents[] = { "ahb_clk_div", "osc_33m_clk", };
+-static const char const *dc_parents[] = { "dc_clk_div", "osc_33m_clk", };
++static const char * const cpu_parents[] = { "cpu_clk_div", "osc_33m_clk", };
++static const char * const ahb_parents[] = { "ahb_clk_div", "osc_33m_clk", };
++static const char * const dc_parents[] = { "dc_clk_div", "osc_33m_clk", };
  
-@@ -102,7 +102,7 @@ static const char * const cdce706_pll_name[] = {
- 	"pll1", "pll2", "pll3",
- };
- 
--static const char *cdce706_divider_parent_name[] = {
-+static const char * const cdce706_divider_parent_name[] = {
- 	"clk_in", "pll1", "pll2", "pll2", "pll3",
- };
- 
+ void __init ls1x_clk_init(void)
+ {
 -- 
 1.9.1
