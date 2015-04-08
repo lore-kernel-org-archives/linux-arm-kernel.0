@@ -1,25 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 8 Apr 2015 19:52:33 -0300
-Subject: [PATCH] ARM: dts: imx23-olinuxino: Add i2c support
-In-Reply-To: <1158701263.68321.1428531175931.JavaMail.open-xchange@oxbaltgw03.schlund.de>
-References: <1428515100-1496-1-git-send-email-harald@ccbib.org>
- <1158701263.68321.1428531175931.JavaMail.open-xchange@oxbaltgw03.schlund.de>
-Message-ID: <CAOMZO5A1LFD7V+MXfe2dVbV3GU9AQ0qRXHH5ez7gDcn+Q7qjYA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Apr 2015 00:06:58 +0100
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <20150407152207.GM18048@atomide.com>
+References: <5520E2EE.4080302@gmail.com>
+ <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
+ <5521A438.1070008@gmail.com>
+ <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com>
+ <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
+ <20150406174245.GJ18048@atomide.com>
+ <20150407135713.GL4027@n2100.arm.linux.org.uk>
+ <20150407152207.GM18048@atomide.com>
+Message-ID: <20150408230658.GO4027@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Tue, Apr 07, 2015 at 08:22:08AM -0700, Tony Lindgren wrote:
+> Works for me. The above needs the following fix folded in to build:
+> 
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -532,7 +532,7 @@ __v7_ca9mp_proc_info:
+>  __v7_ca8_proc_info:
+>  	.long	0x410fc080
+>  	.long	0xff0ffff0
+> -	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
+> +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
+>  	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
+>  
+>  #endif	/* CONFIG_ARM_LPAE */
 
-On Wed, Apr 8, 2015 at 7:12 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+Thanks, merged into the original patch.
 
-> AFAIK the iMX233-OLinuXino-MICRO don't have a UEXT connector. Maybe we reached
-> the point
-> to make dts files for every Olinuxino board. In that case we could also handle
-> the USB Host / Peripherial issue.
-
-Yes, I agree. it would be better to split the dts files for the
-olinuxino variants.
-
-Regards,
-
-Fabio Estevam
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
