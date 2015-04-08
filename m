@@ -1,49 +1,211 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Apr 2015 16:49:46 +0200
-Subject: linux-next: build failure after merge of the arm-soc tree
-In-Reply-To: <2111946.bc0NbpO0Gp@wuerfel>
-References: <20150407111217.2b2cf440@canb.auug.org.au>
- <CABuKBe+iBfmxHat3Ezinpd-85CA5m1f2gYydk=uW4SwABQ-0Wg@mail.gmail.com>
- <CACRpkdZE0JB0xBENNPhi6g4Su5ZuZA0wf1mi8xzbLeKm3rOYjA@mail.gmail.com>
- <2111946.bc0NbpO0Gp@wuerfel>
-Message-ID: <CACRpkdYmnEsVkfw64ihMP6BHK3+R0eiYqzHbEM1-hBcau1Nwwg@mail.gmail.com>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Wed, 08 Apr 2015 17:56:49 +0300
+Subject: [PATCH 2/6] ARM: keystone2: move update of the phys-to-virt
+ constants into generic code
+In-Reply-To: <E1YfmXq-0006Wr-M7@rmk-PC.arm.linux.org.uk>
+References: <20150408094438.GM12732@n2100.arm.linux.org.uk>
+ <E1YfmXq-0006Wr-M7@rmk-PC.arm.linux.org.uk>
+Message-ID: <552541B1.2000501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 7, 2015 at 2:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 07 April 2015 11:28:22 Linus Walleij wrote:
->> On Tue, Apr 7, 2015 at 10:43 AM, Matthias Brugger
->> <matthias.bgg@gmail.com> wrote:
->> > 2015-04-07 3:12 GMT+02:00 Stephen Rothwell <sfr@canb.auug.org.au>:
->> >> Hi all,
->> >>
->> >> After merging the arm-soc tree, today's linux-next build (arm
->> >> multi_v7_defconfig) failed like this:
->> >>
->> >> In file included from arch/arm/boot/dts/mt8135.dtsi:18:0,
->> >>                  from arch/arm/boot/dts/mt8135-evbp1.dts:16:
->> >> arch/arm/boot/dts/mt8135-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
->> >>  #include <dt-bindings/pinctrl/mt65xx.h>
->> >>                                         ^
->> >>
->> >> Caused by commit e6f219b8ec5e ("ARM: dts: mt8135: Add pinctrl/GPIO/EINT
->> >> node for mt8135").
->> >
->> > This will be fixed as soon as Linus pinctrl for-next branch got merged [1].
->>
->> Hm that's unfortunate, we do not rely on merge orders.
->>
->> Either the ARM SoC tree needs to pull in the pinctrl commit
->> or I need to carry this patch in the pinctrl tree.
->>
->> Is this sufficiently stand-alone to be merged into my tree
->> or do you need to go by the former approach?
->
-> Let's just delay this patch to another merge window. You can add the
-> driver now, and we should just revert the DT node addition in arm-soc,
-> and then we'll add it in 4.2, or come up with a better solution.
+Hi Russell,
 
-OK. I'm not applying it then.
+On 04/08/2015 12:45 PM, Russell King wrote:
+> Make the init_meminfo function return the offset to be applied to the
+> phys-to-virt translation constants.  This allows us to move the update
+> into generic code, along with the requirements for this update.
 
-Yours,
-Linus Walleij
+
+I have a question (or may be proposition) regarding this patch.
+
+Could it be reasonable if .init_meminfo() will return new PHYS offset
+of RAM (new start address), instead of translation's offset?
+
+Additional comments are below, which were done only from Keystone 2 point of view.
+
+> 
+> This avoids platforms having to know the details of the phys-to-virt
+> translation support.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>   arch/arm/include/asm/mach/arch.h  |  2 +-
+>   arch/arm/mach-keystone/keystone.c | 27 ++++++++++-----------------
+>   arch/arm/mm/mmu.c                 | 26 ++++++++++++++++++++++----
+>   3 files changed, 33 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 0406cb3f1af7..e881913f7c3e 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -51,7 +51,7 @@ struct machine_desc {
+>   	bool			(*smp_init)(void);
+>   	void			(*fixup)(struct tag *, char **);
+>   	void			(*dt_fixup)(void);
+> -	void			(*init_meminfo)(void);
+> +	long long		(*init_meminfo)(void);
+>   	void			(*reserve)(void);/* reserve mem blocks	*/
+>   	void			(*map_io)(void);/* IO mapping function	*/
+>   	void			(*init_early)(void);
+> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+> index 3d58a8f4dc7e..baa0fbc9803a 100644
+> --- a/arch/arm/mach-keystone/keystone.c
+> +++ b/arch/arm/mach-keystone/keystone.c
+> @@ -68,11 +68,9 @@ static phys_addr_t keystone_virt_to_idmap(unsigned long x)
+>   	return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET + KEYSTONE_LOW_PHYS_START;
+>   }
+>   
+> -static void __init keystone_init_meminfo(void)
+> +static long long __init keystone_init_meminfo(void)
+>   {
+> -	bool lpae = IS_ENABLED(CONFIG_ARM_LPAE);
+> -	bool pvpatch = IS_ENABLED(CONFIG_ARM_PATCH_PHYS_VIRT);
+> -	phys_addr_t offset = PHYS_OFFSET - KEYSTONE_LOW_PHYS_START;
+> +	long long offset;
+>   	phys_addr_t mem_start, mem_end;
+>   
+>   	mem_start = memblock_start_of_DRAM();
+> @@ -81,29 +79,24 @@ static void __init keystone_init_meminfo(void)
+>   	/* nothing to do if we are running out of the <32-bit space */
+>   	if (mem_start >= KEYSTONE_LOW_PHYS_START &&
+>   	    mem_end   <= KEYSTONE_LOW_PHYS_END)
+> -		return;
+> -
+> -	if (!lpae || !pvpatch) {
+> -		pr_crit("Enable %s%s%s to run outside 32-bit space\n",
+> -		      !lpae ? __stringify(CONFIG_ARM_LPAE) : "",
+> -		      (!lpae && !pvpatch) ? " and " : "",
+> -		      !pvpatch ? __stringify(CONFIG_ARM_PATCH_PHYS_VIRT) : "");
+> -	}
+> +		return 0;
+>   
+>   	if (mem_start < KEYSTONE_HIGH_PHYS_START ||
+>   	    mem_end   > KEYSTONE_HIGH_PHYS_END) {
+>   		pr_crit("Invalid address space for memory (%08llx-%08llx)\n",
+> -		      (u64)mem_start, (u64)mem_end);
+> +		        (u64)mem_start, (u64)mem_end);
+> +		return 0;
+>   	}
+>   
+> -	offset += KEYSTONE_HIGH_PHYS_START;
+> -	__pv_phys_pfn_offset = PFN_DOWN(offset);
+> -	__pv_offset = (offset - PAGE_OFFSET);
+> +	offset = KEYSTONE_HIGH_PHYS_START - KEYSTONE_LOW_PHYS_START;
+
+New PHYS offset of RAM  can be returned here
+
+ offset = KEYSTONE_HIGH_PHYS_START;
+
+>   
+>   	/* Populate the arch idmap hook */
+>   	arch_virt_to_idmap = keystone_virt_to_idmap;
+>   
+> -	pr_info("Switching to high address space at 0x%llx\n", (u64)offset);
+> +	pr_info("Switching to high address space at 0x%llx\n",
+> +	        (u64)PHYS_OFFSET + (u64)offset);
+
+Change can be dropped
+
+> +
+> +	return offset;
+>   }
+>   
+>   static const char *const keystone_match[] __initconst = {
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 4e6ef896c619..71563fdf298c 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1387,7 +1387,7 @@ static void __init map_lowmem(void)
+>   	}
+>   }
+>   
+> -#ifdef CONFIG_ARM_LPAE
+> +#if defined(CONFIG_ARM_LPAE) && defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+>   /*
+>    * early_paging_init() recreates boot time page table setup, allowing machines
+>    * to switch over to a high (>4G) address space on LPAE systems
+> @@ -1397,6 +1397,7 @@ void __init early_paging_init(const struct machine_desc *mdesc,
+>   {
+>   	pmdval_t pmdprot = procinfo->__cpu_mm_mmu_flags;
+>   	unsigned long map_start, map_end;
+> +	long long offset;
+>   	pgd_t *pgd0, *pgdk;
+>   	pud_t *pud0, *pudk, *pud_start;
+>   	pmd_t *pmd0, *pmdk;
+> @@ -1419,7 +1420,13 @@ void __init early_paging_init(const struct machine_desc *mdesc,
+>   	pudk = pud_offset(pgdk, map_start);
+>   	pmdk = pmd_offset(pudk, map_start);
+>   
+
+If I understand PV patching code right, the PHYS_OFFSET == 0x8000 0000 (32 bit address)
+at this moment and its value is adjusted by Asm code. So, this value
+could be considered as old PHYS_OFFSET.
+
+PAGE_OFFSET == 0xC000 0000 (defconfig)
+
+> -	mdesc->init_meminfo();
+> +	offset = mdesc->init_meminfo();
+> +	if (offset == 0)
+> +		return;
+
+Here now: 
+offset == 0x8 0000 0000 (KEYSTONE_HIGH_PHYS_START) - 0x8000 0000 (KEYSTONE_LOW_PHYS_START)
+offset == 0x7 8000 0000
+
+in turn KEYSTONE_LOW_PHYS_START == (old)PHYS_OFFSET 
+
+
+> +
+> +	/* Re-set the phys pfn offset, and the pv offset */
+> +	__pv_offset = PHYS_OFFSET + offset - PAGE_OFFSET;
+
+So, here now:
+
+__pv_offset = 0x8000 0000 + 0x7 8000 0000 - 0xC000 0000;
+
+__pv_offset == 0x8 0000 0000 (KEYSTONE_HIGH_PHYS_START) - 0xC000 0000
+
+code if offset will eq (new)PHYS_OFFSET == KEYSTONE_HIGH_PHYS_START:
+
+  __pv_offset = offset - PAGE_OFFSET;
+
+> +	__pv_phys_pfn_offset = PFN_DOWN(PHYS_OFFSET + offset);
+
+Here
+(old)PHYS_OFFSET + offset == 0x8000 0000 + 0x7 8000 0000 == 0x8 0000 0000 (KEYSTONE_HIGH_PHYS_START)
+
+Code if offset will eq (new)PHYS_OFFSET == KEYSTONE_HIGH_PHYS_START:
+  
+  __pv_phys_pfn_offset = PFN_DOWN(offset);
+
+>   
+>   	/* Run the patch stub to update the constants */
+>   	fixup_pv_table(&__pv_table_begin,
+> @@ -1502,8 +1509,19 @@ void __init early_paging_init(const struct machine_desc *mdesc,
+>   void __init early_paging_init(const struct machine_desc *mdesc,
+>   			      struct proc_info_list *procinfo)
+>   {
+> -	if (mdesc->init_meminfo)
+> -		mdesc->init_meminfo();
+> +	long long offset;
+> +
+> +	if (!mdesc->init_meminfo)
+> +		return;
+> +
+> +	offset = mdesc->init_meminfo();
+> +	if (offset == 0)
+> +		return;
+> +
+> +	pr_crit("Physical address space modification is only to support Keystone2.\n");
+> +	pr_crit("Please enable ARM_LPAE and ARM_PATCH_PHYS_VIRT support to use this\n");
+> +	pr_crit("feature. Your kernel may crash now, have a good day.\n");
+> +	add_taint(TAINT_CPU_OUT_OF_SPEC, LOCKDEP_STILL_OK);
+>   }
+>   
+>   #endif
+> 
+
+-- 
+regards,
+-grygorii
