@@ -1,58 +1,115 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 8 Apr 2015 13:40:33 +0200
-Subject: [PATCH] arm: KVM: force execution of HCPTR access on VM exit
-In-Reply-To: <1426503583-8958-1-git-send-email-marc.zyngier@arm.com>
-References: <1426503583-8958-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150408114033.GH4715@cbox>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 8 Apr 2015 12:55:46 +0100
+Subject: [PATCH] ARM: tegra: cpuidle: implement
+ cpuidle_state.enter_freeze()
+In-Reply-To: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150408115546.GA24271@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16, 2015 at 10:59:43AM +0000, Marc Zyngier wrote:
-> On VM entry, we disable access to the VFP registers in order to
-> perform a lazy save/restore of these registers.
-> 
-> On VM exit, we restore access, test if we did enable them before,
-> and save/restore the guest/host registers if necessary. In this
-> sequence, the FPEXC register is always accessed, irrespective
-> of the trapping configuration.
-> 
-> If the guest didn't touch the VFP registers, then the HCPTR access
-> has now enabled such access, but we're missing a barrier to ensure
-> architectural execution of the new HCPTR configuration. If the HCPTR
-> access has been delayed/reordered, the subsequent access to FPEXC
-> will cause a trap, which we aren't prepared to handle at all.
-> 
-> The fix is to introduce a barrier that only takes place if the
-> guest hasn't accessed its view of the VFP registers, making
-> the access to FPEXC safe.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/interrupts.S | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 79caf79..3ac7aca 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -175,10 +175,13 @@ __kvm_vcpu_return:
->  #ifdef CONFIG_VFPv3
->  	@ Save floating point registers we if let guest use them.
->  	tst	r2, #(HCPTR_TCP(10) | HCPTR_TCP(11))
-> -	bne	after_vfp_restore
-> +	beq	1f
-> +
-> +	isb	@ Force execution of HCPTR if we've just reenabled VFP access
-> +	b	after_vfp_restore
->  
->  	@ Switch VFP/NEON hardware state to the host's
-> -	add	r7, vcpu, #VCPU_VFP_GUEST
-> +1:	add	r7, vcpu, #VCPU_VFP_GUEST
->  	store_vfp_state r7
->  	add	r7, vcpu, #VCPU_VFP_HOST
->  	ldr	r7, [r7]
-> -- 
-> 2.1.4
-> 
+On Wed, Apr 08, 2015 at 11:54:38AM +0100, Tomeu Vizoso wrote:
+> This callback is expected to do the same as enter() only that all
+> non-wakeup IRQs are expected to be disabled.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+This is not true or at least it is misworded. The enter_freeze() function
+is expected to return from the state with IRQs disabled at CPU level, or
+put it differently it must not re-enable IRQs while executing since the
+tick is frozen.
+
+> It will be called when the system goes to suspend-to-idle and will
+> reduce power usage because CPUs won't be awaken for unnecessary IRQs.
+> 
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> ---
+>  arch/arm/mach-tegra/cpuidle-tegra114.c | 31 ++++++++++++++++++++++++-------
+>  1 file changed, 24 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> index f2b586d..ef06001 100644
+> --- a/arch/arm/mach-tegra/cpuidle-tegra114.c
+> +++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> @@ -39,28 +39,44 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+>  				    struct cpuidle_driver *drv,
+>  				    int index)
+>  {
+> -	local_fiq_disable();
+> -
+>  	tegra_set_cpu_in_lp2();
+>  	cpu_pm_enter();
+>  
+> -	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+> -
+>  	call_firmware_op(prepare_idle);
+>  
+>  	/* Do suspend by ourselves if the firmware does not implement it */
+>  	if (call_firmware_op(do_idle, 0) == -ENOSYS)
+>  		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+>  
+> -	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
+> -
+>  	cpu_pm_exit();
+>  	tegra_clear_cpu_in_lp2();
+>  
+> +	return index;
+> +}
+> +
+> +static int tegra114_idle_enter(struct cpuidle_device *dev,
+> +			       struct cpuidle_driver *drv,
+> +			       int index)
+> +{
+> +	local_fiq_disable();
+> +
+> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+> +
+> +	index = tegra114_idle_power_down(dev, drv, index);
+> +
+> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
+> +
+>  	local_fiq_enable();
+>  
+>  	return index;
+>  }
+> +
+> +static void tegra114_idle_enter_freeze(struct cpuidle_device *dev,
+> +				       struct cpuidle_driver *drv,
+> +				       int index)
+> +{
+> +	tegra114_idle_power_down(dev, drv, index);
+
+Cool. So if the problem is FIQs, you don't disabled them on entry
+which means you enter the "frozen" state with FIQs enabled and tick frozen,
+unless I am missing something.
+
+The question here is: are we allowed to enable FIQs before returning
+from an enter_freeze() call (and to enter it with FIQs enabled) ?
+
+If we are not your code here certainly does not solve the issue, since
+it does _not_ disable FIQs upon enter_freeze call anyway.
+
+Lorenzo
+
+> +}
+>  #endif
+>  
+>  static struct cpuidle_driver tegra_idle_driver = {
+> @@ -71,7 +87,8 @@ static struct cpuidle_driver tegra_idle_driver = {
+>  		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
+>  #ifdef CONFIG_PM_SLEEP
+>  		[1] = {
+> -			.enter			= tegra114_idle_power_down,
+> +			.enter			= tegra114_idle_enter,
+> +			.enter_freeze		= tegra114_idle_enter_freeze,
+>  			.exit_latency		= 500,
+>  			.target_residency	= 1000,
+>  			.power_usage		= 0,
+> -- 
+> 2.3.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
