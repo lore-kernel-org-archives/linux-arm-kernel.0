@@ -1,98 +1,212 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 8 Apr 2015 17:22:05 +0800
-Subject: [PATCH v9 08/30] PCI: Update pci_host_bridge bus resource
-In-Reply-To: <20150407224243.GL10892@google.com>
-References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
- <1428053164-28277-10-git-send-email-wangyijing@huawei.com>
- <20150407224243.GL10892@google.com>
-Message-ID: <5524F33D.7090800@huawei.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Wed, 08 Apr 2015 11:30:03 +0200
+Subject: [PATCH 3/6] ARM:dts exynos5422 Update the thermal sensor for
+ tmu_cpu0
+In-Reply-To: <CANAwSgTSsGF1p7ehvMHpBX5MbtickOKXe3oZw26EuB9BMxY4Hg@mail.gmail.com>
+References: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
+ <1427387955-5129-4-git-send-email-linux.amoon@gmail.com>
+ <20150408100240.7f597dae@amdc2363>
+ <CANAwSgTSsGF1p7ehvMHpBX5MbtickOKXe3oZw26EuB9BMxY4Hg@mail.gmail.com>
+Message-ID: <20150408113003.78ec5f86@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/4/8 6:42, Bjorn Helgaas wrote:
-> On Fri, Apr 03, 2015 at 05:25:42PM +0800, Yijing Wang wrote:
->> From: Yijing Wang <wangyijing0307@gmail.com>
->>
->> Sometimes, the bus resource start number is not equal to
->> root bus number. For example, in pci_scan_bus(), we always
->> add the default bus resource which start bus number is 0,
->> but the root bus number callers given may != 0, so
->> we need to update pci_host_bridge bus resource, because we
->> would check whether host bridge bus resoruce is confict
->> in later patch.
-> 
-> It's true that pci_scan_bus() always inserts [bus 00-ff].  But I think
-> that's completely bogus.  The caller of pci_scan_bus() supplies a root bus
-> number X.  Any bus numbers below X are useless as far as this host bridge
-> is concerned, and it's pointless to include them in the range inserted by
-> pci_scan_bus().
+Hi Anand,
 
-Agree, I think it's better to use the [bus start - FF] instead of [00-FF].
+> Hi Lukasz,
+> 
+> On Odroidxu3 board critical temp is 85.0 C. Below is the sensors
+> output.
+
+Do you have XU3 with a fan?
 
 > 
-> I think we'd be better off if we forced every pci_scan_bus() caller to
-> supply a real non-overlapping bus number range.  We probably can't do that
-> easily because the arch knows the beginning bus number, but some don't know
-> how to figure out the ending bus number.
-
-It seems to have some problems in pci_scan_bus() if we have more than one pci host bridge
-in a domain. Because we add the default busn_res[00-FF] to resource list in pci_scan_bus(),
-and pass the resource list to pci_create_root_bus().  The pci root bus would
-consume the bus range from the start to the 0xFF, and request it from the per-domain resource[00-FF].
-So if we have another pci host bridge in this domain, and pass another start bus number, it would
-fail when the root bus try to request bus resource from per-domain resource. Now only several archs
-call pci_scan_bus(), I guess they didn't run the code in above case, so we didn't find
-the bus report.
-
+> therm_zone0-virtual-0
+> Adapter: Virtual device
+> temp1: +39.0??C (crit = +85.0??C)
+> temp2: +38.0??C (crit = +85.0??C)
+> temp3: +40.0??C (crit = +85.0??C)
+> temp4: +49.0??C (crit = +85.0??C)
+> temp5: +29.0??C (crit = +85.0??C)
 > 
-> Do we have a per-domain structure that tracks the bus numbers in use in the
-> domain?  It seems like if we had one, we could use that to approximate the
-> end.  For example, if the arch scans three root buses, at bus 00, bus 40,
-> and bus 80, we could start with the first one at [bus 00-ff], and when we
-> scan the one at bus 40, we could either report a conflict (if the bus 00
-> tree included a bus 40) or reduce the first range to [bus 00-3f].
-
-Per-domain resource pci_domain_busn_res is what we are looking for.
-For simplicity, we could report a conflict and fail when we find a conflict bus
-resource in system.
-
-
->>  	resource_list_for_each_entry(window, resources)
->> -		if (window->res->flags & IORESOURCE_BUS)
->> +		if (window->res->flags & IORESOURCE_BUS) {
->> +			if (bus > window->res->start)
->> +				window->res->start = bus;
+> I have observed cpu shutdown as we do test pm-qa thermal testing.
 > 
-> I see what you're trying to do here, but I think this is the wrong place to
-> do it.  I'd rather figure out a way to insert something other than
-> busn_resource in pci_scan_bus().  That probably means we need to
-> dynamically allocate a new busn_res struct.
-
-Allocate a new busn_res maybe unnecessary, the bus resource we added to resource list
-and passed to pci_create_root_bus() will never be used again after we call
-pci_bus_insert_busn_res(), we may could consider to use local busn_res in pci_scan_bus().
-
-Thanks!
-Yijing.
-
+> So I propose the temperature values to be 50000, 65000 ,80000 and
+> 85000 Critical temperature.
 > 
->>  			return;
->> +		}
->>  
->>  	pr_info(
->>  	 "No busn resource found for pci%04x:%02x, will use [bus %02x-ff]\n",
->> -- 
->> 1.7.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+This seems strange - since other Samsung's SoC have higher work
+temperatures (both exynos5 and exynos4).
+
+I will try to check those thresholds on my XU3. Have anybody else
+experienced overheating at XU3?
+
+Sjoerd? Kukjin?
+
+> Please share your thoughts.
 > 
-> .
+> -Anand Moon
 > 
+> On 8 April 2015 at 13:32, Lukasz Majewski <l.majewski@samsung.com>
+> wrote:
+> > Hi Anand,
+> >
+> >> Move the registration of thermal sensors for tmu_cpu0 from
+> >> exynos5420.dtsi to exynos5-cpu-thermal.dtsi, to avoid duplicate
+> >> registration of the sensors.
+> >>
+> >> Tested on OdroidXU3 board.
+> >>
+> >> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> >> ---
+> >>  arch/arm/boot/dts/exynos5-cpu-thermal.dtsi | 58
+> >> ++++++++++++++++++++++++++++++
+> >> arch/arm/boot/dts/exynos5420.dtsi          |  4 ---
+> >> arch/arm/boot/dts/exynos5422-odroidxu3.dts |  1 + 3 files changed,
+> >> 59 insertions(+), 4 deletions(-) create mode 100644
+> >> arch/arm/boot/dts/exynos5-cpu-thermal.dtsi
+> >>
+> >> diff --git a/arch/arm/boot/dts/exynos5-cpu-thermal.dtsi
+> >> b/arch/arm/boot/dts/exynos5-cpu-thermal.dtsi new file mode 100644
+> >> index 0000000..8fede70
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/exynos5-cpu-thermal.dtsi
+> >> @@ -0,0 +1,58 @@
+> >> +/*
+> >> + * Device tree sources for Exynos5 thermal zone
+> >> + *
+> >> + * Copyright (c) 2014 Lukasz Majewski <l.majewski@samsung.com>
+> >
+> >                         ^^^^^^^^^^^^^^^^ Could you update this
+> >                         line :-). I'm just reviewer here :-)
+> >
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or
+> >> modify
+> >> + * it under the terms of the GNU General Public License version 2
+> >> as
+> >> + * published by the Free Software Foundation.
+> >> + *
+> >> + */
+> >> +
+> >> +#include <dt-bindings/thermal/thermal.h>
+> >> +
+> >> +/ {
+> >> +     thermal-zones {
+> >> +             cpu0_thermal: cpu0-thermal {
+> >> +                     thermal-sensors = <&tmu_cpu0>;
+> >> +                     polling-delay-passive = <0>;
+> >> +                     polling-delay = <0>;
+> >> +                     trips {
+> >> +                             cpu_alert0: cpu-alert-0 {
+> >> +                                     temperature = <48000>; /* ms
+> >> */
+> >> +                                     hysteresis = <3000>; /* ms */
+> >                                                             ^^^^^^^^^
+> >                                                         We already
+> > have "millicelsius"
+> >                                                         instead od
+> > ms
+> >> +                                     type = "active";
+> >> +                             };
+> >> +                             cpu_alert1: cpu-alert-1 {
+> >> +                                     temperature = <53000>; /* ms
+> >> */
+> >> +                                     hysteresis = <3000>; /* ms */
+> >> +                                     type = "active";
+> >> +                             };
+> >> +                             cpu_alert2: cpu-alert-2 {
+> >> +                                     temperature = <59000>; /* ms
+> >> */
+> >> +                                     hysteresis = <3000>; /* ms */
+> >> +                                     type = "active";
+> >> +                             };
+> >> +                             cpu_crit0: cpu-crit-0 {
+> >> +                                     temperature = <75000>; /* ms
+> >> */
+> >> +                                     hysteresis = <0>; /* ms */
+> >> +                                     type = "critical";
+> >
+> >                 Is there any special reasons why we need special
+> > values for cpu0_thermal sensor at XU3? Is something wrong with
+> >                 default values defined at exynos4-cpu-thermal.dtsi?
+> >
+> >                 If this is Odroid XU3 specific, then IMHO it should
+> > be added to exynos5422-odroidxu3.dts
+> >
+> >> +                             };
+> >> +                     };
+> >> +                     cooling-maps {
+> >> +                             map0 {
+> >> +                                  trip = <&cpu_alert0>;
+> >> +                                  cooling-device = <&fan0 0 1>;
+> >> +                             };
+> >> +                             map1 {
+> >> +                                  trip = <&cpu_alert1>;
+> >> +                                  cooling-device = <&fan0 1 2>;
+> >> +                             };
+> >> +                             map2 {
+> >> +                                  trip = <&cpu_alert2>;
+> >> +                                  cooling-device = <&fan0 2 3>;
+> >> +                             };
+> >> +                     };
+> >> +             };
+> >> +     };
+> >> +};
+> >> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
+> >> b/arch/arm/boot/dts/exynos5420.dtsi index 6b49f3c..eb0f16c 100644
+> >> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> >> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> >> @@ -827,10 +827,6 @@
+> >>       };
+> >>
+> >>       thermal-zones {
+> >> -             cpu0_thermal: cpu0-thermal {
+> >> -                     thermal-sensors = <&tmu_cpu0>;
+> >> -                     #include "exynos5420-trip-points.dtsi"
+> >                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ [1]
+> >
+> >> -             };
+> >>               cpu1_thermal: cpu1-thermal {
+> >>                      thermal-sensors = <&tmu_cpu1>;
+> >>                      #include "exynos5420-trip-points.dtsi"
+> >> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> >> b/arch/arm/boot/dts/exynos5422-odroidxu3.dts index eaec006..c8b3e3e
+> >> 100644 --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> >> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> >> @@ -12,6 +12,7 @@
+> >>
+> >>  /dts-v1/;
+> >>  #include "exynos5800.dtsi"
+> >> +#include "exynos5-cpu-thermal.dtsi"
+> >
+> > I would prefer to stick to convention proposed at [1]. It keeps
+> > the locality of the include with respective thermal zone.
+> >
+> >>
+> >>  / {
+> >>       model = "Hardkernel Odroid XU3";
+> >
+> > DTS changes should be added to Samsung tree by Samsung maintainer -
+> > Mr. Kukjin Kim.
+> >
+> > --
+> > Best regards,
+> >
+> > Lukasz Majewski
+> >
+> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 
 
 -- 
-Thanks!
-Yijing
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
