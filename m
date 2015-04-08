@@ -1,421 +1,873 @@
 From: dev@lynxeye.de (Lucas Stach)
-Date: Wed,  8 Apr 2015 21:46:05 +0200
-Subject: [PATCH v2 0/5] Tegra 2 NAND Flash Support
-Message-ID: <1428522370-18035-1-git-send-email-dev@lynxeye.de>
+Date: Wed,  8 Apr 2015 21:46:07 +0200
+Subject: [PATCH v2 2/5] mtd: nand: add NVIDIA Tegra NAND Flash controller
+ driver
+In-Reply-To: <1428522370-18035-1-git-send-email-dev@lynxeye.de>
+References: <1428522370-18035-1-git-send-email-dev@lynxeye.de>
+Message-ID: <1428522370-18035-3-git-send-email-dev@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Add support for the NAND flash controller found on NVIDIA
+Tegra 2/3 SoCs.
 
-I've spent some idle cycles to get the Tegra NAND flash controller
-driver into shape. I reworked the driver to incorporate any review
-I got from the first round of this series.
-
-Performance is up a bit, and now seems to be in the range that
-one could expect from the device. According to some simple
-benchmarks (thanks Stefan) this driver is faster than the L4T
-downstream driver.
-
-Also the driver got a significant amount of testing, which revealed
-some problems with ECC handling which should now be all fixed. MTD
-test results attached.
-
-Regards,
-Lucas
-
-[root at localhost ~]# insmod /root/mtd-tests/mtd_speedtest.ko dev=1
-[  108.607611] 
-[  108.612143] =================================================
-[  108.617913] mtd_speedtest: MTD device: 1
-[  108.622930] mtd_speedtest: MTD device size 67108864, eraseblock size 524288, page size 4096, count of eraseblocks 128, pages per eraseblock 128, OOB size 224
-[  108.677678] mtd_test: scanning for bad eraseblocks
-[  108.682616] mtd_test: scanned 128 eraseblocks, 0 are bad
-[  108.786282] mtd_speedtest: testing eraseblock write speed
-[  116.735746] mtd_speedtest: eraseblock write speed is 8403 KiB/s
-[  116.741699] mtd_speedtest: testing eraseblock read speed
-[  121.365402] mtd_speedtest: eraseblock read speed is 14256 KiB/s
-[  121.509170] mtd_speedtest: testing page write speed
-[  129.700082] mtd_speedtest: page write speed is 8012 KiB/s
-[  129.705515] mtd_speedtest: testing page read speed
-[  134.377940] mtd_speedtest: page read speed is 14039 KiB/s
-[  134.521148] mtd_speedtest: testing 2 page write speed
-[  142.564004] mtd_speedtest: 2 page write speed is 8154 KiB/s
-[  142.569610] mtd_speedtest: testing 2 page read speed
-[  147.221758] mtd_speedtest: 2 page read speed is 14099 KiB/s
-[  147.227360] mtd_speedtest: Testing erase speed
-[  147.369935] mtd_speedtest: erase speed is 474898 KiB/s
-[  147.375105] mtd_speedtest: Testing 2x multi-block erase speed
-[  147.456717] mtd_speedtest: 2x multi-block erase speed is 873813 KiB/s
-[  147.463163] mtd_speedtest: Testing 4x multi-block erase speed
-[  147.546198] mtd_speedtest: 4x multi-block erase speed is 862315 KiB/s
-[  147.552643] mtd_speedtest: Testing 8x multi-block erase speed
-[  147.635005] mtd_speedtest: 8x multi-block erase speed is 873813 KiB/s
-[  147.641449] mtd_speedtest: Testing 16x multi-block erase speed
-[  147.723454] mtd_speedtest: 16x multi-block erase speed is 873813 KiB/s
-[  147.730037] mtd_speedtest: Testing 32x multi-block erase speed
-[  147.810388] mtd_speedtest: 32x multi-block erase speed is 897753 KiB/s
-[  147.816953] mtd_speedtest: Testing 64x multi-block erase speed
-[  147.897626] mtd_speedtest: 64x multi-block erase speed is 885621 KiB/s
-[  147.904147] mtd_speedtest: finished
-[  147.908506] =================================================
-
-
-[root at localhost ~]# insmod /root/mtd-tests/mtd_nandbiterrs.ko dev=1 mode=0
-[  174.629593] 
-[  174.631117] ==================================================
-[  174.638285] mtd_nandbiterrs: MTD device: 1
-[  174.642420] mtd_nandbiterrs: MTD device size 67108864, eraseblock=524288, page=4096, oob=224
-[  174.651956] mtd_nandbiterrs: Device uses 4 subpages of 1024 bytes
-[  174.658947] mtd_nandbiterrs: Using page=0, offset=0, eraseblock=0
-[  174.666945] mtd_nandbiterrs: incremental biterrors test
-[  174.673084] mtd_nandbiterrs: write_page
-[  174.677507] mtd_nandbiterrs: rewrite page
-[  174.699128] mtd_nandbiterrs: read_page
-[  174.703391] mtd_nandbiterrs: verify_page
-[  174.707929] mtd_nandbiterrs: Successfully corrected 0 bit errors per subpage
-[  174.715160] mtd_nandbiterrs: Inserted biterror @ 0/5
-[  174.720140] mtd_nandbiterrs: Inserted biterror @ 1025/7
-[  174.725527] mtd_nandbiterrs: Inserted biterror @ 2048/5
-[  174.730765] mtd_nandbiterrs: Inserted biterror @ 3072/4
-[  174.736142] mtd_nandbiterrs: rewrite page
-[  174.751375] mtd_nandbiterrs: read_page
-[  174.755414] mtd_nandbiterrs: Read reported 4 corrected bit errors
-[  174.761490] mtd_nandbiterrs: verify_page
-[  174.765547] mtd_nandbiterrs: Successfully corrected 1 bit errors per subpage
-[  174.772577] mtd_nandbiterrs: Inserted biterror @ 0/2
-[  174.777541] mtd_nandbiterrs: Inserted biterror @ 1026/6
-[  174.782786] mtd_nandbiterrs: Inserted biterror @ 2048/4
-[  174.788013] mtd_nandbiterrs: Inserted biterror @ 3072/1
-[  174.793221] mtd_nandbiterrs: rewrite page
-[  174.806444] mtd_nandbiterrs: read_page
-[  174.810464] mtd_nandbiterrs: Read reported 5 corrected bit errors
-[  174.816560] mtd_nandbiterrs: verify_page
-[  174.820604] mtd_nandbiterrs: Successfully corrected 2 bit errors per subpage
-[  174.827649] mtd_nandbiterrs: Inserted biterror @ 0/0
-[  174.832598] mtd_nandbiterrs: Inserted biterror @ 1027/7
-[  174.837821] mtd_nandbiterrs: Inserted biterror @ 2048/2
-[  174.843030] mtd_nandbiterrs: Inserted biterror @ 3073/7
-[  174.848251] mtd_nandbiterrs: rewrite page
-[  174.861385] mtd_nandbiterrs: read_page
-[  174.865420] mtd_nandbiterrs: Read reported 8 corrected bit errors
-[  174.871495] mtd_nandbiterrs: verify_page
-[  174.875551] mtd_nandbiterrs: Successfully corrected 3 bit errors per subpage
-[  174.882580] mtd_nandbiterrs: Inserted biterror @ 1/7
-[  174.887550] mtd_nandbiterrs: Inserted biterror @ 1027/6
-[  174.892759] mtd_nandbiterrs: Inserted biterror @ 2048/1
-[  174.897983] mtd_nandbiterrs: Inserted biterror @ 3073/4
-[  174.903197] mtd_nandbiterrs: rewrite page
-[  174.916415] mtd_nandbiterrs: read_page
-[  174.920435] mtd_nandbiterrs: Read reported 9 corrected bit errors
-[  174.926530] mtd_nandbiterrs: verify_page
-[  174.930567] mtd_nandbiterrs: Successfully corrected 4 bit errors per subpage
-[  174.937611] mtd_nandbiterrs: Inserted biterror @ 1/5
-[  174.942560] mtd_nandbiterrs: Inserted biterror @ 1028/5
-[  174.947782] mtd_nandbiterrs: Inserted biterror @ 2048/0
-[  174.952991] mtd_nandbiterrs: Inserted biterror @ 3073/1
-[  174.958212] mtd_nandbiterrs: rewrite page
-[  174.971437] mtd_nandbiterrs: read_page
-[  174.975472] mtd_nandbiterrs: Read reported 11 corrected bit errors
-[  174.981634] mtd_nandbiterrs: verify_page
-[  174.985690] mtd_nandbiterrs: Successfully corrected 5 bit errors per subpage
-[  174.992724] mtd_nandbiterrs: Inserted biterror @ 1/2
-[  174.997688] mtd_nandbiterrs: Inserted biterror @ 1029/7
-[  175.002897] mtd_nandbiterrs: Inserted biterror @ 2049/7
-[  175.008124] mtd_nandbiterrs: Inserted biterror @ 3074/6
-[  175.013332] mtd_nandbiterrs: rewrite page
-[  175.026567] mtd_nandbiterrs: read_page
-[  175.030591] mtd_nandbiterrs: Read reported 14 corrected bit errors
-[  175.036771] mtd_nandbiterrs: verify_page
-[  175.040841] mtd_nandbiterrs: Successfully corrected 6 bit errors per subpage
-[  175.047889] mtd_nandbiterrs: Inserted biterror @ 1/0
-[  175.052839] mtd_nandbiterrs: Inserted biterror @ 1029/5
-[  175.058063] mtd_nandbiterrs: Inserted biterror @ 2049/5
-[  175.063271] mtd_nandbiterrs: Inserted biterror @ 3074/4
-[  175.068492] mtd_nandbiterrs: rewrite page
-[  175.081688] mtd_nandbiterrs: read_page
-[  175.085710] mtd_nandbiterrs: Read reported 14 corrected bit errors
-[  175.091890] mtd_nandbiterrs: verify_page
-[  175.095927] mtd_nandbiterrs: Successfully corrected 7 bit errors per subpage
-[  175.102971] mtd_nandbiterrs: Inserted biterror @ 2/6
-[  175.107935] mtd_nandbiterrs: Inserted biterror @ 1030/6
-[  175.113150] mtd_nandbiterrs: Inserted biterror @ 2049/4
-[  175.118374] mtd_nandbiterrs: Inserted biterror @ 3074/1
-[  175.123582] mtd_nandbiterrs: rewrite page
-[  175.136799] mtd_nandbiterrs: read_page
-[  175.140821] mtd_nandbiterrs: Read reported 17 corrected bit errors
-[  175.147001] mtd_nandbiterrs: verify_page
-[  175.151039] mtd_nandbiterrs: Successfully corrected 8 bit errors per subpage
-[  175.158083] mtd_nandbiterrs: Inserted biterror @ 2/5
-[  175.163032] mtd_nandbiterrs: Inserted biterror @ 1030/5
-[  175.168284] mtd_nandbiterrs: Inserted biterror @ 2049/2
-[  175.173493] mtd_nandbiterrs: Inserted biterror @ 3075/7
-[  175.178718] mtd_nandbiterrs: rewrite page
-[  175.191926] mtd_nandbiterrs: read_page
-[  175.195949] mtd_nandbiterrs: Read reported 18 corrected bit errors
-[  175.202129] mtd_nandbiterrs: verify_page
-[  175.206168] mtd_nandbiterrs: Successfully corrected 9 bit errors per subpage
-[  175.213215] mtd_nandbiterrs: Inserted biterror @ 2/2
-[  175.218183] mtd_nandbiterrs: Inserted biterror @ 1031/7
-[  175.223392] mtd_nandbiterrs: Inserted biterror @ 2049/1
-[  175.228614] mtd_nandbiterrs: Inserted biterror @ 3075/6
-[  175.233822] mtd_nandbiterrs: rewrite page
-[  175.246926] mtd_nandbiterrs: read_page
-[  175.250997] mtd_nandbiterrs: Read reported 20 corrected bit errors
-[  175.257160] mtd_nandbiterrs: verify_page
-[  175.261217] mtd_nandbiterrs: Successfully corrected 10 bit errors per subpage
-[  175.268354] mtd_nandbiterrs: Inserted biterror @ 2/0
-[  175.273303] mtd_nandbiterrs: Inserted biterror @ 1031/6
-[  175.278527] mtd_nandbiterrs: Inserted biterror @ 2049/0
-[  175.283736] mtd_nandbiterrs: Inserted biterror @ 3075/4
-[  175.288957] mtd_nandbiterrs: rewrite page
-[  175.302207] mtd_nandbiterrs: read_page
-[  175.306233] mtd_nandbiterrs: Read reported 20 corrected bit errors
-[  175.312415] mtd_nandbiterrs: verify_page
-[  175.316453] mtd_nandbiterrs: Successfully corrected 11 bit errors per subpage
-[  175.323589] mtd_nandbiterrs: Inserted biterror @ 3/7
-[  175.328555] mtd_nandbiterrs: Inserted biterror @ 1031/5
-[  175.333765] mtd_nandbiterrs: Inserted biterror @ 2050/6
-[  175.338988] mtd_nandbiterrs: Inserted biterror @ 3075/1
-[  175.344196] mtd_nandbiterrs: rewrite page
-[  175.357415] mtd_nandbiterrs: read_page
-[  175.361457] mtd_nandbiterrs: Read reported 22 corrected bit errors
-[  175.367620] mtd_nandbiterrs: verify_page
-[  175.371676] mtd_nandbiterrs: Successfully corrected 12 bit errors per subpage
-[  175.378807] mtd_nandbiterrs: Inserted biterror @ 3/6
-[  175.383757] mtd_nandbiterrs: Inserted biterror @ 1032/7
-[  175.388979] mtd_nandbiterrs: Inserted biterror @ 2050/5
-[  175.394188] mtd_nandbiterrs: Inserted biterror @ 3076/5
-[  175.399408] mtd_nandbiterrs: rewrite page
-[  175.412576] mtd_nandbiterrs: read_page
-[  175.416602] mtd_nandbiterrs: Read reported 24 corrected bit errors
-[  175.422817] mtd_nandbiterrs: verify_page
-[  175.426856] mtd_nandbiterrs: Successfully corrected 13 bit errors per subpage
-[  175.433992] mtd_nandbiterrs: Inserted biterror @ 3/5
-[  175.438956] mtd_nandbiterrs: Inserted biterror @ 1032/4
-[  175.444165] mtd_nandbiterrs: Inserted biterror @ 2050/4
-[  175.449387] mtd_nandbiterrs: Inserted biterror @ 3076/4
-[  175.454596] mtd_nandbiterrs: rewrite page
-[  175.467725] mtd_nandbiterrs: read_page
-[  175.471762] mtd_nandbiterrs: Read reported 25 corrected bit errors
-[  175.477925] mtd_nandbiterrs: verify_page
-[  175.481981] mtd_nandbiterrs: Successfully corrected 14 bit errors per subpage
-[  175.489097] mtd_nandbiterrs: Inserted biterror @ 3/2
-[  175.494061] mtd_nandbiterrs: Inserted biterror @ 1033/4
-[  175.499282] mtd_nandbiterrs: Inserted biterror @ 2050/2
-[  175.504492] mtd_nandbiterrs: Inserted biterror @ 3076/1
-[  175.509712] mtd_nandbiterrs: rewrite page
-[  175.522924] mtd_nandbiterrs: read_page
-[  175.526948] mtd_nandbiterrs: Read reported 27 corrected bit errors
-[  175.533129] mtd_nandbiterrs: verify_page
-[  175.537180] mtd_nandbiterrs: Successfully corrected 15 bit errors per subpage
-[  175.544311] mtd_nandbiterrs: Inserted biterror @ 3/0
-[  175.549290] mtd_nandbiterrs: Inserted biterror @ 1034/7
-[  175.554516] mtd_nandbiterrs: Inserted biterror @ 2050/1
-[  175.559728] mtd_nandbiterrs: Inserted biterror @ 3077/7
-[  175.564949] mtd_nandbiterrs: rewrite page
-[  175.578130] mtd_nandbiterrs: read_page
-[  175.582166] mtd_nandbiterrs: error: read failed at 0x0
-[  175.587289] mtd_nandbiterrs: After 16 biterrors per subpage, read reported error -74
-[  175.595596] mtd_nandbiterrs: finished successfully.
-[  175.600478] ==================================================
-insmod: ERROR: could not insert module /root/mtd-tests/mtd_nandbiterrs.ko: Input/output error
-
-[root at localhost ~]# insmod /root/mtd-tests/mtd_nandbiterrs.ko dev=1 mode=1
-[  189.039493] 
-[  189.041014] ==================================================
-[  189.046968] mtd_nandbiterrs: MTD device: 1
-[  189.051096] mtd_nandbiterrs: MTD device size 67108864, eraseblock=524288, page=4096, oob=224
-[  189.060056] mtd_nandbiterrs: Device uses 4 subpages of 1024 bytes
-[  189.066396] mtd_nandbiterrs: Using page=0, offset=0, eraseblock=0
-[  189.074382] mtd_nandbiterrs: overwrite biterrors test
-[  189.079952] mtd_nandbiterrs: write_page
-[  202.616531] mtd_nandbiterrs: Read reported 1 corrected bit errors
-[  207.467579] mtd_nandbiterrs: Read reported 2 corrected bit errors
-[  209.060301] mtd_nandbiterrs: Read reported 3 corrected bit errors
-[  211.872583] mtd_nandbiterrs: Read reported 4 corrected bit errors
-[  213.115939] mtd_nandbiterrs: Read reported 5 corrected bit errors
-[  218.396860] mtd_nandbiterrs: Read reported 6 corrected bit errors
-[  218.554635] mtd_nandbiterrs: Read reported 7 corrected bit errors
-[  219.949190] mtd_nandbiterrs: Read reported 8 corrected bit errors
-[  221.741819] mtd_nandbiterrs: Read reported 9 corrected bit errors
-[  225.065108] mtd_nandbiterrs: Read reported 10 corrected bit errors
-[  225.449503] mtd_nandbiterrs: Read reported 11 corrected bit errors
-[  227.442651] mtd_nandbiterrs: Read reported 12 corrected bit errors
-[  232.432393] mtd_nandbiterrs: Read reported 13 corrected bit errors
-[  234.794003] mtd_nandbiterrs: Read reported 14 corrected bit errors
-[  235.065069] mtd_nandbiterrs: Read reported 15 corrected bit errors
-[  235.686246] mtd_nandbiterrs: Read reported 16 corrected bit errors
-[  238.296935] mtd_nandbiterrs: Read reported 17 corrected bit errors
-[  239.316587] mtd_nandbiterrs: Read reported 18 corrected bit errors
-[  239.957394] mtd_nandbiterrs: Read reported 19 corrected bit errors
-[  241.752129] mtd_nandbiterrs: Read reported 20 corrected bit errors
-[  242.430117] mtd_nandbiterrs: Read reported 21 corrected bit errors
-[  243.817587] mtd_nandbiterrs: Read reported 22 corrected bit errors
-[  243.861707] mtd_nandbiterrs: Read reported 23 corrected bit errors
-[  244.047620] mtd_nandbiterrs: Read reported 24 corrected bit errors
-[  244.989938] mtd_nandbiterrs: Read reported 25 corrected bit errors
-[  246.840869] mtd_nandbiterrs: Read reported 26 corrected bit errors
-[  246.998449] mtd_nandbiterrs: Read reported 27 corrected bit errors
-[  247.299432] mtd_nandbiterrs: Read reported 28 corrected bit errors
-[  247.769255] mtd_nandbiterrs: Read reported 29 corrected bit errors
-[  248.115931] mtd_nandbiterrs: Read reported 30 corrected bit errors
-[  250.174867] mtd_nandbiterrs: Read reported 31 corrected bit errors
-[  250.805717] mtd_nandbiterrs: Read reported 32 corrected bit errors
-[  253.500340] mtd_nandbiterrs: Read reported 33 corrected bit errors
-[  255.854560] mtd_nandbiterrs: Read reported 34 corrected bit errors
-[  258.862542] mtd_nandbiterrs: Read reported 35 corrected bit errors
-[  260.061025] mtd_nandbiterrs: Read reported 36 corrected bit errors
-[  260.398326] mtd_nandbiterrs: Read reported 37 corrected bit errors
-[  261.209347] mtd_nandbiterrs: Read reported 38 corrected bit errors
-[  262.133054] mtd_nandbiterrs: Read reported 39 corrected bit errors
-[  262.782686] mtd_nandbiterrs: Read reported 40 corrected bit errors
-[  262.836213] mtd_nandbiterrs: Read reported 41 corrected bit errors
-[  263.590229] mtd_nandbiterrs: Read reported 42 corrected bit errors
-[  264.505231] mtd_nandbiterrs: Read reported 43 corrected bit errors
-[  268.433205] mtd_nandbiterrs: Read reported 44 corrected bit errors
-[  273.150540] mtd_nandbiterrs: Read reported 45 corrected bit errors
-[  275.095989] mtd_nandbiterrs: Read reported 46 corrected bit errors
-[  276.530180] mtd_nandbiterrs: Read reported 47 corrected bit errors
-[  277.654199] mtd_nandbiterrs: Read reported 48 corrected bit errors
-[  278.598045] mtd_nandbiterrs: Read reported 49 corrected bit errors
-[  279.115607] mtd_nandbiterrs: Read reported 50 corrected bit errors
-[  280.578877] mtd_nandbiterrs: Read reported 51 corrected bit errors
-[  281.407856] mtd_nandbiterrs: error: read failed at 0x0
-[  281.412997] mtd_nandbiterrs: Read reported error -74
-[  281.417947] mtd_nandbiterrs: Bit error histogram (9698 operations total):
-[  281.424732] mtd_nandbiterrs: Page reads with   0 corrected bit errors: 1408
-[  281.431693] mtd_nandbiterrs: Page reads with   1 corrected bit errors: 512
-[  281.438549] mtd_nandbiterrs: Page reads with   2 corrected bit errors: 166
-[  281.445422] mtd_nandbiterrs: Page reads with   3 corrected bit errors: 297
-[  281.452298] mtd_nandbiterrs: Page reads with   4 corrected bit errors: 128
-[  281.459155] mtd_nandbiterrs: Page reads with   5 corrected bit errors: 565
-[  281.466027] mtd_nandbiterrs: Page reads with   6 corrected bit errors: 12
-[  281.472812] mtd_nandbiterrs: Page reads with   7 corrected bit errors: 170
-[  281.479668] mtd_nandbiterrs: Page reads with   8 corrected bit errors: 199
-[  281.486539] mtd_nandbiterrs: Page reads with   9 corrected bit errors: 319
-[  281.493439] mtd_nandbiterrs: Page reads with  10 corrected bit errors: 50
-[  281.500210] mtd_nandbiterrs: Page reads with  11 corrected bit errors: 206
-[  281.507084] mtd_nandbiterrs: Page reads with  12 corrected bit errors: 628
-[  281.513957] mtd_nandbiterrs: Page reads with  13 corrected bit errors: 166
-[  281.520813] mtd_nandbiterrs: Page reads with  14 corrected bit errors: 31
-[  281.527598] mtd_nandbiterrs: Page reads with  15 corrected bit errors: 259
-[  281.534508] mtd_nandbiterrs: Page reads with  16 corrected bit errors: 63
-[  281.541283] mtd_nandbiterrs: Page reads with  17 corrected bit errors: 95
-[  281.548070] mtd_nandbiterrs: Page reads with  18 corrected bit errors: 105
-[  281.554946] mtd_nandbiterrs: Page reads with  19 corrected bit errors: 188
-[  281.561819] mtd_nandbiterrs: Page reads with  20 corrected bit errors: 122
-[  281.568674] mtd_nandbiterrs: Page reads with  21 corrected bit errors: 61
-[  281.575458] mtd_nandbiterrs: Page reads with  22 corrected bit errors: 20
-[  281.582243] mtd_nandbiterrs: Page reads with  23 corrected bit errors: 37
-[  281.589012] mtd_nandbiterrs: Page reads with  24 corrected bit errors: 88
-[  281.595796] mtd_nandbiterrs: Page reads with  25 corrected bit errors: 168
-[  281.602668] mtd_nandbiterrs: Page reads with  26 corrected bit errors: 24
-[  281.609438] mtd_nandbiterrs: Page reads with  27 corrected bit errors: 40
-[  281.616222] mtd_nandbiterrs: Page reads with  28 corrected bit errors: 63
-[  281.623006] mtd_nandbiterrs: Page reads with  29 corrected bit errors: 149
-[  281.629861] mtd_nandbiterrs: Page reads with  30 corrected bit errors: 125
-[  281.636732] mtd_nandbiterrs: Page reads with  31 corrected bit errors: 234
-[  281.643603] mtd_nandbiterrs: Page reads with  32 corrected bit errors: 114
-[  281.650459] mtd_nandbiterrs: Page reads with  33 corrected bit errors: 205
-[  281.657334] mtd_nandbiterrs: Page reads with  34 corrected bit errors: 438
-[  281.664239] mtd_nandbiterrs: Page reads with  35 corrected bit errors: 69
-[  281.671014] mtd_nandbiterrs: Page reads with  36 corrected bit errors: 49
-[  281.677799] mtd_nandbiterrs: Page reads with  37 corrected bit errors: 65
-[  281.684585] mtd_nandbiterrs: Page reads with  38 corrected bit errors: 84
-[  281.691354] mtd_nandbiterrs: Page reads with  39 corrected bit errors: 41
-[  281.698138] mtd_nandbiterrs: Page reads with  40 corrected bit errors: 34
-[  281.704923] mtd_nandbiterrs: Page reads with  41 corrected bit errors: 30
-[  281.711707] mtd_nandbiterrs: Page reads with  42 corrected bit errors: 128
-[  281.718562] mtd_nandbiterrs: Page reads with  43 corrected bit errors: 455
-[  281.725434] mtd_nandbiterrs: Page reads with  44 corrected bit errors: 490
-[  281.732305] mtd_nandbiterrs: Page reads with  45 corrected bit errors: 152
-[  281.739161] mtd_nandbiterrs: Page reads with  46 corrected bit errors: 244
-[  281.746032] mtd_nandbiterrs: Page reads with  47 corrected bit errors: 101
-[  281.752904] mtd_nandbiterrs: Page reads with  48 corrected bit errors: 63
-[  281.759680] mtd_nandbiterrs: Page reads with  49 corrected bit errors: 106
-[  281.766551] mtd_nandbiterrs: Page reads with  50 corrected bit errors: 88
-[  281.773915] mtd_nandbiterrs: finished successfully.
-[  281.778779] ==================================================
-insmod: ERROR: could not insert module /root/mtd-tests/mtd_nandbiterrs.ko: Input/output error
-
-
-[root at localhost ~]# insmod /root/mtd-tests/mtd_oobtest.ko dev=1
-[   81.671222] 
-[   81.672889] =================================================
-[   81.678647] mtd_oobtest: MTD device: 1
-[   81.684113] mtd_oobtest: MTD device size 67108864, eraseblock size 524288, page size 4096, count of eraseblocks 128, pages per eraseblock 128, OOB size 224
-[   81.735121] mtd_test: scanning for bad eraseblocks
-[   81.739934] mtd_test: scanned 128 eraseblocks, 0 are bad
-[   81.745294] mtd_oobtest: test 1 of 5
-[   81.826984] mtd_oobtest: writing OOBs of whole device
-[   82.012080] mtd_oobtest: written up to eraseblock 0
-[   95.693233] mtd_oobtest: written 128 eraseblocks
-[   95.697860] mtd_oobtest: verifying all eraseblocks
-[   95.784329] mtd_oobtest: verified up to eraseblock 0
-[  104.453700] mtd_oobtest: verified 128 eraseblocks
-[  104.458408] mtd_oobtest: test 2 of 5
-[  104.535594] mtd_oobtest: writing OOBs of whole device
-[  104.640800] mtd_oobtest: written up to eraseblock 0
-[  118.332306] mtd_oobtest: written 128 eraseblocks
-[  118.336935] mtd_oobtest: verifying all eraseblocks
-[  118.423385] mtd_oobtest: verified up to eraseblock 0
-[  127.075131] mtd_oobtest: verified 128 eraseblocks
-[  127.079825] mtd_oobtest: test 3 of 5
-[  127.158388] mtd_oobtest: writing OOBs of whole device
-[  127.269185] mtd_oobtest: written up to eraseblock 0
-[  140.822559] mtd_oobtest: written 128 eraseblocks
-[  140.827186] mtd_oobtest: verifying all eraseblocks
-[  140.994636] mtd_oobtest: verified up to eraseblock 0
-[  158.287402] mtd_oobtest: verified 128 eraseblocks
-[  158.292096] mtd_oobtest: test 4 of 5
-[  158.369704] mtd_oobtest: attempting to start write past end of OOB
-[  158.375884] mtd_oobtest: an error is expected...
-[  158.380488] mtd_oobtest: error occurred as expected
-[  158.385927] mtd_oobtest: attempting to start read past end of OOB
-[  158.392046] mtd_oobtest: an error is expected...
-[  158.396679] mtd_oobtest: error occurred as expected
-[  158.401552] mtd_oobtest: attempting to write past end of device
-[  158.407477] mtd_oobtest: an error is expected...
-[  158.412082] mtd_oobtest: error occurred as expected
-[  158.416991] mtd_oobtest: attempting to read past end of device
-[  158.422809] mtd_oobtest: an error is expected...
-[  158.427434] mtd_oobtest: error occurred as expected
-[  158.432869] mtd_oobtest: attempting to write past end of device
-[  158.438805] mtd_oobtest: an error is expected...
-[  158.443411] mtd_oobtest: error occurred as expected
-[  158.448295] mtd_oobtest: attempting to read past end of device
-[  158.454132] mtd_oobtest: an error is expected...
-[  158.458736] mtd_oobtest: error occurred as expected
-[  158.463598] mtd_oobtest: test 5 of 5
-[  158.540451] mtd_oobtest: writing OOBs of whole device
-[  158.546342] mtd_oobtest: written up to eraseblock 0
-[  158.552043] mtd_oobtest: written up to eraseblock 0
-[  158.767554] mtd_oobtest: written 127 eraseblocks
-[  158.772159] mtd_oobtest: verifying all eraseblocks
-[  158.778355] mtd_oobtest: verified up to eraseblock 0
-[  158.955044] mtd_oobtest: verified 127 eraseblocks
-[  158.959737] mtd_oobtest: finished with 0 errors
-[  158.964975] =================================================
-
-
-Lucas Stach (5):
-  mtd: nand: tegra: add devicetree binding
-  mtd: nand: add NVIDIA Tegra NAND Flash controller driver
-  clk: tegra20: init NDFLASH clock to sensible rate
-  ARM: tegra: add Tegra20 NAND flash controller node
-  ARM: tegra: enable NAND flash on Colibri T20
-
- .../bindings/mtd/nvidia,tegra20-nand.txt           |  29 +
- MAINTAINERS                                        |   6 +
- arch/arm/boot/dts/tegra20-colibri-512.dtsi         |   6 +
- arch/arm/boot/dts/tegra20.dtsi                     |  13 +
- drivers/clk/tegra/clk-tegra20.c                    |   1 +
- drivers/mtd/nand/Kconfig                           |   6 +
- drivers/mtd/nand/Makefile                          |   1 +
- drivers/mtd/nand/tegra_nand.c                      | 786 +++++++++++++++++++++
- 8 files changed, 848 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Lucas Stach <dev@lynxeye.de>
+---
+v2:
+- remove Tegra 3 compatible
+- remove useless part_probes
+- don't store irq number
+- use gpiod API instead of deprecated of_gpios
+- don't store reset
+- correct TIMING_TCS mask
+- simplify irq handler
+- correct timing calculations
+- don't store buswidth
+- drop compile test
+- correct ECC handling
+---
+ MAINTAINERS                   |   6 +
+ drivers/mtd/nand/Kconfig      |   6 +
+ drivers/mtd/nand/Makefile     |   1 +
+ drivers/mtd/nand/tegra_nand.c | 786 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 799 insertions(+)
  create mode 100644 drivers/mtd/nand/tegra_nand.c
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ddc5a8c..6c56739 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9641,6 +9641,12 @@ M:	Laxman Dewangan <ldewangan@nvidia.com>
+ S:	Supported
+ F:	drivers/input/keyboard/tegra-kbc.c
+ 
++TEGRA NAND DRIVER
++M:	Lucas Stach <dev@lynxeye.de>
++S:	Maintained
++F:	Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
++F:	drivers/mtd/nand/tegra_nand.c
++
+ TEGRA PWM DRIVER
+ M:	Thierry Reding <thierry.reding@gmail.com>
+ S:	Supported
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 5b76a17..86d7c87 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -529,4 +529,10 @@ config MTD_NAND_HISI504
+ 	help
+ 	  Enables support for NAND controller on Hisilicon SoC Hip04.
+ 
++config MTD_NAND_TEGRA
++	tristate "Support for NAND on NVIDIA Tegra"
++	depends on ARCH_TEGRA
++	help
++	  Enables support for NAND flash on NVIDIA Tegra SoC based boards.
++
+ endif # MTD_NAND
+diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+index 582bbd05..3228e6e 100644
+--- a/drivers/mtd/nand/Makefile
++++ b/drivers/mtd/nand/Makefile
+@@ -52,5 +52,6 @@ obj-$(CONFIG_MTD_NAND_XWAY)		+= xway_nand.o
+ obj-$(CONFIG_MTD_NAND_BCM47XXNFLASH)	+= bcm47xxnflash/
+ obj-$(CONFIG_MTD_NAND_SUNXI)		+= sunxi_nand.o
+ obj-$(CONFIG_MTD_NAND_HISI504)	        += hisi504_nand.o
++obj-$(CONFIG_MTD_NAND_TEGRA)		+= tegra_nand.o
+ 
+ nand-objs := nand_base.o nand_bbt.o nand_timings.o
+diff --git a/drivers/mtd/nand/tegra_nand.c b/drivers/mtd/nand/tegra_nand.c
+new file mode 100644
+index 0000000..0e42985
+--- /dev/null
++++ b/drivers/mtd/nand/tegra_nand.c
+@@ -0,0 +1,786 @@
++/*
++ * Copyright (C) 2014-2015 Lucas Stach <dev@lynxeye.de>
++ * Copyright (C) 2012 Avionic Design GmbH
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/clk.h>
++#include <linux/completion.h>
++#include <linux/delay.h>
++#include <linux/dma-mapping.h>
++#include <linux/err.h>
++#include <linux/gpio/consumer.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/mtd/nand.h>
++#include <linux/mtd/partitions.h>
++#include <linux/of_mtd.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reset.h>
++
++#define CMD				0x00
++#define   CMD_GO			(1 << 31)
++#define   CMD_CLE			(1 << 30)
++#define   CMD_ALE			(1 << 29)
++#define   CMD_PIO			(1 << 28)
++#define   CMD_TX			(1 << 27)
++#define   CMD_RX			(1 << 26)
++#define   CMD_SEC_CMD			(1 << 25)
++#define   CMD_AFT_DAT			(1 << 24)
++#define   CMD_TRANS_SIZE(x)		(((x) & 0xf) << 20)
++#define   CMD_A_VALID			(1 << 19)
++#define   CMD_B_VALID			(1 << 18)
++#define   CMD_RD_STATUS_CHK		(1 << 17)
++#define   CMD_RBSY_CHK			(1 << 16)
++#define   CMD_CE(x)			(1 << (8 + ((x) & 0x7)))
++#define   CMD_CLE_SIZE(x)		(((x) & 0x3) << 4)
++#define   CMD_ALE_SIZE(x)		(((x) & 0xf) << 0)
++
++#define STATUS				0x04
++
++#define ISR				0x08
++#define   ISR_UND			(1 << 7)
++#define   ISR_OVR			(1 << 6)
++#define   ISR_CMD_DONE			(1 << 5)
++#define   ISR_ECC_ERR			(1 << 4)
++
++#define IER				0x0c
++#define   IER_ERR_TRIG_VAL(x)		(((x) & 0xf) << 16)
++#define   IER_UND			(1 << 7)
++#define   IER_OVR			(1 << 6)
++#define   IER_CMD_DONE			(1 << 5)
++#define   IER_ECC_ERR			(1 << 4)
++#define   IER_GIE			(1 << 0)
++
++#define CFG				0x10
++#define   CFG_HW_ECC			(1 << 31)
++#define   CFG_ECC_SEL			(1 << 30)
++#define   CFG_ERR_COR			(1 << 29)
++#define   CFG_PIPE_EN			(1 << 28)
++#define   CFG_TVAL_4			(0 << 24)
++#define   CFG_TVAL_6			(1 << 24)
++#define   CFG_TVAL_8			(2 << 24)
++#define   CFG_SKIP_SPARE		(1 << 23)
++#define   CFG_BUS_WIDTH_8		(0 << 21)
++#define   CFG_BUS_WIDTH_16		(1 << 21)
++#define   CFG_COM_BSY			(1 << 20)
++#define   CFG_PS_256			(0 << 16)
++#define   CFG_PS_512			(1 << 16)
++#define   CFG_PS_1024			(2 << 16)
++#define   CFG_PS_2048			(3 << 16)
++#define   CFG_PS_4096			(4 << 16)
++#define   CFG_SKIP_SPARE_SIZE_4		(0 << 14)
++#define   CFG_SKIP_SPARE_SIZE_8		(1 << 14)
++#define   CFG_SKIP_SPARE_SIZE_12	(2 << 14)
++#define   CFG_SKIP_SPARE_SIZE_16	(3 << 14)
++#define   CFG_TAG_BYTE_SIZE(x)		((x) & 0xff)
++
++#define TIMING_1			0x14
++#define   TIMING_TRP_RESP(x)		(((x) & 0xf) << 28)
++#define   TIMING_TWB(x)			(((x) & 0xf) << 24)
++#define   TIMING_TCR_TAR_TRR(x)		(((x) & 0xf) << 20)
++#define   TIMING_TWHR(x)		(((x) & 0xf) << 16)
++#define   TIMING_TCS(x)			(((x) & 0x3) << 14)
++#define   TIMING_TWH(x)			(((x) & 0x3) << 12)
++#define   TIMING_TWP(x)			(((x) & 0xf) <<  8)
++#define   TIMING_TRH(x)			(((x) & 0xf) <<  4)
++#define   TIMING_TRP(x)			(((x) & 0xf) <<  0)
++
++#define RESP				0x18
++
++#define TIMING_2			0x1c
++#define   TIMING_TADL(x)		((x) & 0xf)
++
++#define CMD_1				0x20
++#define CMD_2				0x24
++#define ADDR_1				0x28
++#define ADDR_2				0x2c
++
++#define DMA_CTRL			0x30
++#define   DMA_CTRL_GO			(1 << 31)
++#define   DMA_CTRL_IN			(0 << 30)
++#define   DMA_CTRL_OUT			(1 << 30)
++#define   DMA_CTRL_PERF_EN		(1 << 29)
++#define   DMA_CTRL_IE_DONE		(1 << 28)
++#define   DMA_CTRL_REUSE		(1 << 27)
++#define   DMA_CTRL_BURST_1		(2 << 24)
++#define   DMA_CTRL_BURST_4		(3 << 24)
++#define   DMA_CTRL_BURST_8		(4 << 24)
++#define   DMA_CTRL_BURST_16		(5 << 24)
++#define   DMA_CTRL_IS_DONE		(1 << 20)
++#define   DMA_CTRL_EN_A			(1 <<  2)
++#define   DMA_CTRL_EN_B			(1 <<  1)
++
++#define DMA_CFG_A			0x34
++#define DMA_CFG_B			0x38
++
++#define FIFO_CTRL			0x3c
++#define   FIFO_CTRL_CLR_ALL		(1 << 3)
++
++#define DATA_PTR			0x40
++#define TAG_PTR				0x44
++#define ECC_PTR				0x48
++
++#define DEC_STATUS			0x4c
++#define   DEC_STATUS_A_ECC_FAIL		(1 << 1)
++#define   DEC_STATUS_ERR_COUNT_MASK	0x00ff0000
++#define   DEC_STATUS_ERR_COUNT_SHIFT	16
++
++#define HWSTATUS_CMD			0x50
++#define HWSTATUS_MASK			0x54
++#define   HWSTATUS_RDSTATUS_MASK(x)	(((x) & 0xff) << 24)
++#define   HWSTATUS_RDSTATUS_VALUE(x)	(((x) & 0xff) << 16)
++#define   HWSTATUS_RBSY_MASK(x)		(((x) & 0xff) << 8)
++#define   HWSTATUS_RBSY_VALUE(x)	(((x) & 0xff) << 0)
++
++struct tegra_nand {
++	void __iomem *regs;
++	struct clk *clk;
++	struct gpio_desc *wp_gpio;
++
++	struct nand_chip chip;
++	struct mtd_info mtd;
++	struct device *dev;
++
++	struct completion command_complete;
++	struct completion dma_complete;
++
++	dma_addr_t data_dma;
++	void *data_buf;
++	dma_addr_t oob_dma;
++	void *oob_buf;
++
++	int cur_chip;
++};
++
++static inline struct tegra_nand *to_tegra_nand(struct mtd_info *mtd)
++{
++	return container_of(mtd, struct tegra_nand, mtd);
++}
++
++static struct nand_ecclayout tegra_nand_oob_16 = {
++	.eccbytes = 4,
++	.eccpos = { 3, 4, 5, 6 },
++	.oobfree = {
++		{ .offset = 7, . length = 8 }
++	}
++};
++
++static struct nand_ecclayout tegra_nand_oob_64 = {
++	.eccbytes = 36,
++	.eccpos = {
++		 3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
++		19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
++		35, 36, 37, 38, 39
++	},
++	.oobfree = {
++		{ .offset = 40, .length = 24 }
++	}
++};
++
++static struct nand_ecclayout tegra_nand_oob_128 = {
++	.eccbytes = 72,
++	.eccpos = {
++		 3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
++		19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
++		35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
++		51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66,
++		67, 68, 69, 70, 71, 72, 73, 74, 75
++	},
++	.oobfree = {
++		{ .offset = 76, .length = 52 }
++	}
++};
++
++static struct nand_ecclayout tegra_nand_oob_224 = {
++	.eccbytes = 144,
++	.eccpos = {
++		  3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,
++		 15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,
++		 27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,
++		 39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,
++		 51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,
++		 63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,
++		 75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,
++		 87,  88,  89,  90,  91,  92,  93,  94,  95,  96,  97,  98,
++		 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110,
++		111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122,
++		123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134,
++		135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146,
++		147
++	},
++	.oobfree = {
++		{ .offset = 148, .length = 76 }
++	}
++};
++
++static irqreturn_t tegra_nand_irq(int irq, void *data)
++{
++	struct tegra_nand *nand = data;
++	u32 isr, dma;
++
++	isr = readl(nand->regs + ISR);
++	dma = readl(nand->regs + DMA_CTRL);
++
++	if (!isr && !(dma & DMA_CTRL_IS_DONE))
++		return IRQ_NONE;
++
++	if (isr & ISR_CMD_DONE)
++		complete(&nand->command_complete);
++
++	if (isr & ISR_UND)
++		dev_dbg(nand->dev, "FIFO underrun\n");
++
++	if (isr & ISR_OVR)
++		dev_dbg(nand->dev, "FIFO overrun\n");
++
++	/* handle DMA interrupts */
++	if (dma & DMA_CTRL_IS_DONE) {
++		writel(dma, nand->regs + DMA_CTRL);
++		complete(&nand->dma_complete);
++	}
++
++	/* clear interrupts */
++	writel(isr, nand->regs + ISR);
++
++	return IRQ_HANDLED;
++}
++
++static void tegra_nand_command(struct mtd_info *mtd, unsigned int command,
++			       int column, int page_addr)
++{
++	struct tegra_nand *nand = to_tegra_nand(mtd);
++	u32 value;
++
++	switch (command) {
++	case NAND_CMD_READOOB:
++		column += mtd->writesize;
++		/* fall-through */
++
++	case NAND_CMD_READ0:
++		writel(NAND_CMD_READ0, nand->regs + CMD_1);
++		writel(NAND_CMD_READSTART, nand->regs + CMD_2);
++
++		value = (page_addr << 16) | (column & 0xffff);
++		writel(value, nand->regs + ADDR_1);
++
++		value = page_addr >> 16;
++		writel(value, nand->regs + ADDR_2);
++
++		value = CMD_CLE | CMD_ALE | CMD_ALE_SIZE(4) | CMD_SEC_CMD |
++			CMD_RBSY_CHK | CMD_CE(nand->cur_chip) | CMD_GO;
++		writel(value, nand->regs + CMD);
++		break;
++
++	case NAND_CMD_SEQIN:
++		writel(NAND_CMD_SEQIN, nand->regs + CMD_1);
++
++		value = (page_addr << 16) | (column & 0xffff);
++		writel(value, nand->regs + ADDR_1);
++
++		value = page_addr >> 16;
++		writel(value, nand->regs + ADDR_2);
++
++		value = CMD_CLE | CMD_ALE | CMD_ALE_SIZE(4) |
++			CMD_CE(nand->cur_chip) | CMD_GO;
++		writel(value, nand->regs + CMD);
++		break;
++
++	case NAND_CMD_PAGEPROG:
++		writel(NAND_CMD_PAGEPROG, nand->regs + CMD_1);
++
++		value = CMD_CLE | CMD_CE(nand->cur_chip) | CMD_GO;
++		writel(value, nand->regs + CMD);
++		break;
++
++	case NAND_CMD_READID:
++		writel(NAND_CMD_READID, nand->regs + CMD_1);
++		writel(column & 0xff, nand->regs + ADDR_1);
++
++		value = CMD_GO | CMD_CLE | CMD_ALE | CMD_CE(nand->cur_chip);
++		writel(value, nand->regs + CMD);
++		break;
++
++	case NAND_CMD_ERASE1:
++		writel(NAND_CMD_ERASE1, nand->regs + CMD_1);
++		writel(NAND_CMD_ERASE2, nand->regs + CMD_2);
++		writel(page_addr, nand->regs + ADDR_1);
++
++		value = CMD_GO | CMD_CLE | CMD_ALE | CMD_ALE_SIZE(2) |
++			CMD_SEC_CMD | CMD_RBSY_CHK | CMD_CE(nand->cur_chip);
++		writel(value, nand->regs + CMD);
++		break;
++
++	case NAND_CMD_ERASE2:
++		return;
++
++	case NAND_CMD_STATUS:
++		writel(NAND_CMD_STATUS, nand->regs + CMD_1);
++
++		value = CMD_GO | CMD_CLE | CMD_CE(nand->cur_chip);
++		writel(value, nand->regs + CMD);
++		break;
++
++	case NAND_CMD_PARAM:
++		writel(NAND_CMD_PARAM, nand->regs + CMD_1);
++		writel(column & 0xff, nand->regs + ADDR_1);
++		value = CMD_GO | CMD_CLE | CMD_ALE | CMD_CE(nand->cur_chip);
++		writel(value, nand->regs + CMD);
++		break;
++
++	case NAND_CMD_RESET:
++		writel(NAND_CMD_RESET, nand->regs + CMD_1);
++
++		value = CMD_GO | CMD_CLE | CMD_CE(nand->cur_chip);
++		writel(value, nand->regs + CMD);
++		break;
++
++	default:
++		dev_warn(nand->dev, "unsupported command: %x\n", command);
++		return;
++	}
++
++	wait_for_completion(&nand->command_complete);
++}
++
++static void tegra_nand_select_chip(struct mtd_info *mtd, int chip)
++{
++	struct tegra_nand *nand = to_tegra_nand(mtd);
++
++	nand->cur_chip = chip;
++}
++
++static uint8_t tegra_nand_read_byte(struct mtd_info *mtd)
++{
++	struct tegra_nand *nand = to_tegra_nand(mtd);
++	u32 value;
++
++	value = CMD_TRANS_SIZE(0) | CMD_CE(nand->cur_chip) |
++		CMD_PIO | CMD_RX | CMD_A_VALID | CMD_GO;
++
++	writel(value, nand->regs + CMD);
++	wait_for_completion(&nand->command_complete);
++
++	return readl(nand->regs + RESP) & 0xff;
++}
++
++static void tegra_nand_read_buf(struct mtd_info *mtd, uint8_t *buffer,
++				int length)
++{
++	struct tegra_nand *nand = to_tegra_nand(mtd);
++	size_t i;
++
++	for (i = 0; i < length; i += 4) {
++		u32 value;
++		size_t n = min_t(size_t, length - i, 4);
++
++		value = CMD_GO | CMD_PIO | CMD_RX | CMD_A_VALID |
++			CMD_CE(nand->cur_chip) | CMD_TRANS_SIZE(n - 1);
++
++		writel(value, nand->regs + CMD);
++		wait_for_completion(&nand->command_complete);
++
++		value = readl(nand->regs + RESP);
++		memcpy(buffer + i, &value, n);
++	}
++}
++
++static void tegra_nand_write_buf(struct mtd_info *mtd, const uint8_t *buffer,
++				 int length)
++{
++	struct tegra_nand *nand = to_tegra_nand(mtd);
++	size_t i;
++
++	for (i = 0; i < length; i += 4) {
++		u32 value;
++		size_t n = min_t(size_t, length - i, 4);
++
++		memcpy(&value, buffer + i, n);
++		writel(value, nand->regs + RESP);
++
++		value = CMD_GO | CMD_PIO | CMD_TX | CMD_A_VALID |
++			CMD_CE(nand->cur_chip) | CMD_TRANS_SIZE(n - 1);
++
++		writel(value, nand->regs + CMD);
++		wait_for_completion(&nand->command_complete);
++	}
++}
++
++static int tegra_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
++				uint8_t *buf, int oob_required, int page)
++{
++	struct tegra_nand *nand = to_tegra_nand(mtd);
++	u32 value;
++
++	value = readl(nand->regs + CFG);
++	value |= CFG_HW_ECC | CFG_ERR_COR;
++	writel(value, nand->regs + CFG);
++
++	writel(mtd->writesize - 1, nand->regs + DMA_CFG_A);
++	writel(nand->data_dma, nand->regs + DATA_PTR);
++
++	if (oob_required) {
++		writel(mtd->oobsize - 1, nand->regs + DMA_CFG_B);
++		writel(nand->oob_dma, nand->regs + TAG_PTR);
++	} else {
++		writel(0, nand->regs + DMA_CFG_B);
++		writel(0, nand->regs + TAG_PTR);
++	}
++
++	value = DMA_CTRL_GO | DMA_CTRL_IN | DMA_CTRL_PERF_EN |
++		DMA_CTRL_REUSE | DMA_CTRL_IE_DONE | DMA_CTRL_IS_DONE |
++		DMA_CTRL_BURST_8 | DMA_CTRL_EN_A;
++
++	if (oob_required)
++		value |= DMA_CTRL_EN_B;
++
++	writel(value, nand->regs + DMA_CTRL);
++
++	value = CMD_GO | CMD_RX | CMD_TRANS_SIZE(8) |
++		CMD_A_VALID | CMD_CE(nand->cur_chip);
++	if (oob_required)
++		value |= CMD_B_VALID;
++	writel(value, nand->regs + CMD);
++
++	wait_for_completion(&nand->command_complete);
++	wait_for_completion(&nand->dma_complete);
++
++	if (oob_required)
++		memcpy(chip->oob_poi, nand->oob_buf, mtd->oobsize);
++	memcpy(buf, nand->data_buf, mtd->writesize);
++
++	value = readl(nand->regs + CFG);
++	value &= ~(CFG_HW_ECC | CFG_ERR_COR);
++	writel(value, nand->regs + CFG);
++
++	value = readl(nand->regs + DEC_STATUS);
++	if (value & DEC_STATUS_A_ECC_FAIL) {
++		mtd->ecc_stats.failed++;
++		return -EBADMSG;
++	}
++	if (value & DEC_STATUS_ERR_COUNT_MASK) {
++		value = (value & DEC_STATUS_ERR_COUNT_MASK) >>
++			DEC_STATUS_ERR_COUNT_SHIFT;
++		mtd->ecc_stats.corrected += value;
++		return value;
++	}
++
++	return 0;
++}
++
++static int tegra_nand_write_page(struct mtd_info *mtd, struct nand_chip *chip,
++				 const uint8_t *buf, int oob_required)
++{
++	struct tegra_nand *nand = to_tegra_nand(mtd);
++	unsigned long value;
++
++	value = readl(nand->regs + CFG);
++	value |= CFG_HW_ECC | CFG_ERR_COR;
++	writel(value, nand->regs + CFG);
++
++	memcpy(nand->data_buf, buf, mtd->writesize);
++
++	writel(mtd->writesize - 1, nand->regs + DMA_CFG_A);
++	writel(nand->data_dma, nand->regs + DATA_PTR);
++
++	writel(0, nand->regs + DMA_CFG_B);
++	writel(0, nand->regs + TAG_PTR);
++
++	value = DMA_CTRL_GO | DMA_CTRL_OUT | DMA_CTRL_PERF_EN |
++		DMA_CTRL_IE_DONE | DMA_CTRL_IS_DONE |
++		DMA_CTRL_BURST_8 | DMA_CTRL_EN_A;
++	writel(value, nand->regs + DMA_CTRL);
++
++	value = CMD_GO | CMD_TX | CMD_A_VALID | CMD_TRANS_SIZE(8) |
++		CMD_CE(nand->cur_chip);
++	writel(value, nand->regs + CMD);
++
++	wait_for_completion(&nand->command_complete);
++	wait_for_completion(&nand->dma_complete);
++
++	value = readl(nand->regs + CFG);
++	value &= ~(CFG_HW_ECC | CFG_ERR_COR);
++	writel(value, nand->regs + CFG);
++
++	return 0;
++}
++
++static void tegra_nand_setup_timing(struct tegra_nand *nand, int mode)
++{
++	unsigned long rate = clk_get_rate(nand->clk) / 1000000;
++	unsigned long period = 1000000 / rate;
++	const struct nand_sdr_timings *timings;
++	u32 val, reg = 0;
++
++	timings = onfi_async_timing_mode_to_sdr_timings(mode);
++
++	val = max3(timings->tAR_min, timings->tRR_min,
++		   timings->tRC_min) / period;
++	if (val > 2)
++		val -= 3;
++	reg |= TIMING_TCR_TAR_TRR(val);
++
++	val = max(max(timings->tCS_min, timings->tCH_min),
++		  max(timings->tALS_min, timings->tALH_min)) / period;
++	if (val > 1)
++		val -= 2;
++	reg |= TIMING_TCS(val);
++
++	val = (max(timings->tRP_min, timings->tREA_max) + 6000) / period;
++	reg |= (TIMING_TRP(val) | TIMING_TRP_RESP(val));
++
++	reg |= TIMING_TWB(timings->tWB_max / period);
++	reg |= TIMING_TWHR(timings->tWHR_min / period);
++	reg |= TIMING_TWH(timings->tWH_min / period);
++	reg |= TIMING_TWP(timings->tWP_min / period);
++	reg |= TIMING_TRH(timings->tRHW_min / period);
++
++	writel(reg, nand->regs + TIMING_1);
++
++	val = timings->tADL_min / period;
++	if (val > 2)
++		val -= 3;
++	reg = TIMING_TADL(val);
++
++	writel(reg, nand->regs + TIMING_2);
++}
++
++static void tegra_nand_setup_chiptiming(struct tegra_nand *nand)
++{
++	struct nand_chip *chip = &nand->chip;
++	int mode;
++
++	mode = onfi_get_async_timing_mode(chip);
++	if (mode == ONFI_TIMING_MODE_UNKNOWN)
++		mode = chip->onfi_timing_mode_default;
++	else
++		mode = fls(mode);
++
++	tegra_nand_setup_timing(nand, mode);
++}
++
++static int tegra_nand_probe(struct platform_device *pdev)
++{
++	struct reset_control *rst;
++	struct tegra_nand *nand;
++	struct nand_chip *chip;
++	struct mtd_info *mtd;
++	struct resource *res;
++	unsigned long value;
++	int irq, buswidth, err = 0;
++
++	nand = devm_kzalloc(&pdev->dev, sizeof(*nand), GFP_KERNEL);
++	if (!nand)
++		return -ENOMEM;
++
++	nand->dev = &pdev->dev;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	nand->regs = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(nand->regs))
++		return PTR_ERR(nand->regs);
++
++	irq = platform_get_irq(pdev, 0);
++	err = devm_request_irq(&pdev->dev, irq, tegra_nand_irq, 0,
++			       dev_name(&pdev->dev), nand);
++	if (err)
++		return err;
++
++	rst = devm_reset_control_get(&pdev->dev, "nand");
++	if (IS_ERR(rst))
++		return PTR_ERR(rst);
++
++	nand->clk = devm_clk_get(&pdev->dev, "nand");
++	if (IS_ERR(nand->clk))
++		return PTR_ERR(nand->clk);
++
++	nand->wp_gpio = gpiod_get_optional(&pdev->dev, "nvidia,wp-gpios",
++					   GPIOD_OUT_HIGH);
++	if (IS_ERR(nand->wp_gpio))
++		return PTR_ERR(nand->wp_gpio);
++
++	buswidth = of_get_nand_bus_width(pdev->dev.of_node);
++	if (buswidth < 0)
++		return buswidth;
++
++	err = clk_prepare_enable(nand->clk);
++	if (err)
++		return err;
++
++	reset_control_assert(rst);
++	udelay(2);
++	reset_control_deassert(rst);
++
++	value = HWSTATUS_RDSTATUS_MASK(1) | HWSTATUS_RDSTATUS_VALUE(0) |
++		HWSTATUS_RBSY_MASK(NAND_STATUS_READY) |
++		HWSTATUS_RBSY_VALUE(NAND_STATUS_READY);
++	writel(NAND_CMD_STATUS, nand->regs + HWSTATUS_CMD);
++	writel(value, nand->regs + HWSTATUS_MASK);
++
++	init_completion(&nand->command_complete);
++	init_completion(&nand->dma_complete);
++
++	mtd = &nand->mtd;
++	mtd->name = dev_name(&pdev->dev);
++	mtd->owner = THIS_MODULE;
++	mtd->priv = &nand->chip;
++
++	mtd->type = MTD_NANDFLASH;
++	mtd->flags = MTD_CAP_NANDFLASH;
++
++	/* clear interrupts */
++	value = readl(nand->regs + ISR);
++	writel(value, nand->regs + ISR);
++
++	writel(DMA_CTRL_IS_DONE, nand->regs + DMA_CTRL);
++
++	/* enable interrupts */
++	value = IER_UND | IER_OVR | IER_CMD_DONE | IER_ECC_ERR | IER_GIE;
++	writel(value, nand->regs + IER);
++
++	value = 0;
++	if (buswidth == 16)
++		value |= CFG_BUS_WIDTH_16;
++	writel(value, nand->regs + CFG);
++
++	chip = &nand->chip;
++	chip->cmdfunc = tegra_nand_command;
++	chip->select_chip = tegra_nand_select_chip;
++	chip->read_byte = tegra_nand_read_byte;
++	chip->read_buf = tegra_nand_read_buf;
++	chip->write_buf = tegra_nand_write_buf;
++
++	tegra_nand_setup_timing(nand, 0);
++
++	err = nand_scan_ident(mtd, 1, NULL);
++	if (err)
++		return err;
++
++	nand->data_buf = dmam_alloc_coherent(&pdev->dev, mtd->writesize,
++					    &nand->data_dma, GFP_KERNEL);
++	if (!nand->data_buf)
++		return -ENOMEM;
++
++	nand->oob_buf = dmam_alloc_coherent(&pdev->dev, mtd->oobsize,
++					    &nand->oob_dma, GFP_KERNEL);
++	if (!nand->oob_buf)
++		return -ENOMEM;
++
++	chip->ecc.mode = NAND_ECC_HW;
++	chip->ecc.size = 512;
++	chip->ecc.bytes = mtd->oobsize;
++	chip->ecc.read_page = tegra_nand_read_page;
++	chip->ecc.write_page = tegra_nand_write_page;
++
++	value = readl(nand->regs + CFG);
++	value |=  CFG_PIPE_EN | CFG_SKIP_SPARE | CFG_SKIP_SPARE_SIZE_4;
++
++	switch (mtd->oobsize) {
++	case 16:
++		chip->ecc.layout = &tegra_nand_oob_16;
++		chip->ecc.strength = 1;
++		value |= CFG_TAG_BYTE_SIZE(tegra_nand_oob_16.oobfree[0].length
++			 - 1);
++		break;
++	case 64:
++		chip->ecc.layout = &tegra_nand_oob_64;
++		chip->ecc.strength = 8;
++		value |= CFG_ECC_SEL | CFG_TVAL_8 |
++			 CFG_TAG_BYTE_SIZE(tegra_nand_oob_64.oobfree[0].length
++			 - 1);
++		break;
++	case 128:
++		chip->ecc.layout = &tegra_nand_oob_128;
++		chip->ecc.strength = 8;
++		value |= CFG_ECC_SEL | CFG_TVAL_8 |
++			 CFG_TAG_BYTE_SIZE(tegra_nand_oob_128.oobfree[0].length
++			 - 1);
++		break;
++	case 224:
++		chip->ecc.layout = &tegra_nand_oob_224;
++		chip->ecc.strength = 8;
++		value |= CFG_ECC_SEL | CFG_TVAL_8 |
++			 CFG_TAG_BYTE_SIZE(tegra_nand_oob_224.oobfree[0].length
++			 - 1);
++		break;
++	default:
++		dev_err(&pdev->dev, "unhandled OOB size %d\n", mtd->oobsize);
++		return -ENODEV;
++	}
++
++	switch (mtd->writesize) {
++	case 256:
++		value |= CFG_PS_256;
++		break;
++	case 512:
++		value |= CFG_PS_512;
++		break;
++	case 1024:
++		value |= CFG_PS_1024;
++		break;
++	case 2048:
++		value |= CFG_PS_2048;
++		break;
++	case 4096:
++		value |= CFG_PS_4096;
++		break;
++	default:
++		dev_err(&pdev->dev, "unhandled writesize %d\n", mtd->writesize);
++		return -ENODEV;
++	}
++
++	writel(value, nand->regs + CFG);
++
++	tegra_nand_setup_chiptiming(nand);
++
++	err = nand_scan_tail(mtd);
++	if (err)
++		return err;
++
++	mtd_device_parse_register(mtd, NULL,
++				  &(struct mtd_part_parser_data) {
++					.of_node = pdev->dev.of_node,
++				  },
++				  NULL, 0);
++
++	platform_set_drvdata(pdev, nand);
++
++	return 0;
++}
++
++static int tegra_nand_remove(struct platform_device *pdev)
++{
++	struct tegra_nand *nand = platform_get_drvdata(pdev);
++
++	nand_release(&nand->mtd);
++
++	clk_disable_unprepare(nand->clk);
++
++	return 0;
++}
++
++static const struct of_device_id tegra_nand_of_match[] = {
++	{ .compatible = "nvidia,tegra20-nand" },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver tegra_nand_driver = {
++	.driver = {
++		.name = "tegra-nand",
++		.of_match_table = tegra_nand_of_match,
++	},
++	.probe = tegra_nand_probe,
++	.remove = tegra_nand_remove,
++};
++module_platform_driver(tegra_nand_driver);
++
++MODULE_DESCRIPTION("NVIDIA Tegra NAND driver");
++MODULE_AUTHOR("Thierry Reding <thierry.reding at avionic-design.de");
++MODULE_AUTHOR("Lucas Stach <dev@lynxeye.de");
++MODULE_LICENSE("GPL v2");
++MODULE_DEVICE_TABLE(of, tegra_nand_of_match);
 -- 
 2.1.0
