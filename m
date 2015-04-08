@@ -1,59 +1,34 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 8 Apr 2015 11:40:16 +0200
-Subject: [PATCH v2 2/2] mmc: host: Add some quirks to be read from fdt in
- sdhci-pltm.c
-In-Reply-To: <1427726768-17233-3-git-send-email-stripathi@apm.com>
-References: <1427726768-17233-1-git-send-email-stripathi@apm.com>
- <1427726768-17233-3-git-send-email-stripathi@apm.com>
-Message-ID: <CAPDyKFoc0V5BdKCO8v92Y1qHzEPgwxRdYR3cCj8nCyU-s25NuQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Apr 2015 10:44:38 +0100
+Subject: [PATCH 0/7] Fix Keystone 2 physical address switch
+Message-ID: <20150408094438.GM12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 March 2015 at 16:46, Suman Tripathi <stripathi@apm.com> wrote:
-> This patch adds some quirks support to be read from fdt.
->
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->  drivers/mmc/host/sdhci-pltfm.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->
-> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-> index bef250e..9f6a4b9 100644
-> --- a/drivers/mmc/host/sdhci-pltfm.c
-> +++ b/drivers/mmc/host/sdhci-pltfm.c
-> @@ -85,6 +85,21 @@ void sdhci_get_of_property(struct platform_device *pdev)
->
->                 if (of_get_property(np, "broken-cd", NULL))
->                         host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
-> +
-> +               if (of_get_property(np, "delay-after-power", NULL))
-> +                       host->quirks |= SDHCI_QUIRK_DELAY_AFTER_POWER;
-> +
-> +               if (of_get_property(np, "no-hispd", NULL))
-> +                       host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
-> +
-> +               if (of_get_property(np, "broken-adma", NULL))
-> +                       host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
-> +
-> +               if (of_get_property(np, "broken-dma", NULL))
-> +                       host->quirks |= SDHCI_QUIRK_BROKEN_DMA;
-> +
-> +               if (of_get_property(np, "no-cmd23", NULL))
-> +                       host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+For some time, the Keystone 2 physical address switch has been
+tainting the kernel ever since we decided that it was not safe.
 
-Can't at least some of these be distinguished from what sdhci variant
-that is being used? Instead of having them in DT...
+This series re-works the address switch to be compliant architecturally.
 
-Kind regards
-Uffe
+There's still a niggle in the keystone2 code, where we set the
+arch_virt_to_idmap function pointer in keystone_pv_fixup() - something
+I'd ideally like to avoid.
 
->
->                 if (of_get_property(np, "no-1-8-v", NULL))
->                         host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
-> --
-> 1.8.2.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I'm in two minds about how much of this code should be in SoC specific
+code, and how much should be in generic code - on one hand, I don't
+want to give a green light to this kind of sillyness by encouraging
+it, but I'd rather not end up with multiple implementations of this.
+
+ arch/arm/include/asm/mach/arch.h  |   2 +-
+ arch/arm/kernel/setup.c           |   7 +-
+ arch/arm/mach-keystone/keystone.c |  41 +++++------
+ arch/arm/mm/Kconfig               |   4 ++
+ arch/arm/mm/Makefile              |   1 +
+ arch/arm/mm/mmu.c                 | 148 +++++++++++++++-----------------------
+ arch/arm/mm/nommu.c               |   9 ---
+ arch/arm/mm/pv-fixup-asm.S        |  88 +++++++++++++++++++++++
+ 8 files changed, 174 insertions(+), 126 deletions(-)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
