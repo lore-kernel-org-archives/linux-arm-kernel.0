@@ -1,77 +1,45 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Apr 2015 15:22:17 +0200
-Subject: [PATCH 6/8] clk: sirf: Constify parent names in clock init data
+Date: Wed, 08 Apr 2015 15:22:12 +0200
+Subject: [PATCH 1/8] clk: rockchip: Staticize file-scope declarations
 In-Reply-To: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
 References: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1428499339-29569-7-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1428499339-29569-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The array of parent names can be made as array of const pointers to
-const strings.
+Add missing static to local (file-scope only) symbols.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/clk/sirf/clk-common.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/clk/rockchip/clk-rk3188.c | 2 +-
+ drivers/clk/rockchip/clk-rk3288.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/sirf/clk-common.c b/drivers/clk/sirf/clk-common.c
-index 37af51c5f213..e9cf5730effe 100644
---- a/drivers/clk/sirf/clk-common.c
-+++ b/drivers/clk/sirf/clk-common.c
-@@ -188,7 +188,7 @@ static struct clk_ops std_pll_ops = {
- 	.set_rate = pll_clk_set_rate,
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index 7eb684c50d42..d045a6ae4e5f 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -26,7 +26,7 @@ enum rk3188_plls {
+ 	apll, cpll, dpll, gpll,
  };
  
--static const char *pll_clk_parents[] = {
-+static const char * const pll_clk_parents[] = {
- 	"osc",
+-struct rockchip_pll_rate_table rk3188_pll_rates[] = {
++static struct rockchip_pll_rate_table rk3188_pll_rates[] = {
+ 	RK3066_PLL_RATE(2208000000, 1, 92, 1),
+ 	RK3066_PLL_RATE(2184000000, 1, 91, 1),
+ 	RK3066_PLL_RATE(2160000000, 1, 90, 1),
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 05d7a0bc0599..fabc4d63a100 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -27,7 +27,7 @@ enum rk3288_plls {
+ 	apll, dpll, cpll, gpll, npll,
  };
  
-@@ -284,7 +284,7 @@ static struct clk_hw usb_pll_clk_hw = {
-  * clock domains - cpu, mem, sys/io, dsp, gfx
-  */
- 
--static const char *dmn_clk_parents[] = {
-+static const char * const dmn_clk_parents[] = {
- 	"rtc",
- 	"osc",
- 	"pll1",
-@@ -673,7 +673,7 @@ static void std_clk_disable(struct clk_hw *hw)
- 	clkc_writel(val, reg);
- }
- 
--static const char *std_clk_io_parents[] = {
-+static const char * const std_clk_io_parents[] = {
- 	"io",
- };
- 
-@@ -949,7 +949,7 @@ static struct clk_std clk_pulse = {
- 	},
- };
- 
--static const char *std_clk_dsp_parents[] = {
-+static const char * const std_clk_dsp_parents[] = {
- 	"dsp",
- };
- 
-@@ -981,7 +981,7 @@ static struct clk_std clk_mf = {
- 	},
- };
- 
--static const char *std_clk_sys_parents[] = {
-+static const char * const std_clk_sys_parents[] = {
- 	"sys",
- };
- 
-@@ -999,7 +999,7 @@ static struct clk_std clk_security = {
- 	},
- };
- 
--static const char *std_clk_usb_parents[] = {
-+static const char * const std_clk_usb_parents[] = {
- 	"usb_pll",
- };
- 
+-struct rockchip_pll_rate_table rk3288_pll_rates[] = {
++static struct rockchip_pll_rate_table rk3288_pll_rates[] = {
+ 	RK3066_PLL_RATE(2208000000, 1, 92, 1),
+ 	RK3066_PLL_RATE(2184000000, 1, 91, 1),
+ 	RK3066_PLL_RATE(2160000000, 1, 90, 1),
 -- 
 1.9.1
