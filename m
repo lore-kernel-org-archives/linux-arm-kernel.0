@@ -1,57 +1,27 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 8 Apr 2015 18:56:27 -0500
-Subject: [PATCH 2/2] ARM: dts: am57xx-beagle-x15: Fix RTC aliases
-In-Reply-To: <1428537387-18776-1-git-send-email-nm@ti.com>
-References: <1428537387-18776-1-git-send-email-nm@ti.com>
-Message-ID: <1428537387-18776-3-git-send-email-nm@ti.com>
+Date: Wed, 8 Apr 2015 18:56:25 -0500
+Subject: [PATCH 0/2] ARM: dts: am57xx-beagle-x15: Fixes for RTC
+Message-ID: <1428537387-18776-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit bc078316d86c ("ARM: dts: DRA7: Add node for RTC"), we now
-have AM57xx RTC register itself as alias 0 even before DS1307 or TPS
-rtc drivers are loaded up. However, since neither TPS, nor AM57xx RTC
-are capable of being backedup by battery, we would like to maintain
-the "primary" rtc as mcp79410 rtc device.
+Couple of fixes for MCP79410 RTC on BeagleBoard-X15 platform. This is
+not urgent enough for 4.0 material, but will be good to have it on one
+of 4.1 rcs. tested on next-20150407:
+http://pastebin.ubuntu.com/10777733/
+(NOTE: I believe DRA7 rtc still needs reset driver to be done before it can be fully functional).
 
-This also generates the following warnings in the bootlog highlighting
-the issue:
-[    5.895445] rtc-ds1307 2-006f: /aliases ID 0 not available
-...
-[    6.476285] palmas-rtc 48070000.i2c:tps659038 at 58:tps659038_rtc: /aliases ID 1 not available
+Grygorii Strashko (1):
+  ARM: dts: am57xx-beagle-x15: Fix IRQ type for mcp7941x
 
-So, add proper aliases to ensure that RTC order is always consistent
-to userspace immaterial of probe order.
+Nishanth Menon (1):
+  ARM: dts: am57xx-beagle-x15: Fix RTC aliases
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/am57xx-beagle-x15.dts |    1 +
+ arch/arm/boot/dts/am57xx-beagle-x15.dts |    3 ++-
  arch/arm/boot/dts/dra7.dtsi             |    2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 57279e3b439b..6837f44db534 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -18,6 +18,7 @@
- 	aliases {
- 		rtc0 = &mcp_rtc;
- 		rtc1 = &tps659038_rtc;
-+		rtc2 = &rtc;
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 5332b57b4950..0f73fea9f5c3 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1203,7 +1203,7 @@
- 			status = "disabled";
- 		};
- 
--		rtc at 48838000 {
-+		rtc: rtc at 48838000 {
- 			compatible = "ti,am3352-rtc";
- 			reg = <0x48838000 0x100>;
- 			interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
+Regards,
+Nishanth Menon
 -- 
 1.7.9.5
