@@ -1,72 +1,75 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Apr 2015 14:05:20 +0100
-Subject: [v3 2/5] arm64: kvm: allow EL2 context to be reset on shutdown
-In-Reply-To: <1427953216-11737-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1427953216-11737-1-git-send-email-takahiro.akashi@linaro.org>
- <1427953216-11737-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20150408130520.GB5977@leverpostej>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 08 Apr 2015 15:08:55 +0200
+Subject: [PATCH v2 1/9] ata: at91: use syscon to configure the smc
+In-Reply-To: <552519B7.2090206@atmel.com>
+References: <1427138955-3617-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <3156869.zFaIKVVpHK@amdc1032> <552519B7.2090206@atmel.com>
+Message-ID: <1581911.ATyU5YCajb@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 02, 2015 at 06:40:13AM +0100, AKASHI Takahiro wrote:
-> The current kvm implementation keeps EL2 vector table installed even
-> when the system is shut down. This prevents kexec from putting the system
-> with kvm back into EL2 when starting a new kernel.
-> 
-> This patch resolves this issue by calling a cpu tear-down function via
-> reboot notifier, kvm_reboot_notify(), which is invoked by
-> kernel_restart_prepare() in kernel_kexec().
-> While kvm has a generic hook, kvm_reboot(), we can't use it here because
-> a cpu teardown function will not be invoked, under current implementation,
-> if no guest vm has been created by kvm_create_vm().
-> Please note that kvm_usage_count is zero in this case.
-> 
-> We'd better, in the future, implement cpu hotplug support and put the
-> arch-specific initialization into kvm_arch_hardware_enable/disable().
-> This way, we would be able to revert this patch.
 
-Why can't we use kvm_arch_hardware_enable/disable() currently?
+Hi,
 
+On Wednesday, April 08, 2015 02:06:15 PM Nicolas Ferre wrote:
+> Le 08/04/2015 14:00, Bartlomiej Zolnierkiewicz a ?crit :
+> > On Wednesday, April 08, 2015 01:13:35 PM Alexandre Belloni wrote:
+> >> Hi,
+> >>
+> >> On 08/04/2015 at 13:04:19 +0200, Bartlomiej Zolnierkiewicz wrote :
+> >>> On Monday, March 23, 2015 08:29:07 PM Alexandre Belloni wrote:
+> >>>> Use syscon/regmap to configure the smc. This allows to avoid using
+> >>>> at91sam9_smc.h and to compile the driver in a multiplatform configuration.
+> >>>>
+> >>>> The driver will still not probe until the proper DT bindings are added. That
+> >>>> binding will include an atmel,smc property that is a phandle to the SMC the CF
+> >>>> controller is connected to.
+> >>>
+> >>> If the driver is currently working fine in !ARCH_MULTIPLATFORM
+> >>> configuration then this patch will make it non-functional until
+> >>> atmel,smc property is added to DT.  To prevent this and preserve
+> >>> bisectability the patchset should first add atmel,smc property
+> >>> and then convert pata_at91 driver to use it.
+> >>>
+> >>
+> >> Starting with 4.1, it will not be possible to use the driver anyway as
+> >> all the platforms using it have switched to multiplatform. This patch
+> >> makes it compilable again.
+> > 
+> > Hmm.  It seems that it was your commit which did the switch without
+> > converting all at91 specific code to be multiplatform ready first:
+> > 
+> >     From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> >     Date: Fri, 13 Mar 2015 22:57:18 +0100
+> >     Subject: ARM: at91: switch to multiplatform
+> > 
+> >     Switch AT91 to multiplatform as all SoCs are properly handled.
+> > 
+> >     Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> >     Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > 
+> > ?
+> > 
+> >> Anyway, it seems that there is little interest in that driver and nobody
+> >> I contacted has access to a board which can be used to test this.
+> > 
+> > If there are no users then probably the driver can be removed but this
+> > something that platform Maintainers should decide on.
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm/kvm/arm.c     |   21 +++++++++++++++++++++
->  arch/arm64/kvm/Kconfig |    1 -
->  2 files changed, 21 insertions(+), 1 deletion(-)
+> This is why there are loose constrains on this driver and that we
+> decided to move on.
 > 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 39df694..f64713e 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -25,6 +25,7 @@
->  #include <linux/vmalloc.h>
->  #include <linux/fs.h>
->  #include <linux/mman.h>
-> +#include <linux/reboot.h>
->  #include <linux/sched.h>
->  #include <linux/kvm.h>
->  #include <trace/events/kvm.h>
-> @@ -1100,6 +1101,23 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)
->  	return NULL;
->  }
->  
-> +static int kvm_reboot_notify(struct notifier_block *nb,
-> +			     unsigned long val, void *v)
-> +{
-> +	/*
-> +	 * Reset each CPU in EL2 to initial state.
-> +	 */
-> +	on_each_cpu(kvm_cpu_reset, NULL, 1);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static struct notifier_block kvm_reboot_nb = {
-> +	.notifier_call		= kvm_reboot_notify,
-> +	.next			= NULL,
-> +	.priority		= 0, /* FIXME */
+> So I think that modifying it and introducing the DT property afterwards
+> can be done.
 
-It would be helpful for the comment to explain why this is wrong, and
-what needs fixing.
+OK, thank you for clarifying this.
 
-Mark.
+For pata_at91 changes:
+
+Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
