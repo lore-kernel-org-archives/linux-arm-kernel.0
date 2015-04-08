@@ -1,131 +1,90 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Wed, 08 Apr 2015 10:28:11 +0200
-Subject: [PATCH 5/6] pwm: samsung: Fix output race on disabling
-In-Reply-To: <1427387955-5129-6-git-send-email-linux.amoon@gmail.com>
-References: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
- <1427387955-5129-6-git-send-email-linux.amoon@gmail.com>
-Message-ID: <20150408102811.219b964f@amdc2363>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 8 Apr 2015 16:30:39 +0800
+Subject: [PATCH v9 23/30] PCI/mvebu: Use pci_common_init_dev() to simplify
+ code
+In-Reply-To: <5524E1F9.6030700@free-electrons.com>
+References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
+ <1428053164-28277-25-git-send-email-wangyijing@huawei.com>
+ <5524E1F9.6030700@free-electrons.com>
+Message-ID: <5524E72F.1050500@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anand,
-
-> From: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> 2 months ago, Thomas Petazzoni was concerned about the removal of
+> mvebu_pcie_scan_bus(). So I dig the archives of the discussion
+> surrounding the pcie-mvebu drive. I found that the main purpose
+> of using this function was to allow to pass "struct device *" pointer.
 > 
-> When disabling the samsung PWM the output state remains at the level
-> it was in the end of a pwm cycle. In other words, calling pwm_disable
-> when at 100% duty will keep the output active, while at all other
-> setting the output will go/stay inactive. On top of that the samsung
-> PWM settings are double-buffered, which means the new settings only
-> get applied at the start of a new PWM cycle.
+> Thanks to the introduction of pci_common_init_dev it was not needed
+> anymore. Actually we should have done this change when this function
+> had been introduced. So for the point of view of the code it's fine.
+> Then I tested your full series on Armada XP, Armada 375 and Armada 38x
+> SoCs, and I didn't saw any regression. So you can add my:
 > 
-> This results in a race if the PWM is at 100% duty and a driver calls:
->   pwm_config (pwm, 0, period);
->   pwm_disable (pwm);
+> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Great, thanks very much!
+
+Thanks!
+Yijing.
+
+
 > 
-> In this case the PWMs output will unexpectedly stay active, unless a
-> new PWM cycle happened to start between the register writes in
-> _config and _disable. As far as i can tell this is a regression
-> introduced by 3bdf878, before that a call to pwm_config would call
-> pwm_samsung_enable which, while heavy-handed, made sure the expected
-> settings were live.
 > 
-> To resolve this, while not re-introducing the issues 3bdf878
-> (flickering as the PWM got reset while in a PWM cycle). Only force an
-> update of the settings when at 100% duty, which shouldn't have a
-> noticeable effect on the output but is enough to ensure the behaviour
-> is as expected on disable.
 > 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
->  drivers/pwm/pwm-samsung.c | 31 ++++++++++++++++++++++++++++++-
->  1 file changed, 30 insertions(+), 1 deletion(-)
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> CC: Jason Cooper <jason@lakedaemon.net>
+>> ---
+>>  drivers/pci/host/pci-mvebu.c |   18 +-----------------
+>>  1 files changed, 1 insertions(+), 17 deletions(-)
+>>
+>> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+>> index 0cfc494..d5a2b70 100644
+>> --- a/drivers/pci/host/pci-mvebu.c
+>> +++ b/drivers/pci/host/pci-mvebu.c
+>> @@ -750,21 +750,6 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+>>  	return 1;
+>>  }
+>>  
+>> -static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+>> -{
+>> -	struct mvebu_pcie *pcie = sys_to_pcie(sys);
+>> -	struct pci_bus *bus;
+>> -
+>> -	bus = pci_create_root_bus(&pcie->pdev->dev, -1, sys->busnr,
+>> -				  &mvebu_pcie_ops, sys, &sys->resources);
+>> -	if (!bus)
+>> -		return NULL;
+>> -
+>> -	pci_scan_child_bus(bus);
+>> -
+>> -	return bus;
+>> -}
+>> -
+>>  static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+>>  						 const struct resource *res,
+>>  						 resource_size_t start,
+>> @@ -808,12 +793,11 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+>>  	hw.nr_controllers = 1;
+>>  	hw.private_data   = (void **)&pcie;
+>>  	hw.setup          = mvebu_pcie_setup;
+>> -	hw.scan           = mvebu_pcie_scan_bus;
+>>  	hw.map_irq        = of_irq_parse_and_map_pci;
+>>  	hw.ops            = &mvebu_pcie_ops;
+>>  	hw.align_resource = mvebu_pcie_align_resource;
+>>  
+>> -	pci_common_init(&hw);
+>> +	pci_common_init_dev(&pcie->pdev->dev, &hw);
+>>  }
+>>  
+>>  /*
+>>
 > 
-> diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
-> index 3e9b583..649f6c4 100644
-> --- a/drivers/pwm/pwm-samsung.c
-> +++ b/drivers/pwm/pwm-samsung.c
-> @@ -269,12 +269,31 @@ static void pwm_samsung_disable(struct pwm_chip
-> *chip, struct pwm_device *pwm)
-> spin_unlock_irqrestore(&samsung_pwm_lock, flags); }
->  
-> +static void pwm_samsung_manual_update(struct samsung_pwm_chip *chip,
-> +				      struct pwm_device *pwm)
-> +{
-> +	unsigned int tcon_chan = to_tcon_channel(pwm->hwpwm);
-> +	u32 tcon;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&samsung_pwm_lock, flags);
-> +
-> +	tcon = readl(chip->base + REG_TCON);
-> +	tcon |= TCON_MANUALUPDATE(tcon_chan);
-> +	writel(tcon, chip->base + REG_TCON);
-> +
-> +	tcon &= ~TCON_MANUALUPDATE(tcon_chan);
-> +	writel(tcon, chip->base + REG_TCON);
-> +
-> +	spin_unlock_irqrestore(&samsung_pwm_lock, flags);
-> +}
-> +
->  static int pwm_samsung_config(struct pwm_chip *chip, struct
-> pwm_device *pwm, int duty_ns, int period_ns)
->  {
->  	struct samsung_pwm_chip *our_chip =
-> to_samsung_pwm_chip(chip); struct samsung_pwm_channel *chan =
-> pwm_get_chip_data(pwm);
-> -	u32 tin_ns = chan->tin_ns, tcnt, tcmp;
-> +	u32 tin_ns = chan->tin_ns, tcnt, tcmp, oldtcmp;
->  
->  	/*
->  	 * We currently avoid using 64bit arithmetic by using the
-> @@ -288,6 +307,7 @@ static int pwm_samsung_config(struct pwm_chip
-> *chip, struct pwm_device *pwm, return 0;
->  
->  	tcnt = readl(our_chip->base + REG_TCNTB(pwm->hwpwm));
-> +	oldtcmp = readl(our_chip->base + REG_TCMPB(pwm->hwpwm));
->  
->  	/* We need tick count for calculation, not last tick. */
->  	++tcnt;
-> @@ -335,6 +355,15 @@ static int pwm_samsung_config(struct pwm_chip
-> *chip, struct pwm_device *pwm, writel(tcnt, our_chip->base +
-> REG_TCNTB(pwm->hwpwm)); writel(tcmp, our_chip->base +
-> REG_TCMPB(pwm->hwpwm)); 
-> +	/* In case the PWM is currently at 100% duty, force a manual
-> update
-	
-	Cosmetic comment:
+> 
 
-	Wasn't checkpatch complaining about this comment style?
-	/* .....
-         * .....
-
-	instead of:
-	/*
-	 * .....
-	 * .....
-
-> +	 * to prevent the signal staying high in the pwm is disabled
-> shortly
-> +	 * afer this update (before it autoreloaded the new values) .
-> +	 */
-> +	if (oldtcmp == (u32) -1) {
-> +		dev_dbg(our_chip->chip.dev, "Forcing manual update");
-> +		pwm_samsung_manual_update(our_chip, pwm);
-> +	}
-> +
->  	chan->period_ns = period_ns;
->  	chan->tin_ns = tin_ns;
->  	chan->duty_ns = duty_ns;
-
-Despite the above,
-
-Acked-by: Lukasz Majewski <l.majewski@samsung.com>
 
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Thanks!
+Yijing
