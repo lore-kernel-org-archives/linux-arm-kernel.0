@@ -1,40 +1,45 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 08 Apr 2015 11:17:29 +0200
-Subject: [PATCH 1/1] clk: exynos5420: Restore GATE_BUS_TOP on suspend
-In-Reply-To: <5524EFA8.6000800@samsung.com>
-References: <1428471252-15872-1-git-send-email-javier.martinez@collabora.co.uk>
- <5524EFA8.6000800@samsung.com>
-Message-ID: <5524F229.1060802@collabora.co.uk>
+From: dmngaie@gmail.com (Dennis Mungai)
+Date: Wed, 8 Apr 2015 09:23:53 +0000
+Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
+In-Reply-To: <CAK7LNAS=ee4j0COJGj70y6zRs6+_99JcX8GFerCbgt5me3rBLw@mail.gmail.com>
+References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
+ <20150407124209.GA12633@lunn.ch>
+ <CAKKYfmEAckXkgJTWbVJ5kFD2tkyb8q5OB-jdZr_YYbNj+9m_LQ@mail.gmail.com>
+ <CAK7LNAS=ee4j0COJGj70y6zRs6+_99JcX8GFerCbgt5me3rBLw@mail.gmail.com>
+Message-ID: <CAKKYfmFbPb2kyF-u=tpUtn5QWbys7RewVAF2YrECLFZLY3wu8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sylwester,
+You're welcome, Yamada.
 
-On 04/08/2015 11:06 AM, Sylwester Nawrocki wrote:
->> 
->> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
->> index 07d666cc6a29..bea4a173eef5 100644
->> --- a/drivers/clk/samsung/clk-exynos5420.c
->> +++ b/drivers/clk/samsung/clk-exynos5420.c
->> @@ -271,6 +271,7 @@ static const struct samsung_clk_reg_dump exynos5420_set_clksrc[] = {
->>  	{ .offset = SRC_MASK_PERIC0,		.value = 0x11111110, },
->>  	{ .offset = SRC_MASK_PERIC1,		.value = 0x11111100, },
->>  	{ .offset = SRC_MASK_ISP,		.value = 0x11111000, },
->> +	{ .offset = GATE_BUS_TOP,		.value = 0xffffffff, },
->>  	{ .offset = GATE_BUS_DISP1,		.value = 0xffffffff, },
->>  	{ .offset = GATE_IP_PERIC,		.value = 0xffffffff, },
->>  };
-> 
-> I'm going to tag this patch for inclusion in the stable tree and send
-> it to Mike or Stephen with other clk/samsung fixes after v4.1-rc1 is
-> released.
-> 
-> Mike/Stephen, if you're willing to take this patch earlier here is my:
-> 
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> 
-
-Great, thanks a lot for your help!
-
-Best regards,
-Javier
+On 8 April 2015 at 06:45, Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+> Hi Dennis,
+>
+> 2015-04-07 23:09 GMT+09:00 Dennis Mungai <dmngaie@gmail.com>:
+>> Hello Masahiro,
+>>
+>> Please see this patch here on the LKML:
+>>
+>> https://lkml.org/lkml/2013/7/12/173
+>>
+>> signed off by Stephen Boyd <sboyd@codeaurora.org>
+>>
+>> This may be related to the problem you're having.
+>>
+>> Regards,
+>>
+>> Dennis.
+>
+>
+> Thanks for this information.
+>
+> My target SoC has a single ARM core, so
+> I guess I can ignore the false alarm
+> "GIC CPU mask not found - kernel will fail to boot".
+>
+>
+>
+>
+> --
+> Best Regards
+> Masahiro Yamada
