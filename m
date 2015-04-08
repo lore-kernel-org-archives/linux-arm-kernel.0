@@ -1,81 +1,86 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 8 Apr 2015 11:54:43 +0100
-Subject: [PATCH v2] ARM: dts: mt8173: support arm64 cpuidle-dt
-In-Reply-To: <1428393905-32166-1-git-send-email-howard.chen@linaro.org>
-References: <1428393905-32166-1-git-send-email-howard.chen@linaro.org>
-Message-ID: <20150408105443.GA23642@red-moon>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed,  8 Apr 2015 12:54:38 +0200
+Subject: [PATCH] ARM: tegra: cpuidle: implement cpuidle_state.enter_freeze()
+Message-ID: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 09:05:05AM +0100, Howard Chen wrote:
-> This patch adds an idle-states node to describe the mt8173 idle states and
-> also adds references to the idle-states node in all CPU nodes.
-> 
-> Signed-off-by: Howard Chen <howard.chen@linaro.org>
+This callback is expected to do the same as enter() only that all
+non-wakeup IRQs are expected to be disabled.
 
-Is copying me in too much effort to ask ?
+It will be called when the system goes to suspend-to-idle and will
+reduce power usage because CPUs won't be awaken for unnecessary IRQs.
 
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 8554ec3..0d31a34 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -48,6 +48,8 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a53";
->  			reg = <0x000>;
-> +			enable-method = "psci";
-> +			cpu-idle-states = <&CPU_SLEEP_0>;
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+---
+ arch/arm/mach-tegra/cpuidle-tegra114.c | 31 ++++++++++++++++++++++++-------
+ 1 file changed, 24 insertions(+), 7 deletions(-)
 
-Cluster idle state vanished between v1 and v2.
-
-?
-
->  		};
->  
->  		cpu1: cpu at 1 {
-> @@ -55,6 +57,7 @@
->  			compatible = "arm,cortex-a53";
->  			reg = <0x001>;
->  			enable-method = "psci";
-> +			cpu-idle-states = <&CPU_SLEEP_0>;
->  		};
->  
->  		cpu2: cpu at 100 {
-> @@ -62,6 +65,7 @@
->  			compatible = "arm,cortex-a57";
->  			reg = <0x100>;
->  			enable-method = "psci";
-> +			cpu-idle-states = <&CPU_SLEEP_0>;
->  		};
->  
->  		cpu3: cpu at 101 {
-> @@ -69,6 +73,19 @@
->  			compatible = "arm,cortex-a57";
->  			reg = <0x101>;
->  			enable-method = "psci";
-> +			cpu-idle-states = <&CPU_SLEEP_0>;
-> +		};
-> +
-> +		idle-states {
-> +			entry-method = "arm,psci";
-> +
-> +			CPU_SLEEP_0: cpu-sleep-0 {
-> +				compatible = "arm,idle-state";
-> +				arm,psci-suspend-param = <0x0010000>;
-> +				entry-latency-us = <639>;
-> +				exit-latency-us = <328>;
-> +				min-residency-us = <1088>;
-> +			};
->  		};
->  	};
-
-Is the arch timer still running when you enter this state ?
-
-Apart from these remarks the patch seems fine, I wonder whether we should
-merge these changes into the kernel instead of keeping these changes in
-firmware for specific kernel configurations.
-
-Lorenzo
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+index f2b586d..ef06001 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra114.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+@@ -39,28 +39,44 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+ 				    struct cpuidle_driver *drv,
+ 				    int index)
+ {
+-	local_fiq_disable();
+-
+ 	tegra_set_cpu_in_lp2();
+ 	cpu_pm_enter();
+ 
+-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+-
+ 	call_firmware_op(prepare_idle);
+ 
+ 	/* Do suspend by ourselves if the firmware does not implement it */
+ 	if (call_firmware_op(do_idle, 0) == -ENOSYS)
+ 		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+ 
+-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
+-
+ 	cpu_pm_exit();
+ 	tegra_clear_cpu_in_lp2();
+ 
++	return index;
++}
++
++static int tegra114_idle_enter(struct cpuidle_device *dev,
++			       struct cpuidle_driver *drv,
++			       int index)
++{
++	local_fiq_disable();
++
++	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
++
++	index = tegra114_idle_power_down(dev, drv, index);
++
++	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
++
+ 	local_fiq_enable();
+ 
+ 	return index;
+ }
++
++static void tegra114_idle_enter_freeze(struct cpuidle_device *dev,
++				       struct cpuidle_driver *drv,
++				       int index)
++{
++	tegra114_idle_power_down(dev, drv, index);
++}
+ #endif
+ 
+ static struct cpuidle_driver tegra_idle_driver = {
+@@ -71,7 +87,8 @@ static struct cpuidle_driver tegra_idle_driver = {
+ 		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
+ #ifdef CONFIG_PM_SLEEP
+ 		[1] = {
+-			.enter			= tegra114_idle_power_down,
++			.enter			= tegra114_idle_enter,
++			.enter_freeze		= tegra114_idle_enter_freeze,
+ 			.exit_latency		= 500,
+ 			.target_residency	= 1000,
+ 			.power_usage		= 0,
+-- 
+2.3.4
