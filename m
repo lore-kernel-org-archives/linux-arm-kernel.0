@@ -1,44 +1,97 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Wed, 8 Apr 2015 16:41:05 -0500
-Subject: [PATCH] ARM: VDSO: depend on CPU_V7
-Message-ID: <1428529265-26772-1-git-send-email-nathan_lynch@mentor.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 9 Apr 2015 07:46:54 +1000
+Subject: LDP: next-20150402: twl4030 regression?
+In-Reply-To: <20150408163559.GE1738@saruman.tx.rr.com>
+References: <5522886D.5050409@ti.com> <20150406134541.GE6023@sirena.org.uk>
+ <55228FE0.2040702@ti.com>
+ <20150406135829.GH4027@n2100.arm.linux.org.uk>
+ <20150406150127.GF6023@sirena.org.uk> <5522A391.6080503@ti.com>
+ <20150406152750.GE11160@saruman.tx.rr.com>
+ <5522D442.9090905@ti.com> <20150408163559.GE1738@saruman.tx.rr.com>
+Message-ID: <20150409074654.5a3ec836@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Arnd reported a build break with the VDSO code when targeting v4 (but
-not v4t).  I haven't been able to recreate it locally because all the
-toolchains I have at hand convert 'bx lr' to 'mov pc,lr' when
-targeting v4.)
+Hi Felipe,
 
-The __get_datapage routine in the VDSO uses 'bx lr' to return to the
-caller.  This is inappropriate when targeting v4 CPUs, and the VDSO is
-unlikely to be useful for pre-v7 CPUs anyway due to its reliance on
-the generic timers extension, so the easy thing to do here is just
-make CONFIG_VDSO depend on CONFIG_CPU_V7.
+On Wed, 8 Apr 2015 11:35:59 -0500 Felipe Balbi <balbi@ti.com> wrote:
+>
+> On Mon, Apr 06, 2015 at 01:45:22PM -0500, Nishanth Menon wrote:
+> > On 04/06/2015 10:27 AM, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Mon, Apr 06, 2015 at 10:17:37AM -0500, Nishanth Menon wrote:
+> > >> On 04/06/2015 10:01 AM, Mark Brown wrote:
+> > >>> On Mon, Apr 06, 2015 at 02:58:29PM +0100, Russell King - ARM Linux wrote:
+> > >>>> On Mon, Apr 06, 2015 at 08:53:36AM -0500, Nishanth Menon wrote:
+> > >>>
+> > >>>>>> at least a description of the problem you're seeing and some attempt at
+> > >>>
+> > >>>>> Test was a simple boot test. There seems to be a lockdep reported at the
+> > >>>>> very least in the log provided (see
+> > >>>>> https://github.com/nmenon/kernel-test-logs/blob/next-20150402/omap2plus_defconfig/ldp.txt#L488
+> > >>>>> ).
+> > >>>
+> > >>>> I think what Mark is trying to say is to include a fuller description of
+> > >>>> the problem, and don't expect people to fire up their web browser to get
+> > >>>> a basic overview of what the problem is.
+> > >>>
+> > >>> Yes, indeed.  I hadn't actually opened the links, I might've got round
+> > >>> to it later on.
+> > >>>
+> > >>>> My guess is that the problem _appears_ to be that someone's added a call
+> > >>>> to debug_check_no_locks_held() into schedule_hrtimeout_range_clock()
+> > >>>> without considering what this means.
+> > >>>
+> > >>>> What it means is that you can't now use usleep_range() from within any
+> > >>>> driver probe function - which is absolutely absurd.
+> > >>>
+> > >>> I can't think of any regulator side changes which might be relevant in
+> > >>> that period.  It's possible that there might be something in the MFD I
+> > >>> guess.
+> > >>>
+> > >>
+> > >> Ran a few tests since my original email..
+> > >>
+> > >> 6261b06de565baafa590e58a531a1a5522cea0b6 ("regulator: Defer lookup of
+> > >> supply to regulator_get") was the only patch that was introduced in
+> > >> the interval. there seems nothing in mfd either.
+> > >>
+> > >> I still have the following in my log.. trying to further down.
+> > > 
+> > > I noticed a similar warning with AM437x SK
+> > > 
+> > posting intermediate debug results:
+> > 
+> > I did a bisect on the merge commits to identify which tree the
+> > regression got introduced, looks like it is the merge from akpm tree -
+> > I have not yet looked deeper.
+> > 
+> > b58a6c0b0808 Merge branch 'akpm-current/current'
+> > ---> FAIL http://paste.ubuntu.org.cn/2540641
+> > 
+> > ef31288bdf44 Merge remote-tracking branch 'livepatching/for-next'
+> > --> OK -> http://paste.ubuntu.org.cn/2540778
+> 
+> yeah, this works on my SK too. I bisected it further down to one commit.
+> 
+> commit 6dfc11e36ee0 is the first bad commit, but looks like that's not
+> in linux-next anymore.
 
-An alternative considered was to use 'ldr pc,lr' when armv4 (or lower)
-is enabled, but Arnd pointed out that this would be broken when
-running with a kernel that supports both v4 arnd v4t, and you have a
-thumb user space.
+Please give at least the summary line as well when you refer to
+commits.  They get rebase and rewritten which means that their commit
+SHA1 changes ...
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
----
- arch/arm/mm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index b7644310236b..b4f92b9a13ac 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -827,7 +827,7 @@ config KUSER_HELPERS
- 
- config VDSO
- 	bool "Enable VDSO for acceleration of some system calls"
--	depends on AEABI && MMU
-+	depends on AEABI && MMU && CPU_V7
- 	default y if ARM_ARCH_TIMER
- 	select GENERIC_TIME_VSYSCALL
- 	help
+That commit is "kernel/time/hrtimer.c: restart_syscall: use freezable
+blocking call" and, indeed, it was removed from linux-next and Andrew's
+tree.
 -- 
-1.9.3
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/53e56ee0/attachment.sig>
