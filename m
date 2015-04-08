@@ -1,63 +1,37 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 8 Apr 2015 14:06:15 +0200
-Subject: [PATCH v2 1/9] ata: at91: use syscon to configure the smc
-In-Reply-To: <3156869.zFaIKVVpHK@amdc1032>
-References: <1427138955-3617-1-git-send-email-alexandre.belloni@free-electrons.com>
- <2936706.hVbBP0ExQQ@amdc1032> <20150408111335.GZ20669@piout.net>
- <3156869.zFaIKVVpHK@amdc1032>
-Message-ID: <552519B7.2090206@atmel.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 08 Apr 2015 13:08:32 +0100
+Subject: [RESEND PATCH 4.0-rc5 v19 5/6] x86/nmi: Use common printk
+ functions
+In-Reply-To: <20150407124307.58c7dd20@gandalf.local.home>
+References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>	<1428421083-9137-1-git-send-email-daniel.thompson@linaro.org>	<1428421083-9137-6-git-send-email-daniel.thompson@linaro.org>	<20150407121942.627d2165@gandalf.local.home>	<20150407163746.GA14115@pd.tnic>
+ <20150407124307.58c7dd20@gandalf.local.home>
+Message-ID: <55251A40.5030105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/04/2015 14:00, Bartlomiej Zolnierkiewicz a ?crit :
-> On Wednesday, April 08, 2015 01:13:35 PM Alexandre Belloni wrote:
->> Hi,
+On 07/04/15 17:43, Steven Rostedt wrote:
+> On Tue, 7 Apr 2015 18:37:46 +0200
+> Borislav Petkov <bp@alien8.de> wrote:
+>
+>
+>> I would simply say:
 >>
->> On 08/04/2015 at 13:04:19 +0200, Bartlomiej Zolnierkiewicz wrote :
->>> On Monday, March 23, 2015 08:29:07 PM Alexandre Belloni wrote:
->>>> Use syscon/regmap to configure the smc. This allows to avoid using
->>>> at91sam9_smc.h and to compile the driver in a multiplatform configuration.
->>>>
->>>> The driver will still not probe until the proper DT bindings are added. That
->>>> binding will include an atmel,smc property that is a phandle to the SMC the CF
->>>> controller is connected to.
->>>
->>> If the driver is currently working fine in !ARCH_MULTIPLATFORM
->>> configuration then this patch will make it non-functional until
->>> atmel,smc property is added to DT.  To prevent this and preserve
->>> bisectability the patchset should first add atmel,smc property
->>> and then convert pata_at91 driver to use it.
->>>
+>> 	err = printk_nmi_backtrace_prepare();
+>> 	if (err)
 >>
->> Starting with 4.1, it will not be possible to use the driver anyway as
->> all the platforms using it have switched to multiplatform. This patch
->> makes it compilable again.
-> 
-> Hmm.  It seems that it was your commit which did the switch without
-> converting all at91 specific code to be multiplatform ready first:
-> 
->     From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->     Date: Fri, 13 Mar 2015 22:57:18 +0100
->     Subject: ARM: at91: switch to multiplatform
-> 
->     Switch AT91 to multiplatform as all SoCs are properly handled.
-> 
->     Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->     Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> ?
-> 
->> Anyway, it seems that there is little interest in that driver and nobody
->> I contacted has access to a board which can be used to test this.
-> 
-> If there are no users then probably the driver can be removed but this
-> something that platform Maintainers should decide on.
+>> like sane kernel code does.
+>>
+>
+> Yes, that is even the better solution.
 
-This is why there are loose constrains on this driver and that we
-decided to move on.
-So I think that modifying it and introducing the DT property afterwards
-can be done.
+Ok. I'll do this.
 
-Bye,
--- 
-Nicolas Ferre
+The constant on the left habit is so ingrained for me I often don't 
+notice it. I agree with Steven that modern compiler warnings render it 
+an obsolete habit...
+
+
+Thanks.
+
+
+Daniel.
