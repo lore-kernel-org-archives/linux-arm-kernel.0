@@ -1,68 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 08 Apr 2015 18:16:50 +0100
-Subject: [PATCH] arm: KVM: force execution of HCPTR access on VM exit
-In-Reply-To: <20150408114033.GH4715@cbox>
-References: <1426503583-8958-1-git-send-email-marc.zyngier@arm.com>
- <20150408114033.GH4715@cbox>
-Message-ID: <55256282.40606@arm.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 08 Apr 2015 10:21:47 -0700
+Subject: [PATCH 0/7] Fix Keystone 2 physical address switch
+In-Reply-To: <20150408094438.GM12732@n2100.arm.linux.org.uk>
+References: <20150408094438.GM12732@n2100.arm.linux.org.uk>
+Message-ID: <552563AB.8050308@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/15 12:40, Christoffer Dall wrote:
-> On Mon, Mar 16, 2015 at 10:59:43AM +0000, Marc Zyngier wrote:
->> On VM entry, we disable access to the VFP registers in order to
->> perform a lazy save/restore of these registers.
->>
->> On VM exit, we restore access, test if we did enable them before,
->> and save/restore the guest/host registers if necessary. In this
->> sequence, the FPEXC register is always accessed, irrespective
->> of the trapping configuration.
->>
->> If the guest didn't touch the VFP registers, then the HCPTR access
->> has now enabled such access, but we're missing a barrier to ensure
->> architectural execution of the new HCPTR configuration. If the HCPTR
->> access has been delayed/reordered, the subsequent access to FPEXC
->> will cause a trap, which we aren't prepared to handle at all.
->>
->> The fix is to introduce a barrier that only takes place if the
->> guest hasn't accessed its view of the VFP registers, making
->> the access to FPEXC safe.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/kvm/interrupts.S | 7 +++++--
->>  1 file changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
->> index 79caf79..3ac7aca 100644
->> --- a/arch/arm/kvm/interrupts.S
->> +++ b/arch/arm/kvm/interrupts.S
->> @@ -175,10 +175,13 @@ __kvm_vcpu_return:
->>  #ifdef CONFIG_VFPv3
->>  	@ Save floating point registers we if let guest use them.
->>  	tst	r2, #(HCPTR_TCP(10) | HCPTR_TCP(11))
->> -	bne	after_vfp_restore
->> +	beq	1f
->> +
->> +	isb	@ Force execution of HCPTR if we've just reenabled VFP access
->> +	b	after_vfp_restore
->>  
->>  	@ Switch VFP/NEON hardware state to the host's
->> -	add	r7, vcpu, #VCPU_VFP_GUEST
->> +1:	add	r7, vcpu, #VCPU_VFP_GUEST
->>  	store_vfp_state r7
->>  	add	r7, vcpu, #VCPU_VFP_HOST
->>  	ldr	r7, [r7]
->> -- 
->> 2.1.4
->>
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Russell,
 
-Thanks (I must admit I completely forgot the existence of this patch...).
+On 4/8/2015 2:44 AM, Russell King - ARM Linux wrote:
+> For some time, the Keystone 2 physical address switch has been
+> tainting the kernel ever since we decided that it was not safe.
+>
+> This series re-works the address switch to be compliant architecturally.
+>
+Thanks a lot for doing it. Will have a look at the series.
 
-I guess we can queue that for -rc1, with a Cc to stable...
+> There's still a niggle in the keystone2 code, where we set the
+> arch_virt_to_idmap function pointer in keystone_pv_fixup() - something
+> I'd ideally like to avoid.
+>
+> I'm in two minds about how much of this code should be in SoC specific
+> code, and how much should be in generic code - on one hand, I don't
+> want to give a green light to this kind of sillyness by encouraging
+> it, but I'd rather not end up with multiple implementations of this.
+>
+Either way you decide, its fine by me. Actually there is just one user
+at this point of time but so is the case for the address switch code.
+I couldn't come up with more generic than the function pointer last
+time.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Regards,
+Santosh
