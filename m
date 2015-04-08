@@ -1,60 +1,86 @@
-From: lhikichi@broadcom.com (Lori Hikichi)
-Date: Tue, 7 Apr 2015 19:30:57 -0700
-Subject: [PATCH 2/2] ASoC: add core audio driver for Broadcom Cygnus SOC.
-In-Reply-To: <20150406161939.GJ6023@sirena.org.uk>
-References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
- <1427771784-29950-3-git-send-email-sbranden@broadcom.com>
- <20150331064209.GD2869@sirena.org.uk> <551D8EB6.1050004@broadcom.com>
- <20150406161939.GJ6023@sirena.org.uk>
-Message-ID: <552492E1.3050207@broadcom.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 7 Apr 2015 22:02:57 -0700
+Subject: [PATCH v6 3/4] clk: Provide always-on clock support
+In-Reply-To: <1428432239-4114-4-git-send-email-lee.jones@linaro.org>
+References: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
+ <1428432239-4114-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150408050257.GA31970@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/07, Lee Jones wrote:
+> Lots of platforms contain clocks which if turned off would prove fatal.
+> The only way to recover from these catastrophic failures is to restart
+> the board(s).  Now, when a clock provider is registered with the
+> framework it is possible for a list of always-on clocks to be supplied
+> which must be kept ungated.  Each clock mentioned in the newly
+> introduced 'clock-always-on' will be clk_prepare_enable()d where the
+> normal references will be taken.  This will prevent the common clk
+> framework from attempting to gate them during the clk_disable_unused()
+> and disable_clock() procedures.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/clk/clk-conf.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 42 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
+> index aad4796..a07aced 100644
+> --- a/drivers/clk/clk-conf.c
+> +++ b/drivers/clk/clk-conf.c
+> @@ -116,6 +116,43 @@ static int __set_clk_rates(struct device_node *node, bool clk_supplier)
+>  	return 0;
+>  }
+>  
+> +static int __set_clk_always_on(struct device_node *node, bool clk_supplier)
+> +{
+> +	struct of_phandle_args clkspec;
+> +	struct clk *clk;
+> +	struct property	*prop;
+> +	const __be32 *cur;
+> +	uint32_t index;
 
+u32 please
 
-On 15-04-06 09:19 AM, Mark Brown wrote:
-> On Thu, Apr 02, 2015 at 11:47:18AM -0700, Lori Hikichi wrote:
->> On 15-03-30 11:42 PM, Mark Brown wrote:
->
->>>> +config SND_SOC_CYGNUS
->>>> +	tristate "SoC platform audio for Broadcom Cygnus chips"
->>>> +	depends on ARCH_BCM_CYGNUS || COMPILE_TEST
->>>> +	default ARCH_BCM_CYGNUS
->
->> Okay.
->
-> You don't need to reply to every single comment, the general assumption
-> will be that if there's no other followup all review comments will be
-> addressed.  It's better to just reply to things where there's something
-> more detailed to say, if you explicitly reply to everything then that
-> makes it easier for actual replies to be missed since there's a lot of
-> there's a lot of the mail that's just going to be skipped through.
->
->>>> +static void ringbuf_inc(void __iomem *audio_io, bool is_playback,
->>>> +			const struct ringbuf_regs *p_rbuf)
->
->>> So it looks like we're getting an interrupt per period and we have to
->>> manually advance to the next one?
->
->> Yes.
->
-> OK, so that seems fragile - what happens if we're slightly late
-> processing an interrupt or miss one entirely?  Most hardware has some
-> way to read back the current position which tends to be more reliable,
-> is that not an option here?
->
-The hardware updates a read pointer (rdaddr) which we feed to ALSA via 
-the ".pointer" hook. So yes, the hardware does have a register that 
-tells us its progress.  This routine (ringbuf_inc) actually updates a 
-write pointer (wraddr) which is a misnomer.  The write pointer doesn?t 
-actually tell us where we are writing to ? ALSA keeps track of that. 
-The wraddr only prevents the hardware from reading past it.  We just use 
-it, along with a low water mark configuration register, to keep the 
-periodic interrupts firing.  The hardware is tracking the distance 
-between rdaddr and wraddr and comparing that to the low water mark.
+> +	int ret;
+> +
+> +	if (!clk_supplier)
+> +		return 0;
+> +
+> +	of_property_for_each_u32(node, "clock-always-on", prop, cur, index) {
+> +		clkspec.np = node;
+> +		clkspec.args_count = 1;
+> +		clkspec.args[0] = index;
+> +
+> +		clk = of_clk_get_from_provider(&clkspec);
+> +		if (IS_ERR(clk)) {
+> +			pr_err("clk: couldn't get clock %u for %s\n",
+> +				index, node->full_name);
+> +			return PTR_ERR(clk);
+> +		}
+> +
+> +		ret = clk_prepare_enable(clk);
+> +		if (ret) {
+> +			pr_err("Failed to enable clock %u for %s: %d\n",
+> +			       index, node->full_name, ret);
+> +			return ret;
+> +		}
 
-Being late processing the interrupt is okay since there are more samples 
-to read.  That is, it was only a low water mark interrupt and we have 
-one period of valid data still (we configure low water to be one 
-period).  Missing an interrupt is okay since the hardware will just stop 
-reading from the ring buffer when rdaddr has hit wraddr.
+I guess we don't have a clk_put() here because we want to keep the
+refcount high forever? We should at least put a comment here
+explaining why we left out clk_put() if so.
+
+> +
+> +		pr_debug("Setting clock as always-on %pC\n", clk);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  /**
+>   * of_clk_set_defaults() - parse and set assigned clocks configuration
+>   * @node: device node to apply clock settings for
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
