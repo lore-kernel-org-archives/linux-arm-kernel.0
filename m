@@ -1,106 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Apr 2015 16:15:52 -0700
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150408230839.GP4027@n2100.arm.linux.org.uk>
-References: <5521A438.1070008@gmail.com>
- <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
- <20150406151939.GG18048@atomide.com>
- <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
- <20150406174245.GJ18048@atomide.com>
- <20150407135713.GL4027@n2100.arm.linux.org.uk>
- <20150407152207.GM18048@atomide.com>
- <20150407154404.GN18048@atomide.com>
- <20150408230839.GP4027@n2100.arm.linux.org.uk>
-Message-ID: <20150408231552.GO18048@atomide.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 09 Apr 2015 01:28:24 +0200
+Subject: [GIT PULL] ARM: dts: rockchip: small bunch of improvements,
+ maybe still for 4.1
+Message-ID: <1461099.EW9lnJUZxa@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [150408 16:09]:
-> On Tue, Apr 07, 2015 at 08:44:05AM -0700, Tony Lindgren wrote:
-> > And then on top of that patch, we can fix the sefaulting issues with the
-> > following, what do you guys think?
-> 
-> Has this change been tested on OMAP secure parts?
+Hi Arnd, Olof,
 
-Boots just fine for me on n900, but let's wait for comments
-from Sebastian.
+these are 4 small dts improvements, two of which where waiting for
+dependend patches to go into the respective maintainer trees.
+I don't think there is something controversial in here, but it still
+might be to late for 4.1, if so I'll repost these for 4.2 instead.
 
-Regards,
 
-Tony
- 
-> > 8< --------------------
-> > From: Tony Lindgren <tony@atomide.com>
-> > Date: Tue, 7 Apr 2015 07:52:39 -0700
-> > Subject: [PATCH] ARM: mm: Fix Cortex-A8 erratum 430973 segfaults for bootloaders and multiarch
-> > 
-> > Looks like apps can be made to segfault easily on armhf distros
-> > just by running cpuburn-a8 in the background, then starting apt
-> > get update unless erratum 430973 workaround is enabled. This happens
-> > on r3p2 also, which has 430973 fixed in hardware.
-> > 
-> > Turns out the reason for this is some bootloaders incorrectly
-> > setting the auxilary register IBE bit, which probably causes us
-> > to hit erratum 687067 on Cortex-A8 later than r1p2.
-> > 
-> > Now that Cortex-A8 has it's own cpu_ca8_switch_mm, we can fix these
-> > issues:
-> > 
-> > 1. If the bootloader incorrectly sets the IBE bit in the auxilary
-> >    control register for Cortex-A8 revisions with 430973 fixed
-> >    in hardware, we need to call flush BTAC/BTB to avoid segfaults
-> >    probably caused by erratum 687067. So let's flush BTAC/BTB
-> >    unconditionally for Cortex-A8. It won't do anything unless the
-> >    IBE bit is set.
-> > 
-> > 2. We can and should now keep 430973 enabled for multiarch builds
-> >    as it no longer causes issues with Cortex-A9 as we have a separate
-> >    cpu_ca8_switch_mm.
-> > 
-> > Note that SoCs probably should also add checks and print warnings
-> > for the misconfigured IBE bit depending on the Cortex-A8 revision
-> > so the bootloaders can be fixed Cortex-A8 revisions later than
-> > r1p2 to not set the IBE bit.
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > --- a/arch/arm/mm/proc-v7-2level.S
-> > +++ b/arch/arm/mm/proc-v7-2level.S
-> > @@ -36,14 +36,16 @@
-> >   *
-> >   *	It is assumed that:
-> >   *	- we are not using split page tables
-> > + *
-> > + *	Note that we always need to flush BTAC/BTB if IBE is set
-> > + *	even on Cortex-A8 revisions not affected by 430973.
-> > + *	If IBE is not set, the flush BTAC/BTB won't do anything.
-> >   */
-> >  ENTRY(cpu_ca8_switch_mm)
-> >  #ifdef CONFIG_MMU
-> >  	mov	r2, #0
-> > -#ifdef CONFIG_ARM_ERRATA_430973
-> >  	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
-> >  #endif
-> > -#endif
-> >  ENTRY(cpu_v7_switch_mm)
-> >  #ifdef CONFIG_MMU
-> >  	mmid	r1, r1				@ get mm->context.id
-> > --- a/arch/arm/mm/proc-v7.S
-> > +++ b/arch/arm/mm/proc-v7.S
-> > @@ -352,7 +352,7 @@ __v7_setup:
-> >  	ldr	r10, =0x00000c08		@ Cortex-A8 primary part number
-> >  	teq	r0, r10
-> >  	bne	2f
-> > -#if defined(CONFIG_ARM_ERRATA_430973) && !defined(CONFIG_ARCH_MULTIPLATFORM)
-> > +#if defined(CONFIG_ARM_ERRATA_430973)
-> >  
-> >  	teq	r5, #0x00100000			@ only present in r1p*
-> >  	mrceq	p15, 0, r10, c1, c0, 1		@ read aux control register
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks
+Heiko
+
+
+The following changes since commit 91d5cb737287642b75e47790a28a43cd0efd80cb:
+
+  ARM: dts: rockchip: complete rk3288-evb pmic supplies (2015-03-13 00:07:39 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.1-rockchip-dts2
+
+for you to fetch changes up to 98febfbeb99dc0cb1409099eba0e93d0cab12843:
+
+  ARM: dts: rockchip: enable tsadc on rk3288 boards (2015-04-07 23:28:51 +0200)
+
+----------------------------------------------------------------
+Some more quite small changes. Enabling the tsadc on the other
+supported rk3288 boards besides the rk3288-evb, the firefly board
+needs a hym8563 fix that was accepted into the mm-tree.
+Adding the act8846 supplies for the firefly board, which where
+somehow forgotten.
+Also the addition of the cortex-a12-pmu dt node and the sdmmc supplies
+on the rk3288-evb which now do not produce deferal errors anymore
+thanks to a patch going through the mmc tree.
+
+----------------------------------------------------------------
+Doug Anderson (1):
+      ARM: dts: rockchip: Specify VMMC and VQMMC on rk3288-evb
+
+Heiko Stuebner (2):
+      ARM: dts: rockchip: add act8846 supplies on rk3288-firefly
+      ARM: dts: rockchip: enable tsadc on rk3288 boards
+
+Sonny Rao (1):
+      arm: dts: rockchip: Enable Cortex-A12 HW PMU events on rk3288
+
+ arch/arm/boot/dts/rk3288-evb.dtsi     | 23 +++++++++++++++++++++++
+ arch/arm/boot/dts/rk3288-firefly.dtsi | 14 ++++++++++++++
+ arch/arm/boot/dts/rk3288-popmetal.dts |  6 ++++++
+ arch/arm/boot/dts/rk3288.dtsi         |  8 ++++++++
+ 4 files changed, 51 insertions(+)
