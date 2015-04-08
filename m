@@ -1,85 +1,119 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 8 Apr 2015 11:35:59 -0500
-Subject: LDP: next-20150402: twl4030 regression?
-In-Reply-To: <5522D442.9090905@ti.com>
-References: <5522886D.5050409@ti.com> <20150406134541.GE6023@sirena.org.uk>
- <55228FE0.2040702@ti.com>
- <20150406135829.GH4027@n2100.arm.linux.org.uk>
- <20150406150127.GF6023@sirena.org.uk> <5522A391.6080503@ti.com>
- <20150406152750.GE11160@saruman.tx.rr.com>
- <5522D442.9090905@ti.com>
-Message-ID: <20150408163559.GE1738@saruman.tx.rr.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 8 Apr 2015 09:53:51 -0700
+Subject: [PATCH 6/6] hwmon: pwm-fan: Update the duty cycle inorder to
+ control the pwm-fan
+In-Reply-To: <CANAwSgSD52sDpP7NH2hhiZX-=LZF6Qo-X3enqsqM+5XAMfyP=Q@mail.gmail.com>
+References: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
+ <1427387955-5129-7-git-send-email-linux.amoon@gmail.com>
+ <20150408104415.07e1c821@amdc2363>
+ <20150408153214.GA15942@roeck-us.net>
+ <CANAwSgSD52sDpP7NH2hhiZX-=LZF6Qo-X3enqsqM+5XAMfyP=Q@mail.gmail.com>
+Message-ID: <20150408165351.GA22846@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 01:45:22PM -0500, Nishanth Menon wrote:
-> On 04/06/2015 10:27 AM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Mon, Apr 06, 2015 at 10:17:37AM -0500, Nishanth Menon wrote:
-> >> On 04/06/2015 10:01 AM, Mark Brown wrote:
-> >>> On Mon, Apr 06, 2015 at 02:58:29PM +0100, Russell King - ARM Linux wrote:
-> >>>> On Mon, Apr 06, 2015 at 08:53:36AM -0500, Nishanth Menon wrote:
-> >>>
-> >>>>>> at least a description of the problem you're seeing and some attempt at
-> >>>
-> >>>>> Test was a simple boot test. There seems to be a lockdep reported at the
-> >>>>> very least in the log provided (see
-> >>>>> https://github.com/nmenon/kernel-test-logs/blob/next-20150402/omap2plus_defconfig/ldp.txt#L488
-> >>>>> ).
-> >>>
-> >>>> I think what Mark is trying to say is to include a fuller description of
-> >>>> the problem, and don't expect people to fire up their web browser to get
-> >>>> a basic overview of what the problem is.
-> >>>
-> >>> Yes, indeed.  I hadn't actually opened the links, I might've got round
-> >>> to it later on.
-> >>>
-> >>>> My guess is that the problem _appears_ to be that someone's added a call
-> >>>> to debug_check_no_locks_held() into schedule_hrtimeout_range_clock()
-> >>>> without considering what this means.
-> >>>
-> >>>> What it means is that you can't now use usleep_range() from within any
-> >>>> driver probe function - which is absolutely absurd.
-> >>>
-> >>> I can't think of any regulator side changes which might be relevant in
-> >>> that period.  It's possible that there might be something in the MFD I
-> >>> guess.
-> >>>
-> >>
-> >> Ran a few tests since my original email..
-> >>
-> >> 6261b06de565baafa590e58a531a1a5522cea0b6 ("regulator: Defer lookup of
-> >> supply to regulator_get") was the only patch that was introduced in
-> >> the interval. there seems nothing in mfd either.
-> >>
-> >> I still have the following in my log.. trying to further down.
-> > 
-> > I noticed a similar warning with AM437x SK
-> > 
-> posting intermediate debug results:
+On Wed, Apr 08, 2015 at 09:32:05PM +0530, Anand Moon wrote:
+> Hi Guenter,
 > 
-> I did a bisect on the merge commits to identify which tree the
-> regression got introduced, looks like it is the merge from akpm tree -
-> I have not yet looked deeper.
+> Initially the board bootup the cooling level state is 0.
+> So update the duty cycle and this power off the fan.
+> As their is no state change the fan will not spin.
 > 
-> b58a6c0b0808 Merge branch 'akpm-current/current'
-> ---> FAIL http://paste.ubuntu.org.cn/2540641
+> Once the temperature sensor is reached to alert temperature it changes state.
+> With the state change the fan cools the CPU and then stop's
 > 
-> ef31288bdf44 Merge remote-tracking branch 'livepatching/for-next'
-> --> OK -> http://paste.ubuntu.org.cn/2540778
+> I have observed this state change with tmon utility in linux/tools/thermal/tmon/
+> 
+Sorry, I am missing something. I still don't see what problem you are fixing
+with this patch. What behavior is wrong with the current code, and how does your
+patch fix it ?
 
-yeah, this works on my SK too. I bisected it further down to one commit.
+Guenter
 
-commit 6dfc11e36ee0 is the first bad commit, but looks like that's not
-in linux-next anymore.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150408/4c860763/attachment.sig>
+> -Anand Moon
+> 
+> On 8 April 2015 at 21:02, Guenter Roeck <linux@roeck-us.net> wrote:
+> > On Wed, Apr 08, 2015 at 10:44:15AM +0200, Lukasz Majewski wrote:
+> >> Hi Anand,
+> >>
+> >> > Below changes depend on following patch.
+> >> > https://patchwork.kernel.org/patch/5944061/
+> >> >
+> >> > Update the pwm_config with duty then update the pwm_disable
+> >> > to poweroff the cpu fan.
+> >> >
+> >
+> > Unfortunately, the patch does not include an explanation why it is needed.
+> >
+> > The original code presumably did not update the duty cycle because
+> > pwm was about to be disabled anyway. That kind of made sense to me.
+> > Updating the duty cycle to 0 just to disable the pwm channel right
+> > afterwards does not immediately make sense.
+> >
+> > Given that, I would expect to see a rationale here. Why is this patch needed ?
+> > Does it fix a bug ? If yes, pelase describe the bug. If not, what is the
+> > purpose of this patch ?
+> >
+> > Maybe that is all explained in patch 0/6, which I was not copied on. Even
+> > if so, the reationale will be needed in the changelog to explain to future
+> > developers why this change was made.
+> >
+> > Thanks,
+> > Guenter
+> >
+> >> > Tested on OdroidXU3 board.
+> >> >
+> >> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> >> > ---
+> >> >  drivers/hwmon/pwm-fan.c | 10 ++++------
+> >> >  1 file changed, 4 insertions(+), 6 deletions(-)
+> >> >
+> >> > diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
+> >> > index 7c83dc4..f25c841 100644
+> >> > --- a/drivers/hwmon/pwm-fan.c
+> >> > +++ b/drivers/hwmon/pwm-fan.c
+> >> > @@ -44,26 +44,24 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx,
+> >> > unsigned long pwm) int ret = 0;
+> >> >
+> >> >     mutex_lock(&ctx->lock);
+> >> > +
+> >
+> > [ please refrain from unnecessary whitespace changes ]
+> >
+> >> >     if (ctx->pwm_value == pwm)
+> >> >             goto exit_set_pwm_err;
+> >> >
+> >> > -   if (pwm == 0) {
+> >> > -           pwm_disable(ctx->pwm);
+> >> > -           goto exit_set_pwm;
+> >> > -   }
+> >> > -
+> >> >     duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
+> >> >     ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
+> >> >     if (ret)
+> >> >             goto exit_set_pwm_err;
+> >> >
+> >> > +   if (pwm == 0)
+> >> > +           pwm_disable(ctx->pwm);
+> >> > +
+> >> >     if (ctx->pwm_value == 0) {
+> >> >             ret = pwm_enable(ctx->pwm);
+> >> >             if (ret)
+> >> >                     goto exit_set_pwm_err;
+> >> >     }
+> >> >
+> >> > -exit_set_pwm:
+> >> >     ctx->pwm_value = pwm;
+> >> >  exit_set_pwm_err:
+> >> >     mutex_unlock(&ctx->lock);
+> >>
+> >> Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
+> >>
+> >> BTW: I've added Guenter to CC.
+> >>
+> >> --
+> >> Best regards,
+> >>
+> >> Lukasz Majewski
+> >>
+> >> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
