@@ -1,270 +1,161 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 8 Apr 2015 17:42:51 +0200
-Subject: [PATCH v4 1/8] dmaengine: of_dma: Support for DMA routers
-In-Reply-To: <1428498892-28471-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1428498892-28471-1-git-send-email-peter.ujfalusi@ti.com>
- <1428498892-28471-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20150408154251.GE26727@lukather>
+Date: Wed, 8 Apr 2015 17:57:05 +0200
+Subject: [PATCH v6 4/4] clk: dt: Introduce binding for always-on clock
+ support
+In-Reply-To: <20150408103832.GG5162@x1>
+References: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
+ <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
+ <20150407191746.GA26727@lukather> <20150408081450.GB5162@x1>
+ <20150408094349.GC26727@lukather> <20150408103832.GG5162@x1>
+Message-ID: <20150408155705.GF26727@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Apr 08, 2015 at 04:14:45PM +0300, Peter Ujfalusi wrote:
-> DMA routers are transparent devices used to mux DMA requests from
-> peripherals to DMA controllers. They are used when the SoC integrates more
-> devices with DMA requests then their controller can handle.
-> DRA7x is one example of such SoC, where the sDMA can hanlde 128 DMA request
-> lines, but in SoC level it has 205 DMA requests.
+On Wed, Apr 08, 2015 at 11:38:32AM +0100, Lee Jones wrote:
+> On Wed, 08 Apr 2015, Maxime Ripard wrote:
 > 
-> The of_dma_router will be registered as of_dma_controller with special
-> xlate function and additional parameters. The driver for the router is
-> responsible to craft the dma_spec (in the of_dma_route_allocate callback)
-> which can be used to requests a DMA channel from the real DMA controller.
-> This way the router can be transparent for the system while remaining generic
-> enough to be used in different environments.
+> > On Wed, Apr 08, 2015 at 09:14:50AM +0100, Lee Jones wrote:
+> > > > > +
+> > > > > +		    This property is not to be abused.  It is only to be used to
+> > > > > +		    protect platforms from being crippled by gated clocks, not
+> > > > > +		    as a convenience function to avoid using the framework
+> > > > > +		    correctly inside device drivers.
+> > > > 
+> > > > Disregarding what's stated here, I'm pretty sure that this will
+> > > > actually happen. Where do you place the cursor?
+> > > 
+> > > That's up to Mike.
+> > 
+> > Except that Mike won't review any of the DT changes, so he won't be
+> > able to refrain users from using it. Let alone out-of-tree DTs using a
+> > mainline kernel.
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  Documentation/devicetree/bindings/dma/dma.txt | 28 +++++++++
->  drivers/dma/dmaengine.c                       |  7 +++
->  drivers/dma/of-dma.c                          | 86 +++++++++++++++++++++++++++
->  include/linux/dmaengine.h                     | 17 ++++++
->  include/linux/of_dma.h                        | 21 +++++++
->  5 files changed, 159 insertions(+)
+> Ideally Mike should be Cc'ed on patches using clock bindings, but if
+> he isn't the DT guys are smart enough to either make the right
+> decisions themselves (Rob has Acked these bindings already, so will be
+> on the lookout for misuse, I'm sure), or ask for Mike's help.
 
-Can that be moved to a header / C file of its own?
+Yeah, right, as if this strategy really worked in the past....
 
-There's a lot of various code already in dmaengine.h and dmaengine.c,
-it would be really great to avoid adding more random stuff in there.
+Do we really want to look at even the DT bindings that have actually
+been reviewed by maintainers that got merged?
 
+They don't have time for that, which is totally fine, but we really
+should bury our head in the sand by actually thinking they will review
+every single DT-related patch.
+
+Using that as an argument is just plain denial of what really happened
+for the past 4 years.
+
+> > > > Should we create a new driver for our RAM controller, or do we want to
+> > > > use clock-always-on?
+> > > 
+> > > I would say that if all the driver did was to enable clocks, then you
+> > > should use this instead.  This binding was designed specifically for
+> > > that purpose.
+> > > 
+> > > However, if the aforementioned driver clock can be safely gated, then
+> > > it should not be an always-on clock.
+> > 
+> > Yeah, of course, I understand the original intent of it, but that
+> > argument, which might very well be true at one point in time, might
+> > not be true anymore two or three releases later.
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/dma.txt b/Documentation/devicetree/bindings/dma/dma.txt
-> index 82104271e754..6312fb00ce8d 100644
-> --- a/Documentation/devicetree/bindings/dma/dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/dma.txt
-> @@ -31,6 +31,34 @@ Example:
->  		dma-requests = <127>;
->  	};
->  
-> +* DMA router
-> +
-> +DMA routers are transparent IP blocks used to route DMA request lines from
-> +devices to the DMA controller. Some SoCs (like TI DRA7x) have more peripherals
-> +integrated with DMA requests than what the DMA controller can handle directly.
-> +
-> +Required property:
-> +- dma-masters:		phandle of the DMA controller or list of phandles for
-> +			the DMA controllers the router can direct the signal to.
-> +- #dma-cells: 		Must be at least 1. Used to provide DMA router specific
-> +			information. See DMA client binding below for more
-> +			details.
-> +
-> +Optional properties:
-> +- dma-requests: 	Number of incoming request lines the router can handle.
-> +- In the node pointed by the dma-masters:
-> +	- dma-requests:	The router driver might need to look for this in order
-> +			to configure the routing.
-> +
-> +Example:
-> +	sdma_xbar: dma-router at 4a002b78 {
-> +		compatible = "ti,dra7-dma-crossbar";
-> +		reg = <0x4a002b78 0xfc>;
-> +		#dma-cells = <1>;
-> +		dma-requests = <205>;
-> +		ti,dma-safe-map = <0>;
-> +		dma-masters = <&sdma>;
-> +	};
->  
->  * DMA client
->  
-> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-> index 24967c89f5d4..c7aa232b4a59 100644
-> --- a/drivers/dma/dmaengine.c
-> +++ b/drivers/dma/dmaengine.c
-> @@ -267,6 +267,13 @@ static void dma_chan_put(struct dma_chan *chan)
->  	/* This channel is not in use anymore, free it */
->  	if (!chan->client_count && chan->device->device_free_chan_resources)
->  		chan->device->device_free_chan_resources(chan);
-> +
-> +	/* If the channel is used via a DMA request router, free the mapping */
-> +	if (chan->router && chan->router->route_free) {
-> +		chan->router->route_free(chan->router->dev, chan->route_data);
-> +		chan->router = NULL;
-> +		chan->route_data = NULL;
-> +	}
->  }
->  
->  enum dma_status dma_sync_wait(struct dma_chan *chan, dma_cookie_t cookie)
-> diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
-> index cbd4a8aff120..98b3b61624f0 100644
-> --- a/drivers/dma/of-dma.c
-> +++ b/drivers/dma/of-dma.c
-> @@ -45,6 +45,47 @@ static struct of_dma *of_dma_find_controller(struct of_phandle_args *dma_spec)
->  }
->  
->  /**
-> + * of_dma_router_xlate - translation function for router devices
-> + * @dma_spec:	pointer to DMA specifier as found in the device tree
-> + * @of_dma:	pointer to DMA controller data (router information)
-> + *
-> + * The function creates new dma_spec to be passed to the router driver's
-> + * of_dma_route_allocate() function to prepare a dma_spec which will be used
-> + * to request channel from the real DMA controller.
-> + */
-> +static struct dma_chan *of_dma_router_xlate(struct of_phandle_args *dma_spec,
-> +					    struct of_dma *ofdma)
-> +{
-> +	struct dma_chan		*chan;
-> +	struct of_dma		*ofdma_target;
-> +	struct of_phandle_args	dma_spec_target;
-> +	void			*route_data;
-> +
-> +	/* translate the request for the real DMA controller */
-> +	memcpy(&dma_spec_target, dma_spec, sizeof(dma_spec_target));
-> +	route_data = ofdma->of_dma_route_allocate(&dma_spec_target, ofdma);
-> +
-> +	ofdma_target = of_dma_find_controller(&dma_spec_target);
-> +	if (!ofdma_target)
-> +		return NULL;
-> +
-> +	chan = ofdma_target->of_dma_xlate(&dma_spec_target, ofdma_target);
-> +	if (chan) {
-> +		chan->router = ofdma->dma_router;
-> +		chan->route_data = route_data;
-> +	} else {
-> +		ofdma->dma_router->route_free(ofdma->dma_router->dev, route_data);
+> Why?  The H/W isn't going to change in two or three releases.  The
+> clocks designated as 'always-on' will have to be on forever, or
+> synonymously, 'always'.
+>
+> > And that driver might actually rely on the fact that the clock is shut
+> > down, which won't be the case.
+> 
+> I think you are missing the point of this binding.  The driver can
+> never rely on that in this use-case.  If the clock is off, there is no
+> device driver, period. 
 
-This line is over 80 characters.
+Ok. So CPU hotplug or cpuidle is not a thing then? I'm pretty sure the
+PM guys will be happy to hear that.
 
-> +	}
-> +
-> +	/*
-> +	 * Need to put the node back since the ofdma->of_dma_route_allocate
-> +	 * has taken it for generating the new, translated dma_spec
-> +	 */
-> +	of_node_put(dma_spec_target.np);
-> +	return chan;
-> +}
-> +
-> +/**
->   * of_dma_controller_register - Register a DMA controller to DT DMA helpers
->   * @np:			device node of DMA controller
->   * @of_dma_xlate:	translation function which converts a phandle
-> @@ -110,6 +151,51 @@ void of_dma_controller_free(struct device_node *np)
->  EXPORT_SYMBOL_GPL(of_dma_controller_free);
->  
->  /**
-> + * of_dma_router_register - Register a DMA router to DT DMA helpers as a
-> + *			    controller
-> + * @np:				device node of DMA router
-> + * @of_dma_route_allocate:	setup function for the router which need to
-> + *				modify the dma_spec for the DMA controller to
-> + *				use and to set up the requested route.
-> + * @dma_router:			pointer to dma_router structure to be used when
-> + *				the route need to be free up.
-> + *
-> + * Returns 0 on success or appropriate errno value on error.
-> + *
-> + * Allocated memory should be freed with appropriate of_dma_controller_free()
-> + * call.
-> + */
-> +int of_dma_router_register(struct device_node *np,
-> +			   void *(*of_dma_route_allocate)
-> +			   (struct of_phandle_args *, struct of_dma *),
-> +			   struct dma_router *dma_router)
-> +{
-> +	struct of_dma	*ofdma;
-> +
-> +	if (!np || !of_dma_route_allocate || !dma_router) {
-> +		pr_err("%s: not enough information provided\n", __func__);
-> +		return -EINVAL;
-> +	}
-> +
-> +	ofdma = kzalloc(sizeof(*ofdma), GFP_KERNEL);
-> +	if (!ofdma)
-> +		return -ENOMEM;
+And they are not device drivers, are not mandatory in the system, and
+it's usually a good thing to keep the CPU running whenever you don't
+have such drivers.
 
-Is that expected that you allocate through kzalloc, but never have a
-matching free function implemented?
+> > Introducing a DT interface solely by refering to the current state of
+> > a driver is a bit odd.
+> 
+> I'm not sure I get your point.  This binding has nothing to do with
+> drivers.
 
-> +	ofdma->of_node = np;
-> +	ofdma->of_dma_xlate = of_dma_router_xlate;
-> +	ofdma->of_dma_route_allocate = of_dma_route_allocate;
-> +	ofdma->dma_router = dma_router;
-> +
-> +	/* Now queue of_dma controller structure in list */
-> +	mutex_lock(&of_dma_lock);
-> +	list_add_tail(&ofdma->of_dma_controllers, &of_dma_list);
-> +	mutex_unlock(&of_dma_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(of_dma_router_register);
-> +
-> +/**
->   * of_dma_match_channel - Check if a DMA specifier matches name
->   * @np:		device node to look for DMA channels
->   * @name:	channel name to be matched
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index ad419757241f..abf63ceabef9 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -222,6 +222,16 @@ struct dma_chan_percpu {
->  };
->  
->  /**
-> + * struct dma_router - DMA router structure
-> + * @dev: pointer to the DMA router device
-> + * @route_free: function to be called when the route can be disconnected
-> + */
-> +struct dma_router {
-> +	struct device *dev;
-> +	void (*route_free)(struct device *dev, void *route_data);
-> +};
-> +
-> +/**
->   * struct dma_chan - devices supply DMA channels, clients use them
->   * @device: ptr to the dma device who supplies this channel, always !%NULL
->   * @cookie: last cookie value returned to client
-> @@ -232,6 +242,8 @@ struct dma_chan_percpu {
->   * @local: per-cpu pointer to a struct dma_chan_percpu
->   * @client_count: how many clients are using this channel
->   * @table_count: number of appearances in the mem-to-mem allocation table
-> + * @router: pointer to the DMA router structure
-> + * @route_data: channel specific data for the router
->   * @private: private data for certain client-channel associations
->   */
->  struct dma_chan {
-> @@ -247,6 +259,11 @@ struct dma_chan {
->  	struct dma_chan_percpu __percpu *local;
->  	int client_count;
->  	int table_count;
-> +
-> +	/* DMA router */
-> +	struct dma_router *router;
-> +	void *route_data;
-> +
->  	void *private;
->  };
->  
-> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
-> index 56bc026c143f..734e449f87c1 100644
-> --- a/include/linux/of_dma.h
-> +++ b/include/linux/of_dma.h
-> @@ -23,6 +23,9 @@ struct of_dma {
->  	struct device_node	*of_node;
->  	struct dma_chan		*(*of_dma_xlate)
->  				(struct of_phandle_args *, struct of_dma *);
-> +	void			*(*of_dma_route_allocate)
-> +				(struct of_phandle_args *, struct of_dma *);
-> +	struct dma_router	*dma_router;
+It's all about drivers. Or rather all about missing drivers.
 
-I don't really see why this is really tied to the device tree.
+> > > > Do we really want to enforce this if we ever gain a driver that would
+> > > > actually be able to manage its clock (like do we want the CPU clock to
+> > > > never *ever* be gated just because we don't have a cpuidle/hotplug
+> > > > driver yet?)
+> > > 
+> > > As I've just mentioned, if a clock 'can' be turned off, this binding
+> > > should never be used. Situations where using always-on as a stop-gap
+> > > due to a lack of current functionality is what the paragraph above is
+> > > trying to mitigate.
+> > 
+> > But it's not really what this property is about. What this property
+> > describes is that these clocks should never be gated. Any point in
+> > time during the life of the system AND with in any kernel version.
+> 
+> You got it, that's correct -- these clocks should never be gated.
+> 
+> So why would that ever change?  If that is likely (or even possible)
+> to change in the future then this binding should not be used.
+>
+> To reiterate; this binding should be used on ungatable clocks only.
+> Non-negotiable, non-changeable either by the introduction of new
+> functionality/support or kernel version.
 
-Couldn't we use the device_alloc_chan_resources to do that?
+I'm pretty sure that if that patch gets merged, by the end of the
+year, there will be "incorrect" users by your standards.
 
-Thanks,
+If you introduce a feature, you should expect people to use
+it.  If not, what's the point?
+
+> > > > Have you seen the numerous NAK on such approach Mike did?
+> > > 
+> > > I haven't, but the folks reviewing previous versions have.  Do you
+> > > have something specific in mind that you'd like to bring to my
+> > > attention?
+> > 
+> > Unfortunately, I haven't been able to dig out such mails. But it's why
+> > we ended up with clock protection code in various clock drivers
+> > including:
+> > 
+> > AT91: http://lxr.free-electrons.com/source/drivers/clk/at91/clk-slow.c#L484
+> > iMX28: http://lxr.free-electrons.com/source/drivers/clk/mxs/clk-imx28.c#L154
+> > Rockchip: http://lxr.free-electrons.com/source/drivers/clk/rockchip/clk.c#L320
+> > sunXi: http://lxr.free-electrons.com/source/drivers/clk/sunxi/clk-sunxi.c#L1183
+> > Zynq: http://lxr.free-electrons.com/source/drivers/clk/zynq/clkc.c#L504
+> > 
+> > Which is much more flexible, since you won't have to modify the DT to
+> > change which clocks are to be left enabled, as well as way easier to
+> > debug if you ever have to remove that property from the DT.
+> 
+> You're right, you don't have the change the DT in these cases.  You
+> have to write new C code, which is _less_ flexible.
+
+I'm sorry to learn that you never heard of that stable-DT thing.
+
+And a bit sorry to see that a maintainer is really seeing C as not
+flexible.
+
+> So all these platforms are adding their own hand-rolled version of
+> this binding, adding more duplication and cruft to the kernel.
+> Instead they can use this 'always-on' and we can consolidate and strip
+> it all out.
+
+Except that all these platforms are actually not implementing a
+binding, ie not an interface with the DT they are bound to. Each and
+every of these platforms can change that list whenever they wish, just
+by sending a single one-liner patch (just like the DT, really.).
+
+Which is not something that you can achieve with a DT binding.
+
 Maxime
 
 -- 
@@ -277,4 +168,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150408/9b73cb30/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150408/b1336402/attachment.sig>
