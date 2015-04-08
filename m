@@ -1,45 +1,59 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 8 Apr 2015 11:36:28 +0200
-Subject: [PATCH] soc/mediatek: Remove unused variables
-In-Reply-To: <1428483016-5472-1-git-send-email-thierry.reding@gmail.com>
-References: <1428483016-5472-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <CABuKBeKDyBU8WynSKy55XZ7=a2JJzESxO_neKJkKNRTeMKxAqw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 8 Apr 2015 11:40:16 +0200
+Subject: [PATCH v2 2/2] mmc: host: Add some quirks to be read from fdt in
+ sdhci-pltm.c
+In-Reply-To: <1427726768-17233-3-git-send-email-stripathi@apm.com>
+References: <1427726768-17233-1-git-send-email-stripathi@apm.com>
+ <1427726768-17233-3-git-send-email-stripathi@apm.com>
+Message-ID: <CAPDyKFoc0V5BdKCO8v92Y1qHzEPgwxRdYR3cCj8nCyU-s25NuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-08 10:50 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
-> From: Thierry Reding <treding@nvidia.com>
+On 30 March 2015 at 16:46, Suman Tripathi <stripathi@apm.com> wrote:
+> This patch adds some quirks support to be read from fdt.
 >
-> The PMIC wrapper driver adds a couple of variables that are never used.
-> Remove them to avoid build warnings.
->
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-
-You are right, I didn't notice when merging.
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
 > ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 2 --
->  1 file changed, 2 deletions(-)
+>  drivers/mmc/host/sdhci-pltfm.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 >
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index 4a38506154c6..db5be1eec54c 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -563,8 +563,6 @@ static int pwrap_init_sidly(struct pmic_wrapper *wrp)
+> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+> index bef250e..9f6a4b9 100644
+> --- a/drivers/mmc/host/sdhci-pltfm.c
+> +++ b/drivers/mmc/host/sdhci-pltfm.c
+> @@ -85,6 +85,21 @@ void sdhci_get_of_property(struct platform_device *pdev)
 >
->  static int pwrap_init_reg_clock(struct pmic_wrapper *wrp)
->  {
-> -       u32 wdata;
-> -       u32 rdata;
->         unsigned long rate_spi;
->         int ck_mhz;
+>                 if (of_get_property(np, "broken-cd", NULL))
+>                         host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+> +
+> +               if (of_get_property(np, "delay-after-power", NULL))
+> +                       host->quirks |= SDHCI_QUIRK_DELAY_AFTER_POWER;
+> +
+> +               if (of_get_property(np, "no-hispd", NULL))
+> +                       host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+> +
+> +               if (of_get_property(np, "broken-adma", NULL))
+> +                       host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
+> +
+> +               if (of_get_property(np, "broken-dma", NULL))
+> +                       host->quirks |= SDHCI_QUIRK_BROKEN_DMA;
+> +
+> +               if (of_get_property(np, "no-cmd23", NULL))
+> +                       host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+
+Can't at least some of these be distinguished from what sdhci variant
+that is being used? Instead of having them in DT...
+
+Kind regards
+Uffe
+
+>
+>                 if (of_get_property(np, "no-1-8-v", NULL))
+>                         host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
+> --
+> 1.8.2.1
 >
 > --
-> 2.3.2
->
-
-
-
--- 
-motzblog.wordpress.com
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
