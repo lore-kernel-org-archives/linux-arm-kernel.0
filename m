@@ -1,51 +1,32 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 07 Apr 2015 17:15:58 -0700
-Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid ICE
- in gcc 4.7.3
-In-Reply-To: <20150407163614.1f0ec880cecd681dcd271295@linux-foundation.org>
- (Andrew Morton's message of "Tue, 7 Apr 2015 16:36:14 -0700")
-References: <20150324004537.GA24816@verge.net.au>
- <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
- <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
- <20150326133631.GB2805@arm.com>
- <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
- <20150327002554.GA5527@verge.net.au> <20150327100612.GB1562@arm.com>
- <7hbnj99epe.fsf@deeprootsystems.com>
- <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
- <7h8uec95t2.fsf@deeprootsystems.com>
- <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
- <551BBEC5.7070801@arm.com>
- <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
- <7hwq1v4iq4.fsf@deeprootsystems.com>
- <CAMAWPa_YEJDQc=_60_sPqzwLYN8Yefzcko_rydxrt8oOCq20gw@mail.gmail.com>
- <20150407131740.ac8a856537fecb1b5d142f5f@linux-foundation.org>
- <7hpp7fo92b.fsf@deeprootsystems.com>
- <20150407155310.a3e9dfb6d929a968c4bfc286@linux-foundation.org>
- <7hiod7o6xb.fsf@deeprootsystems.com>
- <20150407163614.1f0ec880cecd681dcd271295@linux-foundation.org>
-Message-ID: <7hsicbmq4h.fsf@deeprootsystems.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 8 Apr 2015 09:44:05 +0900
+Subject: [PATCH 1/6] Revert "staging: board: disable as it breaks the
+ build"
+In-Reply-To: <CAMuHMdX1uHq23h_qsq2csTSYbAhN9ZDdMviDi=KtbLuWucYWXA@mail.gmail.com>
+References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
+ <1428064923-24950-2-git-send-email-geert+renesas@glider.be>
+ <20150406004031.GD1841@verge.net.au>
+ <CAMuHMdX1uHq23h_qsq2csTSYbAhN9ZDdMviDi=KtbLuWucYWXA@mail.gmail.com>
+Message-ID: <20150408004400.GA3456@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Morton <akpm@linux-foundation.org> writes:
+On Tue, Apr 07, 2015 at 03:16:54PM +0200, Geert Uytterhoeven wrote:
+> On Mon, Apr 6, 2015 at 2:40 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Fri, Apr 03, 2015 at 02:41:58PM +0200, Geert Uytterhoeven wrote:
+> >> This reverts commit d13778d537a0ed6115d2a79a942af999cfb8eec6.
+> >>
+> >> Commit 13c11072536f2613 ("staging:board: remove unnecessary function")
+> >> fixed the build of drivers/staging/board/board.c.
+> >>
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Acked-by? Reviewed-by? Tested-by? Rejected-by?
 
-> On Tue, 07 Apr 2015 16:27:44 -0700 Kevin Hilman <khilman@kernel.org> wrote:
->
->> >> > It should all be there today?
->> >> 
->> >> Nope.  
->> >
->> > huh, I swear I did an mmotm yesterday.
->> 
->> Well, based on the timestamp of the mmotm dir on ozlabs, it appears you
->> did.  That's why I was confused why the gcc-473 patches from mmots aren't
->> there.
->
-> Things look a bit better now.
+To be honest I was flipping between Signed-off-by and Acked-by.
+But it seems you don't think either of those would be appropriate.
+So how about:
 
-Yup, I can confirm all 4 patches are there now.  Things should be in
-good shape for the next -next.
-
-Thanks,
-
-Kevin
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
