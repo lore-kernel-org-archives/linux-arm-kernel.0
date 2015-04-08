@@ -1,84 +1,45 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Wed, 8 Apr 2015 07:20:26 +0530
-Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
- enabled during suspend
-In-Reply-To: <5523F10D.20801@collabora.co.uk>
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
- <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
- <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
- <551976F1.1000605@collabora.co.uk>
- <CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>
- <551AFCCE.4050404@collabora.co.uk> <551BD07E.2090506@samsung.com>
- <551BDA0A.7010704@collabora.co.uk> <551C2B6D.4010001@samsung.com>
- <551C71A5.1070903@collabora.co.uk>
- <CAM4voakS8PnatqRTW5gkD0NNKD9gW9Tuv5p-ekxFhKN5NcuBCQ@mail.gmail.com>
- <5523B878.8040304@collabora.co.uk>
- <5523C5F5.6000604@collabora.co.uk>
- <CA+Ln22FrvQQ_pX7ELG-jYriGkQHmtX3aUHYqsc_-CRXcc4zxbg@mail.gmail.com>
- <5523E5A9.4080302@collabora.co.uk>
- <CAM4voamV-TcyqXSu7_HeQvd2aEUXpkjbJ14Otb_MLFMEO_1Vbg@mail.gmail.com>
- <5523F10D.20801@collabora.co.uk>
-Message-ID: <CAM4voa=4+EjNAqNjC5PupnN0eXyQjxOxn_ABtnZb6HToai1k_Q@mail.gmail.com>
+From: lhikichi@broadcom.com (Lori Hikichi)
+Date: Tue, 7 Apr 2015 19:28:40 -0700
+Subject: [PATCH 0/2] Cygnus Audio Driver
+In-Reply-To: <20150406095803.GD6023@sirena.org.uk>
+References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+ <20150331064338.GE2869@sirena.org.uk> <551EEAF8.7050108@broadcom.com>
+ <20150406095803.GD6023@sirena.org.uk>
+Message-ID: <55249258.1020907@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
 
-On Tue, Apr 7, 2015 at 8:30 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Hello Abhilash,
->
-> On 04/07/2015 04:38 PM, Abhilash Kesavan wrote:
->>>
->>> [0]
->>> From 78aa551ebcb9a4a7ae9d5581c33e0c0f19fe5ad6 Mon Sep 17 00:00:00 2001
->>> From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>> Date: Tue, 7 Apr 2015 15:53:27 +0200
->>> Subject: [RFC PATCH] clk: exynos5420: Restore GATE_BUS_TOP on suspend
->>>
->>> Commit ae43b3289186 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power
->>> Management support v12") added pm support for the pl330 dma driver but
->>> it makes the clock for the Exynos5420 MDMA0 DMA controller to be gated
->>> during suspend and this in turn makes its parent clock aclk266_g2d to
->>> be gated. But the clock needs to be ungated prior suspend to allow the
->>> system to be suspend and resumed correctly.
->>>
->>> Add GATE_BUS_TOP register to the list of registers to be restored when
->>> the system enters into a suspend state so aclk266_g2d will be ungated.
->>>
->>> Thanks to Abhilash Kesavan for figuring out that this was the issue.
->>>
->>> Fixes: ae43b32 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12")
->>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>> ---
->>>  drivers/clk/samsung/clk-exynos5420.c | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
->>> index 07d666cc6a29..bea4a173eef5 100644
->>> --- a/drivers/clk/samsung/clk-exynos5420.c
->>> +++ b/drivers/clk/samsung/clk-exynos5420.c
->>> @@ -271,6 +271,7 @@ static const struct samsung_clk_reg_dump exynos5420_set_clksrc[] = {
->>>         { .offset = SRC_MASK_PERIC0,            .value = 0x11111110, },
->>>         { .offset = SRC_MASK_PERIC1,            .value = 0x11111100, },
->>>         { .offset = SRC_MASK_ISP,               .value = 0x11111000, },
->>> +       { .offset = GATE_BUS_TOP,               .value = 0xffffffff, },
->>>         { .offset = GATE_BUS_DISP1,             .value = 0xffffffff, },
->>>         { .offset = GATE_IP_PERIC,              .value = 0xffffffff, },
->>>  };
->>
->> While there could be a concern that we are ungating all the clocks in
->
-> Yes, I mentioned that but OTOH it will be even more dangerous to gate
-> clocks that should remain enabled so I used the register default values.
->
->> BUS_TOP, this looks like the least intrusive fix for the issue. Tested
->> this on Peach Pi, S2R works fine.
->>
->
-> Thanks a lot for testing, does it mean I can add your Tested-by then when
-> posting it as a proper patch? I'll wait for Tomasz to comment before though.
 
-Tested-by: Abhilash Kesavan <a.kesavan@samsung.com>.
-
-Abhilash
+On 15-04-06 02:58 AM, Mark Brown wrote:
+> On Fri, Apr 03, 2015 at 12:33:12PM -0700, Scott Branden wrote:
+>> On 15-03-30 11:43 PM, Mark Brown wrote:
+>>> On Mon, Mar 30, 2015 at 08:16:22PM -0700, Scott Branden wrote:
+>
+>>>> The audio PLL is embedded in the audio block and only used
+>>>> by the audio block. The audio PLL registers are also in the middle of
+>>>> the audio register map.
+>
+>>> When you say it's only used by the audio block do you mean to say that
+>>> the audio block exposes no clock signals other than the bit and frame
+>>> clocks?
+>
+>> The audio block exposes the MCLK in addition to the bit and frame clock.
+>
+> OK, then it's going to need to be a clock provider at some point - the
+> clock will be going into external devices which are going to need to be
+> able to interact with the clock (for example, to get the rate).
+>
+Currently, the ASoC machine driver is responsible for requesting a 
+certain frequency of MCLK be generated from our driver and then also 
+sending the frequency information along to the external device (codec).
+This is done via the snd_soc_dai_set_sysclk.  That is the only clock 
+interaction we have needed for the core part of the driver.  For 
+enhanced features, we also have the need to make minor adjustments 
+(tweaks) to the PLL.  The tweaks are used to make the PLLs output 
+frequency match as closely as possible to a true reference frequency. 
+As such, we would like to provide the finest adjustment resolution as 
+possible. The clocking framework only seems to allow for a 1 Hz 
+adjustment. This limitation and the fact that no other device seems to 
+need to interact directly will the PLL are why we have not put it in the 
+clocking framework.
