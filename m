@@ -1,77 +1,98 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 08 Apr 2015 11:25:21 +0200
-Subject: [PATCH] ASoC: max98090: add shutdown callback for max98090
-In-Reply-To: <1428483128-23498-2-git-send-email-wxt@rock-chips.com>
-References: <1428483128-23498-1-git-send-email-wxt@rock-chips.com>
- <1428483128-23498-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <15530630.jvXTF4Jl8n@diego>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 8 Apr 2015 17:22:05 +0800
+Subject: [PATCH v9 08/30] PCI: Update pci_host_bridge bus resource
+In-Reply-To: <20150407224243.GL10892@google.com>
+References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
+ <1428053164-28277-10-git-send-email-wangyijing@huawei.com>
+ <20150407224243.GL10892@google.com>
+Message-ID: <5524F33D.7090800@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
-
-Am Mittwoch, 8. April 2015, 16:52:08 schrieb Caesar Wang:
-> To fix pop noise when shutdown,the pop noise during shutdown
-> is the pmic cutoff power of codec without any notice.
+On 2015/4/8 6:42, Bjorn Helgaas wrote:
+> On Fri, Apr 03, 2015 at 05:25:42PM +0800, Yijing Wang wrote:
+>> From: Yijing Wang <wangyijing0307@gmail.com>
+>>
+>> Sometimes, the bus resource start number is not equal to
+>> root bus number. For example, in pci_scan_bus(), we always
+>> add the default bus resource which start bus number is 0,
+>> but the root bus number callers given may != 0, so
+>> we need to update pci_host_bridge bus resource, because we
+>> would check whether host bridge bus resoruce is confict
+>> in later patch.
 > 
-> Signed-off-by: jay.xu <xjq@rock-chips.com>
-> Signed-off-by: zhengxing <zhengxing@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> It's true that pci_scan_bus() always inserts [bus 00-ff].  But I think
+> that's completely bogus.  The caller of pci_scan_bus() supplies a root bus
+> number X.  Any bus numbers below X are useless as far as this host bridge
+> is concerned, and it's pointless to include them in the range inserted by
+> pci_scan_bus().
+
+Agree, I think it's better to use the [bus start - FF] instead of [00-FF].
+
 > 
-> Serien-cc: linux-kernel at vger.kernel.org
-> Serien-cc: devicetree at vger.kernel.org
-> Serien-cc: dianders at chromium.org
+> I think we'd be better off if we forced every pci_scan_bus() caller to
+> supply a real non-overlapping bus number range.  We probably can't do that
+> easily because the arch knows the beginning bus number, but some don't know
+> how to figure out the ending bus number.
+
+It seems to have some problems in pci_scan_bus() if we have more than one pci host bridge
+in a domain. Because we add the default busn_res[00-FF] to resource list in pci_scan_bus(),
+and pass the resource list to pci_create_root_bus().  The pci root bus would
+consume the bus range from the start to the 0xFF, and request it from the per-domain resource[00-FF].
+So if we have another pci host bridge in this domain, and pass another start bus number, it would
+fail when the root bus try to request bus resource from per-domain resource. Now only several archs
+call pci_scan_bus(), I guess they didn't run the code in above case, so we didn't find
+the bus report.
+
 > 
-> ---
+> Do we have a per-domain structure that tracks the bus numbers in use in the
+> domain?  It seems like if we had one, we could use that to approximate the
+> end.  For example, if the arch scans three root buses, at bus 00, bus 40,
+> and bus 80, we could start with the first one at [bus 00-ff], and when we
+> scan the one at bus 40, we could either report a conflict (if the bus 00
+> tree included a bus 40) or reduce the first range to [bus 00-3f].
+
+Per-domain resource pci_domain_busn_res is what we are looking for.
+For simplicity, we could report a conflict and fail when we find a conflict bus
+resource in system.
+
+
+>>  	resource_list_for_each_entry(window, resources)
+>> -		if (window->res->flags & IORESOURCE_BUS)
+>> +		if (window->res->flags & IORESOURCE_BUS) {
+>> +			if (bus > window->res->start)
+>> +				window->res->start = bus;
 > 
->  sound/soc/codecs/max98090.c | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
+> I see what you're trying to do here, but I think this is the wrong place to
+> do it.  I'd rather figure out a way to insert something other than
+> busn_resource in pci_scan_bus().  That probably means we need to
+> dynamically allocate a new busn_res struct.
+
+Allocate a new busn_res maybe unnecessary, the bus resource we added to resource list
+and passed to pci_create_root_bus() will never be used again after we call
+pci_bus_insert_busn_res(), we may could consider to use local busn_res in pci_scan_bus().
+
+Thanks!
+Yijing.
+
 > 
-> diff --git a/sound/soc/codecs/max98090.c b/sound/soc/codecs/max98090.c
-> index b112b1c..066954a0 100644
-> --- a/sound/soc/codecs/max98090.c
-> +++ b/sound/soc/codecs/max98090.c
-> @@ -2611,6 +2611,22 @@ static int max98090_i2c_remove(struct i2c_client
-> *client) return 0;
->  }
+>>  			return;
+>> +		}
+>>  
+>>  	pr_info(
+>>  	 "No busn resource found for pci%04x:%02x, will use [bus %02x-ff]\n",
+>> -- 
+>> 1.7.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> +static void max98090_i2c_shutdown(struct i2c_client *i2c)
-> +{
-> +	struct max98090_priv *max98090 = dev_get_drvdata(&i2c->dev);
-> +
-> +	dev_info(&i2c->dev, "shut down device\n");
-
-is this dev_info really necessary? dev_dbg might be better, or leave it out 
-completely, as it doesn't really provide any additional benefit.
+> .
+> 
 
 
-> +
-> +	/* Enable volume smoothing, disable zero cross.  This will cause
-> +	 * a quick 40ms ramp to mute on shutdown.
-> +	 */
-
-Comment style is off ... should be
-
-/*
- * Enable volume smoothing, disable zero cross.  This will cause
- * a quick 40ms ramp to mute on shutdown.
- */
-
-
-> +	regmap_write(max98090->regmap,
-> +		M98090_REG_LEVEL_CONTROL, M98090_VSENN_MASK);
-> +	regmap_write(max98090->regmap,
-> +		M98090_REG_DEVICE_SHUTDOWN, 0x00);
-> +	msleep(40);
-> +}
-> +
->  #ifdef CONFIG_PM
->  static int max98090_runtime_resume(struct device *dev)
->  {
-> @@ -2697,6 +2713,7 @@ static struct i2c_driver max98090_i2c_driver = {
->  	},
->  	.probe  = max98090_i2c_probe,
->  	.remove = max98090_i2c_remove,
-> +	.shutdown = max98090_i2c_shutdown,
->  	.id_table = max98090_i2c_id,
->  };
+-- 
+Thanks!
+Yijing
