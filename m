@@ -1,27 +1,76 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 8 Apr 2015 10:42:40 -0300
-Subject: imx6: PCIe imx6_pcie_assert_core_reset() hangs after watchdog
- reset
-In-Reply-To: <1428500226.2809.28.camel@pengutronix.de>
-References: <55128016.3030903@denx.de>
- <CAOMZO5CDOJXp3Hbe8a9dPh=krWhw-i5i8Zoa5Hb+2XGAdou7ew@mail.gmail.com>
- <1428500226.2809.28.camel@pengutronix.de>
-Message-ID: <CAOMZO5CS3hW5CCOWf4J-dUP-eAn-JYDCb=5DPMs_+x9gWyu2bg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 8 Apr 2015 15:52:46 +0200
+Subject: [PATCH v3 01/16] crypto: sha1: implement base layer for SHA-1
+In-Reply-To: <CAKv+Gu-=obTKmviwH9B2wBi==LQa_-aAXVU9QPh1gUeYyopmVw@mail.gmail.com>
+References: <1428396724-19962-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1428396724-19962-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20150408131916.GA29646@gondor.apana.org.au>
+ <CAKv+Gu9gQqQEEXgJ=JhVf=7SURx9BfRiaJkakhGv1S9FsqujaQ@mail.gmail.com>
+ <20150408133050.GB29646@gondor.apana.org.au>
+ <CAKv+Gu-=obTKmviwH9B2wBi==LQa_-aAXVU9QPh1gUeYyopmVw@mail.gmail.com>
+Message-ID: <CAKv+Gu9yynJyw95=Rc97Xnrrwrv7V6dTFQvEK26OwbjJKJTRAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 8, 2015 at 10:37 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+On 8 April 2015 at 15:40, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 8 April 2015 at 15:30, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+>> On Wed, Apr 08, 2015 at 03:25:14PM +0200, Ard Biesheuvel wrote:
+>>>
+>>> Not having to call the function twice is the whole point. In the arm64
+>>> case, all the SHA-256 round keys can be kept in registers (it has 32
+>>> 16-byte SIMD registers), and that is what motivates this pattern. By
+>>> passing a head block, a pointer to the source and the generic pointer
+>>> (which arm64 uses to finalize the block, we can process all data in a
+>>> single invocation of the block transform)
+>>
+>> Does this really make any difference? With IPsec the partial code
+>> path is never even going to get executed.
+>>
+>
+> This is not the partial code path, it is the .finup path, in fact.
+> Anything that hashes data that is often a multiple of the block size
+> (which is more likely for block based applications than for IPsec, I
+> think) should benefit from this. But even if it is not, using a head
+> block and a pointer to the src eliminates one call of the block
+> transform.
+>
+> Note that, in the arm64 case, calling a SHA-256 block transform in
+> non-process context involves:
+> - stacking the contents of 28 SIMD registers (28 x 16 = 448 bytes)
+> - loading the SHA-256 constants (16 x 16 = 256 bytes)
+> - processing the data
+> - unstacking the contents of 28 SIMD registers (448 bytes)
+>
+> so anything that can prevent needlessly calling these functions
+> multiple times in quick successsion is going to help, and 'just
+> calling it twice' just doesn't cut it.
+>
 
-> The problem appears when a watchdog reset happens, so the kernel has no
-> chance to clean things up before rebooting. This isn't a problem if you
-> do a full system reset via the watchdog out line to the PMIC, but gets
-> ugly if only the i.MX6 is reset (which apparently doesn't clear the GPR
-> bits).
+OK, stacking/unstacking can be amortized over multiple invocations of
+the block transform, only loading the round constants cannot.
 
-Got it. Yes, in imx6q-sabresd I see U-boot reporting 'Reset cause:
-POR' after the 'reboot' command, and this is in fact due to full
-system reset via PMIC as you explained.
 
-Regards,
-
-Fabio Estevam
+>>> Do note that these are only used by static inline functions, so the
+>>> unused arguments are all eliminated from the binary anyway. In fact,
+>>> looking at the generated code, the function calls don't use function
+>>> pointers at all anymore,
+>>> but just call the block transform directly, so the typedef is only
+>>> used as a prototype, really.
+>>
+>> It's not just the generated code.  The next guy that comes along
+>> and writes a SHA implementation is going to go WTH is this p
+>> argument.  I'm not going to add crap to the generic layer just
+>> because ARM needs it.  In fact ARM doesn't even need it.
+>>
+>
+> OK, so there are 2 pieces of crap [sic] in this proposed generic layer:
+> - the head block
+> - the generic pointer
+>
+> The generic pointer is used in the arm64 case to convey the
+> information that the current invocation of the block transform is the
+> final one, and the core code can apply the padding and finalize /and/
+> pass back whether it has done so or not. (the latter can easily be
+> done in the C code as well)  I used a generic pointer to allow other
+> uses, but if you have a better idea for this particular use case, I'd
+> be happy to hear it.
