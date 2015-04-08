@@ -1,52 +1,58 @@
-From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Wed, 8 Apr 2015 11:37:04 +0530
-Subject: [PATCH v5 3/6] arm64: Kprobes with single stepping support
-In-Reply-To: <1424214701-4899-4-git-send-email-dave.long@linaro.org>
-References: <1424214701-4899-1-git-send-email-dave.long@linaro.org>
- <1424214701-4899-4-git-send-email-dave.long@linaro.org>
-Message-ID: <CAHM4w1=84w40VCKyEtGfqYEziZaqgRWG6O7TGn+w1CeQuPyVPg@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 8 Apr 2015 15:23:14 +0900
+Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
+In-Reply-To: <19177883.oJbWsfhyVG@wuerfel>
+References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
+ <3196164.8b31S2QWFd@wuerfel>
+ <CAK7LNATkYVwT337okeW=c1NjyxB4ovXKSNzxtTwk7XXGN45z7w@mail.gmail.com>
+ <19177883.oJbWsfhyVG@wuerfel>
+Message-ID: <CAK7LNATHJF0qgQvhw=A2gdgTwhL9aCUjM_=kUR5RohzOKq8fQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Hi Arnd,
 
-On Wed, Feb 18, 2015 at 4:41 AM, David Long <dave.long@linaro.org> wrote:
+2015-04-07 21:22 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 07 April 2015 17:22:32 Masahiro Yamada wrote:
+>> Hi Arnd,
+>>
+>> Thanks for your comment!
+>>
+>> 2015-04-07 16:41 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+>> > On Tuesday 07 April 2015 12:34:30 Masahiro Yamada wrote:
+>> >>
+>> >> What is the cause of the kernel panic?  How to fix it?
+>> >> Any hint is very appreciated.
+>> >>
+>> >
+>> > Cortex-A9 usually need to set up the L2 Cache controller, and you
+>> > don't have a node for that.
+>> >
+>> > Can you try adding a DT node for it? You may also have to specify
+>> > the overrides for its aux control register in DT if that is not
+>> > set up right by the boot loader or the power-on defaults.
+>>
+>> I have not checked the L2 (outer) cache yet.
+>>
+>> The L2 cache on our SoC is not a famous IP, but our own implementation.
+>> I will have to implement L2 code as well as the device tree node.
+>> Is there any workaround to boot Linux without L2 cache?
 >
-> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
->
-> Add support for basic kernel probes(kprobes) and jump probes
-> (jprobes) for ARM64.
->
+> It should work normally, I think the only dangerous combination is
+> when the L2 controller is enabled but not configured correctly.
 
-[...]
+OK, I must check this area.
 
->
-> +#ifdef CONFIG_KPROBES
-> +static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
-> +{
-> +       int ret = 0;
-> +
-> +       /* kprobe_running() needs smp_processor_id() */
-> +       if (!user_mode(regs)) {
-> +               preempt_disable();
-> +               if (kprobe_running() && kprobe_fault_handler(regs, esr))
-> +                       ret = 1;
-> +               preempt_enable();
-> +       }
-> +
-> +       return ret;
-> +}
-> +#else
-> +static inline int notify_page_fault(struct pt_regs *regs)
+> It's also quite likely that there is some other problem with your
+> user space image. Are you able to boot the same image inside of
+> qemu or on another hardware that is supported with multi_v7_defconfig?
 
-Please fix this definition in next revision, other wise there would be
-a build error
-if CONFIG_KPROBES is not defined.
+Yes, I have a Zynq Zedboard.
+
+It successfully boots Linux with the same kernel image and initramdisk.
 
 
-should be:
 
-+static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
-
-
-~Pratyush
+-- 
+Best Regards
+Masahiro Yamada
