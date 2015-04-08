@@ -1,40 +1,30 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 8 Apr 2015 16:32:27 +0800
-Subject: [PATCH v9 03/30] PCI: Save domain in pci_host_bridge
-In-Reply-To: <5524E248.9010509@free-electrons.com>
-References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
- <1428053164-28277-5-git-send-email-wangyijing@huawei.com>
- <5524E248.9010509@free-electrons.com>
-Message-ID: <5524E79B.5020304@huawei.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Wed, 08 Apr 2015 10:42:07 +0200
+Subject: [PATCH 5/6] pwm: samsung: Fix output race on disabling
+In-Reply-To: <20150408102811.219b964f@amdc2363>
+References: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
+ <1427387955-5129-6-git-send-email-linux.amoon@gmail.com>
+ <20150408102811.219b964f@amdc2363>
+Message-ID: <1428482527.4333.50.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/4/8 16:09, Gregory CLEMENT wrote:
-> Hi Yijing,
+
+
+On Wed, 2015-04-08 at 10:28 +0200, Lukasz Majewski wrote:
+> Hi Anand,
 > 
-> On 03/04/2015 11:25, Yijing Wang wrote:
->> Save domain in pci_host_bridge, so we could get domain
->> from pci_host_bridge, and at the end of series, we could
->> clean up the arch specific pci_domain_nr(). For arm,
->> we pass -1 as the domain number, we would update the
->> domain number in core by pci_bus_assign_domain_nr().
->>
-> For the mvebu part I tested on Armada XP, Armada 375 and Armada 38x
-> SoCs, and I didn't saw any regression. So you can add my:
-> 
-> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > From: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> > When disabling the samsung PWM the output state remains at the level
+> > it was in the end of a pwm cycle. In other words, calling pwm_disable
+> > when at 100% duty will keep the output active, while at all other
+> > setting the output will go/stay inactive. On top of that the samsung
+> > PWM settings are double-buffered, which means the new settings only
+> > get applied at the start of a new PWM cycle.
 
-Thanks a lot for your test!
-
-Thanks!
-Yijing.
-
-
->>
-> 
-> 
-
+This patch is already in the linux-pwm for-next tree so should probably
+be dropped form this patchset to prevent conflicts.
 
 -- 
-Thanks!
-Yijing
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
