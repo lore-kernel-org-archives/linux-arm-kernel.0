@@ -1,45 +1,47 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Apr 2015 15:22:12 +0200
-Subject: [PATCH 1/8] clk: rockchip: Staticize file-scope declarations
+Date: Wed, 08 Apr 2015 15:22:19 +0200
+Subject: [PATCH 8/8] MIPS: Alchemy: Remove unneeded cast removing const
 In-Reply-To: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
 References: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1428499339-29569-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1428499339-29569-9-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing static to local (file-scope only) symbols.
+Parent names in clock init data is now array of const pointers to const
+strings so the cast is not needed.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/clk/rockchip/clk-rk3188.c | 2 +-
- drivers/clk/rockchip/clk-rk3288.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/mips/alchemy/common/clock.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index 7eb684c50d42..d045a6ae4e5f 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -26,7 +26,7 @@ enum rk3188_plls {
- 	apll, cpll, dpll, gpll,
- };
+diff --git a/arch/mips/alchemy/common/clock.c b/arch/mips/alchemy/common/clock.c
+index 6a98d2cb402c..6e46abe0dac6 100644
+--- a/arch/mips/alchemy/common/clock.c
++++ b/arch/mips/alchemy/common/clock.c
+@@ -752,12 +752,12 @@ static int __init alchemy_clk_init_fgens(int ctype)
+ 	switch (ctype) {
+ 	case ALCHEMY_CPU_AU1000...ALCHEMY_CPU_AU1200:
+ 		id.ops = &alchemy_clkops_fgenv1;
+-		id.parent_names = (const char **)alchemy_clk_fgv1_parents;
++		id.parent_names = alchemy_clk_fgv1_parents;
+ 		id.num_parents = 2;
+ 		break;
+ 	case ALCHEMY_CPU_AU1300:
+ 		id.ops = &alchemy_clkops_fgenv2;
+-		id.parent_names = (const char **)alchemy_clk_fgv2_parents;
++		id.parent_names = alchemy_clk_fgv2_parents;
+ 		id.num_parents = 3;
+ 		break;
+ 	default:
+@@ -961,7 +961,7 @@ static int __init alchemy_clk_setup_imux(int ctype)
+ 	struct clk *c;
  
--struct rockchip_pll_rate_table rk3188_pll_rates[] = {
-+static struct rockchip_pll_rate_table rk3188_pll_rates[] = {
- 	RK3066_PLL_RATE(2208000000, 1, 92, 1),
- 	RK3066_PLL_RATE(2184000000, 1, 91, 1),
- 	RK3066_PLL_RATE(2160000000, 1, 90, 1),
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 05d7a0bc0599..fabc4d63a100 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -27,7 +27,7 @@ enum rk3288_plls {
- 	apll, dpll, cpll, gpll, npll,
- };
+ 	id.ops = &alchemy_clkops_csrc;
+-	id.parent_names = (const char **)alchemy_clk_csrc_parents;
++	id.parent_names = alchemy_clk_csrc_parents;
+ 	id.num_parents = 7;
+ 	id.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE;
  
--struct rockchip_pll_rate_table rk3288_pll_rates[] = {
-+static struct rockchip_pll_rate_table rk3288_pll_rates[] = {
- 	RK3066_PLL_RATE(2208000000, 1, 92, 1),
- 	RK3066_PLL_RATE(2184000000, 1, 91, 1),
- 	RK3066_PLL_RATE(2160000000, 1, 90, 1),
 -- 
 1.9.1
