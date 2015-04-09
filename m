@@ -1,98 +1,160 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu,  9 Apr 2015 12:29:14 +0100
-Subject: [PATCH v3 03/10] drivers: PL011: refactor pl011_shutdown()
+Date: Thu,  9 Apr 2015 12:29:16 +0100
+Subject: [PATCH v3 05/10] drivers: PL011: refactor pl011_probe()
 In-Reply-To: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
 References: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1428578961-6896-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <1428578961-6896-6-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the pl011_shutdown() function into smaller chunks to allow
-easier reuse later when adding SBSA support.
+Currently the pl011_probe() function is relying on some AMBA IDs
+and a device tree node to initialize the driver and a port.
+Both features are not necessarily required for the driver:
+- we lack AMBA IDs in the ARM SBSA generic UART and
+- we lack a DT node in ACPI systems.
+So lets refactor the function to ease later reuse.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/tty/serial/amba-pl011.c |   58 ++++++++++++++++++++++-----------------
- 1 file changed, 33 insertions(+), 25 deletions(-)
+ drivers/tty/serial/amba-pl011.c |   89 ++++++++++++++++++++++++++-------------
+ 1 file changed, 60 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index d6a081e..9eb6d13 100644
+index e1ac2cb..65df5c7 100644
 --- a/drivers/tty/serial/amba-pl011.c
 +++ b/drivers/tty/serial/amba-pl011.c
-@@ -1635,34 +1635,15 @@ static void pl011_shutdown_channel(struct uart_amba_port *uap,
-       writew(val, uap->port.membase + lcrh);
+@@ -2174,13 +2174,10 @@ static void pl011_unregister_port(struct uart_amba_port *uap)
+ 		uart_unregister_driver(&amba_reg);
  }
  
--static void pl011_shutdown(struct uart_port *port)
-+/*
-+ * disable the port. It should not disable RTS and DTR.
-+ * Also RTS and DTR state should be preserved to restore
-+ * it during startup().
-+ */
-+static void pl011_disable_uart(struct uart_amba_port *uap)
+-
+-static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
++static int pl011_allocate_port(struct device *dev, struct uart_amba_port **_uap)
  {
--	struct uart_amba_port *uap =
--	    container_of(port, struct uart_amba_port, port);
- 	unsigned int cr;
+ 	struct uart_amba_port *uap;
+-	struct vendor_data *vendor = id->data;
+-	void __iomem *base;
+-	int i, ret;
++	int i;
  
--	/*
--	 * disable all interrupts
--	 */
--	spin_lock_irq(&uap->port.lock);
--	uap->im = 0;
--	writew(uap->im, uap->port.membase + UART011_IMSC);
+ 	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
+ 		if (amba_ports[i] == NULL)
+@@ -2189,51 +2186,53 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (i == ARRAY_SIZE(amba_ports))
+ 		return -EBUSY;
+ 
+-	uap = devm_kzalloc(&dev->dev, sizeof(struct uart_amba_port),
+-			   GFP_KERNEL);
++	uap = devm_kzalloc(dev, sizeof(struct uart_amba_port), GFP_KERNEL);
+ 	if (uap == NULL)
+ 		return -ENOMEM;
+ 
+-	i = pl011_probe_dt_alias(i, &dev->dev);
++	if (_uap)
++		*_uap = uap;
++
++	return i;
++}
+ 
+-	base = devm_ioremap(&dev->dev, dev->res.start,
+-			    resource_size(&dev->res));
++static int pl011_setup_port(struct device *dev, struct uart_amba_port *uap,
++			    struct resource *mmiobase, int index)
++{
++	void __iomem *base;
++
++	base = devm_ioremap_resource(dev, mmiobase);
+ 	if (!base)
+ 		return -ENOMEM;
+ 
+-	uap->clk = devm_clk_get(&dev->dev, NULL);
+-	if (IS_ERR(uap->clk))
+-		return PTR_ERR(uap->clk);
++	index = pl011_probe_dt_alias(index, dev);
+ 
+-	uap->vendor = vendor;
+-	uap->lcrh_rx = vendor->lcrh_rx;
+-	uap->lcrh_tx = vendor->lcrh_tx;
+ 	uap->old_cr = 0;
+-	uap->fifosize = vendor->get_fifosize(dev);
+-	uap->port.dev = &dev->dev;
+-	uap->port.mapbase = dev->res.start;
++	uap->port.dev = dev;
++	uap->port.mapbase = mmiobase->start;
+ 	uap->port.membase = base;
+ 	uap->port.iotype = UPIO_MEM;
+-	uap->port.irq = dev->irq[0];
+ 	uap->port.fifosize = uap->fifosize;
+-	uap->port.ops = &amba_pl011_pops;
+ 	uap->port.flags = UPF_BOOT_AUTOCONF;
+-	uap->port.line = i;
++	uap->port.line = index;
+ 
+-	/* Ensure interrupts from this UART are masked and cleared */
+-	writew(0, uap->port.membase + UART011_IMSC);
 -	writew(0xffff, uap->port.membase + UART011_ICR);
--	spin_unlock_irq(&uap->port.lock);
--
--	pl011_dma_shutdown(uap);
--
--	/*
--	 * Free the interrupt
--	 */
--	free_irq(uap->port.irq, uap);
--
--	/*
--	 * disable the port
--	 * disable the port. It should not disable RTS and DTR.
--	 * Also RTS and DTR state should be preserved to restore
--	 * it during startup().
--	 */
- 	uap->autorts = false;
- 	spin_lock_irq(&uap->port.lock);
- 	cr = readw(uap->port.membase + UART011_CR);
-@@ -1678,6 +1659,33 @@ static void pl011_shutdown(struct uart_port *port)
- 	pl011_shutdown_channel(uap, uap->lcrh_rx);
- 	if (uap->lcrh_rx != uap->lcrh_tx)
- 		pl011_shutdown_channel(uap, uap->lcrh_tx);
-+}
-+
-+static void pl011_disable_interrupts(struct uart_amba_port *uap)
-+{
-+	spin_lock_irq(&uap->port.lock);
-+	/*
-+	 * mask all interrupts and clear all pending ones
-+	 */
-+	uap->im = 0;
-+	writew(uap->im, uap->port.membase + UART011_IMSC);
-+	writew(0xffff & ~UART011_TXIS, uap->port.membase + UART011_ICR);
-+
-+	spin_unlock_irq(&uap->port.lock);
-+}
-+
-+static void pl011_shutdown(struct uart_port *port)
-+{
-+	struct uart_amba_port *uap =
-+		container_of(port, struct uart_amba_port, port);
-+
-+	pl011_disable_interrupts(uap);
-+
-+	pl011_dma_shutdown(uap);
-+
-+	free_irq(uap->port.irq, uap);
-+
-+	pl011_disable_uart(uap);
++	amba_ports[index] = uap;
  
- 	/*
- 	 * Shut down the clock producer
+-	snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
++	return 0;
++}
+ 
+-	amba_ports[i] = uap;
++static int pl011_register_port(struct uart_amba_port *uap)
++{
++	int ret;
+ 
+-	amba_set_drvdata(dev, uap);
++	/* Ensure interrupts from this UART are masked and cleared */
++	writew(0, uap->port.membase + UART011_IMSC);
++	writew(0xffff, uap->port.membase + UART011_ICR);
+ 
+ 	if (!amba_reg.state) {
+ 		ret = uart_register_driver(&amba_reg);
+ 		if (ret < 0) {
+-			dev_err(&dev->dev,
++			dev_err(uap->port.dev,
+ 				"Failed to register AMBA-PL011 driver\n");
+ 			return ret;
+ 		}
+@@ -2246,6 +2245,38 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	return ret;
+ }
+ 
++static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
++{
++	struct uart_amba_port *uap;
++	struct vendor_data *vendor = id->data;
++	int portnr, ret;
++
++	portnr = pl011_allocate_port(&dev->dev, &uap);
++	if (portnr < 0)
++		return portnr;
++
++	uap->clk = devm_clk_get(&dev->dev, NULL);
++	if (IS_ERR(uap->clk))
++		return PTR_ERR(uap->clk);
++
++	uap->vendor = vendor;
++	uap->lcrh_rx = vendor->lcrh_rx;
++	uap->lcrh_tx = vendor->lcrh_tx;
++	uap->fifosize = vendor->get_fifosize(dev);
++	uap->port.irq = dev->irq[0];
++	uap->port.ops = &amba_pl011_pops;
++
++	snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
++
++	ret = pl011_setup_port(&dev->dev, uap, &dev->res, portnr);
++	if (ret)
++		return ret;
++
++	amba_set_drvdata(dev, uap);
++
++	return pl011_register_port(uap);
++}
++
+ static int pl011_remove(struct amba_device *dev)
+ {
+ 	struct uart_amba_port *uap = amba_get_drvdata(dev);
 -- 
 1.7.9.5
