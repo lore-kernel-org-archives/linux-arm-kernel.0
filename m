@@ -1,125 +1,208 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  9 Apr 2015 09:40:41 +0200
-Subject: [PATCH] RFT: pinctrl: samsung: separate wakeup irqdomain
-Message-ID: <1428565241-5099-1-git-send-email-linus.walleij@linaro.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 9 Apr 2015 09:42:38 +0200
+Subject: [PATCHv7] media: i2c/adp1653: Devicetree support for adp1653
+In-Reply-To: <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
+References: <20150402143846.GA11687@amd> <20150402203417.GA6336@amd>
+ <20150403083353.GA21070@amd>
+ <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
+ <20150403202624.GA4308@amd>
+ <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
+ <20150404074337.GA31064@amd>
+ <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
+ <20150404171116.GA15025@Nokia-N900>
+ <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
+Message-ID: <20150409074238.GA22603@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Samsung pin control driver and subdrivers sometimes use both
-an irqdomain for some IRQs and another irqdomain for wakeup irqs,
-registering the first with a call to the per-SoC callback
-.eint_gpio_init() and the second with a call to .eint_wkup_init()
-however it seems both runpaths will assign the resulting irqdomain
-to the per-bank bank.irq_domain member, making the second
-(wakeup) irqdomain overwrite the first one.
 
-I'm surprised this even works, and it seems that the S3C
-per-domain "domain data" that seems to be used in part to work
-around this bug by creating a local array with copies of the
-irqdomain (!).
+Add device tree support for adp1653 flash LED driver.
 
-This patch mainly adds a new record to the GPIO/pin "bank"
-for wakeups and use this in the .eint_wkup_init() callbacks
-to pave the way for more cleanups.
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Tomasz etc: I don't know if I'm just misunderstanding this,
-can you look at it and tell me how badly I misunderstand
-these Samsung wakeups, to me it is a complete mystery.
----
- drivers/pinctrl/samsung/pinctrl-exynos.c  | 6 +++---
- drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 6 +++---
- drivers/pinctrl/samsung/pinctrl-s3c64xx.c | 6 +++---
- drivers/pinctrl/samsung/pinctrl-samsung.h | 1 +
- 4 files changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index c8f83f96546c..6adf34e3cce6 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -469,7 +469,7 @@ static void exynos_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
- 				+ b->eint_offset);
- 		mask = readl(d->virt_base + b->irq_chip->eint_mask
- 				+ b->eint_offset);
--		exynos_irq_demux_eint(pend & ~mask, b->irq_domain);
-+		exynos_irq_demux_eint(pend & ~mask, b->wkup_domain);
- 	}
+Second part of a patch after documentation was merged.
+
+Please apply,
+							Pavel
+
+diff --git a/drivers/media/i2c/adp1653.c b/drivers/media/i2c/adp1653.c
+index 873fe19..d703636 100644
+--- a/drivers/media/i2c/adp1653.c
++++ b/drivers/media/i2c/adp1653.c
+@@ -8,6 +8,7 @@
+  * Contributors:
+  *	Sakari Ailus <sakari.ailus@iki.fi>
+  *	Tuukka Toivonen <tuukkat76@gmail.com>
++ *	Pavel Machek <pavel@ucw.cz>
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License
+@@ -34,6 +35,8 @@
+ #include <linux/module.h>
+ #include <linux/i2c.h>
+ #include <linux/slab.h>
++#include <linux/of_gpio.h>
++#include <linux/gpio.h>
+ #include <media/adp1653.h>
+ #include <media/v4l2-device.h>
  
- 	chained_irq_exit(chip, desc);
-@@ -511,9 +511,9 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
- 		if (bank->eint_type != EINT_TYPE_WKUP)
- 			continue;
+@@ -306,9 +309,17 @@ adp1653_init_device(struct adp1653_flash *flash)
+ static int
+ __adp1653_set_power(struct adp1653_flash *flash, int on)
+ {
+-	int ret;
++	int ret = 0;
++
++	if (flash->platform_data->power) {
++		ret = flash->platform_data->power(&flash->subdev, on);
++	} else {
++		gpiod_set_value(flash->platform_data->enable_gpio, on);
++		if (on)
++			/* Some delay is apparently required. */
++			udelay(20);
++	}
  
--		bank->irq_domain = irq_domain_add_linear(bank->of_node,
-+		bank->wkup_domain = irq_domain_add_linear(bank->of_node,
- 				bank->nr_pins, &exynos_eint_irqd_ops, bank);
--		if (!bank->irq_domain) {
-+		if (!bank->wkup_domain) {
- 			dev_err(dev, "wkup irq domain add failed\n");
- 			return -ENXIO;
- 		}
-diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-index f1993f42114c..1dd1e5a0ed58 100644
---- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-+++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-@@ -539,9 +539,9 @@ static int s3c24xx_eint_init(struct samsung_pinctrl_drv_data *d)
- 		ops = (bank->eint_offset == 0) ? &s3c24xx_gpf_irq_ops
- 					       : &s3c24xx_gpg_irq_ops;
+-	ret = flash->platform_data->power(&flash->subdev, on);
+ 	if (ret < 0)
+ 		return ret;
  
--		bank->irq_domain = irq_domain_add_linear(bank->of_node,
-+		bank->wkup_domain = irq_domain_add_linear(bank->of_node,
- 				bank->nr_pins, ops, ddata);
--		if (!bank->irq_domain) {
-+		if (!bank->wkup_domain) {
- 			dev_err(dev, "wkup irq domain add failed\n");
- 			return -ENXIO;
- 		}
-@@ -553,7 +553,7 @@ static int s3c24xx_eint_init(struct samsung_pinctrl_drv_data *d)
- 				break;
- 			if (!(mask & 1))
- 				continue;
--			eint_data->domains[irq] = bank->irq_domain;
-+			eint_data->domains[irq] = bank->wkup_domain;
- 			++irq;
- 		}
- 	}
-diff --git a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-index 7756c1e9e763..9701424a8bea 100644
---- a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-+++ b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-@@ -757,9 +757,9 @@ static int s3c64xx_eint_eint0_init(struct samsung_pinctrl_drv_data *d)
- 		}
- 		ddata->bank = bank;
+@@ -316,8 +327,13 @@ __adp1653_set_power(struct adp1653_flash *flash, int on)
+ 		return 0;
  
--		bank->irq_domain = irq_domain_add_linear(bank->of_node,
-+		bank->wkup_domain = irq_domain_add_linear(bank->of_node,
- 				nr_eints, &s3c64xx_eint0_irqd_ops, ddata);
--		if (!bank->irq_domain) {
-+		if (!bank->wkup_domain) {
- 			dev_err(dev, "wkup irq domain add failed\n");
- 			return -ENXIO;
- 		}
-@@ -769,7 +769,7 @@ static int s3c64xx_eint_eint0_init(struct samsung_pinctrl_drv_data *d)
- 		for (pin = 0; mask; ++pin, mask >>= 1) {
- 			if (!(mask & 1))
- 				continue;
--			data->domains[irq] = bank->irq_domain;
-+			data->domains[irq] = bank->wkup_domain;
- 			data->pins[irq] = pin;
- 			ddata->eints[pin] = irq;
- 			++irq;
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-index 1b8c0139d604..c97dd1e6ae2e 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-@@ -170,6 +170,7 @@ struct samsung_pin_bank {
- 	struct device_node *of_node;
- 	struct samsung_pinctrl_drv_data *drvdata;
- 	struct irq_domain *irq_domain;
-+	struct irq_domain *wkup_domain;
- 	struct gpio_chip gpio_chip;
- 	struct pinctrl_gpio_range grange;
- 	struct exynos_irq_chip *irq_chip;
+ 	ret = adp1653_init_device(flash);
+-	if (ret < 0)
++	if (ret >= 0)
++		return ret;
++
++	if (flash->platform_data->power)
+ 		flash->platform_data->power(&flash->subdev, 0);
++	else
++		gpiod_set_value(flash->platform_data->enable_gpio, 0);
+ 
+ 	return ret;
+ }
+@@ -407,21 +423,78 @@ static int adp1653_resume(struct device *dev)
+ 
+ #endif /* CONFIG_PM */
+ 
++static int adp1653_of_init(struct i2c_client *client,
++			   struct adp1653_flash *flash,
++			   struct device_node *node)
++{
++	u32 val;
++	struct adp1653_platform_data *pd;
++	struct device_node *child = NULL;
++
++	if (!node)
++		return -EINVAL;
++
++	pd = devm_kzalloc(&client->dev, sizeof(*pd), GFP_KERNEL);
++	if (!pd)
++		return -ENOMEM;
++	flash->platform_data = pd;
++
++	child = of_get_child_by_name(node, "flash");
++	if (!child)
++		return -EINVAL;
++
++	if (of_property_read_u32(child, "flash-timeout-us", &val))
++		goto err;
++
++	pd->max_flash_timeout = val;
++	if (of_property_read_u32(child, "flash-max-microamp", &val))
++		goto err;
++	pd->max_flash_intensity = val/1000;
++
++	if (of_property_read_u32(child, "max-microamp", &val))
++		goto err;
++	pd->max_torch_intensity = val/1000;
++	of_node_put(child);
++
++	child = of_get_child_by_name(node, "indicator");
++	if (!child)
++		return -EINVAL;
++	if (of_property_read_u32(child, "max-microamp", &val))
++		goto err;
++	pd->max_indicator_intensity = val;
++
++	of_node_put(child);
++
++	pd->enable_gpio = devm_gpiod_get(&client->dev, "enable");
++	if (!pd->enable_gpio) {
++		dev_err(&client->dev, "Error getting GPIO\n");
++		return -EINVAL;
++	}
++
++	return 0;
++err:
++	dev_err(&client->dev, "Required property not found\n");
++	of_node_put(child);
++	return -EINVAL;
++}
++
++
+ static int adp1653_probe(struct i2c_client *client,
+ 			 const struct i2c_device_id *devid)
+ {
+ 	struct adp1653_flash *flash;
+ 	int ret;
+ 
+-	/* we couldn't work without platform data */
+-	if (client->dev.platform_data == NULL)
+-		return -ENODEV;
+-
+ 	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
+ 	if (flash == NULL)
+ 		return -ENOMEM;
+ 
+ 	flash->platform_data = client->dev.platform_data;
++	if (client->dev.of_node) {
++		ret = adp1653_of_init(client, flash, client->dev.of_node);
++		if (ret)
++			return ret;
++	}
+ 
+ 	mutex_init(&flash->power_lock);
+ 
+@@ -442,6 +515,7 @@ static int adp1653_probe(struct i2c_client *client,
+ 	return 0;
+ 
+ free_and_quit:
++	dev_err(&client->dev, "adp1653: failed to register device\n");
+ 	v4l2_ctrl_handler_free(&flash->ctrls);
+ 	return ret;
+ }
+@@ -464,7 +538,7 @@ static const struct i2c_device_id adp1653_id_table[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, adp1653_id_table);
+ 
+-static struct dev_pm_ops adp1653_pm_ops = {
++static const struct dev_pm_ops adp1653_pm_ops = {
+ 	.suspend	= adp1653_suspend,
+ 	.resume		= adp1653_resume,
+ };
+diff --git a/include/media/adp1653.h b/include/media/adp1653.h
+index 1d9b48a..34b505e 100644
+--- a/include/media/adp1653.h
++++ b/include/media/adp1653.h
+@@ -100,9 +100,11 @@ struct adp1653_platform_data {
+ 	int (*power)(struct v4l2_subdev *sd, int on);
+ 
+ 	u32 max_flash_timeout;		/* flash light timeout in us */
+-	u32 max_flash_intensity;	/* led intensity, flash mode */
+-	u32 max_torch_intensity;	/* led intensity, torch mode */
+-	u32 max_indicator_intensity;	/* indicator led intensity */
++	u32 max_flash_intensity;	/* led intensity, flash mode, mA */
++	u32 max_torch_intensity;	/* led intensity, torch mode, mA */
++	u32 max_indicator_intensity;	/* indicator led intensity, uA */
++
++	struct gpio_desc *enable_gpio;	/* for device-tree based boot */
+ };
+ 
+ #define to_adp1653_flash(sd)	container_of(sd, struct adp1653_flash, subdev)
+
 -- 
-1.9.3
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
