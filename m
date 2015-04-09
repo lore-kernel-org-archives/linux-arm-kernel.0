@@ -1,47 +1,29 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 09 Apr 2015 09:16:58 -0700
-Subject: "tcp: refine TSO autosizing" causes performance regression on Xen
-In-Reply-To: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
-Message-ID: <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Apr 2015 17:21:39 +0100
+Subject: [PATCH 0/7] Fix Keystone 2 physical address switch
+In-Reply-To: <552563AB.8050308@oracle.com>
+References: <20150408094438.GM12732@n2100.arm.linux.org.uk>
+ <552563AB.8050308@oracle.com>
+Message-ID: <20150409162139.GZ12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-04-09 at 16:46 +0100, Stefano Stabellini wrote:
-> Hi all,
+On Wed, Apr 08, 2015 at 10:21:47AM -0700, santosh shilimkar wrote:
+> Russell,
 > 
-> I found a performance regression when running netperf -t TCP_MAERTS from
-> an external host to a Xen VM on ARM64: v3.19 and v4.0-rc4 running in the
-> virtual machine are 30% slower than v3.18.
-> 
-> Through bisection I found that the perf regression is caused by the
-> prensence of the following commit in the guest kernel:
-> 
-> 
-> commit 605ad7f184b60cfaacbc038aa6c55ee68dee3c89
-> Author: Eric Dumazet <edumazet@google.com>
-> Date:   Sun Dec 7 12:22:18 2014 -0800
-> 
->     tcp: refine TSO autosizing
-> 
-> 
-> A simple revert would fix the issue.
-> 
-> Does anybody have any ideas on what could be the cause of the problem?
-> Suggestions on what to do to fix it?
+> On 4/8/2015 2:44 AM, Russell King - ARM Linux wrote:
+> >For some time, the Keystone 2 physical address switch has been
+> >tainting the kernel ever since we decided that it was not safe.
+> >
+> >This series re-works the address switch to be compliant architecturally.
+> >
+> Thanks a lot for doing it. Will have a look at the series.
 
-You sent this to lkml while networking discussions are on netdev.
+I think given where we are, it's already too late to get it into this
+merge window _unless_ Linus does -rc8 this weekend.  I don't classify
+this as a "fix" which would be mergable during the window or during
+-rc after, but more as a correctness update.
 
-This topic had been discussed on netdev multiple times.
-
-This commit restored original TCP Small Queue behavior, which is the
-first step to fight bufferbloat.
-
-Some network drivers are known to be problematic because of a delayed TX
-completion.
-
-So far this commit did not impact max single flow throughput on 40Gb
-mlx4 NIC. (ie : line rate is possible)
-
-Try to tweak /proc/sys/net/ipv4/tcp_limit_output_bytes to see if it
-makes a difference ?
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
