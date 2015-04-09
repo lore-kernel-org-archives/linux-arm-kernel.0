@@ -1,27 +1,79 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 9 Apr 2015 20:55:02 +0100
-Subject: [PATCH v6 3/6] regulator: axp20x: prepare support for multiple
- AXP chip families
-In-Reply-To: <CAGb2v66zbATMHY5SgZLs3RCoRETroSh5nC3h4TXRLm5UAbythw@mail.gmail.com>
-References: <1427868203-7486-1-git-send-email-wens@csie.org>
- <1427868203-7486-4-git-send-email-wens@csie.org>
- <CAGb2v66zbATMHY5SgZLs3RCoRETroSh5nC3h4TXRLm5UAbythw@mail.gmail.com>
-Message-ID: <20150409195502.GC6023@sirena.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu,  9 Apr 2015 22:04:06 +0200
+Subject: [PATCH v5 02/11] irqchip: nvic: support hierarchy irq domain
+In-Reply-To: <1428609855-27657-1-git-send-email-stefan@agner.ch>
+References: <1428609855-27657-1-git-send-email-stefan@agner.ch>
+Message-ID: <1428609855-27657-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 10:23:41AM -0700, Chen-Yu Tsai wrote:
+Add support for hierarchy irq domains. This is required to stack
+the MSCM interrupt router and the NVIC controller found in Vybrid
+SoC.
 
-> Are you OK with Lee taking the 2 regulator patches through his tree?
-> I realize I'm asking this way too late for this merge window.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/irqchip/Kconfig    |  1 +
+ drivers/irqchip/irq-nvic.c | 28 +++++++++++++++++++++++++++-
+ 2 files changed, 28 insertions(+), 1 deletion(-)
 
-Someone would need to resend them to me as I've deleted them and it
-appears that this is a part of a series - are you sure there are no
-dependencies?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/80850295/attachment.sig>
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index cc79d2a..ab8de26 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -30,6 +30,7 @@ config ARM_GIC_V3_ITS
+ config ARM_NVIC
+ 	bool
+ 	select IRQ_DOMAIN
++	select IRQ_DOMAIN_HIERARCHY
+ 	select GENERIC_IRQ_CHIP
+ 
+ config ARM_VIC
+diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
+index 4ff0805..5fac910 100644
+--- a/drivers/irqchip/irq-nvic.c
++++ b/drivers/irqchip/irq-nvic.c
+@@ -49,6 +49,31 @@ nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
+ 	handle_IRQ(irq, regs);
+ }
+ 
++static int nvic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				unsigned int nr_irqs, void *arg)
++{
++	int i, ret;
++	irq_hw_number_t hwirq;
++	unsigned int type = IRQ_TYPE_NONE;
++	struct of_phandle_args *irq_data = arg;
++
++	ret = irq_domain_xlate_onecell(domain, irq_data->np, irq_data->args,
++				   irq_data->args_count, &hwirq, &type);
++	if (ret)
++		return ret;
++
++	for (i = 0; i < nr_irqs; i++)
++		irq_map_generic_chip(domain, virq + i, hwirq + i);
++
++	return 0;
++}
++
++static const struct irq_domain_ops nvic_irq_domain_ops = {
++	.xlate = irq_domain_xlate_onecell,
++	.alloc = nvic_irq_domain_alloc,
++	.free = irq_domain_free_irqs_top,
++};
++
+ static int __init nvic_of_init(struct device_node *node,
+ 			       struct device_node *parent)
+ {
+@@ -70,7 +95,8 @@ static int __init nvic_of_init(struct device_node *node,
+ 		irqs = NVIC_MAX_IRQ;
+ 
+ 	nvic_irq_domain =
+-		irq_domain_add_linear(node, irqs, &irq_generic_chip_ops, NULL);
++		irq_domain_add_linear(node, irqs, &nvic_irq_domain_ops, NULL);
++
+ 	if (!nvic_irq_domain) {
+ 		pr_warn("Failed to allocate irq domain\n");
+ 		return -ENOMEM;
+-- 
+2.3.5
