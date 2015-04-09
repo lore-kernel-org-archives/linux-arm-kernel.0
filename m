@@ -1,40 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 09 Apr 2015 23:14:14 +0200
-Subject: [PATCH] mempool: add missing include
-In-Reply-To: <alpine.DEB.2.10.1504091230400.11370@chino.kir.corp.google.com>
-References: <3302342.cNyRUGN06P@wuerfel>
- <alpine.DEB.2.10.1504091230400.11370@chino.kir.corp.google.com>
-Message-ID: <6079838.EgducKeYG3@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 9 Apr 2015 16:15:21 -0500
+Subject: [PATCH 3/3] ARM: multi_v7_defconfig: Enable generic SoC internal OMAP
+ regulators
+In-Reply-To: <1428614121-3374-1-git-send-email-nm@ti.com>
+References: <1428614121-3374-1-git-send-email-nm@ti.com>
+Message-ID: <1428614121-3374-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 April 2015 12:31:05 David Rientjes wrote:
-> On Thu, 9 Apr 2015, Arnd Bergmann wrote:
-> 
-> > This is a fix^3 for the mempool poisoning patch, which introduces
-> > a compile-time error on some ARM randconfig builds:
-> > 
-> > mm/mempool.c: In function 'check_element':
-> > mm/mempool.c:65:16: error: implicit declaration of function 'kmap_atomic' [-Werror=implicit-function-declaration]
-> >    void *addr = kmap_atomic((struct page *)element);
-> > 
-> > The problem is clearly the missing declaration, and including
-> > linux/highmem.h fixes it.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: a3db5a8463b0db ("mm, mempool: poison elements backed by page allocator fix fix")
-> 
-> Acked-by: David Rientjes <rientjes@google.com>
-> 
-> Thanks!  Can you confirm that this is because CONFIG_BLOCK is disabled and 
-> not something else?
+ABB and PBIAS are internal LDO control regulators that are needed for
+maintaining proper functionality of OMAP architecture SoCs. Enable the
+same.
 
-Unfortunately I've lost the information which build was responsible
-for this error (normally I keep it, but my script failed here because the
-same config introduced two new regressions). CONFIG_BLOCK sounds plausible
-here.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/configs/multi_v7_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-If necessary, I can repeat the last few hundred builds without this
-patch to find out what it was.
-
-	Arnd
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index f48dfa7787dc..b86ff6e957a0 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -363,8 +363,10 @@ CONFIG_REGULATOR_MAX8907=y
+ CONFIG_REGULATOR_MAX8973=y
+ CONFIG_REGULATOR_MAX77686=y
+ CONFIG_REGULATOR_PALMAS=y
++CONFIG_REGULATOR_PBIAS=y
+ CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_REGULATOR_S5M8767=y
++CONFIG_REGULATOR_TI_ABB=y
+ CONFIG_REGULATOR_TPS51632=y
+ CONFIG_REGULATOR_TPS62360=y
+ CONFIG_REGULATOR_TPS65090=y
+-- 
+1.7.9.5
