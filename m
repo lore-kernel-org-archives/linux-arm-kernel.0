@@ -1,88 +1,165 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Apr 2015 16:02:44 +0100
-Subject: [v3 2/5] arm64: kvm: allow EL2 context to be reset on shutdown
-In-Reply-To: <552605CD.7000704@linaro.org>
-References: <1427953216-11737-1-git-send-email-takahiro.akashi@linaro.org>
- <1427953216-11737-3-git-send-email-takahiro.akashi@linaro.org>
- <20150408130520.GB5977@leverpostej> <552605CD.7000704@linaro.org>
-Message-ID: <20150409150244.GG9648@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 9 Apr 2015 08:09:19 -0700
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <20150409134843.GQ4027@n2100.arm.linux.org.uk>
+References: <5521A438.1070008@gmail.com>
+ <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com>
+ <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
+ <20150406174245.GJ18048@atomide.com>
+ <20150407135713.GL4027@n2100.arm.linux.org.uk>
+ <20150407152207.GM18048@atomide.com>
+ <20150408230658.GO4027@n2100.arm.linux.org.uk>
+ <20150409134843.GQ4027@n2100.arm.linux.org.uk>
+Message-ID: <20150409150918.GP18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 05:53:33AM +0100, AKASHI Takahiro wrote:
-> Mark,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [150409 06:49]:
+> On Thu, Apr 09, 2015 at 12:06:58AM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Apr 07, 2015 at 08:22:08AM -0700, Tony Lindgren wrote:
+> > > Works for me. The above needs the following fix folded in to build:
+> > > 
+> > > --- a/arch/arm/mm/proc-v7.S
+> > > +++ b/arch/arm/mm/proc-v7.S
+> > > @@ -532,7 +532,7 @@ __v7_ca9mp_proc_info:
+> > >  __v7_ca8_proc_info:
+> > >  	.long	0x410fc080
+> > >  	.long	0xff0ffff0
+> > > -	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
+> > > +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
+> > >  	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
+> > >  
+> > >  #endif	/* CONFIG_ARM_LPAE */
+> > 
+> > Thanks, merged into the original patch.
 > 
-> On 04/08/2015 10:05 PM, Mark Rutland wrote:
-> > On Thu, Apr 02, 2015 at 06:40:13AM +0100, AKASHI Takahiro wrote:
-> >> The current kvm implementation keeps EL2 vector table installed even
-> >> when the system is shut down. This prevents kexec from putting the system
-> >> with kvm back into EL2 when starting a new kernel.
-> >>
-> >> This patch resolves this issue by calling a cpu tear-down function via
-> >> reboot notifier, kvm_reboot_notify(), which is invoked by
-> >> kernel_restart_prepare() in kernel_kexec().
-> >> While kvm has a generic hook, kvm_reboot(), we can't use it here because
-> >> a cpu teardown function will not be invoked, under current implementation,
-> >> if no guest vm has been created by kvm_create_vm().
-> >> Please note that kvm_usage_count is zero in this case.
-> >>
-> >> We'd better, in the future, implement cpu hotplug support and put the
-> >> arch-specific initialization into kvm_arch_hardware_enable/disable().
-> >> This way, we would be able to revert this patch.
-> >
-> > Why can't we use kvm_arch_hardware_enable/disable() currently?
+> Do you want to give me an ack for this, thanks?
+
+The patch below works for me:
+
+Tested-by: Tony Lindgren <tony@atomide.com>
+
+I'm wondering if this and the follow-up patch should be tagged
+cc: stable?
+
+They together fix apps segfaulting both with and without 430973
+for some common use cases for distro kernels.
+
+Regards,
+
+Tony
+ 
+> 8<===
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> Subject: [PATCH] ARM: proc-v7: avoid errata 430973 workaround for non-Cortex
+>  A8 CPUs
 > 
-> IIUC, kvm will call kvm_arch_hardware_enable() iff a new guest is being
-> created *and* cpus have not been initialized yet. kvm_usage_count==0
-> indicates this. Similarly, kvm will call kvm_arch_hardware_disable() whenever
-> a guest is being terminated (i.e. kvm_usage_count != 0).
-> Therefore if kvm_arch_hardware_enable/disable() also handle EL2 vector table
-> initialization, we don't have to have any particular operations, as my patch
-> does, for kexec case.
-> (a long-term solution)
+> Avoid the errata 430973 workaround for non-Cortex A8 CPUs.  Having this
+> workaround enabled introduces an additional branch target buffer flush
+> into the context switching path, something we wish to avoid.  To allow
+> this errata to be enabled in multiplatform kernels while reducing its
+> impact, rearrange the Cortex-A8 CPU support to avoid impacting on other
+> Version 7 CPUs.
 > 
-> Since arm64 doesn't implement kvm_arch_hardware_enable() (I don't know why),
-> I'm trying to fix the problem by adding a minimum tear-down function, kvm_cpu_reset,
-> and invoking it via a reboot hook.
-> (an interim fix)
-
-What I don't understand is why we can't move the init and tear-down
-functions into kvm_arch_hardware_enable/disable(). They seem to be for
-precisely what you are implementing, with the only difference being the
-time that they are called.
-
-Either I'm missing something, or we can simply implement the existing
-hooks. I assume I'm missing something.
-
-> >> +static struct notifier_block kvm_reboot_nb = {
-> >> +	.notifier_call		= kvm_reboot_notify,
-> >> +	.next			= NULL,
-> >> +	.priority		= 0, /* FIXME */
-> >
-> > It would be helpful for the comment to explain why this is wrong, and
-> > what needs fixing.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mm/proc-v7-2level.S | 12 ++++++++----
+>  arch/arm/mm/proc-v7.S        | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 36 insertions(+), 4 deletions(-)
 > 
-> Thank for reminding me of this.
+> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+> index bc86be205c04..fa385140715f 100644
+> --- a/arch/arm/mm/proc-v7-2level.S
+> +++ b/arch/arm/mm/proc-v7-2level.S
+> @@ -37,15 +37,18 @@
+>   *	It is assumed that:
+>   *	- we are not using split page tables
+>   */
+> -ENTRY(cpu_v7_switch_mm)
+> +ENTRY(cpu_ca8_switch_mm)
+>  #ifdef CONFIG_MMU
+>  	mov	r2, #0
+> -	mmid	r1, r1				@ get mm->context.id
+> -	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
+> -	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
+>  #ifdef CONFIG_ARM_ERRATA_430973
+>  	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+>  #endif
+> +#endif
+> +ENTRY(cpu_v7_switch_mm)
+> +#ifdef CONFIG_MMU
+> +	mmid	r1, r1				@ get mm->context.id
+> +	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
+> +	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
+>  #ifdef CONFIG_PID_IN_CONTEXTIDR
+>  	mrc	p15, 0, r2, c13, c0, 1		@ read current context ID
+>  	lsr	r2, r2, #8			@ extract the PID
+> @@ -61,6 +64,7 @@ ENTRY(cpu_v7_switch_mm)
+>  #endif
+>  	bx	lr
+>  ENDPROC(cpu_v7_switch_mm)
+> +ENDPROC(cpu_ca8_switch_mm)
+>  
+>  /*
+>   *	cpu_v7_set_pte_ext(ptep, pte)
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index b1d19ea5e1af..003190ae9cd8 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -153,6 +153,21 @@ ENDPROC(cpu_v7_do_resume)
+>  #endif
+>  
+>  /*
+> + * Cortex-A8
+> + */
+> +	globl_equ	cpu_ca8_proc_init,	cpu_v7_proc_init
+> +	globl_equ	cpu_ca8_proc_fin,	cpu_v7_proc_fin
+> +	globl_equ	cpu_ca8_reset,		cpu_v7_reset
+> +	globl_equ	cpu_ca8_do_idle,	cpu_v7_do_idle
+> +	globl_equ	cpu_ca8_dcache_clean_area, cpu_v7_dcache_clean_area
+> +	globl_equ	cpu_ca8_set_pte_ext,	cpu_v7_set_pte_ext
+> +	globl_equ	cpu_ca8_suspend_size,	cpu_v7_suspend_size
+> +#ifdef CONFIG_ARM_CPU_SUSPEND
+> +	globl_equ	cpu_ca8_do_suspend,	cpu_v7_do_suspend
+> +	globl_equ	cpu_ca8_do_resume,	cpu_v7_do_resume
+> +#endif
+> +
+> +/*
+>   * Cortex-A9 processor functions
+>   */
+>  	globl_equ	cpu_ca9mp_proc_init,	cpu_v7_proc_init
+> @@ -471,7 +486,10 @@ __v7_setup_stack:
+>  
+>  	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
+>  	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+> +#ifndef CONFIG_ARM_LPAE
+> +	define_processor_functions ca8, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+>  	define_processor_functions ca9mp, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+> +#endif
+>  #ifdef CONFIG_CPU_PJ4B
+>  	define_processor_functions pj4b, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+>  #endif
+> @@ -527,6 +545,16 @@ __v7_ca9mp_proc_info:
+>  	__v7_proc __v7_ca9mp_proc_info, __v7_ca9mp_setup, proc_fns = ca9mp_processor_functions
+>  	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
+>  
+> +	/*
+> +	 * ARM Ltd. Cortex A8 processor.
+> +	 */
+> +	.type	__v7_ca8_proc_info, #object
+> +__v7_ca8_proc_info:
+> +	.long	0x410fc080
+> +	.long	0xff0ffff0
+> +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
+> +	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
+> +
+>  #endif	/* CONFIG_ARM_LPAE */
+>  
+>  	/*
+> -- 
+> 1.8.3.1
 > 
-> *priority* enforces a calling order of registered hook functions.
-> If some hook returns NOTIFY_STOP_MASK, subsequent hooks won't be called.
-> (Nevertheless, reboot sequence will go ahead. See kernel_restart_prepare()/
-> notifier_call_chain().)
-> 
-> So we should make sure that kvm_reboot_notify() be called
-> 1) after any hook functions which may depend on kvm, and
-
-Which hooks depend on KVM?
-
-> 2) before any hook functions which kvm may depend on, and
-
-Which other hooks does KVM depend on?
-
-> 3) before any hook functions that may return NOTIFY_STOP_MASK
-
-I think this would be solved by using kvm_arch_hardware_enable/disable.
-As far as I can tell, the VMs would be destroyed earlier (and hence KVM
-disabled) before we got to the final teardown.
-
-Thanks,
-Mark.
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
