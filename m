@@ -1,37 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 Apr 2015 12:12:07 -0700
-Subject: [PATCH v5 8/8] ARM: DTS: dra7x: Integrate sDMA crossbar
-In-Reply-To: <5526CD6A.8010300@ti.com>
-References: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
- <1428572154-3548-9-git-send-email-peter.ujfalusi@ti.com>
- <20150409151846.GR18048@atomide.com> <5526C9E5.4070601@ti.com>
- <20150409190126.GT18048@atomide.com> <5526CD6A.8010300@ti.com>
-Message-ID: <20150409191206.GU18048@atomide.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu,  9 Apr 2015 13:20:40 -0600
+Subject: [PATCH v19 0/3] ARM: qcom: cpuidle support for 8064, 8074, 8084
+Message-ID: <1428607243-7723-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [150409 12:07]:
-> On 04/09/2015 10:01 PM, Tony Lindgren wrote:
-> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [150409 11:55]:
-> >> On 04/09/2015 06:18 PM, Tony Lindgren wrote:
-> >>> * Peter Ujfalusi <peter.ujfalusi@ti.com> [150409 02:37]:
-> >>>> The sDMA requests are routed through the DMA crossbar and without the
-> >>>> crossbar only peripherals using DMA request 0-127 can be used.
-> >>>
-> >>> I assume this can be merged separately from the driver
-> >>> changes?
-> >>
-> >> Unfortunately not. We need to have the drivers in place for the DTS changes to
-> >> work.
-> > 
-> > Right but just merging the driver changes presumably won't
-> > break things?
-> 
-> No, they will not break anything. We just do not have control over the DMA
-> crossbar (in a same way as we don't have control right now).
+Hi,
 
-OK good to hear.
+This patchset adds acks and reviewed-by tags to the SPM driver and updates the
+defconfig files to enable cpuidle support on the v18 rev of the patchset [1].
+
+The dependencies for these changes are
+- SCM and device tree changes for QCOM SoCs [2], [4].
+- cpuidle framework changes [3]
+
+Changes since v18:
++ Add commit tags to SPM driver
++ Update qcom_defconfig to enable cpuidle support
++ Update multi_v7_defconfig to enable cpuidle support
 
 Thanks,
+Lina
 
-Tony
+[1]. http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333521.html
+[2]. https://lkml.org/lkml/2015/3/27/599
+[3]. https://lkml.org/lkml/2015/3/25/117
+[4]. https://lkml.org/lkml/2015/1/19/483
+
+Lina Iyer (3):
+  ARM: qcom: Add Subsystem Power Manager (SPM) driver
+  ARM: config: Update qcom_defconfig to enable cpuidle
+  ARM: config: multi_v7: Update to enable cpuidle for QCOM SoCs
+
+ arch/arm/configs/multi_v7_defconfig |   2 +
+ arch/arm/configs/qcom_defconfig     |   2 +
+ drivers/soc/qcom/Kconfig            |   7 +
+ drivers/soc/qcom/Makefile           |   1 +
+ drivers/soc/qcom/spm.c              | 385 ++++++++++++++++++++++++++++++++++++
+ 5 files changed, 397 insertions(+)
+ create mode 100644 drivers/soc/qcom/spm.c
+
+-- 
+2.1.0
