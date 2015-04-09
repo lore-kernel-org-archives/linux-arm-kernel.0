@@ -1,157 +1,92 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 9 Apr 2015 16:26:04 -0700
-Subject: [PATCH v3 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
- termination driver
-In-Reply-To: <CAErSpo6VKuu2AewfqSrJaoVyQ-CqMtKbnH_U83XYxsXem+hQJg@mail.gmail.com>
-References: <20150408084448.5f0793b7@why.wild-wind.fr.eu.org>
- <cover.1428564115.git.dhdang@apm.com>
- <7923ef6ffd60a7c3de3c8c04fe746bbd3c15b5ac.1428564115.git.dhdang@apm.com>
- <20150409201115.GN30967@google.com>
- <CADaLND=3dj5LuHx9+OLmes8zDO_qFa1qV4bJz4Oy5Gw_OsgGXQ@mail.gmail.com>
- <CAErSpo6VKuu2AewfqSrJaoVyQ-CqMtKbnH_U83XYxsXem+hQJg@mail.gmail.com>
-Message-ID: <CADaLNDkJZ2v8S+PqQ4sVkmuu40KacW6S4WmVEM+b-b9YOcFKpg@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 9 Apr 2015 18:44:08 -0500
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <20150409224446.GV18048@atomide.com>
+References: <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
+ <5521A438.1070008@gmail.com>
+ <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com> <20150406154037.GI18048@atomide.com>
+ <5522BEEF.2000405@gmail.com> <20150406174245.GJ18048@atomide.com>
+ <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
+ <20150407022312.GK18048@atomide.com>
+ <CANOLnOMyNesvA2nGC2uMnmYGLBQkU1dnfG1rBg1UWeGMrpHFzQ@mail.gmail.com>
+ <20150409224446.GV18048@atomide.com>
+Message-ID: <55270EC8.2080900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 9, 2015 at 3:39 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Thu, Apr 9, 2015 at 4:52 PM, Duc Dang <dhdang@apm.com> wrote:
->> On Thu, Apr 9, 2015 at 1:11 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
->>> On Thu, Apr 09, 2015 at 10:05:03AM -0700, Duc Dang wrote:
->>>> X-Gene v1 SoC supports total 2688 MSI/MSIX vectors coalesced into
->>>> 16 HW IRQ lines.
+On 04/09/2015 05:44 PM, Tony Lindgren wrote:
+> * Grazvydas Ignotas <notasas@gmail.com> [150409 15:37]:
+>> On Tue, Apr 7, 2015 at 5:23 AM, Tony Lindgren <tony@atomide.com> wrote:
+>>> * Matthijs van Duin <matthijsvanduin@gmail.com> [150406 11:15]:
 >>>>
->>>> Signed-off-by: Duc Dang <dhdang@apm.com>
->>>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
->>>> ...
+>>>> On 6 April 2015 at 19:42, Tony Lindgren <tony@atomide.com> wrote:
+>>>>> Hmm but it still seems to do something also on cortex-a8 r3p2 that
+>>>>> is supposedly not affected by 430973.. Based on my tests so far, at least
+>>>>> armhf running cpuburn-a8 in the background and doing apt-get update
+>>>>> segfaults constantly without flush BTAC/BTB. This seems to be the case
+>>>>> no matter how the aux ctrl reg bits are set..
+>>>>
+>>>> That sounds.... really odd.  The TRM is fairly explicit about BTB
+>>>> flush executing as nop when IBE is not set. Of course the TRM is not
+>>>> exactly flawless, but still...
 >>>
->>>> --- /dev/null
->>>> +++ b/drivers/pci/host/pci-xgene-msi.c
->>>> @@ -0,0 +1,407 @@
->>>> ...
->>>
->>>> +static void xgene_irq_domain_free(struct irq_domain *domain,
->>>> +                               unsigned int virq, unsigned int nr_irqs)
->>>> +{
->>>> +     struct irq_data *d = irq_domain_get_irq_data(domain, virq);
->>>> +     struct xgene_msi *msi = irq_data_get_irq_chip_data(d);
->>>> +
->>>> +     mutex_lock(&msi->bitmap_lock);
->>>> +
->>>> +     if (!test_bit(d->hwirq, msi->bitmap))
->>>> +             pr_err("trying to free unused MSI#%lu\n", d->hwirq);
->>>
->>> I'll let Marc comment on the substance of this patch, but I'd sure like to
->>> see more information in this and the other pr_errs below.  The text "failed
->>> to create parent MSI domain" in the dmesg log is not enough.  Ideally it
->>> would identify the relevant host bridge.
->>>
->> Hi Bjorn,
+>>> Oops, sorry user error.. I was trying to clear IBE as a banked register
+>>> like L2 enable bit and of course it did not get cleared.. Clearing it
+>>> with a smc call really clears it. And in that case my test case seems to
+>>> work reliably on r3p2 without erratum 430973 enabled.
 >>
->> X-Gene has single MSI block that serves 5 PCIe ports. so in this
->> implementation, 5 X-Gene PCIe host bridges share the same MSI domain.
+>> May I ask how do you perform the smc call? I wanted to clear IBE too
+>> to experiment, but it just hangs my board, even if I just write back
+>> the same value. Here is what I do:
 >>
->> I can add X-Gene 1 MSI driver name and device tree node name into
->> these messages, but the host bridge information is not available.
+>>         asm ("mrc p15, 0, %0, c1, c0, 1" : "=r"(val));
 >>
->> As I understand, in case of error, the upper layer MSI core and driver
->> code will check and report the error with additional device
->> information (bus number, function number, etc)?
->
-> If you think the upper layers already report the error, maybe you
-> could just drop the output from the X-Gene code.
->
-> I just think it's pointless to print messages that are constant
-> strings with no hook for the user to associate them with a device or
-> event.
+>>         asm (".arch_extension sec\n\t"
+>>              "mov r0,  %0\n"
+>>              "mov r12, #3\n"
+>>              "smc #0\n"
+>>              :: "r"(val) : "r0", "r12");
+>>
+>> I just run this from a sysfs write handler, does it need to be run on
+>> SRAM or something?
+> 
+> Best done in the bootloader.. I just hacked it into the restore from
 
-Hi Bjorn,
+I recently did that in u-boot:
 
-Yes, I will do so.
+http://git.denx.de/?p=u-boot.git;a=commitdiff;h=5902f4ce0f2bd1411e40dc0ece3598a0fc19b2ae
 
+http://git.denx.de/?p=u-boot.git;a=blob;f=arch/arm/cpu/armv7/omap3/board.c;h=b064c0cc834356b33e14e0f36774108fa6a6c580;hb=HEAD#l428
+
+I believe it should be scalable to other SoCs as well (weak function
+that may be overriden as needed). Hope that helps.
+
+> off-idle to test, see below. But for that you naturally need to have
+> a device with working idle and it's usable for just testing for lazy
+> people.
+> 
+> Regards,
+> 
+> Tony
+> 
+> --- a/arch/arm/mach-omap2/sleep34xx.S
+> +++ b/arch/arm/mach-omap2/sleep34xx.S
+> @@ -516,6 +516,7 @@ l2_inv_gp:
+>  	ldr	r4, scratchpad_base
+>  	ldr	r3, [r4,#0xBC]
+>  	ldr	r0, [r3,#4]
+> +	bic	r0, r1, #(1 << 6)
+>  	mov	r12, #0x3
+>  	smc	#0			@ Call SMI monitor (smieq)
+>  	ldr	r4, scratchpad_base
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+-- 
 Regards,
-Duc Dang.
->
->>>> +     else
->>>> +             clear_bit(d->hwirq, msi->bitmap);
->>>> +
->>>> +     mutex_unlock(&msi->bitmap_lock);
->>>> +
->>>> +     irq_domain_free_irqs_parent(domain, virq, nr_irqs);
->>>> +}
->>>> +
->>>> +static const struct irq_domain_ops msi_domain_ops = {
->>>> +     .alloc  = xgene_irq_domain_alloc,
->>>> +     .free   = xgene_irq_domain_free,
->>>> +};
->>>> +
->>>> +static int xgene_allocate_domains(struct xgene_msi *msi)
->>>> +{
->>>> +     msi->domain = irq_domain_add_linear(NULL, msi->settings->nr_msi_vec,
->>>> +                                         &msi_domain_ops, msi);
->>>> +
->>>> +     if (!msi->domain) {
->>>> +             pr_err("failed to create parent MSI domain\n");
->>>> +             return -ENOMEM;
->>>> +     }
->>>> +
->>>> +     msi->mchip.of_node = msi->node;
->>>> +     msi->mchip.domain = pci_msi_create_irq_domain(msi->mchip.of_node,
->>>> +                                                   &xgene_msi_domain_info,
->>>> +                                                   msi->domain);
->>>> +
->>>> +     if (!msi->mchip.domain) {
->>>> +             pr_err("failed to create MSI domain\n");
->>>> +             irq_domain_remove(msi->domain);
->>>> +             return -ENOMEM;
->>>> +     }
->>>> +
->>>> +     return 0;
->>>> +}
->>>> +
->>>> +static void xgene_free_domains(struct xgene_msi *msi)
->>>> +{
->>>> +     if (msi->mchip.domain)
->>>> +             irq_domain_remove(msi->mchip.domain);
->>>> +     if (msi->domain)
->>>> +             irq_domain_remove(msi->domain);
->>>> +}
->>>> +
->>>> +static int xgene_msi_init_allocator(struct xgene_msi *xgene_msi)
->>>> +{
->>>> +     u32 msi_irq_count = xgene_msi->settings->nr_msi_vec;
->>>> +     u32 hw_irq_count = xgene_msi->settings->nr_hw_irqs;
->>>> +     int size = BITS_TO_LONGS(msi_irq_count) * sizeof(long);
->>>> +
->>>> +     xgene_msi->bitmap = kzalloc(size, GFP_KERNEL);
->>>> +     if (!xgene_msi->bitmap)
->>>> +             return -ENOMEM;
->>>> +
->>>> +     mutex_init(&xgene_msi->bitmap_lock);
->>>> +
->>>> +     xgene_msi->msi_virqs = kcalloc(hw_irq_count, sizeof(int), GFP_KERNEL);
->>>> +     if (!xgene_msi->msi_virqs)
->>>> +             return -ENOMEM;
->>>> +
->>>> +     return 0;
->>>> +}
->>>> +
->>>> +static irqreturn_t xgene_msi_isr(int irq, void *data)
->>>> +{
->>>> +     struct xgene_msi *xgene_msi = (struct xgene_msi *) data;
->>>> +     unsigned int virq;
->>>> +     int msir_index, msir_reg, msir_val, hw_irq;
->>>> +     u32 intr_index, grp_select, msi_grp, processed = 0;
->>>> +     u32 nr_hw_irqs, irqs_per_index, index_per_group;
->>>> +
->>>> +     msi_grp = irq - xgene_msi->msi_virqs[0];
->>>> +     if (msi_grp >= xgene_msi->settings->nr_hw_irqs) {
->>>> +             pr_err("invalid msi received\n");
->>>> +             return IRQ_NONE;
->>>> +     }
->>>
->>> Bjorn
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+Nishanth Menon
