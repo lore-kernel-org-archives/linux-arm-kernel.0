@@ -1,64 +1,31 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 9 Apr 2015 13:25:01 -0700
-Subject: [PATCH 08/10] ARM: dts: qcom: Add DT alias for serial port
-In-Reply-To: <1428567823-11062-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1428567674-10672-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1428567823-11062-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150409202501.GK19186@sonymobile.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 9 Apr 2015 13:30:25 -0700
+Subject: [PATCH v6 3/6] regulator: axp20x: prepare support for multiple
+ AXP chip families
+In-Reply-To: <20150409195502.GC6023@sirena.org.uk>
+References: <1427868203-7486-1-git-send-email-wens@csie.org>
+ <1427868203-7486-4-git-send-email-wens@csie.org>
+ <CAGb2v66zbATMHY5SgZLs3RCoRETroSh5nC3h4TXRLm5UAbythw@mail.gmail.com>
+ <20150409195502.GC6023@sirena.org.uk>
+Message-ID: <CAGb2v66B-__CRcoyoiebNUs-=UBWxP4kQBGVpO4R_FMUSh7MKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 09 Apr 01:23 PDT 2015, Srinivas Kandagatla wrote:
+On Thu, Apr 9, 2015 at 12:55 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Apr 09, 2015 at 10:23:41AM -0700, Chen-Yu Tsai wrote:
+>
+>> Are you OK with Lee taking the 2 regulator patches through his tree?
+>> I realize I'm asking this way too late for this merge window.
+>
+> Someone would need to resend them to me as I've deleted them and it
+> appears that this is a part of a series - are you sure there are no
+> dependencies?
 
-> From: Pramod Gurav <pramod.gurav@smartplayin.com>
-> 
-> Define an alias for serial port present on ifc6410 which is used as
-> console.
-> 
-> Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
-> ---
->  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 4 ++++
->  arch/arm/boot/dts/qcom-apq8064.dtsi        | 3 +--
->  2 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> index d39a5bb..b76a92b 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> @@ -5,6 +5,10 @@
->  	model = "Qualcomm APQ8064/IFC6410";
->  	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
->  
-> +	aliases {
-> +		serial0 = &serial0;
-> +	};
-> +
->  	soc {
->  		pinctrl at 800000 {
->  			i2c1_pins: i2c1 {
-> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> index 70e417f..f4b8c3a 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> @@ -252,10 +252,9 @@
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  			ranges;
-> -
->  			syscon-tcsr = <&tcsr>;
->  
-> -			serial at 16640000 {
-> +			serial0: serial at 16640000 {
+The 2 patches only touch drivers/regulator/axp20x-regulator.c.
+Unless someone else is doing cleanup on them (AFAIK no one has),
+there should be no problem.
 
-On my 8064 devices gsbi7 uart is used for felica, gsbi5 is the debug
-uart. So I don't think it's right to call this serial0 here.
+In any case, I will resend them after 4.1-rc1 if they aren't merged
+by then.
 
->  				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
->  				reg = <0x16640000 0x1000>,
->  				      <0x16600000 0x1000>;
-> -- 
-> 1.9.1
-> 
-
-Regards,
-Bjorn
+ChenYu
