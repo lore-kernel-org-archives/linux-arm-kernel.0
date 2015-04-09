@@ -1,133 +1,158 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  9 Apr 2015 12:55:32 +0200
-Subject: [PATCH v4 00/16] crypto: SHA glue code consolidation
-Message-ID: <1428576948-23863-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu,  9 Apr 2015 12:55:33 +0200
+Subject: [PATCH v4 01/16] crypto: sha1: implement base layer for SHA-1
+In-Reply-To: <1428576948-23863-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1428576948-23863-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1428576948-23863-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+To reduce the number of copies of boilerplate code throughout
+the tree, this patch implements generic glue for the SHA-1
+algorithm. This allows a specific arch or hardware implementation
+to only implement the special handling that it needs.
 
-This is v4 of what is now a complete glue code consolidation series
-for generic, x86, arm and arm64 implementations of SHA-1, SHA-224/256
-and SHA-384/512.
+The users need to supply an implementation of
 
-The purpose is to have a single, canonical implementation of the core
-logic that gets reused by all versions of the algorithm. Note that this
-is not about saving space in the binary, but about ensuring that the same
-code is used everywhere, reducing the maintenance burden.
+  void (sha1_block_fn)(struct sha1_state *sst, u8 const *src, int blocks)
 
-The base layer implements all the update and finalization logic around
-the block transforms, where the prototypes of the latter look something
-like this:
+and pass it to the SHA-1 base functions. For easy casting between the
+prototype above and existing block functions that take a 'u32 state[]'
+as their first argument, the 'state' member of struct sha1_state is
+moved to the base of the struct.
 
-typedef void (shaXXX_block_fn)(struct sha###_state *, u8 const *src, int blocks)
-
-Note that the definitions of sha1_state, sha256_state and sha512_state are
-updated to put the state[] member first: this allows us to easily cast
-existing asm implementation that take a state[] member as first argument
-to the above prototype.
-
-Note that the base functions prototypes are all 'returning int' but
-they all return 0. They should be invoked as tail calls where possible
-to eliminate some of the function call overhead. If that is not possible,
-the return values can be safely ignored.
-
-Changes since v3:
-- adopted Herbert't suggestion to get rid of the additional arguments in the
-  prototype; instead, the prototype now takes a 'struct shaXXX_state' pointer,
-  which can be overloaded if there is additional state that needs to be passed
-  between the glue layer and the block transform (look at patches #12 and #13
-  for examples)
-- dropped all export() and import() functions and .statesize members: these are
-  only required if statesize != descsize, otherwise, the default implementations
-  in the crypto api layer are perfectly adequate
-- reshuffled some x86 code so that the existing asm transforms adhere to the
-  above prototype (modulo casting), allowing them to be passed to the base layer
-  directly
-
-Changes since v2:
-- Replace the base modules with header files containing static inlines that
-  implement the core logic. This avoids introducing new modules or new
-  inter-module dependencies, and gives the compiler the opportunity for
-  optimization.
-- Now includes new glue fo the existing SHA-1 NEON module and Sami's new
-  SHA-224/256 ASM+NEON module
-- Use direct assigments instead of memcpy() to set the initial state (as is
-  done in many of the call sites of the various init functions that are being
-  converted by this series)
-
-Changes since v1 (RFC):
-- prefixed globally visible generic symbols with crypto_
-- added SHA-1 base layer
-- updated init code to only set the initial constants and clear the
-  count, clearing the buffer is unnecessary [Markus]
-- favor the small update path in crypto_sha_XXX_base_do_update() [Markus]
-- update crypto_sha_XXX_do_finalize() to use memset() on the buffer directly
-  rather than copying a statically allocated padding buffer into it
-  [Markus]
-- moved a bunch of existing arm and x86 implementations to use the new base
-  layers
-
-Note: looking at the generated asm (for arm64), I noticed that the memcpy/memset
-invocations with compile time constant src and len arguments (which includes
-the empty struct assignments) are eliminated completely, and replaced by
-direct loads and stores. Hopefully this addresses the concern raised by Markus
-regarding this.
-
-Ard Biesheuvel (16):
-  crypto: sha1: implement base layer for SHA-1
-  crypto: sha256: implement base layer for SHA-256
-  crypto: sha512: implement base layer for SHA-512
-  crypto: sha1-generic: move to generic glue implementation
-  crypto: sha256-generic: move to generic glue implementation
-  crypto: sha512-generic: move to generic glue implementation
-  crypto/arm: move SHA-1 ARM asm implementation to base layer
-  crypto/arm: move SHA-1 NEON implementation to base layer
-  crypto/arm: move SHA-1 ARMv8 implementation to base layer
-  crypto/arm: move SHA-224/256 ASM/NEON implementation to base layer
-  crypto/arm: move SHA-224/256 ARMv8 implementation to base layer
-  crypto/arm64: move SHA-1 ARMv8 implementation to base layer
-  crypto/arm64: move SHA-224/256 ARMv8 implementation to base layer
-  crypto/x86: move SHA-1 SSSE3 implementation to base layer
-  crypto/x86: move SHA-224/256 SSSE3 implementation to base layer
-  crypto/x86: move SHA-384/512 SSSE3 implementation to base layer
-
- arch/arm/crypto/Kconfig                  |   3 +-
- arch/arm/crypto/sha1-ce-core.S           |  23 +---
- arch/arm/crypto/sha1-ce-glue.c           | 110 ++++-----------
- arch/arm/{include/asm => }/crypto/sha1.h |   3 +
- arch/arm/crypto/sha1_glue.c              | 112 +++------------
- arch/arm/crypto/sha1_neon_glue.c         | 137 ++++---------------
- arch/arm/crypto/sha2-ce-core.S           |  19 +--
- arch/arm/crypto/sha2-ce-glue.c           | 155 +++++----------------
- arch/arm/crypto/sha256_glue.c            | 170 ++++-------------------
- arch/arm/crypto/sha256_glue.h            |  17 +--
- arch/arm/crypto/sha256_neon_glue.c       | 143 +++++--------------
- arch/arm64/crypto/sha1-ce-core.S         |  33 ++---
- arch/arm64/crypto/sha1-ce-glue.c         | 151 ++++++--------------
- arch/arm64/crypto/sha2-ce-core.S         |  29 ++--
- arch/arm64/crypto/sha2-ce-glue.c         | 227 +++++++------------------------
- arch/x86/crypto/sha1_ssse3_glue.c        | 139 ++++---------------
- arch/x86/crypto/sha256-avx-asm.S         |  10 +-
- arch/x86/crypto/sha256-avx2-asm.S        |  10 +-
- arch/x86/crypto/sha256-ssse3-asm.S       |  10 +-
- arch/x86/crypto/sha256_ssse3_glue.c      | 193 +++++---------------------
- arch/x86/crypto/sha512-avx-asm.S         |   6 +-
- arch/x86/crypto/sha512-avx2-asm.S        |   6 +-
- arch/x86/crypto/sha512-ssse3-asm.S       |   6 +-
- arch/x86/crypto/sha512_ssse3_glue.c      | 202 +++++----------------------
- crypto/sha1_generic.c                    | 102 +++-----------
- crypto/sha256_generic.c                  | 133 +++---------------
- crypto/sha512_generic.c                  | 123 +++--------------
- include/crypto/sha.h                     |  15 +-
- include/crypto/sha1_base.h               | 106 +++++++++++++++
- include/crypto/sha256_base.h             | 128 +++++++++++++++++
- include/crypto/sha512_base.h             | 131 ++++++++++++++++++
- 31 files changed, 866 insertions(+), 1786 deletions(-)
- rename arch/arm/{include/asm => }/crypto/sha1.h (67%)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ include/crypto/sha.h       |   2 +-
+ include/crypto/sha1_base.h | 106 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 107 insertions(+), 1 deletion(-)
  create mode 100644 include/crypto/sha1_base.h
- create mode 100644 include/crypto/sha256_base.h
- create mode 100644 include/crypto/sha512_base.h
 
+diff --git a/include/crypto/sha.h b/include/crypto/sha.h
+index 190f8a0e0242..a9aad8e63f43 100644
+--- a/include/crypto/sha.h
++++ b/include/crypto/sha.h
+@@ -65,8 +65,8 @@
+ #define SHA512_H7	0x5be0cd19137e2179ULL
+ 
+ struct sha1_state {
+-	u64 count;
+ 	u32 state[SHA1_DIGEST_SIZE / 4];
++	u64 count;
+ 	u8 buffer[SHA1_BLOCK_SIZE];
+ };
+ 
+diff --git a/include/crypto/sha1_base.h b/include/crypto/sha1_base.h
+new file mode 100644
+index 000000000000..41ccc5f325a0
+--- /dev/null
++++ b/include/crypto/sha1_base.h
+@@ -0,0 +1,106 @@
++/*
++ * sha1_base.h - core logic for SHA-1 implementations
++ *
++ * Copyright (C) 2015 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <crypto/internal/hash.h>
++#include <crypto/sha.h>
++#include <linux/crypto.h>
++#include <linux/module.h>
++
++#include <asm/unaligned.h>
++
++typedef void (sha1_block_fn)(struct sha1_state *sst, u8 const *src, int blocks);
++
++static inline int sha1_base_init(struct shash_desc *desc)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++
++	sctx->state[0] = SHA1_H0;
++	sctx->state[1] = SHA1_H1;
++	sctx->state[2] = SHA1_H2;
++	sctx->state[3] = SHA1_H3;
++	sctx->state[4] = SHA1_H4;
++ 	sctx->count = 0;
++
++	return 0;
++}
++
++static inline int sha1_base_do_update(struct shash_desc *desc,
++				      const u8 *data,
++				      unsigned int len,
++				      sha1_block_fn *block_fn)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
++
++	sctx->count += len;
++
++	if (unlikely((partial + len) >= SHA1_BLOCK_SIZE)) {
++		int blocks;
++
++		if (partial) {
++			int p = SHA1_BLOCK_SIZE - partial;
++
++			memcpy(sctx->buffer + partial, data, p);
++			data += p;
++			len -= p;
++
++			block_fn(sctx, sctx->buffer, 1);
++		}
++
++		blocks = len / SHA1_BLOCK_SIZE;
++		len %= SHA1_BLOCK_SIZE;
++
++		if (blocks) {
++			block_fn(sctx, data, blocks);
++			data += blocks * SHA1_BLOCK_SIZE;
++		}
++		partial = 0;
++	}
++	if (len)
++		memcpy(sctx->buffer + partial, data, len);
++
++	return 0;
++}
++
++static inline int sha1_base_do_finalize(struct shash_desc *desc,
++					sha1_block_fn *block_fn)
++{
++	const int bit_offset = SHA1_BLOCK_SIZE - sizeof(__be64);
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	__be64 *bits = (__be64 *)(sctx->buffer + bit_offset);
++	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
++
++	sctx->buffer[partial++] = 0x80;
++	if (partial > bit_offset) {
++		memset(sctx->buffer + partial, 0x0, SHA1_BLOCK_SIZE - partial);
++		partial = 0;
++
++		block_fn(sctx, sctx->buffer, 1);
++	}
++
++	memset(sctx->buffer + partial, 0x0, bit_offset - partial);
++	*bits = cpu_to_be64(sctx->count << 3);
++	block_fn(sctx, sctx->buffer, 1);
++
++	return 0;
++}
++
++static inline int sha1_base_finish(struct shash_desc *desc, u8 *out)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	__be32 *digest = (__be32 *)out;
++	int i;
++
++	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], digest++);
++
++	*sctx = (struct sha1_state){};
++	return 0;
++}
 -- 
 1.8.3.2
