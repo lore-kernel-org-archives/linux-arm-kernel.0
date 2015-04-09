@@ -1,50 +1,83 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 09 Apr 2015 16:58:36 +0200
-Subject: [PATCH 1/2] doc/bindings: Add 'endianess'
- optional-property for FlexCAN controller
-In-Reply-To: <1428591087-12831-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1428591087-12831-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <5526939C.5090309@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu,  9 Apr 2015 16:58:43 +0200
+Subject: [PATCH 2/2] crypto: marvell/CESA: update DT bindings documentation
+In-Reply-To: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1428591523-1780-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2015 04:51 PM, Bhupesh Sharma wrote:
-> This patch adds 'endianess' as the optional-property for
-> describing the FlexCAN controller present on various FSL platforms.
-> 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> Signed-off-by: Sakar Arora <Sakar.Arora@freescale.com>
-> ---
->  .../devicetree/bindings/net/can/fsl-flexcan.txt    |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
-> index 56d6cc3..0d5e668 100644
-> --- a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
-> +++ b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
-> @@ -18,6 +18,10 @@ Optional properties:
->  
->  - xceiver-supply: Regulator that powers the CAN transceiver
->  
-> +- little-endian: If the FlexCAN IP on this SoC is little-endian, use
-> +                 this property. By default it is assumed that the IP
-> +                 is big-endian
+Document new compatible strings, document the new method to reference the
+crypto SRAM and deprecate the old one and document the the 'clocks' and
+'clock-names' properties.
 
-Where's the code that's evaluating this property? On ARM little endian
-is assumed so far, on powerpc (p1010) it's big endian.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ .../devicetree/bindings/crypto/mv_cesa.txt         | 50 ++++++++++++++++------
+ 1 file changed, 38 insertions(+), 12 deletions(-)
 
-Marc
-
+diff --git a/Documentation/devicetree/bindings/crypto/mv_cesa.txt b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
+index 47229b1..4ce9bc5 100644
+--- a/Documentation/devicetree/bindings/crypto/mv_cesa.txt
++++ b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
+@@ -1,20 +1,46 @@
+ Marvell Cryptographic Engines And Security Accelerator
+ 
+ Required properties:
+-- compatible : should be "marvell,orion-crypto"
+-- reg : base physical address of the engine and length of memory mapped
+-        region, followed by base physical address of sram and its memory
+-        length
+-- reg-names : "regs" , "sram";
+-- interrupts : interrupt number
++- compatible: should be one of the following string
++	      "marvell,orion-crypto"
++	      "marvell,kirkwood-crypto"
++	      "marvell,armada-370-crypto"
++	      "marvell,armada-xp-crypto"
++	      "marvell,armada-375-crypto"
++	      "marvell,armada-38x-crypto"
++- reg: base physical address of the engine and length of memory mapped
++       region
++- reg-names: "regs"
++- interrupts: interrupt number
++- clocks: reference to the crypto engines clocks. This property is not
++	  required for orion and kirkwood platforms
++- clock-names: "cesaX" and "cesazX", X should be replaced by the crypto engine
++	       id.
++	       This property is not required for the orion and kirkwoord
++	       platforms.
++	       "cesazX" clocks are not required on armada-370 platforms
++- marvell,crypto-srams: phandle to crypto SRAM definitions
++
++Optional properties:
++- marvell,crypto-sram-size: SRAM size reserved for crypto operations, if not
++			    specified the whole SRAM is used (2KB)
++
++Deprecated properties:
++- reg: base physical address of the engine and length of memory mapped
++       region, followed by base physical address of sram and its memory
++       length
++- reg-names: "regs" , "sram"
+ 
+ Examples:
+ 
+-	crypto at 30000 {
+-		compatible = "marvell,orion-crypto";
+-		reg = <0x30000 0x10000>,
+-		      <0x4000000 0x800>;
+-		reg-names = "regs" , "sram";
+-		interrupts = <22>;
++	crypto at 90000 {
++		compatible = "marvell,armada-xp-crypto";
++		reg = <0x90000 0x10000>;
++		reg-names = "regs";
++		interrupts = <48>, <49>;
++		clocks = <&gateclk 23>, <&gateclk 23>;
++		clock-names = "cesa0", "cesa1";
++		marvell,crypto-srams = <&crypto_sram0>, <&crypto_sram1>;
++		marvell,crypto-sram-size = <0x600>;
+ 		status = "okay";
+ 	};
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/a1e76d34/attachment.sig>
+1.9.1
