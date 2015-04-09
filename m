@@ -1,10 +1,10 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  9 Apr 2015 12:55:44 +0200
-Subject: [PATCH v4 12/16] crypto/arm64: move SHA-1 ARMv8 implementation to
- base layer
+Date: Thu,  9 Apr 2015 12:55:46 +0200
+Subject: [PATCH v4 14/16] crypto/x86: move SHA-1 SSSE3 implementation to base
+ layer
 In-Reply-To: <1428576948-23863-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1428576948-23863-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1428576948-23863-13-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1428576948-23863-15-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,283 +13,195 @@ and replaces it with calls into the base layer.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/sha1-ce-core.S |  33 ++++-----
- arch/arm64/crypto/sha1-ce-glue.c | 151 ++++++++++++---------------------------
- 2 files changed, 59 insertions(+), 125 deletions(-)
+ arch/x86/crypto/sha1_ssse3_glue.c | 139 ++++++++------------------------------
+ 1 file changed, 28 insertions(+), 111 deletions(-)
 
-diff --git a/arch/arm64/crypto/sha1-ce-core.S b/arch/arm64/crypto/sha1-ce-core.S
-index 09d57d98609c..033aae6d732a 100644
---- a/arch/arm64/crypto/sha1-ce-core.S
-+++ b/arch/arm64/crypto/sha1-ce-core.S
-@@ -66,8 +66,8 @@
- 	.word		0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6
- 
- 	/*
--	 * void sha1_ce_transform(int blocks, u8 const *src, u32 *state,
--	 * 			  u8 *head, long bytes)
-+	 * void sha1_ce_transform(struct sha1_ce_state *sst, u8 const *src,
-+	 *			  int blocks)
- 	 */
- ENTRY(sha1_ce_transform)
- 	/* load round constants */
-@@ -78,25 +78,22 @@ ENTRY(sha1_ce_transform)
- 	ld1r		{k3.4s}, [x6]
- 
- 	/* load state */
--	ldr		dga, [x2]
--	ldr		dgb, [x2, #16]
-+	ldr		dga, [x0]
-+	ldr		dgb, [x0, #16]
- 
--	/* load partial state (if supplied) */
--	cbz		x3, 0f
--	ld1		{v8.4s-v11.4s}, [x3]
--	b		1f
-+	/* load sha1_ce_state::finalize */
-+	ldr		w4, [x0, #:lo12:sha1_ce_offsetof_finalize]
- 
- 	/* load input */
- 0:	ld1		{v8.4s-v11.4s}, [x1], #64
--	sub		w0, w0, #1
-+	sub		w2, w2, #1
- 
--1:
- CPU_LE(	rev32		v8.16b, v8.16b		)
- CPU_LE(	rev32		v9.16b, v9.16b		)
- CPU_LE(	rev32		v10.16b, v10.16b	)
- CPU_LE(	rev32		v11.16b, v11.16b	)
- 
--2:	add		t0.4s, v8.4s, k0.4s
-+1:	add		t0.4s, v8.4s, k0.4s
- 	mov		dg0v.16b, dgav.16b
- 
- 	add_update	c, ev, k0,  8,  9, 10, 11, dgb
-@@ -127,15 +124,15 @@ CPU_LE(	rev32		v11.16b, v11.16b	)
- 	add		dgbv.2s, dgbv.2s, dg1v.2s
- 	add		dgav.4s, dgav.4s, dg0v.4s
- 
--	cbnz		w0, 0b
-+	cbnz		w2, 0b
- 
- 	/*
- 	 * Final block: add padding and total bit count.
--	 * Skip if we have no total byte count in x4. In that case, the input
--	 * size was not a round multiple of the block size, and the padding is
--	 * handled by the C code.
-+	 * Skip if the input size was not a round multiple of the block size,
-+	 * the padding is handled by the C code in that case.
- 	 */
- 	cbz		x4, 3f
-+	ldr		x4, [x0, #:lo12:sha1_ce_offsetof_count]
- 	movi		v9.2d, #0
- 	mov		x8, #0x80000000
- 	movi		v10.2d, #0
-@@ -144,10 +141,10 @@ CPU_LE(	rev32		v11.16b, v11.16b	)
- 	mov		x4, #0
- 	mov		v11.d[0], xzr
- 	mov		v11.d[1], x7
--	b		2b
-+	b		1b
- 
- 	/* store new state */
--3:	str		dga, [x2]
--	str		dgb, [x2, #16]
-+3:	str		dga, [x0]
-+	str		dgb, [x0, #16]
- 	ret
- ENDPROC(sha1_ce_transform)
-diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
-index 6fe83f37a750..114e7cc5de8c 100644
---- a/arch/arm64/crypto/sha1-ce-glue.c
-+++ b/arch/arm64/crypto/sha1-ce-glue.c
-@@ -12,144 +12,81 @@
- #include <asm/unaligned.h>
- #include <crypto/internal/hash.h>
+diff --git a/arch/x86/crypto/sha1_ssse3_glue.c b/arch/x86/crypto/sha1_ssse3_glue.c
+index 6c20fe04a738..33d1b9dc14cc 100644
+--- a/arch/x86/crypto/sha1_ssse3_glue.c
++++ b/arch/x86/crypto/sha1_ssse3_glue.c
+@@ -28,7 +28,7 @@
+ #include <linux/cryptohash.h>
+ #include <linux/types.h>
  #include <crypto/sha.h>
+-#include <asm/byteorder.h>
 +#include <crypto/sha1_base.h>
- #include <linux/cpufeature.h>
- #include <linux/crypto.h>
- #include <linux/module.h>
+ #include <asm/i387.h>
+ #include <asm/xcr.h>
+ #include <asm/xsave.h>
+@@ -44,132 +44,51 @@ asmlinkage void sha1_transform_avx(u32 *digest, const char *data,
+ #define SHA1_AVX2_BLOCK_OPTSIZE	4	/* optimal 4*64 bytes of SHA1 blocks */
  
-+#define ASM_EXPORT(sym, val) \
-+	asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
-+
- MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
- MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
- MODULE_LICENSE("GPL v2");
+ asmlinkage void sha1_transform_avx2(u32 *digest, const char *data,
+-				unsigned int rounds);
++				    unsigned int rounds);
+ #endif
  
--asmlinkage void sha1_ce_transform(int blocks, u8 const *src, u32 *state,
--				  u8 *head, long bytes);
-+struct sha1_ce_state {
-+	struct sha1_state	sst;
-+	u32			finalize;
-+};
- 
--static int sha1_init(struct shash_desc *desc)
+-static asmlinkage void (*sha1_transform_asm)(u32 *, const char *, unsigned int);
+-
+-
+-static int sha1_ssse3_init(struct shash_desc *desc)
 -{
 -	struct sha1_state *sctx = shash_desc_ctx(desc);
-+asmlinkage void sha1_ce_transform(struct sha1_ce_state *sst, u8 const *src,
-+				  int blocks);
- 
+-
 -	*sctx = (struct sha1_state){
 -		.state = { SHA1_H0, SHA1_H1, SHA1_H2, SHA1_H3, SHA1_H4 },
 -	};
+-
 -	return 0;
 -}
 -
--static int sha1_update(struct shash_desc *desc, const u8 *data,
--		       unsigned int len)
-+static int sha1_ce_update(struct shash_desc *desc, const u8 *data,
-+			  unsigned int len)
- {
+-static int __sha1_ssse3_update(struct shash_desc *desc, const u8 *data,
+-			       unsigned int len, unsigned int partial)
+-{
 -	struct sha1_state *sctx = shash_desc_ctx(desc);
--	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
+-	unsigned int done = 0;
 -
 -	sctx->count += len;
 -
--	if ((partial + len) >= SHA1_BLOCK_SIZE) {
--		int blocks;
--
--		if (partial) {
--			int p = SHA1_BLOCK_SIZE - partial;
-+	struct sha1_ce_state *sctx = shash_desc_ctx(desc);
- 
--			memcpy(sctx->buffer + partial, data, p);
--			data += p;
--			len -= p;
--		}
--
--		blocks = len / SHA1_BLOCK_SIZE;
--		len %= SHA1_BLOCK_SIZE;
--
--		kernel_neon_begin_partial(16);
--		sha1_ce_transform(blocks, data, sctx->state,
--				  partial ? sctx->buffer : NULL, 0);
--		kernel_neon_end();
-+	sctx->finalize = 0;
-+	kernel_neon_begin_partial(16);
-+	sha1_base_do_update(desc, data, len,
-+			    (sha1_block_fn *)sha1_ce_transform);
-+	kernel_neon_end();
- 
--		data += blocks * SHA1_BLOCK_SIZE;
--		partial = 0;
+-	if (partial) {
+-		done = SHA1_BLOCK_SIZE - partial;
+-		memcpy(sctx->buffer + partial, data, done);
+-		sha1_transform_asm(sctx->state, sctx->buffer, 1);
 -	}
--	if (len)
+-
+-	if (len - done >= SHA1_BLOCK_SIZE) {
+-		const unsigned int rounds = (len - done) / SHA1_BLOCK_SIZE;
+-
+-		sha1_transform_asm(sctx->state, data + done, rounds);
+-		done += rounds * SHA1_BLOCK_SIZE;
+-	}
+-
+-	memcpy(sctx->buffer, data + done, len - done);
+-
+-	return 0;
+-}
++static void (*sha1_transform_asm)(u32 *, const char *, unsigned int);
+ 
+ static int sha1_ssse3_update(struct shash_desc *desc, const u8 *data,
+ 			     unsigned int len)
+ {
+ 	struct sha1_state *sctx = shash_desc_ctx(desc);
+-	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
+-	int res;
+ 
+-	/* Handle the fast case right here */
+-	if (partial + len < SHA1_BLOCK_SIZE) {
+-		sctx->count += len;
 -		memcpy(sctx->buffer + partial, data, len);
++	if (!irq_fpu_usable() ||
++	    (sctx->count % SHA1_BLOCK_SIZE) + len < SHA1_BLOCK_SIZE)
++		return crypto_sha1_update(desc, data, len);
+ 
+-		return 0;
+-	}
++	/* make sure casting to sha1_block_fn() is safe */
++	BUILD_BUG_ON(offsetof(struct sha1_state, state) != 0);
+ 
+-	if (!irq_fpu_usable()) {
+-		res = crypto_sha1_update(desc, data, len);
+-	} else {
+-		kernel_fpu_begin();
+-		res = __sha1_ssse3_update(desc, data, len, partial);
+-		kernel_fpu_end();
+-	}
+-
+-	return res;
+-}
+-
+-
+-/* Add padding and return the message digest. */
+-static int sha1_ssse3_final(struct shash_desc *desc, u8 *out)
+-{
+-	struct sha1_state *sctx = shash_desc_ctx(desc);
+-	unsigned int i, index, padlen;
+-	__be32 *dst = (__be32 *)out;
+-	__be64 bits;
+-	static const u8 padding[SHA1_BLOCK_SIZE] = { 0x80, };
+-
+-	bits = cpu_to_be64(sctx->count << 3);
+-
+-	/* Pad out to 56 mod 64 and append length */
+-	index = sctx->count % SHA1_BLOCK_SIZE;
+-	padlen = (index < 56) ? (56 - index) : ((SHA1_BLOCK_SIZE+56) - index);
+-	if (!irq_fpu_usable()) {
+-		crypto_sha1_update(desc, padding, padlen);
+-		crypto_sha1_update(desc, (const u8 *)&bits, sizeof(bits));
+-	} else {
+-		kernel_fpu_begin();
+-		/* We need to fill a whole block for __sha1_ssse3_update() */
+-		if (padlen <= 56) {
+-			sctx->count += padlen;
+-			memcpy(sctx->buffer + index, padding, padlen);
+-		} else {
+-			__sha1_ssse3_update(desc, padding, padlen, index);
+-		}
+-		__sha1_ssse3_update(desc, (const u8 *)&bits, sizeof(bits), 56);
+-		kernel_fpu_end();
+-	}
+-
+-	/* Store state in digest */
+-	for (i = 0; i < 5; i++)
+-		dst[i] = cpu_to_be32(sctx->state[i]);
+-
+-	/* Wipe context */
+-	memset(sctx, 0, sizeof(*sctx));
++	kernel_fpu_begin();
++	sha1_base_do_update(desc, data, len,
++			    (sha1_block_fn *)sha1_transform_asm);
++	kernel_fpu_end();
+ 
  	return 0;
  }
  
--static int sha1_final(struct shash_desc *desc, u8 *out)
-+static int sha1_ce_finup(struct shash_desc *desc, const u8 *data,
-+			 unsigned int len, u8 *out)
+-static int sha1_ssse3_export(struct shash_desc *desc, void *out)
++static int sha1_ssse3_finup(struct shash_desc *desc, const u8 *data,
++			      unsigned int len, u8 *out)
  {
--	static const u8 padding[SHA1_BLOCK_SIZE] = { 0x80, };
-+	struct sha1_ce_state *sctx = shash_desc_ctx(desc);
-+	bool finalize = !sctx->sst.count && !(len % SHA1_BLOCK_SIZE);
- 
 -	struct sha1_state *sctx = shash_desc_ctx(desc);
--	__be64 bits = cpu_to_be64(sctx->count << 3);
--	__be32 *dst = (__be32 *)out;
--	int i;
--
--	u32 padlen = SHA1_BLOCK_SIZE
--		     - ((sctx->count + sizeof(bits)) % SHA1_BLOCK_SIZE);
--
--	sha1_update(desc, padding, padlen);
--	sha1_update(desc, (const u8 *)&bits, sizeof(bits));
--
--	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
--		put_unaligned_be32(sctx->state[i], dst++);
--
--	*sctx = (struct sha1_state){};
--	return 0;
--}
--
--static int sha1_finup(struct shash_desc *desc, const u8 *data,
--		      unsigned int len, u8 *out)
--{
--	struct sha1_state *sctx = shash_desc_ctx(desc);
--	__be32 *dst = (__be32 *)out;
--	int blocks;
--	int i;
--
--	if (sctx->count || !len || (len % SHA1_BLOCK_SIZE)) {
--		sha1_update(desc, data, len);
--		return sha1_final(desc, out);
--	}
-+	ASM_EXPORT(sha1_ce_offsetof_count,
-+		   offsetof(struct sha1_ce_state, sst.count));
-+	ASM_EXPORT(sha1_ce_offsetof_finalize,
-+		   offsetof(struct sha1_ce_state, finalize));
++	if (!irq_fpu_usable())
++		return crypto_sha1_finup(desc, data, len, out);
  
- 	/*
--	 * Use a fast path if the input is a multiple of 64 bytes. In
--	 * this case, there is no need to copy data around, and we can
--	 * perform the entire digest calculation in a single invocation
--	 * of sha1_ce_transform()
-+	 * Allow the asm code to perform the finalization if there is no
-+	 * partial data and the input is a round multiple of the block size.
- 	 */
--	blocks = len / SHA1_BLOCK_SIZE;
-+	sctx->finalize = finalize;
+-	memcpy(out, sctx, sizeof(*sctx));
++	kernel_fpu_begin();
++	if (len)
++		sha1_base_do_update(desc, data, len,
++				    (sha1_block_fn *)sha1_transform_asm);
++	sha1_base_do_finalize(desc, (sha1_block_fn *)sha1_transform_asm);
++	kernel_fpu_end();
  
- 	kernel_neon_begin_partial(16);
--	sha1_ce_transform(blocks, data, sctx->state, NULL, len);
-+	sha1_base_do_update(desc, data, len,
-+			    (sha1_block_fn *)sha1_ce_transform);
-+	if (!finalize)
-+		sha1_base_do_finalize(desc, (sha1_block_fn *)sha1_ce_transform);
- 	kernel_neon_end();
--
--	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
--		put_unaligned_be32(sctx->state[i], dst++);
--
--	*sctx = (struct sha1_state){};
 -	return 0;
 +	return sha1_base_finish(desc, out);
  }
  
--static int sha1_export(struct shash_desc *desc, void *out)
-+static int sha1_ce_final(struct shash_desc *desc, u8 *out)
+-static int sha1_ssse3_import(struct shash_desc *desc, const void *in)
++/* Add padding and return the message digest. */
++static int sha1_ssse3_final(struct shash_desc *desc, u8 *out)
  {
 -	struct sha1_state *sctx = shash_desc_ctx(desc);
--	struct sha1_state *dst = out;
 -
--	*dst = *sctx;
+-	memcpy(sctx, in, sizeof(*sctx));
+-
 -	return 0;
--}
--
--static int sha1_import(struct shash_desc *desc, const void *in)
--{
--	struct sha1_state *sctx = shash_desc_ctx(desc);
--	struct sha1_state const *src = in;
--
--	*sctx = *src;
--	return 0;
-+	kernel_neon_begin_partial(16);
-+	sha1_base_do_finalize(desc, (sha1_block_fn *)sha1_ce_transform);
-+	kernel_neon_end();
-+	return sha1_base_finish(desc, out);
++	return sha1_ssse3_finup(desc, NULL, 0, out);
  }
+ 
+ #ifdef CONFIG_AS_AVX2
+@@ -186,13 +105,11 @@ static void sha1_apply_transform_avx2(u32 *digest, const char *data,
  
  static struct shash_alg alg = {
--	.init			= sha1_init,
--	.update			= sha1_update,
--	.final			= sha1_final,
--	.finup			= sha1_finup,
--	.export			= sha1_export,
--	.import			= sha1_import,
--	.descsize		= sizeof(struct sha1_state),
-+	.init			= sha1_base_init,
-+	.update			= sha1_ce_update,
-+	.final			= sha1_ce_final,
-+	.finup			= sha1_ce_finup,
-+	.descsize		= sizeof(struct sha1_ce_state),
- 	.digestsize		= SHA1_DIGEST_SIZE,
--	.statesize		= sizeof(struct sha1_state),
- 	.base			= {
- 		.cra_name		= "sha1",
- 		.cra_driver_name	= "sha1-ce",
+ 	.digestsize	=	SHA1_DIGEST_SIZE,
+-	.init		=	sha1_ssse3_init,
++	.init		=	sha1_base_init,
+ 	.update		=	sha1_ssse3_update,
+ 	.final		=	sha1_ssse3_final,
+-	.export		=	sha1_ssse3_export,
+-	.import		=	sha1_ssse3_import,
++	.finup		=	sha1_ssse3_finup,
+ 	.descsize	=	sizeof(struct sha1_state),
+-	.statesize	=	sizeof(struct sha1_state),
+ 	.base		=	{
+ 		.cra_name	=	"sha1",
+ 		.cra_driver_name=	"sha1-ssse3",
 -- 
 1.8.3.2
