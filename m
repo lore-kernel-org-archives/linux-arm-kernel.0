@@ -1,45 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 09 Apr 2015 11:33:09 +0200
-Subject: [PATCH] nfs: do not export discarded symbols
-In-Reply-To: <1426175918.15787.3.camel@primarydata.com>
-References: <3173686.FPJdK9jLbA@wuerfel>
- <1426175918.15787.3.camel@primarydata.com>
-Message-ID: <2350360.PssyUvDc2B@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 09 Apr 2015 12:34:02 +0300
+Subject: [PATCH] ata: ahci_st: fixup layering violations / drvdata errors
+In-Reply-To: <1428519599-31885-1-git-send-email-computersforpeace@gmail.com>
+References: <1428519599-31885-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <5526478A.6060707@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 March 2015 11:58:38 Trond Myklebust wrote:
-> On Wed, 2015-03-11 at 14:37 +0100, Arnd Bergmann wrote:
-> > The function nfs4_pnfs_v3_ds_connect_unload is exported so it can be
-> > used by other modules, but is also marked '__exit' and will be
-> > discarded when built into the kernel, as pointed out by this
-> > linker error:
-> > 
-> > `nfs4_pnfs_v3_ds_connect_unload' referenced in section `___ksymtab_gpl+nfs4_pnfs_v3_ds_connect_unload' of fs/built-in.o: defined in discarded section `.exit.text' of fs/built-in.o
-> > 
-> > This removes the __exit annotation to make it safe to call this function.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 5f01d9539496 ("nfs41: create NFSv3 DS connection if specified")
-> > 
-> > diff --git a/fs/nfs/pnfs_nfs.c b/fs/nfs/pnfs_nfs.c
-> > index 54e36b38fb5f..8582dae5ae99 100644
-> > --- a/fs/nfs/pnfs_nfs.c
-> > +++ b/fs/nfs/pnfs_nfs.c
-> > @@ -561,7 +561,7 @@ static bool load_v3_ds_connect(void)
-> >       return(get_v3_ds_connect != NULL);
-> >  }
-> >  
-> > -void __exit nfs4_pnfs_v3_ds_connect_unload(void)
-> > +void nfs4_pnfs_v3_ds_connect_unload(void)
-> >  {
-> >       if (get_v3_ds_connect) {
-> >               symbol_put(nfs3_set_ds_client);
-> > 
-> 
-> Thanks! Applied...
-> 
+Hello.
 
-I don't see the patch in linux-next, did something go wrong here?
+On 4/8/2015 9:59 PM, Brian Norris wrote:
 
-	Arnd
+> When working on another SATA driver that uses libahci_platform, I
+> noticed an error in this driver; it tries to the the driver data for its
+> device, while libata also thinks it can set the driver data. See:
+
+>    ahci_platform_init_host()
+>    -> ata_host_alloc_pinfo()
+>       -> ata_host_alloc()
+>          -> dev_set_drvdata()
+
+> So instead of sticking the IP-specific platform data into drvdata, let's
+> use the plat_data variable that is reserved for this use.
+
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+> Cc: Maxime Coquelin <maxime.coquelin@st.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> ---
+> This is ONLY compile tested; I don't have hardware to run. This looks like it
+> could have ramifications on suspend/resume support, and hot device removal
+> (e.g., sysfs unbind), so it might qualify as -stable, if someone can test it
+
+>   drivers/ata/ahci_st.c | 25 ++++++++++++++-----------
+>   1 file changed, 14 insertions(+), 11 deletions(-)
+
+> diff --git a/drivers/ata/ahci_st.c b/drivers/ata/ahci_st.c
+> index bc971af262e7..2bd2375c2ab1 100644
+> --- a/drivers/ata/ahci_st.c
+> +++ b/drivers/ata/ahci_st.c
+[...]
+> @@ -107,7 +108,9 @@ static void st_ahci_host_stop(struct ata_host *host)
+>
+>   static int st_ahci_probe_resets(struct platform_device *pdev)
+>   {
+> -	struct st_ahci_drv_data *drv_data = platform_get_drvdata(pdev);
+> +	struct ata_host *host = dev_get_drvdata(&pdev->dev);
+
+    Why not just platform_get_drvdata()?
+
+[...]
+
+MBR, Sergei
