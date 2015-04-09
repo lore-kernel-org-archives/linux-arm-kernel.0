@@ -1,45 +1,117 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Apr 2015 15:40:29 +0100
-Subject: [PATCH] drivers: CCI: fix used_mask init in validate_group()
-In-Reply-To: <1428589600.20354.27.camel@deneb.redhat.com>
-References: <1428517284-7951-1-git-send-email-msalter@redhat.com>
- <20150409135124.GA9648@leverpostej>
- <1428588703.20354.23.camel@deneb.redhat.com>
- <20150409142047.GC9648@leverpostej>
- <1428589600.20354.27.camel@deneb.redhat.com>
-Message-ID: <20150409144029.GE9648@leverpostej>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 9 Apr 2015 07:45:22 -0700
+Subject: [PATCH v4 04/10] eeprom: Add a simple EEPROM framework for
+ eeprom consumers
+In-Reply-To: <55243982.7020907@linaro.org>
+References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427752670-17219-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150407184533.GA10278@codeaurora.org>
+ <55243982.7020907@linaro.org>
+Message-ID: <20150409144522.GB9663@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > >  validate_group(struct perf_event *event)
-> > > > >  {
-> > > > >  	struct perf_event *sibling, *leader = event->group_leader;
-> > > > > -	struct cci_pmu_hw_events fake_pmu = {
-> > > > > -		/*
-> > > > > -		 * Initialise the fake PMU. We only need to populate the
-> > > > > -		 * used_mask for the purposes of validation.
-> > > > > -		 */
-> > > > > -		.used_mask = CPU_BITS_NONE,
-> > > > 
-> > > > Can we not simply change this to:
-> > > > 
-> > > > 		.used_mask = { 0 },
-> > > > 
-> > > > That should result in the entire array being zeroed.
-> > > 
-> > > It does, but it also causes the whole struct to be cleared.
-> > 
-> > Sure, but it's also the minimal diff, and it's easier to read. This was
-> > what the code was intended to be initially.
-> > 
-> > > With the memset, only used_mask gets cleared.
-> > 
-> > Is there an appreciable difference between the two performance-wise?
+On 04/07, Srinivas Kandagatla wrote:
+> On 07/04/15 19:45, Stephen Boyd wrote:
+> >On 03/30, Srinivas Kandagatla wrote:
+> >
+> >Do you have an overview of how to use these APIs? Maybe some
+> >Documentation/ is in order? I'm mostly interested in how the
+> >blocks array is supposed to work and how this hooks up to drivers
+> >that are using DT.
 > 
-> I dunno. It is 3 strp insns vs 1 str.
-> If you want the static init, I'll send another patch.
+> Only doc ATM is function level kernel doc in c file.
+> May be I can explain you for now and I will try to add some
+> documentation with some usage examples in next version.
 
-I'd prefer the designated initializer to the memset.
+Thanks.
 
-Thanks,
-Mark.
+> 
+> eeprom block array is just another way intended to get hold of
+> eeprom content for non-DT providers/consumers, but DT
+> consumers/providers can also use it. As of today SOC/mach level code
+> could use it as well.
+> 
+> In eeprom_cell_get() case the lookup of provider is done based on
+> provider name, this provider name is generally supplied by all the
+> providers (both DT/non DT).
+> 
+> for example in qfprom case,
+> provider is registered from DT with eeprom config containing a unique name:
+> static struct eeprom_config econfig = {
+> 	.name = "qfprom",
+> 	.id = 0,
+> };
+> 
+> In the consumer case, the tsens driver could do some like in non DT way:
+> 
+> 	struct eeprom_block blocks[4] ={
+> 		{
+> 		.offset = 0x404,
+> 		.count = 0x4,
+> 		},
+> 		{
+> 		.offset = 0x408,
+> 		.count = 0x4,
+> 		},
+> 		{
+> 		.offset = 0x40c,
+> 		.count = 0x4,
+> 		},
+> 		{
+> 		.offset = 0x410,
+> 		.count = 0x4,
+> 		},
+> 	};
+> 	calib_cell = eeprom_cell_get("qfprom0", blocks, 4);
+> 
+> 
+> Or in DT way
+> calib_cell  = of_eeprom_cell_get(np, "calib");
+> 
+
+Ok. I guess I was hoping for a more device centric approach like
+we have for clks/regulators/etc. That way a driver doesn't need
+to know it's using DT or not to figure out which API to call.
+Also the global namespace is sort of worrying (qfprom0 part). How
+do we know it's qfprom0? What if it's qfprom1 sometimes?
+
+Also, how are we supposed to encode certain bits inside the
+stream of bytes (blocks)? In some situations (e.g. the qcom CPR
+stuff) we have quite a few fuse bits we need to read that are
+packed into different bytes and may cross byte boundaries (i.e.
+bits 6 to 10 of a 32-bit word). The current API looks to be byte
+focused when I have bit based/non-byte aligned data.
+
+My current feeling is that I don't want to use any of the block
+stuff at all. I just want a simple byte-based API that allows me
+to read a number of contiguous bytes from the fuses. Then I'll
+need to shift that data down by a few bits and mask it with the
+width of the data I want to read to extract the data needed.
+
+The only thing after that where I have a problem is figuring out
+which eeprom is present in the consumer driver. I think I may
+need to open-code it and look at the phandle for the eeprom and
+do a compatible check to figure out which bits I want to read.
+
+The DT would be like this (note I left eeprom-cells/eeproms here
+because that allows us to generically find eeproms used by a
+device and find eeprom providers):
+
+	qfprom: eeprom at 58000 {
+		compatible = "qcom,qfprom-msm8916";
+		reg = <0x58000 0x7000>;
+		#eeprom-cells = <0>;
+	};
+	
+	cpr at b018000 {
+		compatible = "qcom,cpr";
+		reg = <0xb018000 0x1000>;
+		interrupts = <0 15 1>, <0 16 1>, <0 17 1>;
+		eeproms = <&qfprom>;
+		...
+	};
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
