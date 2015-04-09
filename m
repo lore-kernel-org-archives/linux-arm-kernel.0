@@ -1,45 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 9 Apr 2015 16:34:33 +0100
-Subject: [PATCH] coresight: etb10: Print size of buffer we fail to allocate
-In-Reply-To: <CANLsYkzKJM0c4cw9=6bi=ZQYk9K6f-BLm7bSoUKUjgVNS5K_VA@mail.gmail.com>
-References: <1428531327-16902-1-git-send-email-broonie@kernel.org>
- <CANLsYkzoj5nPs2dnejOsDgEHZXArbXq5s6B7Cp3P1siu0Vv8YA@mail.gmail.com>
- <20150409145558.GW6023@sirena.org.uk>
- <CANLsYkzKJM0c4cw9=6bi=ZQYk9K6f-BLm7bSoUKUjgVNS5K_VA@mail.gmail.com>
-Message-ID: <20150409153433.GY6023@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 9 Apr 2015 16:36:29 +0100
+Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+In-Reply-To: <1428591425-17330-1-git-send-email-msalter@redhat.com>
+References: <20150409144029.GE9648@leverpostej>
+ <1428591425-17330-1-git-send-email-msalter@redhat.com>
+Message-ID: <20150409153629.GI9648@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 09:14:40AM -0600, Mathieu Poirier wrote:
-> On 9 April 2015 at 08:55, Mark Brown <broonie@kernel.org> wrote:
+On Thu, Apr 09, 2015 at 03:57:05PM +0100, Mark Salter wrote:
+> Currently in validate_group(), there is a static initializer
+> for fake_pmu.used_mask which is based on CPU_BITS_NONE but
+> the used_mask array size is based on CCI_PMU_MAX_HW_EVENTS.
+> CCI_PMU_MAX_HW_EVENTS is not based on NR_CPUS, so CPU_BITS_NONE
+> is not correct and will cause a build failure if NR_CPUS
+> is set high enough to make CPU_BITS_NONE larger than used_mask.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
 
-> > This depends on what the hardware does and how the device is registered
-> > - if the device is registered with an ID provided (which you can do)
-> > then AMBA won't bother reading the ID back and verifying that it's
-> > correct so there's no interaction with the hardware until we hit the
-> > driver.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-> Indeed possible, but in that case you'll get a core dump or the kernel
-> will simply hang waiting on the memory area being read.
+Arnd, Olof, are you happy to take this via arm-soc?
 
-That's the "depends on what the hardware does" bit - some will either
-read back nonsense or some predictable but undesirable value like all
-1s.
+My (broken) patch went via Will's tree because of a perf dependency, but
+other CCI patches have gone via you guys.
 
-> > I've not checked the DT case, though it doesn't seem like there's any
-> > check that the compatible string matches the ID read from the hardware
-> > which is a bit interesting...
+Thanks,
+Mark.
 
-> This is something I've been meaning to add for a while now but never
-> got around to do it.
-
-Yeah, and it's not clear what the best thing to do is - should we be
-using the DT to fix up problems in the hardware or should we be
-verifying that people got the DT right?  Usually it's the former...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/7078512a/attachment.sig>
+> ---
+>  drivers/bus/arm-cci.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> index 84fd660..759e41c 100644
+> --- a/drivers/bus/arm-cci.c
+> +++ b/drivers/bus/arm-cci.c
+> @@ -684,7 +684,7 @@ validate_group(struct perf_event *event)
+>  		 * Initialise the fake PMU. We only need to populate the
+>  		 * used_mask for the purposes of validation.
+>  		 */
+> -		.used_mask = CPU_BITS_NONE,
+> +		.used_mask = { 0 },
+>  	};
+>  
+>  	if (!validate_event(&fake_pmu, leader))
+> -- 
+> 1.8.3.1
+> 
