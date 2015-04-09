@@ -1,74 +1,40 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 9 Apr 2015 17:57:35 +0200
-Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
-In-Reply-To: <55269C05.2060401@gmail.com>
-References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
- <55269C05.2060401@gmail.com>
-Message-ID: <20150409175735.342d0111@bbrezillon>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 9 Apr 2015 10:59:26 -0500
+Subject: [PATCH 1/2] arm: boot: dts: am437x-sk: fix for new newhaven display
+ module revision
+Message-ID: <1428595167-10050-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+AM437x Starter Kit uses a NewHaven Display module with
+a 4.3" display and EDT FT5306 touchscreen
 
-On Thu, 09 Apr 2015 17:34:29 +0200
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+On that module's new revision, NewHave decided to change
+the pinout on the 6 pin flat-pcb touchscreen connector so
+that instead of having WAKE pin, we now have RESETn.
 
-> 
-> if you include a bunch of performance measurements, I guess it will help
-> you to get an agreement of replacing the driver instead of reworking it.
+The new display module is available on AM437x SK Beta and
+all new revisions while the older revision is only available
+on AM437x SK Alpha which, unfortunately, can't be supported
+anymore in mainline without a revert of this patch.
 
-Yep, I made some measurements using tcrypt a while ago, I'll provide
-them in the next round.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/boot/dts/am437x-sk-evm.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 
-> > Here are the main features brought by this new driver:
-> > - support for armada SoCs (up to 38x) while keeping support for older ones
-> >    (Orion and Kirkwood)
-> 
-> Unfortunately, the list above is missing Dove SoCs which also have a
-> CESA engine with TDMA support. I checked the registers _very_ quickly
-> but it seems that they are compatible with Kirkwood's CESA.
-
-I checked it too: it should work, but I don't have any board to test
-it :-/.
-
-> 
-> > - DMA mode to offload the CPU in case of intensive crypto usage
-> > - new algorithms: SHA256, DES and 3DES
-> >
-> [...]
-> > Boris Brezillon (2):
-> >    crypto: add new driver for Marvell CESA
-> >    crypto: marvell/CESA: update DT bindings documentation
-> 
-> IMHO, the patch set should be split up in:
-> - new core driver
-> - add support for TDMA on platforms that support it
-> - new cipher algorithms
-> - removal of old mv_cesa
-
-I agree for the 2 steps operation:
-- add new driver code without compiling it
-- remove old code, update Kconfig (add new dependencies) and Makefile
-  entries (compile the code in marvell/ instead of mv_cesa.c)
-
-Is there a good reason for separating the core, TDMA and algorithms
-support in different patches (keep Arnaud's authorship ?) ?
-Anyway, this should be feasible, but I thought the policy was to
-minimize the number of patches when submitting new drivers.
-
-> 
-> I'd love to test on Dove, but time still is very limited. I guess the
-> patches will receive another round anyway, maybe I find some until the
-> final version.
-
-No problem (thanks for the offer).
-
-Best Regards,
-
-Boris
-
+diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+index 832d24318f62..58dc1cd58bdd 100644
+--- a/arch/arm/boot/dts/am437x-sk-evm.dts
++++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+@@ -474,7 +474,7 @@
+ 		interrupt-parent = <&gpio0>;
+ 		interrupts = <31 0>;
+ 
+-		wake-gpios = <&gpio1 28 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&gpio1 28 GPIO_ACTIVE_LOW>;
+ 
+ 		touchscreen-size-x = <480>;
+ 		touchscreen-size-y = <272>;
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.3.0
