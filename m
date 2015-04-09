@@ -1,70 +1,90 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Apr 2015 16:29:50 +0200
-Subject: [GIT PULL] Allwinner drivers changes for 4.1
-Message-ID: <20150409142950.GA17959@lukather>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu,  9 Apr 2015 16:34:04 +0200
+Subject: [PATCH 1/6] drm/cache: Build-in drm_clflush_*() functions
+Message-ID: <1428590049-20357-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+From: Thierry Reding <treding@nvidia.com>
 
-This is a (late) pull request for a single SoC-specific driver that
-set up the SRAM mapping.
+Irrespective of whether or not the DRM core is built as a module, build
+the cache flush functions into the kernel. This is required because the
+implementation may require functions that shouldn't be exported to most
+drivers. DRM is somewhat of a special case here because it requires the
+cache maintenance functions to properly flush pages backed by shmemfs.
+These pages are directly given to display hardware for scanout, so they
+must be purged from any caches to avoid visual corruption on screen.
 
-This mapping was previously done by the bootloader, but in several
-occasions, we found out that it couldn't be relied on, and that the
-kernel should make sure that these mappings were correct.
+To achieve this, add a new boolean Kconfig symbol that drivers can
+select if they use any of these functions. drm_cache.c is then built if
+and only if this symbol is selected. TTM and the i915 driver already use
+these functions, so make them select DRM_CACHE.
 
-I'm aware that this is a late pull request, but hopefully, since it's
-a new driver, with no impact on other SoCs, it should be rather safe
-to merge.
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Daniel Vetter <daniel.vetter@intel.com>
+Cc: Jani Nikula <jani.nikula@linux.intel.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/gpu/drm/Kconfig      | 5 +++++
+ drivers/gpu/drm/Makefile     | 3 ++-
+ drivers/gpu/drm/i915/Kconfig | 1 +
+ 3 files changed, 8 insertions(+), 1 deletion(-)
 
-Thanks,
-Maxime
-
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drivers-for-4.1
-
-for you to fetch changes up to b7c4366ac68e1b0964a1ec2e53f91e5227273791:
-
-  drivers: soc: sunxi: Introduce SoC driver to map SRAMs (2015-04-05 15:08:09 +0200)
-
-----------------------------------------------------------------
-Allwinner drivers patches for 4.1
-
-This pull request contain a single driver to handle the SRAM mapping between
-the CPU and devices.
-
-----------------------------------------------------------------
-Maxime Ripard (1):
-      drivers: soc: sunxi: Introduce SoC driver to map SRAMs
-
- .../devicetree/bindings/soc/sunxi/sram.txt         |  64 ++++++
- drivers/soc/Kconfig                                |   1 +
- drivers/soc/Makefile                               |   1 +
- drivers/soc/sunxi/Kconfig                          |  10 +
- drivers/soc/sunxi/Makefile                         |   1 +
- drivers/soc/sunxi/sunxi_sram.c                     | 235 +++++++++++++++++++++
- include/linux/soc/sunxi/sunxi_sram.h               |  24 +++
- 7 files changed, 336 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/sunxi/sram.txt
- create mode 100644 drivers/soc/sunxi/Kconfig
- create mode 100644 drivers/soc/sunxi/Makefile
- create mode 100644 drivers/soc/sunxi/sunxi_sram.c
- create mode 100644 include/linux/soc/sunxi/sunxi_sram.h
-
+diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+index 47f2ce81b412..25bffdb89304 100644
+--- a/drivers/gpu/drm/Kconfig
++++ b/drivers/gpu/drm/Kconfig
+@@ -21,6 +21,10 @@ menuconfig DRM
+ 	  details.  You should also select and configure AGP
+ 	  (/dev/agpgart) support if it is available for your platform.
+ 
++config DRM_CACHE
++	bool
++	depends on DRM
++
+ config DRM_MIPI_DSI
+ 	bool
+ 	depends on DRM
+@@ -55,6 +59,7 @@ config DRM_LOAD_EDID_FIRMWARE
+ config DRM_TTM
+ 	tristate
+ 	depends on DRM
++	select DRM_CACHE
+ 	help
+ 	  GPU memory management subsystem for devices with multiple
+ 	  GPU memory types. Will be enabled automatically if a device driver
+diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+index 7d4944e1a60c..1ad54a0e4467 100644
+--- a/drivers/gpu/drm/Makefile
++++ b/drivers/gpu/drm/Makefile
+@@ -4,7 +4,7 @@
+ 
+ ccflags-y := -Iinclude/drm
+ 
+-drm-y       :=	drm_auth.o drm_bufs.o drm_cache.o \
++drm-y       :=	drm_auth.o drm_bufs.o \
+ 		drm_context.o drm_dma.o \
+ 		drm_fops.o drm_gem.o drm_ioctl.o drm_irq.o \
+ 		drm_lock.o drm_memory.o drm_drv.o drm_vm.o \
+@@ -33,6 +33,7 @@ obj-$(CONFIG_DRM_KMS_HELPER) += drm_kms_helper.o
+ CFLAGS_drm_trace_points.o := -I$(src)
+ 
+ obj-$(CONFIG_DRM)	+= drm.o
++obj-$(CONFIG_DRM_CACHE) += drm_cache.o
+ obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
+ obj-$(CONFIG_DRM_TTM)	+= ttm/
+ obj-$(CONFIG_DRM_TDFX)	+= tdfx/
+diff --git a/drivers/gpu/drm/i915/Kconfig b/drivers/gpu/drm/i915/Kconfig
+index 74acca9bcd9d..237be03e8a7c 100644
+--- a/drivers/gpu/drm/i915/Kconfig
++++ b/drivers/gpu/drm/i915/Kconfig
+@@ -10,6 +10,7 @@ config DRM_I915
+ 	# the shmem_readpage() which depends upon tmpfs
+ 	select SHMEM
+ 	select TMPFS
++	select DRM_CACHE
+ 	select DRM_KMS_HELPER
+ 	select DRM_PANEL
+ 	select DRM_MIPI_DSI
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/43f3efb0/attachment.sig>
+2.3.2
