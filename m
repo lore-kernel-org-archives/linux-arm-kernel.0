@@ -1,244 +1,137 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 10 Apr 2015 00:47:39 +0300
-Subject: [PATCHv7] media: i2c/adp1653: Devicetree support for adp1653
-In-Reply-To: <20150409074238.GA22603@amd>
-References: <20150402203417.GA6336@amd> <20150403083353.GA21070@amd>
- <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
- <20150403202624.GA4308@amd>
- <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
- <20150404074337.GA31064@amd>
- <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
- <20150404171116.GA15025@Nokia-N900>
- <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
- <20150409074238.GA22603@amd>
-Message-ID: <20150409214739.GD20756@valkosipuli.retiisi.org.uk>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 9 Apr 2015 14:52:02 -0700
+Subject: [PATCH v3 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
+ termination driver
+In-Reply-To: <20150409201115.GN30967@google.com>
+References: <20150408084448.5f0793b7@why.wild-wind.fr.eu.org>
+ <cover.1428564115.git.dhdang@apm.com>
+ <7923ef6ffd60a7c3de3c8c04fe746bbd3c15b5ac.1428564115.git.dhdang@apm.com>
+ <20150409201115.GN30967@google.com>
+Message-ID: <CADaLND=3dj5LuHx9+OLmes8zDO_qFa1qV4bJz4Oy5Gw_OsgGXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Thu, Apr 9, 2015 at 1:11 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Thu, Apr 09, 2015 at 10:05:03AM -0700, Duc Dang wrote:
+>> X-Gene v1 SoC supports total 2688 MSI/MSIX vectors coalesced into
+>> 16 HW IRQ lines.
+>>
+>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>> ...
+>
+>> --- /dev/null
+>> +++ b/drivers/pci/host/pci-xgene-msi.c
+>> @@ -0,0 +1,407 @@
+>> ...
+>
+>> +static void xgene_irq_domain_free(struct irq_domain *domain,
+>> +                               unsigned int virq, unsigned int nr_irqs)
+>> +{
+>> +     struct irq_data *d = irq_domain_get_irq_data(domain, virq);
+>> +     struct xgene_msi *msi = irq_data_get_irq_chip_data(d);
+>> +
+>> +     mutex_lock(&msi->bitmap_lock);
+>> +
+>> +     if (!test_bit(d->hwirq, msi->bitmap))
+>> +             pr_err("trying to free unused MSI#%lu\n", d->hwirq);
+>
+> I'll let Marc comment on the substance of this patch, but I'd sure like to
+> see more information in this and the other pr_errs below.  The text "failed
+> to create parent MSI domain" in the dmesg log is not enough.  Ideally it
+> would identify the relevant host bridge.
+>
+Hi Bjorn,
 
-(Cc linux-media. Media related patches should be sent there.)
+X-Gene has single MSI block that serves 5 PCIe ports. so in this
+implementation, 5 X-Gene PCIe host bridges share the same MSI domain.
 
-On Thu, Apr 09, 2015 at 09:42:38AM +0200, Pavel Machek wrote:
-> 
-> Add device tree support for adp1653 flash LED driver.
-> 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> 
-> ---
-> 
-> Second part of a patch after documentation was merged.
-> 
-> Please apply,
-> 							Pavel
-> 
-> diff --git a/drivers/media/i2c/adp1653.c b/drivers/media/i2c/adp1653.c
-> index 873fe19..d703636 100644
-> --- a/drivers/media/i2c/adp1653.c
-> +++ b/drivers/media/i2c/adp1653.c
-> @@ -8,6 +8,7 @@
->   * Contributors:
->   *	Sakari Ailus <sakari.ailus@iki.fi>
->   *	Tuukka Toivonen <tuukkat76@gmail.com>
-> + *	Pavel Machek <pavel@ucw.cz>
->   *
->   * This program is free software; you can redistribute it and/or
->   * modify it under the terms of the GNU General Public License
-> @@ -34,6 +35,8 @@
->  #include <linux/module.h>
->  #include <linux/i2c.h>
->  #include <linux/slab.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/gpio.h>
+I can add X-Gene 1 MSI driver name and device tree node name into
+these messages, but the host bridge information is not available.
 
-As Sebastian suggested, linux/of.h and linux/gpio/consumer.h should be used.
+As I understand, in case of error, the upper layer MSI core and driver
+code will check and report the error with additional device
+information (bus number, function number, etc)?
 
->  #include <media/adp1653.h>
->  #include <media/v4l2-device.h>
->  
-> @@ -306,9 +309,17 @@ adp1653_init_device(struct adp1653_flash *flash)
->  static int
->  __adp1653_set_power(struct adp1653_flash *flash, int on)
->  {
-> -	int ret;
-> +	int ret = 0;
-> +
-> +	if (flash->platform_data->power) {
-> +		ret = flash->platform_data->power(&flash->subdev, on);
-> +	} else {
-> +		gpiod_set_value(flash->platform_data->enable_gpio, on);
-> +		if (on)
-> +			/* Some delay is apparently required. */
-> +			udelay(20);
-> +	}
->  
-> -	ret = flash->platform_data->power(&flash->subdev, on);
->  	if (ret < 0)
->  		return ret;
+Regards,
+Duc Dang.
 
-Please check ret after assigning it. The assignment in declaration is
-unnecessary.
-
->  
-> @@ -316,8 +327,13 @@ __adp1653_set_power(struct adp1653_flash *flash, int on)
->  		return 0;
->  
->  	ret = adp1653_init_device(flash);
-> -	if (ret < 0)
-> +	if (ret >= 0)
-> +		return ret;
-> +
-> +	if (flash->platform_data->power)
->  		flash->platform_data->power(&flash->subdev, 0);
-> +	else
-> +		gpiod_set_value(flash->platform_data->enable_gpio, 0);
->  
->  	return ret;
->  }
-> @@ -407,21 +423,78 @@ static int adp1653_resume(struct device *dev)
->  
->  #endif /* CONFIG_PM */
->  
-> +static int adp1653_of_init(struct i2c_client *client,
-> +			   struct adp1653_flash *flash,
-> +			   struct device_node *node)
-> +{
-> +	u32 val;
-> +	struct adp1653_platform_data *pd;
-> +	struct device_node *child = NULL;
-
-The NULL assignment can be removed.
-
-> +
-> +	if (!node)
-> +		return -EINVAL;
-
-node is always non-NULL here; no need to check.
-
-> +
-> +	pd = devm_kzalloc(&client->dev, sizeof(*pd), GFP_KERNEL);
-> +	if (!pd)
-> +		return -ENOMEM;
-> +	flash->platform_data = pd;
-> +
-> +	child = of_get_child_by_name(node, "flash");
-> +	if (!child)
-> +		return -EINVAL;
-> +
-> +	if (of_property_read_u32(child, "flash-timeout-us", &val))
-
-You could read the values directly to the appropriate struct
-adp1653_platform_data field.
-
-> +		goto err;
-> +
-> +	pd->max_flash_timeout = val;
-> +	if (of_property_read_u32(child, "flash-max-microamp", &val))
-> +		goto err;
-> +	pd->max_flash_intensity = val/1000;
-> +
-> +	if (of_property_read_u32(child, "max-microamp", &val))
-> +		goto err;
-> +	pd->max_torch_intensity = val/1000;
-> +	of_node_put(child);
-> +
-> +	child = of_get_child_by_name(node, "indicator");
-> +	if (!child)
-> +		return -EINVAL;
-> +	if (of_property_read_u32(child, "max-microamp", &val))
-
-Let's wait a bit the resolution of the property name. I'm in principle fine
-with both. I can do the change once it's been decided, hopefully very soon.
-
-> +		goto err;
-> +	pd->max_indicator_intensity = val;
-> +
-> +	of_node_put(child);
-> +
-> +	pd->enable_gpio = devm_gpiod_get(&client->dev, "enable");
-> +	if (!pd->enable_gpio) {
-> +		dev_err(&client->dev, "Error getting GPIO\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +err:
-> +	dev_err(&client->dev, "Required property not found\n");
-> +	of_node_put(child);
-> +	return -EINVAL;
-> +}
-> +
-> +
->  static int adp1653_probe(struct i2c_client *client,
->  			 const struct i2c_device_id *devid)
->  {
->  	struct adp1653_flash *flash;
->  	int ret;
->  
-> -	/* we couldn't work without platform data */
-> -	if (client->dev.platform_data == NULL)
-> -		return -ENODEV;
-> -
->  	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
->  	if (flash == NULL)
->  		return -ENOMEM;
->  
->  	flash->platform_data = client->dev.platform_data;
-
-I think it'd be cleaner to make the assignment only if not using of, i.e.
-add else branch to the if below.
-
-> +	if (client->dev.of_node) {
-> +		ret = adp1653_of_init(client, flash, client->dev.of_node);
-> +		if (ret)
-> +			return ret;
-> +	}
->  
->  	mutex_init(&flash->power_lock);
->  
-> @@ -442,6 +515,7 @@ static int adp1653_probe(struct i2c_client *client,
->  	return 0;
->  
->  free_and_quit:
-> +	dev_err(&client->dev, "adp1653: failed to register device\n");
->  	v4l2_ctrl_handler_free(&flash->ctrls);
->  	return ret;
->  }
-> @@ -464,7 +538,7 @@ static const struct i2c_device_id adp1653_id_table[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, adp1653_id_table);
->  
-> -static struct dev_pm_ops adp1653_pm_ops = {
-> +static const struct dev_pm_ops adp1653_pm_ops = {
->  	.suspend	= adp1653_suspend,
->  	.resume		= adp1653_resume,
->  };
-> diff --git a/include/media/adp1653.h b/include/media/adp1653.h
-> index 1d9b48a..34b505e 100644
-> --- a/include/media/adp1653.h
-> +++ b/include/media/adp1653.h
-> @@ -100,9 +100,11 @@ struct adp1653_platform_data {
->  	int (*power)(struct v4l2_subdev *sd, int on);
->  
->  	u32 max_flash_timeout;		/* flash light timeout in us */
-> -	u32 max_flash_intensity;	/* led intensity, flash mode */
-> -	u32 max_torch_intensity;	/* led intensity, torch mode */
-> -	u32 max_indicator_intensity;	/* indicator led intensity */
-> +	u32 max_flash_intensity;	/* led intensity, flash mode, mA */
-> +	u32 max_torch_intensity;	/* led intensity, torch mode, mA */
-> +	u32 max_indicator_intensity;	/* indicator led intensity, uA */
-> +
-> +	struct gpio_desc *enable_gpio;	/* for device-tree based boot */
->  };
->  
->  #define to_adp1653_flash(sd)	container_of(sd, struct adp1653_flash, subdev)
-> 
-
-Let me know if you're going to send v8 or if I can make the changes. I think
-we're pretty much done then.
-
--- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+>> +     else
+>> +             clear_bit(d->hwirq, msi->bitmap);
+>> +
+>> +     mutex_unlock(&msi->bitmap_lock);
+>> +
+>> +     irq_domain_free_irqs_parent(domain, virq, nr_irqs);
+>> +}
+>> +
+>> +static const struct irq_domain_ops msi_domain_ops = {
+>> +     .alloc  = xgene_irq_domain_alloc,
+>> +     .free   = xgene_irq_domain_free,
+>> +};
+>> +
+>> +static int xgene_allocate_domains(struct xgene_msi *msi)
+>> +{
+>> +     msi->domain = irq_domain_add_linear(NULL, msi->settings->nr_msi_vec,
+>> +                                         &msi_domain_ops, msi);
+>> +
+>> +     if (!msi->domain) {
+>> +             pr_err("failed to create parent MSI domain\n");
+>> +             return -ENOMEM;
+>> +     }
+>> +
+>> +     msi->mchip.of_node = msi->node;
+>> +     msi->mchip.domain = pci_msi_create_irq_domain(msi->mchip.of_node,
+>> +                                                   &xgene_msi_domain_info,
+>> +                                                   msi->domain);
+>> +
+>> +     if (!msi->mchip.domain) {
+>> +             pr_err("failed to create MSI domain\n");
+>> +             irq_domain_remove(msi->domain);
+>> +             return -ENOMEM;
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static void xgene_free_domains(struct xgene_msi *msi)
+>> +{
+>> +     if (msi->mchip.domain)
+>> +             irq_domain_remove(msi->mchip.domain);
+>> +     if (msi->domain)
+>> +             irq_domain_remove(msi->domain);
+>> +}
+>> +
+>> +static int xgene_msi_init_allocator(struct xgene_msi *xgene_msi)
+>> +{
+>> +     u32 msi_irq_count = xgene_msi->settings->nr_msi_vec;
+>> +     u32 hw_irq_count = xgene_msi->settings->nr_hw_irqs;
+>> +     int size = BITS_TO_LONGS(msi_irq_count) * sizeof(long);
+>> +
+>> +     xgene_msi->bitmap = kzalloc(size, GFP_KERNEL);
+>> +     if (!xgene_msi->bitmap)
+>> +             return -ENOMEM;
+>> +
+>> +     mutex_init(&xgene_msi->bitmap_lock);
+>> +
+>> +     xgene_msi->msi_virqs = kcalloc(hw_irq_count, sizeof(int), GFP_KERNEL);
+>> +     if (!xgene_msi->msi_virqs)
+>> +             return -ENOMEM;
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static irqreturn_t xgene_msi_isr(int irq, void *data)
+>> +{
+>> +     struct xgene_msi *xgene_msi = (struct xgene_msi *) data;
+>> +     unsigned int virq;
+>> +     int msir_index, msir_reg, msir_val, hw_irq;
+>> +     u32 intr_index, grp_select, msi_grp, processed = 0;
+>> +     u32 nr_hw_irqs, irqs_per_index, index_per_group;
+>> +
+>> +     msi_grp = irq - xgene_msi->msi_virqs[0];
+>> +     if (msi_grp >= xgene_msi->settings->nr_hw_irqs) {
+>> +             pr_err("invalid msi received\n");
+>> +             return IRQ_NONE;
+>> +     }
+>
+> Bjorn
