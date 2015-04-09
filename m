@@ -1,59 +1,94 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 9 Apr 2015 14:19:14 +0200
-Subject: [PATCHv7] media: i2c/adp1653: Devicetree support for adp1653
-In-Reply-To: <20150409112943.GA31173@amd>
-References: <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
- <20150403202624.GA4308@amd>
- <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
- <20150404074337.GA31064@amd>
- <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
- <20150404171116.GA15025@Nokia-N900>
- <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
- <20150409074238.GA22603@amd> <20150409091017.GA4526@earth>
- <20150409112943.GA31173@amd>
-Message-ID: <20150409121913.GB18713@earth>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 9 Apr 2015 14:28:07 +0200
+Subject: [PATCH v2 04/10] KVM: arm: guest debug, add stub
+ KVM_SET_GUEST_DEBUG ioctl
+In-Reply-To: <20150401175529.642f64af@thinkpad-w530>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-5-git-send-email-alex.bennee@linaro.org>
+ <20150401175529.642f64af@thinkpad-w530>
+Message-ID: <20150409122806.GB3212@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 01:29:43PM +0200, Pavel Machek wrote:
-> On Thu 2015-04-09 11:10:17, Sebastian Reichel wrote:
-> > On Thu, Apr 09, 2015 at 09:42:38AM +0200, Pavel Machek wrote:
-> > > [...]
-> > > +#include <linux/of_gpio.h>
-> > > +#include <linux/gpio.h>
-> > > [...]
-> > 
-> > This should probably be
-> > 
-> > #include <linux/of.h>
-> > #include <linux/gpio/consumer.h>
+On Wed, Apr 01, 2015 at 05:55:29PM +0200, David Hildenbrand wrote:
+> > This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
+> > ioctl. Currently any operation flag will return EINVAL. Actual
 > 
-> And I thought people would only bikesched paint on the
-> Documentation. Sakari, feel free to change that, but
+> Well it won't return -EINVAL if you push in KVM_GUESTDBG_ENABLE or 0.
+> 
+> "Any unsupported flag will return -EINVAL. For now, only KVM_GUESTDBG_ENABLE is
+> supported, although it won't have any effects."
+> 
+> > functionality will be added with further patches.
+> > 
+> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
+> > 
+> > ---
+> > v2
+> >   - simplified form of the ioctl (stuff will go into setup_debug)
+> > 
+> > diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> > index b112efc..06c5064 100644
+> > --- a/Documentation/virtual/kvm/api.txt
+> > +++ b/Documentation/virtual/kvm/api.txt
+> > @@ -2604,7 +2604,7 @@ handled.
+> >  4.87 KVM_SET_GUEST_DEBUG
+> > 
+> >  Capability: KVM_CAP_SET_GUEST_DEBUG
+> > -Architectures: x86, s390, ppc
+> > +Architectures: x86, s390, ppc, arm64
+> >  Type: vcpu ioctl
+> >  Parameters: struct kvm_guest_debug (in)
+> >  Returns: 0 on success; -1 on error
+> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> > index 5560f74..445933d 100644
+> > --- a/arch/arm/kvm/arm.c
+> > +++ b/arch/arm/kvm/arm.c
+> > @@ -183,6 +183,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+> >  	case KVM_CAP_ARM_PSCI:
+> >  	case KVM_CAP_ARM_PSCI_0_2:
+> >  	case KVM_CAP_READONLY_MEM:
+> > +	case KVM_CAP_SET_GUEST_DEBUG:
+> >  		r = 1;
+> >  		break;
+> >  	case KVM_CAP_COALESCED_MMIO:
+> > @@ -303,10 +304,21 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+> >  	kvm_arm_set_running_vcpu(NULL);
+> >  }
+> > 
+> > +#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE)
+> 
+> That makes me rather think that it is another flag.
+> 
+> We(s390x) use VALID_GUESTDBG_FLAGS, what about that or KVM_GUESTDBG_VALID_MASK?
+> 
+> > +
+> >  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+> >  					struct kvm_guest_debug *dbg)
+> >  {
+> > -	return -EINVAL;
+> > +	if (dbg->control & KVM_GUESTDBG_ENABLE) {
+> > +		if (dbg->control & ~KVM_GUESTDBG_VALID)
+> > +			return -EINVAL;
+> 
+> I'd move that check directly to the start of the function and bail out on any
+> unsupported flag.
+> 
+> > +
+> > +		vcpu->guest_debug = dbg->control;
+> > +	} else {
+> > +		/* If not enabled clear all flags */
+> > +		vcpu->guest_debug = 0;
+> > +	}
+> > +	return 0;
+> >  }
+> > 
+> > 
+> 
+> David
+>
 
-> a) I don't see why Sebastian's version is better
+I don't see any follow-up from Alex on this, so I feel the need to
+"+1" all David's comments here.
 
-You neither use <linux/of_gpio.h> nor <linux/gpio.h>.
-
-Well "include/linux/gpio.h" describes the old gpio API. The new
-gpiod gpiod API is described in "include/linux/gpio/consumer.h" and
-you use it, so the include should be included ;)
-
-You don't use anything from "include/linux/of_gpio.h", but it
-includes "include/linux/of.h", which you are using. So you should
-include <linux/of.h> instead ;)
-
-> b) am pretty sure there is about infinite number of
-> possibilities there.
-
-Yes, but most are wrong. You should include all headers,
-that are used by you - nothing more and nothing less.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/8604f8c9/attachment.sig>
+drew
