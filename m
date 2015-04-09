@@ -1,44 +1,49 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 9 Apr 2015 14:56:07 +0200
-Subject: [PATCH v2 05/10] KVM: arm: introduce kvm_arch_setup/clear_debug()
-In-Reply-To: <20150401182855.4650b14a@thinkpad-w530>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-6-git-send-email-alex.bennee@linaro.org>
- <20150401182855.4650b14a@thinkpad-w530>
-Message-ID: <20150409125607.GD3212@hawk.usersys.redhat.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Thu, 9 Apr 2015 14:59:27 +0200
+Subject: [PATCHv7] media: i2c/adp1653: fix includes
+In-Reply-To: <CABxcv=mB=LqO2paGfYq1jCbky=kudT-mS8cJ-pPwdqZYQLeO4A@mail.gmail.com>
+References: <20150404074337.GA31064@amd>
+ <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
+ <20150404171116.GA15025@Nokia-N900>
+ <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
+ <20150409074238.GA22603@amd> <20150409091017.GA4526@earth>
+ <20150409112943.GA31173@amd> <20150409121913.GB18713@earth>
+ <20150409123155.GB9563@amd>
+ <CABxcv=mB=LqO2paGfYq1jCbky=kudT-mS8cJ-pPwdqZYQLeO4A@mail.gmail.com>
+Message-ID: <20150409125927.GC12339@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 06:28:55PM +0200, David Hildenbrand wrote:
-> > This is a precursor for later patches which will need to do more to
-> > setup debug state before entering the hyp.S switch code. The existing
-> > functionality for setting mdcr_el2 has been moved out of hyp.S and now
-> > uses the value kept in vcpu->arch.mdcr_el2.
-> > 
-> > This also moves the conditional setting of the TDA bit from the hyp code
-> > into the C code.
-> > 
-> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> > 
-> >  create mode 100644 arch/arm64/kvm/debug.c
-> > 
-> > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> > index 41008cd..8c01c97 100644
-> > --- a/arch/arm/include/asm/kvm_host.h
-> > +++ b/arch/arm/include/asm/kvm_host.h
-> > @@ -242,5 +242,7 @@ static inline void kvm_arch_hardware_unsetup(void) {}
-> >  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-> >  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> >  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-> > +static inline void kvm_arch_setup_debug(struct kvm_vcpu *vcpu) {}
-> > +static inline void kvm_arch_clear_debug(struct kvm_vcpu *vcpu) {}
+On Thursday 09 April 2015 14:43:59 Javier Martinez Canillas wrote:
+> Hello Pavel,
 > 
-> Do you really want to call these functions "kvm_arch.." although they are not
-> defined for other arch and not triggered by common code?
->
+> >
+> > diff --git a/drivers/media/i2c/adp1653.c b/drivers/media/i2c/adp1653.c
+> > index d703636..7107ac2 100644
+> > --- a/drivers/media/i2c/adp1653.c
+> > +++ b/drivers/media/i2c/adp1653.c
+> > @@ -35,8 +35,8 @@
+> >  #include <linux/module.h>
+> >  #include <linux/i2c.h>
+> >  #include <linux/slab.h>
+> > -#include <linux/of_gpio.h>
+> > -#include <linux/gpio.h>
+> > +#include <linux/of.h>
+> > +#include <linux/gpio/consumer.h>
+> >  #include <media/adp1653.h>
+> >  #include <media/v4l2-device.h>
+> >
+> 
+> Please re-spin your previous patch and submit it properly.
+> 
+> Best regards,
+> Javier
 
-Agreed. If other arches want something similar we can rename/refactor
-later. If these are arm-only functions, then we don't need the generic
-prefix, which is actually even a bit confusing.
+Hi all! What about stopping this meaningless discussion about resending
+full patch series when everybody know how to fix is quickly in editor
+(e.g with sed under 5s) and not wasting another 10 minutes to generate
+new unified diff sent via SMTP protocol?
 
-drew 
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
