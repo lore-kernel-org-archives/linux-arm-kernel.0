@@ -1,60 +1,81 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 9 Apr 2015 08:46:55 -0600
-Subject: [PATCH] coresight: etb10: Print size of buffer we fail to allocate
-In-Reply-To: <1428531327-16902-1-git-send-email-broonie@kernel.org>
-References: <1428531327-16902-1-git-send-email-broonie@kernel.org>
-Message-ID: <CANLsYkzoj5nPs2dnejOsDgEHZXArbXq5s6B7Cp3P1siu0Vv8YA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  9 Apr 2015 15:47:25 +0100
+Subject: [PATCH v7 0/9] mfd: watchdog: rtc: New driver for ST's LPC IP
+Message-ID: <1428590854-14095-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 April 2015 at 16:15, Mark Brown <broonie@kernel.org> wrote:
-> When we initialise the ETB driver we attempt to allocate a buffer suitable
-> for storing the data buffered in the hardware based on sizing information
-> reported by the hardware. Unfortunately if the hardware is not properly
-> configured (for example if power domains are not set up correctly) then we
-> may read back a nonsensically large value and therefore the allocation will
-> be too big to succeed. Print an error message showing the amount of memory
-> we tried to allocate if the buffer allocation fails to help users diagnose
-> such problems.
->
-> Normally it is bad practice to print an error message on memory allocation
-> failures since there are verbose core messages reported for this but in
-> this case where the allocation size might be incorrect it is a useful hint.
->
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> ---
->  drivers/hwtracing/coresight/coresight-etb10.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-> index 40049869aecd..46eb9f88a29f 100644
-> --- a/drivers/hwtracing/coresight/coresight-etb10.c
-> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
-> @@ -462,8 +462,11 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
->
->         drvdata->buf = devm_kzalloc(dev,
->                                     drvdata->buffer_depth * 4, GFP_KERNEL);
-> -       if (!drvdata->buf)
-> +       if (!drvdata->buf) {
-> +               dev_err(dev, "Failed to allocate %u bytes for buffer data\n",
-> +                       drvdata->buffer_depth * 4);
->                 return -ENOMEM;
-> +       }
->
->         desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
->         if (!desc)
-> --
-> 2.1.4
->
+[Alessandro: This just needs RTC Acks now]
+ 
+ST's Low Power Controller (LPC) controls two devices; watchdog and RTC.
+Only one of the devices can be used at any one time, which is enforced
+by the Device Driver model.
+ 
+This driver set provides everything you need to choose one (and only
+one) of the LPC devices to run per I/P block, of which there are two
+on the enabled STiH407 h/w.
 
-This could be helpful during the bringup phase of the device when the
-HW implementation isn't showing what's expected/intended.  On the
-flips side such a problem would show up pretty quickly, specifically
-with the -ENOMEM guarding against future damage.
+Version 7:
+ - Fix 2 legacy typos in the binding documentation compatible string
+   examples.  
+ 
+Version 6:
+ - RTC: GPL v2 => GPL to reflect the information in the header
+ - Applied another Reviewed-by from Guenter
+ 
+Version 5:
+ - Disable WDT clock over suspend
+ - WDT: GPL v2 => GPL to reflect the information in the header
+ - Change module name in Kconfig help and file header
+ 
+Version 4:
+ - Use {readl,writel}_relaxed() calls
+ - Add Guenter's Reviewed-by
+ - Rebased onto v4.0-rc1
+ 
+Version 3:
+ - Move Regmap pointer into core device data structure
+ - Remove error message from devm_ioremap_resource
 
-I'll take this patch but will rework the commit message a little.  If
-the power domains are not setup properly the device won't show up on
-AMBA and as such won't get probed.
+Version 2:
+ - Only calculate keepalive once in probe()
+ - Check for a 0 clk_rate
+ - Set limits using predefined attributes from watchdog_device
+ - CONFIG_PM => CONFIG_SLEEP
+ - Call st_wdog_setup() on resume
+ - Remove MFD driver -- instead rely on driver probing mechanism
+   which continues attempting to bind to different drivers until
+   one does not return -ENODEV
 
-Thanks,
-Mathieu
+Lee Jones (9):
+  mfd: dt-bindings: Provide human readable defines for LPC mode choosing
+  ARM: multi_v7_defconfig: Enable support for ST's LPC Watchdog
+  ARM: multi_v7_defconfig: Enable support for ST's LPC RTC
+  ARM: STi: DT: STiH407: Add Device Tree node for the LPC
+  watchdog: bindings: Provide ST bindings for ST's LPC Watchdog device
+  watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+  rtc: bindings: Provide ST bindings for ST's LPC RTC device
+  rtc: st: add new driver for ST's LPC RTC
+  MAINTAINERS: Add Watchdog and RTC files to STI's maintainer entry
+
+ .../devicetree/bindings/rtc/rtc-st-lpc.txt         |  25 ++
+ .../devicetree/bindings/watchdog/st_lpc_wdt.txt    |  38 +++
+ MAINTAINERS                                        |   2 +
+ arch/arm/boot/dts/stih407-family.dtsi              |  20 ++
+ arch/arm/configs/multi_v7_defconfig                |   2 +
+ drivers/rtc/Kconfig                                |  12 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-st-lpc.c                           | 354 +++++++++++++++++++++
+ drivers/watchdog/Kconfig                           |  13 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/st_lpc_wdt.c                      | 344 ++++++++++++++++++++
+ include/dt-bindings/mfd/st-lpc.h                   |  15 +
+ 12 files changed, 827 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
+ create mode 100644 Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+ create mode 100644 drivers/rtc/rtc-st-lpc.c
+ create mode 100644 drivers/watchdog/st_lpc_wdt.c
+ create mode 100644 include/dt-bindings/mfd/st-lpc.h
+
+-- 
+1.9.1
