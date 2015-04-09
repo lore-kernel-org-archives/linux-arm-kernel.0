@@ -1,55 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Apr 2015 16:30:33 +0100
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150409150918.GP18048@atomide.com>
-References: <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
- <20150406151939.GG18048@atomide.com>
- <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
- <20150406174245.GJ18048@atomide.com>
- <20150407135713.GL4027@n2100.arm.linux.org.uk>
- <20150407152207.GM18048@atomide.com>
- <20150408230658.GO4027@n2100.arm.linux.org.uk>
- <20150409134843.GQ4027@n2100.arm.linux.org.uk>
- <20150409150918.GP18048@atomide.com>
-Message-ID: <20150409153033.GR4027@n2100.arm.linux.org.uk>
+From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
+Date: Thu, 9 Apr 2015 15:31:39 +0000
+Subject: [PATCH 2/2] arm/dts: Add nodes for flexcan devices present on
+ LS1021A SoC
+In-Reply-To: <55269444.7050707@pengutronix.de>
+References: <1428591087-12831-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1428591087-12831-2-git-send-email-bhupesh.sharma@freescale.com>
+ <55269444.7050707@pengutronix.de>
+Message-ID: <BY1PR0301MB130321631BC01630EA87441282FB0@BY1PR0301MB1303.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 08:09:19AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150409 06:49]:
-> > On Thu, Apr 09, 2015 at 12:06:58AM +0100, Russell King - ARM Linux wrote:
-> > > On Tue, Apr 07, 2015 at 08:22:08AM -0700, Tony Lindgren wrote:
-> > > > Works for me. The above needs the following fix folded in to build:
-> > > > 
-> > > > --- a/arch/arm/mm/proc-v7.S
-> > > > +++ b/arch/arm/mm/proc-v7.S
-> > > > @@ -532,7 +532,7 @@ __v7_ca9mp_proc_info:
-> > > >  __v7_ca8_proc_info:
-> > > >  	.long	0x410fc080
-> > > >  	.long	0xff0ffff0
-> > > > -	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
-> > > > +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
-> > > >  	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
-> > > >  
-> > > >  #endif	/* CONFIG_ARM_LPAE */
-> > > 
-> > > Thanks, merged into the original patch.
-> > 
-> > Do you want to give me an ack for this, thanks?
-> 
-> The patch below works for me:
-> 
-> Tested-by: Tony Lindgren <tony@atomide.com>
-> 
-> I'm wondering if this and the follow-up patch should be tagged
-> cc: stable?
-> 
-> They together fix apps segfaulting both with and without 430973
-> for some common use cases for distro kernels.
+Hi Marc,
 
-If we do, I'll want to merge both patches together...  For the time being,
-I'll queue it without the stable tag.
+> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
+> 
+> On 04/09/2015 04:51 PM, Bhupesh Sharma wrote:
+> > From: Sakar Arora <Sakar.Arora@freescale.com>
+> >
+> > This patch adds the device nodes for flexcan controller(s) present on
+> > LS1021A SoC.
+> >
+> > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> > Signed-off-by: Sakar Arora <Sakar.Arora@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/ls1021a-qds.dts |    8 ++++++++
+> >  arch/arm/boot/dts/ls1021a.dtsi    |   20 ++++++++++++++++++++
+> >  2 files changed, 28 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/ls1021a-qds.dts
+> > b/arch/arm/boot/dts/ls1021a-qds.dts
+> > index 9c5e16b..1641a04 100644
+> > --- a/arch/arm/boot/dts/ls1021a-qds.dts
+> > +++ b/arch/arm/boot/dts/ls1021a-qds.dts
+> > @@ -238,3 +238,11 @@
+> >  &uart1 {
+> >  	status = "okay";
+> >  };
+> > +
+> > +&can0 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&can1 {
+> > +	status = "okay";
+> > +};
+> > diff --git a/arch/arm/boot/dts/ls1021a.dtsi
+> > b/arch/arm/boot/dts/ls1021a.dtsi index c70bb27..c44661b 100644
+> > --- a/arch/arm/boot/dts/ls1021a.dtsi
+> > +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> > @@ -332,6 +332,26 @@
+> >  			status = "disabled";
+> >  		};
+> >
+> > +		can0: can at 2a70000 {
+> > +			compatible = "fsl,ls1021a-flexcan";
+> > +			reg = <0x0 0x2a70000 0x0 0x1000>;
+> > +			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>;
+> > +			clocks = <&platform_clk 1>;
+> > +			clock-frequency = <150000000>;
+> 
+> Please don't use clock-frequency, it's only needed for powerpcs without
+> proper clock support.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Ok. Will fix in v2.
+
+> 
+> > +			clock-names = "per";
+> 
+> Please provide a per and ipg clock, otherwise the driver will not work
+> properly.
+
+Ok. Will fix in v2.
+
+> > +			little-endian;
+> > +		};
+> 
+
+Regards,
+Bhupesh
