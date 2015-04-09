@@ -1,50 +1,82 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 09 Apr 2015 18:39:55 +0530
-Subject: [PATCH 1/5] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <1427358533-3754-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1427358533-3754-1-git-send-email-takahiro.akashi@linaro.org>
- <1427358533-3754-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <55267A23.2040007@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 9 Apr 2015 14:12:23 +0100
+Subject: [PATCH v3 2/5] arm64: use fixmap region for permanent FDT mapping
+In-Reply-To: <CAKv+Gu_dqMtLhLdCjj-eWn+tiAkwwXvNE6LJv7GPkx4aqTqsdA@mail.gmail.com>
+References: <1426698308-726-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426698308-726-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20150409114911.GB18488@leverpostej>
+ <CAKv+Gu_dqMtLhLdCjj-eWn+tiAkwwXvNE6LJv7GPkx4aqTqsdA@mail.gmail.com>
+Message-ID: <20150409131223.GA9527@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Takahiro,
+> >> +NOTE: versions prior to v4.1 require, in addition to the requirements
+> >> +listed above, that the dtb be placed above the kernel Image inside the
+> >> +same naturally aligned 512 MB region.
+> >
+> > Minor nit: This would read a little better if we just said "versions
+> > prior to v4.1 also require that ...", dropping "in addition to the
+> > requirements listed above".
+> >
+> 
+> OK
+> 
+> Actually, I realized that this is incorrect anyway: it is not the same
+> naturally aligned 512 MB region, it is actually 'within 512 MB of the
+> start of the kernel Image' since that itself is naturally aligned to
+> 512 MB in the virtual address space.
 
-On Thursday 26 March 2015 01:58 PM, AKASHI Takahiro wrote:
-> Crash dump kernel will access memory regions in system kernel via
-> copy_oldmem_page(), which reads a page with ioremap'ing it assuming that
-> such pages are not part of main memory of crash dump kernel.
-> This is true under non-UEFI environment because kexec-tools modifies
-> a device tree adding "usablemem" attributes to memory sections.
-> Under UEFI, however, this is not true because UEFI remove memory sections
-> in a device tree and export all the memory regions, even though they belong
-> to system kernel.
->
-> So we should add "mem=X[MG]" boot parameter to limit the meory size and
-> avoid hitting the following assertion in ioremap():
-> 	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-> 		return NULL;
+Surely starting at TEXT_OFFSET bytes below the kernel image? ;)
 
-Well I am using your updated kexec-tool which has support of automatic 
-addition of "mem=" parameter. I found that this warning is still 
-appearing and therefore another error about "Kdump: vmcore not initialized".
+> >> +static void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+> >> +{
+> >> +     const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
+> >> +     phys_addr_t dt_phys_base = dt_phys & ~(FIX_FDT_SIZE - 1);
+> >> +
+> >> +     /*
+> >> +      * Make sure that the FDT region can be mapped without the need to
+> >> +      * allocate additional translation table pages, so that it is safe
+> >> +      * to call create_pgd_mapping() this early.
+> >> +      * On 4k pages, we'll use section mappings for the region so we
+> >> +      * only have to be in the same PUD as the rest of the fixmap.
+> >> +      * On 64k pages, we need to be in the same PMD as well, as the region
+> >> +      * will be mapped using PTEs.
+> >> +      */
+> >> +     BUILD_BUG_ON(dt_virt_base & (SZ_2M - 1));
+> >
+> > s/SZ_2M/FIX_FDT_SIZE/
+> >
+> > Perhaps we should also have:
+> >
+> > BUILD_BUG_ON_NOT_POWER_OF_2(FIX_FDT_SIZE);
+> >
+> > ... given it's necessary for the address masking we do here.
+> >
+> > [...]
+> >
+> 
+> I was going to suggest to use SZ_2M for the masking, but map a 4 MB
+> window. That way, we can relax the requirement from "should not cross
+> a 2 MB boundary' to 'should not exceed 2 MB in size', which is
+> arguable easier to adhere to, since the latter is a property of the
+> DTB itself, whereas the former is a property of whatever your malloc()
+> gives you. That means the mask would remain SZ_2M, and the size would
+> become SZ_4M
 
-Memory address for which ioremap failed was almost at the top of 
-crash_reserved_mem. So I modified kexec-tool [1] to accept user specific 
-mem= parameter with a value lesser than physical location which was 
-being remapped, however still the warning was there.
+That sounds good so long as it doesn't get in the way of increasing
+FIX_FDT_SIZE in future.
 
-Further I noticed that there is no reserved memblock with nonzero 
-memblock_region->size when early_mem -> memblock_enforce_memory_limit is 
-called. Therefore this mem= param is not limiting memory location in my 
-case.
+> > I've tested this on my Juno (atop of arm64 for-next/core), and all seems
+> > well, so with those points addressed:
+> >
+> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> > Tested-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Thanks, but this code will likely look quite different if we are going
+> to cater for moving the kernel out of the linear range, so by then I
+> probably won't be able to retain these tags.
 
-I was just wondering, why do not we use ioremap_cache instead of ioremap 
-in copy_oldmem_page?
+Ok. I guess you'll merge the two series together?
 
-~Pratyush
-
-
-
-[1] 
-https://github.com/pratyushanand/kexec-tools/commit/7dc38d587cb32d4522f6baf035d09eeaf71c5105
+Thanks,
+Mark.
