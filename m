@@ -1,13 +1,14 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu,  9 Apr 2015 13:20:42 -0600
-Subject: [PATCH v19 2/3] ARM: config: Update qcom_defconfig to enable cpuidle
+Date: Thu,  9 Apr 2015 13:20:43 -0600
+Subject: [PATCH v19 3/3] ARM: config: multi_v7: Update to enable cpuidle for
+ QCOM SoCs
 In-Reply-To: <1428607243-7723-1-git-send-email-lina.iyer@linaro.org>
 References: <1428607243-7723-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1428607243-7723-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1428607243-7723-4-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update qcom_defconfig to allow cpuidle for QCOM cpus.
+Update defconfig to allow cpuidle for QCOM cpus.
 
 * Enable QCOM_PM
 * Enable ARM_CPUIDLE
@@ -15,28 +16,28 @@ Update qcom_defconfig to allow cpuidle for QCOM cpus.
 Cc: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm/configs/qcom_defconfig | 2 ++
+ arch/arm/configs/multi_v7_defconfig | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 8c7da33..33a5339 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -30,6 +30,7 @@ CONFIG_CLEANCACHE=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e8a4c95..18fcc66 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -96,6 +96,7 @@ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_STAT_DETAILS=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
  CONFIG_CPU_IDLE=y
 +CONFIG_ARM_CPUIDLE=y
- CONFIG_VFP=y
  CONFIG_NEON=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-@@ -135,6 +136,7 @@ CONFIG_DMADEVICES=y
- CONFIG_QCOM_BAM_DMA=y
- CONFIG_STAGING=y
+ CONFIG_ARM_ZYNQ_CPUIDLE=y
+ CONFIG_NET=y
+@@ -454,6 +455,7 @@ CONFIG_SERIO_NVEC_PS2=y
+ CONFIG_NVEC_POWER=y
+ CONFIG_NVEC_PAZ00=y
  CONFIG_QCOM_GSBI=y
 +CONFIG_QCOM_PM=y
  CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_COMMON_CLK_MAX77686=y
  CONFIG_APQ_MMCC_8084=y
- CONFIG_IPQ_GCC_806X=y
 -- 
 2.1.0
