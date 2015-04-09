@@ -1,23 +1,19 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Apr 2015 09:33:46 +0200
-Subject: [PATCH] ARM: Remove deprecated symbol from defconfig files
-In-Reply-To: <1428353842-3488-1-git-send-email-public_timo.s@silentcreek.de>
-References: <1428353842-3488-1-git-send-email-public_timo.s@silentcreek.de>
-Message-ID: <20150409073346.GK26727@lukather>
+Date: Thu, 9 Apr 2015 09:39:18 +0200
+Subject: [PATCH v2] ARM: dts: sun5i: Enable touchscreen on Utoo P66
+In-Reply-To: <1427902177-26526-1-git-send-email-hdegoede@redhat.com>
+References: <1427902177-26526-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150409073918.GL26727@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 10:57:22PM +0200, public_timo.s at silentcreek.de wrote:
-> From: Timo Sigurdsson <public_timo.s@silentcreek.de>
+On Wed, Apr 01, 2015 at 05:29:37PM +0200, Hans de Goede wrote:
+> Add a node for the chipone-icn8318 touchscreen found on the Utoo P66 tablet.
 > 
-> Commit b2b3a8b934e6 ("power/reset: Remove sun6i reboot driver") removed
-> the sun6i reboot driver. But sunxi_defconfig and multi_v7_defconfig
-> still contain the symbol CONFIG_POWER_RESET_SUN6I that was deprecated
-> by that commit, so remove it.
-> 
-> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Applied, thanks!
+Merged, thanks!
+
 Maxime
 
 -- 
@@ -30,4 +26,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/b38796a6/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/da6eb863/attachment.sig>
