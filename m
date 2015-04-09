@@ -1,31 +1,48 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  9 Apr 2015 22:04:08 +0200
-Subject: [PATCH v5 04/11] ARM: ARMv7M: define size of vector table for Vybrid
+Date: Thu,  9 Apr 2015 22:04:10 +0200
+Subject: [PATCH v5 06/11] ARM: unify MMU/!MMU addruart calls
 In-Reply-To: <1428609855-27657-1-git-send-email-stefan@agner.ch>
 References: <1428609855-27657-1-git-send-email-stefan@agner.ch>
-Message-ID: <1428609855-27657-5-git-send-email-stefan@agner.ch>
+Message-ID: <1428609855-27657-7-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vybrids has 112 peripherial interrupts which can be routed to the
-Cortex-M4's NVIC interrupt controller.
+Remove the needless differences between MMU/!MMU addruart calls.
+This allows to use the same addruart macro on SoC level. Useful
+for SoC consisting of multiple CPUs with and without MMU such as
+Freescale Vybrid.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/mm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/include/debug/efm32.S | 2 +-
+ arch/arm/kernel/debug.S        | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 16d077e..8eebc0d 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -609,6 +609,7 @@ config CPUV7M_NUM_IRQ
- 	depends on CPU_V7M
- 	default 90 if ARCH_STM32
- 	default 38 if ARCH_EFM32
-+	default 112 if SOC_VF610
- 	default 240
- 	help
- 	  This option indicates the number of interrupts connected to the NVIC.
+diff --git a/arch/arm/include/debug/efm32.S b/arch/arm/include/debug/efm32.S
+index 2265a19..660fa1e 100644
+--- a/arch/arm/include/debug/efm32.S
++++ b/arch/arm/include/debug/efm32.S
+@@ -16,7 +16,7 @@
+ 
+ #define	UARTn_TXDATA		0x0034
+ 
+-		.macro	addruart, rx, tmp
++		.macro	addruart, rx, tmp, tmp2
+ 		ldr	\rx, =(CONFIG_DEBUG_UART_PHYS)
+ 
+ 		/*
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index 78c91b5..ea9646c 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -35,7 +35,7 @@
+ 
+ #else /* !CONFIG_MMU */
+ 		.macro	addruart_current, rx, tmp1, tmp2
+-		addruart	\rx, \tmp1
++		addruart	\rx, \tmp1, \tmp2
+ 		.endm
+ 
+ #endif /* CONFIG_MMU */
 -- 
 2.3.5
