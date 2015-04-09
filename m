@@ -1,27 +1,39 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 8 Apr 2015 18:56:25 -0500
-Subject: [PATCH 0/2] ARM: dts: am57xx-beagle-x15: Fixes for RTC
-Message-ID: <1428537387-18776-1-git-send-email-nm@ti.com>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Wed,  8 Apr 2015 17:04:43 -0700
+Subject: [RFC PATCH] ARM: debug: Add prompt for FRAME_POINTER to Kconfig.debug
+Message-ID: <1428537883-19622-1-git-send-email-gregory.0xf0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Couple of fixes for MCP79410 RTC on BeagleBoard-X15 platform. This is
-not urgent enough for 4.0 material, but will be good to have it on one
-of 4.1 rcs. tested on next-20150407:
-http://pastebin.ubuntu.com/10777733/
-(NOTE: I believe DRA7 rtc still needs reset driver to be done before it can be fully functional).
+Without a prompt string, it is impossible to disable FRAME_POINTER on
+ARM. It will simply set the default value anytime you run 'make'.
 
-Grygorii Strashko (1):
-  ARM: dts: am57xx-beagle-x15: Fix IRQ type for mcp7941x
+To reproduce the original issue, run:
+  make multi_v7_defconfig
+  scripts/config -d ARM_UNWIND
+  make oldconfig
+  # check .config, note that FRAME_POINTER=y
+  scripts/config -d FRAME_POINTER
+  make oldconfig
+  # check .config, note that FRAME_POINTER is still y
 
-Nishanth Menon (1):
-  ARM: dts: am57xx-beagle-x15: Fix RTC aliases
+Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+---
+ arch/arm/Kconfig.debug | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/am57xx-beagle-x15.dts |    3 ++-
- arch/arm/boot/dts/dra7.dtsi             |    2 +-
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
-Regards,
-Nishanth Menon
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 970de75..b881fd3 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -33,7 +33,7 @@ config STRICT_DEVMEM
+ # traces, you can get a slightly smaller kernel by setting this option to
+ # n, but then RMK will have to kill you ;).
+ config FRAME_POINTER
+-	bool
++	bool "Compile the kernel with frame pointers"
+ 	depends on !THUMB2_KERNEL
+ 	default y if !ARM_UNWIND || FUNCTION_GRAPH_TRACER
+ 	help
 -- 
-1.7.9.5
+1.9.1
