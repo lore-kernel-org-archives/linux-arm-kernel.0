@@ -1,42 +1,32 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 09 Apr 2015 10:07:05 -0700
-Subject: "tcp: refine TSO autosizing" causes performance regression on Xen
-In-Reply-To: <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
-Message-ID: <1428599225.25985.267.camel@edumazet-glaptop2.roam.corp.google.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 9 Apr 2015 18:09:35 +0100
+Subject: [PATCH 2/7] ARM: cache-v7: shift CLIDR to extract appropriate
+ field before masking
+In-Reply-To: <E1YdzF0-0008Cj-Dk@rmk-PC.arm.linux.org.uk>
+References: <20150403100848.GZ24899@n2100.arm.linux.org.uk>
+ <E1YdzF0-0008Cj-Dk@rmk-PC.arm.linux.org.uk>
+Message-ID: <20150409170934.GE23861@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-04-09 at 17:36 +0100, Stefano Stabellini wrote:
-
-> A very big difference:
+On Fri, Apr 03, 2015 at 11:54:22AM +0100, Russell King wrote:
+> Rather than have code which masks and then shifts, such as:
 > 
-> echo 262144 > /proc/sys/net/ipv4/tcp_limit_output_bytes
-> brings us much closer to the original performance, the slowdown is just
-> 8%
-
-Cool.
-
+> 	mrc     p15, 1, r0, c0, c0, 1
+> ALT_SMP(ands	r3, r0, #7 << 21)
+> ALT_UP( ands	r3, r0, #7 << 27)
+> ALT_SMP(mov	r3, r3, lsr #20)
+> ALT_UP(	mov	r3, r3, lsr #26)
 > 
-> echo 1048576 > /proc/sys/net/ipv4/tcp_limit_output_bytes
-> fills the gap entirely, same performance as before "refine TSO
-> autosizing"
-
-
-Sure, this basically disables TCP Small Queue and select the opposite :
-
-Favor single flow throughput and huge latencies (bufferbloat)
-
-
+> re-arrange this as a shift and then mask.  The masking is the same for
+> each field which we want to extract, so this allows the mask to be
+> shared amongst code paths:
 > 
-> 
-> What would be the next step for here?  Should I just document this as an
-> important performance tweaking step for Xen, or is there something else
-> we can do?
+> 	mrc     p15, 1, r0, c0, c0, 1
+> ALT_SMP(mov	r3, r0, lsr #20)
+> ALT_UP(	mov	r3, r0, lsr #26)
+> 	ands	r3, r3, #7 << 1
 
-I guess this is a reasonable choice.
+It looks fine.
 
-Note that /proc/sys/net/ipv4/tcp_limit_output_bytes is already
-documented.
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
