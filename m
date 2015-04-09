@@ -1,75 +1,202 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 9 Apr 2015 14:43:59 +0200
-Subject: [PATCHv7] media: i2c/adp1653: fix includes
-In-Reply-To: <20150409123155.GB9563@amd>
-References: <20150403202624.GA4308@amd>
- <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
- <20150404074337.GA31064@amd>
- <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
- <20150404171116.GA15025@Nokia-N900>
- <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
- <20150409074238.GA22603@amd> <20150409091017.GA4526@earth>
- <20150409112943.GA31173@amd> <20150409121913.GB18713@earth>
- <20150409123155.GB9563@amd>
-Message-ID: <CABxcv=mB=LqO2paGfYq1jCbky=kudT-mS8cJ-pPwdqZYQLeO4A@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 9 Apr 2015 14:55:12 +0200
+Subject: [PATCH v2 05/10] KVM: arm: introduce kvm_arch_setup/clear_debug()
+In-Reply-To: <1427814488-28467-6-git-send-email-alex.bennee@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-6-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150409125511.GC3212@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Pavel,
+On Tue, Mar 31, 2015 at 04:08:03PM +0100, Alex Benn?e wrote:
+> This is a precursor for later patches which will need to do more to
+> setup debug state before entering the hyp.S switch code. The existing
+> functionality for setting mdcr_el2 has been moved out of hyp.S and now
+> uses the value kept in vcpu->arch.mdcr_el2.
+> 
+> This also moves the conditional setting of the TDA bit from the hyp code
+> into the C code.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
+>  create mode 100644 arch/arm64/kvm/debug.c
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 41008cd..8c01c97 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -242,5 +242,7 @@ static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+> +static inline void kvm_arch_setup_debug(struct kvm_vcpu *vcpu) {}
+> +static inline void kvm_arch_clear_debug(struct kvm_vcpu *vcpu) {}
+>  
+>  #endif /* __ARM_KVM_HOST_H__ */
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 445933d..7ea8b0e 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -523,6 +523,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  		kvm_vgic_flush_hwstate(vcpu);
+>  		kvm_timer_flush_hwstate(vcpu);
+> +		kvm_arch_setup_debug(vcpu);
+>  
+>  		local_irq_disable();
+>  
+> @@ -569,6 +570,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		 * Back from guest
+>  		 *************************************************************/
+>  
+> +		kvm_arch_clear_debug(vcpu);
+>  		kvm_timer_sync_hwstate(vcpu);
+>  		kvm_vgic_sync_hwstate(vcpu);
+>  
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 8ac3c70..0631840 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -101,6 +101,7 @@ struct kvm_vcpu_arch {
+>  
+>  	/* HYP configuration */
+>  	u64 hcr_el2;
+> +	u32 mdcr_el2;
+>  
+>  	/* Exception Information */
+>  	struct kvm_vcpu_fault_info fault;
+> @@ -257,4 +258,7 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+>  
+> +void kvm_arch_setup_debug(struct kvm_vcpu *vcpu);
+> +void kvm_arch_clear_debug(struct kvm_vcpu *vcpu);
+> +
+>  #endif /* __ARM64_KVM_HOST_H__ */
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index f7fa65d..cd06209 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -122,6 +122,7 @@ int main(void)
+>    DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
+>    DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
+>    DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
+> +  DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
+>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+>    DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index 4e6e09e..6796d4a 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -17,7 +17,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+>  
+>  kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
+> -kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
+> +kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
+>  
+>  kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
+>  kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v2.o
+> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> new file mode 100644
+> index 0000000..8a29d0b
+> --- /dev/null
+> +++ b/arch/arm64/kvm/debug.c
+> @@ -0,0 +1,58 @@
+> +/*
+> + * Debug and Guest Debug support
+> + *
+> + * Copyright (C) 2015 - Linaro Ltd
+> + * Author: Alex Benn?e <alex.bennee@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/kvm_host.h>
+> +
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_host.h>
 
-On Thu, Apr 9, 2015 at 2:31 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> Fix includes according to Sebastian.
->
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
->
-> ---
->
-> On Thu 2015-04-09 14:19:14, Sebastian Reichel wrote:
->> On Thu, Apr 09, 2015 at 01:29:43PM +0200, Pavel Machek wrote:
->> > On Thu 2015-04-09 11:10:17, Sebastian Reichel wrote:
->> > > On Thu, Apr 09, 2015 at 09:42:38AM +0200, Pavel Machek wrote:
->> > > > [...]
->> > > > +#include <linux/of_gpio.h>
->> > > > +#include <linux/gpio.h>
->> > > > [...]
->> > >
->> > > This should probably be
->> > >
->> > > #include <linux/of.h>
->> > > #include <linux/gpio/consumer.h>
->> >
->> > And I thought people would only bikesched paint on the
->> > Documentation. Sakari, feel free to change that, but
->>
->> > a) I don't see why Sebastian's version is better
->>
->> You neither use <linux/of_gpio.h> nor <linux/gpio.h>.
->>
->> Well "include/linux/gpio.h" describes the old gpio API. The new
->> gpiod gpiod API is described in "include/linux/gpio/consumer.h" and
->> you use it, so the include should be included ;)
->>
->> You don't use anything from "include/linux/of_gpio.h", but it
->> includes "include/linux/of.h", which you are using. So you should
->> include <linux/of.h> instead ;)
->
-> diff --git a/drivers/media/i2c/adp1653.c b/drivers/media/i2c/adp1653.c
-> index d703636..7107ac2 100644
-> --- a/drivers/media/i2c/adp1653.c
-> +++ b/drivers/media/i2c/adp1653.c
-> @@ -35,8 +35,8 @@
->  #include <linux/module.h>
->  #include <linux/i2c.h>
->  #include <linux/slab.h>
-> -#include <linux/of_gpio.h>
-> -#include <linux/gpio.h>
-> +#include <linux/of.h>
-> +#include <linux/gpio/consumer.h>
->  #include <media/adp1653.h>
->  #include <media/v4l2-device.h>
->
+linux/kvm_host.h added above includes this asm/kvm_host already
 
-Please re-spin your previous patch and submit it properly.
+> +
+> +/**
+> + * kvm_arch_setup_debug - set-up debug related stuff
+> + *
+> + * @vcpu:	the vcpu pointer
+> + *
+> + * This is called before each entry in to the hypervisor to setup any
 
-Best regards,
-Javier
+into
+
+> + * debug related registers. Currently this just ensures we will trap
+> + * access to:
+> + *  - Performance monitors (MDCR_EL2_TPM/MDCR_EL2_TPMCR)
+> + *  - Debug ROM Address (MDCR_EL2_TDRA)
+> + *  - Power down debug registers (MDCR_EL2_TDOSA)
+> + *
+> + * Additionally the hypervisor lazily saves/restores the debug
+> + * register state. If it is not currently doing so (arch.debug_flags)
+> + * then we also need to ensure we trap if the guest messes with them
+> + * so we know we need to save them.
+> + */
+> +
+> +void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM | MDCR_EL2_TPMCR);
+> +	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TDRA | MDCR_EL2_TDOSA);
+> +
+> +	if (!vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+
+missing () in the if (!(x & y)) condition
+
+> +		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
+> +	else
+> +		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
+> +
+> +}
+> +
+> +void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
+> +{
+> +	/* Nothing to do yet */
+> +}
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index 5befd01..be92bfe1 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -768,17 +768,8 @@
+>  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
+>  	msr	hstr_el2, x2
+>  
+> -	mrs	x2, mdcr_el2
+> -	and	x2, x2, #MDCR_EL2_HPMN_MASK
+> -	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+> -	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
+> -
+> -	// Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
+> -	// if not dirty.
+> -	ldr	x3, [x0, #VCPU_DEBUG_FLAGS]
+> -	tbnz	x3, #KVM_ARM64_DEBUG_DIRTY_SHIFT, 1f
+> -	orr	x2, x2,  #MDCR_EL2_TDA
+> -1:
+> +	// Monitor Debug Config - see kvm_arch_setup_debug()
+> +	ldr	x2, [x0, #VCPU_MDCR_EL2]
+>  	msr	mdcr_el2, x2
+>  .endm
+
+We lose the preservation of HPMN, as I see David points out as well.
+Based on the ARM ARM setting it to zero is most likely wrong, as
+that results in constrained unpredictable behavior.
+
+drew
