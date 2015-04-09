@@ -1,34 +1,32 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 10 Apr 2015 01:14:19 +0930
-Subject: [PATCH v2 5/5] ARM: dts: Enable thermal_zone for exynos5422.
-In-Reply-To: <1428594259-3915-1-git-send-email-linux.amoon@gmail.com>
-References: <1428594259-3915-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1428594259-3915-6-git-send-email-linux.amoon@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 9 Apr 2015 16:46:30 +0100
+Subject: "tcp: refine TSO autosizing" causes performance regression on Xen
+Message-ID: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include exynos5-cpu-thermal.dtsi to enable thermal_zone support.
+Hi all,
 
-Changes since v1 : Seperate the include previous patch.
+I found a performance regression when running netperf -t TCP_MAERTS from
+an external host to a Xen VM on ARM64: v3.19 and v4.0-rc4 running in the
+virtual machine are 30% slower than v3.18.
 
-Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
- arch/arm/boot/dts/exynos5422-odroidxu3.dts | 1 +
- 1 file changed, 1 insertion(+)
+Through bisection I found that the perf regression is caused by the
+prensence of the following commit in the guest kernel:
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-index 6e7ee53..16a5f10 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -12,6 +12,7 @@
- 
- /dts-v1/;
- #include "exynos5800.dtsi"
-+#include "exynos5-cpu-thermal.dtsi"
- 
- / {
- 	model = "Hardkernel Odroid XU3";
--- 
-1.9.1
+
+commit 605ad7f184b60cfaacbc038aa6c55ee68dee3c89
+Author: Eric Dumazet <edumazet@google.com>
+Date:   Sun Dec 7 12:22:18 2014 -0800
+
+    tcp: refine TSO autosizing
+
+
+A simple revert would fix the issue.
+
+Does anybody have any ideas on what could be the cause of the problem?
+Suggestions on what to do to fix it?
+
+Cheers,
+
+Stefano
