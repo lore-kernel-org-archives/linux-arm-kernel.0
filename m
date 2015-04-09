@@ -1,52 +1,97 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu,  9 Apr 2015 12:29:17 +0100
-Subject: [PATCH v3 06/10] drivers: PL011: replace UART_MIS reading with _RIS &
- _IMSC
+Date: Thu,  9 Apr 2015 12:29:15 +0100
+Subject: [PATCH v3 04/10] drivers: PL011: refactor pl011_set_termios()
 In-Reply-To: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
 References: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1428578961-6896-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <1428578961-6896-5-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PL011 register UART_MIS is actually a bitwise AND of the
-UART_RIS and the UART_MISC register.
-Since the SBSA UART does not include the _MIS register, use the
-two separate registers to get the same behaviour. Since we are
-inside the spinlock and we read the _IMSC register only once, there
-should be no race issue.
+Split the pl011_set_termios() function into smaller chunks to allow
+easier reuse later when adding SBSA support.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/tty/serial/amba-pl011.c |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/tty/serial/amba-pl011.c |   60 +++++++++++++++++++++------------------
+ 1 file changed, 33 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 65df5c7..3829879 100644
+index 9eb6d13..e1ac2cb 100644
 --- a/drivers/tty/serial/amba-pl011.c
 +++ b/drivers/tty/serial/amba-pl011.c
-@@ -1322,11 +1322,13 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
- 	struct uart_amba_port *uap = dev_id;
- 	unsigned long flags;
- 	unsigned int status, pass_counter = AMBA_ISR_PASS_LIMIT;
-+	u16 imsc;
- 	int handled = 0;
- 	unsigned int dummy_read;
+@@ -1707,6 +1707,38 @@ static void pl011_shutdown(struct uart_port *port)
+ }
  
- 	spin_lock_irqsave(&uap->port.lock, flags);
--	status = readw(uap->port.membase + UART011_MIS);
-+	imsc = readw(uap->port.membase + UART011_IMSC);
-+	status = readw(uap->port.membase + UART011_RIS) & imsc;
- 	if (status) {
- 		do {
- 			if (uap->vendor->cts_event_workaround) {
-@@ -1361,7 +1363,7 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
- 			if (pass_counter-- == 0)
- 				break;
+ static void
++pl011_setup_status_masks(struct uart_port *port, struct ktermios *termios)
++{
++	port->read_status_mask = UART011_DR_OE | 255;
++	if (termios->c_iflag & INPCK)
++		port->read_status_mask |= UART011_DR_FE | UART011_DR_PE;
++	if (termios->c_iflag & (IGNBRK | BRKINT | PARMRK))
++		port->read_status_mask |= UART011_DR_BE;
++
++	/*
++	 * Characters to ignore
++	 */
++	port->ignore_status_mask = 0;
++	if (termios->c_iflag & IGNPAR)
++		port->ignore_status_mask |= UART011_DR_FE | UART011_DR_PE;
++	if (termios->c_iflag & IGNBRK) {
++		port->ignore_status_mask |= UART011_DR_BE;
++		/*
++		 * If we're ignoring parity and break indicators,
++		 * ignore overruns too (for real raw support).
++		 */
++		if (termios->c_iflag & IGNPAR)
++			port->ignore_status_mask |= UART011_DR_OE;
++	}
++
++	/*
++	 * Ignore all characters if CREAD is not set.
++	 */
++	if ((termios->c_cflag & CREAD) == 0)
++		port->ignore_status_mask |= UART_DUMMY_DR_RX;
++}
++
++static void
+ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		     struct ktermios *old)
+ {
+@@ -1770,33 +1802,7 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	 */
+ 	uart_update_timeout(port, termios->c_cflag, baud);
  
--			status = readw(uap->port.membase + UART011_MIS);
-+			status = readw(uap->port.membase + UART011_RIS) & imsc;
- 		} while (status != 0);
- 		handled = 1;
- 	}
+-	port->read_status_mask = UART011_DR_OE | 255;
+-	if (termios->c_iflag & INPCK)
+-		port->read_status_mask |= UART011_DR_FE | UART011_DR_PE;
+-	if (termios->c_iflag & (IGNBRK | BRKINT | PARMRK))
+-		port->read_status_mask |= UART011_DR_BE;
+-
+-	/*
+-	 * Characters to ignore
+-	 */
+-	port->ignore_status_mask = 0;
+-	if (termios->c_iflag & IGNPAR)
+-		port->ignore_status_mask |= UART011_DR_FE | UART011_DR_PE;
+-	if (termios->c_iflag & IGNBRK) {
+-		port->ignore_status_mask |= UART011_DR_BE;
+-		/*
+-		 * If we're ignoring parity and break indicators,
+-		 * ignore overruns too (for real raw support).
+-		 */
+-		if (termios->c_iflag & IGNPAR)
+-			port->ignore_status_mask |= UART011_DR_OE;
+-	}
+-
+-	/*
+-	 * Ignore all characters if CREAD is not set.
+-	 */
+-	if ((termios->c_cflag & CREAD) == 0)
+-		port->ignore_status_mask |= UART_DUMMY_DR_RX;
++	pl011_setup_status_masks(port, termios);
+ 
+ 	if (UART_ENABLE_MS(port, termios->c_cflag))
+ 		pl011_enable_ms(port);
 -- 
 1.7.9.5
