@@ -1,26 +1,32 @@
-From: dashie@sigpipe.me (Dashie)
-Date: Thu, 9 Apr 2015 11:34:19 +0200
-Subject: Building DTS, problem with includes
-Message-ID: <2A6B56A6-CEF1-4616-B651-D0A00FC330E5@sigpipe.me>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Apr 2015 11:46:55 +0200
+Subject: [PATCH] mempool: add missing include
+Message-ID: <3302342.cNyRUGN06P@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is a fix^3 for the mempool poisoning patch, which introduces
+a compile-time error on some ARM randconfig builds:
 
-I?ve re-started playing with my kirkwood board and still need to get a properly working DTB.
+mm/mempool.c: In function 'check_element':
+mm/mempool.c:65:16: error: implicit declaration of function 'kmap_atomic' [-Werror=implicit-function-declaration]
+   void *addr = kmap_atomic((struct page *)element);
 
-I?ve tried repos from :
-  - arm-soc (for-next branch)
-  - linus one from kernel.org git
+The problem is clearly the missing declaration, and including
+linux/highmem.h fixes it.
 
-With the two i got the error :
-./dtc -I dts -O dtb ../kirkwood-verbatim-powerbay.dts
-Error: ../kirkwood-verbatim-powerbay.dts:3.1-9 syntax error
-FATAL ERROR: Unable to parse input tree
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: a3db5a8463b0db ("mm, mempool: poison elements backed by page allocator fix fix")
 
-While line three is :
-#include "kirkwood.dtsi"
-
-I?ve got info that there is migration from /include/ to #include but i?ve tried the two DTC included in the sources without any success.
-
-Any hints i?m missing here ?
+diff --git a/mm/mempool.c b/mm/mempool.c
+index 05ad55e61264..5e7c4a871391 100644
+--- a/mm/mempool.c
++++ b/mm/mempool.c
+@@ -12,6 +12,7 @@
+ #include <linux/mm.h>
+ #include <linux/slab.h>
+ #include <linux/kasan.h>
++#include <linux/highmem.h>
+ #include <linux/kmemleak.h>
+ #include <linux/export.h>
+ #include <linux/mempool.h>
