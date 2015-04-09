@@ -1,65 +1,70 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 09 Apr 2015 10:26:40 -0400
-Subject: [PATCH] drivers: CCI: fix used_mask init in validate_group()
-In-Reply-To: <20150409142047.GC9648@leverpostej>
-References: <1428517284-7951-1-git-send-email-msalter@redhat.com>
- <20150409135124.GA9648@leverpostej>
- <1428588703.20354.23.camel@deneb.redhat.com>
- <20150409142047.GC9648@leverpostej>
-Message-ID: <1428589600.20354.27.camel@deneb.redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 9 Apr 2015 16:29:50 +0200
+Subject: [GIT PULL] Allwinner drivers changes for 4.1
+Message-ID: <20150409142950.GA17959@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-04-09 at 15:20 +0100, Mark Rutland wrote:
-> On Thu, Apr 09, 2015 at 03:11:43PM +0100, Mark Salter wrote:
-> > On Thu, 2015-04-09 at 14:51 +0100, Mark Rutland wrote:
-> > > On Wed, Apr 08, 2015 at 07:21:24PM +0100, Mark Salter wrote:
-> > > > Currently in validate_group(), there is a static initializer
-> > > > for fake_pmu.used_mask which is based on CPU_BITS_NONE but
-> > > > the used_mask array size is based on CCI_PMU_MAX_HW_EVENTS.
-> > > > CCI_PMU_MAX_HW_EVENTS is not based on NR_CPUS, so CPU_BITS_NONE
-> > > > is not correct and will cause a build failure if NR_CPUS
-> > > > is set high enough to make CPU_BITS_NONE larger than used_mask.
-> > > 
-> > > Whoops. My bad.
-> > > 
-> > > > This patch changes the used_mask initialization to be runtime
-> > > > based on the actual size of the array.
-> > > > 
-> > > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > > ---
-> > > >  drivers/bus/arm-cci.c | 14 +++++++-------
-> > > >  1 file changed, 7 insertions(+), 7 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> > > > index 84fd660..1d83072 100644
-> > > > --- a/drivers/bus/arm-cci.c
-> > > > +++ b/drivers/bus/arm-cci.c
-> > > > @@ -679,13 +679,13 @@ static int
-> > > >  validate_group(struct perf_event *event)
-> > > >  {
-> > > >  	struct perf_event *sibling, *leader = event->group_leader;
-> > > > -	struct cci_pmu_hw_events fake_pmu = {
-> > > > -		/*
-> > > > -		 * Initialise the fake PMU. We only need to populate the
-> > > > -		 * used_mask for the purposes of validation.
-> > > > -		 */
-> > > > -		.used_mask = CPU_BITS_NONE,
-> > > 
-> > > Can we not simply change this to:
-> > > 
-> > > 		.used_mask = { 0 },
-> > > 
-> > > That should result in the entire array being zeroed.
-> > 
-> > It does, but it also causes the whole struct to be cleared.
-> 
-> Sure, but it's also the minimal diff, and it's easier to read. This was
-> what the code was intended to be initially.
-> 
-> > With the memset, only used_mask gets cleared.
-> 
-> Is there an appreciable difference between the two performance-wise?
+Hi Arnd, Kevin, Olof,
 
-I dunno. It is 3 strp insns vs 1 str.
-If you want the static init, I'll send another patch.
+This is a (late) pull request for a single SoC-specific driver that
+set up the SRAM mapping.
+
+This mapping was previously done by the bootloader, but in several
+occasions, we found out that it couldn't be relied on, and that the
+kernel should make sure that these mappings were correct.
+
+I'm aware that this is a late pull request, but hopefully, since it's
+a new driver, with no impact on other SoCs, it should be rather safe
+to merge.
+
+Thanks,
+Maxime
+
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drivers-for-4.1
+
+for you to fetch changes up to b7c4366ac68e1b0964a1ec2e53f91e5227273791:
+
+  drivers: soc: sunxi: Introduce SoC driver to map SRAMs (2015-04-05 15:08:09 +0200)
+
+----------------------------------------------------------------
+Allwinner drivers patches for 4.1
+
+This pull request contain a single driver to handle the SRAM mapping between
+the CPU and devices.
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      drivers: soc: sunxi: Introduce SoC driver to map SRAMs
+
+ .../devicetree/bindings/soc/sunxi/sram.txt         |  64 ++++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/sunxi/Kconfig                          |  10 +
+ drivers/soc/sunxi/Makefile                         |   1 +
+ drivers/soc/sunxi/sunxi_sram.c                     | 235 +++++++++++++++++++++
+ include/linux/soc/sunxi/sunxi_sram.h               |  24 +++
+ 7 files changed, 336 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/sunxi/sram.txt
+ create mode 100644 drivers/soc/sunxi/Kconfig
+ create mode 100644 drivers/soc/sunxi/Makefile
+ create mode 100644 drivers/soc/sunxi/sunxi_sram.c
+ create mode 100644 include/linux/soc/sunxi/sunxi_sram.h
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/43f3efb0/attachment.sig>
