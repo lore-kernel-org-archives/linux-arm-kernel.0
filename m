@@ -1,60 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 9 Apr 2015 14:14:37 +0200
-Subject: [PATCH v3 3/5] arm64: Documentation: clarify Image placement in
- physical RAM
-In-Reply-To: <20150409115417.GD18488@leverpostej>
-References: <1426698308-726-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426698308-726-4-git-send-email-ard.biesheuvel@linaro.org>
- <20150409115417.GD18488@leverpostej>
-Message-ID: <CAKv+Gu9AnYxRisCenSE=ydd9wx7JPTqCogu2R4+ZzU4N6LUHng@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 9 Apr 2015 14:19:14 +0200
+Subject: [PATCHv7] media: i2c/adp1653: Devicetree support for adp1653
+In-Reply-To: <20150409112943.GA31173@amd>
+References: <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
+ <20150403202624.GA4308@amd>
+ <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
+ <20150404074337.GA31064@amd>
+ <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
+ <20150404171116.GA15025@Nokia-N900>
+ <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
+ <20150409074238.GA22603@amd> <20150409091017.GA4526@earth>
+ <20150409112943.GA31173@amd>
+Message-ID: <20150409121913.GB18713@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 April 2015 at 13:54, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Ard,
->
-> I take it that this (and patch 4) are superseded by the single-page
-> idmap approach, and when this is next posted you'll fold the series?
->
+On Thu, Apr 09, 2015 at 01:29:43PM +0200, Pavel Machek wrote:
+> On Thu 2015-04-09 11:10:17, Sebastian Reichel wrote:
+> > On Thu, Apr 09, 2015 at 09:42:38AM +0200, Pavel Machek wrote:
+> > > [...]
+> > > +#include <linux/of_gpio.h>
+> > > +#include <linux/gpio.h>
+> > > [...]
+> > 
+> > This should probably be
+> > 
+> > #include <linux/of.h>
+> > #include <linux/gpio/consumer.h>
+> 
+> And I thought people would only bikesched paint on the
+> Documentation. Sakari, feel free to change that, but
 
-indeed.
+> a) I don't see why Sebastian's version is better
 
--- 
-Ard.
+You neither use <linux/of_gpio.h> nor <linux/gpio.h>.
 
+Well "include/linux/gpio.h" describes the old gpio API. The new
+gpiod gpiod API is described in "include/linux/gpio/consumer.h" and
+you use it, so the include should be included ;)
 
-> On Wed, Mar 18, 2015 at 05:05:06PM +0000, Ard Biesheuvel wrote:
->> The early init code maps the kernel image using statically
->> allocated page tables. This means that we can only allow
->> Image to be placed such that we can map its entire static
->> footprint using a single table entry at all but the lowest
->> level. So update the documentation to reflect that the Image
->> should not cross a 512 MB boundary, which ensures the above
->> on both 4k and 64k pages kernels.
->>
->> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  Documentation/arm64/booting.txt | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
->> index ab5a90adece3..5949bdbe7aac 100644
->> --- a/Documentation/arm64/booting.txt
->> +++ b/Documentation/arm64/booting.txt
->> @@ -115,8 +115,9 @@ The Image must be placed text_offset bytes from a 2MB aligned base
->>  address near the start of usable system RAM and called there. Memory
->>  below that base address is currently unusable by Linux, and therefore it
->>  is strongly recommended that this location is the start of system RAM.
->> -At least image_size bytes from the start of the image must be free for
->> -use by the kernel.
->> +The physical memory region consisting of image_size bytes counting from
->> +the start of the image must be free for use by the kernel, and must not
->> +cross a 512 MB physical alignment boundary.
->>
->>  Any memory described to the kernel (even that below the 2MB aligned base
->>  address) which is not marked as reserved from the kernel e.g. with a
->> --
->> 1.8.3.2
->>
->>
+You don't use anything from "include/linux/of_gpio.h", but it
+includes "include/linux/of.h", which you are using. So you should
+include <linux/of.h> instead ;)
+
+> b) am pretty sure there is about infinite number of
+> possibilities there.
+
+Yes, but most are wrong. You should include all headers,
+that are used by you - nothing more and nothing less.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/8604f8c9/attachment.sig>
