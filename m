@@ -1,35 +1,25 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 9 Apr 2015 12:35:53 +0300
-Subject: [PATCH v5 7/8] dmaengine: omap-dma: Reduce the number of virtual
- channels
-In-Reply-To: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1428572154-3548-8-git-send-email-peter.ujfalusi@ti.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Thu, 9 Apr 2015 11:42:24 +0200
+Subject: rootdelay regression is back in 4.0? was Re: [PATCH] Revert "init:
+ make rootdelay=N consistent with rootwait behaviour"
+In-Reply-To: <20140918131716.GA29533@amd>
+References: <20140917142542.GA5225@windriver.com>
+ <1410965865-5547-1-git-send-email-paul.gortmaker@windriver.com>
+ <20140918131716.GA29533@amd>
+Message-ID: <20150409094224.GA7499@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the mapping between the hardware request lines and channels has been
-removed it no longer make sense to have too many channels.
-Set the number of channels to match with the number of logical channels
-supported by sDMA.
+On Thu 2014-09-18 15:17:16, Pavel Machek wrote:
+> On Wed 2014-09-17 10:57:45, Paul Gortmaker wrote:
+> > This reverts commit 4dfe694f616e00e6fd83e5bbcd7a3c4d7113493d.
+> 
+> This solves my problems, thanks.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- drivers/dma/omap-dma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Weird. It seems this regression is back in 4.0-rc7?
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index b19b9ee8f1d1..7f154c138200 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -1129,7 +1129,7 @@ static int omap_dma_probe(struct platform_device *pdev)
- 			 OMAP_SDMA_REQUESTS);
- 	}
- 
--	for (i = 0; i < od->dma_requests; i++) {
-+	for (i = 0; i < OMAP_SDMA_CHANNELS; i++) {
- 		rc = omap_dma_chan_init(od);
- 		if (rc) {
- 			omap_dma_free(od);
+root=0xb302 works, root=/dev/mmcblk0p2 does not. socfpga board.
+									Pavel
 -- 
-2.3.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
