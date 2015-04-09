@@ -1,68 +1,44 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 9 Apr 2015 14:32:32 -0500
-Subject: [PATCH] PCI: versatile: don't check resource with
- devm_ioremap_resource
-In-Reply-To: <1428067025-543-1-git-send-email-jszhang@marvell.com>
-References: <1428067025-543-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20150409193232.GK30967@google.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 9 Apr 2015 22:54:26 +0300
+Subject: [patch 2/2] leds: netxbig: clean up a data type issue
+In-Reply-To: <20150409192557.GD1509@kw.sim.vm.gnt>
+References: <20150409090712.GF17605@mwanda>
+ <20150409192557.GD1509@kw.sim.vm.gnt>
+Message-ID: <20150409195426.GP10964@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 09:17:05PM +0800, Jisheng Zhang wrote:
-> devm_ioremap_resource does sanity checks on the given resource. No need
-> to duplicate this in the driver. And we should check whether
-> devm_ioremap_resource() succeeds or not.
+On Thu, Apr 09, 2015 at 09:25:57PM +0200, Simon Guinot wrote:
+> On Thu, Apr 09, 2015 at 12:07:12PM +0300, Dan Carpenter wrote:
+> > This driver is pretty hardware specific so it's unlikely that we're
+> > going to be using it on 64 big endian systems.  Still, the current code
+> > causes a static checker warning so we may as well change the type from
+> > "unsigned long" to "u32" and remove the casting.
 > 
-> This patch fixes all of these two trival issues.
+> Hi Dan,
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Thanks for the patch.
+> 
+> Why do you think it would be an issue to use the u32 type for this
+> variables on a 64-bit big-endian machine ? Note that this LED mechanism
+> is actually used on ARM 32-bits and x86-64 NAS platforms. The latter are
+> not mainlined yet. But indeed, for now, there is no plan to use it on a
+> 64-bit big-endian machine.
+> 
+> Since the whole LED code uses the unsigned long type to hold the delay
+> values, if possible, I would prefer to keep the delay_{on,off} variables
+> consistent with that.
+> 
+> Is there an another way to make the "static checker" happy ?
 
-This looks correct to me, so I applied it to pci/host-versatile for v4.1
-(unless Rob chimes in).
+We're writing over 32 bits of a long.  It's a dangerous habbit.
 
-commit 873581698d391ff070fc1eb8fb298c85e873c07c
-Author: Jisheng Zhang <jszhang@marvell.com>
-Date:   Fri Apr 3 21:17:05 2015 +0800
+If long is u32 then of_property_read_u32_index() works, obviously.  If
+it is a little endian and the last 32 bits have been zeroed out (as they
+have been here) then that also works.
 
-    PCI: versatile: Check for devm_ioremap_resource() failures
-    
-    Check for failure of devm_ioremap_resource().
-    
-    devm_ioremap_resource() validates the resource it receives, so if we check
-    for devm_ioremap_resource() failure, we need not check for failure of the
-    preceding platform_get_resource().
-    
-    [bhelgaas: changelog]
-    Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+If it's big endian and 64 bit then it doesn't work because we're writing
+to the wrong 32 bits.
 
-diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
-index 1ec694a52379..b1caaea740fe 100644
---- a/drivers/pci/host/pci-versatile.c
-+++ b/drivers/pci/host/pci-versatile.c
-@@ -138,19 +138,19 @@ static int versatile_pci_probe(struct platform_device *pdev)
- 	LIST_HEAD(pci_res);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res)
--		return -ENODEV;
- 	versatile_pci_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(versatile_pci_base))
-+		return PTR_ERR(versatile_pci_base);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	if (!res)
--		return -ENODEV;
- 	versatile_cfg_base[0] = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(versatile_cfg_base[0]))
-+		return PTR_ERR(versatile_cfg_base[0]);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
--	if (!res)
--		return -ENODEV;
- 	versatile_cfg_base[1] = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(versatile_cfg_base[1]))
-+		return PTR_ERR(versatile_cfg_base[1]);
- 
- 	ret = versatile_pci_parse_request_of_pci_ranges(&pdev->dev, &pci_res);
- 	if (ret)
+regards,
+dan carpenter
