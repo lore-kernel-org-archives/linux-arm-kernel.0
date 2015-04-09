@@ -1,101 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 9 Apr 2015 09:16:52 +0200
-Subject: [PATCH v3] mmc: sdhci-esdhc-imx: Call mmc_of_parse()
-In-Reply-To: <1428499065-25544-1-git-send-email-festevam@gmail.com>
-References: <1428499065-25544-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAPDyKFqz_FstT=HpgsNWac1t+tThRPq+KCtz=2ozFTy3izXEsQ@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 9 Apr 2015 09:18:21 +0200
+Subject: [PATCH] ata: ahci_st: fixup layering violations / drvdata errors
+In-Reply-To: <1428519599-31885-1-git-send-email-computersforpeace@gmail.com>
+References: <1428519599-31885-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <552627BD.9060109@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 April 2015 at 15:17, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Currently it is not possible to use 'mmc-pwrseq-simple' property with this
-> driver because mmc_of_parse() is never called.
->
-> mmc_of_parse() calls mmc_pwrseq_alloc() that manages MMC power sequence and
-> allows passing GPIOs in the devicetree to properly power/reset the Wifi
-> chipset.
->
-> When using mmc_of_parse() we no longer need to have custom code to request
-> card-detect and write-protect pins, as this can now be handled by the mmc
-> core.
->
-> Tested on a imx6sl-warp board where BT/Wifi is functional and also on a
-> imx6q-sabresd.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Hello Brian,
 
-Thanks! Applied.
-
-Kind regards
-Uffe
-
+On 04/08/2015 08:59 PM, Brian Norris wrote:
+> When working on another SATA driver that uses libahci_platform, I
+> noticed an error in this driver; it tries to the the driver data for its
+> device, while libata also thinks it can set the driver data. See:
+>
+>    ahci_platform_init_host()
+>    -> ata_host_alloc_pinfo()
+>       -> ata_host_alloc()
+>          -> dev_set_drvdata()
+>
+> So instead of sticking the IP-specific platform data into drvdata, let's
+> use the plat_data variable that is reserved for this use.
+>
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+> Cc: Maxime Coquelin <maxime.coquelin@st.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
 > ---
-> Change since v2:
-> - Use mmc_of_parse() and remove custom code to retrieve CD/WP GPIOs.
+> This is ONLY compile tested; I don't have hardware to run. This looks like it
+> could have ramifications on suspend/resume support, and hot device removal
+> (e.g., sysfs unbind), so it might qualify as -stable, if someone can test it
 >
->  drivers/mmc/host/sdhci-esdhc-imx.c | 38 ++++++--------------------------------
->  1 file changed, 6 insertions(+), 32 deletions(-)
+>   drivers/ata/ahci_st.c | 25 ++++++++++++++-----------
+>   1 file changed, 14 insertions(+), 11 deletions(-)
 >
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 7ee8312..82f512d 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -1013,40 +1013,9 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->                                         host->mmc->parent->platform_data);
->         }
 >
-> -       /* write_protect */
-> -       if (boarddata->wp_type == ESDHC_WP_GPIO) {
-> -               err = mmc_gpio_request_ro(host->mmc, boarddata->wp_gpio);
-> -               if (err) {
-> -                       dev_err(mmc_dev(host->mmc),
-> -                               "failed to request write-protect gpio!\n");
-> -                       goto disable_clk;
-> -               }
-> -               host->mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
-> -       }
-> -
->         /* card_detect */
-> -       switch (boarddata->cd_type) {
-> -       case ESDHC_CD_GPIO:
-> -               err = mmc_gpio_request_cd(host->mmc, boarddata->cd_gpio, 0);
-> -               if (err) {
-> -                       dev_err(mmc_dev(host->mmc),
-> -                               "failed to request card-detect gpio!\n");
-> -                       goto disable_clk;
-> -               }
-> -               /* fall through */
-> -
-> -       case ESDHC_CD_CONTROLLER:
-> -               /* we have a working card_detect back */
-> +       if (boarddata->cd_type == ESDHC_CD_CONTROLLER)
->                 host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
-> -               break;
-> -
-> -       case ESDHC_CD_PERMANENT:
-> -               host->mmc->caps |= MMC_CAP_NONREMOVABLE;
-> -               break;
-> -
-> -       case ESDHC_CD_NONE:
-> -               break;
-> -       }
->
->         switch (boarddata->max_bus_width) {
->         case 8:
-> @@ -1079,6 +1048,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->                 host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
->         }
->
-> +       /* call to generic mmc_of_parse to support additional capabilities */
-> +       err = mmc_of_parse(host->mmc);
-> +       if (err)
-> +               goto disable_clk;
-> +
->         err = sdhci_add_host(host);
->         if (err)
->                 goto disable_clk;
-> --
-> 1.9.1
->
+
+Your patch looks sensible, thanks for spotting this issue.
+
+Peter, do you have the SATA setup in place to test Brian's patch?
+
+Once tested, you can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+
+Thanks,
+Maxime
