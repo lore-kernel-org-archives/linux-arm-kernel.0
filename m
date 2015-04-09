@@ -1,85 +1,93 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu,  9 Apr 2015 09:23:59 +0100
-Subject: [PATCH 10/10] ARM: dts: apq8064 add i2c3 node for panel.
-In-Reply-To: <1428567674-10672-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1428567674-10672-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1428567839-11147-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 9 Apr 2015 11:24:58 +0300
+Subject: [PATCH v4 1/8] dmaengine: of_dma: Support for DMA routers
+In-Reply-To: <20150408154251.GE26727@lukather>
+References: <1428498892-28471-1-git-send-email-peter.ujfalusi@ti.com>
+ <1428498892-28471-2-git-send-email-peter.ujfalusi@ti.com>
+ <20150408154251.GE26727@lukather>
+Message-ID: <5526375A.7090708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds i2c3 node which is used for panel control on IFC6410.
+On 04/08/2015 06:42 PM, Maxime Ripard wrote:
+>> ---
+>>  Documentation/devicetree/bindings/dma/dma.txt | 28 +++++++++
+>>  drivers/dma/dmaengine.c                       |  7 +++
+>>  drivers/dma/of-dma.c                          | 86 +++++++++++++++++++++++++++
+>>  include/linux/dmaengine.h                     | 17 ++++++
+>>  include/linux/of_dma.h                        | 21 +++++++
+>>  5 files changed, 159 insertions(+)
+> 
+> Can that be moved to a header / C file of its own?
+> 
+> There's a lot of various code already in dmaengine.h and dmaengine.c,
+> it would be really great to avoid adding more random stuff in there.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 10 ++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        | 27 +++++++++++++++++++++++++++
- 2 files changed, 37 insertions(+)
+This patch adds the core support for DMA signal routers. It adds fairly small
+amount of generic code to the core to achieve this. I don't think it would be
+better to create let's say of-dma-router.c and .h just for this and export
+functions from of-dma.c to be used outside of the file.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 9bd9dfe..3edd1ce 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -20,6 +20,16 @@
- 			};
- 		};
- 
-+		gsbi3: gsbi at 16200000 {
-+			status = "okay";
-+			qcom,mode = <GSBI_PROT_I2C>;
-+			i2c3: i2c at 16280000 {
-+				status = "okay";
-+				pinctrl-0 = <&i2c3_pins>;
-+				pinctrl-names = "default";
-+			};
-+		};
-+
- 		gsbi at 12440000 {
- 			status = "okay";
- 			qcom,mode = <GSBI_PROT_I2C>;
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 2fa979f..b1f574d 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -136,6 +136,13 @@
- 					function = "gsbi1";
- 				};
- 			};
-+
-+			i2c3_pins: i2c3 {
-+				mux {
-+					pins = "gpio8", "gpio9";
-+					function = "gsbi3";
-+				};
-+			};
- 		};
- 
- 		intc: interrupt-controller at 2000000 {
-@@ -249,6 +256,26 @@
- 			};
- 		};
- 
-+		gsbi3: gsbi at 16200000 {
-+			status = "disabled";
-+			compatible = "qcom,gsbi-v1.0.0";
-+			reg = <0x16200000 0x100>;
-+			clocks = <&gcc GSBI3_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			i2c3: i2c at 16280000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				reg = <0x16280000 0x1000>;
-+				interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI3_QUP_CLK>,
-+					 <&gcc GSBI3_H_CLK>;
-+				clock-names = "core", "iface";
-+			};
-+		};
-+
- 		gsbi7: gsbi at 16600000 {
- 			status = "disabled";
- 			compatible = "qcom,gsbi-v1.0.0";
+>> +	chan = ofdma_target->of_dma_xlate(&dma_spec_target, ofdma_target);
+>> +	if (chan) {
+>> +		chan->router = ofdma->dma_router;
+>> +		chan->route_data = route_data;
+>> +	} else {
+>> +		ofdma->dma_router->route_free(ofdma->dma_router->dev, route_data);
+> 
+> This line is over 80 characters.
+
+Oh, true.
+
+>> +int of_dma_router_register(struct device_node *np,
+>> +			   void *(*of_dma_route_allocate)
+>> +			   (struct of_phandle_args *, struct of_dma *),
+>> +			   struct dma_router *dma_router)
+>> +{
+>> +	struct of_dma	*ofdma;
+>> +
+>> +	if (!np || !of_dma_route_allocate || !dma_router) {
+>> +		pr_err("%s: not enough information provided\n", __func__);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	ofdma = kzalloc(sizeof(*ofdma), GFP_KERNEL);
+>> +	if (!ofdma)
+>> +		return -ENOMEM;
+> 
+> Is that expected that you allocate through kzalloc, but never have a
+> matching free function implemented?
+
+The free is via the of_dma_router_free() in case the router is removed
+runtime, which is unlikely to happen since it will cause all DMA request to fail.
+
+>> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+>> index 56bc026c143f..734e449f87c1 100644
+>> --- a/include/linux/of_dma.h
+>> +++ b/include/linux/of_dma.h
+>> @@ -23,6 +23,9 @@ struct of_dma {
+>>  	struct device_node	*of_node;
+>>  	struct dma_chan		*(*of_dma_xlate)
+>>  				(struct of_phandle_args *, struct of_dma *);
+>> +	void			*(*of_dma_route_allocate)
+>> +				(struct of_phandle_args *, struct of_dma *);
+>> +	struct dma_router	*dma_router;
+> 
+> I don't really see why this is really tied to the device tree.
+
+The signal router is not a DMA device, it is represented in the device tree
+and the code will do the needed translation, which is transparent for the DMA
+clients and also for the DMA controllers. Neither should know about the signal
+router.
+Similar translation can be done for ACPI.
+
+> Couldn't we use the device_alloc_chan_resources to do that?
+
+Not really. The router itself is not a DMA controller. The routing need to be
+configured before the device_alloc_chan_resources can be called for the real
+DMA controller. The signal router (core part + the HW driver) need to prepare
+the route and do the translation so the filter function of the DMA driver can
+validate the translated request.
+
 -- 
-1.9.1
+P?ter
