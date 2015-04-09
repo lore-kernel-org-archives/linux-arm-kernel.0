@@ -1,28 +1,33 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 9 Apr 2015 09:27:47 +0200
-Subject: [PATCH 1/6] clk: make strings in parent name arrays const
-In-Reply-To: <1427825817-26773-2-git-send-email-s.hauer@pengutronix.de>
-References: <1427825817-26773-1-git-send-email-s.hauer@pengutronix.de>
- <1427825817-26773-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CAJKOXPeNw6teVhgnuW3da=chMemCErTWK_oV4rx=CBaHjyTQ7w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 9 Apr 2015 09:33:46 +0200
+Subject: [PATCH] ARM: Remove deprecated symbol from defconfig files
+In-Reply-To: <1428353842-3488-1-git-send-email-public_timo.s@silentcreek.de>
+References: <1428353842-3488-1-git-send-email-public_timo.s@silentcreek.de>
+Message-ID: <20150409073346.GK26727@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-31 20:16 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> The clk functions and structs declare the parent_name arrays as
-> 'const char **parent_names' which means the parent name strings
-> are const, but the array itself is not. Use
-> 'const char * const * parent_names' instead which also makes
-> the array const. This allows us to put the parent_name arrays into
-> the __initconst section.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+On Mon, Apr 06, 2015 at 10:57:22PM +0200, public_timo.s at silentcreek.de wrote:
+> From: Timo Sigurdsson <public_timo.s@silentcreek.de>
+> 
+> Commit b2b3a8b934e6 ("power/reset: Remove sun6i reboot driver") removed
+> the sun6i reboot driver. But sunxi_defconfig and multi_v7_defconfig
+> still contain the symbol CONFIG_POWER_RESET_SUN6I that was deprecated
+> by that commit, so remove it.
+> 
+> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Applied, thanks!
+Maxime
 
-and tested:
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-
-Best regards,
-Krzysztof
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/b38796a6/attachment-0001.sig>
