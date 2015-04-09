@@ -1,34 +1,198 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 9 Apr 2015 09:14:40 -0600
-Subject: [PATCH] coresight: etb10: Print size of buffer we fail to allocate
-In-Reply-To: <20150409145558.GW6023@sirena.org.uk>
-References: <1428531327-16902-1-git-send-email-broonie@kernel.org>
- <CANLsYkzoj5nPs2dnejOsDgEHZXArbXq5s6B7Cp3P1siu0Vv8YA@mail.gmail.com>
- <20150409145558.GW6023@sirena.org.uk>
-Message-ID: <CANLsYkzKJM0c4cw9=6bi=ZQYk9K6f-BLm7bSoUKUjgVNS5K_VA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 9 Apr 2015 08:18:46 -0700
+Subject: [PATCH v5 8/8] ARM: DTS: dra7x: Integrate sDMA crossbar
+In-Reply-To: <1428572154-3548-9-git-send-email-peter.ujfalusi@ti.com>
+References: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
+ <1428572154-3548-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20150409151846.GR18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 April 2015 at 08:55, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Apr 09, 2015 at 08:46:55AM -0600, Mathieu Poirier wrote:
->
->> I'll take this patch but will rework the commit message a little.  If
->> the power domains are not setup properly the device won't show up on
->> AMBA and as such won't get probed.
->
-> This depends on what the hardware does and how the device is registered
-> - if the device is registered with an ID provided (which you can do)
-> then AMBA won't bother reading the ID back and verifying that it's
-> correct so there's no interaction with the hardware until we hit the
-> driver.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [150409 02:37]:
+> The sDMA requests are routed through the DMA crossbar and without the
+> crossbar only peripherals using DMA request 0-127 can be used.
 
-Indeed possible, but in that case you'll get a core dump or the kernel
-will simply hang waiting on the memory area being read.
+I assume this can be merged separately from the driver
+changes?
 
->
-> I've not checked the DT case, though it doesn't seem like there's any
-> check that the compatible string matches the ID read from the hardware
-> which is a bit interesting...
+Otherwise we'll have the same kind of "flag day" mess with
+the IRQ crossbar..
 
-This is something I've been meaning to add for a while now but never
-got around to do it.
+Regards,
+
+Tony
+ 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  arch/arm/boot/dts/dra7.dtsi | 57 ++++++++++++++++++++++++++-------------------
+>  1 file changed, 33 insertions(+), 24 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 5332b57b4950..a2f4aa01984f 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -303,6 +303,15 @@
+>  			dma-requests = <127>;
+>  		};
+>  
+> +		sdma_xbar: dma-router at 4a002b78 {
+> +			compatible = "ti,dra7-dma-crossbar";
+> +			reg = <0x4a002b78 0xfc>;
+> +			#dma-cells = <1>;
+> +			dma-requests = <205>;
+> +			ti,dma-safe-map = <0>;
+> +			dma-masters = <&sdma>;
+> +		};
+> +
+>  		gpio1: gpio at 4ae10000 {
+>  			compatible = "ti,omap4-gpio";
+>  			reg = <0x4ae10000 0x200>;
+> @@ -398,7 +407,7 @@
+>  			ti,hwmods = "uart1";
+>  			clock-frequency = <48000000>;
+>  			status = "disabled";
+> -			dmas = <&sdma 49>, <&sdma 50>;
+> +			dmas = <&sdma_xbar 49>, <&sdma_xbar 50>;
+>  			dma-names = "tx", "rx";
+>  		};
+>  
+> @@ -409,7 +418,7 @@
+>  			ti,hwmods = "uart2";
+>  			clock-frequency = <48000000>;
+>  			status = "disabled";
+> -			dmas = <&sdma 51>, <&sdma 52>;
+> +			dmas = <&sdma_xbar 51>, <&sdma_xbar 52>;
+>  			dma-names = "tx", "rx";
+>  		};
+>  
+> @@ -420,7 +429,7 @@
+>  			ti,hwmods = "uart3";
+>  			clock-frequency = <48000000>;
+>  			status = "disabled";
+> -			dmas = <&sdma 53>, <&sdma 54>;
+> +			dmas = <&sdma_xbar 53>, <&sdma_xbar 54>;
+>  			dma-names = "tx", "rx";
+>  		};
+>  
+> @@ -431,7 +440,7 @@
+>  			ti,hwmods = "uart4";
+>  			clock-frequency = <48000000>;
+>                          status = "disabled";
+> -			dmas = <&sdma 55>, <&sdma 56>;
+> +			dmas = <&sdma_xbar 55>, <&sdma_xbar 56>;
+>  			dma-names = "tx", "rx";
+>  		};
+>  
+> @@ -442,7 +451,7 @@
+>  			ti,hwmods = "uart5";
+>  			clock-frequency = <48000000>;
+>  			status = "disabled";
+> -			dmas = <&sdma 63>, <&sdma 64>;
+> +			dmas = <&sdma_xbar 63>, <&sdma_xbar 64>;
+>  			dma-names = "tx", "rx";
+>  		};
+>  
+> @@ -453,7 +462,7 @@
+>  			ti,hwmods = "uart6";
+>  			clock-frequency = <48000000>;
+>  			status = "disabled";
+> -			dmas = <&sdma 79>, <&sdma 80>;
+> +			dmas = <&sdma_xbar 79>, <&sdma_xbar 80>;
+>  			dma-names = "tx", "rx";
+>  		};
+>  
+> @@ -862,7 +871,7 @@
+>  			ti,hwmods = "mmc1";
+>  			ti,dual-volt;
+>  			ti,needs-special-reset;
+> -			dmas = <&sdma 61>, <&sdma 62>;
+> +			dmas = <&sdma_xbar 61>, <&sdma_xbar 62>;
+>  			dma-names = "tx", "rx";
+>  			status = "disabled";
+>  			pbias-supply = <&pbias_mmc_reg>;
+> @@ -874,7 +883,7 @@
+>  			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+>  			ti,hwmods = "mmc2";
+>  			ti,needs-special-reset;
+> -			dmas = <&sdma 47>, <&sdma 48>;
+> +			dmas = <&sdma_xbar 47>, <&sdma_xbar 48>;
+>  			dma-names = "tx", "rx";
+>  			status = "disabled";
+>  		};
+> @@ -885,7 +894,7 @@
+>  			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+>  			ti,hwmods = "mmc3";
+>  			ti,needs-special-reset;
+> -			dmas = <&sdma 77>, <&sdma 78>;
+> +			dmas = <&sdma_xbar 77>, <&sdma_xbar 78>;
+>  			dma-names = "tx", "rx";
+>  			status = "disabled";
+>  		};
+> @@ -896,7 +905,7 @@
+>  			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+>  			ti,hwmods = "mmc4";
+>  			ti,needs-special-reset;
+> -			dmas = <&sdma 57>, <&sdma 58>;
+> +			dmas = <&sdma_xbar 57>, <&sdma_xbar 58>;
+>  			dma-names = "tx", "rx";
+>  			status = "disabled";
+>  		};
+> @@ -1041,14 +1050,14 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi1";
+>  			ti,spi-num-cs = <4>;
+> -			dmas = <&sdma 35>,
+> -			       <&sdma 36>,
+> -			       <&sdma 37>,
+> -			       <&sdma 38>,
+> -			       <&sdma 39>,
+> -			       <&sdma 40>,
+> -			       <&sdma 41>,
+> -			       <&sdma 42>;
+> +			dmas = <&sdma_xbar 35>,
+> +			       <&sdma_xbar 36>,
+> +			       <&sdma_xbar 37>,
+> +			       <&sdma_xbar 38>,
+> +			       <&sdma_xbar 39>,
+> +			       <&sdma_xbar 40>,
+> +			       <&sdma_xbar 41>,
+> +			       <&sdma_xbar 42>;
+>  			dma-names = "tx0", "rx0", "tx1", "rx1",
+>  				    "tx2", "rx2", "tx3", "rx3";
+>  			status = "disabled";
+> @@ -1062,10 +1071,10 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi2";
+>  			ti,spi-num-cs = <2>;
+> -			dmas = <&sdma 43>,
+> -			       <&sdma 44>,
+> -			       <&sdma 45>,
+> -			       <&sdma 46>;
+> +			dmas = <&sdma_xbar 43>,
+> +			       <&sdma_xbar 44>,
+> +			       <&sdma_xbar 45>,
+> +			       <&sdma_xbar 46>;
+>  			dma-names = "tx0", "rx0", "tx1", "rx1";
+>  			status = "disabled";
+>  		};
+> @@ -1078,7 +1087,7 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi3";
+>  			ti,spi-num-cs = <2>;
+> -			dmas = <&sdma 15>, <&sdma 16>;
+> +			dmas = <&sdma_xbar 15>, <&sdma_xbar 16>;
+>  			dma-names = "tx0", "rx0";
+>  			status = "disabled";
+>  		};
+> @@ -1091,7 +1100,7 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi4";
+>  			ti,spi-num-cs = <1>;
+> -			dmas = <&sdma 70>, <&sdma 71>;
+> +			dmas = <&sdma_xbar 70>, <&sdma_xbar 71>;
+>  			dma-names = "tx0", "rx0";
+>  			status = "disabled";
+>  		};
+> -- 
+> 2.3.5
+> 
