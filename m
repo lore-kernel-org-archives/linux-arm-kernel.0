@@ -1,212 +1,73 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 9 Apr 2015 15:24:43 +0200
-Subject: [PATCH v2 07/10] KVM: arm64: guest debug, add support for
- single-step
-In-Reply-To: <1427814488-28467-8-git-send-email-alex.bennee@linaro.org>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-8-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150409132442.GE3212@hawk.usersys.redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 9 Apr 2015 14:29:25 +0100
+Subject: [PATCH v3 2/5] arm64: use fixmap region for permanent FDT mapping
+In-Reply-To: <CAKv+Gu9b9Now_B_xftJDFyGxs8DGOTRZeGQjgOusiPh8Qvi0uw@mail.gmail.com>
+References: <1426698308-726-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426698308-726-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20150409114911.GB18488@leverpostej>
+ <CAKv+Gu_dqMtLhLdCjj-eWn+tiAkwwXvNE6LJv7GPkx4aqTqsdA@mail.gmail.com>
+ <20150409131223.GA9527@leverpostej>
+ <CAKv+Gu9b9Now_B_xftJDFyGxs8DGOTRZeGQjgOusiPh8Qvi0uw@mail.gmail.com>
+Message-ID: <20150409132925.GB9527@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 04:08:05PM +0100, Alex Benn?e wrote:
-> This adds support for single-stepping the guest. As userspace can and
-> will manipulate guest registers before restarting any tweaking of the
-> registers has to occur just before control is passed back to the guest.
-> Furthermore while guest debugging is in effect we need to squash the
-> ability of the guest to single-step itself as we have no easy way of
-> re-entering the guest after the exception has been delivered to the
-> hypervisor.
+On Thu, Apr 09, 2015 at 02:16:23PM +0100, Ard Biesheuvel wrote:
+> On 9 April 2015 at 15:12, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> >> +NOTE: versions prior to v4.1 require, in addition to the requirements
+> >> >> +listed above, that the dtb be placed above the kernel Image inside the
+> >> >> +same naturally aligned 512 MB region.
+> >> >
+> >> > Minor nit: This would read a little better if we just said "versions
+> >> > prior to v4.1 also require that ...", dropping "in addition to the
+> >> > requirements listed above".
+> >> >
+> >>
+> >> OK
+> >>
+> >> Actually, I realized that this is incorrect anyway: it is not the same
+> >> naturally aligned 512 MB region, it is actually 'within 512 MB of the
+> >> start of the kernel Image' since that itself is naturally aligned to
+> >> 512 MB in the virtual address space.
+> >
+> > Surely starting at TEXT_OFFSET bytes below the kernel image? ;)
+> >
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> Only if you find it acceptable that people start putting their FDT in
+> the TEXT_OFFSET region ... :-)
+
+Unfortunately people are already doing such things (which is one reason
+I moved the page tables out of the region).
+
+It also means that the region of TEXT_OFFSET bytes below 512M from the
+start of the image is unusable...
+
+[...]
+
+> >> I was going to suggest to use SZ_2M for the masking, but map a 4 MB
+> >> window. That way, we can relax the requirement from "should not cross
+> >> a 2 MB boundary' to 'should not exceed 2 MB in size', which is
+> >> arguable easier to adhere to, since the latter is a property of the
+> >> DTB itself, whereas the former is a property of whatever your malloc()
+> >> gives you. That means the mask would remain SZ_2M, and the size would
+> >> become SZ_4M
+> >
+> > That sounds good so long as it doesn't get in the way of increasing
+> > FIX_FDT_SIZE in future.
+> >
 > 
-> ---
-> v2
->   - Move pstate/mdscr manipulation into C
->   - don't export guest_debug to assembly
->   - add accessor for saved_debug regs
->   - tweak save/restore of mdscr_el1
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index d3bc8dc..c1ed8cb 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -304,7 +304,21 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->  	kvm_arm_set_running_vcpu(NULL);
->  }
->  
-> -#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE|KVM_GUESTDBG_USE_SW_BP)
-> +#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE |    \
-> +			    KVM_GUESTDBG_USE_SW_BP | \
-> +			    KVM_GUESTDBG_SINGLESTEP)
-> +
-> +/**
-> + * kvm_arch_vcpu_ioctl_set_guest_debug - Setup guest debugging
-> + * @kvm:	pointer to the KVM struct
-> + * @kvm_guest_debug: the ioctl data buffer
-> + *
-> + * This sets up the VM for guest debugging. Care has to be taken when
-> + * manipulating guest registers as these will be set/cleared by the
-> + * hyper-visor controller, typically before each kvm_run event. As a
-> + * result modification of the guest registers needs to take place
-> + * after they have been restored in the hyp.S trampoline code.
-> + */
->  
->  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->  					struct kvm_guest_debug *dbg)
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 0631840..6a33647 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -121,6 +121,13 @@ struct kvm_vcpu_arch {
->  	 * here.
->  	 */
->  
-> +	/* Registers pre any guest debug manipulations */
-> +	struct {
-> +		u32	pstate_ss_bit;
-> +		u32	mdscr_el1_bits;
-> +
-> +	} debug_saved_regs;
+> No, it shouldn't. And it actually makes it more obvious when we do
+> increase it later which values should be left alone (SZ_2M) and which
+> values should be increased (the higher ones)
 
-Hmm, you have a struct called "regs", but then each member is
-suffixed with _bit(s). This looks awkward.
+Sounds good to me then.
 
+> Yes. I am currently looking into a way to make early_fixmap_init() not
+> rely on __va(), and if that is easily doable, I will propose something
+> for the FDT which is quite close to the latest submitted version. But
+> otherwise, it may be a bit more complicated, and the FDT mapping needs
+> more work.
 
-> +
->  	/* Don't run the guest */
->  	bool pause;
->  
-> @@ -143,6 +150,7 @@ struct kvm_vcpu_arch {
->  
->  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
->  #define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
-> +#define vcpu_debug_saved_reg(v, r) ((v)->arch.debug_saved_regs.r)
->  /*
->   * CP14 and CP15 live in the same array, as they are backed by the
->   * same system registers.
-> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-> index cff0475..b32362c 100644
-> --- a/arch/arm64/kvm/debug.c
-> +++ b/arch/arm64/kvm/debug.c
-> @@ -19,8 +19,16 @@
->  
->  #include <linux/kvm_host.h>
->  
-> +#include <asm/debug-monitors.h>
-> +#include <asm/kvm_asm.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_host.h>
-> +#include <asm/kvm_emulate.h>
-> +
-> +/* These are the bits of MDSCR_EL1 we may mess with */
-> +#define MDSCR_EL1_DEBUG_BITS	(DBG_MDSCR_SS | \
-> +				DBG_MDSCR_KDE | \
-> +				DBG_MDSCR_MDE)
+Ok. I'll keep an eye out then.
 
-_MASK instead of _BITS ?
-
->  
->  /**
->   * kvm_arch_setup_debug - set-up debug related stuff
-> @@ -51,15 +59,46 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
->  	else
->  		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
->  
-> -	/* Trap breakpoints? */
-> -	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
-> +	/* Is Guest debugging in effect? */
-> +	if (vcpu->guest_debug) {
->  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
-> -	else
-> -		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
->  
-> +		/* Save pstate/mdscr */
-> +		vcpu_debug_saved_reg(vcpu, pstate_ss_bit) =
-> +			*vcpu_cpsr(vcpu) & DBG_SPSR_SS;
-> +		vcpu_debug_saved_reg(vcpu, mdscr_el1_bits) =
-> +			vcpu_sys_reg(vcpu, MDSCR_EL1) & MDSCR_EL1_DEBUG_BITS;
-
-I think it would be clearer if we embed the masks into helper
-functions, and, assuming we drop the _bits concept too, then
-
-#define SPSR_DEBUG_MASK DBG_SPSR_SS
-
-vcpu_debug_save_regs(vcpu)
-{
-  vcpu->arch.debug_saved_regs.pstate = *vcpu_cpsr(vcpu);
-  vcpu->arch.debug_saved_regs.mdscr_el1 = vcpu_sys_reg(vcpu, MDSCR_EL1);
-}
-
-vcpu_debug_restore_regs(vcpu)
-{
-  *vcpu_cpsr(vcpu) |=
-       (vcpu->arch.debug_saved_regs.pstate & SPSR_DEBUG_MASK);
-  vcpu_sys_reg(vcpu, MDSCR_EL1) |=
-       (vcpu->arch.debug_saved_regs.mdscr_el1 & MDSCR_EL1_DEBUG_MASK)
-}
-
-> +		/*
-> +		 * Single Step (ARM ARM D2.12.3 The software step state
-> +		 * machine)
-> +		 *
-> +		 * If we are doing Single Step we need to manipulate
-> +		 * MDSCR_EL1.SS and PSTATE.SS. If not we need to
-> +		 * suppress the guest from messing with it.
-> +		 */
-> +		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-> +			*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
-> +			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
-> +		} else {
-> +			*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
-> +			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
-> +		}
-> +
-> +	} else {
-> +		/* Debug operations can go straight to the guest */
-> +		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
-> +	}
->  }
->  
->  void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
->  {
-> -	/* Nothing to do yet */
-
-This would now just be
-
-  if (vcpu->guest_debug)
-     vcpu_debug_restore_regs(vcpu);
-
-> +	if (vcpu->guest_debug) {
-> +		/* Restore pstate/mdscr bits we may have messed with */
-> +		*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
-> +		*vcpu_cpsr(vcpu) |= vcpu_debug_saved_reg(vcpu, pstate_ss_bit);
-> +
-> +		vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~MDSCR_EL1_DEBUG_BITS;
-> +		vcpu_sys_reg(vcpu, MDSCR_EL1) |=
-> +			vcpu_debug_saved_reg(vcpu, mdscr_el1_bits);
-> +	}
->  }
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index ed1bbb4..16accae 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -101,6 +101,7 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	run->debug.arch.hsr = hsr;
->  
->  	switch (hsr >> ESR_ELx_EC_SHIFT) {
-> +	case ESR_ELx_EC_SOFTSTP_LOW:
->  	case ESR_ELx_EC_BKPT32:
->  	case ESR_ELx_EC_BRK64:
->  		run->debug.arch.pc = *vcpu_pc(vcpu);
-> @@ -127,6 +128,7 @@ static exit_handle_fn arm_exit_handlers[] = {
->  	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
->  	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
->  	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
-> +	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
->  	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
->  	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
->  };
-> -- 
-> 2.3.4
-> 
+Mark.
