@@ -1,53 +1,56 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu,  9 Apr 2015 09:23:43 +0100
-Subject: [PATCH 08/10] ARM: dts: qcom: Add DT alias for serial port
+Date: Thu,  9 Apr 2015 09:23:51 +0100
+Subject: [PATCH 09/10] ARM: dts: Move i2c1 pinctrl to apq8064.dtsi
 In-Reply-To: <1428567674-10672-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1428567674-10672-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1428567823-11062-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1428567831-11105-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pramod Gurav <pramod.gurav@smartplayin.com>
+I2C1 pinctrl is not really specific to a board, moving to SOC dtsi would
+avoid redefining this in every board.
 
-Define an alias for serial port present on ifc6410 which is used as
-console.
-
-Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 4 ++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        | 3 +--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 7 -------
+ arch/arm/boot/dts/qcom-apq8064.dtsi        | 7 +++++++
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index d39a5bb..b76a92b 100644
+index b76a92b..9bd9dfe 100644
 --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
 +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -5,6 +5,10 @@
- 	model = "Qualcomm APQ8064/IFC6410";
- 	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
+@@ -11,13 +11,6 @@
  
-+	aliases {
-+		serial0 = &serial0;
-+	};
-+
  	soc {
  		pinctrl at 800000 {
- 			i2c1_pins: i2c1 {
+-			i2c1_pins: i2c1 {
+-				mux {
+-					pins = "gpio20", "gpio21";
+-					function = "gsbi1";
+-				};
+-			};
+-
+ 			card_detect: card_detect {
+ 				mux {
+ 					pins = "gpio26";
 diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 70e417f..f4b8c3a 100644
+index f4b8c3a..2fa979f 100644
 --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
 +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -252,10 +252,9 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
--
- 			syscon-tcsr = <&tcsr>;
+@@ -129,6 +129,13 @@
+ 					function = "ps_hold";
+ 				};
+ 			};
++
++			i2c1_pins: i2c1 {
++				mux {
++					pins = "gpio20", "gpio21";
++					function = "gsbi1";
++				};
++			};
+ 		};
  
--			serial at 16640000 {
-+			serial0: serial at 16640000 {
- 				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
- 				reg = <0x16640000 0x1000>,
- 				      <0x16600000 0x1000>;
+ 		intc: interrupt-controller at 2000000 {
 -- 
 1.9.1
