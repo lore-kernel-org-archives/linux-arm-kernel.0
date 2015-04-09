@@ -1,62 +1,98 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Apr 2015 15:20:48 +0100
-Subject: [PATCH] drivers: CCI: fix used_mask init in validate_group()
-In-Reply-To: <1428588703.20354.23.camel@deneb.redhat.com>
-References: <1428517284-7951-1-git-send-email-msalter@redhat.com>
- <20150409135124.GA9648@leverpostej>
- <1428588703.20354.23.camel@deneb.redhat.com>
-Message-ID: <20150409142047.GC9648@leverpostej>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 9 Apr 2015 16:25:29 +0200
+Subject: [PATCH 0/4] Allow to use leds-ns2 with n090401 boards
+In-Reply-To: <20150323103243.GQ1509@kw.sim.vm.gnt>
+References: <1425480739-2373-1-git-send-email-simon.guinot@sequanux.org>
+ <20150313094433.GU1509@kw.sim.vm.gnt>
+ <20150323103243.GQ1509@kw.sim.vm.gnt>
+Message-ID: <20150409142529.GC1509@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 03:11:43PM +0100, Mark Salter wrote:
-> On Thu, 2015-04-09 at 14:51 +0100, Mark Rutland wrote:
-> > On Wed, Apr 08, 2015 at 07:21:24PM +0100, Mark Salter wrote:
-> > > Currently in validate_group(), there is a static initializer
-> > > for fake_pmu.used_mask which is based on CPU_BITS_NONE but
-> > > the used_mask array size is based on CCI_PMU_MAX_HW_EVENTS.
-> > > CCI_PMU_MAX_HW_EVENTS is not based on NR_CPUS, so CPU_BITS_NONE
-> > > is not correct and will cause a build failure if NR_CPUS
-> > > is set high enough to make CPU_BITS_NONE larger than used_mask.
-> > 
-> > Whoops. My bad.
-> > 
-> > > This patch changes the used_mask initialization to be runtime
-> > > based on the actual size of the array.
+On Mon, Mar 23, 2015 at 11:32:43AM +0100, Simon Guinot wrote:
+> On Fri, Mar 13, 2015 at 10:44:33AM +0100, Simon Guinot wrote:
+> > On Wed, Mar 04, 2015 at 03:52:15PM +0100, Simon Guinot wrote:
+> > > Hello,
 > > > 
-> > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > ---
-> > >  drivers/bus/arm-cci.c | 14 +++++++-------
-> > >  1 file changed, 7 insertions(+), 7 deletions(-)
+> > > This patch series allows to use the leds-ns2 driver with the n090401
+> > > boards (Seagate NAS 4-Bay), based on an Armada-370 SoC.
 > > > 
-> > > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> > > index 84fd660..1d83072 100644
-> > > --- a/drivers/bus/arm-cci.c
-> > > +++ b/drivers/bus/arm-cci.c
-> > > @@ -679,13 +679,13 @@ static int
-> > >  validate_group(struct perf_event *event)
-> > >  {
-> > >  	struct perf_event *sibling, *leader = event->group_leader;
-> > > -	struct cci_pmu_hw_events fake_pmu = {
-> > > -		/*
-> > > -		 * Initialise the fake PMU. We only need to populate the
-> > > -		 * used_mask for the purposes of validation.
-> > > -		 */
-> > > -		.used_mask = CPU_BITS_NONE,
+> > > Here is the list changes:
+> > > 
+> > > - Allow to configure the LED mode mapping.
+> > > - Handle can_sleep GPIOs. On n090401, the LEDs are connected to an I2C
+> > >   GPIO expander.
+> > > - Make leds-ns2 depends on MACH_ARMADA_370.
 > > 
-> > Can we not simply change this to:
+> > Hi Brian,
 > > 
-> > 		.used_mask = { 0 },
-> > 
-> > That should result in the entire array being zeroed.
+> > Please consider applying the leds-ns2 patches of this serie.
 > 
-> It does, but it also causes the whole struct to be cleared.
+> Hi Brian,
+> 
+> Again, it would be nice to have this patches for the incoming release.
+> Please, consider picking the leds-ns2 patches of this serie.
 
-Sure, but it's also the minimal diff, and it's easier to read. This was
-what the code was intended to be initially.
+Hi Bryan,
 
-> With the memset, only used_mask gets cleared.
+Ping :)
 
-Is there an appreciable difference between the two performance-wise?
+Please, let me know if there is anything I can do to have this patches
+merged for the next Linux release.
 
-Mark.
+Thanks,
+
+Simon
+
+> > > Simon Guinot (2):
+> > >   leds: leds-ns2: handle can_sleep GPIOs
+> > >   leds: leds-ns2: depends on MACH_ARMADA_370
+> > > 
+> > > Vincent Donnefort (2):
+> > >   leds: leds-ns2: move LED modes mapping outside of the driver
+> > >   ARM: Kirkwood: add modes-map property to ns2-leds nodes
+> > > 
+> > >  .../devicetree/bindings/leds/leds-ns2.txt          |   9 ++
+> > >  arch/arm/boot/dts/kirkwood-d2net.dts               |   5 +
+> > >  arch/arm/boot/dts/kirkwood-is2.dts                 |   5 +
+> > >  arch/arm/boot/dts/kirkwood-ns2.dts                 |   5 +
+> > >  arch/arm/boot/dts/kirkwood-ns2max.dts              |   5 +
+> > >  arch/arm/boot/dts/kirkwood-ns2mini.dts             |   5 +
+> > >  drivers/leds/Kconfig                               |  12 +-
+> > >  drivers/leds/leds-ns2.c                            | 156 +++++++++++++--------
+> > >  include/dt-bindings/leds/leds-ns2.h                |   8 ++
+> > >  include/linux/platform_data/leds-kirkwood-ns2.h    |  14 ++
+> > >  10 files changed, 159 insertions(+), 65 deletions(-)
+> > >  create mode 100644 include/dt-bindings/leds/leds-ns2.h
+> > > 
+> > > -- 
+> > > 2.1.1
+> > > 
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/60a936e8/attachment.sig>
