@@ -1,28 +1,33 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Thu, 9 Apr 2015 11:16:32 -0700
-Subject: [RFC PATCH] ARM: debug: Add prompt for FRAME_POINTER to
- Kconfig.debug
-In-Reply-To: <20150409074558.GT12732@n2100.arm.linux.org.uk>
-References: <1428537883-19622-1-git-send-email-gregory.0xf0@gmail.com>
- <20150409074558.GT12732@n2100.arm.linux.org.uk>
-Message-ID: <CADtm3G6HOikdeXSKjtP61mTRCXpJ6XX90+g+jrCxEojN9=D_XA@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 9 Apr 2015 21:50:13 +0300
+Subject: [PATCH v5 8/8] ARM: DTS: dra7x: Integrate sDMA crossbar
+In-Reply-To: <20150409151846.GR18048@atomide.com>
+References: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
+ <1428572154-3548-9-git-send-email-peter.ujfalusi@ti.com>
+ <20150409151846.GR18048@atomide.com>
+Message-ID: <5526C9E5.4070601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 9, 2015 at 12:45 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Apr 08, 2015 at 05:04:43PM -0700, Gregory Fong wrote:
->> Without a prompt string, it is impossible to disable FRAME_POINTER on
->> ARM. It will simply set the default value anytime you run 'make'.
->
-> Have you read the comment above it?
+On 04/09/2015 06:18 PM, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [150409 02:37]:
+>> The sDMA requests are routed through the DMA crossbar and without the
+>> crossbar only peripherals using DMA request 0-127 can be used.
+> 
+> I assume this can be merged separately from the driver
+> changes?
 
-Yes!  It says that you'll kill those who disable the option, but
-that's not itself a reason to be completely unable to turn it off.
+Unfortunately not. We need to have the drivers in place for the DTS changes to
+work.
 
-Just think of it as a good way to increase your reputation as a bounty hunter ;)
+> 
+> Otherwise we'll have the same kind of "flag day" mess with
+> the IRQ crossbar..
+> 
+> Regards,
+> 
+> Tony
+>  
 
-Seriously though, I agree it's a terrible idea to turn this off in
-general, but really that's not a reason to make it impossible, as it
-does still have value in very specific cases.  You can still disable
-CONFIG_BUG, for example.
+-- 
+P?ter
