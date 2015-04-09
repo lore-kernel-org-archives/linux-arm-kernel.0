@@ -1,79 +1,165 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  9 Apr 2015 22:04:15 +0200
-Subject: [PATCH v5 11/11] ARM: vf610m4: add defconfig for Linux on Vybrids
- Cortex-M4
+Date: Thu,  9 Apr 2015 22:04:13 +0200
+Subject: [PATCH v5 09/11] ARM: vf610: enable Cortex-M4 configuration on Vybrid
+ SoC
 In-Reply-To: <1428609855-27657-1-git-send-email-stefan@agner.ch>
 References: <1428609855-27657-1-git-send-email-stefan@agner.ch>
-Message-ID: <1428609855-27657-12-git-send-email-stefan@agner.ch>
+Message-ID: <1428609855-27657-10-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add defconfig for Linux on Vybrid (vf610) on the secondary Cortex-
-M4 CPU. The use of a XIP image has been tested which needs to be
-loaded (e.g. using the custom m4boot loader) to the end of the
-available RAM at address 0x8f000000. The Cortex-M4 has a code-alias
-which makes sure that the instructions get fetched through the code
-bus (alias starts at 0x00800000 => 0x80800000 in system address).
-Hence, to get optimal performance, use 0x0f000000 as XIP_PHYS_ADDR.
-This address is additionally shifted by the length of the minimal
-loader which is inserted by m4boot. Currently, this offset is 0x80.
+This patch allows to build the Kernel for Vybrid (VF6xx) SoC
+when ARMv7-M CPU is selected. The resulting image runs on the
+secondary Cortex-M4 core. This core has equally access to all
+peripherals as the main Cortex-A5 core. However, there is no
+resource control mechanism, hence when both cores are used
+simultaneously, orthogonal device tree's are required.
 
-The standard DRAM base address is configured to 0x8C000000, which
-gives the Cortex-M4 48MiB of RAM.
+The boot CPU is dependent on the SoC variant. The available
+boards use mostly variants where the Cortex-A5 is the primary
+and hence the boot CPU. Booting the secondary Cortex-M4 CPU
+needs SoC specific registers written. There is no in kernel
+support for this right now, a external userspace utility
+called "m4boot" can be used to boot the kernel:
+
+m4boot xipImage initramfs.cpio.lzo vf610m4-colibri.dtb
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/configs/vf610m4_defconfig | 42 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
- create mode 100644 arch/arm/configs/vf610m4_defconfig
+ Documentation/devicetree/bindings/arm/fsl.txt |  3 +++
+ arch/arm/Kconfig.debug                        |  2 +-
+ arch/arm/mach-imx/Kconfig                     | 38 ++++++++++++++++-----------
+ arch/arm/mach-imx/Makefile.boot               |  0
+ arch/arm/mach-imx/mach-vf610.c                |  1 +
+ 5 files changed, 28 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/mach-imx/Makefile.boot
 
-diff --git a/arch/arm/configs/vf610m4_defconfig b/arch/arm/configs/vf610m4_defconfig
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index a5462b6..2a3ba73 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -81,12 +81,15 @@ Freescale Vybrid Platform Device Tree Bindings
+ For the Vybrid SoC familiy all variants with DDR controller are supported,
+ which is the VF5xx and VF6xx series. Out of historical reasons, in most
+ places the kernel uses vf610 to refer to the whole familiy.
++The compatible string "fsl,vf610m4" is used for the secondary Cortex-M4
++core support.
+ 
+ Required root node compatible property (one of them):
+     - compatible = "fsl,vf500";
+     - compatible = "fsl,vf510";
+     - compatible = "fsl,vf600";
+     - compatible = "fsl,vf610";
++    - compatible = "fsl,vf610m4";
+ 
+ Freescale LS1021A Platform Device Tree Bindings
+ ------------------------------------------------
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 970de75..2e55557 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1573,7 +1573,7 @@ config DEBUG_UNCOMPRESS
+ config UNCOMPRESS_INCLUDE
+ 	string
+ 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
+-					PLAT_SAMSUNG || ARCH_EFM32
++					PLAT_SAMSUNG || ARCH_EFM32 || SOC_VF610
+ 	default "mach/uncompress.h"
+ 
+ config EARLY_PRINTK
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index c8dffce..aa8ad4a 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -1,5 +1,5 @@
+ menuconfig ARCH_MXC
+-	bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
++	bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7 || ARM_SINGLE_ARMV7M
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_CPU_SUSPEND if PM
+ 	select CLKSRC_MMIO
+@@ -557,9 +557,11 @@ config MACH_VPR200
+ 
+ endif
+ 
++comment "Device tree only"
++
+ if ARCH_MULTI_V7
+ 
+-comment "Device tree only"
++comment "Cortex-A platforms"
+ 
+ config SOC_IMX5
+ 	bool
+@@ -629,10 +631,26 @@ config SOC_IMX6SX
+ 	help
+ 	  This enables support for Freescale i.MX6 SoloX processor.
+ 
++
++config SOC_LS1021A
++	bool "Freescale LS1021A support"
++	select ARM_GIC
++	select HAVE_ARM_ARCH_TIMER
++	select PCI_DOMAINS if PCI
++	select ZONE_DMA if ARM_LPAE
++
++	help
++	  This enable support for Freescale LS1021A processor.
++
++endif
++
++comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
++
++if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
++
+ config SOC_VF610
+ 	bool "Vybrid Family VF610 support"
+-	select IRQ_DOMAIN_HIERARCHY
+-	select ARM_GIC
++	select ARM_GIC if ARCH_MULTI_V7
+ 	select PINCTRL_VF610
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+ 
+@@ -645,7 +663,7 @@ choice
+ 	default VF_USE_ARM_GLOBAL_TIMER
+ 
+ 	config VF_USE_ARM_GLOBAL_TIMER
+-		bool "Use ARM Global Timer"
++		bool "Use ARM Global Timer" if ARCH_MULTI_V7
+ 		select ARM_GLOBAL_TIMER
+ 		select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+ 		help
+@@ -659,16 +677,6 @@ choice
+ 
+ endchoice
+ 
+-config SOC_LS1021A
+-	bool "Freescale LS1021A support"
+-	select ARM_GIC
+-	select HAVE_ARM_ARCH_TIMER
+-	select PCI_DOMAINS if PCI
+-	select ZONE_DMA if ARM_LPAE
+-
+-	help
+-	  This enable support for Freescale LS1021A processor.
+-
+ endif
+ 
+ source "arch/arm/mach-imx/devices/Kconfig"
+diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
 new file mode 100644
-index 0000000..aeb2482
---- /dev/null
-+++ b/arch/arm/configs/vf610m4_defconfig
-@@ -0,0 +1,42 @@
-+CONFIG_NAMESPACES=y
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_RD_BZIP2 is not set
-+# CONFIG_RD_LZMA is not set
-+# CONFIG_RD_XZ is not set
-+# CONFIG_RD_LZ4 is not set
-+CONFIG_KALLSYMS_ALL=y
-+CONFIG_EMBEDDED=y
-+# CONFIG_MMU is not set
-+CONFIG_ARM_SINGLE_ARMV7M=y
-+CONFIG_ARCH_MXC=y
-+CONFIG_SOC_VF610=y
-+CONFIG_SET_MEM_PARAM=y
-+CONFIG_DRAM_BASE=0x8c000000
-+CONFIG_FLASH_MEM_BASE=0x8f000000
-+CONFIG_FLASH_SIZE=0x01000000
-+CONFIG_CMDLINE="console=/dev/ttyLP2"
-+CONFIG_XIP_KERNEL=y
-+CONFIG_XIP_PHYS_ADDR=0x0f000080
-+CONFIG_BINFMT_FLAT=y
-+CONFIG_BINFMT_ZFLAT=y
-+CONFIG_BINFMT_SHARED_FLAT=y
-+# CONFIG_SUSPEND is not set
-+# CONFIG_UEVENT_HELPER is not set
-+# CONFIG_STANDALONE is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_FIRMWARE_IN_KERNEL is not set
-+# CONFIG_ALLOW_DEV_COREDUMP is not set
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=4
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_KEYBOARD_ATKBD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+CONFIG_SERIAL_FSL_LPUART=y
-+CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_MFD_SYSCON=y
-+# CONFIG_HID is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_MISC_FILESYSTEMS is not set
-+# CONFIG_FTRACE is not set
+index 0000000..e69de29
+diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+index 2e7c75b..b20f6c1 100644
+--- a/arch/arm/mach-imx/mach-vf610.c
++++ b/arch/arm/mach-imx/mach-vf610.c
+@@ -17,6 +17,7 @@ static const char * const vf610_dt_compat[] __initconst = {
+ 	"fsl,vf510",
+ 	"fsl,vf600",
+ 	"fsl,vf610",
++	"fsl,vf610m4",
+ 	NULL,
+ };
+ 
 -- 
 2.3.5
