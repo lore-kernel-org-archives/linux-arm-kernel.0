@@ -1,79 +1,28 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 9 Apr 2015 16:15:18 -0500
-Subject: [PATCH 0/3] ARM: multi_v7_defconfig: Enable more OMAP family platforms
-Message-ID: <1428614121-3374-1-git-send-email-nm@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Apr 2015 23:17:06 +0200
+Subject: [RFC PATCH 3/5] arm64: introduce CPU_OF_TABLES for cpu ops
+ selection
+In-Reply-To: <1428601031-5366-4-git-send-email-galak@codeaurora.org>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <1428601031-5366-4-git-send-email-galak@codeaurora.org>
+Message-ID: <3133453.Cys8lc6CAy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thursday 09 April 2015 12:37:09 Kumar Gala wrote:
+> @@ -67,4 +67,9 @@ extern const struct cpu_operations *cpu_ops[NR_CPUS];
+>  int __init cpu_read_ops(struct device_node *dn, int cpu);
+>  void __init cpu_read_bootcpu_ops(void);
+>  
+> +#define CPU_METHOD_OF_DECLARE(name, __ops)                             \
+> +       static const struct cpu_operations *__cpu_method_table_##name   \
+> +       __used __section(__cpu_method_of_table)                         \
+> +       = __ops;
+> +
+>  #endif /* ifndef __ASM_CPU_OPS_H */
+> 
 
-As of next-20150409 tag, the following platforms (I have access
-to) report failures for AM437x-sk and legacy beaglebone (white).
-omap2plus_defconfig boots up fine on these platforms.
+I'd rather not add this, to avoid giving the appearance that platforms
+can just add another one here.
 
-So, the basic minimum stuff I could pickup to fix up beaglebone-white
-and am437x-sk.
-
-This series is still missing the magic sauce for LDP - will try to
-track that down later as well.
-
-This series is based on next-20150409
-
-multi_v7_defconfig (as on next-20150409)
- 1:                     am335x-evm: BOOT: PASS: am335x-evm.txt
- 2:                      am335x-sk: BOOT: PASS: am335x-sk.txt
- 3:                     am3517-evm: BOOT: PASS: am3517-evm.txt
- 4:                      am37x-evm: BOOT: PASS: am37x-evm.txt
- 5:                      am437x-sk: BOOT: FAIL: am437x-sk.txt
- 6:                    am43xx-epos: BOOT: PASS: am43xx-epos.txt
- 7:                   am43xx-gpevm: BOOT: PASS: am43xx-gpevm.txt
- 8:                 BeagleBoard-XM: BOOT: PASS: beagleboard.txt
- 9:            beagleboard-vanilla: BOOT: PASS: beagleboard-vanilla.txt
-10:               beaglebone-black: BOOT: PASS: beaglebone-black.txt
-11:                     beaglebone: BOOT: FAIL: beaglebone.txt
-12:                     craneboard: BOOT: PASS: craneboard.txt
-13:                     dra72x-evm: BOOT: PASS: dra72x-evm.txt
-14:                     dra7xx-evm: BOOT: PASS: dra7xx-evm.txt
-15:         OMAP3430-Labrador(LDP): BOOT: FAIL: ldp.txt
-16:                           n900: BOOT: PASS: n900.txt
-17:                      omap5-evm: BOOT: PASS: omap5-evm.txt
-18:                  pandaboard-es: BOOT: PASS: pandaboard-es.txt
-19:             pandaboard-vanilla: BOOT: PASS: pandaboard-vanilla.txt
-20:                        sdp3430: BOOT: PASS: sdp3430.txt
-21:                        sdp4430: BOOT: PASS: sdp4430.txt
-
-After this series:
- 1:                     am335x-evm: BOOT: PASS: am335x-evm.txt
- 2:                     am3517-evm: BOOT: PASS: am3517-evm.txt
- 3:                      am37x-evm: BOOT: PASS: am37x-evm.txt
- 4:                      am437x-sk: BOOT: PASS: am437x-sk.txt
- 5:                    am43xx-epos: BOOT: PASS: am43xx-epos.txt
- 6:                   am43xx-gpevm: BOOT: PASS: am43xx-gpevm.txt
- 7:                 BeagleBoard-XM: BOOT: PASS: beagleboard.txt
- 8:            beagleboard-vanilla: BOOT: PASS: beagleboard-vanilla.txt
- 9:               beaglebone-black: BOOT: PASS: beaglebone-black.txt
-10:                     beaglebone: BOOT: PASS: beaglebone.txt
-11:                     craneboard: BOOT: PASS: craneboard.txt
-12:                     dra72x-evm: BOOT: PASS: dra72x-evm.txt
-13:                     dra7xx-evm: BOOT: PASS: dra7xx-evm.txt
-14:         OMAP3430-Labrador(LDP): BOOT: FAIL: ldp.txt
-15:                           n900: BOOT: PASS: n900.txt
-16:                      omap5-evm: BOOT: PASS: omap5-evm.txt
-17:                  pandaboard-es: BOOT: PASS: pandaboard-es.txt
-18:             pandaboard-vanilla: BOOT: PASS: pandaboard-vanilla.txt
-19:                        sdp3430: BOOT: PASS: sdp3430.txt
-20:                        sdp4430: BOOT: PASS: sdp4430.txt
-TOTAL = 20 boards, Booted Boards = 19, No Boot boards = 1
-
-Nishanth Menon (3):
-  ARM: multi_v7_defconfig: Enable beaglebone PMIC TPS65217
-  ARM: multi_v7_defconfig: Enable AM437x PMIC TPS65218
-  ARM: multi_v7_defconfig: Enable generic SoC internal OMAP regulators
-
- arch/arm/configs/multi_v7_defconfig |    6 ++++++
- 1 file changed, 6 insertions(+)
-
-Regards,
-Nishanth Menon
--- 
-1.7.9.5
+	Arnd
