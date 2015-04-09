@@ -1,34 +1,48 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  9 Apr 2015 22:04:09 +0200
-Subject: [PATCH v5 05/11] clocksource: add dependencies for Vybrid pit
- clocksource
+Date: Thu,  9 Apr 2015 22:04:11 +0200
+Subject: [PATCH v5 07/11] ARM: introduce ARM_SINGLE_ARMV7M for ARMv7-M
+ platforms
 In-Reply-To: <1428609855-27657-1-git-send-email-stefan@agner.ch>
 References: <1428609855-27657-1-git-send-email-stefan@agner.ch>
-Message-ID: <1428609855-27657-6-git-send-email-stefan@agner.ch>
+Message-ID: <1428609855-27657-8-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the minimal dependencies required to use the Vybrid PIT
-clocksource driver. Those are not part of the SoC dependencies.
+This introduces a new top level config symbol ARM_SINGLE_ARMV7M
+for non-MMU, ARMv7-M platforms. It also support multiple ARMv7-M
+platforms in one kernel image since the cores share the same
+basic memory layout and interrupt controller. However, this works
+only if the combined platforms also have a similar (main) memory
+layout.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/clocksource/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/Kconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 1c2506f..350e742 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -164,6 +164,8 @@ config FSL_FTM_TIMER
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9f1f09a..66e60af 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -323,6 +323,19 @@ config ARCH_MULTIPLATFORM
+ 	select SPARSE_IRQ
+ 	select USE_OF
  
- config VF_PIT_TIMER
- 	bool
-+	select CLKSRC_MMIO
++config ARM_SINGLE_ARMV7M
++	bool "ARMv7-M based platforms (Cortex-M0/M3/M4)"
++	depends on !MMU
++	select ARCH_WANT_OPTIONAL_GPIOLIB
++	select ARM_NVIC
 +	select CLKSRC_OF
- 	help
- 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
- 
++	select COMMON_CLK
++	select CPU_V7M
++	select GENERIC_CLOCKEVENTS
++	select NO_IOPORT_MAP
++	select SPARSE_IRQ
++	select USE_OF
++
+ config ARCH_REALVIEW
+ 	bool "ARM Ltd. RealView family"
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
 -- 
 2.3.5
