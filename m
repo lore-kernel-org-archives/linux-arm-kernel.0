@@ -1,150 +1,133 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 09 Apr 2015 12:52:54 +0200
-Subject: [PATCH v6 04/15] clocksource/drivers: Add ARM System timer driver
-In-Reply-To: <1428424234-28572-5-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1428424234-28572-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1428424234-28572-5-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <55265A06.5020902@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  9 Apr 2015 12:55:32 +0200
+Subject: [PATCH v4 00/16] crypto: SHA glue code consolidation
+Message-ID: <1428576948-23863-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2015 06:30 PM, Maxime Coquelin wrote:
-> This patch adds clocksource support for ARMv7-M's System timer,
-> also known as SysTick.
->
-> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Hello all,
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+This is v4 of what is now a complete glue code consolidation series
+for generic, x86, arm and arm64 implementations of SHA-1, SHA-224/256
+and SHA-384/512.
 
-> ---
->   drivers/clocksource/Kconfig          |  7 ++++
->   drivers/clocksource/Makefile         |  1 +
->   drivers/clocksource/armv7m_systick.c | 79 ++++++++++++++++++++++++++++++++++++
->   3 files changed, 87 insertions(+)
->   create mode 100644 drivers/clocksource/armv7m_systick.c
->
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 1c2506f..b82e58b 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -134,6 +134,13 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
->   	help
->   	 Use ARM global timer clock source as sched_clock
->
-> +config ARMV7M_SYSTICK
-> +	bool
-> +	select CLKSRC_OF if OF
-> +	select CLKSRC_MMIO
-> +	help
-> +	  This options enables support for the ARMv7M system timer unit
-> +
->   config ATMEL_PIT
->   	select CLKSRC_OF if OF
->   	def_bool SOC_AT91SAM9 || SOC_SAMA5
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 752d5c7..1c9a643 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -44,6 +44,7 @@ obj-$(CONFIG_MTK_TIMER)		+= mtk_timer.o
->
->   obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
->   obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
-> +obj-$(CONFIG_ARMV7M_SYSTICK)		+= armv7m_systick.o
->   obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
->   obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
->   obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
-> diff --git a/drivers/clocksource/armv7m_systick.c b/drivers/clocksource/armv7m_systick.c
-> new file mode 100644
-> index 0000000..addfd2c
-> --- /dev/null
-> +++ b/drivers/clocksource/armv7m_systick.c
-> @@ -0,0 +1,79 @@
-> +/*
-> + * Copyright (C) Maxime Coquelin 2015
-> + * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/clocksource.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/clk.h>
-> +#include <linux/bitops.h>
-> +
-> +#define SYST_CSR	0x00
-> +#define SYST_RVR	0x04
-> +#define SYST_CVR	0x08
-> +#define SYST_CALIB	0x0c
-> +
-> +#define SYST_CSR_ENABLE BIT(0)
-> +
-> +#define SYSTICK_LOAD_RELOAD_MASK 0x00FFFFFF
-> +
-> +static void __init system_timer_of_register(struct device_node *np)
-> +{
-> +	struct clk *clk = NULL;
-> +	void __iomem *base;
-> +	u32 rate;
-> +	int ret;
-> +
-> +	base = of_iomap(np, 0);
-> +	if (!base) {
-> +		pr_warn("system-timer: invalid base address\n");
-> +		return;
-> +	}
-> +
-> +	ret = of_property_read_u32(np, "clock-frequency", &rate);
-> +	if (ret) {
-> +		clk = of_clk_get(np, 0);
-> +		if (IS_ERR(clk))
-> +			goto out_unmap;
-> +
-> +		ret = clk_prepare_enable(clk);
-> +		if (ret)
-> +			goto out_clk_put;
-> +
-> +		rate = clk_get_rate(clk);
-> +		if (!rate)
-> +			goto out_clk_disable;
-> +	}
-> +
-> +	writel_relaxed(SYSTICK_LOAD_RELOAD_MASK, base + SYST_RVR);
-> +	writel_relaxed(SYST_CSR_ENABLE, base + SYST_CSR);
-> +
-> +	ret = clocksource_mmio_init(base + SYST_CVR, "arm_system_timer", rate,
-> +			200, 24, clocksource_mmio_readl_down);
-> +	if (ret) {
-> +		pr_err("failed to init clocksource (%d)\n", ret);
-> +		if (clk)
-> +			goto out_clk_disable;
-> +		else
-> +			goto out_unmap;
-> +	}
-> +
-> +	pr_info("ARM System timer initialized as clocksource\n");
-> +
-> +	return;
-> +
-> +out_clk_disable:
-> +	clk_disable_unprepare(clk);
-> +out_clk_put:
-> +	clk_put(clk);
-> +out_unmap:
-> +	iounmap(base);
-> +	pr_warn("ARM System timer register failed (%d)\n", ret);
-> +}
-> +
-> +CLOCKSOURCE_OF_DECLARE(arm_systick, "arm,armv7m-systick",
-> +			system_timer_of_register);
->
+The purpose is to have a single, canonical implementation of the core
+logic that gets reused by all versions of the algorithm. Note that this
+is not about saving space in the binary, but about ensuring that the same
+code is used everywhere, reducing the maintenance burden.
 
+The base layer implements all the update and finalization logic around
+the block transforms, where the prototypes of the latter look something
+like this:
+
+typedef void (shaXXX_block_fn)(struct sha###_state *, u8 const *src, int blocks)
+
+Note that the definitions of sha1_state, sha256_state and sha512_state are
+updated to put the state[] member first: this allows us to easily cast
+existing asm implementation that take a state[] member as first argument
+to the above prototype.
+
+Note that the base functions prototypes are all 'returning int' but
+they all return 0. They should be invoked as tail calls where possible
+to eliminate some of the function call overhead. If that is not possible,
+the return values can be safely ignored.
+
+Changes since v3:
+- adopted Herbert't suggestion to get rid of the additional arguments in the
+  prototype; instead, the prototype now takes a 'struct shaXXX_state' pointer,
+  which can be overloaded if there is additional state that needs to be passed
+  between the glue layer and the block transform (look at patches #12 and #13
+  for examples)
+- dropped all export() and import() functions and .statesize members: these are
+  only required if statesize != descsize, otherwise, the default implementations
+  in the crypto api layer are perfectly adequate
+- reshuffled some x86 code so that the existing asm transforms adhere to the
+  above prototype (modulo casting), allowing them to be passed to the base layer
+  directly
+
+Changes since v2:
+- Replace the base modules with header files containing static inlines that
+  implement the core logic. This avoids introducing new modules or new
+  inter-module dependencies, and gives the compiler the opportunity for
+  optimization.
+- Now includes new glue fo the existing SHA-1 NEON module and Sami's new
+  SHA-224/256 ASM+NEON module
+- Use direct assigments instead of memcpy() to set the initial state (as is
+  done in many of the call sites of the various init functions that are being
+  converted by this series)
+
+Changes since v1 (RFC):
+- prefixed globally visible generic symbols with crypto_
+- added SHA-1 base layer
+- updated init code to only set the initial constants and clear the
+  count, clearing the buffer is unnecessary [Markus]
+- favor the small update path in crypto_sha_XXX_base_do_update() [Markus]
+- update crypto_sha_XXX_do_finalize() to use memset() on the buffer directly
+  rather than copying a statically allocated padding buffer into it
+  [Markus]
+- moved a bunch of existing arm and x86 implementations to use the new base
+  layers
+
+Note: looking at the generated asm (for arm64), I noticed that the memcpy/memset
+invocations with compile time constant src and len arguments (which includes
+the empty struct assignments) are eliminated completely, and replaced by
+direct loads and stores. Hopefully this addresses the concern raised by Markus
+regarding this.
+
+Ard Biesheuvel (16):
+  crypto: sha1: implement base layer for SHA-1
+  crypto: sha256: implement base layer for SHA-256
+  crypto: sha512: implement base layer for SHA-512
+  crypto: sha1-generic: move to generic glue implementation
+  crypto: sha256-generic: move to generic glue implementation
+  crypto: sha512-generic: move to generic glue implementation
+  crypto/arm: move SHA-1 ARM asm implementation to base layer
+  crypto/arm: move SHA-1 NEON implementation to base layer
+  crypto/arm: move SHA-1 ARMv8 implementation to base layer
+  crypto/arm: move SHA-224/256 ASM/NEON implementation to base layer
+  crypto/arm: move SHA-224/256 ARMv8 implementation to base layer
+  crypto/arm64: move SHA-1 ARMv8 implementation to base layer
+  crypto/arm64: move SHA-224/256 ARMv8 implementation to base layer
+  crypto/x86: move SHA-1 SSSE3 implementation to base layer
+  crypto/x86: move SHA-224/256 SSSE3 implementation to base layer
+  crypto/x86: move SHA-384/512 SSSE3 implementation to base layer
+
+ arch/arm/crypto/Kconfig                  |   3 +-
+ arch/arm/crypto/sha1-ce-core.S           |  23 +---
+ arch/arm/crypto/sha1-ce-glue.c           | 110 ++++-----------
+ arch/arm/{include/asm => }/crypto/sha1.h |   3 +
+ arch/arm/crypto/sha1_glue.c              | 112 +++------------
+ arch/arm/crypto/sha1_neon_glue.c         | 137 ++++---------------
+ arch/arm/crypto/sha2-ce-core.S           |  19 +--
+ arch/arm/crypto/sha2-ce-glue.c           | 155 +++++----------------
+ arch/arm/crypto/sha256_glue.c            | 170 ++++-------------------
+ arch/arm/crypto/sha256_glue.h            |  17 +--
+ arch/arm/crypto/sha256_neon_glue.c       | 143 +++++--------------
+ arch/arm64/crypto/sha1-ce-core.S         |  33 ++---
+ arch/arm64/crypto/sha1-ce-glue.c         | 151 ++++++--------------
+ arch/arm64/crypto/sha2-ce-core.S         |  29 ++--
+ arch/arm64/crypto/sha2-ce-glue.c         | 227 +++++++------------------------
+ arch/x86/crypto/sha1_ssse3_glue.c        | 139 ++++---------------
+ arch/x86/crypto/sha256-avx-asm.S         |  10 +-
+ arch/x86/crypto/sha256-avx2-asm.S        |  10 +-
+ arch/x86/crypto/sha256-ssse3-asm.S       |  10 +-
+ arch/x86/crypto/sha256_ssse3_glue.c      | 193 +++++---------------------
+ arch/x86/crypto/sha512-avx-asm.S         |   6 +-
+ arch/x86/crypto/sha512-avx2-asm.S        |   6 +-
+ arch/x86/crypto/sha512-ssse3-asm.S       |   6 +-
+ arch/x86/crypto/sha512_ssse3_glue.c      | 202 +++++----------------------
+ crypto/sha1_generic.c                    | 102 +++-----------
+ crypto/sha256_generic.c                  | 133 +++---------------
+ crypto/sha512_generic.c                  | 123 +++--------------
+ include/crypto/sha.h                     |  15 +-
+ include/crypto/sha1_base.h               | 106 +++++++++++++++
+ include/crypto/sha256_base.h             | 128 +++++++++++++++++
+ include/crypto/sha512_base.h             | 131 ++++++++++++++++++
+ 31 files changed, 866 insertions(+), 1786 deletions(-)
+ rename arch/arm/{include/asm => }/crypto/sha1.h (67%)
+ create mode 100644 include/crypto/sha1_base.h
+ create mode 100644 include/crypto/sha256_base.h
+ create mode 100644 include/crypto/sha512_base.h
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.3.2
