@@ -1,45 +1,50 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 10 Apr 2015 08:51:43 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes changes for v4.0
-Message-ID: <552772FF.3080807@free-electrons.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 9 Apr 2015 17:37:27 +0200
+Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
+In-Reply-To: <20150409172826.18916274@bbrezillon>
+References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150409151846.GE1459@lunn.ch>
+ <20150409172826.18916274@bbrezillon>
+Message-ID: <20150409153727.GF1459@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Apr 09, 2015 at 05:28:26PM +0200, Boris Brezillon wrote:
+> Hi Andrew,
+> 
+> On Thu, 9 Apr 2015 17:18:46 +0200
+> Andrew Lunn <andrew@lunn.ch> wrote:
+> 
+> > On Thu, Apr 09, 2015 at 04:58:41PM +0200, Boris Brezillon wrote:
+> > > Hello,
+> > > 
+> > > This is an attempt to replace the mv_cesa driver by a new one to address
+> > > some limitations of the existing driver.
+> > > >From a performance and CPU load point of view the most important
+> > > limitation is the lack of DMA support, thus preventing us from chaining
+> > > crypto operations.
+> > > 
+> > > I know we usually try to adapt existing drivers instead of replacing them
+> > > by new ones, but after trying to refactor the mv_cesa driver I realized it
+> > > would take longer than writing an new one from scratch.
+> > 
+> > Hi Boris
+> > 
+> > What is the situation with backwards compatibility? I see you have
+> > kept the old compatibility string, and added lots of new ones, and
+> > deprecated some properties. Will an old DT blob still work?
+> 
+> Yep, I tried on an Orion platform, and Arnaud tried on a Kirkwood one
+> without any changes to the existing DT and it works.
 
-Here is the second pull request for fixes for mvebu for v4.0.
-Actually it is not a critical one, so it's fine applying it only
-on v4.1 if you are not comfortable to send for v4.0
+Great. It would be nice to state this in the ChangeLog or cover note.
 
-Gregory
+> Anyway, IMHO even those DT should be updated to use the new bindings
+> (sram nodes, new compatible if available, addition of clock-names
+> properties, ...).
 
-The following changes since commit 548ae94c1cc7fc120848757249b9a542b1080ffb:
+Agreed. Maybe you can extend the patchset to modify the relevant .dtsi
+files?
 
-  ARM: mvebu: Disable CPU Idle on Armada 38x (2015-03-31 18:47:33 +0200)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.0-2
-
-for you to fetch changes up to 4f054d445139d63868f931328f897ac5ef87242e:
-
-  ARM: mvebu: use 0xf1000000 as internal registers on Armada 370 DB (2015-04-08 16:37:02 +0200)
-
-----------------------------------------------------------------
-mvebu fix for 4.0
-
-use 0xf1000000 as internal registers on Armada 370 DB: needed for the
-recent version of the board which no more comes with a bogus version of
-the Armada 370 SoC.
-
-----------------------------------------------------------------
-Thomas Petazzoni (1):
-      ARM: mvebu: use 0xf1000000 as internal registers on Armada 370 DB
-
- arch/arm/boot/dts/armada-370-db.dts | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks
+	Andrew
