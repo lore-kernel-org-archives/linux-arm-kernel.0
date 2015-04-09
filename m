@@ -1,32 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 09 Apr 2015 11:46:55 +0200
-Subject: [PATCH] mempool: add missing include
-Message-ID: <3302342.cNyRUGN06P@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 9 Apr 2015 11:48:28 +0200
+Subject: [PATCH V2] tty: serial: Add const to struct uart_ops declarations
+In-Reply-To: <1428258294.2775.69.camel@perches.com>
+References: <1428169665.2775.53.camel@perches.com>
+ <a938a0e86638588e5ccff85771fa3b95@agner.ch>
+ <1428258294.2775.69.camel@perches.com>
+Message-ID: <20150409094827.GI12103@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a fix^3 for the mempool poisoning patch, which introduces
-a compile-time error on some ARM randconfig builds:
+On Sun, Apr 05, 2015 at 11:24:54AM -0700, Joe Perches wrote:
+[...]
+>  drivers/tty/serial/serial-tegra.c           | 2 +-
 
-mm/mempool.c: In function 'check_element':
-mm/mempool.c:65:16: error: implicit declaration of function 'kmap_atomic' [-Werror=implicit-function-declaration]
-   void *addr = kmap_atomic((struct page *)element);
-
-The problem is clearly the missing declaration, and including
-linux/highmem.h fixes it.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a3db5a8463b0db ("mm, mempool: poison elements backed by page allocator fix fix")
-
-diff --git a/mm/mempool.c b/mm/mempool.c
-index 05ad55e61264..5e7c4a871391 100644
---- a/mm/mempool.c
-+++ b/mm/mempool.c
-@@ -12,6 +12,7 @@
- #include <linux/mm.h>
- #include <linux/slab.h>
- #include <linux/kasan.h>
-+#include <linux/highmem.h>
- #include <linux/kmemleak.h>
- #include <linux/export.h>
- #include <linux/mempool.h>
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/555f870e/attachment.sig>
