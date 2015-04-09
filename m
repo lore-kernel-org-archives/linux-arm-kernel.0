@@ -1,83 +1,81 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  9 Apr 2015 16:58:43 +0200
-Subject: [PATCH 2/2] crypto: marvell/CESA: update DT bindings documentation
-In-Reply-To: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1428591523-1780-3-git-send-email-boris.brezillon@free-electrons.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 09 Apr 2015 17:01:24 +0200
+Subject: [PATCH 2/2] arm/dts: Add nodes for flexcan devices
+ present on LS1021A SoC
+In-Reply-To: <1428591087-12831-2-git-send-email-bhupesh.sharma@freescale.com>
+References: <1428591087-12831-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1428591087-12831-2-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <55269444.7050707@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document new compatible strings, document the new method to reference the
-crypto SRAM and deprecate the old one and document the the 'clocks' and
-'clock-names' properties.
+On 04/09/2015 04:51 PM, Bhupesh Sharma wrote:
+> From: Sakar Arora <Sakar.Arora@freescale.com>
+> 
+> This patch adds the device nodes for flexcan controller(s) present
+> on LS1021A SoC.
+> 
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> Signed-off-by: Sakar Arora <Sakar.Arora@freescale.com>
+> ---
+>  arch/arm/boot/dts/ls1021a-qds.dts |    8 ++++++++
+>  arch/arm/boot/dts/ls1021a.dtsi    |   20 ++++++++++++++++++++
+>  2 files changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
+> index 9c5e16b..1641a04 100644
+> --- a/arch/arm/boot/dts/ls1021a-qds.dts
+> +++ b/arch/arm/boot/dts/ls1021a-qds.dts
+> @@ -238,3 +238,11 @@
+>  &uart1 {
+>  	status = "okay";
+>  };
+> +
+> +&can0 {
+> +	status = "okay";
+> +};
+> +
+> +&can1 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index c70bb27..c44661b 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -332,6 +332,26 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		can0: can at 2a70000 {
+> +			compatible = "fsl,ls1021a-flexcan";
+> +			reg = <0x0 0x2a70000 0x0 0x1000>;
+> +			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&platform_clk 1>;
+> +			clock-frequency = <150000000>;
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- .../devicetree/bindings/crypto/mv_cesa.txt         | 50 ++++++++++++++++------
- 1 file changed, 38 insertions(+), 12 deletions(-)
+Please don't use clock-frequency, it's only needed for powerpcs without
+proper clock support.
 
-diff --git a/Documentation/devicetree/bindings/crypto/mv_cesa.txt b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
-index 47229b1..4ce9bc5 100644
---- a/Documentation/devicetree/bindings/crypto/mv_cesa.txt
-+++ b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
-@@ -1,20 +1,46 @@
- Marvell Cryptographic Engines And Security Accelerator
- 
- Required properties:
--- compatible : should be "marvell,orion-crypto"
--- reg : base physical address of the engine and length of memory mapped
--        region, followed by base physical address of sram and its memory
--        length
--- reg-names : "regs" , "sram";
--- interrupts : interrupt number
-+- compatible: should be one of the following string
-+	      "marvell,orion-crypto"
-+	      "marvell,kirkwood-crypto"
-+	      "marvell,armada-370-crypto"
-+	      "marvell,armada-xp-crypto"
-+	      "marvell,armada-375-crypto"
-+	      "marvell,armada-38x-crypto"
-+- reg: base physical address of the engine and length of memory mapped
-+       region
-+- reg-names: "regs"
-+- interrupts: interrupt number
-+- clocks: reference to the crypto engines clocks. This property is not
-+	  required for orion and kirkwood platforms
-+- clock-names: "cesaX" and "cesazX", X should be replaced by the crypto engine
-+	       id.
-+	       This property is not required for the orion and kirkwoord
-+	       platforms.
-+	       "cesazX" clocks are not required on armada-370 platforms
-+- marvell,crypto-srams: phandle to crypto SRAM definitions
-+
-+Optional properties:
-+- marvell,crypto-sram-size: SRAM size reserved for crypto operations, if not
-+			    specified the whole SRAM is used (2KB)
-+
-+Deprecated properties:
-+- reg: base physical address of the engine and length of memory mapped
-+       region, followed by base physical address of sram and its memory
-+       length
-+- reg-names: "regs" , "sram"
- 
- Examples:
- 
--	crypto at 30000 {
--		compatible = "marvell,orion-crypto";
--		reg = <0x30000 0x10000>,
--		      <0x4000000 0x800>;
--		reg-names = "regs" , "sram";
--		interrupts = <22>;
-+	crypto at 90000 {
-+		compatible = "marvell,armada-xp-crypto";
-+		reg = <0x90000 0x10000>;
-+		reg-names = "regs";
-+		interrupts = <48>, <49>;
-+		clocks = <&gateclk 23>, <&gateclk 23>;
-+		clock-names = "cesa0", "cesa1";
-+		marvell,crypto-srams = <&crypto_sram0>, <&crypto_sram1>;
-+		marvell,crypto-sram-size = <0x600>;
- 		status = "okay";
- 	};
+> +			clock-names = "per";
+
+Please provide a per and ipg clock, otherwise the driver will not work
+properly.
+
+> +			little-endian;
+> +		};
+
+Marc
+
 -- 
-1.9.1
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/ad99c47c/attachment.sig>
