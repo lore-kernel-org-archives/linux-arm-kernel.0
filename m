@@ -1,92 +1,135 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 9 Apr 2015 17:56:01 -0500
-Subject: [PATCH 1/2] ARM: dts: am57xx-beagle-x15: Switch UART mux pins
-In-Reply-To: <1428618797-17190-2-git-send-email-nm@ti.com>
-References: <1428618797-17190-1-git-send-email-nm@ti.com>
- <1428618797-17190-2-git-send-email-nm@ti.com>
-Message-ID: <20150409225600.GA17542@kahuna>
+From: lexszero@gmail.com (Alexey Ignatov)
+Date: Fri, 10 Apr 2015 02:00:50 +0300
+Subject: [PATCH 1/2] ASoC: davinci: Clear VCIF read FIFO on errors
+Message-ID: <1428620479-32696-1-git-send-email-lexszero@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:33-20150409, Nishanth Menon wrote:
-> BeagleBoard-X15 pre-production change includes switching over to UART
-> pins that now allow for UART download capability. All original boards
-> should either have been returned for modifications or already modified
-> for the required change and maintaining compatibility for older boards
-> are no longer needed.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->  arch/arm/boot/dts/am57xx-beagle-x15.dts |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> index 15f198e4864d..cea3be3a051c 100644
-> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> @@ -130,8 +130,8 @@
->  
->  	uart3_pins_default: uart3_pins_default {
->  		pinctrl-single,pins = <
-> -			0x248 (PIN_INPUT_SLEW | MUX_MODE0) /* uart3_rxd.rxd */
-> -			0x24c (PIN_INPUT_SLEW | MUX_MODE0) /* uart3_txd.txd */
-> +			0x3f8 (PIN_INPUT_SLEW | MUX_MODE2) /* uart2_ctsn.uart3_rxd */
-> +			0x3fc (PIN_INPUT_SLEW | MUX_MODE1) /* uart2_rtsn.uart3_txd */
->  		>;
->  	};
->  
-> -- 
-> 1.7.9.5
-> 
+Clearing VCIF read FIFO on overflow and underflow events fixes audio glitching
+when DMA load is high. This happened when simultaneously capturing and encoding
+video and audio, for example.
 
-Drat!.. I missed the daisychain merge that took place :( updated V2 patch
-below. Do let me know if you'd like me to repost this.
-
----8<---
->From 055f2837f8eebd680e954088908c43dbe16b15d7 Mon Sep 17 00:00:00 2001
-From: Nishanth Menon <nm@ti.com>
-Date: Wed, 8 Apr 2015 17:40:59 -0500
-Subject: [PATCH V2 1/2] ARM: dts: am57xx-beagle-x15: Switch UART mux pins
-
-BeagleBoard-X15 pre-production change includes switching over to UART
-pins that now allow for UART download capability. All original boards
-should either have been returned for modifications or already modified
-for the required change and maintaining compatibility for older boards
-are no longer needed.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Alexey Ignatov <lexszero@gmail.com>
 ---
- arch/arm/boot/dts/am57xx-beagle-x15.dts |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ sound/soc/davinci/davinci-vcif.c | 60 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 56 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 15f198e4864d..01661e9013fe 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -130,8 +130,8 @@
+diff --git a/sound/soc/davinci/davinci-vcif.c b/sound/soc/davinci/davinci-vcif.c
+index 5bee0427..0d8014e 100644
+--- a/sound/soc/davinci/davinci-vcif.c
++++ b/sound/soc/davinci/davinci-vcif.c
+@@ -45,6 +45,10 @@
+ 	} \
+ } while (0)
  
- 	uart3_pins_default: uart3_pins_default {
- 		pinctrl-single,pins = <
--			0x248 (PIN_INPUT_SLEW | MUX_MODE0) /* uart3_rxd.rxd */
--			0x24c (PIN_INPUT_SLEW | MUX_MODE0) /* uart3_txd.txd */
-+			0x3f8 (PIN_INPUT_SLEW | MUX_MODE2) /* uart2_ctsn.uart3_rxd */
-+			0x3fc (PIN_INPUT_SLEW | MUX_MODE1) /* uart2_rtsn.uart3_txd */
- 		>;
- 	};
++#define DAVINCI_VC_INT_RERR_MASK \
++	(DAVINCI_VC_INT_RERRUDR_MASK | \
++	 DAVINCI_VC_INT_RERROVF_MASK)
++
+ struct davinci_vcif_dev {
+ 	struct davinci_vc *davinci_vc;
+ 	struct davinci_pcm_dma_params	dma_params[2];
+@@ -87,6 +91,22 @@ static void davinci_vcif_stop(struct snd_pcm_substream *substream)
+ 	writel(w, davinci_vc->base + DAVINCI_VC_CTRL);
+ }
  
-@@ -478,7 +478,7 @@
- &uart3 {
- 	status = "okay";
- 	interrupts-extended = <&crossbar_mpu GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
--			      <&dra7_pmx_core 0x248>;
-+			      <&dra7_pmx_core 0x3f8>;
++static void davinci_vcif_interrupts(struct snd_pcm_substream *substream,
++		int enable)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct davinci_vcif_dev *davinci_vcif_dev =
++			snd_soc_dai_get_drvdata(rtd->cpu_dai);
++	struct davinci_vc *davinci_vc = davinci_vcif_dev->davinci_vc;
++
++	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
++		writel(DAVINCI_VC_INT_RERR_MASK,
++				davinci_vc->base + DAVINCI_VC_INTCLR);
++		writel(enable ? DAVINCI_VC_INT_RERR_MASK : 0,
++				davinci_vc->base + DAVINCI_VC_INTEN);
++	}
++}
++
+ static int davinci_vcif_hw_params(struct snd_pcm_substream *substream,
+ 				  struct snd_pcm_hw_params *params,
+ 				  struct snd_soc_dai *dai)
+@@ -104,10 +124,6 @@ static int davinci_vcif_hw_params(struct snd_pcm_substream *substream,
+ 	/* General line settings */
+ 	writel(DAVINCI_VC_CTRL_MASK, davinci_vc->base + DAVINCI_VC_CTRL);
  
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_pins_default>;
+-	writel(DAVINCI_VC_INT_MASK, davinci_vc->base + DAVINCI_VC_INTCLR);
+-
+-	writel(DAVINCI_VC_INT_MASK, davinci_vc->base + DAVINCI_VC_INTEN);
+-
+ 	w = readl(davinci_vc->base + DAVINCI_VC_CTRL);
+ 
+ 	/* Determine xfer data type */
+@@ -149,6 +165,32 @@ static int davinci_vcif_hw_params(struct snd_pcm_substream *substream,
+ 	return 0;
+ }
+ 
++static irqreturn_t davinci_vcif_irq_handler(int irq, void *data)
++{
++	struct davinci_vcif_dev *davinci_vcif_dev = data;
++	struct davinci_vc *davinci_vc = davinci_vcif_dev->davinci_vc;
++	uint32_t w;
++
++	w = readl(davinci_vc->base + DAVINCI_VC_INTSTATUS);
++
++	if (w & DAVINCI_VC_INT_RERR_MASK) {
++		pr_debug("vc overflow or underflow occurred, resetting fifo\n");
++
++		w = readl(davinci_vc->base + DAVINCI_VC_CTRL);
++		MOD_REG_BIT(w, DAVINCI_VC_CTRL_RFIFOCL, 1);
++		writel(w, davinci_vc->base + DAVINCI_VC_CTRL);
++
++		w = readl(davinci_vc->base + DAVINCI_VC_CTRL);
++		MOD_REG_BIT(w, DAVINCI_VC_CTRL_RFIFOCL, 0);
++		writel(w, davinci_vc->base + DAVINCI_VC_CTRL);
++
++		writel(DAVINCI_VC_INT_RERR_MASK,
++				davinci_vc->base + DAVINCI_VC_INTCLR);
++	}
++
++	return IRQ_HANDLED;
++}
++
+ static int davinci_vcif_trigger(struct snd_pcm_substream *substream, int cmd,
+ 				struct snd_soc_dai *dai)
+ {
+@@ -159,10 +201,12 @@ static int davinci_vcif_trigger(struct snd_pcm_substream *substream, int cmd,
+ 	case SNDRV_PCM_TRIGGER_RESUME:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+ 		davinci_vcif_start(substream);
++		davinci_vcif_interrupts(substream, 1);
+ 		break;
+ 	case SNDRV_PCM_TRIGGER_STOP:
+ 	case SNDRV_PCM_TRIGGER_SUSPEND:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
++		davinci_vcif_interrupts(substream, 0);
+ 		davinci_vcif_stop(substream);
+ 		break;
+ 	default:
+@@ -178,6 +222,7 @@ static int davinci_vcif_startup(struct snd_pcm_substream *substream,
+ 	struct davinci_vcif_dev *dev = snd_soc_dai_get_drvdata(dai);
+ 
+ 	snd_soc_dai_set_dma_data(dai, substream, dev->dma_params);
++
+ 	return 0;
+ }
+ 
+@@ -238,6 +283,13 @@ static int davinci_vcif_probe(struct platform_device *pdev)
+ 
+ 	dev_set_drvdata(&pdev->dev, davinci_vcif_dev);
+ 
++	ret = devm_request_irq(&pdev->dev, IRQ_MBXINT, davinci_vcif_irq_handler,
++			0, "vcif", davinci_vcif_dev);
++	if (ret != 0) {
++		dev_err(&pdev->dev, "could not request irq: %d\n", ret);
++		return ret;
++	}
++
+ 	ret = snd_soc_register_component(&pdev->dev, &davinci_vcif_component,
+ 					 &davinci_vcif_dai, 1);
+ 	if (ret != 0) {
 -- 
-1.7.9.5
-
-
--- 
-Regards,
-Nishanth Menon
+2.3.5
