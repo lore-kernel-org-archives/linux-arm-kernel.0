@@ -1,107 +1,38 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 9 Apr 2015 17:01:48 +0800
-Subject: [PATCH v2 3/3] media: atmel-isi: remove mck back compatiable code as
- it's not need
-In-Reply-To: <1428570108-4961-1-git-send-email-josh.wu@atmel.com>
-References: <1428570108-4961-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1428570108-4961-4-git-send-email-josh.wu@atmel.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 9 Apr 2015 11:10:17 +0200
+Subject: [PATCHv7] media: i2c/adp1653: Devicetree support for adp1653
+In-Reply-To: <20150409074238.GA22603@amd>
+References: <20150402203417.GA6336@amd> <20150403083353.GA21070@amd>
+ <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
+ <20150403202624.GA4308@amd>
+ <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
+ <20150404074337.GA31064@amd>
+ <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
+ <20150404171116.GA15025@Nokia-N900>
+ <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
+ <20150409074238.GA22603@amd>
+Message-ID: <20150409091017.GA4526@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The master clock should handled by sensor itself.
+Hi,
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
+On Thu, Apr 09, 2015 at 09:42:38AM +0200, Pavel Machek wrote:
+> [...]
+> +#include <linux/of_gpio.h>
+> +#include <linux/gpio.h>
+> [...]
 
-Changes in v2:
-- totally remove clock_start()/clock_stop() as they are optional.
+This should probably be
 
- drivers/media/platform/soc_camera/atmel-isi.c | 45 ---------------------------
- 1 file changed, 45 deletions(-)
+#include <linux/of.h>
+#include <linux/gpio/consumer.h>
 
-diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index 2b05f89..7bba7d9 100644
---- a/drivers/media/platform/soc_camera/atmel-isi.c
-+++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -83,8 +83,6 @@ struct atmel_isi {
- 	struct completion		complete;
- 	/* ISI peripherial clock */
- 	struct clk			*pclk;
--	/* ISI_MCK, feed to camera sensor to generate pixel clock */
--	struct clk			*mck;
- 	unsigned int			irq;
- 
- 	struct isi_platform_data	pdata;
-@@ -727,31 +725,6 @@ static void isi_camera_remove_device(struct soc_camera_device *icd)
- 		 icd->devnum);
- }
- 
--/* Called with .host_lock held */
--static int isi_camera_clock_start(struct soc_camera_host *ici)
--{
--	struct atmel_isi *isi = ici->priv;
--	int ret;
--
--	if (!IS_ERR(isi->mck)) {
--		ret = clk_prepare_enable(isi->mck);
--		if (ret) {
--			return ret;
--		}
--	}
--
--	return 0;
--}
--
--/* Called with .host_lock held */
--static void isi_camera_clock_stop(struct soc_camera_host *ici)
--{
--	struct atmel_isi *isi = ici->priv;
--
--	if (!IS_ERR(isi->mck))
--		clk_disable_unprepare(isi->mck);
--}
--
- static unsigned int isi_camera_poll(struct file *file, poll_table *pt)
- {
- 	struct soc_camera_device *icd = file->private_data;
-@@ -865,8 +838,6 @@ static struct soc_camera_host_ops isi_soc_camera_host_ops = {
- 	.owner		= THIS_MODULE,
- 	.add		= isi_camera_add_device,
- 	.remove		= isi_camera_remove_device,
--	.clock_start	= isi_camera_clock_start,
--	.clock_stop	= isi_camera_clock_stop,
- 	.set_fmt	= isi_camera_set_fmt,
- 	.try_fmt	= isi_camera_try_fmt,
- 	.get_formats	= isi_camera_get_formats,
-@@ -904,7 +875,6 @@ static int atmel_isi_probe_dt(struct atmel_isi *isi,
- 
- 	/* Default settings for ISI */
- 	isi->pdata.full_mode = 1;
--	isi->pdata.mck_hz = ISI_DEFAULT_MCLK_FREQ;
- 	isi->pdata.frate = ISI_CFG1_FRATE_CAPTURE_ALL;
- 
- 	np = of_graph_get_next_endpoint(np, NULL);
-@@ -980,21 +950,6 @@ static int atmel_isi_probe(struct platform_device *pdev)
- 	INIT_LIST_HEAD(&isi->video_buffer_list);
- 	INIT_LIST_HEAD(&isi->dma_desc_head);
- 
--	/* ISI_MCK is the sensor master clock. It should be handled by the
--	 * sensor driver directly, as the ISI has no use for that clock. Make
--	 * the clock optional here while platforms transition to the correct
--	 * model.
--	 */
--	isi->mck = devm_clk_get(dev, "isi_mck");
--	if (!IS_ERR(isi->mck)) {
--		/* Set ISI_MCK's frequency, it should be faster than pixel
--		 * clock.
--		 */
--		ret = clk_set_rate(isi->mck, isi->pdata.mck_hz);
--		if (ret < 0)
--			return ret;
--	}
--
- 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
- 				sizeof(struct fbd) * MAX_BUFFER_NUM,
- 				&isi->fb_descriptors_phys,
--- 
-1.9.1
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/db10f0dd/attachment.sig>
