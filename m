@@ -1,69 +1,63 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 9 Apr 2015 15:35:40 +0200
-Subject: [PATCH] arm: KVM: force execution of HCPTR access on VM exit
-In-Reply-To: <55256282.40606@arm.com>
-References: <1426503583-8958-1-git-send-email-marc.zyngier@arm.com>
- <20150408114033.GH4715@cbox> <55256282.40606@arm.com>
-Message-ID: <20150409133540.GO4715@cbox>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 9 Apr 2015 15:36:19 +0200
+Subject: [regression, armada-xp] bus: mvebu-mbus: make sure SDRAM CS...
+ breaks PCI
+In-Reply-To: <55267F36.3070908@list.ru>
+References: <55267F36.3070908@list.ru>
+Message-ID: <20150409153619.7ef251cb@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 08, 2015 at 06:16:50PM +0100, Marc Zyngier wrote:
-> On 08/04/15 12:40, Christoffer Dall wrote:
-> > On Mon, Mar 16, 2015 at 10:59:43AM +0000, Marc Zyngier wrote:
-> >> On VM entry, we disable access to the VFP registers in order to
-> >> perform a lazy save/restore of these registers.
-> >>
-> >> On VM exit, we restore access, test if we did enable them before,
-> >> and save/restore the guest/host registers if necessary. In this
-> >> sequence, the FPEXC register is always accessed, irrespective
-> >> of the trapping configuration.
-> >>
-> >> If the guest didn't touch the VFP registers, then the HCPTR access
-> >> has now enabled such access, but we're missing a barrier to ensure
-> >> architectural execution of the new HCPTR configuration. If the HCPTR
-> >> access has been delayed/reordered, the subsequent access to FPEXC
-> >> will cause a trap, which we aren't prepared to handle at all.
-> >>
-> >> The fix is to introduce a barrier that only takes place if the
-> >> guest hasn't accessed its view of the VFP registers, making
-> >> the access to FPEXC safe.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm/kvm/interrupts.S | 7 +++++--
-> >>  1 file changed, 5 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> >> index 79caf79..3ac7aca 100644
-> >> --- a/arch/arm/kvm/interrupts.S
-> >> +++ b/arch/arm/kvm/interrupts.S
-> >> @@ -175,10 +175,13 @@ __kvm_vcpu_return:
-> >>  #ifdef CONFIG_VFPv3
-> >>  	@ Save floating point registers we if let guest use them.
-> >>  	tst	r2, #(HCPTR_TCP(10) | HCPTR_TCP(11))
-> >> -	bne	after_vfp_restore
-> >> +	beq	1f
-> >> +
-> >> +	isb	@ Force execution of HCPTR if we've just reenabled VFP access
-> >> +	b	after_vfp_restore
-> >>  
-> >>  	@ Switch VFP/NEON hardware state to the host's
-> >> -	add	r7, vcpu, #VCPU_VFP_GUEST
-> >> +1:	add	r7, vcpu, #VCPU_VFP_GUEST
-> >>  	store_vfp_state r7
-> >>  	add	r7, vcpu, #VCPU_VFP_HOST
-> >>  	ldr	r7, [r7]
-> >> -- 
-> >> 2.1.4
-> >>
-> > 
-> > Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> Thanks (I must admit I completely forgot the existence of this patch...).
-> 
-> I guess we can queue that for -rc1, with a Cc to stable...
-> 
-yes, I tested it on TC2 (both A15 and A7) and it works like a charm.
+Dear Stas Sergeev,
 
--Christoffer
+On Thu, 09 Apr 2015 16:31:34 +0300, Stas Sergeev wrote:
+> Hello Thomas and arm developers.
+> 
+> I've bisected the patch that makes the PCI devices
+> (mvsas in my case) to cause the entire system hang.
+
+Yes, I also investigated this issue last week, and came to the same
+conclusion.
+
+> commit 1737cac6936938a9bc52c03c4a3ff2032c702fa5
+> Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Date:   Fri Jan 9 10:59:04 2015 -0600
+> 
+>     bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge wi
+> 
+> 
+> That patch looks into mblock for the hole at the end of 4G
+> space and rounds down the DRAM window size.
+> The problem is that the window sizes must be the power of 2.
+> Here's the quote from Marvel datasheet:
+> ---
+> The size must be programmed as a set of 1s (starting from the LSB) followed by a set of
+> 0s. The set of 1s defines the size. For example, if Size[7:0] is set to 0x0F, it defines a size of 256 MB
+> (number of 1s is 4, 2^4 x 16 MB = 256 MB).
+> ---
+> This basically mean that if the size is the power of 2, you
+> can just subtract 1 and apply the AND mask, but if it is not
+> the power of 2, you need to round-up. But round-up will again
+> create an overlap with MBus bridge, defeating the purpose of the
+> patch.
+> 
+> I think the patch should be reverted.
+> After reverting it I've got the stable system with mvsas working fine.
+> 
+> If you have any other ideas than to revert patch, I can test.
+
+The patch was originally meant to allow the upcoming crypto CESA driver
+to do DMA with the SRAM. And the CESA unit doesn't have the power of
+two requirement for the DRAM windows, but this is something we only
+realized in the last few days.
+
+So most likely, the best course of action will be to revert this patch,
+and instead handle the problem of making sure the DRAM windows don't
+overlap with the I/O space directly in the CESA driver, which is the
+only one actually interested in doing DMA with the SRAM.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
