@@ -1,51 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 9 Apr 2015 08:28:26 -0700
-Subject: [PATCH 4/8] clk: tegra: Fix duplicate const for parent names
-In-Reply-To: <20150409101947.GM12103@ulmo>
-References: <1428499339-29569-1-git-send-email-k.kozlowski@samsung.com>
- <1428499339-29569-5-git-send-email-k.kozlowski@samsung.com>
- <20150409100036.GK12103@ulmo>
- <CAJKOXPd4KsZ-pLDUtyWwyJviZyFWQKVLTVpW_6_Yye2o=3xy0g@mail.gmail.com>
- <20150409101947.GM12103@ulmo>
-Message-ID: <20150409152826.GB18835@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Apr 2015 16:30:33 +0100
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <20150409150918.GP18048@atomide.com>
+References: <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com>
+ <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
+ <20150406174245.GJ18048@atomide.com>
+ <20150407135713.GL4027@n2100.arm.linux.org.uk>
+ <20150407152207.GM18048@atomide.com>
+ <20150408230658.GO4027@n2100.arm.linux.org.uk>
+ <20150409134843.GQ4027@n2100.arm.linux.org.uk>
+ <20150409150918.GP18048@atomide.com>
+Message-ID: <20150409153033.GR4027@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09, Thierry Reding wrote:
-> On Thu, Apr 09, 2015 at 12:07:59PM +0200, Krzysztof Kozlowski wrote:
-> > 2015-04-09 12:00 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
-> > > On Wed, Apr 08, 2015 at 03:22:15PM +0200, Krzysztof Kozlowski wrote:
-> > >> Replace duplicated const keyword for 'emc_parent_clk_names' with proper
-> > >> array of const pointers to const strings.
-> > >>
-> > >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > >> ---
-> > >>  drivers/clk/tegra/clk-emc.c | 2 +-
-> > >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >
-> > > This would probably better go in via the Tegra tree since the patch that
-> > > contains this has only made it to linux-next.
-> > >
-> > > Stephen, Mike, any objections to me taking this?
+On Thu, Apr 09, 2015 at 08:09:19AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150409 06:49]:
+> > On Thu, Apr 09, 2015 at 12:06:58AM +0100, Russell King - ARM Linux wrote:
+> > > On Tue, Apr 07, 2015 at 08:22:08AM -0700, Tony Lindgren wrote:
+> > > > Works for me. The above needs the following fix folded in to build:
+> > > > 
+> > > > --- a/arch/arm/mm/proc-v7.S
+> > > > +++ b/arch/arm/mm/proc-v7.S
+> > > > @@ -532,7 +532,7 @@ __v7_ca9mp_proc_info:
+> > > >  __v7_ca8_proc_info:
+> > > >  	.long	0x410fc080
+> > > >  	.long	0xff0ffff0
+> > > > -	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
+> > > > +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
+> > > >  	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
+> > > >  
+> > > >  #endif	/* CONFIG_ARM_LPAE */
+> > > 
+> > > Thanks, merged into the original patch.
 > > 
-> > Applying this without the change for const-ness of parent_names (patch
-> > by Sascha Hauer sent before mine [1]) would introduce a warning -
-> > assign of const to non-const. Any idea to solve it? Immutable branch?
+> > Do you want to give me an ack for this, thanks?
 > 
-> Right, I had missed that. Immutable branch would work, though perhaps
-> it'd be easier to just defer this until after v4.1-rc1. The warning
-> shouldn't happen if we leave out this single patch and apply it later
-> on, right?
+> The patch below works for me:
 > 
-> Alternatively the whole series could be deferred until after v4.1-rc1.
+> Tested-by: Tony Lindgren <tony@atomide.com>
 > 
+> I'm wondering if this and the follow-up patch should be tagged
+> cc: stable?
+> 
+> They together fix apps segfaulting both with and without 430973
+> for some common use cases for distro kernels.
 
-Yeah I don't really care to make an immutable branch for this
-cleanup series. If everyone is ok with waiting until after -rc1
-we can apply the Tegra patch then (or you can and we'll get it
-through a pull later). We should be able to apply the parts that
-go through clk tree though.
+If we do, I'll want to merge both patches together...  For the time being,
+I'll queue it without the stable tag.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
