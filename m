@@ -1,111 +1,44 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 9 Apr 2015 11:09:07 +0300
-Subject: [PATCH v4 3/8] dmaengine: Add driver for TI DMA crossbar on DRA7x
-In-Reply-To: <20150408152349.GD26727@lukather>
-References: <1428498892-28471-1-git-send-email-peter.ujfalusi@ti.com>
- <1428498892-28471-4-git-send-email-peter.ujfalusi@ti.com>
- <20150408152349.GD26727@lukather>
-Message-ID: <552633A3.3070909@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Apr 2015 10:13:06 +0200
+Subject: [PATCH 4/7] ARM: cache-v7: optimise branches in
+ v7_flush_cache_louis
+In-Reply-To: <E1YdzFA-0008Cr-Ku@rmk-PC.arm.linux.org.uk>
+References: <20150403100848.GZ24899@n2100.arm.linux.org.uk>
+ <E1YdzFA-0008Cr-Ku@rmk-PC.arm.linux.org.uk>
+Message-ID: <2570741.Vc3c6Ovx3m@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +static inline void ti_dma_xbar_write(void __iomem *iomem, int xbar, int val)
->> +{
->> +	writew_relaxed(val, iomem + (xbar * 2));
-> 
-> Silently casting val (an integer) to a u16 isn't really nice I
-> guess. At least you could be upfront about it in the prototype.
+On Friday 03 April 2015 11:54:32 Russell King wrote:
+> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> index 5b5d0c00bca7..793d061b4dce 100644
+> --- a/arch/arm/mm/cache-v7.S
+> +++ b/arch/arm/mm/cache-v7.S
+> @@ -93,17 +93,18 @@ ENTRY(v7_flush_dcache_louis)
+>  ALT_SMP(mov	r3, r0, lsr #20)		@ move LoUIS into position
+>  ALT_UP(	mov	r3, r0, lsr #26)		@ move LoUU into position
+>  	ands	r3, r3, #7 << 1 		@ extract LoU*2 field from clidr
+> +	bne	start_flush_levels		@ LoU != 0, start flushing
+>  #ifdef CONFIG_ARM_ERRATA_643719
+> -	ALT_SMP(mrceq	p15, 0, r2, c0, c0, 0)	@ read main ID register
+> -	ALT_UP(reteq	lr)			@ LoUU is zero, so nothing to do
+> -	movweq	r1, #:lower16:0x410fc090	@ ID of ARM Cortex A9 r0p?
+> -	movteq	r1, #:upper16:0x410fc090
+> -	biceq	r2, r2, #0x0000000f             @ clear minor revision number
+> -	teqeq	r2, r1                          @ test for errata affected core and if so...
+> -	moveqs	r3, #1 << 1			@   fix LoUIS value (and set flags state to 'ne')
+> +ALT_SMP(mrc	p15, 0, r2, c0, c0, 0)		@ read main ID register
+> +ALT_UP(	ret	lr)				@ LoUU is zero, so nothing to do
+> +	movw	r1, #:lower16:0x410fc090	@ ID of ARM Cortex A9 r0p?
 
-The value in val is guarantied not to overflow the u16, but sure, I can change
-this.
+With this in linux-next, I get a build failure on randconfig kernels with
+THUMB2_KERNEL enabled:
 
->> +	dma_spec->np = of_parse_phandle(ofdma->of_node, "dma-masters", 0);
->> +	if (!dma_spec->np) {
->> +		dev_err(&pdev->dev, "Can't get DMA master\n");
->> +		return NULL;
->> +	}
->> +
->> +	map = kzalloc(sizeof(*map), GFP_KERNEL);
->> +	if (!map)
->> +		return NULL;
-> 
-> You're leaking dma_spec->np.
+arch/arm/mm/cache-v7.S: Assembler messages:
+arch/arm/mm/cache-v7.S:99: Error: ALT_UP() content must assemble to exactly 4 bytes
 
-If kzalloc fails we have other things to worry about, but true, I'll
-restructure the code to avoid leaking the node.
+Any idea for a method that will work with all combinations of SMP/UP
+and ARM/THUMB? The best I could come up with was to add an extra 'mov r0,r0',
+but that gets rather ugly as you then have to do it only for THUMB2.
 
->> +	dma_node = of_parse_phandle(node, "dma-masters", 0);
->> +	if (!dma_node) {
->> +		dev_err(&pdev->dev, "Can't get DMA master node\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	xbar = devm_kzalloc(&pdev->dev, sizeof(*xbar), GFP_KERNEL);
->> +	if (!xbar)
->> +		return -ENOMEM;
-> 
-> And here too.
-
-same here, I'll change the code to not leak.
-
-> 
->> +	if (of_property_read_u32(dma_node, "dma-requests",
->> +				 &xbar->dma_requests)) {
->> +		dev_info(&pdev->dev,
->> +			 "Missing XBAR output information, using %u.\n",
->> +			 TI_XBAR_OUTPUTS);
->> +		xbar->dma_requests = TI_XBAR_OUTPUTS;
->> +	}
->> +	of_node_put(dma_node);
->> +
->> +	if (of_property_read_u32(node, "dma-requests", &xbar->xbar_requests)) {
->> +		dev_info(&pdev->dev,
->> +			 "Missing XBAR input information, using %u.\n",
->> +			 TI_XBAR_INPUTS);
->> +		xbar->xbar_requests = TI_XBAR_INPUTS;
->> +	}
->> +
->> +	if (of_property_read_u32(node, "ti,dma-safe-map", &xbar->safe_val))
->> +		xbar->safe_val = 0;
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	if (!res)
->> +		return -ENODEV;
->> +
->> +	if (!devm_request_mem_region(&pdev->dev, res->start, resource_size(res),
->> +				     dev_name(&pdev->dev)))
->> +		return -ENODEV;
->> +
->> +	iomem = devm_ioremap(&pdev->dev, res->start, resource_size(res));
->> +	if (!iomem)
->> +		return -ENOMEM;
-> 
-> You can use devm_ioremap_resource here.
-
-I tend to forgot about this...
-
->> +	xbar->iomem = iomem;
->> +
->> +	xbar->dmarouter.dev = &pdev->dev;
->> +	xbar->dmarouter.route_free = ti_dma_xbar_free;
->> +
->> +	platform_set_drvdata(pdev, xbar);
->> +
->> +	ret = of_dma_router_register(node, ti_dma_xbar_route_allocate,
->> +				     &xbar->dmarouter);
->> +	if (ret)
->> +		return -ENODEV;
-> 
-> Starting here, I'd expect that your driver can be used....
-> 
->> +
->> +	/* Reset the crossbar */
->> +	for (i = 0; i < xbar->dma_requests; i++)
->> +		ti_dma_xbar_write(xbar->iomem, i, xbar->safe_val);
-> 
-> ... however, the hardware doesn't seem ready. Isn't it a race?
-
-True, will change the order.
-
-Thanks,
-P?ter
+	Arnd
