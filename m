@@ -1,89 +1,52 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu,  9 Apr 2015 12:29:12 +0100
-Subject: [PATCH v3 01/10] drivers: PL011: avoid potential unregister_driver
- call
+Date: Thu,  9 Apr 2015 12:29:17 +0100
+Subject: [PATCH v3 06/10] drivers: PL011: replace UART_MIS reading with _RIS &
+ _IMSC
 In-Reply-To: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
 References: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1428578961-6896-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <1428578961-6896-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although we care about not unregistering the driver if there are
-still ports connected during the .remove callback, we do miss this
-check in the pl011_probe function. So if the current port allocation
-fails, but there are other ports already registered, we will kill
-those.
-So factor out the port removal into a separate function and use that
-in the probe function, too.
+The PL011 register UART_MIS is actually a bitwise AND of the
+UART_RIS and the UART_MISC register.
+Since the SBSA UART does not include the _MIS register, use the
+two separate registers to get the same behaviour. Since we are
+inside the spinlock and we read the _IMSC register only once, there
+should be no race issue.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/tty/serial/amba-pl011.c |   37 +++++++++++++++++++++----------------
- 1 file changed, 21 insertions(+), 16 deletions(-)
+ drivers/tty/serial/amba-pl011.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index f5bd842..d08951f 100644
+index 65df5c7..3829879 100644
 --- a/drivers/tty/serial/amba-pl011.c
 +++ b/drivers/tty/serial/amba-pl011.c
-@@ -2135,6 +2135,24 @@ static int pl011_probe_dt_alias(int index, struct device *dev)
- 	return ret;
- }
+@@ -1322,11 +1322,13 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
+ 	struct uart_amba_port *uap = dev_id;
+ 	unsigned long flags;
+ 	unsigned int status, pass_counter = AMBA_ISR_PASS_LIMIT;
++	u16 imsc;
+ 	int handled = 0;
+ 	unsigned int dummy_read;
  
-+/* unregisters the driver also if no more ports are left */
-+static void pl011_unregister_port(struct uart_amba_port *uap)
-+{
-+	int i;
-+	bool busy = false;
-+
-+	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
-+		if (amba_ports[i] == uap)
-+			amba_ports[i] = NULL;
-+		else if (amba_ports[i])
-+			busy = true;
-+	}
-+	pl011_dma_remove(uap);
-+	if (!busy)
-+		uart_unregister_driver(&amba_reg);
-+}
-+
-+
- static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- {
- 	struct uart_amba_port *uap;
-@@ -2200,10 +2218,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	spin_lock_irqsave(&uap->port.lock, flags);
+-	status = readw(uap->port.membase + UART011_MIS);
++	imsc = readw(uap->port.membase + UART011_IMSC);
++	status = readw(uap->port.membase + UART011_RIS) & imsc;
+ 	if (status) {
+ 		do {
+ 			if (uap->vendor->cts_event_workaround) {
+@@ -1361,7 +1363,7 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
+ 			if (pass_counter-- == 0)
+ 				break;
+ 
+-			status = readw(uap->port.membase + UART011_MIS);
++			status = readw(uap->port.membase + UART011_RIS) & imsc;
+ 		} while (status != 0);
+ 		handled = 1;
  	}
- 
- 	ret = uart_add_one_port(&amba_reg, &uap->port);
--	if (ret) {
--		amba_ports[i] = NULL;
--		uart_unregister_driver(&amba_reg);
--	}
-+	if (ret)
-+		pl011_unregister_port(uap);
- 
- 	return ret;
- }
-@@ -2211,20 +2227,9 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- static int pl011_remove(struct amba_device *dev)
- {
- 	struct uart_amba_port *uap = amba_get_drvdata(dev);
--	bool busy = false;
--	int i;
- 
- 	uart_remove_one_port(&amba_reg, &uap->port);
--
--	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
--		if (amba_ports[i] == uap)
--			amba_ports[i] = NULL;
--		else if (amba_ports[i])
--			busy = true;
--
--	pl011_dma_remove(uap);
--	if (!busy)
--		uart_unregister_driver(&amba_reg);
-+	pl011_unregister_port(uap);
- 	return 0;
- }
- 
 -- 
 1.7.9.5
