@@ -1,32 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 9 Apr 2015 18:26:57 +0100
-Subject: [PATCH 4/7] ARM: cache-v7: optimise branches in
- v7_flush_cache_louis
-In-Reply-To: <20150409134656.GX12732@n2100.arm.linux.org.uk>
-References: <20150403100848.GZ24899@n2100.arm.linux.org.uk>
- <2570741.Vc3c6Ovx3m@wuerfel>
- <20150409082116.GV12732@n2100.arm.linux.org.uk>
- <2927556.fYRDzU3Hag@wuerfel>
- <20150409134656.GX12732@n2100.arm.linux.org.uk>
-Message-ID: <20150409172657.GL23861@e104818-lin.cambridge.arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 9 Apr 2015 10:27:48 -0700
+Subject: [PATCH] ata: ahci_st: fixup layering violations / drvdata errors
+In-Reply-To: <5526478A.6060707@cogentembedded.com>
+References: <1428519599-31885-1-git-send-email-computersforpeace@gmail.com>
+ <5526478A.6060707@cogentembedded.com>
+Message-ID: <20150409172748.GN32500@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 02:46:56PM +0100, Russell King - ARM Linux wrote:
-> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-> index 7d807cfd8ef5..0f2055fe21af 100644
-> --- a/arch/arm/lib/bitops.h
-> +++ b/arch/arm/lib/bitops.h
-> @@ -14,7 +14,7 @@ UNWIND(	.fnstart	)
->  #if __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
->  	.arch_extension	mp
->  	ALT_SMP(W(pldw)	[r1])
-> -	ALT_UP(W(nop))
-> +	ALT_UP(nop)
+On Thu, Apr 09, 2015 at 12:34:02PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 4/8/2015 9:59 PM, Brian Norris wrote:
+> 
+> >When working on another SATA driver that uses libahci_platform, I
+> >noticed an error in this driver; it tries to the the driver data for its
+> >device, while libata also thinks it can set the driver data. See:
+> 
+> >   ahci_platform_init_host()
+> >   -> ata_host_alloc_pinfo()
+> >      -> ata_host_alloc()
+> >         -> dev_set_drvdata()
+> 
+> >So instead of sticking the IP-specific platform data into drvdata, let's
+> >use the plat_data variable that is reserved for this use.
+> 
+> >Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> >Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+> >Cc: Maxime Coquelin <maxime.coquelin@st.com>
+> >Cc: Patrice Chotard <patrice.chotard@st.com>
+> >---
+> >This is ONLY compile tested; I don't have hardware to run. This looks like it
+> >could have ramifications on suspend/resume support, and hot device removal
+> >(e.g., sysfs unbind), so it might qualify as -stable, if someone can test it
+> 
+> >  drivers/ata/ahci_st.c | 25 ++++++++++++++-----------
+> >  1 file changed, 14 insertions(+), 11 deletions(-)
+> 
+> >diff --git a/drivers/ata/ahci_st.c b/drivers/ata/ahci_st.c
+> >index bc971af262e7..2bd2375c2ab1 100644
+> >--- a/drivers/ata/ahci_st.c
+> >+++ b/drivers/ata/ahci_st.c
+> [...]
+> >@@ -107,7 +108,9 @@ static void st_ahci_host_stop(struct ata_host *host)
+> >
+> >  static int st_ahci_probe_resets(struct platform_device *pdev)
+> >  {
+> >-	struct st_ahci_drv_data *drv_data = platform_get_drvdata(pdev);
+> >+	struct ata_host *host = dev_get_drvdata(&pdev->dev);
+> 
+>    Why not just platform_get_drvdata()?
 
-So for cases like this, we end up with two NOPs on Thumb-2 UP. Depending
-on the microarchitecture implementation, we may have two instructions in
-the pipeline to execute instead of one.
+Just being consistent, as that's what the rest of the driver uses. It
+seems like it'd be easy to misconstrue dev_get_drvrdata(&pdev->dev) and
+platform_get_drvdata(pdev) as two different things (e.g., when
+grepping), when in fact they are the same. Seems like a needless source
+of potential confusion.
 
--- 
-Catalin
+Why should I use platform_get_drvdata()?
+
+(NB: I didn't notice at first that the driver already was using
+platform_get_drvdata(). I pretty much ignored anything that was already
+there, since it was all wrong anyway.)
+
+Anyway, I don't care either way, and in fact, I don't care about this
+driver much at all as I never expect to use it; I just noticed the
+defect when reading.
+
+Brian
