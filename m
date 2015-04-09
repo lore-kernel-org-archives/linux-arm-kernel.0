@@ -1,130 +1,63 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 09 Apr 2015 23:19:59 +0200
-Subject: [PATCH] ARM: tegra: cpuidle: implement
- cpuidle_state.enter_freeze()
-In-Reply-To: <552643E1.3060200@collabora.com>
-References: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
- <20150408115546.GA24271@red-moon> <552643E1.3060200@collabora.com>
-Message-ID: <285738930.THBQOWvsah@vostro.rjw.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Apr 2015 23:06:53 +0200
+Subject: [PATCH] leds: fix !CONFIG_LEDS_TRIGGERS builds
+Message-ID: <32374082.15Rv66z5Mo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 09, 2015 11:18:25 AM Tomeu Vizoso wrote:
-> On 04/08/2015 01:55 PM, Lorenzo Pieralisi wrote:
-> > On Wed, Apr 08, 2015 at 11:54:38AM +0100, Tomeu Vizoso wrote:
-> >> This callback is expected to do the same as enter() only that all
-> >> non-wakeup IRQs are expected to be disabled.
-> > 
-> > This is not true or at least it is misworded. The enter_freeze() function
-> > is expected to return from the state with IRQs disabled at CPU level, or
-> > put it differently it must not re-enable IRQs while executing since the
-> > tick is frozen.
-> 
-> True, only that it mentions interrupts in general, not just IRQs (I
-> don't know if the terminology used in the base code matches the one in
-> ARM's documentation).
-> 
-> /*
->  * CPUs execute ->enter_freeze with the local tick or entire timekeeping
->  * suspended, so it must not re-enable interrupts at any point (even
->  * temporarily) or attempt to change states of clock event devices.
->  */
+A recent move of the header led trigger function declaration caused the
+alternative wrappers to be entirely invisible if LEDS_TRIGGERS is
+disabled, leading to a compile-time error:
 
-This means interrupts on the local CPU (ie. the thing done by local_irq_disable()).
+drivers/leds/led-class.c: In function 'brightness_store':
+drivers/leds/led-class.c:57:3: error: implicit declaration of function 'led_trigger_remove' [-Werror=implicit-function-declaration]
 
-> >> It will be called when the system goes to suspend-to-idle and will
-> >> reduce power usage because CPUs won't be awaken for unnecessary IRQs.
-> >>
-> >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> >> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> >> ---
-> >>  arch/arm/mach-tegra/cpuidle-tegra114.c | 31 ++++++++++++++++++++++++-------
-> >>  1 file changed, 24 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
-> >> index f2b586d..ef06001 100644
-> >> --- a/arch/arm/mach-tegra/cpuidle-tegra114.c
-> >> +++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
-> >> @@ -39,28 +39,44 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
-> >>  				    struct cpuidle_driver *drv,
-> >>  				    int index)
-> >>  {
-> >> -	local_fiq_disable();
-> >> -
-> >>  	tegra_set_cpu_in_lp2();
-> >>  	cpu_pm_enter();
-> >>  
-> >> -	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-> >> -
-> >>  	call_firmware_op(prepare_idle);
-> >>  
-> >>  	/* Do suspend by ourselves if the firmware does not implement it */
-> >>  	if (call_firmware_op(do_idle, 0) == -ENOSYS)
-> >>  		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
-> >>  
-> >> -	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-> >> -
-> >>  	cpu_pm_exit();
-> >>  	tegra_clear_cpu_in_lp2();
-> >>  
-> >> +	return index;
-> >> +}
-> >> +
-> >> +static int tegra114_idle_enter(struct cpuidle_device *dev,
-> >> +			       struct cpuidle_driver *drv,
-> >> +			       int index)
-> >> +{
-> >> +	local_fiq_disable();
-> >> +
-> >> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-> >> +
-> >> +	index = tegra114_idle_power_down(dev, drv, index);
-> >> +
-> >> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-> >> +
-> >>  	local_fiq_enable();
-> >>  
-> >>  	return index;
-> >>  }
-> >> +
-> >> +static void tegra114_idle_enter_freeze(struct cpuidle_device *dev,
-> >> +				       struct cpuidle_driver *drv,
-> >> +				       int index)
-> >> +{
-> >> +	tegra114_idle_power_down(dev, drv, index);
-> > 
-> > Cool. So if the problem is FIQs, you don't disabled them on entry
-> > which means you enter the "frozen" state with FIQs enabled and tick frozen,
-> > unless I am missing something.
-> 
-> I have gone a bit deeper in the code and that's correct, AFAICS.
-> 
-> > The question here is: are we allowed to enable FIQs before returning
-> > from an enter_freeze() call (and to enter it with FIQs enabled) ?
-> > 
-> > If we are not your code here certainly does not solve the issue, since
-> > it does _not_ disable FIQs upon enter_freeze call anyway.
-> 
-> I think doing that would go against the wording of the comment I quoted
-> above, so I see two ways of fixing this:
-> 
-> * Change the wording to refer to normal IRQs and leave the task of
-> enabling and disabling FIQs to the enter_freeze implementation (ugly and
-> I don't see any good reason for this)
-> 
-> * Have FIQs already disabled when enter_freeze gets called, probably by
-> having arch_cpu_idle_enter do it on ARM (and the inverse in
-> arch_cpu_idle_exit)?
-> 
-> Rafael, what's your opinion on this?
+This moves the wrappers to an appropriate location and changes the
+macros to inline functions to match the style of the surrounding code.
 
-I don't know what FIQs are. :-)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 5a15d172057c ("leds: unify the location of led-trigger API")
+---
+This showed up in today's linux-next
 
-->enter_freeze is entered with interrupts disabled on the local CPU.  It is
-not supposed to re-enable them.  That is, while in the ->enter_freeze callback
-routine, the CPU must not be interrupted aby anything other than NMI.
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+diff --git a/include/linux/leds.h b/include/linux/leds.h
+index 057970818961..e049cb374837 100644
+--- a/include/linux/leds.h
++++ b/include/linux/leds.h
+@@ -223,7 +223,6 @@ struct led_trigger {
+ 	struct list_head  next_trig;
+ };
+ 
+-#ifdef CONFIG_LEDS_TRIGGERS
+ void led_trigger_set_default(struct led_classdev *led_cdev);
+ void led_trigger_set(struct led_classdev *led_cdev,
+ 			struct led_trigger *trigger);
+@@ -234,13 +233,6 @@ static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
+ 	return led_cdev->trigger_data;
+ }
+ 
+-#else
+-#define led_trigger_set_default(x) do {} while (0)
+-#define led_trigger_set(x, y) do {} while (0)
+-#define led_trigger_remove(x) do {} while (0)
+-#define led_get_trigger_data(x) (NULL)
+-#endif
+-
+ ssize_t led_trigger_store(struct device *dev, struct device_attribute *attr,
+ 			const char *buf, size_t count);
+ ssize_t led_trigger_show(struct device *dev, struct device_attribute *attr,
+@@ -286,6 +278,14 @@ extern void led_trigger_rename_static(const char *name,
+ struct led_trigger {};
+ 
+ /* Trigger inline empty functions */
++static inline void led_trigger_set_default(struct led_classdev *led_cdev) {}
++static inline void led_trigger_set(struct led_classdev *led_cdev,
++				   struct led_trigger *trigger) {}
++static inline void led_trigger_remove(struct led_classdev *led_cdev) {}
++static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
++{
++	return NULL;
++}
+ static inline void led_trigger_register_simple(const char *name,
+ 					struct led_trigger **trigger) {}
+ static inline void led_trigger_unregister_simple(struct led_trigger *trigger) {}
