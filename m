@@ -1,80 +1,34 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  9 Apr 2015 22:04:12 +0200
-Subject: [PATCH v5 08/11] ARM: efm32: use ARM_SINGLE_ARMV7M
+Date: Thu,  9 Apr 2015 22:04:09 +0200
+Subject: [PATCH v5 05/11] clocksource: add dependencies for Vybrid pit
+ clocksource
 In-Reply-To: <1428609855-27657-1-git-send-email-stefan@agner.ch>
 References: <1428609855-27657-1-git-send-email-stefan@agner.ch>
-Message-ID: <1428609855-27657-9-git-send-email-stefan@agner.ch>
+Message-ID: <1428609855-27657-6-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new config symbol ARM_SINGLE_ARMV7M which groups config
-symbols used by modern ARMv7-M platforms. It also support multiple
-ARMv7-M platforms in one kernel image. However, this only works if
-the combined platforms share the same (main) memory layout.
+Add the minimal dependencies required to use the Vybrid PIT
+clocksource driver. Those are not part of the SoC dependencies.
 
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/Kconfig                 | 28 ++++++++++------------------
- arch/arm/configs/efm32_defconfig |  1 +
- 2 files changed, 11 insertions(+), 18 deletions(-)
+ drivers/clocksource/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 66e60af..9c139fb 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -418,24 +418,6 @@ config ARCH_EBSA110
- 	  Ethernet interface, two PCMCIA sockets, two serial ports and a
- 	  parallel port.
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 1c2506f..350e742 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -164,6 +164,8 @@ config FSL_FTM_TIMER
  
--config ARCH_EFM32
--	bool "Energy Micro efm32"
--	depends on !MMU
--	select ARCH_REQUIRE_GPIOLIB
--	select ARM_NVIC
--	select AUTO_ZRELADDR
--	select CLKSRC_OF
--	select COMMON_CLK
--	select CPU_V7M
--	select GENERIC_CLOCKEVENTS
--	select NO_DMA
--	select NO_IOPORT_MAP
--	select SPARSE_IRQ
--	select USE_OF
--	help
--	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
--	  processors.
--
- config ARCH_EP93XX
- 	bool "EP93xx-based"
- 	select ARCH_HAS_HOLES_MEMORYMODEL
-@@ -982,6 +964,16 @@ source "arch/arm/mach-w90x900/Kconfig"
- 
- source "arch/arm/mach-zynq/Kconfig"
- 
-+# ARMv7-M architecture
-+config ARCH_EFM32
-+	bool "Energy Micro efm32"
-+	depends on ARM_SINGLE_ARMV7M
-+	select ARCH_REQUIRE_GPIOLIB
-+	select AUTO_ZRELADDR
-+	help
-+	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
-+	  processors.
-+
- # Definitions to make life easier
- config ARCH_ACORN
+ config VF_PIT_TIMER
  	bool
-diff --git a/arch/arm/configs/efm32_defconfig b/arch/arm/configs/efm32_defconfig
-index c4c17e3..e969f78 100644
---- a/arch/arm/configs/efm32_defconfig
-+++ b/arch/arm/configs/efm32_defconfig
-@@ -16,6 +16,7 @@ CONFIG_EMBEDDED=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- # CONFIG_MMU is not set
-+CONFIG_ARM_SINGLE_ARMV7M=y
- CONFIG_ARCH_EFM32=y
- CONFIG_SET_MEM_PARAM=y
- CONFIG_DRAM_BASE=0x88000000
++	select CLKSRC_MMIO
++	select CLKSRC_OF
+ 	help
+ 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+ 
 -- 
 2.3.5
