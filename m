@@ -1,33 +1,37 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 9 Apr 2015 17:33:17 -0500
-Subject: [PATCH 2/2] ARM: dts: am57xx-beagle-x15: Switch GPIO fan number
+Date: Thu, 9 Apr 2015 17:33:16 -0500
+Subject: [PATCH 1/2] ARM: dts: am57xx-beagle-x15: Switch UART mux pins
 In-Reply-To: <1428618797-17190-1-git-send-email-nm@ti.com>
 References: <1428618797-17190-1-git-send-email-nm@ti.com>
-Message-ID: <1428618797-17190-3-git-send-email-nm@ti.com>
+Message-ID: <1428618797-17190-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BeagleBoard-X15 pre-production change includes switching the GPIO fan
-gpio over from 1 to 2 to allow for a potential fix at a later point in
-time for USB client VBUS detection using PMIC VBUS detect capability.
+BeagleBoard-X15 pre-production change includes switching over to UART
+pins that now allow for UART download capability. All original boards
+should either have been returned for modifications or already modified
+for the required change and maintaining compatibility for older boards
+are no longer needed.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/boot/dts/am57xx-beagle-x15.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/am57xx-beagle-x15.dts |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index cea3be3a051c..fe141c47d647 100644
+index 15f198e4864d..cea3be3a051c 100644
 --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
 +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -83,7 +83,7 @@
- 	gpio_fan: gpio_fan {
- 		/* Based on 5v 500mA AFB02505HHB */
- 		compatible = "gpio-fan";
--		gpios =  <&tps659038_gpio 1 GPIO_ACTIVE_HIGH>;
-+		gpios =  <&tps659038_gpio 2 GPIO_ACTIVE_HIGH>;
- 		gpio-fan,speed-map = <0     0>,
- 				     <13000 1>;
- 		#cooling-cells = <2>;
+@@ -130,8 +130,8 @@
+ 
+ 	uart3_pins_default: uart3_pins_default {
+ 		pinctrl-single,pins = <
+-			0x248 (PIN_INPUT_SLEW | MUX_MODE0) /* uart3_rxd.rxd */
+-			0x24c (PIN_INPUT_SLEW | MUX_MODE0) /* uart3_txd.txd */
++			0x3f8 (PIN_INPUT_SLEW | MUX_MODE2) /* uart2_ctsn.uart3_rxd */
++			0x3fc (PIN_INPUT_SLEW | MUX_MODE1) /* uart2_rtsn.uart3_txd */
+ 		>;
+ 	};
+ 
 -- 
 1.7.9.5
