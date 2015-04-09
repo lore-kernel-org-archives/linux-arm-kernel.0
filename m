@@ -1,85 +1,45 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 09 Apr 2015 11:20:10 +0200
-Subject: [PATCH] ARM: dts: imx23-olinuxino: Add i2c support
-In-Reply-To: <3f0efa88b69ea2e8eb22909b6fbe6f91@imap.cosmopool.net>
-References: <1428515100-1496-1-git-send-email-harald@ccbib.org>
- <1158701263.68321.1428531175931.JavaMail.open-xchange@oxbaltgw03.schlund.de>
- <3f0efa88b69ea2e8eb22909b6fbe6f91@imap.cosmopool.net>
-Message-ID: <5526444A.3060805@i2se.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Apr 2015 11:33:09 +0200
+Subject: [PATCH] nfs: do not export discarded symbols
+In-Reply-To: <1426175918.15787.3.camel@primarydata.com>
+References: <3173686.FPJdK9jLbA@wuerfel>
+ <1426175918.15787.3.camel@primarydata.com>
+Message-ID: <2350360.PssyUvDc2B@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Harald,
+On Thursday 12 March 2015 11:58:38 Trond Myklebust wrote:
+> On Wed, 2015-03-11 at 14:37 +0100, Arnd Bergmann wrote:
+> > The function nfs4_pnfs_v3_ds_connect_unload is exported so it can be
+> > used by other modules, but is also marked '__exit' and will be
+> > discarded when built into the kernel, as pointed out by this
+> > linker error:
+> > 
+> > `nfs4_pnfs_v3_ds_connect_unload' referenced in section `___ksymtab_gpl+nfs4_pnfs_v3_ds_connect_unload' of fs/built-in.o: defined in discarded section `.exit.text' of fs/built-in.o
+> > 
+> > This removes the __exit annotation to make it safe to call this function.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: 5f01d9539496 ("nfs41: create NFSv3 DS connection if specified")
+> > 
+> > diff --git a/fs/nfs/pnfs_nfs.c b/fs/nfs/pnfs_nfs.c
+> > index 54e36b38fb5f..8582dae5ae99 100644
+> > --- a/fs/nfs/pnfs_nfs.c
+> > +++ b/fs/nfs/pnfs_nfs.c
+> > @@ -561,7 +561,7 @@ static bool load_v3_ds_connect(void)
+> >       return(get_v3_ds_connect != NULL);
+> >  }
+> >  
+> > -void __exit nfs4_pnfs_v3_ds_connect_unload(void)
+> > +void nfs4_pnfs_v3_ds_connect_unload(void)
+> >  {
+> >       if (get_v3_ds_connect) {
+> >               symbol_put(nfs3_set_ds_client);
+> > 
+> 
+> Thanks! Applied...
+> 
 
->>> This patch provides the necessary devicetree code.
->>> Tested with MOD-LCD1x9 from Olimex.
->>>
->>> This patch is based on work by Fadil Berisha with his permission.
-> However
->>> all bugs are mine.
->>>
->>> Signed-off-by: Harald Geyer <harald@ccbib.org>
->>> ---
->>> arch/arm/boot/dts/imx23-olinuxino.dts | 6 +++++
->>> arch/arm/boot/dts/imx23.dtsi | 40 ++++++++++++++++++++++++++++++++-
->>> 2 files changed, 45 insertions(+), 1 deletion(-)
->>>
->>> [...]
->>> --- a/arch/arm/boot/dts/imx23.dtsi
->>> +++ b/arch/arm/boot/dts/imx23.dtsi
->>> @@ -308,6 +308,39 @@
->>> fsl,voltage = <MXS_VOLTAGE_HIGH>;
->>> fsl,pull-up = <MXS_PULL_ENABLE>;
->>> };
->>> +
->>> + i2c_pins_a: i2c at 0 {
->>> + reg = <0>;
->>> + fsl,pinmux-ids = <
->>> + MX23_PAD_I2C_SCL__I2C_SCL
->>> + MX23_PAD_I2C_SDA__I2C_SDA
->>> + >;
->>> + fsl,drive-strength = <MXS_DRIVE_8mA>;
->>> + fsl,voltage = <MXS_VOLTAGE_HIGH>;
->>> + fsl,pull-up = <MXS_PULL_ENABLE>;
->>> + };
->>> +
->>> + i2c_pins_b: i2c at 1 {
->>> + reg = <1>;
->>> + fsl,pinmux-ids = <
->>> + MX23_PAD_LCD_ENABLE__I2C_SCL
->>> + MX23_PAD_LCD_HSYNC__I2C_SDA
->>> + >;
->>> + fsl,drive-strength = <MXS_DRIVE_8mA>;
->>> + fsl,voltage = <MXS_VOLTAGE_HIGH>;
->>> + fsl,pull-up = <MXS_PULL_ENABLE>;
->>> + };
->>> +
->>> + i2c_pins_c: i2c at 2 {
->>> + reg = <2>;
->>> + fsl,pinmux-ids = <
->>> + MX23_PAD_SSP1_DATA1__I2C_SCL
->>> + MX23_PAD_SSP1_DATA2__I2C_SDA
->>> + >;
->>> + fsl,drive-strength = <MXS_DRIVE_8mA>;
->>> + fsl,voltage = <MXS_VOLTAGE_HIGH>;
->>> + fsl,pull-up = <MXS_PULL_ENABLE>;
->>> + };
->> Please add only i2c_pins_b because this pin muxing is the only used one.
-> I disagree: Having all possible i2c pin groups documented in devicetree is
-> a good thing. Also imx23.dtsi is more general then olinuxino - somebody
-> might produce a imx23 based board where one of the other pin groups makes
-> more sense to use. Well, even on olinuxino somebody might use i2c_pins_a
-> if they don't need an UART, but use an LCD.
+I don't see the patch in linux-next, did something go wrong here?
 
-Sure. But this 2 additional muxes have nothing to do with adding i2c
-support to olinuxino and should be a separate patch. In case of a revert
-of this patch the other i.MX23 boards are also affected. So i think it
-should be a separate patch.
-
-Btw i read that Shawn only want used muxes [1].
-
-[1] -
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/115779.html
-
-> Thanks,
-> Harald
+	Arnd
