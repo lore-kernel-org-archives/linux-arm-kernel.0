@@ -1,62 +1,50 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  9 Apr 2015 16:58:41 +0200
-Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
-Message-ID: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 09 Apr 2015 16:58:36 +0200
+Subject: [PATCH 1/2] doc/bindings: Add 'endianess'
+ optional-property for FlexCAN controller
+In-Reply-To: <1428591087-12831-1-git-send-email-bhupesh.sharma@freescale.com>
+References: <1428591087-12831-1-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <5526939C.5090309@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 04/09/2015 04:51 PM, Bhupesh Sharma wrote:
+> This patch adds 'endianess' as the optional-property for
+> describing the FlexCAN controller present on various FSL platforms.
+> 
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> Signed-off-by: Sakar Arora <Sakar.Arora@freescale.com>
+> ---
+>  .../devicetree/bindings/net/can/fsl-flexcan.txt    |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+> index 56d6cc3..0d5e668 100644
+> --- a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+> +++ b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+> @@ -18,6 +18,10 @@ Optional properties:
+>  
+>  - xceiver-supply: Regulator that powers the CAN transceiver
+>  
+> +- little-endian: If the FlexCAN IP on this SoC is little-endian, use
+> +                 this property. By default it is assumed that the IP
+> +                 is big-endian
 
-This is an attempt to replace the mv_cesa driver by a new one to address
-some limitations of the existing driver.
->From a performance and CPU load point of view the most important
-limitation is the lack of DMA support, thus preventing us from chaining
-crypto operations.
+Where's the code that's evaluating this property? On ARM little endian
+is assumed so far, on powerpc (p1010) it's big endian.
 
-I know we usually try to adapt existing drivers instead of replacing them
-by new ones, but after trying to refactor the mv_cesa driver I realized it
-would take longer than writing an new one from scratch.
-
-Here are the main features brought by this new driver:
-- support for armada SoCs (up to 38x) while keeping support for older ones
-  (Orion and Kirkwood)
-- DMA mode to offload the CPU in case of intensive crypto usage
-- new algorithms: SHA256, DES and 3DES
-
-I'd like to thank Arnaud, who has carefully reviewed several iterations of
-this driver, helped me improved my implementation, provided support for
-several crypto algorithms, provided support for armada-370 and tested
-the driver on different platforms, hence the SoB and dual MODULE_AUTHOR
-in the driver code.
-
-Best Regards,
-
-Boris
-
-Boris Brezillon (2):
-  crypto: add new driver for Marvell CESA
-  crypto: marvell/CESA: update DT bindings documentation
-
- .../devicetree/bindings/crypto/mv_cesa.txt         |   50 +-
- drivers/crypto/Kconfig                             |    2 +
- drivers/crypto/Makefile                            |    2 +-
- drivers/crypto/marvell/Makefile                    |    1 +
- drivers/crypto/marvell/cesa.c                      |  539 ++++++++
- drivers/crypto/marvell/cesa.h                      |  802 ++++++++++++
- drivers/crypto/marvell/cipher.c                    |  761 +++++++++++
- drivers/crypto/marvell/hash.c                      | 1349 ++++++++++++++++++++
- drivers/crypto/marvell/tdma.c                      |  223 ++++
- drivers/crypto/mv_cesa.c                           | 1193 -----------------
- drivers/crypto/mv_cesa.h                           |  150 ---
- 11 files changed, 3716 insertions(+), 1356 deletions(-)
- create mode 100644 drivers/crypto/marvell/Makefile
- create mode 100644 drivers/crypto/marvell/cesa.c
- create mode 100644 drivers/crypto/marvell/cesa.h
- create mode 100644 drivers/crypto/marvell/cipher.c
- create mode 100644 drivers/crypto/marvell/hash.c
- create mode 100644 drivers/crypto/marvell/tdma.c
- delete mode 100644 drivers/crypto/mv_cesa.c
- delete mode 100644 drivers/crypto/mv_cesa.h
+Marc
 
 -- 
-1.9.1
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/a1e76d34/attachment.sig>
