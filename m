@@ -1,81 +1,88 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 09 Apr 2015 17:01:24 +0200
-Subject: [PATCH 2/2] arm/dts: Add nodes for flexcan devices
- present on LS1021A SoC
-In-Reply-To: <1428591087-12831-2-git-send-email-bhupesh.sharma@freescale.com>
-References: <1428591087-12831-1-git-send-email-bhupesh.sharma@freescale.com>
- <1428591087-12831-2-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <55269444.7050707@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 9 Apr 2015 16:02:44 +0100
+Subject: [v3 2/5] arm64: kvm: allow EL2 context to be reset on shutdown
+In-Reply-To: <552605CD.7000704@linaro.org>
+References: <1427953216-11737-1-git-send-email-takahiro.akashi@linaro.org>
+ <1427953216-11737-3-git-send-email-takahiro.akashi@linaro.org>
+ <20150408130520.GB5977@leverpostej> <552605CD.7000704@linaro.org>
+Message-ID: <20150409150244.GG9648@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2015 04:51 PM, Bhupesh Sharma wrote:
-> From: Sakar Arora <Sakar.Arora@freescale.com>
+On Thu, Apr 09, 2015 at 05:53:33AM +0100, AKASHI Takahiro wrote:
+> Mark,
 > 
-> This patch adds the device nodes for flexcan controller(s) present
-> on LS1021A SoC.
+> On 04/08/2015 10:05 PM, Mark Rutland wrote:
+> > On Thu, Apr 02, 2015 at 06:40:13AM +0100, AKASHI Takahiro wrote:
+> >> The current kvm implementation keeps EL2 vector table installed even
+> >> when the system is shut down. This prevents kexec from putting the system
+> >> with kvm back into EL2 when starting a new kernel.
+> >>
+> >> This patch resolves this issue by calling a cpu tear-down function via
+> >> reboot notifier, kvm_reboot_notify(), which is invoked by
+> >> kernel_restart_prepare() in kernel_kexec().
+> >> While kvm has a generic hook, kvm_reboot(), we can't use it here because
+> >> a cpu teardown function will not be invoked, under current implementation,
+> >> if no guest vm has been created by kvm_create_vm().
+> >> Please note that kvm_usage_count is zero in this case.
+> >>
+> >> We'd better, in the future, implement cpu hotplug support and put the
+> >> arch-specific initialization into kvm_arch_hardware_enable/disable().
+> >> This way, we would be able to revert this patch.
+> >
+> > Why can't we use kvm_arch_hardware_enable/disable() currently?
 > 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> Signed-off-by: Sakar Arora <Sakar.Arora@freescale.com>
-> ---
->  arch/arm/boot/dts/ls1021a-qds.dts |    8 ++++++++
->  arch/arm/boot/dts/ls1021a.dtsi    |   20 ++++++++++++++++++++
->  2 files changed, 28 insertions(+)
+> IIUC, kvm will call kvm_arch_hardware_enable() iff a new guest is being
+> created *and* cpus have not been initialized yet. kvm_usage_count==0
+> indicates this. Similarly, kvm will call kvm_arch_hardware_disable() whenever
+> a guest is being terminated (i.e. kvm_usage_count != 0).
+> Therefore if kvm_arch_hardware_enable/disable() also handle EL2 vector table
+> initialization, we don't have to have any particular operations, as my patch
+> does, for kexec case.
+> (a long-term solution)
 > 
-> diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
-> index 9c5e16b..1641a04 100644
-> --- a/arch/arm/boot/dts/ls1021a-qds.dts
-> +++ b/arch/arm/boot/dts/ls1021a-qds.dts
-> @@ -238,3 +238,11 @@
->  &uart1 {
->  	status = "okay";
->  };
-> +
-> +&can0 {
-> +	status = "okay";
-> +};
-> +
-> +&can1 {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index c70bb27..c44661b 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -332,6 +332,26 @@
->  			status = "disabled";
->  		};
->  
-> +		can0: can at 2a70000 {
-> +			compatible = "fsl,ls1021a-flexcan";
-> +			reg = <0x0 0x2a70000 0x0 0x1000>;
-> +			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&platform_clk 1>;
-> +			clock-frequency = <150000000>;
+> Since arm64 doesn't implement kvm_arch_hardware_enable() (I don't know why),
+> I'm trying to fix the problem by adding a minimum tear-down function, kvm_cpu_reset,
+> and invoking it via a reboot hook.
+> (an interim fix)
 
-Please don't use clock-frequency, it's only needed for powerpcs without
-proper clock support.
+What I don't understand is why we can't move the init and tear-down
+functions into kvm_arch_hardware_enable/disable(). They seem to be for
+precisely what you are implementing, with the only difference being the
+time that they are called.
 
-> +			clock-names = "per";
+Either I'm missing something, or we can simply implement the existing
+hooks. I assume I'm missing something.
 
-Please provide a per and ipg clock, otherwise the driver will not work
-properly.
+> >> +static struct notifier_block kvm_reboot_nb = {
+> >> +	.notifier_call		= kvm_reboot_notify,
+> >> +	.next			= NULL,
+> >> +	.priority		= 0, /* FIXME */
+> >
+> > It would be helpful for the comment to explain why this is wrong, and
+> > what needs fixing.
+> 
+> Thank for reminding me of this.
+> 
+> *priority* enforces a calling order of registered hook functions.
+> If some hook returns NOTIFY_STOP_MASK, subsequent hooks won't be called.
+> (Nevertheless, reboot sequence will go ahead. See kernel_restart_prepare()/
+> notifier_call_chain().)
+> 
+> So we should make sure that kvm_reboot_notify() be called
+> 1) after any hook functions which may depend on kvm, and
 
-> +			little-endian;
-> +		};
+Which hooks depend on KVM?
 
-Marc
+> 2) before any hook functions which kvm may depend on, and
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Which other hooks does KVM depend on?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/ad99c47c/attachment.sig>
+> 3) before any hook functions that may return NOTIFY_STOP_MASK
+
+I think this would be solved by using kvm_arch_hardware_enable/disable.
+As far as I can tell, the VMs would be destroyed earlier (and hence KVM
+disabled) before we got to the final teardown.
+
+Thanks,
+Mark.
