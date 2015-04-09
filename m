@@ -1,40 +1,92 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 9 Apr 2015 13:29:43 +0200
-Subject: [PATCHv7] media: i2c/adp1653: Devicetree support for adp1653
-In-Reply-To: <20150409091017.GA4526@earth>
-References: <20150403083353.GA21070@amd>
- <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
- <20150403202624.GA4308@amd>
- <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
- <20150404074337.GA31064@amd>
- <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
- <20150404171116.GA15025@Nokia-N900>
- <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
- <20150409074238.GA22603@amd> <20150409091017.GA4526@earth>
-Message-ID: <20150409112943.GA31173@amd>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu,  9 Apr 2015 12:29:13 +0100
+Subject: [PATCH v3 02/10] drivers: PL011: refactor pl011_startup()
+In-Reply-To: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
+References: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1428578961-6896-3-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2015-04-09 11:10:17, Sebastian Reichel wrote:
-> Hi,
-> 
-> On Thu, Apr 09, 2015 at 09:42:38AM +0200, Pavel Machek wrote:
-> > [...]
-> > +#include <linux/of_gpio.h>
-> > +#include <linux/gpio.h>
-> > [...]
-> 
-> This should probably be
-> 
-> #include <linux/of.h>
-> #include <linux/gpio/consumer.h>
+Split the pl011_startup() function into smaller chunks to allow
+easier reuse later when adding SBSA support.
 
-And I thought people would only bikesched paint on the
-Documentation. Sakari, feel free to change that, but a) I don't see
-why Sebastian's version is better and b) am pretty sure there is about
-infinite number of possibilities there.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |   48 +++++++++++++++++++++++----------------
+ 1 file changed, 28 insertions(+), 20 deletions(-)
 
-									Pavel
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index d08951f..d6a081e 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1556,6 +1556,32 @@ static void pl011_write_lcr_h(struct uart_amba_port *uap, unsigned int lcr_h)
+ 	}
+ }
+ 
++static int pl011_allocate_irq(struct uart_amba_port *uap)
++{
++	writew(uap->im, uap->port.membase + UART011_IMSC);
++
++	return request_irq(uap->port.irq, pl011_int, 0, "uart-pl011", uap);
++}
++
++/*
++ * Enable interrupts, only timeouts when using DMA
++ * if initial RX DMA job failed, start in interrupt mode
++ * as well.
++ */
++static void pl011_enable_interrupts(struct uart_amba_port *uap)
++{
++	spin_lock_irq(&uap->port.lock);
++
++	/* Clear out any spuriously appearing RX interrupts */
++	writew(UART011_RTIS | UART011_RXIS,
++		uap->port.membase + UART011_ICR);
++	uap->im = UART011_RTIM;
++	if (!pl011_dma_rx_running(uap))
++		uap->im |= UART011_RXIM;
++	writew(uap->im, uap->port.membase + UART011_IMSC);
++	spin_unlock_irq(&uap->port.lock);
++}
++
+ static int pl011_startup(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap =
+@@ -1567,12 +1593,7 @@ static int pl011_startup(struct uart_port *port)
+ 	if (retval)
+ 		goto clk_dis;
+ 
+-	writew(uap->im, uap->port.membase + UART011_IMSC);
+-
+-	/*
+-	 * Allocate the IRQ
+-	 */
+-	retval = request_irq(uap->port.irq, pl011_int, 0, "uart-pl011", uap);
++	retval = pl011_allocate_irq(uap);
+ 	if (retval)
+ 		goto clk_dis;
+ 
+@@ -1595,20 +1616,7 @@ static int pl011_startup(struct uart_port *port)
+ 	/* Startup DMA */
+ 	pl011_dma_startup(uap);
+ 
+-	/*
+-	 * Finally, enable interrupts, only timeouts when using DMA
+-	 * if initial RX DMA job failed, start in interrupt mode
+-	 * as well.
+-	 */
+-	spin_lock_irq(&uap->port.lock);
+-	/* Clear out any spuriously appearing RX interrupts */
+-	 writew(UART011_RTIS | UART011_RXIS,
+-		uap->port.membase + UART011_ICR);
+-	uap->im = UART011_RTIM;
+-	if (!pl011_dma_rx_running(uap))
+-		uap->im |= UART011_RXIM;
+-	writew(uap->im, uap->port.membase + UART011_IMSC);
+-	spin_unlock_irq(&uap->port.lock);
++	pl011_enable_interrupts(uap);
+ 
+ 	return 0;
+ 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.9.5
