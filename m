@@ -1,39 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 9 Apr 2015 21:36:34 +0100
-Subject: [PATCH v6 3/6] regulator: axp20x: prepare support for multiple
- AXP chip families
-In-Reply-To: <CAGb2v66B-__CRcoyoiebNUs-=UBWxP4kQBGVpO4R_FMUSh7MKw@mail.gmail.com>
-References: <1427868203-7486-1-git-send-email-wens@csie.org>
- <1427868203-7486-4-git-send-email-wens@csie.org>
- <CAGb2v66zbATMHY5SgZLs3RCoRETroSh5nC3h4TXRLm5UAbythw@mail.gmail.com>
- <20150409195502.GC6023@sirena.org.uk>
- <CAGb2v66B-__CRcoyoiebNUs-=UBWxP4kQBGVpO4R_FMUSh7MKw@mail.gmail.com>
-Message-ID: <20150409203634.GD6023@sirena.org.uk>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 9 Apr 2015 22:43:55 +0200
+Subject: [PATCH 2/6] clocksource: add lpc32xx timer driver
+In-Reply-To: <2923915.RDtqXmzaM0@wuerfel>
+References: <1427923243-26296-1-git-send-email-manabian@gmail.com>
+ <4915355.ihr3xRKEKp@wuerfel>
+ <CAGhQ9Vxpwb6M0vLerV8_xEDD_bz5ngN68u_2RgaR+LHz+Z2rqA@mail.gmail.com>
+ <2923915.RDtqXmzaM0@wuerfel>
+Message-ID: <CAGhQ9Vw4Jr5fpnsmAWDiTioFOP53vkKEuA3h4H+_xn182P+=QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 01:30:25PM -0700, Chen-Yu Tsai wrote:
-> On Thu, Apr 9, 2015 at 12:55 PM, Mark Brown <broonie@kernel.org> wrote:
+On 9 April 2015 at 22:24, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 02 April 2015 18:35:33 Joachim Eastwood wrote:
+>> On 2 April 2015 at 16:24, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Wednesday 01 April 2015 23:20:39 Joachim Eastwood wrote:
+>> >> Add support for using the NXP LPC timer as clocksource and
+>> >> clock event. These timers are present on many NXP devices
+>> >> including LPC32xx, LPC17xx, LPC18xx and LPC43xx.
+>> >>
+>> >> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> >>
+>> >
+>> > Would it make sense to change mach-lpc32xx as a follow-up to use
+>> > the same driver? It currently hardcodes a driver instead of using
+>> > DT.
+>>
+>> I believe it would be hard since mach-lpc32xx currently lacks a proper
+>> clk driver. mach-lpc32xx/timer.c currently does a lot of SoC specific
+>> init.
+>>
+>> But if a better clk driver comes along for mach-lpc32xx the swap should be easy.
+>
+> Right, makes sense.
 
-> > Someone would need to resend them to me as I've deleted them and it
-> > appears that this is a part of a series - are you sure there are no
-> > dependencies?
+I will be getting a LPC3250 board soon so I can take a look at the clk
+stuff. But from what I can see the clk register layout (system control
+block) on lpc32xx seems very hairy.
 
-> The 2 patches only touch drivers/regulator/axp20x-regulator.c.
-> Unless someone else is doing cleanup on them (AFAIK no one has),
-> there should be no problem.
+btw, I noticed that the lpc32xx timer really has two clk inputs. On
+lpc18xx both are feed by the same clk, but not on lpc32xx. So I will
+update the driver and DT bindings to reflect this in the next version.
 
-No header file dependencies?
 
-> In any case, I will resend them after 4.1-rc1 if they aren't merged
-> by then.
-
-To be clear there is no chance they will be applied if they're not
-resent before the merge window.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150409/d25c1623/attachment.sig>
+best regards,
+Joachim Eastwood
