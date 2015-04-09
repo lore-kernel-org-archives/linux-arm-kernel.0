@@ -1,51 +1,98 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 09 Apr 2015 12:06:06 +0100
-Subject: [PATCH] drivers: CCI: fix used_mask init in validate_group()
-In-Reply-To: <1428517284-7951-1-git-send-email-msalter@redhat.com>
-References: <1428517284-7951-1-git-send-email-msalter@redhat.com>
-Message-ID: <55265D1E.8050700@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu,  9 Apr 2015 12:29:14 +0100
+Subject: [PATCH v3 03/10] drivers: PL011: refactor pl011_shutdown()
+In-Reply-To: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
+References: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1428578961-6896-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/15 19:21, Mark Salter wrote:
-> Currently in validate_group(), there is a static initializer
-> for fake_pmu.used_mask which is based on CPU_BITS_NONE but
-> the used_mask array size is based on CCI_PMU_MAX_HW_EVENTS.
-> CCI_PMU_MAX_HW_EVENTS is not based on NR_CPUS, so CPU_BITS_NONE
-> is not correct and will cause a build failure if NR_CPUS
-> is set high enough to make CPU_BITS_NONE larger than used_mask.
-> This patch changes the used_mask initialization to be runtime
-> based on the actual size of the array.
->
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->   drivers/bus/arm-cci.c | 14 +++++++-------
->   1 file changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index 84fd660..1d83072 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -679,13 +679,13 @@ static int
->   validate_group(struct perf_event *event)
->   {
->   	struct perf_event *sibling, *leader = event->group_leader;
-> -	struct cci_pmu_hw_events fake_pmu = {
-> -		/*
-> -		 * Initialise the fake PMU. We only need to populate the
-> -		 * used_mask for the purposes of validation.
-> -		 */
-> -		.used_mask = CPU_BITS_NONE,
-> -	};
-> +	struct cci_pmu_hw_events fake_pmu;
-> +
-> +	/*
-> +	 * Initialise the fake PMU. We only need to populate the
-> +	 * used_mask for the purposes of validation.
-> +	 */
-> +	memset(fake_pmu.used_mask, 0, sizeof(fake_pmu.used_mask));
-The patch looks good to me.
+Split the pl011_shutdown() function into smaller chunks to allow
+easier reuse later when adding SBSA support.
 
-Reviewed-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |   58 ++++++++++++++++++++++-----------------
+ 1 file changed, 33 insertions(+), 25 deletions(-)
 
-Suzuki
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index d6a081e..9eb6d13 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1635,34 +1635,15 @@ static void pl011_shutdown_channel(struct uart_amba_port *uap,
+       writew(val, uap->port.membase + lcrh);
+ }
+ 
+-static void pl011_shutdown(struct uart_port *port)
++/*
++ * disable the port. It should not disable RTS and DTR.
++ * Also RTS and DTR state should be preserved to restore
++ * it during startup().
++ */
++static void pl011_disable_uart(struct uart_amba_port *uap)
+ {
+-	struct uart_amba_port *uap =
+-	    container_of(port, struct uart_amba_port, port);
+ 	unsigned int cr;
+ 
+-	/*
+-	 * disable all interrupts
+-	 */
+-	spin_lock_irq(&uap->port.lock);
+-	uap->im = 0;
+-	writew(uap->im, uap->port.membase + UART011_IMSC);
+-	writew(0xffff, uap->port.membase + UART011_ICR);
+-	spin_unlock_irq(&uap->port.lock);
+-
+-	pl011_dma_shutdown(uap);
+-
+-	/*
+-	 * Free the interrupt
+-	 */
+-	free_irq(uap->port.irq, uap);
+-
+-	/*
+-	 * disable the port
+-	 * disable the port. It should not disable RTS and DTR.
+-	 * Also RTS and DTR state should be preserved to restore
+-	 * it during startup().
+-	 */
+ 	uap->autorts = false;
+ 	spin_lock_irq(&uap->port.lock);
+ 	cr = readw(uap->port.membase + UART011_CR);
+@@ -1678,6 +1659,33 @@ static void pl011_shutdown(struct uart_port *port)
+ 	pl011_shutdown_channel(uap, uap->lcrh_rx);
+ 	if (uap->lcrh_rx != uap->lcrh_tx)
+ 		pl011_shutdown_channel(uap, uap->lcrh_tx);
++}
++
++static void pl011_disable_interrupts(struct uart_amba_port *uap)
++{
++	spin_lock_irq(&uap->port.lock);
++	/*
++	 * mask all interrupts and clear all pending ones
++	 */
++	uap->im = 0;
++	writew(uap->im, uap->port.membase + UART011_IMSC);
++	writew(0xffff & ~UART011_TXIS, uap->port.membase + UART011_ICR);
++
++	spin_unlock_irq(&uap->port.lock);
++}
++
++static void pl011_shutdown(struct uart_port *port)
++{
++	struct uart_amba_port *uap =
++		container_of(port, struct uart_amba_port, port);
++
++	pl011_disable_interrupts(uap);
++
++	pl011_dma_shutdown(uap);
++
++	free_irq(uap->port.irq, uap);
++
++	pl011_disable_uart(uap);
+ 
+ 	/*
+ 	 * Shut down the clock producer
+-- 
+1.7.9.5
