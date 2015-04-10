@@ -1,59 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Apr 2015 15:44:30 +0200
-Subject: [PATCH v2] arm: zynq: Fix system clock with multi_v7_defconfig
-In-Reply-To: <BY2FFO11FD0520A960F287A6B7BA6A9DAE20D0@BY2FFO11FD052.protection.gbl>
-References: <550F6EDA.30709@adapteva.com>
- <BY2FFO11FD0520A960F287A6B7BA6A9DAE20D0@BY2FFO11FD052.protection.gbl>
-Message-ID: <26139139.4pXlnbLfh0@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 10 Apr 2015 13:50:56 +0000
+Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
+In-Reply-To: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150410135056.GB28873@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 March 2015 08:05:45 Michal Simek wrote:
-> Hi,
-> 
-> On 03/23/2015 02:39 AM, Ola Jeppsson wrote:
-> > As mentioned in this commit:
-> > arm: zynq: Don't use arm_global_timer with cpufreq
-> > 61f1fc7e9258a169ac8afb5ddf657a181e60d052
-> > 
-> > arm_global_timer depends on the CPU frequency. With cpufreq altering the
-> > CPU frequency arm_global_timer will not maintain a stable time base. So
-> > arm_global_timer must not be the clocksource when cpufreq is enabled.
-> > 
-> > The above commit tries to solve this at build time by only selecting
-> > CONFIG_ARM_GLOBAL_TIMER if CONFIG_CPU_FREQ is disabled. This is not
-> > always sufficient because other machs can also enable
-> > CONFIG_ARM_GLOBAL_TIMER.
-> > 
-> > Therefore: If built with CONFIG_CPU_FREQ and CONFIG_ARM_GLOBAL_TIMER,
-> > disable (on Zynq) the arm_global_timer devicetree node at boot before
-> > clock sources are initialized. This ensures that arm_global_timer will
-> > not be selected clocksource.
-> > 
-> > Signed-off-by: Ola Jeppsson <ola@adapteva.com>
+Hey Boris,
 
+On Thu, Apr 09, 2015 at 04:58:41PM +0200, Boris Brezillon wrote:
+> I know we usually try to adapt existing drivers instead of replacing them
+> by new ones, but after trying to refactor the mv_cesa driver I realized it
+> would take longer than writing an new one from scratch.
 
-> 
-> Arnd: Waiting for your thoughts on this one?
-> It is some sort of arch/arm/mach-mvebu/board-v7.c quirk code.
-> 
-> I don't think it can be done via Kconfig because it will affect others.
+I'm sorry, but this makes me *very* uncomfortable.  Any organization
+worth it's salt will do a very careful audit of code touching
+cryptographic material and sensitive (decrypted) data.  From that point
+on, small audits of the changes to the code allow the organization to
+build a comfort level with kernel updates.  iow, following the git
+history of the driver.
 
-(catching up with old email)
+By apply this series, we are basically forcing those organizations to
+either a) stop updating, or b) expend significant resources to do
+another full audit.
 
-I think it's ok to work around the problem like this in principle.
+In short, this series breaks the audit chain for the mv_cesa driver.
 
-However, I have one concern about the way this condition is detected.
-At the moment, you assume that all zynq variants suffer from this
-problem and no other chip has it.
+Maybe I'm the only person with this level of paranoia.  If so, I'm sure
+others will override me.
 
-How would you handle the situation if a future zynq variant fixes
-the problem?
+>From my POV, it looks like the *only* reason we've chosen this route is
+developer convenience.  I don't think that's sufficient reason to break
+the change history of a driver handling sensitive data.
 
-What if it turns out to be a more common problem and we actually
-want to work around it in the arm global timer implementation
-by dynamically adapting to CPU frequency changes? I believe some
-other drivers (x86 tsc?) do this. Would we be able to detect this case
-on zynq?
+For an example of how I use the git history and binary differences to
+audit a series of changes to cryptographic code, please take a look at
+objdiff [1]. You can even duplicate my audit of my submission for the
+skein/threefish driver currently in the staging tree, starting at [2]
+and going up to [3].
 
-	Arnd
+thx,
+
+Jason.
+
+[1] scripts/objdiff [4]
+[2] 449bb8125e3f "staging: crypto: skein: import code from Skein3Fish.git"
+[3] 0264b7b7fb44 "staging: crypto: skein: rename macros"
+[4] There are better tools out there for auditing actual code changes,
+    radare (http://radare.org/r/) is one of them.  objdiff is good only
+    at validating object code *hasn't* been changed by style commits.
