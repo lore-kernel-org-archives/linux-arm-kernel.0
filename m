@@ -1,79 +1,95 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 10 Apr 2015 19:58:56 +0200
-Subject: [PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
- platform
-Message-ID: <1428688742-15578-1-git-send-email-b.zolnierkie@samsung.com>
+Date: Fri, 10 Apr 2015 19:58:59 +0200
+Subject: [PATCH 3/6] clk: samsung: exynos4x12: add cpu clock configuration data
+ and instantiate cpu clock
+In-Reply-To: <1428688742-15578-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1428688742-15578-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1428688742-15578-4-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With the addition of the new Samsung specific cpu-clock type, the
+arm clock can be represented as a cpu-clock type. Add the CPU clock
+configuration data and instantiate the CPU clock type for Exynos4x12.
 
-This patch series removes the use of Exynos4x12 specific support
-from cpufreq-exynos driver and enables the use of cpufreq-dt driver
-for this platform.
+Based on the earlier work by Thomas Abraham.
 
-In order to preserve support for Exynos4x12 'boost' mode cpufreq-dt
-driver is made aware of 'boost' mode frequencies and boost-opps
-binding is provided.
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos4.c |   50 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
-boost-opps binding is currently limited to cpufreq-dt but once there is
-a need for cpufreq wide and/or generic Linux device support for 'boost'
-mode cpufreq-dt can be updated to handle the new code without changing
-the binding itself.
-
-The decision to make 'boost' mode support limited to cpufreq-dt driver
-for now was taken because 'boost' mode is currently a niche feature and
-code needed for parsing boost-opps binding is minimal and simple.  More
-generic (i.e. separate 'boost' OPPs list in struct device and generic
-cpufreq convertion of them to freq_table format) support would need far
-more code and effort to make it work.  Doing it without a demonstrated
-real need would be on overengineering IMHO.
-
-This patch series has been tested on Exynos4412 based Odroid-U3 and
-Trats2 boards.
-
-Depends on:
-- next-20150330 branch of linux-next kernel tree
-- "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4210
-  platform" [1]
-
-[1] http://www.kernelhub.org/?msg=721136&p=2
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-
-Bartlomiej Zolnierkiewicz (6):
-  cpufreq / OPP: allow allocation of extra table entries in freq_table
-  cpufreq-dt: add 'boost' mode frequencies support
-  clk: samsung: exynos4x12: add cpu clock configuration data and
-    instantiate cpu clock
-  ARM: dts: Exynos4x12: add CPU OPP and regulator supply property
-  ARM: Exynos: switch to using generic cpufreq driver for Exynos4x12
-  cpufreq: exynos: remove Exynos4x12 specific cpufreq driver support
-
- .../devicetree/bindings/cpufreq/cpufreq-dt.txt     |   14 ++
- arch/arm/boot/dts/exynos4212.dtsi                  |   22 ++
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |    4 +
- arch/arm/boot/dts/exynos4412-origen.dts            |    5 +
- arch/arm/boot/dts/exynos4412-trats2.dts            |    5 +
- arch/arm/boot/dts/exynos4412.dtsi                  |   22 ++
- arch/arm/mach-exynos/exynos.c                      |   14 ++
- drivers/clk/samsung/clk-exynos4.c                  |   50 +++++
- drivers/cpufreq/Kconfig.arm                        |   13 +-
- drivers/cpufreq/Makefile                           |    1 -
- drivers/cpufreq/cpufreq-dt.c                       |  114 ++++++++--
- drivers/cpufreq/cpufreq_opp.c                      |   18 +-
- drivers/cpufreq/exynos-cpufreq.c                   |   11 +-
- drivers/cpufreq/exynos-cpufreq.h                   |   21 --
- drivers/cpufreq/exynos4x12-cpufreq.c               |  236 --------------------
- include/linux/cpufreq-dt.h                         |    1 +
- include/linux/cpufreq.h                            |    3 +
- 17 files changed, 257 insertions(+), 297 deletions(-)
- delete mode 100644 drivers/cpufreq/exynos4x12-cpufreq.c
-
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index cae2c048..5140bec 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -1396,6 +1396,45 @@ static const struct exynos_cpuclk_cfg_data e4210_armclk_d[] __initconst = {
+ 	{  0 },
+ };
+ 
++static const struct exynos_cpuclk_cfg_data e4212_armclk_d[] __initconst = {
++	{ 1500000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4210_CPU_DIV1(2, 6), },
++	{ 1400000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4210_CPU_DIV1(2, 6), },
++	{ 1300000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4210_CPU_DIV1(2, 5), },
++	{ 1200000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4210_CPU_DIV1(2, 5), },
++	{ 1100000, E4210_CPU_DIV0(2, 1, 4, 0, 6, 3), E4210_CPU_DIV1(2, 4), },
++	{ 1000000, E4210_CPU_DIV0(1, 1, 4, 0, 5, 2), E4210_CPU_DIV1(2, 4), },
++	{  900000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4210_CPU_DIV1(2, 3), },
++	{  800000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4210_CPU_DIV1(2, 3), },
++	{  700000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
++	{  600000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
++	{  500000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
++	{  400000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
++	{  300000, E4210_CPU_DIV0(1, 1, 2, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
++	{  200000, E4210_CPU_DIV0(1, 1, 1, 0, 3, 1), E4210_CPU_DIV1(2, 3), },
++	{  0 },
++};
++
++#define E4412_CPU_DIV1(cores, hpm, copy)				\
++		(((cores) << 8) | ((hpm) << 4) | ((copy) << 0))
++
++static const struct exynos_cpuclk_cfg_data e4412_armclk_d[] __initconst = {
++	{ 1500000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4412_CPU_DIV1(7, 0, 6), },
++	{ 1400000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4412_CPU_DIV1(6, 0, 6), },
++	{ 1300000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4412_CPU_DIV1(6, 0, 5), },
++	{ 1200000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4412_CPU_DIV1(5, 0, 5), },
++	{ 1100000, E4210_CPU_DIV0(2, 1, 4, 0, 6, 3), E4412_CPU_DIV1(5, 0, 4), },
++	{ 1000000, E4210_CPU_DIV0(1, 1, 4, 0, 5, 2), E4412_CPU_DIV1(4, 0, 4), },
++	{  900000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4412_CPU_DIV1(4, 0, 3), },
++	{  800000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4412_CPU_DIV1(3, 0, 3), },
++	{  700000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(3, 0, 3), },
++	{  600000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(2, 0, 3), },
++	{  500000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(2, 0, 3), },
++	{  400000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(1, 0, 3), },
++	{  300000, E4210_CPU_DIV0(1, 1, 2, 0, 4, 2), E4412_CPU_DIV1(1, 0, 3), },
++	{  200000, E4210_CPU_DIV0(1, 1, 1, 0, 3, 1), E4412_CPU_DIV1(0, 0, 3), },
++	{  0 },
++};
++
+ /* register exynos4 clocks */
+ static void __init exynos4_clk_init(struct device_node *np,
+ 				    enum exynos4_soc soc)
+@@ -1489,6 +1528,17 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 		samsung_clk_register_fixed_factor(ctx,
+ 			exynos4x12_fixed_factor_clks,
+ 			ARRAY_SIZE(exynos4x12_fixed_factor_clks));
++		if (of_machine_is_compatible("samsung,exynos4412")) {
++			exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
++				mout_core_p4x12[0], mout_core_p4x12[1], 0x14200,
++				e4212_armclk_d, ARRAY_SIZE(e4212_armclk_d),
++				CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1);
++		} else {
++			exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
++				mout_core_p4x12[0], mout_core_p4x12[1], 0x14200,
++				e4412_armclk_d, ARRAY_SIZE(e4412_armclk_d),
++				CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1);
++		}
+ 	}
+ 
+ 	samsung_clk_register_alias(ctx, exynos4_aliases,
 -- 
 1.7.9.5
