@@ -1,95 +1,85 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 10 Apr 2015 21:30:29 +0100
-Subject: [PATCH v2 06/12] ARM: dts: apq8064: Add MDP support
-In-Reply-To: <552830C9.4030601@codeaurora.org>
-References: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1428669271-11032-1-git-send-email-srinivas.kandagatla@linaro.org>
- <552802B6.2040804@codeaurora.org> <552826F6.5040105@linaro.org>
- <552830C9.4030601@codeaurora.org>
-Message-ID: <552832E5.1010208@linaro.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 10 Apr 2015 13:41:34 -0700
+Subject: [PATCH v2] arm: zynq: Fix system clock with multi_v7_defconfig
+In-Reply-To: <7398185.8qW42GIbsU@wuerfel>
+References: <550F6EDA.30709@adapteva.com> <26139139.4pXlnbLfh0@wuerfel>
+ <5527E78D.9040908@adapteva.com> <7398185.8qW42GIbsU@wuerfel>
+Message-ID: <1d6383c8-de0d-474b-a824-d1402b40391f@BY2FFO11FD035.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 2015-04-10 at 10:04PM +0200, Arnd Bergmann wrote:
+> On Friday 10 April 2015 17:09:01 Ola Jeppsson wrote:
+> > On 2015-04-10 15:44, Arnd Bergmann wrote:
+> > > On Monday 23 March 2015 08:05:45 Michal Simek wrote:
+> > >> Hi,
+> > >>
+> > >> On 03/23/2015 02:39 AM, Ola Jeppsson wrote:
+> > >>> As mentioned in this commit:
+> > >>> arm: zynq: Don't use arm_global_timer with cpufreq
+> > >>> 61f1fc7e9258a169ac8afb5ddf657a181e60d052
+> > >>>
+> > >>> arm_global_timer depends on the CPU frequency. With cpufreq altering the
+> > >>> CPU frequency arm_global_timer will not maintain a stable time base. So
+> > >>> arm_global_timer must not be the clocksource when cpufreq is enabled.
+> > >>>
+> > >>> The above commit tries to solve this at build time by only selecting
+> > >>> CONFIG_ARM_GLOBAL_TIMER if CONFIG_CPU_FREQ is disabled. This is not
+> > >>> always sufficient because other machs can also enable
+> > >>> CONFIG_ARM_GLOBAL_TIMER.
+> > >>>
+> > >>> Therefore: If built with CONFIG_CPU_FREQ and CONFIG_ARM_GLOBAL_TIMER,
+> > >>> disable (on Zynq) the arm_global_timer devicetree node at boot before
+> > >>> clock sources are initialized. This ensures that arm_global_timer will
+> > >>> not be selected clocksource.
+> > >>>
+> > >>> Signed-off-by: Ola Jeppsson <ola@adapteva.com>
+> > >
+> > >> Arnd: Waiting for your thoughts on this one?
+> > >> It is some sort of arch/arm/mach-mvebu/board-v7.c quirk code.
+> > >>
+> > >> I don't think it can be done via Kconfig because it will affect others.
+> > > (catching up with old email)
+> > >
+> > > I think it's ok to work around the problem like this in principle.
+> > >
+> > > However, I have one concern about the way this condition is detected.
+> > > At the moment, you assume that all zynq variants suffer from this
+> > > problem and no other chip has it.
+> > >
+> > > How would you handle the situation if a future zynq variant fixes
+> > > the problem?
+> > The check is only applicable on Cortex A9 zynqs.
+> > Assume for now that it is broken on all those variants. If it gets fixed on some variant add a
+> > of_machine_is_compatible() check?
+> 
+> I think it would be better to avoid those if we can.
+> 
+> > > What if it turns out to be a more common problem and we actually
+> > > want to work around it in the arm global timer implementation
+> > > by dynamically adapting to CPU frequency changes? I believe some
+> > > other drivers (x86 tsc?) do this. Would we be able to detect this case
+> > > on zynq?
+> > >
+> > If  the arm global timer implementation gets cpufreq scaling support,
+> > this check isn't needed and should be removed?
+> 
+> The timer code however would still need to find out whether to scale the
+> frequence along with the CPU or not.
+> 
+> > The only thing that happens if it is left in is that you end up with
+> > an inferior, but correct, clock source (which is what you already had
+> > before cpufreq support in arm-global-timer).
+> 
+> I've just had another idea: how about introducing a new compatible string
+> for the global timer that gets used for timers that have their frequency
+> tied to the CPU (alternatively a bool property in that node). This can
+> be checked by the clocksource driver, which will then be able to either
+> skip the device if cpufreq is in use, or implement a more sophisticated
+> workaround.
 
+If this is the only available clocksource, you'd still want to use it
+though. A bad clocksource is still better than none. But I guess that
+would just mean to lie in the DT.
 
-On 10/04/15 21:21, Stephen Boyd wrote:
-> On 04/10/15 12:39, Srinivas Kandagatla wrote:
->>
->>
->> On 10/04/15 18:04, Stephen Boyd wrote:
->>> On 04/10/15 05:34, Srinivas Kandagatla wrote:
->>>> @@ -250,6 +265,18 @@
->>>>                };
->>>>            };
->>>>
->>>> +        ext_3p3v: regulator-fixed at 1 {
->>>> +            compatible = "regulator-fixed";
->>>> +            regulator-min-microvolt = <3300000>;
->>>> +            regulator-max-microvolt = <3300000>;
->>>> +            regulator-name = "ext_3p3v";
->>>> +            regulator-type = "voltage";
->>>> +            startup-delay-us = <0>;
->>>> +            gpio = <&tlmm_pinmux 77 GPIO_ACTIVE_HIGH>;
->>>> +            enable-active-high;
->>>> +            regulator-boot-on;
->>>> +        };
->>>
->>> This shouldn't be inside the SoC node because it doesn't have a reg
->>> property. It should be in a 'regulators' node that's in the root of the
->>> tree:
->>
->> Is this new DT requirement/style? I have not noticed such a dt style
->> in the past. I might have missed it. Any advantage of doing this way?
->
-> It's a style. I'm not sure if it's new, but I feel like I've seen
-> mention of it before more than a year ago (see
-> arch/arm/boot/dts/tegra30-beaver.dts for an example). The advantage of
-> doing it this way is we can see all the gpio/fixed regulators in one
-> place and they're physically placed on a separate bus from the SoC bus.
-> Typically nodes have reg properties too, so making up fake reg
-> properties for the regulator nodes when they're on the SoC bus would be
-> wrong and confusing. If they're under some regulators container node we
-> can number them from 0 to N and use that for the reg property.
->
-Thanks for explaining.
->>>
->>>> +
->>>> +        hdmi: qcom,hdmi-tx at 4a00000 {
->>>> +            compatible = "qcom,hdmi-tx-8960";
->>>> +            reg-names = "core_physical";
->>>> +            reg = <0x04a00000 0x1000>;
->>>> +            interrupts = <GIC_SPI 79 IRQ_TYPE_NONE>;
->>>> +            clock-names =
->>>> +                "core_clk",
->>>> +                "master_iface_clk",
->>>> +                "slave_iface_clk";
->>>> +            clocks =
->>>> +                <&mmcc HDMI_APP_CLK>,
->>>> +                <&mmcc HDMI_M_AHB_CLK>,
->>>> +                <&mmcc HDMI_S_AHB_CLK>;
->>>> +            qcom,hdmi-tx-ddc-clk = <&tlmm_pinmux 70
->>>> +                        GPIO_ACTIVE_HIGH>;
->>>> +            qcom,hdmi-tx-ddc-data = <&tlmm_pinmux 71
->>>> +                        GPIO_ACTIVE_HIGH>;
->>>> +            qcom,hdmi-tx-hpd = <&tlmm_pinmux 72
->>>> +                        GPIO_ACTIVE_HIGH>;
->>>
->>> This should be done via the *-gpios method. i.e. hdmi-tx-ddc-clk-gpios,
->>> hdmi-tx-ddc-data-gpios, etc.
->>>
->> Thanks for the inputs,
->>
->> That's true, These are existing bindings, so I can't change it as part
->> of this patch, However I will make another patch to fix this in both
->> drivers and DT for good reasons. Just noticed that bindings are not
->> consistent with the examples and the driver, which I guess is another
->> issue.
->
-> Yes, the driver/binding should be fixed and then this patch can be
-> corrected and applied. There are no implementations of the DT for this
-> device upstream in the dts directory so there's no breakage or backwards
-> incompatibility problem by fixing the driver/binding.
->
-Yep, In that case, I should pull this patch out of this series just to 
-avoid any delays and create a new patchset for fixing bindings + driver 
-+ DT.
+	S?ren
