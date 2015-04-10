@@ -1,56 +1,34 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 10 Apr 2015 21:41:31 +0100
-Subject: [PATCH v3 00/11] ARM: dts: apq8064 dt patches
-In-Reply-To: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1428698491-11881-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Apr 2015 21:42:21 +0100
+Subject: Guarantee udelay(N) spins at least N microseconds
+In-Reply-To: <55282C1F.3000600@free.fr>
+References: <5527B331.5000205@free.fr>
+ <20150410114415.GC12732@n2100.arm.linux.org.uk>
+ <5527C501.2040808@free.fr>
+ <20150410150607.GG12732@n2100.arm.linux.org.uk>
+ <5527EC90.9050900@free.fr>
+ <20150410160817.GH12732@n2100.arm.linux.org.uk>
+ <55282C1F.3000600@free.fr>
+Message-ID: <20150410204221.GI12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks all for reviewing v2 patches.
+On Fri, Apr 10, 2015 at 10:01:35PM +0200, Mason wrote:
+> There is, however, an important difference between loop-based
+> delays and timer-based delays; CPU frequencies typically fall
+> in the 50-5000 MHz range, while timer frequencies typically
+> span tens of kHz up to hundreds of MHz. For example, 90 kHz
+> is sometimes provided in multimedia systems (MPEG TS).
 
-Hi Kumar, 
+Why would you want to use such a slowly clocked counter for something
+which is supposed to be able to produce delays in the micro-second and
+potentially the nanosecond range?
 
-Now that the rpm redesign dependency is resolved, If its not too late could you
-queue these dt patches for v4.1-rc1 or v4.1-rc2.
-
-I tested these patches on APQ8064 based IFC6410 and CMQS600 board with SATA/USB.
-I also rebased these patches on top of your qcom/dt branch.
-
-Thanks,
-srini
-
-Changes since v2
- * Some cosmetic fixes spotted by Stephen Boyd.
- * Rename sata_phy to phy suggested by Stephen Boyd
- * Dropped MDP patch to track it in different patchset.
-
-Changes since v1
- * Made regulators board specific, as suggested by Bjorn.
- * Used correct IRQF flags for rpm, spotted by Bjorn.
- * Fixed serial lable to be more appropriate, spotted by Bjorn.
-
-Nicolas Dechesne (2):
-  ARM: dts: apq8064: Add usb host support to CM QS-600
-  ARM: dts: apq8064: Add USB OTG support for CM QS-600
-
-Pramod Gurav (1):
-  ARM: dts: apq8064-ifc6410: Add DT alias for serial port
-
-Srinivas Kandagatla (8):
-  ARM: dts: apq8064: add RPM regulators support
-  ARM: dts: apq8064-ifc6410: Add basic regulators
-  ARM: dts: apq8064: Add usb host support.
-  ARM: dts: apq8064: Add USB OTG support
-  ARM: dts: apq8064: Add SATA controller support.
-  ARM: dts: apq8064-cm-qs600: Add basic regulators.
-  ARM: dts: apq8064: Move i2c1 pinctrl to apq8064.dtsi
-  ARM: dts: apq8064: add i2c3 node for panel.
-
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 100 ++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  | 136 +++++++++++++++++++--
- arch/arm/boot/dts/qcom-apq8064.dtsi         | 175 +++++++++++++++++++++++++++-
- 3 files changed, 402 insertions(+), 9 deletions(-)
+get_cycles(), which is what the timer based delay is based upon, is
+supposed to be a _high resolution counter_, preferably running at
+the same kind of speeds as the CPU, though with a fixed clock rate.
+It most definitely is not supposed to be in the kHz range.
 
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
