@@ -1,37 +1,53 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Fri, 10 Apr 2015 21:59:22 +0800
-Subject: [PATCH 0/2] Enable HiSilicon hip04 ethernet controller
-In-Reply-To: <15355533.8BHqyIEd6L@wuerfel>
-References: <1428650180-9746-1-git-send-email-fathi.boudra@linaro.org>
- <15355533.8BHqyIEd6L@wuerfel>
-Message-ID: <5527D73A.5010000@huawei.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 10 Apr 2015 22:05:41 +0800
+Subject: [PATCH] ARM: alignment: Use is_wide_instruction() to check wide
+ instruction
+Message-ID: <1428674741-5409-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/4/10 17:06, Arnd Bergmann wrote:
-> On Friday 10 April 2015 10:16:18 Fathi Boudra wrote:
->> The following patches enable the ethernet controller on HiSilicon hip04
->> as documented in the device tree binding but not currently enabled.
->> It has been tested on real hardware with tftp boot + NFS root filesystem.
-> 
-> The patches looks ok to me, but we don't normally pick up changes like
-> this from developers, you should address them to Wei Xu so he can send
-> them to arm-soc along with his other changes.
->
 
-Ok.
+I first notice the comment is incorrect, then I realize there's another
+macro which do exactly the same thing.
+Tested with hand written userspace program with a few wide instructions
+to make sure this still work as expect.
 
-> Note that there are some known bugs in this driver, I sent an experimental
-> patch for some of them but never heard back.
-> 
-> 	Arnd
->
+8<-------------------------------------------------
+do_alignment() is using locally added IS_T32() macro to check if an
+instruction is a Thumb-2 32 bit instruction. The macro
+is_wide_instruction() is doing the same thing, with slightly faster
+implementation.
+Change to use is_wide_instruction() in do_alignment() and remove
+IS_T32().
 
-I got the experimental patch and prepare the patches for several weeks, but too busy and not test them yet, sorry for that,
-I will test and send them as soon as possible thanks for the advise.
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+ arch/arm/mm/alignment.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-Ding
-
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 2c0c541..f8e82f5 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -71,10 +71,6 @@
  
-> .
-> 
+ #define BAD_INSTR 	0xdeadc0de
+ 
+-/* Thumb-2 32 bit format per ARMv7 DDI0406A A6.3, either f800h,e800h,f800h */
+-#define IS_T32(hi16) \
+-	(((hi16) & 0xe000) == 0xe000 && ((hi16) & 0x1800))
+-
+ static unsigned long ai_user;
+ static unsigned long ai_sys;
+ static void *ai_sys_last_pc;
+@@ -770,7 +766,7 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 		tinstr = __mem_to_opcode_thumb16(tinstr);
+ 		if (!fault) {
+ 			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
+-			    IS_T32(tinstr)) {
++			    is_wide_instruction(tinstr)) {
+ 				/* Thumb-2 32-bit */
+ 				u16 tinst2 = 0;
+ 				fault = probe_kernel_address(ptr + 1, tinst2);
+-- 
+1.8.1.1.dirty
