@@ -1,37 +1,40 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 10 Apr 2015 09:25:37 -0600
-Subject: [PATCH 2/2] coresight: etb10: Fix check for bogus buffer depth
-In-Reply-To: <1428679537-26590-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1428679537-26590-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1428679537-26590-3-git-send-email-mathieu.poirier@linaro.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 10 Apr 2015 10:25:54 -0500
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <20150410110328.GC25921@red-moon>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <20150410110328.GC25921@red-moon>
+Message-ID: <AF65C7BF-CBBD-4E03-95AA-495830D6DC20@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@kernel.org>
 
-We attempt to sanity check the buffer depth reported by the hardware by
-making sure it is not less than zero however this check will never be true
-since the buffer depth is stored in an unsigned integer. Instead change
-the check to look for the top bit being set which was the intention.
+On Apr 10, 2015, at 6:03 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etb10.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> On Thu, Apr 09, 2015 at 06:37:06PM +0100, Kumar Gala wrote:
+>> This patch set adds support for SMP boot on the MSM8x16 family of Qualcomm SoCs.
+>> 
+>> To support SMP on the MSM8x16 SoCs we need to add ARMv8/64-bit SCM interfaces to
+>> setup the boot/release addresses for the secondary CPUs.  In addition we need
+>> a uniquie set of cpu ops.  I'm aware the desired methods for booting secondary
+>> CPUs is either via spintable or PSCI.  However, these SoCs are shipping with a
+>> firmware that does not support those methods.
+> 
+> Why ? Do not tell me you were not aware of those standard methods,
+> because I can't believe you.
+> 
+> If there were additional features to add to spin-table and PSCI,
+> you were, you are and you will always be welcome to debate them.
+> 
+> There is no justification for this patchset, honestly.
+> 
+> Lorenzo
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 46eb9f88a29f..2a77d83130e6 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -457,7 +457,7 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
- 	drvdata->buffer_depth = etb_get_buffer_depth(drvdata);
- 	clk_disable_unprepare(drvdata->clk);
- 
--	if (drvdata->buffer_depth < 0)
-+	if (drvdata->buffer_depth & 0x80000000)
- 		return -EINVAL;
- 
- 	drvdata->buf = devm_kzalloc(dev,
+The justification for this patchset is support for a hardware platform that exists in the world.  The kernel usual is willing to accept such things as long as the code is reasonable.
+
+- k
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
