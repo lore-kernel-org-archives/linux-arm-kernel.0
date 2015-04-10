@@ -1,32 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 10 Apr 2015 14:23:30 +0100
-Subject: [REGRESSION] commit 0461a41 "spi: Pump transfers inside calling
- context for spi_sync()" breaks Apalis/Colibri T30 with MCP2515 SPI CAN
- controller
-In-Reply-To: <1428670853.7008.87.camel@localhost.localdomain>
-References: <1428670853.7008.87.camel@localhost.localdomain>
-Message-ID: <20150410132330.GH6023@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 10 Apr 2015 14:27:42 +0100
+Subject: [RFC] mixture of cleanups to cache-v7.S
+In-Reply-To: <20150402224947.GX24899@n2100.arm.linux.org.uk>
+References: <20150402224947.GX24899@n2100.arm.linux.org.uk>
+Message-ID: <20150410132723.GD6854@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 03:00:53PM +0200, Marcel Ziswiler wrote:
-> Hi there
+On Thu, Apr 02, 2015 at 11:49:47PM +0100, Russell King - ARM Linux wrote:
+> Several cleanups are in the patch below... I'll separate them out, but
+> I'd like to hear comments on them.  Basically:
+> 
+> 1. cache-v7.S is built for ARMv7 CPUs, so there's no reason not to
+>    use movw and movt when loading large constants, rather than using
+>    "ldr rd,=constant"
+> 
+> 2. we can do a much more efficient check for the errata in
+>    v7_flush_dcache_louis than we were doing - rather than putting the
+>    work-around code in the fast path, we can re-organise this such that
+>    we only try to run the workaround code if the LoU field is zero.
+> 
+> 3. shift the bitfield we want to extract in the CLIDR to the appropriate
+>    bit position prior to masking; this reduces the complexity of the
+>    code, particularly with the SMP differences in v7_flush_dcache_louis.
+> 
+> 4. pre-shift the Cortex A9 MIDR value to be checked, and shift the
+>    actual MIDR to lose the bottom four revision bits.
+> 
+> 5. as the v7_flush_dcache_louis code is more optimal, I see no reason not
+>    to enable this workaround by default now - if people really want it to
+>    be disabled, they can still choose that option.  This is in addition
+>    to Versatile Express enabling it.  Given the memory corrupting abilities
+>    of not having this errata enabled, I think it's only sane that it's
+>    something that should be encouraged to be enabled, even though it only
+>    affects r0pX CPUs.
+> 
+> One obvious issue comes up here though - in the case that the LoU bits
+> are validly zero, we merely return from v7_flush_dcache_louis with no
+> DSB or ISB.  However v7_flush_dcache_all always has a DSB or ISB at the
+> end, even if LoC is zero.  Is this an intentional difference, or should
+> v7_flush_dcache_louis always end with a DSB+ISB ?
 
-Please try to use somewhat more targetted CC lists...
+Cc'ing Lorenzo since he added this code.
 
-> I also have not yet looked further into what exactly is happening and
-> whether or not the SPI stack, the Tegra SPI controller driver or the
-> MCP2515 SPI CAN driver is to blame but rather decided to ask Mr. Brown
-> and the community first for any insights they might have to share.
-> Anybody?
+The DSB+ISB at the end is usually meant to wait for the completion of
+the cache maintenance operation. If there is no cache maintenance
+required, you don't need the barriers (nor the DMB at the beginning of
+the function), unless the semantics of this function always imply
+barrier. I assume not since we have a DSB anyway before issuing the WFI
+to put the CPU into a sleep state but I'll wait for Lorenzo to confirm.
 
-I'd ask for trace logs but obviously we can't turn them on until boot
-has finished...  Adding some trace in the relevant bits of code to try
-to see where it's deadlocking is the obvious first step.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150410/fbcffabf/attachment.sig>
+As for the v7_flush_dcache_all always having the barriers, I guess
+no-one is expecting a v7 CPU without caches.
+
+-- 
+Catalin
