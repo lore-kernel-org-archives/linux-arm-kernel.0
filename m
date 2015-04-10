@@ -1,74 +1,239 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 10 Apr 2015 22:30:08 +0000
-Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
-In-Reply-To: <20150410171148.07bc9429@bbrezillon>
-References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150410135056.GB28873@io.lakedaemon.net>
- <20150410171148.07bc9429@bbrezillon>
-Message-ID: <20150410223008.GA18660@io.lakedaemon.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 10 Apr 2015 15:33:11 -0700
+Subject: [PATCH v5] ARM: smp: Only expose /sys/.../cpuX/online if hotpluggable
+Message-ID: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Boris,
+Writes to /sys/.../cpuX/online fail if we determine the platform
+doesn't support hotplug for that CPU. Furthermore, if the cpu_die
+op isn't specified the system hangs when we try to offline a CPU
+and it comes right back online unexpectedly. Let's figure this
+stuff out before we make the sysfs nodes so that the online file
+doesn't even exist if it isn't (at least sometimes) possible to
+hotplug the CPU.
 
-On Fri, Apr 10, 2015 at 05:11:48PM +0200, Boris Brezillon wrote:
-> On Fri, 10 Apr 2015 13:50:56 +0000 Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Thu, Apr 09, 2015 at 04:58:41PM +0200, Boris Brezillon wrote:
-> > > I know we usually try to adapt existing drivers instead of replacing them
-> > > by new ones, but after trying to refactor the mv_cesa driver I realized it
-> > > would take longer than writing an new one from scratch.
-> > 
-> > I'm sorry, but this makes me *very* uncomfortable.  Any organization
-> > worth it's salt will do a very careful audit of code touching
-> > cryptographic material and sensitive (decrypted) data.  From that point
-> > on, small audits of the changes to the code allow the organization to
-> > build a comfort level with kernel updates.  iow, following the git
-> > history of the driver.
-> > 
-> > By apply this series, we are basically forcing those organizations to
-> > either a) stop updating, or b) expend significant resources to do
-> > another full audit.
-> > 
-> > In short, this series breaks the audit chain for the mv_cesa driver.
-> > 
-> > Maybe I'm the only person with this level of paranoia.  If so, I'm sure
-> > others will override me.
-> > 
-> > From my POV, it looks like the *only* reason we've chosen this route is
-> > developer convenience.  I don't think that's sufficient reason to break
-> > the change history of a driver handling sensitive data.
-> 
-> Well, I understand you concern, but if you read carefully the old and
-> new drivers, you'll notice that they are completely different (the only
-> thing I kept are the macro definitions).
+Add a new 'cpu_can_disable' op and repoint all 'cpu_disable'
+implementations at it because all implementers use the op to
+indicate if a CPU can be hotplugged or not in a static fashion.
+With PSCI we may need to add a 'cpu_disable' op so that the
+secure OS can be migrated off the CPU we're trying to hotplug.
+In this case, the 'cpu_can_disable' op will indicate that all
+CPUs are hotpluggable by returning true, but the 'cpu_disable' op
+will make a PSCI migration call and occasionally fail, denying
+the hotplug of a CPU. This shouldn't be any worse than x86 where
+we may indicate that all CPUs are hotpluggable but occasionally
+we can't offline a CPU due to check_irq_vectors_for_cpu_disable()
+failing to find a CPU to move vectors to.
 
-Yes, that's the worrying part for me. ;-)
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Dave Martin <Dave.Martin@arm.com>
+Acked-by: Simon Horman <horms@verge.net.au> [shmobile portion]
+Tested-by: Simon Horman <horms@verge.net.au>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: <linux-sh@vger.kernel.org>
+Cc: Tyler Baker <tyler.baker@linaro.org>
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-> I really tried to adapt the existing driver to add the missing
-> features (especially the support for TDMA), but all my attempts
-> ended up introducing hackish code (not even talking about the
-> performance penalty of this approach).
+Changes since v4:
+ * Fix build error on !SMP (Tyler Baker)
+ * Picked up Simon's ack/tested-by
 
-Ok, fair enough.  It would be helpful if this account of attempting to
-reconcile the old driver made it into the commit message.  This puts us
-in "perfect is the enemy of getting it done" territory.
+Changes since v3:
+ * Return bool instead of int from 'cpu_can_disable' op
 
-> I have another solution though: keep the existing driver for old
-> marvell SoCs (orion, kirkwood and dove), and add a new one for modern
-> SoCs (armada 370, XP, 375 and 38x), so that users of the mv_cesa driver
-> won't have to audit the new code.
+Changes since v2:
+ * Left cpu_disable op in place
+ * Split out shmobile function deletion
 
-A fair proposal, but I'll freely admit the number of people actually auditing
-their code paths is orders of magnitude smaller than the number of users
-of the driver.
+ arch/arm/common/mcpm_platsmp.c       | 12 ++++--------
+ arch/arm/include/asm/smp.h           |  1 +
+ arch/arm/include/asm/smp_plat.h      |  9 +++++++++
+ arch/arm/kernel/setup.c              |  2 +-
+ arch/arm/kernel/smp.c                | 15 ++++++++++++++-
+ arch/arm/mach-shmobile/common.h      |  2 +-
+ arch/arm/mach-shmobile/platsmp.c     |  4 ++--
+ arch/arm/mach-shmobile/smp-r8a7790.c |  2 +-
+ arch/arm/mach-shmobile/smp-r8a7791.c |  2 +-
+ arch/arm/mach-shmobile/smp-sh73a0.c  |  2 +-
+ 10 files changed, 35 insertions(+), 16 deletions(-)
 
-There's such a large population of compatible legacy SoCs in the wild,
-adding an artificial boundary doesn't make sense.  Especially since
-we're talking about features everyone would want to use.
-
-Perhaps we should keep both around, and deprecate the legacy driver over
-3 to 4 cycles?
-
-thx,
-
-Jason.
+diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
+index 92e54d7c6f46..2b25b6038f66 100644
+--- a/arch/arm/common/mcpm_platsmp.c
++++ b/arch/arm/common/mcpm_platsmp.c
+@@ -65,14 +65,10 @@ static int mcpm_cpu_kill(unsigned int cpu)
+ 	return !mcpm_wait_for_cpu_powerdown(pcpu, pcluster);
+ }
+ 
+-static int mcpm_cpu_disable(unsigned int cpu)
++static bool mcpm_cpu_can_disable(unsigned int cpu)
+ {
+-	/*
+-	 * We assume all CPUs may be shut down.
+-	 * This would be the hook to use for eventual Secure
+-	 * OS migration requests as described in the PSCI spec.
+-	 */
+-	return 0;
++	/* We assume all CPUs may be shut down. */
++	return true;
+ }
+ 
+ static void mcpm_cpu_die(unsigned int cpu)
+@@ -92,7 +88,7 @@ static struct smp_operations __initdata mcpm_smp_ops = {
+ 	.smp_secondary_init	= mcpm_secondary_init,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= mcpm_cpu_kill,
+-	.cpu_disable		= mcpm_cpu_disable,
++	.cpu_can_disable	= mcpm_cpu_can_disable,
+ 	.cpu_die		= mcpm_cpu_die,
+ #endif
+ };
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 18f5a554134f..2563453d7b37 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -104,6 +104,7 @@ struct smp_operations {
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	int  (*cpu_kill)(unsigned int cpu);
+ 	void (*cpu_die)(unsigned int cpu);
++	bool  (*cpu_can_disable)(unsigned int cpu);
+ 	int  (*cpu_disable)(unsigned int cpu);
+ #endif
+ #endif
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index 993e5224d8f7..f9080717fc88 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -107,4 +107,13 @@ static inline u32 mpidr_hash_size(void)
+ extern int platform_can_secondary_boot(void);
+ extern int platform_can_cpu_hotplug(void);
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++extern int platform_can_hotplug_cpu(unsigned int cpu);
++#else
++static inline int platform_can_hotplug_cpu(unsigned int cpu)
++{
++	return 0;
++}
++#endif
++
+ #endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 6c777e908a24..955d45d0f70c 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -992,7 +992,7 @@ static int __init topology_init(void)
+ 
+ 	for_each_possible_cpu(cpu) {
+ 		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
+-		cpuinfo->cpu.hotpluggable = 1;
++		cpuinfo->cpu.hotpluggable = platform_can_hotplug_cpu(cpu);
+ 		register_cpu(&cpuinfo->cpu, cpu);
+ 	}
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index cca5b8758185..8c834ecc09db 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -173,13 +173,26 @@ static int platform_cpu_disable(unsigned int cpu)
+ 	if (smp_ops.cpu_disable)
+ 		return smp_ops.cpu_disable(cpu);
+ 
++	return 0;
++}
++
++int platform_can_hotplug_cpu(unsigned int cpu)
++{
++	/* cpu_die must be specified to support hotplug */
++	if (!smp_ops.cpu_die)
++		return 0;
++
++	if (smp_ops.cpu_can_disable)
++		return smp_ops.cpu_can_disable(cpu);
++
+ 	/*
+ 	 * By default, allow disabling all CPUs except the first one,
+ 	 * since this is special on a lot of platforms, e.g. because
+ 	 * of clock tick interrupts.
+ 	 */
+-	return cpu == 0 ? -EPERM : 0;
++	return cpu != 0;
+ }
++
+ /*
+  * __cpu_disable runs on the processor to be shutdown.
+  */
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index afc60bad6fd6..f2c4bf437ea7 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -13,7 +13,7 @@ extern void shmobile_smp_boot(void);
+ extern void shmobile_smp_sleep(void);
+ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+ 			      unsigned long arg);
+-extern int shmobile_smp_cpu_disable(unsigned int cpu);
++extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
+ extern void shmobile_invalidate_start(void);
+ extern void shmobile_boot_scu(void);
+ extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
+diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
+index 3923e09e966d..b23378f3d7e1 100644
+--- a/arch/arm/mach-shmobile/platsmp.c
++++ b/arch/arm/mach-shmobile/platsmp.c
+@@ -31,8 +31,8 @@ void shmobile_smp_hook(unsigned int cpu, unsigned long fn, unsigned long arg)
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-int shmobile_smp_cpu_disable(unsigned int cpu)
++bool shmobile_smp_cpu_can_disable(unsigned int cpu)
+ {
+-	return 0; /* Hotplug of any CPU is supported */
++	return true; /* Hotplug of any CPU is supported */
+ }
+ #endif
+diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
+index 930f45cbc08a..947e437cab68 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7790.c
++++ b/arch/arm/mach-shmobile/smp-r8a7790.c
+@@ -64,7 +64,7 @@ struct smp_operations r8a7790_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= r8a7790_smp_prepare_cpus,
+ 	.smp_boot_secondary	= shmobile_smp_apmu_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+-	.cpu_disable		= shmobile_smp_cpu_disable,
++	.cpu_can_disable	= shmobile_smp_cpu_can_disable,
+ 	.cpu_die		= shmobile_smp_apmu_cpu_die,
+ 	.cpu_kill		= shmobile_smp_apmu_cpu_kill,
+ #endif
+diff --git a/arch/arm/mach-shmobile/smp-r8a7791.c b/arch/arm/mach-shmobile/smp-r8a7791.c
+index 5e2d1db79afa..b2508c0d276b 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7791.c
++++ b/arch/arm/mach-shmobile/smp-r8a7791.c
+@@ -58,7 +58,7 @@ struct smp_operations r8a7791_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= r8a7791_smp_prepare_cpus,
+ 	.smp_boot_secondary	= r8a7791_smp_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+-	.cpu_disable		= shmobile_smp_cpu_disable,
++	.cpu_can_disable	= shmobile_smp_cpu_can_disable,
+ 	.cpu_die		= shmobile_smp_apmu_cpu_die,
+ 	.cpu_kill		= shmobile_smp_apmu_cpu_kill,
+ #endif
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 2106d6b76a06..ae7c764fd6b4 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -68,7 +68,7 @@ struct smp_operations sh73a0_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= sh73a0_smp_prepare_cpus,
+ 	.smp_boot_secondary	= sh73a0_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+-	.cpu_disable		= shmobile_smp_cpu_disable,
++	.cpu_can_disable	= shmobile_smp_cpu_can_disable,
+ 	.cpu_die		= shmobile_smp_scu_cpu_die,
+ 	.cpu_kill		= shmobile_smp_scu_cpu_kill,
+ #endif
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
