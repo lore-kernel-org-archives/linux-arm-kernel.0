@@ -1,238 +1,251 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 10 Apr 2015 14:17:16 +0100
-Subject: [PATCH] KVM: arm/arm64: avoid using kvm_run for in-kernel
- emulation
-In-Reply-To: <20150410091549.GD6186@cbox>
-References: <1427507300-19200-1-git-send-email-andre.przywara@arm.com>
- <20150409133042.GM4715@cbox> <5526A101.1040301@arm.com>
- <20150410091549.GD6186@cbox>
-Message-ID: <5527CD5C.1020602@arm.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Fri, 10 Apr 2015 18:47:45 +0530
+Subject: [PATCH 6/6] hwmon: pwm-fan: Update the duty cycle inorder to
+ control the pwm-fan
+In-Reply-To: <5527CB78.4040002@roeck-us.net>
+References: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
+ <1427387955-5129-7-git-send-email-linux.amoon@gmail.com>
+ <20150408104415.07e1c821@amdc2363>
+ <20150408153214.GA15942@roeck-us.net>
+ <CANAwSgSD52sDpP7NH2hhiZX-=LZF6Qo-X3enqsqM+5XAMfyP=Q@mail.gmail.com>
+ <20150408165351.GA22846@roeck-us.net>
+ <CANAwSgQbNV9QZ2bFGk6g+RyWW6f5iW4e8ii_5rJ4srv02L=L_Q@mail.gmail.com>
+ <CANAwSgRSxj9frUHRXh3JwD+bpnFrj8WkpDMKHZn-OPmuCEgP7w@mail.gmail.com>
+ <1428667201.22057.20.camel@collabora.co.uk>
+ <CANAwSgQHi2-i8xHn+X+KTGg8HFpe6SPgkuSvuApJP3342N8+zQ@mail.gmail.com>
+ <5527CB78.4040002@roeck-us.net>
+Message-ID: <CANAwSgQqnuSXsaeRoBSZq8xz=9jHNtniNEaO9-joCMvevNBRhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Guenter,
 
-On 10/04/15 10:15, Christoffer Dall wrote:
-> On Thu, Apr 09, 2015 at 04:55:45PM +0100, Andre Przywara wrote:
->> Hej Christoffer,
+I will do so.
+
+-Anand Moon
+
+On 10 April 2015 at 18:39, Guenter Roeck <linux@roeck-us.net> wrote:
+> On 04/10/2015 05:59 AM, Anand Moon wrote:
 >>
->> On 09/04/15 14:30, Christoffer Dall wrote:
->>> On Sat, Mar 28, 2015 at 01:48:20AM +0000, Andre Przywara wrote:
->>>> Our in-kernel VGIC emulation still uses struct kvm_run briefly before
->>>> writing back the emulation result into the guest register. Using a
->>>> userspace mapped data structure within the kernel sounds dodgy, also
->>>> we do some extra copying at the moment at the end of the VGIC
->>>> emulation code.
->>>> Replace the usage of struct kvm_run in favour of passing separate
->>>> parameters into kvm_handle_mmio_return (and rename the function on
->>>> the way) to optimise the VGIC emulation. The real userland MMIO code
->>>> path does not change much.
->>>>
->>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>> ---
->>>> Hi,
->>>>
->>>> this is an optimization of the VGIC code totally removing struct
->>>> kvm_run from the VGIC emulation. In my eyes it provides a nice
->>>> cleanup and is a logical consequence of the kvm_io_bus patches (on
->>>> which it goes on top). On the other hand it is optional and I didn't
->>>> want to merge it with the already quite large last patch 11.
->>>> Marc, I leave it up to you whether you take this as part of the
->>>> kvm_io_bus series or not.
->>>>
->>>> Cheers,
->>>> Andre.
->>>>
->>>>  arch/arm/include/asm/kvm_mmio.h   |    3 +-
->>>>  arch/arm/kvm/arm.c                |    6 ++--
->>>>  arch/arm/kvm/mmio.c               |   55 ++++++++++++++++++-------------------
->>>>  arch/arm64/include/asm/kvm_mmio.h |    3 +-
->>>>  virt/kvm/arm/vgic.c               |    8 ++----
->>>>  5 files changed, 37 insertions(+), 38 deletions(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/kvm_mmio.h b/arch/arm/include/asm/kvm_mmio.h
->>>> index d8e90c8..53461a6 100644
->>>> --- a/arch/arm/include/asm/kvm_mmio.h
->>>> +++ b/arch/arm/include/asm/kvm_mmio.h
->>>> @@ -28,7 +28,8 @@ struct kvm_decode {
->>>>  	bool sign_extend;
->>>>  };
->>>>  
->>>> -int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
->>>> +int kvm_writeback_mmio_data(struct kvm_vcpu *vcpu, unsigned int len,
->>>> +			    void *val, gpa_t phys_addr);
->>>>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>>>  		 phys_addr_t fault_ipa);
->>>>  
->>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->>>> index e98370c..b837aef 100644
->>>> --- a/arch/arm/kvm/arm.c
->>>> +++ b/arch/arm/kvm/arm.c
->>>> @@ -506,8 +506,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>  	if (ret)
->>>>  		return ret;
->>>>  
->>>> -	if (run->exit_reason == KVM_EXIT_MMIO) {
->>>> -		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
->>>> +	if (run->exit_reason == KVM_EXIT_MMIO && !run->mmio.is_write) {
->>>> +		ret = kvm_writeback_mmio_data(vcpu, run->mmio.len,
->>>> +					      run->mmio.data,
->>>> +					      run->mmio.phys_addr);
->>>>  		if (ret)
->>>>  			return ret;
->>>>  	}
->>>> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
->>>> index 974b1c6..3c57f96 100644
->>>> --- a/arch/arm/kvm/mmio.c
->>>> +++ b/arch/arm/kvm/mmio.c
->>>> @@ -86,38 +86,36 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
->>>>  }
->>>>  
->>>>  /**
->>>> - * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
->>>> - * @vcpu: The VCPU pointer
->>>> - * @run:  The VCPU run struct containing the mmio data
->>>> + * kvm_writeback_mmio_data -- Handle MMIO loads after user space emulation
->>>> + * @vcpu:	The VCPU pointer
->>>> + * @len:	The length in Bytes of the MMIO access
->>>> + * @data_ptr:	Pointer to the data to be written back into the guest
->>>> + * @phys_addr:	Physical address of the originating MMIO access
->>>>   *
->>>>   * This should only be called after returning from userspace for MMIO load
->>>> - * emulation.
->>>> + * emulation. phys_addr is only used for the tracepoint output.
->>>>   */
->>>> -int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>> +int kvm_writeback_mmio_data(struct kvm_vcpu *vcpu, unsigned int len,
->>>> +			    void *data_ptr, gpa_t phys_addr)
->>>>  {
->>>>  	unsigned long data;
->>>> -	unsigned int len;
->>>>  	int mask;
->>>>  
->>>> -	if (!run->mmio.is_write) {
->>>> -		len = run->mmio.len;
->>>> -		if (len > sizeof(unsigned long))
->>>> -			return -EINVAL;
->>>> +	if (len > sizeof(unsigned long))
->>>> +		return -EINVAL;
->>>>  
->>>> -		data = mmio_read_buf(run->mmio.data, len);
->>>> +	data = mmio_read_buf(data_ptr, len);
->>>>  
->>>> -		if (vcpu->arch.mmio_decode.sign_extend &&
->>>> -		    len < sizeof(unsigned long)) {
->>>> -			mask = 1U << ((len * 8) - 1);
->>>> -			data = (data ^ mask) - mask;
->>>> -		}
->>>> -
->>>> -		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
->>>> -			       data);
->>>> -		data = vcpu_data_host_to_guest(vcpu, data, len);
->>>> -		*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = data;
->>>> +	if (vcpu->arch.mmio_decode.sign_extend &&
->>>> +	    len < sizeof(unsigned long)) {
->>>> +		mask = 1U << ((len * 8) - 1);
->>>> +		data = (data ^ mask) - mask;
->>>>  	}
->>>>  
->>>> +	trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, phys_addr, data);
->>>> +	data = vcpu_data_host_to_guest(vcpu, data, len);
->>>> +	*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = data;
->>>> +
->>>>  	return 0;
->>>>  }
->>>>  
->>>> @@ -201,18 +199,19 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>>>  				      data_buf);
->>>>  	}
->>>>  
->>>> -	/* Now prepare kvm_run for the potential return to userland. */
->>>> -	run->mmio.is_write	= is_write;
->>>> -	run->mmio.phys_addr	= fault_ipa;
->>>> -	run->mmio.len		= len;
->>>> -	memcpy(run->mmio.data, data_buf, len);
->>>> -
->>>>  	if (!ret) {
->>>>  		/* We handled the access successfully in the kernel. */
->>>> -		kvm_handle_mmio_return(vcpu, run);
->>>> +		if (!is_write)
->>>> +			kvm_writeback_mmio_data(vcpu, len, data_buf, fault_ipa);
->>>>  		return 1;
->>>>  	}
->>>>  
->>>> +	/* Now prepare the kvm_run structure for the return to userland. */
->>>> +	run->mmio.phys_addr	= fault_ipa;
->>>> +	run->mmio.len		= len;
->>>> +	run->mmio.is_write	= is_write;
->>>> +	memcpy(run->mmio.data, data_buf, len);
->>>>  	run->exit_reason	= KVM_EXIT_MMIO;
->>>> +
->>>>  	return 0;
->>>>  }
->>>> diff --git a/arch/arm64/include/asm/kvm_mmio.h b/arch/arm64/include/asm/kvm_mmio.h
->>>> index 889c908..3b83475 100644
->>>> --- a/arch/arm64/include/asm/kvm_mmio.h
->>>> +++ b/arch/arm64/include/asm/kvm_mmio.h
->>>> @@ -31,7 +31,8 @@ struct kvm_decode {
->>>>  	bool sign_extend;
->>>>  };
->>>>  
->>>> -int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
->>>> +int kvm_writeback_mmio_data(struct kvm_vcpu *vcpu, unsigned int len,
->>>> +			    void *val, gpa_t phys_addr);
->>>>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>>>  		 phys_addr_t fault_ipa);
->>>>  
->>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->>>> index b70174e..4047fc0 100644
->>>> --- a/virt/kvm/arm/vgic.c
->>>> +++ b/virt/kvm/arm/vgic.c
->>>> @@ -803,7 +803,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
->>>>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->>>>  	struct vgic_io_device *iodev = container_of(this,
->>>>  						    struct vgic_io_device, dev);
->>>> -	struct kvm_run *run = vcpu->run;
->>>>  	const struct vgic_io_range *range;
->>>>  	struct kvm_exit_mmio mmio;
->>>>  	bool updated_state;
->>>> @@ -832,12 +831,9 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
->>>>  		updated_state = false;
->>>>  	}
->>>>  	spin_unlock(&dist->lock);
->>>> -	run->mmio.is_write	= is_write;
->>>> -	run->mmio.len		= len;
->>>> -	run->mmio.phys_addr	= addr;
->>>> -	memcpy(run->mmio.data, val, len);
->>>>  
->>>> -	kvm_handle_mmio_return(vcpu, run);
->>>> +	if (!is_write)
->>>> +		kvm_writeback_mmio_data(vcpu, len, val, addr);
+>> Hi Sjoerd,
+>>
+>> I don't much advance knowledge on internal signaling of pwm-samsung
+>> module.
+>>
+>> So do I need to send this patch again ?
+>>
+>
+> From the context, it seems that the fix in hwmon would only paint
+> over a problem in the actual pwm driver, correct ?
+>
+> If you resubmit the patch I would expect you to explain this in the
+> commit log.
+>
+> Guenter
+>
+>
+>> -Anand Moon
+>>
+>>
+>> On 10 April 2015 at 17:30, Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+>> wrote:
 >>>
->>> why do we do a kvm_writeback_mmio_data() call here in addition to
->>> io_mem_abort() ?  Are we not doing this twice?  What am I missing?
+>>> Hey Anand,
+>>>
+>>> On Fri, 2015-04-10 at 16:58 +0530, Anand Moon wrote:
+>>>>
+>>>> Hi Guenter/Lukasz,
+>>>>
+>>>> Earlier I send v2 version of the patch spiking this one.
+>>>>
+>>>> Markus Riechl came back to me with below mail.
+>>>> So This patch confirms fixes the bug.
+>>>>
+>>>> I will send v3 version of the patch. Earlier I was in delima about the
+>>>> bug.
+>>>>
+>>>> -Anand Moon
+>>>> -------------------------------------------
+>>>> Hi Anand,
+>>>>
+>>>> I tested your patch.
+>>>>
+>>>> After booting the fan is spinning despite only 44?C.
+>>>>
+>>>> /sys/class/thermal/cooling_device0/curstate is 0.
+>>>> /sys/class/hwmon/hwmon4/pwm1 is 0
+>>>>
+>>>> when I echo 1 > cur_state and then echo 0 > cur_state again,
+>>>> the fan switches to off and behaves as expected.
+>>>>
+>>>> It looks like there is a bug in initializing the pwm output
+>>>> immediately after booting.
+>>>
+>>>
+>>> The problem here will be that at boot the PWM runs at full duty. With
+>>> the current exynos PWM drive if you disable the PWM it will stop pulsing
+>>> but remain high if it was at 100% duty. My patch on which you depend
+>>> upon fixed a race  where disabling the pwm right after changing the duty
+>>> cycle (e.g. to 0%) also kept the signal high.
+>>>
+>>>  From looking at other PWM users at the time it seemed that most if not
+>>> all always first set to duty to 0% and then disable the pwm. Which
+>>> should work fine on exynos now. However iirc Thierry recently clarified
+>>> that the expected result of pwm_disable is not just that the modulation
+>>> stops but also that the output signal goes low, although that's not very
+>>> explicit in the current pwm documentation.. The exynos PWM driver will
+>>> need another fix tweak to make that true.
+>>>
+>>>
+>>>
+>>>> Best Regards,
+>>>
+>>>
+>>>
+>>>
+>>>> --
+>>>> Markus Reichl
+>>>>
+>>>> On 8 April 2015 at 23:19, Anand Moon <linux.amoon@gmail.com> wrote:
+>>>>>
+>>>>> Hi Guenter,
+>>>>>
+>>>>> Sorry my blunder mistake. Sorry for the noise.
+>>>>>
+>>>>> I just tested with spiking this patch and my observation and testing
+>>>>> were wrong we can skip this patch.
+>>>>>
+>>>>> I will send an v2 patch series removing the patch 5 and patch 6.
+>>>>>
+>>>>> With correct dts changes.
+>>>>>
+>>>>> Thanks for pointing my mistake.
+>>>>>
+>>>>> -Anand Moon
+>>>>>
+>>>>> On 8 April 2015 at 22:23, Guenter Roeck <linux@roeck-us.net> wrote:
+>>>>>>
+>>>>>> On Wed, Apr 08, 2015 at 09:32:05PM +0530, Anand Moon wrote:
+>>>>>>>
+>>>>>>> Hi Guenter,
+>>>>>>>
+>>>>>>> Initially the board bootup the cooling level state is 0.
+>>>>>>> So update the duty cycle and this power off the fan.
+>>>>>>> As their is no state change the fan will not spin.
+>>>>>>>
+>>>>>>> Once the temperature sensor is reached to alert temperature it
+>>>>>>> changes state.
+>>>>>>> With the state change the fan cools the CPU and then stop's
+>>>>>>>
+>>>>>>> I have observed this state change with tmon utility in
+>>>>>>> linux/tools/thermal/tmon/
+>>>>>>>
+>>>>>> Sorry, I am missing something. I still don't see what problem you are
+>>>>>> fixing
+>>>>>> with this patch. What behavior is wrong with the current code, and how
+>>>>>> does your
+>>>>>> patch fix it ?
+>>>>>>
+>>>>>> Guenter
+>>>>>>
+>>>>>>> -Anand Moon
+>>>>>>>
+>>>>>>> On 8 April 2015 at 21:02, Guenter Roeck <linux@roeck-us.net> wrote:
+>>>>>>>>
+>>>>>>>> On Wed, Apr 08, 2015 at 10:44:15AM +0200, Lukasz Majewski wrote:
+>>>>>>>>>
+>>>>>>>>> Hi Anand,
+>>>>>>>>>
+>>>>>>>>>> Below changes depend on following patch.
+>>>>>>>>>> https://patchwork.kernel.org/patch/5944061/
+>>>>>>>>>>
+>>>>>>>>>> Update the pwm_config with duty then update the pwm_disable
+>>>>>>>>>> to poweroff the cpu fan.
+>>>>>>>>>>
+>>>>>>>>
+>>>>>>>> Unfortunately, the patch does not include an explanation why it is
+>>>>>>>> needed.
+>>>>>>>>
+>>>>>>>> The original code presumably did not update the duty cycle because
+>>>>>>>> pwm was about to be disabled anyway. That kind of made sense to me.
+>>>>>>>> Updating the duty cycle to 0 just to disable the pwm channel right
+>>>>>>>> afterwards does not immediately make sense.
+>>>>>>>>
+>>>>>>>> Given that, I would expect to see a rationale here. Why is this
+>>>>>>>> patch needed ?
+>>>>>>>> Does it fix a bug ? If yes, pelase describe the bug. If not, what is
+>>>>>>>> the
+>>>>>>>> purpose of this patch ?
+>>>>>>>>
+>>>>>>>> Maybe that is all explained in patch 0/6, which I was not copied on.
+>>>>>>>> Even
+>>>>>>>> if so, the reationale will be needed in the changelog to explain to
+>>>>>>>> future
+>>>>>>>> developers why this change was made.
+>>>>>>>>
+>>>>>>>> Thanks,
+>>>>>>>> Guenter
+>>>>>>>>
+>>>>>>>>>> Tested on OdroidXU3 board.
+>>>>>>>>>>
+>>>>>>>>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>>>>>>>>> ---
+>>>>>>>>>>   drivers/hwmon/pwm-fan.c | 10 ++++------
+>>>>>>>>>>   1 file changed, 4 insertions(+), 6 deletions(-)
+>>>>>>>>>>
+>>>>>>>>>> diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
+>>>>>>>>>> index 7c83dc4..f25c841 100644
+>>>>>>>>>> --- a/drivers/hwmon/pwm-fan.c
+>>>>>>>>>> +++ b/drivers/hwmon/pwm-fan.c
+>>>>>>>>>> @@ -44,26 +44,24 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx,
+>>>>>>>>>> unsigned long pwm) int ret = 0;
+>>>>>>>>>>
+>>>>>>>>>>      mutex_lock(&ctx->lock);
+>>>>>>>>>> +
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> [ please refrain from unnecessary whitespace changes ]
+>>>>>>>>
+>>>>>>>>>>      if (ctx->pwm_value == pwm)
+>>>>>>>>>>              goto exit_set_pwm_err;
+>>>>>>>>>>
+>>>>>>>>>> -   if (pwm == 0) {
+>>>>>>>>>> -           pwm_disable(ctx->pwm);
+>>>>>>>>>> -           goto exit_set_pwm;
+>>>>>>>>>> -   }
+>>>>>>>>>> -
+>>>>>>>>>>      duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
+>>>>>>>>>>      ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
+>>>>>>>>>>      if (ret)
+>>>>>>>>>>              goto exit_set_pwm_err;
+>>>>>>>>>>
+>>>>>>>>>> +   if (pwm == 0)
+>>>>>>>>>> +           pwm_disable(ctx->pwm);
+>>>>>>>>>> +
+>>>>>>>>>>      if (ctx->pwm_value == 0) {
+>>>>>>>>>>              ret = pwm_enable(ctx->pwm);
+>>>>>>>>>>              if (ret)
+>>>>>>>>>>                      goto exit_set_pwm_err;
+>>>>>>>>>>      }
+>>>>>>>>>>
+>>>>>>>>>> -exit_set_pwm:
+>>>>>>>>>>      ctx->pwm_value = pwm;
+>>>>>>>>>>   exit_set_pwm_err:
+>>>>>>>>>>      mutex_unlock(&ctx->lock);
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
+>>>>>>>>>
+>>>>>>>>> BTW: I've added Guenter to CC.
+>>>>>>>>>
+>>>>>>>>> --
+>>>>>>>>> Best regards,
+>>>>>>>>>
+>>>>>>>>> Lukasz Majewski
+>>>>>>>>>
+>>>>>>>>> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+>>>
+>>>
+>>>
 >>
->> You are missing: ... nothing, we are indeed doing it twice. This looks
->> like an oversight when converting from using a data buffer to a pointer.
->>
->> So we can drop this here, and io_mem_abort() takes care (tested
->> quickly). Shall I add a comment or just remove those two lines?
->>
->> Are you OK with the rest of the patch?
->>
-> Roughly ok, I think it would be nicer to not rename
-> kvm_handle_mmio_return() but call that as is, and then introduce
-> kvm_writeback_mmio_data() as a static function called only within mmio.c
-> and do the check for !run->mmio.is_write in the kvm_handle_mmio_return()
-> function before calling kvm_writeback_mmio_data().
-> 
-> That would reduce the impact of this patch and keep the run-loop code
-> slightly less cluttered.
-
-Very neat! Thanks for that suggestion! I think that didn't work before
-because of the former usage in vgic, but now it is indeed much nicer
-this way.
-Will send out the patch ASAP.
-
-Cheers,
-Andre.
+>
