@@ -1,50 +1,46 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Fri, 10 Apr 2015 17:06:49 +0200
-Subject: Guarantee udelay(N) spins at least N microseconds
-In-Reply-To: <5527E3D6.1010608@free.fr>
-References: <5527B331.5000205@free.fr> <20150410114253.GA18645@1wt.eu>
- <5527E3D6.1010608@free.fr>
-Message-ID: <20150410150649.GB18690@1wt.eu>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 10 Apr 2015 17:15:11 +0200
+Subject: [REGRESSION] commit 0461a41 "spi: Pump transfers inside
+ calling context for spi_sync()" breaks Apalis/Colibri T30 with MCP2515
+ SPI CAN controller
+In-Reply-To: <20150410132330.GH6023@sirena.org.uk>
+References: <1428670853.7008.87.camel@localhost.localdomain>
+ <20150410132330.GH6023@sirena.org.uk>
+Message-ID: <5527E8FF.7050104@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mason,
+On 04/10/2015 03:23 PM, Mark Brown wrote:
+> On Fri, Apr 10, 2015 at 03:00:53PM +0200, Marcel Ziswiler wrote:
+>> Hi there
+> 
+> Please try to use somewhat more targetted CC lists...
+> 
+>> I also have not yet looked further into what exactly is happening and
+>> whether or not the SPI stack, the Tegra SPI controller driver or the
+>> MCP2515 SPI CAN driver is to blame but rather decided to ask Mr. Brown
+>> and the community first for any insights they might have to share.
+>> Anybody?
+> 
+> I'd ask for trace logs but obviously we can't turn them on until boot
+> has finished...  Adding some trace in the relevant bits of code to try
+> to see where it's deadlocking is the obvious first step.
 
-On Fri, Apr 10, 2015 at 04:53:10PM +0200, Mason wrote:
-> The important thing to realize is that xloops is already rounded down,
-> because we use 2199023 as an approximation of 2^41 / 10^6.
-> 
-> Thus, even when 'loops' is a multiple of 2^30, we'll want to round up.
-> 
-> Illustration
-> 
-> timer->freq = 100*2^20 && HZ = 100
-> (thus UDELAY_MULT = 107374 && ticks_per_jiffy = 2^20)
-> 
-> Suppose udelay(512)
-> so we want to spin for 512 / 10^6 * 100*2^20 = 53687,0912 cycles
-> i.e. 53688 cycles if we round up.
-> 
-> loops = 512 * 107374 * 2^20 = 53687 * 2^30
-> 
-> If we just add (2^30-1) before shifting by 30, the result comes out
-> to 53687, but (loops >> 30) + 1 is closer to what we really want.
-> 
-> One might argue that the difference between 53687 and 53688 is
-> lost in the noise and thus irrelevant. I can agree with that.
-> 
-> Which is why I chose the simpler
-> 
->   __timer_delay((loops >> UDELAY_SHIFT) + 1);
-> 
-> over
-> 
->   __timer_delay((loops + (1 << UDELAY_SHIFT) - 1) >> UDELAY_SHIFT);
-> 
-> 
-> Do you disagree with this logic?
+FWIW: the mcp2515 driver is accessing the SPI bus during probe(). Seems
+you have to instrument the SPI stack and/or host driver.
 
-OK it seems to make sense then.
+Marc
 
-Regards,
-Willy
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150410/72bebd48/attachment.sig>
