@@ -1,77 +1,83 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Fri, 10 Apr 2015 15:05:36 +0200
-Subject: [PATCH v2 03/10] KVM: arm: guest debug, define API headers
-In-Reply-To: <1427814488-28467-4-git-send-email-alex.bennee@linaro.org>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-4-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150410130535.GF3227@hawk.usersys.redhat.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 10 Apr 2015 15:05:59 +0200
+Subject: [PATCH 2/6] drm/cache: Implement drm_clflush_*() for ARM
+In-Reply-To: <20150410120312.GD12732@n2100.arm.linux.org.uk>
+References: <1428590049-20357-1-git-send-email-thierry.reding@gmail.com>
+ <1428590049-20357-2-git-send-email-thierry.reding@gmail.com>
+ <20150410120312.GD12732@n2100.arm.linux.org.uk>
+Message-ID: <20150410130557.GB32473@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 04:08:01PM +0100, Alex Benn?e wrote:
-> This commit defines the API headers for guest debugging. There are two
-> architecture specific debug structures:
+On Fri, Apr 10, 2015 at 01:03:13PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 09, 2015 at 04:34:05PM +0200, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > Add implementations for drm_clflush_*() on ARM by borrowing code from
+> > the DMA mapping API implementation. Unfortunately ARM doesn't export an
+> > API to flush caches on a page by page basis, so this replicates most of
+> > the code.
 > 
->   - kvm_guest_debug_arch, allows us to pass in HW debug registers
->   - kvm_debug_exit_arch, signals the exact debug exit and pc
+> I'm _really_ not happy with this, because it's poking about in ARM
+> internal implementation details of the DMA API.  It's also not going
+> to work too well on aliasing caches either - especially when you
+> consider that the userspace mapping of a page may have no relationship
+> to the address you get from kmap.
 > 
-> The type of debugging being used is control by the architecture specific
-controlled
-> control bits of the kvm_guest_debug->control flags in the ioctl
-> structure.
+> For an aliasing cache, the way things work with the DMA API, we ensure
+> that the kernel alias is clean whenever pages are un-kmapped, which
+> means that unmapped highmem pages never have L1 cache lines associated
+> with the kernel alias of them.  The user aliases are handled separately
+> via the normal flush_dcache_page()/flush_anon_page() calls.
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> None of this exists here...
 > 
-> ---
-> v2
->    - expose hsr and pc directly to user-space
+> It gets even more hairly on older ARM CPUs - but I hope no one is
+> expecting to support DRM's clflush there - we should make that explicit
+> though, and ensure that clflush support returns an error there.
 > 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 3ef77a4..6ee70a0 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -100,10 +100,24 @@ struct kvm_sregs {
->  struct kvm_fpu {
->  };
->  
-> +/*
-> + * See ARM ARM D7.3: Debug Registers
-> + *
-> + * The control registers are architecturally defined as 32 bits but are
-> + * stored as 64 bit values along side the value registers and aligned
-> + * with the rest 64 bit registers in the normal CPU context.
-                   ^ of the
-> + */
-> +#define KVM_ARM_NDBG_REGS 16
->  struct kvm_guest_debug_arch {
-> +	__u64 dbg_bcr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_bvr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_wcr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_wvr[KVM_ARM_NDBG_REGS];
->  };
->  
->  struct kvm_debug_exit_arch {
-> +	__u64 pc;
-> +	__u32 hsr;
->  };
->  
->  struct kvm_sync_regs {
-> @@ -207,4 +221,11 @@ struct kvm_arch_memory_slot {
->  
->  #endif
->  
-> +/*
-> + * Architecture related debug defines - upper 16 bits of
-> + * kvm_guest_debug->control
-> + */
-> +#define KVM_GUESTDBG_USE_SW_BP	        __KVM_GUESTDBG_USE_SW_BP
-> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
-> +
->  #endif /* __ARM_KVM_H__ */
-> -- 
-> 2.3.4
->
+> That aside, we have most of this logic already inside
+> dma_cache_maint_page(), and even if it was the right thing to be doing,
+> we shouldn't be duplicating this architecture specific code inside a
+> driver.
+> 
+> So you can take that as a NAK on this.
 
-couple typo nits, otherwise
+Perhaps I should take a step back and explain what I'm trying to solve,
+maybe that'll allow us to come up with a more proper solution.
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Both the MSM and Tegra drivers allocate framebuffers from shmem in the
+presence of an IOMMU. The problem with allocating pages from the shmem
+is that pages end up not being flushed, resulting in visual artifacts
+on the screen (horizontal black lines) when the cachelines from earlier
+allocations of these pages get flushed. The drivers also use the IOMMU
+API directly to manage the IOVA space.
+
+Currently both drivers work around this by faking up an sg_table and
+calling dma_map_sg(), which ends up doing the right thing. Unfortunately
+this only works if nothing backs the DMA API and we end up getting the
+regular arm_dma_ops. If an IOMMU registers with the ARM/DMA glue, we'll
+end up getting a different set of dma_ops and things break (buffers are
+mapped through the IOMMU twice, ...).
+
+Still, this has worked fine on Tegra (and I assume the same is true for
+MSM) so far because we don't register an IOMMU with the ARM/DMA glue.
+However while porting this to 64-bit ARM I started seeing failures to
+map buffers because SWIOTLB is enabled by default and gets in the way.
+
+With regards to code duplication, I suspect we could call something like
+arm_dma_ops.sync_sg_for_device() directly, but that raises the question
+about which device to pass in. It isn't clear at allocation time which
+device will use the buffer. It may in fact be used by multiple devices
+at once.
+
+Do you have an alternative suggestion on how to fix this?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150410/d26ac0a7/attachment.sig>
