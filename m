@@ -1,70 +1,57 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Fri, 10 Apr 2015 09:43:32 -0700
-Subject: [PATCH] efi: stub: use a pool allocation for the cmdline
-In-Reply-To: <1428670569-23089-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1428670569-23089-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAFECyb9efREE=BU5RGSbzAGHqi5CkivUuTf=BRdq02GvFqJaOA@mail.gmail.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 10 Apr 2015 18:43:57 +0200
+Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
+In-Reply-To: <5527EB5F.6080500@arm.com>
+References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
+ <5527EB5F.6080500@arm.com>
+Message-ID: <5527FDCD.70507@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 5:56 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> This changes the allocation for the ASCII-converted command
-> line to use an ordinary memory pool rather than a separate
-> page based allocation.
->
-> Pool allocations are generally preferred over page based
-> allocations due to the fact that they cause less fragmentation,
-> but in the particular case of arm64, where page allocations are
-> rounded up to 64 KB and where this allocation happens to be the
-> only explicit low allocation, it results in the lowest 64 KB of
-> memory to always be taken up by this particular allocation.
->
-> So allocate from the EFI_LOADER_DATA pool instead.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/firmware/efi/libstub/efi-stub-helper.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> index f07d4a67fa76..c95a567ca132 100644
-> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> @@ -684,7 +684,8 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
->
->         options_bytes++;        /* NUL termination */
->
-> -       status = efi_low_alloc(sys_table_arg, options_bytes, 0, &cmdline_addr);
-> +       status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
-> +                               options_bytes, (void **)&cmdline_addr);
->         if (status != EFI_SUCCESS)
->                 return NULL;
->
-> --
-> 1.8.3.2
->
 
-Hi Ard,
 
-We can't do this without also changing the frees on the error paths in
-arm-stub.c (line 289)
-and eboot.c (line 1148) to be a pool free as well.
-Also, for x86/x86_64 the address of the command line is put into a
-boot_params structure,
-which only has a __u32 field for the address of the command line, so
-we could get an address
-that won't fit if we use a pool allocation.
-Looking at that bit of if it, I don't think we handle the case of no
-32 bit addressable memory
-existing at the time of the efi_low_alloc() for x86_64 systems, so if
-a >32 bit address is returned here,
-this won't be detected as a failure, and the cmdline address will be
-the 32 bit truncated address.
+On 10/04/2015 17:25, Marc Zyngier wrote:
+> On 10/04/15 16:17, Andre Przywara wrote:
+>> When userland injects a SPI via the KVM_IRQ_LINE ioctl we currently
+>> only check it against a fixed limit, which historically is set
+>> to 127. With the new dynamic IRQ allocation the effective limit may
+>> actually be smaller (64).
+>> So when now a malicious or buggy userland injects a SPI in that
+>> range, we spill over on our VGIC bitmaps and bytemaps memory.
+>> I could trigger a host kernel NULL pointer dereference with current
+>> mainline by injecting some bogus IRQ number from a hacked kvmtool:
+>> -----------------
+>> ....
+>> DEBUG: kvm_vgic_inject_irq(kvm, cpu=0, irq=114, level=1)
+>> DEBUG: vgic_update_irq_pending(kvm, cpu=0, irq=114, level=1)
+>> DEBUG: IRQ #114 still in the game, writing to bytemap now...
+>> Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>> pgd = ffffffc07652e000
+>> [00000000] *pgd=00000000f658b003, *pud=00000000f658b003, *pmd=0000000000000000
+>> Internal error: Oops: 96000006 [#1] PREEMPT SMP
+>> Modules linked in:
+>> CPU: 1 PID: 1053 Comm: lkvm-msi-irqinj Not tainted 4.0.0-rc7+ #3027
+>> Hardware name: FVP Base (DT)
+>> task: ffffffc0774e9680 ti: ffffffc0765a8000 task.ti: ffffffc0765a8000
+>> PC is at kvm_vgic_inject_irq+0x234/0x310
+>> LR is at kvm_vgic_inject_irq+0x30c/0x310
+>> pc : [<ffffffc0000ae0a8>] lr : [<ffffffc0000ae180>] pstate: 80000145
+>> .....
+>>
+>> So this patch fixes this by checking the SPI number against the
+>> actual limit. Also we remove the former legacy hard limit of
+>> 127 in the ioctl code.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> CC: <stable@vger.kernel.org> # 4.0, 3.19, 3.18
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> It is getting really tight for 4.0, but hopefully I can squeeze it in a
+> second pull request together with the missing barrier on 32bit.
 
-I don't think that there is a way to control the address range
-returned by pool allocations,
-so I think we are stuck with the page based allocations if we have
-address restrictions.
+I doubt I'll be able to send the pull request to Linus.  Can't it really
+wait a couple of weeks?  I'll include it in the second pull request for
+4.1, together with (if you want) the lazy (lazier) FP/SIMD save/restore.
 
-Roy
+Paolo
