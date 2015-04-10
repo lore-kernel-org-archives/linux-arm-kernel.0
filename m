@@ -1,57 +1,90 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 10 Apr 2015 13:34:53 +0100
-Subject: [PATCH v2 09/12] ARM: dts: apq8064: Add USB OTG support for CM QS-600
+Date: Fri, 10 Apr 2015 13:34:38 +0100
+Subject: [PATCH v2 07/12] ARM: dts: apq8064-cm-qs600: Add basic regulators.
 In-Reply-To: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1428669293-11165-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1428669278-11075-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Dechesne <nicolas.dechesne@linaro.org>
-
-This patch adds USB OTG support on USB1 for Compulab QS-600 Board.
+This patch adds basic regulator support for USB and HDMI.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-[Srinivas Kandagatla: fixed up regulators and status properties]
-Signed-off-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 61 +++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-index fc69931..d353694 100644
+index 5d75666..142885d 100644
 --- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
 +++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-@@ -101,6 +101,14 @@
+@@ -14,6 +14,67 @@
  			};
  		};
  
-+		/* OTG */
-+		usb1_phy:phy at 12500000 {
-+			status		= "okay";
-+			vddcx-supply	= <&pm8921_s3>;
-+			v3p3-supply	= <&pm8921_l3>;
-+			v1p8-supply	= <&pm8921_l4>;
++		rpm at 108000 {
++			regulators {
++				vin_lvs1_3_6-supply = <&pm8921_s4>;
++				vin_lvs2-supply = <&pm8921_s1>;
++				vin_lvs4_5_7-supply = <&pm8921_s4>;
++
++				vdd_l1_l2_l12_l18-supply = <&pm8921_s4>;
++				vdd_l24-supply = <&pm8921_s1>;
++				vdd_l25-supply = <&pm8921_s1>;
++				vdd_l26-supply = <&pm8921_s7>;
++				vdd_l27-supply = <&pm8921_s7>;
++				vdd_l28-supply = <&pm8921_s7>;
++
++
++				/* Buck SMPS */
++				pm8921_s1: s1 {
++					regulator-always-on;
++					regulator-min-microvolt = <1225000>;
++					regulator-max-microvolt = <1225000>;
++					qcom,switch-mode-frequency = <3200000>;
++					bias-pull-down;
++				};
++
++				pm8921_s3: s3 {
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1400000>;
++					qcom,switch-mode-frequency = <4800000>;
++				};
++
++				pm8921_s4: s4 {
++					regulator-min-microvolt	= <1800000>;
++					regulator-max-microvolt	= <1800000>;
++					qcom,switch-mode-frequency = <3200000>;
++				};
++
++				pm8921_s7: s7 {
++					regulator-min-microvolt = <1300000>;
++					regulator-max-microvolt = <1300000>;
++					qcom,switch-mode-frequency = <3200000>;
++				};
++
++				pm8921_l3: l3 {
++					regulator-min-microvolt = <3050000>;
++					regulator-max-microvolt = <3300000>;
++					bias-pull-down;
++				};
++
++				pm8921_l4: l4 {
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1800000>;
++					bias-pull-down;
++				};
++
++				pm8921_l23: l23 {
++					regulator-min-microvolt = <1700000>;
++					regulator-max-microvolt = <1900000>;
++					bias-pull-down;
++				};
++			};
 +		};
 +
- 		usb3_phy:phy at 12520000 {
- 			status		= "okay";
- 			vddcx-supply	= <&pm8921_s3>;
-@@ -115,6 +123,15 @@
- 			v1p8-supply	= <&pm8921_l23>;
- 		};
- 
-+		gadget1:gadget at 12500000 {
-+			status = "ok";
-+		};
-+
-+		/* OTG */
-+		usb1: usb at 12500000 {
-+			status = "ok";
-+		};
-+
- 		usb3: usb at 12520000 {
+ 		gsbi at 12440000 {
  			status = "okay";
- 		};
+ 			qcom,mode = <GSBI_PROT_I2C>;
 -- 
 1.9.1
