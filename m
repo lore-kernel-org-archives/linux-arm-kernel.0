@@ -1,49 +1,96 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 10 Apr 2015 10:58:01 -0700
-Subject: [PATCH 6/6] hwmon: pwm-fan: Update the duty cycle inorder to
- control the pwm-fan
-In-Reply-To: <87h9snvqsf.fsf@gmail.com>
-References: <CANAwSgSD52sDpP7NH2hhiZX-=LZF6Qo-X3enqsqM+5XAMfyP=Q@mail.gmail.com>
- <20150408165351.GA22846@roeck-us.net>
- <CANAwSgQbNV9QZ2bFGk6g+RyWW6f5iW4e8ii_5rJ4srv02L=L_Q@mail.gmail.com>
- <CANAwSgRSxj9frUHRXh3JwD+bpnFrj8WkpDMKHZn-OPmuCEgP7w@mail.gmail.com>
- <1428667201.22057.20.camel@collabora.co.uk>
- <CANAwSgQHi2-i8xHn+X+KTGg8HFpe6SPgkuSvuApJP3342N8+zQ@mail.gmail.com>
- <5527CB78.4040002@roeck-us.net>
- <1428672601.22057.25.camel@collabora.co.uk>
- <20150410135844.GA20147@ulmo.nvidia.com> <87h9snvqsf.fsf@gmail.com>
-Message-ID: <20150410175801.GA31499@roeck-us.net>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 10 Apr 2015 19:58:57 +0200
+Subject: [PATCH 1/6] cpufreq / OPP: allow allocation of extra table entries in
+ freq_table
+In-Reply-To: <1428688742-15578-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1428688742-15578-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1428688742-15578-2-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 01:25:52PM -0400, Ben Gamari wrote:
-> Thierry Reding <thierry.reding@gmail.com> writes:
-> 
-> > On Fri, Apr 10, 2015 at 03:30:01PM +0200, Sjoerd Simons wrote:
-> >> 
-> >> Yes/no/maybe :). Imho this is something to clarify in the pwm API
-> >> documentation. As currently all it says is: 
-> >>   "pwm_disable - stop a PWM output toggling", 
-> >> 
-> >> Which is what the exynos driver does. 
-> >> 
-> >> Thierry, could you clearify what the intention is here? I'm happy to
-> >> prepare a pwm driver patch if needed to solve this?
-> >
-> > I think the safest thing to do is for users to do both. You call
-> > pwm_config() with a zero duty cycle to make it clear what the status is
-> > that you want. Then you call pwm_disable() to state that you don't need
-> > the output signal anymore, so that any clocks needed by the PWM can be
-> > stopped. Doing so gives the driver the most information and should make
-> > the user more resilient against any possible quirks in drivers.
-> >
-> It would be great if the documentation were more clear on this matter
-> regardless. This is something I can imagine having to spend substantial
-> amounts of time Googling whereas a simple note in the documentation would
-> have removed all ambiguity.
-> 
-Especially since, in this case, the output signal _is_ still needed.
-It appears that pwm_disable() is only expected to stop the clock, not
-the signal itself.
+Prefix dev_pm_opp_init_cpufreq_table() with "__" and add a wrapper
+for it to keep current users unchanged.  Then add an extra_opps
+parameter to __dev_pm_opp_init_cpufreq_table() to allow allocation of
+extra table entries in freq_table.
 
-Guenter
+This patch is a preparation for adding 'boost' mode frequencies
+support to cpufreq-dt driver.
+
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/cpufreq/cpufreq_opp.c |   18 ++++++++++++++----
+ include/linux/cpufreq.h       |    3 +++
+ 2 files changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
+index 773bcde..773164b 100644
+--- a/drivers/cpufreq/cpufreq_opp.c
++++ b/drivers/cpufreq/cpufreq_opp.c
+@@ -21,9 +21,10 @@
+ #include <linux/slab.h>
+ 
+ /**
+- * dev_pm_opp_init_cpufreq_table() - create a cpufreq table for a device
++ * __dev_pm_opp_init_cpufreq_table() - create a cpufreq table for a device
+  * @dev:	device for which we do this operation
+  * @table:	Cpufreq table returned back to caller
++ * @extra_opps:	Number of extra table entries to allocate
+  *
+  * Generate a cpufreq table for a provided device- this assumes that the
+  * opp list is already initialized and ready for usage.
+@@ -44,8 +45,9 @@
+  * structures, we use RCU read lock inside this function. As a result, users of
+  * this function DONOT need to use explicit locks for invoking.
+  */
+-int dev_pm_opp_init_cpufreq_table(struct device *dev,
+-				  struct cpufreq_frequency_table **table)
++int __dev_pm_opp_init_cpufreq_table(struct device *dev,
++				    struct cpufreq_frequency_table **table,
++				    unsigned int extra_opps)
+ {
+ 	struct dev_pm_opp *opp;
+ 	struct cpufreq_frequency_table *freq_table = NULL;
+@@ -60,7 +62,8 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+ 		goto out;
+ 	}
+ 
+-	freq_table = kcalloc((max_opps + 1), sizeof(*freq_table), GFP_ATOMIC);
++	freq_table = kcalloc((max_opps + extra_opps + 1), sizeof(*freq_table),
++			     GFP_ATOMIC);
+ 	if (!freq_table) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -89,6 +92,13 @@ out:
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(__dev_pm_opp_init_cpufreq_table);
++
++int dev_pm_opp_init_cpufreq_table(struct device *dev,
++				  struct cpufreq_frequency_table **table)
++{
++	return __dev_pm_opp_init_cpufreq_table(dev, table, 0);
++}
+ EXPORT_SYMBOL_GPL(dev_pm_opp_init_cpufreq_table);
+ 
+ /**
+diff --git a/include/linux/cpufreq.h b/include/linux/cpufreq.h
+index 2ee4888..e46feed 100644
+--- a/include/linux/cpufreq.h
++++ b/include/linux/cpufreq.h
+@@ -505,6 +505,9 @@ struct cpufreq_frequency_table {
+ };
+ 
+ #if defined(CONFIG_CPU_FREQ) && defined(CONFIG_PM_OPP)
++int __dev_pm_opp_init_cpufreq_table(struct device *dev,
++				    struct cpufreq_frequency_table **table,
++				    unsigned int extra_opps);
+ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+ 				  struct cpufreq_frequency_table **table);
+ void dev_pm_opp_free_cpufreq_table(struct device *dev,
+-- 
+1.7.9.5
