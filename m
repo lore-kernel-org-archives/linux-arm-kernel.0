@@ -1,25 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Apr 2015 22:23:32 +0200
-Subject: [PATCH v2] crypto/arm: accelerated SHA-512 using ARM generic ASM
- and NEON
-In-Reply-To: <5553652.sur4tr0YJi@wuerfel>
-References: <1428676148-28210-1-git-send-email-ard.biesheuvel@linaro.org>
- <5553652.sur4tr0YJi@wuerfel>
-Message-ID: <F695F357-2A5C-4DFC-9F0E-188CDBBE7C01@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Apr 2015 22:24:17 +0200
+Subject: [PATCH] [media] vb2: remove unused variable
+Message-ID: <8477099.Iv3RkyDk0C@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+A recent bug fix removed all uses of the 'fileio' variable in
+vb2_thread_stop(), which now causes warnings in a lot of
+ARM defconfig builds:
 
-> On 10 apr. 2015, at 22:08, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
->> On Friday 10 April 2015 16:29:08 Ard Biesheuvel wrote:
->> +#if __ARM_MAX_ARCH__>=7
->> +.arch  armv7-a
->> +.fpu   neon
->> +
-> 
-> This will cause a build failure on an ARMv7-M build, which is incompatible
-> with .arch  armv7-a and .fpu   neon.
-> 
+drivers/media/v4l2-core/videobuf2-core.c:3228:26: warning: unused variable 'fileio' [-Wunused-variable]
 
-The neon part depends on CONFIG_KERNEL_MODE_NEON, which would never be set for that platform, I suppose
+This removes the variable as well. The commit that introduced
+the warning was marked for 3.18+ backports, so this should
+probably be backported too.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 0e661006370b7 ("[media] vb2: fix 'UNBALANCED' warnings when calling vb2_thread_stop()")
+Cc: <stable@vger.kernel.org>      # for v3.18 and up
+
+diff --git a/drivers/media/v4l2-core/videobuf2-core.c b/drivers/media/v4l2-core/videobuf2-core.c
+index c11aee7db884..d3f7bf0db61e 100644
+--- a/drivers/media/v4l2-core/videobuf2-core.c
++++ b/drivers/media/v4l2-core/videobuf2-core.c
+@@ -3225,7 +3225,6 @@ EXPORT_SYMBOL_GPL(vb2_thread_start);
+ int vb2_thread_stop(struct vb2_queue *q)
+ {
+ 	struct vb2_threadio_data *threadio = q->threadio;
+-	struct vb2_fileio_data *fileio = q->fileio;
+ 	int err;
+ 
+ 	if (threadio == NULL)
