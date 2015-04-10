@@ -1,62 +1,18 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Fri, 10 Apr 2015 02:25:07 +0200
-Subject: [patch 2/2] leds: netxbig: clean up a data type issue
-In-Reply-To: <20150409195426.GP10964@mwanda>
-References: <20150409090712.GF17605@mwanda>
- <20150409192557.GD1509@kw.sim.vm.gnt>
- <20150409195426.GP10964@mwanda>
-Message-ID: <20150410002507.GF1509@kw.sim.vm.gnt>
+From: austin.lund@gmail.com (Austin Lund)
+Date: Fri, 10 Apr 2015 11:59:21 +1000
+Subject: gcc to remove -mapcs-frame which will break perf userspace backtraces
+ on ARM
+Message-ID: <CAHLDD1O0iHYPtL3qi2TmKkaDvPPuUsnGfdFhqWBSxo3TP4peTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 10:54:26PM +0300, Dan Carpenter wrote:
-> On Thu, Apr 09, 2015 at 09:25:57PM +0200, Simon Guinot wrote:
-> > On Thu, Apr 09, 2015 at 12:07:12PM +0300, Dan Carpenter wrote:
-> > > This driver is pretty hardware specific so it's unlikely that we're
-> > > going to be using it on 64 big endian systems.  Still, the current code
-> > > causes a static checker warning so we may as well change the type from
-> > > "unsigned long" to "u32" and remove the casting.
-> > 
-> > Hi Dan,
-> > 
-> > Thanks for the patch.
-> > 
-> > Why do you think it would be an issue to use the u32 type for this
-> > variables on a 64-bit big-endian machine ? Note that this LED mechanism
-> > is actually used on ARM 32-bits and x86-64 NAS platforms. The latter are
-> > not mainlined yet. But indeed, for now, there is no plan to use it on a
-> > 64-bit big-endian machine.
-> > 
-> > Since the whole LED code uses the unsigned long type to hold the delay
-> > values, if possible, I would prefer to keep the delay_{on,off} variables
-> > consistent with that.
-> > 
-> > Is there an another way to make the "static checker" happy ?
-> 
-> We're writing over 32 bits of a long.  It's a dangerous habbit.
-> 
-> If long is u32 then of_property_read_u32_index() works, obviously.  If
-> it is a little endian and the last 32 bits have been zeroed out (as they
-> have been here) then that also works.
-> 
-> If it's big endian and 64 bit then it doesn't work because we're writing
-> to the wrong 32 bits.
+Using -fomit-frame-pointer with gcc on ARM does not guarantee that the
+full frame with the return address is actually pushed onto the stack.
+Currently I use -mapcs-frame to achieve this and this allows the code
+in perf_callchain.c to generate the right userspace stack traces for
+perf.
 
-Sorry, I misunderstood your commit message.
+It seems that gcc have deprecated -mapcs-frame
+(https://gcc.gnu.org/ml/gcc-patches/2015-01/msg01001.html)
 
-But still, rather than changing the type from unsigned long to u32 for
-the delay_{on,off} variables, I think we should use a temporary u32
-variable for the of_property_read_u32_index calls. This way we can keep
-the type of the delay_{on,off} variables consistent with the LED core
-code.
-
-Regards,
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150410/493f813c/attachment.sig>
+It isn't clear to me what should replace it.  Any suggestions?
