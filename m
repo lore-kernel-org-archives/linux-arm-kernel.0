@@ -1,75 +1,50 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 10 Apr 2015 17:11:48 +0200
-Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
-In-Reply-To: <20150410135056.GB28873@io.lakedaemon.net>
-References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150410135056.GB28873@io.lakedaemon.net>
-Message-ID: <20150410171148.07bc9429@bbrezillon>
+From: w@1wt.eu (Willy Tarreau)
+Date: Fri, 10 Apr 2015 17:06:49 +0200
+Subject: Guarantee udelay(N) spins at least N microseconds
+In-Reply-To: <5527E3D6.1010608@free.fr>
+References: <5527B331.5000205@free.fr> <20150410114253.GA18645@1wt.eu>
+ <5527E3D6.1010608@free.fr>
+Message-ID: <20150410150649.GB18690@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hi Mason,
 
-On Fri, 10 Apr 2015 13:50:56 +0000
-Jason Cooper <jason@lakedaemon.net> wrote:
-
-> Hey Boris,
+On Fri, Apr 10, 2015 at 04:53:10PM +0200, Mason wrote:
+> The important thing to realize is that xloops is already rounded down,
+> because we use 2199023 as an approximation of 2^41 / 10^6.
 > 
-> On Thu, Apr 09, 2015 at 04:58:41PM +0200, Boris Brezillon wrote:
-> > I know we usually try to adapt existing drivers instead of replacing them
-> > by new ones, but after trying to refactor the mv_cesa driver I realized it
-> > would take longer than writing an new one from scratch.
+> Thus, even when 'loops' is a multiple of 2^30, we'll want to round up.
 > 
-> I'm sorry, but this makes me *very* uncomfortable.  Any organization
-> worth it's salt will do a very careful audit of code touching
-> cryptographic material and sensitive (decrypted) data.  From that point
-> on, small audits of the changes to the code allow the organization to
-> build a comfort level with kernel updates.  iow, following the git
-> history of the driver.
+> Illustration
 > 
-> By apply this series, we are basically forcing those organizations to
-> either a) stop updating, or b) expend significant resources to do
-> another full audit.
+> timer->freq = 100*2^20 && HZ = 100
+> (thus UDELAY_MULT = 107374 && ticks_per_jiffy = 2^20)
 > 
-> In short, this series breaks the audit chain for the mv_cesa driver.
+> Suppose udelay(512)
+> so we want to spin for 512 / 10^6 * 100*2^20 = 53687,0912 cycles
+> i.e. 53688 cycles if we round up.
 > 
-> Maybe I'm the only person with this level of paranoia.  If so, I'm sure
-> others will override me.
+> loops = 512 * 107374 * 2^20 = 53687 * 2^30
 > 
-> From my POV, it looks like the *only* reason we've chosen this route is
-> developer convenience.  I don't think that's sufficient reason to break
-> the change history of a driver handling sensitive data.
-
-Well, I understand you concern, but if you read carefully the old and
-new drivers, you'll notice that they are completely different (the only
-thing I kept are the macro definitions).
-I really tried to adapt the existing driver to add the missing
-features (especially the support for TDMA), but all my attempts
-ended up introducing hackish code (not even talking about the
-performance penalty of this approach). Is that really what we want ?
-How would you make such big changes on the existing driver (I mean, the
-core infrastructure dealing with crypto requests is completely
-different) ?
-
-I have another solution though: keep the existing driver for old
-marvell SoCs (orion, kirkwood and dove), and add a new one for modern
-SoCs (armada 370, XP, 375 and 38x), so that users of the mv_cesa driver
-won't have to audit the new code.
-
+> If we just add (2^30-1) before shifting by 30, the result comes out
+> to 53687, but (loops >> 30) + 1 is closer to what we really want.
 > 
-> For an example of how I use the git history and binary differences to
-> audit a series of changes to cryptographic code, please take a look at
-> objdiff [1]. You can even duplicate my audit of my submission for the
-> skein/threefish driver currently in the staging tree, starting at [2]
-> and going up to [3].
+> One might argue that the difference between 53687 and 53688 is
+> lost in the noise and thus irrelevant. I can agree with that.
+> 
+> Which is why I chose the simpler
+> 
+>   __timer_delay((loops >> UDELAY_SHIFT) + 1);
+> 
+> over
+> 
+>   __timer_delay((loops + (1 << UDELAY_SHIFT) - 1) >> UDELAY_SHIFT);
+> 
+> 
+> Do you disagree with this logic?
 
-Thanks for the pointers.
+OK it seems to make sense then.
 
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Willy
