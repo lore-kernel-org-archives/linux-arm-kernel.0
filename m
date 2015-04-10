@@ -1,122 +1,116 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 10 Apr 2015 16:22:13 +0200
-Subject: [GIT PULL v2 1/2] ARM: tegra: Core code changes for v4.1-rc1
-In-Reply-To: <1427710333-13472-1-git-send-email-thierry.reding@gmail.com>
-References: <1427710333-13472-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1428675733-23523-1-git-send-email-thierry.reding@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Apr 2015 15:26:55 +0100
+Subject: [RFC] mixture of cleanups to cache-v7.S
+In-Reply-To: <20150410141105.GA16979@red-moon>
+References: <20150402224947.GX24899@n2100.arm.linux.org.uk>
+ <20150410132723.GD6854@e104818-lin.cambridge.arm.com>
+ <20150410141105.GA16979@red-moon>
+Message-ID: <20150410142655.GF12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Fri, Apr 10, 2015 at 03:11:05PM +0100, Lorenzo Pieralisi wrote:
+> On Fri, Apr 10, 2015 at 02:27:42PM +0100, Catalin Marinas wrote:
+> > As for the v7_flush_dcache_all always having the barriers, I guess
+> > no-one is expecting a v7 CPU without caches.
+> 
+> Well, yes, actually I'd rather remove the barriers if LoC is 0 instead
+> of adding them to LoUIS API in case there is nothing to flush, I do not
+> think that's a problem in the first place.
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+Maybe you should read through the patch set before declaring there to
+be no problem.
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+There may be no problem as the code stands right now, and we can bury
+our heads in the sand and continue as through there's no problem what
+so ever, and we'd be right to, but...
 
-are available in the git repository at:
+We need to have 643719 enabled for all platforms.  Right now, the code
+in cache-v7 surrounding that workaround is pretty crap - enabling the
+option places the workaround into the execution path whether it applies
+or not.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.1-soc-20150410
+What this patch series does is rearrange stuff to avoid the workaround
+where it's possible to do so, while cleaning up a lot of the crap coding
+that was done here in the first place.
 
-for you to fetch changes up to 50ce434c2399586a71a868795401b59e04486824:
+In doing this, I spotted that if we _solve_ the above issue by making
+both functions behave in the same way, we get more common code paths.
 
-  memory: tegra: Explicitly mark defines unsigned (2015-04-03 00:01:09 +0200)
+So, while the issue doesn't _cause_ a problem, fixing the disparity
+between the two functions is worth it just to be able to have a
+flush_levels implementation which behaves the same no matter how it's
+called - one which always has a dmb before it, and (possibly) always
+the dsb+isb afterwards - or only has the dsb+isb afterwards if it's
+done some cache flushing.
 
-This is essentially the same as the earlier pull requests, except that
-it contains fixes for the linux-next build errors reported by Mark
-Brown.
+Look at the resulting code after applying all the patches, and I'm sure
+you'd agree that it's a lot better than the crap which is currently
+there.  To save you having to look up the files and apply the patches,
+here are the old and new versions:
 
-Thanks,
-Thierry
+============= old ====================
+ENTRY(v7_flush_dcache_louis)
+        dmb                                     @ ensure ordering with previous memory accesses
+        mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+        ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
+        ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
+#ifdef CONFIG_ARM_ERRATA_643719
+        ALT_SMP(mrceq   p15, 0, r2, c0, c0, 0)  @ read main ID register
+        ALT_UP(reteq    lr)                     @ LoUU is zero, so nothing to do        ldreq   r1, =0x410fc090                 @ ID of ARM Cortex A9 r0p?
+        biceq   r2, r2, #0x0000000f             @ clear minor revision number
+        teqeq   r2, r1                          @ test for errata affected core and if so...
+        orreqs  r3, #(1 << 21)                  @   fix LoUIS value (and set flags state to 'ne')
+#endif
+        ALT_SMP(mov     r3, r3, lsr #20)        @ r3 = LoUIS * 2
+        ALT_UP(mov      r3, r3, lsr #26)        @ r3 = LoUU * 2
+        reteq   lr                              @ return if level == 0
+        mov     r10, #0                         @ r10 (starting level) = 0
+        b       flush_levels                    @ start flushing cache levels
 
-----------------------------------------------------------------
-ARM: tegra: Core code changes for v4.1-rc1
+ENTRY(v7_flush_dcache_all)
+        dmb                                     @ ensure ordering with previous memory accesses
+        mrc     p15, 1, r0, c0, c0, 1           @ read clidr
+        ands    r3, r0, #0x7000000              @ extract loc from clidr
+        mov     r3, r3, lsr #23                 @ left align loc bit field
+        beq     finished                        @ if loc is 0, then no need to clean
+        mov     r10, #0                         @ start clean@cache level 0
+flush_levels:
+        add     r2, r10, r10, lsr #1            @ work out 3x current cache level
+        mov     r1, r0, lsr r2                  @ extract cache type bits from clidr
+...
+============= new ====================
+ENTRY(v7_flush_dcache_louis)
+        mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+ALT_SMP(mov     r3, r0, lsr #20)                @ move LoUIS into position
+ALT_UP( mov     r3, r0, lsr #26)                @ move LoUU into position
+#ifdef CONFIG_ARM_ERRATA_643719
+ALT_SMP(ands    r3, r3, #7 << 1)                @ extract LoU*2 field from clidrALT_UP( b       start_flush_levels)
+        bne     start_flush_levels              @ LoU != 0, start flushing
+        mrc     p15, 0, r2, c0, c0, 0           @ read main ID register
+        movw    r1, #:lower16:(0x410fc090 >> 4) @ ID of ARM Cortex A9 r0p?
+        movt    r1, #:upper16:(0x410fc090 >> 4)
+        teq     r1, r2, lsr #4                  @ test for errata affected core
+and if so...
+        moveq   r3, #1 << 1                     @ fix LoUIS value (and set flags state to 'ne')
+#endif
+        b       start_flush_levels              @ start flushing cache levels
 
-The biggest chunk of these changes is Mikko and Tomeu's external memory
-controller driver. It allows the frequency of the external memory to be
-changed and also puts the initial pieces into place to enable automatic
-scaling of the EMC frequency.
+ENTRY(v7_flush_dcache_all)
+        mrc     p15, 1, r0, c0, c0, 1           @ read clidr
+        mov     r3, r0, lsr #23                 @ move LoC into position
+start_flush_levels:
+        dmb                                     @ ensure ordering with previous memory accesses
+        ands    r3, r3, #7 << 1                 @ extract field from clidr
+        beq     finished                        @ if loc is 0, then no need to clean
+        mov     r10, #0                         @ start clean at cache level 0
+flush_levels:
+        add     r2, r10, r10, lsr #1            @ work out 3x current cache level
+        mov     r1, r0, lsr r2                  @ extract cache type bits from clidr
+...
 
-There are also a couple of improvements such as the move to a restart
-handler to make it easier for boards to override restart behaviour in a
-board-specific way. There are also some preparatory patches to enable
-Tegra to run in big-endian mode.
+Which do you think is better, the old version or the new version?
 
-Finally there's a fix for a regression that was introduced in v3.17,
-causing suspend/resume to break.
-
-----------------------------------------------------------------
-Bob Mottram (1):
-      gpio: tegra: Maintain endianness
-
-David Riley (1):
-      soc/tegra: pmc: move to using a restart handler
-
-Dmitry Osipenko (1):
-      ARM: tegra20: Store CPU "resettable" status in IRAM
-
-Mikko Perttunen (7):
-      soc/tegra: fuse: Add RAM code reader helper
-      of: Add Tegra124 EMC bindings
-      memory: tegra: Add API needed by the EMC driver
-      memory: tegra: Add EMC (external memory controller) driver
-      memory: tegra: Add debugfs entry for getting and setting the EMC rate
-      clk: tegra124: Remove old emc clock
-      clk: tegra: Add EMC clock driver
-
-Nicholas Mc Guire (1):
-      soc/tegra: Watch wait_for_completion_timeout() return type
-
-Thierry Reding (3):
-      memory: tegra: Add SWGROUP names
-      clk: tegra: EMC clock driver depends on EMC driver
-      memory: tegra: Explicitly mark defines unsigned
-
-Tomeu Vizoso (8):
-      of: Document long-ram-code property in nvidia,tegra20-apbmisc
-      of: Document timings subnode of nvidia,tegra-mc
-      memory: tegra: Disable ARBITRATION_EMEM interrupt
-      of: document new emc-timings subnode in nvidia,tegra124-car
-      of: document external-memory-controller property in tegra124-car
-      clk: Expose clk_hw_reparent() to providers
-      clk: tegra: Set the EMC clock as the parent of the MC clock
-      clk: tegra: Have EMC clock implement determine_rate()
-
- .../bindings/clock/nvidia,tegra124-car.txt         |   44 +-
- .../memory-controllers/nvidia,tegra-mc.txt         |   84 +-
- .../bindings/memory-controllers/tegra-emc.txt      |  374 +++++++
- .../bindings/misc/nvidia,tegra20-apbmisc.txt       |    2 +
- arch/arm/mach-tegra/cpuidle-tegra20.c              |    5 +-
- arch/arm/mach-tegra/reset-handler.S                |   10 +-
- arch/arm/mach-tegra/reset.h                        |    4 +
- arch/arm/mach-tegra/sleep-tegra20.S                |   37 +-
- arch/arm/mach-tegra/sleep.h                        |    4 +
- arch/arm/mach-tegra/tegra.c                        |    1 -
- drivers/clk/Kconfig                                |    1 +
- drivers/clk/clk.c                                  |    8 +
- drivers/clk/tegra/Kconfig                          |    3 +
- drivers/clk/tegra/Makefile                         |    1 +
- drivers/clk/tegra/clk-emc.c                        |  539 ++++++++++
- drivers/clk/tegra/clk-tegra124.c                   |   18 +-
- drivers/clk/tegra/clk.h                            |   12 +
- drivers/gpio/gpio-tegra.c                          |    4 +-
- drivers/memory/tegra/Kconfig                       |   10 +
- drivers/memory/tegra/Makefile                      |    2 +
- drivers/memory/tegra/mc.c                          |  140 ++-
- drivers/memory/tegra/tegra114.c                    |   32 +-
- drivers/memory/tegra/tegra124-emc.c                | 1137 ++++++++++++++++++++
- drivers/memory/tegra/tegra124.c                    |   90 +-
- drivers/memory/tegra/tegra30.c                     |   32 +-
- drivers/soc/tegra/fuse/fuse-tegra20.c              |    6 +-
- drivers/soc/tegra/fuse/tegra-apbmisc.c             |   21 +
- drivers/soc/tegra/pmc.c                            |   23 +-
- include/linux/clk-provider.h                       |    1 +
- include/soc/tegra/emc.h                            |   19 +
- include/soc/tegra/fuse.h                           |    1 +
- include/soc/tegra/mc.h                             |   15 +-
- include/soc/tegra/pmc.h                            |    2 -
- 33 files changed, 2572 insertions(+), 110 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
- create mode 100644 drivers/clk/tegra/Kconfig
- create mode 100644 drivers/clk/tegra/clk-emc.c
- create mode 100644 drivers/memory/tegra/tegra124-emc.c
- create mode 100644 include/soc/tegra/emc.h
+-- 
+FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
+according to speedtest.net.
