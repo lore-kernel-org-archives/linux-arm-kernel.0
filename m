@@ -1,38 +1,41 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 10 Apr 2015 10:25:54 -0500
-Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
-In-Reply-To: <20150410110328.GC25921@red-moon>
-References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <20150410110328.GC25921@red-moon>
-Message-ID: <AF65C7BF-CBBD-4E03-95AA-495830D6DC20@codeaurora.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 10 Apr 2015 11:29:22 -0400
+Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
+In-Reply-To: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
+References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <5527EC52.4050500@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andre,
 
-On Apr 10, 2015, at 6:03 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+On 04/10/2015 11:17 AM, Andre Przywara wrote:
+> When userland injects a SPI via the KVM_IRQ_LINE ioctl we currently
+> only check it against a fixed limit, which historically is set
+> to 127. With the new dynamic IRQ allocation the effective limit may
+> actually be smaller (64).
+> So when now a malicious or buggy userland injects a SPI in that
+> range, we spill over on our VGIC bitmaps and bytemaps memory.
+> I could trigger a host kernel NULL pointer dereference with current
+> mainline by injecting some bogus IRQ number from a hacked kvmtool:
 
-> On Thu, Apr 09, 2015 at 06:37:06PM +0100, Kumar Gala wrote:
->> This patch set adds support for SMP boot on the MSM8x16 family of Qualcomm SoCs.
->> 
->> To support SMP on the MSM8x16 SoCs we need to add ARMv8/64-bit SCM interfaces to
->> setup the boot/release addresses for the secondary CPUs.  In addition we need
->> a uniquie set of cpu ops.  I'm aware the desired methods for booting secondary
->> CPUs is either via spintable or PSCI.  However, these SoCs are shipping with a
->> firmware that does not support those methods.
-> 
-> Why ? Do not tell me you were not aware of those standard methods,
-> because I can't believe you.
-> 
-> If there were additional features to add to spin-table and PSCI,
-> you were, you are and you will always be welcome to debate them.
-> 
-> There is no justification for this patchset, honestly.
-> 
-> Lorenzo
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -195,7 +195,11 @@ struct kvm_arch_memory_slot {
+>  #define KVM_ARM_IRQ_CPU_IRQ		0
+>  #define KVM_ARM_IRQ_CPU_FIQ		1
+>  
+> -/* Highest supported SPI, from VGIC_NR_IRQS */
+> +/*
+> + * This used to hold the highest supported SPI, but it is now obsolete
+> + * and only here to provide source code level compatibility with older
+> + * userland. The highest SPI number can be set via KVM_DEV_ARM_VGIC_GRP_NR_IRQS.
+> + */
+>  #define KVM_ARM_IRQ_GIC_MAX		127
 
-The justification for this patchset is support for a hardware platform that exists in the world.  The kernel usual is willing to accept such things as long as the code is reasonable.
+If that's the case should it maybe only defined when __KERNEL__ is not defined?
 
-- k
+Chris
 
 -- 
 Qualcomm Innovation Center, Inc.
