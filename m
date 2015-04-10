@@ -1,49 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 11 Apr 2015 00:27:58 +0200
-Subject: [PATCH] dmaengine: shdmac: avoid unused variable warnings
-Message-ID: <27084610.k92kokiTBY@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 10 Apr 2015 22:30:08 +0000
+Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
+In-Reply-To: <20150410171148.07bc9429@bbrezillon>
+References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150410135056.GB28873@io.lakedaemon.net>
+ <20150410171148.07bc9429@bbrezillon>
+Message-ID: <20150410223008.GA18660@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver uses '#ifdef CONFIG_ARCH_SHMOBILE' and '#ifdef CONFIG_ARM'
-interchangeably in its sh_dmae_probe function, which causes a build
-warning when building for ARM without also enabling shmobile:
+Hey Boris,
 
-dma/sh/shdmac.c: In function sh_dmae_probe:
-dma/sh/shdmac.c:696:6: warning: unused variable errirq [-Wunused-variable]
-dma/sh/shdmac.c:695:16: warning: unused variable irqflags [-Wunused-variable]
-dma/sh/shdmac.c: At top level:
-dma/sh/shdmac.c:447:20: warning: sh_dmae_err defined but not used [-Wunused-function]
+On Fri, Apr 10, 2015 at 05:11:48PM +0200, Boris Brezillon wrote:
+> On Fri, 10 Apr 2015 13:50:56 +0000 Jason Cooper <jason@lakedaemon.net> wrote:
+> > On Thu, Apr 09, 2015 at 04:58:41PM +0200, Boris Brezillon wrote:
+> > > I know we usually try to adapt existing drivers instead of replacing them
+> > > by new ones, but after trying to refactor the mv_cesa driver I realized it
+> > > would take longer than writing an new one from scratch.
+> > 
+> > I'm sorry, but this makes me *very* uncomfortable.  Any organization
+> > worth it's salt will do a very careful audit of code touching
+> > cryptographic material and sensitive (decrypted) data.  From that point
+> > on, small audits of the changes to the code allow the organization to
+> > build a comfort level with kernel updates.  iow, following the git
+> > history of the driver.
+> > 
+> > By apply this series, we are basically forcing those organizations to
+> > either a) stop updating, or b) expend significant resources to do
+> > another full audit.
+> > 
+> > In short, this series breaks the audit chain for the mv_cesa driver.
+> > 
+> > Maybe I'm the only person with this level of paranoia.  If so, I'm sure
+> > others will override me.
+> > 
+> > From my POV, it looks like the *only* reason we've chosen this route is
+> > developer convenience.  I don't think that's sufficient reason to break
+> > the change history of a driver handling sensitive data.
+> 
+> Well, I understand you concern, but if you read carefully the old and
+> new drivers, you'll notice that they are completely different (the only
+> thing I kept are the macro definitions).
 
-This changes all the #ifdef to test for CONFIG_ARCH_SHMOBILE to
-avoid that warning. An earlier patch from Laurent had fixed the warning
-for non-ARM case, but it still remained present in ARM randconfig builds.
+Yes, that's the worrying part for me. ;-)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 52d6a5ee101bf ("DMA: shdma: Fix warnings due to declared but unused symbols")
----
- drivers/dma/sh/shdmac.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> I really tried to adapt the existing driver to add the missing
+> features (especially the support for TDMA), but all my attempts
+> ended up introducing hackish code (not even talking about the
+> performance penalty of this approach).
 
-diff --git a/drivers/dma/sh/shdmac.c b/drivers/dma/sh/shdmac.c
-index 9f1d4c7dbab8..11707df1a689 100644
---- a/drivers/dma/sh/shdmac.c
-+++ b/drivers/dma/sh/shdmac.c
-@@ -443,7 +443,7 @@ static bool sh_dmae_reset(struct sh_dmae_device *shdev)
- 	return ret;
- }
- 
--#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARM)
-+#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
- static irqreturn_t sh_dmae_err(int irq, void *data)
- {
- 	struct sh_dmae_device *shdev = data;
-@@ -689,7 +689,7 @@ static int sh_dmae_probe(struct platform_device *pdev)
- 	const struct sh_dmae_pdata *pdata;
- 	unsigned long chan_flag[SH_DMAE_MAX_CHANNELS] = {};
- 	int chan_irq[SH_DMAE_MAX_CHANNELS];
--#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARM)
-+#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
- 	unsigned long irqflags = 0;
- 	int errirq;
- #endif
+Ok, fair enough.  It would be helpful if this account of attempting to
+reconcile the old driver made it into the commit message.  This puts us
+in "perfect is the enemy of getting it done" territory.
+
+> I have another solution though: keep the existing driver for old
+> marvell SoCs (orion, kirkwood and dove), and add a new one for modern
+> SoCs (armada 370, XP, 375 and 38x), so that users of the mv_cesa driver
+> won't have to audit the new code.
+
+A fair proposal, but I'll freely admit the number of people actually auditing
+their code paths is orders of magnitude smaller than the number of users
+of the driver.
+
+There's such a large population of compatible legacy SoCs in the wild,
+adding an artificial boundary doesn't make sense.  Especially since
+we're talking about features everyone would want to use.
+
+Perhaps we should keep both around, and deprecate the legacy driver over
+3 to 4 cycles?
+
+thx,
+
+Jason.
