@@ -1,50 +1,31 @@
 From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Fri, 10 Apr 2015 23:35:58 +0200
-Subject: [PATCH 3/9] Documentation: DT bindings: fix hda2codec_2x clock name
- for tegra30-hda
+Date: Fri, 10 Apr 2015 23:35:56 +0200
+Subject: [PATCH 1/9] ARM: tegra: Cardhu device-tree comment spelling fix
 In-Reply-To: <cover.1428700856.git.marcel.ziswiler@toradex.com>
 References: <cover.1428700856.git.marcel.ziswiler@toradex.com>
-Message-ID: <ee8e9952dfdfd87da52f817fca0a6ad94a137742.1428700856.git.marcel.ziswiler@toradex.com>
+Message-ID: <cb3321c697591c3b2ae2ad799282448cff4bef21.1428700856.git.marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
-Fix hda2codec_2x clock name in Tegra30 HDA controller device tree node
-documentation.
-While at it also fix coma vs. semicolon issue.
-
 Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 ---
- Documentation/devicetree/bindings/sound/nvidia,tegra30-hda.txt | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/tegra30-cardhu.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra30-hda.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra30-hda.txt
-index 13e2ef4..5032efa 100644
---- a/Documentation/devicetree/bindings/sound/nvidia,tegra30-hda.txt
-+++ b/Documentation/devicetree/bindings/sound/nvidia,tegra30-hda.txt
-@@ -8,10 +8,10 @@ Required properties:
- - interrupts : The interrupt from the HDA controller.
- - clocks : Must contain an entry for each required entry in clock-names.
-   See ../clocks/clock-bindings.txt for details.
--- clock-names : Must include the following entries: hda, hdacodec_2x, hda2hdmi
-+- clock-names : Must include the following entries: hda, hda2codec_2x, hda2hdmi
- - resets : Must contain an entry for each entry in reset-names.
-   See ../reset/reset.txt for details.
--- reset-names : Must include the following entries: hda, hdacodec_2x, hda2hdmi
-+- reset-names : Must include the following entries: hda, hda2codec_2x, hda2hdmi
- 
- Example:
- 
-@@ -24,7 +24,7 @@ hda at 0,70030000 {
- 		 <&tegra_car TEGRA124_CLK_HDA2CODEC_2X>;
- 	clock-names = "hda", "hda2hdmi", "hda2codec_2x";
- 	resets = <&tegra_car 125>, /* hda */
--		 <&tegra_car 128>; /* hda2hdmi */
--		 <&tegra_car 111>, /* hda2codec_2x */
-+		 <&tegra_car 128>, /* hda2hdmi */
-+		 <&tegra_car 111>; /* hda2codec_2x */
- 	reset-names = "hda", "hda2hdmi", "hda2codec_2x";
- };
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index a1b682e..6f86820 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -12,7 +12,7 @@
+  * tegra30-cardhu-a04.dts.
+  * The identification of board is done in two ways, by looking the sticker
+  * on PCB and by reading board id eeprom.
+- * The stciker will have number like 600-81291-1000-002 C.3. In this 4th
++ * The sticker will have number like 600-81291-1000-002 C.3. In this 4th
+  * number is the fab version like here it is 002 and hence fab version A02.
+  * The (downstream internal) U-Boot of Cardhu display the board-id as
+  * follows:
 -- 
 1.9.3
