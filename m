@@ -1,32 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 11 Apr 2015 00:01:32 +0200
-Subject: [PATCH] serial: earlycon requires console support
-Message-ID: <5009638.HyplLv73fU@wuerfel>
+Date: Sat, 11 Apr 2015 00:03:19 +0200
+Subject: [PATCH] staging: sm750: remove incorrect __exit annotation
+Message-ID: <3220041.yyKr7PMSXS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A configuration that enables earlycon but not the core console
-code causes a link error:
+The lynxfb_pci_remove function is used as the 'remove' callback
+of the driver, and must not be discarded:
 
-drivers/built-in.o: In function `setup_earlycon':
-drivers/tty/serial/earlycon.c:70: undefined reference to `uart_parse_earlycon'
+lynxfb_pci_remove' referenced in section `.data' of drivers/built-in.o: defined in discarded section `.exit.text' of drivers/built-in.o
 
-That error can be triggered by the newly added samsung earlycon support,
-which is missing a 'select' statement. This patch adds the 'select'
-to make serial-samsung behave like the other drivers.
+This removes the extraneous annotation.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b94ba0328d3b3 ("serial: samsung: Add support for early console")
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index f8120c1bde14..5cd8f38a36de 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -241,6 +241,7 @@ config SERIAL_SAMSUNG
- 	tristate "Samsung SoC serial support"
- 	depends on PLAT_SAMSUNG || ARCH_EXYNOS
- 	select SERIAL_CORE
-+	select SERIAL_CORE_CONSOLE
- 	select SERIAL_EARLYCON
- 	help
- 	  Support for the on-chip UARTs on the Samsung S3C24XX series CPUs,
+diff --git a/drivers/staging/sm750fb/sm750.c b/drivers/staging/sm750fb/sm750.c
+index 3c7ea95dd9f9..dbbb2f879a29 100644
+--- a/drivers/staging/sm750fb/sm750.c
++++ b/drivers/staging/sm750fb/sm750.c
+@@ -1250,7 +1250,7 @@ err_enable:
+ 	return -ENODEV;
+ }
+ 
+-static void __exit lynxfb_pci_remove(struct pci_dev *pdev)
++static void lynxfb_pci_remove(struct pci_dev *pdev)
+ {
+ 	struct fb_info *info;
+ 	struct lynx_share *share;
