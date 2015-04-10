@@ -1,30 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 10 Apr 2015 16:48:09 +0100
-Subject: [PATCH RESEND v6 4/6] regulator: axp20x: add support for AXP22X
- regulators
-In-Reply-To: <1428638946-24890-5-git-send-email-wens@csie.org>
-References: <1428638946-24890-1-git-send-email-wens@csie.org>
- <1428638946-24890-5-git-send-email-wens@csie.org>
-Message-ID: <20150410154809.GN6023@sirena.org.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 10 Apr 2015 17:59:40 +0200
+Subject: [PATCH v4 0/3] i2c: davinci improvements and fixes
+In-Reply-To: <1428323921-25832-1-git-send-email-grygorii.strashko@linaro.org>
+References: <1428323921-25832-1-git-send-email-grygorii.strashko@linaro.org>
+Message-ID: <20150410155940.GA2408@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 12:09:04PM +0800, Chen-Yu Tsai wrote:
+On Mon, Apr 06, 2015 at 03:38:38PM +0300, grygorii.strashko at linaro.org wrote:
+> From: Grygorii Strashko <grygorii.strashko@linaro.org>
+> 
+> This series converts driver to use I2C bus recovery infrastructure and
+> adds Davinci I2C bus recovery mechanizm based on using ICPFUNC registers.
+> These patches are combination of two patches from Ben Gardiner [1] and
+> Mike Looijmans [2] which i've reworked to use I2C bus recovery infrastructure
 
-> This patch depends on the previous patch "regulator: axp20x: prepare
-> support for multiple AXP chip families" and the mfd header from the
-> first patch "mfd: axp20x: add AXP22x PMIC support".
+Applied to for-next, thanks for keeping at it and providing useful info!
 
-> Could we merge both regulator patches through the mfd tree, with the
-> other patches in the series? There are no other external dependencies.
-
-Yes, of course we can - that's the whole point of me sending a
-Reviewed-by!  Half of what I'm trying to do with that is to cut down on
-the number of reposts of MFD series I get sent :(
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150410/87044ca6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150410/aed38f5b/attachment.sig>
