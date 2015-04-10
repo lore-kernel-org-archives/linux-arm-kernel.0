@@ -1,162 +1,110 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 10 Apr 2015 09:58:24 +0100
-Subject: [PATCH v4 2/9] mmc: sdhci-st: Add support for de-asserting reset
- signal and top regs resource
+Date: Fri, 10 Apr 2015 09:58:25 +0100
+Subject: [PATCH v4 3/9] mmc: sdhci-st: Add delay management functions for top
+ registers (eMMC).
 In-Reply-To: <1428656311-2605-1-git-send-email-peter.griffin@linaro.org>
 References: <1428656311-2605-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1428656311-2605-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1428656311-2605-4-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STiH407 family SoC's can have a reset signal for the controller which needs to
-be managed. Also the eMMC controller has some additional 'top' memory mapped
-registers which are used to manage the dynamic and static delay required for
-UHS modes. This patch adds support for creating the mapping, which will be used
-by subsequent patches.
+Due to the tight timing constraints in some UHS modes, it is required to have
+some delay management in the design. Two types of delay management are supported
+in the HW: -
+
+1) Static delay management
+2) Dynamic delay management
+
+NB: The delay management is only there when eMMC interface is selected.
+
+1: Static delay management: is used to provide PVT dependent static delay on the
+clock/data lines to manage setup/hold requirements of the interface. The maximum
+delay possible is 3.25ns. These delays are PVT dependent, and thus delay values
+applied are not accurate and vary across provcess voltage and temperature range.
+Due to this these delays must not be used on the very time critical paths.
+
+2. Dynamic delay locked loop (DLL): is used to provide dynamic delay management.
+The advantage of DLL is that it provides accurate & PVT indepedent delay.
+
+The DLL is used to provide delay on the loopback clock on "Read Path" to capture
+read data reliably. On TX path the clock on which output data is transmitted is
+delayed, resulting in delay of TX data.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- drivers/mmc/host/sdhci-st.c | 59 ++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 56 insertions(+), 3 deletions(-)
+ drivers/mmc/host/sdhci-st.c | 59 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
 
 diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
-index a80de93..f6f2a48 100644
+index f6f2a48..b5e4df8 100644
 --- a/drivers/mmc/host/sdhci-st.c
 +++ b/drivers/mmc/host/sdhci-st.c
-@@ -23,9 +23,14 @@
- #include <linux/module.h>
- #include <linux/err.h>
- #include <linux/mmc/host.h>
--
-+#include <linux/reset.h>
- #include "sdhci-pltfm.h"
+@@ -122,6 +122,65 @@ struct st_mmc_platform_data {
+ 		 ST_TOP_MMC_DLY_CTRL_ATUNE_NOT_CFG_DLY | \
+ 		 ST_TOP_MMC_START_DLL_LOCK)
  
-+struct st_mmc_platform_data {
-+	struct  reset_control *rstc;
-+	void __iomem *top_ioaddr;
-+};
++/*
++ * For clock speeds greater than 90MHz, we need to check that the
++ * DLL procedure has finished before switching to ultra-speed modes.
++ */
++#define	CLK_TO_CHECK_DLL_LOCK	90000000
 +
- /* MMCSS glue logic to setup the HC on some ST SoCs (e.g. STiH407 family) */
- 
- #define ST_MMC_CCONFIG_REG_1		0x400
-@@ -151,10 +156,16 @@ static const struct sdhci_pltfm_data sdhci_st_pdata = {
- static int sdhci_st_probe(struct platform_device *pdev)
- {
- 	struct sdhci_host *host;
-+	struct st_mmc_platform_data *pdata;
- 	struct sdhci_pltfm_host *pltfm_host;
- 	struct clk *clk;
- 	int ret = 0;
- 	u16 host_version;
-+	struct resource *res;
++static inline void st_mmcss_set_static_delay(void __iomem *ioaddr)
++{
++	if (!ioaddr)
++		return;
 +
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return -ENOMEM;
- 
- 	clk =  devm_clk_get(&pdev->dev, "mmc");
- 	if (IS_ERR(clk)) {
-@@ -162,10 +173,17 @@ static int sdhci_st_probe(struct platform_device *pdev)
- 		return PTR_ERR(clk);
- 	}
- 
-+	pdata->rstc = devm_reset_control_get(&pdev->dev, NULL);
-+	if (IS_ERR(pdata->rstc))
-+		pdata->rstc = NULL;
-+	else
-+		reset_control_deassert(pdata->rstc);
++	writel_relaxed(0x0, ioaddr + ST_TOP_MMC_DLY_CTRL);
++	writel_relaxed(ST_TOP_MMC_DLY_MAX,
++			ioaddr + ST_TOP_MMC_TX_CLK_DLY);
++}
 +
- 	host = sdhci_pltfm_init(pdev, &sdhci_st_pdata, 0);
- 	if (IS_ERR(host)) {
- 		dev_err(&pdev->dev, "Failed sdhci_pltfm_init\n");
--		return PTR_ERR(host);
-+		ret = PTR_ERR(host);
-+		goto err_pltfm_init;
- 	}
- 
- 	ret = mmc_of_parse(host->mmc);
-@@ -176,7 +194,17 @@ static int sdhci_st_probe(struct platform_device *pdev)
- 
- 	clk_prepare_enable(clk);
- 
-+	/* Configure the FlashSS Top registers for setting eMMC TX/RX delay */
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+					   "top-mmc-delay");
-+	pdata->top_ioaddr = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(pdata->top_ioaddr)) {
-+		dev_warn(&pdev->dev, "FlashSS Top Dly registers not available");
-+		pdata->top_ioaddr = NULL;
++static inline void st_mmcss_set_dll(void __iomem *ioaddr)
++{
++	if (!ioaddr)
++		return;
++
++	writel_relaxed(ST_TOP_MMC_DYN_DLY_CONF,	ioaddr + ST_TOP_MMC_DLY_CTRL);
++	writel_relaxed(ST_TOP_MMC_TX_DLL_STEP_DLY_VALID,
++			ioaddr + ST_TOP_MMC_TX_DLL_STEP_DLY);
++}
++
++static int st_mmcss_lock_dll(void __iomem *ioaddr)
++{
++	unsigned long curr, value;
++	unsigned long finish = jiffies + HZ;
++
++	/* Checks if the DLL procedure is finished */
++	do {
++		curr = jiffies;
++		value = readl(ioaddr + ST_MMC_STATUS_R);
++		if (value & 0x1)
++			return 0;
++
++		cpu_relax();
++	} while (!time_after_eq(curr, finish));
++
++	return -EBUSY;
++}
++
++static int sdhci_st_set_dll_for_clock(struct sdhci_host *host)
++{
++	int ret = 0;
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct st_mmc_platform_data *pdata = pltfm_host->priv;
++
++	if (host->clock > CLK_TO_CHECK_DLL_LOCK) {
++		st_mmcss_set_dll(pdata->top_ioaddr);
++		ret = st_mmcss_lock_dll(host->ioaddr);
 +	}
-+
- 	pltfm_host = sdhci_priv(host);
-+	pltfm_host->priv = pdata;
- 	pltfm_host->clk = clk;
- 
- 	ret = sdhci_add_host(host);
-@@ -200,6 +228,23 @@ err_out:
- 	clk_disable_unprepare(clk);
- err_of:
- 	sdhci_pltfm_free(pdev);
-+err_pltfm_init:
-+	if (pdata->rstc)
-+		reset_control_assert(pdata->rstc);
 +
 +	return ret;
 +}
 +
-+static int sdhci_st_remove(struct platform_device *pdev)
-+{
-+	struct sdhci_host *host = platform_get_drvdata(pdev);
-+	struct st_mmc_platform_data *pdata = pltfm_host->priv;
-+	int ret;
 +
-+	ret = sdhci_pltfm_unregister(pdev);
-+
-+	if (pdata->rstc)
-+		reset_control_assert(pdata->rstc);
- 
- 	return ret;
- }
-@@ -209,11 +254,15 @@ static int sdhci_st_suspend(struct device *dev)
+ static u32 sdhci_st_readl(struct sdhci_host *host, int reg)
  {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct st_mmc_platform_data *pdata = pltfm_host->priv;
- 	int ret = sdhci_suspend_host(host);
- 
- 	if (ret)
- 		goto out;
- 
-+	if (pdata->rstc)
-+		reset_control_assert(pdata->rstc);
-+
- 	clk_disable_unprepare(pltfm_host->clk);
- out:
- 	return ret;
-@@ -223,9 +272,13 @@ static int sdhci_st_resume(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct st_mmc_platform_data *pdata = pltfm_host->priv;
- 
- 	clk_prepare_enable(pltfm_host->clk);
- 
-+	if (pdata->rstc)
-+		reset_control_deassert(pdata->rstc);
-+
- 	return sdhci_resume_host(host);
- }
- #endif
-@@ -241,7 +294,7 @@ MODULE_DEVICE_TABLE(of, st_sdhci_match);
- 
- static struct platform_driver sdhci_st_driver = {
- 	.probe = sdhci_st_probe,
--	.remove = sdhci_pltfm_unregister,
-+	.remove = sdhci_st_remove,
- 	.driver = {
- 		   .name = "sdhci-st",
- 		   .pm = &sdhci_st_pmops,
+ 	u32 ret;
 -- 
 1.9.1
