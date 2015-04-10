@@ -1,7 +1,7 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Apr 2015 16:11:05 -0700
-Subject: [PATCH] TTY: msm_smd_tty: Remove unused driver
-Message-ID: <1428707466-24526-4-git-send-email-sboyd@codeaurora.org>
+Date: Fri, 10 Apr 2015 16:11:03 -0700
+Subject: [PATCH] drivers/char: Remove msm_smd_pkt driver
+Message-ID: <1428707466-24526-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,281 +13,514 @@ Cc: Bryan Huntsman <bryanh@codeaurora.org>
 Cc: Daniel Walker <dwalker@fifo99.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/tty/serial/Kconfig       |   8 --
- drivers/tty/serial/Makefile      |   1 -
- drivers/tty/serial/msm_smd_tty.c | 232 ---------------------------------------
- 3 files changed, 241 deletions(-)
- delete mode 100644 drivers/tty/serial/msm_smd_tty.c
+ drivers/char/Kconfig       |   8 -
+ drivers/char/Makefile      |   1 -
+ drivers/char/msm_smd_pkt.c | 465 ---------------------------------------------
+ 3 files changed, 474 deletions(-)
+ delete mode 100644 drivers/char/msm_smd_pkt.c
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index f8120c1bde14..3a2bfca6f4b0 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -1378,14 +1378,6 @@ config SERIAL_PCH_UART_CONSOLE
- 	  (the system  console is the device which receives all kernel messages and
- 	  warnings and which allows logins in single user mode).
+diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
+index a4af8221751e..a043107da2af 100644
+--- a/drivers/char/Kconfig
++++ b/drivers/char/Kconfig
+@@ -590,14 +590,6 @@ config DEVPORT
  
--config SERIAL_MSM_SMD
--	bool "Enable tty device interface for some SMD ports"
+ source "drivers/s390/char/Kconfig"
+ 
+-config MSM_SMD_PKT
+-	bool "Enable device interface for some SMD packet ports"
 -	default n
 -	depends on MSM_SMD
 -	help
--	  Enables userspace clients to read and write to some streaming SMD
--	  ports via tty device interface for MSM chipset.
+-	  Enables userspace clients to read and write to some packet SMD
+-	  ports via device interface for MSM chipset.
 -
- config SERIAL_MXS_AUART
- 	depends on ARCH_MXS
- 	tristate "MXS AUART support"
-diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-index c3ac3d930b33..432cb6465227 100644
---- a/drivers/tty/serial/Makefile
-+++ b/drivers/tty/serial/Makefile
-@@ -79,7 +79,6 @@ obj-$(CONFIG_SERIAL_ALTERA_JTAGUART) += altera_jtaguart.o
- obj-$(CONFIG_SERIAL_VT8500) += vt8500_serial.o
- obj-$(CONFIG_SERIAL_IFX6X60)  	+= ifx6x60.o
- obj-$(CONFIG_SERIAL_PCH_UART)	+= pch_uart.o
--obj-$(CONFIG_SERIAL_MSM_SMD)	+= msm_smd_tty.o
- obj-$(CONFIG_SERIAL_MXS_AUART) += mxs-auart.o
- obj-$(CONFIG_SERIAL_LANTIQ)	+= lantiq.o
- obj-$(CONFIG_SERIAL_XILINX_PS_UART) += xilinx_uartps.o
-diff --git a/drivers/tty/serial/msm_smd_tty.c b/drivers/tty/serial/msm_smd_tty.c
+ config TILE_SROM
+ 	bool "Character-device access via hypervisor to the Tilera SPI ROM"
+ 	depends on TILE
+diff --git a/drivers/char/Makefile b/drivers/char/Makefile
+index d06cde26031b..76cdfaa07cd5 100644
+--- a/drivers/char/Makefile
++++ b/drivers/char/Makefile
+@@ -9,7 +9,6 @@ obj-$(CONFIG_ATARI_DSP56K)	+= dsp56k.o
+ obj-$(CONFIG_VIRTIO_CONSOLE)	+= virtio_console.o
+ obj-$(CONFIG_RAW_DRIVER)	+= raw.o
+ obj-$(CONFIG_SGI_SNSC)		+= snsc.o snsc_event.o
+-obj-$(CONFIG_MSM_SMD_PKT)	+= msm_smd_pkt.o
+ obj-$(CONFIG_MSPEC)		+= mspec.o
+ obj-$(CONFIG_MMTIMER)		+= mmtimer.o
+ obj-$(CONFIG_UV_MMTIMER)	+= uv_mmtimer.o
+diff --git a/drivers/char/msm_smd_pkt.c b/drivers/char/msm_smd_pkt.c
 deleted file mode 100644
-index 1238ac370bff..000000000000
---- a/drivers/tty/serial/msm_smd_tty.c
+index ba82a06d9684..000000000000
+--- a/drivers/char/msm_smd_pkt.c
 +++ /dev/null
-@@ -1,232 +0,0 @@
--/*
-- * Copyright (C) 2007 Google, Inc.
-- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
-- * Author: Brian Swetland <swetland@google.com>
+@@ -1,465 +0,0 @@
+-/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
 - *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
 - *
 - * This program is distributed in the hope that it will be useful,
 - * but WITHOUT ANY WARRANTY; without even the implied warranty of
 - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 - * GNU General Public License for more details.
 - *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+- * 02110-1301, USA.
+- *
+- */
+-/*
+- * SMD Packet Driver -- Provides userspace interface to SMD packet ports.
 - */
 -
+-#include <linux/slab.h>
+-#include <linux/cdev.h>
 -#include <linux/module.h>
 -#include <linux/fs.h>
--#include <linux/cdev.h>
 -#include <linux/device.h>
--#include <linux/wait.h>
--
--#include <linux/tty.h>
--#include <linux/tty_driver.h>
--#include <linux/tty_flip.h>
+-#include <linux/sched.h>
+-#include <linux/mutex.h>
+-#include <linux/delay.h>
+-#include <linux/uaccess.h>
+-#include <linux/workqueue.h>
+-#include <linux/poll.h>
 -
 -#include <mach/msm_smd.h>
 -
--#define MAX_SMD_TTYS 32
+-#define NUM_SMD_PKT_PORTS 9
+-#define DEVICE_NAME "smdpkt"
+-#define MAX_BUF_SIZE 2048
 -
--struct smd_tty_info {
--	struct tty_port port;
--	smd_channel_t *ch;
--};
+-struct smd_pkt_dev {
+-	struct cdev cdev;
+-	struct device *devicep;
 -
--struct smd_tty_channel_desc {
--	int id;
--	const char *name;
--};
+-	struct smd_channel *ch;
+-	int open_count;
+-	struct mutex ch_lock;
+-	struct mutex rx_lock;
+-	struct mutex tx_lock;
+-	wait_queue_head_t ch_read_wait_queue;
+-	wait_queue_head_t ch_opened_wait_queue;
 -
--static struct smd_tty_info smd_tty[MAX_SMD_TTYS];
+-	int i;
 -
--static const struct smd_tty_channel_desc smd_default_tty_channels[] = {
--	{ .id = 0, .name = "SMD_DS" },
--	{ .id = 27, .name = "SMD_GPSNMEA" },
--};
+-	unsigned char tx_buf[MAX_BUF_SIZE];
+-	unsigned char rx_buf[MAX_BUF_SIZE];
+-	int remote_open;
 -
--static const struct smd_tty_channel_desc *smd_tty_channels =
--		smd_default_tty_channels;
--static int smd_tty_channels_len = ARRAY_SIZE(smd_default_tty_channels);
+-} *smd_pkt_devp[NUM_SMD_PKT_PORTS];
 -
--static void smd_tty_notify(void *priv, unsigned event)
+-struct class *smd_pkt_classp;
+-static dev_t smd_pkt_number;
+-
+-static int msm_smd_pkt_debug_enable;
+-module_param_named(debug_enable, msm_smd_pkt_debug_enable,
+-		   int, S_IRUGO | S_IWUSR | S_IWGRP);
+-
+-#ifdef DEBUG
+-#define D_DUMP_BUFFER(prestr, cnt, buf) do {			\
+-		int i;						\
+-		if (msm_smd_pkt_debug_enable) {			\
+-			pr_debug("%s", prestr);			\
+-			for (i = 0; i < cnt; i++)		\
+-				pr_debug("%.2x", buf[i]);	\
+-			pr_debug("\n");				\
+-		}						\
+-	} while (0)
+-#else
+-#define D_DUMP_BUFFER(prestr, cnt, buf) do {} while (0)
+-#endif
+-
+-#ifdef DEBUG
+-#define DBG(x...) do {			\
+-	if (msm_smd_pkt_debug_enable)	\
+-		pr_debug(x);		\
+-	} while (0)
+-#else
+-#define DBG(x...) do {} while (0)
+-#endif
+-
+-static void check_and_wakeup_reader(struct smd_pkt_dev *smd_pkt_devp)
 -{
--	unsigned char *ptr;
--	int avail;
--	struct smd_tty_info *info = priv;
--	struct tty_struct *tty;
+-	int sz;
 -
--	if (event != SMD_EVENT_DATA)
+-	if (!smd_pkt_devp || !smd_pkt_devp->ch)
 -		return;
 -
--	tty = tty_port_tty_get(&info->port);
--	if (!tty)
+-	sz = smd_cur_packet_size(smd_pkt_devp->ch);
+-	if (sz == 0) {
+-		DBG("no packet\n");
 -		return;
--
--	for (;;) {
--		if (test_bit(TTY_THROTTLED, &tty->flags))
--			break;
--		avail = smd_read_avail(info->ch);
--		if (avail == 0)
--			break;
--
--		avail = tty_prepare_flip_string(&info->port, &ptr, avail);
--
--		if (smd_read(info->ch, ptr, avail) != avail) {
--			/* shouldn't be possible since we're in interrupt
--			** context here and nobody else could 'steal' our
--			** characters.
--			*/
--			pr_err("OOPS - smd_tty_buffer mismatch?!");
--		}
--
--		tty_flip_buffer_push(&info->port);
+-	}
+-	if (sz > smd_read_avail(smd_pkt_devp->ch)) {
+-		DBG("incomplete packet\n");
+-		return;
 -	}
 -
--	/* XXX only when writable and necessary */
--	tty_wakeup(tty);
--	tty_kref_put(tty);
+-	DBG("waking up reader\n");
+-	wake_up_interruptible(&smd_pkt_devp->ch_read_wait_queue);
 -}
 -
--static int smd_tty_port_activate(struct tty_port *tport, struct tty_struct *tty)
+-static int smd_pkt_read(struct file *file, char __user *buf,
+-			size_t count, loff_t *ppos)
 -{
--	struct smd_tty_info *info = container_of(tport, struct smd_tty_info,
--			port);
--	int i, res = 0;
--	const char *name = NULL;
+-	int r, bytes_read;
+-	struct smd_pkt_dev *smd_pkt_devp;
+-	struct smd_channel *chl;
 -
--	for (i = 0; i < smd_tty_channels_len; i++) {
--		if (smd_tty_channels[i].id == tty->index) {
--			name = smd_tty_channels[i].name;
--			break;
--		}
+-	DBG("read %d bytes\n", count);
+-	if (count > MAX_BUF_SIZE)
+-		return -EINVAL;
+-
+-	smd_pkt_devp = file->private_data;
+-	if (!smd_pkt_devp || !smd_pkt_devp->ch)
+-		return -EINVAL;
+-
+-	chl = smd_pkt_devp->ch;
+-wait_for_packet:
+-	r = wait_event_interruptible(smd_pkt_devp->ch_read_wait_queue,
+-				     (smd_cur_packet_size(chl) > 0 &&
+-				      smd_read_avail(chl) >=
+-				      smd_cur_packet_size(chl)));
+-
+-	if (r < 0) {
+-		if (r != -ERESTARTSYS)
+-			pr_err("wait returned %d\n", r);
+-		return r;
 -	}
--	if (!name)
--		return -ENODEV;
 -
--	if (info->ch)
--		smd_kick(info->ch);
--	else
--		res = smd_open(name, &info->ch, info, smd_tty_notify);
+-	mutex_lock(&smd_pkt_devp->rx_lock);
 -
--	if (!res)
--		tty->driver_data = info;
--
--	return res;
--}
--
--static void smd_tty_port_shutdown(struct tty_port *tport)
--{
--	struct smd_tty_info *info = container_of(tport, struct smd_tty_info,
--			port);
--
--	if (info->ch) {
--		smd_close(info->ch);
--		info->ch = 0;
+-	bytes_read = smd_cur_packet_size(smd_pkt_devp->ch);
+-	if (bytes_read == 0 ||
+-	    bytes_read < smd_read_avail(smd_pkt_devp->ch)) {
+-		mutex_unlock(&smd_pkt_devp->rx_lock);
+-		DBG("Nothing to read\n");
+-		goto wait_for_packet;
 -	}
+-
+-	if (bytes_read > count) {
+-		mutex_unlock(&smd_pkt_devp->rx_lock);
+-		pr_info("packet size %d > buffer size %d", bytes_read, count);
+-		return -EINVAL;
+-	}
+-
+-	r = smd_read(smd_pkt_devp->ch, smd_pkt_devp->rx_buf, bytes_read);
+-	if (r != bytes_read) {
+-		mutex_unlock(&smd_pkt_devp->rx_lock);
+-		pr_err("smd_read failed to read %d bytes: %d\n", bytes_read, r);
+-		return -EIO;
+-	}
+-
+-	D_DUMP_BUFFER("read: ", bytes_read, smd_pkt_devp->rx_buf);
+-	r = copy_to_user(buf, smd_pkt_devp->rx_buf, bytes_read);
+-	mutex_unlock(&smd_pkt_devp->rx_lock);
+-	if (r) {
+-		pr_err("copy_to_user failed %d\n", r);
+-		return -EFAULT;
+-	}
+-
+-	DBG("read complete %d bytes\n", bytes_read);
+-	check_and_wakeup_reader(smd_pkt_devp);
+-
+-	return bytes_read;
 -}
 -
--static int smd_tty_open(struct tty_struct *tty, struct file *f)
+-static int smd_pkt_write(struct file *file, const char __user *buf,
+-			 size_t count, loff_t *ppos)
 -{
--	struct smd_tty_info *info = smd_tty + tty->index;
+-	int r;
+-	struct smd_pkt_dev *smd_pkt_devp;
 -
--	return tty_port_open(&info->port, tty, f);
--}
+-	if (count > MAX_BUF_SIZE)
+-		return -EINVAL;
 -
--static void smd_tty_close(struct tty_struct *tty, struct file *f)
--{
--	struct smd_tty_info *info = tty->driver_data;
+-	DBG("writing %d bytes\n", count);
 -
--	tty_port_close(&info->port, tty, f);
--}
+-	smd_pkt_devp = file->private_data;
+-	if (!smd_pkt_devp || !smd_pkt_devp->ch)
+-		return -EINVAL;
 -
--static int smd_tty_write(struct tty_struct *tty,
--			 const unsigned char *buf, int len)
--{
--	struct smd_tty_info *info = tty->driver_data;
--	int avail;
--
--	/* if we're writing to a packet channel we will
--	** never be able to write more data than there
--	** is currently space for
--	*/
--	avail = smd_write_avail(info->ch);
--	if (len > avail)
--		len = avail;
--
--	return smd_write(info->ch, buf, len);
--}
--
--static int smd_tty_write_room(struct tty_struct *tty)
--{
--	struct smd_tty_info *info = tty->driver_data;
--	return smd_write_avail(info->ch);
--}
--
--static int smd_tty_chars_in_buffer(struct tty_struct *tty)
--{
--	struct smd_tty_info *info = tty->driver_data;
--	return smd_read_avail(info->ch);
--}
--
--static void smd_tty_unthrottle(struct tty_struct *tty)
--{
--	struct smd_tty_info *info = tty->driver_data;
--	smd_kick(info->ch);
--}
--
--static const struct tty_port_operations smd_tty_port_ops = {
--	.shutdown = smd_tty_port_shutdown,
--	.activate = smd_tty_port_activate,
--};
--
--static const struct tty_operations smd_tty_ops = {
--	.open = smd_tty_open,
--	.close = smd_tty_close,
--	.write = smd_tty_write,
--	.write_room = smd_tty_write_room,
--	.chars_in_buffer = smd_tty_chars_in_buffer,
--	.unthrottle = smd_tty_unthrottle,
--};
--
--static struct tty_driver *smd_tty_driver;
--
--static int __init smd_tty_init(void)
--{
--	int ret, i;
--
--	smd_tty_driver = alloc_tty_driver(MAX_SMD_TTYS);
--	if (smd_tty_driver == 0)
+-	mutex_lock(&smd_pkt_devp->tx_lock);
+-	if (smd_write_avail(smd_pkt_devp->ch) < count) {
+-		mutex_unlock(&smd_pkt_devp->tx_lock);
+-		DBG("Not enough space to write\n");
 -		return -ENOMEM;
--
--	smd_tty_driver->driver_name = "smd_tty_driver";
--	smd_tty_driver->name = "smd";
--	smd_tty_driver->major = 0;
--	smd_tty_driver->minor_start = 0;
--	smd_tty_driver->type = TTY_DRIVER_TYPE_SERIAL;
--	smd_tty_driver->subtype = SERIAL_TYPE_NORMAL;
--	smd_tty_driver->init_termios = tty_std_termios;
--	smd_tty_driver->init_termios.c_iflag = 0;
--	smd_tty_driver->init_termios.c_oflag = 0;
--	smd_tty_driver->init_termios.c_cflag = B38400 | CS8 | CREAD;
--	smd_tty_driver->init_termios.c_lflag = 0;
--	smd_tty_driver->flags = TTY_DRIVER_RESET_TERMIOS |
--		TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
--	tty_set_operations(smd_tty_driver, &smd_tty_ops);
--
--	ret = tty_register_driver(smd_tty_driver);
--	if (ret)
--		return ret;
--
--	for (i = 0; i < smd_tty_channels_len; i++) {
--		struct tty_port *port = &smd_tty[smd_tty_channels[i].id].port;
--		tty_port_init(port);
--		port->ops = &smd_tty_port_ops;
--		tty_port_register_device(port, smd_tty_driver,
--				smd_tty_channels[i].id, NULL);
 -	}
 -
--	return 0;
+-	D_DUMP_BUFFER("write: ", count, buf);
+-	r = copy_from_user(smd_pkt_devp->tx_buf, buf, count);
+-	if (r) {
+-		mutex_unlock(&smd_pkt_devp->tx_lock);
+-		pr_err("copy_from_user failed %d\n", r);
+-		return -EFAULT;
+-	}
+-
+-	r = smd_write(smd_pkt_devp->ch, smd_pkt_devp->tx_buf, count);
+-	if (r != count) {
+-		mutex_unlock(&smd_pkt_devp->tx_lock);
+-		pr_err("smd_write failed to write %d bytes: %d.\n", count, r);
+-		return -EIO;
+-	}
+-	mutex_unlock(&smd_pkt_devp->tx_lock);
+-
+-	DBG("wrote %d bytes\n", count);
+-	return count;
 -}
 -
--module_init(smd_tty_init);
+-static unsigned int smd_pkt_poll(struct file *file, poll_table *wait)
+-{
+-	struct smd_pkt_dev *smd_pkt_devp;
+-	unsigned int mask = 0;
+-
+-	smd_pkt_devp = file->private_data;
+-	if (!smd_pkt_devp)
+-		return POLLERR;
+-
+-	DBG("poll waiting\n");
+-	poll_wait(file, &smd_pkt_devp->ch_read_wait_queue, wait);
+-	if (smd_read_avail(smd_pkt_devp->ch))
+-		mask |= POLLIN | POLLRDNORM;
+-
+-	DBG("poll return\n");
+-	return mask;
+-}
+-
+-static void smd_pkt_ch_notify(void *priv, unsigned event)
+-{
+-	struct smd_pkt_dev *smd_pkt_devp = priv;
+-
+-	if (smd_pkt_devp->ch == 0)
+-		return;
+-
+-	switch (event) {
+-	case SMD_EVENT_DATA:
+-		DBG("data\n");
+-		check_and_wakeup_reader(smd_pkt_devp);
+-		break;
+-
+-	case SMD_EVENT_OPEN:
+-		DBG("remote open\n");
+-		smd_pkt_devp->remote_open = 1;
+-		wake_up_interruptible(&smd_pkt_devp->ch_opened_wait_queue);
+-		break;
+-
+-	case SMD_EVENT_CLOSE:
+-		smd_pkt_devp->remote_open = 0;
+-		pr_info("remote closed\n");
+-		break;
+-
+-	default:
+-		pr_err("unknown event %d\n", event);
+-		break;
+-	}
+-}
+-
+-static char *smd_pkt_dev_name[] = {
+-	"smdcntl0",
+-	"smdcntl1",
+-	"smdcntl2",
+-	"smdcntl3",
+-	"smdcntl4",
+-	"smdcntl5",
+-	"smdcntl6",
+-	"smdcntl7",
+-	"smd22",
+-};
+-
+-static char *smd_ch_name[] = {
+-	"DATA5_CNTL",
+-	"DATA6_CNTL",
+-	"DATA7_CNTL",
+-	"DATA8_CNTL",
+-	"DATA9_CNTL",
+-	"DATA12_CNTL",
+-	"DATA13_CNTL",
+-	"DATA14_CNTL",
+-	"DATA22",
+-};
+-
+-static int smd_pkt_open(struct inode *inode, struct file *file)
+-{
+-	int r = 0;
+-	struct smd_pkt_dev *smd_pkt_devp;
+-
+-	smd_pkt_devp = container_of(inode->i_cdev, struct smd_pkt_dev, cdev);
+-	if (!smd_pkt_devp)
+-		return -EINVAL;
+-
+-	file->private_data = smd_pkt_devp;
+-
+-	mutex_lock(&smd_pkt_devp->ch_lock);
+-	if (smd_pkt_devp->open_count == 0) {
+-		r = smd_open(smd_ch_name[smd_pkt_devp->i],
+-			     &smd_pkt_devp->ch, smd_pkt_devp,
+-			     smd_pkt_ch_notify);
+-		if (r < 0) {
+-			pr_err("smd_open failed for %s, %d\n",
+-			       smd_ch_name[smd_pkt_devp->i], r);
+-			goto out;
+-		}
+-
+-		r = wait_event_interruptible_timeout(
+-				smd_pkt_devp->ch_opened_wait_queue,
+-				smd_pkt_devp->remote_open,
+-				msecs_to_jiffies(2 * HZ));
+-		if (r == 0)
+-			r = -ETIMEDOUT;
+-
+-		if (r < 0) {
+-			pr_err("wait returned %d\n", r);
+-			smd_close(smd_pkt_devp->ch);
+-			smd_pkt_devp->ch = 0;
+-		} else {
+-			smd_pkt_devp->open_count++;
+-			r = 0;
+-		}
+-	}
+-out:
+-	mutex_unlock(&smd_pkt_devp->ch_lock);
+-	return r;
+-}
+-
+-static int smd_pkt_release(struct inode *inode, struct file *file)
+-{
+-	int r = 0;
+-	struct smd_pkt_dev *smd_pkt_devp = file->private_data;
+-
+-	if (!smd_pkt_devp)
+-		return -EINVAL;
+-
+-	mutex_lock(&smd_pkt_devp->ch_lock);
+-	if (--smd_pkt_devp->open_count == 0) {
+-		r = smd_close(smd_pkt_devp->ch);
+-		smd_pkt_devp->ch = 0;
+-	}
+-	mutex_unlock(&smd_pkt_devp->ch_lock);
+-
+-	return r;
+-}
+-
+-static const struct file_operations smd_pkt_fops = {
+-	.owner = THIS_MODULE,
+-	.open = smd_pkt_open,
+-	.release = smd_pkt_release,
+-	.read = smd_pkt_read,
+-	.write = smd_pkt_write,
+-	.poll = smd_pkt_poll,
+-};
+-
+-static int __init smd_pkt_init(void)
+-{
+-	int i;
+-	int r;
+-
+-	r = alloc_chrdev_region(&smd_pkt_number, 0,
+-				NUM_SMD_PKT_PORTS, DEVICE_NAME);
+-	if (r) {
+-		pr_err("alloc_chrdev_region() failed %d\n", r);
+-		return r;
+-	}
+-
+-	smd_pkt_classp = class_create(THIS_MODULE, DEVICE_NAME);
+-	if (IS_ERR(smd_pkt_classp)) {
+-		r = PTR_ERR(smd_pkt_classp);
+-		pr_err("class_create() failed %d\n", r);
+-		goto unreg_chardev;
+-	}
+-
+-	for (i = 0; i < NUM_SMD_PKT_PORTS; ++i) {
+-		smd_pkt_devp[i] = kzalloc(sizeof(struct smd_pkt_dev),
+-					  GFP_KERNEL);
+-		if (!smd_pkt_devp[i]) {
+-			pr_err("kmalloc() failed\n");
+-			goto clean_cdevs;
+-		}
+-
+-		smd_pkt_devp[i]->i = i;
+-
+-		init_waitqueue_head(&smd_pkt_devp[i]->ch_read_wait_queue);
+-		smd_pkt_devp[i]->remote_open = 0;
+-		init_waitqueue_head(&smd_pkt_devp[i]->ch_opened_wait_queue);
+-
+-		mutex_init(&smd_pkt_devp[i]->ch_lock);
+-		mutex_init(&smd_pkt_devp[i]->rx_lock);
+-		mutex_init(&smd_pkt_devp[i]->tx_lock);
+-
+-		cdev_init(&smd_pkt_devp[i]->cdev, &smd_pkt_fops);
+-		smd_pkt_devp[i]->cdev.owner = THIS_MODULE;
+-
+-		r = cdev_add(&smd_pkt_devp[i]->cdev,
+-			     (smd_pkt_number + i), 1);
+-		if (r) {
+-			pr_err("cdev_add() failed %d\n", r);
+-			kfree(smd_pkt_devp[i]);
+-			goto clean_cdevs;
+-		}
+-
+-		smd_pkt_devp[i]->devicep =
+-			device_create(smd_pkt_classp, NULL,
+-				      (smd_pkt_number + i), NULL,
+-				      smd_pkt_dev_name[i]);
+-		if (IS_ERR(smd_pkt_devp[i]->devicep)) {
+-			r = PTR_ERR(smd_pkt_devp[i]->devicep);
+-			pr_err("device_create() failed %d\n", r);
+-			cdev_del(&smd_pkt_devp[i]->cdev);
+-			kfree(smd_pkt_devp[i]);
+-			goto clean_cdevs;
+-		}
+-
+-	}
+-
+-	pr_info("SMD Packet Port Driver Initialized.\n");
+-	return 0;
+-
+-clean_cdevs:
+-	if (i > 0) {
+-		while (--i >= 0) {
+-			mutex_destroy(&smd_pkt_devp[i]->ch_lock);
+-			mutex_destroy(&smd_pkt_devp[i]->rx_lock);
+-			mutex_destroy(&smd_pkt_devp[i]->tx_lock);
+-			cdev_del(&smd_pkt_devp[i]->cdev);
+-			kfree(smd_pkt_devp[i]);
+-			device_destroy(smd_pkt_classp,
+-				       MKDEV(MAJOR(smd_pkt_number), i));
+-		}
+-	}
+-
+-	class_destroy(smd_pkt_classp);
+-unreg_chardev:
+-	unregister_chrdev_region(MAJOR(smd_pkt_number), NUM_SMD_PKT_PORTS);
+-	return r;
+-}
+-module_init(smd_pkt_init);
+-
+-static void __exit smd_pkt_cleanup(void)
+-{
+-	int i;
+-
+-	for (i = 0; i < NUM_SMD_PKT_PORTS; ++i) {
+-		mutex_destroy(&smd_pkt_devp[i]->ch_lock);
+-		mutex_destroy(&smd_pkt_devp[i]->rx_lock);
+-		mutex_destroy(&smd_pkt_devp[i]->tx_lock);
+-		cdev_del(&smd_pkt_devp[i]->cdev);
+-		kfree(smd_pkt_devp[i]);
+-		device_destroy(smd_pkt_classp,
+-			       MKDEV(MAJOR(smd_pkt_number), i));
+-	}
+-
+-	class_destroy(smd_pkt_classp);
+-	unregister_chrdev_region(MAJOR(smd_pkt_number), NUM_SMD_PKT_PORTS);
+-}
+-module_exit(smd_pkt_cleanup);
+-
+-MODULE_DESCRIPTION("MSM Shared Memory Packet Port");
+-MODULE_LICENSE("GPL v2");
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
