@@ -1,56 +1,71 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 10 Apr 2015 20:13:46 +0200
-Subject: [PATCH v3 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
- termination driver
-In-Reply-To: <7923ef6ffd60a7c3de3c8c04fe746bbd3c15b5ac.1428564115.git.dhdang@apm.com>
-References: <cover.1428564115.git.dhdang@apm.com>
- <7923ef6ffd60a7c3de3c8c04fe746bbd3c15b5ac.1428564115.git.dhdang@apm.com>
-Message-ID: <1428689626.17822.37.camel@x220>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 10 Apr 2015 19:32:31 +0100
+Subject: [PATCH v2 09/12] ARM: dts: apq8064: Add USB OTG support for CM
+ QS-600
+In-Reply-To: <552807CF.4070600@codeaurora.org>
+References: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1428669293-11165-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <552807CF.4070600@codeaurora.org>
+Message-ID: <5528173F.6000509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a nit about a license mismatch.
-
-On Thu, 2015-04-09 at 10:05 -0700, Duc Dang wrote:
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
- 
-> +config PCI_XGENE_MSI
-> +	bool "X-Gene v1 PCIe MSI feature"
-> +	depends on PCI_XGENE && PCI_MSI
-
-> --- a/drivers/pci/host/Makefile
-> +++ b/drivers/pci/host/Makefile
-
-> +obj-$(CONFIG_PCI_XGENE_MSI) += pci-xgene-msi.o
-
-> --- /dev/null
-> +++ b/drivers/pci/host/pci-xgene-msi.c
-
-> + * This program is free software; you can redistribute  it and/or modify it
-> + * under  the terms of  the GNU General  Public License as published by the
-> + * Free Software Foundation;  either version 2 of the  License, or (at your
-> + * option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-
-This states the license of this file is GPL v2 or later.
-
-> +MODULE_LICENSE("GPL v2");
-
-And, according to include/linux/module.h, this states the license of
-this driver is GPL v2. So either the comment at the top of this file or
-the license ident used in this macro needs to change.
-
-(Now, as far as I can tell, this driver is built-in only. So I think
-this macro - and all other module specific code in this file - is
-actually unneeded. But I already know Bjorn's position here, so I won't
-bother you about that.)
-
-Thanks,
 
 
-Paul Bolle
+On 10/04/15 18:26, Stephen Boyd wrote:
+> On 04/10/15 05:34, Srinivas Kandagatla wrote:
+>> From: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+>>
+>> This patch adds USB OTG support on USB1 for Compulab QS-600 Board.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> [Srinivas Kandagatla: fixed up regulators and status properties]
+>> Signed-off-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+>> ---
+>>   arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 17 +++++++++++++++++
+>>   1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+>> index fc69931..d353694 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+>> +++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+>> @@ -101,6 +101,14 @@
+>>   			};
+>>   		};
+>>
+>> +		/* OTG */
+>> +		usb1_phy:phy at 12500000 {
+>
+> Space after that ':' please.
+>
+Yep, I will fix it in next version.
+>> +			status		= "okay";
+>> +			vddcx-supply	= <&pm8921_s3>;
+>> +			v3p3-supply	= <&pm8921_l3>;
+>> +			v1p8-supply	= <&pm8921_l4>;
+>> +		};
+>> +
+>>   		usb3_phy:phy at 12520000 {
+>>   			status		= "okay";
+>>   			vddcx-supply	= <&pm8921_s3>;
+>> @@ -115,6 +123,15 @@
+>>   			v1p8-supply	= <&pm8921_l23>;
+>>   		};
+>>
+>> +		gadget1:gadget at 12500000 {
+>> +			status = "ok";
+>> +		};
+>> +
+>> +		/* OTG */
+>> +		usb1: usb at 12500000 {
+>
+> This one is good.
+>
+>> +			status = "ok";
+>> +		};
+>> +
+>>   		usb3: usb at 12520000 {
+>>   			status = "okay";
+>>   		};
+>
+>
