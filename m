@@ -1,24 +1,60 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Fri, 10 Apr 2015 13:48:52 +0300
-Subject: [PATCH 2/2] arm64: add KASan support
-In-Reply-To: <3164609.kEhR8riVSV@wuerfel>
-References: <1427208544-8232-1-git-send-email-a.ryabinin@samsung.com>
- <1427208544-8232-3-git-send-email-a.ryabinin@samsung.com>
- <3164609.kEhR8riVSV@wuerfel>
-Message-ID: <5527AA94.5080803@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Apr 2015 12:50:57 +0200
+Subject: [PATCH RFC] ARM: BCM5301X: Add /device_id property including
+ device ID string
+In-Reply-To: <20150330105828.GE17971@leverpostej>
+References: <1427667288-23903-1-git-send-email-zajec5@gmail.com>
+ <CACna6rykQq6AVSWzJh3qnHVNzPXbTD9TMGQf9D9p50pcbQkmng@mail.gmail.com>
+ <20150330105828.GE17971@leverpostej>
+Message-ID: <24438163.XzJnLCdvP5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2015 11:17 PM, Arnd Bergmann wrote:
-> On Tuesday 24 March 2015 17:49:04 Andrey Ryabinin wrote:
->>  arch/arm64/mm/kasan_init.c           | 211 +++++++++++++++++++++++++++++++++++
->>
+On Monday 30 March 2015 11:58:29 Mark Rutland wrote:
+> > > On Sun, Mar 29, 2015 at 11:14:48PM +0100, Rafa? Mi?ecki wrote:
+> > >> Device vendors often assign IDs to their devices to allow comparing
+> > >> firmware image with device model. This is required to prevent users
+> > >> from flashing incompatible image and soft-bricking device.
+> > >> Add device_id property to DTs to allow user space (and optionally
+> > >> bootloader) verifying firmware images.
+> > >
+> > > This sounds like exactly what the "model" property is meant to be (per
+> > > ePAPR) -- a string that specifices the manufacturer's model number of
+> > > the device, ideally in "manufacturer,model" format.
+> > 
+> > What if manufacturer decided to use some totally unfriendly ID for
+> > their low-level (firmware upgrade) model identification? I can't
+> > really see us using
+> > model  "U12H245T00_NETGEAR"
+> > which would mean nothing compared to the current friendly:
+> > model  "Netgear R6250 V1 (BCM4708)"
 > 
-> Just one very high-level question: as this code is clearly derived from
-> the x86 version and nontrivial, could we move most of it out of
-> arch/{x86,arm64} into mm/kasan/init.c and have the rest in some header
-> file?
+> If it uniquely identifies the model, it's fit to be a model string. If
+> being "friendly" means that we lose that, then the property is useless
+> anyway.
 > 
+> Note that both examples above deviate from the recommended format, and
+> something like: "netgear,U12H245T00" would better align with the
+> recommendation.
 
-I think most of this could be moved out from arch code, but not everything.
-E.g. kasan_init() function is too arch-specific.
+Sorry for jumping in late here, but this still sounds like more fitting
+for the "compatible" property than "model". For compatible, you can
+already have multiple strings, and they come with a vendor prefix.
+
+Any of these would seem reasonable to me:
+
+a)
+        compatible = "asus,rt-ac68u", "openwrt,RT-AC68U", "brcm,bcm4708";
+        model = "Asus RT-AC68U (BCM4708)";
+
+b)
+        compatible = "asus,rt-ac68u", "brcm,RT-AC68U", "brcm,bcm4708";
+        model = "Asus RT-AC68U (BCM4708)";
+
+c)
+        compatible = "asus,rt-ac68u", "asus,RT-AC68U", "brcm,bcm4708";
+        model = "Asus RT-AC68U (BCM4708)";
+
+depending on which party maintains the list of these identifiers.
+
+	Arnd
