@@ -1,125 +1,439 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Apr 2015 11:28:43 +0100
-Subject: [RFC PATCH 3/5] arm64: introduce CPU_OF_TABLES for cpu ops
- selection
-In-Reply-To: <1428601031-5366-4-git-send-email-galak@codeaurora.org>
+Date: Fri, 10 Apr 2015 11:39:20 +0100
+Subject: [RFC PATCH 5/5] arm64: qcom: add cpu operations
+In-Reply-To: <1428601031-5366-6-git-send-email-galak@codeaurora.org>
 References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <1428601031-5366-4-git-send-email-galak@codeaurora.org>
-Message-ID: <20150410102843.GA25921@red-moon>
+ <1428601031-5366-6-git-send-email-galak@codeaurora.org>
+Message-ID: <20150410103920.GB25921@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 06:37:09PM +0100, Kumar Gala wrote:
+On Thu, Apr 09, 2015 at 06:37:11PM +0100, Kumar Gala wrote:
 > From: Abhimanyu Kapur <abhimany@codeaurora.org>
 > 
-> Add support to arm64 to provide a dt-based method to allow soc-vendors to
-> supply cpu_ops. Also move psci and smp_spin_table ops to use CPU_OF_TABLES.
+> Add qcom cpu operations for arm-v8 cpus. Implement secondary cpu boot ops
+> As a part of this change update device tree documentation for:
+> 
+> 1. Arm cortex-a ACC device which provides percpu reg
+> 2. Armv8 cortex-a compatible string in arm/cpus.txt
 
-On arm64 there are two enable methods: PSCI and spin-table.
-
-Update your firmware accordingly and drop this patch, thanks.
+I am pretty sure you heard about a standard FW interface called PSCI,
+please implement it and drop this patch, thanks.
 
 Lorenzo
 
 > Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
 > Signed-off-by: Kumar Gala <galak@codeaurora.org>
 > ---
->  arch/arm64/include/asm/cpu_ops.h   |  5 +++++
->  arch/arm64/kernel/cpu_ops.c        | 27 +++++++++------------------
->  arch/arm64/kernel/psci.c           |  1 +
->  arch/arm64/kernel/smp_spin_table.c |  3 ++-
->  4 files changed, 17 insertions(+), 19 deletions(-)
+>  Documentation/devicetree/bindings/arm/cpus.txt    |   2 +
+>  Documentation/devicetree/bindings/arm/msm/acc.txt |  19 ++
+>  drivers/soc/qcom/Makefile                         |   1 +
+>  drivers/soc/qcom/cpu_ops.c                        | 343 ++++++++++++++++++++++
+>  4 files changed, 365 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/msm/acc.txt
+>  create mode 100644 drivers/soc/qcom/cpu_ops.c
 > 
-> diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-> index da301ee..a7efab8 100644
-> --- a/arch/arm64/include/asm/cpu_ops.h
-> +++ b/arch/arm64/include/asm/cpu_ops.h
-> @@ -67,4 +67,9 @@ extern const struct cpu_operations *cpu_ops[NR_CPUS];
->  int __init cpu_read_ops(struct device_node *dn, int cpu);
->  void __init cpu_read_bootcpu_ops(void);
->  
-> +#define CPU_METHOD_OF_DECLARE(name, __ops)				\
-> +	static const struct cpu_operations *__cpu_method_table_##name	\
-> +	__used __section(__cpu_method_of_table)				\
-> +	= __ops;
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 8b9e0a9..35cabe5 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -185,6 +185,8 @@ nodes to be present and contain the properties described below.
+>                           be one of:
+>                              "psci"
+>                              "spin-table"
+> +                            "qcom,arm-cortex-acc"
 > +
->  #endif /* ifndef __ASM_CPU_OPS_H */
-> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-> index cce9524..ad33f98 100644
-> --- a/arch/arm64/kernel/cpu_ops.c
-> +++ b/arch/arm64/kernel/cpu_ops.c
-> @@ -22,29 +22,20 @@
->  #include <linux/of.h>
->  #include <linux/string.h>
->  
-> -extern const struct cpu_operations smp_spin_table_ops;
-> -extern const struct cpu_operations cpu_psci_ops;
-> -
->  const struct cpu_operations *cpu_ops[NR_CPUS];
->  
-> -static const struct cpu_operations *supported_cpu_ops[] __initconst = {
-> -#ifdef CONFIG_SMP
-> -	&smp_spin_table_ops,
-> -#endif
-> -	&cpu_psci_ops,
-> -	NULL,
-> -};
-> +extern struct cpu_operations __cpu_method_of_table[];
-> +static const struct cpu_operations *__cpu_method_of_table_sentinel
-> +	__used __section(__cpu_method_of_table_end);
->  
-> -static const struct cpu_operations * __init cpu_get_ops(const char *name)
-> +const struct cpu_operations * __init cpu_get_ops(const char *name)
->  {
-> -	const struct cpu_operations **ops = supported_cpu_ops;
-> -
-> -	while (*ops) {
-> -		if (!strcmp(name, (*ops)->name))
-> -			return *ops;
-> +	const struct cpu_operations **start = (void *)__cpu_method_of_table;
->  
-> -		ops++;
-> -	}
-> +	for (; *start; start++) {
-> +		if (!strcmp((*start)->name, name))
-> +			return *start;
-> +	};
->  
->  	return NULL;
->  }
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 9b8a70a..2f255c7 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -523,3 +523,4 @@ const struct cpu_operations cpu_psci_ops = {
->  #endif
->  };
->  
-> +CPU_METHOD_OF_DECLARE(psci, &cpu_psci_ops);
-> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-> index 14944e5..b41a8b4 100644
-> --- a/arch/arm64/kernel/smp_spin_table.c
-> +++ b/arch/arm64/kernel/smp_spin_table.c
-> @@ -119,9 +119,10 @@ static int smp_spin_table_cpu_boot(unsigned int cpu)
->  	return 0;
->  }
->  
-> -const struct cpu_operations smp_spin_table_ops = {
-> +static const struct cpu_operations smp_spin_table_ops = {
->  	.name		= "spin-table",
->  	.cpu_init	= smp_spin_table_cpu_init,
->  	.cpu_prepare	= smp_spin_table_cpu_prepare,
->  	.cpu_boot	= smp_spin_table_cpu_boot,
->  };
-> +CPU_METHOD_OF_DECLARE(spin_table, &smp_spin_table_ops);
-> -- 
+>                         # On ARM 32-bit systems this property is optional and
+>                           can be one of:
+>                             "allwinner,sun6i-a31"
+> diff --git a/Documentation/devicetree/bindings/arm/msm/acc.txt b/Documentation/devicetree/bindings/arm/msm/acc.txt
+> new file mode 100644
+> index 0000000..ae2d725
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/msm/acc.txt
+> @@ -0,0 +1,19 @@
+> +Application Processor Sub-system (APSS) Application Clock Controller (ACC)
+> +
+> +The ACC provides clock, power domain, and reset control to a CPU. There is one ACC
+> +register region per CPU within the APSS remapped region as well as an alias register
+> +region that remaps accesses to the ACC associated with the CPU accessing the region.
+> +
+> +Required properties:
+> +- compatible:          Must be "qcom,arm-cortex-acc"
+> +- reg:                 The first element specifies the base address and size of
+> +                       the register region. An optional second element specifies
+> +                       the base address and size of the alias register region.
+> +
+> +Example:
+> +
+> +       clock-controller at b088000 {
+> +               compatible = "qcom,arm-cortex-acc";
+> +               reg = <0x0b088000 0x1000>,
+> +                     <0x0b008000 0x1000>;
+> +       }
+> diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+> index 4389012..bb6030a 100644
+> --- a/drivers/soc/qcom/Makefile
+> +++ b/drivers/soc/qcom/Makefile
+> @@ -1 +1,2 @@
+> +obj-$(CONFIG_ARM64)    +=      cpu_ops.o
+>  obj-$(CONFIG_QCOM_GSBI)        +=      qcom_gsbi.o
+> diff --git a/drivers/soc/qcom/cpu_ops.c b/drivers/soc/qcom/cpu_ops.c
+> new file mode 100644
+> index 0000000..d831cb0
+> --- /dev/null
+> +++ b/drivers/soc/qcom/cpu_ops.c
+> @@ -0,0 +1,343 @@
+> +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + * Copyright (c) 2013 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +/* MSM ARMv8 CPU Operations
+> + * Based on arch/arm64/kernel/smp_spin_table.c
+> + */
+> +
+> +#include <linux/bitops.h>
+> +#include <linux/cpu.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/smp.h>
+> +#include <linux/qcom_scm.h>
+> +
+> +#include <asm/barrier.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/cpu_ops.h>
+> +#include <asm/cputype.h>
+> +#include <asm/smp_plat.h>
+> +
+> +static DEFINE_RAW_SPINLOCK(boot_lock);
+> +
+> +DEFINE_PER_CPU(int, cold_boot_done);
+> +
+> +#if 0
+> +static int cold_boot_flags[] = {
+> +       0,
+> +       QCOM_SCM_FLAG_COLDBOOT_CPU1,
+> +       QCOM_SCM_FLAG_COLDBOOT_CPU2,
+> +       QCOM_SCM_FLAG_COLDBOOT_CPU3,
+> +};
+> +#endif
+> +
+> +/* CPU power domain register offsets */
+> +#define CPU_PWR_CTL            0x4
+> +#define CPU_PWR_GATE_CTL       0x14
+> +#define LDO_BHS_PWR_CTL                0x28
+> +
+> +/* L2 power domain register offsets */
+> +#define L2_PWR_CTL_OVERRIDE    0xc
+> +#define L2_PWR_CTL             0x14
+> +#define L2_PWR_STATUS          0x18
+> +#define        L2_CORE_CBCR            0x58
+> +#define L1_RST_DIS             0x284
+> +
+> +#define L2_SPM_STS             0xc
+> +#define L2_VREG_CTL            0x1c
+> +
+> +#define SCM_IO_READ            1
+> +#define SCM_IO_WRITE           2
+> +
+> +/*
+> + * struct msm_l2ccc_of_info: represents of data for l2 cache clock controller.
+> + * @compat: compat string for l2 cache clock controller
+> + * @l2_pon: l2 cache power on routine
+> + */
+> +struct msm_l2ccc_of_info {
+> +       const char *compat;
+> +       int (*l2_power_on) (struct device_node *dn, u32 l2_mask, int cpu);
+> +       u32 l2_power_on_mask;
+> +};
+> +
+> +
+> +static int power_on_l2_msm8916(struct device_node *l2ccc_node, u32 pon_mask,
+> +                               int cpu)
+> +{
+> +       u32 pon_status;
+> +       void __iomem *l2_base;
+> +
+> +       l2_base = of_iomap(l2ccc_node, 0);
+> +       if (!l2_base)
+> +               return -ENOMEM;
+> +
+> +       /* Skip power-on sequence if l2 cache is already powered up*/
+> +       pon_status = (__raw_readl(l2_base + L2_PWR_STATUS) & pon_mask)
+> +                               == pon_mask;
+> +       if (pon_status) {
+> +               iounmap(l2_base);
+> +               return 0;
+> +       }
+> +
+> +       /* Close L2/SCU Logic GDHS and power up the cache */
+> +       writel_relaxed(0x10D700, l2_base + L2_PWR_CTL);
+> +
+> +       /* Assert PRESETDBGn */
+> +       writel_relaxed(0x400000, l2_base + L2_PWR_CTL_OVERRIDE);
+> +       mb();
+> +       udelay(2);
+> +
+> +       /* De-assert L2/SCU memory Clamp */
+> +       writel_relaxed(0x101700, l2_base + L2_PWR_CTL);
+> +
+> +       /* Wakeup L2/SCU RAMs by deasserting sleep signals */
+> +       writel_relaxed(0x101703, l2_base + L2_PWR_CTL);
+> +       mb();
+> +       udelay(2);
+> +
+> +       /* Enable clocks via SW_CLK_EN */
+> +       writel_relaxed(0x01, l2_base + L2_CORE_CBCR);
+> +
+> +       /* De-assert L2/SCU logic clamp */
+> +       writel_relaxed(0x101603, l2_base + L2_PWR_CTL);
+> +       mb();
+> +       udelay(2);
+> +
+> +       /* De-assert PRESSETDBg */
+> +       writel_relaxed(0x0, l2_base + L2_PWR_CTL_OVERRIDE);
+> +
+> +       /* De-assert L2/SCU Logic reset */
+> +       writel_relaxed(0x100203, l2_base + L2_PWR_CTL);
+> +       mb();
+> +       udelay(54);
+> +
+> +       /* Turn on the PMIC_APC */
+> +       writel_relaxed(0x10100203, l2_base + L2_PWR_CTL);
+> +
+> +       /* Set H/W clock control for the cpu CBC block */
+> +       writel_relaxed(0x03, l2_base + L2_CORE_CBCR);
+> +       mb();
+> +       iounmap(l2_base);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct msm_l2ccc_of_info l2ccc_info[] = {
+> +       {
+> +               .compat = "qcom,8916-l2ccc",
+> +               .l2_power_on = power_on_l2_msm8916,
+> +               .l2_power_on_mask = BIT(9),
+> +       },
+> +};
+> +
+> +static int power_on_l2_cache(struct device_node *l2ccc_node, int cpu)
+> +{
+> +       int ret, i;
+> +       const char *compat;
+> +
+> +       ret = of_property_read_string(l2ccc_node, "compatible", &compat);
+> +       if (ret)
+> +               return ret;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(l2ccc_info); i++) {
+> +               const struct msm_l2ccc_of_info *ptr = &l2ccc_info[i];
+> +
+> +               if (!of_compat_cmp(ptr->compat, compat, strlen(compat)))
+> +                               return ptr->l2_power_on(l2ccc_node,
+> +                                               ptr->l2_power_on_mask, cpu);
+> +       }
+> +       pr_err("Compat string not found for L2CCC node\n");
+> +       return -EIO;
+> +}
+> +
+> +static int msm_unclamp_secondary_arm_cpu(unsigned int cpu)
+> +{
+> +
+> +       int ret = 0;
+> +       struct device_node *cpu_node, *acc_node, *l2_node, *l2ccc_node;
+> +       void __iomem *reg;
+> +
+> +       cpu_node = of_get_cpu_node(cpu, NULL);
+> +       if (!cpu_node)
+> +               return -ENODEV;
+> +
+> +       acc_node = of_parse_phandle(cpu_node, "qcom,acc", 0);
+> +       if (!acc_node) {
+> +                       ret = -ENODEV;
+> +                       goto out_acc;
+> +       }
+> +
+> +       l2_node = of_parse_phandle(cpu_node, "next-level-cache", 0);
+> +       if (!l2_node) {
+> +               ret = -ENODEV;
+> +               goto out_l2;
+> +       }
+> +
+> +       l2ccc_node = of_parse_phandle(l2_node, "power-domain", 0);
+> +       if (!l2ccc_node) {
+> +               ret = -ENODEV;
+> +               goto out_l2;
+> +       }
+> +
+> +       /* Ensure L2-cache of the CPU is powered on before
+> +        * unclamping cpu power rails.
+> +        */
+> +       ret = power_on_l2_cache(l2ccc_node, cpu);
+> +       if (ret) {
+> +               pr_err("L2 cache power up failed for CPU%d\n", cpu);
+> +               goto out_l2ccc;
+> +       }
+> +
+> +       reg = of_iomap(acc_node, 0);
+> +       if (!reg) {
+> +               ret = -ENOMEM;
+> +               goto out_acc_reg;
+> +       }
+> +
+> +       /* Assert Reset on cpu-n */
+> +       writel_relaxed(0x00000033, reg + CPU_PWR_CTL);
+> +       mb();
+> +
+> +       /*Program skew to 16 X0 clock cycles*/
+> +       writel_relaxed(0x10000001, reg + CPU_PWR_GATE_CTL);
+> +       mb();
+> +       udelay(2);
+> +
+> +       /* De-assert coremem clamp */
+> +       writel_relaxed(0x00000031, reg + CPU_PWR_CTL);
+> +       mb();
+> +
+> +       /* Close coremem array gdhs */
+> +       writel_relaxed(0x00000039, reg + CPU_PWR_CTL);
+> +       mb();
+> +       udelay(2);
+> +
+> +       /* De-assert cpu-n clamp */
+> +       writel_relaxed(0x00020038, reg + CPU_PWR_CTL);
+> +       mb();
+> +       udelay(2);
+> +
+> +       /* De-assert cpu-n reset */
+> +       writel_relaxed(0x00020008, reg + CPU_PWR_CTL);
+> +       mb();
+> +
+> +       /* Assert PWRDUP signal on core-n */
+> +       writel_relaxed(0x00020088, reg + CPU_PWR_CTL);
+> +       mb();
+> +
+> +       /* Secondary CPU-N is now alive */
+> +       iounmap(reg);
+> +out_acc_reg:
+> +       of_node_put(l2ccc_node);
+> +out_l2ccc:
+> +       of_node_put(l2_node);
+> +out_l2:
+> +       of_node_put(acc_node);
+> +out_acc:
+> +       of_node_put(cpu_node);
+> +
+> +       return ret;
+> +}
+> +
+> +static void write_pen_release(u64 val)
+> +{
+> +       void *start = (void *)&secondary_holding_pen_release;
+> +       unsigned long size = sizeof(secondary_holding_pen_release);
+> +
+> +       secondary_holding_pen_release = val;
+> +       smp_wmb();
+> +       __flush_dcache_area(start, size);
+> +}
+> +
+> +static int secondary_pen_release(unsigned int cpu)
+> +{
+> +       unsigned long timeout;
+> +
+> +       /*
+> +        * Set synchronisation state between this boot processor
+> +        * and the secondary one
+> +        */
+> +       raw_spin_lock(&boot_lock);
+> +       write_pen_release(cpu_logical_map(cpu));
+> +
+> +       timeout = jiffies + (1 * HZ);
+> +       while (time_before(jiffies, timeout)) {
+> +               if (secondary_holding_pen_release == INVALID_HWID)
+> +                       break;
+> +               udelay(10);
+> +       }
+> +       raw_spin_unlock(&boot_lock);
+> +
+> +       return secondary_holding_pen_release != INVALID_HWID ? -ENOSYS : 0;
+> +}
+> +
+> +static int __init msm_cpu_init(struct device_node *dn, unsigned int cpu)
+> +{
+> +       /* Mark CPU0 cold boot flag as done */
+> +       if (!cpu && !per_cpu(cold_boot_done, cpu))
+> +               per_cpu(cold_boot_done, cpu) = true;
+> +
+> +       return 0;
+> +}
+> +
+> +static int __init msm_cpu_prepare(unsigned int cpu)
+> +{
+> +       const cpumask_t *mask = cpumask_of(cpu);
+> +
+> +       if (qcom_scm_set_cold_boot_addr(secondary_holding_pen, mask)) {
+> +               pr_warn("CPU%d:Failed to set boot address\n", cpu);
+> +               return -ENOSYS;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int msm_cpu_boot(unsigned int cpu)
+> +{
+> +       int ret = 0;
+> +
+> +       if (per_cpu(cold_boot_done, cpu) == false) {
+> +               ret = msm_unclamp_secondary_arm_cpu(cpu);
+> +               if (ret)
+> +                       return ret;
+> +               per_cpu(cold_boot_done, cpu) = true;
+> +       }
+> +       return secondary_pen_release(cpu);
+> +}
+> +
+> +void msm_cpu_postboot(void)
+> +{
+> +       /*
+> +        * Let the primary processor know we're out of the pen.
+> +        */
+> +       write_pen_release(INVALID_HWID);
+> +
+> +       /*
+> +        * Synchronise with the boot thread.
+> +        */
+> +       raw_spin_lock(&boot_lock);
+> +       raw_spin_unlock(&boot_lock);
+> +}
+> +
+> +static const struct cpu_operations msm_cortex_a_ops = {
+> +       .name           = "qcom,arm-cortex-acc",
+> +       .cpu_init       = msm_cpu_init,
+> +       .cpu_prepare    = msm_cpu_prepare,
+> +       .cpu_boot       = msm_cpu_boot,
+> +       .cpu_postboot   = msm_cpu_postboot,
+> +};
+> +CPU_METHOD_OF_DECLARE(msm_cortex_a_ops, &msm_cortex_a_ops);
+> --
 > Qualcomm Innovation Center, Inc.
 > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 > a Linux Foundation Collaborative Project
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
 > 
