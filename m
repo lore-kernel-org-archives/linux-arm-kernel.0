@@ -1,41 +1,47 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Apr 2015 10:36:40 +0100
+Date: Fri, 10 Apr 2015 10:40:16 +0100
 Subject: [RFC PATCH] arm64: KVM: remove fpsimd save/restore from the world
  switch
-In-Reply-To: <20150410091215.GC6186@cbox>
+In-Reply-To: <5527943C.3030400@redhat.com>
 References: <1428598439-5217-1-git-send-email-marc.zyngier@arm.com>
- <20150410091215.GC6186@cbox>
-Message-ID: <552799A8.1020307@arm.com>
+ <55278CAD.70302@redhat.com> <552793CF.8050904@arm.com>
+ <5527943C.3030400@redhat.com>
+Message-ID: <55279A80.5030709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/15 10:12, Christoffer Dall wrote:
-> On Thu, Apr 09, 2015 at 05:53:59PM +0100, Marc Zyngier wrote:
->> The world switch spends quite some time dealing with the FP/SIMD
->> registers, as the state is quite sizeable (32 128bit registers,
->> plus some crumbs on the side). We save/restore them on each
->> entry/exit, so that both the host and the guest always see
->> the state they expect.
+On 10/04/15 10:13, Paolo Bonzini wrote:
+> 
+> 
+> On 10/04/2015 11:11, Marc Zyngier wrote:
+>>> Good idea!  Does ARM have a way to do "lazy" save/restore?  On x86 we
+>>> know if the FP/SIMD state was in use on the host, and we can force an
+>>> exit the first time the guest uses the FP/SIMD.
+>>>
+>>> On ARM, it wouldn't be a problem to handle this kind of exit straight in
+>>> EL2 (similar to the hack Ard used when playing with memory attributes).
 >>
->> But let's face it: the host kernel doesn't care. It is the host
->> userspace that actually cares about FP. An obvious improvement is
->> to remove the save/restore from the world switch, and only perform
->> it when we're about to enter/exit the guest (by plugging it into
->> vcpu_load/vcpu_put). The effect is pretty spectacular when running
->> hackbench (which is the only benchmark worth looking at):
+>> We already do this on the 32bit port, and it works fine.
 >>
-> so the kernel never uses fp/simd registers for stuff like memcopies
-> etc.?
+>> I did some experimentations on arm64 a long while ago (see the
+>> kvm-arm64/lazy-fp branch in my tree), and it wasn't that great,
+>> apparently because aarch64 userspace tends to be much more FP happy than
+>> aarch32, but I'm not completely sure about it. Also this is from a time
+>> when I didn't have much HW to play with...
+>>
+>> Maybe I should resurrect it and compare it to what this patch does, just
+>> as a comparison point.
+> 
+> This patch looks like very nice low-hanging fruit anyway.  Would you
+> like to have it in 4.1?
 
-It can, but wraps it with kernel_neon_begin/kernel_neon_end, which does
-its own save-restore. And when we perform our own save/restore, we do it
-with interrupts disabled so that the kernel cannot change the state
-during that time.
+It is a bit "fresh off the compiler", hence the RFC tag. I'm going to
+run some tests on it during the day, using slightly less braindead
+hardware (the HiKey board is nice because of its form factor, but that's
+the only nice thing about it...).
 
-> Can we also make a similar change for ARM on the 32-bit side?
-
-We could, but it is worth evaluating how much better this is compared to
-what we have already.
+Once I'm confident it doesn't introduce any regression, it will be worth
+considering.
 
 Thanks,
 
