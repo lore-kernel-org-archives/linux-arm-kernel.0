@@ -1,53 +1,25 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Apr 2015 16:25:19 +0100
-Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
-In-Reply-To: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
-References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <5527EB5F.6080500@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 10 Apr 2015 09:25:35 -0600
+Subject: [PATCH 0/2] coresight: next 4.0-rc7 
+Message-ID: <1428679537-26590-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/15 16:17, Andre Przywara wrote:
-> When userland injects a SPI via the KVM_IRQ_LINE ioctl we currently
-> only check it against a fixed limit, which historically is set
-> to 127. With the new dynamic IRQ allocation the effective limit may
-> actually be smaller (64).
-> So when now a malicious or buggy userland injects a SPI in that
-> range, we spill over on our VGIC bitmaps and bytemaps memory.
-> I could trigger a host kernel NULL pointer dereference with current
-> mainline by injecting some bogus IRQ number from a hacked kvmtool:
-> -----------------
-> ....
-> DEBUG: kvm_vgic_inject_irq(kvm, cpu=0, irq=114, level=1)
-> DEBUG: vgic_update_irq_pending(kvm, cpu=0, irq=114, level=1)
-> DEBUG: IRQ #114 still in the game, writing to bytemap now...
-> Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> pgd = ffffffc07652e000
-> [00000000] *pgd=00000000f658b003, *pud=00000000f658b003, *pmd=0000000000000000
-> Internal error: Oops: 96000006 [#1] PREEMPT SMP
-> Modules linked in:
-> CPU: 1 PID: 1053 Comm: lkvm-msi-irqinj Not tainted 4.0.0-rc7+ #3027
-> Hardware name: FVP Base (DT)
-> task: ffffffc0774e9680 ti: ffffffc0765a8000 task.ti: ffffffc0765a8000
-> PC is at kvm_vgic_inject_irq+0x234/0x310
-> LR is at kvm_vgic_inject_irq+0x30c/0x310
-> pc : [<ffffffc0000ae0a8>] lr : [<ffffffc0000ae180>] pstate: 80000145
-> .....
-> 
-> So this patch fixes this by checking the SPI number against the
-> actual limit. Also we remove the former legacy hard limit of
-> 127 in the ioctl code.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> CC: <stable@vger.kernel.org> # 4.0, 3.19, 3.18
+Good morning,
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-It is getting really tight for 4.0, but hopefully I can squeeze it in a
-second pull request together with the missing barrier on 32bit.
+I'd appreciate if this could go in the 4.1 merge window with the other
+coresight fix.  If this is too close for comfort then we'll simply get
+the next one.
 
 Thanks,
+Mathieu
 
-	M.
+Mark Brown (2):
+  coresight: etb10: Print size of buffer we fail to allocate
+  coresight: etb10: Fix check for bogus buffer depth
+
+ drivers/hwtracing/coresight/coresight-etb10.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
