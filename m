@@ -1,33 +1,31 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 10 Apr 2015 11:12:44 +0200
-Subject: [PATCH v3 1/5] ARM: STi: Kconfig update for PCIe support
+Date: Fri, 10 Apr 2015 11:12:48 +0200
+Subject: [PATCH v3 5/5] MAINTAINERS: Add pci-st.c to ARCH/STI architecture
 In-Reply-To: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1428657168-12495-2-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1428657168-12495-6-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update Kconfig:
-- MIGHT_HAVE_PCI
-- PCI_DOMAINS
+This patch adds the pci-st.c pci driver found on STMicroelectronics
+SoC's into the STI arch section of the maintainers file.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- arch/arm/mach-sti/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index 3b1ac46..7f9b432 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -8,6 +8,8 @@ menuconfig ARCH_STI
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select HAVE_ARM_SCU if SMP
- 	select ARCH_REQUIRE_GPIOLIB
-+	select PCI_DOMAINS if PCI
-+	select MIGHT_HAVE_PCI
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_764369 if SMP
- 	select ARM_ERRATA_775420
+diff --git a/MAINTAINERS b/MAINTAINERS
+index efbcb50..4639d2d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1468,6 +1468,7 @@ F:	drivers/clocksource/arm_global_timer.c
+ F:	drivers/i2c/busses/i2c-st.c
+ F:	drivers/media/rc/st_rc.c
+ F:	drivers/mmc/host/sdhci-st.c
++F:	drivers/pci/host/pci-st.c
+ F:	drivers/phy/phy-stih407-usb.c
+ F:	drivers/phy/phy-stih41x-usb.c
+ F:	drivers/pinctrl/pinctrl-st.c
 -- 
 1.9.1
