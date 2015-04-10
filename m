@@ -1,48 +1,21 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Fri, 10 Apr 2015 15:56:26 -0500
-Subject: [PATCH] ARM: socfpga: dts: Add a ciu clock node for sdmmc
-Message-ID: <1428699386-2622-1-git-send-email-dinguyen@opensource.altera.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 10 Apr 2015 14:04:24 -0700
+Subject: [PATCH v3 01/11] ARM: dts: apq8064: add RPM regulators support
+In-Reply-To: <1428698564-11938-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1428698491-11881-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1428698564-11938-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150410210424.GQ19186@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Fri 10 Apr 13:42 PDT 2015, Srinivas Kandagatla wrote:
 
-The CIU(Card Interface Unit) clock is used by the dw_mmc IP to clock an SD
-card. The ciu_clk is the sdmmc_clk passed through a fixed divider of 4. This patch
-adds the ciu_clk node and makes the sdmmc_clk it's parent.
+> This patch adds rpm node to apq8064 dt as rpm would be used by other
+> devices for regulator support.
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga.dtsi | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index d9176e6..25418ee 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -451,6 +451,14 @@
- 						clk-phase = <0 135>;
- 					};
- 
-+					ciu_clk: ciu_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&sdmmc_clk>;
-+						clk-gate = <0xa0 8>;
-+						fixed-divider = <4>;
-+					};
-+
- 					nand_x_clk: nand_x_clk {
- 						#clock-cells = <0>;
- 						compatible = "altr,socfpga-gate-clk";
-@@ -635,7 +643,7 @@
- 			fifo-depth = <0x400>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
-+			clocks = <&l4_mp_clk>, <&ciu_clk>;
- 			clock-names = "biu", "ciu";
- 		};
- 
--- 
-2.2.1
+Regards,
+Bjorn
