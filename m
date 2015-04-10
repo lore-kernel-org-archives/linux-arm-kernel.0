@@ -1,84 +1,50 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 10 Apr 2015 09:02:27 -0700
-Subject: [PATCH v2] arm: zynq: Fix system clock with multi_v7_defconfig
-In-Reply-To: <550F6EDA.30709@adapteva.com>
-References: <550F6EDA.30709@adapteva.com>
-Message-ID: <0fe57162-2295-426f-98ee-e47cd17b925e@BN1AFFO11FD010.protection.gbl>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 10 Apr 2015 17:07:20 +0100
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <AF65C7BF-CBBD-4E03-95AA-495830D6DC20@codeaurora.org>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <20150410110328.GC25921@red-moon>
+ <AF65C7BF-CBBD-4E03-95AA-495830D6DC20@codeaurora.org>
+Message-ID: <20150410160720.GC17828@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-03-23 at 02:39AM +0100, Ola Jeppsson wrote:
-> As mentioned in this commit:
-> arm: zynq: Don't use arm_global_timer with cpufreq
-> 61f1fc7e9258a169ac8afb5ddf657a181e60d052
+On Fri, Apr 10, 2015 at 04:25:54PM +0100, Kumar Gala wrote:
 > 
-> arm_global_timer depends on the CPU frequency. With cpufreq altering the
-> CPU frequency arm_global_timer will not maintain a stable time base. So
-> arm_global_timer must not be the clocksource when cpufreq is enabled.
+> On Apr 10, 2015, at 6:03 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
 > 
-> The above commit tries to solve this at build time by only selecting
-> CONFIG_ARM_GLOBAL_TIMER if CONFIG_CPU_FREQ is disabled. This is not
-> always sufficient because other machs can also enable
-> CONFIG_ARM_GLOBAL_TIMER.
+> > On Thu, Apr 09, 2015 at 06:37:06PM +0100, Kumar Gala wrote:
+> >> This patch set adds support for SMP boot on the MSM8x16 family of Qualcomm SoCs.
+> >> 
+> >> To support SMP on the MSM8x16 SoCs we need to add ARMv8/64-bit SCM interfaces to
+> >> setup the boot/release addresses for the secondary CPUs.  In addition we need
+> >> a uniquie set of cpu ops.  I'm aware the desired methods for booting secondary
+> >> CPUs is either via spintable or PSCI.  However, these SoCs are shipping with a
+> >> firmware that does not support those methods.
+> > 
+> > Why ? Do not tell me you were not aware of those standard methods,
+> > because I can't believe you.
+> > 
+> > If there were additional features to add to spin-table and PSCI,
+> > you were, you are and you will always be welcome to debate them.
+> > 
+> > There is no justification for this patchset, honestly.
+> > 
+> > Lorenzo
 > 
-> Therefore: If built with CONFIG_CPU_FREQ and CONFIG_ARM_GLOBAL_TIMER,
-> disable (on Zynq) the arm_global_timer devicetree node at boot before
-> clock sources are initialized. This ensures that arm_global_timer will
-> not be selected clocksource.
-> 
-> Signed-off-by: Ola Jeppsson <ola@adapteva.com>
-> ---
->  arch/arm/mach-zynq/common.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index c887196..a4666d4 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -148,10 +148,36 @@ out:
->  	platform_device_register_full(&devinfo);
->  }
->  
-> +#if defined(CONFIG_CPU_FREQ) && defined(CONFIG_ARM_GLOBAL_TIMER)
-> +static struct property zynq_disable_arm_global_timer_prop = {
-> +	.name = "status",
-> +	.length = sizeof("disabled"),
-> +	.value = "disabled"
-> +};
-> +
-> +static void __init zynq_disable_arm_global_timer(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-global-timer");
-> +	if (!np)
-> +		return;
-> +
-> +	pr_info("%s: disabling arm_global_timer node\n", __func__);
-> +
-> +	if (of_update_property(np, &zynq_disable_arm_global_timer_prop))
-> +		pr_warn("%s: could not disable arm_global_timer node\n",
-> +			__func__);
-> +}
-> +#endif
+> The justification for this patchset is support for a hardware platform that exists in the world.  The kernel usual is willing to accept such things as long as the code is reasonable.
 
-can we get an empty implementation of the function here and...
-> +
->  static void __init zynq_timer_init(void)
->  {
->  	zynq_early_slcr_init();
->  
-> +#if defined(CONFIG_CPU_FREQ) && defined(CONFIG_ARM_GLOBAL_TIMER)
-> +	zynq_disable_arm_global_timer();
-> +#endif
+You are telling me you add a linker section for cpu_ops just for
+"a platform that exists", sorry I do not believe that (and that's *not*
+reasonable).
 
-remove #ifdefs down here, please?
+I do not like this line of reasoning, at all, because you were aware of
+PSCI and ignored it, deliberately. Start by pushing code for platforms
+upstream that support PSCI, "they are coming up next" does not cut it.
 
->  	zynq_clock_init();
->  	of_clk_init(NULL);
->  	clocksource_of_init();
-> -- 
-> 2.3.3
-> 
+I can see power management mach code coming next, just no way.
 
-S?ren
+Implement PSCI and the kernel will be willing to accept it, as it stands
+as far as I am concerned that's a NAK on the series.
+
+Lorenzo
