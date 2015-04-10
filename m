@@ -1,50 +1,85 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Apr 2015 10:40:16 +0100
-Subject: [RFC PATCH] arm64: KVM: remove fpsimd save/restore from the world
- switch
-In-Reply-To: <5527943C.3030400@redhat.com>
-References: <1428598439-5217-1-git-send-email-marc.zyngier@arm.com>
- <55278CAD.70302@redhat.com> <552793CF.8050904@arm.com>
- <5527943C.3030400@redhat.com>
-Message-ID: <55279A80.5030709@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 10 Apr 2015 10:40:22 +0100
+Subject: [PATCH v5 0/9] Add sd/emmc support for stih407 family silicon
+Message-ID: <1428658831-14308-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/15 10:13, Paolo Bonzini wrote:
-> 
-> 
-> On 10/04/2015 11:11, Marc Zyngier wrote:
->>> Good idea!  Does ARM have a way to do "lazy" save/restore?  On x86 we
->>> know if the FP/SIMD state was in use on the host, and we can force an
->>> exit the first time the guest uses the FP/SIMD.
->>>
->>> On ARM, it wouldn't be a problem to handle this kind of exit straight in
->>> EL2 (similar to the hack Ard used when playing with memory attributes).
->>
->> We already do this on the 32bit port, and it works fine.
->>
->> I did some experimentations on arm64 a long while ago (see the
->> kvm-arm64/lazy-fp branch in my tree), and it wasn't that great,
->> apparently because aarch64 userspace tends to be much more FP happy than
->> aarch32, but I'm not completely sure about it. Also this is from a time
->> when I didn't have much HW to play with...
->>
->> Maybe I should resurrect it and compare it to what this patch does, just
->> as a comparison point.
-> 
-> This patch looks like very nice low-hanging fruit anyway.  Would you
-> like to have it in 4.1?
+Hi,
 
-It is a bit "fresh off the compiler", hence the RFC tag. I'm going to
-run some tests on it during the day, using slightly less braindead
-hardware (the HiKey board is nice because of its form factor, but that's
-the only nice thing about it...).
+This series adds sd/emmc support to the sdhci-st.c driver for stih407
+family silicon. The changes mainly involve configuring some extra glue
+registers in the flashSS which configure the Arasan controller.
 
-Once I'm confident it doesn't introduce any regression, it will be worth
-considering.
+This series also adds support for UHS modes for eMMC. To allow
+UHS HS200/SD104 modes to function correctly, due to the
+tight timing constriants, support for delay management is also added.
+Two types of delay management are supported, static delay management and
+dynamic delay management, this delay management is only available
+on eMMC pads on stih410 and later silicon.
 
-Thanks,
+This series has been tested with stih410-b2120 revd on eMMC and sd, at
+various clock speeds. As part of this testing a bug was also found in the
+upstream flexgen clock set_rate implementation (now fixed upstream).
 
-	M.
+    max-frequency = 200Mhz
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 270 MB in  3.02 seconds =  89.54 MB/sec
+    
+    max-frequency = 100Mhz
+    root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 210 MB in  3.00 seconds =  70.00 MB/sec
+    
+    max-frequency = 50Mhz
+    root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 118 MB in  3.00 seconds =  39.28 MB/sec
+
+It has also been tested on stih416-b2020 to ensure we have caused no
+regressions. Finally the dt documentation has been updated to reflect
+the changes in the driver code. Intrestingly it seems we are the first
+upstream platform to be using some of the uhs bindings such as
+sd-uhs-sdr104.
+
+Changes since v4:
+ - Fixup typo (Pete)
+
+Changes since v3:
+ - Rebased on Ulf's mmc next branch (rc5 based) (Ulf)
+
+Changes since v2:
+ - Some whitespace fixups (Max)
+ - if (!ioaddr) suggestion (Max)
+ - Add stih418-b2199 suport (Max)
+ - Stih410 to STiH410 fixes (Max)
+ - rebased on v4.0-rc6 (Pete)
+
+Changes since v1:
+ - Partition the changes into smaller patches to aid review process (Ulf)
+
+Peter Griffin (9):
+  mmc: sdhci-st: Add macros for register offsets and bitfields for mmcss
+    glue regs
+  mmc: sdhci-st: Add support for de-asserting reset signal and top regs
+    resource
+  mmc: sdhci-st: Add delay management functions for top registers
+    (eMMC).
+  mmc: sdhci-st: Add st_mmcss_cconfig function to configure mmcss glue
+    registers.
+  mmc: sdhci-st: Add sdhci_st_set_uhs_signaling function.
+  mmc: sdhci-st: Update the quirks for this controller.
+  mmc: sdhci-st: Update ST SDHCI binding documentation.
+  ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
+  ARM: STi: DT: STiH418: Add dt nodes for sdhci and emmc.
+
+ Documentation/devicetree/bindings/mmc/sdhci-st.txt | 100 +++++-
+ arch/arm/boot/dts/stih407-family.dtsi              |  30 ++
+ arch/arm/boot/dts/stih410-b2120.dts                |  10 +
+ arch/arm/boot/dts/stih418-b2199.dts                |  12 +
+ arch/arm/boot/dts/stihxxx-b2120.dtsi               |   8 +
+ drivers/mmc/host/sdhci-st.c                        | 354 ++++++++++++++++++++-
+ 6 files changed, 500 insertions(+), 14 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
