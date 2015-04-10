@@ -1,66 +1,75 @@
-From: ola@adapteva.com (Ola Jeppsson)
-Date: Fri, 10 Apr 2015 17:09:01 +0200
-Subject: [PATCH v2] arm: zynq: Fix system clock with multi_v7_defconfig
-In-Reply-To: <26139139.4pXlnbLfh0@wuerfel>
-References: <550F6EDA.30709@adapteva.com>
- <BY2FFO11FD0520A960F287A6B7BA6A9DAE20D0@BY2FFO11FD052.protection.gbl>
- <26139139.4pXlnbLfh0@wuerfel>
-Message-ID: <5527E78D.9040908@adapteva.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 10 Apr 2015 17:11:48 +0200
+Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
+In-Reply-To: <20150410135056.GB28873@io.lakedaemon.net>
+References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150410135056.GB28873@io.lakedaemon.net>
+Message-ID: <20150410171148.07bc9429@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-04-10 15:44, Arnd Bergmann wrote:
-> On Monday 23 March 2015 08:05:45 Michal Simek wrote:
->> Hi,
->>
->> On 03/23/2015 02:39 AM, Ola Jeppsson wrote:
->>> As mentioned in this commit:
->>> arm: zynq: Don't use arm_global_timer with cpufreq
->>> 61f1fc7e9258a169ac8afb5ddf657a181e60d052
->>>
->>> arm_global_timer depends on the CPU frequency. With cpufreq altering the
->>> CPU frequency arm_global_timer will not maintain a stable time base. So
->>> arm_global_timer must not be the clocksource when cpufreq is enabled.
->>>
->>> The above commit tries to solve this at build time by only selecting
->>> CONFIG_ARM_GLOBAL_TIMER if CONFIG_CPU_FREQ is disabled. This is not
->>> always sufficient because other machs can also enable
->>> CONFIG_ARM_GLOBAL_TIMER.
->>>
->>> Therefore: If built with CONFIG_CPU_FREQ and CONFIG_ARM_GLOBAL_TIMER,
->>> disable (on Zynq) the arm_global_timer devicetree node at boot before
->>> clock sources are initialized. This ensures that arm_global_timer will
->>> not be selected clocksource.
->>>
->>> Signed-off-by: Ola Jeppsson <ola@adapteva.com>
->
->> Arnd: Waiting for your thoughts on this one?
->> It is some sort of arch/arm/mach-mvebu/board-v7.c quirk code.
->>
->> I don't think it can be done via Kconfig because it will affect others.
-> (catching up with old email)
->
-> I think it's ok to work around the problem like this in principle.
->
-> However, I have one concern about the way this condition is detected.
-> At the moment, you assume that all zynq variants suffer from this
-> problem and no other chip has it.
->
-> How would you handle the situation if a future zynq variant fixes
-> the problem?
-The check is only applicable on Cortex A9 zynqs.
-Assume for now that it is broken on all those variants. If it gets fixed on some variant add a
-of_machine_is_compatible() check?
-> What if it turns out to be a more common problem and we actually
-> want to work around it in the arm global timer implementation
-> by dynamically adapting to CPU frequency changes? I believe some
-> other drivers (x86 tsc?) do this. Would we be able to detect this case
-> on zynq?
->
-> 	Arnd
-If  the arm global timer implementation gets cpufreq scaling support, this check isn't needed and should be removed?
-The only thing that happens if it is left in is that you end up with an inferior, but correct, clock source (which is what you already had before cpufreq support in arm-global-timer).
+Hi Jason,
 
+On Fri, 10 Apr 2015 13:50:56 +0000
+Jason Cooper <jason@lakedaemon.net> wrote:
 
-Thanks,
-Ola
+> Hey Boris,
+> 
+> On Thu, Apr 09, 2015 at 04:58:41PM +0200, Boris Brezillon wrote:
+> > I know we usually try to adapt existing drivers instead of replacing them
+> > by new ones, but after trying to refactor the mv_cesa driver I realized it
+> > would take longer than writing an new one from scratch.
+> 
+> I'm sorry, but this makes me *very* uncomfortable.  Any organization
+> worth it's salt will do a very careful audit of code touching
+> cryptographic material and sensitive (decrypted) data.  From that point
+> on, small audits of the changes to the code allow the organization to
+> build a comfort level with kernel updates.  iow, following the git
+> history of the driver.
+> 
+> By apply this series, we are basically forcing those organizations to
+> either a) stop updating, or b) expend significant resources to do
+> another full audit.
+> 
+> In short, this series breaks the audit chain for the mv_cesa driver.
+> 
+> Maybe I'm the only person with this level of paranoia.  If so, I'm sure
+> others will override me.
+> 
+> From my POV, it looks like the *only* reason we've chosen this route is
+> developer convenience.  I don't think that's sufficient reason to break
+> the change history of a driver handling sensitive data.
+
+Well, I understand you concern, but if you read carefully the old and
+new drivers, you'll notice that they are completely different (the only
+thing I kept are the macro definitions).
+I really tried to adapt the existing driver to add the missing
+features (especially the support for TDMA), but all my attempts
+ended up introducing hackish code (not even talking about the
+performance penalty of this approach). Is that really what we want ?
+How would you make such big changes on the existing driver (I mean, the
+core infrastructure dealing with crypto requests is completely
+different) ?
+
+I have another solution though: keep the existing driver for old
+marvell SoCs (orion, kirkwood and dove), and add a new one for modern
+SoCs (armada 370, XP, 375 and 38x), so that users of the mv_cesa driver
+won't have to audit the new code.
+
+> 
+> For an example of how I use the git history and binary differences to
+> audit a series of changes to cryptographic code, please take a look at
+> objdiff [1]. You can even duplicate my audit of my submission for the
+> skein/threefish driver currently in the staging tree, starting at [2]
+> and going up to [3].
+
+Thanks for the pointers.
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
