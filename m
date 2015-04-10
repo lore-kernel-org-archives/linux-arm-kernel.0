@@ -1,85 +1,56 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 10 Apr 2015 13:41:34 -0700
-Subject: [PATCH v2] arm: zynq: Fix system clock with multi_v7_defconfig
-In-Reply-To: <7398185.8qW42GIbsU@wuerfel>
-References: <550F6EDA.30709@adapteva.com> <26139139.4pXlnbLfh0@wuerfel>
- <5527E78D.9040908@adapteva.com> <7398185.8qW42GIbsU@wuerfel>
-Message-ID: <1d6383c8-de0d-474b-a824-d1402b40391f@BY2FFO11FD035.protection.gbl>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 10 Apr 2015 21:41:31 +0100
+Subject: [PATCH v3 00/11] ARM: dts: apq8064 dt patches
+In-Reply-To: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1428698491-11881-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-04-10 at 10:04PM +0200, Arnd Bergmann wrote:
-> On Friday 10 April 2015 17:09:01 Ola Jeppsson wrote:
-> > On 2015-04-10 15:44, Arnd Bergmann wrote:
-> > > On Monday 23 March 2015 08:05:45 Michal Simek wrote:
-> > >> Hi,
-> > >>
-> > >> On 03/23/2015 02:39 AM, Ola Jeppsson wrote:
-> > >>> As mentioned in this commit:
-> > >>> arm: zynq: Don't use arm_global_timer with cpufreq
-> > >>> 61f1fc7e9258a169ac8afb5ddf657a181e60d052
-> > >>>
-> > >>> arm_global_timer depends on the CPU frequency. With cpufreq altering the
-> > >>> CPU frequency arm_global_timer will not maintain a stable time base. So
-> > >>> arm_global_timer must not be the clocksource when cpufreq is enabled.
-> > >>>
-> > >>> The above commit tries to solve this at build time by only selecting
-> > >>> CONFIG_ARM_GLOBAL_TIMER if CONFIG_CPU_FREQ is disabled. This is not
-> > >>> always sufficient because other machs can also enable
-> > >>> CONFIG_ARM_GLOBAL_TIMER.
-> > >>>
-> > >>> Therefore: If built with CONFIG_CPU_FREQ and CONFIG_ARM_GLOBAL_TIMER,
-> > >>> disable (on Zynq) the arm_global_timer devicetree node at boot before
-> > >>> clock sources are initialized. This ensures that arm_global_timer will
-> > >>> not be selected clocksource.
-> > >>>
-> > >>> Signed-off-by: Ola Jeppsson <ola@adapteva.com>
-> > >
-> > >> Arnd: Waiting for your thoughts on this one?
-> > >> It is some sort of arch/arm/mach-mvebu/board-v7.c quirk code.
-> > >>
-> > >> I don't think it can be done via Kconfig because it will affect others.
-> > > (catching up with old email)
-> > >
-> > > I think it's ok to work around the problem like this in principle.
-> > >
-> > > However, I have one concern about the way this condition is detected.
-> > > At the moment, you assume that all zynq variants suffer from this
-> > > problem and no other chip has it.
-> > >
-> > > How would you handle the situation if a future zynq variant fixes
-> > > the problem?
-> > The check is only applicable on Cortex A9 zynqs.
-> > Assume for now that it is broken on all those variants. If it gets fixed on some variant add a
-> > of_machine_is_compatible() check?
-> 
-> I think it would be better to avoid those if we can.
-> 
-> > > What if it turns out to be a more common problem and we actually
-> > > want to work around it in the arm global timer implementation
-> > > by dynamically adapting to CPU frequency changes? I believe some
-> > > other drivers (x86 tsc?) do this. Would we be able to detect this case
-> > > on zynq?
-> > >
-> > If  the arm global timer implementation gets cpufreq scaling support,
-> > this check isn't needed and should be removed?
-> 
-> The timer code however would still need to find out whether to scale the
-> frequence along with the CPU or not.
-> 
-> > The only thing that happens if it is left in is that you end up with
-> > an inferior, but correct, clock source (which is what you already had
-> > before cpufreq support in arm-global-timer).
-> 
-> I've just had another idea: how about introducing a new compatible string
-> for the global timer that gets used for timers that have their frequency
-> tied to the CPU (alternatively a bool property in that node). This can
-> be checked by the clocksource driver, which will then be able to either
-> skip the device if cpufreq is in use, or implement a more sophisticated
-> workaround.
+Thanks all for reviewing v2 patches.
 
-If this is the only available clocksource, you'd still want to use it
-though. A bad clocksource is still better than none. But I guess that
-would just mean to lie in the DT.
+Hi Kumar, 
 
-	S?ren
+Now that the rpm redesign dependency is resolved, If its not too late could you
+queue these dt patches for v4.1-rc1 or v4.1-rc2.
+
+I tested these patches on APQ8064 based IFC6410 and CMQS600 board with SATA/USB.
+I also rebased these patches on top of your qcom/dt branch.
+
+Thanks,
+srini
+
+Changes since v2
+ * Some cosmetic fixes spotted by Stephen Boyd.
+ * Rename sata_phy to phy suggested by Stephen Boyd
+ * Dropped MDP patch to track it in different patchset.
+
+Changes since v1
+ * Made regulators board specific, as suggested by Bjorn.
+ * Used correct IRQF flags for rpm, spotted by Bjorn.
+ * Fixed serial lable to be more appropriate, spotted by Bjorn.
+
+Nicolas Dechesne (2):
+  ARM: dts: apq8064: Add usb host support to CM QS-600
+  ARM: dts: apq8064: Add USB OTG support for CM QS-600
+
+Pramod Gurav (1):
+  ARM: dts: apq8064-ifc6410: Add DT alias for serial port
+
+Srinivas Kandagatla (8):
+  ARM: dts: apq8064: add RPM regulators support
+  ARM: dts: apq8064-ifc6410: Add basic regulators
+  ARM: dts: apq8064: Add usb host support.
+  ARM: dts: apq8064: Add USB OTG support
+  ARM: dts: apq8064: Add SATA controller support.
+  ARM: dts: apq8064-cm-qs600: Add basic regulators.
+  ARM: dts: apq8064: Move i2c1 pinctrl to apq8064.dtsi
+  ARM: dts: apq8064: add i2c3 node for panel.
+
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 100 ++++++++++++++++
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  | 136 +++++++++++++++++++--
+ arch/arm/boot/dts/qcom-apq8064.dtsi         | 175 +++++++++++++++++++++++++++-
+ 3 files changed, 402 insertions(+), 9 deletions(-)
+
+-- 
+1.9.1
