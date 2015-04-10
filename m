@@ -1,58 +1,49 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 10 Apr 2015 19:54:00 +0200
-Subject: [PATCH v5 09/11] ARM: vf610: enable Cortex-M4 configuration on
- Vybrid SoC
-In-Reply-To: <1428609855-27657-10-git-send-email-stefan@agner.ch>
-References: <1428609855-27657-1-git-send-email-stefan@agner.ch>
- <1428609855-27657-10-git-send-email-stefan@agner.ch>
-Message-ID: <1428688440.17822.33.camel@x220>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 10 Apr 2015 10:58:01 -0700
+Subject: [PATCH 6/6] hwmon: pwm-fan: Update the duty cycle inorder to
+ control the pwm-fan
+In-Reply-To: <87h9snvqsf.fsf@gmail.com>
+References: <CANAwSgSD52sDpP7NH2hhiZX-=LZF6Qo-X3enqsqM+5XAMfyP=Q@mail.gmail.com>
+ <20150408165351.GA22846@roeck-us.net>
+ <CANAwSgQbNV9QZ2bFGk6g+RyWW6f5iW4e8ii_5rJ4srv02L=L_Q@mail.gmail.com>
+ <CANAwSgRSxj9frUHRXh3JwD+bpnFrj8WkpDMKHZn-OPmuCEgP7w@mail.gmail.com>
+ <1428667201.22057.20.camel@collabora.co.uk>
+ <CANAwSgQHi2-i8xHn+X+KTGg8HFpe6SPgkuSvuApJP3342N8+zQ@mail.gmail.com>
+ <5527CB78.4040002@roeck-us.net>
+ <1428672601.22057.25.camel@collabora.co.uk>
+ <20150410135844.GA20147@ulmo.nvidia.com> <87h9snvqsf.fsf@gmail.com>
+Message-ID: <20150410175801.GA31499@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just two whitespace nits. (Please don't tell anyone, I'm a bit
-embarrassed that I even spot them, let alone that I comment on them.)
+On Fri, Apr 10, 2015 at 01:25:52PM -0400, Ben Gamari wrote:
+> Thierry Reding <thierry.reding@gmail.com> writes:
+> 
+> > On Fri, Apr 10, 2015 at 03:30:01PM +0200, Sjoerd Simons wrote:
+> >> 
+> >> Yes/no/maybe :). Imho this is something to clarify in the pwm API
+> >> documentation. As currently all it says is: 
+> >>   "pwm_disable - stop a PWM output toggling", 
+> >> 
+> >> Which is what the exynos driver does. 
+> >> 
+> >> Thierry, could you clearify what the intention is here? I'm happy to
+> >> prepare a pwm driver patch if needed to solve this?
+> >
+> > I think the safest thing to do is for users to do both. You call
+> > pwm_config() with a zero duty cycle to make it clear what the status is
+> > that you want. Then you call pwm_disable() to state that you don't need
+> > the output signal anymore, so that any clocks needed by the PWM can be
+> > stopped. Doing so gives the driver the most information and should make
+> > the user more resilient against any possible quirks in drivers.
+> >
+> It would be great if the documentation were more clear on this matter
+> regardless. This is something I can imagine having to spend substantial
+> amounts of time Googling whereas a simple note in the documentation would
+> have removed all ambiguity.
+> 
+Especially since, in this case, the output signal _is_ still needed.
+It appears that pwm_disable() is only expected to stop the clock, not
+the signal itself.
 
-On Thu, 2015-04-09 at 22:04 +0200, Stefan Agner wrote:
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-
-> @@ -629,10 +631,26 @@ config SOC_IMX6SX
->  	help
->  	  This enables support for Freescale i.MX6 SoloX processor.
->  
-> +
-
-This second empty line is unneeded.
-
-> +config SOC_LS1021A
-> +	bool "Freescale LS1021A support"
-> +	select ARM_GIC
-> +	select HAVE_ARM_ARCH_TIMER
-> +	select PCI_DOMAINS if PCI
-> +	select ZONE_DMA if ARM_LPAE
-> +
-
-Please drop this empty line.
-
-> +	help
-> +	  This enable support for Freescale LS1021A processor.
-> +
-> +endif
-> +
-> +comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
-> +
-> +if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
-> +
->  config SOC_VF610
->  	bool "Vybrid Family VF610 support"
-> -	select IRQ_DOMAIN_HIERARCHY
-> -	select ARM_GIC
-> +	select ARM_GIC if ARCH_MULTI_V7
->  	select PINCTRL_VF610
->  	select PL310_ERRATA_769419 if CACHE_L2X0
->  
-
-Thanks,
-
-
-Paul Bolle
+Guenter
