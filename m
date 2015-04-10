@@ -1,92 +1,62 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 9 Apr 2015 18:44:08 -0500
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150409224446.GV18048@atomide.com>
-References: <CAALWOA_-RkkgvrxZ32U6WFAZ4Wo5hkkaeo9VNBq48JwMVvkMvw@mail.gmail.com>
- <5521A438.1070008@gmail.com>
- <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
- <20150406151939.GG18048@atomide.com> <20150406154037.GI18048@atomide.com>
- <5522BEEF.2000405@gmail.com> <20150406174245.GJ18048@atomide.com>
- <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
- <20150407022312.GK18048@atomide.com>
- <CANOLnOMyNesvA2nGC2uMnmYGLBQkU1dnfG1rBg1UWeGMrpHFzQ@mail.gmail.com>
- <20150409224446.GV18048@atomide.com>
-Message-ID: <55270EC8.2080900@ti.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Fri, 10 Apr 2015 02:25:07 +0200
+Subject: [patch 2/2] leds: netxbig: clean up a data type issue
+In-Reply-To: <20150409195426.GP10964@mwanda>
+References: <20150409090712.GF17605@mwanda>
+ <20150409192557.GD1509@kw.sim.vm.gnt>
+ <20150409195426.GP10964@mwanda>
+Message-ID: <20150410002507.GF1509@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2015 05:44 PM, Tony Lindgren wrote:
-> * Grazvydas Ignotas <notasas@gmail.com> [150409 15:37]:
->> On Tue, Apr 7, 2015 at 5:23 AM, Tony Lindgren <tony@atomide.com> wrote:
->>> * Matthijs van Duin <matthijsvanduin@gmail.com> [150406 11:15]:
->>>>
->>>> On 6 April 2015 at 19:42, Tony Lindgren <tony@atomide.com> wrote:
->>>>> Hmm but it still seems to do something also on cortex-a8 r3p2 that
->>>>> is supposedly not affected by 430973.. Based on my tests so far, at least
->>>>> armhf running cpuburn-a8 in the background and doing apt-get update
->>>>> segfaults constantly without flush BTAC/BTB. This seems to be the case
->>>>> no matter how the aux ctrl reg bits are set..
->>>>
->>>> That sounds.... really odd.  The TRM is fairly explicit about BTB
->>>> flush executing as nop when IBE is not set. Of course the TRM is not
->>>> exactly flawless, but still...
->>>
->>> Oops, sorry user error.. I was trying to clear IBE as a banked register
->>> like L2 enable bit and of course it did not get cleared.. Clearing it
->>> with a smc call really clears it. And in that case my test case seems to
->>> work reliably on r3p2 without erratum 430973 enabled.
->>
->> May I ask how do you perform the smc call? I wanted to clear IBE too
->> to experiment, but it just hangs my board, even if I just write back
->> the same value. Here is what I do:
->>
->>         asm ("mrc p15, 0, %0, c1, c0, 1" : "=r"(val));
->>
->>         asm (".arch_extension sec\n\t"
->>              "mov r0,  %0\n"
->>              "mov r12, #3\n"
->>              "smc #0\n"
->>              :: "r"(val) : "r0", "r12");
->>
->> I just run this from a sysfs write handler, does it need to be run on
->> SRAM or something?
+On Thu, Apr 09, 2015 at 10:54:26PM +0300, Dan Carpenter wrote:
+> On Thu, Apr 09, 2015 at 09:25:57PM +0200, Simon Guinot wrote:
+> > On Thu, Apr 09, 2015 at 12:07:12PM +0300, Dan Carpenter wrote:
+> > > This driver is pretty hardware specific so it's unlikely that we're
+> > > going to be using it on 64 big endian systems.  Still, the current code
+> > > causes a static checker warning so we may as well change the type from
+> > > "unsigned long" to "u32" and remove the casting.
+> > 
+> > Hi Dan,
+> > 
+> > Thanks for the patch.
+> > 
+> > Why do you think it would be an issue to use the u32 type for this
+> > variables on a 64-bit big-endian machine ? Note that this LED mechanism
+> > is actually used on ARM 32-bits and x86-64 NAS platforms. The latter are
+> > not mainlined yet. But indeed, for now, there is no plan to use it on a
+> > 64-bit big-endian machine.
+> > 
+> > Since the whole LED code uses the unsigned long type to hold the delay
+> > values, if possible, I would prefer to keep the delay_{on,off} variables
+> > consistent with that.
+> > 
+> > Is there an another way to make the "static checker" happy ?
 > 
-> Best done in the bootloader.. I just hacked it into the restore from
-
-I recently did that in u-boot:
-
-http://git.denx.de/?p=u-boot.git;a=commitdiff;h=5902f4ce0f2bd1411e40dc0ece3598a0fc19b2ae
-
-http://git.denx.de/?p=u-boot.git;a=blob;f=arch/arm/cpu/armv7/omap3/board.c;h=b064c0cc834356b33e14e0f36774108fa6a6c580;hb=HEAD#l428
-
-I believe it should be scalable to other SoCs as well (weak function
-that may be overriden as needed). Hope that helps.
-
-> off-idle to test, see below. But for that you naturally need to have
-> a device with working idle and it's usable for just testing for lazy
-> people.
+> We're writing over 32 bits of a long.  It's a dangerous habbit.
 > 
-> Regards,
+> If long is u32 then of_property_read_u32_index() works, obviously.  If
+> it is a little endian and the last 32 bits have been zeroed out (as they
+> have been here) then that also works.
 > 
-> Tony
-> 
-> --- a/arch/arm/mach-omap2/sleep34xx.S
-> +++ b/arch/arm/mach-omap2/sleep34xx.S
-> @@ -516,6 +516,7 @@ l2_inv_gp:
->  	ldr	r4, scratchpad_base
->  	ldr	r3, [r4,#0xBC]
->  	ldr	r0, [r3,#4]
-> +	bic	r0, r1, #(1 << 6)
->  	mov	r12, #0x3
->  	smc	#0			@ Call SMI monitor (smieq)
->  	ldr	r4, scratchpad_base
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> If it's big endian and 64 bit then it doesn't work because we're writing
+> to the wrong 32 bits.
 
+Sorry, I misunderstood your commit message.
 
--- 
+But still, rather than changing the type from unsigned long to u32 for
+the delay_{on,off} variables, I think we should use a temporary u32
+variable for the of_property_read_u32_index calls. This way we can keep
+the type of the delay_{on,off} variables consistent with the LED core
+code.
+
 Regards,
-Nishanth Menon
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150410/493f813c/attachment.sig>
