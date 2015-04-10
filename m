@@ -1,90 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Apr 2015 17:08:17 +0100
-Subject: Guarantee udelay(N) spins at least N microseconds
-In-Reply-To: <5527EC90.9050900@free.fr>
-References: <5527B331.5000205@free.fr>
- <20150410114415.GC12732@n2100.arm.linux.org.uk>
- <5527C501.2040808@free.fr>
- <20150410150607.GG12732@n2100.arm.linux.org.uk>
- <5527EC90.9050900@free.fr>
-Message-ID: <20150410160817.GH12732@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 10 Apr 2015 17:10:53 +0100
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <493B15F8-0EBE-4633-9604-671EF403F36E@codeaurora.org>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
+ <493B15F8-0EBE-4633-9604-671EF403F36E@codeaurora.org>
+Message-ID: <20150410161052.GF6854@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 05:30:24PM +0200, Mason wrote:
-> I appreciate (very much so) that you spend time replying to me,
-> but I also sense a lot of animosity, and I don't know what I've
-> done wrong to deserve it :-(
-
-I'm putting the point across strongly because I really don't think
-there is an issue to be solved here.
-
-> On 10/04/2015 17:06, Russell King - ARM Linux wrote:
-> >And what this means is that udelay(n) where 'n' is less than the
-> >period between two timer interrupts /will/ be, and is /expected to
-> >be/ potentially shorter than the requested period.
+On Fri, Apr 10, 2015 at 10:24:46AM -0500, Kumar Gala wrote:
+> On Apr 10, 2015, at 5:05 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Thu, Apr 09, 2015 at 12:37:06PM -0500, Kumar Gala wrote:
+> >> This patch set adds support for SMP boot on the MSM8x16 family of Qualcomm SoCs.
+> >> 
+> >> To support SMP on the MSM8x16 SoCs we need to add ARMv8/64-bit SCM interfaces to
+> >> setup the boot/release addresses for the secondary CPUs.  In addition we need
+> >> a uniquie set of cpu ops.  I'm aware the desired methods for booting secondary
+> >> CPUs is either via spintable or PSCI.  However, these SoCs are shipping with a
+> >> firmware that does not support those methods.
+> > 
+> > And the reason is? Some guesses:
+> > 
+> > a) QC doesn't think boot interface (and cpuidle) standardisation is
+> >   worth the effort (to put it nicely)
+> > b) The hardware was available before we even mentioned PSCI
+> > c) PSCI is not suitable for the QC's SCM interface
+> > d) Any combination of the above
+> > 
+> > I strongly suspect it's point (a). Should we expect future QC hardware
+> > to do the same?
+> > 
+> > You could argue the reason was (b), though we've been discussing PSCI
+> > for at least two years and, according to QC press releases, MSM8916
+> > started sampling in 2014.
+> > 
+> > The only valid reason is (c) and if that's the case, I would expect a
+> > proposal for a new firmware interface protocol (it could be PSCI-based),
+> > well documented, that can be shared with others that may encounter the
+> > same shortcomings.
 > 
-> You've made it clear how loop-based delays are implemented; and also
-> that loop-based delays are typically 1% shorter than requested.
-> (Thanks for the overview, by the way.) Please note that I haven't
-> touched to the loop-based code, I'm only discussing the timer-based
-> code.
+> Does it matter?  I?ve always felt the kernel was a place of inclusion.
+> Qualcomm choose for whatever reason to not use PSCI or spin table.
+> You don?t like it, I might not like it, but it is what it is.
 
-1% is a figure I pulled out of the air.  It really depends on the CPU
-instructions per cycle, and how much work is being done in the timer
-interrupt handler.
+Yes, it matters, but only if Qualcomm wants the SoC support in mainline.
+Just because Qualcomm Inc does not want to invest in implementing a
+standard firmware interface is not a good enough reason to merge the
+kernel code.
 
-> >There's no getting away from that, we can't estimate how long the timer
-> >interrupt takes to handle without the use of an external timer, and if
-> >we've got an external timer, we might as well use it for all delays.
-> 
-> Exactly! And my patch only changes __timer_const_udelay() so again I'm
-> not touching loop-based code.
+What if Qualcomm decides that it doesn't like DT, nor ACPI but comes up
+with yet another way to describe hardware because that's what the
+firmware provides? Should the kernel community take it? You could argue
+that this is a significant change but it's about the principle. And each
+SoC with its own non-standard boot protocol for no good reason is
+significant.
 
-What I'm trying to get through to you is that udelay() as a _whole_ does
-not provide a guarantee that it will wait for _at least_ the time you
-asked for.  All that it does is provide an _approximate_ delay.
+It's not Qualcomm Inc maintaining the kernel code but individuals like
+you and me who may or may not be sponsored by Qualcomm. And being
+sponsored by a company to do kernel maintenance work does not mean that
+said company decides what gets merged (on my side, ARM Ltd management is
+aware of this, though it's not always easy for the parties involved).
 
-Yes, we can improve the timer delays to provide a guaranteed delay of at
-least the requested period.  We _can't_ do the same for the loop-based
-delay.
+We haven't really asked for anything difficult like hardware changes,
+such decisions are left with Qualcomm. We asked for a standard secure
+firmware interface, either an existing one or, if not suitable (with
+good arguments), to come up with a proposal for an alternative
+_standard_ interface. I don't even have the certitude that the firmware
+interface used in these patches would be consistent across Qualcomm
+SoCs, let alone being properly documented.
 
-So, if we fix the timer based delays, udelay() will then have two differing
-expectations depending on whether it's using a timer or a loop based delay.
-That is bad.  It's extremely poor.  The expectations of an API should not
-change because of a different implementation, that's the way bugs happen.
-
-That's why...
-
-> >No.  See above.  Not doing that.  Live with it.
-
-it's not a problem, and why we're not going to fix the timer code to
-provide a minimum guaranteed delay.
-
-> Specifically, should a driver writer use
-> 
->   udelay(101);
-> 
-> when his spec says to spin 100 ?s?
-> 
-> (Anyway, this is just a tangential question, as I digest the ins
-> and outs of kernel and driver development.)
-
-A driver writer should always use the required delay plus an adequate
-cushion to ensure that the delay required by the hardware is met.
-
-I suggest you read this:
-
-	https://lkml.org/lkml/2011/1/9/37
-
-which is the discussion I had with Linus on the point you are raising
-here, which is the 4th hit in google for "udelay shorter delays".
-
-Given that some udelay() implementations have been known to be as much
-as 50% off, that suggests using a delay value of 200 in your above
-example for a delay of 100?s.  ARM is /relatively/ good in that
-regard, cpufreq and scheduling effects withstanding.
+So please come up with proper technical arguments rather than the kernel
+should take whatever SoC vendors dreamt of.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Catalin
