@@ -1,69 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Apr 2015 10:26:39 -0700
-Subject: [PATCH v2 09/12] ARM: dts: apq8064: Add USB OTG support for CM
- QS-600
-In-Reply-To: <1428669293-11165-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1428669293-11165-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <552807CF.4070600@codeaurora.org>
+From: harald@ccbib.org (Harald Geyer)
+Date: Fri, 10 Apr 2015 19:37:15 +0200
+Subject: [PATCH] ARM: dts: imx23-olinuxino: Add i2c support
+In-Reply-To: <1893593729.135182.1428597263856.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+References: <1428515100-1496-1-git-send-email-harald@ccbib.org>
+ <1158701263.68321.1428531175931.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+ <3f0efa88b69ea2e8eb22909b6fbe6f91@imap.cosmopool.net>
+ <5526444A.3060805@i2se.com>
+ <d8d27c22eb78aed693a977b88ebcc327@imap.cosmopool.net>
+ <1893593729.135182.1428597263856.JavaMail.open-xchange@oxbaltgw02.schlund.de>
+Message-ID: <E1Ygcrj-00010H-H6@stardust.g4.wien.funkfeuer.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/15 05:34, Srinivas Kandagatla wrote:
-> From: Nicolas Dechesne <nicolas.dechesne@linaro.org>
->
-> This patch adds USB OTG support on USB1 for Compulab QS-600 Board.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> [Srinivas Kandagatla: fixed up regulators and status properties]
-> Signed-off-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
-> ---
->  arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-> index fc69931..d353694 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-> @@ -101,6 +101,14 @@
->  			};
->  		};
->  
-> +		/* OTG */
-> +		usb1_phy:phy at 12500000 {
+Stefan Wahren writes:
+> > On Thu, 09 Apr 2015 11:20:10 +0200, Stefan Wahren <stefan.wahren@i2se.com>
+> > wrote:
+> >
+> > > Btw i read that Shawn only want used muxes [1].
+> > >
+> > > [1] -
+> > >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/115779.html
+> >
+> > If that is an issue, then I'll just test all three pin groups on my
+> > olinuxino
+> > board. After all it would be really awkward to have only one pin group and
+> > that
+> > one is labeled "i2c_pins_b" ...
+> 
+> from my understanding you are free about the labels. So you could
+> rename it to "i2c_pins_a" and change the other pin groups.
 
-Space after that ':' please.
+Theoretically yes, but there are two reasons not to do that:
+1) When Fadil Berisha chose the labels he didn't do so arbitrarily. The
+   labels make sense the way the pinmux table is organised in the datasheet.
+   (otherwise he sure would have chosen "i2c_pins_a" for the default pin
+   group on olinuxino).
+2) The labels are in use for about two years now by a lot of people. (Yes
+   it really takes that long to have this merged.) I would hate to break
+   their setups for no strong reason.
 
-> +			status		= "okay";
-> +			vddcx-supply	= <&pm8921_s3>;
-> +			v3p3-supply	= <&pm8921_l3>;
-> +			v1p8-supply	= <&pm8921_l4>;
-> +		};
-> +
->  		usb3_phy:phy at 12520000 {
->  			status		= "okay";
->  			vddcx-supply	= <&pm8921_s3>;
-> @@ -115,6 +123,15 @@
->  			v1p8-supply	= <&pm8921_l23>;
->  		};
->  
-> +		gadget1:gadget at 12500000 {
-> +			status = "ok";
-> +		};
-> +
-> +		/* OTG */
-> +		usb1: usb at 12500000 {
-
-This one is good.
-
-> +			status = "ok";
-> +		};
-> +
->  		usb3: usb at 12520000 {
->  			status = "okay";
->  		};
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Harald
