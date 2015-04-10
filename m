@@ -1,86 +1,90 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 10 Apr 2015 21:43:56 +0100
-Subject: [PATCH v3 05/11] ARM: dts: apq8064: Add SATA controller support.
+Date: Fri, 10 Apr 2015 21:44:05 +0100
+Subject: [PATCH v3 06/11] ARM: dts: apq8064-cm-qs600: Add basic regulators.
 In-Reply-To: <1428698491-11881-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1428698491-11881-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1428698636-12114-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1428698645-12156-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds AHCI based SATA controller support to APQ8064.
-Tested on IFC6410 board.
+This patch adds basic regulator support for USB and HDMI.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |  9 ++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        | 35 ++++++++++++++++++++++++++++++
- 2 files changed, 44 insertions(+)
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 61 +++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 122bf34..3d96cb8 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -116,6 +116,15 @@
+diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+index 5d75666..142885d 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+@@ -14,6 +14,67 @@
  			};
  		};
  
-+		sata_phy0: phy at 1b400000 {
-+			status = "okay";
++		rpm at 108000 {
++			regulators {
++				vin_lvs1_3_6-supply = <&pm8921_s4>;
++				vin_lvs2-supply = <&pm8921_s1>;
++				vin_lvs4_5_7-supply = <&pm8921_s4>;
++
++				vdd_l1_l2_l12_l18-supply = <&pm8921_s4>;
++				vdd_l24-supply = <&pm8921_s1>;
++				vdd_l25-supply = <&pm8921_s1>;
++				vdd_l26-supply = <&pm8921_s7>;
++				vdd_l27-supply = <&pm8921_s7>;
++				vdd_l28-supply = <&pm8921_s7>;
++
++
++				/* Buck SMPS */
++				pm8921_s1: s1 {
++					regulator-always-on;
++					regulator-min-microvolt = <1225000>;
++					regulator-max-microvolt = <1225000>;
++					qcom,switch-mode-frequency = <3200000>;
++					bias-pull-down;
++				};
++
++				pm8921_s3: s3 {
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1400000>;
++					qcom,switch-mode-frequency = <4800000>;
++				};
++
++				pm8921_s4: s4 {
++					regulator-min-microvolt	= <1800000>;
++					regulator-max-microvolt	= <1800000>;
++					qcom,switch-mode-frequency = <3200000>;
++				};
++
++				pm8921_s7: s7 {
++					regulator-min-microvolt = <1300000>;
++					regulator-max-microvolt = <1300000>;
++					qcom,switch-mode-frequency = <3200000>;
++				};
++
++				pm8921_l3: l3 {
++					regulator-min-microvolt = <3050000>;
++					regulator-max-microvolt = <3300000>;
++					bias-pull-down;
++				};
++
++				pm8921_l4: l4 {
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1800000>;
++					bias-pull-down;
++				};
++
++				pm8921_l23: l23 {
++					regulator-min-microvolt = <1700000>;
++					regulator-max-microvolt = <1900000>;
++					bias-pull-down;
++				};
++			};
 +		};
 +
-+		sata0: sata at 29000000 {
-+			status		= "okay";
-+			target-supply	= <&pm8921_s4>;
-+		};
-+
- 		/* OTG */
- 		usb1_phy: phy at 12500000 {
- 			status		= "okay";
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 5aac9a5..1f900c7 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -379,6 +379,41 @@
- 			usb-phy		= <&usb4_phy>;
- 		};
- 
-+		sata_phy0: phy at 1b400000 {
-+			compatible	= "qcom,apq8064-sata-phy";
-+			status		= "disabled";
-+			reg		= <0x1b400000 0x200>;
-+			reg-names	= "phy_mem";
-+			clocks		= <&gcc SATA_PHY_CFG_CLK>;
-+			clock-names	= "cfg";
-+			#phy-cells	= <0>;
-+		};
-+
-+		sata0: sata at 29000000 {
-+			compatible		= "generic-ahci";
-+			status			= "disabled";
-+			reg			= <0x29000000 0x180>;
-+			interrupts		= <GIC_SPI 209 IRQ_TYPE_NONE>;
-+
-+			clocks			= <&gcc SFAB_SATA_S_H_CLK>,
-+						<&gcc SATA_H_CLK>,
-+						<&gcc SATA_A_CLK>,
-+						<&gcc SATA_RXOOB_CLK>,
-+						<&gcc SATA_PMALIVE_CLK>;
-+			clock-names		= "slave_iface",
-+						"iface",
-+						"bus",
-+						"rxoob",
-+						"core_pmalive";
-+
-+			assigned-clocks		= <&gcc SATA_RXOOB_CLK>,
-+						<&gcc SATA_PMALIVE_CLK>;
-+			assigned-clock-rates	= <100000000>, <100000000>;
-+
-+			phys			= <&sata_phy0>;
-+			phy-names		= "sata-phy";
-+		};
-+
- 		/* Temporary fixed regulator */
- 		vsdcc_fixed: vsdcc-regulator {
- 			compatible = "regulator-fixed";
+ 		gsbi at 12440000 {
+ 			status = "okay";
+ 			qcom,mode = <GSBI_PROT_I2C>;
 -- 
 1.9.1
