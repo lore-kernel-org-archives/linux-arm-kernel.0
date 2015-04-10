@@ -1,39 +1,125 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 10 Apr 2015 18:13:09 +0800
-Subject: [PATCH 0/2] Enable HiSilicon hip04 ethernet controller
-In-Reply-To: <15355533.8BHqyIEd6L@wuerfel>
-References: <1428650180-9746-1-git-send-email-fathi.boudra@linaro.org>
- <15355533.8BHqyIEd6L@wuerfel>
-Message-ID: <5527A235.9050601@hisilicon.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 10 Apr 2015 11:28:43 +0100
+Subject: [RFC PATCH 3/5] arm64: introduce CPU_OF_TABLES for cpu ops
+ selection
+In-Reply-To: <1428601031-5366-4-git-send-email-galak@codeaurora.org>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <1428601031-5366-4-git-send-email-galak@codeaurora.org>
+Message-ID: <20150410102843.GA25921@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/4/10 17:06, Arnd Bergmann wrote:
-> On Friday 10 April 2015 10:16:18 Fathi Boudra wrote:
->> The following patches enable the ethernet controller on HiSilicon hip04
->> as documented in the device tree binding but not currently enabled.
->> It has been tested on real hardware with tftp boot + NFS root filesystem.
-
-Hi Fathi and Arnd
-> The patches looks ok to me, but we don't normally pick up changes like
-> this from developers, you should address them to Wei Xu so he can send
-> them to arm-soc along with his other changes.
-
-Thanks!
-I will test it and prepare the pull request with other changes.
-
-> Note that there are some known bugs in this driver, I sent an experimental
-> patch for some of them but never heard back.
-
-I will contact with tianhong and zhangfei about it.
-Thanks!
-
-Best Regards,
-Wei
-
-> 	Arnd
+On Thu, Apr 09, 2015 at 06:37:09PM +0100, Kumar Gala wrote:
+> From: Abhimanyu Kapur <abhimany@codeaurora.org>
 > 
-> .
+> Add support to arm64 to provide a dt-based method to allow soc-vendors to
+> supply cpu_ops. Also move psci and smp_spin_table ops to use CPU_OF_TABLES.
+
+On arm64 there are two enable methods: PSCI and spin-table.
+
+Update your firmware accordingly and drop this patch, thanks.
+
+Lorenzo
+
+> Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+>  arch/arm64/include/asm/cpu_ops.h   |  5 +++++
+>  arch/arm64/kernel/cpu_ops.c        | 27 +++++++++------------------
+>  arch/arm64/kernel/psci.c           |  1 +
+>  arch/arm64/kernel/smp_spin_table.c |  3 ++-
+>  4 files changed, 17 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
+> index da301ee..a7efab8 100644
+> --- a/arch/arm64/include/asm/cpu_ops.h
+> +++ b/arch/arm64/include/asm/cpu_ops.h
+> @@ -67,4 +67,9 @@ extern const struct cpu_operations *cpu_ops[NR_CPUS];
+>  int __init cpu_read_ops(struct device_node *dn, int cpu);
+>  void __init cpu_read_bootcpu_ops(void);
+>  
+> +#define CPU_METHOD_OF_DECLARE(name, __ops)				\
+> +	static const struct cpu_operations *__cpu_method_table_##name	\
+> +	__used __section(__cpu_method_of_table)				\
+> +	= __ops;
+> +
+>  #endif /* ifndef __ASM_CPU_OPS_H */
+> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+> index cce9524..ad33f98 100644
+> --- a/arch/arm64/kernel/cpu_ops.c
+> +++ b/arch/arm64/kernel/cpu_ops.c
+> @@ -22,29 +22,20 @@
+>  #include <linux/of.h>
+>  #include <linux/string.h>
+>  
+> -extern const struct cpu_operations smp_spin_table_ops;
+> -extern const struct cpu_operations cpu_psci_ops;
+> -
+>  const struct cpu_operations *cpu_ops[NR_CPUS];
+>  
+> -static const struct cpu_operations *supported_cpu_ops[] __initconst = {
+> -#ifdef CONFIG_SMP
+> -	&smp_spin_table_ops,
+> -#endif
+> -	&cpu_psci_ops,
+> -	NULL,
+> -};
+> +extern struct cpu_operations __cpu_method_of_table[];
+> +static const struct cpu_operations *__cpu_method_of_table_sentinel
+> +	__used __section(__cpu_method_of_table_end);
+>  
+> -static const struct cpu_operations * __init cpu_get_ops(const char *name)
+> +const struct cpu_operations * __init cpu_get_ops(const char *name)
+>  {
+> -	const struct cpu_operations **ops = supported_cpu_ops;
+> -
+> -	while (*ops) {
+> -		if (!strcmp(name, (*ops)->name))
+> -			return *ops;
+> +	const struct cpu_operations **start = (void *)__cpu_method_of_table;
+>  
+> -		ops++;
+> -	}
+> +	for (; *start; start++) {
+> +		if (!strcmp((*start)->name, name))
+> +			return *start;
+> +	};
+>  
+>  	return NULL;
+>  }
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 9b8a70a..2f255c7 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -523,3 +523,4 @@ const struct cpu_operations cpu_psci_ops = {
+>  #endif
+>  };
+>  
+> +CPU_METHOD_OF_DECLARE(psci, &cpu_psci_ops);
+> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+> index 14944e5..b41a8b4 100644
+> --- a/arch/arm64/kernel/smp_spin_table.c
+> +++ b/arch/arm64/kernel/smp_spin_table.c
+> @@ -119,9 +119,10 @@ static int smp_spin_table_cpu_boot(unsigned int cpu)
+>  	return 0;
+>  }
+>  
+> -const struct cpu_operations smp_spin_table_ops = {
+> +static const struct cpu_operations smp_spin_table_ops = {
+>  	.name		= "spin-table",
+>  	.cpu_init	= smp_spin_table_cpu_init,
+>  	.cpu_prepare	= smp_spin_table_cpu_prepare,
+>  	.cpu_boot	= smp_spin_table_cpu_boot,
+>  };
+> +CPU_METHOD_OF_DECLARE(spin_table, &smp_spin_table_ops);
+> -- 
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 > 
