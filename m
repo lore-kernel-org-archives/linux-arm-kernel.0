@@ -1,30 +1,105 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 10 Apr 2015 14:07:34 -0700
-Subject: [PATCH v3 09/11] ARM: dts: apq8064-ifc6410: Add DT alias for
- serial port
-In-Reply-To: <1428698671-12282-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1428698491-11881-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1428698671-12282-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150410210734.GR19186@sonymobile.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Fri, 10 Apr 2015 14:08:32 -0700
+Subject: [PATCH v8 10/18] clk: tegra: Initialize PLL_X before CCLK_G to
+ ensure it has a parent
+In-Reply-To: <1425213881-5262-11-git-send-email-mikko.perttunen@kapsi.fi>
+References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1425213881-5262-11-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <20150410210832.14369.65901@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 10 Apr 13:44 PDT 2015, Srinivas Kandagatla wrote:
+Quoting Mikko Perttunen (2015-03-01 04:44:33)
+> This patch moves the initialization of PLL_X to be slightly before
+> that of CCLK_G. This ensures that at boot, CCLK_G will immediately
+> have a parent and the common clock framework can determine its
+> clock rate correctly.
+> 
+> Without this patch, calling clk_put on CCLK_G could cause the CCF
+> to set its rate to zero, hanging the system.
 
-> From: Pramod Gurav <pramod.gurav@smartplayin.com>
+Hi Mikko,
+
+Patch looks fine to me but I wanted to get more info on the behavior you
+mentioned above about clk_put. Is there some special circumstance that
+causes this for you? Why does calling clk_put adjust the rate of your
+clock?
+
+Thanks,
+Mike
+
 > 
-> Define an alias for serial port present on ifc6410 which is used as
-> console.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> [Srinivas Kandagatla: renamed the serial0 label appropriately]
-> Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
 > ---
-
-The order of the sobs should be reversed, your name should be last as
-you're the last one touching the patch.
-
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-
-Regards,
-Bjorn
+> v8:
+> - Added
+> 
+>  drivers/clk/tegra/clk-tegra-super-gen4.c | 46 ++++++++++++++++++--------------
+>  1 file changed, 26 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/clk/tegra/clk-tegra-super-gen4.c b/drivers/clk/tegra/clk-tegra-super-gen4.c
+> index f1f4410..c5ea9ee 100644
+> --- a/drivers/clk/tegra/clk-tegra-super-gen4.c
+> +++ b/drivers/clk/tegra/clk-tegra-super-gen4.c
+> @@ -104,6 +104,32 @@ void __init tegra_super_clk_gen4_init(void __iomem *clk_base,
+>         struct clk *clk;
+>         struct clk **dt_clk;
+>  
+> +       /*
+> +        * Register PLL_X first so that CCLK_G has a parent at registration
+> +        * time. This ensures that the common clock framework knows CCLK_G's
+> +        * rate.
+> +        */
+> +
+> +#if defined(CONFIG_ARCH_TEGRA_114_SOC) || defined(CONFIG_ARCH_TEGRA_124_SOC)
+> +       /* PLLX */
+> +       dt_clk = tegra_lookup_dt_id(tegra_clk_pll_x, tegra_clks);
+> +       if (!dt_clk)
+> +               return;
+> +
+> +       clk = tegra_clk_register_pllxc("pll_x", "pll_ref", clk_base,
+> +                       pmc_base, CLK_IGNORE_UNUSED, params, NULL);
+> +       *dt_clk = clk;
+> +
+> +       /* PLLX_OUT0 */
+> +
+> +       dt_clk = tegra_lookup_dt_id(tegra_clk_pll_x_out0, tegra_clks);
+> +       if (!dt_clk)
+> +               return;
+> +       clk = clk_register_fixed_factor(NULL, "pll_x_out0", "pll_x",
+> +                                       CLK_SET_RATE_PARENT, 1, 2);
+> +       *dt_clk = clk;
+> +#endif
+> +
+>         /* CCLKG */
+>         dt_clk = tegra_lookup_dt_id(tegra_clk_cclk_g, tegra_clks);
+>         if (dt_clk) {
+> @@ -127,25 +153,5 @@ void __init tegra_super_clk_gen4_init(void __iomem *clk_base,
+>         }
+>  
+>         tegra_sclk_init(clk_base, tegra_clks);
+> -
+> -#if defined(CONFIG_ARCH_TEGRA_114_SOC) || defined(CONFIG_ARCH_TEGRA_124_SOC)
+> -       /* PLLX */
+> -       dt_clk = tegra_lookup_dt_id(tegra_clk_pll_x, tegra_clks);
+> -       if (!dt_clk)
+> -               return;
+> -
+> -       clk = tegra_clk_register_pllxc("pll_x", "pll_ref", clk_base,
+> -                       pmc_base, CLK_IGNORE_UNUSED, params, NULL);
+> -       *dt_clk = clk;
+> -
+> -       /* PLLX_OUT0 */
+> -
+> -       dt_clk = tegra_lookup_dt_id(tegra_clk_pll_x_out0, tegra_clks);
+> -       if (!dt_clk)
+> -               return;
+> -       clk = clk_register_fixed_factor(NULL, "pll_x_out0", "pll_x",
+> -                                       CLK_SET_RATE_PARENT, 1, 2);
+> -       *dt_clk = clk;
+> -#endif
+>  }
+>  
+> -- 
+> 2.3.0
+> 
