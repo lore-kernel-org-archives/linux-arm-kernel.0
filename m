@@ -1,94 +1,108 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 10 Apr 2015 13:06:01 +0200
-Subject: [PATCH v5 0/9] Add sd/emmc support for stih407 family silicon
-In-Reply-To: <1428658831-14308-1-git-send-email-peter.griffin@linaro.org>
-References: <1428658831-14308-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <CAPDyKFouXDCbPB9Ow6vzRdHdWkscDs3fjThCX69mA97fwZ+Lfw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 10 Apr 2015 13:17:08 +0200
+Subject: [PATCH 1/2] crypto: add new driver for Marvell CESA
+In-Reply-To: <1428662339.17822.18.camel@x220>
+References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1428591523-1780-2-git-send-email-boris.brezillon@free-electrons.com>
+ <1428662339.17822.18.camel@x220>
+Message-ID: <20150410131708.258b0a99@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2015 at 11:40, Peter Griffin <peter.griffin@linaro.org> wrote:
-> Hi,
->
-> This series adds sd/emmc support to the sdhci-st.c driver for stih407
-> family silicon. The changes mainly involve configuring some extra glue
-> registers in the flashSS which configure the Arasan controller.
->
-> This series also adds support for UHS modes for eMMC. To allow
-> UHS HS200/SD104 modes to function correctly, due to the
-> tight timing constriants, support for delay management is also added.
-> Two types of delay management are supported, static delay management and
-> dynamic delay management, this delay management is only available
-> on eMMC pads on stih410 and later silicon.
->
-> This series has been tested with stih410-b2120 revd on eMMC and sd, at
-> various clock speeds. As part of this testing a bug was also found in the
-> upstream flexgen clock set_rate implementation (now fixed upstream).
->
->     max-frequency = 200Mhz
->     /dev/mmcblk0p1:
->      Timing buffered disk reads: 270 MB in  3.02 seconds =  89.54 MB/sec
->
->     max-frequency = 100Mhz
->     root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
->     /dev/mmcblk0p1:
->      Timing buffered disk reads: 210 MB in  3.00 seconds =  70.00 MB/sec
->
->     max-frequency = 50Mhz
->     root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
->     /dev/mmcblk0p1:
->      Timing buffered disk reads: 118 MB in  3.00 seconds =  39.28 MB/sec
->
-> It has also been tested on stih416-b2020 to ensure we have caused no
-> regressions. Finally the dt documentation has been updated to reflect
-> the changes in the driver code. Intrestingly it seems we are the first
-> upstream platform to be using some of the uhs bindings such as
-> sd-uhs-sdr104.
->
-> Changes since v4:
->  - Fixup typo (Pete)
->
-> Changes since v3:
->  - Rebased on Ulf's mmc next branch (rc5 based) (Ulf)
->
-> Changes since v2:
->  - Some whitespace fixups (Max)
->  - if (!ioaddr) suggestion (Max)
->  - Add stih418-b2199 suport (Max)
->  - Stih410 to STiH410 fixes (Max)
->  - rebased on v4.0-rc6 (Pete)
->
-> Changes since v1:
->  - Partition the changes into smaller patches to aid review process (Ulf)
->
-> Peter Griffin (9):
->   mmc: sdhci-st: Add macros for register offsets and bitfields for mmcss
->     glue regs
->   mmc: sdhci-st: Add support for de-asserting reset signal and top regs
->     resource
->   mmc: sdhci-st: Add delay management functions for top registers
->     (eMMC).
->   mmc: sdhci-st: Add st_mmcss_cconfig function to configure mmcss glue
->     registers.
->   mmc: sdhci-st: Add sdhci_st_set_uhs_signaling function.
->   mmc: sdhci-st: Update the quirks for this controller.
->   mmc: sdhci-st: Update ST SDHCI binding documentation.
->   ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
->   ARM: STi: DT: STiH418: Add dt nodes for sdhci and emmc.
->
->  Documentation/devicetree/bindings/mmc/sdhci-st.txt | 100 +++++-
->  arch/arm/boot/dts/stih407-family.dtsi              |  30 ++
->  arch/arm/boot/dts/stih410-b2120.dts                |  10 +
->  arch/arm/boot/dts/stih418-b2199.dts                |  12 +
->  arch/arm/boot/dts/stihxxx-b2120.dtsi               |   8 +
->  drivers/mmc/host/sdhci-st.c                        | 354 ++++++++++++++++++++-
->  6 files changed, 500 insertions(+), 14 deletions(-)
->
-> --
-> 1.9.1
->
+Hi Paul,
 
-Thanks! Applied.
+On Fri, 10 Apr 2015 12:38:59 +0200
+Paul Bolle <pebolle@tiscali.nl> wrote:
 
-Kind regards
-Uffe
+> (This patch needed a trivial context change in drivers/crypto/Makefile
+> to get it applied on top of next-20150409.)
+
+I'll rebase my work on linux-next.
+
+> 
+> On Thu, 2015-04-09 at 16:58 +0200, Boris Brezillon wrote:
+> > --- a/drivers/crypto/Kconfig
+> > +++ b/drivers/crypto/Kconfig
+> > @@ -164,8 +164,10 @@ config CRYPTO_DEV_MV_CESA
+> >  	depends on PLAT_ORION
+> >  	select CRYPTO_ALGAPI
+> >  	select CRYPTO_AES
+> > +	select CRYPTO_DES
+> >  	select CRYPTO_BLKCIPHER2
+> >  	select CRYPTO_HASH
+> > +	select SRAM
+> >  	help
+> >  	  This driver allows you to utilize the Cryptographic Engines and
+> >  	  Security Accelerator (CESA) which can be found on the Marvell Orion
+> 
+> > --- a/drivers/crypto/Makefile
+> > +++ b/drivers/crypto/Makefile
+> 
+> > -obj-$(CONFIG_CRYPTO_DEV_MV_CESA) += mv_cesa.o
+> > +obj-$(CONFIG_CRYPTO_DEV_MV_CESA) += marvell/
+> 
+> > --- /dev/null
+> > +++ b/drivers/crypto/marvell/Makefile
+> > @@ -0,0 +1 @@
+> > +obj-$(CONFIG_CRYPTO_DEV_MV_CESA) += cesa.o cipher.o hash.o tdma.o
+> 
+> For a modular build (which is all I tried) this doesn't do what you
+> probably want, as this will generate four modules. Assuming you want to
+> keep the mv_cesa name for the module, you could try something like:
+>     obj-$(CONFIG_CRYPTO_DEV_MV_CESA) += mv_cesa.o
+>     mv_cesa-objs := cesa.o cipher.o hash.o tdma.o
+> 
+> Does that do what you want?
+
+Yes, I'll fix that in v2.
+
+> 
+> > --- /dev/null
+> > +++ b/drivers/crypto/marvell/cesa.c
+> 
+> > + * This program is free software; you can redistribute it and/or modify it
+> > + * under the terms of the GNU General Public License version 2 as published
+> > + * by the Free Software Foundation.
+> 
+> This states the license is GPL v2.
+> 
+> > +static struct platform_driver marvell_cesa = {
+> > +	.probe		= mv_cesa_probe,
+> > +	.remove		= mv_cesa_remove,
+> > +	.driver		= {
+> > +		.owner	= THIS_MODULE,
+> > +		.name	= "mv_crypto",
+> > +		.of_match_table = mv_cesa_of_match_table,
+> > +	},
+> > +};
+> > +MODULE_ALIAS("platform:mv_crypto");
+> 
+> (It's nicer to make that macro be a part of the block of the other
+> MODULE_ macros.)
+> 
+> > +module_platform_driver(marvell_cesa);
+> 
+> (And it's nicer to have this directly follow the definition of
+> marvell_cesa.)
+
+Absolutely.
+
+> 
+> > +MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com>");
+> > +MODULE_AUTHOR("Arnaud Ebalard <arno@natisbad.org>");
+> > +MODULE_DESCRIPTION("Support for Marvell's cryptographic engine");
+> > +MODULE_LICENSE("GPL");
+> 
+> And this states the license is GPL v2 or later. So either the comment at
+> the top of this file or this macro need to be changed.
+
+I'll change the MODULE_LICENSE definition.
+
+Thanks,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
