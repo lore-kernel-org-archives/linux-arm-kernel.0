@@ -1,59 +1,147 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 10 Apr 2015 09:58:28 +0100
-Subject: [PATCH v4 6/9] mmc: sdhci-st: Update the quirks for this controller.
+Date: Fri, 10 Apr 2015 09:58:29 +0100
+Subject: [PATCH v4 7/9] mmc: sdhci-st: Update ST SDHCI binding documentation.
 In-Reply-To: <1428656311-2605-1-git-send-email-peter.griffin@linaro.org>
 References: <1428656311-2605-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1428656311-2605-7-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1428656311-2605-8-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some additional quirks need to be enabled now we support UHS
-modes. This avoids some spurious warnings like
+This patch updates the binding information to reflect the
+extra dt options which are now supported by the sdhci-st.c
+driver which enable support for stih407 family silicon.
 
-"Got data interrupt 0x00000002 even though no data operation was in progress"
-
-Testing on stih410-b2120 board achieves the following speeds
-with HS200 eMMC card.
-
-max-frequency = 200Mhz
-/dev/mmcblk0p1:
- Timing buffered disk reads: 270 MB in  3.02 seconds =  89.54 MB/sec
-
-max-frequency = 100Mhz
-root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
-/dev/mmcblk0p1:
- Timing buffered disk reads: 210 MB in  3.00 seconds =  70.00 MB/sec
-
-max-frequency = 50Mhz
-root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
-/dev/mmcblk0p1:
- Timing buffered disk reads: 118 MB in  3.00 seconds =  39.28 MB/sec
-
-This is better than the 3.10 kernel which achieves 77.59 MB/sec
-at 200Mhz clock (same board/soc/eMMC).
+STiH410 SoC and later support UHS modes for eMMC, so the
+driver now makes use of these common bindings. Examples
+are provided for both eMMC (which has additional bindings)
+and also sd slot for STiH407.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- drivers/mmc/host/sdhci-st.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mmc/sdhci-st.txt | 100 ++++++++++++++++++---
+ 1 file changed, 90 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
-index 2ce842b..751452b 100644
---- a/drivers/mmc/host/sdhci-st.c
-+++ b/drivers/mmc/host/sdhci-st.c
-@@ -340,7 +340,10 @@ static const struct sdhci_ops sdhci_st_ops = {
- static const struct sdhci_pltfm_data sdhci_st_pdata = {
- 	.ops = &sdhci_st_ops,
- 	.quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
--	    SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
-+		SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
-+		SDHCI_QUIRK_NO_HISPD_BIT,
-+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
-+		SDHCI_QUIRK2_STOP_WITH_TC,
+diff --git a/Documentation/devicetree/bindings/mmc/sdhci-st.txt b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
+index 7527db4..18d950d 100644
+--- a/Documentation/devicetree/bindings/mmc/sdhci-st.txt
++++ b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
+@@ -5,20 +5,62 @@ Documentation/devicetree/bindings/mmc/mmc.txt and the properties
+ used by the sdhci-st driver.
+ 
+ Required properties:
+-- compatible :  Must be "st,sdhci"
+-- clock-names : Should be "mmc"
+-                See: Documentation/devicetree/bindings/resource-names.txt
+-- clocks :      Phandle of the clock used by the sdhci controler
+-                See: Documentation/devicetree/bindings/clock/clock-bindings.txt
++- compatible:		Must be "st,sdhci" and it can be compatible to "st,sdhci-stih407"
++			to set the internal glue logic used for configuring the MMC
++			subsystem (mmcss) inside the FlashSS (available in STiH407 SoC
++			family).
++
++- clock-names:		Should be "mmc".
++			See: Documentation/devicetree/bindings/resource-names.txt
++- clocks:		Phandle to the clock.
++			See: Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++- interrupts:		One mmc interrupt should be described here.
++- interrupt-names:	Should be "mmcirq".
++
++- pinctrl-names:	A pinctrl state names "default" must be defined.
++- pinctrl-0:		Phandle referencing pin configuration of the sd/emmc controller.
++			See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
++
++- reg:			This must provide the host controller base address and it can also
++			contain the FlashSS Top register for TX/RX delay used by the driver
++			to configure DLL inside the flashSS, if so reg-names must also be
++			specified.
+ 
+ Optional properties:
+-- non-removable: non-removable slot
+-                 See: Documentation/devicetree/bindings/mmc/mmc.txt
+-- bus-width: Number of data lines
+-                 See: Documentation/devicetree/bindings/mmc/mmc.txt
++- reg-names:		Should be "mmc" and "top-mmc-delay". "top-mmc-delay" is optional
++			for eMMC on stih407 family silicon to configure DLL inside FlashSS.
++
++- non-removable:	Non-removable slot. Also used for configuring mmcss in STiH407 SoC
++			family.
++			See:  Documentation/devicetree/bindings/mmc/mmc.txt.
++
++- bus-width:		Number of data lines.
++			See:  Documentation/devicetree/bindings/mmc/mmc.txt.
++
++- max-frequency: 	Can be 200MHz, 100Mz or 50MHz (default) and used for
++			configuring the CCONFIG3 in the mmcss.
++			See:  Documentation/devicetree/bindings/mmc/mmc.txt.
++
++- resets:		Phandle and reset specifier pair to softreset line of HC IP.
++			See: Documentation/devicetree/bindings/reset/reset.txt
++
++- vqmmc-supply:		Phandle to the regulator dt node, mentioned as the vcc/vdd
++			supply in eMMC/SD specs.
++
++- sd-uhs--sdr50:	To enable the SDR50 in the mmcss.
++			See:  Documentation/devicetree/bindings/mmc/mmc.txt.
++
++- sd-uhs-sdr104:	To enable the SDR104 in the mmcss.
++			See:  Documentation/devicetree/bindings/mmc/mmc.txt.
++
++- sd-uhs-ddr50:		To enable the DDR50 in the mmcss.
++			See:  Documentation/devicetree/bindings/mmc/mmc.txt.
+ 
+ Example:
+ 
++/* Example stih416e eMMC configuration */
++
+ mmc0: sdhci at fe81e000 {
+ 	compatible	= "st,sdhci";
+ 	status		= "disabled";
+@@ -29,5 +71,43 @@ mmc0: sdhci at fe81e000 {
+ 	pinctrl-0	= <&pinctrl_mmc0>;
+ 	clock-names	= "mmc";
+ 	clocks		= <&clk_s_a1_ls 1>;
+-	bus-width       = <8>
++	bus-width	= <8>
++
++/* Example SD stih407 family configuration */
++
++mmc1: sdhci at 09080000 {
++	compatible	= "st,sdhci-stih407", "st,sdhci";
++	status		= "disabled";
++	reg		= <0x09080000 0x7ff>;
++	reg-names	= "mmc";
++	interrupts	= <GIC_SPI 90 IRQ_TYPE_NONE>;
++	interrupt-names	= "mmcirq";
++	pinctrl-names	= "default";
++	pinctrl-0	= <&pinctrl_sd1>;
++	clock-names	= "mmc";
++	clocks		= <&clk_s_c0_flexgen CLK_MMC_1>;
++	resets		= <&softreset STIH407_MMC1_SOFTRESET>;
++	bus-width	= <4>;
++};
++
++/* Example eMMC stih407 family configuration */
++
++mmc0: sdhci at 09060000 {
++	compatible	= "st,sdhci-stih407", "st,sdhci";
++	status		= "disabled";
++	reg		= <0x09060000 0x7ff>, <0x9061008 0x20>;
++	reg-names	= "mmc", "top-mmc-delay";
++	interrupts	= <GIC_SPI 92 IRQ_TYPE_NONE>;
++	interrupt-names	= "mmcirq";
++	pinctrl-names	= "default";
++	pinctrl-0	= <&pinctrl_mmc0>;
++	clock-names	= "mmc";
++	clocks		= <&clk_s_c0_flexgen CLK_MMC_0>;
++	vqmmc-supply	= <&vmmc_reg>;
++	max-frequency	= <200000000>;
++	bus-width	= <8>;
++	non-removable;
++	sd-uhs-sdr50;
++	sd-uhs-sdr104;
++	sd-uhs-ddr50;
  };
- 
- 
 -- 
 1.9.1
