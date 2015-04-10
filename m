@@ -1,49 +1,31 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 10 Apr 2015 09:38:22 +0200
-Subject: [PATCH 0/5] PCI: st: provide support for dw pcie
-Message-ID: <1428651507-32554-1-git-send-email-gabriel.fernandez@linaro.org>
+Date: Fri, 10 Apr 2015 09:38:27 +0200
+Subject: [PATCH 5/5] MAINTAINERS: Add pci-st.c to ARCH/STI architecture
+In-Reply-To: <1428651507-32554-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1428651507-32554-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1428651507-32554-6-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v3:
- - Remove power management functions (was not fully tested)
- - Remove configuration space range from dt binding
- - Remove pci_common_init_dev() call in pcie-designware.c to avoid 
-   default IO space declaration. 
+This patch adds the pci-st.c pci driver found on STMicroelectronics
+SoC's into the STI arch section of the maintainers file.
 
-Changes in v2:
- - comestic corrections in device tree binding
- - add pci-st.c into MAINTAINERS
- - remove st_pcie_ops structure to avoid another level of indirection
- - remove nasty busy-loop
- - remove useless test using virt_to_phys()
- - move disable io support into dw-pcie driver
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-I don't change the st_pcie_abort_handler() function because abort handling
-is masked during boot.
-
-
-This patch-set introduces a STMicroelectronics PCIe controller.
-It's based on designware PCIe driver.
-
-Gabriel Fernandez (5):
-  ARM: STi: Kconfig update for PCIe support
-  PCI: st: Add Device Tree bindings for sti pcie
-  PCI: st: Provide support for the sti PCIe controller
-  pci: designware: remove pci_common_init_dev()
-  MAINTAINERS: Add pci-st.c to ARCH/STI architecture
-
- Documentation/devicetree/bindings/pci/st-pcie.txt |  53 ++
- MAINTAINERS                                       |   1 +
- arch/arm/mach-sti/Kconfig                         |   2 +
- drivers/pci/host/Kconfig                          |   9 +
- drivers/pci/host/Makefile                         |   1 +
- drivers/pci/host/pci-st.c                         | 583 ++++++++++++++++++++++
- drivers/pci/host/pcie-designware.c                |  62 +--
- drivers/pci/host/pcie-designware.h                |   2 +
- 8 files changed, 683 insertions(+), 30 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
- create mode 100644 drivers/pci/host/pci-st.c
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index efbcb50..4639d2d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1468,6 +1468,7 @@ F:	drivers/clocksource/arm_global_timer.c
+ F:	drivers/i2c/busses/i2c-st.c
+ F:	drivers/media/rc/st_rc.c
+ F:	drivers/mmc/host/sdhci-st.c
++F:	drivers/pci/host/pci-st.c
+ F:	drivers/phy/phy-stih407-usb.c
+ F:	drivers/phy/phy-stih41x-usb.c
+ F:	drivers/pinctrl/pinctrl-st.c
 -- 
 1.9.1
