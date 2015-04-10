@@ -1,63 +1,58 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 10 Apr 2015 19:33:45 +0100
-Subject: [PATCH v2 05/12] ARM: dts: apq8064: Add SATA controller support.
-In-Reply-To: <5528076B.1010808@codeaurora.org>
-References: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1428669263-10990-1-git-send-email-srinivas.kandagatla@linaro.org>
- <5528076B.1010808@codeaurora.org>
-Message-ID: <55281789.2060402@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 10 Apr 2015 12:00:22 -0700
+Subject: [GIT PULL] MAINTAINERS update for Broadcom SoCs for 4.1
+Message-ID: <1428692422-18369-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following changes since commit f22e6e847115abc3a0e2ad7bb18d243d42275af1:
 
+  Linux 4.0-rc7 (2015-04-06 15:39:45 -0700)
 
-On 10/04/15 18:24, Stephen Boyd wrote:
-> On 04/10/15 05:34, Srinivas Kandagatla wrote:
->> This patch adds AHCI based SATA controller support to APQ8064.
->> Tested on IFC6410 board.
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |  9 ++++++++
->>   arch/arm/boot/dts/qcom-apq8064.dtsi        | 35 ++++++++++++++++++++++++++++++
->>   2 files changed, 44 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> index 122bf34..c9c9c5e 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> @@ -116,6 +116,15 @@
->>   			};
->>   		};
->>
->> +		sata_phy0: sata-phy at 1b400000{
->
-> Space before '{' please.
-Yeo, Will fix it in next version.
->
->> +			status = "okay";
->> +		};
->> +
->> +		sata0: sata at 29000000 {
->> +			status		= "okay";
->> +			target-supply	= <&pm8921_s4>;
->> +		};
->> +
->>   		/* OTG */
->>   		usb1_phy: phy at 12500000 {
->>   			status		= "okay";
->> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
->> index 5aac9a5..56cc65e 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
->> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
->> @@ -379,6 +379,41 @@
->>   			usb-phy		= <&usb4_phy>;
->>   		};
->>
->> +		sata_phy0: sata-phy at 1b400000{
->
-> Space before '{' please. Also I wonder if it should just be called
-> phy at 1b400000 because phy is more standard than sata-phy.
-Make sense, I will fix it in next version.
+are available in the git repository at:
 
->
+  http://github.com/broadcom/stblinux tags/arm-soc/for-4.1/maintainers
+
+for you to fetch changes up to 90a604a9ce881290fdc7468df4ca4e9c2ae4de62:
+
+  MAINTAINERS: Update brcmstb entry (2015-04-10 11:52:40 -0700)
+
+----------------------------------------------------------------
+This pull request contains 3 changes to the MAINTAINERS file for Broadcom SoCs:
+
+- add Ray and Scott for mach-bcm
+- remove Christian for mach-bcm
+- remove Marc for brcmstb
+
+----------------------------------------------------------------
+Florian Fainelli (3):
+      MAINTAINERS: Update mach-bcm maintainers list
+      MAINTAINERS: Remove Christian Daudt for mach-bcm
+      MAINTAINERS: Update brcmstb entry
+
+ MAINTAINERS | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index efbcb50e4969..ba694bfa0a4f 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2117,8 +2117,9 @@ S:	Supported
+ F:	drivers/net/ethernet/broadcom/bnx2x/
+ 
+ BROADCOM BCM281XX/BCM11XXX/BCM216XX ARM ARCHITECTURE
+-M:	Christian Daudt <bcm@fixthebug.org>
+ M:	Florian Fainelli <f.fainelli@gmail.com>
++M:	Ray Jui <rjui@broadcom.com>
++M:	Scott Branden <sbranden@broadcom.com>
+ L:	bcm-kernel-feedback-list at broadcom.com
+ T:	git git://github.com/broadcom/mach-bcm
+ S:	Maintained
+@@ -2169,7 +2170,6 @@ S:	Maintained
+ F:	drivers/usb/gadget/udc/bcm63xx_udc.*
+ 
+ BROADCOM BCM7XXX ARM ARCHITECTURE
+-M:	Marc Carino <marc.ceeeee@gmail.com>
+ M:	Brian Norris <computersforpeace@gmail.com>
+ M:	Gregory Fong <gregory.0xf0@gmail.com>
+ M:	Florian Fainelli <f.fainelli@gmail.com>
