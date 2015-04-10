@@ -1,33 +1,49 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 10 Apr 2015 09:38:23 +0200
-Subject: [PATCH 1/5] ARM: STi: Kconfig update for PCIe support
-In-Reply-To: <1428651507-32554-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1428651507-32554-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1428651507-32554-2-git-send-email-gabriel.fernandez@linaro.org>
+Date: Fri, 10 Apr 2015 09:38:22 +0200
+Subject: [PATCH 0/5] PCI: st: provide support for dw pcie
+Message-ID: <1428651507-32554-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update Kconfig:
-- MIGHT_HAVE_PCI
-- PCI_DOMAINS
+Changes in v3:
+ - Remove power management functions (was not fully tested)
+ - Remove configuration space range from dt binding
+ - Remove pci_common_init_dev() call in pcie-designware.c to avoid 
+   default IO space declaration. 
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- arch/arm/mach-sti/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Changes in v2:
+ - comestic corrections in device tree binding
+ - add pci-st.c into MAINTAINERS
+ - remove st_pcie_ops structure to avoid another level of indirection
+ - remove nasty busy-loop
+ - remove useless test using virt_to_phys()
+ - move disable io support into dw-pcie driver
 
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index 3b1ac46..7f9b432 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -8,6 +8,8 @@ menuconfig ARCH_STI
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select HAVE_ARM_SCU if SMP
- 	select ARCH_REQUIRE_GPIOLIB
-+	select PCI_DOMAINS if PCI
-+	select MIGHT_HAVE_PCI
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_764369 if SMP
- 	select ARM_ERRATA_775420
+I don't change the st_pcie_abort_handler() function because abort handling
+is masked during boot.
+
+
+This patch-set introduces a STMicroelectronics PCIe controller.
+It's based on designware PCIe driver.
+
+Gabriel Fernandez (5):
+  ARM: STi: Kconfig update for PCIe support
+  PCI: st: Add Device Tree bindings for sti pcie
+  PCI: st: Provide support for the sti PCIe controller
+  pci: designware: remove pci_common_init_dev()
+  MAINTAINERS: Add pci-st.c to ARCH/STI architecture
+
+ Documentation/devicetree/bindings/pci/st-pcie.txt |  53 ++
+ MAINTAINERS                                       |   1 +
+ arch/arm/mach-sti/Kconfig                         |   2 +
+ drivers/pci/host/Kconfig                          |   9 +
+ drivers/pci/host/Makefile                         |   1 +
+ drivers/pci/host/pci-st.c                         | 583 ++++++++++++++++++++++
+ drivers/pci/host/pcie-designware.c                |  62 +--
+ drivers/pci/host/pcie-designware.h                |   2 +
+ 8 files changed, 683 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
+ create mode 100644 drivers/pci/host/pci-st.c
+
 -- 
 1.9.1
