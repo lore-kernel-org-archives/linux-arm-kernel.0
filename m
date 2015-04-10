@@ -1,146 +1,73 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 10 Apr 2015 15:59:47 +0100
-Subject: [PATCH v2] KVM: arm/arm64: avoid using kvm_run for in-kernel emulation
-Message-ID: <1428677987-15494-1-git-send-email-andre.przywara@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Apr 2015 16:06:09 +0100
+Subject: Guarantee udelay(N) spins at least N microseconds
+In-Reply-To: <5527C501.2040808@free.fr>
+References: <5527B331.5000205@free.fr>
+ <20150410114415.GC12732@n2100.arm.linux.org.uk>
+ <5527C501.2040808@free.fr>
+Message-ID: <20150410150607.GG12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our in-kernel VGIC emulation still uses struct kvm_run briefly before
-writing back the emulation result into the guest register.
-Although this particular case looks safe from an exploitation
-perspective, we can save some unneeded copying at the end of the VGIC
-emulation code.
-Replace the usage of struct kvm_run in favour of passing separate
-parameters in io_mem_abort(). Since the write back is now handled
-for all kvm_io_bus users, we can get rid of it in the VGIC.
+On Fri, Apr 10, 2015 at 02:41:37PM +0200, Mason wrote:
+> On 10/04/2015 13:44, Russell King - ARM Linux wrote:
+> >On Fri, Apr 10, 2015 at 01:25:37PM +0200, Mason wrote:
+> >>If I understand correctly, most drivers expect udelay(N) to spin for
+> >>at least N ?s. Is that correct? In that use case, spinning less might
+> >>introduce subtle heisenbugs.
+> >
+> >We've never guaranteed this.
+> >
+> >The fact is that udelay() can delay for _approximately_ the time you
+> >ask for - it might be slightly shorter, or it could be much longer
+> >than you expect.
+> 
+> OK, but asking for 10 ?s and spinning 0 is a problem, right?
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-This one applies on top of kvmarm/queue.
+Potentially.
 
- arch/arm/kvm/mmio.c |   65 ++++++++++++++++++++++++++++-----------------------
- virt/kvm/arm/vgic.c |    7 ------
- 2 files changed, 36 insertions(+), 36 deletions(-)
+> >On most UP implementations using the software loop
+> >it will typically be around 1% slower than requested.
+> 
+> Please correct any misconception, it seems to me that typical
+> driver writers, reading "operation X takes 10 ?s to complete"
+> will write udelay(10); (if they want to spin-wait)
 
-diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-index 974b1c6..42004cb 100644
---- a/arch/arm/kvm/mmio.c
-+++ b/arch/arm/kvm/mmio.c
-@@ -85,6 +85,30 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
- 	return data;
- }
- 
-+static int kvm_writeback_mmio_data(struct kvm_vcpu *vcpu, unsigned int len,
-+				   void *data_ptr, gpa_t phys_addr)
-+{
-+	unsigned long data;
-+
-+	if (len > sizeof(unsigned long))
-+		return -EINVAL;
-+
-+	data = mmio_read_buf(data_ptr, len);
-+
-+	if (vcpu->arch.mmio_decode.sign_extend &&
-+	    len < sizeof(unsigned long)) {
-+		int mask = 1U << ((len * 8) - 1);
-+
-+		data = (data ^ mask) - mask;
-+	}
-+
-+	trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, phys_addr, data);
-+	data = vcpu_data_host_to_guest(vcpu, data, len);
-+	*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = data;
-+
-+	return 0;
-+}
-+
- /**
-  * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
-  * @vcpu: The VCPU pointer
-@@ -95,28 +119,10 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
-  */
- int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	unsigned long data;
--	unsigned int len;
--	int mask;
--
--	if (!run->mmio.is_write) {
--		len = run->mmio.len;
--		if (len > sizeof(unsigned long))
--			return -EINVAL;
--
--		data = mmio_read_buf(run->mmio.data, len);
--
--		if (vcpu->arch.mmio_decode.sign_extend &&
--		    len < sizeof(unsigned long)) {
--			mask = 1U << ((len * 8) - 1);
--			data = (data ^ mask) - mask;
--		}
--
--		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
--			       data);
--		data = vcpu_data_host_to_guest(vcpu, data, len);
--		*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = data;
--	}
-+	if (!run->mmio.is_write)
-+		return kvm_writeback_mmio_data(vcpu, run->mmio.len,
-+					       run->mmio.data,
-+					       run->mmio.phys_addr);
- 
- 	return 0;
- }
-@@ -201,18 +207,19 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 				      data_buf);
- 	}
- 
--	/* Now prepare kvm_run for the potential return to userland. */
--	run->mmio.is_write	= is_write;
--	run->mmio.phys_addr	= fault_ipa;
--	run->mmio.len		= len;
--	memcpy(run->mmio.data, data_buf, len);
--
- 	if (!ret) {
- 		/* We handled the access successfully in the kernel. */
--		kvm_handle_mmio_return(vcpu, run);
-+		if (!is_write)
-+			kvm_writeback_mmio_data(vcpu, len, data_buf, fault_ipa);
- 		return 1;
- 	}
- 
-+	/* Now prepare the kvm_run structure for the return to userland. */
-+	run->mmio.is_write	= is_write;
-+	run->mmio.phys_addr	= fault_ipa;
-+	run->mmio.len		= len;
-+	memcpy(run->mmio.data, data_buf, len);
- 	run->exit_reason	= KVM_EXIT_MMIO;
-+
- 	return 0;
- }
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index b70174e..e23f50d 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -803,7 +803,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct vgic_io_device *iodev = container_of(this,
- 						    struct vgic_io_device, dev);
--	struct kvm_run *run = vcpu->run;
- 	const struct vgic_io_range *range;
- 	struct kvm_exit_mmio mmio;
- 	bool updated_state;
-@@ -832,12 +831,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
- 		updated_state = false;
- 	}
- 	spin_unlock(&dist->lock);
--	run->mmio.is_write	= is_write;
--	run->mmio.len		= len;
--	run->mmio.phys_addr	= addr;
--	memcpy(run->mmio.data, val, len);
--
--	kvm_handle_mmio_return(vcpu, run);
- 
- 	if (updated_state)
- 		vgic_kick_vcpus(vcpu->kvm);
+Arguments do not matter here, sorry.  What I said above is the way it
+behaves, period.  It's not for discussion.
+
+It may interest you that I discussed this issue with Linus, and Linus
+also said that it _isn't_ a problem and it _isn't_ something we care
+to fix.
+
+So, like it or not, we're stuck with udelay(10) being possible to
+delay by 9.99us intead of 10us.
+
+Where the inaccuracy comes from is entirely down to the way we calculate
+loops_per_jiffy - this is the number of loop cycles between two timer
+interrupts - but this does _not_ take account of the time to execute a
+timer interrupt.
+
+So, loops_per_jiffy is the number of loop cycles between two timer
+interrupts minus the time taken to service the timer interrupt.
+
+And what this means is that udelay(n) where 'n' is less than the
+period between two timer interrupts /will/ be, and is /expected to
+be/ potentially shorter than the requested period.
+
+There's no getting away from that, we can't estimate how long the timer
+interrupt takes to handle without the use of an external timer, and if
+we've got an external timer, we might as well use it for all delays.
+
+> Do you think they should take the inherent imprecision of loop-based
+> delays into account, and add a small cushion to be safe?
+
+No.  See above.  Not doing that.  Live with it.
+
+Fix the rounding errors if you wish, but do _not_ try to fix the
+"udelay() may return slightly earlier than requested" problem.  I
+will not apply a patch to fix _that_ problem.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
