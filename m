@@ -1,52 +1,74 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 10 Apr 2015 13:50:56 +0000
-Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
-In-Reply-To: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150410135056.GB28873@io.lakedaemon.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 10 Apr 2015 15:53:44 +0200
+Subject: [PATCH v3 00/11] arm64: update/clarify/relax Image and FDT placement
+ rules
+Message-ID: <1428674035-26603-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Boris,
+This series came about after Mark Rutland brought up the fact that the current
+FDT placement logic used by the EFI stub is flawed. But actually, it turned out
+that the documentation for both the Image and FDT placement was incorrect as
+well, or confusing at the very least.
 
-On Thu, Apr 09, 2015 at 04:58:41PM +0200, Boris Brezillon wrote:
-> I know we usually try to adapt existing drivers instead of replacing them
-> by new ones, but after trying to refactor the mv_cesa driver I realized it
-> would take longer than writing an new one from scratch.
+Changes since v2:
+This is a complete overhaul of the previous version. The FDT changes are mostly
+equivalent, but have been reimplemented in a way that does not rely on the
+linear mapping to have been initialized yet. This includes changes to the fixmap
+code itself to not rely on that either. Combined with the ID map reduction in
+patch #1, this paves the way for relaxing the Image placement requirements as
+well, i.e., the kernel Image can now be placed anywhere in memory without
+affecting the accessibility of memory below it, or causing the resulting mapping
+to be less efficient due to physical and virtual memory to not be relatively
+aligned.
 
-I'm sorry, but this makes me *very* uncomfortable.  Any organization
-worth it's salt will do a very careful audit of code touching
-cryptographic material and sensitive (decrypted) data.  From that point
-on, small audits of the changes to the code allow the organization to
-build a comfort level with kernel updates.  iow, following the git
-history of the driver.
+Changes since v1:
+- patch #1: split off reservation of the FDT binary itself from the memreserve
+  processing, since the former assumes the FDT is accessed via the linear
+  mapping, which we are about to change
+- patch #2: mention the older, stricter FDT placement rules in booting.txt,
+  get rid of early_print,
+  use correct format specifier for phys_addr_t,
+  use R/O mapping for FDT,
+- patches #3 .. #5: add R-b, minor style and grammar tweaks
 
-By apply this series, we are basically forcing those organizations to
-either a) stop updating, or b) expend significant resources to do
-another full audit.
+Ard Biesheuvel (11):
+  arm64: reduce ID map to a single page
+  arm64: drop sleep_idmap_phys and clean up cpu_resume()
+  of/fdt: split off FDT self reservation from memreserve processing
+  arm64: use fixmap region for permanent FDT mapping
+  arm64/efi: adapt to relaxed FDT placement requirements
+  arm64: implement our own early_init_dt_add_memory_arch()
+  arm64: fixmap: allow init before linear mapping is set up
+  arm64: mm: explicitly bootstrap the linear mapping
+  arm64: move kernel mapping out of linear region
+  arm64: allow kernel Image to be loaded anywhere in physical memory
+  arm64/efi: adapt to relaxed kernel Image placement requirements
 
-In short, this series breaks the audit chain for the mv_cesa driver.
+ Documentation/arm64/booting.txt         |  25 ++-
+ arch/arm/mm/init.c                      |   1 +
+ arch/arm64/include/asm/compiler.h       |   2 +
+ arch/arm64/include/asm/efi.h            |   8 +-
+ arch/arm64/include/asm/fixmap.h         |   9 ++
+ arch/arm64/include/asm/memory.h         |  15 +-
+ arch/arm64/include/asm/mmu.h            |   1 +
+ arch/arm64/kernel/Makefile              |   1 +
+ arch/arm64/kernel/efi-stub.c            |   4 +-
+ arch/arm64/kernel/head.S                |  60 ++-----
+ arch/arm64/kernel/setup.c               |  45 +++---
+ arch/arm64/kernel/sleep.S               |   9 +-
+ arch/arm64/kernel/suspend.c             |   3 -
+ arch/arm64/kernel/vmlinux.lds.S         |  35 ++++-
+ arch/arm64/mm/init.c                    |  35 +++++
+ arch/arm64/mm/mmu.c                     | 271 ++++++++++++++++++++++++--------
+ arch/arm64/mm/proc.S                    |   3 +-
+ arch/powerpc/kernel/prom.c              |   1 +
+ drivers/firmware/efi/libstub/arm-stub.c |   5 +-
+ drivers/firmware/efi/libstub/efistub.h  |   1 -
+ drivers/firmware/efi/libstub/fdt.c      |  23 +--
+ drivers/of/fdt.c                        |  19 ++-
+ include/linux/of_fdt.h                  |   2 +
+ 23 files changed, 380 insertions(+), 198 deletions(-)
 
-Maybe I'm the only person with this level of paranoia.  If so, I'm sure
-others will override me.
-
->From my POV, it looks like the *only* reason we've chosen this route is
-developer convenience.  I don't think that's sufficient reason to break
-the change history of a driver handling sensitive data.
-
-For an example of how I use the git history and binary differences to
-audit a series of changes to cryptographic code, please take a look at
-objdiff [1]. You can even duplicate my audit of my submission for the
-skein/threefish driver currently in the staging tree, starting at [2]
-and going up to [3].
-
-thx,
-
-Jason.
-
-[1] scripts/objdiff [4]
-[2] 449bb8125e3f "staging: crypto: skein: import code from Skein3Fish.git"
-[3] 0264b7b7fb44 "staging: crypto: skein: rename macros"
-[4] There are better tools out there for auditing actual code changes,
-    radare (http://radare.org/r/) is one of them.  objdiff is good only
-    at validating object code *hasn't* been changed by style commits.
+-- 
+1.8.3.2
