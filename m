@@ -1,165 +1,42 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Fri, 10 Apr 2015 14:11:57 -0700
-Subject: [PATCH v8 00/18] Tegra124 CL-DVFS / DFLL clocksource + cpufreq
-In-Reply-To: <20150311100741.GK19577@ulmo.nvidia.com>
-References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
- <20150311100741.GK19577@ulmo.nvidia.com>
-Message-ID: <20150410211157.14369.51754@quantum>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 10 Apr 2015 23:22:56 +0200
+Subject: Guarantee udelay(N) spins at least N microseconds
+In-Reply-To: <20150410204221.GI12732@n2100.arm.linux.org.uk>
+References: <5527B331.5000205@free.fr>
+ <20150410114415.GC12732@n2100.arm.linux.org.uk> <5527C501.2040808@free.fr>
+ <20150410150607.GG12732@n2100.arm.linux.org.uk> <5527EC90.9050900@free.fr>
+ <20150410160817.GH12732@n2100.arm.linux.org.uk> <55282C1F.3000600@free.fr>
+ <20150410204221.GI12732@n2100.arm.linux.org.uk>
+Message-ID: <55283F30.7030109@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Thierry Reding (2015-03-11 03:07:43)
-> Hi Mike,
+On 10/04/2015 22:42, Russell King - ARM Linux wrote:
+> On Fri, Apr 10, 2015 at 10:01:35PM +0200, Mason wrote:
+>> There is, however, an important difference between loop-based
+>> delays and timer-based delays; CPU frequencies typically fall
+>> in the 50-5000 MHz range, while timer frequencies typically
+>> span tens of kHz up to hundreds of MHz. For example, 90 kHz
+>> is sometimes provided in multimedia systems (MPEG TS).
 > 
-> Have you had a chance to look at these changes to the Tegra clock
-> driver? If you're fine with it, I'd like to take these patches through
-> the Tegra tree because the rest of the series depends on them. I can
-> provide a stable branch in case we need to base other Tegra clock
-> changes on top of this.
-
-Hi Thierry,
-
-Clock patches (and corresponding DT binding descriptions and changes to
-DTS) look fine to me. Please add:
-
-Acked-by: Michael Turquette <mturquette@linaro.org>
-
-I did have a question about the beahvior of clk_put in one of Mikko's
-patches but it should not gate this series. I'm just trying to find out
-if we have a bug in the framework or if the Tegra driver is a special
-case.
-
-Also I do not think a stable branch is necessary.
-
-Regards,
-Mike
-
+> Why would you want to use such a slowly clocked counter for something
+> which is supposed to be able to produce delays in the micro-second and
+> potentially the nanosecond range?
 > 
-> Thierry
-> 
-> On Sun, Mar 01, 2015 at 02:44:23PM +0200, Mikko Perttunen wrote:
-> > Hi, this is v8 of the Tegra124 cpufreq series. Aside rebasing on latest -next,
-> > the following changes have been done:
-> > 
-> > clk: tegra: Add binding for the Tegra124 DFLL clocksource
-> > - Changed dfll@ -> clock@
-> > - Changed compatibility string to "nvidia,tegra124-dfll"
-> > - Clarified how the vdd-cpu-supply property is used
-> > - Marked nvidia,cg-scale as optional since it is a boolean property
-> > - Expanded the 'FS mode' term to 'full speed mode'
-> > - Added dvco reset control
-> > 
-> > ARM: tegra: Add the DFLL to Tegra124 device tree
-> > - Changed dfll@ -> clock@
-> > - Added dvco reset control
-> > 
-> > ARM: tegra: Enable the DFLL on the Jetson TK1
-> > - Changed dfll@ -> clock@
-> > 
-> > clk: tegra: Initialize PLL_X before CCLK_G to ensure it has a parent
-> > - Added
-> > 
-> > clk: tegra: Introduce ability for SoC-specific reset control callbacks
-> > - Added
-> > 
-> > clk: tegra: Add DFLL DVCO reset control for Tegra124
-> > - Changed to use SoC-specific reset control callback
-> > 
-> > clk: tegra: Add Tegra124 DFLL clocksource platform driver
-> > - Don't set DVCO reset handlers
-> > 
-> > clk: tegra: Add library for the DFLL clock source (open-loop mode)
-> > - Use reset control instead of function pointers
-> > 
-> > also added acks from v7.
-> > 
-> > The series is available in a git repository at
-> >   git://github.com/cyndis/linux.git cldvfs-v8
-> > 
-> > Tested by me on Jetson-TK1 (rev. D).
-> > 
-> > Original cover letter:
-> > 
-> > This series implements the DFLL/CL-DVFS clock source for the fast CPU
-> > cluster on Tegra124, and a cpufreq driver that uses the DFLL for
-> > clocking the CPU. Most of this is based on Paul Walmsley's public patch
-> > set from December 2013, which is available at
-> > http://comments.gmane.org/gmane.linux.ports.tegra/15273
-> > 
-> > The DFLL clock hardware is a voltage-controlled oscillator plus
-> > control logic that compares the generated output clock with a
-> > 51 MHz reference clock, and can make decisions to either lower
-> > or raise the DFLL voltage to keep the output rate close to the
-> > software-requested rate. The voltage changes are done by
-> > communicating with an off-chip PMIC via either I2C or PWM.
-> > As the DFLL oscillator is powered via the CPU rail, using
-> > the DFLL as the CPU clocksource also gives us dynamic CPU
-> > voltage scaling.
-> > 
-> > This series has been tested on the Jetson TK1 (Rev C). Porting this to
-> > the Venice2 should be simple, though do note that it does not have
-> > active cooling.
-> > 
-> > Thanks,
-> > Tuomas
-> > 
-> > Mikko Perttunen (3):
-> >   clk: tegra: Introduce ability for SoC-specific reset control callbacks
-> >   clk: tegra: Initialize PLL_X before CCLK_G to ensure it has a parent
-> >   ARM: tegra: Add CPU regulator to the Jetson TK1 device tree
-> > 
-> > Paul Walmsley (1):
-> >   clk: tegra: Add DFLL DVCO reset control for Tegra124
-> > 
-> > Tuomas Tynkkynen (14):
-> >   clk: tegra: Add binding for the Tegra124 DFLL clocksource
-> >   clk: tegra: Add library for the DFLL clock source (open-loop mode)
-> >   clk: tegra: Add closed loop support for the DFLL
-> >   clk: tegra: Add functions for parsing CVB tables
-> >   clk: tegra: Add Tegra124 DFLL clocksource platform driver
-> >   clk: tegra: Save/restore CCLKG_BURST_POLICY on suspend
-> >   clk: tegra: Add the DFLL as a possible parent of the cclk_g clock
-> >   ARM: tegra: Add the DFLL to Tegra124 device tree
-> >   ARM: tegra: Enable the DFLL on the Jetson TK1
-> >   cpufreq: tegra124: Add device tree bindings
-> >   cpufreq: tegra: Rename tegra-cpufreq to tegra20-cpufreq
-> >   cpufreq: Add cpufreq driver for Tegra124
-> >   ARM: tegra: Add entries for cpufreq on Tegra124
-> >   ARM: tegra: enable Tegra124 cpufreq driver by default
-> > 
-> >  .../bindings/clock/nvidia,tegra124-dfll.txt        |   79 +
-> >  .../bindings/cpufreq/tegra124-cpufreq.txt          |   44 +
-> >  arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   15 +-
-> >  arch/arm/boot/dts/tegra124.dtsi                    |   34 +
-> >  arch/arm/configs/tegra_defconfig                   |    1 +
-> >  arch/arm/mach-tegra/Kconfig                        |    1 +
-> >  drivers/clk/tegra/Makefile                         |    3 +
-> >  drivers/clk/tegra/clk-dfll.c                       | 1755 ++++++++++++++++++++
-> >  drivers/clk/tegra/clk-dfll.h                       |   54 +
-> >  drivers/clk/tegra/clk-tegra-super-gen4.c           |   50 +-
-> >  drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         |  163 ++
-> >  drivers/clk/tegra/clk-tegra124.c                   |   82 +
-> >  drivers/clk/tegra/clk.c                            |   36 +-
-> >  drivers/clk/tegra/clk.h                            |    3 +
-> >  drivers/clk/tegra/cvb.c                            |  133 ++
-> >  drivers/clk/tegra/cvb.h                            |   67 +
-> >  drivers/cpufreq/Kconfig.arm                        |   13 +-
-> >  drivers/cpufreq/Makefile                           |    3 +-
-> >  drivers/cpufreq/tegra124-cpufreq.c                 |  217 +++
-> >  .../cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} |    0
-> >  include/dt-bindings/reset/tegra124-car.h           |   11 +
-> >  21 files changed, 2730 insertions(+), 34 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
-> >  create mode 100644 Documentation/devicetree/bindings/cpufreq/tegra124-cpufreq.txt
-> >  create mode 100644 drivers/clk/tegra/clk-dfll.c
-> >  create mode 100644 drivers/clk/tegra/clk-dfll.h
-> >  create mode 100644 drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-> >  create mode 100644 drivers/clk/tegra/cvb.c
-> >  create mode 100644 drivers/clk/tegra/cvb.h
-> >  create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
-> >  rename drivers/cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} (100%)
-> >  create mode 100644 include/dt-bindings/reset/tegra124-car.h
-> > 
-> > --
-> > 2.3.0
-> > 
+> get_cycles(), which is what the timer based delay is based upon, is
+> supposed to be a _high resolution counter_, preferably running at
+> the same kind of speeds as the CPU, though with a fixed clock rate.
+> It most definitely is not supposed to be in the kHz range.
+
+If there's only a single fixed clock in the system, I'd
+use it for sched_clock, clocksource, and timer delay.
+Are there other options?
+
+It was you who wrote some time ago: "Timers are preferred
+because of the problems with the software delay loop."
+(My system implements DVFS.)
+
+It seems to me that a 90 kHz timer is still better than
+the jiffy counter, or am I mistaken again?
+
+Regards.
