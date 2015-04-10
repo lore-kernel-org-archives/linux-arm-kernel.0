@@ -1,87 +1,85 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 10 Apr 2015 22:01:35 +0200
-Subject: Guarantee udelay(N) spins at least N microseconds
-In-Reply-To: <20150410160817.GH12732@n2100.arm.linux.org.uk>
-References: <5527B331.5000205@free.fr>
- <20150410114415.GC12732@n2100.arm.linux.org.uk> <5527C501.2040808@free.fr>
- <20150410150607.GG12732@n2100.arm.linux.org.uk> <5527EC90.9050900@free.fr>
- <20150410160817.GH12732@n2100.arm.linux.org.uk>
-Message-ID: <55282C1F.3000600@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Apr 2015 22:04:57 +0200
+Subject: [PATCH v2] arm: zynq: Fix system clock with multi_v7_defconfig
+In-Reply-To: <5527E78D.9040908@adapteva.com>
+References: <550F6EDA.30709@adapteva.com> <26139139.4pXlnbLfh0@wuerfel>
+ <5527E78D.9040908@adapteva.com>
+Message-ID: <7398185.8qW42GIbsU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2015 18:08, Russell King - ARM Linux wrote:
-> On Fri, Apr 10, 2015 at 05:30:24PM +0200, Mason wrote:
->> I appreciate (very much so) that you spend time replying to me,
->> but I also sense a lot of animosity, and I don't know what I've
->> done wrong to deserve it :-(
-> 
-> I'm putting the point across strongly because I really don't think
-> there is an issue to be solved here.
-> 
->> On 10/04/2015 17:06, Russell King - ARM Linux wrote:
->>> And what this means is that udelay(n) where 'n' is less than the
->>> period between two timer interrupts /will/ be, and is /expected to
->>> be/ potentially shorter than the requested period.
->>
->> You've made it clear how loop-based delays are implemented; and also
->> that loop-based delays are typically 1% shorter than requested.
->> (Thanks for the overview, by the way.) Please note that I haven't
->> touched to the loop-based code, I'm only discussing the timer-based
->> code.
-> 
-> 1% is a figure I pulled out of the air.  It really depends on the CPU
-> instructions per cycle, and how much work is being done in the timer
-> interrupt handler.
-> 
->>> There's no getting away from that, we can't estimate how long the timer
->>> interrupt takes to handle without the use of an external timer, and if
->>> we've got an external timer, we might as well use it for all delays.
->>
->> Exactly! And my patch only changes __timer_const_udelay() so again I'm
->> not touching loop-based code.
-> 
-> What I'm trying to get through to you is that udelay() as a _whole_ does
-> not provide a guarantee that it will wait for _at least_ the time you
-> asked for.  All that it does is provide an _approximate_ delay.
+On Friday 10 April 2015 17:09:01 Ola Jeppsson wrote:
+> On 2015-04-10 15:44, Arnd Bergmann wrote:
+> > On Monday 23 March 2015 08:05:45 Michal Simek wrote:
+> >> Hi,
+> >>
+> >> On 03/23/2015 02:39 AM, Ola Jeppsson wrote:
+> >>> As mentioned in this commit:
+> >>> arm: zynq: Don't use arm_global_timer with cpufreq
+> >>> 61f1fc7e9258a169ac8afb5ddf657a181e60d052
+> >>>
+> >>> arm_global_timer depends on the CPU frequency. With cpufreq altering the
+> >>> CPU frequency arm_global_timer will not maintain a stable time base. So
+> >>> arm_global_timer must not be the clocksource when cpufreq is enabled.
+> >>>
+> >>> The above commit tries to solve this at build time by only selecting
+> >>> CONFIG_ARM_GLOBAL_TIMER if CONFIG_CPU_FREQ is disabled. This is not
+> >>> always sufficient because other machs can also enable
+> >>> CONFIG_ARM_GLOBAL_TIMER.
+> >>>
+> >>> Therefore: If built with CONFIG_CPU_FREQ and CONFIG_ARM_GLOBAL_TIMER,
+> >>> disable (on Zynq) the arm_global_timer devicetree node at boot before
+> >>> clock sources are initialized. This ensures that arm_global_timer will
+> >>> not be selected clocksource.
+> >>>
+> >>> Signed-off-by: Ola Jeppsson <ola@adapteva.com>
+> >
+> >> Arnd: Waiting for your thoughts on this one?
+> >> It is some sort of arch/arm/mach-mvebu/board-v7.c quirk code.
+> >>
+> >> I don't think it can be done via Kconfig because it will affect others.
+> > (catching up with old email)
+> >
+> > I think it's ok to work around the problem like this in principle.
+> >
+> > However, I have one concern about the way this condition is detected.
+> > At the moment, you assume that all zynq variants suffer from this
+> > problem and no other chip has it.
+> >
+> > How would you handle the situation if a future zynq variant fixes
+> > the problem?
+> The check is only applicable on Cortex A9 zynqs.
+> Assume for now that it is broken on all those variants. If it gets fixed on some variant add a
+> of_machine_is_compatible() check?
 
-I've taken time to digest the information you provided.
+I think it would be better to avoid those if we can.
 
-Let's forget the subject of my message, i.e. trying to
-guarantee udelay(N) spins at least N microseconds.
+> > What if it turns out to be a more common problem and we actually
+> > want to work around it in the arm global timer implementation
+> > by dynamically adapting to CPU frequency changes? I believe some
+> > other drivers (x86 tsc?) do this. Would we be able to detect this case
+> > on zynq?
+> >
+> If  the arm global timer implementation gets cpufreq scaling support,
+> this check isn't needed and should be removed?
 
-There is, however, an important difference between loop-based
-delays and timer-based delays; CPU frequencies typically fall
-in the 50-5000 MHz range, while timer frequencies typically
-span tens of kHz up to hundreds of MHz. For example, 90 kHz
-is sometimes provided in multimedia systems (MPEG TS).
+The timer code however would still need to find out whether to scale the
+frequence along with the CPU or not.
 
-And rounding down the cycle count becomes a real problem
-with coarse timers. Consider the aforementioned 90 kHz
-timer, i.e. T = 11.1 ?s
+> The only thing that happens if it is left in is that you end up with
+> an inferior, but correct, clock source (which is what you already had
+> before cpufreq support in arm-global-timer).
 
-If a driver wants to spin for 5 ?s, and the author was
-careful enough to double the number, for a safe cushion,
-he'll request 10 ?s. But since 10 < 11.1, the request
-gets rounded down to 0.
+I've just had another idea: how about introducing a new compatible string
+for the global timer that gets used for timers that have their frequency
+tied to the CPU (alternatively a bool property in that node). This can
+be checked by the clocksource driver, which will then be able to either
+skip the device if cpufreq is in use, or implement a more sophisticated
+workaround.
 
-Therefore, I think timer-based loops should round up.
+This would keep the hack outside of platform code and make it immediately
+available to any platform with the same problem. The only zynq specific
+hack you need is to modify that property on old dtb files that you want
+to keep supporting with new kernels (if any).
 
-If you NAK the patch, that's OK. I'll drop the issue,
-and only apply it locally.
-
-Regards.
-
-Patch provided for easier reference:
-
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index 312d43e..3cfbd07 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -66,7 +66,7 @@ static void __timer_const_udelay(unsigned long xloops)
-  {
-         unsigned long long loops = xloops;
-         loops *= arm_delay_ops.ticks_per_jiffy;
--       __timer_delay(loops >> UDELAY_SHIFT);
-+       __timer_delay((loops >> UDELAY_SHIFT) + 1);
-  }
+	Arnd
