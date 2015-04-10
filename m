@@ -1,43 +1,80 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Fri, 10 Apr 2015 10:50:34 +0200
-Subject: [PATCH v5 00/11] ARM: vf610m4: Add Vybrid Cortex-M4 support
-In-Reply-To: <1428609855-27657-1-git-send-email-stefan@agner.ch>
-References: <1428609855-27657-1-git-send-email-stefan@agner.ch>
-Message-ID: <CALszF6Cc_7g873cz-zr=k4dDqDu+aMRjT1o2RGEh-tpSjYyREA@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 10 Apr 2015 09:58:22 +0100
+Subject: [PATCH v4 0/9] Add sd/emmc support for stih407 family silicon
+Message-ID: <1428656311-2605-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+This series adds sd/emmc support to the sdhci-st.c driver for stih407
+family silicon. The changes mainly involve configuring some extra glue
+registers in the flashSS which configure the Arasan controller.
 
-2015-04-09 22:04 GMT+02:00 Stefan Agner <stefan@agner.ch>:
-> In this fifth revision the patchset moves away from the idea
-> including ARMv7-M platforms into ARCH_MULTIPLATFORM, but
-> instead adds a new top-level config symbol ARM_SINGLE_ARMV7M
-> Patch 7 adds this new config symbol while patch 8 alters the
-> existing ARMv7-M platform ARCH_EFM32 to use ARM_SINGLE_ARMV7M.
-> I chose to move the config symbol of the ARMv7-M specific
-> architectures (ARCH_EFM32 at that point) below the multiarch
-> includes. I think it is a good idea to keep them together, but
-> I'm not sure if this is an appropriate place. The architecture
-> which Vybrid is depending on, ARCH_MXC, is not also selectable
-> when ARM_SINGLE_ARMV7M is selected.
->
-> Since v3, this patchset does not contain the interrupt router
-> driver anymore (MSCM IR). The driver has been merged inbetween:
-> https://lkml.org/lkml/2015/3/8/6
->
-> This patchset extends the NVIC driver to support irq domain
-> hierarchy and the MSCM IR driver to support NVIC as a parent
-> irq controller.
->
-> The patchset has proven to be working on the Cortex-M4 of the
-> Vybrid SoC using a Colibri VF61 module.
->
-> Note: This patchset has dependencies on "ARM: ARMv7-M: Enlarge
-> vector table up to 256 entries" (Maxime Coquelin) and the
+This series also adds support for UHS modes for eMMC. To allow
+UHS HS200/SD104 modes to function correctly, due to the
+tight timing constriants, support for delay management is also added.
+Two types of delay management are supported, static delay management and
+dynamic delay management, this delay management is only available
+on eMMC pads on stih410 and later silicon.
 
-I just submitted the patch to Russell's patch tracking system:
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8340/1
+This series has been tested with stih410-b2120 revd on eMMC and sd, at
+various clock speeds. As part of this testing a bug was also found in the
+upstream flexgen clock set_rate implementation (now fixed upstream).
 
-Kind regards,
-Maxime
+    max-frequency = 200Mhz
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 270 MB in  3.02 seconds =  89.54 MB/sec
+    
+    max-frequency = 100Mhz
+    root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 210 MB in  3.00 seconds =  70.00 MB/sec
+    
+    max-frequency = 50Mhz
+    root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 118 MB in  3.00 seconds =  39.28 MB/sec
+
+It has also been tested on stih416-b2020 to ensure we have caused no
+regressions. Finally the dt documentation has been updated to reflect
+the changes in the driver code. Intrestingly it seems we are the first
+upstream platform to be using some of the uhs bindings such as
+sd-uhs-sdr104.
+
+Changes since v3:
+ - Rebased on Ulf's mmc next branch (rc5 based) (Ulf)
+
+Changes since v2:
+ - Some whitespace fixups (Max)
+ - if (!ioaddr) suggestion (Max)
+ - Add stih418-b2199 suport (Max)
+ - Stih410 to STiH410 fixes (Max)
+ - rebased on v4.0-rc6 (Pete)
+
+Changes since v1:
+ - Partition the changes into smaller patches to aid review process (Ulf)
+
+Peter Griffin (9):
+  mmc: sdhci-st: Add macros for register offsets and bitfields for mmcss
+    glue regs
+  mmc: sdhci-st: Add support for de-asserting reset signal and top regs
+    resource
+  mmc: sdhci-st: Add delay management functions for top registers
+    (eMMC).
+  mmc: sdhci-st: Add st_mmcss_cconfig function to configure mmcss glue
+    registers.
+  mmc: sdhci-st: Add sdhci_st_set_uhs_signaling function.
+  mmc: sdhci-st: Update the quirks for this controller.
+  mmc: sdhci-st: Update ST SDHCI binding documentation.
+  ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
+  ARM: STi: DT: STiH418: Add dt nodes for sdhci and emmc.
+
+ Documentation/devicetree/bindings/mmc/sdhci-st.txt | 100 +++++-
+ arch/arm/boot/dts/stih407-family.dtsi              |  30 ++
+ arch/arm/boot/dts/stih410-b2120.dts                |  10 +
+ arch/arm/boot/dts/stih418-b2199.dts                |  12 +
+ arch/arm/boot/dts/stihxxx-b2120.dtsi               |   8 +
+ drivers/mmc/host/sdhci-st.c                        | 353 ++++++++++++++++++++-
+ 6 files changed, 499 insertions(+), 14 deletions(-)
+
+-- 
+1.9.1
