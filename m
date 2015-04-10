@@ -1,439 +1,85 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Apr 2015 11:39:20 +0100
-Subject: [RFC PATCH 5/5] arm64: qcom: add cpu operations
-In-Reply-To: <1428601031-5366-6-git-send-email-galak@codeaurora.org>
-References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <1428601031-5366-6-git-send-email-galak@codeaurora.org>
-Message-ID: <20150410103920.GB25921@red-moon>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 10 Apr 2015 12:38:59 +0200
+Subject: [PATCH 1/2] crypto: add new driver for Marvell CESA
+In-Reply-To: <1428591523-1780-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1428591523-1780-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1428662339.17822.18.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 06:37:11PM +0100, Kumar Gala wrote:
-> From: Abhimanyu Kapur <abhimany@codeaurora.org>
-> 
-> Add qcom cpu operations for arm-v8 cpus. Implement secondary cpu boot ops
-> As a part of this change update device tree documentation for:
-> 
-> 1. Arm cortex-a ACC device which provides percpu reg
-> 2. Armv8 cortex-a compatible string in arm/cpus.txt
+(This patch needed a trivial context change in drivers/crypto/Makefile
+to get it applied on top of next-20150409.)
 
-I am pretty sure you heard about a standard FW interface called PSCI,
-please implement it and drop this patch, thanks.
+On Thu, 2015-04-09 at 16:58 +0200, Boris Brezillon wrote:
+> --- a/drivers/crypto/Kconfig
+> +++ b/drivers/crypto/Kconfig
+> @@ -164,8 +164,10 @@ config CRYPTO_DEV_MV_CESA
+>  	depends on PLAT_ORION
+>  	select CRYPTO_ALGAPI
+>  	select CRYPTO_AES
+> +	select CRYPTO_DES
+>  	select CRYPTO_BLKCIPHER2
+>  	select CRYPTO_HASH
+> +	select SRAM
+>  	help
+>  	  This driver allows you to utilize the Cryptographic Engines and
+>  	  Security Accelerator (CESA) which can be found on the Marvell Orion
 
-Lorenzo
+> --- a/drivers/crypto/Makefile
+> +++ b/drivers/crypto/Makefile
 
-> Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt    |   2 +
->  Documentation/devicetree/bindings/arm/msm/acc.txt |  19 ++
->  drivers/soc/qcom/Makefile                         |   1 +
->  drivers/soc/qcom/cpu_ops.c                        | 343 ++++++++++++++++++++++
->  4 files changed, 365 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/msm/acc.txt
->  create mode 100644 drivers/soc/qcom/cpu_ops.c
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 8b9e0a9..35cabe5 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -185,6 +185,8 @@ nodes to be present and contain the properties described below.
->                           be one of:
->                              "psci"
->                              "spin-table"
-> +                            "qcom,arm-cortex-acc"
-> +
->                         # On ARM 32-bit systems this property is optional and
->                           can be one of:
->                             "allwinner,sun6i-a31"
-> diff --git a/Documentation/devicetree/bindings/arm/msm/acc.txt b/Documentation/devicetree/bindings/arm/msm/acc.txt
-> new file mode 100644
-> index 0000000..ae2d725
+> -obj-$(CONFIG_CRYPTO_DEV_MV_CESA) += mv_cesa.o
+> +obj-$(CONFIG_CRYPTO_DEV_MV_CESA) += marvell/
+
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/msm/acc.txt
-> @@ -0,0 +1,19 @@
-> +Application Processor Sub-system (APSS) Application Clock Controller (ACC)
-> +
-> +The ACC provides clock, power domain, and reset control to a CPU. There is one ACC
-> +register region per CPU within the APSS remapped region as well as an alias register
-> +region that remaps accesses to the ACC associated with the CPU accessing the region.
-> +
-> +Required properties:
-> +- compatible:          Must be "qcom,arm-cortex-acc"
-> +- reg:                 The first element specifies the base address and size of
-> +                       the register region. An optional second element specifies
-> +                       the base address and size of the alias register region.
-> +
-> +Example:
-> +
-> +       clock-controller at b088000 {
-> +               compatible = "qcom,arm-cortex-acc";
-> +               reg = <0x0b088000 0x1000>,
-> +                     <0x0b008000 0x1000>;
-> +       }
-> diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
-> index 4389012..bb6030a 100644
-> --- a/drivers/soc/qcom/Makefile
-> +++ b/drivers/soc/qcom/Makefile
-> @@ -1 +1,2 @@
-> +obj-$(CONFIG_ARM64)    +=      cpu_ops.o
->  obj-$(CONFIG_QCOM_GSBI)        +=      qcom_gsbi.o
-> diff --git a/drivers/soc/qcom/cpu_ops.c b/drivers/soc/qcom/cpu_ops.c
-> new file mode 100644
-> index 0000000..d831cb0
+> +++ b/drivers/crypto/marvell/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_CRYPTO_DEV_MV_CESA) += cesa.o cipher.o hash.o tdma.o
+
+For a modular build (which is all I tried) this doesn't do what you
+probably want, as this will generate four modules. Assuming you want to
+keep the mv_cesa name for the module, you could try something like:
+    obj-$(CONFIG_CRYPTO_DEV_MV_CESA) += mv_cesa.o
+    mv_cesa-objs := cesa.o cipher.o hash.o tdma.o
+
+Does that do what you want?
+
 > --- /dev/null
-> +++ b/drivers/soc/qcom/cpu_ops.c
-> @@ -0,0 +1,343 @@
-> +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + * Copyright (c) 2013 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/* MSM ARMv8 CPU Operations
-> + * Based on arch/arm64/kernel/smp_spin_table.c
-> + */
-> +
-> +#include <linux/bitops.h>
-> +#include <linux/cpu.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/delay.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/smp.h>
-> +#include <linux/qcom_scm.h>
-> +
-> +#include <asm/barrier.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/cpu_ops.h>
-> +#include <asm/cputype.h>
-> +#include <asm/smp_plat.h>
-> +
-> +static DEFINE_RAW_SPINLOCK(boot_lock);
-> +
-> +DEFINE_PER_CPU(int, cold_boot_done);
-> +
-> +#if 0
-> +static int cold_boot_flags[] = {
-> +       0,
-> +       QCOM_SCM_FLAG_COLDBOOT_CPU1,
-> +       QCOM_SCM_FLAG_COLDBOOT_CPU2,
-> +       QCOM_SCM_FLAG_COLDBOOT_CPU3,
+> +++ b/drivers/crypto/marvell/cesa.c
+
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published
+> + * by the Free Software Foundation.
+
+This states the license is GPL v2.
+
+> +static struct platform_driver marvell_cesa = {
+> +	.probe		= mv_cesa_probe,
+> +	.remove		= mv_cesa_remove,
+> +	.driver		= {
+> +		.owner	= THIS_MODULE,
+> +		.name	= "mv_crypto",
+> +		.of_match_table = mv_cesa_of_match_table,
+> +	},
 > +};
-> +#endif
-> +
-> +/* CPU power domain register offsets */
-> +#define CPU_PWR_CTL            0x4
-> +#define CPU_PWR_GATE_CTL       0x14
-> +#define LDO_BHS_PWR_CTL                0x28
-> +
-> +/* L2 power domain register offsets */
-> +#define L2_PWR_CTL_OVERRIDE    0xc
-> +#define L2_PWR_CTL             0x14
-> +#define L2_PWR_STATUS          0x18
-> +#define        L2_CORE_CBCR            0x58
-> +#define L1_RST_DIS             0x284
-> +
-> +#define L2_SPM_STS             0xc
-> +#define L2_VREG_CTL            0x1c
-> +
-> +#define SCM_IO_READ            1
-> +#define SCM_IO_WRITE           2
-> +
-> +/*
-> + * struct msm_l2ccc_of_info: represents of data for l2 cache clock controller.
-> + * @compat: compat string for l2 cache clock controller
-> + * @l2_pon: l2 cache power on routine
-> + */
-> +struct msm_l2ccc_of_info {
-> +       const char *compat;
-> +       int (*l2_power_on) (struct device_node *dn, u32 l2_mask, int cpu);
-> +       u32 l2_power_on_mask;
-> +};
-> +
-> +
-> +static int power_on_l2_msm8916(struct device_node *l2ccc_node, u32 pon_mask,
-> +                               int cpu)
-> +{
-> +       u32 pon_status;
-> +       void __iomem *l2_base;
-> +
-> +       l2_base = of_iomap(l2ccc_node, 0);
-> +       if (!l2_base)
-> +               return -ENOMEM;
-> +
-> +       /* Skip power-on sequence if l2 cache is already powered up*/
-> +       pon_status = (__raw_readl(l2_base + L2_PWR_STATUS) & pon_mask)
-> +                               == pon_mask;
-> +       if (pon_status) {
-> +               iounmap(l2_base);
-> +               return 0;
-> +       }
-> +
-> +       /* Close L2/SCU Logic GDHS and power up the cache */
-> +       writel_relaxed(0x10D700, l2_base + L2_PWR_CTL);
-> +
-> +       /* Assert PRESETDBGn */
-> +       writel_relaxed(0x400000, l2_base + L2_PWR_CTL_OVERRIDE);
-> +       mb();
-> +       udelay(2);
-> +
-> +       /* De-assert L2/SCU memory Clamp */
-> +       writel_relaxed(0x101700, l2_base + L2_PWR_CTL);
-> +
-> +       /* Wakeup L2/SCU RAMs by deasserting sleep signals */
-> +       writel_relaxed(0x101703, l2_base + L2_PWR_CTL);
-> +       mb();
-> +       udelay(2);
-> +
-> +       /* Enable clocks via SW_CLK_EN */
-> +       writel_relaxed(0x01, l2_base + L2_CORE_CBCR);
-> +
-> +       /* De-assert L2/SCU logic clamp */
-> +       writel_relaxed(0x101603, l2_base + L2_PWR_CTL);
-> +       mb();
-> +       udelay(2);
-> +
-> +       /* De-assert PRESSETDBg */
-> +       writel_relaxed(0x0, l2_base + L2_PWR_CTL_OVERRIDE);
-> +
-> +       /* De-assert L2/SCU Logic reset */
-> +       writel_relaxed(0x100203, l2_base + L2_PWR_CTL);
-> +       mb();
-> +       udelay(54);
-> +
-> +       /* Turn on the PMIC_APC */
-> +       writel_relaxed(0x10100203, l2_base + L2_PWR_CTL);
-> +
-> +       /* Set H/W clock control for the cpu CBC block */
-> +       writel_relaxed(0x03, l2_base + L2_CORE_CBCR);
-> +       mb();
-> +       iounmap(l2_base);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct msm_l2ccc_of_info l2ccc_info[] = {
-> +       {
-> +               .compat = "qcom,8916-l2ccc",
-> +               .l2_power_on = power_on_l2_msm8916,
-> +               .l2_power_on_mask = BIT(9),
-> +       },
-> +};
-> +
-> +static int power_on_l2_cache(struct device_node *l2ccc_node, int cpu)
-> +{
-> +       int ret, i;
-> +       const char *compat;
-> +
-> +       ret = of_property_read_string(l2ccc_node, "compatible", &compat);
-> +       if (ret)
-> +               return ret;
-> +
-> +       for (i = 0; i < ARRAY_SIZE(l2ccc_info); i++) {
-> +               const struct msm_l2ccc_of_info *ptr = &l2ccc_info[i];
-> +
-> +               if (!of_compat_cmp(ptr->compat, compat, strlen(compat)))
-> +                               return ptr->l2_power_on(l2ccc_node,
-> +                                               ptr->l2_power_on_mask, cpu);
-> +       }
-> +       pr_err("Compat string not found for L2CCC node\n");
-> +       return -EIO;
-> +}
-> +
-> +static int msm_unclamp_secondary_arm_cpu(unsigned int cpu)
-> +{
-> +
-> +       int ret = 0;
-> +       struct device_node *cpu_node, *acc_node, *l2_node, *l2ccc_node;
-> +       void __iomem *reg;
-> +
-> +       cpu_node = of_get_cpu_node(cpu, NULL);
-> +       if (!cpu_node)
-> +               return -ENODEV;
-> +
-> +       acc_node = of_parse_phandle(cpu_node, "qcom,acc", 0);
-> +       if (!acc_node) {
-> +                       ret = -ENODEV;
-> +                       goto out_acc;
-> +       }
-> +
-> +       l2_node = of_parse_phandle(cpu_node, "next-level-cache", 0);
-> +       if (!l2_node) {
-> +               ret = -ENODEV;
-> +               goto out_l2;
-> +       }
-> +
-> +       l2ccc_node = of_parse_phandle(l2_node, "power-domain", 0);
-> +       if (!l2ccc_node) {
-> +               ret = -ENODEV;
-> +               goto out_l2;
-> +       }
-> +
-> +       /* Ensure L2-cache of the CPU is powered on before
-> +        * unclamping cpu power rails.
-> +        */
-> +       ret = power_on_l2_cache(l2ccc_node, cpu);
-> +       if (ret) {
-> +               pr_err("L2 cache power up failed for CPU%d\n", cpu);
-> +               goto out_l2ccc;
-> +       }
-> +
-> +       reg = of_iomap(acc_node, 0);
-> +       if (!reg) {
-> +               ret = -ENOMEM;
-> +               goto out_acc_reg;
-> +       }
-> +
-> +       /* Assert Reset on cpu-n */
-> +       writel_relaxed(0x00000033, reg + CPU_PWR_CTL);
-> +       mb();
-> +
-> +       /*Program skew to 16 X0 clock cycles*/
-> +       writel_relaxed(0x10000001, reg + CPU_PWR_GATE_CTL);
-> +       mb();
-> +       udelay(2);
-> +
-> +       /* De-assert coremem clamp */
-> +       writel_relaxed(0x00000031, reg + CPU_PWR_CTL);
-> +       mb();
-> +
-> +       /* Close coremem array gdhs */
-> +       writel_relaxed(0x00000039, reg + CPU_PWR_CTL);
-> +       mb();
-> +       udelay(2);
-> +
-> +       /* De-assert cpu-n clamp */
-> +       writel_relaxed(0x00020038, reg + CPU_PWR_CTL);
-> +       mb();
-> +       udelay(2);
-> +
-> +       /* De-assert cpu-n reset */
-> +       writel_relaxed(0x00020008, reg + CPU_PWR_CTL);
-> +       mb();
-> +
-> +       /* Assert PWRDUP signal on core-n */
-> +       writel_relaxed(0x00020088, reg + CPU_PWR_CTL);
-> +       mb();
-> +
-> +       /* Secondary CPU-N is now alive */
-> +       iounmap(reg);
-> +out_acc_reg:
-> +       of_node_put(l2ccc_node);
-> +out_l2ccc:
-> +       of_node_put(l2_node);
-> +out_l2:
-> +       of_node_put(acc_node);
-> +out_acc:
-> +       of_node_put(cpu_node);
-> +
-> +       return ret;
-> +}
-> +
-> +static void write_pen_release(u64 val)
-> +{
-> +       void *start = (void *)&secondary_holding_pen_release;
-> +       unsigned long size = sizeof(secondary_holding_pen_release);
-> +
-> +       secondary_holding_pen_release = val;
-> +       smp_wmb();
-> +       __flush_dcache_area(start, size);
-> +}
-> +
-> +static int secondary_pen_release(unsigned int cpu)
-> +{
-> +       unsigned long timeout;
-> +
-> +       /*
-> +        * Set synchronisation state between this boot processor
-> +        * and the secondary one
-> +        */
-> +       raw_spin_lock(&boot_lock);
-> +       write_pen_release(cpu_logical_map(cpu));
-> +
-> +       timeout = jiffies + (1 * HZ);
-> +       while (time_before(jiffies, timeout)) {
-> +               if (secondary_holding_pen_release == INVALID_HWID)
-> +                       break;
-> +               udelay(10);
-> +       }
-> +       raw_spin_unlock(&boot_lock);
-> +
-> +       return secondary_holding_pen_release != INVALID_HWID ? -ENOSYS : 0;
-> +}
-> +
-> +static int __init msm_cpu_init(struct device_node *dn, unsigned int cpu)
-> +{
-> +       /* Mark CPU0 cold boot flag as done */
-> +       if (!cpu && !per_cpu(cold_boot_done, cpu))
-> +               per_cpu(cold_boot_done, cpu) = true;
-> +
-> +       return 0;
-> +}
-> +
-> +static int __init msm_cpu_prepare(unsigned int cpu)
-> +{
-> +       const cpumask_t *mask = cpumask_of(cpu);
-> +
-> +       if (qcom_scm_set_cold_boot_addr(secondary_holding_pen, mask)) {
-> +               pr_warn("CPU%d:Failed to set boot address\n", cpu);
-> +               return -ENOSYS;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int msm_cpu_boot(unsigned int cpu)
-> +{
-> +       int ret = 0;
-> +
-> +       if (per_cpu(cold_boot_done, cpu) == false) {
-> +               ret = msm_unclamp_secondary_arm_cpu(cpu);
-> +               if (ret)
-> +                       return ret;
-> +               per_cpu(cold_boot_done, cpu) = true;
-> +       }
-> +       return secondary_pen_release(cpu);
-> +}
-> +
-> +void msm_cpu_postboot(void)
-> +{
-> +       /*
-> +        * Let the primary processor know we're out of the pen.
-> +        */
-> +       write_pen_release(INVALID_HWID);
-> +
-> +       /*
-> +        * Synchronise with the boot thread.
-> +        */
-> +       raw_spin_lock(&boot_lock);
-> +       raw_spin_unlock(&boot_lock);
-> +}
-> +
-> +static const struct cpu_operations msm_cortex_a_ops = {
-> +       .name           = "qcom,arm-cortex-acc",
-> +       .cpu_init       = msm_cpu_init,
-> +       .cpu_prepare    = msm_cpu_prepare,
-> +       .cpu_boot       = msm_cpu_boot,
-> +       .cpu_postboot   = msm_cpu_postboot,
-> +};
-> +CPU_METHOD_OF_DECLARE(msm_cortex_a_ops, &msm_cortex_a_ops);
-> --
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> +MODULE_ALIAS("platform:mv_crypto");
+
+(It's nicer to make that macro be a part of the block of the other
+MODULE_ macros.)
+
+> +module_platform_driver(marvell_cesa);
+
+(And it's nicer to have this directly follow the definition of
+marvell_cesa.)
+
+> +MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com>");
+> +MODULE_AUTHOR("Arnaud Ebalard <arno@natisbad.org>");
+> +MODULE_DESCRIPTION("Support for Marvell's cryptographic engine");
+> +MODULE_LICENSE("GPL");
+
+And this states the license is GPL v2 or later. So either the comment at
+the top of this file or this macro need to be changed.
+
+
+Paul Bolle
