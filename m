@@ -1,49 +1,37 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 10 Apr 2015 09:25:36 -0600
-Subject: [PATCH 1/2] coresight: etb10: Print size of buffer we fail to allocate
+Date: Fri, 10 Apr 2015 09:25:37 -0600
+Subject: [PATCH 2/2] coresight: etb10: Fix check for bogus buffer depth
 In-Reply-To: <1428679537-26590-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1428679537-26590-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1428679537-26590-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1428679537-26590-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Brown <broonie@kernel.org>
 
-When we initialise the ETB driver we attempt to allocate a buffer suitable
-for storing the data buffered in the hardware based on sizing information
-reported by the hardware. Unfortunately if the hardware is not properly
-configured (for example if power domains are not set up correctly) then we
-may read back a nonsensically large value and therefore the allocation will
-be too big to succeed. Print an error message showing the amount of memory
-we tried to allocate if the buffer allocation fails to help users diagnose
-such problems.
-
-Normally it is bad practice to print an error message on memory allocation
-failures since there are verbose core messages reported for this but in
-this case where the allocation size might be incorrect it is a useful hint.
+We attempt to sanity check the buffer depth reported by the hardware by
+making sure it is not less than zero however this check will never be true
+since the buffer depth is stored in an unsigned integer. Instead change
+the check to look for the top bit being set which was the intention.
 
 Signed-off-by: Mark Brown <broonie@kernel.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 40049869aecd..46eb9f88a29f 100644
+index 46eb9f88a29f..2a77d83130e6 100644
 --- a/drivers/hwtracing/coresight/coresight-etb10.c
 +++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -462,8 +462,11 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+@@ -457,7 +457,7 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+ 	drvdata->buffer_depth = etb_get_buffer_depth(drvdata);
+ 	clk_disable_unprepare(drvdata->clk);
+ 
+-	if (drvdata->buffer_depth < 0)
++	if (drvdata->buffer_depth & 0x80000000)
+ 		return -EINVAL;
  
  	drvdata->buf = devm_kzalloc(dev,
- 				    drvdata->buffer_depth * 4, GFP_KERNEL);
--	if (!drvdata->buf)
-+	if (!drvdata->buf) {
-+		dev_err(dev, "Failed to allocate %u bytes for buffer data\n",
-+			drvdata->buffer_depth * 4);
- 		return -ENOMEM;
-+	}
- 
- 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
- 	if (!desc)
 -- 
 1.9.1
