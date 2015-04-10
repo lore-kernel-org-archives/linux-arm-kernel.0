@@ -1,526 +1,139 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Apr 2015 16:11:03 -0700
-Subject: [PATCH] drivers/char: Remove msm_smd_pkt driver
-Message-ID: <1428707466-24526-2-git-send-email-sboyd@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 10 Apr 2015 16:08:14 -0700
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <CANOLnOMJ9oy_VhxGDyg9yx8XLVSZPf51eycP7-j=r4KVF6RX-A@mail.gmail.com>
+References: <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com>
+ <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
+ <20150406174245.GJ18048@atomide.com>
+ <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
+ <20150407022312.GK18048@atomide.com>
+ <CANOLnOMyNesvA2nGC2uMnmYGLBQkU1dnfG1rBg1UWeGMrpHFzQ@mail.gmail.com>
+ <20150409224446.GV18048@atomide.com>
+ <CANOLnOMJ9oy_VhxGDyg9yx8XLVSZPf51eycP7-j=r4KVF6RX-A@mail.gmail.com>
+Message-ID: <20150410230814.GX18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This code is no longer used now that mach-msm has been removed.
-Delete it.
+* Grazvydas Ignotas <notasas@gmail.com> [150410 15:06]:
+> On Fri, Apr 10, 2015 at 1:44 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Grazvydas Ignotas <notasas@gmail.com> [150409 15:37]:
+> >> On Tue, Apr 7, 2015 at 5:23 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > * Matthijs van Duin <matthijsvanduin@gmail.com> [150406 11:15]:
+> >> >>
+> >> >> On 6 April 2015 at 19:42, Tony Lindgren <tony@atomide.com> wrote:
+> >> >> > Hmm but it still seems to do something also on cortex-a8 r3p2 that
+> >> >> > is supposedly not affected by 430973.. Based on my tests so far, at least
+> >> >> > armhf running cpuburn-a8 in the background and doing apt-get update
+> >> >> > segfaults constantly without flush BTAC/BTB. This seems to be the case
+> >> >> > no matter how the aux ctrl reg bits are set..
+> >> >>
+> >> >> That sounds.... really odd.  The TRM is fairly explicit about BTB
+> >> >> flush executing as nop when IBE is not set. Of course the TRM is not
+> >> >> exactly flawless, but still...
+> >> >
+> >> > Oops, sorry user error.. I was trying to clear IBE as a banked register
+> >> > like L2 enable bit and of course it did not get cleared.. Clearing it
+> >> > with a smc call really clears it. And in that case my test case seems to
+> >> > work reliably on r3p2 without erratum 430973 enabled.
+> >>
+> >> May I ask how do you perform the smc call? I wanted to clear IBE too
+> >> to experiment, but it just hangs my board, even if I just write back
+> >> the same value. Here is what I do:
+> >>
+> >>         asm ("mrc p15, 0, %0, c1, c0, 1" : "=r"(val));
+> >>
+> >>         asm (".arch_extension sec\n\t"
+> >>              "mov r0,  %0\n"
+> >>              "mov r12, #3\n"
+> >>              "smc #0\n"
+> >>              :: "r"(val) : "r0", "r12");
+> >>
+> >> I just run this from a sysfs write handler, does it need to be run on
+> >> SRAM or something?
+> >
+> > Best done in the bootloader.. I just hacked it into the restore from
+> > off-idle to test, see below. But for that you naturally need to have
+> > a device with working idle and it's usable for just testing for lazy
+> > people.
+> >
+> > Regards,
+> >
+> > Tony
+> >
+> > --- a/arch/arm/mach-omap2/sleep34xx.S
+> > +++ b/arch/arm/mach-omap2/sleep34xx.S
+> > @@ -516,6 +516,7 @@ l2_inv_gp:
+> >         ldr     r4, scratchpad_base
+> >         ldr     r3, [r4,#0xBC]
+> >         ldr     r0, [r3,#4]
+> > +       bic     r0, r1, #(1 << 6)
+> 
+> Hmm did you mean r0 instead of r1 here? I hope your test results
+> didn't come from some other random bit from r1 being written to
+> aux_ctrl.
 
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/char/Kconfig       |   8 -
- drivers/char/Makefile      |   1 -
- drivers/char/msm_smd_pkt.c | 465 ---------------------------------------------
- 3 files changed, 474 deletions(-)
- delete mode 100644 drivers/char/msm_smd_pkt.c
+Oh right sorry, yeah it should be r0 above. Luck based coding :)
 
-diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
-index a4af8221751e..a043107da2af 100644
---- a/drivers/char/Kconfig
-+++ b/drivers/char/Kconfig
-@@ -590,14 +590,6 @@ config DEVPORT
+> And according to readback this doesn't seem to work for me, even when
+> my board has idle working. Or is it not supposed to be visible in
+> readback?
+
+Hmm I've verified between apps segfaulting depending on how bit 6
+is set on r3p2.
+
+Anyways, did a retry just in case, below is an updated test patch.
+For me aux ctrl changes after enabling idle stuff:
+
+aux ctrl: 0x000000e2
+...
+aux ctrl: 0x000000a2
+
+Did you enable the UART timeout etc so it really hits off mode
+when testing?
  
- source "drivers/s390/char/Kconfig"
+> Anyway I've managed to clear that damn bit in the bootloader, but
+> failed to measure any performance impact from clearing this bit and
+> getting rid of BTB flush mcr in cpu_v7_switch_mm() (this is on DM3730
+> with r3p2 A8). My test was to simply run 2 processes that would spin a
+> counter (running more processes doesn't seem to increase context
+> switches per second, so running 2 seemed enough).
+
+Well that's a good test result :) It means it's OK to keep the
+430973 enabled without a performance impatct.
+
+Regards,
+
+Tony
+
+8< -----------------
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -93,6 +93,7 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
+ {
+ 	struct seq_file *s = (struct seq_file *)user;
+ 	int i;
++	u32 val;
  
--config MSM_SMD_PKT
--	bool "Enable device interface for some SMD packet ports"
--	default n
--	depends on MSM_SMD
--	help
--	  Enables userspace clients to read and write to some packet SMD
--	  ports via device interface for MSM chipset.
--
- config TILE_SROM
- 	bool "Character-device access via hypervisor to the Tilera SPI ROM"
- 	depends on TILE
-diff --git a/drivers/char/Makefile b/drivers/char/Makefile
-index d06cde26031b..76cdfaa07cd5 100644
---- a/drivers/char/Makefile
-+++ b/drivers/char/Makefile
-@@ -9,7 +9,6 @@ obj-$(CONFIG_ATARI_DSP56K)	+= dsp56k.o
- obj-$(CONFIG_VIRTIO_CONSOLE)	+= virtio_console.o
- obj-$(CONFIG_RAW_DRIVER)	+= raw.o
- obj-$(CONFIG_SGI_SNSC)		+= snsc.o snsc_event.o
--obj-$(CONFIG_MSM_SMD_PKT)	+= msm_smd_pkt.o
- obj-$(CONFIG_MSPEC)		+= mspec.o
- obj-$(CONFIG_MMTIMER)		+= mmtimer.o
- obj-$(CONFIG_UV_MMTIMER)	+= uv_mmtimer.o
-diff --git a/drivers/char/msm_smd_pkt.c b/drivers/char/msm_smd_pkt.c
-deleted file mode 100644
-index ba82a06d9684..000000000000
---- a/drivers/char/msm_smd_pkt.c
-+++ /dev/null
-@@ -1,465 +0,0 @@
--/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-- * 02110-1301, USA.
-- *
-- */
--/*
-- * SMD Packet Driver -- Provides userspace interface to SMD packet ports.
-- */
--
--#include <linux/slab.h>
--#include <linux/cdev.h>
--#include <linux/module.h>
--#include <linux/fs.h>
--#include <linux/device.h>
--#include <linux/sched.h>
--#include <linux/mutex.h>
--#include <linux/delay.h>
--#include <linux/uaccess.h>
--#include <linux/workqueue.h>
--#include <linux/poll.h>
--
--#include <mach/msm_smd.h>
--
--#define NUM_SMD_PKT_PORTS 9
--#define DEVICE_NAME "smdpkt"
--#define MAX_BUF_SIZE 2048
--
--struct smd_pkt_dev {
--	struct cdev cdev;
--	struct device *devicep;
--
--	struct smd_channel *ch;
--	int open_count;
--	struct mutex ch_lock;
--	struct mutex rx_lock;
--	struct mutex tx_lock;
--	wait_queue_head_t ch_read_wait_queue;
--	wait_queue_head_t ch_opened_wait_queue;
--
--	int i;
--
--	unsigned char tx_buf[MAX_BUF_SIZE];
--	unsigned char rx_buf[MAX_BUF_SIZE];
--	int remote_open;
--
--} *smd_pkt_devp[NUM_SMD_PKT_PORTS];
--
--struct class *smd_pkt_classp;
--static dev_t smd_pkt_number;
--
--static int msm_smd_pkt_debug_enable;
--module_param_named(debug_enable, msm_smd_pkt_debug_enable,
--		   int, S_IRUGO | S_IWUSR | S_IWGRP);
--
--#ifdef DEBUG
--#define D_DUMP_BUFFER(prestr, cnt, buf) do {			\
--		int i;						\
--		if (msm_smd_pkt_debug_enable) {			\
--			pr_debug("%s", prestr);			\
--			for (i = 0; i < cnt; i++)		\
--				pr_debug("%.2x", buf[i]);	\
--			pr_debug("\n");				\
--		}						\
--	} while (0)
--#else
--#define D_DUMP_BUFFER(prestr, cnt, buf) do {} while (0)
--#endif
--
--#ifdef DEBUG
--#define DBG(x...) do {			\
--	if (msm_smd_pkt_debug_enable)	\
--		pr_debug(x);		\
--	} while (0)
--#else
--#define DBG(x...) do {} while (0)
--#endif
--
--static void check_and_wakeup_reader(struct smd_pkt_dev *smd_pkt_devp)
--{
--	int sz;
--
--	if (!smd_pkt_devp || !smd_pkt_devp->ch)
--		return;
--
--	sz = smd_cur_packet_size(smd_pkt_devp->ch);
--	if (sz == 0) {
--		DBG("no packet\n");
--		return;
--	}
--	if (sz > smd_read_avail(smd_pkt_devp->ch)) {
--		DBG("incomplete packet\n");
--		return;
--	}
--
--	DBG("waking up reader\n");
--	wake_up_interruptible(&smd_pkt_devp->ch_read_wait_queue);
--}
--
--static int smd_pkt_read(struct file *file, char __user *buf,
--			size_t count, loff_t *ppos)
--{
--	int r, bytes_read;
--	struct smd_pkt_dev *smd_pkt_devp;
--	struct smd_channel *chl;
--
--	DBG("read %d bytes\n", count);
--	if (count > MAX_BUF_SIZE)
--		return -EINVAL;
--
--	smd_pkt_devp = file->private_data;
--	if (!smd_pkt_devp || !smd_pkt_devp->ch)
--		return -EINVAL;
--
--	chl = smd_pkt_devp->ch;
--wait_for_packet:
--	r = wait_event_interruptible(smd_pkt_devp->ch_read_wait_queue,
--				     (smd_cur_packet_size(chl) > 0 &&
--				      smd_read_avail(chl) >=
--				      smd_cur_packet_size(chl)));
--
--	if (r < 0) {
--		if (r != -ERESTARTSYS)
--			pr_err("wait returned %d\n", r);
--		return r;
--	}
--
--	mutex_lock(&smd_pkt_devp->rx_lock);
--
--	bytes_read = smd_cur_packet_size(smd_pkt_devp->ch);
--	if (bytes_read == 0 ||
--	    bytes_read < smd_read_avail(smd_pkt_devp->ch)) {
--		mutex_unlock(&smd_pkt_devp->rx_lock);
--		DBG("Nothing to read\n");
--		goto wait_for_packet;
--	}
--
--	if (bytes_read > count) {
--		mutex_unlock(&smd_pkt_devp->rx_lock);
--		pr_info("packet size %d > buffer size %d", bytes_read, count);
--		return -EINVAL;
--	}
--
--	r = smd_read(smd_pkt_devp->ch, smd_pkt_devp->rx_buf, bytes_read);
--	if (r != bytes_read) {
--		mutex_unlock(&smd_pkt_devp->rx_lock);
--		pr_err("smd_read failed to read %d bytes: %d\n", bytes_read, r);
--		return -EIO;
--	}
--
--	D_DUMP_BUFFER("read: ", bytes_read, smd_pkt_devp->rx_buf);
--	r = copy_to_user(buf, smd_pkt_devp->rx_buf, bytes_read);
--	mutex_unlock(&smd_pkt_devp->rx_lock);
--	if (r) {
--		pr_err("copy_to_user failed %d\n", r);
--		return -EFAULT;
--	}
--
--	DBG("read complete %d bytes\n", bytes_read);
--	check_and_wakeup_reader(smd_pkt_devp);
--
--	return bytes_read;
--}
--
--static int smd_pkt_write(struct file *file, const char __user *buf,
--			 size_t count, loff_t *ppos)
--{
--	int r;
--	struct smd_pkt_dev *smd_pkt_devp;
--
--	if (count > MAX_BUF_SIZE)
--		return -EINVAL;
--
--	DBG("writing %d bytes\n", count);
--
--	smd_pkt_devp = file->private_data;
--	if (!smd_pkt_devp || !smd_pkt_devp->ch)
--		return -EINVAL;
--
--	mutex_lock(&smd_pkt_devp->tx_lock);
--	if (smd_write_avail(smd_pkt_devp->ch) < count) {
--		mutex_unlock(&smd_pkt_devp->tx_lock);
--		DBG("Not enough space to write\n");
--		return -ENOMEM;
--	}
--
--	D_DUMP_BUFFER("write: ", count, buf);
--	r = copy_from_user(smd_pkt_devp->tx_buf, buf, count);
--	if (r) {
--		mutex_unlock(&smd_pkt_devp->tx_lock);
--		pr_err("copy_from_user failed %d\n", r);
--		return -EFAULT;
--	}
--
--	r = smd_write(smd_pkt_devp->ch, smd_pkt_devp->tx_buf, count);
--	if (r != count) {
--		mutex_unlock(&smd_pkt_devp->tx_lock);
--		pr_err("smd_write failed to write %d bytes: %d.\n", count, r);
--		return -EIO;
--	}
--	mutex_unlock(&smd_pkt_devp->tx_lock);
--
--	DBG("wrote %d bytes\n", count);
--	return count;
--}
--
--static unsigned int smd_pkt_poll(struct file *file, poll_table *wait)
--{
--	struct smd_pkt_dev *smd_pkt_devp;
--	unsigned int mask = 0;
--
--	smd_pkt_devp = file->private_data;
--	if (!smd_pkt_devp)
--		return POLLERR;
--
--	DBG("poll waiting\n");
--	poll_wait(file, &smd_pkt_devp->ch_read_wait_queue, wait);
--	if (smd_read_avail(smd_pkt_devp->ch))
--		mask |= POLLIN | POLLRDNORM;
--
--	DBG("poll return\n");
--	return mask;
--}
--
--static void smd_pkt_ch_notify(void *priv, unsigned event)
--{
--	struct smd_pkt_dev *smd_pkt_devp = priv;
--
--	if (smd_pkt_devp->ch == 0)
--		return;
--
--	switch (event) {
--	case SMD_EVENT_DATA:
--		DBG("data\n");
--		check_and_wakeup_reader(smd_pkt_devp);
--		break;
--
--	case SMD_EVENT_OPEN:
--		DBG("remote open\n");
--		smd_pkt_devp->remote_open = 1;
--		wake_up_interruptible(&smd_pkt_devp->ch_opened_wait_queue);
--		break;
--
--	case SMD_EVENT_CLOSE:
--		smd_pkt_devp->remote_open = 0;
--		pr_info("remote closed\n");
--		break;
--
--	default:
--		pr_err("unknown event %d\n", event);
--		break;
--	}
--}
--
--static char *smd_pkt_dev_name[] = {
--	"smdcntl0",
--	"smdcntl1",
--	"smdcntl2",
--	"smdcntl3",
--	"smdcntl4",
--	"smdcntl5",
--	"smdcntl6",
--	"smdcntl7",
--	"smd22",
--};
--
--static char *smd_ch_name[] = {
--	"DATA5_CNTL",
--	"DATA6_CNTL",
--	"DATA7_CNTL",
--	"DATA8_CNTL",
--	"DATA9_CNTL",
--	"DATA12_CNTL",
--	"DATA13_CNTL",
--	"DATA14_CNTL",
--	"DATA22",
--};
--
--static int smd_pkt_open(struct inode *inode, struct file *file)
--{
--	int r = 0;
--	struct smd_pkt_dev *smd_pkt_devp;
--
--	smd_pkt_devp = container_of(inode->i_cdev, struct smd_pkt_dev, cdev);
--	if (!smd_pkt_devp)
--		return -EINVAL;
--
--	file->private_data = smd_pkt_devp;
--
--	mutex_lock(&smd_pkt_devp->ch_lock);
--	if (smd_pkt_devp->open_count == 0) {
--		r = smd_open(smd_ch_name[smd_pkt_devp->i],
--			     &smd_pkt_devp->ch, smd_pkt_devp,
--			     smd_pkt_ch_notify);
--		if (r < 0) {
--			pr_err("smd_open failed for %s, %d\n",
--			       smd_ch_name[smd_pkt_devp->i], r);
--			goto out;
--		}
--
--		r = wait_event_interruptible_timeout(
--				smd_pkt_devp->ch_opened_wait_queue,
--				smd_pkt_devp->remote_open,
--				msecs_to_jiffies(2 * HZ));
--		if (r == 0)
--			r = -ETIMEDOUT;
--
--		if (r < 0) {
--			pr_err("wait returned %d\n", r);
--			smd_close(smd_pkt_devp->ch);
--			smd_pkt_devp->ch = 0;
--		} else {
--			smd_pkt_devp->open_count++;
--			r = 0;
--		}
--	}
--out:
--	mutex_unlock(&smd_pkt_devp->ch_lock);
--	return r;
--}
--
--static int smd_pkt_release(struct inode *inode, struct file *file)
--{
--	int r = 0;
--	struct smd_pkt_dev *smd_pkt_devp = file->private_data;
--
--	if (!smd_pkt_devp)
--		return -EINVAL;
--
--	mutex_lock(&smd_pkt_devp->ch_lock);
--	if (--smd_pkt_devp->open_count == 0) {
--		r = smd_close(smd_pkt_devp->ch);
--		smd_pkt_devp->ch = 0;
--	}
--	mutex_unlock(&smd_pkt_devp->ch_lock);
--
--	return r;
--}
--
--static const struct file_operations smd_pkt_fops = {
--	.owner = THIS_MODULE,
--	.open = smd_pkt_open,
--	.release = smd_pkt_release,
--	.read = smd_pkt_read,
--	.write = smd_pkt_write,
--	.poll = smd_pkt_poll,
--};
--
--static int __init smd_pkt_init(void)
--{
--	int i;
--	int r;
--
--	r = alloc_chrdev_region(&smd_pkt_number, 0,
--				NUM_SMD_PKT_PORTS, DEVICE_NAME);
--	if (r) {
--		pr_err("alloc_chrdev_region() failed %d\n", r);
--		return r;
--	}
--
--	smd_pkt_classp = class_create(THIS_MODULE, DEVICE_NAME);
--	if (IS_ERR(smd_pkt_classp)) {
--		r = PTR_ERR(smd_pkt_classp);
--		pr_err("class_create() failed %d\n", r);
--		goto unreg_chardev;
--	}
--
--	for (i = 0; i < NUM_SMD_PKT_PORTS; ++i) {
--		smd_pkt_devp[i] = kzalloc(sizeof(struct smd_pkt_dev),
--					  GFP_KERNEL);
--		if (!smd_pkt_devp[i]) {
--			pr_err("kmalloc() failed\n");
--			goto clean_cdevs;
--		}
--
--		smd_pkt_devp[i]->i = i;
--
--		init_waitqueue_head(&smd_pkt_devp[i]->ch_read_wait_queue);
--		smd_pkt_devp[i]->remote_open = 0;
--		init_waitqueue_head(&smd_pkt_devp[i]->ch_opened_wait_queue);
--
--		mutex_init(&smd_pkt_devp[i]->ch_lock);
--		mutex_init(&smd_pkt_devp[i]->rx_lock);
--		mutex_init(&smd_pkt_devp[i]->tx_lock);
--
--		cdev_init(&smd_pkt_devp[i]->cdev, &smd_pkt_fops);
--		smd_pkt_devp[i]->cdev.owner = THIS_MODULE;
--
--		r = cdev_add(&smd_pkt_devp[i]->cdev,
--			     (smd_pkt_number + i), 1);
--		if (r) {
--			pr_err("cdev_add() failed %d\n", r);
--			kfree(smd_pkt_devp[i]);
--			goto clean_cdevs;
--		}
--
--		smd_pkt_devp[i]->devicep =
--			device_create(smd_pkt_classp, NULL,
--				      (smd_pkt_number + i), NULL,
--				      smd_pkt_dev_name[i]);
--		if (IS_ERR(smd_pkt_devp[i]->devicep)) {
--			r = PTR_ERR(smd_pkt_devp[i]->devicep);
--			pr_err("device_create() failed %d\n", r);
--			cdev_del(&smd_pkt_devp[i]->cdev);
--			kfree(smd_pkt_devp[i]);
--			goto clean_cdevs;
--		}
--
--	}
--
--	pr_info("SMD Packet Port Driver Initialized.\n");
--	return 0;
--
--clean_cdevs:
--	if (i > 0) {
--		while (--i >= 0) {
--			mutex_destroy(&smd_pkt_devp[i]->ch_lock);
--			mutex_destroy(&smd_pkt_devp[i]->rx_lock);
--			mutex_destroy(&smd_pkt_devp[i]->tx_lock);
--			cdev_del(&smd_pkt_devp[i]->cdev);
--			kfree(smd_pkt_devp[i]);
--			device_destroy(smd_pkt_classp,
--				       MKDEV(MAJOR(smd_pkt_number), i));
--		}
--	}
--
--	class_destroy(smd_pkt_classp);
--unreg_chardev:
--	unregister_chrdev_region(MAJOR(smd_pkt_number), NUM_SMD_PKT_PORTS);
--	return r;
--}
--module_init(smd_pkt_init);
--
--static void __exit smd_pkt_cleanup(void)
--{
--	int i;
--
--	for (i = 0; i < NUM_SMD_PKT_PORTS; ++i) {
--		mutex_destroy(&smd_pkt_devp[i]->ch_lock);
--		mutex_destroy(&smd_pkt_devp[i]->rx_lock);
--		mutex_destroy(&smd_pkt_devp[i]->tx_lock);
--		cdev_del(&smd_pkt_devp[i]->cdev);
--		kfree(smd_pkt_devp[i]);
--		device_destroy(smd_pkt_classp,
--			       MKDEV(MAJOR(smd_pkt_number), i));
--	}
--
--	class_destroy(smd_pkt_classp);
--	unregister_chrdev_region(MAJOR(smd_pkt_number), NUM_SMD_PKT_PORTS);
--}
--module_exit(smd_pkt_cleanup);
--
--MODULE_DESCRIPTION("MSM Shared Memory Packet Port");
--MODULE_LICENSE("GPL v2");
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+ 	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
+ 		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
+@@ -116,6 +117,9 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
+ 
+ 	seq_printf(s, "\n");
+ 
++	asm ("mrc p15, 0, %0, c1, c0, 1" : "=r"(val));
++	seq_printf(s, "aux ctrl: 0x%08x\n", val);
++
+ 	return 0;
+ }
+ 
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -516,6 +516,7 @@ l2_inv_gp:
+ 	ldr	r4, scratchpad_base
+ 	ldr	r3, [r4,#0xBC]
+ 	ldr	r0, [r3,#4]
++	bic	r0, r0, #(1 << 6)
+ 	mov	r12, #0x3
+ 	smc	#0			@ Call SMI monitor (smieq)
+ 	ldr	r4, scratchpad_base
