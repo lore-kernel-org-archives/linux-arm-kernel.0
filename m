@@ -1,37 +1,42 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Fri, 10 Apr 2015 16:37:50 +0300
-Subject: [PATCH 2/2] arm64: add KASan support
-In-Reply-To: <8790947.ikOtIjWHkt@wuerfel>
-References: <1427208544-8232-1-git-send-email-a.ryabinin@samsung.com>
- <3164609.kEhR8riVSV@wuerfel> <5527AA94.5080803@samsung.com>
- <8790947.ikOtIjWHkt@wuerfel>
-Message-ID: <5527D22E.9090000@samsung.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 10 Apr 2015 21:42:51 +0800
+Subject: [PATCH v4 00/16] crypto: SHA glue code consolidation
+In-Reply-To: <1428576948-23863-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1428576948-23863-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150410134251.GB21873@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2015 04:02 PM, Arnd Bergmann wrote:
-> On Friday 10 April 2015 13:48:52 Andrey Ryabinin wrote:
->> On 04/09/2015 11:17 PM, Arnd Bergmann wrote:
->>> On Tuesday 24 March 2015 17:49:04 Andrey Ryabinin wrote:
->>>>  arch/arm64/mm/kasan_init.c           | 211 +++++++++++++++++++++++++++++++++++
->>>>
->>>
->>> Just one very high-level question: as this code is clearly derived from
->>> the x86 version and nontrivial, could we move most of it out of
->>> arch/{x86,arm64} into mm/kasan/init.c and have the rest in some header
->>> file?
->>>
->>
->> I think most of this could be moved out from arch code, but not everything.
->> E.g. kasan_init() function is too arch-specific.
+On Thu, Apr 09, 2015 at 12:55:32PM +0200, Ard Biesheuvel wrote:
+> Hello all,
 > 
-> Right, makes sense. So presumably, populate_zero_shadow could become a global
-> function by another name, and possibly also handle registering the die
-> handler, so you can call it from an architecture specific kasan_init() 
-> function, right?
+> This is v4 of what is now a complete glue code consolidation series
+> for generic, x86, arm and arm64 implementations of SHA-1, SHA-224/256
+> and SHA-384/512.
 > 
+> The purpose is to have a single, canonical implementation of the core
+> logic that gets reused by all versions of the algorithm. Note that this
+> is not about saving space in the binary, but about ensuring that the same
+> code is used everywhere, reducing the maintenance burden.
+> 
+> The base layer implements all the update and finalization logic around
+> the block transforms, where the prototypes of the latter look something
+> like this:
+> 
+> typedef void (shaXXX_block_fn)(struct sha###_state *, u8 const *src, int blocks)
+> 
+> Note that the definitions of sha1_state, sha256_state and sha512_state are
+> updated to put the state[] member first: this allows us to easily cast
+> existing asm implementation that take a state[] member as first argument
+> to the above prototype.
+> 
+> Note that the base functions prototypes are all 'returning int' but
+> they all return 0. They should be invoked as tail calls where possible
+> to eliminate some of the function call overhead. If that is not possible,
+> the return values can be safely ignored.
 
-Yep, you are right.
-
-> 	Arnd
-> 
+All applied.  Thanks Ard!
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
