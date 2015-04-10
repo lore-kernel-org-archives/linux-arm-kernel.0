@@ -1,31 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Apr 2015 15:02:39 +0200
-Subject: [PATCH 2/2] arm64: add KASan support
-In-Reply-To: <5527AA94.5080803@samsung.com>
-References: <1427208544-8232-1-git-send-email-a.ryabinin@samsung.com>
- <3164609.kEhR8riVSV@wuerfel> <5527AA94.5080803@samsung.com>
-Message-ID: <8790947.ikOtIjWHkt@wuerfel>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 10 Apr 2015 15:05:36 +0200
+Subject: [PATCH v2 03/10] KVM: arm: guest debug, define API headers
+In-Reply-To: <1427814488-28467-4-git-send-email-alex.bennee@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-4-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150410130535.GF3227@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 April 2015 13:48:52 Andrey Ryabinin wrote:
-> On 04/09/2015 11:17 PM, Arnd Bergmann wrote:
-> > On Tuesday 24 March 2015 17:49:04 Andrey Ryabinin wrote:
-> >>  arch/arm64/mm/kasan_init.c           | 211 +++++++++++++++++++++++++++++++++++
-> >>
-> > 
-> > Just one very high-level question: as this code is clearly derived from
-> > the x86 version and nontrivial, could we move most of it out of
-> > arch/{x86,arm64} into mm/kasan/init.c and have the rest in some header
-> > file?
-> > 
+On Tue, Mar 31, 2015 at 04:08:01PM +0100, Alex Benn?e wrote:
+> This commit defines the API headers for guest debugging. There are two
+> architecture specific debug structures:
 > 
-> I think most of this could be moved out from arch code, but not everything.
-> E.g. kasan_init() function is too arch-specific.
+>   - kvm_guest_debug_arch, allows us to pass in HW debug registers
+>   - kvm_debug_exit_arch, signals the exact debug exit and pc
+> 
+> The type of debugging being used is control by the architecture specific
+controlled
+> control bits of the kvm_guest_debug->control flags in the ioctl
+> structure.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
+> ---
+> v2
+>    - expose hsr and pc directly to user-space
+> 
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 3ef77a4..6ee70a0 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -100,10 +100,24 @@ struct kvm_sregs {
+>  struct kvm_fpu {
+>  };
+>  
+> +/*
+> + * See ARM ARM D7.3: Debug Registers
+> + *
+> + * The control registers are architecturally defined as 32 bits but are
+> + * stored as 64 bit values along side the value registers and aligned
+> + * with the rest 64 bit registers in the normal CPU context.
+                   ^ of the
+> + */
+> +#define KVM_ARM_NDBG_REGS 16
+>  struct kvm_guest_debug_arch {
+> +	__u64 dbg_bcr[KVM_ARM_NDBG_REGS];
+> +	__u64 dbg_bvr[KVM_ARM_NDBG_REGS];
+> +	__u64 dbg_wcr[KVM_ARM_NDBG_REGS];
+> +	__u64 dbg_wvr[KVM_ARM_NDBG_REGS];
+>  };
+>  
+>  struct kvm_debug_exit_arch {
+> +	__u64 pc;
+> +	__u32 hsr;
+>  };
+>  
+>  struct kvm_sync_regs {
+> @@ -207,4 +221,11 @@ struct kvm_arch_memory_slot {
+>  
+>  #endif
+>  
+> +/*
+> + * Architecture related debug defines - upper 16 bits of
+> + * kvm_guest_debug->control
+> + */
+> +#define KVM_GUESTDBG_USE_SW_BP	        __KVM_GUESTDBG_USE_SW_BP
+> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
+> +
+>  #endif /* __ARM_KVM_H__ */
+> -- 
+> 2.3.4
+>
 
-Right, makes sense. So presumably, populate_zero_shadow could become a global
-function by another name, and possibly also handle registering the die
-handler, so you can call it from an architecture specific kasan_init() 
-function, right?
+couple typo nits, otherwise
 
-	Arnd
+Reviewed-by: Andrew Jones <drjones@redhat.com>
