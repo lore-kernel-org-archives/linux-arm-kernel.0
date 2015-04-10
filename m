@@ -1,42 +1,59 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 10 Apr 2015 21:42:51 +0800
-Subject: [PATCH v4 00/16] crypto: SHA glue code consolidation
-In-Reply-To: <1428576948-23863-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1428576948-23863-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150410134251.GB21873@gondor.apana.org.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Apr 2015 15:44:30 +0200
+Subject: [PATCH v2] arm: zynq: Fix system clock with multi_v7_defconfig
+In-Reply-To: <BY2FFO11FD0520A960F287A6B7BA6A9DAE20D0@BY2FFO11FD052.protection.gbl>
+References: <550F6EDA.30709@adapteva.com>
+ <BY2FFO11FD0520A960F287A6B7BA6A9DAE20D0@BY2FFO11FD052.protection.gbl>
+Message-ID: <26139139.4pXlnbLfh0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 12:55:32PM +0200, Ard Biesheuvel wrote:
-> Hello all,
+On Monday 23 March 2015 08:05:45 Michal Simek wrote:
+> Hi,
 > 
-> This is v4 of what is now a complete glue code consolidation series
-> for generic, x86, arm and arm64 implementations of SHA-1, SHA-224/256
-> and SHA-384/512.
-> 
-> The purpose is to have a single, canonical implementation of the core
-> logic that gets reused by all versions of the algorithm. Note that this
-> is not about saving space in the binary, but about ensuring that the same
-> code is used everywhere, reducing the maintenance burden.
-> 
-> The base layer implements all the update and finalization logic around
-> the block transforms, where the prototypes of the latter look something
-> like this:
-> 
-> typedef void (shaXXX_block_fn)(struct sha###_state *, u8 const *src, int blocks)
-> 
-> Note that the definitions of sha1_state, sha256_state and sha512_state are
-> updated to put the state[] member first: this allows us to easily cast
-> existing asm implementation that take a state[] member as first argument
-> to the above prototype.
-> 
-> Note that the base functions prototypes are all 'returning int' but
-> they all return 0. They should be invoked as tail calls where possible
-> to eliminate some of the function call overhead. If that is not possible,
-> the return values can be safely ignored.
+> On 03/23/2015 02:39 AM, Ola Jeppsson wrote:
+> > As mentioned in this commit:
+> > arm: zynq: Don't use arm_global_timer with cpufreq
+> > 61f1fc7e9258a169ac8afb5ddf657a181e60d052
+> > 
+> > arm_global_timer depends on the CPU frequency. With cpufreq altering the
+> > CPU frequency arm_global_timer will not maintain a stable time base. So
+> > arm_global_timer must not be the clocksource when cpufreq is enabled.
+> > 
+> > The above commit tries to solve this at build time by only selecting
+> > CONFIG_ARM_GLOBAL_TIMER if CONFIG_CPU_FREQ is disabled. This is not
+> > always sufficient because other machs can also enable
+> > CONFIG_ARM_GLOBAL_TIMER.
+> > 
+> > Therefore: If built with CONFIG_CPU_FREQ and CONFIG_ARM_GLOBAL_TIMER,
+> > disable (on Zynq) the arm_global_timer devicetree node at boot before
+> > clock sources are initialized. This ensures that arm_global_timer will
+> > not be selected clocksource.
+> > 
+> > Signed-off-by: Ola Jeppsson <ola@adapteva.com>
 
-All applied.  Thanks Ard!
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+
+> 
+> Arnd: Waiting for your thoughts on this one?
+> It is some sort of arch/arm/mach-mvebu/board-v7.c quirk code.
+> 
+> I don't think it can be done via Kconfig because it will affect others.
+
+(catching up with old email)
+
+I think it's ok to work around the problem like this in principle.
+
+However, I have one concern about the way this condition is detected.
+At the moment, you assume that all zynq variants suffer from this
+problem and no other chip has it.
+
+How would you handle the situation if a future zynq variant fixes
+the problem?
+
+What if it turns out to be a more common problem and we actually
+want to work around it in the arm global timer implementation
+by dynamically adapting to CPU frequency changes? I believe some
+other drivers (x86 tsc?) do this. Would we be able to detect this case
+on zynq?
+
+	Arnd
