@@ -1,35 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Apr 2015 11:20:45 +0100
-Subject: [RFC PATCH] arm64: KVM: remove fpsimd save/restore from the
- world switch
-In-Reply-To: <CAFEAcA8J-kDHjkg9uFbHHAEu=zSSv+CB1Vmy1JBh==SmeiWL1Q@mail.gmail.com>
-References: <1428598439-5217-1-git-send-email-marc.zyngier@arm.com>
- <55278CAD.70302@redhat.com> <552793CF.8050904@arm.com>
- <CAFEAcA8J-kDHjkg9uFbHHAEu=zSSv+CB1Vmy1JBh==SmeiWL1Q@mail.gmail.com>
-Message-ID: <20150410102044.GC6854@e104818-lin.cambridge.arm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 10 Apr 2015 18:13:09 +0800
+Subject: [PATCH 0/2] Enable HiSilicon hip04 ethernet controller
+In-Reply-To: <15355533.8BHqyIEd6L@wuerfel>
+References: <1428650180-9746-1-git-send-email-fathi.boudra@linaro.org>
+ <15355533.8BHqyIEd6L@wuerfel>
+Message-ID: <5527A235.9050601@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:01:36AM +0100, Peter Maydell wrote:
-> On 10 April 2015 at 10:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > I did some experimentations on arm64 a long while ago (see the
-> > kvm-arm64/lazy-fp branch in my tree), and it wasn't that great,
-> > apparently because aarch64 userspace tends to be much more FP happy than
-> > aarch32, but I'm not completely sure about it.
+
+
+On 2015/4/10 17:06, Arnd Bergmann wrote:
+> On Friday 10 April 2015 10:16:18 Fathi Boudra wrote:
+>> The following patches enable the ethernet controller on HiSilicon hip04
+>> as documented in the device tree binding but not currently enabled.
+>> It has been tested on real hardware with tftp boot + NFS root filesystem.
+
+Hi Fathi and Arnd
+> The patches looks ok to me, but we don't normally pick up changes like
+> this from developers, you should address them to Wei Xu so he can send
+> them to arm-soc along with his other changes.
+
+Thanks!
+I will test it and prepare the pull request with other changes.
+
+> Note that there are some known bugs in this driver, I sent an experimental
+> patch for some of them but never heard back.
+
+I will contact with tianhong and zhangfei about it.
+Thanks!
+
+Best Regards,
+Wei
+
+> 	Arnd
 > 
-> Was that with the buggy version of the toolchain that had
-> incorrect costs and so was much more inclined to spill
-> integer values into the FPU than it should have been?
-> It might be worth retesting with a freshly compiled
-> userspace some day...
-
-It really depends on what you mean by userspace (which benchmarks you
-use). If for example you only care about Javascript heavy web
-applications, all numbers are 64-bit floats. But I think it's worth
-investigating.
-
-We could also make it smarter and mark some tasks as FP heavy for a
-limited time to avoid faults.
-
--- 
-Catalin
+> .
+> 
