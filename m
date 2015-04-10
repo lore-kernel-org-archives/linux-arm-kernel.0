@@ -1,64 +1,27 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Fri, 10 Apr 2015 12:55:02 +0200
-Subject: [PATCH RFC] ARM: BCM5301X: Add /device_id property including
- device ID string
-In-Reply-To: <24438163.XzJnLCdvP5@wuerfel>
-References: <1427667288-23903-1-git-send-email-zajec5@gmail.com>
- <CACna6rykQq6AVSWzJh3qnHVNzPXbTD9TMGQf9D9p50pcbQkmng@mail.gmail.com>
- <20150330105828.GE17971@leverpostej> <24438163.XzJnLCdvP5@wuerfel>
-Message-ID: <CACna6rzmACyJ6=EJCCi2eCp1A8cCLJiusm7=pyHQM0QL+82Zng@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 10 Apr 2015 12:03:28 +0100
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+Message-ID: <20150410110328.GC25921@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2015 at 12:50, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 30 March 2015 11:58:29 Mark Rutland wrote:
->> > > On Sun, Mar 29, 2015 at 11:14:48PM +0100, Rafa? Mi?ecki wrote:
->> > >> Device vendors often assign IDs to their devices to allow comparing
->> > >> firmware image with device model. This is required to prevent users
->> > >> from flashing incompatible image and soft-bricking device.
->> > >> Add device_id property to DTs to allow user space (and optionally
->> > >> bootloader) verifying firmware images.
->> > >
->> > > This sounds like exactly what the "model" property is meant to be (per
->> > > ePAPR) -- a string that specifices the manufacturer's model number of
->> > > the device, ideally in "manufacturer,model" format.
->> >
->> > What if manufacturer decided to use some totally unfriendly ID for
->> > their low-level (firmware upgrade) model identification? I can't
->> > really see us using
->> > model  "U12H245T00_NETGEAR"
->> > which would mean nothing compared to the current friendly:
->> > model  "Netgear R6250 V1 (BCM4708)"
->>
->> If it uniquely identifies the model, it's fit to be a model string. If
->> being "friendly" means that we lose that, then the property is useless
->> anyway.
->>
->> Note that both examples above deviate from the recommended format, and
->> something like: "netgear,U12H245T00" would better align with the
->> recommendation.
->
-> Sorry for jumping in late here, but this still sounds like more fitting
-> for the "compatible" property than "model". For compatible, you can
-> already have multiple strings, and they come with a vendor prefix.
->
-> Any of these would seem reasonable to me:
->
-> a)
->         compatible = "asus,rt-ac68u", "openwrt,RT-AC68U", "brcm,bcm4708";
->         model = "Asus RT-AC68U (BCM4708)";
->
-> b)
->         compatible = "asus,rt-ac68u", "brcm,RT-AC68U", "brcm,bcm4708";
->         model = "Asus RT-AC68U (BCM4708)";
->
-> c)
->         compatible = "asus,rt-ac68u", "asus,RT-AC68U", "brcm,bcm4708";
->         model = "Asus RT-AC68U (BCM4708)";
->
-> depending on which party maintains the list of these identifiers.
+On Thu, Apr 09, 2015 at 06:37:06PM +0100, Kumar Gala wrote:
+> This patch set adds support for SMP boot on the MSM8x16 family of Qualcomm SoCs.
+> 
+> To support SMP on the MSM8x16 SoCs we need to add ARMv8/64-bit SCM interfaces to
+> setup the boot/release addresses for the secondary CPUs.  In addition we need
+> a uniquie set of cpu ops.  I'm aware the desired methods for booting secondary
+> CPUs is either via spintable or PSCI.  However, these SoCs are shipping with a
+> firmware that does not support those methods.
 
-Thanks, I think it looks like the best alternative to my initial idea.
+Why ? Do not tell me you were not aware of those standard methods,
+because I can't believe you.
 
--- 
-Rafa?
+If there were additional features to add to spin-table and PSCI,
+you were, you are and you will always be welcome to debate them.
+
+There is no justification for this patchset, honestly.
+
+Lorenzo
