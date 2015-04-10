@@ -1,53 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Apr 2015 12:24:31 +0100
-Subject: [PATCH] ARM: print cma-reserved pages from show_mem
-In-Reply-To: <35FD53F367049845BC99AC72306C23D104A310D42397@CNBJMBX05.corpusers.net>
-References: <54D40DAF.4080609@codeaurora.org>
- <CADtm3G7ROX4CrxSKRvTKcjqCiX=uJQZ=Q5izH8pS61z4jfumLg@mail.gmail.com>
- <54D534FB.1090101@codeaurora.org>
- <CADtm3G7CUYUUbmTrWiudQ5j-wX9hu86Ox8TkB+FnXwEvjb=xeg@mail.gmail.com>
- <20150210113230.GJ8656@n2100.arm.linux.org.uk>
- <CADtm3G64rPf7O76xUbLwqsqTkJxdGJMT9sHj810xPuThDA0ddg@mail.gmail.com>
- <20150326114612.GD8656@n2100.arm.linux.org.uk>
- <20150326123028.GM4701@suse.de>
- <CADtm3G4Lb=u+BAHZF+O+RgB4VS9iW8epCPJ9ssBTj=+p3+h==Q@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D104A310D42397@CNBJMBX05.corpusers.net>
-Message-ID: <20150410112430.GB12732@n2100.arm.linux.org.uk>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 10 Apr 2015 13:25:37 +0200
+Subject: Guarantee udelay(N) spins at least N microseconds
+Message-ID: <5527B331.5000205@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 01:18:04PM +0800, Wang, Yalin wrote:
-> > [   12.212102] active_anon:734 inactive_anon:1189 isolated_anon:0
-> > [   12.212102]  active_file:0 inactive_file:0 isolated_file:0
-> > [   12.212102]  unevictable:0 dirty:0 writeback:0 unstable:0
-> > [   12.212102]  free:254104 slab_reclaimable:82 slab_unreclaimable:843
+Hello everyone,
 
-Here, we have 82 pages reclaimable, which is 328kB, and 843 unreclaimable
-which is 3372kB, which is a total of 925 pages.
+This is take 2 of my tiny delay.c patch
 
-> > [   12.212102]  mapped:429 shmem:1815 pagetables:13 bounce:0
-> > [   12.212102]  free_cma:4032
-> > [   12.243172] DMA free:754080kB min:3472kB low:4340kB high:5208kB
-> > active_anon:180kB inactive_anon:0kB active_file:0kB inactive_file:0kB
-> > unevictable:0kB isolated(anon):0kB isolated(file):0kB present:778240kB
-> > managed:759252kB mlocked:0kB dirty:0kB writeback:0kB mapped:0kB
-> > shmem:0kB slab_reclaimable:328kB slab_unreclaimable:3372kB
+Problem statement
 
-Which agrees here.
+When converting microseconds to timer cycles in __timer_udelay() and
+__timer_const_udelay(), the result is rounded down(*), which means the
+system will not spin as long as requested (specifically, between
+epsilon and 1 cycle shorter).
 
-> > [   12.401609] 834 slab pages
+If I understand correctly, most drivers expect udelay(N) to spin for
+at least N ?s. Is that correct? In that use case, spinning less might
+introduce subtle heisenbugs.
 
-but not here... this is an interesting difference, because in the ARM
-version of show_mem(), we count the actual number of pages where
-PageSlab() returns true.  Can slab pages also be reserved pages or
-swap cache pages?  I thought they were exclusive of those.  So, the
-question comes... why the difference in accounting, and which one is
-correct.
 
-Maybe there's a bug in the accounting somewhere...
+Typical example
 
-So I think we're not ready for this patch to be merged yet.
+timer->freq = 90 kHz && HZ = 100
+(thus UDELAY_MULT = 107374 && ticks_per_jiffy = 900)
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+udelay(10) => __timer_const_udelay(10*107374)
+            => __timer_delay((1073740*900) >> 30)
+            => __timer_delay(0)
+
+So udelay(10) resolves to no delay at all.
+
+
+(*) 2^41 / 10^6 = 2199023,255552
+2199023 < 2^41 / 10^6
+UDELAY_MULT = 2199023*HZ / 2^11 < 2^30*HZ / 10^6
+
+cycles = N * UDELAY_MULT * freq/HZ / 2^30
+        < N * 2^30*HZ / 10^6 * freq/HZ / 2^30
+        < N / 10^6 * freq
+
+
+Proposed fix
+
+Since results are always rounded down, all we need is to increment
+the result by 1 to round it up.
+
+Would someone ACK the patch below?
+
+Regards.
+
+
+Patch against 4.0-rc4
+
+diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+index 312d43e..3cfbd07 100644
+--- a/arch/arm/lib/delay.c
++++ b/arch/arm/lib/delay.c
+@@ -66,7 +66,7 @@ static void __timer_const_udelay(unsigned long xloops)
+  {
+         unsigned long long loops = xloops;
+         loops *= arm_delay_ops.ticks_per_jiffy;
+-       __timer_delay(loops >> UDELAY_SHIFT);
++       __timer_delay((loops >> UDELAY_SHIFT) + 1);
+  }
+  
+  static void __timer_udelay(unsigned long usecs)
