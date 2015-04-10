@@ -1,33 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Apr 2015 11:08:38 +0100
-Subject: [RFC PATCH] arm64: KVM: remove fpsimd save/restore from the world
- switch
-In-Reply-To: <CAFEAcA8J-kDHjkg9uFbHHAEu=zSSv+CB1Vmy1JBh==SmeiWL1Q@mail.gmail.com>
-References: <1428598439-5217-1-git-send-email-marc.zyngier@arm.com>
- <55278CAD.70302@redhat.com> <552793CF.8050904@arm.com>
- <CAFEAcA8J-kDHjkg9uFbHHAEu=zSSv+CB1Vmy1JBh==SmeiWL1Q@mail.gmail.com>
-Message-ID: <5527A126.6080202@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 10 Apr 2015 11:08:33 +0100
+Subject: [RFC PATCH 5/5] arm64: qcom: add cpu operations
+In-Reply-To: <2294107.GTDFpLFyzQ@wuerfel>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <1428601031-5366-6-git-send-email-galak@codeaurora.org>
+ <2294107.GTDFpLFyzQ@wuerfel>
+Message-ID: <20150410100832.GB6854@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/15 11:01, Peter Maydell wrote:
-> On 10 April 2015 at 10:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> I did some experimentations on arm64 a long while ago (see the
->> kvm-arm64/lazy-fp branch in my tree), and it wasn't that great,
->> apparently because aarch64 userspace tends to be much more FP happy than
->> aarch32, but I'm not completely sure about it.
+On Thu, Apr 09, 2015 at 11:19:02PM +0200, Arnd Bergmann wrote:
+> On Thursday 09 April 2015 12:37:11 Kumar Gala wrote:
+> > From: Abhimanyu Kapur <abhimany@codeaurora.org>
+> > 
+> > Add qcom cpu operations for arm-v8 cpus. Implement secondary cpu boot ops
+> > As a part of this change update device tree documentation for:
+> > 
+> > 1. Arm cortex-a ACC device which provides percpu reg
+> > 2. Armv8 cortex-a compatible string in arm/cpus.txt
+> > 
+> > Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
+> > Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> > ---
+> >  Documentation/devicetree/bindings/arm/cpus.txt    |   2 +
+> >  Documentation/devicetree/bindings/arm/msm/acc.txt |  19 ++
+> >  drivers/soc/qcom/Makefile                         |   1 +
+> >  drivers/soc/qcom/cpu_ops.c                        | 343 ++++++++++++++++++++++
+> >  4 files changed, 365 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/msm/acc.txt
 > 
-> Was that with the buggy version of the toolchain that had
-> incorrect costs and so was much more inclined to spill
-> integer values into the FPU than it should have been?
-> It might be worth retesting with a freshly compiled
-> userspace some day...
+> I don't want this in drivers/soc. Please find a way to integrate it into the
+> arch/arm64 code.
 
-It definitely was with a very old toolchain and an even older userspace.
-I'll respin the branch when I get some thime.
+And rename it to something like qc-special-cpu-ops-dont-copy-this.c
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
