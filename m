@@ -1,29 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Apr 2015 22:59:52 +0200
-Subject: [PATCH v2] arm: zynq: Fix system clock with multi_v7_defconfig
-In-Reply-To: <1d6383c8-de0d-474b-a824-d1402b40391f@BY2FFO11FD035.protection.gbl>
-References: <550F6EDA.30709@adapteva.com> <7398185.8qW42GIbsU@wuerfel>
- <1d6383c8-de0d-474b-a824-d1402b40391f@BY2FFO11FD035.protection.gbl>
-Message-ID: <7916396.UBTtkSpjzN@wuerfel>
+From: robdclark@gmail.com (Rob Clark)
+Date: Fri, 10 Apr 2015 17:01:51 -0400
+Subject: [PATCH v2 06/12] ARM: dts: apq8064: Add MDP support
+In-Reply-To: <552830C9.4030601@codeaurora.org>
+References: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1428669271-11032-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <552802B6.2040804@codeaurora.org> <552826F6.5040105@linaro.org>
+ <552830C9.4030601@codeaurora.org>
+Message-ID: <CAF6AEGtYQJVt+ETtgnhANJq8c8Z0CyQj=8UddGLL2FR+jpgXAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 April 2015 13:41:34 S?ren Brinkmann wrote:
-> On Fri, 2015-04-10 at 10:04PM +0200, Arnd Bergmann wrote:
-> > I've just had another idea: how about introducing a new compatible string
-> > for the global timer that gets used for timers that have their frequency
-> > tied to the CPU (alternatively a bool property in that node). This can
-> > be checked by the clocksource driver, which will then be able to either
-> > skip the device if cpufreq is in use, or implement a more sophisticated
-> > workaround.
-> 
-> If this is the only available clocksource, you'd still want to use it
-> though. A bad clocksource is still better than none. But I guess that
-> would just mean to lie in the DT.
+On Fri, Apr 10, 2015 at 4:21 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> That's true, These are existing bindings, so I can't change it as part
+>> of this patch, However I will make another patch to fix this in both
+>> drivers and DT for good reasons. Just noticed that bindings are not
+>> consistent with the examples and the driver, which I guess is another
+>> issue.
+>
+> Yes, the driver/binding should be fixed and then this patch can be
+> corrected and applied. There are no implementations of the DT for this
+> device upstream in the dts directory so there's no breakage or backwards
+> incompatibility problem by fixing the driver/binding.
 
-On zynq, you always have a local time, right?
 
-If we get a platform that has no reliable clocksource, it's probably
-time to implement scaling in the global timer driver.
+jfyi, some of the current bindings are the way they are to simplify
+compatibility w/ downstream kernels which I unfortunately still have
+to deal with.. ofc, the sooner I don't have to deal w/ downstream
+kernels, the easier it gets to clean up ;-)
 
-	Arnd
+ofc, since the number of devices that can run upstream kernel but
+don't have upstream dts files is approximately zero, this would be a
+case were it would be useful to be able to mark certain bindings as
+non-abi and refactor them later.
+
+BR,
+-R
