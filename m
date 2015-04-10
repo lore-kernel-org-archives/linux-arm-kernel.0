@@ -1,178 +1,79 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 10 Apr 2015 09:38:26 +0200
-Subject: [PATCH 4/5] pci: designware: remove pci_common_init_dev()
+Date: Fri, 10 Apr 2015 09:38:24 +0200
+Subject: [PATCH 2/5] PCI: st: Add Device Tree bindings for sti pcie
 In-Reply-To: <1428651507-32554-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1428651507-32554-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1428651507-32554-5-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1428651507-32554-3-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call directly pci_*() instead of using pci_common_init_dev().
-Enforce error handling in probe.
-It also allows st pcie driver not to declare IO space:
-pci_common_init_dev() is assigning one by default.
+sti pcie is built around a Synopsis Designware PCIe IP.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- drivers/pci/host/pcie-designware.c | 62 ++++++++++++++++++++------------------
- drivers/pci/host/pcie-designware.h |  2 ++
- 2 files changed, 34 insertions(+), 30 deletions(-)
+ Documentation/devicetree/bindings/pci/st-pcie.txt | 53 +++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 1f4ea6f..d4b1bf7 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -67,8 +67,6 @@
- #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
- #define PCIE_ATU_UPPER_TARGET		0x91C
- 
--static struct hw_pci dw_pci;
--
- static unsigned long global_io_offset;
- 
- static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
-@@ -342,6 +340,9 @@ static const struct irq_domain_ops msi_domain_ops = {
- 	.map = dw_pcie_msi_map,
- };
- 
-+static int dw_pcie_setup(struct pci_sys_data *sys);
-+static struct pci_bus *dw_pcie_scan_bus(struct pci_sys_data *sys);
+diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
+new file mode 100644
+index 0000000..25fcab3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
+@@ -0,0 +1,53 @@
++STMicroelectronics STi PCIe controller
 +
- int __init dw_pcie_host_init(struct pcie_port *pp)
- {
- 	struct device_node *np = pp->dev->of_node;
-@@ -352,6 +353,9 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 	u32 val, na, ns;
- 	const __be32 *addrp;
- 	int i, index, ret;
-+	struct list_head *resources = &pp->sysdata.resources;
++This PCIe host controller is based on the Synopsis Designware PCIe IP
++and thus inherits all the common properties defined in designware-pcie.txt.
 +
-+	INIT_LIST_HEAD(resources);
- 
- 	/* Find the address cell size and the number of cells in order to get
- 	 * the untranslated address.
-@@ -504,13 +508,17 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 
- #ifdef CONFIG_PCI_MSI
- 	dw_pcie_msi_chip.dev = pp->dev;
--	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
-+	pp->sysdata.msi_ctrl = &dw_pcie_msi_chip;
- #endif
- 
--	dw_pci.nr_controllers = 1;
--	dw_pci.private_data = (void **)&pp;
-+	pp->sysdata.private_data = pp;
- 
--	pci_common_init_dev(pp->dev, &dw_pci);
-+	ret = dw_pcie_setup(&pp->sysdata);
-+	if (ret)
-+		return ret;
++Required properties:
++ - compatible: "st,stih407-pcie"
++ - reg: base address and length of the pcie controller, mem-window address
++   and length available to the controller.
++ - interrupts: A list of interrupt outputs of the controller. Must contain an
++   entry for each entry in the interrupt-names property.
++ - interrupt-names: Should be "msi". STi interrupt that is asserted when an
++   MSI is received.
++ - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
++   offset for IP configuration.
++ - resets, reset-names: the power-down and soft-reset lines of PCIe IP.
++   Associated names must be "powerdown" and "softreset".
++ - phys, phy-names: the phandle for the PHY device.
++   Associated name must be "pcie"
 +
-+	if (!dw_pcie_scan_bus(&pp->sysdata))
-+		return -ENXIO;
- 
- 	return 0;
- }
-@@ -701,15 +709,19 @@ static struct pci_ops dw_pcie_ops = {
- 	.write = dw_pcie_wr_conf,
- };
- 
--static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
-+static int dw_pcie_setup(struct pci_sys_data *sys)
- {
- 	struct pcie_port *pp;
-+	int err;
- 
- 	pp = sys_to_pcie(sys);
- 
- 	if (global_io_offset < SZ_1M && pp->io_size > 0) {
- 		sys->io_offset = global_io_offset - pp->io_bus_addr;
--		pci_ioremap_io(global_io_offset, pp->io_base);
-+		err = pci_ioremap_io(global_io_offset, pp->io_base);
-+		if (err)
-+			return err;
++Optional properties:
++ - reset-gpio: a GPIO spec to define which pin is connected to the bus reset.
 +
- 		global_io_offset += SZ_64K;
- 		pci_add_resource_offset(&sys->resources, &pp->io,
- 					sys->io_offset);
-@@ -719,10 +731,10 @@ static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
- 	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
- 	pci_add_resource(&sys->resources, &pp->busn);
- 
--	return 1;
-+	return 0;
- }
- 
--static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-+static struct pci_bus *dw_pcie_scan_bus(struct pci_sys_data *sys)
- {
- 	struct pci_bus *bus;
- 	struct pcie_port *pp = sys_to_pcie(sys);
-@@ -738,27 +750,13 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- 	if (bus && pp->ops->scan_bus)
- 		pp->ops->scan_bus(pp);
- 
--	return bus;
--}
--
--static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
--{
--	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
--	int irq;
--
--	irq = of_irq_parse_and_map_pci(dev, slot, pin);
--	if (!irq)
--		irq = pp->irq;
-+	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-+	pci_assign_unassigned_bus_resources(bus);
-+	pci_bus_add_devices(bus);
- 
--	return irq;
-+	return bus;
- }
- 
--static struct hw_pci dw_pci = {
--	.setup		= dw_pcie_setup,
--	.scan		= dw_pcie_scan_bus,
--	.map_irq	= dw_pcie_map_irq,
--};
--
- void dw_pcie_setup_rc(struct pcie_port *pp)
- {
- 	u32 val;
-@@ -822,8 +820,12 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
- 	/* setup command register */
- 	dw_pcie_readl_rc(pp, PCI_COMMAND, &val);
- 	val &= 0xffff0000;
--	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
--		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
++Example:
 +
-+	if (!pp->io_size)
-+		val |= PCI_COMMAND_IO;
++pcie0: pcie at 9b00000 {
++	compatible = "st,pcie", "snps,dw-pcie";
++	device_type = "pci";
++	reg = <0x09b00000 0x4000>,	/* dbi cntrl registers */
++	      <0x2fff0000 0x00010000>,	/* configuration space */
++	      <0x40000000 0x80000000>;	/* lmi mem window */
++	reg-names = "dbi", "config", "mem-window";
++	st,syscfg = <&syscfg_core 0xd8 0xe0>;
++	#address-cells = <3>;
++	#size-cells = <2>;
++	ranges = <0x82000000 0 0x20000000 0x20000000 0 0x0FFF0000>; /* non-prefetchable memory */
++	num-lanes = <1>;
++	interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "msi";
++	#interrupt-cells = <1>;
++	interrupt-map-mask = <0 0 0 7>;
++	interrupt-map = <0 0 0 1 &intc GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>, /* INT A */
++			<0 0 0 2 &intc GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>, /* INT B */
++			<0 0 0 3 &intc GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>, /* INT C */
++			<0 0 0 4 &intc GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>; /* INT D */
 +
-+	val |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
-+
- 	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
- }
- 
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index d0bbd27..c647092 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -46,12 +46,14 @@ struct pcie_port {
- 	struct resource		io;
- 	struct resource		mem;
- 	struct resource		busn;
-+	struct pci_sys_data	sysdata;
- 	int			irq;
- 	u32			lanes;
- 	struct pcie_host_ops	*ops;
- 	int			msi_irq;
- 	struct irq_domain	*irq_domain;
- 	unsigned long		msi_data;
-+	bool			disable_io_support;
- 	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
- };
- 
++	resets = <&powerdown STIH407_PCIE0_POWERDOWN>,
++		 <&softreset STIH407_PCIE0_SOFTRESET>;
++	reset-names = "powerdown",
++		      "softreset";
++	phys = <&phy_port0 PHY_TYPE_PCIE>;
++	phy-names = "pcie";
++};
 -- 
 1.9.1
