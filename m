@@ -1,118 +1,95 @@
 From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Fri, 10 Apr 2015 16:06:37 +0300
-Subject: [PATCHv5 2/4] watchdog: Allow watchdog to reset device at early boot
-In-Reply-To: <1428671199-5562-1-git-send-email-timo.kokkonen@offcode.fi>
-References: <1428671199-5562-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <1428671199-5562-3-git-send-email-timo.kokkonen@offcode.fi>
+Date: Fri, 10 Apr 2015 16:06:35 +0300
+Subject: [PATCHv5 0/4] watchdog: Extend kernel API and add early_timeout_sec
+ feature
+Message-ID: <1428671199-5562-1-git-send-email-timo.kokkonen@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Historically the watchdogs have always been stopped before user space
-opens and takes over the device. This is not good on many production
-systems where any crash, in kernel or user space, must always result
-in a device reset.
+The watchdog kernel API is quite limited. It has support for providing
+generic device handling, but it doesn't really know anything about the
+watchdog hardware or its constraints. The watchdog drivers come with a
+lot of diversity and their own set of quirks and constraints. Some of
+their limitations are not nice for the user space, so the drivers work
+around them with all sorts of ad hoc implementations.
 
-Add a new early_timeout_sec parameter to the watchdog that gives user
-space certain amount of time to set up itself and take over the
-watchdog. Until this timeout has been reached the watchdog core takes
-care of petting the watchdog HW. If there is any crash in kernel or
-user space, reboot is guaranteed as watchdog hardware is never
-stopped.
+One common pattern is to use kernel timers or work queues to allow
+longer timeout parameters than the actual hardware supports. To solve
+this problem, this patch set extends the kernel watchdog API with a few
+parameters that let the core know more about the watchdog HW and take
+care about the timeout extending.
 
-There is also mode of supplying zero seconds for the early_timeout_sec
-parameter. In this mode the worker is not scheduled, so the watchdog
-timer is not touched nor is the HW petted until user space takes over
-it.
+The patch set also implements "early_timeout_sec" feature that is very
+common on many production systems where early kernel or user space
+crashes must lead to a device reset. Traditional watchdog handling
+does not allow this as the watchdog is stopped (fully or emulating
+stopped state with kernel timers) before user space opens it for the
+first time.
 
-Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
----
- drivers/watchdog/watchdog_core.c | 39 ++++++++++++++++++++++++++++++---------
- include/linux/watchdog.h         |  1 +
- 2 files changed, 31 insertions(+), 9 deletions(-)
+The changes are designed to be taken in use one driver at time. If the
+driver does not set the new parameters and call
+watchdog_init_params(), the watchdog behavior is exactly the same as
+before.
 
-diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-index 8e7d08d..d6bedf7 100644
---- a/drivers/watchdog/watchdog_core.c
-+++ b/drivers/watchdog/watchdog_core.c
-@@ -111,12 +111,18 @@ EXPORT_SYMBOL_GPL(watchdog_init_timeout);
-  */
- int watchdog_init_params(struct watchdog_device *wdd, struct device *dev)
- {
-+	unsigned int t = 0;
- 	int ret = 0;
- 
- 	ret = watchdog_init_timeout(wdd, wdd->timeout, dev);
- 	if (ret < 0)
- 		return ret;
- 
-+	if (!of_property_read_u32(dev->of_node, "early-timeout-sec", &t))
-+		wdd->early_timeout_sec = t;
-+	else
-+		wdd->early_timeout_sec = -1;
-+
- 	/*
- 	 * Max HW timeout needs to be set so that core knows when to
- 	 * use a kernel worker to support longer watchdog timeouts
-@@ -139,6 +145,7 @@ static void watchdog_worker(struct work_struct *work)
- 	}
- 
- 	if ((!watchdog_active(wdd) && !watchdog_is_stoppable(wdd)) ||
-+		(!watchdog_active(wdd) && wdd->early_timeout_sec >= 0) ||
- 		(watchdog_active(wdd) &&
- 			wdd->hw_max_timeout < wdd->timeout * HZ)) {
- 		if (wdd->ops->ping)
-@@ -152,17 +159,31 @@ static void watchdog_worker(struct work_struct *work)
- 
- static int prepare_watchdog(struct watchdog_device *wdd)
- {
--	/* Stop the watchdog now before user space opens the device */
--	if (wdd->hw_features & WDOG_HW_IS_STOPPABLE &&
--		wdd->hw_features & WDOG_HW_RUNNING_AT_BOOT) {
--		wdd->ops->stop(wdd);
--
--	} else if (!(wdd->hw_features & WDOG_HW_IS_STOPPABLE)) {
-+	if (wdd->early_timeout_sec >= 0) {
- 		/*
--		 * Can't stop it, use a kernel timer to tick
--		 * it until it's open by user space
-+		 * early timeout, if set, ensures that watchdog will
-+		 * reset the device unless user space opens the
-+		 * watchdog device within the given interval.
- 		 */
--		schedule_delayed_work(&wdd->work, wdd->hw_heartbeat);
-+		if (!(wdd->hw_features & WDOG_HW_RUNNING_AT_BOOT))
-+			wdd->ops->start(wdd);
-+
-+		if (wdd->early_timeout_sec > 0) {
-+			schedule_delayed_work(&wdd->work,  wdd->hw_heartbeat);
-+		}
-+	} else {
-+		/* Stop the watchdog now before user space opens the device */
-+		if (wdd->hw_features & WDOG_HW_IS_STOPPABLE &&
-+			wdd->hw_features & WDOG_HW_RUNNING_AT_BOOT) {
-+			wdd->ops->stop(wdd);
-+
-+		} else if (!(wdd->hw_features & WDOG_HW_IS_STOPPABLE)) {
-+			/*
-+			 * Can't stop it, use a kernel timer to tick
-+			 * it until it's open by user space
-+			 */
-+			schedule_delayed_work(&wdd->work, wdd->hw_heartbeat);
-+		}
- 	}
- 	return 0;
- }
-diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-index c16c921..6f868b6 100644
---- a/include/linux/watchdog.h
-+++ b/include/linux/watchdog.h
-@@ -94,6 +94,7 @@ struct watchdog_device {
- 	unsigned int hw_max_timeout; /* in jiffies */
- 	unsigned int hw_heartbeat; /* in jiffies */
- 	unsigned long int expires; /* for soft timer */
-+	unsigned int early_timeout_sec;
- 	void *driver_data;
- 	struct mutex lock;
- 	struct delayed_work work;
+In principle this new API makes it possible for the user space to see
+every watchdog hardware to behave the same, at least in terms of
+watchdog timeouts. Once the API is in, it should be easier to move
+even more common behavior out of the driver code to the watchdog core
+and make the drivers simpler.
+
+I'm not anticipating this patch set to go in as is, this is merely to
+help bringing up the discussion as there is a working patch set to look
+at. There are propably some corner cases that I didn't get right
+yet. Also, we could even remove the maximum timeout completely as the
+HW no longer limits the watchdog timeouts. This propably needs some
+thinking still and your commenting.
+
+Please review and give feedback.
+
+Patch revision history:
+
+-v5: Re-think the approach to be fully generic. The early_timeout_sec
+  handling is no longer in the driver but in the watchdog core. As a
+  result the core needed to gain knowledge about the watchdog
+  hardware. Appropriate handling is added in the core. The side effect
+  for this is that drivers using the new extensions can be simplified
+  a lot and different kinds of watchdog hardware can be made to
+  behave the same for the user space.
+
+-v4: Binding documentation is now separated completely from the driver
+  patch. The documentation no longer makes any assumptions about how
+  the actual implementation is made, it just describes the actual
+  behavior the driver should implement in order to satisfy the
+  requirement.
+
+- v3: Rename the property to "early-timeout-sec" and use it as a
+  timeout value that stops the timer in the atmel driver after the
+  timeout expires. A watchdog.txt is also introduced for documenting
+  the common watchdog properties, including now this one and
+  "timeout-sec" property.
+
+- v2: Rename the property to "enable-early-reset" as the behavior
+  itself is not atmel specific. This way other drivers are free to
+  implement same behavior with the same property name.
+
+- v1: Propose property name "atmle,no-early-timer" for disabling the
+  timer that keeps the atmel watchdog running until user space opens
+  the device.
+
+
+Timo Kokkonen (4):
+  watchdog: Extend kernel API to know about HW limitations
+  watchdog: Allow watchdog to reset device at early boot
+  devicetree: Document generic watchdog properties
+  watchdog: at91sam9_wdt: Convert to use new watchdog core extensions
+
+ .../devicetree/bindings/watchdog/watchdog.txt      |  20 ++++
+ drivers/watchdog/at91sam9_wdt.c                    |  58 +++--------
+ drivers/watchdog/watchdog_core.c                   | 108 ++++++++++++++++++++-
+ drivers/watchdog/watchdog_dev.c                    |  12 +++
+ include/linux/watchdog.h                           |  24 +++++
+ 5 files changed, 173 insertions(+), 49 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/watchdog.txt
+
 -- 
 2.1.0
