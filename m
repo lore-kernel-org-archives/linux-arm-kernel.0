@@ -1,45 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 11 Apr 2015 00:42:13 +0200
-Subject: [PATCH v2] arm: zynq: Fix system clock with multi_v7_defconfig
-In-Reply-To: <9ba39554-1587-42c6-977e-e4da896cf9c8@BN1BFFO11FD051.protection.gbl>
-References: <550F6EDA.30709@adapteva.com> <7916396.UBTtkSpjzN@wuerfel>
- <9ba39554-1587-42c6-977e-e4da896cf9c8@BN1BFFO11FD051.protection.gbl>
-Message-ID: <6604961.5ESoH44gK3@wuerfel>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 10 Apr 2015 22:51:32 +0000 (UTC)
+Subject: [PATCH v3] ARM: AM43xx: hwmod: add VPFE hwmod entries
+In-Reply-To: <CA+V-a8vx=A8qQh4CtD7tjFwgBmkFPX7sUVuak8e4rH9N39gwfA@mail.gmail.com>
+References: <1422260488-380-1-git-send-email-prabhakar.csengg@gmail.com>
+ <20150128193247.GH2570@ti.com>
+ <alpine.DEB.2.02.1502102310010.3767@utopia.booyaka.com>
+ <CA+V-a8vx=A8qQh4CtD7tjFwgBmkFPX7sUVuak8e4rH9N39gwfA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1504102248590.19540@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 April 2015 15:15:11 S?ren Brinkmann wrote:
-> On Fri, 2015-04-10 at 10:59PM +0200, Arnd Bergmann wrote:
-> > On Friday 10 April 2015 13:41:34 S?ren Brinkmann wrote:
-> > > On Fri, 2015-04-10 at 10:04PM +0200, Arnd Bergmann wrote:
-> > > > I've just had another idea: how about introducing a new compatible string
-> > > > for the global timer that gets used for timers that have their frequency
-> > > > tied to the CPU (alternatively a bool property in that node). This can
-> > > > be checked by the clocksource driver, which will then be able to either
-> > > > skip the device if cpufreq is in use, or implement a more sophisticated
-> > > > workaround.
-> > > 
-> > > If this is the only available clocksource, you'd still want to use it
-> > > though. A bad clocksource is still better than none. But I guess that
-> > > would just mean to lie in the DT.
-> > 
-> > On zynq, you always have a local time, right?
+Hi Prabhakar
+
+On Fri, 10 Apr 2015, Lad, Prabhakar wrote:
+
+> Hi Paul,
 > 
-> Yes, we have the cadence_ttc as clocksource.
+> On Tue, Feb 10, 2015 at 11:10 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Wed, 28 Jan 2015, Benoit Parrot wrote:
+> >
+> >> Suspend/resume is functional with this patch.
+> >>
+> >> Tested-by: Benoit Parrot <bparrot@ti.com>
+> >
+> > Thanks folks, queued for v3.21.
+> >
+> >
+> I see that this patch is not into linux-next yet.
 
-I was thinking of the generic ARM timer (drivers/clocksource/arm_arch_timer.c),
-but I forgot that this was only introduced with Cortex-A7/A15 while Zynq is
-based on the older Cortex-A9.
+thanks for the ping.  This slipped through the cracks here due to the 
+kernel version number change from 3.21 to 4.1 :-(  Sorry about that; I 
+will requeue for either 4.1-rc or 4.2.
 
-> > If we get a platform that has no reliable clocksource, it's probably
-> > time to implement scaling in the global timer driver.
-> 
-> IIRC, the person submitting the driver for the arm_gt said something
-> like that those days: https://lkml.org/lkml/2013/5/8/250
-> No clue what the current status of that is today though.
+Unfortunately I don't have an AM43xx board.  Is suspend/resume broken 
+without this patch?  If so, then v4.1-rc seems like the appropriate 
+target.
 
-I see. Well, I'm not making it your problem, since you have another
-timer to use, but I guess it will get fixed eventually. This kind of
-bug tends to get duplicated across chips from multiple vendors.
 
-	Arnd
+- Paul
