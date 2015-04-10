@@ -1,26 +1,24 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 10 Apr 2015 11:47:07 +0100
-Subject: [RESEND PATCH 4.0-rc7 v20 0/6] irq/arm: Implement
- arch_trigger_all_cpu_backtrace
-In-Reply-To: <1428659511-9590-1-git-send-email-daniel.thompson@linaro.org>
-References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
- <1428659511-9590-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <5527AA2B.306@linaro.org>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Fri, 10 Apr 2015 13:48:52 +0300
+Subject: [PATCH 2/2] arm64: add KASan support
+In-Reply-To: <3164609.kEhR8riVSV@wuerfel>
+References: <1427208544-8232-1-git-send-email-a.ryabinin@samsung.com>
+ <1427208544-8232-3-git-send-email-a.ryabinin@samsung.com>
+ <3164609.kEhR8riVSV@wuerfel>
+Message-ID: <5527AA94.5080803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/15 10:51, Daniel Thompson wrote:
-> ...
-> v20:
->
-> * Fixed bad coding style (removed "if (0 != func())") (Steven Rostedt
->    and Borislav Petkov).
-> * Rebased on v4.0-rc7.
+On 04/09/2015 11:17 PM, Arnd Bergmann wrote:
+> On Tuesday 24 March 2015 17:49:04 Andrey Ryabinin wrote:
+>>  arch/arm64/mm/kasan_init.c           | 211 +++++++++++++++++++++++++++++++++++
+>>
+> 
+> Just one very high-level question: as this code is clearly derived from
+> the x86 version and nontrivial, could we move most of it out of
+> arch/{x86,arm64} into mm/kasan/init.c and have the rest in some header
+> file?
+> 
 
-I just spotted I incorrectly tagged this with RESEND. That was a mistake 
-on my part (forgot to remove it when I bumped the revision to v20). Sorry.
-
-Today's mail is the first time I have posted v20.
-
-
-Daniel.
+I think most of this could be moved out from arch code, but not everything.
+E.g. kasan_init() function is too arch-specific.
