@@ -1,118 +1,146 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 10 Apr 2015 16:53:10 +0200
-Subject: Guarantee udelay(N) spins at least N microseconds
-In-Reply-To: <20150410114253.GA18645@1wt.eu>
-References: <5527B331.5000205@free.fr> <20150410114253.GA18645@1wt.eu>
-Message-ID: <5527E3D6.1010608@free.fr>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 10 Apr 2015 15:59:47 +0100
+Subject: [PATCH v2] KVM: arm/arm64: avoid using kvm_run for in-kernel emulation
+Message-ID: <1428677987-15494-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Willy,
+Our in-kernel VGIC emulation still uses struct kvm_run briefly before
+writing back the emulation result into the guest register.
+Although this particular case looks safe from an exploitation
+perspective, we can save some unneeded copying at the end of the VGIC
+emulation code.
+Replace the usage of struct kvm_run in favour of passing separate
+parameters in io_mem_abort(). Since the write back is now handled
+for all kvm_io_bus users, we can get rid of it in the VGIC.
 
-On 10/04/2015 13:42, Willy Tarreau wrote:
-> Hi,
->
-> On Fri, Apr 10, 2015 at 01:25:37PM +0200, Mason wrote:
->> Hello everyone,
->>
->> This is take 2 of my tiny delay.c patch
->>
->> Problem statement
->>
->> When converting microseconds to timer cycles in __timer_udelay() and
->> __timer_const_udelay(), the result is rounded down(*), which means the
->> system will not spin as long as requested (specifically, between
->> epsilon and 1 cycle shorter).
->>
->> If I understand correctly, most drivers expect udelay(N) to spin for
->> at least N ?s. Is that correct? In that use case, spinning less might
->> introduce subtle heisenbugs.
->>
->>
->> Typical example
->>
->> timer->freq = 90 kHz && HZ = 100
->> (thus UDELAY_MULT = 107374 && ticks_per_jiffy = 900)
->>
->> udelay(10) => __timer_const_udelay(10*107374)
->>             => __timer_delay((1073740*900) >> 30)
->>             => __timer_delay(0)
->>
->> So udelay(10) resolves to no delay at all.
->>
->>
->> (*) 2^41 / 10^6 = 2199023,255552
->> 2199023 < 2^41 / 10^6
->> UDELAY_MULT = 2199023*HZ / 2^11 < 2^30*HZ / 10^6
->>
->> cycles = N * UDELAY_MULT * freq/HZ / 2^30
->>         < N * 2^30*HZ / 10^6 * freq/HZ / 2^30
->>         < N / 10^6 * freq
->>
->>
->> Proposed fix
->>
->> Since results are always rounded down, all we need is to increment
->> the result by 1 to round it up.
->>
->> Would someone ACK the patch below?
->>
->> Regards.
->>
->>
->> Patch against 4.0-rc4
->>
->> diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
->> index 312d43e..3cfbd07 100644
->> --- a/arch/arm/lib/delay.c
->> +++ b/arch/arm/lib/delay.c
->> @@ -66,7 +66,7 @@ static void __timer_const_udelay(unsigned long xloops)
->>   {
->>          unsigned long long loops = xloops;
->>          loops *= arm_delay_ops.ticks_per_jiffy;
->> -       __timer_delay(loops >> UDELAY_SHIFT);
->> +       __timer_delay((loops >> UDELAY_SHIFT) + 1);
->>   }
->
-> If loops is a multiple of 2 ^ UDELAY_SHIFT, then your result is too
-> high by one. The proper way to round by excess is the following :
->
->      __timer_delay((loops + (1 << UDELAY_SHIFT) - 1) >> UDELAY_SHIFT);
->
-> That way it does +1 for every value of loop not an exact multiple
-> of 2^UDELAY_SHIFT.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+This one applies on top of kvmarm/queue.
 
-The important thing to realize is that xloops is already rounded down,
-because we use 2199023 as an approximation of 2^41 / 10^6.
+ arch/arm/kvm/mmio.c |   65 ++++++++++++++++++++++++++++-----------------------
+ virt/kvm/arm/vgic.c |    7 ------
+ 2 files changed, 36 insertions(+), 36 deletions(-)
 
-Thus, even when 'loops' is a multiple of 2^30, we'll want to round up.
-
-Illustration
-
-timer->freq = 100*2^20 && HZ = 100
-(thus UDELAY_MULT = 107374 && ticks_per_jiffy = 2^20)
-
-Suppose udelay(512)
-so we want to spin for 512 / 10^6 * 100*2^20 = 53687,0912 cycles
-i.e. 53688 cycles if we round up.
-
-loops = 512 * 107374 * 2^20 = 53687 * 2^30
-
-If we just add (2^30-1) before shifting by 30, the result comes out
-to 53687, but (loops >> 30) + 1 is closer to what we really want.
-
-One might argue that the difference between 53687 and 53688 is
-lost in the noise and thus irrelevant. I can agree with that.
-
-Which is why I chose the simpler
-
-   __timer_delay((loops >> UDELAY_SHIFT) + 1);
-
-over
-
-   __timer_delay((loops + (1 << UDELAY_SHIFT) - 1) >> UDELAY_SHIFT);
-
-
-Do you disagree with this logic?
-
-Regards.
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 974b1c6..42004cb 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -85,6 +85,30 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
+ 	return data;
+ }
+ 
++static int kvm_writeback_mmio_data(struct kvm_vcpu *vcpu, unsigned int len,
++				   void *data_ptr, gpa_t phys_addr)
++{
++	unsigned long data;
++
++	if (len > sizeof(unsigned long))
++		return -EINVAL;
++
++	data = mmio_read_buf(data_ptr, len);
++
++	if (vcpu->arch.mmio_decode.sign_extend &&
++	    len < sizeof(unsigned long)) {
++		int mask = 1U << ((len * 8) - 1);
++
++		data = (data ^ mask) - mask;
++	}
++
++	trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, phys_addr, data);
++	data = vcpu_data_host_to_guest(vcpu, data, len);
++	*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = data;
++
++	return 0;
++}
++
+ /**
+  * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
+  * @vcpu: The VCPU pointer
+@@ -95,28 +119,10 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
+  */
+ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	unsigned long data;
+-	unsigned int len;
+-	int mask;
+-
+-	if (!run->mmio.is_write) {
+-		len = run->mmio.len;
+-		if (len > sizeof(unsigned long))
+-			return -EINVAL;
+-
+-		data = mmio_read_buf(run->mmio.data, len);
+-
+-		if (vcpu->arch.mmio_decode.sign_extend &&
+-		    len < sizeof(unsigned long)) {
+-			mask = 1U << ((len * 8) - 1);
+-			data = (data ^ mask) - mask;
+-		}
+-
+-		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
+-			       data);
+-		data = vcpu_data_host_to_guest(vcpu, data, len);
+-		*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = data;
+-	}
++	if (!run->mmio.is_write)
++		return kvm_writeback_mmio_data(vcpu, run->mmio.len,
++					       run->mmio.data,
++					       run->mmio.phys_addr);
+ 
+ 	return 0;
+ }
+@@ -201,18 +207,19 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 				      data_buf);
+ 	}
+ 
+-	/* Now prepare kvm_run for the potential return to userland. */
+-	run->mmio.is_write	= is_write;
+-	run->mmio.phys_addr	= fault_ipa;
+-	run->mmio.len		= len;
+-	memcpy(run->mmio.data, data_buf, len);
+-
+ 	if (!ret) {
+ 		/* We handled the access successfully in the kernel. */
+-		kvm_handle_mmio_return(vcpu, run);
++		if (!is_write)
++			kvm_writeback_mmio_data(vcpu, len, data_buf, fault_ipa);
+ 		return 1;
+ 	}
+ 
++	/* Now prepare the kvm_run structure for the return to userland. */
++	run->mmio.is_write	= is_write;
++	run->mmio.phys_addr	= fault_ipa;
++	run->mmio.len		= len;
++	memcpy(run->mmio.data, data_buf, len);
+ 	run->exit_reason	= KVM_EXIT_MMIO;
++
+ 	return 0;
+ }
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index b70174e..e23f50d 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -803,7 +803,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_io_device *iodev = container_of(this,
+ 						    struct vgic_io_device, dev);
+-	struct kvm_run *run = vcpu->run;
+ 	const struct vgic_io_range *range;
+ 	struct kvm_exit_mmio mmio;
+ 	bool updated_state;
+@@ -832,12 +831,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+ 		updated_state = false;
+ 	}
+ 	spin_unlock(&dist->lock);
+-	run->mmio.is_write	= is_write;
+-	run->mmio.len		= len;
+-	run->mmio.phys_addr	= addr;
+-	memcpy(run->mmio.data, val, len);
+-
+-	kvm_handle_mmio_return(vcpu, run);
+ 
+ 	if (updated_state)
+ 		vgic_kick_vcpus(vcpu->kvm);
+-- 
+1.7.9.5
