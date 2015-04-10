@@ -1,36 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Apr 2015 15:53:55 +0200
-Subject: [PATCH v3 11/11] arm64/efi: adapt to relaxed kernel Image placement
- requirements
-In-Reply-To: <1428674035-26603-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1428674035-26603-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1428674035-26603-12-git-send-email-ard.biesheuvel@linaro.org>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 10 Apr 2015 21:55:50 +0800
+Subject: [PATCH] time: Remove nonexistent function prototype.
+Message-ID: <1428674150-1780-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adapts the EFI stub kernel placement to the new relaxed
-requirements, by placing the kernel Image at the highest available
-2 MB offset in physical memory.
+The function clocksource_get_next() was removed in commit 75c5158f70
+(timekeeping: Update clocksource with stop_machine), but the
+prototype is not removed with it. Remove the prototype.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 ---
- arch/arm64/kernel/efi-stub.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/linux/clocksource.h | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-index f5374065ad53..c2141ed8a043 100644
---- a/arch/arm64/kernel/efi-stub.c
-+++ b/arch/arm64/kernel/efi-stub.c
-@@ -28,8 +28,8 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
- 	kernel_size = _edata - _text;
- 	if (*image_addr != (dram_base + TEXT_OFFSET)) {
- 		kernel_memsize = kernel_size + (_end - _edata);
--		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
--				       SZ_2M, reserve_addr);
-+		status = efi_high_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
-+				       SZ_2M, reserve_addr, ULONG_MAX);
- 		if (status != EFI_SUCCESS) {
- 			pr_efi_err(sys_table, "Failed to relocate kernel\n");
- 			return status;
+diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+index 9c78d15..450695d 100644
+--- a/include/linux/clocksource.h
++++ b/include/linux/clocksource.h
+@@ -181,7 +181,6 @@ static inline s64 clocksource_cyc2ns(cycle_t cycles, u32 mult, u32 shift)
+ extern int clocksource_register(struct clocksource*);
+ extern int clocksource_unregister(struct clocksource*);
+ extern void clocksource_touch_watchdog(void);
+-extern struct clocksource* clocksource_get_next(void);
+ extern void clocksource_change_rating(struct clocksource *cs, int rating);
+ extern void clocksource_suspend(void);
+ extern void clocksource_resume(void);
 -- 
-1.8.3.2
+1.8.1.1.dirty
