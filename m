@@ -1,26 +1,84 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 10 Apr 2015 17:59:40 +0200
-Subject: [PATCH v4 0/3] i2c: davinci improvements and fixes
-In-Reply-To: <1428323921-25832-1-git-send-email-grygorii.strashko@linaro.org>
-References: <1428323921-25832-1-git-send-email-grygorii.strashko@linaro.org>
-Message-ID: <20150410155940.GA2408@katana>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 10 Apr 2015 09:02:27 -0700
+Subject: [PATCH v2] arm: zynq: Fix system clock with multi_v7_defconfig
+In-Reply-To: <550F6EDA.30709@adapteva.com>
+References: <550F6EDA.30709@adapteva.com>
+Message-ID: <0fe57162-2295-426f-98ee-e47cd17b925e@BN1AFFO11FD010.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 03:38:38PM +0300, grygorii.strashko at linaro.org wrote:
-> From: Grygorii Strashko <grygorii.strashko@linaro.org>
+On Mon, 2015-03-23 at 02:39AM +0100, Ola Jeppsson wrote:
+> As mentioned in this commit:
+> arm: zynq: Don't use arm_global_timer with cpufreq
+> 61f1fc7e9258a169ac8afb5ddf657a181e60d052
 > 
-> This series converts driver to use I2C bus recovery infrastructure and
-> adds Davinci I2C bus recovery mechanizm based on using ICPFUNC registers.
-> These patches are combination of two patches from Ben Gardiner [1] and
-> Mike Looijmans [2] which i've reworked to use I2C bus recovery infrastructure
+> arm_global_timer depends on the CPU frequency. With cpufreq altering the
+> CPU frequency arm_global_timer will not maintain a stable time base. So
+> arm_global_timer must not be the clocksource when cpufreq is enabled.
+> 
+> The above commit tries to solve this at build time by only selecting
+> CONFIG_ARM_GLOBAL_TIMER if CONFIG_CPU_FREQ is disabled. This is not
+> always sufficient because other machs can also enable
+> CONFIG_ARM_GLOBAL_TIMER.
+> 
+> Therefore: If built with CONFIG_CPU_FREQ and CONFIG_ARM_GLOBAL_TIMER,
+> disable (on Zynq) the arm_global_timer devicetree node at boot before
+> clock sources are initialized. This ensures that arm_global_timer will
+> not be selected clocksource.
+> 
+> Signed-off-by: Ola Jeppsson <ola@adapteva.com>
+> ---
+>  arch/arm/mach-zynq/common.c | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> index c887196..a4666d4 100644
+> --- a/arch/arm/mach-zynq/common.c
+> +++ b/arch/arm/mach-zynq/common.c
+> @@ -148,10 +148,36 @@ out:
+>  	platform_device_register_full(&devinfo);
+>  }
+>  
+> +#if defined(CONFIG_CPU_FREQ) && defined(CONFIG_ARM_GLOBAL_TIMER)
+> +static struct property zynq_disable_arm_global_timer_prop = {
+> +	.name = "status",
+> +	.length = sizeof("disabled"),
+> +	.value = "disabled"
+> +};
+> +
+> +static void __init zynq_disable_arm_global_timer(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-global-timer");
+> +	if (!np)
+> +		return;
+> +
+> +	pr_info("%s: disabling arm_global_timer node\n", __func__);
+> +
+> +	if (of_update_property(np, &zynq_disable_arm_global_timer_prop))
+> +		pr_warn("%s: could not disable arm_global_timer node\n",
+> +			__func__);
+> +}
+> +#endif
 
-Applied to for-next, thanks for keeping at it and providing useful info!
+can we get an empty implementation of the function here and...
+> +
+>  static void __init zynq_timer_init(void)
+>  {
+>  	zynq_early_slcr_init();
+>  
+> +#if defined(CONFIG_CPU_FREQ) && defined(CONFIG_ARM_GLOBAL_TIMER)
+> +	zynq_disable_arm_global_timer();
+> +#endif
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150410/aed38f5b/attachment.sig>
+remove #ifdefs down here, please?
+
+>  	zynq_clock_init();
+>  	of_clk_init(NULL);
+>  	clocksource_of_init();
+> -- 
+> 2.3.3
+> 
+
+S?ren
