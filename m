@@ -1,53 +1,53 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 10 Apr 2015 10:24:46 -0500
-Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
-In-Reply-To: <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
-References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
-Message-ID: <493B15F8-0EBE-4633-9604-671EF403F36E@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 10 Apr 2015 16:25:19 +0100
+Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
+In-Reply-To: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
+References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <5527EB5F.6080500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/04/15 16:17, Andre Przywara wrote:
+> When userland injects a SPI via the KVM_IRQ_LINE ioctl we currently
+> only check it against a fixed limit, which historically is set
+> to 127. With the new dynamic IRQ allocation the effective limit may
+> actually be smaller (64).
+> So when now a malicious or buggy userland injects a SPI in that
+> range, we spill over on our VGIC bitmaps and bytemaps memory.
+> I could trigger a host kernel NULL pointer dereference with current
+> mainline by injecting some bogus IRQ number from a hacked kvmtool:
+> -----------------
+> ....
+> DEBUG: kvm_vgic_inject_irq(kvm, cpu=0, irq=114, level=1)
+> DEBUG: vgic_update_irq_pending(kvm, cpu=0, irq=114, level=1)
+> DEBUG: IRQ #114 still in the game, writing to bytemap now...
+> Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> pgd = ffffffc07652e000
+> [00000000] *pgd=00000000f658b003, *pud=00000000f658b003, *pmd=0000000000000000
+> Internal error: Oops: 96000006 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 1 PID: 1053 Comm: lkvm-msi-irqinj Not tainted 4.0.0-rc7+ #3027
+> Hardware name: FVP Base (DT)
+> task: ffffffc0774e9680 ti: ffffffc0765a8000 task.ti: ffffffc0765a8000
+> PC is at kvm_vgic_inject_irq+0x234/0x310
+> LR is at kvm_vgic_inject_irq+0x30c/0x310
+> pc : [<ffffffc0000ae0a8>] lr : [<ffffffc0000ae180>] pstate: 80000145
+> .....
+> 
+> So this patch fixes this by checking the SPI number against the
+> actual limit. Also we remove the former legacy hard limit of
+> 127 in the ioctl code.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> CC: <stable@vger.kernel.org> # 4.0, 3.19, 3.18
 
-On Apr 10, 2015, at 5:05 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> On Thu, Apr 09, 2015 at 12:37:06PM -0500, Kumar Gala wrote:
->> This patch set adds support for SMP boot on the MSM8x16 family of Qualcomm SoCs.
->> 
->> To support SMP on the MSM8x16 SoCs we need to add ARMv8/64-bit SCM interfaces to
->> setup the boot/release addresses for the secondary CPUs.  In addition we need
->> a uniquie set of cpu ops.  I'm aware the desired methods for booting secondary
->> CPUs is either via spintable or PSCI.  However, these SoCs are shipping with a
->> firmware that does not support those methods.
-> 
-> And the reason is? Some guesses:
-> 
-> a) QC doesn't think boot interface (and cpuidle) standardisation is
->   worth the effort (to put it nicely)
-> b) The hardware was available before we even mentioned PSCI
-> c) PSCI is not suitable for the QC's SCM interface
-> d) Any combination of the above
-> 
-> I strongly suspect it's point (a). Should we expect future QC hardware
-> to do the same?
-> 
-> You could argue the reason was (b), though we've been discussing PSCI
-> for at least two years and, according to QC press releases, MSM8916
-> started sampling in 2014.
-> 
-> The only valid reason is (c) and if that's the case, I would expect a
-> proposal for a new firmware interface protocol (it could be PSCI-based),
-> well documented, that can be shared with others that may encounter the
-> same shortcomings.
-> 
-> -- 
-> Catalin
+It is getting really tight for 4.0, but hopefully I can squeeze it in a
+second pull request together with the missing barrier on 32bit.
 
-Does it matter?  I?ve always felt the kernel was a place of inclusion.  Qualcomm choose for whatever reason to not use PSCI or spin table.  You don?t like it, I might not like it, but it is what it is.
+Thanks,
 
-- k
-
+	M.
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jazz is not dead. It just smells funny...
