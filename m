@@ -1,71 +1,63 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 10 Apr 2015 19:32:31 +0100
-Subject: [PATCH v2 09/12] ARM: dts: apq8064: Add USB OTG support for CM
- QS-600
-In-Reply-To: <552807CF.4070600@codeaurora.org>
+Date: Fri, 10 Apr 2015 19:33:45 +0100
+Subject: [PATCH v2 05/12] ARM: dts: apq8064: Add SATA controller support.
+In-Reply-To: <5528076B.1010808@codeaurora.org>
 References: <1428669187-10775-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1428669293-11165-1-git-send-email-srinivas.kandagatla@linaro.org>
- <552807CF.4070600@codeaurora.org>
-Message-ID: <5528173F.6000509@linaro.org>
+ <1428669263-10990-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5528076B.1010808@codeaurora.org>
+Message-ID: <55281789.2060402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 10/04/15 18:26, Stephen Boyd wrote:
+On 10/04/15 18:24, Stephen Boyd wrote:
 > On 04/10/15 05:34, Srinivas Kandagatla wrote:
->> From: Nicolas Dechesne <nicolas.dechesne@linaro.org>
->>
->> This patch adds USB OTG support on USB1 for Compulab QS-600 Board.
+>> This patch adds AHCI based SATA controller support to APQ8064.
+>> Tested on IFC6410 board.
 >>
 >> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> [Srinivas Kandagatla: fixed up regulators and status properties]
->> Signed-off-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
 >> ---
->>   arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 17 +++++++++++++++++
->>   1 file changed, 17 insertions(+)
+>>   arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |  9 ++++++++
+>>   arch/arm/boot/dts/qcom-apq8064.dtsi        | 35 ++++++++++++++++++++++++++++++
+>>   2 files changed, 44 insertions(+)
 >>
->> diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
->> index fc69931..d353694 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
->> +++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
->> @@ -101,6 +101,14 @@
+>> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> index 122bf34..c9c9c5e 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> @@ -116,6 +116,15 @@
 >>   			};
 >>   		};
 >>
->> +		/* OTG */
->> +		usb1_phy:phy at 12500000 {
+>> +		sata_phy0: sata-phy at 1b400000{
 >
-> Space after that ':' please.
+> Space before '{' please.
+Yeo, Will fix it in next version.
 >
-Yep, I will fix it in next version.
->> +			status		= "okay";
->> +			vddcx-supply	= <&pm8921_s3>;
->> +			v3p3-supply	= <&pm8921_l3>;
->> +			v1p8-supply	= <&pm8921_l4>;
+>> +			status = "okay";
 >> +		};
 >> +
->>   		usb3_phy:phy at 12520000 {
+>> +		sata0: sata at 29000000 {
+>> +			status		= "okay";
+>> +			target-supply	= <&pm8921_s4>;
+>> +		};
+>> +
+>>   		/* OTG */
+>>   		usb1_phy: phy at 12500000 {
 >>   			status		= "okay";
->>   			vddcx-supply	= <&pm8921_s3>;
->> @@ -115,6 +123,15 @@
->>   			v1p8-supply	= <&pm8921_l23>;
+>> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+>> index 5aac9a5..56cc65e 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+>> @@ -379,6 +379,41 @@
+>>   			usb-phy		= <&usb4_phy>;
 >>   		};
 >>
->> +		gadget1:gadget at 12500000 {
->> +			status = "ok";
->> +		};
->> +
->> +		/* OTG */
->> +		usb1: usb at 12500000 {
+>> +		sata_phy0: sata-phy at 1b400000{
 >
-> This one is good.
->
->> +			status = "ok";
->> +		};
->> +
->>   		usb3: usb at 12520000 {
->>   			status = "okay";
->>   		};
->
+> Space before '{' please. Also I wonder if it should just be called
+> phy at 1b400000 because phy is more standard than sata-phy.
+Make sense, I will fix it in next version.
+
 >
