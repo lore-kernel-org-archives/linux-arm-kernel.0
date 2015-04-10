@@ -1,70 +1,281 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 10 Apr 2015 14:44:29 +0200
-Subject: [PATCH 5/6] drm/armada: gem: Use drm_clflush_*() functions
-In-Reply-To: <20150410120802.GE12732@n2100.arm.linux.org.uk>
-References: <1428590049-20357-1-git-send-email-thierry.reding@gmail.com>
- <1428590049-20357-5-git-send-email-thierry.reding@gmail.com>
- <20150410120802.GE12732@n2100.arm.linux.org.uk>
-Message-ID: <20150410124427.GA32473@ulmo.nvidia.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 10 Apr 2015 14:54:16 +0200
+Subject: [PATCH v2 10/10] KVM: arm64: add trace points for guest_debug
+ debug
+In-Reply-To: <1427814488-28467-11-git-send-email-alex.bennee@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-11-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150410125415.GC3227@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 01:08:02PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 09, 2015 at 04:34:08PM +0200, Thierry Reding wrote:
-> > diff --git a/drivers/gpu/drm/armada/armada_gem.c b/drivers/gpu/drm/armada/armada_gem.c
-> > index 580e10acaa3a..c2d4414031ab 100644
-> > --- a/drivers/gpu/drm/armada/armada_gem.c
-> > +++ b/drivers/gpu/drm/armada/armada_gem.c
-> > @@ -453,19 +453,14 @@ armada_gem_prime_map_dma_buf(struct dma_buf_attachment *attach,
-> >  			sg_set_page(sg, page, PAGE_SIZE, 0);
-> >  		}
-> >  
-> > -		if (dma_map_sg(attach->dev, sgt->sgl, sgt->nents, dir) == 0) {
-> > -			num = sgt->nents;
-> > -			goto release;
-> > -		}
-> > +		drm_clflush_sg(sgt);
-> >  	} else if (dobj->page) {
-> >  		/* Single contiguous page */
-> >  		if (sg_alloc_table(sgt, 1, GFP_KERNEL))
-> >  			goto free_sgt;
-> >  
-> >  		sg_set_page(sgt->sgl, dobj->page, dobj->obj.size, 0);
-> > -
-> > -		if (dma_map_sg(attach->dev, sgt->sgl, sgt->nents, dir) == 0)
-> > -			goto free_table;
-> > +		drm_clflush_sg(sgt);
-> >  	} else if (dobj->linear) {
-> >  		/* Single contiguous physical region - no struct page */
-> >  		if (sg_alloc_table(sgt, 1, GFP_KERNEL))
-> > @@ -480,7 +475,6 @@ armada_gem_prime_map_dma_buf(struct dma_buf_attachment *attach,
-> >   release:
-> >  	for_each_sg(sgt->sgl, sg, num, i)
-> >  		page_cache_release(sg_page(sg));
-> > - free_table:
-> >  	sg_free_table(sgt);
-> >   free_sgt:
-> >  	kfree(sgt);
-> > @@ -494,9 +488,6 @@ static void armada_gem_prime_unmap_dma_buf(struct dma_buf_attachment *attach,
-> >  	struct armada_gem_object *dobj = drm_to_armada_gem(obj);
-> >  	int i;
-> >  
-> > -	if (!dobj->linear)
-> > -		dma_unmap_sg(attach->dev, sgt->sgl, sgt->nents, dir);
-> > -
+
+$SUBJECT | sed s/guest_debug debug/guest debug/ ?
+
+On Tue, Mar 31, 2015 at 04:08:08PM +0100, Alex Benn?e wrote:
+> This includes trace points for:
+>   kvm_arch_setup_guest_debug
+>   kvm_arch_clear_guest_debug
+>   kvm_handle_guest_debug
 > 
-> I'm really wonder where this is the right thing to do.
+> I've also added some generic register setting trace events so I can
+> watch the register values being built up over time. The local
+> dump_dbg_regs() function dumps all the HW BKPT and WPT registers.
+> 
+> I've also added a #define trace_dreg to shorten some lines.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
+> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> index 638c111..7c96288 100644
+> --- a/arch/arm64/kvm/debug.c
+> +++ b/arch/arm64/kvm/debug.c
+> @@ -25,12 +25,37 @@
+>  #include <asm/kvm_host.h>
+>  #include <asm/kvm_emulate.h>
+>  
+> +#include "trace.h"
+> +
+> +#define trace_dreg(name, value) trace_kvm_arch_setup_debug_reg32(name, value)
 
-I think it isn't the right thing to do in this case indeed. Both Tegra
-and MSM were using this pattern to make sure that caches are invalidated
-upon allocation of memory from shmemfs, but I now realize that for the
-Armada driver this isn't the case.
+I don't think this name shortener should be necessary
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150410/629c796e/attachment.sig>
+> +
+>  /* These are the bits of MDSCR_EL1 we may mess with */
+>  #define MDSCR_EL1_DEBUG_BITS	(DBG_MDSCR_SS | \
+>  				DBG_MDSCR_KDE | \
+>  				DBG_MDSCR_MDE)
+>  
+>  /**
+> + * dump_dbg_regs - simple debug helper
+> + *
+> + * This provides a simple helper to dump the HW debug registers
+> + */
+> +static void dump_dbg_regs(struct kvm_vcpu *vcpu, int nb, int nw)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < nb; i++) {
+> +		trace_printk("bkpt%d: 0x%08x:0x%llx\n", i,
+> +			(u32) vcpu_sys_reg(vcpu, DBGBCR0_EL1 + i),
+> +			vcpu_sys_reg(vcpu, DBGBVR0_EL1 + i));
+> +	}
+> +	for (i = 0; i < nb; i++) {
+> +		trace_printk("wtpt%d: 0x%08x:0x%llx\n", i,
+> +			(u32) vcpu_sys_reg(vcpu, DBGWCR0_EL1 + i),
+> +			vcpu_sys_reg(vcpu, DBGWVR0_EL1 + i));
+> +	}
+> +}
+> +
+> +/**
+>   * kvm_arch_setup_debug - set-up debug related stuff
+>   *
+>   * @vcpu:	the vcpu pointer
+> @@ -52,9 +77,13 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
+>  {
+>  	bool trap_debug = false;
+>  
+> +	trace_kvm_arch_setup_debug(vcpu->guest_debug);
+> +
+>  	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM | MDCR_EL2_TPMCR);
+>  	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TDRA | MDCR_EL2_TDOSA);
+>  
+> +	trace_kvm_arch_setup_debug_reg32("MDCR_EL2", vcpu->arch.mdcr_el2);
+
+Not using your trace_dreg here? I guess you didn't think it was
+necessary either.
+
+> +
+>  	/*
+>  	 * If we are not treating debug registers are dirty we need
+>  	 * to trap if the guest starts accessing them.
+> @@ -66,6 +95,8 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
+>  	if (vcpu->guest_debug) {
+>  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
+>  
+> +		trace_dreg("MDCR_EL2", vcpu->arch.mdcr_el2);
+> +
+>  		/* Save pstate/mdscr */
+>  		vcpu_debug_saved_reg(vcpu, pstate_ss_bit) =
+>  			*vcpu_cpsr(vcpu) & DBG_SPSR_SS;
+> @@ -73,6 +104,11 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
+>  		vcpu_debug_saved_reg(vcpu, mdscr_el1) =
+>  			vcpu_sys_reg(vcpu, MDSCR_EL1);
+>  
+> +		trace_dreg("Save: PSTATE.SS",
+> +			vcpu_debug_saved_reg(vcpu, pstate_ss_bit));
+> +		trace_dreg("Save: MDSCR",
+> +			vcpu_debug_saved_reg(vcpu, mdscr_el1));
+> +
+>  		/*
+>  		 * Single Step (ARM ARM D2.12.3 The software step state
+>  		 * machine)
+> @@ -88,6 +124,8 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
+>  			*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
+>  			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
+>  		}
+> +		trace_dreg("SPSR_EL2", *vcpu_cpsr(vcpu));
+> +		trace_dreg("MDSCR_EL1", vcpu_sys_reg(vcpu, MDSCR_EL1));
+>  
+>  		/*
+>  		 * HW Break/Watch points
+> @@ -136,6 +174,9 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
+>  			       &host->dbg_wvr,
+>  			       sizeof(__u64)*nw);
+>  
+> +			if (trace_kvm_arch_setup_debug_reg32_enabled())
+> +				dump_dbg_regs(vcpu, nb, nw);
+> +
+>  			/* Make sure hyp.S copies them in/out */
+>  			vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+>  			/* Also track guest changes */
+> @@ -147,15 +188,24 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
+>  		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
+>  	}
+>  
+> +	trace_kvm_arch_setup_debug_reg32("MDCR_EL2", vcpu->arch.mdcr_el2);
+> +	trace_kvm_arch_setup_debug_reg32("MDSCR_EL1",
+> +					vcpu_sys_reg(vcpu, MDSCR_EL1));
+> +
+> +
+>  	/* Trap debug register access? */
+>  	if (trap_debug)
+>  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
+>  	else
+>  		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
+> +
+> +	trace_kvm_arch_setup_debug_reg32("MDCR_EL2", vcpu->arch.mdcr_el2);
+>  }
+>  
+>  void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
+>  {
+> +	trace_kvm_arch_clear_debug(vcpu->guest_debug);
+> +
+>  	if (vcpu->guest_debug) {
+>  		/* Restore pstate/mdscr bits we may have messed with */
+>  		*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
+> @@ -164,6 +214,8 @@ void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
+>  		vcpu_sys_reg(vcpu, MDSCR_EL1) =
+>  			vcpu_debug_saved_reg(vcpu, mdscr_el1);
+>  
+> +		trace_dreg("SPSR_EL2", *vcpu_cpsr(vcpu));
+> +		trace_dreg("MDSCR_EL1", vcpu_sys_reg(vcpu, MDSCR_EL1));
+>  		/*
+>  		 * If we were using HW debug we need to restore the
+>  		 * values the guest had set them up with
+> @@ -188,6 +240,10 @@ void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
+>  			memcpy(&vcpu_sys_reg(vcpu, DBGWVR0_EL1),
+>  			       &regs->dbg_wvr,
+>  			       sizeof(__u64)*nw);
+> +
+> +			if (trace_kvm_arch_setup_debug_reg32_enabled())
+> +				dump_dbg_regs(vcpu, nb, nw);
+> +
+>  		}
+>  	}
+>  }
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index 460a1aa..c6cc69a 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -97,6 +97,8 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+>  	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+>  
+> +	trace_kvm_handle_guest_debug(*vcpu_pc(vcpu), hsr);
+> +
+>  	run->exit_reason = KVM_EXIT_DEBUG;
+>  	run->debug.arch.hsr = hsr;
+>  
+> diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
+> index 157416e9..dffdb49 100644
+> --- a/arch/arm64/kvm/trace.h
+> +++ b/arch/arm64/kvm/trace.h
+> @@ -44,6 +44,72 @@ TRACE_EVENT(kvm_hvc_arm64,
+>  		  __entry->vcpu_pc, __entry->r0, __entry->imm)
+>  );
+>  
+> +TRACE_EVENT(kvm_handle_guest_debug,
+> +	TP_PROTO(unsigned long vcpu_pc, u32 hsr),
+> +	TP_ARGS(vcpu_pc, hsr),
+> +
+> +	TP_STRUCT__entry(
+> +		__field(unsigned long,	vcpu_pc)
+> +		__field(u32,		hsr)
+> +	),
+> +
+> +	TP_fast_assign(
+> +		__entry->vcpu_pc = vcpu_pc;
+> +		__entry->hsr = hsr;
+> +	),
+> +
+> +	TP_printk("debug exception at 0x%08lx (HSR: 0x%08x)",
+> +		__entry->vcpu_pc, __entry->hsr)
+> +);
+> +
+> +
+> +TRACE_EVENT(kvm_arch_setup_debug,
+> +	TP_PROTO(__u32 guest_debug),
+> +	TP_ARGS(guest_debug),
+> +
+> +	TP_STRUCT__entry(
+> +		__field(__u32, guest_debug)
+> +	),
+> +
+> +	TP_fast_assign(
+> +		__entry->guest_debug = guest_debug;
+> +	),
+> +
+> +	TP_printk("flags: 0x%08x", __entry->guest_debug)
+> +);
+> +
+> +TRACE_EVENT(kvm_arch_clear_debug,
+> +	TP_PROTO(__u32 guest_debug),
+> +	TP_ARGS(guest_debug),
+> +
+> +	TP_STRUCT__entry(
+> +		__field(__u32, guest_debug)
+> +	),
+> +
+> +	TP_fast_assign(
+> +		__entry->guest_debug = guest_debug;
+> +	),
+> +
+> +	TP_printk("flags: 0x%08x", __entry->guest_debug)
+> +);
+> +
+> +TRACE_EVENT(kvm_arch_setup_debug_reg32,
+> +	TP_PROTO(const char *name, __u32 value),
+> +	TP_ARGS(name, value),
+> +
+> +	TP_STRUCT__entry(
+> +		__field(const char *, name)
+> +		__field(__u32, value)
+> +	),
+> +
+> +	TP_fast_assign(
+> +		__entry->name = name;
+> +		__entry->value = value;
+> +	),
+> +
+> +	TP_printk("%s now 0x%08x", __entry->name, __entry->value)
+> +);
+> +
+>  #endif /* _TRACE_ARM64_KVM_H */
+>  
+>  #undef TRACE_INCLUDE_PATH
+> -- 
+> 2.3.4
+> 
+
+This looks like it would be super noisy. I'm sure that's nice for
+developing/debugging, but can't we reduce the, now debugged, version
+down to just one trace point per unique, and interesting, path? If you
+have several variables you want to see, then maybe they can all be
+on the same line.
+
+Also, I'm not sure about the necessity of the dump_dbg_regs function,
+but I think you should be able to embed it in the trace event code
+using __print_array
+
+drew
