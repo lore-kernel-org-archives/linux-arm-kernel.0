@@ -1,34 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Apr 2015 21:42:21 +0100
-Subject: Guarantee udelay(N) spins at least N microseconds
-In-Reply-To: <55282C1F.3000600@free.fr>
-References: <5527B331.5000205@free.fr>
- <20150410114415.GC12732@n2100.arm.linux.org.uk>
- <5527C501.2040808@free.fr>
- <20150410150607.GG12732@n2100.arm.linux.org.uk>
- <5527EC90.9050900@free.fr>
- <20150410160817.GH12732@n2100.arm.linux.org.uk>
- <55282C1F.3000600@free.fr>
-Message-ID: <20150410204221.GI12732@n2100.arm.linux.org.uk>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 10 Apr 2015 21:42:44 +0100
+Subject: [PATCH v3 01/11] ARM: dts: apq8064: add RPM regulators support
+In-Reply-To: <1428698491-11881-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1428698491-11881-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1428698564-11938-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 10:01:35PM +0200, Mason wrote:
-> There is, however, an important difference between loop-based
-> delays and timer-based delays; CPU frequencies typically fall
-> in the 50-5000 MHz range, while timer frequencies typically
-> span tens of kHz up to hundreds of MHz. For example, 90 kHz
-> is sometimes provided in multimedia systems (MPEG TS).
+This patch adds rpm node to apq8064 dt as rpm would be used by other
+devices for regulator support.
 
-Why would you want to use such a slowly clocked counter for something
-which is supposed to be able to produce delays in the micro-second and
-potentially the nanosecond range?
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-get_cycles(), which is what the timer based delay is based upon, is
-supposed to be a _high resolution counter_, preferably running at
-the same kind of speeds as the CPU, though with a fixed clock rate.
-It most definitely is not supposed to be in the kHz range.
-
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 6c15112..19629c9 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -276,6 +276,30 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
++		l2cc: clock-controller at 2011000 {
++			compatible	= "syscon";
++			reg		= <0x2011000 0x1000>;
++		};
++
++		rpm at 108000 {
++			compatible	= "qcom,rpm-apq8064";
++			reg		= <0x108000 0x1000>;
++			qcom,ipc	= <&l2cc 0x8 2>;
++
++			interrupts	= <GIC_SPI 19 IRQ_TYPE_EDGE_RISING>,
++					  <GIC_SPI 21 IRQ_TYPE_EDGE_RISING>,
++					  <GIC_SPI 22 IRQ_TYPE_EDGE_RISING>;
++			interrupt-names	= "ack", "err", "wakeup";
++
++			regulators {
++				compatible = "qcom,rpm-pm8921-regulators";
++
++				pm8921_hdmi_switch: hdmi-switch {
++					bias-pull-down;
++				};
++			};
++		};
++
+ 		/* Temporary fixed regulator */
+ 		vsdcc_fixed: vsdcc-regulator {
+ 			compatible = "regulator-fixed";
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
