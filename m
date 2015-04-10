@@ -1,43 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Apr 2015 23:53:53 +0200
-Subject: [PATCH] Add support for CONFIG_ARM64_DMA_USE_IOMMU.
-In-Reply-To: <CAOHikRC4w7N8DFh0WyjzUDuscmwP6xYeSDBF404P4RMYcCip2g@mail.gmail.com>
-References: <1422379495-10268-1-git-send-email-stripathi@apm.com>
- <201503220231.40375.arnd@arndb.de>
- <CAOHikRC4w7N8DFh0WyjzUDuscmwP6xYeSDBF404P4RMYcCip2g@mail.gmail.com>
-Message-ID: <2336087.ba2dFNn0Gn@wuerfel>
+Date: Fri, 10 Apr 2015 23:58:24 +0200
+Subject: [PATCH] iommu: rockchip: fix build without CONFIG_OF
+Message-ID: <3138014.xYAj3FssJ8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 March 2015 21:28:45 Suman Tripathi wrote:
-> > My first suggestion would be to separate this from IOMMU support
-> > completely
-> > as you don't really have an IOMMU. The easiest way to deal with hardware
-> > like this is to use swiotlb with a fixed mapping. This is also the only
-> > way to deal with any devices that may have multiple outstanding DMAs
-> > (PCI, SATA, USB, ...).
-> I guess you are talking about the swiotlb force idea ?  That's really
-> good but I think we should make configuring  swiotlb force per device
-> otherwise it applies to all devices ??
+The rockchip iommu driver references its of_device_id table
+from the init function, which fails to build when the table
+is undefined:
 
-Sorry for the late reply, I was still catching up on email after
-my vacation.
+iommu/rockchip-iommu.c: In function 'rk_iommu_init':
+iommu/rockchip-iommu.c:1029:35: error: 'rk_iommu_dt_ids' undeclared (first use in this function)
+  np = of_find_matching_node(NULL, rk_iommu_dt_ids);
 
-The swiotlb is automatically enabled for all devices that have a DMA mask
-smaller than the available memory. There is no need to force that at
-all. All you have to do is to put devices that have the same limitation
-regarding their DMA space on a common device node, and set the dma-ranges
-property of the bus node to correctly describe the mapping.
+This removes the #ifdef and the corresponding of_match_ptr wrapper
+to make it build both with CONFIG_OF enabled or disabled.
 
-For devices that have a real iommu, or that are on a 64-bit DMA capable
-bus, you model that bus correctly in DT and set the dma-ranges to
-cover that address space.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 425061b0f5074 ("iommu/rockchip: Play nice in multi-platform builds")
 
-The default dma_mask is 32-bit wide, so for devices that have exactly
-32-bit (4GB) visibility into physical memory, you don't actually need
-to do anything. Only devices that you want to access a larger address
-space have to be on a bus node with the larger dma-ranges, and they
-need to call dma_set_mask_and_coherent() with the mask that the device
-supports itself (which may be more than the bus can handle).
-
-	Arnd
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index 4015560bf486..cab214544237 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -1004,20 +1004,18 @@ static int rk_iommu_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_OF
+ static const struct of_device_id rk_iommu_dt_ids[] = {
+ 	{ .compatible = "rockchip,iommu" },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, rk_iommu_dt_ids);
+-#endif
+ 
+ static struct platform_driver rk_iommu_driver = {
+ 	.probe = rk_iommu_probe,
+ 	.remove = rk_iommu_remove,
+ 	.driver = {
+ 		   .name = "rk_iommu",
+-		   .of_match_table = of_match_ptr(rk_iommu_dt_ids),
++		   .of_match_table = rk_iommu_dt_ids,
+ 	},
+ };
+ 
