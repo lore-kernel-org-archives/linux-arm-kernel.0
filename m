@@ -1,103 +1,127 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 10 Apr 2015 17:30:24 +0200
-Subject: Guarantee udelay(N) spins at least N microseconds
-In-Reply-To: <20150410150607.GG12732@n2100.arm.linux.org.uk>
-References: <5527B331.5000205@free.fr>
- <20150410114415.GC12732@n2100.arm.linux.org.uk> <5527C501.2040808@free.fr>
- <20150410150607.GG12732@n2100.arm.linux.org.uk>
-Message-ID: <5527EC90.9050900@free.fr>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 10 Apr 2015 16:37:51 +0100
+Subject: [RFC] mixture of cleanups to cache-v7.S
+In-Reply-To: <20150410142655.GF12732@n2100.arm.linux.org.uk>
+References: <20150402224947.GX24899@n2100.arm.linux.org.uk>
+ <20150410132723.GD6854@e104818-lin.cambridge.arm.com>
+ <20150410141105.GA16979@red-moon>
+ <20150410142655.GF12732@n2100.arm.linux.org.uk>
+Message-ID: <20150410153751.GB17828@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Fri, Apr 10, 2015 at 03:26:55PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Apr 10, 2015 at 03:11:05PM +0100, Lorenzo Pieralisi wrote:
+> > On Fri, Apr 10, 2015 at 02:27:42PM +0100, Catalin Marinas wrote:
+> > > As for the v7_flush_dcache_all always having the barriers, I guess
+> > > no-one is expecting a v7 CPU without caches.
+> > 
+> > Well, yes, actually I'd rather remove the barriers if LoC is 0 instead
+> > of adding them to LoUIS API in case there is nothing to flush, I do not
+> > think that's a problem in the first place.
+> 
+> Maybe you should read through the patch set before declaring there to
+> be no problem.
+> 
+> There may be no problem as the code stands right now, and we can bury
+> our heads in the sand and continue as through there's no problem what
+> so ever, and we'd be right to, but...
+> 
+> We need to have 643719 enabled for all platforms.  Right now, the code
+> in cache-v7 surrounding that workaround is pretty crap - enabling the
+> option places the workaround into the execution path whether it applies
+> or not.
+> 
+> What this patch series does is rearrange stuff to avoid the workaround
+> where it's possible to do so, while cleaning up a lot of the crap coding
+> that was done here in the first place.
+> 
+> In doing this, I spotted that if we _solve_ the above issue by making
+> both functions behave in the same way, we get more common code paths.
 
-I appreciate (very much so) that you spend time replying to me,
-but I also sense a lot of animosity, and I don't know what I've
-done wrong to deserve it :-(
+I certainly agree it is a good clean-up, I was referring to barriers and
+the barrier semantics.
 
-On 10/04/2015 17:06, Russell King - ARM Linux wrote:
-> On Fri, Apr 10, 2015 at 02:41:37PM +0200, Mason wrote:
->> On 10/04/2015 13:44, Russell King - ARM Linux wrote:
->>> On Fri, Apr 10, 2015 at 01:25:37PM +0200, Mason wrote:
->>>> If I understand correctly, most drivers expect udelay(N) to spin for
->>>> at least N ?s. Is that correct? In that use case, spinning less might
->>>> introduce subtle heisenbugs.
->>>
->>> We've never guaranteed this.
->>>
->>> The fact is that udelay() can delay for _approximately_ the time you
->>> ask for - it might be slightly shorter, or it could be much longer
->>> than you expect.
->>
->> OK, but asking for 10 ?s and spinning 0 is a problem, right?
->
-> Potentially.
->
->>> On most UP implementations using the software loop
->>> it will typically be around 1% slower than requested.
->>
->> Please correct any misconception, it seems to me that typical
->> driver writers, reading "operation X takes 10 ?s to complete"
->> will write udelay(10); (if they want to spin-wait)
->
-> Arguments do not matter here, sorry.  What I said above is the way it
-> behaves, period.  It's not for discussion.
->
-> It may interest you that I discussed this issue with Linus, and Linus
-> also said that it _isn't_ a problem and it _isn't_ something we care
-> to fix.
->
-> So, like it or not, we're stuck with udelay(10) being possible to
-> delay by 9.99us instead of 10us.
->
-> Where the inaccuracy comes from is entirely down to the way we calculate
-> loops_per_jiffy - this is the number of loop cycles between two timer
-> interrupts - but this does _not_ take account of the time to execute a
-> timer interrupt.
->
-> So, loops_per_jiffy is the number of loop cycles between two timer
-> interrupts minus the time taken to service the timer interrupt.
->
-> And what this means is that udelay(n) where 'n' is less than the
-> period between two timer interrupts /will/ be, and is /expected to
-> be/ potentially shorter than the requested period.
+> So, while the issue doesn't _cause_ a problem, fixing the disparity
+> between the two functions is worth it just to be able to have a
+> flush_levels implementation which behaves the same no matter how it's
+> called - one which always has a dmb before it, and (possibly) always
+> the dsb+isb afterwards - or only has the dsb+isb afterwards if it's
+> done some cache flushing.
 
-You've made it clear how loop-based delays are implemented; and also
-that loop-based delays are typically 1% shorter than requested.
-(Thanks for the overview, by the way.) Please note that I haven't
-touched to the loop-based code, I'm only discussing the timer-based
-code.
+In actual facts the latter is what's required, for practical
+purposes the former solution is acceptable to fix the disparity.
 
-> There's no getting away from that, we can't estimate how long the timer
-> interrupt takes to handle without the use of an external timer, and if
-> we've got an external timer, we might as well use it for all delays.
+> Look at the resulting code after applying all the patches, and I'm sure
+> you'd agree that it's a lot better than the crap which is currently
+> there.  To save you having to look up the files and apply the patches,
+> here are the old and new versions:
+> 
+> ============= old ====================
+> ENTRY(v7_flush_dcache_louis)
+>         dmb                                     @ ensure ordering with previous memory accesses
+>         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+>         ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
+>         ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
+> #ifdef CONFIG_ARM_ERRATA_643719
+>         ALT_SMP(mrceq   p15, 0, r2, c0, c0, 0)  @ read main ID register
+>         ALT_UP(reteq    lr)                     @ LoUU is zero, so nothing to do        ldreq   r1, =0x410fc090                 @ ID of ARM Cortex A9 r0p?
+>         biceq   r2, r2, #0x0000000f             @ clear minor revision number
+>         teqeq   r2, r1                          @ test for errata affected core and if so...
+>         orreqs  r3, #(1 << 21)                  @   fix LoUIS value (and set flags state to 'ne')
+> #endif
+>         ALT_SMP(mov     r3, r3, lsr #20)        @ r3 = LoUIS * 2
+>         ALT_UP(mov      r3, r3, lsr #26)        @ r3 = LoUU * 2
+>         reteq   lr                              @ return if level == 0
+>         mov     r10, #0                         @ r10 (starting level) = 0
+>         b       flush_levels                    @ start flushing cache levels
+> 
+> ENTRY(v7_flush_dcache_all)
+>         dmb                                     @ ensure ordering with previous memory accesses
+>         mrc     p15, 1, r0, c0, c0, 1           @ read clidr
+>         ands    r3, r0, #0x7000000              @ extract loc from clidr
+>         mov     r3, r3, lsr #23                 @ left align loc bit field
+>         beq     finished                        @ if loc is 0, then no need to clean
+>         mov     r10, #0                         @ start clean at cache level 0
+> flush_levels:
+>         add     r2, r10, r10, lsr #1            @ work out 3x current cache level
+>         mov     r1, r0, lsr r2                  @ extract cache type bits from clidr
+> ...
+> ============= new ====================
+> ENTRY(v7_flush_dcache_louis)
+>         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+> ALT_SMP(mov     r3, r0, lsr #20)                @ move LoUIS into position
+> ALT_UP( mov     r3, r0, lsr #26)                @ move LoUU into position
+> #ifdef CONFIG_ARM_ERRATA_643719
+> ALT_SMP(ands    r3, r3, #7 << 1)                @ extract LoU*2 field from clidrALT_UP( b       start_flush_levels)
+>         bne     start_flush_levels              @ LoU != 0, start flushing
+>         mrc     p15, 0, r2, c0, c0, 0           @ read main ID register
+>         movw    r1, #:lower16:(0x410fc090 >> 4) @ ID of ARM Cortex A9 r0p?
+>         movt    r1, #:upper16:(0x410fc090 >> 4)
+>         teq     r1, r2, lsr #4                  @ test for errata affected core
+> and if so...
+>         moveq   r3, #1 << 1                     @ fix LoUIS value (and set flags state to 'ne')
+> #endif
+>         b       start_flush_levels              @ start flushing cache levels
+> 
+> ENTRY(v7_flush_dcache_all)
+>         mrc     p15, 1, r0, c0, c0, 1           @ read clidr
+>         mov     r3, r0, lsr #23                 @ move LoC into position
+> start_flush_levels:
+>         dmb                                     @ ensure ordering with previous memory accesses
+>         ands    r3, r3, #7 << 1                 @ extract field from clidr
+>         beq     finished                        @ if loc is 0, then no need to clean
+>         mov     r10, #0                         @ start clean at cache level 0
+> flush_levels:
+>         add     r2, r10, r10, lsr #1            @ work out 3x current cache level
+>         mov     r1, r0, lsr r2                  @ extract cache type bits from clidr
+> ...
+> 
+> Which do you think is better, the old version or the new version?
 
-Exactly! And my patch only changes __timer_const_udelay() so again I'm
-not touching loop-based code.
+The old version, joking ;). I was not referring to the clean-up which
+is a good thing on its own, we just have to agree on barriers semantics
+in case the cache flushing level turns out to be 0, see above.
 
->> Do you think they should take the inherent imprecision of loop-based
->> delays into account, and add a small cushion to be safe?
->
-> No.  See above.  Not doing that.  Live with it.
-
-See, I don't understand your "Not doing that" statement.
-I didn't suggest changing the implementation, I asked your opinion
-(and the opinion of others on the list) whether driver _writers_
-should take into account _in their code_ the 1% error you mentioned.
-
-Specifically, should a driver writer use
-
-   udelay(101);
-
-when his spec says to spin 100 ?s?
-
-(Anyway, this is just a tangential question, as I digest the ins
-and outs of kernel and driver development.)
-
-> Fix the rounding errors if you wish, but do _not_ try to fix the
-> "udelay() may return slightly earlier than requested" problem.  I
-> will not apply a patch to fix _that_ problem.
-
-Can I submit as-is the one-line patch I proposed earlier?
-
-Regards.
+Thanks,
+Lorenzo
