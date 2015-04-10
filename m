@@ -1,139 +1,111 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Apr 2015 16:08:14 -0700
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <CANOLnOMJ9oy_VhxGDyg9yx8XLVSZPf51eycP7-j=r4KVF6RX-A@mail.gmail.com>
-References: <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
- <20150406151939.GG18048@atomide.com>
- <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
- <20150406174245.GJ18048@atomide.com>
- <CAALWOA93+ohYJ7Q06H4gVMywzP5=RC3uBkUVXjWMriRBoHzXKQ@mail.gmail.com>
- <20150407022312.GK18048@atomide.com>
- <CANOLnOMyNesvA2nGC2uMnmYGLBQkU1dnfG1rBg1UWeGMrpHFzQ@mail.gmail.com>
- <20150409224446.GV18048@atomide.com>
- <CANOLnOMJ9oy_VhxGDyg9yx8XLVSZPf51eycP7-j=r4KVF6RX-A@mail.gmail.com>
-Message-ID: <20150410230814.GX18048@atomide.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Fri, 10 Apr 2015 16:31:35 -0700
+Subject: [PATCH 1/3] clk: meson: Add support for Meson clock controller
+In-Reply-To: <1425313322-18567-2-git-send-email-carlo@caione.org>
+References: <1425313322-18567-1-git-send-email-carlo@caione.org>
+ <1425313322-18567-2-git-send-email-carlo@caione.org>
+Message-ID: <20150410233135.18916.85534@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [150410 15:06]:
-> On Fri, Apr 10, 2015 at 1:44 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Grazvydas Ignotas <notasas@gmail.com> [150409 15:37]:
-> >> On Tue, Apr 7, 2015 at 5:23 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >> > * Matthijs van Duin <matthijsvanduin@gmail.com> [150406 11:15]:
-> >> >>
-> >> >> On 6 April 2015 at 19:42, Tony Lindgren <tony@atomide.com> wrote:
-> >> >> > Hmm but it still seems to do something also on cortex-a8 r3p2 that
-> >> >> > is supposedly not affected by 430973.. Based on my tests so far, at least
-> >> >> > armhf running cpuburn-a8 in the background and doing apt-get update
-> >> >> > segfaults constantly without flush BTAC/BTB. This seems to be the case
-> >> >> > no matter how the aux ctrl reg bits are set..
-> >> >>
-> >> >> That sounds.... really odd.  The TRM is fairly explicit about BTB
-> >> >> flush executing as nop when IBE is not set. Of course the TRM is not
-> >> >> exactly flawless, but still...
-> >> >
-> >> > Oops, sorry user error.. I was trying to clear IBE as a banked register
-> >> > like L2 enable bit and of course it did not get cleared.. Clearing it
-> >> > with a smc call really clears it. And in that case my test case seems to
-> >> > work reliably on r3p2 without erratum 430973 enabled.
-> >>
-> >> May I ask how do you perform the smc call? I wanted to clear IBE too
-> >> to experiment, but it just hangs my board, even if I just write back
-> >> the same value. Here is what I do:
-> >>
-> >>         asm ("mrc p15, 0, %0, c1, c0, 1" : "=r"(val));
-> >>
-> >>         asm (".arch_extension sec\n\t"
-> >>              "mov r0,  %0\n"
-> >>              "mov r12, #3\n"
-> >>              "smc #0\n"
-> >>              :: "r"(val) : "r0", "r12");
-> >>
-> >> I just run this from a sysfs write handler, does it need to be run on
-> >> SRAM or something?
-> >
-> > Best done in the bootloader.. I just hacked it into the restore from
-> > off-idle to test, see below. But for that you naturally need to have
-> > a device with working idle and it's usable for just testing for lazy
-> > people.
-> >
-> > Regards,
-> >
-> > Tony
-> >
-> > --- a/arch/arm/mach-omap2/sleep34xx.S
-> > +++ b/arch/arm/mach-omap2/sleep34xx.S
-> > @@ -516,6 +516,7 @@ l2_inv_gp:
-> >         ldr     r4, scratchpad_base
-> >         ldr     r3, [r4,#0xBC]
-> >         ldr     r0, [r3,#4]
-> > +       bic     r0, r1, #(1 << 6)
-> 
-> Hmm did you mean r0 instead of r1 here? I hope your test results
-> didn't come from some other random bit from r1 being written to
-> aux_ctrl.
+Quoting Carlo Caione (2015-03-02 08:22:00)
+> +static int meson_clk_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                                 unsigned long parent_rate)
+> +{
+> +       struct meson_clk_cpu *clk_cpu = to_meson_clk_cpu_hw(hw);
+> +       unsigned int div, sel, N = 0;
+> +       u32 reg;
+> +
+> +       div = DIV_ROUND_UP(parent_rate, rate);
+> +
+> +       if (div <= 3) {
+> +               sel = div - 1;
+> +       } else {
+> +               sel = 3;
+> +               N = div / 2;
+> +       }
+> +
+> +       reg = readl(clk_cpu->base + clk_cpu->reg_off + MESON_CPU_CLK_CNTL1);
+> +       reg = PARM_SET(MESON_N_WIDTH, MESON_N_SHIFT, reg, N);
+> +       writel(reg, clk_cpu->base + clk_cpu->reg_off + MESON_CPU_CLK_CNTL1);
+> +
+> +       reg = readl(clk_cpu->base + clk_cpu->reg_off + MESON_CPU_CLK_CNTL);
+> +       reg = PARM_SET(MESON_SEL_WIDTH, MESON_SEL_SHIFT, reg, sel);
+> +       writel(reg, clk_cpu->base + clk_cpu->reg_off + MESON_CPU_CLK_CNTL);
+> +
+> +       return 0;
+> +}
 
-Oh right sorry, yeah it should be r0 above. Luck based coding :)
+<snip>
 
-> And according to readback this doesn't seem to work for me, even when
-> my board has idle working. Or is it not supposed to be visible in
-> readback?
+> +static int meson_clk_cpu_pre_rate_change(struct meson_clk_cpu *clk_cpu,
+> +                                        struct clk_notifier_data *ndata)
+> +{
+> +       u32 cpu_clk_cntl;
+> +
+> +       spin_lock(clk_cpu->lock);
+> +
+> +       /* switch MUX1 to xtal */
+> +       cpu_clk_cntl = readl(clk_cpu->base + clk_cpu->reg_off
+> +                               + MESON_CPU_CLK_CNTL);
+> +       cpu_clk_cntl &= ~MESON_CPU_CLK_MUX1;
+> +       writel(cpu_clk_cntl, clk_cpu->base + clk_cpu->reg_off
+> +                               + MESON_CPU_CLK_CNTL);
+> +       udelay(100);
+> +
+> +       /* switch MUX2 to sys-pll */
+> +       cpu_clk_cntl |= MESON_CPU_CLK_MUX2;
+> +       writel(cpu_clk_cntl, clk_cpu->base + clk_cpu->reg_off
+> +                               + MESON_CPU_CLK_CNTL);
+> +
+> +       spin_unlock(clk_cpu->lock);
+> +
+> +       return 0;
+> +}
+> +
+> +static int meson_clk_cpu_post_rate_change(struct meson_clk_cpu *clk_cpu,
+> +                                         struct clk_notifier_data *ndata)
+> +{
+> +       u32 cpu_clk_cntl;
+> +
+> +       spin_lock(clk_cpu->lock);
+> +
+> +       /* switch MUX1 to divisors' output */
+> +       cpu_clk_cntl = readl(clk_cpu->base + clk_cpu->reg_off
+> +                               + MESON_CPU_CLK_CNTL);
+> +       cpu_clk_cntl |= MESON_CPU_CLK_MUX1;
+> +       writel(cpu_clk_cntl, clk_cpu->base + clk_cpu->reg_off
+> +                               + MESON_CPU_CLK_CNTL);
+> +       udelay(100);
+> +
+> +       spin_unlock(clk_cpu->lock);
+> +
+> +       return 0;
+> +}
+> +
+> +/*
+> + * This clock notifier is called when the frequency of the of the parent
+> + * PLL clock is to be changed. We use the xtal input as temporary parent
+> + * while the PLL frequency is stabilized.
+> + */
+> +static int meson_clk_cpu_notifier_cb(struct notifier_block *nb,
+> +                                    unsigned long event, void *data)
+> +{
+> +       struct clk_notifier_data *ndata = data;
+> +       struct meson_clk_cpu *clk_cpu = to_meson_clk_cpu_nb(nb);
+> +       int ret = 0;
+> +
+> +       if (event == PRE_RATE_CHANGE)
+> +               ret = meson_clk_cpu_pre_rate_change(clk_cpu, ndata);
+> +       else if (event == POST_RATE_CHANGE)
+> +               ret = meson_clk_cpu_post_rate_change(clk_cpu, ndata);
+> +
+> +       return notifier_from_errno(ret);
+> +}
 
-Hmm I've verified between apps segfaulting depending on how bit 6
-is set on r3p2.
-
-Anyways, did a retry just in case, below is an updated test patch.
-For me aux ctrl changes after enabling idle stuff:
-
-aux ctrl: 0x000000e2
-...
-aux ctrl: 0x000000a2
-
-Did you enable the UART timeout etc so it really hits off mode
-when testing?
- 
-> Anyway I've managed to clear that damn bit in the bootloader, but
-> failed to measure any performance impact from clearing this bit and
-> getting rid of BTB flush mcr in cpu_v7_switch_mm() (this is on DM3730
-> with r3p2 A8). My test was to simply run 2 processes that would spin a
-> counter (running more processes doesn't seem to increase context
-> switches per second, so running 2 seemed enough).
-
-Well that's a good test result :) It means it's OK to keep the
-430973 enabled without a performance impatct.
+Why use a notifier for this? Could you simply call
+meson_clk_cpu_{pre,post}_rate_change directly from
+meson_clk_cpu_set_rate?
 
 Regards,
-
-Tony
-
-8< -----------------
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -93,6 +93,7 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
- {
- 	struct seq_file *s = (struct seq_file *)user;
- 	int i;
-+	u32 val;
- 
- 	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
- 		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
-@@ -116,6 +117,9 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
- 
- 	seq_printf(s, "\n");
- 
-+	asm ("mrc p15, 0, %0, c1, c0, 1" : "=r"(val));
-+	seq_printf(s, "aux ctrl: 0x%08x\n", val);
-+
- 	return 0;
- }
- 
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -516,6 +516,7 @@ l2_inv_gp:
- 	ldr	r4, scratchpad_base
- 	ldr	r3, [r4,#0xBC]
- 	ldr	r0, [r3,#4]
-+	bic	r0, r0, #(1 << 6)
- 	mov	r12, #0x3
- 	smc	#0			@ Call SMI monitor (smieq)
- 	ldr	r4, scratchpad_base
+Mike
