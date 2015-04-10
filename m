@@ -1,37 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 11 Apr 2015 00:17:11 +0200
-Subject: [PATCH] cpufreq: fix qoriq uniprocessor build
-Message-ID: <8186394.6fcP6P730e@wuerfel>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 10 Apr 2015 22:18:25 +0000 (UTC)
+Subject: [PATCH 1/9] ARM: tegra: Cardhu device-tree comment spelling
+ fix
+In-Reply-To: <cb3321c697591c3b2ae2ad799282448cff4bef21.1428700856.git.marcel.ziswiler@toradex.com>
+References: <cover.1428700856.git.marcel.ziswiler@toradex.com>
+ <cb3321c697591c3b2ae2ad799282448cff4bef21.1428700856.git.marcel.ziswiler@toradex.com>
+Message-ID: <alpine.DEB.2.02.1504102217130.19540@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The qoriq-cpufreq driver contains a hack for powerpc to include
-asm/smp.h on uniprocessor builds so it can get the hardware CPU
-number. On ARM, it does not require this hack, but instead gets
-a compile error:
+On Fri, 10 Apr 2015, Marcel Ziswiler wrote:
 
-In file included from drivers/cpufreq/qoriq-cpufreq.c:24:0:
-arch/arm/include/asm/smp.h:18:3: error: #error "<asm/smp.h> included in non-SMP build"
-arch/arm/include/asm/smp.h:21:0: warning: "raw_smp_processor_id" redefined
+> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> 
+> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
-This adds an #ifdef to mirror the one in its get_cpu_physical_id()
-function.
+This patch is missing a commit message; please add one.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 2f249358eedaf ("cpufreq: qoriq: rename the driver")
-Cc: Tang Yuantian <Yuantian.Tang@freescale.com>
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/SubmittingPatches#n109
 
-diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
-index 9fd51c860308..88b21ae0d6b0 100644
---- a/drivers/cpufreq/qoriq-cpufreq.c
-+++ b/drivers/cpufreq/qoriq-cpufreq.c
-@@ -21,7 +21,9 @@
- #include <linux/slab.h>
- #include <linux/smp.h>
- 
-+#if !defined(CONFIG_ARM)
- #include <asm/smp.h>	/* for get_hard_smp_processor_id() in UP configs */
-+#endif
- 
- /**
-  * struct cpu_data
+
+- Paul
