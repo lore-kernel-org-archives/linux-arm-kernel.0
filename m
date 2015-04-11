@@ -1,55 +1,41 @@
-From: lhikichi@broadcom.com (Lori Hikichi)
-Date: Fri, 10 Apr 2015 20:06:28 -0700
-Subject: [PATCH 0/2] Cygnus Audio Driver
-In-Reply-To: <20150408185420.GH6023@sirena.org.uk>
-References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
- <20150331064338.GE2869@sirena.org.uk> <551EEAF8.7050108@broadcom.com>
- <20150406095803.GD6023@sirena.org.uk> <55249258.1020907@broadcom.com>
- <20150408185420.GH6023@sirena.org.uk>
-Message-ID: <55288FB4.2010906@broadcom.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Sat, 11 Apr 2015 12:38:59 +0530
+Subject: [PATCH V3 0/6]  i2c: qup: Add support for v2 tags and bam dma
+Message-ID: <1428736145-18361-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+QUP from version 2.1.1 onwards, supports a new format of i2c command tags.
+Tag codes instructs the controller to perform a operation like read/write.
+This new tagging version supports and is required for adding bam dma
+capabilities. v2 tags supports transfer of more than 256 bytes in a single
+i2c transaction. Also adding bam dma support facilitates transferring each
+i2c_msg in i2c_msgs without a 'stop' bit in between which is required for
+some of the clients.
 
+This series depends on the below bam dma bug fix
+ https://lkml.org/lkml/2015/2/20/47
 
-On 15-04-08 11:54 AM, Mark Brown wrote:
-> On Tue, Apr 07, 2015 at 07:28:40PM -0700, Lori Hikichi wrote:
->> On 15-04-06 02:58 AM, Mark Brown wrote:
-> 
->>> OK, then it's going to need to be a clock provider at some point - the
->>> clock will be going into external devices which are going to need to be
->>> able to interact with the clock (for example, to get the rate).
-> 
->> Currently, the ASoC machine driver is responsible for requesting a certain
->> frequency of MCLK be generated from our driver and then also sending the
->> frequency information along to the external device (codec).
->> This is done via the snd_soc_dai_set_sysclk.  That is the only clock
->> interaction we have needed for the core part of the driver.  For enhanced
-> 
-> I have some passing familiarity with ASoC...  if you look at newer
-> drivers, especially those for DT systems, you'll see that we're
-> transitioning CODEC drivers to use the clock API for their clocks since
-> this makes integrating with both generic ASoC things like simple card
-> and non-ASoC clocks.
-> 
->> features, we also have the need to make minor adjustments (tweaks) to the
->> PLL.  The tweaks are used to make the PLLs output frequency match as closely
->> as possible to a true reference frequency. As such, we would like to provide
->> the finest adjustment resolution as possible. The clocking framework only
->> seems to allow for a 1 Hz adjustment. This limitation and the fact that no
->> other device seems to need to interact directly will the PLL are why we have
->> not put it in the clocking framework.
-> 
-> That's going to be an issue no matter where you put the control - the
-> ASoC specific clocking APIs don't have any control here either.  I don't
-> know if we want to add the functionality for doing very fine grained
-> adjustments into the clock API or not (the use cases seem limited though
-> I'm sure they exist), though I do think we should have that discussion
-> if only to confirm, but that's a separate thing to how we expose any
-> userspace control - the clock API is a kernel internal thing.
-> 
-Seems like there are some benefits to integrating with the clocking framework.
-I will have to consider what kernel APIs we want to expose as well.  I believe
-we may have another kernel driver wanting to control this tweaking.  Do you feel
-it is ok to have to PLL code reside in this driver for now, and then we can patch
-later after we get this clocking control sorted out.
+Tested this series on apq8074 dragon board eeprom client on i2c bus1
+
+[V3] Added support to coalesce each i2c_msg in i2c_msgs for fifo and
+     block mode in Patch 2. Also addressed further code comments.
+
+[V2] Addressed comments from Ivan T. Ivanov, Andy Gross [v1] Initial Version
+
+Andy Gross (1):
+  i2c: qup: Add V2 tags support
+
+Sricharan R (5):
+  i2c: qup: Change qup_wait_writeready function to use for all timeouts
+  i2c: qup: Add bam dma capabilities
+  i2c: qup: Transfer every i2c_msg in i2c_msgs without stop
+  dts: msm8974: Add blsp2_bam dma node
+  dts: msm8974: Add dma channels for blsp2_i2c1 node
+
+ arch/arm/boot/dts/qcom-msm8974.dtsi |  14 +-
+ drivers/i2c/busses/i2c-qup.c        | 877 +++++++++++++++++++++++++++++++++---
+ 2 files changed, 822 insertions(+), 69 deletions(-)
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
