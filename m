@@ -1,42 +1,89 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Apr 2015 17:19:25 -0700
-Subject: [PATCH] ARM: dts: qcom: Add msm8660 PMU node
-In-Reply-To: <1423616763-21121-1-git-send-email-sboyd@codeaurora.org>
-References: <1423616763-21121-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <5528688D.9040302@codeaurora.org>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Fri, 10 Apr 2015 17:23:58 -0700
+Subject: [PATCH] clk: sirf: add CSR atlas7 clk and reset support
+In-Reply-To: <1419495845-4345-1-git-send-email-21cnbao@gmail.com>
+References: <1419495845-4345-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <20150411002358.18916.16856@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/15 17:06, Stephen Boyd wrote:
-> Enable perf events on msm8660 devices by adding the pmu node.
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Quoting Barry Song (2014-12-25 00:24:05)
+> From: Zhiwu Song <Zhiwu.Song@csr.com>
+> 
+> the hardware node includes both clock and reset support, so it
+> is named as "car".
+> this patch implements Flexible clocks(mux, divider, gate), Selectable
+> clock(mux, divider, gate), root clock(gate),leaf clock(gate), others.
+> it also implements the reset controller functionality.
+> 
+> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 > ---
-
-Ping? Sorry, trying to clear out patches on a Friday night before going
-home.
-
->  arch/arm/boot/dts/qcom-msm8660.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-> index 0affd6193f56..48330e3c8307 100644
-> --- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-> @@ -37,6 +37,11 @@
->  		};
->  	};
->  
-> +	cpu-pmu {
-> +		compatible = "qcom,scorpion-mp-pmu";
-> +		interrupts = <1 9 0x304>;
-> +	};
+>  .../devicetree/bindings/clock/csr,atlas7-car.txt   |   46 +
+>  drivers/clk/sirf/Makefile                          |    2 +-
+>  drivers/clk/sirf/clk-atlas7.c                      | 1652 ++++++++++++++++++++
+>  3 files changed, 1699 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
+>  create mode 100644 drivers/clk/sirf/clk-atlas7.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt b/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
+> new file mode 100644
+> index 0000000..a1a9499
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
+> @@ -0,0 +1,46 @@
+> +* Clock and reset bindings for CSR atlas7
 > +
->  	soc: soc {
->  		#address-cells = <1>;
->  		#size-cells = <1>;
+> +Required properties:
+> +- compatible: Should be "sirf,atlas7-car"
+> +- reg: Address and length of the register set
+> +- #clock-cells: Should be <1>
+> +- #reset-cells: Should be <1>
+> +
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell.
+> +The ID list atlas7_clks defined in drivers/clk/sirf/clk-atlas7.c
+> +
+> +The reset consumer should specify the desired reset by having the reset
+> +ID in its "reset" phandle cell.
+> +The ID list atlas7_reset_unit defined in drivers/clk/sirf/clk-atlas7.c
+> +
+> +Examples:
+> +
+> +timer at 10dc0000 {
+> +       compatible = "sirf,macro-tick";
+> +       reg = <0x10dc0000 0x1000>;
+> +       clocks = <&car 54>;
+> +       interrupts = <0 0 0>,
+> +                  <0 1 0>,
+> +                  <0 2 0>,
+> +                  <0 49 0>,
+> +                  <0 50 0>,
+> +                  <0 51 0>;
+> +};
+> +
+> +uart1: uart at 18020000 {
+> +       cell-index = <1>;
+> +       compatible = "sirf,macro-uart";
+> +       reg = <0x18020000 0x1000>;
+> +       clocks = <&clks 95>;
+> +       interrupts = <0 18 0>;
+> +       fifosize = <32>;
+> +};
+> +
+> +vpp at 13110000 {
+> +       compatible = "sirf,prima2-vpp";
+> +       reg = <0x13110000 0x10000>;
+> +       interrupts = <0 31 0>;
+> +       clocks = <&car 85>;
+> +       resets = <&car 29>;
+> +};
 
+It would be nice to provide an example of the clock provider node,
+"sirf,atlas7-car". Also do you have a patch which adds this node to a
+dts file somewhere?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Otherwise the rest of this patch looks OK.
+
+Regards,
+Mike
