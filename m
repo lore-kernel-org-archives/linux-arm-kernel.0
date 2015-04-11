@@ -1,24 +1,19 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sat, 11 Apr 2015 15:45:29 +0200
-Subject: Guarantee udelay(N) spins at least N microseconds
-In-Reply-To: <20150411121049.GM12732@n2100.arm.linux.org.uk>
-References: <20150410114415.GC12732@n2100.arm.linux.org.uk>
- <5527C501.2040808@free.fr> <20150410150607.GG12732@n2100.arm.linux.org.uk>
- <5527EC90.9050900@free.fr> <20150410160817.GH12732@n2100.arm.linux.org.uk>
- <55282C1F.3000600@free.fr> <20150410204221.GI12732@n2100.arm.linux.org.uk>
- <55283F30.7030109@free.fr> <20150411073022.GJ12732@n2100.arm.linux.org.uk>
- <55290C18.8070301@free.fr> <20150411121049.GM12732@n2100.arm.linux.org.uk>
-Message-ID: <55292579.1070903@free.fr>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Sat, 11 Apr 2015 14:12:16 +0000
+Subject: [PATCH 1/9] ARM: tegra: Cardhu device-tree comment spelling fix
+In-Reply-To: <alpine.DEB.2.02.1504102217130.19540@utopia.booyaka.com>
+References: <cover.1428700856.git.marcel.ziswiler@toradex.com>
+ <cb3321c697591c3b2ae2ad799282448cff4bef21.1428700856.git.marcel.ziswiler@toradex.com>
+ <alpine.DEB.2.02.1504102217130.19540@utopia.booyaka.com>
+Message-ID: <1428761534.26561.2.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2015 14:10, Russell King - ARM Linux wrote:
+On Fri, 2015-04-10 at 22:18 +0000, Paul Walmsley wrote:
+> This patch is missing a commit message; please add one.
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/SubmittingPatches#n109
 
-> What this also means is that if you only have a 90kHz counter
-> available, doing DVFS is also a stupid idea.
-
-I must be missing something, because I don't see why DVFS
-(i.e. saving energy when the system is idle) is a stupid
-idea when only a 90 kHz counter is available?
-
-What's the connection?
+Yes, sorry. I vaguely recall having seen such oneline summary only
+trivial commits before but maybe that was in U-Boot and the Linux kernel
+mandates some higher standards. Will of course add them all in a v2.
