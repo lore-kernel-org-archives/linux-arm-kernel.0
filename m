@@ -1,76 +1,31 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 11 Apr 2015 21:42:21 +0200
-Subject: [GIT PULL RESEND] pxa: for-next v4.1
-In-Reply-To: <87ioe08y4b.fsf@free.fr> (Robert Jarzmik's message of "Mon, 16
- Mar 2015 21:51:16 +0100")
-References: <87ioe08y4b.fsf@free.fr>
-Message-ID: <87vbh2pi3m.fsf@free.fr>
+Date: Sat, 11 Apr 2015 21:40:33 +0200
+Subject: [PATCH v2 2/5] MAINTAINERS: add pxa dma driver to pxa architecture
+In-Reply-To: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
+References: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1428781236-25806-3-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+Add the pxa dma driver as maintained by the pxa architecture
+maintainers, as it is part of the core IP.
 
-Hello Arnd, Kevin, Olof,
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-Please consider these pxa for next for v4.1 cycle. This is my leap of faith,
-with the conversion of all pxa variants to clock framework. The diffstat is
-quite pretty, given all the code moved to drivers/clk.
-
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  https://github.com/rjarzmik/linux.git tags/pxa-for-4.1
-
-for you to fetch changes up to 6fe9642bed2e8760be51d4278a21efccc8cceb06:
-
-  ARM: pxa: Transition pxa25x, pxa27x, pxa3xx to clk framework (2015-03-16 21:35:10 +0100)
-
-----------------------------------------------------------------
-This is the pxa changes for v4.1 cycle.
-
-The main and only feature is the conversion of all pxa variants to clock
-framework. This encompasses pxa25x, pxa27x and pxa3xx, for all boards.
-
-This should be a disruptive cycle in the normally quiet pxa history, as
-the change can break any platform, and the test were performed on only 4
-boards (lubbock, zylonite, mioa701, cm-x300).
-
-----------------------------------------------------------------
-Robert Jarzmik (7):
-      ARM: pxa: change clocks init sequence
-      ARM: pxa: move gpio11 clock to board files
-      clk: pxa: add missing pxa27x clocks for Irda and sa1100-rtc
-      ARM: pxa: pxa27x skip default device initialization with DT
-      ARM: pxa: Transition pxa25x and pxa27x to clk framework
-      ARM: pxa: convert eseries to clock framework
-      ARM: pxa: Transition pxa25x, pxa27x, pxa3xx to clk framework
-
- arch/arm/Kconfig                 |   1 +
- arch/arm/mach-pxa/Makefile       |   9 +-
- arch/arm/mach-pxa/clock-pxa2xx.c |  55 ----------
- arch/arm/mach-pxa/clock-pxa3xx.c | 212 ---------------------------------------
- arch/arm/mach-pxa/clock.c        |  86 ----------------
- arch/arm/mach-pxa/clock.h        |  80 ---------------
- arch/arm/mach-pxa/eseries.c      |  27 ++---
- arch/arm/mach-pxa/generic.c      |   6 ++
- arch/arm/mach-pxa/generic.h      |   3 +
- arch/arm/mach-pxa/lubbock.c      |   4 +-
- arch/arm/mach-pxa/pxa25x.c       | 183 ---------------------------------
- arch/arm/mach-pxa/pxa27x.c       | 182 ++-------------------------------
- arch/arm/mach-pxa/pxa300.c       |  20 +---
- arch/arm/mach-pxa/pxa320.c       |  10 --
- arch/arm/mach-pxa/pxa3xx.c       |  59 -----------
- arch/arm/mach-pxa/raumfeld.c     |   1 -
- arch/arm/mach-pxa/tosa.c         |   1 -
- drivers/clk/pxa/clk-pxa27x.c     |  32 +++++-
- 18 files changed, 62 insertions(+), 909 deletions(-)
- delete mode 100644 arch/arm/mach-pxa/clock-pxa2xx.c
- delete mode 100644 arch/arm/mach-pxa/clock-pxa3xx.c
- delete mode 100644 arch/arm/mach-pxa/clock.c
- delete mode 100644 arch/arm/mach-pxa/clock.h
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9a76a40..35062a7 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7873,6 +7873,7 @@ T:	git git://github.com/hzhuang1/linux.git
+ T:	git git://github.com/rjarzmik/linux.git
+ S:	Maintained
+ F:	arch/arm/mach-pxa/
++F:	drivers/dma/pxa*
+ F:	drivers/pcmcia/pxa2xx*
+ F:	drivers/spi/spi-pxa2xx*
+ F:	drivers/usb/gadget/udc/pxa2*
 -- 
-Robert
+2.1.4
