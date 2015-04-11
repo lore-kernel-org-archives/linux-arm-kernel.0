@@ -1,89 +1,94 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Fri, 10 Apr 2015 17:23:58 -0700
-Subject: [PATCH] clk: sirf: add CSR atlas7 clk and reset support
-In-Reply-To: <1419495845-4345-1-git-send-email-21cnbao@gmail.com>
-References: <1419495845-4345-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <20150411002358.18916.16856@quantum>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Fri, 10 Apr 2015 17:44:41 -0700
+Subject: [PATCH] efi: stub: use a pool allocation for the cmdline
+In-Reply-To: <CAKv+Gu-KHpSWLKOgA7UW8C6L1-K3dOieNmF2=qq_t5N73u3Spg@mail.gmail.com>
+References: <1428670569-23089-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAFECyb9efREE=BU5RGSbzAGHqi5CkivUuTf=BRdq02GvFqJaOA@mail.gmail.com>
+ <CAKv+Gu-KHpSWLKOgA7UW8C6L1-K3dOieNmF2=qq_t5N73u3Spg@mail.gmail.com>
+Message-ID: <CAFECyb8RTMjR_hHHznOEJCGwuVj2GmMUnhoLAsdqyoPU7-vrbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Barry Song (2014-12-25 00:24:05)
-> From: Zhiwu Song <Zhiwu.Song@csr.com>
-> 
-> the hardware node includes both clock and reset support, so it
-> is named as "car".
-> this patch implements Flexible clocks(mux, divider, gate), Selectable
-> clock(mux, divider, gate), root clock(gate),leaf clock(gate), others.
-> it also implements the reset controller functionality.
-> 
-> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  .../devicetree/bindings/clock/csr,atlas7-car.txt   |   46 +
->  drivers/clk/sirf/Makefile                          |    2 +-
->  drivers/clk/sirf/clk-atlas7.c                      | 1652 ++++++++++++++++++++
->  3 files changed, 1699 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
->  create mode 100644 drivers/clk/sirf/clk-atlas7.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt b/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
-> new file mode 100644
-> index 0000000..a1a9499
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
-> @@ -0,0 +1,46 @@
-> +* Clock and reset bindings for CSR atlas7
-> +
-> +Required properties:
-> +- compatible: Should be "sirf,atlas7-car"
-> +- reg: Address and length of the register set
-> +- #clock-cells: Should be <1>
-> +- #reset-cells: Should be <1>
-> +
-> +The clock consumer should specify the desired clock by having the clock
-> +ID in its "clocks" phandle cell.
-> +The ID list atlas7_clks defined in drivers/clk/sirf/clk-atlas7.c
-> +
-> +The reset consumer should specify the desired reset by having the reset
-> +ID in its "reset" phandle cell.
-> +The ID list atlas7_reset_unit defined in drivers/clk/sirf/clk-atlas7.c
-> +
-> +Examples:
-> +
-> +timer at 10dc0000 {
-> +       compatible = "sirf,macro-tick";
-> +       reg = <0x10dc0000 0x1000>;
-> +       clocks = <&car 54>;
-> +       interrupts = <0 0 0>,
-> +                  <0 1 0>,
-> +                  <0 2 0>,
-> +                  <0 49 0>,
-> +                  <0 50 0>,
-> +                  <0 51 0>;
-> +};
-> +
-> +uart1: uart at 18020000 {
-> +       cell-index = <1>;
-> +       compatible = "sirf,macro-uart";
-> +       reg = <0x18020000 0x1000>;
-> +       clocks = <&clks 95>;
-> +       interrupts = <0 18 0>;
-> +       fifosize = <32>;
-> +};
-> +
-> +vpp at 13110000 {
-> +       compatible = "sirf,prima2-vpp";
-> +       reg = <0x13110000 0x10000>;
-> +       interrupts = <0 31 0>;
-> +       clocks = <&car 85>;
-> +       resets = <&car 29>;
-> +};
+On Fri, Apr 10, 2015 at 10:14 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 10 April 2015 at 18:43, Roy Franz <roy.franz@linaro.org> wrote:
+>> On Fri, Apr 10, 2015 at 5:56 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> This changes the allocation for the ASCII-converted command
+>>> line to use an ordinary memory pool rather than a separate
+>>> page based allocation.
+>>>
+>>> Pool allocations are generally preferred over page based
+>>> allocations due to the fact that they cause less fragmentation,
+>>> but in the particular case of arm64, where page allocations are
+>>> rounded up to 64 KB and where this allocation happens to be the
+>>> only explicit low allocation, it results in the lowest 64 KB of
+>>> memory to always be taken up by this particular allocation.
+>>>
+>>> So allocate from the EFI_LOADER_DATA pool instead.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>  drivers/firmware/efi/libstub/efi-stub-helper.c | 3 ++-
+>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+>>> index f07d4a67fa76..c95a567ca132 100644
+>>> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
+>>> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+>>> @@ -684,7 +684,8 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
+>>>
+>>>         options_bytes++;        /* NUL termination */
+>>>
+>>> -       status = efi_low_alloc(sys_table_arg, options_bytes, 0, &cmdline_addr);
+>>> +       status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
+>>> +                               options_bytes, (void **)&cmdline_addr);
+>>>         if (status != EFI_SUCCESS)
+>>>                 return NULL;
+>>>
+>>> --
+>>> 1.8.3.2
+>>>
+>>
+>> Hi Ard,
+>>
+>> We can't do this without also changing the frees on the error paths in
+>> arm-stub.c (line 289)
+>> and eboot.c (line 1148) to be a pool free as well.
+>> Also, for x86/x86_64 the address of the command line is put into a
+>> boot_params structure,
+>> which only has a __u32 field for the address of the command line, so
+>> we could get an address
+>> that won't fit if we use a pool allocation.
+>> Looking at that bit of if it, I don't think we handle the case of no
+>> 32 bit addressable memory
+>> existing at the time of the efi_low_alloc() for x86_64 systems, so if
+>> a >32 bit address is returned here,
+>> this won't be detected as a failure, and the cmdline address will be
+>> the 32 bit truncated address.
+I'm working on a patch for this, and it also looks like efi_low_alloc() is
+not correct for 32 bit builds, as internally it can allocate a >32 bit address,
+and then will truncate that to return an 'unsigned long'.
 
-It would be nice to provide an example of the clock provider node,
-"sirf,atlas7-car". Also do you have a patch which adds this node to a
-dts file somewhere?
+I should have something out next week.
 
-Otherwise the rest of this patch looks OK.
-
-Regards,
-Mike
+>>
+>> I don't think that there is a way to control the address range
+>> returned by pool allocations,
+>> so I think we are stuck with the page based allocations if we have
+>> address restrictions.
+>>
+>
+> Ah yes, I wondered about the reason for the low_alloc(). I guess I
+> could have looked a bit further myself :-)
+>
+> It is not such a big deal: the memory is reclaimed anyway, I was just
+> trying to reduce the fragmentation a bit, and trying to avoid
+> efi_xxx_alloc() which are substantially heavier than calling
+> allocate_pool() or allocate_pages() directly.
+>
+> I'll drop this patch then. It's not really worth the effort as its
+> primarily cosmetics anyway.
+>
+> --
+> Ard.
