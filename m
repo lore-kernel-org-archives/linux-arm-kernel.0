@@ -1,60 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Apr 2015 17:52:43 -0700
-Subject: [PATCH 3/4] clk: add CLK_DEFER_ORPHAN flag to prevent orphans
- from being used
-In-Reply-To: <1427988853-9549-4-git-send-email-heiko@sntech.de>
-References: <1427988853-9549-1-git-send-email-heiko@sntech.de>
- <1427988853-9549-4-git-send-email-heiko@sntech.de>
-Message-ID: <5528705B.3040102@codeaurora.org>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Fri, 10 Apr 2015 17:58:18 -0700
+Subject: [PATCH] clk: spear600: Fix adc clock device name
+In-Reply-To: <1426772043-12267-1-git-send-email-sr@denx.de>
+References: <1426772043-12267-1-git-send-email-sr@denx.de>
+Message-ID: <20150411005818.19585.73074@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/15 08:34, Heiko Stuebner wrote:
-> The usage of clocks derived from an orphan can produce issues when trying
-> to set rates etc. So ideally a clk_get to such a clock should defer till
-> the clock hierarchy is complete.
-> But as some arches probably rely on such clocks we can't disable them all.
-> Therefore add a new clk flag where arches can enable this behaviour for
-> their clocks.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Quoting Stefan Roese (2015-03-19 06:34:03)
+> The device name for the adc clock is incorrect. This results in the
+> IIO ADC driver to fail while probing for the clock. This patch
+> fixes the name and the ADC driver is now started correctly.
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: spear-devel at list.st.com
+
+Applied to clk-next.
+
+Thanks,
+Mike
+
 > ---
->  drivers/clk/clk.c            | 6 ++++++
->  include/linux/clk-provider.h | 1 +
->  2 files changed, 7 insertions(+)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 476f491..8511c62 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -3041,6 +3041,12 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
->  		if (provider->node == clkspec->np)
->  			clk = provider->get(clkspec, provider->data);
->  		if (!IS_ERR(clk)) {
-> +			if ((__clk_get_flags(clk) & CLK_DEFER_ORPHAN)
-> +						&& clk_is_orphan(clk)) {
-> +				clk = ERR_PTR(-EPROBE_DEFER);
-> +				break;
-> +			}
-> +
->  			clk = __clk_create_clk(__clk_get_hw(clk), dev_id,
->  					       con_id);
+>  drivers/clk/spear/spear6xx_clock.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/spear/spear6xx_clock.c b/drivers/clk/spear/spear6xx_clock.c
+> index 4f649c9..3e43244 100644
+> --- a/drivers/clk/spear/spear6xx_clock.c
+> +++ b/drivers/clk/spear/spear6xx_clock.c
+> @@ -316,7 +316,7 @@ void __init spear6xx_clk_init(void __iomem *misc_base)
+>         /* clock derived from apb clk */
+>         clk = clk_register_gate(NULL, "adc_clk", "apb_clk", 0, PERIP1_CLK_ENB,
+>                         ADC_CLK_ENB, 0, &_lock);
+> -       clk_register_clkdev(clk, NULL, "adc");
+> +       clk_register_clkdev(clk, NULL, "d8200000.adc");
 >  
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 28abf1b..ef8d669 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -31,6 +31,7 @@
->  #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
->  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
->  #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
-> +#define CLK_DEFER_ORPHAN	BIT(9) /* defer clk_get calls for orphans */
->  
-
-I don't see why this is an opt-in feature. If we think there are arches
-that are setting rates of clocks before they're ready then we have a
-problem and we should fix it. These last two patches don't look necessary.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>         clk = clk_register_fixed_factor(NULL, "gpio0_clk", "apb_clk", 0, 1, 1);
+>         clk_register_clkdev(clk, NULL, "f0100000.gpio");
+> -- 
+> 2.3.3
+> 
