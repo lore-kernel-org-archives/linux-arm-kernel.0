@@ -1,19 +1,138 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Sat, 11 Apr 2015 14:12:16 +0000
-Subject: [PATCH 1/9] ARM: tegra: Cardhu device-tree comment spelling fix
-In-Reply-To: <alpine.DEB.2.02.1504102217130.19540@utopia.booyaka.com>
-References: <cover.1428700856.git.marcel.ziswiler@toradex.com>
- <cb3321c697591c3b2ae2ad799282448cff4bef21.1428700856.git.marcel.ziswiler@toradex.com>
- <alpine.DEB.2.02.1504102217130.19540@utopia.booyaka.com>
-Message-ID: <1428761534.26561.2.camel@localhost.localdomain>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Sat, 11 Apr 2015 10:42:36 -0400
+Subject: [PATCH] earlycon: Fix uart_parse_earlycon() if
+ !CONFIG_SERIAL_CORE_CONSOLE
+Message-ID: <1428763356-29158-1-git-send-email-peter@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-04-10 at 22:18 +0000, Paul Walmsley wrote:
-> This patch is missing a commit message; please add one.
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/SubmittingPatches#n109
+Arnd Bergmann wrote:
+> A configuration that enables earlycon but not the core console
+> code causes a link error:
+>
+> drivers/built-in.o: In function `setup_earlycon':
+> drivers/tty/serial/earlycon.c:70: undefined reference to `uart_parse_earlycon'
 
-Yes, sorry. I vaguely recall having seen such oneline summary only
-trivial commits before but maybe that was in U-Boot and the Linux kernel
-mandates some higher standards. Will of course add them all in a v2.
+CONFIG_SERIAL_EARLYCON should not require CONFIG_SERIAL_CORE_CONSOLE.
+Move uart_parse_earlycon() and compile if either CONFIG_SERIAL_CORE_CONSOLE
+or CONFIG_SERIAL_EARLYCON.
+
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+---
+
+NB: The diff moves everything else around uart_parse_earlycon() :/
+
+ drivers/tty/serial/serial_core.c | 90 ++++++++++++++++++++--------------------
+ 1 file changed, 46 insertions(+), 44 deletions(-)
+
+diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+index eec067d..4d42b13 100644
+--- a/drivers/tty/serial/serial_core.c
++++ b/drivers/tty/serial/serial_core.c
+@@ -1762,50 +1762,7 @@ static const struct file_operations uart_proc_fops = {
+ };
+ #endif
+ 
+-#if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(CONFIG_CONSOLE_POLL)
+-/**
+- *	uart_console_write - write a console message to a serial port
+- *	@port: the port to write the message
+- *	@s: array of characters
+- *	@count: number of characters in string to write
+- *	@putchar: function to write character to port
+- */
+-void uart_console_write(struct uart_port *port, const char *s,
+-			unsigned int count,
+-			void (*putchar)(struct uart_port *, int))
+-{
+-	unsigned int i;
+-
+-	for (i = 0; i < count; i++, s++) {
+-		if (*s == '\n')
+-			putchar(port, '\r');
+-		putchar(port, *s);
+-	}
+-}
+-EXPORT_SYMBOL_GPL(uart_console_write);
+-
+-/*
+- *	Check whether an invalid uart number has been specified, and
+- *	if so, search for the first available port that does have
+- *	console support.
+- */
+-struct uart_port * __init
+-uart_get_console(struct uart_port *ports, int nr, struct console *co)
+-{
+-	int idx = co->index;
+-
+-	if (idx < 0 || idx >= nr || (ports[idx].iobase == 0 &&
+-				     ports[idx].membase == NULL))
+-		for (idx = 0; idx < nr; idx++)
+-			if (ports[idx].iobase != 0 ||
+-			    ports[idx].membase != NULL)
+-				break;
+-
+-	co->index = idx;
+-
+-	return ports + idx;
+-}
+-
++#if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(CONFIG_SERIAL_EARLYCON)
+ /**
+  *	uart_parse_earlycon - Parse earlycon options
+  *	@p:	  ptr to 2nd field (ie., just beyond '<name>,')
+@@ -1851,6 +1808,51 @@ int uart_parse_earlycon(char *p, unsigned char *iotype, unsigned long *addr,
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(uart_parse_earlycon);
++#endif
++
++#if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(CONFIG_CONSOLE_POLL)
++/**
++ *	uart_console_write - write a console message to a serial port
++ *	@port: the port to write the message
++ *	@s: array of characters
++ *	@count: number of characters in string to write
++ *	@putchar: function to write character to port
++ */
++void uart_console_write(struct uart_port *port, const char *s,
++			unsigned int count,
++			void (*putchar)(struct uart_port *, int))
++{
++	unsigned int i;
++
++	for (i = 0; i < count; i++, s++) {
++		if (*s == '\n')
++			putchar(port, '\r');
++		putchar(port, *s);
++	}
++}
++EXPORT_SYMBOL_GPL(uart_console_write);
++
++/*
++ *	Check whether an invalid uart number has been specified, and
++ *	if so, search for the first available port that does have
++ *	console support.
++ */
++struct uart_port * __init
++uart_get_console(struct uart_port *ports, int nr, struct console *co)
++{
++	int idx = co->index;
++
++	if (idx < 0 || idx >= nr || (ports[idx].iobase == 0 &&
++				     ports[idx].membase == NULL))
++		for (idx = 0; idx < nr; idx++)
++			if (ports[idx].iobase != 0 ||
++			    ports[idx].membase != NULL)
++				break;
++
++	co->index = idx;
++
++	return ports + idx;
++}
+ 
+ /**
+  *	uart_parse_options - Parse serial port baud/parity/bits/flow control.
+-- 
+2.3.5
