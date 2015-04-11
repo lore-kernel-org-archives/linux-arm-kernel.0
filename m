@@ -1,40 +1,90 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Apr 2015 19:00:59 +0100
-Subject: [PATCH] Ensure delay timer has sufficient accuracy for delays
-In-Reply-To: <alpine.LFD.2.11.1504111339070.5619@knanqh.ubzr>
-References: <20150411122056.GN12732@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1504111339070.5619@knanqh.ubzr>
-Message-ID: <20150411180059.GO12732@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 11 Apr 2015 21:15:10 +0200
+Subject: [PATCH v2] crypto/arm: accelerated SHA-512 using ARM generic ASM
+ and NEON
+In-Reply-To: <2845656.4sNJ3XBxnz@wuerfel>
+References: <1428676148-28210-1-git-send-email-ard.biesheuvel@linaro.org>
+ <F695F357-2A5C-4DFC-9F0E-188CDBBE7C01@linaro.org>
+ <CAKv+Gu-6mZwrVSCvS+ZWWwwM-294nWAqX4_J3r5Z8NM7KKC0=Q@mail.gmail.com>
+ <2845656.4sNJ3XBxnz@wuerfel>
+Message-ID: <CAKv+Gu9TU6ETRQDvp7M7Q43xAR5A25scgP3tsvZMmzBQNOK7Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 11, 2015 at 01:42:35PM -0400, Nicolas Pitre wrote:
-> On Sat, 11 Apr 2015, Russell King - ARM Linux wrote:
-> 
-> > We have recently had an example of someone wanting to use a 90kHz timer
-> > for the software delay loop.
-> > 
-> > udelay() needs to have at least microsecond resolution to allow drivers
-> > access to a delay mechanism with a reasonable chance of delaying the
-> > period they requested within at least a 50% marging of error, especially
-> > for small delays.
-> > 
-> > Discussion about the udelay() accuracy can be found at:
-> > 	https://lkml.org/lkml/2011/1/9/37
-> > 
-> > Reject timers which are unable to supply this level of resolution.
-> 
-> Is there a platform where that would be the only available timer?
-> Well, the code would use the loop based delay in that case.
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+On 11 April 2015 at 10:48, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 11 April 2015 09:35:15 Ard Biesheuvel wrote:
+>> On 10 April 2015 at 22:23, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> >
+>> >> On 10 apr. 2015, at 22:08, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >>
+>> >>> On Friday 10 April 2015 16:29:08 Ard Biesheuvel wrote:
+>> >>> +#if __ARM_MAX_ARCH__>=7
+>> >>> +.arch  armv7-a
+>> >>> +.fpu   neon
+>> >>> +
+>> >>
+>> >> This will cause a build failure on an ARMv7-M build, which is incompatible
+>> >> with .arch  armv7-a and .fpu   neon.
+>> >>
+>> >
+>> > The neon part depends on CONFIG_KERNEL_MODE_NEON, which would never be set for that platform, I suppose
+>>
+>> On second thought, that is not entirely true, but I still don't think
+>> there is problem here:
+>> the .arch/.fpu declarations are understood perfectly fine by GAS when
+>> targeting ARMv7-M. Only, it will emit code that is incompatible with
+>> it. However, this code is invoked at runtime only if a NEON unit has
+>> been detected, so it will just be ignored on ARMv7-M
+>
+> Sorry, I should have collected my findings better when replying to your
+> patch. What I remembered was that I saw a problem in this area in linux-next
+> with randconfig builds, but I did not notice that it was for a different
+> file, and I had not double-checked that patch yet in order to send it
+> out.
+>
+> See below for the patch I'm currently using for my randconfig builder.
+> Before you apply this, please check again which files are affected, as
+> it's possible that there are other modules that suffer from the same
+> problem.
+>
+>         Arnd
+>
+> 8<-----------
+> Subject: [PATCH] ARM: crypto: avoid sha256 code on ARMv7-M
+>
+> The sha256 assembly implementation can deal with all architecture levels
+> from ARMv4 to ARMv7-A, but not with ARMv7-M. Enabling it in an
+> ARMv7-M kernel results in this build failure:
+>
+> arm-linux-gnueabi-ld: error: arch/arm/crypto/sha256_glue.o: Conflicting architecture profiles M/A
+> arm-linux-gnueabi-ld: failed to merge target specific data of file arch/arm/crypto/sha256_glue.o
+>
+> This adds a Kconfig dependency to prevent the code from being disabled
 
-See the thread "Guarantee udelay(N) spins at least N microseconds" where
-we have someone trying to use a 90kHz counter for the delay loop, where
-there's complaints that delays are (a) not accurate and (b) can equate
-to no delay at all due to the low resolution of the counter, with all
-sorts of rediculous arguments put forward.
+... enabled?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> for ARMv7-M.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
+> index 458729d2ce22..76463da22f81 100644
+> --- a/arch/arm/crypto/Kconfig
+> +++ b/arch/arm/crypto/Kconfig
+> @@ -49,6 +49,7 @@ config CRYPTO_SHA2_ARM_CE
+>  config CRYPTO_SHA256_ARM
+>         tristate "SHA-224/256 digest algorithm (ARM-asm and NEON)"
+>         select CRYPTO_HASH
+> +       depends on !CPU_V7M
+>         help
+>           SHA-256 secure hash standard (DFIPS 180-2) implemented
+>           using optimized ARM assembler and NEON, when available.
+>
+
+@Herbert: could you please apply this onto cryptodev before sending
+out your pull request for v4.1?
+And please disregard $subject, I will post a v3 with a similar
+'depends on' added (unless you're ok to add it yourself)
+
+Thanks,
+Ard.
