@@ -1,54 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Apr 2015 08:30:22 +0100
-Subject: Guarantee udelay(N) spins at least N microseconds
-In-Reply-To: <55283F30.7030109@free.fr>
-References: <5527B331.5000205@free.fr>
- <20150410114415.GC12732@n2100.arm.linux.org.uk>
- <5527C501.2040808@free.fr>
- <20150410150607.GG12732@n2100.arm.linux.org.uk>
- <5527EC90.9050900@free.fr>
- <20150410160817.GH12732@n2100.arm.linux.org.uk>
- <55282C1F.3000600@free.fr>
- <20150410204221.GI12732@n2100.arm.linux.org.uk>
- <55283F30.7030109@free.fr>
-Message-ID: <20150411073022.GJ12732@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 11 Apr 2015 09:35:15 +0200
+Subject: [PATCH v2] crypto/arm: accelerated SHA-512 using ARM generic ASM
+ and NEON
+In-Reply-To: <F695F357-2A5C-4DFC-9F0E-188CDBBE7C01@linaro.org>
+References: <1428676148-28210-1-git-send-email-ard.biesheuvel@linaro.org>
+ <5553652.sur4tr0YJi@wuerfel>
+ <F695F357-2A5C-4DFC-9F0E-188CDBBE7C01@linaro.org>
+Message-ID: <CAKv+Gu-6mZwrVSCvS+ZWWwwM-294nWAqX4_J3r5Z8NM7KKC0=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:22:56PM +0200, Mason wrote:
-> On 10/04/2015 22:42, Russell King - ARM Linux wrote:
-> > On Fri, Apr 10, 2015 at 10:01:35PM +0200, Mason wrote:
-> >> There is, however, an important difference between loop-based
-> >> delays and timer-based delays; CPU frequencies typically fall
-> >> in the 50-5000 MHz range, while timer frequencies typically
-> >> span tens of kHz up to hundreds of MHz. For example, 90 kHz
-> >> is sometimes provided in multimedia systems (MPEG TS).
-> > 
-> > Why would you want to use such a slowly clocked counter for something
-> > which is supposed to be able to produce delays in the micro-second and
-> > potentially the nanosecond range?
-> > 
-> > get_cycles(), which is what the timer based delay is based upon, is
-> > supposed to be a _high resolution counter_, preferably running at
-> > the same kind of speeds as the CPU, though with a fixed clock rate.
-> > It most definitely is not supposed to be in the kHz range.
-> 
-> If there's only a single fixed clock in the system, I'd
-> use it for sched_clock, clocksource, and timer delay.
-> Are there other options?
-> 
-> It was you who wrote some time ago: "Timers are preferred
-> because of the problems with the software delay loop."
-> (My system implements DVFS.)
-> 
-> It seems to me that a 90 kHz timer is still better than
-> the jiffy counter, or am I mistaken again?
+On 10 April 2015 at 22:23, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> On 10 apr. 2015, at 22:08, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>>> On Friday 10 April 2015 16:29:08 Ard Biesheuvel wrote:
+>>> +#if __ARM_MAX_ARCH__>=7
+>>> +.arch  armv7-a
+>>> +.fpu   neon
+>>> +
+>>
+>> This will cause a build failure on an ARMv7-M build, which is incompatible
+>> with .arch  armv7-a and .fpu   neon.
+>>
+>
+> The neon part depends on CONFIG_KERNEL_MODE_NEON, which would never be set for that platform, I suppose
 
-Given the choice of a 90kHz timer vs using a calibrated software delay
-loop, the software delay loop wins.  I never envisioned that someone
-would be silly enough to think that a 90kHz timer would somehow be
-suitable to replace a software delay loop calibrated against a timer.
+On second thought, that is not entirely true, but I still don't think
+there is problem here:
+the .arch/.fpu declarations are understood perfectly fine by GAS when
+targeting ARMv7-M. Only, it will emit code that is incompatible with
+it. However, this code is invoked at runtime only if a NEON unit has
+been detected, so it will just be ignored on ARMv7-M
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Ard.
