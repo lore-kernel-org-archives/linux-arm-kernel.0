@@ -1,55 +1,64 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 11 Apr 2015 21:42:52 +0200
-Subject: [GIT PULL RESEND] pxa dt for v4.1
-In-Reply-To: <87egoo8xqr.fsf@free.fr> (Robert Jarzmik's message of "Mon, 16
- Mar 2015 21:59:24 +0100")
-References: <87egoo8xqr.fsf@free.fr>
-Message-ID: <87r3rqpi2r.fsf@free.fr>
+From: andrew@ncrmnt.org (Andrew Andrianov)
+Date: Sat, 11 Apr 2015 23:29:18 +0300
+Subject: [PATCH 0/2] ARM: mvebu: Add DLINK-DNS327L support
+Message-ID: <1428784160-19431-1-git-send-email-andrew@ncrmnt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+This patchset adds support for armada370-based NAS by DLINK.
 
-Hello Arnd, Kevin, Olof,
+DNS-327L is a 2-bay NAS with the following specs:     
+     - 512MiB RAM
+     - 128MiB NAND Flash
+     - 1 GbE interface (Marvell PHY)
+     - 1 rear USB 3.0 port (via PCIe USB 3.0 controller)
+     - 2 internal SATA ports handled by the Armada 370: 
+       	 uses 2 gpios for power control
+     - two front 2-color leds (amber + white) for both discs, 
+        controlled by the SoC
+     - One white LED handled by SoC (USB)
+     - 3 buttons. Power handled by weltrend, USB and 
+       RESET (on the bottom) are wired via GPIOs 
+     - Unidentified i2c device at address 0x13 (via i2cdetect)
+     - UART0 providing serial console
+     - Weltrend MCU serving for RTC, temperature, fan control, 
+       and power button handling interfaced via UART1 (dns320l-daemon)
+     
+Hardware notes follow: 
+Everything's supported, save for mysterious i2c device at 
+address 0x13 that I couldn't even find on the PCB.
 
-Please consider these device-tree changes for pxa for v4.1 cycle.
+Stock firmware performs some messing with PHY registers (that 
+have no public documentation) using a userspace script. With 
+upstream kernel it is possible to match the stock behavior using 
+the following in u-boot prompt:
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+mw.l 0xd00184e0 0xa8a; 
+phyWrite 0 16 2; 
+phyWrite 0 19 77; 
+phyWrite 0 18 5747; 
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+When power button is pressed to turn the NAS off, weltrend signals 
+the SoC by driving mpp63 line low. Apparently right now pinctrl assumes
+that this line can only work as 'gpo' that screws up gpio-buttons driver.
+Since without gpio-buttons, mpp63 works as input properly via sysfs 
+interface, I've added a patch for pinctrl-armada-370.c that fixes the 
+issue.
 
-are available in the git repository at:
+The only remaining issue are hard-freezes every 4-16 hours when
+CONFIG_ARM_MVEBU_V7_CPUIDLE=y
+As of 3.18 this issue was still present, I'm testing if things changed 
+in 4.0-rc7 right now (Still live for 3 hours at the time of writing)
 
-  https://github.com/rjarzmik/linux.git tags/pxa-dt-4.1
+Andrew Andrianov (2):
+  pinctrl: mvebu: Fix mapping of pin 63 (gpo -> gpio)
+  ARM: mvebu: dts: Add dts file for DLink DNS-327L
 
-for you to fetch changes up to e3cacd113d5e3e362ee671fa42fc013efd5c2937:
-
-  ARM: dts: pxa: add pxa-timer to pxa27x and pxa3xx (2015-02-23 19:30:04 +0100)
-
-----------------------------------------------------------------
-This device-tree pxa update brings :
- - clocks descriptions (pxa27x, pxa3xx)
- - timer descriptions (pxa27x, pxa3xx)
- - IPs which are embedded on the SoC
-   - keypad
-   - udc (USB client)
-   - power I2C
-
-These are amongst the building blocks for future pxa device-tree board
-description.
-
-----------------------------------------------------------------
-Robert Jarzmik (5):
-      ARM: dts: pxa: add pwri2c to pxa device-tree
-      ARM: dts: pxa: add clocks
-      ARM: dts: pxa: add pxa27x-udc to pxa27x
-      ARM: dts: pxa: add pxa27x-keypad to pxa27x
-      ARM: dts: pxa: add pxa-timer to pxa27x and pxa3xx
-
- arch/arm/boot/dts/pxa27x.dtsi | 46 ++++++++++++++++++++++++++++++++++++++++---
- arch/arm/boot/dts/pxa2xx.dtsi |  7 ++++++-
- arch/arm/boot/dts/pxa3xx.dtsi | 29 ++++++++++++++++++++++++++-
- 3 files changed, 77 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/Makefile                     |    1 +
+ arch/arm/boot/dts/armada-370-dlink-dns327l.dts |  309 ++++++++++++++++++++++++
+ drivers/pinctrl/mvebu/pinctrl-armada-370.c     |    2 +-
+ 3 files changed, 311 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/armada-370-dlink-dns327l.dts
 
 -- 
-Robert
+1.7.10.4
