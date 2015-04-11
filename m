@@ -1,90 +1,50 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 11 Apr 2015 21:15:10 +0200
-Subject: [PATCH v2] crypto/arm: accelerated SHA-512 using ARM generic ASM
- and NEON
-In-Reply-To: <2845656.4sNJ3XBxnz@wuerfel>
-References: <1428676148-28210-1-git-send-email-ard.biesheuvel@linaro.org>
- <F695F357-2A5C-4DFC-9F0E-188CDBBE7C01@linaro.org>
- <CAKv+Gu-6mZwrVSCvS+ZWWwwM-294nWAqX4_J3r5Z8NM7KKC0=Q@mail.gmail.com>
- <2845656.4sNJ3XBxnz@wuerfel>
-Message-ID: <CAKv+Gu9TU6ETRQDvp7M7Q43xAR5A25scgP3tsvZMmzBQNOK7Cg@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 11 Apr 2015 21:40:31 +0200
+Subject: [PATCH v2 0/5] Driver for pxa architectures
+Message-ID: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 April 2015 at 10:48, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 11 April 2015 09:35:15 Ard Biesheuvel wrote:
->> On 10 April 2015 at 22:23, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> >
->> >> On 10 apr. 2015, at 22:08, Arnd Bergmann <arnd@arndb.de> wrote:
->> >>
->> >>> On Friday 10 April 2015 16:29:08 Ard Biesheuvel wrote:
->> >>> +#if __ARM_MAX_ARCH__>=7
->> >>> +.arch  armv7-a
->> >>> +.fpu   neon
->> >>> +
->> >>
->> >> This will cause a build failure on an ARMv7-M build, which is incompatible
->> >> with .arch  armv7-a and .fpu   neon.
->> >>
->> >
->> > The neon part depends on CONFIG_KERNEL_MODE_NEON, which would never be set for that platform, I suppose
->>
->> On second thought, that is not entirely true, but I still don't think
->> there is problem here:
->> the .arch/.fpu declarations are understood perfectly fine by GAS when
->> targeting ARMv7-M. Only, it will emit code that is incompatible with
->> it. However, this code is invoked at runtime only if a NEON unit has
->> been detected, so it will just be ignored on ARMv7-M
->
-> Sorry, I should have collected my findings better when replying to your
-> patch. What I remembered was that I saw a problem in this area in linux-next
-> with randconfig builds, but I did not notice that it was for a different
-> file, and I had not double-checked that patch yet in order to send it
-> out.
->
-> See below for the patch I'm currently using for my randconfig builder.
-> Before you apply this, please check again which files are affected, as
-> it's possible that there are other modules that suffer from the same
-> problem.
->
->         Arnd
->
-> 8<-----------
-> Subject: [PATCH] ARM: crypto: avoid sha256 code on ARMv7-M
->
-> The sha256 assembly implementation can deal with all architecture levels
-> from ARMv4 to ARMv7-A, but not with ARMv7-M. Enabling it in an
-> ARMv7-M kernel results in this build failure:
->
-> arm-linux-gnueabi-ld: error: arch/arm/crypto/sha256_glue.o: Conflicting architecture profiles M/A
-> arm-linux-gnueabi-ld: failed to merge target specific data of file arch/arm/crypto/sha256_glue.o
->
-> This adds a Kconfig dependency to prevent the code from being disabled
+Hi Vinod,
 
-... enabled?
+This is the same serie as in v1, only one fix around irq probing was included in
+patch 3/5. I copy-pasted the previous cover letter for reference here :
 
-> for ARMv7-M.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
-> index 458729d2ce22..76463da22f81 100644
-> --- a/arch/arm/crypto/Kconfig
-> +++ b/arch/arm/crypto/Kconfig
-> @@ -49,6 +49,7 @@ config CRYPTO_SHA2_ARM_CE
->  config CRYPTO_SHA256_ARM
->         tristate "SHA-224/256 digest algorithm (ARM-asm and NEON)"
->         select CRYPTO_HASH
-> +       depends on !CPU_V7M
->         help
->           SHA-256 secure hash standard (DFIPS 180-2) implemented
->           using optimized ARM assembler and NEON, when available.
->
+This serie introduces a new driver for Marvell pxa architectures. There is a
+full rationale explanation in patch 3/5 on why mmp_pdma was not reused nor
+patched incrementally.
 
-@Herbert: could you please apply this onto cryptodev before sending
-out your pull request for v4.1?
-And please disregard $subject, I will post a v3 with a similar
-'depends on' added (unless you're ok to add it yourself)
+This new driver provides all the capabilities to port all the drivers of pxa
+architecture to dmaengine. It was tested against the most dma advanced user I
+know (pxa_camera), as well a more casual ones (pxamci and dmatest).
 
-Thanks,
-Ard.
+This is big piece of code, so I expect the review will take time. If we converge
+on it, it will be maintained as well as part of the pxa architeture
+maintainance.
+
+It is as well one of the last steps (or so I hope) for pxa architure to be part
+of the multiplatform ARM architecture, and at the same time keep its legacy
+platforms operational. It will kill arch/arm/plat-pxa/dma.c in the long term.
+
+Cheers.
+
+Robert Jarzmik (5):
+  Documentation: dmaengine: pxa-dma design
+  MAINTAINERS: add pxa dma driver to pxa architecture
+  dmaengine: pxa: add pxa dmaengine driver
+  dmaengine: pxa_dma: add debug information
+  dmaengine: pxa_dma: add support for legacy transition
+
+ Documentation/dmaengine/pxa_dma.txt |  157 ++++
+ MAINTAINERS                         |    1 +
+ drivers/dma/Kconfig                 |   11 +
+ drivers/dma/Makefile                |    1 +
+ drivers/dma/pxa_dma.c               | 1479 +++++++++++++++++++++++++++++++++++
+ include/linux/dma/pxa-dma.h         |   27 +
+ 6 files changed, 1676 insertions(+)
+ create mode 100644 Documentation/dmaengine/pxa_dma.txt
+ create mode 100644 drivers/dma/pxa_dma.c
+ create mode 100644 include/linux/dma/pxa-dma.h
+
+-- 
+2.1.4
