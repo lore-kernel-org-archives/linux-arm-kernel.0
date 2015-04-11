@@ -1,56 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 11 Apr 2015 16:55:50 +0200
-Subject: [PATCH v3 3/5] PCI: st: Provide support for the sti PCIe
- controller
-In-Reply-To: <1428747477.17822.90.camel@x220>
-References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
- <1428657168-12495-4-git-send-email-gabriel.fernandez@linaro.org>
- <1428747477.17822.90.camel@x220>
-Message-ID: <2529595.kpEIoZMpcn@wuerfel>
+Date: Sat, 11 Apr 2015 17:00:20 +0200
+Subject: [PATCH] serial: earlycon requires console support
+In-Reply-To: <5529241F.2040308@hurleysoftware.com>
+References: <5009638.HyplLv73fU@wuerfel> <5529241F.2040308@hurleysoftware.com>
+Message-ID: <19182495.QL5edbqjaN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 11 April 2015 12:17:57 Paul Bolle wrote:
-> Something I didn't spot in my first look at this patch.
+On Saturday 11 April 2015 09:39:43 Peter Hurley wrote:
+> Hi Arnd,
 > 
-> On Fri, 2015-04-10 at 11:12 +0200, Gabriel FERNANDEZ wrote:
-> > --- a/drivers/pci/host/Kconfig
-> > +++ b/drivers/pci/host/Kconfig
-> >  
-> > +config PCI_ST
-> > +     bool "ST PCIe controller"
-> > +     depends on ARCH_STI || (ARM && COMPILE_TEST)
-> > +     select PCIE_DW
-> > +     help
-> > +       Enable PCIe controller support on ST Socs. This controller is based
-> > +       on Designware hardware and therefore the driver re-uses the
-> > +       Designware core functions to implement the driver.
+> On 04/10/2015 06:01 PM, Arnd Bergmann wrote:
+> > A configuration that enables earlycon but not the core console
+> > code causes a link error:
+> > 
+> > drivers/built-in.o: In function `setup_earlycon':
+> > drivers/tty/serial/earlycon.c:70: undefined reference to `uart_parse_earlycon'
+> > 
+> > That error can be triggered by the newly added samsung earlycon support,
+> > which is missing a 'select' statement. This patch adds the 'select'
+> > to make serial-samsung behave like the other drivers.
 > 
-> You can't have ARCH_STI without ARM, so ARM will always be set if this
-> driver is enabled. Correct?
+> Since Kconfig has a separate option for enabling console on Samsung,
+> I'd rather move uart_parse_earlycon() and enclose it in
+> 
+> #if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(CONFIG_SERIAL_EARLYCON)
+> ...
+> #endif
+> 
+> I'll send a fix for that right now.
+> 
 
-Right, though the ARM dependency could soon be dropped, once the PCIE_DW
-driver can use generic infrastructure in the few places it relies on
-ARM specific code today.
-
-> > --- /dev/null
-> > +++ b/drivers/pci/host/pci-st.c
-> 
-> > +     if (IS_ENABLED(CONFIG_ARM)) {
-> > +             /*
-> > +              * We have to hook the abort handler so that we can intercept
-> > +              * bus errors when doing config read/write that return UR,
-> > +              * which is flagged up as a bus error
-> > +              */
-> > +             hook_fault_code(16+6, st_pcie_abort_handler, SIGBUS, 0,
-> > +                             "imprecise external abort");
-> > +     }
-> 
-> So, unless I'm missing something obvious here, IS_ENABLED(CONFIG_ARM)
-> will always evaluate to 1. Can't that test be dropped?
-
-I would leave it in, as it's quite likely to get reused with ARM64 at some
-point in the future (no, I don't know anything about ST's product plans,
-but everybody seems to be doing this).
+Hmm, maybe the 'select SERIAL_EARLYCON' should just be under SERIAL_SAMSUNG_CONSOLE
+then? Upon looking closer at the other drivers, that seems to be the common
+model, and I don't know what it means to have EARLYCON but no CORE_CONSOLE
+enabled.
 
 	Arnd
