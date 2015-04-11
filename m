@@ -1,69 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Apr 2015 10:00:24 +0100
-Subject: Two new breakages since Thursday
-In-Reply-To: <20150405080645.GE13898@n2100.arm.linux.org.uk>
-References: <20150405080645.GE13898@n2100.arm.linux.org.uk>
-Message-ID: <20150411090024.GL12732@n2100.arm.linux.org.uk>
+From: linux-arm@myspectrum.nl (Jeroen Hofstee)
+Date: Sat, 11 Apr 2015 11:25:32 +0200
+Subject: [RESEND][PATCH] ARM errata, 430973: update the affected revisions
+In-Reply-To: <20150411075220.GK12732@n2100.arm.linux.org.uk>
+References: <1418131842-6752-1-git-send-email-jhofstee@victronenergy.com>
+ <54EE2453.9080301@myspectrum.nl> <552840A9.8070406@myspectrum.nl>
+ <20150411075220.GK12732@n2100.arm.linux.org.uk>
+Message-ID: <5528E88C.4070107@myspectrum.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And almost a week later, and most of these are _still_ present.
+Hello Russell, +Tony,
 
-Given that the merge window is potentially opening on Sunday, this
-is _very_ poor, because it means that we've had a week of failing
-builds in the week before the merge window - the week where we
-_should_ be stabilising the code and getting it ready for submission
-to Linus.
+Thanks for taking the time to respond,
 
-Right now, arm-soc is *NOT* ready for submission to Linus.
+On 11-04-15 09:52, Russell King - ARM Linux wrote:
+> On Fri, Apr 10, 2015 at 11:29:13PM +0200, Jeroen Hofstee wrote:
+>> On 25-02-15 20:36, Jeroen Hofstee wrote:
+>>> On 09-12-14 14:30, Jeroen Hofstee wrote:
+>>>> From: Jeroen Hofstee <linux-arm@myspectrum.nl>
+>>>>
+>>>> Update the list of revisions subject to this errata.
+>>>>
+>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+>>>> Cc: Andreas Bie?mann <andreas.devel@googlemail.com>
+>>>> Signed-off-by: Jeroen Hofstee <jhofstee@victronenergy.com>
+>>>> ---
+>>>> I don't have access to the AT400/AT401/AT490 document, but
+>>>> Andreas was kind enough to provide this information, see
+>>>> https://www.mail-archive.com/u-boot at lists.denx.de/msg156620.html
+>>>>
+>>>> Resending from an address which is subscribed to the ML...
+>>>> ---
+>>>>   arch/arm/Kconfig | 2 +-
+>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>>>> index 89c4b5c..a2202fa 100644
+>>>> --- a/arch/arm/Kconfig
+>>>> +++ b/arch/arm/Kconfig
+>>>> @@ -1063,7 +1063,7 @@ config ARM_ERRATA_430973
+>>>>       depends on CPU_V7
+>>>>       help
+>>>>         This option enables the workaround for the 430973 Cortex-A8
+>>>> -      (r1p0..r1p2) erratum. If a code sequence containing an ARM/Thumb
+>>>> +      (r1p0..r1p3, r1p7) erratum. If a code sequence containing an
+>>>> ARM/Thumb
+>>>>         interworking branch is replaced with another code sequence at
+>>>> the
+>>>>         same virtual address, whether due to self-modifying code or
+>>>> virtual
+>>>>         to physical address re-mapping, Cortex-A8 does not recover from
+>>>> the
+>>>
+> No.  If you read the discussion that the OMAP people are having, it is
+> unclear whether r3p2 is actually affected by this errata or not.
+I scanned through it, but that is a different issue it seems. This patch
+only adds r1p3 and r1p7 to the documentation, since according to ARM
+they are affected by this errata. Newer revision should not be affected
+by this errata (or ARM reintroduced it).
 
-Please fix this as a top priority.
+The patch is _not_ adding r3p2 as an affected version. And is also not
+about how to deal with cores no longer needing this workaround.
 
-On Sun, Apr 05, 2015 at 09:06:45AM +0100, Russell King - ARM Linux wrote:
-> Two new breakages have appeared since Thursday.  The first affects both
-> ARM and ARM64 builds (a missing file), the second only ARM builds.
-> 
-> arch/arm64/boot/dts/mediatek/mt8173-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
-> arch/arm/boot/dts/mt8135-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
-> arch/arm/mach-at91/pm_suspend.S:143: Error: selected processor does not support ARM mode `dsb'
-> 
-> ARM64 breaks on a defconfig build, ARM breaks with these errors on
-> an allmodconfig build.
-> 
-> The first two are due to the mediatek patches merged via the arm-soc
-> tree.  The second is due to:
-> 
-> commit 20567658b8f010eea287087bfdbeb25757801aed
-> Author: Wenyou Yang <wenyou.yang@atmel.com>
-> Date:   Mon Mar 9 11:53:46 2015 +0800
-> 
->     ARM: at91/pm_suspend: add the WFI instruction support for ARMv7
-> 
-> which looks to me like completely the wrong solution:
-> 
-> +       .macro at91_cpu_idle
-> +
-> +#if defined(CONFIG_CPU_V7)
-> +       mov     tmp1, #AT91_PMC_PCK
-> +       str     tmp1, [pmc, #AT91_PMC_SCDR]
-> +
-> +       dsb
-> +
-> +       wfi             @ Wait For Interrupt
-> +#else
-> +       mcr     p15, 0, tmp1, c7, c0, 4
-> +#endif
-> +
-> +       .endm
-> 
-> So, if we build a kernel with ARMc6 and ARMv7 CPUs, AT91 ends up using
-> ARMv7-only instructions in this function, which will cause an illegal
-> instruction exception on ARMv6 CPUs.
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+> In the discussion with OMAP people, we've come up with a potentially
+> better solution to this, which is to rearrange the code so that only
+> Cortex-A8 executes this workaround, and the BTB flush is always
+> present (which Tony says fixes the problem.)
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+The am3517 / r1p7 is a Cortex-a8 and is affected by this errata. I fail to
+see why making this cortex-a8 specific will help anything about the revision
+not being mentioned in the help text. (unless the CONFIG option gets 
+completely
+removed).
+> Meanwhile, OMAP people are seeing about updating uboot to set/clear
+> the auxiliary control register bit appropriately for the revision of
+> the core.
+Well almost appropriately. [1] suggest "the bootloaders can be fixed 
+Cortex-A8
+revisions later than r1p2 to not set the IBE bit.". That should have 
+been r1p7 as
+well.
+
+> In any case, adding the patch and suggesting people enable this for
+> more Cortex-A8's (eg, non-OMAP) won't actually do anything in a
+> multiplatform kernel.
+>
+Can you give an example of a r1p7 not needing the workaround?
+
+Regards,
+Jeroen
+
+http://www.spinics.net/lists/arm-kernel/msg411297.html
