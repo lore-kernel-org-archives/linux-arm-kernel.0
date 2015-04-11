@@ -1,29 +1,56 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 11 Apr 2015 16:50:47 +0200
-Subject: [PATCH v3 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
- termination driver
-In-Reply-To: <CAL85gmDmycodMV2WJydmA7u60S+K2w3Ji=BSVPfAg04N6unX0g@mail.gmail.com>
-References: <20150408084448.5f0793b7@why.wild-wind.fr.eu.org>
- <55280665.9020603@arm.com>
- <CAL85gmDmycodMV2WJydmA7u60S+K2w3Ji=BSVPfAg04N6unX0g@mail.gmail.com>
-Message-ID: <8653876.C24YDfhd04@wuerfel>
+Date: Sat, 11 Apr 2015 16:55:50 +0200
+Subject: [PATCH v3 3/5] PCI: st: Provide support for the sti PCIe
+ controller
+In-Reply-To: <1428747477.17822.90.camel@x220>
+References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1428657168-12495-4-git-send-email-gabriel.fernandez@linaro.org>
+ <1428747477.17822.90.camel@x220>
+Message-ID: <2529595.kpEIoZMpcn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 April 2015 17:16:32 Feng Kan wrote:
-> Hi Marc:
+On Saturday 11 April 2015 12:17:57 Paul Bolle wrote:
+> Something I didn't spot in my first look at this patch.
 > 
-> Is there any plans to support ACPI for GICv2m MSI? Both this driver and the
-> GICv2m seems to support OF model of discovery for msi controller. X-Gene1
-> uses this driver and X-Gene2 uses GICv2m, there needs to be a way to
-> associate msi controller with the PCIe bus. I haven't
-> found a standard way of doing finding "msi-parent" for ACPI. Do you have
-> any suggestion.
+> On Fri, 2015-04-10 at 11:12 +0200, Gabriel FERNANDEZ wrote:
+> > --- a/drivers/pci/host/Kconfig
+> > +++ b/drivers/pci/host/Kconfig
+> >  
+> > +config PCI_ST
+> > +     bool "ST PCIe controller"
+> > +     depends on ARCH_STI || (ARM && COMPILE_TEST)
+> > +     select PCIE_DW
+> > +     help
+> > +       Enable PCIe controller support on ST Socs. This controller is based
+> > +       on Designware hardware and therefore the driver re-uses the
+> > +       Designware core functions to implement the driver.
 > 
-> Sorry for top posting.
+> You can't have ARCH_STI without ARM, so ARM will always be set if this
+> driver is enabled. Correct?
 
-Doing gicv2m in ACPI should be straightforward, and the ACPI code can simply
-assume that there is only one GIC instance (whichever version) in the system
-and use that for all standard PCI hosts.
+Right, though the ARM dependency could soon be dropped, once the PCIE_DW
+driver can use generic infrastructure in the few places it relies on
+ARM specific code today.
+
+> > --- /dev/null
+> > +++ b/drivers/pci/host/pci-st.c
+> 
+> > +     if (IS_ENABLED(CONFIG_ARM)) {
+> > +             /*
+> > +              * We have to hook the abort handler so that we can intercept
+> > +              * bus errors when doing config read/write that return UR,
+> > +              * which is flagged up as a bus error
+> > +              */
+> > +             hook_fault_code(16+6, st_pcie_abort_handler, SIGBUS, 0,
+> > +                             "imprecise external abort");
+> > +     }
+> 
+> So, unless I'm missing something obvious here, IS_ENABLED(CONFIG_ARM)
+> will always evaluate to 1. Can't that test be dropped?
+
+I would leave it in, as it's quite likely to get reused with ARM64 at some
+point in the future (no, I don't know anything about ST's product plans,
+but everybody seems to be doing this).
 
 	Arnd
