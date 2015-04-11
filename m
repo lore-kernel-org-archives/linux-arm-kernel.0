@@ -1,39 +1,55 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 11 Apr 2015 08:32:58 +0530
-Subject: [PATCH] cpufreq: fix qoriq uniprocessor build
-In-Reply-To: <8186394.6fcP6P730e@wuerfel>
-References: <8186394.6fcP6P730e@wuerfel>
-Message-ID: <CAKohpomGUfYsuFnCN3y_=WOG44sbVNy4OFTQ6VFy+69dOhj9kw@mail.gmail.com>
+From: lhikichi@broadcom.com (Lori Hikichi)
+Date: Fri, 10 Apr 2015 20:06:28 -0700
+Subject: [PATCH 0/2] Cygnus Audio Driver
+In-Reply-To: <20150408185420.GH6023@sirena.org.uk>
+References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+ <20150331064338.GE2869@sirena.org.uk> <551EEAF8.7050108@broadcom.com>
+ <20150406095803.GD6023@sirena.org.uk> <55249258.1020907@broadcom.com>
+ <20150408185420.GH6023@sirena.org.uk>
+Message-ID: <55288FB4.2010906@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 April 2015 at 03:47, Arnd Bergmann <arnd@arndb.de> wrote:
-> The qoriq-cpufreq driver contains a hack for powerpc to include
-> asm/smp.h on uniprocessor builds so it can get the hardware CPU
-> number. On ARM, it does not require this hack, but instead gets
-> a compile error:
->
-> In file included from drivers/cpufreq/qoriq-cpufreq.c:24:0:
-> arch/arm/include/asm/smp.h:18:3: error: #error "<asm/smp.h> included in non-SMP build"
-> arch/arm/include/asm/smp.h:21:0: warning: "raw_smp_processor_id" redefined
->
-> This adds an #ifdef to mirror the one in its get_cpu_physical_id()
-> function.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 2f249358eedaf ("cpufreq: qoriq: rename the driver")
-> Cc: Tang Yuantian <Yuantian.Tang@freescale.com>
->
-> diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
-> index 9fd51c860308..88b21ae0d6b0 100644
-> --- a/drivers/cpufreq/qoriq-cpufreq.c
-> +++ b/drivers/cpufreq/qoriq-cpufreq.c
-> @@ -21,7 +21,9 @@
->  #include <linux/slab.h>
->  #include <linux/smp.h>
->
-> +#if !defined(CONFIG_ARM)
->  #include <asm/smp.h>   /* for get_hard_smp_processor_id() in UP configs */
-> +#endif
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+On 15-04-08 11:54 AM, Mark Brown wrote:
+> On Tue, Apr 07, 2015 at 07:28:40PM -0700, Lori Hikichi wrote:
+>> On 15-04-06 02:58 AM, Mark Brown wrote:
+> 
+>>> OK, then it's going to need to be a clock provider at some point - the
+>>> clock will be going into external devices which are going to need to be
+>>> able to interact with the clock (for example, to get the rate).
+> 
+>> Currently, the ASoC machine driver is responsible for requesting a certain
+>> frequency of MCLK be generated from our driver and then also sending the
+>> frequency information along to the external device (codec).
+>> This is done via the snd_soc_dai_set_sysclk.  That is the only clock
+>> interaction we have needed for the core part of the driver.  For enhanced
+> 
+> I have some passing familiarity with ASoC...  if you look at newer
+> drivers, especially those for DT systems, you'll see that we're
+> transitioning CODEC drivers to use the clock API for their clocks since
+> this makes integrating with both generic ASoC things like simple card
+> and non-ASoC clocks.
+> 
+>> features, we also have the need to make minor adjustments (tweaks) to the
+>> PLL.  The tweaks are used to make the PLLs output frequency match as closely
+>> as possible to a true reference frequency. As such, we would like to provide
+>> the finest adjustment resolution as possible. The clocking framework only
+>> seems to allow for a 1 Hz adjustment. This limitation and the fact that no
+>> other device seems to need to interact directly will the PLL are why we have
+>> not put it in the clocking framework.
+> 
+> That's going to be an issue no matter where you put the control - the
+> ASoC specific clocking APIs don't have any control here either.  I don't
+> know if we want to add the functionality for doing very fine grained
+> adjustments into the clock API or not (the use cases seem limited though
+> I'm sure they exist), though I do think we should have that discussion
+> if only to confirm, but that's a separate thing to how we expose any
+> userspace control - the clock API is a kernel internal thing.
+> 
+Seems like there are some benefits to integrating with the clocking framework.
+I will have to consider what kernel APIs we want to expose as well.  I believe
+we may have another kernel driver wanting to control this tweaking.  Do you feel
+it is ok to have to PLL code reside in this driver for now, and then we can patch
+later after we get this clocking control sorted out.
