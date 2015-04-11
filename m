@@ -1,99 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Apr 2015 08:52:20 +0100
-Subject: [RESEND][PATCH] ARM errata, 430973: update the affected revisions
-In-Reply-To: <552840A9.8070406@myspectrum.nl>
-References: <1418131842-6752-1-git-send-email-jhofstee@victronenergy.com>
- <54EE2453.9080301@myspectrum.nl> <552840A9.8070406@myspectrum.nl>
-Message-ID: <20150411075220.GK12732@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 11 Apr 2015 10:48:44 +0200
+Subject: [PATCH v2] crypto/arm: accelerated SHA-512 using ARM generic ASM
+ and NEON
+In-Reply-To: <CAKv+Gu-6mZwrVSCvS+ZWWwwM-294nWAqX4_J3r5Z8NM7KKC0=Q@mail.gmail.com>
+References: <1428676148-28210-1-git-send-email-ard.biesheuvel@linaro.org>
+ <F695F357-2A5C-4DFC-9F0E-188CDBBE7C01@linaro.org>
+ <CAKv+Gu-6mZwrVSCvS+ZWWwwM-294nWAqX4_J3r5Z8NM7KKC0=Q@mail.gmail.com>
+Message-ID: <2845656.4sNJ3XBxnz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:29:13PM +0200, Jeroen Hofstee wrote:
-> Hi again,
+On Saturday 11 April 2015 09:35:15 Ard Biesheuvel wrote:
+> On 10 April 2015 at 22:23, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >
+> >> On 10 apr. 2015, at 22:08, Arnd Bergmann <arnd@arndb.de> wrote:
+> >>
+> >>> On Friday 10 April 2015 16:29:08 Ard Biesheuvel wrote:
+> >>> +#if __ARM_MAX_ARCH__>=7
+> >>> +.arch  armv7-a
+> >>> +.fpu   neon
+> >>> +
+> >>
+> >> This will cause a build failure on an ARMv7-M build, which is incompatible
+> >> with .arch  armv7-a and .fpu   neon.
+> >>
+> >
+> > The neon part depends on CONFIG_KERNEL_MODE_NEON, which would never be set for that platform, I suppose
 > 
-> On 25-02-15 20:36, Jeroen Hofstee wrote:
-> >Hi,
-> >
-> >On 09-12-14 14:30, Jeroen Hofstee wrote:
-> >>From: Jeroen Hofstee <linux-arm@myspectrum.nl>
-> >>
-> >>Update the list of revisions subject to this errata.
-> >>
-> >>Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >>Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> >>Cc: Andreas Bie?mann <andreas.devel@googlemail.com>
-> >>Signed-off-by: Jeroen Hofstee <jhofstee@victronenergy.com>
-> >>---
-> >>I don't have access to the AT400/AT401/AT490 document, but
-> >>Andreas was kind enough to provide this information, see
-> >>https://www.mail-archive.com/u-boot at lists.denx.de/msg156620.html
-> >>
-> >>Resending from an address which is subscribed to the ML...
-> >>---
-> >>  arch/arm/Kconfig | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >>diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> >>index 89c4b5c..a2202fa 100644
-> >>--- a/arch/arm/Kconfig
-> >>+++ b/arch/arm/Kconfig
-> >>@@ -1063,7 +1063,7 @@ config ARM_ERRATA_430973
-> >>      depends on CPU_V7
-> >>      help
-> >>        This option enables the workaround for the 430973 Cortex-A8
-> >>-      (r1p0..r1p2) erratum. If a code sequence containing an ARM/Thumb
-> >>+      (r1p0..r1p3, r1p7) erratum. If a code sequence containing an
-> >>ARM/Thumb
-> >>        interworking branch is replaced with another code sequence at
-> >>the
-> >>        same virtual address, whether due to self-modifying code or
-> >>virtual
-> >>        to physical address re-mapping, Cortex-A8 does not recover from
-> >>the
-> >
-> >It seems this is not applied yet. For completeness, this only updates the
-> >description
-> >of the workaround, so should be safe to apply. At the moment people might
-> >disable
-> >this workaround (since the description says its not applicable) even if
-> >the cpu does
-> >need this workaround.
-> >
-> >Please consider applying this,
-> >
-> 
-> ping
-> 
-> This still seems not be be applied. Please do update the documentation
-> because it
-> causes segfaults when disabled wrongly. Below is a discussion about the
-> topic as well.
+> On second thought, that is not entirely true, but I still don't think
+> there is problem here:
+> the .arch/.fpu declarations are understood perfectly fine by GAS when
+> targeting ARMv7-M. Only, it will emit code that is incompatible with
+> it. However, this code is invoked at runtime only if a NEON unit has
+> been detected, so it will just be ignored on ARMv7-M
 
-No.  If you read the discussion that the OMAP people are having, it is
-unclear whether r3p2 is actually affected by this errata or not.
+Sorry, I should have collected my findings better when replying to your
+patch. What I remembered was that I saw a problem in this area in linux-next
+with randconfig builds, but I did not notice that it was for a different
+file, and I had not double-checked that patch yet in order to send it
+out.
 
-In the discussion with OMAP people, we've come up with a potentially
-better solution to this, which is to rearrange the code so that only
-Cortex-A8 executes this workaround, and the BTB flush is always
-present (which Tony says fixes the problem.)
+See below for the patch I'm currently using for my randconfig builder.
+Before you apply this, please check again which files are affected, as
+it's possible that there are other modules that suffer from the same
+problem.
 
-However, due to the lack of audience participation in that thread,
-Tony's patch to do the last bit is still sitting around.  I quote
-from April 8th:
+	Arnd
 
-  "Boots just fine for me on n900, but let's wait for comments
-  from Sebastian."
+8<-----------
+Subject: [PATCH] ARM: crypto: avoid sha256 code on ARMv7-M
 
-and we're doing just that, we're waiting...
+The sha256 assembly implementation can deal with all architecture levels
+from ARMv4 to ARMv7-A, but not with ARMv7-M. Enabling it in an
+ARMv7-M kernel results in this build failure:
 
-Meanwhile, OMAP people are seeing about updating uboot to set/clear
-the auxiliary control register bit appropriately for the revision of
-the core.
+arm-linux-gnueabi-ld: error: arch/arm/crypto/sha256_glue.o: Conflicting architecture profiles M/A
+arm-linux-gnueabi-ld: failed to merge target specific data of file arch/arm/crypto/sha256_glue.o
 
-In any case, adding the patch and suggesting people enable this for
-more Cortex-A8's (eg, non-OMAP) won't actually do anything in a
-multiplatform kernel.
+This adds a Kconfig dependency to prevent the code from being disabled
+for ARMv7-M.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
+index 458729d2ce22..76463da22f81 100644
+--- a/arch/arm/crypto/Kconfig
++++ b/arch/arm/crypto/Kconfig
+@@ -49,6 +49,7 @@ config CRYPTO_SHA2_ARM_CE
+ config CRYPTO_SHA256_ARM
+ 	tristate "SHA-224/256 digest algorithm (ARM-asm and NEON)"
+ 	select CRYPTO_HASH
++	depends on !CPU_V7M
+ 	help
+ 	  SHA-256 secure hash standard (DFIPS 180-2) implemented
+ 	  using optimized ARM assembler and NEON, when available.
