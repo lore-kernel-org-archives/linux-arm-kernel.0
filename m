@@ -1,94 +1,93 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Fri, 10 Apr 2015 17:44:41 -0700
-Subject: [PATCH] efi: stub: use a pool allocation for the cmdline
-In-Reply-To: <CAKv+Gu-KHpSWLKOgA7UW8C6L1-K3dOieNmF2=qq_t5N73u3Spg@mail.gmail.com>
-References: <1428670569-23089-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAFECyb9efREE=BU5RGSbzAGHqi5CkivUuTf=BRdq02GvFqJaOA@mail.gmail.com>
- <CAKv+Gu-KHpSWLKOgA7UW8C6L1-K3dOieNmF2=qq_t5N73u3Spg@mail.gmail.com>
-Message-ID: <CAFECyb8RTMjR_hHHznOEJCGwuVj2GmMUnhoLAsdqyoPU7-vrbg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 10 Apr 2015 17:49:16 -0700
+Subject: [PATCH 2/4] clk: add clk_is_orphan() to check if a clocks inherits
+ from an orphan clock
+In-Reply-To: <1427988853-9549-3-git-send-email-heiko@sntech.de>
+References: <1427988853-9549-1-git-send-email-heiko@sntech.de>
+ <1427988853-9549-3-git-send-email-heiko@sntech.de>
+Message-ID: <55286F8C.1030008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 10:14 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 10 April 2015 at 18:43, Roy Franz <roy.franz@linaro.org> wrote:
->> On Fri, Apr 10, 2015 at 5:56 AM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> This changes the allocation for the ASCII-converted command
->>> line to use an ordinary memory pool rather than a separate
->>> page based allocation.
->>>
->>> Pool allocations are generally preferred over page based
->>> allocations due to the fact that they cause less fragmentation,
->>> but in the particular case of arm64, where page allocations are
->>> rounded up to 64 KB and where this allocation happens to be the
->>> only explicit low allocation, it results in the lowest 64 KB of
->>> memory to always be taken up by this particular allocation.
->>>
->>> So allocate from the EFI_LOADER_DATA pool instead.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  drivers/firmware/efi/libstub/efi-stub-helper.c | 3 ++-
->>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
->>> index f07d4a67fa76..c95a567ca132 100644
->>> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
->>> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
->>> @@ -684,7 +684,8 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
->>>
->>>         options_bytes++;        /* NUL termination */
->>>
->>> -       status = efi_low_alloc(sys_table_arg, options_bytes, 0, &cmdline_addr);
->>> +       status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
->>> +                               options_bytes, (void **)&cmdline_addr);
->>>         if (status != EFI_SUCCESS)
->>>                 return NULL;
->>>
->>> --
->>> 1.8.3.2
->>>
->>
->> Hi Ard,
->>
->> We can't do this without also changing the frees on the error paths in
->> arm-stub.c (line 289)
->> and eboot.c (line 1148) to be a pool free as well.
->> Also, for x86/x86_64 the address of the command line is put into a
->> boot_params structure,
->> which only has a __u32 field for the address of the command line, so
->> we could get an address
->> that won't fit if we use a pool allocation.
->> Looking at that bit of if it, I don't think we handle the case of no
->> 32 bit addressable memory
->> existing at the time of the efi_low_alloc() for x86_64 systems, so if
->> a >32 bit address is returned here,
->> this won't be detected as a failure, and the cmdline address will be
->> the 32 bit truncated address.
-I'm working on a patch for this, and it also looks like efi_low_alloc() is
-not correct for 32 bit builds, as internally it can allocate a >32 bit address,
-and then will truncate that to return an 'unsigned long'.
+On 04/02/15 08:34, Heiko Stuebner wrote:
+> There are cases where it is helpful to know if the full clock path can be
+> trusted or if there is a parent clock missing somewhere in the parent-path.
+>
+> We keep it confined to the ccf area for now, if later users outside the ccf
+> surface it can be made more publically available.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/clk.c | 38 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 512323f..476f491 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2271,6 +2271,44 @@ bool clk_is_match(const struct clk *p, const struct clk *q)
+>  EXPORT_SYMBOL_GPL(clk_is_match);
+>  
+>  /**
+> + * __clk_is_orphan - check if a clock or its parent is an orphan
 
-I should have something out next week.
+@clk?
 
->>
->> I don't think that there is a way to control the address range
->> returned by pool allocations,
->> so I think we are stuck with the page based allocations if we have
->> address restrictions.
->>
->
-> Ah yes, I wondered about the reason for the low_alloc(). I guess I
-> could have looked a bit further myself :-)
->
-> It is not such a big deal: the memory is reclaimed anyway, I was just
-> trying to reduce the fragmentation a bit, and trying to avoid
-> efi_xxx_alloc() which are substantially heavier than calling
-> allocate_pool() or allocate_pages() directly.
->
-> I'll drop this patch then. It's not really worth the effort as its
-> primarily cosmetics anyway.
->
-> --
-> Ard.
+> + *
+> + * Walks up the clock parents until it reaches a root-clock or
+> + * a clock contained in the orphan list. Returns true if there is
+> + * an orphan in the parent-path otherwise false.
+> + */
+> +static bool __clk_is_orphan(struct clk_core *clk)
+> +{
+> +	struct clk_core *orphan;
+> +
+> +	if (clk->flags & CLK_IS_ROOT)
+> +		return false;
+> +
+> +	hlist_for_each_entry(orphan, &clk_orphan_list, child_node) {
+> +		if (clk == orphan)
+> +			return true;
+> +	}
+
+Nitpick: Please drop braces
+
+> +
+> +	if (clk->num_parents)
+> +		return __clk_is_orphan(clk->parent);
+
+This looks inefficient. Hopefully we're not calling this all the time?
+Except we call it from clk_get().
+
+Maybe it would make sense to mark the clock as orphaned or not. When we
+regsiter the clock we can see if the parent is there and if so, check
+the parent's flag to see if it's orphaned or not. If it isn't orphaned
+everything is good, cheap lookup to figure it out and we don't set the
+flag. If it is orphaned, again cheap lookup and we set the flag. When we
+adopt the clock (deorphan?) we would have to go through the clock and
+all it's children to clear the flag. The cost is paid once. Then this
+function becomes a cheap flag check that we can do whenever we want.
+
+> +
+> +	return false;
+> +}
+> +
+> +static bool clk_is_orphan(struct clk *clk)
+> +{
+> +	bool ret;
+> +
+> +	if (!clk)
+> +		return false;
+> +
+> +	clk_prepare_lock();
+> +	ret = __clk_is_orphan(clk->core);
+> +	clk_prepare_unlock();
+
+Unfortunately we still have to take some sort of lock here. If we had a
+new lock, orphan_lock or something, then we could lock the adoption
+phase and the flag setting of all clocks under that lock. When we go to
+per-clock locks we could change that to use the lock for a particular clock.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
