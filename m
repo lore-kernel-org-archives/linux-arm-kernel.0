@@ -1,51 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 11 Apr 2015 13:18:43 +0100
-Subject: [PATCH v3 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
- termination driver
-In-Reply-To: <CAL85gmDmycodMV2WJydmA7u60S+K2w3Ji=BSVPfAg04N6unX0g@mail.gmail.com>
-References: <20150408084448.5f0793b7@why.wild-wind.fr.eu.org>
- <cover.1428564115.git.dhdang@apm.com>
- <7923ef6ffd60a7c3de3c8c04fe746bbd3c15b5ac.1428564115.git.dhdang@apm.com>
- <55280665.9020603@arm.com>
- <CAL85gmDmycodMV2WJydmA7u60S+K2w3Ji=BSVPfAg04N6unX0g@mail.gmail.com>
-Message-ID: <bb00880b6d37fff304797d0c3e4e670d@www.loen.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 11 Apr 2015 13:20:56 +0100
+Subject: [PATCH] Ensure delay timer has sufficient accuracy for delays
+Message-ID: <20150411122056.GN12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Feng,
+We have recently had an example of someone wanting to use a 90kHz timer
+for the software delay loop.
 
-On 2015-04-11 01:16, Feng Kan wrote:
+udelay() needs to have at least microsecond resolution to allow drivers
+access to a delay mechanism with a reasonable chance of delaying the
+period they requested within at least a 50% marging of error, especially
+for small delays.
 
-> Is there any plans to support ACPI for GICv2m MSI? Both this driver 
-> and the
-> GICv2m seems to support OF model of discovery for msi controller. 
-> X-Gene1
-> uses this driver and X-Gene2 uses GICv2m, there needs to be a way to
-> associate msi controller with the PCIe bus. I haven't
-> found a standard way of doing finding "msi-parent" for ACPI. Do you 
-> have
-> any suggestion.
+Discussion about the udelay() accuracy can be found at:
+	https://lkml.org/lkml/2011/1/9/37
 
-This is remarkably off topic! ;-)
+Reject timers which are unable to supply this level of resolution.
 
-ACPI only provides information for GICv2m and GICv3. No other interrupt 
-controller,
-MSI widget or fairy dust provider will be supported on arm64 with ACPI. 
-So this driver
-will be DT only.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/lib/delay.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-GICv2m, being described in the ACPI spec, is growing some support. My 
-understanding is
-that this is done by AMD (Suravee Suthikulpanit) using my 
-irq/msi-domain branch as a
-base (I know that Suravee is looking at expanding the irqdomain 
-matching code to
-accept a pointer to an ACPI table instead of a device node to match the 
-target
-domain).
+diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+index 312d43eb686a..8044591dca72 100644
+--- a/arch/arm/lib/delay.c
++++ b/arch/arm/lib/delay.c
+@@ -83,6 +83,12 @@ void __init register_current_timer_delay(const struct delay_timer *timer)
+ 			       NSEC_PER_SEC, 3600);
+ 	res = cyc_to_ns(1ULL, new_mult, new_shift);
+ 
++	if (res > 1000) {
++		pr_err("Ignoring delay timer %ps, which has insufficient resolution of %lluns\n",
++			timer, res);
++		return;
++	}
++
+ 	if (!delay_calibrated && (!delay_res || (res < delay_res))) {
+ 		pr_info("Switching to timer-based delay loop, resolution %lluns\n", res);
+ 		delay_timer			= timer;
 
-Hope this helps,
-
-         M.
 -- 
-Fast, cheap, reliable. Pick two.
+FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
+according to speedtest.net.
