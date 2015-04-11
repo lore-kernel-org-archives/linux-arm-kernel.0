@@ -1,70 +1,87 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Apr 2015 17:59:08 -0700
-Subject: [PATCH 1/4] clk: Propagate prepare and enable when reparenting
- orphans
-In-Reply-To: <1427988853-9549-2-git-send-email-heiko@sntech.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 11 Apr 2015 03:32:55 +0200
+Subject: [PATCH 3/4] clk: add CLK_DEFER_ORPHAN flag to prevent orphans
+ from being used
+In-Reply-To: <5528705B.3040102@codeaurora.org>
 References: <1427988853-9549-1-git-send-email-heiko@sntech.de>
- <1427988853-9549-2-git-send-email-heiko@sntech.de>
-Message-ID: <552871DC.2020400@codeaurora.org>
+ <1427988853-9549-4-git-send-email-heiko@sntech.de>
+ <5528705B.3040102@codeaurora.org>
+Message-ID: <2590765.DXLmcCCmf5@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/15 08:34, Heiko Stuebner wrote:
-> From: Doug Anderson <dianders@chromium.org>
->
-> With the existing code, if you find a parent for an orhpan that has
-> already been prepared / enabled, you won't enable the parent.  That
-> can cause later problems since the clock tree isn't in a consistent
-> state.  Fix by propagating the prepare and enable.
->
-> NOTE: this does bring up the question about whether the enable of the
-> orphan actually made sense.  If the orphan's parent wasn't enabled by
-> default (by the bootloader or the default state of the hardware) then
-> the original enable of the orphan probably didn't do what the caller
-> though it would.  Some users of the orphan might have preferred an
-> EPROBE_DEFER be returned until we had a full path to a root clock.
-> This patch doesn't address those concerns and really just syncs up the
-> state.
->
-> Tested on rk3288-evb-rk808 by temporarily considering "sclk_tsadc" as
-> a critical clock (to simulate a driver enabling it at bootup).
->
-> Before:
->
->    clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
-> ----------------------------------------------------------------------------------------
->  xin32k                                   0            0       32768          0 0
->     sclk_hdmi_cec                         0            0       32768          0 0
->     sclk_otg_adp                          0            0       32768          0 0
->     sclk_tsadc                            1            1         993          0 0
->
-> After:
->
->    clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
-> ----------------------------------------------------------------------------------------
->  xin32k                                   1            1       32768          0 0
->     sclk_hdmi_cec                         0            0       32768          0 0
->     sclk_otg_adp                          0            0       32768          0 0
->     sclk_tsadc                            1            1         993          0 0
->
-> Note that xin32k on rk808 is a clock that cannot be disabled in
-> hardware (it's an always on clock), so really all we needed to do was
-> to sync up the state.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
->
-> Adapted to recent clk->clk_core changes and move orphan handling to
-> a separate function as the main clk_core_reparent function is already
-> also used in other contexts.
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
+Am Freitag, 10. April 2015, 17:52:43 schrieb Stephen Boyd:
+> On 04/02/15 08:34, Heiko Stuebner wrote:
+> > The usage of clocks derived from an orphan can produce issues when trying
+> > to set rates etc. So ideally a clk_get to such a clock should defer till
+> > the clock hierarchy is complete.
+> > But as some arches probably rely on such clocks we can't disable them all.
+> > Therefore add a new clk flag where arches can enable this behaviour for
+> > their clocks.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  drivers/clk/clk.c            | 6 ++++++
+> >  include/linux/clk-provider.h | 1 +
+> >  2 files changed, 7 insertions(+)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index 476f491..8511c62 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -3041,6 +3041,12 @@ struct clk *__of_clk_get_from_provider(struct
+> > of_phandle_args *clkspec,> 
+> >  		if (provider->node == clkspec->np)
+> >  		
+> >  			clk = provider->get(clkspec, provider->data);
+> >  		
+> >  		if (!IS_ERR(clk)) {
+> > 
+> > +			if ((__clk_get_flags(clk) & CLK_DEFER_ORPHAN)
+> > +						&& clk_is_orphan(clk)) {
+> > +				clk = ERR_PTR(-EPROBE_DEFER);
+> > +				break;
+> > +			}
+> > +
+> > 
+> >  			clk = __clk_create_clk(__clk_get_hw(clk), dev_id,
+> >  			
+> >  					       con_id);
+> > 
+> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> > index 28abf1b..ef8d669 100644
+> > --- a/include/linux/clk-provider.h
+> > +++ b/include/linux/clk-provider.h
+> > @@ -31,6 +31,7 @@
+> > 
+> >  #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
+> >  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change
+> >  */ #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk
+> >  accuracy */> 
+> > +#define CLK_DEFER_ORPHAN	BIT(9) /* defer clk_get calls for orphans */
+> 
+> I don't see why this is an opt-in feature. If we think there are arches
+> that are setting rates of clocks before they're ready then we have a
+> problem and we should fix it. These last two patches don't look necessary.
 
-Sorry I don't get this patch at all. We shouldn't be handing out clocks
-to consumers if the clock is an orphan. We also have a problem syncing
-enable state in the framework with what is there in hardware when we
-boot up. These aren't the same problem but they're related. Let's not
-conflate the two.
+yep this is some sort of policy-decision ... I'm perfectly fine with changing 
+the default behaviour from my Rockchip-pov but was reluctant to do this for 
+everybody.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+For example in the cited example in patch1, the clock from an i2c-device 
+supplies a soc-clock and the soc-clock only gets enabled/disabled at this 
+point. The i2c-device is default on, so everything works till it falls over 
+when going to suspend. So I guess similar corner cases might exist on other 
+platforms.
+
+It might very well be better to change the behaviour and hope for little 
+fallout to fix.
+
+So, it looks like your on favour of preventing the usage of orphans 
+altogether, so I'll try to come up with a better implementation taking into 
+account your comments to patch2.
+
+
+Thanks
+Heiko
