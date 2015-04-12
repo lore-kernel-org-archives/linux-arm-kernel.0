@@ -1,150 +1,113 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 12 Apr 2015 15:28:13 +0300
-Subject: [PATCH] v4l: omap4iss: Replace outdated OMAP4 control pad API with
- syscon
-In-Reply-To: <3292592.cickJMVhRq@wuerfel>
-References: <3292592.cickJMVhRq@wuerfel>
-Message-ID: <1428841693-15109-1-git-send-email-laurent.pinchart@ideasonboard.com>
+From: andrew@ncrmnt.org (Andrew)
+Date: Sun, 12 Apr 2015 16:02:12 +0300
+Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
+ DNS-327L
+In-Reply-To: <552A6209.9040903@gmail.com>
+References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
+ <552A6209.9040903@gmail.com>
+Message-ID: <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap4_ctrl_pad_readl and omap4_ctrl_pad_writel functions have been
-removed by commit efde234674d9 ("ARM: OMAP4+: control: remove support
-for legacy pad read/write") but are still used by the OMAP4 ISS driver,
-resulting in a compilation breakage:
+Sebastian Hesselbarth ????? 12.04.2015 15:16:
+> On 12.04.2015 13:43, Andrew wrote:
+>> Sebastian Hesselbarth ????? 12.04.2015 14:20:
+>>> On 11.04.2015 22:29, Andrew Andrianov wrote:
+>>>> Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
+> [...]
+>>>> + * CONFIG_ARM_MVEBU_V7_CPUIDLE=y causes hard freezes every 1-8 
+>>>> hours
+>>> 
+>>> I don't think the dts is the right place for Linux issues.
+>> 
+>> Not sure if that's a hardware weirdness or software issue (yet).
+>> Just checked - this goblin is there in 4.0-rc7.
+> 
+> I understand the issue, but still the dts is not the right place
+> for this comment.
 
-drivers/staging/media/omap4iss/iss_csiphy.c: In function 'omap4iss_csiphy_config':
-drivers/staging/media/omap4iss/iss_csiphy.c:167:2: error: implicit declaration of function 'omap4_ctrl_pad_writel' [-Werror=implicit-function-declaration]
-  omap4_ctrl_pad_writel(cam_rx_ctrl,
+Okay, got it.
+I'll file a bug about this issue to the the bugzilla. However something
+tells me it might not be cpuidle, but D-link. This one's sounds nasty
+and it has been around since 3.16.x. How could it go unnoticed?
+Unfortunately I have no other armada-370 hardware to test it.
 
-Fix the problem by using the syscon API to reaplace the control pad API.
-Lookup the syscon instance by compatible name for now as the OMAP4 ISS
-driver doesn't support DT yet.
+> 
+> [...]
+>>>> +                marvell,nand-keep-config;
+>>>> +                marvell,nand-enable-arbiter;
+>>>> +                nand-on-flash-bbt;
+>>> 
+>>> Do you know the ECC scheme used?
+>> 
+>> Any hints on how to find it apart from dumping NAND controller 
+>> registers
+>> from bootloader ?
+> 
+> From the original bootlog:
+> 
+> armada-nand armada-nand.0: Initialize HAL based NFC in 8bit mode with
+> DMA Disabled using BCH 4bit ECC
+> 
+> that translates into
+> 
+> nand-ecc-strength = <4>;
+> nand-ecc-step-size = <512>;
 
-Fixes: efde234674d9 ("ARM: OMAP4+: control: remove support for legacy pad read/write")
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- drivers/staging/media/omap4iss/Kconfig      |  1 +
- drivers/staging/media/omap4iss/iss.c        | 11 +++++++++++
- drivers/staging/media/omap4iss/iss.h        |  4 ++++
- drivers/staging/media/omap4iss/iss_csiphy.c | 12 +++++++-----
- 4 files changed, 23 insertions(+), 5 deletions(-)
+Thanks!
 
-Hi Arnd,
+> 
+> [...]
+>>>> +                /* Hardwired into stock bootloader */
+>>> 
+>>> I don't get the comment above.
+>> 
+>> The stock u-boot is hacked with a 'failsafe' kernel address.
+> 
+> Ok, the above partition isn't passed by the bootloader on mtdparts
+> cmdline, i.e. that is why you call it "hardwired" ?
 
-This patch doesn't depend nor conflict with the OMAP4 ISS patches scheduled to
-be merged in v4.1. If Mauro is fine with that, and if it makes your life
-easier, it could get merged through the arm-soc tree. Please let me know what
-you prefer.
+As far I got - stock u-boot knows nothing about partition tables and
+operates just on raw NAND offsets.
 
-diff --git a/drivers/staging/media/omap4iss/Kconfig b/drivers/staging/media/omap4iss/Kconfig
-index b78643f..072dac0 100644
---- a/drivers/staging/media/omap4iss/Kconfig
-+++ b/drivers/staging/media/omap4iss/Kconfig
-@@ -2,6 +2,7 @@ config VIDEO_OMAP4
- 	bool "OMAP 4 Camera support"
- 	depends on VIDEO_V4L2=y && VIDEO_V4L2_SUBDEV_API && I2C=y && ARCH_OMAP4
- 	depends on HAS_DMA
-+	select MFD_SYSCON
- 	select VIDEOBUF2_DMA_CONTIG
- 	---help---
- 	  Driver for an OMAP 4 ISS controller.
-diff --git a/drivers/staging/media/omap4iss/iss.c b/drivers/staging/media/omap4iss/iss.c
-index 44b81a2..cf22dd2 100644
---- a/drivers/staging/media/omap4iss/iss.c
-+++ b/drivers/staging/media/omap4iss/iss.c
-@@ -17,6 +17,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/i2c.h>
- #include <linux/interrupt.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-@@ -1386,6 +1387,16 @@ static int iss_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, iss);
- 
-+	/*
-+	 * TODO: When implementing DT support switch to syscon regmap lookup by
-+	 * phandle.
-+	 */
-+	iss->syscon = syscon_regmap_lookup_by_compatible("syscon");
-+	if (IS_ERR(iss->syscon)) {
-+		ret = PTR_ERR(iss->syscon);
-+		goto error;
-+	}
-+
- 	/* Clocks */
- 	ret = iss_map_mem_resource(pdev, iss, OMAP4_ISS_MEM_TOP);
- 	if (ret < 0)
-diff --git a/drivers/staging/media/omap4iss/iss.h b/drivers/staging/media/omap4iss/iss.h
-index 734cfee..35df8b4 100644
---- a/drivers/staging/media/omap4iss/iss.h
-+++ b/drivers/staging/media/omap4iss/iss.h
-@@ -29,6 +29,8 @@
- #include "iss_ipipe.h"
- #include "iss_resizer.h"
- 
-+struct regmap;
-+
- #define to_iss_device(ptr_module)				\
- 	container_of(ptr_module, struct iss_device, ptr_module)
- #define to_device(ptr_module)						\
-@@ -79,6 +81,7 @@ struct iss_reg {
- 
- /*
-  * struct iss_device - ISS device structure.
-+ * @syscon: Regmap for the syscon register space
-  * @crashed: Bitmask of crashed entities (indexed by entity ID)
-  */
- struct iss_device {
-@@ -93,6 +96,7 @@ struct iss_device {
- 
- 	struct resource *res[OMAP4_ISS_MEM_LAST];
- 	void __iomem *regs[OMAP4_ISS_MEM_LAST];
-+	struct regmap *syscon;
- 
- 	u64 raw_dmamask;
- 
-diff --git a/drivers/staging/media/omap4iss/iss_csiphy.c b/drivers/staging/media/omap4iss/iss_csiphy.c
-index 7c3d55d..748607f 100644
---- a/drivers/staging/media/omap4iss/iss_csiphy.c
-+++ b/drivers/staging/media/omap4iss/iss_csiphy.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/delay.h>
- #include <linux/device.h>
-+#include <linux/regmap.h>
- 
- #include "../../../../arch/arm/mach-omap2/control.h"
- 
-@@ -140,9 +141,11 @@ int omap4iss_csiphy_config(struct iss_device *iss,
- 	 * - bit [18] : CSIPHY1 CTRLCLK enable
- 	 * - bit [17:16] : CSIPHY1 config: 00 d-phy, 01/10 ccp2
- 	 */
--	cam_rx_ctrl = omap4_ctrl_pad_readl(
--			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
--
-+	/*
-+	 * TODO: When implementing DT support specify the CONTROL_CAMERA_RX
-+	 * register offset in the syscon property instead of hardcoding it.
-+	 */
-+	regmap_read(iss->syscon, 0x68, &cam_rx_ctrl);
- 
- 	if (subdevs->interface == ISS_INTERFACE_CSI2A_PHY1) {
- 		cam_rx_ctrl &= ~(OMAP4_CAMERARX_CSI21_LANEENABLE_MASK |
-@@ -166,8 +169,7 @@ int omap4iss_csiphy_config(struct iss_device *iss,
- 		cam_rx_ctrl |= OMAP4_CAMERARX_CSI22_CTRLCLKEN_MASK;
- 	}
- 
--	omap4_ctrl_pad_writel(cam_rx_ctrl,
--		 OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
-+	regmap_write(iss->syscon, 0x68, cam_rx_ctrl);
- 
- 	/* Reset used lane count */
- 	csi2->phy->used_data_lanes = 0;
+> Just remove the comment, actually the whole partition table is
+> "hacked" into the stock bootloader.
+> 
+>> If for some reason running the 'bootcmd' fails, it reads
+>> 5MiBs from partition @ (5d00000 + 0x800) and tries to boot it.
+>> There's no way to change this via environment, only by replacing
+>> the bootloader.
+>> Personally I'm more happy with a simpler partition table, but I
+>> guess upstream should be oriented towards the stock bootloader.
+> 
+> Yeah, leave the original partition table. Any other, smarter
+> bootloader can replace it.
+> 
+> [...]
+>> Thanks for the review, I'll resubmit the fixed patchset shortly.
+>> Please disregard my [PATCH v2] messages. I've send them the moment 
+>> before
+>> I noticed your email and review.
+> 
+> Please always leave the Cc-list in place.
+
+Sorry, I had to resend that email twice. First one to you, next to the 
+list
+and others. I'm quite new to LKML so still playing with proper email 
+setup.
+
+> And you should relax and leave patches there a day or two (or three).
+> Not everybody is reading patches immediately.
+> 
+> We are in no hurry, the current merge window is already closed,
+> the new one is 6 weeks away.
+> 
+> Sebastian
+
+I only have a chance to play with the hardware at the weekend, since the
+spare dns327l is at the country house, so I try to send fixes as soon as
+get feedback while I can quickly test it.
+
 -- 
 Regards,
-
-Laurent Pinchart
+Andrew
