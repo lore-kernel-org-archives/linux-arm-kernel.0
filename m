@@ -1,71 +1,46 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sun, 12 Apr 2015 22:30:59 +0200
-Subject: [PATCH 1/1] ARM: dts: Make DP a consumer of DISP1 power domain on
- Exynos5420
-Message-ID: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Mon, 13 Apr 2015 00:16:46 +0200
+Subject: [PATCHv7 0/2] INPUT: Route keyboard LEDs through the generic LEDs
+ layer
+In-Reply-To: <20150402144410.GB18125@amd>
+References: <20150217191527.GA9594@type.youpi.perso.aquilenet.fr>
+ <20150401211140.GI2901@type.youpi.perso.aquilenet.fr>
+ <20150402144410.GB18125@amd>
+Message-ID: <201504130016.46771@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
-added a device node for the Exynos5420 DISP1 power domain but dit not
-make the DP controller a consumer of that power domain.
+On Thursday 02 April 2015 16:44:10 Pavel Machek wrote:
+> On Wed 2015-04-01 23:11:40, Samuel Thibault wrote:
+> > Pali Roh?r, le Wed 01 Apr 2015 22:00:07 +0200, a ?crit :
+> > > On Tuesday 17 February 2015 20:15:27 Samuel Thibault wrote:
+> > > > Here is an updated version to fix the initialization of
+> > > > the vt_led_work queues before registering LEDs, and
+> > > > refresh against 3.19.
+> > > 
+> > > Hello! I would like to ask when will be this patch series
+> > > merged into mainline kernel? Are there still some
+> > > problems with it?
+> > 
+> > There are no known problems ATM.
+> 
+> I thought it made it to -next, but apparently not.
+> 
+> Dmitry, can you comment what needs to be done, or just merge
+> it, please?
+> 
+> 									Pavel
 
-This causes an "Unhandled fault: imprecise external abort" error if the
-exynos-dp driver tries to access the DP controller registers and the PD
-was turned off. This lead to a kernel panic and a complete system hang.
+Dmitry, ping. If everything is OK, can you merge this patch? If 
+not can you comment it?
 
-Make the DP controller device node a consumer of the DISP1 power domain
-to ensure that the PD is turned on when the exynos-dp driver is probed.
-
-Fixes: ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
-
-Hello,
-
-This latent bug was not exposed before since drivers for other devices
-marked as DISP1 power domain consumers were probed before exynos-dp so
-the PD was already on which made possible to access the DP registers.
-
-But "regulator: Defer lookup of supply to regulator_get" [0] that is in
-linux-next from a couple of days now, changed the order on which the
-drivers' probes succeed so the PD was disabled during exynos-dp probe.
-
-Exynos5420 machines with a display such as the Exynos5420 Peach Pit and
-Exynos5800 Peach Pi were failing to boot due this issue, i.e: [1].
-
-Olof,
-
-Could you please confirm $subject fixes the issue catched by your farm?
-
-Krzysztof,
-
-This patch conflicts with your Exynos5 phandle notation cleanup [2] but
-I preferred to send it on top of linux-next instead of making your series
-a dependency since it fixes a very important bug that had caused -next to
-be broken on these matchines for days now.
-
-Thanks a lot and best regards,
-Javier
-
-[0]: https://lkml.org/lkml/2015/3/24/1167
-[1]: http://arm-soc.lixom.net/bootlogs/next/next-20150409/pi-arm-exynos_defconfig.html
-[2]: https://lkml.org/lkml/2015/4/12/49
-
- arch/arm/boot/dts/exynos5420.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index f67b23f303c3..45317538bbae 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -536,6 +536,7 @@
- 		clock-names = "dp";
- 		phys = <&dp_phy>;
- 		phy-names = "dp";
-+		power-domains = <&disp_pd>;
- 	};
- 
- 	mipi_phy: video-phy at 10040714 {
 -- 
-2.1.4
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150413/c6493527/attachment.sig>
