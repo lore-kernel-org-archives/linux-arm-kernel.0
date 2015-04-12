@@ -1,82 +1,71 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 12 Apr 2015 14:16:09 +0200
-Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
- DNS-327L
-In-Reply-To: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
-References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
-Message-ID: <552A6209.9040903@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 12 Apr 2015 15:22:24 +0300
+Subject: [PATCH] [media] omap4iss: avoid broken OMAP4 dependency
+In-Reply-To: <3292592.cickJMVhRq@wuerfel>
+References: <3292592.cickJMVhRq@wuerfel>
+Message-ID: <62125726.UhoJzFudPk@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.04.2015 13:43, Andrew wrote:
-> Sebastian Hesselbarth ????? 12.04.2015 14:20:
->> On 11.04.2015 22:29, Andrew Andrianov wrote:
->>> Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
-[...]
->>> + * CONFIG_ARM_MVEBU_V7_CPUIDLE=y causes hard freezes every 1-8 hours
->>
->> I don't think the dts is the right place for Linux issues.
+Hi Arnd,
+
+Thank you for the patch.
+
+On Friday 10 April 2015 22:20:20 Arnd Bergmann wrote:
+> The omap4iss driver uses an interface that used to be provided
+> by OMAP4 but has now been removed and replaced with a WARN_ON(1)
+> statement, which likely broke the iss_csiphy code at runtime.
+> 
+> It also broke compiling the driver when CONFIG_ARCH_OMAP2PLUS
+> is set, which is implied by OMAP4:
+> 
+> drivers/staging/media/omap4iss/iss_csiphy.c: In function
+> 'omap4iss_csiphy_config':
+> drivers/staging/media/omap4iss/iss_csiphy.c:167:2: error: implicit
+> declaration of function 'omap4_ctrl_pad_writel'
+> [-Werror=implicit-function-declaration] omap4_ctrl_pad_writel(cam_rx_ctrl,
 >
-> Not sure if that's a hardware weirdness or software issue (yet).
-> Just checked - this goblin is there in 4.0-rc7.
+> In turn, this broke ARM allyesconfig builds. Replacing the
+> omap4_ctrl_pad_writel call with WARN_ON(1) won't make the
+> situation any worse than it already is, but fixes the build
+> problem.
 
-I understand the issue, but still the dts is not the right place
-for this comment.
+I've fixed the problem properly by switching to the syscon API. I'll send the 
+patch as a separate reply, let's discuss there how to handle the issue.
 
-[...]
->>> +                marvell,nand-keep-config;
->>> +                marvell,nand-enable-arbiter;
->>> +                nand-on-flash-bbt;
->>
->> Do you know the ECC scheme used?
->
-> Any hints on how to find it apart from dumping NAND controller registers
-> from bootloader ?
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: efde234674d9 ("ARM: OMAP4+: control: remove support for legacy pad
+> read/write")
+> ---
+> diff --git a/drivers/staging/media/omap4iss/iss_csiphy.c
+> b/drivers/staging/media/omap4iss/iss_csiphy.c index
+> 7c3d55d811ef..24f56ed90ac3 100644
+> --- a/drivers/staging/media/omap4iss/iss_csiphy.c
+> +++ b/drivers/staging/media/omap4iss/iss_csiphy.c
+> 
+> @@ -140,9 +140,7 @@ int omap4iss_csiphy_config(struct iss_device *iss,
+>  	 * - bit [18] : CSIPHY1 CTRLCLK enable
+>  	 * - bit [17:16] : CSIPHY1 config: 00 d-phy, 01/10 ccp2
+>  	 */
+> -	cam_rx_ctrl = omap4_ctrl_pad_readl(
+> -			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
+> -
+> +	cam_rx_ctrl = WARN_ON(1);
+> 
+>  	if (subdevs->interface == ISS_INTERFACE_CSI2A_PHY1) {
+>  		cam_rx_ctrl &= ~(OMAP4_CAMERARX_CSI21_LANEENABLE_MASK |
+> @@ -166,8 +164,7 @@ int omap4iss_csiphy_config(struct iss_device *iss,
+>  		cam_rx_ctrl |= OMAP4_CAMERARX_CSI22_CTRLCLKEN_MASK;
+>  	}
+> 
+> -	omap4_ctrl_pad_writel(cam_rx_ctrl,
+> -		 OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
+> +	WARN_ON(1);
+> 
+>  	/* Reset used lane count */
+>  	csi2->phy->used_data_lanes = 0;
 
- From the original bootlog:
+-- 
+Regards,
 
-armada-nand armada-nand.0: Initialize HAL based NFC in 8bit mode with 
-DMA Disabled using BCH 4bit ECC
-
-that translates into
-
-nand-ecc-strength = <4>;
-nand-ecc-step-size = <512>;
-
-[...]
->>> +                /* Hardwired into stock bootloader */
->>
->> I don't get the comment above.
->
-> The stock u-boot is hacked with a 'failsafe' kernel address.
-
-Ok, the above partition isn't passed by the bootloader on mtdparts
-cmdline, i.e. that is why you call it "hardwired" ?
-
-Just remove the comment, actually the whole partition table is
-"hacked" into the stock bootloader.
-
-> If for some reason running the 'bootcmd' fails, it reads
-> 5MiBs from partition @ (5d00000 + 0x800) and tries to boot it.
-> There's no way to change this via environment, only by replacing
-> the bootloader.
-> Personally I'm more happy with a simpler partition table, but I
-> guess upstream should be oriented towards the stock bootloader.
-
-Yeah, leave the original partition table. Any other, smarter
-bootloader can replace it.
-
-[...]
-> Thanks for the review, I'll resubmit the fixed patchset shortly.
-> Please disregard my [PATCH v2] messages. I've send them the moment before
-> I noticed your email and review.
-
-Please always leave the Cc-list in place.
-
-And you should relax and leave patches there a day or two (or three).
-Not everybody is reading patches immediately.
-
-We are in no hurry, the current merge window is already closed,
-the new one is 6 weeks away.
-
-Sebastian
+Laurent Pinchart
