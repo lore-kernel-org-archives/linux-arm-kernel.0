@@ -1,164 +1,685 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sun, 12 Apr 2015 21:24:52 +0900
-Subject: [PATCH 5/7] ARM: dts: Use phandle notation for overriding nodes in
- Exynos5420
+Date: Sun, 12 Apr 2015 21:24:53 +0900
+Subject: [PATCH 6/7] ARM: dts: Use phandle notation for overriding nodes in
+ SMDK5420
 In-Reply-To: <1428841494-20769-1-git-send-email-k.kozlowski.k@gmail.com>
 References: <1428841494-20769-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1428841494-20769-6-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1428841494-20769-7-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The phandle notation reduces possible mistakes when overriding nodes.
-Additionally remove duplicated serial and uart labels for serial.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- arch/arm/boot/dts/exynos5420-peach-pit.dts |  2 +-
- arch/arm/boot/dts/exynos5420.dtsi          | 80 +++++++++++++++---------------
- arch/arm/boot/dts/exynos5800-peach-pi.dts  |  2 +-
- 3 files changed, 42 insertions(+), 42 deletions(-)
+ arch/arm/boot/dts/exynos5420-smdk5420.dts | 639 +++++++++++++++---------------
+ 1 file changed, 320 insertions(+), 319 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 3f4e2feaa927..9d199ce01314 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -1024,7 +1024,7 @@
- 	};
- };
- 
--&uart_3 {
-+&serial_3 {
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index c7a44ee0ce06..25228527294c 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -328,13 +328,6 @@
- 		interrupts = <0 47 0>;
+diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+index 7a56852efada..0a5d812b5c85 100644
+--- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
++++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+@@ -64,102 +64,6 @@
+ 		};
  	};
  
--	rtc: rtc at 101E0000 {
--		clocks = <&clock CLK_RTC>;
--		clock-names = "rtc";
--		interrupt-parent = <&pmu_system_controller>;
--		status = "disabled";
+-	rtc at 101E0000 {
+-		status = "okay";
 -	};
 -
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -496,26 +489,6 @@
- 		status = "disabled";
+-	codec at 11000000 {
+-		samsung,mfc-r = <0x43000000 0x800000>;
+-		samsung,mfc-l = <0x51000000 0x800000>;
+-	};
+-
+-	mmc at 12200000 {
+-		status = "okay";
+-		broken-cd;
+-		card-detect-delay = <200>;
+-		samsung,dw-mshc-ciu-div = <3>;
+-		samsung,dw-mshc-sdr-timing = <0 4>;
+-		samsung,dw-mshc-ddr-timing = <0 2>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
+-		bus-width = <8>;
+-		cap-mmc-highspeed;
+-	};
+-
+-	mmc at 12220000 {
+-		status = "okay";
+-		card-detect-delay = <200>;
+-		samsung,dw-mshc-ciu-div = <3>;
+-		samsung,dw-mshc-sdr-timing = <2 3>;
+-		samsung,dw-mshc-ddr-timing = <1 2>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
+-		bus-width = <4>;
+-		cap-sd-highspeed;
+-	};
+-
+-	dp-controller at 145B0000 {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&dp_hpd>;
+-		samsung,color-space = <0>;
+-		samsung,dynamic-range = <0>;
+-		samsung,ycbcr-coeff = <0>;
+-		samsung,color-depth = <1>;
+-		samsung,link-rate = <0x0a>;
+-		samsung,lane-count = <4>;
+-		status = "okay";
+-	};
+-
+-	fimd at 14400000 {
+-		status = "okay";
+-		display-timings {
+-			native-mode = <&timing0>;
+-			timing0: timing at 0 {
+-				clock-frequency = <50000>;
+-				hactive = <2560>;
+-				vactive = <1600>;
+-				hfront-porch = <48>;
+-				hback-porch = <80>;
+-				hsync-len = <32>;
+-				vback-porch = <16>;
+-				vfront-porch = <8>;
+-				vsync-len = <6>;
+-			};
+-		};
+-	};
+-
+-	pinctrl at 13400000 {
+-		hdmi_hpd_irq: hdmi-hpd-irq {
+-			samsung,pins = "gpx3-7";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <1>;
+-			samsung,pin-drv = <0>;
+-		};
+-	};
+-
+-	pinctrl at 14000000 {
+-		usb300_vbus_en: usb300-vbus-en {
+-			samsung,pins = "gpg0-5";
+-			samsung,pin-function = <1>;
+-			samsung,pin-pud = <0>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		usb301_vbus_en: usb301-vbus-en {
+-			samsung,pins = "gpg1-4";
+-			samsung,pin-function = <1>;
+-			samsung,pin-pud = <0>;
+-			samsung,pin-drv = <0>;
+-		};
+-	};
+-
+-	hdmi at 14530000 {
+-		status = "okay";
+-		hpd-gpio = <&gpx3 7 0>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&hdmi_hpd_irq>;
+-	};
+-
+ 	usb300_vbus_reg: regulator-usb300 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "VBUS0";
+@@ -182,238 +86,335 @@
+ 		enable-active-high;
  	};
  
--	uart_0: serial at 12C00000 {
--		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
--		clock-names = "uart", "clk_uart_baud0";
+-	phy at 12100000 {
+-		vbus-supply = <&usb300_vbus_reg>;
 -	};
--
--	uart_1: serial at 12C10000 {
--		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
--		clock-names = "uart", "clk_uart_baud0";
--	};
--
--	uart_2: serial at 12C20000 {
--		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
--		clock-names = "uart", "clk_uart_baud0";
--	};
--
--	uart_3: serial at 12C30000 {
--		clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
--		clock-names = "uart", "clk_uart_baud0";
--	};
--
- 	pwm: pwm at 12dd0000 {
- 		compatible = "samsung,exynos4210-pwm";
- 		reg = <0x12dd0000 0x100>;
-@@ -531,13 +504,6 @@
- 		#phy-cells = <0>;
- 	};
++};
  
--	dp: dp-controller at 145B0000 {
--		clocks = <&clock CLK_DP1>;
--		clock-names = "dp";
--		phys = <&dp_phy>;
--		phy-names = "dp";
--	};
--
- 	mipi_phy: video-phy at 10040714 {
- 		compatible = "samsung,s5pv210-mipi-video-phy";
- 		reg = <0x10040714 12>;
-@@ -557,12 +523,6 @@
- 		status = "disabled";
- 	};
- 
--	fimd: fimd at 14400000 {
--		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
--		clock-names = "sclk_fimd", "fimd";
--		power-domains = <&disp_pd>;
--	};
--
- 	adc: adc at 12D10000 {
- 		compatible = "samsung,exynos-adc-v2";
- 		reg = <0x12D10000 0x100>;
-@@ -962,3 +922,43 @@
- 		samsung,pmureg-phandle = <&pmu_system_controller>;
- 	};
- };
-+
+-	phy at 12500000 {
+-		vbus-supply = <&usb301_vbus_reg>;
 +&dp {
-+	clocks = <&clock CLK_DP1>;
-+	clock-names = "dp";
-+	phys = <&dp_phy>;
-+	phy-names = "dp";
++	pinctrl-names = "default";
++	pinctrl-0 = <&dp_hpd>;
++	samsung,color-space = <0>;
++	samsung,dynamic-range = <0>;
++	samsung,ycbcr-coeff = <0>;
++	samsung,color-depth = <1>;
++	samsung,link-rate = <0x0a>;
++	samsung,lane-count = <4>;
++	status = "okay";
 +};
 +
 +&fimd {
-+	clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
-+	clock-names = "sclk_fimd", "fimd";
-+	power-domains = <&disp_pd>;
++	status = "okay";
++	display-timings {
++		native-mode = <&timing0>;
++		timing0: timing at 0 {
++			clock-frequency = <50000>;
++			hactive = <2560>;
++			vactive = <1600>;
++			hfront-porch = <48>;
++			hback-porch = <80>;
++			hsync-len = <32>;
++			vback-porch = <16>;
++			vfront-porch = <8>;
++			vsync-len = <6>;
++		};
+ 	};
++};
+ 
+-	i2c_2: i2c at 12C80000 {
+-		samsung,i2c-sda-delay = <100>;
+-		samsung,i2c-max-bus-freq = <66000>;
+-		status = "okay";
++&hdmi {
++	status = "okay";
++	hpd-gpio = <&gpx3 7 0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&hdmi_hpd_irq>;
++};
+ 
+-		hdmiddc at 50 {
+-			compatible = "samsung,exynos4210-hdmiddc";
+-			reg = <0x50>;
++&hsi2c_4 {
++	status = "okay";
++
++	s2mps11_pmic at 66 {
++		compatible = "samsung,s2mps11-pmic";
++		reg = <0x66>;
++		s2mps11,buck2-ramp-delay = <12>;
++		s2mps11,buck34-ramp-delay = <12>;
++		s2mps11,buck16-ramp-delay = <12>;
++		s2mps11,buck6-ramp-enable = <1>;
++		s2mps11,buck2-ramp-enable = <1>;
++		s2mps11,buck3-ramp-enable = <1>;
++		s2mps11,buck4-ramp-enable = <1>;
++
++		s2mps11_osc: clocks {
++			#clock-cells = <1>;
++			clock-output-names = "s2mps11_ap",
++					"s2mps11_cp", "s2mps11_bt";
+ 		};
+-	};
+ 
+-	hsi2c_4: i2c at 12CA0000 {
+-		status = "okay";
+-
+-		s2mps11_pmic at 66 {
+-			compatible = "samsung,s2mps11-pmic";
+-			reg = <0x66>;
+-			s2mps11,buck2-ramp-delay = <12>;
+-			s2mps11,buck34-ramp-delay = <12>;
+-			s2mps11,buck16-ramp-delay = <12>;
+-			s2mps11,buck6-ramp-enable = <1>;
+-			s2mps11,buck2-ramp-enable = <1>;
+-			s2mps11,buck3-ramp-enable = <1>;
+-			s2mps11,buck4-ramp-enable = <1>;
+-
+-			s2mps11_osc: clocks {
+-				#clock-cells = <1>;
+-				clock-output-names = "s2mps11_ap",
+-						"s2mps11_cp", "s2mps11_bt";
++		regulators {
++			ldo1_reg: LDO1 {
++				regulator-name = "vdd_ldo1";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++
++			ldo3_reg: LDO3 {
++				regulator-name = "vdd_ldo3";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			ldo5_reg: LDO5 {
++				regulator-name = "vdd_ldo5";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			ldo6_reg: LDO6 {
++				regulator-name = "vdd_ldo6";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++
++			ldo7_reg: LDO7 {
++				regulator-name = "vdd_ldo7";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			ldo8_reg: LDO8 {
++				regulator-name = "vdd_ldo8";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			ldo9_reg: LDO9 {
++				regulator-name = "vdd_ldo9";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++			};
++
++			ldo10_reg: LDO10 {
++				regulator-name = "vdd_ldo10";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			ldo11_reg: LDO11 {
++				regulator-name = "vdd_ldo11";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++
++			ldo12_reg: LDO12 {
++				regulator-name = "vdd_ldo12";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
+ 			};
+ 
+-			regulators {
+-				ldo1_reg: LDO1 {
+-					regulator-name = "vdd_ldo1";
+-					regulator-min-microvolt = <1000000>;
+-					regulator-max-microvolt = <1000000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo3_reg: LDO3 {
+-					regulator-name = "vdd_ldo3";
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt = <1800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo5_reg: LDO5 {
+-					regulator-name = "vdd_ldo5";
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt = <1800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo6_reg: LDO6 {
+-					regulator-name = "vdd_ldo6";
+-					regulator-min-microvolt = <1000000>;
+-					regulator-max-microvolt = <1000000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo7_reg: LDO7 {
+-					regulator-name = "vdd_ldo7";
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt = <1800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo8_reg: LDO8 {
+-					regulator-name = "vdd_ldo8";
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt = <1800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo9_reg: LDO9 {
+-					regulator-name = "vdd_ldo9";
+-					regulator-min-microvolt = <3000000>;
+-					regulator-max-microvolt = <3000000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo10_reg: LDO10 {
+-					regulator-name = "vdd_ldo10";
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt = <1800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo11_reg: LDO11 {
+-					regulator-name = "vdd_ldo11";
+-					regulator-min-microvolt = <1000000>;
+-					regulator-max-microvolt = <1000000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo12_reg: LDO12 {
+-					regulator-name = "vdd_ldo12";
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt = <1800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo13_reg: LDO13 {
+-					regulator-name = "vdd_ldo13";
+-					regulator-min-microvolt = <2800000>;
+-					regulator-max-microvolt = <2800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo15_reg: LDO15 {
+-					regulator-name = "vdd_ldo15";
+-					regulator-min-microvolt = <3100000>;
+-					regulator-max-microvolt = <3100000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo16_reg: LDO16 {
+-					regulator-name = "vdd_ldo16";
+-					regulator-min-microvolt = <2200000>;
+-					regulator-max-microvolt = <2200000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo17_reg: LDO17 {
+-					regulator-name = "tsp_avdd";
+-					regulator-min-microvolt = <3300000>;
+-					regulator-max-microvolt = <3300000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo19_reg: LDO19 {
+-					regulator-name = "vdd_sd";
+-					regulator-min-microvolt = <2800000>;
+-					regulator-max-microvolt = <2800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo24_reg: LDO24 {
+-					regulator-name = "tsp_io";
+-					regulator-min-microvolt = <2800000>;
+-					regulator-max-microvolt = <2800000>;
+-					regulator-always-on;
+-				};
+-
+-				buck1_reg: BUCK1 {
+-					regulator-name = "vdd_mif";
+-					regulator-min-microvolt = <800000>;
+-					regulator-max-microvolt = <1300000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck2_reg: BUCK2 {
+-					regulator-name = "vdd_arm";
+-					regulator-min-microvolt = <800000>;
+-					regulator-max-microvolt = <1500000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck3_reg: BUCK3 {
+-					regulator-name = "vdd_int";
+-					regulator-min-microvolt = <800000>;
+-					regulator-max-microvolt = <1400000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck4_reg: BUCK4 {
+-					regulator-name = "vdd_g3d";
+-					regulator-min-microvolt = <800000>;
+-					regulator-max-microvolt = <1400000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck5_reg: BUCK5 {
+-					regulator-name = "vdd_mem";
+-					regulator-min-microvolt = <800000>;
+-					regulator-max-microvolt = <1400000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck6_reg: BUCK6 {
+-					regulator-name = "vdd_kfc";
+-					regulator-min-microvolt = <800000>;
+-					regulator-max-microvolt = <1500000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck7_reg: BUCK7 {
+-					regulator-name = "vdd_1.0v_ldo";
+-					regulator-min-microvolt = <800000>;
+-					regulator-max-microvolt = <1500000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck8_reg: BUCK8 {
+-					regulator-name = "vdd_1.8v_ldo";
+-					regulator-min-microvolt = <800000>;
+-					regulator-max-microvolt = <1500000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck9_reg: BUCK9 {
+-					regulator-name = "vdd_2.8v_ldo";
+-					regulator-min-microvolt = <3000000>;
+-					regulator-max-microvolt = <3750000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck10_reg: BUCK10 {
+-					regulator-name = "vdd_vmem";
+-					regulator-min-microvolt = <2850000>;
+-					regulator-max-microvolt = <2850000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
++			ldo13_reg: LDO13 {
++				regulator-name = "vdd_ldo13";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++			};
++
++			ldo15_reg: LDO15 {
++				regulator-name = "vdd_ldo15";
++				regulator-min-microvolt = <3100000>;
++				regulator-max-microvolt = <3100000>;
++				regulator-always-on;
++			};
++
++			ldo16_reg: LDO16 {
++				regulator-name = "vdd_ldo16";
++				regulator-min-microvolt = <2200000>;
++				regulator-max-microvolt = <2200000>;
++				regulator-always-on;
++			};
++
++			ldo17_reg: LDO17 {
++				regulator-name = "tsp_avdd";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			ldo19_reg: LDO19 {
++				regulator-name = "vdd_sd";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++			};
++
++			ldo24_reg: LDO24 {
++				regulator-name = "tsp_io";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++			};
++
++			buck1_reg: BUCK1 {
++				regulator-name = "vdd_mif";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck2_reg: BUCK2 {
++				regulator-name = "vdd_arm";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck3_reg: BUCK3 {
++				regulator-name = "vdd_int";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1400000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck4_reg: BUCK4 {
++				regulator-name = "vdd_g3d";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1400000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck5_reg: BUCK5 {
++				regulator-name = "vdd_mem";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1400000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck6_reg: BUCK6 {
++				regulator-name = "vdd_kfc";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck7_reg: BUCK7 {
++				regulator-name = "vdd_1.0v_ldo";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck8_reg: BUCK8 {
++				regulator-name = "vdd_1.8v_ldo";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck9_reg: BUCK9 {
++				regulator-name = "vdd_2.8v_ldo";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3750000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck10_reg: BUCK10 {
++				regulator-name = "vdd_vmem";
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <2850000>;
++				regulator-always-on;
++				regulator-boot-on;
+ 			};
+ 		};
+ 	};
+ };
++
++&i2c_2 {
++	samsung,i2c-sda-delay = <100>;
++	samsung,i2c-max-bus-freq = <66000>;
++	status = "okay";
++
++	hdmiddc at 50 {
++		compatible = "samsung,exynos4210-hdmiddc";
++		reg = <0x50>;
++	};
++};
++
++&mfc {
++	samsung,mfc-r = <0x43000000 0x800000>;
++	samsung,mfc-l = <0x51000000 0x800000>;
++};
++
++&mmc_0 {
++	status = "okay";
++	broken-cd;
++	card-detect-delay = <200>;
++	samsung,dw-mshc-ciu-div = <3>;
++	samsung,dw-mshc-sdr-timing = <0 4>;
++	samsung,dw-mshc-ddr-timing = <0 2>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
++	bus-width = <8>;
++	cap-mmc-highspeed;
++};
++
++&mmc_2 {
++	status = "okay";
++	card-detect-delay = <200>;
++	samsung,dw-mshc-ciu-div = <3>;
++	samsung,dw-mshc-sdr-timing = <2 3>;
++	samsung,dw-mshc-ddr-timing = <1 2>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
++	bus-width = <4>;
++	cap-sd-highspeed;
++};
++
++&pinctrl_0 {
++	hdmi_hpd_irq: hdmi-hpd-irq {
++		samsung,pins = "gpx3-7";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <1>;
++		samsung,pin-drv = <0>;
++	};
++};
++
++&pinctrl_2 {
++	usb300_vbus_en: usb300-vbus-en {
++		samsung,pins = "gpg0-5";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	usb301_vbus_en: usb301-vbus-en {
++		samsung,pins = "gpg1-4";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
 +};
 +
 +&rtc {
-+	clocks = <&clock CLK_RTC>;
-+	clock-names = "rtc";
-+	interrupt-parent = <&pmu_system_controller>;
-+	status = "disabled";
++	status = "okay";
 +};
 +
-+&serial_0 {
-+	clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
-+	clock-names = "uart", "clk_uart_baud0";
++&usbdrd_phy0 {
++	vbus-supply = <&usb300_vbus_reg>;
 +};
 +
-+&serial_1 {
-+	clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
-+	clock-names = "uart", "clk_uart_baud0";
++&usbdrd_phy1 {
++	vbus-supply = <&usb301_vbus_reg>;
 +};
-+
-+&serial_2 {
-+	clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
-+	clock-names = "uart", "clk_uart_baud0";
-+};
-+
-+&serial_3 {
-+	clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
-+	clock-names = "uart", "clk_uart_baud0";
-+};
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index c833bacf873b..9d26abd88dfd 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -986,7 +986,7 @@
- 	};
- };
- 
--&uart_3 {
-+&serial_3 {
- 	status = "okay";
- };
- 
 -- 
 2.1.0
