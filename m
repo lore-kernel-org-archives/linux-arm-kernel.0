@@ -1,113 +1,70 @@
-From: andrew@ncrmnt.org (Andrew)
-Date: Sun, 12 Apr 2015 16:02:12 +0300
-Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
- DNS-327L
-In-Reply-To: <552A6209.9040903@gmail.com>
-References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
- <552A6209.9040903@gmail.com>
-Message-ID: <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
+From: wangbintian@gmail.com (Brent Wang)
+Date: Sun, 12 Apr 2015 21:07:43 +0800
+Subject: [PATCH 3/3] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <7a9107efdfe64b0d9e9d93421595badb@www.loen.fr>
+References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
+ <1423128277-10297-4-git-send-email-bintian.wang@huawei.com>
+ <20150205193017.GF20735@leverpostej>
+ <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
+ <CAAS=xmgySDmwNpx5xpHd15M-1eJLvPBhudhGu+cRqw3g_X_SZA@mail.gmail.com>
+ <7a9107efdfe64b0d9e9d93421595badb@www.loen.fr>
+Message-ID: <CAAS=xmh1j3H6Dj2-4UgWCtcXSnm_ASiEhee3XDawg7Gi2pTJmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian Hesselbarth ????? 12.04.2015 15:16:
-> On 12.04.2015 13:43, Andrew wrote:
->> Sebastian Hesselbarth ????? 12.04.2015 14:20:
->>> On 11.04.2015 22:29, Andrew Andrianov wrote:
->>>> Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
-> [...]
->>>> + * CONFIG_ARM_MVEBU_V7_CPUIDLE=y causes hard freezes every 1-8 
->>>> hours
->>> 
->>> I don't think the dts is the right place for Linux issues.
->> 
->> Not sure if that's a hardware weirdness or software issue (yet).
->> Just checked - this goblin is there in 4.0-rc7.
-> 
-> I understand the issue, but still the dts is not the right place
-> for this comment.
+Hello Marc,
 
-Okay, got it.
-I'll file a bug about this issue to the the bugzilla. However something
-tells me it might not be cpuidle, but D-link. This one's sounds nasty
-and it has been around since 3.16.x. How could it go unnoticed?
-Unfortunately I have no other armada-370 hardware to test it.
+2015-04-12 18:57 GMT+08:00 Marc Zyngier <marc.zyngier@arm.com>:
+> On 2015-04-12 07:40, Brent Wang wrote:
+>>
+>> Hello Mark,
+>>
+>> 2015-02-06 16:42 GMT+08:00 Brent Wang <wangbintian@gmail.com>:
+>> [...]
+>>>>
+>>>>
+>>>>> +     gic: interrupt-controller at f6800000 {
+>>>>> +             compatible = "arm,gic-400", "arm,cortex-a15-gic";
+>>>>
+>>>>
+>>>> Surely there's no need for the "arm,cortex-a15-gic" fallback entry? What
+>>>> am I missing?
+>>>
+>>> Remove it in next version.
+>>
+>> After remove "arm,cortex-a15-gic", I get the following error during
+>> kernel booting:
+>> -----
+>> kvm [1]: Using HYP init bounce page @396d9000
+>> kvm [1]: error: no compatible GIC node found
+>> kvm [1]: error initializing Hyp mode: -19
+>> -----
+>>
+>> Check code "virt/kvm/arm/vgic.c", gicv2 only "cortex-a15-gic" and
+>> gicv3 support kvm now,
+>> so I think we should keep it, how about your idea?
+>
+>
+> Please look at commit 0f37247574b3 that is queued for merge in 4.1.
+> It adds the required compatibility strings to KVM, so Mark is perfectly
+> right to ask you to drop this "cortex-a15-gic" from your DT.
 
-> 
-> [...]
->>>> +                marvell,nand-keep-config;
->>>> +                marvell,nand-enable-arbiter;
->>>> +                nand-on-flash-bbt;
->>> 
->>> Do you know the ECC scheme used?
->> 
->> Any hints on how to find it apart from dumping NAND controller 
->> registers
->> from bootloader ?
-> 
-> From the original bootlog:
-> 
-> armada-nand armada-nand.0: Initialize HAL based NFC in 8bit mode with
-> DMA Disabled using BCH 4bit ECC
-> 
-> that translates into
-> 
-> nand-ecc-strength = <4>;
-> nand-ecc-step-size = <512>;
+Thanks for the information.
 
-Thanks!
+> This DT won't be merged before 4.1 anyway, so there is no point trying
+> to make it work with older kernels.
+>
+> Thanks,
+>
+>         M.
+> --
+> Fast, cheap, reliable. Pick two.
 
-> 
-> [...]
->>>> +                /* Hardwired into stock bootloader */
->>> 
->>> I don't get the comment above.
->> 
->> The stock u-boot is hacked with a 'failsafe' kernel address.
-> 
-> Ok, the above partition isn't passed by the bootloader on mtdparts
-> cmdline, i.e. that is why you call it "hardwired" ?
 
-As far I got - stock u-boot knows nothing about partition tables and
-operates just on raw NAND offsets.
-
-> Just remove the comment, actually the whole partition table is
-> "hacked" into the stock bootloader.
-> 
->> If for some reason running the 'bootcmd' fails, it reads
->> 5MiBs from partition @ (5d00000 + 0x800) and tries to boot it.
->> There's no way to change this via environment, only by replacing
->> the bootloader.
->> Personally I'm more happy with a simpler partition table, but I
->> guess upstream should be oriented towards the stock bootloader.
-> 
-> Yeah, leave the original partition table. Any other, smarter
-> bootloader can replace it.
-> 
-> [...]
->> Thanks for the review, I'll resubmit the fixed patchset shortly.
->> Please disregard my [PATCH v2] messages. I've send them the moment 
->> before
->> I noticed your email and review.
-> 
-> Please always leave the Cc-list in place.
-
-Sorry, I had to resend that email twice. First one to you, next to the 
-list
-and others. I'm quite new to LKML so still playing with proper email 
-setup.
-
-> And you should relax and leave patches there a day or two (or three).
-> Not everybody is reading patches immediately.
-> 
-> We are in no hurry, the current merge window is already closed,
-> the new one is 6 weeks away.
-> 
-> Sebastian
-
-I only have a chance to play with the hardware at the weekend, since the
-spare dns327l is at the country house, so I try to send fixes as soon as
-get feedback while I can quickly test it.
 
 -- 
-Regards,
-Andrew
+Best Regards,
+
+Bintian
+===========================
+Don't be nervous, just be happy!
