@@ -1,83 +1,72 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sun, 12 Apr 2015 21:24:50 +0900
-Subject: [PATCH 3/7] ARM: dts: Remove duplicated I2C 7 nodes in Snow
+Date: Sun, 12 Apr 2015 21:24:48 +0900
+Subject: [PATCH 1/7] ARM: dts: Add labels to nodes used in Exynos5 based DTS
 In-Reply-To: <1428841494-20769-1-git-send-email-k.kozlowski.k@gmail.com>
 References: <1428841494-20769-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1428841494-20769-4-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1428841494-20769-2-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2c_7 node (i2c at 12CD0000) with LVDS bridge child node was put in
-Exynos5250 Snow DTS file twice.
+Add new labels to certain nodes so they could be easily referenced by
+Exynos5 board DTS.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- arch/arm/boot/dts/exynos5250-snow.dts | 46 +++++++++++++++++------------------
- 1 file changed, 22 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/exynos5.dtsi    | 6 +++---
+ arch/arm/boot/dts/exynos5440.dtsi | 4 ++--
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index 2657e842e5a5..7ecdad0517e7 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -177,30 +177,6 @@
- 		};
+diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+index 056251599c69..e0f00bde7b14 100644
+--- a/arch/arm/boot/dts/exynos5.dtsi
++++ b/arch/arm/boot/dts/exynos5.dtsi
+@@ -81,14 +81,14 @@
+ 		interrupts = <0 54 0>;
  	};
  
--	i2c at 12CD0000 {
--		ptn3460: lvds-bridge at 20 {
--			compatible = "nxp,ptn3460";
--			reg = <0x20>;
--			powerdown-gpios = <&gpy2 5 GPIO_ACTIVE_HIGH>;
--			reset-gpios = <&gpx1 5 GPIO_ACTIVE_HIGH>;
--			edid-emulation = <5>;
--
--			ports {
--				port at 0 {
--					bridge_out: endpoint {
--						remote-endpoint = <&panel_in>;
--					};
--				};
--
--				port at 1 {
--					bridge_in: endpoint {
--						remote-endpoint = <&dp_out>;
--					};
--				};
--			};
--		};
--	};
--
- 	sound {
- 		compatible = "google,snow-audio-max98095";
+-	rtc at 101E0000 {
++	rtc: rtc at 101E0000 {
+ 		compatible = "samsung,s3c6410-rtc";
+ 		reg = <0x101E0000 0x100>;
+ 		interrupts = <0 43 0>, <0 44 0>;
+ 		status = "disabled";
+ 	};
  
-@@ -507,6 +483,28 @@
- 	samsung,i2c-sda-delay = <100>;
- 	samsung,i2c-max-bus-freq = <66000>;
+-	fimd at 14400000 {
++	fimd: fimd at 14400000 {
+ 		compatible = "samsung,exynos5250-fimd";
+ 		interrupt-parent = <&combiner>;
+ 		reg = <0x14400000 0x40000>;
+@@ -98,7 +98,7 @@
+ 		status = "disabled";
+ 	};
  
-+	ptn3460: lvds-bridge at 20 {
-+		compatible = "nxp,ptn3460";
-+		reg = <0x20>;
-+		powerdown-gpios = <&gpy2 5 GPIO_ACTIVE_HIGH>;
-+		reset-gpios = <&gpx1 5 GPIO_ACTIVE_HIGH>;
-+		edid-emulation = <5>;
-+
-+		ports {
-+			port at 0 {
-+				bridge_out: endpoint {
-+					remote-endpoint = <&panel_in>;
-+				};
-+			};
-+
-+			port at 1 {
-+				bridge_in: endpoint {
-+					remote-endpoint = <&dp_out>;
-+				};
-+			};
-+		};
-+	};
-+
- 	max98095: codec at 11 {
- 		compatible = "maxim,max98095";
- 		reg = <0x11>;
+-	dp-controller at 145B0000 {
++	dp: dp-controller at 145B0000 {
+ 		compatible = "samsung,exynos5-dp";
+ 		reg = <0x145B0000 0x1000>;
+ 		interrupts = <10 3>;
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index 59d9416b3b03..f18b51f2eeaa 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -279,7 +279,7 @@
+ 		clock-names = "usbhost";
+ 	};
+ 
+-	pcie at 290000 {
++	pcie_0: pcie at 290000 {
+ 		compatible = "samsung,exynos5440-pcie", "snps,dw-pcie";
+ 		reg = <0x290000 0x1000
+ 			0x270000 0x1000
+@@ -300,7 +300,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	pcie at 2a0000 {
++	pcie_1: pcie@2a0000 {
+ 		compatible = "samsung,exynos5440-pcie", "snps,dw-pcie";
+ 		reg = <0x2a0000 0x1000
+ 			0x272000 0x1000
 -- 
 2.1.0
