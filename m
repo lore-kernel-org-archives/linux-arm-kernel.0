@@ -1,73 +1,27 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 13 Apr 2015 00:24:12 +0930
-Subject: [PATCH v3 6/6] hwmon: pwm-fan: Update the duty cycle inorder to
- control the pwm-fan
-In-Reply-To: <1428850452-4178-1-git-send-email-linux.amoon@gmail.com>
-References: <1428850452-4178-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1428850452-4178-7-git-send-email-linux.amoon@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 12 Apr 2015 16:58:57 +0200
+Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
+ DNS-327L
+In-Reply-To: <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
+References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
+ <552A6209.9040903@gmail.com>
+ <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
+Message-ID: <20150412145857.GA14038@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to disable the PWM we need to update using following sequence.
+> Okay, got it.
+> I'll file a bug about this issue to the the bugzilla. However something
+> tells me it might not be cpuidle, but D-link. This one's sounds nasty
+> and it has been around since 3.16.x. How could it go unnoticed?
+> Unfortunately I have no other armada-370 hardware to test it.
 
-	pwm_config(pwm, 0, period);
- 	pwm_disable(pwm);
+Hi Andrew
 
-pwm_config() with a zero duty cycle to make it clear the timer and update the PWM registers.
-pwm_disable will clear the TCON_AUTORELOAD(tcon_chan) and update the PWM register.
+A few of us here do have hardware to test with. Please give a detailed
+description of how you reproduce the issue, and your kernel
+configuration, if different from mvebu_v7_defconfig, or
+multi_v7_defconfig.
 
-Next change in state will get trigger unless a new PWM cycle happened.
-
-	pwm_config(pwm, duty, period);
- 	pwm_enable(pwm);
-
-Through pwm_config we update the duty cycle and period and update the PWM register.
-pwm_enable will update the state to TCON_MANUALUPDATE(tcon_chan)
-and TCON_START(tcon_chan) | TCON_AUTORELOAD(tcon_chan) and update the PWM register.
-
-Reported-by: Markus Reichl <m.reichl@fivetechno.de>
-Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
-Reviewed-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
- drivers/hwmon/pwm-fan.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
-index 7c83dc4..f25c841 100644
---- a/drivers/hwmon/pwm-fan.c
-+++ b/drivers/hwmon/pwm-fan.c
-@@ -44,26 +44,24 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
- 	int ret = 0;
- 
- 	mutex_lock(&ctx->lock);
-+
- 	if (ctx->pwm_value == pwm)
- 		goto exit_set_pwm_err;
- 
--	if (pwm == 0) {
--		pwm_disable(ctx->pwm);
--		goto exit_set_pwm;
--	}
--
- 	duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
- 	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
- 	if (ret)
- 		goto exit_set_pwm_err;
- 
-+	if (pwm == 0)
-+		pwm_disable(ctx->pwm);
-+
- 	if (ctx->pwm_value == 0) {
- 		ret = pwm_enable(ctx->pwm);
- 		if (ret)
- 			goto exit_set_pwm_err;
- 	}
- 
--exit_set_pwm:
- 	ctx->pwm_value = pwm;
- exit_set_pwm_err:
- 	mutex_unlock(&ctx->lock);
--- 
-1.9.1
+	Thanks
+		Andrew
