@@ -1,57 +1,65 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 12 Apr 2015 12:06:10 +0200 (CEST)
-Subject: Bug: Toggling green led on Olinuxino Maxi, also toggles USB
-Message-ID: <1622635769.189113.1428833170958.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
+Date: Sun, 12 Apr 2015 12:16:22 +0200
+Subject: [PATCH v3 05/10] drivers: PL011: refactor pl011_probe()
+In-Reply-To: <1428578961-6896-6-git-send-email-andre.przywara@arm.com>
+References: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
+ <1428578961-6896-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150412121622.2ee92f59@north>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu,  9 Apr 2015 12:29:16 +0100, Andre Przywara wrote:
+> Currently the pl011_probe() function is relying on some AMBA IDs
+> and a device tree node to initialize the driver and a port.
+> Both features are not necessarily required for the driver:
+> - we lack AMBA IDs in the ARM SBSA generic UART and
+> - we lack a DT node in ACPI systems.
+> So lets refactor the function to ease later reuse.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  drivers/tty/serial/amba-pl011.c |   89 ++++++++++++++++++++++++++-------------
+>  1 file changed, 60 insertions(+), 29 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index e1ac2cb..65df5c7 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2174,13 +2174,10 @@ static void pl011_unregister_port(struct uart_amba_port *uap)
+>  		uart_unregister_driver(&amba_reg);
+>  }
+>  
+> -
+> -static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+> +static int pl011_allocate_port(struct device *dev, struct uart_amba_port **_uap)
+>  {
+>  	struct uart_amba_port *uap;
+> -	struct vendor_data *vendor = id->data;
+> -	void __iomem *base;
+> -	int i, ret;
+> +	int i;
+>  
+>  	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
+>  		if (amba_ports[i] == NULL)
+> @@ -2189,51 +2186,53 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>  	if (i == ARRAY_SIZE(amba_ports))
+>  		return -EBUSY;
+>  
+> -	uap = devm_kzalloc(&dev->dev, sizeof(struct uart_amba_port),
+> -			   GFP_KERNEL);
+> +	uap = devm_kzalloc(dev, sizeof(struct uart_amba_port), GFP_KERNEL);
+>  	if (uap == NULL)
+>  		return -ENOMEM;
+>  
+> -	i = pl011_probe_dt_alias(i, &dev->dev);
+> +	if (_uap)
+> +		*_uap = uap;
+> +
+> +	return i;
+> +}
 
-toggling the green LED (GPIO 65) on Olinuxino Maxi unexpectedly also toggles the
-USB Host support.
+Could we please move the allocation out of this function and spare
+ourselves the "out argument".  It's just a matter of personal
+preference so the final decision is up to you.
 
-Here is the console output:
-
-# Switching the led off (USB drive connected)
-echo 255 > /sys/class/leds/green/brightness
-[  318.650000] ci_hdrc ci_hdrc.0: timeout waiting for 00000800 in 11
-[  318.650000] ci_hdrc ci_hdrc.0: EHCI Host Controller
-[  318.670000] ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
-[  318.710000] ci_hdrc ci_hdrc.0: USB 2.0 started, EHCI 1.00
-[  318.750000] hub 1-0:1.0: USB hub found
-[  318.780000] hub 1-0:1.0: 1 port detected
-[  319.140000] usb 1-1: new high-speed USB device number 2 using ci_hdrc
-[  319.310000] hub 1-1:1.0: USB hub found
-[  319.340000] hub 1-1:1.0: 3 ports detected
-[  319.640000] usb 1-1.1: new high-speed USB device number 3 using ci_hdrc
-[  319.880000] usb 1-1.2: new high-speed USB device number 4 using ci_hdrc
-[  320.030000] usb-storage 1-1.2:1.0: USB Mass Storage device detected
-[  320.040000] scsi host0: usb-storage 1-1.2:1.0
-[  321.090000] scsi 0:0:0:0: Direct-Access     LG       USB Drive        1100
-PQ: 0 ANSI: 0 CCS
-
-# Switching the led on (USB drive connected)
-echo "0" > /sys/class/leds/green/brightness
-[ 1068.890000] ci_hdrc ci_hdrc.0: remove, state 1
-[ 1068.890000] usb usb1: USB disconnect, device number 1
-[ 1068.920000] usb 1-1: USB disconnect, device number 2
-[ 1068.920000] usb 1-1.1: USB disconnect, device number 3
-[ 1069.070000] usb 1-1.2: USB disconnect, device number 4
-[ 1069.450000] ci_hdrc ci_hdrc.0: USB bus 1 deregistered
-[ 1074.460000] ci_hdrc ci_hdrc.0: timeout waiting for 00000800 in 11
-
-Kernel: 4.0.0-rc4-next-20150320
-Bootloader: U-Boot 2014-10
-
-Harald discovered this problem before me on Olinuxino Mini [1].
-
-I think the problem has something to with USB OTG, because GPIO 65 is on the
-same pin for USB_OTG_ID.
-My idea was to set "dr_mode" in olinuxino dts explicit to "host" and it works,
-but i'm not sure that is the right fix.
-
-Shouldn't chipidea driver complain about missing pinctrl or something else?
-
-Stefan
-
-[1] - https://www.olimex.com/forum/index.php?topic=4271.0
+Also you never pass _uap as NULL so the check is unnecessary.
