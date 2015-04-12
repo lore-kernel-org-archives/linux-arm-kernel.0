@@ -1,33 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Apr 2015 20:14:21 +0100
-Subject: how to mapping device memory in head.S
-In-Reply-To: <CADUS3onGVjDd3Mquda2bgeLFvmxZUUYdiwzJ4nd7XjhyyudiDw@mail.gmail.com>
-References: <CADUS3onGVjDd3Mquda2bgeLFvmxZUUYdiwzJ4nd7XjhyyudiDw@mail.gmail.com>
-Message-ID: <20150412191420.GP12732@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 12 Apr 2015 21:47:35 +0200
+Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
+ DNS-327L
+In-Reply-To: <b172d775afa24cea69a9490f531c6b37@mail.ncrmnt.org>
+References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
+ <552A6209.9040903@gmail.com>
+ <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
+ <20150412145857.GA14038@lunn.ch>
+ <b172d775afa24cea69a9490f531c6b37@mail.ncrmnt.org>
+Message-ID: <20150412194735.GA27921@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 12, 2015 at 08:23:59PM +0800, yoma sophian wrote:
-> hi all:
-> I need to map peripheral address in head.S for early usage.
+On Sun, Apr 12, 2015 at 06:41:31PM +0300, Andrew wrote:
+> Andrew Lunn ?????????? 12.04.2015 17:58:
+> >>Okay, got it.
+> >>I'll file a bug about this issue to the the bugzilla. However
+> >>something
+> >>tells me it might not be cpuidle, but D-link. This one's sounds nasty
+> >>and it has been around since 3.16.x. How could it go unnoticed?
+> >>Unfortunately I have no other armada-370 hardware to test it.
+> >
+> >Hi Andrew
+> >
+> >A few of us here do have hardware to test with. Please give a detailed
+> >description of how you reproduce the issue, and your kernel
+> >configuration, if different from mvebu_v7_defconfig, or
+> >multi_v7_defconfig.
+> >
+> >	Thanks
+> >		Andrew
+> 
+> 
+> arch/arm/configs/mvebu_v7_defconfig has CONFIG_ARM_MVEBU_V7_CPUIDLE=y,
+> so it should be sufficient to reproduce the issue. I first encountered
+> this issue using that very config and observed it on 2 DNS-327L boxes I
+> own.
+> 
+> All I have to do to trigger the bug - enable cpuidle driver and let
+> the box
+> sit for some 4-12 hours, till it hard-freezes. If wdt is enabled -
+> wdt reboot
+> will happen.
 
-Basically, you do not.
+That simple! Well i've got a 370RD which has been sat mostly idle for
+weeks, using the mvebu_v7_defconfig, with a few addition things turned
+on for testing the Ethernet switch on the board. I've not had that
+lockup.
 
-Please explain in detail what you're trying to do.
-
-> 1. CONFIG_DEBUG_LL is  using short-descriptor 1st-level section
-> descriptor formats. Is it possible to use short-descriptor 2nd-level
-> small page descriptor in head.S?
-
-Definitely not, there is no memory management at that stage to allocate
-a 2nd level descriptor table.
-
-> 2. The peripheral mapping virtual address created in head.S is need to
-> access even after paging_init. Is it possible to put the mapping in
-> the persistent mapping in head.S?
-
-No, we don't support that.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+One thing you can try to narrow it down is the disable the second idle
+mode. Take a look at armada370_idle_driver. Keep the
+ARM_CPUIDLE_WFI_STATE but disable the "Deep Idle" state.
+      
+      Andrew
