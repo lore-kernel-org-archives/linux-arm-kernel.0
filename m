@@ -1,65 +1,109 @@
-From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
-Date: Sun, 12 Apr 2015 12:16:22 +0200
-Subject: [PATCH v3 05/10] drivers: PL011: refactor pl011_probe()
-In-Reply-To: <1428578961-6896-6-git-send-email-andre.przywara@arm.com>
-References: <1428578961-6896-1-git-send-email-andre.przywara@arm.com>
- <1428578961-6896-6-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150412121622.2ee92f59@north>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 12 Apr 2015 18:24:37 +0800
+Subject: [PATCH] clk: sirf: add CSR atlas7 clk and reset support
+In-Reply-To: <20150411002358.18916.16856@quantum>
+References: <1419495845-4345-1-git-send-email-21cnbao@gmail.com>
+ <20150411002358.18916.16856@quantum>
+Message-ID: <CAGsJ_4zUcZY2_rTeav521-1j-QGeHWF+ArO_dYoOSOYCJDNvEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  9 Apr 2015 12:29:16 +0100, Andre Przywara wrote:
-> Currently the pl011_probe() function is relying on some AMBA IDs
-> and a device tree node to initialize the driver and a port.
-> Both features are not necessarily required for the driver:
-> - we lack AMBA IDs in the ARM SBSA generic UART and
-> - we lack a DT node in ACPI systems.
-> So lets refactor the function to ease later reuse.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  drivers/tty/serial/amba-pl011.c |   89 ++++++++++++++++++++++++++-------------
->  1 file changed, 60 insertions(+), 29 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index e1ac2cb..65df5c7 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2174,13 +2174,10 @@ static void pl011_unregister_port(struct uart_amba_port *uap)
->  		uart_unregister_driver(&amba_reg);
->  }
->  
-> -
-> -static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
-> +static int pl011_allocate_port(struct device *dev, struct uart_amba_port **_uap)
->  {
->  	struct uart_amba_port *uap;
-> -	struct vendor_data *vendor = id->data;
-> -	void __iomem *base;
-> -	int i, ret;
-> +	int i;
->  
->  	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
->  		if (amba_ports[i] == NULL)
-> @@ -2189,51 +2186,53 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->  	if (i == ARRAY_SIZE(amba_ports))
->  		return -EBUSY;
->  
-> -	uap = devm_kzalloc(&dev->dev, sizeof(struct uart_amba_port),
-> -			   GFP_KERNEL);
-> +	uap = devm_kzalloc(dev, sizeof(struct uart_amba_port), GFP_KERNEL);
->  	if (uap == NULL)
->  		return -ENOMEM;
->  
-> -	i = pl011_probe_dt_alias(i, &dev->dev);
-> +	if (_uap)
-> +		*_uap = uap;
-> +
-> +	return i;
-> +}
+2015-04-11 8:23 GMT+08:00 Michael Turquette <mturquette@linaro.org>:
+> Quoting Barry Song (2014-12-25 00:24:05)
+>> From: Zhiwu Song <Zhiwu.Song@csr.com>
+>>
+>> the hardware node includes both clock and reset support, so it
+>> is named as "car".
+>> this patch implements Flexible clocks(mux, divider, gate), Selectable
+>> clock(mux, divider, gate), root clock(gate),leaf clock(gate), others.
+>> it also implements the reset controller functionality.
+>>
+>> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
+>>  .../devicetree/bindings/clock/csr,atlas7-car.txt   |   46 +
+>>  drivers/clk/sirf/Makefile                          |    2 +-
+>>  drivers/clk/sirf/clk-atlas7.c                      | 1652 ++++++++++++++++++++
+>>  3 files changed, 1699 insertions(+), 1 deletion(-)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
+>>  create mode 100644 drivers/clk/sirf/clk-atlas7.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt b/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
+>> new file mode 100644
+>> index 0000000..a1a9499
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
+>> @@ -0,0 +1,46 @@
+>> +* Clock and reset bindings for CSR atlas7
+>> +
+>> +Required properties:
+>> +- compatible: Should be "sirf,atlas7-car"
+>> +- reg: Address and length of the register set
+>> +- #clock-cells: Should be <1>
+>> +- #reset-cells: Should be <1>
+>> +
+>> +The clock consumer should specify the desired clock by having the clock
+>> +ID in its "clocks" phandle cell.
+>> +The ID list atlas7_clks defined in drivers/clk/sirf/clk-atlas7.c
+>> +
+>> +The reset consumer should specify the desired reset by having the reset
+>> +ID in its "reset" phandle cell.
+>> +The ID list atlas7_reset_unit defined in drivers/clk/sirf/clk-atlas7.c
+>> +
+>> +Examples:
+>> +
+>> +timer at 10dc0000 {
+>> +       compatible = "sirf,macro-tick";
+>> +       reg = <0x10dc0000 0x1000>;
+>> +       clocks = <&car 54>;
+>> +       interrupts = <0 0 0>,
+>> +                  <0 1 0>,
+>> +                  <0 2 0>,
+>> +                  <0 49 0>,
+>> +                  <0 50 0>,
+>> +                  <0 51 0>;
+>> +};
+>> +
+>> +uart1: uart at 18020000 {
+>> +       cell-index = <1>;
+>> +       compatible = "sirf,macro-uart";
+>> +       reg = <0x18020000 0x1000>;
+>> +       clocks = <&clks 95>;
+>> +       interrupts = <0 18 0>;
+>> +       fifosize = <32>;
+>> +};
+>> +
+>> +vpp at 13110000 {
+>> +       compatible = "sirf,prima2-vpp";
+>> +       reg = <0x13110000 0x10000>;
+>> +       interrupts = <0 31 0>;
+>> +       clocks = <&car 85>;
+>> +       resets = <&car 29>;
+>> +};
+>
+> It would be nice to provide an example of the clock provider node,
+> "sirf,atlas7-car".
 
-Could we please move the allocation out of this function and spare
-ourselves the "out argument".  It's just a matter of personal
-preference so the final decision is up to you.
+ok. Mike, thanks for reviewing.
 
-Also you never pass _uap as NULL so the check is unnecessary.
+> Also do you have a patch which adds this node to a
+> dts file somewhere?
+>
+
+this has been done when atlas7 platform was added. see:
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/atlas7.dtsi
+
+there is a node:
+            car: clock-controller at 18620000 {
+                compatible = "sirf,atlas7-car";
+                reg = <0x18620000 0x1000>;
+                #clock-cells = <1>;
+                #reset-cells = <1>;
+            };
+
+> Otherwise the rest of this patch looks OK.
+>
+> Regards,
+> Mike
+
+-barry
