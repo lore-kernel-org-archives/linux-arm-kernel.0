@@ -1,59 +1,33 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 13 Apr 2015 04:14:11 +0930
-Subject: [PATCH v4 6/6] hwmon: pwm-fan: Update the duty cycle inorder to
- control the pwm-fan
-In-Reply-To: <1428864251-31780-1-git-send-email-linux.amoon@gmail.com>
-References: <1428864251-31780-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1428864251-31780-7-git-send-email-linux.amoon@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 12 Apr 2015 20:14:21 +0100
+Subject: how to mapping device memory in head.S
+In-Reply-To: <CADUS3onGVjDd3Mquda2bgeLFvmxZUUYdiwzJ4nd7XjhyyudiDw@mail.gmail.com>
+References: <CADUS3onGVjDd3Mquda2bgeLFvmxZUUYdiwzJ4nd7XjhyyudiDw@mail.gmail.com>
+Message-ID: <20150412191420.GP12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm_config() must be called with a duty cycle of 0 prior to calling
-pwm_disable() to ensure that the pwm signal is set to low.
+On Sun, Apr 12, 2015 at 08:23:59PM +0800, yoma sophian wrote:
+> hi all:
+> I need to map peripheral address in head.S for early usage.
 
-Changes since v1 : None.
-Changes since v2 : None
-Changes since v3 : Simplify the comment.
+Basically, you do not.
 
-Reported-by: Markus Reichl <m.reichl@fivetechno.de>
-Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
-Reviewed-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
- drivers/hwmon/pwm-fan.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+Please explain in detail what you're trying to do.
 
-diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
-index 7c83dc4..c2a469e 100644
---- a/drivers/hwmon/pwm-fan.c
-+++ b/drivers/hwmon/pwm-fan.c
-@@ -47,23 +47,20 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
- 	if (ctx->pwm_value == pwm)
- 		goto exit_set_pwm_err;
- 
--	if (pwm == 0) {
--		pwm_disable(ctx->pwm);
--		goto exit_set_pwm;
--	}
--
- 	duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
- 	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
- 	if (ret)
- 		goto exit_set_pwm_err;
- 
-+	if (pwm == 0)
-+		pwm_disable(ctx->pwm);
-+
- 	if (ctx->pwm_value == 0) {
- 		ret = pwm_enable(ctx->pwm);
- 		if (ret)
- 			goto exit_set_pwm_err;
- 	}
- 
--exit_set_pwm:
- 	ctx->pwm_value = pwm;
- exit_set_pwm_err:
- 	mutex_unlock(&ctx->lock);
+> 1. CONFIG_DEBUG_LL is  using short-descriptor 1st-level section
+> descriptor formats. Is it possible to use short-descriptor 2nd-level
+> small page descriptor in head.S?
+
+Definitely not, there is no memory management at that stage to allocate
+a 2nd level descriptor table.
+
+> 2. The peripheral mapping virtual address created in head.S is need to
+> access even after paging_init. Is it possible to put the mapping in
+> the persistent mapping in head.S?
+
+No, we don't support that.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
