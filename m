@@ -1,150 +1,63 @@
-From: andrew@ncrmnt.org (Andrew)
-Date: Sun, 12 Apr 2015 01:33:04 +0300
-Subject: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink DNS-327L
-In-Reply-To: <20150411214005.GJ5244@lunn.ch>
-References: <1428784160-19431-1-git-send-email-andrew@ncrmnt.org>
- <1428784160-19431-3-git-send-email-andrew@ncrmnt.org>
- <20150411214005.GJ5244@lunn.ch>
-Message-ID: <926c05317f677c9e2562e1fe07b4a550@mail.ncrmnt.org>
+From: wangbintian@gmail.com (Brent Wang)
+Date: Sun, 12 Apr 2015 14:40:46 +0800
+Subject: [PATCH 3/3] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
+References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
+ <1423128277-10297-4-git-send-email-bintian.wang@huawei.com>
+ <20150205193017.GF20735@leverpostej>
+ <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
+Message-ID: <CAAS=xmgySDmwNpx5xpHd15M-1eJLvPBhudhGu+cRqw3g_X_SZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Lunn ????? 12.04.2015 00:40:
-> On Sat, Apr 11, 2015 at 11:29:20PM +0300, Andrew Andrianov wrote:
->> Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
->> ---
->>  arch/arm/boot/dts/Makefile                     |    1 +
->>  arch/arm/boot/dts/armada-370-dlink-dns327l.dts |  309 
->> ++++++++++++++++++++++++
->>  2 files changed, 310 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/armada-370-dlink-dns327l.dts
->> 
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index a1c776b..8535e4e 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -612,6 +612,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
->>  	zynq-zybo.dtb
->>  dtb-$(CONFIG_MACH_ARMADA_370) += \
->>  	armada-370-db.dtb \
->> +	armada-370-dlink-dns327l.dtb \
->>  	armada-370-mirabox.dtb \
->>  	armada-370-netgear-rn102.dtb \
->>  	armada-370-netgear-rn104.dtb \
->> diff --git a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts 
->> b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
->> new file mode 100644
->> index 0000000..12bc072
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
->> @@ -0,0 +1,309 @@
->> +/*
->> + * Device Tree file for DLINK DNS-327L
->> + *
->> + * Copyright (C) 2014, Andrew Andrianov <andrew@ncrmnt.org>
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License
->> + * as published by the Free Software Foundation; either version
->> + * 2 of the License, or (at your option) any later version.
->> + */
-> 
-> Hi Andrew
-> 
-> There has been a move to license all the 370 and XP DTS files under
-> dual GPL and X11. Are you willing to add X11?
+Hello Mark,
 
-No problem, will fix.
+2015-02-06 16:42 GMT+08:00 Brent Wang <wangbintian@gmail.com>:
+[...]
+>>
+>>> +     gic: interrupt-controller at f6800000 {
+>>> +             compatible = "arm,gic-400", "arm,cortex-a15-gic";
+>>
+>> Surely there's no need for the "arm,cortex-a15-gic" fallback entry? What
+>> am I missing?
+> Remove it in next version.
+After remove "arm,cortex-a15-gic", I get the following error during
+kernel booting:
+-----
+kvm [1]: Using HYP init bounce page @396d9000
+kvm [1]: error: no compatible GIC node found
+kvm [1]: error initializing Hyp mode: -19
+-----
 
-> 
->> +
->> +/* Remaining mysteries:
->> + *
->> + * There's still something unknown on i2c address 0x13
->> + * CONFIG_ARM_MVEBU_V7_CPUIDLE=y causes hard freezes every 1-8 hours
->> + *
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include <dt-bindings/input/input.h>
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include "armada-370.dtsi"
->> +
->> +/ {
->> +	model = "DLINK DNS-327L";
->> +	compatible = "dlink,dns327l",
->> +		"marvell,armada370",
->> +		"marvell,armada-370-xp";
->> +
->> +	chosen {
->> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> 
-> It would be nice to have
-> 
-> stdout-path = &uart0;
-> 
-> here. That will help with boot loaders, using this DT file, and it a
-> step towards removing the console=ttyS0,115200.
-> 
->> +	};
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg = <0x00000000 0x20000000>; /* 512 MiB */
->> +	};
->> +
->> +	soc {
->> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
->> +			MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
->> +
->> +		pcie-controller {
->> +			status = "okay";
->> +
->> +			/* Connected to Marvell SATA controller */
->> +			pcie at 1,0 {
->> +				/* Port 0, Lane 0 */
->> +				status = "okay";
->> +			};
->> +
->> +			/* Connected to NEC USB 3.0 controller */
->> +			pcie at 2,0 {
->> +				/* Port 1, Lane 0 */
->> +				status = "okay";
->> +			};
->> +		};
->> +
->> +		internal-regs {
->> +			serial at 12000 {
->> +				status = "okay";
->> +			};
->> +
->> +			serial at 12100 {
->> +				status = "okay";
->> +			};
-> 
-> Are both serial ports usable?
-> Could you document the pinout for the console?
-> 
->       Thanks
-> 	Andrew
+Check code "virt/kvm/arm/vgic.c", gicv2 only "cortex-a15-gic" and
+gicv3 support kvm now,
+so I think we should keep it, how about your idea?
 
+Thanks,
 
-The serial console pinout is :
-[RXD|(gap)|3.3v|GND|TXD]
+Bintian
 
-
-I've been documenting the hardware extensively in my blog here:
-http://ncrmnt.org/wp/2015/02/15/debian-dlink-dns-327l-the-guide/
-Pictures of the PCB are all there.
-
-The second UART is used to interface with weltrend mcu only.
-
-I'll resubmit the patches with fixes sometime tomorrow evening (GMT+4).
-Hopefully I'll also find out is hardware freezes with cpuidle enabled 
-are
-still there on 4.0-rc7.
-
--- 
-Regards,
-Andrew
+>>
+>>> +             reg = <0x0 0xf6801000 0x0 0x1000>, /* GICD */
+>>
+>> This doesn't match the unit-address.
+> Do you mean change to "<0x0 0xf6801000 0 0x1000>" ?
+>
+>>
+>>> +                   <0x0 0xf6802000 0x0 0x2000>, /* GICC */
+>>> +                   <0x0 0xf6804000 0x0 0x2000>, /* GICH */
+>>> +                   <0x0 0xf6806000 0x0 0x2000>; /* GICV */
+>>
+>> I guess no-one's bothered to consider 64k pages?
+>>
+>> Given GICH and GICV, I hope that this platform is booted at EL2?
+> Transfer from EL3 to EL1 directly, keep these two just for future use.
+>
+>>
+>>> +             #interrupt-cells = <3>;
+>>> +             #address-cells = <0>;
+>>> +             interrupt-controller;
+>>> +     };
+>>> +
+>>> +
+[...]
