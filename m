@@ -1,55 +1,26 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 12 Apr 2015 21:47:35 +0200
-Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
- DNS-327L
-In-Reply-To: <b172d775afa24cea69a9490f531c6b37@mail.ncrmnt.org>
-References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
- <552A6209.9040903@gmail.com>
- <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
- <20150412145857.GA14038@lunn.ch>
- <b172d775afa24cea69a9490f531c6b37@mail.ncrmnt.org>
-Message-ID: <20150412194735.GA27921@lunn.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 12 Apr 2015 22:04:20 +0200
+Subject: [PATCH] v4l: omap4iss: Replace outdated OMAP4 control pad API
+ with syscon
+In-Reply-To: <1428841693-15109-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <3292592.cickJMVhRq@wuerfel>
+ <1428841693-15109-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <3942354.hKemp4fIKP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 12, 2015 at 06:41:31PM +0300, Andrew wrote:
-> Andrew Lunn ?????????? 12.04.2015 17:58:
-> >>Okay, got it.
-> >>I'll file a bug about this issue to the the bugzilla. However
-> >>something
-> >>tells me it might not be cpuidle, but D-link. This one's sounds nasty
-> >>and it has been around since 3.16.x. How could it go unnoticed?
-> >>Unfortunately I have no other armada-370 hardware to test it.
-> >
-> >Hi Andrew
-> >
-> >A few of us here do have hardware to test with. Please give a detailed
-> >description of how you reproduce the issue, and your kernel
-> >configuration, if different from mvebu_v7_defconfig, or
-> >multi_v7_defconfig.
-> >
-> >	Thanks
-> >		Andrew
+On Sunday 12 April 2015 15:28:13 Laurent Pinchart wrote:
 > 
+> Hi Arnd,
 > 
-> arch/arm/configs/mvebu_v7_defconfig has CONFIG_ARM_MVEBU_V7_CPUIDLE=y,
-> so it should be sufficient to reproduce the issue. I first encountered
-> this issue using that very config and observed it on 2 DNS-327L boxes I
-> own.
-> 
-> All I have to do to trigger the bug - enable cpuidle driver and let
-> the box
-> sit for some 4-12 hours, till it hard-freezes. If wdt is enabled -
-> wdt reboot
-> will happen.
+> This patch doesn't depend nor conflict with the OMAP4 ISS patches scheduled to
+> be merged in v4.1. If Mauro is fine with that, and if it makes your life
+> easier, it could get merged through the arm-soc tree. Please let me know what
+> you prefer.
 
-That simple! Well i've got a 370RD which has been sat mostly idle for
-weeks, using the mvebu_v7_defconfig, with a few addition things turned
-on for testing the Ethernet switch on the board. I've not had that
-lockup.
+I think it's fine to merge it through the media/staging tree as normal.
+I'm not as worried about bisection problems in staging drivers as elsewhere.
 
-One thing you can try to narrow it down is the disable the second idle
-mode. Take a look at armada370_idle_driver. Keep the
-ARM_CPUIDLE_WFI_STATE but disable the "Deep Idle" state.
-      
-      Andrew
+Thanks a lot for addressing this properly!
+
+	Arnd
