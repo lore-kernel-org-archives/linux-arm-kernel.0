@@ -1,20 +1,57 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 13 Apr 2015 00:24:06 +0930
-Subject: v3 Exynos5422 odroidxu3 pwm-fan control using thermal sensors
-Message-ID: <1428850452-4178-1-git-send-email-linux.amoon@gmail.com>
+Date: Mon, 13 Apr 2015 00:24:07 +0930
+Subject: [PATCH v3 1/6] ARM: dts :exynos5422-odroidxu3 Add pwm-fan node to the
+ Odroid-XU3 board.
+In-Reply-To: <1428850452-4178-1-git-send-email-linux.amoon@gmail.com>
+References: <1428850452-4178-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <1428850452-4178-2-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This work depeds upon work done by Lukasz Majewski <l.majewski@samsung.com>
-and Sjoerd Simons <sjoerd.simons@collabora.co.uk> regarding the pwm-fan.
+Add pwm-fan node to the OdroidXU3 board.
 
-Changes from v1
-        fixed the registration of thermal sensor to tmu_cpu0
-Dropped patches.
-        0005-pwm-samsung-Fix-output-race-on-disabling.patch
-        0006-hwmon-pwm-fan-Update-the-duty-cycle-inorder-to-contr.patch
-changes from v2
-Added patch
-	0006-hwmon-pwm-fan-Update-the-duty-cycle-inorder-to-contr.patch
+Tested on OdroidXU3 board.
 
--Anand Moon
+Changes since v1 : None
+Changes since v2 : None
+
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+index a519c86..04d982b 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -278,6 +278,15 @@
+ 	rtc at 101E0000 {
+ 		status = "okay";
+ 	};
++
++	fan0: pwm-fan {
++		compatible = "pwm-fan";
++		pwms = <&pwm 0 20972 0>;
++		cooling-min-state = <0>;
++		cooling-max-state = <3>;
++		#cooling-cells = <2>;
++		cooling-levels = <0 130 170 230>;
++	};
+ };
+ 
+ &hdmi {
+@@ -369,3 +378,10 @@
+ 		shunt-resistor = <10000>;
+ 	};
+ };
++
++&pwm {
++	pinctrl-0 = <&pwm0_out>;
++	pinctrl-names = "default";
++	samsung,pwm-outputs = <0>;
++	status = "okay";
++};
+-- 
+1.9.1
