@@ -1,149 +1,150 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sun, 12 Apr 2015 21:24:54 +0900
-Subject: [PATCH 7/7] ARM: dts: Use phandle notation for overriding nodes in
- Exynos5440 boards
-In-Reply-To: <1428841494-20769-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1428841494-20769-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1428841494-20769-8-git-send-email-k.kozlowski.k@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 12 Apr 2015 15:28:13 +0300
+Subject: [PATCH] v4l: omap4iss: Replace outdated OMAP4 control pad API with
+ syscon
+In-Reply-To: <3292592.cickJMVhRq@wuerfel>
+References: <3292592.cickJMVhRq@wuerfel>
+Message-ID: <1428841693-15109-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phandle notation reduces possible mistakes when overriding nodes.
+The omap4_ctrl_pad_readl and omap4_ctrl_pad_writel functions have been
+removed by commit efde234674d9 ("ARM: OMAP4+: control: remove support
+for legacy pad read/write") but are still used by the OMAP4 ISS driver,
+resulting in a compilation breakage:
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+drivers/staging/media/omap4iss/iss_csiphy.c: In function 'omap4iss_csiphy_config':
+drivers/staging/media/omap4iss/iss_csiphy.c:167:2: error: implicit declaration of function 'omap4_ctrl_pad_writel' [-Werror=implicit-function-declaration]
+  omap4_ctrl_pad_writel(cam_rx_ctrl,
+
+Fix the problem by using the syscon API to reaplace the control pad API.
+Lookup the syscon instance by compatible name for now as the OMAP4 ISS
+driver doesn't support DT yet.
+
+Fixes: efde234674d9 ("ARM: OMAP4+: control: remove support for legacy pad read/write")
+Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/boot/dts/exynos5440-sd5v1.dts    | 10 ++--
- arch/arm/boot/dts/exynos5440-ssdk5440.dts | 85 +++++++++++++++----------------
- 2 files changed, 47 insertions(+), 48 deletions(-)
+ drivers/staging/media/omap4iss/Kconfig      |  1 +
+ drivers/staging/media/omap4iss/iss.c        | 11 +++++++++++
+ drivers/staging/media/omap4iss/iss.h        |  4 ++++
+ drivers/staging/media/omap4iss/iss_csiphy.c | 12 +++++++-----
+ 4 files changed, 23 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5440-sd5v1.dts b/arch/arm/boot/dts/exynos5440-sd5v1.dts
-index 268609a42b2c..a98501bab6fc 100644
---- a/arch/arm/boot/dts/exynos5440-sd5v1.dts
-+++ b/arch/arm/boot/dts/exynos5440-sd5v1.dts
-@@ -27,13 +27,13 @@
- 		};
- 	};
+Hi Arnd,
+
+This patch doesn't depend nor conflict with the OMAP4 ISS patches scheduled to
+be merged in v4.1. If Mauro is fine with that, and if it makes your life
+easier, it could get merged through the arm-soc tree. Please let me know what
+you prefer.
+
+diff --git a/drivers/staging/media/omap4iss/Kconfig b/drivers/staging/media/omap4iss/Kconfig
+index b78643f..072dac0 100644
+--- a/drivers/staging/media/omap4iss/Kconfig
++++ b/drivers/staging/media/omap4iss/Kconfig
+@@ -2,6 +2,7 @@ config VIDEO_OMAP4
+ 	bool "OMAP 4 Camera support"
+ 	depends on VIDEO_V4L2=y && VIDEO_V4L2_SUBDEV_API && I2C=y && ARCH_OMAP4
+ 	depends on HAS_DMA
++	select MFD_SYSCON
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	---help---
+ 	  Driver for an OMAP 4 ISS controller.
+diff --git a/drivers/staging/media/omap4iss/iss.c b/drivers/staging/media/omap4iss/iss.c
+index 44b81a2..cf22dd2 100644
+--- a/drivers/staging/media/omap4iss/iss.c
++++ b/drivers/staging/media/omap4iss/iss.c
+@@ -17,6 +17,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/i2c.h>
+ #include <linux/interrupt.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+@@ -1386,6 +1387,16 @@ static int iss_probe(struct platform_device *pdev)
  
--	gmac: ethernet at 00230000 {
--		fixed_phy;
--		phy_addr = <1>;
--	};
--
- 	spi {
- 		status = "disabled";
- 	};
+ 	platform_set_drvdata(pdev, iss);
  
- };
++	/*
++	 * TODO: When implementing DT support switch to syscon regmap lookup by
++	 * phandle.
++	 */
++	iss->syscon = syscon_regmap_lookup_by_compatible("syscon");
++	if (IS_ERR(iss->syscon)) {
++		ret = PTR_ERR(iss->syscon);
++		goto error;
++	}
 +
-+&gmac {
-+	fixed_phy;
-+	phy_addr = <1>;
-+};
-diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-index ff55dac6e219..e4443f4e6572 100644
---- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-+++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-@@ -20,59 +20,58 @@
- 		bootargs = "root=/dev/sda2 rw rootwait ignore_loglevel earlyprintk no_console_suspend mem=2048M at 0x80000000 mem=6144M at 0x100000000 console=ttySAC0,115200";
- 	};
+ 	/* Clocks */
+ 	ret = iss_map_mem_resource(pdev, iss, OMAP4_ISS_MEM_TOP);
+ 	if (ret < 0)
+diff --git a/drivers/staging/media/omap4iss/iss.h b/drivers/staging/media/omap4iss/iss.h
+index 734cfee..35df8b4 100644
+--- a/drivers/staging/media/omap4iss/iss.h
++++ b/drivers/staging/media/omap4iss/iss.h
+@@ -29,6 +29,8 @@
+ #include "iss_ipipe.h"
+ #include "iss_resizer.h"
  
--	spi_0: spi at D0000 {
++struct regmap;
++
+ #define to_iss_device(ptr_module)				\
+ 	container_of(ptr_module, struct iss_device, ptr_module)
+ #define to_device(ptr_module)						\
+@@ -79,6 +81,7 @@ struct iss_reg {
+ 
+ /*
+  * struct iss_device - ISS device structure.
++ * @syscon: Regmap for the syscon register space
+  * @crashed: Bitmask of crashed entities (indexed by entity ID)
+  */
+ struct iss_device {
+@@ -93,6 +96,7 @@ struct iss_device {
+ 
+ 	struct resource *res[OMAP4_ISS_MEM_LAST];
+ 	void __iomem *regs[OMAP4_ISS_MEM_LAST];
++	struct regmap *syscon;
+ 
+ 	u64 raw_dmamask;
+ 
+diff --git a/drivers/staging/media/omap4iss/iss_csiphy.c b/drivers/staging/media/omap4iss/iss_csiphy.c
+index 7c3d55d..748607f 100644
+--- a/drivers/staging/media/omap4iss/iss_csiphy.c
++++ b/drivers/staging/media/omap4iss/iss_csiphy.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/delay.h>
+ #include <linux/device.h>
++#include <linux/regmap.h>
+ 
+ #include "../../../../arch/arm/mach-omap2/control.h"
+ 
+@@ -140,9 +141,11 @@ int omap4iss_csiphy_config(struct iss_device *iss,
+ 	 * - bit [18] : CSIPHY1 CTRLCLK enable
+ 	 * - bit [17:16] : CSIPHY1 config: 00 d-phy, 01/10 ccp2
+ 	 */
+-	cam_rx_ctrl = omap4_ctrl_pad_readl(
+-			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
 -
--		flash: w25q128 at 0 {
--			#address-cells = <1>;
--			#size-cells = <1>;
--			compatible = "winbond,w25q128";
--			spi-max-frequency = <15625000>;
--			reg = <0>;
--			controller-data {
--				samsung,spi-feedback-delay = <0>;
--			};
-+	fixed-rate-clocks {
-+		xtal {
-+			compatible = "samsung,clock-xtal";
-+			clock-frequency = <50000000>;
-+		};
-+	};
-+};
++	/*
++	 * TODO: When implementing DT support specify the CONTROL_CAMERA_RX
++	 * register offset in the syscon property instead of hardcoding it.
++	 */
++	regmap_read(iss->syscon, 0x68, &cam_rx_ctrl);
  
--			partition at 00000 {
--				label = "BootLoader";
--				reg = <0x60000 0x80000>;
--				read-only;
--			};
-+&pcie_0 {
-+	reset-gpio = <&pin_ctrl 5 0>;
-+	status = "okay";
-+};
+ 	if (subdevs->interface == ISS_INTERFACE_CSI2A_PHY1) {
+ 		cam_rx_ctrl &= ~(OMAP4_CAMERARX_CSI21_LANEENABLE_MASK |
+@@ -166,8 +169,7 @@ int omap4iss_csiphy_config(struct iss_device *iss,
+ 		cam_rx_ctrl |= OMAP4_CAMERARX_CSI22_CTRLCLKEN_MASK;
+ 	}
  
--			partition at e0000 {
--				label = "Recovery-Kernel";
--				reg = <0xe0000 0x300000>;
--				read-only;
--			};
-+&pcie_1 {
-+	reset-gpio = <&pin_ctrl 22 0>;
-+	status = "okay";
-+};
+-	omap4_ctrl_pad_writel(cam_rx_ctrl,
+-		 OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
++	regmap_write(iss->syscon, 0x68, cam_rx_ctrl);
  
--			partition at 3e0000 {
--				label = "CRAM-FS";
--				reg = <0x3e0000 0x700000>;
--				read-only;
--			};
-+&spi_0 {
-+	flash: w25q128 at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "winbond,w25q128";
-+		spi-max-frequency = <15625000>;
-+		reg = <0>;
-+		controller-data {
-+			samsung,spi-feedback-delay = <0>;
-+		};
- 
--			partition at ae0000 {
--				label = "User-Data";
--				reg = <0xae0000 0x520000>;
--			};
-+		partition at 00000 {
-+			label = "BootLoader";
-+			reg = <0x60000 0x80000>;
-+			read-only;
-+		};
- 
-+		partition at e0000 {
-+			label = "Recovery-Kernel";
-+			reg = <0xe0000 0x300000>;
-+			read-only;
- 		};
- 
--	};
-+		partition at 3e0000 {
-+			label = "CRAM-FS";
-+			reg = <0x3e0000 0x700000>;
-+			read-only;
-+		};
- 
--	fixed-rate-clocks {
--		xtal {
--			compatible = "samsung,clock-xtal";
--			clock-frequency = <50000000>;
-+		partition at ae0000 {
-+			label = "User-Data";
-+			reg = <0xae0000 0x520000>;
- 		};
--	};
- 
--	pcie at 290000 {
--		reset-gpio = <&pin_ctrl 5 0>;
--		status = "okay";
- 	};
- 
--	pcie at 2a0000 {
--		reset-gpio = <&pin_ctrl 22 0>;
--		status = "okay";
--	};
- };
+ 	/* Reset used lane count */
+ 	csi2->phy->used_data_lanes = 0;
 -- 
-2.1.0
+Regards,
+
+Laurent Pinchart
