@@ -1,71 +1,20 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 12 Apr 2015 15:22:24 +0300
-Subject: [PATCH] [media] omap4iss: avoid broken OMAP4 dependency
-In-Reply-To: <3292592.cickJMVhRq@wuerfel>
-References: <3292592.cickJMVhRq@wuerfel>
-Message-ID: <62125726.UhoJzFudPk@avalon>
+From: sophian.yoma@gmail.com (yoma sophian)
+Date: Sun, 12 Apr 2015 20:23:59 +0800
+Subject: how to mapping device memory in head.S
+Message-ID: <CADUS3onGVjDd3Mquda2bgeLFvmxZUUYdiwzJ4nd7XjhyyudiDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+hi all:
+I need to map peripheral address in head.S for early usage.
+And I found in arm/kernel/head.S, there is  CONFIG_DEBUG_LL for
+mapping low level uart.
+My questions are:
+1. CONFIG_DEBUG_LL is  using short-descriptor 1st-level section
+descriptor formats. Is it possible to use short-descriptor 2nd-level
+small page descriptor in head.S?
+2. The peripheral mapping virtual address created in head.S is need to
+access even after paging_init. Is it possible to put the mapping in
+the persistent mapping in head.S?
 
-Thank you for the patch.
-
-On Friday 10 April 2015 22:20:20 Arnd Bergmann wrote:
-> The omap4iss driver uses an interface that used to be provided
-> by OMAP4 but has now been removed and replaced with a WARN_ON(1)
-> statement, which likely broke the iss_csiphy code at runtime.
-> 
-> It also broke compiling the driver when CONFIG_ARCH_OMAP2PLUS
-> is set, which is implied by OMAP4:
-> 
-> drivers/staging/media/omap4iss/iss_csiphy.c: In function
-> 'omap4iss_csiphy_config':
-> drivers/staging/media/omap4iss/iss_csiphy.c:167:2: error: implicit
-> declaration of function 'omap4_ctrl_pad_writel'
-> [-Werror=implicit-function-declaration] omap4_ctrl_pad_writel(cam_rx_ctrl,
->
-> In turn, this broke ARM allyesconfig builds. Replacing the
-> omap4_ctrl_pad_writel call with WARN_ON(1) won't make the
-> situation any worse than it already is, but fixes the build
-> problem.
-
-I've fixed the problem properly by switching to the syscon API. I'll send the 
-patch as a separate reply, let's discuss there how to handle the issue.
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: efde234674d9 ("ARM: OMAP4+: control: remove support for legacy pad
-> read/write")
-> ---
-> diff --git a/drivers/staging/media/omap4iss/iss_csiphy.c
-> b/drivers/staging/media/omap4iss/iss_csiphy.c index
-> 7c3d55d811ef..24f56ed90ac3 100644
-> --- a/drivers/staging/media/omap4iss/iss_csiphy.c
-> +++ b/drivers/staging/media/omap4iss/iss_csiphy.c
-> 
-> @@ -140,9 +140,7 @@ int omap4iss_csiphy_config(struct iss_device *iss,
->  	 * - bit [18] : CSIPHY1 CTRLCLK enable
->  	 * - bit [17:16] : CSIPHY1 config: 00 d-phy, 01/10 ccp2
->  	 */
-> -	cam_rx_ctrl = omap4_ctrl_pad_readl(
-> -			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
-> -
-> +	cam_rx_ctrl = WARN_ON(1);
-> 
->  	if (subdevs->interface == ISS_INTERFACE_CSI2A_PHY1) {
->  		cam_rx_ctrl &= ~(OMAP4_CAMERARX_CSI21_LANEENABLE_MASK |
-> @@ -166,8 +164,7 @@ int omap4iss_csiphy_config(struct iss_device *iss,
->  		cam_rx_ctrl |= OMAP4_CAMERARX_CSI22_CTRLCLKEN_MASK;
->  	}
-> 
-> -	omap4_ctrl_pad_writel(cam_rx_ctrl,
-> -		 OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
-> +	WARN_ON(1);
-> 
->  	/* Reset used lane count */
->  	csi2->phy->used_data_lanes = 0;
-
--- 
-Regards,
-
-Laurent Pinchart
+appreciate your kind help in advance,
