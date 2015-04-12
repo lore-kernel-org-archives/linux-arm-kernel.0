@@ -1,67 +1,41 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 12 Apr 2015 14:45:49 +0300
-Subject: [PATCH] dmaengine: shdmac: avoid unused variable warnings
-In-Reply-To: <27084610.k92kokiTBY@wuerfel>
-References: <27084610.k92kokiTBY@wuerfel>
-Message-ID: <2023178.SEyFnlpYZz@avalon>
+From: harald@ccbib.org (Harald Geyer)
+Date: Sun, 12 Apr 2015 14:05:48 +0200
+Subject: Bug: Wrong gpio polarity for green LED on Olinuxino Maxi
+In-Reply-To: <1546181298.189897.1428834954615.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+References: <1546181298.189897.1428834954615.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+Message-ID: <E1YhGe4-00011i-B4@stardust.g4.wien.funkfeuer.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Stefan!
 
-Thank you for the patch.
-
-On Saturday 11 April 2015 00:27:58 Arnd Bergmann wrote:
-> This driver uses '#ifdef CONFIG_ARCH_SHMOBILE' and '#ifdef CONFIG_ARM'
-> interchangeably in its sh_dmae_probe function, which causes a build
-> warning when building for ARM without also enabling shmobile:
+Stefan Wahren writes:
+> i recently discovered that the polarity of the green LED on iMX233-Olinuxino
+> Maxi (Rev B) is wrong:
 > 
-> dma/sh/shdmac.c: In function sh_dmae_probe:
-> dma/sh/shdmac.c:696:6: warning: unused variable errirq [-Wunused-variable]
-> dma/sh/shdmac.c:695:16: warning: unused variable irqflags
-> [-Wunused-variable] dma/sh/shdmac.c: At top level:
-> dma/sh/shdmac.c:447:20: warning: sh_dmae_err defined but not used
-> [-Wunused-function]
+> # Switches the led off, expected on
+> echo 255 > /sys/class/leds/green/brightness
 > 
-> This changes all the #ifdef to test for CONFIG_ARCH_SHMOBILE to
-> avoid that warning. An earlier patch from Laurent had fixed the warning
-> for non-ARM case, but it still remained present in ARM randconfig builds.
+> # Switches the led on, exptected off
+> echo 0 > /sys/class/leds/green/brightness
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-Vinod, could you please pick the patch up ?
-
-> Fixes: 52d6a5ee101bf ("DMA: shdma: Fix warnings due to declared but unused
-> symbols") ---
->  drivers/dma/sh/shdmac.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Kernel: 4.0.0-rc4-next-20150320
 > 
-> diff --git a/drivers/dma/sh/shdmac.c b/drivers/dma/sh/shdmac.c
-> index 9f1d4c7dbab8..11707df1a689 100644
-> --- a/drivers/dma/sh/shdmac.c
-> +++ b/drivers/dma/sh/shdmac.c
-> @@ -443,7 +443,7 @@ static bool sh_dmae_reset(struct sh_dmae_device *shdev)
->  	return ret;
->  }
+> Unfortunately i don't have any other Olimex board like Mini or Nano.
 > 
-> -#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARM)
-> +#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
->  static irqreturn_t sh_dmae_err(int irq, void *data)
->  {
->  	struct sh_dmae_device *shdev = data;
-> @@ -689,7 +689,7 @@ static int sh_dmae_probe(struct platform_device *pdev)
->  	const struct sh_dmae_pdata *pdata;
->  	unsigned long chan_flag[SH_DMAE_MAX_CHANNELS] = {};
->  	int chan_irq[SH_DMAE_MAX_CHANNELS];
-> -#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARM)
-> +#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
->  	unsigned long irqflags = 0;
->  	int errirq;
->  #endif
+> @Harald: Could you please check it on your boards?
 
--- 
-Regards,
+I don't have access to my boards right now, but I know that this is
+the behaviour on Mini and Nano and always (i started with 3.10) has been.
+This is caused by the leds-gpio configuration in devicetree:
+                user {
+                        label = "green";
+                        gpios = <&gpio2 1 1>;
+                };
 
-Laurent Pinchart
+The last 1 in <&gpio2 1 1> inverts gpio polarity AFAIR. I don't know why
+this was selected, but as it seemed to be deliberate I never bothered
+about it.
+
+HTH,
+Harald
