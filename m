@@ -1,26 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 12 Apr 2015 22:04:20 +0200
-Subject: [PATCH] v4l: omap4iss: Replace outdated OMAP4 control pad API
- with syscon
-In-Reply-To: <1428841693-15109-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <3292592.cickJMVhRq@wuerfel>
- <1428841693-15109-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <3942354.hKemp4fIKP@wuerfel>
+Date: Sun, 12 Apr 2015 22:07:02 +0200
+Subject: [PATCH 0/7] ARM: dts: Refactor Exynos5 boards for phandle notation
+In-Reply-To: <1428841494-20769-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1428841494-20769-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <2603418.sEMfdEBYRq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 12 April 2015 15:28:13 Laurent Pinchart wrote:
+On Sunday 12 April 2015 21:24:47 Krzysztof Kozlowski wrote:
 > 
-> Hi Arnd,
+> The phandle notation reduces possible mistakes when overriding nodes
+> by child board files and reduces duplication of addresses.
 > 
-> This patch doesn't depend nor conflict with the OMAP4 ISS patches scheduled to
-> be merged in v4.1. If Mauro is fine with that, and if it makes your life
-> easier, it could get merged through the arm-soc tree. Please let me know what
-> you prefer.
+> The patchset refactors Exynos5 boards to use the phandle way.
+> 
+> Tested by comparison of decompiled DTB for each commit.
 
-I think it's fine to merge it through the media/staging tree as normal.
-I'm not as worried about bisection problems in staging drivers as elsewhere.
+The patches look fine, but the description is wrong as you are not
+using 'phandles' here, you are using 'labels'.
 
-Thanks a lot for addressing this properly!
+A phandle is a reference to another device node inside of a property,
+and while that is normally done using labels like
+
+	interrupt-parent = <&gic>;
+
+you can just as well use the full path in a phandle.
 
 	Arnd
