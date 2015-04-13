@@ -1,33 +1,85 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 13 Apr 2015 16:15:16 +0200
-Subject: [PATCH v2 4/6] clk: hi6220: Clock driver support for Hisilicon
- hi6220 SoC
-In-Reply-To: <552BC207.40807@huawei.com>
-References: <1428916660-25910-1-git-send-email-bintian.wang@huawei.com>
- <1428916660-25910-5-git-send-email-bintian.wang@huawei.com>
- <1428926202.11113.77.camel@x220> <552BC207.40807@huawei.com>
-Message-ID: <1428934516.11113.82.camel@x220>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 13 Apr 2015 16:12:54 +0200
+Subject: [PATCH v4 0/3] genirq: Saving/restoring the irqchip state of
+ an irq line
+In-Reply-To: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
+References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <552BCEE6.6060003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-04-13 at 21:17 +0800, Bintian wrote:
-> Thank you very much for code review and testing on arm!
+Hi Marc,
 
-s/testing/crosscompiling for/
+You can apply my R-b and T-b on the whole series. To be precise, I
+tested the get path only with my kvm-vfio forward series.
 
-> On 2015/4/13 19:56, Paul Bolle wrote:
-> > I wonder what checkpatch had to say about the length of the lines seen
-> > in this patch.
+Best Regards
+
+Eric
+
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Tested-by: Eric Auger <eric.auger@linaro.org>
+
+
+On 03/18/2015 12:01 PM, Marc Zyngier wrote:
+> Despite Linux offering a rather fine grained control over the life
+> cycle of an interrupt, there is a few cases where it would be very
+> useful to snapshot (or even set) the internal state of the interrupt
+> controller for a given interrupt line:
 > 
-> Yes, I ran this script before sending out this patch set, it reports
-> warnings about "line over 80 characters ", but I find it's easier to
-> read than shrinking one line to several lines, so just keep it, do I
-> need to fix it?
-
-I'll leave that to the maintainers of drivers/clk/. (I don't care
-deeply. So on second thought I should not have made that remark.)
-
-Thanks,
-
-
-Paul Bolle
+> - With KVM, a device shared between VMs must have its whole context
+>   switched, and that includes the interrupt line state. KVM/arm is
+>   moving to using this.
+> - Some GPIO controllers seem to require peeking into the interrupt
+>   controller they are connected to to report their internal state.
+> 
+> Instead of letting people facing this situation doing horrible
+> (controller specific) hacks in their code, let's offer a couple of new
+> entry points that allow a few attributes to be read and set.
+> 
+> Of course, this is a very dangerous thing to do if you don't know what
+> you doing, and I wouldn't expect most drivers to use this. But this
+> can also be a life saver at times.
+> 
+> This patch series implement said API, and adds support for this to the
+> two main ARM interrupt controllers (GIC and GICv3). Available at:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irqchip_state
+> 
+> This has been fairly heavily tested with KVM on ARM, which makes use
+> of this feature to context switch the timer interrupt (see the last
+> three patch in the above branch).
+> 
+> Thanks,
+> 
+> 	M.
+> 
+> * From v3 [3]
+> - Rebased on top of 4.0-rc4
+> 
+> * From v2 [2]:
+> - Rebased on top of 3.19-rc3
+> - Fixed irq_set_irqchip_state return value
+> 
+> * From v1 [1]:
+> - Rebased on top of 3.18-rc7 + tip/irq/irqdomain-arm
+> - Now deals with stacked domains
+> - Changed the API to be less ambiguous (after review by tglx)
+> - Added IRQCHIP_STATE_LINE_LEVEL (as requested by Bjorn Anderson)
+> 
+> [1] https://lkml.org/lkml/2014/10/25/134
+> [2] https://lkml.org/lkml/2014/12/3/612
+> [3] http://lkml.iu.edu/hypermail/linux/kernel/1501.0/03473.html
+> 
+> Marc Zyngier (3):
+>   genirq: Allow the irqchip state of an IRQ to be save/restored
+>   irqchip: GIC: Add support for irq_{get,set}_irqchip_state
+>   irqchip: GICv3: Add support for irq_{get,set}_irqchip_state
+> 
+>  drivers/irqchip/irq-gic-v3.c | 83 +++++++++++++++++++++++++++++++++-------
+>  drivers/irqchip/irq-gic.c    | 69 +++++++++++++++++++++++++++++++--
+>  include/linux/interrupt.h    | 14 +++++++
+>  include/linux/irq.h          |  6 +++
+>  kernel/irq/manage.c          | 91 ++++++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 246 insertions(+), 17 deletions(-)
+> 
