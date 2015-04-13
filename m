@@ -1,35 +1,83 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Mon, 13 Apr 2015 12:10:53 +0200
-Subject: [PATCH] iommu: rockchip: fix build without CONFIG_OF
-In-Reply-To: <3138014.xYAj3FssJ8@wuerfel>
-References: <3138014.xYAj3FssJ8@wuerfel>
-Message-ID: <20150413101050.GA3654@ulmo.nvidia.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 13 Apr 2015 18:17:17 +0800
+Subject: [PATCH v2 1/3] media: atmel-isi: remove the useless code which
+ disable isi
+In-Reply-To: <2109629.IWfKzc1IIn@avalon>
+References: <1428570108-4961-1-git-send-email-josh.wu@atmel.com>
+ <1428570108-4961-2-git-send-email-josh.wu@atmel.com>
+ <2109629.IWfKzc1IIn@avalon>
+Message-ID: <552B97AD.8080509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:58:24PM +0200, Arnd Bergmann wrote:
-> The rockchip iommu driver references its of_device_id table
-> from the init function, which fails to build when the table
-> is undefined:
-> 
-> iommu/rockchip-iommu.c: In function 'rk_iommu_init':
-> iommu/rockchip-iommu.c:1029:35: error: 'rk_iommu_dt_ids' undeclared (first use in this function)
->   np = of_find_matching_node(NULL, rk_iommu_dt_ids);
-> 
-> This removes the #ifdef and the corresponding of_match_ptr wrapper
-> to make it build both with CONFIG_OF enabled or disabled.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 425061b0f5074 ("iommu/rockchip: Play nice in multi-platform builds")
+Hi, Laurent
 
-How can this even happen? Rockchip depends on multiplatform, and
-multiplatform pulls in OF. Ah... COMPILE_TEST... oh well.
+On 4/12/2015 9:10 PM, Laurent Pinchart wrote:
+> Hi Josh,
+>
+> Thank you for the patch.
+>
+> On Thursday 09 April 2015 17:01:46 Josh Wu wrote:
+>> To program ISI control register, the pixel clock should be enabled.
+> That's an awful hardware design :-(
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150413/14d922ea/attachment.sig>
+yes, But I need to live with this.
+
+>
+>> So without pixel clock (from sensor) enabled, disable ISI controller is
+>> not make sense. So this patch remove those code.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>
+>> Changes in v2:
+>> - this file is new added.
+>>
+>>   drivers/media/platform/soc_camera/atmel-isi.c | 5 -----
+>>   1 file changed, 5 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
+>> b/drivers/media/platform/soc_camera/atmel-isi.c index c125b1d..31254b4
+>> 100644
+>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+>> @@ -131,8 +131,6 @@ static int configure_geometry(struct atmel_isi *isi, u32
+>> width, return -EINVAL;
+>>   	}
+>>
+>> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>> -
+>>   	cfg2 = isi_readl(isi, ISI_CFG2);
+> Can the configuration registers be accessed when the pixel clock is disabled ?
+
+yes, it can be accessed. The CFG1, CFG2 are not impacted.
+
+So far as I know only the ISI_CR is impacted, we can 
+disable/enable/reset ISI by set ISI_CR.
+Since ISI_CR register will work with pixel clock, so you need to poll 
+the ISI_SR to verify your control of ISI is effective.
+
+Best Regards,
+Josh Wu
+
+>
+>>   	/* Set YCC swap mode */
+>>   	cfg2 &= ~ISI_CFG2_YCC_SWAP_MODE_MASK;
+>> @@ -843,7 +841,6 @@ static int isi_camera_set_bus_param(struct
+>> soc_camera_device *icd)
+>>
+>>   	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
+>>
+>> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>>   	isi_writel(isi, ISI_CFG1, cfg1);
+>>
+>>   	return 0;
+>> @@ -1022,8 +1019,6 @@ static int atmel_isi_probe(struct platform_device
+>> *pdev) if (isi->pdata.data_width_flags & ISI_DATAWIDTH_10)
+>>   		isi->width_flags |= 1 << 9;
+>>
+>> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>> -
+>>   	irq = platform_get_irq(pdev, 0);
+>>   	if (IS_ERR_VALUE(irq)) {
+>>   		ret = irq;
