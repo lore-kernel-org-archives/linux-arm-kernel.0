@@ -1,48 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Apr 2015 14:42:46 +0100
-Subject: [PATCH v5] ARM: smp: Only expose /sys/.../cpuX/online if
- hotpluggable
-In-Reply-To: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
-References: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150413134246.GS12732@n2100.arm.linux.org.uk>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Mon, 13 Apr 2015 06:49:30 -0700
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
+ <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+ <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+Message-ID: <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 03:33:11PM -0700, Stephen Boyd wrote:
-> Writes to /sys/.../cpuX/online fail if we determine the platform
-> doesn't support hotplug for that CPU. Furthermore, if the cpu_die
-> op isn't specified the system hangs when we try to offline a CPU
-> and it comes right back online unexpectedly. Let's figure this
-> stuff out before we make the sysfs nodes so that the online file
-> doesn't even exist if it isn't (at least sometimes) possible to
-> hotplug the CPU.
-> 
-> Add a new 'cpu_can_disable' op and repoint all 'cpu_disable'
-> implementations at it because all implementers use the op to
-> indicate if a CPU can be hotplugged or not in a static fashion.
-> With PSCI we may need to add a 'cpu_disable' op so that the
-> secure OS can be migrated off the CPU we're trying to hotplug.
-> In this case, the 'cpu_can_disable' op will indicate that all
-> CPUs are hotpluggable by returning true, but the 'cpu_disable' op
-> will make a PSCI migration call and occasionally fail, denying
-> the hotplug of a CPU. This shouldn't be any worse than x86 where
-> we may indicate that all CPUs are hotpluggable but occasionally
-> we can't offline a CPU due to check_irq_vectors_for_cpu_disable()
-> failing to find a CPU to move vectors to.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Acked-by: Simon Horman <horms@verge.net.au> [shmobile portion]
-> Tested-by: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: <linux-sh@vger.kernel.org>
-> Cc: Tyler Baker <tyler.baker@linaro.org>
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Mon, 2015-04-13 at 11:56 +0100, George Dunlap wrote:
 
-Let's see some more acks for this...
+> Is the problem perhaps that netback/netfront delays TX completion?
+> Would it be better to see if that can be addressed properly, so that
+> the original purpose of the patch (fighting bufferbloat) can be
+> achieved while not degrading performance for Xen?  Or at least, so
+> that people get decent perfomance out of the box without having to
+> tweak TCP parameters?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Sure, please provide a patch, that does not break back pressure.
+
+But just in case, if Xen performance relied on bufferbloat, it might be
+very difficult to reach a stable equilibrium : Any small change in stack
+or scheduling might introduce a significant difference in 'raw
+performance'.
