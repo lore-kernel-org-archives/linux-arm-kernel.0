@@ -1,32 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 13 Apr 2015 11:53:06 +0200
-Subject: [PATCH 4/6] clk: mediatek: Add basic clocks for Mediatek MT8135.
-In-Reply-To: <CABuKBeJKrDMR+xHSk_WvppGE7KftMy-QL8ATFi081++C3vaKEg@mail.gmail.com>
-References: <1427825817-26773-1-git-send-email-s.hauer@pengutronix.de>
- <1427825817-26773-5-git-send-email-s.hauer@pengutronix.de>
- <CABuKBeJKrDMR+xHSk_WvppGE7KftMy-QL8ATFi081++C3vaKEg@mail.gmail.com>
-Message-ID: <20150413095306.GM9742@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Apr 2015 10:56:45 +0100
+Subject: [PATCH] ARM: print cma-reserved pages from show_mem
+In-Reply-To: <20150413012115.GB15225@corellia.local>
+References: <CADtm3G7CUYUUbmTrWiudQ5j-wX9hu86Ox8TkB+FnXwEvjb=xeg@mail.gmail.com>
+ <20150210113230.GJ8656@n2100.arm.linux.org.uk>
+ <CADtm3G64rPf7O76xUbLwqsqTkJxdGJMT9sHj810xPuThDA0ddg@mail.gmail.com>
+ <20150326114612.GD8656@n2100.arm.linux.org.uk>
+ <20150326123028.GM4701@suse.de>
+ <CADtm3G4Lb=u+BAHZF+O+RgB4VS9iW8epCPJ9ssBTj=+p3+h==Q@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D104A310D42397@CNBJMBX05.corpusers.net>
+ <20150410112430.GB12732@n2100.arm.linux.org.uk>
+ <20150413010913.GA15225@corellia.local>
+ <20150413012115.GB15225@corellia.local>
+Message-ID: <20150413095645.GQ12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 07:05:22PM +0200, Matthias Brugger wrote:
-> 2015-03-31 20:16 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> > +
-> > +       FACTOR(TOP_UNIVPLL_D3, "univpll_d3", "univpll_416m", 1, 1),
-> > +       FACTOR(TOP_UNIVPLL_D5, "univpll_d5", "univpll_249p6m", 1, 1),
-> > +       FACTOR(TOP_UNIVPLL_D7, "univpll_d7", "univpll_178p3m", 1, 1),
-> > +       FACTOR(TOP_UNIVPLL_D10, "univpll_d10", "univpll_249p6m", 1, 5),
+On Sun, Apr 12, 2015 at 06:21:15PM -0700, Gregory Fong wrote:
+> On Sun, Apr 12, 2015 at 06:09:13PM -0700, Gregory Fong wrote:
+> > And now we see 83 slab_reclaimable + 846 slab_unreclaimable adds up
+> > correctly to the total of 929.
+> > 
+> > The patch below will end up with the correct count.
+> > 
 > 
-> shouldn't that be
-> FACTOR(TOP_UNIVPLL_D10, "univpll_d10", "univpll_249p6m", 1, 2),
-> as univpll_249p6m is univpll divided by 5?
+> Sorry, messed up the patch formatting.  Here it is fixed:
 
-Yes, fixed.
-
-Sascha
+So now the question is: do we fix this, or do we use the generic version?
+Given that the total number of slab pages can be easily deduced from the
+generic statistics, do we need to modify the generic version to print an
+additional line with this?  It seems wasteful to do so, and just adds
+more noise to the kernel's debug output.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
