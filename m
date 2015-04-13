@@ -1,116 +1,131 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 13 Apr 2015 14:29:24 +0200
-Subject: [RFC v6 09/16] VFIO: add vfio_external_{mask|is_active|set_automasked}
+Date: Mon, 13 Apr 2015 14:29:25 +0200
+Subject: [RFC v6 10/16] KVM: kvm-vfio: wrappers to VFIO external API device
+ helpers
 In-Reply-To: <1428928171-18884-1-git-send-email-eric.auger@linaro.org>
 References: <1428928171-18884-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1428928171-18884-10-git-send-email-eric.auger@linaro.org>
+Message-ID: <1428928171-18884-11-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduces 3 new external functions aimed at doing actions
-on VFIO devices:
-- mask VFIO IRQ
-- get the active status of VFIO IRQ (active at interrupt
-  controller level or masked by the level-sensitive automasking).
-- change the automasked property and switch the IRQ handler
-  (between automasked/ non automasked)
+Provide wrapper functions that allow KVM-VFIO device code to
+interact with a vfio device:
+- kvm_vfio_device_get_external_user gets a handle to a struct
+  vfio_device from the vfio device file descriptor and increments
+  its reference counter,
+- kvm_vfio_device_put_external_user decrements the reference counter
+  to a vfio device,
+- kvm_vfio_external_base_device returns a handle to the struct device
+  of the vfio device.
 
-Their implementation is based on bus specific callbacks.
-
-Note there is no way to discriminate between user-space
-masking and automasked handler masking. As a consequence, is_active
-will return true in case the IRQ was masked by the user-space.
+Also kvm_vfio_get_vfio_device and kvm_vfio_put_vfio_device helpers
+are introduced.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
-v5 -> v6:
-- implementation now uses external ops
-- prototype changed (index, start, count) and returns int
+v3 -> v4:
+- wrappers are no more exposed in kvm_host and become kvm/vfio.c static
+  functions
+- added kvm_vfio_get_vfio_device/kvm_vfio_put_vfio_device in that
+  patch file
 
-V4: creation
+v2 -> v3:
+- reword the commit message and title
+
+v1 -> v2:
+- kvm_vfio_external_get_base_device renamed into
+  kvm_vfio_external_base_device
+- kvm_vfio_external_get_type removed
 ---
- drivers/vfio/vfio.c  | 39 +++++++++++++++++++++++++++++++++++++++
- include/linux/vfio.h | 16 ++++++++++++++++
- 2 files changed, 55 insertions(+)
+ virt/kvm/vfio.c | 74 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
 
-diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
-index 33ae8c5..a36188e 100644
---- a/drivers/vfio/vfio.c
-+++ b/drivers/vfio/vfio.c
-@@ -1526,6 +1526,45 @@ long vfio_external_check_extension(struct vfio_group *group, unsigned long arg)
+diff --git a/virt/kvm/vfio.c b/virt/kvm/vfio.c
+index 620e37f..80a45e4 100644
+--- a/virt/kvm/vfio.c
++++ b/virt/kvm/vfio.c
+@@ -60,6 +60,80 @@ static void kvm_vfio_group_put_external_user(struct vfio_group *vfio_group)
+ 	symbol_put(vfio_group_put_external_user);
  }
- EXPORT_SYMBOL_GPL(vfio_external_check_extension);
  
-+int vfio_external_mask(struct vfio_device *vdev, unsigned index,
-+			unsigned start, unsigned count)
++static struct vfio_device *kvm_vfio_device_get_external_user(struct file *filep)
 +{
-+	if (vdev->ops->external_ops &&
-+		vdev->ops->external_ops->mask)
-+		return vdev->ops->external_ops->mask(vdev->device_data,
-+						     index, start, count);
-+	else
-+		return -ENXIO;
-+}
-+EXPORT_SYMBOL_GPL(vfio_external_mask);
++	struct vfio_device *vdev;
++	struct vfio_device *(*fn)(struct file *);
 +
-+int vfio_external_is_active(struct vfio_device *vdev, unsigned index,
-+			     unsigned start, unsigned count)
++	fn = symbol_get(vfio_device_get_external_user);
++	if (!fn)
++		return ERR_PTR(-EINVAL);
++
++	vdev = fn(filep);
++
++	symbol_put(vfio_device_get_external_user);
++
++	return vdev;
++}
++
++static void kvm_vfio_device_put_external_user(struct vfio_device *vdev)
 +{
-+	if (vdev->ops->external_ops &&
-+		vdev->ops->external_ops->is_active)
-+		return vdev->ops->external_ops->is_active(vdev->device_data,
-+							  index, start, count);
-+	else
-+		return -ENXIO;
-+}
-+EXPORT_SYMBOL_GPL(vfio_external_is_active);
++	void (*fn)(struct vfio_device *);
 +
-+int vfio_external_set_automasked(struct vfio_device *vdev,
-+				  unsigned index, unsigned start,
-+				  unsigned count, bool automasked)
++	fn = symbol_get(vfio_device_put_external_user);
++	if (!fn)
++		return;
++
++	fn(vdev);
++
++	symbol_put(vfio_device_put_external_user);
++}
++
++static struct device *kvm_vfio_external_base_device(struct vfio_device *vdev)
 +{
-+	if (vdev->ops->external_ops &&
-+		vdev->ops->external_ops->set_automasked)
-+		return vdev->ops->external_ops->set_automasked(
-+							vdev->device_data,
-+							index, start,
-+							count, automasked);
-+	else
-+		return -ENXIO;
-+}
-+EXPORT_SYMBOL_GPL(vfio_external_set_automasked);
++	struct device *(*fn)(struct vfio_device *);
++	struct device *dev;
 +
- /**
-  * Module/class support
-  */
-diff --git a/include/linux/vfio.h b/include/linux/vfio.h
-index b0ec474..a740392 100644
---- a/include/linux/vfio.h
-+++ b/include/linux/vfio.h
-@@ -123,6 +123,22 @@ extern struct vfio_device *vfio_device_get_external_user(struct file *filep);
- extern void vfio_device_put_external_user(struct vfio_device *vdev);
- extern struct device *vfio_external_base_device(struct vfio_device *vdev);
- 
-+extern int vfio_external_mask(struct vfio_device *vdev, unsigned index,
-+			       unsigned start, unsigned count);
-+/*
-+ * returns whether the VFIO IRQ is active:
-+ * true if not yet deactivated at interrupt controller level or if
-+ * automasked (level sensitive IRQ). Unfortunately there is no way to
-+ * discriminate between handler auto-masking and user-space masking
++	fn = symbol_get(vfio_external_base_device);
++	if (!fn)
++		return NULL;
++
++	dev = fn(vdev);
++
++	symbol_put(vfio_external_base_device);
++
++	return dev;
++}
++
++/**
++ * kvm_vfio_get_vfio_device - Returns a handle to a vfio-device
++ *
++ * Checks it is a valid vfio device and increments its reference counter
++ * @fd: file descriptor of the vfio platform device
 + */
-+extern int vfio_external_is_active(struct vfio_device *vdev,
-+				    unsigned index, unsigned start,
-+				    unsigned count);
++static struct vfio_device *kvm_vfio_get_vfio_device(int fd)
++{
++	struct fd f = fdget(fd);
++	struct vfio_device *vdev;
 +
-+extern int vfio_external_set_automasked(struct vfio_device *vdev,
-+					 unsigned index, unsigned start,
-+					 unsigned count, bool automasked);
++	if (!f.file)
++		return ERR_PTR(-EINVAL);
++	vdev = kvm_vfio_device_get_external_user(f.file);
++	fdput(f);
++	return vdev;
++}
 +
- struct pci_dev;
- #ifdef CONFIG_EEH
- extern void vfio_spapr_pci_eeh_open(struct pci_dev *pdev);
++/**
++ * kvm_vfio_put_vfio_device: decrements the reference counter of the
++ * vfio platform * device
++ *
++ * @vdev: vfio_device handle to release
++ */
++static void kvm_vfio_put_vfio_device(struct vfio_device *vdev)
++{
++	kvm_vfio_device_put_external_user(vdev);
++}
++
+ static bool kvm_vfio_group_is_coherent(struct vfio_group *vfio_group)
+ {
+ 	long (*fn)(struct vfio_group *, unsigned long);
 -- 
 1.9.1
