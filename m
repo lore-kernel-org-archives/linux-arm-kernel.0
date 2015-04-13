@@ -1,197 +1,180 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Mon, 13 Apr 2015 21:22:54 +0200
-Subject: [PATCH v2 2/5] mtd: nand: add NVIDIA Tegra NAND Flash
- controller driver
-In-Reply-To: <99af1297029d7f1624db2f5fd9d228d1@agner.ch>
-References: <1428522370-18035-1-git-send-email-dev@lynxeye.de>
- <1428522370-18035-3-git-send-email-dev@lynxeye.de>
- <99af1297029d7f1624db2f5fd9d228d1@agner.ch>
-Message-ID: <1428952974.2616.2.camel@lynxeye.de>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Mon, 13 Apr 2015 12:31:08 -0700
+Subject: [PATCH v8 10/18] clk: tegra: Initialize PLL_X before CCLK_G to
+ ensure it has a parent
+In-Reply-To: <CAAObsKCHUG7Auwu29My5xfynsQ1Jm6KB0bGxf1e3uUO6dvsBRA@mail.gmail.com>
+References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1425213881-5262-11-git-send-email-mikko.perttunen@kapsi.fi>
+ <20150410210832.14369.65901@quantum> <5528FEC8.3080103@kapsi.fi>
+ <CAAObsKCHUG7Auwu29My5xfynsQ1Jm6KB0bGxf1e3uUO6dvsBRA@mail.gmail.com>
+Message-ID: <20150413193108.19585.29183@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Quoting Tomeu Vizoso (2015-04-13 05:17:01)
+> On 11 April 2015 at 13:00, Mikko Perttunen <mikko.perttunen@kapsi.fi> wrote:
+> > On 04/11/2015 12:08 AM, Michael Turquette wrote:
+> >>
+> >> Quoting Mikko Perttunen (2015-03-01 04:44:33)
+> >>>
+> >>> This patch moves the initialization of PLL_X to be slightly before
+> >>> that of CCLK_G. This ensures that at boot, CCLK_G will immediately
+> >>> have a parent and the common clock framework can determine its
+> >>> clock rate correctly.
+> >>>
+> >>> Without this patch, calling clk_put on CCLK_G could cause the CCF
+> >>> to set its rate to zero, hanging the system.
+> >>
+> >>
+> >> Hi Mikko,
+> >>
+> >> Patch looks fine to me but I wanted to get more info on the behavior you
+> >> mentioned above about clk_put. Is there some special circumstance that
+> >> causes this for you? Why does calling clk_put adjust the rate of your
+> >> clock?
+> >>
+> >> Thanks,
+> >> Mike
+> >
+> >
+> > Hi Mike,
+> >
+> > this is the chain of events:
+> > - CCLK_G is registered. CCF stores its current rate, but since it doesn't
+> > have a parent at this point, the rate is assumed zero.
+> > - tegra cpufreq driver tries to probe, and clk_gets CCLK_G
+> > - tegra dfll driver tries to probe, but fails
+> > - tegra cpufreq driver's probe fails, and during unwinding clk_puts CCLK_G
+> > - CCF attempts to restore CCLK_G's rate to what it was prior to the clk_get
+> > (to revert possible changes due to clock constraints)
+> 
+> The CCF will currently only do so if any constraints were set in the
+> per-user clk that was destroyed, so this particular problem shouldn't
+> happen any more: ec02ace clk: Only recalculate the rate if needed
 
-thanks for the review.
+Precisely. clk_put shouldn't be setting rates unless we're releasing a
+constraint. Can this re-ordering patch be dropped?
 
-Am Freitag, den 10.04.2015, 10:46 +0200 schrieb Stefan Agner:
-> Hi Lucas,
 > 
-> Thanks for working on that. Some minor comments below...
+> > - the stored rate was zero, so CCLK_G is set to zero.
+> >
+> > We did discuss it a bit on IRC with Tomeu and Peter and agreed that some fix
+> > in CCF should be done, but we didn't get much further than that.
 > 
-> On 2015-04-08 21:46, Lucas Stach wrote:
-> > Add support for the NAND flash controller found on NVIDIA
-> > Tegra 2/3 SoCs.
-> > 
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > Signed-off-by: Lucas Stach <dev@lynxeye.de>
-> > ---
-> > v2:
-> > - remove Tegra 3 compatible
-> > - remove useless part_probes
-> > - don't store irq number
-> > - use gpiod API instead of deprecated of_gpios
-> > - don't store reset
-> > - correct TIMING_TCS mask
-> > - simplify irq handler
-> > - correct timing calculations
-> > - don't store buswidth
-> > - drop compile test
-> > - correct ECC handling
-> > ---
-> >  MAINTAINERS                   |   6 +
-> >  drivers/mtd/nand/Kconfig      |   6 +
-> >  drivers/mtd/nand/Makefile     |   1 +
-> >  drivers/mtd/nand/tegra_nand.c | 786 ++++++++++++++++++++++++++++++++++++++++++
-> >  4 files changed, 799 insertions(+)
-> >  create mode 100644 drivers/mtd/nand/tegra_nand.c
-> > 
-> [...]
-> > +static struct nand_ecclayout tegra_nand_oob_16 = {
-> > +	.eccbytes = 4,
-> > +	.eccpos = { 3, 4, 5, 6 },
-> > +	.oobfree = {
-> > +		{ .offset = 7, . length = 8 }
-> > +	}
-> > +};
-> > +
-> > +static struct nand_ecclayout tegra_nand_oob_64 = {
-> > +	.eccbytes = 36,
-> > +	.eccpos = {
-> > +		 3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-> > +		19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-> > +		35, 36, 37, 38, 39
-> > +	},
-> 
-> The amount of eccbytes vs. length of eccpos do not match...
-> 
-> > +	.oobfree = {
-> > +		{ .offset = 40, .length = 24 }
-> > +	}
-> > +};
-> > +
-> > +static struct nand_ecclayout tegra_nand_oob_128 = {
-> > +	.eccbytes = 72,
-> > +	.eccpos = {
-> > +		 3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-> > +		19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-> > +		35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
-> > +		51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66,
-> > +		67, 68, 69, 70, 71, 72, 73, 74, 75
-> > +	},
-> 
-> Here...
-> 
-> > +	.oobfree = {
-> > +		{ .offset = 76, .length = 52 }
-> > +	}
-> > +};
-> > +
-> > +static struct nand_ecclayout tegra_nand_oob_224 = {
-> > +	.eccbytes = 144,
-> > +	.eccpos = {
-> > +		  3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,
-> > +		 15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,
-> > +		 27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,
-> > +		 39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,
-> > +		 51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,
-> > +		 63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,
-> > +		 75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,
-> > +		 87,  88,  89,  90,  91,  92,  93,  94,  95,  96,  97,  98,
-> > +		 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110,
-> > +		111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122,
-> > +		123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134,
-> > +		135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146,
-> > +		147
-> > +	},
-> 
-> ... and here too.
-> 
+> Wonder if we could somehow make sure that the rate in the CCF matches
+> the current state of the HW.
 
-Urgh, actually they are all wrong, as the ECC starts at byte 4, not
-3. :/ Thanks for the hint.
+If there is no constraint expressed by Linux software then we
+should not care.
 
-> [...]
-> > +static int tegra_nand_probe(struct platform_device *pdev)
-> > +{
-> > +	struct reset_control *rst;
-> > +	struct tegra_nand *nand;
-> > +	struct nand_chip *chip;
-> > +	struct mtd_info *mtd;
-> > +	struct resource *res;
-> > +	unsigned long value;
-> > +	int irq, buswidth, err = 0;
-> > +
-> > +	nand = devm_kzalloc(&pdev->dev, sizeof(*nand), GFP_KERNEL);
-> > +	if (!nand)
-> > +		return -ENOMEM;
-> > +
-> > +	nand->dev = &pdev->dev;
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	nand->regs = devm_ioremap_resource(&pdev->dev, res);
-> > +	if (IS_ERR(nand->regs))
-> > +		return PTR_ERR(nand->regs);
-> > +
-> > +	irq = platform_get_irq(pdev, 0);
-> > +	err = devm_request_irq(&pdev->dev, irq, tegra_nand_irq, 0,
-> > +			       dev_name(&pdev->dev), nand);
-> > +	if (err)
-> > +		return err;
-> > +
-> > +	rst = devm_reset_control_get(&pdev->dev, "nand");
-> > +	if (IS_ERR(rst))
-> > +		return PTR_ERR(rst);
-> > +
-> > +	nand->clk = devm_clk_get(&pdev->dev, "nand");
-> > +	if (IS_ERR(nand->clk))
-> > +		return PTR_ERR(nand->clk);
-> > +
-> > +	nand->wp_gpio = gpiod_get_optional(&pdev->dev, "nvidia,wp-gpios",
-> > +					   GPIOD_OUT_HIGH);
-> > +	if (IS_ERR(nand->wp_gpio))
-> > +		return PTR_ERR(nand->wp_gpio);
-> > +
-> > +	buswidth = of_get_nand_bus_width(pdev->dev.of_node);
-> > +	if (buswidth < 0)
-> > +		return buswidth;
-> > +
-> > +	err = clk_prepare_enable(nand->clk);
-> > +	if (err)
-> > +		return err;
-> > +
-> > +	reset_control_assert(rst);
-> > +	udelay(2);
-> > +	reset_control_deassert(rst);
-> > +
-> > +	value = HWSTATUS_RDSTATUS_MASK(1) | HWSTATUS_RDSTATUS_VALUE(0) |
-> > +		HWSTATUS_RBSY_MASK(NAND_STATUS_READY) |
-> > +		HWSTATUS_RBSY_VALUE(NAND_STATUS_READY);
-> > +	writel(NAND_CMD_STATUS, nand->regs + HWSTATUS_CMD);
-> > +	writel(value, nand->regs + HWSTATUS_MASK);
-> > +
-> > +	init_completion(&nand->command_complete);
-> > +	init_completion(&nand->dma_complete);
-> > +
-> > +	mtd = &nand->mtd;
-> > +	mtd->name = dev_name(&pdev->dev);
-> > +	mtd->owner = THIS_MODULE;
-> > +	mtd->priv = &nand->chip;
-> > +
-> > +	mtd->type = MTD_NANDFLASH;
-> > +	mtd->flags = MTD_CAP_NANDFLASH;
-> 
-> This get filled by nand_scan_tail anyway, any reason to have it here
-> too?
-> 
-No, not really. Probably just cargo-culting. I'll remove this.
+Probably we need to track a few more things in the framework. Stephen
+and I were discussing struct clk.hw_en which tracks the enable/disable
+state of the hardware independently of the enable_count (e.g. gate clock
+is enabled by bootloader but not enabled by Linux ccf).
 
-> Other than that, looks solid to me.
-> 
-> Reviewed-by: Stefan Agner <stefan@agner.ch>
-> 
-I'll wait a bit more before posting a v3, to give other people a chance
-to look at this.
+Tracking something like "is_clk_initialized" would be helpful. It is an
+abstract concept but knowing that clock has been successfully hooked up
+to its parent and that its rate has been properly calculated would be
+very helpful for some corner cases.
 
-Thanks,
-Lucas
+Regards,
+Mike
+
+> 
+> Regards,
+> 
+> Tomeu
+> 
+> > Mikko
+> >
+> >
+> >>
+> >>>
+> >>> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+> >>> ---
+> >>> v8:
+> >>> - Added
+> >>>
+> >>>   drivers/clk/tegra/clk-tegra-super-gen4.c | 46
+> >>> ++++++++++++++++++--------------
+> >>>   1 file changed, 26 insertions(+), 20 deletions(-)
+> >>>
+> >>> diff --git a/drivers/clk/tegra/clk-tegra-super-gen4.c
+> >>> b/drivers/clk/tegra/clk-tegra-super-gen4.c
+> >>> index f1f4410..c5ea9ee 100644
+> >>> --- a/drivers/clk/tegra/clk-tegra-super-gen4.c
+> >>> +++ b/drivers/clk/tegra/clk-tegra-super-gen4.c
+> >>> @@ -104,6 +104,32 @@ void __init tegra_super_clk_gen4_init(void __iomem
+> >>> *clk_base,
+> >>>          struct clk *clk;
+> >>>          struct clk **dt_clk;
+> >>>
+> >>> +       /*
+> >>> +        * Register PLL_X first so that CCLK_G has a parent at
+> >>> registration
+> >>> +        * time. This ensures that the common clock framework knows
+> >>> CCLK_G's
+> >>> +        * rate.
+> >>> +        */
+> >>> +
+> >>> +#if defined(CONFIG_ARCH_TEGRA_114_SOC) ||
+> >>> defined(CONFIG_ARCH_TEGRA_124_SOC)
+> >>> +       /* PLLX */
+> >>> +       dt_clk = tegra_lookup_dt_id(tegra_clk_pll_x, tegra_clks);
+> >>> +       if (!dt_clk)
+> >>> +               return;
+> >>> +
+> >>> +       clk = tegra_clk_register_pllxc("pll_x", "pll_ref", clk_base,
+> >>> +                       pmc_base, CLK_IGNORE_UNUSED, params, NULL);
+> >>> +       *dt_clk = clk;
+> >>> +
+> >>> +       /* PLLX_OUT0 */
+> >>> +
+> >>> +       dt_clk = tegra_lookup_dt_id(tegra_clk_pll_x_out0, tegra_clks);
+> >>> +       if (!dt_clk)
+> >>> +               return;
+> >>> +       clk = clk_register_fixed_factor(NULL, "pll_x_out0", "pll_x",
+> >>> +                                       CLK_SET_RATE_PARENT, 1, 2);
+> >>> +       *dt_clk = clk;
+> >>> +#endif
+> >>> +
+> >>>          /* CCLKG */
+> >>>          dt_clk = tegra_lookup_dt_id(tegra_clk_cclk_g, tegra_clks);
+> >>>          if (dt_clk) {
+> >>> @@ -127,25 +153,5 @@ void __init tegra_super_clk_gen4_init(void __iomem
+> >>> *clk_base,
+> >>>          }
+> >>>
+> >>>          tegra_sclk_init(clk_base, tegra_clks);
+> >>> -
+> >>> -#if defined(CONFIG_ARCH_TEGRA_114_SOC) ||
+> >>> defined(CONFIG_ARCH_TEGRA_124_SOC)
+> >>> -       /* PLLX */
+> >>> -       dt_clk = tegra_lookup_dt_id(tegra_clk_pll_x, tegra_clks);
+> >>> -       if (!dt_clk)
+> >>> -               return;
+> >>> -
+> >>> -       clk = tegra_clk_register_pllxc("pll_x", "pll_ref", clk_base,
+> >>> -                       pmc_base, CLK_IGNORE_UNUSED, params, NULL);
+> >>> -       *dt_clk = clk;
+> >>> -
+> >>> -       /* PLLX_OUT0 */
+> >>> -
+> >>> -       dt_clk = tegra_lookup_dt_id(tegra_clk_pll_x_out0, tegra_clks);
+> >>> -       if (!dt_clk)
+> >>> -               return;
+> >>> -       clk = clk_register_fixed_factor(NULL, "pll_x_out0", "pll_x",
+> >>> -                                       CLK_SET_RATE_PARENT, 1, 2);
+> >>> -       *dt_clk = clk;
+> >>> -#endif
+> >>>   }
+> >>>
+> >>> --
+> >>> 2.3.0
+> >>>
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
