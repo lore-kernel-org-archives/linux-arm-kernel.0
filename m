@@ -1,66 +1,90 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 13 Apr 2015 12:44:28 +0100
-Subject: [PATCH] sunxi: a10-lime: add regulator nodes
-In-Reply-To: <20150413081518.GF27783@lukather>
-References: <551538AB.50207@redhat.com> <55169622.5070007@gmail.com>
- <20150330222311.GY23664@lukather>
- <CABxcv=nCROiQ2COrTmnwvhtSJzh83BWKaxgn0EkFuwW8HqSiQw@mail.gmail.com>
- <20150404123302.GY6023@sirena.org.uk>
- <20150404125645.GK14618@lukather>
- <20150404184716.GZ6023@sirena.org.uk>
- <20150407101757.GC15823@lukather>
- <20150408123506.GY6023@sirena.org.uk>
- <20150413081518.GF27783@lukather>
-Message-ID: <20150413114428.GF6023@sirena.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 13 Apr 2015 13:55:35 +0200
+Subject: [PATCH v2 02/10] KVM: define common __KVM_GUESTDBG_USE_SW/HW_BP
+ values
+In-Reply-To: <1427814488-28467-3-git-send-email-alex.bennee@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-3-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150413115535.GM6186@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 10:15:18AM +0200, Maxime Ripard wrote:
-> On Wed, Apr 08, 2015 at 01:35:06PM +0100, Mark Brown wrote:
-> > On Tue, Apr 07, 2015 at 12:17:57PM +0200, Maxime Ripard wrote:
-> > > On Sat, Apr 04, 2015 at 07:47:16PM +0100, Mark Brown wrote:
+On Tue, Mar 31, 2015 at 04:08:00PM +0100, Alex Benn?e wrote:
+> Currently x86, powerpc and soon arm64 use the same two architecture
+> specific bits for guest debug support for software and hardware
+> breakpoints. This makes the shared values explicit while leaving the
+> gate open for another architecture to use some other value if they
+> really really want to.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
+> diff --git a/arch/powerpc/include/uapi/asm/kvm.h b/arch/powerpc/include/uapi/asm/kvm.h
+> index ab4d473..1731569 100644
+> --- a/arch/powerpc/include/uapi/asm/kvm.h
+> +++ b/arch/powerpc/include/uapi/asm/kvm.h
+> @@ -310,8 +310,8 @@ struct kvm_guest_debug_arch {
+>   * and upper 16 bits are architecture specific. Architecture specific defines
+>   * that ioctl is for setting hardware breakpoint or software breakpoint.
+>   */
+> -#define KVM_GUESTDBG_USE_SW_BP		0x00010000
+> -#define KVM_GUESTDBG_USE_HW_BP		0x00020000
+> +#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
+> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
+>  
+>  /* definition of registers in kvm_run */
+>  struct kvm_sync_regs {
+> diff --git a/arch/x86/include/uapi/asm/kvm.h b/arch/x86/include/uapi/asm/kvm.h
+> index d7dcef5..1438202 100644
+> --- a/arch/x86/include/uapi/asm/kvm.h
+> +++ b/arch/x86/include/uapi/asm/kvm.h
+> @@ -250,8 +250,8 @@ struct kvm_debug_exit_arch {
+>  	__u64 dr7;
+>  };
+>  
+> -#define KVM_GUESTDBG_USE_SW_BP		0x00010000
+> -#define KVM_GUESTDBG_USE_HW_BP		0x00020000
+> +#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
+> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
+>  #define KVM_GUESTDBG_INJECT_DB		0x00040000
+>  #define KVM_GUESTDBG_INJECT_BP		0x00080000
+>  
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 5eedf84..ce2db14 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -525,8 +525,16 @@ struct kvm_s390_irq {
+>  
+>  /* for KVM_SET_GUEST_DEBUG */
+>  
+> -#define KVM_GUESTDBG_ENABLE		0x00000001
+> -#define KVM_GUESTDBG_SINGLESTEP		0x00000002
+> +#define KVM_GUESTDBG_ENABLE		(1 << 0)
+> +#define KVM_GUESTDBG_SINGLESTEP	(1 << 1)
+> +
+> +/*
+> + * Architecture specific stuff uses the top 16 bits of the field,
 
-> > > > Or the regulator is used by some passive component on the board that
-> > > > doesn't appear in DT (or some driver that doesn't yet have DT support
-> > > > doesn't claim the regulator) and it gets switched off.  Or we power it
-> > > > off and then later discover that we've been placing physical stress on
-> > > > the system.
+can you be more specific than 'stuff' here?  features?
 
-> > > Isn't that what the regulator-always-on property is here for?
+> + * however there is some shared commonality for the common cases
 
-> > Only if it's actually added by someone after having looked at the
-> > system...
+I don't like this sentence; shared commonality is a pleonasm and the use
+of however makes it sounds like there's some caveat here.
 
-> True, but that can also be said for pretty much any DT patch. If you
-> do something wrong in your DT and haven't looked carefuly at your
-> datasheet/schematics, here be dragons.
+If the top 16 bits are indeed arhictecture specific, then I think they
+should just be defined in their architecture specific headers.  Unless
+the idea here is that there's a fixed set of of flags that architectures
+can choose to support, in which case it should simply be defined in the
+common header.
 
-There's a difference between actively choosing to do something and
-having it done by default - the goal here is to make sure that if
-someone didn't even look at something we're as safe as possible.
 
-> > > > Providing .dtsis for reference designs can make sense, if there's a
-> > > > widely cloned board with lots of common design elements then reusing
-> > > > that .dtsi is fine but clearly that .dtsi isn't going to enable the full
-> > > > flexibility of the regulators since there will be constraints from that
-> > > > reference design.
-
-> > > That PMIC is used with various SoCs, so that's not really an
-> > > option. And especially when it comes to regulators, I don't think
-> > > there's really a pattern that emerged yet...
-
-> > I'm not sure you saw the "reference design" part of the above?
-
-> I saw that, I was just saying that this doesn't really work for us
-> unfortunately.
-
-I really don't understand how your explanation follows at all, sorry.
-How does the ability to use the same PMIC with multiple SoCs influence
-reference designs?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150413/03c6949b/attachment.sig>
+> + */
+> +#define __KVM_GUESTDBG_USE_SW_BP	(1 << 16)
+> +#define __KVM_GUESTDBG_USE_HW_BP	(1 << 17)
+> +
+>  
+>  struct kvm_guest_debug {
+>  	__u32 control;
+> -- 
+> 2.3.4
+> 
