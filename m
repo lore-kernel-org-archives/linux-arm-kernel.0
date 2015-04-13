@@ -1,127 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Apr 2015 09:28:09 -0700
-Subject: [RESEND][PATCH] ARM errata, 430973: update the affected revisions
-In-Reply-To: <20150413143941.GY18048@atomide.com>
-References: <1418131842-6752-1-git-send-email-jhofstee@victronenergy.com>
- <54EE2453.9080301@myspectrum.nl> <552840A9.8070406@myspectrum.nl>
- <20150411075220.GK12732@n2100.arm.linux.org.uk>
- <5528E88C.4070107@myspectrum.nl>
- <20150413143941.GY18048@atomide.com>
-Message-ID: <20150413162808.GZ18048@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 13 Apr 2015 17:35:07 +0100
+Subject: [PATCH v3 05/11] arm64/efi: adapt to relaxed FDT placement
+ requirements
+In-Reply-To: <CAKv+Gu9CeZonkTVMBRVfXrtALZXXVBxGM+zzWwdYTtBXR1_yVg@mail.gmail.com>
+References: <1428674035-26603-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1428674035-26603-6-git-send-email-ard.biesheuvel@linaro.org>
+ <20150413162019.GJ4076@leverpostej>
+ <CAKv+Gu9CeZonkTVMBRVfXrtALZXXVBxGM+zzWwdYTtBXR1_yVg@mail.gmail.com>
+Message-ID: <20150413163507.GL4076@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150413 07:46]:
-> * Jeroen Hofstee <linux-arm@myspectrum.nl> [150411 02:26]:
-> > Hello Russell, +Tony,
-> > 
-> > Thanks for taking the time to respond,
-> > 
-> > On 11-04-15 09:52, Russell King - ARM Linux wrote:
-> > >On Fri, Apr 10, 2015 at 11:29:13PM +0200, Jeroen Hofstee wrote:
-> > >>On 25-02-15 20:36, Jeroen Hofstee wrote:
-> > >>>On 09-12-14 14:30, Jeroen Hofstee wrote:
-> > >>>>From: Jeroen Hofstee <linux-arm@myspectrum.nl>
-> > >>>>
-> > >>>>Update the list of revisions subject to this errata.
-> > >>>>
-> > >>>>Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > >>>>Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > >>>>Cc: Andreas Bie?mann <andreas.devel@googlemail.com>
-> > >>>>Signed-off-by: Jeroen Hofstee <jhofstee@victronenergy.com>
-> > >>>>---
-> > >>>>I don't have access to the AT400/AT401/AT490 document, but
-> > >>>>Andreas was kind enough to provide this information, see
-> > >>>>https://www.mail-archive.com/u-boot at lists.denx.de/msg156620.html
-> > >>>>
-> > >>>>Resending from an address which is subscribed to the ML...
-> > >>>>---
-> > >>>>  arch/arm/Kconfig | 2 +-
-> > >>>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >>>>
-> > >>>>diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > >>>>index 89c4b5c..a2202fa 100644
-> > >>>>--- a/arch/arm/Kconfig
-> > >>>>+++ b/arch/arm/Kconfig
-> > >>>>@@ -1063,7 +1063,7 @@ config ARM_ERRATA_430973
-> > >>>>      depends on CPU_V7
-> > >>>>      help
-> > >>>>        This option enables the workaround for the 430973 Cortex-A8
-> > >>>>-      (r1p0..r1p2) erratum. If a code sequence containing an ARM/Thumb
-> > >>>>+      (r1p0..r1p3, r1p7) erratum. If a code sequence containing an
-> > >>>>ARM/Thumb
-> > >>>>        interworking branch is replaced with another code sequence at
-> > >>>>the
-> > >>>>        same virtual address, whether due to self-modifying code or
-> > >>>>virtual
-> > >>>>        to physical address re-mapping, Cortex-A8 does not recover from
-> > >>>>the
-> > >>>
-> > >No.  If you read the discussion that the OMAP people are having, it is
-> > >unclear whether r3p2 is actually affected by this errata or not.
-> > I scanned through it, but that is a different issue it seems. This patch
-> > only adds r1p3 and r1p7 to the documentation, since according to ARM
-> > they are affected by this errata. Newer revision should not be affected
-> > by this errata (or ARM reintroduced it).
-> > 
-> > The patch is _not_ adding r3p2 as an affected version. And is also not
-> > about how to deal with cores no longer needing this workaround.
+On Mon, Apr 13, 2015 at 05:25:55PM +0100, Ard Biesheuvel wrote:
+> On 13 April 2015 at 18:20, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Apr 10, 2015 at 02:53:49PM +0100, Ard Biesheuvel wrote:
+> >> With the relaxed FDT placement requirements in place, we can change
+> >> the allocation strategy used by the stub to put the FDT image higher
+> >> up in memory. At the same time, reduce the minimal alignment to 8 bytes,
+> >> and impose a 2 MB size limit, as per the new requirements.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm64/include/asm/efi.h            |  8 +++-----
+> >>  drivers/firmware/efi/libstub/arm-stub.c |  5 ++---
+> >>  drivers/firmware/efi/libstub/efistub.h  |  1 -
+> >>  drivers/firmware/efi/libstub/fdt.c      | 23 +++++++++++++----------
+> >>  4 files changed, 18 insertions(+), 19 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+> >> index ef572206f1c3..bd513dd663b9 100644
+> >> --- a/arch/arm64/include/asm/efi.h
+> >> +++ b/arch/arm64/include/asm/efi.h
+> >> @@ -39,12 +39,10 @@ extern void efi_init(void);
+> >>  /* arch specific definitions used by the stub code */
+> >>
+> >>  /*
+> >> - * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
+> >> - * start of kernel and may not cross a 2MiB boundary. We set alignment to
+> >> - * 2MiB so we know it won't cross a 2MiB boundary.
+> >> + * AArch64 requires the DTB to be 8-byte aligned and not exceed 2MiB in size.
+> >>   */
+> >> -#define EFI_FDT_ALIGN        SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
+> >> -#define MAX_FDT_OFFSET       SZ_512M
+> >> +#define EFI_FDT_ALIGN                8
+> >> +#define EFI_FDT_MAX_SIZE     SZ_2M
+> >
+> > Is there any way we can organise things so we can share the kernel's
+> > MAX_FDT_SIZE definition, so as to keep the stub and kernel in sync?
+> >
 > 
-> Right.. But it seems that having the aux ctrl register bit enabled
-> without doing the flush btac part leads into a different set of
-> issues.
->  
-> > >In the discussion with OMAP people, we've come up with a potentially
-> > >better solution to this, which is to rearrange the code so that only
-> > >Cortex-A8 executes this workaround, and the BTB flush is always
-> > >present (which Tony says fixes the problem.)
-> > 
-> > The am3517 / r1p7 is a Cortex-a8 and is affected by this errata. I fail to
-> > see why making this cortex-a8 specific will help anything about the revision
-> > not being mentioned in the help text. (unless the CONFIG option gets
-> > completely
-> > removed).
-> > >Meanwhile, OMAP people are seeing about updating uboot to set/clear
-> > >the auxiliary control register bit appropriately for the revision of
-> > >the core.
-> > Well almost appropriately. [1] suggest "the bootloaders can be fixed
-> > Cortex-A8
-> > revisions later than r1p2 to not set the IBE bit.". That should have been
-> > r1p7 as
-> > well.
-> > 
-> > >In any case, adding the patch and suggesting people enable this for
-> > >more Cortex-A8's (eg, non-OMAP) won't actually do anything in a
-> > >multiplatform kernel.
-> > >
-> > Can you give an example of a r1p7 not needing the workaround?
-> 
-> Do you have some pointer for the documentation mentioning r1p7 is
-> affected? It is possible that the revision range is wrong.. But I'm
-> more likely to believe it is correct and we're hitting a different
-> problem.
-> 
-> I'm hoping that with Russell's patch and my patch in the thread
-> below, you don't necessarily need to enable 430973. That's these
-> two patches:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg411433.html
-> http://www.spinics.net/lists/arm-kernel/msg411038.html
-> 
-> If what Russell and I are saying is correct, with the above two
-> patches your system should behave properly with 430973 even if
-> bit 6 in the aux ctrl register is set (or unset) by the bootloader.
-> 
-> If r1p7 is behaves with bit 6 cleared and errata 430973 set, then
-> we know r1p7 is unaffected by 430973.
+> I'll put MAX_FDT_SIZE in asm/page.h (unless you can propose a better place)
+> That way, both fixmap.h and efi.h can refer to it.
 
-Sorry let's take this part again:
+Using page.h feels a little weird, but I can't see that a better header
+exists currently.
 
-If r1p7 is behaves with bit 6 cleared and errata 430973 _unset_,
-then we know r1p7 is unaffected by 430973.
+We could add asm/boot.h for things related to boot protocol that we want
+to have shareable with the stub, but I can't see anything else that we'd
+want to put in there at the moment. If there are other things we could
+deduplicate it would probably make sense, but it seems overkill for a
+single definition. :/
 
-Regards,
-
-Tony
-  
-> > http://www.spinics.net/lists/arm-kernel/msg411297.html
+Mark.
