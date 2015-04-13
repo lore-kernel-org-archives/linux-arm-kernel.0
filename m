@@ -1,357 +1,197 @@
-From: philipp.tomsich@theobroma-systems.com (Philipp Tomsich)
-Date: Mon, 13 Apr 2015 21:44:14 +0200
-Subject: [PATCH v4 04/24] arm64: change some CONFIG_COMPAT over to use
- CONFIG_AARCH32_EL0 instead
-In-Reply-To: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
-References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
-Message-ID: <1dcebee7eb4b364c511908651c3939b62f864d81.1428953303.git.philipp.tomsich@theobroma-systems.com>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Mon, 13 Apr 2015 12:48:44 -0700
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabrelite: add supported LVDS
+ displays
+In-Reply-To: <1428920545.3192.41.camel@pengutronix.de>
+References: <5521E08F.3060407@boundarydevices.com>
+ <1428920545.3192.41.camel@pengutronix.de>
+Message-ID: <552C1D9C.4090303@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+Thanks Philipp,
 
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
----
- arch/arm64/include/asm/elf.h      | 23 ++++++++++++++++++++---
- arch/arm64/include/asm/fpsimd.h   |  2 +-
- arch/arm64/include/asm/ptrace.h   |  2 +-
- arch/arm64/include/asm/signal32.h |  2 ++
- arch/arm64/include/asm/stat.h     |  2 ++
- arch/arm64/include/asm/unistd.h   |  2 +-
- arch/arm64/kernel/Makefile        |  2 +-
- arch/arm64/kernel/asm-offsets.c   |  2 +-
- arch/arm64/kernel/entry.S         |  6 +++---
- arch/arm64/kernel/head.S          |  2 +-
- arch/arm64/kernel/ptrace.c        | 31 ++++++++++++++++++++++++-------
- arch/arm64/kernel/signal.c        | 13 +++++++++++++
- arch/arm64/kernel/traps.c         |  2 +-
- arch/arm64/kernel/vdso.c          |  4 ++--
- 14 files changed, 73 insertions(+), 22 deletions(-)
+On 04/13/2015 03:22 AM, Philipp Zabel wrote:
+> Hi Eric,
+> 
+> Am Sonntag, den 05.04.2015, 18:25 -0700 schrieb Eric Nelson:
+>> Hi Philipp,
+>>
+>> Sorry for the delayed response. I missed your reply and Shawn pointed
+>> it out.
+> [...]
+>> The use of simple panel seems to add and remove functionality:
+>> 	- adds backlight, regulators and enable GPIOs!
+>> 	- loses the ability to express timings in DT
+> 
+> For the simple panel driver Thierry preferred to have a panel database
+> in the driver and uniquely identify the panel by its compatible value.
+> This will also allow to infer the data mapping and width from
+> the panel, and the panel timings are available for the next hardware to
+> reuse the same panel (however likely that is).
+> 
+> The old method with display-timings will stay available, but for
+> mainline I think it is better to add the panel to the driver.
+> 
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 1f65be3..b73c2e2 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -171,24 +171,41 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
- 
- #define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
- 
-+
-+#ifdef CONFIG_AARCH32_EL0
-+
- /* AArch32 registers. */
--#define COMPAT_ELF_NGREG		18
-+#define COMPAT_A32_ELF_NGREG		18
- typedef unsigned int			compat_elf_greg_t;
--typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
-+typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_A32_ELF_NGREG];
- 
- /* AArch32 EABI. */
- #define EF_ARM_EABI_MASK		0xff000000
--#define compat_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
-+#define compat_a32_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
- 					 ((x)->e_flags & EF_ARM_EABI_MASK))
- 
- #define compat_start_thread		compat_start_thread
- #define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
- #define COMPAT_ARCH_DLINFO
-+
-+
- extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
- 				      int uses_interp);
- #define compat_arch_setup_additional_pages \
- 					aarch32_setup_vectors_page
- 
-+#else
-+
-+typedef elf_greg_t			compat_elf_greg_t;
-+typedef elf_gregset_t			compat_elf_gregset_t;
-+#define compat_a32_elf_check_arch(x)	0
-+#define COMPAT_SET_PERSONALITY(ex)
-+#define COMPAT_ARCH_DLINFO
-+
-+#endif
-+
-+#define compat_elf_check_arch(x)	compat_a32_elf_check_arch(x)
-+
- #endif /* CONFIG_COMPAT */
- 
- #endif
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 50f559f..63b19f1 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -52,7 +52,7 @@ struct fpsimd_partial_state {
- };
- 
- 
--#if defined(__KERNEL__) && defined(CONFIG_COMPAT)
-+#if defined(__KERNEL__) && defined(CONFIG_AARCH32_EL0)
- /* Masks for extracting the FPSR and FPCR from the FPSCR */
- #define VFP_FPSCR_STAT_MASK	0xf800009f
- #define VFP_FPSCR_CTRL_MASK	0x07f79f00
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index d6dd9fd..a379596 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -120,7 +120,7 @@ struct pt_regs {
- 
- #define arch_has_single_step()	(1)
- 
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- #define compat_thumb_mode(regs) \
- 	(((regs)->pstate & COMPAT_PSR_T_BIT))
- #else
-diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
-index eeaa975..4302909 100644
---- a/arch/arm64/include/asm/signal32.h
-+++ b/arch/arm64/include/asm/signal32.h
-@@ -20,6 +20,7 @@
- #ifdef CONFIG_COMPAT
- #include <linux/compat.h>
- 
-+#ifdef CONFIG_AARCH32_EL0
- #define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
- 
- extern const compat_ulong_t aarch32_sigret_code[6];
-@@ -47,6 +48,7 @@ static inline int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t
- static inline void compat_setup_restart_syscall(struct pt_regs *regs)
- {
- }
-+#endif /* CONFIG_AARCH32_EL0 */
- #endif /* CONFIG_COMPAT */
- #endif /* __KERNEL__ */
- #endif /* __ASM_SIGNAL32_H */
-diff --git a/arch/arm64/include/asm/stat.h b/arch/arm64/include/asm/stat.h
-index 15e3559..af04276 100644
---- a/arch/arm64/include/asm/stat.h
-+++ b/arch/arm64/include/asm/stat.h
-@@ -22,6 +22,7 @@
- 
- #include <asm/compat.h>
- 
-+#ifdef CONFIG_AARCH32_EL0
- /*
-  * struct stat64 is needed for compat tasks only. Its definition is different
-  * from the generic struct stat64.
-@@ -59,3 +60,4 @@ struct stat64 {
- 
- #endif
- #endif
-+#endif
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index 3bc498c..bed97c3 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -13,7 +13,7 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
- #define __ARCH_WANT_COMPAT_STAT64
- #define __ARCH_WANT_SYS_GETHOSTNAME
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 5ee07ee..61f8fbb 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -19,7 +19,7 @@ arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
- 			   return_address.o cpuinfo.o cpu_errata.o		\
- 			   alternative.o cacheinfo.o
- 
--arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
-+arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o entry32.o		\
- 					   ../../arm/kernel/opcodes.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index f7fa65d..0d35135 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -53,7 +53,7 @@ int main(void)
-   DEFINE(S_X7,			offsetof(struct pt_regs, regs[7]));
-   DEFINE(S_LR,			offsetof(struct pt_regs, regs[30]));
-   DEFINE(S_SP,			offsetof(struct pt_regs, sp));
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
-   DEFINE(S_COMPAT_SP,		offsetof(struct pt_regs, compat_sp));
- #endif
-   DEFINE(S_PSTATE,		offsetof(struct pt_regs, pstate));
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index cf21bb3..0dce3d0 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -196,7 +196,7 @@ ENTRY(vectors)
- 	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
- 	ventry	el0_error_invalid		// Error 64-bit EL0
- 
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- 	ventry	el0_sync_compat			// Synchronous 32-bit EL0
- 	ventry	el0_irq_compat			// IRQ 32-bit EL0
- 	ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
-@@ -236,7 +236,7 @@ el0_error_invalid:
- 	inv_entry 0, BAD_ERROR
- ENDPROC(el0_error_invalid)
- 
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- el0_fiq_invalid_compat:
- 	inv_entry 0, BAD_FIQ, 32
- ENDPROC(el0_fiq_invalid_compat)
-@@ -398,7 +398,7 @@ el0_sync:
- 	b.ge	el0_dbg
- 	b	el0_inv
- 
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- 	.align	6
- el0_sync_compat:
- 	kernel_entry 0, 32
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 07f9305..9a4ef52 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -540,7 +540,7 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- 	mov	x0, #0x33ff
- 	msr	cptr_el2, x0			// Disable copro. traps to EL2
- 
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- 	msr	hstr_el2, xzr			// Disable CP15 traps to EL2
- #endif
- 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index d882b83..cac913e 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -76,7 +76,7 @@ static void ptrace_hbptriggered(struct perf_event *bp,
- 		.si_addr	= (void __user *)(bkpt->trigger),
- 	};
- 
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- 	int i;
- 
- 	if (!is_compat_task())
-@@ -651,7 +651,7 @@ static const struct user_regset_view user_aarch64_view = {
- 	.regsets = aarch64_regsets, .n = ARRAY_SIZE(aarch64_regsets)
- };
- 
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- #include <linux/compat.h>
- 
- enum compat_regset {
-@@ -829,7 +829,7 @@ static int compat_vfp_set(struct task_struct *target,
- static const struct user_regset aarch32_regsets[] = {
- 	[REGSET_COMPAT_GPR] = {
- 		.core_note_type = NT_PRSTATUS,
--		.n = COMPAT_ELF_NGREG,
-+		.n = COMPAT_A32_ELF_NGREG,
- 		.size = sizeof(compat_elf_greg_t),
- 		.align = sizeof(compat_elf_greg_t),
- 		.get = compat_gpr_get,
-@@ -1027,8 +1027,8 @@ static int compat_ptrace_sethbpregs(struct task_struct *tsk, compat_long_t num,
- }
- #endif	/* CONFIG_HAVE_HW_BREAKPOINT */
- 
--long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
--			compat_ulong_t caddr, compat_ulong_t cdata)
-+long compat_a32_arch_ptrace(struct task_struct *child, compat_long_t request,
-+			    compat_ulong_t caddr, compat_ulong_t cdata)
- {
- 	unsigned long addr = caddr;
- 	unsigned long data = cdata;
-@@ -1104,11 +1104,28 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
- 
- 	return ret;
- }
--#endif /* CONFIG_COMPAT */
-+#else /* !CONFIG_AARCH32_EL0 */
-+long compat_a32_arch_ptrace(struct task_struct *child, compat_long_t request,
-+			    compat_ulong_t caddr, compat_ulong_t cdata)
-+{
-+	return -1;
-+}
-+#endif /* !CONFIG_AARCH32_EL0 */
-+
-+#ifdef CONFIG_COMPAT
-+long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
-+			compat_ulong_t caddr, compat_ulong_t cdata)
-+{
-+	if (is_compat_task())
-+		return compat_a32_arch_ptrace(child, request, caddr, cdata);
-+	return compat_ptrace_request(child, request, caddr, cdata);
-+}
-+#endif
-+
- 
- const struct user_regset_view *task_user_regset_view(struct task_struct *task)
- {
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- 	if (is_compat_thread(task_thread_info(task)))
- 		return &user_aarch32_view;
- #endif
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 660ccf9..eed18b6 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -421,3 +421,16 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
- 		fpsimd_restore_current_state();
- 
- }
-+
-+/* Some functions are needed for compat ptrace but we don't define
-+   them if we don't have AARCH32 support compiled in */
-+#if defined CONFIG_COMPAT && !defined CONFIG_AARCH32_EL0
-+int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
-+{
-+	return -EFAULT;
-+}
-+int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
-+{
-+	return -EFAULT;
-+}
-+#endif
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 1ef2940..848126d 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -354,7 +354,7 @@ long compat_arm_syscall(struct pt_regs *regs);
- 
- asmlinkage long do_ni_syscall(struct pt_regs *regs)
- {
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- 	long ret;
- 	if (is_compat_task()) {
- 		ret = compat_arm_syscall(regs);
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 32aeea0..897981b 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -49,7 +49,7 @@ static union {
- } vdso_data_store __page_aligned_data;
- struct vdso_data *vdso_data = &vdso_data_store.data;
- 
--#ifdef CONFIG_COMPAT
-+#ifdef CONFIG_AARCH32_EL0
- /*
-  * Create and map the vectors page for AArch32 tasks.
-  */
-@@ -107,7 +107,7 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
- 
- 	return PTR_ERR_OR_ZERO(ret);
- }
--#endif /* CONFIG_COMPAT */
-+#endif /* CONFIG_AARCH32_EL0 */
- 
- static struct vm_special_mapping vdso_spec[2];
- 
--- 
-1.9.1
+I predict that panel-simple.c will get really big, really fast.
+
+Scanning it for panels that match our Okaya 1024x600 panel shows
+that there already four with that resolution which seem to differ
+only in margin timings.
+
+I think the addition of an optional display-timings node and/or
+a VESA GTF mode string would prevent a lot of churn, but this is
+a separate topic.
+
+>>> After:
+>>> 	ldb {
+>>> 		...
+>>>
+>>> 		lvds-channel at 0 {
+>>> 			...
+>>>
+>>
+>> Using port here to point at the panel seems to conflict
+>> with the use of ports to point at the IPU.
+> 
+> I'm sorry, I don't understand what you mean exactly. There are some
+> input ports (two on i.MX5, four on i.MX6) that are connected to the IPU,
+> and one output port that is connected to the panel, in that order by
+> convention. The port id 4 (reg = <4>) uniquely identifies the output
+> port on i.MX6.
+> 
+
+The full DT for an LVDS channel looks like this:
+
+...	
+lvds-channel at 0 {
+	#address-cells = <0x00000001>;
+	#size-cells = <0x00000000>;
+	...
+	port at 0 {
+		reg = <0x00000000>;
+		endpoint {
+			remote-endpoint = <0x00000013>;
+			linux,phandle = <0x00000039>;
+			phandle = <0x00000039>;
+		};
+	};
+	port at 1 {
+...	};
+	port at 2 {
+...	};
+	port at 3 {
+...	};
+	port at 4 {
+		reg = <0x00000004>;
+		endpoint {
+			remote-endpoint = <0x00000017>;
+			linux,phandle = <0x00000053>;
+			phandle = <0x00000053>;
+		};
+	};
+};
+
+ports 0-3 refer to the LVDS mux and which IPU and display
+interface is connected up to the LVDS channel (i.e. the
+input to the LVDS display bridge) and port at 4 refer to the
+panel.
+
+>>> [snip]
+>>>
+>>> 	panel {
+>>> 		compatible = "edt,etm0700g0dh6", "simple-panel";
+>>> 		...
+>>>
+>>
+>> And why would the panel need to point back to the LVDS
+>> channel?
+> 
+> This is the way the bindings are defined right now in
+> Documentation/devicetree/bindings/graph.txt, section "Links between
+> endpoints". The panel driver itself doesn't use the backlink, but the
+> endpoint needs to exist anyway.
+> 
+
+Thanks for the reference.
+
+I'm not following the rationale  since in this case, the communication
+needs seem to be uni-directional, but okay.
+
+>> [snip]
+>>
+>> Do you have a working example of how this should be used?
+>>
+>> My attempts to follow the notes above results in a failure
+>> to find a crtc for the LVDS channel.
+>>
+>> Please advise,
+> 
+> I have used this patch to connect a HannStar HSD070PWW1 LVDS panel to a
+> Nitrogen6X board:
+> 
+
+Thanks again. This patch works for me with your prior patch applied:
+
+	https://patchwork.kernel.org/patch/5854771/
+
+> -----8<-----
+> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> index 0821812..9e52adf 100644
+> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> @@ -122,7 +122,7 @@
+>  		status = "okay";
+>  	};
+>  
+> -	backlight_lvds {
+> +	backlight_lvds: backlight_lvds {
+>  		compatible = "pwm-backlight";
+>  		pwms = <&pwm4 0 5000000>;
+>  		brightness-levels = <0 4 8 16 32 64 128 255>;
+> @@ -130,6 +130,17 @@
+>  		power-supply = <&reg_3p3v>;
+>  		status = "okay";
+>  	};
+> +
+> +	panel {
+> +		compatible = "hannstar,hsd070pww1";
+> +		backlight = <&backlight_lvds>;
+> +
+> +		port {
+> +			panel_in: endpoint {
+> +				remote-endpoint = <&lvds0_out>;
+> +			};
+> +		};
+> +	};
+>  };
+>  
+
+This does give me a path to get the equivalent functionality
+as my original patches:
+
+	- (if needed) add displays to panel-simple.c
+	- update DT in boot loader to fix up displays based on panel
+	detection by setting the panel.compatible string value.
+
+I am still left with a quandary, which relates to my comment about
+the port selection.
+
+With our current device tree, both the HDMI and LVDS devices
+are being mapped to IPU1/DI0 and the same DRM "card":
+
+	~# ls  /sys/class/graphics/fb0/device/drm/card0/card*
+	card0-HDMI-A-1	card0-LVDS-1
+
+Since the default i.MX6 graph appears to have links for all four LVDS
+mux options, and the path to binding to one of the IPU/DI -> LVDS
+channel mappings isn't clear to me.
+
+I have the same question for HDMI and LCD interfaces though, and
+this is a separate topic.
+
+Regards,
+
+
+Eric
