@@ -1,37 +1,30 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 13 Apr 2015 16:44:59 -0700
-Subject: [PATCH] ARM: socfpga: dts: Add a ciu clock node for sdmmc
-In-Reply-To: <1428699386-2622-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1428699386-2622-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <CAD=FV=XunJQ=DMvQrJo3f8A67yrwL6-kwcEcUC9=WqM4+Lx4Rg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Apr 2015 01:46:16 +0200
+Subject: [GIT PULL RESEND] pxa: for-next v4.1
+In-Reply-To: <87vbh2pi3m.fsf@free.fr>
+References: <87ioe08y4b.fsf@free.fr> <87vbh2pi3m.fsf@free.fr>
+Message-ID: <201504140146.16720.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Saturday 11 April 2015, Robert Jarzmik wrote:
+> This is the pxa changes for v4.1 cycle.
+> 
+> The main and only feature is the conversion of all pxa variants to clock
+> framework. This encompasses pxa25x, pxa27x and pxa3xx, for all boards.
+> 
+> This should be a disruptive cycle in the normally quiet pxa history, as
+> the change can break any platform, and the test were performed on only 4
+> boards (lubbock, zylonite, mioa701, cm-x300).
 
-On Fri, Apr 10, 2015 at 1:56 PM,  <dinguyen@opensource.altera.com> wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
->
-> The CIU(Card Interface Unit) clock is used by the dw_mmc IP to clock an SD
-> card. The ciu_clk is the sdmmc_clk passed through a fixed divider of 4. This patch
-> adds the ciu_clk node and makes the sdmmc_clk it's parent.
->
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
->  arch/arm/boot/dts/socfpga.dtsi | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index d9176e6..25418ee 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -451,6 +451,14 @@
->                                                 clk-phase = <0 135>;
->                                         };
->
-> +                                       ciu_clk: ciu_clk {
+Hi Robert,
 
-Can't say I'm an expert on socfpga, but seems like this clock is only
-for sdmmc, right?  ...so its name ought to have sdmmc in its name?
+We screwed up here and missed the pull requests earlier. I thought
+about putting them in the late branch now, but as they had no time in
+linux-next before the merge window, I think it's way too risky.
 
--Doug
+Please submit again after 4.1-rc1. Feel free to nag us much earlier
+if you get the impression that we missed something you wanted us
+to pick up.
+
+	Arnd
