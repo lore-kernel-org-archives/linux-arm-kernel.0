@@ -1,33 +1,61 @@
 From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Mon, 13 Apr 2015 13:05:15 +0200
-Subject: [PATCH  0/2] gpio: Allow userspace export from DT
-Message-ID: <20150413110515.9681.58848.stgit@localhost>
+Date: Mon, 13 Apr 2015 13:05:17 +0200
+Subject: [PATCH 1/2] Doc: DT: Add binding document for GPIO exporter
+In-Reply-To: <20150413110515.9681.58848.stgit@localhost>
+References: <20150413110515.9681.58848.stgit@localhost>
+Message-ID: <20150413110517.9681.2438.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the gpio sysfs interface allows userspace to access simple hardware
-where no kernel driver exists or would be useful.
+Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+---
+ .../devicetree/bindings/gpio/gpio-exporter.txt     |   40 ++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-exporter.txt
 
-However it requires userspace to know the gpio number that has been assigned
-by the kernel.
-
-That number, in the case of gpio drviers using dynamic allocation, is not fixed,
-and may change when:
-* The kernel version changes and ARCH_NR_GPIOS is changed (happened in 3.17)
-* The kernel version changes and probe order changes for gpio chips.
-* The kernel configuration is changed if CONFIG_ARCH_NR_GPIO is used
-* The board is redesigned (eg switching an externally visible signal from a
-SoC provided GPIO to an I2C expander chip or vice versa).
-* Other GPIO chips are added to the system.
-
-The above means that, in order to export the GPIO to userspace via
-/sys/class/gpio/export the userspace code must know the exact hardware and
-kernel version information.
-
-Furthermore, in many cases, it makes no sense to allow userspace to change the
-signal direction; even if the GPIO itself allows it the circuitry connected
-to the pin often does not (eg a signal dedicated to an output function driving
-a  transistor).
-
-This patch series solves both problems by performing the external
-signal => GPIO mapping in the device tree.
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-exporter.txt b/Documentation/devicetree/bindings/gpio/gpio-exporter.txt
+new file mode 100644
+index 0000000..58fc2a9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-exporter.txt
+@@ -0,0 +1,40 @@
++Bindings to export some GPIOs to userspace.
++
++This is useful when some signals are made externally available by a piece
++of hardware (eg terminal blocks to connect sensors, actuators) but no
++special purpose kernel driver exists.
++
++Use of this binding allows userspace to have a stable name and input
++/ output mode across hardware and software versions.
++
++Required properties:
++- compatible: "linux,gpio-exporter"
++
++
++Each GPIO to be exported is represented as a child node with:
++
++Required child properties:
++- gpios : Reference to the GPIO to export (standard gpio binding)
++
++Optional child properties:
++- output : if present GPIO is output, otherwise input
++- initial-state : Initial state (0=low, 1=high) for output
++- allow-direction-change : Present if GPIO direction may be modified
++
++The name of the child node is that exposed to userspace.
++
++Example:
++	gpio_exporter:gpio-exporter {
++		compatible = "linux,gpio-exporter";
++
++		terminalblock_1_out1 {
++			gpios = <&gpio2 12 0>;
++			output;
++			initial-state = <0>;
++		};
++
++		terminalblock_1_in1 {
++			gpios = <&gpio2 15 0>;
++		};
++
++	};
