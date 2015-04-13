@@ -1,40 +1,43 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 13 Apr 2015 18:39:21 +0200 (CEST)
-Subject: Bug: Toggling green led on Olinuxino Maxi, also toggles USB
-In-Reply-To: <20150413070037.GA9119@shlinux2>
-References: <1622635769.189113.1428833170958.JavaMail.open-xchange@oxbaltgw01.schlund.de>
- <20150413070037.GA9119@shlinux2>
-Message-ID: <517669452.288592.1428943161783.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+From: matthew@mattleach.net (Matthew Leach)
+Date: Mon, 13 Apr 2015 18:02:46 +0100
+Subject: [PATCH RESEND] ARM: dts: exynos4412: Enable AX88760 USB hub on Origen
+ board
+Message-ID: <1428944566-17132-1-git-send-email-matthew@mattleach.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Enable the Origen's usb phy and ohci devices in the device tree.  Also
+add the "samsung,vbus-gpio" property to enable the GPX3(5) gpio pin so
+the AX88760 hub is powered.
 
-> Peter Chen <peter.chen@freescale.com> hat am 13. April 2015 um 09:00
-> geschrieben:
->
->
-> On Sun, Apr 12, 2015 at 12:06:10PM +0200, Stefan Wahren wrote:
-> > [...]
-> >
-> > I think the problem has something to with USB OTG, because GPIO 65 is on the
-> > same pin for USB_OTG_ID.
-> > My idea was to set "dr_mode" in olinuxino dts explicit to "host" and it
-> > works,
-> > but i'm not sure that is the right fix.
-> >
-> > Shouldn't chipidea driver complain about missing pinctrl or something else?
->
-> Some controllers have dedicated ID pin which doesn't need to configure pinctrl
-> registers. If the user would like to use role switch function and the
-> ID pin can be configured by pinctrl subsystem, it needs to set pinctrl
-> through dts.
->
+Signed-off-by: Matthew Leach <matthew@mattleach.net>
+---
+ arch/arm/boot/dts/exynos4412-origen.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-So setting "dr_mode" to "host" is the one and only solution for this case?
-
->
-> Best Regards,
-> Peter Chen
-
-Stefan
+diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+index bd8b730..c810ca3 100644
+--- a/arch/arm/boot/dts/exynos4412-origen.dts
++++ b/arch/arm/boot/dts/exynos4412-origen.dts
+@@ -531,4 +531,19 @@
+ 			clock-frequency = <24000000>;
+ 		};
+ 	};
++
++	exynos-usbphy at 125B0000 {
++		status = "okay";
++	};
++
++	ehci at 12580000 {
++		samsung,vbus-gpio = <&gpx3 5 1>;
++		status = "okay";
++		port at 1{
++			status = "okay";
++		};
++		port at 2 {
++			status = "okay";
++		};
++	};
+ };
+-- 
+2.3.5
