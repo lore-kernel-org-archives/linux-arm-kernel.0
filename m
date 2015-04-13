@@ -1,28 +1,22 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Mon, 13 Apr 2015 06:49:30 -0700
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
-Message-ID: <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 13 Apr 2015 09:52:19 -0400
+Subject: [PATCH v2] ARM: io: Unpessimize relaxed io accessors
+In-Reply-To: <20150413130017.GG2869@arm.com>
+References: <1427133619-24005-1-git-send-email-peter@hurleysoftware.com>
+ <5527C048.8010302@hurleysoftware.com> <20150413130017.GG2869@arm.com>
+Message-ID: <552BCA13.3070102@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-04-13 at 11:56 +0100, George Dunlap wrote:
+On 04/13/2015 09:00 AM, Will Deacon wrote:
+> On Fri, Apr 10, 2015 at 01:21:28PM +0100, Peter Hurley wrote:
+>> Did this patch get overlooked? I'm not seeing it in anyone's tree.
+> 
+> You'll need to stick it into rmk's patch system:
+> 
+>   http://www.arm.linux.org.uk/developer/patches/
+> 
+> (git send-email to patches at arm.linux.org.uk with an additional
+>  KernelVersion: tag in your patch)
 
-> Is the problem perhaps that netback/netfront delays TX completion?
-> Would it be better to see if that can be addressed properly, so that
-> the original purpose of the patch (fighting bufferbloat) can be
-> achieved while not degrading performance for Xen?  Or at least, so
-> that people get decent perfomance out of the box without having to
-> tweak TCP parameters?
-
-Sure, please provide a patch, that does not break back pressure.
-
-But just in case, if Xen performance relied on bufferbloat, it might be
-very difficult to reach a stable equilibrium : Any small change in stack
-or scheduling might introduce a significant difference in 'raw
-performance'.
+Thanks.
