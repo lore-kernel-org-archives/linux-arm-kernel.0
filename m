@@ -1,47 +1,47 @@
 From: philipp.tomsich@theobroma-systems.com (Philipp Tomsich)
-Date: Mon, 13 Apr 2015 21:44:12 +0200
-Subject: [PATCH v4 02/24] arm64: ensure the kernel is compiled for LP64
+Date: Mon, 13 Apr 2015 21:44:13 +0200
+Subject: [PATCH v4 03/24] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
 In-Reply-To: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
 References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
-Message-ID: <dd9e3bcebfe639ac9789bad8a02de016bf8b9af0.1428953303.git.philipp.tomsich@theobroma-systems.com>
+Message-ID: <3beb4627e3ffb9932457297818ddf8fd05eb3196.1428953303.git.philipp.tomsich@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Pinski <apinski@cavium.com>
 
-The kernel needs to be compiled as a LP64 binary for ARM64, even when
-using a compiler that defaults to code-generation for the ILP32 ABI.
-Consequently, we need to explicitly pass '-mabi=lp64' (supported on
-gcc-4.9 and newer).
-
 Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 ---
- arch/arm64/Makefile | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/Kconfig | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 69ceedc..2ad0c34 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -18,14 +18,18 @@ GZFLAGS		:=-9
- KBUILD_DEFCONFIG := defconfig
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b8e9733..6211b3f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -669,9 +669,13 @@ menu "Userspace binary formats"
+ source "fs/Kconfig.binfmt"
  
- KBUILD_CFLAGS	+= -mgeneral-regs-only
-+KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
-+KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- AS		+= -EB
- LD		+= -EB
-+LDFLAGS		+= -maarch64linuxb
- else
- KBUILD_CPPFLAGS	+= -mlittle-endian
- AS		+= -EL
- LD		+= -EL
-+LDFLAGS		+= -maarch64linux
- endif
+ config COMPAT
++	def_bool y
++	depends on AARCH32_EL0
++	select COMPAT_BINFMT_ELF
++
++config AARCH32_EL0
+ 	bool "Kernel support for 32-bit EL0"
+ 	depends on !ARM64_64K_PAGES
+-	select COMPAT_BINFMT_ELF
+ 	select HAVE_UID16
+ 	select OLD_SIGSUSPEND3
+ 	select COMPAT_OLD_SIGACTION
+@@ -685,7 +689,7 @@ config COMPAT
  
- CHECKFLAGS	+= -D__aarch64__
+ config SYSVIPC_COMPAT
+ 	def_bool y
+-	depends on COMPAT && SYSVIPC
++	depends on AARCH32_EL0 && SYSVIPC
+ 
+ endmenu
+ 
 -- 
 1.9.1
