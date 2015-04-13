@@ -1,58 +1,28 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 13 Apr 2015 12:35:48 +0200
-Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
-In-Reply-To: <552B98A0.6020304@arm.com>
-References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
- <5527EC52.4050500@codeaurora.org> <5527FFB5.9020103@arm.com>
- <20150413100400.GJ6186@cbox> <552B98A0.6020304@arm.com>
-Message-ID: <20150413103548.GK6186@cbox>
+From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
+Date: Mon, 13 Apr 2015 19:54:40 +0900
+Subject: [PATCH 0/7] ARM: dts: Refactor Exynos5 boards for phandle notation
+In-Reply-To: <2603418.sEMfdEBYRq@wuerfel>
+References: <1428841494-20769-1-git-send-email-k.kozlowski.k@gmail.com>
+ <2603418.sEMfdEBYRq@wuerfel>
+Message-ID: <CAJKOXPekqfWn0E8R2NWgS656mcBjiAzOeoLvMEx=vbnAyupF-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 11:21:20AM +0100, Marc Zyngier wrote:
-> On 13/04/15 11:04, Christoffer Dall wrote:
-> > On Fri, Apr 10, 2015 at 05:52:05PM +0100, Andre Przywara wrote:
-> >> Hi Christopher,
-> >>
-> >> On 10/04/15 16:29, Christopher Covington wrote:
-> >>> Hi Andre,
-> >>>
-> >>> On 04/10/2015 11:17 AM, Andre Przywara wrote:
-> >>>> When userland injects a SPI via the KVM_IRQ_LINE ioctl we currently
-> >>>> only check it against a fixed limit, which historically is set
-> >>>> to 127. With the new dynamic IRQ allocation the effective limit may
-> >>>> actually be smaller (64).
-> >>>> So when now a malicious or buggy userland injects a SPI in that
-> >>>> range, we spill over on our VGIC bitmaps and bytemaps memory.
-> >>>> I could trigger a host kernel NULL pointer dereference with current
-> >>>> mainline by injecting some bogus IRQ number from a hacked kvmtool:
-> >>>
-> >>>> --- a/arch/arm/include/uapi/asm/kvm.h
-> >>>> +++ b/arch/arm/include/uapi/asm/kvm.h
-> >>>> @@ -195,7 +195,11 @@ struct kvm_arch_memory_slot {
-> >>>>  #define KVM_ARM_IRQ_CPU_IRQ		0
-> >>>>  #define KVM_ARM_IRQ_CPU_FIQ		1
-> >>>>  
-> >>>> -/* Highest supported SPI, from VGIC_NR_IRQS */
-> >>>> +/*
-> >>>> + * This used to hold the highest supported SPI, but it is now obsolete
-> >>>> + * and only here to provide source code level compatibility with older
-> >>>> + * userland. The highest SPI number can be set via KVM_DEV_ARM_VGIC_GRP_NR_IRQS.
-> >>>> + */
-> >>>>  #define KVM_ARM_IRQ_GIC_MAX		127
-> >>>
-> >>> If that's the case should it maybe only defined when __KERNEL__ is not defined?
-> >>
-> >> Mmmh, I am not sure it's really worth the hassle. Actually it seems like
-> >> that neither kvmtool nor QEMU use this definition, so it's more or less
-> >> orphaned by now. I am confident we can avoid it sneaking in in the
-> >> kernel again.
-> >>
-> > TBH, I wouldn't object against Marc enclosing the definition in an
-> > #ifdef __KERNEL__.
-> 
-> Yeah, I'll fix that up (assuming you mean #ifndef rather than #ifdef).
-> 
-Yes, Monday morning ;)
+2015-04-13 5:07 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Sunday 12 April 2015 21:24:47 Krzysztof Kozlowski wrote:
+>>
+>> The phandle notation reduces possible mistakes when overriding nodes
+>> by child board files and reduces duplication of addresses.
+>>
+>> The patchset refactors Exynos5 boards to use the phandle way.
+>>
+>> Tested by comparison of decompiled DTB for each commit.
+>
+> The patches look fine, but the description is wrong as you are not
+> using 'phandles' here, you are using 'labels'.
 
--Christoffer
+Heh, I suspected this but some docs I found referred to "&label { ...
+}" also as a phandle. Thanks for pointing this out. I'll respin.
+
+Best regards,
+Krzysztof
