@@ -1,68 +1,60 @@
-From: George.Dunlap@eu.citrix.com (George Dunlap)
-Date: Mon, 13 Apr 2015 11:56:29 +0100
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
-Message-ID: <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 13 Apr 2015 12:57:44 +0200
+Subject: [PATCH v2 01/10] KVM: add commentary for kvm_debug_exit_arch
+ struct
+In-Reply-To: <1427814488-28467-2-git-send-email-alex.bennee@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-2-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150413105744.GL6186@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 9, 2015 at 5:36 PM, Stefano Stabellini
-<stefano.stabellini@eu.citrix.com> wrote:
-> On Thu, 9 Apr 2015, Eric Dumazet wrote:
->> On Thu, 2015-04-09 at 16:46 +0100, Stefano Stabellini wrote:
->> > Hi all,
->> >
->> > I found a performance regression when running netperf -t TCP_MAERTS from
->> > an external host to a Xen VM on ARM64: v3.19 and v4.0-rc4 running in the
->> > virtual machine are 30% slower than v3.18.
->> >
->> > Through bisection I found that the perf regression is caused by the
->> > prensence of the following commit in the guest kernel:
->> >
->> >
->> > commit 605ad7f184b60cfaacbc038aa6c55ee68dee3c89
->> > Author: Eric Dumazet <edumazet@google.com>
->> > Date:   Sun Dec 7 12:22:18 2014 -0800
->> >
->> >     tcp: refine TSO autosizing
+On Tue, Mar 31, 2015 at 04:07:59PM +0100, Alex Benn?e wrote:
+> Bring into line with the commentary for the other structures and their
+> KVM_EXIT_* cases.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
+> ---
+> 
+> v2
+>   - add comments for other exit types
+> 
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 8055706..5eedf84 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -226,6 +226,7 @@ struct kvm_run {
+>  			__u32 count;
+>  			__u64 data_offset; /* relative to kvm_run start */
+>  		} io;
+> +		/* KVM_EXIT_DEBUG */
+>  		struct {
+>  			struct kvm_debug_exit_arch arch;
+>  		} debug;
+> @@ -274,6 +275,7 @@ struct kvm_run {
+>  			__u32 data;
+>  			__u8  is_write;
+>  		} dcr;
+> +		/* KVM_EXIT_INTERNAL_ERROR */
+>  		struct {
+>  			__u32 suberror;
+>  			/* Available with KVM_CAP_INTERNAL_ERROR_DATA: */
+> @@ -284,6 +286,7 @@ struct kvm_run {
+>  		struct {
+>  			__u64 gprs[32];
+>  		} osi;
+> +		/* KVM_EXIT_PAPR_HCALL */
+>  		struct {
+>  			__u64 nr;
+>  			__u64 ret;
+> -- 
+> 2.3.4
+> 
 
-[snip]
+I'm fine with this change as it is, but I think it should update the
+documenation of the kvm_run structure along with it, and in there it
+seems the debug struct is listed as 'unused'; this should be addressed
+in this patch set somewhere if we start using this struct?
 
->> This commit restored original TCP Small Queue behavior, which is the
->> first step to fight bufferbloat.
->>
->> Some network drivers are known to be problematic because of a delayed TX
->> completion.
-
-[snip]
-
->> Try to tweak /proc/sys/net/ipv4/tcp_limit_output_bytes to see if it
->> makes a difference ?
->
-> A very big difference:
->
-> echo 262144 > /proc/sys/net/ipv4/tcp_limit_output_bytes
-> brings us much closer to the original performance, the slowdown is just
-> 8%
->
-> echo 1048576 > /proc/sys/net/ipv4/tcp_limit_output_bytes
-> fills the gap entirely, same performance as before "refine TSO
-> autosizing"
->
->
-> What would be the next step for here?  Should I just document this as an
-> important performance tweaking step for Xen, or is there something else
-> we can do?
-
-Is the problem perhaps that netback/netfront delays TX completion?
-Would it be better to see if that can be addressed properly, so that
-the original purpose of the patch (fighting bufferbloat) can be
-achieved while not degrading performance for Xen?  Or at least, so
-that people get decent perfomance out of the box without having to
-tweak TCP parameters?
-
- -George
+-Christoffer
