@@ -1,13 +1,15 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Apr 2015 11:21:20 +0100
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 13 Apr 2015 11:21:30 +0100
 Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
 In-Reply-To: <20150413100400.GJ6186@cbox>
 References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
  <5527EC52.4050500@codeaurora.org> <5527FFB5.9020103@arm.com>
  <20150413100400.GJ6186@cbox>
-Message-ID: <552B98A0.6020304@arm.com>
+Message-ID: <552B98AA.6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi,
 
 On 13/04/15 11:04, Christoffer Dall wrote:
 > On Fri, Apr 10, 2015 at 05:52:05PM +0100, Andre Przywara wrote:
@@ -50,10 +52,25 @@ On 13/04/15 11:04, Christoffer Dall wrote:
 > TBH, I wouldn't object against Marc enclosing the definition in an
 > #ifdef __KERNEL__.
 
-Yeah, I'll fix that up (assuming you mean #ifndef rather than #ifdef).
+So just to clarify: Isn't this definition part of the userspace API that
+we have to maintain forever? That was my understanding when Christopher
+suggested to enclose it in #ifndef __KERNEL__ (if I got this correctly).
+So we would at least avoid any future kernel code to (ab)use it again.
+But putting it inside #ifdef __KERNEL__ does contradict this, doesn't it?
 
-Thanks,
+If it is not an API, I'd rather remove it all:
+a) it is not used by the kernel anymore after this patch
+b) it became meaningless with the introduction of the dynamic NR_IRQS
+   allocation
+c) none of the two KVM userspace tools (I know of) is using it
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+So I guess any userspace tool trying to make use of it deserves to not
+compile anymore.
+But if we somehow promised that any userspace program will compile
+forever against even the newest kernel headers, then we have to keep it
+in, haven't we?
+
+Or am I totally wrong here?
+
+Cheers,
+Andre.
