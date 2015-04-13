@@ -1,49 +1,120 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 13 Apr 2015 16:39:10 +0200
-Subject: [PATCH 0/2] ARM: mvebu: Add DLINK-DNS327L support
-In-Reply-To: <20150411212823.GI5244@lunn.ch>
-References: <1428784160-19431-1-git-send-email-andrew@ncrmnt.org>
- <20150411212823.GI5244@lunn.ch>
-Message-ID: <552BD50E.9080403@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Apr 2015 07:39:42 -0700
+Subject: [RESEND][PATCH] ARM errata, 430973: update the affected revisions
+In-Reply-To: <5528E88C.4070107@myspectrum.nl>
+References: <1418131842-6752-1-git-send-email-jhofstee@victronenergy.com>
+ <54EE2453.9080301@myspectrum.nl> <552840A9.8070406@myspectrum.nl>
+ <20150411075220.GK12732@n2100.arm.linux.org.uk>
+ <5528E88C.4070107@myspectrum.nl>
+Message-ID: <20150413143941.GY18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On 11/04/2015 23:28, Andrew Lunn wrote:
->> When power button is pressed to turn the NAS off, weltrend signals 
->> the SoC by driving mpp63 line low. Apparently right now pinctrl assumes
->> that this line can only work as 'gpo' that screws up gpio-buttons driver.
->> Since without gpio-buttons, mpp63 works as input properly via sysfs 
->> interface, I've added a patch for pinctrl-armada-370.c that fixes the 
->> issue.
+* Jeroen Hofstee <linux-arm@myspectrum.nl> [150411 02:26]:
+> Hello Russell, +Tony,
 > 
-> Hi Andrew
+> Thanks for taking the time to respond,
 > 
-> This is odd. I just checked the Marvell datasheets, and they list this
-> pin a GPO.
+> On 11-04-15 09:52, Russell King - ARM Linux wrote:
+> >On Fri, Apr 10, 2015 at 11:29:13PM +0200, Jeroen Hofstee wrote:
+> >>On 25-02-15 20:36, Jeroen Hofstee wrote:
+> >>>On 09-12-14 14:30, Jeroen Hofstee wrote:
+> >>>>From: Jeroen Hofstee <linux-arm@myspectrum.nl>
+> >>>>
+> >>>>Update the list of revisions subject to this errata.
+> >>>>
+> >>>>Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >>>>Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> >>>>Cc: Andreas Bie?mann <andreas.devel@googlemail.com>
+> >>>>Signed-off-by: Jeroen Hofstee <jhofstee@victronenergy.com>
+> >>>>---
+> >>>>I don't have access to the AT400/AT401/AT490 document, but
+> >>>>Andreas was kind enough to provide this information, see
+> >>>>https://www.mail-archive.com/u-boot at lists.denx.de/msg156620.html
+> >>>>
+> >>>>Resending from an address which is subscribed to the ML...
+> >>>>---
+> >>>>  arch/arm/Kconfig | 2 +-
+> >>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>>
+> >>>>diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >>>>index 89c4b5c..a2202fa 100644
+> >>>>--- a/arch/arm/Kconfig
+> >>>>+++ b/arch/arm/Kconfig
+> >>>>@@ -1063,7 +1063,7 @@ config ARM_ERRATA_430973
+> >>>>      depends on CPU_V7
+> >>>>      help
+> >>>>        This option enables the workaround for the 430973 Cortex-A8
+> >>>>-      (r1p0..r1p2) erratum. If a code sequence containing an ARM/Thumb
+> >>>>+      (r1p0..r1p3, r1p7) erratum. If a code sequence containing an
+> >>>>ARM/Thumb
+> >>>>        interworking branch is replaced with another code sequence at
+> >>>>the
+> >>>>        same virtual address, whether due to self-modifying code or
+> >>>>virtual
+> >>>>        to physical address re-mapping, Cortex-A8 does not recover from
+> >>>>the
+> >>>
+> >No.  If you read the discussion that the OMAP people are having, it is
+> >unclear whether r3p2 is actually affected by this errata or not.
+> I scanned through it, but that is a different issue it seems. This patch
+> only adds r1p3 and r1p7 to the documentation, since according to ARM
+> they are affected by this errata. Newer revision should not be affected
+> by this errata (or ARM reintroduced it).
 > 
-> We probably want Thomas or Gregory to check this with Marvell.
+> The patch is _not_ adding r3p2 as an affected version. And is also not
+> about how to deal with cores no longer needing this workaround.
 
-I have check on the datasheet I have (in case of it was different of the public one)
-and for all the variant of the Armada 370:  88F6710, 88F6707, and 88F6W11 the MPP63
-is list as GPO.
-
-I will ask Marvell to see if it was a typo on their datasheet.
-
-
-Thanks,
-
-Gregory
-
-
+Right.. But it seems that having the aux ctrl register bit enabled
+without doing the flush btac part leads into a different set of
+issues.
+ 
+> >In the discussion with OMAP people, we've come up with a potentially
+> >better solution to this, which is to rearrange the code so that only
+> >Cortex-A8 executes this workaround, and the BTB flush is always
+> >present (which Tony says fixes the problem.)
 > 
->    Andrew
+> The am3517 / r1p7 is a Cortex-a8 and is affected by this errata. I fail to
+> see why making this cortex-a8 specific will help anything about the revision
+> not being mentioned in the help text. (unless the CONFIG option gets
+> completely
+> removed).
+> >Meanwhile, OMAP people are seeing about updating uboot to set/clear
+> >the auxiliary control register bit appropriately for the revision of
+> >the core.
+> Well almost appropriately. [1] suggest "the bootloaders can be fixed
+> Cortex-A8
+> revisions later than r1p2 to not set the IBE bit.". That should have been
+> r1p7 as
+> well.
 > 
+> >In any case, adding the patch and suggesting people enable this for
+> >more Cortex-A8's (eg, non-OMAP) won't actually do anything in a
+> >multiplatform kernel.
+> >
+> Can you give an example of a r1p7 not needing the workaround?
 
+Do you have some pointer for the documentation mentioning r1p7 is
+affected? It is possible that the revision range is wrong.. But I'm
+more likely to believe it is correct and we're hitting a different
+problem.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I'm hoping that with Russell's patch and my patch in the thread
+below, you don't necessarily need to enable 430973. That's these
+two patches:
+
+http://www.spinics.net/lists/arm-kernel/msg411433.html
+http://www.spinics.net/lists/arm-kernel/msg411038.html
+
+If what Russell and I are saying is correct, with the above two
+patches your system should behave properly with 430973 even if
+bit 6 in the aux ctrl register is set (or unset) by the bootloader.
+
+If r1p7 is behaves with bit 6 cleared and errata 430973 set, then
+we know r1p7 is unaffected by 430973.
+
+Regards,
+
+Tony
+ 
+> http://www.spinics.net/lists/arm-kernel/msg411297.html
