@@ -1,44 +1,47 @@
 From: philipp.tomsich@theobroma-systems.com (Philipp Tomsich)
-Date: Mon, 13 Apr 2015 21:44:16 +0200
-Subject: [PATCH v4 06/24] arm64:uapi: set __BITS_PER_LONG correctly for ILP32
- and LP64
+Date: Mon, 13 Apr 2015 21:44:12 +0200
+Subject: [PATCH v4 02/24] arm64: ensure the kernel is compiled for LP64
 In-Reply-To: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
 References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
-Message-ID: <397d8e22b263375720e757f00f3056db8e978d50.1428953303.git.philipp.tomsich@theobroma-systems.com>
+Message-ID: <dd9e3bcebfe639ac9789bad8a02de016bf8b9af0.1428953303.git.philipp.tomsich@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Pinski <apinski@cavium.com>
 
-Define __BITS_PER_LONG depending on the ABI used (i.e. check whether
-__ILP32__ or __LP64__ is defined).  This is necessary for glibc to
-determine the appropriate type definitions for the system call interface.
+The kernel needs to be compiled as a LP64 binary for ARM64, even when
+using a compiler that defaults to code-generation for the ILP32 ABI.
+Consequently, we need to explicitly pass '-mabi=lp64' (supported on
+gcc-4.9 and newer).
 
 Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 ---
- arch/arm64/include/uapi/asm/bitsperlong.h | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
-index fce9c29..4265243 100644
---- a/arch/arm64/include/uapi/asm/bitsperlong.h
-+++ b/arch/arm64/include/uapi/asm/bitsperlong.h
-@@ -16,7 +16,14 @@
- #ifndef __ASM_BITSPERLONG_H
- #define __ASM_BITSPERLONG_H
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 69ceedc..2ad0c34 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -18,14 +18,18 @@ GZFLAGS		:=-9
+ KBUILD_DEFCONFIG := defconfig
  
--#define __BITS_PER_LONG 64
-+#if defined(__LP64__)
-+/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
-+#  define __BITS_PER_LONG 64
-+#elif defined(__ILP32__)
-+#  define __BITS_PER_LONG 32
-+#else
-+#  error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
-+#endif
+ KBUILD_CFLAGS	+= -mgeneral-regs-only
++KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
++KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ AS		+= -EB
+ LD		+= -EB
++LDFLAGS		+= -maarch64linuxb
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
+ AS		+= -EL
+ LD		+= -EL
++LDFLAGS		+= -maarch64linux
+ endif
  
- #include <asm-generic/bitsperlong.h>
- 
+ CHECKFLAGS	+= -D__aarch64__
 -- 
 1.9.1
