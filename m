@@ -1,60 +1,64 @@
-From: ola@adapteva.com (Ola Jeppsson)
-Date: Mon, 13 Apr 2015 19:37:29 +0200
-Subject: [PATCH] clocksource: arm_global_timer: Detect if gt is usable with
- CPU_FREQ
-Message-ID: <552BFED9.3020105@adapteva.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 13 Apr 2015 19:46:58 +0200
+Subject: [PATCH 0/4] cpufreq: use generic cpufreq drivers for Exynos5250
+ platform
+Message-ID: <1428947223-17268-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Cortex A9 CPU:s (e.g. zynq) have the tick tied to the CPU
-frequency. On those CPU:s we cannot use the global-timer as a reliable
-clocksource with CPU frequency scaling enabled since this is not
-currently taken into account by the driver.
+Hi,
 
-Add a "tied-to-cpu-freq" boolean to the global-timer dt node indicate
-this condition.
+This patch series removes the use of Exynos5250 specific support
+from exynos-cpufreq driver and enables the use of cpufreq-dt driver
+for this platform.  The exynos-cpufreq driver itself is also removed
+as it is no longer used/needed after Exynos5250 support removal.
 
-When the global-timer register function sees this property return
-immediately and don't register the clocksource.
+This patch series has been tested on Exynos5250 based Arndale board.
 
-Signed-off-by: Ola Jeppsson <ola@adapteva.com>
----
- Documentation/devicetree/bindings/arm/global_timer.txt | 4 ++++
- drivers/clocksource/arm_global_timer.c                 | 7 +++++++
- 2 files changed, 11 insertions(+)
+Depends on:
+- next-20150330 branch of linux-next kernel tree
+- "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4210
+  platform" [1]
+- "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+  platform" [2]
+- "[PATCH] cpufreq: exynos: remove dead ->need_apll_change method" [3]
 
-diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
-index bdae3a818793..465e02c17b5b 100644
---- a/Documentation/devicetree/bindings/arm/global_timer.txt
-+++ b/Documentation/devicetree/bindings/arm/global_timer.txt
-@@ -17,6 +17,10 @@
- 
- - clocks : Should be phandle to a clock.
- 
-+** Timer node optional properties:
-+
-+- tied-to-cpu-freq : indicates that the timer scales with the CPU frequency.
-+
- Example:
- 
- 	timer at 2c000600 {
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index e6833771a716..8913ebda3f09 100644
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -268,6 +268,13 @@ static void __init global_timer_of_register(struct device_node *np)
- 		return;
- 	}
- 
-+#ifdef CONFIG_CPU_FREQ
-+	if (of_property_read_bool(np, "tied-to-cpu-freq")) {
-+		pr_warn("global-timer: tied to cpu frequency, not supported with scaling\n");
-+		return;
-+	}
-+#endif
-+
- 	gt_clk = of_clk_get(np, 0);
- 	if (!IS_ERR(gt_clk)) {
- 		err = clk_prepare_enable(gt_clk);
+[1] http://www.kernelhub.org/?msg=721136&p=2
+[2] http://marc.info/?l=linux-pm&m=142868881101873&w=2
+[3] https://lkml.org/lkml/2015/3/27/574
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+Bartlomiej Zolnierkiewicz (1):
+  cpufreq: exynos: remove Exynos5250 specific cpufreq driver support
+
+Thomas Abraham (3):
+  clk: samsung: exynos5250: add cpu clock configuration data and
+    instantiate cpu clock
+  ARM: dts: Exynos5250: add CPU OPP and regulator supply property
+  ARM: Exynos: switch to using generic cpufreq driver for Exynos5250
+
+ arch/arm/boot/dts/exynos5250-arndale.dts  |    4 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |    4 +
+ arch/arm/boot/dts/exynos5250-snow.dts     |    4 +
+ arch/arm/boot/dts/exynos5250-spring.dts   |    4 +
+ arch/arm/boot/dts/exynos5250.dtsi         |   22 +++
+ arch/arm/mach-exynos/exynos.c             |    1 +
+ drivers/clk/samsung/clk-exynos5250.c      |   31 +++++
+ drivers/cpufreq/Kconfig.arm               |   22 ---
+ drivers/cpufreq/Makefile                  |    3 -
+ drivers/cpufreq/exynos-cpufreq.c          |  203 ----------------------------
+ drivers/cpufreq/exynos-cpufreq.h          |   67 ---------
+ drivers/cpufreq/exynos5250-cpufreq.c      |  210 -----------------------------
+ include/dt-bindings/clock/exynos5250.h    |    1 +
+ 13 files changed, 71 insertions(+), 505 deletions(-)
+ delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos-cpufreq.h
+ delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
+
 -- 
-2.3.3
+1.7.9.5
