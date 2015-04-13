@@ -1,32 +1,43 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 13 Apr 2015 12:13:43 +0800
-Subject: [PATCH v2] crypto/arm: accelerated SHA-512 using ARM generic ASM
- and NEON
-In-Reply-To: <CAKv+Gu9TU6ETRQDvp7M7Q43xAR5A25scgP3tsvZMmzBQNOK7Cg@mail.gmail.com>
-References: <1428676148-28210-1-git-send-email-ard.biesheuvel@linaro.org>
- <F695F357-2A5C-4DFC-9F0E-188CDBBE7C01@linaro.org>
- <CAKv+Gu-6mZwrVSCvS+ZWWwwM-294nWAqX4_J3r5Z8NM7KKC0=Q@mail.gmail.com>
- <2845656.4sNJ3XBxnz@wuerfel>
- <CAKv+Gu9TU6ETRQDvp7M7Q43xAR5A25scgP3tsvZMmzBQNOK7Cg@mail.gmail.com>
-Message-ID: <20150413041343.GB11091@gondor.apana.org.au>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 13 Apr 2015 09:44:36 +0530
+Subject: [PATCH V3 5/6] dts: msm8974: Add blsp2_bam dma node
+In-Reply-To: <55299C4A.3020905@cogentembedded.com>
+References: <1428736145-18361-1-git-send-email-sricharan@codeaurora.org>
+ <1428736145-18361-6-git-send-email-sricharan@codeaurora.org>
+ <55299C4A.3020905@cogentembedded.com>
+Message-ID: <552B42AC.7010407@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 11, 2015 at 09:15:10PM +0200, Ard Biesheuvel wrote:
+Hi,
+
+On 04/12/2015 03:42 AM, Sergei Shtylyov wrote:
+> Hello.
 >
-> @Herbert: could you please apply this onto cryptodev before sending
-> out your pull request for v4.1?
+> On 04/11/2015 10:09 AM, Sricharan R wrote:
+>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>   arch/arm/boot/dts/qcom-msm8974.dtsi | 12 +++++++++++-
+>>   1 file changed, 11 insertions(+), 1 deletion(-)
+>
+>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> index e265ec1..2c26151 100644
+>> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> [...]
+>> @@ -247,5 +247,15 @@
+>>               #address-cells = <1>;
+>>               #size-cells = <0>;
+>>           };
+>> +
+>> +        blsp2_dma: dma at f9944000 {
+>
+>     The ePAPR standard says that the node name should be
+> "dma-controller", not just "dma".
+>
+  Ok, will correct this.
 
-Done.
-
-> And please disregard $subject, I will post a v3 with a similar
-> 'depends on' added (unless you're ok to add it yourself)
-
-Please resend the patch.  But I'll process it after the merge
-window closes so no hurry.
-
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Regards,
+  Sricharan
