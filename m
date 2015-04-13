@@ -1,147 +1,34 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Mon, 13 Apr 2015 15:10:46 -0700
-Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
-In-Reply-To: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
-References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
+Date: Mon, 13 Apr 2015 15:10:44 -0700
+Subject: [PATCHv2 0/3] Add devm_of_phy_get_by_index and update platform drivers
+Message-ID: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Getting phys by index instead of phy names so that we do
-not have to create a naming scheme when multiple phys
-are present
+This patch set adds a new API to get phy by index when multiple 
+phys are present. This patch is based on discussion with Arnd Bergmann
+about dt bindings for multiple phys.
 
-Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- drivers/usb/host/Kconfig         |  1 +
+History:
+v1:
+    - Removed null pointers on Dmitry's suggestion
+    - Improved documentation in commit messages
+    - Exported new phy api
+v2:
+    - EHCI and OHCI platform Kconfigs select Generic Phy
+      to fix build errors in certain configs. 
+
+Arun Ramamurthy (3):
+  phy: core: Add devm_of_phy_get_by_index to phy-core
+  usb: ehci-platform: Use devm_of_phy_get_by_index
+  usb: ohci-platform: Use devm_of_phy_get_by_index
+
+ drivers/phy/phy-core.c           | 32 ++++++++++++++++++
+ drivers/usb/host/Kconfig         |  2 ++
  drivers/usb/host/ehci-platform.c | 70 ++++++++++++++--------------------------
- 2 files changed, 26 insertions(+), 45 deletions(-)
+ drivers/usb/host/ohci-platform.c | 70 ++++++++++++++--------------------------
+ include/linux/phy/phy.h          |  2 ++
+ 5 files changed, 86 insertions(+), 90 deletions(-)
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 5ad60e4..563f22d 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -284,6 +284,7 @@ config USB_EHCI_ATH79
- 
- config USB_EHCI_HCD_PLATFORM
- 	tristate "Generic EHCI driver for a platform device"
-+	select GENERIC_PHY
- 	default n
- 	---help---
- 	  Adds an EHCI host driver for a generic platform device, which
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index d8a75a5..a7563b9 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -88,15 +88,13 @@ static int ehci_platform_power_on(struct platform_device *dev)
- 	}
- 
- 	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--		if (priv->phys[phy_num]) {
--			ret = phy_init(priv->phys[phy_num]);
--			if (ret)
--				goto err_exit_phy;
--			ret = phy_power_on(priv->phys[phy_num]);
--			if (ret) {
--				phy_exit(priv->phys[phy_num]);
--				goto err_exit_phy;
--			}
-+		ret = phy_init(priv->phys[phy_num]);
-+		if (ret)
-+			goto err_exit_phy;
-+		ret = phy_power_on(priv->phys[phy_num]);
-+		if (ret) {
-+			phy_exit(priv->phys[phy_num]);
-+			goto err_exit_phy;
- 		}
- 	}
- 
-@@ -104,10 +102,8 @@ static int ehci_platform_power_on(struct platform_device *dev)
- 
- err_exit_phy:
- 	while (--phy_num >= 0) {
--		if (priv->phys[phy_num]) {
--			phy_power_off(priv->phys[phy_num]);
--			phy_exit(priv->phys[phy_num]);
--		}
-+		phy_power_off(priv->phys[phy_num]);
-+		phy_exit(priv->phys[phy_num]);
- 	}
- err_disable_clks:
- 	while (--clk >= 0)
-@@ -123,10 +119,8 @@ static void ehci_platform_power_off(struct platform_device *dev)
- 	int clk, phy_num;
- 
- 	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--		if (priv->phys[phy_num]) {
--			phy_power_off(priv->phys[phy_num]);
--			phy_exit(priv->phys[phy_num]);
--		}
-+		phy_power_off(priv->phys[phy_num]);
-+		phy_exit(priv->phys[phy_num]);
- 	}
- 
- 	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
-@@ -154,7 +148,6 @@ static int ehci_platform_probe(struct platform_device *dev)
- 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ehci_platform_priv *priv;
- 	struct ehci_hcd *ehci;
--	const char *phy_name;
- 	int err, irq, phy_num, clk = 0;
- 
- 	if (usb_disabled())
-@@ -204,36 +197,23 @@ static int ehci_platform_probe(struct platform_device *dev)
- 
- 		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
- 				"phys", "#phy-cells");
--		priv->num_phys = priv->num_phys > 0 ? priv->num_phys : 1;
- 
--		priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
--				sizeof(struct phy *), GFP_KERNEL);
--		if (!priv->phys)
--			return -ENOMEM;
-+		if (priv->num_phys > 0) {
-+			priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
-+					    sizeof(struct phy *), GFP_KERNEL);
-+			if (!priv->phys)
-+				return -ENOMEM;
-+		} else
-+			priv->num_phys = 0;
- 
- 		for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--				err = of_property_read_string_index(
--						dev->dev.of_node,
--						"phy-names", phy_num,
--						&phy_name);
--
--				if (err < 0) {
--					if (priv->num_phys > 1) {
--						dev_err(&dev->dev, "phy-names not provided");
--						goto err_put_hcd;
--					} else
--						phy_name = "usb";
--				}
--
--				priv->phys[phy_num] = devm_phy_get(&dev->dev,
--						phy_name);
--				if (IS_ERR(priv->phys[phy_num])) {
--					err = PTR_ERR(priv->phys[phy_num]);
--					if ((priv->num_phys > 1) ||
--					    (err == -EPROBE_DEFER))
--						goto err_put_hcd;
--					priv->phys[phy_num] = NULL;
--				}
-+			priv->phys[phy_num] = devm_of_phy_get_by_index(&dev->dev
-+						, dev->dev.of_node
-+						, phy_num);
-+			if (IS_ERR(priv->phys[phy_num])) {
-+				err = PTR_ERR(priv->phys[phy_num]);
-+					goto err_put_hcd;
-+			}
- 		}
- 
- 		for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
 -- 
 2.3.4
