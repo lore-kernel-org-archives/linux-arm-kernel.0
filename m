@@ -1,265 +1,210 @@
-From: wenyou.yang@atmel.com (Yang, Wenyou)
-Date: Mon, 13 Apr 2015 15:56:27 +0800
-Subject: [PATCHv5 1/4] watchdog: Extend kernel API to know about HW
- limitations
-In-Reply-To: <1428671199-5562-2-git-send-email-timo.kokkonen@offcode.fi>
-References: <1428671199-5562-1-git-send-email-timo.kokkonen@offcode.fi>
- <1428671199-5562-2-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <552B76AB.10102@atmel.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 13 Apr 2015 08:59:21 +0100
+Subject: [PATCH v2 09/10] KVM: arm64: trap nested debug register access
+In-Reply-To: <20150410123830.GB3227@hawk.usersys.redhat.com>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-10-git-send-email-alex.bennee@linaro.org>
+ <20150410123830.GB3227@hawk.usersys.redhat.com>
+Message-ID: <877ftglaqu.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Timo,
+Andrew Jones <drjones@redhat.com> writes:
 
-There is trivial typo.
+> On Tue, Mar 31, 2015 at 04:08:07PM +0100, Alex Benn?e wrote:
+>> When we are using the hardware registers for guest debug we need to deal
+>> with the guests access to them. There is already a mechanism for dealing
+>> with these accesses so we build on top of that.
+>> 
+>>   - mdscr_el1_bits is renamed as we save the whole register
+>>   - any access to mdscr_el1 is now stored in the mirror location
+>>   - if we are using HW assisted debug we do the same with DBG[WB][CV]R
+>> 
+>> There is one register (MDCCINT_EL1) which guest debug doesn't care about
+>> so this behaves as before.
+>> 
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> 
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 2c359c9..3d32d45 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -122,10 +122,13 @@ struct kvm_vcpu_arch {
+>>  	 * here.
+>>  	 */
+>>  
+>> -	/* Registers pre any guest debug manipulations */
+>> +	/* Registers before any guest debug manipulations. These
+>
+> starting comment /* on own line
+>
+>> +	 * shadow registers are updated by the kvm_handle_sys_reg
+>> +	 * trap handler if the guest accesses or updates them
+>> +	 */
+>>  	struct {
+>>  		u32	pstate_ss_bit;
+>> -		u32	mdscr_el1_bits;
+>> +		u32	mdscr_el1;
+>>  
+>>  		struct kvm_guest_debug_arch debug_regs;
+>>  	} debug_saved_regs;
+>> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+>> index 3b368f3..638c111 100644
+>> --- a/arch/arm64/kvm/debug.c
+>> +++ b/arch/arm64/kvm/debug.c
+>> @@ -55,8 +55,6 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
+>>  	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM | MDCR_EL2_TPMCR);
+>>  	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TDRA | MDCR_EL2_TDOSA);
+>>  
+>> -	trace_kvm_arch_setup_debug_reg32("MDCR_EL2", vcpu->arch.mdcr_el2);
+>> -
+>
+> I guess I'll see this come back in the next patch. You must be playing
+> 'now you see me, now you don't'
 
-On 2015/4/10 21:06, Timo Kokkonen wrote:
-> There is a great deal of diversity in the watchdog hardware found on
-> different devices. Differen hardware have different contstraints on
-> them, many of the constraints that are excessively difficult for the
-> user space to satisfy.
+Oops, missed that on the rebase.
+
 >
-> One such constraint is the length of the timeout value, which in many
-> cases can be just a few seconds. Drivers are creating ad hoc solutions
-> with timers and workqueues to extend the timeout in order to give user
-> space more time between updates. Looking at the drivers it is clear
-> that this has resulted to a lot of duplicate code.
+>>  	/*
+>>  	 * If we are not treating debug registers are dirty we need
+>>  	 * to trap if the guest starts accessing them.
+>> @@ -71,8 +69,10 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
+>>  		/* Save pstate/mdscr */
+>>  		vcpu_debug_saved_reg(vcpu, pstate_ss_bit) =
+>>  			*vcpu_cpsr(vcpu) & DBG_SPSR_SS;
+>> -		vcpu_debug_saved_reg(vcpu, mdscr_el1_bits) =
+>> -			vcpu_sys_reg(vcpu, MDSCR_EL1) & MDSCR_EL1_DEBUG_BITS;
+>> +
+>> +		vcpu_debug_saved_reg(vcpu, mdscr_el1) =
+>> +			vcpu_sys_reg(vcpu, MDSCR_EL1);
+>> +
+>>  		/*
+>>  		 * Single Step (ARM ARM D2.12.3 The software step state
+>>  		 * machine)
+>> @@ -161,9 +161,8 @@ void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
+>>  		*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
+>>  		*vcpu_cpsr(vcpu) |= vcpu_debug_saved_reg(vcpu, pstate_ss_bit);
+>>  
+>> -		vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~MDSCR_EL1_DEBUG_BITS;
+>> -		vcpu_sys_reg(vcpu, MDSCR_EL1) |=
+>> -			vcpu_debug_saved_reg(vcpu, mdscr_el1_bits);
+>> +		vcpu_sys_reg(vcpu, MDSCR_EL1) =
+>> +			vcpu_debug_saved_reg(vcpu, mdscr_el1);
+>>  
+>>  		/*
+>>  		 * If we were using HW debug we need to restore the
+>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> index be9b188..d43d7d1 100644
+>> --- a/arch/arm64/kvm/sys_regs.c
+>> +++ b/arch/arm64/kvm/sys_regs.c
+>> @@ -208,39 +208,61 @@ static bool trap_debug_regs(struct kvm_vcpu *vcpu,
+>>  			    const struct sys_reg_params *p,
+>>  			    const struct sys_reg_desc *r)
+>>  {
+>> -	if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
+>> -		struct kvm_guest_debug_arch *saved;
+>> -		__u64 *val;
+>> -
+>> -		saved = &vcpu_debug_saved_reg(vcpu, debug_regs);
+>> -
+>> -		if (r->reg >= DBGBCR0_EL1 && r->reg <= DBGBCR15_EL1)
+>> -			val = &saved->dbg_bcr[r->reg - DBGBCR0_EL1];
+>> -		else if (r->reg >= DBGBVR0_EL1 && r->reg <= DBGBVR15_EL1)
+>> -			val = &saved->dbg_bvr[r->reg - DBGBVR0_EL1];
+>> -		else if (r->reg >= DBGWCR0_EL1 && r->reg <= DBGWCR15_EL1)
+>> -			val = &saved->dbg_wcr[r->reg - DBGWCR0_EL1];
+>> -		else if (r->reg >= DBGWVR0_EL1 && r->reg <= DBGWVR15_EL1)
+>> -			val = &saved->dbg_wvr[r->reg - DBGWVR0_EL1];
+>> -		else {
+>> -			kvm_err("Bad register index %d\n", r->reg);
+>> -			return false;
+>> +	if (vcpu->guest_debug) {
+>> +
+>> +		/* MDSCR_EL1 */
+>> +		if (r->reg == MDSCR_EL1) {
+>> +			if (p->is_write)
+>> +				vcpu_debug_saved_reg(vcpu, mdscr_el1) =
+>> +					*vcpu_reg(vcpu, p->Rt);
+>> +			else
+>> +				*vcpu_reg(vcpu, p->Rt) =
+>> +					vcpu_debug_saved_reg(vcpu, mdscr_el1);
 >
-> Add an extension to the watchdog kernel API that allows the driver to
-> describe tis HW constraints to the watchdog code. A kernel worker in
-> the core is then used to extend the watchdog timeout on behalf of the
-> user space. This allows the drivers to be simplified as core takes
-> over the timer extending.
+> With this lines wrapping, {}'s might be nice.
+
+My natural inclination is to wrap in {}'s but I know the kernel is a fan
+of the single-statement if forms.
+
 >
-> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
-> ---
->   drivers/watchdog/watchdog_core.c | 87 ++++++++++++++++++++++++++++++++++++++--
->   drivers/watchdog/watchdog_dev.c  | 12 ++++++
->   include/linux/watchdog.h         | 23 +++++++++++
->   3 files changed, 119 insertions(+), 3 deletions(-)
+>> +
+>> +			return true;
+>>  		}
+>>  
+>> -		if (p->is_write)
+>> -			*val = *vcpu_reg(vcpu, p->Rt);
+>> -		else
+>> -			*vcpu_reg(vcpu, p->Rt) = *val;
+>> +		/* MDCCINT_EL1 */
+>> +		if (r->reg == MDCCINT_EL1)
+>> +			goto old;
 >
-> diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-> index cec9b55..8e7d08d 100644
-> --- a/drivers/watchdog/watchdog_core.c
-> +++ b/drivers/watchdog/watchdog_core.c
-> @@ -99,6 +99,75 @@ int watchdog_init_timeout(struct watchdog_device *wdd,
->   EXPORT_SYMBOL_GPL(watchdog_init_timeout);
->   
->   /**
-> + * watchdog_init_timeout() - initialize generic watchdog parameters
-s/watchdog_init_timeout/watchdog_init_params/ ?
-> + * @wdd: Watchdog device to operate
-> + * @dev: Device that stores the device tree properties
-> + *
-> + * Initialize the generic timeout parameters. The driver needs to set
-> + * hw_features bitmask from @wdd prior calling this function in order
-> + * to ensure the core knows how to handle the HW.
-> + *
-> + * A zero is returned on success and -EINVAL for failure.
-> + */
-> +int watchdog_init_params(struct watchdog_device *wdd, struct device *dev)
-> +{
-> +	int ret = 0;
-> +
-> +	ret = watchdog_init_timeout(wdd, wdd->timeout, dev);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	/*
-> +	 * Max HW timeout needs to be set so that core knows when to
-> +	 * use a kernel worker to support longer watchdog timeouts
-> +	 */
-> +	if (!wdd->hw_max_timeout)
-> +		return -EINVAL;
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(watchdog_init_params);
-> +
-> +static void watchdog_worker(struct work_struct *work)
-> +{
-> +	struct watchdog_device *wdd = container_of(to_delayed_work(work),
-> +						struct watchdog_device, work);
-> +
-> +	if (time_after(jiffies, wdd->expires)) {
-> +		pr_crit("I will reset your machine !\n");
-> +		return;
-> +	}
-> +
-> +	if ((!watchdog_active(wdd) && !watchdog_is_stoppable(wdd)) ||
-> +		(watchdog_active(wdd) &&
-> +			wdd->hw_max_timeout < wdd->timeout * HZ)) {
-> +		if (wdd->ops->ping)
-> +			wdd->ops->ping(wdd);
-> +		else
-> +			wdd->ops->start(wdd);
-> +
-> +		schedule_delayed_work(&wdd->work,  wdd->hw_heartbeat);
-> +	}
-> +}
-> +
-> +static int prepare_watchdog(struct watchdog_device *wdd)
-> +{
-> +	/* Stop the watchdog now before user space opens the device */
-> +	if (wdd->hw_features & WDOG_HW_IS_STOPPABLE &&
-> +		wdd->hw_features & WDOG_HW_RUNNING_AT_BOOT) {
-> +		wdd->ops->stop(wdd);
-> +
-> +	} else if (!(wdd->hw_features & WDOG_HW_IS_STOPPABLE)) {
-> +		/*
-> +		 * Can't stop it, use a kernel timer to tick
-> +		 * it until it's open by user space
-> +		 */
-> +		schedule_delayed_work(&wdd->work, wdd->hw_heartbeat);
-> +	}
-> +	return 0;
-> +}
-> +
-> +/**
->    * watchdog_register_device() - register a watchdog device
->    * @wdd: watchdog device
->    *
-> @@ -156,13 +225,24 @@ int watchdog_register_device(struct watchdog_device *wdd)
->   	wdd->dev = device_create(watchdog_class, wdd->parent, devno,
->   					NULL, "watchdog%d", wdd->id);
->   	if (IS_ERR(wdd->dev)) {
-> -		watchdog_dev_unregister(wdd);
-> -		ida_simple_remove(&watchdog_ida, id);
->   		ret = PTR_ERR(wdd->dev);
-> -		return ret;
-> +		goto dev_create_fail;
-> +	}
-> +
-> +	INIT_DELAYED_WORK(&wdd->work, watchdog_worker);
-> +
-> +	if (wdd->hw_max_timeout) {
-> +		ret = prepare_watchdog(wdd);
-> +		if (ret)
-> +			goto dev_create_fail;
->   	}
->   
->   	return 0;
-> +
-> +dev_create_fail:
-> +	watchdog_dev_unregister(wdd);
-> +	ida_simple_remove(&watchdog_ida, id);
-> +	return ret;
->   }
->   EXPORT_SYMBOL_GPL(watchdog_register_device);
->   
-> @@ -181,6 +261,7 @@ void watchdog_unregister_device(struct watchdog_device *wdd)
->   	if (wdd == NULL)
->   		return;
->   
-> +	cancel_delayed_work_sync(&wdd->work);
->   	devno = wdd->cdev.dev;
->   	ret = watchdog_dev_unregister(wdd);
->   	if (ret)
-> diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
-> index 6aaefba..99eb363 100644
-> --- a/drivers/watchdog/watchdog_dev.c
-> +++ b/drivers/watchdog/watchdog_dev.c
-> @@ -78,6 +78,12 @@ static int watchdog_ping(struct watchdog_device *wddev)
->   	else
->   		err = wddev->ops->start(wddev); /* restart watchdog */
->   
-> +	if (wddev->hw_max_timeout &&
-> +		wddev->timeout * HZ > wddev->hw_max_timeout) {
-> +		wddev->expires = jiffies + wddev->timeout * HZ;
-> +		schedule_delayed_work(&wddev->work, wddev->hw_heartbeat);
-> +	}
-> +
->   out_ping:
->   	mutex_unlock(&wddev->lock);
->   	return err;
-> @@ -110,6 +116,12 @@ static int watchdog_start(struct watchdog_device *wddev)
->   	if (err == 0)
->   		set_bit(WDOG_ACTIVE, &wddev->status);
->   
-> +	if (wddev->hw_max_timeout &&
-> +		wddev->timeout * HZ > wddev->hw_max_timeout) {
-> +		wddev->expires = jiffies + wddev->timeout * HZ;
-> +		schedule_delayed_work(&wddev->work, wddev->hw_heartbeat);
-> +	}
-> +
->   out_start:
->   	mutex_unlock(&wddev->lock);
->   	return err;
-> diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-> index 395b70e..c16c921 100644
-> --- a/include/linux/watchdog.h
-> +++ b/include/linux/watchdog.h
-> @@ -12,6 +12,7 @@
->   #include <linux/bitops.h>
->   #include <linux/device.h>
->   #include <linux/cdev.h>
-> +#include <linux/workqueue.h>
->   #include <uapi/linux/watchdog.h>
->   
->   struct watchdog_ops;
-> @@ -62,9 +63,13 @@ struct watchdog_ops {
->    * @timeout:	The watchdog devices timeout value.
->    * @min_timeout:The watchdog devices minimum timeout value.
->    * @max_timeout:The watchdog devices maximum timeout value.
-> + * @hw_max_timeout:The watchdog hardware maximum timeout value.
-> + * @hw_margin:	Time interval between timer pings.
-s/hw_margin/hw_heartbeat/ ?
->    * @driver-data:Pointer to the drivers private data.
->    * @lock:	Lock for watchdog core internal use only.
-> + * @work:	Worker used to provide longer timeouts than hardware supports.
->    * @status:	Field that contains the devices internal status bits.
-> + * @hw_features:Feature bits describing how the watchdog HW works.
->    *
->    * The watchdog_device structure contains all information about a
->    * watchdog timer device.
-> @@ -86,8 +91,12 @@ struct watchdog_device {
->   	unsigned int timeout;
->   	unsigned int min_timeout;
->   	unsigned int max_timeout;
-> +	unsigned int hw_max_timeout; /* in jiffies */
-> +	unsigned int hw_heartbeat; /* in jiffies */
-> +	unsigned long int expires; /* for soft timer */
->   	void *driver_data;
->   	struct mutex lock;
-> +	struct delayed_work work;
->   	unsigned long status;
->   /* Bit numbers for status flags */
->   #define WDOG_ACTIVE		0	/* Is the watchdog running/active */
-> @@ -95,6 +104,14 @@ struct watchdog_device {
->   #define WDOG_ALLOW_RELEASE	2	/* Did we receive the magic char ? */
->   #define WDOG_NO_WAY_OUT		3	/* Is 'nowayout' feature set ? */
->   #define WDOG_UNREGISTERED	4	/* Has the device been unregistered */
-> +
-> +/* Bits describing features supported by the HW */
-> +	unsigned long hw_features;
-> +
-> +/* Can the watchdog be stopped and started */
-> +#define WDOG_HW_IS_STOPPABLE		BIT(0)
-> +/* Is the watchdog already running when the driver starts up */
-> +#define WDOG_HW_RUNNING_AT_BOOT		BIT(1)
->   };
->   
->   #define WATCHDOG_NOWAYOUT		IS_BUILTIN(CONFIG_WATCHDOG_NOWAYOUT)
-> @@ -120,6 +137,11 @@ static inline bool watchdog_timeout_invalid(struct watchdog_device *wdd, unsigne
->   		(t < wdd->min_timeout || t > wdd->max_timeout));
->   }
->   
-> +static inline bool watchdog_is_stoppable(struct watchdog_device *wdd)
-> +{
-> +	return wdd->hw_features & WDOG_HW_IS_STOPPABLE;
-> +}
-> +
->   /* Use the following functions to manipulate watchdog driver specific data */
->   static inline void watchdog_set_drvdata(struct watchdog_device *wdd, void *data)
->   {
-> @@ -134,6 +156,7 @@ static inline void *watchdog_get_drvdata(struct watchdog_device *wdd)
->   /* drivers/watchdog/watchdog_core.c */
->   extern int watchdog_init_timeout(struct watchdog_device *wdd,
->   				  unsigned int timeout_parm, struct device *dev);
-> +int watchdog_init_params(struct watchdog_device *wdd, struct device *dev);
->   extern int watchdog_register_device(struct watchdog_device *);
->   extern void watchdog_unregister_device(struct watchdog_device *);
->   
-Best Regards,
-Wenyou Yang
+> "old"? As in the old way this worked? Someday (soon) all this code will
+> be "old". How about just 'out'? Or use some other way to get the flow
+> such that we avoid code duplication, but doesn't require a goto?
+
+I'll see if I can structure this better.
+
+>
+>> +
+>> +		/* We only shadow DBG* if guest being debugged */
+>> +		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
+>> +			struct kvm_guest_debug_arch *saved;
+>> +			__u64 *val;
+>> +
+>> +			saved = &vcpu_debug_saved_reg(vcpu, debug_regs);
+>> +
+>> +			if (r->reg >= DBGBCR0_EL1 && r->reg <= DBGBCR15_EL1)
+>> +				val = &saved->dbg_bcr[r->reg - DBGBCR0_EL1];
+>> +			else if (r->reg >= DBGBVR0_EL1 && r->reg <= DBGBVR15_EL1)
+>> +				val = &saved->dbg_bvr[r->reg - DBGBVR0_EL1];
+>> +			else if (r->reg >= DBGWCR0_EL1 && r->reg <= DBGWCR15_EL1)
+>> +				val = &saved->dbg_wcr[r->reg - DBGWCR0_EL1];
+>> +			else if (r->reg >= DBGWVR0_EL1 && r->reg <= DBGWVR15_EL1)
+>> +				val = &saved->dbg_wvr[r->reg - DBGWVR0_EL1];
+>> +			else {
+>> +				kvm_err("Bad register index %d\n", r->reg);
+>> +				return false;
+>> +			}
+>>  
+>> -	} else {
+>> -		if (p->is_write) {
+>> -			vcpu_sys_reg(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
+>> -			vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+>> -		} else {
+>> -			*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, r->reg);
+>> +			if (p->is_write)
+>> +				*val = *vcpu_reg(vcpu, p->Rt);
+>> +			else
+>> +				*vcpu_reg(vcpu, p->Rt) = *val;
+>> +
+>> +			return true;
+>>  		}
+>>  	}
+>>  
+>> +old:
+>> +	if (p->is_write) {
+>> +		vcpu_sys_reg(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
+>> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+>> +	} else {
+>> +		*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, r->reg);
+>> +	}
+>> +
+>>  	return true;
+>>  }
+>>  
+>> -- 
+>> 2.3.4
+>> 
+
+-- 
+Alex Benn?e
