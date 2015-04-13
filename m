@@ -1,56 +1,74 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 13 Apr 2015 19:59:11 +0900
-Subject: [PATCH 1/1] ARM: dts: Make DP a consumer of DISP1 power domain on
- Exynos5420
-In-Reply-To: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAJKOXPdpxst6HocbMr53HoKQJu=09aCuy_sKVpUei240TbRVKg@mail.gmail.com>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Mon, 13 Apr 2015 12:59:30 +0200
+Subject: [PATCH v3] spi: bitbang: only toggle bitchanges
+In-Reply-To: <20150331202306.GX2869@sirena.org.uk>
+References: <20150331202306.GX2869@sirena.org.uk>
+Message-ID: <1428922770-16955-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-13 5:30 GMT+09:00 Javier Martinez Canillas
-<javier.martinez@collabora.co.uk>:
-> Commit ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
-> added a device node for the Exynos5420 DISP1 power domain but dit not
-> make the DP controller a consumer of that power domain.
->
-> This causes an "Unhandled fault: imprecise external abort" error if the
-> exynos-dp driver tries to access the DP controller registers and the PD
-> was turned off. This lead to a kernel panic and a complete system hang.
->
-> Make the DP controller device node a consumer of the DISP1 power domain
-> to ensure that the PD is turned on when the exynos-dp driver is probed.
->
-> Fixes: ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->
-> Hello,
->
-> This latent bug was not exposed before since drivers for other devices
-> marked as DISP1 power domain consumers were probed before exynos-dp so
-> the PD was already on which made possible to access the DP registers.
->
-> But "regulator: Defer lookup of supply to regulator_get" [0] that is in
-> linux-next from a couple of days now, changed the order on which the
-> drivers' probes succeed so the PD was disabled during exynos-dp probe.
->
-> Exynos5420 machines with a display such as the Exynos5420 Peach Pit and
-> Exynos5800 Peach Pi were failing to boot due this issue, i.e: [1].
->
-> Olof,
->
-> Could you please confirm $subject fixes the issue catched by your farm?
->
-> Krzysztof,
->
-> This patch conflicts with your Exynos5 phandle notation cleanup [2] but
-> I preferred to send it on top of linux-next instead of making your series
-> a dependency since it fixes a very important bug that had caused -next to
-> be broken on these matchines for days now.
+The current implementation of bitbang_txrx_be_cpha0 and
+bitbang_txrx_be_cpha1 always call setmosi. That runs into several
+unnecessary calls into the gpiolib when the level of the GPIO actually
+has not to be changed.
 
-Sure, I don't mind. My patchset is just a cleanup so it can wait and
-should not block important stuff.
+This patch changes the routines to remember the last GPIO level
+and only calls setmosi if an change has to be made. This
+way it improves the transfer throughput.
 
-Best regards,
-Krzysztof
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+v2: - added missing braces
+v3: - fixed initial value of oldbit
+    - added !! to condition for bool comparison
+
+ drivers/spi/spi-bitbang-txrx.h | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/spi/spi-bitbang-txrx.h b/drivers/spi/spi-bitbang-txrx.h
+index c616e41..58606bf 100644
+--- a/drivers/spi/spi-bitbang-txrx.h
++++ b/drivers/spi/spi-bitbang-txrx.h
+@@ -49,12 +49,17 @@ bitbang_txrx_be_cpha0(struct spi_device *spi,
+ {
+ 	/* if (cpol == 0) this is SPI_MODE_0; else this is SPI_MODE_2 */
+ 
++	bool oldbit = !(word & (1 << 31));
+ 	/* clock starts at inactive polarity */
+ 	for (word <<= (32 - bits); likely(bits); bits--) {
+ 
+ 		/* setup MSB (to slave) on trailing edge */
+-		if ((flags & SPI_MASTER_NO_TX) == 0)
+-			setmosi(spi, word & (1 << 31));
++		if ((flags & SPI_MASTER_NO_TX) == 0) {
++			if (!!(word & (1 << 31)) != oldbit) {
++				setmosi(spi, word & (1 << 31));
++				oldbit = word & (1 << 31);
++			}
++		}
+ 		spidelay(nsecs);	/* T(setup) */
+ 
+ 		setsck(spi, !cpol);
+@@ -76,13 +81,18 @@ bitbang_txrx_be_cpha1(struct spi_device *spi,
+ {
+ 	/* if (cpol == 0) this is SPI_MODE_1; else this is SPI_MODE_3 */
+ 
++	bool oldbit = !(word & (1 << 31));
+ 	/* clock starts@inactive polarity */
+ 	for (word <<= (32 - bits); likely(bits); bits--) {
+ 
+ 		/* setup MSB (to slave) on leading edge */
+ 		setsck(spi, !cpol);
+-		if ((flags & SPI_MASTER_NO_TX) == 0)
+-			setmosi(spi, word & (1 << 31));
++		if ((flags & SPI_MASTER_NO_TX) == 0) {
++			if (!!(word & (1 << 31)) != oldbit) {
++				setmosi(spi, word & (1 << 31));
++				oldbit = word & (1 << 31);
++			}
++		}
+ 		spidelay(nsecs); /* T(setup) */
+ 
+ 		setsck(spi, cpol);
+-- 
+2.1.4
