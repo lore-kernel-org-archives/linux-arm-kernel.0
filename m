@@ -1,65 +1,215 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Mon, 13 Apr 2015 21:57:46 +0800
-Subject: [PATCH v2 4/6] clk: hi6220: Clock driver support for Hisilicon
- hi6220 SoC
-In-Reply-To: <2254597.TWaxeZsKvK@wuerfel>
-References: <1428916660-25910-1-git-send-email-bintian.wang@huawei.com>
- <1428916660-25910-5-git-send-email-bintian.wang@huawei.com>
- <2254597.TWaxeZsKvK@wuerfel>
-Message-ID: <552BCB5A.8010705@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 Apr 2015 15:12:10 +0100
+Subject: [RFC PATCH] arm64: KVM: remove fpsimd save/restore from the world
+ switch
+In-Reply-To: <20150413125751.GA13347@cbox>
+References: <1428598439-5217-1-git-send-email-marc.zyngier@arm.com>
+ <20150413125751.GA13347@cbox>
+Message-ID: <552BCEBA.8010204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
-
-Thanks for your code review.
-
-On 2015/4/13 21:30, Arnd Bergmann wrote:
-> On Monday 13 April 2015 17:17:38 Bintian Wang wrote:
->> +#define HI6220_CFG_CSI2PHY     8
->> +#define HI6220_ISP_SCLK_GATE   9
->> +#define HI6220_ISP_SCLK_GATE1  10
->> +#define HI6220_ADE_CORE_GATE   11
->> +#define HI6220_CODEC_VPU_GATE  12
->> +#define HI6220_MED_SYSPLL      13
->> +
->> +/* mux clocks */
->> +#define HI6220_1440_1200       20
->> +#define HI6220_1000_1200       21
->> +#define HI6220_1000_1440       22
->> +
->> +/* divider clocks */
->> +#define HI6220_CODEC_JPEG      30
->> +#define HI6220_ISP_SCLK_SRC    31
->> +#define HI6220_ISP_SCLK1       32
+On 13/04/15 13:57, Christoffer Dall wrote:
+> On Thu, Apr 09, 2015 at 05:53:59PM +0100, Marc Zyngier wrote:
+>> The world switch spends quite some time dealing with the FP/SIMD
+>> registers, as the state is quite sizeable (32 128bit registers,
+>> plus some crumbs on the side). We save/restore them on each
+>> entry/exit, so that both the host and the guest always see
+>> the state they expect.
 >>
->
-> The numbers seem rather arbitrary, and you have both holes as well as duplicate
-> numbers here. I would suggest you do one of two things instead:
-I just worry about some special clocks may be added later so keep some
-holes for them;
+>> But let's face it: the host kernel doesn't care. It is the host
+>> userspace that actually cares about FP. An obvious improvement is
+>> to remove the save/restore from the world switch, and only perform
+>> it when we're about to enter/exit the guest (by plugging it into
+>> vcpu_load/vcpu_put). The effect is pretty spectacular when running
+>> hackbench (which is the only benchmark worth looking at):
+>>
+>> Without this patch:
+>>
+>> 	Running with 50*40 (== 2000) tasks.
+>> 	Time: 36.756
+>> 	Running with 50*40 (== 2000) tasks.
+>> 	Time: 36.679
+>> 	Running with 50*40 (== 2000) tasks.
+>> 	Time: 36.699
+>>
+>> With this patch:
+>>
+>> 	Running with 50*40 (== 2000) tasks.
+>> 	Time: 30.947
+>> 	Running with 50*40 (== 2000) tasks.
+>> 	Time: 30.868
+>> 	Running with 50*40 (== 2000) tasks.
+>> 	Time: 30.961
+>>
+>> This is on a HiKey board (8*A53), with a 4 vcpu guest.
+> 
+> cool.  Based on stats from kvm-unit-tests on A57 we should reduce the
+> overall world-switch cost (in the best cases, caches, etc.) with ~8.5%,
+> but this is even better and we are doing slightly more work than
+> context-switching here, so I'm guessing factoring in potential extra
+> cache misses, it can be this good.
+> 
+> However, on XGene with Ubuntu 14.04 Trusty, I get the following (do not
+> compare to Marc's results, I may be using different kernel settings and
+> different payload size):
+> 
+> Without the patch:
+> 
+> 	Running with 50*40 (== 2000) tasks.
+> 	Time: 15.970
+> 	Running with 50*40 (== 2000) tasks.
+> 	Time: 15.963
+> 	Running with 50*40 (== 2000) tasks.
+> 	Time: 15.875
+> 
+> 
+> With the patch:
+> 
+> 	Running with 50*40 (== 2000) tasks.
+> 	Time: 16.768:
+> 	Running with 50*40 (== 2000) tasks.
+> 	Time: 14.865
+> 	Running with 50*40 (== 2000) tasks.
+> 	Time: 14.880
+> 
+> On an HP Moonshot server I ran a number of other benchmarks and got
+> similarly boring results.
 
-The duplicate numbers means clocks belong to different system control
-domains.
->
-> a) have a separate header file per clock driver and make all the
->     numbers unique and consecutive within that header
->
-> b) use the same numbers as the hardware registers so you can put the
->     numbers directly into the dts and don't need a header to create
->     an artificial ABI between the clock driver and the boot loader.
-This header file will be used by device tree (I like using the clock
-name instead "magic number" in dts :) ), so how about keep them in one
-header file and let dts just include one header file (not four files),
-but remove the holes?
+I did another set of tests, this time involving Seattle, XGene and the
+HiKey board. The result is that you cannot trust HiKey, this is the most
+unpredictable platform I've ever seen (I had some chosen words for it,
+that I don't want to write here....).
 
-Thank you Arnd.
+So while this patch seems to provide a small improvement in some cases,
+it is definitely not as interesting as my first testing suggested. Too
+good to be true! ;-)
 
-BR,
+I'm going to try and revive my lazy-fp patches, and see if there's
+anything to improve here.
 
-Bintian
->
-> 	Arnd
->
-> .
->
+> Comments on the patch itself below:
+> 
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/include/asm/kvm_host.h   |  3 +++
+>>  arch/arm/kvm/arm.c                |  2 ++
+>>  arch/arm64/include/asm/kvm_asm.h  |  4 ++++
+>>  arch/arm64/include/asm/kvm_host.h |  3 +++
+>>  arch/arm64/kvm/Makefile           |  1 +
+>>  arch/arm64/kvm/fpsimd.S           | 39 ++++++++++++++++++++++++++++++++++++
+>>  arch/arm64/kvm/handle_fpsimd.c    | 42 +++++++++++++++++++++++++++++++++++++++
+>>  arch/arm64/kvm/hyp.S              | 27 -------------------------
+>>  8 files changed, 94 insertions(+), 27 deletions(-)
+>>  create mode 100644 arch/arm64/kvm/fpsimd.S
+>>  create mode 100644 arch/arm64/kvm/handle_fpsimd.c
+>>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index d71607c..65cf1d1 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -226,6 +226,9 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
+>>  int kvm_perf_init(void);
+>>  int kvm_perf_teardown(void);
+>>  
+>> +static inline void kvm_fpsimd_flush_hwstate(struct kvm_vcpu *vcpu) {}
+>> +static inline void kvm_fpsimd_sync_hwstate(struct kvm_vcpu *vcpu) {}
+>> +
+>>  void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>>  
+>>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 6f53645..ff1213c 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -287,6 +287,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>>  	vcpu->cpu = cpu;
+>>  	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
+>>  
+>> +	kvm_fpsimd_flush_hwstate(vcpu);
+> 
+> not sure about the flus/sync terminology here, because we're not really
+> flushing a software model to hardware state - we're doing both in every
+> step.
+> 
+> How about:
+> 
+> kvm_fpsimd_load_vcpu_state()
+> kvm_fpsimd_put_vcpu_state()
+
+The rest of the kernel does use that flush/sync terminology, specially
+for FP/SIMD. So it is a matter of either being consistent with the arm64
+convention, or consistent with the KVM convention. I don't mind either way.
+
+>>  	kvm_arm_set_running_vcpu(vcpu);
+>>  }
+>>  
+>> @@ -299,6 +300,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>>  	 */
+>>  	vcpu->cpu = -1;
+>>  
+>> +	kvm_fpsimd_sync_hwstate(vcpu);
+>>  	kvm_arm_set_running_vcpu(NULL);
+>>  }
+>>  
+>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>> index 4f7310f..eafb0c3 100644
+>> --- a/arch/arm64/include/asm/kvm_asm.h
+>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>> @@ -137,6 +137,10 @@ extern char __restore_vgic_v2_state[];
+>>  extern char __save_vgic_v3_state[];
+>>  extern char __restore_vgic_v3_state[];
+>>  
+>> +struct kvm_cpu_context;
+>> +extern void __kvm_save_fpsimd(struct kvm_cpu_context *);
+>> +extern void __kvm_restore_fpsimd(struct kvm_cpu_context *);
+>> +
+>>  #endif
+>>  
+>>  #endif /* __ARM_KVM_ASM_H__ */
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index f0f58c9..2b968e5 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -201,6 +201,9 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>  int kvm_perf_init(void);
+>>  int kvm_perf_teardown(void);
+>>  
+>> +void kvm_fpsimd_flush_hwstate(struct kvm_vcpu *vcpu);
+>> +void kvm_fpsimd_sync_hwstate(struct kvm_vcpu *vcpu);
+>> +
+>>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>>  
+>>  static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+>> index d5904f8..6d9c2b7 100644
+>> --- a/arch/arm64/kvm/Makefile
+>> +++ b/arch/arm64/kvm/Makefile
+>> @@ -18,6 +18,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
+>> +kvm-$(CONFIG_KVM_ARM_HOST) += fpsimd.o handle_fpsimd.o
+>>  
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
+>> diff --git a/arch/arm64/kvm/fpsimd.S b/arch/arm64/kvm/fpsimd.S
+>> new file mode 100644
+>> index 0000000..458a1a7
+>> --- /dev/null
+>> +++ b/arch/arm64/kvm/fpsimd.S
+>> @@ -0,0 +1,39 @@
+>> +/*
+>> + * Copyright (C) 2012,2013 - ARM Ltd
+> 
+> I don't know if you care, but shouldn't this be 2015?
+
+I wondered. I've just moved existing code around, so I decided to keep
+the original date.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
