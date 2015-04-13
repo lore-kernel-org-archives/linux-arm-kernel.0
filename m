@@ -1,104 +1,139 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Mon, 13 Apr 2015 15:51:33 +0100
-Subject: [PATCH v2 02/10] KVM: define common __KVM_GUESTDBG_USE_SW/HW_BP
- values
-In-Reply-To: <20150413115535.GM6186@cbox>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-3-git-send-email-alex.bennee@linaro.org>
- <20150413115535.GM6186@cbox>
-Message-ID: <871tjokrnu.fsf@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 13 Apr 2015 16:02:04 +0100
+Subject: [PATCH v3 04/11] arm64: use fixmap region for permanent FDT
+ mapping
+In-Reply-To: <1428674035-26603-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1428674035-26603-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1428674035-26603-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150413150203.GF4076@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ard,
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
+> -The device tree blob (dtb) must be placed on an 8-byte boundary within
+> -the first 512 megabytes from the start of the kernel image and must not
+> -cross a 2-megabyte boundary. This is to allow the kernel to map the
+> -blob using a single section mapping in the initial page tables.
+> +The device tree blob (dtb) must be placed on an 8-byte boundary and must
+> +not exceed 2 megabytes in size.
+>  
+> +NOTE: versions prior to v4.2 also require that the dtb be placed within
+> +512 MB of the 2 MB aligned boundary right below the kernel Image.
 
-> On Tue, Mar 31, 2015 at 04:08:00PM +0100, Alex Benn?e wrote:
->> Currently x86, powerpc and soon arm64 use the same two architecture
->> specific bits for guest debug support for software and hardware
->> breakpoints. This makes the shared values explicit while leaving the
->> gate open for another architecture to use some other value if they
->> really really want to.
->> 
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> 
->> diff --git a/arch/powerpc/include/uapi/asm/kvm.h b/arch/powerpc/include/uapi/asm/kvm.h
->> index ab4d473..1731569 100644
->> --- a/arch/powerpc/include/uapi/asm/kvm.h
->> +++ b/arch/powerpc/include/uapi/asm/kvm.h
->> @@ -310,8 +310,8 @@ struct kvm_guest_debug_arch {
->>   * and upper 16 bits are architecture specific. Architecture specific defines
->>   * that ioctl is for setting hardware breakpoint or software breakpoint.
->>   */
->> -#define KVM_GUESTDBG_USE_SW_BP		0x00010000
->> -#define KVM_GUESTDBG_USE_HW_BP		0x00020000
->> +#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
->> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
->>  
->>  /* definition of registers in kvm_run */
->>  struct kvm_sync_regs {
->> diff --git a/arch/x86/include/uapi/asm/kvm.h b/arch/x86/include/uapi/asm/kvm.h
->> index d7dcef5..1438202 100644
->> --- a/arch/x86/include/uapi/asm/kvm.h
->> +++ b/arch/x86/include/uapi/asm/kvm.h
->> @@ -250,8 +250,8 @@ struct kvm_debug_exit_arch {
->>  	__u64 dr7;
->>  };
->>  
->> -#define KVM_GUESTDBG_USE_SW_BP		0x00010000
->> -#define KVM_GUESTDBG_USE_HW_BP		0x00020000
->> +#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
->> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
->>  #define KVM_GUESTDBG_INJECT_DB		0x00040000
->>  #define KVM_GUESTDBG_INJECT_BP		0x00080000
->>  
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index 5eedf84..ce2db14 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -525,8 +525,16 @@ struct kvm_s390_irq {
->>  
->>  /* for KVM_SET_GUEST_DEBUG */
->>  
->> -#define KVM_GUESTDBG_ENABLE		0x00000001
->> -#define KVM_GUESTDBG_SINGLESTEP		0x00000002
->> +#define KVM_GUESTDBG_ENABLE		(1 << 0)
->> +#define KVM_GUESTDBG_SINGLESTEP	(1 << 1)
->> +
->> +/*
->> + * Architecture specific stuff uses the top 16 bits of the field,
->
-> can you be more specific than 'stuff' here?  features?
->
->> + * however there is some shared commonality for the common cases
->
-> I don't like this sentence; shared commonality is a pleonasm and the use
-> of however makes it sounds like there's some caveat here.
+This reads a little odd (it sounds like you could load the DTB 512M
+below the boundary too).
 
-OK I can see that - after I looked it up ;-)
+How about:
 
-> If the top 16 bits are indeed arhictecture specific, then I think they
-> should just be defined in their architecture specific headers.  Unless
-> the idea here is that there's a fixed set of of flags that architectures
-> can choose to support, in which case it should simply be defined in the
-> common header.
+NOTE: versions prior to v4.2 also require that the DTB be placed within
+the 512 MB region starting at text_offset bytes below the kernel Image.
 
-Well an architecture might not support some features and want to use
-those bits for something else? I didn't want to force the bottom two
-of the architecture specific bits to wasted if the features don't exist.
+[...]
 
->
->
->> + */
->> +#define __KVM_GUESTDBG_USE_SW_BP	(1 << 16)
->> +#define __KVM_GUESTDBG_USE_HW_BP	(1 << 17)
->> +
->>  
->>  struct kvm_guest_debug {
->>  	__u32 control;
->> -- 
->> 2.3.4
->> 
+>  enum fixed_addresses {
+>  	FIX_HOLE,
+> +
+> +	/*
+> +	 * Reserve 4 MB of virtual space for the FDT at the top of the fixmap
+> +	 * region. Keep this at the top so it remains 2 MB aligned.
+> +	 */
+> +#define FIX_FDT_SIZE		SZ_4M
+> +	FIX_FDT_END,
+> +	FIX_FDT = FIX_FDT_END + FIX_FDT_SIZE / PAGE_SIZE - 1,
+> +
+>  	FIX_EARLYCON_MEM_BASE,
+>  	FIX_TEXT_POKE0,
+>  	__end_of_permanent_fixed_addresses,
 
--- 
-Alex Benn?e
+[...]
+
+> +	/*
+> +	 * Before passing the dt_virt pointer to early_init_dt_scan(), we have
+> +	 * to ensure that the FDT size as reported in the FDT itself does not
+> +	 * exceed the window we just mapped for it.
+> +	 */
+> +	if (!dt_virt ||
+> +	    fdt_check_header(dt_virt) != 0 ||
+> +	    (dt_phys & (SZ_2M - 1)) + fdt_totalsize(dt_virt) > FIX_FDT_SIZE ||
+> +	    !early_init_dt_scan(dt_virt)) {
+
+Doesn't this allow a DTB > 2M (violating the boot protocol's 2M
+restriction)?
+
+Perhaps we want a MAX_FDT_SIZE, and have FIX_FDT_SIZE be MAX_FDT_SIZE +
+2M. Then we can check that the DTB <= MAX_FDT_SIZE, and we know we will
+always be able to map it. 
+
+Otherwise we could get intermittent failures for DTBs larger than 2MB,
+depending on where they're loaded. Always failing those for now would
+give us a consistent early warning that we need to bump MAX_FDT_SIZE.
+
+[...]
+
+> +void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+> +{
+> +	const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
+> +	phys_addr_t dt_phys_base = dt_phys & ~(SZ_2M - 1);
+
+Do we definitely retain the high bits here? I don't have the C integer
+promotion rules paged into my head, but the definition in
+include/linux/sizes.h makes me suspicious, given it should have an int
+type:
+
+#define SZ_2M                           0x00200000
+
+> +	u64 pfn = dt_phys_base >> PAGE_SHIFT;
+> +	u64 pfn_end = pfn + (FIX_FDT_SIZE >> PAGE_SHIFT);
+> +	pgprot_t prot = PAGE_KERNEL | PTE_RDONLY;
+> +
+> +	/*
+> +	 * Make sure that the FDT region can be mapped without the need to
+> +	 * allocate additional translation table pages, or perform physical
+> +	 * to virtual address translations via the linear mapping.
+> +	 *
+> +	 * On 4k pages, we'll use section mappings for the region so we
+> +	 * only have to be in the same PUD as the rest of the fixmap.
+> +	 * On 64k pages, we need to be in the same PMD as well, as the region
+> +	 * will be mapped using PTEs.
+> +	 */
+
+It would be nice to have the last two statements swapped (with
+appropriate wording fixups) to match the order of the if branches.
+
+Otherwise this looks good to me.
+
+Mark.
+
+> +	BUILD_BUG_ON(dt_virt_base & (SZ_2M - 1));
+> +
+> +	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES)) {
+> +		pte_t *pte;
+> +
+> +		BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> PMD_SHIFT !=
+> +			     __fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT);
+> +
+> +		/* map the FDT using 64k pages */
+> +		pte = fixmap_pte(dt_virt_base);
+> +		do {
+> +			set_pte(pte++, pfn_pte(pfn++, prot));
+> +		} while (pfn < pfn_end);
+> +	} else {
+> +		pmd_t *pmd;
+> +
+> +		BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> PUD_SHIFT !=
+> +			     __fix_to_virt(FIX_BTMAP_BEGIN) >> PUD_SHIFT);
+> +
+> +		/* map the FDT using 2 MB sections */
+> +		pmd = fixmap_pmd(dt_virt_base);
+> +		do {
+> +			set_pmd(pmd++, pfn_pmd(pfn, mk_sect_prot(prot)));
+> +			pfn += PMD_SIZE >> PAGE_SHIFT;
+> +		} while (pfn < pfn_end);
+> +	}
+> +
+> +	return (void *)(dt_virt_base + dt_phys - dt_phys_base);
+> +}
+> -- 
+> 1.8.3.2
+> 
