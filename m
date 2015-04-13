@@ -1,43 +1,54 @@
-From: matthew@mattleach.net (Matthew Leach)
-Date: Mon, 13 Apr 2015 18:02:46 +0100
-Subject: [PATCH RESEND] ARM: dts: exynos4412: Enable AX88760 USB hub on Origen
- board
-Message-ID: <1428944566-17132-1-git-send-email-matthew@mattleach.net>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 13 Apr 2015 11:09:09 -0600
+Subject: Tegra baseline test results for v4.0-rc7
+Message-ID: <552BF835.5010306@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Origen's usb phy and ohci devices in the device tree.  Also
-add the "samsung,vbus-gpio" property to enable the GPX3(5) gpio pin so
-the AX88760 hub is powered.
+Here are some basic Tegra test results for Linux v4.0-rc7.
+Logs and other details at:
 
-Signed-off-by: Matthew Leach <matthew@mattleach.net>
----
- arch/arm/boot/dts/exynos4412-origen.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v4.0-rc7/20150413093827/
 
-diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-index bd8b730..c810ca3 100644
---- a/arch/arm/boot/dts/exynos4412-origen.dts
-+++ b/arch/arm/boot/dts/exynos4412-origen.dts
-@@ -531,4 +531,19 @@
- 			clock-frequency = <24000000>;
- 		};
- 	};
-+
-+	exynos-usbphy at 125B0000 {
-+		status = "okay";
-+	};
-+
-+	ehci at 12580000 {
-+		samsung,vbus-gpio = <&gpx3 5 1>;
-+		status = "okay";
-+		port at 1{
-+			status = "okay";
-+		};
-+		port at 2 {
-+			status = "okay";
-+		};
-+	};
- };
--- 
-2.3.5
+
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+     Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+     Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.0-rc6 (e42391cd048809d903291d07f86ed3934ce138e9)):
+    text     data      bss    total  kernel
+    +875      +72        0     +947  multi_v7_defconfig
+   +1435      +88        0    +1523  tegra_defconfig
+   +4167    -4088        0      +79  defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.0-rc6 (e42391cd048809d903291d07f86ed3934ce138e9))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        .      qemu-vexpress64            defconfig           __internal
+         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+         .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+         .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+         .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
