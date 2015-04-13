@@ -1,111 +1,95 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Mon, 13 Apr 2015 11:19:18 +0300
-Subject: [PATCHv5 0/4] watchdog: Extend kernel API and add
- early_timeout_sec feature
-In-Reply-To: <552B767C.6020300@atmel.com>
-References: <1428671199-5562-1-git-send-email-timo.kokkonen@offcode.fi>
- <552B767C.6020300@atmel.com>
-Message-ID: <552B7C06.1010209@offcode.fi>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 13 Apr 2015 10:15:18 +0200
+Subject: [PATCH] sunxi: a10-lime: add regulator nodes
+In-Reply-To: <20150408123506.GY6023@sirena.org.uk>
+References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
+ <55169622.5070007@gmail.com> <20150330222311.GY23664@lukather>
+ <CABxcv=nCROiQ2COrTmnwvhtSJzh83BWKaxgn0EkFuwW8HqSiQw@mail.gmail.com>
+ <20150404123302.GY6023@sirena.org.uk>
+ <20150404125645.GK14618@lukather>
+ <20150404184716.GZ6023@sirena.org.uk>
+ <20150407101757.GC15823@lukather>
+ <20150408123506.GY6023@sirena.org.uk>
+Message-ID: <20150413081518.GF27783@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.04.2015 10:55, Yang, Wenyou wrote:
->
->
-> On 2015/4/10 21:06, Timo Kokkonen wrote:
->> The watchdog kernel API is quite limited. It has support for providing
->> generic device handling, but it doesn't really know anything about the
->> watchdog hardware or its constraints. The watchdog drivers come with a
->> lot of diversity and their own set of quirks and constraints. Some of
->> their limitations are not nice for the user space, so the drivers work
->> around them with all sorts of ad hoc implementations.
->>
->> One common pattern is to use kernel timers or work queues to allow
->> longer timeout parameters than the actual hardware supports. To solve
->> this problem, this patch set extends the kernel watchdog API with a few
->> parameters that let the core know more about the watchdog HW and take
->> care about the timeout extending.
->>
->> The patch set also implements "early_timeout_sec" feature that is very
->> common on many production systems where early kernel or user space
->> crashes must lead to a device reset. Traditional watchdog handling
->> does not allow this as the watchdog is stopped (fully or emulating
->> stopped state with kernel timers) before user space opens it for the
->> first time.
->>
->> The changes are designed to be taken in use one driver at time. If the
->> driver does not set the new parameters and call
->> watchdog_init_params(), the watchdog behavior is exactly the same as
->> before.
->>
->> In principle this new API makes it possible for the user space to see
->> every watchdog hardware to behave the same, at least in terms of
->> watchdog timeouts. Once the API is in, it should be easier to move
->> even more common behavior out of the driver code to the watchdog core
->> and make the drivers simpler.
->>
->> I'm not anticipating this patch set to go in as is, this is merely to
->> help bringing up the discussion as there is a working patch set to look
->> at. There are propably some corner cases that I didn't get right
->> yet. Also, we could even remove the maximum timeout completely as the
->> HW no longer limits the watchdog timeouts. This propably needs some
->> thinking still and your commenting.
->>
->> Please review and give feedback.
-> Tested on the SAMA5D4EK.
->
-> Tested-by Wenyou Yang <wenyou.yang@atmel.com>
+On Wed, Apr 08, 2015 at 01:35:06PM +0100, Mark Brown wrote:
+> On Tue, Apr 07, 2015 at 12:17:57PM +0200, Maxime Ripard wrote:
+> > On Sat, Apr 04, 2015 at 07:47:16PM +0100, Mark Brown wrote:
+> 
+> > > Or the regulator is used by some passive component on the board that
+> > > doesn't appear in DT (or some driver that doesn't yet have DT support
+> > > doesn't claim the regulator) and it gets switched off.  Or we power it
+> > > off and then later discover that we've been placing physical stress on
+> > > the system.
+> 
+> > Isn't that what the regulator-always-on property is here for?
+> 
+> Only if it's actually added by someone after having looked at the
+> system...
 
-Thank you, the typos you pointed will be fixed on the next version.
+True, but that can also be said for pretty much any DT patch. If you
+do something wrong in your DT and haven't looked carefuly at your
+datasheet/schematics, here be dragons.
 
--Timo
+> > > Providing .dtsis for reference designs can make sense, if there's a
+> > > widely cloned board with lots of common design elements then reusing
+> > > that .dtsi is fine but clearly that .dtsi isn't going to enable the full
+> > > flexibility of the regulators since there will be constraints from that
+> > > reference design.
+> 
+> > That PMIC is used with various SoCs, so that's not really an
+> > option. And especially when it comes to regulators, I don't think
+> > there's really a pattern that emerged yet...
+> 
+> I'm not sure you saw the "reference design" part of the above?
 
->>
->> Patch revision history:
->>
->> -v5: Re-think the approach to be fully generic. The early_timeout_sec
->>    handling is no longer in the driver but in the watchdog core. As a
->>    result the core needed to gain knowledge about the watchdog
->>    hardware. Appropriate handling is added in the core. The side effect
->>    for this is that drivers using the new extensions can be simplified
->>    a lot and different kinds of watchdog hardware can be made to
->>    behave the same for the user space.
->>
->> -v4: Binding documentation is now separated completely from the driver
->>    patch. The documentation no longer makes any assumptions about how
->>    the actual implementation is made, it just describes the actual
->>    behavior the driver should implement in order to satisfy the
->>    requirement.
->>
->> - v3: Rename the property to "early-timeout-sec" and use it as a
->>    timeout value that stops the timer in the atmel driver after the
->>    timeout expires. A watchdog.txt is also introduced for documenting
->>    the common watchdog properties, including now this one and
->>    "timeout-sec" property.
->>
->> - v2: Rename the property to "enable-early-reset" as the behavior
->>    itself is not atmel specific. This way other drivers are free to
->>    implement same behavior with the same property name.
->>
->> - v1: Propose property name "atmle,no-early-timer" for disabling the
->>    timer that keeps the atmel watchdog running until user space opens
->>    the device.
->>
->>
->> Timo Kokkonen (4):
->>    watchdog: Extend kernel API to know about HW limitations
->>    watchdog: Allow watchdog to reset device at early boot
->>    devicetree: Document generic watchdog properties
->>    watchdog: at91sam9_wdt: Convert to use new watchdog core extensions
->>
->>   .../devicetree/bindings/watchdog/watchdog.txt      |  20 ++++
->>   drivers/watchdog/at91sam9_wdt.c                    |  58 +++--------
->>   drivers/watchdog/watchdog_core.c                   | 108
->> ++++++++++++++++++++-
->>   drivers/watchdog/watchdog_dev.c                    |  12 +++
->>   include/linux/watchdog.h                           |  24 +++++
->>   5 files changed, 173 insertions(+), 49 deletions(-)
->>   create mode 100644
->> Documentation/devicetree/bindings/watchdog/watchdog.txt
->>
->
+I saw that, I was just saying that this doesn't really work for us
+unfortunately.
+
+> > > Nothing else is safe.  Remember, if we get this wrong we risk system
+> > > instability and at worst physical damage to the system either in rare
+> > > cases immediately due to getting something badly wrong or more likely
+> > > from long term electrical stresses.  If what you were proposing were
+> > > safe then we should still not be enumerating everything in device trees,
+> > > we should just be enabling all operations for every regulator in the
+> > > system by default.  The fact that you have to override this should be a
+> > > warning sign that you shouldn't be doing it.
+> 
+> > Well, we're doing low level stuff and (from experience) things like a
+> > poor muxing option can cause physical damage too, and we don't have
+> > any kind of protection or policy against that.
+> 
+> Does the pinmux code actively go in and do things without being
+> explicitly configured?
+
+You have a point :)
+
+> > So, what do you suggest for the kernel to have a behaviour
+> > independant of what the bootloader state was, without adding a lot
+> > of churn in each and every DTS?
+> 
+> Well, I'm fairly happy with the current state.  I think having some
+> sort of board level property saying that undescribed regulators can
+> be enabled and disabled (which I think is all that this is really
+> doing) might be a viable solution?
+
+It looks like configuration to me ;)
+
+Especially since the semantic of it would be to disable something that
+is not even declared in the DT in the first place.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150413/1390e7d1/attachment.sig>
