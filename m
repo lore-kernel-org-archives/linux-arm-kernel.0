@@ -1,566 +1,105 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Sun, 12 Apr 2015 17:20:55 -0700
-Subject: [PATCH] clk: don't use __initconst for non-const arrays
-In-Reply-To: <20150325104117.GD32677@pengutronix.de>
-References: <1424253585-27011-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20150325104117.GD32677@pengutronix.de>
-Message-ID: <20150413002055.19585.30736@quantum>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Sun, 12 Apr 2015 18:09:13 -0700
+Subject: [PATCH] ARM: print cma-reserved pages from show_mem
+In-Reply-To: <20150410112430.GB12732@n2100.arm.linux.org.uk>
+References: <CADtm3G7ROX4CrxSKRvTKcjqCiX=uJQZ=Q5izH8pS61z4jfumLg@mail.gmail.com>
+ <54D534FB.1090101@codeaurora.org>
+ <CADtm3G7CUYUUbmTrWiudQ5j-wX9hu86Ox8TkB+FnXwEvjb=xeg@mail.gmail.com>
+ <20150210113230.GJ8656@n2100.arm.linux.org.uk>
+ <CADtm3G64rPf7O76xUbLwqsqTkJxdGJMT9sHj810xPuThDA0ddg@mail.gmail.com>
+ <20150326114612.GD8656@n2100.arm.linux.org.uk>
+ <20150326123028.GM4701@suse.de>
+ <CADtm3G4Lb=u+BAHZF+O+RgB4VS9iW8epCPJ9ssBTj=+p3+h==Q@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D104A310D42397@CNBJMBX05.corpusers.net>
+ <20150410112430.GB12732@n2100.arm.linux.org.uk>
+Message-ID: <20150413010913.GA15225@corellia.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Uwe Kleine-K?nig (2015-03-25 03:41:17)
-> On Wed, Feb 18, 2015 at 10:59:45AM +0100, Uwe Kleine-K?nig wrote:
-> > The statement
-> > 
-> >       static const char *name[];
-> > 
-> > defines a modifiable array of pointers to constant chars. That is
-> > 
-> >       *name[0] = 'f';
-> > 
-> > is forbidden, but
-> > 
-> >       name[0] = "f";
-> > 
-> > is not. So marking an array that is defined as above with __initconst is
-> > wrong. Either an additional const must be added such that the whole
-> > definition reads:
-> > 
-> >       static const char *const name[] __initconst;
-> > 
-> > or where this is not possible __initdata must be used.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> gentle ping
-
-Gently applied w/ a small fix rolled in:
-
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index e42fe09..e63cafe 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -407,7 +407,7 @@ void rockchip_clk_register_armclk(unsigned int lookup_id, const char *name,
-                        const struct rockchip_cpuclk_reg_data *reg_data,
-                        const struct rockchip_cpuclk_rate_table *rates,
-                        int nrates);
--void rockchip_clk_protect_critical(const char *clocks[], int nclocks);
-+void rockchip_clk_protect_critical(const char *const clocks[], int nclocks);
- void rockchip_register_restart_notifier(unsigned int reg);
-
- #define ROCKCHIP_SOFTRST_HIWORD_MASK   BIT(0)
-
-Thanks for the fix,
-Mike
-
+On Fri, Apr 10, 2015 at 12:24:31PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Apr 10, 2015 at 01:18:04PM +0800, Wang, Yalin wrote:
+> > > [   12.212102] active_anon:734 inactive_anon:1189 isolated_anon:0
+> > > [   12.212102]  active_file:0 inactive_file:0 isolated_file:0
+> > > [   12.212102]  unevictable:0 dirty:0 writeback:0 unstable:0
+> > > [   12.212102]  free:254104 slab_reclaimable:82 slab_unreclaimable:843
 > 
-> Uwe
+> Here, we have 82 pages reclaimable, which is 328kB, and 843 unreclaimable
+> which is 3372kB, which is a total of 925 pages.
 > 
-> > ---
-> >  drivers/clk/hisilicon/clk-hi3620.c  | 70 ++++++++++++++++++-------------------
-> >  drivers/clk/hisilicon/clk-hix5hd2.c |  6 ++--
-> >  drivers/clk/mxs/clk-imx23.c         | 12 +++----
-> >  drivers/clk/mxs/clk-imx28.c         | 18 +++++-----
-> >  drivers/clk/pxa/clk-pxa.h           |  2 +-
-> >  drivers/clk/rockchip/clk-rk3188.c   |  2 +-
-> >  drivers/clk/rockchip/clk-rk3288.c   |  2 +-
-> >  drivers/clk/rockchip/clk.c          |  3 +-
-> >  drivers/clk/rockchip/clk.h          |  2 +-
-> >  drivers/clk/samsung/clk-s5pv210.c   | 56 ++++++++++++++---------------
-> >  drivers/clk/ti/composite.c          |  2 +-
-> >  drivers/clk/zynq/clkc.c             | 24 ++++++-------
-> >  12 files changed, 100 insertions(+), 99 deletions(-)
-> > 
-> > diff --git a/drivers/clk/hisilicon/clk-hi3620.c b/drivers/clk/hisilicon/clk-hi3620.c
-> > index 007144f81f50..480c24e24f8e 100644
-> > --- a/drivers/clk/hisilicon/clk-hi3620.c
-> > +++ b/drivers/clk/hisilicon/clk-hi3620.c
-> > @@ -38,44 +38,44 @@
-> >  #include "clk.h"
-> >  
-> >  /* clock parent list */
-> > -static const char *timer0_mux_p[] __initconst = { "osc32k", "timerclk01", };
-> > -static const char *timer1_mux_p[] __initconst = { "osc32k", "timerclk01", };
-> > -static const char *timer2_mux_p[] __initconst = { "osc32k", "timerclk23", };
-> > -static const char *timer3_mux_p[] __initconst = { "osc32k", "timerclk23", };
-> > -static const char *timer4_mux_p[] __initconst = { "osc32k", "timerclk45", };
-> > -static const char *timer5_mux_p[] __initconst = { "osc32k", "timerclk45", };
-> > -static const char *timer6_mux_p[] __initconst = { "osc32k", "timerclk67", };
-> > -static const char *timer7_mux_p[] __initconst = { "osc32k", "timerclk67", };
-> > -static const char *timer8_mux_p[] __initconst = { "osc32k", "timerclk89", };
-> > -static const char *timer9_mux_p[] __initconst = { "osc32k", "timerclk89", };
-> > -static const char *uart0_mux_p[] __initconst = { "osc26m", "pclk", };
-> > -static const char *uart1_mux_p[] __initconst = { "osc26m", "pclk", };
-> > -static const char *uart2_mux_p[] __initconst = { "osc26m", "pclk", };
-> > -static const char *uart3_mux_p[] __initconst = { "osc26m", "pclk", };
-> > -static const char *uart4_mux_p[] __initconst = { "osc26m", "pclk", };
-> > -static const char *spi0_mux_p[] __initconst = { "osc26m", "rclk_cfgaxi", };
-> > -static const char *spi1_mux_p[] __initconst = { "osc26m", "rclk_cfgaxi", };
-> > -static const char *spi2_mux_p[] __initconst = { "osc26m", "rclk_cfgaxi", };
-> > +static const char *timer0_mux_p[] __initdata = { "osc32k", "timerclk01", };
-> > +static const char *timer1_mux_p[] __initdata = { "osc32k", "timerclk01", };
-> > +static const char *timer2_mux_p[] __initdata = { "osc32k", "timerclk23", };
-> > +static const char *timer3_mux_p[] __initdata = { "osc32k", "timerclk23", };
-> > +static const char *timer4_mux_p[] __initdata = { "osc32k", "timerclk45", };
-> > +static const char *timer5_mux_p[] __initdata = { "osc32k", "timerclk45", };
-> > +static const char *timer6_mux_p[] __initdata = { "osc32k", "timerclk67", };
-> > +static const char *timer7_mux_p[] __initdata = { "osc32k", "timerclk67", };
-> > +static const char *timer8_mux_p[] __initdata = { "osc32k", "timerclk89", };
-> > +static const char *timer9_mux_p[] __initdata = { "osc32k", "timerclk89", };
-> > +static const char *uart0_mux_p[] __initdata = { "osc26m", "pclk", };
-> > +static const char *uart1_mux_p[] __initdata = { "osc26m", "pclk", };
-> > +static const char *uart2_mux_p[] __initdata = { "osc26m", "pclk", };
-> > +static const char *uart3_mux_p[] __initdata = { "osc26m", "pclk", };
-> > +static const char *uart4_mux_p[] __initdata = { "osc26m", "pclk", };
-> > +static const char *spi0_mux_p[] __initdata = { "osc26m", "rclk_cfgaxi", };
-> > +static const char *spi1_mux_p[] __initdata = { "osc26m", "rclk_cfgaxi", };
-> > +static const char *spi2_mux_p[] __initdata = { "osc26m", "rclk_cfgaxi", };
-> >  /* share axi parent */
-> > -static const char *saxi_mux_p[] __initconst = { "armpll3", "armpll2", };
-> > -static const char *pwm0_mux_p[] __initconst = { "osc32k", "osc26m", };
-> > -static const char *pwm1_mux_p[] __initconst = { "osc32k", "osc26m", };
-> > -static const char *sd_mux_p[] __initconst = { "armpll2", "armpll3", };
-> > -static const char *mmc1_mux_p[] __initconst = { "armpll2", "armpll3", };
-> > -static const char *mmc1_mux2_p[] __initconst = { "osc26m", "mmc1_div", };
-> > -static const char *g2d_mux_p[] __initconst = { "armpll2", "armpll3", };
-> > -static const char *venc_mux_p[] __initconst = { "armpll2", "armpll3", };
-> > -static const char *vdec_mux_p[] __initconst = { "armpll2", "armpll3", };
-> > -static const char *vpp_mux_p[] __initconst = { "armpll2", "armpll3", };
-> > -static const char *edc0_mux_p[] __initconst = { "armpll2", "armpll3", };
-> > -static const char *ldi0_mux_p[] __initconst = { "armpll2", "armpll4",
-> > +static const char *saxi_mux_p[] __initdata = { "armpll3", "armpll2", };
-> > +static const char *pwm0_mux_p[] __initdata = { "osc32k", "osc26m", };
-> > +static const char *pwm1_mux_p[] __initdata = { "osc32k", "osc26m", };
-> > +static const char *sd_mux_p[] __initdata = { "armpll2", "armpll3", };
-> > +static const char *mmc1_mux_p[] __initdata = { "armpll2", "armpll3", };
-> > +static const char *mmc1_mux2_p[] __initdata = { "osc26m", "mmc1_div", };
-> > +static const char *g2d_mux_p[] __initdata = { "armpll2", "armpll3", };
-> > +static const char *venc_mux_p[] __initdata = { "armpll2", "armpll3", };
-> > +static const char *vdec_mux_p[] __initdata = { "armpll2", "armpll3", };
-> > +static const char *vpp_mux_p[] __initdata = { "armpll2", "armpll3", };
-> > +static const char *edc0_mux_p[] __initdata = { "armpll2", "armpll3", };
-> > +static const char *ldi0_mux_p[] __initdata = { "armpll2", "armpll4",
-> >                                            "armpll3", "armpll5", };
-> > -static const char *edc1_mux_p[] __initconst = { "armpll2", "armpll3", };
-> > -static const char *ldi1_mux_p[] __initconst = { "armpll2", "armpll4",
-> > +static const char *edc1_mux_p[] __initdata = { "armpll2", "armpll3", };
-> > +static const char *ldi1_mux_p[] __initdata = { "armpll2", "armpll4",
-> >                                            "armpll3", "armpll5", };
-> > -static const char *rclk_hsic_p[] __initconst = { "armpll3", "armpll2", };
-> > -static const char *mmc2_mux_p[] __initconst = { "armpll2", "armpll3", };
-> > -static const char *mmc3_mux_p[] __initconst = { "armpll2", "armpll3", };
-> > +static const char *rclk_hsic_p[] __initdata = { "armpll3", "armpll2", };
-> > +static const char *mmc2_mux_p[] __initdata = { "armpll2", "armpll3", };
-> > +static const char *mmc3_mux_p[] __initdata = { "armpll2", "armpll3", };
-> >  
-> >  
-> >  /* fixed rate clocks */
-> > diff --git a/drivers/clk/hisilicon/clk-hix5hd2.c b/drivers/clk/hisilicon/clk-hix5hd2.c
-> > index 3f369c60fe56..f1d239435826 100644
-> > --- a/drivers/clk/hisilicon/clk-hix5hd2.c
-> > +++ b/drivers/clk/hisilicon/clk-hix5hd2.c
-> > @@ -46,15 +46,15 @@ static struct hisi_fixed_rate_clock hix5hd2_fixed_rate_clks[] __initdata = {
-> >       { HIX5HD2_FIXED_83M, "83m", NULL, CLK_IS_ROOT, 83333333, },
-> >  };
-> >  
-> > -static const char *sfc_mux_p[] __initconst = {
-> > +static const char *sfc_mux_p[] __initdata = {
-> >               "24m", "150m", "200m", "100m", "75m", };
-> >  static u32 sfc_mux_table[] = {0, 4, 5, 6, 7};
-> >  
-> > -static const char *sdio_mux_p[] __initconst = {
-> > +static const char *sdio_mux_p[] __initdata = {
-> >               "75m", "100m", "50m", "15m", };
-> >  static u32 sdio_mux_table[] = {0, 1, 2, 3};
-> >  
-> > -static const char *fephy_mux_p[] __initconst = { "25m", "125m"};
-> > +static const char *fephy_mux_p[] __initdata = { "25m", "125m"};
-> >  static u32 fephy_mux_table[] = {0, 1};
-> >  
-> >  
-> > diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
-> > index 9fc9359f5133..22d136aa699f 100644
-> > --- a/drivers/clk/mxs/clk-imx23.c
-> > +++ b/drivers/clk/mxs/clk-imx23.c
-> > @@ -77,12 +77,12 @@ static void __init clk_misc_init(void)
-> >       writel_relaxed(30 << BP_FRAC_IOFRAC, FRAC + SET);
-> >  }
-> >  
-> > -static const char *sel_pll[]  __initconst = { "pll", "ref_xtal", };
-> > -static const char *sel_cpu[]  __initconst = { "ref_cpu", "ref_xtal", };
-> > -static const char *sel_pix[]  __initconst = { "ref_pix", "ref_xtal", };
-> > -static const char *sel_io[]   __initconst = { "ref_io", "ref_xtal", };
-> > -static const char *cpu_sels[] __initconst = { "cpu_pll", "cpu_xtal", };
-> > -static const char *emi_sels[] __initconst = { "emi_pll", "emi_xtal", };
-> > +static const char *sel_pll[]  __initdata = { "pll", "ref_xtal", };
-> > +static const char *sel_cpu[]  __initdata = { "ref_cpu", "ref_xtal", };
-> > +static const char *sel_pix[]  __initdata = { "ref_pix", "ref_xtal", };
-> > +static const char *sel_io[]   __initdata = { "ref_io", "ref_xtal", };
-> > +static const char *cpu_sels[] __initdata = { "cpu_pll", "cpu_xtal", };
-> > +static const char *emi_sels[] __initdata = { "emi_pll", "emi_xtal", };
-> >  
-> >  enum imx23_clk {
-> >       ref_xtal, pll, ref_cpu, ref_emi, ref_pix, ref_io, saif_sel,
-> > diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-> > index a6c35010e4e5..b1be3746ce95 100644
-> > --- a/drivers/clk/mxs/clk-imx28.c
-> > +++ b/drivers/clk/mxs/clk-imx28.c
-> > @@ -125,15 +125,15 @@ static void __init clk_misc_init(void)
-> >       writel_relaxed(val, FRAC0);
-> >  }
-> >  
-> > -static const char *sel_cpu[]  __initconst = { "ref_cpu", "ref_xtal", };
-> > -static const char *sel_io0[]  __initconst = { "ref_io0", "ref_xtal", };
-> > -static const char *sel_io1[]  __initconst = { "ref_io1", "ref_xtal", };
-> > -static const char *sel_pix[]  __initconst = { "ref_pix", "ref_xtal", };
-> > -static const char *sel_gpmi[] __initconst = { "ref_gpmi", "ref_xtal", };
-> > -static const char *sel_pll0[] __initconst = { "pll0", "ref_xtal", };
-> > -static const char *cpu_sels[] __initconst = { "cpu_pll", "cpu_xtal", };
-> > -static const char *emi_sels[] __initconst = { "emi_pll", "emi_xtal", };
-> > -static const char *ptp_sels[] __initconst = { "ref_xtal", "pll0", };
-> > +static const char *sel_cpu[]  __initdata = { "ref_cpu", "ref_xtal", };
-> > +static const char *sel_io0[]  __initdata = { "ref_io0", "ref_xtal", };
-> > +static const char *sel_io1[]  __initdata = { "ref_io1", "ref_xtal", };
-> > +static const char *sel_pix[]  __initdata = { "ref_pix", "ref_xtal", };
-> > +static const char *sel_gpmi[] __initdata = { "ref_gpmi", "ref_xtal", };
-> > +static const char *sel_pll0[] __initdata = { "pll0", "ref_xtal", };
-> > +static const char *cpu_sels[] __initdata = { "cpu_pll", "cpu_xtal", };
-> > +static const char *emi_sels[] __initdata = { "emi_pll", "emi_xtal", };
-> > +static const char *ptp_sels[] __initdata = { "ref_xtal", "pll0", };
-> >  
-> >  enum imx28_clk {
-> >       ref_xtal, pll0, pll1, pll2, ref_cpu, ref_emi, ref_io0, ref_io1,
-> > diff --git a/drivers/clk/pxa/clk-pxa.h b/drivers/clk/pxa/clk-pxa.h
-> > index 323965430111..b04c5b9c0ea8 100644
-> > --- a/drivers/clk/pxa/clk-pxa.h
-> > +++ b/drivers/clk/pxa/clk-pxa.h
-> > @@ -14,7 +14,7 @@
-> >  #define _CLK_PXA_
-> >  
-> >  #define PARENTS(name) \
-> > -     static const char *name ## _parents[] __initconst
-> > +     static const char *name ## _parents[] __initdata
-> >  #define MUX_RO_RATE_RO_OPS(name, clk_name)                   \
-> >       static struct clk_hw name ## _mux_hw;                   \
-> >       static struct clk_hw name ## _rate_hw;                  \
-> > diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-> > index 7eb684c50d42..556ce041d371 100644
-> > --- a/drivers/clk/rockchip/clk-rk3188.c
-> > +++ b/drivers/clk/rockchip/clk-rk3188.c
-> > @@ -704,7 +704,7 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
-> >       GATE(ACLK_GPS, "aclk_gps", "aclk_peri", 0, RK2928_CLKGATE_CON(8), 13, GFLAGS),
-> >  };
-> >  
-> > -static const char *rk3188_critical_clocks[] __initconst = {
-> > +static const char *const rk3188_critical_clocks[] __initconst = {
-> >       "aclk_cpu",
-> >       "aclk_peri",
-> >       "hclk_peri",
-> > diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-> > index 11194b8329fe..434b42ccd7e7 100644
-> > --- a/drivers/clk/rockchip/clk-rk3288.c
-> > +++ b/drivers/clk/rockchip/clk-rk3288.c
-> > @@ -771,7 +771,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
-> >       GATE(0, "pclk_isp_in", "ext_isp", 0, RK3288_CLKGATE_CON(16), 3, GFLAGS),
-> >  };
-> >  
-> > -static const char *rk3288_critical_clocks[] __initconst = {
-> > +static const char *const rk3288_critical_clocks[] __initconst = {
-> >       "aclk_cpu",
-> >       "aclk_peri",
-> >       "hclk_peri",
-> > diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-> > index 20e05bbb3a67..edb5d489ae61 100644
-> > --- a/drivers/clk/rockchip/clk.c
-> > +++ b/drivers/clk/rockchip/clk.c
-> > @@ -317,7 +317,8 @@ void __init rockchip_clk_register_armclk(unsigned int lookup_id,
-> >       rockchip_clk_add_lookup(clk, lookup_id);
-> >  }
-> >  
-> > -void __init rockchip_clk_protect_critical(const char *clocks[], int nclocks)
-> > +void __init rockchip_clk_protect_critical(const char *const clocks[],
-> > +                                       int nclocks)
-> >  {
-> >       int i;
-> >  
-> > diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-> > index 58d2e3bdf22f..e42fe095a9c0 100644
-> > --- a/drivers/clk/rockchip/clk.h
-> > +++ b/drivers/clk/rockchip/clk.h
-> > @@ -182,7 +182,7 @@ struct clk *rockchip_clk_register_mmc(const char *name,
-> >                               const char **parent_names, u8 num_parents,
-> >                               void __iomem *reg, int shift);
-> >  
-> > -#define PNAME(x) static const char *x[] __initconst
-> > +#define PNAME(x) static const char *x[] __initdata
-> >  
-> >  enum rockchip_clk_branch_type {
-> >       branch_composite,
-> > diff --git a/drivers/clk/samsung/clk-s5pv210.c b/drivers/clk/samsung/clk-s5pv210.c
-> > index d270a2084644..e668e479a697 100644
-> > --- a/drivers/clk/samsung/clk-s5pv210.c
-> > +++ b/drivers/clk/samsung/clk-s5pv210.c
-> > @@ -169,44 +169,44 @@ static inline void s5pv210_clk_sleep_init(void) { }
-> >  #endif
-> >  
-> >  /* Mux parent lists. */
-> > -static const char *fin_pll_p[] __initconst = {
-> > +static const char *fin_pll_p[] __initdata = {
-> >       "xxti",
-> >       "xusbxti"
-> >  };
-> >  
-> > -static const char *mout_apll_p[] __initconst = {
-> > +static const char *mout_apll_p[] __initdata = {
-> >       "fin_pll",
-> >       "fout_apll"
-> >  };
-> >  
-> > -static const char *mout_mpll_p[] __initconst = {
-> > +static const char *mout_mpll_p[] __initdata = {
-> >       "fin_pll",
-> >       "fout_mpll"
-> >  };
-> >  
-> > -static const char *mout_epll_p[] __initconst = {
-> > +static const char *mout_epll_p[] __initdata = {
-> >       "fin_pll",
-> >       "fout_epll"
-> >  };
-> >  
-> > -static const char *mout_vpllsrc_p[] __initconst = {
-> > +static const char *mout_vpllsrc_p[] __initdata = {
-> >       "fin_pll",
-> >       "sclk_hdmi27m"
-> >  };
-> >  
-> > -static const char *mout_vpll_p[] __initconst = {
-> > +static const char *mout_vpll_p[] __initdata = {
-> >       "mout_vpllsrc",
-> >       "fout_vpll"
-> >  };
-> >  
-> > -static const char *mout_group1_p[] __initconst = {
-> > +static const char *mout_group1_p[] __initdata = {
-> >       "dout_a2m",
-> >       "mout_mpll",
-> >       "mout_epll",
-> >       "mout_vpll"
-> >  };
-> >  
-> > -static const char *mout_group2_p[] __initconst = {
-> > +static const char *mout_group2_p[] __initdata = {
-> >       "xxti",
-> >       "xusbxti",
-> >       "sclk_hdmi27m",
-> > @@ -218,7 +218,7 @@ static const char *mout_group2_p[] __initconst = {
-> >       "mout_vpll",
-> >  };
-> >  
-> > -static const char *mout_audio0_p[] __initconst = {
-> > +static const char *mout_audio0_p[] __initdata = {
-> >       "xxti",
-> >       "pcmcdclk0",
-> >       "sclk_hdmi27m",
-> > @@ -230,7 +230,7 @@ static const char *mout_audio0_p[] __initconst = {
-> >       "mout_vpll",
-> >  };
-> >  
-> > -static const char *mout_audio1_p[] __initconst = {
-> > +static const char *mout_audio1_p[] __initdata = {
-> >       "i2scdclk1",
-> >       "pcmcdclk1",
-> >       "sclk_hdmi27m",
-> > @@ -242,7 +242,7 @@ static const char *mout_audio1_p[] __initconst = {
-> >       "mout_vpll",
-> >  };
-> >  
-> > -static const char *mout_audio2_p[] __initconst = {
-> > +static const char *mout_audio2_p[] __initdata = {
-> >       "i2scdclk2",
-> >       "pcmcdclk2",
-> >       "sclk_hdmi27m",
-> > @@ -254,63 +254,63 @@ static const char *mout_audio2_p[] __initconst = {
-> >       "mout_vpll",
-> >  };
-> >  
-> > -static const char *mout_spdif_p[] __initconst = {
-> > +static const char *mout_spdif_p[] __initdata = {
-> >       "dout_audio0",
-> >       "dout_audio1",
-> >       "dout_audio3",
-> >  };
-> >  
-> > -static const char *mout_group3_p[] __initconst = {
-> > +static const char *mout_group3_p[] __initdata = {
-> >       "mout_apll",
-> >       "mout_mpll"
-> >  };
-> >  
-> > -static const char *mout_group4_p[] __initconst = {
-> > +static const char *mout_group4_p[] __initdata = {
-> >       "mout_mpll",
-> >       "dout_a2m"
-> >  };
-> >  
-> > -static const char *mout_flash_p[] __initconst = {
-> > +static const char *mout_flash_p[] __initdata = {
-> >       "dout_hclkd",
-> >       "dout_hclkp"
-> >  };
-> >  
-> > -static const char *mout_dac_p[] __initconst = {
-> > +static const char *mout_dac_p[] __initdata = {
-> >       "mout_vpll",
-> >       "sclk_hdmiphy"
-> >  };
-> >  
-> > -static const char *mout_hdmi_p[] __initconst = {
-> > +static const char *mout_hdmi_p[] __initdata = {
-> >       "sclk_hdmiphy",
-> >       "dout_tblk"
-> >  };
-> >  
-> > -static const char *mout_mixer_p[] __initconst = {
-> > +static const char *mout_mixer_p[] __initdata = {
-> >       "mout_dac",
-> >       "mout_hdmi"
-> >  };
-> >  
-> > -static const char *mout_vpll_6442_p[] __initconst = {
-> > +static const char *mout_vpll_6442_p[] __initdata = {
-> >       "fin_pll",
-> >       "fout_vpll"
-> >  };
-> >  
-> > -static const char *mout_mixer_6442_p[] __initconst = {
-> > +static const char *mout_mixer_6442_p[] __initdata = {
-> >       "mout_vpll",
-> >       "dout_mixer"
-> >  };
-> >  
-> > -static const char *mout_d0sync_6442_p[] __initconst = {
-> > +static const char *mout_d0sync_6442_p[] __initdata = {
-> >       "mout_dsys",
-> >       "div_apll"
-> >  };
-> >  
-> > -static const char *mout_d1sync_6442_p[] __initconst = {
-> > +static const char *mout_d1sync_6442_p[] __initdata = {
-> >       "mout_psys",
-> >       "div_apll"
-> >  };
-> >  
-> > -static const char *mout_group2_6442_p[] __initconst = {
-> > +static const char *mout_group2_6442_p[] __initdata = {
-> >       "fin_pll",
-> >       "none",
-> >       "none",
-> > @@ -322,7 +322,7 @@ static const char *mout_group2_6442_p[] __initconst = {
-> >       "mout_vpll",
-> >  };
-> >  
-> > -static const char *mout_audio0_6442_p[] __initconst = {
-> > +static const char *mout_audio0_6442_p[] __initdata = {
-> >       "fin_pll",
-> >       "pcmcdclk0",
-> >       "none",
-> > @@ -334,7 +334,7 @@ static const char *mout_audio0_6442_p[] __initconst = {
-> >       "mout_vpll",
-> >  };
-> >  
-> > -static const char *mout_audio1_6442_p[] __initconst = {
-> > +static const char *mout_audio1_6442_p[] __initdata = {
-> >       "i2scdclk1",
-> >       "pcmcdclk1",
-> >       "none",
-> > @@ -347,7 +347,7 @@ static const char *mout_audio1_6442_p[] __initconst = {
-> >       "fin_pll",
-> >  };
-> >  
-> > -static const char *mout_clksel_p[] __initconst = {
-> > +static const char *mout_clksel_p[] __initdata = {
-> >       "fout_apll_clkout",
-> >       "fout_mpll_clkout",
-> >       "fout_epll",
-> > @@ -370,7 +370,7 @@ static const char *mout_clksel_p[] __initconst = {
-> >       "div_dclk"
-> >  };
-> >  
-> > -static const char *mout_clksel_6442_p[] __initconst = {
-> > +static const char *mout_clksel_6442_p[] __initdata = {
-> >       "fout_apll_clkout",
-> >       "fout_mpll_clkout",
-> >       "fout_epll",
-> > @@ -393,7 +393,7 @@ static const char *mout_clksel_6442_p[] __initconst = {
-> >       "div_dclk"
-> >  };
-> >  
-> > -static const char *mout_clkout_p[] __initconst = {
-> > +static const char *mout_clkout_p[] __initdata = {
-> >       "dout_clkout",
-> >       "none",
-> >       "xxti",
-> > diff --git a/drivers/clk/ti/composite.c b/drivers/clk/ti/composite.c
-> > index 19d8980ba458..c429c65b5b21 100644
-> > --- a/drivers/clk/ti/composite.c
-> > +++ b/drivers/clk/ti/composite.c
-> > @@ -67,7 +67,7 @@ struct component_clk {
-> >       struct list_head link;
-> >  };
-> >  
-> > -static const char * __initconst component_clk_types[] = {
-> > +static const char * const component_clk_types[] __initconst = {
-> >       "gate", "divider", "mux"
-> >  };
-> >  
-> > diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-> > index 9037bebd69f7..5ac254f7e3b8 100644
-> > --- a/drivers/clk/zynq/clkc.c
-> > +++ b/drivers/clk/zynq/clkc.c
-> > @@ -85,22 +85,22 @@ static DEFINE_SPINLOCK(canmioclk_lock);
-> >  static DEFINE_SPINLOCK(dbgclk_lock);
-> >  static DEFINE_SPINLOCK(aperclk_lock);
-> >  
-> > -static const char *armpll_parents[] __initconst = {"armpll_int", "ps_clk"};
-> > -static const char *ddrpll_parents[] __initconst = {"ddrpll_int", "ps_clk"};
-> > -static const char *iopll_parents[] __initconst = {"iopll_int", "ps_clk"};
-> > -static const char *gem0_mux_parents[] __initconst = {"gem0_div1", "dummy_name"};
-> > -static const char *gem1_mux_parents[] __initconst = {"gem1_div1", "dummy_name"};
-> > -static const char *can0_mio_mux2_parents[] __initconst = {"can0_gate",
-> > +static const char *armpll_parents[] __initdata = {"armpll_int", "ps_clk"};
-> > +static const char *ddrpll_parents[] __initdata = {"ddrpll_int", "ps_clk"};
-> > +static const char *iopll_parents[] __initdata = {"iopll_int", "ps_clk"};
-> > +static const char *gem0_mux_parents[] __initdata = {"gem0_div1", "dummy_name"};
-> > +static const char *gem1_mux_parents[] __initdata = {"gem1_div1", "dummy_name"};
-> > +static const char *can0_mio_mux2_parents[] __initdata = {"can0_gate",
-> >       "can0_mio_mux"};
-> > -static const char *can1_mio_mux2_parents[] __initconst = {"can1_gate",
-> > +static const char *can1_mio_mux2_parents[] __initdata = {"can1_gate",
-> >       "can1_mio_mux"};
-> > -static const char *dbg_emio_mux_parents[] __initconst = {"dbg_div",
-> > +static const char *dbg_emio_mux_parents[] __initdata = {"dbg_div",
-> >       "dummy_name"};
-> >  
-> > -static const char *dbgtrc_emio_input_names[] __initconst = {"trace_emio_clk"};
-> > -static const char *gem0_emio_input_names[] __initconst = {"gem0_emio_clk"};
-> > -static const char *gem1_emio_input_names[] __initconst = {"gem1_emio_clk"};
-> > -static const char *swdt_ext_clk_input_names[] __initconst = {"swdt_ext_clk"};
-> > +static const char *dbgtrc_emio_input_names[] __initdata = {"trace_emio_clk"};
-> > +static const char *gem0_emio_input_names[] __initdata = {"gem0_emio_clk"};
-> > +static const char *gem1_emio_input_names[] __initdata = {"gem1_emio_clk"};
-> > +static const char *swdt_ext_clk_input_names[] __initdata = {"swdt_ext_clk"};
-> >  
-> >  static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
-> >               const char *clk_name, void __iomem *fclk_ctrl_reg,
-> > -- 
-> > 2.1.4
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > [   12.212102]  mapped:429 shmem:1815 pagetables:13 bounce:0
+> > > [   12.212102]  free_cma:4032
+> > > [   12.243172] DMA free:754080kB min:3472kB low:4340kB high:5208kB
+> > > active_anon:180kB inactive_anon:0kB active_file:0kB inactive_file:0kB
+> > > unevictable:0kB isolated(anon):0kB isolated(file):0kB present:778240kB
+> > > managed:759252kB mlocked:0kB dirty:0kB writeback:0kB mapped:0kB
+> > > shmem:0kB slab_reclaimable:328kB slab_unreclaimable:3372kB
 > 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Which agrees here.
+> 
+> > > [   12.401609] 834 slab pages
+> 
+> but not here... this is an interesting difference, because in the ARM
+> version of show_mem(), we count the actual number of pages where
+> PageSlab() returns true.  Can slab pages also be reserved pages or
+> swap cache pages?  I thought they were exclusive of those.  So, the
+> question comes... why the difference in accounting, and which one is
+> correct.
+> 
+> Maybe there's a bug in the accounting somewhere...
+
+Yes, the ARM show_mem wasn't updated after the various allocators
+(SLUB, SLAB, SLOB) were updated to use compound pages.  Fixing it, you
+get
+
+[    7.081826] sysrq: SysRq : Show Memory
+[    7.085610] Mem-info:
+[    7.087890] DMA per-cpu:
+[    7.090431] CPU    0: hi:  186, btch:  31 usd:  98
+[    7.095230] HighMem per-cpu:
+[    7.098116] CPU    0: hi:   90, btch:  15 usd:  29
+[    7.102923] active_anon:724 inactive_anon:1189 isolated_anon:0
+[    7.102923]  active_file:0 inactive_file:0 isolated_file:0
+[    7.102923]  unevictable:0 dirty:0 writeback:0 unstable:0
+[    7.102923]  free:253980 slab_reclaimable:83 slab_unreclaimable:846
+[    7.102923]  mapped:429 shmem:1815 pagetables:15 bounce:0
+[    7.102923]  free_cma:4032
+[    7.133995] DMA free:753344kB min:3472kB low:4340kB high:5208kB active_anon:292kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:778240kB managed:759188kB mlocked:0kB dirty:0kB writeback:0kB mapped:0kB shmem:0kB slab_reclaimable:332kB slab_unreclaimable:3384kB kernel_stack:256kB pagetables:36kB unstable:0kB bounce:0kB free_cma:0kB writeback_tmp:0kB pages_scanned:0 all_unreclaimable? yes
+[    7.174080] lowmem_reserve[]: 0 0 264 264
+[    7.178175] HighMem free:262576kB min:264kB low:572kB high:884kB active_anon:2604kB inactive_anon:4756kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:270336kB managed:270336kB mlocked:0kB dirty:0kB writeback:0kB mapped:1716kB shmem:7260kB slab_reclaimable:0kB slab_unreclaimable:0kB kernel_stack:0kB pagetables:24kB unstable:0kB bounce:0kB free_cma:16128kB writeback_tmp:0kB pages_scanned:0 all_unreclaimable? yes
+[    7.218955] lowmem_reserve[]: 0 0 0 0
+[    7.222687] DMA: 8*4kB (UEM) 8*8kB (UM) 4*16kB (UEM) 5*32kB (UM) 2*64kB (M) 4*128kB (UEM) 3*256kB (M) 2*512kB (EM) 5*1024kB (UEM) 6*2048kB (UEM) 3*4096kB (EM) 88*8192kB (MR) = 753344kB
+[    7.239477] HighMem: 0*4kB 0*8kB 1*16kB (M) 1*32kB (M) 2*64kB (UM) 2*128kB (UM) 2*256kB (UC) 3*512kB (UMC) 2*1024kB (UC) 2*2048kB (UC) 2*4096kB (UC) 30*8192kB (MRC) = 262576kB
+[    7.255455] 1815 total pagecache pages
+[    7.259211] 0 pages in swap cache
+[    7.262533] Swap cache stats: add 0, delete 0, find 0/0
+[    7.267764] Free swap  = 0kB
+[    7.270647] Total swap = 0kB
+[    7.282890] 262144 pages of RAM
+[    7.286041] 254274 free pages
+[    7.289013] 4763 reserved pages
+[    7.292157] 929 slab pages
+[    7.294868] 1063 pages shared
+[    7.297839] 0 pages swap cached
+
+And now we see 83 slab_reclaimable + 846 slab_unreclaimable adds up
+correctly to the total of 929.
+
+The patch below will end up with the correct count.
+
+8<===
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 1609b02..8d606bb 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -117,7 +117,7 @@ void show_mem(unsigned int filter)
+                        else if (PageSwapCache(page))
+                                cached++;
+                        else if (PageSlab(page))
+-                               slab++;
++                               slab += 1 << compound_order(page);
+                        else if (!page_count(page))
+                                free++;
+                        else
+
+-- 
+ Gregory V. Fong >< GPG key: 0BAE9648
