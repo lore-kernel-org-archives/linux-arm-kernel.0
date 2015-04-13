@@ -1,197 +1,90 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Mon, 13 Apr 2015 12:48:44 -0700
-Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabrelite: add supported LVDS
- displays
-In-Reply-To: <1428920545.3192.41.camel@pengutronix.de>
-References: <5521E08F.3060407@boundarydevices.com>
- <1428920545.3192.41.camel@pengutronix.de>
-Message-ID: <552C1D9C.4090303@boundarydevices.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 13 Apr 2015 20:11:46 +0000
+Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
+In-Reply-To: <87r3rom2qu.fsf@natisbad.org>
+References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150410135056.GB28873@io.lakedaemon.net>
+ <20150410171148.07bc9429@bbrezillon>
+ <20150410223008.GA18660@io.lakedaemon.net>
+ <552B8EC4.209@free-electrons.com>
+ <20150413124711.GI18660@io.lakedaemon.net>
+ <87r3rom2qu.fsf@natisbad.org>
+Message-ID: <20150413201146.GL18660@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Philipp,
+Hey Arnaud,
 
-On 04/13/2015 03:22 AM, Philipp Zabel wrote:
-> Hi Eric,
+On Mon, Apr 13, 2015 at 06:06:49PM +0200, Arnaud Ebalard wrote:
+> Jason Cooper <jason@lakedaemon.net> writes:
+...
+> >> >> I really tried to adapt the existing driver to add the missing
+> >> >> features (especially the support for TDMA), but all my attempts
+> >> >> ended up introducing hackish code (not even talking about the
+> >> >> performance penalty of this approach).
+> >> > 
+> >> > Ok, fair enough.  It would be helpful if this account of attempting to
+> >> > reconcile the old driver made it into the commit message.  This puts us
+> >> > in "perfect is the enemy of getting it done" territory.
+> >> > 
+> >> >> I have another solution though: keep the existing driver for old
+> >> >> marvell SoCs (orion, kirkwood and dove), and add a new one for modern
+> >> >> SoCs (armada 370, XP, 375 and 38x), so that users of the mv_cesa driver
+> >> >> won't have to audit the new code.
+> >> > 
+> >> > A fair proposal, but I'll freely admit the number of people actually auditing
+> >> > their code paths is orders of magnitude smaller than the number of users
+> >> > of the driver.
+> >> > 
+> >> > There's such a large population of compatible legacy SoCs in the wild,
+> >> > adding an artificial boundary doesn't make sense.  Especially since
+> >> > we're talking about features everyone would want to use.
+> >> > 
+> >> > Perhaps we should keep both around, and deprecate the legacy driver over
+> >> > 3 to 4 cycles?
+> >> 
+> >> But I guess that some users will want to use the new driver on the "old" marvell
+> >> SoCs (especially kirkwood and dove).
+> >
+> > Yes, despite my arguments, I'm one of those people.  :-P
+> >
+> >> If we go to this path, then the best solution would be to still update
+> >> all the the dts, and modifying the old driver to be able to use the
+> >> new binding: for my point of view the only adaptation should be
+> >> related to the SRAM. It will be also needed to find a way to be able
+> >> to load only one driver at a time: either the old or the new, but not
+> >> both.
 > 
-> Am Sonntag, den 05.04.2015, 18:25 -0700 schrieb Eric Nelson:
->> Hi Philipp,
->>
->> Sorry for the delayed response. I missed your reply and Shawn pointed
->> it out.
-> [...]
->> The use of simple panel seems to add and remove functionality:
->> 	- adds backlight, regulators and enable GPIOs!
->> 	- loses the ability to express timings in DT
+> The approach Boris proposed above seems to make everyone happy:
 > 
-> For the simple panel driver Thierry preferred to have a panel database
-> in the driver and uniquely identify the panel by its compatible value.
-> This will also allow to infer the data mapping and width from
-> the panel, and the panel timings are available for the next hardware to
-> reuse the same panel (however likely that is).
+>  1) Keep the old driver for old marvells SoCs (kirkwood, dove and orion)
+>  2) Introduce the new driver for those that are not supported by the old
+>     driver, i.e. armada (370, XP, 375, 38x)
 > 
-> The old method with display-timings will stay available, but for
-> mainline I think it is better to add the panel to the driver.
+> AFAICT, this can easily be done (based on compatible strings) and it
+> will let everyone the time to audit the new driver. Current users will
+> not be taken by surprise. At some point, when everyone is confident w/
+> the new driver, we can then switch to that one for all SoCs so that
+> old platform get more performance.
 > 
-
-I predict that panel-simple.c will get really big, really fast.
-
-Scanning it for panels that match our Okaya 1024x600 panel shows
-that there already four with that resolution which seem to differ
-only in margin timings.
-
-I think the addition of an optional display-timings node and/or
-a VESA GTF mode string would prevent a lot of churn, but this is
-a separate topic.
-
->>> After:
->>> 	ldb {
->>> 		...
->>>
->>> 		lvds-channel at 0 {
->>> 			...
->>>
->>
->> Using port here to point at the panel seems to conflict
->> with the use of ports to point at the IPU.
+> Additionnally, for those who want to get the feature of the new driver
+> for their old SoC right now, we *could* add a simple kernel config option
+> for the new driver to use it for the old SoC too (that one disabling the
+> old one).
 > 
-> I'm sorry, I don't understand what you mean exactly. There are some
-> input ports (two on i.MX5, four on i.MX6) that are connected to the IPU,
-> and one output port that is connected to the panel, in that order by
-> convention. The port id 4 (reg = <4>) uniquely identifies the output
-> port on i.MX6.
 > 
-
-The full DT for an LVDS channel looks like this:
-
-...	
-lvds-channel at 0 {
-	#address-cells = <0x00000001>;
-	#size-cells = <0x00000000>;
-	...
-	port at 0 {
-		reg = <0x00000000>;
-		endpoint {
-			remote-endpoint = <0x00000013>;
-			linux,phandle = <0x00000039>;
-			phandle = <0x00000039>;
-		};
-	};
-	port at 1 {
-...	};
-	port at 2 {
-...	};
-	port at 3 {
-...	};
-	port at 4 {
-		reg = <0x00000004>;
-		endpoint {
-			remote-endpoint = <0x00000017>;
-			linux,phandle = <0x00000053>;
-			phandle = <0x00000053>;
-		};
-	};
-};
-
-ports 0-3 refer to the LVDS mux and which IPU and display
-interface is connected up to the LVDS channel (i.e. the
-input to the LVDS display bridge) and port at 4 refer to the
-panel.
-
->>> [snip]
->>>
->>> 	panel {
->>> 		compatible = "edt,etm0700g0dh6", "simple-panel";
->>> 		...
->>>
->>
->> And why would the panel need to point back to the LVDS
->> channel?
+> > I'd appreciate if we'd look into it.  I understand from on-list and
+> > off-list discussion that the rewrite was unavoidable.  So I'm willing to
+> > concede that.  Giving people time to migrate from old to new while still
+> > being able to update for other security fixes seems reasonable.
 > 
-> This is the way the bindings are defined right now in
-> Documentation/devicetree/bindings/graph.txt, section "Links between
-> endpoints". The panel driver itself doesn't use the backlink, but the
-> endpoint needs to exist anyway.
-> 
+> Jason, what do you think of the approach above? 
 
-Thanks for the reference.
+I say keep it simple.  We shouldn't use the DT changes to trigger one
+vice the other.  We need to be able to build both, but only load one at
+a time.  If that's anything other than simple to do, then we make it a
+Kconfig binary choice and move on.
 
-I'm not following the rationale  since in this case, the communication
-needs seem to be uni-directional, but okay.
+thx,
 
->> [snip]
->>
->> Do you have a working example of how this should be used?
->>
->> My attempts to follow the notes above results in a failure
->> to find a crtc for the LVDS channel.
->>
->> Please advise,
-> 
-> I have used this patch to connect a HannStar HSD070PWW1 LVDS panel to a
-> Nitrogen6X board:
-> 
-
-Thanks again. This patch works for me with your prior patch applied:
-
-	https://patchwork.kernel.org/patch/5854771/
-
-> -----8<-----
-> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> index 0821812..9e52adf 100644
-> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> @@ -122,7 +122,7 @@
->  		status = "okay";
->  	};
->  
-> -	backlight_lvds {
-> +	backlight_lvds: backlight_lvds {
->  		compatible = "pwm-backlight";
->  		pwms = <&pwm4 0 5000000>;
->  		brightness-levels = <0 4 8 16 32 64 128 255>;
-> @@ -130,6 +130,17 @@
->  		power-supply = <&reg_3p3v>;
->  		status = "okay";
->  	};
-> +
-> +	panel {
-> +		compatible = "hannstar,hsd070pww1";
-> +		backlight = <&backlight_lvds>;
-> +
-> +		port {
-> +			panel_in: endpoint {
-> +				remote-endpoint = <&lvds0_out>;
-> +			};
-> +		};
-> +	};
->  };
->  
-
-This does give me a path to get the equivalent functionality
-as my original patches:
-
-	- (if needed) add displays to panel-simple.c
-	- update DT in boot loader to fix up displays based on panel
-	detection by setting the panel.compatible string value.
-
-I am still left with a quandary, which relates to my comment about
-the port selection.
-
-With our current device tree, both the HDMI and LVDS devices
-are being mapped to IPU1/DI0 and the same DRM "card":
-
-	~# ls  /sys/class/graphics/fb0/device/drm/card0/card*
-	card0-HDMI-A-1	card0-LVDS-1
-
-Since the default i.MX6 graph appears to have links for all four LVDS
-mux options, and the path to binding to one of the IPU/DI -> LVDS
-channel mappings isn't clear to me.
-
-I have the same question for HDMI and LCD interfaces though, and
-this is a separate topic.
-
-Regards,
-
-
-Eric
+Jason.
