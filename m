@@ -1,76 +1,39 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 13 Apr 2015 11:21:30 +0100
-Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
-In-Reply-To: <20150413100400.GJ6186@cbox>
-References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
- <5527EC52.4050500@codeaurora.org> <5527FFB5.9020103@arm.com>
- <20150413100400.GJ6186@cbox>
-Message-ID: <552B98AA.6@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Apr 2015 11:21:43 +0100
+Subject: [GIT PULL] ARM perf updates for 4.1
+In-Reply-To: <20150413092812.GC432@lukather>
+References: <20150327172246.GN1562@arm.com>
+ <CAMuHMdUvjqYSSTwFcyhn=ChCJWZsqvL1CAVWRgnid0=giD56Ag@mail.gmail.com>
+ <20150413091011.GA1582@arm.com> <20150413092812.GC432@lukather>
+Message-ID: <20150413102031.GA2869@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Apr 13, 2015 at 10:28:12AM +0100, Maxime Ripard wrote:
+> On Mon, Apr 13, 2015 at 10:10:12AM +0100, Will Deacon wrote:
+> > On Tue, Apr 07, 2015 at 04:05:40PM +0100, Geert Uytterhoeven wrote:
+> > > On Fri, Mar 27, 2015 at 6:22 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > > > Will Deacon (1):
+> > > >       ARM: pmu: add support for interrupt-affinity property
+> > > 
+> > > As most DTSes lack this property, we now get scary warnings:
+> > > 
+> > >         CPU PMU: Failed to parse <no-node>/interrupt-affinity[0]
+> > 
+> > That's a harmless warning (i.e. perf will `work' as before), but I'd like to
+> > print something to say that we didn't find the property.
+> 
+> Shouldn't we have a warning only if that property makes some kind of
+> sense?
+> 
+> I mean, I agree on the fact that we want this property if this is an
+> SPI, but if it is a PPI, it doesn't make any sense to have this
+> property, and this is very well documented in the binding
+> documentation.
 
-On 13/04/15 11:04, Christoffer Dall wrote:
-> On Fri, Apr 10, 2015 at 05:52:05PM +0100, Andre Przywara wrote:
->> Hi Christopher,
->>
->> On 10/04/15 16:29, Christopher Covington wrote:
->>> Hi Andre,
->>>
->>> On 04/10/2015 11:17 AM, Andre Przywara wrote:
->>>> When userland injects a SPI via the KVM_IRQ_LINE ioctl we currently
->>>> only check it against a fixed limit, which historically is set
->>>> to 127. With the new dynamic IRQ allocation the effective limit may
->>>> actually be smaller (64).
->>>> So when now a malicious or buggy userland injects a SPI in that
->>>> range, we spill over on our VGIC bitmaps and bytemaps memory.
->>>> I could trigger a host kernel NULL pointer dereference with current
->>>> mainline by injecting some bogus IRQ number from a hacked kvmtool:
->>>
->>>> --- a/arch/arm/include/uapi/asm/kvm.h
->>>> +++ b/arch/arm/include/uapi/asm/kvm.h
->>>> @@ -195,7 +195,11 @@ struct kvm_arch_memory_slot {
->>>>  #define KVM_ARM_IRQ_CPU_IRQ		0
->>>>  #define KVM_ARM_IRQ_CPU_FIQ		1
->>>>  
->>>> -/* Highest supported SPI, from VGIC_NR_IRQS */
->>>> +/*
->>>> + * This used to hold the highest supported SPI, but it is now obsolete
->>>> + * and only here to provide source code level compatibility with older
->>>> + * userland. The highest SPI number can be set via KVM_DEV_ARM_VGIC_GRP_NR_IRQS.
->>>> + */
->>>>  #define KVM_ARM_IRQ_GIC_MAX		127
->>>
->>> If that's the case should it maybe only defined when __KERNEL__ is not defined?
->>
->> Mmmh, I am not sure it's really worth the hassle. Actually it seems like
->> that neither kvmtool nor QEMU use this definition, so it's more or less
->> orphaned by now. I am confident we can avoid it sneaking in in the
->> kernel again.
->>
-> TBH, I wouldn't object against Marc enclosing the definition in an
-> #ifdef __KERNEL__.
-
-So just to clarify: Isn't this definition part of the userspace API that
-we have to maintain forever? That was my understanding when Christopher
-suggested to enclose it in #ifndef __KERNEL__ (if I got this correctly).
-So we would at least avoid any future kernel code to (ab)use it again.
-But putting it inside #ifdef __KERNEL__ does contradict this, doesn't it?
-
-If it is not an API, I'd rather remove it all:
-a) it is not used by the kernel anymore after this patch
-b) it became meaningless with the introduction of the dynamic NR_IRQS
-   allocation
-c) none of the two KVM userspace tools (I know of) is using it
-
-So I guess any userspace tool trying to make use of it deserves to not
-compile anymore.
-But if we somehow promised that any userspace program will compile
-forever against even the newest kernel headers, then we have to keep it
-in, haven't we?
-
-Or am I totally wrong here?
+Yes, that's a good point; for PPIs, the warning is nonsensical. I'll cook
+a fix.
 
 Cheers,
-Andre.
+
+Will
