@@ -1,149 +1,58 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 13 Apr 2015 12:22:25 +0200
-Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabrelite: add supported LVDS
- displays
-In-Reply-To: <5521E08F.3060407@boundarydevices.com>
-References: <5521E08F.3060407@boundarydevices.com>
-Message-ID: <1428920545.3192.41.camel@pengutronix.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 13 Apr 2015 12:35:48 +0200
+Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
+In-Reply-To: <552B98A0.6020304@arm.com>
+References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
+ <5527EC52.4050500@codeaurora.org> <5527FFB5.9020103@arm.com>
+ <20150413100400.GJ6186@cbox> <552B98A0.6020304@arm.com>
+Message-ID: <20150413103548.GK6186@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-Am Sonntag, den 05.04.2015, 18:25 -0700 schrieb Eric Nelson:
-> Hi Philipp,
+On Mon, Apr 13, 2015 at 11:21:20AM +0100, Marc Zyngier wrote:
+> On 13/04/15 11:04, Christoffer Dall wrote:
+> > On Fri, Apr 10, 2015 at 05:52:05PM +0100, Andre Przywara wrote:
+> >> Hi Christopher,
+> >>
+> >> On 10/04/15 16:29, Christopher Covington wrote:
+> >>> Hi Andre,
+> >>>
+> >>> On 04/10/2015 11:17 AM, Andre Przywara wrote:
+> >>>> When userland injects a SPI via the KVM_IRQ_LINE ioctl we currently
+> >>>> only check it against a fixed limit, which historically is set
+> >>>> to 127. With the new dynamic IRQ allocation the effective limit may
+> >>>> actually be smaller (64).
+> >>>> So when now a malicious or buggy userland injects a SPI in that
+> >>>> range, we spill over on our VGIC bitmaps and bytemaps memory.
+> >>>> I could trigger a host kernel NULL pointer dereference with current
+> >>>> mainline by injecting some bogus IRQ number from a hacked kvmtool:
+> >>>
+> >>>> --- a/arch/arm/include/uapi/asm/kvm.h
+> >>>> +++ b/arch/arm/include/uapi/asm/kvm.h
+> >>>> @@ -195,7 +195,11 @@ struct kvm_arch_memory_slot {
+> >>>>  #define KVM_ARM_IRQ_CPU_IRQ		0
+> >>>>  #define KVM_ARM_IRQ_CPU_FIQ		1
+> >>>>  
+> >>>> -/* Highest supported SPI, from VGIC_NR_IRQS */
+> >>>> +/*
+> >>>> + * This used to hold the highest supported SPI, but it is now obsolete
+> >>>> + * and only here to provide source code level compatibility with older
+> >>>> + * userland. The highest SPI number can be set via KVM_DEV_ARM_VGIC_GRP_NR_IRQS.
+> >>>> + */
+> >>>>  #define KVM_ARM_IRQ_GIC_MAX		127
+> >>>
+> >>> If that's the case should it maybe only defined when __KERNEL__ is not defined?
+> >>
+> >> Mmmh, I am not sure it's really worth the hassle. Actually it seems like
+> >> that neither kvmtool nor QEMU use this definition, so it's more or less
+> >> orphaned by now. I am confident we can avoid it sneaking in in the
+> >> kernel again.
+> >>
+> > TBH, I wouldn't object against Marc enclosing the definition in an
+> > #ifdef __KERNEL__.
 > 
-> Sorry for the delayed response. I missed your reply and Shawn pointed
-> it out.
-[...]
-> The use of simple panel seems to add and remove functionality:
-> 	- adds backlight, regulators and enable GPIOs!
-> 	- loses the ability to express timings in DT
-
-For the simple panel driver Thierry preferred to have a panel database
-in the driver and uniquely identify the panel by its compatible value.
-This will also allow to infer the data mapping and width from
-the panel, and the panel timings are available for the next hardware to
-reuse the same panel (however likely that is).
-
-The old method with display-timings will stay available, but for
-mainline I think it is better to add the panel to the driver.
-
-> > After:
-> > 	ldb {
-> > 		...
-> > 
-> > 		lvds-channel at 0 {
-> > 			...
-> > 
+> Yeah, I'll fix that up (assuming you mean #ifndef rather than #ifdef).
 > 
-> Using port here to point at the panel seems to conflict
-> with the use of ports to point at the IPU.
+Yes, Monday morning ;)
 
-I'm sorry, I don't understand what you mean exactly. There are some
-input ports (two on i.MX5, four on i.MX6) that are connected to the IPU,
-and one output port that is connected to the panel, in that order by
-convention. The port id 4 (reg = <4>) uniquely identifies the output
-port on i.MX6.
-
-> > 			port at 4 {
-> > 				reg = <4>;
-> > 
-> > 				lvds_out: endpoint {
-> > 					remote_endpoint = <&panel_in>;
-> > 				};
-> > 			};
-> > 		};
-> > 	};
-> > 
-> > 	panel {
-> > 		compatible = "edt,etm0700g0dh6", "simple-panel";
-> > 		...
-> > 
-> 
-> And why would the panel need to point back to the LVDS
-> channel?
-
-This is the way the bindings are defined right now in
-Documentation/devicetree/bindings/graph.txt, section "Links between
-endpoints". The panel driver itself doesn't use the backlink, but the
-endpoint needs to exist anyway.
-
-> > 		port {
-> > 			panel_in: endpoint {
-> > 				remote-endpoint = <&lvds_out>;
-> > 			};
-> > 		};
-> > 	}; 
-> > 
-> 
-> Do you have a working example of how this should be used?
-> 
-> My attempts to follow the notes above results in a failure
-> to find a crtc for the LVDS channel.
-> 
-> Please advise,
-
-I have used this patch to connect a HannStar HSD070PWW1 LVDS panel to a
-Nitrogen6X board:
-
------8<-----
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index 0821812..9e52adf 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -122,7 +122,7 @@
- 		status = "okay";
- 	};
- 
--	backlight_lvds {
-+	backlight_lvds: backlight_lvds {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm4 0 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -130,6 +130,17 @@
- 		power-supply = <&reg_3p3v>;
- 		status = "okay";
- 	};
-+
-+	panel {
-+		compatible = "hannstar,hsd070pww1";
-+		backlight = <&backlight_lvds>;
-+
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&lvds0_out>;
-+			};
-+		};
-+	};
- };
- 
- &audmux {
-@@ -379,18 +390,11 @@
- 		fsl,data-width = <18>;
- 		status = "okay";
- 
--		display-timings {
--			native-mode = <&timing0>;
--			timing0: hsd100pxn1 {
--				clock-frequency = <65000000>;
--				hactive = <1024>;
--				vactive = <768>;
--				hback-porch = <220>;
--				hfront-porch = <40>;
--				vback-porch = <21>;
--				vfront-porch = <7>;
--				hsync-len = <60>;
--				vsync-len = <10>;
-+		port at 4 {
-+			reg = <4>;
-+
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&panel_in>;
- 			};
- 		};
- 	};
------>8-----
-
-regards
-Philipp
+-Christoffer
