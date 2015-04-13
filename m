@@ -1,85 +1,84 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 13 Apr 2015 16:12:54 +0200
-Subject: [PATCH v4 0/3] genirq: Saving/restoring the irqchip state of
- an irq line
-In-Reply-To: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
-References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <552BCEE6.6060003@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 13 Apr 2015 16:16:10 +0200
+Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
+ DNS-327L
+In-Reply-To: <20150412194735.GA27921@lunn.ch>
+References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
+ <552A6209.9040903@gmail.com>
+ <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
+ <20150412145857.GA14038@lunn.ch>
+ <b172d775afa24cea69a9490f531c6b37@mail.ncrmnt.org>
+ <20150412194735.GA27921@lunn.ch>
+Message-ID: <552BCFAA.2020109@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Andrew(s),
 
-You can apply my R-b and T-b on the whole series. To be precise, I
-tested the get path only with my kvm-vfio forward series.
+On 12/04/2015 21:47, Andrew Lunn wrote:
+> On Sun, Apr 12, 2015 at 06:41:31PM +0300, Andrew wrote:
+>> Andrew Lunn ?????????? 12.04.2015 17:58:
+>>>> Okay, got it.
+>>>> I'll file a bug about this issue to the the bugzilla. However
+>>>> something
+>>>> tells me it might not be cpuidle, but D-link. This one's sounds nasty
+>>>> and it has been around since 3.16.x. How could it go unnoticed?
+>>>> Unfortunately I have no other armada-370 hardware to test it.
+>>>
+>>> Hi Andrew
+>>>
+>>> A few of us here do have hardware to test with. Please give a detailed
+>>> description of how you reproduce the issue, and your kernel
+>>> configuration, if different from mvebu_v7_defconfig, or
+>>> multi_v7_defconfig.
+>>>
+>>> 	Thanks
+>>> 		Andrew
+>>
+>>
+>> arch/arm/configs/mvebu_v7_defconfig has CONFIG_ARM_MVEBU_V7_CPUIDLE=y,
+>> so it should be sufficient to reproduce the issue. I first encountered
+>> this issue using that very config and observed it on 2 DNS-327L boxes I
+>> own.
+>>
+>> All I have to do to trigger the bug - enable cpuidle driver and let
+>> the box
+>> sit for some 4-12 hours, till it hard-freezes. If wdt is enabled -
+>> wdt reboot
+>> will happen.
+> 
+> That simple! Well i've got a 370RD which has been sat mostly idle for
+> weeks, using the mvebu_v7_defconfig, with a few addition things turned
+> on for testing the Ethernet switch on the board. I've not had that
+> lockup.
+> 
+> One thing you can try to narrow it down is the disable the second idle
+> mode. Take a look at armada370_idle_driver. Keep the
+> ARM_CPUIDLE_WFI_STATE but disable the "Deep Idle" state.
 
-Best Regards
+Actually you don't have to modify the kernel you can setup the CPU idle level
+you want at runtime:
 
-Eric
+echo 1 > /sys/devices/system/cpu/cpu0/cpuidle/state1/disable
 
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
-Tested-by: Eric Auger <eric.auger@linaro.org>
+will disable the state1. By doing this on Armada 370 then you
+will only use the WFI state.
+
+Do you still have this issue on v4.0-rc7?
+
+Thanks,
+
+Gregory
 
 
-On 03/18/2015 12:01 PM, Marc Zyngier wrote:
-> Despite Linux offering a rather fine grained control over the life
-> cycle of an interrupt, there is a few cases where it would be very
-> useful to snapshot (or even set) the internal state of the interrupt
-> controller for a given interrupt line:
+
+>       
+>       Andrew
 > 
-> - With KVM, a device shared between VMs must have its whole context
->   switched, and that includes the interrupt line state. KVM/arm is
->   moving to using this.
-> - Some GPIO controllers seem to require peeking into the interrupt
->   controller they are connected to to report their internal state.
-> 
-> Instead of letting people facing this situation doing horrible
-> (controller specific) hacks in their code, let's offer a couple of new
-> entry points that allow a few attributes to be read and set.
-> 
-> Of course, this is a very dangerous thing to do if you don't know what
-> you doing, and I wouldn't expect most drivers to use this. But this
-> can also be a life saver at times.
-> 
-> This patch series implement said API, and adds support for this to the
-> two main ARM interrupt controllers (GIC and GICv3). Available at:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irqchip_state
-> 
-> This has been fairly heavily tested with KVM on ARM, which makes use
-> of this feature to context switch the timer interrupt (see the last
-> three patch in the above branch).
-> 
-> Thanks,
-> 
-> 	M.
-> 
-> * From v3 [3]
-> - Rebased on top of 4.0-rc4
-> 
-> * From v2 [2]:
-> - Rebased on top of 3.19-rc3
-> - Fixed irq_set_irqchip_state return value
-> 
-> * From v1 [1]:
-> - Rebased on top of 3.18-rc7 + tip/irq/irqdomain-arm
-> - Now deals with stacked domains
-> - Changed the API to be less ambiguous (after review by tglx)
-> - Added IRQCHIP_STATE_LINE_LEVEL (as requested by Bjorn Anderson)
-> 
-> [1] https://lkml.org/lkml/2014/10/25/134
-> [2] https://lkml.org/lkml/2014/12/3/612
-> [3] http://lkml.iu.edu/hypermail/linux/kernel/1501.0/03473.html
-> 
-> Marc Zyngier (3):
->   genirq: Allow the irqchip state of an IRQ to be save/restored
->   irqchip: GIC: Add support for irq_{get,set}_irqchip_state
->   irqchip: GICv3: Add support for irq_{get,set}_irqchip_state
-> 
->  drivers/irqchip/irq-gic-v3.c | 83 +++++++++++++++++++++++++++++++++-------
->  drivers/irqchip/irq-gic.c    | 69 +++++++++++++++++++++++++++++++--
->  include/linux/interrupt.h    | 14 +++++++
->  include/linux/irq.h          |  6 +++
->  kernel/irq/manage.c          | 91 ++++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 246 insertions(+), 17 deletions(-)
-> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
