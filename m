@@ -1,52 +1,41 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 13 Apr 2015 12:04:00 +0200
-Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
-In-Reply-To: <5527FFB5.9020103@arm.com>
-References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
- <5527EC52.4050500@codeaurora.org> <5527FFB5.9020103@arm.com>
-Message-ID: <20150413100400.GJ6186@cbox>
+From: mgorman@suse.de (Mel Gorman)
+Date: Mon, 13 Apr 2015 11:04:26 +0100
+Subject: [PATCH] ARM: print cma-reserved pages from show_mem
+In-Reply-To: <20150413095645.GQ12732@n2100.arm.linux.org.uk>
+References: <20150210113230.GJ8656@n2100.arm.linux.org.uk>
+ <CADtm3G64rPf7O76xUbLwqsqTkJxdGJMT9sHj810xPuThDA0ddg@mail.gmail.com>
+ <20150326114612.GD8656@n2100.arm.linux.org.uk>
+ <20150326123028.GM4701@suse.de>
+ <CADtm3G4Lb=u+BAHZF+O+RgB4VS9iW8epCPJ9ssBTj=+p3+h==Q@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D104A310D42397@CNBJMBX05.corpusers.net>
+ <20150410112430.GB12732@n2100.arm.linux.org.uk>
+ <20150413010913.GA15225@corellia.local>
+ <20150413012115.GB15225@corellia.local>
+ <20150413095645.GQ12732@n2100.arm.linux.org.uk>
+Message-ID: <20150413100425.GB14842@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 05:52:05PM +0100, Andre Przywara wrote:
-> Hi Christopher,
-> 
-> On 10/04/15 16:29, Christopher Covington wrote:
-> > Hi Andre,
+On Mon, Apr 13, 2015 at 10:56:45AM +0100, Russell King - ARM Linux wrote:
+> On Sun, Apr 12, 2015 at 06:21:15PM -0700, Gregory Fong wrote:
+> > On Sun, Apr 12, 2015 at 06:09:13PM -0700, Gregory Fong wrote:
+> > > And now we see 83 slab_reclaimable + 846 slab_unreclaimable adds up
+> > > correctly to the total of 929.
+> > > 
+> > > The patch below will end up with the correct count.
+> > > 
 > > 
-> > On 04/10/2015 11:17 AM, Andre Przywara wrote:
-> >> When userland injects a SPI via the KVM_IRQ_LINE ioctl we currently
-> >> only check it against a fixed limit, which historically is set
-> >> to 127. With the new dynamic IRQ allocation the effective limit may
-> >> actually be smaller (64).
-> >> So when now a malicious or buggy userland injects a SPI in that
-> >> range, we spill over on our VGIC bitmaps and bytemaps memory.
-> >> I could trigger a host kernel NULL pointer dereference with current
-> >> mainline by injecting some bogus IRQ number from a hacked kvmtool:
-> > 
-> >> --- a/arch/arm/include/uapi/asm/kvm.h
-> >> +++ b/arch/arm/include/uapi/asm/kvm.h
-> >> @@ -195,7 +195,11 @@ struct kvm_arch_memory_slot {
-> >>  #define KVM_ARM_IRQ_CPU_IRQ		0
-> >>  #define KVM_ARM_IRQ_CPU_FIQ		1
-> >>  
-> >> -/* Highest supported SPI, from VGIC_NR_IRQS */
-> >> +/*
-> >> + * This used to hold the highest supported SPI, but it is now obsolete
-> >> + * and only here to provide source code level compatibility with older
-> >> + * userland. The highest SPI number can be set via KVM_DEV_ARM_VGIC_GRP_NR_IRQS.
-> >> + */
-> >>  #define KVM_ARM_IRQ_GIC_MAX		127
-> > 
-> > If that's the case should it maybe only defined when __KERNEL__ is not defined?
+> > Sorry, messed up the patch formatting.  Here it is fixed:
 > 
-> Mmmh, I am not sure it's really worth the hassle. Actually it seems like
-> that neither kvmtool nor QEMU use this definition, so it's more or less
-> orphaned by now. I am confident we can avoid it sneaking in in the
-> kernel again.
-> 
-TBH, I wouldn't object against Marc enclosing the definition in an
-#ifdef __KERNEL__.
+> So now the question is: do we fix this, or do we use the generic version?
+> Given that the total number of slab pages can be easily deduced from the
+> generic statistics, do we need to modify the generic version to print an
+> additional line with this?
 
-Thanks,
--Christoffer
+Whatever ARM decides, I do not think the generic version needs to do
+a PFN walk to recaluate the SLAB statistics. The slab_reclaimable and
+slab_unreclaimable stats based on the vmstat counters is sufficient. 
+
+-- 
+Mel Gorman
+SUSE Labs
