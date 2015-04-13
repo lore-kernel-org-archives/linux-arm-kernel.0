@@ -1,48 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 13 Apr 2015 11:58:51 +0200
-Subject: [PATCH v11]: clk: Add common clock support for Mediatek MT8135
- and MT8173
-In-Reply-To: <CABuKBeJ256HBLP+3WB+acNbMonGknQJgWBnGjEx1VWecWc-Y5g@mail.gmail.com>
-References: <1427825817-26773-1-git-send-email-s.hauer@pengutronix.de>
- <CABuKBeJ256HBLP+3WB+acNbMonGknQJgWBnGjEx1VWecWc-Y5g@mail.gmail.com>
-Message-ID: <20150413095851.GN9742@pengutronix.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 13 Apr 2015 12:02:45 +0200
+Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
+In-Reply-To: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
+References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150413100245.GI6186@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 07, 2015 at 01:47:58PM +0200, Matthias Brugger wrote:
-> Hi Sascha,
+On Fri, Apr 10, 2015 at 04:17:59PM +0100, Andre Przywara wrote:
+> When userland injects a SPI via the KVM_IRQ_LINE ioctl we currently
+> only check it against a fixed limit, which historically is set
+> to 127. With the new dynamic IRQ allocation the effective limit may
+> actually be smaller (64).
+> So when now a malicious or buggy userland injects a SPI in that
+> range, we spill over on our VGIC bitmaps and bytemaps memory.
+> I could trigger a host kernel NULL pointer dereference with current
+> mainline by injecting some bogus IRQ number from a hacked kvmtool:
+> -----------------
+> ....
+> DEBUG: kvm_vgic_inject_irq(kvm, cpu=0, irq=114, level=1)
+> DEBUG: vgic_update_irq_pending(kvm, cpu=0, irq=114, level=1)
+> DEBUG: IRQ #114 still in the game, writing to bytemap now...
+> Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> pgd = ffffffc07652e000
+> [00000000] *pgd=00000000f658b003, *pud=00000000f658b003, *pmd=0000000000000000
+> Internal error: Oops: 96000006 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 1 PID: 1053 Comm: lkvm-msi-irqinj Not tainted 4.0.0-rc7+ #3027
+> Hardware name: FVP Base (DT)
+> task: ffffffc0774e9680 ti: ffffffc0765a8000 task.ti: ffffffc0765a8000
+> PC is at kvm_vgic_inject_irq+0x234/0x310
+> LR is at kvm_vgic_inject_irq+0x30c/0x310
+> pc : [<ffffffc0000ae0a8>] lr : [<ffffffc0000ae180>] pstate: 80000145
+> .....
 > 
+> So this patch fixes this by checking the SPI number against the
+> actual limit. Also we remove the former legacy hard limit of
+> 127 in the ioctl code.
 > 
-> 2015-03-31 20:16 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> >
-> > The following changes since commit 9eccca0843205f87c00404b663188b88eb248051:
-> >
-> >   Linux 4.0-rc3 (2015-03-08 16:09:09 -0700)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.pengutronix.de/git/imx/linux-2.6.git tags/v4.0-clk-mediatek-v11
-> >
-> > for you to fetch changes up to ae9129219143cfdefe8b3a463deb8c5cb8955525:
-> >
-> >   dt-bindings: ARM: Mediatek: Document devicetree bindings for clock/reset controllers (2015-03-31 20:08:46 +0200)
-> >
-> > ----------------------------------------------------------------
-> > This patchset contains the initial common clock support for Mediatek SoCs.
-> > Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes
-> > and clock gates.
-> 
-> I tried the patch set on my mt8135 eval board. I used the dts bindings
-> from a former version of this set [1], but it does not boot the board
-> (based on v4.0-rc7).
-> Do you have any hint, what is happening, or are the bindings wrong?
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> CC: <stable@vger.kernel.org> # 4.0, 3.19, 3.18
 
-I can give this a test tomorrow.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
