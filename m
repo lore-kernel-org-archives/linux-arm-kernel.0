@@ -1,20 +1,32 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 13 Apr 2015 15:01:35 +0200
-Subject: NXP LPC3250 broken?
-In-Reply-To: <CAGhQ9VznbxkAPquM9FXAw44bE5N3SJxn+TGtySUkCgDGYTH6wA@mail.gmail.com>
-References: <CAGhQ9VysMCJzRYz-C_VmWqBAVKXfh2ydq5iNu96RxfD4k0cWvw@mail.gmail.com>	<552B77CA.2070604@antcom.de>
- <CAGhQ9VznbxkAPquM9FXAw44bE5N3SJxn+TGtySUkCgDGYTH6wA@mail.gmail.com>
-Message-ID: <552BBE2F.8010403@antcom.de>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 13 Apr 2015 15:01:59 +0200
+Subject: [PATCH] KVM: arm: irqfd: fix value returned by kvm_irq_map_gsi
+Message-ID: <1428930119-21692-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2015 01:59 PM, Joachim Eastwood wrote:
->> I also have an EA board but not currently connected. Will need to test
->> when I have access to it again.
-> 
-> Okey, sounds good.
-> 
-> Which EA board do you have, btw?
-> The old one with the display or the v2?
+irqfd/arm curently does not support routing. kvm_irq_map_gsi is
+supposed to return all the routing entries associated with the
+provided gsi and return the number of those entries. We should
+return 0 at this point.
 
-The one w/ the display. Would be interesting to support the v2 also, though!
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ virt/kvm/arm/vgic.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 9ad074e..9b4f7d4 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1947,7 +1947,7 @@ int kvm_irq_map_gsi(struct kvm *kvm,
+ 		    struct kvm_kernel_irq_routing_entry *entries,
+ 		    int gsi)
+ {
+-	return gsi;
++	return 0;
+ }
+ 
+ int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned irqchip, unsigned pin)
+-- 
+1.9.1
