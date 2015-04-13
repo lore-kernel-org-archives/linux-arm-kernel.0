@@ -1,37 +1,68 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 13 Apr 2015 17:19:17 +0200
-Subject: NXP LPC3250 broken?
-In-Reply-To: <5023825.DuPpA61AdY@wuerfel>
-References: <CAGhQ9VysMCJzRYz-C_VmWqBAVKXfh2ydq5iNu96RxfD4k0cWvw@mail.gmail.com>
- <CAGhQ9VznbxkAPquM9FXAw44bE5N3SJxn+TGtySUkCgDGYTH6wA@mail.gmail.com>
- <552BBE2F.8010403@antcom.de> <5023825.DuPpA61AdY@wuerfel>
-Message-ID: <CAGhQ9Vx5P-U0k0+Mjf8GxDf3j8RaNsHEGXSSKOrwo6rCgz5Xzw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 13 Apr 2015 16:26:36 +0100
+Subject: [PATCH v3 04/11] arm64: use fixmap region for permanent FDT
+ mapping
+In-Reply-To: <CAKv+Gu8AmPU0iPYHsvG6Lbyi+ho_DBD1PG+8sOLYkTiHjF-ZtQ@mail.gmail.com>
+References: <1428674035-26603-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1428674035-26603-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20150413150203.GF4076@leverpostej>
+ <CAKv+Gu8AmPU0iPYHsvG6Lbyi+ho_DBD1PG+8sOLYkTiHjF-ZtQ@mail.gmail.com>
+Message-ID: <20150413152636.GH4076@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 April 2015 at 15:26, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 13 April 2015 15:01:35 Roland Stigge wrote:
->> On 04/13/2015 01:59 PM, Joachim Eastwood wrote:
->> >> I also have an EA board but not currently connected. Will need to test
->> >> when I have access to it again.
->> >
->> > Okey, sounds good.
->> >
->> > Which EA board do you have, btw?
->> > The old one with the display or the v2?
->>
->> The one w/ the display. Would be interesting to support the v2 also, though!
->
-> Sorry for highjacking the thread, but if one of you is still actively working
-> on lpc32xx stuff, would you be able to convert arch/arm/mach-lpc32xx/clock.c
-> to a proper driver for drivers/clk?
+> >> +     /*
+> >> +      * Before passing the dt_virt pointer to early_init_dt_scan(), we have
+> >> +      * to ensure that the FDT size as reported in the FDT itself does not
+> >> +      * exceed the window we just mapped for it.
+> >> +      */
+> >> +     if (!dt_virt ||
+> >> +         fdt_check_header(dt_virt) != 0 ||
+> >> +         (dt_phys & (SZ_2M - 1)) + fdt_totalsize(dt_virt) > FIX_FDT_SIZE ||
+> >> +         !early_init_dt_scan(dt_virt)) {
+> >
+> > Doesn't this allow a DTB > 2M (violating the boot protocol's 2M
+> > restriction)?
+> >
+> 
+> Yes it does, and I was wondering what to do about it. We could be
+> pedantic, and fail here with no user visible feedback about what went
+> wrong, or we could be lax here, and add a warning later (similar to
+> the x1/x2/x3 check) that the boot protocol was violated if the FDT
+> exceeds 2 MB but otherwise proceed normally.
+> 
+> > Perhaps we want a MAX_FDT_SIZE, and have FIX_FDT_SIZE be MAX_FDT_SIZE +
+> > 2M. Then we can check that the DTB <= MAX_FDT_SIZE, and we know we will
+> > always be able to map it.
+> >
+> > Otherwise we could get intermittent failures for DTBs larger than 2MB,
+> > depending on where they're loaded. Always failing those for now would
+> > give us a consistent early warning that we need to bump MAX_FDT_SIZE.
+> >
+> 
+> Consistent, early, but emitted before we even have a console ...
 
-I am currently looking at it, but I won't promise anything.
+When I say warning, I mean that boot will consistently fail, rather than
+there being a pr_warn.
 
-regards,
-Joachim Eastwood
+People seem to wait until their platform is hilariously broken before
+reporting bugs...
 
-> I'd like to see the platform get converted to use ARCH_MULTIPLATFORM
-> eventually, and this is the main showstopper.
->
->         Arnd
+> >> +void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+> >> +{
+> >> +     const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
+> >> +     phys_addr_t dt_phys_base = dt_phys & ~(SZ_2M - 1);
+> >
+> > Do we definitely retain the high bits here? I don't have the C integer
+> > promotion rules paged into my head, but the definition in
+> > include/linux/sizes.h makes me suspicious, given it should have an int
+> > type:
+> >
+> > #define SZ_2M                           0x00200000
+> >
+> 
+> I will use round_down() instead
+
+Ok.
+
+Mark.
