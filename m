@@ -1,89 +1,60 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 13 Apr 2015 14:29:20 +0200
-Subject: [RFC v6 05/16] VFIO: external user API for interaction with vfio
- devices
+Date: Mon, 13 Apr 2015 14:29:21 +0200
+Subject: [RFC v6 06/16] VFIO: Introduce vfio_device_external_ops
 In-Reply-To: <1428928171-18884-1-git-send-email-eric.auger@linaro.org>
 References: <1428928171-18884-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1428928171-18884-6-git-send-email-eric.auger@linaro.org>
+Message-ID: <1428928171-18884-7-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VFIO external user API is enriched with 3 new functions that
-allows a kernel user external to VFIO to retrieve some information
-from a VFIO device.
-
-- vfio_device_get_external_user enables to get a vfio device from
-  its fd and increments its reference counter
-- vfio_device_put_external_user decrements the reference counter
-- vfio_external_base_device returns a handle to the struct device
-
----
-
-v3 -> v4:
-- change the commit title
-
-v2 -> v3:
-- reword the commit message
-
-v1 -> v2:
-
-- vfio_external_get_base_device renamed into vfio_external_base_device
-- vfio_external_get_type removed
+New bus callbacks are introduced. They correspond to external
+functions. To avoid messing up the main vfio_device_ops
+struct, a new vfio_device_external_ops struct is introduced.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
----
- drivers/vfio/vfio.c  | 24 ++++++++++++++++++++++++
- include/linux/vfio.h |  3 +++
- 2 files changed, 27 insertions(+)
 
-diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
-index 23ba12a..33ae8c5 100644
---- a/drivers/vfio/vfio.c
-+++ b/drivers/vfio/vfio.c
-@@ -1490,6 +1490,30 @@ void vfio_group_put_external_user(struct vfio_group *group)
- }
- EXPORT_SYMBOL_GPL(vfio_group_put_external_user);
- 
-+struct vfio_device *vfio_device_get_external_user(struct file *filep)
-+{
-+	struct vfio_device *vdev = filep->private_data;
-+
-+	if (filep->f_op != &vfio_device_fops)
-+		return ERR_PTR(-EINVAL);
-+
-+	vfio_device_get(vdev);
-+	return vdev;
-+}
-+EXPORT_SYMBOL_GPL(vfio_device_get_external_user);
-+
-+void vfio_device_put_external_user(struct vfio_device *vdev)
-+{
-+	vfio_device_put(vdev);
-+}
-+EXPORT_SYMBOL_GPL(vfio_device_put_external_user);
-+
-+struct device *vfio_external_base_device(struct vfio_device *vdev)
-+{
-+	return vdev->dev;
-+}
-+EXPORT_SYMBOL_GPL(vfio_external_base_device);
-+
- int vfio_external_user_iommu_id(struct vfio_group *group)
- {
- 	return iommu_group_id(group->iommu_group);
+---
+
+v6: creation
+---
+ include/linux/vfio.h | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
 diff --git a/include/linux/vfio.h b/include/linux/vfio.h
-index 683b514..b18c38f 100644
+index b18c38f..b0ec474 100644
 --- a/include/linux/vfio.h
 +++ b/include/linux/vfio.h
-@@ -101,6 +101,9 @@ extern void vfio_group_put_external_user(struct vfio_group *group);
- extern int vfio_external_user_iommu_id(struct vfio_group *group);
- extern long vfio_external_check_extension(struct vfio_group *group,
- 					  unsigned long arg);
-+extern struct vfio_device *vfio_device_get_external_user(struct file *filep);
-+extern void vfio_device_put_external_user(struct vfio_device *vdev);
-+extern struct device *vfio_external_base_device(struct vfio_device *vdev);
+@@ -19,6 +19,23 @@
+ #include <uapi/linux/vfio.h>
  
- struct pci_dev;
- #ifdef CONFIG_EEH
+ /**
++ * struct vfio_device_external_ops - VFIO bus driver device callbacks
++ * used as external API
++ * @mask: mask any IRQ defined by triplet
++ * @is_active: returns whether any IRQ defined by triplet is active
++ * @set_automasked: sets the automasked flag of triplet's IRQ
++ */
++struct vfio_device_external_ops  {
++	int (*mask)(void *device_data, unsigned index, unsigned start,
++		    unsigned count);
++	int (*is_active)(void *device_data, unsigned index, unsigned start,
++			 unsigned count);
++	int (*set_automasked)(void *device_data, unsigned index,
++			      unsigned start, unsigned count,
++			       bool automasked);
++};
++
++/**
+  * struct vfio_device_ops - VFIO bus driver device callbacks
+  *
+  * @open: Called when userspace creates new file descriptor for device
+@@ -42,6 +59,7 @@ struct vfio_device_ops {
+ 			 unsigned long arg);
+ 	int	(*mmap)(void *device_data, struct vm_area_struct *vma);
+ 	void	(*request)(void *device_data, unsigned int count);
++	struct vfio_device_external_ops *external_ops;
+ };
+ 
+ extern int vfio_add_group_dev(struct device *dev,
 -- 
 1.9.1
