@@ -1,21 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Apr 2015 14:00:17 +0100
-Subject: [PATCH v2] ARM: io: Unpessimize relaxed io accessors
-In-Reply-To: <5527C048.8010302@hurleysoftware.com>
-References: <1427133619-24005-1-git-send-email-peter@hurleysoftware.com>
- <5527C048.8010302@hurleysoftware.com>
-Message-ID: <20150413130017.GG2869@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 13 Apr 2015 15:00:22 +0200
+Subject: [PATCHv7] media: i2c/adp1653: Devicetree support for adp1653
+In-Reply-To: <20150409214739.GD20756@valkosipuli.retiisi.org.uk>
+References: <20150403083353.GA21070@amd>
+ <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
+ <20150403202624.GA4308@amd>
+ <20150403213655.GO20756@valkosipuli.retiisi.org.uk>
+ <20150404074337.GA31064@amd>
+ <20150404102435.GR20756@valkosipuli.retiisi.org.uk>
+ <20150404171116.GA15025@Nokia-N900>
+ <20150404200307.GS20756@valkosipuli.retiisi.org.uk>
+ <20150409074238.GA22603@amd>
+ <20150409214739.GD20756@valkosipuli.retiisi.org.uk>
+Message-ID: <20150413130022.GE21051@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 01:21:28PM +0100, Peter Hurley wrote:
-> Did this patch get overlooked? I'm not seeing it in anyone's tree.
+Hi!
 
-You'll need to stick it into rmk's patch system:
+> >  #define to_adp1653_flash(sd)	container_of(sd, struct adp1653_flash, subdev)
+> > 
+> 
+> Let me know if you're going to send v8 or if I can make the changes. I think
+> we're pretty much done then.
 
-  http://www.arm.linux.org.uk/developer/patches/
+You are free to make the changes.
 
-(git send-email to patches at arm.linux.org.uk with an additional
- KernelVersion: tag in your patch)
-
-Will
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
