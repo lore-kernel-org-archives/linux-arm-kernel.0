@@ -1,40 +1,65 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 13 Apr 2015 09:20:24 +0200
-Subject: [PATCH] serial: imx: protect Soft Reset of port with lock
-In-Reply-To: <552B6791.60905@mentor.com>
-References: <1426228691-20529-1-git-send-email-jiada_wang@mentor.com>
- <20150326220113.GA24630@kroah.com> <552B6791.60905@mentor.com>
-Message-ID: <20150413072024.GA4473@kroah.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Mon, 13 Apr 2015 09:35:34 +0200
+Subject: [PATCH v3 3/5] PCI: st: Provide support for the sti PCIe
+ controller
+In-Reply-To: <2529595.kpEIoZMpcn@wuerfel>
+References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1428657168-12495-4-git-send-email-gabriel.fernandez@linaro.org>
+ <1428747477.17822.90.camel@x220> <2529595.kpEIoZMpcn@wuerfel>
+Message-ID: <CAG374jDUPK5hCZBLR_r5om8mh8wy1NyxDaZ-DP_A-xjNN6f2pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 03:52:01PM +0900, jiwang wrote:
-> Hi Greg
-> 
-> On 03/27/2015 07:01 AM, Greg KH wrote:
-> >On Fri, Mar 13, 2015 at 03:38:11PM +0900, Jiada Wang wrote:
-> >>Previously Soft Reset (clear of SRST bit in UCR2 register)
-> >>of UART in startup is not protected by lock, which may have race
-> >>with console_write, as console_write may occur at anytime even
-> >>when UART port is shutdown.
-> >>
-> >>To avoid this race, protect Soft reset of UART port with spin_lock.
-> >>
-> >>Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
-> >>---
-> >>  drivers/tty/serial/imx.c | 12 ++++++------
-> >>  1 file changed, 6 insertions(+), 6 deletions(-)
-> >Doesn't apply to my tree :(
-> Can you tell me which tree are you using?
-> so that I can submit another patch based same tree.
+Hi
 
-Always either work off of linux-next, or my tty tree, and the tty-next
-branch of it on git.kernel.org.
+Thanks for reviewing.
 
-What tree were you working against, Linus's?  If so, please read
-Documentation/development_process to get an understanding of how the
-kernel development process works.
+On 11 April 2015 at 16:55, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 11 April 2015 12:17:57 Paul Bolle wrote:
+>> Something I didn't spot in my first look at this patch.
+>>
+>> On Fri, 2015-04-10 at 11:12 +0200, Gabriel FERNANDEZ wrote:
+>> > --- a/drivers/pci/host/Kconfig
+>> > +++ b/drivers/pci/host/Kconfig
+>> >
+>> > +config PCI_ST
+>> > +     bool "ST PCIe controller"
+>> > +     depends on ARCH_STI || (ARM && COMPILE_TEST)
+>> > +     select PCIE_DW
+>> > +     help
+>> > +       Enable PCIe controller support on ST Socs. This controller is based
+>> > +       on Designware hardware and therefore the driver re-uses the
+>> > +       Designware core functions to implement the driver.
+>>
+>> You can't have ARCH_STI without ARM, so ARM will always be set if this
+>> driver is enabled. Correct?
+>
+> Right, though the ARM dependency could soon be dropped, once the PCIE_DW
+> driver can use generic infrastructure in the few places it relies on
+> ARM specific code today.
+>
+>> > --- /dev/null
+>> > +++ b/drivers/pci/host/pci-st.c
+>>
+>> > +     if (IS_ENABLED(CONFIG_ARM)) {
+>> > +             /*
+>> > +              * We have to hook the abort handler so that we can intercept
+>> > +              * bus errors when doing config read/write that return UR,
+>> > +              * which is flagged up as a bus error
+>> > +              */
+>> > +             hook_fault_code(16+6, st_pcie_abort_handler, SIGBUS, 0,
+>> > +                             "imprecise external abort");
+>> > +     }
+>>
+>> So, unless I'm missing something obvious here, IS_ENABLED(CONFIG_ARM)
+>> will always evaluate to 1. Can't that test be dropped?
+>
+> I would leave it in, as it's quite likely to get reused with ARM64 at some
+> point in the future (no, I don't know anything about ST's product plans,
+> but everybody seems to be doing this).
+>
+>         Arnd
 
-thanks,
+Yes i agree with that.
 
-greg k-h
+Gabriel
