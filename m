@@ -1,50 +1,47 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 13 Apr 2015 17:59:06 +0200
+Date: Mon, 13 Apr 2015 18:09:51 +0200
 Subject: [PATCH] ARM: dts: sun7i: Add Goodix GT911 nodes for Wexler TAB7200
-In-Reply-To: <20150411193614.83013f345aaa1123ef55ecbf@gmail.com>
+In-Reply-To: <20150411191816.cdc5ec802b01028eb2913906@gmail.com>
 References: <1427789897-4085-1-git-send-email-mamlinav@gmail.com>
  <20150331144338.GG23664@lukather>
- <20150331223120.10199bf9e3fb41b16f879eca@gmail.com>
- <20150402185008.GC14618@lukather>
- <20150411193614.83013f345aaa1123ef55ecbf@gmail.com>
-Message-ID: <20150413155906.GH29832@lukather>
+ <20150331221420.3b65d2540c7dbe1d12611e12@gmail.com>
+ <20150402092259.GK23664@lukather>
+ <20150411191816.cdc5ec802b01028eb2913906@gmail.com>
+Message-ID: <20150413160951.GJ29832@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 11, 2015 at 07:36:14PM +0300, Aleksei Mamlin wrote:
-> On Thu, 2 Apr 2015 20:50:08 +0200
+On Sat, Apr 11, 2015 at 07:18:16PM +0300, Aleksei Mamlin wrote:
+> On Thu, 2 Apr 2015 11:22:59 +0200
 > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> > On Tue, Mar 31, 2015 at 10:31:20PM +0300, Aleksei Mamlin wrote:
-> > > > > +		compatible = "goodix,gt911";
-> > > > > +		reg = <0x5d>;
-> > > > > +		interrupt-parent = <&pio>;
-> > > > > +		interrupts = <21 IRQ_TYPE_NONE>; /* EINT21 (PH21) */
+> > On Tue, Mar 31, 2015 at 10:14:20PM +0300, Aleksei Mamlin wrote:
+> > > On Tue, 31 Mar 2015 07:43:38 -0700
+> > > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > > 
+> > > > Hi,
 > > > > 
-> > > > Unfortunately, IRQ_TYPE_NONE is not a valid value for the GIC
-> > > > bindings.
+> > > > On Tue, Mar 31, 2015 at 11:18:17AM +0300, Aleksei Mamlin wrote:
+> > > > > This patch adds nodes for the Goodix GT911 touchscreen controller found
+> > > > > on the Wexler TAB7200 tablet. Controller uses one of following I2C
+> > > > > addresses: 0x5d or 0x14, so just add two nodes.
 > > > > 
+> > > > In which case are these different addresses encountered? Different
+> > > > revisions of the same board?
 > > >
-> > > Hmm. Which value I must use in this case? IRQ type is set by the
-> > > touchscreen controller driver, so I think that value must be 0.
+> > > According to the datasheet it is a feature of the controller. 
+> > > The address(0x5d or 0x14) can be configured using a reset sequence,
+> > > which has not yet been implemented in the driver.
 > > 
-> > Whatever the hardware is using. Presumably the same value than the
-> > driver sets.
-> > 
-> > > >
-> > > > You're also not adding a pinctrl group for that pin?
-> > >
-> > > No, because it works fine with this DT nodes. It seems that I should
-> > > first configure pin to work in interrupt mode. Correct?
-> > 
-> > You don't have to, since the pio driver will already take care of
-> > muxing it to the right function, but that will prevent any driver to
-> > call pinctrl_request on the same pin.
+> > Which address is set up by the bootloader then?
 >
-> It is still necessary?
-> I see that you have accepted Hans de Goede's patches: http://www.spinics.net/lists/arm-kernel/msg411142.html
+> I assume that bootloader(u-boot) didn't sets up any address, but touchscreen
+> controller usually uses 0x5d. Sometimes, after hard reset, it uses 0x14.
+> For this we need nodes on both adresses.
 
-No, it's fine.
+I'm confused, who changes that address then?
+
+The controller itself?
 
 Maxime
 
@@ -58,4 +55,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150413/568ef726/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150413/94a5ec53/attachment.sig>
