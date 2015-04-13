@@ -1,42 +1,146 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Apr 2015 14:45:49 -0700
-Subject: [RESEND][PATCH] ARM errata, 430973: update the affected revisions
-In-Reply-To: <20150413213556.GT4027@n2100.arm.linux.org.uk>
-References: <1418131842-6752-1-git-send-email-jhofstee@victronenergy.com>
- <54EE2453.9080301@myspectrum.nl> <552840A9.8070406@myspectrum.nl>
- <20150411075220.GK12732@n2100.arm.linux.org.uk>
- <5528E88C.4070107@myspectrum.nl>
- <20150413143941.GY18048@atomide.com>
- <20150413162808.GZ18048@atomide.com>
- <20150413213556.GT4027@n2100.arm.linux.org.uk>
-Message-ID: <20150413214549.GA18048@atomide.com>
+From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
+Date: Mon, 13 Apr 2015 15:10:47 -0700
+Subject: [PATCHv2 3/3] usb: ohci-platform: Use devm_of_phy_get_by_index
+In-Reply-To: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
+References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <1428963047-23666-4-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [150413 14:37]:
-> On Mon, Apr 13, 2015 at 09:28:09AM -0700, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [150413 07:46]:
-> > > If what Russell and I are saying is correct, with the above two
-> > > patches your system should behave properly with 430973 even if
-> > > bit 6 in the aux ctrl register is set (or unset) by the bootloader.
-> > > 
-> > > If r1p7 is behaves with bit 6 cleared and errata 430973 set, then
-> > > we know r1p7 is unaffected by 430973.
-> > 
-> > Sorry let's take this part again:
-> > 
-> > If r1p7 is behaves with bit 6 cleared and errata 430973 _unset_,
-> > then we know r1p7 is unaffected by 430973.
-> 
-> I've asked.  The errata applies to _all_ Cortex A8 r1pX versions.
-> This is actually what the code in the kernel does today, but the
-> documentation does not reflect it.  So, I've updated the
-> documentation to reflect (a) the code and (b) the info I received:
-> 
-> http://ftp.arm.linux.org.uk/cgit/linux-arm.git/commit/?id=59552cc87cb6
+Getting phys by index instead of phy names so that we do
+not have to create a naming scheme when multiple phys are present
 
-OK thanks for checking it, that should clear quite a bit of confusion.
+Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ drivers/usb/host/Kconfig         |  1 +
+ drivers/usb/host/ohci-platform.c | 70 ++++++++++++++--------------------------
+ 2 files changed, 26 insertions(+), 45 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 563f22d..1a8869c 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -558,6 +558,7 @@ config USB_CNS3XXX_OHCI
+ 
+ config USB_OHCI_HCD_PLATFORM
+ 	tristate "Generic OHCI driver for a platform device"
++	select GENERIC_PHY
+ 	default n
+ 	---help---
+ 	  Adds an OHCI host driver for a generic platform device, which
+diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
+index 185ceee..0f8edf6 100644
+--- a/drivers/usb/host/ohci-platform.c
++++ b/drivers/usb/host/ohci-platform.c
+@@ -57,15 +57,13 @@ static int ohci_platform_power_on(struct platform_device *dev)
+ 	}
+ 
+ 	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
+-		if (priv->phys[phy_num]) {
+-			ret = phy_init(priv->phys[phy_num]);
+-			if (ret)
+-				goto err_exit_phy;
+-			ret = phy_power_on(priv->phys[phy_num]);
+-			if (ret) {
+-				phy_exit(priv->phys[phy_num]);
+-				goto err_exit_phy;
+-			}
++		ret = phy_init(priv->phys[phy_num]);
++		if (ret)
++			goto err_exit_phy;
++		ret = phy_power_on(priv->phys[phy_num]);
++		if (ret) {
++			phy_exit(priv->phys[phy_num]);
++			goto err_exit_phy;
+ 		}
+ 	}
+ 
+@@ -73,10 +71,8 @@ static int ohci_platform_power_on(struct platform_device *dev)
+ 
+ err_exit_phy:
+ 	while (--phy_num >= 0) {
+-		if (priv->phys[phy_num]) {
+-			phy_power_off(priv->phys[phy_num]);
+-			phy_exit(priv->phys[phy_num]);
+-		}
++		phy_power_off(priv->phys[phy_num]);
++		phy_exit(priv->phys[phy_num]);
+ 	}
+ err_disable_clks:
+ 	while (--clk >= 0)
+@@ -92,10 +88,8 @@ static void ohci_platform_power_off(struct platform_device *dev)
+ 	int clk, phy_num;
+ 
+ 	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
+-		if (priv->phys[phy_num]) {
+-			phy_power_off(priv->phys[phy_num]);
+-			phy_exit(priv->phys[phy_num]);
+-		}
++		phy_power_off(priv->phys[phy_num]);
++		phy_exit(priv->phys[phy_num]);
+ 	}
+ 
+ 	for (clk = OHCI_MAX_CLKS - 1; clk >= 0; clk--)
+@@ -123,7 +117,6 @@ static int ohci_platform_probe(struct platform_device *dev)
+ 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
+ 	struct ohci_platform_priv *priv;
+ 	struct ohci_hcd *ohci;
+-	const char *phy_name;
+ 	int err, irq, phy_num, clk = 0;
+ 
+ 	if (usb_disabled())
+@@ -174,36 +167,23 @@ static int ohci_platform_probe(struct platform_device *dev)
+ 
+ 		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
+ 				"phys", "#phy-cells");
+-		priv->num_phys = priv->num_phys > 0 ? priv->num_phys : 1;
+ 
+-		priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
+-				sizeof(struct phy *), GFP_KERNEL);
+-		if (!priv->phys)
+-			return -ENOMEM;
++		if (priv->num_phys > 0) {
++			priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
++					    sizeof(struct phy *), GFP_KERNEL);
++			if (!priv->phys)
++				return -ENOMEM;
++		} else
++			priv->num_phys = 0;
+ 
+ 		for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
+-				err = of_property_read_string_index(
+-						dev->dev.of_node,
+-						"phy-names", phy_num,
+-						&phy_name);
+-
+-				if (err < 0) {
+-					if (priv->num_phys > 1) {
+-						dev_err(&dev->dev, "phy-names not provided");
+-						goto err_put_hcd;
+-					} else
+-						phy_name = "usb";
+-				}
+-
+-				priv->phys[phy_num] = devm_phy_get(&dev->dev,
+-						phy_name);
+-				if (IS_ERR(priv->phys[phy_num])) {
+-					err = PTR_ERR(priv->phys[phy_num]);
+-					if ((priv->num_phys > 1) ||
+-					    (err == -EPROBE_DEFER))
+-						goto err_put_hcd;
+-					priv->phys[phy_num] = NULL;
+-				}
++			priv->phys[phy_num] = devm_of_phy_get_by_index(&dev->dev
++						, dev->dev.of_node
++						, phy_num);
++			if (IS_ERR(priv->phys[phy_num])) {
++				err = PTR_ERR(priv->phys[phy_num]);
++				goto err_put_hcd;
++			}
+ 		}
+ 
+ 		for (clk = 0; clk < OHCI_MAX_CLKS; clk++) {
+-- 
+2.3.4
