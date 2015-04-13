@@ -1,38 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 13 Apr 2015 08:30:18 +0200
-Subject: [PATCH 13/13] thermal: of: implement .set_trips for device tree
- thermal zones
-In-Reply-To: <20150407024307.GH4648@localhost.localdomain>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-14-git-send-email-s.hauer@pengutronix.de>
- <20150407024307.GH4648@localhost.localdomain>
-Message-ID: <20150413063018.GT9742@pengutronix.de>
+From: jiada_wang@mentor.com (jiwang)
+Date: Mon, 13 Apr 2015 15:52:01 +0900
+Subject: [PATCH] serial: imx: protect Soft Reset of port with lock
+In-Reply-To: <20150326220113.GA24630@kroah.com>
+References: <1426228691-20529-1-git-send-email-jiada_wang@mentor.com>
+ <20150326220113.GA24630@kroah.com>
+Message-ID: <552B6791.60905@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+Hi Greg
 
-On Mon, Apr 06, 2015 at 07:43:08PM -0700, Eduardo Valentin wrote:
-> On Thu, Mar 26, 2015 at 04:54:00PM +0100, Sascha Hauer wrote:
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  drivers/thermal/of-thermal.c | 12 ++++++++++++
-> >  include/linux/thermal.h      |  1 +
-> >  2 files changed, 13 insertions(+)
-> 
-> Can you please include at least one user of this call back in your patch
-> series?
+On 03/27/2015 07:01 AM, Greg KH wrote:
+> On Fri, Mar 13, 2015 at 03:38:11PM +0900, Jiada Wang wrote:
+>> Previously Soft Reset (clear of SRST bit in UCR2 register)
+>> of UART in startup is not protected by lock, which may have race
+>> with console_write, as console_write may occur at anytime even
+>> when UART port is shutdown.
+>>
+>> To avoid this race, protect Soft reset of UART port with spin_lock.
+>>
+>> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+>> ---
+>>   drivers/tty/serial/imx.c | 12 ++++++------
+>>   1 file changed, 6 insertions(+), 6 deletions(-)
+> Doesn't apply to my tree :(
+Can you tell me which tree are you using?
+so that I can submit another patch based same tree.
 
-Thanks for the comments on this series. I'll address them in the next
-round. The user for this callback is not yet ready to be posted. I'll
-try and move this patch to the end of the series so that the series can
-be applied without this one.
-
-Thanks
-  Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Jiada
