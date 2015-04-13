@@ -1,83 +1,59 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 13 Apr 2015 18:17:17 +0800
-Subject: [PATCH v2 1/3] media: atmel-isi: remove the useless code which
- disable isi
-In-Reply-To: <2109629.IWfKzc1IIn@avalon>
-References: <1428570108-4961-1-git-send-email-josh.wu@atmel.com>
- <1428570108-4961-2-git-send-email-josh.wu@atmel.com>
- <2109629.IWfKzc1IIn@avalon>
-Message-ID: <552B97AD.8080509@atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 Apr 2015 11:21:20 +0100
+Subject: [PATCH] KVM: arm/arm64: check IRQ number on userland injection
+In-Reply-To: <20150413100400.GJ6186@cbox>
+References: <1428679079-16499-1-git-send-email-andre.przywara@arm.com>
+ <5527EC52.4050500@codeaurora.org> <5527FFB5.9020103@arm.com>
+ <20150413100400.GJ6186@cbox>
+Message-ID: <552B98A0.6020304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Laurent
+On 13/04/15 11:04, Christoffer Dall wrote:
+> On Fri, Apr 10, 2015 at 05:52:05PM +0100, Andre Przywara wrote:
+>> Hi Christopher,
+>>
+>> On 10/04/15 16:29, Christopher Covington wrote:
+>>> Hi Andre,
+>>>
+>>> On 04/10/2015 11:17 AM, Andre Przywara wrote:
+>>>> When userland injects a SPI via the KVM_IRQ_LINE ioctl we currently
+>>>> only check it against a fixed limit, which historically is set
+>>>> to 127. With the new dynamic IRQ allocation the effective limit may
+>>>> actually be smaller (64).
+>>>> So when now a malicious or buggy userland injects a SPI in that
+>>>> range, we spill over on our VGIC bitmaps and bytemaps memory.
+>>>> I could trigger a host kernel NULL pointer dereference with current
+>>>> mainline by injecting some bogus IRQ number from a hacked kvmtool:
+>>>
+>>>> --- a/arch/arm/include/uapi/asm/kvm.h
+>>>> +++ b/arch/arm/include/uapi/asm/kvm.h
+>>>> @@ -195,7 +195,11 @@ struct kvm_arch_memory_slot {
+>>>>  #define KVM_ARM_IRQ_CPU_IRQ		0
+>>>>  #define KVM_ARM_IRQ_CPU_FIQ		1
+>>>>  
+>>>> -/* Highest supported SPI, from VGIC_NR_IRQS */
+>>>> +/*
+>>>> + * This used to hold the highest supported SPI, but it is now obsolete
+>>>> + * and only here to provide source code level compatibility with older
+>>>> + * userland. The highest SPI number can be set via KVM_DEV_ARM_VGIC_GRP_NR_IRQS.
+>>>> + */
+>>>>  #define KVM_ARM_IRQ_GIC_MAX		127
+>>>
+>>> If that's the case should it maybe only defined when __KERNEL__ is not defined?
+>>
+>> Mmmh, I am not sure it's really worth the hassle. Actually it seems like
+>> that neither kvmtool nor QEMU use this definition, so it's more or less
+>> orphaned by now. I am confident we can avoid it sneaking in in the
+>> kernel again.
+>>
+> TBH, I wouldn't object against Marc enclosing the definition in an
+> #ifdef __KERNEL__.
 
-On 4/12/2015 9:10 PM, Laurent Pinchart wrote:
-> Hi Josh,
->
-> Thank you for the patch.
->
-> On Thursday 09 April 2015 17:01:46 Josh Wu wrote:
->> To program ISI control register, the pixel clock should be enabled.
-> That's an awful hardware design :-(
+Yeah, I'll fix that up (assuming you mean #ifndef rather than #ifdef).
 
-yes, But I need to live with this.
+Thanks,
 
->
->> So without pixel clock (from sensor) enabled, disable ISI controller is
->> not make sense. So this patch remove those code.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>
->> Changes in v2:
->> - this file is new added.
->>
->>   drivers/media/platform/soc_camera/atmel-isi.c | 5 -----
->>   1 file changed, 5 deletions(-)
->>
->> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
->> b/drivers/media/platform/soc_camera/atmel-isi.c index c125b1d..31254b4
->> 100644
->> --- a/drivers/media/platform/soc_camera/atmel-isi.c
->> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
->> @@ -131,8 +131,6 @@ static int configure_geometry(struct atmel_isi *isi, u32
->> width, return -EINVAL;
->>   	}
->>
->> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->> -
->>   	cfg2 = isi_readl(isi, ISI_CFG2);
-> Can the configuration registers be accessed when the pixel clock is disabled ?
-
-yes, it can be accessed. The CFG1, CFG2 are not impacted.
-
-So far as I know only the ISI_CR is impacted, we can 
-disable/enable/reset ISI by set ISI_CR.
-Since ISI_CR register will work with pixel clock, so you need to poll 
-the ISI_SR to verify your control of ISI is effective.
-
-Best Regards,
-Josh Wu
-
->
->>   	/* Set YCC swap mode */
->>   	cfg2 &= ~ISI_CFG2_YCC_SWAP_MODE_MASK;
->> @@ -843,7 +841,6 @@ static int isi_camera_set_bus_param(struct
->> soc_camera_device *icd)
->>
->>   	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
->>
->> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->>   	isi_writel(isi, ISI_CFG1, cfg1);
->>
->>   	return 0;
->> @@ -1022,8 +1019,6 @@ static int atmel_isi_probe(struct platform_device
->> *pdev) if (isi->pdata.data_width_flags & ISI_DATAWIDTH_10)
->>   		isi->width_flags |= 1 << 9;
->>
->> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->> -
->>   	irq = platform_get_irq(pdev, 0);
->>   	if (IS_ERR_VALUE(irq)) {
->>   		ret = irq;
+	M.
+-- 
+Jazz is not dead. It just smells funny...
