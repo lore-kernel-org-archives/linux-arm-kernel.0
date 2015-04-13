@@ -1,53 +1,57 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 13 Apr 2015 16:07:57 +0100
-Subject: [PATCH] ARM: alignment: Use is_wide_instruction() to check wide
- instruction
-In-Reply-To: <1428936444.7514.66.camel@mtksdaap41>
-References: <1428674741-5409-1-git-send-email-yingjoe.chen@mediatek.com>
- <20150413124832.GA15504@e103592.cambridge.arm.com>
- <1428936444.7514.66.camel@mtksdaap41>
-Message-ID: <20150413150757.GB15504@e103592.cambridge.arm.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Mon, 13 Apr 2015 10:05:53 -0500
+Subject: [PATCH] ARM: socfpga: dts: Add a ciu clock node for sdmmc
+In-Reply-To: <73wq1g30ua.fsf@unicorn.hi.pengutronix.de>
+References: <1428699386-2622-1-git-send-email-dinguyen@opensource.altera.com>
+ <73wq1g30ua.fsf@unicorn.hi.pengutronix.de>
+Message-ID: <552BDB51.70903@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 10:47:24PM +0800, Yingjoe Chen wrote:
-> On Mon, 2015-04-13 at 13:48 +0100, Dave Martin wrote:
-> > On Fri, Apr 10, 2015 at 10:05:41PM +0800, Yingjoe Chen wrote:
-> > > 
-> > > I first notice the comment is incorrect, then I realize there's another
-> > > macro which do exactly the same thing.
-> > > Tested with hand written userspace program with a few wide instructions
-> > > to make sure this still work as expect.
-> > > 
-> > > 8<-------------------------------------------------
-> > > do_alignment() is using locally added IS_T32() macro to check if an
-> > > instruction is a Thumb-2 32 bit instruction. The macro
-> > > is_wide_instruction() is doing the same thing, with slightly faster
-> > > implementation.
-> > > Change to use is_wide_instruction() in do_alignment() and remove
-> > > IS_T32().
-> > 
-> > Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-> > 
-> > The existing code is correct, but the comment is indeed wrong.
-> > Consolidating this with one of the other existing macros makes sense.
-> > 
-> > 
-> > !__opcode_is_thumb16() could also be used here (or is_wide_instruction()
-> > redefined in terms of it), but that's not essential.
-> 
-> Hi Dave,
-> 
-> Thanks for your review.
-> 
-> I did notice there are __opcode_is_thumb16/32. They need to handle
-> 32bits instruction instead of 16bits only for is_wide_instruction, so I
-> think using same implementation for them is a different story.
-> 
-> Joe.C
+Hi Steffen,
 
-No worries.  It can be tidied up some more later if someone finds a good
-reason for it.
+On 04/13/2015 03:10 AM, Steffen Trumtrar wrote:
+> 
+> Hi!
+> 
+> dinguyen at opensource.altera.com writes:
+>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+>>
+>> The CIU(Card Interface Unit) clock is used by the dw_mmc IP to clock an SD
+>> card. The ciu_clk is the sdmmc_clk passed through a fixed divider of 4. This patch
+>> adds the ciu_clk node and makes the sdmmc_clk it's parent.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+>> ---
+>>  arch/arm/boot/dts/socfpga.dtsi | 10 +++++++++-
+>>  1 file changed, 9 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>> index d9176e6..25418ee 100644
+>> --- a/arch/arm/boot/dts/socfpga.dtsi
+>> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>> @@ -451,6 +451,14 @@
+>>  						clk-phase = <0 135>;
+>>  					};
+>>  
+>> +					ciu_clk: ciu_clk {
+>> +						#clock-cells = <0>;
+>> +						compatible = "altr,socfpga-gate-clk";
+>> +						clocks = <&sdmmc_clk>;
+>> +						clk-gate = <0xa0 8>;
+>> +						fixed-divider = <4>;
+>> +					};
+>> +
+> 
+> Hm, is this correct? The clk-gate at 0xa0 is for the SDMMC_CLK, no?
+> Also, maybe the clock should be named "sdmmc_clk_divided" like in the
+> datasheet, so it is easier to find.
+> 
 
-Cheers
----Dave
+Well, I didn't want to go down the path of defining a new clock that is
+just a fork of the sdmmc_clk, so I just defined it as a gate-clock. I
+think ultimately the gating of the sdmmc_clk is being done.
+
+I can rename it to sdmmc_clk_divided.
+
+Dinh
