@@ -1,50 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Apr 2015 01:06:40 +0200
-Subject: [GIT PULL] omap late prcm clean-up for v4.1
-In-Reply-To: <20150403232536.GC18048@atomide.com>
-References: <20150403232536.GC18048@atomide.com>
-Message-ID: <201504140106.40326.arnd@arndb.de>
+Date: Tue, 14 Apr 2015 01:09:56 +0200
+Subject: [GIT PULL v2 1/2] ARM: tegra: Core code changes for v4.1-rc1
+In-Reply-To: <20150411015201.19585.59549@quantum>
+References: <1427710333-13472-1-git-send-email-thierry.reding@gmail.com>
+ <1428675733-23523-1-git-send-email-thierry.reding@gmail.com>
+ <20150411015201.19585.59549@quantum>
+Message-ID: <201504140109.56537.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 04 April 2015, Tony Lindgren wrote:
-> The following changes since commit 209431eff8afb928d72200c79153165c7d860ca0:
+On Saturday 11 April 2015, Michael Turquette wrote:
+> > Tomeu Vizoso (8):
+> >       of: Document long-ram-code property in nvidia,tegra20-apbmisc
+> >       of: Document timings subnode of nvidia,tegra-mc
+> >       memory: tegra: Disable ARBITRATION_EMEM interrupt
+> >       of: document new emc-timings subnode in nvidia,tegra124-car
+> >       of: document external-memory-controller property in tegra124-car
+> >       clk: Expose clk_hw_reparent() to providers
 > 
->   ARM: DRA7: Enable Cortex A15 errata 798181 (2015-03-27 14:38:03 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/prcm-dts
-> 
-> for you to fetch changes up to 21295368367beaa563b310d5492166dba158b884:
-> 
->   Merge branch '4.0-rc1-prcm-cleanup-v6' of https://github.com/t-kristo/linux-pm into omap-for-v4.1/prcm-cleanup (2015-04-01 12:24:29 -0700)
-> 
-> ----------------------------------------------------------------
-> Clean-up for omap PRCM (Power Reset Clock Management) and interconnects
-> from Tero Kristo <t-kristo@ti.com>.
-> 
-> This sets gets us into a better position for further clean-up:
-> 
-> - Gets PRCM code closer to being device drivers
-> 
-> - Allows to move the remainig clock code to drivers/clk for v4.2
-> 
-> - Starts enforcing interconnect hierarchy in the SoC specific .dts
->   files to enforce device drivers are only accesing registers in
->   the related hardware module
-> 
-> This patchset has seen quite a few revisions but did not come into
-> mergeable shape until recently. As other patchsets for clock specific
-> device drivers depend on this, it would be good to get this merged
-> although it's a bit late for the v4.1 merge window.
-> 
-> Note that as the device entries in the .dts files are moved around,
-> this is based on earlier non-urgent fixes to avoid a non-trivial
-> merge conflict.
+> ... this patch! I'd prefer to not do this. Let's see if
+> .set_rate_and_parent solve the problem for you.
 
-Sorry for missing this earlier, I've put it into the next/late branch now.
-If everything goes well, we'll submit that a few days after the other
-branches.
+Not pulling this for 4.1 then. Even without the objections, it was basically
+too late for the amount of changes now.
 
 	Arnd
