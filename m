@@ -1,51 +1,92 @@
 From: philipp.tomsich@theobroma-systems.com (Philipp Tomsich)
-Date: Mon, 13 Apr 2015 21:44:30 +0200
-Subject: [PATCH v4 20/24] arm64:ilp32: use compat-syscalls for msgsnd and
- msgrcv for ILP32
+Date: Mon, 13 Apr 2015 21:44:21 +0200
+Subject: [PATCH v4 11/24] arm64:ilp32: add is_ilp32_compat_{task,
+ thread} and TIF_32BIT_AARCH64
 In-Reply-To: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
 References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
-Message-ID: <649a5110365ed1bac99b91eb88e65425eb61ca29.1428953303.git.philipp.tomsich@theobroma-systems.com>
+Message-ID: <9abd0b5771a96752c5fae1195ed98618c6a24f4a.1428953303.git.philipp.tomsich@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-msgsnd and msgrcv require the compat-layer, as they are defined to
-use data structures with a 'long' (32bit in ILP32, 64bit in LP64)
-element.
+From: Andrew Pinski <apinski@cavium.com>
 
 Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 ---
- arch/arm64/kernel/sys_ilp32.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/compat.h      | 32 ++++++++++++++++++++++++++++++--
+ arch/arm64/include/asm/thread_info.h |  1 +
+ 2 files changed, 31 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-index 06c05ce..3471f27 100644
---- a/arch/arm64/kernel/sys_ilp32.c
-+++ b/arch/arm64/kernel/sys_ilp32.c
-@@ -1,9 +1,12 @@
- /*
-- * AArch64- ILP32 specific system calls implementation
-+ * AArch64: ILP32 specific system calls implementation
-  *
-  * Copyright (C) 2013 Cavium Inc.
-  * Author: Andrew Pinski <apinski@cavium.com>
-  *
-+ * Copyright (C) 2014 Theobroma Systems GmbH
-+ *                    <philipp.tomsich@theobroma-systems.com>
-+ *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-@@ -50,6 +53,10 @@
- /* Ptrace has some structures which are different between ILP32 and LP64 */
- #define sys_ptrace		compat_sys_ptrace
+diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+index 3a2976d..f53c4e6 100644
+--- a/arch/arm64/include/asm/compat.h
++++ b/arch/arm64/include/asm/compat.h
+@@ -319,6 +319,26 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
+ }
+ #endif
  
-+/* message type is 64bit in LP64 and 32bit in ILP32 */
-+#define sys_msgsnd              compat_sys_msgsnd
-+#define sys_msgrcv              compat_sys_msgrcv
++#ifdef CONFIG_ARM64_ILP32
++static inline int is_ilp32_compat_task(void)
++{
++	return test_thread_flag(TIF_32BIT_AARCH64);
++}
++static inline int is_ilp32_compat_thread(struct thread_info *thread)
++{
++	return test_ti_thread_flag(thread, TIF_32BIT_AARCH64);
++}
++#else
++static inline int is_ilp32_compat_task(void)
++{
++	return 0;
++}
++static inline int is_ilp32_compat_thread(struct thread_info *thread)
++{
++	return 0;
++}
++#endif
 +
- /* struct msghdr */
- #define sys_recvfrom		compat_sys_recvfrom
- #define sys_recvmmsg		compat_sys_recvmmsg
+ #else /* !CONFIG_COMPAT */
+ 
+ static inline int is_compat_thread(struct thread_info *thread)
+@@ -330,17 +350,25 @@ static inline int is_a32_compat_task(void)
+ {
+ 	return 0;
+ }
++static inline int is_ilp32_compat_task(void)
++{
++	return 0;
++}
++static inline int is_ilp32_compat_thread(struct thread_info *thread)
++{
++	return 0;
++}
+ 
+ #endif /* CONFIG_COMPAT */
+ 
+ static inline int is_compat_task(void)
+ {
+-	return is_a32_compat_task();
++	return is_a32_compat_task() || is_ilp32_compat_task();
+ }
+ 
+ static inline int is_compat_thread(struct thread_info *thread)
+ {
+-	return is_a32_compat_thread(thread);
++	return is_a32_compat_thread(thread) || is_ilp32_compat_thread(thread);
+ }
+ #endif /* __KERNEL__ */
+ #endif /* __ASM_COMPAT_H */
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 75f8d56..d41586c 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -115,6 +115,7 @@ static inline struct thread_info *current_thread_info(void)
+ #define TIF_SINGLESTEP		21
+ #define TIF_32BIT		22	/* AARCH32 process */
+ #define TIF_SWITCH_MM		23	/* deferred switch_mm */
++#define TIF_32BIT_AARCH64	24	/* 32 bit process on AArch64(ILP32) */
+ 
+ #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
 -- 
 1.9.1
