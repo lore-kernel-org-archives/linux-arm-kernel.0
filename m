@@ -1,89 +1,48 @@
-From: jonathan.davies@citrix.com (Jonathan Davies)
-Date: Mon, 13 Apr 2015 14:38:25 +0100
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
-Message-ID: <552BC6D1.1060907@citrix.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Apr 2015 14:42:46 +0100
+Subject: [PATCH v5] ARM: smp: Only expose /sys/.../cpuX/online if
+ hotpluggable
+In-Reply-To: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
+References: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150413134246.GS12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/15 11:56, George Dunlap wrote:
-> On Thu, Apr 9, 2015 at 5:36 PM, Stefano Stabellini
-> <stefano.stabellini@eu.citrix.com> wrote:
->> On Thu, 9 Apr 2015, Eric Dumazet wrote:
->>> On Thu, 2015-04-09 at 16:46 +0100, Stefano Stabellini wrote:
->>>> Hi all,
->>>>
->>>> I found a performance regression when running netperf -t TCP_MAERTS from
->>>> an external host to a Xen VM on ARM64: v3.19 and v4.0-rc4 running in the
->>>> virtual machine are 30% slower than v3.18.
->>>>
->>>> Through bisection I found that the perf regression is caused by the
->>>> prensence of the following commit in the guest kernel:
->>>>
->>>>
->>>> commit 605ad7f184b60cfaacbc038aa6c55ee68dee3c89
->>>> Author: Eric Dumazet <edumazet@google.com>
->>>> Date:   Sun Dec 7 12:22:18 2014 -0800
->>>>
->>>>      tcp: refine TSO autosizing
->
-> [snip]
+On Fri, Apr 10, 2015 at 03:33:11PM -0700, Stephen Boyd wrote:
+> Writes to /sys/.../cpuX/online fail if we determine the platform
+> doesn't support hotplug for that CPU. Furthermore, if the cpu_die
+> op isn't specified the system hangs when we try to offline a CPU
+> and it comes right back online unexpectedly. Let's figure this
+> stuff out before we make the sysfs nodes so that the online file
+> doesn't even exist if it isn't (at least sometimes) possible to
+> hotplug the CPU.
+> 
+> Add a new 'cpu_can_disable' op and repoint all 'cpu_disable'
+> implementations at it because all implementers use the op to
+> indicate if a CPU can be hotplugged or not in a static fashion.
+> With PSCI we may need to add a 'cpu_disable' op so that the
+> secure OS can be migrated off the CPU we're trying to hotplug.
+> In this case, the 'cpu_can_disable' op will indicate that all
+> CPUs are hotpluggable by returning true, but the 'cpu_disable' op
+> will make a PSCI migration call and occasionally fail, denying
+> the hotplug of a CPU. This shouldn't be any worse than x86 where
+> we may indicate that all CPUs are hotpluggable but occasionally
+> we can't offline a CPU due to check_irq_vectors_for_cpu_disable()
+> failing to find a CPU to move vectors to.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Cc: Dave Martin <Dave.Martin@arm.com>
+> Acked-by: Simon Horman <horms@verge.net.au> [shmobile portion]
+> Tested-by: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: <linux-sh@vger.kernel.org>
+> Cc: Tyler Baker <tyler.baker@linaro.org>
+> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-I recently discussed this issue on netdev in the following thread:
+Let's see some more acks for this...
 
-https://www.marc.info/?l=linux-netdev&m=142738853820517
-
->>> This commit restored original TCP Small Queue behavior, which is the
->>> first step to fight bufferbloat.
->>>
->>> Some network drivers are known to be problematic because of a delayed TX
->>> completion.
->
-> [snip]
->
->>> Try to tweak /proc/sys/net/ipv4/tcp_limit_output_bytes to see if it
->>> makes a difference ?
->>
->> A very big difference:
->>
->> echo 262144 > /proc/sys/net/ipv4/tcp_limit_output_bytes
->> brings us much closer to the original performance, the slowdown is just
->> 8%
->>
->> echo 1048576 > /proc/sys/net/ipv4/tcp_limit_output_bytes
->> fills the gap entirely, same performance as before "refine TSO
->> autosizing"
->>
->>
->> What would be the next step for here?  Should I just document this as an
->> important performance tweaking step for Xen, or is there something else
->> we can do?
->
-> Is the problem perhaps that netback/netfront delays TX completion?
-> Would it be better to see if that can be addressed properly, so that
-> the original purpose of the patch (fighting bufferbloat) can be
-> achieved while not degrading performance for Xen?  Or at least, so
-> that people get decent perfomance out of the box without having to
-> tweak TCP parameters?
-
-I agree; reducing the completion latency should be the ultimate goal. 
-However, that won't be easy, so we need a work-around in the short term. 
-I don't like the idea of relying on documenting the recommendation to 
-change tcp_limit_output_bytes; too many people won't read this advice 
-and will expect the out-of-the-box defaults to be reasonable.
-
-Following Eric's pointers to where a similar problem had been 
-experienced in wifi drivers, I came up with two proof-of-concept patches 
-that gave a similar performance gain without any changes to sysctl 
-parameters or core tcp/ip code. See 
-https://www.marc.info/?l=linux-netdev&m=142746161307283.
-
-I haven't yet received any feedback from the xen-netfront maintainers 
-about whether those ideas could be reasonably adopted.
-
-Jonathan
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
