@@ -1,39 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Apr 2015 10:33:53 +0100
-Subject: [GIT PULL] ARM perf updates for 4.1
-In-Reply-To: <CAMuHMdUPpAnJz7Pv=aTv+ZhCkjDPLkry_gV6=GFMmSCEsXEOSw@mail.gmail.com>
-References: <20150327172246.GN1562@arm.com>
- <CAMuHMdUvjqYSSTwFcyhn=ChCJWZsqvL1CAVWRgnid0=giD56Ag@mail.gmail.com>
- <20150413091011.GA1582@arm.com>
- <CAMuHMdUPpAnJz7Pv=aTv+ZhCkjDPLkry_gV6=GFMmSCEsXEOSw@mail.gmail.com>
-Message-ID: <20150413093353.GB1582@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 13 Apr 2015 11:34:51 +0200
+Subject: [PATCH v2] crypto/arm: accelerated SHA-512 using ARM generic ASM
+ and NEON
+In-Reply-To: <20150413041343.GB11091@gondor.apana.org.au>
+References: <1428676148-28210-1-git-send-email-ard.biesheuvel@linaro.org>
+ <F695F357-2A5C-4DFC-9F0E-188CDBBE7C01@linaro.org>
+ <CAKv+Gu-6mZwrVSCvS+ZWWwwM-294nWAqX4_J3r5Z8NM7KKC0=Q@mail.gmail.com>
+ <2845656.4sNJ3XBxnz@wuerfel>
+ <CAKv+Gu9TU6ETRQDvp7M7Q43xAR5A25scgP3tsvZMmzBQNOK7Cg@mail.gmail.com>
+ <20150413041343.GB11091@gondor.apana.org.au>
+Message-ID: <CAKv+Gu_7RAAvWRpfAvTCs3zNPvbfrD=V7AHcJr+Qcj0B9Sf9TA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 10:30:22AM +0100, Geert Uytterhoeven wrote:
-> On Mon, Apr 13, 2015 at 11:10 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Apr 07, 2015 at 04:05:40PM +0100, Geert Uytterhoeven wrote:
-> >> On Fri, Mar 27, 2015 at 6:22 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > Will Deacon (1):
-> >> >       ARM: pmu: add support for interrupt-affinity property
-> >>
-> >> As most DTSes lack this property, we now get scary warnings:
-> >>
-> >>         CPU PMU: Failed to parse <no-node>/interrupt-affinity[0]
-> >
-> > That's a harmless warning (i.e. perf will `work' as before), but I'd like to
-> > print something to say that we didn't find the property.
-> >
-> >> BTW, shouldn't the DT update go in first, or together with the code update?
-> >
-> > It's going via the arm64 tree (I had to choose one of the trees for the
-> > binding, since they both arm and arm64 use it).
-> 
-> OK. Will start to pull arm64 too into renesas-drivers...
-> 
-> BTW, time to start unifying arm32 and arm64? ;-)
+On 13 April 2015 at 06:13, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> On Sat, Apr 11, 2015 at 09:15:10PM +0200, Ard Biesheuvel wrote:
+>>
+>> @Herbert: could you please apply this onto cryptodev before sending
+>> out your pull request for v4.1?
+>
+> Done.
+>
+>> And please disregard $subject, I will post a v3 with a similar
+>> 'depends on' added (unless you're ok to add it yourself)
+>
+> Please resend the patch.  But I'll process it after the merge
+> window closes so no hurry.
+>
 
-We're already working on unifying the perf bits (the major duplication imo)
-by moving the bulk of it into drivers. Stay tuned!
 
-Will
+OK, all fine.
+
+Thanks Herbert!
