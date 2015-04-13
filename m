@@ -1,65 +1,19 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Mon, 13 Apr 2015 09:35:34 +0200
-Subject: [PATCH v3 3/5] PCI: st: Provide support for the sti PCIe
- controller
-In-Reply-To: <2529595.kpEIoZMpcn@wuerfel>
-References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
- <1428657168-12495-4-git-send-email-gabriel.fernandez@linaro.org>
- <1428747477.17822.90.camel@x220> <2529595.kpEIoZMpcn@wuerfel>
-Message-ID: <CAG374jDUPK5hCZBLR_r5om8mh8wy1NyxDaZ-DP_A-xjNN6f2pQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 13 Apr 2015 15:54:06 +0800
+Subject: [PATCH v2 5/7] clk: zx: add clock support to zx296702
+In-Reply-To: <1427464356-20112-6-git-send-email-jun.nie@linaro.org>
+References: <1427464356-20112-1-git-send-email-jun.nie@linaro.org>
+ <1427464356-20112-6-git-send-email-jun.nie@linaro.org>
+Message-ID: <20150413075404.GA29331@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Fri, Mar 27, 2015 at 09:52:34PM +0800, Jun Nie wrote:
+> It adds a clock driver for zx296702 SoC to register the clock tree to
+> Common Clock Framework.  All the clocks of bus topology and some the
+> peripheral clocks are ready with this commit. Some missing leaf clocks
+> for peripherals will be added later when needed.
+> 
+> Signed-off-by: Jun Nie <jun.nie@linaro.org>
 
-Thanks for reviewing.
-
-On 11 April 2015 at 16:55, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 11 April 2015 12:17:57 Paul Bolle wrote:
->> Something I didn't spot in my first look at this patch.
->>
->> On Fri, 2015-04-10 at 11:12 +0200, Gabriel FERNANDEZ wrote:
->> > --- a/drivers/pci/host/Kconfig
->> > +++ b/drivers/pci/host/Kconfig
->> >
->> > +config PCI_ST
->> > +     bool "ST PCIe controller"
->> > +     depends on ARCH_STI || (ARM && COMPILE_TEST)
->> > +     select PCIE_DW
->> > +     help
->> > +       Enable PCIe controller support on ST Socs. This controller is based
->> > +       on Designware hardware and therefore the driver re-uses the
->> > +       Designware core functions to implement the driver.
->>
->> You can't have ARCH_STI without ARM, so ARM will always be set if this
->> driver is enabled. Correct?
->
-> Right, though the ARM dependency could soon be dropped, once the PCIE_DW
-> driver can use generic infrastructure in the few places it relies on
-> ARM specific code today.
->
->> > --- /dev/null
->> > +++ b/drivers/pci/host/pci-st.c
->>
->> > +     if (IS_ENABLED(CONFIG_ARM)) {
->> > +             /*
->> > +              * We have to hook the abort handler so that we can intercept
->> > +              * bus errors when doing config read/write that return UR,
->> > +              * which is flagged up as a bus error
->> > +              */
->> > +             hook_fault_code(16+6, st_pcie_abort_handler, SIGBUS, 0,
->> > +                             "imprecise external abort");
->> > +     }
->>
->> So, unless I'm missing something obvious here, IS_ENABLED(CONFIG_ARM)
->> will always evaluate to 1. Can't that test be dropped?
->
-> I would leave it in, as it's quite likely to get reused with ARM64 at some
-> point in the future (no, I don't know anything about ST's product plans,
-> but everybody seems to be doing this).
->
->         Arnd
-
-Yes i agree with that.
-
-Gabriel
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
