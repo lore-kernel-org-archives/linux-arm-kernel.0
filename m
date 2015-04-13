@@ -1,62 +1,41 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 13 Apr 2015 17:18:09 +0100
-Subject: [PATCH v4 1/3] genirq: Allow the irqchip state of an IRQ to be
- save/restored
-In-Reply-To: <CAJAp7Ogq+4Km=H1o3q3M8F1ntMo3nf=Xt92HSW0N+3OeVaGbSw@mail.gmail.com>
-References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>	<1426676484-21812-2-git-send-email-marc.zyngier@arm.com>
- <CAJAp7Ogq+4Km=H1o3q3M8F1ntMo3nf=Xt92HSW0N+3OeVaGbSw@mail.gmail.com>
-Message-ID: <552BEC41.3080909@linaro.org>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 14 Apr 2015 00:18:22 +0800
+Subject: Two new breakages since Thursday
+In-Reply-To: <20150411090024.GL12732@n2100.arm.linux.org.uk>
+References: <20150405080645.GE13898@n2100.arm.linux.org.uk>
+ <20150411090024.GL12732@n2100.arm.linux.org.uk>
+Message-ID: <1428941902.7514.73.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, 2015-04-11 at 10:00 +0100, Russell King - ARM Linux wrote:
+> And almost a week later, and most of these are _still_ present.
+> 
+> Given that the merge window is potentially opening on Sunday, this
+> is _very_ poor, because it means that we've had a week of failing
+> builds in the week before the merge window - the week where we
+> _should_ be stabilising the code and getting it ready for submission
+> to Linus.
+> 
+> Right now, arm-soc is *NOT* ready for submission to Linus.
+> 
+> Please fix this as a top priority.
+> 
+> On Sun, Apr 05, 2015 at 09:06:45AM +0100, Russell King - ARM Linux wrote:
+> > Two new breakages have appeared since Thursday.  The first affects both
+> > ARM and ARM64 builds (a missing file), the second only ARM builds.
+> > 
+> > arch/arm64/boot/dts/mediatek/mt8173-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
+> > arch/arm/boot/dts/mt8135-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
+> > arch/arm/mach-at91/pm_suspend.S:143: Error: selected processor does not support ARM mode `dsb'
 
+Hi Arnd/Olof,
 
-On 08/04/15 18:48, Bjorn Andersson wrote:
-> On Wed, Mar 18, 2015 at 4:01 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> There is a number of cases where a kernel subsystem may want to
->> introspect the state of an interrupt at the irqchip level:
->>
->> - When a peripheral is shared between virtual machines,
->>    its interrupt state becomes part of the guest's state,
->>    and must be switched accordingly. KVM on arm/arm64 requires
->>    this for its guest-visible timer
->> - Some GPIO controllers seem to require peeking into the
->>    interrupt controller they are connected to to report
->>    their internal state
->>
->> This seem to be a pattern that is common enough for the core code
->> to try and support this without too many horrible hacks. Introduce
->> a pair of accessors (irq_get_irqchip_state/irq_set_irqchip_state)
->> to retrieve the bits that can be of interest to another subsystem:
->> pending, active, and masked.
->>
->> - irq_get_irqchip_state returns the state of the interrupt according
->>    to a parameter set to IRQCHIP_STATE_PENDING, IRQCHIP_STATE_ACTIVE,
->>    IRQCHIP_STATE_MASKED or IRQCHIP_STATE_LINE_LEVEL.
->> - irq_set_irqchip_state similarly sets the state of the interrupt.
->>
->> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
->> Tested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->
-> Sorry for bothering you Thomas, but we have a couple of driver for the
-> Qualcomm platforms that depends on this patch (the line level part).
+The mediatek part is due to merge dependency in pinctrl driver. It is
+discussed in
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/336258.html
 
-+1
+I thought we already decided to revert DT node in arm-soc tree for 4.1.
+What should we do next?
 
-Couple of Qualcomm board support are left incomplete due to missing 
-drivers using these patches.
-Would be nice to get this patch mainlined sooner.
-
--srini
-
-> Could you please have a look at it?
->
-> Thanks,
-> Bjorn
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Joe.C
