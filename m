@@ -1,73 +1,105 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Sun, 12 Apr 2015 21:37:25 -0700
-Subject: [PATCH] clk: at91: pll: fix input range validity check
-In-Reply-To: <1427594023-9697-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1427594023-9697-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150413043725.19585.5717@quantum>
+From: harald@ccbib.org (harald at ccbib.org)
+Date: Mon, 13 Apr 2015 07:59:29 +0200
+Subject: Bug: Toggling green led on Olinuxino Maxi, also toggles USB
+In-Reply-To: <201504130118.07766.marex@denx.de>
+References: <1622635769.189113.1428833170958.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+ <201504130118.07766.marex@denx.de>
+Message-ID: <1db871b644e46516922636d7bb7635f8@imap.cosmopool.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris Brezillon (2015-03-28 18:53:43)
-> The PLL impose a certain input range to work correctly, but it appears that
-> this input range does not apply on the input clock (or parent clock) but
-> on the input clock after it has passed the PLL divisor.
-> Fix the implementation accordingly.
+On Mon, 13 Apr 2015 01:18:07 +0200, Marek Vasut <marex@denx.de> wrote:
+> On Sunday, April 12, 2015 at 12:06:10 PM, Stefan Wahren wrote:
+>> Hi,
+>> 
+>> toggling the green LED (GPIO 65) on Olinuxino Maxi unexpectedly also
+>> toggles the USB Host support.
+>> 
+>> Here is the console output:
+>> 
+>> # Switching the led off (USB drive connected)
+>> echo 255 > /sys/class/leds/green/brightness
+>> [  318.650000] ci_hdrc ci_hdrc.0: timeout waiting for 00000800 in 11
+>> [  318.650000] ci_hdrc ci_hdrc.0: EHCI Host Controller
+>> [  318.670000] ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus
+>> number 1 [  318.710000] ci_hdrc ci_hdrc.0: USB 2.0 started, EHCI 1.00
+>> [  318.750000] hub 1-0:1.0: USB hub found
+>> [  318.780000] hub 1-0:1.0: 1 port detected
+>> [  319.140000] usb 1-1: new high-speed USB device number 2 using
+ci_hdrc
+>> [  319.310000] hub 1-1:1.0: USB hub found
+>> [  319.340000] hub 1-1:1.0: 3 ports detected
+>> [  319.640000] usb 1-1.1: new high-speed USB device number 3 using
+>> ci_hdrc
+>> [  319.880000] usb 1-1.2: new high-speed USB device number 4 using
+>> ci_hdrc
+>> [  320.030000] usb-storage 1-1.2:1.0: USB Mass Storage device detected
+>> [  320.040000] scsi host0: usb-storage 1-1.2:1.0
+>> [  321.090000] scsi 0:0:0:0: Direct-Access     LG       USB Drive      
+
+>> 1100 PQ: 0 ANSI: 0 CCS
+>> 
+>> # Switching the led on (USB drive connected)
+>> echo "0" > /sys/class/leds/green/brightness
+>> [ 1068.890000] ci_hdrc ci_hdrc.0: remove, state 1
+>> [ 1068.890000] usb usb1: USB disconnect, device number 1
+>> [ 1068.920000] usb 1-1: USB disconnect, device number 2
+>> [ 1068.920000] usb 1-1.1: USB disconnect, device number 3
+>> [ 1069.070000] usb 1-1.2: USB disconnect, device number 4
+>> [ 1069.450000] ci_hdrc ci_hdrc.0: USB bus 1 deregistered
+>> [ 1074.460000] ci_hdrc ci_hdrc.0: timeout waiting for 00000800 in 11
+>> 
+>> Kernel: 4.0.0-rc4-next-20150320
+>> Bootloader: U-Boot 2014-10
+>> 
+>> Harald discovered this problem before me on Olinuxino Mini [1].
+>> 
+>> I think the problem has something to with USB OTG, because GPIO 65 is
+on
+>> the same pin for USB_OTG_ID.
+>> My idea was to set "dr_mode" in olinuxino dts explicit to "host" and it
+>> works, but i'm not sure that is the right fix.
+>> 
+>> Shouldn't chipidea driver complain about missing pinctrl or something
+>> else?
 > 
-> Cc: <stable@vger.kernel.org> # v3.14+
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Reported-by: Jonas Andersson <jonas@microbit.se>
+> Is the MX23_PAD_SSP1_DETECT pin muxed as a GPIO ? ie. you should have
+such
+> an
+> entry in the DTS pinmux setup -- MX23_PAD_SSP1_DETECT__GPIO_2_1 .
 
-Hi Boris,
+Yes:
+led_pin_gpio2_1: led_gpio2_1 at 0 {
+	reg = <0>;
+	fsl,pinmux-ids = <
+		MX23_PAD_SSP1_DETECT__GPIO_2_1
+	>;
+	fsl,drive-strength = <MXS_DRIVE_4mA>;
+	fsl,voltage = <MXS_VOLTAGE_HIGH>;
+	fsl,pull-up = <MXS_PULL_DISABLE>;
+};
 
-OK, so this patch along with your two previous submissions kind of
-tackle some of items I mentioned earlier today[0].
+> If it is, then it'd probably mean that the pin state is leaking into the
+> USB
+> core even if it's muxed as GPIO, in which case this would be a silicon
+> problem.
 
-Does this patch, combined with your two prior patches[1][2] resolve the
-issue you brought up in your "Propagating clock rate constraints"
-thread[3]?
+Well, silicon problem or not: It is actually documented in the iMX23
+Reference Manual 37.2.2: 
+| Readback registers are never affected by the operation of the
+| HW_PINCTRL_MUXSELx registers and always sense the actual value
+| on the data pin.
+|
+| For example, if a pin is programmed to be a GPIO output and then
+| driven high, any specialized hardware interfaces that are actively
+| monitoring that pin will read the high logic value. Conversely, if
+| the pin mux is programmed to give a specialized hardware interface
+| such as the EMI block control of a particular pin, the current state
+| of that pin can be read through its GPIO read register at any time,
+| even while active EMI cycles are in progress.
 
-[0] http://lkml.kernel.org/r/<20150412235021.19585.27431@quantum>
-[1] http://lkml.kernel.org/r/<1427593728-9366-1-git-send-email-boris.brezillon@free-electrons.com>
-[2] http://lkml.kernel.org/r/<1427593533-9019-1-git-send-email-boris.brezillon@free-electrons.com>
-[3] http://lkml.kernel.org/r/<20150327004054.2f6f34ee@bbrezillon>
+So it seems like the driver has to take care not to read pins it isn't
+actually in charge of.
 
-Regards,
-Mike
-
-> ---
->  drivers/clk/at91/clk-pll.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-> index 6ec79db..cbbe403 100644
-> --- a/drivers/clk/at91/clk-pll.c
-> +++ b/drivers/clk/at91/clk-pll.c
-> @@ -173,8 +173,7 @@ static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
->         int i = 0;
->  
->         /* Check if parent_rate is a valid input rate */
-> -       if (parent_rate < characteristics->input.min ||
-> -           parent_rate > characteristics->input.max)
-> +       if (parent_rate < characteristics->input.min)
->                 return -ERANGE;
->  
->         /*
-> @@ -187,6 +186,15 @@ static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
->         if (!mindiv)
->                 mindiv = 1;
->  
-> +       if (parent_rate > characteristics->input.max) {
-> +               tmpdiv = DIV_ROUND_UP(parent_rate, characteristics->input.max);
-> +               if (tmpdiv > PLL_DIV_MAX)
-> +                       return -ERANGE;
-> +
-> +               if (tmpdiv > mindiv)
-> +                       mindiv = tmpdiv;
-> +       }
-> +
->         /*
->          * Calculate the maximum divider which is limited by PLL register
->          * layout (limited by the MUL or DIV field size).
-> -- 
-> 1.9.1
-> 
+HTH,
+Harald
