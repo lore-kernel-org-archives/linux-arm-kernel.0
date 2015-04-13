@@ -1,80 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 13 Apr 2015 11:56:19 +0100
-Subject: [PATCH v7 1/9] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <20150407102523.GA23190@leverpostej>
-References: <1426637856-3730-1-git-send-email-cw00.choi@samsung.com>
- <1426637856-3730-2-git-send-email-cw00.choi@samsung.com>
- <20150330160940.GA13731@leverpostej> <5519E2B6.2030905@samsung.com>
- <20150402173558.GB30669@leverpostej> <551DD321.6030707@samsung.com>
- <20150407102523.GA23190@leverpostej>
-Message-ID: <20150413105618.GD4076@leverpostej>
+From: George.Dunlap@eu.citrix.com (George Dunlap)
+Date: Mon, 13 Apr 2015 11:56:29 +0100
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
+ <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+Message-ID: <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On Thu, Apr 9, 2015 at 5:36 PM, Stefano Stabellini
+<stefano.stabellini@eu.citrix.com> wrote:
+> On Thu, 9 Apr 2015, Eric Dumazet wrote:
+>> On Thu, 2015-04-09 at 16:46 +0100, Stefano Stabellini wrote:
+>> > Hi all,
+>> >
+>> > I found a performance regression when running netperf -t TCP_MAERTS from
+>> > an external host to a Xen VM on ARM64: v3.19 and v4.0-rc4 running in the
+>> > virtual machine are 30% slower than v3.18.
+>> >
+>> > Through bisection I found that the perf regression is caused by the
+>> > prensence of the following commit in the guest kernel:
+>> >
+>> >
+>> > commit 605ad7f184b60cfaacbc038aa6c55ee68dee3c89
+>> > Author: Eric Dumazet <edumazet@google.com>
+>> > Date:   Sun Dec 7 12:22:18 2014 -0800
+>> >
+>> >     tcp: refine TSO autosizing
 
-Could you please reply to the below?
+[snip]
 
-Without an answer I'm going to have to ask for the patch to be unqueued
-for the moment, and I'd prefer that we came to a solution instead.
+>> This commit restored original TCP Small Queue behavior, which is the
+>> first step to fight bufferbloat.
+>>
+>> Some network drivers are known to be problematic because of a delayed TX
+>> completion.
 
-Thanks,
-Mark.
+[snip]
 
-On Tue, Apr 07, 2015 at 11:25:27AM +0100, Mark Rutland wrote:
-> > >>> I'm very worried about adding a DT that's known broken, especially when
-> > >>> we have no idea as to if/when the FW will be fixed judging from prior
-> > >>> replies.
-> > >>
-> > >> As I replied, I can not fix the FW because I don't have any code of FW.
-> > > 
-> > > Surely you are able to contact those who do?
-> > > 
-> > >> I don't have any solution to fix it on Linux kernel level.
-> > >>
-> > >> So, If you agree, I can add the comment of CPU0 hotplug issue on DT file.
-> > > 
-> > > I disagree. I do not want to add a DT that is known to be broken;
-> > > especially when we have no idea how to fix it. It creates long-term
-> > > maintenance pain for everyone, and marginal gain for few. A comment does
-> > > nothing to aid the end-user.
-> > > 
-> > > So NAK to the PSCI node and PSCI enable method in this dts until we
-> > > either have a working firmware, or a reasonable mechanism to handle the
-> > > deficiency.
-> > 
-> > There is only CPU0 hotplug issue. Excpet CPU{1-7} are well working.
-> 
-> I understand that, but the issue with CPU0 is still a blocker from my
-> PoV.
-> 
-> > To fix this issue, we must need the help of firmware developer.
-> > But, We never get the any help.
-> 
-> Previously you said that you did not have access to the source code
-> rather than not having help from the relevant firmware engineers. I take
-> it you have informed them of the issue with CPU0?
-> 
-> > Also, as I mentioned on previous mail, all Exynos SoCs can not turn
-> > off the CPU0. I've never seen Exynos SoC that CP0 hotplug is possible.
-> 
-> While that may be the case, PSCI is a more generic standard, and it is
-> used on systems where CPU0 can be hot unplugged. So Exynos-specific
-> details cannot dictate how the kernel PSCI driver should behave.
-> 
-> Is there a particular reason that CPU0 cannot be hotplugged?
-> 
-> In PSCI 0.2 and later it's possible to determine whether a trusted OS
-> prohibits a core from being hotplugged, but this mechanism doesn't exist
-> in earlier versions. I am not averse to adding a property to PSCI 0.1
-> to mark a CPU as not being hotpluggable if there is a fundamental reason
-> (i.e. not simply a bug) for this being the case.
-> 
-> Thanks,
-> Mark.
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+>> Try to tweak /proc/sys/net/ipv4/tcp_limit_output_bytes to see if it
+>> makes a difference ?
+>
+> A very big difference:
+>
+> echo 262144 > /proc/sys/net/ipv4/tcp_limit_output_bytes
+> brings us much closer to the original performance, the slowdown is just
+> 8%
+>
+> echo 1048576 > /proc/sys/net/ipv4/tcp_limit_output_bytes
+> fills the gap entirely, same performance as before "refine TSO
+> autosizing"
+>
+>
+> What would be the next step for here?  Should I just document this as an
+> important performance tweaking step for Xen, or is there something else
+> we can do?
+
+Is the problem perhaps that netback/netfront delays TX completion?
+Would it be better to see if that can be addressed properly, so that
+the original purpose of the patch (fighting bufferbloat) can be
+achieved while not degrading performance for Xen?  Or at least, so
+that people get decent perfomance out of the box without having to
+tweak TCP parameters?
+
+ -George
