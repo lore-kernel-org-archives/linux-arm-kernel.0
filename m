@@ -1,91 +1,93 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 13 Apr 2015 21:06:34 +0900
-Subject: [PATCH v7 1/9] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <20150413105618.GD4076@leverpostej>
-References: <1426637856-3730-1-git-send-email-cw00.choi@samsung.com>
- <1426637856-3730-2-git-send-email-cw00.choi@samsung.com>
- <20150330160940.GA13731@leverpostej> <5519E2B6.2030905@samsung.com>
- <20150402173558.GB30669@leverpostej> <551DD321.6030707@samsung.com>
- <20150407102523.GA23190@leverpostej> <20150413105618.GD4076@leverpostej>
-Message-ID: <552BB14A.6010205@samsung.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 13 Apr 2015 14:08:13 +0200
+Subject: [PATCH v2 03/10] KVM: arm: guest debug, define API headers
+In-Reply-To: <1427814488-28467-4-git-send-email-alex.bennee@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-4-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150413120813.GN6186@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 04/13/2015 07:56 PM, Mark Rutland wrote:
-> Hi Chanwoo,
+On Tue, Mar 31, 2015 at 04:08:01PM +0100, Alex Benn?e wrote:
+> This commit defines the API headers for guest debugging. There are two
+> architecture specific debug structures:
 > 
-> Could you please reply to the below?
+>   - kvm_guest_debug_arch, allows us to pass in HW debug registers
+>   - kvm_debug_exit_arch, signals the exact debug exit and pc
 > 
-> Without an answer I'm going to have to ask for the patch to be unqueued
-> for the moment, and I'd prefer that we came to a solution instead.
-
-I'm sorry about late reply.
-
+> The type of debugging being used is control by the architecture specific
+> control bits of the kvm_guest_debug->control flags in the ioctl
+> structure.
 > 
-> Thanks,
-> Mark.
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 > 
-> On Tue, Apr 07, 2015 at 11:25:27AM +0100, Mark Rutland wrote:
->>>>>> I'm very worried about adding a DT that's known broken, especially when
->>>>>> we have no idea as to if/when the FW will be fixed judging from prior
->>>>>> replies.
->>>>>
->>>>> As I replied, I can not fix the FW because I don't have any code of FW.
->>>>
->>>> Surely you are able to contact those who do?
->>>>
->>>>> I don't have any solution to fix it on Linux kernel level.
->>>>>
->>>>> So, If you agree, I can add the comment of CPU0 hotplug issue on DT file.
->>>>
->>>> I disagree. I do not want to add a DT that is known to be broken;
->>>> especially when we have no idea how to fix it. It creates long-term
->>>> maintenance pain for everyone, and marginal gain for few. A comment does
->>>> nothing to aid the end-user.
->>>>
->>>> So NAK to the PSCI node and PSCI enable method in this dts until we
->>>> either have a working firmware, or a reasonable mechanism to handle the
->>>> deficiency.
->>>
->>> There is only CPU0 hotplug issue. Excpet CPU{1-7} are well working.
->>
->> I understand that, but the issue with CPU0 is still a blocker from my
->> PoV.
->>
->>> To fix this issue, we must need the help of firmware developer.
->>> But, We never get the any help.
->>
->> Previously you said that you did not have access to the source code
->> rather than not having help from the relevant firmware engineers. I take
->> it you have informed them of the issue with CPU0?
+> ---
+> v2
+>    - expose hsr and pc directly to user-space
+> 
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 3ef77a4..6ee70a0 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -100,10 +100,24 @@ struct kvm_sregs {
+>  struct kvm_fpu {
+>  };
+>  
+> +/*
+> + * See ARM ARM D7.3: Debug Registers
 
-I didn't ask any help to firmware engineer because I didn't know who firmware engineer
-and also didn't access the source code. If I knew the engineer and can access them,
-I would have asked some help to them or inquired the reason about CPU0 not hotplugged.
+see the ARM ARM for ??
 
->>
->>> Also, as I mentioned on previous mail, all Exynos SoCs can not turn
->>> off the CPU0. I've never seen Exynos SoC that CP0 hotplug is possible.
->>
->> While that may be the case, PSCI is a more generic standard, and it is
->> used on systems where CPU0 can be hot unplugged. So Exynos-specific
->> details cannot dictate how the kernel PSCI driver should behave.
->>
->> Is there a particular reason that CPU0 cannot be hotplugged?
+> + *
+> + * The control registers are architecturally defined as 32 bits but are
+> + * stored as 64 bit values along side the value registers and aligned
 
-Unfortunately, I don't know correctly why Exynos SoC cannot hotplug the CPU0.
-But, IMHO, SoC had to maintain at least online core for operation.
-Just Exynos SoC has remained the CPU0 as at least online core.
+do you mean alongside?
 
->>
->> In PSCI 0.2 and later it's possible to determine whether a trusted OS
->> prohibits a core from being hotplugged, but this mechanism doesn't exist
->> in earlier versions. I am not averse to adding a property to PSCI 0.1
->> to mark a CPU as not being hotpluggable if there is a fundamental reason
->> (i.e. not simply a bug) for this being the case.
+> + * with the rest 64 bit registers in the normal CPU context.
+
+rest of the 64 bit
+
+> + */
+
+why do we store them as 64 bit values?  There's nothing prevented us
+from defining them as __u32 is there?  Is this to make the ONE_REG
+interface accessers more convenient?
+
+> +#define KVM_ARM_NDBG_REGS 16
+
+nit: is NDBG short for something I don't know about or is it
+the number of debug registers we are noting here, in which case I think
+KVM_ARM_NUM_DBG_REGS is more clear.
+
+>  struct kvm_guest_debug_arch {
+> +	__u64 dbg_bcr[KVM_ARM_NDBG_REGS];
+> +	__u64 dbg_bvr[KVM_ARM_NDBG_REGS];
+> +	__u64 dbg_wcr[KVM_ARM_NDBG_REGS];
+> +	__u64 dbg_wvr[KVM_ARM_NDBG_REGS];
+>  };
+>  
+>  struct kvm_debug_exit_arch {
+> +	__u64 pc;
+> +	__u32 hsr;
+>  };
+>  
+>  struct kvm_sync_regs {
+> @@ -207,4 +221,11 @@ struct kvm_arch_memory_slot {
+>  
+>  #endif
+>  
+> +/*
+> + * Architecture related debug defines - upper 16 bits of
+> + * kvm_guest_debug->control
+> + */
+> +#define KVM_GUESTDBG_USE_SW_BP	        __KVM_GUESTDBG_USE_SW_BP
+> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
+> +
+>  #endif /* __ARM_KVM_H__ */
+> -- 
+> 2.3.4
+> 
 
 Thanks,
-Chanwoo Choi
+-Christoffer
