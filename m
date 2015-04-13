@@ -1,40 +1,41 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Mon, 13 Apr 2015 15:10:47 -0700
-Subject: [PATCHv2 3/3] usb: ohci-platform: Use devm_of_phy_get_by_index
+Date: Mon, 13 Apr 2015 15:10:46 -0700
+Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
 In-Reply-To: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
 References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1428963047-23666-4-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Getting phys by index instead of phy names so that we do
-not have to create a naming scheme when multiple phys are present
+not have to create a naming scheme when multiple phys
+are present
 
 Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
 Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
  drivers/usb/host/Kconfig         |  1 +
- drivers/usb/host/ohci-platform.c | 70 ++++++++++++++--------------------------
+ drivers/usb/host/ehci-platform.c | 70 ++++++++++++++--------------------------
  2 files changed, 26 insertions(+), 45 deletions(-)
 
 diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 563f22d..1a8869c 100644
+index 5ad60e4..563f22d 100644
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
-@@ -558,6 +558,7 @@ config USB_CNS3XXX_OHCI
+@@ -284,6 +284,7 @@ config USB_EHCI_ATH79
  
- config USB_OHCI_HCD_PLATFORM
- 	tristate "Generic OHCI driver for a platform device"
+ config USB_EHCI_HCD_PLATFORM
+ 	tristate "Generic EHCI driver for a platform device"
 +	select GENERIC_PHY
  	default n
  	---help---
- 	  Adds an OHCI host driver for a generic platform device, which
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index 185ceee..0f8edf6 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -57,15 +57,13 @@ static int ohci_platform_power_on(struct platform_device *dev)
+ 	  Adds an EHCI host driver for a generic platform device, which
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index d8a75a5..a7563b9 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -88,15 +88,13 @@ static int ehci_platform_power_on(struct platform_device *dev)
  	}
  
  	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
@@ -57,7 +58,7 @@ index 185ceee..0f8edf6 100644
  		}
  	}
  
-@@ -73,10 +71,8 @@ static int ohci_platform_power_on(struct platform_device *dev)
+@@ -104,10 +102,8 @@ static int ehci_platform_power_on(struct platform_device *dev)
  
  err_exit_phy:
  	while (--phy_num >= 0) {
@@ -70,7 +71,7 @@ index 185ceee..0f8edf6 100644
  	}
  err_disable_clks:
  	while (--clk >= 0)
-@@ -92,10 +88,8 @@ static void ohci_platform_power_off(struct platform_device *dev)
+@@ -123,10 +119,8 @@ static void ehci_platform_power_off(struct platform_device *dev)
  	int clk, phy_num;
  
  	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
@@ -82,16 +83,16 @@ index 185ceee..0f8edf6 100644
 +		phy_exit(priv->phys[phy_num]);
  	}
  
- 	for (clk = OHCI_MAX_CLKS - 1; clk >= 0; clk--)
-@@ -123,7 +117,6 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv;
- 	struct ohci_hcd *ohci;
+ 	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
+@@ -154,7 +148,6 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+ 	struct ehci_platform_priv *priv;
+ 	struct ehci_hcd *ehci;
 -	const char *phy_name;
  	int err, irq, phy_num, clk = 0;
  
  	if (usb_disabled())
-@@ -174,36 +167,23 @@ static int ohci_platform_probe(struct platform_device *dev)
+@@ -204,36 +197,23 @@ static int ehci_platform_probe(struct platform_device *dev)
  
  		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
  				"phys", "#phy-cells");
@@ -137,10 +138,10 @@ index 185ceee..0f8edf6 100644
 +						, phy_num);
 +			if (IS_ERR(priv->phys[phy_num])) {
 +				err = PTR_ERR(priv->phys[phy_num]);
-+				goto err_put_hcd;
++					goto err_put_hcd;
 +			}
  		}
  
- 		for (clk = 0; clk < OHCI_MAX_CLKS; clk++) {
+ 		for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
 -- 
 2.3.4
