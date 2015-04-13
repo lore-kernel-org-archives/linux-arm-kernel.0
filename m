@@ -1,55 +1,84 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Mon, 13 Apr 2015 05:29:16 -0700
-Subject: [PATCH] ARM: print cma-reserved pages from show_mem
-In-Reply-To: <20150413100538.GR12732@n2100.arm.linux.org.uk>
-References: <CADtm3G64rPf7O76xUbLwqsqTkJxdGJMT9sHj810xPuThDA0ddg@mail.gmail.com>
- <20150326114612.GD8656@n2100.arm.linux.org.uk> <20150326123028.GM4701@suse.de>
- <CADtm3G4Lb=u+BAHZF+O+RgB4VS9iW8epCPJ9ssBTj=+p3+h==Q@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D104A310D42397@CNBJMBX05.corpusers.net>
- <20150410112430.GB12732@n2100.arm.linux.org.uk>
- <20150413010913.GA15225@corellia.local>
- <20150413012115.GB15225@corellia.local>
- <20150413095645.GQ12732@n2100.arm.linux.org.uk>
- <20150413100425.GB14842@suse.de>
- <20150413100538.GR12732@n2100.arm.linux.org.uk>
-Message-ID: <CADtm3G5Fj=LyLQOYea6=5ywanApion1sjzh2+K9NWnrAX+5GHA@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 13 Apr 2015 14:29:16 +0200
+Subject: [RFC v6 01/16] KVM: arm/arm64: Enable the KVM-VFIO device
+In-Reply-To: <1428928171-18884-1-git-send-email-eric.auger@linaro.org>
+References: <1428928171-18884-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1428928171-18884-2-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 3:05 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Apr 13, 2015 at 11:04:26AM +0100, Mel Gorman wrote:
->> On Mon, Apr 13, 2015 at 10:56:45AM +0100, Russell King - ARM Linux wrote:
->> > On Sun, Apr 12, 2015 at 06:21:15PM -0700, Gregory Fong wrote:
->> > > On Sun, Apr 12, 2015 at 06:09:13PM -0700, Gregory Fong wrote:
->> > > > And now we see 83 slab_reclaimable + 846 slab_unreclaimable adds up
->> > > > correctly to the total of 929.
->> > > >
->> > > > The patch below will end up with the correct count.
->> > > >
->> > >
->> > > Sorry, messed up the patch formatting.  Here it is fixed:
->> >
->> > So now the question is: do we fix this, or do we use the generic version?
->> > Given that the total number of slab pages can be easily deduced from the
->> > generic statistics, do we need to modify the generic version to print an
->> > additional line with this?
->>
->> Whatever ARM decides, I do not think the generic version needs to do
->> a PFN walk to recaluate the SLAB statistics. The slab_reclaimable and
->> slab_unreclaimable stats based on the vmstat counters is sufficient.
->
-> Yes, I agree.  My feeling is we just switch to the generic version and be
-> done with it.
+From: Kim Phillips <kim.phillips@linaro.org>
 
-Agreed.  This is really what I was hoping for in the first place, but
-didn't know before submitting the initial patch whether there was some
-arcane reason for the arm-specific show_mem.
+The KVM-VFIO device is used by the QEMU VFIO device. It is used to
+record the list of in-use VFIO groups so that KVM can manipulate
+them. With this series, it will also be used to record the forwarded
+IRQs.
 
-If someone like Yalin really wants the total slab pages, they can just
-add slab_unreclaimable and slab_reclaimable (btw, Yalin, all emails
-I've sent to you are bouncing, maybe you'll see this since it's going
-to the list).
+Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
-Thanks,
-Gregory
+---
+
+v4 -> v5:
+- reword the commit message to explain both usages of the KVM-VFIO
+  device in QEMU
+- squash both arm and arm64 enables
+---
+ arch/arm/kvm/Kconfig    | 1 +
+ arch/arm/kvm/Makefile   | 2 +-
+ arch/arm64/kvm/Kconfig  | 1 +
+ arch/arm64/kvm/Makefile | 2 +-
+ 4 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index f1f79d1..bfb915d 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -28,6 +28,7 @@ config KVM
+ 	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+ 	select SRCU
+ 	select MMU_NOTIFIER
++	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index a093bf1..a4dbb97 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+ AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+ 
+ KVM := ../../../virt/kvm
+-kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
++kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+ 
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 5105e29..bfffe8f 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -28,6 +28,7 @@ config KVM
+ 	select KVM_ARM_HOST
+ 	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+ 	select SRCU
++	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	---help---
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index b22c636..7104ca1 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
+ 
+ obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
+ 
+-kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+ 
+-- 
+1.9.1
