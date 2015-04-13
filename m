@@ -1,58 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Apr 2015 16:21:12 -0700
-Subject: [GIT PULL] omap late prcm clean-up for v4.1
-In-Reply-To: <201504140106.40326.arnd@arndb.de>
-References: <20150403232536.GC18048@atomide.com>
- <201504140106.40326.arnd@arndb.de>
-Message-ID: <20150413232112.GB18048@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Apr 2015 01:27:27 +0200
+Subject: [PATCH v5 00/11] ARM: vf610m4: Add Vybrid Cortex-M4 support
+In-Reply-To: <1428609855-27657-1-git-send-email-stefan@agner.ch>
+References: <1428609855-27657-1-git-send-email-stefan@agner.ch>
+Message-ID: <201504140127.28066.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [150413 16:07]:
-> On Saturday 04 April 2015, Tony Lindgren wrote:
-> > The following changes since commit 209431eff8afb928d72200c79153165c7d860ca0:
-> > 
-> >   ARM: DRA7: Enable Cortex A15 errata 798181 (2015-03-27 14:38:03 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/prcm-dts
-> > 
-> > for you to fetch changes up to 21295368367beaa563b310d5492166dba158b884:
-> > 
-> >   Merge branch '4.0-rc1-prcm-cleanup-v6' of https://github.com/t-kristo/linux-pm into omap-for-v4.1/prcm-cleanup (2015-04-01 12:24:29 -0700)
-> > 
-> > ----------------------------------------------------------------
-> > Clean-up for omap PRCM (Power Reset Clock Management) and interconnects
-> > from Tero Kristo <t-kristo@ti.com>.
-> > 
-> > This sets gets us into a better position for further clean-up:
-> > 
-> > - Gets PRCM code closer to being device drivers
-> > 
-> > - Allows to move the remainig clock code to drivers/clk for v4.2
-> > 
-> > - Starts enforcing interconnect hierarchy in the SoC specific .dts
-> >   files to enforce device drivers are only accesing registers in
-> >   the related hardware module
-> > 
-> > This patchset has seen quite a few revisions but did not come into
-> > mergeable shape until recently. As other patchsets for clock specific
-> > device drivers depend on this, it would be good to get this merged
-> > although it's a bit late for the v4.1 merge window.
-> > 
-> > Note that as the device entries in the .dts files are moved around,
-> > this is based on earlier non-urgent fixes to avoid a non-trivial
-> > merge conflict.
-> 
-> Sorry for missing this earlier, I've put it into the next/late branch now.
-> If everything goes well, we'll submit that a few days after the other
-> branches.
+On Thursday 09 April 2015, Stefan Agner wrote:
+> In this fifth revision the patchset moves away from the idea
+> including ARMv7-M platforms into ARCH_MULTIPLATFORM, but
+> instead adds a new top-level config symbol ARM_SINGLE_ARMV7M
+> Patch 7 adds this new config symbol while patch 8 alters the
+> existing ARMv7-M platform ARCH_EFM32 to use ARM_SINGLE_ARMV7M.
+> I chose to move the config symbol of the ARMv7-M specific
+> architectures (ARCH_EFM32 at that point) below the multiarch
+> includes. I think it is a good idea to keep them together, but
+> I'm not sure if this is an appropriate place. The architecture
+> which Vybrid is depending on, ARCH_MXC, is not also selectable
+> when ARM_SINGLE_ARMV7M is selected.
 
-OK thanks. Yeah this has been sitting in Linux next for about 1.5 weeks
-already. It removes some dependencies for further work so would be
-nice to get this out of the way.
+It's a shame we didn't manage to pull these in in time for 4.1,
+but while the patches look ok to me, they came a little late,
+and it's not clear to me how we should maintain that platform.
 
-Regards,
+You have lots of people on 'To:' for the emails, which is always
+confusing. My preferred way of merging these in 4.2 would be for
+you to send the patches to the imx maintainers so they can
+pick them up and send them to arm at kernel.org.
 
-Tony
+	Arnd
