@@ -1,66 +1,51 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 13 Apr 2015 10:10:37 +0200
-Subject: [PATCH] ARM: socfpga: dts: Add a ciu clock node for sdmmc
-In-Reply-To: <1428699386-2622-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1428699386-2622-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <73wq1g30ua.fsf@unicorn.hi.pengutronix.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 13 Apr 2015 10:01:14 +0200
+Subject: NXP LPC3250 broken?
+In-Reply-To: <CAGhQ9VysMCJzRYz-C_VmWqBAVKXfh2ydq5iNu96RxfD4k0cWvw@mail.gmail.com>
+References: <CAGhQ9VysMCJzRYz-C_VmWqBAVKXfh2ydq5iNu96RxfD4k0cWvw@mail.gmail.com>
+Message-ID: <552B77CA.2070604@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Hi!
+have you tried to compare with an NXP dev kit?
 
-dinguyen at opensource.altera.com writes:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
->
-> The CIU(Card Interface Unit) clock is used by the dw_mmc IP to clock an SD
-> card. The ciu_clk is the sdmmc_clk passed through a fixed divider of 4. This patch
-> adds the ciu_clk node and makes the sdmmc_clk it's parent.
->
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
->  arch/arm/boot/dts/socfpga.dtsi | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index d9176e6..25418ee 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -451,6 +451,14 @@
->  						clk-phase = <0 135>;
->  					};
->  
-> +					ciu_clk: ciu_clk {
-> +						#clock-cells = <0>;
-> +						compatible = "altr,socfpga-gate-clk";
-> +						clocks = <&sdmmc_clk>;
-> +						clk-gate = <0xa0 8>;
-> +						fixed-divider = <4>;
-> +					};
-> +
+I also have an EA board but not currently connected. Will need to test
+when I have access to it again.
 
-Hm, is this correct? The clk-gate at 0xa0 is for the SDMMC_CLK, no?
-Also, maybe the clock should be named "sdmmc_clk_divided" like in the
-datasheet, so it is easier to find.
+Thanks for reporting,
 
->  					nand_x_clk: nand_x_clk {
->  						#clock-cells = <0>;
->  						compatible = "altr,socfpga-gate-clk";
-> @@ -635,7 +643,7 @@
->  			fifo-depth = <0x400>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> -			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
-> +			clocks = <&l4_mp_clk>, <&ciu_clk>;
->  			clock-names = "biu", "ciu";
->  		};
->  
+Roland
 
-Regards,
-Steffen
 
--- 
-Pengutronix e.K.                           | Steffen Trumtrar            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+On 04/12/2015 04:20 PM, Joachim Eastwood wrote:
+> Hi,
+> 
+> I recently got a Embedded Artist LPC3250 (ea3250.dts) board that I
+> wanted to test mainline Linux on.
+> 
+> But with lpc32xx_defconfig, ea3250.dts and the latest rc (v4.0-rc7) I am
+> not getting very far.
+> 
+> First I got a "kernel NULL pointer dereference". See
+> http://slexy.org/raw/s211rzbZL1
+> I got around this one by disabling the leds-gpio driver.
+> 
+> Then, without leds-gpio, I get an endless stream of "unexpected IRQ trap
+> at vector 00" messages.
+> See: http://slexy.org/raw/s2S5Z9TtoV
+> 
+> I also tried an older kernel (3.18). This one seemed at first to hang
+> but after a short while I got lots of backtraces which seem to involve
+> rcu, tick and timer interrupt.
+> See: http://slexy.org/raw/s2024RXCkX
+> 
+> Does anyone got any ideas on what may be going on?
+> 
+> 
+> When I get a bit more time to play around with the kit I will try even
+> older kernels to see if I can get it working at all.
+> 
+> best regards,
+> Joachim Eastwood
