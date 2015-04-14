@@ -1,162 +1,93 @@
 From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Tue, 14 Apr 2015 10:26:52 +0300
-Subject: [PATCHv6 4/4] watchdog: at91sam9_wdt: Convert to use new watchdog
- core extensions
-In-Reply-To: <1428996412-30448-1-git-send-email-timo.kokkonen@offcode.fi>
-References: <1428996412-30448-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <1428996412-30448-5-git-send-email-timo.kokkonen@offcode.fi>
+Date: Tue, 14 Apr 2015 10:26:48 +0300
+Subject: [PATCHv6 0/4] watchdog: Extend kernel API and add early_timeout_sec
+ feature
+Message-ID: <1428996412-30448-1-git-send-email-timo.kokkonen@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fill in the new watchdog core parameters and call
-watchdog_init_params() to let core know we are ready to support the
-new core API extensions. This allows the ad hoc timer code to be
-removed from the driver as the watchdog core takes care of petting the
-driver as needed.
+The watchdog kernel API is quite limited. It has support for providing
+generic device handling, but it doesn't really know anything about the
+watchdog hardware or its constraints. The watchdog drivers come with a
+lot of diversity and their own set of quirks and constraints. Some of
+their limitations are not nice for the user space, so the drivers work
+around them with all sorts of ad hoc implementations.
 
-Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
-Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
----
- drivers/watchdog/at91sam9_wdt.c | 58 +++++++++--------------------------------
- 1 file changed, 12 insertions(+), 46 deletions(-)
+One common pattern is to use kernel timers or work queues to allow
+longer timeout parameters than the actual hardware supports. To solve
+this problem, this patch set extends the kernel watchdog API with a few
+parameters that let the core know more about the watchdog HW and take
+care about the timeout extending.
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 1443b3c..a30dadb 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -29,7 +29,6 @@
- #include <linux/types.h>
- #include <linux/watchdog.h>
- #include <linux/jiffies.h>
--#include <linux/timer.h>
- #include <linux/bitops.h>
- #include <linux/uaccess.h>
- #include <linux/of.h>
-@@ -83,11 +82,8 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
- struct at91wdt {
- 	struct watchdog_device wdd;
- 	void __iomem *base;
--	unsigned long next_heartbeat;	/* the next_heartbeat for the timer */
--	struct timer_list timer;	/* The timer that pings the watchdog */
- 	u32 mr;
- 	u32 mr_mask;
--	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
- 	bool nowayout;
- 	unsigned int irq;
- };
-@@ -115,26 +111,11 @@ static inline void at91_wdt_reset(struct at91wdt *wdt)
- 	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
- }
- 
--/*
-- * Timer tick
-- */
--static void at91_ping(unsigned long data)
--{
--	struct at91wdt *wdt = (struct at91wdt *)data;
--	if (time_before(jiffies, wdt->next_heartbeat) ||
--	    !watchdog_active(&wdt->wdd)) {
--		at91_wdt_reset(wdt);
--		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
--	} else {
--		pr_crit("I will reset your machine !\n");
--	}
--}
--
- static int at91_wdt_start(struct watchdog_device *wdd)
- {
- 	struct at91wdt *wdt = to_wdt(wdd);
--	/* calculate when the next userspace timeout will be */
--	wdt->next_heartbeat = jiffies + wdd->timeout * HZ;
-+
-+	at91_wdt_reset(wdt);
- 	return 0;
- }
- 
-@@ -146,7 +127,7 @@ static int at91_wdt_stop(struct watchdog_device *wdd)
- 
- static int at91_wdt_set_timeout(struct watchdog_device *wdd, unsigned int new_timeout)
- {
--	wdd->timeout = new_timeout;
-+	/* The watchdog hardware can't be reconfigured */
- 	return at91_wdt_start(wdd);
- }
- 
-@@ -196,11 +177,11 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
- 	 * it at the min_heartbeat period.
- 	 */
- 	if ((max_heartbeat / 4) >= min_heartbeat)
--		wdt->heartbeat = max_heartbeat / 4;
-+		wdt->wdd.hw_heartbeat = max_heartbeat / 4;
- 	else if ((max_heartbeat / 2) >= min_heartbeat)
--		wdt->heartbeat = max_heartbeat / 2;
-+		wdt->wdd.hw_heartbeat = max_heartbeat / 2;
- 	else
--		wdt->heartbeat = min_heartbeat;
-+		wdt->wdd.hw_heartbeat = min_heartbeat;
- 
- 	if (max_heartbeat < min_heartbeat + 4)
- 		dev_warn(dev,
-@@ -220,32 +201,15 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
- 			 "watchdog already configured differently (mr = %x expecting %x)\n",
- 			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
- 
--	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
-+	wdt->wdd.hw_features = WDOG_HW_RUNNING_AT_BOOT;
-+	watchdog_init_params(&wdt->wdd, dev);
- 
--	/*
--	 * Use min_heartbeat the first time to avoid spurious watchdog reset:
--	 * we don't know for how long the watchdog counter is running, and
--	 *  - resetting it right now might trigger a watchdog fault reset
--	 *  - waiting for heartbeat time might lead to a watchdog timeout
--	 *    reset
--	 */
--	mod_timer(&wdt->timer, jiffies + min_heartbeat);
--
--	/* Try to set timeout from device tree first */
--	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
--		watchdog_init_timeout(&wdt->wdd, heartbeat, dev);
- 	watchdog_set_nowayout(&wdt->wdd, wdt->nowayout);
- 	err = watchdog_register_device(&wdt->wdd);
- 	if (err)
--		goto out_stop_timer;
--
--	wdt->next_heartbeat = jiffies + wdt->wdd.timeout * HZ;
-+		return err;
- 
- 	return 0;
--
--out_stop_timer:
--	del_timer(&wdt->timer);
--	return err;
- }
- 
- /* ......................................................................... */
-@@ -287,6 +251,8 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
- 		}
- 	}
- 
-+	wdt->wdd.hw_max_timeout = max * HZ;
-+
- 	min = secs_to_ticks(min);
- 	max = secs_to_ticks(max);
- 
-@@ -346,6 +312,7 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 	wdt->wdd.timeout = WDT_HEARTBEAT;
- 	wdt->wdd.min_timeout = 1;
- 	wdt->wdd.max_timeout = 0xFFFF;
-+	wdt->wdd.hw_max_timeout = 15 * HZ;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	wdt->base = devm_ioremap_resource(&pdev->dev, r);
-@@ -376,7 +343,6 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
- 	watchdog_unregister_device(&wdt->wdd);
- 
- 	pr_warn("I quit now, hardware will probably reboot!\n");
--	del_timer(&wdt->timer);
- 
- 	return 0;
- }
+The patch set also implements "early_timeout_sec" feature that is very
+common on many production systems where early kernel or user space
+crashes must lead to a device reset. Traditional watchdog handling
+does not allow this as the watchdog is stopped (fully or emulating
+stopped state with kernel timers) before user space opens it for the
+first time.
+
+The changes are designed to be taken in use one driver at time. If the
+driver does not set the new parameters and call
+watchdog_init_params(), the watchdog behavior is exactly the same as
+before.
+
+In principle this new API makes it possible for the user space to see
+every watchdog hardware to behave the same, at least in terms of
+watchdog timeouts. Once the API is in, it should be easier to move
+even more common behavior out of the driver code to the watchdog core
+and make the drivers simpler. This patch set converts at91sam9_wdt to
+use the new API.
+
+Please review and give feedback.
+
+Patch revision history:
+
+-v6: Fixed some issued based on feedback from Wenyou Yang. The logic
+  in watchdog_worker() function is now significantly easier to
+  read. Several errors with stopping and starting the worker are also
+  now fixed.
+
+-v5: Re-think the approach to be fully generic. The early_timeout_sec
+  handling is no longer in the driver but in the watchdog core. As a
+  result the core needed to gain knowledge about the watchdog
+  hardware. Appropriate handling is added in the core. The side effect
+  for this is that drivers using the new extensions can be simplified
+  a lot and different kinds of watchdog hardware can be made to
+  behave the same for the user space.
+
+-v4: Binding documentation is now separated completely from the driver
+  patch. The documentation no longer makes any assumptions about how
+  the actual implementation is made, it just describes the actual
+  behavior the driver should implement in order to satisfy the
+  requirement.
+
+- v3: Rename the property to "early-timeout-sec" and use it as a
+  timeout value that stops the timer in the atmel driver after the
+  timeout expires. A watchdog.txt is also introduced for documenting
+  the common watchdog properties, including now this one and
+  "timeout-sec" property.
+
+- v2: Rename the property to "enable-early-reset" as the behavior
+  itself is not atmel specific. This way other drivers are free to
+  implement same behavior with the same property name.
+
+- v1: Propose property name "atmle,no-early-timer" for disabling the
+  timer that keeps the atmel watchdog running until user space opens
+  the device.
+
+Timo Kokkonen (4):
+  watchdog: Extend kernel API to know about HW limitations
+  watchdog: Allow watchdog to reset device at early boot
+  devicetree: Document generic watchdog properties
+  watchdog: at91sam9_wdt: Convert to use new watchdog core extensions
+
+ .../devicetree/bindings/watchdog/watchdog.txt      |  20 ++++
+ drivers/watchdog/at91sam9_wdt.c                    |  58 ++--------
+ drivers/watchdog/watchdog_core.c                   | 124 ++++++++++++++++++++-
+ drivers/watchdog/watchdog_dev.c                    |  26 ++++-
+ include/linux/watchdog.h                           |  24 ++++
+ 5 files changed, 201 insertions(+), 51 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/watchdog.txt
+
 -- 
 2.1.0
