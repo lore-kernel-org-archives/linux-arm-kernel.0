@@ -1,84 +1,60 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 14 Apr 2015 19:21:08 +0200
-Subject: [PATCH v8 00/18] Tegra124 CL-DVFS / DFLL clocksource + cpufreq
-In-Reply-To: <552CF947.9030609@kapsi.fi>
-References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
- <20150311100741.GK19577@ulmo.nvidia.com>
- <20150410211157.14369.51754@quantum> <552CF947.9030609@kapsi.fi>
-Message-ID: <20150414192108.6a376ce8@bbrezillon>
+Date: Tue, 14 Apr 2015 19:48:26 +0200
+Subject: [PATCH] clk: at91: pll: fix input range validity check
+In-Reply-To: <20150413043725.19585.5717@quantum>
+References: <1427594023-9697-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150413043725.19585.5717@quantum>
+Message-ID: <20150414194826.1c43aff1@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mikko,
+Hi Mike,
 
-On Tue, 14 Apr 2015 14:25:59 +0300
-Mikko Perttunen <mikko.perttunen@kapsi.fi> wrote:
+On Sun, 12 Apr 2015 21:37:25 -0700
+Michael Turquette <mturquette@linaro.org> wrote:
 
-> On 04/11/2015 12:11 AM, Michael Turquette wrote:
-> > Quoting Thierry Reding (2015-03-11 03:07:43)
-> >> Hi Mike,
-> >>
-> >> Have you had a chance to look at these changes to the Tegra clock
-> >> driver? If you're fine with it, I'd like to take these patches through
-> >> the Tegra tree because the rest of the series depends on them. I can
-> >> provide a stable branch in case we need to base other Tegra clock
-> >> changes on top of this.
-> >
-> > Hi Thierry,
-> >
-> > Clock patches (and corresponding DT binding descriptions and changes to
-> > DTS) look fine to me. Please add:
-> >
-> > Acked-by: Michael Turquette <mturquette@linaro.org>
-> >
-> > I did have a question about the beahvior of clk_put in one of Mikko's
-> > patches but it should not gate this series. I'm just trying to find out
-> > if we have a bug in the framework or if the Tegra driver is a special
-> > case.
-> >
-> > Also I do not think a stable branch is necessary.
-> >
-> > Regards,
-> > Mike
-> >
+> Quoting Boris Brezillon (2015-03-28 18:53:43)
+> > The PLL impose a certain input range to work correctly, but it appears that
+> > this input range does not apply on the input clock (or parent clock) but
+> > on the input clock after it has passed the PLL divisor.
+> > Fix the implementation accordingly.
+> > 
+> > Cc: <stable@vger.kernel.org> # v3.14+
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Reported-by: Jonas Andersson <jonas@microbit.se>
 > 
-> Looks like in the meantime, this has been partially broken by
-> 03bc10ab5b0f "clk: check ->determine/round_rate() return value in 
-> clk_calc_new_rates". The highest rates supported by the DFLL clock have 
-> 1 in the MSB, so those cannot be entered after the aforementioned patch, 
-> as the return value of round_rate is interpreted as an error. Avenues 
-> that I can see: 1) revert the above patch 2) restrict the cpu clock rate 
-> to those with 0 in the MSB 3) move to 64-bit clock rates.
+> Hi Boris,
+> 
+> OK, so this patch along with your two previous submissions kind of
+> tackle some of items I mentioned earlier today[0].
+> 
+> Does this patch, combined with your two prior patches[1][2] resolve the
+> issue you brought up in your "Propagating clock rate constraints"
+> thread[3]?
 
-How about changing ->determine_rate() and ->round_rate() prototypes so
-that they always return 0 or an error code and passing the adjusted_rate
-as an argument ?
+Unfortunately it doesn't (though it does resolve one of my
+issues, so I definitely need that patch :-)).
 
-Something like that:
+Take the following case:
+1/ clock X takes clock Y as its parent (let's say clock X is a clock
+divider)
+2/ user U claims clock X and configure X's rate (X then propagates
+rate change to Y) and assign a specific supported rate range to X
+2/ user V claims clock Y and sets a specific rate
 
-	int (*round_rate)(struct clk_hw *hw, unsigned long *rate,
-			  unsigned long *parent_rate);
-	int (*determine_rate)(struct clk_hw *hw, unsigned long *rate,
-			      unsigned long min_rate,
-			      unsigned long max_rate,
-			      unsigned long *best_parent_rate,
-			      struct clk_hw **best_parent_hw);
+As of today, the constraint U has set on clock X is not propagated to
+clock Y, which means user V might configure a rate that is not
+fulfilling users V constraint, and the clk infrastructure won't
+complain (actually it won't detect it).
 
-I know this implies a lot of changes (in all clock drivers and in the
-core infrastructure), but I really think we should not mix error codes
-and clock frequencies (even if we decide to move to a 64 bits rate
-approach).
+Here's what I would expect: if a (MIN -> MAX) constraint is set on clock
+X the (MIN * XDIV -> MAX * XDIV) constraint should be propagated to
+clock Y.
 
-Anyway, IMHO the only alternative to this solution is solution #3,
-because #1 implies re-introducing another bug where
-->round_rate()/->determine_rate() are silently ignored, and #2 implies
-lying about your DFLL capabilities.
-
-Mike, what's your opinion ?
+Am I wrong ?
 
 Best Regards,
 
-Boris
 
 -- 
 Boris Brezillon, Free Electrons
