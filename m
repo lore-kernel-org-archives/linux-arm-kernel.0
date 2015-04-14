@@ -1,263 +1,43 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 14 Apr 2015 10:27:02 +0200
-Subject: [PATCH v2 07/10] KVM: arm64: guest debug, add support for
- single-step
-In-Reply-To: <1427814488-28467-8-git-send-email-alex.bennee@linaro.org>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-8-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150414082702.GT6186@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Apr 2015 10:30:30 +0200
+Subject: [GIT PULL v2 1/2] ARM: tegra: Core code changes for v4.1-rc1
+In-Reply-To: <20150414070649.GA11715@ulmo>
+References: <1427710333-13472-1-git-send-email-thierry.reding@gmail.com>
+ <201504140109.56537.arnd@arndb.de> <20150414070649.GA11715@ulmo>
+Message-ID: <2204375.plVGQ25v9Q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-
-On Tue, Mar 31, 2015 at 04:08:05PM +0100, Alex Benn?e wrote:
-> This adds support for single-stepping the guest. As userspace can and
-> will manipulate guest registers before restarting any tweaking of the
-> registers has to occur just before control is passed back to the guest.
-
-this sentence is hard to read.  Do you mean:
-
-(a) As userspace can and will manipulate guest register, we must ensure
-that any tweaking of the registers before restarting the guest happens
-immediately before...
-
-or
-
-(b) As userspace manipulates guest registers before restarting the
-guest, we must ensure that any tweaking of the register happens
-immediately before...
-
-> Furthermore while guest debugging is in effect we need to squash the
-
-Furthermore, while guest debugging is in effect,
-(commas)
-
-> ability of the guest to single-step itself as we have no easy way of
-> re-entering the guest after the exception has been delivered to the
-> hypervisor.
-
-I'm not sure I understand this last part of the sentence.  Is the point
-that if we trap on a guest single-step exception we cannot easily inject
-such an exception back into the guest and therefore we trap the guest if
-it tries to set itself up for single-stepping?
-
-What is our recourse then?  To just ignore the single-step setting of
-the guest and execute it as normal (while single-stepping the guest from
-the outside)?
-
+On Tuesday 14 April 2015 09:06:50 Thierry Reding wrote:
+> On Tue, Apr 14, 2015 at 01:09:56AM +0200, Arnd Bergmann wrote:
+> > On Saturday 11 April 2015, Michael Turquette wrote:
+> > > > Tomeu Vizoso (8):
+> > > >       of: Document long-ram-code property in nvidia,tegra20-apbmisc
+> > > >       of: Document timings subnode of nvidia,tegra-mc
+> > > >       memory: tegra: Disable ARBITRATION_EMEM interrupt
+> > > >       of: document new emc-timings subnode in nvidia,tegra124-car
+> > > >       of: document external-memory-controller property in tegra124-car
+> > > >       clk: Expose clk_hw_reparent() to providers
+> > > 
+> > > ... this patch! I'd prefer to not do this. Let's see if
+> > > .set_rate_and_parent solve the problem for you.
+> > 
+> > Not pulling this for 4.1 then. Even without the objections, it was basically
+> > too late for the amount of changes now.
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> ---
-> v2
->   - Move pstate/mdscr manipulation into C
->   - don't export guest_debug to assembly
->   - add accessor for saved_debug regs
->   - tweak save/restore of mdscr_el1
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index d3bc8dc..c1ed8cb 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -304,7 +304,21 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->  	kvm_arm_set_running_vcpu(NULL);
->  }
->  
-> -#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE|KVM_GUESTDBG_USE_SW_BP)
-> +#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE |    \
-> +			    KVM_GUESTDBG_USE_SW_BP | \
-> +			    KVM_GUESTDBG_SINGLESTEP)
-> +
-> +/**
-> + * kvm_arch_vcpu_ioctl_set_guest_debug - Setup guest debugging
-> + * @kvm:	pointer to the KVM struct
-> + * @kvm_guest_debug: the ioctl data buffer
-> + *
-> + * This sets up the VM for guest debugging. Care has to be taken when
-> + * manipulating guest registers as these will be set/cleared by the
-> + * hyper-visor controller, typically before each kvm_run event. As a
+> For my education, when do you expect pull requests with "this amount of
+> changes" to be sent?
 
-which guest registers are set/cleared by userspace exactly?
+Generally speaking, we want large patch series to come early after -rc1,
+followed by smaller subsequent updates. We often don't get around to
+applying stuff before -rc3, which is a problem on our side, but it helps
+to have patches available by then.
 
-s/by the hyper-visor controller/by userspace/
+Also, if you have a large series (100+ patches) early on, we'd be more
+likely to take a 20-patch series later than if the 20-patch series comes
+at rc6 and is the first thing we see from you: after around rc5 or rc6,
+what we want to see are mostly patches that directly result from work
+that we merged earlier for the same merge window, like regression fixes
+or wrapping up a larger series that was started but incomplete at -rc2.
 
-> + * result modification of the guest registers needs to take place
-
-As a result, (comma)
-
-s/needs to/must/
-
-> + * after they have been restored in the hyp.S trampoline code.
-
-trampoline code?  The trampoline code we are referring to is in
-hyp-init.S.  Do you mean in EL2?  Then just sya in hyp.S or say in EL2
-or in hyp mode.
-
-> + */
->  
->  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->  					struct kvm_guest_debug *dbg)
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 0631840..6a33647 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -121,6 +121,13 @@ struct kvm_vcpu_arch {
->  	 * here.
->  	 */
->  
-> +	/* Registers pre any guest debug manipulations */
-
-I couldn't find 'pre' as an independent word in any English
-dictionaries.  I'm also not entirely sure what you mean?  Who modifies
-this when, and why do we need to store this?
-
-> +	struct {
-> +		u32	pstate_ss_bit;
-> +		u32	mdscr_el1_bits;
-> +
-> +	} debug_saved_regs;
-
-If I understood this state correctly (see below), then guest_debug_state
-is probably a better name for this struct.
-
-> +
->  	/* Don't run the guest */
->  	bool pause;
->  
-> @@ -143,6 +150,7 @@ struct kvm_vcpu_arch {
->  
->  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
->  #define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
-> +#define vcpu_debug_saved_reg(v, r) ((v)->arch.debug_saved_regs.r)
-
-hmm, not sure this is warranted if the 'saved_regs' is not the current
-state of the VM, which is sort of what the vcpu_gp_regs() and friends
-hint at.  Maybe I'm just not getting exactly what piece of state it is.
-
->  /*
->   * CP14 and CP15 live in the same array, as they are backed by the
->   * same system registers.
-> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-> index cff0475..b32362c 100644
-> --- a/arch/arm64/kvm/debug.c
-> +++ b/arch/arm64/kvm/debug.c
-> @@ -19,8 +19,16 @@
->  
->  #include <linux/kvm_host.h>
->  
-> +#include <asm/debug-monitors.h>
-> +#include <asm/kvm_asm.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_host.h>
-> +#include <asm/kvm_emulate.h>
-> +
-> +/* These are the bits of MDSCR_EL1 we may mess with */
-
-we may mess with?  Can you be more specific?
-
-> +#define MDSCR_EL1_DEBUG_BITS	(DBG_MDSCR_SS | \
-> +				DBG_MDSCR_KDE | \
-> +				DBG_MDSCR_MDE)
->  
->  /**
->   * kvm_arch_setup_debug - set-up debug related stuff
-> @@ -51,15 +59,46 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
->  	else
->  		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
->  
-> -	/* Trap breakpoints? */
-> -	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
-> +	/* Is Guest debugging in effect? */
-> +	if (vcpu->guest_debug) {
->  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
-> -	else
-> -		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
->  
-> +		/* Save pstate/mdscr */
-> +		vcpu_debug_saved_reg(vcpu, pstate_ss_bit) =
-> +			*vcpu_cpsr(vcpu) & DBG_SPSR_SS;
-> +		vcpu_debug_saved_reg(vcpu, mdscr_el1_bits) =
-> +			vcpu_sys_reg(vcpu, MDSCR_EL1) & MDSCR_EL1_DEBUG_BITS;
-
-nit: add blank line
-
-> +		/*
-> +		 * Single Step (ARM ARM D2.12.3 The software step state
-> +		 * machine)
-> +		 *
-> +		 * If we are doing Single Step we need to manipulate
-> +		 * MDSCR_EL1.SS and PSTATE.SS. If not we need to
-> +		 * suppress the guest from messing with it.
-
-If not, we must prevent the guest from modifying them.
-     ^^^    ^^^    ^^^                            ^^^
-
-Why must we prevent the guest from modifying them if we're not
-single-stepping the guest?
-
-
-> +		 */
-> +		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-> +			*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
-> +			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
-> +		} else {
-> +			*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
-> +			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
-> +		}
-> +
-> +	} else {
-> +		/* Debug operations can go straight to the guest */
-> +		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
-> +	}
->  }
->  
->  void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
->  {
-> -	/* Nothing to do yet */
-> +	if (vcpu->guest_debug) {
-> +		/* Restore pstate/mdscr bits we may have messed with */
-
-Can you be more specific than "messed with"?  "... bits that may have
-been modified if we were debugging the guest" ?
-
-Drew's suggestion may make this easier to read...
-
-
-> +		*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
-> +		*vcpu_cpsr(vcpu) |= vcpu_debug_saved_reg(vcpu, pstate_ss_bit);
-> +
-> +		vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~MDSCR_EL1_DEBUG_BITS;
-> +		vcpu_sys_reg(vcpu, MDSCR_EL1) |=
-> +			vcpu_debug_saved_reg(vcpu, mdscr_el1_bits);
-
-So the debug_saved_reg is simply the guest's view of the debug
-registers?  In that case I think vcpu_guest_dbg_reg() is more clear.
-
-
-
-> +	}
->  }
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index ed1bbb4..16accae 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -101,6 +101,7 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	run->debug.arch.hsr = hsr;
->  
->  	switch (hsr >> ESR_ELx_EC_SHIFT) {
-> +	case ESR_ELx_EC_SOFTSTP_LOW:
->  	case ESR_ELx_EC_BKPT32:
->  	case ESR_ELx_EC_BRK64:
->  		run->debug.arch.pc = *vcpu_pc(vcpu);
-> @@ -127,6 +128,7 @@ static exit_handle_fn arm_exit_handlers[] = {
->  	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
->  	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
->  	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
-> +	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
->  	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
->  	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
->  };
-> -- 
-> 2.3.4
-> 
+	Arnd
