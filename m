@@ -1,32 +1,164 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 14 Apr 2015 12:44:47 +0200
-Subject: [PATCH 05/13] thermal: inline only once used function
-In-Reply-To: <20150407022307.GE4648@localhost.localdomain>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-6-git-send-email-s.hauer@pengutronix.de>
- <20150407022307.GE4648@localhost.localdomain>
-Message-ID: <20150414104447.GI4946@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 14 Apr 2015 11:47:12 +0100
+Subject: [PATCH v3 07/11] arm64: fixmap: allow init before linear mapping
+ is set up
+In-Reply-To: <1428674035-26603-8-git-send-email-ard.biesheuvel@linaro.org>
+References: <1428674035-26603-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1428674035-26603-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150414104711.GC28709@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 06, 2015 at 07:23:08PM -0700, Eduardo Valentin wrote:
-> On Thu, Mar 26, 2015 at 04:53:52PM +0100, Sascha Hauer wrote:
-> > Inline update_temperature into its only caller to make the code
-> > more readable.
+Hi Ard,
+
+On Fri, Apr 10, 2015 at 02:53:51PM +0100, Ard Biesheuvel wrote:
+> This reworks early_ioremap_init() so it populates the various levels
+> of translation tables while taking the following into account:
+> - be prepared for any of the levels to have been populated already, as
+>   this may be the case once we move the kernel text mapping out of the
+>   linear mapping;
+> - don't rely on __va() to translate the physical address in a page table
+>   entry to a virtual address, since this produces linear mapping addresses;
+>   instead, use the fact that at any level, we know exactly which page in
+>   swapper_pg_dir an entry could be pointing to if it points anywhere.
+
+Can we not use Catalin's PHYS_OFFSET swizzling trick instead? i.e.
+
+ * Set PHYS_OFFSET so __va hits in the text mapping.
+
+ * Create the fixmap entries.
+
+ * Parse the DTB or UEFI memory map, figure out the real PHYS_OFFSET.
+ 
+ * Create linear mapping for the initial tables.
+
+ * Swap PHYS_OFFSET for the real version, and update init_mm->pgd to
+   point at the linear map alias of the swapper pgd.
+
+It seemed like that would require less open-coding of table manipulation
+code, as we could use __va() early.
+
+Is there a limitation with that approach that I'm missing?
+
+Otherwise, comments below.
+
+> This allows us to defer the initialization of the linear mapping until
+> after we have figured out where our RAM resides in the physical address
+> space.
 > 
-> I am not sure I understand how this is improving readability, can you
-> please elaborate?
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/compiler.h |   2 +
+>  arch/arm64/kernel/vmlinux.lds.S   |  14 +++--
+>  arch/arm64/mm/mmu.c               | 117 +++++++++++++++++++++++++-------------
+>  3 files changed, 90 insertions(+), 43 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
+> index ee35fd0f2236..dd342af63673 100644
+> --- a/arch/arm64/include/asm/compiler.h
+> +++ b/arch/arm64/include/asm/compiler.h
+> @@ -27,4 +27,6 @@
+>   */
+>  #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
+>  
+> +#define __pgdir		__attribute__((section(".pgdir"),aligned(PAGE_SIZE)))
+> +
+>  #endif	/* __ASM_COMPILER_H */
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 98073332e2d0..604f285d3832 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -160,11 +160,15 @@ SECTIONS
+>  
+>  	BSS_SECTION(0, 0, 0)
+>  
+> -	. = ALIGN(PAGE_SIZE);
+> -	idmap_pg_dir = .;
+> -	. += IDMAP_DIR_SIZE;
+> -	swapper_pg_dir = .;
+> -	. += SWAPPER_DIR_SIZE;
+> +	.pgdir (NOLOAD) : {
+> +		. = ALIGN(PAGE_SIZE);
+> +		idmap_pg_dir = .;
+> +		. += IDMAP_DIR_SIZE;
+> +		swapper_pg_dir = .;
+> +		__swapper_bs_region = . + PAGE_SIZE;
+> +		. += SWAPPER_DIR_SIZE;
+> +		*(.pgdir)
+> +	}
+>  
+>  	_end = .;
+>  
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 60be58a160a2..c0427b5c90c7 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -341,6 +341,70 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+>  }
+>  #endif
+>  
+> +struct mem_bootstrap_region {
 
-It improves readability because the reader does not have to lookup the
-definition of update_temperature but can instead just read through. The
-function name "update_temperature" does not give new information either,
-so I thought inlining the code is a good idea. Anyway, I can skip this
-patch if you want.
+The "region" naming is a little confusing IMO. To me it sounds like
+something akin to a VMA rather than a set of tables.
 
-Sascha
+> +#if CONFIG_ARM64_PGTABLE_LEVELS > 3
+> +	pud_t	pud[PTRS_PER_PUD];
+> +#endif
+> +#if CONFIG_ARM64_PGTABLE_LEVELS > 2
+> +	pmd_t	pmd[PTRS_PER_PMD];
+> +#endif
+> +	pte_t	pte[PTRS_PER_PTE];
+> +};
+> +
+> +static void __init bootstrap_mem_region(unsigned long addr,
+> +					struct mem_bootstrap_region *reg,
+> +					pmd_t **ppmd, pte_t **ppte)
+> +{
+> +	/*
+> +	 * Avoid using the linear phys-to-virt translation __va() so that we
+> +	 * can use this code before the linear mapping is set up. Note that
+> +	 * any populated entries at any level can only point into swapper_pg_dir
+> +	 * since no other translation table pages have been allocated yet.
+> +	 * So at each level, we either need to populate it, or it has already
+> +	 * been populated by a swapper_pg_dir table at the same level, in which
+> +	 * case we can figure out its virtual address without applying __va()
+> +	 * on the contents of the entry, using the following struct.
+> +	 */
+> +	extern struct mem_bootstrap_region __swapper_bs_region;
+> +
+> +	pgd_t *pgd = pgd_offset_k(addr);
+> +	pud_t *pud = (pud_t *)pgd;
+> +	pmd_t *pmd = (pmd_t *)pud;
+> +
+> +#if CONFIG_ARM64_PGTABLE_LEVELS > 3
+> +	if (pgd_none(*pgd)) {
+> +		clear_page(reg->pud);
+> +		pgd_populate(&init_mm, pgd, reg->pud);
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+What's PHYS_OFFSET expected to be at this point (for the purposes of
+__pa() in the *_populate*() macros)?
+
+If we're relying on __pa() to convert text->phys, won't __va() convert
+phys->text at this point?
+
+> +		pud = reg->pud;
+> +	} else {
+> +		pud = __swapper_bs_region.pud;
+> +	}
+> +	pud += pud_index(addr);
+> +#endif
+
+Can we free the unused reg tables in the else cases? If __pa() works we
+should be able to hand them to memblock, no?
+
+[...]
+
+>  	/*
+>  	 * The boot-ioremap range spans multiple pmds, for which
+> -	 * we are not preparted:
+> +	 * we are not prepared:
+
+This typo has been bugging me for ages. I'll be glad to see it go!
+
+Mark.
