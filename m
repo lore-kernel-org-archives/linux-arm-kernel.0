@@ -1,34 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Apr 2015 00:28:09 +0200
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <20150414150034.GF14546@e104818-lin.cambridge.arm.com>
-References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
- <2069111.6po5Xr33Dn@wuerfel>
- <20150414150034.GF14546@e104818-lin.cambridge.arm.com>
-Message-ID: <2947000.5TRODaJfhK@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Apr 2015 23:30:29 +0100
+Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
+ callbacks
+In-Reply-To: <20150414162210.GA29874@dtor-ws>
+References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
+ <20150414162210.GA29874@dtor-ws>
+Message-ID: <20150414223029.GU12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 April 2015 16:00:34 Catalin Marinas wrote:
-> On Tue, Apr 14, 2015 at 04:07:36PM +0200, Arnd Bergmann wrote:
-> > For completeness, there is yet another option, which would be to use the
-> > exact system call table from arm64 and do all the emulation in user space
-> > rather than the kernel. This would however be the least compatible with
-> > existing source code, so you probably don't want to do that.
+On Tue, Apr 14, 2015 at 09:22:10AM -0700, Dmitry Torokhov wrote:
+> On Tue, Apr 14, 2015 at 12:41:48PM +0200, Ulf Hansson wrote:
+> > The legacy system PM support has long time ago been dropped from the
+> > AMBA bus. Align to that by converting to the modern system PM
+> > callbacks.
+> > 
+> > Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
+> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > 
-> It would be great if this worked but I think we looked at it before and
-> it seems nice until you hit the futex stuff and robust lists (I don't
-> fully remember the details). Some of the structures (siginfo) would no
-> longer be POSIX compliant and some of them aren't only accessed via libc
-> to be able to create shadow copies.
+> If this has not been noticed since end of 2013 maybe we should drop the
+> driver?
 
-Well, that may or may not be acceptable. Aarch64-ilp32 mode is a hack to
-enable a very special class of applications, it's not like anyone would
-want to run a full system for this and need POSIX compliance.
+That's rather silly.  It isn't a build breakage, and it's not a
+functional breakage.  In fact, this driver gets build and boot tested
+every evening on hardware I have here in my autobuild system.
 
-We could definitely be pragmatic and do whatever helps get the job
-done. That said, it diverges further from what legacy 32-bit applications
-expect to see, so this approach will likely make an application port harder,
-not easier.
+The regression is only visible if it is used on a platform with power
+management support, and that's probably close to none - unless hibernate
+support is enabled.  I'm just pushing up some patches which fix long
+term hibernation issues on ARM.
 
-	Arnd
+If we apply your "lets drop stuff" argument, maybe we should drop ARM
+hibernation support because its been broken for many years... obviously
+that's also a rediculous suggestion.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
