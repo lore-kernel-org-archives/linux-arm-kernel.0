@@ -1,47 +1,43 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 14 Apr 2015 23:32:43 +0100
-Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
-In-Reply-To: <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
-References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
- <493B15F8-0EBE-4633-9604-671EF403F36E@codeaurora.org>
- <20150410161052.GF6854@e104818-lin.cambridge.arm.com>
- <FDC755A7-ACCF-4222-8730-782EEC632159@codeaurora.org>
- <20150413094117.GA2745@e104818-lin.cambridge.arm.com>
- <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
-Message-ID: <20150414223242.GA18888@e107981-lin.cambridge.arm.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Tue, 14 Apr 2015 15:50:56 -0700
+Subject: [PATCH 0/7] selftests: fixes for installation and cross compilation
+Message-ID: <1429051856-14557-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 03:21:17PM +0100, Kumar Gala wrote:
+This patch set fixes various issues observed when cross building and 
+installing selftests.
 
-[...]
+As I began investigating improving the test output format, I performed an 
+audit of the current tests to ensure all tests were able to execute on various 
+target architectures. I found that some tests did not install their binaries 
+and others required directories to be installed to execute properly. There 
+were also cases in which tests were being installed when they were never built.
+With this series applied all tests compile when appropriate and install their 
+output properly.
 
-> > Looking beyond this set of patches, I can foresee that you won't care
-> > about the generic arm64 cpuidle driver either, or more precisely the
-> > separation between cpuidle subsystem+driver and the SoC-specific
-> > back-end (cpu_operations).
-> 
-> That's probably true for what I guess are a number of reasons.  I'm guessing the arm64 cpuidle driver expects PSCI.
+I have tested this series by building, installing and deploying all selftests 
+to x86, arm and arm64 targets. 
 
-Wrap lines sensibly please.
+This series is based on next-20150414
 
-The arm64 cpuidle driver, that is now arm generic cpuidle driver does
-not expect anything apart from an enable-method (and you pulled
-part of its back-end implementation for arm32 Qualcomm platforms, FYI).
+Tyler Baker (7):
+  selftests: copy TEST_DIRS to INSTALL_PATH
+  selftests/ftrace: install test.d
+  selftests/breakpoints: emit skip and omit installation when tests are
+    not compiled
+  selftests/kdbus: install kdbus-test
+  selftests/x86: fix cross build logic
+  selftests/x86: install tests
+  selftests/exec: do not install subdir as it is already created
 
-It took years to consolidate it and the main reason was the lack of
-standard interfaces for power down/up sequences that this patchset of
-yours wants to promote in arm64 world.
+ tools/testing/selftests/breakpoints/Makefile |  7 ++++-
+ tools/testing/selftests/exec/Makefile        |  2 +-
+ tools/testing/selftests/ftrace/Makefile      |  1 +
+ tools/testing/selftests/kdbus/Makefile       |  2 ++
+ tools/testing/selftests/lib.mk               |  3 ++
+ tools/testing/selftests/x86/Makefile         | 41 +++++++++++++++++++++-------
+ 6 files changed, 44 insertions(+), 12 deletions(-)
 
-The lack of standard power interfaces may not have been an issue for you,
-who cares about Qualcomm code, it has been a sore issue for people
-trying to generalize things across ARM platforms in the kernel, which is
-the only sensible way forward.
-
-PSCI is a standard interface (and Qualcomm are already contributing to
-it, for the records) that can certainly be extended, and you are welcome
-to contribute to it, but certainly not ignored.
-
-Thanks,
-Lorenzo
+-- 
+2.1.0
