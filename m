@@ -1,39 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Apr 2015 23:30:29 +0100
-Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
- callbacks
-In-Reply-To: <20150414162210.GA29874@dtor-ws>
-References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
- <20150414162210.GA29874@dtor-ws>
-Message-ID: <20150414223029.GU12732@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 14 Apr 2015 23:32:43 +0100
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
+ <493B15F8-0EBE-4633-9604-671EF403F36E@codeaurora.org>
+ <20150410161052.GF6854@e104818-lin.cambridge.arm.com>
+ <FDC755A7-ACCF-4222-8730-782EEC632159@codeaurora.org>
+ <20150413094117.GA2745@e104818-lin.cambridge.arm.com>
+ <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
+Message-ID: <20150414223242.GA18888@e107981-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 09:22:10AM -0700, Dmitry Torokhov wrote:
-> On Tue, Apr 14, 2015 at 12:41:48PM +0200, Ulf Hansson wrote:
-> > The legacy system PM support has long time ago been dropped from the
-> > AMBA bus. Align to that by converting to the modern system PM
-> > callbacks.
-> > 
-> > Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Tue, Apr 14, 2015 at 03:21:17PM +0100, Kumar Gala wrote:
+
+[...]
+
+> > Looking beyond this set of patches, I can foresee that you won't care
+> > about the generic arm64 cpuidle driver either, or more precisely the
+> > separation between cpuidle subsystem+driver and the SoC-specific
+> > back-end (cpu_operations).
 > 
-> If this has not been noticed since end of 2013 maybe we should drop the
-> driver?
+> That's probably true for what I guess are a number of reasons.  I'm guessing the arm64 cpuidle driver expects PSCI.
 
-That's rather silly.  It isn't a build breakage, and it's not a
-functional breakage.  In fact, this driver gets build and boot tested
-every evening on hardware I have here in my autobuild system.
+Wrap lines sensibly please.
 
-The regression is only visible if it is used on a platform with power
-management support, and that's probably close to none - unless hibernate
-support is enabled.  I'm just pushing up some patches which fix long
-term hibernation issues on ARM.
+The arm64 cpuidle driver, that is now arm generic cpuidle driver does
+not expect anything apart from an enable-method (and you pulled
+part of its back-end implementation for arm32 Qualcomm platforms, FYI).
 
-If we apply your "lets drop stuff" argument, maybe we should drop ARM
-hibernation support because its been broken for many years... obviously
-that's also a rediculous suggestion.
+It took years to consolidate it and the main reason was the lack of
+standard interfaces for power down/up sequences that this patchset of
+yours wants to promote in arm64 world.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+The lack of standard power interfaces may not have been an issue for you,
+who cares about Qualcomm code, it has been a sore issue for people
+trying to generalize things across ARM platforms in the kernel, which is
+the only sensible way forward.
+
+PSCI is a standard interface (and Qualcomm are already contributing to
+it, for the records) that can certainly be extended, and you are welcome
+to contribute to it, but certainly not ignored.
+
+Thanks,
+Lorenzo
