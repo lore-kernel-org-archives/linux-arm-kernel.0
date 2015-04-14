@@ -1,67 +1,62 @@
 From: jbe@pengutronix.de (Juergen Borleis)
-Date: Tue, 14 Apr 2015 11:11:54 +0200
-Subject: [PATCH 3/5] RTC/i.MX/DryIce: monitor a security violation at runtime
+Date: Tue, 14 Apr 2015 11:11:55 +0200
+Subject: [PATCH 4/5] RTC/i.MX/DryIce: when locked, do not fail silently
 In-Reply-To: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
 References: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <1429002716-19821-4-git-send-email-jbe@pengutronix.de>
+Message-ID: <1429002716-19821-5-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Maybe the unit enters the hardware related state at runtime and not at
-system boot time (after a power cycle).
 
 Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
 Signed-off-by: Robert Schwebel <rsc@pengutronix.de>
 [rsc: got NDA clearance from Freescale]
 ---
- drivers/rtc/rtc-imxdi.c | 21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ drivers/rtc/rtc-imxdi.c | 28 +++++++++++++++++++++++++---
+ 1 file changed, 25 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
-index f8abf2b..b04c64f 100644
+index b04c64f..de1a2e4 100644
 --- a/drivers/rtc/rtc-imxdi.c
 +++ b/drivers/rtc/rtc-imxdi.c
-@@ -680,6 +680,25 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
- 	irqreturn_t rc = IRQ_NONE;
+@@ -581,14 +581,36 @@ static int dryice_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ static int dryice_rtc_set_mmss(struct device *dev, unsigned long secs)
+ {
+ 	struct imxdi_dev *imxdi = dev_get_drvdata(dev);
++	u32 dcr, dsr;
+ 	int rc;
  
- 	dier = __raw_readl(imxdi->ioaddr + DIER);
++	dcr = __raw_readl(imxdi->ioaddr + DCR);
 +	dsr = __raw_readl(imxdi->ioaddr + DSR);
 +
-+	/* handle the security violation event */
-+	if (dier & DIER_SVIE) {
-+		if (dsr & DSR_SVF) {
-+			/*
-+			 * Disable the interrupt when this kind of event has
-+			 * happened.
-+			 * There cannot be more than one event of this type,
-+			 * because it needs a complex state change
-+			 * including a main power cycle to get again out of
-+			 * this state.
-+			 */
-+			di_int_disable(imxdi, DIER_SVIE);
-+			/* report the violation */
-+			di_report_tamper_info(imxdi, dsr);
-+			rc = IRQ_HANDLED;
++	if (!(dcr & DCR_TCE) || (dsr & DSR_SVF)) {
++		if (dcr & DCR_TCHL) {
++			/* we are even more out of luck */
++			di_what_is_to_be_done(imxdi, "battery");
++			return -EPERM;
++		}
++		if ((dcr & DCR_TCSL) || (dsr & DSR_SVF)) {
++			/* we are out of luck for now */
++			di_what_is_to_be_done(imxdi, "main");
++			return -EPERM;
 +		}
 +	}
++
+ 	/* zero the fractional part first */
+ 	rc = di_write_wait(imxdi, 0, DTCLR);
+-	if (rc == 0)
+-		rc = di_write_wait(imxdi, secs, DTCMR);
++	if (rc != 0)
++		return rc;
  
- 	/* handle write complete and write error cases */
- 	if (dier & DIER_WCIE) {
-@@ -690,7 +709,6 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
- 			return rc;
+-	return rc;
++	rc = di_write_wait(imxdi, secs, DTCMR);
++	if (rc != 0)
++		return rc;
++
++	return di_write_wait(imxdi, __raw_readl(imxdi->ioaddr + DCR) |
++								DCR_TCE, DCR);
+ }
  
- 		/* DSR_WCF clears itself on DSR read */
--		dsr = __raw_readl(imxdi->ioaddr + DSR);
- 		if (dsr & (DSR_WCF | DSR_WEF)) {
- 			/* mask the interrupt */
- 			di_int_disable(imxdi, DIER_WCIE);
-@@ -706,7 +724,6 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
- 	/* handle the alarm case */
- 	if (dier & DIER_CAIE) {
- 		/* DSR_WCF clears itself on DSR read */
--		dsr = __raw_readl(imxdi->ioaddr + DSR);
- 		if (dsr & DSR_CAF) {
- 			/* mask the interrupt */
- 			di_int_disable(imxdi, DIER_CAIE);
+ static int dryice_rtc_alarm_irq_enable(struct device *dev,
 -- 
 2.1.4
