@@ -1,89 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Apr 2015 11:40:32 +0200
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <332955D5-3122-437B-93A1-E1973BE09FCA@theobroma-systems.com>
-References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
- <2507322.zX46IY7aRK@wuerfel>
- <332955D5-3122-437B-93A1-E1973BE09FCA@theobroma-systems.com>
-Message-ID: <10153809.37pl8TnISa@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 14 Apr 2015 11:06:58 +0100
+Subject: [PATCH 3/5] dt-bindings: mediatek: Add smi dts binding
+In-Reply-To: <1429002474.14855.7.camel@mhfsdcap03>
+References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+ <1425638900-24989-4-git-send-email-yong.wu@mediatek.com>
+ <20150306111338.GD8700@leverpostej>
+ <1429002474.14855.7.camel@mhfsdcap03>
+Message-ID: <20150414100657.GB28709@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 April 2015 00:58:59 Dr. Philipp Tomsich wrote:
-> Arnd,
+On Tue, Apr 14, 2015 at 10:07:54AM +0100, Yong Wu wrote:
+> Hi Mark,
+>     Thanks very much for review. 
+>     About the clock name should be the PoV of _this_ device. Could you
+> help check below?
 > 
-> > 1. Adding a whole new ABI to the kernel is adding a long-term maintenance
-> > burden, and we don't want to do that just because someone thinks it's a cute
-> > hack or because it might add a few percent in performance of some low-level
-> > benchmark. Please describe in the cover-letter for the patch series
-> > specifically what applications you have in mind that would be using this, and
-> > what the expected timeframe is before users could move to 64-bit user space.
+> On Fri, 2015-03-06 at 11:13 +0000, Mark Rutland wrote:
+> > On Fri, Mar 06, 2015 at 10:48:18AM +0000, yong.wu at mediatek.com wrote:
+> > > From: Yong Wu <yong.wu@mediatek.com>
+> > > 
+> > > This patch add smi binding document.
+> > 
+> > Please move binding documents to the start of the series. It makes
+> > things far easier to review.
+> > 
+> > > 
+> > > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> > > +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+> > > @@ -0,0 +1,17 @@
+> > > +SMI hardware block diagram please help check <bindings/iommu/mediatek,iommu.txt>
+> > > +
+> > > +Required properties:
+> > > +- compatible : must be "mediatek,mediatek,mt8173-smi-larb"
+> > 
+> > Double vendor prefix?
+> > 
+> > What does "larb" mean? It would be nice for the intorductory paragraph
+> > in this file to explain.
+> > 
+> > > +- reg : the register of each local arbiter
+> > > +- clocks : the clocks of each local arbiter
+> > > +- clock-name: larb_sub*(3 clockes at most)
+> > 
+> > The names required _must_ be specified here, or clock-names is
+> > pointless.
+> > 
+> > The clock names should be from the PoV of _this_ device (i.e. they
+> > should be the names of the inputs) not from the PoV of the provider
+> > (i.e. they should not be the names of the outputs from the provider).
+> > 
+> > Mark.
+> > 
+>      After we check with our SMI Designer. Every SMI local arbiter need
+> two clocks, which is called  APB clocks and SMI clock.
+>      APB clock : Advanced Peripheral Bus Clock. It is the clock for
+> setting the register of local arbiter.
+>      SMI clock : Smart Multimedia Interface Clock, It is the clock for
+> transfering the data and command. 
 > 
-> There?s a couple of drivers behind getting ILP32 merged on ARM64:
-> (a) There?s plenty of applications (i.e. having a large code-base, but not requiring 
-> a 64bit address space) that can?t readily be migrated to LP64 (typically networking
-> or data-storage applications) because they were written assuming an ILP32 data
-> model.  Many of these applications will never become suitable for a LP64 data
-> model and will remain locked into ILP32 operating environments.
-> (b) A number of SPEC2006 components (i.e. not low-level benchmarks, but test
-> cases that have been derived from large application use cases) benefit from 
-> having a denser data-representation?this includes the mcf, xalancbmk, astar 
-> and  ometpp.  This not an observation specific to ARM64 and can be observed
-> on other architectures as well (e.g. [1] contains data for POWER from 2010).
-> (c) Using AArch32 (assuming that any given ARMv8 processor supports it),
-> is not a real alternative, as 64bit arithmetic is not supported on AArch32 and the
-> AArch32 register set is significantly smaller.  Our experience shows that the 
-> benefit of having 64bit registers, of a larger register file and of using 64bit 
-> arithmetic makes ILP32 a worthwhile improvement over AArch32.
+>      And all the local arbiters need the smi common clock, so we
+> separate it. 
 > 
-> In summary, we believe that the need for ILP32 will never disappear on ARM64.
-> In fact, I rather expect the AArch32 compatibility to eventually disapper from
-> further processor designs? which will turn ILP32 into the only option for 
-> legacy software.
-
-Ok, this is the kind of text that I was looking for to put in the cover letter,
-and eventually into the git changelog when the branch gets merged.
-
-Regarding a), listing specific applications would be helpful. I keep having
-trouble coming up with examples that fit in all these categories:
-
-- can be easily ported to a brand new CPU architecture
-- is complex enough to to not be portable to 64-bit
-- is performance sensitive enough to not work with full emulation
-- fits within the memory constraints of a 32-bit task a few years from
-  now.
-- must run on CPUs that are explicitly designed to not support 32-bit
-  (aarch32) tasks.
-
-I have seen a lot of legacy code, but most of it fails at one of the
-above. There is also a lot of legacy code (from MS Windows) that
-already supports LLP64 but not LP64.
-
-
-> > The most important aspect here I think is time_t, and while it means starting
-> > out with a system call ABI that is not ready for y2038, at the same time the
-> > purpose of ILP32 support is to support legacy source code that is not 64-bit
-> > safe now, and using 32-bit time_t will make that easier in a lot of ways.
-> > Note that I am also leading the effort to make 32-bit Linux ready for using
-> > 64-bit time_t on all architectures, so ARM64 ILP32 will be fixed as well, it
-> > just won't be any better or worse than the others.
+>      Then I prepare to design the smi the dtsi like this: 
 > 
-> The decision to use the 64bit time_t actually came out of Andrew?s earliest
-> patch-set from late 2013? we based the kernel-side of ILP32 on that one, while
-> we focussed on getting all the other components into a working shape.
+>       smi_common:smi at 14022000 {
+>                  compatible = ?mediate, mt8173-smi?;
+>                  reg = <0 0x14022000 0 0x1000>;
+>                  clocks = <&mmsys MM_SMI_COMMON>;
+>                  clocks-names = ?smi_common?;
+>       };
 > 
-> Breaking the C specification (by redefining time_t) always remained a 
-> controversial issue on our end, as we knew that the day of switching back
-> to a 32-bit time_t would eventually have to come.
+>       larb0: larb at 14021000 {
+>                  compatible = ?mediate, mt8173-smi-larb?;
+>                  reg = <0 0x14021000 0 0x1000>;
+>                  smi = <&smi_common>;
+>                  clocks = <&mmsys MM_SMI_LARB0>, 
+> 		 	<&mmsys MM_SMI_LARB0>;
+>                  clocks-names = ?apb_clk?, ?smi_clk?;
+>      };
+> 
+>      larb1: larb at 16010000 {
+>                  compatible = ?mediate, mt8173-smi-larb?;
+>                  reg = <0 0x16010000 0 0x1000>;
+>                  smi = <&smi_common>;
+>                  clocks = <&vdecsys VDEC_CKEN>, 
+> 			 <&mmsys VDEC_LARB_CKEN>;
+>                  clocks-names = ?apb_clk?, ?smi_clk?;
+>       };
+>       ? 
+>      In some local arbiter, the source clock of the APB clock and the
+> SMI clock may be the same, like larb0. so the two clocks are the same.
+> And they may be different in other local arbiteres, like larb1.      
+> 
+>      If it is designed like this, is it ok?
 
-Well, the reason that x32 uses a 64-bit time_t is because Linus Torvalds
-intervened and asked for it to be done that way. I just think that today
-we have a better plan for dealing with the issue on the whole.
+That looks pretty good; the clocks and names on the larb nodes seem
+sensible.
 
-I'd definitely want to get input from other parties on this. I know that
-Rich Felker was particularly against the x32 definition of timespec, and
-it using 32-bit time_t would let us avoid the controversy for the moment,
-but of course we get to the same point later when we have to fix for
-all architectures anyway.
+The naming of the "smi_common" clock on the smi_common node looks a bit
+odd though. Is that really what the clock input is called?
 
-	Arnd
+Mark.
