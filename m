@@ -1,30 +1,29 @@
-From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Tue, 14 Apr 2015 10:54:05 -0700
-Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
-In-Reply-To: <Pine.LNX.4.44L0.1504141040340.1370-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1504141040340.1370-100000@iolanthe.rowland.org>
-Message-ID: <552D543D.5060600@broadcom.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 14 Apr 2015 14:57:40 -0300
+Subject: [PATCH] ARM: dts: imx23-olinuxino: Fix polarity of LED GPIO
+In-Reply-To: <2047797975.287859.1429033877762.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+References: <1429020304-31045-1-git-send-email-fabio.estevam@freescale.com>
+ <2047797975.287859.1429033877762.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+Message-ID: <CAOMZO5AF0ntbAMVF=m4e21b7AFse32Okit0HvSRRYrTYVA1vLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My apologies Alan, I missed that comment I was indeed trying to avoid 
-the 80 column rule. It looks like i will have to resend this patch, so i 
-will reformat the code then. Thanks
+Hi Stefan,
 
-On 15-04-14 07:41 AM, Alan Stern wrote:
-> On Mon, 13 Apr 2015, Arun Ramamurthy wrote:
+On Tue, Apr 14, 2015 at 2:51 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+
+> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
 >
->> Getting phys by index instead of phy names so that we do
->> not have to create a naming scheme when multiple phys
->> are present
->>
->> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
->> Reviewed-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->
-> You have not responded to the comments I posted earlier:
->
-> 	http://marc.info/?l=linux-usb&m=142798455925594&w=2
->
-> Alan Stern
->
+> I did my tests only with iMX233-Olinuxino Maxi. How about your test equipment?
+
+Thanks for testing.
+
+Unfortunately, I don't have access to my mx23 olinuxino board and
+could not test it.
+
+I have looked in all schematics (maxi, micro, mini and nano) and all
+of them require logic level high to turn on the LED.
+
+Regards,
+
+Fabio Estevam
