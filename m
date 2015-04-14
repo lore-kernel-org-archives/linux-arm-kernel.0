@@ -1,36 +1,89 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Tue, 14 Apr 2015 08:43:22 +0000
-Subject: Bug: Toggling green led on Olinuxino Maxi, also toggles USB
-In-Reply-To: <517669452.288592.1428943161783.JavaMail.open-xchange@oxbaltgw03.schlund.de>
-References: <1622635769.189113.1428833170958.JavaMail.open-xchange@oxbaltgw01.schlund.de>
- <20150413070037.GA9119@shlinux2>
- <517669452.288592.1428943161783.JavaMail.open-xchange@oxbaltgw03.schlund.de>
-Message-ID: <BN3PR0301MB08493E69AF05491D033C462481E60@BN3PR0301MB0849.namprd03.prod.outlook.com>
+From: xuyiping@hisilicon.com (YiPing Xu)
+Date: Tue, 14 Apr 2015 16:53:45 +0800
+Subject: [PATCH v2 4/6] clk: hi6220: Clock driver support for Hisilicon
+ hi6220 SoC
+In-Reply-To: <3183355.UnoLoN8dF8@wuerfel>
+References: <1428916660-25910-1-git-send-email-bintian.wang@huawei.com>
+ <2254597.TWaxeZsKvK@wuerfel> <552BCB5A.8010705@huawei.com>
+ <3183355.UnoLoN8dF8@wuerfel>
+Message-ID: <552CD599.4010705@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> >
-> > On Sun, Apr 12, 2015 at 12:06:10PM +0200, Stefan Wahren wrote:
-> > > [...]
-> > >
-> > > I think the problem has something to with USB OTG, because GPIO 65
-> > > is on the same pin for USB_OTG_ID.
-> > > My idea was to set "dr_mode" in olinuxino dts explicit to "host" and
-> > > it works, but i'm not sure that is the right fix.
-> > >
-> > > Shouldn't chipidea driver complain about missing pinctrl or something else?
-> >
-> > Some controllers have dedicated ID pin which doesn't need to configure
-> > pinctrl registers. If the user would like to use role switch function
-> > and the ID pin can be configured by pinctrl subsystem, it needs to set
-> > pinctrl through dts.
-> >
-> 
-> So setting "dr_mode" to "host" is the one and only solution for this case?
-> 
-> >
- 
->From my point, yes.
+? 2015/4/13 23:34, Arnd Bergmann ??:
+> On Monday 13 April 2015 21:57:46 Bintian wrote:
+>> Hello Arnd,
+>>
+>> Thanks for your code review.
+>>
+>> On 2015/4/13 21:30, Arnd Bergmann wrote:
+>>> On Monday 13 April 2015 17:17:38 Bintian Wang wrote:
+>>>> +#define HI6220_CFG_CSI2PHY     8
+>>>> +#define HI6220_ISP_SCLK_GATE   9
+>>>> +#define HI6220_ISP_SCLK_GATE1  10
+>>>> +#define HI6220_ADE_CORE_GATE   11
+>>>> +#define HI6220_CODEC_VPU_GATE  12
+>>>> +#define HI6220_MED_SYSPLL      13
+>>>> +
+>>>> +/* mux clocks */
+>>>> +#define HI6220_1440_1200       20
+>>>> +#define HI6220_1000_1200       21
+>>>> +#define HI6220_1000_1440       22
+>>>> +
+>>>> +/* divider clocks */
+>>>> +#define HI6220_CODEC_JPEG      30
+>>>> +#define HI6220_ISP_SCLK_SRC    31
+>>>> +#define HI6220_ISP_SCLK1       32
+>>>>
+>>>
+>>> The numbers seem rather arbitrary, and you have both holes as well as duplicate
+>>> numbers here. I would suggest you do one of two things instead:
+>
+>> I just worry about some special clocks may be added later so keep some
+>> holes for them;
+>>
+>> The duplicate numbers means clocks belong to different system control
+>> domains.
+>
+> I don't understand. How would there be additional clocks added later?
+> Wouldn't that be a new chip?
 
-Peter
+   There are some clocks not used in linux system. e.g, some clocks are 
+used in base band processor. So, some numbers are not defined here.
+
+> If you have separate system control domains, doesn't that mean that you
+> also have separate DT bindings?
+>
+>>> a) have a separate header file per clock driver and make all the
+>>>      numbers unique and consecutive within that header
+>>>
+>>> b) use the same numbers as the hardware registers so you can put the
+>>>      numbers directly into the dts and don't need a header to create
+>>>      an artificial ABI between the clock driver and the boot loader.
+>> This header file will be used by device tree (I like using the clock
+>> name instead "magic number" in dts :) )
+>
+> That's not how it works though: The dts file is the place to define
+> the hardware numbers, we do that for all sorts of numbers: interrupts,
+> gpios, register ranges etc are all defined in dts to avoid putting
+> magic numbers in external header files.
+>
+> There are some cases where it gets too ugly for clock controllers
+> that are highly irregular, but yours doesn't seem to be that kind.
+>
+> E.g. all the fixed rate clocks should just be separate device nodes,
+> which lets you remove the binding for that node.
+>
+>> so how about keep them in one header file and let dts just include
+>> one header file (not four files), but remove the holes?
+>
+> The header files constantly cause problems with merge dependencies,
+> and we have some other companies that keep releasing new chips
+> that each time require a new header file. If hisilicon plans to make
+> more chips like this one, please consider coming up with more
+> generic bindings to avoid this.
+>
+> 	Arnd
+>
+> .
+>
