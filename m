@@ -1,63 +1,94 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 14 Apr 2015 14:37:37 +0200
-Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
-In-Reply-To: <6483716.157BQAaRqF@wuerfel>
-References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
- <20150414111934.GA27836@kroah.com> <6483716.157BQAaRqF@wuerfel>
-Message-ID: <20150414123737.GB18756@kroah.com>
+From: bintian.wang@huawei.com (Bintian)
+Date: Tue, 14 Apr 2015 20:37:11 +0800
+Subject: [PATCH v2 3/6] clk: hi6220: Document devicetree bindings for
+ hi6220 clock
+In-Reply-To: <2456827.cDpE8M58pn@wuerfel>
+References: <1428916660-25910-1-git-send-email-bintian.wang@huawei.com>
+ <7304398.GVjUsTVoce@wuerfel> <552C8AFE.9040907@huawei.com>
+ <2456827.cDpE8M58pn@wuerfel>
+Message-ID: <552D09F7.7080603@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 01:33:08PM +0200, Arnd Bergmann wrote:
-> On Tuesday 14 April 2015 13:19:34 Greg Kroah-Hartman wrote:
-> > On Mon, Apr 13, 2015 at 03:10:46PM -0700, Arun Ramamurthy wrote:
-> > > Getting phys by index instead of phy names so that we do
-> > > not have to create a naming scheme when multiple phys
-> > > are present
-> > > 
-> > > Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
-> > > Reviewed-by: Ray Jui <rjui@broadcom.com>
-> > > Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> > > ---
-> > >  drivers/usb/host/Kconfig         |  1 +
-> > >  drivers/usb/host/ehci-platform.c | 70 ++++++++++++++--------------------------
-> > >  2 files changed, 26 insertions(+), 45 deletions(-)
-> > > 
-> > > diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> > > index 5ad60e4..563f22d 100644
-> > > --- a/drivers/usb/host/Kconfig
-> > > +++ b/drivers/usb/host/Kconfig
-> > > @@ -284,6 +284,7 @@ config USB_EHCI_ATH79
-> > >  
-> > >  config USB_EHCI_HCD_PLATFORM
-> > >       tristate "Generic EHCI driver for a platform device"
-> > > +     select GENERIC_PHY
-> > 
-> > Configs should never select if at all possible.
-> > 
-> 
-> This is true, but all other drivers do the same for GENERIC_PHY at the
-> moment. If this one gets changed, we should probably apply the same
-> solution to all current users and fix them consistently.
-> 
-> We can do one of these two:
-> 
-> a) make sure that the framework has 'static inline' stubs that let you
->    build all drivers using it when the framework itself is disabled.
+Hello Arnd,
 
-Yes, please do that.
+On 2015/4/14 18:19, Arnd Bergmann wrote:
+> On Tuesday 14 April 2015 11:35:26 Bintian wrote:
+>> Hello Arnd,
+>>
+>> On 2015/4/13 23:32, Arnd Bergmann wrote:
+>>> On Monday 13 April 2015 17:17:37 Bintian Wang wrote:
+>>>> +- compatible: the compatible should be one of the following strings to
+>>>> +       indicate the clock controller functionality.
+>>>> +
+>>>> +       - "hisilicon,aoctrl"
+>>>> +       - "hisilicon,sysctrl"
+>>>> +       - "hisilicon,mediactrl"
+>>>> +       - "hisilicon,pmctrl"
+>>>> +
+>>>>
+>>>
+>>> These ones already have bindings, you can't reuse the strings.
+>>> Please work with someone in hisilicon to set up a registry of
+>>> device names so you can avoid conflicts in the future.
+>> All the clock registers are under above four system controllers,
+>> discussed with Mark and Haojian two months ago, I think using above
+>> same four binding strings is enough for clk module.
+>> On second thoughts, there really some problems for future hisilicon
+>> code upstream, how about change back to the first version of this
+>> patch set, just like following:
+>> +		sys_ctrl: sys_ctrl {
+>> +			compatible = "hisilicon,sysctrl", "syscon";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			reg = <0x0 0xf7030000 0x0 0x2000>;
+>> +			ranges = <0 0x0 0xf7030000 0x2000>;
+>> +
+>> +			clock_sys: clock1 at 0 {
+>> +				compatible = "hisilicon,hi6220-clock-sys";
+>> +				reg = <0 0x1000>;
+>> +				#clock-cells = <1>;
+>> +			};
+>> +		};
+>
+> Sub-nodes are fine, but you also can't have a device node that
+> is just 'compatible = "hisilicon,sysctrl", "syscon";' when
+> hisilicon,sysctrl can refer to multiple mutually incompatible
+> controllers.
+>
+> The minimum fix would be to mandate the string to be
+> compatible = "hisilicon,hi6220-sysctrl", "hisilicon,sysctrl", "syscon";
+> for this model, and use respective compatible strings for the other
+> chips.
+It's really a smart fix!
 
-> b) change the drivers using it to 'depends on', and make GENERIC_PHY
->    itself a hidden option without a Kconfig prompt.
+For the four system controllers, how about change the following strings:
++       - "hisilicon,aoctrl"
++       - "hisilicon,sysctrl"
++       - "hisilicon,mediactrl"
++       - "hisilicon,pmctrl"
 
-Then how could GENERIC_PHY ever get set?
+to
++       - "hisilicon,hi6220-aoctrl"
++       - "hisilicon,hi6220-sysctrl"
++       - "hisilicon,hi6220-mediactrl"
++       - "hisilicon,hi6220-pmctrl"
+?
 
-> Either solution is probably simple enough that it can be done as
-> part of this series.
+and I also use "hisilicon,hi6220-xxxx" for hi6220 clk driver directly ?
 
-That's fine with me, but please no more selects.
+>
+> For the documentation, I think it would make sense to move that
+> description to "hisilicon,sysctrl" and list all the variants of that
+> component and the respective compatible strings there, rather than
+> have one document per chip and list multiple components in it.
+Sure,
 
-thanks,
+Thanks,
 
-greg k-h
+Bintian
+>
+> 	Arnd
+>
+> .
+>
