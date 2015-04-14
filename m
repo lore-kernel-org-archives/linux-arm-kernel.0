@@ -1,104 +1,125 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Apr 2015 11:06:58 +0100
-Subject: [PATCH 3/5] dt-bindings: mediatek: Add smi dts binding
-In-Reply-To: <1429002474.14855.7.camel@mhfsdcap03>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-4-git-send-email-yong.wu@mediatek.com>
- <20150306111338.GD8700@leverpostej>
- <1429002474.14855.7.camel@mhfsdcap03>
-Message-ID: <20150414100657.GB28709@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Apr 2015 12:08:11 +0200
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <AC03A80E-49F8-4A08-9DDA-0B9F8B734F51@theobroma-systems.com>
+References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
+ <332955D5-3122-437B-93A1-E1973BE09FCA@theobroma-systems.com>
+ <AC03A80E-49F8-4A08-9DDA-0B9F8B734F51@theobroma-systems.com>
+Message-ID: <17844053.vZiPCu4un3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 10:07:54AM +0100, Yong Wu wrote:
-> Hi Mark,
->     Thanks very much for review. 
->     About the clock name should be the PoV of _this_ device. Could you
-> help check below?
+On Tuesday 14 April 2015 11:33:13 Dr.  Philipp Tomsich wrote:
+> Arnd,
 > 
-> On Fri, 2015-03-06 at 11:13 +0000, Mark Rutland wrote:
-> > On Fri, Mar 06, 2015 at 10:48:18AM +0000, yong.wu at mediatek.com wrote:
-> > > From: Yong Wu <yong.wu@mediatek.com>
-> > > 
-> > > This patch add smi binding document.
-> > 
-> > Please move binding documents to the start of the series. It makes
-> > things far easier to review.
-> > 
-> > > 
-> > > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > > +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> > > @@ -0,0 +1,17 @@
-> > > +SMI hardware block diagram please help check <bindings/iommu/mediatek,iommu.txt>
-> > > +
-> > > +Required properties:
-> > > +- compatible : must be "mediatek,mediatek,mt8173-smi-larb"
-> > 
-> > Double vendor prefix?
-> > 
-> > What does "larb" mean? It would be nice for the intorductory paragraph
-> > in this file to explain.
-> > 
-> > > +- reg : the register of each local arbiter
-> > > +- clocks : the clocks of each local arbiter
-> > > +- clock-name: larb_sub*(3 clockes at most)
-> > 
-> > The names required _must_ be specified here, or clock-names is
-> > pointless.
-> > 
-> > The clock names should be from the PoV of _this_ device (i.e. they
-> > should be the names of the inputs) not from the PoV of the provider
-> > (i.e. they should not be the names of the outputs from the provider).
-> > 
-> > Mark.
-> > 
->      After we check with our SMI Designer. Every SMI local arbiter need
-> two clocks, which is called  APB clocks and SMI clock.
->      APB clock : Advanced Peripheral Bus Clock. It is the clock for
-> setting the register of local arbiter.
->      SMI clock : Smart Multimedia Interface Clock, It is the clock for
-> transfering the data and command. 
+> After getting a good night?s sleep, the ?reuse the existing system call table? comment
+> makes a little more sense as I construe it as having just one merged system call table
+> for both LP64 and ILP32 and handling the differences through a different system call
+> numbering in unistd.h towards LP64 and ILP32 processes.
 > 
->      And all the local arbiters need the smi common clock, so we
-> separate it. 
+> If this is the intended implementation, I am not fully sold on the benefit: having a private
+> copy of unistd.h for ARM64 seems to be a less readable and less maintenance-friendly
+> solution to having separate tables.
 > 
->      Then I prepare to design the smi the dtsi like this: 
-> 
->       smi_common:smi at 14022000 {
->                  compatible = ?mediate, mt8173-smi?;
->                  reg = <0 0x14022000 0 0x1000>;
->                  clocks = <&mmsys MM_SMI_COMMON>;
->                  clocks-names = ?smi_common?;
->       };
-> 
->       larb0: larb at 14021000 {
->                  compatible = ?mediate, mt8173-smi-larb?;
->                  reg = <0 0x14021000 0 0x1000>;
->                  smi = <&smi_common>;
->                  clocks = <&mmsys MM_SMI_LARB0>, 
-> 		 	<&mmsys MM_SMI_LARB0>;
->                  clocks-names = ?apb_clk?, ?smi_clk?;
->      };
-> 
->      larb1: larb at 16010000 {
->                  compatible = ?mediate, mt8173-smi-larb?;
->                  reg = <0 0x16010000 0 0x1000>;
->                  smi = <&smi_common>;
->                  clocks = <&vdecsys VDEC_CKEN>, 
-> 			 <&mmsys VDEC_LARB_CKEN>;
->                  clocks-names = ?apb_clk?, ?smi_clk?;
->       };
->       ? 
->      In some local arbiter, the source clock of the APB clock and the
-> SMI clock may be the same, like larb0. so the two clocks are the same.
-> And they may be different in other local arbiteres, like larb1.      
-> 
->      If it is designed like this, is it ok?
+> We?re open to input on this and?if merging the system call tables is the consensus?
+> would like to get the change underway as soon as possible.
 
-That looks pretty good; the clocks and names on the larb nodes seem
-sensible.
+There are multiple ways of doing this:
 
-The naming of the "smi_common" clock on the smi_common node looks a bit
-odd though. Is that really what the clock input is called?
+a) separate syscall table for arm64: as you say, this is the current approach,
+   and I'd like to avoid that too
+b) add syscalls for ilp32 as additional numbers in the normal lp64 version of
+   asm-generic/unistd.h, and share the binary tables between ilp32 and lp64
+   on aarch64
+c) change asm-generic/unistd.h to generate three possible tables: instead of
+   just native (lp64 or ilp32 depending on the arch), compat (support for
+   existing ilp32 binaries on some architectures, there would also be a
+   "modern" ilp32 variant that is a mix of the two, as your table today
+d) don't use the asm-generic/unistd.h table for aarch64-ilp32 at all, but instead
+   reuse the table from arch/arm64/include/asm/unistd32.h
 
-Mark.
+I think you are referring to approach b) or c) above, but my preferred one
+would actually be d).
+
+> > On 14 Apr 2015, at 00:58, Dr. Philipp Tomsich <philipp.tomsich@theobroma-systems.com> wrote:
+> > 
+> >> 2. The ABI follows what x86 has their "x32" ABI. This never saw a lot of
+> >> adoption and in retrospect the decision to have separate system calls seems
+> >> to not have helped them. My feeling now is that if we add support for the
+> >> ARM64 ILP32 ELF ABI, we should better stick to the existing system call ABI
+> >> as close as possible and reuse the existing system call table. I realize
+> >> that this is a bit controversial, but please let's talk about this now.
+> > 
+> > I see benefits and drawback to merging the system tables.  Our philosophy is
+> > already somewhat different from x32 and from the original patch-series, as you
+> > can see from the changes dealing with stack_t in the ?sys_rt_sigreturn' and 
+> > ?setup_rt_frame? functions.  While these could have been duplicated and 
+> > specialized for each ABI (as on x32), the attempt was made to keep these 
+> > changes localized.
+> > 
+> > However, this approach can not always work: if you consider cases like 
+> > ?sys_msgsnd? and ?compat_sys_msgsnd?, there?s little to no benefit in having
+> > just a ?aarch64_sys_msgsnd?, which then calls either the LP64 or the compat
+> > version of the underlying system call.  Having a second system call table 
+> > helps to reduce the overheads in this case and keeps things readable.
+> > 
+> > This comes down to the fact, that a few calls will always be different due to
+> > historical baggage in data structures shared between userspace and kernel:
+> > 'struct msgbuf? immediatly comes to mind.
+> > 
+> > I would liken the situation with ARM64 more of MIPS64 with its 64bit ABI and 
+> > its n32 ABI than to x32? but even there it?s two separate system call tables
+> > (although sequentially concatenated).
+> > 
+> > In other words: I fail to see the benefit from keeping the existing table.
+> > I you elaborate on how such a solution should look, I might be better able
+> > to follow. 
+
+I mainly want to avoid accidentally creating new ABIs for syscalls and ioctls:
+we have many drivers that today use ioctls with data structures derived from
+'__kernel_ulong_t' in some form, often by including a timespec or time_t in
+their own data structures. These are almost all broken today, because the
+data structures are a mix of the aarch32 and aarch64 variants, while the
+ioctl() system call in ilp32 always uses the aarch32 format by default.
+
+An example here would be 
+
+struct cyclades_idle_stats {
+    __kernel_time_t in_use;     /* Time device has been in use (secs) */
+    __kernel_time_t recv_idle;  /* Time since last char received (secs) */
+    __kernel_time_t xmit_idle;  /* Time since last char transmitted (secs) */
+    unsigned long  recv_bytes;  /* Bytes received */
+    unsigned long  xmit_bytes;  /* Bytes transmitted */
+    unsigned long  overruns;    /* Input overruns */
+    unsigned long  frame_errs;  /* Input framing errors */
+    unsigned long  parity_errs; /* Input parity errors */
+};
+
+for a random ancient driver. Introducing a third set of data structures
+and syscalls for aarch64-ilp32 means that any driver doing something like
+this needs to be modified to support existing user space source code.
+
+If we stick to the normal compat32 implementation for all data structures
+and syscalls, we can support all drivers that work with aarch32 emulation
+today, as well as any one that gains support later on a regular compat32
+architecture (x86, powerpc, sparc, mips, arm, tile, parisc, s390), and
+we don't have to watch all new ioctl interfaces that get added to the
+kernel. Note that this does not just impact ioctl, but also things like
+setsockopts and drivers that communicate with user space through a
+mmapped data structure.
+
+Using that existing table would also make it much easier to add support
+for additional C libraries, which then just have to implement the ELF
+format, but could reuse the arm32 kernel interfaces.
+
+Finally, there is a certain set of security issues from each new syscall
+we introduce. With the aarch32 syscall table, we have a higher degree
+of reuse of existing code, so we won't introduce security bugs that
+are only in one of the two ilp32 ABIs (aarch32 and aarch64).
+
+One notable downside of this is that all system calls have to pass 64-bit
+arguments (i.e. loff_t) in two registers instead of one, to match the
+aarch32 calling conventions, but that would be limited to a small part
+of the libc implementation that already does the same thing for arm32.
+
+	Arnd
