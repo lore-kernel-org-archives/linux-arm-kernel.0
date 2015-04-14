@@ -1,30 +1,38 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Tue, 14 Apr 2015 15:52:34 -0700
-Subject: [PATCH 4/7] selftests/kdbus: install kdbus-test
-Message-ID: <1429051954-14735-1-git-send-email-tyler.baker@linaro.org>
+From: ahs3@redhat.com (Al Stone)
+Date: Tue, 14 Apr 2015 16:52:39 -0600
+Subject: [RFC PATCH 5/5] arm64: qcom: add cpu operations
+In-Reply-To: <20150414162953.GL28709@leverpostej>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <1428601031-5366-6-git-send-email-galak@codeaurora.org>
+ <20150414162953.GL28709@leverpostej>
+Message-ID: <552D9A37.6070107@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set TEST_PROGS so that kdbus-test is installed.
+On 04/14/2015 10:29 AM, Mark Rutland wrote:
+>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>> index 8b9e0a9..35cabe5 100644
+>> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>> @@ -185,6 +185,8 @@ nodes to be present and contain the properties described below.
+>>                           be one of:
+>>                              "psci"
+>>                              "spin-table"
+> 
+> In the case of these two, there's documentation on what the OS, FW, and
+> HW are expected to do. There's a PSCI spec, and spin-table is documented
+> in booting.txt (which is admittedly not fantastic).
+> [snip...]
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
----
- tools/testing/selftests/kdbus/Makefile | 2 ++
- 1 file changed, 2 insertions(+)
+Perhaps a side topic, but I thought spin-table was being actively discouraged
+for arm64.  Forgive me if I missed the memo, but is that not correct?
 
-diff --git a/tools/testing/selftests/kdbus/Makefile b/tools/testing/selftests/kdbus/Makefile
-index e21bf1f..62f8d5a 100644
---- a/tools/testing/selftests/kdbus/Makefile
-+++ b/tools/testing/selftests/kdbus/Makefile
-@@ -42,6 +42,8 @@ include ../lib.mk
- kdbus-test: $(OBJS)
- 	$(CC) $(CFLAGS) $^ $(LDLIBS) -o $@
- 
-+TEST_PROGS := kdbus-test
-+
- run_tests:
- 	./kdbus-test --tap
- 
 -- 
-2.1.0
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
