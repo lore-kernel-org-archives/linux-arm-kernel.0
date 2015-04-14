@@ -1,77 +1,27 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Tue, 14 Apr 2015 14:09:38 -0700
-Subject: [PATCH v8 00/18] Tegra124 CL-DVFS / DFLL clocksource + cpufreq
-In-Reply-To: <20150414144339.GA30495@ulmo.nvidia.com>
-References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
- <20150311100741.GK19577@ulmo.nvidia.com> <20150410211157.14369.51754@quantum>
- <20150414144339.GA30495@ulmo.nvidia.com>
-Message-ID: <20150414210938.19585.25150@quantum>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 14 Apr 2015 23:09:46 +0200
+Subject: [PATCH v3 2/3] firmware: qcom: scm: Add support for ARM64 SoCs
+In-Reply-To: <1429041520-6720-3-git-send-email-galak@codeaurora.org>
+References: <1429041520-6720-1-git-send-email-galak@codeaurora.org>
+ <1429041520-6720-3-git-send-email-galak@codeaurora.org>
+Message-ID: <1429045786.27492.51.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Thierry Reding (2015-04-14 07:43:41)
-> On Fri, Apr 10, 2015 at 02:11:57PM -0700, Michael Turquette wrote:
-> > Quoting Thierry Reding (2015-03-11 03:07:43)
-> > > Hi Mike,
-> > > 
-> > > Have you had a chance to look at these changes to the Tegra clock
-> > > driver? If you're fine with it, I'd like to take these patches through
-> > > the Tegra tree because the rest of the series depends on them. I can
-> > > provide a stable branch in case we need to base other Tegra clock
-> > > changes on top of this.
-> > 
-> > Hi Thierry,
-> > 
-> > Clock patches (and corresponding DT binding descriptions and changes to
-> > DTS) look fine to me. Please add:
-> > 
-> > Acked-by: Michael Turquette <mturquette@linaro.org>
-> > 
-> > I did have a question about the beahvior of clk_put in one of Mikko's
-> > patches but it should not gate this series. I'm just trying to find out
-> > if we have a bug in the framework or if the Tegra driver is a special
-> > case.
-> > 
-> > Also I do not think a stable branch is necessary.
-> 
-> Given how this didn't work at all for v4.1, why don't we try to do this
-> the conventional way for v4.2? What I propose is that I collect all the
-> patches that I've had in these branches into a single branch that I can
-> send you shortly after v4.1-rc1. Then you can pull that into the clock
-> tree when you're happy and I can pull that into the Tegra tree again if
-> needed to resolve dependencies.
+On Tue, 2015-04-14 at 14:58 -0500, Kumar Gala wrote:
+> --- a/drivers/firmware/Makefile
+> +++ b/drivers/firmware/Makefile
 
-Sounds fine, so long as you do not rebase your branch.
+> +ifdef CONFIG_64BIT
+> +obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-64.o
+> +else
+>  obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-32.o
+> +endif
 
-> 
-> One problem that I foresee is that the EMC clock driver relies on some
-> symbols exported by the EMC driver, so it will fail to build on its own
-> if merged into the clock tree. Usually I'd say we can solve this by
-> merging a stable branch from the Tegra tree into the clock tree, but if
-> any of the ARM SoC maintainers then decides that, for whatever reason,
-> the Tegra pull request isn't good enough, you'd need to either redo the
-> clock tree or we slip in the changes via the clock tree anyway.
-> 
-> Perhaps a solution would be to implement stubs for the API exposed by
-> the EMC driver and merge that through the clock tree, which should give
-> us a tree that can be built but be a no-op at runtime. Then we can add
-> the actual code to enable EMC scaling in the Tegra tree by providing a
-> real implementation. That way we only have the Tegra tree depend on the
-> clock tree.
+I don't think arm and arm64 set BITS. If they did 
+    obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-$(BITS).o
 
-That sounds OK, but it does create some extra work for you.
-Alternatively you can just take these patches through your tegra tree
-into arm-soc with my Ack (which is the reason I gave it out in the first
-place).
+might have worked here.
 
-However if you have other clock patches which conflict then having the
-stable branch makes good sense. The choice is yours since it will be an
-extra burden on your to stub things out.
 
-Regards,
-Mike
-
-> 
-> How does that sound?
-> 
-> Thierry
+Paul Bolle
