@@ -1,188 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 14 Apr 2015 13:02:13 +0200
-Subject: [PATCH v3 07/11] arm64: fixmap: allow init before linear mapping
- is set up
-In-Reply-To: <20150414104711.GC28709@leverpostej>
-References: <1428674035-26603-1-git-send-email-ard.biesheuvel@linaro.org>
- <1428674035-26603-8-git-send-email-ard.biesheuvel@linaro.org>
- <20150414104711.GC28709@leverpostej>
-Message-ID: <CAKv+Gu_sQnVMEFs5ubT=VK=LsptJkvVuUnhZMBJY81TmuU+iAg@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 14 Apr 2015 13:14:26 +0200
+Subject: [GIT PULL v2 1/2] ARM: tegra: Core code changes for v4.1-rc1
+In-Reply-To: <2204375.plVGQ25v9Q@wuerfel>
+References: <1427710333-13472-1-git-send-email-thierry.reding@gmail.com>
+ <201504140109.56537.arnd@arndb.de> <20150414070649.GA11715@ulmo>
+ <2204375.plVGQ25v9Q@wuerfel>
+Message-ID: <20150414111425.GB15878@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 April 2015 at 12:47, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Ard,
->
-> On Fri, Apr 10, 2015 at 02:53:51PM +0100, Ard Biesheuvel wrote:
->> This reworks early_ioremap_init() so it populates the various levels
->> of translation tables while taking the following into account:
->> - be prepared for any of the levels to have been populated already, as
->>   this may be the case once we move the kernel text mapping out of the
->>   linear mapping;
->> - don't rely on __va() to translate the physical address in a page table
->>   entry to a virtual address, since this produces linear mapping addresses;
->>   instead, use the fact that at any level, we know exactly which page in
->>   swapper_pg_dir an entry could be pointing to if it points anywhere.
->
-> Can we not use Catalin's PHYS_OFFSET swizzling trick instead? i.e.
->
->  * Set PHYS_OFFSET so __va hits in the text mapping.
->
->  * Create the fixmap entries.
->
->  * Parse the DTB or UEFI memory map, figure out the real PHYS_OFFSET.
->
->  * Create linear mapping for the initial tables.
->
->  * Swap PHYS_OFFSET for the real version, and update init_mm->pgd to
->    point at the linear map alias of the swapper pgd.
->
-> It seemed like that would require less open-coding of table manipulation
-> code, as we could use __va() early.
->
-> Is there a limitation with that approach that I'm missing?
->
+On Tue, Apr 14, 2015 at 10:30:30AM +0200, Arnd Bergmann wrote:
+> On Tuesday 14 April 2015 09:06:50 Thierry Reding wrote:
+> > On Tue, Apr 14, 2015 at 01:09:56AM +0200, Arnd Bergmann wrote:
+> > > On Saturday 11 April 2015, Michael Turquette wrote:
+> > > > > Tomeu Vizoso (8):
+> > > > >       of: Document long-ram-code property in nvidia,tegra20-apbmisc
+> > > > >       of: Document timings subnode of nvidia,tegra-mc
+> > > > >       memory: tegra: Disable ARBITRATION_EMEM interrupt
+> > > > >       of: document new emc-timings subnode in nvidia,tegra124-car
+> > > > >       of: document external-memory-controller property in tegra124-car
+> > > > >       clk: Expose clk_hw_reparent() to providers
+> > > > 
+> > > > ... this patch! I'd prefer to not do this. Let's see if
+> > > > .set_rate_and_parent solve the problem for you.
+> > > 
+> > > Not pulling this for 4.1 then. Even without the objections, it was basically
+> > > too late for the amount of changes now.
+> > 
+> > For my education, when do you expect pull requests with "this amount of
+> > changes" to be sent?
+> 
+> Generally speaking, we want large patch series to come early after -rc1,
+> followed by smaller subsequent updates. We often don't get around to
+> applying stuff before -rc3, which is a problem on our side, but it helps
+> to have patches available by then.
+> 
+> Also, if you have a large series (100+ patches) early on, we'd be more
+> likely to take a 20-patch series later than if the 20-patch series comes
+> at rc6 and is the first thing we see from you: after around rc5 or rc6,
+> what we want to see are mostly patches that directly result from work
+> that we merged earlier for the same merge window, like regression fixes
+> or wrapping up a larger series that was started but incomplete at -rc2.
 
-I didn't quite catch Catalin's suggestion to mean the above, but the
-way you put it seems viable to me. I'll have a go and see how far I
-get with it.
+That's not generally what we've done on Tegra. We usually keep things in
+linux-next until around -rc6 to make sure whatever gets pulled into the
+arm-soc tree is stable.
 
-> Otherwise, comments below.
->
->> This allows us to defer the initialization of the linear mapping until
->> after we have figured out where our RAM resides in the physical address
->> space.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/compiler.h |   2 +
->>  arch/arm64/kernel/vmlinux.lds.S   |  14 +++--
->>  arch/arm64/mm/mmu.c               | 117 +++++++++++++++++++++++++-------------
->>  3 files changed, 90 insertions(+), 43 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
->> index ee35fd0f2236..dd342af63673 100644
->> --- a/arch/arm64/include/asm/compiler.h
->> +++ b/arch/arm64/include/asm/compiler.h
->> @@ -27,4 +27,6 @@
->>   */
->>  #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
->>
->> +#define __pgdir              __attribute__((section(".pgdir"),aligned(PAGE_SIZE)))
->> +
->>  #endif       /* __ASM_COMPILER_H */
->> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->> index 98073332e2d0..604f285d3832 100644
->> --- a/arch/arm64/kernel/vmlinux.lds.S
->> +++ b/arch/arm64/kernel/vmlinux.lds.S
->> @@ -160,11 +160,15 @@ SECTIONS
->>
->>       BSS_SECTION(0, 0, 0)
->>
->> -     . = ALIGN(PAGE_SIZE);
->> -     idmap_pg_dir = .;
->> -     . += IDMAP_DIR_SIZE;
->> -     swapper_pg_dir = .;
->> -     . += SWAPPER_DIR_SIZE;
->> +     .pgdir (NOLOAD) : {
->> +             . = ALIGN(PAGE_SIZE);
->> +             idmap_pg_dir = .;
->> +             . += IDMAP_DIR_SIZE;
->> +             swapper_pg_dir = .;
->> +             __swapper_bs_region = . + PAGE_SIZE;
->> +             . += SWAPPER_DIR_SIZE;
->> +             *(.pgdir)
->> +     }
->>
->>       _end = .;
->>
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index 60be58a160a2..c0427b5c90c7 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -341,6 +341,70 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
->>  }
->>  #endif
->>
->> +struct mem_bootstrap_region {
->
-> The "region" naming is a little confusing IMO. To me it sounds like
-> something akin to a VMA rather than a set of tables.
->
+With what you said above I'm pretty much forced to either send you pulls
+that aren't well tested (linux-next isn't supposed to get new code until
+after -rc1) or I have to plan for an extra release cycle for anything
+that is "big", which would mean that many new features would potentially
+take 6 months to get merged.
 
-ok
+I don't like either of those choices.
 
->> +#if CONFIG_ARM64_PGTABLE_LEVELS > 3
->> +     pud_t   pud[PTRS_PER_PUD];
->> +#endif
->> +#if CONFIG_ARM64_PGTABLE_LEVELS > 2
->> +     pmd_t   pmd[PTRS_PER_PMD];
->> +#endif
->> +     pte_t   pte[PTRS_PER_PTE];
->> +};
->> +
->> +static void __init bootstrap_mem_region(unsigned long addr,
->> +                                     struct mem_bootstrap_region *reg,
->> +                                     pmd_t **ppmd, pte_t **ppte)
->> +{
->> +     /*
->> +      * Avoid using the linear phys-to-virt translation __va() so that we
->> +      * can use this code before the linear mapping is set up. Note that
->> +      * any populated entries at any level can only point into swapper_pg_dir
->> +      * since no other translation table pages have been allocated yet.
->> +      * So at each level, we either need to populate it, or it has already
->> +      * been populated by a swapper_pg_dir table at the same level, in which
->> +      * case we can figure out its virtual address without applying __va()
->> +      * on the contents of the entry, using the following struct.
->> +      */
->> +     extern struct mem_bootstrap_region __swapper_bs_region;
->> +
->> +     pgd_t *pgd = pgd_offset_k(addr);
->> +     pud_t *pud = (pud_t *)pgd;
->> +     pmd_t *pmd = (pmd_t *)pud;
->> +
->> +#if CONFIG_ARM64_PGTABLE_LEVELS > 3
->> +     if (pgd_none(*pgd)) {
->> +             clear_page(reg->pud);
->> +             pgd_populate(&init_mm, pgd, reg->pud);
->
-> What's PHYS_OFFSET expected to be at this point (for the purposes of
-> __pa() in the *_populate*() macros)?
->
-> If we're relying on __pa() to convert text->phys, won't __va() convert
-> phys->text at this point?
->
-
-At this points, yes. But later on, when the kernel text moves out of
-the linear region, __pa() takes into account whether the input VA is
-above or below PAGE_OFFSET, and adds the kernel image offset in the
-latter case.
-Changing __va() so it implements the inverse would be a can of worms
-i'd rather keep closed.
-
->> +             pud = reg->pud;
->> +     } else {
->> +             pud = __swapper_bs_region.pud;
->> +     }
->> +     pud += pud_index(addr);
->> +#endif
->
-> Can we free the unused reg tables in the else cases? If __pa() works we
-> should be able to hand them to memblock, no?
->
-
-Only if we put the memblock_reserve() of the kernel image before
-early_fixmap_init(), otherwise we are freeing only to reserve it again
-later.
-
-> [...]
->
->>       /*
->>        * The boot-ioremap range spans multiple pmds, for which
->> -      * we are not preparted:
->> +      * we are not prepared:
->
-> This typo has been bugging me for ages. I'll be glad to see it go!
->
-
-:-)
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150414/21677873/attachment-0001.sig>
