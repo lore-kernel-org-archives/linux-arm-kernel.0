@@ -1,35 +1,34 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Tue, 14 Apr 2015 13:20:59 +0200
-Subject: [PATCH v7 2/4] ARM: sunxi: dt: Add DT bindings documentation for
- SUNXI Security System
+Date: Tue, 14 Apr 2015 13:21:00 +0200
+Subject: [PATCH v7 3/4] MAINTAINERS: Add myself as maintainer of Allwinner
+ Security System
 In-Reply-To: <1429010461-9243-1-git-send-email-clabbe.montjoie@gmail.com>
 References: <1429010461-9243-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1429010461-9243-3-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1429010461-9243-4-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for Device-Tree bindings for the Security System cryptographic accelerator driver.
-
 Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 ---
- Documentation/devicetree/bindings/crypto/sunxi-ss.txt | 9 +++++++++
- 1 file changed, 9 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/sunxi-ss.txt
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/crypto/sunxi-ss.txt b/Documentation/devicetree/bindings/crypto/sunxi-ss.txt
-new file mode 100644
-index 0000000..a566803
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/sunxi-ss.txt
-@@ -0,0 +1,9 @@
-+* Allwinner Security System found on A20 SoC
+diff --git a/MAINTAINERS b/MAINTAINERS
+index efbcb50..dd3e27f 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -555,6 +555,12 @@ S:	Maintained
+ F:	Documentation/i2c/busses/i2c-ali1563
+ F:	drivers/i2c/busses/i2c-ali1563.c
+ 
++ALLWINNER SECURITY SYSTEM
++M:	Corentin Labbe <clabbe.montjoie@gmail.com>
++L:	linux-crypto at vger.kernel.org
++S:	Maintained
++F:	drivers/crypto/sunxi-ss/
 +
-+Required properties:
-+- compatible : Should be "allwinner,sun7i-a20-crypto".
-+- reg: Should contain the Security System register location and length.
-+- interrupts: Should contain the IRQ line for the Security System.
-+- clocks : A phandle to the functional clock node of the Security System module
-+- clock-names : Name of the functional clock, should be "ahb" and "mod".
-+
+ ALPHA PORT
+ M:	Richard Henderson <rth@twiddle.net>
+ M:	Ivan Kokshaysky <ink@jurassic.park.msu.ru>
 -- 
 2.0.5
