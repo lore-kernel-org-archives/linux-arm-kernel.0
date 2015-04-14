@@ -1,42 +1,45 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 14 Apr 2015 19:53:05 +0530
-Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
-In-Reply-To: <2433709.D3gBAte9Iu@wuerfel>
-References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
- <6483716.157BQAaRqF@wuerfel> <20150414123737.GB18756@kroah.com>
- <2433709.D3gBAte9Iu@wuerfel>
-Message-ID: <552D22C9.6090503@ti.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Tue, 14 Apr 2015 16:31:02 +0200
+Subject: [PATCH 1/2] Documentation: devicetree: root node serial-number
+ property documentation
+In-Reply-To: <1427564371-26039-1-git-send-email-contact@paulk.fr>
+References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
+Message-ID: <1429021862.2422.16.camel@collins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Le samedi 28 mars 2015 ? 18:39 +0100, Paul Kocialkowski a ?crit :
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 
-On Tuesday 14 April 2015 06:47 PM, Arnd Bergmann wrote:
-> On Tuesday 14 April 2015 14:37:37 Greg Kroah-Hartman wrote:
->> On Tue, Apr 14, 2015 at 01:33:08PM +0200, Arnd Bergmann wrote:
->>> This is true, but all other drivers do the same for GENERIC_PHY at the
->>> moment. If this one gets changed, we should probably apply the same
->>> solution to all current users and fix them consistently.
->>>
->>> We can do one of these two:
->>>
->>> a) make sure that the framework has 'static inline' stubs that let you
->>>     build all drivers using it when the framework itself is disabled.
->>
->> Yes, please do that.
->>
->>> b) change the drivers using it to 'depends on', and make GENERIC_PHY
->>>     itself a hidden option without a Kconfig prompt.
->>
->> Then how could GENERIC_PHY ever get set?
->
-> Right now, every driver that provides a phy uses 'select GENERIC_PHY',
-> and they would have to keep doing that. This is not unlike what we
-> do for other silent symbols like MFD_CORE, REGMAP_I2C, or PINCTRL,
-> and it's not as problematic as 'select' on a user-visible option,
-> or (worst) mixing 'select' and 'depends on'.
+Since the merge windows on both U-Boot and Linux are now open, I'd like
+to attract your attention on this again.
 
-Sorry, didn't get how GENERIC_PHY could be set with option 'b'.
+Any comments/remarks are welcome!
 
-Thanks
-Kishon
+> ---
+>  Documentation/devicetree/booting-without-of.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+> index 7768518..8b055897 100644
+> --- a/Documentation/devicetree/booting-without-of.txt
+> +++ b/Documentation/devicetree/booting-without-of.txt
+> @@ -828,6 +828,10 @@ address which can extend beyond that limit.
+>    name may clash with standard defined ones, you prefix them with your
+>    vendor name and a comma.
+>  
+> +  Additional properties for the root node:
+> +
+> +    - serial-number : a string representing the board's serial number
+> +
+>    b) The /cpus node
+>  
+>    This node is the parent of all individual CPU nodes. It doesn't
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150414/031c416d/attachment.sig>
