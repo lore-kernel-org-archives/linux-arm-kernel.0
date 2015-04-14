@@ -1,79 +1,113 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Apr 2015 16:45:10 +0100
-Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
-In-Reply-To: <97B1A2D4-6F6B-433B-83E6-9C8A95D1BFC6@codeaurora.org>
-References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
- <493B15F8-0EBE-4633-9604-671EF403F36E@codeaurora.org>
- <20150410161052.GF6854@e104818-lin.cambridge.arm.com>
- <FDC755A7-ACCF-4222-8730-782EEC632159@codeaurora.org>
- <20150413094117.GA2745@e104818-lin.cambridge.arm.com>
- <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
- <97B1A2D4-6F6B-433B-83E6-9C8A95D1BFC6@codeaurora.org>
-Message-ID: <20150414154509.GI28709@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 14 Apr 2015 17:46:11 +0200
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <20150205132142.GD2079@lukather>
+References: <20150121160631.GH4367@lukather>
+ <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
+ <54C0A8C9.3040201@visionsystems.de>
+ <20150205132142.GD2079@lukather>
+Message-ID: <20150414154611.GE27280@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 03:44:11PM +0100, Kumar Gala wrote:
+Hi,
+
+On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> > On Apr 14, 2015, at 9:21 AM, Kumar Gala <galak@codeaurora.org> wrote:
-> > 
-> >>>> 
-> >>>> So please come up with proper technical arguments rather than the kernel
-> >>>> should take whatever SoC vendors dreamt of.
-> >>> 
-> >>> There is no technical argument to be made.  This is about the
-> >>> community and you as maintainer wanting to accept code that complies
-> >>> to your decision or not.
-> >> 
-> >> If you are not willing to make technical arguments, I don't have to
-> >> provide any further reasons in this thread. It's your choice. In the
-> >> meantime, the short answer is NAK.
+> On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
+> > I have the same experience with 3.15. The switching is working when
+> > CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
+> > it seems to be broken. Still had no time to bisect this.
 > 
-> I assume you would than NAK someone trying to get support for their
-> Nexus 9 Tablet using a Tegra K1.
-
-That would depend on how they try to boot secondary CPUs. It's
-unfortunate that a product is shipping with an arbitrary implementation
-specific SMP bringup mechanism, but its existence doesn't necessitate
-that we support it.
-
-People are currently working on PSCI support for 32-bit Tegra platforms
-in U-Boot, and it's my understanding that a reasonable proportion of
-that could should be possible to reuse for 64-bit. That may be
-applicable to the Nexus 9.
-
-Otherwise it's possible to have a shim which can place the secondaries
-into a spin-table. It looks like that would be necessary anyway; there
-seem to be some egregious boot protocol violations. 
-
-> It appears the shipping code for that device didn?t use PSCI (again guessing because it wasn?t available at the time).
+> I've been giving a few versions (from v3.15 to Tuesday's linux-next) a
+> try, and I always see the same behaviour now:
 > 
-> https://android.googlesource.com/kernel/tegra/+/android-tegra-flounder-3.10-lollipop-release/arch/arm64/mach-tegra/platsmp.c
+>   - Booting as a gadget (ie, with a USB cable plugged in), and
+>     swapping the cable for a (real, this time) USB OTG cable with a
+>     USB key never works. When the device is plugged, all I get is
+> 
+> [  262.944846] usb 1-1: new high-speed USB device number 2 using musb-hdrc
+> [  278.064748] usb 1-1: device descriptor read/64, error -110
+> 
+>     Putting in back in gadget results with a load of continuous:
+> [  315.258839] musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
+> 
+>   - Booting as a host, or with nothing connected to it actually work,
+>     up to a few plug-a-device-then-plug-a-host cycles, where you end
+>     up with the following logs when disconnecting the device (somehow,
+>     it always happens when it is set in host mode).
+> 
+> [   12.969075] CAUTION: musb: Babble Interrupt Occurred
+> [   12.974445] CAUTION: musb: Babble Interrupt Occurred
+> [   12.979637] musb_stage0_irq 789: unhandled DISCONNECT transition (a_wait_bcon)
+> [   12.988498] usb 1-1: USB disconnect, device number 2
+> [   13.071849] musb-hdrc musb-hdrc.0.auto: Restarting MUSB to recover from Babble
+> 
+>     Plugging back our USB cable, with the AM335x acting as a device
+>     work once. Then, when it switches to the host mode, we end up with
+>     the same scenario than in the coldplug as gadget case: USB read
+>     error, before then having all the a_wait_vfall messages.
 
-Commit e790f1deb26a2e23 ("arm64: psci: add support for PSCI invocations
-from the kernel") has been upstream since v3.9-rc1. It's even in the
-(v3.10 derived) tree you link to:
+I gave it some more testing these two days, with next-20150410, with
+pretty much the same results.
 
-https://android.googlesource.com/kernel/tegra/+/android-tegra-flounder-3.10-lollipop-release/arch/arm64/kernel/psci.c
+Dumping the DSPS glue registers doesn't get anywhere, in both cases
+(booting as peripheral and then switching to host, or booting as host)
+they are identical.
 
-As is spin-table:
+However, the musb registers vary greatly.
 
-https://android.googlesource.com/kernel/tegra/+/android-tegra-flounder-3.10-lollipop-release/arch/arm64/kernel/smp_spin_table.c
+In the first case, we boot as host, switch to peripheral, and then
+switch back to host, repeatedly until it fails:
 
-> If so, I find this counter to the Linux kernel communities normal desire to support the most hardware platforms.
+http://code.bulix.org/p0d964-88211?raw
 
-Supporting hardware platforms doesn't mean that we must accept code
-which we believe to be problematic.
+We can see that while it still works, value comes back to their
+original state when switching back to host, which makes sense.
 
-We don't want implementation-specific SMP bringup mechanisms because
-we've learnt from the lessons of the past. They're almost always
-ill-defined, not reusable, and they're a maintenance burden for all
-system software targeting ARM which gets worse over time.
+However, when it fails, some registers are not set back to their
+initial values, including TxMaxPp, TxCSRp, RxMaxPp, ConfigData,
+DevCtl, TxFIFOadd and RxFIFOadd.
 
-If there are technical problems with the existing mechanisms, we're open
-to solving them. Others have engaged with the kernel community and/or
-ARM (in the case of PSCI) to do so, and all others upstream so far have
-used common enable methods.
+Some registers that were not changing while it was working also now
+have a different value: TxMaxPp, RxMaxPp, MISC, TxFIFOsz and RxFIFOsz.
 
-Mark. 
+Starting with the device as peripheral, and then switching to host
+fails instantly, once again with exotic values for the registers
+compared to the configuration set whenever the host mode is working:
+
+http://code.bulix.org/uo8fmu-88210?raw
+
+However, the registers values are quite similar to the one we got
+previously when the host mode was failing after a while, which might
+indicate that we end up in the same case somehow.
+
+Since I've not been able to find the musb datasheet, I'm unfortunately
+unable to make any deduction from these besides that something looks
+fishy.
+
+I've also did some runs with the musb glue and core compiled with
+debug options:
+
+Booted as host:
+http://code.bulix.org/97jz3i-88207?raw
+
+Booted as peripheral:
+http://code.bulix.org/vqdqt6-88208?raw
+
+I hope it helps...
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150414/60f5fe1e/attachment-0001.sig>
