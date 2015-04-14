@@ -1,41 +1,88 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Apr 2015 16:52:14 +0100
-Subject: [RFC PATCH 3/5] arm64: introduce CPU_OF_TABLES for cpu ops
- selection
-In-Reply-To: <3133453.Cys8lc6CAy@wuerfel>
+Date: Tue, 14 Apr 2015 16:59:41 +0100
+Subject: [RFC PATCH 4/5] arm64: smp: move the pen to a header file
+In-Reply-To: <1428601031-5366-5-git-send-email-galak@codeaurora.org>
 References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <1428601031-5366-4-git-send-email-galak@codeaurora.org>
- <3133453.Cys8lc6CAy@wuerfel>
-Message-ID: <20150414155214.GJ28709@leverpostej>
+ <1428601031-5366-5-git-send-email-galak@codeaurora.org>
+Message-ID: <20150414155941.GK28709@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 10:17:06PM +0100, Arnd Bergmann wrote:
-> On Thursday 09 April 2015 12:37:09 Kumar Gala wrote:
-> > @@ -67,4 +67,9 @@ extern const struct cpu_operations *cpu_ops[NR_CPUS];
-> >  int __init cpu_read_ops(struct device_node *dn, int cpu);
-> >  void __init cpu_read_bootcpu_ops(void);
-> >  
-> > +#define CPU_METHOD_OF_DECLARE(name, __ops)                             \
-> > +       static const struct cpu_operations *__cpu_method_table_##name   \
-> > +       __used __section(__cpu_method_of_table)                         \
-> > +       = __ops;
-> > +
-> >  #endif /* ifndef __ASM_CPU_OPS_H */
-> > 
+On Thu, Apr 09, 2015 at 06:37:10PM +0100, Kumar Gala wrote:
+> From: Abhimanyu Kapur <abhimany@codeaurora.org>
 > 
-> I'd rather not add this, to avoid giving the appearance that platforms
-> can just add another one here.
+> Move the secondary_pen_release variable and the secondary_holding_pen
+> entry function to asm/smp_plat.h so that the other cpu ops implementations
+> can share them.
 
-Likewise.
+If anything, this should all be moved into smp_spin_table.c, and made
+static.
 
-SMP bringup is always hairy, and giving the appearance that such code
-should be hidden away somewhere (and missing critical review) is a bad
-idea.
-
-While this seemed like a good idea in the past for 32-bit, we've only
-seen marginal decoupling, and very little in the way of actual semantics
-defined for the enable-methods. Which effectively spreads implementation
-details further rather than separating them from the interface.
+We made a mistake with the pen (and allowing multiple CPUs to enter the
+kernel at once). That mistake shouldn't be spread further.
 
 Mark.
+
+> 
+> Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+>  arch/arm64/include/asm/smp_plat.h  | 2 ++
+>  arch/arm64/kernel/smp.c            | 1 +
+>  arch/arm64/kernel/smp_spin_table.c | 3 ---
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+> index 59e2823..235ff04 100644
+> --- a/arch/arm64/include/asm/smp_plat.h
+> +++ b/arch/arm64/include/asm/smp_plat.h
+> @@ -34,10 +34,12 @@ static inline u32 mpidr_hash_size(void)
+>  	return 1 << mpidr_hash.bits;
+>  }
+>  
+> +extern void secondary_holding_pen(void);
+>  /*
+>   * Logical CPU mapping.
+>   */
+>  extern u64 __cpu_logical_map[NR_CPUS];
+>  #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
+> +extern volatile unsigned long secondary_holding_pen_release;
+>  
+>  #endif /* __ASM_SMP_PLAT_H */
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 328b8ce..4ce1f23 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -61,6 +61,7 @@
+>   * where to place its SVC stack
+>   */
+>  struct secondary_data secondary_data;
+> +volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
+>  
+>  enum ipi_msg_type {
+>  	IPI_RESCHEDULE,
+> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+> index b41a8b4..be833b9 100644
+> --- a/arch/arm64/kernel/smp_spin_table.c
+> +++ b/arch/arm64/kernel/smp_spin_table.c
+> @@ -28,9 +28,6 @@
+>  #include <asm/io.h>
+>  #include <asm/smp_plat.h>
+>  
+> -extern void secondary_holding_pen(void);
+> -volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
+> -
+>  static phys_addr_t cpu_release_addr[NR_CPUS];
+>  
+>  /*
+> -- 
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
