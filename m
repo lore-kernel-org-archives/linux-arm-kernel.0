@@ -1,44 +1,70 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 14 Apr 2015 11:07:00 -0500
-Subject: [PATCH 0/3] clk: socfpga: Add clock driver for Arria10
-In-Reply-To: <1428036055-27607-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1428036055-27607-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <552D3B24.501@opensource.altera.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 14 Apr 2015 09:22:10 -0700
+Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
+ callbacks
+In-Reply-To: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
+References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20150414162210.GA29874@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+On Tue, Apr 14, 2015 at 12:41:48PM +0200, Ulf Hansson wrote:
+> The legacy system PM support has long time ago been dropped from the
+> AMBA bus. Align to that by converting to the modern system PM
+> callbacks.
+> 
+> Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-On 04/02/2015 11:40 PM, dinguyen at opensource.altera.com wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+If this has not been noticed since end of 2013 maybe we should drop the
+driver?
+
+> ---
+>  drivers/input/serio/ambakmi.c | 10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
 > 
-> Hi,
-> 
-> This patch series add the clock driver for the Arria10 platform. Although the
-> Arria10 SoC's clock framework has some similarities the Cyclone/Arria 5, the
-> differences are enough to warrant it's own driver, rather than polluting the
-> existing driver with platform lookups.
-> 
-> Dinh Nguyen (3):
->   clk: socfpga: update clk.h so for Arria10 platform to use
->   clk: socfpga: add a clock driver for the Arria 10 platform
->   ARM: socfpga: dts: add clocks to the Arria10 platform
-> 
->  arch/arm/boot/dts/socfpga_arria10.dtsi | 298 ++++++++++++++++++++++++++++++++-
->  drivers/clk/socfpga/Makefile           |   1 +
->  drivers/clk/socfpga/clk-gate-a10.c     | 187 +++++++++++++++++++++
->  drivers/clk/socfpga/clk-gate.c         |   4 -
->  drivers/clk/socfpga/clk-periph-a10.c   | 131 +++++++++++++++
->  drivers/clk/socfpga/clk-pll-a10.c      | 132 +++++++++++++++
->  drivers/clk/socfpga/clk.c              |   7 +-
->  drivers/clk/socfpga/clk.h              |  10 +-
->  8 files changed, 760 insertions(+), 10 deletions(-)
->  create mode 100644 drivers/clk/socfpga/clk-gate-a10.c
->  create mode 100644 drivers/clk/socfpga/clk-periph-a10.c
->  create mode 100644 drivers/clk/socfpga/clk-pll-a10.c
+> diff --git a/drivers/input/serio/ambakmi.c b/drivers/input/serio/ambakmi.c
+> index 8b748d9..058e1d8 100644
+> --- a/drivers/input/serio/ambakmi.c
+> +++ b/drivers/input/serio/ambakmi.c
+> @@ -175,15 +175,19 @@ static int amba_kmi_remove(struct amba_device *dev)
+>  	return 0;
+>  }
+>  
+> -static int amba_kmi_resume(struct amba_device *dev)
+> +#ifdef CONFIG_PM_SLEEP
+> +static int amba_kmi_resume(struct device *dev)
+>  {
+> -	struct amba_kmi_port *kmi = amba_get_drvdata(dev);
+> +	struct amba_kmi_port *kmi = dev_get_drvdata(dev);
+>  
+>  	/* kick the serio layer to rescan this port */
+>  	serio_reconnect(kmi->io);
+>  
+>  	return 0;
+>  }
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(amba_kmi_dev_pm_ops, NULL, amba_kmi_resume);
+>  
+>  static struct amba_id amba_kmi_idtable[] = {
+>  	{
+> @@ -199,11 +203,11 @@ static struct amba_driver ambakmi_driver = {
+>  	.drv		= {
+>  		.name	= "kmi-pl050",
+>  		.owner	= THIS_MODULE,
+> +		.pm	= &amba_kmi_dev_pm_ops,
+>  	},
+>  	.id_table	= amba_kmi_idtable,
+>  	.probe		= amba_kmi_probe,
+>  	.remove		= amba_kmi_remove,
+> -	.resume		= amba_kmi_resume,
+>  };
+>  
+>  module_amba_driver(ambakmi_driver);
+> -- 
+> 1.9.1
 > 
 
-Just wondering if you have had a chance to look over this patch series?
-
-Thanks,
-Dinh
+-- 
+Dmitry
