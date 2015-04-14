@@ -1,114 +1,597 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 14 Apr 2015 14:58:40 -0500
-Subject: [PATCH v3 3/3] arm64: qcom: add cpu operations
+Date: Tue, 14 Apr 2015 14:58:38 -0500
+Subject: [PATCH v3 1/3] firmware: qcom: scm: Split out 32-bit specific SCM code
 In-Reply-To: <1429041520-6720-1-git-send-email-galak@codeaurora.org>
 References: <1429041520-6720-1-git-send-email-galak@codeaurora.org>
-Message-ID: <1429041520-6720-4-git-send-email-galak@codeaurora.org>
+Message-ID: <1429041520-6720-2-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhimanyu Kapur <abhimany@codeaurora.org>
+Split out the 32-bit SCM implementation into its own file to prep for
+supporting a 64-bit/ARM64 implementation as well.  We create a simple shim
+to ensure both versions conform to the same interface.
 
-Add qcom cpu operations for arm-v8 cpus. Implement secondary cpu boot ops
-As a part of this change update device tree documentation for:
-
-1. Arm cortex-a ACC device which provides percpu reg
-2. Armv8 cortex-a compatible string in arm/cpus.txt
-
-Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
 Signed-off-by: Kumar Gala <galak@codeaurora.org>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt     |   2 +
- Documentation/devicetree/bindings/arm/msm/acc.txt  |  19 ++
- arch/arm64/kernel/Makefile                         |   3 +
- arch/arm64/kernel/cpu_ops.c                        |   4 +
- .../kernel/qcom-special-cpu-ops-dont-copy-this.c   | 281 +++++++++++++++++++++
- 5 files changed, 309 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/msm/acc.txt
- create mode 100644 arch/arm64/kernel/qcom-special-cpu-ops-dont-copy-this.c
+ drivers/firmware/Makefile                      |   3 +-
+ drivers/firmware/{qcom_scm.c => qcom_scm-32.c} |  15 +-
+ drivers/firmware/qcom_scm.c                    | 442 +------------------------
+ drivers/firmware/qcom_scm.h                    |  29 ++
+ 4 files changed, 42 insertions(+), 447 deletions(-)
+ copy drivers/firmware/{qcom_scm.c => qcom_scm-32.c} (96%)
+ create mode 100644 drivers/firmware/qcom_scm.h
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 8b9e0a9..35cabe5 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -185,6 +185,8 @@ nodes to be present and contain the properties described below.
- 			  be one of:
- 			     "psci"
- 			     "spin-table"
-+			     "qcom,arm-cortex-acc"
-+
- 			# On ARM 32-bit systems this property is optional and
- 			  can be one of:
- 			    "allwinner,sun6i-a31"
-diff --git a/Documentation/devicetree/bindings/arm/msm/acc.txt b/Documentation/devicetree/bindings/arm/msm/acc.txt
+diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+index 3fdd391..3001f1a 100644
+--- a/drivers/firmware/Makefile
++++ b/drivers/firmware/Makefile
+@@ -12,7 +12,8 @@ obj-$(CONFIG_ISCSI_IBFT_FIND)	+= iscsi_ibft_find.o
+ obj-$(CONFIG_ISCSI_IBFT)	+= iscsi_ibft.o
+ obj-$(CONFIG_FIRMWARE_MEMMAP)	+= memmap.o
+ obj-$(CONFIG_QCOM_SCM)		+= qcom_scm.o
+-CFLAGS_qcom_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
++obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-32.o
++CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+ 
+ obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
+ obj-$(CONFIG_EFI)		+= efi/
+diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm-32.c
+similarity index 96%
+copy from drivers/firmware/qcom_scm.c
+copy to drivers/firmware/qcom_scm-32.c
+index 994b50f..89be15e 100644
+--- a/drivers/firmware/qcom_scm.c
++++ b/drivers/firmware/qcom_scm-32.c
+@@ -27,6 +27,7 @@
+ #include <asm/outercache.h>
+ #include <asm/cacheflush.h>
+ 
++#include "qcom_scm.h"
+ 
+ #define QCOM_SCM_ENOMEM		-5
+ #define QCOM_SCM_EOPNOTSUPP	-4
+@@ -386,8 +387,6 @@ u32 qcom_scm_get_version(void)
+ }
+ EXPORT_SYMBOL(qcom_scm_get_version);
+ 
+-#define QCOM_SCM_SVC_BOOT			0x1
+-#define QCOM_SCM_BOOT_ADDR			0x1
+ /*
+  * Set the cold/warm boot address for one of the CPU cores.
+  */
+@@ -412,7 +411,7 @@ static int qcom_scm_set_boot_addr(u32 addr, int flags)
+  * Set the cold boot address of the cpus. Any cpu outside the supported
+  * range would be removed from the cpu present mask.
+  */
+-int qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
++int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
+ {
+ 	int flags = 0;
+ 	int cpu;
+@@ -435,7 +434,6 @@ int qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
+ 
+ 	return qcom_scm_set_boot_addr(virt_to_phys(entry), flags);
+ }
+-EXPORT_SYMBOL(qcom_scm_set_cold_boot_addr);
+ 
+ /**
+  * qcom_scm_set_warm_boot_addr() - Set the warm boot address for cpus
+@@ -445,7 +443,7 @@ EXPORT_SYMBOL(qcom_scm_set_cold_boot_addr);
+  * Set the Linux entry point for the SCM to transfer control to when coming
+  * out of a power down. CPU power down may be executed on cpuidle or hotplug.
+  */
+-int qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
++int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
+ {
+ 	int ret;
+ 	int flags = 0;
+@@ -473,10 +471,6 @@ int qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
+ 
+ 	return ret;
+ }
+-EXPORT_SYMBOL(qcom_scm_set_warm_boot_addr);
+-
+-#define QCOM_SCM_CMD_TERMINATE_PC	0x2
+-#define QCOM_SCM_FLUSH_FLAG_MASK	0x3
+ 
+ /**
+  * qcom_scm_cpu_power_down() - Power down the cpu
+@@ -486,9 +480,8 @@ EXPORT_SYMBOL(qcom_scm_set_warm_boot_addr);
+  * the control would return from this function, otherwise, the cpu jumps to the
+  * warm boot entry point set for this cpu upon reset.
+  */
+-void qcom_scm_cpu_power_down(u32 flags)
++void __qcom_scm_cpu_power_down(u32 flags)
+ {
+ 	qcom_scm_call_atomic1(QCOM_SCM_SVC_BOOT, QCOM_SCM_CMD_TERMINATE_PC,
+ 			flags & QCOM_SCM_FLUSH_FLAG_MASK);
+ }
+-EXPORT_SYMBOL(qcom_scm_cpu_power_down);
+diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+index 994b50f..9989241 100644
+--- a/drivers/firmware/qcom_scm.c
++++ b/drivers/firmware/qcom_scm.c
+@@ -16,393 +16,12 @@
+  * 02110-1301, USA.
+  */
+ 
+-#include <linux/slab.h>
+-#include <linux/io.h>
+-#include <linux/module.h>
+-#include <linux/mutex.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
++#include <linux/cpumask.h>
++#include <linux/export.h>
++#include <linux/types.h>
+ #include <linux/qcom_scm.h>
+ 
+-#include <asm/outercache.h>
+-#include <asm/cacheflush.h>
+-
+-
+-#define QCOM_SCM_ENOMEM		-5
+-#define QCOM_SCM_EOPNOTSUPP	-4
+-#define QCOM_SCM_EINVAL_ADDR	-3
+-#define QCOM_SCM_EINVAL_ARG	-2
+-#define QCOM_SCM_ERROR		-1
+-#define QCOM_SCM_INTERRUPTED	1
+-
+-#define QCOM_SCM_FLAG_COLDBOOT_CPU0	0x00
+-#define QCOM_SCM_FLAG_COLDBOOT_CPU1	0x01
+-#define QCOM_SCM_FLAG_COLDBOOT_CPU2	0x08
+-#define QCOM_SCM_FLAG_COLDBOOT_CPU3	0x20
+-
+-#define QCOM_SCM_FLAG_WARMBOOT_CPU0	0x04
+-#define QCOM_SCM_FLAG_WARMBOOT_CPU1	0x02
+-#define QCOM_SCM_FLAG_WARMBOOT_CPU2	0x10
+-#define QCOM_SCM_FLAG_WARMBOOT_CPU3	0x40
+-
+-struct qcom_scm_entry {
+-	int flag;
+-	void *entry;
+-};
+-
+-static struct qcom_scm_entry qcom_scm_wb[] = {
+-	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU0 },
+-	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU1 },
+-	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU2 },
+-	{ .flag = QCOM_SCM_FLAG_WARMBOOT_CPU3 },
+-};
+-
+-static DEFINE_MUTEX(qcom_scm_lock);
+-
+-/**
+- * struct qcom_scm_command - one SCM command buffer
+- * @len: total available memory for command and response
+- * @buf_offset: start of command buffer
+- * @resp_hdr_offset: start of response buffer
+- * @id: command to be executed
+- * @buf: buffer returned from qcom_scm_get_command_buffer()
+- *
+- * An SCM command is laid out in memory as follows:
+- *
+- *	------------------- <--- struct qcom_scm_command
+- *	| command header  |
+- *	------------------- <--- qcom_scm_get_command_buffer()
+- *	| command buffer  |
+- *	------------------- <--- struct qcom_scm_response and
+- *	| response header |      qcom_scm_command_to_response()
+- *	------------------- <--- qcom_scm_get_response_buffer()
+- *	| response buffer |
+- *	-------------------
+- *
+- * There can be arbitrary padding between the headers and buffers so
+- * you should always use the appropriate qcom_scm_get_*_buffer() routines
+- * to access the buffers in a safe manner.
+- */
+-struct qcom_scm_command {
+-	__le32 len;
+-	__le32 buf_offset;
+-	__le32 resp_hdr_offset;
+-	__le32 id;
+-	__le32 buf[0];
+-};
+-
+-/**
+- * struct qcom_scm_response - one SCM response buffer
+- * @len: total available memory for response
+- * @buf_offset: start of response data relative to start of qcom_scm_response
+- * @is_complete: indicates if the command has finished processing
+- */
+-struct qcom_scm_response {
+-	__le32 len;
+-	__le32 buf_offset;
+-	__le32 is_complete;
+-};
+-
+-/**
+- * alloc_qcom_scm_command() - Allocate an SCM command
+- * @cmd_size: size of the command buffer
+- * @resp_size: size of the response buffer
+- *
+- * Allocate an SCM command, including enough room for the command
+- * and response headers as well as the command and response buffers.
+- *
+- * Returns a valid &qcom_scm_command on success or %NULL if the allocation fails.
+- */
+-static struct qcom_scm_command *alloc_qcom_scm_command(size_t cmd_size, size_t resp_size)
+-{
+-	struct qcom_scm_command *cmd;
+-	size_t len = sizeof(*cmd) + sizeof(struct qcom_scm_response) + cmd_size +
+-		resp_size;
+-	u32 offset;
+-
+-	cmd = kzalloc(PAGE_ALIGN(len), GFP_KERNEL);
+-	if (cmd) {
+-		cmd->len = cpu_to_le32(len);
+-		offset = offsetof(struct qcom_scm_command, buf);
+-		cmd->buf_offset = cpu_to_le32(offset);
+-		cmd->resp_hdr_offset = cpu_to_le32(offset + cmd_size);
+-	}
+-	return cmd;
+-}
+-
+-/**
+- * free_qcom_scm_command() - Free an SCM command
+- * @cmd: command to free
+- *
+- * Free an SCM command.
+- */
+-static inline void free_qcom_scm_command(struct qcom_scm_command *cmd)
+-{
+-	kfree(cmd);
+-}
+-
+-/**
+- * qcom_scm_command_to_response() - Get a pointer to a qcom_scm_response
+- * @cmd: command
+- *
+- * Returns a pointer to a response for a command.
+- */
+-static inline struct qcom_scm_response *qcom_scm_command_to_response(
+-		const struct qcom_scm_command *cmd)
+-{
+-	return (void *)cmd + le32_to_cpu(cmd->resp_hdr_offset);
+-}
+-
+-/**
+- * qcom_scm_get_command_buffer() - Get a pointer to a command buffer
+- * @cmd: command
+- *
+- * Returns a pointer to the command buffer of a command.
+- */
+-static inline void *qcom_scm_get_command_buffer(const struct qcom_scm_command *cmd)
+-{
+-	return (void *)cmd->buf;
+-}
+-
+-/**
+- * qcom_scm_get_response_buffer() - Get a pointer to a response buffer
+- * @rsp: response
+- *
+- * Returns a pointer to a response buffer of a response.
+- */
+-static inline void *qcom_scm_get_response_buffer(const struct qcom_scm_response *rsp)
+-{
+-	return (void *)rsp + le32_to_cpu(rsp->buf_offset);
+-}
+-
+-static int qcom_scm_remap_error(int err)
+-{
+-	pr_err("qcom_scm_call failed with error code %d\n", err);
+-	switch (err) {
+-	case QCOM_SCM_ERROR:
+-		return -EIO;
+-	case QCOM_SCM_EINVAL_ADDR:
+-	case QCOM_SCM_EINVAL_ARG:
+-		return -EINVAL;
+-	case QCOM_SCM_EOPNOTSUPP:
+-		return -EOPNOTSUPP;
+-	case QCOM_SCM_ENOMEM:
+-		return -ENOMEM;
+-	}
+-	return -EINVAL;
+-}
+-
+-static u32 smc(u32 cmd_addr)
+-{
+-	int context_id;
+-	register u32 r0 asm("r0") = 1;
+-	register u32 r1 asm("r1") = (u32)&context_id;
+-	register u32 r2 asm("r2") = cmd_addr;
+-	do {
+-		asm volatile(
+-			__asmeq("%0", "r0")
+-			__asmeq("%1", "r0")
+-			__asmeq("%2", "r1")
+-			__asmeq("%3", "r2")
+-#ifdef REQUIRES_SEC
+-			".arch_extension sec\n"
+-#endif
+-			"smc	#0	@ switch to secure world\n"
+-			: "=r" (r0)
+-			: "r" (r0), "r" (r1), "r" (r2)
+-			: "r3");
+-	} while (r0 == QCOM_SCM_INTERRUPTED);
+-
+-	return r0;
+-}
+-
+-static int __qcom_scm_call(const struct qcom_scm_command *cmd)
+-{
+-	int ret;
+-	u32 cmd_addr = virt_to_phys(cmd);
+-
+-	/*
+-	 * Flush the command buffer so that the secure world sees
+-	 * the correct data.
+-	 */
+-	__cpuc_flush_dcache_area((void *)cmd, cmd->len);
+-	outer_flush_range(cmd_addr, cmd_addr + cmd->len);
+-
+-	ret = smc(cmd_addr);
+-	if (ret < 0)
+-		ret = qcom_scm_remap_error(ret);
+-
+-	return ret;
+-}
+-
+-static void qcom_scm_inv_range(unsigned long start, unsigned long end)
+-{
+-	u32 cacheline_size, ctr;
+-
+-	asm volatile("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
+-	cacheline_size = 4 << ((ctr >> 16) & 0xf);
+-
+-	start = round_down(start, cacheline_size);
+-	end = round_up(end, cacheline_size);
+-	outer_inv_range(start, end);
+-	while (start < end) {
+-		asm ("mcr p15, 0, %0, c7, c6, 1" : : "r" (start)
+-		     : "memory");
+-		start += cacheline_size;
+-	}
+-	dsb();
+-	isb();
+-}
+-
+-/**
+- * qcom_scm_call() - Send an SCM command
+- * @svc_id: service identifier
+- * @cmd_id: command identifier
+- * @cmd_buf: command buffer
+- * @cmd_len: length of the command buffer
+- * @resp_buf: response buffer
+- * @resp_len: length of the response buffer
+- *
+- * Sends a command to the SCM and waits for the command to finish processing.
+- *
+- * A note on cache maintenance:
+- * Note that any buffers that are expected to be accessed by the secure world
+- * must be flushed before invoking qcom_scm_call and invalidated in the cache
+- * immediately after qcom_scm_call returns. Cache maintenance on the command
+- * and response buffers is taken care of by qcom_scm_call; however, callers are
+- * responsible for any other cached buffers passed over to the secure world.
+- */
+-static int qcom_scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf,
+-			size_t cmd_len, void *resp_buf, size_t resp_len)
+-{
+-	int ret;
+-	struct qcom_scm_command *cmd;
+-	struct qcom_scm_response *rsp;
+-	unsigned long start, end;
+-
+-	cmd = alloc_qcom_scm_command(cmd_len, resp_len);
+-	if (!cmd)
+-		return -ENOMEM;
+-
+-	cmd->id = cpu_to_le32((svc_id << 10) | cmd_id);
+-	if (cmd_buf)
+-		memcpy(qcom_scm_get_command_buffer(cmd), cmd_buf, cmd_len);
+-
+-	mutex_lock(&qcom_scm_lock);
+-	ret = __qcom_scm_call(cmd);
+-	mutex_unlock(&qcom_scm_lock);
+-	if (ret)
+-		goto out;
+-
+-	rsp = qcom_scm_command_to_response(cmd);
+-	start = (unsigned long)rsp;
+-
+-	do {
+-		qcom_scm_inv_range(start, start + sizeof(*rsp));
+-	} while (!rsp->is_complete);
+-
+-	end = (unsigned long)qcom_scm_get_response_buffer(rsp) + resp_len;
+-	qcom_scm_inv_range(start, end);
+-
+-	if (resp_buf)
+-		memcpy(resp_buf, qcom_scm_get_response_buffer(rsp), resp_len);
+-out:
+-	free_qcom_scm_command(cmd);
+-	return ret;
+-}
+-
+-#define SCM_CLASS_REGISTER	(0x2 << 8)
+-#define SCM_MASK_IRQS		BIT(5)
+-#define SCM_ATOMIC(svc, cmd, n) (((((svc) << 10)|((cmd) & 0x3ff)) << 12) | \
+-				SCM_CLASS_REGISTER | \
+-				SCM_MASK_IRQS | \
+-				(n & 0xf))
+-
+-/**
+- * qcom_scm_call_atomic1() - Send an atomic SCM command with one argument
+- * @svc_id: service identifier
+- * @cmd_id: command identifier
+- * @arg1: first argument
+- *
+- * This shall only be used with commands that are guaranteed to be
+- * uninterruptable, atomic and SMP safe.
+- */
+-static s32 qcom_scm_call_atomic1(u32 svc, u32 cmd, u32 arg1)
+-{
+-	int context_id;
+-
+-	register u32 r0 asm("r0") = SCM_ATOMIC(svc, cmd, 1);
+-	register u32 r1 asm("r1") = (u32)&context_id;
+-	register u32 r2 asm("r2") = arg1;
+-
+-	asm volatile(
+-			__asmeq("%0", "r0")
+-			__asmeq("%1", "r0")
+-			__asmeq("%2", "r1")
+-			__asmeq("%3", "r2")
+-#ifdef REQUIRES_SEC
+-			".arch_extension sec\n"
+-#endif
+-			"smc    #0      @ switch to secure world\n"
+-			: "=r" (r0)
+-			: "r" (r0), "r" (r1), "r" (r2)
+-			: "r3");
+-	return r0;
+-}
+-
+-u32 qcom_scm_get_version(void)
+-{
+-	int context_id;
+-	static u32 version = -1;
+-	register u32 r0 asm("r0");
+-	register u32 r1 asm("r1");
+-
+-	if (version != -1)
+-		return version;
+-
+-	mutex_lock(&qcom_scm_lock);
+-
+-	r0 = 0x1 << 8;
+-	r1 = (u32)&context_id;
+-	do {
+-		asm volatile(
+-			__asmeq("%0", "r0")
+-			__asmeq("%1", "r1")
+-			__asmeq("%2", "r0")
+-			__asmeq("%3", "r1")
+-#ifdef REQUIRES_SEC
+-			".arch_extension sec\n"
+-#endif
+-			"smc	#0	@ switch to secure world\n"
+-			: "=r" (r0), "=r" (r1)
+-			: "r" (r0), "r" (r1)
+-			: "r2", "r3");
+-	} while (r0 == QCOM_SCM_INTERRUPTED);
+-
+-	version = r1;
+-	mutex_unlock(&qcom_scm_lock);
+-
+-	return version;
+-}
+-EXPORT_SYMBOL(qcom_scm_get_version);
+-
+-#define QCOM_SCM_SVC_BOOT			0x1
+-#define QCOM_SCM_BOOT_ADDR			0x1
+-/*
+- * Set the cold/warm boot address for one of the CPU cores.
+- */
+-static int qcom_scm_set_boot_addr(u32 addr, int flags)
+-{
+-	struct {
+-		__le32 flags;
+-		__le32 addr;
+-	} cmd;
+-
+-	cmd.addr = cpu_to_le32(addr);
+-	cmd.flags = cpu_to_le32(flags);
+-	return qcom_scm_call(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR,
+-			&cmd, sizeof(cmd), NULL, 0);
+-}
++#include "qcom_scm.h"
+ 
+ /**
+  * qcom_scm_set_cold_boot_addr() - Set the cold boot address for cpus
+@@ -414,26 +33,7 @@ static int qcom_scm_set_boot_addr(u32 addr, int flags)
+  */
+ int qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
+ {
+-	int flags = 0;
+-	int cpu;
+-	int scm_cb_flags[] = {
+-		QCOM_SCM_FLAG_COLDBOOT_CPU0,
+-		QCOM_SCM_FLAG_COLDBOOT_CPU1,
+-		QCOM_SCM_FLAG_COLDBOOT_CPU2,
+-		QCOM_SCM_FLAG_COLDBOOT_CPU3,
+-	};
+-
+-	if (!cpus || (cpus && cpumask_empty(cpus)))
+-		return -EINVAL;
+-
+-	for_each_cpu(cpu, cpus) {
+-		if (cpu < ARRAY_SIZE(scm_cb_flags))
+-			flags |= scm_cb_flags[cpu];
+-		else
+-			set_cpu_present(cpu, false);
+-	}
+-
+-	return qcom_scm_set_boot_addr(virt_to_phys(entry), flags);
++	return __qcom_scm_set_cold_boot_addr(entry, cpus);
+ }
+ EXPORT_SYMBOL(qcom_scm_set_cold_boot_addr);
+ 
+@@ -447,37 +47,10 @@ EXPORT_SYMBOL(qcom_scm_set_cold_boot_addr);
+  */
+ int qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
+ {
+-	int ret;
+-	int flags = 0;
+-	int cpu;
+-
+-	/*
+-	 * Reassign only if we are switching from hotplug entry point
+-	 * to cpuidle entry point or vice versa.
+-	 */
+-	for_each_cpu(cpu, cpus) {
+-		if (entry == qcom_scm_wb[cpu].entry)
+-			continue;
+-		flags |= qcom_scm_wb[cpu].flag;
+-	}
+-
+-	/* No change in entry function */
+-	if (!flags)
+-		return 0;
+-
+-	ret = qcom_scm_set_boot_addr(virt_to_phys(entry), flags);
+-	if (!ret) {
+-		for_each_cpu(cpu, cpus)
+-			qcom_scm_wb[cpu].entry = entry;
+-	}
+-
+-	return ret;
++	return __qcom_scm_set_warm_boot_addr(entry, cpus);
+ }
+ EXPORT_SYMBOL(qcom_scm_set_warm_boot_addr);
+ 
+-#define QCOM_SCM_CMD_TERMINATE_PC	0x2
+-#define QCOM_SCM_FLUSH_FLAG_MASK	0x3
+-
+ /**
+  * qcom_scm_cpu_power_down() - Power down the cpu
+  * @flags - Flags to flush cache
+@@ -488,7 +61,6 @@ EXPORT_SYMBOL(qcom_scm_set_warm_boot_addr);
+  */
+ void qcom_scm_cpu_power_down(u32 flags)
+ {
+-	qcom_scm_call_atomic1(QCOM_SCM_SVC_BOOT, QCOM_SCM_CMD_TERMINATE_PC,
+-			flags & QCOM_SCM_FLUSH_FLAG_MASK);
++	__qcom_scm_cpu_power_down(flags);
+ }
+ EXPORT_SYMBOL(qcom_scm_cpu_power_down);
+diff --git a/drivers/firmware/qcom_scm.h b/drivers/firmware/qcom_scm.h
 new file mode 100644
-index 0000000..ae2d725
+index 0000000..9fbede4
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/msm/acc.txt
-@@ -0,0 +1,19 @@
-+Application Processor Sub-system (APSS) Application Clock Controller (ACC)
-+
-+The ACC provides clock, power domain, and reset control to a CPU. There is one ACC
-+register region per CPU within the APSS remapped region as well as an alias register
-+region that remaps accesses to the ACC associated with the CPU accessing the region.
-+
-+Required properties:
-+- compatible:		Must be "qcom,arm-cortex-acc"
-+- reg:			The first element specifies the base address and size of
-+			the register region. An optional second element specifies
-+			the base address and size of the alias register region.
-+
-+Example:
-+
-+	clock-controller at b088000 {
-+		compatible = "qcom,arm-cortex-acc";
-+		reg = <0x0b088000 0x1000>,
-+		      <0x0b008000 0x1000>;
-+	}
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 5ee07ee..8d77ac5 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -25,6 +25,9 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o topology.o
-+ifdef CONFIG_SMP
-+arm64-obj-$(CONFIG_ARCH_QCOM)		+= qcom-special-cpu-ops-dont-copy-this.o
-+endif
- arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
-diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-index cce9524..d002168 100644
---- a/arch/arm64/kernel/cpu_ops.c
-+++ b/arch/arm64/kernel/cpu_ops.c
-@@ -24,6 +24,7 @@
- 
- extern const struct cpu_operations smp_spin_table_ops;
- extern const struct cpu_operations cpu_psci_ops;
-+extern const struct cpu_operations qcom_cortex_a_ops;
- 
- const struct cpu_operations *cpu_ops[NR_CPUS];
- 
-@@ -32,6 +33,9 @@ static const struct cpu_operations *supported_cpu_ops[] __initconst = {
- 	&smp_spin_table_ops,
- #endif
- 	&cpu_psci_ops,
-+#ifdef CONFIG_ARCH_QCOM
-+	&qcom_cortex_a_ops,
-+#endif
- 	NULL,
- };
- 
-diff --git a/arch/arm64/kernel/qcom-special-cpu-ops-dont-copy-this.c b/arch/arm64/kernel/qcom-special-cpu-ops-dont-copy-this.c
-new file mode 100644
-index 0000000..5037aa9
---- /dev/null
-+++ b/arch/arm64/kernel/qcom-special-cpu-ops-dont-copy-this.c
-@@ -0,0 +1,281 @@
-+/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ * Copyright (c) 2013 ARM Ltd.
++++ b/drivers/firmware/qcom_scm.h
+@@ -0,0 +1,29 @@
++/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 and
@@ -119,275 +602,24 @@ index 0000000..5037aa9
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + */
++#ifndef __QCOM_SCM_INT_H
++#define __QCOM_SCM_INT_H
 +
-+/* MSM ARMv8 CPU Operations
-+ * Based on arch/arm64/kernel/smp_spin_table.c
-+ */
++#define QCOM_SCM_SVC_BOOT		0x1
++#define QCOM_SCM_BOOT_ADDR		0x1
++#define QCOM_SCM_BOOT_ADDR_MC		0x11
 +
-+#include <linux/bitops.h>
-+#include <linux/cpu.h>
-+#include <linux/cpumask.h>
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/smp.h>
-+#include <linux/qcom_scm.h>
++#define QCOM_SCM_FLAG_HLOS		0x01
++#define QCOM_SCM_FLAG_COLDBOOT_MC	0x02
++#define QCOM_SCM_FLAG_WARMBOOT_MC	0x04
++extern int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus);
++extern int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus);
 +
-+#include <asm/barrier.h>
-+#include <asm/cacheflush.h>
-+#include <asm/cpu_ops.h>
-+#include <asm/cputype.h>
-+#include <asm/smp_plat.h>
-+
-+DEFINE_PER_CPU(int, cold_boot_done);
-+
-+/* CPU power domain register offsets */
-+#define CPU_PWR_CTL		0x4
-+#define CPU_PWR_GATE_CTL	0x14
-+#define LDO_BHS_PWR_CTL		0x28
-+
-+/* L2 power domain register offsets */
-+#define L2_PWR_CTL_OVERRIDE	0xc
-+#define L2_PWR_CTL		0x14
-+#define L2_PWR_STATUS		0x18
-+#define	L2_CORE_CBCR		0x58
-+#define L1_RST_DIS		0x284
-+
-+#define L2_SPM_STS		0xc
-+#define L2_VREG_CTL		0x1c
-+
-+/*
-+ * struct qcom_l2ccc_of_info: represents of data for l2 cache clock controller.
-+ * @compat: compat string for l2 cache clock controller
-+ * @l2_pon: l2 cache power on routine
-+ */
-+struct qcom_l2ccc_of_info {
-+	const char *compat;
-+	int (*l2_power_on) (struct device_node *dn, u32 l2_mask, int cpu);
-+	u32 l2_power_on_mask;
-+};
-+
-+static int power_on_l2_msm8916(struct device_node *l2ccc_node, u32 pon_mask,
-+				int cpu)
-+{
-+	u32 pon_status;
-+	void __iomem *l2_base;
-+
-+	l2_base = of_iomap(l2ccc_node, 0);
-+	if (!l2_base)
-+		return -ENOMEM;
-+
-+	/* Skip power-on sequence if l2 cache is already powered up*/
-+	pon_status = (__raw_readl(l2_base + L2_PWR_STATUS) & pon_mask)
-+				== pon_mask;
-+	if (pon_status) {
-+		iounmap(l2_base);
-+		return 0;
-+	}
-+
-+	/* Close L2/SCU Logic GDHS and power up the cache */
-+	writel_relaxed(0x10D700, l2_base + L2_PWR_CTL);
-+
-+	/* Assert PRESETDBGn */
-+	writel_relaxed(0x400000, l2_base + L2_PWR_CTL_OVERRIDE);
-+	mb();
-+	udelay(2);
-+
-+	/* De-assert L2/SCU memory Clamp */
-+	writel_relaxed(0x101700, l2_base + L2_PWR_CTL);
-+
-+	/* Wakeup L2/SCU RAMs by deasserting sleep signals */
-+	writel_relaxed(0x101703, l2_base + L2_PWR_CTL);
-+	mb();
-+	udelay(2);
-+
-+	/* Enable clocks via SW_CLK_EN */
-+	writel_relaxed(0x01, l2_base + L2_CORE_CBCR);
-+
-+	/* De-assert L2/SCU logic clamp */
-+	writel_relaxed(0x101603, l2_base + L2_PWR_CTL);
-+	mb();
-+	udelay(2);
-+
-+	/* De-assert PRESSETDBg */
-+	writel_relaxed(0x0, l2_base + L2_PWR_CTL_OVERRIDE);
-+
-+	/* De-assert L2/SCU Logic reset */
-+	writel_relaxed(0x100203, l2_base + L2_PWR_CTL);
-+	mb();
-+	udelay(54);
-+
-+	/* Turn on the PMIC_APC */
-+	writel_relaxed(0x10100203, l2_base + L2_PWR_CTL);
-+
-+	/* Set H/W clock control for the cpu CBC block */
-+	writel_relaxed(0x03, l2_base + L2_CORE_CBCR);
-+	mb();
-+	iounmap(l2_base);
-+
-+	return 0;
-+}
-+
-+static const struct qcom_l2ccc_of_info l2ccc_info[] = {
-+	{
-+		.compat = "qcom,8916-l2ccc",
-+		.l2_power_on = power_on_l2_msm8916,
-+		.l2_power_on_mask = BIT(9),
-+	},
-+};
-+
-+static int power_on_l2_cache(struct device_node *l2ccc_node, int cpu)
-+{
-+	int ret, i;
-+	const char *compat;
-+
-+	ret = of_property_read_string(l2ccc_node, "compatible", &compat);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < ARRAY_SIZE(l2ccc_info); i++) {
-+		const struct qcom_l2ccc_of_info *ptr = &l2ccc_info[i];
-+
-+		if (!of_compat_cmp(ptr->compat, compat, strlen(compat)))
-+				return ptr->l2_power_on(l2ccc_node,
-+						ptr->l2_power_on_mask, cpu);
-+	}
-+	pr_err("Compat string not found for L2CCC node\n");
-+	return -EIO;
-+}
-+
-+static int qcom_unclamp_secondary_arm_cpu(unsigned int cpu)
-+{
-+
-+	int ret = 0;
-+	struct device_node *cpu_node, *acc_node, *l2_node, *l2ccc_node;
-+	void __iomem *reg;
-+
-+	cpu_node = of_get_cpu_node(cpu, NULL);
-+	if (!cpu_node)
-+		return -ENODEV;
-+
-+	acc_node = of_parse_phandle(cpu_node, "qcom,acc", 0);
-+	if (!acc_node) {
-+			ret = -ENODEV;
-+			goto out_acc;
-+	}
-+
-+	l2_node = of_parse_phandle(cpu_node, "next-level-cache", 0);
-+	if (!l2_node) {
-+		ret = -ENODEV;
-+		goto out_l2;
-+	}
-+
-+	l2ccc_node = of_parse_phandle(l2_node, "power-domain", 0);
-+	if (!l2ccc_node) {
-+		ret = -ENODEV;
-+		goto out_l2;
-+	}
-+
-+	/* Ensure L2-cache of the CPU is powered on before
-+	 * unclamping cpu power rails.
-+	 */
-+	ret = power_on_l2_cache(l2ccc_node, cpu);
-+	if (ret) {
-+		pr_err("L2 cache power up failed for CPU%d\n", cpu);
-+		goto out_l2ccc;
-+	}
-+
-+	reg = of_iomap(acc_node, 0);
-+	if (!reg) {
-+		ret = -ENOMEM;
-+		goto out_acc_reg;
-+	}
-+
-+	/* Assert Reset on cpu-n */
-+	writel_relaxed(0x00000033, reg + CPU_PWR_CTL);
-+	mb();
-+
-+	/*Program skew to 16 X0 clock cycles*/
-+	writel_relaxed(0x10000001, reg + CPU_PWR_GATE_CTL);
-+	mb();
-+	udelay(2);
-+
-+	/* De-assert coremem clamp */
-+	writel_relaxed(0x00000031, reg + CPU_PWR_CTL);
-+	mb();
-+
-+	/* Close coremem array gdhs */
-+	writel_relaxed(0x00000039, reg + CPU_PWR_CTL);
-+	mb();
-+	udelay(2);
-+
-+	/* De-assert cpu-n clamp */
-+	writel_relaxed(0x00020038, reg + CPU_PWR_CTL);
-+	mb();
-+	udelay(2);
-+
-+	/* De-assert cpu-n reset */
-+	writel_relaxed(0x00020008, reg + CPU_PWR_CTL);
-+	mb();
-+
-+	/* Assert PWRDUP signal on core-n */
-+	writel_relaxed(0x00020088, reg + CPU_PWR_CTL);
-+	mb();
-+
-+	/* Secondary CPU-N is now alive */
-+	iounmap(reg);
-+out_acc_reg:
-+	of_node_put(l2ccc_node);
-+out_l2ccc:
-+	of_node_put(l2_node);
-+out_l2:
-+	of_node_put(acc_node);
-+out_acc:
-+	of_node_put(cpu_node);
-+
-+	return ret;
-+}
-+
-+static int __init qcom_cpu_init(struct device_node *dn, unsigned int cpu)
-+{
-+	/* Mark CPU0 cold boot flag as done */
-+	if (!cpu && !per_cpu(cold_boot_done, cpu))
-+		per_cpu(cold_boot_done, cpu) = true;
-+
-+	return 0;
-+}
-+
-+static int __init qcom_cpu_prepare(unsigned int cpu)
-+{
-+	const cpumask_t *mask = cpumask_of(cpu);
-+
-+	if (qcom_scm_set_cold_boot_addr(secondary_entry, mask)) {
-+		pr_warn("CPU%d:Failed to set boot address\n", cpu);
-+		return -ENOSYS;
-+	}
-+
-+	return 0;
-+}
-+
-+static int qcom_cpu_boot(unsigned int cpu)
-+{
-+	int ret = 0;
-+
-+	if (per_cpu(cold_boot_done, cpu) == false) {
-+		ret = qcom_unclamp_secondary_arm_cpu(cpu);
-+		if (ret)
-+			return ret;
-+		per_cpu(cold_boot_done, cpu) = true;
-+	}
-+
-+	return ret;
-+}
-+
-+const struct cpu_operations qcom_cortex_a_ops = {
-+	.name		= "qcom,arm-cortex-acc",
-+	.cpu_init	= qcom_cpu_init,
-+	.cpu_prepare	= qcom_cpu_prepare,
-+	.cpu_boot	= qcom_cpu_boot,
-+};
++#define QCOM_SCM_CMD_TERMINATE_PC	0x2
++#define QCOM_SCM_FLUSH_FLAG_MASK	0x3
++#define QCOM_SCM_CMD_CORE_HOTPLUGGED	0x10
++extern void __qcom_scm_cpu_power_down(u32 flags);
++#endif
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
