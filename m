@@ -1,23 +1,67 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 14 Apr 2015 10:41:29 -0400 (EDT)
-Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
-In-Reply-To: <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <Pine.LNX.4.44L0.1504141040340.1370-100000@iolanthe.rowland.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 14 Apr 2015 16:43:41 +0200
+Subject: [PATCH v8 00/18] Tegra124 CL-DVFS / DFLL clocksource + cpufreq
+In-Reply-To: <20150410211157.14369.51754@quantum>
+References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <20150311100741.GK19577@ulmo.nvidia.com>
+ <20150410211157.14369.51754@quantum>
+Message-ID: <20150414144339.GA30495@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Apr 2015, Arun Ramamurthy wrote:
-
-> Getting phys by index instead of phy names so that we do
-> not have to create a naming scheme when multiple phys
-> are present
+On Fri, Apr 10, 2015 at 02:11:57PM -0700, Michael Turquette wrote:
+> Quoting Thierry Reding (2015-03-11 03:07:43)
+> > Hi Mike,
+> > 
+> > Have you had a chance to look at these changes to the Tegra clock
+> > driver? If you're fine with it, I'd like to take these patches through
+> > the Tegra tree because the rest of the series depends on them. I can
+> > provide a stable branch in case we need to base other Tegra clock
+> > changes on top of this.
 > 
-> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> Hi Thierry,
+> 
+> Clock patches (and corresponding DT binding descriptions and changes to
+> DTS) look fine to me. Please add:
+> 
+> Acked-by: Michael Turquette <mturquette@linaro.org>
+> 
+> I did have a question about the beahvior of clk_put in one of Mikko's
+> patches but it should not gate this series. I'm just trying to find out
+> if we have a bug in the framework or if the Tegra driver is a special
+> case.
+> 
+> Also I do not think a stable branch is necessary.
 
-You have not responded to the comments I posted earlier:
+Given how this didn't work at all for v4.1, why don't we try to do this
+the conventional way for v4.2? What I propose is that I collect all the
+patches that I've had in these branches into a single branch that I can
+send you shortly after v4.1-rc1. Then you can pull that into the clock
+tree when you're happy and I can pull that into the Tegra tree again if
+needed to resolve dependencies.
 
-	http://marc.info/?l=linux-usb&m=142798455925594&w=2
+One problem that I foresee is that the EMC clock driver relies on some
+symbols exported by the EMC driver, so it will fail to build on its own
+if merged into the clock tree. Usually I'd say we can solve this by
+merging a stable branch from the Tegra tree into the clock tree, but if
+any of the ARM SoC maintainers then decides that, for whatever reason,
+the Tegra pull request isn't good enough, you'd need to either redo the
+clock tree or we slip in the changes via the clock tree anyway.
 
-Alan Stern
+Perhaps a solution would be to implement stubs for the API exposed by
+the EMC driver and merge that through the clock tree, which should give
+us a tree that can be built but be a no-op at runtime. Then we can add
+the actual code to enable EMC scaling in the Tegra tree by providing a
+real implementation. That way we only have the Tegra tree depend on the
+clock tree.
+
+How does that sound?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150414/d4f41106/attachment.sig>
