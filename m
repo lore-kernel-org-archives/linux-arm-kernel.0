@@ -1,38 +1,67 @@
 From: jbe@pengutronix.de (Juergen Borleis)
-Date: Tue, 14 Apr 2015 11:11:51 +0200
-Subject: [PATCH 2nd try] RTC/i.MX/DryICE: add recovery routines to the driver
-Message-ID: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
+Date: Tue, 14 Apr 2015 11:11:54 +0200
+Subject: [PATCH 3/5] RTC/i.MX/DryIce: monitor a security violation at runtime
+In-Reply-To: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
+References: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <1429002716-19821-4-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2nd try, this time with a cover letter... m(
+Maybe the unit enters the hardware related state at runtime and not at
+system boot time (after a power cycle).
 
-The built-in RTC unit on some i.MX SoCs isn't an RTC only. It is also a tamper
-monitor unit which can keep some keys. When it does its tamper detection job
-and a tamper violation is detected, this RTC unit locks completely including
-the real-time counter. In this state the unit is completely useless. The only
-way to bring it out of this locked state is a power on reset. At the next boot
-time some flags signals the tamper violation and a specific register access
-sequence must be done to finaly bring this unit into life again. Until this is
-done, there is no way to use it again as an RTC.
-But also without any enabled tamper detection sometimes this unit tends to
-lock. And in this case the same steps must be done to bring it into life
-again.
-The current implementation of the DryIce driver isn't able to unlock the
-device successfully in the case it is locked somehow. Only a full power cycle
-including *battery power* can help in this case.
+Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+Signed-off-by: Robert Schwebel <rsc@pengutronix.de>
+[rsc: got NDA clearance from Freescale]
+---
+ drivers/rtc/rtc-imxdi.c | 21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
 
-The attached change set adds the required routines to be able to unlock the
-DryIce unit in the case the driver detects a locked unit. This includes
-unlocking it if it is locked by accident or malfunction and not by a real
-tamper violation.
-
-The last patch of this series is for reference only and should not be part
-of the kernel. It just adds some code to force a locked DryIce unit to check
-if the new routines are able to unlock it again. This code was required
-because I had no hardware which really uses the tamper detection features of
-this unit.
-
-Comments are welcome.
-
-jbe
+diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
+index f8abf2b..b04c64f 100644
+--- a/drivers/rtc/rtc-imxdi.c
++++ b/drivers/rtc/rtc-imxdi.c
+@@ -680,6 +680,25 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
+ 	irqreturn_t rc = IRQ_NONE;
+ 
+ 	dier = __raw_readl(imxdi->ioaddr + DIER);
++	dsr = __raw_readl(imxdi->ioaddr + DSR);
++
++	/* handle the security violation event */
++	if (dier & DIER_SVIE) {
++		if (dsr & DSR_SVF) {
++			/*
++			 * Disable the interrupt when this kind of event has
++			 * happened.
++			 * There cannot be more than one event of this type,
++			 * because it needs a complex state change
++			 * including a main power cycle to get again out of
++			 * this state.
++			 */
++			di_int_disable(imxdi, DIER_SVIE);
++			/* report the violation */
++			di_report_tamper_info(imxdi, dsr);
++			rc = IRQ_HANDLED;
++		}
++	}
+ 
+ 	/* handle write complete and write error cases */
+ 	if (dier & DIER_WCIE) {
+@@ -690,7 +709,6 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
+ 			return rc;
+ 
+ 		/* DSR_WCF clears itself on DSR read */
+-		dsr = __raw_readl(imxdi->ioaddr + DSR);
+ 		if (dsr & (DSR_WCF | DSR_WEF)) {
+ 			/* mask the interrupt */
+ 			di_int_disable(imxdi, DIER_WCIE);
+@@ -706,7 +724,6 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
+ 	/* handle the alarm case */
+ 	if (dier & DIER_CAIE) {
+ 		/* DSR_WCF clears itself on DSR read */
+-		dsr = __raw_readl(imxdi->ioaddr + DSR);
+ 		if (dsr & DSR_CAF) {
+ 			/* mask the interrupt */
+ 			di_int_disable(imxdi, DIER_CAIE);
+-- 
+2.1.4
