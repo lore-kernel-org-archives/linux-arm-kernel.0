@@ -1,67 +1,42 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 14 Apr 2015 16:43:41 +0200
-Subject: [PATCH v8 00/18] Tegra124 CL-DVFS / DFLL clocksource + cpufreq
-In-Reply-To: <20150410211157.14369.51754@quantum>
-References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
- <20150311100741.GK19577@ulmo.nvidia.com>
- <20150410211157.14369.51754@quantum>
-Message-ID: <20150414144339.GA30495@ulmo.nvidia.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 14 Apr 2015 09:44:11 -0500
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
+ <493B15F8-0EBE-4633-9604-671EF403F36E@codeaurora.org>
+ <20150410161052.GF6854@e104818-lin.cambridge.arm.com>
+ <FDC755A7-ACCF-4222-8730-782EEC632159@codeaurora.org>
+ <20150413094117.GA2745@e104818-lin.cambridge.arm.com>
+ <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
+Message-ID: <97B1A2D4-6F6B-433B-83E6-9C8A95D1BFC6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 02:11:57PM -0700, Michael Turquette wrote:
-> Quoting Thierry Reding (2015-03-11 03:07:43)
-> > Hi Mike,
-> > 
-> > Have you had a chance to look at these changes to the Tegra clock
-> > driver? If you're fine with it, I'd like to take these patches through
-> > the Tegra tree because the rest of the series depends on them. I can
-> > provide a stable branch in case we need to base other Tegra clock
-> > changes on top of this.
-> 
-> Hi Thierry,
-> 
-> Clock patches (and corresponding DT binding descriptions and changes to
-> DTS) look fine to me. Please add:
-> 
-> Acked-by: Michael Turquette <mturquette@linaro.org>
-> 
-> I did have a question about the beahvior of clk_put in one of Mikko's
-> patches but it should not gate this series. I'm just trying to find out
-> if we have a bug in the framework or if the Tegra driver is a special
-> case.
-> 
-> Also I do not think a stable branch is necessary.
 
-Given how this didn't work at all for v4.1, why don't we try to do this
-the conventional way for v4.2? What I propose is that I collect all the
-patches that I've had in these branches into a single branch that I can
-send you shortly after v4.1-rc1. Then you can pull that into the clock
-tree when you're happy and I can pull that into the Tegra tree again if
-needed to resolve dependencies.
+> On Apr 14, 2015, at 9:21 AM, Kumar Gala <galak@codeaurora.org> wrote:
+> 
+>>>> 
+>>>> So please come up with proper technical arguments rather than the kernel
+>>>> should take whatever SoC vendors dreamt of.
+>>> 
+>>> There is no technical argument to be made.  This is about the
+>>> community and you as maintainer wanting to accept code that complies
+>>> to your decision or not.
+>> 
+>> If you are not willing to make technical arguments, I don't have to
+>> provide any further reasons in this thread. It's your choice. In the
+>> meantime, the short answer is NAK.
 
-One problem that I foresee is that the EMC clock driver relies on some
-symbols exported by the EMC driver, so it will fail to build on its own
-if merged into the clock tree. Usually I'd say we can solve this by
-merging a stable branch from the Tegra tree into the clock tree, but if
-any of the ARM SoC maintainers then decides that, for whatever reason,
-the Tegra pull request isn't good enough, you'd need to either redo the
-clock tree or we slip in the changes via the clock tree anyway.
+I assume you would than NAK someone trying to get support for their Nexus 9 Tablet using a Tegra K1.  It appears the shipping code for that device didn?t use PSCI (again guessing because it wasn?t available at the time).
 
-Perhaps a solution would be to implement stubs for the API exposed by
-the EMC driver and merge that through the clock tree, which should give
-us a tree that can be built but be a no-op at runtime. Then we can add
-the actual code to enable EMC scaling in the Tegra tree by providing a
-real implementation. That way we only have the Tegra tree depend on the
-clock tree.
+https://android.googlesource.com/kernel/tegra/+/android-tegra-flounder-3.10-lollipop-release/arch/arm64/mach-tegra/platsmp.c
 
-How does that sound?
+If so, I find this counter to the Linux kernel communities normal desire to support the most hardware platforms.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150414/d4f41106/attachment.sig>
+- k
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
