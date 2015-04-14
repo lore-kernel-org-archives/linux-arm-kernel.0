@@ -1,52 +1,77 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 14 Apr 2015 16:53:35 +0900
-Subject: [PATCH v7 1/9] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <20150413154949.GI4076@leverpostej>
-References: <1426637856-3730-1-git-send-email-cw00.choi@samsung.com>
- <1426637856-3730-2-git-send-email-cw00.choi@samsung.com>
- <20150330160940.GA13731@leverpostej> <5519E2B6.2030905@samsung.com>
- <20150402173558.GB30669@leverpostej> <551DD321.6030707@samsung.com>
- <20150407102523.GA23190@leverpostej> <20150413105618.GD4076@leverpostej>
- <552BB14A.6010205@samsung.com> <20150413154949.GI4076@leverpostej>
-Message-ID: <552CC77F.10801@samsung.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 14 Apr 2015 09:03:53 +0100
+Subject: [PATCH v2 04/10] KVM: arm: guest debug,
+ add stub KVM_SET_GUEST_DEBUG ioctl
+In-Reply-To: <20150414083157.65733022@thinkpad-w530>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-5-git-send-email-alex.bennee@linaro.org>
+ <20150413121231.GO6186@cbox> <20150414083157.65733022@thinkpad-w530>
+Message-ID: <87y4lvf85y.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin and Mark,
 
-On 04/14/2015 12:49 AM, Mark Rutland wrote:
->>>>>> So NAK to the PSCI node and PSCI enable method in this dts until we
->>>>>> either have a working firmware, or a reasonable mechanism to handle the
->>>>>> deficiency.
->>>>>
->>>>> There is only CPU0 hotplug issue. Excpet CPU{1-7} are well working.
->>>>
->>>> I understand that, but the issue with CPU0 is still a blocker from my
->>>> PoV.
->>>>
->>>>> To fix this issue, we must need the help of firmware developer.
->>>>> But, We never get the any help.
->>>>
->>>> Previously dyou said that you did not have access to the source code
->>>> rather than not having help from the relevant firmware engineers. I take
->>>> it you have informed them of the issue with CPU0?
->>
->> I didn't ask any help to firmware engineer because I didn't know who firmware engineer
->> and also didn't access the source code. If I knew the engineer and can access them,
->> I would have asked some help to them or inquired the reason about CPU0 not hotplugged.
-> 
-> You must have acquired the firmware (or board(s) with the firmware
-> preloaded) from somewhere. Surely you can work backwards from there to
-> file a bug report and/or inquire as to who you need to speak to...
+David Hildenbrand <dahi@linux.vnet.ibm.com> writes:
 
-As you commented, I got the board that firmware was preloaded.
-Unfortunately, I didn't know the any routine to contact firmware developer
-and developer about SoC design.
+>> On Tue, Mar 31, 2015 at 04:08:02PM +0100, Alex Benn?e wrote:
+>> > This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
+>> > ioctl. Currently any operation flag will return EINVAL. Actual
+>> > functionality will be added with further patches.
+>> > 
+>> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
+>> > 
+>> > ---
+>> > v2
+>> >   - simplified form of the ioctl (stuff will go into setup_debug)
+>> > 
+>> > diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> > index b112efc..06c5064 100644
+>> > --- a/Documentation/virtual/kvm/api.txt
+>> > +++ b/Documentation/virtual/kvm/api.txt
+>> > @@ -2604,7 +2604,7 @@ handled.
+>> >  4.87 KVM_SET_GUEST_DEBUG
+>> >  
+>> >  Capability: KVM_CAP_SET_GUEST_DEBUG
+>> > -Architectures: x86, s390, ppc
+>> > +Architectures: x86, s390, ppc, arm64
+>> >  Type: vcpu ioctl
+>> >  Parameters: struct kvm_guest_debug (in)
+>> >  Returns: 0 on success; -1 on error
+>> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> > index 5560f74..445933d 100644
+>> > --- a/arch/arm/kvm/arm.c
+>> > +++ b/arch/arm/kvm/arm.c
+>> > @@ -183,6 +183,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>> >  	case KVM_CAP_ARM_PSCI:
+>> >  	case KVM_CAP_ARM_PSCI_0_2:
+>> >  	case KVM_CAP_READONLY_MEM:
+>> > +	case KVM_CAP_SET_GUEST_DEBUG:
+>> >  		r = 1;
+>> >  		break;
+>> 
+>> shouldn't you wait with advertising this capability until you've
+>> implemented support for it?
+>> 
+>
+> I think this would work for now, however it's not very practical
+> - in the end one has to sense which debug flags are actually supported.
+>
+> Question is if he wants to add initial support and extend functionality and
+> flags with each patch or enable the whole set of features in one shot at the
+> end.
 
-Dear Kukjin,
-I need your help about CPU0 issue of Exynos SoC.
-Could you answer why CPU0 cannot be hotplugged on Exynos SoC?
+This is what in effect I was doing. Testing each feature in turn and
+ensuring it failed gracefully when kernel features where not present
+(both missing the capability or returning EINVAL).
 
-Thanks,
-Chanwoo Choi
+> Doing the latter seems more practicable to me (especially as the debug features
+> are added in the same patch series).
+
+Well in practice the whole series will go in together so this is only
+really relevant to what happens when you bisect the series.
+
+>
+> David
+
+-- 
+Alex Benn?e
