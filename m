@@ -1,41 +1,170 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 14 Apr 2015 11:05:04 -0300
-Subject: [PATCH] ARM: dts: imx23-olinuxino: Fix polarity of LED GPIO
-Message-ID: <1429020304-31045-1-git-send-email-fabio.estevam@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Apr 2015 16:07:36 +0200
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <76000FE9-46E5-4883-9E4F-C65444FD406C@theobroma-systems.com>
+References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
+ <3234795.e0Uq9k2nUp@wuerfel>
+ <76000FE9-46E5-4883-9E4F-C65444FD406C@theobroma-systems.com>
+Message-ID: <2069111.6po5Xr33Dn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On imx23-olinuxino the LED turns on when level logic high is aplied to
-GPIO2_1.
+On Tuesday 14 April 2015 13:50:21 Dr. Philipp Tomsich wrote:
+> 
+> > On 14 Apr 2015, at 13:14, Arnd Bergmann <arnd@arndb.de> wrote:
+> > 
+> > On Tuesday 14 April 2015 10:45:43 Pinski, Andrew wrote:
+> >>> On Apr 14, 2015, at 3:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >>> 
+> >>>> On Tuesday 14 April 2015 11:33:13 Dr.  Philipp Tomsich wrote:
+> >>>> Arnd,
+> >>>> 
+> >>>> After getting a good night?s sleep, the ?reuse the existing system call table? comment
+> >>>> makes a little more sense as I construe it as having just one merged system call table
+> >>>> for both LP64 and ILP32 and handling the differences through a different system call
+> >>>> numbering in unistd.h towards LP64 and ILP32 processes.
+> >>>> 
+> >>>> If this is the intended implementation, I am not fully sold on the benefit: having a private
+> >>>> copy of unistd.h for ARM64 seems to be a less readable and less maintenance-friendly
+> >>>> solution to having separate tables.
+> >>>> 
+> >>>> We?re open to input on this and?if merging the system call tables is the consensus?
+> >>>> would like to get the change underway as soon as possible.
+> >>> 
+> >>> There are multiple ways of doing this:
+> >>> 
+> >>> a) separate syscall table for arm64: as you say, this is the current approach,
+> >>>  and I'd like to avoid that too
+> >>> b) add syscalls for ilp32 as additional numbers in the normal lp64 version of
+> >>>  asm-generic/unistd.h, and share the binary tables between ilp32 and lp64
+> >>>  on aarch64
+> >>> c) change asm-generic/unistd.h to generate three possible tables: instead of
+> >>>  just native (lp64 or ilp32 depending on the arch), compat (support for
+> >>>  existing ilp32 binaries on some architectures, there would also be a
+> >>>  "modern" ilp32 variant that is a mix of the two, as your table today
+> >>> d) don't use the asm-generic/unistd.h table for aarch64-ilp32 at all, but instead
+> >>>  reuse the table from arch/arm64/include/asm/unistd32.h
+> >>> 
+> >>> I think you are referring to approach b) or c) above, but my preferred one
+> >>> would actually be d).
+> >> 
+> >> D is the worst of all 4 options in my mind. The reason is when a new syscall is
+> >> added, then you have to update that file too.
+> > 
+> > I don't know what the miscommunication is here, but the advantage of d is
+> > specifically that it is /less/ work to maintain: With the current approach,
+> > each new syscall that gets added needs to be checked to see if the normal
+> > aarch64 version works or if it needs another wrapper, while with d) we
+> > get the update for free, because we follow exactly what aarch32 is doing.
+> 
+> I must agree with Andrew, that (d) seems like a bad fit for ILP32? after all the
+> ILP32 (ELF) ABI specifies that 64bit values are to be passed in a single register,
+> but the unistd32.h assumes a 32bit kernel that receives 64bit arguments split
+> over two registers (i.e. the 64-variants of the various system calls, such as
+> ftruncate64).
+> 
+> I strongly prefer (b) as this satisfies the largest number of requirements:
+>  (i) it will be a single system call table for LP64 and ILP32
+>  (ii) it?s easy to be make use of the 64bit capable system calls
+>  (iii) it fits with the relationship of ILP32 to LP64 in the ILP32 ELF ABI definition
 
-Fix the gpios property accordingly.
+Ok, I see. I'd still like to hear other opinions on the matter, and my
+preference remains D. Most importantly, I'd like Catalin and Will to
+comment on this.
 
-Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx23-olinuxino.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+For completeness, there is yet another option, which would be to use the
+exact system call table from arm64 and do all the emulation in user space
+rather than the kernel. This would however be the least compatible with
+existing source code, so you probably don't want to do that.
 
-diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
-index 7e6eef2..839a3b9 100644
---- a/arch/arm/boot/dts/imx23-olinuxino.dts
-+++ b/arch/arm/boot/dts/imx23-olinuxino.dts
-@@ -12,6 +12,7 @@
-  */
- 
- /dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
- #include "imx23.dtsi"
- 
- / {
-@@ -122,7 +123,7 @@
- 
- 		user {
- 			label = "green";
--			gpios = <&gpio2 1 1>;
-+			gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
- };
--- 
-1.9.1
+> As we don?t support ILP32 without LP64, the resulting implementation will
+> be even simpler (i.e. no need to duplicate the entire table) than the n32 
+> implementation on MIPS...
+
+Right. Andrew didn't like the idea that the syscall numbers are slightly
+different in B, but I think that is not a significant downside, as the kernel
+header would be done in a way to report the correct __NR_* macros here.
+
+> >> Also d is worse than the rest as
+> >> you no longer default to 64bit off_t which is not a good thing. 
+> > 
+> > That decision is up to the libc implementation, just as it is for the existing
+> > aarch32 libc. The kernel just offers both versions and the libc can pick
+> > one, or use the _LARGEFILE64_SOURCE hack that glibc has to also implement
+> > both. It would probably be reasonable to use 64-bit off_t only for a libc
+> > and ignore the old calls.
+> 
+> The glibc implementation, as we have it today, always uses the 64bit system call
+> and performs overflow-checking on results (on ILP32, we can?t perform overflow
+> checking on arguments, as the callee needs to sign-extend).
+> 
+> In other words: glibc uses the LP64 system calls and handles any pre- and 
+> post-processing in the system-call wrappers.
+
+Hmm, that sounds like much more work you already do in glibc than
+you'd need to split up the 64-bit arguments for the eight syscalls
+that pass an loff_t in a register.
+
+> >> B is just as bad and goes against using the generic syscall numbers. 
+> > 
+> > How so? The newly introduce syscalls then would be the generic ones.
+> 
+> By applying the ?strace-test? (i.e. ?How will this affect the implementation of strace,
+> when considering a ILP32-compiled and a LP64-compiled strace where both should
+> be capable of tracing either ILP32 or LP64 targets??), option (b) appears the cleanest
+> choice, as no test on the dependent?s ABI would be necessary and all internal 
+> dispatching could be performed on syscall numbers alone.
+> 
+> Using the same "strace-test", option (d) would be the least preferred, as it will make 
+> the internal dispatching entirely dependent on the dependent?s ABI.
+
+I don't understand what you mean here, please elaborate. Why would an ABI that works
+on aarch32 be wrong on aarch64-ilp32 user space when you are using the same header
+files?
+
+> >> I was trying to model ilp32 so there was less maintain hassle if a new syscall was added. 
+> >> 
+> >> Also about time_t, my original patch had used 32bit but was asked to change
+> >> it to the 64bit one. So now I am upset this being asked again to change it back.
+> >> The review process for the linux kernel is much harder than the review process
+> >> of gcc or even glibc now. 
+> > 
+> > For now, I'm just opening that discussion again, but the reason this
+> > comes up again now is that a lot has happened in the meantime on this
+> > front, and we have already decided to merge new architecture ports with
+> > 32-bit time_t since.
+> 
+> I think my sloppy e-mail writing blew this out of proportion: I never intended to focus on 
+> ?time_t?, but on ?timespec? as a whole (i.e. keeping ?tv_nsec? defined as a ?long? in 
+> userspace). The problem, as far as I can see from the kernel source, is that 
+> kernel/compat.c assumes that tv_sec (time_t) and tv_nsec (long) are of equal size.
+
+There are multiple problems relating to time_t here, the padding in
+timespec is one of them. There are similar problems relating to __kernel_size_t,
+__kernel_ptrdiff_t, __kernel_off_t, __kernel_clock_t, __kernel_ino_t and
+structs that build on top of these: whenever you have device driver using
+these in an ioctl, you don't know what a user space tool passes, as they
+might use a kernel header that contains a 64-bit definition for that type,
+or they may have their own definition using the standard types, e.g. copied
+from an older kernel, or written independently.
+
+time_t is just special here, because we know that we have to extend it
+to 64-bit eventually, while for the others, staying at 32-bit wide types
+would generally help compatibility with existing source code bases, both
+in kernel drivers and in user space.
+
+> My hope was that to resolve this by extending the compat-layer (in those places where
+> COMPAT_USE_64BIT_TIME is tested) with a COMPAT_USE_64BIT_TIME_COMPLIANT
+> path that supports a 64-bit time_t with a ILP32-long tv_nsecs.
+> 
+> We should not break C11-compliant programs by changing the size of tv_nsecs.  As a
+> consequence, we shouldn?t propagate a questionable choice made for x32 into ILP32.
+> On the other hand, I don?t want to limit time_t to 32bits, as C11 permits any reasonable
+> define for it?
+
+Breaking C11 is one concern, but to me the much more valuable question is
+whether we break existing user space code. This is about code that is
+already not 64-bit clean, so it's also likely to not cope well with
+e.g. a 64-bit __kernel_ulong_t.
+
+	Arnd
