@@ -1,164 +1,143 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Apr 2015 11:47:12 +0100
-Subject: [PATCH v3 07/11] arm64: fixmap: allow init before linear mapping
- is set up
-In-Reply-To: <1428674035-26603-8-git-send-email-ard.biesheuvel@linaro.org>
-References: <1428674035-26603-1-git-send-email-ard.biesheuvel@linaro.org>
- <1428674035-26603-8-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150414104711.GC28709@leverpostej>
+From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
+Date: Tue, 14 Apr 2015 10:45:43 +0000
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <17844053.vZiPCu4un3@wuerfel>
+References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
+ <332955D5-3122-437B-93A1-E1973BE09FCA@theobroma-systems.com>
+ <AC03A80E-49F8-4A08-9DDA-0B9F8B734F51@theobroma-systems.com>,
+ <17844053.vZiPCu4un3@wuerfel>
+Message-ID: <6C99D1ED-37A9-4E68-A137-BF8F78720BFE@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
 
-On Fri, Apr 10, 2015 at 02:53:51PM +0100, Ard Biesheuvel wrote:
-> This reworks early_ioremap_init() so it populates the various levels
-> of translation tables while taking the following into account:
-> - be prepared for any of the levels to have been populated already, as
->   this may be the case once we move the kernel text mapping out of the
->   linear mapping;
-> - don't rely on __va() to translate the physical address in a page table
->   entry to a virtual address, since this produces linear mapping addresses;
->   instead, use the fact that at any level, we know exactly which page in
->   swapper_pg_dir an entry could be pointing to if it points anywhere.
 
-Can we not use Catalin's PHYS_OFFSET swizzling trick instead? i.e.
 
- * Set PHYS_OFFSET so __va hits in the text mapping.
 
- * Create the fixmap entries.
-
- * Parse the DTB or UEFI memory map, figure out the real PHYS_OFFSET.
- 
- * Create linear mapping for the initial tables.
-
- * Swap PHYS_OFFSET for the real version, and update init_mm->pgd to
-   point at the linear map alias of the swapper pgd.
-
-It seemed like that would require less open-coding of table manipulation
-code, as we could use __va() early.
-
-Is there a limitation with that approach that I'm missing?
-
-Otherwise, comments below.
-
-> This allows us to defer the initialization of the linear mapping until
-> after we have figured out where our RAM resides in the physical address
-> space.
+> On Apr 14, 2015, at 3:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/compiler.h |   2 +
->  arch/arm64/kernel/vmlinux.lds.S   |  14 +++--
->  arch/arm64/mm/mmu.c               | 117 +++++++++++++++++++++++++-------------
->  3 files changed, 90 insertions(+), 43 deletions(-)
+>> On Tuesday 14 April 2015 11:33:13 Dr.  Philipp Tomsich wrote:
+>> Arnd,
+>> 
+>> After getting a good night?s sleep, the ?reuse the existing system call table? comment
+>> makes a little more sense as I construe it as having just one merged system call table
+>> for both LP64 and ILP32 and handling the differences through a different system call
+>> numbering in unistd.h towards LP64 and ILP32 processes.
+>> 
+>> If this is the intended implementation, I am not fully sold on the benefit: having a private
+>> copy of unistd.h for ARM64 seems to be a less readable and less maintenance-friendly
+>> solution to having separate tables.
+>> 
+>> We?re open to input on this and?if merging the system call tables is the consensus?
+>> would like to get the change underway as soon as possible.
 > 
-> diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
-> index ee35fd0f2236..dd342af63673 100644
-> --- a/arch/arm64/include/asm/compiler.h
-> +++ b/arch/arm64/include/asm/compiler.h
-> @@ -27,4 +27,6 @@
->   */
->  #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
->  
-> +#define __pgdir		__attribute__((section(".pgdir"),aligned(PAGE_SIZE)))
-> +
->  #endif	/* __ASM_COMPILER_H */
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 98073332e2d0..604f285d3832 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -160,11 +160,15 @@ SECTIONS
->  
->  	BSS_SECTION(0, 0, 0)
->  
-> -	. = ALIGN(PAGE_SIZE);
-> -	idmap_pg_dir = .;
-> -	. += IDMAP_DIR_SIZE;
-> -	swapper_pg_dir = .;
-> -	. += SWAPPER_DIR_SIZE;
-> +	.pgdir (NOLOAD) : {
-> +		. = ALIGN(PAGE_SIZE);
-> +		idmap_pg_dir = .;
-> +		. += IDMAP_DIR_SIZE;
-> +		swapper_pg_dir = .;
-> +		__swapper_bs_region = . + PAGE_SIZE;
-> +		. += SWAPPER_DIR_SIZE;
-> +		*(.pgdir)
-> +	}
->  
->  	_end = .;
->  
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 60be58a160a2..c0427b5c90c7 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -341,6 +341,70 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
->  }
->  #endif
->  
-> +struct mem_bootstrap_region {
+> There are multiple ways of doing this:
+> 
+> a) separate syscall table for arm64: as you say, this is the current approach,
+>   and I'd like to avoid that too
+> b) add syscalls for ilp32 as additional numbers in the normal lp64 version of
+>   asm-generic/unistd.h, and share the binary tables between ilp32 and lp64
+>   on aarch64
+> c) change asm-generic/unistd.h to generate three possible tables: instead of
+>   just native (lp64 or ilp32 depending on the arch), compat (support for
+>   existing ilp32 binaries on some architectures, there would also be a
+>   "modern" ilp32 variant that is a mix of the two, as your table today
+> d) don't use the asm-generic/unistd.h table for aarch64-ilp32 at all, but instead
+>   reuse the table from arch/arm64/include/asm/unistd32.h
+> 
+> I think you are referring to approach b) or c) above, but my preferred one
+> would actually be d).
 
-The "region" naming is a little confusing IMO. To me it sounds like
-something akin to a VMA rather than a set of tables.
+D is the worst of all 4 options in my mind. The reason is when a new syscall is added, then you have to update that file too. Also d is worse than the rest as you no longer default to 64bit off_t which is not a good thing.  B is just as bad and goes against using the generic syscall numbers. 
 
-> +#if CONFIG_ARM64_PGTABLE_LEVELS > 3
-> +	pud_t	pud[PTRS_PER_PUD];
-> +#endif
-> +#if CONFIG_ARM64_PGTABLE_LEVELS > 2
-> +	pmd_t	pmd[PTRS_PER_PMD];
-> +#endif
-> +	pte_t	pte[PTRS_PER_PTE];
-> +};
-> +
-> +static void __init bootstrap_mem_region(unsigned long addr,
-> +					struct mem_bootstrap_region *reg,
-> +					pmd_t **ppmd, pte_t **ppte)
-> +{
-> +	/*
-> +	 * Avoid using the linear phys-to-virt translation __va() so that we
-> +	 * can use this code before the linear mapping is set up. Note that
-> +	 * any populated entries at any level can only point into swapper_pg_dir
-> +	 * since no other translation table pages have been allocated yet.
-> +	 * So at each level, we either need to populate it, or it has already
-> +	 * been populated by a swapper_pg_dir table at the same level, in which
-> +	 * case we can figure out its virtual address without applying __va()
-> +	 * on the contents of the entry, using the following struct.
-> +	 */
-> +	extern struct mem_bootstrap_region __swapper_bs_region;
-> +
-> +	pgd_t *pgd = pgd_offset_k(addr);
-> +	pud_t *pud = (pud_t *)pgd;
-> +	pmd_t *pmd = (pmd_t *)pud;
-> +
-> +#if CONFIG_ARM64_PGTABLE_LEVELS > 3
-> +	if (pgd_none(*pgd)) {
-> +		clear_page(reg->pud);
-> +		pgd_populate(&init_mm, pgd, reg->pud);
+I was trying to model ilp32 so there was less maintain hassle if a new syscall was added. 
 
-What's PHYS_OFFSET expected to be at this point (for the purposes of
-__pa() in the *_populate*() macros)?
+Also about time_t, my original patch had used 32bit but was asked to change it to the 64bit one. So now I am upset this being asked again to change it back. The review process for the linux kernel is much harder than the review process of gcc or even glibc now. 
 
-If we're relying on __pa() to convert text->phys, won't __va() convert
-phys->text at this point?
+Thanks,
+Andrew
 
-> +		pud = reg->pud;
-> +	} else {
-> +		pud = __swapper_bs_region.pud;
-> +	}
-> +	pud += pud_index(addr);
-> +#endif
 
-Can we free the unused reg tables in the else cases? If __pa() works we
-should be able to hand them to memblock, no?
-
-[...]
-
->  	/*
->  	 * The boot-ioremap range spans multiple pmds, for which
-> -	 * we are not preparted:
-> +	 * we are not prepared:
-
-This typo has been bugging me for ages. I'll be glad to see it go!
-
-Mark.
+> 
+>>>> On 14 Apr 2015, at 00:58, Dr. Philipp Tomsich <philipp.tomsich@theobroma-systems.com> wrote:
+>>>> 
+>>>> 2. The ABI follows what x86 has their "x32" ABI. This never saw a lot of
+>>>> adoption and in retrospect the decision to have separate system calls seems
+>>>> to not have helped them. My feeling now is that if we add support for the
+>>>> ARM64 ILP32 ELF ABI, we should better stick to the existing system call ABI
+>>>> as close as possible and reuse the existing system call table. I realize
+>>>> that this is a bit controversial, but please let's talk about this now.
+>>> 
+>>> I see benefits and drawback to merging the system tables.  Our philosophy is
+>>> already somewhat different from x32 and from the original patch-series, as you
+>>> can see from the changes dealing with stack_t in the ?sys_rt_sigreturn' and 
+>>> ?setup_rt_frame? functions.  While these could have been duplicated and 
+>>> specialized for each ABI (as on x32), the attempt was made to keep these 
+>>> changes localized.
+>>> 
+>>> However, this approach can not always work: if you consider cases like 
+>>> ?sys_msgsnd? and ?compat_sys_msgsnd?, there?s little to no benefit in having
+>>> just a ?aarch64_sys_msgsnd?, which then calls either the LP64 or the compat
+>>> version of the underlying system call.  Having a second system call table 
+>>> helps to reduce the overheads in this case and keeps things readable.
+>>> 
+>>> This comes down to the fact, that a few calls will always be different due to
+>>> historical baggage in data structures shared between userspace and kernel:
+>>> 'struct msgbuf? immediatly comes to mind.
+>>> 
+>>> I would liken the situation with ARM64 more of MIPS64 with its 64bit ABI and 
+>>> its n32 ABI than to x32? but even there it?s two separate system call tables
+>>> (although sequentially concatenated).
+>>> 
+>>> In other words: I fail to see the benefit from keeping the existing table.
+>>> I you elaborate on how such a solution should look, I might be better able
+>>> to follow. 
+> 
+> I mainly want to avoid accidentally creating new ABIs for syscalls and ioctls:
+> we have many drivers that today use ioctls with data structures derived from
+> '__kernel_ulong_t' in some form, often by including a timespec or time_t in
+> their own data structures. These are almost all broken today, because the
+> data structures are a mix of the aarch32 and aarch64 variants, while the
+> ioctl() system call in ilp32 always uses the aarch32 format by default.
+> 
+> An example here would be 
+> 
+> struct cyclades_idle_stats {
+>    __kernel_time_t in_use;     /* Time device has been in use (secs) */
+>    __kernel_time_t recv_idle;  /* Time since last char received (secs) */
+>    __kernel_time_t xmit_idle;  /* Time since last char transmitted (secs) */
+>    unsigned long  recv_bytes;  /* Bytes received */
+>    unsigned long  xmit_bytes;  /* Bytes transmitted */
+>    unsigned long  overruns;    /* Input overruns */
+>    unsigned long  frame_errs;  /* Input framing errors */
+>    unsigned long  parity_errs; /* Input parity errors */
+> };
+> 
+> for a random ancient driver. Introducing a third set of data structures
+> and syscalls for aarch64-ilp32 means that any driver doing something like
+> this needs to be modified to support existing user space source code.
+> 
+> If we stick to the normal compat32 implementation for all data structures
+> and syscalls, we can support all drivers that work with aarch32 emulation
+> today, as well as any one that gains support later on a regular compat32
+> architecture (x86, powerpc, sparc, mips, arm, tile, parisc, s390), and
+> we don't have to watch all new ioctl interfaces that get added to the
+> kernel. Note that this does not just impact ioctl, but also things like
+> setsockopts and drivers that communicate with user space through a
+> mmapped data structure.
+> 
+> Using that existing table would also make it much easier to add support
+> for additional C libraries, which then just have to implement the ELF
+> format, but could reuse the arm32 kernel interfaces.
+> 
+> Finally, there is a certain set of security issues from each new syscall
+> we introduce. With the aarch32 syscall table, we have a higher degree
+> of reuse of existing code, so we won't introduce security bugs that
+> are only in one of the two ilp32 ABIs (aarch32 and aarch64).
+> 
+> One notable downside of this is that all system calls have to pass 64-bit
+> arguments (i.e. loff_t) in two registers instead of one, to match the
+> aarch32 calling conventions, but that would be limited to a small part
+> of the libc implementation that already does the same thing for arm32.
+> 
+>    Arnd
