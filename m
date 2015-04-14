@@ -1,42 +1,30 @@
 From: tyler.baker@linaro.org (Tyler Baker)
-Date: Tue, 14 Apr 2015 15:51:34 -0700
-Subject: [PATCH 3/7] selftests/breakpoints: emit skip and omit installation
- when tests are not compiled
-Message-ID: <1429051894-14687-1-git-send-email-tyler.baker@linaro.org>
+Date: Tue, 14 Apr 2015 15:52:34 -0700
+Subject: [PATCH 4/7] selftests/kdbus: install kdbus-test
+Message-ID: <1429051954-14735-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The breakpoints test should only should be executed on x86 targets, so lets
-emit a skip and omit the installation when ARCH != x86.
+Set TEST_PROGS so that kdbus-test is installed.
 
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
 ---
- tools/testing/selftests/breakpoints/Makefile | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ tools/testing/selftests/kdbus/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/tools/testing/selftests/breakpoints/Makefile b/tools/testing/selftests/breakpoints/Makefile
-index 1822356..430b76d 100644
---- a/tools/testing/selftests/breakpoints/Makefile
-+++ b/tools/testing/selftests/breakpoints/Makefile
-@@ -8,7 +8,6 @@ ifeq ($(ARCH),x86_64)
- 	ARCH := x86
- endif
+diff --git a/tools/testing/selftests/kdbus/Makefile b/tools/testing/selftests/kdbus/Makefile
+index e21bf1f..62f8d5a 100644
+--- a/tools/testing/selftests/kdbus/Makefile
++++ b/tools/testing/selftests/kdbus/Makefile
+@@ -42,6 +42,8 @@ include ../lib.mk
+ kdbus-test: $(OBJS)
+ 	$(CC) $(CFLAGS) $^ $(LDLIBS) -o $@
  
--
- all:
- ifeq ($(ARCH),x86)
- 	gcc breakpoint_test.c -o breakpoint_test
-@@ -20,5 +19,11 @@ TEST_PROGS := breakpoint_test
- 
- include ../lib.mk
- 
-+install:
-+ifneq ($(ARCH),x86)
-+echo "Not an x86 target, can't install breakpoints selftests"
-+override EMIT_TESTS :=  echo "echo \"selftests: breakpoint_test [SKIP]\""
-+endif
++TEST_PROGS := kdbus-test
 +
- clean:
- 	rm -fr breakpoint_test
+ run_tests:
+ 	./kdbus-test --tap
+ 
 -- 
 2.1.0
