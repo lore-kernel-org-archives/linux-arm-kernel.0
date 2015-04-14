@@ -1,29 +1,67 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 14 Apr 2015 14:57:40 -0300
-Subject: [PATCH] ARM: dts: imx23-olinuxino: Fix polarity of LED GPIO
-In-Reply-To: <2047797975.287859.1429033877762.JavaMail.open-xchange@oxbaltgw08.schlund.de>
-References: <1429020304-31045-1-git-send-email-fabio.estevam@freescale.com>
- <2047797975.287859.1429033877762.JavaMail.open-xchange@oxbaltgw08.schlund.de>
-Message-ID: <CAOMZO5AF0ntbAMVF=m4e21b7AFse32Okit0HvSRRYrTYVA1vLw@mail.gmail.com>
+From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
+Date: Tue, 14 Apr 2015 11:05:35 -0700
+Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
+In-Reply-To: <552D2255.1050704@ti.com>
+References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <6483716.157BQAaRqF@wuerfel> <20150414123737.GB18756@kroah.com>
+ <2433709.D3gBAte9Iu@wuerfel> <20150414132745.GA5650@kroah.com>
+ <552D2255.1050704@ti.com>
+Message-ID: <552D56EF.2020409@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
 
-On Tue, Apr 14, 2015 at 2:51 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+On 15-04-14 07:21 AM, Kishon Vijay Abraham I wrote:
+> Hi,
 >
-> I did my tests only with iMX233-Olinuxino Maxi. How about your test equipment?
-
-Thanks for testing.
-
-Unfortunately, I don't have access to my mx23 olinuxino board and
-could not test it.
-
-I have looked in all schematics (maxi, micro, mini and nano) and all
-of them require logic level high to turn on the LED.
-
-Regards,
-
-Fabio Estevam
+> On Tuesday 14 April 2015 06:57 PM, Greg Kroah-Hartman wrote:
+>> On Tue, Apr 14, 2015 at 03:17:30PM +0200, Arnd Bergmann wrote:
+>>> On Tuesday 14 April 2015 14:37:37 Greg Kroah-Hartman wrote:
+>>>> On Tue, Apr 14, 2015 at 01:33:08PM +0200, Arnd Bergmann wrote:
+>>>>> This is true, but all other drivers do the same for GENERIC_PHY at the
+>>>>> moment. If this one gets changed, we should probably apply the same
+>>>>> solution to all current users and fix them consistently.
+>>>>>
+>>>>> We can do one of these two:
+>>>>>
+>>>>> a) make sure that the framework has 'static inline' stubs that let you
+>>>>>     build all drivers using it when the framework itself is disabled.
+>>>>
+>>>> Yes, please do that.
+>>>>
+>>>>> b) change the drivers using it to 'depends on', and make GENERIC_PHY
+>>>>>     itself a hidden option without a Kconfig prompt.
+>>>>
+>>>> Then how could GENERIC_PHY ever get set?
+>>>
+>>> Right now, every driver that provides a phy uses 'select GENERIC_PHY',
+>>> and they would have to keep doing that. This is not unlike what we
+>>> do for other silent symbols like MFD_CORE, REGMAP_I2C, or PINCTRL,
+>>> and it's not as problematic as 'select' on a user-visible option,
+>>> or (worst) mixing 'select' and 'depends on'.
+>>
+>> Ok, that would make more sense, but it would be good for the PHY
+>> maintainer to agree to it as well :)
+>
+> looking at [1], we should use select only for non-visible symbols and
+> for symbols with no dependencies. As such GENERIC_PHY is not dependent
+> on other symbols but for now it is "visible".
+>
+> phy-core has all the stubs already implemented in
+> include/linux/phy/phy.h. So removing select GENERIC_PHY shouldn't be a
+> problem. But then it might break a few platforms where GENERIC_PHY is
+> indirectly enabled by selecting the config of the driver (using default
+> defconfigs in arch/arm/configs).
+>
+> The simplest thing would be to make GENERIC_PHY an invisible option?
+>
+> [1] ->
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/kbuild/kconfig-language.txt#n111
+>
+Kishon,removing select GENERIC_PHY also breaks the builds for certain 
+architectures (i386 and x84_64). Is the consensus to leave the select 
+but make GENERIC_PHY a invisible option? Thanks
+>
+> Thanks
+> Kishon
