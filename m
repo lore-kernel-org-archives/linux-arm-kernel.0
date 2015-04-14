@@ -1,45 +1,73 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 14 Apr 2015 16:31:02 +0200
-Subject: [PATCH 1/2] Documentation: devicetree: root node serial-number
- property documentation
-In-Reply-To: <1427564371-26039-1-git-send-email-contact@paulk.fr>
-References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
-Message-ID: <1429021862.2422.16.camel@collins>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Apr 2015 07:28:47 -0700
+Subject: Two new breakages since Thursday
+In-Reply-To: <3997405.uu5IlQn29B@wuerfel>
+References: <20150405080645.GE13898@n2100.arm.linux.org.uk>
+ <201504140041.34509.arnd@arndb.de>
+ <20150414092612.GT12732@n2100.arm.linux.org.uk>
+ <3997405.uu5IlQn29B@wuerfel>
+Message-ID: <20150414142847.GC18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le samedi 28 mars 2015 ? 18:39 +0100, Paul Kocialkowski a ?crit :
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-
-Since the merge windows on both U-Boot and Linux are now open, I'd like
-to attract your attention on this again.
-
-Any comments/remarks are welcome!
-
-> ---
->  Documentation/devicetree/booting-without-of.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+* Arnd Bergmann <arnd@arndb.de> [150414 02:37]:
+> On Tuesday 14 April 2015 10:26:12 Russell King - ARM Linux wrote:
+> > On Tue, Apr 14, 2015 at 12:41:34AM +0200, Arnd Bergmann wrote:
+> > > On Monday 13 April 2015, Yingjoe Chen wrote:
+> > > > 
+> > > > On Sat, 2015-04-11 at 10:00 +0100, Russell King - ARM Linux wrote:
+> > > > > And almost a week later, and most of these are still present.
+> > > > > 
+> > > > > Given that the merge window is potentially opening on Sunday, this
+> > > > > is very poor, because it means that we've had a week of failing
+> > > > > builds in the week before the merge window - the week where we
+> > > > > should be stabilising the code and getting it ready for submission
+> > > > > to Linus.
+> > > > > 
+> > > > > Right now, arm-soc is NOT ready for submission to Linus.
+> > > > > 
+> > > > > Please fix this as a top priority.
+> > > > > 
+> > > > > On Sun, Apr 05, 2015 at 09:06:45AM +0100, Russell King - ARM Linux wrote:
+> > > > > > Two new breakages have appeared since Thursday.  The first affects both
+> > > > > > ARM and ARM64 builds (a missing file), the second only ARM builds.
+> > > > > > 
+> > > > > > arch/arm64/boot/dts/mediatek/mt8173-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
+> > > > > > arch/arm/boot/dts/mt8135-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
+> > > > > > arch/arm/mach-at91/pm_suspend.S:143: Error: selected processor does not support ARM mode `dsb'
+> > > > 
+> > > > Hi Arnd/Olof,
+> > > > 
+> > > > The mediatek part is due to merge dependency in pinctrl driver. It is
+> > > > discussed in
+> > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/336258.html
+> > > > 
+> > > > I thought we already decided to revert DT node in arm-soc tree for 4.1.
+> > > > What should we do next?
+> > > 
+> > > I've finally managed to find my way through the email backlog from being
+> > > away for three weeks and got to this one now. Patch is reverted in next/dt now.
+> > > 
+> > > Sorry about the delay in processing this.
+> > 
+> > Well, if this is now gone, there's still the issue of the AT91 breakage
+> > that also needs to be fixed which is still there when I pulled arm-soc
+> > last night.  What's happening there?
+> > 
 > 
-> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
-> index 7768518..8b055897 100644
-> --- a/Documentation/devicetree/booting-without-of.txt
-> +++ b/Documentation/devicetree/booting-without-of.txt
-> @@ -828,6 +828,10 @@ address which can extend beyond that limit.
->    name may clash with standard defined ones, you prefix them with your
->    vendor name and a comma.
->  
-> +  Additional properties for the root node:
-> +
-> +    - serial-number : a string representing the board's serial number
-> +
->    b) The /cpus node
->  
->    This node is the parent of all individual CPU nodes. It doesn't
+> I managed to catch up with my email last night and pulled in these two fixes
+> as well as a number of others that we had neglected over the last two weeks.
+> 
+> I found one new regression with the overnight build tests in a branch I pulled
+> in as 'next/late' from Tony, and backed that out now. I'll wait for you and
+> Stephen Rothwell (who also reported these issues) to confirm that it's ok
+> now and we'll hopefully be ready to send pull requests by the end of the
+> week.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150414/031c416d/attachment.sig>
+Hmm what's this issue you're mentioning here for the next/late? Is it the
+merge conflict with camera related changes fixed up by Stephen Rothwell
+in next?
+
+Regards,
+
+Tony
