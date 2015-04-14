@@ -1,305 +1,130 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Tue, 14 Apr 2015 14:43:51 +0300
-Subject: [PATCHv6 1/4] watchdog: Extend kernel API to know about HW
- limitations
-In-Reply-To: <1428996412-30448-2-git-send-email-timo.kokkonen@offcode.fi>
-References: <1428996412-30448-1-git-send-email-timo.kokkonen@offcode.fi>
- <1428996412-30448-2-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <552CFD77.1040209@offcode.fi>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Tue, 14 Apr 2015 13:50:21 +0200
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <3234795.e0Uq9k2nUp@wuerfel>
+References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
+ <17844053.vZiPCu4un3@wuerfel>
+ <6C99D1ED-37A9-4E68-A137-BF8F78720BFE@caviumnetworks.com>
+ <3234795.e0Uq9k2nUp@wuerfel>
+Message-ID: <76000FE9-46E5-4883-9E4F-C65444FD406C@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.04.2015 10:26, Timo Kokkonen wrote:
-> There is a great deal of diversity in the watchdog hardware found on
-> different devices. Differen hardware have different contstraints on
-> them, many of the constraints that are excessively difficult for the
-> user space to satisfy.
->
-> One such constraint is the length of the timeout value, which in many
-> cases can be just a few seconds. Drivers are creating ad hoc solutions
-> with timers and workqueues to extend the timeout in order to give user
-> space more time between updates. Looking at the drivers it is clear
-> that this has resulted to a lot of duplicate code.
->
-> Add an extension to the watchdog kernel API that allows the driver to
-> describe tis HW constraints to the watchdog code. A kernel worker in
-> the core is then used to extend the watchdog timeout on behalf of the
-> user space. This allows the drivers to be simplified as core takes
-> over the timer extending.
->
-> Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
-> ---
->   drivers/watchdog/watchdog_core.c | 98 ++++++++++++++++++++++++++++++++++++++--
->   drivers/watchdog/watchdog_dev.c  | 22 ++++++++-
->   include/linux/watchdog.h         | 23 ++++++++++
->   3 files changed, 138 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-> index cec9b55..7854ecb 100644
-> --- a/drivers/watchdog/watchdog_core.c
-> +++ b/drivers/watchdog/watchdog_core.c
-> @@ -99,6 +99,86 @@ int watchdog_init_timeout(struct watchdog_device *wdd,
->   EXPORT_SYMBOL_GPL(watchdog_init_timeout);
->
->   /**
-> + * watchdog_init_parms() - initialize generic watchdog parameters
-> + * @wdd: Watchdog device to operate
-> + * @dev: Device that stores the device tree properties
-> + *
-> + * Initialize the generic timeout parameters. The driver needs to set
-> + * hw_features bitmask from @wdd prior calling this function in order
-> + * to ensure the core knows how to handle the HW.
-> + *
-> + * A zero is returned on success and -EINVAL for failure.
-> + */
-> +int watchdog_init_params(struct watchdog_device *wdd, struct device *dev)
-> +{
-> +	int ret = 0;
-> +
-> +	ret = watchdog_init_timeout(wdd, wdd->timeout, dev);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	/*
-> +	 * Max HW timeout needs to be set so that core knows when to
-> +	 * use a kernel worker to support longer watchdog timeouts
-> +	 */
-> +	if (!wdd->hw_max_timeout)
-> +		return -EINVAL;
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(watchdog_init_params);
-> +
-> +static void watchdog_worker(struct work_struct *work)
-> +{
-> +	struct watchdog_device *wdd = container_of(to_delayed_work(work),
-> +						struct watchdog_device, work);
-> +	bool boot_keepalive;
-> +	bool active_keepalive;
-> +
-> +	mutex_lock(&wdd->lock);
-> +
-> +	boot_keepalive = !watchdog_active(wdd) &&
-> +		!watchdog_is_stoppable(wdd);
-> +
-> +	active_keepalive = watchdog_active(wdd) &&
-> +		wdd->hw_max_timeout < wdd->timeout * HZ;
-> +
-> +	if (time_after(jiffies, wdd->expires) && watchdog_active(wdd)) {
-> +		pr_crit("I will reset your machine !\n");
-> +		mutex_unlock(&wdd->lock);
-> +		return;
-> +	}
-> +
-> +	if (boot_keepalive || active_keepalive) {
-> +		if (wdd->ops->ping)
-> +			wdd->ops->ping(wdd);
-> +		else
-> +			wdd->ops->start(wdd);
-> +
-> +		schedule_delayed_work(&wdd->work,  wdd->hw_heartbeat);
-> +	}
-> +
-> +	mutex_unlock(&wdd->lock);
-> +}
-> +
-> +static int prepare_watchdog(struct watchdog_device *wdd)
-> +{
-> +	/* Stop the watchdog now before user space opens the device */
-> +	if (wdd->hw_features & WDOG_HW_IS_STOPPABLE &&
-> +		wdd->hw_features & WDOG_HW_RUNNING_AT_BOOT) {
-> +		wdd->ops->stop(wdd);
-> +
-> +	} else if (!(wdd->hw_features & WDOG_HW_IS_STOPPABLE)) {
-> +		/*
-> +		 * Can't stop it, use a kernel timer to tick
-> +		 * it until it's open by user space
-> +		 */
-> +		schedule_delayed_work(&wdd->work, wdd->hw_heartbeat);
-> +	}
-> +	return 0;
-> +}
-> +
-> +/**
->    * watchdog_register_device() - register a watchdog device
->    * @wdd: watchdog device
->    *
-> @@ -156,13 +236,24 @@ int watchdog_register_device(struct watchdog_device *wdd)
->   	wdd->dev = device_create(watchdog_class, wdd->parent, devno,
->   					NULL, "watchdog%d", wdd->id);
->   	if (IS_ERR(wdd->dev)) {
-> -		watchdog_dev_unregister(wdd);
-> -		ida_simple_remove(&watchdog_ida, id);
->   		ret = PTR_ERR(wdd->dev);
-> -		return ret;
-> +		goto dev_create_fail;
-> +	}
-> +
-> +	INIT_DELAYED_WORK(&wdd->work, watchdog_worker);
-> +
-> +	if (wdd->hw_max_timeout) {
-> +		ret = prepare_watchdog(wdd);
-> +		if (ret)
-> +			goto dev_create_fail;
->   	}
->
->   	return 0;
-> +
-> +dev_create_fail:
-> +	watchdog_dev_unregister(wdd);
-> +	ida_simple_remove(&watchdog_ida, id);
-> +	return ret;
->   }
->   EXPORT_SYMBOL_GPL(watchdog_register_device);
->
-> @@ -181,6 +272,7 @@ void watchdog_unregister_device(struct watchdog_device *wdd)
->   	if (wdd == NULL)
->   		return;
->
-> +	cancel_delayed_work_sync(&wdd->work);
->   	devno = wdd->cdev.dev;
->   	ret = watchdog_dev_unregister(wdd);
->   	if (ret)
-> diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
-> index 6aaefba..b4c2c6cd2 100644
-> --- a/drivers/watchdog/watchdog_dev.c
-> +++ b/drivers/watchdog/watchdog_dev.c
-> @@ -78,6 +78,12 @@ static int watchdog_ping(struct watchdog_device *wddev)
->   	else
->   		err = wddev->ops->start(wddev); /* restart watchdog */
->
-> +	if (wddev->hw_max_timeout &&
-> +		wddev->timeout * HZ > wddev->hw_max_timeout) {
-> +		wddev->expires = jiffies + wddev->timeout * HZ;
-> +		schedule_delayed_work(&wddev->work, wddev->hw_heartbeat);
-> +	}
-> +
->   out_ping:
->   	mutex_unlock(&wddev->lock);
->   	return err;
-> @@ -110,6 +116,12 @@ static int watchdog_start(struct watchdog_device *wddev)
->   	if (err == 0)
->   		set_bit(WDOG_ACTIVE, &wddev->status);
->
-> +	if (wddev->hw_max_timeout &&
-> +		wddev->timeout * HZ > wddev->hw_max_timeout) {
-> +		wddev->expires = jiffies + wddev->timeout * HZ;
-> +		schedule_delayed_work(&wddev->work, wddev->hw_heartbeat);
-> +	}
-> +
 
-We need to delete the possibly active keepalive worker here unless we 
-need to keep running it:
+> On 14 Apr 2015, at 13:14, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> On Tuesday 14 April 2015 10:45:43 Pinski, Andrew wrote:
+>>> On Apr 14, 2015, at 3:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> 
+>>>> On Tuesday 14 April 2015 11:33:13 Dr.  Philipp Tomsich wrote:
+>>>> Arnd,
+>>>> 
+>>>> After getting a good night?s sleep, the ?reuse the existing system call table? comment
+>>>> makes a little more sense as I construe it as having just one merged system call table
+>>>> for both LP64 and ILP32 and handling the differences through a different system call
+>>>> numbering in unistd.h towards LP64 and ILP32 processes.
+>>>> 
+>>>> If this is the intended implementation, I am not fully sold on the benefit: having a private
+>>>> copy of unistd.h for ARM64 seems to be a less readable and less maintenance-friendly
+>>>> solution to having separate tables.
+>>>> 
+>>>> We?re open to input on this and?if merging the system call tables is the consensus?
+>>>> would like to get the change underway as soon as possible.
+>>> 
+>>> There are multiple ways of doing this:
+>>> 
+>>> a) separate syscall table for arm64: as you say, this is the current approach,
+>>>  and I'd like to avoid that too
+>>> b) add syscalls for ilp32 as additional numbers in the normal lp64 version of
+>>>  asm-generic/unistd.h, and share the binary tables between ilp32 and lp64
+>>>  on aarch64
+>>> c) change asm-generic/unistd.h to generate three possible tables: instead of
+>>>  just native (lp64 or ilp32 depending on the arch), compat (support for
+>>>  existing ilp32 binaries on some architectures, there would also be a
+>>>  "modern" ilp32 variant that is a mix of the two, as your table today
+>>> d) don't use the asm-generic/unistd.h table for aarch64-ilp32 at all, but instead
+>>>  reuse the table from arch/arm64/include/asm/unistd32.h
+>>> 
+>>> I think you are referring to approach b) or c) above, but my preferred one
+>>> would actually be d).
+>> 
+>> D is the worst of all 4 options in my mind. The reason is when a new syscall is
+>> added, then you have to update that file too.
+> 
+> I don't know what the miscommunication is here, but the advantage of d is
+> specifically that it is /less/ work to maintain: With the current approach,
+> each new syscall that gets added needs to be checked to see if the normal
+> aarch64 version works or if it needs another wrapper, while with d) we
+> get the update for free, because we follow exactly what aarch32 is doing.
 
--       }
-+       } else
-+               cancel_delayed_work(&wddev->work);
+I must agree with Andrew, that (d) seems like a bad fit for ILP32? after all the
+ILP32 (ELF) ABI specifies that 64bit values are to be passed in a single register,
+but the unistd32.h assumes a 32bit kernel that receives 64bit arguments split
+over two registers (i.e. the 64-variants of the various system calls, such as
+ftruncate64).
 
+I strongly prefer (b) as this satisfies the largest number of requirements:
+ (i) it will be a single system call table for LP64 and ILP32
+ (ii) it?s easy to be make use of the 64bit capable system calls
+ (iii) it fits with the relationship of ILP32 to LP64 in the ILP32 ELF ABI definition
 
-Otherwise we might get a spurious "I will reset your machine" print in 
-dmesg as the worker is scheduled to run one more time even though it is 
-not needed any more. This of course happens only with unstoppable 
-watchdogs that don't need a timer after user space starts pinging them.
+As we don?t support ILP32 without LP64, the resulting implementation will
+be even simpler (i.e. no need to duplicate the entire table) than the n32 
+implementation on MIPS...
 
-I'll add this to the next revision.
+>> Also d is worse than the rest as
+>> you no longer default to 64bit off_t which is not a good thing. 
+> 
+> That decision is up to the libc implementation, just as it is for the existing
+> aarch32 libc. The kernel just offers both versions and the libc can pick
+> one, or use the _LARGEFILE64_SOURCE hack that glibc has to also implement
+> both. It would probably be reasonable to use 64-bit off_t only for a libc
+> and ignore the old calls.
 
--Timo
+The glibc implementation, as we have it today, always uses the 64bit system call
+and performs overflow-checking on results (on ILP32, we can?t perform overflow
+checking on arguments, as the callee needs to sign-extend).
 
->   out_start:
->   	mutex_unlock(&wddev->lock);
->   	return err;
-> @@ -145,9 +157,15 @@ static int watchdog_stop(struct watchdog_device *wddev)
->   		goto out_stop;
->   	}
->
-> -	err = wddev->ops->stop(wddev);
-> -	if (err == 0)
-> +	if (!wddev->hw_max_timeout || watchdog_is_stoppable(wddev)) {
-> +		err = wddev->ops->stop(wddev);
-> +		if (err == 0)
-> +			clear_bit(WDOG_ACTIVE, &wddev->status);
-> +	} else {
-> +		/* Unstoppable watchdogs need the worker to keep them alive */
->   		clear_bit(WDOG_ACTIVE, &wddev->status);
-> +		schedule_delayed_work(&wddev->work, wddev->hw_heartbeat);
-> +	}
->
->   out_stop:
->   	mutex_unlock(&wddev->lock);
-> diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-> index 395b70e..027c99d 100644
-> --- a/include/linux/watchdog.h
-> +++ b/include/linux/watchdog.h
-> @@ -12,6 +12,7 @@
->   #include <linux/bitops.h>
->   #include <linux/device.h>
->   #include <linux/cdev.h>
-> +#include <linux/workqueue.h>
->   #include <uapi/linux/watchdog.h>
->
->   struct watchdog_ops;
-> @@ -62,9 +63,13 @@ struct watchdog_ops {
->    * @timeout:	The watchdog devices timeout value.
->    * @min_timeout:The watchdog devices minimum timeout value.
->    * @max_timeout:The watchdog devices maximum timeout value.
-> + * @hw_max_timeout:The watchdog hardware maximum timeout value.
-> + * @hw_heartbeat:Time interval in HW between timer pings.
->    * @driver-data:Pointer to the drivers private data.
->    * @lock:	Lock for watchdog core internal use only.
-> + * @work:	Worker used to provide longer timeouts than hardware supports.
->    * @status:	Field that contains the devices internal status bits.
-> + * @hw_features:Feature bits describing how the watchdog HW works.
->    *
->    * The watchdog_device structure contains all information about a
->    * watchdog timer device.
-> @@ -86,8 +91,12 @@ struct watchdog_device {
->   	unsigned int timeout;
->   	unsigned int min_timeout;
->   	unsigned int max_timeout;
-> +	unsigned int hw_max_timeout; /* in jiffies */
-> +	unsigned int hw_heartbeat; /* in jiffies */
-> +	unsigned long int expires; /* for keepalive worker */
->   	void *driver_data;
->   	struct mutex lock;
-> +	struct delayed_work work;
->   	unsigned long status;
->   /* Bit numbers for status flags */
->   #define WDOG_ACTIVE		0	/* Is the watchdog running/active */
-> @@ -95,6 +104,14 @@ struct watchdog_device {
->   #define WDOG_ALLOW_RELEASE	2	/* Did we receive the magic char ? */
->   #define WDOG_NO_WAY_OUT		3	/* Is 'nowayout' feature set ? */
->   #define WDOG_UNREGISTERED	4	/* Has the device been unregistered */
-> +
-> +/* Bits describing features supported by the HW */
-> +	unsigned long hw_features;
-> +
-> +/* Can the watchdog be stopped and started */
-> +#define WDOG_HW_IS_STOPPABLE		BIT(0)
-> +/* Is the watchdog already running when the driver starts up */
-> +#define WDOG_HW_RUNNING_AT_BOOT		BIT(1)
->   };
->
->   #define WATCHDOG_NOWAYOUT		IS_BUILTIN(CONFIG_WATCHDOG_NOWAYOUT)
-> @@ -120,6 +137,11 @@ static inline bool watchdog_timeout_invalid(struct watchdog_device *wdd, unsigne
->   		(t < wdd->min_timeout || t > wdd->max_timeout));
->   }
->
-> +static inline bool watchdog_is_stoppable(struct watchdog_device *wdd)
-> +{
-> +	return wdd->hw_features & WDOG_HW_IS_STOPPABLE;
-> +}
-> +
->   /* Use the following functions to manipulate watchdog driver specific data */
->   static inline void watchdog_set_drvdata(struct watchdog_device *wdd, void *data)
->   {
-> @@ -134,6 +156,7 @@ static inline void *watchdog_get_drvdata(struct watchdog_device *wdd)
->   /* drivers/watchdog/watchdog_core.c */
->   extern int watchdog_init_timeout(struct watchdog_device *wdd,
->   				  unsigned int timeout_parm, struct device *dev);
-> +int watchdog_init_params(struct watchdog_device *wdd, struct device *dev);
->   extern int watchdog_register_device(struct watchdog_device *);
->   extern void watchdog_unregister_device(struct watchdog_device *);
->
->
+In other words: glibc uses the LP64 system calls and handles any pre- and 
+post-processing in the system-call wrappers.
+
+>> B is just as bad and goes against using the generic syscall numbers. 
+> 
+> How so? The newly introduce syscalls then would be the generic ones.
+
+By applying the ?strace-test? (i.e. ?How will this affect the implementation of strace,
+when considering a ILP32-compiled and a LP64-compiled strace where both should
+be capable of tracing either ILP32 or LP64 targets??), option (b) appears the cleanest
+choice, as no test on the dependent?s ABI would be necessary and all internal 
+dispatching could be performed on syscall numbers alone.
+
+Using the same "strace-test", option (d) would be the least preferred, as it will make 
+the internal dispatching entirely dependent on the dependent?s ABI.
+
+>> I was trying to model ilp32 so there was less maintain hassle if a new syscall was added. 
+>> 
+>> Also about time_t, my original patch had used 32bit but was asked to change
+>> it to the 64bit one. So now I am upset this being asked again to change it back.
+>> The review process for the linux kernel is much harder than the review process
+>> of gcc or even glibc now. 
+> 
+> For now, I'm just opening that discussion again, but the reason this
+> comes up again now is that a lot has happened in the meantime on this
+> front, and we have already decided to merge new architecture ports with
+> 32-bit time_t since.
+
+I think my sloppy e-mail writing blew this out of proportion: I never intended to focus on 
+?time_t?, but on ?timespec? as a whole (i.e. keeping ?tv_nsec? defined as a ?long? in 
+userspace). The problem, as far as I can see from the kernel source, is that 
+kernel/compat.c assumes that tv_sec (time_t) and tv_nsec (long) are of equal size.
+
+My hope was that to resolve this by extending the compat-layer (in those places where
+COMPAT_USE_64BIT_TIME is tested) with a COMPAT_USE_64BIT_TIME_COMPLIANT
+path that supports a 64-bit time_t with a ILP32-long tv_nsecs.
+
+We should not break C11-compliant programs by changing the size of tv_nsecs.  As a
+consequence, we shouldn?t propagate a questionable choice made for x32 into ILP32.
+On the other hand, I don?t want to limit time_t to 32bits, as C11 permits any reasonable
+define for it?
+
+--Philipp.
