@@ -1,57 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Apr 2015 10:26:12 +0100
-Subject: Two new breakages since Thursday
-In-Reply-To: <201504140041.34509.arnd@arndb.de>
-References: <20150405080645.GE13898@n2100.arm.linux.org.uk>
- <20150411090024.GL12732@n2100.arm.linux.org.uk>
- <1428941902.7514.73.camel@mtksdaap41>
- <201504140041.34509.arnd@arndb.de>
-Message-ID: <20150414092612.GT12732@n2100.arm.linux.org.uk>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Tue, 14 Apr 2015 11:33:13 +0200
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <332955D5-3122-437B-93A1-E1973BE09FCA@theobroma-systems.com>
+References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
+ <2507322.zX46IY7aRK@wuerfel>
+ <332955D5-3122-437B-93A1-E1973BE09FCA@theobroma-systems.com>
+Message-ID: <AC03A80E-49F8-4A08-9DDA-0B9F8B734F51@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 12:41:34AM +0200, Arnd Bergmann wrote:
-> On Monday 13 April 2015, Yingjoe Chen wrote:
-> > 
-> > On Sat, 2015-04-11 at 10:00 +0100, Russell King - ARM Linux wrote:
-> > > And almost a week later, and most of these are still present.
-> > > 
-> > > Given that the merge window is potentially opening on Sunday, this
-> > > is very poor, because it means that we've had a week of failing
-> > > builds in the week before the merge window - the week where we
-> > > should be stabilising the code and getting it ready for submission
-> > > to Linus.
-> > > 
-> > > Right now, arm-soc is NOT ready for submission to Linus.
-> > > 
-> > > Please fix this as a top priority.
-> > > 
-> > > On Sun, Apr 05, 2015 at 09:06:45AM +0100, Russell King - ARM Linux wrote:
-> > > > Two new breakages have appeared since Thursday.  The first affects both
-> > > > ARM and ARM64 builds (a missing file), the second only ARM builds.
-> > > > 
-> > > > arch/arm64/boot/dts/mediatek/mt8173-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
-> > > > arch/arm/boot/dts/mt8135-pinfunc.h:18:40: fatal error: dt-bindings/pinctrl/mt65xx.h: No such file or directory
-> > > > arch/arm/mach-at91/pm_suspend.S:143: Error: selected processor does not support ARM mode `dsb'
-> > 
-> > Hi Arnd/Olof,
-> > 
-> > The mediatek part is due to merge dependency in pinctrl driver. It is
-> > discussed in
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/336258.html
-> > 
-> > I thought we already decided to revert DT node in arm-soc tree for 4.1.
-> > What should we do next?
-> 
-> I've finally managed to find my way through the email backlog from being
-> away for three weeks and got to this one now. Patch is reverted in next/dt now.
-> 
-> Sorry about the delay in processing this.
+Arnd,
 
-Well, if this is now gone, there's still the issue of the AT91 breakage
-that also needs to be fixed which is still there when I pulled arm-soc
-last night.  What's happening there?
+After getting a good night?s sleep, the ?reuse the existing system call table? comment
+makes a little more sense as I construe it as having just one merged system call table
+for both LP64 and ILP32 and handling the differences through a different system call
+numbering in unistd.h towards LP64 and ILP32 processes.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+If this is the intended implementation, I am not fully sold on the benefit: having a private
+copy of unistd.h for ARM64 seems to be a less readable and less maintenance-friendly
+solution to having separate tables.
+
+We?re open to input on this and?if merging the system call tables is the consensus?
+would like to get the change underway as soon as possible.
+
+Cheers,
+Phil.
+
+> On 14 Apr 2015, at 00:58, Dr. Philipp Tomsich <philipp.tomsich@theobroma-systems.com> wrote:
+> 
+>> 2. The ABI follows what x86 has their "x32" ABI. This never saw a lot of
+>> adoption and in retrospect the decision to have separate system calls seems
+>> to not have helped them. My feeling now is that if we add support for the
+>> ARM64 ILP32 ELF ABI, we should better stick to the existing system call ABI
+>> as close as possible and reuse the existing system call table. I realize
+>> that this is a bit controversial, but please let's talk about this now.
+> 
+> I see benefits and drawback to merging the system tables.  Our philosophy is
+> already somewhat different from x32 and from the original patch-series, as you
+> can see from the changes dealing with stack_t in the ?sys_rt_sigreturn' and 
+> ?setup_rt_frame? functions.  While these could have been duplicated and 
+> specialized for each ABI (as on x32), the attempt was made to keep these 
+> changes localized.
+> 
+> However, this approach can not always work: if you consider cases like 
+> ?sys_msgsnd? and ?compat_sys_msgsnd?, there?s little to no benefit in having
+> just a ?aarch64_sys_msgsnd?, which then calls either the LP64 or the compat
+> version of the underlying system call.  Having a second system call table 
+> helps to reduce the overheads in this case and keeps things readable.
+> 
+> This comes down to the fact, that a few calls will always be different due to
+> historical baggage in data structures shared between userspace and kernel:
+> 'struct msgbuf? immediatly comes to mind.
+> 
+> I would liken the situation with ARM64 more of MIPS64 with its 64bit ABI and 
+> its n32 ABI than to x32? but even there it?s two separate system call tables
+> (although sequentially concatenated).
+> 
+> In other words: I fail to see the benefit from keeping the existing table.
+> I you elaborate on how such a solution should look, I might be better able
+> to follow. 
