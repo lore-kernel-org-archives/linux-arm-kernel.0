@@ -1,94 +1,33 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Tue, 14 Apr 2015 20:37:11 +0800
-Subject: [PATCH v2 3/6] clk: hi6220: Document devicetree bindings for
- hi6220 clock
-In-Reply-To: <2456827.cDpE8M58pn@wuerfel>
-References: <1428916660-25910-1-git-send-email-bintian.wang@huawei.com>
- <7304398.GVjUsTVoce@wuerfel> <552C8AFE.9040907@huawei.com>
- <2456827.cDpE8M58pn@wuerfel>
-Message-ID: <552D09F7.7080603@huawei.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 14 Apr 2015 14:50:42 +0200
+Subject: [PATCH 7/9] ARM: tegra: enable HDA in defconfig
+In-Reply-To: <alpine.DEB.2.02.1504102218290.19540@utopia.booyaka.com>
+References: <cover.1428700856.git.marcel.ziswiler@toradex.com>
+ <16307b8af5a65c8ba5a2b9cb640b4718142adbca.1428700856.git.marcel.ziswiler@toradex.com>
+ <alpine.DEB.2.02.1504102218290.19540@utopia.booyaka.com>
+Message-ID: <20150414125041.GA13446@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Fri, Apr 10, 2015 at 10:18:44PM +0000, Paul Walmsley wrote:
+> On Fri, 10 Apr 2015, Marcel Ziswiler wrote:
+> 
+> > From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> > 
+> > Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> 
+> This one is also missing a commit message; please add one.
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/SubmittingPatches#n109
 
-On 2015/4/14 18:19, Arnd Bergmann wrote:
-> On Tuesday 14 April 2015 11:35:26 Bintian wrote:
->> Hello Arnd,
->>
->> On 2015/4/13 23:32, Arnd Bergmann wrote:
->>> On Monday 13 April 2015 17:17:37 Bintian Wang wrote:
->>>> +- compatible: the compatible should be one of the following strings to
->>>> +       indicate the clock controller functionality.
->>>> +
->>>> +       - "hisilicon,aoctrl"
->>>> +       - "hisilicon,sysctrl"
->>>> +       - "hisilicon,mediactrl"
->>>> +       - "hisilicon,pmctrl"
->>>> +
->>>>
->>>
->>> These ones already have bindings, you can't reuse the strings.
->>> Please work with someone in hisilicon to set up a registry of
->>> device names so you can avoid conflicts in the future.
->> All the clock registers are under above four system controllers,
->> discussed with Mark and Haojian two months ago, I think using above
->> same four binding strings is enough for clk module.
->> On second thoughts, there really some problems for future hisilicon
->> code upstream, how about change back to the first version of this
->> patch set, just like following:
->> +		sys_ctrl: sys_ctrl {
->> +			compatible = "hisilicon,sysctrl", "syscon";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			reg = <0x0 0xf7030000 0x0 0x2000>;
->> +			ranges = <0 0x0 0xf7030000 0x2000>;
->> +
->> +			clock_sys: clock1 at 0 {
->> +				compatible = "hisilicon,hi6220-clock-sys";
->> +				reg = <0 0x1000>;
->> +				#clock-cells = <1>;
->> +			};
->> +		};
->
-> Sub-nodes are fine, but you also can't have a device node that
-> is just 'compatible = "hisilicon,sysctrl", "syscon";' when
-> hisilicon,sysctrl can refer to multiple mutually incompatible
-> controllers.
->
-> The minimum fix would be to mandate the string to be
-> compatible = "hisilicon,hi6220-sysctrl", "hisilicon,sysctrl", "syscon";
-> for this model, and use respective compatible strings for the other
-> chips.
-It's really a smart fix!
+defconfig updates are generally an exception to this rule. The reason is
+that I'll end up squashing them into a single commit anyway.
 
-For the four system controllers, how about change the following strings:
-+       - "hisilicon,aoctrl"
-+       - "hisilicon,sysctrl"
-+       - "hisilicon,mediactrl"
-+       - "hisilicon,pmctrl"
-
-to
-+       - "hisilicon,hi6220-aoctrl"
-+       - "hisilicon,hi6220-sysctrl"
-+       - "hisilicon,hi6220-mediactrl"
-+       - "hisilicon,hi6220-pmctrl"
-?
-
-and I also use "hisilicon,hi6220-xxxx" for hi6220 clk driver directly ?
-
->
-> For the documentation, I think it would make sense to move that
-> description to "hisilicon,sysctrl" and list all the variants of that
-> component and the respective compatible strings there, rather than
-> have one document per chip and list multiple components in it.
-Sure,
-
-Thanks,
-
-Bintian
->
-> 	Arnd
->
-> .
->
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150414/b3ffa582/attachment-0001.sig>
