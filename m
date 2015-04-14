@@ -1,178 +1,53 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Tue, 14 Apr 2015 14:25:59 +0300
-Subject: [PATCH v8 00/18] Tegra124 CL-DVFS / DFLL clocksource + cpufreq
-In-Reply-To: <20150410211157.14369.51754@quantum>
-References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
- <20150311100741.GK19577@ulmo.nvidia.com> <20150410211157.14369.51754@quantum>
-Message-ID: <552CF947.9030609@kapsi.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Apr 2015 13:33:08 +0200
+Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
+In-Reply-To: <20150414111934.GA27836@kroah.com>
+References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
+ <20150414111934.GA27836@kroah.com>
+Message-ID: <6483716.157BQAaRqF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2015 12:11 AM, Michael Turquette wrote:
-> Quoting Thierry Reding (2015-03-11 03:07:43)
->> Hi Mike,
->>
->> Have you had a chance to look at these changes to the Tegra clock
->> driver? If you're fine with it, I'd like to take these patches through
->> the Tegra tree because the rest of the series depends on them. I can
->> provide a stable branch in case we need to base other Tegra clock
->> changes on top of this.
->
-> Hi Thierry,
->
-> Clock patches (and corresponding DT binding descriptions and changes to
-> DTS) look fine to me. Please add:
->
-> Acked-by: Michael Turquette <mturquette@linaro.org>
->
-> I did have a question about the beahvior of clk_put in one of Mikko's
-> patches but it should not gate this series. I'm just trying to find out
-> if we have a bug in the framework or if the Tegra driver is a special
-> case.
->
-> Also I do not think a stable branch is necessary.
->
-> Regards,
-> Mike
->
+On Tuesday 14 April 2015 13:19:34 Greg Kroah-Hartman wrote:
+> On Mon, Apr 13, 2015 at 03:10:46PM -0700, Arun Ramamurthy wrote:
+> > Getting phys by index instead of phy names so that we do
+> > not have to create a naming scheme when multiple phys
+> > are present
+> > 
+> > Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+> > Reviewed-by: Ray Jui <rjui@broadcom.com>
+> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> > ---
+> >  drivers/usb/host/Kconfig         |  1 +
+> >  drivers/usb/host/ehci-platform.c | 70 ++++++++++++++--------------------------
+> >  2 files changed, 26 insertions(+), 45 deletions(-)
+> > 
+> > diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> > index 5ad60e4..563f22d 100644
+> > --- a/drivers/usb/host/Kconfig
+> > +++ b/drivers/usb/host/Kconfig
+> > @@ -284,6 +284,7 @@ config USB_EHCI_ATH79
+> >  
+> >  config USB_EHCI_HCD_PLATFORM
+> >       tristate "Generic EHCI driver for a platform device"
+> > +     select GENERIC_PHY
+> 
+> Configs should never select if at all possible.
+> 
 
-Looks like in the meantime, this has been partially broken by
-03bc10ab5b0f "clk: check ->determine/round_rate() return value in 
-clk_calc_new_rates". The highest rates supported by the DFLL clock have 
-1 in the MSB, so those cannot be entered after the aforementioned patch, 
-as the return value of round_rate is interpreted as an error. Avenues 
-that I can see: 1) revert the above patch 2) restrict the cpu clock rate 
-to those with 0 in the MSB 3) move to 64-bit clock rates.
+This is true, but all other drivers do the same for GENERIC_PHY at the
+moment. If this one gets changed, we should probably apply the same
+solution to all current users and fix them consistently.
 
-Cheers,
-Mikko.
+We can do one of these two:
 
->>
->> Thierry
->>
->> On Sun, Mar 01, 2015 at 02:44:23PM +0200, Mikko Perttunen wrote:
->>> Hi, this is v8 of the Tegra124 cpufreq series. Aside rebasing on latest -next,
->>> the following changes have been done:
->>>
->>> clk: tegra: Add binding for the Tegra124 DFLL clocksource
->>> - Changed dfll@ -> clock@
->>> - Changed compatibility string to "nvidia,tegra124-dfll"
->>> - Clarified how the vdd-cpu-supply property is used
->>> - Marked nvidia,cg-scale as optional since it is a boolean property
->>> - Expanded the 'FS mode' term to 'full speed mode'
->>> - Added dvco reset control
->>>
->>> ARM: tegra: Add the DFLL to Tegra124 device tree
->>> - Changed dfll@ -> clock@
->>> - Added dvco reset control
->>>
->>> ARM: tegra: Enable the DFLL on the Jetson TK1
->>> - Changed dfll@ -> clock@
->>>
->>> clk: tegra: Initialize PLL_X before CCLK_G to ensure it has a parent
->>> - Added
->>>
->>> clk: tegra: Introduce ability for SoC-specific reset control callbacks
->>> - Added
->>>
->>> clk: tegra: Add DFLL DVCO reset control for Tegra124
->>> - Changed to use SoC-specific reset control callback
->>>
->>> clk: tegra: Add Tegra124 DFLL clocksource platform driver
->>> - Don't set DVCO reset handlers
->>>
->>> clk: tegra: Add library for the DFLL clock source (open-loop mode)
->>> - Use reset control instead of function pointers
->>>
->>> also added acks from v7.
->>>
->>> The series is available in a git repository at
->>>    git://github.com/cyndis/linux.git cldvfs-v8
->>>
->>> Tested by me on Jetson-TK1 (rev. D).
->>>
->>> Original cover letter:
->>>
->>> This series implements the DFLL/CL-DVFS clock source for the fast CPU
->>> cluster on Tegra124, and a cpufreq driver that uses the DFLL for
->>> clocking the CPU. Most of this is based on Paul Walmsley's public patch
->>> set from December 2013, which is available at
->>> http://comments.gmane.org/gmane.linux.ports.tegra/15273
->>>
->>> The DFLL clock hardware is a voltage-controlled oscillator plus
->>> control logic that compares the generated output clock with a
->>> 51 MHz reference clock, and can make decisions to either lower
->>> or raise the DFLL voltage to keep the output rate close to the
->>> software-requested rate. The voltage changes are done by
->>> communicating with an off-chip PMIC via either I2C or PWM.
->>> As the DFLL oscillator is powered via the CPU rail, using
->>> the DFLL as the CPU clocksource also gives us dynamic CPU
->>> voltage scaling.
->>>
->>> This series has been tested on the Jetson TK1 (Rev C). Porting this to
->>> the Venice2 should be simple, though do note that it does not have
->>> active cooling.
->>>
->>> Thanks,
->>> Tuomas
->>>
->>> Mikko Perttunen (3):
->>>    clk: tegra: Introduce ability for SoC-specific reset control callbacks
->>>    clk: tegra: Initialize PLL_X before CCLK_G to ensure it has a parent
->>>    ARM: tegra: Add CPU regulator to the Jetson TK1 device tree
->>>
->>> Paul Walmsley (1):
->>>    clk: tegra: Add DFLL DVCO reset control for Tegra124
->>>
->>> Tuomas Tynkkynen (14):
->>>    clk: tegra: Add binding for the Tegra124 DFLL clocksource
->>>    clk: tegra: Add library for the DFLL clock source (open-loop mode)
->>>    clk: tegra: Add closed loop support for the DFLL
->>>    clk: tegra: Add functions for parsing CVB tables
->>>    clk: tegra: Add Tegra124 DFLL clocksource platform driver
->>>    clk: tegra: Save/restore CCLKG_BURST_POLICY on suspend
->>>    clk: tegra: Add the DFLL as a possible parent of the cclk_g clock
->>>    ARM: tegra: Add the DFLL to Tegra124 device tree
->>>    ARM: tegra: Enable the DFLL on the Jetson TK1
->>>    cpufreq: tegra124: Add device tree bindings
->>>    cpufreq: tegra: Rename tegra-cpufreq to tegra20-cpufreq
->>>    cpufreq: Add cpufreq driver for Tegra124
->>>    ARM: tegra: Add entries for cpufreq on Tegra124
->>>    ARM: tegra: enable Tegra124 cpufreq driver by default
->>>
->>>   .../bindings/clock/nvidia,tegra124-dfll.txt        |   79 +
->>>   .../bindings/cpufreq/tegra124-cpufreq.txt          |   44 +
->>>   arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   15 +-
->>>   arch/arm/boot/dts/tegra124.dtsi                    |   34 +
->>>   arch/arm/configs/tegra_defconfig                   |    1 +
->>>   arch/arm/mach-tegra/Kconfig                        |    1 +
->>>   drivers/clk/tegra/Makefile                         |    3 +
->>>   drivers/clk/tegra/clk-dfll.c                       | 1755 ++++++++++++++++++++
->>>   drivers/clk/tegra/clk-dfll.h                       |   54 +
->>>   drivers/clk/tegra/clk-tegra-super-gen4.c           |   50 +-
->>>   drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         |  163 ++
->>>   drivers/clk/tegra/clk-tegra124.c                   |   82 +
->>>   drivers/clk/tegra/clk.c                            |   36 +-
->>>   drivers/clk/tegra/clk.h                            |    3 +
->>>   drivers/clk/tegra/cvb.c                            |  133 ++
->>>   drivers/clk/tegra/cvb.h                            |   67 +
->>>   drivers/cpufreq/Kconfig.arm                        |   13 +-
->>>   drivers/cpufreq/Makefile                           |    3 +-
->>>   drivers/cpufreq/tegra124-cpufreq.c                 |  217 +++
->>>   .../cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} |    0
->>>   include/dt-bindings/reset/tegra124-car.h           |   11 +
->>>   21 files changed, 2730 insertions(+), 34 deletions(-)
->>>   create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
->>>   create mode 100644 Documentation/devicetree/bindings/cpufreq/tegra124-cpufreq.txt
->>>   create mode 100644 drivers/clk/tegra/clk-dfll.c
->>>   create mode 100644 drivers/clk/tegra/clk-dfll.h
->>>   create mode 100644 drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
->>>   create mode 100644 drivers/clk/tegra/cvb.c
->>>   create mode 100644 drivers/clk/tegra/cvb.h
->>>   create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
->>>   rename drivers/cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} (100%)
->>>   create mode 100644 include/dt-bindings/reset/tegra124-car.h
->>>
->>> --
->>> 2.3.0
->>>
+a) make sure that the framework has 'static inline' stubs that let you
+   build all drivers using it when the framework itself is disabled.
+b) change the drivers using it to 'depends on', and make GENERIC_PHY
+   itself a hidden option without a Kconfig prompt.
+
+Either solution is probably simple enough that it can be done as
+part of this series.
+
+	Arnd
