@@ -1,76 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 14 Apr 2015 13:57:02 +0200
-Subject: [PATCH v11]: clk: Add common clock support for Mediatek MT8135
- and MT8173
-In-Reply-To: <CABuKBeLxcCcfcunwX7q=hSHRrrHd5-EMgRzSwhx9eSdvNKum=A@mail.gmail.com>
-References: <1427825817-26773-1-git-send-email-s.hauer@pengutronix.de>
- <CABuKBeJ256HBLP+3WB+acNbMonGknQJgWBnGjEx1VWecWc-Y5g@mail.gmail.com>
- <20150414100810.GH4946@pengutronix.de>
- <CABuKBeLxcCcfcunwX7q=hSHRrrHd5-EMgRzSwhx9eSdvNKum=A@mail.gmail.com>
-Message-ID: <20150414115702.GX9742@pengutronix.de>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 14 Apr 2015 14:37:37 +0200
+Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
+In-Reply-To: <6483716.157BQAaRqF@wuerfel>
+References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
+ <20150414111934.GA27836@kroah.com> <6483716.157BQAaRqF@wuerfel>
+Message-ID: <20150414123737.GB18756@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 01:01:30PM +0200, Matthias Brugger wrote:
-> Hi Sascha,
+On Tue, Apr 14, 2015 at 01:33:08PM +0200, Arnd Bergmann wrote:
+> On Tuesday 14 April 2015 13:19:34 Greg Kroah-Hartman wrote:
+> > On Mon, Apr 13, 2015 at 03:10:46PM -0700, Arun Ramamurthy wrote:
+> > > Getting phys by index instead of phy names so that we do
+> > > not have to create a naming scheme when multiple phys
+> > > are present
+> > > 
+> > > Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+> > > Reviewed-by: Ray Jui <rjui@broadcom.com>
+> > > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> > > ---
+> > >  drivers/usb/host/Kconfig         |  1 +
+> > >  drivers/usb/host/ehci-platform.c | 70 ++++++++++++++--------------------------
+> > >  2 files changed, 26 insertions(+), 45 deletions(-)
+> > > 
+> > > diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> > > index 5ad60e4..563f22d 100644
+> > > --- a/drivers/usb/host/Kconfig
+> > > +++ b/drivers/usb/host/Kconfig
+> > > @@ -284,6 +284,7 @@ config USB_EHCI_ATH79
+> > >  
+> > >  config USB_EHCI_HCD_PLATFORM
+> > >       tristate "Generic EHCI driver for a platform device"
+> > > +     select GENERIC_PHY
+> > 
+> > Configs should never select if at all possible.
+> > 
 > 
-> 2015-04-14 12:08 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> > Hi Matthias,
-> >
-> > On Tue, Apr 07, 2015 at 01:47:58PM +0200, Matthias Brugger wrote:
-> >> Hi Sascha,
-> >>
-> >>
-> >> 2015-03-31 20:16 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> >> >
-> >> > The following changes since commit 9eccca0843205f87c00404b663188b88eb248051:
-> >> >
-> >> >   Linux 4.0-rc3 (2015-03-08 16:09:09 -0700)
-> >> >
-> >> > are available in the git repository at:
-> >> >
-> >> >   git://git.pengutronix.de/git/imx/linux-2.6.git tags/v4.0-clk-mediatek-v11
-> >> >
-> >> > for you to fetch changes up to ae9129219143cfdefe8b3a463deb8c5cb8955525:
-> >> >
-> >> >   dt-bindings: ARM: Mediatek: Document devicetree bindings for clock/reset controllers (2015-03-31 20:08:46 +0200)
-> >> >
-> >> > ----------------------------------------------------------------
-> >> > This patchset contains the initial common clock support for Mediatek SoCs.
-> >> > Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes
-> >> > and clock gates.
-> >>
-> >> I tried the patch set on my mt8135 eval board. I used the dts bindings
-> >> from a former version of this set [1], but it does not boot the board
-> >> (based on v4.0-rc7).
-> >> Do you have any hint, what is happening, or are the bindings wrong?
-> >
-> > I just tried on a v4.0 with
-> > - this series applied
-> > - the dts patch applied (which is still up-to-date)
-> > - multi_v7_defconfig
-> >
-> > And it still works. What do you mean with "does not boot the board"? No
-> > console output? Could you try with earlyprintk?
+> This is true, but all other drivers do the same for GENERIC_PHY at the
+> moment. If this one gets changed, we should probably apply the same
+> solution to all current users and fix them consistently.
 > 
-> The probelms I see is, that with the clock patches, I'm not able to
-> boot into a initramfs [1].
-> Whereas if I just comment topckgen and preicfg in the dts, I'm able to
-> get the a serial console of my initramfs [2].
+> We can do one of these two:
 > 
-> I wonder if you are able to get serial console from the initramfs with
-> the clock patches + dts patch?
+> a) make sure that the framework has 'static inline' stubs that let you
+>    build all drivers using it when the framework itself is disabled.
 
-So you get kernel messages but no output from initramfs? In this case
-the kernel disables the unused clocks in a late_initcall. The UART
-driver still uses the dummy clock provided in the dtsi, so the real
-UART clk gets disabled in the initcall. Try passing clk_ignore_unused to
-the kernel
+Yes, please do that.
 
-Sascha
+> b) change the drivers using it to 'depends on', and make GENERIC_PHY
+>    itself a hidden option without a Kconfig prompt.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Then how could GENERIC_PHY ever get set?
+
+> Either solution is probably simple enough that it can be done as
+> part of this series.
+
+That's fine with me, but please no more selects.
+
+thanks,
+
+greg k-h
