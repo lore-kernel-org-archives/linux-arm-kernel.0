@@ -1,33 +1,34 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 14 Apr 2015 12:23:45 +0200
-Subject: [PATCH v2 08/10] KVM: arm64: guest debug, HW assisted debug
- support
-In-Reply-To: <20150410122520.GA3227@hawk.usersys.redhat.com>
+Date: Tue, 14 Apr 2015 12:27:03 +0200
+Subject: [PATCH v2 09/10] KVM: arm64: trap nested debug register access
+In-Reply-To: <877ftglaqu.fsf@linaro.org>
 References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-9-git-send-email-alex.bennee@linaro.org>
- <20150410122520.GA3227@hawk.usersys.redhat.com>
-Message-ID: <20150414102345.GV6186@cbox>
+ <1427814488-28467-10-git-send-email-alex.bennee@linaro.org>
+ <20150410123830.GB3227@hawk.usersys.redhat.com>
+ <877ftglaqu.fsf@linaro.org>
+Message-ID: <20150414102703.GW6186@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 02:25:21PM +0200, Andrew Jones wrote:
+On Mon, Apr 13, 2015 at 08:59:21AM +0100, Alex Benn?e wrote:
 
 [...]
 
-> > --- a/arch/arm64/kvm/sys_regs.c
-> > +++ b/arch/arm64/kvm/sys_regs.c
-> > @@ -196,16 +196,49 @@ static bool trap_dbgauthstatus_el1(struct kvm_vcpu *vcpu,
-> >   * - If the dirty bit is set, save guest registers, restore host
-> >   *   registers and clear the dirty bit. This ensure that the host can
-> >   *   now use the debug registers.
-> > + *
-> > + * We also use this mechanism to set-up the debug registers for guest
-> setup
-
-since I'm in this mood:
-
-setup: noun or adjective
-set-up: noun derived from the phrasal verb, example "Run! It's a set-up."
-set up: verb
+> >> +		/* MDSCR_EL1 */
+> >> +		if (r->reg == MDSCR_EL1) {
+> >> +			if (p->is_write)
+> >> +				vcpu_debug_saved_reg(vcpu, mdscr_el1) =
+> >> +					*vcpu_reg(vcpu, p->Rt);
+> >> +			else
+> >> +				*vcpu_reg(vcpu, p->Rt) =
+> >> +					vcpu_debug_saved_reg(vcpu, mdscr_el1);
+> >
+> > With this lines wrapping, {}'s might be nice.
+> 
+> My natural inclination is to wrap in {}'s but I know the kernel is a fan
+> of the single-statement if forms.
+> 
+It's accepted to use braces for multi-line single statements - and I
+prefer it too :)
 
 -Christoffer
