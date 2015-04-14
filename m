@@ -1,67 +1,71 @@
 From: jbe@pengutronix.de (Juergen Borleis)
-Date: Tue, 14 Apr 2015 11:08:36 +0200
-Subject: [PATCH 3/5] RTC/i.MX/DryIce: monitor a security violation at runtime
-In-Reply-To: <1429002518-5015-2-git-send-email-jbe@pengutronix.de>
-References: <1429002518-5015-2-git-send-email-jbe@pengutronix.de>
-Message-ID: <1429002518-5015-4-git-send-email-jbe@pengutronix.de>
+Date: Tue, 14 Apr 2015 11:08:34 +0200
+Subject: [PATCH 1/5] RTC/i.MX/DryIce: add some background info about the
+ states the machine can be in
+Message-ID: <1429002518-5015-2-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Maybe the unit enters the hardware related state at runtime and not at
-system boot time (after a power cycle).
 
 Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
 Signed-off-by: Robert Schwebel <rsc@pengutronix.de>
 [rsc: got NDA clearance from Freescale]
 ---
- drivers/rtc/rtc-imxdi.c | 21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ drivers/rtc/rtc-imxdi.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
 diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
-index f8abf2b..b04c64f 100644
+index c666eab..8750477 100644
 --- a/drivers/rtc/rtc-imxdi.c
 +++ b/drivers/rtc/rtc-imxdi.c
-@@ -680,6 +680,25 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
- 	irqreturn_t rc = IRQ_NONE;
+@@ -129,6 +129,49 @@ struct imxdi_dev {
+ 	struct work_struct work;
+ };
  
- 	dier = __raw_readl(imxdi->ioaddr + DIER);
-+	dsr = __raw_readl(imxdi->ioaddr + DSR);
++/* Some background:
++ *
++ * The DryIce unit is a complex security/tamper monitor device. To be able do
++ * its job in a useful manner it runs a bigger statemachine to bring it into
++ * security/tamper failure state and once again to bring it out of this state.
++ *
++ * This unit can be in one of three states:
++ *
++ * - "NON-VALID STATE"
++ *   always after the battery power was removed
++ * - "FAILURE STATE"
++ *   if one of the enabled security events have happend
++ * - "VALID STATE"
++ *   if the unit works as expected
++ *
++ * Everything stops when the unit enters the failure state including the RTC
++ * counter (to be able to detect the time the security event happend).
++ *
++ * The following events (when enabled) let the DryIce unit enter the failure
++ * state:
++ *
++ * - wire-mesh-tamper detect
++ * - external tamper B detect
++ * - external tamper A detect
++ * - temperature tamper detect
++ * - clock tamper detect
++ * - voltage tamper detect
++ * - RTC counter overflow
++ * - monotonic counter overflow
++ * - external boot
++ *
++ * If we find the DryIce unit in "FAILURE STATE" and the TDCHL cleared, we
++ * can only detect this state. In this case the unit is completely locked and
++ * must force a second "SYSTEM POR" to bring the DryIce into the
++ * "NON-VALID STATE" + "FAILURE STATE" where a recovery is possible.
++ * If the TDCHL is set in the "FAILURE STATE" we are out of luck. In this case
++ * a battery power cycle is required.
++ *
++ * In the "NON-VALID STATE" + "FAILURE STATE" we can clear the "FAILURE STATE"
++ * and recover the DryIce unit. By clearing the "NON-VALID STATE" as the last
++ * task, we bring back this unit into life.
++ */
 +
-+	/* handle the security violation event */
-+	if (dier & DIER_SVIE) {
-+		if (dsr & DSR_SVF) {
-+			/*
-+			 * Disable the interrupt when this kind of event has
-+			 * happened.
-+			 * There cannot be more than one event of this type,
-+			 * because it needs a complex state change
-+			 * including a main power cycle to get again out of
-+			 * this state.
-+			 */
-+			di_int_disable(imxdi, DIER_SVIE);
-+			/* report the violation */
-+			di_report_tamper_info(imxdi, dsr);
-+			rc = IRQ_HANDLED;
-+		}
-+	}
- 
- 	/* handle write complete and write error cases */
- 	if (dier & DIER_WCIE) {
-@@ -690,7 +709,6 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
- 			return rc;
- 
- 		/* DSR_WCF clears itself on DSR read */
--		dsr = __raw_readl(imxdi->ioaddr + DSR);
- 		if (dsr & (DSR_WCF | DSR_WEF)) {
- 			/* mask the interrupt */
- 			di_int_disable(imxdi, DIER_WCIE);
-@@ -706,7 +724,6 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
- 	/* handle the alarm case */
- 	if (dier & DIER_CAIE) {
- 		/* DSR_WCF clears itself on DSR read */
--		dsr = __raw_readl(imxdi->ioaddr + DSR);
- 		if (dsr & DSR_CAF) {
- 			/* mask the interrupt */
- 			di_int_disable(imxdi, DIER_CAIE);
+ /*
+  * enable a dryice interrupt
+  */
 -- 
 2.1.4
