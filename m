@@ -1,36 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 14 Apr 2015 12:44:46 +0200
-Subject: [PATCH] KVM: arm: irqfd: fix value returned by kvm_irq_map_gsi
-In-Reply-To: <1428930119-21692-1-git-send-email-eric.auger@linaro.org>
-References: <1428930119-21692-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <20150414104446.GA6186@cbox>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 14 Apr 2015 12:44:47 +0200
+Subject: [PATCH 05/13] thermal: inline only once used function
+In-Reply-To: <20150407022307.GE4648@localhost.localdomain>
+References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+ <1427385240-6086-6-git-send-email-s.hauer@pengutronix.de>
+ <20150407022307.GE4648@localhost.localdomain>
+Message-ID: <20150414104447.GI4946@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 03:01:59PM +0200, Eric Auger wrote:
-> irqfd/arm curently does not support routing. kvm_irq_map_gsi is
-> supposed to return all the routing entries associated with the
-> provided gsi and return the number of those entries. We should
-> return 0 at this point.
+On Mon, Apr 06, 2015 at 07:23:08PM -0700, Eduardo Valentin wrote:
+> On Thu, Mar 26, 2015 at 04:53:52PM +0100, Sascha Hauer wrote:
+> > Inline update_temperature into its only caller to make the code
+> > more readable.
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> ---
->  virt/kvm/arm/vgic.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 9ad074e..9b4f7d4 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1947,7 +1947,7 @@ int kvm_irq_map_gsi(struct kvm *kvm,
->  		    struct kvm_kernel_irq_routing_entry *entries,
->  		    int gsi)
->  {
-> -	return gsi;
-> +	return 0;
->  }
->  
->  int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned irqchip, unsigned pin)
-> -- 
+> I am not sure I understand how this is improving readability, can you
+> please elaborate?
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+It improves readability because the reader does not have to lookup the
+definition of update_temperature but can instead just read through. The
+function name "update_temperature" does not give new information either,
+so I thought inlining the code is a good idea. Anyway, I can skip this
+patch if you want.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
