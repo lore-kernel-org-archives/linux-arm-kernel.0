@@ -1,29 +1,31 @@
-From: mwelling@ieee.org (Michael Welling)
-Date: Tue, 14 Apr 2015 16:17:35 -0500
-Subject: AM335x OMAP2 common clock external fixed-clock registration
-Message-ID: <20150414211734.GA28974@deathray>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Apr 2015 23:47:35 +0200
+Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
+In-Reply-To: <552D56EF.2020409@broadcom.com>
+References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <552D2255.1050704@ti.com> <552D56EF.2020409@broadcom.com>
+Message-ID: <4138287.C3OjQp3FFm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+On Tuesday 14 April 2015 11:05:35 Arun Ramamurthy wrote:
+> >
+> > [1] ->
+> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/kbuild/kconfig-language.txt#n111
+> >
+> Kishon,removing select GENERIC_PHY also breaks the builds for certain 
+> architectures (i386 and x84_64). Is the consensus to leave the select 
+> but make GENERIC_PHY a invisible option? Thanks
 
-I have developed an AM3354 based SoM and it uses an external SI5351 clock
-generator to drive the clock inputs for an external duart and I2S audio
-master clock. With the registration according to the documentation the
-reference clock is not being detected and hence the clock generator is
-not working as expect.
+I think the best solution is
 
-After trying many different things, I started to look around the mailing
-lists to find information related to this issue.
+- make GENERIC_PHY a silent option
+- change PHY_RCAR_GEN2 to use 'select' instead of 'depends on', so
+  it will still work when all other phy drivers are disabled
+- change the non-phy drivers that select GENERIC_PHY to either
+  use 'depends on' or no explicit dependency in case they are
+  still functional without the API. Note that
+  drivers/pinctrl/pinctrl-tegra-xusb.c is a phy provider as well,
+  not a consumer, despite being outside of drivers/phy.
 
-I came acrossed post that has the exact same issue:
-https://lkml.org/lkml/2013/2/18/468
-
-Seeing as the patch did not land upstream, I am wondering if there is
-a solution that I am not seeing.
-
-I am willing to provide a patch given appropriate guidance.
-
-Regards,
-
-Michael
+	Arnd
