@@ -1,88 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Apr 2015 16:59:41 +0100
-Subject: [RFC PATCH 4/5] arm64: smp: move the pen to a header file
-In-Reply-To: <1428601031-5366-5-git-send-email-galak@codeaurora.org>
-References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <1428601031-5366-5-git-send-email-galak@codeaurora.org>
-Message-ID: <20150414155941.GK28709@leverpostej>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Tue, 14 Apr 2015 11:05:19 -0500
+Subject: [PATCHv2] ARM: socfpga: dts: Add a clock node for sdmmc CIU
+Message-ID: <1429027519-22209-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 06:37:10PM +0100, Kumar Gala wrote:
-> From: Abhimanyu Kapur <abhimany@codeaurora.org>
-> 
-> Move the secondary_pen_release variable and the secondary_holding_pen
-> entry function to asm/smp_plat.h so that the other cpu ops implementations
-> can share them.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-If anything, this should all be moved into smp_spin_table.c, and made
-static.
+The CIU(Card Interface Unit) get its clock from the sdmmc_clk_divided clock
+which is used to clock the card. The sdmmc_clk_divided clock is the sdmmc_clk
+passed through a fixed divider of 4. This patch adds the sdmmc_clk_divided
+node and makes the sdmmc_clk it's parent.
 
-We made a mistake with the pen (and allowing multiple CPUs to enter the
-kernel at once). That mistake shouldn't be spread further.
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+v2: renamed ciu_clk to sdmmc_clk_divided
+---
+ arch/arm/boot/dts/socfpga.dtsi | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-Mark.
-
-> 
-> Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
-> ---
->  arch/arm64/include/asm/smp_plat.h  | 2 ++
->  arch/arm64/kernel/smp.c            | 1 +
->  arch/arm64/kernel/smp_spin_table.c | 3 ---
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
-> index 59e2823..235ff04 100644
-> --- a/arch/arm64/include/asm/smp_plat.h
-> +++ b/arch/arm64/include/asm/smp_plat.h
-> @@ -34,10 +34,12 @@ static inline u32 mpidr_hash_size(void)
->  	return 1 << mpidr_hash.bits;
->  }
->  
-> +extern void secondary_holding_pen(void);
->  /*
->   * Logical CPU mapping.
->   */
->  extern u64 __cpu_logical_map[NR_CPUS];
->  #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
-> +extern volatile unsigned long secondary_holding_pen_release;
->  
->  #endif /* __ASM_SMP_PLAT_H */
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 328b8ce..4ce1f23 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -61,6 +61,7 @@
->   * where to place its SVC stack
->   */
->  struct secondary_data secondary_data;
-> +volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
->  
->  enum ipi_msg_type {
->  	IPI_RESCHEDULE,
-> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-> index b41a8b4..be833b9 100644
-> --- a/arch/arm64/kernel/smp_spin_table.c
-> +++ b/arch/arm64/kernel/smp_spin_table.c
-> @@ -28,9 +28,6 @@
->  #include <asm/io.h>
->  #include <asm/smp_plat.h>
->  
-> -extern void secondary_holding_pen(void);
-> -volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
-> -
->  static phys_addr_t cpu_release_addr[NR_CPUS];
->  
->  /*
-> -- 
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index d9176e6..be4beda 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -451,6 +451,14 @@
+ 						clk-phase = <0 135>;
+ 					};
+ 
++					sdmmc_clk_divided: sdmmc_clk_divided {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-gate-clk";
++						clocks = <&sdmmc_clk>;
++						clk-gate = <0xa0 8>;
++						fixed-divider = <4>;
++					};
++
+ 					nand_x_clk: nand_x_clk {
+ 						#clock-cells = <0>;
+ 						compatible = "altr,socfpga-gate-clk";
+@@ -635,7 +643,7 @@
+ 			fifo-depth = <0x400>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
++			clocks = <&l4_mp_clk>, <&sdmmc_clk_divided>;
+ 			clock-names = "biu", "ciu";
+ 		};
+ 
+-- 
+2.2.1
