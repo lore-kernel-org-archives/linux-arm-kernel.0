@@ -1,43 +1,33 @@
 From: tyler.baker@linaro.org (Tyler Baker)
-Date: Tue, 14 Apr 2015 15:50:56 -0700
-Subject: [PATCH 0/7] selftests: fixes for installation and cross compilation
-Message-ID: <1429051856-14557-1-git-send-email-tyler.baker@linaro.org>
+Date: Tue, 14 Apr 2015 15:51:09 -0700
+Subject: [PATCH 1/7] selftests: copy TEST_DIRS to INSTALL_PATH
+Message-ID: <1429051869-14599-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set fixes various issues observed when cross building and 
-installing selftests.
+Loop over all TEST_DIRS and recursively copy them to the INSTALL_PATH. Tests
+such as ftrace require a directory and all of it's contents to execute the
+test properly, thus these directories and files need to be copied when we
+perform an install.
 
-As I began investigating improving the test output format, I performed an 
-audit of the current tests to ensure all tests were able to execute on various 
-target architectures. I found that some tests did not install their binaries 
-and others required directories to be installed to execute properly. There 
-were also cases in which tests were being installed when they were never built.
-With this series applied all tests compile when appropriate and install their 
-output properly.
+Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+---
+ tools/testing/selftests/lib.mk | 3 +++
+ 1 file changed, 3 insertions(+)
 
-I have tested this series by building, installing and deploying all selftests 
-to x86, arm and arm64 targets. 
-
-This series is based on next-20150414
-
-Tyler Baker (7):
-  selftests: copy TEST_DIRS to INSTALL_PATH
-  selftests/ftrace: install test.d
-  selftests/breakpoints: emit skip and omit installation when tests are
-    not compiled
-  selftests/kdbus: install kdbus-test
-  selftests/x86: fix cross build logic
-  selftests/x86: install tests
-  selftests/exec: do not install subdir as it is already created
-
- tools/testing/selftests/breakpoints/Makefile |  7 ++++-
- tools/testing/selftests/exec/Makefile        |  2 +-
- tools/testing/selftests/ftrace/Makefile      |  1 +
- tools/testing/selftests/kdbus/Makefile       |  2 ++
- tools/testing/selftests/lib.mk               |  3 ++
- tools/testing/selftests/x86/Makefile         | 41 +++++++++++++++++++++-------
- 6 files changed, 44 insertions(+), 12 deletions(-)
-
+diff --git a/tools/testing/selftests/lib.mk b/tools/testing/selftests/lib.mk
+index 2194155..ee412ba 100644
+--- a/tools/testing/selftests/lib.mk
++++ b/tools/testing/selftests/lib.mk
+@@ -13,6 +13,9 @@ run_tests: all
+ 
+ define INSTALL_RULE
+ 	mkdir -p $(INSTALL_PATH)
++	@for TEST_DIR in $(TEST_DIRS); do\
++		cp -r $$TEST_DIR $(INSTALL_PATH); \
++	done;
+ 	install -t $(INSTALL_PATH) $(TEST_PROGS) $(TEST_PROGS_EXTENDED) $(TEST_FILES)
+ endef
+ 
 -- 
 2.1.0
