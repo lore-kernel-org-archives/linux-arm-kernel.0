@@ -1,77 +1,105 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 14 Apr 2015 09:03:53 +0100
-Subject: [PATCH v2 04/10] KVM: arm: guest debug,
- add stub KVM_SET_GUEST_DEBUG ioctl
-In-Reply-To: <20150414083157.65733022@thinkpad-w530>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-5-git-send-email-alex.bennee@linaro.org>
- <20150413121231.GO6186@cbox> <20150414083157.65733022@thinkpad-w530>
-Message-ID: <87y4lvf85y.fsf@linaro.org>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 14 Apr 2015 10:06:18 +0200
+Subject: [PATCH] clocksource: arm_global_timer: Detect if gt is usable
+ with CPU_FREQ
+In-Reply-To: <552CC490.4010002@linaro.org>
+References: <552BFED9.3020105@adapteva.com> <552CC490.4010002@linaro.org>
+Message-ID: <552CCA7A.3090306@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Srini, Ola,
 
-David Hildenbrand <dahi@linux.vnet.ibm.com> writes:
-
->> On Tue, Mar 31, 2015 at 04:08:02PM +0100, Alex Benn?e wrote:
->> > This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
->> > ioctl. Currently any operation flag will return EINVAL. Actual
->> > functionality will be added with further patches.
->> > 
->> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
->> > 
->> > ---
->> > v2
->> >   - simplified form of the ioctl (stuff will go into setup_debug)
->> > 
->> > diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->> > index b112efc..06c5064 100644
->> > --- a/Documentation/virtual/kvm/api.txt
->> > +++ b/Documentation/virtual/kvm/api.txt
->> > @@ -2604,7 +2604,7 @@ handled.
->> >  4.87 KVM_SET_GUEST_DEBUG
->> >  
->> >  Capability: KVM_CAP_SET_GUEST_DEBUG
->> > -Architectures: x86, s390, ppc
->> > +Architectures: x86, s390, ppc, arm64
->> >  Type: vcpu ioctl
->> >  Parameters: struct kvm_guest_debug (in)
->> >  Returns: 0 on success; -1 on error
->> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> > index 5560f74..445933d 100644
->> > --- a/arch/arm/kvm/arm.c
->> > +++ b/arch/arm/kvm/arm.c
->> > @@ -183,6 +183,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->> >  	case KVM_CAP_ARM_PSCI:
->> >  	case KVM_CAP_ARM_PSCI_0_2:
->> >  	case KVM_CAP_READONLY_MEM:
->> > +	case KVM_CAP_SET_GUEST_DEBUG:
->> >  		r = 1;
->> >  		break;
->> 
->> shouldn't you wait with advertising this capability until you've
->> implemented support for it?
->> 
+On 04/14/2015 09:41 AM, Srinivas Kandagatla wrote:
+> +Adding Pete and Maxime
 >
-> I think this would work for now, however it's not very practical
-> - in the end one has to sense which debug flags are actually supported.
+> Hi Ola,
+> Thankyou for sending the patch,
 >
-> Question is if he wants to add initial support and extend functionality and
-> flags with each patch or enable the whole set of features in one shot at the
-> end.
+> I like the Idea, but I have some specific concerns which would break 
+> existing SOCs.
 
-This is what in effect I was doing. Testing each feature in turn and
-ensuring it failed gracefully when kernel features where not present
-(both missing the capability or returning EINVAL).
-
-> Doing the latter seems more practicable to me (especially as the debug features
-> are added in the same patch series).
-
-Well in practice the whole series will go in together so this is only
-really relevant to what happens when you bisect the series.
+I like the idea too.
 
 >
-> David
+>
+> On 13/04/15 18:37, Ola Jeppsson wrote:
+>> Some Cortex A9 CPU:s (e.g. zynq) have the tick tied to the CPU
+>> frequency. On those CPU:s we cannot use the global-timer as a reliable
+>> clocksource with CPU frequency scaling enabled since this is not
+>> currently taken into account by the driver.
+>>
+>> Add a "tied-to-cpu-freq" boolean to the global-timer dt node indicate
+>> this condition.
+>>
+>> When the global-timer register function sees this property return
+>> immediately and don't register the clocksource.
+>>
+>> Signed-off-by: Ola Jeppsson <ola@adapteva.com>
+>> ---
+>>   Documentation/devicetree/bindings/arm/global_timer.txt | 4 ++++
+>>   drivers/clocksource/arm_global_timer.c                 | 7 +++++++
+>>   2 files changed, 11 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt 
+>> b/Documentation/devicetree/bindings/arm/global_timer.txt
+>> index bdae3a818793..465e02c17b5b 100644
+>> --- a/Documentation/devicetree/bindings/arm/global_timer.txt
+>> +++ b/Documentation/devicetree/bindings/arm/global_timer.txt
+>> @@ -17,6 +17,10 @@
+>>
+>>   - clocks : Should be phandle to a clock.
+>>
+>> +** Timer node optional properties:
+>> +
+>> +- tied-to-cpu-freq : indicates that the timer scales with the CPU 
+>> frequency.
+>> +
+>>   Example:
+>>
+>>       timer at 2c000600 {
+>> diff --git a/drivers/clocksource/arm_global_timer.c 
+>> b/drivers/clocksource/arm_global_timer.c
+>> index e6833771a716..8913ebda3f09 100644
+>> --- a/drivers/clocksource/arm_global_timer.c
+>> +++ b/drivers/clocksource/arm_global_timer.c
+>> @@ -268,6 +268,13 @@ static void __init 
+>> global_timer_of_register(struct device_node *np)
+>>           return;
+>>       }
+>>
+>> +#ifdef CONFIG_CPU_FREQ
+>> +    if (of_property_read_bool(np, "tied-to-cpu-freq")) {
+>> +        pr_warn("global-timer: tied to cpu frequency, not supported 
+>> with scaling\n");
+>> +        return;
+>> +    }
+>> +#endif
+>> +
+>
+> This patch would not let the SOC like STiH415/416 or zynq with 
+> "tied-to-cpu-freq" property to boot with multi_v7_defconfig. Which is 
+> not correct thing to do, as STi SOC's do not use cpufreq driver 
+> however the tick is tied to this clocksource.
+Yes, you are right, but I don't see any cleaner way to do this.
 
--- 
-Alex Benn?e
+On STi, we have another timer we can use as a clocksource when doing CPU 
+Freq, the ST LPC timer.
+It is not upstreamed yet, but we will try to have it for next release.
+
+I propose we set the "tied-to-cpu-freq" in GT node of STi family as soon 
+as we enable the LPC timer one.
+Doing that, the STi boot won't break in multi_v7 config.
+
+Kind regards,
+Maxime
+
+>
+>
+>
+> --srini
+>
+>>       gt_clk = of_clk_get(np, 0);
+>>       if (!IS_ERR(gt_clk)) {
+>>           err = clk_prepare_enable(gt_clk);
+>>
