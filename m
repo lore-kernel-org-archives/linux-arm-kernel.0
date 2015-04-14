@@ -1,64 +1,81 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 14 Apr 2015 13:14:26 +0200
-Subject: [GIT PULL v2 1/2] ARM: tegra: Core code changes for v4.1-rc1
-In-Reply-To: <2204375.plVGQ25v9Q@wuerfel>
-References: <1427710333-13472-1-git-send-email-thierry.reding@gmail.com>
- <201504140109.56537.arnd@arndb.de> <20150414070649.GA11715@ulmo>
- <2204375.plVGQ25v9Q@wuerfel>
-Message-ID: <20150414111425.GB15878@ulmo.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Apr 2015 13:14:48 +0200
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <6C99D1ED-37A9-4E68-A137-BF8F78720BFE@caviumnetworks.com>
+References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
+ <17844053.vZiPCu4un3@wuerfel>
+ <6C99D1ED-37A9-4E68-A137-BF8F78720BFE@caviumnetworks.com>
+Message-ID: <3234795.e0Uq9k2nUp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 10:30:30AM +0200, Arnd Bergmann wrote:
-> On Tuesday 14 April 2015 09:06:50 Thierry Reding wrote:
-> > On Tue, Apr 14, 2015 at 01:09:56AM +0200, Arnd Bergmann wrote:
-> > > On Saturday 11 April 2015, Michael Turquette wrote:
-> > > > > Tomeu Vizoso (8):
-> > > > >       of: Document long-ram-code property in nvidia,tegra20-apbmisc
-> > > > >       of: Document timings subnode of nvidia,tegra-mc
-> > > > >       memory: tegra: Disable ARBITRATION_EMEM interrupt
-> > > > >       of: document new emc-timings subnode in nvidia,tegra124-car
-> > > > >       of: document external-memory-controller property in tegra124-car
-> > > > >       clk: Expose clk_hw_reparent() to providers
-> > > > 
-> > > > ... this patch! I'd prefer to not do this. Let's see if
-> > > > .set_rate_and_parent solve the problem for you.
-> > > 
-> > > Not pulling this for 4.1 then. Even without the objections, it was basically
-> > > too late for the amount of changes now.
+On Tuesday 14 April 2015 10:45:43 Pinski, Andrew wrote:
+> > On Apr 14, 2015, at 3:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 > > 
-> > For my education, when do you expect pull requests with "this amount of
-> > changes" to be sent?
+> >> On Tuesday 14 April 2015 11:33:13 Dr.  Philipp Tomsich wrote:
+> >> Arnd,
+> >> 
+> >> After getting a good night?s sleep, the ?reuse the existing system call table? comment
+> >> makes a little more sense as I construe it as having just one merged system call table
+> >> for both LP64 and ILP32 and handling the differences through a different system call
+> >> numbering in unistd.h towards LP64 and ILP32 processes.
+> >> 
+> >> If this is the intended implementation, I am not fully sold on the benefit: having a private
+> >> copy of unistd.h for ARM64 seems to be a less readable and less maintenance-friendly
+> >> solution to having separate tables.
+> >> 
+> >> We?re open to input on this and?if merging the system call tables is the consensus?
+> >> would like to get the change underway as soon as possible.
+> > 
+> > There are multiple ways of doing this:
+> > 
+> > a) separate syscall table for arm64: as you say, this is the current approach,
+> >   and I'd like to avoid that too
+> > b) add syscalls for ilp32 as additional numbers in the normal lp64 version of
+> >   asm-generic/unistd.h, and share the binary tables between ilp32 and lp64
+> >   on aarch64
+> > c) change asm-generic/unistd.h to generate three possible tables: instead of
+> >   just native (lp64 or ilp32 depending on the arch), compat (support for
+> >   existing ilp32 binaries on some architectures, there would also be a
+> >   "modern" ilp32 variant that is a mix of the two, as your table today
+> > d) don't use the asm-generic/unistd.h table for aarch64-ilp32 at all, but instead
+> >   reuse the table from arch/arm64/include/asm/unistd32.h
+> > 
+> > I think you are referring to approach b) or c) above, but my preferred one
+> > would actually be d).
 > 
-> Generally speaking, we want large patch series to come early after -rc1,
-> followed by smaller subsequent updates. We often don't get around to
-> applying stuff before -rc3, which is a problem on our side, but it helps
-> to have patches available by then.
+> D is the worst of all 4 options in my mind. The reason is when a new syscall is
+> added, then you have to update that file too.
+
+I don't know what the miscommunication is here, but the advantage of d is
+specifically that it is /less/ work to maintain: With the current approach,
+each new syscall that gets added needs to be checked to see if the normal
+aarch64 version works or if it needs another wrapper, while with d) we
+get the update for free, because we follow exactly what aarch32 is doing.
+
+> Also d is worse than the rest as
+> you no longer default to 64bit off_t which is not a good thing. 
+
+That decision is up to the libc implementation, just as it is for the existing
+aarch32 libc. The kernel just offers both versions and the libc can pick
+one, or use the _LARGEFILE64_SOURCE hack that glibc has to also implement
+both. It would probably be reasonable to use 64-bit off_t only for a libc
+and ignore the old calls.
+
+> B is just as bad and goes against using the generic syscall numbers. 
+
+How so? The newly introduce syscalls then would be the generic ones.
+ 
+> I was trying to model ilp32 so there was less maintain hassle if a new syscall was added. 
 > 
-> Also, if you have a large series (100+ patches) early on, we'd be more
-> likely to take a 20-patch series later than if the 20-patch series comes
-> at rc6 and is the first thing we see from you: after around rc5 or rc6,
-> what we want to see are mostly patches that directly result from work
-> that we merged earlier for the same merge window, like regression fixes
-> or wrapping up a larger series that was started but incomplete at -rc2.
+> Also about time_t, my original patch had used 32bit but was asked to change
+> it to the 64bit one. So now I am upset this being asked again to change it back.
+> The review process for the linux kernel is much harder than the review process
+> of gcc or even glibc now. 
 
-That's not generally what we've done on Tegra. We usually keep things in
-linux-next until around -rc6 to make sure whatever gets pulled into the
-arm-soc tree is stable.
+For now, I'm just opening that discussion again, but the reason this
+comes up again now is that a lot has happened in the meantime on this
+front, and we have already decided to merge new architecture ports with
+32-bit time_t since.
 
-With what you said above I'm pretty much forced to either send you pulls
-that aren't well tested (linux-next isn't supposed to get new code until
-after -rc1) or I have to plan for an extra release cycle for anything
-that is "big", which would mean that many new features would potentially
-take 6 months to get merged.
-
-I don't like either of those choices.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150414/21677873/attachment-0001.sig>
+	Arnd
