@@ -1,93 +1,149 @@
-From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
-Date: Tue, 14 Apr 2015 11:51:54 +0000
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <3234795.e0Uq9k2nUp@wuerfel>
-References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
- <17844053.vZiPCu4un3@wuerfel>
- <6C99D1ED-37A9-4E68-A137-BF8F78720BFE@caviumnetworks.com>,
- <3234795.e0Uq9k2nUp@wuerfel>
-Message-ID: <8EFB0EC5-969B-40B1-BF72-359D9CB76B3F@caviumnetworks.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 14 Apr 2015 11:55:55 +0000
+Subject: [PATCH 1/2 RESEND] ARM: prima2: move to use REGMAP APIs for rtciobrg
+Message-ID: <1429012556-14041-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Guo Zeng <Guo.Zeng@csr.com>
 
+all devices behind rtciobrg needs a special way to access. currently they
+are using a platform-specific API.
+this patch moves to REGMAP, then clients can use regmap APIs to read/write.
+for the moment, old APIs are still kept, once all clients move to regmap,
+old APIs will be dropped.
 
+this patch also does minor clean for comments, authors statement.
 
+Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/mach-prima2/Kconfig         |  1 +
+ arch/arm/mach-prima2/rtciobrg.c      | 48 +++++++++++++++++++++++++++++++++---
+ include/linux/rtc/sirfsoc_rtciobrg.h |  4 +++
+ 3 files changed, 50 insertions(+), 3 deletions(-)
 
-> On Apr 14, 2015, at 4:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> On Tuesday 14 April 2015 10:45:43 Pinski, Andrew wrote:
->>> On Apr 14, 2015, at 3:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> 
->>>> On Tuesday 14 April 2015 11:33:13 Dr.  Philipp Tomsich wrote:
->>>> Arnd,
->>>> 
->>>> After getting a good night?s sleep, the ?reuse the existing system call table? comment
->>>> makes a little more sense as I construe it as having just one merged system call table
->>>> for both LP64 and ILP32 and handling the differences through a different system call
->>>> numbering in unistd.h towards LP64 and ILP32 processes.
->>>> 
->>>> If this is the intended implementation, I am not fully sold on the benefit: having a private
->>>> copy of unistd.h for ARM64 seems to be a less readable and less maintenance-friendly
->>>> solution to having separate tables.
->>>> 
->>>> We?re open to input on this and?if merging the system call tables is the consensus?
->>>> would like to get the change underway as soon as possible.
->>> 
->>> There are multiple ways of doing this:
->>> 
->>> a) separate syscall table for arm64: as you say, this is the current approach,
->>>  and I'd like to avoid that too
->>> b) add syscalls for ilp32 as additional numbers in the normal lp64 version of
->>>  asm-generic/unistd.h, and share the binary tables between ilp32 and lp64
->>>  on aarch64
->>> c) change asm-generic/unistd.h to generate three possible tables: instead of
->>>  just native (lp64 or ilp32 depending on the arch), compat (support for
->>>  existing ilp32 binaries on some architectures, there would also be a
->>>  "modern" ilp32 variant that is a mix of the two, as your table today
->>> d) don't use the asm-generic/unistd.h table for aarch64-ilp32 at all, but instead
->>>  reuse the table from arch/arm64/include/asm/unistd32.h
->>> 
->>> I think you are referring to approach b) or c) above, but my preferred one
->>> would actually be d).
->> 
->> D is the worst of all 4 options in my mind. The reason is when a new syscall is
->> added, then you have to update that file too.
-> 
-> I don't know what the miscommunication is here, but the advantage of d is
-> specifically that it is /less/ work to maintain: With the current approach,
-> each new syscall that gets added needs to be checked to see if the normal
-> aarch64 version works or if it needs another wrapper, while with d) we
-> get the update for free, because we follow exactly what aarch32 is doing.
-
-More than that d won't work due to ucontext being different between aarch32 and aarch64. I still say the current way is the best approach and is better option than the rest and it was what was agreed upon when I wrote the patch. I don't see why you are agreeing a different way. The split 64bit long was decided not to be split too, there was a previous discussion about that too. 
-
-Also this abi is about to be used in a product so any changes need to happen fast and need to thought out why making changes to it make senses. Changing to use the aarch32 syscall #'s make less sense since this is not a legacy syscalls. 
-
-> 
->> Also d is worse than the rest as
->> you no longer default to 64bit off_t which is not a good thing.
-> 
-> That decision is up to the libc implementation, just as it is for the existing
-> aarch32 libc. The kernel just offers both versions and the libc can pick
-> one, or use the _LARGEFILE64_SOURCE hack that glibc has to also implement
-> both. It would probably be reasonable to use 64-bit off_t only for a libc
-> and ignore the old calls.
-> 
->> B is just as bad and goes against using the generic syscall numbers.
-> 
-> How so? The newly introduce syscalls then would be the generic ones.
-> 
->> I was trying to model ilp32 so there was less maintain hassle if a new syscall was added. 
->> 
->> Also about time_t, my original patch had used 32bit but was asked to change
->> it to the 64bit one. So now I am upset this being asked again to change it back.
->> The review process for the linux kernel is much harder than the review process
->> of gcc or even glibc now.
-> 
-> For now, I'm just opening that discussion again, but the reason this
-> comes up again now is that a lot has happened in the meantime on this
-> front, and we have already decided to merge new architecture ports with
-> 32-bit time_t since.
-> 
->    Arnd
+diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
+index e03d8b5..9ab8932 100644
+--- a/arch/arm/mach-prima2/Kconfig
++++ b/arch/arm/mach-prima2/Kconfig
+@@ -4,6 +4,7 @@ menuconfig ARCH_SIRF
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_IRQ_CHIP
+ 	select NO_IOPORT_MAP
++	select REGMAP
+ 	select PINCTRL
+ 	select PINCTRL_SIRF
+ 	help
+diff --git a/arch/arm/mach-prima2/rtciobrg.c b/arch/arm/mach-prima2/rtciobrg.c
+index 8f66d8f..d4852d2 100644
+--- a/arch/arm/mach-prima2/rtciobrg.c
++++ b/arch/arm/mach-prima2/rtciobrg.c
+@@ -1,5 +1,5 @@
+ /*
+- * RTC I/O Bridge interfaces for CSR SiRFprimaII
++ * RTC I/O Bridge interfaces for CSR SiRFprimaII/atlas7
+  * ARM access the registers of SYSRTC, GPSRTC and PWRC through this module
+  *
+  * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+@@ -10,6 +10,7 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/io.h>
++#include <linux/regmap.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
+@@ -66,6 +67,7 @@ u32 sirfsoc_rtc_iobrg_readl(u32 addr)
+ {
+ 	unsigned long flags, val;
+ 
++	/* TODO: add hwspinlock to sync with M3 */
+ 	spin_lock_irqsave(&rtciobrg_lock, flags);
+ 
+ 	val = __sirfsoc_rtc_iobrg_readl(addr);
+@@ -90,6 +92,7 @@ void sirfsoc_rtc_iobrg_writel(u32 val, u32 addr)
+ {
+ 	unsigned long flags;
+ 
++	 /* TODO: add hwspinlock to sync with M3 */
+ 	spin_lock_irqsave(&rtciobrg_lock, flags);
+ 
+ 	sirfsoc_rtc_iobrg_pre_writel(val, addr);
+@@ -102,6 +105,45 @@ void sirfsoc_rtc_iobrg_writel(u32 val, u32 addr)
+ }
+ EXPORT_SYMBOL_GPL(sirfsoc_rtc_iobrg_writel);
+ 
++
++static int regmap_iobg_regwrite(void *context, unsigned int reg,
++				   unsigned int val)
++{
++	sirfsoc_rtc_iobrg_writel(val, reg);
++	return 0;
++}
++
++static int regmap_iobg_regread(void *context, unsigned int reg,
++				  unsigned int *val)
++{
++	*val = (u32)sirfsoc_rtc_iobrg_readl(reg);
++	return 0;
++}
++
++static struct regmap_bus regmap_iobg = {
++	.reg_write = regmap_iobg_regwrite,
++	.reg_read = regmap_iobg_regread,
++};
++
++/**
++ * devm_regmap_init_iobg(): Initialise managed register map
++ *
++ * @iobg: Device that will be interacted with
++ * @config: Configuration for register map
++ *
++ * The return value will be an ERR_PTR() on error or a valid pointer
++ * to a struct regmap.  The regmap will be automatically freed by the
++ * device management code.
++ */
++struct regmap *devm_regmap_init_iobg(struct device *dev,
++				    const struct regmap_config *config)
++{
++	const struct regmap_bus *bus = &regmap_iobg;
++
++	return devm_regmap_init(dev, bus, dev, config);
++}
++EXPORT_SYMBOL_GPL(devm_regmap_init_iobg);
++
+ static const struct of_device_id rtciobrg_ids[] = {
+ 	{ .compatible = "sirf,prima2-rtciobg" },
+ 	{}
+@@ -132,7 +174,7 @@ static int __init sirfsoc_rtciobrg_init(void)
+ }
+ postcore_initcall(sirfsoc_rtciobrg_init);
+ 
+-MODULE_AUTHOR("Zhiwu Song <zhiwu.song@csr.com>, "
+-		"Barry Song <baohua.song@csr.com>");
++MODULE_AUTHOR("Zhiwu Song <zhiwu.song@csr.com>");
++MODULE_AUTHOR("Barry Song <baohua.song@csr.com>");
+ MODULE_DESCRIPTION("CSR SiRFprimaII rtc io bridge");
+ MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/rtc/sirfsoc_rtciobrg.h b/include/linux/rtc/sirfsoc_rtciobrg.h
+index 2c92e1c..aefd997 100644
+--- a/include/linux/rtc/sirfsoc_rtciobrg.h
++++ b/include/linux/rtc/sirfsoc_rtciobrg.h
+@@ -9,10 +9,14 @@
+ #ifndef _SIRFSOC_RTC_IOBRG_H_
+ #define _SIRFSOC_RTC_IOBRG_H_
+ 
++struct regmap_config;
++
+ extern void sirfsoc_rtc_iobrg_besyncing(void);
+ 
+ extern u32 sirfsoc_rtc_iobrg_readl(u32 addr);
+ 
+ extern void sirfsoc_rtc_iobrg_writel(u32 val, u32 addr);
++struct regmap *devm_regmap_init_iobg(struct device *dev,
++				    const struct regmap_config *config);
+ 
+ #endif
+-- 
+1.9.1
