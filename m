@@ -1,51 +1,23 @@
-From: wangbintian@gmail.com (Brent Wang)
-Date: Tue, 14 Apr 2015 22:37:34 +0800
-Subject: [PATCH v2 3/6] clk: hi6220: Document devicetree bindings for
- hi6220 clock
-In-Reply-To: <5065055.RUNnjWsHWj@wuerfel>
-References: <1428916660-25910-1-git-send-email-bintian.wang@huawei.com>
- <2456827.cDpE8M58pn@wuerfel> <552D09F7.7080603@huawei.com>
- <5065055.RUNnjWsHWj@wuerfel>
-Message-ID: <CAAS=xmip9WeN2AXH+YpQK9Un1TCaXkHbK-cRFcr3fMcFvrfhPQ@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 14 Apr 2015 10:41:29 -0400 (EDT)
+Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
+In-Reply-To: <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <Pine.LNX.4.44L0.1504141040340.1370-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Mon, 13 Apr 2015, Arun Ramamurthy wrote:
 
-2015-04-14 21:20 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 14 April 2015 20:37:11 Bintian wrote:
->> It's really a smart fix!
->>
->> For the four system controllers, how about change the following strings:
->> +       - "hisilicon,aoctrl"
->> +       - "hisilicon,sysctrl"
->> +       - "hisilicon,mediactrl"
->> +       - "hisilicon,pmctrl"
->>
->> to
->> +       - "hisilicon,hi6220-aoctrl"
->> +       - "hisilicon,hi6220-sysctrl"
->> +       - "hisilicon,hi6220-mediactrl"
->> +       - "hisilicon,hi6220-pmctrl"
->
-> Yes, that works.
-Thanks, will fix in next version.
+> Getting phys by index instead of phy names so that we do
+> not have to create a naming scheme when multiple phys
+> are present
+> 
+> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
 
->
->> and I also use "hisilicon,hi6220-xxxx" for hi6220 clk driver directly ?
->
-> Seems fine to me, though I'd have to look at the bigger picture to see
-> any potential problems. At the moment, I don't see any.
-Sure, please also help to review the 6/6 patch of this patch set, many thanks!
+You have not responded to the comments I posted earlier:
 
-BR,
+	http://marc.info/?l=linux-usb&m=142798455925594&w=2
 
-Bintian
-
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Alan Stern
