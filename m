@@ -1,217 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Apr 2015 16:25:53 +0200
-Subject: [PATCH net-next 0/6] net: hip04: fix some problem for hip04
- drivers
-In-Reply-To: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
-References: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <3635761.IYy1QBa93a@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 15 Apr 2015 15:27:30 +0100
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
+ <493B15F8-0EBE-4633-9604-671EF403F36E@codeaurora.org>
+ <20150410161052.GF6854@e104818-lin.cambridge.arm.com>
+ <FDC755A7-ACCF-4222-8730-782EEC632159@codeaurora.org>
+ <20150413094117.GA2745@e104818-lin.cambridge.arm.com>
+ <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
+Message-ID: <20150415142729.GC26099@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 April 2015 20:30:02 Ding Tianhong wrote:
-> The patches series was used to fix the issues of the hip04 driver, and added
-> some optimizations according to some good suggestion. 
+On Tue, Apr 14, 2015 at 09:21:17AM -0500, Kumar Gala wrote:
+> On Apr 13, 2015, at 4:41 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Fri, Apr 10, 2015 at 02:06:33PM -0500, Kumar Gala wrote:
+> >> On Apr 10, 2015, at 11:10 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> Qualcomm choose for whatever reasons to not implement it.  There are
+> >> examples on other architectures supporting non-standard platforms all
+> >> the time (x86 supported Voyager and SGI VIS for a long time).  As far
+> >> as I can tell you are just wanting uniformity to impose this rule.
+> > 
+> > Don't confuse non-standard hardware (which has always been acceptable on
+> > ARM) with non-standard ways of entering the kernel from firmware,
+> > whether it's a primary or secondary CPU. Just look at how many smp_ops
+> > structures are defined on x86.
 > 
+> When Voyager was supported it had a unique means for SMP bring up.
+
+And was it fixed afterwards on newer board revisions?
+
+> In the 4.0 kernel MIPS supports 13 different means, PowerPC has 14
+> different means, ARM has 36 different means.
+
+Obviously you don't think there is any problem with having 36 different
+ways to enable secondary CPUs. I have a completely different opinion.
+While it was not feasible to change the rules on arm32, it's a good
+opportunity to impose some rules on arm64, given the new AArch64
+exception model.
+
+> > Looking beyond this set of patches, I can foresee that you won't care
+> > about the generic arm64 cpuidle driver either, or more precisely the
+> > separation between cpuidle subsystem+driver and the SoC-specific
+> > back-end (cpu_operations).
 > 
+> That?s probably true for what I guess are a number of reasons.  I?m
+> guessing the arm64 cpuidle driver expects PSCI.
 
-Thanks, that looks much better, except for patch 4 that I commented on.
+Lorenzo replied already. It expects a cpu_operations back-end
+implementing the cpu_suspend function. The only enable-method we have
+providing cpu_suspend functionality is PSCI.
 
-I had at some point sent a patch that is archived at
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318120.html
+> >>> We haven't really asked for anything difficult like hardware changes,
+> >>> such decisions are left with Qualcomm. We asked for a standard secure
+> >>> firmware interface, either an existing one or, if not suitable (with
+> >>> good arguments), to come up with a proposal for an alternative
+> >>> _standard_ interface. I don't even have the certitude that the firmware
+> >>> interface used in these patches would be consistent across Qualcomm
+> >>> SoCs, let alone being properly documented.
+> >> 
+> >> If and when those issues arise we can accept or reject that code.
+> >> Right now when I look at the impact to supporting this to generic
+> >> arch/arm64 kernel it is either non-existant if we use the
+> >> CPU_OF_TABLES or extremely minor if we just add an entry to the
+> >> supported_cpu_ops struct.
+> > 
+> > Again, see above about how such change is no longer small when each SoC
+> > does the same.
+> 
+> There are so many places that we already deal with per SoC uniqueness.
+> We setup a software interface in the kernel and people develop towards
+> it.
+> 
+> Are you saying that going forward all SoCs should have the same
+> clocking programming interface to ease portability?  Do you expect
+> them all to have the same pin control programming interface if someone
+> defines a firmware abstraction?
 
-I believe that one is also still needed, but I have not tested whether it
-is correct. Can you have a look at the patch from back then and see if it
-works, of if you find something wrong about it?
+What you said is primarily about device interfaces and given how
+different they are, most of them not even requiring firmware
+interaction, it doesn't make sense to come up with a firmware
+abstraction (well, it may actually be impossible). But if you spot some
+common pattern, it's fine by me to propose such interface.
 
-I'm sending the unmodified patch from then here again for you to apply
-or comment. It will have to be rebased on top of your current changes.
+However, what I'm not talking about devices but CPUs. The ARM CPUs are
+defined by an architecture spec and they have a consistent behaviour.
+Hardware for CPU powering on/off is not architected/standardised and
+that's not because ARM wouldn't want to but because SoC vendors want to
+be able differentiate. Given that (on ARMv8 especially) Linux is not the
+first thing to run on a CPU out of reset and it may need to go back to
+firmware for deeper sleep states, it makes sense to at least hide some
+of the implementation specific SoC details behind a standard firmware
+interface. It keeps the hardware folk happy as they can design CPU power
+on/off as they like with little impact on the software world. Yes, I
+said "little" impact overall, the only thing needed is a shift of such
+CPU enabling code from the kernel to firmware. ARM even provides an open
+source (BSD) firmware to make things easier for partners and there is
+similar work going into U-Boot.
 
-	Arnd
+Ideally you shouldn't place all the firmware in ROM (just part of it)
+but even if it is and we find bugs that require working around in the
+kernel, we can apply quirks on a case by case basis. But what you are
+arguing about is to plainly ignore this standardisation effort.
 
-8<----
-Subject: [PATCH] net/hip04: refactor interrupt masking
+Long term plan is to avoid most of the SoC specific code in the kernel
+before device_initcall() level (wouldn't it be nice if you could load
+the SoC support from modules in initramfs?). The clocks are an exception
+for the time being but it's something that could be sorted by sane prior
+firmware initialisation and just frequency changes at run-time (that's
+what we are actually imposing on ACPI-capable SoCs).
 
-The hip04 ethernet driver currently acknowledges all interrupts directly
-in the interrupt handler, and leaves all interrupts except the RX data
-enabled the whole time. This causes multiple problems:
-
-- When more packets come in between the original interrupt and the
-  NAPI poll function, we will get an extraneous RX interrupt as soon
-  as interrupts are enabled again.
-
-- The two error interrupts are by definition combining all errors that
-  may have happened since the last time they were handled, but just
-  acknowledging the irq without dealing with the cause of the condition
-  makes it come back immediately. In particular, when NAPI is intentionally
-  stalling the rx queue, this causes a storm of "rx dropped" messages.  
-
-- The access to the 'reg_inten' field in hip_priv is used for serializing
-  access, but is in fact racy itself.
-
-To deal with these issues, the driver is changed to only acknowledge
-the IRQ at the point when it is being handled. The RX interrupts now get
-acked right before reading the number of received frames to keep spurious
-interrupts to the absolute minimum without losing interrupts.
-
-As there is no tx-complete interrupt, only an informational tx-dropped
-one, we now ack that in the tx reclaim handler, hoping that clearing
-the descriptors has also eliminated the error condition.
-
-The only place that reads the reg_inten now just relies on
-napi_schedule_prep() to return whether NAPI is active or not, and
-the poll() function is then going to ack and reenabled the IRQ if
-necessary.
-
-Finally, when we disable interrupts, they are now all disabled
-together, in order to simplify the logic and to avoid getting
-rx-dropped interrupts when NAPI is in control of the rx queue.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
-index 525214ef5984..83773247a368 100644
---- a/drivers/net/ethernet/hisilicon/hip04_eth.c
-+++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
-@@ -56,6 +56,8 @@
- #define RCV_DROP                       BIT(7)
- #define TX_DROP                                BIT(6)
- #define DEF_INT_ERR                    (RCV_NOBUF | RCV_DROP | TX_DROP)
-+#define DEF_INT_RX                     (RCV_INT | RCV_NOBUF | RCV_DROP)
-+#define DEF_INT_TX                     (TX_DROP)
- #define DEF_INT_MASK                   (RCV_INT | DEF_INT_ERR)
- 
- /* TX descriptor config */
-@@ -154,7 +156,6 @@ struct hip04_priv {
-        unsigned int port;
-        unsigned int speed;
-        unsigned int duplex;
--       unsigned int reg_inten;
- 
-        struct napi_struct napi;
-        struct net_device *ndev;
-@@ -303,17 +304,15 @@ static void hip04_mac_enable(struct net_device *ndev)
-        val |= GE_RX_PORT_EN | GE_TX_PORT_EN;
-        writel_relaxed(val, priv->base + GE_PORT_EN);
- 
--       /* clear rx int */
--       val = RCV_INT;
--       writel_relaxed(val, priv->base + PPE_RINT);
-+       /* clear prior interrupts */
-+       writel_relaxed(DEF_INT_MASK, priv->base + PPE_RINT);
- 
-        /* config recv int */
-        val = GE_RX_INT_THRESHOLD | GE_RX_TIMEOUT;
-        writel_relaxed(val, priv->base + PPE_CFG_RX_PKT_INT);
- 
-        /* enable interrupt */
--       priv->reg_inten = DEF_INT_MASK;
--       writel_relaxed(priv->reg_inten, priv->base + PPE_INTEN);
-+       writel_relaxed(DEF_INT_MASK, priv->base + PPE_INTEN);
- }
- 
- static void hip04_mac_disable(struct net_device *ndev)
-@@ -322,8 +321,7 @@ static void hip04_mac_disable(struct net_device *ndev)
-        u32 val;
- 
-        /* disable int */
--       priv->reg_inten &= ~(DEF_INT_MASK);
--       writel_relaxed(priv->reg_inten, priv->base + PPE_INTEN);
-+       writel_relaxed(0, priv->base + PPE_INTEN);
- 
-        /* disable tx & rx */
-        val = readl_relaxed(priv->base + GE_PORT_EN);
-@@ -403,6 +401,8 @@ static int hip04_tx_reclaim(struct net_device *ndev, bool force)
-        priv->tx_tail = tx_tail;
-        smp_wmb(); /* Ensure tx_tail visible to xmit */
- 
-+       writel_relaxed(DEF_INT_TX, priv->base + PPE_RINT);
-+
- out:
-        if (pkts_compl || bytes_compl)
-                netdev_completed_queue(ndev, pkts_compl, bytes_compl);
-@@ -458,9 +458,7 @@ static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-        if (count >= priv->tx_coalesce_frames) {
-                if (napi_schedule_prep(&priv->napi)) {
-                        /* disable rx interrupt and timer */
--                       priv->reg_inten &= ~(RCV_INT);
--                       writel_relaxed(DEF_INT_MASK & ~RCV_INT,
--                                      priv->base + PPE_INTEN);
-+                       writel_relaxed(0, priv->base + PPE_INTEN);
-                        hrtimer_cancel(&priv->tx_coalesce_timer);
-                        __napi_schedule(&priv->napi);
-                }
-@@ -478,7 +476,7 @@ static int hip04_rx_poll(struct napi_struct *napi, int budget)
-        struct hip04_priv *priv = container_of(napi, struct hip04_priv, napi);
-        struct net_device *ndev = priv->ndev;
-        struct net_device_stats *stats = &ndev->stats;
--       unsigned int cnt = hip04_recv_cnt(priv);
-+       unsigned int cnt;
-        struct rx_desc *desc;
-        struct sk_buff *skb;
-        unsigned char *buf;
-@@ -489,6 +487,10 @@ static int hip04_rx_poll(struct napi_struct *napi, int budget)
-        u16 len;
-        u32 err;
- 
-+       /* acknowledge interrupts and read status */
-+       writel_relaxed(DEF_INT_RX, priv->base + PPE_RINT);
-+       cnt = hip04_recv_cnt(priv);
-+
-        while (cnt && !last) {
-                buf = priv->rx_buf[priv->rx_head];
-                skb = build_skb(buf, priv->rx_buf_size);
-@@ -539,11 +541,8 @@ static int hip04_rx_poll(struct napi_struct *napi, int budget)
-                        cnt = hip04_recv_cnt(priv);
-        }
- 
--       if (!(priv->reg_inten & RCV_INT)) {
--               /* enable rx interrupt */
--               priv->reg_inten |= RCV_INT;
--               writel_relaxed(priv->reg_inten, priv->base + PPE_INTEN);
--       }
-+       /* enable rx interrupt */
-+       writel_relaxed(DEF_INT_MASK, priv->base + PPE_INTEN);
-        napi_complete(napi);
- done:
-        /* clean up tx descriptors and start a new timer if necessary */
-@@ -564,23 +563,21 @@ static irqreturn_t hip04_mac_interrupt(int irq, void *dev_id)
-        if (!ists)
-                return IRQ_NONE;
- 
--       writel_relaxed(DEF_INT_MASK, priv->base + PPE_RINT);
--
-        if (unlikely(ists & DEF_INT_ERR)) {
--               if (ists & (RCV_NOBUF | RCV_DROP))
-+               if (ists & (RCV_NOBUF | RCV_DROP)) {
-                        stats->rx_errors++;
-                        stats->rx_dropped++;
--                       netdev_err(ndev, "rx drop\n");
-+                       netdev_dbg(ndev, "rx drop\n");
-+               }
-                if (ists & TX_DROP) {
-                        stats->tx_dropped++;
--                       netdev_err(ndev, "tx drop\n");
-+                       netdev_dbg(ndev, "tx drop\n");
-                }
-        }
- 
--       if (ists & RCV_INT && napi_schedule_prep(&priv->napi)) {
--               /* disable rx interrupt */
--               priv->reg_inten &= ~(RCV_INT);
--               writel_relaxed(DEF_INT_MASK & ~RCV_INT, priv->base + PPE_INTEN);
-+       if (napi_schedule_prep(&priv->napi)) {
-+               /* disable interrupt */
-+               writel_relaxed(0, priv->base + PPE_INTEN);
-                hrtimer_cancel(&priv->tx_coalesce_timer);
-                __napi_schedule(&priv->napi);
-        }
-@@ -596,8 +593,7 @@ enum hrtimer_restart tx_done(struct hrtimer *hrtimer)
- 
-        if (napi_schedule_prep(&priv->napi)) {
-                /* disable rx interrupt */
--               priv->reg_inten &= ~(RCV_INT);
--               writel_relaxed(DEF_INT_MASK & ~RCV_INT, priv->base + PPE_INTEN);
-+               writel_relaxed(0, priv->base + PPE_INTEN);
-                __napi_schedule(&priv->napi);
-        }
- 
+-- 
+Catalin
