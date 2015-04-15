@@ -1,51 +1,36 @@
-From: tfiga@google.com (Tomasz Figa)
-Date: Wed, 15 Apr 2015 11:20:51 +0900
-Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <1428993067.13552.14.camel@mhfsdcap03>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
- <CAAFQd5ASywTX7P9L8cogBbBTra0W1=oVxeWfK5=K7L+SR2xaFA@mail.gmail.com>
- <1426677749.22581.38.camel@mhfsdcap03>
- <CAAFQd5DOzFmfXki8GwUC75VQFEWzxBUNUgOtSuRtV6tc27kD2A@mail.gmail.com>
- <1428993067.13552.14.camel@mhfsdcap03>
-Message-ID: <CAAFQd5Db+DacQYa1pdr=w5JpU76AYa-Xhd20wHBF=F6m=Efokw@mail.gmail.com>
+From: dkeitel@codeaurora.org (David Keitel)
+Date: Tue, 14 Apr 2015 19:37:13 -0700
+Subject: [PATCH 2/2] arm64: add KASan support
+In-Reply-To: <551E993E.5060801@samsung.com>
+References: <1427208544-8232-1-git-send-email-a.ryabinin@samsung.com>
+ <1427208544-8232-3-git-send-email-a.ryabinin@samsung.com>
+ <20150401122843.GA28616@e104818-lin.cambridge.arm.com>
+ <551E993E.5060801@samsung.com>
+Message-ID: <552DCED9.40207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 3:31 PM, Yong Wu <yong.wu@mediatek.com> wrote:
->> >>
->> >> > +
->> >> > +       piommu->protect_va = devm_kmalloc(piommu->dev, MTK_PROTECT_PA_ALIGN*2,
->> >>
->> >> style: Operators like * should have space on both sides.
->> >>
->> >> > +                                         GFP_KERNEL);
->> >>
->> >> Shouldn't dma_alloc_coherent() be used for this?
->> >      We don't care the data in it. I think they are the same. Could you
->> > help tell me why dma_alloc_coherent may be better.
+>>> +	pgd = __pgd(__pa(kasan_zero_pmd) | PAGE_KERNEL);
+>>> +#else
+>>> +	pgd = __pgd(__pa(kasan_zero_pte) | PAGE_KERNEL);
+>>> +#endif
+>>> +
+>>> +	for (i = pgd_index(start); start < end; i++) {
+>>> +		set_pgd(&pgdp[i], pgd);
+>>> +		start += PGDIR_SIZE;
+>>> +	}
+>>> +}
 >>
->> Can you guarantee that at the time you allocate the memory using
->> devm_kmalloc() the memory is not dirty (i.e. some write back data are
->> stored in CPU cache) and is not going to be written back in some time,
->> overwriting data put there by IOMMU hardware?
->>
-> As I noted in the function "mtk_iommu_hw_init":
->
->        /* protect memory,HW will write here while translation fault */
->        protectpa = __virt_to_phys(piommu->protect_va);
->
->      We don?t care the content of this buffer, It is ok even though its
-> data is dirty.
->     It seem to be a the protect memory. While a translation fault
-> happened, The iommu HW will overwrite here instead of writing to the
-> fault physical address which may be 0 or some random address.
->
+>> Same problem as above with PAGE_KERNEL. You should just use
+>> pgd_populate().
 
-Do you mean that it's just a dummy page for hardware behind the IOMMU
-to access when the mapping is not available? How would that work with
-potential on demand paging when the hardware needs to be blocked until
-the mapping is created?
+Any suggestion what the correct flag setting would be here for a 4K mapping?
 
-Best regards,
-Tomasz
+I tried fixing this by changing this to pud and setting the PMD_TYPE_TABLE flag for kasan_zero_pmd. However the MMU doesn't like it and I get a first level address translation fault.
+
+If you have any updated patches to share I'd be glad to try them out.
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
