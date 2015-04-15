@@ -1,40 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Apr 2015 16:13:37 +0200
-Subject: [PATCH net-next 2/6] net: hip04: use the big endian for tx and rx
- desc
-In-Reply-To: <1429101008-9464-3-git-send-email-dingtianhong@huawei.com>
+Date: Wed, 15 Apr 2015 16:14:26 +0200
+Subject: [PATCH net-next 5/6] net: hip04: remove the unnecessary check
+In-Reply-To: <1429101008-9464-6-git-send-email-dingtianhong@huawei.com>
 References: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
- <1429101008-9464-3-git-send-email-dingtianhong@huawei.com>
-Message-ID: <6631765.x1c1LvG6uN@wuerfel>
+ <1429101008-9464-6-git-send-email-dingtianhong@huawei.com>
+Message-ID: <2645626.sX8mP7tn7R@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 April 2015 20:30:04 Ding Tianhong wrote:
-> The hip04 ethernet use the big endian for tx and rx, so set desc to
-> big endian and remove the unused next_addr.
-
-I don't understand:
-
+On Wednesday 15 April 2015 20:30:07 Ding Tianhong wrote:
 > diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
-> index b0a7f03..6473462 100644
+> index ff9d19c..a7ab1d9 100644
 > --- a/drivers/net/ethernet/hisilicon/hip04_eth.c
 > +++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
-> @@ -132,19 +132,18 @@
->  #define HIP04_MIN_TX_COALESCE_FRAMES   1
+> @@ -440,7 +440,7 @@ static int hip04_tx_reclaim(struct net_device *ndev, bool force)
+>         smp_wmb(); /* Ensure tx_tail visible to xmit */
 >  
->  struct tx_desc {
-> -       u32 send_addr;
-> -       u32 send_size;
-> -       u32 next_addr;
-> -       u32 cfg;
-> -       u32 wb_addr;
-> +       __be32 send_addr;
-> +       __be32 send_size;
-> +       __be32 cfg;
-> +       __be32 wb_addr;
->  } __aligned(64);
+>  out:
+> -       if (pkts_compl || bytes_compl)
+> +       if (bytes_compl)
+>                 netdev_completed_queue(ndev, pkts_compl, bytes_compl);
+>  
+>         if (unlikely(netif_queue_stopped(ndev)) && (count < (TX_DESC_NUM - 1)))
+> -- 
+> 
 
-I would think this is a hardware structure, does this not break
-access to the cfg and wb_addr fields if you remove next_addr?
-
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
