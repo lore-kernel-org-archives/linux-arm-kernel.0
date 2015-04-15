@@ -1,8 +1,8 @@
 From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 15 Apr 2015 11:19:39 -0700
+Date: Wed, 15 Apr 2015 11:32:14 -0700
 Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
  regression on Xen
-In-Reply-To: <552EA844.5010308@eu.citrix.com>
+In-Reply-To: <552EABA3.30109@hp.com>
 References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
  <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
  <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
@@ -14,18 +14,18 @@ References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
  <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
  <552EA2BC.5000707@eu.citrix.com>
  <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA844.5010308@eu.citrix.com>
-Message-ID: <1429121979.7346.138.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA604.8010400@hp.com>
+ <1429121303.7346.126.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EABA3.30109@hp.com>
+Message-ID: <1429122734.7346.141.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-04-15 at 19:04 +0100, George Dunlap wrote:
+On Wed, 2015-04-15 at 11:19 -0700, Rick Jones wrote:
 
-> Maybe you should stop wasting all of our time and just tell us what
-> you're thinking.
+> Well, I'm not sure that it is George and Jonathan themselves who don't 
+> want to change a sysctl, but the customers who would have to tweak that 
+> in their VMs?
 
-I think you make me wasting my time.
-
-I already gave all the hints in prior discussions.
-
-Rome was not built in one day.
+Keep in mind some VM users install custom qdisc, or even custom TCP
+sysctls.
