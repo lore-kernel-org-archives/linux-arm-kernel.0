@@ -1,35 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Apr 2015 11:48:31 +0200
-Subject: [PATCH] modpost: add .text.fixup to OTHER_TEXT_SECTIONS
-Message-ID: <5641468.B6ky8Ch4vY@wuerfel>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 15 Apr 2015 10:55:06 +0100
+Subject: [PATCH] efi: stub: use a pool allocation for the cmdline
+In-Reply-To: <CAKv+Gu-KHpSWLKOgA7UW8C6L1-K3dOieNmF2=qq_t5N73u3Spg@mail.gmail.com>
+References: <1428670569-23089-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAFECyb9efREE=BU5RGSbzAGHqi5CkivUuTf=BRdq02GvFqJaOA@mail.gmail.com>
+ <CAKv+Gu-KHpSWLKOgA7UW8C6L1-K3dOieNmF2=qq_t5N73u3Spg@mail.gmail.com>
+Message-ID: <20150415095506.GA4804@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two correct patches for the 4.1 release clashed in a way that
-caused modpost to fail badly, with hundreds warnings like
+On Fri, 10 Apr, at 07:14:34PM, Ard Biesheuvel wrote:
+> 
+> It is not such a big deal: the memory is reclaimed anyway, I was just
+> trying to reduce the fragmentation a bit, and trying to avoid
+> efi_xxx_alloc() which are substantially heavier than calling
+> allocate_pool() or allocate_pages() directly.
 
-WARNING: vmlinux.o(__ex_table+0x1014): Section mismatch in reference from the (unknown reference) (unknown) to the (unknown reference) .text.fixup:(unknown)
+Out of curiosity, do you have any runtime numbers to backup the claim
+that allocate_*() is substantially more lightweight?
 
-The fix, as suggested by the warnings, is to add the new .text.fixup
-section into the OTHER_TEXT_SECTIONS list.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 52dc0595d540 ("modpost: handle relocations mismatch in __ex_table")
-Fixes: c4a84ae39b4a ("ARM: 8322/1: keep .text and .fixup regions closer together")
----
-The mostpost patch has not made it into 4.1 yet, so it's probably best to
-add this fix on top of that to avoid breaking when Linus pulls it in.
-
-diff --git a/scripts/mod/modpost.c b/scripts/mod/modpost.c
-index cbd53e08769d..dd7efba020a1 100644
---- a/scripts/mod/modpost.c
-+++ b/scripts/mod/modpost.c
-@@ -876,7 +876,7 @@ static void check_section(const char *modname, struct elf_info *elf,
- #define TEXT_SECTIONS ".text", ".text.unlikely", ".sched.text", \
- 		".kprobes.text"
- #define OTHER_TEXT_SECTIONS ".ref.text", ".head.text", ".spinlock.text", \
--		".fixup", ".entry.text"
-+		".fixup", ".text.fixup", ".entry.text"
- 
- #define INIT_SECTIONS      ".init.*"
- #define MEM_INIT_SECTIONS  ".meminit.*"
+-- 
+Matt Fleming, Intel Open Source Technology Center
