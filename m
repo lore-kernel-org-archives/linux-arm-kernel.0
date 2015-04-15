@@ -1,30 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Apr 2015 12:40:52 +0200
-Subject: [PATCH] modpost: add .text.fixup to OTHER_TEXT_SECTIONS
-In-Reply-To: <5641468.B6ky8Ch4vY@wuerfel>
-References: <5641468.B6ky8Ch4vY@wuerfel>
-Message-ID: <2576764.pLO2LLU9HG@wuerfel>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 15 Apr 2015 11:44:06 +0100
+Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+In-Reply-To: <1428591425-17330-1-git-send-email-msalter@redhat.com>
+References: <20150409144029.GE9648@leverpostej>
+ <1428591425-17330-1-git-send-email-msalter@redhat.com>
+Message-ID: <552E40F6.1010504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 April 2015 11:48:31 Arnd Bergmann wrote:
-> Two correct patches for the 4.1 release clashed in a way that
-> caused modpost to fail badly, with hundreds warnings like
-> 
-> WARNING: vmlinux.o(__ex_table+0x1014): Section mismatch in reference from the (unknown reference) (unknown) to the (unknown reference) .text.fixup:(unknown)
-> 
-> The fix, as suggested by the warnings, is to add the new .text.fixup
-> section into the OTHER_TEXT_SECTIONS list.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 52dc0595d540 ("modpost: handle relocations mismatch in __ex_table")
-> Fixes: c4a84ae39b4a ("ARM: 8322/1: keep .text and .fixup regions closer together")
+On 09/04/15 15:57, Mark Salter wrote:
+> Currently in validate_group(), there is a static initializer
+> for fake_pmu.used_mask which is based on CPU_BITS_NONE but
+> the used_mask array size is based on CCI_PMU_MAX_HW_EVENTS.
+> CCI_PMU_MAX_HW_EVENTS is not based on NR_CPUS, so CPU_BITS_NONE
+> is not correct and will cause a build failure if NR_CPUS
+> is set high enough to make CPU_BITS_NONE larger than used_mask.
+>
+> Signed-off-by: Mark Salter <msalter@redhat.com>
 > ---
-> The mostpost patch has not made it into 4.1 yet, so it's probably best to
-> add this fix on top of that to avoid breaking when Linus pulls it in.
-> 
+>   drivers/bus/arm-cci.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> index 84fd660..759e41c 100644
+> --- a/drivers/bus/arm-cci.c
+> +++ b/drivers/bus/arm-cci.c
+> @@ -684,7 +684,7 @@ validate_group(struct perf_event *event)
+>   		 * Initialise the fake PMU. We only need to populate the
+>   		 * used_mask for the purposes of validation.
+>   		 */
+> -		.used_mask = CPU_BITS_NONE,
+> +		.used_mask = { 0 },
+>   	};
+>
+>   	if (!validate_event(&fake_pmu, leader))
+>
+I have a series of patches to add CCI-500 PMU, targeting 4.2, which 
+changes the used_mask to a pointer and changes it to depend on the 
+number of counters available on the CCI PMU.  I will post it in very 
+soon here, which could make this patch obsolete. Let me know if you 
+don't mind getting this sorted out through my series. I am fine either way.
 
-Nevermind this patch, I'm way behind the times apparently, and multiple
-improvements of the original code have made it in since it was broken.
-
-	Arnd
+Regards
+Suzuki
