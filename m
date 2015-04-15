@@ -1,155 +1,71 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Apr 2015 17:34:16 +0200
-Subject: [PATCH v4 05/13] arm64/efi: adapt to relaxed FDT placement
- requirements
+Date: Wed, 15 Apr 2015 17:34:17 +0200
+Subject: [PATCH v4 06/13] arm64: implement our own
+ early_init_dt_add_memory_arch()
 In-Reply-To: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1429112064-19952-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1429112064-19952-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the relaxed FDT placement requirements in place, we can change
-the allocation strategy used by the stub to put the FDT image higher
-up in memory. At the same time, reduce the minimal alignment to 8 bytes,
-and impose a 2 MB size limit, as per the new requirements.
+Override the __weak early_init_dt_add_memory_arch() with our own
+version. This allows us to relax the imposed restrictions at memory
+discovery time, which is needed if we want to defer the assignment
+of PHYS_OFFSET and make it independent of where the kernel Image
+is placed in physical memory.
+
+So copy the generic original, but only retain the check against
+regions whose sizes become zero when clipped to page alignment.
+
+For now, we will remove the range below PHYS_OFFSET explicitly
+until we rework that logic in a subsequent patch. Any memory that
+we will not be able to map due to insufficient size of the linear
+region is also removed.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/efi.h            | 10 +++-------
- drivers/firmware/efi/libstub/arm-stub.c |  5 ++---
- drivers/firmware/efi/libstub/efistub.h  |  1 -
- drivers/firmware/efi/libstub/fdt.c      | 23 +++++++++++++----------
- 4 files changed, 18 insertions(+), 21 deletions(-)
+ arch/arm64/mm/init.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index ef572206f1c3..825c85666b6b 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -1,6 +1,7 @@
- #ifndef _ASM_EFI_H
- #define _ASM_EFI_H
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index ae85da6307bb..1599a5c5e94a 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -158,6 +158,15 @@ early_param("mem", early_mem);
  
-+#include <asm/boot.h>
- #include <asm/io.h>
- #include <asm/neon.h>
- 
-@@ -38,13 +39,8 @@ extern void efi_init(void);
- 
- /* arch specific definitions used by the stub code */
- 
--/*
-- * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
-- * start of kernel and may not cross a 2MiB boundary. We set alignment to
-- * 2MiB so we know it won't cross a 2MiB boundary.
-- */
--#define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
--#define MAX_FDT_OFFSET	SZ_512M
-+#define EFI_FDT_ALIGN		MIN_FDT_ALIGN
-+#define EFI_FDT_MAX_SIZE	MAX_FDT_SIZE
- 
- #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
- 
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index dcae482a9a17..f54c76a4fd32 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -269,9 +269,8 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 
- 	new_fdt_addr = fdt_addr;
- 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
--				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
--				initrd_addr, initrd_size, cmdline_ptr,
--				fdt_addr, fdt_size);
-+				&new_fdt_addr, initrd_addr, initrd_size,
-+				cmdline_ptr, fdt_addr, fdt_size);
+ void __init arm64_memblock_init(void)
+ {
++	/*
++	 * Remove the memory that we will not be able to cover
++	 * with the linear mapping.
++	 */
++	const s64 linear_region_size = -(s64)PAGE_OFFSET;
++
++	memblock_remove(0, memstart_addr);
++	memblock_remove(memstart_addr + linear_region_size, ULLONG_MAX);
++
+ 	memblock_enforce_memory_limit(memory_limit);
  
  	/*
- 	 * If all went well, we need to return the FDT address to the
-diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index 47437b16b186..c8e096094ea9 100644
---- a/drivers/firmware/efi/libstub/efistub.h
-+++ b/drivers/firmware/efi/libstub/efistub.h
-@@ -35,7 +35,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 					    void *handle,
- 					    unsigned long *new_fdt_addr,
--					    unsigned long max_addr,
- 					    u64 initrd_addr, u64 initrd_size,
- 					    char *cmdline_ptr,
- 					    unsigned long fdt_addr,
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index 91da56c4fd54..ace5ed70a88e 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -165,10 +165,6 @@ fdt_set_fail:
- 	return EFI_LOAD_ERROR;
- }
+@@ -372,3 +381,19 @@ static int __init keepinitrd_setup(char *__unused)
  
--#ifndef EFI_FDT_ALIGN
--#define EFI_FDT_ALIGN EFI_PAGE_SIZE
--#endif
--
- /*
-  * Allocate memory for a new FDT, then add EFI, commandline, and
-  * initrd related fields to the FDT.  This routine increases the
-@@ -186,7 +182,6 @@ fdt_set_fail:
- efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 					    void *handle,
- 					    unsigned long *new_fdt_addr,
--					    unsigned long max_addr,
- 					    u64 initrd_addr, u64 initrd_size,
- 					    char *cmdline_ptr,
- 					    unsigned long fdt_addr,
-@@ -197,6 +192,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 	unsigned long mmap_key;
- 	efi_memory_desc_t *memory_map, *runtime_map;
- 	unsigned long new_fdt_size;
-+	void *fdt_alloc;
- 	efi_status_t status;
- 	int runtime_entry_count = 0;
- 
-@@ -221,14 +217,21 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 	 * will allocate a bigger buffer if this ends up being too
- 	 * small, so a rough guess is OK here.
- 	 */
--	new_fdt_size = fdt_size + EFI_PAGE_SIZE;
-+	new_fdt_size = fdt_size + EFI_PAGE_SIZE + EFI_FDT_ALIGN;
- 	while (1) {
--		status = efi_high_alloc(sys_table, new_fdt_size, EFI_FDT_ALIGN,
--					new_fdt_addr, max_addr);
-+		if (new_fdt_size > EFI_FDT_MAX_SIZE) {
-+			pr_efi_err(sys_table, "FDT size exceeds EFI_FDT_MAX_SIZE.\n");
-+			goto fail;
+ __setup("keepinitrd", keepinitrd_setup);
+ #endif
++
++void __init early_init_dt_add_memory_arch(u64 base, u64 size)
++{
++	if (!PAGE_ALIGNED(base)) {
++		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
++			pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
++				base, base + size);
++			return;
 +		}
-+		status = sys_table->boottime->allocate_pool(EFI_LOADER_DATA,
-+							    new_fdt_size,
-+							    &fdt_alloc);
- 		if (status != EFI_SUCCESS) {
- 			pr_efi_err(sys_table, "Unable to allocate memory for new device tree.\n");
- 			goto fail;
- 		}
-+		*new_fdt_addr = round_up((unsigned long)fdt_alloc,
-+					 EFI_FDT_ALIGN);
- 
- 		/*
- 		 * Now that we have done our final memory allocation (and free)
-@@ -258,7 +261,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 			 * to get new one that reflects the free/alloc we do
- 			 * on the device tree buffer.
- 			 */
--			efi_free(sys_table, new_fdt_size, *new_fdt_addr);
-+			sys_table->boottime->free_pool(&fdt_alloc);
- 			sys_table->boottime->free_pool(memory_map);
- 			new_fdt_size += EFI_PAGE_SIZE;
- 		} else {
-@@ -316,7 +319,7 @@ fail_free_mmap:
- 	sys_table->boottime->free_pool(memory_map);
- 
- fail_free_new_fdt:
--	efi_free(sys_table, new_fdt_size, *new_fdt_addr);
-+	sys_table->boottime->free_pool(&fdt_alloc);
- 
- fail:
- 	sys_table->boottime->free_pool(runtime_map);
++		size -= PAGE_SIZE - (base & ~PAGE_MASK);
++		base = PAGE_ALIGN(base);
++	}
++	size &= PAGE_MASK;
++
++	memblock_add(base, size);
++}
 -- 
 1.8.3.2
