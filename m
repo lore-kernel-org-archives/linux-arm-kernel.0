@@ -1,99 +1,29 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 14 Apr 2015 17:33:09 -0700
-Subject: [PATCH 5/7] selftests/x86: fix cross build logic
-In-Reply-To: <1429051978-14778-1-git-send-email-tyler.baker@linaro.org>
-References: <1429051978-14778-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <552DB1C5.7020704@amacapital.net>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Tue, 14 Apr 2015 21:29:10 -0400
+Subject: [PATCH 1/2] pinctrl: bindings: pinctrl: Add support for TI's
+ IODelay configuration
+In-Reply-To: <20150318014151.GL31346@atomide.com>
+References: <1425427237-11511-1-git-send-email-nm@ti.com>
+ <1425427237-11511-2-git-send-email-nm@ti.com>
+ <CACRpkdaLEPzBywMnMrteboK7Q4su8PoB0wjnGvVpgUJ=2czVxQ@mail.gmail.com>
+ <20150310153321.GO5264@atomide.com> <54FF28F5.4040707@ti.com>
+ <20150310173115.GS5264@atomide.com> <54FF38F3.2030703@ti.com>
+ <CACRpkdZ1faucps07jaT9kOyviC+Sw6gPkbF=cAGCUj+DiaEgTA@mail.gmail.com>
+ <20150318014151.GL31346@atomide.com>
+Message-ID: <20150415012910.GA29560@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2015 03:52 PM, Tyler Baker wrote:
-> x86 tests should not be built when ARCH != x86. Reused the logic from
-> breakpoints to determine when it's appropriate to build.
+On Tue, Mar 17, 2015 at 06:41:51PM -0700, Tony Lindgren wrote:
+> Yeah agreed. I suggest discussing the binding and the generic
+> parsing code for it first :)
+>  
+> It seems with the generic binding the actual driver should be
+> just the hardware specific code hopefully.
 
-In the future, please cc the author of recently-written code that you're 
-fixing :)
+Did this thread go anywhere in the last month?  I am certainly looking
+forward to seeing what the resolution is to this, given for our use the
+boot loader setup is not appealing at all.
 
-This patch is really weird.  You're generating ARCH, then you're 
-modifying it part way through, and you're changing the rule for all_32 
-and all_64 to print an error (and succeed!) if run on the wrong arch.
-
-I don't see the point of the latter at all.  Just let all have no 
-dependencies if you're on the wrong ARCH.
-
-As for the former, can you do this more cleanly?  This is really ugly. 
-It looks to me (on naive reading) like 64-bit hosts won't do the right 
-thing.  (The right thing is to build both bitnesses of tests.)
-
---Andy
-
->
-> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
-> ---
->   tools/testing/selftests/x86/Makefile | 35 +++++++++++++++++++++++------------
->   1 file changed, 23 insertions(+), 12 deletions(-)
->
-> diff --git a/tools/testing/selftests/x86/Makefile b/tools/testing/selftests/x86/Makefile
-> index f0a7918..7be67a0 100644
-> --- a/tools/testing/selftests/x86/Makefile
-> +++ b/tools/testing/selftests/x86/Makefile
-> @@ -7,31 +7,36 @@ BINARIES_64 := $(TARGETS_C_BOTHBITS:%=%_64)
->
->   CFLAGS := -O2 -g -std=gnu99 -pthread -Wall
->
-> -UNAME_P := $(shell uname -p)
-> -
-> -# Always build 32-bit tests
-> +# Taken from perf makefile
-> +uname_M := $(shell uname -m 2>/dev/null || echo not)
-> +ARCH ?= $(shell echo $(uname_M) | sed -e s/i.86/i386/)
-> +ifeq ($(ARCH),i386)
-> +ARCH := x86
->   all: all_32
-> -
-> +endif
-> +ifeq ($(ARCH),x86_64)
-> +ARCH := x86
->   # If we're on a 64-bit host, build 64-bit tests as well
-> -ifeq ($(shell uname -p),x86_64)
-> -all: all_64
-> +all: all_32 all_64
->   endif
->
->   all_32: check_build32 $(BINARIES_32)
->
->   all_64: $(BINARIES_64)
->
-> -clean:
-> -	$(RM) $(BINARIES_32) $(BINARIES_64)
-> -
-> -run_tests:
-> -	./run_x86_tests.sh
-> -
->   $(TARGETS_C_BOTHBITS:%=%_32): %_32: %.c
-> +ifeq ($(ARCH),x86)
->   	$(CC) -m32 -o $@ $(CFLAGS) $(EXTRA_CFLAGS) $^ -lrt -ldl
-> +else
-> +	echo "Not an x86 target, can't build x86 tests"
-> +endif
->
->   $(TARGETS_C_BOTHBITS:%=%_64): %_64: %.c
-> +ifeq ($(ARCH),x86)
->   	$(CC) -m64 -o $@ $(CFLAGS) $(EXTRA_CFLAGS) $^ -lrt -ldl
-> +else
-> +	echo "Not an x86 target, can't build x86 tests"
-> +endif
->
->   check_build32:
->   	@if ! $(CC) -m32 -o /dev/null trivial_32bit_program.c; then	\
-> @@ -46,3 +51,9 @@ check_build32:
->   	  echo "  yum install glibc-devel.*i686";			\
->   	  exit 1;							\
->   	fi
-> +
-> +run_tests:
-> +	./run_x86_tests.sh
-> +
-> +clean:
-> +	$(RM) $(BINARIES_32) $(BINARIES_64)
->
+-- 
+Len Sorensen
