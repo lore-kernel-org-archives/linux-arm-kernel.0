@@ -1,45 +1,76 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 15 Apr 2015 11:44:06 +0100
-Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
-In-Reply-To: <1428591425-17330-1-git-send-email-msalter@redhat.com>
-References: <20150409144029.GE9648@leverpostej>
- <1428591425-17330-1-git-send-email-msalter@redhat.com>
-Message-ID: <552E40F6.1010504@arm.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Wed, 15 Apr 2015 11:08:08 +0000
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+In-Reply-To: <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/15 15:57, Mark Salter wrote:
-> Currently in validate_group(), there is a static initializer
-> for fake_pmu.used_mask which is based on CPU_BITS_NONE but
-> the used_mask array size is based on CCI_PMU_MAX_HW_EVENTS.
-> CCI_PMU_MAX_HW_EVENTS is not based on NR_CPUS, so CPU_BITS_NONE
-> is not correct and will cause a build failure if NR_CPUS
-> is set high enough to make CPU_BITS_NONE larger than used_mask.
->
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->   drivers/bus/arm-cci.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index 84fd660..759e41c 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -684,7 +684,7 @@ validate_group(struct perf_event *event)
->   		 * Initialise the fake PMU. We only need to populate the
->   		 * used_mask for the purposes of validation.
->   		 */
-> -		.used_mask = CPU_BITS_NONE,
-> +		.used_mask = { 0 },
->   	};
->
->   	if (!validate_event(&fake_pmu, leader))
->
-I have a series of patches to add CCI-500 PMU, targeting 4.2, which 
-changes the used_mask to a pointer and changes it to depend on the 
-number of counters available on the CCI PMU.  I will post it in very 
-soon here, which could make this patch obsolete. Let me know if you 
-don't mind getting this sorted out through my series. I am fine either way.
+Hi Minghuan,
+Not clear what this patch intends to do. Can you please explain the point about SMMU isolating limited device ID.
 
 Regards
-Suzuki
+Varun
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Minghuan Lian
+> Sent: Wednesday, April 15, 2015 3:19 PM
+> To: linux-pci at vger.kernel.org
+> Cc: Arnd Bergmann; Lian Minghuan-B31939; Hu Mingkai-B21284; Zang Roy-
+> R61911; Yoder Stuart-B08248; Bjorn Helgaas; Wood Scott-B07421; linux-arm-
+> kernel at lists.infradead.org
+> Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> 
+> SMMU of some platforms can only isolate limited device ID.
+> This may require that all PCI devices share the same ITS device with the fixed
+> device ID. The patch adds function arch_msi_share_devid_update used for
+> these platforms to update the fixed device ID and maximum MSI interrupts
+> number.
+> 
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index d0374a6..be78d0a 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1169,6 +1169,15 @@ static int its_get_pci_alias(struct pci_dev *pdev,
+> u16 alias, void *data)
+>  	return 0;
+>  }
+> 
+> +void __weak
+> +arch_msi_share_devid_update(struct pci_dev *pdev, u32 *dev_id, u32
+> +*nvesc) {
+> +	/*
+> +	 * use PCI_DEVID NOT share device ID as default
+> +	 * so nothing need to do
+> +	 */
+> +}
+> +
+>  static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
+>  			   int nvec, msi_alloc_info_t *info)  { @@ -1185,6
+> +1194,8 @@ static int its_msi_prepare(struct irq_domain *domain, struct
+> device *dev,
+>  	dev_alias.count = nvec;
+> 
+>  	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+> +	arch_msi_share_devid_update(pdev, &dev_alias.dev_id,
+> +&dev_alias.count);
+> +
+>  	its = domain->parent->host_data;
+> 
+>  	its_dev = its_find_device(its, dev_alias.dev_id);
+> --
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
