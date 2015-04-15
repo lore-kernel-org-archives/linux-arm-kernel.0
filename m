@@ -1,16 +1,15 @@
 From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 15 Apr 2015 20:30:03 +0800
-Subject: [PATCH net-next 1/6] net: hip04: Set more appropriate value for tx
- coalesce num
+Date: Wed, 15 Apr 2015 20:30:08 +0800
+Subject: [PATCH net-next 6/6] net: hip04: add ratelimit for rx/tx drops skb
 In-Reply-To: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
 References: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1429101008-9464-2-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1429101008-9464-7-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According Arnd's suggestion, the user might set the tx coalesce value
-in large range for different workloads, so we should define them to
-appropriate value.
+There can be quite a lot of rx/tx drops message and affect
+useful message, so need to ratelimit them to not overwhelm
+logging.
 
 Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 Cc: "David S. Miller" <davem@davemloft.net>
@@ -20,27 +19,30 @@ Cc: Zhangfei Gao <zhangfei.gao@linaro.org>
 Cc: Dan Carpenter <dan.carpenter@oracle.com>
 Cc: Joe Perches <joe@perches.com>
 ---
- drivers/net/ethernet/hisilicon/hip04_eth.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/hisilicon/hip04_eth.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
-index b72d238..b0a7f03 100644
+index a7ab1d9..b19830d 100644
 --- a/drivers/net/ethernet/hisilicon/hip04_eth.c
 +++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
-@@ -126,10 +126,10 @@
- #define DRV_NAME			"hip04-ether"
- #define DRV_VERSION			"v1.0"
+@@ -608,11 +608,15 @@ static irqreturn_t hip04_mac_interrupt(int irq, void *dev_id)
+ 		if (ists & (RCV_NOBUF | RCV_DROP)) {
+ 			stats->rx_errors++;
+ 			stats->rx_dropped++;
+-			netdev_err(ndev, "rx drop\n");
++			if (net_ratelimit())
++				netdev_dbg(ndev, "rx drop: %lu\n",
++					   stats->rx_dropped);
+ 		}
+ 		if (ists & TX_DROP) {
+ 			stats->tx_dropped++;
+-			netdev_err(ndev, "tx drop\n");
++			if (net_ratelimit())
++				netdev_dbg(ndev, "tx drop: %lu\n",
++					   stats->rx_dropped);
+ 		}
+ 	}
  
--#define HIP04_MAX_TX_COALESCE_USECS	200
--#define HIP04_MIN_TX_COALESCE_USECS	100
--#define HIP04_MAX_TX_COALESCE_FRAMES	200
--#define HIP04_MIN_TX_COALESCE_FRAMES	100
-+#define HIP04_MAX_TX_COALESCE_USECS	100000
-+#define HIP04_MIN_TX_COALESCE_USECS	1
-+#define HIP04_MAX_TX_COALESCE_FRAMES	(TX_DESC_NUM - 1)
-+#define HIP04_MIN_TX_COALESCE_FRAMES	1
- 
- struct tx_desc {
- 	u32 send_addr;
 -- 
 1.8.0
