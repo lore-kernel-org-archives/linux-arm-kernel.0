@@ -1,99 +1,117 @@
-From: George.Dunlap@eu.citrix.com (George Dunlap)
-Date: Wed, 15 Apr 2015 14:43:58 +0100
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 15 Apr 2015 16:02:28 +0200
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabrelite: add supported LVDS
+ displays
+In-Reply-To: <552C1D9C.4090303@boundarydevices.com>
+References: <5521E08F.3060407@boundarydevices.com>
+ <1428920545.3192.41.camel@pengutronix.de>
+ <552C1D9C.4090303@boundarydevices.com>
+Message-ID: <1429106548.3480.43.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 2:49 PM, Eric Dumazet <eric.dumazet@gmail.com> wrote:
-> On Mon, 2015-04-13 at 11:56 +0100, George Dunlap wrote:
+Hi Eric,
+
+Am Montag, den 13.04.2015, 12:48 -0700 schrieb Eric Nelson:
+[...]
+> The full DT for an LVDS channel looks like this:
+> 
+> ...	
+> lvds-channel at 0 {
+> 	#address-cells = <0x00000001>;
+> 	#size-cells = <0x00000000>;
+> 	...
+> 	port at 0 {
+> 		reg = <0x00000000>;
+> 		endpoint {
+> 			remote-endpoint = <0x00000013>;
+> 			linux,phandle = <0x00000039>;
+> 			phandle = <0x00000039>;
+> 		};
+> 	};
+> 	port at 1 {
+> ...	};
+> 	port at 2 {
+> ...	};
+> 	port at 3 {
+> ...	};
+> 	port at 4 {
+> 		reg = <0x00000004>;
+> 		endpoint {
+> 			remote-endpoint = <0x00000017>;
+> 			linux,phandle = <0x00000053>;
+> 			phandle = <0x00000053>;
+> 		};
+> 	};
+> };
+> 
+> ports 0-3 refer to the LVDS mux and which IPU and display
+> interface is connected up to the LVDS channel (i.e. the
+> input to the LVDS display bridge) and port at 4 refer to the
+> panel.
+
+Yes. I still don't understand what you think is the problem with that.
+
+> >>> [snip]
+> >>>
+> >>> 	panel {
+> >>> 		compatible = "edt,etm0700g0dh6", "simple-panel";
+> >>> 		...
+> >>>
+> >>
+> >> And why would the panel need to point back to the LVDS
+> >> channel?
+> > 
+> > This is the way the bindings are defined right now in
+> > Documentation/devicetree/bindings/graph.txt, section "Links between
+> > endpoints". The panel driver itself doesn't use the backlink, but the
+> > endpoint needs to exist anyway.
+> > 
+> 
+> Thanks for the reference.
+> 
+> I'm not following the rationale  since in this case, the communication
+> needs seem to be uni-directional, but okay.
+
+The binding as currently defined describes an undirected graph, set up
+in a way that each node can find its peers without knowing anything
+about the peer's bindings and without scanning the whole device tree.
+So far there has been no consensus whether a direction should be added,
+if it should be marked by leaving out one of the phandles, and if so,
+what this direction should represent.
+
+[...]
+> This does give me a path to get the equivalent functionality
+> as my original patches:
+> 
+> 	- (if needed) add displays to panel-simple.c
+> 	- update DT in boot loader to fix up displays based on panel
+> 	detection by setting the panel.compatible string value.
+> 
+> I am still left with a quandary, which relates to my comment about
+> the port selection.
 >
->> Is the problem perhaps that netback/netfront delays TX completion?
->> Would it be better to see if that can be addressed properly, so that
->> the original purpose of the patch (fighting bufferbloat) can be
->> achieved while not degrading performance for Xen?  Or at least, so
->> that people get decent perfomance out of the box without having to
->> tweak TCP parameters?
->
-> Sure, please provide a patch, that does not break back pressure.
->
-> But just in case, if Xen performance relied on bufferbloat, it might be
-> very difficult to reach a stable equilibrium : Any small change in stack
-> or scheduling might introduce a significant difference in 'raw
-> performance'.
+> With our current device tree, both the HDMI and LVDS devices
+> are being mapped to IPU1/DI0 and the same DRM "card":
+> 
+> 	~# ls  /sys/class/graphics/fb0/device/drm/card0/card*
+> 	card0-HDMI-A-1	card0-LVDS-1
 
-So help me understand this a little bit here.  tcp_limit_output_bytes
-limits the amount of data allowed to be "in-transit" between a send()
-and the wire, is that right?
+There is only one "card" representing both IPUs and everything connected
+to their DI outputs. Both connectors being mapped to the same frame
+buffer is a property of drm_fb_helper_initial_config, as described in
+its kerneldoc comment:
 
-And so the "bufferbloat" problem you're talking about here are TCP
-buffers inside the kernel, and/or buffers in the NIC, is that right?
+ "At the moment, this is a cloned configuration across all heads with
+  a new framebuffer object as the backing store."
 
-So ideally, you want this to be large enough to fill the "pipeline"
-all the way from send() down to actually getting out on the wire;
-otherwise, you'll have gaps in the pipeline, and the machinery won't
-be working at full throttle.
+> Since the default i.MX6 graph appears to have links for all four LVDS
+> mux options, and the path to binding to one of the IPU/DI -> LVDS
+> channel mappings isn't clear to me.
 
-And the reason it's a problem is that many NICs now come with large
-send buffers; and effectively what happens then is that this makes the
-"pipeline" longer -- as the buffer fills up, the time between send()
-and the wire is increased.  This increased latency causes delays in
-round-trip-times and interferes with the mechanisms TCP uses to try to
-determine what the actual sustainable rate of data trasmission is.
+All four LVDS mux options are connected in hardware, so that's what the
+device tree describes. The path can be chosen dynamically via CRTC
+modeset.
 
-By limiting the number of "in-transit" bytes, you make sure that
-neither the kernel nor the NIC are going to have packets queues up for
-long lengths of time in buffers, and you keep this "pipeline" as close
-to the actual minimal length of the pipeline as possible.  And it
-sounds like for your 40G NIC, 128k is big enough to fill the pipeline
-without unduly making it longer by introducing buffering.
-
-Is that an accurate picture of what you're trying to achieve?
-
-But the problem for xennet (and a number of other drivers), as I
-understand it, is that at the moment the "pipeline" itself is just
-longer -- it just takes a longer time from the time you send a packet
-to the time it actually gets out on the wire.
-
-So it's not actually accurate to say that "Xen performance relies on
-bufferbloat".  There's no buffering involved -- the pipeline is just
-longer, and so to fill up the pipeline you need more data.
-
-Basically, to maximize throughput while minimizing buffering, for
-*any* connection, tcp_limit_output_bytes should ideally be around
-(min_tx_latency * max_bandwidth).  For physical NICs, the minimum
-latency is really small, but for xennet -- and I'm guessing for a lot
-of virtualized cards -- the min_tx_latency will be a lot higher,
-requiring a much higher ideal tcp_limit_output value.
-
-Rather than trying to pick a single value which will be good for all
-NICs, it seems like it would make more sense to have this vary
-depending on the parameters of the NIC.  After all, for NICs that have
-low throughput -- say, old 100MiB NICs -- even 128k may still
-introduce a significant amount of buffering.
-
-Obviously one solution would be to allow the drivers themselves to set
-the tcp_limit_output_bytes, but that seems like a maintenance
-nightmare.
-
-Another simple solution would be to allow drivers to indicate whether
-they have a high transmit latency, and have the kernel use a higher
-value by default when that's the case.
-
-Probably the most sustainable solution would be to have the networking
-layer keep track of the average and minimum transmit latencies, and
-automatically adjust tcp_limit_output_bytes based on that.  (Keeping
-the minimum as well as the average because the whole problem with
-bufferbloat is that the more data you give it, the longer the apparent
-"pipeline" becomes.)
-
-Thoughts?
-
- -George
+regards
+Philipp
