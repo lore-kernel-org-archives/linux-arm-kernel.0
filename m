@@ -1,96 +1,35 @@
-From: Minghuan.Lian@freescale.com (Minghuan Lian)
-Date: Wed, 15 Apr 2015 17:49:24 +0800
-Subject: [PATCH 2/2] pci/layerscape: Add LS2085A MSI support
-In-Reply-To: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <1429091364-31939-3-git-send-email-Minghuan.Lian@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Apr 2015 11:48:31 +0200
+Subject: [PATCH] modpost: add .text.fixup to OTHER_TEXT_SECTIONS
+Message-ID: <5641468.B6ky8Ch4vY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Freescale LS2085A uses GICv3 ITS to provide MSI functionality,
-but it only supports 64 isolation context identifiers. So, all
-the PCIe devices inserted to the same PCIe controller will share
-the fixed ICID.
+Two correct patches for the 4.1 release clashed in a way that
+caused modpost to fail badly, with hundreds warnings like
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+WARNING: vmlinux.o(__ex_table+0x1014): Section mismatch in reference from the (unknown reference) (unknown) to the (unknown reference) .text.fixup:(unknown)
+
+The fix, as suggested by the warnings, is to add the new .text.fixup
+section into the OTHER_TEXT_SECTIONS list.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 52dc0595d540 ("modpost: handle relocations mismatch in __ex_table")
+Fixes: c4a84ae39b4a ("ARM: 8322/1: keep .text and .fixup regions closer together")
 ---
-Depend on pci-layerscape-Add-LS2085A-PCIe-support.patch
+The mostpost patch has not made it into 4.1 yet, so it's probably best to
+add this fix on top of that to avoid breaking when Linus pulls it in.
 
- drivers/pci/host/pci-layerscape.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-index 15c5e47..1f317ca 100644
---- a/drivers/pci/host/pci-layerscape.c
-+++ b/drivers/pci/host/pci-layerscape.c
-@@ -30,20 +30,38 @@
+diff --git a/scripts/mod/modpost.c b/scripts/mod/modpost.c
+index cbd53e08769d..dd7efba020a1 100644
+--- a/scripts/mod/modpost.c
++++ b/scripts/mod/modpost.c
+@@ -876,7 +876,7 @@ static void check_section(const char *modname, struct elf_info *elf,
+ #define TEXT_SECTIONS ".text", ".text.unlikely", ".sched.text", \
+ 		".kprobes.text"
+ #define OTHER_TEXT_SECTIONS ".ref.text", ".head.text", ".spinlock.text", \
+-		".fixup", ".entry.text"
++		".fixup", ".text.fixup", ".entry.text"
  
- /* PEX LUT registers */
- #define PCIE_LUT_BASE		0x80000
-+#define PCIE_LUT_PEXLCR		0x024 /* PEX LUT Control Register */
-+#define PCIE_LUT_UDR(n)		(0x800 + (n) * 8)
-+#define PCIE_LUT_LDR(n)		(0x804 + (n) * 8)
-+#define PCIE_LUT_MASK_ALL	0xffff
-+#define PCIE_LUT_DR_NUM		32
-+#define PCIE_LUT_ENABLE		(0x1 << 31)
- #define PCIE_LUT_DBG		0x7FC /* PEX LUT Debug register */
- 
- #define PCIE_ATU_NUM		6
- 
-+#define PCIE_MSI_MAX_NUM	64
-+#define PCIE_ICID_BASE		1
-+
- struct ls_pcie {
- 	struct dw_pcie_port	pp;
- 	void __iomem		*regs;
- 	void __iomem		*lut;
- 	struct regmap		*scfg;
- 	int			index;
-+	int			icid;
- };
- 
- #define to_ls_pcie(x)	container_of(x, struct ls_pcie, pp)
- 
-+void arch_msi_share_devid_update(struct pci_dev *pdev, u32 *dev_id, u32 *nvesc)
-+{
-+	struct ls_pcie *pcie = to_ls_pcie(pdev->bus->sysdata);
-+
-+	*dev_id = pcie->icid;
-+	*nvesc = PCIE_MSI_MAX_NUM;
-+}
-+
- static int ls1_pcie_link_up(struct dw_pcie_port *pp)
- {
- 	struct ls_pcie *pcie = to_ls_pcie(pp);
-@@ -136,6 +154,12 @@ static int ls2_pcie_host_init(struct dw_pcie_port *pp)
- 	dw_pcie_dbi_write(pp, val, PCI_HEADER_TYPE & ~0x3);
- 	dw_pcie_dbi_write(pp, 0, PCIE_DBI_RO_WR_EN);
- 
-+	/* Set LUT. All request ID will map to a static ICID */
-+	iowrite32(pcie->icid, pcie->lut + PCIE_LUT_PEXLCR);
-+	iowrite32(PCIE_LUT_MASK_ALL, pcie->lut + PCIE_LUT_UDR(0));
-+	iowrite32(PCIE_LUT_ENABLE | pcie->icid,
-+		  pcie->lut + PCIE_LUT_LDR(0));
-+
- 	if (!ls2_pcie_link_up(pp))
- 		dev_err(pp->dev, "phy link never came up\n");
- 
-@@ -159,6 +183,7 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
- 	const struct of_device_id *match;
- 	struct ls_pcie *pcie;
- 	struct resource *res;
-+	static int ls_pcie_num;
- 	int ret;
- 
- 	match = of_match_device(ls_pcie_of_match, &pdev->dev);
-@@ -177,6 +202,8 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
- 	}
- 
- 	pcie->lut = pcie->regs + PCIE_LUT_BASE;
-+	pcie->index = ls_pcie_num++;
-+	pcie->icid = PCIE_ICID_BASE + pcie->index;
- 	pcie->pp.dev = &pdev->dev;
- 	pcie->pp.dbi = pcie->regs;
- 	pcie->pp.dw_ops = (struct dw_host_ops *)match->data;
--- 
-1.9.1
+ #define INIT_SECTIONS      ".init.*"
+ #define MEM_INIT_SECTIONS  ".meminit.*"
