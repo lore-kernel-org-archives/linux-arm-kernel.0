@@ -1,66 +1,61 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 15 Apr 2015 13:53:59 -0500
-Subject: [PATCH 1/2] pinctrl: bindings: pinctrl: Add support for TI's
- IODelay configuration
-In-Reply-To: <20150415184454.GT29558@csclub.uwaterloo.ca>
-References: <1425427237-11511-2-git-send-email-nm@ti.com>
- <CACRpkdaLEPzBywMnMrteboK7Q4su8PoB0wjnGvVpgUJ=2czVxQ@mail.gmail.com>
- <20150310153321.GO5264@atomide.com> <54FF28F5.4040707@ti.com>
- <20150310173115.GS5264@atomide.com> <54FF38F3.2030703@ti.com>
- <CACRpkdZ1faucps07jaT9kOyviC+Sw6gPkbF=cAGCUj+DiaEgTA@mail.gmail.com>
- <20150318014151.GL31346@atomide.com>
- <20150415012910.GA29560@csclub.uwaterloo.ca> <552E9714.10001@ti.com>
- <20150415184454.GT29558@csclub.uwaterloo.ca>
-Message-ID: <552EB3C7.90603@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 15 Apr 2015 20:57:05 +0200
+Subject: [PATCH] ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal
+ RTC
+In-Reply-To: <1429094447-4324-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1429094447-4324-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150415185705.GA13105@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2015 01:44 PM, Lennart Sorensen wrote:
-> On Wed, Apr 15, 2015 at 11:51:32AM -0500, Nishanth Menon wrote:
->> I am yet to post a new revision to this series - few other stuff got
->> in the way. IODelay driver in no way removes the constraint that the
->> SoC architecture has - most of the pins still need to be muxed in
->> bootloader - we cannot escape that. The reasoning for doing the mux in
->> bootloader is independent of the need for iodelay.
->>
->> Reasoning for mux in bootloader is because the mux and pull fields are
->> glitchy - much more than previous generations of TI SoCs and
->> significantly long enough to cause issues depending on the pins being
->> muxed.
-> 
-> Well if we know glitching is NOT an issue on our boards, then we don't
-> have to do anything in the boot loader other than the basic setup for
-> the serial console and emmc and SD, which has always been necesary.
-> 
-> I consider moving the mux setup to the bootloader a terrible design and
-> won't go along with it.  We make sure all external devices have reset
-> lines being held while the pinmux is being setup, so glitching is a
-> non issue.
+On Wed, Apr 15, 2015 at 12:40:47PM +0200, Gregory CLEMENT wrote:
+> There is no crystal connected to the internal RTC on the Open Block
+> AX3. So let's disable it in order to prevent the kernel probing the
+> driver uselessly. Eventually this patches removes the following
+> warning message from the boot log:
+> "rtc-mv d0010300.rtc: internal RTC not ticking"
 
-I cannot discuss customer boards on this list - the right forum for TI
-support is e2e.ti.com or in cases where FAE (Field Applications
-Engineer) is involved, via appropriate support path.
+Hi Gregory
 
-Now, that said, even with personal opinions in place, I have to stick
-with what the SoC constraints on hand and suggested architecture we
-have discussed to ensure safe platform operation at least for the
-platforms we are contributing to. again... muxing in the bootloader IS
-NOT what this patch is about. If we can stick to the topic in
-discussion, it is probably more effective. Any improvement suggestions
-to the code is more than appreciated.
+I've seen this as well with my device.
 
->> Reasoning for iodelay is different - it is a hardware block meant to
->> control the timing of signals in a particular signal path to ensure
->> that specification compliance is met.
->>
->> Lets try not to mix the two.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+	  Andrew
+
 > 
-> Well I was told by multiple people from TI that the reason for moving
-> the pinmux setup to the bootloader was because of the iodelay issue,
-> so you will have to get the message made clear within TI then.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # v3.8 +
+> ---
+> Hi,
 > 
-I have passed on this message.
-
--- 
-Regards,
-Nishanth Menon
+> I plan to add this patch to mvebu/fixes once the v4.1-rc1 will be
+> released. I don't expect much comments about it, but there is time
+> for them if needed until the next PR.
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> 
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> index 0c76d9f05fd0..f4838ebd918b 100644
+> --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> @@ -105,6 +105,10 @@
+>  		};
+>  
+>  		internal-regs {
+> +			rtc at 10300 {
+> +				/* No crystal connected to the internal RTC */
+> +				status = "disabled";
+> +			};
+>  			serial at 12000 {
+>  				status = "okay";
+>  			};
+> -- 
+> 2.1.0
+> 
