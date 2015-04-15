@@ -1,69 +1,126 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Apr 2015 17:34:13 +0200
-Subject: [PATCH v4 02/13] arm64: drop sleep_idmap_phys and clean up
- cpu_resume()
+Date: Wed, 15 Apr 2015 17:34:14 +0200
+Subject: [PATCH v4 03/13] of/fdt: split off FDT self reservation from
+ memreserve processing
 In-Reply-To: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1429112064-19952-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1429112064-19952-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two cleanups of the asm function cpu_resume():
-- The global variable sleep_idmap_phys always points to idmap_pg_dir,
-  so we can just use that value directly in the CPU resume path.
-- Unclutter the load of sleep_save_sp::save_ptr_stash_phys.
+This splits off the reservation of the memory occupied by the FDT
+binary itself from the processing of the memory reservations it
+contains. This is necessary because the physical address of the FDT,
+which is needed to perform the reservation, may not be known to the
+FDT driver core, i.e., it may be mapped outside the linear direct
+mapping, in which case __pa() returns a bogus value.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/sleep.S   | 7 ++-----
- arch/arm64/kernel/suspend.c | 3 ---
- 2 files changed, 2 insertions(+), 8 deletions(-)
+ arch/arm/mm/init.c         |  1 +
+ arch/arm64/mm/init.c       |  1 +
+ arch/powerpc/kernel/prom.c |  1 +
+ drivers/of/fdt.c           | 19 ++++++++++++++-----
+ include/linux/of_fdt.h     |  2 ++
+ 5 files changed, 19 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 811e61a2d847..803cfea41962 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -164,15 +164,12 @@ ENTRY(cpu_resume)
- #else
- 	mov	x7, xzr
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 1609b022a72f..0b8657c36fe4 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -317,6 +317,7 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
+ 	if (mdesc->reserve)
+ 		mdesc->reserve();
+ 
++	early_init_fdt_reserve_self();
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	/* reserve memory for DMA contiguous allocations */
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index ae85da6307bb..fa2389b0f7f0 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -170,6 +170,7 @@ void __init arm64_memblock_init(void)
+ 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
  #endif
--	adrp	x0, sleep_save_sp
--	add	x0, x0, #:lo12:sleep_save_sp
--	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
-+	ldr_l	x0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
- 	ldr	x0, [x0, x7, lsl #3]
- 	/* load sp from context */
- 	ldr	x2, [x0, #CPU_CTX_SP]
--	adrp	x1, sleep_idmap_phys
- 	/* load physical address of identity map page table in x1 */
--	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
-+	adrp	x1, idmap_pg_dir
- 	mov	sp, x2
- 	/*
- 	 * cpu_do_resume expects x0 to contain context physical address
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index d7daf45ae7a2..f6073c27d65f 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -118,7 +118,6 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 
++	early_init_fdt_reserve_self();
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
+diff --git a/arch/powerpc/kernel/prom.c b/arch/powerpc/kernel/prom.c
+index b8e15c678960..093ccfb384af 100644
+--- a/arch/powerpc/kernel/prom.c
++++ b/arch/powerpc/kernel/prom.c
+@@ -573,6 +573,7 @@ static void __init early_reserve_mem_dt(void)
+ 	int len;
+ 	const __be32 *prop;
+ 
++	early_init_fdt_reserve_self();
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	dt_root = of_get_flat_dt_root();
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 3a896c9aeb74..bbb35cdb06e8 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -561,11 +561,6 @@ void __init early_init_fdt_scan_reserved_mem(void)
+ 	if (!initial_boot_params)
+ 		return;
+ 
+-	/* Reserve the dtb region */
+-	early_init_dt_reserve_memory_arch(__pa(initial_boot_params),
+-					  fdt_totalsize(initial_boot_params),
+-					  0);
+-
+ 	/* Process header /memreserve/ fields */
+ 	for (n = 0; ; n++) {
+ 		fdt_get_mem_rsv(initial_boot_params, n, &base, &size);
+@@ -579,6 +574,20 @@ void __init early_init_fdt_scan_reserved_mem(void)
  }
  
- struct sleep_save_sp sleep_save_sp;
--phys_addr_t sleep_idmap_phys;
- 
- static int __init cpu_suspend_init(void)
- {
-@@ -132,9 +131,7 @@ static int __init cpu_suspend_init(void)
- 
- 	sleep_save_sp.save_ptr_stash = ctx_ptr;
- 	sleep_save_sp.save_ptr_stash_phys = virt_to_phys(ctx_ptr);
--	sleep_idmap_phys = virt_to_phys(idmap_pg_dir);
- 	__flush_dcache_area(&sleep_save_sp, sizeof(struct sleep_save_sp));
--	__flush_dcache_area(&sleep_idmap_phys, sizeof(sleep_idmap_phys));
- 
- 	return 0;
- }
+ /**
++ * early_init_fdt_reserve_self() - reserve the memory used by the FDT blob
++ */
++void __init early_init_fdt_reserve_self(void)
++{
++	if (!initial_boot_params)
++		return;
++
++	/* Reserve the dtb region */
++	early_init_dt_reserve_memory_arch(__pa(initial_boot_params),
++					  fdt_totalsize(initial_boot_params),
++					  0);
++}
++
++/**
+  * of_scan_flat_dt - scan flattened tree blob and call callback on each.
+  * @it: callback function
+  * @data: context data pointer
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index 0ff360d5b3b3..6ef6b33238d3 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -62,6 +62,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+ extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+ 				     int depth, void *data);
+ extern void early_init_fdt_scan_reserved_mem(void);
++extern void early_init_fdt_reserve_self(void);
+ extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+ extern int early_init_dt_reserve_memory_arch(phys_addr_t base, phys_addr_t size,
+ 					     bool no_map);
+@@ -89,6 +90,7 @@ extern u64 fdt_translate_address(const void *blob, int node_offset);
+ extern void of_fdt_limit_memory(int limit);
+ #else /* CONFIG_OF_FLATTREE */
+ static inline void early_init_fdt_scan_reserved_mem(void) {}
++static inline void early_init_fdt_reserve_self(void) {}
+ static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
+ static inline void unflatten_device_tree(void) {}
+ static inline void unflatten_and_copy_device_tree(void) {}
 -- 
 1.8.3.2
