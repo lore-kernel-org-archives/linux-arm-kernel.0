@@ -1,34 +1,96 @@
 From: Minghuan.Lian@freescale.com (Minghuan Lian)
-Date: Wed, 15 Apr 2015 17:49:22 +0800
-Subject: [PATCH] irqchip/gicv3-its: Decrease page size when needed
-Message-ID: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+Date: Wed, 15 Apr 2015 17:49:24 +0800
+Subject: [PATCH 2/2] pci/layerscape: Add LS2085A MSI support
+In-Reply-To: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <1429091364-31939-3-git-send-email-Minghuan.Lian@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default page size of ITS table has been changed to 64KB,
-but for some platforms the real size of allocate memory which
-calculated by DEVBITS of register GITS_TYPER may smaller than
-default size. In this case, psz must be decreased, otherwise,
-the wrong page number will cause kernel hang.
+Freescale LS2085A uses GICv3 ITS to provide MSI functionality,
+but it only supports 64 isolation context identifiers. So, all
+the PCIe devices inserted to the same PCIe controller will share
+the fixed ICID.
 
 Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 3 +++
- 1 file changed, 3 insertions(+)
+Depend on pci-layerscape-Add-LS2085A-PCIe-support.patch
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 596b0a9..d0374a6 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -844,6 +844,9 @@ static int its_alloc_tables(struct its_node *its)
+ drivers/pci/host/pci-layerscape.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+index 15c5e47..1f317ca 100644
+--- a/drivers/pci/host/pci-layerscape.c
++++ b/drivers/pci/host/pci-layerscape.c
+@@ -30,20 +30,38 @@
  
- 		its->tables[i] = base;
+ /* PEX LUT registers */
+ #define PCIE_LUT_BASE		0x80000
++#define PCIE_LUT_PEXLCR		0x024 /* PEX LUT Control Register */
++#define PCIE_LUT_UDR(n)		(0x800 + (n) * 8)
++#define PCIE_LUT_LDR(n)		(0x804 + (n) * 8)
++#define PCIE_LUT_MASK_ALL	0xffff
++#define PCIE_LUT_DR_NUM		32
++#define PCIE_LUT_ENABLE		(0x1 << 31)
+ #define PCIE_LUT_DBG		0x7FC /* PEX LUT Debug register */
  
-+		while (alloc_size < psz)
-+			psz = psz >> 1;
+ #define PCIE_ATU_NUM		6
+ 
++#define PCIE_MSI_MAX_NUM	64
++#define PCIE_ICID_BASE		1
 +
- retry_baser:
- 		val = (virt_to_phys(base) 				 |
- 		       (type << GITS_BASER_TYPE_SHIFT)			 |
+ struct ls_pcie {
+ 	struct dw_pcie_port	pp;
+ 	void __iomem		*regs;
+ 	void __iomem		*lut;
+ 	struct regmap		*scfg;
+ 	int			index;
++	int			icid;
+ };
+ 
+ #define to_ls_pcie(x)	container_of(x, struct ls_pcie, pp)
+ 
++void arch_msi_share_devid_update(struct pci_dev *pdev, u32 *dev_id, u32 *nvesc)
++{
++	struct ls_pcie *pcie = to_ls_pcie(pdev->bus->sysdata);
++
++	*dev_id = pcie->icid;
++	*nvesc = PCIE_MSI_MAX_NUM;
++}
++
+ static int ls1_pcie_link_up(struct dw_pcie_port *pp)
+ {
+ 	struct ls_pcie *pcie = to_ls_pcie(pp);
+@@ -136,6 +154,12 @@ static int ls2_pcie_host_init(struct dw_pcie_port *pp)
+ 	dw_pcie_dbi_write(pp, val, PCI_HEADER_TYPE & ~0x3);
+ 	dw_pcie_dbi_write(pp, 0, PCIE_DBI_RO_WR_EN);
+ 
++	/* Set LUT. All request ID will map to a static ICID */
++	iowrite32(pcie->icid, pcie->lut + PCIE_LUT_PEXLCR);
++	iowrite32(PCIE_LUT_MASK_ALL, pcie->lut + PCIE_LUT_UDR(0));
++	iowrite32(PCIE_LUT_ENABLE | pcie->icid,
++		  pcie->lut + PCIE_LUT_LDR(0));
++
+ 	if (!ls2_pcie_link_up(pp))
+ 		dev_err(pp->dev, "phy link never came up\n");
+ 
+@@ -159,6 +183,7 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
+ 	const struct of_device_id *match;
+ 	struct ls_pcie *pcie;
+ 	struct resource *res;
++	static int ls_pcie_num;
+ 	int ret;
+ 
+ 	match = of_match_device(ls_pcie_of_match, &pdev->dev);
+@@ -177,6 +202,8 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	pcie->lut = pcie->regs + PCIE_LUT_BASE;
++	pcie->index = ls_pcie_num++;
++	pcie->icid = PCIE_ICID_BASE + pcie->index;
+ 	pcie->pp.dev = &pdev->dev;
+ 	pcie->pp.dbi = pcie->regs;
+ 	pcie->pp.dw_ops = (struct dw_host_ops *)match->data;
 -- 
 1.9.1
