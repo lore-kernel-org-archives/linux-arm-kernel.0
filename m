@@ -1,152 +1,179 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Apr 2015 17:34:19 +0200
-Subject: [PATCH v4 08/13] arm64: split off early mapping code from
- early_fixmap_init()
+Date: Wed, 15 Apr 2015 17:34:20 +0200
+Subject: [PATCH v4 09/13] arm64: mm: explicitly bootstrap the linear mapping
 In-Reply-To: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1429112064-19952-9-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1429112064-19952-10-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This splits off and generalises the population of the statically
-allocated fixmap page tables so that we may reuse it later for
-the linear mapping once we move the kernel text mapping out of it.
-
-This also involves taking into account that table entries at any of
-the levels we are populating may have been populated already, since
-the fixmap mapping might not be disjoint up to the pgd level anymore
-from other early mappings.
+In preparation of moving the kernel text out of the linear
+mapping, ensure that the part of the kernel Image that contains
+the statically allocated page tables is made accessible via the
+linear mapping before performing the actual mapping of all of
+memory. This is needed by the normal mapping routines, that rely
+on the linear mapping to walk the page tables while manipulating
+them.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/compiler.h |  2 ++
- arch/arm64/kernel/vmlinux.lds.S   | 12 ++++----
- arch/arm64/mm/mmu.c               | 60 +++++++++++++++++++++++++++------------
- 3 files changed, 51 insertions(+), 23 deletions(-)
+ arch/arm64/kernel/vmlinux.lds.S | 18 ++++++++-
+ arch/arm64/mm/mmu.c             | 89 +++++++++++++++++++++++++++--------------
+ 2 files changed, 75 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
-index ee35fd0f2236..dd342af63673 100644
---- a/arch/arm64/include/asm/compiler.h
-+++ b/arch/arm64/include/asm/compiler.h
-@@ -27,4 +27,6 @@
-  */
- #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
- 
-+#define __pgdir		__attribute__((section(".pgdir"),aligned(PAGE_SIZE)))
-+
- #endif	/* __ASM_COMPILER_H */
 diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 98073332e2d0..ceec4def354b 100644
+index ceec4def354b..338eaa7bcbfd 100644
 --- a/arch/arm64/kernel/vmlinux.lds.S
 +++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -160,11 +160,13 @@ SECTIONS
+@@ -68,6 +68,17 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+ #define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(min);
+ #endif
+ 
++/*
++ * The pgdir region needs to be mappable using a single PMD or PUD sized region,
++ * so it should not cross a 512 MB or 1 GB alignment boundary, respectively
++ * (depending on page size). So align to an upper bound of its size.
++ */
++#if CONFIG_ARM64_PGTABLE_LEVELS == 2
++#define PGDIR_ALIGN	(8 * PAGE_SIZE)
++#else
++#define PGDIR_ALIGN	(16 * PAGE_SIZE)
++#endif
++
+ SECTIONS
+ {
+ 	/*
+@@ -160,7 +171,7 @@ SECTIONS
  
  	BSS_SECTION(0, 0, 0)
  
--	. = ALIGN(PAGE_SIZE);
--	idmap_pg_dir = .;
--	. += IDMAP_DIR_SIZE;
--	swapper_pg_dir = .;
--	. += SWAPPER_DIR_SIZE;
-+	.pgdir (NOLOAD) : ALIGN(PAGE_SIZE) {
-+		idmap_pg_dir = .;
-+		. += IDMAP_DIR_SIZE;
-+		swapper_pg_dir = .;
-+		. += SWAPPER_DIR_SIZE;
-+		*(.pgdir)
-+	}
+-	.pgdir (NOLOAD) : ALIGN(PAGE_SIZE) {
++	.pgdir (NOLOAD) : ALIGN(PGDIR_ALIGN) {
+ 		idmap_pg_dir = .;
+ 		. += IDMAP_DIR_SIZE;
+ 		swapper_pg_dir = .;
+@@ -185,6 +196,11 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
+ 	"ID map text too big or misaligned")
  
- 	_end = .;
- 
+ /*
++ * Check that the chosen PGDIR_ALIGN value if sufficient.
++ */
++ASSERT(SIZEOF(.pgdir) < ALIGNOF(.pgdir), ".pgdir size exceeds its alignment")
++
++/*
+  * If padding is applied before .head.text, virt<->phys conversions will fail.
+  */
+ ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index aa99b7a0d660..c27ab20a5ba9 100644
+index c27ab20a5ba9..93e5a2497f01 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -342,6 +342,44 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+@@ -380,26 +380,68 @@ static void __init bootstrap_early_mapping(unsigned long addr,
+ 	}
  }
- #endif
  
-+struct bootstrap_pgtables {
-+	pte_t	pte[PTRS_PER_PTE];
-+	pmd_t	pmd[PTRS_PER_PMD > 1 ? PTRS_PER_PMD : 0];
-+	pud_t	pud[PTRS_PER_PUD > 1 ? PTRS_PER_PUD : 0];
-+};
-+
-+static void __init bootstrap_early_mapping(unsigned long addr,
-+					   struct bootstrap_pgtables *reg,
-+					   bool pte_level)
++static void __init bootstrap_linear_mapping(unsigned long va_offset)
 +{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
++	/*
++	 * Bootstrap the linear range that covers swapper_pg_dir so that the
++	 * statically allocated page tables as well as newly allocated ones
++	 * are accessible via the linear mapping.
++	 */
++	static struct bootstrap_pgtables linear_bs_pgtables __pgdir;
++	const phys_addr_t swapper_phys = __pa(swapper_pg_dir);
++	unsigned long swapper_virt = __phys_to_virt(swapper_phys) + va_offset;
++	struct memblock_region *reg;
 +
-+	pgd = pgd_offset_k(addr);
-+	if (pgd_none(*pgd)) {
-+		clear_page(reg->pud);
-+		memblock_reserve(__pa(reg->pud), PAGE_SIZE);
-+		pgd_populate(&init_mm, pgd, reg->pud);
-+	}
-+	pud = pud_offset(pgd, addr);
-+	if (pud_none(*pud)) {
-+		clear_page(reg->pmd);
-+		memblock_reserve(__pa(reg->pmd), PAGE_SIZE);
-+		pud_populate(&init_mm, pud, reg->pmd);
-+	}
++	bootstrap_early_mapping(swapper_virt, &linear_bs_pgtables,
++				IS_ENABLED(CONFIG_ARM64_64K_PAGES));
 +
-+	if (!pte_level)
++	/* now find the memblock that covers swapper_pg_dir, and clip */
++	for_each_memblock(memory, reg) {
++		phys_addr_t start = reg->base;
++		phys_addr_t end = start + reg->size;
++		unsigned long vstart, vend;
++
++		if (start > swapper_phys || end <= swapper_phys)
++			continue;
++
++#ifdef CONFIG_ARM64_64K_PAGES
++		/* clip the region to PMD size */
++		vstart = max(swapper_virt & PMD_MASK,
++			     round_up(__phys_to_virt(start + va_offset),
++				      PAGE_SIZE));
++		vend = min(round_up(swapper_virt, PMD_SIZE),
++			   round_down(__phys_to_virt(end + va_offset),
++				      PAGE_SIZE));
++#else
++		/* clip the region to PUD size */
++		vstart = max(swapper_virt & PUD_MASK,
++			     round_up(__phys_to_virt(start + va_offset),
++				      PMD_SIZE));
++		vend = min(round_up(swapper_virt, PUD_SIZE),
++			   round_down(__phys_to_virt(end + va_offset),
++				      PMD_SIZE));
++#endif
++
++		create_mapping(__pa(vstart - va_offset), vstart, vend - vstart,
++			       PAGE_KERNEL_EXEC);
++
++		/*
++		 * Temporarily limit the memblock range. We need to do this as
++		 * create_mapping requires puds, pmds and ptes to be allocated
++		 * from memory addressable from the early linear mapping.
++		 */
++		memblock_set_current_limit(__pa(vend - va_offset));
++
 +		return;
-+
-+	pmd = pmd_offset(pud, addr);
-+	if (pmd_none(*pmd)) {
-+		clear_page(reg->pte);
-+		memblock_reserve(__pa(reg->pte), PAGE_SIZE);
-+		pmd_populate_kernel(&init_mm, pmd, reg->pte);
 +	}
++	BUG();
 +}
 +
  static void __init map_mem(void)
  {
  	struct memblock_region *reg;
-@@ -555,14 +593,6 @@ void vmemmap_free(unsigned long start, unsigned long end)
- }
- #endif	/* CONFIG_SPARSEMEM_VMEMMAP */
+-	phys_addr_t limit;
  
--static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
--#if CONFIG_ARM64_PGTABLE_LEVELS > 2
--static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+-	/*
+-	 * Temporarily limit the memblock range. We need to do this as
+-	 * create_mapping requires puds, pmds and ptes to be allocated from
+-	 * memory addressable from the initial direct kernel mapping.
+-	 *
+-	 * The initial direct kernel mapping, located@swapper_pg_dir, gives
+-	 * us PUD_SIZE (4K pages) or PMD_SIZE (64K pages) memory starting from
+-	 * PHYS_OFFSET (which must be aligned to 2MB as per
+-	 * Documentation/arm64/booting.txt).
+-	 */
+-	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES))
+-		limit = PHYS_OFFSET + PMD_SIZE;
+-	else
+-		limit = PHYS_OFFSET + PUD_SIZE;
+-	memblock_set_current_limit(limit);
++	bootstrap_linear_mapping(0);
+ 
+ 	/* map all the memory banks */
+ 	for_each_memblock(memory, reg) {
+@@ -409,21 +451,6 @@ static void __init map_mem(void)
+ 		if (start >= end)
+ 			break;
+ 
+-#ifndef CONFIG_ARM64_64K_PAGES
+-		/*
+-		 * For the first memory bank align the start address and
+-		 * current memblock limit to prevent create_mapping() from
+-		 * allocating pte page tables from unmapped memory.
+-		 * When 64K pages are enabled, the pte page table for the
+-		 * first PGDIR_SIZE is already present in swapper_pg_dir.
+-		 */
+-		if (start < limit)
+-			start = ALIGN(start, PMD_SIZE);
+-		if (end < limit) {
+-			limit = end & PMD_MASK;
+-			memblock_set_current_limit(limit);
+-		}
 -#endif
--#if CONFIG_ARM64_PGTABLE_LEVELS > 3
--static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
--#endif
--
- static inline pud_t * fixmap_pud(unsigned long addr)
- {
- 	pgd_t *pgd = pgd_offset_k(addr);
-@@ -592,21 +622,15 @@ static inline pte_t * fixmap_pte(unsigned long addr)
+ 		__map_memblock(start, end);
+ 	}
  
- void __init early_fixmap_init(void)
- {
--	pgd_t *pgd;
--	pud_t *pud;
-+	static struct bootstrap_pgtables fixmap_bs_pgtables __pgdir;
- 	pmd_t *pmd;
--	unsigned long addr = FIXADDR_START;
- 
--	pgd = pgd_offset_k(addr);
--	pgd_populate(&init_mm, pgd, bm_pud);
--	pud = pud_offset(pgd, addr);
--	pud_populate(&init_mm, pud, bm_pmd);
--	pmd = pmd_offset(pud, addr);
--	pmd_populate_kernel(&init_mm, pmd, bm_pte);
-+	bootstrap_early_mapping(FIXADDR_START, &fixmap_bs_pgtables, true);
-+	pmd = fixmap_pmd(FIXADDR_START);
- 
- 	/*
- 	 * The boot-ioremap range spans multiple pmds, for which
--	 * we are not preparted:
-+	 * we are not prepared:
- 	 */
- 	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
- 		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
 -- 
 1.8.3.2
