@@ -1,71 +1,32 @@
-From: Minghuan.Lian@freescale.com (Minghuan.Lian at freescale.com)
-Date: Wed, 15 Apr 2015 11:42:22 +0000
-Subject: [PATCH v2 2/3] pci/designware: Add base driver for Designware PCIe
-In-Reply-To: <2123546.0rhYViPpvy@wuerfel>
-References: <1429091315-31891-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091315-31891-3-git-send-email-Minghuan.Lian@freescale.com>
- <2123546.0rhYViPpvy@wuerfel>
-Message-ID: <DM2PR0301MB0640C4BA8501EED83F9303F1E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Wed, 15 Apr 2015 13:50:51 +0200
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <20150415112224.GA26099@e104818-lin.cambridge.arm.com>
+References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
+ <17844053.vZiPCu4un3@wuerfel>
+ <20150414144702.GD14546@e104818-lin.cambridge.arm.com>
+ <2485404.lBlHmzQPKN@wuerfel>
+ <20150415112224.GA26099@e104818-lin.cambridge.arm.com>
+Message-ID: <721B7D5F-0A9A-45B7-8036-730ED54FB3AB@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
 
-I do not directly add arm64 support to pcie-designware.c, the
-main reason is that it is hard to port other 5 platform PCIe
-driver based on pcie-designware to the new implementation.
-However, not changing those PCIe driver means the code for
-arm32 must be remained.
-
-I add a new file pcie-designware-base.c. Compared with
-pcie-designware.c, there are main 3 differences.
-1. It is a new implementation followed the latest PCIe
-architecture-independent API without any code for specific
-architecture.
-2. There is no MSI chip code, which will be implemented in a 
-separated file.
-3. Improve ATU use - support more than 2 ATUs and use an exclusive
-ATU to translate MEM transaction.
-
-After other platform PCIe owner port the driver to pcie-designware-base.c,
-The pcie-designware.c can be removed.
-
-Thanks,
-Minghuan
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Wednesday, April 15, 2015 6:37 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Lian Minghuan-B31939; linux-pci at vger.kernel.org; Jingoo Han; Hu
-> Mingkai-B21284; Zang Roy-R61911; Yoder Stuart-B08248; Bjorn Helgaas;
-> Wood Scott-B07421
-> Subject: Re: [PATCH v2 2/3] pci/designware: Add base driver for Designware
-> PCIe
+> On 15 Apr 2015, at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
 > 
-> On Wednesday 15 April 2015 17:48:34 Minghuan Lian wrote:
-> > The Synopsys Designware IP is shared with couples of platforms under
-> > multiple architectures. The patch is to provide basic
-> > architecture-independent Designware PCIe host driver including ATU
-> > initialization and PCI OPS. Currently, which supports arm and arm64
-> > simultaneously.
-> >
-> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> > ---
-> > change log:
-> > v1-v2:
-> > 1. Get MSI chip according to dts property 'msi-parent'
-> > 2. Simplify platform_get_resource_byname() failure checking
-> >
-> >  drivers/pci/host/Kconfig                |   3 +
-> >  drivers/pci/host/Makefile               |   1 +
-> >  drivers/pci/host/pcie-designware-base.c | 293
-> > ++++++++++++++++++++++++++++++++
-> > drivers/pci/host/pcie-designware-base.h |  63 +++++++
-> >
-> 
-> I don't understand this patch at all. What is the relation between this driver
-> and the existing pcie-designware.c? From the description above, they would
-> be the same.
-> 
-> 	Arnd
+> I think you are right. I was more thinking of those routed directly to
+> the native (non-compat) syscalls. We would need to make sure the return
+> value (X0 being the only register not restored on return from exception)
+> has the top 32-bit part zeroed.
+
+As the kernel is LP64 and will thus attempt to return a 64bit return value, the
+high bits should be properly sign-extended in all cases.
+
+The problem (posed by procedure call standard) of information leakage could 
+manifest itself only, if the kernel tried to return something smaller than 64 bits? 
+in that case, we can the problem would already exhibit for the LP64 ABI. 
+
+For the ILP32 implementation, I?ll thus assume that all LP64 ABI calls reused
+are clean in this regard.
+
+Phil.
