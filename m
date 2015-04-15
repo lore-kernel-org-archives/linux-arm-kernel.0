@@ -1,8 +1,8 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 15 Apr 2015 10:52:53 -0700
+From: rick.jones2@hp.com (Rick Jones)
+Date: Wed, 15 Apr 2015 10:55:16 -0700
 Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
  regression on Xen
-In-Reply-To: <552EA2BC.5000707@eu.citrix.com>
+In-Reply-To: <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
 References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
  <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
  <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
@@ -13,52 +13,18 @@ References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
  <552E9E8D.1080000@eu.citrix.com>
  <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
  <552EA2BC.5000707@eu.citrix.com>
-Message-ID: <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
+ <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <552EA604.8010400@hp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-04-15 at 18:41 +0100, George Dunlap wrote:
+>
+> Have you tested this patch on a NIC without GSO/TSO ?
+>
+> This would allow more than 500 packets for a single flow.
+>
+> Hello bufferbloat.
 
-> So you'd be OK with a patch like this?  (With perhaps a better changelog?)
-> 
->  -George
-> 
-> ---
-> TSQ: Raise default static TSQ limit
-> 
-> A new dynamic TSQ limit was introduced in c/s 605ad7f18 based on the
-> size of actual packets and the amount of data being transmitted.
-> Raise the default static limit to allow that new limit to actually
-> come into effect.
-> 
-> This fixes a regression where NICs with large transmit completion
-> times (such as xennet) had a 30% hit unless the user manually tweaked
-> the value in /proc.
-> 
-> Signed-off-by: George Dunlap <george.dunlap@eu.citrix.com>
-> 
-> diff --git a/net/ipv4/tcp_output.c b/net/ipv4/tcp_output.c
-> index 1db253e..8ad7cdf 100644
-> --- a/net/ipv4/tcp_output.c
-> +++ b/net/ipv4/tcp_output.c
-> @@ -50,8 +50,8 @@ int sysctl_tcp_retrans_collapse __read_mostly = 1;
->   */
->  int sysctl_tcp_workaround_signed_windows __read_mostly = 0;
-> 
-> -/* Default TSQ limit of two TSO segments */
-> -int sysctl_tcp_limit_output_bytes __read_mostly = 131072;
-> +/* Static TSQ limit.  A more dynamic limit is calculated in
-> tcp_write_xmit. */
-> +int sysctl_tcp_limit_output_bytes __read_mostly = 1048576;
-> 
->  /* This limits the percentage of the congestion window which we
->   * will allow a single TSO frame to consume.  Building TSO frames
-> 
+Woudln't the fq_codel qdisc on that interface address that problem?
 
-Have you tested this patch on a NIC without GSO/TSO ?
-
-This would allow more than 500 packets for a single flow.
-
-Hello bufferbloat.
-
-So my answer to this patch is a no.
+rick
