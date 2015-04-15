@@ -1,55 +1,98 @@
-From: rick.jones2@hp.com (Rick Jones)
-Date: Wed, 15 Apr 2015 13:08:59 -0700
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <1429122734.7346.141.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
- <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
- <552E9E8D.1080000@eu.citrix.com>
- <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA2BC.5000707@eu.citrix.com>
- <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA604.8010400@hp.com>
- <1429121303.7346.126.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EABA3.30109@hp.com>
- <1429122734.7346.141.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <552EC55B.8020907@hp.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 15 Apr 2015 13:45:53 -0700
+Subject: AM335x OMAP2 common clock external fixed-clock registration
+In-Reply-To: <20150415194707.GA11007@deathray>
+References: <20150414211734.GA28974@deathray> <552E0688.1020903@ti.com>
+ <20150415140945.GA30787@deathray> <552EB152.7050306@ti.com>
+ <20150415194707.GA11007@deathray>
+Message-ID: <CAPtuhTggHctp5ArGPEuKn2GuPzb-WnKv2_CzPrHzq8hwOR5Aqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2015 11:32 AM, Eric Dumazet wrote:
-> On Wed, 2015-04-15 at 11:19 -0700, Rick Jones wrote:
+On Wed, Apr 15, 2015 at 12:47 PM, Michael Welling <mwelling@ieee.org> wrote:
+> On Wed, Apr 15, 2015 at 09:43:30PM +0300, Tero Kristo wrote:
+>> On 04/15/2015 05:09 PM, Michael Welling wrote:
+>> >On Wed, Apr 15, 2015 at 09:34:48AM +0300, Tero Kristo wrote:
+>> >>On 04/15/2015 12:17 AM, Michael Welling wrote:
+>> >>>Greetings,
+>> >>>
+>> >>>I have developed an AM3354 based SoM and it uses an external SI5351 clock
+>> >>>generator to drive the clock inputs for an external duart and I2S audio
+>> >>>master clock. With the registration according to the documentation the
+>> >>>reference clock is not being detected and hence the clock generator is
+>> >>>not working as expect.
+>> >>>
+>> >>>After trying many different things, I started to look around the mailing
+>> >>>lists to find information related to this issue.
+>> >>>
+>> >>>I came acrossed post that has the exact same issue:
+>> >>>https://lkml.org/lkml/2013/2/18/468
+>> >>>
+>> >>>Seeing as the patch did not land upstream, I am wondering if there is
+>> >>>a solution that I am not seeing.
+>> >>>
+>> >>>I am willing to provide a patch given appropriate guidance.
+>> >>
+>> >>Hi Michael,
+>> >>
+>> >>The info on the email you referenced is kind of obsolete, TI SoCs
+>> >>are calling of_clk_init() during boot now, and thus external clock
+>> >>nodes should be registered fine also. Maybe you can provide the
+>> >>actual DTS patch you are trying out so we can help better...? Are
+>> >
+>> >See attached patch and console output.
+>>
+>> I see a bug in your dt data.
+>>
+>> <snip>
+>>
+>> +     clocks {
+>> +             ref27: ref27 {
+>> +                     #clock-cells = <0>;
+>> +                     compatibale = "fixed-clock";
+>>
+>> This should be compatible, right? DT is annoying in that it doesn't
+>> verify property names.
+>>
 >
->> Well, I'm not sure that it is George and Jonathan themselves who don't
->> want to change a sysctl, but the customers who would have to tweak that
->> in their VMs?
+> Ooops.
 >
-> Keep in mind some VM users install custom qdisc, or even custom TCP
-> sysctls.
+> Now the clock appears in /sys/kernel/debug/clk:
+> root at som3517-som200:/sys/kernel/debug/clk# cat clk_summary
+>    clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
+> ----------------------------------------------------------------------------------------
+>  ref27                                    0            0    27000000          0 0
+> ...
+>
+> There is still an issue with the si5351.
+>
+> I had to comment out the clk_put here for the frequency to show up:
+> http://lxr.free-electrons.com/source/drivers/clk/clk-si5351.c#L1133
+>
+> Ideas?
 
-That could very well be, though I confess I've not seen that happening 
-in my little corner of the cloud.  They tend to want to launch the VM 
-and go.  Some of the more advanced/sophisticated ones might tweak a few 
-things but my (admittedly limited) experience has been they are few in 
-number.  They just expect it to work "out of the box" (to the extent one 
-can use that phrase still).
+What is the most recent upstream commit that you are based on?
 
-It's kind of ironic - go back to the (early) 1990s when NICs generated a 
-completion interrupt for every individual tx completion (and incoming 
-packet) and all everyone wanted to do was coalesce/avoid interrupts.  I 
-guess that has gone rather far.  And today to fight bufferbloat TCP gets 
-tweaked to favor quick tx completions.  Call it cycles, or pendulums or 
-whatever I guess.
+Regards,
+Mike
 
-I wonder just how consistent tx completion timings are for a VM so a 
-virtio_net or whatnot in the VM can pick a per-device setting to 
-advertise to TCP?  Hopefully, full NIC emulation is no longer a thing 
-and VMs "universally" use a virtual NIC interface. At least in my little 
-corner of the cloud, emulated NICs are gone, and good riddance.
-
-rick
+>
+>> +                     clock-frequency = <27000000>;
+>> +             };
+>> +     };
+>>
+>> -Tero
+>>
+>> >
+>> >>you seeing any boot time error / warning prints for your new clock?
+>> >
+>> >With the debug messages on you see that the reference clock is not being
+>> >detected.
+>> >
+>> >Whilest debugging I found that the of_clk_get is returning an error no matter
+>> >which clock I pass it:
+>> >http://lxr.free-electrons.com/source/drivers/clk/clk-si5351.c#L1131
+>> >
+>> >>
+>> >>-Tero
+>>
