@@ -1,75 +1,85 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 15 Apr 2015 10:29:08 -0700
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <552E9E8D.1080000@eu.citrix.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
- <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
- <552E9E8D.1080000@eu.citrix.com>
-Message-ID: <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 15 Apr 2015 18:35:13 +0100
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <20150415161759.GB1111@linaro.org>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
+ <493B15F8-0EBE-4633-9604-671EF403F36E@codeaurora.org>
+ <20150410161052.GF6854@e104818-lin.cambridge.arm.com>
+ <FDC755A7-ACCF-4222-8730-782EEC632159@codeaurora.org>
+ <20150413094117.GA2745@e104818-lin.cambridge.arm.com>
+ <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
+ <20150414223242.GA18888@e107981-lin.cambridge.arm.com>
+ <20150415161759.GB1111@linaro.org>
+Message-ID: <20150415173513.GE23758@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-04-15 at 18:23 +0100, George Dunlap wrote:
-> On 04/15/2015 05:38 PM, Eric Dumazet wrote:
-> > My thoughts that instead of these long talks you should guys read the
-> > code :
-> > 
-> >                 /* TCP Small Queues :
-> >                  * Control number of packets in qdisc/devices to two packets / or ~1 ms.
-> >                  * This allows for :
-> >                  *  - better RTT estimation and ACK scheduling
-> >                  *  - faster recovery
-> >                  *  - high rates
-> >                  * Alas, some drivers / subsystems require a fair amount
-> >                  * of queued bytes to ensure line rate.
-> >                  * One example is wifi aggregation (802.11 AMPDU)
-> >                  */
-> >                 limit = max(2 * skb->truesize, sk->sk_pacing_rate >> 10);
-> >                 limit = min_t(u32, limit, sysctl_tcp_limit_output_bytes);
-> > 
-> > 
-> > Then you'll see that most of your questions are already answered.
-> > 
-> > Feel free to try to improve the behavior, if it does not hurt critical workloads
-> > like TCP_RR, where we we send very small messages, millions times per second.
-> 
-> First of all, with regard to critical workloads, once this patch gets
-> into distros, *normal TCP streams* on every VM running on Amazon,
-> Rackspace, Linode, &c will get a 30% hit in performance *by default*.
-> Normal TCP streams on xennet *are* a critical workload, and deserve the
-> same kind of accommodation as TCP_RR (if not more).  The same goes for
-> virtio_net.
-> 
-> Secondly, according to Stefano's and Jonathan's tests,
-> tcp_limit_output_bytes completely fixes the problem for Xen.
-> 
-> Which means that max(2*skb->truesize, sk->sk_pacing_rate >>10) is
-> *already* larger for Xen; that calculation mentioned in the comment is
-> *already* doing the right thing.
-> 
-> As Jonathan pointed out, sysctl_tcp_limit_output_bytes is overriding an
-> automatic TSQ calculation which is actually choosing an effective value
-> for xennet.
-> 
-> It certainly makes sense for sysctl_tcp_limit_output_bytes to be an
-> actual maximum limit.  I went back and looked at the original patch
-> which introduced it (46d3ceabd), and it looks to me like it was designed
-> to be a rough, quick estimate of "two packets outstanding" (by choosing
-> the maximum size of the packet, 64k, and multiplying it by two).
-> 
-> Now that you have a better algorithm -- the size of 2 actual packets or
-> the amount transmitted in 1ms -- it seems like the default
-> sysctl_tcp_limit_output_bytes should be higher, and let the automatic
-> TSQ you have on the first line throttle things down when necessary.
+On Wed, Apr 15, 2015 at 05:17:59PM +0100, Lina Iyer wrote:
+> On Tue, Apr 14 2015 at 16:32 -0600, Lorenzo Pieralisi wrote:
+> >On Tue, Apr 14, 2015 at 03:21:17PM +0100, Kumar Gala wrote:
+> >
+> >[...]
+> >
+> >> > Looking beyond this set of patches, I can foresee that you won't care
+> >> > about the generic arm64 cpuidle driver either, or more precisely the
+> >> > separation between cpuidle subsystem+driver and the SoC-specific
+> >> > back-end (cpu_operations).
+> >>
+> >> That's probably true for what I guess are a number of reasons.  I'm guessing the arm64 cpuidle driver expects PSCI.
+> >
+> >Wrap lines sensibly please.
+> >
+> >The arm64 cpuidle driver, that is now arm generic cpuidle driver does
+> >not expect anything apart from an enable-method (and you pulled
+> >part of its back-end implementation for arm32 Qualcomm platforms, FYI).
+> >
+> The backend for this SoC would leverage the same platform code as ARM32.
+> The cpu_operations callbacks for init and suspend will call into the the
+> same platform functions used by arm32 QCOM SoCs.
 
+It is understood, but this does not mean we should merge this patchset,
+actually it is the other way around. It was extremely complicated
+to factor out some common CPUidle bits because of the prolification
+of power down interfaces in arm/mach code, each with its quirks
+du jour.
 
-I asked you guys to make a test by increasing
-sysctl_tcp_limit_output_bytes
+If we had a standard interface (that encompasses what all ARM mach code
+power interfaces do, basically PSCI) when arm32 power management code
+was being pushed upstream we would not have that power management arm/mach
+code today.
 
-You have no need to explain me the code I wrote, thank you.
+PSCI is there to solve that problem, and it predates v8, there is no
+reason to merge code that provides no added value (I am obviously
+talking about the pseudo-boot protocol this patchset is enabling, not
+the platforms themselves which we definitely want to support upstream,
+with some preconditions that are equal for everyone) and to leverage
+a legacy that does not exist for arm64.
+
+Thanks,
+Lorenzo
+
+> 
+> Thanks,
+> Lina
+> 
+> >It took years to consolidate it and the main reason was the lack of
+> >standard interfaces for power down/up sequences that this patchset of
+> >yours wants to promote in arm64 world.
+> >
+> >The lack of standard power interfaces may not have been an issue for you,
+> >who cares about Qualcomm code, it has been a sore issue for people
+> >trying to generalize things across ARM platforms in the kernel, which is
+> >the only sensible way forward.
+> >
+> >PSCI is a standard interface (and Qualcomm are already contributing to
+> >it, for the records) that can certainly be extended, and you are welcome
+> >to contribute to it, but certainly not ignored.
+> >
+> >Thanks,
+> >Lorenzo
+> >--
+> >To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> >the body of a message to majordomo at vger.kernel.org
+> >More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
