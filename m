@@ -1,40 +1,80 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 15 Apr 2015 21:04:37 +0300
-Subject: [PATCH 2/2] arm64: add KASan support
-In-Reply-To: <552DCED9.40207@codeaurora.org>
-References: <1427208544-8232-1-git-send-email-a.ryabinin@samsung.com>
- <1427208544-8232-3-git-send-email-a.ryabinin@samsung.com>
- <20150401122843.GA28616@e104818-lin.cambridge.arm.com>
- <551E993E.5060801@samsung.com> <552DCED9.40207@codeaurora.org>
-Message-ID: <552EA835.5070704@samsung.com>
+From: george.dunlap@eu.citrix.com (George Dunlap)
+Date: Wed, 15 Apr 2015 19:04:52 +0100
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
+ <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+ <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+ <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
+ <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552E9E8D.1080000@eu.citrix.com>
+ <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA2BC.5000707@eu.citrix.com>
+ <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <552EA844.5010308@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2015 05:37 AM, David Keitel wrote:
->>>> +	pgd = __pgd(__pa(kasan_zero_pmd) | PAGE_KERNEL);
->>>> +#else
->>>> +	pgd = __pgd(__pa(kasan_zero_pte) | PAGE_KERNEL);
->>>> +#endif
->>>> +
->>>> +	for (i = pgd_index(start); start < end; i++) {
->>>> +		set_pgd(&pgdp[i], pgd);
->>>> +		start += PGDIR_SIZE;
->>>> +	}
->>>> +}
->>>
->>> Same problem as above with PAGE_KERNEL. You should just use
->>> pgd_populate().
+On 04/15/2015 06:52 PM, Eric Dumazet wrote:
+> On Wed, 2015-04-15 at 18:41 +0100, George Dunlap wrote:
 > 
-> Any suggestion what the correct flag setting would be here for a 4K mapping?
+>> So you'd be OK with a patch like this?  (With perhaps a better changelog?)
+>>
+>>  -George
+>>
+>> ---
+>> TSQ: Raise default static TSQ limit
+>>
+>> A new dynamic TSQ limit was introduced in c/s 605ad7f18 based on the
+>> size of actual packets and the amount of data being transmitted.
+>> Raise the default static limit to allow that new limit to actually
+>> come into effect.
+>>
+>> This fixes a regression where NICs with large transmit completion
+>> times (such as xennet) had a 30% hit unless the user manually tweaked
+>> the value in /proc.
+>>
+>> Signed-off-by: George Dunlap <george.dunlap@eu.citrix.com>
+>>
+>> diff --git a/net/ipv4/tcp_output.c b/net/ipv4/tcp_output.c
+>> index 1db253e..8ad7cdf 100644
+>> --- a/net/ipv4/tcp_output.c
+>> +++ b/net/ipv4/tcp_output.c
+>> @@ -50,8 +50,8 @@ int sysctl_tcp_retrans_collapse __read_mostly = 1;
+>>   */
+>>  int sysctl_tcp_workaround_signed_windows __read_mostly = 0;
+>>
+>> -/* Default TSQ limit of two TSO segments */
+>> -int sysctl_tcp_limit_output_bytes __read_mostly = 131072;
+>> +/* Static TSQ limit.  A more dynamic limit is calculated in
+>> tcp_write_xmit. */
+>> +int sysctl_tcp_limit_output_bytes __read_mostly = 1048576;
+>>
+>>  /* This limits the percentage of the congestion window which we
+>>   * will allow a single TSO frame to consume.  Building TSO frames
+>>
 > 
-> I tried fixing this by changing this to pud and setting the PMD_TYPE_TABLE flag for kasan_zero_pmd. However the MMU doesn't like it and I get a first level address translation fault.
+> Have you tested this patch on a NIC without GSO/TSO ?
 > 
-> If you have any updated patches to share I'd be glad to try them out.
+> This would allow more than 500 packets for a single flow.
 > 
+> Hello bufferbloat.
+> 
+> So my answer to this patch is a no.
 
-Sorry, I didn't have much time on work on this yet.
+You said:
 
-I've pushed the most fresh thing that I have in git:
-	git://github.com/aryabinin/linux.git kasan/arm64v1
+"I asked you guys to make a test by increasing
+sysctl_tcp_limit_output_bytes  You have no need to explain me the code I
+wrote, thank you."
 
-It's the same patches with two simple but important fixes on top of it.
+Which implies to me that you think you've already pointed us to the
+answer you want and we're just not getting it.
+
+Maybe you should stop wasting all of our time and just tell us what
+you're thinking.
+
+ -George
