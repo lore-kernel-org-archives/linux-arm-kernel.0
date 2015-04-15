@@ -1,75 +1,88 @@
-From: tfiga@google.com (Tomasz Figa)
-Date: Wed, 15 Apr 2015 16:41:17 +0900
-Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <1429081567.16400.16.camel@mhfsdcap03>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
- <CAAFQd5ASywTX7P9L8cogBbBTra0W1=oVxeWfK5=K7L+SR2xaFA@mail.gmail.com>
- <1426677749.22581.38.camel@mhfsdcap03>
- <CAAFQd5DOzFmfXki8GwUC75VQFEWzxBUNUgOtSuRtV6tc27kD2A@mail.gmail.com>
- <1428993067.13552.14.camel@mhfsdcap03>
- <CAAFQd5Db+DacQYa1pdr=w5JpU76AYa-Xhd20wHBF=F6m=Efokw@mail.gmail.com>
- <1429081567.16400.16.camel@mhfsdcap03>
-Message-ID: <CAAFQd5A2FgsbusEbxVVqSeC7hY=Ewe-YbJ7bbvk-SjpSC==xDw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Apr 2015 10:03:32 +0200
+Subject: [PATCH] pinctrl: fix allmodconfig noise
+Message-ID: <1429085012-25183-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 15, 2015 at 4:06 PM, Yong Wu <yong.wu@mediatek.com> wrote:
-> On Wed, 2015-04-15 at 11:20 +0900, Tomasz Figa wrote:
->> On Tue, Apr 14, 2015 at 3:31 PM, Yong Wu <yong.wu@mediatek.com> wrote:
->> >> >>
->> >> >> > +
->> >> >> > +       piommu->protect_va = devm_kmalloc(piommu->dev, MTK_PROTECT_PA_ALIGN*2,
->> >> >>
->> >> >> style: Operators like * should have space on both sides.
->> >> >>
->> >> >> > +                                         GFP_KERNEL);
->> >> >>
->> >> >> Shouldn't dma_alloc_coherent() be used for this?
->> >> >      We don't care the data in it. I think they are the same. Could you
->> >> > help tell me why dma_alloc_coherent may be better.
->> >>
->> >> Can you guarantee that at the time you allocate the memory using
->> >> devm_kmalloc() the memory is not dirty (i.e. some write back data are
->> >> stored in CPU cache) and is not going to be written back in some time,
->> >> overwriting data put there by IOMMU hardware?
->> >>
->> > As I noted in the function "mtk_iommu_hw_init":
->> >
->> >        /* protect memory,HW will write here while translation fault */
->> >        protectpa = __virt_to_phys(piommu->protect_va);
->> >
->> >      We don?t care the content of this buffer, It is ok even though its
->> > data is dirty.
->> >     It seem to be a the protect memory. While a translation fault
->> > happened, The iommu HW will overwrite here instead of writing to the
->> > fault physical address which may be 0 or some random address.
->> >
->>
->> Do you mean that it's just a dummy page for hardware behind the IOMMU
->> to access when the mapping is not available? How would that work with
->> potential on demand paging when the hardware needs to be blocked until
->> the mapping is created?
->>
->> Best regards,
->> Tomasz
->  1. YES
->  2. Sorry. Our iommu HW can not support this right now. The HW can not
-> be blocked until the mapping is created.
+There was some mess in the dependencies in the pinctrl
+Kconfig for compile tests under allmodconfig. Mea Culpa.
 
-OK, that explains it. Well, then I guess this is necessary and
-contents of that memory don't matter that much. (Although, this might
-be a minor security issue, because the faulting hardware would get
-access to some data previously stored by kernel code. Not sure how
-much of a threat would that be, though.)
+Reported-by: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/Kconfig          | 5 ++++-
+ drivers/pinctrl/mediatek/Kconfig | 3 +++
+ drivers/pinctrl/nomadik/Kconfig  | 2 +-
+ 3 files changed, 8 insertions(+), 2 deletions(-)
 
->     If the page is not ready, we can not get the physical address, then
-> How to fill the pagetable for that memory. I think the dma&iommu may
-> guaranty it?
-
-If your hardware can't block until the mapping is created then what
-you do currently seems to be the only option. (+/- the missing cache
-maintenance at initialization)
-
-Best regards,
-Tomasz
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index c6f299ba25cb..aeb5729fbda6 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -95,9 +95,11 @@ config PINCTRL_FALCON
+ 
+ config PINCTRL_MESON
+ 	bool
++	depends on OF
+ 	select PINMUX
+ 	select PINCONF
+ 	select GENERIC_PINCONF
++	select GPIOLIB
+ 	select OF_GPIO
+ 	select REGMAP_MMIO
+ 
+@@ -229,7 +231,8 @@ config PINCTRL_XWAY
+ 
+ config PINCTRL_TB10X
+ 	bool
+-	depends on ARC_PLAT_TB10X
++	depends on OF && ARC_PLAT_TB10X
++	select GPIOLIB
+ 
+ endmenu
+ 
+diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
+index 5983cf5b2c46..6b3551cad111 100644
+--- a/drivers/pinctrl/mediatek/Kconfig
++++ b/drivers/pinctrl/mediatek/Kconfig
+@@ -2,6 +2,7 @@ if ARCH_MEDIATEK || COMPILE_TEST
+ 
+ config PINCTRL_MTK_COMMON
+ 	bool
++	depends on OF
+ 	select PINMUX
+ 	select GENERIC_PINCONF
+ 	select GPIOLIB
+@@ -10,12 +11,14 @@ config PINCTRL_MTK_COMMON
+ # For ARMv7 SoCs
+ config PINCTRL_MT8135
+ 	bool "Mediatek MT8135 pin control" if COMPILE_TEST && !MACH_MT8135
++	depends on OF
+ 	default MACH_MT8135
+ 	select PINCTRL_MTK_COMMON
+ 
+ # For ARMv8 SoCs
+ config PINCTRL_MT8173
+ 	bool "Mediatek MT8173 pin control"
++	depends on OF
+ 	depends on ARM64 || COMPILE_TEST
+ 	default ARM64 && ARCH_MEDIATEK
+ 	select PINCTRL_MTK_COMMON
+diff --git a/drivers/pinctrl/nomadik/Kconfig b/drivers/pinctrl/nomadik/Kconfig
+index d48a5aa24a29..f4fcebfce68c 100644
+--- a/drivers/pinctrl/nomadik/Kconfig
++++ b/drivers/pinctrl/nomadik/Kconfig
+@@ -30,9 +30,9 @@ if (ARCH_U8500 || ARCH_NOMADIK)
+ config PINCTRL_NOMADIK
+ 	bool "Nomadik pin controller driver"
+ 	depends on ARCH_U8500 || ARCH_NOMADIK
++	depends on OF && GPIOLIB
+ 	select PINMUX
+ 	select PINCONF
+-	select GPIOLIB
+ 	select OF_GPIO
+ 	select GPIOLIB_IRQCHIP
+ 
+-- 
+1.9.3
