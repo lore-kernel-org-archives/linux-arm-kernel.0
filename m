@@ -1,23 +1,162 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Wed, 15 Apr 2015 10:55:06 +0100
-Subject: [PATCH] efi: stub: use a pool allocation for the cmdline
-In-Reply-To: <CAKv+Gu-KHpSWLKOgA7UW8C6L1-K3dOieNmF2=qq_t5N73u3Spg@mail.gmail.com>
-References: <1428670569-23089-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAFECyb9efREE=BU5RGSbzAGHqi5CkivUuTf=BRdq02GvFqJaOA@mail.gmail.com>
- <CAKv+Gu-KHpSWLKOgA7UW8C6L1-K3dOieNmF2=qq_t5N73u3Spg@mail.gmail.com>
-Message-ID: <20150415095506.GA4804@codeblueprint.co.uk>
+From: rajeevkumar.linux@gmail.com (rajeev kumar)
+Date: Wed, 15 Apr 2015 15:27:00 +0530
+Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
+In-Reply-To: <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
+References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <CAA7nrtipKF-WtGV-9b40DXYm=jBvM=Pg9PCH9U6yWhj37d41aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Apr, at 07:14:34PM, Ard Biesheuvel wrote:
-> 
-> It is not such a big deal: the memory is reclaimed anyway, I was just
-> trying to reduce the fragmentation a bit, and trying to avoid
-> efi_xxx_alloc() which are substantially heavier than calling
-> allocate_pool() or allocate_pages() directly.
+On Tue, Apr 14, 2015 at 3:40 AM, Arun Ramamurthy
+<arun.ramamurthy@broadcom.com> wrote:
+> Getting phys by index instead of phy names so that we do
+> not have to create a naming scheme when multiple phys
+> are present
+>
+> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>  drivers/usb/host/Kconfig         |  1 +
+>  drivers/usb/host/ehci-platform.c | 70 ++++++++++++++--------------------------
+>  2 files changed, 26 insertions(+), 45 deletions(-)
+>
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 5ad60e4..563f22d 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -284,6 +284,7 @@ config USB_EHCI_ATH79
+>
+>  config USB_EHCI_HCD_PLATFORM
+>         tristate "Generic EHCI driver for a platform device"
+> +       select GENERIC_PHY
+>         default n
+>         ---help---
+>           Adds an EHCI host driver for a generic platform device, which
+> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> index d8a75a5..a7563b9 100644
+> --- a/drivers/usb/host/ehci-platform.c
+> +++ b/drivers/usb/host/ehci-platform.c
+> @@ -88,15 +88,13 @@ static int ehci_platform_power_on(struct platform_device *dev)
+>         }
+>
+>         for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
+> -               if (priv->phys[phy_num]) {
+> -                       ret = phy_init(priv->phys[phy_num]);
+> -                       if (ret)
+> -                               goto err_exit_phy;
+> -                       ret = phy_power_on(priv->phys[phy_num]);
+> -                       if (ret) {
+> -                               phy_exit(priv->phys[phy_num]);
+> -                               goto err_exit_phy;
+> -                       }
+> +               ret = phy_init(priv->phys[phy_num]);
+> +               if (ret)
+> +                       goto err_exit_phy;
 
-Out of curiosity, do you have any runtime numbers to backup the claim
-that allocate_*() is substantially more lightweight?
+Jumping to err_exit_phy will perform phy_power_off also which is not
+required as you are are powering on after phy_init. Wrong level
+jumping
 
--- 
-Matt Fleming, Intel Open Source Technology Center
+~Rajeev
+
+> +               ret = phy_power_on(priv->phys[phy_num]);
+> +               if (ret) {
+> +                       phy_exit(priv->phys[phy_num]);
+> +                       goto err_exit_phy;
+>                 }
+>         }
+>
+> @@ -104,10 +102,8 @@ static int ehci_platform_power_on(struct platform_device *dev)
+>
+>  err_exit_phy:
+>         while (--phy_num >= 0) {
+> -               if (priv->phys[phy_num]) {
+> -                       phy_power_off(priv->phys[phy_num]);
+> -                       phy_exit(priv->phys[phy_num]);
+> -               }
+> +               phy_power_off(priv->phys[phy_num]);
+> +               phy_exit(priv->phys[phy_num]);
+>         }
+>  err_disable_clks:
+>         while (--clk >= 0)
+> @@ -123,10 +119,8 @@ static void ehci_platform_power_off(struct platform_device *dev)
+>         int clk, phy_num;
+>
+>         for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
+> -               if (priv->phys[phy_num]) {
+> -                       phy_power_off(priv->phys[phy_num]);
+> -                       phy_exit(priv->phys[phy_num]);
+> -               }
+> +               phy_power_off(priv->phys[phy_num]);
+> +               phy_exit(priv->phys[phy_num]);
+>         }
+>
+>         for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
+> @@ -154,7 +148,6 @@ static int ehci_platform_probe(struct platform_device *dev)
+>         struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+>         struct ehci_platform_priv *priv;
+>         struct ehci_hcd *ehci;
+> -       const char *phy_name;
+>         int err, irq, phy_num, clk = 0;
+>
+>         if (usb_disabled())
+> @@ -204,36 +197,23 @@ static int ehci_platform_probe(struct platform_device *dev)
+>
+>                 priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
+>                                 "phys", "#phy-cells");
+> -               priv->num_phys = priv->num_phys > 0 ? priv->num_phys : 1;
+>
+> -               priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
+> -                               sizeof(struct phy *), GFP_KERNEL);
+> -               if (!priv->phys)
+> -                       return -ENOMEM;
+> +               if (priv->num_phys > 0) {
+> +                       priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
+> +                                           sizeof(struct phy *), GFP_KERNEL);
+> +                       if (!priv->phys)
+> +                               return -ENOMEM;
+> +               } else
+> +                       priv->num_phys = 0;
+>
+>                 for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
+> -                               err = of_property_read_string_index(
+> -                                               dev->dev.of_node,
+> -                                               "phy-names", phy_num,
+> -                                               &phy_name);
+> -
+> -                               if (err < 0) {
+> -                                       if (priv->num_phys > 1) {
+> -                                               dev_err(&dev->dev, "phy-names not provided");
+> -                                               goto err_put_hcd;
+> -                                       } else
+> -                                               phy_name = "usb";
+> -                               }
+> -
+> -                               priv->phys[phy_num] = devm_phy_get(&dev->dev,
+> -                                               phy_name);
+> -                               if (IS_ERR(priv->phys[phy_num])) {
+> -                                       err = PTR_ERR(priv->phys[phy_num]);
+> -                                       if ((priv->num_phys > 1) ||
+> -                                           (err == -EPROBE_DEFER))
+> -                                               goto err_put_hcd;
+> -                                       priv->phys[phy_num] = NULL;
+> -                               }
+> +                       priv->phys[phy_num] = devm_of_phy_get_by_index(&dev->dev
+> +                                               , dev->dev.of_node
+> +                                               , phy_num);
+> +                       if (IS_ERR(priv->phys[phy_num])) {
+> +                               err = PTR_ERR(priv->phys[phy_num]);
+> +                                       goto err_put_hcd;
+> +                       }
+>                 }
+>
+>                 for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
+> --
+> 2.3.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
