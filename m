@@ -1,51 +1,34 @@
 From: Minghuan.Lian@freescale.com (Minghuan Lian)
-Date: Wed, 15 Apr 2015 17:49:23 +0800
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+Date: Wed, 15 Apr 2015 17:49:22 +0800
+Subject: [PATCH] irqchip/gicv3-its: Decrease page size when needed
+Message-ID: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SMMU of some platforms can only isolate limited device ID.
-This may require that all PCI devices share the same ITS
-device with the fixed device ID. The patch adds function
-arch_msi_share_devid_update used for these platforms to update
-the fixed device ID and maximum MSI interrupts number.
+The default page size of ITS table has been changed to 64KB,
+but for some platforms the real size of allocate memory which
+calculated by DEVBITS of register GITS_TYPER may smaller than
+default size. In this case, psz must be decreased, otherwise,
+the wrong page number will cause kernel hang.
 
 Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index d0374a6..be78d0a 100644
+index 596b0a9..d0374a6 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1169,6 +1169,15 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
- 	return 0;
- }
+@@ -844,6 +844,9 @@ static int its_alloc_tables(struct its_node *its)
  
-+void __weak
-+arch_msi_share_devid_update(struct pci_dev *pdev, u32 *dev_id, u32 *nvesc)
-+{
-+	/*
-+	 * use PCI_DEVID NOT share device ID as default
-+	 * so nothing need to do
-+	 */
-+}
+ 		its->tables[i] = base;
+ 
++		while (alloc_size < psz)
++			psz = psz >> 1;
 +
- static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
- 			   int nvec, msi_alloc_info_t *info)
- {
-@@ -1185,6 +1194,8 @@ static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
- 	dev_alias.count = nvec;
- 
- 	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
-+	arch_msi_share_devid_update(pdev, &dev_alias.dev_id, &dev_alias.count);
-+
- 	its = domain->parent->host_data;
- 
- 	its_dev = its_find_device(its, dev_alias.dev_id);
+ retry_baser:
+ 		val = (virt_to_phys(base) 				 |
+ 		       (type << GITS_BASER_TYPE_SHIFT)			 |
 -- 
 1.9.1
