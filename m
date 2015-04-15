@@ -1,52 +1,44 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 15 Apr 2015 15:46:32 +0100
+Date: Wed, 15 Apr 2015 15:53:51 +0100
 Subject: [RFC PATCH 5/5] arm64: qcom: add cpu operations
-In-Reply-To: <2167031.4Enm47D6vo@wuerfel>
+In-Reply-To: <20150415090425.GA2866@leverpostej>
 References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
  <1428601031-5366-6-git-send-email-galak@codeaurora.org>
- <20150414162953.GL28709@leverpostej> <2167031.4Enm47D6vo@wuerfel>
-Message-ID: <20150415144630.GA22741@localhost>
+ <20150414162953.GL28709@leverpostej> <552D9A37.6070107@redhat.com>
+ <20150415090425.GA2866@leverpostej>
+Message-ID: <20150415145350.GB22741@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 10:51:40PM +0200, Arnd Bergmann wrote:
-> On Tuesday 14 April 2015 17:29:53 Mark Rutland wrote:
-> > > +static int msm_cpu_boot(unsigned int cpu)
-> > > +{
-> > > +       int ret = 0;
-> > > +
-> > > +       if (per_cpu(cold_boot_done, cpu) == false) {
-> > > +               ret = msm_unclamp_secondary_arm_cpu(cpu);
-> > > +               if (ret)
-> > > +                       return ret;
-> > > +               per_cpu(cold_boot_done, cpu) = true;
-> > > +       }
-> > > +       return secondary_pen_release(cpu);
-> > > +}
+On Wed, Apr 15, 2015 at 10:04:25AM +0100, Mark Rutland wrote:
+> On Tue, Apr 14, 2015 at 11:52:39PM +0100, Al Stone wrote:
+> > On 04/14/2015 10:29 AM, Mark Rutland wrote:
+> > >> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> > >> index 8b9e0a9..35cabe5 100644
+> > >> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> > >> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> > >> @@ -185,6 +185,8 @@ nodes to be present and contain the properties described below.
+> > >>                           be one of:
+> > >>                              "psci"
+> > >>                              "spin-table"
+> > > 
+> > > In the case of these two, there's documentation on what the OS, FW, and
+> > > HW are expected to do. There's a PSCI spec, and spin-table is documented
+> > > in booting.txt (which is admittedly not fantastic).
+> > > [snip...]
 > > 
-> > Ah, so cold_boot_done is for pseudo-hotplug. Absolute NAK to that.
-> > 
-> > The only thing this gives you over spin-table is one-time powering up of
-> > the CPUs that can be performed prior to entry to Linux. If you do that,
-> > you can trivially share the spin-table code by setting each CPU's
-> > enable-method to "spin-table".
-> > 
-> > That won't give you cpuidle or actual hotplug. For those you'll need
-> > PSCI.
+> > Perhaps a side topic, but I thought spin-table was being actively discouraged
+> > for arm64.  Forgive me if I missed the memo, but is that not correct?
 > 
-> Maybe a way out for the broken firmware is to have a custom boot wrapper
-> that gets distributed separately and that uses the normal spin-table
-> API. We've done similar things on arch/arm/mach-sunxi for boot loaders
-> that are just too different from what we expect.
+> We prefer that people implement PSCI, and if they must use spin-table,
+> each CPU has its own release address.
+> 
+> However, we don't want implementation-specific mechanisms, and
+> spin-table is preferable to these.
 
-As a starting point, we actually have one that can do both spin table
-and PSCI ;) (three-clause BSD license):
-
-git://git.kernel.org/pub/scm/linux/kernel/git/mark/boot-wrapper-aarch64.git
-
-Its primary goal is to create an ELF file that can be loaded on a
-software model but there isn't anything that prevents you from
-generating a kernel Image-like header.
+An important aspect is that with spin-table you don't get CPU off or
+suspend and some kernel functionality will be missing (kexec being one
+of them).
 
 -- 
 Catalin
