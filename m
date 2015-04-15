@@ -1,93 +1,98 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 15 Apr 2015 12:22:24 +0100
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <2485404.lBlHmzQPKN@wuerfel>
-References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
- <17844053.vZiPCu4un3@wuerfel>
- <20150414144702.GD14546@e104818-lin.cambridge.arm.com>
- <2485404.lBlHmzQPKN@wuerfel>
-Message-ID: <20150415112224.GA26099@e104818-lin.cambridge.arm.com>
+From: Minghuan.Lian@freescale.com (Minghuan.Lian at freescale.com)
+Date: Wed, 15 Apr 2015 11:38:21 +0000
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+In-Reply-To: <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+ <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+Message-ID: <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 05:44:07PM +0200, Arnd Bergmann wrote:
-> On Tuesday 14 April 2015 15:47:02 Catalin Marinas wrote:
-> > On Tue, Apr 14, 2015 at 12:08:11PM +0200, Arnd Bergmann wrote:
-> > > d) don't use the asm-generic/unistd.h table for aarch64-ilp32 at all, but instead
-> > >    reuse the table from arch/arm64/include/asm/unistd32.h
-> > 
-> > IMO, (d) only makes sense if we treat ILP32 as a temporary solution
-> > (a.k.a. hack) hoping that such applications will be eventually built for
-> > LP64. If we treat native ILP32 as a real long term alternative to LP64,
-> > I would rather use the asm-generic/unistd.h for syscalls. For example,
-> > use 'openat' instead of 'open' on the native ILP32 (based on the
-> > assumption that ILP32 is a long term alternative).
-> > 
-> > Unless we are aware of performance impact with (a), that's my preferred
-> > option with some form of (b) next.
+Hi Varun,
+
+Freescale LS2085A SMMU uses in hit/miss mechanism for the concatenation {tbu number,stream_id}. This concatenation is then assigned to a context bank that determines the translation type and form. The Isolation Context Identifier ICID is the main field of stream_id which will be used to hit ITS device. We may look ICID as ITS device ID and PCI device ID. But there are only 64 ICIDs  0 - 63.  If using default PCI_DEVID(bus, devfn)  ((((u16)(bus)) << 8) | (devfn)), PCI device(bus >=1) ) ID will larger than 63.  SMMU will miss this translation.
+In addition, because the ICID number  is only 64, all the PCIe device will use the same ICID and share the same ITS device.
+
+Thanks,
+Minghuan
+
+> -----Original Message-----
+> From: Sethi Varun-B16395
+> Sent: Wednesday, April 15, 2015 7:08 PM
+> To: Lian Minghuan-B31939; linux-pci at vger.kernel.org
+> Cc: Arnd Bergmann; Lian Minghuan-B31939; Hu Mingkai-B21284; Zang Roy-
+> R61911; Yoder Stuart-B08248; Bjorn Helgaas; Wood Scott-B07421; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
 > 
-> Ok, let's call that option
+> Hi Minghuan,
+> Not clear what this patch intends to do. Can you please explain the point
+> about SMMU isolating limited device ID.
 > 
-> e) Use the existing aarch32 data structures with the asm-generic/unistd.h
-> system call numbers.
+> Regards
+> Varun
 > 
-> This would solve the main problem of the data structures just like option
-> d), and the main user-visible change would be that the syscall numbers
-> are shifted compared to aarch32, which is a very minor aspect. We could
-> also deal with the ucontext better this way than what I suggested.
-
-I think that's the easiest from a kernel perspective. But see the other
-sub-thread on the long term view of ILP32 (beyond 2038).
-
-> > The above is mainly about syscall numbers and tables but the ABI goes
-> > beyond this. And the key point is whether we go for an AArch32-like ABI
-> > (32-bit time_t) or we try to define one close to LP64. If we go for an
-> > AArch32-like ABI, we'll have to use the compat layer for some of
-> > syscalls and assess how many of the asm/compat.h structures are
-> > different from the generic ones (I wouldn't expect many).
-> 
-> It would be wildly different from the generic data structures, since we
-> can only use the compat code if the implementation is the same as on
-> aarch32. Essentially we have to define the headers so that all native
-> data structures match what is in arch/arm64/include/asm/compat.h,
-> which in turn is largely the same as arch/arm/include/uapi/asm/*.h.
-
-What I meant by generic structures is those include/uapi/asm-generic/*.h
-structures but compiled in an ILP32 context (exported headers not as
-they are compiled in the LP64 kernel). Many of the asm/compat.h had to
-be defined so that we can build them in the kernel context but many of
-them are the same as the asm-generic ones (when compiled as ILP32).
-
-BTW, we have to sort out the exported headers as well since we can't
-rely on AArch32 for this. In the kernel, we'll have to re-use
-asm/compat.h or some other asm/ilp32.h.
-
-> > > Finally, there is a certain set of security issues from each new syscall
-> > > we introduce. With the aarch32 syscall table, we have a higher degree
-> > > of reuse of existing code, so we won't introduce security bugs that
-> > > are only in one of the two ilp32 ABIs (aarch32 and aarch64).
-> > 
-> > Note that the current aarch32 compat ABI assumes that the top 32-bit of
-> > every register is either zeroed or preserved by the architecture on
-> > exception entry. We know that an AArch32 application cannot access the
-> > top 32-bit of an AArch64 register. With native ILP32 however this is no
-> > longer the case (it is running in AArch64 mode). I can't immediately
-> > think of a problem (information leak) but it needs to be reviewed.
-> 
-> Hmm, interesting point. I'd have to think about this a bit more, but
-> I believe it is already solved:
-> 
-> - For input arguments, we have the COMPAT_SYSCALL_DEFINE wrappers that
->   are meant to deal with this problem.
-> - For output arguments, the kernel controls the register contents,
->   and I don't see a way that the function return value could leak
->   data in the upper bits. All syscall return 'long', so it should
->   be well-defined.
-
-I think you are right. I was more thinking of those routed directly to
-the native (non-compat) syscalls. We would need to make sure the return
-value (X0 being the only register not restored on return from exception)
-has the top 32-bit part zeroed.
-
--- 
-Catalin
+> > -----Original Message-----
+> > From: linux-arm-kernel [mailto:linux-arm-kernel-
+> > bounces at lists.infradead.org] On Behalf Of Minghuan Lian
+> > Sent: Wednesday, April 15, 2015 3:19 PM
+> > To: linux-pci at vger.kernel.org
+> > Cc: Arnd Bergmann; Lian Minghuan-B31939; Hu Mingkai-B21284; Zang Roy-
+> > R61911; Yoder Stuart-B08248; Bjorn Helgaas; Wood Scott-B07421;
+> > linux-arm- kernel at lists.infradead.org
+> > Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> >
+> > SMMU of some platforms can only isolate limited device ID.
+> > This may require that all PCI devices share the same ITS device with
+> > the fixed device ID. The patch adds function
+> > arch_msi_share_devid_update used for these platforms to update the
+> > fixed device ID and maximum MSI interrupts number.
+> >
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> > ---
+> >  drivers/irqchip/irq-gic-v3-its.c | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> >
+> > diff --git a/drivers/irqchip/irq-gic-v3-its.c
+> > b/drivers/irqchip/irq-gic-v3-its.c
+> > index d0374a6..be78d0a 100644
+> > --- a/drivers/irqchip/irq-gic-v3-its.c
+> > +++ b/drivers/irqchip/irq-gic-v3-its.c
+> > @@ -1169,6 +1169,15 @@ static int its_get_pci_alias(struct pci_dev
+> > *pdev,
+> > u16 alias, void *data)
+> >  	return 0;
+> >  }
+> >
+> > +void __weak
+> > +arch_msi_share_devid_update(struct pci_dev *pdev, u32 *dev_id, u32
+> > +*nvesc) {
+> > +	/*
+> > +	 * use PCI_DEVID NOT share device ID as default
+> > +	 * so nothing need to do
+> > +	 */
+> > +}
+> > +
+> >  static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
+> >  			   int nvec, msi_alloc_info_t *info)  { @@ -1185,6
+> > +1194,8 @@ static int its_msi_prepare(struct irq_domain *domain,
+> > +struct
+> > device *dev,
+> >  	dev_alias.count = nvec;
+> >
+> >  	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+> > +	arch_msi_share_devid_update(pdev, &dev_alias.dev_id,
+> > +&dev_alias.count);
+> > +
+> >  	its = domain->parent->host_data;
+> >
+> >  	its_dev = its_find_device(its, dev_alias.dev_id);
+> > --
+> > 1.9.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
