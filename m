@@ -1,13 +1,13 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 15 Apr 2015 11:32:12 +0800
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 15 Apr 2015 04:59:58 +0200
 Subject: [PATCH] ARM: dts: imx23-olinuxino: Fix dr_mode of usb0
 In-Reply-To: <1429043846-28731-1-git-send-email-stefan.wahren@i2se.com>
 References: <1429043846-28731-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20150415033211.GB29095@shlinux2>
+Message-ID: <201504150459.58238.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 08:37:26PM +0000, Stefan Wahren wrote:
+On Tuesday, April 14, 2015 at 10:37:26 PM, Stefan Wahren wrote:
 > The dr_mode of usb0 on imx233-olinuxino is left to default "otg".
 > Since the green LED (GPIO2_1) on imx233-olinuxino is connected to the
 > same pin as USB_OTG_ID it's possible to disable USB host by LED toggling:
@@ -25,31 +25,8 @@ On Tue, Apr 14, 2015 at 08:37:26PM +0000, Stefan Wahren wrote:
 > 
 > Reported-by: Harald Geyer <harald@ccbib.org>
 > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->  arch/arm/boot/dts/imx23-olinuxino.dts |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
-> index 7e6eef2..3b2d74d 100644
-> --- a/arch/arm/boot/dts/imx23-olinuxino.dts
-> +++ b/arch/arm/boot/dts/imx23-olinuxino.dts
-> @@ -93,6 +93,7 @@
->  
->  	ahb at 80080000 {
->  		usb0: usb at 80080000 {
-> +			dr_mode = "host";
->  			vbus-supply = <&reg_usb0_vbus>;
->  			status = "okay";
->  		};
-> -- 
-> 1.7.9.5
-> 
 
-If this board has only host function, I am ok for it.
+Reviewed-by: Marek Vasut <marex@denx.de>
 
-Acked-by: Peter Chen <peter.chen@freescale.com>
-
--- 
-
-Best Regards,
-Peter Chen
+Best regards,
+Marek Vasut
