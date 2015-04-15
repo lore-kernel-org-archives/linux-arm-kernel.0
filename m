@@ -1,45 +1,40 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 15 Apr 2015 18:58:07 +0100
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <1429119688.7346.123.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
- <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
- <552E9E8D.1080000@eu.citrix.com>
- <1429119688.7346.123.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <alpine.DEB.2.02.1504151846110.7690@kaball.uk.xensource.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Wed, 15 Apr 2015 21:04:37 +0300
+Subject: [PATCH 2/2] arm64: add KASan support
+In-Reply-To: <552DCED9.40207@codeaurora.org>
+References: <1427208544-8232-1-git-send-email-a.ryabinin@samsung.com>
+ <1427208544-8232-3-git-send-email-a.ryabinin@samsung.com>
+ <20150401122843.GA28616@e104818-lin.cambridge.arm.com>
+ <551E993E.5060801@samsung.com> <552DCED9.40207@codeaurora.org>
+Message-ID: <552EA835.5070704@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Apr 2015, Eric Dumazet wrote:
-> On Wed, 2015-04-15 at 18:23 +0100, George Dunlap wrote:
+On 04/15/2015 05:37 AM, David Keitel wrote:
+>>>> +	pgd = __pgd(__pa(kasan_zero_pmd) | PAGE_KERNEL);
+>>>> +#else
+>>>> +	pgd = __pgd(__pa(kasan_zero_pte) | PAGE_KERNEL);
+>>>> +#endif
+>>>> +
+>>>> +	for (i = pgd_index(start); start < end; i++) {
+>>>> +		set_pgd(&pgdp[i], pgd);
+>>>> +		start += PGDIR_SIZE;
+>>>> +	}
+>>>> +}
+>>>
+>>> Same problem as above with PAGE_KERNEL. You should just use
+>>> pgd_populate().
 > 
-> > Which means that max(2*skb->truesize, sk->sk_pacing_rate >>10) is
-> > *already* larger for Xen; that calculation mentioned in the comment is
-> > *already* doing the right thing.
+> Any suggestion what the correct flag setting would be here for a 4K mapping?
 > 
-> Sigh.
+> I tried fixing this by changing this to pud and setting the PMD_TYPE_TABLE flag for kasan_zero_pmd. However the MMU doesn't like it and I get a first level address translation fault.
 > 
-> 1ms of traffic at 40Gbit is 5 MBytes
+> If you have any updated patches to share I'd be glad to try them out.
 > 
-> The reason for the cap to /proc/sys/net/ipv4/tcp_limit_output_bytes is
-> to provide the limitation of ~2 TSO packets, which _also_ is documented.
-> 
-> Without this limitation, 5 MBytes could translate to : Fill the queue,
-> do not limit.
-> 
-> If a particular driver needs to extend the limit, fine, document it and
-> take actions.
 
-What actions do you have in mind exactly?  It would be great if you
-could suggest how to move forward from here, beside documentation.
+Sorry, I didn't have much time on work on this yet.
 
-I don't think we can really expect every user that spawns a new VM in
-the cloud to manually echo blah >
-/proc/sys/net/ipv4/tcp_limit_output_bytes to an init script.  I cannot
-imagine that would work well.
+I've pushed the most fresh thing that I have in git:
+	git://github.com/aryabinin/linux.git kasan/arm64v1
+
+It's the same patches with two simple but important fixes on top of it.
