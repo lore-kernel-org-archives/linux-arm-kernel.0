@@ -1,60 +1,57 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 15 Apr 2015 10:17:59 -0600
-Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
-In-Reply-To: <20150414223242.GA18888@e107981-lin.cambridge.arm.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Wed, 15 Apr 2015 10:29:33 -0600
+Subject: [RFC PATCH 5/5] arm64: qcom: add cpu operations
+In-Reply-To: <20150415145350.GB22741@localhost>
 References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
- <493B15F8-0EBE-4633-9604-671EF403F36E@codeaurora.org>
- <20150410161052.GF6854@e104818-lin.cambridge.arm.com>
- <FDC755A7-ACCF-4222-8730-782EEC632159@codeaurora.org>
- <20150413094117.GA2745@e104818-lin.cambridge.arm.com>
- <245B9FDD-E1B5-41E4-9F24-4D5BB86C450E@codeaurora.org>
- <20150414223242.GA18888@e107981-lin.cambridge.arm.com>
-Message-ID: <20150415161759.GB1111@linaro.org>
+ <1428601031-5366-6-git-send-email-galak@codeaurora.org>
+ <20150414162953.GL28709@leverpostej> <552D9A37.6070107@redhat.com>
+ <20150415090425.GA2866@leverpostej> <20150415145350.GB22741@localhost>
+Message-ID: <552E91ED.2080805@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14 2015 at 16:32 -0600, Lorenzo Pieralisi wrote:
->On Tue, Apr 14, 2015 at 03:21:17PM +0100, Kumar Gala wrote:
->
->[...]
->
->> > Looking beyond this set of patches, I can foresee that you won't care
->> > about the generic arm64 cpuidle driver either, or more precisely the
->> > separation between cpuidle subsystem+driver and the SoC-specific
->> > back-end (cpu_operations).
+On 04/15/2015 08:53 AM, Catalin Marinas wrote:
+> On Wed, Apr 15, 2015 at 10:04:25AM +0100, Mark Rutland wrote:
+>> On Tue, Apr 14, 2015 at 11:52:39PM +0100, Al Stone wrote:
+>>> On 04/14/2015 10:29 AM, Mark Rutland wrote:
+>>>>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>>>>> index 8b9e0a9..35cabe5 100644
+>>>>> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>>>>> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>>>>> @@ -185,6 +185,8 @@ nodes to be present and contain the properties described below.
+>>>>>                           be one of:
+>>>>>                              "psci"
+>>>>>                              "spin-table"
+>>>>
+>>>> In the case of these two, there's documentation on what the OS, FW, and
+>>>> HW are expected to do. There's a PSCI spec, and spin-table is documented
+>>>> in booting.txt (which is admittedly not fantastic).
+>>>> [snip...]
+>>>
+>>> Perhaps a side topic, but I thought spin-table was being actively discouraged
+>>> for arm64.  Forgive me if I missed the memo, but is that not correct?
 >>
->> That's probably true for what I guess are a number of reasons.  I'm guessing the arm64 cpuidle driver expects PSCI.
->
->Wrap lines sensibly please.
->
->The arm64 cpuidle driver, that is now arm generic cpuidle driver does
->not expect anything apart from an enable-method (and you pulled
->part of its back-end implementation for arm32 Qualcomm platforms, FYI).
->
-The backend for this SoC would leverage the same platform code as ARM32.
-The cpu_operations callbacks for init and suspend will call into the the
-same platform functions used by arm32 QCOM SoCs.
+>> We prefer that people implement PSCI, and if they must use spin-table,
+>> each CPU has its own release address.
+>>
+>> However, we don't want implementation-specific mechanisms, and
+>> spin-table is preferable to these.
+> 
+> An important aspect is that with spin-table you don't get CPU off or
+> suspend and some kernel functionality will be missing (kexec being one
+> of them).
+> 
 
-Thanks,
-Lina
+Thanks for the clarifications.  I misunderstood; I knew PSCI was
+preferred but somehow had it in my head that spin-table was just
+a non-starter.
 
->It took years to consolidate it and the main reason was the lack of
->standard interfaces for power down/up sequences that this patchset of
->yours wants to promote in arm64 world.
->
->The lack of standard power interfaces may not have been an issue for you,
->who cares about Qualcomm code, it has been a sore issue for people
->trying to generalize things across ARM platforms in the kernel, which is
->the only sensible way forward.
->
->PSCI is a standard interface (and Qualcomm are already contributing to
->it, for the records) that can certainly be extended, and you are welcome
->to contribute to it, but certainly not ignored.
->
->Thanks,
->Lorenzo
->--
->To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->the body of a message to majordomo at vger.kernel.org
->More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
