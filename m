@@ -1,49 +1,52 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 15 Apr 2015 11:51:32 -0500
-Subject: [PATCH 1/2] pinctrl: bindings: pinctrl: Add support for TI's
- IODelay configuration
-In-Reply-To: <20150415012910.GA29560@csclub.uwaterloo.ca>
-References: <1425427237-11511-1-git-send-email-nm@ti.com>
- <1425427237-11511-2-git-send-email-nm@ti.com>
- <CACRpkdaLEPzBywMnMrteboK7Q4su8PoB0wjnGvVpgUJ=2czVxQ@mail.gmail.com>
- <20150310153321.GO5264@atomide.com> <54FF28F5.4040707@ti.com>
- <20150310173115.GS5264@atomide.com> <54FF38F3.2030703@ti.com>
- <CACRpkdZ1faucps07jaT9kOyviC+Sw6gPkbF=cAGCUj+DiaEgTA@mail.gmail.com>
- <20150318014151.GL31346@atomide.com>
- <20150415012910.GA29560@csclub.uwaterloo.ca>
-Message-ID: <552E9714.10001@ti.com>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Wed, 15 Apr 2015 19:01:23 +0200
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <20150415153800.GG22741@localhost>
+References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
+ <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
+ <20150415100153.GA11626@localhost> <2243754.JW5bGY74bP@wuerfel>
+ <20150415153800.GG22741@localhost>
+Message-ID: <C342B5CD-D1E2-4364-B99E-C85470A869BB@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2015 08:29 PM, Lennart Sorensen wrote:
-> On Tue, Mar 17, 2015 at 06:41:51PM -0700, Tony Lindgren wrote:
->> Yeah agreed. I suggest discussing the binding and the generic
->> parsing code for it first :)
->>  
->> It seems with the generic binding the actual driver should be
->> just the hardware specific code hopefully.
+
+> On 15 Apr 2015, at 17:38, Catalin Marinas <catalin.marinas@arm.com> wrote:
 > 
-> Did this thread go anywhere in the last month?  I am certainly looking
-> forward to seeing what the resolution is to this, given for our use the
-> boot loader setup is not appealing at all.
+> On Wed, Apr 15, 2015 at 05:15:16PM +0200, Arnd Bergmann wrote:
+>> On Wednesday 15 April 2015 11:01:54 Catalin Marinas wrote:
+>>> On Wed, Apr 15, 2015 at 11:18:06AM +0200, Dr. Philipp Tomsich wrote:
+>>>> We?ve run full systems (built from buildroot) consisting of ILP32 binaries
+>>>> only (ok? admittedly gdb was an exception, as we haven?t fixed the fact
+>>>> that someone has assumed sizeof(long) == 8 in some data-structure of
+>>>> the AArch64 backend there) in our verification runs. In fact, it will be very 
+>>>> special classes of applications that will need a 64bit address-space.
+>>> 
+>>> If we are to merge AArch64-ILP32, I'd like to see a full software stack,
+>>> maybe a distro like Debian. Otherwise the kernel code will bit-rot (just
+>>> like it regularly happens with big endian).
+>> 
+>> I actually don't think this should be a prerequisite. We have too many
+>> dependencies here, and as long as we are debating the exact ABI,
+>> any work that gets put into a full distro support (other than openembedded
+>> etc) would likely be wasted.
 > 
-I am yet to post a new revision to this series - few other stuff got
-in the way. IODelay driver in no way removes the constraint that the
-SoC architecture has - most of the pins still need to be muxed in
-bootloader - we cannot escape that. The reasoning for doing the mux in
-bootloader is independent of the need for iodelay.
+> I agree with this not being a prerequisite for merging ILP32 but at
+> least a long term plan to do something beyond openembedded, once we
+> agreed on the ABI and _upstreamed_ the kernel and glibc code. Those
+> legacy applications will probably need more than glibc to run and it's
+> likely that people will want to run them in a full AArch64 (LP64)
+> environment. A simpler approach (to me, I'm not a distro person) would
+> be to just provide additional ILP32 libs in a multi-lib arm64 distro
+> like Debian rather than all the packages. As for the compiler, AFAIK
+> aarch64-linux-gnu-* simply needs an option to build for ILP32.
 
-Reasoning for mux in bootloader is because the mux and pull fields are
-glitchy - much more than previous generations of TI SoCs and
-significantly long enough to cause issues depending on the pins being
-muxed.
+We?ve had a PPA for Ubuntu 14.04 in the past that included glibc, ncurses, 
+termcap, zlib and a few others in a multiarch setup? this was used in the 
+field by customers and worked rather well.
 
-Reasoning for iodelay is different - it is a hardware block meant to
-control the timing of signals in a particular signal path to ensure
-that specification compliance is met.
+One of the engineers in my team is currently working on carrying this forward
+so we can use this for any Debian-based AArch64 distribution in the future.
 
-Lets try not to mix the two.
-
--- 
-Regards,
-Nishanth Menon
+Best,
+Phil.
