@@ -1,67 +1,75 @@
 From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 15 Apr 2015 22:26:36 +0800
-Subject: [PATCH RFC v1 2/5] clk: add missing lock when call clk_core_enable in
- clk_set_parent
+Date: Wed, 15 Apr 2015 22:26:37 +0800
+Subject: [PATCH RFC v1 3/5] clk: remove unneeded __clk_enable and __clk_disable
 In-Reply-To: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
 References: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <1429107999-24413-3-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <1429107999-24413-4-git-send-email-aisheng.dong@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_core_enable is executed without &enable_clock in clk_set_parent function.
-Adding it to avoid potential race condition issue.
+The only thing __clk_enable/__clk_disable does is NULL pointer checking
+of clk except calling clk_core_{enable|disable} which is already handled
+by clk_core_{enable|disable}.
+So remove this unneeded function.
 
-Fixes: 035a61c314eb ("clk: Make clk API return per-user struct clk instances")
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
 ---
- drivers/clk/clk.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/clk/clk.c | 20 ++------------------
+ 1 file changed, 2 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index cc56ba2..492644f 100644
+index 492644f..7af553d 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -1475,8 +1475,10 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *clk,
- 	 */
- 	if (clk->prepare_count) {
- 		clk_core_prepare(parent);
-+		flags = clk_enable_lock();
- 		clk_core_enable(parent);
- 		clk_core_enable(clk);
-+		clk_enable_unlock(flags);
- 	}
- 
- 	/* update the clk tree topology */
-@@ -1491,13 +1493,17 @@ static void __clk_set_parent_after(struct clk_core *clk,
- 				   struct clk_core *parent,
- 				   struct clk_core *old_parent)
- {
-+	unsigned long flags;
-+
- 	/*
- 	 * Finish the migration of prepare state and undo the changes done
- 	 * for preventing a race with clk_enable().
- 	 */
- 	if (clk->prepare_count) {
-+		flags = clk_enable_lock();
- 		clk_core_disable(clk);
- 		clk_core_disable(old_parent);
-+		clk_enable_unlock(flags);
- 		clk_core_unprepare(old_parent);
- 	}
+@@ -1023,14 +1023,6 @@ static void clk_core_disable(struct clk_core *clk)
+ 	clk_core_disable(clk->parent);
  }
-@@ -1525,8 +1531,10 @@ static int __clk_set_parent(struct clk_core *clk, struct clk_core *parent,
- 		clk_enable_unlock(flags);
  
- 		if (clk->prepare_count) {
-+			flags = clk_enable_lock();
- 			clk_core_disable(clk);
- 			clk_core_disable(parent);
-+			clk_enable_unlock(flags);
- 			clk_core_unprepare(parent);
- 		}
- 		return ret;
+-static void __clk_disable(struct clk *clk)
+-{
+-	if (!clk)
+-		return;
+-
+-	clk_core_disable(clk->core);
+-}
+-
+ /**
+  * clk_disable - gate a clock
+  * @clk: the clk being gated
+@@ -1051,7 +1043,7 @@ void clk_disable(struct clk *clk)
+ 		return;
+ 
+ 	flags = clk_enable_lock();
+-	__clk_disable(clk);
++	clk_core_disable(clk->core);
+ 	clk_enable_unlock(flags);
+ }
+ EXPORT_SYMBOL_GPL(clk_disable);
+@@ -1089,14 +1081,6 @@ static int clk_core_enable(struct clk_core *clk)
+ 	return 0;
+ }
+ 
+-static int __clk_enable(struct clk *clk)
+-{
+-	if (!clk)
+-		return 0;
+-
+-	return clk_core_enable(clk->core);
+-}
+-
+ /**
+  * clk_enable - ungate a clock
+  * @clk: the clk being ungated
+@@ -1116,7 +1100,7 @@ int clk_enable(struct clk *clk)
+ 	int ret;
+ 
+ 	flags = clk_enable_lock();
+-	ret = __clk_enable(clk);
++	ret = clk_core_enable(clk->core);
+ 	clk_enable_unlock(flags);
+ 
+ 	return ret;
 -- 
 1.9.1
