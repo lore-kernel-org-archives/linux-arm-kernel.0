@@ -1,76 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Apr 2015 13:49:14 +0100
-Subject: [v3 2/5] arm64: kvm: allow EL2 context to be reset on shutdown
-In-Reply-To: <55276A7E.1080508@linaro.org>
-References: <1427953216-11737-1-git-send-email-takahiro.akashi@linaro.org>
- <1427953216-11737-3-git-send-email-takahiro.akashi@linaro.org>
- <20150408130520.GB5977@leverpostej> <552605CD.7000704@linaro.org>
- <20150409150244.GG9648@leverpostej> <55276A7E.1080508@linaro.org>
-Message-ID: <20150415124913.GF2866@leverpostej>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 15 Apr 2015 13:50:18 +0100
+Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+In-Reply-To: <20150415115833.GB18864@arm.com>
+References: <20150409144029.GE9648@leverpostej>
+ <1428591425-17330-1-git-send-email-msalter@redhat.com>
+ <552E40F6.1010504@arm.com> <20150415115833.GB18864@arm.com>
+Message-ID: <552E5E8A.6070902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > What I don't understand is why we can't move the init and tear-down
-> > functions into kvm_arch_hardware_enable/disable(). They seem to be for
-> > precisely what you are implementing, with the only difference being the
-> > time that they are called.
-> 
-> I don't know, neither. I just followed the discussions between Marc and Geoff,
-> and their conclusion. I guessed that *refactoring* might be more complicated than
-> expected.
-> 
-> FYI, I gave a quick try to kvm_arch_hardware_enable() approach by removing
-> cpu_init_hyp_mode() from init_hyp_mode() and putting it into kvm_arch_hardware_enable(),
-> and it seems to work, at least, in my environment:
->     boot => start a kvm guest => kexec reboot => start a kvm guest
+On 15/04/15 12:58, Will Deacon wrote:
+> On Wed, Apr 15, 2015 at 11:44:06AM +0100, Suzuki K. Poulose wrote:
+>> On 09/04/15 15:57, Mark Salter wrote:
+>>> Currently in validate_group(), there is a static initializer
+>>> for fake_pmu.used_mask which is based on CPU_BITS_NONE but
+>>> the used_mask array size is based on CCI_PMU_MAX_HW_EVENTS.
+>>> CCI_PMU_MAX_HW_EVENTS is not based on NR_CPUS, so CPU_BITS_NONE
+>>> is not correct and will cause a build failure if NR_CPUS
+>>> is set high enough to make CPU_BITS_NONE larger than used_mask.
+>>>
+>>> Signed-off-by: Mark Salter <msalter@redhat.com>
+>>> ---
+>>>    drivers/bus/arm-cci.c | 2 +-
+>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+>>> index 84fd660..759e41c 100644
+>>> --- a/drivers/bus/arm-cci.c
+>>> +++ b/drivers/bus/arm-cci.c
+>>> @@ -684,7 +684,7 @@ validate_group(struct perf_event *event)
+>>>    		 * Initialise the fake PMU. We only need to populate the
+>>>    		 * used_mask for the purposes of validation.
+>>>    		 */
+>>> -		.used_mask = CPU_BITS_NONE,
+>>> +		.used_mask = { 0 },
+>>>    	};
+>>>
+>>>    	if (!validate_event(&fake_pmu, leader))
+>>>
+>> I have a series of patches to add CCI-500 PMU, targeting 4.2, which
+>> changes the used_mask to a pointer and changes it to depend on the
+>> number of counters available on the CCI PMU.  I will post it in very
+>> soon here, which could make this patch obsolete. Let me know if you
+>> don't mind getting this sorted out through my series. I am fine either way.
+>
+> I'd rather have the fix in for 4.1 and then have your CCI-500 patches based
+> on that.
+>
+> Will
+>
+OK, will rebase my patches on top of this one.
 
-That sounds pretty convincing to me, assuming you wired the teardown
-intp kvm_arch_hardware_disable() ?
-
-> > Either I'm missing something, or we can simply implement the existing
-> > hooks. I assume I'm missing something.
-> 
-> Marc, Geoff, any comments?
-> 
-> 
-> >>>> +static struct notifier_block kvm_reboot_nb = {
-> >>>> +	.notifier_call		= kvm_reboot_notify,
-> >>>> +	.next			= NULL,
-> >>>> +	.priority		= 0, /* FIXME */
-> >>>
-> >>> It would be helpful for the comment to explain why this is wrong, and
-> >>> what needs fixing.
-> >>
-> >> Thank for reminding me of this.
-> >>
-> >> *priority* enforces a calling order of registered hook functions.
-> >> If some hook returns NOTIFY_STOP_MASK, subsequent hooks won't be called.
-> >> (Nevertheless, reboot sequence will go ahead. See kernel_restart_prepare()/
-> >> notifier_call_chain().)
-> >>
-> >> So we should make sure that kvm_reboot_notify() be called
-> >> 1) after any hook functions which may depend on kvm, and
-> >
-> > Which hooks depend on KVM?
-> 
-> I think I answered this question below:
->  >> But how can we guarantee this and determine a priority of kvm_reboot_notify()?
->  >> Looking into all the occurrences of register_reboot_notifier(),
->  >> 1) => nothing
->  >> 2) => virt/kvm/kvm_main.c (priority: 0)
->  >> 3) => drivers/cpufreq/s32416-cpufreq.c (priority: 0)
->  >>        drivers/cpufreq/s5pv210-cpufreq.c (priority: 0)
->  >>
->  >> So a priority higher than zero might be safe and better, but exactly what?
->  >> Some hooks use "INT_MAX."
-
-I can't see anything listed which has a dependency on KVM.
-
-The KVM notifier would be superseded by
-kvm_arch_hardware_{disable,enable}, and the cpufreq instances don't seem
-to have any relationship to KVM.
-
-Other architectures use kvm_arch_hardware_{enable,disable}(), so I
-imagine the core KVM code has no problem with the ordering of these.
-
-Mark.
+Thanks
+Suzuki
