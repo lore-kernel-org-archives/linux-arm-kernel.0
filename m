@@ -1,140 +1,35 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 15 Apr 2015 11:06:48 -0700
-Subject: [PATCH 12/13] thermal: Add support for hardware-tracked trip
- points
-In-Reply-To: <1427385240-6086-13-git-send-email-s.hauer@pengutronix.de>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-13-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150415180648.GS32500@ld-irv-0074>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 15 Apr 2015 11:08:23 -0700
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <552EA604.8010400@hp.com>
+References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
+ <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+ <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+ <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
+ <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552E9E8D.1080000@eu.citrix.com>
+ <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA2BC.5000707@eu.citrix.com>
+ <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA604.8010400@hp.com>
+Message-ID: <1429121303.7346.126.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Wed, 2015-04-15 at 10:55 -0700, Rick Jones wrote:
+> >
+> > Have you tested this patch on a NIC without GSO/TSO ?
+> >
+> > This would allow more than 500 packets for a single flow.
+> >
+> > Hello bufferbloat.
+> 
+> Woudln't the fq_codel qdisc on that interface address that problem?
 
-On Thu, Mar 26, 2015 at 04:53:59PM +0100, Sascha Hauer wrote:
-> This adds support for hardware-tracked trip points to the device tree
-> thermal sensor framework.
-> 
-> The framework supports an arbitrary number of trip points. Whenever
-> the current temperature is updated, the trip points immediately
-> below and above the current temperature are found. A .set_trips
-> callback is then called with the temperatures. If there is no trip
-> point above or below the current temperature, the passed trip
-> temperature will be ULONG_MAX or 0 respectively. In this callback,
-> the driver should program the hardware such that it is notified
-> when either of these trip points are triggered. When a trip point
-> is triggered, the driver should call `thermal_zone_device_update'
-> for the respective thermal zone. This will cause the trip points
-> to be updated again.
-> 
-> If .set_trips is not implemented, the framework behaves as before.
-> 
-> This patch is based on an earlier version from Mikko Perttunen
-> <mikko.perttunen@kapsi.fi>
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/thermal/thermal_core.c | 41 +++++++++++++++++++++++++++++++++++++++++
->  include/linux/thermal.h        |  3 +++
->  2 files changed, 44 insertions(+)
-> 
-> diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-> index dcdf45e..7138f8f 100644
-> --- a/drivers/thermal/thermal_core.c
-> +++ b/drivers/thermal/thermal_core.c
-> @@ -434,6 +434,45 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
->  }
->  EXPORT_SYMBOL_GPL(thermal_zone_get_temp);
->  
-> +static void thermal_zone_set_trips(struct thermal_zone_device *tz)
-> +{
-> +	unsigned long low = 0;
-> +	unsigned long high = ULONG_MAX;
-> +	unsigned long trip_temp, hysteresis;
-> +	unsigned long temp = tz->temperature;
-> +	int i;
-> +
-> +	if (!tz->ops->set_trips)
-> +		return;
-> +
-> +	/* No need to change trip points */
-> +	if (temp > tz->prev_low_trip && temp < tz->prev_high_trip)
-> +		return;
+Last time I checked, default qdisc was pfifo_fast.
 
-I see that you don't actually initialize prev_{low,high}_trip during
-device initialization, so they both start out as zero. I suppose that
-works here, mostly by coincidence, because it means we'll still always
-recalculate trip points the first time, but might it make sense to
-explicitly initialize them to:
-  low = ULONG_MAX
-  high = 0
-at init time? (Or, if these change to integer: INT_MAX and -INT_MAX?)
-
-Thanks,
-Brian
-
-> +
-> +	for (i = 0; i < tz->trips; i++) {
-> +		unsigned long trip_low;
-> +
-> +		tz->ops->get_trip_temp(tz, i, &trip_temp);
-> +		tz->ops->get_trip_hyst(tz, i, &hysteresis);
-> +
-> +		trip_low = trip_temp - hysteresis;
-> +
-> +		if (trip_low < temp && trip_low > low)
-> +			low = trip_low;
-> +
-> +		if (trip_temp > temp && trip_temp < high)
-> +			high = trip_temp;
-> +	}
-> +
-> +	tz->prev_low_trip = low;
-> +	tz->prev_high_trip = high;
-> +
-> +	dev_dbg(&tz->device, "new temperature boundaries: %lu < x < %lu\n",
-> +			low, high);
-> +
-> +	tz->ops->set_trips(tz, low, high);
-> +}
-> +
->  void thermal_zone_device_update(struct thermal_zone_device *tz)
->  {
->  	int count;
-> @@ -460,6 +499,8 @@ void thermal_zone_device_update(struct thermal_zone_device *tz)
->  	dev_dbg(&tz->device, "last_temperature=%lu, current_temperature=%lu\n",
->  				tz->last_temperature, tz->temperature);
->  
-> +	thermal_zone_set_trips(tz);
-> +
->  	for (count = 0; count < tz->trips; count++)
->  		handle_thermal_trip(tz, count);
->  }
-> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-> index ac2897c..b870702 100644
-> --- a/include/linux/thermal.h
-> +++ b/include/linux/thermal.h
-> @@ -87,6 +87,7 @@ struct thermal_zone_device_ops {
->  	int (*unbind) (struct thermal_zone_device *,
->  		       struct thermal_cooling_device *);
->  	int (*get_temp) (struct thermal_zone_device *, unsigned long *);
-> +	int (*set_trips) (struct thermal_zone_device *, unsigned long, unsigned long);
->  	int (*get_mode) (struct thermal_zone_device *,
->  			 enum thermal_device_mode *);
->  	int (*set_mode) (struct thermal_zone_device *,
-> @@ -183,6 +184,8 @@ struct thermal_zone_device {
->  	unsigned long temperature;
->  	unsigned long last_temperature;
->  	unsigned long emul_temperature;
-> +	unsigned long prev_low_trip;
-> +	unsigned long prev_high_trip;
->  	int passive;
->  	unsigned int forced_passive;
->  	const struct thermal_zone_device_ops *ops;
-> -- 
-> 2.1.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+These guys do not want to change a sysctl, how pfifo_fast will magically
+becomes fq_codel ?
