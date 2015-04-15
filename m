@@ -1,108 +1,51 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Wed, 15 Apr 2015 01:51:31 +0000
-Subject: [PATCHv6 0/4] watchdog: Extend kernel API and add
- early_timeout_sec feature
-In-Reply-To: <1428996412-30448-1-git-send-email-timo.kokkonen@offcode.fi>
-References: <1428996412-30448-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFDB902A@penmbx02.corp.atmel.com>
+From: tfiga@google.com (Tomasz Figa)
+Date: Wed, 15 Apr 2015 11:20:51 +0900
+Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <1428993067.13552.14.camel@mhfsdcap03>
+References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+ <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
+ <CAAFQd5ASywTX7P9L8cogBbBTra0W1=oVxeWfK5=K7L+SR2xaFA@mail.gmail.com>
+ <1426677749.22581.38.camel@mhfsdcap03>
+ <CAAFQd5DOzFmfXki8GwUC75VQFEWzxBUNUgOtSuRtV6tc27kD2A@mail.gmail.com>
+ <1428993067.13552.14.camel@mhfsdcap03>
+Message-ID: <CAAFQd5Db+DacQYa1pdr=w5JpU76AYa-Xhd20wHBF=F6m=Efokw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Apr 14, 2015 at 3:31 PM, Yong Wu <yong.wu@mediatek.com> wrote:
+>> >>
+>> >> > +
+>> >> > +       piommu->protect_va = devm_kmalloc(piommu->dev, MTK_PROTECT_PA_ALIGN*2,
+>> >>
+>> >> style: Operators like * should have space on both sides.
+>> >>
+>> >> > +                                         GFP_KERNEL);
+>> >>
+>> >> Shouldn't dma_alloc_coherent() be used for this?
+>> >      We don't care the data in it. I think they are the same. Could you
+>> > help tell me why dma_alloc_coherent may be better.
+>>
+>> Can you guarantee that at the time you allocate the memory using
+>> devm_kmalloc() the memory is not dirty (i.e. some write back data are
+>> stored in CPU cache) and is not going to be written back in some time,
+>> overwriting data put there by IOMMU hardware?
+>>
+> As I noted in the function "mtk_iommu_hw_init":
+>
+>        /* protect memory,HW will write here while translation fault */
+>        protectpa = __virt_to_phys(piommu->protect_va);
+>
+>      We don?t care the content of this buffer, It is ok even though its
+> data is dirty.
+>     It seem to be a the protect memory. While a translation fault
+> happened, The iommu HW will overwrite here instead of writing to the
+> fault physical address which may be 0 or some random address.
+>
 
+Do you mean that it's just a dummy page for hardware behind the IOMMU
+to access when the mapping is not available? How would that work with
+potential on demand paging when the hardware needs to be blocked until
+the mapping is created?
 
-> -----Original Message-----
-> From: Timo Kokkonen [mailto:timo.kokkonen at offcode.fi]
-> Sent: 2015?4?14? 15:27
-> To: linux-arm-kernel at lists.infradead.org; linux-watchdog at vger.kernel.org;
-> boris.brezillon at free-electrons.com; Ferre, Nicolas; alexandre.belloni at free-
-> electrons.com
-> Cc: Yang, Wenyou; Timo Kokkonen
-> Subject: [PATCHv6 0/4] watchdog: Extend kernel API and add early_timeout_sec
-> feature
-> 
-> The watchdog kernel API is quite limited. It has support for providing generic
-> device handling, but it doesn't really know anything about the watchdog hardware
-> or its constraints. The watchdog drivers come with a lot of diversity and their own
-> set of quirks and constraints. Some of their limitations are not nice for the user
-> space, so the drivers work around them with all sorts of ad hoc implementations.
-> 
-> One common pattern is to use kernel timers or work queues to allow longer
-> timeout parameters than the actual hardware supports. To solve this problem, this
-> patch set extends the kernel watchdog API with a few parameters that let the core
-> know more about the watchdog HW and take care about the timeout extending.
-> 
-> The patch set also implements "early_timeout_sec" feature that is very common
-> on many production systems where early kernel or user space crashes must lead
-> to a device reset. Traditional watchdog handling does not allow this as the
-> watchdog is stopped (fully or emulating stopped state with kernel timers) before
-> user space opens it for the first time.
-> 
-> The changes are designed to be taken in use one driver at time. If the driver does
-> not set the new parameters and call watchdog_init_params(), the watchdog
-> behavior is exactly the same as before.
-> 
-> In principle this new API makes it possible for the user space to see every
-> watchdog hardware to behave the same, at least in terms of watchdog timeouts.
-> Once the API is in, it should be easier to move even more common behavior out of
-> the driver code to the watchdog core and make the drivers simpler. This patch set
-> converts at91sam9_wdt to use the new API.
-> 
-> Please review and give feedback.
-
-Tested on sama5d4ek, it works fine.
-
-> 
-> Patch revision history:
-> 
-> -v6: Fixed some issued based on feedback from Wenyou Yang. The logic
->   in watchdog_worker() function is now significantly easier to
->   read. Several errors with stopping and starting the worker are also
->   now fixed.
-> 
-> -v5: Re-think the approach to be fully generic. The early_timeout_sec
->   handling is no longer in the driver but in the watchdog core. As a
->   result the core needed to gain knowledge about the watchdog
->   hardware. Appropriate handling is added in the core. The side effect
->   for this is that drivers using the new extensions can be simplified
->   a lot and different kinds of watchdog hardware can be made to
->   behave the same for the user space.
-> 
-> -v4: Binding documentation is now separated completely from the driver
->   patch. The documentation no longer makes any assumptions about how
->   the actual implementation is made, it just describes the actual
->   behavior the driver should implement in order to satisfy the
->   requirement.
-> 
-> - v3: Rename the property to "early-timeout-sec" and use it as a
->   timeout value that stops the timer in the atmel driver after the
->   timeout expires. A watchdog.txt is also introduced for documenting
->   the common watchdog properties, including now this one and
->   "timeout-sec" property.
-> 
-> - v2: Rename the property to "enable-early-reset" as the behavior
->   itself is not atmel specific. This way other drivers are free to
->   implement same behavior with the same property name.
-> 
-> - v1: Propose property name "atmle,no-early-timer" for disabling the
->   timer that keeps the atmel watchdog running until user space opens
->   the device.
-> 
-> Timo Kokkonen (4):
->   watchdog: Extend kernel API to know about HW limitations
->   watchdog: Allow watchdog to reset device at early boot
->   devicetree: Document generic watchdog properties
->   watchdog: at91sam9_wdt: Convert to use new watchdog core extensions
-> 
->  .../devicetree/bindings/watchdog/watchdog.txt      |  20 ++++
->  drivers/watchdog/at91sam9_wdt.c                    |  58 ++--------
->  drivers/watchdog/watchdog_core.c                   | 124 ++++++++++++++++++++-
->  drivers/watchdog/watchdog_dev.c                    |  26 ++++-
->  include/linux/watchdog.h                           |  24 ++++
->  5 files changed, 201 insertions(+), 51 deletions(-)  create mode 100644
-> Documentation/devicetree/bindings/watchdog/watchdog.txt
-> 
-> --
-> 2.1.0
-
-Best Regards,
-Wenyou Yang
+Best regards,
+Tomasz
