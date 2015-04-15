@@ -1,162 +1,85 @@
-From: rajeevkumar.linux@gmail.com (rajeev kumar)
-Date: Wed, 15 Apr 2015 15:27:00 +0530
-Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
-In-Reply-To: <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 15 Apr 2015 15:29:53 +0530
+Subject: [PATCHv2 1/3] phy: core: Add devm_of_phy_get_by_index to phy-core
+In-Reply-To: <1428963047-23666-2-git-send-email-arun.ramamurthy@broadcom.com>
 References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1428963047-23666-3-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <CAA7nrtipKF-WtGV-9b40DXYm=jBvM=Pg9PCH9U6yWhj37d41aw@mail.gmail.com>
+ <1428963047-23666-2-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <552E3699.4020309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 3:40 AM, Arun Ramamurthy
-<arun.ramamurthy@broadcom.com> wrote:
-> Getting phys by index instead of phy names so that we do
-> not have to create a naming scheme when multiple phys
-> are present
+Hi,
+
+On Tuesday 14 April 2015 03:40 AM, Arun Ramamurthy wrote:
+> Some generic drivers, such as ehci, may use multiple phys and for such
+> drivers referencing phy(s) by name(s) does not make sense. Instead of
+> inventing new naming schemes and using custom code to iterate through them,
+> such drivers are better of using nameless phy bindings and using this newly
+> introduced API to iterate through them.
 >
 > Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
 > Reviewed-by: Ray Jui <rjui@broadcom.com>
 > Reviewed-by: Scott Branden <sbranden@broadcom.com>
 > ---
->  drivers/usb/host/Kconfig         |  1 +
->  drivers/usb/host/ehci-platform.c | 70 ++++++++++++++--------------------------
->  2 files changed, 26 insertions(+), 45 deletions(-)
+>   drivers/phy/phy-core.c  | 32 ++++++++++++++++++++++++++++++++
+>   include/linux/phy/phy.h |  2 ++
+>   2 files changed, 34 insertions(+)
 >
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 5ad60e4..563f22d 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -284,6 +284,7 @@ config USB_EHCI_ATH79
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index 3791838..964a84d 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -623,6 +623,38 @@ struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
+>   EXPORT_SYMBOL_GPL(devm_of_phy_get);
 >
->  config USB_EHCI_HCD_PLATFORM
->         tristate "Generic EHCI driver for a platform device"
-> +       select GENERIC_PHY
->         default n
->         ---help---
->           Adds an EHCI host driver for a generic platform device, which
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index d8a75a5..a7563b9 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -88,15 +88,13 @@ static int ehci_platform_power_on(struct platform_device *dev)
->         }
->
->         for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
-> -               if (priv->phys[phy_num]) {
-> -                       ret = phy_init(priv->phys[phy_num]);
-> -                       if (ret)
-> -                               goto err_exit_phy;
-> -                       ret = phy_power_on(priv->phys[phy_num]);
-> -                       if (ret) {
-> -                               phy_exit(priv->phys[phy_num]);
-> -                               goto err_exit_phy;
-> -                       }
-> +               ret = phy_init(priv->phys[phy_num]);
-> +               if (ret)
-> +                       goto err_exit_phy;
+>   /**
+> + * devm_of_phy_get_by_index() - lookup and obtain a reference to a phy by index.
+> + * @dev: device that requests this phy
+> + * @np: node containing the phy
+> + * @index: index of the phy
+> + *
+> + * Gets the phy using _of_phy_get(), and associates a device with it using
+> + * devres. On driver detach, release function is invoked on the devres data,
+> + * then, devres data is freed.
+> + *
+> + */
+> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
+> +				     int index)
+> +{
+> +	struct phy **ptr, *phy;
+> +
+> +	ptr = devres_alloc(devm_phy_release, sizeof(*ptr), GFP_KERNEL);
+> +	if (!ptr)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	phy = _of_phy_get(np, index);
+> +	if (!IS_ERR(phy)) {
+> +		*ptr = phy;
+> +		devres_add(dev, ptr);
+> +	} else {
+> +		devres_free(ptr);
+> +	}
+> +
+> +	return phy;
+> +}
+> +EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index);
+> +
+> +/**
+>    * phy_create() - create a new phy
+>    * @dev: device that is creating the new phy
+>    * @node: device node of the phy
+> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+> index a0197fa..ae2ffaf 100644
+> --- a/include/linux/phy/phy.h
+> +++ b/include/linux/phy/phy.h
+> @@ -133,6 +133,8 @@ struct phy *devm_phy_get(struct device *dev, const char *string);
+>   struct phy *devm_phy_optional_get(struct device *dev, const char *string);
+>   struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
+>   			    const char *con_id);
+> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
+> +				     int index);
 
-Jumping to err_exit_phy will perform phy_power_off also which is not
-required as you are are powering on after phy_init. Wrong level
-jumping
+Add stubs for this function too. Also update the Documentation/phy.txt.
 
-~Rajeev
-
-> +               ret = phy_power_on(priv->phys[phy_num]);
-> +               if (ret) {
-> +                       phy_exit(priv->phys[phy_num]);
-> +                       goto err_exit_phy;
->                 }
->         }
->
-> @@ -104,10 +102,8 @@ static int ehci_platform_power_on(struct platform_device *dev)
->
->  err_exit_phy:
->         while (--phy_num >= 0) {
-> -               if (priv->phys[phy_num]) {
-> -                       phy_power_off(priv->phys[phy_num]);
-> -                       phy_exit(priv->phys[phy_num]);
-> -               }
-> +               phy_power_off(priv->phys[phy_num]);
-> +               phy_exit(priv->phys[phy_num]);
->         }
->  err_disable_clks:
->         while (--clk >= 0)
-> @@ -123,10 +119,8 @@ static void ehci_platform_power_off(struct platform_device *dev)
->         int clk, phy_num;
->
->         for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
-> -               if (priv->phys[phy_num]) {
-> -                       phy_power_off(priv->phys[phy_num]);
-> -                       phy_exit(priv->phys[phy_num]);
-> -               }
-> +               phy_power_off(priv->phys[phy_num]);
-> +               phy_exit(priv->phys[phy_num]);
->         }
->
->         for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
-> @@ -154,7 +148,6 @@ static int ehci_platform_probe(struct platform_device *dev)
->         struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
->         struct ehci_platform_priv *priv;
->         struct ehci_hcd *ehci;
-> -       const char *phy_name;
->         int err, irq, phy_num, clk = 0;
->
->         if (usb_disabled())
-> @@ -204,36 +197,23 @@ static int ehci_platform_probe(struct platform_device *dev)
->
->                 priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
->                                 "phys", "#phy-cells");
-> -               priv->num_phys = priv->num_phys > 0 ? priv->num_phys : 1;
->
-> -               priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
-> -                               sizeof(struct phy *), GFP_KERNEL);
-> -               if (!priv->phys)
-> -                       return -ENOMEM;
-> +               if (priv->num_phys > 0) {
-> +                       priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
-> +                                           sizeof(struct phy *), GFP_KERNEL);
-> +                       if (!priv->phys)
-> +                               return -ENOMEM;
-> +               } else
-> +                       priv->num_phys = 0;
->
->                 for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
-> -                               err = of_property_read_string_index(
-> -                                               dev->dev.of_node,
-> -                                               "phy-names", phy_num,
-> -                                               &phy_name);
-> -
-> -                               if (err < 0) {
-> -                                       if (priv->num_phys > 1) {
-> -                                               dev_err(&dev->dev, "phy-names not provided");
-> -                                               goto err_put_hcd;
-> -                                       } else
-> -                                               phy_name = "usb";
-> -                               }
-> -
-> -                               priv->phys[phy_num] = devm_phy_get(&dev->dev,
-> -                                               phy_name);
-> -                               if (IS_ERR(priv->phys[phy_num])) {
-> -                                       err = PTR_ERR(priv->phys[phy_num]);
-> -                                       if ((priv->num_phys > 1) ||
-> -                                           (err == -EPROBE_DEFER))
-> -                                               goto err_put_hcd;
-> -                                       priv->phys[phy_num] = NULL;
-> -                               }
-> +                       priv->phys[phy_num] = devm_of_phy_get_by_index(&dev->dev
-> +                                               , dev->dev.of_node
-> +                                               , phy_num);
-> +                       if (IS_ERR(priv->phys[phy_num])) {
-> +                               err = PTR_ERR(priv->phys[phy_num]);
-> +                                       goto err_put_hcd;
-> +                       }
->                 }
->
->                 for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
-> --
-> 2.3.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks
+Kishon
