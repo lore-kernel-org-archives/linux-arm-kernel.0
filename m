@@ -1,28 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Apr 2015 16:14:26 +0200
-Subject: [PATCH net-next 5/6] net: hip04: remove the unnecessary check
-In-Reply-To: <1429101008-9464-6-git-send-email-dingtianhong@huawei.com>
-References: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
- <1429101008-9464-6-git-send-email-dingtianhong@huawei.com>
-Message-ID: <2645626.sX8mP7tn7R@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 15 Apr 2015 15:17:11 +0100
+Subject: [PATCH] irqchip/gicv3-its: Decrease page size when needed
+In-Reply-To: <20150415115118.GN18660@io.lakedaemon.net>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+ <20150415115118.GN18660@io.lakedaemon.net>
+Message-ID: <8ba82758f57122dd360b2e6fac8040fc@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 April 2015 20:30:07 Ding Tianhong wrote:
-> diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
-> index ff9d19c..a7ab1d9 100644
-> --- a/drivers/net/ethernet/hisilicon/hip04_eth.c
-> +++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
-> @@ -440,7 +440,7 @@ static int hip04_tx_reclaim(struct net_device *ndev, bool force)
->         smp_wmb(); /* Ensure tx_tail visible to xmit */
->  
->  out:
-> -       if (pkts_compl || bytes_compl)
-> +       if (bytes_compl)
->                 netdev_completed_queue(ndev, pkts_compl, bytes_compl);
->  
->         if (unlikely(netif_queue_stopped(ndev)) && (count < (TX_DESC_NUM - 1)))
-> -- 
-> 
+On 2015-04-15 12:51, Jason Cooper wrote:
+> Minghuan Lian,
+>
+> On Wed, Apr 15, 2015 at 05:49:22PM +0800, Minghuan Lian wrote:
+>> The default page size of ITS table has been changed to 64KB,
+>> but for some platforms the real size of allocate memory which
+>> calculated by DEVBITS of register GITS_TYPER may smaller than
+>> default size. In this case, psz must be decreased, otherwise,
+>> the wrong page number will cause kernel hang.
+>>
+>> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>
+> Please run scripts/get_maintainer.pl on your patches before sending.  
+> This
+> needs to be sent to myself and Thomas Gleixner for review.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Please also CC me on anything that touches GICv3 or the ITS code.
+
+Thanks,
+
+         M.
+-- 
+Fast, cheap, reliable. Pick two.
