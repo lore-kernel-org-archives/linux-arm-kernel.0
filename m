@@ -1,32 +1,32 @@
-From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
-Date: Wed, 15 Apr 2015 13:50:51 +0200
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <20150415112224.GA26099@e104818-lin.cambridge.arm.com>
-References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
- <17844053.vZiPCu4un3@wuerfel>
- <20150414144702.GD14546@e104818-lin.cambridge.arm.com>
- <2485404.lBlHmzQPKN@wuerfel>
- <20150415112224.GA26099@e104818-lin.cambridge.arm.com>
-Message-ID: <721B7D5F-0A9A-45B7-8036-730ED54FB3AB@theobroma-systems.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 15 Apr 2015 11:51:18 +0000
+Subject: [PATCH] irqchip/gicv3-its: Decrease page size when needed
+In-Reply-To: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <20150415115118.GN18660@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Minghuan Lian,
 
-> On 15 Apr 2015, at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
+On Wed, Apr 15, 2015 at 05:49:22PM +0800, Minghuan Lian wrote:
+> The default page size of ITS table has been changed to 64KB,
+> but for some platforms the real size of allocate memory which
+> calculated by DEVBITS of register GITS_TYPER may smaller than
+> default size. In this case, psz must be decreased, otherwise,
+> the wrong page number will cause kernel hang.
 > 
-> I think you are right. I was more thinking of those routed directly to
-> the native (non-compat) syscalls. We would need to make sure the return
-> value (X0 being the only register not restored on return from exception)
-> has the top 32-bit part zeroed.
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 3 +++
+>  1 file changed, 3 insertions(+)
 
-As the kernel is LP64 and will thus attempt to return a 64bit return value, the
-high bits should be properly sign-extended in all cases.
+Please run scripts/get_maintainer.pl on your patches before sending.  This
+needs to be sent to myself and Thomas Gleixner for review.
 
-The problem (posed by procedure call standard) of information leakage could 
-manifest itself only, if the kernel tried to return something smaller than 64 bits? 
-in that case, we can the problem would already exhibit for the LP64 ABI. 
+The merge window just opened, so nothing new is being added to the tree
+currently.  Go ahead and resend after a few days.
 
-For the ILP32 implementation, I?ll thus assume that all LP64 ABI calls reused
-are clean in this regard.
+thx,
 
-Phil.
+Jason.
