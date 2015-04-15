@@ -1,90 +1,59 @@
-From: mwelling@ieee.org (Michael Welling)
-Date: Wed, 15 Apr 2015 14:47:07 -0500
-Subject: AM335x OMAP2 common clock external fixed-clock registration
-In-Reply-To: <552EB152.7050306@ti.com>
-References: <20150414211734.GA28974@deathray> <552E0688.1020903@ti.com>
- <20150415140945.GA30787@deathray> <552EB152.7050306@ti.com>
-Message-ID: <20150415194707.GA11007@deathray>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Apr 2015 21:50:18 +0200
+Subject: Two new breakages since Thursday
+In-Reply-To: <20150414162154.GE18048@atomide.com>
+References: <20150405080645.GE13898@n2100.arm.linux.org.uk>
+ <20150414150459.GD18048@atomide.com> <20150414162154.GE18048@atomide.com>
+Message-ID: <2870641.sYo0J47DWm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 15, 2015 at 09:43:30PM +0300, Tero Kristo wrote:
-> On 04/15/2015 05:09 PM, Michael Welling wrote:
-> >On Wed, Apr 15, 2015 at 09:34:48AM +0300, Tero Kristo wrote:
-> >>On 04/15/2015 12:17 AM, Michael Welling wrote:
-> >>>Greetings,
-> >>>
-> >>>I have developed an AM3354 based SoM and it uses an external SI5351 clock
-> >>>generator to drive the clock inputs for an external duart and I2S audio
-> >>>master clock. With the registration according to the documentation the
-> >>>reference clock is not being detected and hence the clock generator is
-> >>>not working as expect.
-> >>>
-> >>>After trying many different things, I started to look around the mailing
-> >>>lists to find information related to this issue.
-> >>>
-> >>>I came acrossed post that has the exact same issue:
-> >>>https://lkml.org/lkml/2013/2/18/468
-> >>>
-> >>>Seeing as the patch did not land upstream, I am wondering if there is
-> >>>a solution that I am not seeing.
-> >>>
-> >>>I am willing to provide a patch given appropriate guidance.
-> >>
-> >>Hi Michael,
-> >>
-> >>The info on the email you referenced is kind of obsolete, TI SoCs
-> >>are calling of_clk_init() during boot now, and thus external clock
-> >>nodes should be registered fine also. Maybe you can provide the
-> >>actual DTS patch you are trying out so we can help better...? Are
-> >
-> >See attached patch and console output.
+On Tuesday 14 April 2015 09:21:55 Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [150414 08:13]:
+> > * Arnd Bergmann <arnd@arndb.de> [150414 08:00]:
+> > > On Tuesday 14 April 2015 07:28:47 Tony Lindgren wrote:
+> > > > > I managed to catch up with my email last night and pulled in these two fixes
+> > > > > as well as a number of others that we had neglected over the last two weeks.
+> > > > > 
+> > > > > I found one new regression with the overnight build tests in a branch I pulled
+> > > > > in as 'next/late' from Tony, and backed that out now. I'll wait for you and
+> > > > > Stephen Rothwell (who also reported these issues) to confirm that it's ok
+> > > > > now and we'll hopefully be ready to send pull requests by the end of the
+> > > > > week.
+> > > > 
+> > > > Hmm what's this issue you're mentioning here for the next/late? Is it the
+> > > > merge conflict with camera related changes fixed up by Stephen Rothwell
+> > > > in next?
+> > > > 
+> > > > 
+> > > 
+> > > This is the error I get during 'make dtbs':
+> > > 
+> > >   DTC     arch/arm/boot/dts/am3517_mt_ventoux.dtb
+> > > ERROR (phandle_references): Reference to non-existent node or label "omap3_scm_general"
+> > > 
+> > > The problem is evidently commit b8845074cfbbd ("ARM: dts: omap3: add
+> > > minimal l4 bus layout with control module support"), which for some reason
+> > > removes the tisyscon at 48002270 node that is still referenced through
+> > > the &omap3_scm_general label from omap34xx.dtsi and omap36xx.dtsi.
+> > 
+> > I believe this issue got introduced on the 7th by the camera patches
+> > I acked earlier.
 > 
-> I see a bug in your dt data.
+> Actually, investigating it further, looks like my for-next branch is
+> missing my omap-for-v4.1/dt-v2 branch already merged into arm-soc
+> for-next.. Sorry about that, this merge conflict could have been
+> avoided if I had not missed that branch when rebuilding my for-next.
 > 
-> <snip>
+> Anyways, Stephen's resolve below is correct. Arnd, I suggest you
+> remerge it with --no-commit and apply Stephen's resolution below
+> manually.
 > 
-> +	clocks {
-> +		ref27: ref27 {
-> +			#clock-cells = <0>;
-> +			compatibale = "fixed-clock";
-> 
-> This should be compatible, right? DT is annoying in that it doesn't
-> verify property names.
->
 
-Ooops.
+I've pulled in the omap/dt branch into next/late now, and fixed the
+merge up in that way. I'm putting it back into for-next now.
 
-Now the clock appears in /sys/kernel/debug/clk:
-root at som3517-som200:/sys/kernel/debug/clk# cat clk_summary 
-   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
-----------------------------------------------------------------------------------------
- ref27                                    0            0    27000000          0 0  
-...
+We're running a bit late with the normal pull request now, so
+no promises that next/late will still make it in time.
 
-There is still an issue with the si5351.
-
-I had to comment out the clk_put here for the frequency to show up:
-http://lxr.free-electrons.com/source/drivers/clk/clk-si5351.c#L1133
-
-Ideas?
-
-> +			clock-frequency = <27000000>;
-> +		};
-> +	};
-> 
-> -Tero
-> 
-> >
-> >>you seeing any boot time error / warning prints for your new clock?
-> >
-> >With the debug messages on you see that the reference clock is not being
-> >detected.
-> >
-> >Whilest debugging I found that the of_clk_get is returning an error no matter
-> >which clock I pass it:
-> >http://lxr.free-electrons.com/source/drivers/clk/clk-si5351.c#L1131
-> >
-> >>
-> >>-Tero
-> 
+	Arnd
