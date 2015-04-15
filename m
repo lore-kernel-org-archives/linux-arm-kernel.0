@@ -1,63 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Apr 2015 14:47:37 +0200
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <20150414165459.GG14546@e104818-lin.cambridge.arm.com>
-References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
- <9F7FC15C-EED1-4939-B66A-1BC3119E0D9C@theobroma-systems.com>
- <20150414165459.GG14546@e104818-lin.cambridge.arm.com>
-Message-ID: <2059078.o6U5BYXcDP@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Apr 2015 13:49:14 +0100
+Subject: [v3 2/5] arm64: kvm: allow EL2 context to be reset on shutdown
+In-Reply-To: <55276A7E.1080508@linaro.org>
+References: <1427953216-11737-1-git-send-email-takahiro.akashi@linaro.org>
+ <1427953216-11737-3-git-send-email-takahiro.akashi@linaro.org>
+ <20150408130520.GB5977@leverpostej> <552605CD.7000704@linaro.org>
+ <20150409150244.GG9648@leverpostej> <55276A7E.1080508@linaro.org>
+Message-ID: <20150415124913.GF2866@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 April 2015 17:55:00 Catalin Marinas wrote:
-> On Tue, Apr 14, 2015 at 05:29:36PM +0200, Dr. Philipp Tomsich wrote:
-
-> > So tv_nsec needs to be 32bit on ILP32, as we would otherwise break the C
-> > language.  Any program that assumes that tv_nsec is sizeof(long) would be
-> > correct and it would be unexpected and surprising behaviour [even though it
-> > would be consider a good programming style] if one would need to explicitly 
-> > ask for the sizeof(ts.tv_nsec). Having the same problem on x32 doesn?t seem 
-> > like a good justification to do the same.
+> > What I don't understand is why we can't move the init and tear-down
+> > functions into kvm_arch_hardware_enable/disable(). They seem to be for
+> > precisely what you are implementing, with the only difference being the
+> > time that they are called.
 > 
-> From a standards perspective, that's clear, and I'm fine with not making
-> the same choice as x32. I think on x32 it was a side-effect of glibc
-> defining tv_nsec as __syscall_slong_t and the kernel defining
-> __kernel_long_t to 64-bit.
-
-I'm pretty sure that this part of the x32 ABI was a deliberate choice
-in full knowledge of the tradeoffs.
-
-> > For time_t, I don?t see the need to have a 32bit type yet.
-> > As long as the the type is properly exposed through header files (and user
-> > programs can thus recreate the kernel?s data model), we should be safe.
+> I don't know, neither. I just followed the discussions between Marc and Geoff,
+> and their conclusion. I guessed that *refactoring* might be more complicated than
+> expected.
 > 
-> The problem with a 64-bit time_t is that the timespec structure looks
-> like neither compat32 nor native 64-bit. If we make the AArch32 and
-> native ILP32 exclusive and build time, it makes it easier, otherwise we
-> need to support a third ABI in the kernel.
+> FYI, I gave a quick try to kvm_arch_hardware_enable() approach by removing
+> cpu_init_hyp_mode() from init_hyp_mode() and putting it into kvm_arch_hardware_enable(),
+> and it seems to work, at least, in my environment:
+>     boot => start a kvm guest => kexec reboot => start a kvm guest
 
-Exactly, which is why the layout was chosen to be the same as x86-64
-for x32.
+That sounds pretty convincing to me, assuming you wired the teardown
+intp kvm_arch_hardware_disable() ?
 
-> > Can we thus agree on the following for the next revision of the patch-set:
-> >  (1) We retain a 64bit time_t, but implement different sizes (between ILP32 and 
-> > 	LP64) for ?tv_nsec' in 'struct timespec??
-> >  (2) We use the 64bit system calls whereever possible (i.e. no register splitting).
+> > Either I'm missing something, or we can simply implement the existing
+> > hooks. I assume I'm missing something.
 > 
-> As I mentioned above, timespec and possibly other structures no longer
-> like any of the existing ABIs. Do we know how many syscalls are
-> affected?
+> Marc, Geoff, any comments?
 > 
-> The alternative is 32-bit time_t which makes it easier to use the compat
-> syscall implementations (not numbers). It also depends on how we plan to
-> fix the 2038 problem. For new 32-bit only architectures, are we going to
-> require them to use a 64-bit time_t or we get alternative time64_t and
-> timespec64 specs?
+> 
+> >>>> +static struct notifier_block kvm_reboot_nb = {
+> >>>> +	.notifier_call		= kvm_reboot_notify,
+> >>>> +	.next			= NULL,
+> >>>> +	.priority		= 0, /* FIXME */
+> >>>
+> >>> It would be helpful for the comment to explain why this is wrong, and
+> >>> what needs fixing.
+> >>
+> >> Thank for reminding me of this.
+> >>
+> >> *priority* enforces a calling order of registered hook functions.
+> >> If some hook returns NOTIFY_STOP_MASK, subsequent hooks won't be called.
+> >> (Nevertheless, reboot sequence will go ahead. See kernel_restart_prepare()/
+> >> notifier_call_chain().)
+> >>
+> >> So we should make sure that kvm_reboot_notify() be called
+> >> 1) after any hook functions which may depend on kvm, and
+> >
+> > Which hooks depend on KVM?
+> 
+> I think I answered this question below:
+>  >> But how can we guarantee this and determine a priority of kvm_reboot_notify()?
+>  >> Looking into all the occurrences of register_reboot_notifier(),
+>  >> 1) => nothing
+>  >> 2) => virt/kvm/kvm_main.c (priority: 0)
+>  >> 3) => drivers/cpufreq/s32416-cpufreq.c (priority: 0)
+>  >>        drivers/cpufreq/s5pv210-cpufreq.c (priority: 0)
+>  >>
+>  >> So a priority higher than zero might be safe and better, but exactly what?
+>  >> Some hooks use "INT_MAX."
 
-No, we had originally planned that a few years ago, but after deciding that
-we are fixing this problem for all 32-bit machines, and also seeing the
-magnitude of changes involved in that, I think we have a general consensus
-that we do not want to add special cases for architectures that use 64-bit
-time_t before everyone else does.
+I can't see anything listed which has a dependency on KVM.
 
-	Arnd
+The KVM notifier would be superseded by
+kvm_arch_hardware_{disable,enable}, and the cpufreq instances don't seem
+to have any relationship to KVM.
+
+Other architectures use kvm_arch_hardware_{enable,disable}(), so I
+imagine the core KVM code has no problem with the ordering of these.
+
+Mark.
