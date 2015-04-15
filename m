@@ -1,83 +1,43 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 15 Apr 2015 19:23:58 +0200
-Subject: [PATCH v4 00/10] ARM: berlin: add nand support
-Message-ID: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Wed, 15 Apr 2015 19:24:00 +0200
+Subject: [PATCH v4 02/10] Documentation: bindings: document the clocks for
+ pxa3xx-nand
+In-Reply-To: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1429118648-19416-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The pxa3xx nand driver requires at least one clock to probe correctly.
+A second one, named 'ecc' can be specified if needed. Add the
+corresponding documentation.
 
-This series introduces the support for the Marvell Berlin nand
-controller. It was tested on the Marvell Berlin BG2Q DMP board.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-The support is added into the existing pxa3xx nand controller. Some
-additions were done in order to get this controller working:
-- Support for a non mandatory ECC clock has been added.
-- The Berlin nand controller needs to poll the status register.
-- Sequences of commands are quite different in order to perform write
-  operation.
-
-Since v3, this series had a lots of changes. The pxa3xx nand driver
-was using its own flash table and had its own timings setup. I made
-the required modifications to use the nand framework to perform these
-steps. This worked nicely until we found out some boards use non-onfi
-nands. To handle this case, I had to reintroduce the timing table in
-the pxa3xx driver. In this case, the flash detection is done by the
-framework, and the flash used *has to* be supported by the framework,
-but its timing definitions remains inside the pxa3xx driver.
-
-This should be tested on old platform using this driver, with non-onfi
-devices and theirs definitions may have to be added in the nand_ids
-table.
-
-Another solution would have been to configure the timings in the
-device tree, but this wouldn't have work for devices using board
-files.
-
-Antoine
-
-Changes since v3:
-        - Reworked the nand flash detection
-        - Reworked the timings setup
-
-Changes since v2:
-        - Reworked the timings setup
-        - Added a explanation in the default chunk size commit
-        - Ensured commit 4/10 was useless and removed it
-        - Fixed typos, cosmetic
-
-Changes since v1:
-        - Added a fallback to NULL when looking for the 'nfc' clock
-        - Added the clocks in the bindings documentation
-        - Reworked the DT
-        - Removed non needed RNDOUT command
-        - Used the standard RESET command
-        - Fixed the flash type matching order
-        - Remove all non tested flash types (only one left)
-        - Added a check to explicitly not support nand chips with small pages
-        - Remove useless checks for clocks in the probing function
-        - Various clean up
-
-Antoine Tenart (10):
-  mtd: pxa3xx_nand: add a non mandatory ECC clock
-  Documentation: bindings: document the clocks for pxa3xx-nand
-  mtd: pxa3xx_nand: add a default chunk size
-  mtd: pxa3xx_nand: rework flash detection and timing setup
-  mtd: nand: add Samsung K9GBG08U0A-M to nand_ids table
-  mtd: pxa3xx_nand: add support for the Marvell Berlin nand controller
-  Documentation: bindings: add the Berlin nand controller compatible
-  mtd: nand: let Marvell Berlin SoCs select the pxa3xx driver
-  ARM: berlin: add BG2Q node for the nand
-  ARM: berlin: enable flash on the BG2Q DMP
-
- .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   5 +
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |  25 ++
- arch/arm/boot/dts/berlin2q.dtsi                    |  13 +
- drivers/mtd/nand/Kconfig                           |   4 +-
- drivers/mtd/nand/nand_ids.c                        |   4 +
- drivers/mtd/nand/pxa3xx_nand.c                     | 432 +++++++++++++++------
- include/linux/platform_data/mtd-nand-pxa3xx.h      |  11 +-
- 7 files changed, 366 insertions(+), 128 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+index de8b517a5521..ecd1fc071f81 100644
+--- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+@@ -8,6 +8,8 @@ Required properties:
+  - reg: 		The register base for the controller
+  - interrupts:		The interrupt to map
+  - #address-cells:	Set to <1> if the node includes partitions
++ - clocks:		A phandle to the clocks
++ - clock-names:		'nfc' and 'ecc'. The 'nfc' clock is mandatory.
+ 
+ Optional properties:
+ 
+@@ -32,6 +34,8 @@ Example:
+ 		compatible = "marvell,pxa3xx-nand";
+ 		reg = <0x43100000 90>;
+ 		interrupts = <45>;
++		clocks = <&gateclk 11>;
++		clock-names = "nfc";
+ 		#address-cells = <1>;
+ 
+ 		marvell,nand-enable-arbiter;
 -- 
 2.3.5
