@@ -1,59 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 15 Apr 2015 17:31:05 +0100
-Subject: [PATCH] irqchip/gicv3-its: Decrease page size when needed
-In-Reply-To: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <20150415173105.2069df0c@arm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 15 Apr 2015 18:31:08 +0200
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <20150409134843.GQ4027@n2100.arm.linux.org.uk>
+References: <5521A438.1070008@gmail.com>
+ <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
+ <20150406151939.GG18048@atomide.com>
+ <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
+ <20150406174245.GJ18048@atomide.com>
+ <20150407135713.GL4027@n2100.arm.linux.org.uk>
+ <20150407152207.GM18048@atomide.com>
+ <20150408230658.GO4027@n2100.arm.linux.org.uk>
+ <20150409134843.GQ4027@n2100.arm.linux.org.uk>
+Message-ID: <20150415163108.GB2033@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Apr 2015 17:49:22 +0800
-Minghuan Lian <Minghuan.Lian@freescale.com> wrote:
+Hi,
 
-[adding Jason and Thomas to the party, since they shoud be cc'd the
-first place]
-
-> The default page size of ITS table has been changed to 64KB,
-> but for some platforms the real size of allocate memory which
-> calculated by DEVBITS of register GITS_TYPER may smaller than
-> default size. In this case, psz must be decreased, otherwise,
-> the wrong page number will cause kernel hang.
+On Thu, Apr 09, 2015 at 02:48:43PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 09, 2015 at 12:06:58AM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Apr 07, 2015 at 08:22:08AM -0700, Tony Lindgren wrote:
+> > > Works for me. The above needs the following fix folded in to build:
+> > > 
+> > > --- a/arch/arm/mm/proc-v7.S
+> > > +++ b/arch/arm/mm/proc-v7.S
+> > > @@ -532,7 +532,7 @@ __v7_ca9mp_proc_info:
+> > >  __v7_ca8_proc_info:
+> > >  	.long	0x410fc080
+> > >  	.long	0xff0ffff0
+> > > -	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
+> > > +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
+> > >  	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
+> > >  
+> > >  #endif	/* CONFIG_ARM_LPAE */
+> > 
+> > Thanks, merged into the original patch.
 > 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 596b0a9..d0374a6 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -844,6 +844,9 @@ static int its_alloc_tables(struct its_node *its)
->  
->  		its->tables[i] = base;
->  
-> +		while (alloc_size < psz)
-> +			psz = psz >> 1;
-> +
->  retry_baser:
->  		val = (virt_to_phys(base) 				 |
->  		       (type << GITS_BASER_TYPE_SHIFT)			 |
+> Do you want to give me an ack for this, thanks?
 
-This doesn't make sense to me. psz is the page size that your HW
-supports, not necessarily something that you can actually change as you
-wish (some, if not most, ITSs only support one page size). Also, you
-now have to psz go via unsupported page sizes (like 32K and 8K), and
-you may end up programming junk in the registers. Good job! ;-)
+I tried to test this together with Tony's follow up patch, but I get
+this after applying the patch to v4.0:
 
-So making it vary to accommodate your allocation size is slightly
-doomed. If your allocation is smaller than your ITS page size, it is
-the allocation that has to be bumped up, not the page size that has to
-be reduced.
+sre at earth ~/src/linux [430973-fix] % make -j4
+  CHK     include/config/kernel.release
+  CHK     include/generated/uapi/linux/version.h
+  CHK     include/generated/utsrelease.h
+make[1]: 'include/generated/mach-types.h' is up to date.
+  CALL    scripts/checksyscalls.sh
+  CHK     include/generated/compile.h
+  AS      arch/arm/mm/proc-v7.o
+arch/arm/mm/proc-v7.S: Assembler messages:
+arch/arm/mm/proc-v7.S:535: Error: invalid operands (*ABS* and .text sections) for `|'
+arch/arm/mm/proc-v7.S:535: Error: invalid operands (*ABS* and .text sections) for `|'
+scripts/Makefile.build:294: recipe for target 'arch/arm/mm/proc-v7.o' failed
+make[1]: *** [arch/arm/mm/proc-v7.o] Error 1
+Makefile:947: recipe for target 'arch/arm/mm' failed
+make: *** [arch/arm/mm] Error 2
+make: *** Waiting for unfinished jobs....
 
-So overall, this is a NAK. Please come up with a better fix.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150415/b5f2b80f/attachment.sig>
