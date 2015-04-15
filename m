@@ -1,98 +1,71 @@
 From: Minghuan.Lian@freescale.com (Minghuan.Lian at freescale.com)
-Date: Wed, 15 Apr 2015 11:38:21 +0000
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
-Message-ID: <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
+Date: Wed, 15 Apr 2015 11:42:22 +0000
+Subject: [PATCH v2 2/3] pci/designware: Add base driver for Designware PCIe
+In-Reply-To: <2123546.0rhYViPpvy@wuerfel>
+References: <1429091315-31891-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1429091315-31891-3-git-send-email-Minghuan.Lian@freescale.com>
+ <2123546.0rhYViPpvy@wuerfel>
+Message-ID: <DM2PR0301MB0640C4BA8501EED83F9303F1E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Varun,
+Hi Arnd,
 
-Freescale LS2085A SMMU uses in hit/miss mechanism for the concatenation {tbu number,stream_id}. This concatenation is then assigned to a context bank that determines the translation type and form. The Isolation Context Identifier ICID is the main field of stream_id which will be used to hit ITS device. We may look ICID as ITS device ID and PCI device ID. But there are only 64 ICIDs  0 - 63.  If using default PCI_DEVID(bus, devfn)  ((((u16)(bus)) << 8) | (devfn)), PCI device(bus >=1) ) ID will larger than 63.  SMMU will miss this translation.
-In addition, because the ICID number  is only 64, all the PCIe device will use the same ICID and share the same ITS device.
+I do not directly add arm64 support to pcie-designware.c, the
+main reason is that it is hard to port other 5 platform PCIe
+driver based on pcie-designware to the new implementation.
+However, not changing those PCIe driver means the code for
+arm32 must be remained.
+
+I add a new file pcie-designware-base.c. Compared with
+pcie-designware.c, there are main 3 differences.
+1. It is a new implementation followed the latest PCIe
+architecture-independent API without any code for specific
+architecture.
+2. There is no MSI chip code, which will be implemented in a 
+separated file.
+3. Improve ATU use - support more than 2 ATUs and use an exclusive
+ATU to translate MEM transaction.
+
+After other platform PCIe owner port the driver to pcie-designware-base.c,
+The pcie-designware.c can be removed.
 
 Thanks,
 Minghuan
 
 > -----Original Message-----
-> From: Sethi Varun-B16395
-> Sent: Wednesday, April 15, 2015 7:08 PM
-> To: Lian Minghuan-B31939; linux-pci at vger.kernel.org
-> Cc: Arnd Bergmann; Lian Minghuan-B31939; Hu Mingkai-B21284; Zang Roy-
-> R61911; Yoder Stuart-B08248; Bjorn Helgaas; Wood Scott-B07421; linux-arm-
-> kernel at lists.infradead.org
-> Subject: RE: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Wednesday, April 15, 2015 6:37 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Lian Minghuan-B31939; linux-pci at vger.kernel.org; Jingoo Han; Hu
+> Mingkai-B21284; Zang Roy-R61911; Yoder Stuart-B08248; Bjorn Helgaas;
+> Wood Scott-B07421
+> Subject: Re: [PATCH v2 2/3] pci/designware: Add base driver for Designware
+> PCIe
 > 
-> Hi Minghuan,
-> Not clear what this patch intends to do. Can you please explain the point
-> about SMMU isolating limited device ID.
-> 
-> Regards
-> Varun
-> 
-> > -----Original Message-----
-> > From: linux-arm-kernel [mailto:linux-arm-kernel-
-> > bounces at lists.infradead.org] On Behalf Of Minghuan Lian
-> > Sent: Wednesday, April 15, 2015 3:19 PM
-> > To: linux-pci at vger.kernel.org
-> > Cc: Arnd Bergmann; Lian Minghuan-B31939; Hu Mingkai-B21284; Zang Roy-
-> > R61911; Yoder Stuart-B08248; Bjorn Helgaas; Wood Scott-B07421;
-> > linux-arm- kernel at lists.infradead.org
-> > Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-> >
-> > SMMU of some platforms can only isolate limited device ID.
-> > This may require that all PCI devices share the same ITS device with
-> > the fixed device ID. The patch adds function
-> > arch_msi_share_devid_update used for these platforms to update the
-> > fixed device ID and maximum MSI interrupts number.
+> On Wednesday 15 April 2015 17:48:34 Minghuan Lian wrote:
+> > The Synopsys Designware IP is shared with couples of platforms under
+> > multiple architectures. The patch is to provide basic
+> > architecture-independent Designware PCIe host driver including ATU
+> > initialization and PCI OPS. Currently, which supports arm and arm64
+> > simultaneously.
 > >
 > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
 > > ---
-> >  drivers/irqchip/irq-gic-v3-its.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
+> > change log:
+> > v1-v2:
+> > 1. Get MSI chip according to dts property 'msi-parent'
+> > 2. Simplify platform_get_resource_byname() failure checking
 > >
-> > diff --git a/drivers/irqchip/irq-gic-v3-its.c
-> > b/drivers/irqchip/irq-gic-v3-its.c
-> > index d0374a6..be78d0a 100644
-> > --- a/drivers/irqchip/irq-gic-v3-its.c
-> > +++ b/drivers/irqchip/irq-gic-v3-its.c
-> > @@ -1169,6 +1169,15 @@ static int its_get_pci_alias(struct pci_dev
-> > *pdev,
-> > u16 alias, void *data)
-> >  	return 0;
-> >  }
+> >  drivers/pci/host/Kconfig                |   3 +
+> >  drivers/pci/host/Makefile               |   1 +
+> >  drivers/pci/host/pcie-designware-base.c | 293
+> > ++++++++++++++++++++++++++++++++
+> > drivers/pci/host/pcie-designware-base.h |  63 +++++++
 > >
-> > +void __weak
-> > +arch_msi_share_devid_update(struct pci_dev *pdev, u32 *dev_id, u32
-> > +*nvesc) {
-> > +	/*
-> > +	 * use PCI_DEVID NOT share device ID as default
-> > +	 * so nothing need to do
-> > +	 */
-> > +}
-> > +
-> >  static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
-> >  			   int nvec, msi_alloc_info_t *info)  { @@ -1185,6
-> > +1194,8 @@ static int its_msi_prepare(struct irq_domain *domain,
-> > +struct
-> > device *dev,
-> >  	dev_alias.count = nvec;
-> >
-> >  	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
-> > +	arch_msi_share_devid_update(pdev, &dev_alias.dev_id,
-> > +&dev_alias.count);
-> > +
-> >  	its = domain->parent->host_data;
-> >
-> >  	its_dev = its_find_device(its, dev_alias.dev_id);
-> > --
-> > 1.9.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> I don't understand this patch at all. What is the relation between this driver
+> and the existing pcie-designware.c? From the description above, they would
+> be the same.
+> 
+> 	Arnd
