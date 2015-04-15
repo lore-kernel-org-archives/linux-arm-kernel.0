@@ -1,49 +1,99 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 14 Apr 2015 16:58:22 -0700
-Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
- callbacks
-In-Reply-To: <20150414223029.GU12732@n2100.arm.linux.org.uk>
-References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
- <20150414162210.GA29874@dtor-ws>
- <20150414223029.GU12732@n2100.arm.linux.org.uk>
-Message-ID: <20150414235822.GA22757@dtor-ws>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Tue, 14 Apr 2015 17:33:09 -0700
+Subject: [PATCH 5/7] selftests/x86: fix cross build logic
+In-Reply-To: <1429051978-14778-1-git-send-email-tyler.baker@linaro.org>
+References: <1429051978-14778-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <552DB1C5.7020704@amacapital.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 14, 2015 at 11:30:29PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Apr 14, 2015 at 09:22:10AM -0700, Dmitry Torokhov wrote:
-> > On Tue, Apr 14, 2015 at 12:41:48PM +0200, Ulf Hansson wrote:
-> > > The legacy system PM support has long time ago been dropped from the
-> > > AMBA bus. Align to that by converting to the modern system PM
-> > > callbacks.
-> > > 
-> > > Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
-> > > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > 
-> > If this has not been noticed since end of 2013 maybe we should drop the
-> > driver?
-> 
-> That's rather silly.  It isn't a build breakage, and it's not a
-> functional breakage.  In fact, this driver gets build and boot tested
-> every evening on hardware I have here in my autobuild system.
+On 04/14/2015 03:52 PM, Tyler Baker wrote:
+> x86 tests should not be built when ARCH != x86. Reused the logic from
+> breakpoints to determine when it's appropriate to build.
 
-OK.
+In the future, please cc the author of recently-written code that you're 
+fixing :)
 
-> 
-> The regression is only visible if it is used on a platform with power
-> management support, and that's probably close to none - unless hibernate
-> support is enabled.  I'm just pushing up some patches which fix long
-> term hibernation issues on ARM.
-> 
-> If we apply your "lets drop stuff" argument, maybe we should drop ARM
-> hibernation support because its been broken for many years... obviously
-> that's also a rediculous suggestion.
+This patch is really weird.  You're generating ARCH, then you're 
+modifying it part way through, and you're changing the rule for all_32 
+and all_64 to print an error (and succeed!) if run on the wrong arch.
 
-Why is it a ridiculous suggestion? If it has been broken for  many
-years I do not see why it has to be kept? Is there someone who is
-actively working on making it functional?
+I don't see the point of the latter at all.  Just let all have no 
+dependencies if you're on the wrong ARCH.
 
-Thanks.
+As for the former, can you do this more cleanly?  This is really ugly. 
+It looks to me (on naive reading) like 64-bit hosts won't do the right 
+thing.  (The right thing is to build both bitnesses of tests.)
 
--- 
-Dmitry
+--Andy
+
+>
+> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> ---
+>   tools/testing/selftests/x86/Makefile | 35 +++++++++++++++++++++++------------
+>   1 file changed, 23 insertions(+), 12 deletions(-)
+>
+> diff --git a/tools/testing/selftests/x86/Makefile b/tools/testing/selftests/x86/Makefile
+> index f0a7918..7be67a0 100644
+> --- a/tools/testing/selftests/x86/Makefile
+> +++ b/tools/testing/selftests/x86/Makefile
+> @@ -7,31 +7,36 @@ BINARIES_64 := $(TARGETS_C_BOTHBITS:%=%_64)
+>
+>   CFLAGS := -O2 -g -std=gnu99 -pthread -Wall
+>
+> -UNAME_P := $(shell uname -p)
+> -
+> -# Always build 32-bit tests
+> +# Taken from perf makefile
+> +uname_M := $(shell uname -m 2>/dev/null || echo not)
+> +ARCH ?= $(shell echo $(uname_M) | sed -e s/i.86/i386/)
+> +ifeq ($(ARCH),i386)
+> +ARCH := x86
+>   all: all_32
+> -
+> +endif
+> +ifeq ($(ARCH),x86_64)
+> +ARCH := x86
+>   # If we're on a 64-bit host, build 64-bit tests as well
+> -ifeq ($(shell uname -p),x86_64)
+> -all: all_64
+> +all: all_32 all_64
+>   endif
+>
+>   all_32: check_build32 $(BINARIES_32)
+>
+>   all_64: $(BINARIES_64)
+>
+> -clean:
+> -	$(RM) $(BINARIES_32) $(BINARIES_64)
+> -
+> -run_tests:
+> -	./run_x86_tests.sh
+> -
+>   $(TARGETS_C_BOTHBITS:%=%_32): %_32: %.c
+> +ifeq ($(ARCH),x86)
+>   	$(CC) -m32 -o $@ $(CFLAGS) $(EXTRA_CFLAGS) $^ -lrt -ldl
+> +else
+> +	echo "Not an x86 target, can't build x86 tests"
+> +endif
+>
+>   $(TARGETS_C_BOTHBITS:%=%_64): %_64: %.c
+> +ifeq ($(ARCH),x86)
+>   	$(CC) -m64 -o $@ $(CFLAGS) $(EXTRA_CFLAGS) $^ -lrt -ldl
+> +else
+> +	echo "Not an x86 target, can't build x86 tests"
+> +endif
+>
+>   check_build32:
+>   	@if ! $(CC) -m32 -o /dev/null trivial_32bit_program.c; then	\
+> @@ -46,3 +51,9 @@ check_build32:
+>   	  echo "  yum install glibc-devel.*i686";			\
+>   	  exit 1;							\
+>   	fi
+> +
+> +run_tests:
+> +	./run_x86_tests.sh
+> +
+> +clean:
+> +	$(RM) $(BINARIES_32) $(BINARIES_64)
+>
