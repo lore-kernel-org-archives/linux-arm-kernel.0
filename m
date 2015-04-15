@@ -1,33 +1,38 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 15 Apr 2015 19:24:05 +0200
-Subject: [PATCH v4 07/10] Documentation: bindings: add the Berlin nand
- controller compatible
+Date: Wed, 15 Apr 2015 19:24:01 +0200
+Subject: [PATCH v4 03/10] mtd: pxa3xx_nand: add a default chunk size
 In-Reply-To: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1429118648-19416-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1429118648-19416-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin nand controller support was introduced using the existing
-pxa3xx nand driver. Add the Berlin specific compatible into the
-documentation.
+When keeping the configuration set by the bootloader (by using
+the marvell,nand-keep-config property), the pxa3xx_nand_detect_config()
+function is called and set the chunk size to 512 as a default value if
+NDCR_PAGE_SZ is not set.
+
+In the other case, when not keeping the bootloader configuration, no
+chunk size is set. Fix this by adding a default chunk size of 512.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/mtd/nand/pxa3xx_nand.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-index ecd1fc071f81..f33ee0aa0a2e 100644
---- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-@@ -5,6 +5,7 @@ Required properties:
-  - compatible:		Should be set to one of the following:
- 			marvell,pxa3xx-nand
- 			marvell,armada370-nand
-+			marvell,berlin2-nand
-  - reg: 		The register base for the controller
-  - interrupts:		The interrupt to map
-  - #address-cells:	Set to <1> if the node includes partitions
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 55fce9527c2e..dc0edbc406bb 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -1429,6 +1429,9 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+ 	if (pdata->keep_config && !pxa3xx_nand_detect_config(info))
+ 		goto KEEP_CONFIG;
+ 
++	/* Set a default chunk size */
++	info->chunk_size = 512;
++
+ 	ret = pxa3xx_nand_sensing(info);
+ 	if (ret) {
+ 		dev_info(&info->pdev->dev, "There is no chip on cs %d!\n",
 -- 
 2.3.5
