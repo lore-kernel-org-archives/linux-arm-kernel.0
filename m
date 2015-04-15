@@ -1,45 +1,34 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 15 Apr 2015 19:24:07 +0200
-Subject: [PATCH v4 09/10] ARM: berlin: add BG2Q node for the nand
+Date: Wed, 15 Apr 2015 19:24:03 +0200
+Subject: [PATCH v4 05/10] mtd: nand: add Samsung K9GBG08U0A-M to nand_ids table
 In-Reply-To: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1429118648-19416-10-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1429118648-19416-6-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node describing the nand controller of the Marvell Berlin BG2Q
-SoC. It uses the pxa3xx nand driver, with a dedicated compatible.
-
-Also add the corresponding pinmuxing configuration.
+Add the full description of the Samsung K9GBG08U0A-M nand chip in the
+nand_ids table.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/mtd/nand/nand_ids.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index be5397288d24..aeb3a0ea0540 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -437,6 +437,19 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/mtd/nand/nand_ids.c b/drivers/mtd/nand/nand_ids.c
+index dd620c19c619..500c33e1db06 100644
+--- a/drivers/mtd/nand/nand_ids.c
++++ b/drivers/mtd/nand/nand_ids.c
+@@ -50,6 +50,10 @@ struct nand_flash_dev nand_flash_ids[] = {
+ 		{ .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
+ 		  SZ_8K, SZ_8K, SZ_2M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K),
+ 		  4 },
++	{"NAND 4GiB 3,3V 8-bit",
++		{ .id = {0xec, 0xd7, 0x94, 0x76, 0x64, 0x43}, },
++		  8192, 4096, SZ_1M, LP_OPTIONS, 0, 0, NAND_ECC_INFO(40, SZ_1K),
++		  4 },
  
-+		nand0: nand at f00000 {
-+			compatible = "marvell,berlin2-nand";
-+			reg = <0xf00000 0x10000>;
-+			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_NFC>,
-+				 <&chip CLKID_NFC_ECC>;
-+			clock-names = "nfc", "ecc";
-+
-+			#address-cells = <1>;
-+
-+			status = "disabled";
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
+ 	LEGACY_ID_NAND("NAND 4MiB 5V 8-bit",   0x6B, 4, SZ_8K, SP_OPTIONS),
+ 	LEGACY_ID_NAND("NAND 4MiB 3,3V 8-bit", 0xE3, 4, SZ_8K, SP_OPTIONS),
 -- 
 2.3.5
