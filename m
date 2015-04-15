@@ -1,67 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Apr 2015 13:00:05 -0700
-Subject: Two new breakages since Thursday
-In-Reply-To: <2870641.sYo0J47DWm@wuerfel>
-References: <20150405080645.GE13898@n2100.arm.linux.org.uk>
- <20150414150459.GD18048@atomide.com>
- <20150414162154.GE18048@atomide.com> <2870641.sYo0J47DWm@wuerfel>
-Message-ID: <20150415200004.GG18048@atomide.com>
+From: rick.jones2@hp.com (Rick Jones)
+Date: Wed, 15 Apr 2015 13:08:59 -0700
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <1429122734.7346.141.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
+ <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+ <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+ <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
+ <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552E9E8D.1080000@eu.citrix.com>
+ <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA2BC.5000707@eu.citrix.com>
+ <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA604.8010400@hp.com>
+ <1429121303.7346.126.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EABA3.30109@hp.com>
+ <1429122734.7346.141.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <552EC55B.8020907@hp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [150415 12:52]:
-> On Tuesday 14 April 2015 09:21:55 Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [150414 08:13]:
-> > > * Arnd Bergmann <arnd@arndb.de> [150414 08:00]:
-> > > > On Tuesday 14 April 2015 07:28:47 Tony Lindgren wrote:
-> > > > > > I managed to catch up with my email last night and pulled in these two fixes
-> > > > > > as well as a number of others that we had neglected over the last two weeks.
-> > > > > > 
-> > > > > > I found one new regression with the overnight build tests in a branch I pulled
-> > > > > > in as 'next/late' from Tony, and backed that out now. I'll wait for you and
-> > > > > > Stephen Rothwell (who also reported these issues) to confirm that it's ok
-> > > > > > now and we'll hopefully be ready to send pull requests by the end of the
-> > > > > > week.
-> > > > > 
-> > > > > Hmm what's this issue you're mentioning here for the next/late? Is it the
-> > > > > merge conflict with camera related changes fixed up by Stephen Rothwell
-> > > > > in next?
-> > > > > 
-> > > > > 
-> > > > 
-> > > > This is the error I get during 'make dtbs':
-> > > > 
-> > > >   DTC     arch/arm/boot/dts/am3517_mt_ventoux.dtb
-> > > > ERROR (phandle_references): Reference to non-existent node or label "omap3_scm_general"
-> > > > 
-> > > > The problem is evidently commit b8845074cfbbd ("ARM: dts: omap3: add
-> > > > minimal l4 bus layout with control module support"), which for some reason
-> > > > removes the tisyscon at 48002270 node that is still referenced through
-> > > > the &omap3_scm_general label from omap34xx.dtsi and omap36xx.dtsi.
-> > > 
-> > > I believe this issue got introduced on the 7th by the camera patches
-> > > I acked earlier.
-> > 
-> > Actually, investigating it further, looks like my for-next branch is
-> > missing my omap-for-v4.1/dt-v2 branch already merged into arm-soc
-> > for-next.. Sorry about that, this merge conflict could have been
-> > avoided if I had not missed that branch when rebuilding my for-next.
-> > 
-> > Anyways, Stephen's resolve below is correct. Arnd, I suggest you
-> > remerge it with --no-commit and apply Stephen's resolution below
-> > manually.
-> > 
-> 
-> I've pulled in the omap/dt branch into next/late now, and fixed the
-> merge up in that way. I'm putting it back into for-next now.
+On 04/15/2015 11:32 AM, Eric Dumazet wrote:
+> On Wed, 2015-04-15 at 11:19 -0700, Rick Jones wrote:
+>
+>> Well, I'm not sure that it is George and Jonathan themselves who don't
+>> want to change a sysctl, but the customers who would have to tweak that
+>> in their VMs?
+>
+> Keep in mind some VM users install custom qdisc, or even custom TCP
+> sysctls.
 
-OK thanks!
- 
-> We're running a bit late with the normal pull request now, so
-> no promises that next/late will still make it in time.
+That could very well be, though I confess I've not seen that happening 
+in my little corner of the cloud.  They tend to want to launch the VM 
+and go.  Some of the more advanced/sophisticated ones might tweak a few 
+things but my (admittedly limited) experience has been they are few in 
+number.  They just expect it to work "out of the box" (to the extent one 
+can use that phrase still).
 
-Yes sure totally understood.
+It's kind of ironic - go back to the (early) 1990s when NICs generated a 
+completion interrupt for every individual tx completion (and incoming 
+packet) and all everyone wanted to do was coalesce/avoid interrupts.  I 
+guess that has gone rather far.  And today to fight bufferbloat TCP gets 
+tweaked to favor quick tx completions.  Call it cycles, or pendulums or 
+whatever I guess.
 
-Regards,
+I wonder just how consistent tx completion timings are for a VM so a 
+virtio_net or whatnot in the VM can pick a per-device setting to 
+advertise to TCP?  Hopefully, full NIC emulation is no longer a thing 
+and VMs "universally" use a virtual NIC interface. At least in my little 
+corner of the cloud, emulated NICs are gone, and good riddance.
 
-Tony
+rick
