@@ -1,71 +1,77 @@
-From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
-Date: Wed, 15 Apr 2015 11:18:06 +0200
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <2947000.5TRODaJfhK@wuerfel>
-References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
- <2069111.6po5Xr33Dn@wuerfel>
- <20150414150034.GF14546@e104818-lin.cambridge.arm.com>
- <2947000.5TRODaJfhK@wuerfel>
-Message-ID: <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Apr 2015 10:32:45 +0100
+Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
+ callbacks
+In-Reply-To: <20150414235822.GA22757@dtor-ws>
+References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
+ <20150414162210.GA29874@dtor-ws>
+ <20150414223029.GU12732@n2100.arm.linux.org.uk>
+ <20150414235822.GA22757@dtor-ws>
+Message-ID: <20150415093245.GV12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 15 Apr 2015, at 00:28, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tue, Apr 14, 2015 at 04:58:22PM -0700, Dmitry Torokhov wrote:
+> On Tue, Apr 14, 2015 at 11:30:29PM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Apr 14, 2015 at 09:22:10AM -0700, Dmitry Torokhov wrote:
+> > > On Tue, Apr 14, 2015 at 12:41:48PM +0200, Ulf Hansson wrote:
+> > > > The legacy system PM support has long time ago been dropped from the
+> > > > AMBA bus. Align to that by converting to the modern system PM
+> > > > callbacks.
+> > > > 
+> > > > Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
+> > > > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > > 
+> > > If this has not been noticed since end of 2013 maybe we should drop the
+> > > driver?
+> > 
+> > That's rather silly.  It isn't a build breakage, and it's not a
+> > functional breakage.  In fact, this driver gets build and boot tested
+> > every evening on hardware I have here in my autobuild system.
 > 
-> On Tuesday 14 April 2015 16:00:34 Catalin Marinas wrote:
->> On Tue, Apr 14, 2015 at 04:07:36PM +0200, Arnd Bergmann wrote:
->>> For completeness, there is yet another option, which would be to use the
->>> exact system call table from arm64 and do all the emulation in user space
->>> rather than the kernel. This would however be the least compatible with
->>> existing source code, so you probably don't want to do that.
->> 
->> It would be great if this worked but I think we looked at it before and
->> it seems nice until you hit the futex stuff and robust lists (I don't
->> fully remember the details). Some of the structures (siginfo) would no
->> longer be POSIX compliant and some of them aren't only accessed via libc
->> to be able to create shadow copies.
+> OK.
 > 
-> Well, that may or may not be acceptable. Aarch64-ilp32 mode is a hack to
-> enable a very special class of applications, it's not like anyone would
-> want to run a full system for this and need POSIX compliance.
+> > 
+> > The regression is only visible if it is used on a platform with power
+> > management support, and that's probably close to none - unless hibernate
+> > support is enabled.  I'm just pushing up some patches which fix long
+> > term hibernation issues on ARM.
+> > 
+> > If we apply your "lets drop stuff" argument, maybe we should drop ARM
+> > hibernation support because its been broken for many years... obviously
+> > that's also a rediculous suggestion.
+> 
+> Why is it a ridiculous suggestion? If it has been broken for  many
+> years I do not see why it has to be kept? Is there someone who is
+> actively working on making it functional?
 
-I strongly disagree on this: ILP32 is a first-class citizen of the ARMv8 
-ecosystem as a  ?data-model? for AArch64. Having a corresponding Linux 
-syscall ABI is necessitated because not all data structures shared across
-the syscall-boundary are describted/defined in data-model agnostic types.
-ILP32 thus has the same importance as the LP64 ABI in ARMv8. It is thus 
-neither a hack nor likely/expected to go away anytime soon.
+I *didn't* say it was broken everywhere - it's exactly the same situation
+as ambakmi.  It doesn't work in a certain scenario, but that doesn't mean
+it doesn't work at all, and it doesn't mean that there are no users of it.
 
-We?ve run full systems (built from buildroot) consisting of ILP32 binaries
-only (ok? admittedly gdb was an exception, as we haven?t fixed the fact
-that someone has assumed sizeof(long) == 8 in some data-structure of
-the AArch64 backend there) in our verification runs. In fact, it will be very 
-special classes of applications that will need a 64bit address-space.
+The lesson I'm trying to teach you is that a patch or a report which says
+something is broken does not _necessarily_ mean it's broken everywhere,
+and jumping on the "oh we can remove it then" bandwagon immediately without
+taking the time to understand the nature of the breakage is a totally
+rediculous attitude for a kernel maintainer to take.  In fact, it's
+positively harmful.
 
-If anything, then backward-compatibility for ARMv7 binaries should be
-considered a hack (although one that is performed in hardware).
+Had I not noticed your message, you would have probably ended up removing
+a driver which is very much in use, is functional, and therefore is not
+as broken as Ulf claims.
 
-> We could definitely be pragmatic and do whatever helps get the job
-> done. That said, it diverges further from what legacy 32-bit applications
-> expect to see, so this approach will likely make an application port harder,
-> not easier.
+The other lesson to come away from this is that just because someone claims
+something is broken does *not* make it broken.  It means _they_ are seeing
+some problem which maybe no one else is seeing.  Again, that's no basis to
+jump on the "lets remove the whole driver then" bandwagon.
 
-The key question at this point seems to be whether we want to support
-?legacy 32-bit applications? (i.e. ones that make assumption that are
-not covered by the underlying type definitions or specifications) or whether
-we aim for ?well-formed 32-bit applications?.
+And I doubt that Ulf even has the hardware to be able to test this change,
+which makes it even worse.
 
-To stay with the 'struct timespec?-example, the difference between the 
-former and the latter would (among others) be that the former might 
-assume sizeof(long) == sizeof(time_t), whereas the latter is allowed to
-except that sizeof(long) == sizeof(ts.tv_nsec).
+So please, stop this idiotic "someone reports something broken, lets remove
+the driver" attitude without first analysing whether the breakage actually
+prevents anyone from using the driver.
 
-I don?t believe in keeping compatibility for the former type of applications.
-Consequently, I don?t necessarily see the value in defining ILP32 for
-AArch64 with a 32bit time_t (even though it would be simpler at this 
-moment), as I don?t see the benefit of adding a new ABI that propagates
-a well known problem (even if one could argue that there?s plenty of time
-to fix this by 2038).
-
-Phil.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
