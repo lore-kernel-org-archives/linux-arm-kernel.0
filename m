@@ -1,69 +1,106 @@
-From: george.dunlap@eu.citrix.com (George Dunlap)
-Date: Wed, 15 Apr 2015 18:23:25 +0100
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
- <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <552E9E8D.1080000@eu.citrix.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 15 Apr 2015 10:23:56 -0700
+Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
+ callbacks
+In-Reply-To: <20150415093245.GV12732@n2100.arm.linux.org.uk>
+References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
+ <20150414162210.GA29874@dtor-ws>
+ <20150414223029.GU12732@n2100.arm.linux.org.uk>
+ <20150414235822.GA22757@dtor-ws>
+ <20150415093245.GV12732@n2100.arm.linux.org.uk>
+Message-ID: <20150415172356.GA26350@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2015 05:38 PM, Eric Dumazet wrote:
-> My thoughts that instead of these long talks you should guys read the
-> code :
+On Wed, Apr 15, 2015 at 10:32:45AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Apr 14, 2015 at 04:58:22PM -0700, Dmitry Torokhov wrote:
+> > On Tue, Apr 14, 2015 at 11:30:29PM +0100, Russell King - ARM Linux wrote:
+> > > On Tue, Apr 14, 2015 at 09:22:10AM -0700, Dmitry Torokhov wrote:
+> > > > On Tue, Apr 14, 2015 at 12:41:48PM +0200, Ulf Hansson wrote:
+> > > > > The legacy system PM support has long time ago been dropped from the
+> > > > > AMBA bus. Align to that by converting to the modern system PM
+> > > > > callbacks.
+> > > > > 
+> > > > > Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
+> > > > > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > > > 
+> > > > If this has not been noticed since end of 2013 maybe we should drop the
+> > > > driver?
+> > > 
+> > > That's rather silly.  It isn't a build breakage, and it's not a
+> > > functional breakage.  In fact, this driver gets build and boot tested
+> > > every evening on hardware I have here in my autobuild system.
+> > 
+> > OK.
+> > 
+> > > 
+> > > The regression is only visible if it is used on a platform with power
+> > > management support, and that's probably close to none - unless hibernate
+> > > support is enabled.  I'm just pushing up some patches which fix long
+> > > term hibernation issues on ARM.
+> > > 
+> > > If we apply your "lets drop stuff" argument, maybe we should drop ARM
+> > > hibernation support because its been broken for many years... obviously
+> > > that's also a rediculous suggestion.
+> > 
+> > Why is it a ridiculous suggestion? If it has been broken for  many
+> > years I do not see why it has to be kept? Is there someone who is
+> > actively working on making it functional?
 > 
->                 /* TCP Small Queues :
->                  * Control number of packets in qdisc/devices to two packets / or ~1 ms.
->                  * This allows for :
->                  *  - better RTT estimation and ACK scheduling
->                  *  - faster recovery
->                  *  - high rates
->                  * Alas, some drivers / subsystems require a fair amount
->                  * of queued bytes to ensure line rate.
->                  * One example is wifi aggregation (802.11 AMPDU)
->                  */
->                 limit = max(2 * skb->truesize, sk->sk_pacing_rate >> 10);
->                 limit = min_t(u32, limit, sysctl_tcp_limit_output_bytes);
+> I *didn't* say it was broken everywhere - it's exactly the same situation
+> as ambakmi.  It doesn't work in a certain scenario, but that doesn't mean
+> it doesn't work at all, and it doesn't mean that there are no users of it.
+
+I can only go by what you told me and if you re-read what you wrote
+above you will see that you said that "ARM hibernation support ... been
+broken for many years". You did not say that if was broken only in
+certain cases.
+
 > 
+> The lesson I'm trying to teach you is that a patch or a report which says
+
+I do not need to you to "teach me a lesson", thank you very much.
+Please keep your condescension to yourself.
+
+> something is broken does not _necessarily_ mean it's broken everywhere,
+> and jumping on the "oh we can remove it then" bandwagon immediately without
+> taking the time to understand the nature of the breakage is a totally
+> rediculous attitude for a kernel maintainer to take.  In fact, it's
+> positively harmful.
 > 
-> Then you'll see that most of your questions are already answered.
+> Had I not noticed your message, you would have probably ended up removing
+> a driver which is very much in use, is functional, and therefore is not
+> as broken as Ulf claims.
 > 
-> Feel free to try to improve the behavior, if it does not hurt critical workloads
-> like TCP_RR, where we we send very small messages, millions times per second.
+> The other lesson to come away from this is that just because someone claims
+> something is broken does *not* make it broken.  It means _they_ are seeing
+> some problem which maybe no one else is seeing.  Again, that's no basis to
+> jump on the "lets remove the whole driver then" bandwagon.
 
-First of all, with regard to critical workloads, once this patch gets
-into distros, *normal TCP streams* on every VM running on Amazon,
-Rackspace, Linode, &c will get a 30% hit in performance *by default*.
-Normal TCP streams on xennet *are* a critical workload, and deserve the
-same kind of accommodation as TCP_RR (if not more).  The same goes for
-virtio_net.
+You were on the mail as well as arm list, so I was not concerned about
+accidentally removing something that is in active use. Still, when I see
+a patch to a driver that claims to fix a regression in basic
+functionality (and I do consider PM basic functionality nowadays) that
+was introduced about year and a half ago the question if this driver is
+still relevant is warranted. I can't keep in mind everyone's pet
+sub-arches and whether all drivers are used or not.
 
-Secondly, according to Stefano's and Jonathan's tests,
-tcp_limit_output_bytes completely fixes the problem for Xen.
+> 
+> And I doubt that Ulf even has the hardware to be able to test this change,
+> which makes it even worse.
 
-Which means that max(2*skb->truesize, sk->sk_pacing_rate >>10) is
-*already* larger for Xen; that calculation mentioned in the comment is
-*already* doing the right thing.
+But you will be able to, right?
 
-As Jonathan pointed out, sysctl_tcp_limit_output_bytes is overriding an
-automatic TSQ calculation which is actually choosing an effective value
-for xennet.
+> 
+> So please, stop this idiotic "someone reports something broken, lets remove
+> the driver" attitude without first analysing whether the breakage actually
+> prevents anyone from using the driver.
 
-It certainly makes sense for sysctl_tcp_limit_output_bytes to be an
-actual maximum limit.  I went back and looked at the original patch
-which introduced it (46d3ceabd), and it looks to me like it was designed
-to be a rough, quick estimate of "two packets outstanding" (by choosing
-the maximum size of the packet, 64k, and multiplying it by two).
+Did you see the patch going in removing the driver? No? So take it easy,
+the process worked as it should have been - the question was posted and
+the answer was given.
 
-Now that you have a better algorithm -- the size of 2 actual packets or
-the amount transmitted in 1ms -- it seems like the default
-sysctl_tcp_limit_output_bytes should be higher, and let the automatic
-TSQ you have on the first line throttle things down when necessary.
+Thanks.
 
- -George
+-- 
+Dmitry
