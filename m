@@ -1,30 +1,48 @@
-From: rick.jones2@hp.com (Rick Jones)
-Date: Wed, 15 Apr 2015 10:55:16 -0700
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
- <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
- <552E9E8D.1080000@eu.citrix.com>
- <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA2BC.5000707@eu.citrix.com>
- <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <552EA604.8010400@hp.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 15 Apr 2015 10:59:36 -0700
+Subject: [PATCH 13/13] thermal: of: implement .set_trips for device tree
+ thermal zones
+In-Reply-To: <20150413063018.GT9742@pengutronix.de>
+References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+ <1427385240-6086-14-git-send-email-s.hauer@pengutronix.de>
+ <20150407024307.GH4648@localhost.localdomain>
+ <20150413063018.GT9742@pengutronix.de>
+Message-ID: <20150415175936.GR32500@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> Have you tested this patch on a NIC without GSO/TSO ?
->
-> This would allow more than 500 packets for a single flow.
->
-> Hello bufferbloat.
+On Mon, Apr 13, 2015 at 08:30:18AM +0200, Sascha Hauer wrote:
+> On Mon, Apr 06, 2015 at 07:43:08PM -0700, Eduardo Valentin wrote:
+> > On Thu, Mar 26, 2015 at 04:54:00PM +0100, Sascha Hauer wrote:
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > ---
+> > >  drivers/thermal/of-thermal.c | 12 ++++++++++++
+> > >  include/linux/thermal.h      |  1 +
+> > >  2 files changed, 13 insertions(+)
+> > 
+> > Can you please include at least one user of this call back in your patch
+> > series?
+> 
+> Thanks for the comments on this series. I'll address them in the next
+> round. The user for this callback is not yet ready to be posted. I'll
+> try and move this patch to the end of the series so that the series can
+> be applied without this one.
 
-Woudln't the fq_codel qdisc on that interface address that problem?
+I'm actually interested in this patch, as I am developing a thermal
+sensor driver that has hardware-assisted temperature-trip interrupts.
+I'm testing out your patches now, and will probably end up using them on
+my local tree. With help of this (and a few other changes I need to
+make), my driver should be ready to post soon.
 
-rick
+So, I'll try to post my driver soon as an example, if you'd like. I'd
+also appreciate a CC on any future revisions, if you don't mind. I'm
+subscribed to the list, but it's not always easy to pick out the signal
+from the noise.
+
+Thanks,
+Brian
+
+P.S. Time for a mild complaint: I think it seems to be a bit of a plague
+in the thermal subsystem; there are API's, and even user-space ABI's
+(!!) that have no in-kernel users! e.g., generate_netlink_event()
+http://article.gmane.org/gmane.linux.power-management.general/58685
