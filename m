@@ -1,71 +1,50 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 15 Apr 2015 21:43:30 +0300
-Subject: AM335x OMAP2 common clock external fixed-clock registration
-In-Reply-To: <20150415140945.GA30787@deathray>
-References: <20150414211734.GA28974@deathray> <552E0688.1020903@ti.com>
- <20150415140945.GA30787@deathray>
-Message-ID: <552EB152.7050306@ti.com>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Wed, 15 Apr 2015 14:44:54 -0400
+Subject: [PATCH 1/2] pinctrl: bindings: pinctrl: Add support for TI's
+ IODelay configuration
+In-Reply-To: <552E9714.10001@ti.com>
+References: <1425427237-11511-2-git-send-email-nm@ti.com>
+ <CACRpkdaLEPzBywMnMrteboK7Q4su8PoB0wjnGvVpgUJ=2czVxQ@mail.gmail.com>
+ <20150310153321.GO5264@atomide.com> <54FF28F5.4040707@ti.com>
+ <20150310173115.GS5264@atomide.com> <54FF38F3.2030703@ti.com>
+ <CACRpkdZ1faucps07jaT9kOyviC+Sw6gPkbF=cAGCUj+DiaEgTA@mail.gmail.com>
+ <20150318014151.GL31346@atomide.com>
+ <20150415012910.GA29560@csclub.uwaterloo.ca>
+ <552E9714.10001@ti.com>
+Message-ID: <20150415184454.GT29558@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2015 05:09 PM, Michael Welling wrote:
-> On Wed, Apr 15, 2015 at 09:34:48AM +0300, Tero Kristo wrote:
->> On 04/15/2015 12:17 AM, Michael Welling wrote:
->>> Greetings,
->>>
->>> I have developed an AM3354 based SoM and it uses an external SI5351 clock
->>> generator to drive the clock inputs for an external duart and I2S audio
->>> master clock. With the registration according to the documentation the
->>> reference clock is not being detected and hence the clock generator is
->>> not working as expect.
->>>
->>> After trying many different things, I started to look around the mailing
->>> lists to find information related to this issue.
->>>
->>> I came acrossed post that has the exact same issue:
->>> https://lkml.org/lkml/2013/2/18/468
->>>
->>> Seeing as the patch did not land upstream, I am wondering if there is
->>> a solution that I am not seeing.
->>>
->>> I am willing to provide a patch given appropriate guidance.
->>
->> Hi Michael,
->>
->> The info on the email you referenced is kind of obsolete, TI SoCs
->> are calling of_clk_init() during boot now, and thus external clock
->> nodes should be registered fine also. Maybe you can provide the
->> actual DTS patch you are trying out so we can help better...? Are
->
-> See attached patch and console output.
+On Wed, Apr 15, 2015 at 11:51:32AM -0500, Nishanth Menon wrote:
+> I am yet to post a new revision to this series - few other stuff got
+> in the way. IODelay driver in no way removes the constraint that the
+> SoC architecture has - most of the pins still need to be muxed in
+> bootloader - we cannot escape that. The reasoning for doing the mux in
+> bootloader is independent of the need for iodelay.
+> 
+> Reasoning for mux in bootloader is because the mux and pull fields are
+> glitchy - much more than previous generations of TI SoCs and
+> significantly long enough to cause issues depending on the pins being
+> muxed.
 
-I see a bug in your dt data.
+Well if we know glitching is NOT an issue on our boards, then we don't
+have to do anything in the boot loader other than the basic setup for
+the serial console and emmc and SD, which has always been necesary.
 
-<snip>
+I consider moving the mux setup to the bootloader a terrible design and
+won't go along with it.  We make sure all external devices have reset
+lines being held while the pinmux is being setup, so glitching is a
+non issue.
 
-+	clocks {
-+		ref27: ref27 {
-+			#clock-cells = <0>;
-+			compatibale = "fixed-clock";
+> Reasoning for iodelay is different - it is a hardware block meant to
+> control the timing of signals in a particular signal path to ensure
+> that specification compliance is met.
+> 
+> Lets try not to mix the two.
 
-This should be compatible, right? DT is annoying in that it doesn't 
-verify property names.
+Well I was told by multiple people from TI that the reason for moving
+the pinmux setup to the bootloader was because of the iodelay issue,
+so you will have to get the message made clear within TI then.
 
-+			clock-frequency = <27000000>;
-+		};
-+	};
-
--Tero
-
->
->> you seeing any boot time error / warning prints for your new clock?
->
-> With the debug messages on you see that the reference clock is not being
-> detected.
->
-> Whilest debugging I found that the of_clk_get is returning an error no matter
-> which clock I pass it:
-> http://lxr.free-electrons.com/source/drivers/clk/clk-si5351.c#L1131
->
->>
->> -Tero
+-- 
+Len Sorensen
