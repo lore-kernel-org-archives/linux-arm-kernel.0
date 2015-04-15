@@ -1,68 +1,68 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 15 Apr 2015 18:31:08 +0200
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150409134843.GQ4027@n2100.arm.linux.org.uk>
-References: <5521A438.1070008@gmail.com>
- <CAALWOA_0r1syy4nPBOvf1evhd5_oX=LWjdZAsQGAoGk8OoXTwg@mail.gmail.com>
- <20150406151939.GG18048@atomide.com>
- <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
- <20150406174245.GJ18048@atomide.com>
- <20150407135713.GL4027@n2100.arm.linux.org.uk>
- <20150407152207.GM18048@atomide.com>
- <20150408230658.GO4027@n2100.arm.linux.org.uk>
- <20150409134843.GQ4027@n2100.arm.linux.org.uk>
-Message-ID: <20150415163108.GB2033@earth>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 15 Apr 2015 17:36:54 +0100
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+In-Reply-To: <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <20150415173654.431f5d89@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 15 Apr 2015 17:49:23 +0800
+Minghuan Lian <Minghuan.Lian@freescale.com> wrote:
 
-On Thu, Apr 09, 2015 at 02:48:43PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 09, 2015 at 12:06:58AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Apr 07, 2015 at 08:22:08AM -0700, Tony Lindgren wrote:
-> > > Works for me. The above needs the following fix folded in to build:
-> > > 
-> > > --- a/arch/arm/mm/proc-v7.S
-> > > +++ b/arch/arm/mm/proc-v7.S
-> > > @@ -532,7 +532,7 @@ __v7_ca9mp_proc_info:
-> > >  __v7_ca8_proc_info:
-> > >  	.long	0x410fc080
-> > >  	.long	0xff0ffff0
-> > > -	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
-> > > +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
-> > >  	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
-> > >  
-> > >  #endif	/* CONFIG_ARM_LPAE */
-> > 
-> > Thanks, merged into the original patch.
+> SMMU of some platforms can only isolate limited device ID.
+> This may require that all PCI devices share the same ITS
+> device with the fixed device ID. The patch adds function
+> arch_msi_share_devid_update used for these platforms to update
+> the fixed device ID and maximum MSI interrupts number.
 > 
-> Do you want to give me an ack for this, thanks?
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index d0374a6..be78d0a 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1169,6 +1169,15 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
+>  	return 0;
+>  }
+>  
+> +void __weak
+> +arch_msi_share_devid_update(struct pci_dev *pdev, u32 *dev_id, u32 *nvesc)
+> +{
+> +	/*
+> +	 * use PCI_DEVID NOT share device ID as default
+> +	 * so nothing need to do
+> +	 */
+> +}
+> +
 
-I tried to test this together with Tony's follow up patch, but I get
-this after applying the patch to v4.0:
+NAK. On top of being ugly as sin, this breaks any form of multiplatform
+support. No way anything like this is going in. Guys, you really should
+know better.
 
-sre at earth ~/src/linux [430973-fix] % make -j4
-  CHK     include/config/kernel.release
-  CHK     include/generated/uapi/linux/version.h
-  CHK     include/generated/utsrelease.h
-make[1]: 'include/generated/mach-types.h' is up to date.
-  CALL    scripts/checksyscalls.sh
-  CHK     include/generated/compile.h
-  AS      arch/arm/mm/proc-v7.o
-arch/arm/mm/proc-v7.S: Assembler messages:
-arch/arm/mm/proc-v7.S:535: Error: invalid operands (*ABS* and .text sections) for `|'
-arch/arm/mm/proc-v7.S:535: Error: invalid operands (*ABS* and .text sections) for `|'
-scripts/Makefile.build:294: recipe for target 'arch/arm/mm/proc-v7.o' failed
-make[1]: *** [arch/arm/mm/proc-v7.o] Error 1
-Makefile:947: recipe for target 'arch/arm/mm' failed
-make: *** [arch/arm/mm] Error 2
-make: *** Waiting for unfinished jobs....
+>  static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
+>  			   int nvec, msi_alloc_info_t *info)
+>  {
+> @@ -1185,6 +1194,8 @@ static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
+>  	dev_alias.count = nvec;
+>  
+>  	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+> +	arch_msi_share_devid_update(pdev, &dev_alias.dev_id, &dev_alias.count);
+> +
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150415/b5f2b80f/attachment.sig>
+See the function above? That's where the aliasing should be taken care
+of.
+
+>  	its = domain->parent->host_data;
+>  
+>  	its_dev = its_find_device(its, dev_alias.dev_id);
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
