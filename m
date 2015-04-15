@@ -1,38 +1,35 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 15 Apr 2015 19:24:01 +0200
-Subject: [PATCH v4 03/10] mtd: pxa3xx_nand: add a default chunk size
+Date: Wed, 15 Apr 2015 19:24:06 +0200
+Subject: [PATCH v4 08/10] mtd: nand: let Marvell Berlin SoCs select the pxa3xx
+ driver
 In-Reply-To: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1429118648-19416-4-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1429118648-19416-9-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When keeping the configuration set by the bootloader (by using
-the marvell,nand-keep-config property), the pxa3xx_nand_detect_config()
-function is called and set the chunk size to 512 as a default value if
-NDCR_PAGE_SZ is not set.
-
-In the other case, when not keeping the bootloader configuration, no
-chunk size is set. Fix this by adding a default chunk size of 512.
+Marvell Berlin nand controller support has been added in the pxa3xx nand
+driver. Let these SoCs select the driver.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/mtd/nand/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 55fce9527c2e..dc0edbc406bb 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1429,6 +1429,9 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 	if (pdata->keep_config && !pxa3xx_nand_detect_config(info))
- 		goto KEEP_CONFIG;
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 5b76a173cd95..acca044da603 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -331,8 +331,8 @@ config MTD_NAND_ATMEL
+ 	  on Atmel AT91 and AVR32 processors.
  
-+	/* Set a default chunk size */
-+	info->chunk_size = 512;
-+
- 	ret = pxa3xx_nand_sensing(info);
- 	if (ret) {
- 		dev_info(&info->pdev->dev, "There is no chip on cs %d!\n",
+ config MTD_NAND_PXA3xx
+-	tristate "NAND support on PXA3xx and Armada 370/XP"
+-	depends on PXA3xx || ARCH_MMP || PLAT_ORION
++	tristate "NAND support on PXA3xx, Armada 370/XP and Marvell Berlin"
++	depends on PXA3xx || ARCH_MMP || PLAT_ORION || ARCH_BERLIN
+ 	help
+ 	  This enables the driver for the NAND flash device found on
+ 	  PXA3xx processors (NFCv1) and also on Armada 370/XP (NFCv2).
 -- 
 2.3.5
