@@ -1,363 +1,155 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Apr 2015 17:34:15 +0200
-Subject: [PATCH v4 04/13] arm64: use fixmap region for permanent FDT mapping
+Date: Wed, 15 Apr 2015 17:34:16 +0200
+Subject: [PATCH v4 05/13] arm64/efi: adapt to relaxed FDT placement
+ requirements
 In-Reply-To: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1429112064-19952-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1429112064-19952-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the FDT blob needs to be in the same 512 MB region as
-the kernel, so that it can be mapped into the kernel virtual memory
-space very early on using a minimal set of statically allocated
-translation tables.
-
-Now that we have early fixmap support, we can relax this restriction,
-by moving the permanent FDT mapping to the fixmap region instead.
-This way, the FDT blob may be anywhere in memory.
-
-This also moves the vetting of the FDT to mmu.c, since the early
-init code in head.S does not handle mapping of the FDT anymore.
-At the same time, fix up some comments in head.S that have gone stale.
+With the relaxed FDT placement requirements in place, we can change
+the allocation strategy used by the stub to put the FDT image higher
+up in memory. At the same time, reduce the minimal alignment to 8 bytes,
+and impose a 2 MB size limit, as per the new requirements.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- Documentation/arm64/booting.txt | 13 +++++----
- arch/arm64/include/asm/boot.h   | 14 +++++++++
- arch/arm64/include/asm/fixmap.h | 15 ++++++++++
- arch/arm64/include/asm/mmu.h    |  1 +
- arch/arm64/kernel/head.S        | 39 +------------------------
- arch/arm64/kernel/setup.c       | 32 +++++++-------------
- arch/arm64/mm/Makefile          |  2 ++
- arch/arm64/mm/init.c            |  1 -
- arch/arm64/mm/mmu.c             | 65 +++++++++++++++++++++++++++++++++++++++++
- 9 files changed, 117 insertions(+), 65 deletions(-)
- create mode 100644 arch/arm64/include/asm/boot.h
+ arch/arm64/include/asm/efi.h            | 10 +++-------
+ drivers/firmware/efi/libstub/arm-stub.c |  5 ++---
+ drivers/firmware/efi/libstub/efistub.h  |  1 -
+ drivers/firmware/efi/libstub/fdt.c      | 23 +++++++++++++----------
+ 4 files changed, 18 insertions(+), 21 deletions(-)
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index f3c05b5f9f08..53f18e13d51c 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -45,11 +45,14 @@ sees fit.)
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index ef572206f1c3..825c85666b6b 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -1,6 +1,7 @@
+ #ifndef _ASM_EFI_H
+ #define _ASM_EFI_H
  
- Requirement: MANDATORY
- 
--The device tree blob (dtb) must be placed on an 8-byte boundary within
--the first 512 megabytes from the start of the kernel image and must not
--cross a 2-megabyte boundary. This is to allow the kernel to map the
--blob using a single section mapping in the initial page tables.
--
-+The device tree blob (dtb) must be placed on an 8-byte boundary and must
-+not exceed 2 megabytes in size. Since the dtb will be mapped cacheable using
-+blocks of up to 2 megabytes in size, it should not be placed within 2 megabytes
-+of memreserves or other special carveouts that may be mapped with non-matching
-+attributes.
-+
-+NOTE: versions prior to v4.2 also require that the DTB be placed within
-+the 512 MB region starting at text_offset bytes below the kernel Image.
- 
- 3. Decompress the kernel image
- ------------------------------
-diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
-new file mode 100644
-index 000000000000..81151b67b26b
---- /dev/null
-+++ b/arch/arm64/include/asm/boot.h
-@@ -0,0 +1,14 @@
-+
-+#ifndef __ASM_BOOT_H
-+#define __ASM_BOOT_H
-+
-+#include <asm/sizes.h>
-+
-+/*
-+ * arm64 requires the DTB to be 8 byte aligned and
-+ * not exceed 2MB in size.
-+ */
-+#define MIN_FDT_ALIGN		8
-+#define MAX_FDT_SIZE		SZ_2M
-+
-+#endif
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index 926495686554..ef66c26eebbe 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -17,6 +17,7 @@
- 
- #ifndef __ASSEMBLY__
- #include <linux/kernel.h>
 +#include <asm/boot.h>
- #include <asm/page.h>
+ #include <asm/io.h>
+ #include <asm/neon.h>
  
- /*
-@@ -32,6 +33,20 @@
-  */
- enum fixed_addresses {
- 	FIX_HOLE,
-+
-+	/*
-+	 * Reserve a virtual window for the FDT that is 2 MB larger than the
-+	 * maximum supported size, and put it at the top of the fixmap region.
-+	 * The additional space ensures that any FDT that does not exceed
-+	 * MAX_FDT_SIZE can be mapped regardless of whether it crosses any
-+	 * 2 MB alignment boundaries.
-+	 *
-+	 * Keep this at the top so it remains 2 MB aligned.
-+	 */
-+#define FIX_FDT_SIZE		(MAX_FDT_SIZE + SZ_2M)
-+	FIX_FDT_END,
-+	FIX_FDT = FIX_FDT_END + FIX_FDT_SIZE / PAGE_SIZE - 1,
-+
- 	FIX_EARLYCON_MEM_BASE,
- 	FIX_TEXT_POKE0,
- 	__end_of_permanent_fixed_addresses,
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 3d311761e3c2..79fcfb048884 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -34,5 +34,6 @@ extern void init_mem_pgprot(void);
- extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       unsigned long virt, phys_addr_t size,
- 			       pgprot_t prot);
-+extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
+@@ -38,13 +39,8 @@ extern void efi_init(void);
  
- #endif
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 0c14471d7616..c0ff3ce4299e 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -237,8 +237,6 @@ ENTRY(stext)
- 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
- 	adrp	x24, __PHYS_OFFSET
- 	bl	set_cpu_boot_mode_flag
--
--	bl	__vet_fdt
- 	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
- 	/*
- 	 * The following calls CPU setup code, see arch/arm64/mm/proc.S for
-@@ -270,24 +268,6 @@ preserve_boot_args:
- ENDPROC(preserve_boot_args)
+ /* arch specific definitions used by the stub code */
  
- /*
-- * Determine validity of the x21 FDT pointer.
-- * The dtb must be 8-byte aligned and live in the first 512M of memory.
-- */
--__vet_fdt:
--	tst	x21, #0x7
--	b.ne	1f
--	cmp	x21, x24
--	b.lt	1f
--	mov	x0, #(1 << 29)
--	add	x0, x0, x24
--	cmp	x21, x0
--	b.ge	1f
--	ret
--1:
--	mov	x21, #0
--	ret
--ENDPROC(__vet_fdt)
 -/*
-  * Macro to create a table entry to the next page.
-  *
-  *	tbl:	page table address
-@@ -348,8 +328,7 @@ ENDPROC(__vet_fdt)
-  * required to get the kernel running. The following sections are required:
-  *   - identity mapping to enable the MMU (low address, TTBR0)
-  *   - first few MB of the kernel linear mapping to jump to once the MMU has
-- *     been enabled, including the FDT blob (TTBR1)
-- *   - pgd entry for fixed mappings (TTBR1)
-+ *     been enabled
-  */
- __create_page_tables:
- 	adrp	x25, idmap_pg_dir
-@@ -439,22 +418,6 @@ __create_page_tables:
- 	create_block_map x0, x7, x3, x5, x6
+- * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
+- * start of kernel and may not cross a 2MiB boundary. We set alignment to
+- * 2MiB so we know it won't cross a 2MiB boundary.
+- */
+-#define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
+-#define MAX_FDT_OFFSET	SZ_512M
++#define EFI_FDT_ALIGN		MIN_FDT_ALIGN
++#define EFI_FDT_MAX_SIZE	MAX_FDT_SIZE
+ 
+ #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
+ 
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index dcae482a9a17..f54c76a4fd32 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -269,9 +269,8 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 
+ 	new_fdt_addr = fdt_addr;
+ 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
+-				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
+-				initrd_addr, initrd_size, cmdline_ptr,
+-				fdt_addr, fdt_size);
++				&new_fdt_addr, initrd_addr, initrd_size,
++				cmdline_ptr, fdt_addr, fdt_size);
  
  	/*
--	 * Map the FDT blob (maximum 2MB; must be within 512MB of
--	 * PHYS_OFFSET).
--	 */
--	mov	x3, x21				// FDT phys address
--	and	x3, x3, #~((1 << 21) - 1)	// 2MB aligned
--	mov	x6, #PAGE_OFFSET
--	sub	x5, x3, x24			// subtract PHYS_OFFSET
--	tst	x5, #~((1 << 29) - 1)		// within 512MB?
--	csel	x21, xzr, x21, ne		// zero the FDT pointer
--	b.ne	1f
--	add	x5, x5, x6			// __va(FDT blob)
--	add	x6, x5, #1 << 21		// 2MB for the FDT blob
--	sub	x6, x6, #1			// inclusive range
--	create_block_map x0, x7, x3, x5, x6
--1:
--	/*
- 	 * Since the page tables have been populated with non-cacheable
- 	 * accesses (MMU disabled), invalidate the idmap and swapper page
- 	 * tables again to remove any speculatively loaded cache lines.
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 51ef97274b52..eafad20a4c80 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -103,18 +103,6 @@ static struct resource mem_res[] = {
- #define kernel_code mem_res[0]
- #define kernel_data mem_res[1]
+ 	 * If all went well, we need to return the FDT address to the
+diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+index 47437b16b186..c8e096094ea9 100644
+--- a/drivers/firmware/efi/libstub/efistub.h
++++ b/drivers/firmware/efi/libstub/efistub.h
+@@ -35,7 +35,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 					    void *handle,
+ 					    unsigned long *new_fdt_addr,
+-					    unsigned long max_addr,
+ 					    u64 initrd_addr, u64 initrd_size,
+ 					    char *cmdline_ptr,
+ 					    unsigned long fdt_addr,
+diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+index 91da56c4fd54..ace5ed70a88e 100644
+--- a/drivers/firmware/efi/libstub/fdt.c
++++ b/drivers/firmware/efi/libstub/fdt.c
+@@ -165,10 +165,6 @@ fdt_set_fail:
+ 	return EFI_LOAD_ERROR;
+ }
  
--void __init early_print(const char *str, ...)
--{
--	char buf[256];
--	va_list ap;
--
--	va_start(ap, str);
--	vsnprintf(buf, sizeof(buf), str, ap);
--	va_end(ap);
--
--	printk("%s", buf);
--}
+-#ifndef EFI_FDT_ALIGN
+-#define EFI_FDT_ALIGN EFI_PAGE_SIZE
+-#endif
 -
  /*
-  * The recorded values of x0 .. x3 upon kernel entry.
-  */
-@@ -324,12 +312,14 @@ static void __init setup_processor(void)
+  * Allocate memory for a new FDT, then add EFI, commandline, and
+  * initrd related fields to the FDT.  This routine increases the
+@@ -186,7 +182,6 @@ fdt_set_fail:
+ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 					    void *handle,
+ 					    unsigned long *new_fdt_addr,
+-					    unsigned long max_addr,
+ 					    u64 initrd_addr, u64 initrd_size,
+ 					    char *cmdline_ptr,
+ 					    unsigned long fdt_addr,
+@@ -197,6 +192,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 	unsigned long mmap_key;
+ 	efi_memory_desc_t *memory_map, *runtime_map;
+ 	unsigned long new_fdt_size;
++	void *fdt_alloc;
+ 	efi_status_t status;
+ 	int runtime_entry_count = 0;
  
- static void __init setup_machine_fdt(phys_addr_t dt_phys)
- {
--	if (!dt_phys || !early_init_dt_scan(phys_to_virt(dt_phys))) {
--		early_print("\n"
--			"Error: invalid device tree blob at physical address 0x%p (virtual address 0x%p)\n"
--			"The dtb must be 8-byte aligned and passed in the first 512MB of memory\n"
--			"\nPlease check your bootloader.\n",
--			dt_phys, phys_to_virt(dt_phys));
-+	void *dt_virt = fixmap_remap_fdt(dt_phys);
-+
-+	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
-+		pr_crit("\n"
-+			"Error: invalid device tree blob@physical address %pa (virtual address 0x%p)\n"
-+			"The dtb must be 8-byte aligned and must not exceed 2 MB in size\n"
-+			"\nPlease check your bootloader.",
-+			&dt_phys, dt_virt);
+@@ -221,14 +217,21 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 	 * will allocate a bigger buffer if this ends up being too
+ 	 * small, so a rough guess is OK here.
+ 	 */
+-	new_fdt_size = fdt_size + EFI_PAGE_SIZE;
++	new_fdt_size = fdt_size + EFI_PAGE_SIZE + EFI_FDT_ALIGN;
+ 	while (1) {
+-		status = efi_high_alloc(sys_table, new_fdt_size, EFI_FDT_ALIGN,
+-					new_fdt_addr, max_addr);
++		if (new_fdt_size > EFI_FDT_MAX_SIZE) {
++			pr_efi_err(sys_table, "FDT size exceeds EFI_FDT_MAX_SIZE.\n");
++			goto fail;
++		}
++		status = sys_table->boottime->allocate_pool(EFI_LOADER_DATA,
++							    new_fdt_size,
++							    &fdt_alloc);
+ 		if (status != EFI_SUCCESS) {
+ 			pr_efi_err(sys_table, "Unable to allocate memory for new device tree.\n");
+ 			goto fail;
+ 		}
++		*new_fdt_addr = round_up((unsigned long)fdt_alloc,
++					 EFI_FDT_ALIGN);
  
- 		while (true)
- 			cpu_relax();
-@@ -372,6 +362,9 @@ void __init setup_arch(char **cmdline_p)
- {
- 	setup_processor();
+ 		/*
+ 		 * Now that we have done our final memory allocation (and free)
+@@ -258,7 +261,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 			 * to get new one that reflects the free/alloc we do
+ 			 * on the device tree buffer.
+ 			 */
+-			efi_free(sys_table, new_fdt_size, *new_fdt_addr);
++			sys_table->boottime->free_pool(&fdt_alloc);
+ 			sys_table->boottime->free_pool(memory_map);
+ 			new_fdt_size += EFI_PAGE_SIZE;
+ 		} else {
+@@ -316,7 +319,7 @@ fail_free_mmap:
+ 	sys_table->boottime->free_pool(memory_map);
  
-+	early_fixmap_init();
-+	early_ioremap_init();
-+
- 	setup_machine_fdt(__fdt_pointer);
+ fail_free_new_fdt:
+-	efi_free(sys_table, new_fdt_size, *new_fdt_addr);
++	sys_table->boottime->free_pool(&fdt_alloc);
  
- 	init_mm.start_code = (unsigned long) _text;
-@@ -381,9 +374,6 @@ void __init setup_arch(char **cmdline_p)
- 
- 	*cmdline_p = boot_command_line;
- 
--	early_fixmap_init();
--	early_ioremap_init();
--
- 	parse_early_param();
- 
- 	/*
-diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-index 773d37a14039..9d84feb41a16 100644
---- a/arch/arm64/mm/Makefile
-+++ b/arch/arm64/mm/Makefile
-@@ -4,3 +4,5 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
- 				   context.o proc.o pageattr.o
- obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
- obj-$(CONFIG_ARM64_PTDUMP)	+= dump.o
-+
-+CFLAGS_mmu.o			:= -I$(srctree)/scripts/dtc/libfdt/
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index fa2389b0f7f0..ae85da6307bb 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -170,7 +170,6 @@ void __init arm64_memblock_init(void)
- 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
- #endif
- 
--	early_init_fdt_reserve_self();
- 	early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 428aaf86c95b..aa99b7a0d660 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -21,6 +21,7 @@
- #include <linux/kernel.h>
- #include <linux/errno.h>
- #include <linux/init.h>
-+#include <linux/libfdt.h>
- #include <linux/mman.h>
- #include <linux/nodemask.h>
- #include <linux/memblock.h>
-@@ -643,3 +644,67 @@ void __set_fixmap(enum fixed_addresses idx,
- 		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
- 	}
- }
-+
-+void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
-+{
-+	const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
-+	pgprot_t prot = PAGE_KERNEL | PTE_RDONLY;
-+	int granularity, size;
-+	void *dt_virt;
-+
-+	/*
-+	 * Check whether the physical FDT address is set and meets the minimum
-+	 * alignment requirement. Since we are relying on MIN_FDT_ALIGN to be
-+	 * at least 8 bytes so that we can always access the size field of the
-+	 * FDT header after mapping the first chunk, double check here if that
-+	 * is indeed the case.
-+	 */
-+	BUILD_BUG_ON(MIN_FDT_ALIGN < 8);
-+	if (!dt_phys || dt_phys % MIN_FDT_ALIGN)
-+		return NULL;
-+
-+	/*
-+	 * Make sure that the FDT region can be mapped without the need to
-+	 * allocate additional translation table pages, so that it is safe
-+	 * to call create_mapping() this early.
-+	 *
-+	 * On 64k pages, the fixmap region will be mapped using PTEs, so we
-+	 * need to be in the same PMD as the rest of the fixmap.
-+	 * On 4k pages, we'll use section mappings for the region so we only
-+	 * have to be in the same PUD.
-+	 */
-+	BUILD_BUG_ON(dt_virt_base % SZ_2M);
-+
-+	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES)) {
-+		BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> PMD_SHIFT !=
-+			     __fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT);
-+
-+		granularity = PAGE_SIZE;
-+	} else {
-+		BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> PUD_SHIFT !=
-+			     __fix_to_virt(FIX_BTMAP_BEGIN) >> PUD_SHIFT);
-+
-+		granularity = PMD_SIZE;
-+	}
-+
-+	dt_virt = (void *)dt_virt_base + dt_phys % granularity;
-+
-+	/* map the first chunk so we can read the size from the header */
-+	create_mapping(round_down(dt_phys, granularity), dt_virt_base,
-+		       granularity, prot);
-+
-+	if (fdt_check_header(dt_virt) != 0)
-+		return NULL;
-+
-+	size = fdt_totalsize(dt_virt);
-+	if (size > MAX_FDT_SIZE)
-+		return NULL;
-+
-+	if (size > granularity)
-+		create_mapping(round_down(dt_phys, granularity), dt_virt_base,
-+			       round_up(size, granularity), prot);
-+
-+	memblock_reserve(dt_phys, size);
-+
-+	return dt_virt;
-+}
+ fail:
+ 	sys_table->boottime->free_pool(runtime_map);
 -- 
 1.8.3.2
