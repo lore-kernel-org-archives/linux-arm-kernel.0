@@ -1,35 +1,53 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 15 Apr 2015 19:24:06 +0200
-Subject: [PATCH v4 08/10] mtd: nand: let Marvell Berlin SoCs select the pxa3xx
- driver
+Date: Wed, 15 Apr 2015 19:24:08 +0200
+Subject: [PATCH v4 10/10] ARM: berlin: enable flash on the BG2Q DMP
 In-Reply-To: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1429118648-19416-9-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1429118648-19416-11-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell Berlin nand controller support has been added in the pxa3xx nand
-driver. Let these SoCs select the driver.
+The BG2Q DMP has a nand controller. Add the corresponding node, but do
+not enable it by default because the nand is only available on some BG2Q
+DMP.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/mtd/nand/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 5b76a173cd95..acca044da603 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -331,8 +331,8 @@ config MTD_NAND_ATMEL
- 	  on Atmel AT91 and AVR32 processors.
- 
- config MTD_NAND_PXA3xx
--	tristate "NAND support on PXA3xx and Armada 370/XP"
--	depends on PXA3xx || ARCH_MMP || PLAT_ORION
-+	tristate "NAND support on PXA3xx, Armada 370/XP and Marvell Berlin"
-+	depends on PXA3xx || ARCH_MMP || PLAT_ORION || ARCH_BERLIN
- 	help
- 	  This enables the driver for the NAND flash device found on
- 	  PXA3xx processors (NFCv1) and also on Armada 370/XP (NFCv2).
+diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+index a98ac1bd8f65..4157258a6fb0 100644
+--- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
++++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+@@ -112,3 +112,28 @@
+ &sata_phy {
+ 	status = "okay";
+ };
++
++&chip {
++	nand_pmux: nand-pmux {
++		groups = "G0", "G1";
++		function = "nand";
++	};
++};
++
++&nand0 {
++	pinctrl-0 = <&nand_pmux>;
++	pinctrl-names = "default";
++
++	marvell,nand-enable-arbiter;
++	nand-ecc-strength = <48>;
++	nand-ecc-step-size = <1024>;
++
++	num-cs = <1>;
++
++	/*
++	 * Two kinds of BG2Q DMP are available: one with emmc and
++	 * one with a nand. The latter is not widespread. Because
++	 * of this, disable the nand by default.
++	 */
++	status = "disabled";
++};
 -- 
 2.3.5
