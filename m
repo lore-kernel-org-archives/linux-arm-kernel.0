@@ -1,48 +1,40 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 15 Apr 2015 21:11:32 +0200 (CEST)
-Subject: [PATCH] ARM: dts: imx23-olinuxino: Fix dr_mode of usb0
-In-Reply-To: <20150415033211.GB29095@shlinux2>
-References: <1429043846-28731-1-git-send-email-stefan.wahren@i2se.com>
- <20150415033211.GB29095@shlinux2>
-Message-ID: <772352469.13551.1429125092786.JavaMail.open-xchange@oxbaltgw00.schlund.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 15 Apr 2015 21:27:32 +0200
+Subject: [PATCH] rtc: armada38x: Fix concurrency access in
+ armada38x_rtc_set_time
+In-Reply-To: <1429103633-24376-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1429103633-24376-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150415192732.GB13105@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Wed, Apr 15, 2015 at 03:13:53PM +0200, Gregory CLEMENT wrote:
+> While setting the time, the RTC TIME register should not be
+> accessed. However due to hardware constraints, setting the RTC time
+> involves sleeping during 100ms. This sleep was done outside the
+> critical section protected by the spinlock, so it was possible to read
+> the RTC TIME register and get an incorrect value. This patch
+> introduces a mutex for protecting the RTC TIME access, unlike the
+> spinlock it is allowed to sleep in a critical section protected by a
+> mutex. The RTC STATUS register can still be used from the interrupt
+> handler but it has no effect on setting the time.
 
-> Peter Chen <peter.chen@freescale.com> hat am 15. April 2015 um 05:32
-> geschrieben:
->
->
-> [...]
->
-> If this board has only host function, I am ok for it.
+Hi Gregory
 
-Yes, all 4 boards (Maxi [1], Micro [2], Mini [3], Nano [4]) have only host
-function.
+There is the following comment in the code:
 
->
-> Acked-by: Peter Chen <peter.chen@freescale.com>
+        /*
+         * Setting the RTC time not always succeeds. According to the
+         * errata we need to first write on the status register and
+         * then wait for 100ms before writing to the time register to be
+         * sure that the data will be taken into account.
+         */
 
-Thanks
-Stefan
+The interrupt handler also writes to the STATUS register. So what
+happens if there is an interrupt during that 100ms and a second write
+to STATUS?
 
-[1] -
-https://github.com/OLIMEX/OLINUXINO/blob/master/HARDWARE/iMX233-OLinuXino-Maxi/iMX233-OLINUXINO-MAXI_Rev_D.pdf
-[2] -
-https://github.com/OLIMEX/OLINUXINO/blob/master/HARDWARE/iMX233-OLinuXino-Micro/iMX233-OLinuXino-Micro_Rev_D.pdf
-[3] -
-https://github.com/OLIMEX/OLINUXINO/blob/master/HARDWARE/iMX233-OLinuXino-Mini/iMX233-OLINUXINO-MINI_Rev_C.sch.pdf
-[4] -
-https://github.com/OLIMEX/OLINUXINO/blob/master/HARDWARE/iMX233-OLinuXino-NANO/iMX233-OLinuXino-NANO_Rev_B.pdf
+Maybe it is necessary to disable the RTC interrupt while setting the
+time?
 
->
-> --
->
-> Best Regards,
-> Peter Chen
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	Andrew
