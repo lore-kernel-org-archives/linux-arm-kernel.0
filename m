@@ -1,51 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 15 Apr 2015 08:19:52 -0500
-Subject: [PATCH 0/2] gpio: Allow userspace export from DT
-In-Reply-To: <20150413110515.9681.58848.stgit@localhost>
-References: <20150413110515.9681.58848.stgit@localhost>
-Message-ID: <CAL_JsqJorndYh4ROdKbJfpG1KY=Xosjc6BMFYRPrb+BsauFsnQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 15 Apr 2015 14:34:03 +0100
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <CAF6AEGtoxNrCoxT5n0CXmKMnL-YprJ3DkAuM4Myi87WMxPqBGw@mail.gmail.com>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
+ <20150414163613.GM28709@leverpostej>
+ <07185B2C-3F37-4E70-9096-1EF5EA8D68CE@codeaurora.org>
+ <20150414211720.GA56647@MBP>
+ <CAF6AEGtoxNrCoxT5n0CXmKMnL-YprJ3DkAuM4Myi87WMxPqBGw@mail.gmail.com>
+Message-ID: <20150415133403.GB26099@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 6:05 AM, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
-> Currently the gpio sysfs interface allows userspace to access simple hardware
-> where no kernel driver exists or would be useful.
+On Tue, Apr 14, 2015 at 05:48:48PM -0400, Rob Clark wrote:
+> Just speaking as an outsider to this topic, but seems like most/all
+> tablets/phones/etc ship with signed firmware.  Which means for most of
+> the population, upgrading the firmware to a new version which did
+> support the standard (assuming it existed), isn't really an option on
+> our devices, any more than fixing buggy acpi tables is on our
+> laptops..
 
-Whether or not a kernel driver exists can vary by kernel version. The
-dtb needs to work either way. The way you have done it would require
-dtb changes.
+I wouldn't expect most population to build their own kernels on
+tablets/phones. And even if you could install a custom kernel, mainline
+rarely runs on such devices because of tons of out of tree patches (just
+look at the Nexus 9 patches that Kumar pointed at; even ignoring the
+booting protocol they are extremely far from an upstreamable form).
 
-It would be useful to describe the function of gpios in a way that
-either subsystems can bind to them (e.g. leds, rf-kill, keys, etc.) or
-that information can be exported to userspace.
-
-> However it requires userspace to know the gpio number that has been assigned
-> by the kernel.
->
-> That number, in the case of gpio drviers using dynamic allocation, is not fixed,
-> and may change when:
-> * The kernel version changes and ARCH_NR_GPIOS is changed (happened in 3.17)
-> * The kernel version changes and probe order changes for gpio chips.
-> * The kernel configuration is changed if CONFIG_ARCH_NR_GPIO is used
-> * The board is redesigned (eg switching an externally visible signal from a
-> SoC provided GPIO to an I2C expander chip or vice versa).
-> * Other GPIO chips are added to the system.
-
-Isn't there some plan/desire to fix the GPIO sysfs interface?
-
-> The above means that, in order to export the GPIO to userspace via
-> /sys/class/gpio/export the userspace code must know the exact hardware and
-> kernel version information.
->
-> Furthermore, in many cases, it makes no sense to allow userspace to change the
-> signal direction; even if the GPIO itself allows it the circuitry connected
-> to the pin often does not (eg a signal dedicated to an output function driving
-> a  transistor).
->
-> This patch series solves both problems by performing the external
-> signal => GPIO mapping in the device tree.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Catalin
