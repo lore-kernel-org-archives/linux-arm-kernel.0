@@ -1,26 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Apr 2015 16:11:23 +0200
-Subject: [PATCH net-next 1/6] net: hip04: Set more appropriate value for
- tx coalesce num
-In-Reply-To: <1429101008-9464-2-git-send-email-dingtianhong@huawei.com>
+Date: Wed, 15 Apr 2015 16:13:37 +0200
+Subject: [PATCH net-next 2/6] net: hip04: use the big endian for tx and rx
+ desc
+In-Reply-To: <1429101008-9464-3-git-send-email-dingtianhong@huawei.com>
 References: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
- <1429101008-9464-2-git-send-email-dingtianhong@huawei.com>
-Message-ID: <4574922.qP9qWKPK3R@wuerfel>
+ <1429101008-9464-3-git-send-email-dingtianhong@huawei.com>
+Message-ID: <6631765.x1c1LvG6uN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 April 2015 20:30:03 Ding Tianhong wrote:
-> According Arnd's suggestion, the user might set the tx coalesce value
-> in large range for different workloads, so we should define them to
-> appropriate value.
-> 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: Eric Dumazet <eric.dumazet@gmail.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Cc: Dan Carpenter <dan.carpenter@oracle.com>
-> Cc: Joe Perches <joe@perches.com>
-> 
+On Wednesday 15 April 2015 20:30:04 Ding Tianhong wrote:
+> The hip04 ethernet use the big endian for tx and rx, so set desc to
+> big endian and remove the unused next_addr.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+I don't understand:
+
+> diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
+> index b0a7f03..6473462 100644
+> --- a/drivers/net/ethernet/hisilicon/hip04_eth.c
+> +++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
+> @@ -132,19 +132,18 @@
+>  #define HIP04_MIN_TX_COALESCE_FRAMES   1
+>  
+>  struct tx_desc {
+> -       u32 send_addr;
+> -       u32 send_size;
+> -       u32 next_addr;
+> -       u32 cfg;
+> -       u32 wb_addr;
+> +       __be32 send_addr;
+> +       __be32 send_size;
+> +       __be32 cfg;
+> +       __be32 wb_addr;
+>  } __aligned(64);
+
+I would think this is a hardware structure, does this not break
+access to the cfg and wb_addr fields if you remove next_addr?
+
+	Arnd
