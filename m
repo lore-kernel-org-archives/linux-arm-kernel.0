@@ -1,16 +1,16 @@
 From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 15 Apr 2015 20:30:06 +0800
-Subject: [PATCH net-next 4/6] net: hip04: Don't free the tx skb when the
- buffer is not ready for xmit
+Date: Wed, 15 Apr 2015 20:30:03 +0800
+Subject: [PATCH net-next 1/6] net: hip04: Set more appropriate value for tx
+ coalesce num
 In-Reply-To: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
 References: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1429101008-9464-5-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1429101008-9464-2-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric pointed out the problem that the tx skb might already have be freed
-by tx completion before enter the xmit queue, so don't notice the tx completion
-until the skb is ready to be freed.
+According Arnd's suggestion, the user might set the tx coalesce value
+in large range for different workloads, so we should define them to
+appropriate value.
 
 Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 Cc: "David S. Miller" <davem@davemloft.net>
@@ -20,30 +20,27 @@ Cc: Zhangfei Gao <zhangfei.gao@linaro.org>
 Cc: Dan Carpenter <dan.carpenter@oracle.com>
 Cc: Joe Perches <joe@perches.com>
 ---
- drivers/net/ethernet/hisilicon/hip04_eth.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/hisilicon/hip04_eth.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
-index 7533858..ff9d19c 100644
+index b72d238..b0a7f03 100644
 --- a/drivers/net/ethernet/hisilicon/hip04_eth.c
 +++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
-@@ -480,8 +480,6 @@ static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	skb_tx_timestamp(skb);
+@@ -126,10 +126,10 @@
+ #define DRV_NAME			"hip04-ether"
+ #define DRV_VERSION			"v1.0"
  
- 	hip04_set_xmit_desc(priv, phys);
--	priv->tx_head = TX_NEXT(tx_head);
--	count++;
- 	netdev_sent_queue(ndev, skb->len);
+-#define HIP04_MAX_TX_COALESCE_USECS	200
+-#define HIP04_MIN_TX_COALESCE_USECS	100
+-#define HIP04_MAX_TX_COALESCE_FRAMES	200
+-#define HIP04_MIN_TX_COALESCE_FRAMES	100
++#define HIP04_MAX_TX_COALESCE_USECS	100000
++#define HIP04_MIN_TX_COALESCE_USECS	1
++#define HIP04_MAX_TX_COALESCE_FRAMES	(TX_DESC_NUM - 1)
++#define HIP04_MIN_TX_COALESCE_FRAMES	1
  
- 	stats->tx_bytes += skb->len;
-@@ -489,6 +487,8 @@ static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 
- 	/* Ensure tx_head update visible to tx reclaim */
- 	smp_wmb();
-+	count++;
-+	priv->tx_head = TX_NEXT(tx_head);
- 
- 	/* queue is getting full, better start cleaning up now */
- 	if (count >= priv->tx_coalesce_frames) {
+ struct tx_desc {
+ 	u32 send_addr;
 -- 
 1.8.0
