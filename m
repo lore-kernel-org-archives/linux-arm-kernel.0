@@ -1,48 +1,45 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 15 Apr 2015 10:59:36 -0700
-Subject: [PATCH 13/13] thermal: of: implement .set_trips for device tree
- thermal zones
-In-Reply-To: <20150413063018.GT9742@pengutronix.de>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-14-git-send-email-s.hauer@pengutronix.de>
- <20150407024307.GH4648@localhost.localdomain>
- <20150413063018.GT9742@pengutronix.de>
-Message-ID: <20150415175936.GR32500@ld-irv-0074>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 15 Apr 2015 18:58:07 +0100
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <1429119688.7346.123.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
+ <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+ <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+ <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
+ <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552E9E8D.1080000@eu.citrix.com>
+ <1429119688.7346.123.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <alpine.DEB.2.02.1504151846110.7690@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 08:30:18AM +0200, Sascha Hauer wrote:
-> On Mon, Apr 06, 2015 at 07:43:08PM -0700, Eduardo Valentin wrote:
-> > On Thu, Mar 26, 2015 at 04:54:00PM +0100, Sascha Hauer wrote:
-> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > ---
-> > >  drivers/thermal/of-thermal.c | 12 ++++++++++++
-> > >  include/linux/thermal.h      |  1 +
-> > >  2 files changed, 13 insertions(+)
-> > 
-> > Can you please include at least one user of this call back in your patch
-> > series?
+On Wed, 15 Apr 2015, Eric Dumazet wrote:
+> On Wed, 2015-04-15 at 18:23 +0100, George Dunlap wrote:
 > 
-> Thanks for the comments on this series. I'll address them in the next
-> round. The user for this callback is not yet ready to be posted. I'll
-> try and move this patch to the end of the series so that the series can
-> be applied without this one.
+> > Which means that max(2*skb->truesize, sk->sk_pacing_rate >>10) is
+> > *already* larger for Xen; that calculation mentioned in the comment is
+> > *already* doing the right thing.
+> 
+> Sigh.
+> 
+> 1ms of traffic at 40Gbit is 5 MBytes
+> 
+> The reason for the cap to /proc/sys/net/ipv4/tcp_limit_output_bytes is
+> to provide the limitation of ~2 TSO packets, which _also_ is documented.
+> 
+> Without this limitation, 5 MBytes could translate to : Fill the queue,
+> do not limit.
+> 
+> If a particular driver needs to extend the limit, fine, document it and
+> take actions.
 
-I'm actually interested in this patch, as I am developing a thermal
-sensor driver that has hardware-assisted temperature-trip interrupts.
-I'm testing out your patches now, and will probably end up using them on
-my local tree. With help of this (and a few other changes I need to
-make), my driver should be ready to post soon.
+What actions do you have in mind exactly?  It would be great if you
+could suggest how to move forward from here, beside documentation.
 
-So, I'll try to post my driver soon as an example, if you'd like. I'd
-also appreciate a CC on any future revisions, if you don't mind. I'm
-subscribed to the list, but it's not always easy to pick out the signal
-from the noise.
-
-Thanks,
-Brian
-
-P.S. Time for a mild complaint: I think it seems to be a bit of a plague
-in the thermal subsystem; there are API's, and even user-space ABI's
-(!!) that have no in-kernel users! e.g., generate_netlink_event()
-http://article.gmane.org/gmane.linux.power-management.general/58685
+I don't think we can really expect every user that spawns a new VM in
+the cloud to manually echo blah >
+/proc/sys/net/ipv4/tcp_limit_output_bytes to an init script.  I cannot
+imagine that would work well.
