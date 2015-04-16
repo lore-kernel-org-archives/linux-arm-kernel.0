@@ -1,58 +1,29 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Thu, 16 Apr 2015 11:33:11 -0500
-Subject: [PATCH] ARM: VDSO: depend on CPU_V7
-In-Reply-To: <20150416161049.GB12732@n2100.arm.linux.org.uk>
-References: <1428529265-26772-1-git-send-email-nathan_lynch@mentor.com>
- <552FD47E.7030107@mentor.com> <3179253.8VITBr4Esl@wuerfel>
- <20150416161049.GB12732@n2100.arm.linux.org.uk>
-Message-ID: <552FE447.6020001@mentor.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 Apr 2015 09:35:54 -0700
+Subject: n900 in 4.1-rc0
+In-Reply-To: <552F82F0.3070709@arm.com>
+References: <20150416093234.GA17423@amd>
+ <552F82F0.3070709@arm.com>
+Message-ID: <20150416163553.GJ18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2015 11:10 AM, Russell King - ARM Linux wrote:
-> On Thu, Apr 16, 2015 at 05:42:18PM +0200, Arnd Bergmann wrote:
->> On Thursday 16 April 2015 10:25:50 Nathan Lynch wrote:
->>>> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
->>>> index b7644310236b..b4f92b9a13ac 100644
->>>> --- a/arch/arm/mm/Kconfig
->>>> +++ b/arch/arm/mm/Kconfig
->>>> @@ -827,7 +827,7 @@ config KUSER_HELPERS
->>>>  
->>>>  config VDSO
->>>>       bool "Enable VDSO for acceleration of some system calls"
->>>> -     depends on AEABI && MMU
->>>> +     depends on AEABI && MMU && CPU_V7
->>>>       default y if ARM_ARCH_TIMER
->>>>       select GENERIC_TIME_VSYSCALL
->>>>       help
->>>
->>> Before I put this in RMK's patch queue I'd prefer to get an ack or more
->>> details (kernel config, toolchain) on the build failure, since I've been
->>> unable to recreate it.  Arnd?
->>>
->>
->> Good idea. I checked the patch against the failed randconfig, and must
->> unfortunately report that it does not fix the problem.
->>
->> I'm attaching the .config to this email. Two things to note:
->>
->> - this is building for mach-rpc, so CONFIG_CPU_32v3 is enabled, and
->>   presumably this is required for reproducing the problem, while
->>   building for ARMv4 as I previously said in error does not cause
->>   the problem.
+* Marc Zyngier <marc.zyngier@arm.com> [150416 02:38]:
+> On 16/04/15 10:32, Pavel Machek wrote:
+> > Hi!
+> > 
+> > Just tried booting 4.1-rc0 on n900 (commit
+> > 34c9a0ffc75ad25b6a60f61e27c4a4b1189b8085) and it is broken.
+> > 
+> > Any ideas?
 > 
-> Why doesn't it solve the problem?
+> To such a question, the only answer I have is "Yes".
 > 
-> In your config file, CPU_V7 is not set, so VDSO won't be set either.
-> Are you absolutely sure you tested with the above patch applied?
+> For a more useful reply, I'm afraid you'll have to ask a better question.
 
-I'm puzzled as well.  Using this config, I can force the assembler error:
+Just tried it at 34c9a0ffc75ad25b6a60f61e27c4a4b1189b8085
+and it boots just fine on my n900.
 
-arch/arm/vdso/datapage.S: Assembler messages:
-arch/arm/vdso/datapage.S:13: Error: selected processor does not support
-ARM mode `bx lr'
+Regards,
 
-if I do 'make arch/arm/vdso/' but otherwise the build system doesn't
-seem to enter that directory here.
-
-Still looking into it though.
+Tony
