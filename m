@@ -1,88 +1,37 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 16 Apr 2015 14:31:51 +0200
-Subject: [PATCH 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs
- and boards
-In-Reply-To: <1429170038-16757-4-git-send-email-yamada.masahiro@socionext.com>
-References: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
- <1429170038-16757-4-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20150416123151.GF13105@lunn.ch>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Thu, 16 Apr 2015 05:42:16 -0700
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <552F887A.4060708@eu.citrix.com>
+References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
+ <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+ <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+ <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
+ <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552E9E8D.1080000@eu.citrix.com>
+ <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA2BC.5000707@eu.citrix.com>
+ <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA844.5010308@eu.citrix.com>
+ <1429121979.7346.138.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552F7936.9070205@eu.citrix.com> <552F7EF4.9030107@iogearbox.net>
+ <552F887A.4060708@eu.citrix.com>
+Message-ID: <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 04:40:37PM +0900, Masahiro Yamada wrote:
-> Initial device trees for UniPhier SoCs: PH1-sLD3, PH1-LD4, PH1-Pro4,
-> and PH1-sLD8.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
->  arch/arm/boot/dts/Makefile                   |  5 ++
->  arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts   | 51 +++++++++++++++++
->  arch/arm/boot/dts/uniphier-ph1-ld4.dtsi      | 78 +++++++++++++++++++++++++
->  arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts  | 51 +++++++++++++++++
->  arch/arm/boot/dts/uniphier-ph1-pro4.dtsi     | 85 ++++++++++++++++++++++++++++
->  arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts  | 52 +++++++++++++++++
->  arch/arm/boot/dts/uniphier-ph1-sld3.dtsi     | 85 ++++++++++++++++++++++++++++
->  arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts  | 51 +++++++++++++++++
->  arch/arm/boot/dts/uniphier-ph1-sld8.dtsi     | 78 +++++++++++++++++++++++++
->  arch/arm/boot/dts/uniphier-support-card.dtsi | 39 +++++++++++++
->  10 files changed, 575 insertions(+)
->  create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
->  create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
->  create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
->  create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
->  create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
->  create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
->  create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
->  create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
->  create mode 100644 arch/arm/boot/dts/uniphier-support-card.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a1c776b..d639a90 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -588,6 +588,11 @@ dtb-$(CONFIG_ARCH_U8500) += \
->  	ste-hrefv60plus-tvk.dtb \
->  	ste-ccu8540.dtb \
->  	ste-ccu9540.dtb
-> +dtb-$(CONFIG_ARCH_UNIPHIER) += \
-> +	uniphier-ph1-sld3-ref.dtb \
-> +	uniphier-ph1-ld4-ref.dtb \
-> +	uniphier-ph1-pro4-ref.dtb \
-> +	uniphier-ph1-sld8-ref.dtb
->  dtb-$(CONFIG_ARCH_VERSATILE) += \
->  	versatile-ab.dtb \
->  	versatile-pb.dtb
-> diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-> new file mode 100644
-> index 0000000..2e83363
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-> @@ -0,0 +1,51 @@
-> +/*
-> + * Device Tree Source for UniPhier PH1-LD4 Reference Board
-> + *
-> + * Copyright (C) 2015 Socionext Inc.
-> + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+On Thu, 2015-04-16 at 11:01 +0100, George Dunlap wrote:
 
-Hi Masahiro
+> He suggested that after he'd been prodded by 4 more e-mails in which two
+> of us guessed what he was trying to get at.  That's what I was
+> complaining about.
 
-There is a growing trend to license DT files dual GPL and X11. Having
-the X11 license can help with bootloaders also using the device tree
-files.
+My big complain is that I suggested to test to double the sysctl, which
+gave good results.
 
-Please spend some time researching the issue and consider it.
+Then you provided a patch using a 8x factor. How does that sound ?
 
-Thanks
-	Andrew
+Next time I ask a raise, I should try a 8x factor as well, who knows,
+it might be accepted.
