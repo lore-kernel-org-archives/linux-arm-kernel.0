@@ -1,66 +1,49 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 16 Apr 2015 10:23:08 -0500
-Subject: [PATCH 1/2] Documentation: devicetree: root node serial-number
- property documentation
-In-Reply-To: <CAL_JsqKdHQZL5Z6hKgquKihFykX0ZiCDQfeHOfOZWOh2NMg4Rw@mail.gmail.com>
-References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
- <f6f4f862c78fa626e7f94bde51eec5b1@agner.ch> <1429175421.2483.1.camel@collins>
- <CAL_JsqKdHQZL5Z6hKgquKihFykX0ZiCDQfeHOfOZWOh2NMg4Rw@mail.gmail.com>
-Message-ID: <CFEF8F54-7A3E-482C-B295-6A6BC5D837C8@codeaurora.org>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Thu, 16 Apr 2015 10:25:50 -0500
+Subject: [PATCH] ARM: VDSO: depend on CPU_V7
+In-Reply-To: <1428529265-26772-1-git-send-email-nathan_lynch@mentor.com>
+References: <1428529265-26772-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <552FD47E.7030107@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/08/2015 04:41 PM, Nathan Lynch wrote:
+> (Arnd reported a build break with the VDSO code when targeting v4 (but
+> not v4t).  I haven't been able to recreate it locally because all the
+> toolchains I have at hand convert 'bx lr' to 'mov pc,lr' when
+> targeting v4.)
+> 
+> The __get_datapage routine in the VDSO uses 'bx lr' to return to the
+> caller.  This is inappropriate when targeting v4 CPUs, and the VDSO is
+> unlikely to be useful for pre-v7 CPUs anyway due to its reliance on
+> the generic timers extension, so the easy thing to do here is just
+> make CONFIG_VDSO depend on CONFIG_CPU_V7.
+> 
+> An alternative considered was to use 'ldr pc,lr' when armv4 (or lower)
+> is enabled, but Arnd pointed out that this would be broken when
+> running with a kernel that supports both v4 arnd v4t, and you have a
+> thumb user space.
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> ---
+>  arch/arm/mm/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index b7644310236b..b4f92b9a13ac 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -827,7 +827,7 @@ config KUSER_HELPERS
+>  
+>  config VDSO
+>  	bool "Enable VDSO for acceleration of some system calls"
+> -	depends on AEABI && MMU
+> +	depends on AEABI && MMU && CPU_V7
+>  	default y if ARM_ARCH_TIMER
+>  	select GENERIC_TIME_VSYSCALL
+>  	help
 
-> On Apr 16, 2015, at 9:36 AM, Rob Herring <robherring2@gmail.com> wrote:
-> 
-> On Thu, Apr 16, 2015 at 4:10 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
->> Le jeudi 16 avril 2015 ? 09:56 +0200, Stefan Agner a ?crit :
->>> On 2015-03-28 18:39, Paul Kocialkowski wrote:
->>>> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
->>> 
->>> I think this is a worthwhile standardization.
->>> 
->>> Acked-by: Stefan Agner <stefan@agner.ch>
->> 
->> Thanks! I should also add a commit message in v2 mentioning that this is
->> already used in open firmware and reported by lshw.
-> 
-> With that,
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
->> 
->>>> ---
->>>> Documentation/devicetree/booting-without-of.txt | 4 ++++
->>>> 1 file changed, 4 insertions(+)
->>>> 
->>>> diff --git a/Documentation/devicetree/booting-without-of.txt
->>>> b/Documentation/devicetree/booting-without-of.txt
->>>> index 7768518..8b055897 100644
->>>> --- a/Documentation/devicetree/booting-without-of.txt
->>>> +++ b/Documentation/devicetree/booting-without-of.txt
->>>> @@ -828,6 +828,10 @@ address which can extend beyond that limit.
->>>>   name may clash with standard defined ones, you prefix them with your
->>>>   vendor name and a comma.
->>>> 
->>>> +  Additional properties for the root node:
->>>> +
->>>> +    - serial-number : a string representing the board's serial number
->>>> +
->>>>   b) The /cpus node
->>>> 
->>>>   This node is the parent of all individual CPU nodes. It doesn't
->>> 
->> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-I feel like this is a little lite either in the doc or commit message.  Is the string completely arbitrary?  Is it meant to match labeling on a board or case?  Is this meant to be used by the kernel at all?
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Before I put this in RMK's patch queue I'd prefer to get an ack or more
+details (kernel config, toolchain) on the build failure, since I've been
+unable to recreate it.  Arnd?
