@@ -1,38 +1,73 @@
-From: orjan.eide@arm.com (=?UTF-8?q?=C3=98rjan=20Eide?=)
-Date: Thu, 16 Apr 2015 16:41:51 +0200
-Subject: [PATCH 1/2] drm: rockchip: Don't pass DRM fake offset to dma-api
-Message-ID: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Thu, 16 Apr 2015 15:44:10 +0100
+Subject: [PATCH v3] ARM: AM43xx: hwmod: add VPFE hwmod entries
+In-Reply-To: <CA+V-a8vTKiaJqttuvfU-NHznF=TghH5Fbzqwo8AcCRccn7DJgg@mail.gmail.com>
+References: <1422260488-380-1-git-send-email-prabhakar.csengg@gmail.com>
+ <20150128193247.GH2570@ti.com>
+ <alpine.DEB.2.02.1502102310010.3767@utopia.booyaka.com>
+ <CA+V-a8vx=A8qQh4CtD7tjFwgBmkFPX7sUVuak8e4rH9N39gwfA@mail.gmail.com>
+ <alpine.DEB.2.02.1504102248590.19540@utopia.booyaka.com>
+ <CA+V-a8uw7AM0HWtNgKT6otj1xF502Msn-=a5WzbSYjT0xM8Epw@mail.gmail.com>
+ <alpine.DEB.2.02.1504102302290.19540@utopia.booyaka.com>
+ <CA+V-a8vTKiaJqttuvfU-NHznF=TghH5Fbzqwo8AcCRccn7DJgg@mail.gmail.com>
+Message-ID: <CA+V-a8vP=1jF2a791BTK9A75rWEYnhw_T55qaxh6e57DpzcXQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set vm_pgoff to 0 after using it to look up the GEM node, before passing
-it on rockchip_gem_mmap_buf() where the offset must be from the start of
-the buffer.
+Hi Paul,
 
-Passing in the fake offset currently works because the
-dma_mmap_attrs implementation that is used for this device,
-arm_iommu_mmap_attrs, ignores the offset completely.
+On Sat, Apr 11, 2015 at 10:19 AM, Lad, Prabhakar
+<prabhakar.csengg@gmail.com> wrote:
+> On Sat, Apr 11, 2015 at 12:03 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>> On Fri, 10 Apr 2015, Lad, Prabhakar wrote:
+>>
+>>> On Fri, Apr 10, 2015 at 11:51 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>>> > Hi Prabhakar
+>>> >
+>>> > On Fri, 10 Apr 2015, Lad, Prabhakar wrote:
+>>> >
+>>> >> Hi Paul,
+>>> >>
+>>> >> On Tue, Feb 10, 2015 at 11:10 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>>> >> > On Wed, 28 Jan 2015, Benoit Parrot wrote:
+>>> >> >
+>>> >> >> Suspend/resume is functional with this patch.
+>>> >> >>
+>>> >> >> Tested-by: Benoit Parrot <bparrot@ti.com>
+>>> >> >
+>>> >> > Thanks folks, queued for v3.21.
+>>> >> >
+>>> >> >
+>>> >> I see that this patch is not into linux-next yet.
+>>> >
+>>> > thanks for the ping.  This slipped through the cracks here due to the
+>>> > kernel version number change from 3.21 to 4.1 :-(  Sorry about that; I
+>>> > will requeue for either 4.1-rc or 4.2.
+>>> >
+>>> > Unfortunately I don't have an AM43xx board.  Is suspend/resume broken
+>>> > without this patch?  If so, then v4.1-rc seems like the appropriate
+>>> > target.
+>>> >
+>>> there is kernel soft crashes without this patch, so this needs to go
+>>> in for v4.1-rc.
+>>
+>> Could you provide some further detail?  Does it crash during boot, or
+>> during suspend, or ... ?  Also could you describe what you mean by "soft
+>> crash" ?
+>>
+> with patch [1] applied and VPFE being enabled and this patch missing
+> (ARM: AM43xx: hwmod: add VPFE hwmod entries) I have attached the
+> boot log.
+> By soft crash I meant it doesn't get hung :)
+>
+> With the above patch (ARM: AM43xx: hwmod: add VPFE hwmod entries)
+> applied all goes well.
+>
+>
+> [1] https://lkml.org/lkml/2015/3/12/1001
+>
 
-Signed-off-by: ?rjan Eide <orjan.eide@arm.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Any update on this ?
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index 7ca8799e..69f01c3 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -94,6 +94,11 @@ int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
- 		return -EACCES;
- 	}
- 
-+	/* Set vm_pgoff (used as a fake buffer offset by DRM) to 0 and map the
-+	 * whole buffer from the start.
-+	 */
-+	vma->vm_pgoff = 0;
-+
- 	obj = container_of(node, struct drm_gem_object, vma_node);
- 	ret = rockchip_gem_mmap_buf(obj, vma);
- 
--- 
-1.9.1
+Cheers,
+--Prabhakar Lad
