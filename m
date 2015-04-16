@@ -1,23 +1,17 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 16 Apr 2015 07:07:41 +0200
-Subject: [PATCH] ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal
- RTC
-In-Reply-To: <1429094447-4324-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1429094447-4324-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150416050741.GB21981@1wt.eu>
+From: sophian.yoma@gmail.com (yoma sophian)
+Date: Thu, 16 Apr 2015 13:28:41 +0800
+Subject: some question about writel implement in arm platform
+Message-ID: <CADUS3om64T1pfRqo7nRAVcnj7SKUR2jt4ZsYBcHrgpa7Zb1pkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 15, 2015 at 12:40:47PM +0200, Gregory CLEMENT wrote:
-> There is no crystal connected to the internal RTC on the Open Block
-> AX3. So let's disable it in order to prevent the kernel probing the
-> driver uselessly. Eventually this patches removes the following
-> warning message from the boot log:
-> "rtc-mv d0010300.rtc: internal RTC not ticking"
+hi all:
+the implementation of writel in ARM is writel_relaxed() with barrier
+before (DSB + outer cache sync).
 
-Now I understand why I was getting this message. Everytime it booted
-I thought to myself "I have to debug this thing", now I understand
-better.
+if the memory is device memory, shall we still need outer cache sync?
+if the memory is normal normal, under what circumstance we will write
+it with writel.
+As far as I know, the writel is used for register writing.
 
-Thanks,
-Willy
+appreciate your kind help in advance,
