@@ -1,369 +1,407 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Thu, 16 Apr 2015 12:20:14 -0700
-Subject: [PATCH v6 1/6] clk: iproc: define Broadcom iProc clock binding
-In-Reply-To: <552D662B.80201@broadcom.com>
-References: <1426657522-2473-1-git-send-email-rjui@broadcom.com>
- <1426657522-2473-2-git-send-email-rjui@broadcom.com>
- <20150411001231.18916.93186@quantum> <552B4140.6000705@broadcom.com>
- <20150413060254.19585.59701@quantum> <552C1BA1.1020101@broadcom.com>
- <552D662B.80201@broadcom.com>
-Message-ID: <20150416192014.19585.9663@quantum>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Fri, 17 Apr 2015 03:17:36 +0800
+Subject: [PATCH v2 5/9] ARM: imx: add msl support for imx7d
+In-Reply-To: <1429211860-14438-1-git-send-email-Frank.Li@freescale.com>
+References: <1429211860-14438-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1429211860-14438-6-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ray Jui (2015-04-14 12:10:35)
-> Hi Mike,
-> 
-> On 4/13/2015 12:40 PM, Ray Jui wrote:
-> > Hi Mike,
-> > 
-> > On 4/12/2015 11:02 PM, Michael Turquette wrote:
-> >> Quoting Ray Jui (2015-04-12 21:08:32)
-> >>>
-> >>>
-> >>> On 4/10/2015 5:12 PM, Michael Turquette wrote:
-> >>>> Quoting Ray Jui (2015-03-17 22:45:17)
-> >>>>> Document the device tree binding for Broadcom iProc architecture based
-> >>>>> clock controller
-> >>>>>
-> >>>>> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> >>>>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> >>>>> ---
-> >>>>>  .../bindings/clock/brcm,iproc-clocks.txt           |  171 ++++++++++++++++++++
-> >>>>>  1 file changed, 171 insertions(+)
-> >>>>>  create mode 100644 Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-> >>>>>
-> >>>>> diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-> >>>>> new file mode 100644
-> >>>>> index 0000000..bf2316b
-> >>>>> --- /dev/null
-> >>>>> +++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-> >>>>> @@ -0,0 +1,171 @@
-> >>>>> +Broadcom iProc Family Clocks
-> >>>>> +
-> >>>>> +This binding uses the common clock binding:
-> >>>>> +    Documentation/devicetree/bindings/clock/clock-bindings.txt
-> >>>>> +
-> >>>>> +The iProc clock controller manages clocks that are common to the iProc family.
-> >>>>> +An SoC from the iProc family may have several PPLs, e.g., ARMPLL, GENPLL,
-> >>>>> +LCPLL0, MIPIPLL, and etc., all derived from an onboard crystal. Each PLL
-> >>>>> +comprises of several leaf clocks
-> >>>>> +
-> >>>>> +Required properties for PLLs:
-> >>>>> +- compatible:
-> >>>>> +    Should have a value of the form "brcm,<soc>-<pll>". For example, GENPLL on
-> >>>>> +Cygnus has a compatible string of "brcm,cygnus-genpll"
-> >>>>> +
-> >>>>> +- #clock-cells:
-> >>>>> +    Must be <0>
-> >>>>> +
-> >>>>> +- reg:
-> >>>>> +    Define the base and range of the I/O address space that contain the iProc
-> >>>>> +clock control registers required for the PLL
-> >>>>> +
-> >>>>> +- clocks:
-> >>>>> +    The input parent clock phandle for the PLL. For all iProc PLLs, this is an
-> >>>>> +onboard crystal with a fixed rate
-> >>>>> +
-> >>>>> +Example:
-> >>>>> +
-> >>>>> +       osc: oscillator {
-> >>>>> +               #clock-cells = <0>;
-> >>>>> +               compatible = "fixed-clock";
-> >>>>> +               clock-frequency = <25000000>;
-> >>>>> +       };
-> >>>>> +
-> >>>>> +       genpll: genpll {
-> >>>>> +               #clock-cells = <0>;
-> >>>>> +               compatible = "brcm,cygnus-genpll";
-> >>>>> +               reg = <0x0301d000 0x2c>,
-> >>>>> +                       <0x0301c020 0x4>;
-> >>>>> +               clocks = <&osc>;
-> >>>>> +       };
-> >>>>> +
-> >>>>> +Required properties for leaf clocks of a PLL:
-> >>>>> +
-> >>>>> +- compatible:
-> >>>>> +    Should have a value of the form "brcm,<soc>-<pll>-clk". For example, leaf
-> >>>>> +clocks derived from the GENPLL on Cygnus SoC have a compatible string of
-> >>>>> +"brcm,cygnus-genpll-clk"
-> >>>>> +
-> >>>>> +- #clock-cells:
-> >>>>> +    Have a value of <1> since there are more than 1 leaf clock of a
-> >>>>> +given PLL
-> >>>>> +
-> >>>>> +- reg:
-> >>>>> +    Define the base and range of the I/O address space that contain the iProc
-> >>>>> +clock control registers required for the PLL leaf clocks
-> >>>>> +
-> >>>>> +- clocks:
-> >>>>> +    The input parent PLL phandle for the leaf clock
-> >>>>> +
-> >>>>> +- clock-output-names:
-> >>>>> +    An ordered list of strings defining the names of the leaf clocks
-> >>>>> +
-> >>>>> +Example:
-> >>>>> +
-> >>>>> +       genpll: genpll {
-> >>>>> +               #clock-cells = <0>;
-> >>>>> +               compatible = "brcm,cygnus-genpll";
-> >>>>> +               reg = <0x0301d000 0x2c>,
-> >>>>> +                       <0x0301c020 0x4>;
-> >>>>> +               clocks = <&osc>;
-> >>>>> +       };
-> >>>>> +
-> >>>>> +       genpll_clks: genpll_clks {
-> >>>>> +               #clock-cells = <1>;
-> >>>>> +               compatible = "brcm,cygnus-genpll-clk";
-> >>>>> +               reg = <0x0301d000 0x2c>;
-> >>>>> +               clocks = <&genpll>;
-> >>>>> +               clock-output-names = "axi21", "250mhz", "ihost_sys",
-> >>>>> +                       "enet_sw", "audio_125", "can";
-> >>>>> +       };
-> >>>>
-> >>>> Hi Ray,
-> >>>>
-> >>>> Thanks for submitting the patch. It was nice meeting you at ELC as well.
-> >>>>
-> >>>> This binding doesn't conform to the norms for clock bindings. It looks
-> >>>> like for each type of controllable clock node (e.g. pll, leaf clock,
-> >>>> etc) you have a dts node. Looking at the above example it seems that
-> >>>> those two nodes (genpll and genpll_clks) share the same register.
-> >>>>
-> >>>> /me checks patch #5
-> >>>>
-> >>>> Yup, you re-use the same register address for the *pll and *pll_clks
-> >>>> nodes. I'm not a DT expert but I think this is considered Wrong.
-> >>>>
-> >>>> More generally your clock dt binding should be modeling the hardware in
-> >>>> terms of IP blocks. If you have a clock generator IP block it may
-> >>>> control many clock bits and output many clock signals. E.g. for your
-> >>>> hardware (based only on the addresses in patch #5 and not having seen
-> >>>> any data manual) I will hazard a guess that the genpll, lcpll and asiu
-> >>>> clocks are all part of the same IP block.
-> >>>
-> >>> Hi Mike,
-> >>>
-> >>> In fact, lcpll, genpll, mipipll are similar but DIFFERENT IP blocks, and
-> >>> asiu is completely different from any of them. All of these plls are
-> >>> unique and have their own register banks, as you can see from the
-> >>> bcm-cygnus-clock.dtsi file. Therefore, I think it's totally correct and
-> >>> actually necessary to represent each of them with a separate device node.
-> >>
-> >> OK, that makes sense to me, if those registers live in addresses ranges
-> >> which correspond to different IP blocks.
-> >>
-> >>>
-> >>> Regarding the relationship between a PLL clock and its leaf clocks:
-> >>> Taking the genpll as an example, physically they are connected as:
-> >>>
-> >>> xtal -> genpll -> axi21, 250mhz, ihost_sys, ...
-> >>>
-> >>> The 25 MHz crystal feeds to the genpll, and the genpll generates 6
-> >>> different leaf clocks including axi21, 250mhz, ihost_sys, and etc. One
-> >>> can choose to set the genpll's vco to one frequency, and based on that
-> >>> frequency, different leaf clock frequencies can be generated with their
-> >>> own post divider.
-> >>>
-> >>> Therefore, I think it makes sense to represent xtal, genpll, genpll_clks
-> >>> (including axi21, 250mhz, ihost_sys, and etc) each with a unique device
-> >>> node, and genpll is the parent of these leaf clocks. Basically the
-> >>> device nodes and the way how the "clocks" phandle is used represent the
-> >>> hierarchy of the clock architecture within Cygnus (and in the future
-> >>> other iProc SoCs). Does that make sense?
-> >>
-> >> This doesn't make sense to me. If I understand correctly, the register
-> >> range that controls the post-divider clock (e.g. axi21) is the same
-> >> register range that control's genpll. This is a reasonable indicator to
-> >> me that the leaf clocks are part of the same clock generator IP block as
-> >> the PLL controls. As such they should be on node.
-> >>
-> >>>
-> >>> Regarding the register address overlapping, again, taking genpll as an
-> >>> example, the genpll and the genpll_clks actually never access the same
-> >>> set of registers, but the registers are sort of scattered within one
-> >>> bank, i.e., on Cygnus, genpll uses registers at offset 0x0, 0x8 ~ 0x1c,
-> >>> and genpll_clks uses registers at offset 0x4, 0x20 - 0x24.
-> >>
-> >> Sure, my argument above doesn't hinge on the fact that the pll and child
-> >> clocks use the exact same register. It still looks to me like *pll and
-> >> it's child dividers belong in the same IP block. Is there an open data
-> >> sheet or technical reference manual I can look at for this part? That is
-> >> the best way to put my concerns at ease ;-)
-> >>
-> >> Looking over your binding again, it looks like your nodes are divided
-> >> conveniently for the different clock types (e.g. pll versus
-> >> post-divider), but our goal with DT is to accurately describe the
-> >> hardware, not the C structures.
-> >>
-> >> Regards,
-> >> Mike
-> >>
-> > 
-> > Yes, the genpll and genpll_clks are controlled by the same IP block. I
-> > can make the change to combine them to use one DT node. But before doing
-> > that, I just need to get one thing clarified with you. In SW, the pll
-> > and its leaf clocks will still be registered as separate two clock
-> > providers, since we need to be able to configure the PLL vco frequency
-> > and its leaf clock frequencies separately. The pll will be the parent of
-> > its leaf clocks, and the leaf clocks will be used by various peripherals.
-> > 
-> > I plan to have the combined DT looks like this:
-> > 
-> > genpll_clks: genpll_clks {
-> >     #clock-cells = <1>;
-> >     compatible = "brcm,cygnus-genpll-clk";
-> >     reg = <0x0301d000 0x2c>;
-> > 
-> >     assigned-clocks = <&genpll_clks>;
-> >     /* this sets the PLL rate at the time when the PLL clock is
-> > registered */
-> >     assigned-clock-rates = <4000000000>;
-> > 
-> >     clocks = <&osc>;
-> > 
-> >     clock-output-names = "axi21", "250mhz", "ihost_sys", "enet_sw",
-> > "audio_125", "can";
-> > };
-> > 
-> > peripheralA: peripheralA {
-> >     /* use the first leaf clock of genpll */
-> >     clocks = <&genpll_clks 0>;
-> >     clock-frequency  = <100000000>;
-> > };
-> > 
-> > If we register both the genpll and its leaf clocks to the clock
-> > framework as two separate clock providers, would the above DT entries
-> > still work? For example, peripheralA refers to the phandle of
-> > genpll_clks, but how does the clock framework know to link it to the pll
-> > clock or the leaf clock?
+From: Anson Huang <b20788@freescale.com>
 
-Hi Ray,
+Add i.MX7D MSL support.
 
-There are two options here: using clock-output-names or not using
-clock-output-names.
+Signed-off-by: Anson Huang <b20788@freescale.com>
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig      | 11 +++++++++
+ arch/arm/mach-imx/Makefile     |  1 +
+ arch/arm/mach-imx/anatop.c     | 33 +++++++++++++++++++++++++-
+ arch/arm/mach-imx/common.h     |  1 +
+ arch/arm/mach-imx/cpu.c        | 10 ++++++++
+ arch/arm/mach-imx/hardware.h   |  7 +++++-
+ arch/arm/mach-imx/mach-imx7d.c | 53 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mx7.h        | 38 ++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mxc.h        | 15 +++++++++++-
+ arch/arm/mach-imx/platsmp.c    | 24 ++++++++++++++++++-
+ 10 files changed, 189 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-imx/mach-imx7d.c
+ create mode 100644 arch/arm/mach-imx/mx7.h
 
-I would recommend against using clock-output-names. If both your
-clock driver and the peripheral devices that consume these clocks are
-all represented in DT then you can skip clock-output-names and instead
-create phandle linkage between the clocks inside of your clock provider
-and the consumer devices. String names are still important here, but now
-you only need to specify the string name as an *input* to the consumer
-device, and not as an *output* from the clock provider node. Let's look
-at how the qcom bindings do it:
-
-gcc is a clock generator ip block.
-
-arch/arm/boot/dts/qcom-apq8084.dtsi:
-                gcc: clock-controller at fc400000 {
-                        compatible = "qcom,gcc-apq8084";
-                        #clock-cells = <1>;
-                        #reset-cells = <1>;
-                        reg = <0xfc400000 0x4000>;
-                };
-
-This same file includes this header:
-#include <dt-bindings/clock/qcom,gcc-apq8084.h>
-
-That header creates a map of clocks by numbers. An example:
-#define GCC_BLSP2_UART2_APPS_CLK                        142
-
-We can see how it used by the serial controller in
-arch/arm/boot/dts/qcom-apq8084.dtsi:
-                serial at f995e000 {
-                        compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-                        reg = <0xf995e000 0x1000>;
-                        interrupts = <0 114 0x0>;
-                        clocks = <&gcc GCC_BLSP2_UART2_APPS_CLK>, <&gcc GCC_BLSP2_AHB_CLK>;
-                        clock-names = "core", "iface";
-                        status = "disabled";
-                };
-
-Note the 'clock-names' property. This lists a string name which is a property
-of the *consuming* device (uart controller), not the *providing* device (gcc
-clock generator).
-
-Finally, it all comes together in the driver simply using clk_get:
-        msm_port->clk = devm_clk_get(&pdev->dev, "core");
-        if (IS_ERR(msm_port->clk))
-                return PTR_ERR(msm_port->clk);
-
-        if (msm_port->is_uartdm) {
-                msm_port->pclk = devm_clk_get(&pdev->dev, "iface");
-                if (IS_ERR(msm_port->pclk))
-                        return PTR_ERR(msm_port->pclk);
-
-                clk_set_rate(msm_port->clk, 1843200);
-        }
-
-This works because we have created linkage between the clock phandle and
-the consuming device node. The shared header is used by the Linux kernel
-to look up the clock as well as the consumer node to map the string name
-onto a clock input.
-
-Back to clock-output-names:
-
-If you decide to keep using clock-output-names you can still represent
-the pll clock in your "clock-output-names". In a perfect world DT nodes
-that use clock-output-names would only expose the leaf clocks that your
-peripheral devices consume, but there is no technical reason why your
-pll can't be a part of the clock-output-names array. It is simply an
-array of string names that maps to an index. There is no sense of
-parent-child hierarchy in the DT binding, so there is no problem adding
-a parent pll clock to the array of clock-output-names. I think that this
-will tactically solve your problem in the short term, but I encourage
-you to inspect the qcom binding example I gave above to see if it a
-better fit for you long term.
-
-Regards,
-Mike
-
-> > 
-> > Thanks,
-> > 
-> > Ray
-> > 
-> 
-> So I've changed the code to merge pll and pll_clks nodes and have played
-> around with it a bit. Let me try to explain the issue I'm having here,
-> and see if you can help to shed some light:
-> 
-> As far as I know, the correct way to configure a clock's rate at the
-> time of registering to the clock framework, as you mentioned previously,
-> is to use the "assigned-clock" and "assigned-clock-rates" properties.
-> 
-> Assuming we have a pll clock called "pll", with 6 leaf clocks derived
-> from the pll called "clk-0", "clk-1", etc., and a peripheral using the
-> first leaf clock: "clk-0".
-> 
-> pll: pll {
->    #clock-cell = <1>;
->    compatible = "brcm,pll";
->    clocks = <&osc>;
->    clock-output-names = "clk-0", "clk-1", ...;
-> };
-> 
-> peripheral: peripheral {
->     clocks = <&pll 0>;
-> };
-> 
-> With your proposed way of constructing the above clock device tree,
-> i.e., to combine "pll" and "clk-x" to use the same DT node, now how can
-> one configure the frequency of the "pll" through device tree at the time
-> of clock registration? There's now no access to "pll" through device
-> tree but only access to its leaf clocks, e.g., clocks = <&pll 0>.
-> 
-> The requirement comes from the fact that we need the peripheral to run
-> at a certain clock rate off the leaf clock, and to achieve that we need
-> the pll to run at a specific rate, since we only have an integer based
-> post-divider between the pll and its leaf clocks. I was able to achieve
-> this previously by separating the pll and its leaf clocks into two DT
-> nodes, but I am really not sure how one can do this when merging pll and
-> its leaf clocks into the same node.
-> 
-> Any idea how this can be done cleanly with a single DT node representing
-> the pll and its leaf clocks?
-> 
-> Thanks,
-> 
-> Ray
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 3a3d3e9..162f2c3 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -582,6 +582,17 @@ config SOC_IMX6SX
+ 	help
+ 	  This enables support for Freescale i.MX6 SoloX processor.
+ 
++config SOC_IMX7
++	bool
++	select ARM_GIC
++
++config SOC_IMX7D
++	bool "i.MX7 Dual support"
++	select SOC_IMX7
++	select PINCTRL_IMX7D
++	help
++		This enables support for Freescale i.MX7 Dual processor.
++
+ config SOC_VF610
+ 	bool "Vybrid Family VF610 support"
+ 	select IRQ_DOMAIN_HIERARCHY
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 3244cf1..3d9d755 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -90,6 +90,7 @@ endif
+ obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
+ obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
+ obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o mach-imx6sx.o
++obj-$(CONFIG_SOC_IMX7D) += clk-imx7d.o mach-imx7d.o
+ 
+ ifeq ($(CONFIG_SUSPEND),y)
+ AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+index 7f262fe..12ca5a9 100644
+--- a/arch/arm/mach-imx/anatop.c
++++ b/arch/arm/mach-imx/anatop.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ * Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License. You may obtain a copy of the GNU General Public License
+@@ -21,6 +21,12 @@
+ #define REG_SET		0x4
+ #define REG_CLR		0x8
+ 
++#define ANADIG_ARM_PLL		0x60
++#define ANADIG_DDR_PLL		0x70
++#define ANADIG_SYS_PLL		0xb0
++#define ANADIG_ENET_PLL		0xe0
++#define ANADIG_AUDIO_PLL	0xf0
++#define ANADIG_VIDEO_PLL	0x130
+ #define ANADIG_REG_2P5		0x130
+ #define ANADIG_REG_CORE		0x140
+ #define ANADIG_ANA_MISC0	0x150
+@@ -28,6 +34,7 @@
+ #define ANADIG_USB2_CHRG_DETECT	0x210
+ #define ANADIG_DIGPROG		0x260
+ #define ANADIG_DIGPROG_IMX6SL	0x280
++#define ANADIG_DIGPROG_IMX7D	0x800
+ 
+ #define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
+ #define BM_ANADIG_REG_2P5_ENABLE_PULLDOWN	0x8
+@@ -73,6 +80,17 @@ static inline void imx_anatop_disconnect_high_snvs(bool enable)
+ 
+ void imx_anatop_pre_suspend(void)
+ {
++	if (cpu_is_imx7d()) {
++		/* PLL overwrite set */
++		regmap_write(anatop, ANADIG_ARM_PLL + REG_SET, 1 << 20);
++		regmap_write(anatop, ANADIG_DDR_PLL + REG_SET, 1 << 19);
++		regmap_write(anatop, ANADIG_SYS_PLL + REG_SET, 1 << 17);
++		regmap_write(anatop, ANADIG_ENET_PLL + REG_SET, 1 << 13);
++		regmap_write(anatop, ANADIG_AUDIO_PLL + REG_SET, 1 << 24);
++		regmap_write(anatop, ANADIG_VIDEO_PLL + REG_SET, 1 << 24);
++		return;
++	}
++
+ 	if (imx_mmdc_get_ddr_type() == IMX_DDR_TYPE_LPDDR2)
+ 		imx_anatop_enable_2p5_pulldown(true);
+ 	else
+@@ -86,6 +104,17 @@ void imx_anatop_pre_suspend(void)
+ 
+ void imx_anatop_post_resume(void)
+ {
++	if (cpu_is_imx7d()) {
++		/* PLL overwrite clear */
++		regmap_write(anatop, ANADIG_ARM_PLL + REG_CLR, 1 << 20);
++		regmap_write(anatop, ANADIG_DDR_PLL + REG_CLR, 1 << 19);
++		regmap_write(anatop, ANADIG_SYS_PLL + REG_CLR, 1 << 17);
++		regmap_write(anatop, ANADIG_ENET_PLL + REG_CLR, 1 << 13);
++		regmap_write(anatop, ANADIG_AUDIO_PLL + REG_CLR, 1 << 24);
++		regmap_write(anatop, ANADIG_VIDEO_PLL + REG_CLR, 1 << 24);
++		return;
++	}
++
+ 	if (imx_mmdc_get_ddr_type() == IMX_DDR_TYPE_LPDDR2)
+ 		imx_anatop_enable_2p5_pulldown(false);
+ 	else
+@@ -121,6 +150,8 @@ void __init imx_init_revision_from_anatop(void)
+ 	WARN_ON(!anatop_base);
+ 	if (of_device_is_compatible(np, "fsl,imx6sl-anatop"))
+ 		offset = ANADIG_DIGPROG_IMX6SL;
++	if (of_device_is_compatible(np, "fsl,imx7d-anatop"))
++		offset = ANADIG_DIGPROG_IMX7D;
+ 	digprog = readl_relaxed(anatop_base + offset);
+ 	iounmap(anatop_base);
+ 
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 0f04e30..c8ef395 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -54,6 +54,7 @@ int mx31_clocks_init_dt(void);
+ struct platform_device *mxc_register_gpio(char *name, int id,
+ 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
+ void mxc_set_cpu_type(unsigned int type);
++void mxc_set_arch_type(unsigned int type);
+ void mxc_restart(enum reboot_mode, const char *);
+ void mxc_arch_reset_init(void __iomem *);
+ int mx51_revision(void);
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index df42c14..4e84a7a 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -11,6 +11,8 @@
+ 
+ unsigned int __mxc_cpu_type;
+ EXPORT_SYMBOL(__mxc_cpu_type);
++unsigned int __mxc_arch_type;
++EXPORT_SYMBOL(__mxc_arch_type);
+ 
+ static unsigned int imx_soc_revision;
+ 
+@@ -19,6 +21,11 @@ void mxc_set_cpu_type(unsigned int type)
+ 	__mxc_cpu_type = type;
+ }
+ 
++void mxc_set_arch_type(unsigned int type)
++{
++	__mxc_arch_type = type;
++}
++
+ void imx_set_soc_revision(unsigned int rev)
+ {
+ 	imx_soc_revision = rev;
+@@ -130,6 +137,9 @@ struct device * __init imx_soc_device_init(void)
+ 	case MXC_CPU_IMX6Q:
+ 		soc_id = "i.MX6Q";
+ 		break;
++	case MXC_CPU_IMX7D:
++		soc_id = "i.MX7D";
++		break;
+ 	default:
+ 		soc_id = "Unknown";
+ 	}
+diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
+index 76af2c0..747fe0b 100644
+--- a/arch/arm/mach-imx/hardware.h
++++ b/arch/arm/mach-imx/hardware.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2004-2007, 2014 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2004-2007, 2014-2015 Freescale Semiconductor, Inc.
+  * Copyright 2008 Juergen Beisert, kernel@pengutronix.de
+  *
+  * This program is free software; you can redistribute it and/or
+@@ -93,6 +93,10 @@
+  *	CCM	0x020c4000+0x004000	->	0xf42c4000+0x004000
+  *	ANATOP	0x020c8000+0x004000	->	0xf42c8000+0x004000
+  *	UART4	0x021f0000+0x004000	->	0xf42f0000+0x004000
++ * mx7d:
++ *	CCM	0x30380000+0x010000	->	0xf5380000+0x010000
++ *	ANATOP	0x30360000+0x010000	->	0xf5360000+0x010000
++ *	UART1	0x30860000+0x010000	->	0xf5860000+0x010000
+  */
+ #define IMX_IO_P2V(x)	(						\
+ 			(((x) & 0x80000000) >> 7) |			\
+@@ -112,6 +116,7 @@
+ #include "mx21.h"
+ #include "mx27.h"
+ #include "mx1.h"
++#include "mx7.h"
+ 
+ #define imx_map_entry(soc, name, _type)	{				\
+ 	.virtual = soc ## _IO_P2V(soc ## _ ## name ## _BASE_ADDR),	\
+diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
+new file mode 100644
+index 0000000..5a9c47e6
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-imx7d.c
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (C) 2015 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/irqchip.h>
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <linux/phy.h>
++
++#include "common.h"
++
++static void __init imx7d_init_machine(void)
++{
++	struct device *parent;
++
++	parent = imx_soc_device_init();
++	if (parent == NULL)
++		pr_warn("failed to initialize soc device\n");
++
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	imx_anatop_init();
++}
++
++static void __init imx7d_init_irq(void)
++{
++	imx_init_revision_from_anatop();
++	imx_src_init();
++	irqchip_init();
++}
++
++static const char *imx7d_dt_compat[] __initconst = {
++	"fsl,imx7d",
++	NULL,
++};
++
++static void __init imx7d_map_io(void)
++{
++	debug_ll_io_init();
++}
++
++DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
++	.map_io		= imx7d_map_io,
++	.smp            = smp_ops(imx_smp_ops),
++	.init_irq	= imx7d_init_irq,
++	.init_machine	= imx7d_init_machine,
++	.dt_compat	= imx7d_dt_compat,
++	.restart	= mxc_restart,
++MACHINE_END
+diff --git a/arch/arm/mach-imx/mx7.h b/arch/arm/mach-imx/mx7.h
+new file mode 100644
+index 0000000..bfef936
+--- /dev/null
++++ b/arch/arm/mach-imx/mx7.h
+@@ -0,0 +1,38 @@
++/*
++ * Copyright (C) 2015 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ *  * This program is free software; you can redistribute it and/or modify
++ *   * it under the terms of the GNU General Public License version 2 as
++ *    * published by the Free Software Foundation.
++ *     */
++
++#ifndef __ASM_ARCH_MX7_IOMAP_H__
++#define __ASM_ARCH_MX7_IOMAP_H__
++
++#define MX7D_IO_P2V(x)                  IMX_IO_P2V(x)
++#define MX7D_IO_ADDRESS(x)              IOMEM(MX7D_IO_P2V(x))
++
++#define MX7D_CCM_BASE_ADDR              0x30380000
++#define MX7D_CCM_SIZE                   0x10000
++#define MX7D_IOMUXC_BASE_ADDR           0x30330000
++#define MX7D_IOMUXC_SIZE                0x10000
++#define MX7D_ANATOP_BASE_ADDR           0x30360000
++#define MX7D_ANATOP_SIZE                0x10000
++#define MX7D_GPC_BASE_ADDR              0x303a0000
++#define MX7D_GPC_SIZE                   0x10000
++#define MX7D_SRC_BASE_ADDR              0x30390000
++#define MX7D_SRC_SIZE                   0x10000
++#define MX7D_DDRC_BASE_ADDR             0x307a0000
++#define MX7D_DDRC_SIZE                  0x10000
++#define MX7D_AIPS1_BASE_ADDR            0x30000000
++#define MX7D_AIPS1_SIZE                 0x400000
++#define MX7D_AIPS2_BASE_ADDR            0x30400000
++#define MX7D_AIPS2_SIZE                 0x400000
++#define MX7D_AIPS3_BASE_ADDR            0x30900000
++#define MX7D_AIPS3_SIZE                 0x300000
++
++#define TT_ATTRIB_NON_CACHEABLE_1M	0x802
++#define MX7_IRAM_TLB_SIZE		0x4000
++#endif
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index 4c1343d..2d5e19e 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2004-2007, 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2004-2007, 2010-2015 Freescale Semiconductor, Inc.
+  * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
+  *
+  * This program is free software; you can redistribute it and/or
+@@ -38,6 +38,8 @@
+ #define MXC_CPU_IMX6DL		0x61
+ #define MXC_CPU_IMX6SX		0x62
+ #define MXC_CPU_IMX6Q		0x63
++#define MXC_CPU_IMX7D		0x72
++#define MXC_ARCH_CA7		0xc07
+ 
+ #define IMX_CHIP_REVISION_1_0		0x10
+ #define IMX_CHIP_REVISION_1_1		0x11
+@@ -59,6 +61,7 @@
+ 
+ #ifndef __ASSEMBLY__
+ extern unsigned int __mxc_cpu_type;
++extern unsigned int __mxc_arch_type;
+ #endif
+ 
+ #ifdef CONFIG_SOC_IMX1
+@@ -185,6 +188,16 @@ static inline bool cpu_is_imx6q(void)
+ 	return __mxc_cpu_type == MXC_CPU_IMX6Q;
+ }
+ 
++static inline bool cpu_is_imx7d(void)
++{
++	return __mxc_cpu_type == MXC_CPU_IMX7D;
++}
++
++static inline bool arm_is_ca7(void)
++{
++	return __mxc_arch_type == MXC_ARCH_CA7;
++}
++
+ struct cpu_op {
+ 	u32 cpu_rate;
+ };
+diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+index 7f27001..2ca4a41 100644
+--- a/arch/arm/mach-imx/platsmp.c
++++ b/arch/arm/mach-imx/platsmp.c
+@@ -60,11 +60,33 @@ static int imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ static void __init imx_smp_init_cpus(void)
+ {
+ 	int i, ncores;
++	unsigned long arch_type;
+ 
+-	ncores = scu_get_core_count(scu_base);
++	asm volatile(
++		".align 4\n"
++		"mrc p15, 0, %0, c0, c0, 0\n"
++		: "=r" (arch_type)
++	);
++
++	/* MIDR[15:4] defines ARCH type */
++	mxc_set_arch_type((arch_type >> 4) & 0xfff);
++
++	if (arm_is_ca7()) {
++		unsigned long val;
++
++		/* CA7 core number, [25:24] of CP15 L2CTLR */
++		asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r" (val));
++		ncores = ((val >> 24) & 0x3) + 1;
++	} else {
++		ncores = scu_get_core_count(scu_base);
++	}
++
++	if (setup_max_cpus < ncores)
++		ncores = (setup_max_cpus) ? setup_max_cpus : 1;
+ 
+ 	for (i = ncores; i < NR_CPUS; i++)
+ 		set_cpu_possible(i, false);
++
+ }
+ 
+ void imx_smp_prepare(void)
+-- 
+1.9.1
