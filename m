@@ -1,39 +1,65 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 Apr 2015 06:52:56 +0200
-Subject: [PATCH] ARM: mvebu: armada-xp-openblocks-ax3-4: Disable
- internal RTC
-In-Reply-To: <1429094447-4324-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1429094447-4324-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150416065256.53eca7b4@free-electrons.com>
+From: rajeevkumar.linux@gmail.com (rajeev kumar)
+Date: Thu, 16 Apr 2015 10:25:44 +0530
+Subject: [PATCHv2 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
+In-Reply-To: <Pine.LNX.4.44L0.1504151035150.1404-100000@iolanthe.rowland.org>
+References: <CAA7nrtipKF-WtGV-9b40DXYm=jBvM=Pg9PCH9U6yWhj37d41aw@mail.gmail.com>
+ <Pine.LNX.4.44L0.1504151035150.1404-100000@iolanthe.rowland.org>
+Message-ID: <CAA7nrthjap=s1PMgN3=hzvxzgPNruO=X-XxJdDDWu75mOXtR3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On Wed, Apr 15, 2015 at 8:06 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Wed, 15 Apr 2015, rajeev kumar wrote:
+>
+>> > @@ -88,15 +88,13 @@ static int ehci_platform_power_on(struct platform_device *dev)
+>> >         }
+>> >
+>> >         for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
+>> > -               if (priv->phys[phy_num]) {
+>> > -                       ret = phy_init(priv->phys[phy_num]);
+>> > -                       if (ret)
+>> > -                               goto err_exit_phy;
+>> > -                       ret = phy_power_on(priv->phys[phy_num]);
+>> > -                       if (ret) {
+>> > -                               phy_exit(priv->phys[phy_num]);
+>> > -                               goto err_exit_phy;
+>> > -                       }
+>> > +               ret = phy_init(priv->phys[phy_num]);
+>> > +               if (ret)
+>> > +                       goto err_exit_phy;
+>>
+>> Jumping to err_exit_phy will perform phy_power_off also which is not
+>> required as you are are powering on after phy_init. Wrong level
+>> jumping
+>
+> Look again, and this time pay more attention to the value of phy_num.
+>
+> Alan Stern
 
-On Wed, 15 Apr 2015 12:40:47 +0200, Gregory CLEMENT wrote:
-> There is no crystal connected to the internal RTC on the Open Block
-> AX3. So let's disable it in order to prevent the kernel probing the
-> driver uselessly. Eventually this patches removes the following
-> warning message from the boot log:
-> "rtc-mv d0010300.rtc: internal RTC not ticking"
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: <stable@vger.kernel.org> # v3.8 +
+MIssed it ,  Thanks for the pointer.
 
-If an external crystal is needed on the board for the internal RTC,
-then shouldn't instead the RTC have status = "disabled" in the
-SoC-level .dtsi, and each board enabling it in its own
-specific .dts, like we do for all other hardware blocks that
-require/use external components/connexions?
+~Rajeev
 
-Or, because the AX3 appears to be the only board in this case, we
-decide to factorize enabling the RTC in the .dtsi, and leave it as a
-special case to handle in the AX3 .dts ?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+>> ~Rajeev
+>>
+>> > +               ret = phy_power_on(priv->phys[phy_num]);
+>> > +               if (ret) {
+>> > +                       phy_exit(priv->phys[phy_num]);
+>> > +                       goto err_exit_phy;
+>> >                 }
+>> >         }
+>> >
+>> > @@ -104,10 +102,8 @@ static int ehci_platform_power_on(struct platform_device *dev)
+>> >
+>> >  err_exit_phy:
+>> >         while (--phy_num >= 0) {
+>> > -               if (priv->phys[phy_num]) {
+>> > -                       phy_power_off(priv->phys[phy_num]);
+>> > -                       phy_exit(priv->phys[phy_num]);
+>> > -               }
+>> > +               phy_power_off(priv->phys[phy_num]);
+>> > +               phy_exit(priv->phys[phy_num]);
+>> >         }
+>
+>
