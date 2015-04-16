@@ -1,77 +1,90 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 16 Apr 2015 11:04:14 -0700
-Subject: Allowing reset controllers before SMP initialization (on ARM)?
-In-Reply-To: <2592960.UsK4Hr7GSl@wuerfel>
-References: <552F0786.2000505@gmail.com> <2592960.UsK4Hr7GSl@wuerfel>
-Message-ID: <CAGVrzca2My1WfhQOR56A7rs16BbPCuH9h3-fGgV-HZ4b0MDUyQ@mail.gmail.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Thu, 16 Apr 2015 20:14:37 +0200
+Subject: [PATCH 1/2] Documentation: devicetree: root node serial-number
+ property documentation
+In-Reply-To: <F4D05489-ACF0-44BB-AEC7-7E8FB83FAE4C@codeaurora.org>
+References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
+ <f6f4f862c78fa626e7f94bde51eec5b1@agner.ch>
+ <1429175421.2483.1.camel@collins>
+ <CAL_JsqKdHQZL5Z6hKgquKihFykX0ZiCDQfeHOfOZWOh2NMg4Rw@mail.gmail.com>
+ <CFEF8F54-7A3E-482C-B295-6A6BC5D837C8@codeaurora.org>
+ <1429199145.2563.9.camel@collins>
+ <F4D05489-ACF0-44BB-AEC7-7E8FB83FAE4C@codeaurora.org>
+Message-ID: <1429208077.2563.14.camel@collins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-16 1:04 GMT-07:00 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 15 April 2015 17:51:18 Florian Fainelli wrote:
->> Hi,
->>
->> In order to support initialization of the secondary core on BCM63138
->> SoCs, I would want to utilize a reset controller to release the
->> secondary CPU from reset [1].
->>
->> Here are multiple options:
->>
->> - expose a custom function which registers the reset controller platform
->> driver as early as possible, which is probably acceptable, but also
->> requires the DT machine descriptor to populate the platform bus earlier,
->> which we could completely avoid
->
-> I think populating the platform bus earlier is not realistic, that
-> would break lots of existing dependencies. In particular, we can't
-> do it much earlier because it has to be done after the platform bus
-> itself is instantiated.
+Le jeudi 16 avril 2015 ? 10:53 -0500, Kumar Gala a ?crit :
+> > On Apr 16, 2015, at 10:45 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
+> > 
+> > Le jeudi 16 avril 2015 ? 10:23 -0500, Kumar Gala a ?crit :
+> >>> On Apr 16, 2015, at 9:36 AM, Rob Herring <robherring2@gmail.com> wrote:
+> >>> 
+> >>> On Thu, Apr 16, 2015 at 4:10 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
+> >>>> Le jeudi 16 avril 2015 ? 09:56 +0200, Stefan Agner a ?crit :
+> >>>>> On 2015-03-28 18:39, Paul Kocialkowski wrote:
+> >>>>>> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> >>>>> 
+> >>>>> I think this is a worthwhile standardization.
+> >>>>> 
+> >>>>> Acked-by: Stefan Agner <stefan@agner.ch>
+> >>>> 
+> >>>> Thanks! I should also add a commit message in v2 mentioning that this is
+> >>>> already used in open firmware and reported by lshw.
+> >>> 
+> >>> With that,
+> >>> 
+> >>> Acked-by: Rob Herring <robh@kernel.org>
+> > 
+> > [snip]
+> > 
+> >> I feel like this is a little lite either in the doc or commit message.
+> >> Is the string completely arbitrary?  Is it meant to match labeling on
+> >> a board or case?  Is this meant to be used by the kernel at all?
+> > 
+> > I guess it doesn't really matter what it is, as long as it's a string.
+> > The kernel does not suggest any use for it either, it's just made
+> > available to userspace through cpuinfo.
+> > 
+> > Now if there is a particular use for this in user-space, it would have
+> > to match some standards. For instance, it Android, ro.serialno is
+> > usually a 16-bytes (plus one null byte) representation of a 64 bit
+> > number. For USB, I recall it is usually a 32 bytes string (including the
+> > null byte), but may be extended to more.
+> > 
+> > What the string actually represents depends and some SOCs have serial
+> > number bytes (I know that omap and sunxi have some for instance, that
+> > are usually used) while other devices may take it from somewhere else.
+> > In any case, it doesn't really matter and is not up to the kernel anyway
+> > since it is just passed through from the bootloader.
+> > 
+> > Thus, I don't think it's very relevant to mention it in either the
+> > documentation or the commit message.
+> 
+> So you say ?board? in the patch, since it could be SoC specific, we
+> should probably clean up the wording a bit.
 
-Agreed, I don't quite like that either.
+It really doesn't matter where the string comes from, what it contains
+or whether some SoCs have provisions to generate one.
+I think board is one the most common words that we can use to describe
+devices. "devices" is also fine, I could go with it if you prefer, but I
+don't really see what it changes.
 
->
->> - have a OF_DECLARE_RESET_CONTROLLER() which is running fairly early
->> during boot, such that we can utilize reset controllers are early as
->> possible,  before any initcall level, and before SMP initialization is
->> kicking in
->
-> We've added a couple of those, and it could be done here, but putting
-> them in the right order is a bit tricky, and I think we can avoid it.
+> I?m just saying when someone reads this 6 months or a year later and
+> tries to figure out what the purpose of the property is they don?t
+> really have enough info.  Putting some examples in the commit message
+> of what possibly usages is I think a reasonable thing.
 
-Right, not only that, but it appears that the reset controller binding
-has not standardized a "reset-controller" property, so there is any
-good way to scan for all these kinds of controllers in a given Device
-Tree today, other than looking at a #reset-cells property
-presence/absence.
-
->
->> - since the code that boots secondary CPUs is relatively unique, even
->> within the scope of the reset controllers (sequence involves touching
->> multiple registers), pulling it outside of the reset controller might be
->> acceptable (there is still some level of sharing though for low-level
->> indirect read/write operations)
->
-> Yes, it's a hack, but the SMP code is rather special and a lot of
-> other platforms do similar hacks already. What I'd like to see
-> happen in the long run is more along the lines of:
-
-Right, and even within the context of 63138, bringing-up the secondary
-CPU is about 10 times more lines of code, specific to the CPU complex,
-that are not even shared with the reset of the on-chip peripherals, so
-I can probably stick the low-level routines in a header file and share
-them with not too much gymnastic.
-
->
-> - Avoid dependencies on the early SMP code, and just set up the
->   data structures for possible CPUs early, which can be done without
->   any hardware interaction. Then move the actual CPU enable path
->   much later in the boot process, possibly combined with the cpuidle
->   driver.
-
-That sounds like a nice goal, I suppose that as we start standardizing
-on the firmware interface to bring-up secondary cores, that might
-become easier as well.
-
-Thanks for your feedback!
--- 
-Florian
+Okay, that would make sense. Still, the purpose of this is to pass the
+serial number string from the bootloader to userspace. All of the
+discussion about where to grab the serial from and what it should look
+like is not relevant to the kernel. Instead, it's up to the bootloader
+that is in charge of generating the serial string, so the discussion
+should happen there.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150416/30e5c303/attachment.sig>
