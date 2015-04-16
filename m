@@ -1,46 +1,35 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 16 Apr 2015 11:42:08 +0200
-Subject: Allowing reset controllers before SMP initialization (on ARM)?
-In-Reply-To: <2592960.UsK4Hr7GSl@wuerfel>
-References: <552F0786.2000505@gmail.com> <2592960.UsK4Hr7GSl@wuerfel>
-Message-ID: <552F83F0.1090403@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Apr 2015 11:44:49 +0200
+Subject: [PATCH 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs and
+ boards
+In-Reply-To: <1429170038-16757-4-git-send-email-yamada.masahiro@socionext.com>
+References: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
+ <1429170038-16757-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <2204571.AOVr95oO32@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian, Arnd,
+On Thursday 16 April 2015 16:40:37 Masahiro Yamada wrote:
+> +
+> +/ {
+> +	model = "UniPhier PH1-LD4 Reference Board";
+> +	compatible = "socionext,ph1-ld4-ref", "socionext,ph1-ld4";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x20000000>;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
 
-On 04/16/2015 10:04 AM, Arnd Bergmann wrote:
-> On Wednesday 15 April 2015 17:51:18 Florian Fainelli wrote:
->> Hi,
->>
->> In order to support initialization of the secondary core on BCM63138
->> SoCs, I would want to utilize a reset controller to release the
->> secondary CPU from reset [1].
->>
->> Here are multiple options:
->>
->> - expose a custom function which registers the reset controller platform
->> driver as early as possible, which is probably acceptable, but also
->> requires the DT machine descriptor to populate the platform bus earlier,
->> which we could completely avoid
-> I think populating the platform bus earlier is not realistic, that
-> would break lots of existing dependencies. In particular, we can't
-> do it much earlier because it has to be done after the platform bus
-> itself is instantiated.
->
->> - have a OF_DECLARE_RESET_CONTROLLER() which is running fairly early
->> during boot, such that we can utilize reset controllers are early as
->> possible,  before any initcall level, and before SMP initialization is
->> kicking in
-> We've added a couple of those, and it could be done here, but putting
-> them in the right order is a bit tricky, and I think we can avoid it.
+I would remove the 'earlyprintk' option here. You don't add any options
+for the platform in Kconfig.debug, and I hope that we can eventually
+start using earlycon. Please add an appropriate stdio-path property
+here, but note that we are still lacking the fixmap patches to make
+earlycon work.
 
-I have already proposed a OF_DECLARE_RESET_CONTROLLER() implementation:
-https://lkml.org/lkml/2015/2/20/395
+Otherwise looks good.
 
-I needed it for the STM32 timers, but it was not accepted.
-Now, I perform the timers reset in the bootloader, but it shouldn't work 
-in your case.
-
-Kind regards,
-Maxime
+	Arnd
