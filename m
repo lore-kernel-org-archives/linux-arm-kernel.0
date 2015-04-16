@@ -1,41 +1,23 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 16 Apr 2015 21:59:38 +0800
-Subject: [query] how to use "ranges" in device tree
-Message-ID: <20150416215938.347caa68@xhacker>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 16 Apr 2015 09:11:57 -0500
+Subject: [PATCH RESEND] Doc: dt: arch_timer: discourage clock-frequency use
+In-Reply-To: <20150416114749.GK2866@leverpostej>
+References: <1426874267-24413-1-git-send-email-mark.rutland@arm.com>
+ <CAL_JsqJfyknhZxGvbWcj1Vj1FGRt40qT9b=xrbhm0wfu-BduTw@mail.gmail.com>
+ <20150416114749.GK2866@leverpostej>
+Message-ID: <CAL_JsqKo7DGzEu03fF_Z_bnNheZFHCMkHpoQCS6ro83wFferEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, Apr 16, 2015 at 6:47 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > Rob, are you happy to take this through your tree?
+>>
+>> Yes, I'll take it.
+>
+> Are you still planning on taking this for v4.1? I couldn't spot it in a
+> public branch yet.
 
-I didn't fully understand the "ranges" usage, here is one situation which I dunno
-how to handle.
+Humm, I had marked that I applied it, but you're right. Anyway, it is
+there now in my for-next branch. Sorry about that.
 
-In arch/arm/boot/dts/berlin2q.dtsi, we describe the /soc ranges as
-
-ranges = <0 0xf7000000 0x1000000>;
-
-That's fine. Now there's a pci device based on pcie-designware.c which prefer
-put "config" space in reg. But the config space starts at 0xe0000000, due to
-the /soc ranges, the "config" space following pcie node is not correct in fact.
-
-soc {
-	ranges = <0 0xf7000000 0x1000000>;
-	...
-	pcie: pcie at e40000 {
-		compatible = "...";
-		reg = <0xe40000 0x10000>, <0xe0000000 0x8000000>;
-		reg-names = "dbi", "pad", "config";
-		...
-	};
-	...
-};
-
-How to define the "config" space in this situation? Did we need to change
-the /soc ranges as the following?
-
-soc {
-	ranges;
-}
-
-Thanks in advance,
-Jisheng
+Rob
