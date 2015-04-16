@@ -1,49 +1,178 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 16 Apr 2015 17:38:40 +0800
-Subject: [PATCH net-next 4/6] net: hip04: Don't free the tx skb when the
- buffer is not ready for xmit
-In-Reply-To: <4971105.FJGVdDRE9f@wuerfel>
-References: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
- <2218546.M1hzu1bzfh@wuerfel> <552F560D.4070309@huawei.com>
- <4971105.FJGVdDRE9f@wuerfel>
-Message-ID: <552F8320.9080100@huawei.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 16 Apr 2015 11:41:19 +0200
+Subject: [PATCH v3 2/2] ARM: at91/dt: add support for kizboxmini
+In-Reply-To: <1428929774-8951-3-git-send-email-g.portay@overkiz.com>
+References: <1428929774-8951-1-git-send-email-g.portay@overkiz.com>
+ <1428929774-8951-3-git-send-email-g.portay@overkiz.com>
+Message-ID: <20150416094119.GC29796@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/4/16 16:41, Arnd Bergmann wrote:
-> On Thursday 16 April 2015 14:26:21 Ding Tianhong wrote:
->> On 2015/4/15 22:19, Arnd Bergmann wrote:
->>> On Wednesday 15 April 2015 20:30:06 Ding Tianhong wrote:
->>>> @@ -489,6 +487,8 @@ static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->>>>  
->>>>         /* Ensure tx_head update visible to tx reclaim */
->>>>         smp_wmb();
->>>> +       count++;
->>>> +       priv->tx_head = TX_NEXT(tx_head);
->>>>  
->>>>
->>>
->>> Something is wrong here, the comment does not match the code any more, because
->>> the smp_wmb() won't actually make the tx_head update visible.
->>>
->>>       Arnd
->>>
->> Yes, the smp_wmb() could only make sure the tx buffer was ready to xmit.
+On 13/04/2015 at 14:56:14 +0200, Ga?l PORTAY wrote :
+> Add DT file for Kizbox mini board.
+> This board is based on Atmel's AT91SAM9G25 SoC.
 > 
-> The problem you need to avoid is that the tx reclaim function thinks it's
-> done with all outstanding packets and does not retrigger, while the
-> start_xmit thinks it will still get to that. This means you
-> need a barrier between the priv->tx_head update and the
-> napi_schedule_prep() call.
+> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+> ---
+>  arch/arm/boot/dts/Makefile            |   1 +
+>  arch/arm/boot/dts/at91-kizboxmini.dts | 129 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 130 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index a1c776b..9c11888 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -30,6 +30,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+>  	at91sam9rlek.dtb \
+>  	at91-ariag25.dtb \
+>  	at91-cosino_mega2560.dtb \
+> +	at91-kizboxmini.dtb \
+>  	at91sam9g15ek.dtb \
+>  	at91sam9g25ek.dtb \
+>  	at91sam9g35ek.dtb \
+> diff --git a/arch/arm/boot/dts/at91-kizboxmini.dts b/arch/arm/boot/dts/at91-kizboxmini.dts
+> new file mode 100644
+> index 0000000..19b0ded
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-kizboxmini.dts
+> @@ -0,0 +1,129 @@
+> +/*
+> + * at91-kizboxmini.dts - Device Tree file for Overkiz Kizbox mini board
+> + *
+> + * Copyright (C) 2014 Ga?l PORTAY <g.portay@overkiz.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +/dts-v1/;
+> +#include "at91sam9g25.dtsi"
+> +#include "at91sam9x5.dtsi"
+> +#include <dt-bindings/pwm/pwm.h>
+> +
+> +/ {
+> +	model = "Overkiz Kizbox mini";
+> +	compatible = "overkiz,kizboxmini", "atmel,at91sam9g25", "atmel,at91sam9x5", "atmel,at91sam9";
+> +
+> +	chosen {
+> +		bootargs = "ubi.mtd=ubi";
+> +		linux,stdout-path = &dbgu;
+> +	};
+> +
+> +	memory {
+> +		reg = <0x20000000 0x8000000>;
+> +	};
+> +
+> +	clocks {
+> +		slow_xtal {
+> +			clock-frequency = <32768>;
+> +		};
+> +
+> +		main_xtal {
+> +			clock-frequency = <12000000>;
+> +		};
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			usart0: serial at f801c000 {
+> +				status = "okay";
+> +			};
+> +
+> +			macb0: ethernet at f802c000 {
+> +				phy-mode = "rmii";
+> +				status = "okay";
+> +			};
+> +
+> +			pwm0: pwm at f8034000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_pwm0_pwm0_1
+> +					     &pinctrl_pwm0_pwm1_1>;
+> +				status = "okay";
+> +			};
+> +
+> +			dbgu: serial at fffff200 {
+> +				status = "okay";
+> +			};
+> +
+> +			watchdog at fffffe40 {
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		usb0: ohci at 00600000 {
+> +			status = "okay";
+> +		};
+> +
+> +		usb1: ehci at 00700000 {
+> +			status = "okay";
+> +		};
+> +
+> +		nand0: nand at 40000000 {
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "hw";
+> +			atmel,has-pmecc;
+> +			atmel,pmecc-cap = <4>;
+> +			atmel,pmecc-sector-size = <512>;
+> +			nand-on-flash-bbt;
+> +			status = "okay";
+> +
+> +			bootstrap at 0 {
+> +				label = "bootstrap";
+> +				reg = <0x0 0x20000>;
+> +			};
+> +
+> +			ubi at 20000 {
+> +				label = "ubi";
+> +				reg = <0x20000 0x7fe0000>;
+> +			};
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		prog {
+> +			label = "PB_PROG";
+> +			gpios = <&pioC 17 GPIO_ACTIVE_LOW>;
+> +			linux,code = <0x102>;
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		reset {
+> +			label = "PB_RST";
+> +			gpios = <&pioC 16 GPIO_ACTIVE_LOW>;
+> +			linux,code = <0x100>;
+> +			gpio-key,wakeup;
+> +		};
+> +	};
+> +
+> +	pwm_leds {
+> +		compatible = "pwm-leds";
+> +
+> +		green {
+> +			label = "pwm:green:user";
+> +			pwms = <&pwm0 0 10000000 0>;
+> +			max-brightness = <255>;
+> +			linux,default-trigger = "default-on";
+> +		};
+> +
+> +		red {
+> +			label = "pwm:red:user";
+> +			pwms = <&pwm0 1 10000000 0>;
+> +			max-brightness = <255>;
+> +			linux,default-trigger = "default-on";
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
 > 
 
-But I still doubt about that, when the buffer is ready to xmit, it will add to fifo queue, but it
-doesn't mean it is finished xmit yet, the tx reclaim function will free the skb only
-depend on whether tx_head is updated.
-
-Ding
-
-> 	Arnd
-> 
-> .
-> 
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
