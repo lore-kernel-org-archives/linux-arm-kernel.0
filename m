@@ -1,56 +1,177 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 16 Apr 2015 13:08:56 +0300
-Subject: [PATCH v2 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs
- and boards
-In-Reply-To: <1429171147-19464-4-git-send-email-yamada.masahiro@socionext.com>
-References: <1429171147-19464-1-git-send-email-yamada.masahiro@socionext.com>
- <1429171147-19464-4-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20150416100856.GJ30380@tarshish>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Thu, 16 Apr 2015 12:23:11 +0200
+Subject: [PATCH 2/2] arch: arm: Show the serial number from devicetree
+ in cpuinfo
+In-Reply-To: <20150416094623.GX12732@n2100.arm.linux.org.uk>
+References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
+ <1427564371-26039-2-git-send-email-contact@paulk.fr>
+ <20150416094623.GX12732@n2100.arm.linux.org.uk>
+Message-ID: <1429179791.2483.13.camel@collins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro Yamada,
+Hi Russell, thanks for the review!
 
-On Thu, Apr 16, 2015 at 04:59:06PM +0900, Masahiro Yamada wrote:
-> Initial device trees for UniPhier SoCs: PH1-sLD3, PH1-LD4, PH1-Pro4,
-> and PH1-sLD8.
+Le jeudi 16 avril 2015 ? 10:46 +0100, Russell King - ARM Linux a ?crit :
+> On Sat, Mar 28, 2015 at 06:39:31PM +0100, Paul Kocialkowski wrote:
+> > This grabs the serial number shown in cpuinfo from the serial-number devicetree
+> > property in priority. When booting with ATAGs (and without device-tree), the
+> > provided number is still shown instead.
+> > 
+> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > ---
+> >  arch/arm/include/asm/system_info.h |  1 +
+> >  arch/arm/kernel/atags_parse.c      |  3 +++
+> >  arch/arm/kernel/devtree.c          | 15 ++++++++++-----
+> >  arch/arm/kernel/setup.c            | 11 +++++++++--
+> >  4 files changed, 23 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/system_info.h b/arch/arm/include/asm/system_info.h
+> > index 720ea03..3860cbd40 100644
+> > --- a/arch/arm/include/asm/system_info.h
+> > +++ b/arch/arm/include/asm/system_info.h
+> > @@ -17,6 +17,7 @@
+> >  
+> >  /* information about the system we're running on */
+> >  extern unsigned int system_rev;
+> > +extern const char *system_serial;
+> >  extern unsigned int system_serial_low;
+> >  extern unsigned int system_serial_high;
+> >  extern unsigned int mem_fclk_21285;
+> > diff --git a/arch/arm/kernel/atags_parse.c b/arch/arm/kernel/atags_parse.c
+> > index 68c6ae0..8384818 100644
+> > --- a/arch/arm/kernel/atags_parse.c
+> > +++ b/arch/arm/kernel/atags_parse.c
+> > @@ -231,6 +231,9 @@ setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
+> >  		parse_tags(tags);
+> >  	}
+> >  
+> > +	/* Serial number is stored in system_serial_low/high */
+> > +	system_serial = NULL;
+> > +
+> >  	/* parse_early_param needs a boot_command_line */
+> >  	strlcpy(boot_command_line, from, COMMAND_LINE_SIZE);
+> >  
+> > diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> > index 11c54de..a82a04d 100644
+> > --- a/arch/arm/kernel/devtree.c
+> > +++ b/arch/arm/kernel/devtree.c
+> > @@ -26,6 +26,7 @@
+> >  #include <asm/smp_plat.h>
+> >  #include <asm/mach/arch.h>
+> >  #include <asm/mach-types.h>
+> > +#include <asm/system_info.h>
+> >  
+> >  
+> >  #ifdef CONFIG_SMP
+> > @@ -204,6 +205,9 @@ static const void * __init arch_get_next_mach(const char *const **match)
+> >  const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+> >  {
+> >  	const struct machine_desc *mdesc, *mdesc_best = NULL;
+> > +	const char *prop;
+> > +	int size;
+> > +	unsigned long dt_root;
+> >  
+> >  #ifdef CONFIG_ARCH_MULTIPLATFORM
+> >  	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+> > @@ -215,17 +219,14 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+> >  	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
+> >  		return NULL;
+> >  
+> > +	dt_root = of_get_flat_dt_root();
+> > +
+> >  	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
+> >  
+> >  	if (!mdesc) {
+> > -		const char *prop;
+> > -		int size;
+> > -		unsigned long dt_root;
+> > -
+> >  		early_print("\nError: unrecognized/unsupported "
+> >  			    "device tree compatible list:\n[ ");
+> >  
+> > -		dt_root = of_get_flat_dt_root();
+> >  		prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
+> >  		while (size > 0) {
+> >  			early_print("'%s' ", prop);
+> > @@ -243,6 +244,10 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+> >  
+> >  	early_init_dt_scan_nodes();
+> >  
+> > +	/* Scan for serial number */
+> > +	prop = of_get_flat_dt_prop(dt_root, "serial-number", &size);
+> > +	system_serial = prop;
+> > +
+> >  	/* Change machine number to match the mdesc we're using */
+> >  	__machine_arch_type = mdesc->nr;
+> >  
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index 1d60beb..69fa7ef 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -93,6 +93,9 @@ unsigned int __atags_pointer __initdata;
+> >  unsigned int system_rev;
+> >  EXPORT_SYMBOL(system_rev);
+> >  
+> > +const char *system_serial;
+> > +EXPORT_SYMBOL(system_serial);
+> > +
+> >  unsigned int system_serial_low;
+> >  EXPORT_SYMBOL(system_serial_low);
+> >  
+> > @@ -1091,8 +1094,12 @@ static int c_show(struct seq_file *m, void *v)
+> >  
+> >  	seq_printf(m, "Hardware\t: %s\n", machine_name);
+> >  	seq_printf(m, "Revision\t: %04x\n", system_rev);
+> > -	seq_printf(m, "Serial\t\t: %08x%08x\n",
+> > -		   system_serial_high, system_serial_low);
+> > +
+> > +	if (system_serial)
+> > +		seq_printf(m, "Serial\t\t: %s\n", system_serial);
+> > +	else
+> > +		seq_printf(m, "Serial\t\t: %08x%08x\n",
+> > +			   system_serial_high, system_serial_low);
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> How about this becomes just:
+> 
+> 	seq_printf(m, "Serial\t\t: %s\n", system_serial);
 
-[...]
+Okay, always printing the system_serial string in cpuinfo's c_show seems
+cleaner and clearly states that the string way is preferred over the old
+one, which becomes legacy.
 
-> diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-> new file mode 100644
-> index 0000000..2e83363
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-> @@ -0,0 +1,51 @@
-> +/*
-> + * Device Tree Source for UniPhier PH1-LD4 Reference Board
-> + *
-> + * Copyright (C) 2015 Socionext Inc.
-> + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+> And we arrange for system_serial to always be initialised later on
+> during boot if it's not already set from the system_serial_high and
+> system_serial_low variables?  Eg, adding in init_machine_late():
+> 
+> 	if (!system_serial)
+> 		system_serial = kasprintf(GFP_KERNEL, "%08x%08x",
+> 					  system_serial_high,
+> 					  system_serial_low);
+> 
+> and is there a reason we can't look for the serial number in DT at
+> this point as well - is there a reason we might need the stringified
+> serial number early?
 
-Please consider licensing .dts/.dtsi files also under another, more liberal 
-license, e.g. X11. This would allow easier reuse of these device tree in other 
-software projects. See for example 2ef6ef91c54e (ARM: sun4i: a1000: Relicense 
-the device tree under GPLv2/X11, 2014-09-02).
+Not that I know of -- I just thought it would be a good fit to fill-in
+the string in setup_machine_fdt since ATAGs were being stored in
+serial_low/high in setup_machine_tags (to preserve some kind of
+"structure parallelism" in the way the serial number is obtained).
 
-baruch
+Now if the serial from ATAG is going to end up in the system_serial
+string too, it doesn't make a lot of sense to keep the structure I
+suggested, so I agree with your proposal.
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+We could simply check whether the serial-number property is there (when
+DT is enabled at all) and fallback to using serial_low/high when it's
+not the case (which would perhaps be 0), at a later point in
+initialization. If you think init_machine_late is a good fit, then I'll
+go for it.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150416/5e725ceb/attachment.sig>
