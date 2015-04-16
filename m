@@ -1,44 +1,49 @@
-From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
-Date: Thu, 16 Apr 2015 17:08:17 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable shmobile r8a7778 (M1A)
-Message-ID: <1429196897-18822-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 16 Apr 2015 17:07:56 +0200
+Subject: [PATCH] tty/serial: at91: maxburst was missing for dma transfers
+In-Reply-To: <1429196292-8134-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1429196292-8134-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <552FD04C.2030507@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also enables RTC (RX8581) and camera (ML86V7667) drivers as modules.
+Le 16/04/2015 16:58, Ludovic Desroches a ?crit :
+> Maxburst was not set when doing the dma slave configuration. This value
+> is checked by the recently introduced xdmac. It causes an error when
+> doing the slave configuration and so prevents from using dma.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: <stable@vger.kernel.org> # 3.12 and later
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
----
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Indeed, thanks!
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 06075b6..212199a 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -67,6 +67,7 @@ CONFIG_ARCH_EMEV2=y
- CONFIG_ARCH_R7S72100=y
- CONFIG_ARCH_R8A73A4=y
- CONFIG_ARCH_R8A7740=y
-+CONFIG_ARCH_R8A7778=y
- CONFIG_ARCH_R8A7779=y
- CONFIG_ARCH_R8A7790=y
- CONFIG_ARCH_R8A7791=y
-@@ -377,6 +378,7 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
- CONFIG_VIDEO_RENESAS_VSP1=m
- # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
- CONFIG_VIDEO_ADV7180=m
-+CONFIG_VIDEO_ML86V7667=m
- CONFIG_DRM=y
- CONFIG_DRM_RCAR_DU=m
- CONFIG_DRM_TEGRA=y
-@@ -500,6 +502,7 @@ CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_SUNXI=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_TEGRA=y
-+CONFIG_RTC_DRV_RX8581=m
- CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
- CONFIG_MV_XOR=y
+> ---
+>  drivers/tty/serial/atmel_serial.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 4e959c4..6afce7e 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -880,6 +880,7 @@ static int atmel_prepare_tx_dma(struct uart_port *port)
+>  	config.direction = DMA_MEM_TO_DEV;
+>  	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+>  	config.dst_addr = port->mapbase + ATMEL_US_THR;
+> +	config.dst_maxburst = 1;
+>  
+>  	ret = dmaengine_slave_config(atmel_port->chan_tx,
+>  				     &config);
+> @@ -1059,6 +1060,7 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
+>  	config.direction = DMA_DEV_TO_MEM;
+>  	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+>  	config.src_addr = port->mapbase + ATMEL_US_RHR;
+> +	config.src_maxburst = 1;
+>  
+>  	ret = dmaengine_slave_config(atmel_port->chan_rx,
+>  				     &config);
+> 
+
+
 -- 
-2.3.5
+Nicolas Ferre
