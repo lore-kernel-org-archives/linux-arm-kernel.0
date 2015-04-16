@@ -1,39 +1,77 @@
-From: Minghuan.Lian@freescale.com (Minghuan Lian)
-Date: Thu, 16 Apr 2015 13:30:59 +0800
-Subject: [PATCH v2] irqchip/gicv3-its: ITS table size should not be smaller
- than PSZ
-Message-ID: <1429162259-11344-1-git-send-email-Minghuan.Lian@freescale.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Thu, 16 Apr 2015 11:09:58 +0530
+Subject: [PATCH RFC v9 11/20] drm/bridge: Add Synopsys DesignWare MIPI
+ DSI host controller driver
+In-Reply-To: <20150409084353.GD12103@ulmo>
+References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
+ <1423720903-24806-12-git-send-email-Ying.Liu@freescale.com>
+ <20150409084353.GD12103@ulmo>
+Message-ID: <552F4B2E.2000209@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default page size of ITS table has been changed to 64KB,
-but for some platforms the real size of allocated memory which
-calculated by DEVBITS of register GITS_TYPER may be smaller than
-default size. In this case, the allocation size must be increased
-to the default size, otherwise, the wrong page number will cause
-kernel hang.
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
----
-v2-v1:
-Increase allocation size instead of decreasing PSZ
 
- drivers/irqchip/irq-gic-v3-its.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On 04/09/2015 02:13 PM, Thierry Reding wrote:
+> On Thu, Feb 12, 2015 at 02:01:34PM +0800, Liu Ying wrote:
+> [...]
+>> diff --git a/drivers/gpu/drm/bridge/dw_mipi_dsi.c b/drivers/gpu/drm/bridge/dw_mipi_dsi.c
+> [...]
+>> +struct dw_mipi_dsi {
+>> +	struct mipi_dsi_host dsi_host;
+>> +	struct drm_connector connector;
+>> +	struct drm_encoder *encoder;
+>> +	struct drm_bridge *bridge;
+>> +	struct drm_panel *panel;
+>> +	struct device *dev;
+>> +
+>> +	void __iomem *base;
+>> +
+>> +	struct clk *pllref_clk;
+>> +	struct clk *cfg_clk;
+>> +	struct clk *pclk;
+>> +
+>> +	unsigned int lane_mbps; /* per lane */
+>> +	u32 channel;
+>> +	u32 lanes;
+>> +	u32 format;
+>> +	struct drm_display_mode *mode;
+>> +
+>> +	const struct dw_mipi_dsi_plat_data *pdata;
+>> +
+>> +	bool enabled;
+>> +};
+>
+> While reviewing this I kept thinking whether this is really the right
+> architectural design. This driver is a MIPI DSI host, a connector and
+> a bridge, all in one. But it seems to me like it should really be an
+> encoder/connector and a MIPI DSI host. Why the need for a bridge? The
+> bridge abstraction targets blocks outside of the SoC, but it is my
+> understanding that these DesignWare IP blocks are designed into SoCs.
+>
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 9687f8a..19ab86d 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -828,7 +828,8 @@ static int its_alloc_tables(struct its_node *its)
- 			u64 typer = readq_relaxed(its->base + GITS_TYPER);
- 			u32 ids = GITS_TYPER_DEVBITS(typer);
- 
--			order = get_order((1UL << ids) * entry_size);
-+			order = max(get_order((1UL << ids) * entry_size),
-+				    order);
- 			if (order >= MAX_ORDER) {
- 				order = MAX_ORDER - 1;
- 				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
+The msm driver uses bridges for blocks within the SoC too. We have too 
+many sub blocks in the display controller that use up crtcs and encoder 
+entities. A bridge is the only option one has if an encoder in the 
+display chain is already taken.
+
+In the above designware configuration, if some one created a board that 
+used an external chip to further convert DSI to some other output 
+format, then we would be completely exhausted of all entities.
+
+I posted a patch that allows us to create a chain of bridges for such 
+cases. It seems to work well as an interim solution. Ideally, it would 
+be better if we could make bridge a special case of an encoder, and let 
+one encoder connect to another encoder.
+
+Such a thing would also help us unify i2c slave encoders and bridge 
+drivers too. A chip designed as an i2c slave encoder would work well 
+with a drm driver that doesn't have an encoder, but won't work for SoCs 
+SoCs that already have an encoder and were expecting a bridge entity 
+instead.
+
+Archit
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
