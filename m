@@ -1,28 +1,72 @@
-From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
-Date: Thu, 16 Apr 2015 21:24:03 +0900
-Subject: [PATCH] ASoC: samsung: s3c24xx-i2s: Fix return value check in
- s3c24xx_iis_dev_probe()
-In-Reply-To: <1429186682-20629-1-git-send-email-weiyj_lk@163.com>
-References: <1429186682-20629-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <CAJKOXPf5kiC4pvk0zAOYXu2z8LJAWTLHbcMMzdXzvL+rpiT8Lw@mail.gmail.com>
+From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
+Date: Thu, 16 Apr 2015 14:25:44 +0200
+Subject: [PATCH] ARM: at91/dt: drop deprecated mainck node from pmc
+Message-ID: <1429187145-10741-1-git-send-email-g.portay@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-16 21:18 GMT+09:00  <weiyj_lk@163.com>:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->
-> In case of error, the function devm_ioremap_resource() returns
-> ERR_PTR() and never returns NULL. The NULL test in the return
-> value check should be replaced with IS_ERR().
->
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
->  sound/soc/samsung/s3c24xx-i2s.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+The clock-frequency property became obsolete since the rework of the main
+clock driver in 3.16 (see commit 27cb1c2083373a44130d50d4d2fb64cf7eff2d90).
 
-Good catch.
+It now get and uses the clock-frequency from the main_xtal node.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+---
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 6 ------
+ arch/arm/boot/dts/at91sam9rlek.dts          | 6 ------
+ arch/arm/boot/dts/sama5d3xcm.dtsi           | 6 ------
+ 3 files changed, 18 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+index fec1fca..1721e9b 100644
+--- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+@@ -204,12 +204,6 @@
+ 					};
+ 				};
+ 			};
+-
+-			pmc: pmc at fffffc00 {
+-				main: mainck {
+-					clock-frequency = <12000000>;
+-				};
+-			};
+ 		};
+ 
+ 		nand0: nand at 60000000 {
+diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
+index 9be5b54..d9299be3 100644
+--- a/arch/arm/boot/dts/at91sam9rlek.dts
++++ b/arch/arm/boot/dts/at91sam9rlek.dts
+@@ -181,12 +181,6 @@
+ 				};
+ 			};
+ 
+-			pmc: pmc at fffffc00 {
+-				main: mainck {
+-					clock-frequency = <12000000>;
+-				};
+-			};
+-
+ 			watchdog at fffffd40 {
+ 				status = "okay";
+ 			};
+diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+index 7d6babd..ef404e9 100644
+--- a/arch/arm/boot/dts/sama5d3xcm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+@@ -67,12 +67,6 @@
+ 					rxd3-skew-ps = <400>;
+ 				};
+ 			};
+-
+-			pmc: pmc at fffffc00 {
+-				main: mainck {
+-					clock-frequency = <12000000>;
+-				};
+-			};
+ 		};
+ 
+ 		nand0: nand at 60000000 {
+-- 
+1.9.1
