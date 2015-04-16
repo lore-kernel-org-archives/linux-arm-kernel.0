@@ -1,78 +1,27 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 16 Apr 2015 13:59:32 -0300
-Subject: [PATCH v4 04/10] mtd: pxa3xx_nand: rework flash detection and
- timing setup
-In-Reply-To: <552FBC0E.20004@gmail.com>
-References: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
- <1429118648-19416-5-git-send-email-antoine.tenart@free-electrons.com>
- <552EB7F0.2090106@gmail.com> <552FB4DF.1030403@free-electrons.com>
- <552FBC0E.20004@gmail.com>
-Message-ID: <552FEA74.5020909@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Apr 2015 19:14:53 +0200
+Subject: [PATCH] ARM: VDSO: depend on CPU_V7
+In-Reply-To: <552FE447.6020001@mentor.com>
+References: <1428529265-26772-1-git-send-email-nathan_lynch@mentor.com>
+ <20150416161049.GB12732@n2100.arm.linux.org.uk> <552FE447.6020001@mentor.com>
+Message-ID: <2997269.UTdCCDvBHc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2015 10:41 AM, Sebastian Hesselbarth wrote:
-> On 04/16/2015 03:10 PM, Ezequiel Garcia wrote:
->> On 04/15/2015 04:11 PM, Sebastian Hesselbarth wrote:
->>> On 15.04.2015 19:24, Antoine Tenart wrote:
->>>> Rework the pxa3xx_nand driver to allow using functions exported by the
->>>> nand framework to detect the flash and to configure the timings.
->>>>
->>>> Because this driver supports some non-ONFI devices, we also keep the
->>>> custom timing setup of this driver so these devices won't break.
->>>>
->>>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->>>> ---
->>> [...]
->>> How about we get rid of the driver specific timings completely
->>> and pick up the best onfi timing match instead? The nand_ids table
->>> allows for a default_onfi_timing parameter even if onfi itself is
->>> not supported.
->>>
->>> For generic flash, i.e. no specific entry in the nand_ids table,
->>> we either choose onfi mode 0 (most conservative) or an even slower
->>> one.
->>>
->>
->> I think Robert mentioned [1] that using "ONFI default timings" on
->> non-ONFI devices didn't work for him.
->>
->> [1] https://lkml.org/lkml/2015/3/8/124
+On Thursday 16 April 2015 11:33:11 Nathan Lynch wrote:
 > 
-> Ok, I see. But there is still the option to pass board specific
-> timings with driver's platform_data. We could use
+> if I do 'make arch/arm/vdso/' but otherwise the build system doesn't
+> seem to enter that directory here.
 > 
-> (a) pdata timings if passed
-> (b) onfi timings if available
-> (c) equivalent onfi timings if set
-> (d) conservative equivalent onfi timings otherwise
+> Still looking into it though.
 > 
 
-Right, using platform_data sounds like a nice compromise solution.
-I'm willing to accept this series with the current timing rework; and
-leave the timing setup in-driver replacement for followup patches.
+Ah, my mistake. I typed 'make arch/arm/vdso' and expected the files
+to all be left out, but instead the way the Makefile is written, it
+does not enter the directory at all when VDSO is turned off.
 
-> All we need is a function to convert sdr_timings to sane driver
-> timings. And we really need to split this patch into tiny pieces
-> otherwise it is not reviewable - or at least I need a full overview
-> about the driver first.
-> 
+I tried it again now, building the kernel normally and that works, so
 
-I think that's a bit of a different issue. This patch seems to be doing
-two things: it removes the in-driver flash detection *and* reworks
-timing setup.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-How about we split this in two or even three patches? Along these lines:
-1) introduce timing helpers, 2) rework timing setup, 3) remove in-driver
-flash detection. Not sure how feasible it is.
-
-> Also, as soon as Robert moves pxa3xx boards fully to DT, we'll loose
-> the pdata timings option above. *sigh*
-> 
-
-Well, such move would include proper timing DT properties for non-ONFI
-devices.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+	Arn
