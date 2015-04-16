@@ -1,124 +1,34 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 16 Apr 2015 05:16:02 -0700
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <552F9F60.7090406@eu.citrix.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
- <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
- <552E9E8D.1080000@eu.citrix.com>
- <1429119688.7346.123.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504151846110.7690@kaball.uk.xensource.com>
- <1429121867.7346.136.camel@edumazet-glaptop2.roam.corp.google.com>
- <552F9F60.7090406@eu.citrix.com>
-Message-ID: <1429186562.7346.184.camel@edumazet-glaptop2.roam.corp.google.com>
+From: weiyj_lk@163.com (weiyj_lk at 163.com)
+Date: Thu, 16 Apr 2015 20:18:02 +0800
+Subject: [PATCH] ASoC: samsung: s3c24xx-i2s: Fix return value check in
+ s3c24xx_iis_dev_probe()
+Message-ID: <1429186682-20629-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-04-16 at 12:39 +0100, George Dunlap wrote:
-> On 04/15/2015 07:17 PM, Eric Dumazet wrote:
-> > Do not expect me to fight bufferbloat alone. Be part of the challenge,
-> > instead of trying to get back to proven bad solutions.
-> 
-> I tried that.  I wrote a description of what I thought the situation
-> was, so that you could correct me if my understanding was wrong, and
-> then what I thought we could do about it.  You apparently didn't even
-> read it, but just pointed me to a single cryptic comment that doesn't
-> give me enough information to actually figure out what the situation is.
-> 
-> We all agree that bufferbloat is a problem for everybody, and I can
-> definitely understand the desire to actually make the situation better
-> rather than dying the death of a thousand exceptions.
-> 
-> If you want help fighting bufferbloat, you have to educate people to
-> help you; or alternately, if you don't want to bother educating people,
-> you have to fight it alone -- or lose the battle due to having a
-> thousand exceptions.
-> 
-> So, back to TSQ limits.  What's so magical about 2 packets being *in the
-> device itself*?  And what does 1ms, or 2*64k packets (the default for
-> tcp_limit_output_bytes), have anything to do with it?
-> 
-> Your comment lists three benefits:
-> 1. better RTT estimation
-> 2. faster recovery
-> 3. high rates
-> 
-> #3 is just marketing fluff; it's also contradicted by the statement that
-> immediately follows it -- i.e., there are drivers for which the
-> limitation does *not* give high rates.
-> 
-> #1, as far as I can tell, has to do with measuring the *actual* minimal
-> round trip time of an empty pipe, rather than the round trip time you
-> get when there's 512MB of packets in the device buffer.  If a device has
-> a large internal buffer, then having a large number of packets
-> outstanding means that the measured RTT is skewed.
-> 
-> The goal here, I take it, is to have this "pipe" *exactly* full; having
-> it significantly more than "full" is what leads to bufferbloat.
-> 
-> #2 sounds like you're saying that if there are too many packets
-> outstanding when you discover that you need to adjust things, that it
-> takes a long time for your changes to have an effect; i.e., if you have
-> 5ms of data in the pipe, it will take at least 5ms for your reduced
-> transmmission rate to actually have an effect.
-> 
-> Is that accurate, or have I misunderstood something?
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-#2 means that :
+In case of error, the function devm_ioremap_resource() returns
+ERR_PTR() and never returns NULL. The NULL test in the return
+value check should be replaced with IS_ERR().
 
-If you have an outstanding queue of 500 packets for a flow in qdisc.
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ sound/soc/samsung/s3c24xx-i2s.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-A rtx has to be done, because we receive a SACK.
-
-The rtx is queued _after_ the previous 500 packets.
-
-500 packets have to be drained before rtx can be sent and eventually
-reach destination.
-
-
-These 500 packets will likely be dropped because the destination cannot
-process them before the rtx.
-
-2 TSO packets are already 90 packets (MSS=1448). It is not small, but a
-good compromise allowing line rate even on 40Gbit NIC.
-
-
-#1 is not marketing. It is hugely relevant.
-
-You might use cubic as the default congestion control, you have to
-understand we work hard on delay based cc, as losses are no longer a way
-to measure congestion in modern networks.
-
-Vegas and delay gradient congestion depends on precise RTT measures.
-
-I added usec RTT estimations (instead of jiffies based rtt samples) to
-increase resolution by 3 order of magnitude, not for marketing, but
-because it had to be done when DC communications have typical rtt of 25
-usec these days.
-
-And jitter in host queues is not nice and must be kept at the minimum.
-
-You do not have the whole picture, but this tight bufferbloat control is
-one step before we can replace cubic by new upcoming cc, that many
-companies are actively developing and testing.
-
-The steps are the following :
-
-1) TCP Small queues
-2) FQ/pacing
-3) TSO auto sizing
-3) usec rtt estimations
-4) New revolutionary cc module currently under test at Google,
-   but others have alternatives.
-
-
-The fact that few drivers have bugs should not stop this effort.
-
-If you guys are in the Bay area, we would be happy to host a meeting
-where we can present you how our work reduced packet drops in our
-networks by 2 order of magnitude, and increased capacity by 40 or 50%.
+diff --git a/sound/soc/samsung/s3c24xx-i2s.c b/sound/soc/samsung/s3c24xx-i2s.c
+index 326d3c3..5bf7236 100644
+--- a/sound/soc/samsung/s3c24xx-i2s.c
++++ b/sound/soc/samsung/s3c24xx-i2s.c
+@@ -461,8 +461,8 @@ static int s3c24xx_iis_dev_probe(struct platform_device *pdev)
+ 		return -ENOENT;
+ 	}
+ 	s3c24xx_i2s.regs = devm_ioremap_resource(&pdev->dev, res);
+-	if (s3c24xx_i2s.regs == NULL)
+-		return -ENXIO;
++	if (IS_ERR(s3c24xx_i2s.regs))
++		return PTR_ERR(s3c24xx_i2s.regs);
+ 
+ 	s3c24xx_i2s_pcm_stereo_out.dma_addr = res->start + S3C2410_IISFIFO;
+ 	s3c24xx_i2s_pcm_stereo_in.dma_addr = res->start + S3C2410_IISFIFO;
