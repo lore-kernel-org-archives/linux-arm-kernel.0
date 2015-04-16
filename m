@@ -1,27 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Apr 2015 19:14:53 +0200
-Subject: [PATCH] ARM: VDSO: depend on CPU_V7
-In-Reply-To: <552FE447.6020001@mentor.com>
-References: <1428529265-26772-1-git-send-email-nathan_lynch@mentor.com>
- <20150416161049.GB12732@n2100.arm.linux.org.uk> <552FE447.6020001@mentor.com>
-Message-ID: <2997269.UTdCCDvBHc@wuerfel>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 16 Apr 2015 13:17:32 -0400
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <20150416152121.GE819@e104818-lin.cambridge.arm.com>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
+ <20150414163613.GM28709@leverpostej>
+ <07185B2C-3F37-4E70-9096-1EF5EA8D68CE@codeaurora.org>
+ <20150414211720.GA56647@MBP>
+ <CAF6AEGtoxNrCoxT5n0CXmKMnL-YprJ3DkAuM4Myi87WMxPqBGw@mail.gmail.com>
+ <20150415133403.GB26099@e104818-lin.cambridge.arm.com>
+ <CAF6AEGucYT4LHkFggR0fO_c7gZe7hD7STx1xwKrOvwsnnFbw7Q@mail.gmail.com>
+ <20150416152121.GE819@e104818-lin.cambridge.arm.com>
+Message-ID: <CAF6AEGt3bf70MUWFU_kqtc8KDR09tMUCkXbqOq0SpOXU44moTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 April 2015 11:33:11 Nathan Lynch wrote:
-> 
-> if I do 'make arch/arm/vdso/' but otherwise the build system doesn't
-> seem to enter that directory here.
-> 
-> Still looking into it though.
-> 
+On Thu, Apr 16, 2015 at 11:21 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, Apr 15, 2015 at 11:01:17AM -0400, Rob Clark wrote:
+>> On Wed, Apr 15, 2015 at 9:34 AM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > On Tue, Apr 14, 2015 at 05:48:48PM -0400, Rob Clark wrote:
+>> >> Just speaking as an outsider to this topic, but seems like most/all
+>> >> tablets/phones/etc ship with signed firmware.  Which means for most of
+>> >> the population, upgrading the firmware to a new version which did
+>> >> support the standard (assuming it existed), isn't really an option on
+>> >> our devices, any more than fixing buggy acpi tables is on our
+>> >> laptops..
+>> >
+>> > I wouldn't expect most population to build their own kernels on
+>> > tablets/phones. And even if you could install a custom kernel, mainline
+>> > rarely runs on such devices because of tons of out of tree patches (just
+>> > look at the Nexus 9 patches that Kumar pointed at; even ignoring the
+>> > booting protocol they are extremely far from an upstreamable form).
+>>
+>> my point being, that it happens some times.. for example John Stultz's
+>> work on nexus7:
+>>
+>> https://plus.google.com/111524780435806926688/posts/DzvpMLmzQiQ
+>>
+>> If this had been a year or two in the future and on some 64b
+>> snapdragon, and support for devices with non-PSCI fw is rejected, then
+>> he'd be stuck.
+>>
+>> There are folks who are working to get saner, more-upstream kernels
+>> working on devices.. and improving kernel infrastructure for
+>> device-needs (well, in my neck of the woods, there is drm/kms atomic
+>> and dsi/panel framework stuff.. I'm sure other similar things in other
+>> kernel domains).  And it seems like that is a good thing to encourage,
+>> rather than stymie.
+>
+> I'm not looking to discourage individuals trying to get upstream support
+> for older boards. Should the need arise, we'll look at options which may
+> or may not include kernel changes (e.g. wrap the kernel in a shim).
 
-Ah, my mistake. I typed 'make arch/arm/vdso' and expected the files
-to all be left out, but instead the way the Makefile is written, it
-does not enter the directory at all when VDSO is turned off.
+I had wondered about that, but afaiu psci is a smc interface, and I
+would assume bootloader drops you out of secure mode before entering
+the kernel or whatever comes after first stage bootloader if you are
+chain-loading?  So wasn't sure even how that could work..   (ofc, well
+outside of my areas so I could be quite off base)
 
-I tried it again now, building the kernel normally and that works, so
+If there is a workaround, then I am much less concerned, and would
+rather talk about that :-)
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> But I'm definitely going to discourage companies like Qualcomm
+> deliberately ignoring the existing booting protocols while trying to get
+> their code upstream. This patch series is posted by Qualcomm without
+> providing any technical reason on why they don't want to/couldn't use
+> PSCI (well, I guess there is no technical reason but they may not care
+> much about mainline either).
 
-	Arn
+Sure.. just trying to make sure the wrong people don't end up being
+the ones that suffer.  I would assume/expect that it is at least
+possible for qcom to change firmware/bootloader for their dev boards
+and future devices and whatnot, whether they grumble about it or not.
+But I guess most of what the general public has are devices w/ signed
+fw, which is why "go fix your firmware" is an option that sets off
+alarm bells for me.
+
+I guess the first device where this will matter to me and a large
+group of community folks would be the dragonboard 410c..  *hopefully*
+it does not require signed firmware or at least qcom could make
+available signed firmware which supports psci..
+
+BR,
+-R
+
+> --
+> Catalin
