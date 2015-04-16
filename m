@@ -1,36 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
+From: maxime.coquelin@st.com (Maxime Coquelin)
 Date: Thu, 16 Apr 2015 11:42:08 +0200
-Subject: [PATCH 2/4] ARM: multi_v7_defconfig: enable UniPhier SoC family
-In-Reply-To: <1429170038-16757-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
- <1429170038-16757-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <3561768.u8t9ftxvsL@wuerfel>
+Subject: Allowing reset controllers before SMP initialization (on ARM)?
+In-Reply-To: <2592960.UsK4Hr7GSl@wuerfel>
+References: <552F0786.2000505@gmail.com> <2592960.UsK4Hr7GSl@wuerfel>
+Message-ID: <552F83F0.1090403@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 April 2015 16:40:36 Masahiro Yamada wrote:
-> Add UniPhier, a new citizen in the ARM multi platform.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index d7f038d..24005cf 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -81,6 +81,7 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
->  CONFIG_ARCH_TEGRA_114_SOC=y
->  CONFIG_ARCH_TEGRA_124_SOC=y
->  CONFIG_TEGRA_EMC_SCALING_ENABLE=y
-> +CONFIG_ARCH_UNIPHIER=y
->  CONFIG_ARCH_U8500=y
->  CONFIG_MACH_HREFV60=y
->  CONFIG_MACH_SNOWBALL=y
-> 
+Hi Florian, Arnd,
 
-Any additional device drivers you need?
+On 04/16/2015 10:04 AM, Arnd Bergmann wrote:
+> On Wednesday 15 April 2015 17:51:18 Florian Fainelli wrote:
+>> Hi,
+>>
+>> In order to support initialization of the secondary core on BCM63138
+>> SoCs, I would want to utilize a reset controller to release the
+>> secondary CPU from reset [1].
+>>
+>> Here are multiple options:
+>>
+>> - expose a custom function which registers the reset controller platform
+>> driver as early as possible, which is probably acceptable, but also
+>> requires the DT machine descriptor to populate the platform bus earlier,
+>> which we could completely avoid
+> I think populating the platform bus earlier is not realistic, that
+> would break lots of existing dependencies. In particular, we can't
+> do it much earlier because it has to be done after the platform bus
+> itself is instantiated.
+>
+>> - have a OF_DECLARE_RESET_CONTROLLER() which is running fairly early
+>> during boot, such that we can utilize reset controllers are early as
+>> possible,  before any initcall level, and before SMP initialization is
+>> kicking in
+> We've added a couple of those, and it could be done here, but putting
+> them in the right order is a bit tricky, and I think we can avoid it.
 
-	Arnd
+I have already proposed a OF_DECLARE_RESET_CONTROLLER() implementation:
+https://lkml.org/lkml/2015/2/20/395
+
+I needed it for the STM32 timers, but it was not accepted.
+Now, I perform the timers reset in the bootloader, but it shouldn't work 
+in your case.
+
+Kind regards,
+Maxime
