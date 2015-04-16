@@ -1,38 +1,35 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 16 Apr 2015 09:40:00 +0200
-Subject: [PATCH 1/1] ARM: dts: Make DP a consumer of DISP1 power domain
- on Exynos5420
-In-Reply-To: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <552F6750.6020306@collabora.co.uk>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 16 Apr 2015 16:40:38 +0900
+Subject: [PATCH 4/4] MAINTAINERS: add myself as ARM/UniPhier maintainer
+In-Reply-To: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1429170038-16757-5-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-On 04/12/2015 10:30 PM, Javier Martinez Canillas wrote:
-> Commit ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
-> added a device node for the Exynos5420 DISP1 power domain but dit not
-> make the DP controller a consumer of that power domain.
-> 
-> This causes an "Unhandled fault: imprecise external abort" error if the
-> exynos-dp driver tries to access the DP controller registers and the PD
-> was turned off. This lead to a kernel panic and a complete system hang.
-> 
-> Make the DP controller device node a consumer of the DISP1 power domain
-> to ensure that the PD is turned on when the exynos-dp driver is probed.
-> 
-> Fixes: ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Any comments about this patch?
-
-It's very trivial but fixes a very important regression on Exynos5420 boards
-with display panel and Peach Pit and Pi have been broken since next-20150401.
-
-This [0] is the Peach Pit boot log with yesteday's linux-next for example.
-
-Best regards,
-Javier
-
-[0]: http://arm-soc.lixom.net/bootlogs/next/next-20150415/pit-arm-exynos_defconfig.html
+diff --git a/MAINTAINERS b/MAINTAINERS
+index d158405c..33804df 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1526,6 +1526,13 @@ F:	drivers/rtc/rtc-ab3100.c
+ F:	drivers/rtc/rtc-coh901331.c
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+ 
++ARM/UNIPHIER ARCHITECTURE
++M:	Masahiro Yamada <yamada.masahiro@socionext.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-uniphier/
++N:	uniphier
++
+ ARM/Ux500 ARM ARCHITECTURE
+ M:	Linus Walleij <linus.walleij@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+1.9.1
