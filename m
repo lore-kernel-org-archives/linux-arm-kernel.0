@@ -1,55 +1,58 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Thu, 16 Apr 2015 12:18:39 -0400
-Subject: [PATCH] ARM: gemini: remove unnecessary mdio-gpio includes
-Message-ID: <1429201119-32167-1-git-send-email-vivien.didelot@savoirfairelinux.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Thu, 16 Apr 2015 11:33:11 -0500
+Subject: [PATCH] ARM: VDSO: depend on CPU_V7
+In-Reply-To: <20150416161049.GB12732@n2100.arm.linux.org.uk>
+References: <1428529265-26772-1-git-send-email-nathan_lynch@mentor.com>
+ <552FD47E.7030107@mentor.com> <3179253.8VITBr4Esl@wuerfel>
+ <20150416161049.GB12732@n2100.arm.linux.org.uk>
+Message-ID: <552FE447.6020001@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the inclusion of linux/mdio-gpio.h in nas4220b, wbd111 and wbd222
-boards since mdio-gpio is not used.
+On 04/16/2015 11:10 AM, Russell King - ARM Linux wrote:
+> On Thu, Apr 16, 2015 at 05:42:18PM +0200, Arnd Bergmann wrote:
+>> On Thursday 16 April 2015 10:25:50 Nathan Lynch wrote:
+>>>> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+>>>> index b7644310236b..b4f92b9a13ac 100644
+>>>> --- a/arch/arm/mm/Kconfig
+>>>> +++ b/arch/arm/mm/Kconfig
+>>>> @@ -827,7 +827,7 @@ config KUSER_HELPERS
+>>>>  
+>>>>  config VDSO
+>>>>       bool "Enable VDSO for acceleration of some system calls"
+>>>> -     depends on AEABI && MMU
+>>>> +     depends on AEABI && MMU && CPU_V7
+>>>>       default y if ARM_ARCH_TIMER
+>>>>       select GENERIC_TIME_VSYSCALL
+>>>>       help
+>>>
+>>> Before I put this in RMK's patch queue I'd prefer to get an ack or more
+>>> details (kernel config, toolchain) on the build failure, since I've been
+>>> unable to recreate it.  Arnd?
+>>>
+>>
+>> Good idea. I checked the patch against the failed randconfig, and must
+>> unfortunately report that it does not fix the problem.
+>>
+>> I'm attaching the .config to this email. Two things to note:
+>>
+>> - this is building for mach-rpc, so CONFIG_CPU_32v3 is enabled, and
+>>   presumably this is required for reproducing the problem, while
+>>   building for ARMv4 as I previously said in error does not cause
+>>   the problem.
+> 
+> Why doesn't it solve the problem?
+> 
+> In your config file, CPU_V7 is not set, so VDSO won't be set either.
+> Are you absolutely sure you tested with the above patch applied?
 
-Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
----
- arch/arm/mach-gemini/board-nas4220b.c | 1 -
- arch/arm/mach-gemini/board-wbd111.c   | 1 -
- arch/arm/mach-gemini/board-wbd222.c   | 1 -
- 3 files changed, 3 deletions(-)
+I'm puzzled as well.  Using this config, I can force the assembler error:
 
-diff --git a/arch/arm/mach-gemini/board-nas4220b.c b/arch/arm/mach-gemini/board-nas4220b.c
-index ca8a25b..18b1279 100644
---- a/arch/arm/mach-gemini/board-nas4220b.c
-+++ b/arch/arm/mach-gemini/board-nas4220b.c
-@@ -18,7 +18,6 @@
- #include <linux/leds.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
--#include <linux/mdio-gpio.h>
- #include <linux/io.h>
- 
- #include <asm/setup.h>
-diff --git a/arch/arm/mach-gemini/board-wbd111.c b/arch/arm/mach-gemini/board-wbd111.c
-index 418188c..14c56f3 100644
---- a/arch/arm/mach-gemini/board-wbd111.c
-+++ b/arch/arm/mach-gemini/board-wbd111.c
-@@ -15,7 +15,6 @@
- #include <linux/input.h>
- #include <linux/skbuff.h>
- #include <linux/gpio_keys.h>
--#include <linux/mdio-gpio.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <asm/mach-types.h>
-diff --git a/arch/arm/mach-gemini/board-wbd222.c b/arch/arm/mach-gemini/board-wbd222.c
-index 266b265..6070282 100644
---- a/arch/arm/mach-gemini/board-wbd222.c
-+++ b/arch/arm/mach-gemini/board-wbd222.c
-@@ -15,7 +15,6 @@
- #include <linux/input.h>
- #include <linux/skbuff.h>
- #include <linux/gpio_keys.h>
--#include <linux/mdio-gpio.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <asm/mach-types.h>
--- 
-2.3.5
+arch/arm/vdso/datapage.S: Assembler messages:
+arch/arm/vdso/datapage.S:13: Error: selected processor does not support
+ARM mode `bx lr'
+
+if I do 'make arch/arm/vdso/' but otherwise the build system doesn't
+seem to enter that directory here.
+
+Still looking into it though.
