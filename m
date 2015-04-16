@@ -1,57 +1,38 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 16 Apr 2015 16:40:34 +0900
-Subject: [PATCH 0/4] ARM: SoC: add a new platform,
- UniPhier (arch/arm/mach-uniphier)
-Message-ID: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 16 Apr 2015 09:56:44 +0200
+Subject: [PATCH 1/2] Documentation: devicetree: root node serial-number
+ property documentation
+In-Reply-To: <1427564371-26039-1-git-send-email-contact@paulk.fr>
+References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
+Message-ID: <f6f4f862c78fa626e7f94bde51eec5b1@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2015-03-28 18:39, Paul Kocialkowski wrote:
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 
-This is an initial series for supporting Socionext UniPhier SoCs,
-based on ARM Cortex-A9, mainly used for digital TVs, video recorders, etc.
+I think this is a worthwhile standardization.
+
+Acked-by: Stefan Agner <stefan@agner.ch>
 
 
-
-Masahiro Yamada (4):
-  ARM: UniPhier: add basic support for UniPhier architecture
-  ARM: multi_v7_defconfig: enable UniPhier SoC family
-  ARM: dts: UniPhier: add support for UniPhier SoCs and boards
-  MAINTAINERS: add myself as ARM/UniPhier maintainer
-
- MAINTAINERS                                  |  7 +++
- arch/arm/Kconfig                             |  2 +
- arch/arm/Makefile                            |  1 +
- arch/arm/boot/dts/Makefile                   |  5 ++
- arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts   | 51 +++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-ld4.dtsi      | 78 +++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts  | 51 +++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-pro4.dtsi     | 85 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts  | 52 +++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld3.dtsi     | 85 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts  | 51 +++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld8.dtsi     | 78 +++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-support-card.dtsi | 39 +++++++++++++
- arch/arm/configs/multi_v7_defconfig          |  1 +
- arch/arm/mach-uniphier/Kconfig               | 11 ++++
- arch/arm/mach-uniphier/Makefile              |  2 +
- arch/arm/mach-uniphier/headsmp.S             | 21 +++++++
- arch/arm/mach-uniphier/platsmp.c             | 78 +++++++++++++++++++++++++
- arch/arm/mach-uniphier/uniphier.c            | 31 ++++++++++
- 19 files changed, 729 insertions(+)
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-support-card.dtsi
- create mode 100644 arch/arm/mach-uniphier/Kconfig
- create mode 100644 arch/arm/mach-uniphier/Makefile
- create mode 100644 arch/arm/mach-uniphier/headsmp.S
- create mode 100644 arch/arm/mach-uniphier/platsmp.c
- create mode 100644 arch/arm/mach-uniphier/uniphier.c
-
--- 
-1.9.1
+> ---
+>  Documentation/devicetree/booting-without-of.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/booting-without-of.txt
+> b/Documentation/devicetree/booting-without-of.txt
+> index 7768518..8b055897 100644
+> --- a/Documentation/devicetree/booting-without-of.txt
+> +++ b/Documentation/devicetree/booting-without-of.txt
+> @@ -828,6 +828,10 @@ address which can extend beyond that limit.
+>    name may clash with standard defined ones, you prefix them with your
+>    vendor name and a comma.
+>  
+> +  Additional properties for the root node:
+> +
+> +    - serial-number : a string representing the board's serial number
+> +
+>    b) The /cpus node
+>  
+>    This node is the parent of all individual CPU nodes. It doesn't
