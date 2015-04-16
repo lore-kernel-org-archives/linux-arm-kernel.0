@@ -1,45 +1,42 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 16 Apr 2015 14:18:06 +0200
-Subject: [PATCH] ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal
- RTC
-In-Reply-To: <20150416065256.53eca7b4@free-electrons.com>
-References: <1429094447-4324-1-git-send-email-gregory.clement@free-electrons.com>
- <20150416065256.53eca7b4@free-electrons.com>
-Message-ID: <20150416121806.GE13105@lunn.ch>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 16 Apr 2015 14:22:38 +0200
+Subject: [PATCH] usb: gadget: xudc: fix return value check in xudc_probe()
+In-Reply-To: <1429186650-20465-1-git-send-email-weiyj_lk@163.com>
+References: <1429186650-20465-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <f03a06ba-a2e3-41f6-80da-fb376ced9af6@BY2FFO11FD042.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 06:52:56AM +0200, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
+On 04/16/2015 02:17 PM, weiyj_lk at 163.com wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> On Wed, 15 Apr 2015 12:40:47 +0200, Gregory CLEMENT wrote:
-> > There is no crystal connected to the internal RTC on the Open Block
-> > AX3. So let's disable it in order to prevent the kernel probing the
-> > driver uselessly. Eventually this patches removes the following
-> > warning message from the boot log:
-> > "rtc-mv d0010300.rtc: internal RTC not ticking"
-> > 
-> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > Cc: <stable@vger.kernel.org> # v3.8 +
+> In case of error, the function devm_ioremap_resource() returns
+> ERR_PTR() and never returns NULL. The NULL test in the return
+> value check should be replaced with IS_ERR().
 > 
-> If an external crystal is needed on the board for the internal RTC,
-> then shouldn't instead the RTC have status = "disabled" in the
-> SoC-level .dtsi, and each board enabling it in its own
-> specific .dts, like we do for all other hardware blocks that
-> require/use external components/connexions?
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  drivers/usb/gadget/udc/udc-xilinx.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Or, because the AX3 appears to be the only board in this case, we
-> decide to factorize enabling the RTC in the .dtsi, and leave it as a
-> special case to handle in the AX3 .dts ?
+> diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
+> index dd3e9fd..cfe0349 100644
+> --- a/drivers/usb/gadget/udc/udc-xilinx.c
+> +++ b/drivers/usb/gadget/udc/udc-xilinx.c
+> @@ -2071,8 +2071,8 @@ static int xudc_probe(struct platform_device *pdev)
+>  	/* Map the registers */
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	udc->addr = devm_ioremap_resource(&pdev->dev, res);
+> -	if (!udc->addr)
+> -		return -ENOMEM;
+> +	if (IS_ERR(udc->addr))
+> +		return PTR_ERR(udc->addr);
+>  
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0) {
+> 
 
-Hi Thomas
+Reviewed-by: Michal Simek <michal.simek@xilinx.com>
 
-Experience from Kirkwood is that the majority of boards use the
-internal RTC. Not having a crystal is the exception. So think default
-enabled makes sense.
-
-The only side affect of having the RTC enabled when there is no
-crystal is the warning message. It makes no difference to the active
-RTC on the i2c bus, it becomes rtc0.
-
-    Andrew
+Thanks,
+Michal
