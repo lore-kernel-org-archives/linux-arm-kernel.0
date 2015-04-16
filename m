@@ -1,90 +1,41 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 16 Apr 2015 13:17:32 -0400
-Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
-In-Reply-To: <20150416152121.GE819@e104818-lin.cambridge.arm.com>
-References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
- <20150414163613.GM28709@leverpostej>
- <07185B2C-3F37-4E70-9096-1EF5EA8D68CE@codeaurora.org>
- <20150414211720.GA56647@MBP>
- <CAF6AEGtoxNrCoxT5n0CXmKMnL-YprJ3DkAuM4Myi87WMxPqBGw@mail.gmail.com>
- <20150415133403.GB26099@e104818-lin.cambridge.arm.com>
- <CAF6AEGucYT4LHkFggR0fO_c7gZe7hD7STx1xwKrOvwsnnFbw7Q@mail.gmail.com>
- <20150416152121.GE819@e104818-lin.cambridge.arm.com>
-Message-ID: <CAF6AEGt3bf70MUWFU_kqtc8KDR09tMUCkXbqOq0SpOXU44moTg@mail.gmail.com>
+From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
+Date: Thu, 16 Apr 2015 19:19:14 +0200
+Subject: [PATCH v4 0/2] ARM: at91/dt: add support for at91-kizboxmini
+Message-ID: <1429204756-26749-1-git-send-email-g.portay@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 11:21 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Wed, Apr 15, 2015 at 11:01:17AM -0400, Rob Clark wrote:
->> On Wed, Apr 15, 2015 at 9:34 AM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > On Tue, Apr 14, 2015 at 05:48:48PM -0400, Rob Clark wrote:
->> >> Just speaking as an outsider to this topic, but seems like most/all
->> >> tablets/phones/etc ship with signed firmware.  Which means for most of
->> >> the population, upgrading the firmware to a new version which did
->> >> support the standard (assuming it existed), isn't really an option on
->> >> our devices, any more than fixing buggy acpi tables is on our
->> >> laptops..
->> >
->> > I wouldn't expect most population to build their own kernels on
->> > tablets/phones. And even if you could install a custom kernel, mainline
->> > rarely runs on such devices because of tons of out of tree patches (just
->> > look at the Nexus 9 patches that Kumar pointed at; even ignoring the
->> > booting protocol they are extremely far from an upstreamable form).
->>
->> my point being, that it happens some times.. for example John Stultz's
->> work on nexus7:
->>
->> https://plus.google.com/111524780435806926688/posts/DzvpMLmzQiQ
->>
->> If this had been a year or two in the future and on some 64b
->> snapdragon, and support for devices with non-PSCI fw is rejected, then
->> he'd be stuck.
->>
->> There are folks who are working to get saner, more-upstream kernels
->> working on devices.. and improving kernel infrastructure for
->> device-needs (well, in my neck of the woods, there is drm/kms atomic
->> and dsi/panel framework stuff.. I'm sure other similar things in other
->> kernel domains).  And it seems like that is a good thing to encourage,
->> rather than stymie.
->
-> I'm not looking to discourage individuals trying to get upstream support
-> for older boards. Should the need arise, we'll look at options which may
-> or may not include kernel changes (e.g. wrap the kernel in a shim).
+Hi,
 
-I had wondered about that, but afaiu psci is a smc interface, and I
-would assume bootloader drops you out of secure mode before entering
-the kernel or whatever comes after first stage bootloader if you are
-chain-loading?  So wasn't sure even how that could work..   (ofc, well
-outside of my areas so I could be quite off base)
+Here are two patches to bring support for a new hardware based on SAM9G25 SoC.
 
-If there is a workaround, then I am much less concerned, and would
-rather talk about that :-)
+The first one adds the PIN controller definition for PWM0.
+The second defines the new board.
 
-> But I'm definitely going to discourage companies like Qualcomm
-> deliberately ignoring the existing booting protocols while trying to get
-> their code upstream. This patch series is posted by Qualcomm without
-> providing any technical reason on why they don't want to/couldn't use
-> PSCI (well, I guess there is no technical reason but they may not care
-> much about mainline either).
+Changes since v1:
+- drop useless comments
+- move pwm0 pinctrl's node close to tcb0
+- drop ek boards from compatible machine
+- add at91sam9g25 board to compatible machine
 
-Sure.. just trying to make sure the wrong people don't end up being
-the ones that suffer.  I would assume/expect that it is at least
-possible for qcom to change firmware/bootloader for their dev boards
-and future devices and whatnot, whether they grumble about it or not.
-But I guess most of what the general public has are devices w/ signed
-fw, which is why "go fix your firmware" is an option that sets off
-alarm bells for me.
+Changes since v2:
+- update to v4.0
+- fix alphabetical order between gpio_keys and pwm_leds
 
-I guess the first device where this will matter to me and a large
-group of community folks would be the dragonboard 410c..  *hopefully*
-it does not require signed firmware or at least qcom could make
-available signed firmware which supports psci..
+Changes since v3:
+- add num-ports = <1> attribute to ohci node
 
-BR,
--R
+PS: My apologies for this last minute update.
 
-> --
-> Catalin
+Ga?l PORTAY (2):
+  ARM: at91/dt: sam9x5: add pinctrl for pwm0
+  ARM: at91/dt: add support for kizboxmini
+
+ arch/arm/boot/dts/Makefile            |   1 +
+ arch/arm/boot/dts/at91-kizboxmini.dts | 130 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi     |  46 ++++++++++++
+ 3 files changed, 177 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
+
+-- 
+1.9.3
