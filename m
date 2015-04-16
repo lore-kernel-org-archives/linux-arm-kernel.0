@@ -1,131 +1,44 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 16 Apr 2015 17:04:00 +0200
-Subject: [PATCH] dmaengine: at_xdmac: fix slave configuration issue
-Message-ID: <1429196640-8703-1-git-send-email-ludovic.desroches@atmel.com>
+From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
+Date: Thu, 16 Apr 2015 17:08:17 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable shmobile r8a7778 (M1A)
+Message-ID: <1429196897-18822-1-git-send-email-ulrich.hecht+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When doing the slave configuration, an error is returned if the maxburst
-value is not supported. The bug comes from the fact that we always check
-the maxburst for both directions but in the case of an unidirectional
-channel, only one is set.
+Also enables RTC (RX8581) and camera (ML86V7667) drivers as modules.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: <stable@vger.kernel.org> # 3.19 and later
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 ---
- drivers/dma/at_xdmac.c | 97 +++++++++++++++++++++++++++-----------------------
- 1 file changed, 52 insertions(+), 45 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index d9891d3..30e161b 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -501,54 +501,61 @@ static int at_xdmac_set_slave_config(struct dma_chan *chan,
- 	u8 dwidth;
- 	int csize;
- 
--	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] =
--		AT91_XDMAC_DT_PERID(atchan->perid)
--		| AT_XDMAC_CC_DAM_INCREMENTED_AM
--		| AT_XDMAC_CC_SAM_FIXED_AM
--		| AT_XDMAC_CC_DIF(atchan->memif)
--		| AT_XDMAC_CC_SIF(atchan->perif)
--		| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
--		| AT_XDMAC_CC_DSYNC_PER2MEM
--		| AT_XDMAC_CC_MBSIZE_SIXTEEN
--		| AT_XDMAC_CC_TYPE_PER_TRAN;
--	csize = at_xdmac_csize(sconfig->src_maxburst);
--	if (csize < 0) {
--		dev_err(chan2dev(chan), "invalid src maxburst value\n");
--		return -EINVAL;
--	}
--	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_CSIZE(csize);
--	dwidth = ffs(sconfig->src_addr_width) - 1;
--	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
--
--
--	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] =
--		AT91_XDMAC_DT_PERID(atchan->perid)
--		| AT_XDMAC_CC_DAM_FIXED_AM
--		| AT_XDMAC_CC_SAM_INCREMENTED_AM
--		| AT_XDMAC_CC_DIF(atchan->perif)
--		| AT_XDMAC_CC_SIF(atchan->memif)
--		| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
--		| AT_XDMAC_CC_DSYNC_MEM2PER
--		| AT_XDMAC_CC_MBSIZE_SIXTEEN
--		| AT_XDMAC_CC_TYPE_PER_TRAN;
--	csize = at_xdmac_csize(sconfig->dst_maxburst);
--	if (csize < 0) {
--		dev_err(chan2dev(chan), "invalid src maxburst value\n");
--		return -EINVAL;
-+	if (sconfig->src_addr) {
-+		atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] =
-+			AT91_XDMAC_DT_PERID(atchan->perid)
-+			| AT_XDMAC_CC_DAM_INCREMENTED_AM
-+			| AT_XDMAC_CC_SAM_FIXED_AM
-+			| AT_XDMAC_CC_DIF(atchan->memif)
-+			| AT_XDMAC_CC_SIF(atchan->perif)
-+			| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
-+			| AT_XDMAC_CC_DSYNC_PER2MEM
-+			| AT_XDMAC_CC_MBSIZE_SIXTEEN
-+			| AT_XDMAC_CC_TYPE_PER_TRAN;
-+		csize = at_xdmac_csize(sconfig->src_maxburst);
-+		if (csize < 0) {
-+			dev_err(chan2dev(chan), "invalid src maxburst value\n");
-+			return -EINVAL;
-+		}
-+		atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_CSIZE(csize);
-+		dwidth = ffs(sconfig->src_addr_width) - 1;
-+		atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
-+		/* Src addr is needed to configure the link list descriptor. */
-+		atchan->per_src_addr = sconfig->src_addr;
-+
-+		dev_dbg(chan2dev(chan),
-+			"%s: cfg[dev2mem]=0x%08x, per_src_addr=0x%08x\n",
-+			__func__, atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG],
-+			atchan->per_src_addr);
- 	}
--	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_CSIZE(csize);
--	dwidth = ffs(sconfig->dst_addr_width) - 1;
--	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
- 
--	/* Src and dst addr are needed to configure the link list descriptor. */
--	atchan->per_src_addr = sconfig->src_addr;
--	atchan->per_dst_addr = sconfig->dst_addr;
-+	if (sconfig->dst_addr) {
-+		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] =
-+			AT91_XDMAC_DT_PERID(atchan->perid)
-+			| AT_XDMAC_CC_DAM_FIXED_AM
-+			| AT_XDMAC_CC_SAM_INCREMENTED_AM
-+			| AT_XDMAC_CC_DIF(atchan->perif)
-+			| AT_XDMAC_CC_SIF(atchan->memif)
-+			| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
-+			| AT_XDMAC_CC_DSYNC_MEM2PER
-+			| AT_XDMAC_CC_MBSIZE_SIXTEEN
-+			| AT_XDMAC_CC_TYPE_PER_TRAN;
-+		csize = at_xdmac_csize(sconfig->dst_maxburst);
-+		if (csize < 0) {
-+			dev_err(chan2dev(chan), "invalid src maxburst value\n");
-+			return -EINVAL;
-+		}
-+		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_CSIZE(csize);
-+		dwidth = ffs(sconfig->dst_addr_width) - 1;
-+		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
-+		/* Dst addr is needed to configure the link list descriptor. */
-+		atchan->per_dst_addr = sconfig->dst_addr;
- 
--	dev_dbg(chan2dev(chan),
--		"%s: cfg[dev2mem]=0x%08x, cfg[mem2dev]=0x%08x, per_src_addr=0x%08x, per_dst_addr=0x%08x\n",
--		__func__, atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG],
--		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG],
--		atchan->per_src_addr, atchan->per_dst_addr);
-+		dev_dbg(chan2dev(chan),
-+			"%s: cfg[mem2dev]=0x%08x, per_dst_addr=0x%08x\n",
-+			__func__, atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG],
-+			atchan->per_dst_addr);
-+	}
- 
- 	return 0;
- }
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 06075b6..212199a 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -67,6 +67,7 @@ CONFIG_ARCH_EMEV2=y
+ CONFIG_ARCH_R7S72100=y
+ CONFIG_ARCH_R8A73A4=y
+ CONFIG_ARCH_R8A7740=y
++CONFIG_ARCH_R8A7778=y
+ CONFIG_ARCH_R8A7779=y
+ CONFIG_ARCH_R8A7790=y
+ CONFIG_ARCH_R8A7791=y
+@@ -377,6 +378,7 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
+ CONFIG_VIDEO_RENESAS_VSP1=m
+ # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+ CONFIG_VIDEO_ADV7180=m
++CONFIG_VIDEO_ML86V7667=m
+ CONFIG_DRM=y
+ CONFIG_DRM_RCAR_DU=m
+ CONFIG_DRM_TEGRA=y
+@@ -500,6 +502,7 @@ CONFIG_RTC_DRV_SUN6I=y
+ CONFIG_RTC_DRV_SUNXI=y
+ CONFIG_RTC_DRV_MV=y
+ CONFIG_RTC_DRV_TEGRA=y
++CONFIG_RTC_DRV_RX8581=m
+ CONFIG_DMADEVICES=y
+ CONFIG_DW_DMAC=y
+ CONFIG_MV_XOR=y
 -- 
-2.2.0
+2.3.5
