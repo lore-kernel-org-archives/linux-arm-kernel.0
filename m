@@ -1,70 +1,59 @@
-From: george.dunlap@eu.citrix.com (George Dunlap)
-Date: Thu, 16 Apr 2015 12:39:12 +0100
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <1429121867.7346.136.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
- <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
- <552E9E8D.1080000@eu.citrix.com>
- <1429119688.7346.123.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504151846110.7690@kaball.uk.xensource.com>
- <1429121867.7346.136.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <552F9F60.7090406@eu.citrix.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 16 Apr 2015 12:47:50 +0100
+Subject: [PATCH RESEND] Doc: dt: arch_timer: discourage clock-frequency use
+In-Reply-To: <CAL_JsqJfyknhZxGvbWcj1Vj1FGRt40qT9b=xrbhm0wfu-BduTw@mail.gmail.com>
+References: <1426874267-24413-1-git-send-email-mark.rutland@arm.com>
+ <CAL_JsqJfyknhZxGvbWcj1Vj1FGRt40qT9b=xrbhm0wfu-BduTw@mail.gmail.com>
+Message-ID: <20150416114749.GK2866@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2015 07:17 PM, Eric Dumazet wrote:
-> Do not expect me to fight bufferbloat alone. Be part of the challenge,
-> instead of trying to get back to proven bad solutions.
+> > Rob, are you happy to take this through your tree?
+> 
+> Yes, I'll take it.
 
-I tried that.  I wrote a description of what I thought the situation
-was, so that you could correct me if my understanding was wrong, and
-then what I thought we could do about it.  You apparently didn't even
-read it, but just pointed me to a single cryptic comment that doesn't
-give me enough information to actually figure out what the situation is.
+Are you still planning on taking this for v4.1? I couldn't spot it in a
+public branch yet.
 
-We all agree that bufferbloat is a problem for everybody, and I can
-definitely understand the desire to actually make the situation better
-rather than dying the death of a thousand exceptions.
+Mark
 
-If you want help fighting bufferbloat, you have to educate people to
-help you; or alternately, if you don't want to bother educating people,
-you have to fight it alone -- or lose the battle due to having a
-thousand exceptions.
-
-So, back to TSQ limits.  What's so magical about 2 packets being *in the
-device itself*?  And what does 1ms, or 2*64k packets (the default for
-tcp_limit_output_bytes), have anything to do with it?
-
-Your comment lists three benefits:
-1. better RTT estimation
-2. faster recovery
-3. high rates
-
-#3 is just marketing fluff; it's also contradicted by the statement that
-immediately follows it -- i.e., there are drivers for which the
-limitation does *not* give high rates.
-
-#1, as far as I can tell, has to do with measuring the *actual* minimal
-round trip time of an empty pipe, rather than the round trip time you
-get when there's 512MB of packets in the device buffer.  If a device has
-a large internal buffer, then having a large number of packets
-outstanding means that the measured RTT is skewed.
-
-The goal here, I take it, is to have this "pipe" *exactly* full; having
-it significantly more than "full" is what leads to bufferbloat.
-
-#2 sounds like you're saying that if there are too many packets
-outstanding when you discover that you need to adjust things, that it
-takes a long time for your changes to have an effect; i.e., if you have
-5ms of data in the pipe, it will take at least 5ms for your reduced
-transmmission rate to actually have an effect.
-
-Is that accurate, or have I misunderstood something?
-
- -George
+> 
+> Rob
+> 
+> >
+> > Mark.
+> >
+> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/282804.html
+> > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/282830.html
+> >
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> > index 256b4d8..e774128 100644
+> > --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+> > +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> > @@ -17,7 +17,10 @@ to deliver its interrupts via SPIs.
+> >  - interrupts : Interrupt list for secure, non-secure, virtual and
+> >    hypervisor timers, in that order.
+> >
+> > -- clock-frequency : The frequency of the main counter, in Hz. Optional.
+> > +- clock-frequency : The frequency of the main counter, in Hz. Should be present
+> > +  only where necessary to work around broken firmware which does not configure
+> > +  CNTFRQ on all CPUs to a uniform correct value. Use of this property is
+> > +  strongly discouraged; fix your firmware unless absolutely impossible.
+> >
+> >  - always-on : a boolean property. If present, the timer is powered through an
+> >    always-on power domain, therefore it never loses context.
+> > @@ -46,7 +49,8 @@ Example:
+> >
+> >  - compatible : Should at least contain "arm,armv7-timer-mem".
+> >
+> > -- clock-frequency : The frequency of the main counter, in Hz. Optional.
+> > +- clock-frequency : The frequency of the main counter, in Hz. Should be present
+> > +  only when firmware has not configured the MMIO CNTFRQ registers.
+> >
+> >  - reg : The control frame base address.
+> >
+> > --
+> > 1.9.1
+> >
+> 
