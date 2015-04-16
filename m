@@ -1,63 +1,119 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Thu, 16 Apr 2015 17:03:12 -0500
-Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
-In-Reply-To: <CAF6AEGt3bf70MUWFU_kqtc8KDR09tMUCkXbqOq0SpOXU44moTg@mail.gmail.com>
-References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
- <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
- <20150414163613.GM28709@leverpostej>
- <07185B2C-3F37-4E70-9096-1EF5EA8D68CE@codeaurora.org>
- <20150414211720.GA56647@MBP>
- <CAF6AEGtoxNrCoxT5n0CXmKMnL-YprJ3DkAuM4Myi87WMxPqBGw@mail.gmail.com>
- <20150415133403.GB26099@e104818-lin.cambridge.arm.com>
- <CAF6AEGucYT4LHkFggR0fO_c7gZe7hD7STx1xwKrOvwsnnFbw7Q@mail.gmail.com>
- <20150416152121.GE819@e104818-lin.cambridge.arm.com>
- <CAF6AEGt3bf70MUWFU_kqtc8KDR09tMUCkXbqOq0SpOXU44moTg@mail.gmail.com>
-Message-ID: <CAHCPf3uf+VP5NuEnwABQefeLLm07xb1gwa-tNvLGug1j=Wi-Jg@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 17 Apr 2015 00:05:23 +0200
+Subject: [PATCH 1/2] Documentation: devicetree: root node serial-number
+ property documentation
+In-Reply-To: <1429214815.2563.21.camel@collins>
+References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
+ <f6f4f862c78fa626e7f94bde51eec5b1@agner.ch>
+ <1429175421.2483.1.camel@collins>
+ <CAL_JsqKdHQZL5Z6hKgquKihFykX0ZiCDQfeHOfOZWOh2NMg4Rw@mail.gmail.com>
+ <CFEF8F54-7A3E-482C-B295-6A6BC5D837C8@codeaurora.org>
+ <1429199145.2563.9.camel@collins>
+ <F4D05489-ACF0-44BB-AEC7-7E8FB83FAE4C@codeaurora.org>
+ <1429208077.2563.14.camel@collins>
+ <97473e9075df185ab3024db70c471f53@agner.ch>
+ <1429214815.2563.21.camel@collins>
+Message-ID: <6b259907e5f700ca0e49544f34620455@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 2015-04-16 22:06, Paul Kocialkowski wrote:
+> Le jeudi 16 avril 2015 ? 21:40 +0200, Stefan Agner a ?crit :
+>> On 2015-04-16 20:14, Paul Kocialkowski wrote:
+>> > Le jeudi 16 avril 2015 ? 10:53 -0500, Kumar Gala a ?crit :
+>> >> > On Apr 16, 2015, at 10:45 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
+>> >> >
+>> >> > Le jeudi 16 avril 2015 ? 10:23 -0500, Kumar Gala a ?crit :
+>> >> >>> On Apr 16, 2015, at 9:36 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> >> >>>
+>> >> >>> On Thu, Apr 16, 2015 at 4:10 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
+>> >> >>>> Le jeudi 16 avril 2015 ? 09:56 +0200, Stefan Agner a ?crit :
+>> >> >>>>> On 2015-03-28 18:39, Paul Kocialkowski wrote:
+>> >> >>>>>> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+>> >> >>>>>
+>> >> >>>>> I think this is a worthwhile standardization.
+>> >> >>>>>
+>> >> >>>>> Acked-by: Stefan Agner <stefan@agner.ch>
+>> >> >>>>
+>> >> >>>> Thanks! I should also add a commit message in v2 mentioning that this is
+>> >> >>>> already used in open firmware and reported by lshw.
+>> >> >>>
+>> >> >>> With that,
+>> >> >>>
+>> >> >>> Acked-by: Rob Herring <robh@kernel.org>
+>> >> >
+>> >> > [snip]
+>> >> >
+>> >> >> I feel like this is a little lite either in the doc or commit message.
+>> >> >> Is the string completely arbitrary?  Is it meant to match labeling on
+>> >> >> a board or case?  Is this meant to be used by the kernel at all?
+>> >> >
+>> >> > I guess it doesn't really matter what it is, as long as it's a string.
+>> >> > The kernel does not suggest any use for it either, it's just made
+>> >> > available to userspace through cpuinfo.
+>> >> >
+>> >> > Now if there is a particular use for this in user-space, it would have
+>> >> > to match some standards. For instance, it Android, ro.serialno is
+>> >> > usually a 16-bytes (plus one null byte) representation of a 64 bit
+>> >> > number. For USB, I recall it is usually a 32 bytes string (including the
+>> >> > null byte), but may be extended to more.
+>> >> >
+>> >> > What the string actually represents depends and some SOCs have serial
+>> >> > number bytes (I know that omap and sunxi have some for instance, that
+>> >> > are usually used) while other devices may take it from somewhere else.
+>> >> > In any case, it doesn't really matter and is not up to the kernel anyway
+>> >> > since it is just passed through from the bootloader.
+>> >> >
+>> >> > Thus, I don't think it's very relevant to mention it in either the
+>> >> > documentation or the commit message.
+>> >>
+>> >> So you say ?board? in the patch, since it could be SoC specific, we
+>> >> should probably clean up the wording a bit.
+>> >
+>> > It really doesn't matter where the string comes from, what it contains
+>> > or whether some SoCs have provisions to generate one.
+>> > I think board is one the most common words that we can use to describe
+>> > devices. "devices" is also fine, I could go with it if you prefer, but I
+>> > don't really see what it changes.
+>>
+>> There is already something related for SoC's in SoC bus called soc_id,
+>> see
+>> Documentation/ABI/testing/sysfs-devices-soc
+>>
+>> So I would rather prefer that this is more reserved for device/board
+>> serial number...
+> 
+> Again, I don't wish to define what the number represents in the kernel.
+> 
+> It's whatever string the bootloader sends. I know that e.g. on an omap3
+> device, I'll be using this with the ID bits provided by the SoC (maybe
+> only part of them, there are 128 bits available and I like to have 64
+> bit serial numbers). But if you want your device to use something else
+> (e.g. some serial number stored in an external eeprom), it's up to you
+> to decide and in any case, that will be decided at bootloader stage.
 
-On Thu, Apr 16, 2015 at 12:17 PM, Rob Clark <robdclark@gmail.com> wrote:
-> On Thu, Apr 16, 2015 at 11:21 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->
->> But I'm definitely going to discourage companies like Qualcomm
->> deliberately ignoring the existing booting protocols while trying to get
->> their code upstream. This patch series is posted by Qualcomm without
->> providing any technical reason on why they don't want to/couldn't use
->> PSCI (well, I guess there is no technical reason but they may not care
->> much about mainline either).
->
-> Sure.. just trying to make sure the wrong people don't end up being
-> the ones that suffer.  I would assume/expect that it is at least
-> possible for qcom to change firmware/bootloader for their dev boards
-> and future devices and whatnot, whether they grumble about it or not.
-> But I guess most of what the general public has are devices w/ signed
-> fw, which is why "go fix your firmware" is an option that sets off
-> alarm bells for me.
->
-> I guess the first device where this will matter to me and a large
-> group of community folks would be the dragonboard 410c..  *hopefully*
-> it does not require signed firmware or at least qcom could make
-> available signed firmware which supports psci..
+For that ID the soc_id attribute is actually much more appropriate. 
 
-For development boards, one would hope there is a way to sign your own firmware.
-You can't expect - even for a phone SoC - that the development boards require
-entering some kind of Faustian contract for development of low-level
-software. What if
-someone wants to develop a platform that doesn't require signing?
+But if anybody wants to use that as serial-number, fine. I'm not saying
+we should prohibit that.
 
-That said most of these dev boards have completely mangled JTAG anyway, and
-I know Inforce (and Hardkernel, and so on) love their barely-ever-updated custom
-firmware binaries, so..
 
-The best thing would be to pick up one of those boards and port a PSCI firmware
-to it (ATF or your own..) and just embarrass the SoC vendor by having better
-mainline power management support (implemented by 10 lines in a device tree)
-with the complicated code hidden away behind the scenes there, like it
-should have
-been done in the first place..
+> Perhaps it would make sense to provide consistency for this among a
+> particular family of devices (say, devices from the same manufacture or
+> devices using the same SoC). We have already set up such a standard for
+> Allwinner (sunxi) devices, in U-Boot.
 
-Ta.
-Matt Sealey <neko@bakuhatsu.net>
+That is actually exactly my concern. We (Toradex) are a ARM module
+provider which populate SoC's of different vendors. However, we would
+like to keep consistency across modules. If a SoC vendor mandates to use
+the field for the SoC serial number, we end up with different serial
+numbers in that field.
+
+IMHO, the top level serial-number should be used for the board/device.
+
+But if you don't like to define that, it is ok for me. But maybe we
+could just mention soc_id as a possible alternative for SoC serial
+numbers in the documentation?
+
+--
+Stefan
