@@ -1,96 +1,44 @@
-From: Minghuan.Lian@freescale.com (Minghuan.Lian at freescale.com)
-Date: Thu, 16 Apr 2015 02:57:37 +0000
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <20150415173654.431f5d89@arm.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <20150415173654.431f5d89@arm.com>
-Message-ID: <DM2PR0301MB0640576D29E70392C41444DFE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Thu, 16 Apr 2015 14:08:07 +1000
+Subject: [PATCH 0/7] selftests: fixes for installation and cross
+ compilation
+In-Reply-To: <1429051856-14557-1-git-send-email-tyler.baker@linaro.org>
+References: <1429051856-14557-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <1429157287.3464.0.camel@ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Tue, 2015-04-14 at 15:50 -0700, Tyler Baker wrote:
+> This patch set fixes various issues observed when cross building and 
+> installing selftests.
+> 
+> As I began investigating improving the test output format, I performed an 
+> audit of the current tests to ensure all tests were able to execute on various 
+> target architectures. I found that some tests did not install their binaries 
+> and others required directories to be installed to execute properly. There 
+> were also cases in which tests were being installed when they were never built.
+> With this series applied all tests compile when appropriate and install their 
+> output properly.
+> 
+> I have tested this series by building, installing and deploying all selftests 
+> to x86, arm and arm64 targets. 
+> 
+> This series is based on next-20150414
+> 
+> Tyler Baker (7):
+>   selftests: copy TEST_DIRS to INSTALL_PATH
+>   selftests/ftrace: install test.d
+>   selftests/breakpoints: emit skip and omit installation when tests are
+>     not compiled
+>   selftests/kdbus: install kdbus-test
+>   selftests/x86: fix cross build logic
+>   selftests/x86: install tests
+>   selftests/exec: do not install subdir as it is already created
 
-Please see my comments inline
+This series looks good except for 5/7.
 
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Thursday, April 16, 2015 12:37 AM
-> To: Lian Minghuan-B31939
-> Cc: linux-pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284; Zang
-> Roy-R61911; Yoder Stuart-B08248; Bjorn Helgaas; Wood Scott-B07421; linux-
-> arm-kernel at lists.infradead.org; Jason Cooper; Thomas Gleixner
-> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-> 
-> On Wed, 15 Apr 2015 17:49:23 +0800
-> Minghuan Lian <Minghuan.Lian@freescale.com> wrote:
-> 
-> > SMMU of some platforms can only isolate limited device ID.
-> > This may require that all PCI devices share the same ITS device with
-> > the fixed device ID. The patch adds function
-> > arch_msi_share_devid_update used for these platforms to update the
-> > fixed device ID and maximum MSI interrupts number.
-> >
-> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> > ---
-> >  drivers/irqchip/irq-gic-v3-its.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> >
-> > diff --git a/drivers/irqchip/irq-gic-v3-its.c
-> > b/drivers/irqchip/irq-gic-v3-its.c
-> > index d0374a6..be78d0a 100644
-> > --- a/drivers/irqchip/irq-gic-v3-its.c
-> > +++ b/drivers/irqchip/irq-gic-v3-its.c
-> > @@ -1169,6 +1169,15 @@ static int its_get_pci_alias(struct pci_dev *pdev,
-> u16 alias, void *data)
-> >  	return 0;
-> >  }
-> >
-> > +void __weak
-> > +arch_msi_share_devid_update(struct pci_dev *pdev, u32 *dev_id, u32
-> > +*nvesc) {
-> > +	/*
-> > +	 * use PCI_DEVID NOT share device ID as default
-> > +	 * so nothing need to do
-> > +	 */
-> > +}
-> > +
-> 
-> NAK. On top of being ugly as sin, this breaks any form of multiplatform
-> support. No way anything like this is going in. Guys, you really should know
-> better.
-> 
-[Minghuan]  The current ITS MSI will create an individual ITS device for each PCIe device, and use PCI_DEVID as ITS dev_id
-However, out platform only supports  ITS dev_id 0 -63.  A normal PCIe DEVID of 0000:01:00.0 is 256 bigger than 63.
-Besides, because of the limited dev_id number, all the PCIe device will share the same ITS dev. Our platform provides a hardware module LUT to map PCI DEVID to ITS dev_id.  So, when creating ITS device, we need to update dev_id and the nvesc.
-I may change pci_for_each_dma_alias to add a new flag to use alias_bus and alias_devfn. 
-But I also need to update nvesc which should contains all the PCI device MSI/MSIX nvesc and PCIe PME, aerdrv interrupts.
-The main difference is that we need a ITS device to service multiple PCIe devices.
-Could you give me some suggestions how to implement this requirement.
-     
+As Andy says you should just cause all to have no dependencies for !x86.
 
-> >  static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
-> >  			   int nvec, msi_alloc_info_t *info)  { @@ -1185,6
-> +1194,8 @@
-> > static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
-> >  	dev_alias.count = nvec;
-> >
-> >  	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
-> > +	arch_msi_share_devid_update(pdev, &dev_alias.dev_id,
-> > +&dev_alias.count);
-> > +
-> 
-> See the function above? That's where the aliasing should be taken care of.
-> 
-[Minghuan] The alias will use dma_alias_devfn, but it does not contains alias_bus.
-I need to translate PCI_DEVID to a fixed ID.
+Otherwise-acked-by: Michael Ellerman <mpe@ellerman.id.au>
 
-> >  	its = domain->parent->host_data;
-> >
-> >  	its_dev = its_find_device(its, dev_alias.dev_id);
-> 
-> Thanks,
-> 
-> 	M.
-> --
-> Jazz is not dead. It just smells funny.
+cheers
