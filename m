@@ -1,51 +1,52 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Thu, 16 Apr 2015 11:10:21 +0200
-Subject: [PATCH 1/2] Documentation: devicetree: root node serial-number
- property documentation
-In-Reply-To: <f6f4f862c78fa626e7f94bde51eec5b1@agner.ch>
-References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
- <f6f4f862c78fa626e7f94bde51eec5b1@agner.ch>
-Message-ID: <1429175421.2483.1.camel@collins>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 16 Apr 2015 11:12:16 +0200
+Subject: [PATCH v3 0/2] ARM: at91/dt: add support for at91-kizboxmini
+In-Reply-To: <1428929774-8951-1-git-send-email-g.portay@overkiz.com>
+References: <1428929774-8951-1-git-send-email-g.portay@overkiz.com>
+Message-ID: <20150416111216.1c8f19cc@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le jeudi 16 avril 2015 ? 09:56 +0200, Stefan Agner a ?crit :
-> On 2015-03-28 18:39, Paul Kocialkowski wrote:
-> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> 
-> I think this is a worthwhile standardization.
-> 
-> Acked-by: Stefan Agner <stefan@agner.ch>
+On Mon, 13 Apr 2015 14:56:12 +0200
+Ga?l PORTAY <g.portay@overkiz.com> wrote:
 
-Thanks! I should also add a commit message in v2 mentioning that this is
-already used in open firmware and reported by lshw.
+> Hi,
+> 
+> Here are two patches to bring support for a new hardware based on SAM9G25 SoC.
+> 
+> The first one adds the PIN controller definition for PWM0.
+> The second defines the new board.
 
-> > ---
-> >  Documentation/devicetree/booting-without-of.txt | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/booting-without-of.txt
-> > b/Documentation/devicetree/booting-without-of.txt
-> > index 7768518..8b055897 100644
-> > --- a/Documentation/devicetree/booting-without-of.txt
-> > +++ b/Documentation/devicetree/booting-without-of.txt
-> > @@ -828,6 +828,10 @@ address which can extend beyond that limit.
-> >    name may clash with standard defined ones, you prefix them with your
-> >    vendor name and a comma.
-> >  
-> > +  Additional properties for the root node:
-> > +
-> > +    - serial-number : a string representing the board's serial number
-> > +
-> >    b) The /cpus node
-> >  
-> >    This node is the parent of all individual CPU nodes. It doesn't
+To the whole series,
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> 
+> Changes since v1:
+> - drop useless comments
+> - move pwm0 pinctrl's node close to tcb0
+> - drop ek boards from compatible machine
+> - add at91sam9g25 board to compatible machine
+> 
+> Changes since v2:
+> - update to v4.0
+> - fix alphabetical order between gpio_keys and pwm_leds
+> 
+> Best regards,
+> Ga?l PORTAY (2):
+>   ARM: at91/dt: sam9x5: add pinctrl for pwm0
+>   ARM: at91/dt: add support for kizboxmini
+> 
+>  arch/arm/boot/dts/Makefile            |   1 +
+>  arch/arm/boot/dts/at91-kizboxmini.dts | 129 ++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/at91sam9x5.dtsi     |  46 ++++++++++++
+>  3 files changed, 176 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
 > 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150416/02095292/attachment.sig>
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
