@@ -1,85 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 16 Apr 2015 14:45:53 +0200
-Subject: [PATCH] ARM: at91/dt: drop deprecated mainck node from pmc
-In-Reply-To: <1429187145-10741-1-git-send-email-g.portay@overkiz.com>
-References: <1429187145-10741-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <20150416144553.1eed24dc@bbrezillon>
+From: tim@xen.org (Tim Deegan)
+Date: Thu, 16 Apr 2015 14:00:43 +0100
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <552F9F60.7090406@eu.citrix.com>
+References: <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+ <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+ <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
+ <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552E9E8D.1080000@eu.citrix.com>
+ <1429119688.7346.123.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504151846110.7690@kaball.uk.xensource.com>
+ <1429121867.7346.136.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552F9F60.7090406@eu.citrix.com>
+Message-ID: <20150416130043.GL13443@deinos.phlegethon.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Apr 2015 14:25:44 +0200
-Ga?l PORTAY <g.portay@overkiz.com> wrote:
-
-> The clock-frequency property became obsolete since the rework of the main
-> clock driver in 3.16 (see commit 27cb1c2083373a44130d50d4d2fb64cf7eff2d90).
+At 12:39 +0100 on 16 Apr (1429187952), George Dunlap wrote:
+> Your comment lists three benefits:
+> 1. better RTT estimation
+> 2. faster recovery
+> 3. high rates
 > 
-> It now get and uses the clock-frequency from the main_xtal node.
-> 
-> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+> #3 is just marketing fluff; it's also contradicted by the statement that
+> immediately follows it -- i.e., there are drivers for which the
+> limitation does *not* give high rates.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+AFAICT #3 is talking about throughput _under TCP_, where inflating the
+RTT will absolutely cause problems.
 
-> ---
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 6 ------
->  arch/arm/boot/dts/at91sam9rlek.dts          | 6 ------
->  arch/arm/boot/dts/sama5d3xcm.dtsi           | 6 ------
->  3 files changed, 18 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> index fec1fca..1721e9b 100644
-> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> @@ -204,12 +204,6 @@
->  					};
->  				};
->  			};
-> -
-> -			pmc: pmc at fffffc00 {
-> -				main: mainck {
-> -					clock-frequency = <12000000>;
-> -				};
-> -			};
->  		};
->  
->  		nand0: nand at 60000000 {
-> diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
-> index 9be5b54..d9299be3 100644
-> --- a/arch/arm/boot/dts/at91sam9rlek.dts
-> +++ b/arch/arm/boot/dts/at91sam9rlek.dts
-> @@ -181,12 +181,6 @@
->  				};
->  			};
->  
-> -			pmc: pmc at fffffc00 {
-> -				main: mainck {
-> -					clock-frequency = <12000000>;
-> -				};
-> -			};
-> -
->  			watchdog at fffffd40 {
->  				status = "okay";
->  			};
-> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> index 7d6babd..ef404e9 100644
-> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> @@ -67,12 +67,6 @@
->  					rxd3-skew-ps = <400>;
->  				};
->  			};
-> -
-> -			pmc: pmc at fffffc00 {
-> -				main: mainck {
-> -					clock-frequency = <12000000>;
-> -				};
-> -			};
->  		};
->  
->  		nand0: nand at 60000000 {
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Tim.
