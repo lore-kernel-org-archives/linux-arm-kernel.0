@@ -1,75 +1,77 @@
-From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
-Date: Thu, 16 Apr 2015 19:19:15 +0200
-Subject: [PATCH v4 1/2] ARM: at91/dt: sam9x5: add pinctrl for pwm0
-In-Reply-To: <1429204756-26749-1-git-send-email-g.portay@overkiz.com>
-References: <1429204756-26749-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <1429204756-26749-2-git-send-email-g.portay@overkiz.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 16 Apr 2015 11:04:14 -0700
+Subject: Allowing reset controllers before SMP initialization (on ARM)?
+In-Reply-To: <2592960.UsK4Hr7GSl@wuerfel>
+References: <552F0786.2000505@gmail.com> <2592960.UsK4Hr7GSl@wuerfel>
+Message-ID: <CAGVrzca2My1WfhQOR56A7rs16BbPCuH9h3-fGgV-HZ4b0MDUyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defines the pinctrl configurations for PWM0.
+2015-04-16 1:04 GMT-07:00 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 15 April 2015 17:51:18 Florian Fainelli wrote:
+>> Hi,
+>>
+>> In order to support initialization of the secondary core on BCM63138
+>> SoCs, I would want to utilize a reset controller to release the
+>> secondary CPU from reset [1].
+>>
+>> Here are multiple options:
+>>
+>> - expose a custom function which registers the reset controller platform
+>> driver as early as possible, which is probably acceptable, but also
+>> requires the DT machine descriptor to populate the platform bus earlier,
+>> which we could completely avoid
+>
+> I think populating the platform bus earlier is not realistic, that
+> would break lots of existing dependencies. In particular, we can't
+> do it much earlier because it has to be done after the platform bus
+> itself is instantiated.
 
-Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
----
- arch/arm/boot/dts/at91sam9x5.dtsi | 46 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+Agreed, I don't quite like that either.
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index d221179..98977ad 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -694,6 +694,52 @@
- 					};
- 				};
- 
-+				pwm0 {
-+					pinctrl_pwm0_pwm0_0: pwm0_pwm0-0 {
-+						atmel,pins =
-+							<AT91_PIOB 11 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_pwm0_pwm0_1: pwm0_pwm0-1 {
-+						atmel,pins =
-+							<AT91_PIOC 10 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_pwm0_pwm0_2: pwm0_pwm0-2 {
-+						atmel,pins =
-+							<AT91_PIOC 18 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm1_0: pwm0_pwm1-0 {
-+						atmel,pins =
-+							<AT91_PIOB 12 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_pwm0_pwm1_1: pwm0_pwm1-1 {
-+						atmel,pins =
-+							<AT91_PIOC 11 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_pwm0_pwm1_2: pwm0_pwm1-2 {
-+						atmel,pins =
-+							<AT91_PIOC 19 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm2_0: pwm0_pwm2-0 {
-+						atmel,pins =
-+							<AT91_PIOB 13 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_pwm0_pwm2_1: pwm0_pwm2-1 {
-+						atmel,pins =
-+							<AT91_PIOC 20 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm3_0: pwm0_pwm3-0 {
-+						atmel,pins =
-+							<AT91_PIOB 14 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_pwm0_pwm3_1: pwm0_pwm3-1 {
-+						atmel,pins =
-+							<AT91_PIOC 21 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-+					};
-+				};
-+
- 				tcb0 {
- 					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
- 						atmel,pins = <AT91_PIOA 24 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>
+>> - have a OF_DECLARE_RESET_CONTROLLER() which is running fairly early
+>> during boot, such that we can utilize reset controllers are early as
+>> possible,  before any initcall level, and before SMP initialization is
+>> kicking in
+>
+> We've added a couple of those, and it could be done here, but putting
+> them in the right order is a bit tricky, and I think we can avoid it.
+
+Right, not only that, but it appears that the reset controller binding
+has not standardized a "reset-controller" property, so there is any
+good way to scan for all these kinds of controllers in a given Device
+Tree today, other than looking at a #reset-cells property
+presence/absence.
+
+>
+>> - since the code that boots secondary CPUs is relatively unique, even
+>> within the scope of the reset controllers (sequence involves touching
+>> multiple registers), pulling it outside of the reset controller might be
+>> acceptable (there is still some level of sharing though for low-level
+>> indirect read/write operations)
+>
+> Yes, it's a hack, but the SMP code is rather special and a lot of
+> other platforms do similar hacks already. What I'd like to see
+> happen in the long run is more along the lines of:
+
+Right, and even within the context of 63138, bringing-up the secondary
+CPU is about 10 times more lines of code, specific to the CPU complex,
+that are not even shared with the reset of the on-chip peripherals, so
+I can probably stick the low-level routines in a header file and share
+them with not too much gymnastic.
+
+>
+> - Avoid dependencies on the early SMP code, and just set up the
+>   data structures for possible CPUs early, which can be done without
+>   any hardware interaction. Then move the actual CPU enable path
+>   much later in the boot process, possibly combined with the cpuidle
+>   driver.
+
+That sounds like a nice goal, I suppose that as we start standardizing
+on the firmware interface to bring-up secondary cores, that might
+become easier as well.
+
+Thanks for your feedback!
 -- 
-1.9.3
+Florian
