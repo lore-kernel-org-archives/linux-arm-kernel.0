@@ -1,49 +1,97 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Thu, 16 Apr 2015 18:38:01 +0000
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <552FA20E.3060202@arm.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <20150415173654.431f5d89@arm.com>
- <DM2PR0301MB0640576D29E70392C41444DFE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <552F8910.9000701@arm.com>
- <DM2PR0301MB0640C59C08CBEB4F2F392BAEE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <552FA20E.3060202@arm.com>
-Message-ID: <BN3PR0301MB1219F18B03194B3F4E7A5751EAE40@BN3PR0301MB1219.namprd03.prod.outlook.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 16 Apr 2015 13:54:25 -0500
+Subject: [PATCH 1/2] Documentation: devicetree: root node serial-number
+ property documentation
+In-Reply-To: <1429208077.2563.14.camel@collins>
+References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
+ <f6f4f862c78fa626e7f94bde51eec5b1@agner.ch> <1429175421.2483.1.camel@collins>
+ <CAL_JsqKdHQZL5Z6hKgquKihFykX0ZiCDQfeHOfOZWOh2NMg4Rw@mail.gmail.com>
+ <CFEF8F54-7A3E-482C-B295-6A6BC5D837C8@codeaurora.org>
+ <1429199145.2563.9.camel@collins>
+ <F4D05489-ACF0-44BB-AEC7-7E8FB83FAE4C@codeaurora.org>
+ <1429208077.2563.14.camel@collins>
+Message-ID: <B1128C28-AC17-47F6-A64A-FD3197112751@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Minghuan,
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Marc Zyngier
-> Sent: Thursday, April 16, 2015 5:21 PM
-> To: Lian Minghuan-B31939
-> Cc: Jason Cooper; Arnd Bergmann; linux-pci at vger.kernel.org; Will Deacon;
-> Yoder Stuart-B08248; Wood Scott-B07421; Bjorn Helgaas; Hu Mingkai-B21284;
-> Zang Roy-R61911; Thomas Gleixner; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> On Apr 16, 2015, at 1:14 PM, Paul Kocialkowski <contact@paulk.fr> wrote:
 > 
-> Minghuan,
+> Le jeudi 16 avril 2015 ? 10:53 -0500, Kumar Gala a ?crit :
+>>> On Apr 16, 2015, at 10:45 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
+>>> 
+>>> Le jeudi 16 avril 2015 ? 10:23 -0500, Kumar Gala a ?crit :
+>>>>> On Apr 16, 2015, at 9:36 AM, Rob Herring <robherring2@gmail.com> wrote:
+>>>>> 
+>>>>> On Thu, Apr 16, 2015 at 4:10 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
+>>>>>> Le jeudi 16 avril 2015 ? 09:56 +0200, Stefan Agner a ?crit :
+>>>>>>> On 2015-03-28 18:39, Paul Kocialkowski wrote:
+>>>>>>>> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+>>>>>>> 
+>>>>>>> I think this is a worthwhile standardization.
+>>>>>>> 
+>>>>>>> Acked-by: Stefan Agner <stefan@agner.ch>
+>>>>>> 
+>>>>>> Thanks! I should also add a commit message in v2 mentioning that this is
+>>>>>> already used in open firmware and reported by lshw.
+>>>>> 
+>>>>> With that,
+>>>>> 
+>>>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> 
+>>> [snip]
+>>> 
+>>>> I feel like this is a little lite either in the doc or commit message.
+>>>> Is the string completely arbitrary?  Is it meant to match labeling on
+>>>> a board or case?  Is this meant to be used by the kernel at all?
+>>> 
+>>> I guess it doesn't really matter what it is, as long as it's a string.
+>>> The kernel does not suggest any use for it either, it's just made
+>>> available to userspace through cpuinfo.
+>>> 
+>>> Now if there is a particular use for this in user-space, it would have
+>>> to match some standards. For instance, it Android, ro.serialno is
+>>> usually a 16-bytes (plus one null byte) representation of a 64 bit
+>>> number. For USB, I recall it is usually a 32 bytes string (including the
+>>> null byte), but may be extended to more.
+>>> 
+>>> What the string actually represents depends and some SOCs have serial
+>>> number bytes (I know that omap and sunxi have some for instance, that
+>>> are usually used) while other devices may take it from somewhere else.
+>>> In any case, it doesn't really matter and is not up to the kernel anyway
+>>> since it is just passed through from the bootloader.
+>>> 
+>>> Thus, I don't think it's very relevant to mention it in either the
+>>> documentation or the commit message.
+>> 
+>> So you say ?board? in the patch, since it could be SoC specific, we
+>> should probably clean up the wording a bit.
 > 
-> On 16/04/15 11:57, Minghuan.Lian at freescale.com wrote:
-> 
-> Please include the relevant people (Will Deacon for questions about the
-> SMMU), and avoid top posting, it makes it very hard to follow a discussion.
-> 
-> > I still have a couple of questions,
-> > 1. If I add a new flag and all PCI DEVID will be replaced with a fixed
-> > ID,  does SMMU can work correctly? For example, If we insert an
-> > Ethernet card with two ports, a port is assigned to kvm1, another port
-> > is assigned to kvm2. In this case, we should use one or two fixed ID?
-> 
-> That completely depends on what the SMMU sees. If it sees the same ID,
-> you won't be able to perform any form of isolation. But I have no idea how
-> your hardware works, so maybe explaining in details how this is constructed
-> will help.
-> 
+> It really doesn't matter where the string comes from, what it contains
+> or whether some SoCs have provisions to generate one.
+> I think board is one the most common words that we can use to describe
+> devices. "devices" is also fine, I could go with it if you prefer, but I
+> don't really see what it changes.
 
-We would need separate stream IDs and iommu groups for endpoints, to assign them to different VMs. We would have to set up the stream ID to device ID translation table during device probe, via add_device callback. While setting the device id for the interrupt translation table, you would have to get streamID corresponding to a given PCIe device ID. Again, I don't think that we should consider the TBUID, while setting the ITT device id.
+Lets go with device instead of board.
 
--Varun
+> 
+>> I?m just saying when someone reads this 6 months or a year later and
+>> tries to figure out what the purpose of the property is they don?t
+>> really have enough info.  Putting some examples in the commit message
+>> of what possibly usages is I think a reasonable thing.
+> 
+> Okay, that would make sense. Still, the purpose of this is to pass the
+> serial number string from the bootloader to userspace. All of the
+> discussion about where to grab the serial from and what it should look
+> like is not relevant to the kernel. Instead, it's up to the bootloader
+> that is in charge of generating the serial string, so the discussion
+> should happen there.
+
+Again, I?ve got no issues with the property and its purpose to be used by user space, just saying we need to convey more of the intent via commit message or updating the doc.
+
+- k
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
