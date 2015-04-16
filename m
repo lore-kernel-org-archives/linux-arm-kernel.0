@@ -1,129 +1,63 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Thu, 16 Apr 2015 14:59:23 -0700
-Subject: [PATCH] clk: sirf: add CSR atlas7 clk and reset support
-In-Reply-To: <CAGsJ_4wibCzTOkfxz6HzCa86+eYSaaDo3q7h+JRrXfDuifCLxQ@mail.gmail.com>
-References: <1419495845-4345-1-git-send-email-21cnbao@gmail.com>
- <20150411002358.18916.16856@quantum>
- <CAGsJ_4zUcZY2_rTeav521-1j-QGeHWF+ArO_dYoOSOYCJDNvEA@mail.gmail.com>
- <CAGsJ_4wibCzTOkfxz6HzCa86+eYSaaDo3q7h+JRrXfDuifCLxQ@mail.gmail.com>
-Message-ID: <20150416215923.19585.62580@quantum>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Thu, 16 Apr 2015 17:03:12 -0500
+Subject: [RFC PATCH 0/5] Add smp booting support for Qualcomm ARMv8 SoCs
+In-Reply-To: <CAF6AEGt3bf70MUWFU_kqtc8KDR09tMUCkXbqOq0SpOXU44moTg@mail.gmail.com>
+References: <1428601031-5366-1-git-send-email-galak@codeaurora.org>
+ <20150410100529.GA6854@e104818-lin.cambridge.arm.com>
+ <20150414163613.GM28709@leverpostej>
+ <07185B2C-3F37-4E70-9096-1EF5EA8D68CE@codeaurora.org>
+ <20150414211720.GA56647@MBP>
+ <CAF6AEGtoxNrCoxT5n0CXmKMnL-YprJ3DkAuM4Myi87WMxPqBGw@mail.gmail.com>
+ <20150415133403.GB26099@e104818-lin.cambridge.arm.com>
+ <CAF6AEGucYT4LHkFggR0fO_c7gZe7hD7STx1xwKrOvwsnnFbw7Q@mail.gmail.com>
+ <20150416152121.GE819@e104818-lin.cambridge.arm.com>
+ <CAF6AEGt3bf70MUWFU_kqtc8KDR09tMUCkXbqOq0SpOXU44moTg@mail.gmail.com>
+Message-ID: <CAHCPf3uf+VP5NuEnwABQefeLLm07xb1gwa-tNvLGug1j=Wi-Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Barry Song (2015-04-14 04:57:18)
-> 2015-04-12 18:24 GMT+08:00, Barry Song <21cnbao@gmail.com>:
-> > 2015-04-11 8:23 GMT+08:00 Michael Turquette <mturquette@linaro.org>:
-> >> Quoting Barry Song (2014-12-25 00:24:05)
-> >>> From: Zhiwu Song <Zhiwu.Song@csr.com>
-> >>>
-> >>> the hardware node includes both clock and reset support, so it
-> >>> is named as "car".
-> >>> this patch implements Flexible clocks(mux, divider, gate), Selectable
-> >>> clock(mux, divider, gate), root clock(gate),leaf clock(gate), others.
-> >>> it also implements the reset controller functionality.
-> >>>
-> >>> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-> >>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> >>> ---
-> >>>  .../devicetree/bindings/clock/csr,atlas7-car.txt   |   46 +
-> >>>  drivers/clk/sirf/Makefile                          |    2 +-
-> >>>  drivers/clk/sirf/clk-atlas7.c                      | 1652
-> >>> ++++++++++++++++++++
-> >>>  3 files changed, 1699 insertions(+), 1 deletion(-)
-> >>>  create mode 100644
-> >>> Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
-> >>>  create mode 100644 drivers/clk/sirf/clk-atlas7.c
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
-> >>> b/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
-> >>> new file mode 100644
-> >>> index 0000000..a1a9499
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
-> >>> @@ -0,0 +1,46 @@
-> >>> +* Clock and reset bindings for CSR atlas7
-> >>> +
-> >>> +Required properties:
-> >>> +- compatible: Should be "sirf,atlas7-car"
-> >>> +- reg: Address and length of the register set
-> >>> +- #clock-cells: Should be <1>
-> >>> +- #reset-cells: Should be <1>
-> >>> +
-> >>> +The clock consumer should specify the desired clock by having the clock
-> >>> +ID in its "clocks" phandle cell.
-> >>> +The ID list atlas7_clks defined in drivers/clk/sirf/clk-atlas7.c
-> >>> +
-> >>> +The reset consumer should specify the desired reset by having the reset
-> >>> +ID in its "reset" phandle cell.
-> >>> +The ID list atlas7_reset_unit defined in drivers/clk/sirf/clk-atlas7.c
-> >>> +
-> >>> +Examples:
-> >>> +
-> >>> +timer at 10dc0000 {
-> >>> +       compatible = "sirf,macro-tick";
-> >>> +       reg = <0x10dc0000 0x1000>;
-> >>> +       clocks = <&car 54>;
-> >>> +       interrupts = <0 0 0>,
-> >>> +                  <0 1 0>,
-> >>> +                  <0 2 0>,
-> >>> +                  <0 49 0>,
-> >>> +                  <0 50 0>,
-> >>> +                  <0 51 0>;
-> >>> +};
-> >>> +
-> >>> +uart1: uart at 18020000 {
-> >>> +       cell-index = <1>;
-> >>> +       compatible = "sirf,macro-uart";
-> >>> +       reg = <0x18020000 0x1000>;
-> >>> +       clocks = <&clks 95>;
-> >>> +       interrupts = <0 18 0>;
-> >>> +       fifosize = <32>;
-> >>> +};
-> >>> +
-> >>> +vpp at 13110000 {
-> >>> +       compatible = "sirf,prima2-vpp";
-> >>> +       reg = <0x13110000 0x10000>;
-> >>> +       interrupts = <0 31 0>;
-> >>> +       clocks = <&car 85>;
-> >>> +       resets = <&car 29>;
-> >>> +};
-> >>
-> >> It would be nice to provide an example of the clock provider node,
-> >> "sirf,atlas7-car".
-> >
-> > ok. Mike, thanks for reviewing.
-> 
-> hi mike,  the example of the clock provider node has been done by the
-> v2 patch sent two days ago.is there enough time to push it to 4.1?
+Hi Rob,
 
-I'm afraid not. I'll take it after 4.1-rc1 drops.
+On Thu, Apr 16, 2015 at 12:17 PM, Rob Clark <robdclark@gmail.com> wrote:
+> On Thu, Apr 16, 2015 at 11:21 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+>
+>> But I'm definitely going to discourage companies like Qualcomm
+>> deliberately ignoring the existing booting protocols while trying to get
+>> their code upstream. This patch series is posted by Qualcomm without
+>> providing any technical reason on why they don't want to/couldn't use
+>> PSCI (well, I guess there is no technical reason but they may not care
+>> much about mainline either).
+>
+> Sure.. just trying to make sure the wrong people don't end up being
+> the ones that suffer.  I would assume/expect that it is at least
+> possible for qcom to change firmware/bootloader for their dev boards
+> and future devices and whatnot, whether they grumble about it or not.
+> But I guess most of what the general public has are devices w/ signed
+> fw, which is why "go fix your firmware" is an option that sets off
+> alarm bells for me.
+>
+> I guess the first device where this will matter to me and a large
+> group of community folks would be the dragonboard 410c..  *hopefully*
+> it does not require signed firmware or at least qcom could make
+> available signed firmware which supports psci..
 
-Regards,
-Mike
+For development boards, one would hope there is a way to sign your own firmware.
+You can't expect - even for a phone SoC - that the development boards require
+entering some kind of Faustian contract for development of low-level
+software. What if
+someone wants to develop a platform that doesn't require signing?
 
-> 
-> >
-> >> Also do you have a patch which adds this node to a
-> >> dts file somewhere?
-> >>
-> >
-> > this has been done when atlas7 platform was added. see:
-> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/atlas7.dtsi
-> >
-> > there is a node:
-> >             car: clock-controller at 18620000 {
-> >                 compatible = "sirf,atlas7-car";
-> >                 reg = <0x18620000 0x1000>;
-> >                 #clock-cells = <1>;
-> >                 #reset-cells = <1>;
-> >             };
-> >
-> >> Otherwise the rest of this patch looks OK.
-> >>
-> >> Regards,
-> >> Mike
-> >
-> > -barry
-> >
-> 
-> -barry
+That said most of these dev boards have completely mangled JTAG anyway, and
+I know Inforce (and Hardkernel, and so on) love their barely-ever-updated custom
+firmware binaries, so..
+
+The best thing would be to pick up one of those boards and port a PSCI firmware
+to it (ATF or your own..) and just embarrass the SoC vendor by having better
+mainline power management support (implemented by 10 lines in a device tree)
+with the complicated code hidden away behind the scenes there, like it
+should have
+been done in the first place..
+
+Ta.
+Matt Sealey <neko@bakuhatsu.net>
