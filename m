@@ -1,119 +1,142 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 17 Apr 2015 00:05:23 +0200
-Subject: [PATCH 1/2] Documentation: devicetree: root node serial-number
- property documentation
-In-Reply-To: <1429214815.2563.21.camel@collins>
-References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
- <f6f4f862c78fa626e7f94bde51eec5b1@agner.ch>
- <1429175421.2483.1.camel@collins>
- <CAL_JsqKdHQZL5Z6hKgquKihFykX0ZiCDQfeHOfOZWOh2NMg4Rw@mail.gmail.com>
- <CFEF8F54-7A3E-482C-B295-6A6BC5D837C8@codeaurora.org>
- <1429199145.2563.9.camel@collins>
- <F4D05489-ACF0-44BB-AEC7-7E8FB83FAE4C@codeaurora.org>
- <1429208077.2563.14.camel@collins>
- <97473e9075df185ab3024db70c471f53@agner.ch>
- <1429214815.2563.21.camel@collins>
-Message-ID: <6b259907e5f700ca0e49544f34620455@agner.ch>
+From: mwelling@ieee.org (Michael Welling)
+Date: Thu, 16 Apr 2015 17:09:18 -0500
+Subject: AM335x OMAP2 common clock external fixed-clock registration
+In-Reply-To: <55301D7F.30708@gmail.com>
+References: <20150414211734.GA28974@deathray> <552E0688.1020903@ti.com>
+ <20150415140945.GA30787@deathray> <552EB152.7050306@ti.com>
+ <20150415194707.GA11007@deathray>
+ <CAPtuhTggHctp5ArGPEuKn2GuPzb-WnKv2_CzPrHzq8hwOR5Aqw@mail.gmail.com>
+ <20150415205136.GA3399@deathray> <552F3B60.8050703@ti.com>
+ <20150416161756.GA27590@deathray> <55301D7F.30708@gmail.com>
+Message-ID: <20150416220918.GA6057@deathray>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-04-16 22:06, Paul Kocialkowski wrote:
-> Le jeudi 16 avril 2015 ? 21:40 +0200, Stefan Agner a ?crit :
->> On 2015-04-16 20:14, Paul Kocialkowski wrote:
->> > Le jeudi 16 avril 2015 ? 10:53 -0500, Kumar Gala a ?crit :
->> >> > On Apr 16, 2015, at 10:45 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
->> >> >
->> >> > Le jeudi 16 avril 2015 ? 10:23 -0500, Kumar Gala a ?crit :
->> >> >>> On Apr 16, 2015, at 9:36 AM, Rob Herring <robherring2@gmail.com> wrote:
->> >> >>>
->> >> >>> On Thu, Apr 16, 2015 at 4:10 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
->> >> >>>> Le jeudi 16 avril 2015 ? 09:56 +0200, Stefan Agner a ?crit :
->> >> >>>>> On 2015-03-28 18:39, Paul Kocialkowski wrote:
->> >> >>>>>> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
->> >> >>>>>
->> >> >>>>> I think this is a worthwhile standardization.
->> >> >>>>>
->> >> >>>>> Acked-by: Stefan Agner <stefan@agner.ch>
->> >> >>>>
->> >> >>>> Thanks! I should also add a commit message in v2 mentioning that this is
->> >> >>>> already used in open firmware and reported by lshw.
->> >> >>>
->> >> >>> With that,
->> >> >>>
->> >> >>> Acked-by: Rob Herring <robh@kernel.org>
->> >> >
->> >> > [snip]
->> >> >
->> >> >> I feel like this is a little lite either in the doc or commit message.
->> >> >> Is the string completely arbitrary?  Is it meant to match labeling on
->> >> >> a board or case?  Is this meant to be used by the kernel at all?
->> >> >
->> >> > I guess it doesn't really matter what it is, as long as it's a string.
->> >> > The kernel does not suggest any use for it either, it's just made
->> >> > available to userspace through cpuinfo.
->> >> >
->> >> > Now if there is a particular use for this in user-space, it would have
->> >> > to match some standards. For instance, it Android, ro.serialno is
->> >> > usually a 16-bytes (plus one null byte) representation of a 64 bit
->> >> > number. For USB, I recall it is usually a 32 bytes string (including the
->> >> > null byte), but may be extended to more.
->> >> >
->> >> > What the string actually represents depends and some SOCs have serial
->> >> > number bytes (I know that omap and sunxi have some for instance, that
->> >> > are usually used) while other devices may take it from somewhere else.
->> >> > In any case, it doesn't really matter and is not up to the kernel anyway
->> >> > since it is just passed through from the bootloader.
->> >> >
->> >> > Thus, I don't think it's very relevant to mention it in either the
->> >> > documentation or the commit message.
->> >>
->> >> So you say ?board? in the patch, since it could be SoC specific, we
->> >> should probably clean up the wording a bit.
->> >
->> > It really doesn't matter where the string comes from, what it contains
->> > or whether some SoCs have provisions to generate one.
->> > I think board is one the most common words that we can use to describe
->> > devices. "devices" is also fine, I could go with it if you prefer, but I
->> > don't really see what it changes.
->>
->> There is already something related for SoC's in SoC bus called soc_id,
->> see
->> Documentation/ABI/testing/sysfs-devices-soc
->>
->> So I would rather prefer that this is more reserved for device/board
->> serial number...
+On Thu, Apr 16, 2015 at 10:37:19PM +0200, Sebastian Hesselbarth wrote:
+> On 16.04.2015 18:17, Michael Welling wrote:
+> >On Thu, Apr 16, 2015 at 07:32:32AM +0300, Tero Kristo wrote:
+> >>On 04/15/2015 11:51 PM, Michael Welling wrote:
+> >>>On Wed, Apr 15, 2015 at 01:45:53PM -0700, Mike Turquette wrote:
+> >>>>On Wed, Apr 15, 2015 at 12:47 PM, Michael Welling <mwelling@ieee.org> wrote:
+> [...]
+> >>>>>There is still an issue with the si5351.
+> >>>>>
+> >>>>>I had to comment out the clk_put here for the frequency to show up:
+> >>>>>http://lxr.free-electrons.com/source/drivers/clk/clk-si5351.c#L1133
+> >>>>>
+> >>>>>Ideas?
+> >>>>
+> >>>>What is the most recent upstream commit that you are based on?
+> >>>
+> >>>I am working from 4.0.0-rc7.
+> >>>
+> >>>7b43b47373d40d557cd7e1a84a0bd8ebc4d745ab
+> >>
+> >>Hmm, I wonder why si5351 calls clk_put immediately after of_clk_get
+> >>in the first place, as far as I understand this destroys the clock
+> >>handle, which is still being used later in the code.
+> >
+> >Not sure how this ever worked. This has been in the code since the
+> >initial commit.
 > 
-> Again, I don't wish to define what the number represents in the kernel.
+> The reason it worked before may be related with recent rework of
+> clk_put() itself and clk cookies instead of pointers. I lost track on
+> the recent clk subsystem changes here, sorry.
 > 
-> It's whatever string the bootloader sends. I know that e.g. on an omap3
-> device, I'll be using this with the ID bits provided by the SoC (maybe
-> only part of them, there are 128 bits available and I like to have 64
-> bit serial numbers). But if you want your device to use something else
-> (e.g. some serial number stored in an external eeprom), it's up to you
-> to decide and in any case, that will be decided at bootloader stage.
+> However, droping the clk immediately surely isn't right.
+> The thing is, we can remove the clk_put() just because there is no
+> _remove() for that driver. I remember that back in the days the driver
+> was mainlined, clk removal wasn't too easy.
+> 
+> FWIW, as soon as _remove() support will be added by someone, we'll have
+> to rethink passing struct clk* by platform_data or at least
+> double-check if we ever used [of_]clk_get() to obtain it.
+> 
+> Mind to send a patch removing the clk_put() on !IS_ERR and add a proper
+> error path instead? While of_clk_get() is the only calls that need
+> cleanup on error in si5351_dt_parse() we should probably move that
+> calls to the end of this function. Otherwise we'd also have to cleanup
+> on every of_parse_foo() failure.
 
-For that ID the soc_id attribute is actually much more appropriate. 
+What would be the proper error path?
+What cleanup is required?
 
-But if anybody wants to use that as serial-number, fine. I'm not saying
-we should prohibit that.
+It should be noted that there are more deep rooted issues with the driver
+that I have noticed. For one the driver behaves differently if the debugging
+is on and when it is off.
 
+Here is what the kernel reports with debugging off:
+root at som3517-som200:~# cat /sys/kernel/debug/clk/clk_summary
+   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
+----------------------------------------------------------------------------------------
+ ref27                                    0            0    27000000          0 0  
+    xtal                                  0            0    27000000          0 0  
+       pllb                               0            0   599999994          0 0  
+          ms0                             0            0    12499999          0 0  
+             clk0                         0            0    12499999          0 0  
+       plla                               0            0   599999994          0 0  
+          ms2                             0            0     8219178          0 0  
+             clk2                         0            0     8219178          0 0  
+          ms1                             0            0    94117646          0 0  
+             clk1                         0            0    94117646          0 0  
 
-> Perhaps it would make sense to provide consistency for this among a
-> particular family of devices (say, devices from the same manufacture or
-> devices using the same SoC). We have already set up such a standard for
-> Allwinner (sunxi) devices, in U-Boot.
+Here is what the kernel reports with debugging on:
+   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
+----------------------------------------------------------------------------------------
+ ref27                                    0            0    27000000          0 0  
+    xtal                                  0            0    27000000          0 0  
+       pllb                               0            0   884736000          0 0  
+          ms0                             0            0    18432000          0 0  
+             clk0                         0            0    18432000          0 0  
+       plla                               0            0   897023997          0 0  
+          ms2                             0            0    12287999          0 0  
+             clk2                         0            0    12287999          0 0  
+          ms1                             0            0   140709646          0 0  
+             clk1                         0            0   140709646          0 0 
 
-That is actually exactly my concern. We (Toradex) are a ARM module
-provider which populate SoC's of different vendors. However, we would
-like to keep consistency across modules. If a SoC vendor mandates to use
-the field for the SoC serial number, we end up with different serial
-numbers in that field.
+Note this is with the following devicetree entry:
+        si5351: clock-generator {
+                #address-cells = <1>;
+                #size-cells = <0>;
+                #clock-cells = <1>;
+                compatible = "silabs,si5351a-msop";
+                reg = <0x60>;
+                status = "okay";
 
-IMHO, the top level serial-number should be used for the board/device.
+                /* connect xtal input to 27MHz reference */
+                clocks = <&ref27>;
 
-But if you don't like to define that, it is ok for me. But maybe we
-could just mention soc_id as a possible alternative for SoC serial
-numbers in the documentation?
+                /* connect xtal input as source of pll0 and pll1 */
+                silabs,pll-source = <0 0>, <1 0>;
 
---
-Stefan
+                clkout0: clkout0 {
+                        reg = <0>;
+                        silabs,drive-strength = <8>;
+                        silabs,multisynth-source = <1>;
+                        silabs,clock-source = <0>;
+                        silabs,pll-master;
+                        clock-frequency = <18432000>;
+                 };
+
+                clkout1: clkout1 {
+                        reg = <1>;
+                        silabs,drive-strength = <8>;
+                        silabs,multisynth-source = <0>;
+                        silabs,clock-source = <0>;
+                        clock-frequency = <8000000>;
+                };
+
+                clkout2: clkout2 {
+                        reg = <2>;
+                        silabs,drive-strength = <8>;
+                        silabs,multisynth-source = <0>;
+                        silabs,clock-source = <0>;
+                        silabs,pll-master;
+                        clock-frequency = <12288000>;
+                };
+        };
+
+I am losing hope that this driver is stable enough to even use in production.
+> 
+> Sebastian
+> 
