@@ -1,30 +1,39 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 16 Apr 2015 13:28:10 +0300
-Subject: [PATCH v8 0/4] hwspinlock core & omap dt support
-In-Reply-To: <20150416093130.GH2866@leverpostej>
-References: <1425520876-37826-1-git-send-email-s-anna@ti.com>
- <CAK=WgbY1Gbc+b1YtHafUyph6P60fees1ND_K5OE=9MXuqszbOg@mail.gmail.com>
- <5509F4E7.6070607@ti.com> <551D70EE.307@ti.com>
- <20150416093130.GH2866@leverpostej>
-Message-ID: <CAK=WgbYJAnc_DFbqc3nJfYGWfqk4Krgi_BuJ=UXUNHHA-hvzKw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 16 Apr 2015 11:40:08 +0100
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+In-Reply-To: <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+ <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
+ <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+Message-ID: <20150416104008.GB25640@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 12:31 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
->
-> Apologies for the delay on this.
->
->> > Gentle reminder. Can you please provide your ack on the bindings in this
->> > series (Patches 1 & 3) for Ohad to queue up the series for 4.1.
->> >
->>
->> Ping again, if you can provide your ack on these bindings and the qcom
->> hwmutex bindings, then Ohad can pick up both the series for 4.1. Both
->> series are blocked on getting the binding acks.
->
-> Both the bindings look sane to me, so for patches 1 and 3:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+Hi Varun,
 
-Great, thanks a lot Mark!
+Thanks for adding me to Cc.
+
+On Wed, Apr 15, 2015 at 02:18:13PM +0100, Varun Sethi wrote:
+> Yes, deviceid=stream id (i.e. ICID + other bits). I am not sure if TBU ID
+> would also be forwarded as a part of stream id to GIC. My understanding is
+> that TBU ID is forwarded (as a part of the stream ID) to the TCU in case
+> of a TBU translation miss. In case of the LS2085 PCIe controller you would
+> have to setup the PCIe device ID to stream ID translation table. We may
+> have to restrict the number of entries based on the available number of
+> contexts.
+
+Unfortunately, I'm having a really hard time parsing this thread (some parts
+of it simply don't make sense; others use non-architectural terms and
+overall I don't get a feeling for the problem).
+
+Please could you explain your system design step by step so that I can
+understand (a) what you've built and (b) why the current design of Linux is
+causing you problems?
+
+Sorry if I'm just being thick, but it's important that we get this right.
+
+Cheers,
+
+Will
