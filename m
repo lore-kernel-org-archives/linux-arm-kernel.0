@@ -1,57 +1,60 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 16 Apr 2015 18:08:08 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable shmobile r8a7778 (M1A)
-In-Reply-To: <552FDD73.70805@cogentembedded.com>
-References: <1429196897-18822-1-git-send-email-ulrich.hecht+renesas@gmail.com>
- <552FDD73.70805@cogentembedded.com>
-Message-ID: <CAMuHMdW4=ZA5STuUm1zBypRtfuQtrD=2rBDW5GBGRS--zGMbzw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 16 Apr 2015 17:10:16 +0100
+Subject: [RFC PATCH v2 0/1] ARM: cpuidle: heterogeneous systems extension
+Message-ID: <1429200617-9546-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 6:04 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 04/16/2015 06:08 PM, Ulrich Hecht wrote:
->
->> Also enables RTC (RX8581) and camera (ML86V7667) drivers as modules.
+This patch is a v2 of a previous posting:
 
-I think this is identical to
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/327624.html?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/328192.html
 
->> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
->> ---
->>   arch/arm/configs/multi_v7_defconfig | 3 +++
->>   1 file changed, 3 insertions(+)
->
->
->> diff --git a/arch/arm/configs/multi_v7_defconfig
->> b/arch/arm/configs/multi_v7_defconfig
->> index 06075b6..212199a 100644
->> --- a/arch/arm/configs/multi_v7_defconfig
->> +++ b/arch/arm/configs/multi_v7_defconfig
->
-> [...]
->>
->> @@ -500,6 +502,7 @@ CONFIG_RTC_DRV_SUN6I=y
->>   CONFIG_RTC_DRV_SUNXI=y
->>   CONFIG_RTC_DRV_MV=y
->>   CONFIG_RTC_DRV_TEGRA=y
->> +CONFIG_RTC_DRV_RX8581=m
->
->    The other RTC drivers seem to be built-in.
+v1 -> v2:
 
-The current trend is to make "non-core" functionalities modular, to
-reduce kernel size.
+- Rebased against 4.0
+- Removed DT affinity probe interface
+- Improved and optimized idle states comparison and cpumask creation
+- Merged DT idle states vetting code in the ARM CPUidle driver
 
-Yes, this means many of the existing options should be changed from
-y to m.
+This patch aims at enabling the generic CPUidle driver on ARM systems
+with heterogeneous idle states. In the CPUidle context the kernel
+considers cpus equal (and group them together through a CPUidle driver)
+if they share the same set of idle states.
+Since the idle states represent the differentiation point when it comes
+to creating CPUidle drivers (their states and related cpu logical mask),
+the idle states can be used as a means to create logical masks of cpus
+for which the CPUidle driver applies.
 
-Gr{oetje,eeting}s,
+This patch sets the maximum number of static CPUidle drivers allowed to
+two, since it is hard to foresee systems with more than two sets of CPUs
+having different idle states; it is meant to keep allocation simple
+while keeping functionality.
 
-                        Geert
+The code carrying out idle states comparison is completely generic
+and borrowed from OF unit tests; it overrides the OF API entirely
+though to carry out properties (ie phandles list) comparison in the
+fastest possible way. If deemed worthwhile it can be moved to generic OF
+layer.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Tested through several dts idle states permutations on Juno board with
+CPUidle and related idle states enabled.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Cc: Howard Chen <howard.chen@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Lina Iyer <lina.iyer@linaro.org>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+
+Lorenzo Pieralisi (1):
+  drivers: cpuidle: cpuidle-arm: heterogeneous systems extension
+
+ drivers/cpuidle/Kconfig.arm   |   1 +
+ drivers/cpuidle/cpuidle-arm.c | 176 ++++++++++++++++++++++++++++++++++++------
+ 2 files changed, 152 insertions(+), 25 deletions(-)
+
+-- 
+2.2.1
