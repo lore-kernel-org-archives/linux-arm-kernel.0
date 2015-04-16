@@ -1,37 +1,85 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 16 Apr 2015 05:42:16 -0700
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <552F887A.4060708@eu.citrix.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
- <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
- <552E9E8D.1080000@eu.citrix.com>
- <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA2BC.5000707@eu.citrix.com>
- <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA844.5010308@eu.citrix.com>
- <1429121979.7346.138.camel@edumazet-glaptop2.roam.corp.google.com>
- <552F7936.9070205@eu.citrix.com> <552F7EF4.9030107@iogearbox.net>
- <552F887A.4060708@eu.citrix.com>
-Message-ID: <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 16 Apr 2015 14:45:53 +0200
+Subject: [PATCH] ARM: at91/dt: drop deprecated mainck node from pmc
+In-Reply-To: <1429187145-10741-1-git-send-email-g.portay@overkiz.com>
+References: <1429187145-10741-1-git-send-email-g.portay@overkiz.com>
+Message-ID: <20150416144553.1eed24dc@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-04-16 at 11:01 +0100, George Dunlap wrote:
+On Thu, 16 Apr 2015 14:25:44 +0200
+Ga?l PORTAY <g.portay@overkiz.com> wrote:
 
-> He suggested that after he'd been prodded by 4 more e-mails in which two
-> of us guessed what he was trying to get at.  That's what I was
-> complaining about.
+> The clock-frequency property became obsolete since the rework of the main
+> clock driver in 3.16 (see commit 27cb1c2083373a44130d50d4d2fb64cf7eff2d90).
+> 
+> It now get and uses the clock-frequency from the main_xtal node.
+> 
+> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
 
-My big complain is that I suggested to test to double the sysctl, which
-gave good results.
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Then you provided a patch using a 8x factor. How does that sound ?
+> ---
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 6 ------
+>  arch/arm/boot/dts/at91sam9rlek.dts          | 6 ------
+>  arch/arm/boot/dts/sama5d3xcm.dtsi           | 6 ------
+>  3 files changed, 18 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> index fec1fca..1721e9b 100644
+> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> @@ -204,12 +204,6 @@
+>  					};
+>  				};
+>  			};
+> -
+> -			pmc: pmc at fffffc00 {
+> -				main: mainck {
+> -					clock-frequency = <12000000>;
+> -				};
+> -			};
+>  		};
+>  
+>  		nand0: nand at 60000000 {
+> diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
+> index 9be5b54..d9299be3 100644
+> --- a/arch/arm/boot/dts/at91sam9rlek.dts
+> +++ b/arch/arm/boot/dts/at91sam9rlek.dts
+> @@ -181,12 +181,6 @@
+>  				};
+>  			};
+>  
+> -			pmc: pmc at fffffc00 {
+> -				main: mainck {
+> -					clock-frequency = <12000000>;
+> -				};
+> -			};
+> -
+>  			watchdog at fffffd40 {
+>  				status = "okay";
+>  			};
+> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+> index 7d6babd..ef404e9 100644
+> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+> @@ -67,12 +67,6 @@
+>  					rxd3-skew-ps = <400>;
+>  				};
+>  			};
+> -
+> -			pmc: pmc at fffffc00 {
+> -				main: mainck {
+> -					clock-frequency = <12000000>;
+> -				};
+> -			};
+>  		};
+>  
+>  		nand0: nand at 60000000 {
 
-Next time I ask a raise, I should try a 8x factor as well, who knows,
-it might be accepted.
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
