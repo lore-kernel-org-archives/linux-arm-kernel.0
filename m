@@ -1,56 +1,104 @@
-From: george.dunlap@eu.citrix.com (George Dunlap)
-Date: Thu, 16 Apr 2015 11:01:30 +0100
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <552F7EF4.9030107@iogearbox.net>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
- <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
- <552E9E8D.1080000@eu.citrix.com>
- <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA2BC.5000707@eu.citrix.com>
- <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA844.5010308@eu.citrix.com>
- <1429121979.7346.138.camel@edumazet-glaptop2.roam.corp.google.com>
- <552F7936.9070205@eu.citrix.com> <552F7EF4.9030107@iogearbox.net>
-Message-ID: <552F887A.4060708@eu.citrix.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 16 Apr 2015 11:04:00 +0100
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+In-Reply-To: <DM2PR0301MB0640576D29E70392C41444DFE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>	<1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+ <20150415173654.431f5d89@arm.com>
+ <DM2PR0301MB0640576D29E70392C41444DFE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
+Message-ID: <552F8910.9000701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2015 10:20 AM, Daniel Borkmann wrote:
-> So mid term, it would be much more beneficial if you attempt fix the
-> underlying driver issues that actually cause high tx completion delays,
-> instead of reintroducing bufferbloat. So that we all can move forward
-> and not backwards in time.
+On 16/04/15 03:57, Minghuan.Lian at freescale.com wrote:
+> Hi Marc,
+> 
+> Please see my comments inline
+> 
+>> -----Original Message----- From: Marc Zyngier 
+>> [mailto:marc.zyngier at arm.com] Sent: Thursday, April 16, 2015 12:37
+>>  AM To: Lian Minghuan-B31939 Cc: linux-pci at vger.kernel.org; Arnd 
+>> Bergmann; Hu Mingkai-B21284; Zang Roy-R61911; Yoder Stuart-B08248;
+>>  Bjorn Helgaas; Wood Scott-B07421; linux- 
+>> arm-kernel at lists.infradead.org; Jason Cooper; Thomas Gleixner 
+>> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device 
+>> ID
+>> 
+>> On Wed, 15 Apr 2015 17:49:23 +0800 Minghuan Lian 
+>> <Minghuan.Lian@freescale.com> wrote:
+>> 
+>>> SMMU of some platforms can only isolate limited device ID. This 
+>>> may require that all PCI devices share the same ITS device with 
+>>> the fixed device ID. The patch adds function 
+>>> arch_msi_share_devid_update used for these platforms to update 
+>>> the fixed device ID and maximum MSI interrupts number.
+>>> 
+>>> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com> --- 
+>>> drivers/irqchip/irq-gic-v3-its.c | 11 +++++++++++ 1 file changed,
+>>> 11 insertions(+)
+>>> 
+>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c 
+>>> b/drivers/irqchip/irq-gic-v3-its.c index d0374a6..be78d0a 100644 
+>>> --- a/drivers/irqchip/irq-gic-v3-its.c +++ 
+>>> b/drivers/irqchip/irq-gic-v3-its.c @@ -1169,6 +1169,15 @@ static
+>>>  int its_get_pci_alias(struct pci_dev *pdev,
+>> u16 alias, void *data)
+>>> return 0; }
+>>> 
+>>> +void __weak +arch_msi_share_devid_update(struct pci_dev *pdev, 
+>>> u32 *dev_id, u32 +*nvesc) { +	/* +	 * use PCI_DEVID NOT share 
+>>> device ID as default +	 * so nothing need to do +	 */ +} +
+>> 
+>> NAK. On top of being ugly as sin, this breaks any form of 
+>> multiplatform support. No way anything like this is going in. Guys,
+>> you really should know better.
+>> 
+> [Minghuan]  The current ITS MSI will create an individual ITS device 
+> for each PCIe device, and use PCI_DEVID as ITS dev_id However, out 
+> platform only supports  ITS dev_id 0 -63.  A normal PCIe DEVID of 
+> 0000:01:00.0 is 256 bigger than 63. Besides, because of the limited 
+> dev_id number, all the PCIe device will share the same ITS dev. Our 
+> platform provides a hardware module LUT to map PCI DEVID to ITS 
+> dev_id.  So, when creating ITS device, we need to update dev_id and 
+> the nvesc. I may change pci_for_each_dma_alias to add a new flag to 
+> use alias_bus and alias_devfn.
 
-Yes, I think we definitely see the need for this.  I think we certainly
-agree that bufferbloat needs to be reduced, and minimizing the data we
-need "in the pipe" for full performance on xennet is an important part
-of that.
+Yes, that's where you should take care of this hack.
 
-It should be said, however, that any virtual device is always going to
-have higher latency than a physical device.  Hopefully we'll be able to
-get the latency of xennet down to something that's more "reasonable",
-but it may just not be possible.  And in any case, if we're going to be
-cranking down these limits to just barely within the tolerance of
-physical NICs, virtual devices (either xennet or virtio_net) are never
-going to be able to catch up.  (Without cheating that is.)
+> But I also need to update nvesc which should contains all the PCI 
+> device MSI/MSIX nvesc and PCIe PME, aerdrv interrupts. The main 
+> difference is that we need a ITS device to service multiple PCIe 
+> devices. Could you give me some suggestions how to implement this 
+> requirement.
 
-> What Eric described to you was that you introduce a new netdev member
-> like netdev->needs_bufferbloat, set that indication from driver site,
-> and cache that in the socket that binds to it, so you can adjust the
-> test in tcp_xmit_size_goal(). It should merely be seen as a hint/indication
-> for such devices. Hmm?
+It you take the time to read the code in its_msi_prepare(), you'll
+quickly notice that we already handle aliasing of multiple PCI devices
+to a single DeviceID. Once you have the aliasing taken care of in
+pci_for_each_dma_alias, the ITS code will automatically adjust the
+number of vectors (using its_get_pci_alias as a callback from
+pci_for_each_dma_alias).
 
-He suggested that after he'd been prodded by 4 more e-mails in which two
-of us guessed what he was trying to get at.  That's what I was
-complaining about.
+>>> static int its_msi_prepare(struct irq_domain *domain, struct 
+>>> device *dev, int nvec, msi_alloc_info_t *info)  { @@ -1185,6
+>> +1194,8 @@
+>>> static int its_msi_prepare(struct irq_domain *domain, struct 
+>>> device *dev, dev_alias.count = nvec;
+>>> 
+>>> pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias); + 
+>>> arch_msi_share_devid_update(pdev, &dev_alias.dev_id, 
+>>> +&dev_alias.count); +
+>> 
+>> See the function above? That's where the aliasing should be taken 
+>> care of.
+>> 
+> [Minghuan] The alias will use dma_alias_devfn, but it does not 
+> contains alias_bus. I need to translate PCI_DEVID to a fixed ID.
 
-Having a per-device "long transmit latency" hint sounds like a sensible
-short-term solution to me.
+Then add another flag to deal with that. Your hardware is "creative"
+(some might even argue it is broken), so deal with the creativity as a
+quirk, which has no business in the ITS driver (or any other driver).
 
- -George
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
