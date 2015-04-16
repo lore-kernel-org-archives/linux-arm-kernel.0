@@ -1,52 +1,73 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 16 Apr 2015 11:12:16 +0200
-Subject: [PATCH v3 0/2] ARM: at91/dt: add support for at91-kizboxmini
-In-Reply-To: <1428929774-8951-1-git-send-email-g.portay@overkiz.com>
-References: <1428929774-8951-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <20150416111216.1c8f19cc@bbrezillon>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Thu, 16 Apr 2015 11:20:52 +0200
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <552F7936.9070205@eu.citrix.com>
+References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>	
+ <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>	
+ <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>	
+ <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>	
+ <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>	
+ <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>	
+ <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>	
+ <552E9E8D.1080000@eu.citrix.com>	
+ <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>	
+ <552EA2BC.5000707@eu.citrix.com>	
+ <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>	
+ <552EA844.5010308@eu.citrix.com>
+ <1429121979.7346.138.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552F7936.9070205@eu.citrix.com>
+Message-ID: <552F7EF4.9030107@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Apr 2015 14:56:12 +0200
-Ga?l PORTAY <g.portay@overkiz.com> wrote:
+On 04/16/2015 10:56 AM, George Dunlap wrote:
+> On 04/15/2015 07:19 PM, Eric Dumazet wrote:
+>> On Wed, 2015-04-15 at 19:04 +0100, George Dunlap wrote:
+>>
+>>> Maybe you should stop wasting all of our time and just tell us what
+>>> you're thinking.
+>>
+>> I think you make me wasting my time.
+>>
+>> I already gave all the hints in prior discussions.
+>
+> Right, and I suggested these two options:
 
-> Hi,
-> 
-> Here are two patches to bring support for a new hardware based on SAM9G25 SoC.
-> 
-> The first one adds the PIN controller definition for PWM0.
-> The second defines the new board.
+So mid term, it would be much more beneficial if you attempt fix the
+underlying driver issues that actually cause high tx completion delays,
+instead of reintroducing bufferbloat. So that we all can move forward
+and not backwards in time.
 
-To the whole series,
+> "Obviously one solution would be to allow the drivers themselves to set
+> the tcp_limit_output_bytes, but that seems like a maintenance
+> nightmare.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Possible, but very hacky, as you penalize globally.
 
-> 
-> Changes since v1:
-> - drop useless comments
-> - move pwm0 pinctrl's node close to tcb0
-> - drop ek boards from compatible machine
-> - add at91sam9g25 board to compatible machine
-> 
-> Changes since v2:
-> - update to v4.0
-> - fix alphabetical order between gpio_keys and pwm_leds
-> 
-> Best regards,
-> Ga?l PORTAY (2):
->   ARM: at91/dt: sam9x5: add pinctrl for pwm0
->   ARM: at91/dt: add support for kizboxmini
-> 
->  arch/arm/boot/dts/Makefile            |   1 +
->  arch/arm/boot/dts/at91-kizboxmini.dts | 129 ++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/at91sam9x5.dtsi     |  46 ++++++++++++
->  3 files changed, 176 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
-> 
+> "Another simple solution would be to allow drivers to indicate whether
+> they have a high transmit latency, and have the kernel use a higher
+> value by default when that's the case." [1]
+>
+> Neither of which you commented on.  Instead you pointed me to a comment
 
+What Eric described to you was that you introduce a new netdev member
+like netdev->needs_bufferbloat, set that indication from driver site,
+and cache that in the socket that binds to it, so you can adjust the
+test in tcp_xmit_size_goal(). It should merely be seen as a hint/indication
+for such devices. Hmm?
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> that only partially described what the limitations were. (I.e., it
+> described the "two packets or 1ms", but not how they related, nor how
+> they related to the "max of 2 64k packets outstanding" of the default
+> tcp_limit_output_bytes setting.)
+>
+>   -George
+>
+> [1]
+> http://marc.info/?i=<CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
+> --
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
