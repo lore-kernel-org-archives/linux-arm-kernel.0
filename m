@@ -1,85 +1,28 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 16 Apr 2015 11:30:39 +0200
-Subject: [PATCH v3 1/2] ARM: at91/dt: sam9x5: add pinctrl for pwm0
-In-Reply-To: <1428929774-8951-2-git-send-email-g.portay@overkiz.com>
-References: <1428929774-8951-1-git-send-email-g.portay@overkiz.com>
- <1428929774-8951-2-git-send-email-g.portay@overkiz.com>
-Message-ID: <20150416093039.GB29796@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 16 Apr 2015 10:31:31 +0100
+Subject: [PATCH v8 0/4] hwspinlock core & omap dt support
+In-Reply-To: <551D70EE.307@ti.com>
+References: <1425520876-37826-1-git-send-email-s-anna@ti.com>
+ <CAK=WgbY1Gbc+b1YtHafUyph6P60fees1ND_K5OE=9MXuqszbOg@mail.gmail.com>
+ <5509F4E7.6070607@ti.com> <551D70EE.307@ti.com>
+Message-ID: <20150416093130.GH2866@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/2015 at 14:56:13 +0200, Ga?l PORTAY wrote :
-> Defines the pinctrl configurations for PWM0.
-> 
-> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi,
 
-> ---
->  arch/arm/boot/dts/at91sam9x5.dtsi | 46 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index d221179..98977ad 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -694,6 +694,52 @@
->  					};
->  				};
->  
-> +				pwm0 {
-> +					pinctrl_pwm0_pwm0_0: pwm0_pwm0-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 11 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +					pinctrl_pwm0_pwm0_1: pwm0_pwm0-1 {
-> +						atmel,pins =
-> +							<AT91_PIOC 10 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-> +					};
-> +					pinctrl_pwm0_pwm0_2: pwm0_pwm0-2 {
-> +						atmel,pins =
-> +							<AT91_PIOC 18 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_pwm0_pwm1_0: pwm0_pwm1-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 12 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +					pinctrl_pwm0_pwm1_1: pwm0_pwm1-1 {
-> +						atmel,pins =
-> +							<AT91_PIOC 11 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-> +					};
-> +					pinctrl_pwm0_pwm1_2: pwm0_pwm1-2 {
-> +						atmel,pins =
-> +							<AT91_PIOC 19 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_pwm0_pwm2_0: pwm0_pwm2-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 13 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +					pinctrl_pwm0_pwm2_1: pwm0_pwm2-1 {
-> +						atmel,pins =
-> +							<AT91_PIOC 20 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_pwm0_pwm3_0: pwm0_pwm3-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 14 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +					pinctrl_pwm0_pwm3_1: pwm0_pwm3-1 {
-> +						atmel,pins =
-> +							<AT91_PIOC 21 AT91_PERIPH_C AT91_PINCTRL_NONE>;
-> +					};
-> +				};
-> +
->  				tcb0 {
->  					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
->  						atmel,pins = <AT91_PIOA 24 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> -- 
-> 1.9.1
-> 
+Apologies for the delay on this.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> > Gentle reminder. Can you please provide your ack on the bindings in this
+> > series (Patches 1 & 3) for Ohad to queue up the series for 4.1.
+> > 
+> 
+> Ping again, if you can provide your ack on these bindings and the qcom
+> hwmutex bindings, then Ohad can pick up both the series for 4.1. Both
+> series are blocked on getting the binding acks.
+
+Both the bindings look sane to me, so for patches 1 and 3:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
