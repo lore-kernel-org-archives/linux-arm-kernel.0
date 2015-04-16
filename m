@@ -1,32 +1,98 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 16 Apr 2015 14:26:21 +0800
-Subject: [PATCH net-next 4/6] net: hip04: Don't free the tx skb when the
- buffer is not ready for xmit
-In-Reply-To: <2218546.M1hzu1bzfh@wuerfel>
-References: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
- <1429101008-9464-5-git-send-email-dingtianhong@huawei.com>
- <2218546.M1hzu1bzfh@wuerfel>
-Message-ID: <552F560D.4070309@huawei.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 16 Apr 2015 15:08:23 +0800
+Subject: [PATCHv2 1/3] phy: core: Add devm_of_phy_get_by_index to phy-core
+In-Reply-To: <1428963047-23666-2-git-send-email-arun.ramamurthy@broadcom.com>
+References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1428963047-23666-2-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <20150416070822.GA4682@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/4/15 22:19, Arnd Bergmann wrote:
-> On Wednesday 15 April 2015 20:30:06 Ding Tianhong wrote:
->> @@ -489,6 +487,8 @@ static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->>  
->>         /* Ensure tx_head update visible to tx reclaim */
->>         smp_wmb();
->> +       count++;
->> +       priv->tx_head = TX_NEXT(tx_head);
->>  
->>
+On Mon, Apr 13, 2015 at 03:10:45PM -0700, Arun Ramamurthy wrote:
+> Some generic drivers, such as ehci, may use multiple phys and for such
+> drivers referencing phy(s) by name(s) does not make sense. Instead of
+> inventing new naming schemes and using custom code to iterate through them,
+> such drivers are better of using nameless phy bindings and using this newly
+> introduced API to iterate through them.
 > 
-> Something is wrong here, the comment does not match the code any more, because
-> the smp_wmb() won't actually make the tx_head update visible.
+> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>  drivers/phy/phy-core.c  | 32 ++++++++++++++++++++++++++++++++
+>  include/linux/phy/phy.h |  2 ++
+>  2 files changed, 34 insertions(+)
 > 
-> 	Arnd
-> 
-Yes, the smp_wmb() could only make sure the tx buffer was ready to xmit.
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index 3791838..964a84d 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -623,6 +623,38 @@ struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
+>  EXPORT_SYMBOL_GPL(devm_of_phy_get);
+>  
+>  /**
+> + * devm_of_phy_get_by_index() - lookup and obtain a reference to a phy by index.
+> + * @dev: device that requests this phy
+> + * @np: node containing the phy
+> + * @index: index of the phy
+> + *
+> + * Gets the phy using _of_phy_get(), and associates a device with it using
+> + * devres. On driver detach, release function is invoked on the devres data,
+> + * then, devres data is freed.
+> + *
+> + */
+> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
+> +				     int index)
+> +{
+> +	struct phy **ptr, *phy;
+> +
+> +	ptr = devres_alloc(devm_phy_release, sizeof(*ptr), GFP_KERNEL);
+> +	if (!ptr)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	phy = _of_phy_get(np, index);
+> +	if (!IS_ERR(phy)) {
+> +		*ptr = phy;
+> +		devres_add(dev, ptr);
+> +	} else {
+> +		devres_free(ptr);
+> +	}
+> +
+> +	return phy;
+> +}
+> +EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index);
+> +
+> +/**
+>   * phy_create() - create a new phy
+>   * @dev: device that is creating the new phy
+>   * @node: device node of the phy
+> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+> index a0197fa..ae2ffaf 100644
+> --- a/include/linux/phy/phy.h
+> +++ b/include/linux/phy/phy.h
+> @@ -133,6 +133,8 @@ struct phy *devm_phy_get(struct device *dev, const char *string);
+>  struct phy *devm_phy_optional_get(struct device *dev, const char *string);
+>  struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
+>  			    const char *con_id);
+> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
+> +				     int index);
 
-> .
+You may need to add an implementation if CONFIG_GENERIC_PHY is not enabled.
+
+>  void phy_put(struct phy *phy);
+>  void devm_phy_put(struct device *dev, struct phy *phy);
+>  struct phy *of_phy_get(struct device_node *np, const char *con_id);
+
+
+> -- 
+> 2.3.4
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+
+Best Regards,
+Peter Chen
