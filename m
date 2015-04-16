@@ -1,29 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Apr 2015 10:00:12 +0200
-Subject: [RFC PATCH 1/3] PCI: host: designware: support ARM64
-In-Reply-To: <552F4DF3.6000402@hisilicon.com>
-References: <1429077843-184462-1-git-send-email-wangzhou1@hisilicon.com>
- <5374927.lpgzSJ47Sk@wuerfel> <552F4DF3.6000402@hisilicon.com>
-Message-ID: <4046182.mBfkEVqZjc@wuerfel>
+Date: Thu, 16 Apr 2015 10:04:39 +0200
+Subject: Allowing reset controllers before SMP initialization (on ARM)?
+In-Reply-To: <552F0786.2000505@gmail.com>
+References: <552F0786.2000505@gmail.com>
+Message-ID: <2592960.UsK4Hr7GSl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 April 2015 13:51:47 Zhou Wang wrote:
-> > 
-> > Again, separate patch.
-> > 
-> > I've just tried to come up with a nicer way of doing all this, can
-> > you try the experimental patch below?
-> > 
-> >       Arnd
-> > 
+On Wednesday 15 April 2015 17:51:18 Florian Fainelli wrote:
+> Hi,
 > 
-> Sure, I will try the patch below. I think it can work well in my Hisilicon
-> D02 board. But I don't have arm32 PCIe related board to test. It will be helpful
-> if someone could help to test it.
+> In order to support initialization of the secondary core on BCM63138
+> SoCs, I would want to utilize a reset controller to release the
+> secondary CPU from reset [1].
+> 
+> Here are multiple options:
+> 
+> - expose a custom function which registers the reset controller platform
+> driver as early as possible, which is probably acceptable, but also
+> requires the DT machine descriptor to populate the platform bus earlier,
+> which we could completely avoid
 
-Ok, please incorporate the patch into your series then and make sure it
-builds fine on both 32-bit (multi_v7_defconfig) and 64-bit ARM. If we
-get consensus on the code, I'm sure we can find testers.
+I think populating the platform bus earlier is not realistic, that
+would break lots of existing dependencies. In particular, we can't
+do it much earlier because it has to be done after the platform bus
+itself is instantiated.
+
+> - have a OF_DECLARE_RESET_CONTROLLER() which is running fairly early
+> during boot, such that we can utilize reset controllers are early as
+> possible,  before any initcall level, and before SMP initialization is
+> kicking in
+
+We've added a couple of those, and it could be done here, but putting
+them in the right order is a bit tricky, and I think we can avoid it.
+
+> - since the code that boots secondary CPUs is relatively unique, even
+> within the scope of the reset controllers (sequence involves touching
+> multiple registers), pulling it outside of the reset controller might be
+> acceptable (there is still some level of sharing though for low-level
+> indirect read/write operations)
+
+Yes, it's a hack, but the SMP code is rather special and a lot of
+other platforms do similar hacks already. What I'd like to see
+happen in the long run is more along the lines of:
+
+- Avoid dependencies on the early SMP code, and just set up the
+  data structures for possible CPUs early, which can be done without
+  any hardware interaction. Then move the actual CPU enable path
+  much later in the boot process, possibly combined with the cpuidle
+  driver.
 
 	Arnd
