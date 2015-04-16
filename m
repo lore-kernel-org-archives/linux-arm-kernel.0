@@ -1,104 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Apr 2015 11:04:00 +0100
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <DM2PR0301MB0640576D29E70392C41444DFE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>	<1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <20150415173654.431f5d89@arm.com>
- <DM2PR0301MB0640576D29E70392C41444DFE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
-Message-ID: <552F8910.9000701@arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 16 Apr 2015 13:08:56 +0300
+Subject: [PATCH v2 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs
+ and boards
+In-Reply-To: <1429171147-19464-4-git-send-email-yamada.masahiro@socionext.com>
+References: <1429171147-19464-1-git-send-email-yamada.masahiro@socionext.com>
+ <1429171147-19464-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20150416100856.GJ30380@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/04/15 03:57, Minghuan.Lian at freescale.com wrote:
-> Hi Marc,
+Hi Masahiro Yamada,
+
+On Thu, Apr 16, 2015 at 04:59:06PM +0900, Masahiro Yamada wrote:
+> Initial device trees for UniPhier SoCs: PH1-sLD3, PH1-LD4, PH1-Pro4,
+> and PH1-sLD8.
 > 
-> Please see my comments inline
-> 
->> -----Original Message----- From: Marc Zyngier 
->> [mailto:marc.zyngier at arm.com] Sent: Thursday, April 16, 2015 12:37
->>  AM To: Lian Minghuan-B31939 Cc: linux-pci at vger.kernel.org; Arnd 
->> Bergmann; Hu Mingkai-B21284; Zang Roy-R61911; Yoder Stuart-B08248;
->>  Bjorn Helgaas; Wood Scott-B07421; linux- 
->> arm-kernel at lists.infradead.org; Jason Cooper; Thomas Gleixner 
->> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device 
->> ID
->> 
->> On Wed, 15 Apr 2015 17:49:23 +0800 Minghuan Lian 
->> <Minghuan.Lian@freescale.com> wrote:
->> 
->>> SMMU of some platforms can only isolate limited device ID. This 
->>> may require that all PCI devices share the same ITS device with 
->>> the fixed device ID. The patch adds function 
->>> arch_msi_share_devid_update used for these platforms to update 
->>> the fixed device ID and maximum MSI interrupts number.
->>> 
->>> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com> --- 
->>> drivers/irqchip/irq-gic-v3-its.c | 11 +++++++++++ 1 file changed,
->>> 11 insertions(+)
->>> 
->>> diff --git a/drivers/irqchip/irq-gic-v3-its.c 
->>> b/drivers/irqchip/irq-gic-v3-its.c index d0374a6..be78d0a 100644 
->>> --- a/drivers/irqchip/irq-gic-v3-its.c +++ 
->>> b/drivers/irqchip/irq-gic-v3-its.c @@ -1169,6 +1169,15 @@ static
->>>  int its_get_pci_alias(struct pci_dev *pdev,
->> u16 alias, void *data)
->>> return 0; }
->>> 
->>> +void __weak +arch_msi_share_devid_update(struct pci_dev *pdev, 
->>> u32 *dev_id, u32 +*nvesc) { +	/* +	 * use PCI_DEVID NOT share 
->>> device ID as default +	 * so nothing need to do +	 */ +} +
->> 
->> NAK. On top of being ugly as sin, this breaks any form of 
->> multiplatform support. No way anything like this is going in. Guys,
->> you really should know better.
->> 
-> [Minghuan]  The current ITS MSI will create an individual ITS device 
-> for each PCIe device, and use PCI_DEVID as ITS dev_id However, out 
-> platform only supports  ITS dev_id 0 -63.  A normal PCIe DEVID of 
-> 0000:01:00.0 is 256 bigger than 63. Besides, because of the limited 
-> dev_id number, all the PCIe device will share the same ITS dev. Our 
-> platform provides a hardware module LUT to map PCI DEVID to ITS 
-> dev_id.  So, when creating ITS device, we need to update dev_id and 
-> the nvesc. I may change pci_for_each_dma_alias to add a new flag to 
-> use alias_bus and alias_devfn.
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-Yes, that's where you should take care of this hack.
+[...]
 
-> But I also need to update nvesc which should contains all the PCI 
-> device MSI/MSIX nvesc and PCIe PME, aerdrv interrupts. The main 
-> difference is that we need a ITS device to service multiple PCIe 
-> devices. Could you give me some suggestions how to implement this 
-> requirement.
+> diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
+> new file mode 100644
+> index 0000000..2e83363
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
+> @@ -0,0 +1,51 @@
+> +/*
+> + * Device Tree Source for UniPhier PH1-LD4 Reference Board
+> + *
+> + * Copyright (C) 2015 Socionext Inc.
+> + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
 
-It you take the time to read the code in its_msi_prepare(), you'll
-quickly notice that we already handle aliasing of multiple PCI devices
-to a single DeviceID. Once you have the aliasing taken care of in
-pci_for_each_dma_alias, the ITS code will automatically adjust the
-number of vectors (using its_get_pci_alias as a callback from
-pci_for_each_dma_alias).
+Please consider licensing .dts/.dtsi files also under another, more liberal 
+license, e.g. X11. This would allow easier reuse of these device tree in other 
+software projects. See for example 2ef6ef91c54e (ARM: sun4i: a1000: Relicense 
+the device tree under GPLv2/X11, 2014-09-02).
 
->>> static int its_msi_prepare(struct irq_domain *domain, struct 
->>> device *dev, int nvec, msi_alloc_info_t *info)  { @@ -1185,6
->> +1194,8 @@
->>> static int its_msi_prepare(struct irq_domain *domain, struct 
->>> device *dev, dev_alias.count = nvec;
->>> 
->>> pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias); + 
->>> arch_msi_share_devid_update(pdev, &dev_alias.dev_id, 
->>> +&dev_alias.count); +
->> 
->> See the function above? That's where the aliasing should be taken 
->> care of.
->> 
-> [Minghuan] The alias will use dma_alias_devfn, but it does not 
-> contains alias_bus. I need to translate PCI_DEVID to a fixed ID.
+baruch
 
-Then add another flag to deal with that. Your hardware is "creative"
-(some might even argue it is broken), so deal with the creativity as a
-quirk, which has no business in the ITS driver (or any other driver).
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
