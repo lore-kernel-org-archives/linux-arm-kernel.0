@@ -1,142 +1,38 @@
-From: mwelling@ieee.org (Michael Welling)
-Date: Thu, 16 Apr 2015 17:09:18 -0500
-Subject: AM335x OMAP2 common clock external fixed-clock registration
-In-Reply-To: <55301D7F.30708@gmail.com>
-References: <20150414211734.GA28974@deathray> <552E0688.1020903@ti.com>
- <20150415140945.GA30787@deathray> <552EB152.7050306@ti.com>
- <20150415194707.GA11007@deathray>
- <CAPtuhTggHctp5ArGPEuKn2GuPzb-WnKv2_CzPrHzq8hwOR5Aqw@mail.gmail.com>
- <20150415205136.GA3399@deathray> <552F3B60.8050703@ti.com>
- <20150416161756.GA27590@deathray> <55301D7F.30708@gmail.com>
-Message-ID: <20150416220918.GA6057@deathray>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 16 Apr 2015 17:42:30 -0500
+Subject: [PATCH] bus: omap_l3_noc: Fix offset for DRA7 CLK1_HOST_CLK1_2
+ instance
+Message-ID: <1429224150-28712-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 10:37:19PM +0200, Sebastian Hesselbarth wrote:
-> On 16.04.2015 18:17, Michael Welling wrote:
-> >On Thu, Apr 16, 2015 at 07:32:32AM +0300, Tero Kristo wrote:
-> >>On 04/15/2015 11:51 PM, Michael Welling wrote:
-> >>>On Wed, Apr 15, 2015 at 01:45:53PM -0700, Mike Turquette wrote:
-> >>>>On Wed, Apr 15, 2015 at 12:47 PM, Michael Welling <mwelling@ieee.org> wrote:
-> [...]
-> >>>>>There is still an issue with the si5351.
-> >>>>>
-> >>>>>I had to comment out the clk_put here for the frequency to show up:
-> >>>>>http://lxr.free-electrons.com/source/drivers/clk/clk-si5351.c#L1133
-> >>>>>
-> >>>>>Ideas?
-> >>>>
-> >>>>What is the most recent upstream commit that you are based on?
-> >>>
-> >>>I am working from 4.0.0-rc7.
-> >>>
-> >>>7b43b47373d40d557cd7e1a84a0bd8ebc4d745ab
-> >>
-> >>Hmm, I wonder why si5351 calls clk_put immediately after of_clk_get
-> >>in the first place, as far as I understand this destroys the clock
-> >>handle, which is still being used later in the code.
-> >
-> >Not sure how this ever worked. This has been in the code since the
-> >initial commit.
-> 
-> The reason it worked before may be related with recent rework of
-> clk_put() itself and clk cookies instead of pointers. I lost track on
-> the recent clk subsystem changes here, sorry.
-> 
-> However, droping the clk immediately surely isn't right.
-> The thing is, we can remove the clk_put() just because there is no
-> _remove() for that driver. I remember that back in the days the driver
-> was mainlined, clk removal wasn't too easy.
-> 
-> FWIW, as soon as _remove() support will be added by someone, we'll have
-> to rethink passing struct clk* by platform_data or at least
-> double-check if we ever used [of_]clk_get() to obtain it.
-> 
-> Mind to send a patch removing the clk_put() on !IS_ERR and add a proper
-> error path instead? While of_clk_get() is the only calls that need
-> cleanup on error in si5351_dt_parse() we should probably move that
-> calls to the end of this function. Otherwise we'd also have to cleanup
-> on every of_parse_foo() failure.
+From: Illia Smyrnov <illia.smyrnov@globallogic.com>
 
-What would be the proper error path?
-What cleanup is required?
+The base address for DRA7 CLK1_HOST_CLK1_2 host instance is
+0x44800000, so correct offset is 0x800000. DRA7 TRM rev X(fewb 2015)
+has updates for this information.
 
-It should be noted that there are more deep rooted issues with the driver
-that I have noticed. For one the driver behaves differently if the debugging
-is on and when it is off.
+With wrong offset these errors are not correctly cleared by the L3
+IRQ handler and cause an continuous interrupt scenario and system lockup.
 
-Here is what the kernel reports with debugging off:
-root at som3517-som200:~# cat /sys/kernel/debug/clk/clk_summary
-   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
-----------------------------------------------------------------------------------------
- ref27                                    0            0    27000000          0 0  
-    xtal                                  0            0    27000000          0 0  
-       pllb                               0            0   599999994          0 0  
-          ms0                             0            0    12499999          0 0  
-             clk0                         0            0    12499999          0 0  
-       plla                               0            0   599999994          0 0  
-          ms2                             0            0     8219178          0 0  
-             clk2                         0            0     8219178          0 0  
-          ms1                             0            0    94117646          0 0  
-             clk1                         0            0    94117646          0 0  
+Signed-off-by: Illia Smyrnov <illia.smyrnov@globallogic.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ drivers/bus/omap_l3_noc.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Here is what the kernel reports with debugging on:
-   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
-----------------------------------------------------------------------------------------
- ref27                                    0            0    27000000          0 0  
-    xtal                                  0            0    27000000          0 0  
-       pllb                               0            0   884736000          0 0  
-          ms0                             0            0    18432000          0 0  
-             clk0                         0            0    18432000          0 0  
-       plla                               0            0   897023997          0 0  
-          ms2                             0            0    12287999          0 0  
-             clk2                         0            0    12287999          0 0  
-          ms1                             0            0   140709646          0 0  
-             clk1                         0            0   140709646          0 0 
-
-Note this is with the following devicetree entry:
-        si5351: clock-generator {
-                #address-cells = <1>;
-                #size-cells = <0>;
-                #clock-cells = <1>;
-                compatible = "silabs,si5351a-msop";
-                reg = <0x60>;
-                status = "okay";
-
-                /* connect xtal input to 27MHz reference */
-                clocks = <&ref27>;
-
-                /* connect xtal input as source of pll0 and pll1 */
-                silabs,pll-source = <0 0>, <1 0>;
-
-                clkout0: clkout0 {
-                        reg = <0>;
-                        silabs,drive-strength = <8>;
-                        silabs,multisynth-source = <1>;
-                        silabs,clock-source = <0>;
-                        silabs,pll-master;
-                        clock-frequency = <18432000>;
-                 };
-
-                clkout1: clkout1 {
-                        reg = <1>;
-                        silabs,drive-strength = <8>;
-                        silabs,multisynth-source = <0>;
-                        silabs,clock-source = <0>;
-                        clock-frequency = <8000000>;
-                };
-
-                clkout2: clkout2 {
-                        reg = <2>;
-                        silabs,drive-strength = <8>;
-                        silabs,multisynth-source = <0>;
-                        silabs,clock-source = <0>;
-                        silabs,pll-master;
-                        clock-frequency = <12288000>;
-                };
-        };
-
-I am losing hope that this driver is stable enough to even use in production.
-> 
-> Sebastian
-> 
+diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
+index 95254585db86..a314d800f394 100644
+--- a/drivers/bus/omap_l3_noc.h
++++ b/drivers/bus/omap_l3_noc.h
+@@ -274,7 +274,7 @@ static struct l3_flagmux_data dra_l3_flagmux_clk1 = {
+ 
+ static struct l3_target_data dra_l3_target_data_clk2[] = {
+ 	{0x0,	"HOST CLK1",},
+-	{0x0,	"HOST CLK2",},
++	{0x800000, "HOST CLK2",},
+ 	{0xdead, L3_TARGET_NOT_SUPPORTED,},
+ 	{0x3400, "SHA2_2",},
+ 	{0x0900, "BB2D",},
+-- 
+1.7.9.5
