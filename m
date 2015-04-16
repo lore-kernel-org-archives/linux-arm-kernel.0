@@ -1,17 +1,60 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Thu, 16 Apr 2015 15:15:25 -0500
-Subject: [PATCH v2 3/9] ARM: dts: add imx7d soc dtsi file
-In-Reply-To: <1429211860-14438-4-git-send-email-Frank.Li@freescale.com>
-References: <1429211860-14438-1-git-send-email-Frank.Li@freescale.com>
- <1429211860-14438-4-git-send-email-Frank.Li@freescale.com>
-Message-ID: <5530185D.5040108@mentor.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 16 Apr 2015 22:37:19 +0200
+Subject: AM335x OMAP2 common clock external fixed-clock registration
+In-Reply-To: <20150416161756.GA27590@deathray>
+References: <20150414211734.GA28974@deathray> <552E0688.1020903@ti.com>
+ <20150415140945.GA30787@deathray> <552EB152.7050306@ti.com>
+ <20150415194707.GA11007@deathray>
+ <CAPtuhTggHctp5ArGPEuKn2GuPzb-WnKv2_CzPrHzq8hwOR5Aqw@mail.gmail.com>
+ <20150415205136.GA3399@deathray> <552F3B60.8050703@ti.com>
+ <20150416161756.GA27590@deathray>
+Message-ID: <55301D7F.30708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2015 02:17 PM, Frank.Li at freescale.com wrote:
-> +	timer {
-> +		compatible = "arm,armv7-timer";
-> +		arm,cpu-registers-not-fw-configured;
+On 16.04.2015 18:17, Michael Welling wrote:
+> On Thu, Apr 16, 2015 at 07:32:32AM +0300, Tero Kristo wrote:
+>> On 04/15/2015 11:51 PM, Michael Welling wrote:
+>>> On Wed, Apr 15, 2015 at 01:45:53PM -0700, Mike Turquette wrote:
+>>>> On Wed, Apr 15, 2015 at 12:47 PM, Michael Welling <mwelling@ieee.org> wrote:
+[...]
+>>>>> There is still an issue with the si5351.
+>>>>>
+>>>>> I had to comment out the clk_put here for the frequency to show up:
+>>>>> http://lxr.free-electrons.com/source/drivers/clk/clk-si5351.c#L1133
+>>>>>
+>>>>> Ideas?
+>>>>
+>>>> What is the most recent upstream commit that you are based on?
+>>>
+>>> I am working from 4.0.0-rc7.
+>>>
+>>> 7b43b47373d40d557cd7e1a84a0bd8ebc4d745ab
+>>
+>> Hmm, I wonder why si5351 calls clk_put immediately after of_clk_get
+>> in the first place, as far as I understand this destroys the clock
+>> handle, which is still being used later in the code.
+>
+> Not sure how this ever worked. This has been in the code since the
+> initial commit.
 
-Just checking -- do you definitely need this property?  If so, the VDSO
-won't be able to service gettimeofday/clock_gettime.
+The reason it worked before may be related with recent rework of
+clk_put() itself and clk cookies instead of pointers. I lost track on
+the recent clk subsystem changes here, sorry.
+
+However, droping the clk immediately surely isn't right.
+The thing is, we can remove the clk_put() just because there is no
+_remove() for that driver. I remember that back in the days the driver
+was mainlined, clk removal wasn't too easy.
+
+FWIW, as soon as _remove() support will be added by someone, we'll have
+to rethink passing struct clk* by platform_data or at least
+double-check if we ever used [of_]clk_get() to obtain it.
+
+Mind to send a patch removing the clk_put() on !IS_ERR and add a proper
+error path instead? While of_clk_get() is the only calls that need
+cleanup on error in si5351_dt_parse() we should probably move that
+calls to the end of this function. Otherwise we'd also have to cleanup
+on every of_parse_foo() failure.
+
+Sebastian
