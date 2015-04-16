@@ -1,48 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 16 Apr 2015 15:27:03 +0100
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <09A21550-3538-4A8E-AB12-A9A516D3E866@theobroma-systems.com>
-References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>
- <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
- <20150415100153.GA11626@localhost> <2243754.JW5bGY74bP@wuerfel>
- <20150415153800.GG22741@localhost>
- <C342B5CD-D1E2-4364-B99E-C85470A869BB@theobroma-systems.com>
- <20150415172219.GE26099@e104818-lin.cambridge.arm.com>
- <552EE560.9070205@suse.de>
- <20150416110325.GB819@e104818-lin.cambridge.arm.com>
- <09A21550-3538-4A8E-AB12-A9A516D3E866@theobroma-systems.com>
-Message-ID: <20150416142703.GD819@e104818-lin.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 16 Apr 2015 09:36:17 -0500
+Subject: [PATCH 1/2] Documentation: devicetree: root node serial-number
+ property documentation
+In-Reply-To: <1429175421.2483.1.camel@collins>
+References: <1427564371-26039-1-git-send-email-contact@paulk.fr>
+ <f6f4f862c78fa626e7f94bde51eec5b1@agner.ch> <1429175421.2483.1.camel@collins>
+Message-ID: <CAL_JsqKdHQZL5Z6hKgquKihFykX0ZiCDQfeHOfOZWOh2NMg4Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 01:19:14PM +0200, Dr. Philipp Tomsich wrote:
-> Just for the record (and to avoid anyone wasting their time on what?s available
-> today): we are migrating this over to option (a) now, even though we would
-> prefer to see option (b) implemented.
-> 
-> If we get a consensus on (b) in the next couple of days, we?ll redo things for
-> option (b). If not, we will have an implementation for option (a) available that
-> we can hopefully all agree on merging.
+On Thu, Apr 16, 2015 at 4:10 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
+> Le jeudi 16 avril 2015 ? 09:56 +0200, Stefan Agner a ?crit :
+>> On 2015-03-28 18:39, Paul Kocialkowski wrote:
+>> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+>>
+>> I think this is a worthwhile standardization.
+>>
+>> Acked-by: Stefan Agner <stefan@agner.ch>
+>
+> Thanks! I should also add a commit message in v2 mentioning that this is
+> already used in open firmware and reported by lshw.
 
-When you post, please include the libc-alpha list (I think they are fine
-with cross-posting), maybe only for the cover letter as that's where the
-useful discussion seems to happen.
+With that,
 
-It's interesting to re-read some older posts on x32 (it's not just
-time_t affected, though probably that the most visible):
+Acked-by: Rob Herring <robh@kernel.org>
 
-https://lwn.net/Articles/457089/
-https://sourceware.org/ml/libc-alpha/2012-03/msg00487.html
-https://sourceware.org/ml/libc-alpha/2012-03/msg00574.html
-
-Basically for x32 POSIX compliance doesn't seem too critical. IIUC, the
-x32 wasn't added to solve a 32-bit compatibility problem but as a
-potential optimisation for specific cases.
-
-On ARM OTOH, (one of?) the main goal for AArch64 ILP32 is to offer a
-solution for 32-bit code when AArch32 is not present (and potentially
-slightly more optimal than AArch32 but not necessarily when compared to
-LP64).
-
--- 
-Catalin
+>
+>> > ---
+>> >  Documentation/devicetree/booting-without-of.txt | 4 ++++
+>> >  1 file changed, 4 insertions(+)
+>> >
+>> > diff --git a/Documentation/devicetree/booting-without-of.txt
+>> > b/Documentation/devicetree/booting-without-of.txt
+>> > index 7768518..8b055897 100644
+>> > --- a/Documentation/devicetree/booting-without-of.txt
+>> > +++ b/Documentation/devicetree/booting-without-of.txt
+>> > @@ -828,6 +828,10 @@ address which can extend beyond that limit.
+>> >    name may clash with standard defined ones, you prefix them with your
+>> >    vendor name and a comma.
+>> >
+>> > +  Additional properties for the root node:
+>> > +
+>> > +    - serial-number : a string representing the board's serial number
+>> > +
+>> >    b) The /cpus node
+>> >
+>> >    This node is the parent of all individual CPU nodes. It doesn't
+>>
+>
