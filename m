@@ -1,51 +1,124 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Apr 2015 12:50:38 +0100
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <DM2PR0301MB0640C59C08CBEB4F2F392BAEE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>	<1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <20150415173654.431f5d89@arm.com>
- <DM2PR0301MB0640576D29E70392C41444DFE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <552F8910.9000701@arm.com>
- <DM2PR0301MB0640C59C08CBEB4F2F392BAEE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
-Message-ID: <552FA20E.3060202@arm.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Thu, 16 Apr 2015 05:16:02 -0700
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <552F9F60.7090406@eu.citrix.com>
+References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
+ <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+ <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+ <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
+ <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552E9E8D.1080000@eu.citrix.com>
+ <1429119688.7346.123.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504151846110.7690@kaball.uk.xensource.com>
+ <1429121867.7346.136.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552F9F60.7090406@eu.citrix.com>
+Message-ID: <1429186562.7346.184.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minghuan,
+On Thu, 2015-04-16 at 12:39 +0100, George Dunlap wrote:
+> On 04/15/2015 07:17 PM, Eric Dumazet wrote:
+> > Do not expect me to fight bufferbloat alone. Be part of the challenge,
+> > instead of trying to get back to proven bad solutions.
+> 
+> I tried that.  I wrote a description of what I thought the situation
+> was, so that you could correct me if my understanding was wrong, and
+> then what I thought we could do about it.  You apparently didn't even
+> read it, but just pointed me to a single cryptic comment that doesn't
+> give me enough information to actually figure out what the situation is.
+> 
+> We all agree that bufferbloat is a problem for everybody, and I can
+> definitely understand the desire to actually make the situation better
+> rather than dying the death of a thousand exceptions.
+> 
+> If you want help fighting bufferbloat, you have to educate people to
+> help you; or alternately, if you don't want to bother educating people,
+> you have to fight it alone -- or lose the battle due to having a
+> thousand exceptions.
+> 
+> So, back to TSQ limits.  What's so magical about 2 packets being *in the
+> device itself*?  And what does 1ms, or 2*64k packets (the default for
+> tcp_limit_output_bytes), have anything to do with it?
+> 
+> Your comment lists three benefits:
+> 1. better RTT estimation
+> 2. faster recovery
+> 3. high rates
+> 
+> #3 is just marketing fluff; it's also contradicted by the statement that
+> immediately follows it -- i.e., there are drivers for which the
+> limitation does *not* give high rates.
+> 
+> #1, as far as I can tell, has to do with measuring the *actual* minimal
+> round trip time of an empty pipe, rather than the round trip time you
+> get when there's 512MB of packets in the device buffer.  If a device has
+> a large internal buffer, then having a large number of packets
+> outstanding means that the measured RTT is skewed.
+> 
+> The goal here, I take it, is to have this "pipe" *exactly* full; having
+> it significantly more than "full" is what leads to bufferbloat.
+> 
+> #2 sounds like you're saying that if there are too many packets
+> outstanding when you discover that you need to adjust things, that it
+> takes a long time for your changes to have an effect; i.e., if you have
+> 5ms of data in the pipe, it will take at least 5ms for your reduced
+> transmmission rate to actually have an effect.
+> 
+> Is that accurate, or have I misunderstood something?
 
-On 16/04/15 11:57, Minghuan.Lian at freescale.com wrote:
+#2 means that :
 
-Please include the relevant people (Will Deacon for questions about the
-SMMU), and avoid top posting, it makes it very hard to follow a discussion.
+If you have an outstanding queue of 500 packets for a flow in qdisc.
 
-> I still have a couple of questions,
-> 1. If I add a new flag and all PCI DEVID will be replaced with a
-> fixed ID,  does SMMU can work correctly? For example, If we insert an
-> Ethernet card with two ports, a port is assigned to kvm1, another
-> port is assigned to kvm2. In this case, we should use one or two
-> fixed ID?
+A rtx has to be done, because we receive a SACK.
 
-That completely depends on what the SMMU sees. If it sees the same ID,
-you won't be able to perform any form of isolation. But I have no idea
-how your hardware works, so maybe explaining in details how this is
-constructed will help.
+The rtx is queued _after_ the previous 500 packets.
 
-> 2. If using PCIe device with SR-IOV, the driver will dynamically
-> create some new PCIe devices. At this time, ITS device may has been
-> created for PF.  So we must previously  create ITS device with a
-> large enough nvesc. However its_get_pci_alias: dev_alias->count +=
-> its_pci_msi_vec_count(dev_alias->pdev) only calculate with the
-> exiting PCIe device, could not meet this requirement. How to change
-> dev_alias->count?
+500 packets have to be drained before rtx can be sent and eventually
+reach destination.
 
-You cannot change this dynamically. The ITT for this DeviceID will have
-been allocated, and the ITS is getting live traffic. No way you're going
-to resize it.
 
-You will probable have to add some extra quirks to force the allocation
-of a much larger ITT by lying about the nvec somehow. Or forget about
-SRIOV and hotplug.
+These 500 packets will likely be dropped because the destination cannot
+process them before the rtx.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+2 TSO packets are already 90 packets (MSS=1448). It is not small, but a
+good compromise allowing line rate even on 40Gbit NIC.
+
+
+#1 is not marketing. It is hugely relevant.
+
+You might use cubic as the default congestion control, you have to
+understand we work hard on delay based cc, as losses are no longer a way
+to measure congestion in modern networks.
+
+Vegas and delay gradient congestion depends on precise RTT measures.
+
+I added usec RTT estimations (instead of jiffies based rtt samples) to
+increase resolution by 3 order of magnitude, not for marketing, but
+because it had to be done when DC communications have typical rtt of 25
+usec these days.
+
+And jitter in host queues is not nice and must be kept at the minimum.
+
+You do not have the whole picture, but this tight bufferbloat control is
+one step before we can replace cubic by new upcoming cc, that many
+companies are actively developing and testing.
+
+The steps are the following :
+
+1) TCP Small queues
+2) FQ/pacing
+3) TSO auto sizing
+3) usec rtt estimations
+4) New revolutionary cc module currently under test at Google,
+   but others have alternatives.
+
+
+The fact that few drivers have bugs should not stop this effort.
+
+If you guys are in the Bay area, we would be happy to host a meeting
+where we can present you how our work reduced packet drops in our
+networks by 2 order of magnitude, and increased capacity by 40 or 50%.
