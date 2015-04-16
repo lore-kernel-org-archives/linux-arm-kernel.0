@@ -1,56 +1,38 @@
 From: orjan.eide@arm.com (=?UTF-8?q?=C3=98rjan=20Eide?=)
-Date: Thu, 16 Apr 2015 16:41:52 +0200
-Subject: [PATCH 2/2] ARM: DMA: Use vm_pgoff for IOMMU mmap
-In-Reply-To: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
-References: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
-Message-ID: <1429195312-25898-2-git-send-email-orjan.eide@arm.com>
+Date: Thu, 16 Apr 2015 16:41:51 +0200
+Subject: [PATCH 1/2] drm: rockchip: Don't pass DRM fake offset to dma-api
+Message-ID: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm_iommu_mmap_attrs() ignores the page offset in vma->vm_pgoff that was
-specified in the mmap call. Any user of dma_mmap_* will get an
-unexpected result when the device uses the IOMMU DMA ops.
+Set vm_pgoff to 0 after using it to look up the GEM node, before passing
+it on rockchip_gem_mmap_buf() where the offset must be from the start of
+the buffer.
 
-Some DRM driver that use dma_mmap_* seems to depend on it ignoring
-vma->vm_pgoff.  Both the Samsung Exynos DRM driver before v3.18, and the
-current Rockchip DRM driver, use the page offset to pass GEM cookies
-that are used to look up the GEM buffers and then call dma_mmap_attrs()
-with the cookie value still in vma->vm_pgoff.
-
-rockchip_gem_mmap_buf() in drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-still does this. It should be fixed before fixing
-arm_iommu_mmap_attrs().
+Passing in the fake offset currently works because the
+dma_mmap_attrs implementation that is used for this device,
+arm_iommu_mmap_attrs, ignores the offset completely.
 
 Signed-off-by: ?rjan Eide <orjan.eide@arm.com>
 ---
- arch/arm/mm/dma-mapping.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index c274476..07d571b 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1364,6 +1364,9 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
- {
- 	unsigned long uaddr = vma->vm_start;
- 	unsigned long usize = vma->vm_end - vma->vm_start;
-+	unsigned long nr_vma_pages = usize >> PAGE_SHIFT;
-+	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	unsigned long off = vma->vm_pgoff;
- 	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+index 7ca8799e..69f01c3 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -94,6 +94,11 @@ int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
+ 		return -EACCES;
+ 	}
  
- 	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
-@@ -1371,6 +1374,11 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
- 	if (!pages)
- 		return -ENXIO;
++	/* Set vm_pgoff (used as a fake buffer offset by DRM) to 0 and map the
++	 * whole buffer from the start.
++	 */
++	vma->vm_pgoff = 0;
++
+ 	obj = container_of(node, struct drm_gem_object, vma_node);
+ 	ret = rockchip_gem_mmap_buf(obj, vma);
  
-+	if (off >= nr_pages || nr_vma_pages > (nr_pages - off))
-+		return -ENXIO;
-+
-+	pages += off;
-+
- 	do {
- 		int ret = vm_insert_page(vma, uaddr, *pages++);
- 		if (ret) {
 -- 
 1.9.1
