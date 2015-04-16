@@ -1,28 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Apr 2015 08:19:43 +0200
-Subject: some question about writel implement in arm platform
-In-Reply-To: <CADUS3om64T1pfRqo7nRAVcnj7SKUR2jt4ZsYBcHrgpa7Zb1pkw@mail.gmail.com>
-References: <CADUS3om64T1pfRqo7nRAVcnj7SKUR2jt4ZsYBcHrgpa7Zb1pkw@mail.gmail.com>
-Message-ID: <3810108.M3CSfEDqyN@wuerfel>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 16 Apr 2015 14:25:26 +0800
+Subject: [PATCH net-next 2/6] net: hip04: use the big endian for tx and
+ rx desc
+In-Reply-To: <6631765.x1c1LvG6uN@wuerfel>
+References: <1429101008-9464-1-git-send-email-dingtianhong@huawei.com>
+ <1429101008-9464-3-git-send-email-dingtianhong@huawei.com>
+ <6631765.x1c1LvG6uN@wuerfel>
+Message-ID: <552F55D6.1040307@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 April 2015 13:28:41 yoma sophian wrote:
-> hi all:
-> the implementation of writel in ARM is writel_relaxed() with barrier
-> before (DSB + outer cache sync).
+On 2015/4/15 22:13, Arnd Bergmann wrote:
+> On Wednesday 15 April 2015 20:30:04 Ding Tianhong wrote:
+>> The hip04 ethernet use the big endian for tx and rx, so set desc to
+>> big endian and remove the unused next_addr.
 > 
-> if the memory is device memory, shall we still need outer cache sync?
+> I don't understand:
+> 
+>> diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
+>> index b0a7f03..6473462 100644
+>> --- a/drivers/net/ethernet/hisilicon/hip04_eth.c
+>> +++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
+>> @@ -132,19 +132,18 @@
+>>  #define HIP04_MIN_TX_COALESCE_FRAMES   1
+>>  
+>>  struct tx_desc {
+>> -       u32 send_addr;
+>> -       u32 send_size;
+>> -       u32 next_addr;
+>> -       u32 cfg;
+>> -       u32 wb_addr;
+>> +       __be32 send_addr;
+>> +       __be32 send_size;
+>> +       __be32 cfg;
+>> +       __be32 wb_addr;
+>>  } __aligned(64);
+> 
+> I would think this is a hardware structure, does this not break
+> access to the cfg and wb_addr fields if you remove next_addr?
+> 
+> 	Arnd
+> 
+good cache, I make a mistake here, thanks.
 
-Yes.
-
-> if the memory is normal normal, under what circumstance we will write
-> it with writel.
-
-For normal memory, you never use writel.
-
-> As far as I know, the writel is used for register writing.
-
-Correct.
-
-	Arnd
+> .
+> 
