@@ -1,65 +1,93 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 16 Apr 2015 16:40:37 +0900
-Subject: [PATCH 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs and
- boards
+Date: Thu, 16 Apr 2015 16:40:35 +0900
+Subject: [PATCH 1/4] ARM: UniPhier: add basic support for UniPhier architecture
 In-Reply-To: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1429170038-16757-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1429170038-16757-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial device trees for UniPhier SoCs: PH1-sLD3, PH1-LD4, PH1-Pro4,
-and PH1-sLD8.
+Initial commit for a new SoC family, UniPhier, developed by
+Socionext Inc. (formerly, System LSI Business Division of
+Panasonic Corporation).
+
+This commit includes a minimal set of components for booting the
+kernel, including SMP support.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/dts/Makefile                   |  5 ++
- arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts   | 51 +++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-ld4.dtsi      | 78 +++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts  | 51 +++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-pro4.dtsi     | 85 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts  | 52 +++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld3.dtsi     | 85 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts  | 51 +++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld8.dtsi     | 78 +++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-support-card.dtsi | 39 +++++++++++++
- 10 files changed, 575 insertions(+)
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-support-card.dtsi
+ arch/arm/Kconfig                  |  2 +
+ arch/arm/Makefile                 |  1 +
+ arch/arm/mach-uniphier/Kconfig    | 11 ++++++
+ arch/arm/mach-uniphier/Makefile   |  2 +
+ arch/arm/mach-uniphier/headsmp.S  | 21 +++++++++++
+ arch/arm/mach-uniphier/platsmp.c  | 78 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-uniphier/uniphier.c | 31 ++++++++++++++++
+ 7 files changed, 146 insertions(+)
+ create mode 100644 arch/arm/mach-uniphier/Kconfig
+ create mode 100644 arch/arm/mach-uniphier/Makefile
+ create mode 100644 arch/arm/mach-uniphier/headsmp.S
+ create mode 100644 arch/arm/mach-uniphier/platsmp.c
+ create mode 100644 arch/arm/mach-uniphier/uniphier.c
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b..d639a90 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -588,6 +588,11 @@ dtb-$(CONFIG_ARCH_U8500) += \
- 	ste-hrefv60plus-tvk.dtb \
- 	ste-ccu8540.dtb \
- 	ste-ccu9540.dtb
-+dtb-$(CONFIG_ARCH_UNIPHIER) += \
-+	uniphier-ph1-sld3-ref.dtb \
-+	uniphier-ph1-ld4-ref.dtb \
-+	uniphier-ph1-pro4-ref.dtb \
-+	uniphier-ph1-sld8-ref.dtb
- dtb-$(CONFIG_ARCH_VERSATILE) += \
- 	versatile-ab.dtb \
- 	versatile-pb.dtb
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 392e7ae..c332b98 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -963,6 +963,8 @@ source "arch/arm/mach-tegra/Kconfig"
+ 
+ source "arch/arm/mach-u300/Kconfig"
+ 
++source "arch/arm/mach-uniphier/Kconfig"
++
+ source "arch/arm/mach-ux500/Kconfig"
+ 
+ source "arch/arm/mach-versatile/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 5575d9f..9de6aa6 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -201,6 +201,7 @@ machine-$(CONFIG_ARCH_SUNXI)		+= sunxi
+ machine-$(CONFIG_ARCH_TEGRA)		+= tegra
+ machine-$(CONFIG_ARCH_U300)		+= u300
+ machine-$(CONFIG_ARCH_U8500)		+= ux500
++machine-$(CONFIG_ARCH_UNIPHIER)		+= uniphier
+ machine-$(CONFIG_ARCH_VERSATILE)	+= versatile
+ machine-$(CONFIG_ARCH_VEXPRESS)		+= vexpress
+ machine-$(CONFIG_ARCH_VT8500)		+= vt8500
+diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/mach-uniphier/Kconfig
 new file mode 100644
-index 0000000..2e83363
+index 0000000..a017b1d
 --- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-@@ -0,0 +1,51 @@
++++ b/arch/arm/mach-uniphier/Kconfig
+@@ -0,0 +1,11 @@
++config ARCH_UNIPHIER
++	bool "Socionext UniPhier SoCs"
++	depends on ARCH_MULTI_V7
++	select ARM_AMBA
++	select ARM_GLOBAL_TIMER
++	select ARM_GIC
++	select HAVE_ARM_SCU
++	select HAVE_ARM_TWD
++	help
++	  Support for UniPhier SoC family developed by Socionext Inc.
++	  (formerly, System LSI Business Division of Panasonic Corporation)
+diff --git a/arch/arm/mach-uniphier/Makefile b/arch/arm/mach-uniphier/Makefile
+new file mode 100644
+index 0000000..46cfa54
+--- /dev/null
++++ b/arch/arm/mach-uniphier/Makefile
+@@ -0,0 +1,2 @@
++obj-y			:= uniphier.o
++obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
+diff --git a/arch/arm/mach-uniphier/headsmp.S b/arch/arm/mach-uniphier/headsmp.S
+new file mode 100644
+index 0000000..8d94877
+--- /dev/null
++++ b/arch/arm/mach-uniphier/headsmp.S
+@@ -0,0 +1,21 @@
 +/*
-+ * Device Tree Source for UniPhier PH1-LD4 Reference Board
-+ *
 + * Copyright (C) 2015 Socionext Inc.
 + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
 + *
@@ -74,49 +102,19 @@ index 0000000..2e83363
 + * GNU General Public License for more details.
 + */
 +
-+/dts-v1/;
-+/include/ "uniphier-ph1-ld4.dtsi"
-+/include/ "uniphier-support-card.dtsi"
++#include <linux/linkage.h>
 +
-+/ {
-+	model = "UniPhier PH1-LD4 Reference Board";
-+	compatible = "socionext,ph1-ld4-ref", "socionext,ph1-ld4";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	aliases {
-+		serial0 = &serialsc;
-+	};
-+};
-+
-+&extbus {
-+	ranges = <0 0x00000000 0x0f000000 0x01000000
-+		  1 0x00000000 0x00000000 0x08000000>;
-+};
-+
-+&support_card {
-+	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+};
-+
-+&serialsc {
-+	interrupts = <0 49 4>;
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
++ENTRY(uniphier_secondary_startup)
++	bl	v7_invalidate_l1
++	b	secondary_startup
++ENDPROC(uniphier_secondary_startup)
+diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
 new file mode 100644
-index 0000000..f1b31dc
+index 0000000..6b61f8d
 --- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
++++ b/arch/arm/mach-uniphier/platsmp.c
 @@ -0,0 +1,78 @@
 +/*
-+ * Device Tree Source for UniPhier PH1-LD4 SoC
-+ *
 + * Copyright (C) 2015 Socionext Inc.
 + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
 + *
@@ -131,76 +129,76 @@ index 0000000..f1b31dc
 + * GNU General Public License for more details.
 + */
 +
-+/include/ "skeleton.dtsi"
++#include <linux/sizes.h>
++#include <linux/init.h>
++#include <asm/io.h>
++#include <asm/smp.h>
++#include <asm/smp_scu.h>
 +
-+/ {
-+	compatible = "socionext,ph1-ld4";
++#define ROM_BOOT_ROMRSV2		0x59801208
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++static void __init uniphier_smp_prepare_cpus(unsigned int max_cpus)
++{
++	static cpumask_t only_cpu_0 = { CPU_BITS_CPU0 };
++	unsigned long scu_base_phys = 0;
++	void __iomem *scu_base;
 +
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+	};
++	if (scu_a9_has_base())
++		scu_base_phys = scu_a9_get_base();
 +
-+	clocks {
-+		arm_timer_clk: arm_timer_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <50000000>;
-+		};
-+	};
++	if (!scu_base_phys) {
++		pr_err("failed to get scu base\n");
++		goto err;
++	}
 +
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		interrupt-parent = <&intc>;
++	scu_base = ioremap(scu_base_phys, SZ_128);
++	if (!scu_base) {
++		pr_err("failed to remap scu base (0x%08lx)\n", scu_base_phys);
++		goto err;
++	}
 +
-+		extbus: extbus {
-+			compatible = "simple-bus";
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+		};
++	scu_enable(scu_base);
++	iounmap(scu_base);
 +
-+		timer at 60000200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x60000200 0x20>;
-+			interrupts = <1 11 0x104>;
-+			interrupt-parent = <&intc>;
-+			clocks = <&arm_timer_clk>;
-+		};
++err:
++	pr_warn("disabling SMP\n");
++	init_cpu_present(&only_cpu_0);
++}
 +
-+		timer at 60000600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x60000600 0x20>;
-+			interrupts = <1 13 0x104>;
-+			clocks = <&arm_timer_clk>;
-+		};
++void uniphier_secondary_startup(void);
 +
-+		intc: interrupt-controller at 60001000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x60001000 0x1000>,
-+			      <0x60000100 0x100>;
-+		};
-+	};
++static int uniphier_boot_secondary(unsigned int cpu,
++				   struct task_struct *idle)
++{
++	void __iomem *reg;
++
++	reg = ioremap(ROM_BOOT_ROMRSV2, 4);
++	if (!reg) {
++		pr_err("failed to remap ROM_BOOT_ROMRSV2.\n");
++		return -ENOMEM;
++	}
++
++	writel(virt_to_phys(uniphier_secondary_startup), reg);
++	iounmap(reg);
++
++	asm("sev");
++
++	return 0;
++}
++
++struct smp_operations uniphier_smp_ops __initdata = {
++	.smp_prepare_cpus	= uniphier_smp_prepare_cpus,
++	.smp_boot_secondary	= uniphier_boot_secondary,
 +};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
++CPU_METHOD_OF_DECLARE(uniphier_smp, "socionext,uniphier-smp",
++		      &uniphier_smp_ops);
+diff --git a/arch/arm/mach-uniphier/uniphier.c b/arch/arm/mach-uniphier/uniphier.c
 new file mode 100644
-index 0000000..5e33995
+index 0000000..f08ccf5
 --- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-@@ -0,0 +1,51 @@
++++ b/arch/arm/mach-uniphier/uniphier.c
+@@ -0,0 +1,31 @@
 +/*
-+ * Device Tree Source for UniPhier PH1-Pro4 Reference Board
-+ *
 + * Copyright (C) 2015 Socionext Inc.
 + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
 + *
@@ -215,465 +213,21 @@ index 0000000..5e33995
 + * GNU General Public License for more details.
 + */
 +
-+/dts-v1/;
-+/include/ "uniphier-ph1-pro4.dtsi"
-+/include/ "uniphier-support-card.dtsi"
++#include <asm/mach/arch.h>
 +
-+/ {
-+	model = "UniPhier PH1-Pro4 Reference Board";
-+	compatible = "socionext,ph1-pro4-ref", "socionext,ph1-pro4";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x40000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	aliases {
-+		serial0 = &serialsc;
-+	};
++static const char * const uniphier_board_dt_compat[] __initconst = {
++	"socionext,ph1-sld3",
++	"socionext,ph1-ld4",
++	"socionext,ph1-pro4",
++	"socionext,ph1-sld8",
++	"socionext,ph1-pro5",
++	"socionext,ph1-proxstream2",
++	"socionext,ph1-ld6b",
++	NULL,
 +};
 +
-+&extbus {
-+	ranges = <0 0x00000000 0x0f000000 0x01000000
-+		  1 0x00000000 0x00000000 0x08000000>;
-+};
-+
-+&support_card {
-+	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+};
-+
-+&serialsc {
-+	interrupts = <0 50 4>;
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-new file mode 100644
-index 0000000..7fceedc
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-@@ -0,0 +1,85 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-Pro4 SoC
-+ *
-+ * Copyright (C) 2015 Socionext Inc.
-+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "socionext,ph1-pro4";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "socionext,uniphier-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+		};
-+	};
-+
-+	clocks {
-+		arm_timer_clk: arm_timer_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <50000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		interrupt-parent = <&intc>;
-+
-+		extbus: extbus {
-+			compatible = "simple-bus";
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+		};
-+
-+		timer at 60000200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x60000200 0x20>;
-+			interrupts = <1 11 0x304>;
-+			interrupt-parent = <&intc>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		timer at 60000600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x60000600 0x20>;
-+			interrupts = <1 13 0x304>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		intc: interrupt-controller at 60001000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x60001000 0x1000>,
-+			      <0x60000100 0x100>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-new file mode 100644
-index 0000000..f8f2fa3
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-@@ -0,0 +1,52 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-sLD3 Reference Board
-+ *
-+ * Copyright (C) 2015 Socionext Inc.
-+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+/include/ "uniphier-ph1-sld3.dtsi"
-+/include/ "uniphier-support-card.dtsi"
-+
-+/ {
-+	model = "UniPhier PH1-sLD3 Reference Board";
-+	compatible = "socionext,ph1-sld3-ref", "socionext,ph1-sld3";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000
-+		       0xc0000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	aliases {
-+		serial0 = &serialsc;
-+	};
-+};
-+
-+&extbus {
-+	ranges = <0 0x00000000 0x0f000000 0x01000000
-+		  1 0x00000000 0x00000000 0x08000000>;
-+};
-+
-+&support_card {
-+	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+};
-+
-+&serialsc {
-+	interrupts = <0 49 4>;
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
-new file mode 100644
-index 0000000..06db2a4
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
-@@ -0,0 +1,85 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-sLD3 SoC
-+ *
-+ * Copyright (C) 2015 Socionext Inc.
-+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "socionext,ph1-sld3";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "socionext,uniphier-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+		};
-+	};
-+
-+	clocks {
-+		arm_timer_clk: arm_timer_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <50000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		interrupt-parent = <&intc>;
-+
-+		extbus: extbus {
-+			compatible = "simple-bus";
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+		};
-+
-+		timer at 20000200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x20000200 0x20>;
-+			interrupts = <1 11 0x304>;
-+			interrupt-parent = <&intc>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		timer at 20000600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x20000600 0x20>;
-+			interrupts = <1 13 0x304>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		intc: interrupt-controller at 20001000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x20001000 0x1000>,
-+			      <0x20000100 0x100>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-new file mode 100644
-index 0000000..279a997
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-@@ -0,0 +1,51 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-sLD8 Reference Board
-+ *
-+ * Copyright (C) 2015 Socionext Inc.
-+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+/include/ "uniphier-ph1-sld8.dtsi"
-+/include/ "uniphier-support-card.dtsi"
-+
-+/ {
-+	model = "UniPhier PH1-sLD8 Reference Board";
-+	compatible = "socionext,ph1-sld8-ref", "socionext,ph1-sld8";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	aliases {
-+		serial0 = &serialsc;
-+	};
-+};
-+
-+&extbus {
-+	ranges = <0 0x00000000 0x0f000000 0x01000000
-+		  1 0x00000000 0x00000000 0x08000000>;
-+};
-+
-+&support_card {
-+	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+};
-+
-+&serialsc {
-+	interrupts = <0 48 4>;
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-new file mode 100644
-index 0000000..47d9d61
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-@@ -0,0 +1,78 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-sLD8 SoC
-+ *
-+ * Copyright (C) 2015 Socionext Inc.
-+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "socionext,ph1-sld8";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+	};
-+
-+	clocks {
-+		arm_timer_clk: arm_timer_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <50000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		interrupt-parent = <&intc>;
-+
-+		extbus: extbus {
-+			compatible = "simple-bus";
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+		};
-+
-+		timer at 60000200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x60000200 0x20>;
-+			interrupts = <1 11 0x104>;
-+			interrupt-parent = <&intc>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		timer at 60000600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x60000600 0x20>;
-+			interrupts = <1 13 0x104>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		intc: interrupt-controller at 60001000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x60001000 0x1000>,
-+			      <0x60000100 0x100>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/uniphier-support-card.dtsi b/arch/arm/boot/dts/uniphier-support-card.dtsi
-new file mode 100644
-index 0000000..2abbec1
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-support-card.dtsi
-@@ -0,0 +1,39 @@
-+/*
-+ * Device Tree Source for UniPhier Support Card (Expansion Board)
-+ *
-+ * Copyright (C) 2015 Socionext Inc.
-+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+&extbus {
-+	support_card: support_card {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		ethsc: ethernet at 00000000 {
-+			compatible = "smsc,lan9118", "smsc,lan9115";
-+			reg = <0x00000000 0x1000>;
-+			phy-mode = "mii";
-+			reg-io-width = <4>;
-+		};
-+
-+		serialsc: uart at 000b0000 {
-+			compatible = "ns16550a";
-+			reg = <0x000b0000 0x20>;
-+			clock-frequency = <12288000>;
-+			reg-shift = <1>;
-+			fifo-size = <16>;
-+		};
-+	};
-+};
++DT_MACHINE_START(UNIPHIER, "Socionext UniPhier")
++	.dt_compat	= uniphier_board_dt_compat,
++MACHINE_END
 -- 
 1.9.1
