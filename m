@@ -1,76 +1,76 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Apr 2015 16:13:15 +0100
-Subject: [PATCH v4 04/13] arm64: use fixmap region for permanent FDT
- mapping
-In-Reply-To: <1429112064-19952-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
- <1429112064-19952-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150417151315.GH21904@leverpostej>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Fri, 17 Apr 2015 17:15:46 +0200
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <20150417144656.GQ819@e104818-lin.cambridge.arm.com>
+References: <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
+ <2242025.Z9qPVP4zls@wuerfel>
+ <20150417090156.GH819@e104818-lin.cambridge.arm.com>
+ <3365190.ZbiKjUlDk2@wuerfel>
+ <20150417144656.GQ819@e104818-lin.cambridge.arm.com>
+Message-ID: <0394DFCE-2D52-4028-A9F5-BE4285AFC5D9@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 15, 2015 at 04:34:15PM +0100, Ard Biesheuvel wrote:
-> Currently, the FDT blob needs to be in the same 512 MB region as
-> the kernel, so that it can be mapped into the kernel virtual memory
-> space very early on using a minimal set of statically allocated
-> translation tables.
->
-> Now that we have early fixmap support, we can relax this restriction,
-> by moving the permanent FDT mapping to the fixmap region instead.
-> This way, the FDT blob may be anywhere in memory.
->
-> This also moves the vetting of the FDT to mmu.c, since the early
-> init code in head.S does not handle mapping of the FDT anymore.
-> At the same time, fix up some comments in head.S that have gone stale.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  Documentation/arm64/booting.txt | 13 +++++----
->  arch/arm64/include/asm/boot.h   | 14 +++++++++
->  arch/arm64/include/asm/fixmap.h | 15 ++++++++++
->  arch/arm64/include/asm/mmu.h    |  1 +
->  arch/arm64/kernel/head.S        | 39 +------------------------
->  arch/arm64/kernel/setup.c       | 32 +++++++-------------
->  arch/arm64/mm/Makefile          |  2 ++
->  arch/arm64/mm/init.c            |  1 -
->  arch/arm64/mm/mmu.c             | 65 +++++++++++++++++++++++++++++++++++++++++
->  9 files changed, 117 insertions(+), 65 deletions(-)
->  create mode 100644 arch/arm64/include/asm/boot.h
->
-> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> index f3c05b5f9f08..53f18e13d51c 100644
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -45,11 +45,14 @@ sees fit.)
->
->  Requirement: MANDATORY
->
-> -The device tree blob (dtb) must be placed on an 8-byte boundary within
-> -the first 512 megabytes from the start of the kernel image and must not
-> -cross a 2-megabyte boundary. This is to allow the kernel to map the
-> -blob using a single section mapping in the initial page tables.
-> -
-> +The device tree blob (dtb) must be placed on an 8-byte boundary and must
-> +not exceed 2 megabytes in size. Since the dtb will be mapped cacheable using
-> +blocks of up to 2 megabytes in size, it should not be placed within 2 megabytes
-> +of memreserves or other special carveouts that may be mapped with non-matching
-> +attributes.
+More comments below.
 
-Nit: memreserves are always permitted to be mapped cacheable (following
-the ePAPR definition and the de-facto Linux implementation on everything
-other than PPC), so those should be fine.
+> On 17 Apr 2015, at 16:46, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> 
+> Even in this case, we could enable AArch32 compat knowing that ioctls
+> wouldn't work. If this is important, we can add an option to enable
+> ioctl support for ILP32 and re-target the asm/compat.h definitions.
+> 
+>>  g) create a new ABI that does things in exactly the way that we
+>>     would use as the native syscall interface if we had an ilp32
+>>     kernel running on aarch64 with the asm-generic/unistd.h.
+>>     This would mean a 32-bit __kernel_long_t and time_t, but extending
+>>     time_t in the long run, together with aarch32 and i386.
+>>     This one is particularly interesting for people that are interested
+>>     in maximum posix compliance and in having a "nice" ABI, in particular
+>>     if there is a slight chance that within the next decade we have
+>>     reason to support building an arch/arm64 kernel itself in
+>>     aarch64-ilp32 mode.
 
-How about:
+I don?t believe that an ILP32 kernel wouldn?t use an uint64_t for time_t, as it
+has full support for 64bit arithmetic anyway.  I also believe that other kernel 
+internals (e.g. filesystems and inode-numbering) would use native 64bit types.
 
-The device tree blob (dtb) must be placed on an 8-byte boundary and must
-not exceed 2 megabytes in size. Since the dtb will be mapped cacheable
-using blocks of up to 2 megabytes in size, it must not be placed within
-any 2M region which must be mapped with any specific attributes.
+The differences on the kernel side would mainly rest in that only a 32bit address
+space could reasonably be managed. So a native ILP32 ABI would differ from
+the LP64 ABI mainly in how sizeof(long) is represented in the user-space.
 
-As an aside, we perhaps need a more formal definition of /memreserve/
-semantics.
+In other works: a native ILP32 ABI on an ILP32 kernel would have a 64bit time_t.
 
-The code itself looks good to me. I'll try to give that a go with some
-padded DTBs at some point next week.
+>>>> However, it would be nice to get agreement on the normal 32-bit ABI
+>>>> for time_t and timespec first, and then use the same thing everywhere.
+>>> 
+>>> Do you mean for native 32-bit architectures? I think OpenBSD uses a
+>>> 64-bit time_t already on 32-bit arches, it's doable in Linux as well.
+>> 
+>> Yes, and I'm working on that for Linux. The first step involves fixing
+>> the kernel, one file at a time, changing all users of time_t to use
+>> some other type (ktime_t or time64_t in most cases) instead, and introducing
+>> additional system calls to handle the boundary to user space without
+>> breaking stuff. See my presentation at http://elinux.org/ELC_2015_Presentations
+>> for more detail.
+> 
+> The approach here is primarily to fix the problem for existing 32-bit
+> architectures by adding a new syscall and that's fine. But what if we
+> enforce 64-bit time_t for all _new_ architectures?
 
-Mark.
+This boils down to whether we can define all the new syscalls _right now_ and
+get the new (extended) compat-layer set up. In this case we could have a userspace 
+implementation that already conforms to this for ILP32.
+
+Otherwise, we can just put a (MIPS64) N32-alike (AArch64) ILP32 in and migrate
+with everyone else.
+
+Although it feels wrong to add another ABI that has a known limitation, this may
+in fact be the easiest way, as any fix to ILP32 would be done together with the
+fixes to all other 32bit ABIs.
+
+So, while I would like to have a 64bit time_t for ILP32 based on principle, I do see
+the 32bit time_t path as the most pragmatic way forward? especially, as this unlinks
+getting ?some form of? ILP32 merged from resolving the 64bit time_t issue across
+all architectures.
+
+Phil.
