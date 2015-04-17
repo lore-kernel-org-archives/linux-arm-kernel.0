@@ -1,37 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Apr 2015 17:56:02 +0200
-Subject: [PATCH v3 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs
- and boards
-In-Reply-To: <1429285698-11829-4-git-send-email-yamada.masahiro@socionext.com>
-References: <1429285698-11829-1-git-send-email-yamada.masahiro@socionext.com>
- <1429285698-11829-4-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <2809229.iRV9NgGGKe@wuerfel>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 18 Apr 2015 01:00:16 +0900
+Subject: [PATCH 2/4] ARM: multi_v7_defconfig: enable UniPhier SoC family
+In-Reply-To: <3561768.u8t9ftxvsL@wuerfel>
+References: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
+ <1429170038-16757-3-git-send-email-yamada.masahiro@socionext.com>
+ <3561768.u8t9ftxvsL@wuerfel>
+Message-ID: <CAK7LNAQ7rX7+YQHNmuXvRH7TKcVpNUdDRr5qUS6PYxPa=NYP0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 18 April 2015 00:48:17 Masahiro Yamada wrote:
-> +
-> +               smp_syscon at 59801208 {
-> +                       compatible = "socionext,uniphier-smp-reg", "syscon";
-> +                       reg = <0x59801208 0x4>;
-> +               };
-> +
-> 
+Hi Arnd,
 
-Using syscon here is a good idea, but please name the register area
-according to what it is called in the data sheet, not according to how
-it is used in Linux, and list all the registers that belong in this
-device. It's quite possible that another driver needs a second
-register from the same syscon.
 
-E.g. if there is a device called a foo controller, make this device
+2015-04-16 18:42 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 16 April 2015 16:40:36 Masahiro Yamada wrote:
+>> Add UniPhier, a new citizen in the ARM multi platform.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> ---
+>>
+>>  arch/arm/configs/multi_v7_defconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+>> index d7f038d..24005cf 100644
+>> --- a/arch/arm/configs/multi_v7_defconfig
+>> +++ b/arch/arm/configs/multi_v7_defconfig
+>> @@ -81,6 +81,7 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
+>>  CONFIG_ARCH_TEGRA_114_SOC=y
+>>  CONFIG_ARCH_TEGRA_124_SOC=y
+>>  CONFIG_TEGRA_EMC_SCALING_ENABLE=y
+>> +CONFIG_ARCH_UNIPHIER=y
+>>  CONFIG_ARCH_U8500=y
+>>  CONFIG_MACH_HREFV60=y
+>>  CONFIG_MACH_SNOWBALL=y
+>>
+>
+> Any additional device drivers you need?
+>
 
-	foo-controller at 0x59800000 {
-		compatible = "socionext,uniphier-foo-controller", "syscon";
-		reg = <0x59800000 0x4000>;
-	};
+Our drivers are still based-on old kernel version (pre-DT) with local
+ugly hacking.
+I need more time to re-write them based on the current coding style
+(almost from scratch),
+so I'd like to do it as a second round.
 
-then hardcode the 0x1208 offset in the smp code, or add it as an
-argument to the property containing the phandle.
+This series is just mainlining a minimal support with a serial console.
+I think it is a good starting point.
+The UART device is 16550-compatible, so I do not need any additional driver.
 
-	Arnd
+
+
+-- 
+Best Regards
+Masahiro Yamada
