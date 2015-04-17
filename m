@@ -1,143 +1,56 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 17 Apr 2015 11:50:16 +0800
-Subject: [query] how to use "ranges" in device tree
-In-Reply-To: <20150417102413.705b1ca0@xhacker>
-References: <20150416215938.347caa68@xhacker> <55303EE1.1050108@samsung.com>
- <20150417102413.705b1ca0@xhacker>
-Message-ID: <20150417115016.69857a77@xhacker>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 17 Apr 2015 07:22:44 +0200
+Subject: [PATCH 13/13] thermal: of: implement .set_trips for device tree
+ thermal zones
+In-Reply-To: <20150415175936.GR32500@ld-irv-0074>
+References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+ <1427385240-6086-14-git-send-email-s.hauer@pengutronix.de>
+ <20150407024307.GH4648@localhost.localdomain>
+ <20150413063018.GT9742@pengutronix.de>
+ <20150415175936.GR32500@ld-irv-0074>
+Message-ID: <20150417052244.GA6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Brian,
 
-I got the solution, the ranges can define two or more ranges. What I need to do
-is just add ranges for 0xe0000000 - 0xf0000000 as the following:
+On Wed, Apr 15, 2015 at 10:59:36AM -0700, Brian Norris wrote:
+> On Mon, Apr 13, 2015 at 08:30:18AM +0200, Sascha Hauer wrote:
+> > On Mon, Apr 06, 2015 at 07:43:08PM -0700, Eduardo Valentin wrote:
+> > > On Thu, Mar 26, 2015 at 04:54:00PM +0100, Sascha Hauer wrote:
+> > > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > ---
+> > > >  drivers/thermal/of-thermal.c | 12 ++++++++++++
+> > > >  include/linux/thermal.h      |  1 +
+> > > >  2 files changed, 13 insertions(+)
+> > > 
+> > > Can you please include at least one user of this call back in your patch
+> > > series?
+> > 
+> > Thanks for the comments on this series. I'll address them in the next
+> > round. The user for this callback is not yet ready to be posted. I'll
+> > try and move this patch to the end of the series so that the series can
+> > be applied without this one.
+> 
+> I'm actually interested in this patch, as I am developing a thermal
+> sensor driver that has hardware-assisted temperature-trip interrupts.
+> I'm testing out your patches now, and will probably end up using them on
+> my local tree. With help of this (and a few other changes I need to
+> make), my driver should be ready to post soon.
+> 
+> So, I'll try to post my driver soon as an example, if you'd like. I'd
+> also appreciate a CC on any future revisions, if you don't mind. I'm
+> subscribed to the list, but it's not always easy to pick out the signal
+> from the noise.
 
-soc {
-	ranges = <0 0xf7000000 0x1000000
-		  0xe0000000 0xe0000000 0x10000000>;  //add this line
-	...
-	pcie: pcie at e40000 {
-		...
-		reg = <0xe40000 0x10000>, <0xe0000000 0x8000000>;
-		reg-names = "dbi", "pad", "config";
-		...
-	};
-}
+Sure, I'll add you to Cc next round. I'm halfway through updating this
+series according to the comments I received, but got distracted. I hope
+to send an update next week.
 
-Now, we can get the config space correctly.
+Sascha
 
-
-Thanks,
-Jisheng
-
-On Thu, 16 Apr 2015 19:24:13 -0700
-Jisheng Zhang <jszhang@marvell.com> wrote:
-
-> Hi Jaehoon,
-> 
-> On Thu, 16 Apr 2015 15:59:45 -0700
-> Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> 
-> > Hi,
-> > 
-> > Well, I'm not sure..
-> > But in my understanding..configuration range might be support both "ranges" and "config" of reg.
-> > 
-> > On 04/16/2015 10:59 PM, Jisheng Zhang wrote:
-> > > Hi all,
-> > > 
-> > > I didn't fully understand the "ranges" usage, here is one situation which I dunno
-> > > how to handle.
-> > > 
-> > > In arch/arm/boot/dts/berlin2q.dtsi, we describe the /soc ranges as
-> > > 
-> > > ranges = <0 0xf7000000 0x1000000>;
-> > > 
-> > > That's fine. Now there's a pci device based on pcie-designware.c which prefer
-> > > put "config" space in reg. But the config space starts at 0xe0000000, due to
-> > > the /soc ranges, the "config" space following pcie node is not correct in fact.
-> > > 
-> > > soc {
-> > > 	ranges = <0 0xf7000000 0x1000000>;
-> > > 	...
-> > > 	pcie: pcie at e40000 {
-> > > 		compatible = "...";
-> > > 		reg = <0xe40000 0x10000>, <0xe0000000 0x8000000>;
-> > > 		reg-names = "dbi", "pad", "config";
-> > > 		...
-> > > 	};
-> > > 	...
-> > > };
-> > 
-> > According to yours,
-> > 
-> > reg = <0xe40000 0x1000		/* dbi */
-> > 	0xe000000 0x800000	/* pad */
-> > 	0xf7000000 0x1000000>;	/* config ? */
-> 
-> oops, there's no pad at all, dbi starts at 0xf7e40000, config space starts at 0xe0000000
-> 
-> so my pcie in my understanding is
-> 
-> pcie: pcie at e40000 {
-> 	compatible = "...";
-> 	reg = <0xe40000 0x10000>, <0xe0000000 0x8000000>;
-> 	reg-names = "dbi", "config";
-> };
-> 
-> But the "/soc" ranges is defined as "<0 0xf7000000 0x1000000>;", so the config space
-> in the above dts is not correct.
-> 
-> My solution is change the "/soc" ranges as following:
-> 
-> soc {
-> 	ranges;
-> 	...
-> };
-> 
-> Is there any elegant solutions for this situation?
-> 
-> > 
-> > If there is not "config" into reg-names, it should be tried to find it into "ranges".
-> 
-> The pcie-designware driver prefers users define config space in "reg"
-> 
-> Thanks for your help,
-> Jisheng
-> 
-> > 
-> > If my understanding is wrong, let me know, plz.
-> > 
-> > In my case,
-> > 
-> > 	reg = <0x156b0000 0x1000
-> > 		0x15680000 0x1000
-> > 		0x0c000000 0x1000>;
-> > 	reg-names = "elbi", "phy", "config";
-> > 
-> > 	ranges = < ..... /* downstream I/O */
-> > 		  ...... /* non-prefetchable memory */
-> > 
-> > 
-> > Best Regards,
-> > Jaehoon Chung	
-> > 
-> > > 
-> > > How to define the "config" space in this situation? Did we need to change
-> > > the /soc ranges as the following?
-> > > 
-> > > soc {
-> > > 	ranges;
-> > > }
-> > > 
-> > > Thanks in advance,
-> > > Jisheng
-> > > 
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > 
-> > 
-> 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
