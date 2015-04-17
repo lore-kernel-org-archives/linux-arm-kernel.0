@@ -1,16 +1,16 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 17 Apr 2015 11:21:52 +0200
-Subject: [PATCH 11/13] coresight: funnel: retrieve and handle atclk
-In-Reply-To: <1429261140-13910-12-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 17 Apr 2015 11:31:09 +0200
+Subject: [PATCH 12/13] coresight: replicator: retrieve and handle atclk
+In-Reply-To: <1429261140-13910-13-git-send-email-linus.walleij@linaro.org>
 References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
- <1429261140-13910-12-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAPDyKFqqDO5HuML13vhH8yRTfR949RxTxDxqx78dse7_scMJpg@mail.gmail.com>
+ <1429261140-13910-13-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAPDyKFqevXOepfEYKtYf3yG8dtLyNoczF=Vak1ArmfTYHiH71Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 17 April 2015 at 10:58, Linus Walleij <linus.walleij@linaro.org> wrote:
 > As can be seen from the datasheet of the CoreSight
-> Components, DDI0314 table A-6 the funnel has a clock signal
+> Components, DDI0314 table A-4 the funnel has a clock signal
 > apart from the AHB interconnect ("amba_pclk", that we're
 > already handling) called ATCLK, ARM Trace Clock, that SoC
 > implementers may provide from an entirely different clock
@@ -22,70 +22,99 @@ On 17 April 2015 at 10:58, Linus Walleij <linus.walleij@linaro.org> wrote:
 > unprepare both clocks.
 >
 > The ATCLK is enabled and disabled using the runtime PM
-> callbacks.
+> callbacks. As the replicator is a platform device, the
+> code is a bit different from the other CoreSight components
+> and the bus core does not activate runtime PM by default,
+> so we need a few extra calls.
 >
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/coresight/coresight-funnel.c | 39 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
+>  drivers/coresight/coresight-replicator.c | 43 ++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
 >
-> diff --git a/drivers/coresight/coresight-funnel.c b/drivers/coresight/coresight-funnel.c
-> index 330de2c88759..36c14ca4b916 100644
-> --- a/drivers/coresight/coresight-funnel.c
-> +++ b/drivers/coresight/coresight-funnel.c
-> @@ -21,6 +21,7 @@
->  #include <linux/pm_runtime.h>
+> diff --git a/drivers/coresight/coresight-replicator.c b/drivers/coresight/coresight-replicator.c
+> index cdf05537d574..126ae1f731d7 100644
+> --- a/drivers/coresight/coresight-replicator.c
+> +++ b/drivers/coresight/coresight-replicator.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/io.h>
+>  #include <linux/err.h>
+>  #include <linux/slab.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/clk.h>
+>  #include <linux/of.h>
 >  #include <linux/coresight.h>
->  #include <linux/amba/bus.h>
-> +#include <linux/clk.h>
->
->  #include "coresight-priv.h"
->
-> @@ -35,12 +36,14 @@
->   * struct funnel_drvdata - specifics associated to a funnel component
->   * @base:      memory mapped base address for this component.
->   * @dev:       the device entity associated to this component.
-> + * @atclk:     optional clock for the core parts of the funnel.
->   * @csdev:     component vitals needed by the framework.
->   * @priority:  port selection order.
+> @@ -27,10 +28,12 @@
+>  /**
+>   * struct replicator_drvdata - specifics associated to a replicator component
+>   * @dev:       the device entity associated with this component
+> + * @atclk:     optional clock for the core parts of the replicator.
+>   * @csdev:     component vitals needed by the framework
 >   */
->  struct funnel_drvdata {
->         void __iomem            *base;
+>  struct replicator_drvdata {
 >         struct device           *dev;
 > +       struct clk              *atclk;
 >         struct coresight_device *csdev;
->         unsigned long           priority;
 >  };
-> @@ -168,6 +171,7 @@ ATTRIBUTE_GROUPS(coresight_funnel);
 >
->  static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
+> @@ -39,6 +42,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
+>  {
+>         struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>
+> +       pm_runtime_get_sync(drvdata->dev);
+>         dev_info(drvdata->dev, "REPLICATOR enabled\n");
+>         return 0;
+>  }
+> @@ -48,6 +52,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
+>  {
+>         struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>
+> +       pm_runtime_put(drvdata->dev);
+>         dev_info(drvdata->dev, "REPLICATOR disabled\n");
+>  }
+>
+> @@ -62,6 +67,7 @@ static const struct coresight_ops replicator_cs_ops = {
+>
+>  static int replicator_probe(struct platform_device *pdev)
 >  {
 > +       int ret;
->         void __iomem *base;
->         struct device *dev = &adev->dev;
+>         struct device *dev = &pdev->dev;
 >         struct coresight_platform_data *pdata = NULL;
-> @@ -188,6 +192,12 @@ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
+>         struct replicator_drvdata *drvdata;
+> @@ -80,7 +86,16 @@ static int replicator_probe(struct platform_device *pdev)
 >                 return -ENOMEM;
 >
->         drvdata->dev = &adev->dev;
-> +       drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
+>         drvdata->dev = &pdev->dev;
+> +       drvdata->atclk = devm_clk_get(&pdev->dev, "atclk"); /* optional */
 > +       if (!IS_ERR(drvdata->atclk)) {
 > +               ret = clk_prepare_enable(drvdata->atclk);
 > +               if (ret)
 > +                       return ret;
 > +       }
->         dev_set_drvdata(dev, drvdata);
+>         platform_set_drvdata(pdev, drvdata);
+> +       pm_runtime_set_active(&pdev->dev);
+> +       pm_runtime_enable(&pdev->dev);
+> +       pm_runtime_put(&pdev->dev);
 >
->         /* Validity for the resource is already checked by the AMBA core */
-> @@ -224,6 +234,34 @@ static int funnel_remove(struct amba_device *adev)
+
+Move the pm_runtime_put() to the end of the ->probe().
+
+Add a pm_runtime_get_noresume() prior the pm_runtime_set_active() call.
+
+The you also need to add error handling. Taking care of gating the
+clock, decreasing the runtime PM reference count and disabling runtime
+PM.
+
+>         desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+>         if (!desc)
+> @@ -107,6 +122,33 @@ static int replicator_remove(struct platform_device *pdev)
 >         return 0;
 >  }
 >
 > +#ifdef CONFIG_PM
-> +static int funnel_runtime_suspend(struct device *dev)
+> +static int replicator_runtime_suspend(struct device *dev)
 > +{
-> +       struct amba_device *adev = to_amba_device(dev);
-> +       struct funnel_drvdata *drvdata = amba_get_drvdata(adev);
+> +       struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
 > +
 > +       if (drvdata && !IS_ERR(drvdata->atclk))
 > +               clk_disable_unprepare(drvdata->atclk);
@@ -93,10 +122,12 @@ On 17 April 2015 at 10:58, Linus Walleij <linus.walleij@linaro.org> wrote:
 > +       return 0;
 > +}
 > +
-> +static int funnel_runtime_resume(struct device *dev)
+> +static int replicator_runtime_resume(struct device *dev)
 > +{
-> +       struct amba_device *adev = to_amba_device(dev);
-> +       struct funnel_drvdata *drvdata = amba_get_drvdata(adev);
+> +struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
+
+Tab?
+
 > +
 > +       if (drvdata && !IS_ERR(drvdata->atclk))
 > +               clk_prepare_enable(drvdata->atclk);
@@ -105,25 +136,25 @@ On 17 April 2015 at 10:58, Linus Walleij <linus.walleij@linaro.org> wrote:
 > +}
 > +#endif
 > +
-> +static const struct dev_pm_ops funnel_dev_pm_ops = {
-> +       SET_RUNTIME_PM_OPS(funnel_runtime_suspend, funnel_runtime_resume, NULL)
+> +static const struct dev_pm_ops replicator_dev_pm_ops = {
+> +       SET_RUNTIME_PM_OPS(replicator_runtime_suspend,
+> +                          replicator_runtime_resume, NULL)
 > +};
 > +
->  static struct amba_id funnel_ids[] = {
->         {
->                 .id     = 0x0003b908,
-> @@ -236,6 +274,7 @@ static struct amba_driver funnel_driver = {
->         .drv = {
->                 .name   = "coresight-funnel",
->                 .owner  = THIS_MODULE,
-> +               .pm     = &funnel_dev_pm_ops,
+>  static struct of_device_id replicator_match[] = {
+>         {.compatible = "arm,coresight-replicator"},
+>         {}
+> @@ -118,6 +160,7 @@ static struct platform_driver replicator_driver = {
+>         .driver         = {
+>                 .name   = "coresight-replicator",
+>                 .of_match_table = replicator_match,
+> +               .pm     = &replicator_dev_pm_ops,
 >         },
->         .probe          = funnel_probe,
->         .remove         = funnel_remove,
+>  };
+>
 > --
 > 1.9.3
 >
 
-With the same comment as I had to previous patchnumber.
-
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Kind regards
+Uffe
