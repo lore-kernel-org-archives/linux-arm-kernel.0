@@ -1,71 +1,83 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 17 Apr 2015 17:49:06 -0600
-Subject: [PATCH RFC 4/7] qcom: spm: Add 8916 SPM register data
+Date: Fri, 17 Apr 2015 17:49:07 -0600
+Subject: [PATCH RFC 5/7] arm64: dts: Add power-controller device bindings for
+ QCOM 8916 SoC
 In-Reply-To: <1429314549-6730-1-git-send-email-lina.iyer@linaro.org>
 References: <1429314549-6730-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1429314549-6730-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1429314549-6730-6-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPM register information and initialization values for QCOM 8916
-SoC.
+CPUs on the MSM8916 SoC has a power controller for each cpu that aids in
+regualting power during active and idle usecase. Add SAW device bindings
+for each cpu and L2.
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- .../devicetree/bindings/arm/msm/qcom,saw2.txt       |  1 +
- drivers/soc/qcom/spm.c                              | 21 +++++++++++++++++++++
- 2 files changed, 22 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
-index ae4afc6..986a8ea 100644
---- a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
-+++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
-@@ -27,6 +27,7 @@ PROPERTIES
- 			"qcom,apq8064-saw2-v1.1-cpu"
- 			"qcom,msm8974-saw2-v2.1-cpu"
- 			"qcom,apq8084-saw2-v2.1-cpu"
-+			"qcom,msm8916-saw2-v3.0-cpu"
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index ac4b3e5..a3232be 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -51,6 +51,7 @@
+ 			enable-method = "qcom,arm-cortex-acc";
+ 			qcom,acc = <&acc0>;
+ 			next-level-cache = <&L2_0>;
++			qcom,saw = <&saw0>;
+ 			L2_0: l2-cache {
+ 			      compatible = "arm,arch-cache";
+ 			      cache-level = <2>;
+@@ -65,6 +66,7 @@
+ 			enable-method = "qcom,arm-cortex-acc";
+ 			qcom,acc = <&acc1>;
+ 			next-level-cache = <&L2_0>;
++			qcom,saw = <&saw1>;
+ 		};
  
- - reg:
- 	Usage: required
-diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
-index 392a714..ffb6045 100644
---- a/drivers/soc/qcom/spm.c
-+++ b/drivers/soc/qcom/spm.c
-@@ -115,6 +115,25 @@ static const struct spm_reg_data spm_reg_8064_cpu = {
- 	.start_index[PM_SLEEP_MODE_SPC] = 2,
- };
+ 		CPU2: cpu at 2 {
+@@ -74,6 +76,7 @@
+ 			enable-method = "qcom,arm-cortex-acc";
+ 			qcom,acc = <&acc2>;
+ 			next-level-cache = <&L2_0>;
++			qcom,saw = <&saw2>;
+ 		};
  
-+static const u32 spm_reg_offset_v3_0[SPM_REG_NR] = {
-+	[SPM_REG_CFG]		= 0x08,
-+	[SPM_REG_SPM_CTL]	= 0x30,
-+	[SPM_REG_DLY]		= 0x34,
-+	[SPM_REG_SEQ_ENTRY]	= 0x400,
-+};
+ 		CPU3: cpu at 3 {
+@@ -83,6 +86,7 @@
+ 			enable-method = "qcom,arm-cortex-acc";
+ 			qcom,acc = <&acc3>;
+ 			next-level-cache = <&L2_0>;
++			qcom,saw = <&saw3>;
+ 		};
+ 	};
+ 
+@@ -254,5 +258,25 @@
+ 			reg = <0x0b0b8000 0x1000>,
+ 			      <0x0b008000 0x1000>;
+ 		};
 +
-+/* SPM register data for 8916 */
-+static const struct spm_reg_data spm_reg_8916_cpu = {
-+	.reg_offset = spm_reg_offset_v3_0,
-+	.spm_cfg = 0x1,
-+	.spm_dly = 0x3C102800,
-+	.seq = { 0x60, 0x03, 0x60, 0x0B, 0x0F, 0x20, 0x10, 0x80, 0x30, 0x90,
-+		0x5B, 0x60, 0x03, 0x60, 0x3B, 0x76, 0x76, 0x0B, 0x94, 0x5B,
-+		0x80, 0x10, 0x26, 0x30, 0x0F },
-+	.start_index[PM_SLEEP_MODE_STBY] = 0,
-+	.start_index[PM_SLEEP_MODE_SPC] = 5,
-+};
++		saw0: power-controller at B089000 {
++			compatible = "qcom,msm8916-saw2-v3.0-cpu";
++			reg = <0xB089000 0x1000>, <0xB009000 0x1000>;
++		};
 +
- static DEFINE_PER_CPU(struct spm_driver_data *, cpu_spm_drv);
- 
- typedef int (*idle_fn)(int);
-@@ -325,6 +344,8 @@ static const struct of_device_id spm_match_table[] = {
- 	  .data = &spm_reg_8974_8084_cpu },
- 	{ .compatible = "qcom,apq8064-saw2-v1.1-cpu",
- 	  .data = &spm_reg_8064_cpu },
-+	{ .compatible = "qcom,msm8916-saw2-v3.0-cpu",
-+	  .data = &spm_reg_8916_cpu },
- 	{ },
++		saw1: power-controller at B099000 {
++			compatible = "qcom,msm8916-saw2-v3.0-cpu";
++			reg = <0xB099000 0x1000>, <0xB009000 0x1000>;
++		};
++
++		saw2: power-controller at B0A9000 {
++			compatible = "qcom,msm8916-saw2-v3.0-cpu";
++			reg = <0xB0A9000 0x1000>, <0xB009000 0x1000>;
++		};
++
++		saw3: power-controller at B0B9000 {
++			compatible = "qcom,msm8916-saw2-v3.0-cpu";
++			reg = <0xB0B9000 0x1000>, <0xB009000 0x1000>;
++		};
+ 	};
  };
- 
 -- 
 2.1.0
