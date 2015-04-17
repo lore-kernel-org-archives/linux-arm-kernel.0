@@ -1,34 +1,222 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 18 Apr 2015 00:48:16 +0900
-Subject: [PATCH v3 2/4] ARM: multi_v7_defconfig: enable UniPhier SoC family
+Date: Sat, 18 Apr 2015 00:48:15 +0900
+Subject: [PATCH v3 1/4] ARM: UniPhier: add basic support for UniPhier
+ architecture
 In-Reply-To: <1429285698-11829-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1429285698-11829-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1429285698-11829-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1429285698-11829-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add UniPhier, a new citizen in the ARM multi platform.
+Initial commit for a new SoC family, UniPhier, developed by
+Socionext Inc. (formerly, System LSI Business Division of
+Panasonic Corporation).
+
+This commit includes a minimal set of components for booting the
+kernel, including SMP support.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
-Changes in v3: None
-Changes in v2: None
+Changes in v3:
+  - Replace <asm/io.h> with <linux/io.h>
+  - Rename uniphier_board_dt_compat to uniphier_dt_compat
+  - Move uniphier_secondary_startup into platsmp.c as __naked function
+  - Add return before "err:" label (bug fix)
+  - Use syscon driver rather than hard-coded register address
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Changes in v2:
+  - Fix SoC compatible string
+    "socionext,ph1-proxstream2" -> "socionext,proxstream2"
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 06075b6..85d8a00 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -81,6 +81,7 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
- CONFIG_ARCH_TEGRA_114_SOC=y
- CONFIG_ARCH_TEGRA_124_SOC=y
- CONFIG_TEGRA_EMC_SCALING_ENABLE=y
-+CONFIG_ARCH_UNIPHIER=y
- CONFIG_ARCH_U8500=y
- CONFIG_MACH_HREFV60=y
- CONFIG_MACH_SNOWBALL=y
+ arch/arm/Kconfig                  |  2 +
+ arch/arm/Makefile                 |  1 +
+ arch/arm/mach-uniphier/Kconfig    | 11 +++++
+ arch/arm/mach-uniphier/Makefile   |  2 +
+ arch/arm/mach-uniphier/platsmp.c  | 85 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-uniphier/uniphier.c | 30 ++++++++++++++
+ 6 files changed, 131 insertions(+)
+ create mode 100644 arch/arm/mach-uniphier/Kconfig
+ create mode 100644 arch/arm/mach-uniphier/Makefile
+ create mode 100644 arch/arm/mach-uniphier/platsmp.c
+ create mode 100644 arch/arm/mach-uniphier/uniphier.c
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 392e7ae..c332b98 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -963,6 +963,8 @@ source "arch/arm/mach-tegra/Kconfig"
+ 
+ source "arch/arm/mach-u300/Kconfig"
+ 
++source "arch/arm/mach-uniphier/Kconfig"
++
+ source "arch/arm/mach-ux500/Kconfig"
+ 
+ source "arch/arm/mach-versatile/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 5575d9f..9de6aa6 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -201,6 +201,7 @@ machine-$(CONFIG_ARCH_SUNXI)		+= sunxi
+ machine-$(CONFIG_ARCH_TEGRA)		+= tegra
+ machine-$(CONFIG_ARCH_U300)		+= u300
+ machine-$(CONFIG_ARCH_U8500)		+= ux500
++machine-$(CONFIG_ARCH_UNIPHIER)		+= uniphier
+ machine-$(CONFIG_ARCH_VERSATILE)	+= versatile
+ machine-$(CONFIG_ARCH_VEXPRESS)		+= vexpress
+ machine-$(CONFIG_ARCH_VT8500)		+= vt8500
+diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/mach-uniphier/Kconfig
+new file mode 100644
+index 0000000..a017b1d
+--- /dev/null
++++ b/arch/arm/mach-uniphier/Kconfig
+@@ -0,0 +1,11 @@
++config ARCH_UNIPHIER
++	bool "Socionext UniPhier SoCs"
++	depends on ARCH_MULTI_V7
++	select ARM_AMBA
++	select ARM_GLOBAL_TIMER
++	select ARM_GIC
++	select HAVE_ARM_SCU
++	select HAVE_ARM_TWD
++	help
++	  Support for UniPhier SoC family developed by Socionext Inc.
++	  (formerly, System LSI Business Division of Panasonic Corporation)
+diff --git a/arch/arm/mach-uniphier/Makefile b/arch/arm/mach-uniphier/Makefile
+new file mode 100644
+index 0000000..60bd226
+--- /dev/null
++++ b/arch/arm/mach-uniphier/Makefile
+@@ -0,0 +1,2 @@
++obj-y			:= uniphier.o
++obj-$(CONFIG_SMP)	+= platsmp.o
+diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
+new file mode 100644
+index 0000000..a10999d
+--- /dev/null
++++ b/arch/arm/mach-uniphier/platsmp.c
+@@ -0,0 +1,85 @@
++/*
++ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/sizes.h>
++#include <linux/compiler.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <asm/smp.h>
++#include <asm/smp_scu.h>
++
++static void __init uniphier_smp_prepare_cpus(unsigned int max_cpus)
++{
++	static cpumask_t only_cpu_0 = { CPU_BITS_CPU0 };
++	unsigned long scu_base_phys = 0;
++	void __iomem *scu_base;
++
++	if (scu_a9_has_base())
++		scu_base_phys = scu_a9_get_base();
++
++	if (!scu_base_phys) {
++		pr_err("failed to get scu base\n");
++		goto err;
++	}
++
++	scu_base = ioremap(scu_base_phys, SZ_128);
++	if (!scu_base) {
++		pr_err("failed to remap scu base (0x%08lx)\n", scu_base_phys);
++		goto err;
++	}
++
++	scu_enable(scu_base);
++	iounmap(scu_base);
++
++	return;
++err:
++	pr_warn("disabling SMP\n");
++	init_cpu_present(&only_cpu_0);
++}
++
++static void __naked uniphier_secondary_startup(void)
++{
++	asm("bl		v7_invalidate_l1\n"
++	    "b		secondary_startup\n");
++};
++
++static int uniphier_boot_secondary(unsigned int cpu,
++				   struct task_struct *idle)
++{
++	struct regmap *smp_regmap;
++	int ret;
++
++	smp_regmap = syscon_regmap_lookup_by_compatible(
++						"socionext,uniphier-smp-reg");
++	if (IS_ERR(smp_regmap)) {
++		pr_err("no uniphier-smp-reg node found\n");
++		return PTR_ERR(smp_regmap);
++	}
++
++	ret = regmap_write(smp_regmap, 0,
++			   virt_to_phys(uniphier_secondary_startup));
++	if (!ret)
++		asm("sev"); /* wake up secondary CPU */
++
++	return ret;
++}
++
++struct smp_operations uniphier_smp_ops __initdata = {
++	.smp_prepare_cpus	= uniphier_smp_prepare_cpus,
++	.smp_boot_secondary	= uniphier_boot_secondary,
++};
++CPU_METHOD_OF_DECLARE(uniphier_smp, "socionext,uniphier-smp",
++		      &uniphier_smp_ops);
+diff --git a/arch/arm/mach-uniphier/uniphier.c b/arch/arm/mach-uniphier/uniphier.c
+new file mode 100644
+index 0000000..9be10ef
+--- /dev/null
++++ b/arch/arm/mach-uniphier/uniphier.c
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <asm/mach/arch.h>
++
++static const char * const uniphier_dt_compat[] __initconst = {
++	"socionext,ph1-sld3",
++	"socionext,ph1-ld4",
++	"socionext,ph1-pro4",
++	"socionext,ph1-sld8",
++	"socionext,ph1-pro5",
++	"socionext,proxstream2",
++	"socionext,ph1-ld6b",
++	NULL,
++};
++
++DT_MACHINE_START(UNIPHIER, "Socionext UniPhier")
++	.dt_compat	= uniphier_dt_compat,
++MACHINE_END
 -- 
 1.9.1
