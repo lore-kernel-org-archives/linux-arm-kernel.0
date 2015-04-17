@@ -1,16 +1,16 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 17 Apr 2015 11:18:20 +0200
-Subject: [PATCH 08/13] coresight: etm: retrieve and handle atclk
-In-Reply-To: <1429261140-13910-9-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 17 Apr 2015 11:20:04 +0200
+Subject: [PATCH 09/13] coresight: tpiu: retrieve and handle atclk
+In-Reply-To: <1429261140-13910-10-git-send-email-linus.walleij@linaro.org>
 References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
- <1429261140-13910-9-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAPDyKFprFLerJKSeijOc8cCBZACWo4Tthgsb2yNSbyasOmhU4w@mail.gmail.com>
+ <1429261140-13910-10-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAPDyKFo2OWgtB_ieHT+jrZE-k5b5Fqv3NTLwOwEYMkRTxjMV-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 17 April 2015 at 10:58, Linus Walleij <linus.walleij@linaro.org> wrote:
 > As can be seen from the datasheet of the CoreSight
-> Components, DDI0401C A.1.1 the ETM has a clock signal
+> Components, DDI0314H page A-19 the TPIU has a clock signal
 > apart from the AHB interconnect ("amba_pclk", that we're
 > already handling) called ATCLK, ARM Trace Clock, that SoC
 > implementers may provide from an entirely different clock
@@ -19,84 +19,74 @@ On 17 April 2015 at 10:58, Linus Walleij <linus.walleij@linaro.org> wrote:
 > break old platforms that only define PCLK ("amba_pclk") but
 > still makes it possible for SoCs that have both clock signals
 > (such as the DB8500) to fetch and prepare/enable/disable/
-> unprepare both clocks.
+> unprepare both clocks in conjunction.
 >
 > The ATCLK is enabled and disabled using the runtime PM
 > callbacks.
 >
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/coresight/coresight-etm.h   |  2 ++
->  drivers/coresight/coresight-etm3x.c | 38 ++++++++++++++++++++++++++++++++++++-
->  2 files changed, 39 insertions(+), 1 deletion(-)
+>  drivers/coresight/coresight-tpiu.c | 39 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
 >
-> diff --git a/drivers/coresight/coresight-etm.h b/drivers/coresight/coresight-etm.h
-> index d1421e1f8b8a..098ffbec0a44 100644
-> --- a/drivers/coresight/coresight-etm.h
-> +++ b/drivers/coresight/coresight-etm.h
-> @@ -140,6 +140,7 @@
->   * struct etm_drvdata - specifics associated to an ETM component
+> diff --git a/drivers/coresight/coresight-tpiu.c b/drivers/coresight/coresight-tpiu.c
+> index 688ba937069e..55faea7d55dd 100644
+> --- a/drivers/coresight/coresight-tpiu.c
+> +++ b/drivers/coresight/coresight-tpiu.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/coresight.h>
+>  #include <linux/amba/bus.h>
+> +#include <linux/clk.h>
+>
+>  #include "coresight-priv.h"
+>
+> @@ -50,11 +51,13 @@
+>  /**
 >   * @base:      memory mapped base address for this component.
 >   * @dev:       the device entity associated to this component.
-> + * @atclk:     optional clock for the core parts of the ETM.
+> + * @atclk:     optional clock for the core parts of the TPIU.
 >   * @csdev:     component vitals needed by the framework.
->   * @spinlock:  only one at a time pls.
->   * @cpu:       the cpu this component is affined to.
-> @@ -191,6 +192,7 @@
->  struct etm_drvdata {
->         void __iomem                    *base;
->         struct device                   *dev;
-> +       struct clk                      *atclk;
->         struct coresight_device         *csdev;
->         spinlock_t                      spinlock;
->         int                             cpu;
-> diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
-> index f0be12bd79e0..25f49b84a6d2 100644
-> --- a/drivers/coresight/coresight-etm3x.c
-> +++ b/drivers/coresight/coresight-etm3x.c
-> @@ -30,6 +30,7 @@
->  #include <linux/amba/bus.h>
->  #include <linux/seq_file.h>
->  #include <linux/uaccess.h>
-> +#include <linux/clk.h>
->  #include <asm/sections.h>
+>   */
+>  struct tpiu_drvdata {
+>         void __iomem            *base;
+>         struct device           *dev;
+> +       struct clk              *atclk;
+>         struct coresight_device *csdev;
+>  };
 >
->  #include "coresight-etm.h"
-> @@ -1315,7 +1316,6 @@ static ssize_t seq_curr_state_show(struct device *dev,
->         }
+> @@ -111,6 +114,7 @@ static const struct coresight_ops tpiu_cs_ops = {
 >
->         pm_runtime_get_sync(drvdata->dev);
-> -
->         spin_lock_irqsave(&drvdata->spinlock, flags);
+>  static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
+>  {
+> +       int ret;
+>         void __iomem *base;
+>         struct device *dev = &adev->dev;
+>         struct coresight_platform_data *pdata = NULL;
+> @@ -131,6 +135,12 @@ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
+>                 return -ENOMEM;
 >
->         CS_UNLOCK(drvdata->base);
-> @@ -1796,6 +1796,13 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
->
->         spin_lock_init(&drvdata->spinlock);
->
+>         drvdata->dev = &adev->dev;
 > +       drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
 > +       if (!IS_ERR(drvdata->atclk)) {
 > +               ret = clk_prepare_enable(drvdata->atclk);
 > +               if (ret)
 > +                       return ret;
 > +       }
-> +
->         drvdata->cpu = pdata ? pdata->cpu : 0;
+>         dev_set_drvdata(dev, drvdata);
 >
->         get_online_cpus();
-> @@ -1858,6 +1865,34 @@ static int etm_remove(struct amba_device *adev)
+>         /* Validity for the resource is already checked by the AMBA core */
+> @@ -170,6 +180,34 @@ static int tpiu_remove(struct amba_device *adev)
 >         return 0;
 >  }
 >
 > +#ifdef CONFIG_PM
-> +static int etm_runtime_suspend(struct device *dev)
+> +static int tpiu_runtime_suspend(struct device *dev)
 > +{
 > +       struct amba_device *adev = to_amba_device(dev);
-> +       struct etm_drvdata *drvdata = amba_get_drvdata(adev);
+> +       struct tpiu_drvdata *drvdata = amba_get_drvdata(adev);
 
-I think you could replace the above two lines with:
-
-struct etm_drvdata *drvdata = dev_get_drvdata(dev);
+Same comment as previous patch.
 
 > +
 > +       if (drvdata && !IS_ERR(drvdata->atclk))
@@ -105,14 +95,13 @@ struct etm_drvdata *drvdata = dev_get_drvdata(dev);
 > +       return 0;
 > +}
 > +
-> +static int etm_runtime_resume(struct device *dev)
+> +static int tpiu_runtime_resume(struct device *dev)
 > +{
 > +       struct amba_device *adev = to_amba_device(dev);
-> +       struct etm_drvdata *drvdata = amba_get_drvdata(adev);
+> +       struct tpiu_drvdata *drvdata = amba_get_drvdata(adev);
 
-I think you could replace the above two lines with:
+Same comment as previous patch.
 
-struct etm_drvdata *drvdata = dev_get_drvdata(dev)
 
 > +
 > +       if (drvdata && !IS_ERR(drvdata->atclk))
@@ -122,21 +111,21 @@ struct etm_drvdata *drvdata = dev_get_drvdata(dev)
 > +}
 > +#endif
 > +
-> +static const struct dev_pm_ops etm_dev_pm_ops = {
-> +       SET_RUNTIME_PM_OPS(etm_runtime_suspend, etm_runtime_resume, NULL)
+> +static const struct dev_pm_ops tpiu_dev_pm_ops = {
+> +       SET_RUNTIME_PM_OPS(tpiu_runtime_suspend, tpiu_runtime_resume, NULL)
 > +};
 > +
->  static struct amba_id etm_ids[] = {
->         {       /* ETM 3.3 */
->                 .id     = 0x0003b921,
-> @@ -1886,6 +1921,7 @@ static struct amba_driver etm_driver = {
+>  static struct amba_id tpiu_ids[] = {
+>         {
+>                 .id     = 0x0003b912,
+> @@ -186,6 +224,7 @@ static struct amba_driver tpiu_driver = {
 >         .drv = {
->                 .name   = "coresight-etm3x",
+>                 .name   = "coresight-tpiu",
 >                 .owner  = THIS_MODULE,
-> +               .pm     = &etm_dev_pm_ops,
+> +               .pm     = &tpiu_dev_pm_ops,
 >         },
->         .probe          = etm_probe,
->         .remove         = etm_remove,
+>         .probe          = tpiu_probe,
+>         .remove         = tpiu_remove,
 > --
 > 1.9.3
 >
