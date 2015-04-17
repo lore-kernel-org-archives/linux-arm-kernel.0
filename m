@@ -1,21 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 Apr 2015 00:25:41 +0100
-Subject: [PATCH 0/2] ARM: VDSO: minor fixes for 4.1
-In-Reply-To: <1429306024-5253-1-git-send-email-nathan_lynch@mentor.com>
-References: <1429306024-5253-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20150417232541.GE12732@n2100.arm.linux.org.uk>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 17 Apr 2015 17:49:02 -0600
+Subject: [PATCH RFC 0/7] arm64: qcom: cpuidle support for MSM8916 SoC
+Message-ID: <1429314549-6730-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 17, 2015 at 04:27:02PM -0500, Nathan Lynch wrote:
-> While investigating Arnd's v3 build issue, I became aware of a couple
-> of shortcomings unrelated to runtime in the VDSO code.  With these
-> applied, 'make arch/arm/vdso/' should behave better, and .gitignore is
-> populated properly (I almost always build in a separate directory, so
-> I hadn't noticed until now).
+Hi,
 
-I think both of these are fine.
+This patchset adds cpuidle support for the MSM8916 Qualcomm SoC.  This is based
+on cpu-ops patches for the QCOM arm-v8 SoCs [1].
+
+MSM8916 SoC is a quad-A53 SoC with an L2 configured as a single cluster. Like
+many other QCOM SoC's the power management for the cpu is controlled by a
+peripheral hardware block called the Subsystem Power Manager (SPM) [2]. The SPM
+is a finite state machine that is triggered when the core executes the ARM WFI
+instruction. SPM is configured to execute the desired idle state before
+terminating the cpu in SCM. Low power modes supported are WFI and SPC (standalone
+power collapse - individual cpu power down state).
+
+The patches do the following -
+
+- Modify ARM32 cpuidle_ops structure to match that of ARM64
+- Support ARM32 and AARCH64 initialization using the same platform code
+- Add 8916 specific SPM register information
+- Add device bindings for 8916 SPM nodes
+- Add cpuidle device bindings.
+
+Thanks,
+Lina
+
+[1]. https://lkml.org/lkml/2015/4/9/774
+[2]. http://www.spinics.net/lists/arm-kernel/msg411542.html
+
+Lina Iyer (7):
+  arm: Modify cpuidle_ops structures to match ARM64
+  arm64: qcom: Add SPM driver support for ARM and ARM64
+  qcom: spm: Use u32 for register offsets
+  qcom: spm: Add 8916 SPM register data
+  arm64: dts: Add power-controller device bindings for QCOM 8916 SoC
+  arm64: dts: Add cpu idle states for 8916
+  arm64: defconfig: Enable power management support for QCOM SoCs
+
+ .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  1 +
+ arch/arm/include/asm/cpuidle.h                     |  4 +--
+ arch/arm/kernel/cpuidle.c                          |  2 +-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              | 38 ++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |  1 +
+ drivers/soc/qcom/cpu_ops.c                         |  5 +++
+ drivers/soc/qcom/spm.c                             | 40 ++++++++++++++++++----
+ 7 files changed, 82 insertions(+), 9 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
