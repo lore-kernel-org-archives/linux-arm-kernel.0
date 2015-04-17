@@ -1,74 +1,143 @@
-From: Minghuan.Lian@freescale.com (Minghuan.Lian at freescale.com)
-Date: Fri, 17 Apr 2015 02:34:26 +0000
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <BN3PR0301MB1219F18B03194B3F4E7A5751EAE40@BN3PR0301MB1219.namprd03.prod.outlook.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <20150415173654.431f5d89@arm.com>
- <DM2PR0301MB0640576D29E70392C41444DFE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <552F8910.9000701@arm.com>
- <DM2PR0301MB0640C59C08CBEB4F2F392BAEE2E40@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <552FA20E.3060202@arm.com>
- <BN3PR0301MB1219F18B03194B3F4E7A5751EAE40@BN3PR0301MB1219.namprd03.prod.outlook.com>
-Message-ID: <DM2PR0301MB06408F3AFF35144FCA6ADF26E2E30@DM2PR0301MB0640.namprd03.prod.outlook.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 17 Apr 2015 11:50:16 +0800
+Subject: [query] how to use "ranges" in device tree
+In-Reply-To: <20150417102413.705b1ca0@xhacker>
+References: <20150416215938.347caa68@xhacker> <55303EE1.1050108@samsung.com>
+ <20150417102413.705b1ca0@xhacker>
+Message-ID: <20150417115016.69857a77@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc and Varun,
+Hi all,
 
-Thank you very much for your valuable comments.
-I will study further and try to find a better way to support ls2085 msi.
+I got the solution, the ranges can define two or more ranges. What I need to do
+is just add ranges for 0xe0000000 - 0xf0000000 as the following:
+
+soc {
+	ranges = <0 0xf7000000 0x1000000
+		  0xe0000000 0xe0000000 0x10000000>;  //add this line
+	...
+	pcie: pcie at e40000 {
+		...
+		reg = <0xe40000 0x10000>, <0xe0000000 0x8000000>;
+		reg-names = "dbi", "pad", "config";
+		...
+	};
+}
+
+Now, we can get the config space correctly.
+
 
 Thanks,
-Minghuan
+Jisheng
 
-> -----Original Message-----
-> From: Sethi Varun-B16395
-> Sent: Friday, April 17, 2015 2:38 AM
-> To: Marc Zyngier; Lian Minghuan-B31939
-> Cc: Jason Cooper; Arnd Bergmann; linux-pci at vger.kernel.org; Will Deacon;T
-> Yoder Stuart-B08248; Wood Scott-B07421; Bjorn Helgaas; Hu Mingkai-B21284;
-> Zang Roy-R61911; Thomas Gleixner; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+On Thu, 16 Apr 2015 19:24:13 -0700
+Jisheng Zhang <jszhang@marvell.com> wrote:
+
+> Hi Jaehoon,
 > 
-> Hi Minghuan,
+> On Thu, 16 Apr 2015 15:59:45 -0700
+> Jaehoon Chung <jh80.chung@samsung.com> wrote:
 > 
-> > -----Original Message-----
-> > From: linux-arm-kernel [mailto:linux-arm-kernel-
-> > bounces at lists.infradead.org] On Behalf Of Marc Zyngier
-> > Sent: Thursday, April 16, 2015 5:21 PM
-> > To: Lian Minghuan-B31939
-> > Cc: Jason Cooper; Arnd Bergmann; linux-pci at vger.kernel.org; Will
-> > Deacon; Yoder Stuart-B08248; Wood Scott-B07421; Bjorn Helgaas; Hu
-> > Mingkai-B21284; Zang Roy-R61911; Thomas Gleixner;
-> > linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-> >
-> > Minghuan,
-> >
-> > On 16/04/15 11:57, Minghuan.Lian at freescale.com wrote:
-> >
-> > Please include the relevant people (Will Deacon for questions about
-> > the SMMU), and avoid top posting, it makes it very hard to follow a
-> discussion.
-> >
-> > > I still have a couple of questions,
-> > > 1. If I add a new flag and all PCI DEVID will be replaced with a
-> > > fixed ID,  does SMMU can work correctly? For example, If we insert
-> > > an Ethernet card with two ports, a port is assigned to kvm1, another
-> > > port is assigned to kvm2. In this case, we should use one or two fixed ID?
-> >
-> > That completely depends on what the SMMU sees. If it sees the same ID,
-> > you won't be able to perform any form of isolation. But I have no idea
-> > how your hardware works, so maybe explaining in details how this is
-> > constructed will help.
-> >
+> > Hi,
+> > 
+> > Well, I'm not sure..
+> > But in my understanding..configuration range might be support both "ranges" and "config" of reg.
+> > 
+> > On 04/16/2015 10:59 PM, Jisheng Zhang wrote:
+> > > Hi all,
+> > > 
+> > > I didn't fully understand the "ranges" usage, here is one situation which I dunno
+> > > how to handle.
+> > > 
+> > > In arch/arm/boot/dts/berlin2q.dtsi, we describe the /soc ranges as
+> > > 
+> > > ranges = <0 0xf7000000 0x1000000>;
+> > > 
+> > > That's fine. Now there's a pci device based on pcie-designware.c which prefer
+> > > put "config" space in reg. But the config space starts at 0xe0000000, due to
+> > > the /soc ranges, the "config" space following pcie node is not correct in fact.
+> > > 
+> > > soc {
+> > > 	ranges = <0 0xf7000000 0x1000000>;
+> > > 	...
+> > > 	pcie: pcie at e40000 {
+> > > 		compatible = "...";
+> > > 		reg = <0xe40000 0x10000>, <0xe0000000 0x8000000>;
+> > > 		reg-names = "dbi", "pad", "config";
+> > > 		...
+> > > 	};
+> > > 	...
+> > > };
+> > 
+> > According to yours,
+> > 
+> > reg = <0xe40000 0x1000		/* dbi */
+> > 	0xe000000 0x800000	/* pad */
+> > 	0xf7000000 0x1000000>;	/* config ? */
 > 
-> We would need separate stream IDs and iommu groups for endpoints, to
-> assign them to different VMs. We would have to set up the stream ID to
-> device ID translation table during device probe, via add_device callback.
-> While setting the device id for the interrupt translation table, you would have
-> to get streamID corresponding to a given PCIe device ID. Again, I don't think
-> that we should consider the TBUID, while setting the ITT device id.
+> oops, there's no pad at all, dbi starts at 0xf7e40000, config space starts at 0xe0000000
 > 
-> -Varun
+> so my pcie in my understanding is
+> 
+> pcie: pcie at e40000 {
+> 	compatible = "...";
+> 	reg = <0xe40000 0x10000>, <0xe0000000 0x8000000>;
+> 	reg-names = "dbi", "config";
+> };
+> 
+> But the "/soc" ranges is defined as "<0 0xf7000000 0x1000000>;", so the config space
+> in the above dts is not correct.
+> 
+> My solution is change the "/soc" ranges as following:
+> 
+> soc {
+> 	ranges;
+> 	...
+> };
+> 
+> Is there any elegant solutions for this situation?
+> 
+> > 
+> > If there is not "config" into reg-names, it should be tried to find it into "ranges".
+> 
+> The pcie-designware driver prefers users define config space in "reg"
+> 
+> Thanks for your help,
+> Jisheng
+> 
+> > 
+> > If my understanding is wrong, let me know, plz.
+> > 
+> > In my case,
+> > 
+> > 	reg = <0x156b0000 0x1000
+> > 		0x15680000 0x1000
+> > 		0x0c000000 0x1000>;
+> > 	reg-names = "elbi", "phy", "config";
+> > 
+> > 	ranges = < ..... /* downstream I/O */
+> > 		  ...... /* non-prefetchable memory */
+> > 
+> > 
+> > Best Regards,
+> > Jaehoon Chung	
+> > 
+> > > 
+> > > How to define the "config" space in this situation? Did we need to change
+> > > the /soc ranges as the following?
+> > > 
+> > > soc {
+> > > 	ranges;
+> > > }
+> > > 
+> > > Thanks in advance,
+> > > Jisheng
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > 
+> > 
+> 
