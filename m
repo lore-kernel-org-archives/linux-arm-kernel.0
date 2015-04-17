@@ -1,52 +1,264 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 17 Apr 2015 10:01:56 +0100
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <2242025.Z9qPVP4zls@wuerfel>
-References: <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
- <E769538B-CE45-4FF3-AD2C-21B30069F0B9@caviumnetworks.com>
- <20150416133134.GC819@e104818-lin.cambridge.arm.com>
- <2242025.Z9qPVP4zls@wuerfel>
-Message-ID: <20150417090156.GH819@e104818-lin.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 17 Apr 2015 11:06:46 +0200
+Subject: [PATCH 03/13] coresight: etm: let runtime PM handle core clock
+In-Reply-To: <1429261140-13910-4-git-send-email-linus.walleij@linaro.org>
+References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
+ <1429261140-13910-4-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAPDyKFp=v7S2yKJCmSA98PdFNfKgdimO3i7d9pEqfrhHPjhOtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 05:21:30PM +0200, Arnd Bergmann wrote:
-> On Thursday 16 April 2015 14:31:34 Catalin Marinas wrote:
-> > On Thu, Apr 16, 2015 at 11:33:49AM +0000, Pinski, Andrew wrote:
-> > > There are only a few places where long should be 32bit rather than
-> > > 64bit. The non-time_t field of timespec is the only one I can think
-> > > of.
-> > 
-> > It may be the only one but we could end up with a non-compliant
-> > timespec. Unless we keep the tv_nsec as 32-bit long and add some
-> > padding, we could work around it by getting the C library to sign-extend
-> > such padding or we do it in a new "compat" layer in the kernel (but both
-> > cases imply copying the structure).
-> > 
-> > However, timerspec is included in other structures, so we'd have to
-> > intercept those as well. Philipp provided a list here:
-> > 
-> > http://article.gmane.org/gmane.linux.kernel/1931497
-> 
-> We're basically in the same boat as x32 then, and should do the same
-> thing on both most importantly, whatever that ends up.
+On 17 April 2015 at 10:58, Linus Walleij <linus.walleij@linaro.org> wrote:
+> This uses runtime PM to manage the PCLK ("amba_pclk") instead
+> of screwing around with the framework by going in and taking
+> a copy from the amba device. The amba bus core will uprepare
+> and disable the clock when the device is unused when
+> CONFIG_PM is selected, else the clock will be always on.
+>
+> Prior to this patch, as the AMBA primecell bus code enables
+> the PCLK, it would be left on after probe as
+> the clk_prepare_enable() and clk_disable_unprepare() was
+> called and thus just increase and decreas the refcount by
+> one, without it reaching zero and actually disabling the
+> clock. Now the runtime PM callbacks will make sure the PCLK
+> is properly disabled after probe.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-I'm getting confused ;). I thought you were pushing for a 32-bit time_t
-on AArch64 ILP32.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-I'm not sure we need to be in the same boat as x32. Their decision was
-to primarily use the LP64 ABI and there are performance advantages, not
-only the 2038 issue. The downside, few POSIX incompatibilities that I
-think they are happy to live with. If we are happy to live with them as
-well, we go ahead with the current patchset. We may try to patch some of
-the POSIX incompatibilities (see Philipp's list above) by
-padding/copying/sign-extending the affected structures.
-
-> However, it would be nice to get agreement on the normal 32-bit ABI
-> for time_t and timespec first, and then use the same thing everywhere.
-
-Do you mean for native 32-bit architectures? I think OpenBSD uses a
-64-bit time_t already on 32-bit arches, it's doable in Linux as well.
-
--- 
-Catalin
+> ---
+>  drivers/coresight/coresight-etm.h   |  2 --
+>  drivers/coresight/coresight-etm3x.c | 60 ++++++++++---------------------------
+>  2 files changed, 16 insertions(+), 46 deletions(-)
+>
+> diff --git a/drivers/coresight/coresight-etm.h b/drivers/coresight/coresight-etm.h
+> index 501c5fac8a45..d1421e1f8b8a 100644
+> --- a/drivers/coresight/coresight-etm.h
+> +++ b/drivers/coresight/coresight-etm.h
+> @@ -141,7 +141,6 @@
+>   * @base:      memory mapped base address for this component.
+>   * @dev:       the device entity associated to this component.
+>   * @csdev:     component vitals needed by the framework.
+> - * @clk:       the clock this component is associated to.
+>   * @spinlock:  only one at a time pls.
+>   * @cpu:       the cpu this component is affined to.
+>   * @port_size: port size as reported by ETMCR bit 4-6 and 21.
+> @@ -193,7 +192,6 @@ struct etm_drvdata {
+>         void __iomem                    *base;
+>         struct device                   *dev;
+>         struct coresight_device         *csdev;
+> -       struct clk                      *clk;
+>         spinlock_t                      spinlock;
+>         int                             cpu;
+>         int                             port_size;
+> diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
+> index 66e210d5fddd..f0be12bd79e0 100644
+> --- a/drivers/coresight/coresight-etm3x.c
+> +++ b/drivers/coresight/coresight-etm3x.c
+> @@ -23,7 +23,7 @@
+>  #include <linux/smp.h>
+>  #include <linux/sysfs.h>
+>  #include <linux/stat.h>
+> -#include <linux/clk.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/cpu.h>
+>  #include <linux/of.h>
+>  #include <linux/coresight.h>
+> @@ -325,9 +325,7 @@ static int etm_trace_id(struct coresight_device *csdev)
+>
+>         if (!drvdata->enable)
+>                 return drvdata->traceid;
+> -
+> -       if (clk_prepare_enable(drvdata->clk))
+> -               goto out;
+> +       pm_runtime_get_sync(csdev->dev.parent);
+>
+>         spin_lock_irqsave(&drvdata->spinlock, flags);
+>
+> @@ -336,8 +334,8 @@ static int etm_trace_id(struct coresight_device *csdev)
+>         CS_LOCK(drvdata->base);
+>
+>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> -       clk_disable_unprepare(drvdata->clk);
+> -out:
+> +       pm_runtime_put(csdev->dev.parent);
+> +
+>         return trace_id;
+>  }
+>
+> @@ -346,10 +344,7 @@ static int etm_enable(struct coresight_device *csdev)
+>         struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>         int ret;
+>
+> -       ret = clk_prepare_enable(drvdata->clk);
+> -       if (ret)
+> -               goto err_clk;
+> -
+> +       pm_runtime_get_sync(csdev->dev.parent);
+>         spin_lock(&drvdata->spinlock);
+>
+>         /*
+> @@ -373,8 +368,7 @@ static int etm_enable(struct coresight_device *csdev)
+>         return 0;
+>  err:
+>         spin_unlock(&drvdata->spinlock);
+> -       clk_disable_unprepare(drvdata->clk);
+> -err_clk:
+> +       pm_runtime_put(csdev->dev.parent);
+>         return ret;
+>  }
+>
+> @@ -423,8 +417,7 @@ static void etm_disable(struct coresight_device *csdev)
+>
+>         spin_unlock(&drvdata->spinlock);
+>         put_online_cpus();
+> -
+> -       clk_disable_unprepare(drvdata->clk);
+> +       pm_runtime_put(csdev->dev.parent);
+>
+>         dev_info(drvdata->dev, "ETM tracing disabled\n");
+>  }
+> @@ -474,14 +467,10 @@ static DEVICE_ATTR_RO(nr_ctxid_cmp);
+>  static ssize_t etmsr_show(struct device *dev,
+>                           struct device_attribute *attr, char *buf)
+>  {
+> -       int ret;
+>         unsigned long flags, val;
+>         struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
+>
+> -       ret = clk_prepare_enable(drvdata->clk);
+> -       if (ret)
+> -               return ret;
+> -
+> +       pm_runtime_get_sync(drvdata->dev);
+>         spin_lock_irqsave(&drvdata->spinlock, flags);
+>         CS_UNLOCK(drvdata->base);
+>
+> @@ -489,7 +478,7 @@ static ssize_t etmsr_show(struct device *dev,
+>
+>         CS_LOCK(drvdata->base);
+>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> -       clk_disable_unprepare(drvdata->clk);
+> +       pm_runtime_put(drvdata->dev);
+>
+>         return sprintf(buf, "%#lx\n", val);
+>  }
+> @@ -1317,7 +1306,6 @@ static DEVICE_ATTR_RW(seq_13_event);
+>  static ssize_t seq_curr_state_show(struct device *dev,
+>                                    struct device_attribute *attr, char *buf)
+>  {
+> -       int ret;
+>         unsigned long val, flags;
+>         struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
+>
+> @@ -1326,9 +1314,7 @@ static ssize_t seq_curr_state_show(struct device *dev,
+>                 goto out;
+>         }
+>
+> -       ret = clk_prepare_enable(drvdata->clk);
+> -       if (ret)
+> -               return ret;
+> +       pm_runtime_get_sync(drvdata->dev);
+>
+>         spin_lock_irqsave(&drvdata->spinlock, flags);
+>
+> @@ -1337,7 +1323,7 @@ static ssize_t seq_curr_state_show(struct device *dev,
+>         CS_LOCK(drvdata->base);
+>
+>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> -       clk_disable_unprepare(drvdata->clk);
+> +       pm_runtime_put(drvdata->dev);
+>  out:
+>         return sprintf(buf, "%#lx\n", val);
+>  }
+> @@ -1521,10 +1507,7 @@ static ssize_t status_show(struct device *dev,
+>         unsigned long flags;
+>         struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
+>
+> -       ret = clk_prepare_enable(drvdata->clk);
+> -       if (ret)
+> -               return ret;
+> -
+> +       pm_runtime_get_sync(drvdata->dev);
+>         spin_lock_irqsave(&drvdata->spinlock, flags);
+>
+>         CS_UNLOCK(drvdata->base);
+> @@ -1550,7 +1533,7 @@ static ssize_t status_show(struct device *dev,
+>         CS_LOCK(drvdata->base);
+>
+>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> -       clk_disable_unprepare(drvdata->clk);
+> +       pm_runtime_put(drvdata->dev);
+>
+>         return ret;
+>  }
+> @@ -1559,7 +1542,6 @@ static DEVICE_ATTR_RO(status);
+>  static ssize_t traceid_show(struct device *dev,
+>                             struct device_attribute *attr, char *buf)
+>  {
+> -       int ret;
+>         unsigned long val, flags;
+>         struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
+>
+> @@ -1568,10 +1550,7 @@ static ssize_t traceid_show(struct device *dev,
+>                 goto out;
+>         }
+>
+> -       ret = clk_prepare_enable(drvdata->clk);
+> -       if (ret)
+> -               return ret;
+> -
+> +       pm_runtime_get_sync(drvdata->dev);
+>         spin_lock_irqsave(&drvdata->spinlock, flags);
+>         CS_UNLOCK(drvdata->base);
+>
+> @@ -1579,7 +1558,7 @@ static ssize_t traceid_show(struct device *dev,
+>
+>         CS_LOCK(drvdata->base);
+>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> -       clk_disable_unprepare(drvdata->clk);
+> +       pm_runtime_put(drvdata->dev);
+>  out:
+>         return sprintf(buf, "%#lx\n", val);
+>  }
+> @@ -1817,11 +1796,6 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+>
+>         spin_lock_init(&drvdata->spinlock);
+>
+> -       drvdata->clk = adev->pclk;
+> -       ret = clk_prepare_enable(drvdata->clk);
+> -       if (ret)
+> -               return ret;
+> -
+>         drvdata->cpu = pdata ? pdata->cpu : 0;
+>
+>         get_online_cpus();
+> @@ -1845,8 +1819,6 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+>         }
+>         etm_init_default_data(drvdata);
+>
+> -       clk_disable_unprepare(drvdata->clk);
+> -
+>         desc->type = CORESIGHT_DEV_TYPE_SOURCE;
+>         desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
+>         desc->ops = &etm_cs_ops;
+> @@ -1859,6 +1831,7 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+>                 goto err_arch_supported;
+>         }
+>
+> +       pm_runtime_put(&adev->dev);
+>         dev_info(dev, "%s initialized\n", (char *)id->data);
+>
+>         if (boot_enable) {
+> @@ -1869,7 +1842,6 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+>         return 0;
+>
+>  err_arch_supported:
+> -       clk_disable_unprepare(drvdata->clk);
+>         if (--etm_count == 0)
+>                 unregister_hotcpu_notifier(&etm_cpu_notifier);
+>         return ret;
+> --
+> 1.9.3
+>
