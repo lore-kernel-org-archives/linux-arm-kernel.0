@@ -1,183 +1,38 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 17 Apr 2015 09:41:28 -0600
-Subject: [PATCH 13/13] ARM: ux500: add CoreSight blocks to DTS file
-In-Reply-To: <1429261140-13910-14-git-send-email-linus.walleij@linaro.org>
-References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
- <1429261140-13910-14-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CANLsYkwkuJSHWeDTKiC38bRAQdYvvuGk+d82uOspq-k3DuMMnQ@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 18 Apr 2015 00:48:18 +0900
+Subject: [PATCH v3 4/4] MAINTAINERS: add myself as ARM/UniPhier maintainer
+In-Reply-To: <1429285698-11829-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1429285698-11829-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1429285698-11829-5-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2015 at 02:59, Linus Walleij <linus.walleij@linaro.org> wrote:
-> This registers all the CoreSight blocks on the DB8500 SoC:
-> each core has a PTM (v1.0, r1p0-00rel0) connected, both connected
-> to a funnel (DK-TM908-r0p1-00rel0) which in turn connects to a
-> replicator (DM-TM909-r0p1-00rel0). The replicator has two outputs,
-> port 0 to a TPIU interface and port 1 to an ETB
-> (DK-TM907-r0p3-00rel0). The CoreSight blocks are all clocked by
-> the APEATCLK from the PRCMU and their AHB interconnect is clocked
-> from a separate clock called APETRACECLK.
->
-> The SoC also has a CTI/CTM block which can be added later as we
-> have upstream support in the CoreSight subsystem.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Mathieu: this patch will go into the ux500 tree if you think
-> it looks OK. Just provide your ACK if you think it's looking
-> good and I'll take care of it. The rest of the CoreSight stuff
-> should be funneled through your tree I guess.
-> ---
->  arch/arm/boot/dts/ste-dbx5x0.dtsi | 129 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 129 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-> index bd6bd0926931..2f6ed08db9fe 100644
-> --- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-> +++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-> @@ -48,6 +48,135 @@
->                         };
->                 };
->
-> +               ptm at 801ae000 {
-> +                       compatible = "arm,coresight-etm3x", "arm,primecell";
-> +                       reg = <0x801ae000 0x1000>;
-> +
-> +                       clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
-> +                       clock-names = "apb_pclk", "atclk";
-> +                       cpu = <&CPU0>;
-> +                       port {
-> +                               ptm0_out_port: endpoint {
-> +                                       remote-endpoint = <&funnel_in_port0>;
-> +                               };
-> +                       };
-> +               };
-> +
-> +               ptm at 801af000 {
-> +                       compatible = "arm,coresight-etm3x", "arm,primecell";
-> +                       reg = <0x801af000 0x1000>;
-> +
-> +                       clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
-> +                       clock-names = "apb_pclk", "atclk";
-> +                       cpu = <&CPU1>;
-> +                       port {
-> +                               ptm1_out_port: endpoint {
-> +                                       remote-endpoint = <&funnel_in_port1>;
-> +                               };
-> +                       };
-> +               };
-> +
-> +               funnel at 801a6000 {
-> +                       compatible = "arm,coresight-funnel", "arm,primecell";
-> +                       reg = <0x801a6000 0x1000>;
-> +
-> +                       clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
-> +                       clock-names = "apb_pclk", "atclk";
-> +                       ports {
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +
-> +                               /* funnel output ports */
-> +                               port at 0 {
-> +                                       reg = <0>;
-> +                                       funnel_out_port: endpoint {
-> +                                               remote-endpoint =
-> +                                                       <&replicator_in_port0>;
-> +                                       };
-> +                               };
-> +
-> +                               /* funnel input ports */
-> +                               port at 1 {
-> +                                       reg = <0>;
-> +                                       funnel_in_port0: endpoint {
-> +                                               slave-mode;
-> +                                               remote-endpoint = <&ptm0_out_port>;
-> +                                       };
-> +                               };
-> +
-> +                               port at 2 {
-> +                                       reg = <1>;
-> +                                       funnel_in_port1: endpoint {
-> +                                               slave-mode;
-> +                                               remote-endpoint = <&ptm1_out_port>;
-> +                                       };
-> +                               };
-> +                       };
-> +               };
-> +
-> +               replicator {
-> +                       compatible = "arm,coresight-replicator";
-> +                       clocks = <&prcmu_clk PRCMU_APEATCLK>;
-> +                       clock-names = "atclk";
-> +
-> +                       ports {
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +
-> +                               /* replicator output ports */
-> +                               port at 0 {
-> +                                       reg = <0>;
-> +                                       replicator_out_port0: endpoint {
-> +                                               remote-endpoint = <&tpiu_in_port>;
-> +                                       };
-> +                               };
-> +                               port at 1 {
-> +                                       reg = <1>;
-> +                                       replicator_out_port1: endpoint {
-> +                                               remote-endpoint = <&etb_in_port>;
-> +                                       };
-> +                               };
-> +
-> +                               /* replicator input port */
-> +                               port at 2 {
-> +                                       reg = <0>;
-> +                                       replicator_in_port0: endpoint {
-> +                                               slave-mode;
-> +                                               remote-endpoint = <&funnel_out_port>;
-> +                                       };
-> +                               };
-> +                       };
-> +               };
-> +
-> +               tpiu at 80190000 {
-> +                       compatible = "arm,coresight-tpiu", "arm,primecell";
-> +                       reg = <0x80190000 0x1000>;
-> +
-> +                       clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
-> +                       clock-names = "apb_pclk", "atclk";
-> +                       port {
-> +                               tpiu_in_port: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&replicator_out_port0>;
-> +                               };
-> +                       };
-> +               };
-> +
-> +               etb at 801a4000 {
-> +                       compatible = "arm,coresight-etb10", "arm,primecell";
-> +                       reg = <0x801a4000 0x1000>;
-> +
-> +                       coresight-default-sink;
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-This option is now obsolete and should be removed.
+Changes in v3: None
+Changes in v2: None
 
-> +                       clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
-> +                       clock-names = "apb_pclk", "atclk";
-> +                       port {
-> +                               etb_in_port: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&replicator_out_port1>;
-> +                               };
-> +                       };
-> +               };
-> +
->                 intc: interrupt-controller at a0411000 {
->                         compatible = "arm,cortex-a9-gic";
->                         #interrupt-cells = <3>;
-> --
-> 1.9.3
->
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-With the above change,
-
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f7bbaec..da452f9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1527,6 +1527,13 @@ F:	drivers/rtc/rtc-ab3100.c
+ F:	drivers/rtc/rtc-coh901331.c
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+ 
++ARM/UNIPHIER ARCHITECTURE
++M:	Masahiro Yamada <yamada.masahiro@socionext.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-uniphier/
++N:	uniphier
++
+ ARM/Ux500 ARM ARCHITECTURE
+ M:	Linus Walleij <linus.walleij@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+1.9.1
