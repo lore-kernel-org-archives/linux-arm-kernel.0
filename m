@@ -1,32 +1,66 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Fri, 17 Apr 2015 15:54:48 -0500
-Subject: [PATCH] ARM: VDSO: depend on CPU_V7
-In-Reply-To: <2997269.UTdCCDvBHc@wuerfel>
-References: <1428529265-26772-1-git-send-email-nathan_lynch@mentor.com>
- <20150416161049.GB12732@n2100.arm.linux.org.uk> <552FE447.6020001@mentor.com>
- <2997269.UTdCCDvBHc@wuerfel>
-Message-ID: <55317318.1050609@mentor.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 17 Apr 2015 23:16:45 +0200
+Subject: [PATCH 1/5] clocksource: st_lpc: Add LPC timer as a clocksource.
+In-Reply-To: <1429267823-8879-2-git-send-email-peter.griffin@linaro.org>
+References: <1429267823-8879-1-git-send-email-peter.griffin@linaro.org>
+ <1429267823-8879-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1429305405.16771.114.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2015 12:14 PM, Arnd Bergmann wrote:
-> On Thursday 16 April 2015 11:33:11 Nathan Lynch wrote:
->>
->> if I do 'make arch/arm/vdso/' but otherwise the build system doesn't
->> seem to enter that directory here.
->>
->> Still looking into it though.
->>
-> 
-> Ah, my mistake. I typed 'make arch/arm/vdso' and expected the files
-> to all be left out, but instead the way the Makefile is written, it
-> does not enter the directory at all when VDSO is turned off.
-> 
-> I tried it again now, building the kernel normally and that works, so
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Fri, 2015-04-17 at 11:50 +0100, Peter Griffin wrote:
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
 
-Thanks, in light of our discussion (esp. the v4 vs v3 confusion) I've
-amended the commit message but added your ack.
+> +config CLKSRC_ST_LPC_CLOCK
+> +	bool
+> +	depends on ARCH_STI
+> +	select CLKSRC_OF if OF
+> +	help
+> +	  Enable this option to use the Low Power controller timer
+> +	  as clock source.
+> +
+> +config CLKSRC_ST_LPC_TIMER_SCHED_CLOCK
+> +	bool
+> +	depends on ST_LPC_CLOCK
 
-Submitted as 8342/1.
+It looks like you meant
+     depends on CLKSRC_ST_LPC_CLOCK
+
+> +	default y
+> +	help
+> +	  Use Low Power controller timer clock source as sched_clock
+
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+
+> +obj-$(CONFIG_CLKSRC_ST_LPC_CLOCK)	+= st_lpc.o
+
+> --- /dev/null
+> +++ b/drivers/clocksource/st_lpc.c
+
+> +#ifdef CONFIG_CLKSRC_LPC_TIMER_SCHED_CLOCK
+
+#ifdef CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK here?
+
+> +static u64 notrace st_lpc_sched_clock_read(void)
+> +{
+> +	return st_lpc_counter_read();
+> +}
+> +#endif
+
+> +#ifdef CONFIG_CLKSRC_LPC_TIMER_SCHED_CLOCK
+
+Again, #ifdef CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK here?
+
+> +	sched_clock_register(st_lpc_sched_clock_read, 64, rate);
+> +#endif
+
+Assuming the above suggestions are correct: checkkconfigsymbols.py, as
+shipped in linux-next, helps detect stuff like this. See
+    scripts/checkkconfigsymbols.py --help.
+
+Thanks,
+
+
+Paul Bolle
