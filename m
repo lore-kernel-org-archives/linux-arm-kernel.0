@@ -1,60 +1,27 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Fri, 17 Apr 2015 12:56:37 -0700
-Subject: AM335x OMAP2 common clock external fixed-clock registration
-In-Reply-To: <20150417101833.GU4027@n2100.arm.linux.org.uk>
-References: <20150415194707.GA11007@deathray> <20150415205136.GA3399@deathray>
- <552F3B60.8050703@ti.com> <20150416161756.GA27590@deathray>
- <55301D7F.30708@gmail.com> <20150416220918.GA6057@deathray>
- <55304486.5020404@gmail.com> <20150417020048.GA27174@deathray>
- <5530CE63.9070508@gmail.com> <20150417101833.GU4027@n2100.arm.linux.org.uk>
-Message-ID: <20150417195637.19585.24668@quantum>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 17 Apr 2015 22:01:39 +0200
+Subject: [PATCH] iommu: rockchip: fix build without CONFIG_OF
+In-Reply-To: <3138014.xYAj3FssJ8@wuerfel>
+References: <3138014.xYAj3FssJ8@wuerfel>
+Message-ID: <5765512.Hv9Xq97Xsz@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russell King - ARM Linux (2015-04-17 03:18:33)
-> On Fri, Apr 17, 2015 at 11:12:03AM +0200, Sebastian Hesselbarth wrote:
-> > On 17.04.2015 04:00, Michael Welling wrote:
-> > >On Fri, Apr 17, 2015 at 01:23:50AM +0200, Sebastian Hesselbarth wrote:
-> > >>On 17.04.2015 00:09, Michael Welling wrote:
-> > >>>On Thu, Apr 16, 2015 at 10:37:19PM +0200, Sebastian Hesselbarth wrote:
-> > >>>>On 16.04.2015 18:17, Michael Welling wrote:
-> > [...]
-> > >>>What would be the proper error path?
-> > >>>What cleanup is required?
-> > >>
-> > >>A proper error path would be to release any claimed resource
-> > >>on any error. If you look at the code, the only resources that
-> > >>need to be released are the two clocks in question.
-> > >
-> > >So for every error return in the probe function and in the of si5351_dt_parse
-> > >it needs to clk_put first right?
-> > 
-> > Not quite. The driver should clk_put() every clock that it called a
-> > [of_]clk_get() for. The thing is that clocks can be passed by
-> > platform_data and we never claim them.
+Am Freitag, 10. April 2015, 23:58:24 schrieb Arnd Bergmann:
+> The rockchip iommu driver references its of_device_id table
+> from the init function, which fails to build when the table
+> is undefined:
 > 
-> I've always said clocks (as in struct clk) should never be passed through
-> platform data.
-
-+1
-
-And for ccf clock drivers Stephen and I plan to change the behavior of
-clk_register() at some point so that it returns an error code and not a
-struct clk. This will make clk_dev the only way to get at a struct clk
-for users of the ccf implementation.
-
-Of course it is still possible to clk_get from some place and pass as
-platform_data, but every little bit helps.
-
-Regards,
-Mike
-
+> iommu/rockchip-iommu.c: In function 'rk_iommu_init':
+> iommu/rockchip-iommu.c:1029:35: error: 'rk_iommu_dt_ids' undeclared (first
+> use in this function) np = of_find_matching_node(NULL, rk_iommu_dt_ids);
 > 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> This removes the #ifdef and the corresponding of_match_ptr wrapper
+> to make it build both with CONFIG_OF enabled or disabled.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 425061b0f5074 ("iommu/rockchip: Play nice in multi-platform builds")
+
+not sure if another one is needed, but nevertheless
+
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
