@@ -1,50 +1,72 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 17 Apr 2015 15:08:19 +0100
-Subject: [PATCH] ARM: tegra: cpuidle: implement
- cpuidle_state.enter_freeze()
-In-Reply-To: <CAAObsKAihF1k1yzZxQEs_jpPnCdV3HQbLaYHWu1QNsNd5zqiOg@mail.gmail.com>
-References: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
- <20150408115546.GA24271@red-moon> <552643E1.3060200@collabora.com>
- <285738930.THBQOWvsah@vostro.rjw.lan>
- <20150410100844.GC23730@red-moon>
- <CAAObsKAihF1k1yzZxQEs_jpPnCdV3HQbLaYHWu1QNsNd5zqiOg@mail.gmail.com>
-Message-ID: <20150417140819.GB2347@red-moon>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 17 Apr 2015 16:33:28 +0200
+Subject: [PATCH v5 00/18] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <20150204142149.GM3702@8bytes.org>
+References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
+ <20150204142149.GM3702@8bytes.org>
+Message-ID: <CABxcv=mXENvPHvvN5iOaUBZKORF49RhDs-tL_PBT4Urh54pd0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 03:37:19PM +0100, Tomeu Vizoso wrote:
+Hello Marek,
 
-[...]
+On Wed, Feb 4, 2015 at 3:21 PM, Joerg Roedel <joro@8bytes.org> wrote:
+> Hi Marek,
+>
+> On Fri, Jan 23, 2015 at 04:51:10PM +0100, Marek Szyprowski wrote:
+>> 1. All iommu related patches (with 'iommu: exynos') can be merged to
+>> iommu tree. They don't have any direct dependencies on the DTS, DRM and
+>> power domain initialization change - without them the driver will simply
+>> not initialize, when no exynos,sysmmu nodes are provided in device tree.
+>>
+>> Joerg, could you merge those patches?
+>
+> Given the previous comments and tests on this patch set I am still
+> waiting for some Acked-bys and/or Tested-bys on this. Can you collect
+> these and resend then (probably after the v3.20 merge window)?
+>
 
-> >> I don't know what FIQs are. :-)
-> >
-> > In short, fast IRQs, it is a separate IRQ line handled as a separate
-> > exception source with some private (banked) registers that minimize registers
-> > saving/restoring. They are not identical to NMI on x86, since
-> > their behaviour (handling) may be overriden by platforms and they
-> > can be masked.
-> >
-> >> ->enter_freeze is entered with interrupts disabled on the local CPU.  It is
-> >> not supposed to re-enable them.  That is, while in the ->enter_freeze callback
-> >> routine, the CPU must not be interrupted aby anything other than NMI.
-> >
-> > It boils down to what FIQs handlers are allowed to do with tick frozen
-> > and what they are (may be) currently used for.
-> >
-> > Russell has more insights on this than I do, in particular what FIQs are
-> > currently used for on ARM and if we can leave them enabled safely with tick
-> > frozen.
-> 
-> But even if it's currently safe to leave them enabled, is there any
-> reason for not disabling them?
+I rebased your patches on top of latest linux-next (next-20150415) and
+tested it on my Exynos5420 Peach Pit. HDMI display is working
+correctly (both console and X) when CONFIG_DRM_EXYNOS_IOMMU is
+enabled. I also see that the mixer is attached to the IOMMU domain:
 
-Ok, the point here is: either it is safe, and you leave them enabled,
-or it is not and we must disable them *before* enter_freeze() is entered.
+exynos-mixer 14450000.mixer: exynos_iommu_attach_device: Attached
+IOMMU with pgtable 0x6e5e0000
+...
+exynos-sysmmu 14650000.sysmmu: Enabled
 
-Disabling them in the platform enter_freeze() hook does not make sense,
-because this means we run with FIQs enabled with tick frozen, either
-it is safe or it is not, it can't be both.
+As I mentioned before [0] on your v4 series, I still have the boot
+hang when CONFIG_DRM_EXYNOS_FIMD is enabled. You said that the cause
+is u-boot leaving the FIMD DMA engine enabled and so causing IOMMU
+page faults on init [1].
 
-I would ask Russell opinion on this, before making any decision.
+I tried disabling the display on u-boot but the system hangs remains.
+But since I do a chain loading using the verified u-boot that comes
+with the Chromebooks, I don't know if the RO boot-loader is leaving
+something enabled.
 
-Lorenzo
+In any case since HDMI with sysmmu is working correctly, that issue is
+orthogonal to your series and can be fixed as a followup so:
+
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+NOTE: Most of the patches don't apply cleanly so I pushed a branch [2]
+with my conflict resolution so you don't have to do the same. I also
+did some small changes like using bool instead of int when were
+assigning it to true and renaming some of the subject lines to match
+the format used by the subsystem.
+
+What I didn't change is to re-order the sysmmu device nodes according
+to the unit address that was asked by Andreas since the DTS patches
+are likely to conflict with the work Krzysztof is doing to use labels
+instead of overriding nodes in Exynos 4 and 5 DTS[i]. So you may need
+to change those anyways once Krzysztof patches land.
+
+Best regards,
+Javier
+
+[0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317727.html
+[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/319178.html
+[2]: http://cgit.collabora.com/git/user/javier/linux.git/log/?h=next20150415-exynos-iommu
