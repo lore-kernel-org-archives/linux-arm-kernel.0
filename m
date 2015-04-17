@@ -1,83 +1,65 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 17 Apr 2015 17:49:07 -0600
-Subject: [PATCH RFC 5/7] arm64: dts: Add power-controller device bindings for
- QCOM 8916 SoC
+Date: Fri, 17 Apr 2015 17:49:08 -0600
+Subject: [PATCH RFC 6/7] arm64: dts: Add cpu idle states for 8916
 In-Reply-To: <1429314549-6730-1-git-send-email-lina.iyer@linaro.org>
 References: <1429314549-6730-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1429314549-6730-6-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1429314549-6730-7-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPUs on the MSM8916 SoC has a power controller for each cpu that aids in
-regualting power during active and idle usecase. Add SAW device bindings
-for each cpu and L2.
+Add ARM common idle states device bindings for cpuidle support for 8916
+SOC.
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index ac4b3e5..a3232be 100644
+index a3232be..3c46898 100644
 --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -51,6 +51,7 @@
- 			enable-method = "qcom,arm-cortex-acc";
+@@ -52,6 +52,7 @@
  			qcom,acc = <&acc0>;
  			next-level-cache = <&L2_0>;
-+			qcom,saw = <&saw0>;
+ 			qcom,saw = <&saw0>;
++			cpu-idle-states = <&CPU_SPC>;
  			L2_0: l2-cache {
  			      compatible = "arm,arch-cache";
  			      cache-level = <2>;
-@@ -65,6 +66,7 @@
- 			enable-method = "qcom,arm-cortex-acc";
+@@ -67,6 +68,7 @@
  			qcom,acc = <&acc1>;
  			next-level-cache = <&L2_0>;
-+			qcom,saw = <&saw1>;
+ 			qcom,saw = <&saw1>;
++			cpu-idle-states = <&CPU_SPC>;
  		};
  
  		CPU2: cpu at 2 {
-@@ -74,6 +76,7 @@
- 			enable-method = "qcom,arm-cortex-acc";
+@@ -77,6 +79,7 @@
  			qcom,acc = <&acc2>;
  			next-level-cache = <&L2_0>;
-+			qcom,saw = <&saw2>;
+ 			qcom,saw = <&saw2>;
++			cpu-idle-states = <&CPU_SPC>;
  		};
  
  		CPU3: cpu at 3 {
-@@ -83,6 +86,7 @@
- 			enable-method = "qcom,arm-cortex-acc";
+@@ -87,6 +90,17 @@
  			qcom,acc = <&acc3>;
  			next-level-cache = <&L2_0>;
-+			qcom,saw = <&saw3>;
+ 			qcom,saw = <&saw3>;
++			cpu-idle-states = <&CPU_SPC>;
++		};
++
++		idle-states {
++			CPU_SPC: spc {
++				compatible = "qcom,idle-state-spc",
++						"arm,idle-state";
++				entry-latency-us = <130>;
++				exit-latency-us = <150>;
++				min-residency-us = <2000>;
++			};
  		};
  	};
  
-@@ -254,5 +258,25 @@
- 			reg = <0x0b0b8000 0x1000>,
- 			      <0x0b008000 0x1000>;
- 		};
-+
-+		saw0: power-controller at B089000 {
-+			compatible = "qcom,msm8916-saw2-v3.0-cpu";
-+			reg = <0xB089000 0x1000>, <0xB009000 0x1000>;
-+		};
-+
-+		saw1: power-controller at B099000 {
-+			compatible = "qcom,msm8916-saw2-v3.0-cpu";
-+			reg = <0xB099000 0x1000>, <0xB009000 0x1000>;
-+		};
-+
-+		saw2: power-controller at B0A9000 {
-+			compatible = "qcom,msm8916-saw2-v3.0-cpu";
-+			reg = <0xB0A9000 0x1000>, <0xB009000 0x1000>;
-+		};
-+
-+		saw3: power-controller at B0B9000 {
-+			compatible = "qcom,msm8916-saw2-v3.0-cpu";
-+			reg = <0xB0B9000 0x1000>, <0xB009000 0x1000>;
-+		};
- 	};
- };
 -- 
 2.1.0
