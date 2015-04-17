@@ -1,272 +1,63 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Fri, 17 Apr 2015 09:50:57 +0200
-Subject: [RFC PATCH 2/2] tee: add OP-TEE driver
-In-Reply-To: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
-References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1429257057-7935-3-git-send-email-jens.wiklander@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Apr 2015 10:32 +0200
+Subject: [query] how to use "ranges" in device tree
+In-Reply-To: <20150417115016.69857a77@xhacker>
+References: <20150416215938.347caa68@xhacker>
+ <20150417102413.705b1ca0@xhacker> <20150417115016.69857a77@xhacker>
+Message-ID: <5862495.WQJXyp7MlL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds mostly stubbed OP-TEE driver which also can be compiled as a
-loadable module.
+On Friday 17 April 2015 11:50:16 Jisheng Zhang wrote:
+> Hi all,
+> 
+> I got the solution, the ranges can define two or more ranges. What I need to do
+> is just add ranges for 0xe0000000 - 0xf0000000 as the following:
+> 
+> soc {
+>         ranges = <0 0xf7000000 0x1000000
+>                   0xe0000000 0xe0000000 0x10000000>;  //add this line
+>         ...
+>         pcie: pcie at e40000 {
+>                 ...
+>                 reg = <0xe40000 0x10000>, <0xe0000000 0x8000000>;
+>                 reg-names = "dbi", "pad", "config";
+>                 ...
+>         };
+> }
+> 
+> Now, we can get the config space correctly.
+> 
 
-Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
----
- drivers/tee/Kconfig        |  10 +++
- drivers/tee/Makefile       |   1 +
- drivers/tee/optee/Kconfig  |   7 ++
- drivers/tee/optee/Makefile |   2 +
- drivers/tee/optee/core.c   | 192 +++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 212 insertions(+)
- create mode 100644 drivers/tee/optee/Kconfig
- create mode 100644 drivers/tee/optee/Makefile
- create mode 100644 drivers/tee/optee/core.c
+This will work correctly, but it is not a very clean solution, because
+you define an intermediate address space that has some part of the
+bus mapped to zero, and another part mapped to a high address that
+matches the address the CPU sees.
 
-diff --git a/drivers/tee/Kconfig b/drivers/tee/Kconfig
-index 64a8cd7..b269276 100644
---- a/drivers/tee/Kconfig
-+++ b/drivers/tee/Kconfig
-@@ -6,3 +6,13 @@ config TEE
- 	help
- 	  This implements a generic interface towards a Trusted Execution
- 	  Environment (TEE).
-+
-+if TEE
-+
-+menu "TEE drivers"
-+
-+source "drivers/tee/optee/Kconfig"
-+
-+endmenu
-+
-+endif
-diff --git a/drivers/tee/Makefile b/drivers/tee/Makefile
-index 60d2dab..53f3c76 100644
---- a/drivers/tee/Makefile
-+++ b/drivers/tee/Makefile
-@@ -1,3 +1,4 @@
- obj-y += tee.o
- obj-y += tee_shm.o
- obj-y += tee_shm_pool.o
-+obj-$(CONFIG_OPTEE) += optee/
-diff --git a/drivers/tee/optee/Kconfig b/drivers/tee/optee/Kconfig
-new file mode 100644
-index 0000000..f43af5e
---- /dev/null
-+++ b/drivers/tee/optee/Kconfig
-@@ -0,0 +1,7 @@
-+# OP-TEE Trusted Execution Environment Configuration
-+config OPTEE
-+	tristate "OP-TEE"
-+	default n
-+	select DMA_CMA
-+	help
-+	  This implements the OP-TEE Trusted Execution Environment (TEE) driver.
-diff --git a/drivers/tee/optee/Makefile b/drivers/tee/optee/Makefile
-new file mode 100644
-index 0000000..124d22c
---- /dev/null
-+++ b/drivers/tee/optee/Makefile
-@@ -0,0 +1,2 @@
-+obj-$(CONFIG_OPTEE) += optee.o
-+optee-objs += core.o
-diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-new file mode 100644
-index 0000000..e0f0755
---- /dev/null
-+++ b/drivers/tee/optee/core.c
-@@ -0,0 +1,192 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/types.h>
-+#include <linux/string.h>
-+#include <linux/errno.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/dma-contiguous.h>
-+#include <linux/cma.h>
-+#include <linux/tee/tee_drv.h>
-+
-+#define DRIVER_NAME "tee-optee"
-+#define OPTEE_VERSION	1
-+
-+struct optee {
-+	struct tee_device *supp_teedev;
-+	struct tee_device *teedev;
-+	struct device *dev;
-+	struct tee_shm_pool *pool;
-+};
-+
-+struct optee_context_data {
-+	int dummy;
-+};
-+
-+static void optee_get_version(struct tee_context *ctx,
-+		u32 *version, u8 *uuid)
-+{
-+	*version = OPTEE_VERSION;
-+	memset(uuid, 0, TEE_UUID_SIZE);
-+}
-+
-+static int optee_open(struct tee_context *ctx)
-+{
-+	ctx->data = kzalloc(sizeof(struct optee_context_data), GFP_KERNEL);
-+	if (!ctx->data)
-+		return -ENOMEM;
-+	return 0;
-+}
-+
-+static void optee_release(struct tee_context *ctx)
-+{
-+	kfree(ctx->data);
-+	ctx->data = NULL;
-+}
-+
-+static int optee_cmd(struct tee_context *ctx, void __user *buf, size_t len)
-+{
-+	return -EINVAL;
-+}
-+
-+static int optee_shm_share(struct tee_shm *shm)
-+{
-+	/* No special action needed to share memory with OP-TEE */
-+	return 0;
-+}
-+
-+static void optee_shm_unshare(struct tee_shm *shm)
-+{
-+}
-+
-+static struct tee_driver_ops optee_ops = {
-+	.get_version = optee_get_version,
-+	.open = optee_open,
-+	.release = optee_release,
-+	.cmd = optee_cmd,
-+	.shm_share = optee_shm_share,
-+	.shm_unshare = optee_shm_unshare,
-+};
-+
-+static struct tee_desc optee_desc = {
-+	.name = DRIVER_NAME "-clnt",
-+	.ops = &optee_ops,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int optee_supp_cmd(struct tee_context *teectx, void __user *buf,
-+			size_t len)
-+{
-+	return -EINVAL;
-+}
-+
-+static struct tee_driver_ops optee_supp_ops = {
-+	.get_version = optee_get_version,
-+	.open = optee_open,
-+	.release = optee_release,
-+	.cmd = optee_supp_cmd,
-+	.shm_share = optee_shm_share,
-+	.shm_unshare = optee_shm_unshare,
-+};
-+
-+static struct tee_desc optee_supp_desc = {
-+	.name = DRIVER_NAME "-supp",
-+	.ops = &optee_supp_ops,
-+	.owner = THIS_MODULE,
-+	.flags = TEE_DESC_PRIVILEGED,
-+};
-+
-+static int optee_probe(struct platform_device *pdev)
-+{
-+	struct tee_shm_pool *pool;
-+	struct optee *optee;
-+	u_long vaddr;
-+	phys_addr_t paddr;
-+	size_t size;
-+	int ret;
-+
-+	pool = tee_shm_pool_alloc_cma(&pdev->dev, &vaddr, &paddr, &size);
-+	if (IS_ERR(pool))
-+		return PTR_ERR(pool);
-+
-+	dev_info(&pdev->dev, "pool: va 0x%lx pa 0x%lx size %zx\n",
-+		vaddr, (u_long)paddr, size);
-+
-+	optee = devm_kzalloc(&pdev->dev, sizeof(*optee), GFP_KERNEL);
-+	if (!optee) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	optee->dev = &pdev->dev;
-+
-+	optee->teedev = tee_register(&optee_desc, &pdev->dev, pool, optee);
-+	if (IS_ERR(optee->teedev)) {
-+		ret = PTR_ERR(optee->teedev);
-+		goto err;
-+	}
-+
-+	optee->supp_teedev = tee_register(&optee_supp_desc, &pdev->dev, pool,
-+					  optee);
-+	if (!optee->teedev) {
-+		ret = PTR_ERR(optee->teedev);
-+		goto err;
-+	}
-+
-+	optee->pool = pool;
-+	platform_set_drvdata(pdev, optee);
-+
-+	dev_info(&pdev->dev, "initialized driver\n");
-+	return 0;
-+err:
-+	if (optee && optee->teedev)
-+		tee_unregister(optee->teedev);
-+	if (pool)
-+		tee_shm_pool_free(pool);
-+	return ret;
-+}
-+
-+static int optee_remove(struct platform_device *pdev)
-+{
-+	struct optee *optee = platform_get_drvdata(pdev);
-+
-+	tee_unregister(optee->teedev);
-+	tee_unregister(optee->supp_teedev);
-+	tee_shm_pool_free(optee->pool);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id optee_match[] = {
-+	{ .compatible = "optee,optee-tz" },
-+	{},
-+};
-+
-+static struct platform_driver optee_driver = {
-+	.driver = {
-+		.name = DRIVER_NAME,
-+		.of_match_table = optee_match,
-+	},
-+	.probe = optee_probe,
-+	.remove = optee_remove,
-+};
-+
-+module_platform_driver(optee_driver);
-+
-+MODULE_AUTHOR("Linaro");
-+MODULE_DESCRIPTION("OP-TEE TEE driver");
-+MODULE_SUPPORTED_DEVICE("");
-+MODULE_VERSION("1.0");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+A nicer (but a little more complicated) way to do this would be to use
+#address-cells=<2> in the parent bus and use that to enumerate the
+address ranges that get passed through:
+
+soc {
+	#address-cells=<2>;
+	#size-cells=<1>;
+        ranges = <0 0  0xf7000000  0x1000000>, /* 0: the normal regs */
+		  <1 0  0xe0000000 0x16000000>; /* 1: reallocated registers for PCI */
+
+	pcie at e40000 {
+		#address-cells = <3>;
+		#size-cells = <2>;
+		reg = <0 0xe40000 0x10000>, <1 0 0x8000000>;
+
+		/* memory space at pci address 0xf0000000, cpu address 0xf0000000, 
+		   bus address 0x10000000 */
+		ranges = <0x02000000 0 0xf0000000   0 0x10000000   0 0x06000000>;
+	};
+
+	...
+};
+
+The ranges property inside of the pcie node here should match whatever you program
+into the inbound mapping registers of the PCIe host controller (if any).
+
+	Arnd
