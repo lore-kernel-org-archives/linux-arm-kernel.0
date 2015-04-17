@@ -1,160 +1,56 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 17 Apr 2015 11:31:09 +0200
-Subject: [PATCH 12/13] coresight: replicator: retrieve and handle atclk
-In-Reply-To: <1429261140-13910-13-git-send-email-linus.walleij@linaro.org>
-References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
- <1429261140-13910-13-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAPDyKFqevXOepfEYKtYf3yG8dtLyNoczF=Vak1ArmfTYHiH71Q@mail.gmail.com>
+Date: Fri, 17 Apr 2015 11:37:44 +0200
+Subject: [PATCH v2 2/5] mmc: mediatek: Add Mediatek MMC driver
+In-Reply-To: <20150417091213.GM4946@pengutronix.de>
+References: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
+ <1426562035-16709-3-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFoUg1snXeOwCiKPF_daxAAfcWE0nUbRAj23Z=k9z5FCyA@mail.gmail.com>
+ <20150417091213.GM4946@pengutronix.de>
+Message-ID: <CAPDyKFr5NDTnx_3brksimhqGj+0Rk=tH5fLfWyRddRdPf7i6Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2015 at 10:58, Linus Walleij <linus.walleij@linaro.org> wrote:
-> As can be seen from the datasheet of the CoreSight
-> Components, DDI0314 table A-4 the funnel has a clock signal
-> apart from the AHB interconnect ("amba_pclk", that we're
-> already handling) called ATCLK, ARM Trace Clock, that SoC
-> implementers may provide from an entirely different clock
-> source. So to model this correctly create an optional
-> path for handling ATCLK alongside the PCLK so we don't
-> break old platforms that only define PCLK ("amba_pclk") but
-> still makes it possible for SoCs that have both clock signals
-> (such as the DB8500) to fetch and prepare/enable/disable/
-> unprepare both clocks.
+On 17 April 2015 at 11:12, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Ulf,
 >
-> The ATCLK is enabled and disabled using the runtime PM
-> callbacks. As the replicator is a platform device, the
-> code is a bit different from the other CoreSight components
-> and the bus core does not activate runtime PM by default,
-> so we need a few extra calls.
+> On Tue, Mar 31, 2015 at 02:23:06PM +0200, Ulf Hansson wrote:
+>> On 17 March 2015 at 04:13, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>> > +
+>> > +       msdc_set_buswidth(host, ios->bus_width);
+>> > +
+>> > +       /* Suspend/Resume will do power off/on */
+>> > +       switch (ios->power_mode) {
+>> > +       case MMC_POWER_UP:
+>> > +               msdc_init_hw(host);
+>> > +               if (!IS_ERR(mmc->supply.vmmc)) {
+>> > +                       ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
+>> > +                                       ios->vdd);
+>> > +                       if (ret) {
+>> > +                               dev_err(host->dev, "Failed to set vmmc power!\n");
+>> > +                               return;
+>> > +                       }
+>> > +               }
+>> > +               break;
+>> > +       case MMC_POWER_ON:
+>> > +               if (!IS_ERR(mmc->supply.vqmmc)) {
+>> > +                       ret = regulator_enable(mmc->supply.vqmmc);
+>>
+>> The calls to regulator_enable|disable() for the vqmmc will not be
+>> balanced properly here. You need a local cache variable like
+>> "is_enabled" to keep track of this.
 >
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/coresight/coresight-replicator.c | 43 ++++++++++++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->
-> diff --git a/drivers/coresight/coresight-replicator.c b/drivers/coresight/coresight-replicator.c
-> index cdf05537d574..126ae1f731d7 100644
-> --- a/drivers/coresight/coresight-replicator.c
-> +++ b/drivers/coresight/coresight-replicator.c
-> @@ -18,6 +18,7 @@
->  #include <linux/io.h>
->  #include <linux/err.h>
->  #include <linux/slab.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/clk.h>
->  #include <linux/of.h>
->  #include <linux/coresight.h>
-> @@ -27,10 +28,12 @@
->  /**
->   * struct replicator_drvdata - specifics associated to a replicator component
->   * @dev:       the device entity associated with this component
-> + * @atclk:     optional clock for the core parts of the replicator.
->   * @csdev:     component vitals needed by the framework
->   */
->  struct replicator_drvdata {
->         struct device           *dev;
-> +       struct clk              *atclk;
->         struct coresight_device *csdev;
->  };
->
-> @@ -39,6 +42,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
->  {
->         struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
->
-> +       pm_runtime_get_sync(drvdata->dev);
->         dev_info(drvdata->dev, "REPLICATOR enabled\n");
->         return 0;
->  }
-> @@ -48,6 +52,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
->  {
->         struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
->
-> +       pm_runtime_put(drvdata->dev);
->         dev_info(drvdata->dev, "REPLICATOR disabled\n");
->  }
->
-> @@ -62,6 +67,7 @@ static const struct coresight_ops replicator_cs_ops = {
->
->  static int replicator_probe(struct platform_device *pdev)
->  {
-> +       int ret;
->         struct device *dev = &pdev->dev;
->         struct coresight_platform_data *pdata = NULL;
->         struct replicator_drvdata *drvdata;
-> @@ -80,7 +86,16 @@ static int replicator_probe(struct platform_device *pdev)
->                 return -ENOMEM;
->
->         drvdata->dev = &pdev->dev;
-> +       drvdata->atclk = devm_clk_get(&pdev->dev, "atclk"); /* optional */
-> +       if (!IS_ERR(drvdata->atclk)) {
-> +               ret = clk_prepare_enable(drvdata->atclk);
-> +               if (ret)
-> +                       return ret;
-> +       }
->         platform_set_drvdata(pdev, drvdata);
-> +       pm_runtime_set_active(&pdev->dev);
-> +       pm_runtime_enable(&pdev->dev);
-> +       pm_runtime_put(&pdev->dev);
->
+> Shouldn't the MMC core provide balanced hooks for this? What about
+> MMC_POWER_UP, can this be used for enabling regulators?
 
-Move the pm_runtime_put() to the end of the ->probe().
+Currently host drivers deals with vqmmc enabling/disabling, setting
+voltage, etc - entirely by them selves.
 
-Add a pm_runtime_get_noresume() prior the pm_runtime_set_active() call.
+Dough Anderson is working on fixing that:
+http://lkml.iu.edu/hypermail/linux/kernel/1503.1/03108.html
 
-The you also need to add error handling. Taking care of gating the
-clock, decreasing the runtime PM reference count and disabling runtime
-PM.
+MMC_POWER_UP is when vmmc shall be enabled.
 
->         desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
->         if (!desc)
-> @@ -107,6 +122,33 @@ static int replicator_remove(struct platform_device *pdev)
->         return 0;
->  }
->
-> +#ifdef CONFIG_PM
-> +static int replicator_runtime_suspend(struct device *dev)
-> +{
-> +       struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
-> +
-> +       if (drvdata && !IS_ERR(drvdata->atclk))
-> +               clk_disable_unprepare(drvdata->atclk);
-> +
-> +       return 0;
-> +}
-> +
-> +static int replicator_runtime_resume(struct device *dev)
-> +{
-> +struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
-
-Tab?
-
-> +
-> +       if (drvdata && !IS_ERR(drvdata->atclk))
-> +               clk_prepare_enable(drvdata->atclk);
-> +
-> +       return 0;
-> +}
-> +#endif
-> +
-> +static const struct dev_pm_ops replicator_dev_pm_ops = {
-> +       SET_RUNTIME_PM_OPS(replicator_runtime_suspend,
-> +                          replicator_runtime_resume, NULL)
-> +};
-> +
->  static struct of_device_id replicator_match[] = {
->         {.compatible = "arm,coresight-replicator"},
->         {}
-> @@ -118,6 +160,7 @@ static struct platform_driver replicator_driver = {
->         .driver         = {
->                 .name   = "coresight-replicator",
->                 .of_match_table = replicator_match,
-> +               .pm     = &replicator_dev_pm_ops,
->         },
->  };
->
-> --
-> 1.9.3
->
+MMC_POWER_ON is when vqmmc shall be enabled.
 
 Kind regards
 Uffe
