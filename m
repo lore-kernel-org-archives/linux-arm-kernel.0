@@ -1,944 +1,145 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 18 Apr 2015 00:48:17 +0900
-Subject: [PATCH v3 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs and
- boards
-In-Reply-To: <1429285698-11829-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1429285698-11829-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1429285698-11829-4-git-send-email-yamada.masahiro@socionext.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Apr 2015 17:49:44 +0200
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <20150417144656.GQ819@e104818-lin.cambridge.arm.com>
+References: <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
+ <3365190.ZbiKjUlDk2@wuerfel>
+ <20150417144656.GQ819@e104818-lin.cambridge.arm.com>
+Message-ID: <2522717.YOvNMEL4TJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial device trees for UniPhier SoCs: PH1-sLD3, PH1-LD4, PH1-Pro4,
-and PH1-sLD8.
+On Friday 17 April 2015 15:46:57 Catalin Marinas wrote:
+> On Fri, Apr 17, 2015 at 02:17:32PM +0100, Arnd Bergmann wrote:
+> > - If we do not use the exact data structures that we have on aarch32,
+> >   then I think we should make aarch32 emulation and aarch64-ilp32
+> >   emulation mutually exclusive, and provide two separate asm/compat.h
+> >   header files that contain the differences. In this case, we should
+> >   try to come up with an ABI that makes the most sense for the majority
+> >   of the use cases that people are interested in. The two most likely
+> >   choices here would be
+> > 
+> >   f) create a new ABI that follows exactly what x32 did. This is a
+> >      variation of the earlier b), c), or d), but with the change of
+> >      fixing ioctl support by using a matching asm/compat.h. This
+> >      would not be entirely POSIX compliant, but it would be a nice
+> >      hack to get the highest performance in microbenchmarks, as it
+> >      avoids most of the compat layer. Over time, it can get extended
+> >      to coexist with aarch32 emulation, but that may take a few years.
+> 
+> Even in this case, we could enable AArch32 compat knowing that ioctls
+> wouldn't work. If this is important, we can add an option to enable
+> ioctl support for ILP32 and re-target the asm/compat.h definitions.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+We can allow them to coexist, but I'd only do that in mainline after
+fixing all existing problems. Otherwise we can end up with user space
+that tries to use the wrong ioctl API, and fixing the kernel breaks
+the application, without a way for the kernel to detect which behavior
+the user expects.
 
-Changes in v3:
-  - License under GPL/X11
-  - Drop "earlyprintk" kernel-parameter, add "stdout-path" property
-  - Add syscon device for SMP boot support in order not to
-    hard-code register address in platsmp.c
+> >   g) create a new ABI that does things in exactly the way that we
+> >      would use as the native syscall interface if we had an ilp32
+> >      kernel running on aarch64 with the asm-generic/unistd.h.
+> >      This would mean a 32-bit __kernel_long_t and time_t, but extending
+> >      time_t in the long run, together with aarch32 and i386.
+> >      This one is particularly interesting for people that are interested
+> >      in maximum posix compliance and in having a "nice" ABI, in particular
+> >      if there is a slight chance that within the next decade we have
+> >      reason to support building an arch/arm64 kernel itself in
+> >      aarch64-ilp32 mode.
+> 
+> I don't think there is a much difference between g) and e). The reason
+> we re-define many structures in asm/compat.h is because we don't have a
+> generic compat_* definition (e.g. compat_timespec, compat_timeval,
+> compat_flock, compat_flock64; anyway, I think some of these may not even
+> be needed with the canonical set of syscalls). The signal related
+> structures need to be handled differently for AArch32 and AArch64-ILP32
+> anyway because of the difference in the register set.
 
-Changes in v2: None
+Interesting observation, I had not guessed this.
 
- arch/arm/boot/dts/Makefile                   |   5 ++
- arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts   |  79 ++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-ld4.dtsi      | 105 ++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts  |  79 ++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-pro4.dtsi     | 117 +++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts  |  80 ++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld3.dtsi     | 117 +++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts  |  79 ++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld8.dtsi     | 105 ++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-support-card.dtsi |  66 +++++++++++++++
- 10 files changed, 832 insertions(+)
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-support-card.dtsi
+Let's list the differences, this is what I could find:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b..d639a90 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -588,6 +588,11 @@ dtb-$(CONFIG_ARCH_U8500) += \
- 	ste-hrefv60plus-tvk.dtb \
- 	ste-ccu8540.dtb \
- 	ste-ccu9540.dtb
-+dtb-$(CONFIG_ARCH_UNIPHIER) += \
-+	uniphier-ph1-sld3-ref.dtb \
-+	uniphier-ph1-ld4-ref.dtb \
-+	uniphier-ph1-pro4-ref.dtb \
-+	uniphier-ph1-sld8-ref.dtb
- dtb-$(CONFIG_ARCH_VERSATILE) += \
- 	versatile-ab.dtb \
- 	versatile-pb.dtb
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-new file mode 100644
-index 0000000..200b0c9
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-@@ -0,0 +1,79 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-LD4 Reference Board
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "uniphier-ph1-ld4.dtsi"
-+/include/ "uniphier-support-card.dtsi"
-+
-+/ {
-+	model = "UniPhier PH1-LD4 Reference Board";
-+	compatible = "socionext,ph1-ld4-ref", "socionext,ph1-ld4";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+		stdout-path = &serialsc;
-+	};
-+
-+	aliases {
-+		serial0 = &serialsc;
-+	};
-+};
-+
-+&extbus {
-+	ranges = <0 0x00000000 0x0f000000 0x01000000
-+		  1 0x00000000 0x00000000 0x08000000>;
-+};
-+
-+&support_card {
-+	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+};
-+
-+&serialsc {
-+	interrupts = <0 49 4>;
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-new file mode 100644
-index 0000000..f85168a
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-@@ -0,0 +1,105 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-LD4 SoC
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "socionext,ph1-ld4";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+	};
-+
-+	clocks {
-+		arm_timer_clk: arm_timer_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <50000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		interrupt-parent = <&intc>;
-+
-+		extbus: extbus {
-+			compatible = "simple-bus";
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+		};
-+
-+		timer at 60000200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x60000200 0x20>;
-+			interrupts = <1 11 0x104>;
-+			interrupt-parent = <&intc>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		timer at 60000600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x60000600 0x20>;
-+			interrupts = <1 13 0x104>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		intc: interrupt-controller at 60001000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x60001000 0x1000>,
-+			      <0x60000100 0x100>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-new file mode 100644
-index 0000000..d891135
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-@@ -0,0 +1,79 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-Pro4 Reference Board
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "uniphier-ph1-pro4.dtsi"
-+/include/ "uniphier-support-card.dtsi"
-+
-+/ {
-+	model = "UniPhier PH1-Pro4 Reference Board";
-+	compatible = "socionext,ph1-pro4-ref", "socionext,ph1-pro4";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x40000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+		stdout-path = &serialsc;
-+	};
-+
-+	aliases {
-+		serial0 = &serialsc;
-+	};
-+};
-+
-+&extbus {
-+	ranges = <0 0x00000000 0x0f000000 0x01000000
-+		  1 0x00000000 0x00000000 0x08000000>;
-+};
-+
-+&support_card {
-+	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+};
-+
-+&serialsc {
-+	interrupts = <0 50 4>;
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-new file mode 100644
-index 0000000..2d653f6
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-@@ -0,0 +1,117 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-Pro4 SoC
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "socionext,ph1-pro4";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "socionext,uniphier-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+		};
-+	};
-+
-+	clocks {
-+		arm_timer_clk: arm_timer_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <50000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		interrupt-parent = <&intc>;
-+
-+		extbus: extbus {
-+			compatible = "simple-bus";
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+		};
-+
-+		smp_syscon at 59801208 {
-+			compatible = "socionext,uniphier-smp-reg", "syscon";
-+			reg = <0x59801208 0x4>;
-+		};
-+
-+		timer at 60000200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x60000200 0x20>;
-+			interrupts = <1 11 0x304>;
-+			interrupt-parent = <&intc>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		timer at 60000600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x60000600 0x20>;
-+			interrupts = <1 13 0x304>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		intc: interrupt-controller at 60001000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x60001000 0x1000>,
-+			      <0x60000100 0x100>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-new file mode 100644
-index 0000000..3ea64ae
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-@@ -0,0 +1,80 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-sLD3 Reference Board
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "uniphier-ph1-sld3.dtsi"
-+/include/ "uniphier-support-card.dtsi"
-+
-+/ {
-+	model = "UniPhier PH1-sLD3 Reference Board";
-+	compatible = "socionext,ph1-sld3-ref", "socionext,ph1-sld3";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000
-+		       0xc0000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+		stdout-path = &serialsc;
-+	};
-+
-+	aliases {
-+		serial0 = &serialsc;
-+	};
-+};
-+
-+&extbus {
-+	ranges = <0 0x00000000 0x0f000000 0x01000000
-+		  1 0x00000000 0x00000000 0x08000000>;
-+};
-+
-+&support_card {
-+	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+};
-+
-+&serialsc {
-+	interrupts = <0 49 4>;
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
-new file mode 100644
-index 0000000..d4cee32
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
-@@ -0,0 +1,117 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-sLD3 SoC
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "socionext,ph1-sld3";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "socionext,uniphier-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+		};
-+	};
-+
-+	clocks {
-+		arm_timer_clk: arm_timer_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <50000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		interrupt-parent = <&intc>;
-+
-+		extbus: extbus {
-+			compatible = "simple-bus";
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+		};
-+
-+		timer at 20000200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x20000200 0x20>;
-+			interrupts = <1 11 0x304>;
-+			interrupt-parent = <&intc>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		timer at 20000600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x20000600 0x20>;
-+			interrupts = <1 13 0x304>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		intc: interrupt-controller at 20001000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x20001000 0x1000>,
-+			      <0x20000100 0x100>;
-+		};
-+
-+		smp_syscon at 59801208 {
-+			compatible = "socionext,uniphier-smp-reg", "syscon";
-+			reg = <0x59801208 0x4>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-new file mode 100644
-index 0000000..dcdc4f7
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-@@ -0,0 +1,79 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-sLD8 Reference Board
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "uniphier-ph1-sld8.dtsi"
-+/include/ "uniphier-support-card.dtsi"
-+
-+/ {
-+	model = "UniPhier PH1-sLD8 Reference Board";
-+	compatible = "socionext,ph1-sld8-ref", "socionext,ph1-sld8";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+		stdout-path = &serialsc;
-+	};
-+
-+	aliases {
-+		serial0 = &serialsc;
-+	};
-+};
-+
-+&extbus {
-+	ranges = <0 0x00000000 0x0f000000 0x01000000
-+		  1 0x00000000 0x00000000 0x08000000>;
-+};
-+
-+&support_card {
-+	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+};
-+
-+&serialsc {
-+	interrupts = <0 48 4>;
-+};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-new file mode 100644
-index 0000000..be2f770
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-@@ -0,0 +1,105 @@
-+/*
-+ * Device Tree Source for UniPhier PH1-sLD8 SoC
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "socionext,ph1-sld8";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+	};
-+
-+	clocks {
-+		arm_timer_clk: arm_timer_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <50000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		interrupt-parent = <&intc>;
-+
-+		extbus: extbus {
-+			compatible = "simple-bus";
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+		};
-+
-+		timer at 60000200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x60000200 0x20>;
-+			interrupts = <1 11 0x104>;
-+			interrupt-parent = <&intc>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		timer at 60000600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x60000600 0x20>;
-+			interrupts = <1 13 0x104>;
-+			clocks = <&arm_timer_clk>;
-+		};
-+
-+		intc: interrupt-controller at 60001000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x60001000 0x1000>,
-+			      <0x60000100 0x100>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/uniphier-support-card.dtsi b/arch/arm/boot/dts/uniphier-support-card.dtsi
-new file mode 100644
-index 0000000..443013f
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-support-card.dtsi
-@@ -0,0 +1,66 @@
-+/*
-+ * Device Tree Source for UniPhier Support Card (Expansion Board)
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+&extbus {
-+	support_card: support_card {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		ethsc: ethernet at 00000000 {
-+			compatible = "smsc,lan9118", "smsc,lan9115";
-+			reg = <0x00000000 0x1000>;
-+			phy-mode = "mii";
-+			reg-io-width = <4>;
-+		};
-+
-+		serialsc: uart at 000b0000 {
-+			compatible = "ns16550a";
-+			reg = <0x000b0000 0x20>;
-+			clock-frequency = <12288000>;
-+			reg-shift = <1>;
-+			fifo-size = <16>;
-+		};
-+	};
-+};
--- 
-1.9.1
+| #define FIOQSIZE        0x545E
+
+probably broken on arm64 already, should be investigated
+
+| typedef unsigned short          __kernel_mode_t;
+| typedef unsigned short          __kernel_ipc_pid_t;
+
+Both of these affect all sysvipc, but very little else
+
+| typedef unsigned short          __kernel_uid_t;
+| typedef unsigned short          __kernel_gid_t;
+
+sysvipc, ncpfs, and core dumps (probably fine since they are separate
+anyway), 
+
+| typedef unsigned short          __kernel_old_dev_t; /* compat gets this wrong */
+
+old-style loopdev ioctl
+
+| struct stat { ... } /* possibly not needed */
+
+ - lustre ioctls (needs to be fixed anyway)
+ - old stat syscalls (won't be used with asm-generic/unistd.h)
+
+| struct stat64 { ... }
+
+ - lustre ioctls
+ - new style stat syscalls
+
+So, in essence the difference comes down to the syscalls for stat
+and ipc. If we use the aarch32 data types, we can share the
+fstatat64, fstat64, semctl, msgsnd, msgrcv, msgctl, shmat,
+and shmctl compat system calls between aarch32-compat and
+aarch64-ilp32-compat. Otherwise we have to duplicate or extend
+them to cover both cases at runtime. That would be rather ugly
+but entirely doable. The ioctls are hardly affected, the few
+ones that differ once __kernel_long_t matches could easily be
+fixed up as you say.
+
+> I would add a variation of g):
+> 
+>   h) create a new ABI that uses asm-generic/unistd.h and generic types
+>      with 32-bit __kernel_long_t and 64-bit time_t. This would be POSIX
+>      compliant and we don't have to worry about extending time_t in the
+>      future. We would have to duplicate some of the generic structures
+>      in asm/compat.h so that we can use the compat layer. However, at
+>      least in the short term, we don't have an easy way to enable both
+>      AArch32 and AArch64 ILP32 in the same kernel (they would be
+>      exclusive).
+
+I'd particularly like to avoid this case, out of pure self-interest:
+
+> > > > However, it would be nice to get agreement on the normal 32-bit ABI
+> > > > for time_t and timespec first, and then use the same thing everywhere.
+> > > 
+> > > Do you mean for native 32-bit architectures? I think OpenBSD uses a
+> > > 64-bit time_t already on 32-bit arches, it's doable in Linux as well.
+> > 
+> > Yes, and I'm working on that for Linux. The first step involves fixing
+> > the kernel, one file at a time, changing all users of time_t to use
+> > some other type (ktime_t or time64_t in most cases) instead, and introducing
+> > additional system calls to handle the boundary to user space without
+> > breaking stuff. See my presentation at http://elinux.org/ELC_2015_Presentations
+> > for more detail.
+> 
+> The approach here is primarily to fix the problem for existing 32-bit
+> architectures by adding a new syscall and that's fine. But what if we
+> enforce 64-bit time_t for all _new_ architectures?
+
+I think that makes the job of fixing the existing architectures harder,
+because it adds more special cases. It's already incredibly hard to
+do this without breaking user space or missing some corner cases that
+needs to be fixed. So far, the easy assumption is that 64-bit architectures
+use 64-bit time_t, 32-bit architectures use 32-bit time_t, and x32
+is somewhat broken regarding ioctl and would be fixed in the process.
+I don't want to have to deal with more combinations in the kernel for now.
+Once we have established a syscall API and found a large-enough subset
+of drivers that have a working ioctl (and the other ones marked
+'depends on COMPAT_TIME_T'), we would stop taking new architecture
+ports that provide both APIs and mandate that new ones only implement
+the 64-bit time_t one.
+
+	Arnd
