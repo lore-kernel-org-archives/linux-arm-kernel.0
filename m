@@ -1,82 +1,48 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 17 Apr 2015 20:41:56 +0200
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150416160858.GH18048@atomide.com>
-References: <20150406151939.GG18048@atomide.com>
- <20150406154037.GI18048@atomide.com> <5522BEEF.2000405@gmail.com>
- <20150406174245.GJ18048@atomide.com>
- <20150407135713.GL4027@n2100.arm.linux.org.uk>
- <20150407152207.GM18048@atomide.com>
- <20150408230658.GO4027@n2100.arm.linux.org.uk>
- <20150409134843.GQ4027@n2100.arm.linux.org.uk>
- <20150415163108.GB2033@earth> <20150416160858.GH18048@atomide.com>
-Message-ID: <20150417184156.GA3326@earth>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Fri, 17 Apr 2015 20:43:54 +0200
+Subject: [PATCH v2 1/2] Documentation: devicetree: root node serial-number
+ property documentation
+Message-ID: <1429296235-14123-1-git-send-email-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 09:08:58AM -0700, Tony Lindgren wrote:
-> * Sebastian Reichel <sre@kernel.org> [150415 09:32]:
-> > Hi,
-> > 
-> > On Thu, Apr 09, 2015 at 02:48:43PM +0100, Russell King - ARM Linux wrote:
-> > > On Thu, Apr 09, 2015 at 12:06:58AM +0100, Russell King - ARM Linux wrote:
-> > > > On Tue, Apr 07, 2015 at 08:22:08AM -0700, Tony Lindgren wrote:
-> > > > > Works for me. The above needs the following fix folded in to build:
-> > > > > 
-> > > > > --- a/arch/arm/mm/proc-v7.S
-> > > > > +++ b/arch/arm/mm/proc-v7.S
-> > > > > @@ -532,7 +532,7 @@ __v7_ca9mp_proc_info:
-> > > > >  __v7_ca8_proc_info:
-> > > > >  	.long	0x410fc080
-> > > > >  	.long	0xff0ffff0
-> > > > > -	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
-> > > > > +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
-> > > > >  	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
-> > > > >  
-> > > > >  #endif	/* CONFIG_ARM_LPAE */
-> > > > 
-> > > > Thanks, merged into the original patch.
-> > > 
-> > > Do you want to give me an ack for this, thanks?
-> > 
-> > I tried to test this together with Tony's follow up patch, but I get
-> > this after applying the patch to v4.0:
-> > 
-> > sre at earth ~/src/linux [430973-fix] % make -j4
-> >   CHK     include/config/kernel.release
-> >   CHK     include/generated/uapi/linux/version.h
-> >   CHK     include/generated/utsrelease.h
-> > make[1]: 'include/generated/mach-types.h' is up to date.
-> >   CALL    scripts/checksyscalls.sh
-> >   CHK     include/generated/compile.h
-> >   AS      arch/arm/mm/proc-v7.o
-> > arch/arm/mm/proc-v7.S: Assembler messages:
-> > arch/arm/mm/proc-v7.S:535: Error: invalid operands (*ABS* and .text sections) for `|'
-> > arch/arm/mm/proc-v7.S:535: Error: invalid operands (*ABS* and .text sections) for `|'
-> > scripts/Makefile.build:294: recipe for target 'arch/arm/mm/proc-v7.o' failed
-> > make[1]: *** [arch/arm/mm/proc-v7.o] Error 1
-> > Makefile:947: recipe for target 'arch/arm/mm' failed
-> > make: *** [arch/arm/mm] Error 2
-> > make: *** Waiting for unfinished jobs....
-> 
-> Maybe test the version in Linux next:
-> 
-> a6d746789825 ("ARM: proc-v7: avoid errata 430973 workaround for non-Cortex A8 CPUs")
+Open firmware is already using the serial-number property for passing the
+device's serial number from the bootloader to the kernel. In addition, lshw
+already has support for scanning this property.
 
-DONE with your your patch added on top:
+The serial number is a string that somewhat represents the device's serial
+number. It might come from some form of storage (e.g. an eeprom) and be
+programmed at factory-time by the manufacturer or come from identification
+bits available in e.g. the SoC (note that the soc_id property in the SoC bus
+should hold a full account of those bits).
 
-Tested-By: Sebastian Reichel <sre@kernel.org>
+The serial number is taken as-is from the bootloader, so it is up to the
+bootloader to define where the serial number comes from and what length it
+should be. Some use cases for the serial number require it to have a maximum
+length (e.g. for USB serial number) and some other cases imply more restrictions
+on what the serial number should look like (e.g. in Android, the ro.serialno
+property is usually a 16-bytes (plus one null byte) representation of a 64 bit
+number).
 
-(on N900)
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ Documentation/devicetree/booting-without-of.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-I guess we should also drop the CONFIG_ARM_ERRATA_430973 check from
-pdata-quirks' nokia_n900_legacy_init() and just enable it unconditionally.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150417/809fb17c/attachment-0001.sig>
+diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+index 7768518..95fc385 100644
+--- a/Documentation/devicetree/booting-without-of.txt
++++ b/Documentation/devicetree/booting-without-of.txt
+@@ -828,6 +828,10 @@ address which can extend beyond that limit.
+   name may clash with standard defined ones, you prefix them with your
+   vendor name and a comma.
+ 
++  Additional properties for the root node:
++
++    - serial-number : a string representing the device's serial number
++
+   b) The /cpus node
+ 
+   This node is the parent of all individual CPU nodes. It doesn't
+-- 
+1.9.1
