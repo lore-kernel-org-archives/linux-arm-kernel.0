@@ -1,37 +1,53 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 17 Apr 2015 11:50:23 +0100
-Subject: [PATCH 5/5] ARM: DT: STi: STiH407: Add DT node for st-lpc timer.
-In-Reply-To: <1429267823-8879-1-git-send-email-peter.griffin@linaro.org>
-References: <1429267823-8879-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1429267823-8879-6-git-send-email-peter.griffin@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 17 Apr 2015 10:59:57 +0000
+Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
+In-Reply-To: <20150417103946.2a46c243@bbrezillon>
+References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150410135056.GB28873@io.lakedaemon.net>
+ <20150410171148.07bc9429@bbrezillon>
+ <20150410223008.GA18660@io.lakedaemon.net>
+ <552B8EC4.209@free-electrons.com>
+ <20150413124711.GI18660@io.lakedaemon.net>
+ <87r3rom2qu.fsf@natisbad.org>
+ <20150413201146.GL18660@io.lakedaemon.net>
+ <20150417103356.6ce78145@bbrezillon>
+ <20150417103946.2a46c243@bbrezillon>
+Message-ID: <20150417105957.GB8069@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the dt node for the st-lpc timer found on
-stih407 famliy SoCs. This can then be used as a clocksource.
+Hey Boris,
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+On Fri, Apr 17, 2015 at 10:39:46AM +0200, Boris Brezillon wrote:
+> On Fri, 17 Apr 2015 10:33:56 +0200 Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> > On Mon, 13 Apr 2015 20:11:46 +0000 Jason Cooper <jason@lakedaemon.net> wrote:
+> > > > 
+> > > > > I'd appreciate if we'd look into it.  I understand from on-list and
+> > > > > off-list discussion that the rewrite was unavoidable.  So I'm willing to
+> > > > > concede that.  Giving people time to migrate from old to new while still
+> > > > > being able to update for other security fixes seems reasonable.
+> > > > 
+> > > > Jason, what do you think of the approach above? 
+> > > 
+> > > I say keep it simple.  We shouldn't use the DT changes to trigger one
+> > > vice the other.  We need to be able to build both, but only load one at
+> > > a time.  If that's anything other than simple to do, then we make it a
+> > > Kconfig binary choice and move on.
+> > 
+> > Actually I was planning to handle it with a Kconfig dependency rule
+> > (NEW_DRIVER depends on !OLD_DRIVER and OLD_DRIVER depends
+> > on !NEW_DRIVER).
+> > I don't know how to make it a runtime check without adding new
+> > compatible strings for the kirkwood, dove and orion platforms, and I'm
+> > sure sure this is a good idea.
+>   ^ not
+> 
+> > Do you have any ideas ?
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index c06a546..59c6a22 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -39,6 +39,13 @@
- 		reg = <0x08760000 0x1000>;
- 	};
- 
-+	lpc-timer at 0x8788000 {
-+		compatible = "st,st_lpc_timer";
-+		reg = <0x8788000 0x1000>;
-+		clock-names = "lpc_clk";
-+		clocks = <&clk_s_d3_flexgen CLK_LPC_1>;
-+	};
-+
- 	timer at 08760200 {
- 		interrupt-parent = <&intc>;
- 		compatible = "arm,cortex-a9-global-timer";
--- 
-1.9.1
+I'm kinda wrapped up with dayjob stuff atm...  But I'd look at the wireless
+drivers.  eg b43, b43legacy, brcm80211.  There are devices they overlap for.
+So, they need to deconflict in some way.
+
+thx,
+
+Jason.
