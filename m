@@ -1,115 +1,91 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 17 Apr 2015 11:10:06 +0200
-Subject: [PATCH 07/13] coresight: tmc: let runtime PM handle core clock
-In-Reply-To: <1429261140-13910-8-git-send-email-linus.walleij@linaro.org>
-References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
- <1429261140-13910-8-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAPDyKFqQghV7EmJKwCW0Qc49=chHsGddCs9PPiY8O=p5txBzZA@mail.gmail.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Fri, 17 Apr 2015 14:41:02 +0530
+Subject: [PATCH v3] dmaengine: xgene-dma: Fix sparse wannings and
+ coccinelle warnings
+In-Reply-To: <2380806.YAnOxsf686@wuerfel>
+References: <1429212673-22254-1-git-send-email-rsahu@apm.com>
+ <2380806.YAnOxsf686@wuerfel>
+Message-ID: <CAFd313widYjOzLbKd=BantviCK9O4ZhwN92QuZgipng2A0Ys0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2015 at 10:58, Linus Walleij <linus.walleij@linaro.org> wrote:
-> This uses runtime PM to manage the PCLK ("amba_pclk") instead
-> of screwing around with the framework by going in and taking
-> a copy from the amba device. The amba bus core will uprepare
-> and disable the clock when the device is unused when
-> CONFIG_PM is selected, else the clock will be always on.
->
-> Prior to this patch, as the AMBA primecell bus code enables
-> the PCLK, it would be left on after probe as
-> the clk_prepare_enable() and clk_disable_unprepare() was
-> called and thus just increase and decreas the refcount by
-> one, without it reaching zero and actually disabling the
-> clock. Now the runtime PM callbacks will make sure the PCLK
-> is properly disabled after probe.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Hi Arnd,
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Fri, Apr 17, 2015 at 2:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 17 April 2015 01:01:13 Rameshwar Prasad Sahu wrote:
+>> v3 changes:
+>>       * Minor changes in length setting in DMA descriptor
+>>
+>> v2 changes:
+>>       * Code cleanup
+>>       * Changed way of setting DMA descriptors for big-endian
+>>
+>> This patch fixes compilation sparse warnings like incorrect type in assignment
+>> (different base types), cast to restricted __le64, symbol
+>> '__UNIQUE_ID_author__COUNTER__' has multiple initializers etc and
+>> coccinelle warnings (No need to set .owner here. The core will do it.)
+>>
+>> This patch is based on slave-dma / for-linus branch.
+>> (commit: 9f2fd0dfa594d857fbdaeda523ff7a46f16567f5 [26/28]
+>>       dmaengine: Add support for APM X-Gene SoC DMA engine driver)
+>>
+>> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+>> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+>
+> Looks good now,
+>
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+>
+> There is one small enhancement that you could still do and I'll shut up after
+> that ;-)
+>
+>>
+>> -static void *xgene_dma_lookup_ext8(u64 *desc, int idx)
+>> +static __le64 *xgene_dma_lookup_ext8(struct xgene_dma_desc_hw *desc, int idx)
+>>  {
+>> -     return (idx % 2) ? (desc + idx - 1) : (desc + idx + 1);
+>> +     switch (idx) {
+>> +     case 0:
+>> +             return &desc->m1;
+>> +     case 1:
+>> +             return &desc->m0;
+>> +     case 2:
+>> +             return &desc->m3;
+>> +     case 3:
+>> +             return &desc->m2;
+>> +     default:
+>> +             pr_err("Invalid dma descriptor index\n");
+>> +     }
+>> +
+>> +     return NULL;
+>>  }
+>>
+> ...
+>
+>>       /* Set 1st to 5th source addresses */
+>>       for (i = 0; i < src_cnt; i++) {
+>>               len = *nbytes;
+>> -             xgene_dma_set_src_buffer((i == 0) ? (desc1 + 8) :
+>> +             xgene_dma_set_src_buffer((i == 0) ? &desc1->m1 :
+>>                                        xgene_dma_lookup_ext8(desc2, i - 1),
+>>                                        &len, &src[i]);
+>> -             XGENE_DMA_DESC_MULTI_SET(desc1, scf[i], i);
+>> +             desc1->m2 |= cpu_to_le64((scf[i] << ((i + 1) * 8)));
+>>       }
+>
+> If you just unroll this loop, you get code that is smaller and easier to
+> understand:
+>
+>         /* Set 1st to 5th source addresses */
+>         xgene_dma_set_src_buffer(&desc1->m1, &len, &src[0]);
+>         xgene_dma_set_src_buffer(&desc2->m0, &len, &src[1]);
+>         xgene_dma_set_src_buffer(&desc2->m3, &len, &src[2]);
+>         xgene_dma_set_src_buffer(&desc2->m2, &len, &src[3]);
+>         desc1->m2 |= cpu_to_le64(scf[0] | scf[1] << 8 | scf[2] << 16 | scf[3] << 24);
 
-> ---
->  drivers/coresight/coresight-tmc.c | 20 +++++---------------
->  1 file changed, 5 insertions(+), 15 deletions(-)
+Actually here, in run time src_cnt value can be 2 or 3 upto 5, so we
+can't unroll it.
+
+
 >
-> diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
-> index 3ff232f9ddf7..db917c70d2b3 100644
-> --- a/drivers/coresight/coresight-tmc.c
-> +++ b/drivers/coresight/coresight-tmc.c
-> @@ -23,7 +23,7 @@
->  #include <linux/slab.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/spinlock.h>
-> -#include <linux/clk.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/of.h>
->  #include <linux/coresight.h>
->  #include <linux/amba/bus.h>
-> @@ -104,7 +104,6 @@ enum tmc_mem_intf_width {
->   * @dev:       the device entity associated to this component.
->   * @csdev:     component vitals needed by the framework.
->   * @miscdev:   specifics to handle "/dev/xyz.tmc" entry.
-> - * @clk:       the clock this component is associated to.
->   * @spinlock:  only one at a time pls.
->   * @read_count:        manages preparation of buffer for reading.
->   * @buf:       area of memory where trace data get sent.
-> @@ -120,7 +119,6 @@ struct tmc_drvdata {
->         struct device           *dev;
->         struct coresight_device *csdev;
->         struct miscdevice       miscdev;
-> -       struct clk              *clk;
->         spinlock_t              spinlock;
->         int                     read_count;
->         bool                    reading;
-> @@ -242,17 +240,14 @@ static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
->
->  static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
->  {
-> -       int ret;
->         unsigned long flags;
->
-> -       ret = clk_prepare_enable(drvdata->clk);
-> -       if (ret)
-> -               return ret;
-> +       pm_runtime_get_sync(drvdata->dev);
->
->         spin_lock_irqsave(&drvdata->spinlock, flags);
->         if (drvdata->reading) {
->                 spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> -               clk_disable_unprepare(drvdata->clk);
-> +               pm_runtime_put(drvdata->dev);
->                 return -EBUSY;
->         }
->
-> @@ -386,7 +381,7 @@ out:
->         drvdata->enable = false;
->         spin_unlock_irqrestore(&drvdata->spinlock, flags);
->
-> -       clk_disable_unprepare(drvdata->clk);
-> +       pm_runtime_put(drvdata->dev);
->
->         dev_info(drvdata->dev, "TMC disabled\n");
->  }
-> @@ -644,11 +639,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
->
->         spin_lock_init(&drvdata->spinlock);
->
-> -       drvdata->clk = adev->pclk;
-> -       ret = clk_prepare_enable(drvdata->clk);
-> -       if (ret)
-> -               return ret;
-> -
->         devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
->         drvdata->config_type = BMVAL(devid, 6, 7);
->
-> @@ -663,7 +653,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
->                 drvdata->size = readl_relaxed(drvdata->base + TMC_RSZ) * 4;
->         }
->
-> -       clk_disable_unprepare(drvdata->clk);
-> +       pm_runtime_put(&adev->dev);
->
->         if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
->                 drvdata->vaddr = dma_alloc_coherent(dev, drvdata->size,
-> --
-> 1.9.3
->
+>         Arnd
