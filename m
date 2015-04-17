@@ -1,205 +1,85 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 17 Apr 2015 08:29:28 -0600
-Subject: [RFC 3/3] VFIO: platform: add vfio-platform-calxedaxgmac driver
-In-Reply-To: <1429277833-28663-4-git-send-email-eric.auger@linaro.org>
-References: <1429277833-28663-1-git-send-email-eric.auger@linaro.org>
- <1429277833-28663-4-git-send-email-eric.auger@linaro.org>
-Message-ID: <1429280968.10086.52.camel@redhat.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 17 Apr 2015 16:48:28 +0200
+Subject: [PATCH v5 00/18] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <CABxcv=mXENvPHvvN5iOaUBZKORF49RhDs-tL_PBT4Urh54pd0Q@mail.gmail.com>
+References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
+ <20150204142149.GM3702@8bytes.org>
+ <CABxcv=mXENvPHvvN5iOaUBZKORF49RhDs-tL_PBT4Urh54pd0Q@mail.gmail.com>
+Message-ID: <55311D3C.5050300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-04-17 at 15:37 +0200, Eric Auger wrote:
-> This patch introduces a specialized vfio platform driver for the
-> calxeda xgmac. On top of the generic vfio platform driver functionalities,
-> it implements the reset modality.  This latter basically disables interrupts
-> and stops DMA transfers.
-> 
-> Code is inherited from calxeda xgmac native driver
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> ---
->  drivers/vfio/platform/Kconfig                      |   2 +
->  drivers/vfio/platform/Makefile                     |   2 +
->  drivers/vfio/platform/reset/Kconfig                |   7 ++
->  drivers/vfio/platform/reset/Makefile               |   5 +
->  .../platform/reset/vfio_platform_calxedaxgmac.c    | 109 +++++++++++++++++++++
->  5 files changed, 125 insertions(+)
->  create mode 100644 drivers/vfio/platform/reset/Kconfig
->  create mode 100644 drivers/vfio/platform/reset/Makefile
->  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-> 
-> diff --git a/drivers/vfio/platform/Kconfig b/drivers/vfio/platform/Kconfig
-> index 9a4403e..1df7477 100644
-> --- a/drivers/vfio/platform/Kconfig
-> +++ b/drivers/vfio/platform/Kconfig
-> @@ -18,3 +18,5 @@ config VFIO_AMBA
->  	  framework.
->  
->  	  If you don't know what to do here, say N.
-> +
-> +source "drivers/vfio/platform/reset/Kconfig"
-> diff --git a/drivers/vfio/platform/Makefile b/drivers/vfio/platform/Makefile
-> index 81de144..9ce8afe 100644
-> --- a/drivers/vfio/platform/Makefile
-> +++ b/drivers/vfio/platform/Makefile
-> @@ -2,7 +2,9 @@
->  vfio-platform-y := vfio_platform.o vfio_platform_common.o vfio_platform_irq.o
->  
->  obj-$(CONFIG_VFIO_PLATFORM) += vfio-platform.o
-> +obj-$(CONFIG_VFIO_PLATFORM) += reset/
->  
->  vfio-amba-y := vfio_amba.o
->  
->  obj-$(CONFIG_VFIO_AMBA) += vfio-amba.o
-> +obj-$(CONFIG_VFIO_AMBA) += reset/
-> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
-> new file mode 100644
-> index 0000000..2c09cea
-> --- /dev/null
-> +++ b/drivers/vfio/platform/reset/Kconfig
-> @@ -0,0 +1,7 @@
-> +config VFIO_PLATFORM_CALXEDAXGMAC
-> +	tristate "VFIO support for calxeda xgmac"
-> +	depends on VFIO_PLATFORM
-> +	help
-> +	  Support for VFIO platform driver specialized for Calxeda xgmac reset.
-> +
-> +	  If you don't know what to do here, say N.
-> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
-> new file mode 100644
-> index 0000000..8977721
-> --- /dev/null
-> +++ b/drivers/vfio/platform/reset/Makefile
-> @@ -0,0 +1,5 @@
-> +vfio-platform-calxedaxgmac-y := vfio_platform_calxedaxgmac.o
-> +
-> +ccflags-y += -Idrivers/vfio/platform
-> +
-> +obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC) += vfio-platform-calxedaxgmac.o
-> diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-> new file mode 100644
-> index 0000000..729d0cd
-> --- /dev/null
-> +++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-> @@ -0,0 +1,109 @@
-> +/*
-> + * VFIO platform driver specialized for Calxeda xgmac reset
-> + * reset code is inherited from calxeda xgmac native driver
-> + *
-> + * Copyright 2010-2011 Calxeda, Inc.
-> + * Copyright (c) 2015 Linaro Ltd.
-> + *              www.linaro.org
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/vfio.h>
-> +#include "vfio_platform_private.h"
-> +#include <linux/io.h>
-> +
-> +#define DRIVER_VERSION  "0.1"
-> +#define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
-> +#define DRIVER_DESC     "VFIO - Calxeda xgmac vfio platform driver"
-> +
-> +/* XGMAC Register definitions */
-> +#define XGMAC_CONTROL           0x00000000      /* MAC Configuration */
-> +
-> +/* DMA Control and Status Registers */
-> +#define XGMAC_DMA_CONTROL       0x00000f18      /* Ctrl (Operational Mode) */
-> +#define XGMAC_DMA_INTR_ENA      0x00000f1c      /* Interrupt Enable */
-> +
-> +/* DMA Control registe defines */
-> +#define DMA_CONTROL_ST          0x00002000      /* Start/Stop Transmission */
-> +#define DMA_CONTROL_SR          0x00000002      /* Start/Stop Receive */
-> +
-> +/* Common MAC defines */
-> +#define MAC_ENABLE_TX           0x00000008      /* Transmitter Enable */
-> +#define MAC_ENABLE_RX           0x00000004      /* Receiver Enable */
-> +
-> +static inline void xgmac_mac_disable(void __iomem *ioaddr)
-> +{
-> +	u32 value = readl(ioaddr + XGMAC_DMA_CONTROL);
-> +
-> +	value &= ~(DMA_CONTROL_ST | DMA_CONTROL_SR);
-> +	writel(value, ioaddr + XGMAC_DMA_CONTROL);
-> +
-> +	value = readl(ioaddr + XGMAC_CONTROL);
-> +	value &= ~(MAC_ENABLE_TX | MAC_ENABLE_RX);
-> +	writel(value, ioaddr + XGMAC_CONTROL);
-> +}
-> +
-> +static int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
-> +{
-> +	struct resource *res = get_platform_resource(vdev, 0);
-> +	void __iomem *base = phys_to_virt(res->start);
-> +
-> +	if (!base)
-> +		return -ENOMEM;
-> +
-> +	/* disable IRQ */
-> +	writel(0, base + XGMAC_DMA_INTR_ENA);
-> +
-> +	/* Disable the MAC core */
-> +	xgmac_mac_disable(base);
-> +
-> +	return 0;
-> +}
-> +
-> +static int vfio_platform_calxedaxgmac_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +	struct vfio_device *vfio_dev;
-> +	struct vfio_platform_device *vpdev;
-> +
-> +	ret = vfio_platform_probe(pdev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	vfio_dev = vfio_device_get_from_dev(&pdev->dev),
-> +	vpdev = (struct vfio_platform_device *) vfio_device_data(vfio_dev);
-> +	vpdev->reset = vfio_platform_calxedaxgmac_reset;
-> +
-> +	return ret;
-> +}
-> +
-> +static struct platform_driver vfio_platform_calxedaxgmac_driver = {
-> +	.driver = {
-> +		.name = "vfio-platform-calxedaxgmac",
-> +	},
-> +	.probe = vfio_platform_calxedaxgmac_probe,
-> +	.remove = vfio_platform_remove,
-> +};
-> +
-> +module_platform_driver(vfio_platform_calxedaxgmac_driver);
-> +
-> +MODULE_VERSION(DRIVER_VERSION);
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR(DRIVER_AUTHOR);
-> +MODULE_DESCRIPTION(DRIVER_DESC);
+Hello,
 
-I don't really understand why this needs to be a new driver that wraps
-around the vfio platform driver rather than just an entry in a table of
-available device specific reset functions, setup through the normal
-probe path.  Do we really have no clue what the device is to be able to
-attach a reset function to it from the base vfio platform code?  This
-also seems like a pain for users, who now need to figure out which
-vfio_platform driver to bind to a given device.  If the user can figure
-that out, why can't the kernel just pick the right reset callback for
-them?  Thanks,
+On 2015-04-17 16:33, Javier Martinez Canillas wrote:
+> Hello Marek,
+>
+> On Wed, Feb 4, 2015 at 3:21 PM, Joerg Roedel <joro@8bytes.org> wrote:
+>> Hi Marek,
+>>
+>> On Fri, Jan 23, 2015 at 04:51:10PM +0100, Marek Szyprowski wrote:
+>>> 1. All iommu related patches (with 'iommu: exynos') can be merged to
+>>> iommu tree. They don't have any direct dependencies on the DTS, DRM and
+>>> power domain initialization change - without them the driver will simply
+>>> not initialize, when no exynos,sysmmu nodes are provided in device tree.
+>>>
+>>> Joerg, could you merge those patches?
+>> Given the previous comments and tests on this patch set I am still
+>> waiting for some Acked-bys and/or Tested-bys on this. Can you collect
+>> these and resend then (probably after the v3.20 merge window)?
+>>
+> I rebased your patches on top of latest linux-next (next-20150415) and
+> tested it on my Exynos5420 Peach Pit. HDMI display is working
+> correctly (both console and X) when CONFIG_DRM_EXYNOS_IOMMU is
+> enabled. I also see that the mixer is attached to the IOMMU domain:
+>
+> exynos-mixer 14450000.mixer: exynos_iommu_attach_device: Attached
+> IOMMU with pgtable 0x6e5e0000
+> ...
+> exynos-sysmmu 14650000.sysmmu: Enabled
+>
+> As I mentioned before [0] on your v4 series, I still have the boot
+> hang when CONFIG_DRM_EXYNOS_FIMD is enabled. You said that the cause
+> is u-boot leaving the FIMD DMA engine enabled and so causing IOMMU
+> page faults on init [1].
+>
+> I tried disabling the display on u-boot but the system hangs remains.
+> But since I do a chain loading using the verified u-boot that comes
+> with the Chromebooks, I don't know if the RO boot-loader is leaving
+> something enabled.
+>
+> In any case since HDMI with sysmmu is working correctly, that issue is
+> orthogonal to your series and can be fixed as a followup so:
+>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Alex
+In meantime I've managed to add UART adapter to our Chromebook Snow and
+finally found the issue with FIMD. It was really nasty to debug, because
+it causes a crash with console lock taken in register_framebuffer(), so
+there was no debug/crash message - only complete system freeze. All this
+was caused by fimd left enabled by bootloader, but with gate clock
+disabled, so any access to its register caused freeze.
+
+I need to cleanup the patches. I will rebase them and send once 4.1rc1 is
+out. I'm sorry that I didn't let you know earlier, but I'm terribly busy
+with other (internal) stuff right now.
+
+> NOTE: Most of the patches don't apply cleanly so I pushed a branch [2]
+> with my conflict resolution so you don't have to do the same. I also
+> did some small changes like using bool instead of int when were
+> assigning it to true and renaming some of the subject lines to match
+> the format used by the subsystem.
+>
+> What I didn't change is to re-order the sysmmu device nodes according
+> to the unit address that was asked by Andreas since the DTS patches
+> are likely to conflict with the work Krzysztof is doing to use labels
+> instead of overriding nodes in Exynos 4 and 5 DTS[i]. So you may need
+> to change those anyways once Krzysztof patches land.
+
+Thanks!
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
