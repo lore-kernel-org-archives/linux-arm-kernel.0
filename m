@@ -1,23 +1,27 @@
 From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Fri, 17 Apr 2015 16:27:02 -0500
-Subject: [PATCH 0/2] ARM: VDSO: minor fixes for 4.1
-Message-ID: <1429306024-5253-1-git-send-email-nathan_lynch@mentor.com>
+Date: Fri, 17 Apr 2015 16:27:03 -0500
+Subject: [PATCH 1/2] ARM: VDSO: add build artifacts to .gitignore
+In-Reply-To: <1429306024-5253-1-git-send-email-nathan_lynch@mentor.com>
+References: <1429306024-5253-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1429306024-5253-2-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While investigating Arnd's v3 build issue, I became aware of a couple
-of shortcomings unrelated to runtime in the VDSO code.  With these
-applied, 'make arch/arm/vdso/' should behave better, and .gitignore is
-populated properly (I almost always build in a separate directory, so
-I hadn't noticed until now).
+vdsomunge and vdso.so.raw are outputs that don't get matched by the
+normal ignore rules.
 
-Nathan Lynch (2):
-  ARM: VDSO: add build artifacts to .gitignore
-  ARM: VDSO: honor CONFIG_VDSO in Makefile
-
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
  arch/arm/vdso/.gitignore | 2 ++
- arch/arm/vdso/Makefile   | 4 ++--
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm/vdso/.gitignore b/arch/arm/vdso/.gitignore
+index f8b69d84238e..6b47f6e0b032 100644
+--- a/arch/arm/vdso/.gitignore
++++ b/arch/arm/vdso/.gitignore
+@@ -1 +1,3 @@
+ vdso.lds
++vdso.so.raw
++vdsomunge
 -- 
 1.9.3
