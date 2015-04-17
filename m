@@ -1,173 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 17 Apr 2015 10:59:00 +0200
-Subject: [PATCH 13/13] ARM: ux500: add CoreSight blocks to DTS file
-In-Reply-To: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
-References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1429261140-13910-14-git-send-email-linus.walleij@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 17 Apr 2015 10:01:56 +0100
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <2242025.Z9qPVP4zls@wuerfel>
+References: <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
+ <E769538B-CE45-4FF3-AD2C-21B30069F0B9@caviumnetworks.com>
+ <20150416133134.GC819@e104818-lin.cambridge.arm.com>
+ <2242025.Z9qPVP4zls@wuerfel>
+Message-ID: <20150417090156.GH819@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This registers all the CoreSight blocks on the DB8500 SoC:
-each core has a PTM (v1.0, r1p0-00rel0) connected, both connected
-to a funnel (DK-TM908-r0p1-00rel0) which in turn connects to a
-replicator (DM-TM909-r0p1-00rel0). The replicator has two outputs,
-port 0 to a TPIU interface and port 1 to an ETB
-(DK-TM907-r0p3-00rel0). The CoreSight blocks are all clocked by
-the APEATCLK from the PRCMU and their AHB interconnect is clocked
-from a separate clock called APETRACECLK.
+On Thu, Apr 16, 2015 at 05:21:30PM +0200, Arnd Bergmann wrote:
+> On Thursday 16 April 2015 14:31:34 Catalin Marinas wrote:
+> > On Thu, Apr 16, 2015 at 11:33:49AM +0000, Pinski, Andrew wrote:
+> > > There are only a few places where long should be 32bit rather than
+> > > 64bit. The non-time_t field of timespec is the only one I can think
+> > > of.
+> > 
+> > It may be the only one but we could end up with a non-compliant
+> > timespec. Unless we keep the tv_nsec as 32-bit long and add some
+> > padding, we could work around it by getting the C library to sign-extend
+> > such padding or we do it in a new "compat" layer in the kernel (but both
+> > cases imply copying the structure).
+> > 
+> > However, timerspec is included in other structures, so we'd have to
+> > intercept those as well. Philipp provided a list here:
+> > 
+> > http://article.gmane.org/gmane.linux.kernel/1931497
+> 
+> We're basically in the same boat as x32 then, and should do the same
+> thing on both most importantly, whatever that ends up.
 
-The SoC also has a CTI/CTM block which can be added later as we
-have upstream support in the CoreSight subsystem.
+I'm getting confused ;). I thought you were pushing for a 32-bit time_t
+on AArch64 ILP32.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Mathieu: this patch will go into the ux500 tree if you think
-it looks OK. Just provide your ACK if you think it's looking
-good and I'll take care of it. The rest of the CoreSight stuff
-should be funneled through your tree I guess.
----
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 129 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 129 insertions(+)
+I'm not sure we need to be in the same boat as x32. Their decision was
+to primarily use the LP64 ABI and there are performance advantages, not
+only the 2038 issue. The downside, few POSIX incompatibilities that I
+think they are happy to live with. If we are happy to live with them as
+well, we go ahead with the current patchset. We may try to patch some of
+the POSIX incompatibilities (see Philipp's list above) by
+padding/copying/sign-extending the affected structures.
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index bd6bd0926931..2f6ed08db9fe 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -48,6 +48,135 @@
- 			};
- 		};
- 
-+		ptm at 801ae000 {
-+			compatible = "arm,coresight-etm3x", "arm,primecell";
-+			reg = <0x801ae000 0x1000>;
-+
-+			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
-+			clock-names = "apb_pclk", "atclk";
-+			cpu = <&CPU0>;
-+			port {
-+				ptm0_out_port: endpoint {
-+					remote-endpoint = <&funnel_in_port0>;
-+				};
-+			};
-+		};
-+
-+		ptm at 801af000 {
-+			compatible = "arm,coresight-etm3x", "arm,primecell";
-+			reg = <0x801af000 0x1000>;
-+
-+			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
-+			clock-names = "apb_pclk", "atclk";
-+			cpu = <&CPU1>;
-+			port {
-+				ptm1_out_port: endpoint {
-+					remote-endpoint = <&funnel_in_port1>;
-+				};
-+			};
-+		};
-+
-+		funnel at 801a6000 {
-+			compatible = "arm,coresight-funnel", "arm,primecell";
-+			reg = <0x801a6000 0x1000>;
-+
-+			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
-+			clock-names = "apb_pclk", "atclk";
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				/* funnel output ports */
-+				port at 0 {
-+					reg = <0>;
-+					funnel_out_port: endpoint {
-+						remote-endpoint =
-+							<&replicator_in_port0>;
-+					};
-+				};
-+
-+				/* funnel input ports */
-+				port at 1 {
-+					reg = <0>;
-+					funnel_in_port0: endpoint {
-+						slave-mode;
-+						remote-endpoint = <&ptm0_out_port>;
-+					};
-+				};
-+
-+				port at 2 {
-+					reg = <1>;
-+					funnel_in_port1: endpoint {
-+						slave-mode;
-+						remote-endpoint = <&ptm1_out_port>;
-+					};
-+				};
-+			};
-+		};
-+
-+		replicator {
-+			compatible = "arm,coresight-replicator";
-+			clocks = <&prcmu_clk PRCMU_APEATCLK>;
-+			clock-names = "atclk";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				/* replicator output ports */
-+				port at 0 {
-+					reg = <0>;
-+					replicator_out_port0: endpoint {
-+						remote-endpoint = <&tpiu_in_port>;
-+					};
-+				};
-+				port at 1 {
-+					reg = <1>;
-+					replicator_out_port1: endpoint {
-+						remote-endpoint = <&etb_in_port>;
-+					};
-+				};
-+
-+				/* replicator input port */
-+				port at 2 {
-+					reg = <0>;
-+					replicator_in_port0: endpoint {
-+						slave-mode;
-+						remote-endpoint = <&funnel_out_port>;
-+					};
-+				};
-+			};
-+		};
-+
-+		tpiu at 80190000 {
-+			compatible = "arm,coresight-tpiu", "arm,primecell";
-+			reg = <0x80190000 0x1000>;
-+
-+			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
-+			clock-names = "apb_pclk", "atclk";
-+			port {
-+				tpiu_in_port: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&replicator_out_port0>;
-+				};
-+			};
-+		};
-+
-+		etb at 801a4000 {
-+			compatible = "arm,coresight-etb10", "arm,primecell";
-+			reg = <0x801a4000 0x1000>;
-+
-+			coresight-default-sink;
-+			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
-+			clock-names = "apb_pclk", "atclk";
-+			port {
-+				etb_in_port: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&replicator_out_port1>;
-+				};
-+			};
-+		};
-+
- 		intc: interrupt-controller at a0411000 {
- 			compatible = "arm,cortex-a9-gic";
- 			#interrupt-cells = <3>;
+> However, it would be nice to get agreement on the normal 32-bit ABI
+> for time_t and timespec first, and then use the same thing everywhere.
+
+Do you mean for native 32-bit architectures? I think OpenBSD uses a
+64-bit time_t already on 32-bit arches, it's doable in Linux as well.
+
 -- 
-1.9.3
+Catalin
