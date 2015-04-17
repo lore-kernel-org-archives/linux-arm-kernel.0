@@ -1,27 +1,128 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Fri, 17 Apr 2015 20:32:52 +0300
-Subject: [PATCH v4 0/3] i2c: davinci improvements and fixes
-In-Reply-To: <20150410155940.GA2408@katana>
-References: <1428323921-25832-1-git-send-email-grygorii.strashko@linaro.org>
- <20150410155940.GA2408@katana>
-Message-ID: <553143C4.2060903@linaro.org>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Fri, 17 Apr 2015 17:57:39 +0000
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+In-Reply-To: <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+ <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
+ <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20150416104008.GB25640@arm.com>
+ <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
+Message-ID: <BN3PR0301MB1219C1FEA1B1678D06E17D0AEAE30@BN3PR0301MB1219.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2015 06:59 PM, Wolfram Sang wrote:
-> On Mon, Apr 06, 2015 at 03:38:38PM +0300, grygorii.strashko at linaro.org wrote:
->> From: Grygorii Strashko <grygorii.strashko@linaro.org>
->>
->> This series converts driver to use I2C bus recovery infrastructure and
->> adds Davinci I2C bus recovery mechanizm based on using ICPFUNC registers.
->> These patches are combination of two patches from Ben Gardiner [1] and
->> Mike Looijmans [2] which i've reworked to use I2C bus recovery infrastructure
->
-> Applied to for-next, thanks for keeping at it and providing useful info!
->
+Hi Stuart/Will,
 
-Thanks
+> -----Original Message-----
+> From: Yoder Stuart-B08248
+> Sent: Friday, April 17, 2015 7:49 PM
+> To: Will Deacon; Sethi Varun-B16395
+> Cc: Lian Minghuan-B31939; linux-pci at vger.kernel.org; Arnd Bergmann; Hu
+> Mingkai-B21284; Zang Roy-R61911; Bjorn Helgaas; Wood Scott-B07421; linux-
+> arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Will Deacon [mailto:will.deacon at arm.com]
+> > Sent: Thursday, April 16, 2015 5:40 AM
+> > To: Sethi Varun-B16395
+> > Cc: Lian Minghuan-B31939; linux-pci at vger.kernel.org; Arnd Bergmann; Hu
+> > Mingkai-B21284; Zang Roy-R61911; Yoder Stuart-B08248; Bjorn Helgaas;
+> > Wood Scott-B07421; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> >
+> > Hi Varun,
+> >
+> > Thanks for adding me to Cc.
+> >
+> > On Wed, Apr 15, 2015 at 02:18:13PM +0100, Varun Sethi wrote:
+> > > Yes, deviceid=stream id (i.e. ICID + other bits). I am not sure if
+> > > TBU ID would also be forwarded as a part of stream id to GIC. My
+> > > understanding is that TBU ID is forwarded (as a part of the stream
+> > > ID) to the TCU in case of a TBU translation miss. In case of the
+> > > LS2085 PCIe controller you would have to setup the PCIe device ID to
+> > > stream ID translation table. We may have to restrict the number of
+> > > entries based on the available number of contexts.
+> >
+> > Unfortunately, I'm having a really hard time parsing this thread (some
+> > parts of it simply don't make sense; others use non-architectural
+> > terms and overall I don't get a feeling for the problem).
+> >
+> > Please could you explain your system design step by step so that I can
+> > understand (a) what you've built and (b) why the current design of
+> > Linux is causing you problems?
+> >
+> > Sorry if I'm just being thick, but it's important that we get this right.
+> 
+> I'll try to summarize some key points about the system...
+> 
+> System is using a single SMMU-500 (1 TCU, 6 TBUs) and GICv3-ITS.  There are
+> PCI, fsl-mc, and platform devices that do DMA.  Devices on the PCI and fsl-mc
+> bus generate message interrupts.
+> 
+> The flow a message interrupt would take is this:
+> 
+>     --------------
+>       PCI device
+>     --------------
+>           |
+>           | pcidevid + MSI msg
+>           |
+>           V
+>     --------------
+>     PCI controller
+>       pcidevid ->
+>       streamID
+>       mapping
+>     --------------
+>           |
+>           | streamID + MSI msg
+>           |
+>           V
+>     --------------
+>         SMMU
+>     --------------
+>           |
+>           | streamID + MSI msg
+>           |
+>           V
+>     --------------
+>        CCN-504 (Dickens)
+>     --------------
+>           |
+>           | streamID + MSI msg
+>           |
+>           V
+>     --------------
+>       GICv3 ITS    streamID == ITS deviceID
+>     --------------
+> 
+> So, the way things work (at least initially) is that each PCI device maps to a
+> single streamID, and thus each device has a separate ITT in the ITS.  So, things
+> should be cool.
+> 
+> However, there is an improvement we envision as possible due to the
+> limited number of SMMU contexts (i.e. 64).  If there are
+> 64 SMMU context registers it means that there is a max of
+> 64 software contexts where things can be isolated.  But, say I have an SRIOV
+> card with 64 VFs, and I want to assign 8 of the VFs to a KVM VM.  Those 8 PCI
+> devices could share the same streamID/ITS-device-ID since they all share the
+> same isolation context.
+> 
+> What would be nice is at the time the 8 VFS are being added to the IOMMU
+> domain is for the pcidevid -> streamID mapping table to be updated
+> dynamically.  It simply lets us make more efficient use of the limited
+> streamIDs we have.
+> 
+i.e. we set up a common stream id for PCIe devices while attaching them to a domain. This would require traversal of PCIe bus topology in order to determine the dma alias during attach_device.
+In case of a transparent host bridge we would have to consider the device id corresponding to the bridge.
 
--- 
-regards,
--grygorii
+I think it would be better if we can statically restrict number of permissible stream Ids per PCIe controller. We can setup the stream ID to device ID mapping during device probe itself (add_device or of_xlate)
+
+For the ITS setup, we would have to translate the device id to the associated stream Id. What would happen in case of the transparent host bridge, all the devices behind the bridge would share the same stream ID?
+
+-Varun
