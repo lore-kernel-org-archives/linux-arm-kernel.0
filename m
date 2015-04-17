@@ -1,48 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Apr 2015 20:39:52 +0100
-Subject: AM335x OMAP2 common clock external fixed-clock registration
-In-Reply-To: <20150417190623.GA24506@deathray>
-References: <20150415205136.GA3399@deathray> <552F3B60.8050703@ti.com>
- <20150416161756.GA27590@deathray> <55301D7F.30708@gmail.com>
- <20150416220918.GA6057@deathray> <55304486.5020404@gmail.com>
- <20150417020048.GA27174@deathray> <5530CE63.9070508@gmail.com>
- <20150417101833.GU4027@n2100.arm.linux.org.uk>
- <20150417190623.GA24506@deathray>
-Message-ID: <20150417193952.GV4027@n2100.arm.linux.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 17 Apr 2015 21:52:27 +0200
+Subject: [PATCH v4 04/10] mtd: pxa3xx_nand: rework flash detection and
+ timing setup
+In-Reply-To: <552FEA74.5020909@free-electrons.com> (Ezequiel Garcia's message
+ of "Thu, 16 Apr 2015 13:59:32 -0300")
+References: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1429118648-19416-5-git-send-email-antoine.tenart@free-electrons.com>
+ <552EB7F0.2090106@gmail.com> <552FB4DF.1030403@free-electrons.com>
+ <552FBC0E.20004@gmail.com> <552FEA74.5020909@free-electrons.com>
+Message-ID: <87r3riv8g4.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 17, 2015 at 02:06:23PM -0500, Michael Welling wrote:
-> On Fri, Apr 17, 2015 at 11:18:33AM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Apr 17, 2015 at 11:12:03AM +0200, Sebastian Hesselbarth wrote:
-> > > On 17.04.2015 04:00, Michael Welling wrote:
-> > > >On Fri, Apr 17, 2015 at 01:23:50AM +0200, Sebastian Hesselbarth wrote:
-> > > >>On 17.04.2015 00:09, Michael Welling wrote:
-> > > >>>On Thu, Apr 16, 2015 at 10:37:19PM +0200, Sebastian Hesselbarth wrote:
-> > > >>>>On 16.04.2015 18:17, Michael Welling wrote:
-> > > [...]
-> > > >>>What would be the proper error path?
-> > > >>>What cleanup is required?
-> > > >>
-> > > >>A proper error path would be to release any claimed resource
-> > > >>on any error. If you look at the code, the only resources that
-> > > >>need to be released are the two clocks in question.
-> > > >
-> > > >So for every error return in the probe function and in the of si5351_dt_parse
-> > > >it needs to clk_put first right?
-> > > 
-> > > Not quite. The driver should clk_put() every clock that it called a
-> > > [of_]clk_get() for. The thing is that clocks can be passed by
-> > > platform_data and we never claim them.
-> > 
-> > I've always said clocks (as in struct clk) should never be passed through
-> > platform data.
-> >
-> 
-> What is the alternative for systems that still use the old platform files?
+Ezequiel Garcia <ezequiel.garcia@free-electrons.com> writes:
 
-clkdev, which has pre-existed DT.
+>> Also, as soon as Robert moves pxa3xx boards fully to DT, we'll loose
+>> the pdata timings option above. *sigh*
+>> 
+> Well, such move would include proper timing DT properties for non-ONFI
+> devices.
+I will move several boards to DT, including several pxa3x boards, but not _all_
+the boards.
+
+For reference, I said in [1] this :
+> Actually, this deserves another discussion alltogether. My plan was not to
+> convert all pxa board files to dt support, but all internal SoC IPs drivers +
+> mach/plat support.
+> 
+> Or put another way at the end :
+>  - there will be at least one pxa25x board which is fully DT converted
+>  - there will be at least one pxa27x board which is fully DT converted
+>  - there will be at least one pxa3xx board which is fully DT converted
+> 
+>  - there will be at least one pxa25x board which is not DT converted
+>  - there will be at least one pxa27x board which is not DT converted
+>  - there will be at least one pxa3xx board which is not DT converted
+> 
+> I want to keep the support for both legacy platform_data and DT for pxa
+> architecture. The idea I had was that only fully DT converted machines will
+> benefit from multiplatform support.
+
+And as you said Ezequiel, the problem will arise regardless of being DT or not,
+it's a lack of conformance of the zylonite board's nand amongst others.
+
+So the timings will have to survive somewhere, whichever place is seen fit.
+
+Cheers.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Robert
+
+[1] http://lists.openwall.net/linux-kernel/2015/03/24/101
