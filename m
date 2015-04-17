@@ -1,55 +1,54 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 17 Apr 2015 15:33:49 -0700
-Subject: [PATCH 4/7] ARM: dts: BCM63xx: Add SMP nodes and required properties
-In-Reply-To: <1429310032-19402-1-git-send-email-f.fainelli@gmail.com>
-References: <1429310032-19402-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1429310032-19402-5-git-send-email-f.fainelli@gmail.com>
+Date: Fri, 17 Apr 2015 15:33:45 -0700
+Subject: [PATCH 0/7] ARM: BCM63xx: SMP support
+Message-ID: <1429310032-19402-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update bcm63138.dtsi with the following:
+Hi all,
 
-- enable-method for both CPU nodes
-- brcm,bcm63138-bootlut node
-- resets properties to point to the correct PMB controller to release
-  the secondary CPU from reset
+This patch series implements SMP support on the Broadcom BCM63138 DSL platform.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/bcm63138.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+There is a number of decisions being made here to simplify things:
 
-diff --git a/arch/arm/boot/dts/bcm63138.dtsi b/arch/arm/boot/dts/bcm63138.dtsi
-index f5b5c528c26c..cdbaa14c872c 100644
---- a/arch/arm/boot/dts/bcm63138.dtsi
-+++ b/arch/arm/boot/dts/bcm63138.dtsi
-@@ -26,6 +26,7 @@
- 			compatible = "arm,cortex-a9";
- 			next-level-cache = <&L2>;
- 			reg = <0>;
-+			enable-method = "brcm,bcm63138";
- 		};
- 
- 		cpu at 1 {
-@@ -33,6 +34,8 @@
- 			compatible = "arm,cortex-a9";
- 			next-level-cache = <&L2>;
- 			reg = <1>;
-+			enable-method = "brcm,bcm63138";
-+			resets = <&pmb0 0 4>;
- 		};
- 	};
- 
-@@ -143,5 +146,10 @@
- 			clock-names = "periph";
- 			status = "disabled";
- 		};
-+
-+		bootlut: bootlut at 8000 {
-+			compatible = "brcm,bcm63138-bootlut";
-+			reg = <0x8000 0x50>;
-+		};
- 	};
- };
+- the power on sequence for the secondary CPU is a bit of low-level code that
+  uses the on-chip PMB bus, which will later be supported as a proper reset
+  controller driver, it was considered first to use a reset controller for
+  that, but this was later dropped because:
+	- reset controllers cannot be utilized at SMP init time (too early)
+	- moving reset controllers init earlier has been rejected
+	- the second CPU power on sequence is fairly specific, even within
+	  the context of the BCM63138 SoC, no other peripheral has that
+	  level of detail
+
+- VFP needs to be disabled when SMP is used because the second CPU does not
+  have any VFP unit and will just hang doing a VFP/NEON operation
+
+Florian Fainelli (7):
+  Documentation: DT: Add Broadcom BCM63138 PMB binding
+  ARM: dts: BCM63xx: Add PMB busses nodes
+  Documentation: DT: Document SMP DT nodes and properties for BCM63138
+  ARM: dts: BCM63xx: Add SMP nodes and required properties
+  ARM: BCM63xx: Add Broadcom BCM63xx PMB controller helpers
+  ARM: BCM63xx: Add secondary CPU PMB initialization sequence
+  ARM: BCM63xx: Add SMP support for BCM63138
+
+ .../devicetree/bindings/arm/bcm/bcm63138.txt       |  42 ++++
+ .../bindings/reset/brcm,bcm63138-pmb.txt           |  19 ++
+ arch/arm/boot/dts/bcm63138.dtsi                    |  20 ++
+ arch/arm/mach-bcm/Makefile                         |   7 +-
+ arch/arm/mach-bcm/bcm63xx_headsmp.S                |  23 +++
+ arch/arm/mach-bcm/bcm63xx_pmb.c                    | 222 +++++++++++++++++++++
+ arch/arm/mach-bcm/bcm63xx_smp.c                    | 171 ++++++++++++++++
+ arch/arm/mach-bcm/bcm63xx_smp.h                    |   9 +
+ include/linux/bcm63xx_pmb.h                        |  76 +++++++
+ 9 files changed, 588 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/brcm,bcm63138-pmb.txt
+ create mode 100644 arch/arm/mach-bcm/bcm63xx_headsmp.S
+ create mode 100644 arch/arm/mach-bcm/bcm63xx_pmb.c
+ create mode 100644 arch/arm/mach-bcm/bcm63xx_smp.c
+ create mode 100644 arch/arm/mach-bcm/bcm63xx_smp.h
+ create mode 100644 include/linux/bcm63xx_pmb.h
+
 -- 
 2.1.0
