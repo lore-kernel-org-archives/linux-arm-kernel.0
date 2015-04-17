@@ -1,78 +1,50 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 17 Apr 2015 08:29:11 -0600
-Subject: [RFC 1/3] VFIO: platform: add reset support
-In-Reply-To: <1429277833-28663-2-git-send-email-eric.auger@linaro.org>
-References: <1429277833-28663-1-git-send-email-eric.auger@linaro.org>
- <1429277833-28663-2-git-send-email-eric.auger@linaro.org>
-Message-ID: <1429280951.10086.50.camel@redhat.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 17 Apr 2015 15:08:19 +0100
+Subject: [PATCH] ARM: tegra: cpuidle: implement
+ cpuidle_state.enter_freeze()
+In-Reply-To: <CAAObsKAihF1k1yzZxQEs_jpPnCdV3HQbLaYHWu1QNsNd5zqiOg@mail.gmail.com>
+References: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
+ <20150408115546.GA24271@red-moon> <552643E1.3060200@collabora.com>
+ <285738930.THBQOWvsah@vostro.rjw.lan>
+ <20150410100844.GC23730@red-moon>
+ <CAAObsKAihF1k1yzZxQEs_jpPnCdV3HQbLaYHWu1QNsNd5zqiOg@mail.gmail.com>
+Message-ID: <20150417140819.GB2347@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-04-17 at 15:37 +0200, Eric Auger wrote:
-> This patch adds support for vfio platform reset. The modality only is
-> exposed when a specialized VFIO driver populates the reset callback.
-> For the generic vfio platform/amba driver, the modality is not supported
-> since the driver is by essence a metadriver and does not know how to
-> reset the underlying device.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> ---
->  drivers/vfio/platform/vfio_platform_common.c  | 12 ++++++++++--
->  drivers/vfio/platform/vfio_platform_private.h |  1 +
->  2 files changed, 11 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> index 4113d46..b989ce5 100644
-> --- a/drivers/vfio/platform/vfio_platform_common.c
-> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> @@ -100,6 +100,8 @@ static void vfio_platform_release(void *device_data)
->  	mutex_lock(&driver_lock);
->  
->  	if (!(--vdev->refcnt)) {
-> +		if (vdev->reset)
-> +			vdev->reset(vdev);
->  		vfio_platform_regions_cleanup(vdev);
->  		vfio_platform_irq_cleanup(vdev);
->  	}
-> @@ -159,6 +161,8 @@ static long vfio_platform_ioctl(void *device_data,
->  		if (info.argsz < minsz)
->  			return -EINVAL;
->  
-> +		if (vdev->reset)
-> +			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
->  		info.flags = vdev->flags;
->  		info.num_regions = vdev->num_regions;
->  		info.num_irqs = vdev->num_irqs;
-> @@ -252,8 +256,12 @@ static long vfio_platform_ioctl(void *device_data,
->  
->  		return ret;
->  
-> -	} else if (cmd == VFIO_DEVICE_RESET)
-> -		return -EINVAL;
-> +	} else if (cmd == VFIO_DEVICE_RESET) {
-> +		if (vdev->reset)
-> +			return vdev->reset(vdev);
-> +		else
-> +			return -ENOTTY;
+On Thu, Apr 16, 2015 at 03:37:19PM +0100, Tomeu Vizoso wrote:
 
-nit, this should probably still return -EINVAL.  The ioctl is there, but
-it's unsupported for this device as the user should have learned from
-the above flags.  It's therefore not lack of an ioctl, but invalid use
-of an ioctl.
+[...]
 
-> +	}
->  
->  	return -ENOTTY;
->  }
-> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-> index 253caa3..0a20028 100644
-> --- a/drivers/vfio/platform/vfio_platform_private.h
-> +++ b/drivers/vfio/platform/vfio_platform_private.h
-> @@ -68,6 +68,7 @@ struct vfio_platform_device {
->  	struct resource*
->  		(*get_resource)(struct vfio_platform_device *vdev, int i);
->  	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
-> +	int	(*reset)(struct vfio_platform_device *vdev);
->  };
->  
->  extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+> >> I don't know what FIQs are. :-)
+> >
+> > In short, fast IRQs, it is a separate IRQ line handled as a separate
+> > exception source with some private (banked) registers that minimize registers
+> > saving/restoring. They are not identical to NMI on x86, since
+> > their behaviour (handling) may be overriden by platforms and they
+> > can be masked.
+> >
+> >> ->enter_freeze is entered with interrupts disabled on the local CPU.  It is
+> >> not supposed to re-enable them.  That is, while in the ->enter_freeze callback
+> >> routine, the CPU must not be interrupted aby anything other than NMI.
+> >
+> > It boils down to what FIQs handlers are allowed to do with tick frozen
+> > and what they are (may be) currently used for.
+> >
+> > Russell has more insights on this than I do, in particular what FIQs are
+> > currently used for on ARM and if we can leave them enabled safely with tick
+> > frozen.
+> 
+> But even if it's currently safe to leave them enabled, is there any
+> reason for not disabling them?
+
+Ok, the point here is: either it is safe, and you leave them enabled,
+or it is not and we must disable them *before* enter_freeze() is entered.
+
+Disabling them in the platform enter_freeze() hook does not make sense,
+because this means we run with FIQs enabled with tick frozen, either
+it is safe or it is not, it can't be both.
+
+I would ask Russell opinion on this, before making any decision.
+
+Lorenzo
