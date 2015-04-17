@@ -1,82 +1,61 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 18 Apr 2015 01:12:36 +0900
-Subject: [PATCH 1/4] ARM: UniPhier: add basic support for UniPhier
- architecture
-In-Reply-To: <3655031.20bjeBBBYS@wuerfel>
-References: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
- <1429170038-16757-2-git-send-email-yamada.masahiro@socionext.com>
- <3655031.20bjeBBBYS@wuerfel>
-Message-ID: <CAK7LNARZC3GFa6KpZNsFuZ+0XZ7K0dEbb++PQzwtsZ2z86n9kA@mail.gmail.com>
+Date: Sat, 18 Apr 2015 01:14:40 +0900
+Subject: [PATCH v2 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs
+ and boards
+In-Reply-To: <20150416100856.GJ30380@tarshish>
+References: <1429171147-19464-1-git-send-email-yamada.masahiro@socionext.com>
+ <1429171147-19464-4-git-send-email-yamada.masahiro@socionext.com>
+ <20150416100856.GJ30380@tarshish>
+Message-ID: <CAK7LNARkDJFyHirfGQt-c2NHfUpp2mcY5yEGC1KLvLr=JtiLyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Baruch, Andrew,
 
-2015-04-16 18:41 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 16 April 2015 16:40:35 Masahiro Yamada wrote:
+2015-04-16 19:08 GMT+09:00 Baruch Siach <baruch@tkos.co.il>:
+> Hi Masahiro Yamada,
 >
->>+ENTRY(uniphier_secondary_startup)
->>+       bl      v7_invalidate_l1
->>+       b       secondary_startup
->>+ENDPROC(uniphier_secondary_startup)
+> On Thu, Apr 16, 2015 at 04:59:06PM +0900, Masahiro Yamada wrote:
+>> Initial device trees for UniPhier SoCs: PH1-sLD3, PH1-LD4, PH1-Pro4,
+>> and PH1-sLD8.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> ---
 >
-> Since this file is really trivial, I wonder if you could just use
-> a 'naked' inline assembly function from C code here, to have
-> the entire SMP support in one file.
-
-I merged platsmp.c and headsmp.c into a single file in v3.
-I added __naked as you suggested.
-
-
-
->> +
->> +#define ROM_BOOT_ROMRSV2             0x59801208
+> [...]
 >
-> Please don't hardcode any physical addresses, instead find the DT node
-> or syscon device in the _boot_secondary implementation.
-
-I implemented it as a syscon device in v3.
-
-
-> Which device is this register part of?
-
-It is just a simple register for storing destination address for the
-secondary CPU.
-
-
->> +
->> +static const char * const uniphier_board_dt_compat[] __initconst = {
->> +     "socionext,ph1-sld3",
->> +     "socionext,ph1-ld4",
->> +     "socionext,ph1-pro4",
->> +     "socionext,ph1-sld8",
->> +     "socionext,ph1-pro5",
->> +     "socionext,ph1-proxstream2",
->> +     "socionext,ph1-ld6b",
->> +     NULL,
->> +};
+>> diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
+>> new file mode 100644
+>> index 0000000..2e83363
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
+>> @@ -0,0 +1,51 @@
+>> +/*
+>> + * Device Tree Source for UniPhier PH1-LD4 Reference Board
+>> + *
+>> + * Copyright (C) 2015 Socionext Inc.
+>> + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
 >
-> Are these chip names or board names? The list should normally have
-> just the socs, which I assume you do, but it's not completely clear
-> from the source.
-
-SoC names.
-
-Perhaps, the structure name "uniphier_board_dt_compat" might be confusing.
-I renamed it into "uniphier_dt_compat" in v3.
+> Please consider licensing .dts/.dtsi files also under another, more liberal
+> license, e.g. X11. This would allow easier reuse of these device tree in other
+> software projects. See for example 2ef6ef91c54e (ARM: sun4i: a1000: Relicense
+> the device tree under GPLv2/X11, 2014-09-02).
 
 
-Many thanks!
+I did in v3.
 
-
-
-BTW, I had solved the problem "not syncing: Attempted to kill init!
-exitcode=0x00000004 ?",
-I posted about two weeks ago.
-L2 cache had nothing to do with the issue.
-With a little fix of the device tree and an initramdisk I regenerated
-using Buildroot,
-I succeeded in booting the kernel.
+Thanks!
 
 
 
