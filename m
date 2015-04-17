@@ -1,72 +1,98 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 17 Apr 2015 15:37:11 +0200
-Subject: [RFC 1/3] VFIO: platform: add reset support
+Date: Fri, 17 Apr 2015 15:37:12 +0200
+Subject: [RFC 2/3] VFIO: platform: export platform callbacks, probe and remove
 In-Reply-To: <1429277833-28663-1-git-send-email-eric.auger@linaro.org>
 References: <1429277833-28663-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1429277833-28663-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1429277833-28663-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for vfio platform reset. The modality only is
-exposed when a specialized VFIO driver populates the reset callback.
-For the generic vfio platform/amba driver, the modality is not supported
-since the driver is by essence a metadriver and does not know how to
-reset the underlying device.
+We intend to derive the platform driver into specialized ones, featuring
+reset modality. In order to avoid duplication, let's export the functions
+that can be reused in all vfio_platform drivers:
+- get_platform_resource
+- get_platform_irq
+- vfio_platform_probe
+- vfio_platform_remove
+
+Practically, only the vfio_platform_probe method should need to be
+overridden.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- drivers/vfio/platform/vfio_platform_common.c  | 12 ++++++++++--
- drivers/vfio/platform/vfio_platform_private.h |  1 +
- 2 files changed, 11 insertions(+), 2 deletions(-)
+ drivers/vfio/platform/vfio_platform.c         | 14 +++++++++-----
+ drivers/vfio/platform/vfio_platform_private.h |  7 +++++++
+ 2 files changed, 16 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index 4113d46..b989ce5 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -100,6 +100,8 @@ static void vfio_platform_release(void *device_data)
- 	mutex_lock(&driver_lock);
+diff --git a/drivers/vfio/platform/vfio_platform.c b/drivers/vfio/platform/vfio_platform.c
+index cef645c..81adb03 100644
+--- a/drivers/vfio/platform/vfio_platform.c
++++ b/drivers/vfio/platform/vfio_platform.c
+@@ -25,8 +25,8 @@
  
- 	if (!(--vdev->refcnt)) {
-+		if (vdev->reset)
-+			vdev->reset(vdev);
- 		vfio_platform_regions_cleanup(vdev);
- 		vfio_platform_irq_cleanup(vdev);
+ /* probing devices from the linux platform bus */
+ 
+-static struct resource *get_platform_resource(struct vfio_platform_device *vdev,
+-					      int num)
++struct resource *get_platform_resource(struct vfio_platform_device *vdev,
++				      int num)
+ {
+ 	struct platform_device *dev = (struct platform_device *) vdev->opaque;
+ 	int i;
+@@ -43,15 +43,17 @@ static struct resource *get_platform_resource(struct vfio_platform_device *vdev,
  	}
-@@ -159,6 +161,8 @@ static long vfio_platform_ioctl(void *device_data,
- 		if (info.argsz < minsz)
- 			return -EINVAL;
- 
-+		if (vdev->reset)
-+			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
- 		info.flags = vdev->flags;
- 		info.num_regions = vdev->num_regions;
- 		info.num_irqs = vdev->num_irqs;
-@@ -252,8 +256,12 @@ static long vfio_platform_ioctl(void *device_data,
- 
- 		return ret;
- 
--	} else if (cmd == VFIO_DEVICE_RESET)
--		return -EINVAL;
-+	} else if (cmd == VFIO_DEVICE_RESET) {
-+		if (vdev->reset)
-+			return vdev->reset(vdev);
-+		else
-+			return -ENOTTY;
-+	}
- 
- 	return -ENOTTY;
+ 	return NULL;
  }
++EXPORT_SYMBOL_GPL(get_platform_resource);
+ 
+-static int get_platform_irq(struct vfio_platform_device *vdev, int i)
++int get_platform_irq(struct vfio_platform_device *vdev, int i)
+ {
+ 	struct platform_device *pdev = (struct platform_device *) vdev->opaque;
+ 
+ 	return platform_get_irq(pdev, i);
+ }
++EXPORT_SYMBOL_GPL(get_platform_irq);
+ 
+-static int vfio_platform_probe(struct platform_device *pdev)
++int vfio_platform_probe(struct platform_device *pdev)
+ {
+ 	struct vfio_platform_device *vdev;
+ 	int ret;
+@@ -72,8 +74,9 @@ static int vfio_platform_probe(struct platform_device *pdev)
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(vfio_platform_probe);
+ 
+-static int vfio_platform_remove(struct platform_device *pdev)
++int vfio_platform_remove(struct platform_device *pdev)
+ {
+ 	struct vfio_platform_device *vdev;
+ 
+@@ -85,6 +88,7 @@ static int vfio_platform_remove(struct platform_device *pdev)
+ 
+ 	return -EINVAL;
+ }
++EXPORT_SYMBOL_GPL(vfio_platform_remove);
+ 
+ static struct platform_driver vfio_platform_driver = {
+ 	.probe		= vfio_platform_probe,
 diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 253caa3..0a20028 100644
+index 0a20028..e2b4f0b 100644
 --- a/drivers/vfio/platform/vfio_platform_private.h
 +++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -68,6 +68,7 @@ struct vfio_platform_device {
- 	struct resource*
- 		(*get_resource)(struct vfio_platform_device *vdev, int i);
- 	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
-+	int	(*reset)(struct vfio_platform_device *vdev);
- };
+@@ -95,4 +95,11 @@ extern int vfio_platform_external_set_automasked(void *device_data,
+ 						 unsigned count,
+ 						 bool automasked);
  
- extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
++struct platform_device;
++struct resource *get_platform_resource(struct vfio_platform_device *vdev,
++					int num);
++int get_platform_irq(struct vfio_platform_device *vdev, int i);
++int vfio_platform_probe(struct platform_device *pdev);
++int vfio_platform_remove(struct platform_device *pdev);
++
+ #endif /* VFIO_PLATFORM_PRIVATE_H */
 -- 
 1.9.1
