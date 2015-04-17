@@ -1,117 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 17 Apr 2015 15:42:08 +0200
-Subject: [PATCH] rtc: armada38x: Fix concurrency access in
- armada38x_rtc_set_time
-In-Reply-To: <1429103633-24376-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1429103633-24376-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150417134208.GH29796@piout.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 17 Apr 2015 15:45:47 +0200
+Subject: [PATCH v2 2/5] mmc: mediatek: Add Mediatek MMC driver
+In-Reply-To: <1426562035-16709-3-git-send-email-chaotian.jing@mediatek.com>
+References: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
+ <1426562035-16709-3-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <20150417134547.GN4946@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/2015 at 15:13:53 +0200, Gregory CLEMENT wrote :
-> While setting the time, the RTC TIME register should not be
-> accessed. However due to hardware constraints, setting the RTC time
-> involves sleeping during 100ms. This sleep was done outside the
-> critical section protected by the spinlock, so it was possible to read
-> the RTC TIME register and get an incorrect value. This patch
-> introduces a mutex for protecting the RTC TIME access, unlike the
-> spinlock it is allowed to sleep in a critical section protected by a
-> mutex. The RTC STATUS register can still be used from the interrupt
-> handler but it has no effect on setting the time.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi Chaotian,
 
-> Cc: <stable@vger.kernel.org> #v4.0
-> ---
-> Hi,
+On Tue, Mar 17, 2015 at 11:13:52AM +0800, Chaotian Jing wrote:
+> Add Mediatek MMC driver code
 > 
-> I finally got more information about the RTC behavior and while it is
-> fine accessing RTC_STATUS register during between RTC_STATUS reset and
-> writing time in RTC_TIME register, reading RTC_TIME during this period
-> might five incorrect value.
-> 
-> It is too late to fix 4.0, but we are in time for 4.1 and this patch
-> was tagged to be applied to the stable version of 4.0.
-> 
-> Gregory
-> 
-> 
->  drivers/rtc/rtc-armada38x.c | 24 ++++++++++++------------
->  1 file changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-> index 43e04af39e09..cb70ced7e0db 100644
-> --- a/drivers/rtc/rtc-armada38x.c
-> +++ b/drivers/rtc/rtc-armada38x.c
-> @@ -40,6 +40,13 @@ struct armada38x_rtc {
->  	void __iomem	    *regs;
->  	void __iomem	    *regs_soc;
->  	spinlock_t	    lock;
-> +	/*
-> +	 * While setting the time, the RTC TIME register should not be
-> +	 * accessed. Setting the RTC time involves sleeping during
-> +	 * 100ms, so a mutex instead of a spinlock is used to protect
-> +	 * it
-> +	 */
-> +	struct mutex	    mutex_time;
->  	int		    irq;
->  };
->  
-> @@ -59,8 +66,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
->  	unsigned long time, time_check, flags;
->  
-> -	spin_lock_irqsave(&rtc->lock, flags);
-> -
-> +	mutex_lock(&rtc->mutex_time);
->  	time = readl(rtc->regs + RTC_TIME);
->  	/*
->  	 * WA for failing time set attempts. As stated in HW ERRATA if
-> @@ -71,7 +77,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  	if ((time_check - time) > 1)
->  		time_check = readl(rtc->regs + RTC_TIME);
->  
-> -	spin_unlock_irqrestore(&rtc->lock, flags);
-> +	mutex_unlock(&rtc->mutex_time);
->  
->  	rtc_time_to_tm(time_check, tm);
->  
-> @@ -94,19 +100,12 @@ static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
->  	 * then wait for 100ms before writing to the time register to be
->  	 * sure that the data will be taken into account.
->  	 */
-> -	spin_lock_irqsave(&rtc->lock, flags);
-> -
-> +	mutex_lock(&rtc->mutex_time);
->  	rtc_delayed_write(0, rtc, RTC_STATUS);
-> -
-> -	spin_unlock_irqrestore(&rtc->lock, flags);
-> -
->  	msleep(100);
-> -
-> -	spin_lock_irqsave(&rtc->lock, flags);
-> -
->  	rtc_delayed_write(time, rtc, RTC_TIME);
-> +	mutex_unlock(&rtc->mutex_time);
->  
-> -	spin_unlock_irqrestore(&rtc->lock, flags);
->  out:
->  	return ret;
->  }
-> @@ -230,6 +229,7 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	spin_lock_init(&rtc->lock);
-> +	mutex_init(&rtc->mutex_time);
->  
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rtc");
->  	rtc->regs = devm_ioremap_resource(&pdev->dev, res);
-> -- 
-> 2.1.0
-> 
+
+[...]
+
+> +	host->dev = &pdev->dev;
+> +	host->mmc = mmc;
+> +	/* Set host parameters to mmc */
+> +	mmc->ops = &mt_msdc_ops;
+> +	mmc->f_min = 260000;
+> +	mmc->ocr_avail = MMC_VDD_30_31 | MMC_VDD_31_32 | MMC_VDD_32_33;
+> +
+> +	mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
+> +	/* MMC core transfer sizes tunable parameters */
+> +	mmc->max_segs = MAX_BD_NUM;
+> +	mmc->max_seg_size = 64 * 1024;
+
+Earlier versions of this driver had 64 * 1024 - 512 here. Using 64k
+breaks SD card support here. Reading the partition table still works
+fine, but the next transfers fail with messages like:
+
+mtk-msdc 11240000.mmc: msdc_request_timeout: aborting cmd/data/mrq
+mtk-msdc 11240000.mmc: msdc_request_timeout: aborting mrq=ffffffc06e586860 cmd=18
+mtk-msdc 11240000.mmc: msdc_request_timeout: abort data: cmd18; 136 blocks
+mmcblk1: error -110 transferring data, sector 338488, nr 136, cmd response 0x900, card status 0xb00
+mtk-msdc 11240000.mmc: set mclk to 0 mmc1: tried to reset card
+
+Can you confirm this?
+
+Sascha
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
