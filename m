@@ -1,64 +1,100 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 17 Apr 2015 15:01:01 +0200
-Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
-In-Reply-To: <20150417103946.2a46c243@bbrezillon>
-References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>	<20150410135056.GB28873@io.lakedaemon.net>	<20150410171148.07bc9429@bbrezillon>	<20150410223008.GA18660@io.lakedaemon.net>	<552B8EC4.209@free-electrons.com>	<20150413124711.GI18660@io.lakedaemon.net>	<87r3rom2qu.fsf@natisbad.org>	<20150413201146.GL18660@io.lakedaemon.net>	<20150417103356.6ce78145@bbrezillon>
- <20150417103946.2a46c243@bbrezillon>
-Message-ID: <5531040D.4000007@free-electrons.com>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Fri, 17 Apr 2015 22:00:10 +0900
+Subject: [PATCH 1/2] ARM: dts: s3c2416: Add labels to S3C2416 nodes
+Message-ID: <1429275611-2542-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Add new labels to certain nodes on S3C2416 so they could be easily
+referenced by board DTS files.
 
-On 17/04/2015 10:39, Boris Brezillon wrote:
-> On Fri, 17 Apr 2015 10:33:56 +0200
-> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> 
->> Hi Jason,
->>
->> On Mon, 13 Apr 2015 20:11:46 +0000
->> Jason Cooper <jason@lakedaemon.net> wrote:
->>
->>>>
->>>>> I'd appreciate if we'd look into it.  I understand from on-list and
->>>>> off-list discussion that the rewrite was unavoidable.  So I'm willing to
->>>>> concede that.  Giving people time to migrate from old to new while still
->>>>> being able to update for other security fixes seems reasonable.
->>>>
->>>> Jason, what do you think of the approach above? 
->>>
->>> I say keep it simple.  We shouldn't use the DT changes to trigger one
->>> vice the other.  We need to be able to build both, but only load one at
->>> a time.  If that's anything other than simple to do, then we make it a
->>> Kconfig binary choice and move on.
->>
->> Actually I was planning to handle it with a Kconfig dependency rule
->> (NEW_DRIVER depends on !OLD_DRIVER and OLD_DRIVER depends
->> on !NEW_DRIVER).
->> I don't know how to make it a runtime check without adding new
->> compatible strings for the kirkwood, dove and orion platforms, and I'm
->> sure sure this is a good idea.
->   ^ not
-> 
->> Do you have any ideas ?
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+---
+ arch/arm/boot/dts/s3c2416.dtsi | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-You use devm_ioremap_resource() in the new driver, so if the old one
-is already loaded the memory region will be already hold and the new
-driver will simply fail during the probe. So for this part it is OK.
-
-However, the old driver doesn't try to reserve the region, it directly
-uses an ioremap(). So if the new driver is loaded first, then the old
-one will manage to be loaded too. I think that just adding a
-request_region()/release_region() (or converting the ioremap in a
-devm_ioremap_resource() in the old driver would be enough.
-
-
-Gregory
-
-
-
+diff --git a/arch/arm/boot/dts/s3c2416.dtsi b/arch/arm/boot/dts/s3c2416.dtsi
+index 30b8f7e47454..a5184ff56933 100644
+--- a/arch/arm/boot/dts/s3c2416.dtsi
++++ b/arch/arm/boot/dts/s3c2416.dtsi
+@@ -17,7 +17,7 @@
+ 	compatible = "samsung,s3c2416";
+ 
+ 	aliases {
+-		serial3 = &uart3;
++		serial3 = &uart_3;
+ 	};
+ 
+ 	cpus {
+@@ -48,7 +48,7 @@
+ 		clock-names = "timers";
+ 	};
+ 
+-	serial at 50000000 {
++	uart_0: serial at 50000000 {
+ 		compatible = "samsung,s3c2440-uart";
+ 		clock-names = "uart", "clk_uart_baud2",
+ 				"clk_uart_baud3";
+@@ -56,7 +56,7 @@
+ 				<&clocks SCLK_UART>;
+ 	};
+ 
+-	serial at 50004000 {
++	uart_1: serial at 50004000 {
+ 		compatible = "samsung,s3c2440-uart";
+ 		clock-names = "uart", "clk_uart_baud2",
+ 				"clk_uart_baud3";
+@@ -64,7 +64,7 @@
+ 				<&clocks SCLK_UART>;
+ 	};
+ 
+-	serial at 50008000 {
++	uart_2: serial at 50008000 {
+ 		compatible = "samsung,s3c2440-uart";
+ 		clock-names = "uart", "clk_uart_baud2",
+ 				"clk_uart_baud3";
+@@ -72,7 +72,7 @@
+ 				<&clocks SCLK_UART>;
+ 	};
+ 
+-	uart3: serial at 5000C000 {
++	uart_3: serial at 5000C000 {
+ 		compatible = "samsung,s3c2440-uart";
+ 		reg = <0x5000C000 0x4000>;
+ 		interrupts = <1 18 24 4>, <1 18 25 4>;
+@@ -83,7 +83,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	sdhci at 4AC00000 {
++	sdhci_1: sdhci at 4AC00000 {
+ 		compatible = "samsung,s3c6410-sdhci";
+ 		reg = <0x4AC00000 0x100>;
+ 		interrupts = <0 0 21 3>;
+@@ -94,7 +94,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	sdhci at 4A800000 {
++	sdhci_0: sdhci at 4A800000 {
+ 		compatible = "samsung,s3c6410-sdhci";
+ 		reg = <0x4A800000 0x100>;
+ 		interrupts = <0 0 20 3>;
+@@ -105,13 +105,13 @@
+ 		status = "disabled";
+ 	};
+ 
+-	watchdog at 53000000 {
++	watchdog: watchdog at 53000000 {
+ 		interrupts = <1 9 27 3>;
+ 		clocks = <&clocks PCLK_WDT>;
+ 		clock-names = "watchdog";
+ 	};
+ 
+-	rtc at 57000000 {
++	rtc: rtc at 57000000 {
+ 		compatible = "samsung,s3c2416-rtc";
+ 		clocks = <&clocks PCLK_RTC>;
+ 		clock-names = "rtc";
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.0
