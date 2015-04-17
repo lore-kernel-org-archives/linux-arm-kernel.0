@@ -1,142 +1,173 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 17 Apr 2015 10:58:59 +0200
-Subject: [PATCH 12/13] coresight: replicator: retrieve and handle atclk
+Date: Fri, 17 Apr 2015 10:59:00 +0200
+Subject: [PATCH 13/13] ARM: ux500: add CoreSight blocks to DTS file
 In-Reply-To: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
 References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1429261140-13910-13-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1429261140-13910-14-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As can be seen from the datasheet of the CoreSight
-Components, DDI0314 table A-4 the funnel has a clock signal
-apart from the AHB interconnect ("amba_pclk", that we're
-already handling) called ATCLK, ARM Trace Clock, that SoC
-implementers may provide from an entirely different clock
-source. So to model this correctly create an optional
-path for handling ATCLK alongside the PCLK so we don't
-break old platforms that only define PCLK ("amba_pclk") but
-still makes it possible for SoCs that have both clock signals
-(such as the DB8500) to fetch and prepare/enable/disable/
-unprepare both clocks.
+This registers all the CoreSight blocks on the DB8500 SoC:
+each core has a PTM (v1.0, r1p0-00rel0) connected, both connected
+to a funnel (DK-TM908-r0p1-00rel0) which in turn connects to a
+replicator (DM-TM909-r0p1-00rel0). The replicator has two outputs,
+port 0 to a TPIU interface and port 1 to an ETB
+(DK-TM907-r0p3-00rel0). The CoreSight blocks are all clocked by
+the APEATCLK from the PRCMU and their AHB interconnect is clocked
+from a separate clock called APETRACECLK.
 
-The ATCLK is enabled and disabled using the runtime PM
-callbacks. As the replicator is a platform device, the
-code is a bit different from the other CoreSight components
-and the bus core does not activate runtime PM by default,
-so we need a few extra calls.
+The SoC also has a CTI/CTM block which can be added later as we
+have upstream support in the CoreSight subsystem.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/coresight/coresight-replicator.c | 43 ++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+Mathieu: this patch will go into the ux500 tree if you think
+it looks OK. Just provide your ACK if you think it's looking
+good and I'll take care of it. The rest of the CoreSight stuff
+should be funneled through your tree I guess.
+---
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 129 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 129 insertions(+)
 
-diff --git a/drivers/coresight/coresight-replicator.c b/drivers/coresight/coresight-replicator.c
-index cdf05537d574..126ae1f731d7 100644
---- a/drivers/coresight/coresight-replicator.c
-+++ b/drivers/coresight/coresight-replicator.c
-@@ -18,6 +18,7 @@
- #include <linux/io.h>
- #include <linux/err.h>
- #include <linux/slab.h>
-+#include <linux/pm_runtime.h>
- #include <linux/clk.h>
- #include <linux/of.h>
- #include <linux/coresight.h>
-@@ -27,10 +28,12 @@
- /**
-  * struct replicator_drvdata - specifics associated to a replicator component
-  * @dev:	the device entity associated with this component
-+ * @atclk:	optional clock for the core parts of the replicator.
-  * @csdev:	component vitals needed by the framework
-  */
- struct replicator_drvdata {
- 	struct device		*dev;
-+	struct clk		*atclk;
- 	struct coresight_device	*csdev;
- };
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index bd6bd0926931..2f6ed08db9fe 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -48,6 +48,135 @@
+ 			};
+ 		};
  
-@@ -39,6 +42,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-+	pm_runtime_get_sync(drvdata->dev);
- 	dev_info(drvdata->dev, "REPLICATOR enabled\n");
- 	return 0;
- }
-@@ -48,6 +52,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-+	pm_runtime_put(drvdata->dev);
- 	dev_info(drvdata->dev, "REPLICATOR disabled\n");
- }
- 
-@@ -62,6 +67,7 @@ static const struct coresight_ops replicator_cs_ops = {
- 
- static int replicator_probe(struct platform_device *pdev)
- {
-+	int ret;
- 	struct device *dev = &pdev->dev;
- 	struct coresight_platform_data *pdata = NULL;
- 	struct replicator_drvdata *drvdata;
-@@ -80,7 +86,16 @@ static int replicator_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	drvdata->dev = &pdev->dev;
-+	drvdata->atclk = devm_clk_get(&pdev->dev, "atclk"); /* optional */
-+	if (!IS_ERR(drvdata->atclk)) {
-+		ret = clk_prepare_enable(drvdata->atclk);
-+		if (ret)
-+			return ret;
-+	}
- 	platform_set_drvdata(pdev, drvdata);
-+	pm_runtime_set_active(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_put(&pdev->dev);
- 
- 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
- 	if (!desc)
-@@ -107,6 +122,33 @@ static int replicator_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int replicator_runtime_suspend(struct device *dev)
-+{
-+	struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
++		ptm at 801ae000 {
++			compatible = "arm,coresight-etm3x", "arm,primecell";
++			reg = <0x801ae000 0x1000>;
 +
-+	if (drvdata && !IS_ERR(drvdata->atclk))
-+		clk_disable_unprepare(drvdata->atclk);
++			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
++			clock-names = "apb_pclk", "atclk";
++			cpu = <&CPU0>;
++			port {
++				ptm0_out_port: endpoint {
++					remote-endpoint = <&funnel_in_port0>;
++				};
++			};
++		};
 +
-+	return 0;
-+}
++		ptm at 801af000 {
++			compatible = "arm,coresight-etm3x", "arm,primecell";
++			reg = <0x801af000 0x1000>;
 +
-+static int replicator_runtime_resume(struct device *dev)
-+{
-+struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
++			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
++			clock-names = "apb_pclk", "atclk";
++			cpu = <&CPU1>;
++			port {
++				ptm1_out_port: endpoint {
++					remote-endpoint = <&funnel_in_port1>;
++				};
++			};
++		};
 +
-+	if (drvdata && !IS_ERR(drvdata->atclk))
-+		clk_prepare_enable(drvdata->atclk);
++		funnel at 801a6000 {
++			compatible = "arm,coresight-funnel", "arm,primecell";
++			reg = <0x801a6000 0x1000>;
 +
-+	return 0;
-+}
-+#endif
++			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
++			clock-names = "apb_pclk", "atclk";
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
 +
-+static const struct dev_pm_ops replicator_dev_pm_ops = {
-+	SET_RUNTIME_PM_OPS(replicator_runtime_suspend,
-+			   replicator_runtime_resume, NULL)
-+};
++				/* funnel output ports */
++				port at 0 {
++					reg = <0>;
++					funnel_out_port: endpoint {
++						remote-endpoint =
++							<&replicator_in_port0>;
++					};
++				};
 +
- static struct of_device_id replicator_match[] = {
- 	{.compatible = "arm,coresight-replicator"},
- 	{}
-@@ -118,6 +160,7 @@ static struct platform_driver replicator_driver = {
- 	.driver         = {
- 		.name   = "coresight-replicator",
- 		.of_match_table = replicator_match,
-+		.pm	= &replicator_dev_pm_ops,
- 	},
- };
- 
++				/* funnel input ports */
++				port at 1 {
++					reg = <0>;
++					funnel_in_port0: endpoint {
++						slave-mode;
++						remote-endpoint = <&ptm0_out_port>;
++					};
++				};
++
++				port at 2 {
++					reg = <1>;
++					funnel_in_port1: endpoint {
++						slave-mode;
++						remote-endpoint = <&ptm1_out_port>;
++					};
++				};
++			};
++		};
++
++		replicator {
++			compatible = "arm,coresight-replicator";
++			clocks = <&prcmu_clk PRCMU_APEATCLK>;
++			clock-names = "atclk";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				/* replicator output ports */
++				port at 0 {
++					reg = <0>;
++					replicator_out_port0: endpoint {
++						remote-endpoint = <&tpiu_in_port>;
++					};
++				};
++				port at 1 {
++					reg = <1>;
++					replicator_out_port1: endpoint {
++						remote-endpoint = <&etb_in_port>;
++					};
++				};
++
++				/* replicator input port */
++				port at 2 {
++					reg = <0>;
++					replicator_in_port0: endpoint {
++						slave-mode;
++						remote-endpoint = <&funnel_out_port>;
++					};
++				};
++			};
++		};
++
++		tpiu at 80190000 {
++			compatible = "arm,coresight-tpiu", "arm,primecell";
++			reg = <0x80190000 0x1000>;
++
++			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
++			clock-names = "apb_pclk", "atclk";
++			port {
++				tpiu_in_port: endpoint {
++					slave-mode;
++					remote-endpoint = <&replicator_out_port0>;
++				};
++			};
++		};
++
++		etb at 801a4000 {
++			compatible = "arm,coresight-etb10", "arm,primecell";
++			reg = <0x801a4000 0x1000>;
++
++			coresight-default-sink;
++			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
++			clock-names = "apb_pclk", "atclk";
++			port {
++				etb_in_port: endpoint {
++					slave-mode;
++					remote-endpoint = <&replicator_out_port1>;
++				};
++			};
++		};
++
+ 		intc: interrupt-controller at a0411000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			#interrupt-cells = <3>;
 -- 
 1.9.3
