@@ -1,53 +1,113 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Apr 2015 16:09:23 +0200
-Subject: [RFC] PCI: BCM5301X: add PCIe2 driver for BCM5301X SoCs
-In-Reply-To: <11068573.lefhT3BUSj@wuerfel>
-References: <1415470392-28229-1-git-send-email-hauke@hauke-m.de>
- <545E8AA2.6050301@hauke-m.de> <11068573.lefhT3BUSj@wuerfel>
-Message-ID: <4575399.moLzVD0xqT@wuerfel>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Fri, 17 Apr 2015 14:19:08 +0000
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+In-Reply-To: <20150416104008.GB25640@arm.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+ <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
+ <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20150416104008.GB25640@arm.com>
+Message-ID: <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(reviving an old thread)
 
-On Sunday 09 November 2014 21:27:40 Arnd Bergmann wrote:
+
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Thursday, April 16, 2015 5:40 AM
+> To: Sethi Varun-B16395
+> Cc: Lian Minghuan-B31939; linux-pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284; Zang Roy-R61911; Yoder
+> Stuart-B08248; Bjorn Helgaas; Wood Scott-B07421; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
 > 
-> > >> +  /*
-> > >> +   * Inbound address translation setup
-> > >> +   * Northstar only maps up to 128 MiB inbound, DRAM could be up to 1 GiB.
-> > >> +   *
-> > >> +   * For now allow access to entire DRAM, assuming it is less than 128MiB,
-> > >> +   * otherwise DMA bouncing mechanism may be required.
-> > >> +   * Also consider DMA mask to limit DMA physical address
-> > >> +   */
-> > >> +  /* 64-bit LE regs, write low word, high is 0 at reset */
-> > >> +  bcma_write32(bdev, BCMA_CORE_PCIE2_FUNC0_IMAP1, PHYS_OFFSET | 0x1);
-> > >> +  bcma_write32(bdev, BCMA_CORE_PCIE2_IARR1_LOWER,
-> > >> +                     PHYS_OFFSET | ((SZ_128M >> 20) & 0xff));
-> > > 
-> > > Maybe I should bully you into enabling swiotlb on arm32 
-> > 
-> > This sounds complicated, I hope I can avoid it. 
+> Hi Varun,
 > 
-> I'd really hope that it's not that hard. We basically just need a copy of
-> coherent_swiotlb_dma_ops/noncoherent_swiotlb_dma_ops from arm64 and
-> use those on bcma devices, with the right dma_mask set.
+> Thanks for adding me to Cc.
+> 
+> On Wed, Apr 15, 2015 at 02:18:13PM +0100, Varun Sethi wrote:
+> > Yes, deviceid=stream id (i.e. ICID + other bits). I am not sure if TBU ID
+> > would also be forwarded as a part of stream id to GIC. My understanding is
+> > that TBU ID is forwarded (as a part of the stream ID) to the TCU in case
+> > of a TBU translation miss. In case of the LS2085 PCIe controller you would
+> > have to setup the PCIe device ID to stream ID translation table. We may
+> > have to restrict the number of entries based on the available number of
+> > contexts.
+> 
+> Unfortunately, I'm having a really hard time parsing this thread (some parts
+> of it simply don't make sense; others use non-architectural terms and
+> overall I don't get a feeling for the problem).
+> 
+> Please could you explain your system design step by step so that I can
+> understand (a) what you've built and (b) why the current design of Linux is
+> causing you problems?
+> 
+> Sorry if I'm just being thick, but it's important that we get this right.
 
-Peter Senna has tested this on bcm4708a0 (Buffalo WZR-1750DHP) and found
-that all RAM is DMA capable, as tested with CONFIG_VMSPLIT_1G. Could
-the code comment here be incorrect, or is it possible that it was fixed
-in later chip versions?
+I'll try to summarize some key points about the system...
 
-If this works, using CONFIG_VMSPLIT_1G should result in noticeably
-better I/O performance on this chip.
+System is using a single SMMU-500 (1 TCU, 6 TBUs) and GICv3-ITS.  There are
+PCI, fsl-mc, and platform devices that do DMA.  Devices on the PCI and
+fsl-mc bus generate message interrupts.
 
-I have created a patch that lets him simulate the broken behavior on his
-machine, so he can work on implementing swiotlb, but it would certainly
-be best to understand which machines are really affected.
+The flow a message interrupt would take is this:
 
-Note that the driver that was merged as drivers/pci/host/pcie-iproc.c
-does not seem to touch the BCMA_CORE_PCIE2_IARR1_LOWER (offset 0xd08)
-register, and presumably the power-on default for this register
-maps all of RAM correctly.
+    --------------
+      PCI device
+    --------------
+          |
+          | pcidevid + MSI msg
+          |
+          V
+    --------------
+    PCI controller
+      pcidevid ->
+      streamID
+      mapping
+    --------------
+          |
+          | streamID + MSI msg
+          |
+          V
+    --------------
+        SMMU
+    --------------
+          |
+          | streamID + MSI msg
+          |
+          V
+    --------------
+       CCN-504 (Dickens)
+    --------------
+          |
+          | streamID + MSI msg
+          |
+          V
+    --------------
+      GICv3 ITS    streamID == ITS deviceID
+    --------------
 
-	Arnd
+So, the way things work (at least initially) is that each PCI device maps
+to a single streamID, and thus each device has a separate ITT in 
+the ITS.  So, things should be cool.
+
+However, there is an improvement we envision as possible due to 
+the limited number of SMMU contexts (i.e. 64).  If there are
+64 SMMU context registers it means that there is a max of
+64 software contexts where things can be isolated.  But, say I have
+an SRIOV card with 64 VFs, and I want to assign 8 of the VFs
+to a KVM VM.  Those 8 PCI devices could share the same
+streamID/ITS-device-ID since they all share the same isolation
+context.
+
+What would be nice is at the time the 8 VFS are being added
+to the IOMMU domain is for the pcidevid -> streamID mapping
+table to be updated dynamically.  It simply lets us make
+more efficient use of the limited streamIDs we have.
+
+I think it is this improvement that Minghuan had in mind
+in this patch.
+
+Thanks,
+Stuart
