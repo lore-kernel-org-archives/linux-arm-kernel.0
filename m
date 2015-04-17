@@ -1,49 +1,146 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 17 Apr 2015 11:12:13 +0200
-Subject: [PATCH v2 2/5] mmc: mediatek: Add Mediatek MMC driver
-In-Reply-To: <CAPDyKFoUg1snXeOwCiKPF_daxAAfcWE0nUbRAj23Z=k9z5FCyA@mail.gmail.com>
-References: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
- <1426562035-16709-3-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFoUg1snXeOwCiKPF_daxAAfcWE0nUbRAj23Z=k9z5FCyA@mail.gmail.com>
-Message-ID: <20150417091213.GM4946@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 17 Apr 2015 11:18:20 +0200
+Subject: [PATCH 08/13] coresight: etm: retrieve and handle atclk
+In-Reply-To: <1429261140-13910-9-git-send-email-linus.walleij@linaro.org>
+References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
+ <1429261140-13910-9-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAPDyKFprFLerJKSeijOc8cCBZACWo4Tthgsb2yNSbyasOmhU4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf,
+On 17 April 2015 at 10:58, Linus Walleij <linus.walleij@linaro.org> wrote:
+> As can be seen from the datasheet of the CoreSight
+> Components, DDI0401C A.1.1 the ETM has a clock signal
+> apart from the AHB interconnect ("amba_pclk", that we're
+> already handling) called ATCLK, ARM Trace Clock, that SoC
+> implementers may provide from an entirely different clock
+> source. So to model this correctly create an optional
+> path for handling ATCLK alongside the PCLK so we don't
+> break old platforms that only define PCLK ("amba_pclk") but
+> still makes it possible for SoCs that have both clock signals
+> (such as the DB8500) to fetch and prepare/enable/disable/
+> unprepare both clocks.
+>
+> The ATCLK is enabled and disabled using the runtime PM
+> callbacks.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/coresight/coresight-etm.h   |  2 ++
+>  drivers/coresight/coresight-etm3x.c | 38 ++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 39 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/coresight/coresight-etm.h b/drivers/coresight/coresight-etm.h
+> index d1421e1f8b8a..098ffbec0a44 100644
+> --- a/drivers/coresight/coresight-etm.h
+> +++ b/drivers/coresight/coresight-etm.h
+> @@ -140,6 +140,7 @@
+>   * struct etm_drvdata - specifics associated to an ETM component
+>   * @base:      memory mapped base address for this component.
+>   * @dev:       the device entity associated to this component.
+> + * @atclk:     optional clock for the core parts of the ETM.
+>   * @csdev:     component vitals needed by the framework.
+>   * @spinlock:  only one at a time pls.
+>   * @cpu:       the cpu this component is affined to.
+> @@ -191,6 +192,7 @@
+>  struct etm_drvdata {
+>         void __iomem                    *base;
+>         struct device                   *dev;
+> +       struct clk                      *atclk;
+>         struct coresight_device         *csdev;
+>         spinlock_t                      spinlock;
+>         int                             cpu;
+> diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
+> index f0be12bd79e0..25f49b84a6d2 100644
+> --- a/drivers/coresight/coresight-etm3x.c
+> +++ b/drivers/coresight/coresight-etm3x.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/amba/bus.h>
+>  #include <linux/seq_file.h>
+>  #include <linux/uaccess.h>
+> +#include <linux/clk.h>
+>  #include <asm/sections.h>
+>
+>  #include "coresight-etm.h"
+> @@ -1315,7 +1316,6 @@ static ssize_t seq_curr_state_show(struct device *dev,
+>         }
+>
+>         pm_runtime_get_sync(drvdata->dev);
+> -
+>         spin_lock_irqsave(&drvdata->spinlock, flags);
+>
+>         CS_UNLOCK(drvdata->base);
+> @@ -1796,6 +1796,13 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+>
+>         spin_lock_init(&drvdata->spinlock);
+>
+> +       drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
+> +       if (!IS_ERR(drvdata->atclk)) {
+> +               ret = clk_prepare_enable(drvdata->atclk);
+> +               if (ret)
+> +                       return ret;
+> +       }
+> +
+>         drvdata->cpu = pdata ? pdata->cpu : 0;
+>
+>         get_online_cpus();
+> @@ -1858,6 +1865,34 @@ static int etm_remove(struct amba_device *adev)
+>         return 0;
+>  }
+>
+> +#ifdef CONFIG_PM
+> +static int etm_runtime_suspend(struct device *dev)
+> +{
+> +       struct amba_device *adev = to_amba_device(dev);
+> +       struct etm_drvdata *drvdata = amba_get_drvdata(adev);
 
-On Tue, Mar 31, 2015 at 02:23:06PM +0200, Ulf Hansson wrote:
-> On 17 March 2015 at 04:13, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > +
-> > +       msdc_set_buswidth(host, ios->bus_width);
-> > +
-> > +       /* Suspend/Resume will do power off/on */
-> > +       switch (ios->power_mode) {
-> > +       case MMC_POWER_UP:
-> > +               msdc_init_hw(host);
-> > +               if (!IS_ERR(mmc->supply.vmmc)) {
-> > +                       ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
-> > +                                       ios->vdd);
-> > +                       if (ret) {
-> > +                               dev_err(host->dev, "Failed to set vmmc power!\n");
-> > +                               return;
-> > +                       }
-> > +               }
-> > +               break;
-> > +       case MMC_POWER_ON:
-> > +               if (!IS_ERR(mmc->supply.vqmmc)) {
-> > +                       ret = regulator_enable(mmc->supply.vqmmc);
-> 
-> The calls to regulator_enable|disable() for the vqmmc will not be
-> balanced properly here. You need a local cache variable like
-> "is_enabled" to keep track of this.
+I think you could replace the above two lines with:
 
-Shouldn't the MMC core provide balanced hooks for this? What about
-MMC_POWER_UP, can this be used for enabling regulators?
+struct etm_drvdata *drvdata = dev_get_drvdata(dev);
 
-Sascha
+> +
+> +       if (drvdata && !IS_ERR(drvdata->atclk))
+> +               clk_disable_unprepare(drvdata->atclk);
+> +
+> +       return 0;
+> +}
+> +
+> +static int etm_runtime_resume(struct device *dev)
+> +{
+> +       struct amba_device *adev = to_amba_device(dev);
+> +       struct etm_drvdata *drvdata = amba_get_drvdata(adev);
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I think you could replace the above two lines with:
+
+struct etm_drvdata *drvdata = dev_get_drvdata(dev)
+
+> +
+> +       if (drvdata && !IS_ERR(drvdata->atclk))
+> +               clk_prepare_enable(drvdata->atclk);
+> +
+> +       return 0;
+> +}
+> +#endif
+> +
+> +static const struct dev_pm_ops etm_dev_pm_ops = {
+> +       SET_RUNTIME_PM_OPS(etm_runtime_suspend, etm_runtime_resume, NULL)
+> +};
+> +
+>  static struct amba_id etm_ids[] = {
+>         {       /* ETM 3.3 */
+>                 .id     = 0x0003b921,
+> @@ -1886,6 +1921,7 @@ static struct amba_driver etm_driver = {
+>         .drv = {
+>                 .name   = "coresight-etm3x",
+>                 .owner  = THIS_MODULE,
+> +               .pm     = &etm_dev_pm_ops,
+>         },
+>         .probe          = etm_probe,
+>         .remove         = etm_remove,
+> --
+> 1.9.3
+>
+
+With the minor changes suggested.
+
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
