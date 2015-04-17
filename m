@@ -1,113 +1,83 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Fri, 17 Apr 2015 14:19:08 +0000
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <20150416104008.GB25640@arm.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20150416104008.GB25640@arm.com>
-Message-ID: <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 17 Apr 2015 16:19:22 +0200
+Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
+In-Reply-To: <5531040D.4000007@free-electrons.com>
+References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150410135056.GB28873@io.lakedaemon.net>
+ <20150410171148.07bc9429@bbrezillon>
+ <20150410223008.GA18660@io.lakedaemon.net>
+ <552B8EC4.209@free-electrons.com>
+ <20150413124711.GI18660@io.lakedaemon.net>
+ <87r3rom2qu.fsf@natisbad.org>
+ <20150413201146.GL18660@io.lakedaemon.net>
+ <20150417103356.6ce78145@bbrezillon>
+ <20150417103946.2a46c243@bbrezillon>
+ <5531040D.4000007@free-electrons.com>
+Message-ID: <20150417161922.54adec64@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Gregory,
 
+On Fri, 17 Apr 2015 15:01:01 +0200
+Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Thursday, April 16, 2015 5:40 AM
-> To: Sethi Varun-B16395
-> Cc: Lian Minghuan-B31939; linux-pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284; Zang Roy-R61911; Yoder
-> Stuart-B08248; Bjorn Helgaas; Wood Scott-B07421; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> Hi Boris,
 > 
-> Hi Varun,
+> On 17/04/2015 10:39, Boris Brezillon wrote:
+> > On Fri, 17 Apr 2015 10:33:56 +0200
+> > Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> > 
+> >> Hi Jason,
+> >>
+> >> On Mon, 13 Apr 2015 20:11:46 +0000
+> >> Jason Cooper <jason@lakedaemon.net> wrote:
+> >>
+> >>>>
+> >>>>> I'd appreciate if we'd look into it.  I understand from on-list and
+> >>>>> off-list discussion that the rewrite was unavoidable.  So I'm willing to
+> >>>>> concede that.  Giving people time to migrate from old to new while still
+> >>>>> being able to update for other security fixes seems reasonable.
+> >>>>
+> >>>> Jason, what do you think of the approach above? 
+> >>>
+> >>> I say keep it simple.  We shouldn't use the DT changes to trigger one
+> >>> vice the other.  We need to be able to build both, but only load one at
+> >>> a time.  If that's anything other than simple to do, then we make it a
+> >>> Kconfig binary choice and move on.
+> >>
+> >> Actually I was planning to handle it with a Kconfig dependency rule
+> >> (NEW_DRIVER depends on !OLD_DRIVER and OLD_DRIVER depends
+> >> on !NEW_DRIVER).
+> >> I don't know how to make it a runtime check without adding new
+> >> compatible strings for the kirkwood, dove and orion platforms, and I'm
+> >> sure sure this is a good idea.
+> >   ^ not
+> > 
+> >> Do you have any ideas ?
 > 
-> Thanks for adding me to Cc.
+> You use devm_ioremap_resource() in the new driver, so if the old one
+> is already loaded the memory region will be already hold and the new
+> driver will simply fail during the probe. So for this part it is OK.
+
+I like the idea :-).
+
 > 
-> On Wed, Apr 15, 2015 at 02:18:13PM +0100, Varun Sethi wrote:
-> > Yes, deviceid=stream id (i.e. ICID + other bits). I am not sure if TBU ID
-> > would also be forwarded as a part of stream id to GIC. My understanding is
-> > that TBU ID is forwarded (as a part of the stream ID) to the TCU in case
-> > of a TBU translation miss. In case of the LS2085 PCIe controller you would
-> > have to setup the PCIe device ID to stream ID translation table. We may
-> > have to restrict the number of entries based on the available number of
-> > contexts.
-> 
-> Unfortunately, I'm having a really hard time parsing this thread (some parts
-> of it simply don't make sense; others use non-architectural terms and
-> overall I don't get a feeling for the problem).
-> 
-> Please could you explain your system design step by step so that I can
-> understand (a) what you've built and (b) why the current design of Linux is
-> causing you problems?
-> 
-> Sorry if I'm just being thick, but it's important that we get this right.
+> However, the old driver doesn't try to reserve the region, it directly
+> uses an ioremap(). So if the new driver is loaded first, then the old
+> one will manage to be loaded too. I think that just adding a
+> request_region()/release_region() (or converting the ioremap in a
+> devm_ioremap_resource() in the old driver would be enough.
 
-I'll try to summarize some key points about the system...
-
-System is using a single SMMU-500 (1 TCU, 6 TBUs) and GICv3-ITS.  There are
-PCI, fsl-mc, and platform devices that do DMA.  Devices on the PCI and
-fsl-mc bus generate message interrupts.
-
-The flow a message interrupt would take is this:
-
-    --------------
-      PCI device
-    --------------
-          |
-          | pcidevid + MSI msg
-          |
-          V
-    --------------
-    PCI controller
-      pcidevid ->
-      streamID
-      mapping
-    --------------
-          |
-          | streamID + MSI msg
-          |
-          V
-    --------------
-        SMMU
-    --------------
-          |
-          | streamID + MSI msg
-          |
-          V
-    --------------
-       CCN-504 (Dickens)
-    --------------
-          |
-          | streamID + MSI msg
-          |
-          V
-    --------------
-      GICv3 ITS    streamID == ITS deviceID
-    --------------
-
-So, the way things work (at least initially) is that each PCI device maps
-to a single streamID, and thus each device has a separate ITT in 
-the ITS.  So, things should be cool.
-
-However, there is an improvement we envision as possible due to 
-the limited number of SMMU contexts (i.e. 64).  If there are
-64 SMMU context registers it means that there is a max of
-64 software contexts where things can be isolated.  But, say I have
-an SRIOV card with 64 VFs, and I want to assign 8 of the VFs
-to a KVM VM.  Those 8 PCI devices could share the same
-streamID/ITS-device-ID since they all share the same isolation
-context.
-
-What would be nice is at the time the 8 VFS are being added
-to the IOMMU domain is for the pcidevid -> streamID mapping
-table to be updated dynamically.  It simply lets us make
-more efficient use of the limited streamIDs we have.
-
-I think it is this improvement that Minghuan had in mind
-in this patch.
+Absolutely. Unless someone is opposed to this solution I think I'll
+choose this solution.
 
 Thanks,
-Stuart
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
