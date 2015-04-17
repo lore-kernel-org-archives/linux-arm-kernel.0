@@ -1,56 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 17 Apr 2015 07:22:44 +0200
-Subject: [PATCH 13/13] thermal: of: implement .set_trips for device tree
- thermal zones
-In-Reply-To: <20150415175936.GR32500@ld-irv-0074>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-14-git-send-email-s.hauer@pengutronix.de>
- <20150407024307.GH4648@localhost.localdomain>
- <20150413063018.GT9742@pengutronix.de>
- <20150415175936.GR32500@ld-irv-0074>
-Message-ID: <20150417052244.GA6325@pengutronix.de>
+From: jianwei.wang@freescale.com (Jianwei Wang)
+Date: Fri, 17 Apr 2015 14:36:08 +0800
+Subject: [PATCH v5 2/3] arm/dts/ls1021a: Add DCU dts node
+In-Reply-To: <1429252569-23546-1-git-send-email-jianwei.wang@freescale.com>
+References: <1429252569-23546-1-git-send-email-jianwei.wang@freescale.com>
+Message-ID: <1429252569-23546-2-git-send-email-jianwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+From: Jianwei Wang <b52261@freescale.com>
 
-On Wed, Apr 15, 2015 at 10:59:36AM -0700, Brian Norris wrote:
-> On Mon, Apr 13, 2015 at 08:30:18AM +0200, Sascha Hauer wrote:
-> > On Mon, Apr 06, 2015 at 07:43:08PM -0700, Eduardo Valentin wrote:
-> > > On Thu, Mar 26, 2015 at 04:54:00PM +0100, Sascha Hauer wrote:
-> > > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > ---
-> > > >  drivers/thermal/of-thermal.c | 12 ++++++++++++
-> > > >  include/linux/thermal.h      |  1 +
-> > > >  2 files changed, 13 insertions(+)
-> > > 
-> > > Can you please include at least one user of this call back in your patch
-> > > series?
-> > 
-> > Thanks for the comments on this series. I'll address them in the next
-> > round. The user for this callback is not yet ready to be posted. I'll
-> > try and move this patch to the end of the series so that the series can
-> > be applied without this one.
-> 
-> I'm actually interested in this patch, as I am developing a thermal
-> sensor driver that has hardware-assisted temperature-trip interrupts.
-> I'm testing out your patches now, and will probably end up using them on
-> my local tree. With help of this (and a few other changes I need to
-> make), my driver should be ready to post soon.
-> 
-> So, I'll try to post my driver soon as an example, if you'd like. I'd
-> also appreciate a CC on any future revisions, if you don't mind. I'm
-> subscribed to the list, but it's not always easy to pick out the signal
-> from the noise.
+Add DCU node, DCU is a display controller of Freescale
+named 2D-ACE.
 
-Sure, I'll add you to Cc next round. I'm halfway through updating this
-series according to the comments I received, but got distracted. I hope
-to send an update next week.
+Signed-off-by: Alison Wang <b18965@freescale.com>
+Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+Signed-off-by: Jianwei Wang <jianwei.wang@freescale.com>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Sascha
-
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index c70bb27..6d6e3e2 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -383,6 +383,16 @@
+ 				 <&platform_clk 1>;
+ 		};
+ 
++		dcu: dcu at 2ce0000 {
++			compatible = "fsl,ls1021a-dcu";
++			reg = <0x0 0x2ce0000 0x0 0x10000>;
++			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&platform_clk 0>;
++			clock-names = "dcu";
++			big-endian;
++			status = "disabled";
++		};
++
+ 		mdio0: mdio at 2d24000 {
+ 			compatible = "gianfar";
+ 			device_type = "mdio";
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.1.0.27.g96db324
