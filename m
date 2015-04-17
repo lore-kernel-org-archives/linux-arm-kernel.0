@@ -1,57 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 17 Apr 2015 10:58:48 +0200
-Subject: [PATCH 01/13] coresight: etm: print what version of ETM/PTM is
- detected
+Date: Fri, 17 Apr 2015 10:58:49 +0200
+Subject: [PATCH 02/13] coresight: support the TPIU version found in Ux500
 In-Reply-To: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
 References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1429261140-13910-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1429261140-13910-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Helpfully report a bit more about the hardware found in the
-silicon when matching the AMBA device IDs by using the associated
-.data pointer in the AMBA match.
+The Ux500 has a PrimeCell version 4B instead of the 3B as
+supported by the driver, extend the match table to cover
+this version.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/coresight/coresight-etm3x.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/coresight/coresight-tpiu.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
-index c965f5724abd..66e210d5fddd 100644
---- a/drivers/coresight/coresight-etm3x.c
-+++ b/drivers/coresight/coresight-etm3x.c
-@@ -1859,7 +1859,7 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto err_arch_supported;
- 	}
- 
--	dev_info(dev, "ETM initialized\n");
-+	dev_info(dev, "%s initialized\n", (char *)id->data);
- 
- 	if (boot_enable) {
- 		coresight_enable(drvdata->csdev);
-@@ -1890,18 +1890,22 @@ static struct amba_id etm_ids[] = {
- 	{	/* ETM 3.3 */
- 		.id	= 0x0003b921,
+diff --git a/drivers/coresight/coresight-tpiu.c b/drivers/coresight/coresight-tpiu.c
+index 3b33af2416bb..88b6b0c32538 100644
+--- a/drivers/coresight/coresight-tpiu.c
++++ b/drivers/coresight/coresight-tpiu.c
+@@ -188,6 +188,10 @@ static struct amba_id tpiu_ids[] = {
+ 		.id	= 0x0003b912,
  		.mask	= 0x0003ffff,
-+		.data	= "ETM 3.3",
  	},
- 	{	/* ETM 3.5 */
- 		.id	= 0x0003b956,
- 		.mask	= 0x0003ffff,
-+		.data	= "ETM 3.5",
- 	},
- 	{	/* PTM 1.0 */
- 		.id	= 0x0003b950,
- 		.mask	= 0x0003ffff,
-+		.data	= "PTM 1.0",
- 	},
- 	{	/* PTM 1.1 */
- 		.id	= 0x0003b95f,
- 		.mask	= 0x0003ffff,
-+		.data	= "PTM 1.1",
- 	},
++	{
++		.id	= 0x0004b912,
++		.mask	= 0x0007ffff,
++	},
  	{ 0, 0},
  };
+ 
 -- 
 1.9.3
