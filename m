@@ -1,46 +1,37 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 18 Apr 2015 01:16:24 +0900
-Subject: [PATCH 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs and
- boards
-In-Reply-To: <2204571.AOVr95oO32@wuerfel>
-References: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
- <1429170038-16757-4-git-send-email-yamada.masahiro@socionext.com>
- <2204571.AOVr95oO32@wuerfel>
-Message-ID: <CAK7LNAQfUqZvTWZyETyXJUr3MDdMtU6MV++jfAcaoqzEKpUxtg@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 17 Apr 2015 10:30:54 -0600
+Subject: [tpmdd-devel] [RFC PATCH 1/2] tee: generic TEE subsystem
+In-Reply-To: <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
+References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
+ <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <20150417163054.GA28241@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, Apr 17, 2015 at 09:50:56AM +0200, Jens Wiklander wrote:
+> +	teedev = devm_kzalloc(dev, sizeof(*teedev), GFP_KERNEL);
+[..]
+> +	rc = misc_register(&teedev->miscdev);
+[..]
+> +void tee_unregister(struct tee_device *teedev)
+> +{
+[..]
+> +	misc_deregister(&teedev->miscdev);
+> +}
+[..]
+>+static int optee_remove(struct platform_device *pdev)
+>+{
+>+       tee_unregister(optee->teedev);
 
-2015-04-16 18:44 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 16 April 2015 16:40:37 Masahiro Yamada wrote:
->> +
->> +/ {
->> +     model = "UniPhier PH1-LD4 Reference Board";
->> +     compatible = "socionext,ph1-ld4-ref", "socionext,ph1-ld4";
->> +
->> +     memory {
->> +             device_type = "memory";
->> +             reg = <0x80000000 0x20000000>;
->> +     };
->> +
->> +     chosen {
->> +             bootargs = "console=ttyS0,115200 earlyprintk";
->> +     };
->
-> I would remove the 'earlyprintk' option here. You don't add any options
-> for the platform in Kconfig.debug, and I hope that we can eventually
-> start using earlycon. Please add an appropriate stdio-path property
-> here, but note that we are still lacking the fixmap patches to make
-> earlycon work.
->
-> Otherwise looks good.
+Isn't that a potential use after free? AFAIK misc_deregister does not
+guarentee the miscdev will no longer be accessed after it returns, and
+the devm will free it after optee_remove returns.
 
-I dropped earlyprintk, added stdout-path in v3.
+Memory backing a stuct device needs to be freed via the release
+function.
 
-Thanks!
+We have been going through this for a while with TPM - it seems like
+using misc devices dynamically is not a good idea. Manage your own
+struct device directly..
 
-
--- 
-Best Regards
-Masahiro Yamada
+Jason
