@@ -1,85 +1,101 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 17 Apr 2015 16:48:28 +0200
-Subject: [PATCH v5 00/18] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <CABxcv=mXENvPHvvN5iOaUBZKORF49RhDs-tL_PBT4Urh54pd0Q@mail.gmail.com>
-References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
- <20150204142149.GM3702@8bytes.org>
- <CABxcv=mXENvPHvvN5iOaUBZKORF49RhDs-tL_PBT4Urh54pd0Q@mail.gmail.com>
-Message-ID: <55311D3C.5050300@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 17 Apr 2015 16:50:22 +0200
+Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
+In-Reply-To: <55311B6B.2090108@free-electrons.com>
+References: <552B8EC4.209@free-electrons.com>
+ <20150413124711.GI18660@io.lakedaemon.net>
+ <87r3rom2qu.fsf@natisbad.org>
+ <20150413201146.GL18660@io.lakedaemon.net>
+ <20150417103356.6ce78145@bbrezillon>
+ <20150417103946.2a46c243@bbrezillon>
+ <5531040D.4000007@free-electrons.com>
+ <20150417161922.54adec64@bbrezillon>
+ <20150417143216.GQ15807@lukather>
+ <55311B6B.2090108@free-electrons.com>
+Message-ID: <20150417145022.GR15807@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Apr 17, 2015 at 04:40:43PM +0200, Gregory CLEMENT wrote:
+> Hi Maxime,
+> 
+> On 17/04/2015 16:32, Maxime Ripard wrote:
+> > On Fri, Apr 17, 2015 at 04:19:22PM +0200, Boris Brezillon wrote:
+> >> Hi Gregory,
+> >>
+> >> On Fri, 17 Apr 2015 15:01:01 +0200
+> >> Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+> >>
+> >>> Hi Boris,
+> >>>
+> >>> On 17/04/2015 10:39, Boris Brezillon wrote:
+> >>>> On Fri, 17 Apr 2015 10:33:56 +0200
+> >>>> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> >>>>
+> >>>>> Hi Jason,
+> >>>>>
+> >>>>> On Mon, 13 Apr 2015 20:11:46 +0000
+> >>>>> Jason Cooper <jason@lakedaemon.net> wrote:
+> >>>>>
+> >>>>>>>
+> >>>>>>>> I'd appreciate if we'd look into it.  I understand from on-list and
+> >>>>>>>> off-list discussion that the rewrite was unavoidable.  So I'm willing to
+> >>>>>>>> concede that.  Giving people time to migrate from old to new while still
+> >>>>>>>> being able to update for other security fixes seems reasonable.
+> >>>>>>>
+> >>>>>>> Jason, what do you think of the approach above? 
+> >>>>>>
+> >>>>>> I say keep it simple.  We shouldn't use the DT changes to trigger one
+> >>>>>> vice the other.  We need to be able to build both, but only load one at
+> >>>>>> a time.  If that's anything other than simple to do, then we make it a
+> >>>>>> Kconfig binary choice and move on.
+> >>>>>
+> >>>>> Actually I was planning to handle it with a Kconfig dependency rule
+> >>>>> (NEW_DRIVER depends on !OLD_DRIVER and OLD_DRIVER depends
+> >>>>> on !NEW_DRIVER).
+> >>>>> I don't know how to make it a runtime check without adding new
+> >>>>> compatible strings for the kirkwood, dove and orion platforms, and I'm
+> >>>>> sure sure this is a good idea.
+> >>>>   ^ not
+> >>>>
+> >>>>> Do you have any ideas ?
+> >>>
+> >>> You use devm_ioremap_resource() in the new driver, so if the old one
+> >>> is already loaded the memory region will be already hold and the new
+> >>> driver will simply fail during the probe. So for this part it is OK.
+> >>
+> >> I like the idea :-).
+> > 
+> > Not really, how do you know which device is going to be probed? For
+> > that matter, it's pretty much random, and you have no control over it.
+> > 
+> > Why not just have a choice option, and select which one you want to
+> > enable?
+> 
+> Because you can't prevent an user to build a module, then modifying the
+> configuration and building the other module.
 
-On 2015-04-17 16:33, Javier Martinez Canillas wrote:
-> Hello Marek,
->
-> On Wed, Feb 4, 2015 at 3:21 PM, Joerg Roedel <joro@8bytes.org> wrote:
->> Hi Marek,
->>
->> On Fri, Jan 23, 2015 at 04:51:10PM +0100, Marek Szyprowski wrote:
->>> 1. All iommu related patches (with 'iommu: exynos') can be merged to
->>> iommu tree. They don't have any direct dependencies on the DTS, DRM and
->>> power domain initialization change - without them the driver will simply
->>> not initialize, when no exynos,sysmmu nodes are provided in device tree.
->>>
->>> Joerg, could you merge those patches?
->> Given the previous comments and tests on this patch set I am still
->> waiting for some Acked-bys and/or Tested-bys on this. Can you collect
->> these and resend then (probably after the v3.20 merge window)?
->>
-> I rebased your patches on top of latest linux-next (next-20150415) and
-> tested it on my Exynos5420 Peach Pit. HDMI display is working
-> correctly (both console and X) when CONFIG_DRM_EXYNOS_IOMMU is
-> enabled. I also see that the mixer is attached to the IOMMU domain:
->
-> exynos-mixer 14450000.mixer: exynos_iommu_attach_device: Attached
-> IOMMU with pgtable 0x6e5e0000
-> ...
-> exynos-sysmmu 14650000.sysmmu: Enabled
->
-> As I mentioned before [0] on your v4 series, I still have the boot
-> hang when CONFIG_DRM_EXYNOS_FIMD is enabled. You said that the cause
-> is u-boot leaving the FIMD DMA engine enabled and so causing IOMMU
-> page faults on init [1].
->
-> I tried disabling the display on u-boot but the system hangs remains.
-> But since I do a chain loading using the verified u-boot that comes
-> with the Chromebooks, I don't know if the RO boot-loader is leaving
-> something enabled.
->
-> In any case since HDMI with sysmmu is working correctly, that issue is
-> orthogonal to your series and can be fixed as a followup so:
->
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Well, actually, you don't even know if it's going to be a module. You
+might very well have both drivers compiled statically in the kernel
+image, and this is where the trouble begins.
 
-In meantime I've managed to add UART adapter to our Chromebook Snow and
-finally found the issue with FIMD. It was really nasty to debug, because
-it causes a crash with console lock taken in register_framebuffer(), so
-there was no debug/crash message - only complete system freeze. All this
-was caused by fimd left enabled by bootloader, but with gate clock
-disabled, so any access to its register caused freeze.
+> So even if there is a choice at build time, and I think that it is
+> something expected for the v2, we still need preventing having the
+> both drivers trying accessing the same hardware in the same time.
 
-I need to cleanup the patches. I will rebase them and send once 4.1rc1 is
-out. I'm sorry that I didn't let you know earlier, but I'm terribly busy
-with other (internal) stuff right now.
+Of course, but this is already there, and doesn't really address the
+same issue.
 
-> NOTE: Most of the patches don't apply cleanly so I pushed a branch [2]
-> with my conflict resolution so you don't have to do the same. I also
-> did some small changes like using bool instead of int when were
-> assigning it to true and renaming some of the subject lines to match
-> the format used by the subsystem.
->
-> What I didn't change is to re-order the sysmmu device nodes according
-> to the unit address that was asked by Andreas since the DTS patches
-> are likely to conflict with the work Krzysztof is doing to use labels
-> instead of overriding nodes in Exynos 4 and 5 DTS[i]. So you may need
-> to change those anyways once Krzysztof patches land.
+Maxime
 
-Thanks!
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150417/274bd08b/attachment.sig>
