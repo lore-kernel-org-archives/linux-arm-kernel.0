@@ -1,41 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Apr 2015 11:18:33 +0100
-Subject: AM335x OMAP2 common clock external fixed-clock registration
-In-Reply-To: <5530CE63.9070508@gmail.com>
-References: <20150415194707.GA11007@deathray>
- <CAPtuhTggHctp5ArGPEuKn2GuPzb-WnKv2_CzPrHzq8hwOR5Aqw@mail.gmail.com>
- <20150415205136.GA3399@deathray> <552F3B60.8050703@ti.com>
- <20150416161756.GA27590@deathray> <55301D7F.30708@gmail.com>
- <20150416220918.GA6057@deathray> <55304486.5020404@gmail.com>
- <20150417020048.GA27174@deathray> <5530CE63.9070508@gmail.com>
-Message-ID: <20150417101833.GU4027@n2100.arm.linux.org.uk>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Fri, 17 Apr 2015 12:45:34 +0200
+Subject: [PATCHv2 2/3] bus: mvebu-mbus: use automatic I/O synchronization
+ barriers
+In-Reply-To: <1421424689-5971-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1421424689-5971-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1421424689-5971-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5530E44E.8070105@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 17, 2015 at 11:12:03AM +0200, Sebastian Hesselbarth wrote:
-> On 17.04.2015 04:00, Michael Welling wrote:
-> >On Fri, Apr 17, 2015 at 01:23:50AM +0200, Sebastian Hesselbarth wrote:
-> >>On 17.04.2015 00:09, Michael Welling wrote:
-> >>>On Thu, Apr 16, 2015 at 10:37:19PM +0200, Sebastian Hesselbarth wrote:
-> >>>>On 16.04.2015 18:17, Michael Welling wrote:
-> [...]
-> >>>What would be the proper error path?
-> >>>What cleanup is required?
-> >>
-> >>A proper error path would be to release any claimed resource
-> >>on any error. If you look at the code, the only resources that
-> >>need to be released are the two clocks in question.
-> >
-> >So for every error return in the probe function and in the of si5351_dt_parse
-> >it needs to clk_put first right?
-> 
-> Not quite. The driver should clk_put() every clock that it called a
-> [of_]clk_get() for. The thing is that clocks can be passed by
-> platform_data and we never claim them.
+On 01/16/2015 05:11 PM, Thomas Petazzoni wrote:
+> Instead of using explicit I/O synchronization barriers shoehorned
+> inside the streaming DMA mappings API (in
+> arch/arm/mach-mvebu/coherency.c), we are switching to use automatic
+> I/O synchronization barrier.
 
-I've always said clocks (as in struct clk) should never be passed through
-platform data.
+Hello Thomas,
+
+I'm affraid this patche causes issue on mv88f6282 (and most probably on
+mv88f6281 as well): see below.
+
+[...]
+
+> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+> index eb7682d..398f0ee 100644
+> --- a/drivers/bus/mvebu-mbus.c
+> +++ b/drivers/bus/mvebu-mbus.c
+> @@ -69,6 +69,7 @@
+>   */
+>  #define WIN_CTRL_OFF		0x0000
+>  #define   WIN_CTRL_ENABLE       BIT(0)
+> +#define   WIN_CTRL_SYNCBARRIER  BIT(1)
+
+In the 88f6282 datasheet this bit in the "WindowX Control Register" is
+documented as reserved on all windows but window 6 and 7.
+
+For windows 6 and 7 this bit is documented to write protect the window when set.
+
+In our configuration, this window gets chosen for the PCI memory accesses
+(target 0x4, attribute 0xe8) and we effectively end up only being able to read
+from the PCI devices (mwl8k fails to load the firmware and sky2 timeouts on
+MDIO accesses). Write accesses are silently discarded (no external aborts of
+any kind), but that's probably expected as the AHB error propagation is disabled.
+
+Reverting this patch made all the PCI device work correctly.
+
+Regards,
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Nicolas Schichan
+Freebox SAS
