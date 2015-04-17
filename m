@@ -1,33 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Apr 2015 11:38:45 +0200
-Subject: [query] how to use "ranges" in device tree
-In-Reply-To: <20150417164546.3925eb7c@xhacker>
-References: <20150416215938.347caa68@xhacker> <5862495.WQJXyp7MlL@wuerfel>
- <20150417164546.3925eb7c@xhacker>
-Message-ID: <3074482.0e1L0iyh9V@wuerfel>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 17 Apr 2015 02:50:06 -0700
+Subject: [PATCH v4 0/4] PCI: X-Gene: Add APM X-Gene v1 MSI/MSIX termination
+ driver
+In-Reply-To: <20150415091655.02361cdc@arm.com>
+References: <20150415091655.02361cdc@arm.com>
+Message-ID: <cover.1429263201.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 April 2015 16:45:46 Jisheng Zhang wrote:
-> > 
-> > A nicer (but a little more complicated) way to do this would be to use
-> > #address-cells=<2> in the parent bus and use that to enumerate the
-> 
-> In this way, we need to change all device nodes' "reg" in arch/arm/boot/dts/berlin2q.dtsi?
+This patch set adds MSI/MSIX termination driver support for APM X-Gene v1 SoC.
+APM X-Gene v1 SoC supports its own implementation of MSI, which is not compliant
+to GIC V2M specification for MSI Termination.
 
-Correct
+There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports. This MSI
+block supports 2048 MSI termination ports coalesced into 16 physical HW IRQ lines
+and shared across all 5 PCIe ports.
 
-> And in arm64 case, we should use #address-cells=<3>?
+v4 changes:
+	1. Remove affinity setting for each MSI
+	2. Add description about register layout, MSI termination address and data
+	3. Correct total number of MSI vectors to 2048
+	4. Clean up error messages
+	5. Remove unused module code
 
-It depends: if any of the address spaces within are 64-bit wide, yes, otherwise
-you can make the virtual spaces just 2-cell wide.
-
-> If above two answer is yes, setting "ranges = <..>" seems add complexity in my
-> humble opinion. So is it better to use 1:1 mapping by "ranges;" in "/soc" node?
+v3 changes:
+        1. Implement MSI support using PCI MSI IRQ domain
+        2. Only use msi_controller to store IRQ domain
+v2 changes:
+        1. Use msi_controller structure
+        2. Remove arch hooks arch_teardown_msi_irqs and arch_setup_msi_irqs
  
-I agree, it gets a little awkward at that point. A better solution here would
-be to take the PCI node out of /soc and move it to the root node. This has
-the slight downside that you end up with registers being part of /soc and /pci,
-but that's perfectly legal.
 
-	Arnd
+
+ .../devicetree/bindings/pci/xgene-pci-msi.txt      |  63 ++++
+ MAINTAINERS                                        |   8 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |  27 ++
+ drivers/pci/host/Kconfig                           |   6 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pci-xgene-msi.c                   | 410 +++++++++++++++++++++
+ drivers/pci/host/pci-xgene.c                       |  21 ++
+ 7 files changed, 536 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+ create mode 100644 drivers/pci/host/pci-xgene-msi.c
+
+-- 
+1.9.1
