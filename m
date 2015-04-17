@@ -1,64 +1,117 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 18 Apr 2015 01:14:40 +0900
-Subject: [PATCH v2 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs
- and boards
-In-Reply-To: <20150416100856.GJ30380@tarshish>
-References: <1429171147-19464-1-git-send-email-yamada.masahiro@socionext.com>
- <1429171147-19464-4-git-send-email-yamada.masahiro@socionext.com>
- <20150416100856.GJ30380@tarshish>
-Message-ID: <CAK7LNARkDJFyHirfGQt-c2NHfUpp2mcY5yEGC1KLvLr=JtiLyg@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 17 Apr 2015 18:15:09 +0200
+Subject: [PATCH v5 00/18] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <55311D3C.5050300@samsung.com>
+References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
+ <20150204142149.GM3702@8bytes.org>
+ <CABxcv=mXENvPHvvN5iOaUBZKORF49RhDs-tL_PBT4Urh54pd0Q@mail.gmail.com>
+ <55311D3C.5050300@samsung.com>
+Message-ID: <CABxcv=nNgrtC_reDL3PWOTeUSopataPSHnjhf2Lfu2WwT8m+0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch, Andrew,
+Hello Marek,
 
-2015-04-16 19:08 GMT+09:00 Baruch Siach <baruch@tkos.co.il>:
-> Hi Masahiro Yamada,
+On Fri, Apr 17, 2015 at 4:48 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
 >
-> On Thu, Apr 16, 2015 at 04:59:06PM +0900, Masahiro Yamada wrote:
->> Initial device trees for UniPhier SoCs: PH1-sLD3, PH1-LD4, PH1-Pro4,
->> and PH1-sLD8.
+>
+> On 2015-04-17 16:33, Javier Martinez Canillas wrote:
 >>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> ---
+>> Hello Marek,
+>>
+>> On Wed, Feb 4, 2015 at 3:21 PM, Joerg Roedel <joro@8bytes.org> wrote:
+>>>
+>>> Hi Marek,
+>>>
+>>> On Fri, Jan 23, 2015 at 04:51:10PM +0100, Marek Szyprowski wrote:
+>>>>
+>>>> 1. All iommu related patches (with 'iommu: exynos') can be merged to
+>>>> iommu tree. They don't have any direct dependencies on the DTS, DRM and
+>>>> power domain initialization change - without them the driver will simply
+>>>> not initialize, when no exynos,sysmmu nodes are provided in device tree.
+>>>>
+>>>> Joerg, could you merge those patches?
+>>>
+>>> Given the previous comments and tests on this patch set I am still
+>>> waiting for some Acked-bys and/or Tested-bys on this. Can you collect
+>>> these and resend then (probably after the v3.20 merge window)?
+>>>
+>> I rebased your patches on top of latest linux-next (next-20150415) and
+>> tested it on my Exynos5420 Peach Pit. HDMI display is working
+>> correctly (both console and X) when CONFIG_DRM_EXYNOS_IOMMU is
+>> enabled. I also see that the mixer is attached to the IOMMU domain:
+>>
+>> exynos-mixer 14450000.mixer: exynos_iommu_attach_device: Attached
+>> IOMMU with pgtable 0x6e5e0000
+>> ...
+>> exynos-sysmmu 14650000.sysmmu: Enabled
+>>
+>> As I mentioned before [0] on your v4 series, I still have the boot
+>> hang when CONFIG_DRM_EXYNOS_FIMD is enabled. You said that the cause
+>> is u-boot leaving the FIMD DMA engine enabled and so causing IOMMU
+>> page faults on init [1].
+>>
+>> I tried disabling the display on u-boot but the system hangs remains.
+>> But since I do a chain loading using the verified u-boot that comes
+>> with the Chromebooks, I don't know if the RO boot-loader is leaving
+>> something enabled.
+>>
+>> In any case since HDMI with sysmmu is working correctly, that issue is
+>> orthogonal to your series and can be fixed as a followup so:
+>>
+>> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 >
-> [...]
 >
->> diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
->> new file mode 100644
->> index 0000000..2e83363
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
->> @@ -0,0 +1,51 @@
->> +/*
->> + * Device Tree Source for UniPhier PH1-LD4 Reference Board
->> + *
->> + * Copyright (C) 2015 Socionext Inc.
->> + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
+> In meantime I've managed to add UART adapter to our Chromebook Snow and
+> finally found the issue with FIMD. It was really nasty to debug, because
+> it causes a crash with console lock taken in register_framebuffer(), so
+> there was no debug/crash message - only complete system freeze. All this
+
+Yeah, that's why I was not able to find the cause yet. No output
+message and just a complete system hang.
+
+> was caused by fimd left enabled by bootloader, but with gate clock
+> disabled, so any access to its register caused freeze.
 >
-> Please consider licensing .dts/.dtsi files also under another, more liberal
-> license, e.g. X11. This would allow easier reuse of these device tree in other
-> software projects. See for example 2ef6ef91c54e (ARM: sun4i: a1000: Relicense
-> the device tree under GPLv2/X11, 2014-09-02).
 
+Awesome, I'm glad that you figured it out.
 
-I did in v3.
+Interface clocks being gated that are needed to access registers has
+bitten us too many times, didn't it? :-)
 
-Thanks!
+> I need to cleanup the patches. I will rebase them and send once 4.1rc1 is
+> out. I'm sorry that I didn't let you know earlier, but I'm terribly busy
+> with other (internal) stuff right now.
+>
 
+No worries, I was also busy with other stuff and just took a look at
+this issue again today. I hope my branch could save you some effort
+for the rebase then.
 
+>> NOTE: Most of the patches don't apply cleanly so I pushed a branch [2]
+>> with my conflict resolution so you don't have to do the same. I also
+>> did some small changes like using bool instead of int when were
+>> assigning it to true and renaming some of the subject lines to match
+>> the format used by the subsystem.
+>>
+>> What I didn't change is to re-order the sysmmu device nodes according
+>> to the unit address that was asked by Andreas since the DTS patches
+>> are likely to conflict with the work Krzysztof is doing to use labels
+>> instead of overriding nodes in Exynos 4 and 5 DTS[i]. So you may need
+>> to change those anyways once Krzysztof patches land.
+>
+>
+> Thanks!
+>
+>
+> Best regards
+> --
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+>
 
--- 
-Best Regards
-Masahiro Yamada
+Best regards,
+Javier
