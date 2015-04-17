@@ -1,51 +1,53 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 18 Apr 2015 01:01:39 +0900
-Subject: [PATCH 1/4] ARM: UniPhier: add basic support for UniPhier
- architecture
-In-Reply-To: <20150416095631.GY12732@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Apr 2015 18:04:06 +0200
+Subject: [PATCH 2/4] ARM: multi_v7_defconfig: enable UniPhier SoC family
+In-Reply-To: <CAK7LNAQ7rX7+YQHNmuXvRH7TKcVpNUdDRr5qUS6PYxPa=NYP0A@mail.gmail.com>
 References: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
- <1429170038-16757-2-git-send-email-yamada.masahiro@socionext.com>
- <20150416095631.GY12732@n2100.arm.linux.org.uk>
-Message-ID: <CAK7LNAQ3W0xMM2hZec0WgnCOTxBve51gqwRLpLK_VW15qf3xpg@mail.gmail.com>
+ <3561768.u8t9ftxvsL@wuerfel>
+ <CAK7LNAQ7rX7+YQHNmuXvRH7TKcVpNUdDRr5qUS6PYxPa=NYP0A@mail.gmail.com>
+Message-ID: <102719016.qQcFI3ycIX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Saturday 18 April 2015 01:00:16 Masahiro Yamada wrote:
+> 2015-04-16 18:42 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Thursday 16 April 2015 16:40:36 Masahiro Yamada wrote:
+> >> Add UniPhier, a new citizen in the ARM multi platform.
+> >>
+> >> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> >> ---
+> >>
+> >>  arch/arm/configs/multi_v7_defconfig | 1 +
+> >>  1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> >> index d7f038d..24005cf 100644
+> >> --- a/arch/arm/configs/multi_v7_defconfig
+> >> +++ b/arch/arm/configs/multi_v7_defconfig
+> >> @@ -81,6 +81,7 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
+> >>  CONFIG_ARCH_TEGRA_114_SOC=y
+> >>  CONFIG_ARCH_TEGRA_124_SOC=y
+> >>  CONFIG_TEGRA_EMC_SCALING_ENABLE=y
+> >> +CONFIG_ARCH_UNIPHIER=y
+> >>  CONFIG_ARCH_U8500=y
+> >>  CONFIG_MACH_HREFV60=y
+> >>  CONFIG_MACH_SNOWBALL=y
+> >>
+> >
+> > Any additional device drivers you need?
+> >
+> 
+> Our drivers are still based-on old kernel version (pre-DT) with local
+> ugly hacking.
+> I need more time to re-write them based on the current coding style
+> (almost from scratch),
+> so I'd like to do it as a second round.
+> 
+> This series is just mainlining a minimal support with a serial console.
+> I think it is a good starting point.
+> The UART device is 16550-compatible, so I do not need any additional driver.
+> 
 
-2015-04-16 18:56 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Thu, Apr 16, 2015 at 04:40:35PM +0900, Masahiro Yamada wrote:
->> diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
->> new file mode 100644
->> index 0000000..6b61f8d
->> --- /dev/null
->> +++ b/arch/arm/mach-uniphier/platsmp.c
->> @@ -0,0 +1,78 @@
->> +/*
->> + * Copyright (C) 2015 Socionext Inc.
->> + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/sizes.h>
->> +#include <linux/init.h>
->> +#include <asm/io.h>
->
-> Please use linux/io.h rather than asm/io.h
->
+Ok, seems fine then.
 
-Yes.  Fixed in v3.
-Thanks!
-
-
--- 
-Best Regards
-Masahiro Yamada
+	Arnd
