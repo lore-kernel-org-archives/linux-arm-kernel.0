@@ -1,60 +1,229 @@
-From: jianwei.wang@freescale.com (Jianwei Wang)
-Date: Fri, 17 Apr 2015 14:36:09 +0800
-Subject: [PATCH v5 3/3] arm/dts/ls1021a: Add a TFT LCD panel dts node for DCU
-In-Reply-To: <1429252569-23546-1-git-send-email-jianwei.wang@freescale.com>
-References: <1429252569-23546-1-git-send-email-jianwei.wang@freescale.com>
-Message-ID: <1429252569-23546-3-git-send-email-jianwei.wang@freescale.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 17 Apr 2015 10:13:00 +0300
+Subject: AM335x OMAP2 common clock external fixed-clock registration
+In-Reply-To: <20150417020048.GA27174@deathray>
+References: <20150415140945.GA30787@deathray> <552EB152.7050306@ti.com>
+ <20150415194707.GA11007@deathray>
+ <CAPtuhTggHctp5ArGPEuKn2GuPzb-WnKv2_CzPrHzq8hwOR5Aqw@mail.gmail.com>
+ <20150415205136.GA3399@deathray> <552F3B60.8050703@ti.com>
+ <20150416161756.GA27590@deathray> <55301D7F.30708@gmail.com>
+ <20150416220918.GA6057@deathray> <55304486.5020404@gmail.com>
+ <20150417020048.GA27174@deathray>
+Message-ID: <5530B27C.9020307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jianwei Wang <b52261@freescale.com>
+On 04/17/2015 05:00 AM, Michael Welling wrote:
+> On Fri, Apr 17, 2015 at 01:23:50AM +0200, Sebastian Hesselbarth wrote:
+>> On 17.04.2015 00:09, Michael Welling wrote:
+>>> On Thu, Apr 16, 2015 at 10:37:19PM +0200, Sebastian Hesselbarth wrote:
+>>>> On 16.04.2015 18:17, Michael Welling wrote:
+>>>>> On Thu, Apr 16, 2015 at 07:32:32AM +0300, Tero Kristo wrote:
+>>>>>> On 04/15/2015 11:51 PM, Michael Welling wrote:
+>>>>>>> On Wed, Apr 15, 2015 at 01:45:53PM -0700, Mike Turquette wrote:
+>>>>>>>> On Wed, Apr 15, 2015 at 12:47 PM, Michael Welling <mwelling@ieee.org> wrote:
+>>>> [...]
+>>>>>>>>> There is still an issue with the si5351.
+>>>>>>>>>
+>>>>>>>>> I had to comment out the clk_put here for the frequency to show up:
+>>>>>>>>> http://lxr.free-electrons.com/source/drivers/clk/clk-si5351.c#L1133
+>>>>>>>>>
+>>>>>>>>> Ideas?
+>>>>>>>>
+>>>>>>>> What is the most recent upstream commit that you are based on?
+>>>>>>>
+>>>>>>> I am working from 4.0.0-rc7.
+>>>>>>>
+>>>>>>> 7b43b47373d40d557cd7e1a84a0bd8ebc4d745ab
+>>>>>>
+>>>>>> Hmm, I wonder why si5351 calls clk_put immediately after of_clk_get
+>>>>>> in the first place, as far as I understand this destroys the clock
+>>>>>> handle, which is still being used later in the code.
+>>>>>
+>>>>> Not sure how this ever worked. This has been in the code since the
+>>>>> initial commit.
+>>>>
+>>>> The reason it worked before may be related with recent rework of
+>>>> clk_put() itself and clk cookies instead of pointers. I lost track on
+>>>> the recent clk subsystem changes here, sorry.
+>>>>
+>>>> However, droping the clk immediately surely isn't right.
+>>>> The thing is, we can remove the clk_put() just because there is no
+>>>> _remove() for that driver. I remember that back in the days the driver
+>>>> was mainlined, clk removal wasn't too easy.
+>>>>
+>>>> FWIW, as soon as _remove() support will be added by someone, we'll have
+>>>> to rethink passing struct clk* by platform_data or at least
+>>>> double-check if we ever used [of_]clk_get() to obtain it.
+>>>>
+>>>> Mind to send a patch removing the clk_put() on !IS_ERR and add a proper
+>>>> error path instead? While of_clk_get() is the only calls that need
+>>>> cleanup on error in si5351_dt_parse() we should probably move that
+>>>> calls to the end of this function. Otherwise we'd also have to cleanup
+>>>> on every of_parse_foo() failure.
+>>>
+>>> What would be the proper error path?
+>>> What cleanup is required?
+>>
+>> A proper error path would be to release any claimed resource
+>> on any error. If you look at the code, the only resources that
+>> need to be released are the two clocks in question.
+>
+> So for every error return in the probe function and in the of si5351_dt_parse
+> it needs to clk_put first right?
+>
+> See attached patch to see if we are on the same page.
+>
+>>
+>>> It should be noted that there are more deep rooted issues with the driver
+>>> that I have noticed. For one the driver behaves differently if the debugging
+>>> is on and when it is off.
+>>
+>> I guess you mean #define DEBUG in the driver?
+>
+> Yes.
+>
+>>
+>>> Here is what the kernel reports with debugging off:
+>>
+>> Do you have any measurement equipment to check what is actually set?
+>
+> Yes, I have an oscilloscope here at my desk.
+> The reported numbers do not always correspond to the actual output in some
+> cases.
+>
+> The ms2 output has appeared to stop working all together sometime whilest
+> testing. I may have to solder a new chip on there.
+>
+> Could misconfiguration damage the chip?
+>
+>>
+>>> root at som3517-som200:~# cat /sys/kernel/debug/clk/clk_summary
+>>>     clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
+>>> ----------------------------------------------------------------------------------------
+>>>   ref27                                    0            0    27000000          0 0
+>>>      xtal                                  0            0    27000000          0 0
+>>>         pllb                               0            0   599999994          0 0
+>>>            ms0                             0            0    12499999          0 0
+>>>               clk0                         0            0    12499999          0 0
+>>>         plla                               0            0   599999994          0 0
+>>>            ms2                             0            0     8219178          0 0
+>>>               clk2                         0            0     8219178          0 0
+>>>            ms1                             0            0    94117646          0 0
+>>>               clk1                         0            0    94117646          0 0
+>>>
+>>> Here is what the kernel reports with debugging on:
+>>>     clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
+>>> ----------------------------------------------------------------------------------------
+>>>   ref27                                    0            0    27000000          0 0
+>>>      xtal                                  0            0    27000000          0 0
+>>>         pllb                               0            0   884736000          0 0
+>>>            ms0                             0            0    18432000          0 0
+>>>               clk0                         0            0    18432000          0 0
+>>
+>> Is this what you expect for clk0?
+>
+> Yes.
+>
+>>
+>>>         plla                               0            0   897023997          0 0
+>>>            ms2                             0            0    12287999          0 0
+>>>               clk2                         0            0    12287999          0 0
+>>
+>> ditto for clk2?
+>
+> Yes.
+>
+>>
+>>>            ms1                             0            0   140709646          0 0
+>>>               clk1                         0            0   140709646          0 0
+>>
+>> This is wrong, I agree. Looks like round_rate()/recalc_rate() of msynth
+>> or clkout is broken with respect to non-pll-master clocks.
+>>
+>> I had a quick look at drivers/clk.c too, there has been a lot of churn
+>> in clk API since I last booted my device using si5351.
+>>
+>> Is there any way to try out a less recent kernel, let's say two or
+>> three releases before 4.0?
+>
+> Could you provide a specific version that you think has the best chances of
+> working?
+>
+>>
+>> We should just confirm that there has been an issue with it before
+>> already.
+>>
+>> I have no clue about the debug on/off issue at the moment.
+>>
+>>> Note this is with the following devicetree entry:
+>>>          si5351: clock-generator {
+>>>                  #address-cells = <1>;
+>>>                  #size-cells = <0>;
+>>>                  #clock-cells = <1>;
+>>>                  compatible = "silabs,si5351a-msop";
+>>>                  reg = <0x60>;
+>>>                  status = "okay";
+>>>
+>>>                  /* connect xtal input to 27MHz reference */
+>>>                  clocks = <&ref27>;
+>>>
+>>>                  /* connect xtal input as source of pll0 and pll1 */
+>>>                  silabs,pll-source = <0 0>, <1 0>;
+>>>
+>>>                  clkout0: clkout0 {
+>>>                          reg = <0>;
+>>>                          silabs,drive-strength = <8>;
+>>>                          silabs,multisynth-source = <1>;
+>>>                          silabs,clock-source = <0>;
+>>>                          silabs,pll-master;
+>>>                          clock-frequency = <18432000>;
+>>>                   };
+>>>
+>>>                  clkout1: clkout1 {
+>>>                          reg = <1>;
+>>>                          silabs,drive-strength = <8>;
+>>>                          silabs,multisynth-source = <0>;
+>>>                          silabs,clock-source = <0>;
+>>>                          clock-frequency = <8000000>;
+>>>                  };
+>>>
+>>>                  clkout2: clkout2 {
+>>>                          reg = <2>;
+>>>                          silabs,drive-strength = <8>;
+>>>                          silabs,multisynth-source = <0>;
+>>>                          silabs,clock-source = <0>;
+>>>                          silabs,pll-master;
+>>>                          clock-frequency = <12288000>;
+>>>                  };
+>>>          };
+>>>
+>>> I am losing hope that this driver is stable enough to even use in production.
+>>
+>> Who said it is stable for production use? The driver is written from
+>> scratch based on _very_ limited information of the datasheet an appnote.
+>> Also, I only have a single setup with si5351, that is no way enough to
+>> test every combination.
+>
+> Well it is not in staging and I am sure it took much work to get it working
+> for you.
 
-Add a required display-timings node for the TFT LCD panel
-the TFT LCD panel is WQVGA "480x272", and the bpp is 24.
+non-staging doesn't mean code is absolutely bug free. Linux kernel is 
+still just software, and as we know, every piece of software has bugs 
+(except maybe the simplest hello-world app.)
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <jianwei.wang@freescale.com>
----
- arch/arm/boot/dts/ls1021a-twr.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+>>
+>> I never heard serious complaints before, so either you help improving
+>> this driver or better ask SiLabs for a table-based driver for your
+>> specific setup.
+>
+> I have routines to program the chip from U-Boot and Linux userspace using
+> the table method. I was hoping that a mainline driver could replace these
+> hackish utilities.
 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a2c591e..4780b11 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -58,6 +58,32 @@
- 	};
- };
- 
-+&dcu {
-+	display = <&display>;
-+	status = "okay";
-+
-+	display: display at 0 {
-+		bits-per-pixel = <24>;
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: nl4827hc19 {
-+				clock-frequency = <10870000>;
-+				hactive = <480>;
-+				vactive = <272>;
-+				hback-porch = <2>;
-+				hfront-porch = <2>;
-+				vback-porch = <2>;
-+				vfront-porch = <2>;
-+				hsync-len = <41>;
-+				vsync-len = <4>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+			};
-+		};
-+	};
-+};
-+
- &dspi1 {
- 	bus-num = <0>;
- 	status = "okay";
--- 
-2.1.0.27.g96db324
+You can still replace your hack solution.
+
+The beauty of linux comes in that if you find a bug someplace, you can 
+just fix it, post a patch upstream, and get it fixed for good. :)
+
+-Tero
