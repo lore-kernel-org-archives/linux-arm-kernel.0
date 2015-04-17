@@ -1,72 +1,85 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 17 Apr 2015 09:07:26 -0700
-Subject: [RFC] PCI: BCM5301X: add PCIe2 driver for BCM5301X SoCs
-In-Reply-To: <4575399.moLzVD0xqT@wuerfel>
-References: <1415470392-28229-1-git-send-email-hauke@hauke-m.de>
- <545E8AA2.6050301@hauke-m.de> <11068573.lefhT3BUSj@wuerfel>
- <4575399.moLzVD0xqT@wuerfel>
-Message-ID: <55312FBE.10302@broadcom.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 18 Apr 2015 01:12:36 +0900
+Subject: [PATCH 1/4] ARM: UniPhier: add basic support for UniPhier
+ architecture
+In-Reply-To: <3655031.20bjeBBBYS@wuerfel>
+References: <1429170038-16757-1-git-send-email-yamada.masahiro@socionext.com>
+ <1429170038-16757-2-git-send-email-yamada.masahiro@socionext.com>
+ <3655031.20bjeBBBYS@wuerfel>
+Message-ID: <CAK7LNARZC3GFa6KpZNsFuZ+0XZ7K0dEbb++PQzwtsZ2z86n9kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
+
+2015-04-16 18:41 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 16 April 2015 16:40:35 Masahiro Yamada wrote:
+>
+>>+ENTRY(uniphier_secondary_startup)
+>>+       bl      v7_invalidate_l1
+>>+       b       secondary_startup
+>>+ENDPROC(uniphier_secondary_startup)
+>
+> Since this file is really trivial, I wonder if you could just use
+> a 'naked' inline assembly function from C code here, to have
+> the entire SMP support in one file.
+
+I merged platsmp.c and headsmp.c into a single file in v3.
+I added __naked as you suggested.
 
 
-On 4/17/2015 7:09 AM, Arnd Bergmann wrote:
-> (reviving an old thread)
-> 
-> On Sunday 09 November 2014 21:27:40 Arnd Bergmann wrote:
->>
->>>>> +  /*
->>>>> +   * Inbound address translation setup
->>>>> +   * Northstar only maps up to 128 MiB inbound, DRAM could be up to 1 GiB.
->>>>> +   *
->>>>> +   * For now allow access to entire DRAM, assuming it is less than 128MiB,
->>>>> +   * otherwise DMA bouncing mechanism may be required.
->>>>> +   * Also consider DMA mask to limit DMA physical address
->>>>> +   */
->>>>> +  /* 64-bit LE regs, write low word, high is 0 at reset */
->>>>> +  bcma_write32(bdev, BCMA_CORE_PCIE2_FUNC0_IMAP1, PHYS_OFFSET | 0x1);
->>>>> +  bcma_write32(bdev, BCMA_CORE_PCIE2_IARR1_LOWER,
->>>>> +                     PHYS_OFFSET | ((SZ_128M >> 20) & 0xff));
->>>>
->>>> Maybe I should bully you into enabling swiotlb on arm32 
->>>
->>> This sounds complicated, I hope I can avoid it. 
->>
->> I'd really hope that it's not that hard. We basically just need a copy of
->> coherent_swiotlb_dma_ops/noncoherent_swiotlb_dma_ops from arm64 and
->> use those on bcma devices, with the right dma_mask set.
-> 
-> Peter Senna has tested this on bcm4708a0 (Buffalo WZR-1750DHP) and found
-> that all RAM is DMA capable, as tested with CONFIG_VMSPLIT_1G. Could
-> the code comment here be incorrect, or is it possible that it was fixed
-> in later chip versions?
-> 
-> If this works, using CONFIG_VMSPLIT_1G should result in noticeably
-> better I/O performance on this chip.
-> 
-> I have created a patch that lets him simulate the broken behavior on his
-> machine, so he can work on implementing swiotlb, but it would certainly
-> be best to understand which machines are really affected.
-> 
-> Note that the driver that was merged as drivers/pci/host/pcie-iproc.c
-> does not seem to touch the BCMA_CORE_PCIE2_IARR1_LOWER (offset 0xd08)
-> register, and presumably the power-on default for this register
-> maps all of RAM correctly.
 
-That appears to be the case for Cygnus and NS+ but I just realized I
-should not make this assumption since this is going to be the driver for
-a lot of other iProc based chips. I need to check with our ASIC team on
-limitation of PCIe on each chip on inbound mapping and do more
-investigation and experiment myself.
+>> +
+>> +#define ROM_BOOT_ROMRSV2             0x59801208
+>
+> Please don't hardcode any physical addresses, instead find the DT node
+> or syscon device in the _boot_secondary implementation.
 
-Also note I won't have time to work on this in the short-term, but I
-will eventually get to it.
+I implemented it as a syscon device in v3.
 
-Thanks,
 
-Ray
+> Which device is this register part of?
 
-> 
-> 	Arnd
-> 
+It is just a simple register for storing destination address for the
+secondary CPU.
+
+
+>> +
+>> +static const char * const uniphier_board_dt_compat[] __initconst = {
+>> +     "socionext,ph1-sld3",
+>> +     "socionext,ph1-ld4",
+>> +     "socionext,ph1-pro4",
+>> +     "socionext,ph1-sld8",
+>> +     "socionext,ph1-pro5",
+>> +     "socionext,ph1-proxstream2",
+>> +     "socionext,ph1-ld6b",
+>> +     NULL,
+>> +};
+>
+> Are these chip names or board names? The list should normally have
+> just the socs, which I assume you do, but it's not completely clear
+> from the source.
+
+SoC names.
+
+Perhaps, the structure name "uniphier_board_dt_compat" might be confusing.
+I renamed it into "uniphier_dt_compat" in v3.
+
+
+Many thanks!
+
+
+
+BTW, I had solved the problem "not syncing: Attempted to kill init!
+exitcode=0x00000004 ?",
+I posted about two weeks ago.
+L2 cache had nothing to do with the issue.
+With a little fix of the device tree and an initramdisk I regenerated
+using Buildroot,
+I succeeded in booting the kernel.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
