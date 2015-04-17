@@ -1,54 +1,46 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 17 Apr 2015 15:33:45 -0700
-Subject: [PATCH 0/7] ARM: BCM63xx: SMP support
-Message-ID: <1429310032-19402-1-git-send-email-f.fainelli@gmail.com>
+Date: Fri, 17 Apr 2015 15:33:46 -0700
+Subject: [PATCH 1/7] Documentation: DT: Add Broadcom BCM63138 PMB binding
+In-Reply-To: <1429310032-19402-1-git-send-email-f.fainelli@gmail.com>
+References: <1429310032-19402-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1429310032-19402-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Add a Device Tree binding for the Broadcom BCM63138 Processor Monitor
+Bus, which is an internal bus used to access different power and reset
+signals within a BCM63138 System-on-a-Chip.
 
-This patch series implements SMP support on the Broadcom BCM63138 DSL platform.
-
-There is a number of decisions being made here to simplify things:
-
-- the power on sequence for the secondary CPU is a bit of low-level code that
-  uses the on-chip PMB bus, which will later be supported as a proper reset
-  controller driver, it was considered first to use a reset controller for
-  that, but this was later dropped because:
-	- reset controllers cannot be utilized at SMP init time (too early)
-	- moving reset controllers init earlier has been rejected
-	- the second CPU power on sequence is fairly specific, even within
-	  the context of the BCM63138 SoC, no other peripheral has that
-	  level of detail
-
-- VFP needs to be disabled when SMP is used because the second CPU does not
-  have any VFP unit and will just hang doing a VFP/NEON operation
-
-Florian Fainelli (7):
-  Documentation: DT: Add Broadcom BCM63138 PMB binding
-  ARM: dts: BCM63xx: Add PMB busses nodes
-  Documentation: DT: Document SMP DT nodes and properties for BCM63138
-  ARM: dts: BCM63xx: Add SMP nodes and required properties
-  ARM: BCM63xx: Add Broadcom BCM63xx PMB controller helpers
-  ARM: BCM63xx: Add secondary CPU PMB initialization sequence
-  ARM: BCM63xx: Add SMP support for BCM63138
-
- .../devicetree/bindings/arm/bcm/bcm63138.txt       |  42 ++++
- .../bindings/reset/brcm,bcm63138-pmb.txt           |  19 ++
- arch/arm/boot/dts/bcm63138.dtsi                    |  20 ++
- arch/arm/mach-bcm/Makefile                         |   7 +-
- arch/arm/mach-bcm/bcm63xx_headsmp.S                |  23 +++
- arch/arm/mach-bcm/bcm63xx_pmb.c                    | 222 +++++++++++++++++++++
- arch/arm/mach-bcm/bcm63xx_smp.c                    | 171 ++++++++++++++++
- arch/arm/mach-bcm/bcm63xx_smp.h                    |   9 +
- include/linux/bcm63xx_pmb.h                        |  76 +++++++
- 9 files changed, 588 insertions(+), 1 deletion(-)
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ .../devicetree/bindings/reset/brcm,bcm63138-pmb.txt   | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/reset/brcm,bcm63138-pmb.txt
- create mode 100644 arch/arm/mach-bcm/bcm63xx_headsmp.S
- create mode 100644 arch/arm/mach-bcm/bcm63xx_pmb.c
- create mode 100644 arch/arm/mach-bcm/bcm63xx_smp.c
- create mode 100644 arch/arm/mach-bcm/bcm63xx_smp.h
- create mode 100644 include/linux/bcm63xx_pmb.h
 
+diff --git a/Documentation/devicetree/bindings/reset/brcm,bcm63138-pmb.txt b/Documentation/devicetree/bindings/reset/brcm,bcm63138-pmb.txt
+new file mode 100644
+index 000000000000..aa1eecd23046
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/brcm,bcm63138-pmb.txt
+@@ -0,0 +1,19 @@
++Broadcom BCM63138 Processor Monitor Bus binding
++===============================================
++
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
++
++Require properties:
++
++- compatible: must be "brcm,bcm63138-pmb"
++- reg: base register address and size for this bus controller
++- #reset-cells: must be 2 first cell is the internal bus number, and the third
++  cell is the address on this bus
++
++Example:
++	pmb0: reset-controller at 4800c0 {
++		compatible = "brcm,bcm63138-pmb";
++		reg = <0x4800c0 0x10>;
++		#reset-cells = <2>;
++	};
 -- 
 2.1.0
