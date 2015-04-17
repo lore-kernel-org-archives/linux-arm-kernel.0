@@ -1,57 +1,57 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 17 Apr 2015 10:58:47 +0200
-Subject: [PATCH 00/13] Enable CoreSight for the Ux500
-Message-ID: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 17 Apr 2015 10:58:48 +0200
+Subject: [PATCH 01/13] coresight: etm: print what version of ETM/PTM is
+ detected
+In-Reply-To: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
+References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1429261140-13910-2-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enables the CoreSight blocks for the Ux500.
+Helpfully report a bit more about the hardware found in the
+silicon when matching the AMBA device IDs by using the associated
+.data pointer in the AMBA match.
 
-To do so I ran into a few obstacles, all resolved in this
-series:
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/coresight/coresight-etm3x.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-- The Ux500 have two distinct clocks clocking the CS blocks,
-  APETRACECLK clocking the AHB interconnect, what is usually
-  referred to as "apb_pclk" in the AMBA primecell abstraction
-  layer, and another clock called APEATCLK which is connected
-  to the actual ATCLK on the CS blocks. So I have to add
-  handling for this second clock as only the PCLK is handled
-  today.
-
-- Doing so I need to use runtime PM, and I discovered that
-  the current CS drivers go in and grab the PCLK from the
-  AMBA primecell abstraction which is wrong: this shall be
-  handled using runtime PM callbacks, see e.g.
-  drivers/mmc/host/mmci.c. So I made a patch series fixing
-  this. This also fixes the problem that the PCLK is left
-  on since none of the drivers call pm_runtime_put() so
-  the AMBA core can disable the PCLK, instead they are
-  poking around with the PCLK themselves which is wrong.
-
-Linus Walleij (13):
-  coresight: etm: print what version of ETM/PTM is detected
-  coresight: support the TPIU version found in Ux500
-  coresight: etm: let runtime PM handle core clock
-  coresight: tpiu: let runtime PM handle core clock
-  coresight: etb: let runtime PM handle core clock
-  coresight: funnel: let runtime PM handle core clock
-  coresight: tmc: let runtime PM handle core clock
-  coresight: etm: retrieve and handle atclk
-  coresight: tpiu: retrieve and handle atclk
-  coresight: etb: retrieve and handle atclk
-  coresight: funnel: retrieve and handle atclk
-  coresight: replicator: retrieve and handle atclk
-  ARM: ux500: add CoreSight blocks to DTS file
-
- arch/arm/boot/dts/ste-dbx5x0.dtsi        | 129 +++++++++++++++++++++++++++++++
- drivers/coresight/coresight-etb10.c      |  74 +++++++++++-------
- drivers/coresight/coresight-etm.h        |   4 +-
- drivers/coresight/coresight-etm3x.c      | 102 +++++++++++++-----------
- drivers/coresight/coresight-funnel.c     |  63 +++++++++++----
- drivers/coresight/coresight-replicator.c |  43 +++++++++++
- drivers/coresight/coresight-tmc.c        |  20 ++---
- drivers/coresight/coresight-tpiu.c       |  62 +++++++++++----
- 8 files changed, 376 insertions(+), 121 deletions(-)
-
+diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
+index c965f5724abd..66e210d5fddd 100644
+--- a/drivers/coresight/coresight-etm3x.c
++++ b/drivers/coresight/coresight-etm3x.c
+@@ -1859,7 +1859,7 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto err_arch_supported;
+ 	}
+ 
+-	dev_info(dev, "ETM initialized\n");
++	dev_info(dev, "%s initialized\n", (char *)id->data);
+ 
+ 	if (boot_enable) {
+ 		coresight_enable(drvdata->csdev);
+@@ -1890,18 +1890,22 @@ static struct amba_id etm_ids[] = {
+ 	{	/* ETM 3.3 */
+ 		.id	= 0x0003b921,
+ 		.mask	= 0x0003ffff,
++		.data	= "ETM 3.3",
+ 	},
+ 	{	/* ETM 3.5 */
+ 		.id	= 0x0003b956,
+ 		.mask	= 0x0003ffff,
++		.data	= "ETM 3.5",
+ 	},
+ 	{	/* PTM 1.0 */
+ 		.id	= 0x0003b950,
+ 		.mask	= 0x0003ffff,
++		.data	= "PTM 1.0",
+ 	},
+ 	{	/* PTM 1.1 */
+ 		.id	= 0x0003b95f,
+ 		.mask	= 0x0003ffff,
++		.data	= "PTM 1.1",
+ 	},
+ 	{ 0, 0},
+ };
 -- 
 1.9.3
