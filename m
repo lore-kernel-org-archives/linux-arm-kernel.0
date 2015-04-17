@@ -1,30 +1,40 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 17 Apr 2015 23:45:42 +0530
-Subject: [PATCH] dmaengine: shdmac: avoid unused variable warnings
-In-Reply-To: <27084610.k92kokiTBY@wuerfel>
-References: <27084610.k92kokiTBY@wuerfel>
-Message-ID: <20150417181542.GL30624@intel.com>
+Date: Fri, 17 Apr 2015 23:59:37 +0530
+Subject: [PATCH v3] dmaengine: xgene-dma: Fix sparse wannings and
+ coccinelle warnings
+In-Reply-To: <1429212673-22254-1-git-send-email-rsahu@apm.com>
+References: <1429212673-22254-1-git-send-email-rsahu@apm.com>
+Message-ID: <20150417182937.GN30624@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 11, 2015 at 12:27:58AM +0200, Arnd Bergmann wrote:
-> This driver uses '#ifdef CONFIG_ARCH_SHMOBILE' and '#ifdef CONFIG_ARM'
-> interchangeably in its sh_dmae_probe function, which causes a build
-> warning when building for ARM without also enabling shmobile:
+
+>  	/* Get DMA error interrupt */
+> @@ -2076,7 +2035,6 @@ static struct platform_driver xgene_dma_driver = {
+>  	.remove = xgene_dma_remove,
+>  	.driver = {
+>  		.name = "X-Gene-DMA",
+> -		.owner = THIS_MODULE,
+I have already applied a patch for this
+
+>  		.of_match_table = xgene_dma_of_match_ptr,
+>  	},
+>  };
+> @@ -2085,6 +2043,5 @@ module_platform_driver(xgene_dma_driver);
 > 
-> dma/sh/shdmac.c: In function sh_dmae_probe:
-> dma/sh/shdmac.c:696:6: warning: unused variable errirq [-Wunused-variable]
-> dma/sh/shdmac.c:695:16: warning: unused variable irqflags [-Wunused-variable]
-> dma/sh/shdmac.c: At top level:
-> dma/sh/shdmac.c:447:20: warning: sh_dmae_err defined but not used [-Wunused-function]
-> 
-> This changes all the #ifdef to test for CONFIG_ARCH_SHMOBILE to
-> avoid that warning. An earlier patch from Laurent had fixed the warning
-> for non-ARM case, but it still remained present in ARM randconfig builds.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 52d6a5ee101bf ("DMA: shdma: Fix warnings due to declared but unused symbols")
-Applied, thanks
+>  MODULE_DESCRIPTION("APM X-Gene SoC DMA driver");
+>  MODULE_AUTHOR("Rameshwar Prasad Sahu <rsahu@apm.com>");
+> -MODULE_AUTHOR("Loc Ho <lho@apm.com>");
+And why this?
+
+Fixes looks good though
 
 -- 
 ~Vinod
+>  MODULE_LICENSE("GPL");
+>  MODULE_VERSION("1.0");
+> --
+> 1.8.2.1
+> 
+
+-- 
