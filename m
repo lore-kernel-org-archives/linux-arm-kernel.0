@@ -1,83 +1,133 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Fri, 17 Apr 2015 15:35:19 -0700
-Subject: [PATCH v2 7/8] selftest/x86: install tests
-In-Reply-To: <CALCETrU+jzrt=JLYR_YAqtiEjmY5dZP_Bqus8qE-upj_zydVFw@mail.gmail.com>
-References: <1429308126-5591-1-git-send-email-tyler.baker@linaro.org>
- <CALCETrU+jzrt=JLYR_YAqtiEjmY5dZP_Bqus8qE-upj_zydVFw@mail.gmail.com>
-Message-ID: <CANMBJr4eZ_y6Sp+9t51QpKSwCEyvZVbj7BZ7G5JDqbp+vxB3GA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 18 Apr 2015 00:04:54 +0100
+Subject: [PATCH v2 5/9] ARM: imx: add msl support for imx7d
+In-Reply-To: <1429211860-14438-6-git-send-email-Frank.Li@freescale.com>
+References: <1429211860-14438-1-git-send-email-Frank.Li@freescale.com>
+ <1429211860-14438-6-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20150417230454.GC12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2015 at 15:28, Andy Lutomirski <luto@amacapital.net> wrote:
-> On Fri, Apr 17, 2015 at 3:02 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
->> Include lib.mk and set TEST_PROGS where appropriate. Skip the install and test
->> case when CROSS_COMPILE is not set.
->>
->> Cc: Andy Lutomirski <luto@amacapital.net>
->> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
->> ---
->>  tools/testing/selftests/x86/Makefile | 9 +++++++++
->>  1 file changed, 9 insertions(+)
->>
->> diff --git a/tools/testing/selftests/x86/Makefile b/tools/testing/selftests/x86/Makefile
->> index 9962e10..622717e 100644
->> --- a/tools/testing/selftests/x86/Makefile
->> +++ b/tools/testing/selftests/x86/Makefile
->> @@ -12,19 +12,28 @@ UNAME_M := $(shell uname -m)
->>  ifeq ($(CROSS_COMPILE),)
->>  # Always build 32-bit tests
->>  all: all_32
->> +# Install 32-bit tests
->> +TEST_PROGS += $(BINARIES_32) run_x86_tests.sh
->>  # If we're on a 64-bit host, build 64-bit tests as well
->>  ifeq ($(UNAME_M),x86_64)
->>  all: all_32 all_64
->> +# Install 64-bit tests
->> +TEST_PROGS += $(BINARIES_64)
->>  endif
->>  else
->>  # No dependency on all when cross building
->>  all:
->> +# Skip install and test case when not built
->> +override INSTALL_RULE :=
->> +override EMIT_TESTS :=  echo "echo \"selftests: run_x86_tests.sh [SKIP]\""
->
-> I may just be confused, but why is an emply TEST_PROGS insufficient?
+On Fri, Apr 17, 2015 at 03:17:36AM +0800, Frank.Li at freescale.com wrote:
+> From: Anson Huang <b20788@freescale.com>
+> 
+> Add i.MX7D MSL support.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
 
-This is a good question. The default install in lib.mk rule blindly
-calls 'install -t <INSTALL_PATH>  <TEST_PROG>' which fails the install
-as it is not enough arguments passed. Perhaps we fix this behavior in
-lib.mk.
+I'm not happy with this.
 
->
-> --Andy
->
->>  endif
->>
->>  all_32: check_build32 $(BINARIES_32)
->>
->>  all_64: $(BINARIES_64)
->>
->> +include ../lib.mk
->> +
->>  clean:
->>         $(RM) $(BINARIES_32) $(BINARIES_64)
->>
->> --
->> 2.1.4
->>
->
->
->
-> --
-> Andy Lutomirski
-> AMA Capital Management, LLC
+>  void imx_anatop_pre_suspend(void)
+>  {
+> +	if (cpu_is_imx7d()) {
+> +		/* PLL overwrite set */
+> +		regmap_write(anatop, ANADIG_ARM_PLL + REG_SET, 1 << 20);
+> +		regmap_write(anatop, ANADIG_DDR_PLL + REG_SET, 1 << 19);
+> +		regmap_write(anatop, ANADIG_SYS_PLL + REG_SET, 1 << 17);
+> +		regmap_write(anatop, ANADIG_ENET_PLL + REG_SET, 1 << 13);
+> +		regmap_write(anatop, ANADIG_AUDIO_PLL + REG_SET, 1 << 24);
+> +		regmap_write(anatop, ANADIG_VIDEO_PLL + REG_SET, 1 << 24);
+> +		return;
+> +	}
+> +
+>  	if (imx_mmdc_get_ddr_type() == IMX_DDR_TYPE_LPDDR2)
+>  		imx_anatop_enable_2p5_pulldown(true);
+>  	else
+> @@ -86,6 +104,17 @@ void imx_anatop_pre_suspend(void)
+>  
+>  void imx_anatop_post_resume(void)
+>  {
+> +	if (cpu_is_imx7d()) {
+> +		/* PLL overwrite clear */
+> +		regmap_write(anatop, ANADIG_ARM_PLL + REG_CLR, 1 << 20);
+> +		regmap_write(anatop, ANADIG_DDR_PLL + REG_CLR, 1 << 19);
+> +		regmap_write(anatop, ANADIG_SYS_PLL + REG_CLR, 1 << 17);
+> +		regmap_write(anatop, ANADIG_ENET_PLL + REG_CLR, 1 << 13);
+> +		regmap_write(anatop, ANADIG_AUDIO_PLL + REG_CLR, 1 << 24);
+> +		regmap_write(anatop, ANADIG_VIDEO_PLL + REG_CLR, 1 << 24);
+> +		return;
+> +	}
 
+Shouldn't both of these be determined by the compatible string rather
+than checking __mxc_cpu_type?
 
+> diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+> index df42c14..4e84a7a 100644
+> --- a/arch/arm/mach-imx/cpu.c
+> +++ b/arch/arm/mach-imx/cpu.c
+> @@ -11,6 +11,8 @@
+>  
+>  unsigned int __mxc_cpu_type;
+>  EXPORT_SYMBOL(__mxc_cpu_type);
+> +unsigned int __mxc_arch_type;
+> +EXPORT_SYMBOL(__mxc_arch_type);
+>  
+>  static unsigned int imx_soc_revision;
+>  
+> @@ -19,6 +21,11 @@ void mxc_set_cpu_type(unsigned int type)
+>  	__mxc_cpu_type = type;
+>  }
+>  
+> +void mxc_set_arch_type(unsigned int type)
+> +{
+> +	__mxc_arch_type = type;
+> +}
+
+You're re-inventing the wheel here.  Please get rid of __mxc_arch_type
+and mxc_set_arch_type() entirely.
+
+> @@ -38,6 +38,8 @@
+>  #define MXC_CPU_IMX6DL		0x61
+>  #define MXC_CPU_IMX6SX		0x62
+>  #define MXC_CPU_IMX6Q		0x63
+> +#define MXC_CPU_IMX7D		0x72
+> +#define MXC_ARCH_CA7		0xc07
+
+Get rid of MXC_ARCH_CA7.
+
+> +static inline bool arm_is_ca7(void)
+> +{
+> +	return __mxc_arch_type == MXC_ARCH_CA7;
+> +}
+
+And this function.
+
+> diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+> index 7f27001..2ca4a41 100644
+> --- a/arch/arm/mach-imx/platsmp.c
+> +++ b/arch/arm/mach-imx/platsmp.c
+> @@ -60,11 +60,33 @@ static int imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  static void __init imx_smp_init_cpus(void)
+>  {
+>  	int i, ncores;
+> +	unsigned long arch_type;
+>  
+> -	ncores = scu_get_core_count(scu_base);
+> +	asm volatile(
+> +		".align 4\n"
+> +		"mrc p15, 0, %0, c0, c0, 0\n"
+> +		: "=r" (arch_type)
+> +	);
+> +
+> +	/* MIDR[15:4] defines ARCH type */
+> +	mxc_set_arch_type((arch_type >> 4) & 0xfff);
+> +
+> +	if (arm_is_ca7()) {
+
+Rather than the above, use:
+
+	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A7) {
+
+here.
+
+Even better would be to _not_ re-use imx_smp_init_cpus(), but instead
+declare a separate smp_operations structure for the CA7 iMX7 which
+takes account of this difference by calling a seperate .smp_init_cpus
+function.
+
+Thanks.
 
 -- 
-Tyler Baker
-Tech Lead, LAVA
-Linaro.org | Open source software for ARM SoCs
-Follow Linaro: http://www.facebook.com/pages/Linaro
-http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
