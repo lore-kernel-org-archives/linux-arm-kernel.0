@@ -1,69 +1,80 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 17 Apr 2015 22:30:38 +0900
-Subject: [PATCH 2/2] ARM: dts: Fix pinctrl settings for S2MPS11 RTC alarm
- IRQ on Arndale Octa
-In-Reply-To: <1427985376-20420-3-git-send-email-k.kozlowski@samsung.com>
-References: <1427985376-20420-1-git-send-email-k.kozlowski@samsung.com>
- <1427985376-20420-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CAJKOXPfbsrkvXT_CBxZeDTLYdbwGMH=+5mnBLoy9Yfyp4thVQg@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 17 Apr 2015 15:37:10 +0200
+Subject: [RFC 0/3] VFIO platform reset
+Message-ID: <1429277833-28663-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-02 23:36 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> On Arndale Octa the S2MPS11 RTC alarm interrupt was not handled at all
-> because of wrong configuration of interrupt and gpx3-2.
-> 1. Interrupt is signaled by falling edge.
-> 2. This GPIO line is hard-wired on the board to PVDD_APIO_1V8 through a
->    resistor so pull-up/down must be disabled.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420-arndale-octa.dts | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
+In situations where the userspace driver is stopped abnormally and the
+VFIO platform device is released, the assigned HW device currently is
+left running. As a consequence the HW device might continue issuing IRQs
+and performing DMA accesses.
 
-Dear Kukjin,
+On release, no physical IRQ handler is setup anymore. Also the DMA buffers
+are unmapped leading to IOMMU aborts. So there is no serious consequence.
 
-Any comments  on this and other patches. A lot of emails waits for
-your opinion. Is there anything I could do to help you in smooth
-review or applying?
+However when assigning that HW device again to another userspace driver,
+this latter might face some unexpected IRQs and DMA accesses, which are
+the result of the previous assignment.
 
-Best regards,
-Krzysztof
+In virtualization use-case, a VM newly granted with that HW device may be
+impacted by the assignment of that device to a previous VM:
+- IRQs may be injected very early when booting the new guest, even before
+  the guest driver has initialized leading to possible driver state
+  inconsistency.
+- DMA accesses may hit the newly mapped VM address space at addresses that
+  may jeopardize the integrity of the newly installed VM.
 
->
-> diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> index d78fcd997ce6..97346df31d41 100644
-> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> @@ -87,7 +87,9 @@
->                         s2mps11,buck4-ramp-enable = <1>;
->
->                         interrupt-parent = <&gpx3>;
-> -                       interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
-> +                       interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
-> +                       pinctrl-names = "default";
-> +                       pinctrl-0 = <&s2mps11_irq>;
->
->                         s2mps11_osc: clocks {
->                                 #clock-cells = <1>;
-> @@ -379,3 +381,12 @@
->         clocks = <&clock CLK_RTC>, <&s2mps11_osc S2MPS11_CLK_AP>;
->         clock-names = "rtc", "rtc_src";
->  };
-> +
-> +&pinctrl_0 {
-> +       s2mps11_irq: s2mps11-irq {
-> +               samsung,pins = "gpx3-2";
-> +               samsung,pin-function = <0xf>;
-> +               samsung,pin-pud = <0>;
-> +               samsung,pin-drv = <0>;
-> +       };
-> +};
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Obviously the criticity depends on the assigned HW devcie.
+
+As opposed to PCI, there is no standard mechanism to reset the platform
+device.
+
+This series adds VFIO platform reset support by specializing the vfio
+platform driver for a given device, adding its HW reset modality. Generally
+that code can be reused from the native driver. It basically deals with
+IRQ disabling and DMA transfert stop.
+
+It is still possible to use the generic VFIO platform driver, without
+the reset modality. Here we introduce a new driver for Calxeda xgmac,
+illustrating the mechanism. That code was tested on Calxeda Midway where
+smmu aborts do not seem to be observed anymore.
+
+Obviously the drawback of this approach is possible multiplication of
+VFIO platform drivers. Other solution I envisionned was to put that vfio
+reset function in the native driver and implement some enumeration
+mechanism in the driver core but this looks very weird at the end, with the
+a device somehow bound to 2 different platform drivers.
+
+Any feedback welcome!
+
+Best Regards
+
+Eric
+
+The series can be found at
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/4.O_forward_and_reset
+
+Also some user guidelines are available at
+https://wiki.linaro.org/LEG/Engineering/Virtualization/Platform_Device_Passthrough_on_Midway
+
+Eric Auger (3):
+  VFIO: platform: add reset support
+  VFIO: platform: export platform callbacks, probe and remove
+  VFIO: platform: add vfio-platform-calxedaxgmac driver
+
+ drivers/vfio/platform/Kconfig                      |   2 +
+ drivers/vfio/platform/Makefile                     |   2 +
+ drivers/vfio/platform/reset/Kconfig                |   7 ++
+ drivers/vfio/platform/reset/Makefile               |   5 +
+ .../platform/reset/vfio_platform_calxedaxgmac.c    | 109 +++++++++++++++++++++
+ drivers/vfio/platform/vfio_platform.c              |  14 ++-
+ drivers/vfio/platform/vfio_platform_common.c       |  12 ++-
+ drivers/vfio/platform/vfio_platform_private.h      |   8 ++
+ 8 files changed, 152 insertions(+), 7 deletions(-)
+ create mode 100644 drivers/vfio/platform/reset/Kconfig
+ create mode 100644 drivers/vfio/platform/reset/Makefile
+ create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+
+-- 
+1.9.1
