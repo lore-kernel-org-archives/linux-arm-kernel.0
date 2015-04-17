@@ -1,44 +1,37 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 17 Apr 2015 11:50:22 +0100
-Subject: [PATCH 4/5] ARM: sti: Always enable CLKSRC_ST_LPC_CLOCK
+Date: Fri, 17 Apr 2015 11:50:23 +0100
+Subject: [PATCH 5/5] ARM: DT: STi: STiH407: Add DT node for st-lpc timer.
 In-Reply-To: <1429267823-8879-1-git-send-email-peter.griffin@linaro.org>
 References: <1429267823-8879-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1429267823-8879-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1429267823-8879-6-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If available on the SoC we wish to use st_lpc clksrc
-so that cpufreq can operate without effecting sched_clock.
+This patch adds the dt node for the st-lpc timer found on
+stih407 famliy SoCs. This can then be used as a clocksource.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/mach-sti/Kconfig | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/stih407-family.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index 3b1ac46..48767d3 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -2,6 +2,7 @@ menuconfig ARCH_STI
- 	bool "STMicroelectronics Consumer Electronics SOCs" if ARCH_MULTI_V7
- 	select ARM_GIC
- 	select ARM_GLOBAL_TIMER
-+	select CLKSRC_ST_LPC_CLOCK
- 	select PINCTRL
- 	select PINCTRL_ST
- 	select MFD_SYSCON
-@@ -15,9 +16,9 @@ menuconfig ARCH_STI
- 	select PL310_ERRATA_769419 if CACHE_L2X0
- 	select RESET_CONTROLLER
- 	help
--	  Include support for STiH41x SOCs like STiH415/416 using the device tree
--	  for discovery
--	  More information at Documentation/arm/STiH41x and
-+	  Include support for STiH4xx SOCs like STiH415/416 and stih407/10 family
-+	  using the device tree for discovery
-+	  More information at Documentation/arm/sti/ and
- 	  at Documentation/devicetree
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index c06a546..59c6a22 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -39,6 +39,13 @@
+ 		reg = <0x08760000 0x1000>;
+ 	};
  
- 
++	lpc-timer at 0x8788000 {
++		compatible = "st,st_lpc_timer";
++		reg = <0x8788000 0x1000>;
++		clock-names = "lpc_clk";
++		clocks = <&clk_s_d3_flexgen CLK_LPC_1>;
++	};
++
+ 	timer at 08760200 {
+ 		interrupt-parent = <&intc>;
+ 		compatible = "arm,cortex-a9-global-timer";
 -- 
 1.9.1
