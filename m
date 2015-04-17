@@ -1,53 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 17 Apr 2015 10:59:57 +0000
-Subject: [PATCH 0/2] crypto: add new driver for Marvell CESA
-In-Reply-To: <20150417103946.2a46c243@bbrezillon>
-References: <1428591523-1780-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150410135056.GB28873@io.lakedaemon.net>
- <20150410171148.07bc9429@bbrezillon>
- <20150410223008.GA18660@io.lakedaemon.net>
- <552B8EC4.209@free-electrons.com>
- <20150413124711.GI18660@io.lakedaemon.net>
- <87r3rom2qu.fsf@natisbad.org>
- <20150413201146.GL18660@io.lakedaemon.net>
- <20150417103356.6ce78145@bbrezillon>
- <20150417103946.2a46c243@bbrezillon>
-Message-ID: <20150417105957.GB8069@io.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 17 Apr 2015 13:23:50 +0200
+Subject: [PATCHv2 2/3] bus: mvebu-mbus: use automatic I/O
+ synchronization barriers
+In-Reply-To: <5530E44E.8070105@freebox.fr>
+References: <1421424689-5971-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1421424689-5971-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5530E44E.8070105@freebox.fr>
+Message-ID: <20150417132350.329bcace@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Boris,
+Dear Nicolas Schichan,
 
-On Fri, Apr 17, 2015 at 10:39:46AM +0200, Boris Brezillon wrote:
-> On Fri, 17 Apr 2015 10:33:56 +0200 Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> > On Mon, 13 Apr 2015 20:11:46 +0000 Jason Cooper <jason@lakedaemon.net> wrote:
-> > > > 
-> > > > > I'd appreciate if we'd look into it.  I understand from on-list and
-> > > > > off-list discussion that the rewrite was unavoidable.  So I'm willing to
-> > > > > concede that.  Giving people time to migrate from old to new while still
-> > > > > being able to update for other security fixes seems reasonable.
-> > > > 
-> > > > Jason, what do you think of the approach above? 
-> > > 
-> > > I say keep it simple.  We shouldn't use the DT changes to trigger one
-> > > vice the other.  We need to be able to build both, but only load one at
-> > > a time.  If that's anything other than simple to do, then we make it a
-> > > Kconfig binary choice and move on.
-> > 
-> > Actually I was planning to handle it with a Kconfig dependency rule
-> > (NEW_DRIVER depends on !OLD_DRIVER and OLD_DRIVER depends
-> > on !NEW_DRIVER).
-> > I don't know how to make it a runtime check without adding new
-> > compatible strings for the kirkwood, dove and orion platforms, and I'm
-> > sure sure this is a good idea.
->   ^ not
+On Fri, 17 Apr 2015 12:45:34 +0200, Nicolas Schichan wrote:
+
+> I'm affraid this patche causes issue on mv88f6282 (and most probably on
+> mv88f6281 as well): see below.
 > 
-> > Do you have any ideas ?
+> [...]
+> 
+> > diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+> > index eb7682d..398f0ee 100644
+> > --- a/drivers/bus/mvebu-mbus.c
+> > +++ b/drivers/bus/mvebu-mbus.c
+> > @@ -69,6 +69,7 @@
+> >   */
+> >  #define WIN_CTRL_OFF		0x0000
+> >  #define   WIN_CTRL_ENABLE       BIT(0)
+> > +#define   WIN_CTRL_SYNCBARRIER  BIT(1)
+> 
+> In the 88f6282 datasheet this bit in the "WindowX Control Register" is
+> documented as reserved on all windows but window 6 and 7.
+> 
+> For windows 6 and 7 this bit is documented to write protect the window when set.
+> 
+> In our configuration, this window gets chosen for the PCI memory accesses
+> (target 0x4, attribute 0xe8) and we effectively end up only being able to read
+> from the PCI devices (mwl8k fails to load the firmware and sky2 timeouts on
+> MDIO accesses). Write accesses are silently discarded (no external aborts of
+> any kind), but that's probably expected as the AHB error propagation is disabled.
+> 
+> Reverting this patch made all the PCI device work correctly.
 
-I'm kinda wrapped up with dayjob stuff atm...  But I'd look at the wireless
-drivers.  eg b43, b43legacy, brcm80211.  There are devices they overlap for.
-So, they need to deconflict in some way.
+Ah, thanks a lot for the bug report. I'll cook a fix for this problem,
+and Cc: you when submitting.
 
-thx,
+Thanks again!
 
-Jason.
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
