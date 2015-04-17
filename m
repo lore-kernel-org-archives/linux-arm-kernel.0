@@ -1,217 +1,76 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 17 Apr 2015 17:01:11 +0200
-Subject: [RFC 3/3] VFIO: platform: add vfio-platform-calxedaxgmac driver
-In-Reply-To: <1429280968.10086.52.camel@redhat.com>
-References: <1429277833-28663-1-git-send-email-eric.auger@linaro.org>	
- <1429277833-28663-4-git-send-email-eric.auger@linaro.org>
- <1429280968.10086.52.camel@redhat.com>
-Message-ID: <55312037.3070808@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 17 Apr 2015 16:13:15 +0100
+Subject: [PATCH v4 04/13] arm64: use fixmap region for permanent FDT
+ mapping
+In-Reply-To: <1429112064-19952-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1429112064-19952-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150417151315.GH21904@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-On 04/17/2015 04:29 PM, Alex Williamson wrote:
-> On Fri, 2015-04-17 at 15:37 +0200, Eric Auger wrote:
->> This patch introduces a specialized vfio platform driver for the
->> calxeda xgmac. On top of the generic vfio platform driver functionalities,
->> it implements the reset modality.  This latter basically disables interrupts
->> and stops DMA transfers.
->>
->> Code is inherited from calxeda xgmac native driver
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  drivers/vfio/platform/Kconfig                      |   2 +
->>  drivers/vfio/platform/Makefile                     |   2 +
->>  drivers/vfio/platform/reset/Kconfig                |   7 ++
->>  drivers/vfio/platform/reset/Makefile               |   5 +
->>  .../platform/reset/vfio_platform_calxedaxgmac.c    | 109 +++++++++++++++++++++
->>  5 files changed, 125 insertions(+)
->>  create mode 100644 drivers/vfio/platform/reset/Kconfig
->>  create mode 100644 drivers/vfio/platform/reset/Makefile
->>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
->>
->> diff --git a/drivers/vfio/platform/Kconfig b/drivers/vfio/platform/Kconfig
->> index 9a4403e..1df7477 100644
->> --- a/drivers/vfio/platform/Kconfig
->> +++ b/drivers/vfio/platform/Kconfig
->> @@ -18,3 +18,5 @@ config VFIO_AMBA
->>  	  framework.
->>  
->>  	  If you don't know what to do here, say N.
->> +
->> +source "drivers/vfio/platform/reset/Kconfig"
->> diff --git a/drivers/vfio/platform/Makefile b/drivers/vfio/platform/Makefile
->> index 81de144..9ce8afe 100644
->> --- a/drivers/vfio/platform/Makefile
->> +++ b/drivers/vfio/platform/Makefile
->> @@ -2,7 +2,9 @@
->>  vfio-platform-y := vfio_platform.o vfio_platform_common.o vfio_platform_irq.o
->>  
->>  obj-$(CONFIG_VFIO_PLATFORM) += vfio-platform.o
->> +obj-$(CONFIG_VFIO_PLATFORM) += reset/
->>  
->>  vfio-amba-y := vfio_amba.o
->>  
->>  obj-$(CONFIG_VFIO_AMBA) += vfio-amba.o
->> +obj-$(CONFIG_VFIO_AMBA) += reset/
->> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
->> new file mode 100644
->> index 0000000..2c09cea
->> --- /dev/null
->> +++ b/drivers/vfio/platform/reset/Kconfig
->> @@ -0,0 +1,7 @@
->> +config VFIO_PLATFORM_CALXEDAXGMAC
->> +	tristate "VFIO support for calxeda xgmac"
->> +	depends on VFIO_PLATFORM
->> +	help
->> +	  Support for VFIO platform driver specialized for Calxeda xgmac reset.
->> +
->> +	  If you don't know what to do here, say N.
->> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
->> new file mode 100644
->> index 0000000..8977721
->> --- /dev/null
->> +++ b/drivers/vfio/platform/reset/Makefile
->> @@ -0,0 +1,5 @@
->> +vfio-platform-calxedaxgmac-y := vfio_platform_calxedaxgmac.o
->> +
->> +ccflags-y += -Idrivers/vfio/platform
->> +
->> +obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC) += vfio-platform-calxedaxgmac.o
->> diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
->> new file mode 100644
->> index 0000000..729d0cd
->> --- /dev/null
->> +++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
->> @@ -0,0 +1,109 @@
->> +/*
->> + * VFIO platform driver specialized for Calxeda xgmac reset
->> + * reset code is inherited from calxeda xgmac native driver
->> + *
->> + * Copyright 2010-2011 Calxeda, Inc.
->> + * Copyright (c) 2015 Linaro Ltd.
->> + *              www.linaro.org
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/module.h>
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/slab.h>
->> +#include <linux/vfio.h>
->> +#include "vfio_platform_private.h"
->> +#include <linux/io.h>
->> +
->> +#define DRIVER_VERSION  "0.1"
->> +#define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
->> +#define DRIVER_DESC     "VFIO - Calxeda xgmac vfio platform driver"
->> +
->> +/* XGMAC Register definitions */
->> +#define XGMAC_CONTROL           0x00000000      /* MAC Configuration */
->> +
->> +/* DMA Control and Status Registers */
->> +#define XGMAC_DMA_CONTROL       0x00000f18      /* Ctrl (Operational Mode) */
->> +#define XGMAC_DMA_INTR_ENA      0x00000f1c      /* Interrupt Enable */
->> +
->> +/* DMA Control registe defines */
->> +#define DMA_CONTROL_ST          0x00002000      /* Start/Stop Transmission */
->> +#define DMA_CONTROL_SR          0x00000002      /* Start/Stop Receive */
->> +
->> +/* Common MAC defines */
->> +#define MAC_ENABLE_TX           0x00000008      /* Transmitter Enable */
->> +#define MAC_ENABLE_RX           0x00000004      /* Receiver Enable */
->> +
->> +static inline void xgmac_mac_disable(void __iomem *ioaddr)
->> +{
->> +	u32 value = readl(ioaddr + XGMAC_DMA_CONTROL);
->> +
->> +	value &= ~(DMA_CONTROL_ST | DMA_CONTROL_SR);
->> +	writel(value, ioaddr + XGMAC_DMA_CONTROL);
->> +
->> +	value = readl(ioaddr + XGMAC_CONTROL);
->> +	value &= ~(MAC_ENABLE_TX | MAC_ENABLE_RX);
->> +	writel(value, ioaddr + XGMAC_CONTROL);
->> +}
->> +
->> +static int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
->> +{
->> +	struct resource *res = get_platform_resource(vdev, 0);
->> +	void __iomem *base = phys_to_virt(res->start);
->> +
->> +	if (!base)
->> +		return -ENOMEM;
->> +
->> +	/* disable IRQ */
->> +	writel(0, base + XGMAC_DMA_INTR_ENA);
->> +
->> +	/* Disable the MAC core */
->> +	xgmac_mac_disable(base);
->> +
->> +	return 0;
->> +}
->> +
->> +static int vfio_platform_calxedaxgmac_probe(struct platform_device *pdev)
->> +{
->> +	int ret;
->> +	struct vfio_device *vfio_dev;
->> +	struct vfio_platform_device *vpdev;
->> +
->> +	ret = vfio_platform_probe(pdev);
->> +	if (ret)
->> +		return ret;
->> +
->> +	vfio_dev = vfio_device_get_from_dev(&pdev->dev),
->> +	vpdev = (struct vfio_platform_device *) vfio_device_data(vfio_dev);
->> +	vpdev->reset = vfio_platform_calxedaxgmac_reset;
->> +
->> +	return ret;
->> +}
->> +
->> +static struct platform_driver vfio_platform_calxedaxgmac_driver = {
->> +	.driver = {
->> +		.name = "vfio-platform-calxedaxgmac",
->> +	},
->> +	.probe = vfio_platform_calxedaxgmac_probe,
->> +	.remove = vfio_platform_remove,
->> +};
->> +
->> +module_platform_driver(vfio_platform_calxedaxgmac_driver);
->> +
->> +MODULE_VERSION(DRIVER_VERSION);
->> +MODULE_LICENSE("GPL v2");
->> +MODULE_AUTHOR(DRIVER_AUTHOR);
->> +MODULE_DESCRIPTION(DRIVER_DESC);
-> 
-> I don't really understand why this needs to be a new driver that wraps
-> around the vfio platform driver rather than just an entry in a table of
-> available device specific reset functions, setup through the normal
-> probe path.  Do we really have no clue what the device is to be able to
-> attach a reset function to it from the base vfio platform code?  This
-> also seems like a pain for users, who now need to figure out which
-> vfio_platform driver to bind to a given device.  If the user can figure
-> that out, why can't the kernel just pick the right reset callback for
-> them?  Thanks,
+On Wed, Apr 15, 2015 at 04:34:15PM +0100, Ard Biesheuvel wrote:
+> Currently, the FDT blob needs to be in the same 512 MB region as
+> the kernel, so that it can be mapped into the kernel virtual memory
+> space very early on using a minimal set of statically allocated
+> translation tables.
+>
+> Now that we have early fixmap support, we can relax this restriction,
+> by moving the permanent FDT mapping to the fixmap region instead.
+> This way, the FDT blob may be anywhere in memory.
+>
+> This also moves the vetting of the FDT to mmu.c, since the early
+> init code in head.S does not handle mapping of the FDT anymore.
+> At the same time, fix up some comments in head.S that have gone stale.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  Documentation/arm64/booting.txt | 13 +++++----
+>  arch/arm64/include/asm/boot.h   | 14 +++++++++
+>  arch/arm64/include/asm/fixmap.h | 15 ++++++++++
+>  arch/arm64/include/asm/mmu.h    |  1 +
+>  arch/arm64/kernel/head.S        | 39 +------------------------
+>  arch/arm64/kernel/setup.c       | 32 +++++++-------------
+>  arch/arm64/mm/Makefile          |  2 ++
+>  arch/arm64/mm/init.c            |  1 -
+>  arch/arm64/mm/mmu.c             | 65 +++++++++++++++++++++++++++++++++++++++++
+>  9 files changed, 117 insertions(+), 65 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/boot.h
+>
+> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+> index f3c05b5f9f08..53f18e13d51c 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -45,11 +45,14 @@ sees fit.)
+>
+>  Requirement: MANDATORY
+>
+> -The device tree blob (dtb) must be placed on an 8-byte boundary within
+> -the first 512 megabytes from the start of the kernel image and must not
+> -cross a 2-megabyte boundary. This is to allow the kernel to map the
+> -blob using a single section mapping in the initial page tables.
+> -
+> +The device tree blob (dtb) must be placed on an 8-byte boundary and must
+> +not exceed 2 megabytes in size. Since the dtb will be mapped cacheable using
+> +blocks of up to 2 megabytes in size, it should not be placed within 2 megabytes
+> +of memreserves or other special carveouts that may be mapped with non-matching
+> +attributes.
 
-Yes I can do the proposed way. I can get access to the compat string of
-the device and according to that info I will choose some proper reset
-function. I will respin shortly taking into account the other comments.
+Nit: memreserves are always permitted to be mapped cacheable (following
+the ePAPR definition and the de-facto Linux implementation on everything
+other than PPC), so those should be fine.
 
-Thanks!
+How about:
 
-Eric
-> 
-> Alex
-> 
+The device tree blob (dtb) must be placed on an 8-byte boundary and must
+not exceed 2 megabytes in size. Since the dtb will be mapped cacheable
+using blocks of up to 2 megabytes in size, it must not be placed within
+any 2M region which must be mapped with any specific attributes.
+
+As an aside, we perhaps need a more formal definition of /memreserve/
+semantics.
+
+The code itself looks good to me. I'll try to give that a go with some
+padded DTBs at some point next week.
+
+Mark.
