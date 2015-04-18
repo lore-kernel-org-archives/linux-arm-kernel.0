@@ -1,35 +1,51 @@
-From: mkl@blackshift.org (Marc Kleine-Budde)
-Date: Sat, 18 Apr 2015 15:18:49 +0200
-Subject: [PATCH v3] spi: bitbang: only toggle bitchanges
-In-Reply-To: <20150418120926.GL26185@sirena.org.uk>
-References: <20150331202306.GX2869@sirena.org.uk>
- <1428922770-16955-1-git-send-email-m.grzeschik@pengutronix.de>
- <20150418120926.GL26185@sirena.org.uk>
-Message-ID: <db1d2b9a-730b-40a5-a4f6-091fd3fad0e7@email.android.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 18 Apr 2015 18:55:14 +0200
+Subject: [PATCH 1/2] drm: rockchip: Don't pass DRM fake offset to dma-api
+In-Reply-To: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
+References: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
+Message-ID: <1743547.3D2D8THGkI@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Donnerstag, 16. April 2015, 16:41:51 schrieb ?rjan Eide:
+> Set vm_pgoff to 0 after using it to look up the GEM node, before passing
+> it on rockchip_gem_mmap_buf() where the offset must be from the start of
+> the buffer.
+> 
+> Passing in the fake offset currently works because the
+> dma_mmap_attrs implementation that is used for this device,
+> arm_iommu_mmap_attrs, ignores the offset completely.
+> 
+> Signed-off-by: ?rjan Eide <orjan.eide@arm.com>
+
+both patches on a rk3288-veyron-pinky
+
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+
+Through which tree do you want to take these patches? I guess the rockchip-drm 
+related patch should go through the tree that will take the dma-mapping patch, 
+so you'll probably need an "Ack" from Mark Yao (Cc'ed).
 
 
-On April 18, 2015 2:09:26 PM GMT+02:00, Mark Brown <broonie@kernel.org> wrote:
->On Mon, Apr 13, 2015 at 12:59:30PM +0200, Michael Grzeschik wrote:
->> The current implementation of bitbang_txrx_be_cpha0 and
->> bitbang_txrx_be_cpha1 always call setmosi. That runs into several
->> unnecessary calls into the gpiolib when the level of the GPIO
->actually
->> has not to be changed.
->> 
->> This patch changes the routines to remember the last GPIO level
->> and only calls setmosi if an change has to be made. This
->> way it improves the transfer throughput.
->
->Do you have any benchmarking or anything showing that this offers a
->practical benefit?  Generally a bitbanging system would be using memory
->mapped GPIOs for the bus so we're talking about replacing a memory
->access with some shifts and logic operations here and while I can
->believe that something that runs in cache is going to be an overall win
->over going out to a device it's not quite so clear cut as it could be.
+Heiko
 
-IIRC we had a reduction of about 30% when programming an FPGA via SPI. But Michael can give you the exact numbers. 
-
-Marc
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c index 7ca8799e..69f01c3
+> 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> @@ -94,6 +94,11 @@ int rockchip_gem_mmap(struct file *filp, struct
+> vm_area_struct *vma) return -EACCES;
+>  	}
+> 
+> +	/* Set vm_pgoff (used as a fake buffer offset by DRM) to 0 and map the
+> +	 * whole buffer from the start.
+> +	 */
+> +	vma->vm_pgoff = 0;
+> +
+>  	obj = container_of(node, struct drm_gem_object, vma_node);
+>  	ret = rockchip_gem_mmap_buf(obj, vma);
