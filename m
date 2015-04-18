@@ -1,88 +1,33 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sat, 18 Apr 2015 11:58:55 +0200
-Subject: [PATCH v3 2/2] arch: arm: Show the serial number from devicetree in
- cpuinfo
-In-Reply-To: <1429351135-11842-1-git-send-email-contact@paulk.fr>
-References: <1429351135-11842-1-git-send-email-contact@paulk.fr>
-Message-ID: <1429351135-11842-2-git-send-email-contact@paulk.fr>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 18 Apr 2015 13:09:26 +0100
+Subject: [PATCH v3] spi: bitbang: only toggle bitchanges
+In-Reply-To: <1428922770-16955-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <20150331202306.GX2869@sirena.org.uk>
+ <1428922770-16955-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <20150418120926.GL26185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This grabs the serial number shown in cpuinfo from the serial-number devicetree
-property in priority. When booting with ATAGs (and without device-tree), the
-provided number is still shown instead.
+On Mon, Apr 13, 2015 at 12:59:30PM +0200, Michael Grzeschik wrote:
+> The current implementation of bitbang_txrx_be_cpha0 and
+> bitbang_txrx_be_cpha1 always call setmosi. That runs into several
+> unnecessary calls into the gpiolib when the level of the GPIO actually
+> has not to be changed.
+> 
+> This patch changes the routines to remember the last GPIO level
+> and only calls setmosi if an change has to be made. This
+> way it improves the transfer throughput.
 
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
----
- arch/arm/include/asm/system_info.h |  1 +
- arch/arm/kernel/setup.c            | 27 +++++++++++++++++++++++++--
- 2 files changed, 26 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/system_info.h b/arch/arm/include/asm/system_info.h
-index 720ea03..3860cbd40 100644
---- a/arch/arm/include/asm/system_info.h
-+++ b/arch/arm/include/asm/system_info.h
-@@ -17,6 +17,7 @@
- 
- /* information about the system we're running on */
- extern unsigned int system_rev;
-+extern const char *system_serial;
- extern unsigned int system_serial_low;
- extern unsigned int system_serial_high;
- extern unsigned int mem_fclk_21285;
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 1d60beb..349790f 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -93,6 +93,9 @@ unsigned int __atags_pointer __initdata;
- unsigned int system_rev;
- EXPORT_SYMBOL(system_rev);
- 
-+const char *system_serial;
-+EXPORT_SYMBOL(system_serial);
-+
- unsigned int system_serial_low;
- EXPORT_SYMBOL(system_serial_low);
- 
-@@ -821,8 +824,29 @@ arch_initcall(customize_machine);
- 
- static int __init init_machine_late(void)
- {
-+#ifdef CONFIG_OF
-+	struct device_node *root;
-+	int ret;
-+#endif
-+
- 	if (machine_desc->init_late)
- 		machine_desc->init_late();
-+
-+#ifdef CONFIG_OF
-+	root = of_find_node_by_path("/");
-+	if (root) {
-+		ret = of_property_read_string(root, "serial-number",
-+					      &system_serial);
-+		if (ret)
-+			system_serial = NULL;
-+	}
-+#endif
-+
-+	if (!system_serial)
-+		system_serial = kasprintf(GFP_KERNEL, "%08x%08x",
-+					  system_serial_high,
-+					  system_serial_low);
-+
- 	return 0;
- }
- late_initcall(init_machine_late);
-@@ -1091,8 +1115,7 @@ static int c_show(struct seq_file *m, void *v)
- 
- 	seq_printf(m, "Hardware\t: %s\n", machine_name);
- 	seq_printf(m, "Revision\t: %04x\n", system_rev);
--	seq_printf(m, "Serial\t\t: %08x%08x\n",
--		   system_serial_high, system_serial_low);
-+	seq_printf(m, "Serial\t\t: %s\n", system_serial);
- 
- 	return 0;
- }
--- 
-1.9.1
+Do you have any benchmarking or anything showing that this offers a
+practical benefit?  Generally a bitbanging system would be using memory
+mapped GPIOs for the bus so we're talking about replacing a memory
+access with some shifts and logic operations here and while I can
+believe that something that runs in cache is going to be an overall win
+over going out to a device it's not quite so clear cut as it could be.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150418/1e85d2d5/attachment.sig>
