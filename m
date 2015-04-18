@@ -1,41 +1,39 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 Apr 2015 10:08:45 +0100
-Subject: [PATCH] ARM: mm: add imprecise abort non-deadly handler
-In-Reply-To: <1429316083.8341.76.camel@xylophone.i.decadent.org.uk>
-References: <1429316083.8341.76.camel@xylophone.i.decadent.org.uk>
-Message-ID: <20150418090845.GH12732@n2100.arm.linux.org.uk>
+Date: Sat, 18 Apr 2015 10:13:10 +0100
+Subject: [PATCH v2 2/2] arch: arm: Show the serial number from devicetree
+ in cpuinfo
+In-Reply-To: <1429296235-14123-2-git-send-email-contact@paulk.fr>
+References: <1429296235-14123-1-git-send-email-contact@paulk.fr>
+ <1429296235-14123-2-git-send-email-contact@paulk.fr>
+Message-ID: <20150418091310.GI12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 18, 2015 at 01:14:43AM +0100, Ben Hutchings wrote:
-> From: Ben Dooks <ben.dooks@codethink.co.uk>
-> 
-> Given that imprecise aborts may be delivered after the action that
-> caused them (or even for non-cpu related activities such as bridge
-> faults from a bus-master) it is possible that the wrong process is
-> terminated as a result.
-> 
-> Add a handler to take and print imprecise aborts and allow the process
-> to continue. This should ensure that the abort is shown but not kill
-> the process that was running on the cpu core at the time.
+Hi,
 
-I'm not happy with this.
+On Fri, Apr 17, 2015 at 08:43:55PM +0200, Paul Kocialkowski wrote:
+>  static int __init init_machine_late(void)
+>  {
+> +#ifdef CONFIG_OF
+> +	unsigned long dt_root;
+> +	int size;
+> +
+> +	dt_root = of_get_flat_dt_root();
+> +
+> +	/* Scan for serial number */
+> +	system_serial = of_get_flat_dt_prop(dt_root, "serial-number", &size);
 
-On older CPUs, you generally get the "imprecise" (aka external) aborts
-within a few cycles of the faulting instruction, which is good enough
-to ensure that the appropriate process gets terminated.
+I was really hoping for:
 
-Yes, this is not true of ARMv7, where such faults can happen a longer
-time after the access which caused them.
+	if (of_property_read_string(of_root, "serial-number", &system_serial))
+		system_serial = NULL;
 
-However, I would argue that merely printing a message to the kernel
-log is insufficient - especially as the kernel networking layer can
-spam the log so that such messages yet rotated out of the ring buffer.
+here.  I can't see a reason to use the flattened DT at this point as
+we've already parsed it.
 
-An imprecise abort is a serious condition, one which _ought_ to be very
-noticable, on the level of panic()ing the kernel.  It's a data loss
-condition, one which _can_ result in corruption of user data or even
-filesystems.
+I'd also put this after the call to machine_desc->init_late().
+
+Thanks.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
