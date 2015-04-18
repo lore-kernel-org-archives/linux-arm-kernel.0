@@ -1,51 +1,26 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 18 Apr 2015 18:55:14 +0200
-Subject: [PATCH 1/2] drm: rockchip: Don't pass DRM fake offset to dma-api
-In-Reply-To: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
-References: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
-Message-ID: <1743547.3D2D8THGkI@diego>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 18 Apr 2015 18:16:17 +0100
+Subject: [PATCH v3] spi: bitbang: only toggle bitchanges
+In-Reply-To: <db1d2b9a-730b-40a5-a4f6-091fd3fad0e7@email.android.com>
+References: <20150331202306.GX2869@sirena.org.uk>
+ <1428922770-16955-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20150418120926.GL26185@sirena.org.uk>
+ <db1d2b9a-730b-40a5-a4f6-091fd3fad0e7@email.android.com>
+Message-ID: <20150418171617.GZ26185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 16. April 2015, 16:41:51 schrieb ?rjan Eide:
-> Set vm_pgoff to 0 after using it to look up the GEM node, before passing
-> it on rockchip_gem_mmap_buf() where the offset must be from the start of
-> the buffer.
-> 
-> Passing in the fake offset currently works because the
-> dma_mmap_attrs implementation that is used for this device,
-> arm_iommu_mmap_attrs, ignores the offset completely.
-> 
-> Signed-off-by: ?rjan Eide <orjan.eide@arm.com>
+On Sat, Apr 18, 2015 at 03:18:49PM +0200, Marc Kleine-Budde wrote:
 
-both patches on a rk3288-veyron-pinky
+> IIRC we had a reduction of about 30% when programming an FPGA via SPI.
+> But Michael can give you the exact numbers. 
 
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-
-Through which tree do you want to take these patches? I guess the rockchip-drm 
-related patch should go through the tree that will take the dma-mapping patch, 
-so you'll probably need an "Ack" from Mark Yao (Cc'ed).
-
-
-Heiko
-
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c index 7ca8799e..69f01c3
-> 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> @@ -94,6 +94,11 @@ int rockchip_gem_mmap(struct file *filp, struct
-> vm_area_struct *vma) return -EACCES;
->  	}
-> 
-> +	/* Set vm_pgoff (used as a fake buffer offset by DRM) to 0 and map the
-> +	 * whole buffer from the start.
-> +	 */
-> +	vma->vm_pgoff = 0;
-> +
->  	obj = container_of(node, struct drm_gem_object, vma_node);
->  	ret = rockchip_gem_mmap_buf(obj, vma);
+OK, that's definitely worth writing home about - putting that in the
+commit message would have helped a lot!  I've applied the patch.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150418/dc5213ca/attachment.sig>
