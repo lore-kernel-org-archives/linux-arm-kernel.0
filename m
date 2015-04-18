@@ -1,37 +1,36 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 18 Apr 2015 20:47:13 +0200
-Subject: [RFC PATCH 1/2] tee: generic TEE subsystem
-In-Reply-To: <20150418090420.GG12732@n2100.arm.linux.org.uk>
+Date: Sat, 18 Apr 2015 20:49:03 +0200
+Subject: [RFC PATCH 2/2] tee: add OP-TEE driver
+In-Reply-To: <FCFF5E10-0DDC-4ED1-A8B8-D649ADD5E506@javigon.com>
 References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
- <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
- <20150418085712.GB29858@kroah.com>
- <20150418090420.GG12732@n2100.arm.linux.org.uk>
-Message-ID: <20150418184713.GA30508@kroah.com>
+ <1429257057-7935-3-git-send-email-jens.wiklander@linaro.org>
+ <20150418085747.GC29858@kroah.com>
+ <FCFF5E10-0DDC-4ED1-A8B8-D649ADD5E506@javigon.com>
+Message-ID: <20150418184903.GB30508@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 18, 2015 at 10:04:20AM +0100, Russell King - ARM Linux wrote:
-> On Sat, Apr 18, 2015 at 10:57:12AM +0200, Greg Kroah-Hartman wrote:
-> > On Fri, Apr 17, 2015 at 09:50:56AM +0200, Jens Wiklander wrote:
-> > > +struct tee_device {
-> > > +	char name[TEE_MAX_DEV_NAME_LEN];
-> > > +	const struct tee_desc *desc;
-> > > +	struct device *dev;
-> > 
-> > No, please embed the device in your structure, don't have a pointer to
-> > it.
-> 
-> Greg, "dev" here is not a locally allocated device, but the parent device.
-> It's actually the same as struct tee_device.miscdev.parent, which could be
-> used instead and this member deleted.
+On Sat, Apr 18, 2015 at 11:36:53AM +0200, Javier Gonz?lez wrote:
+> Hi,
 
-A miscdev doesn't need to have a "parent", it's just there to provide a
-character device node to userspace, not to represent a "device that you
-can do things with in the heirachy".
+A: No.
+Q: Should I include quotations after my reply?
 
-If you really want that, then use a real 'struct device' as should be
-done here.  Have just a pointer to a misc device, that is meant to be
-dynamic.
+http://daringfireball.net/2007/07/on_top
+
+> We have discussed and implemented an in-kernel interface for the driver.
+> However, we need to agree on that interface with the kernel submodules that
+> can be interested in using it (e.g., IMA, keyring). We though it was easier
+> to have a framework in place before taking this space. This makes sense
+> since a TEE driver will be, as for today, mostly used by user space.
+> applications.
+
+No, please provide a "real" solution, just providing a framework that no
+one uses means that I get to delete it from the kernel tree the next
+release, and I doubt you want that :)
+
+Please do all of the work here, as odds are, what you need in the end
+will be different from what you have proposed here.
 
 thanks,
 
