@@ -1,35 +1,33 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sat, 18 Apr 2015 09:20:58 +0200
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 18 Apr 2015 10:55:50 +0200
 Subject: [RFC PATCH 1/2] tee: generic TEE subsystem
-In-Reply-To: <2102140.2VHBUJBHNB@wuerfel>
+In-Reply-To: <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
 References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
  <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
- <2102140.2VHBUJBHNB@wuerfel>
-Message-ID: <1429341658.16771.123.camel@x220>
+Message-ID: <20150418085550.GA29858@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-04-17 at 22:07 +0200, Arnd Bergmann wrote:
-> On Friday 17 April 2015 09:50:56 Jens Wiklander wrote:
-> > +static const struct file_operations tee_fops = {
-> > +	.owner = THIS_MODULE,
-> > +	.open = tee_open,
-> > +	.release = tee_release,
-> > +	.unlocked_ioctl = tee_ioctl
-> > +};
-> 
-> Add a .compat_ioctl function, to make it work on arm64 as well.
-> If you got all the data structures right, you can use the same
-> tee_ioctl function.
-> 
-> Minor nit: put a comma behind the last line in each struct initialization
-> to make it easier to add another callback.
+On Fri, Apr 17, 2015 at 09:50:56AM +0200, Jens Wiklander wrote:
+> +/**
+> + * struct tee_cmd_data - Opaque command argument
+> + * @buf_ptr:	[in] A __user pointer to a command buffer
+> + * @buf_len:	[in] Length of the buffer above
+> + *
+> + * Opaque command data which is passed on to the specific driver. The command
+> + * buffer doesn't have to reside in shared memory.
+> + * Used as argument for TEE_IOC_CMD below.
+> + */
+> +struct tee_ioctl_cmd_data {
+> +	uint64_t buf_ptr;
+> +	uint64_t buf_len;
+> +};
 
-And another nit: this is built-in only code, right? So, according to
-include/linux/export.h, THIS_MODULE will be basically equivalent to
-NULL. So I think you can drop that line.
+All structures that cross the user/kernel boundry must use the __
+variant of variable names.  So for this one, it must be __u64.
 
-Thanks,
+Same for all of your ioctl structures.
 
+thanks,
 
-Paul Bolle
+greg k-h
