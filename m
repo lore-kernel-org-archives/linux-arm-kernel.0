@@ -1,60 +1,27 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 Apr 2015 10:01:47 +0100
-Subject: [tpmdd-devel] [RFC PATCH 1/2] tee: generic TEE subsystem
-In-Reply-To: <20150417163054.GA28241@obsidianresearch.com>
+Date: Sat, 18 Apr 2015 10:04:20 +0100
+Subject: [RFC PATCH 1/2] tee: generic TEE subsystem
+In-Reply-To: <20150418085712.GB29858@kroah.com>
 References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
  <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
- <20150417163054.GA28241@obsidianresearch.com>
-Message-ID: <20150418090147.GF12732@n2100.arm.linux.org.uk>
+ <20150418085712.GB29858@kroah.com>
+Message-ID: <20150418090420.GG12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 17, 2015 at 10:30:54AM -0600, Jason Gunthorpe wrote:
+On Sat, Apr 18, 2015 at 10:57:12AM +0200, Greg Kroah-Hartman wrote:
 > On Fri, Apr 17, 2015 at 09:50:56AM +0200, Jens Wiklander wrote:
-> > +	teedev = devm_kzalloc(dev, sizeof(*teedev), GFP_KERNEL);
-> [..]
-> > +	rc = misc_register(&teedev->miscdev);
-> [..]
-> > +void tee_unregister(struct tee_device *teedev)
-> > +{
-> [..]
-> > +	misc_deregister(&teedev->miscdev);
-> > +}
-> [..]
-> >+static int optee_remove(struct platform_device *pdev)
-> >+{
-> >+       tee_unregister(optee->teedev);
+> > +struct tee_device {
+> > +	char name[TEE_MAX_DEV_NAME_LEN];
+> > +	const struct tee_desc *desc;
+> > +	struct device *dev;
 > 
-> Isn't that a potential use after free? AFAIK misc_deregister does not
-> guarentee the miscdev will no longer be accessed after it returns, and
-> the devm will free it after optee_remove returns.
-> 
-> Memory backing a stuct device needs to be freed via the release
-> function.
+> No, please embed the device in your structure, don't have a pointer to
+> it.
 
-Out of interest, which struct device are you talking about here?
-
-struct tee_device contains two things - a struct device _pointer_ to the
-device passed into the registration function, and a miscdev.
-
-A miscdev contains two struct device _pointers_ - a pointer to the parent
-device, and a pointer to the char class device.  As both of these are
-pointers, freeing struct tee_device does not free the memory underlying
-any device structure.
-
-What does need to be taken care of is that unbinding the parent device
-may cause an already-open user of the userspace interface to dereference
-the memory which was freed.  Tying this to the lifetime of a struct
-device doesn't seem right.
-
-I would suggest adding a kref to struct tee_device and use that to manage
-the lifetime of that structure - incrementing the refcount on fops->open
-and dropping it at fops->release time, so that the struct is automatically
-freed when the last user closes the miscdev after the device has been
-unbound.  You should probably also have a flag to indicate that the device
-is no longer present too to prevent further userspace IO.
-
-It would be nice if miscdev provided help with this...
+Greg, "dev" here is not a locally allocated device, but the parent device.
+It's actually the same as struct tee_device.miscdev.parent, which could be
+used instead and this member deleted.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
