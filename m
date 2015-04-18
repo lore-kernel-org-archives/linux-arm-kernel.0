@@ -1,33 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 18 Apr 2015 13:09:26 +0100
-Subject: [PATCH v3] spi: bitbang: only toggle bitchanges
-In-Reply-To: <1428922770-16955-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <20150331202306.GX2869@sirena.org.uk>
- <1428922770-16955-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20150418120926.GL26185@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 18 Apr 2015 13:27:59 +0100
+Subject: [PATCH v2 2/2] arch: arm: Show the serial number from devicetree
+ in cpuinfo
+In-Reply-To: <1429350313.2424.1.camel@collins>
+References: <1429296235-14123-1-git-send-email-contact@paulk.fr>
+ <1429296235-14123-2-git-send-email-contact@paulk.fr>
+ <20150418091310.GI12732@n2100.arm.linux.org.uk>
+ <1429350313.2424.1.camel@collins>
+Message-ID: <20150418122758.GJ12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2015 at 12:59:30PM +0200, Michael Grzeschik wrote:
-> The current implementation of bitbang_txrx_be_cpha0 and
-> bitbang_txrx_be_cpha1 always call setmosi. That runs into several
-> unnecessary calls into the gpiolib when the level of the GPIO actually
-> has not to be changed.
+On Sat, Apr 18, 2015 at 11:45:13AM +0200, Paul Kocialkowski wrote:
+> Le samedi 18 avril 2015 ? 10:13 +0100, Russell King - ARM Linux a
+> ?crit :
+> > Hi,
+> > 
+> > On Fri, Apr 17, 2015 at 08:43:55PM +0200, Paul Kocialkowski wrote:
+> > >  static int __init init_machine_late(void)
+> > >  {
+> > > +#ifdef CONFIG_OF
+> > > +	unsigned long dt_root;
+> > > +	int size;
+> > > +
+> > > +	dt_root = of_get_flat_dt_root();
+> > > +
+> > > +	/* Scan for serial number */
+> > > +	system_serial = of_get_flat_dt_prop(dt_root, "serial-number", &size);
+> > 
+> > I was really hoping for:
+> > 
+> > 	if (of_property_read_string(of_root, "serial-number", &system_serial))
+> > 		system_serial = NULL;
+> > 
+> > here.  I can't see a reason to use the flattened DT at this point as
+> > we've already parsed it.
 > 
-> This patch changes the routines to remember the last GPIO level
-> and only calls setmosi if an change has to be made. This
-> way it improves the transfer throughput.
+> Good point -- I'm not very used to using device-tree so I didn't think
+> of it, thanks for mentioning it.
+> 
+> At this point, I guess I can also add your Signed-Off-By to the patch.
 
-Do you have any benchmarking or anything showing that this offers a
-practical benefit?  Generally a bitbanging system would be using memory
-mapped GPIOs for the bus so we're talking about replacing a memory
-access with some shifts and logic operations here and while I can
-believe that something that runs in cache is going to be an overall win
-over going out to a device it's not quite so clear cut as it could be.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150418/1e85d2d5/attachment.sig>
+No - Signed-off-by is to indicate the path by which it was committed
+into the git tree, not for review, etc.
+
+I'm assuming you'll be submitting this to my patch system eventually,
+which means when I apply the patch, it'll have my S-o-b automatically
+added.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
