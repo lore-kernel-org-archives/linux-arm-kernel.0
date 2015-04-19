@@ -1,51 +1,98 @@
-From: chaotian.jing@mediatek.com (chaotian.jing)
-Date: Sun, 19 Apr 2015 11:22:41 +0800
-Subject: [PATCH v2 2/5] mmc: mediatek: Add Mediatek MMC driver
-In-Reply-To: <20150417134547.GN4946@pengutronix.de>
-References: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
- <1426562035-16709-3-git-send-email-chaotian.jing@mediatek.com>
- <20150417134547.GN4946@pengutronix.de>
-Message-ID: <1429413761.16027.2.camel@mhfsdcap03>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 19 Apr 2015 09:00:49 +0200
+Subject: [RFC PATCH 1/2] tee: generic TEE subsystem
+In-Reply-To: <20150418205019.GL12732@n2100.arm.linux.org.uk>
+References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
+ <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
+ <20150418085712.GB29858@kroah.com>
+ <20150418090420.GG12732@n2100.arm.linux.org.uk>
+ <20150418184713.GA30508@kroah.com>
+ <20150418190224.GK12732@n2100.arm.linux.org.uk>
+ <20150418203716.GC1347@kroah.com>
+ <20150418205019.GL12732@n2100.arm.linux.org.uk>
+Message-ID: <20150419070049.GA2391@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sascha,
-
-
-On Fri, 2015-04-17 at 15:45 +0200, Sascha Hauer wrote:
-> Hi Chaotian,
-> 
-> On Tue, Mar 17, 2015 at 11:13:52AM +0800, Chaotian Jing wrote:
-> > Add Mediatek MMC driver code
+On Sat, Apr 18, 2015 at 09:50:19PM +0100, Russell King - ARM Linux wrote:
+> On Sat, Apr 18, 2015 at 10:37:16PM +0200, Greg Kroah-Hartman wrote:
+> > On Sat, Apr 18, 2015 at 08:02:24PM +0100, Russell King - ARM Linux wrote:
+> > > On Sat, Apr 18, 2015 at 08:47:13PM +0200, Greg Kroah-Hartman wrote:
+> > > > On Sat, Apr 18, 2015 at 10:04:20AM +0100, Russell King - ARM Linux wrote:
+> > > > > On Sat, Apr 18, 2015 at 10:57:12AM +0200, Greg Kroah-Hartman wrote:
+> > > > > > On Fri, Apr 17, 2015 at 09:50:56AM +0200, Jens Wiklander wrote:
+> > > > > > > +struct tee_device {
+> > > > > > > +	char name[TEE_MAX_DEV_NAME_LEN];
+> > > > > > > +	const struct tee_desc *desc;
+> > > > > > > +	struct device *dev;
+> > > > > > 
+> > > > > > No, please embed the device in your structure, don't have a pointer to
+> > > > > > it.
+> > > > > 
+> > > > > Greg, "dev" here is not a locally allocated device, but the parent device.
+> > > > > It's actually the same as struct tee_device.miscdev.parent, which could be
+> > > > > used instead and this member deleted.
+> > > > 
+> > > > A miscdev doesn't need to have a "parent", it's just there to provide a
+> > > > character device node to userspace, not to represent a "device that you
+> > > > can do things with in the heirachy".
+> > > > 
+> > > > If you really want that, then use a real 'struct device' as should be
+> > > > done here.  Have just a pointer to a misc device, that is meant to be
+> > > > dynamic.
+> > > 
+> > > Let's rewind.
+> > > 
+> > > You are saying that "struct device *dev;" should be "struct device dev;"
 > > 
+> > Yes.
+> > 
+> > > I'm saying that you are mis-interpreting in your review what _that_ is.
+> > 
+> > Probably, I really have no idea what it is anymore.  What it _should_ be
+> > is the thing that controls the lifecycle of the structure.  Do not use a
+> > miscdevice for that, it will not work, as the TPM developers found out
+> > the hard way.
 > 
-> [...]
+> I _really_ don't understand what you're going on about.
 > 
-> > +	host->dev = &pdev->dev;
-> > +	host->mmc = mmc;
-> > +	/* Set host parameters to mmc */
-> > +	mmc->ops = &mt_msdc_ops;
-> > +	mmc->f_min = 260000;
-> > +	mmc->ocr_avail = MMC_VDD_30_31 | MMC_VDD_31_32 | MMC_VDD_32_33;
-> > +
-> > +	mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
-> > +	/* MMC core transfer sizes tunable parameters */
-> > +	mmc->max_segs = MAX_BD_NUM;
-> > +	mmc->max_seg_size = 64 * 1024;
+> The "struct device *dev" is a pointer to the struct device corresponding
+> to the _device_ which is being probed and the tee device is being
+> registered for - in the case of the submitted code, that is the
+> struct device embedded in the platform device.
 > 
-> Earlier versions of this driver had 64 * 1024 - 512 here. Using 64k
-> breaks SD card support here. Reading the partition table still works
-> fine, but the next transfers fail with messages like:
-> 
-> mtk-msdc 11240000.mmc: msdc_request_timeout: aborting cmd/data/mrq
-> mtk-msdc 11240000.mmc: msdc_request_timeout: aborting mrq=ffffffc06e586860 cmd=18
-> mtk-msdc 11240000.mmc: msdc_request_timeout: abort data: cmd18; 136 blocks
-> mmcblk1: error -110 transferring data, sector 338488, nr 136, cmd response 0x900, card status 0xb00
-> mtk-msdc 11240000.mmc: set mclk to 0 mmc1: tried to reset card
-> 
-> Can you confirm this?
-> 
-Yes, it will be fixed at next revision.
-Thx!
-> Sascha
-> 
+> This is a /really/ standard thing to do in drivers - saving a pointer
+> to the struct device which the driver is responsible for.
+
+Yes, but this structure says it is a "tee_device", and as such, should
+be a real device, not just an internal structure that is never exposed
+to userspace, right?
+
+> So why should this pointer become a struct device itself?
+
+Because it is a device.  It should be a child of the platform device.
+
+Unless it's just a "normal" device, then platform device shouldn't be
+used here :)
+
+> Greg, I think you have performed a disservice by poorly reviewing the
+> driver, and giving _incorrect_ comments.  Please can you have another
+> look at both patches together and provide a better review.  Thanks.
+
+I think the comment about how the model is all messed up as it looks
+like the TPM original code is correct.
+
+> Second point _against_ embedding a struct device here - a struct device
+> is exposed to userspace.  Why expose this to userspace - we have other
+> ways to manage the lifetime of data structures, such as krefs, which
+> are not exposed to userspace.  What's wrong with using a kref to
+> control the lifetime of this structure?
+
+It's a device, why wouldn't it be exposed to userspace.
+
+If this isn't a device, then yes, it doesn't need to be.  But then don't
+call it a "tee_device" :)
+
+thanks,
+
+greg k-h
