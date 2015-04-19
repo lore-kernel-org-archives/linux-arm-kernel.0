@@ -1,92 +1,112 @@
-From: viniciustinti@gmail.com (Vinicius Tinti)
-Date: Sun, 19 Apr 2015 08:40:26 -0300
-Subject: [PATCH] arm64: annotate psci invoke functions as notrace
-In-Reply-To: <20150224181137.GY9714@leverpostej>
-References: <20150218172638.GB1772@redacted.bos.redhat.com>
- <20150224175950.GA28145@redhat.com>
- <20150224181137.GY9714@leverpostej>
-Message-ID: <CALD9WKxTcfDzfK9BuWFW00c1o4CJShSrmw_Z4Nikojhw9mG-Eg@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sun, 19 Apr 2015 14:13:04 +0200
+Subject: [PATCH 1/2] clk: change clk_ops' ->round_rate() prototype
+In-Reply-To: <1429255769-13639-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1429255769-13639-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1429255769-13639-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <7408975.lBcgZIN9hf@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 3:11 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Feb 24, 2015 at 05:59:50PM +0000, Richard W.M. Jones wrote:
->> On Wed, Feb 18, 2015 at 12:26:38PM -0500, Kyle McMartin wrote:
->> > Using GCC 5 to build the kernel with ftrace enabled, we encounter the
->> > following error as a result of the mcount prologue changing the expected
->> > register use of the function parameters,
->> >
->> > /tmp/cc8Kpn7A.s: Assembler messages:
->> > /tmp/cc8Kpn7A.s:41: Error: .err encountered
->> > /tmp/cc8Kpn7A.s:42: Error: .err encountered
->> > /tmp/cc8Kpn7A.s:43: Error: .err encountered
->> > /tmp/cc8Kpn7A.s:101: Error: .err encountered
->> > /tmp/cc8Kpn7A.s:102: Error: .err encountered
->> > /tmp/cc8Kpn7A.s:103: Error: .err encountered
->> > scripts/Makefile.build:257: recipe for target 'arch/arm64/kernel/psci.o' failed
->> >
->> > Fix this by annotating the function as notrace, to suppress the
->> > generation of profiling prologues and epilogues on the function.
->> >
->> > Signed-off-by: Kyle McMartin <kyle@redhat.com>
->> >
->> > --- a/arch/arm64/kernel/psci.c
->> > +++ b/arch/arm64/kernel/psci.c
->> > @@ -113,7 +113,7 @@ static void psci_power_state_unpack(u32 power_state,
->> >   * The following two functions are invoked via the invoke_psci_fn pointer
->> >   * and will not be inlined, allowing us to piggyback on the AAPCS.
->> >   */
->> > -static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
->> > +static noinline notrace int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
->> >                                      u64 arg2)
->> >  {
->> >     asm volatile(
->> > @@ -128,7 +128,7 @@ static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
->> >     return function_id;
->> >  }
->> >
->> > -static noinline int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
->> > +static noinline notrace int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
->> >                                      u64 arg2)
->> >  {
->> >     asm volatile(
->>
->> I need this patch in order to compile the upstream kernel on aarch64
->> using gcc 5.  Can it not be added temporarily while the longer term
->> fix, whatever that is, is worked out?
->
-> As I mentioned in my reply, Will was waiting for -rc1 to post our
-> patches (which move this out to asm for arm and arm64). He's out of the
-> office today, but I expect they will be posted tomorrow (and hopefully
-> queued shortly thereafter).
->
-> Mark.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Hi Boris,
 
-Hi,
+Am Freitag, 17. April 2015, 09:29:28 schrieb Boris Brezillon:
+> Clock rates are stored in an unsigned long field, but ->round_rate()
+> (which returns a rounded rate from a requested one) returns a long
+> value (errors are reported using negative error codes), which can lead
+> to long overflow if the clock rate exceed 2Ghz.
+> 
+> Change ->round_rate() prototype to return 0 or an error code, and pass the
+> requested rate as a pointer so that it can be adjusted depending on
+> hardware capabilities.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
 
-I notice that the mainline kernel moved these psci calls to a separate
-file but I
-was wondering how can it guarantee that the function register
-placement will hold?
+On a rk3288-veyron-pinky with the fix described below:
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 
-If you build the kernel with -O0 some function register allocation changes as
-opposed to -O2 or if you use another compiler such as Clang. In LLVMLinux we
-solved this by using one of Andy's solution which is to use register placement:
 
-  register u32 function_id_r0 asm ("r0") = function_id;
-  register u32 arg0_r1 asm ("r1") = arg0;
-  register u32 arg1_r2 asm ("r2") = arg1;
-  register u32 arg2_r3 asm ("r3") = arg2;
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index fa5a00e..1462ddc 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1640,8 +1643,10 @@ static struct clk_core *clk_calc_new_rates(struct
+> clk_core *clk, &parent_hw);
+>  		parent = parent_hw ? parent_hw->core : NULL;
+>  	} else if (clk->ops->round_rate) {
+> -		new_rate = clk->ops->round_rate(clk->hw, rate,
+> -						&best_parent_rate);
+> +		if (clk->ops->round_rate(clk->hw, &new_rate,
+> +					 &best_parent_rate))
+> +			return NULL;
+> +
+>  		if (new_rate < min_rate || new_rate > max_rate)
+>  			return NULL;
+>  	} else if (!parent || !(clk->flags & CLK_SET_RATE_PARENT)) {
 
-Sorry by the late reply.
+This is using new_rate uninitialized when calling into the round_rate
+callback. Which in turn pushed my PLLs up to 2.2GHz :-)
 
-Regards,
-Tinti
+I guess you'll need something like the following:
 
--- 
-Simplicity is the ultimate sophistication
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index db4e4b2..afc7733 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1605,6 +1605,7 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *clk,
+ 						    &parent_hw);
+ 		parent = parent_hw ? parent_hw->core : NULL;
+ 	} else if (clk->ops->round_rate) {
++		new_rate = rate;
+ 		if (clk->ops->round_rate(clk->hw, &new_rate,
+ 					 &best_parent_rate))
+ 			return NULL;
+
+
+
+
+> diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
+> index f8d3baf..bd408ef 100644
+> --- a/drivers/clk/rockchip/clk-pll.c
+> +++ b/drivers/clk/rockchip/clk-pll.c
+> @@ -63,8 +63,8 @@ static const struct rockchip_pll_rate_table
+> *rockchip_get_pll_settings( return NULL;
+>  }
+> 
+> -static long rockchip_pll_round_rate(struct clk_hw *hw,
+> -			    unsigned long drate, unsigned long *prate)
+> +static int rockchip_pll_round_rate(struct clk_hw *hw,
+> +			    unsigned long *drate, unsigned long *prate)
+>  {
+>  	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
+>  	const struct rockchip_pll_rate_table *rate_table = pll->rate_table;
+> @@ -72,12 +72,15 @@ static long rockchip_pll_round_rate(struct clk_hw *hw,
+> 
+>  	/* Assumming rate_table is in descending order */
+>  	for (i = 0; i < pll->rate_count; i++) {
+> -		if (drate >= rate_table[i].rate)
+> -			return rate_table[i].rate;
+> +		if (*drate >= rate_table[i].rate) {
+> +			*drate = rate_table[i].rate;
+> +			return 0;
+> +		}
+>  	}
+> 
+>  	/* return minimum supported value */
+> -	return rate_table[i - 1].rate;
+> +	*drate = rate_table[i - 1].rate;
+> +	return 0;
+>  }
+> 
+>  /*
+
+The rockchip-part:
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+
+And as I've stumbled onto this recently too, the clock-maintainership has
+expanded to Stephen Boyd and linux-clk at vger.kernel.org .
+
+
+Heiko
