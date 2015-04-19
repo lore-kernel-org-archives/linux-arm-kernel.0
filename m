@@ -1,77 +1,56 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 19 Apr 2015 17:30:06 +0200
-Subject: [PATCH 1/2] clk: change clk_ops' ->round_rate() prototype
-In-Reply-To: <7408975.lBcgZIN9hf@diego>
-References: <1429255769-13639-1-git-send-email-boris.brezillon@free-electrons.com>
- <1429255769-13639-2-git-send-email-boris.brezillon@free-electrons.com>
- <7408975.lBcgZIN9hf@diego>
-Message-ID: <20150419173006.0ce6cfe0@bbrezillon>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 19 Apr 2015 18:59:45 +0200
+Subject: [PATCH v2 1/8] ARM: replace PROCINFO embedded branch with
+ relative offset
+In-Reply-To: <1426248452-4773-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426248452-4773-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426248452-4773-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAGhQ9VynJZWRb4iysXPE3X0GRaZNDNObz2Bgys01Kn7gjav7ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi Ard,
+On 13 March 2015 at 13:07, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> This patch replaces the 'branch to setup()' instructions embedded
+> in the PROCINFO structs with the offset to that setup function
+> relative to the base of the struct. This preserves the position
+> independent nature of that field, but uses a data item rather
+> than an instruction.
+>
+> This is mainly done to prevent linker failures on large kernels,
+> where the setup function is out of reach for the branch.
 
-On Sun, 19 Apr 2015 14:13:04 +0200
-Heiko St?bner <heiko@sntech.de> wrote:
+This commit (bf35706f3d09 in Linus master) breaks booting on ARMv7-M.
 
-> Hi Boris,
-> 
-> Am Freitag, 17. April 2015, 09:29:28 schrieb Boris Brezillon:
-> > Clock rates are stored in an unsigned long field, but ->round_rate()
-> > (which returns a rounded rate from a requested one) returns a long
-> > value (errors are reported using negative error codes), which can lead
-> > to long overflow if the clock rate exceed 2Ghz.
-> > 
-> > Change ->round_rate() prototype to return 0 or an error code, and pass the
-> > requested rate as a pointer so that it can be adjusted depending on
-> > hardware capabilities.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> 
-> On a rk3288-veyron-pinky with the fix described below:
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index fa5a00e..1462ddc 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -1640,8 +1643,10 @@ static struct clk_core *clk_calc_new_rates(struct
-> > clk_core *clk, &parent_hw);
-> >  		parent = parent_hw ? parent_hw->core : NULL;
-> >  	} else if (clk->ops->round_rate) {
-> > -		new_rate = clk->ops->round_rate(clk->hw, rate,
-> > -						&best_parent_rate);
-> > +		if (clk->ops->round_rate(clk->hw, &new_rate,
-> > +					 &best_parent_rate))
-> > +			return NULL;
-> > +
-> >  		if (new_rate < min_rate || new_rate > max_rate)
-> >  			return NULL;
-> >  	} else if (!parent || !(clk->flags & CLK_SET_RATE_PARENT)) {
-> 
-> This is using new_rate uninitialized when calling into the round_rate
-> callback. Which in turn pushed my PLLs up to 2.2GHz :-)
+When I try to boot Linus master now on my NXP LPC4357 (Cortex-M4) dev
+kit I get the following message from u-boot.
+## Booting kernel from Legacy Image at 29000000 ...
+Image Name: Linux
+Image Type: ARM Linux Kernel Image (uncompressed)
+Data Size: 1412318 Bytes = 1.3 MB
+Load Address: 28008000
+Entry Point: 28008001
+Verifying Checksum ... OK
+Loading Kernel Image ... OK
+OK
 
-Indeed, thanks for the fix.
+Starting kernel ...
 
-[...]
+UNHANDLED EXCEPTION: HARD FAULT
+R0 = ffffffff R1 = 00001038
+R2 = 281d8711 R3 = 00000000
+R12 = 2822092c LR = 28008023
+PC = 2822092e PSR = 21000000
 
-> 
-> 
-> And as I've stumbled onto this recently too, the clock-maintainership has
-> expanded to Stephen Boyd and linux-clk at vger.kernel.org .
+Reverting bf35706f3d09 (plus fixing a small conflict) makes Linus
+master boot again.
 
-Noted. I'll add Stephen and the new linux-clk ML in the recipient list
-next time.
+I am using the following compiler:
+gcc version 4.9.2 20140904 (prerelease) (crosstool-NG
+linaro-1.13.1-4.9-2014.09 - Linaro GCC 4.9-2014.09
 
-Best Regards,
+The ARMv7-M machine that I am using is not upstream yet, but you can
+find the patch set on the mailing list.
 
-Boris
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+regards,
+Joachim Eastwood
