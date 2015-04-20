@@ -1,114 +1,127 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Apr 2015 14:59:00 +0200
-Subject: [PATCH 07/13 v2] coresight: tmc: let runtime PM handle core clock
+Date: Mon, 20 Apr 2015 14:59:02 +0200
+Subject: [PATCH 09/13 v2] coresight: tpiu: retrieve and handle atclk
 In-Reply-To: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
 References: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1429534746-3068-7-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1429534746-3068-9-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This uses runtime PM to manage the PCLK ("amba_pclk") instead
-of screwing around with the framework by going in and taking
-a copy from the amba device. The amba bus core will uprepare
-and disable the clock when the device is unused when
-CONFIG_PM is selected, else the clock will be always on.
+As can be seen from the datasheet of the CoreSight
+Components, DDI0314H page A-19 the TPIU has a clock signal
+apart from the AHB interconnect ("amba_pclk", that we're
+already handling) called ATCLK, ARM Trace Clock, that SoC
+implementers may provide from an entirely different clock
+source. So to model this correctly create an optional
+path for handling ATCLK alongside the PCLK so we don't
+break old platforms that only define PCLK ("amba_pclk") but
+still makes it possible for SoCs that have both clock signals
+(such as the DB8500) to fetch and prepare/enable/disable/
+unprepare both clocks in conjunction.
 
-Prior to this patch, as the AMBA primecell bus code enables
-the PCLK, it would be left on after probe as
-the clk_prepare_enable() and clk_disable_unprepare() was
-called and thus just increase and decreas the refcount by
-one, without it reaching zero and actually disabling the
-clock. Now the runtime PM callbacks will make sure the PCLK
-is properly disabled after probe.
+The ATCLK is enabled and disabled using the runtime PM
+callbacks.
 
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v1->v2:
 - Rebased on the coresight git tree.
+- Get driver data directly from the device in runtime
+  suspend/resume hooks and skip the intermediate conversion
+  to AMBA device.
 - Added Ulf's review tag.
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 20 +++++---------------
- 1 file changed, 5 insertions(+), 15 deletions(-)
+ drivers/hwtracing/coresight/coresight-tpiu.c | 37 ++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 7147f3dd363c..8f2e55cc354c 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -23,7 +23,7 @@
- #include <linux/slab.h>
- #include <linux/dma-mapping.h>
- #include <linux/spinlock.h>
--#include <linux/clk.h>
-+#include <linux/pm_runtime.h>
- #include <linux/of.h>
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 688ba937069e..7214efd10db5 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -20,6 +20,7 @@
+ #include <linux/pm_runtime.h>
  #include <linux/coresight.h>
  #include <linux/amba/bus.h>
-@@ -104,7 +104,6 @@ enum tmc_mem_intf_width {
++#include <linux/clk.h>
+ 
+ #include "coresight-priv.h"
+ 
+@@ -50,11 +51,13 @@
+ /**
+  * @base:	memory mapped base address for this component.
   * @dev:	the device entity associated to this component.
++ * @atclk:	optional clock for the core parts of the TPIU.
   * @csdev:	component vitals needed by the framework.
-  * @miscdev:	specifics to handle "/dev/xyz.tmc" entry.
-- * @clk:	the clock this component is associated to.
-  * @spinlock:	only one at a time pls.
-  * @read_count:	manages preparation of buffer for reading.
-  * @buf:	area of memory where trace data get sent.
-@@ -120,7 +119,6 @@ struct tmc_drvdata {
+  */
+ struct tpiu_drvdata {
+ 	void __iomem		*base;
  	struct device		*dev;
++	struct clk		*atclk;
  	struct coresight_device	*csdev;
- 	struct miscdevice	miscdev;
--	struct clk		*clk;
- 	spinlock_t		spinlock;
- 	int			read_count;
- 	bool			reading;
-@@ -242,17 +240,14 @@ static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
+ };
  
- static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
+@@ -111,6 +114,7 @@ static const struct coresight_ops tpiu_cs_ops = {
+ 
+ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
  {
--	int ret;
- 	unsigned long flags;
++	int ret;
+ 	void __iomem *base;
+ 	struct device *dev = &adev->dev;
+ 	struct coresight_platform_data *pdata = NULL;
+@@ -131,6 +135,12 @@ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
+ 		return -ENOMEM;
  
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
-+	pm_runtime_get_sync(drvdata->dev);
+ 	drvdata->dev = &adev->dev;
++	drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
++	if (!IS_ERR(drvdata->atclk)) {
++		ret = clk_prepare_enable(drvdata->atclk);
++		if (ret)
++			return ret;
++	}
+ 	dev_set_drvdata(dev, drvdata);
  
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	if (drvdata->reading) {
- 		spin_unlock_irqrestore(&drvdata->spinlock, flags);
--		clk_disable_unprepare(drvdata->clk);
-+		pm_runtime_put(drvdata->dev);
- 		return -EBUSY;
- 	}
- 
-@@ -386,7 +381,7 @@ out:
- 	drvdata->enable = false;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	clk_disable_unprepare(drvdata->clk);
-+	pm_runtime_put(drvdata->dev);
- 
- 	dev_info(drvdata->dev, "TMC disabled\n");
+ 	/* Validity for the resource is already checked by the AMBA core */
+@@ -170,6 +180,32 @@ static int tpiu_remove(struct amba_device *adev)
+ 	return 0;
  }
-@@ -700,11 +695,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
  
- 	spin_lock_init(&drvdata->spinlock);
- 
--	drvdata->clk = adev->pclk;
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
--
- 	devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
- 	drvdata->config_type = BMVAL(devid, 6, 7);
- 
-@@ -719,7 +709,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 		drvdata->size = readl_relaxed(drvdata->base + TMC_RSZ) * 4;
- 	}
- 
--	clk_disable_unprepare(drvdata->clk);
-+	pm_runtime_put(&adev->dev);
- 
- 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
- 		drvdata->vaddr = dma_alloc_coherent(dev, drvdata->size,
++#ifdef CONFIG_PM
++static int tpiu_runtime_suspend(struct device *dev)
++{
++	struct tpiu_drvdata *drvdata = dev_get_drvdata(dev);
++
++	if (drvdata && !IS_ERR(drvdata->atclk))
++		clk_disable_unprepare(drvdata->atclk);
++
++	return 0;
++}
++
++static int tpiu_runtime_resume(struct device *dev)
++{
++	struct tpiu_drvdata *drvdata = dev_get_drvdata(dev);
++
++	if (drvdata && !IS_ERR(drvdata->atclk))
++		clk_prepare_enable(drvdata->atclk);
++
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops tpiu_dev_pm_ops = {
++	SET_RUNTIME_PM_OPS(tpiu_runtime_suspend, tpiu_runtime_resume, NULL)
++};
++
+ static struct amba_id tpiu_ids[] = {
+ 	{
+ 		.id	= 0x0003b912,
+@@ -186,6 +222,7 @@ static struct amba_driver tpiu_driver = {
+ 	.drv = {
+ 		.name	= "coresight-tpiu",
+ 		.owner	= THIS_MODULE,
++		.pm	= &tpiu_dev_pm_ops,
+ 	},
+ 	.probe		= tpiu_probe,
+ 	.remove		= tpiu_remove,
 -- 
 1.9.3
