@@ -1,36 +1,54 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 20 Apr 2015 14:04:26 +0100
-Subject: [PATCH] ata: ahci_st: fixup layering violations / drvdata errors
-In-Reply-To: <20150417145558.GD1954@htj.duckdns.org>
-References: <1428519599-31885-1-git-send-email-computersforpeace@gmail.com>
- <552627BD.9060109@st.com>
- <20150409094310.GA29026@griffinp-ThinkPad-X1-Carbon-2nd>
- <20150417145558.GD1954@htj.duckdns.org>
-Message-ID: <20150420130426.GA906@griffinp-ThinkPad-X1-Carbon-2nd>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 Apr 2015 15:06:28 +0200
+Subject: [PATCH] clk: ux500: ape[ate|trace]clk are scaleable
+Message-ID: <1429535188-4327-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
+The APEATCLK and APETRACECLK are actually scaleable so register
+them as scaleable clocks.
 
-On Fri, 17 Apr 2015, Tejun Heo wrote:
-> On Thu, Apr 09, 2015 at 10:43:10AM +0100, Peter Griffin wrote:
-> > Yes I can test, although not until Saturday as I only have remote
-> > access to the board today & tomorrow and the hard drive isn't
-> > plugged in.
-> 
-> What's the status on this patch?  Should I push it through
-> for-4.1-fixes?
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/clk/ux500/u8500_clk.c    | 7 ++++---
+ drivers/clk/ux500/u8500_of_clk.c | 4 ++--
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
-The layering violation which Brian identified does need fixing. However
-please don't take this patch as it currently is, as it causes a NULL
-ptr dereference.
-
-I can send an updated version in a moment which: -
-1) Fixes the conflict you will get when applying it for v4.1
-   (due to my "st_configure_oob must be called after IP is clocked" patch).
-
-2) Fixes the crash which this patch introduces.
-
-regards,
-
-Peter.
+diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+index 80069c370a47..4626b97b7d83 100644
+--- a/drivers/clk/ux500/u8500_clk.c
++++ b/drivers/clk/ux500/u8500_clk.c
+@@ -116,11 +116,12 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+ 	clk_register_clkdev(clk, NULL, "hdmi");
+ 	clk_register_clkdev(clk, "hdmi", "mcde");
+ 
+-	clk = clk_reg_prcmu_gate("apeatclk", NULL, PRCMU_APEATCLK, CLK_IS_ROOT);
++	clk = clk_reg_prcmu_scalable("apeatclk", NULL, PRCMU_APEATCLK, 0,
++				     CLK_IS_ROOT|CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "apeat");
+ 
+-	clk = clk_reg_prcmu_gate("apetraceclk", NULL, PRCMU_APETRACECLK,
+-				CLK_IS_ROOT);
++	clk = clk_reg_prcmu_scalable("apetraceclk", NULL, PRCMU_APETRACECLK, 0,
++				CLK_IS_ROOT|CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "apetrace");
+ 
+ 	clk = clk_reg_prcmu_gate("mcdeclk", NULL, PRCMU_MCDECLK, CLK_IS_ROOT);
+diff --git a/drivers/clk/ux500/u8500_of_clk.c b/drivers/clk/ux500/u8500_of_clk.c
+index 7b55ef89baa5..e319ef912dc6 100644
+--- a/drivers/clk/ux500/u8500_of_clk.c
++++ b/drivers/clk/ux500/u8500_of_clk.c
+@@ -166,8 +166,8 @@ void u8500_of_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+ 	clk = clk_reg_prcmu_gate("apeatclk", NULL, PRCMU_APEATCLK, CLK_IS_ROOT);
+ 	prcmu_clk[PRCMU_APEATCLK] = clk;
+ 
+-	clk = clk_reg_prcmu_gate("apetraceclk", NULL, PRCMU_APETRACECLK,
+-				CLK_IS_ROOT);
++	clk = clk_reg_prcmu_scalable("apetraceclk", NULL, PRCMU_APETRACECLK, 0,
++				CLK_IS_ROOT|CLK_SET_RATE_GATE);
+ 	prcmu_clk[PRCMU_APETRACECLK] = clk;
+ 
+ 	clk = clk_reg_prcmu_gate("mcdeclk", NULL, PRCMU_MCDECLK, CLK_IS_ROOT);
+-- 
+1.9.3
