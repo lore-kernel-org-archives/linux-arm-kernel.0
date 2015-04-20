@@ -1,46 +1,43 @@
-From: George.Dunlap@eu.citrix.com (George Dunlap)
-Date: Mon, 20 Apr 2015 12:03:02 +0100
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
- <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
- <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
- <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
- <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
- <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
- <552E9E8D.1080000@eu.citrix.com>
- <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA2BC.5000707@eu.citrix.com>
- <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA844.5010308@eu.citrix.com>
- <1429121979.7346.138.camel@edumazet-glaptop2.roam.corp.google.com>
- <552F7936.9070205@eu.citrix.com> <552F7EF4.9030107@iogearbox.net>
- <552F887A.4060708@eu.citrix.com>
- <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <CAFLBxZarvxtq-6fNAxioq64bw6SMZFVuoLzJgK=E6nvcbS2X4w@mail.gmail.com>
+From: cbz@baozis.org (Chen Baozi)
+Date: Mon, 20 Apr 2015 19:07:30 +0800
+Subject: [Xen-devel] [PATCH] xen: Add __GFP_DMA flag when
+ xen_swiotlb_init gets free pages.
+In-Reply-To: <5534DABB.5060305@citrix.com>
+References: <1429526904-27176-1-git-send-email-cbz@baozis.org>
+ <5534DABB.5060305@citrix.com>
+Message-ID: <20150420110729.GA27707@cbz-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 1:42 PM, Eric Dumazet <eric.dumazet@gmail.com> wrote:
-> On Thu, 2015-04-16 at 11:01 +0100, George Dunlap wrote:
->
->> He suggested that after he'd been prodded by 4 more e-mails in which two
->> of us guessed what he was trying to get at.  That's what I was
->> complaining about.
->
-> My big complain is that I suggested to test to double the sysctl, which
-> gave good results.
->
-> Then you provided a patch using a 8x factor. How does that sound ?
->
-> Next time I ask a raise, I should try a 8x factor as well, who knows,
-> it might be accepted.
+On Mon, Apr 20, 2015 at 11:53:47AM +0100, David Vrabel wrote:
+> On 20/04/15 11:48, Chen Baozi wrote:
+> > Make sure that xen_swiotlb_init allocates buffers that is DMA capable.
+> > 
+> > Signed-off-by: Chen Baozi <baozich@gmail.com>
+> > ---
+> >  drivers/xen/swiotlb-xen.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> > index 810ad41..7345afd 100644
+> > --- a/drivers/xen/swiotlb-xen.c
+> > +++ b/drivers/xen/swiotlb-xen.c
+> > @@ -235,7 +235,8 @@ retry:
+> >  #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
+> >  #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
+> >  		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
+> > -			xen_io_tlb_start = (void *)__get_free_pages(__GFP_NOWARN, order);
+> > +			xen_io_tlb_start = (void *)__get_free_pages(
+> > +						__GFP_NOWARN|__GFP_DMA, order);
+> 
+> I think this breaks x86 where __GFP_DMA means below 16 MB.  Perhaps you
+> mean __GFP_DMA32?
 
-I see.  I chose the value that Stefano had determined had completely
-eliminated the overhead.  Doubling the value reduces the overhead to
-8%, which should be fine for a short-term fix while we git a proper
-mid/long-term fix.
+__GFP_DMA32 doesn't help on arm64...
 
- -George
+I guess there might be conflicts about the meaning of __GFP_DMA between x86 and
+arm?
+
+Cheers,
+
+Baozi.
