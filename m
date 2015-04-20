@@ -1,57 +1,84 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 20 Apr 2015 06:50:17 +0200
-Subject: [RESEND RFC PATCH 2/3] ASoC: mediatek: Add AFE connection control
-In-Reply-To: <20150418173740.GF26185@sirena.org.uk>
-References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
- <1428653649-38200-3-git-send-email-koro.chen@mediatek.com>
- <20150418173740.GF26185@sirena.org.uk>
-Message-ID: <20150420045017.GI6325@pengutronix.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Sun, 19 Apr 2015 23:08:00 -0600
+Subject: [tpmdd-devel] [RFC PATCH 1/2] tee: generic TEE subsystem
+In-Reply-To: <20150418215755.GM12732@n2100.arm.linux.org.uk>
+References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
+ <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
+ <20150417163054.GA28241@obsidianresearch.com>
+ <20150418090147.GF12732@n2100.arm.linux.org.uk>
+ <20150418172923.GA10605@obsidianresearch.com>
+ <20150418215755.GM12732@n2100.arm.linux.org.uk>
+Message-ID: <20150420050800.GA12928@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 18, 2015 at 06:37:40PM +0100, Mark Brown wrote:
-> On Fri, Apr 10, 2015 at 04:14:08PM +0800, Koro Chen wrote:
+On Sat, Apr 18, 2015 at 10:57:55PM +0100, Russell King - ARM Linux wrote:
+
+> > But then we trundle down to:
+> > 
+> > + ctx->teedev->desc->ops->get_version(ctx, &vers.spec_version,
+> > +   vers.uuid);
+> > 
+> > If we kref teedev so it is valid then calling a driver call back after
+> > (or during) it's remove function is very likely to blow up.
 > 
-> > +/*
-> > + * The MTK AFE unit has a audio interconnect with MTK_AFE_INTERCONN_NUM_INPUT
-> > + * inputs and MTK_AFE_INTERCONN_NUM_OUTPUT outputs. Below table holds the
-> > + * register/bits to set to connect an input with an output.
-> > + */
-> > +static const struct mtk_afe_connection
-> > +	connections[MTK_AFE_INTERCONN_NUM_INPUT][MTK_AFE_INTERCONN_NUM_OUTPUT] = {
-> > +	[0][0] =   { .creg = 0x020, .cshift =  0, .sreg = 0x020, .sshift = 10},
-> > +	[0][1] =   { .creg = 0x020, .cshift = 16, .sreg = 0x020, .sshift = 26},
+> Why?
 > 
-> What are the constraints on using this - is it one input to one output
-> only or can we do mixing or duplication?  The register interface
-> definitely does look like something asking for runtime configuration.
-> 
-> It'd also be nice to have less magic numbers in the table, at least for
-> the indexes (which I guess correspond to some of the defines in the
-> headers)?
+> Normally, the file_operations will be associated with the module which,
+> in this case, called misc_register() - the same module which contains
+> the remove function.
 
-With defines the above two lines would become something like:
+As I read it, tee is similar to TPM and RTC, this code is the mid
+layer code, and resides in it's own module while the function pointers
+in 'ops' reside in the actual driver. So there are two modules.
 
-#define AFE_CONN0		0x20
+There is some mucking in tee to keep the driver module around, it is
+probably OK for the chardev, but again, sysfs, probably not. Absent
+that code I think the module ops points to could be unloaded and the
+.text backing the ops function can go away.
 
-#define CONN0_I00_O00_S		0
-...
-#define CONN0_I00_O00_R		10
-...
-#define CONN0_I00_O01_s		16
-...
-#define CONN0_I00_O01_S		26
+However, I was worrying about the driver itself - what is a driver to
+do if a callback is called after tee_unregister is called? It must do
+nothing and return error. Drawing from TPM, most drivers did not have
+this check, so they blow up. Ie devm frees all their resources after
+tee_unregister returns and they quickly deref null, or sleep on
+disabled IRQ or timer, or something else fatal.
 
-[0][0] = { .creg = AFE_CONN0, .cshift = CONN0_I00_O00_S, .sreg = AFE_CONN0, .sshift = CONN0_I00_O00_R },
-[0][1] = { .creg = AFE_CONN0, .cshift = CONN0_I00_O01_S, .sreg = AFE_CONN0, .sshift = CONN0_I00_O01_S },
+It seems like a good idea to have the midlayer guarentee the driver
+ops cannot be called after the midlayer unregister function returns so
+that drivers can operate in a simple environment. Nulling ops also
+avoids caring about the driver's module ref count.
 
-For the registers we could use defines, but I think using defines for
-the shifts doesn't add much value given they are only used once.
+> > Also, in TPM we discovered that adding a sysfs file was very ugly
+> > (impossible?) because without the misc_mtx protection that open has,
+> > getting a locked tee_device in the sysfs callback is difficult.
 
-Sascha
+> So, attaching attributes to the class device is _really_ a no-go.
+> The attributes should be attached to the parent device - the device
+> which is actually being driven.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+But common midlayer convention is to put them in the same directory as
+the 'dev', ie:
+
+/sys/devices/pnp0/00:06/rtc/rtc0/dev
+/sys/devices/pnp0/00:06/rtc/rtc0/max_user_freq
+
+Which, I think, is misc->this_device
+
+> attribute is removed from a struct device, its method won't be
+> called any further (if it doesn't do this, I suspect we have a fair
+> number of buggy drivers...)
+
+Hmm, I went and looked again, and it seems kernfs_drain is part of a
+mechanism that causes kernfs_remove to wait until all opens are
+closed, so it sure looks like a sysfs callback cannot be called after
+it is removed.
+
+Years ago lwn documented that this wasn't true,
+https://lwn.net/Articles/54651/, it is nice to see that has changed.
+
+I still suspect the expected way to write a new mid layer is to create
+your own struct device and not rely on misc_device, but use-after-free
+races from sysfs doesn't seem to be a motivating reason...
+
+Jason
