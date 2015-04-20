@@ -1,31 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Apr 2015 16:49:13 +0100
-Subject: Fscking OMAP
-Message-ID: <20150420154912.GW4027@n2100.arm.linux.org.uk>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Mon, 20 Apr 2015 08:49:37 -0700
+Subject: [PATCH 0/3] ARM: ux500: Fix SD-card regression by using GPIO
+ regulator
+In-Reply-To: <1429538553-17366-1-git-send-email-ulf.hansson@linaro.org>
+References: <1429538553-17366-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAJAp7Oh1V7QKUtBnf-RCYyFD_RfTLOM5ir-jnr2DR3kg1xAOKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On Mon, Apr 20, 2015 at 7:02 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> This patchset fixes an old stability issue for detection of SD-cards. The DT
+> node for the GPIO regulator which controls the I/O voltage level towards the
+> SD-card was disabled in below commit.
+>
+[..]
+> The commit that introduced the thorough error handling is:
+> 9369c97cc7ec ("mmc: mmci: Cascade EPROBE_DEFER from regulators")
+>
 
-If you're going to introduce a dependency on some infrastructure which
-you absolutely require for booting, then _please_ ensure that the
-configuration system is updated such that pre-existing kernel
-configurations continue to work.
+Glad I could help :)
 
-Don't leave it such that the infrastructure ends up returning -ENOSYS,
-which then filters down into your SoC specific code, and aborts the
-initialisation of critical infrastructure, leaving you with a totally
-silent boot failure.
+>
+> Ulf Hansson (3):
+>   ARM: ux500: Move GPIO regulator for SD-card into board DTSs
+>   ARM: ux500: Enable GPIO regulator for SD-card for HREF boards
+>   ARM: ux500: Enable GPIO regulator for SD-card for snowball
+>
 
-In this case, it's the addition of syscon to OMAP internals,
-specifically in omap_control_init().
+Looks good
 
-This is explicitly targetted at OMAP people, who have wasted much of
-my day today investigating why their platforms no longer boot in DT
-mode.
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Bjorn
