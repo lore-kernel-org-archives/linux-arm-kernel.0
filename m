@@ -1,128 +1,43 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Apr 2015 14:59:04 +0200
-Subject: [PATCH 11/13 v2] coresight: funnel: retrieve and handle atclk
+Date: Mon, 20 Apr 2015 14:59:06 +0200
+Subject: [PATCH 13/13] coresight: document the bindings for the ATCLK
 In-Reply-To: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
 References: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1429534746-3068-11-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1429534746-3068-13-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As can be seen from the datasheet of the CoreSight
-Components, DDI0314 table A-6 the funnel has a clock signal
-apart from the AHB interconnect ("amba_pclk", that we're
-already handling) called ATCLK, ARM Trace Clock, that SoC
-implementers may provide from an entirely different clock
-source. So to model this correctly create an optional
-path for handling ATCLK alongside the PCLK so we don't
-break old platforms that only define PCLK ("amba_pclk") but
-still makes it possible for SoCs that have both clock signals
-(such as the DB8500) to fetch and prepare/enable/disable/
-unprepare both clocks.
+Put in a blurb in the device tree bindings indicating that
+coresight blocks may have an optional ATCLK.
 
-The ATCLK is enabled and disabled using the runtime PM
-callbacks.
-
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ChangeLog v1->v2:
-- Rebased on the coresight git tree.
-- Get driver data directly from the device in runtime
-  suspend/resume hooks and skip the intermediate conversion
-  to AMBA device.
-- Added Ulf's review tag.
----
- drivers/hwtracing/coresight/coresight-funnel.c | 37 ++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ Documentation/devicetree/bindings/arm/coresight.txt | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 330de2c88759..2e36bde7fcb4 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -21,6 +21,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/coresight.h>
- #include <linux/amba/bus.h>
-+#include <linux/clk.h>
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index 88602b75418e..8711c1065479 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -21,11 +21,14 @@ its hardware characteristcs.
+ 	* reg: physical base address and length of the register
+ 	  set(s) of the component.
  
- #include "coresight-priv.h"
+-	* clocks: the clock associated to this component.
+-
+-	* clock-names: the name of the clock as referenced by the code.
+-	  Since we are using the AMBA framework, the name should be
+-	  "apb_pclk".
++	* clocks: the clocks associated to this component.
++
++	* clock-names: the name of the clocks referenced by the code.
++	  Since we are using the AMBA framework, the name of the clock
++	  providing the interconnect should be "apb_pclk", and some
++	  coresight blocks also have an additional clock "atclk", which
++	  clocks the core of that coresight component. The latter clock
++	  is optional.
  
-@@ -35,12 +36,14 @@
-  * struct funnel_drvdata - specifics associated to a funnel component
-  * @base:	memory mapped base address for this component.
-  * @dev:	the device entity associated to this component.
-+ * @atclk:	optional clock for the core parts of the funnel.
-  * @csdev:	component vitals needed by the framework.
-  * @priority:	port selection order.
-  */
- struct funnel_drvdata {
- 	void __iomem		*base;
- 	struct device		*dev;
-+	struct clk		*atclk;
- 	struct coresight_device	*csdev;
- 	unsigned long		priority;
- };
-@@ -168,6 +171,7 @@ ATTRIBUTE_GROUPS(coresight_funnel);
- 
- static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
- {
-+	int ret;
- 	void __iomem *base;
- 	struct device *dev = &adev->dev;
- 	struct coresight_platform_data *pdata = NULL;
-@@ -188,6 +192,12 @@ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
- 		return -ENOMEM;
- 
- 	drvdata->dev = &adev->dev;
-+	drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
-+	if (!IS_ERR(drvdata->atclk)) {
-+		ret = clk_prepare_enable(drvdata->atclk);
-+		if (ret)
-+			return ret;
-+	}
- 	dev_set_drvdata(dev, drvdata);
- 
- 	/* Validity for the resource is already checked by the AMBA core */
-@@ -224,6 +234,32 @@ static int funnel_remove(struct amba_device *adev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int funnel_runtime_suspend(struct device *dev)
-+{
-+	struct funnel_drvdata *drvdata = dev_get_drvdata(dev);
-+
-+	if (drvdata && !IS_ERR(drvdata->atclk))
-+		clk_disable_unprepare(drvdata->atclk);
-+
-+	return 0;
-+}
-+
-+static int funnel_runtime_resume(struct device *dev)
-+{
-+	struct funnel_drvdata *drvdata = dev_get_drvdata(dev);
-+
-+	if (drvdata && !IS_ERR(drvdata->atclk))
-+		clk_prepare_enable(drvdata->atclk);
-+
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops funnel_dev_pm_ops = {
-+	SET_RUNTIME_PM_OPS(funnel_runtime_suspend, funnel_runtime_resume, NULL)
-+};
-+
- static struct amba_id funnel_ids[] = {
- 	{
- 		.id     = 0x0003b908,
-@@ -236,6 +272,7 @@ static struct amba_driver funnel_driver = {
- 	.drv = {
- 		.name	= "coresight-funnel",
- 		.owner	= THIS_MODULE,
-+		.pm	= &funnel_dev_pm_ops,
- 	},
- 	.probe		= funnel_probe,
- 	.remove		= funnel_remove,
+ 	* port or ports: The representation of the component's port
+ 	  layout using the generic DT graph presentation found in
 -- 
 1.9.3
