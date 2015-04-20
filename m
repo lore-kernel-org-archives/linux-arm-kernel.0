@@ -1,94 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 20 Apr 2015 16:56:00 +0100
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <2522717.YOvNMEL4TJ@wuerfel>
-References: <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
- <3365190.ZbiKjUlDk2@wuerfel>
- <20150417144656.GQ819@e104818-lin.cambridge.arm.com>
- <2522717.YOvNMEL4TJ@wuerfel>
-Message-ID: <20150420155600.GF24715@e104818-lin.cambridge.arm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 20 Apr 2015 09:56:48 -0600
+Subject: [tpmdd-devel] [RFC PATCH 1/2] tee: generic TEE subsystem
+In-Reply-To: <20150420145432.GD7261@kroah.com>
+References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
+ <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
+ <20150417163054.GA28241@obsidianresearch.com>
+ <20150418090147.GF12732@n2100.arm.linux.org.uk>
+ <20150418172923.GA10605@obsidianresearch.com>
+ <20150418215755.GM12732@n2100.arm.linux.org.uk>
+ <20150420050800.GA12928@obsidianresearch.com>
+ <20150420145432.GD7261@kroah.com>
+Message-ID: <20150420155648.GA7676@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 17, 2015 at 05:49:44PM +0200, Arnd Bergmann wrote:
-> On Friday 17 April 2015 15:46:57 Catalin Marinas wrote:
-> > On Fri, Apr 17, 2015 at 02:17:32PM +0100, Arnd Bergmann wrote:
-> > >   g) create a new ABI that does things in exactly the way that we
-> > >      would use as the native syscall interface if we had an ilp32
-> > >      kernel running on aarch64 with the asm-generic/unistd.h.
-> > >      This would mean a 32-bit __kernel_long_t and time_t, but extending
-> > >      time_t in the long run, together with aarch32 and i386.
-> > >      This one is particularly interesting for people that are interested
-> > >      in maximum posix compliance and in having a "nice" ABI, in particular
-> > >      if there is a slight chance that within the next decade we have
-> > >      reason to support building an arch/arm64 kernel itself in
-> > >      aarch64-ilp32 mode.
-> > 
-> > I don't think there is a much difference between g) and e). The reason
-> > we re-define many structures in asm/compat.h is because we don't have a
-> > generic compat_* definition (e.g. compat_timespec, compat_timeval,
-> > compat_flock, compat_flock64; anyway, I think some of these may not even
-> > be needed with the canonical set of syscalls). The signal related
-> > structures need to be handled differently for AArch32 and AArch64-ILP32
-> > anyway because of the difference in the register set.
+On Mon, Apr 20, 2015 at 04:54:32PM +0200, Greg Kroah-Hartman wrote:
+> On Sun, Apr 19, 2015 at 11:08:00PM -0600, Jason Gunthorpe wrote:
+> > I still suspect the expected way to write a new mid layer is to create
+> > your own struct device and not rely on misc_device,
 > 
-> Interesting observation, I had not guessed this.
+> Yes, that is the way.  You can not use misc_device for anything other
+> than creating the char node that your driver can use through the fileops
+> you pass to it.
 > 
-> Let's list the differences, this is what I could find:
-> 
-> | #define FIOQSIZE        0x545E
-> 
-> probably broken on arm64 already, should be investigated
+> Do not use a misc_device to create sysfs files for, or anything else, it
+> will be wrong and racy, as you have pointed out.
 
-Yes, it seems broken. arm64 uses the generic FIOQSIZE which doesn't
-match the compat one.
+Thanks!
 
-> | typedef unsigned short          __kernel_mode_t;
-> | typedef unsigned short          __kernel_ipc_pid_t;
-> 
-> Both of these affect all sysvipc, but very little else
-> 
-> | typedef unsigned short          __kernel_uid_t;
-> | typedef unsigned short          __kernel_gid_t;
-> 
-> sysvipc, ncpfs, and core dumps (probably fine since they are separate
-> anyway), 
+Can you quickly comment on when a misc device should be used compared to
+alloc_chrdev_region & cdev_add ?
 
-Not all ipc functions are affected AFAICT. msgsnd, msgrcv, msgctl look
-to me like we can just use the compat variants with the generic
-definitions for the types above (unless I missed something). Similarly
-for shmat, compat_sys_shmat just does some compat_ptr casting.
-
-> | typedef unsigned short          __kernel_old_dev_t; /* compat gets this wrong */
-> 
-> old-style loopdev ioctl
-> 
-> | struct stat { ... } /* possibly not needed */
-> 
->  - lustre ioctls (needs to be fixed anyway)
->  - old stat syscalls (won't be used with asm-generic/unistd.h)
-> 
-> | struct stat64 { ... }
-> 
->  - lustre ioctls
->  - new style stat syscalls
-
-For stat64 the wrappers don't look complicated, so we could add arm64
-ILP32-specific ones.
-
-I'm not sure about the ioctls affected, I haven't checked.
-
-> So, in essence the difference comes down to the syscalls for stat
-> and ipc. If we use the aarch32 data types, we can share the
-> fstatat64, fstat64, semctl, msgsnd, msgrcv, msgctl, shmat,
-> and shmctl compat system calls between aarch32-compat and
-> aarch64-ilp32-compat. Otherwise we have to duplicate or extend
-> them to cover both cases at runtime. That would be rather ugly
-> but entirely doable. The ioctls are hardly affected, the few
-> ones that differ once __kernel_long_t matches could easily be
-> fixed up as you say.
-
-I'd prefer a cleaner ABI even if we are to write some specific wrappers.
-
--- 
-Catalin
+Jason
