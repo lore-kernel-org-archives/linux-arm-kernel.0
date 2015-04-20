@@ -1,33 +1,67 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 20 Apr 2015 15:51:38 +0200
-Subject: [PATCH 1/7] ARM: mach-imx: devices: platform-sdhci-esdhc-imx: fix
- broken email address
-Message-ID: <1429537917-7433-1-git-send-email-wsa@the-dreams.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 20 Apr 2015 15:59:33 +0200
+Subject: [PATCH] ARM: mvebu: Fix the main PLL frequency on Armada 375,
+ 38x and 39x SoCs
+Message-ID: <1429538373-31064-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My Pengutronix address is not valid anymore, redirect people to the Pengutronix
-kernel team.
+Whereas for Armada 370 and XP the main PLL frequency was 2GHz for the
+Armada 375, 38x and 39x, the frequency is 1GHz. When writting support
+for these last SoCs, there was no offical value for the PLL. Now that
+we have it, this patch fixes it in the device tree.
 
-Reported-by: Harald Geyer <harald@ccbib.org>
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-Acked-by: Robert Schwebel <r.schwebel@pengutronix.de>
+This value is currently only used by the NAND driver for the setting
+the NAND timing. Fortunately it is not acutally used: all the mainline
+board with a NAND flash comes with a NAND device tree node using the
+"marvell,nand-keep-config" property. With this property the timings
+are not modified in the kernel driver and are kept from the botloader.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
-These patches shall go via the individual subsystem trees.
+ arch/arm/boot/dts/armada-375.dtsi | 2 +-
+ arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+ arch/arm/boot/dts/armada-39x.dtsi | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
- arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-index fb8d4a2ad48c06..a5edd7d6026698 100644
---- a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-+++ b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2010 Pengutronix, Wolfram Sang <w.sang@pengutronix.de>
-+ * Copyright (C) 2010 Pengutronix, Wolfram Sang <kernel@pengutronix.de>
-  *
-  * This program is free software; you can redistribute it and/or modify it under
-  * the terms of the GNU General Public License version 2 as published by the
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index c675257f2377..f076ff856d8b 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -69,7 +69,7 @@
+ 		mainpll: mainpll {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+-			clock-frequency = <2000000000>;
++			clock-frequency = <1000000000>;
+ 		};
+ 		/* 25 MHz reference crystal */
+ 		refclk: oscillator {
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index ed2dd8ba4080..218a2acd36e5 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -585,7 +585,7 @@
+ 		mainpll: mainpll {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+-			clock-frequency = <2000000000>;
++			clock-frequency = <1000000000>;
+ 		};
+ 
+ 		/* 25 MHz reference crystal */
+diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+index 0e85fc15ceda..ecd1318109ba 100644
+--- a/arch/arm/boot/dts/armada-39x.dtsi
++++ b/arch/arm/boot/dts/armada-39x.dtsi
+@@ -502,7 +502,7 @@
+ 		mainpll: mainpll {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+-			clock-frequency = <2000000000>;
++			clock-frequency = <1000000000>;
+ 		};
+ 	};
+ };
 -- 
-2.1.4
+2.1.0
