@@ -1,304 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 20 Apr 2015 19:23:00 +0200
-Subject: [PATCH] arm64: kill flush_cache_all()
-In-Reply-To: <1429521875-16893-1-git-send-email-mark.rutland@arm.com>
-References: <1429521875-16893-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAKv+Gu-VVA+wruJgfWksFdL5eXrp5nZV-b9q7eYspfi=KoqvEg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 Apr 2015 10:20:34 -0700
+Subject: Fscking OMAP
+In-Reply-To: <20150420171421.GY4027@n2100.arm.linux.org.uk>
+References: <20150420154912.GW4027@n2100.arm.linux.org.uk>
+ <20150420162515.GK18048@atomide.com>
+ <20150420171421.GY4027@n2100.arm.linux.org.uk>
+Message-ID: <20150420172034.GL18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 April 2015 at 11:24, Mark Rutland <mark.rutland@arm.com> wrote:
-> The documented semantics of flush_cache_all are not possible to provide
-> for arm64 (short of flushing the entire physical address space by VA),
-> and there are currently no users; KVM uses VA maintenance exclusively,
-> cpu_reset is never called, and the only two users outside of arch code
-> cannot be built for arm64.
->
-> While cpu_soft_reset and related functions (which call flush_cache_all)
-> were thought to be useful for kexec, their current implementations only
-> serve to mask bugs. For correctness kexec will need to perform
-> maintenance by VA anyway to account for system caches, line migration,
-> and other subtleties of the cache architecture. As the extent of this
-> cache maintenance will be kexec-specific, it should probably live in the
-> kexec code.
->
-> This patch removes flush_cache_all, and related unused components,
-> preventing further abuse.
->
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [150420 10:15]:
+> On Mon, Apr 20, 2015 at 09:25:16AM -0700, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [150420 08:50]:
+> > > Guys,
+> > > 
+> > > If you're going to introduce a dependency on some infrastructure which
+> > > you absolutely require for booting, then _please_ ensure that the
+> > > configuration system is updated such that pre-existing kernel
+> > > configurations continue to work.
+> > > 
+> > > Don't leave it such that the infrastructure ends up returning -ENOSYS,
+> > > which then filters down into your SoC specific code, and aborts the
+> > > initialisation of critical infrastructure, leaving you with a totally
+> > > silent boot failure.
+> > > 
+> > > In this case, it's the addition of syscon to OMAP internals,
+> > > specifically in omap_control_init().
+> > > 
+> > > This is explicitly targetted at OMAP people, who have wasted much of
+> > > my day today investigating why their platforms no longer boot in DT
+> > > mode.
+> > 
+> > Ouch, yeah missing dependencies are a pain to debug.
+> > 
+> > Looks like we get MFD_SYSCON selected with omap2plus_defconfig,
+> > but that's not always the case like you pointed out.
+> > 
+> > Does the patch below fix the issue for you?
+> 
+> Yes, that fixes it, thanks.
 
-While I agree fully with the general purpose of this patch, i.e., to
-prevent set/way operations to be abused for managing coherency,
-perhaps it would make sense to retain/repurpose some of this code as
-the 'supported' way of putting the CPU in the mode that is mandated by
-the boot protocol, so that it can be shared between the EFI stub and
-kexec.
+OK let's get this merged immediately and then Tero can add some more
+checks to the init code like you suggested with a follow-up patch.
 
-I think the former is not entirely safe at the moment, since the only
-region we clean/invalidate [by VA] is the memory region containing the
-copied kernel image, and the remainder of the efi-entry.S code itself.
-I may be wrong, but I think that means that any cached software state
-owned by the runtime services [including virtual remappings] could
-potentially get lost when we disable the dcache without cleaning it by
-set/way first.
+Regards,
 
--- 
-Ard.
-
-
-
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Geoff Levand <geoff@infradead.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/cacheflush.h  |  5 ---
->  arch/arm64/include/asm/proc-fns.h    |  4 --
->  arch/arm64/include/asm/system_misc.h |  1 -
->  arch/arm64/kernel/process.c          | 12 +-----
->  arch/arm64/mm/cache.S                | 73 ------------------------------------
->  arch/arm64/mm/flush.c                |  1 -
->  arch/arm64/mm/proc.S                 | 46 -----------------------
->  7 files changed, 1 insertion(+), 141 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-> index 67d309c..c75b8d0 100644
-> --- a/arch/arm64/include/asm/cacheflush.h
-> +++ b/arch/arm64/include/asm/cacheflush.h
-> @@ -40,10 +40,6 @@
->   *     the implementation assumes non-aliasing VIPT D-cache and (aliasing)
->   *     VIPT or ASID-tagged VIVT I-cache.
->   *
-> - *     flush_cache_all()
-> - *
-> - *             Unconditionally clean and invalidate the entire cache.
-> - *
->   *     flush_cache_mm(mm)
->   *
->   *             Clean and invalidate all user space cache entries
-> @@ -69,7 +65,6 @@
->   *             - kaddr  - page address
->   *             - size   - region size
->   */
-> -extern void flush_cache_all(void);
->  extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
->  extern void flush_icache_range(unsigned long start, unsigned long end);
->  extern void __flush_dcache_area(void *addr, size_t len);
-> diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-> index 4d9ede7..06732c8 100644
-> --- a/arch/arm64/include/asm/proc-fns.h
-> +++ b/arch/arm64/include/asm/proc-fns.h
-> @@ -28,12 +28,8 @@
->  struct mm_struct;
->  struct cpu_suspend_ctx;
->
-> -extern void cpu_cache_off(void);
->  extern void cpu_do_idle(void);
->  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
-> -extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
-> -void cpu_soft_restart(phys_addr_t cpu_reset,
-> -               unsigned long addr) __attribute__((noreturn));
->  extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
->  extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
->
-> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-> index 7a18fab..659fbf5 100644
-> --- a/arch/arm64/include/asm/system_misc.h
-> +++ b/arch/arm64/include/asm/system_misc.h
-> @@ -41,7 +41,6 @@ struct mm_struct;
->  extern void show_pte(struct mm_struct *mm, unsigned long addr);
->  extern void __show_regs(struct pt_regs *);
->
-> -void soft_restart(unsigned long);
->  extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->
->  #define UDBG_UNDEFINED (1 << 0)
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index c6b1f3b9..c506bee 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -58,14 +58,6 @@ unsigned long __stack_chk_guard __read_mostly;
->  EXPORT_SYMBOL(__stack_chk_guard);
->  #endif
->
-> -void soft_restart(unsigned long addr)
-> -{
-> -       setup_mm_for_reboot();
-> -       cpu_soft_restart(virt_to_phys(cpu_reset), addr);
-> -       /* Should never get here */
-> -       BUG();
-> -}
-> -
->  /*
->   * Function pointers to optional machine specific functions
->   */
-> @@ -136,9 +128,7 @@ void machine_power_off(void)
->
->  /*
->   * Restart requires that the secondary CPUs stop performing any activity
-> - * while the primary CPU resets the system. Systems with a single CPU can
-> - * use soft_restart() as their machine descriptor's .restart hook, since that
-> - * will cause the only available CPU to reset. Systems with multiple CPUs must
-> + * while the primary CPU resets the system. Systems with multiple CPUs must
->   * provide a HW restart implementation, to ensure that all CPUs reset at once.
->   * This is required so that any code running after reset on the primary CPU
->   * doesn't have to co-ordinate with other CPUs to ensure they aren't still
-> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> index 2560e1e..f563e9a 100644
-> --- a/arch/arm64/mm/cache.S
-> +++ b/arch/arm64/mm/cache.S
-> @@ -27,79 +27,6 @@
->  #include "proc-macros.S"
->
->  /*
-> - *     __flush_dcache_all()
-> - *
-> - *     Flush the whole D-cache.
-> - *
-> - *     Corrupted registers: x0-x7, x9-x11
-> - */
-> -__flush_dcache_all:
-> -       dmb     sy                              // ensure ordering with previous memory accesses
-> -       mrs     x0, clidr_el1                   // read clidr
-> -       and     x3, x0, #0x7000000              // extract loc from clidr
-> -       lsr     x3, x3, #23                     // left align loc bit field
-> -       cbz     x3, finished                    // if loc is 0, then no need to clean
-> -       mov     x10, #0                         // start clean at cache level 0
-> -loop1:
-> -       add     x2, x10, x10, lsr #1            // work out 3x current cache level
-> -       lsr     x1, x0, x2                      // extract cache type bits from clidr
-> -       and     x1, x1, #7                      // mask of the bits for current cache only
-> -       cmp     x1, #2                          // see what cache we have at this level
-> -       b.lt    skip                            // skip if no cache, or just i-cache
-> -       save_and_disable_irqs x9                // make CSSELR and CCSIDR access atomic
-> -       msr     csselr_el1, x10                 // select current cache level in csselr
-> -       isb                                     // isb to sych the new cssr&csidr
-> -       mrs     x1, ccsidr_el1                  // read the new ccsidr
-> -       restore_irqs x9
-> -       and     x2, x1, #7                      // extract the length of the cache lines
-> -       add     x2, x2, #4                      // add 4 (line length offset)
-> -       mov     x4, #0x3ff
-> -       and     x4, x4, x1, lsr #3              // find maximum number on the way size
-> -       clz     w5, w4                          // find bit position of way size increment
-> -       mov     x7, #0x7fff
-> -       and     x7, x7, x1, lsr #13             // extract max number of the index size
-> -loop2:
-> -       mov     x9, x4                          // create working copy of max way size
-> -loop3:
-> -       lsl     x6, x9, x5
-> -       orr     x11, x10, x6                    // factor way and cache number into x11
-> -       lsl     x6, x7, x2
-> -       orr     x11, x11, x6                    // factor index number into x11
-> -       dc      cisw, x11                       // clean & invalidate by set/way
-> -       subs    x9, x9, #1                      // decrement the way
-> -       b.ge    loop3
-> -       subs    x7, x7, #1                      // decrement the index
-> -       b.ge    loop2
-> -skip:
-> -       add     x10, x10, #2                    // increment cache number
-> -       cmp     x3, x10
-> -       b.gt    loop1
-> -finished:
-> -       mov     x10, #0                         // swith back to cache level 0
-> -       msr     csselr_el1, x10                 // select current cache level in csselr
-> -       dsb     sy
-> -       isb
-> -       ret
-> -ENDPROC(__flush_dcache_all)
-> -
-> -/*
-> - *     flush_cache_all()
-> - *
-> - *     Flush the entire cache system.  The data cache flush is now achieved
-> - *     using atomic clean / invalidates working outwards from L1 cache. This
-> - *     is done using Set/Way based cache maintainance instructions.  The
-> - *     instruction cache can still be invalidated back to the point of
-> - *     unification in a single instruction.
-> - */
-> -ENTRY(flush_cache_all)
-> -       mov     x12, lr
-> -       bl      __flush_dcache_all
-> -       mov     x0, #0
-> -       ic      ialluis                         // I+BTB cache invalidate
-> -       ret     x12
-> -ENDPROC(flush_cache_all)
-> -
-> -/*
->   *     flush_icache_range(start,end)
->   *
->   *     Ensure that the I and D caches are coherent within specified region.
-> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> index b6f14e8..4dfa397 100644
-> --- a/arch/arm64/mm/flush.c
-> +++ b/arch/arm64/mm/flush.c
-> @@ -102,7 +102,6 @@ EXPORT_SYMBOL(flush_dcache_page);
->  /*
->   * Additional functions defined in assembly.
->   */
-> -EXPORT_SYMBOL(flush_cache_all);
->  EXPORT_SYMBOL(flush_icache_range);
->
->  #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index cdd754e..39139a3 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -46,52 +46,6 @@
->  #define MAIR(attr, mt) ((attr) << ((mt) * 8))
->
->  /*
-> - *     cpu_cache_off()
-> - *
-> - *     Turn the CPU D-cache off.
-> - */
-> -ENTRY(cpu_cache_off)
-> -       mrs     x0, sctlr_el1
-> -       bic     x0, x0, #1 << 2                 // clear SCTLR.C
-> -       msr     sctlr_el1, x0
-> -       isb
-> -       ret
-> -ENDPROC(cpu_cache_off)
-> -
-> -/*
-> - *     cpu_reset(loc)
-> - *
-> - *     Perform a soft reset of the system.  Put the CPU into the same state
-> - *     as it would be if it had been reset, and branch to what would be the
-> - *     reset vector. It must be executed with the flat identity mapping.
-> - *
-> - *     - loc   - location to jump to for soft reset
-> - */
-> -       .align  5
-> -ENTRY(cpu_reset)
-> -       mrs     x1, sctlr_el1
-> -       bic     x1, x1, #1
-> -       msr     sctlr_el1, x1                   // disable the MMU
-> -       isb
-> -       ret     x0
-> -ENDPROC(cpu_reset)
-> -
-> -ENTRY(cpu_soft_restart)
-> -       /* Save address of cpu_reset() and reset address */
-> -       mov     x19, x0
-> -       mov     x20, x1
-> -
-> -       /* Turn D-cache off */
-> -       bl      cpu_cache_off
-> -
-> -       /* Push out all dirty data, and ensure cache is empty */
-> -       bl      flush_cache_all
-> -
-> -       mov     x0, x20
-> -       ret     x19
-> -ENDPROC(cpu_soft_restart)
-> -
-> -/*
->   *     cpu_do_idle()
->   *
->   *     Idle the processor (wait for interrupt).
-> --
-> 1.9.1
->
+Tony
+ 
+> > 8< -----------------------
+> > From: Tony Lindgren <tony@atomide.com>
+> > Date: Mon, 20 Apr 2015 09:23:25 -0700
+> > Subject: [PATCH] ARM: OMAP2+: Fix booting with configs that don't have MFD_SYSCON
+> > 
+> > With the recent changes omaps have developed a dependency to MFD_SYSCON.
+> > This is used for system control module generic register area and some
+> > clocks.
+> > 
+> > We do have it selected in omap2plus_defconfig, but targeted config
+> > files may not have it selected. Let's make sure it's selected like
+> > few other ARM platforms are already doing.
+> > 
+> > Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > --- a/arch/arm/mach-omap2/Kconfig
+> > +++ b/arch/arm/mach-omap2/Kconfig
+> > @@ -81,6 +81,7 @@ config ARCH_OMAP2PLUS
+> >  	select GENERIC_IRQ_CHIP
+> >  	select MACH_OMAP_GENERIC
+> >  	select MEMORY
+> > +	select MFD_SYSCON
+> >  	select OMAP_DM_TIMER
+> >  	select OMAP_GPMC
+> >  	select PINCTRL
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
