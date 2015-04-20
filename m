@@ -1,79 +1,72 @@
-From: vbridger@opensource.altera.com (Vince Bridgers)
-Date: Mon, 20 Apr 2015 11:24:28 -0500
-Subject: [PATCH 2/2] ARM: socfpga: dts: Add tx-fifo-depth and rx-fifo-depth
- properties
-In-Reply-To: <1429547068-12501-1-git-send-email-vbridger@opensource.altera.com>
-References: <1429547068-12501-1-git-send-email-vbridger@opensource.altera.com>
-Message-ID: <1429547068-12501-2-git-send-email-vbridger@opensource.altera.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 20 Apr 2015 21:48:49 +0100
+Subject: [RESEND RFC PATCH 1/3] ASoC: mediatek: Add binding support for
+ AFE driver
+In-Reply-To: <20150420043747.GH6325@pengutronix.de>
+References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
+ <1428653649-38200-2-git-send-email-koro.chen@mediatek.com>
+ <20150418173407.GE26185@sirena.org.uk>
+ <20150420043747.GH6325@pengutronix.de>
+Message-ID: <20150420204849.GJ14892@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add tx-fifo-depth and rx-fifo-depth devicetree properties for socfpga
-stmmac. These devicetree properties will be used to configure certain
-features of the stmmac on the socfpga.
+On Mon, Apr 20, 2015 at 06:37:47AM +0200, Sascha Hauer wrote:
+> On Sat, Apr 18, 2015 at 06:34:07PM +0100, Mark Brown wrote:
+> > On Fri, Apr 10, 2015 at 04:14:07PM +0800, Koro Chen wrote:
 
-Signed-off-by: Vince Bridgers <vbridger@opensource.altera.com>
----
-This patch is based on patches
-http://www.spinics.net/lists/devicetree/msg75270.html
-http://www.spinics.net/lists/devicetree/msg75273.html
----
- arch/arm/boot/dts/socfpga.dtsi         | 4 ++++
- arch/arm/boot/dts/socfpga_arria10.dtsi | 6 ++++++
- 2 files changed, 10 insertions(+)
+> > > +Each external interface (called "IO" in this driver) is presented as a
+> > > +DAI to ASoC. An IO must be connected via the interconnect to a memif.
+> > > +The connection paths are configured through the device tree.
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index d9176e6..4721a9d 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -488,6 +488,8 @@
- 			reset-names = "stmmaceth";
- 			snps,multicast-filter-bins = <256>;
- 			snps,perfect-filter-entries = <128>;
-+			tx-fifo-depth = <4096>;
-+			rx-fifo-depth = <4096>;
- 			status = "disabled";
- 		};
- 
-@@ -504,6 +506,8 @@
- 			reset-names = "stmmaceth";
- 			snps,multicast-filter-bins = <256>;
- 			snps,perfect-filter-entries = <128>;
-+			tx-fifo-depth = <4096>;
-+			rx-fifo-depth = <4096>;
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index d2ef52b..9c6dcff 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -397,6 +397,8 @@
- 			mac-address = [00 00 00 00 00 00];
- 			snps,multicast-filter-bins = <256>;
- 			snps,perfect-filter-entries = <128>;
-+			tx-fifo-depth = <4096>;
-+			rx-fifo-depth = <16384>;
- 			clocks = <&l4_mp_clk>;
- 			clock-names = "stmmaceth";
- 			status = "disabled";
-@@ -412,6 +414,8 @@
- 			mac-address = [00 00 00 00 00 00];
- 			snps,multicast-filter-bins = <256>;
- 			snps,perfect-filter-entries = <128>;
-+			tx-fifo-depth = <4096>;
-+			rx-fifo-depth = <16384>;
- 			status = "disabled";
- 		};
- 
-@@ -425,6 +429,8 @@
- 			mac-address = [00 00 00 00 00 00];
- 			snps,multicast-filter-bins = <256>;
- 			snps,perfect-filter-entries = <128>;
-+			tx-fifo-depth = <4096>;
-+			rx-fifo-depth = <16384>;
- 			status = "disabled";
- 		};
- 
--- 
-1.9.1
+> > Why are these connection paths configured via device tree?  I would
+> > expect that either there would be runtime configurability of these
+> > things (particularly if loopback configurations within the hardware are
+> > possible) or we'd just allocate memory interfaces to DAIs automatically
+> > as DAIs come into use.
+
+> There is a crossbar switch between the memory interfaces and the DAIs.
+> Not every connection is possible, so not every memory interface can be
+> used for every DAI. An algorithm choosing a suitable memory interface
+> must be quite clever, complicated and also SoC dependent (the same but
+> different hardware is used on MT8135 aswell), so I thought offering a
+> static configuration via device tree is a good start. Should there be
+> runtime configuration possible later the device tree settings could
+> provide a good default.
+
+What exactly do the restrictions look like and how often do they vary in
+practice (can we get away with just doing a single static setup in the
+driver)?  I'd have thought it should be fairly straightforward to have a
+table of valid mappings and just pick the first free memory interface?
+I'd rather not get stuck with the tables in the DT.  It's partly to
+avoid setting bad precendents, we really don't want everyone coming
+along hard coding this stuff, and partly because the hardware you
+described didn't seem that hard to handle.
+
+> > > +- mem-interface-playback:
+> > > +  mem-interface-capture: property of memif, format is: <memif irq use_sram>;
+> > > +	                 memif: which memif to be used
+> > > +			        (defined in include/dt-bindings/sound/mtk-afe.h)
+> > > +		         irq: which irq to be used
+> > > +			      (defined in include/dt-bindings/sound/mtk-afe.h)
+> > > +		         use_sram: 1 is yes, 0 is no
+
+> > Again, this looks like stuff we should be able to figure out at runtime
+> > - the use of SRAM in particular looks like something we might want to
+> > change depending on use case.  Assuming it adds buffering then for a
+> > VoIP application we might not want to use SRAM to minimize latency but
+> > during music playback we might want to enable SRAM to minimize power
+> > consumption.
+
+> That's exactly the usecase. How could such a runtime configurability
+> look like? sysfs? Or something based on the buffer sizes?
+
+Yeah, one of those :) but probably an ALSA control is going to be the
+easiest for applications.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150420/c4e99187/attachment.sig>
