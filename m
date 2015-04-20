@@ -1,36 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 20 Apr 2015 21:55:11 +0100
-Subject: [RESEND RFC PATCH 3/3] ASoC: mediatek: Add AFE platform driver
-In-Reply-To: <1429510944.30743.36.camel@mtksdaap41>
-References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
- <1428653649-38200-4-git-send-email-koro.chen@mediatek.com>
- <20150418175139.GG26185@sirena.org.uk>
- <1429510944.30743.36.camel@mtksdaap41>
-Message-ID: <20150420205511.GL14892@sirena.org.uk>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 20 Apr 2015 14:07:33 -0700
+Subject: [PATCH 0/4] cpufreq: use generic cpufreq drivers for Exynos5250
+ platform
+In-Reply-To: <1428946441-17058-1-git-send-email-b.zolnierkie@samsung.com>
+ (Bartlomiej Zolnierkiewicz's message of "Mon, 13 Apr 2015 19:33:57
+ +0200")
+References: <1428946441-17058-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <7h1tjeh5ka.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 02:22:24PM +0800, Koro Chen wrote:
-> On Sat, 2015-04-18 at 18:51 +0100, Mark Brown wrote:
-> > On Fri, Apr 10, 2015 at 04:14:09PM +0800, Koro Chen wrote:
+Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> writes:
 
-> > Ah, so the SRAM is directly memory mappable.  Nice.  But we have a
-> > limited amount of it so need to allocate it to a device somehow based on
-> > some factor I guess?
+> Hi,
+>
+> This patch series removes the use of Exynos5250 specific support
+> from exynos-cpufreq driver and enables the use of cpufreq-dt driver
+> for this platform.  The exynos-cpufreq driver itself is also removed
+> as it is no longer used/needed after Exynos5250 support removal.
+>
+> This patch series has been tested on Exynos5250 based Arndale board.
+>
+> Depends on:
+> - next-20150330 branch of linux-next kernel tree
+> - "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4210
+>   platform" [1]
+> - "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+>   platform" [2]
+> - "[PATCH] cpufreq: exynos: remove dead ->need_apll_change method" [3]
 
-> Yes, actually SRAM is only used for the main playback path (which is
-> memif "DL1") to achieve low power in real use case. Maybe you think it's
-> better to not describe this in the device tree, but to choose SRAM
-> automatically if memif "DL1" is chosen?
+Any chance you could prepare a branch with all the dependencies for easy
+testing?
 
-Since it's directly memory mappable is there actually any cost in
-latency terms from using the SRAM in low latency cases (or did I misread
-what the code was doing there)?  If it can only be used with one
-interface and there's no downside from using it...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150420/071b0bdc/attachment-0001.sig>
+Also, The previous version from Thomas was v12, and this one is neither
+versioned nor has any reference to what may have changed since that
+version.  Also, on v12, I had several comments[1] and wonder if they've
+been addressed.
+
+Kevin
+
+[1] http://article.gmane.org/gmane.linux.power-management.general/53494/match=patch+v12+0+6+use+generic+cpufreq
