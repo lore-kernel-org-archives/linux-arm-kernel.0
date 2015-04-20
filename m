@@ -1,43 +1,31 @@
 From: tyler.baker@linaro.org (Tyler Baker)
-Date: Mon, 20 Apr 2015 16:14:21 -0700
-Subject: [PATCH v3 3/8] selftests/breakpoints: emit skip and omit installation
- when tests are not compiled
-Message-ID: <1429571661-26337-1-git-send-email-tyler.baker@linaro.org>
+Date: Mon, 20 Apr 2015 16:14:45 -0700
+Subject: [PATCH v3 4/8] selftests/kdbus: install kdbus-test
+Message-ID: <1429571685-26643-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The breakpoints test should only should be executed on x86 targets, so lets
-emit a skip and omit the installation when ARCH != x86.
+Set TEST_PROGS so that kdbus-test is installed.
 
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Acked-by: Michael Ellerman <mpe@ellerman.id.au>
 Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
 ---
- tools/testing/selftests/breakpoints/Makefile | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ tools/testing/selftests/kdbus/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/tools/testing/selftests/breakpoints/Makefile b/tools/testing/selftests/breakpoints/Makefile
-index 1822356..430b76d 100644
---- a/tools/testing/selftests/breakpoints/Makefile
-+++ b/tools/testing/selftests/breakpoints/Makefile
-@@ -8,7 +8,6 @@ ifeq ($(ARCH),x86_64)
- 	ARCH := x86
- endif
+diff --git a/tools/testing/selftests/kdbus/Makefile b/tools/testing/selftests/kdbus/Makefile
+index de8242f..94ea75b 100644
+--- a/tools/testing/selftests/kdbus/Makefile
++++ b/tools/testing/selftests/kdbus/Makefile
+@@ -41,6 +41,8 @@ include ../lib.mk
+ kdbus-test: $(OBJS)
+ 	$(CC) $(CFLAGS) $^ $(LDLIBS) -o $@
  
--
- all:
- ifeq ($(ARCH),x86)
- 	gcc breakpoint_test.c -o breakpoint_test
-@@ -20,5 +19,11 @@ TEST_PROGS := breakpoint_test
- 
- include ../lib.mk
- 
-+install:
-+ifneq ($(ARCH),x86)
-+echo "Not an x86 target, can't install breakpoints selftests"
-+override EMIT_TESTS :=  echo "echo \"selftests: breakpoint_test [SKIP]\""
-+endif
++TEST_PROGS := kdbus-test
 +
- clean:
- 	rm -fr breakpoint_test
+ run_tests:
+ 	./kdbus-test --tap
+ 
 -- 
 2.1.4
