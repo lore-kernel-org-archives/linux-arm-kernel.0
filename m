@@ -1,56 +1,72 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Mon, 20 Apr 2015 08:38:18 +0530
-Subject: [PATCH v3] dmaengine: xgene-dma: Fix sparse wannings and
- coccinelle warnings
-In-Reply-To: <20150417182937.GN30624@intel.com>
-References: <1429212673-22254-1-git-send-email-rsahu@apm.com>
- <20150417182937.GN30624@intel.com>
-Message-ID: <CAFd313y-HfW_us0FVQFEkGAzf-ZCKpRtF6eYweaK0V94MBg4iQ@mail.gmail.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 20 Apr 2015 12:13:34 +0800
+Subject: [PATCH 2/2] ARM: DMA: Use vm_pgoff for IOMMU mmap
+In-Reply-To: <1429195312-25898-2-git-send-email-orjan.eide@arm.com>
+References: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
+ <1429195312-25898-2-git-send-email-orjan.eide@arm.com>
+Message-ID: <CAGS+omCONjvt-QJ1ZHQcydAPBT7vUr1TUyXjZG+25BK-j8XMyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi ?rjan,
 
-On Fri, Apr 17, 2015 at 11:59 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+On Thu, Apr 16, 2015 at 10:41 PM, ?rjan Eide <orjan.eide@arm.com> wrote:
+> arm_iommu_mmap_attrs() ignores the page offset in vma->vm_pgoff that was
+> specified in the mmap call. Any user of dma_mmap_* will get an
+> unexpected result when the device uses the IOMMU DMA ops.
 >
->>       /* Get DMA error interrupt */
->> @@ -2076,7 +2035,6 @@ static struct platform_driver xgene_dma_driver = {
->>       .remove = xgene_dma_remove,
->>       .driver = {
->>               .name = "X-Gene-DMA",
->> -             .owner = THIS_MODULE,
-> I have already applied a patch for this
-
-Okay, I didn't pull latest git
-
+> Some DRM driver that use dma_mmap_* seems to depend on it ignoring
+> vma->vm_pgoff.  Both the Samsung Exynos DRM driver before v3.18, and the
+> current Rockchip DRM driver, use the page offset to pass GEM cookies
+> that are used to look up the GEM buffers and then call dma_mmap_attrs()
+> with the cookie value still in vma->vm_pgoff.
 >
->>               .of_match_table = xgene_dma_of_match_ptr,
->>       },
->>  };
->> @@ -2085,6 +2043,5 @@ module_platform_driver(xgene_dma_driver);
->>
->>  MODULE_DESCRIPTION("APM X-Gene SoC DMA driver");
->>  MODULE_AUTHOR("Rameshwar Prasad Sahu <rsahu@apm.com>");
->> -MODULE_AUTHOR("Loc Ho <lho@apm.com>");
-> And why this?
-
-I saw below warning reported by the kbuild robot test
-
-drivers/dma/xgene-dma.c:2088:1: sparse: symbol
-'__UNIQUE_ID_author__COUNTER__' has multiple initializers (originally
-initialized at drivers/dma/xgene-dma.c:2087)
-So, I kept only one author here.
-
-
+> rockchip_gem_mmap_buf() in drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> still does this. It should be fixed before fixing
+> arm_iommu_mmap_attrs().
 >
-> Fixes looks good though
+> Signed-off-by: ?rjan Eide <orjan.eide@arm.com>
+
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+
+I tested this patch on my RK3288 board with the corresponding
+rockchip_drm patch [0], and it works.  So, also:
+Tested-by: Daniel Kurtz <djkurtz@chromium.org>
+
+[0] https://patchwork.kernel.org/patch/6226591/
+
+
+
+> ---
+>  arch/arm/mm/dma-mapping.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 >
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index c274476..07d571b 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1364,6 +1364,9 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>  {
+>         unsigned long uaddr = vma->vm_start;
+>         unsigned long usize = vma->vm_end - vma->vm_start;
+> +       unsigned long nr_vma_pages = usize >> PAGE_SHIFT;
+> +       unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> +       unsigned long off = vma->vm_pgoff;
+>         struct page **pages = __iommu_get_pages(cpu_addr, attrs);
+>
+>         vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
+> @@ -1371,6 +1374,11 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>         if (!pages)
+>                 return -ENXIO;
+>
+> +       if (off >= nr_pages || nr_vma_pages > (nr_pages - off))
+> +               return -ENXIO;
+> +
+> +       pages += off;
+> +
+>         do {
+>                 int ret = vm_insert_page(vma, uaddr, *pages++);
+>                 if (ret) {
 > --
-> ~Vinod
->>  MODULE_LICENSE("GPL");
->>  MODULE_VERSION("1.0");
->> --
->> 1.8.2.1
->>
+> 1.9.1
 >
-> --
