@@ -1,81 +1,80 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 20 Apr 2015 10:42:51 -0500
-Subject: [PATCH RESEND 1/2] ARM: socfpga: Add support for UART1 debug uart for
- earlyprintk
-Message-ID: <1429544572-22421-1-git-send-email-dinguyen@opensource.altera.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Apr 2015 16:48:24 +0100
+Subject: [PATCH] arm64: Implement 1-,2- byte smp_load_acquire and
+ smp_store_release
+In-Reply-To: <1429544753-4120-1-git-send-email-a.ryabinin@samsung.com>
+References: <1429544753-4120-1-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <20150420154824.GD1504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+Hi Andrey,
 
-Add support for hardware uart1 for earlyprintk support on Arria10 devkit.
+On Mon, Apr 20, 2015 at 04:45:53PM +0100, Andrey Ryabinin wrote:
+> commit 47933ad41a86 ("arch: Introduce smp_load_acquire(), smp_store_release()")
+> allowed only 4- and 8-byte smp_load_acquire, smp_store_release.
+> So 1- and 2-byte cases weren't implemented in arm64.
+> Later commit 536fa402221f ("compiler: Allow 1- and 2-byte smp_load_acquire()
+> 				and smp_store_release()")
+> allowed to use 1 and 2 byte smp_load_acquire and smp_store_release
+> by adjusting the definition of __native_word().
+> However, 1-,2- byte cases in arm64 version left unimplemented.
+> 
+> Commit 8053871d0f7f ("smp: Fix smp_call_function_single_async() locking")
+> started to use smp_load_acquire() to load 2-bytes csd->flags.
+> That crashes arm64 kernel during the boot.
+> 
+> Implement 1,2 byte cases in arm64's  smp_load_acquire()
+> and smp_store_release() to fix this.
+> 
+> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-CC: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/Kconfig.debug | 25 ++++++++++++++++++-------
- 1 file changed, 18 insertions(+), 7 deletions(-)
+I already have an equivalent patch queued in the arm64/fixes branch[1]. I'll
+send a pull shortly.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 970de75..0e52b92 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -920,13 +920,22 @@ choice
- 		  on SA-11x0 UART ports. The kernel will check for the first
- 		  enabled UART in a sequence 3-1-2.
- 
--	config DEBUG_SOCFPGA_UART
-+	config DEBUG_SOCFPGA_UART0
- 		depends on ARCH_SOCFPGA
--		bool "Use SOCFPGA UART for low-level debug"
-+		bool "Use SOCFPGA UART0 for low-level debug"
- 		select DEBUG_UART_8250
- 		help
- 		  Say Y here if you want kernel low-level debugging support
--		  on SOCFPGA based platforms.
-+		  on SOCFPGA(Cyclone 5 and Arria 5) based platforms.
-+
-+	config DEBUG_SOCFPGA_UART1
-+		depends on ARCH_SOCFPGA
-+		bool "Use SOCFPGA UART1 for low-level debug"
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on SOCFPGA(Arria 10) based platforms.
-+
- 
- 	config DEBUG_SUN9I_UART0
- 		bool "Kernel low-level debugging messages via sun9i UART0"
-@@ -1419,7 +1428,8 @@ config DEBUG_UART_PHYS
- 	default 0xfcb00000 if DEBUG_HI3620_UART
- 	default 0xfe800000 if ARCH_IOP32X
- 	default 0xff690000 if DEBUG_RK32_UART2
--	default 0xffc02000 if DEBUG_SOCFPGA_UART
-+	default 0xffc02000 if DEBUG_SOCFPGA_UART0
-+	default 0xffc02100 if DEBUG_SOCFPGA_UART1
- 	default 0xffd82340 if ARCH_IOP13XX
- 	default 0xffe40000 if DEBUG_RCAR_GEN1_SCIF0
- 	default 0xffe42000 if DEBUG_RCAR_GEN1_SCIF2
-@@ -1497,7 +1507,8 @@ config DEBUG_UART_VIRT
- 	default 0xfeb26000 if DEBUG_RK3X_UART1
- 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
- 	default 0xfeb31000 if DEBUG_KEYSTONE_UART1
--	default 0xfec02000 if DEBUG_SOCFPGA_UART
-+	default 0xfec02000 if DEBUG_SOCFPGA_UART0
-+	default 0xfec02100 if DEBUG_SOCFPGA_UART1
- 	default 0xfec12000 if DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE
- 	default 0xfec12100 if DEBUG_MVEBU_UART1_ALTERNATE
- 	default 0xfec10000 if DEBUG_SIRFATLAS7_UART0
-@@ -1542,8 +1553,8 @@ config DEBUG_UART_8250_WORD
- 	bool "Use 32-bit accesses for 8250 UART"
- 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
- 	depends on DEBUG_UART_8250_SHIFT >= 2
--	default y if DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART || \
--		ARCH_KEYSTONE || \
-+	default y if DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART0 || \
-+		DEBUG_SOCFPGA_UART1 || ARCH_KEYSTONE || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
- 		DEBUG_DAVINCI_DA8XX_UART2 || \
- 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
--- 
-2.2.1
+Will
+
+[1]
+https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=fixes/core
+
+> ---
+>  arch/arm64/include/asm/barrier.h | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+> index a5abb00..71f19c4 100644
+> --- a/arch/arm64/include/asm/barrier.h
+> +++ b/arch/arm64/include/asm/barrier.h
+> @@ -65,6 +65,14 @@ do {									\
+>  do {									\
+>  	compiletime_assert_atomic_type(*p);				\
+>  	switch (sizeof(*p)) {						\
+> +	case 1:								\
+> +		asm volatile ("stlrb %w1, %0"				\
+> +				: "=Q" (*p) : "r" (v) : "memory");	\
+> +		break;							\
+> +	case 2:								\
+> +		asm volatile ("stlrh %w1, %0"				\
+> +				: "=Q" (*p) : "r" (v) : "memory");	\
+> +		break;							\
+>  	case 4:								\
+>  		asm volatile ("stlr %w1, %0"				\
+>  				: "=Q" (*p) : "r" (v) : "memory");	\
+> @@ -81,6 +89,14 @@ do {									\
+>  	typeof(*p) ___p1;						\
+>  	compiletime_assert_atomic_type(*p);				\
+>  	switch (sizeof(*p)) {						\
+> +	case 1:								\
+> +		asm volatile ("ldarb %w0, %1"				\
+> +			: "=r" (___p1) : "Q" (*p) : "memory");		\
+> +		break;							\
+> +	case 2:								\
+> +		asm volatile ("ldarh %w0, %1"				\
+> +			: "=r" (___p1) : "Q" (*p) : "memory");		\
+> +		break;							\
+>  	case 4:								\
+>  		asm volatile ("ldar %w0, %1"				\
+>  			: "=r" (___p1) : "Q" (*p) : "memory");		\
+> -- 
+> 2.3.5
+> 
