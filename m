@@ -1,72 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Apr 2015 19:02:55 +0100
-Subject: [PATCH] arm64: kill flush_cache_all()
-In-Reply-To: <CAKv+Gu-VVA+wruJgfWksFdL5eXrp5nZV-b9q7eYspfi=KoqvEg@mail.gmail.com>
-References: <1429521875-16893-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu-VVA+wruJgfWksFdL5eXrp5nZV-b9q7eYspfi=KoqvEg@mail.gmail.com>
-Message-ID: <20150420180255.GB17767@leverpostej>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 20 Apr 2015 12:20:52 -0600
+Subject: [tpmdd-devel] [RFC PATCH 1/2] tee: generic TEE subsystem
+In-Reply-To: <20150420062044.GA7767@ermac>
+References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
+ <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
+ <2102140.2VHBUJBHNB@wuerfel> <20150420062044.GA7767@ermac>
+Message-ID: <20150420182052.GA32299@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 06:23:00PM +0100, Ard Biesheuvel wrote:
-> On 20 April 2015 at 11:24, Mark Rutland <mark.rutland@arm.com> wrote:
-> > The documented semantics of flush_cache_all are not possible to provide
-> > for arm64 (short of flushing the entire physical address space by VA),
-> > and there are currently no users; KVM uses VA maintenance exclusively,
-> > cpu_reset is never called, and the only two users outside of arch code
-> > cannot be built for arm64.
-> >
-> > While cpu_soft_reset and related functions (which call flush_cache_all)
-> > were thought to be useful for kexec, their current implementations only
-> > serve to mask bugs. For correctness kexec will need to perform
-> > maintenance by VA anyway to account for system caches, line migration,
-> > and other subtleties of the cache architecture. As the extent of this
-> > cache maintenance will be kexec-specific, it should probably live in the
-> > kexec code.
-> >
-> > This patch removes flush_cache_all, and related unused components,
-> > preventing further abuse.
-> >
-> 
-> While I agree fully with the general purpose of this patch, i.e., to
-> prevent set/way operations to be abused for managing coherency,
-> perhaps it would make sense to retain/repurpose some of this code as
-> the 'supported' way of putting the CPU in the mode that is mandated by
-> the boot protocol, so that it can be shared between the EFI stub and
-> kexec.
-> 
-> I think the former is not entirely safe at the moment, since the only
-> region we clean/invalidate [by VA] is the memory region containing the
-> copied kernel image, and the remainder of the efi-entry.S code itself.
-> I may be wrong, but I think that means that any cached software state
-> owned by the runtime services [including virtual remappings] could
-> potentially get lost when we disable the dcache without cleaning it by
-> set/way first.
+On Mon, Apr 20, 2015 at 08:20:44AM +0200, Jens Wiklander wrote:
 
-Regarding the boot protocol, note that this was relaxed a while back
-w.r.t. cache requirements, only mandating that certain regions of memory
-are clean to the PoC.
+> I'm not sure I understand what you mean. This function is a building
+> block for the TEE driver to supply whatever interface is needed for user
+> space. For a Global Platform like TEE it will typically have support for
+> TEEC_OpenSession(), TEEC_InvokeCommand(), TEEC_RequestCancellation() and
+> TEEC_CloseSession(). But how that's done is depending on how the
+> interface towards the TEE (in secure world) looks like. From what I've
+> heard so far those interfaces diverges a lot so we've compromised with
+> this function.
 
-Clearing SCTLR.C prevents accesses from being given cacheable
-attributes, but doesn't disable any caches as such. The CPU caches
-remain active and coherent (unless some IMPLEMENTATION DEFINED mechanism
-is used to exit coherency), so the data will remain there unless
-naturally evicted, taken by another cache, or explicitly
-cleaned/invalidated.
+The goal of the mid layer is to bring all these differences into a
+common abstraction, not punt on them to higher layers.
 
-With SCTLR.C clear, memory accesses should not result in the allocation
-of new lines into the caches (though if data for a given address is
-present, an access may hit said data). Clearing SCTLR.M is necessary to
-prevent allocation by the page table walkers, unless these are not using
-cacheable attributes to begin with.
+The goal if the driver is to translate and transport the common
+abstraction to the hardware.
 
-Set/Way maintenance races with the usual operation of the caches while
-cacheable accesses may be made into them, so do not make sense to use
-while SCTLR.C or SCTLR.M are set. They can only drain the CPU-local
-caches when nothing may allocate into them, and do not affect system
-caches, so portable software must use maintenance by VA for correctness.
+It is an absolute failure if each TEE driver implements a different
+TEEC_OpenSession() ioctl. They must be the same, the common code
+must de-marshal the request from user space and then call
+ops->open_session()
 
-Does that address your concerns? Or pose new questions? ;)
+Driver specific ioctls are a terrible way to start a new mid layer.
 
-Thanks,
-Mark.
+> > What is the typical and maximum allocation size here?
+> It depends on the design of the Trusted Application in secure world and
+> the client in user space.  A few KiB could be the typical allocation
+> size, with a maximum at perhaps 512 KiB (for instance when loading a
+> very large Trusted Application).
+
+So this TEE stuff also encompasses a 'firmware' loader (to the secure
+world, presumably)?
+
+That is probably your base level of 'ops' functionality, plus the
+shared memroy stuff.
+
+How does this work if two userspace things run concurrently with
+different firmwares? Is there some locking or something? What is the
+lifetime of this firmware tied to?
+
+> I agree that we can drop least one of the _version fields probably both,
+> but something is needed for user space to be able to know which TEE (in
+> secure world) it's communicating with. The uuid will let the client know
+> how how to format the commands passed to TEE_IOC_CMD below.
+
+So you load the firmare, learn what command set it supports then use
+TEE_IOC_CMD to shuttle firmware-specific data to and from?
+
+> I've touched on this above, this function the essential when
+> communicating with the driver and secure world. Different TEEs (running
+> in some secure environment) provides different interfaces. By providing
+> an opaque channel we don't have to force something on the TEE.  The
+> problem is moved to the user space library which is used when talking to
+> the TEE. The assumption here is that the interface provided the TEE is
+> stable or something that the specific TEE driver can handle with a glue
+> layer.
+
+I would use read/write for this, not ioctl. read/write can work with
+select/poll so you can send your command then go into a polling loop
+waiting for the reply from the firmware.
+
+Jason
