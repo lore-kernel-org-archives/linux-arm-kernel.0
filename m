@@ -1,216 +1,208 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Mon, 20 Apr 2015 09:17:19 -0500
-Subject: [PATCH 1/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
-References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
- <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20150420141719.GF27115@jcartwri.amer.corp.natinst.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 20 Apr 2015 16:17:30 +0200
+Subject: [PATCH 12/13 v2] coresight: replicator: retrieve and handle atclk
+In-Reply-To: <1429534746-3068-12-git-send-email-linus.walleij@linaro.org>
+References: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
+ <1429534746-3068-12-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAPDyKFr+54aT0VxsaYk4borLQQzYwCq-RAyjTwg6W4XQRLk8Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 05:27:26PM +0800, pi-cheng.chen wrote:
-> This patch implements MT8173 specific cpufreq driver with OPP table defined
-> in the driver code.
-> 
-> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
+On 20 April 2015 at 14:59, Linus Walleij <linus.walleij@linaro.org> wrote:
+> As can be seen from the datasheet of the CoreSight
+> Components, DDI0314 table A-4 the funnel has a clock signal
+> apart from the AHB interconnect ("amba_pclk", that we're
+> already handling) called ATCLK, ARM Trace Clock, that SoC
+> implementers may provide from an entirely different clock
+> source. So to model this correctly create an optional
+> path for handling ATCLK alongside the PCLK so we don't
+> break old platforms that only define PCLK ("amba_pclk") but
+> still makes it possible for SoCs that have both clock signals
+> (such as the DB8500) to fetch and prepare/enable/disable/
+> unprepare both clocks.
+>
+> The ATCLK is enabled and disabled using the runtime PM
+> callbacks. As the replicator is a platform device, the
+> code is a bit different from the other CoreSight components
+> and the bus core does not activate runtime PM by default,
+> so we need a few extra calls.
+>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/cpufreq/Kconfig.arm      |   6 +
->  drivers/cpufreq/Makefile         |   1 +
->  drivers/cpufreq/mt8173-cpufreq.c | 509 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 516 insertions(+)
->  create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
-> 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 1b06fc4..25643c7 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -132,6 +132,12 @@ config ARM_KIRKWOOD_CPUFREQ
->  	  This adds the CPUFreq driver for Marvell Kirkwood
->  	  SoCs.
->  
-> +config ARM_MT8173_CPUFREQ
-> +	bool "Mediatek MT8173 CPUFreq support"
-> +	depends on ARCH_MEDIATEK && REGULATOR
+> ChangeLog v1->v2:
+> - Rebased on the coresight git tree.
+> - Fix up runtime suspend/resume code as indicated by Ulf.
+> - Added Ulf's review tag.
+> ---
+>  drivers/hwtracing/coresight/coresight-replicator.c | 65 ++++++++++++++++++++--
+>  1 file changed, 61 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
+> index cdf05537d574..68f3985f750d 100644
+> --- a/drivers/hwtracing/coresight/coresight-replicator.c
+> +++ b/drivers/hwtracing/coresight/coresight-replicator.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/io.h>
+>  #include <linux/err.h>
+>  #include <linux/slab.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/clk.h>
+>  #include <linux/of.h>
+>  #include <linux/coresight.h>
+> @@ -27,10 +28,12 @@
+>  /**
+>   * struct replicator_drvdata - specifics associated to a replicator component
+>   * @dev:       the device entity associated with this component
+> + * @atclk:     optional clock for the core parts of the replicator.
+>   * @csdev:     component vitals needed by the framework
+>   */
+>  struct replicator_drvdata {
+>         struct device           *dev;
+> +       struct clk              *atclk;
+>         struct coresight_device *csdev;
+>  };
+>
+> @@ -39,6 +42,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
+>  {
+>         struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>
+> +       pm_runtime_get_sync(drvdata->dev);
+>         dev_info(drvdata->dev, "REPLICATOR enabled\n");
+>         return 0;
+>  }
+> @@ -48,6 +52,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
+>  {
+>         struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>
+> +       pm_runtime_put(drvdata->dev);
+>         dev_info(drvdata->dev, "REPLICATOR disabled\n");
+>  }
+>
+> @@ -62,6 +67,7 @@ static const struct coresight_ops replicator_cs_ops = {
+>
+>  static int replicator_probe(struct platform_device *pdev)
+>  {
+> +       int ret;
+>         struct device *dev = &pdev->dev;
+>         struct coresight_platform_data *pdata = NULL;
+>         struct replicator_drvdata *drvdata;
+> @@ -80,11 +86,22 @@ static int replicator_probe(struct platform_device *pdev)
+>                 return -ENOMEM;
+>
+>         drvdata->dev = &pdev->dev;
+> +       drvdata->atclk = devm_clk_get(&pdev->dev, "atclk"); /* optional */
+> +       if (!IS_ERR(drvdata->atclk)) {
+> +               ret = clk_prepare_enable(drvdata->atclk);
+> +               if (ret)
+> +                       return ret;
+> +       }
+> +       pm_runtime_get_noresume(&pdev->dev);
+> +       pm_runtime_set_active(&pdev->dev);
+> +       pm_runtime_enable(&pdev->dev);
+>         platform_set_drvdata(pdev, drvdata);
+>
+>         desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+> -       if (!desc)
+> -               return -ENOMEM;
+> +       if (!desc) {
+> +               ret = -ENOMEM;
+> +               goto out_disable_pm;
+> +       }
+>
+>         desc->type = CORESIGHT_DEV_TYPE_LINK;
+>         desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
+> @@ -92,21 +109,60 @@ static int replicator_probe(struct platform_device *pdev)
+>         desc->pdata = pdev->dev.platform_data;
+>         desc->dev = &pdev->dev;
+>         drvdata->csdev = coresight_register(desc);
+> -       if (IS_ERR(drvdata->csdev))
+> -               return PTR_ERR(drvdata->csdev);
+> +       if (IS_ERR(drvdata->csdev)) {
+> +               ret = PTR_ERR(drvdata->csdev);
+> +               goto out_disable_pm;
+> +       }
+> +
+> +       pm_runtime_put(&pdev->dev);
+>
+>         dev_info(dev, "REPLICATOR initialized\n");
+>         return 0;
+> +
+> +out_disable_pm:
+> +       if (!IS_ERR(drvdata->atclk))
+> +               clk_disable_unprepare(drvdata->atclk);
+> +       pm_runtime_disable(&pdev->dev);
 
-I think you want to 'select REGULATOR' here; because REGULATOR isn't
-a user-visible option.
+I don't think it matters much, but you might want to restore the
+runtime PM usage count as this point as well.
 
-> +	help
-> +	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
-> +
->  config ARM_OMAP2PLUS_CPUFREQ
->  	bool "TI OMAP2+"
->  	depends on ARCH_OMAP2PLUS
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index 82a1821..da9d616 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -62,6 +62,7 @@ obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
->  obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
->  obj-$(CONFIG_ARM_INTEGRATOR)		+= integrator-cpufreq.o
->  obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
-> +obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
->  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
->  obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
->  obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
-> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-> new file mode 100644
-> index 0000000..a310e72
-> --- /dev/null
-> +++ b/drivers/cpufreq/mt8173-cpufreq.c
-> @@ -0,0 +1,509 @@
-> +/*
-> +* Copyright (c) 2015 Linaro Ltd.
-> +* Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> +*
-> +* This program is free software; you can redistribute it and/or modify
-> +* it under the terms of the GNU General Public License version 2 as
-> +* published by the Free Software Foundation.
-> +*
-> +* This program is distributed in the hope that it will be useful,
-> +* but WITHOUT ANY WARRANTY; without even the implied warranty of
-> +* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> +* GNU General Public License for more details.
-> +*/
-> +
-> +#include <linux/clk.h>
-> +#include <linux/cpu.h>
-> +#include <linux/cpufreq.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/slab.h>
-> +
-> +#define MIN_VOLT_SHIFT		100000
-> +#define MAX_VOLT_SHIFT		200000
-> +
-> +#define OPP(f, vp, vs) {		\
-> +		.freq	= f,		\
-> +		.vproc	= vp,		\
-> +		.vsram	= vs,		\
-> +	}
-> +
-> +struct mtk_cpu_opp {
-> +	unsigned int freq;
-> +	int vproc;
-> +	int vsram;
-> +};
-> +
-> +/*
-> + * The struct cpu_dvfs_info holds necessary information for doing CPU DVFS of
-> + * each cluster. For Mediatek SoCs, each CPU cluster in SoC has two voltage
-> + * inputs, Vproc and Vsram. For some cluster in SoC, the two voltage inputs are
-> + * supplied by different PMICs. In this case, when scaling up/down the voltage
-> + * of Vsram and Vproc, the two voltage inputs need to be controlled under a
-> + * hardware limitation: 100mV < Vsram - Vproc < 200mV
-> + * When scaling up/down the clock frequency of a cluster, the clock source need
-> + * to be switched to another stable PLL clock temporarily, and switched back to
-> + * the original PLL after the it becomes stable at target frequency.
-> + * Hence the voltage inputs of cluster need to be set to an intermediate voltage
-> + * before the clock frequency being scaled up/down.
-> + */
-> +
-> +struct cpu_dvfs_info {
-> +	cpumask_t cpus;
-> +
-> +	struct mtk_cpu_opp *opp_tbl;
-> +	struct mtk_cpu_opp *intermediate_opp;
-> +	int nr_opp;
-> +
-> +	struct regulator *proc_reg;
-> +	struct regulator *sram_reg;
-> +	struct clk *cpu_clk;
-> +	struct clk *inter_pll;
-> +};
-> +
-> +/*
-> + * This is a temporary solution until we have new OPPv2 bindings. Therefore we
-> + * could describe the OPPs with (freq, volt, volt) tuple properly in device
-> + * tree.
-> + */
-> +
-> +/* OPP table for LITTLE cores of MT8173 */
-> +struct mtk_cpu_opp mt8173_l_opp[] = {
+pm_runtime_put_noidle();
 
-static const?
-
-> +	OPP(507000000, 859000, 0),
-> +	OPP(702000000, 908000, 0),
-> +	OPP(1001000000, 983000, 0),
-> +	OPP(1105000000, 1009000, 0),
-> +	OPP(1183000000, 1028000, 0),
-> +	OPP(1404000000, 1083000, 0),
-> +	OPP(1508000000, 1109000, 0),
-> +	OPP(1573000000, 1125000, 0),
-> +};
 > +
-> +/* OPP table for big cores of MT8173 */
-> +struct mtk_cpu_opp mt8173_b_opp[] = {
+> +       return ret;
+>  }
+>
+>  static int replicator_remove(struct platform_device *pdev)
+>  {
+>         struct replicator_drvdata *drvdata = platform_get_drvdata(pdev);
+>
 
-same here?
+Add:
+pm_runtime_get_sync();
+clk_disable_unprepare();
 
-> +	OPP(507000000, 828000, 928000),
-> +	OPP(702000000, 867000, 967000),
-> +	OPP(1001000000, 927000, 1027000),
-> +	OPP(1209000000, 968000, 1068000),
-> +	OPP(1404000000, 1007000, 1107000),
-> +	OPP(1612000000, 1049000, 1149000),
-> +	OPP(1807000000, 1089000, 1150000),
-> +	OPP(1989000000, 1125000, 1150000),
-> +};
-> +
-[..]
-> +static int mtk_cpufreq_voltage_trace(struct cpu_dvfs_info *info,
-> +				     struct mtk_cpu_opp *opp)
+> +       pm_runtime_disable(&pdev->dev);
+
+pm_runtime_put_noidle();
+
+Maybe it's also appropriate to move all the above below the
+coresight_unregister()?
+
+>         coresight_unregister(drvdata->csdev);
+>         return 0;
+>  }
+>
+> +#ifdef CONFIG_PM
+> +static int replicator_runtime_suspend(struct device *dev)
 > +{
-> +	struct regulator *proc_reg = info->proc_reg;
-> +	struct regulator *sram_reg = info->sram_reg;
-> +	int old_vproc, new_vproc, old_vsram, new_vsram, vsram, vproc, ret;
+> +       struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
 > +
-> +	old_vproc = regulator_get_voltage(proc_reg);
-> +	old_vsram = regulator_get_voltage(sram_reg);
+> +       if (drvdata && !IS_ERR(drvdata->atclk))
+> +               clk_disable_unprepare(drvdata->atclk);
 > +
-> +	new_vproc = opp->vproc;
-> +	new_vsram = opp->vsram;
+> +       return 0;
+> +}
 > +
-> +	/*
-> +	 * In the case the voltage is going to be scaled up, Vsram and Vproc
-> +	 * need to be scaled up step by step. In each step, Vsram needs to be
-> +	 * set to (Vproc + 200mV) first, then Vproc is set to (Vsram - 100mV).
-> +	 * Repeat the step until Vsram and Vproc are set to target voltage.
-> +	 */
-> +	if (old_vproc < new_vproc) {
-> +next_up_step:
-> +		old_vsram = regulator_get_voltage(sram_reg);
+> +static int replicator_runtime_resume(struct device *dev)
+> +{
+> +       struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
 > +
-> +		vsram = (new_vsram - old_vproc < MAX_VOLT_SHIFT) ?
-> +			new_vsram : old_vproc + MAX_VOLT_SHIFT;
-> +		vsram = get_regulator_voltage_floor(sram_reg, vsram);
+> +       if (drvdata && !IS_ERR(drvdata->atclk))
+> +               clk_prepare_enable(drvdata->atclk);
 > +
-> +		ret = regulator_set_voltage(sram_reg, vsram, vsram);
-> +		if (ret)
-> +			return ret;
+> +       return 0;
+> +}
+> +#endif
 > +
-> +		vproc = (new_vsram == vsram) ?
-> +			new_vproc : vsram - MIN_VOLT_SHIFT;
-> +		vproc = get_regulator_voltage_ceil(proc_reg, vproc);
+> +static const struct dev_pm_ops replicator_dev_pm_ops = {
+> +       SET_RUNTIME_PM_OPS(replicator_runtime_suspend,
+> +                          replicator_runtime_resume, NULL)
+> +};
 > +
-> +		ret = regulator_set_voltage(proc_reg, vproc, vproc);
-> +		if (ret) {
-> +			regulator_set_voltage(sram_reg, old_vsram, old_vsram);
-> +			return ret;
-> +		}
-> +
-> +		if (new_vproc == vproc && new_vsram == vsram)
-> +			return 0;
-> +
-> +		old_vproc = vproc;
-> +		goto next_up_step;
+>  static struct of_device_id replicator_match[] = {
+>         {.compatible = "arm,coresight-replicator"},
+>         {}
+> @@ -118,6 +174,7 @@ static struct platform_driver replicator_driver = {
+>         .driver         = {
+>                 .name   = "coresight-replicator",
+>                 .of_match_table = replicator_match,
+> +               .pm     = &replicator_dev_pm_ops,
+>         },
+>  };
+>
+> --
+> 1.9.3
+>
 
-Perhaps a naive question: but, is this the correct place to do this?  I
-would expect this stepping behavior to be implemented in the driver
-controlling the regulator you are consuming.  It seems strange to do it
-here.
-
-  Josh
+Kind regards
+Uffe
