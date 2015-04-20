@@ -1,67 +1,41 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 20 Apr 2015 15:59:33 +0200
-Subject: [PATCH] ARM: mvebu: Fix the main PLL frequency on Armada 375,
- 38x and 39x SoCs
-Message-ID: <1429538373-31064-1-git-send-email-gregory.clement@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 20 Apr 2015 16:02:30 +0200
+Subject: [PATCH 0/3] ARM: ux500: Fix SD-card regression by using GPIO regulator
+Message-ID: <1429538553-17366-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whereas for Armada 370 and XP the main PLL frequency was 2GHz for the
-Armada 375, 38x and 39x, the frequency is 1GHz. When writting support
-for these last SoCs, there was no offical value for the PLL. Now that
-we have it, this patch fixes it in the device tree.
+This patchset fixes an old stability issue for detection of SD-cards. The DT
+node for the GPIO regulator which controls the I/O voltage level towards the
+SD-card was disabled in below commit.
 
-This value is currently only used by the NAND driver for the setting
-the NAND timing. Fortunately it is not acutally used: all the mainline
-board with a NAND flash comes with a NAND device tree node using the
-"marvell,nand-keep-config" property. With this property the timings
-are not modified in the kernel driver and are kept from the botloader.
+c94a4ab7af3f ("ARM: ux500: Disable the MMCI gpio-regulator by default")
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-375.dtsi | 2 +-
- arch/arm/boot/dts/armada-38x.dtsi | 2 +-
- arch/arm/boot/dts/armada-39x.dtsi | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+The conseqeunce from that commit, was that the initially chosen voltage level
+remained, even after I/O voltage switch sequence was performed for UHS-I cards,
+since no GPIO regulator could be fetched.
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index c675257f2377..f076ff856d8b 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -69,7 +69,7 @@
- 		mainpll: mainpll {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
--			clock-frequency = <2000000000>;
-+			clock-frequency = <1000000000>;
- 		};
- 		/* 25 MHz reference crystal */
- 		refclk: oscillator {
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index ed2dd8ba4080..218a2acd36e5 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -585,7 +585,7 @@
- 		mainpll: mainpll {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
--			clock-frequency = <2000000000>;
-+			clock-frequency = <1000000000>;
- 		};
- 
- 		/* 25 MHz reference crystal */
-diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-index 0e85fc15ceda..ecd1318109ba 100644
---- a/arch/arm/boot/dts/armada-39x.dtsi
-+++ b/arch/arm/boot/dts/armada-39x.dtsi
-@@ -502,7 +502,7 @@
- 		mainpll: mainpll {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
--			clock-frequency = <2000000000>;
-+			clock-frequency = <1000000000>;
- 		};
- 	};
- };
+Appearantly some SD-cards didn't have any problem to cope with that, but some
+had.
+
+Recently thorough error handling was introduced for the MMCI mmc host driver,
+while fetching the regulators for the SD-card. That actually made the driver to
+continously return -EPROBE_DEFER while probing, which thus meant failing all the
+times instead of just failing "sometimes".
+
+The commit that introduced the thorough error handling is:
+9369c97cc7ec ("mmc: mmci: Cascade EPROBE_DEFER from regulators")
+
+
+Ulf Hansson (3):
+  ARM: ux500: Move GPIO regulator for SD-card into board DTSs
+  ARM: ux500: Enable GPIO regulator for SD-card for HREF boards
+  ARM: ux500: Enable GPIO regulator for SD-card for snowball
+
+ arch/arm/boot/dts/ste-dbx5x0.dtsi  | 17 -----------------
+ arch/arm/boot/dts/ste-href.dtsi    | 15 +++++++++++++++
+ arch/arm/boot/dts/ste-snowball.dts | 13 +++++++++++++
+ 3 files changed, 28 insertions(+), 17 deletions(-)
+
 -- 
-2.1.0
+1.9.1
