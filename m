@@ -1,34 +1,37 @@
-From: lee@kernel.org (Lee Jones)
-Date: Mon, 20 Apr 2015 19:27:30 +0100
-Subject: [PATCH 2/3] ARM: ux500: Enable GPIO regulator for SD-card for
- HREF boards
-In-Reply-To: <1429538553-17366-3-git-send-email-ulf.hansson@linaro.org>
-References: <1429538553-17366-1-git-send-email-ulf.hansson@linaro.org>
- <1429538553-17366-3-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20150420182730.GI3447@x1>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Mon, 20 Apr 2015 20:28:02 +0200
+Subject: [PATCH v2 5/9] ARM: imx: add msl support for imx7d
+In-Reply-To: <CAHrpEqR=9XOy2bjfVm1WihTcxwkC8UsGK=XSJCamaMVvNwA6RA@mail.gmail.com>
+References: <1429211860-14438-1-git-send-email-Frank.Li@freescale.com>
+ <1429211860-14438-6-git-send-email-Frank.Li@freescale.com>
+ <20150417230454.GC12732@n2100.arm.linux.org.uk>
+ <CAHrpEqR=9XOy2bjfVm1WihTcxwkC8UsGK=XSJCamaMVvNwA6RA@mail.gmail.com>
+Message-ID: <20150420182802.GH2803@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Apr 2015, Ulf Hansson wrote:
-
-> Fixes: c94a4ab7af3f ("ARM: ux500: Disable the MMCI gpio-regulator by default")
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  arch/arm/boot/dts/ste-href.dtsi | 2 --
->  1 file changed, 2 deletions(-)
+On Mon, Apr 20, 2015 at 10:55:12AM -0500, Zhi Li wrote:
+> On Fri, Apr 17, 2015 at 6:04 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Apr 17, 2015 at 03:17:36AM +0800, Frank.Li at freescale.com wrote:
+> >> From: Anson Huang <b20788@freescale.com>
+> >>
+> >> Add i.MX7D MSL support.
+> >>
+> >> Signed-off-by: Anson Huang <b20788@freescale.com>
+> >> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> >
+> > I'm not happy with this.
+> >
 > 
-> diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-> index 8cf499a..744c1e3 100644
-> --- a/arch/arm/boot/dts/ste-href.dtsi
-> +++ b/arch/arm/boot/dts/ste-href.dtsi
-> @@ -124,8 +124,6 @@
->  
->  			states = <1800000 0x1
->  				  2900000 0x0>;
-> -
-> -			status = "disabled";
->  		};
+> Sorry, what cause your unhappy?
+> Can you tell me detail?
 
-Seems weird to do this in a separate patch.
+Please read the rest of Russell's mail and you'll find out.
 
->  		// External Micro SD slot
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
