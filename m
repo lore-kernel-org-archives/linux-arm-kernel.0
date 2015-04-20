@@ -1,362 +1,279 @@
-From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
-Date: Mon, 20 Apr 2015 11:13:38 +0200
-Subject: [PATCH] ARM: at91/dt: kizbox: update and rename to at91-kizbox
-Message-ID: <1429521218-9752-1-git-send-email-g.portay@overkiz.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Apr 2015 10:24:35 +0100
+Subject: [PATCH] arm64: kill flush_cache_all()
+Message-ID: <1429521875-16893-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort nodes, rename to match Atmel naming convention and update the features
-below:
- - command-line,
- - use proper serial uart,
- - rename leds and gpio-keys,
- - update to pwm-leds and
- - fix gpio-key level.
+The documented semantics of flush_cache_all are not possible to provide
+for arm64 (short of flushing the entire physical address space by VA),
+and there are currently no users; KVM uses VA maintenance exclusively,
+cpu_reset is never called, and the only two users outside of arch code
+cannot be built for arm64.
 
-Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+While cpu_soft_reset and related functions (which call flush_cache_all)
+were thought to be useful for kexec, their current implementations only
+serve to mask bugs. For correctness kexec will need to perform
+maintenance by VA anyway to account for system caches, line migration,
+and other subtleties of the cache architecture. As the extent of this
+cache maintenance will be kexec-specific, it should probably live in the
+kexec code.
+
+This patch removes flush_cache_all, and related unused components,
+preventing further abuse.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Geoff Levand <geoff@infradead.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/boot/dts/Makefile        |   2 +-
- arch/arm/boot/dts/at91-kizbox.dts | 159 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/kizbox.dts      | 150 -----------------------------------
- 3 files changed, 160 insertions(+), 151 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-kizbox.dts
- delete mode 100644 arch/arm/boot/dts/kizbox.dts
+ arch/arm64/include/asm/cacheflush.h  |  5 ---
+ arch/arm64/include/asm/proc-fns.h    |  4 --
+ arch/arm64/include/asm/system_misc.h |  1 -
+ arch/arm64/kernel/process.c          | 12 +-----
+ arch/arm64/mm/cache.S                | 73 ------------------------------------
+ arch/arm64/mm/flush.c                |  1 -
+ arch/arm64/mm/proc.S                 | 46 -----------------------
+ 7 files changed, 1 insertion(+), 141 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d2b559d..32568fb 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -18,9 +18,9 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
- 	tny_a9263.dtb \
- 	usb_a9263.dtb \
- 	at91-foxg20.dtb \
-+	at91-kizbox.dtb \
- 	at91sam9g20ek.dtb \
- 	at91sam9g20ek_2mmc.dtb \
--	kizbox.dtb \
- 	tny_a9g20.dtb \
- 	usb_a9g20.dtb \
- 	usb_a9g20_lpw.dtb \
-diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-new file mode 100644
-index 0000000..b567b5f
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -0,0 +1,159 @@
-+/*
-+ * at91-kizbox.dts - Device Tree file for Overkiz Kizbox board
-+ *
-+ * Copyright (C) 2012-2014 Boris BREZILLON <b.brezillon@overkiz.com>
-+ *               2014-2015 Ga?l PORTAY <g.portay@overkiz.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+#include "at91sam9g20.dtsi"
-+#include <dt-bindings/pwm/pwm.h>
-+
-+/ {
-+	model = "Overkiz Kizbox";
-+	compatible = "overkiz,kizbox", "atmel,at91sam9g20", "atmel,at91sam9";
-+
-+	chosen {
-+		bootargs = "ubi.mtd=ubi";
-+		linux,stdout-path = &dbgu;
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x2000000>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		main_clock: clock at 0 {
-+			compatible = "atmel,osc", "fixed-clock";
-+			clock-frequency = <18432000>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <18432000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			macb0: ethernet at fffc4000 {
-+				phy-mode = "mii";
-+				pinctrl-0 = <&pinctrl_macb_rmii
-+				             &pinctrl_macb_rmii_mii_alt>;
-+				status = "okay";
-+			};
-+
-+			usart3: serial at fffd0000 {
-+				status = "okay";
-+			};
-+
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
-+			watchdog at fffffd40 {
-+				timeout-sec = <15>;
-+				atmel,max-heartbeat-sec = <16>;
-+				atmel,min-heartbeat-sec = <0>;
-+				status = "okay";
-+			};
-+		};
-+
-+		usb0: ohci at 00500000 {
-+			num-ports = <1>;
-+			status = "okay";
-+		};
-+
-+		nand0: nand at 40000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "soft";
-+			status = "okay";
-+
-+			bootstrap at 0 {
-+				label = "bootstrap";
-+				reg = <0x0 0x20000>;
-+			};
-+
-+			ubi at 20000 {
-+				label = "ubi";
-+				reg = <0x20000 0x7fe0000>;
-+			};
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reset {
-+			label = "PB_RST";
-+			gpios = <&pioB 30 GPIO_ACTIVE_HIGH>;
-+			linux,code = <0x100>;
-+			gpio-key,wakeup;
-+		};
-+
-+		user {
-+			label = "PB_USER";
-+			gpios = <&pioB 31 GPIO_ACTIVE_HIGH>;
-+			linux,code = <0x101>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+
-+	i2c at 0 {
-+		status = "okay";
-+
-+		rtc: pcf8563 at 51 {
-+			compatible = "nxp,pcf8563";
-+			reg = <0x51>;
-+		};
-+	};
-+
-+	pwm_leds {
-+		compatible = "pwm-leds";
-+
-+		network_green {
-+			label = "pwm:green:network";
-+			pwms = <&tcb_pwm 2 10000000 PWM_POLARITY_INVERTED>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		network_red {
-+			label = "pwm:red:network";
-+			pwms = <&tcb_pwm 3 10000000 PWM_POLARITY_INVERTED>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		user_green {
-+			label = "pwm:green:user";
-+			pwms = <&tcb_pwm 0 10000000 PWM_POLARITY_INVERTED>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		user_red {
-+			label = "pwm:red:user";
-+			pwms = <&tcb_pwm 1 10000000 PWM_POLARITY_INVERTED>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	tcb_pwm: pwm {
-+		compatible = "atmel,tcb-pwm";
-+		#pwm-cells = <3>;
-+		tc-block = <1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_tcb1_tioa0
-+			     &pinctrl_tcb1_tioa1
-+			     &pinctrl_tcb1_tioa2
-+			     &pinctrl_tcb1_tiob0>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/kizbox.dts b/arch/arm/boot/dts/kizbox.dts
-deleted file mode 100644
-index e83e4f9..0000000
---- a/arch/arm/boot/dts/kizbox.dts
-+++ /dev/null
-@@ -1,150 +0,0 @@
--/*
-- * kizbox.dts - Device Tree file for Overkiz Kizbox board
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index 67d309c..c75b8d0 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -40,10 +40,6 @@
+  *	the implementation assumes non-aliasing VIPT D-cache and (aliasing)
+  *	VIPT or ASID-tagged VIVT I-cache.
+  *
+- *	flush_cache_all()
 - *
-- * Copyright (C) 2012 Boris BREZILLON <linux-arm@overkiz.com>
+- *		Unconditionally clean and invalidate the entire cache.
 - *
-- * Licensed under GPLv2.
+  *	flush_cache_mm(mm)
+  *
+  *		Clean and invalidate all user space cache entries
+@@ -69,7 +65,6 @@
+  *		- kaddr  - page address
+  *		- size   - region size
+  */
+-extern void flush_cache_all(void);
+ extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
+ extern void flush_icache_range(unsigned long start, unsigned long end);
+ extern void __flush_dcache_area(void *addr, size_t len);
+diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+index 4d9ede7..06732c8 100644
+--- a/arch/arm64/include/asm/proc-fns.h
++++ b/arch/arm64/include/asm/proc-fns.h
+@@ -28,12 +28,8 @@
+ struct mm_struct;
+ struct cpu_suspend_ctx;
+ 
+-extern void cpu_cache_off(void);
+ extern void cpu_do_idle(void);
+ extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+-extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
+-void cpu_soft_restart(phys_addr_t cpu_reset,
+-		unsigned long addr) __attribute__((noreturn));
+ extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
+ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+ 
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 7a18fab..659fbf5 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -41,7 +41,6 @@ struct mm_struct;
+ extern void show_pte(struct mm_struct *mm, unsigned long addr);
+ extern void __show_regs(struct pt_regs *);
+ 
+-void soft_restart(unsigned long);
+ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ 
+ #define UDBG_UNDEFINED	(1 << 0)
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index c6b1f3b9..c506bee 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -58,14 +58,6 @@ unsigned long __stack_chk_guard __read_mostly;
+ EXPORT_SYMBOL(__stack_chk_guard);
+ #endif
+ 
+-void soft_restart(unsigned long addr)
+-{
+-	setup_mm_for_reboot();
+-	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
+-	/* Should never get here */
+-	BUG();
+-}
+-
+ /*
+  * Function pointers to optional machine specific functions
+  */
+@@ -136,9 +128,7 @@ void machine_power_off(void)
+ 
+ /*
+  * Restart requires that the secondary CPUs stop performing any activity
+- * while the primary CPU resets the system. Systems with a single CPU can
+- * use soft_restart() as their machine descriptor's .restart hook, since that
+- * will cause the only available CPU to reset. Systems with multiple CPUs must
++ * while the primary CPU resets the system. Systems with multiple CPUs must
+  * provide a HW restart implementation, to ensure that all CPUs reset at once.
+  * This is required so that any code running after reset on the primary CPU
+  * doesn't have to co-ordinate with other CPUs to ensure they aren't still
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 2560e1e..f563e9a 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -27,79 +27,6 @@
+ #include "proc-macros.S"
+ 
+ /*
+- *	__flush_dcache_all()
+- *
+- *	Flush the whole D-cache.
+- *
+- *	Corrupted registers: x0-x7, x9-x11
 - */
--/dts-v1/;
--#include "at91sam9g20.dtsi"
+-__flush_dcache_all:
+-	dmb	sy				// ensure ordering with previous memory accesses
+-	mrs	x0, clidr_el1			// read clidr
+-	and	x3, x0, #0x7000000		// extract loc from clidr
+-	lsr	x3, x3, #23			// left align loc bit field
+-	cbz	x3, finished			// if loc is 0, then no need to clean
+-	mov	x10, #0				// start clean at cache level 0
+-loop1:
+-	add	x2, x10, x10, lsr #1		// work out 3x current cache level
+-	lsr	x1, x0, x2			// extract cache type bits from clidr
+-	and	x1, x1, #7			// mask of the bits for current cache only
+-	cmp	x1, #2				// see what cache we have@this level
+-	b.lt	skip				// skip if no cache, or just i-cache
+-	save_and_disable_irqs x9		// make CSSELR and CCSIDR access atomic
+-	msr	csselr_el1, x10			// select current cache level in csselr
+-	isb					// isb to sych the new cssr&csidr
+-	mrs	x1, ccsidr_el1			// read the new ccsidr
+-	restore_irqs x9
+-	and	x2, x1, #7			// extract the length of the cache lines
+-	add	x2, x2, #4			// add 4 (line length offset)
+-	mov	x4, #0x3ff
+-	and	x4, x4, x1, lsr #3		// find maximum number on the way size
+-	clz	w5, w4				// find bit position of way size increment
+-	mov	x7, #0x7fff
+-	and	x7, x7, x1, lsr #13		// extract max number of the index size
+-loop2:
+-	mov	x9, x4				// create working copy of max way size
+-loop3:
+-	lsl	x6, x9, x5
+-	orr	x11, x10, x6			// factor way and cache number into x11
+-	lsl	x6, x7, x2
+-	orr	x11, x11, x6			// factor index number into x11
+-	dc	cisw, x11			// clean & invalidate by set/way
+-	subs	x9, x9, #1			// decrement the way
+-	b.ge	loop3
+-	subs	x7, x7, #1			// decrement the index
+-	b.ge	loop2
+-skip:
+-	add	x10, x10, #2			// increment cache number
+-	cmp	x3, x10
+-	b.gt	loop1
+-finished:
+-	mov	x10, #0				// swith back to cache level 0
+-	msr	csselr_el1, x10			// select current cache level in csselr
+-	dsb	sy
+-	isb
+-	ret
+-ENDPROC(__flush_dcache_all)
 -
--/ {
+-/*
+- *	flush_cache_all()
+- *
+- *	Flush the entire cache system.  The data cache flush is now achieved
+- *	using atomic clean / invalidates working outwards from L1 cache. This
+- *	is done using Set/Way based cache maintainance instructions.  The
+- *	instruction cache can still be invalidated back to the point of
+- *	unification in a single instruction.
+- */
+-ENTRY(flush_cache_all)
+-	mov	x12, lr
+-	bl	__flush_dcache_all
+-	mov	x0, #0
+-	ic	ialluis				// I+BTB cache invalidate
+-	ret	x12
+-ENDPROC(flush_cache_all)
 -
--	model = "Overkiz kizbox";
--	compatible = "overkiz,kizbox", "atmel,at91sam9g20", "atmel,at91sam9";
+-/*
+  *	flush_icache_range(start,end)
+  *
+  *	Ensure that the I and D caches are coherent within specified region.
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index b6f14e8..4dfa397 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -102,7 +102,6 @@ EXPORT_SYMBOL(flush_dcache_page);
+ /*
+  * Additional functions defined in assembly.
+  */
+-EXPORT_SYMBOL(flush_cache_all);
+ EXPORT_SYMBOL(flush_icache_range);
+ 
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index cdd754e..39139a3 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -46,52 +46,6 @@
+ #define MAIR(attr, mt)	((attr) << ((mt) * 8))
+ 
+ /*
+- *	cpu_cache_off()
+- *
+- *	Turn the CPU D-cache off.
+- */
+-ENTRY(cpu_cache_off)
+-	mrs	x0, sctlr_el1
+-	bic	x0, x0, #1 << 2			// clear SCTLR.C
+-	msr	sctlr_el1, x0
+-	isb
+-	ret
+-ENDPROC(cpu_cache_off)
 -
--	chosen {
--		bootargs = "panic=5 ubi.mtd=1 rootfstype=ubifs root=ubi0:root";
--	};
+-/*
+- *	cpu_reset(loc)
+- *
+- *	Perform a soft reset of the system.  Put the CPU into the same state
+- *	as it would be if it had been reset, and branch to what would be the
+- *	reset vector. It must be executed with the flat identity mapping.
+- *
+- *	- loc   - location to jump to for soft reset
+- */
+-	.align	5
+-ENTRY(cpu_reset)
+-	mrs	x1, sctlr_el1
+-	bic	x1, x1, #1
+-	msr	sctlr_el1, x1			// disable the MMU
+-	isb
+-	ret	x0
+-ENDPROC(cpu_reset)
 -
--	memory {
--		reg = <0x20000000 0x2000000>;
--	};
+-ENTRY(cpu_soft_restart)
+-	/* Save address of cpu_reset() and reset address */
+-	mov	x19, x0
+-	mov	x20, x1
 -
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
+-	/* Turn D-cache off */
+-	bl	cpu_cache_off
 -
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <18432000>;
--		};
+-	/* Push out all dirty data, and ensure cache is empty */
+-	bl	flush_cache_all
 -
--		main_xtal {
--			clock-frequency = <18432000>;
--		};
--	};
+-	mov	x0, x20
+-	ret	x19
+-ENDPROC(cpu_soft_restart)
 -
--	ahb {
--		apb {
--			dbgu: serial at fffff200 {
--				status = "okay";
--			};
--
--			usart0: serial at fffb0000 {
--				status = "okay";
--			};
--
--			usart1: serial at fffb4000 {
--				status = "okay";
--			};
--
--			macb0: ethernet at fffc4000 {
--				phy-mode = "mii";
--				pinctrl-0 = <&pinctrl_macb_rmii
--				             &pinctrl_macb_rmii_mii_alt>;
--				status = "okay";
--			};
--
--			watchdog at fffffd40 {
--				timeout-sec = <15>;
--				atmel,max-heartbeat-sec = <16>;
--				atmel,min-heartbeat-sec = <0>;
--				status = "okay";
--			};
--		};
--
--		nand0: nand at 40000000 {
--			nand-bus-width = <8>;
--			nand-ecc-mode = "soft";
--			status = "okay";
--
--			bootloaderkernel at 0 {
--				label = "bootloader-kernel";
--				reg = <0x0 0xc0000>;
--			};
--
--			ubi at c0000 {
--				label = "ubi";
--				reg = <0xc0000 0x7f40000>;
--			};
--
--		};
--
--		usb0: ohci at 00500000 {
--			num-ports = <1>;
--			status = "okay";
--		};
--	};
--
--	i2c at 0 {
--		status = "okay";
--
--		pcf8563 at 51 {
--			/* nxp pcf8563 rtc */
--			compatible = "nxp,pcf8563";
--			reg = <0x51>;
--		};
--
--	};
--
--	leds {
--		compatible = "gpio-leds";
--
--		led1g {
--			label = "led1:green";
--			gpios = <&pioB 0 GPIO_ACTIVE_LOW>;
--			linux,default-trigger = "none";
--		};
--
--		led1r {
--			label = "led1:red";
--			gpios = <&pioB 1 GPIO_ACTIVE_LOW>;
--			linux,default-trigger = "none";
--		};
--
--		led2g {
--			label = "led2:green";
--			gpios = <&pioB 2 GPIO_ACTIVE_LOW>;
--			linux,default-trigger = "none";
--			default-state = "on";
--		};
--
--		led2r {
--			label = "led2:red";
--			gpios = <&pioB 3 GPIO_ACTIVE_LOW>;
--			linux,default-trigger = "none";
--		};
--	};
--
--	gpio_keys {
--		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		reset {
--			label = "reset";
--			gpios = <&pioB 30 GPIO_ACTIVE_LOW>;
--			linux,code = <0x100>;
--			gpio-key,wakeup;
--		};
--
--		mode {
--			label = "mode";
--			gpios = <&pioB 31 GPIO_ACTIVE_LOW>;
--			linux,code = <0x101>;
--			gpio-key,wakeup;
--		};
--	};
--};
+-/*
+  *	cpu_do_idle()
+  *
+  *	Idle the processor (wait for interrupt).
 -- 
 1.9.1
