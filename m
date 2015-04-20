@@ -1,30 +1,50 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 20 Apr 2015 13:50:22 -0500
-Subject: [PATCHv2 1/4] ARM: socfpga: add cpu1-start-addr for Arria 10
+Date: Mon, 20 Apr 2015 13:50:23 -0500
+Subject: [PATCHv2 2/4] ARM: socfpga: disable the sdmmc,
+ and uart nodes in the base arria10
 In-Reply-To: <1429555825-23560-1-git-send-email-dinguyen@opensource.altera.com>
 References: <1429555825-23560-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1429555825-23560-2-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1429555825-23560-3-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
+Add status = "disabled" in the base DTSI for Arria10.  The SDMMC and uart
+nodes should be enabled in the appropriate board file.
+
 Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- arch/arm/boot/dts/socfpga_arria10.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/socfpga_arria10.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 8a05c47..69d616a 100644
+index 69d616a..d843609 100644
 --- a/arch/arm/boot/dts/socfpga_arria10.dtsi
 +++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -284,6 +284,7 @@
- 		sysmgr: sysmgr at ffd06000 {
- 			compatible = "altr,sys-mgr", "syscon";
- 			reg = <0xffd06000 0x300>;
-+			cpu1-start-addr = <0xffd06230>;
+@@ -268,6 +268,7 @@
+ 			reg = <0xff808000 0x1000>;
+ 			interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
+ 			fifo-depth = <0x400>;
++			status = "disabled";
  		};
  
- 		/* Local timer */
+ 		ocram: sram at ffe00000 {
+@@ -324,6 +325,7 @@
+ 			interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
++			status = "disabled";
+ 		};
+ 
+ 		uart1: serial1 at ffc02100 {
+@@ -332,6 +334,7 @@
+ 			interrupts = <0 111 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
++			status = "disabled";
+ 		};
+ 
+ 		usbphy0: usbphy at 0 {
 -- 
 2.2.1
