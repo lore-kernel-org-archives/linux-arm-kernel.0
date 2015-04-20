@@ -1,50 +1,65 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 20 Apr 2015 13:50:23 -0500
-Subject: [PATCHv2 2/4] ARM: socfpga: disable the sdmmc,
- and uart nodes in the base arria10
+Date: Mon, 20 Apr 2015 13:50:24 -0500
+Subject: [PATCHv2 3/4] ARM: socfpga: dts: enable UART1 for the debug uart
 In-Reply-To: <1429555825-23560-1-git-send-email-dinguyen@opensource.altera.com>
 References: <1429555825-23560-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1429555825-23560-3-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1429555825-23560-4-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Add status = "disabled" in the base DTSI for Arria10.  The SDMMC and uart
-nodes should be enabled in the appropriate board file.
+Arria10 devkit is using UART1 for the debug uart port. Remove
+unused aliases.
 
 Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- arch/arm/boot/dts/socfpga_arria10.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+v2: Add removal of unused aliases
+---
+ arch/arm/boot/dts/socfpga_arria10.dtsi      | 12 ------------
+ arch/arm/boot/dts/socfpga_arria10_socdk.dts |  8 ++++----
+ 2 files changed, 4 insertions(+), 16 deletions(-)
 
 diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 69d616a..d843609 100644
+index d843609..6c3ad92 100644
 --- a/arch/arm/boot/dts/socfpga_arria10.dtsi
 +++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -268,6 +268,7 @@
- 			reg = <0xff808000 0x1000>;
- 			interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
- 			fifo-depth = <0x400>;
-+			status = "disabled";
- 		};
+@@ -21,18 +21,6 @@
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
  
- 		ocram: sram at ffe00000 {
-@@ -324,6 +325,7 @@
- 			interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
-+			status = "disabled";
+-	aliases {
+-		ethernet0 = &gmac0;
+-		ethernet1 = &gmac1;
+-		ethernet2 = &gmac2;
+-		serial0 = &uart0;
+-		serial1 = &uart1;
+-		timer0 = &timer0;
+-		timer1 = &timer1;
+-		timer2 = &timer2;
+-		timer3 = &timer3;
+-	};
+-
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dts b/arch/arm/boot/dts/socfpga_arria10_socdk.dts
+index 3015ce8..811a61c 100755
+--- a/arch/arm/boot/dts/socfpga_arria10_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dts
+@@ -40,9 +40,9 @@
+ 				};
+ 			};
  		};
- 
- 		uart1: serial1 at ffc02100 {
-@@ -332,6 +334,7 @@
- 			interrupts = <0 111 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
-+			status = "disabled";
- 		};
- 
- 		usbphy0: usbphy at 0 {
+-
+-		serial0 at ffc02000 {
+-			status = "okay";
+-		};
+ 	};
+ };
++
++&uart1 {
++	status = "okay";
++};
 -- 
 2.2.1
