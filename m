@@ -1,73 +1,80 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 20 Apr 2015 11:55:15 -0600
-Subject: [tpmdd-devel] [RFC PATCH 1/2] tee: generic TEE subsystem
-In-Reply-To: <20150420130203.GB25054@ermac>
-References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
- <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
- <20150417163054.GA28241@obsidianresearch.com>
- <20150418090147.GF12732@n2100.arm.linux.org.uk>
- <20150418172923.GA10605@obsidianresearch.com>
- <20150420130203.GB25054@ermac>
-Message-ID: <20150420175515.GA31958@obsidianresearch.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 20 Apr 2015 18:54:22 +0100
+Subject: [Xen-devel] [PATCH] xen: Add __GFP_DMA flag when xen_swiotlb_init
+ gets free pages.
+In-Reply-To: <5534EAE3.8060403@citrix.com>
+References: <1429526904-27176-1-git-send-email-cbz@baozis.org>
+ <5534DABB.5060305@citrix.com> <20150420110729.GA27707@cbz-thinkpad>
+ <5534EAE3.8060403@citrix.com>
+Message-ID: <alpine.DEB.2.02.1504201828380.30125@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 03:02:03PM +0200, Jens Wiklander wrote:
-> > It appeared to me this driver was copying TPM's old architecture,
-> > which is very much known to be broken.
+On Mon, 20 Apr 2015, David Vrabel wrote:
+> On 20/04/15 12:07, Chen Baozi wrote:
+> > On Mon, Apr 20, 2015 at 11:53:47AM +0100, David Vrabel wrote:
+> >> On 20/04/15 11:48, Chen Baozi wrote:
+> >>> Make sure that xen_swiotlb_init allocates buffers that is DMA capable.
+> >>>
+> >>> Signed-off-by: Chen Baozi <baozich@gmail.com>
+> >>> ---
+> >>>  drivers/xen/swiotlb-xen.c | 3 ++-
+> >>>  1 file changed, 2 insertions(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> >>> index 810ad41..7345afd 100644
+> >>> --- a/drivers/xen/swiotlb-xen.c
+> >>> +++ b/drivers/xen/swiotlb-xen.c
+> >>> @@ -235,7 +235,8 @@ retry:
+> >>>  #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
+> >>>  #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
+> >>>  		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
+> >>> -			xen_io_tlb_start = (void *)__get_free_pages(__GFP_NOWARN, order);
+> >>> +			xen_io_tlb_start = (void *)__get_free_pages(
+> >>> +						__GFP_NOWARN|__GFP_DMA, order);
+> >>
+> >> I think this breaks x86 where __GFP_DMA means below 16 MB.  Perhaps you
+> >> mean __GFP_DMA32?
+> > 
+> > __GFP_DMA32 doesn't help on arm64...
+> > 
+> > I guess there might be conflicts about the meaning of __GFP_DMA between x86 and
+> > arm?
 > 
-> The struct tee_device holds a shared memory pool from which shared
-> memory objects are allocated. These shared memory objects can be mapped
-> both by user space and secure world. 
+> Yes.
 
-So this is a whole other set of problems besides what was already
-brought up.
+This should definitely be done only on ARM and ARM64, as on x86 PVH
+assumes the presence of an IOMMU. We need an ifdef.
 
-You need to figure out a lifetime model for this shared memory that
-works.
+Also we need to figure out a way to try without GFP_DMA in case no ram
+under 4g is available at all, as some arm64 platforms don't have any. Of
+course in those cases we don't need to worry about devices and their dma
+masks.  Maybe we could use memblock for that? Something like:
 
-> To come around the problem with what should happen when the driver
-> is removed I'm increasing the refcount on the driver for each
-> allocated shared memory object and created file pointers. As long as
-> any resource is in use by either user space or secure world the
-> driver can't be unloaded.
+    struct memblock_region *reg;
+    gfp_t flags = __GFP_NOWARN;
 
-This isn't how the kernel works. The module refcount effects module
-unload (it protects the .text) - it does not interact with driver
-detatch. Userspace can trigger driver detatch (which results in
-tee_unregister being called) at any time via sysfs.
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+	for_each_memblock(memory, reg) {
+		unsigned long start = memblock_region_memory_base_pfn(reg);
 
-If you properly design for that case then module unload sequencing
-works properly for free.
+        if (start < 4G) {
+            flags |= __GFP_DMA;
+            break;
+        }
+    }
+#endif
 
-Based on what I gather, I would suggest the following sequence in
-tee_unregister
- - unregister all sysfs and char dev registrations.
- - Write lock ops and set to null. This will error future cdev ioctls,
-   and guarentees no driver ops callbacks are in progress, or will be
-   started in future.
- - Wait until all client accesses to shared memory are
-   released.
- - Command the driver to release it's side of the
-   shared memory and wait for that to complete
- - Free the shared memory
- - deref the tee_device's struct device (match ref in tee_register)
+    [...]
 
-Then in your struct tee_device's release function free the tee_device
-memory.
+    xen_io_tlb_start = (void *)__get_free_pages(flags, order);
+    
 
-Replace all the module locking code with an active count in struct
-tee_device (see something like kernfs_drain for an example).
 
-> * Change to use the pattern (with a struct device etc) as described
->   above.
 
-Yes, I think Greg confirmed you need to use a struct device, and purge
-misc_device from the mid layer.
 
->   I can't protect the ops with just a mutex since tee_ioctl_cmd() needs to
->   be multithreaded.
+> This is also conceptually wrong since it doesn't matter where the pages
+> are in PFN space,  but where they are in bus address (MFN) space (which
+> is what the subsequent hypercall is required to sort out).
 
-Then use a sleeping read/write lock - aka an active count.
-
-Jason
+Actually on ARM dom0 is mapped 1:1, so it is the same thing.
