@@ -1,138 +1,108 @@
-From: mohan_gg@yahoo.com (Mohan G)
-Date: Mon, 20 Apr 2015 10:39:35 +0000 (UTC)
-Subject: kvm vs host (arm64)
-In-Reply-To: <5534C25E.7070702@arm.com>
-References: <5534C25E.7070702@arm.com>
-Message-ID: <865655860.251789.1429526375276.JavaMail.yahoo@mail.yahoo.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 20 Apr 2015 12:46:51 +0200
+Subject: qemu:arm test failure due to commit 8053871d0f7f (smp: Fix
+ smp_call_function_single_async() locking)
+In-Reply-To: <5533B6D7.9050101@roeck-us.net>
+References: <20150418232325.GA22411@roeck-us.net>
+ <20150418234050.GA5987@roeck-us.net>
+ <CA+55aFz1934X3wu7FdGerwYMJ_BAkrFsajOQFtU3_ogsUX3_eQ@mail.gmail.com>
+ <55330B32.4010907@roeck-us.net> <20150419033940.GA25145@debian>
+ <CA+55aFw4FSja+VBuCYJ7wLXKVRQZ7w6vOUaUJ4B=FXyBmNkrUg@mail.gmail.com>
+ <CA+55aFwTMJ7CAtBaL-uGsgVf9-oyGwqLZwz_pwjX=umbS-2CNQ@mail.gmail.com>
+ <20150419093112.GA6139@gmail.com> <5533B6D7.9050101@roeck-us.net>
+Message-ID: <CAMuHMdWn-XsRX8O+LOSTFv3vZ6VjXZFU2WEkZsgz-NgsHRpmVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for looking into this Marc. 
-Its the xgene  storm based SOC. for profiling , we used the ftrace tool. The support for ftrace is present from 3.16 
-onwards. Its the main line kernel that we have installed. The main purpose of running this BM is for 
-I/O. 
-We initially saw these numbers with DD. The DD numbers too reflect the same. 
+On Sun, Apr 19, 2015 at 4:08 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On 04/19/2015 02:31 AM, Ingo Molnar wrote:
+>> * Linus Torvalds <torvalds@linux-foundation.org> wrote:
+>>
+>>> On Sun, Apr 19, 2015 at 4:48 AM, Linus Torvalds
+>>> <torvalds@linux-foundation.org> wrote:
+>>>>
+>>>>
+>>>> Does that smaller patch work equally well?
+>>>
+>>>
+>>> .. and here's a properly formatted email and patch.
+>>>
+>>>             Linus
+>>
+>>
+>>>   kernel/smp.c | 4 +++-
+>>>   1 file changed, 3 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/kernel/smp.c b/kernel/smp.c
+>>> index 2aaac2c47683..07854477c164 100644
+>>> --- a/kernel/smp.c
+>>> +++ b/kernel/smp.c
+>>> @@ -159,8 +159,10 @@ static int generic_exec_single(int cpu, struct
+>>> call_single_data *csd,
+>>>         }
+>>>
+>>>
+>>> -       if ((unsigned)cpu >= nr_cpu_ids || !cpu_online(cpu))
+>>> +       if ((unsigned)cpu >= nr_cpu_ids || !cpu_online(cpu)) {
+>>> +               csd_unlock(csd);
+>>>                 return -ENXIO;
+>>> +       }
+>>
+>>
+>> Acked-by: Ingo Molnar <mingo@kernel.org>
+>>
+> Tested-by: Guenter Roeck <linux@roeck-us.net>
 
-We even tried netperf, just to remove i/o path from perf results. Here too the results are same. 
-Have pasted the perf stat below too 
+I've bisected a boot regression on a real system to the same commit
+8053871d0f7f ("smp: Fix smp_call_function_single_async() locking").
 
-guest stat 
-========== 
+Linus' patch fixes it, so
 
-directlocalhost:~]# perf stat dd if=/dev/zero of=/dev/sdc bs=8192 count=1 oflag= 
-1+0 records in 
-1+0 records out 
-8192 bytes (8.2 kB) copied, 0.0132908 s, 616 kB/s 
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Performance counter stats for 'dd if=/dev/zero of=/dev/sdc bs=8192 count=1 oflag=direct': 
-
-110.474128 task-clock (msec) # 0.848 CPUs utilized 
-1 context-switches # 0.009 K/sec 
-0 cpu-migrations # 0.000 K/sec 
-174 page-faults # 0.002 M/sec 
-<not supported> cycles 
-<not supported> stalled-cycles-frontend 
-<not supported> stalled-cycles-backend 
-<not supported> instructions 
-<not supported> branches 
-<not supported> branch-misses 
-
-0.130255744 seconds time elapsed 
-
-
-
-host 
-===== 
-root at mustang1:/home/gmohan# perf stat dd if=/dev/zero of=/dev/sda6 bs=8192 count=1 oflag=direct 
-1+0 records in 
-1+0 records out 
-8192 bytes (8.2 kB) copied, 0.00087308 s, 9.4 MB/s 
-
-Performance counter stats for 'dd if=/dev/zero of=/dev/sda6 bs=8192 count=1 oflag=direct': 
-
-1.024280 task-clock (msec) # 0.525 CPUs utilized 
-9 context-switches # 0.009 M/sec 
-0 cpu-migrations # 0.000 K/sec 
-198 page-faults # 0.193 M/sec 
-24,17,939 cycles # 2.361 GHz 
-<not supported> stalled-cycles-frontend 
-<not supported> stalled-cycles-backend 
-8,30,511 instructions # 0.34 insns per cycle 
-<not supported> branches 
-17,198 branch-misses # 0.00% of all branches 
-
-0.001949620 seconds time elapsed 
-
-
-
-Regards
-Mohan
-
-
------ Original Message -----
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Mohan G <mohan_gg@yahoo.com>; "linux-arm-kernel at lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Cc: 
-Sent: Monday, April 20, 2015 2:39 PM
-Subject: Re: kvm vs host (arm64)
-
-On 20/04/15 06:45, Mohan G wrote:
-> Hi, 
-> I have got hold of few mustang boards (cortex-a57). Ran a few bench
-
-Mustang is *not* based on Cortex-A57. So which hardware do you have?
-
-> marks to measure perf numbers b/w host and guest (kvm). The numbers 
-> are pretty bad. (drop of about 90% to that of host). I even tried
-> running this simple program .
-> 
-> main(){ 
-> int i=0; 
-> 
-> for(i=0;i<10;i++); 
-> } 
-> Profiling the above shows that same kernel functions in guest takes
-> almost 10x to that of host. sample below
+>> Btw., in this case we should probably also generate a WARN_ONCE()
+>> warning?
+>>
+>> I _think_ most such callers calling an SMP function call for offline
+>> or out of range CPUs are at minimum racy.
+>>
+> Not really; at least the online cpu part is an absolutely normal use
+> case for qemu-arm.
 >
-> 
-> Host 
-> ==== 
-> 7202              one-3920  [003] 20015.611563: funcgraph_entry:                   |              find_vma() { 
-> 7203              one-3920  [003] 20015.611564: funcgraph_entry:        0.180 us   |                vmacache_find(); 
-> 7204              one-3920  [003] 20015.611565: funcgraph_entry:        0.120 us   |                vmacache_update(); 
-> 7205              one-3920  [003] 20015.611566: funcgraph_exit:         2.320 us   |              } 
-> 
-> 
-> Guest 
-> ===== 
-> 
-> one-751   [000]   206.843300: funcgraph_entry:                   |              find_vma() { 
-> one-751   [000]   206.843312: funcgraph_entry:        4.880 us   |                vmacache_find(); 
-> one-751   [000]   206.843335: funcgraph_entry:        2.656 us   |                vmacache_update(); 
-> one-751   [000]   206.843354: funcgraph_exit:       + 46.256 us  |              } 
+> Sure, you can argue that "this isn't the real system", and that
+> qemu-arm should be "fixed", but there are reasons - the emulation
+> is (much) slower if the number of CPUs is set to 4, and not everyone
+> who wants to use qemu has a system with as many CPUs as the emulated
+> system would normally have.
 
+In my case boot failed on r8a73a4/ape6evm, where I had added nodes for all
+CPU cores to the .dtsi, while the SoC code doesn't have SMP bringup code yet.
+This worked fine before.
 
-I wonder how you manage to profile this, as we don't have any perf
-support in KVM yet (you cannot profile a guest). Can you describe your
-profiling method? Also, can you use a non-trivial test (i.e. something
-that is not pure overhead)?
+With CONFIG_DEBUG_LL=y, the boot hung after:
 
-If that's all your test does, you end up measuring the cost of a stage-2
-page fault, which only happens at startup.
+    Calibrating delay loop (skipped), value calculated using timer
+frequency.. 26.00 BogoMIPS (lpj=130000)
+    pid_max: default: 32768 minimum: 301
+    Mount-cache hash table entries: 2048 (order: 1, 8192 bytes)
+    Mountpoint-cache hash table entries: 2048 (order: 1, 8192 bytes)
+    CPU: Testing write buffer coherency: ok
+    CPU0: update cpu_capacity 1516
+    CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+    Setting up static identity map for 0x40009000 - 0x40009058
 
-> kernel: 3.18.9 
+With the fix, it continues as expected with:
 
-Is that mainline 3.18.9? Or some special tree? I'm also interested in
-seeing results from a 4.0 kernel.
+    Brought up 1 CPUs
+    SMP: Total of 1 processors activated (26.00 BogoMIPS).
 
-Thanks,
+Gr{oetje,eeting}s,
 
+                        Geert
 
-    M.
--- 
-Jazz is not dead. It just smells funny...
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
