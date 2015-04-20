@@ -1,85 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 20 Apr 2015 20:42:50 +0200
-Subject: [PATCH] arm64: kill flush_cache_all()
-In-Reply-To: <20150420180255.GB17767@leverpostej>
-References: <1429521875-16893-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu-VVA+wruJgfWksFdL5eXrp5nZV-b9q7eYspfi=KoqvEg@mail.gmail.com>
- <20150420180255.GB17767@leverpostej>
-Message-ID: <CAKv+Gu_6u6wZrd=3z94Wqrab=G=bxm30=zWK0Rry3w+F92Wn9w@mail.gmail.com>
+From: fkan@apm.com (Feng Kan)
+Date: Mon, 20 Apr 2015 11:49:37 -0700
+Subject: [PATCH v4 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
+ termination driver
+In-Reply-To: <3188893.aaXgNln69B@wuerfel>
+References: <cover.1429263201.git.dhdang@apm.com> <2306642.JeuMKoBEGq@wuerfel>
+ <CADaLNDn_U_VKBg-ve+X_Ovvzi7TZZJkPotCTKiWjfvANXqsSPQ@mail.gmail.com>
+ <3188893.aaXgNln69B@wuerfel>
+Message-ID: <CAL85gmB_1zTy7wHw2zud5ofmX=dXY1sQ49dLJPysk+Z0N4TiaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 April 2015 at 20:02, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Apr 20, 2015 at 06:23:00PM +0100, Ard Biesheuvel wrote:
->> On 20 April 2015 at 11:24, Mark Rutland <mark.rutland@arm.com> wrote:
->> > The documented semantics of flush_cache_all are not possible to provide
->> > for arm64 (short of flushing the entire physical address space by VA),
->> > and there are currently no users; KVM uses VA maintenance exclusively,
->> > cpu_reset is never called, and the only two users outside of arch code
->> > cannot be built for arm64.
+On Sun, Apr 19, 2015 at 12:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 19 April 2015 11:40:09 Duc Dang wrote:
+>> On Fri, Apr 17, 2015 at 7:10 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday 17 April 2015 02:50:07 Duc Dang wrote:
+>> >> +
+>> >> +       /*
+>> >> +        * MSIINTn (n is 0..F) indicates if there is a pending MSI interrupt
+>> >> +        * If bit x of this register is set (x is 0..7), one or more interupts
+>> >> +        * corresponding to MSInIRx is set.
+>> >> +        */
+>> >> +       grp_select = readl(xgene_msi->msi_regs + MSI_INT0 + (msi_grp << 16));
+>> >> +       while (grp_select) {
+>> >> +               msir_index = ffs(grp_select) - 1;
+>> >> +               /*
+>> >> +                * Calculate MSInIRx address to read to check for interrupts
+>> >> +                * (refer to termination address and data assignment
+>> >> +                * described in xgene_compose_msi_msg function)
+>> >> +                */
+>> >> +               msir_reg = (msi_grp << 19) + (msir_index << 16);
+>> >> +               msir_val = readl(xgene_msi->msi_regs + MSI_IR0 + msir_reg);
+>> >> +               while (msir_val) {
+>> >> +                       intr_index = ffs(msir_val) - 1;
+>> >> +                       /*
+>> >> +                        * Calculate MSI vector number (refer to the termination
+>> >> +                        * address and data assignment described in
+>> >> +                        * xgene_compose_msi_msg function)
+>> >> +                        */
+>> >> +                       hw_irq = (((msir_index * IRQS_PER_IDX) + intr_index) *
+>> >> +                                NR_HW_IRQS) + msi_grp;
+>> >> +                       virq = irq_find_mapping(xgene_msi->domain, hw_irq);
+>> >> +                       if (virq != 0)
+>> >> +                               generic_handle_irq(virq);
+>> >> +                       msir_val &= ~(1 << intr_index);
+>> >> +                       processed++;
+>> >> +               }
+>> >> +               grp_select &= ~(1 << msir_index);
+>> >> +       }
+>> >>
 >> >
->> > While cpu_soft_reset and related functions (which call flush_cache_all)
->> > were thought to be useful for kexec, their current implementations only
->> > serve to mask bugs. For correctness kexec will need to perform
->> > maintenance by VA anyway to account for system caches, line migration,
->> > and other subtleties of the cache architecture. As the extent of this
->> > cache maintenance will be kexec-specific, it should probably live in the
->> > kexec code.
->> >
->> > This patch removes flush_cache_all, and related unused components,
->> > preventing further abuse.
->> >
+>> > As the MSI is forwarded to the GIC here, how do you maintain ordering
+>> > between DMA data getting forwarded from the PCI host bridge to RAM
+>> > with regard to the MSI handler getting entered from this code?
 >>
->> While I agree fully with the general purpose of this patch, i.e., to
->> prevent set/way operations to be abused for managing coherency,
->> perhaps it would make sense to retain/repurpose some of this code as
->> the 'supported' way of putting the CPU in the mode that is mandated by
->> the boot protocol, so that it can be shared between the EFI stub and
->> kexec.
+>> When device perform a DMA transfer, the order of PCIE inbound requests
+>> will be like this:
+>> 1. DMA data get transferred via PCIe inbound request
+>> 2. After devices issue DMA transfer request, the device fires an MSI
+>> interrupt by issuing another inbound write to write MSI data to MSI
+>> termination address.
 >>
->> I think the former is not entirely safe at the moment, since the only
->> region we clean/invalidate [by VA] is the memory region containing the
->> copied kernel image, and the remainder of the efi-entry.S code itself.
->> I may be wrong, but I think that means that any cached software state
->> owned by the runtime services [including virtual remappings] could
->> potentially get lost when we disable the dcache without cleaning it by
->> set/way first.
+>> As these 2 requests are transferred via PCIe bus in order, the DMA
+>> data will be all in DDR before the MSI data hit the termination
+>> address to trigger the MSI handler in interrupt handler code.
 >
-> Regarding the boot protocol, note that this was relaxed a while back
-> w.r.t. cache requirements, only mandating that certain regions of memory
-> are clean to the PoC.
->
-> Clearing SCTLR.C prevents accesses from being given cacheable
-> attributes, but doesn't disable any caches as such. The CPU caches
-> remain active and coherent (unless some IMPLEMENTATION DEFINED mechanism
-> is used to exit coherency), so the data will remain there unless
-> naturally evicted, taken by another cache, or explicitly
-> cleaned/invalidated.
->
-> With SCTLR.C clear, memory accesses should not result in the allocation
-> of new lines into the caches (though if data for a given address is
-> present, an access may hit said data). Clearing SCTLR.M is necessary to
-> prevent allocation by the page table walkers, unless these are not using
-> cacheable attributes to begin with.
->
-> Set/Way maintenance races with the usual operation of the caches while
-> cacheable accesses may be made into them, so do not make sense to use
-> while SCTLR.C or SCTLR.M are set. They can only drain the CPU-local
-> caches when nothing may allocate into them, and do not affect system
-> caches, so portable software must use maintenance by VA for correctness.
->
-> Does that address your concerns? Or pose new questions? ;)
->
+> Obviously they appear on the PCI host bridge in order, because that
+> is a how PCI works. My question was about what happens then. On a lot
+> of SoCs, there is something like an AXI bus that uses posted
+> transactions between PCI and RAM, so you have a do a full manual
+> syncronization of ongoing PIC DMAs when the MSI catcher signals the
+> top-level interrupt. Do you have a bus between PCI and RAM that does
+> not require this, or does the MSI catcher have logic to flush all DMAs?
 
-Crystal clear. Lately I have been dealing with some dodgy Tianocore
-code that 'promoted' VA operations to set/way operations if the VA
-range exceeded a certain size threshold (and nuked the whole cache
-instead), so by now I am well aware of the differences. I was just
-vaguely under the impression that clearing the C bit could result in
-the caches to lose state, but apparently not.
+Our hardware has an automatic mechanism to flush the content to DRAM before the
+MSI write is committed.
 
-So that means the EFI stub entry code is sound, and I have no
-objections whatsoever to removing flush_cache_all() et al
-
--- 
-Ard.
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
