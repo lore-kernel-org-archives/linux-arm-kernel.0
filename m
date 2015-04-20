@@ -1,9 +1,9 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Apr 2015 14:58:58 +0200
-Subject: [PATCH 05/13 v2] coresight: etb: let runtime PM handle core clock
+Date: Mon, 20 Apr 2015 14:58:59 +0200
+Subject: [PATCH 06/13 v2] coresight: funnel: let runtime PM handle core clock
 In-Reply-To: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
 References: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1429534746-3068-5-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1429534746-3068-6-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,11 +15,9 @@ CONFIG_PM is selected, else the clock will be always on.
 
 Prior to this patch, as the AMBA primecell bus code enables
 the PCLK, it would be left on after probe as
-the clk_prepare_enable() and clk_disable_unprepare() was
-called and thus just increase and decreas the refcount by
-one, without it reaching zero and actually disabling the
-clock. Now the runtime PM callbacks will make sure the PCLK
-is properly disabled after probe.
+clk_disable_unprepare() was not called. Now the runtime PM
+callbacks will make sure the PCLK is properly disabled
+after probe.
 
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
@@ -28,131 +26,90 @@ ChangeLog v1->v2:
 - Rebased on the coresight git tree.
 - Added Ulf's review tag.
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 35 +++++++--------------------
- 1 file changed, 9 insertions(+), 26 deletions(-)
+ drivers/hwtracing/coresight/coresight-funnel.c | 24 +++++++-----------------
+ 1 file changed, 7 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 40049869aecd..f6ec3ae5a76b 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -22,7 +22,7 @@
- #include <linux/uaccess.h>
+diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+index 3db36f70b666..330de2c88759 100644
+--- a/drivers/hwtracing/coresight/coresight-funnel.c
++++ b/drivers/hwtracing/coresight/coresight-funnel.c
+@@ -18,7 +18,7 @@
+ #include <linux/err.h>
+ #include <linux/fs.h>
  #include <linux/slab.h>
- #include <linux/spinlock.h>
 -#include <linux/clk.h>
 +#include <linux/pm_runtime.h>
- #include <linux/seq_file.h>
  #include <linux/coresight.h>
  #include <linux/amba/bus.h>
-@@ -68,7 +68,6 @@
+ 
+@@ -36,14 +36,12 @@
+  * @base:	memory mapped base address for this component.
   * @dev:	the device entity associated to this component.
   * @csdev:	component vitals needed by the framework.
-  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
 - * @clk:	the clock this component is associated to.
-  * @spinlock:	only one at a time pls.
-  * @in_use:	synchronise user space access to etb buffer.
-  * @buf:	area of memory where ETB buffer content gets sent.
-@@ -81,7 +80,6 @@ struct etb_drvdata {
+  * @priority:	port selection order.
+  */
+ struct funnel_drvdata {
+ 	void __iomem		*base;
  	struct device		*dev;
  	struct coresight_device	*csdev;
- 	struct miscdevice	miscdev;
 -	struct clk		*clk;
- 	spinlock_t		spinlock;
- 	atomic_t		in_use;
- 	u8			*buf;
-@@ -92,17 +90,14 @@ struct etb_drvdata {
+ 	unsigned long		priority;
+ };
  
- static unsigned int etb_get_buffer_depth(struct etb_drvdata *drvdata)
+@@ -67,12 +65,8 @@ static int funnel_enable(struct coresight_device *csdev, int inport,
+ 			 int outport)
  {
+ 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 -	int ret;
- 	u32 depth = 0;
- 
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
-+	pm_runtime_get_sync(drvdata->dev);
- 
- 	/* RO registers don't need locking */
- 	depth = readl_relaxed(drvdata->base + ETB_RAM_DEPTH_REG);
- 
--	clk_disable_unprepare(drvdata->clk);
-+	pm_runtime_put(drvdata->dev);
- 	return depth;
- }
- 
-@@ -137,12 +132,9 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
- static int etb_enable(struct coresight_device *csdev)
- {
- 	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
--	int ret;
- 	unsigned long flags;
- 
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
-+	pm_runtime_get_sync(drvdata->dev);
- 
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	etb_enable_hw(drvdata);
-@@ -252,7 +244,7 @@ static void etb_disable(struct coresight_device *csdev)
- 	drvdata->enable = false;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	clk_disable_unprepare(drvdata->clk);
-+	pm_runtime_put(drvdata->dev);
- 
- 	dev_info(drvdata->dev, "ETB disabled\n");
- }
-@@ -339,16 +331,12 @@ static const struct file_operations etb_fops = {
- static ssize_t status_show(struct device *dev,
- 			   struct device_attribute *attr, char *buf)
- {
--	int ret;
- 	unsigned long flags;
- 	u32 etb_rdr, etb_sr, etb_rrp, etb_rwp;
- 	u32 etb_trg, etb_cr, etb_ffsr, etb_ffcr;
- 	struct etb_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		goto out;
 -
+-	ret = clk_prepare_enable(drvdata->clk);
+-	if (ret)
+-		return ret;
+ 
 +	pm_runtime_get_sync(drvdata->dev);
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	CS_UNLOCK(drvdata->base);
+ 	funnel_enable_hw(drvdata, inport);
  
-@@ -364,7 +352,7 @@ static ssize_t status_show(struct device *dev,
- 	CS_LOCK(drvdata->base);
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 	dev_info(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
+@@ -98,8 +92,7 @@ static void funnel_disable(struct coresight_device *csdev, int inport,
+ 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
  
+ 	funnel_disable_hw(drvdata, inport);
+-
 -	clk_disable_unprepare(drvdata->clk);
 +	pm_runtime_put(drvdata->dev);
  
- 	return sprintf(buf,
- 		       "Depth:\t\t0x%x\n"
-@@ -377,7 +365,7 @@ static ssize_t status_show(struct device *dev,
- 		       "Flush ctrl:\t0x%x\n",
- 		       etb_rdr, etb_sr, etb_rrp, etb_rwp,
- 		       etb_trg, etb_cr, etb_ffsr, etb_ffcr);
--out:
+ 	dev_info(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
+ }
+@@ -153,16 +146,14 @@ static u32 get_funnel_ctrl_hw(struct funnel_drvdata *drvdata)
+ static ssize_t funnel_ctrl_show(struct device *dev,
+ 			     struct device_attribute *attr, char *buf)
+ {
+-	int ret;
+ 	u32 val;
+ 	struct funnel_drvdata *drvdata = dev_get_drvdata(dev->parent);
+ 
+-	ret = clk_prepare_enable(drvdata->clk);
+-	if (ret)
+-		return ret;
++	pm_runtime_get_sync(drvdata->dev);
+ 
+ 	val = get_funnel_ctrl_hw(drvdata);
+-	clk_disable_unprepare(drvdata->clk);
 +
- 	return -EINVAL;
++	pm_runtime_put(drvdata->dev);
+ 
+ 	return sprintf(buf, "%#x\n", val);
  }
- static DEVICE_ATTR_RO(status);
-@@ -449,13 +437,8 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+@@ -205,8 +196,7 @@ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
+ 		return PTR_ERR(base);
  
- 	spin_lock_init(&drvdata->spinlock);
- 
--	drvdata->clk = adev->pclk;
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
+ 	drvdata->base = base;
 -
- 	drvdata->buffer_depth = etb_get_buffer_depth(drvdata);
--	clk_disable_unprepare(drvdata->clk);
+-	drvdata->clk = adev->pclk;
 +	pm_runtime_put(&adev->dev);
  
- 	if (drvdata->buffer_depth < 0)
- 		return -EINVAL;
+ 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+ 	if (!desc)
 -- 
 1.9.3
