@@ -1,37 +1,31 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 20 Apr 2015 14:13:12 -0500
-Subject: [PATCH] MAINTAINERS: socfpga: update the git repo for SoCFPGA
-Message-ID: <1429557192-23866-1-git-send-email-dinguyen@opensource.altera.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Apr 2015 20:22:44 +0100
+Subject: [PATCH] arm64: kill flush_cache_all()
+In-Reply-To: <CAKv+Gu_6u6wZrd=3z94Wqrab=G=bxm30=zWK0Rry3w+F92Wn9w@mail.gmail.com>
+References: <1429521875-16893-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu-VVA+wruJgfWksFdL5eXrp5nZV-b9q7eYspfi=KoqvEg@mail.gmail.com>
+ <20150420180255.GB17767@leverpostej>
+ <CAKv+Gu_6u6wZrd=3z94Wqrab=G=bxm30=zWK0Rry3w+F92Wn9w@mail.gmail.com>
+Message-ID: <20150420192243.GA8040@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+> > Does that address your concerns? Or pose new questions? ;)
+> >
+> 
+> Crystal clear. Lately I have been dealing with some dodgy Tianocore
+> code that 'promoted' VA operations to set/way operations if the VA
+> range exceeded a certain size threshold (and nuked the whole cache
+> instead), so by now I am well aware of the differences. I was just
+> vaguely under the impression that clearing the C bit could result in
+> the caches to lose state, but apparently not.
 
-The git tree at rocketboards.org is going away. Update the entry to reflect
-the address of the new location. Also add an entry for all the socfpga_*
-dts files.
+To the best of my knowledge, that is not permitted.
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- MAINTAINERS | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+> So that means the EFI stub entry code is sound, and I have no
+> objections whatsoever to removing flush_cache_all() et al
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index db335f9..b939fc9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1447,9 +1447,10 @@ ARM/SOCFPGA ARCHITECTURE
- M:	Dinh Nguyen <dinguyen@opensource.altera.com>
- S:	Maintained
- F:	arch/arm/mach-socfpga/
-+F:	arch/arm/boot/dts/socfpga*
-+F:	arch/arm/configs/socfpga_defconfig
- W:	http://www.rocketboards.org
--T:	git://git.rocketboards.org/linux-socfpga.git
--T:	git://git.rocketboards.org/linux-socfpga-next.git
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git
- 
- ARM/SOCFPGA CLOCK FRAMEWORK SUPPORT
- M:	Dinh Nguyen <dinguyen@opensource.altera.com>
--- 
-2.2.1
+Great! Can I consider that an Acked-by?
+
+Thanks,
+Mark.
