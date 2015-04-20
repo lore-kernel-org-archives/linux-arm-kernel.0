@@ -1,49 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 20 Apr 2015 15:32:51 +0300
-Subject: [PATCH] pinctrl: mediatek: mtk-common: initialize unmask
-In-Reply-To: <1429528516-9245-1-git-send-email-colin.king@canonical.com>
-References: <1429528516-9245-1-git-send-email-colin.king@canonical.com>
-Message-ID: <5534F1F3.9060802@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 Apr 2015 14:58:54 +0200
+Subject: [PATCH 01/13 v2] coresight: etm: print what version of ETM/PTM is
+ detected
+Message-ID: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Helpfully report a bit more about the hardware found in the
+silicon when matching the AMBA device IDs by using the associated
+.data pointer in the AMBA match.
 
-On 04/20/2015 02:15 PM, Colin King wrote:
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Rebased on the coresight git tree.
+---
+ drivers/hwtracing/coresight/coresight-etm3x.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-> From: Colin Ian King <colin.king@canonical.com>
-
-> cppcheck detected an unitialized variable:
-
-    Uninitialized.
-
-> [drivers/pinctrl/mediatek/pinctrl-mtk-common.c:897]:
->    (error) Uninitialized variable: unmask
-
-> unmask should be initialized to zero to ensure unmasking
-> only occurs if a previous mask occurred. The current situation
-> is that the unmask variable could contain any random garbage
-> causing random unexpected unmasking.
-
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->   drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index 493294c..3173125 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -881,7 +881,8 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
->   	if (!mtk_eint_get_mask(pctl, eint_num)) {
->   		mtk_eint_mask(d);
->   		unmask = 1;
-> -	}
-> +	} else
-> +		unmask = 0;
-
-    The CodingStyle dictates that there should be {} around *else* branch too.
-
-[...]
-
-WBR, Sergei
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index c965f5724abd..66e210d5fddd 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -1859,7 +1859,7 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto err_arch_supported;
+ 	}
+ 
+-	dev_info(dev, "ETM initialized\n");
++	dev_info(dev, "%s initialized\n", (char *)id->data);
+ 
+ 	if (boot_enable) {
+ 		coresight_enable(drvdata->csdev);
+@@ -1890,18 +1890,22 @@ static struct amba_id etm_ids[] = {
+ 	{	/* ETM 3.3 */
+ 		.id	= 0x0003b921,
+ 		.mask	= 0x0003ffff,
++		.data	= "ETM 3.3",
+ 	},
+ 	{	/* ETM 3.5 */
+ 		.id	= 0x0003b956,
+ 		.mask	= 0x0003ffff,
++		.data	= "ETM 3.5",
+ 	},
+ 	{	/* PTM 1.0 */
+ 		.id	= 0x0003b950,
+ 		.mask	= 0x0003ffff,
++		.data	= "PTM 1.0",
+ 	},
+ 	{	/* PTM 1.1 */
+ 		.id	= 0x0003b95f,
+ 		.mask	= 0x0003ffff,
++		.data	= "PTM 1.1",
+ 	},
+ 	{ 0, 0},
+ };
+-- 
+1.9.3
