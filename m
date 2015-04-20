@@ -1,9 +1,9 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 20 Apr 2015 11:06:22 +0100
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 20 Apr 2015 11:21:55 +0100
 Subject: [PATCH] arm64: kill flush_cache_all()
 In-Reply-To: <1429521875-16893-1-git-send-email-mark.rutland@arm.com>
 References: <1429521875-16893-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150420100621.GD24715@e104818-lin.cambridge.arm.com>
+Message-ID: <20150420102155.GA12507@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,7 +33,16 @@ On Mon, Apr 20, 2015 at 10:24:35AM +0100, Mark Rutland wrote:
 > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/cacheflush.h  |  5 ---
+>  arch/arm64/include/asm/proc-fns.h    |  4 --
+>  arch/arm64/include/asm/system_misc.h |  1 -
+>  arch/arm64/kernel/process.c          | 12 +-----
+>  arch/arm64/mm/cache.S                | 73 ------------------------------------
+>  arch/arm64/mm/flush.c                |  1 -
+>  arch/arm64/mm/proc.S                 | 46 -----------------------
+>  7 files changed, 1 insertion(+), 141 deletions(-)
 
-We should have done this long time ago.
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Lorenzo
