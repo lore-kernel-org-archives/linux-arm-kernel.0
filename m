@@ -1,64 +1,53 @@
-From: dave.long@linaro.org (David Long)
-Date: Mon, 20 Apr 2015 03:15:06 -0400
-Subject: [PATCH v5 1/6] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-In-Reply-To: <20150325134410.GA26903@localhost>
-References: <1424214701-4899-1-git-send-email-dave.long@linaro.org>
- <1424214701-4899-2-git-send-email-dave.long@linaro.org>
- <20150325134410.GA26903@localhost>
-Message-ID: <5534A77A.8040509@linaro.org>
+From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
+Date: Mon, 20 Apr 2015 10:45:34 +0300
+Subject: [PATCH v2 0/7] ARM: dts: qcom: Add more device coniguration nodes
+Message-ID: <1429515941-15334-1-git-send-email-ivan.ivanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/15 09:44, Catalin Marinas wrote:
-> On Tue, Feb 17, 2015 at 06:11:36PM -0500, David Long wrote:
->> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
->> index 6913643..700d28b 100644
->> --- a/arch/arm64/include/uapi/asm/ptrace.h
->> +++ b/arch/arm64/include/uapi/asm/ptrace.h
->> @@ -61,6 +61,42 @@
->>
->>   #ifndef __ASSEMBLY__
->>
->> +#define ARM_cpsr	pstate
->
-> There is no CPSR on AArch64, it's just called PSTATE. But more
-> importantly, what's the point of all these macros?
->
->> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->> index d882b83..adc1f39 100644
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->> @@ -48,6 +48,122 @@
->>   #define CREATE_TRACE_POINTS
->>   #include <trace/events/syscalls.h>
->>
->> +struct pt_regs_offset {
->> +	const char *name;
->> +	int offset;
->> +};
->> +
->> +#define REG_OFFSET_NAME(r) \
->> +	{.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
->> +#define REG_OFFSET_END {.name = NULL, .offset = 0}
->> +
->> +static const struct pt_regs_offset regoffset_table[] = {
->> +	REG_OFFSET_NAME(x0),
->
-> If it is just for defining a name, just change the REG_OFFSET_NAME macro
-> to take a string argument and remove all the ARM_ macros.
->
-> I'm also not sure why we need the ARM_ prefix. Do you see them used
-> outside the arm64 context?
->
+Recent Qualcomm PMIC's devices are accessed over SPMI bus.
+Every PMIC has several "sub-function" devices inside.
 
-Sorry Catalin, I don't have a record of having replied to this yet so 
-this is a quite late reply.
+First three patches are adding device nodes to PM8841, PM8941 and PMA8084 PMIC's.
+Next two are introducing PM8916 PMIC chip with its device nodes. The sixth one
+add restart device node for MSM8916 chip. And the last one add initial GPIO
+definitions for APQ8016 SBC board.
 
-The macros were taken from the 32-bit ARM implementation, which in turn 
-looks to be taken from x86/sh/powerpc for 
-HAVE_REGS_AND_STACK_ACCESS_API.  I've replaced the hacky define of cpsr 
-with pstate. The macros create symbolic names that can be looked up by, 
-for example, event tracing strings entered through debugfs.  This is 
-consistent across multiple platforms.
+checkpatch will complain about "appears un-documented" for several drivers,
+but I am expecting they to mergeed soon, hopefully during this merge window.
 
--dl
+Changes since v0 [2]:
+
+* Add proper IRQ_TYPE_* specifiers in the interrupt bidings.
+
+Patches are created top of Kumar's kernel tree and tags/qcom-dt-for-4.1 [1].
+
+[1] https://lkml.org/lkml/2015/3/27/599
+[2] http://comments.gmane.org/gmane.linux.ports.arm.msm/12610
+
+Ivan T. Ivanov (7):
+  ARM: dts: qcom: Add PM8841 functions device nodes
+  ARM: dts: qcom: Add PM8941 functions device nodes
+  ARM: dts: qcom: Add PMA8084 functions device nodes
+  arm64: dts: qcom: Add SPMI PMIC Arbiter node for MSM8916
+  arm64: dts: qcom: Add 8x16 chipset SPMI PMIC's nodes
+  arm64: dts: qcom: Add MSM8916 restart device node
+  arm64: dts: qcom: Add initial set of PMIC and SoC pins for APQ8016 SBC
+    board
+
+ arch/arm/boot/dts/qcom-pm8841.dtsi                 |  18 +++
+ arch/arm/boot/dts/qcom-pm8941.dtsi                 | 133 ++++++++++++++++++++-
+ arch/arm/boot/dts/qcom-pma8084.dtsi                |  92 ++++++++++++++
+ .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |  30 +++++
+ arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi |  21 ++++
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          |   3 +
+ arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi          |   1 +
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  25 +++-
+ arch/arm64/boot/dts/qcom/pm8916.dtsi               |  99 +++++++++++++++
+ 9 files changed, 420 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/pm8916.dtsi
+
+--
+1.9.1
