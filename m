@@ -1,527 +1,506 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Tue, 21 Apr 2015 05:05:27 +0800
-Subject: [PATCH v4 05/11] ARM: dts: add imx7d soc dtsi file
+Date: Tue, 21 Apr 2015 05:05:28 +0800
+Subject: [PATCH v4 06/11] pinctrl: add imx7d support
 In-Reply-To: <1429563933-3129-1-git-send-email-Frank.Li@freescale.com>
 References: <1429563933-3129-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1429563933-3129-6-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1429563933-3129-7-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Frank Li <Frank.Li@freescale.com>
 
-Add i.mx7d support:
-	imx7d dtsi part
+Add i.MX7D pinctrl driver support
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
 Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/boot/dts/imx7d.dtsi | 498 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 498 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx7d.dtsi
+ drivers/pinctrl/freescale/Kconfig         |   7 +
+ drivers/pinctrl/freescale/Makefile        |   1 +
+ drivers/pinctrl/freescale/pinctrl-imx.c   |   3 +-
+ drivers/pinctrl/freescale/pinctrl-imx.h   |   1 +
+ drivers/pinctrl/freescale/pinctrl-imx7d.c | 411 ++++++++++++++++++++++++++++++
+ 5 files changed, 421 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/pinctrl/freescale/pinctrl-imx7d.c
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+diff --git a/drivers/pinctrl/freescale/Kconfig b/drivers/pinctrl/freescale/Kconfig
+index 16aac38..12ef544 100644
+--- a/drivers/pinctrl/freescale/Kconfig
++++ b/drivers/pinctrl/freescale/Kconfig
+@@ -87,6 +87,13 @@ config PINCTRL_IMX6SX
+ 	help
+ 	  Say Y here to enable the imx6sx pinctrl driver
+ 
++config PINCTRL_IMX7D
++	bool "IMX7D pinctrl driver"
++	depends on SOC_IMX7D
++	select PINCTRL_IMX
++	help
++	  Say Y here to enable the imx7d pinctrl driver
++
+ config PINCTRL_VF610
+ 	bool "Freescale Vybrid VF610 pinctrl driver"
+ 	depends on SOC_VF610
+diff --git a/drivers/pinctrl/freescale/Makefile b/drivers/pinctrl/freescale/Makefile
+index bba73c2..343cb43 100644
+--- a/drivers/pinctrl/freescale/Makefile
++++ b/drivers/pinctrl/freescale/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_PINCTRL_IMX6Q)	+= pinctrl-imx6q.o
+ obj-$(CONFIG_PINCTRL_IMX6Q)	+= pinctrl-imx6dl.o
+ obj-$(CONFIG_PINCTRL_IMX6SL)	+= pinctrl-imx6sl.o
+ obj-$(CONFIG_PINCTRL_IMX6SX)	+= pinctrl-imx6sx.o
++obj-$(CONFIG_PINCTRL_IMX7D)	+= pinctrl-imx7d.o
+ obj-$(CONFIG_PINCTRL_VF610)	+= pinctrl-vf610.o
+ obj-$(CONFIG_PINCTRL_MXS)	+= pinctrl-mxs.o
+ obj-$(CONFIG_PINCTRL_IMX23)	+= pinctrl-imx23.o
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index e261f1c..af3e9ae 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -580,7 +580,6 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
+ 	struct device_node *child;
+ 	struct imx_pmx_func *func;
+ 	struct imx_pin_group *grp;
+-	static u32 grp_index;
+ 	u32 i = 0;
+ 
+ 	dev_dbg(info->dev, "parse function(%d): %s\n", index, np->name);
+@@ -599,7 +598,7 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
+ 
+ 	for_each_child_of_node(np, child) {
+ 		func->groups[i] = child->name;
+-		grp = &info->groups[grp_index++];
++		grp = &info->groups[info->grp_index++];
+ 		imx_pinctrl_parse_groups(child, grp, info, i++);
+ 	}
+ 
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
+index 49e55d3..09b0458 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.h
++++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+@@ -81,6 +81,7 @@ struct imx_pinctrl_soc_info {
+ 	struct imx_pmx_func *functions;
+ 	unsigned int nfunctions;
+ 	unsigned int flags;
++	unsigned int grp_index;
+ };
+ 
+ #define SHARE_MUX_CONF_REG	0x1
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
 new file mode 100644
-index 0000000..dd391e2
+index 0000000..d9011c6
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -0,0 +1,498 @@
++++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
+@@ -0,0 +1,411 @@
 +/*
-+ * Copyright 2015 Freescale Semiconductor, Inc.
++ * Copyright (C) 2014-2015 Freescale Semiconductor, Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
-+#include <dt-bindings/clock/imx7d-clock.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "imx7d-pinfunc.h"
-+#include "skeleton.dtsi"
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/pinctrl/pinctrl.h>
 +
-+/ {
-+	aliases {
-+		gpio0 = &gpio1;
-+		gpio1 = &gpio2;
-+		gpio2 = &gpio3;
-+		gpio3 = &gpio4;
-+		gpio4 = &gpio5;
-+		gpio5 = &gpio6;
-+		gpio6 = &gpio7;
-+		i2c0 = &i2c1;
-+		i2c1 = &i2c2;
-+		i2c2 = &i2c3;
-+		i2c3 = &i2c4;
-+		mmc0 = &usdhc1;
-+		mmc1 = &usdhc2;
-+		mmc2 = &usdhc3;
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+		serial3 = &uart4;
-+		serial4 = &uart5;
-+		serial5 = &uart6;
-+		serial6 = &uart7;
-+	};
++#include "pinctrl-imx.h"
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0>;
-+			operating-points = <
-+				/* KHz	uV */
-+				996000	1075000
-+				792000	975000
-+			>;
-+			clock-latency = <61036>; /* two CLK32 periods */
-+			clocks = <&clks IMX7D_ARM_A7_ROOT_CLK>, <&clks IMX7D_ARM_A7_ROOT_SRC>,
-+				 <&clks IMX7D_PLL_ARM_MAIN_CLK>, <&clks IMX7D_PLL_SYS_MAIN_CLK>;
-+			clock-names = "arm", "arm_root_src", "pll_arm", "pll_sys_main";
-+		};
-+/*
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <1>;
-+		};
-+*/
-+	};
-+
-+	intc: interrupt-controller at 31001000 {
-+		compatible = "arm,cortex-a7-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x31001000 0x1000>,
-+		      <0x31002000 0x100>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ckil: clock at 0 {
-+			compatible = "fixed-clock";
-+			reg = <0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+			clock-output-names = "ckil";
-+		};
-+
-+		osc: clock at 1 {
-+			compatible = "fixed-clock";
-+			reg = <1>;
-+			#clock-cells = <0>;
-+			clock-frequency = <24000000>;
-+			clock-output-names = "osc";
-+		};
-+
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		arm,cpu-registers-not-fw-configured;
-+		interrupts = <GIC_PPI 13
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			<GIC_PPI 14
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupt-parent = <&intc>;
-+		clock-frequency = <8000000>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&intc>;
-+		ranges;
-+
-+		pmu {
-+			compatible = "arm,cortex-a7-pmu";
-+			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		aips1: aips-bus at 30000000 {
-+			compatible = "fsl,aips-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x30000000 0x400000>;
-+			ranges;
-+
-+			gpio1: gpio at 30200000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30200000 0x10000>;
-+				interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>, /* GPIO1_INT15_0 */
-+					     <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>; /* GPIO1_INT31_16 */
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio2: gpio at 30210000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30210000 0x10000>;
-+				interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio3: gpio at 30220000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30220000 0x10000>;
-+				interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio4: gpio at 30230000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30230000 0x10000>;
-+				interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio5: gpio at 30240000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30240000 0x10000>;
-+				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio6: gpio at 30250000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30250000 0x10000>;
-+				interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio7: gpio at 30260000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30260000 0x10000>;
-+				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			iomuxc_lpsr: iomuxc-lpsr at 302c0000 {
-+				compatible = "fsl,imx7d-iomuxc-lpsr";
-+				reg = <0x302c0000 0x10000>;
-+			};
-+
-+			gpt1: gpt at 302d0000 {
-+				compatible = "fsl,imx7d-gpt", "fsl,imx31-gpt";
-+				reg = <0x302d0000 0x10000>;
-+				interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_GPT1_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+			};
-+
-+			gpt2: gpt at 302e0000 {
-+				compatible = "fsl,imx7d-gpt", "fsl,imx31-gpt";
-+				reg = <0x302e0000 0x10000>;
-+				interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_GPT2_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			gpt3: gpt at 302f0000 {
-+				compatible = "fsl,imx7d-gpt", "fsl,imx31-gpt";
-+				reg = <0x302f0000 0x10000>;
-+				interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_GPT3_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			gpt4: gpt at 30300000 {
-+				compatible = "fsl,imx7d-gpt", "fsl,imx31-gpt";
-+				reg = <0x30300000 0x10000>;
-+				interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_GPT4_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			iomuxc: iomuxc at 30330000 {
-+				compatible = "fsl,imx7d-iomuxc";
-+				reg = <0x30330000 0x10000>;
-+			};
-+
-+			gpr: iomuxc-gpr at 30340000 {
-+				compatible = "fsl,imx7d-iomuxc-gpr", "syscon";
-+				reg = <0x30340000 0x10000>;
-+			};
-+
-+			ocotp: ocotp-ctrl at 30350000 {
-+				compatible = "syscon";
-+				reg = <0x30350000 0x10000>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>;
-+				status = "disabled";
-+			};
-+
-+			anatop: anatop at 30360000 {
-+				compatible = "fsl,imx7d-anatop", "fsl,imx6q-anatop",
-+					"syscon", "simple-bus";
-+				reg = <0x30360000 0x10000>;
-+				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-+
-+				reg_1p0d: regulator-vdd1p0d at 210 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vdd1p0d";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1200000>;
-+					anatop-reg-offset = <0x210>;
-+					anatop-vol-bit-shift = <8>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <8>;
-+					anatop-min-voltage = <800000>;
-+					anatop-max-voltage = <1200000>;
-+					anatop-enable-bit = <31>;
-+				};
-+			};
-+
-+			snvs: snvs at 30370000 {
-+				compatible = "fsl,sec-v4.0-mon", "simple-bus";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0x30370000 0x10000>;
-+
-+				snvs-rtc-lp at 34 {
-+					compatible = "fsl,sec-v4.0-mon-rtc-lp";
-+					reg = <0x34 0x58>;
-+					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
-+						<GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+			};
-+
-+			snvs-pwrkey at 0x30370000 {
-+				compatible = "fsl, imx7d-snvs-pwrkey", "fsl,imx6sx-snvs-pwrkey";
-+				reg = <0x30370000 0x10000>;
-+				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+				fsl,keycode = <116>; /* KEY_POWER */
-+				fsl,wakeup;
-+			};
-+
-+			clks: ccm at 30380000 {
-+				compatible = "fsl,imx7d-ccm";
-+				reg = <0x30380000 0x10000>;
-+				interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+				#clock-cells = <1>;
-+				clocks = <&ckil>, <&osc>;
-+				clock-names = "ckil", "osc";
-+			};
-+
-+			src: src at 30390000 {
-+				compatible = "fsl,imx7d-src", "fsl,imx51-src", "syscon";
-+				reg = <0x30390000 0x10000>;
-+				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-+				#reset-cells = <1>;
-+			};
-+
-+			gpc: gpc at 303a0000 {
-+				compatible = "fsl,imx7d-gpc";
-+				reg = <0x303a0000 0x10000>;
-+				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+				fsl,mf-mix-wakeup-irq = <0x4000000 0xc00 0x0 0x0>;
-+				#power-domain-cells = <1>;
-+				pcie-phy-supply = <&reg_1p0d>;
-+			};
-+		};
-+
-+		aips3: aips-bus at 30800000 {
-+			compatible = "fsl,aips-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x30800000 0x400000>;
-+			ranges;
-+
-+			uart1: serial at 30860000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
-+				reg = <0x30860000 0x10000>;
-+				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART1_ROOT_CLK>,
-+					<&clks IMX7D_UART1_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			uart2: serial at 30870000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
-+				reg = <0x30870000 0x10000>;
-+				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART2_ROOT_CLK>,
-+					<&clks IMX7D_UART2_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			uart3: serial at 30880000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
-+				reg = <0x30880000 0x10000>;
-+				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART3_ROOT_CLK>,
-+					<&clks IMX7D_UART3_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			i2c1: i2c at 30a20000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx7d-i2c", "fsl,imx21-i2c";
-+				reg = <0x30a20000 0x10000>;
-+				interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_I2C1_ROOT_CLK>;
-+				status = "disabled";
-+			};
-+
-+			i2c2: i2c at 30a30000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx7d-i2c", "fsl,imx21-i2c";
-+				reg = <0x30a30000 0x10000>;
-+				interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_I2C2_ROOT_CLK>;
-+				status = "disabled";
-+			};
-+
-+			i2c3: i2c at 30a40000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx7d-i2c", "fsl,imx21-i2c";
-+				reg = <0x30a40000 0x10000>;
-+				interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_I2C3_ROOT_CLK>;
-+				status = "disabled";
-+			};
-+
-+			i2c4: i2c at 30a50000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx7d-i2c", "fsl,imx21-i2c";
-+				reg = <0x30a50000 0x10000>;
-+				interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_I2C4_ROOT_CLK>;
-+				status = "disabled";
-+			};
-+
-+			uart4: serial at 30a60000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
-+				reg = <0x30a60000 0x10000>;
-+				interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART4_ROOT_CLK>,
-+					<&clks IMX7D_UART4_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			uart5: serial at 30a70000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
-+				reg = <0x30a70000 0x10000>;
-+				interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART5_ROOT_CLK>,
-+					<&clks IMX7D_UART5_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			uart6: serial at 30a80000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
-+				reg = <0x30a80000 0x10000>;
-+				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART6_ROOT_CLK>,
-+					<&clks IMX7D_UART6_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			uart7: serial at 30a90000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
-+				reg = <0x30a90000 0x10000>;
-+				interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART7_ROOT_CLK>,
-+					<&clks IMX7D_UART7_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			usdhc1: usdhc at 30b40000 {
-+				compatible = "fsl,imx7d-usdhc", "fsl,imx6sx-usdhc", "fsl,imx6sl-usdhc";
-+				reg = <0x30b40000 0x10000>;
-+				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_USDHC1_ROOT_CLK>;
-+				clock-names = "ipg", "ahb", "per";
-+				bus-width = <4>;
-+				status = "disabled";
-+			};
-+
-+			usdhc2: usdhc at 30b50000 {
-+				compatible = "fsl,imx7d-usdhc", "fsl,imx6sx-usdhc", "fsl,imx6sl-usdhc";
-+				reg = <0x30b50000 0x10000>;
-+				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_USDHC2_ROOT_CLK>;
-+				clock-names = "ipg", "ahb", "per";
-+				bus-width = <4>;
-+				status = "disabled";
-+			};
-+
-+			usdhc3: usdhc at 30b60000 {
-+				compatible = "fsl,imx7d-usdhc", "fsl,imx6sx-usdhc", "fsl,imx6sl-usdhc";
-+				reg = <0x30b60000 0x10000>;
-+				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_USDHC3_ROOT_CLK>;
-+				clock-names = "ipg", "ahb", "per";
-+				bus-width = <4>;
-+				status = "disabled";
-+			};
-+		};
-+	};
++enum imx7d_pads {
++	MX7D_PAD_RESERVE0 = 0,
++	MX7D_PAD_RESERVE1 = 1,
++	MX7D_PAD_RESERVE2 = 2,
++	MX7D_PAD_RESERVE3 = 3,
++	MX7D_PAD_RESERVE4 = 4,
++	MX7D_PAD_GPIO1_IO08 = 5,
++	MX7D_PAD_GPIO1_IO09 = 6,
++	MX7D_PAD_GPIO1_IO10 = 7,
++	MX7D_PAD_GPIO1_IO11 = 8,
++	MX7D_PAD_GPIO1_IO12 = 9,
++	MX7D_PAD_GPIO1_IO13 = 10,
++	MX7D_PAD_GPIO1_IO14 = 11,
++	MX7D_PAD_GPIO1_IO15 = 12,
++	MX7D_PAD_EPDC_DATA00 = 13,
++	MX7D_PAD_EPDC_DATA01 = 14,
++	MX7D_PAD_EPDC_DATA02 = 15,
++	MX7D_PAD_EPDC_DATA03 = 16,
++	MX7D_PAD_EPDC_DATA04 = 17,
++	MX7D_PAD_EPDC_DATA05 = 18,
++	MX7D_PAD_EPDC_DATA06 = 19,
++	MX7D_PAD_EPDC_DATA07 = 20,
++	MX7D_PAD_EPDC_DATA08 = 21,
++	MX7D_PAD_EPDC_DATA09 = 22,
++	MX7D_PAD_EPDC_DATA10 = 23,
++	MX7D_PAD_EPDC_DATA11 = 24,
++	MX7D_PAD_EPDC_DATA12 = 25,
++	MX7D_PAD_EPDC_DATA13 = 26,
++	MX7D_PAD_EPDC_DATA14 = 27,
++	MX7D_PAD_EPDC_DATA15 = 28,
++	MX7D_PAD_EPDC_SDCLK = 29,
++	MX7D_PAD_EPDC_SDLE = 30,
++	MX7D_PAD_EPDC_SDOE = 31,
++	MX7D_PAD_EPDC_SDSHR = 32,
++	MX7D_PAD_EPDC_SDCE0 = 33,
++	MX7D_PAD_EPDC_SDCE1 = 34,
++	MX7D_PAD_EPDC_SDCE2 = 35,
++	MX7D_PAD_EPDC_SDCE3 = 36,
++	MX7D_PAD_EPDC_GDCLK = 37,
++	MX7D_PAD_EPDC_GDOE = 38,
++	MX7D_PAD_EPDC_GDRL = 39,
++	MX7D_PAD_EPDC_GDSP = 40,
++	MX7D_PAD_EPDC_BDR0 = 41,
++	MX7D_PAD_EPDC_BDR1 = 42,
++	MX7D_PAD_EPDC_PWR_COM = 43,
++	MX7D_PAD_EPDC_PWR_STAT = 44,
++	MX7D_PAD_LCD_CLK = 45,
++	MX7D_PAD_LCD_ENABLE = 46,
++	MX7D_PAD_LCD_HSYNC = 47,
++	MX7D_PAD_LCD_VSYNC = 48,
++	MX7D_PAD_LCD_RESET = 49,
++	MX7D_PAD_LCD_DATA00 = 50,
++	MX7D_PAD_LCD_DATA01 = 51,
++	MX7D_PAD_LCD_DATA02 = 52,
++	MX7D_PAD_LCD_DATA03 = 53,
++	MX7D_PAD_LCD_DATA04 = 54,
++	MX7D_PAD_LCD_DATA05 = 55,
++	MX7D_PAD_LCD_DATA06 = 56,
++	MX7D_PAD_LCD_DATA07 = 57,
++	MX7D_PAD_LCD_DATA08 = 58,
++	MX7D_PAD_LCD_DATA09 = 59,
++	MX7D_PAD_LCD_DATA10 = 60,
++	MX7D_PAD_LCD_DATA11 = 61,
++	MX7D_PAD_LCD_DATA12 = 62,
++	MX7D_PAD_LCD_DATA13 = 63,
++	MX7D_PAD_LCD_DATA14 = 64,
++	MX7D_PAD_LCD_DATA15 = 65,
++	MX7D_PAD_LCD_DATA16 = 66,
++	MX7D_PAD_LCD_DATA17 = 67,
++	MX7D_PAD_LCD_DATA18 = 68,
++	MX7D_PAD_LCD_DATA19 = 69,
++	MX7D_PAD_LCD_DATA20 = 70,
++	MX7D_PAD_LCD_DATA21 = 71,
++	MX7D_PAD_LCD_DATA22 = 72,
++	MX7D_PAD_LCD_DATA23 = 73,
++	MX7D_PAD_UART1_RX_DATA = 74,
++	MX7D_PAD_UART1_TX_DATA = 75,
++	MX7D_PAD_UART2_RX_DATA = 76,
++	MX7D_PAD_UART2_TX_DATA = 77,
++	MX7D_PAD_UART3_RX_DATA = 78,
++	MX7D_PAD_UART3_TX_DATA = 79,
++	MX7D_PAD_UART3_RTS_B = 80,
++	MX7D_PAD_UART3_CTS_B = 81,
++	MX7D_PAD_I2C1_SCL = 82,
++	MX7D_PAD_I2C1_SDA = 83,
++	MX7D_PAD_I2C2_SCL = 84,
++	MX7D_PAD_I2C2_SDA = 85,
++	MX7D_PAD_I2C3_SCL = 86,
++	MX7D_PAD_I2C3_SDA = 87,
++	MX7D_PAD_I2C4_SCL = 88,
++	MX7D_PAD_I2C4_SDA = 89,
++	MX7D_PAD_ECSPI1_SCLK = 90,
++	MX7D_PAD_ECSPI1_MOSI = 91,
++	MX7D_PAD_ECSPI1_MISO = 92,
++	MX7D_PAD_ECSPI1_SS0 = 93,
++	MX7D_PAD_ECSPI2_SCLK = 94,
++	MX7D_PAD_ECSPI2_MOSI = 95,
++	MX7D_PAD_ECSPI2_MISO = 96,
++	MX7D_PAD_ECSPI2_SS0 = 97,
++	MX7D_PAD_SD1_CD_B = 98,
++	MX7D_PAD_SD1_WP = 99,
++	MX7D_PAD_SD1_RESET_B = 100,
++	MX7D_PAD_SD1_CLK = 101,
++	MX7D_PAD_SD1_CMD = 102,
++	MX7D_PAD_SD1_DATA0 = 103,
++	MX7D_PAD_SD1_DATA1 = 104,
++	MX7D_PAD_SD1_DATA2 = 105,
++	MX7D_PAD_SD1_DATA3 = 106,
++	MX7D_PAD_SD2_CD_B = 107,
++	MX7D_PAD_SD2_WP = 108,
++	MX7D_PAD_SD2_RESET_B = 109,
++	MX7D_PAD_SD2_CLK = 110,
++	MX7D_PAD_SD2_CMD = 111,
++	MX7D_PAD_SD2_DATA0 = 112,
++	MX7D_PAD_SD2_DATA1 = 113,
++	MX7D_PAD_SD2_DATA2 = 114,
++	MX7D_PAD_SD2_DATA3 = 115,
++	MX7D_PAD_SD3_CLK = 116,
++	MX7D_PAD_SD3_CMD = 117,
++	MX7D_PAD_SD3_DATA0 = 118,
++	MX7D_PAD_SD3_DATA1 = 119,
++	MX7D_PAD_SD3_DATA2 = 120,
++	MX7D_PAD_SD3_DATA3 = 121,
++	MX7D_PAD_SD3_DATA4 = 122,
++	MX7D_PAD_SD3_DATA5 = 123,
++	MX7D_PAD_SD3_DATA6 = 124,
++	MX7D_PAD_SD3_DATA7 = 125,
++	MX7D_PAD_SD3_STROBE = 126,
++	MX7D_PAD_SD3_RESET_B = 127,
++	MX7D_PAD_SAI1_RX_DATA = 128,
++	MX7D_PAD_SAI1_TX_BCLK = 129,
++	MX7D_PAD_SAI1_TX_SYNC = 130,
++	MX7D_PAD_SAI1_TX_DATA = 131,
++	MX7D_PAD_SAI1_RX_SYNC = 132,
++	MX7D_PAD_SAI1_RX_BCLK = 133,
++	MX7D_PAD_SAI1_MCLK = 134,
++	MX7D_PAD_SAI2_TX_SYNC = 135,
++	MX7D_PAD_SAI2_TX_BCLK = 136,
++	MX7D_PAD_SAI2_RX_DATA = 137,
++	MX7D_PAD_SAI2_TX_DATA = 138,
++	MX7D_PAD_ENET1_RGMII_RD0 = 139,
++	MX7D_PAD_ENET1_RGMII_RD1 = 140,
++	MX7D_PAD_ENET1_RGMII_RD2 = 141,
++	MX7D_PAD_ENET1_RGMII_RD3 = 142,
++	MX7D_PAD_ENET1_RGMII_RX_CTL = 143,
++	MX7D_PAD_ENET1_RGMII_RXC = 144,
++	MX7D_PAD_ENET1_RGMII_TD0 = 145,
++	MX7D_PAD_ENET1_RGMII_TD1 = 146,
++	MX7D_PAD_ENET1_RGMII_TD2 = 147,
++	MX7D_PAD_ENET1_RGMII_TD3 = 148,
++	MX7D_PAD_ENET1_RGMII_TX_CTL = 149,
++	MX7D_PAD_ENET1_RGMII_TXC = 150,
++	MX7D_PAD_ENET1_TX_CLK = 151,
++	MX7D_PAD_ENET1_RX_CLK = 152,
++	MX7D_PAD_ENET1_CRS = 153,
++	MX7D_PAD_ENET1_COL = 154,
++	MX7D_PAD_GPIO1_IO00 = 0,
++	MX7D_PAD_GPIO1_IO01 = 1,
++	MX7D_PAD_GPIO1_IO02 = 2,
++	MX7D_PAD_GPIO1_IO03 = 3,
++	MX7D_PAD_GPIO1_IO04 = 4,
++	MX7D_PAD_GPIO1_IO05 = 5,
++	MX7D_PAD_GPIO1_IO06 = 6,
++	MX7D_PAD_GPIO1_IO07 = 7,
 +};
++
++/* Pad names for the pinmux subsystem */
++static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
++	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE0),
++	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE1),
++	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE2),
++	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE3),
++	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE4),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO08),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO09),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO10),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO11),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO12),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO13),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO14),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO15),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA00),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA01),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA02),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA03),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA04),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA05),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA06),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA07),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA08),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA09),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA10),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA11),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA12),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA13),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA14),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA15),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDCLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDLE),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDOE),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDSHR),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDCE0),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDCE1),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDCE2),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDCE3),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_GDCLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_GDOE),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_GDRL),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_GDSP),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_BDR0),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_BDR1),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_PWR_COM),
++	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_PWR_STAT),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_CLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_ENABLE),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_HSYNC),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_VSYNC),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_RESET),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA00),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA01),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA02),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA03),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA04),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA05),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA06),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA07),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA08),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA09),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA10),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA11),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA12),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA13),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA14),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA15),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA16),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA17),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA18),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA19),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA20),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA21),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA22),
++	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA23),
++	IMX_PINCTRL_PIN(MX7D_PAD_UART1_RX_DATA),
++	IMX_PINCTRL_PIN(MX7D_PAD_UART1_TX_DATA),
++	IMX_PINCTRL_PIN(MX7D_PAD_UART2_RX_DATA),
++	IMX_PINCTRL_PIN(MX7D_PAD_UART2_TX_DATA),
++	IMX_PINCTRL_PIN(MX7D_PAD_UART3_RX_DATA),
++	IMX_PINCTRL_PIN(MX7D_PAD_UART3_TX_DATA),
++	IMX_PINCTRL_PIN(MX7D_PAD_UART3_RTS_B),
++	IMX_PINCTRL_PIN(MX7D_PAD_UART3_CTS_B),
++	IMX_PINCTRL_PIN(MX7D_PAD_I2C1_SCL),
++	IMX_PINCTRL_PIN(MX7D_PAD_I2C1_SDA),
++	IMX_PINCTRL_PIN(MX7D_PAD_I2C2_SCL),
++	IMX_PINCTRL_PIN(MX7D_PAD_I2C2_SDA),
++	IMX_PINCTRL_PIN(MX7D_PAD_I2C3_SCL),
++	IMX_PINCTRL_PIN(MX7D_PAD_I2C3_SDA),
++	IMX_PINCTRL_PIN(MX7D_PAD_I2C4_SCL),
++	IMX_PINCTRL_PIN(MX7D_PAD_I2C4_SDA),
++	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI1_SCLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI1_MOSI),
++	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI1_MISO),
++	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI1_SS0),
++	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI2_SCLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI2_MOSI),
++	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI2_MISO),
++	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI2_SS0),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD1_CD_B),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD1_WP),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD1_RESET_B),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD1_CLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD1_CMD),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD1_DATA0),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD1_DATA1),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD1_DATA2),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD1_DATA3),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD2_CD_B),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD2_WP),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD2_RESET_B),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD2_CLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD2_CMD),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD2_DATA0),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD2_DATA1),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD2_DATA2),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD2_DATA3),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_CLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_CMD),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA0),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA1),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA2),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA3),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA4),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA5),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA6),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA7),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_STROBE),
++	IMX_PINCTRL_PIN(MX7D_PAD_SD3_RESET_B),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_RX_DATA),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_TX_BCLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_TX_SYNC),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_TX_DATA),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_RX_SYNC),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_RX_BCLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_MCLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI2_TX_SYNC),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI2_TX_BCLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI2_RX_DATA),
++	IMX_PINCTRL_PIN(MX7D_PAD_SAI2_TX_DATA),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RD0),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RD1),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RD2),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RD3),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RX_CTL),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RXC),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TD0),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TD1),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TD2),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TD3),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TX_CTL),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TXC),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_TX_CLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RX_CLK),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_CRS),
++	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
++};
++
++/* Pad names for the pinmux subsystem */
++static const struct pinctrl_pin_desc imx7d_lpsr_pinctrl_pads[] = {
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO00),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO01),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO02),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO03),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO04),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO05),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO06),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO07),
++};
++
++static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
++	.pins = imx7d_pinctrl_pads,
++	.npins = ARRAY_SIZE(imx7d_pinctrl_pads),
++};
++
++static struct imx_pinctrl_soc_info imx7d_lpsr_pinctrl_info = {
++	.pins = imx7d_lpsr_pinctrl_pads,
++	.npins = ARRAY_SIZE(imx7d_lpsr_pinctrl_pads),
++};
++
++static struct of_device_id imx7d_pinctrl_of_match[] = {
++	{ .compatible = "fsl,imx7d-iomuxc", .data = &imx7d_pinctrl_info, },
++	{ .compatible = "fsl,imx7d-iomuxc-lpsr", .data = &imx7d_lpsr_pinctrl_info },
++	{ /* sentinel */ }
++};
++
++static int imx7d_pinctrl_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *match;
++	struct imx_pinctrl_soc_info *pinctrl_info;
++
++	match = of_match_device(imx7d_pinctrl_of_match, &pdev->dev);
++
++	if (!match)
++		return -ENODEV;
++
++	pinctrl_info = (struct imx_pinctrl_soc_info *) match->data;
++
++	return imx_pinctrl_probe(pdev, pinctrl_info);
++}
++
++static struct platform_driver imx7d_pinctrl_driver = {
++	.driver = {
++		.name = "imx7d-pinctrl",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(imx7d_pinctrl_of_match),
++	},
++	.probe = imx7d_pinctrl_probe,
++	.remove = imx_pinctrl_remove,
++};
++
++static int __init imx7d_pinctrl_init(void)
++{
++	return platform_driver_register(&imx7d_pinctrl_driver);
++}
++arch_initcall(imx7d_pinctrl_init);
++
++static void __exit imx7d_pinctrl_exit(void)
++{
++	platform_driver_unregister(&imx7d_pinctrl_driver);
++}
++module_exit(imx7d_pinctrl_exit);
++
++MODULE_AUTHOR("Anson Huang <Anson.Huang@freescale.com>");
++MODULE_DESCRIPTION("Freescale imx7d pinctrl driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
