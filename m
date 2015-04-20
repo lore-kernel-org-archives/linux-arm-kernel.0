@@ -1,57 +1,44 @@
-From: bhaskarbudiredla@gmail.com (Bhaskara rao Budiredla)
-Date: Tue, 21 Apr 2015 00:23:17 +0530
-Subject: Programming the boundary between Inner and Outer caches on ARM
- architecture
-In-Reply-To: <20150420100119.GC24715@e104818-lin.cambridge.arm.com>
-References: <CAJWVF-w5YpZjRqnvbz1p70_WTBROL9vDkvYb_sG43nGp=s1vLg@mail.gmail.com>
- <20150420100119.GC24715@e104818-lin.cambridge.arm.com>
-Message-ID: <CAJWVF-xvca0MpKF1=GoyyffGTzxtvy_LoaZfjhwU27vSuyOHFA@mail.gmail.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Mon, 20 Apr 2015 13:50:21 -0500
+Subject: [PATCHv2 0/4] Add support for Arria10 devkit
+Message-ID: <1429555825-23560-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin - The above said desired configuration was with respect to
-a specific requirement of mine on Cortex A15. Seems it is confusing.
-Let me give you the complete details. Along with PRRR/NMRR registers,
-I am using [TEX[0], C, B] to configure the memory system attributes.
-The inner cacheable attribute of NMRR normal memory region is
-"write-back, write-allocate" and the corresponding outer cacheable
-attribute is "write-back, no write-allocate". Since the lowest level
-(level zero) cache defaults to inner cacheable attribute and the
-highest level (level two) defaults to outer cacheable attribute, level
-one cache is the remaining that I need to program explicitly. Hence
-the requirement to configure the boundary between the inner and outer
-cacheable attributes to group the level one cache either with level
-zero (or) level two.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-1. I am unable to find the register name that can be used for the
-above said purpose from Cortex A15 documentation. Please help me in
-providing that register details, if there is any such register (or)
-some other procedure by which the same can be achieved.
-2. Configuration of the boundary between inner and outer caches is not
-needed for a system where in the inner and outer cacheable attributes
-are same. Does the current Linux kernel for ARM architecture assumes
-this?
+Hi,
 
-NOTE: The Normal memory of PRRR in my case is configured as Outer Shareable.
+This patchset enables and tidy up support for the Arria10 devkit. Along with
+this patchset and the patchset for enabling clocks on the Arria10, the devkit
+can boot Linux.
+
+V2:
+- Patch "ARM: socfpga: dts: enable UART1 for the debug uart" adds the removal
+  of unused aliases in the dts file.
+
+- Split out the "Documentation: DT bindings: add doc for Altera's SoCFPGA
+  platform" patch.
+
+- Split out the 2 patches for early printk uart.
 
 Thanks,
-Bhaskara
 
-On Mon, Apr 20, 2015 at 3:31 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Apr 09, 2015 at 09:45:08PM +0530, Bhaskara rao Budiredla wrote:
->> Hi - can someone please provide the register details to configure the
->> boundary between Inner and Outer caches? In a three level cache
->> system, it is desired to apply Inner cacheable attributes to level 1
->> cache and Outer cacheable attributes to level two & level three
->> caches.
->
-> Who told you that?
->
-> --
-> Catalin
+Dinh Nguyen (4):
+  ARM: socfpga: add cpu1-start-addr for Arria 10
+  ARM: socfpga: disable the sdmmc, and uart nodes in the base arria10
+  ARM: socfpga: dts: enable UART1 for the debug uart
+  ARM: socfpga: rename socdk board file to socdk_sdmmc
 
-
+ arch/arm/boot/dts/Makefile                        |  2 +-
+ arch/arm/boot/dts/socfpga_arria10.dtsi            | 16 ++------
+ arch/arm/boot/dts/socfpga_arria10_socdk.dts       | 48 -----------------------
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi      | 46 ++++++++++++++++++++++
+ arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts | 26 ++++++++++++
+ 5 files changed, 77 insertions(+), 61 deletions(-)
+ delete mode 100755 arch/arm/boot/dts/socfpga_arria10_socdk.dts
+ create mode 100644 arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+ create mode 100644 arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts
 
 -- 
-.
+2.2.1
