@@ -1,32 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Apr 2015 15:14:22 +0200
-Subject: [PATCH 5/5] ARM: ux500: enable CoreSight in defconfig
-Message-ID: <1429535662-9389-1-git-send-email-linus.walleij@linaro.org>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 20 Apr 2015 14:41:04 +0100
+Subject: [PATCH v2] ata: ahci_st: fixup layering violations / drvdata errors
+Message-ID: <1429537265-22367-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the CoreSight blocks found on the Ux500 SoC
-into the Ux500 defconfig.
+Hi Tejun / Brian,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/u8500_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+I tested the initial version of this patch (see http://patchwork.ozlabs.org/patch/459422/)
+on stih410 hardware, however it introduced a NULL ptr dereference, as plat_data
+isn't set until ahci_platform_init_host() but plat_data was being used before
+this in the st_ahci_probe_resets and st_ahci_deassert_resets() functions.
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index b4c6d34ef946..07055eacbb0f 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -135,6 +135,10 @@ CONFIG_DEBUG_KERNEL=y
- # CONFIG_DEBUG_PREEMPT is not set
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_USER=y
-+CONFIG_CORESIGHT=y
-+CONFIG_CORESIGHT_SINK_TPIU=y
-+CONFIG_CORESIGHT_SINK_ETBV10=y
-+CONFIG_CORESIGHT_SOURCE_ETM3X=y
- CONFIG_CRYPTO_DEV_UX500=y
- CONFIG_CRYPTO_DEV_UX500_CRYP=y
- CONFIG_CRYPTO_DEV_UX500_HASH=y
+Also the original patch had a conflict with a patch which Tejun has already
+taken of mine 
+(see here http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/326900.html).
+
+So this V2 fixes the conflict, and re-works st_ahci_probe_resets and 
+st_ahci_deassert_resets functions to take struct ahci_host_priv *hpriv as
+a parameter.
+
+Brian - I'm not sure of the correct patch etiquette here. Currently I have
+taken authorship of the patch and added a "Suggested-by" tag on the V2.
+Maybe I should have also kept your "Signed-off-by" or done something else?
+Please let me know if this is OK or if you would like something changed.
+
+regards,
+
+Peter. 
+
+Changes since v1:
+ - Rework st_ahci_deassert_resets and st_ahci_probe_resets
+ - Fix conflict with "st_configure_oob must be called after IP is clocked." patch
+
+Peter Griffin (1):
+  ata: ahci_st: fixup layering violations / drvdata errors
+
+ drivers/ata/ahci_st.c | 49 ++++++++++++++++++++++++-------------------------
+ 1 file changed, 24 insertions(+), 25 deletions(-)
+
 -- 
-1.9.3
+1.9.1
