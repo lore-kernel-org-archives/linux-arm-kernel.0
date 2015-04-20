@@ -1,38 +1,41 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Mon, 20 Apr 2015 13:58:15 -0500
-Subject: [trivial PATCH] arm: dts: socfpga: Remove executable permission
- bits
-In-Reply-To: <1429544704.4216.39.camel@perches.com>
-References: <1429224565.2850.62.camel@perches.com>
- <CAL_Jsq+VN15c-LE_iQzx1AnoPWmNEtjVgiEBb2OkHQPP=ZrQMQ@mail.gmail.com>
- <CADhT+wf4UY+N+k9BLk5WcGd5czjo8CK86ocDoCPMDVjzLGay2w@mail.gmail.com>
- <1429544704.4216.39.camel@perches.com>
-Message-ID: <CADhT+wec-yRrreOxbcGpL9uRQDuq16B2CT7yMYNLp70LEBubZQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 Apr 2015 11:58:16 -0700
+Subject: [GIT PULL] urgent omap boot fix for v4.1 if MFD_SYSCON is not set
+Message-ID: <20150420185816.GI5140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 10:45 AM, Joe Perches <joe@perches.com> wrote:
-> On Mon, 2015-04-20 at 10:37 -0500, Dinh Nguyen wrote:
->> On Thu, Apr 16, 2015 at 5:54 PM, Rob Herring <robherring2@gmail.com> wrote:
->> > +arm-soc
->> > On Thu, Apr 16, 2015 at 5:49 PM, Joe Perches <joe@perches.com> wrote:
->> >> Change the .dts file permissions from 755 to 644.
->> >> Signed-off-by: Joe Perches <joe@perches.com>
->> > ARM dts files go in thru arm-soc tree.
->> > Acked-by: Rob Herring <robh@kernel.org>
->> Thanks for doing this, but this patch:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/335418.html
->> should address the same issue.
->
-> That's fine with me.
-> This patch is not in -next yet though.
-> Is someone going to apply/push/pull it?
->
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 
-I need to send a v2 for this patch series, and I'll send a pull
-request to arm-soc once it's been reviewed.
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/338273.html
+are available in the git repository at:
 
-Thanks,
-Dinh
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/prcm-dts-mfd-syscon-fix
+
+for you to fetch changes up to da4d81453cf1eedfcd8b2cd1e7bfab230084bd87:
+
+  ARM: OMAP2+: Fix booting with configs that don't have MFD_SYSCON (2015-04-20 10:36:31 -0700)
+
+----------------------------------------------------------------
+Urgent pull request for v4.1 to booting for custom kernel
+.config files that do not have MFD_SYSCON set.
+
+Omaps now have a dependency to MFD_SYSCON for system control
+module generic register area and some clocks with the changes
+done in omap-for-v4.1/prcm-dts branch.
+
+This can be pulled on top of omap-for-v4.1/prcm-dts, or into
+fixes for v4.1.
+
+We already do have a slight MFD_SYSCON dependency for
+REGULATOR_PBIAS for dual voltage MMC cards on the first MMC
+bus for many devices, so from that point of view this can
+also be merged separately from omap-for-v4.1/prcm-dts.
+
+----------------------------------------------------------------
+Tony Lindgren (1):
+      ARM: OMAP2+: Fix booting with configs that don't have MFD_SYSCON
+
+ arch/arm/mach-omap2/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
