@@ -1,80 +1,72 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 20 Apr 2015 18:54:22 +0100
-Subject: [Xen-devel] [PATCH] xen: Add __GFP_DMA flag when xen_swiotlb_init
- gets free pages.
-In-Reply-To: <5534EAE3.8060403@citrix.com>
-References: <1429526904-27176-1-git-send-email-cbz@baozis.org>
- <5534DABB.5060305@citrix.com> <20150420110729.GA27707@cbz-thinkpad>
- <5534EAE3.8060403@citrix.com>
-Message-ID: <alpine.DEB.2.02.1504201828380.30125@kaball.uk.xensource.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Apr 2015 19:02:55 +0100
+Subject: [PATCH] arm64: kill flush_cache_all()
+In-Reply-To: <CAKv+Gu-VVA+wruJgfWksFdL5eXrp5nZV-b9q7eYspfi=KoqvEg@mail.gmail.com>
+References: <1429521875-16893-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu-VVA+wruJgfWksFdL5eXrp5nZV-b9q7eYspfi=KoqvEg@mail.gmail.com>
+Message-ID: <20150420180255.GB17767@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Apr 2015, David Vrabel wrote:
-> On 20/04/15 12:07, Chen Baozi wrote:
-> > On Mon, Apr 20, 2015 at 11:53:47AM +0100, David Vrabel wrote:
-> >> On 20/04/15 11:48, Chen Baozi wrote:
-> >>> Make sure that xen_swiotlb_init allocates buffers that is DMA capable.
-> >>>
-> >>> Signed-off-by: Chen Baozi <baozich@gmail.com>
-> >>> ---
-> >>>  drivers/xen/swiotlb-xen.c | 3 ++-
-> >>>  1 file changed, 2 insertions(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> >>> index 810ad41..7345afd 100644
-> >>> --- a/drivers/xen/swiotlb-xen.c
-> >>> +++ b/drivers/xen/swiotlb-xen.c
-> >>> @@ -235,7 +235,8 @@ retry:
-> >>>  #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
-> >>>  #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
-> >>>  		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
-> >>> -			xen_io_tlb_start = (void *)__get_free_pages(__GFP_NOWARN, order);
-> >>> +			xen_io_tlb_start = (void *)__get_free_pages(
-> >>> +						__GFP_NOWARN|__GFP_DMA, order);
-> >>
-> >> I think this breaks x86 where __GFP_DMA means below 16 MB.  Perhaps you
-> >> mean __GFP_DMA32?
-> > 
-> > __GFP_DMA32 doesn't help on arm64...
-> > 
-> > I guess there might be conflicts about the meaning of __GFP_DMA between x86 and
-> > arm?
+On Mon, Apr 20, 2015 at 06:23:00PM +0100, Ard Biesheuvel wrote:
+> On 20 April 2015 at 11:24, Mark Rutland <mark.rutland@arm.com> wrote:
+> > The documented semantics of flush_cache_all are not possible to provide
+> > for arm64 (short of flushing the entire physical address space by VA),
+> > and there are currently no users; KVM uses VA maintenance exclusively,
+> > cpu_reset is never called, and the only two users outside of arch code
+> > cannot be built for arm64.
+> >
+> > While cpu_soft_reset and related functions (which call flush_cache_all)
+> > were thought to be useful for kexec, their current implementations only
+> > serve to mask bugs. For correctness kexec will need to perform
+> > maintenance by VA anyway to account for system caches, line migration,
+> > and other subtleties of the cache architecture. As the extent of this
+> > cache maintenance will be kexec-specific, it should probably live in the
+> > kexec code.
+> >
+> > This patch removes flush_cache_all, and related unused components,
+> > preventing further abuse.
+> >
 > 
-> Yes.
+> While I agree fully with the general purpose of this patch, i.e., to
+> prevent set/way operations to be abused for managing coherency,
+> perhaps it would make sense to retain/repurpose some of this code as
+> the 'supported' way of putting the CPU in the mode that is mandated by
+> the boot protocol, so that it can be shared between the EFI stub and
+> kexec.
+> 
+> I think the former is not entirely safe at the moment, since the only
+> region we clean/invalidate [by VA] is the memory region containing the
+> copied kernel image, and the remainder of the efi-entry.S code itself.
+> I may be wrong, but I think that means that any cached software state
+> owned by the runtime services [including virtual remappings] could
+> potentially get lost when we disable the dcache without cleaning it by
+> set/way first.
 
-This should definitely be done only on ARM and ARM64, as on x86 PVH
-assumes the presence of an IOMMU. We need an ifdef.
+Regarding the boot protocol, note that this was relaxed a while back
+w.r.t. cache requirements, only mandating that certain regions of memory
+are clean to the PoC.
 
-Also we need to figure out a way to try without GFP_DMA in case no ram
-under 4g is available at all, as some arm64 platforms don't have any. Of
-course in those cases we don't need to worry about devices and their dma
-masks.  Maybe we could use memblock for that? Something like:
+Clearing SCTLR.C prevents accesses from being given cacheable
+attributes, but doesn't disable any caches as such. The CPU caches
+remain active and coherent (unless some IMPLEMENTATION DEFINED mechanism
+is used to exit coherency), so the data will remain there unless
+naturally evicted, taken by another cache, or explicitly
+cleaned/invalidated.
 
-    struct memblock_region *reg;
-    gfp_t flags = __GFP_NOWARN;
+With SCTLR.C clear, memory accesses should not result in the allocation
+of new lines into the caches (though if data for a given address is
+present, an access may hit said data). Clearing SCTLR.M is necessary to
+prevent allocation by the page table walkers, unless these are not using
+cacheable attributes to begin with.
 
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-	for_each_memblock(memory, reg) {
-		unsigned long start = memblock_region_memory_base_pfn(reg);
+Set/Way maintenance races with the usual operation of the caches while
+cacheable accesses may be made into them, so do not make sense to use
+while SCTLR.C or SCTLR.M are set. They can only drain the CPU-local
+caches when nothing may allocate into them, and do not affect system
+caches, so portable software must use maintenance by VA for correctness.
 
-        if (start < 4G) {
-            flags |= __GFP_DMA;
-            break;
-        }
-    }
-#endif
+Does that address your concerns? Or pose new questions? ;)
 
-    [...]
-
-    xen_io_tlb_start = (void *)__get_free_pages(flags, order);
-    
-
-
-
-
-> This is also conceptually wrong since it doesn't matter where the pages
-> are in PFN space,  but where they are in bus address (MFN) space (which
-> is what the subsequent hypercall is required to sort out).
-
-Actually on ARM dom0 is mapped 1:1, so it is the same thing.
+Thanks,
+Mark.
