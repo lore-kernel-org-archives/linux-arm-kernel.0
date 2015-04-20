@@ -1,162 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Apr 2015 12:02:14 +0100
-Subject: kvm vs host (arm64)
-In-Reply-To: <865655860.251789.1429526375276.JavaMail.yahoo@mail.yahoo.com>
-References: <5534C25E.7070702@arm.com>
- <865655860.251789.1429526375276.JavaMail.yahoo@mail.yahoo.com>
-Message-ID: <5534DCB6.2070304@arm.com>
+From: George.Dunlap@eu.citrix.com (George Dunlap)
+Date: Mon, 20 Apr 2015 12:03:02 +0100
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <alpine.DEB.2.02.1504091344260.7690@kaball.uk.xensource.com>
+ <1428596218.25985.263.camel@edumazet-glaptop2.roam.corp.google.com>
+ <alpine.DEB.2.02.1504091729160.7690@kaball.uk.xensource.com>
+ <CAFLBxZaVjFHh4UBnksGZS4waBr4jLdO8aJegyKvsU1-TvVt2Dg@mail.gmail.com>
+ <1428932970.3834.4.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CAFLBxZYt7-v29ysm=f+5QMOw64_QhESjzj98udba+1cS-PfObA@mail.gmail.com>
+ <1429115934.7346.107.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552E9E8D.1080000@eu.citrix.com>
+ <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA2BC.5000707@eu.citrix.com>
+ <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA844.5010308@eu.citrix.com>
+ <1429121979.7346.138.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552F7936.9070205@eu.citrix.com> <552F7EF4.9030107@iogearbox.net>
+ <552F887A.4060708@eu.citrix.com>
+ <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <CAFLBxZarvxtq-6fNAxioq64bw6SMZFVuoLzJgK=E6nvcbS2X4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't top post. This is very annoying.
+On Thu, Apr 16, 2015 at 1:42 PM, Eric Dumazet <eric.dumazet@gmail.com> wrote:
+> On Thu, 2015-04-16 at 11:01 +0100, George Dunlap wrote:
+>
+>> He suggested that after he'd been prodded by 4 more e-mails in which two
+>> of us guessed what he was trying to get at.  That's what I was
+>> complaining about.
+>
+> My big complain is that I suggested to test to double the sysctl, which
+> gave good results.
+>
+> Then you provided a patch using a 8x factor. How does that sound ?
+>
+> Next time I ask a raise, I should try a 8x factor as well, who knows,
+> it might be accepted.
 
-On 20/04/15 11:39, Mohan G wrote:
-> Thanks for looking into this Marc. 
-> Its the xgene  storm based SOC. for profiling , we used the ftrace
-> tool. The support for ftrace is present from 3.16 onwards. Its the
-> main line kernel that we have installed. The main purpose of running
-> this BM is for I/O.
-> We initially saw these numbers with DD. The DD numbers too reflect the same. 
-> 
-> We even tried netperf, just to remove i/o path from perf results.
-> Here too the results are same. Have pasted the perf stat below too
+I see.  I chose the value that Stefano had determined had completely
+eliminated the overhead.  Doubling the value reduces the overhead to
+8%, which should be fine for a short-term fix while we git a proper
+mid/long-term fix.
 
-
-
-> guest stat 
-> ========== 
-> 
-> directlocalhost:~]# perf stat dd if=/dev/zero of=/dev/sdc bs=8192 count=1 oflag= 
-> 1+0 records in 
-> 1+0 records out 
-> 8192 bytes (8.2 kB) copied, 0.0132908 s, 616 kB/s 
-> 
-> Performance counter stats for 'dd if=/dev/zero of=/dev/sdc bs=8192 count=1 oflag=direct': 
-> 
-> 110.474128 task-clock (msec) # 0.848 CPUs utilized 
-> 1 context-switches # 0.009 K/sec 
-> 0 cpu-migrations # 0.000 K/sec 
-> 174 page-faults # 0.002 M/sec 
-> <not supported> cycles 
-> <not supported> stalled-cycles-frontend 
-> <not supported> stalled-cycles-backend 
-> <not supported> instructions 
-> <not supported> branches 
-> <not supported> branch-misses 
-> 
-> 0.130255744 seconds time elapsed 
-
-Do you realize that:
-- You're using what looks like a userspace emulated device. Du you
-expect any form for performance with that kind of setup?
-- Your "benchmark" is absolutely meaningless (who wants to transfer 8k
-to measure bandwidth?)
-
-For the record:
-
-root at muffin-man:~# dd if=/dev/zero of=/dev/vda5 bs=8192 count=1 oflag=direct
-1+0 records in
-1+0 records out
-8192 bytes (8.2 kB) copied, 0.00110308 s, 7.4 MB/s
-
-And yet I persist, this is an absolute meaningless test.
-
-Thanks,
-
-	M.
-> 
-> 
-> 
-> host 
-> ===== 
-> root at mustang1:/home/gmohan# perf stat dd if=/dev/zero of=/dev/sda6 bs=8192 count=1 oflag=direct 
-> 1+0 records in 
-> 1+0 records out 
-> 8192 bytes (8.2 kB) copied, 0.00087308 s, 9.4 MB/s 
-> 
-> Performance counter stats for 'dd if=/dev/zero of=/dev/sda6 bs=8192 count=1 oflag=direct': 
-> 
-> 1.024280 task-clock (msec) # 0.525 CPUs utilized 
-> 9 context-switches # 0.009 M/sec 
-> 0 cpu-migrations # 0.000 K/sec 
-> 198 page-faults # 0.193 M/sec 
-> 24,17,939 cycles # 2.361 GHz 
-> <not supported> stalled-cycles-frontend 
-> <not supported> stalled-cycles-backend 
-> 8,30,511 instructions # 0.34 insns per cycle 
-> <not supported> branches 
-> 17,198 branch-misses # 0.00% of all branches 
-> 
-> 0.001949620 seconds time elapsed 
-> 
-> 
-> 
-> Regards
-> Mohan
-> 
-> 
-> ----- Original Message -----
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> To: Mohan G <mohan_gg@yahoo.com>; "linux-arm-kernel at lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-> Cc: 
-> Sent: Monday, April 20, 2015 2:39 PM
-> Subject: Re: kvm vs host (arm64)
-> 
-> On 20/04/15 06:45, Mohan G wrote:
->> Hi, 
->> I have got hold of few mustang boards (cortex-a57). Ran a few bench
-> 
-> Mustang is *not* based on Cortex-A57. So which hardware do you have?
-> 
->> marks to measure perf numbers b/w host and guest (kvm). The numbers 
->> are pretty bad. (drop of about 90% to that of host). I even tried
->> running this simple program .
->>
->> main(){ 
->> int i=0; 
->>
->> for(i=0;i<10;i++); 
->> } 
->> Profiling the above shows that same kernel functions in guest takes
->> almost 10x to that of host. sample below
->>
->>
->> Host 
->> ==== 
->> 7202              one-3920  [003] 20015.611563: funcgraph_entry:                   |              find_vma() { 
->> 7203              one-3920  [003] 20015.611564: funcgraph_entry:        0.180 us   |                vmacache_find(); 
->> 7204              one-3920  [003] 20015.611565: funcgraph_entry:        0.120 us   |                vmacache_update(); 
->> 7205              one-3920  [003] 20015.611566: funcgraph_exit:         2.320 us   |              } 
->>
->>
->> Guest 
->> ===== 
->>
->> one-751   [000]   206.843300: funcgraph_entry:                   |              find_vma() { 
->> one-751   [000]   206.843312: funcgraph_entry:        4.880 us   |                vmacache_find(); 
->> one-751   [000]   206.843335: funcgraph_entry:        2.656 us   |                vmacache_update(); 
->> one-751   [000]   206.843354: funcgraph_exit:       + 46.256 us  |              } 
-> 
-> 
-> I wonder how you manage to profile this, as we don't have any perf
-> support in KVM yet (you cannot profile a guest). Can you describe your
-> profiling method? Also, can you use a non-trivial test (i.e. something
-> that is not pure overhead)?
-> 
-> If that's all your test does, you end up measuring the cost of a stage-2
-> page fault, which only happens at startup.
-> 
->> kernel: 3.18.9 
-> 
-> Is that mainline 3.18.9? Or some special tree? I'm also interested in
-> seeing results from a 4.0 kernel.
-> 
-> Thanks,
-> 
-> 
->     M.
-> 
-
-
--- 
-Jazz is not dead. It just smells funny...
+ -George
