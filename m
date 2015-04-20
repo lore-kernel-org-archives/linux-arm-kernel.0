@@ -1,115 +1,135 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Apr 2015 14:58:59 +0200
-Subject: [PATCH 06/13 v2] coresight: funnel: let runtime PM handle core clock
+Date: Mon, 20 Apr 2015 14:59:01 +0200
+Subject: [PATCH 08/13 v2] coresight: etm: retrieve and handle atclk
 In-Reply-To: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
 References: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1429534746-3068-6-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1429534746-3068-8-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This uses runtime PM to manage the PCLK ("amba_pclk") instead
-of screwing around with the framework by going in and taking
-a copy from the amba device. The amba bus core will uprepare
-and disable the clock when the device is unused when
-CONFIG_PM is selected, else the clock will be always on.
+As can be seen from the datasheet of the CoreSight
+Components, DDI0401C A.1.1 the ETM has a clock signal
+apart from the AHB interconnect ("amba_pclk", that we're
+already handling) called ATCLK, ARM Trace Clock, that SoC
+implementers may provide from an entirely different clock
+source. So to model this correctly create an optional
+path for handling ATCLK alongside the PCLK so we don't
+break old platforms that only define PCLK ("amba_pclk") but
+still makes it possible for SoCs that have both clock signals
+(such as the DB8500) to fetch and prepare/enable/disable/
+unprepare both clocks.
 
-Prior to this patch, as the AMBA primecell bus code enables
-the PCLK, it would be left on after probe as
-clk_disable_unprepare() was not called. Now the runtime PM
-callbacks will make sure the PCLK is properly disabled
-after probe.
+The ATCLK is enabled and disabled using the runtime PM
+callbacks.
 
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v1->v2:
 - Rebased on the coresight git tree.
+- Get driver data directly from the device in runtime
+  suspend/resume hooks and skip the intermediate conversion
+  to AMBA device.
 - Added Ulf's review tag.
 ---
- drivers/hwtracing/coresight/coresight-funnel.c | 24 +++++++-----------------
- 1 file changed, 7 insertions(+), 17 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm.h   |  2 ++
+ drivers/hwtracing/coresight/coresight-etm3x.c | 36 ++++++++++++++++++++++++++-
+ 2 files changed, 37 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 3db36f70b666..330de2c88759 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -18,7 +18,7 @@
- #include <linux/err.h>
- #include <linux/fs.h>
- #include <linux/slab.h>
--#include <linux/clk.h>
-+#include <linux/pm_runtime.h>
- #include <linux/coresight.h>
- #include <linux/amba/bus.h>
- 
-@@ -36,14 +36,12 @@
+diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
+index d1421e1f8b8a..098ffbec0a44 100644
+--- a/drivers/hwtracing/coresight/coresight-etm.h
++++ b/drivers/hwtracing/coresight/coresight-etm.h
+@@ -140,6 +140,7 @@
+  * struct etm_drvdata - specifics associated to an ETM component
   * @base:	memory mapped base address for this component.
   * @dev:	the device entity associated to this component.
++ * @atclk:	optional clock for the core parts of the ETM.
   * @csdev:	component vitals needed by the framework.
-- * @clk:	the clock this component is associated to.
-  * @priority:	port selection order.
-  */
- struct funnel_drvdata {
- 	void __iomem		*base;
- 	struct device		*dev;
- 	struct coresight_device	*csdev;
--	struct clk		*clk;
- 	unsigned long		priority;
- };
+  * @spinlock:	only one at a time pls.
+  * @cpu:	the cpu this component is affined to.
+@@ -191,6 +192,7 @@
+ struct etm_drvdata {
+ 	void __iomem			*base;
+ 	struct device			*dev;
++	struct clk			*atclk;
+ 	struct coresight_device		*csdev;
+ 	spinlock_t			spinlock;
+ 	int				cpu;
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index f0be12bd79e0..4da203cc9c8e 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -30,6 +30,7 @@
+ #include <linux/amba/bus.h>
+ #include <linux/seq_file.h>
+ #include <linux/uaccess.h>
++#include <linux/clk.h>
+ #include <asm/sections.h>
  
-@@ -67,12 +65,8 @@ static int funnel_enable(struct coresight_device *csdev, int inport,
- 			 int outport)
- {
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
--	int ret;
+ #include "coresight-etm.h"
+@@ -1315,7 +1316,6 @@ static ssize_t seq_curr_state_show(struct device *dev,
+ 	}
+ 
+ 	pm_runtime_get_sync(drvdata->dev);
 -
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
  
-+	pm_runtime_get_sync(drvdata->dev);
- 	funnel_enable_hw(drvdata, inport);
+ 	CS_UNLOCK(drvdata->base);
+@@ -1796,6 +1796,13 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
  
- 	dev_info(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
-@@ -98,8 +92,7 @@ static void funnel_disable(struct coresight_device *csdev, int inport,
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 	spin_lock_init(&drvdata->spinlock);
  
- 	funnel_disable_hw(drvdata, inport);
--
--	clk_disable_unprepare(drvdata->clk);
-+	pm_runtime_put(drvdata->dev);
- 
- 	dev_info(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
- }
-@@ -153,16 +146,14 @@ static u32 get_funnel_ctrl_hw(struct funnel_drvdata *drvdata)
- static ssize_t funnel_ctrl_show(struct device *dev,
- 			     struct device_attribute *attr, char *buf)
- {
--	int ret;
- 	u32 val;
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
-+	pm_runtime_get_sync(drvdata->dev);
- 
- 	val = get_funnel_ctrl_hw(drvdata);
--	clk_disable_unprepare(drvdata->clk);
++	drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
++	if (!IS_ERR(drvdata->atclk)) {
++		ret = clk_prepare_enable(drvdata->atclk);
++		if (ret)
++			return ret;
++	}
 +
-+	pm_runtime_put(drvdata->dev);
+ 	drvdata->cpu = pdata ? pdata->cpu : 0;
  
- 	return sprintf(buf, "%#x\n", val);
+ 	get_online_cpus();
+@@ -1858,6 +1865,32 @@ static int etm_remove(struct amba_device *adev)
+ 	return 0;
  }
-@@ -205,8 +196,7 @@ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
- 		return PTR_ERR(base);
  
- 	drvdata->base = base;
--
--	drvdata->clk = adev->pclk;
-+	pm_runtime_put(&adev->dev);
- 
- 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
- 	if (!desc)
++#ifdef CONFIG_PM
++static int etm_runtime_suspend(struct device *dev)
++{
++	struct etm_drvdata *drvdata = dev_get_drvdata(dev);
++
++	if (drvdata && !IS_ERR(drvdata->atclk))
++		clk_disable_unprepare(drvdata->atclk);
++
++	return 0;
++}
++
++static int etm_runtime_resume(struct device *dev)
++{
++	struct etm_drvdata *drvdata = dev_get_drvdata(dev);
++
++	if (drvdata && !IS_ERR(drvdata->atclk))
++		clk_prepare_enable(drvdata->atclk);
++
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops etm_dev_pm_ops = {
++	SET_RUNTIME_PM_OPS(etm_runtime_suspend, etm_runtime_resume, NULL)
++};
++
+ static struct amba_id etm_ids[] = {
+ 	{	/* ETM 3.3 */
+ 		.id	= 0x0003b921,
+@@ -1886,6 +1919,7 @@ static struct amba_driver etm_driver = {
+ 	.drv = {
+ 		.name	= "coresight-etm3x",
+ 		.owner	= THIS_MODULE,
++		.pm	= &etm_dev_pm_ops,
+ 	},
+ 	.probe		= etm_probe,
+ 	.remove		= etm_remove,
 -- 
 1.9.3
