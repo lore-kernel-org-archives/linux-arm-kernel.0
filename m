@@ -1,122 +1,96 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Mon, 20 Apr 2015 22:37:29 +0800
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <3365190.ZbiKjUlDk2@wuerfel>
-References: <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
- <2242025.Z9qPVP4zls@wuerfel>
- <20150417090156.GH819@e104818-lin.cambridge.arm.com>
- <3365190.ZbiKjUlDk2@wuerfel>
-Message-ID: <55350F29.4050702@huawei.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Mon, 20 Apr 2015 22:42:44 +0800
+Subject: [PATCH v13 2/3] power-domain: rockchip: add power domain driver
+In-Reply-To: <1429522004.14597.8.camel@x220>
+References: <1429438552-17733-1-git-send-email-wxt@rock-chips.com>	
+ <1429440280-18915-1-git-send-email-wxt@rock-chips.com>
+ <1429522004.14597.8.camel@x220>
+Message-ID: <55351064.7090409@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Paul,
 
+Thanks your commnets!:-)
 
-On 2015/4/17 21:17, Arnd Bergmann wrote:
-> On Friday 17 April 2015 10:01:56 Catalin Marinas wrote:
->> On Thu, Apr 16, 2015 at 05:21:30PM +0200, Arnd Bergmann wrote:
->>> On Thursday 16 April 2015 14:31:34 Catalin Marinas wrote:
->>>> On Thu, Apr 16, 2015 at 11:33:49AM +0000, Pinski, Andrew wrote:
->>>>> There are only a few places where long should be 32bit rather than
->>>>> 64bit. The non-time_t field of timespec is the only one I can think
->>>>> of.
->>>>
->>>> It may be the only one but we could end up with a non-compliant
->>>> timespec. Unless we keep the tv_nsec as 32-bit long and add some
->>>> padding, we could work around it by getting the C library to sign-extend
->>>> such padding or we do it in a new "compat" layer in the kernel (but both
->>>> cases imply copying the structure).
->>>>
->>>> However, timerspec is included in other structures, so we'd have to
->>>> intercept those as well. Philipp provided a list here:
->>>>
->>>> http://article.gmane.org/gmane.linux.kernel/1931497
->>>
->>> We're basically in the same boat as x32 then, and should do the same
->>> thing on both most importantly, whatever that ends up.
->>
->> I'm getting confused ;). I thought you were pushing for a 32-bit time_t
->> on AArch64 ILP32.
->>
->> I'm not sure we need to be in the same boat as x32. Their decision was
->> to primarily use the LP64 ABI and there are performance advantages, not
->> only the 2038 issue. The downside, few POSIX incompatibilities that I
->> think they are happy to live with. If we are happy to live with them as
->> well, we go ahead with the current patchset. We may try to patch some of
->> the POSIX incompatibilities (see Philipp's list above) by
->> padding/copying/sign-extending the affected structures.
+? 2015?04?20? 17:26, Paul Bolle ??:
+> On Sun, 2015-04-19 at 18:44 +0800, Caesar Wang wrote:
+>> --- a/arch/arm/mach-rockchip/Makefile
+>> +++ b/arch/arm/mach-rockchip/Makefile
+> +obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
 >
-> Here is my current line of thinking:
->
-> - Using all the aarch32 data structures would be the easiest way, then
->    we could use the side of asm-generic/unistd.h and everything should
->    work to the same degree as it does today for aarch32 emulation.
->    This means 32-bit time_t of course, and it would give us the best
->    tradeoff between the amount of work needed and the results we get.
->    A few downsides have been mentioned, but I still think it's the
->    best approach. This would be the approach e) that you suggested
->    earlier.
->
-> - If we do not use the exact data structures that we have on aarch32,
->    then I think we should make aarch32 emulation and aarch64-ilp32
->    emulation mutually exclusive, and provide two separate asm/compat.h
->    header files that contain the differences. In this case, we should
->    try to come up with an ABI that makes the most sense for the majority
->    of the use cases that people are interested in. The two most likely
->    choices here would be
- From my point of view, Aarch32 and Aarch64 ILP32 should be not exclusive,
-otherwise, it would be a little bit hard to maintenance.
-IIUC, ILP32 address an optional road for the application migrating from
-arm 32bit SOC to arm64 SOC. There are lots of application in huawei we
-need to support in the same product. And different subsystem of the product may
-choose the different road to migrate. E.g.  Aarch32 -> Aarch64 LP64, arm 32bit
--> Aarch64 ILP32, arm 32bit -> Aarch64, ... (Those application running on one
-kernel of course).
+> PM_GENERIC_DOMAINS is a bool symbol, so pm_domains.o can never be part
+> of a module. Is that correct?
 
-regards
+Yeah, So this platform_driver does not need to set an owner, it will be 
+populated by the
+driver core.
+>
+>> --- /dev/null
+>> +++ b/arch/arm/mach-rockchip/pm_domains.c
+>> +#include <linux/module.h>
+> This include could probably be dropped.
 
-bamvor
+Yeah. As the about said.
+>> +static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+>> +	{
+>> +		.compatible = "rockchip,rk3288-power-controller",
+>> +		.data = (void *)&rk3288_pmu,
+>> +	},
+>> +	{ /* sentinel */ },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, rockchip_pm_domain_dt_match);
+> The MODULE_DEVICE_TABLE() macro will be preprocessed away for built-in
+> code, according to include/linux/module.h.
 
->    f) create a new ABI that follows exactly what x32 did. This is a
->       variation of the earlier b), c), or d), but with the change of
->       fixing ioctl support by using a matching asm/compat.h. This
->       would not be entirely POSIX compliant, but it would be a nice
->       hack to get the highest performance in microbenchmarks, as it
->       avoids most of the compat layer. Over time, it can get extended
->       to coexist with aarch32 emulation, but that may take a few years.
+So,do you think we should remove it?
+wow.....,looks we should remove it.
+>> +static struct platform_driver rockchip_pm_domain_driver = {
+>> +	.probe = rockchip_pm_domain_probe,
+>> +	.driver = {
+>> +		.name   = "rockchip-pm-domain",
+>> +		.owner  = THIS_MODULE,
+> According to include/linux/export.h THIS_MODULE is equivalent to NULL
+> for built-in code. So I think this line is not needed.
 >
->    g) create a new ABI that does things in exactly the way that we
->       would use as the native syscall interface if we had an ilp32
->       kernel running on aarch64 with the asm-generic/unistd.h.
->       This would mean a 32-bit __kernel_long_t and time_t, but extending
->       time_t in the long run, together with aarch32 and i386.
->       This one is particularly interesting for people that are interested
->       in maximum posix compliance and in having a "nice" ABI, in particular
->       if there is a slight chance that within the next decade we have
->       reason to support building an arch/arm64 kernel itself in
->       aarch64-ilp32 mode.
+
+Yeah,you are right.
+>> +		.of_match_table = rockchip_pm_domain_dt_match,
+>> +		/*
+>> +		 * We can't forcibly eject devices form power domain,
+>> +		 * so we can't really remove power domains once they
+>> +		 * were added.
+>> +		 */
+>> +		.suppress_bind_attrs = true,
+>> +	},
+>> +};
+> Thanks,
 >
-> Between e), f), and g), I'd lean towards e), but I'm fine with the other
-> two as well and still lack sufficient information on what people want
-> to do with it in the long run.
 >
->>> However, it would be nice to get agreement on the normal 32-bit ABI
->>> for time_t and timespec first, and then use the same thing everywhere.
->>
->> Do you mean for native 32-bit architectures? I think OpenBSD uses a
->> 64-bit time_t already on 32-bit arches, it's doable in Linux as well.
+> Paul Bolle
 >
-> Yes, and I'm working on that for Linux. The first step involves fixing
-> the kernel, one file at a time, changing all users of time_t to use
-> some other type (ktime_t or time64_t in most cases) instead, and introducing
-> additional system calls to handle the boundary to user space without
-> breaking stuff. See my presentation at http://elinux.org/ELC_2015_Presentations
-> for more detail.
 >
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
 >
+>
+Thanks,
+
+Caesar
+
+-- 
+**************************************************************************************
+???    Caesar Wang
+Product R&D Dept.III
+Fuzhou Rockchip Electronics Co.Ltd
+Addr?  NO.18 Building, A District, Fuzhou Software Park,Gulou District,Fuzhou, Fujian,China(Fuzhou Headquarters)
+               21F,Malata Building,Kejizhongyi Avenue,Nanshan District,Shenzhen  (Shenzhen Office)
+Tel?+86-591-83991906/07 - 8221
+Mobile:+86 15059456742
+E-mail : wxt at rock-chips.com
+***************************************************************************************
+***************************************************************************************
+IMPORTANT NOTICE: This email is from Fuzhou Rockchip Electronics Co., Ltd .The contents of this email and any attachments may
+contain information that is privileged, confidential and/or exempt from disclosure under applicable law and relevant NDA.
+If you are not the intended recipient, you are hereby notified that any disclosure, copying, distribution, or use of the
+information is STRICTLY PROHIBITED. Please immediately contact the sender as soon as possible and destroy the material
+in its entirety in any format. Thank you.
+***************************************************************************************
