@@ -1,85 +1,48 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Mon, 20 Apr 2015 20:43:44 +0900
-Subject: [PATCH v2] CHROMIUM: iommu: rockchip: Make sure that page table state
- is coherent
-Message-ID: <1429530224-24719-1-git-send-email-tfiga@chromium.org>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Mon, 20 Apr 2015 13:02:43 +0100
+Subject: [Xen-devel] [PATCH] xen: Add __GFP_DMA flag when xen_swiotlb_init
+ gets free pages.
+In-Reply-To: <20150420110729.GA27707@cbz-thinkpad>
+References: <1429526904-27176-1-git-send-email-cbz@baozis.org>
+ <5534DABB.5060305@citrix.com> <20150420110729.GA27707@cbz-thinkpad>
+Message-ID: <5534EAE3.8060403@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To flush created mappings, current mapping code relies on the fact that
-during unmap the driver zaps every IOVA being unmapped and that it is
-enough to zap a single IOVA of page table to remove the entire page
-table from IOMMU cache. Based on these assumptions the driver was made to
-simply zap the first IOVA of the mapping being created. This is enough
-to invalidate first page table, which could be shared with another
-mapping (and thus could be already present in IOMMU cache), but
-unfortunately it does not do anything about the last page table that
-could be shared with other mappings as well.
+On 20/04/15 12:07, Chen Baozi wrote:
+> On Mon, Apr 20, 2015 at 11:53:47AM +0100, David Vrabel wrote:
+>> On 20/04/15 11:48, Chen Baozi wrote:
+>>> Make sure that xen_swiotlb_init allocates buffers that is DMA capable.
+>>>
+>>> Signed-off-by: Chen Baozi <baozich@gmail.com>
+>>> ---
+>>>  drivers/xen/swiotlb-xen.c | 3 ++-
+>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+>>> index 810ad41..7345afd 100644
+>>> --- a/drivers/xen/swiotlb-xen.c
+>>> +++ b/drivers/xen/swiotlb-xen.c
+>>> @@ -235,7 +235,8 @@ retry:
+>>>  #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
+>>>  #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
+>>>  		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
+>>> -			xen_io_tlb_start = (void *)__get_free_pages(__GFP_NOWARN, order);
+>>> +			xen_io_tlb_start = (void *)__get_free_pages(
+>>> +						__GFP_NOWARN|__GFP_DMA, order);
+>>
+>> I think this breaks x86 where __GFP_DMA means below 16 MB.  Perhaps you
+>> mean __GFP_DMA32?
+> 
+> __GFP_DMA32 doesn't help on arm64...
+> 
+> I guess there might be conflicts about the meaning of __GFP_DMA between x86 and
+> arm?
 
-Moreover, the flushing is performed before page table contents are
-actually modified, so there is a race between the CPU updating the page
-tables and hardware that could be possibly running at the same time and
-triggering IOMMU look-ups, which could bring back the page tables back
-to the cache.
+Yes.
 
-To fix both issues, this patch makes the mapping code zap first and last
-(if they are different) IOVAs of new mapping after the page table is
-updated.
+This is also conceptually wrong since it doesn't matter where the pages
+are in PFN space,  but where they are in bus address (MFN) space (which
+is what the subsequent hypercall is required to sort out).
 
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-Tested-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/iommu/rockchip-iommu.c | 23 +++++++++++++++++------
- 1 file changed, 17 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 4015560..31004c0 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -551,6 +551,15 @@ static void rk_iommu_zap_iova(struct rk_iommu_domain *rk_domain,
- 	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
- }
- 
-+static void rk_iommu_zap_iova_first_last(struct rk_iommu_domain *rk_domain,
-+					 dma_addr_t iova, size_t size)
-+{
-+	rk_iommu_zap_iova(rk_domain, iova, SPAGE_SIZE);
-+	if (size > SPAGE_SIZE)
-+		rk_iommu_zap_iova(rk_domain, iova + size - SPAGE_SIZE,
-+					SPAGE_SIZE);
-+}
-+
- static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
- 				  dma_addr_t iova)
- {
-@@ -575,12 +584,6 @@ static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
- 	rk_table_flush(page_table, NUM_PT_ENTRIES);
- 	rk_table_flush(dte_addr, 1);
- 
--	/*
--	 * Zap the first iova of newly allocated page table so iommu evicts
--	 * old cached value of new dte from the iotlb.
--	 */
--	rk_iommu_zap_iova(rk_domain, iova, SPAGE_SIZE);
--
- done:
- 	pt_phys = rk_dte_pt_address(dte);
- 	return (u32 *)phys_to_virt(pt_phys);
-@@ -630,6 +633,14 @@ static int rk_iommu_map_iova(struct rk_iommu_domain *rk_domain, u32 *pte_addr,
- 
- 	rk_table_flush(pte_addr, pte_count);
- 
-+	/*
-+	 * Zap the first and last iova to evict from iotlb any previously
-+	 * mapped cachelines holding stale values for its dte and pte.
-+	 * We only zap the first and last iova, since only they could have
-+	 * dte or pte shared with an existing mapping.
-+	 */
-+	rk_iommu_zap_iova_first_last(rk_domain, iova, size);
-+
- 	return 0;
- unwind:
- 	/* Unmap the range of iovas that we just mapped */
--- 
-2.2.0.rc0.207.ga3a616c
+David
