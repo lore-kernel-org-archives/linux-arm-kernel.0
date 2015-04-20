@@ -1,38 +1,47 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 20 Apr 2015 14:10:22 -0700
-Subject: [PATCH v2 1/6] arm64: Enable Hisilicon ARMv8 SoC family in
- Kconfig and defconfig
-In-Reply-To: <1428916660-25910-2-git-send-email-bintian.wang@huawei.com>
- (Bintian Wang's message of "Mon, 13 Apr 2015 17:17:35 +0800")
-References: <1428916660-25910-1-git-send-email-bintian.wang@huawei.com>
- <1428916660-25910-2-git-send-email-bintian.wang@huawei.com>
-Message-ID: <7hvbgqfqv5.fsf@deeprootsystems.com>
+From: spang@chromium.org (Michael Spang)
+Date: Mon, 20 Apr 2015 17:20:57 -0400
+Subject: [PATCH] arm64: Add KEYS_COMPAT to Kconfig & enable
+In-Reply-To: <20141020161017.GL20301@arm.com>
+References: <1413316871-27404-1-git-send-email-spang@chromium.org>
+ <20141020161017.GL20301@arm.com>
+Message-ID: <CAC5F_1ktq6jArPYA4e+Ac43pYAPK_D_ZV9NEn3Sc53F=DzUHaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bintian Wang <bintian.wang@huawei.com> writes:
-
-> This patch introduces ARCH_HISI to enable Hisilicon SoC family in
-> Kconfig and defconfig.
+On Mon, Oct 20, 2014 at 12:10 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Oct 14, 2014 at 09:01:11PM +0100, Michael Spang wrote:
+>> This enables the keyctl compat syscall.
+>>
+>> Signed-off-by: Michael Spang <spang@chromium.org>
+>> ---
+>>  arch/arm64/Kconfig | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index ac9afde..35c3103 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -461,6 +461,11 @@ source "arch/arm64/Kconfig.debug"
+>>
+>>  source "security/Kconfig"
+>>
+>> +config KEYS_COMPAT
+>> +     bool
+>> +     depends on COMPAT && KEYS
+>> +     default y
 >
-> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
-> Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Reviewed-by: Wei Xu <xuwei5@hisilicon.com>
+> I'm curious as to why this requires a Kconfig option, whilst other compat
+> system calls do not. The core code is already using COMPAT_SYSCALL_DEFINE,
+> so why can't the architecture just plumb the compat syscall table and be
+> done with it?
+>
+> Failing that, the pattern used elsewhere involves __ARCH_WANT_COMPAT_*
+> #defines.
 
-[...]
+I am not actually sure why it is the way it is. All the other archs
+just set the option exactly like this.
 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index be1f12a..36ebd9b 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -36,6 +36,7 @@ CONFIG_ARCH_MEDIATEK=y
->  CONFIG_ARCH_THUNDER=y
->  CONFIG_ARCH_VEXPRESS=y
->  CONFIG_ARCH_XGENE=y
-> +CONFIG_ARCH_HISI=y
+I've just resent it with only a minor adjustment.
 
-nit: please keep CONFIG_ARCH_* sorted alphabetically.
-
-Thanks,
-
-Kevin
+Cheers!
+Michael
