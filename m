@@ -1,143 +1,94 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Mon, 20 Apr 2015 10:55:12 -0500
-Subject: [PATCH v2 5/9] ARM: imx: add msl support for imx7d
-In-Reply-To: <20150417230454.GC12732@n2100.arm.linux.org.uk>
-References: <1429211860-14438-1-git-send-email-Frank.Li@freescale.com>
- <1429211860-14438-6-git-send-email-Frank.Li@freescale.com>
- <20150417230454.GC12732@n2100.arm.linux.org.uk>
-Message-ID: <CAHrpEqR=9XOy2bjfVm1WihTcxwkC8UsGK=XSJCamaMVvNwA6RA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 20 Apr 2015 16:56:00 +0100
+Subject: [PATCH v4 00/24] ILP32 for ARM64
+In-Reply-To: <2522717.YOvNMEL4TJ@wuerfel>
+References: <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
+ <3365190.ZbiKjUlDk2@wuerfel>
+ <20150417144656.GQ819@e104818-lin.cambridge.arm.com>
+ <2522717.YOvNMEL4TJ@wuerfel>
+Message-ID: <20150420155600.GF24715@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 17, 2015 at 6:04 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 17, 2015 at 03:17:36AM +0800, Frank.Li at freescale.com wrote:
->> From: Anson Huang <b20788@freescale.com>
->>
->> Add i.MX7D MSL support.
->>
->> Signed-off-by: Anson Huang <b20788@freescale.com>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->
-> I'm not happy with this.
->
+On Fri, Apr 17, 2015 at 05:49:44PM +0200, Arnd Bergmann wrote:
+> On Friday 17 April 2015 15:46:57 Catalin Marinas wrote:
+> > On Fri, Apr 17, 2015 at 02:17:32PM +0100, Arnd Bergmann wrote:
+> > >   g) create a new ABI that does things in exactly the way that we
+> > >      would use as the native syscall interface if we had an ilp32
+> > >      kernel running on aarch64 with the asm-generic/unistd.h.
+> > >      This would mean a 32-bit __kernel_long_t and time_t, but extending
+> > >      time_t in the long run, together with aarch32 and i386.
+> > >      This one is particularly interesting for people that are interested
+> > >      in maximum posix compliance and in having a "nice" ABI, in particular
+> > >      if there is a slight chance that within the next decade we have
+> > >      reason to support building an arch/arm64 kernel itself in
+> > >      aarch64-ilp32 mode.
+> > 
+> > I don't think there is a much difference between g) and e). The reason
+> > we re-define many structures in asm/compat.h is because we don't have a
+> > generic compat_* definition (e.g. compat_timespec, compat_timeval,
+> > compat_flock, compat_flock64; anyway, I think some of these may not even
+> > be needed with the canonical set of syscalls). The signal related
+> > structures need to be handled differently for AArch32 and AArch64-ILP32
+> > anyway because of the difference in the register set.
+> 
+> Interesting observation, I had not guessed this.
+> 
+> Let's list the differences, this is what I could find:
+> 
+> | #define FIOQSIZE        0x545E
+> 
+> probably broken on arm64 already, should be investigated
 
-Sorry, what cause your unhappy?
-Can you tell me detail?
+Yes, it seems broken. arm64 uses the generic FIOQSIZE which doesn't
+match the compat one.
 
-best regards
-Frank Li
+> | typedef unsigned short          __kernel_mode_t;
+> | typedef unsigned short          __kernel_ipc_pid_t;
+> 
+> Both of these affect all sysvipc, but very little else
+> 
+> | typedef unsigned short          __kernel_uid_t;
+> | typedef unsigned short          __kernel_gid_t;
+> 
+> sysvipc, ncpfs, and core dumps (probably fine since they are separate
+> anyway), 
 
->>  void imx_anatop_pre_suspend(void)
->>  {
->> +     if (cpu_is_imx7d()) {
->> +             /* PLL overwrite set */
->> +             regmap_write(anatop, ANADIG_ARM_PLL + REG_SET, 1 << 20);
->> +             regmap_write(anatop, ANADIG_DDR_PLL + REG_SET, 1 << 19);
->> +             regmap_write(anatop, ANADIG_SYS_PLL + REG_SET, 1 << 17);
->> +             regmap_write(anatop, ANADIG_ENET_PLL + REG_SET, 1 << 13);
->> +             regmap_write(anatop, ANADIG_AUDIO_PLL + REG_SET, 1 << 24);
->> +             regmap_write(anatop, ANADIG_VIDEO_PLL + REG_SET, 1 << 24);
->> +             return;
->> +     }
->> +
->>       if (imx_mmdc_get_ddr_type() == IMX_DDR_TYPE_LPDDR2)
->>               imx_anatop_enable_2p5_pulldown(true);
->>       else
->> @@ -86,6 +104,17 @@ void imx_anatop_pre_suspend(void)
->>
->>  void imx_anatop_post_resume(void)
->>  {
->> +     if (cpu_is_imx7d()) {
->> +             /* PLL overwrite clear */
->> +             regmap_write(anatop, ANADIG_ARM_PLL + REG_CLR, 1 << 20);
->> +             regmap_write(anatop, ANADIG_DDR_PLL + REG_CLR, 1 << 19);
->> +             regmap_write(anatop, ANADIG_SYS_PLL + REG_CLR, 1 << 17);
->> +             regmap_write(anatop, ANADIG_ENET_PLL + REG_CLR, 1 << 13);
->> +             regmap_write(anatop, ANADIG_AUDIO_PLL + REG_CLR, 1 << 24);
->> +             regmap_write(anatop, ANADIG_VIDEO_PLL + REG_CLR, 1 << 24);
->> +             return;
->> +     }
->
-> Shouldn't both of these be determined by the compatible string rather
-> than checking __mxc_cpu_type?
->
->> diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
->> index df42c14..4e84a7a 100644
->> --- a/arch/arm/mach-imx/cpu.c
->> +++ b/arch/arm/mach-imx/cpu.c
->> @@ -11,6 +11,8 @@
->>
->>  unsigned int __mxc_cpu_type;
->>  EXPORT_SYMBOL(__mxc_cpu_type);
->> +unsigned int __mxc_arch_type;
->> +EXPORT_SYMBOL(__mxc_arch_type);
->>
->>  static unsigned int imx_soc_revision;
->>
->> @@ -19,6 +21,11 @@ void mxc_set_cpu_type(unsigned int type)
->>       __mxc_cpu_type = type;
->>  }
->>
->> +void mxc_set_arch_type(unsigned int type)
->> +{
->> +     __mxc_arch_type = type;
->> +}
->
-> You're re-inventing the wheel here.  Please get rid of __mxc_arch_type
-> and mxc_set_arch_type() entirely.
->
->> @@ -38,6 +38,8 @@
->>  #define MXC_CPU_IMX6DL               0x61
->>  #define MXC_CPU_IMX6SX               0x62
->>  #define MXC_CPU_IMX6Q                0x63
->> +#define MXC_CPU_IMX7D                0x72
->> +#define MXC_ARCH_CA7         0xc07
->
-> Get rid of MXC_ARCH_CA7.
->
->> +static inline bool arm_is_ca7(void)
->> +{
->> +     return __mxc_arch_type == MXC_ARCH_CA7;
->> +}
->
-> And this function.
->
->> diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
->> index 7f27001..2ca4a41 100644
->> --- a/arch/arm/mach-imx/platsmp.c
->> +++ b/arch/arm/mach-imx/platsmp.c
->> @@ -60,11 +60,33 @@ static int imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
->>  static void __init imx_smp_init_cpus(void)
->>  {
->>       int i, ncores;
->> +     unsigned long arch_type;
->>
->> -     ncores = scu_get_core_count(scu_base);
->> +     asm volatile(
->> +             ".align 4\n"
->> +             "mrc p15, 0, %0, c0, c0, 0\n"
->> +             : "=r" (arch_type)
->> +     );
->> +
->> +     /* MIDR[15:4] defines ARCH type */
->> +     mxc_set_arch_type((arch_type >> 4) & 0xfff);
->> +
->> +     if (arm_is_ca7()) {
->
-> Rather than the above, use:
->
->         if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A7) {
->
-> here.
->
-> Even better would be to _not_ re-use imx_smp_init_cpus(), but instead
-> declare a separate smp_operations structure for the CA7 iMX7 which
-> takes account of this difference by calling a seperate .smp_init_cpus
-> function.
->
-> Thanks.
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+Not all ipc functions are affected AFAICT. msgsnd, msgrcv, msgctl look
+to me like we can just use the compat variants with the generic
+definitions for the types above (unless I missed something). Similarly
+for shmat, compat_sys_shmat just does some compat_ptr casting.
+
+> | typedef unsigned short          __kernel_old_dev_t; /* compat gets this wrong */
+> 
+> old-style loopdev ioctl
+> 
+> | struct stat { ... } /* possibly not needed */
+> 
+>  - lustre ioctls (needs to be fixed anyway)
+>  - old stat syscalls (won't be used with asm-generic/unistd.h)
+> 
+> | struct stat64 { ... }
+> 
+>  - lustre ioctls
+>  - new style stat syscalls
+
+For stat64 the wrappers don't look complicated, so we could add arm64
+ILP32-specific ones.
+
+I'm not sure about the ioctls affected, I haven't checked.
+
+> So, in essence the difference comes down to the syscalls for stat
+> and ipc. If we use the aarch32 data types, we can share the
+> fstatat64, fstat64, semctl, msgsnd, msgrcv, msgctl, shmat,
+> and shmctl compat system calls between aarch32-compat and
+> aarch64-ilp32-compat. Otherwise we have to duplicate or extend
+> them to cover both cases at runtime. That would be rather ugly
+> but entirely doable. The ioctls are hardly affected, the few
+> ones that differ once __kernel_long_t matches could easily be
+> fixed up as you say.
+
+I'd prefer a cleaner ABI even if we are to write some specific wrappers.
+
+-- 
+Catalin
