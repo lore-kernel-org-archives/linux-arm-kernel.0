@@ -1,58 +1,60 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 20 Apr 2015 12:13:43 +0800
-Subject: [PATCH 1/2] drm: rockchip: Don't pass DRM fake offset to dma-api
-In-Reply-To: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
-References: <1429195312-25898-1-git-send-email-orjan.eide@arm.com>
-Message-ID: <CAGS+omADEKZMDLxa9eEgrxhL1V7ZvFEU1Xnhc4rbPHLCthyvNA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 20 Apr 2015 06:37:47 +0200
+Subject: [RESEND RFC PATCH 1/3] ASoC: mediatek: Add binding support for
+ AFE driver
+In-Reply-To: <20150418173407.GE26185@sirena.org.uk>
+References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
+ <1428653649-38200-2-git-send-email-koro.chen@mediatek.com>
+ <20150418173407.GE26185@sirena.org.uk>
+Message-ID: <20150420043747.GH6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ?rjan,
+On Sat, Apr 18, 2015 at 06:34:07PM +0100, Mark Brown wrote:
+> On Fri, Apr 10, 2015 at 04:14:07PM +0800, Koro Chen wrote:
+> 
+> > +Each external interface (called "IO" in this driver) is presented as a
+> > +DAI to ASoC. An IO must be connected via the interconnect to a memif.
+> > +The connection paths are configured through the device tree.
+> 
+> Why are these connection paths configured via device tree?  I would
+> expect that either there would be runtime configurability of these
+> things (particularly if loopback configurations within the hardware are
+> possible) or we'd just allocate memory interfaces to DAIs automatically
+> as DAIs come into use.
 
-On Thu, Apr 16, 2015 at 10:41 PM, ?rjan Eide <orjan.eide@arm.com> wrote:
->
-> Set vm_pgoff to 0 after using it to look up the GEM node, before passing
-> it on rockchip_gem_mmap_buf() where the offset must be from the start of
-> the buffer.
->
-> Passing in the fake offset currently works because the
-> dma_mmap_attrs implementation that is used for this device,
-> arm_iommu_mmap_attrs, ignores the offset completely.
->
-> Signed-off-by: ?rjan Eide <orjan.eide@arm.com>
->
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> index 7ca8799e..69f01c3 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> @@ -94,6 +94,11 @@ int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
->                 return -EACCES;
->         }
->
-> +       /* Set vm_pgoff (used as a fake buffer offset by DRM) to 0 and map the
-> +        * whole buffer from the start.
-> +        */
+There is a crossbar switch between the memory interfaces and the DAIs.
+Not every connection is possible, so not every memory interface can be
+used for every DAI. An algorithm choosing a suitable memory interface
+must be quite clever, complicated and also SoC dependent (the same but
+different hardware is used on MT8135 aswell), so I thought offering a
+static configuration via device tree is a good start. Should there be
+runtime configuration possible later the device tree settings could
+provide a good default.
 
-One very tiny nit.  According to [0], multi-line comments start are
-supposed to start with a single "/*"
-[0] https://www.kernel.org/doc/Documentation/CodingStyle
+> 
+> > +- mem-interface-playback:
+> > +  mem-interface-capture: property of memif, format is: <memif irq use_sram>;
+> > +	                 memif: which memif to be used
+> > +			        (defined in include/dt-bindings/sound/mtk-afe.h)
+> > +		         irq: which irq to be used
+> > +			      (defined in include/dt-bindings/sound/mtk-afe.h)
+> > +		         use_sram: 1 is yes, 0 is no
+> 
+> Again, this looks like stuff we should be able to figure out at runtime
+> - the use of SRAM in particular looks like something we might want to
+> change depending on use case.  Assuming it adds buffering then for a
+> VoIP application we might not want to use SRAM to minimize latency but
+> during music playback we might want to enable SRAM to minimize power
+> consumption.
 
-Other than that, this patch is
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+That's exactly the usecase. How could such a runtime configurability
+look like? sysfs? Or something based on the buffer sizes?
 
-Thanks for sending this up!
+Sascha
 
-
->
-> +       vma->vm_pgoff = 0;
-> +
->         obj = container_of(node, struct drm_gem_object, vma_node);
->         ret = rockchip_gem_mmap_buf(obj, vma);
->
-> --
-> 1.9.1
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
