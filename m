@@ -1,40 +1,72 @@
-From: javier@javigon.com (=?utf-8?Q?Javier_Gonz=C3=A1lez?=)
-Date: Mon, 20 Apr 2015 09:05:56 +0200
-Subject: [RFC PATCH 2/2] tee: add OP-TEE driver
-In-Reply-To: <7401865.1Pb83TJP0q@wuerfel>
-References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
- <4984990.7rV4p0zMYU@wuerfel>
- <3960750D-EAE4-4FA0-9E15-89F9CE39257E@javigon.com>
- <7401865.1Pb83TJP0q@wuerfel>
-Message-ID: <C29F84BF-7972-4F9B-BEF1-6857BCEA26A0@javigon.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 20 Apr 2015 08:14:17 +0100
+Subject: [PATCH 1/5] clocksource: st_lpc: Add LPC timer as a clocksource.
+In-Reply-To: <1429305405.16771.114.camel@x220>
+References: <1429267823-8879-1-git-send-email-peter.griffin@linaro.org>
+ <1429267823-8879-2-git-send-email-peter.griffin@linaro.org>
+ <1429305405.16771.114.camel@x220>
+Message-ID: <20150420071417.GA17802@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 19 Apr 2015, at 21:47, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> On Sunday 19 April 2015 13:17:20 Javier Gonz?lez wrote:
->> 
->> Only providing user space support would defeat one of the main purposes
->> of the driver. We could better organize the patches and divide them into user
->> space support and in-kernel support if that is what you mean. In the end
->> the interfaces are orthogonal, even though the functionality should be very
->> similar.
-> 
-> Splitting up the patches to separate the user interface from the in-kernel
-> interface is certainly a good idea, but aside from that, I also agree with
-> Greg on this point: if you want to establish an in-kernel interface, don't
-> add any dead code at the beginning, but add it together with the users
-> of that interface.
-> 
-> 	Arnd
+Hi Paul,
 
-Thanks for the feedback. We will do so.
+On Fri, 17 Apr 2015, Paul Bolle wrote:
+> On Fri, 2015-04-17 at 11:50 +0100, Peter Griffin wrote:
+> > --- a/drivers/clocksource/Kconfig
+> > +++ b/drivers/clocksource/Kconfig
+> 
+> > +config CLKSRC_ST_LPC_CLOCK
+> > +	bool
+> > +	depends on ARCH_STI
+> > +	select CLKSRC_OF if OF
+> > +	help
+> > +	  Enable this option to use the Low Power controller timer
+> > +	  as clock source.
+> > +
+> > +config CLKSRC_ST_LPC_TIMER_SCHED_CLOCK
+> > +	bool
+> > +	depends on ST_LPC_CLOCK
+> 
+> It looks like you meant
+>      depends on CLKSRC_ST_LPC_CLOCK
 
-Javier.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 842 bytes
-Desc: Message signed with OpenPGP using GPGMail
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150420/2c4a6f56/attachment-0001.sig>
+Yes your correct, will fix in v2. I did a last minute change to append CLKSRC_,
+and seem to have messed it up.
+
+<snip>
+> > --- /dev/null
+> > +++ b/drivers/clocksource/st_lpc.c
+> 
+> > +#ifdef CONFIG_CLKSRC_LPC_TIMER_SCHED_CLOCK
+> 
+> #ifdef CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK here?
+Yes, will fix in v2
+> 
+> > +static u64 notrace st_lpc_sched_clock_read(void)
+> > +{
+> > +	return st_lpc_counter_read();
+> > +}
+> > +#endif
+> 
+> > +#ifdef CONFIG_CLKSRC_LPC_TIMER_SCHED_CLOCK
+> 
+> Again, #ifdef CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK here?
+
+Yes, will fix in v2
+> 
+> > +	sched_clock_register(st_lpc_sched_clock_read, 64, rate);
+> > +#endif
+> 
+> Assuming the above suggestions are correct: checkkconfigsymbols.py, as
+> shipped in linux-next, helps detect stuff like this. See
+>     scripts/checkkconfigsymbols.py --help.
+
+Thanks for the pointer to the script, I'd not heard of that before, so
+will take a look.
+
+Thanks for reviewing, 
+
+regards,
+
+Peter.
