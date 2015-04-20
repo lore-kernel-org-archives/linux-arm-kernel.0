@@ -1,72 +1,64 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 20 Apr 2015 08:14:17 +0100
-Subject: [PATCH 1/5] clocksource: st_lpc: Add LPC timer as a clocksource.
-In-Reply-To: <1429305405.16771.114.camel@x220>
-References: <1429267823-8879-1-git-send-email-peter.griffin@linaro.org>
- <1429267823-8879-2-git-send-email-peter.griffin@linaro.org>
- <1429305405.16771.114.camel@x220>
-Message-ID: <20150420071417.GA17802@griffinp-ThinkPad-X1-Carbon-2nd>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 20 Apr 2015 03:15:06 -0400
+Subject: [PATCH v5 1/6] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+In-Reply-To: <20150325134410.GA26903@localhost>
+References: <1424214701-4899-1-git-send-email-dave.long@linaro.org>
+ <1424214701-4899-2-git-send-email-dave.long@linaro.org>
+ <20150325134410.GA26903@localhost>
+Message-ID: <5534A77A.8040509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On 03/25/15 09:44, Catalin Marinas wrote:
+> On Tue, Feb 17, 2015 at 06:11:36PM -0500, David Long wrote:
+>> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+>> index 6913643..700d28b 100644
+>> --- a/arch/arm64/include/uapi/asm/ptrace.h
+>> +++ b/arch/arm64/include/uapi/asm/ptrace.h
+>> @@ -61,6 +61,42 @@
+>>
+>>   #ifndef __ASSEMBLY__
+>>
+>> +#define ARM_cpsr	pstate
+>
+> There is no CPSR on AArch64, it's just called PSTATE. But more
+> importantly, what's the point of all these macros?
+>
+>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>> index d882b83..adc1f39 100644
+>> --- a/arch/arm64/kernel/ptrace.c
+>> +++ b/arch/arm64/kernel/ptrace.c
+>> @@ -48,6 +48,122 @@
+>>   #define CREATE_TRACE_POINTS
+>>   #include <trace/events/syscalls.h>
+>>
+>> +struct pt_regs_offset {
+>> +	const char *name;
+>> +	int offset;
+>> +};
+>> +
+>> +#define REG_OFFSET_NAME(r) \
+>> +	{.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
+>> +#define REG_OFFSET_END {.name = NULL, .offset = 0}
+>> +
+>> +static const struct pt_regs_offset regoffset_table[] = {
+>> +	REG_OFFSET_NAME(x0),
+>
+> If it is just for defining a name, just change the REG_OFFSET_NAME macro
+> to take a string argument and remove all the ARM_ macros.
+>
+> I'm also not sure why we need the ARM_ prefix. Do you see them used
+> outside the arm64 context?
+>
 
-On Fri, 17 Apr 2015, Paul Bolle wrote:
-> On Fri, 2015-04-17 at 11:50 +0100, Peter Griffin wrote:
-> > --- a/drivers/clocksource/Kconfig
-> > +++ b/drivers/clocksource/Kconfig
-> 
-> > +config CLKSRC_ST_LPC_CLOCK
-> > +	bool
-> > +	depends on ARCH_STI
-> > +	select CLKSRC_OF if OF
-> > +	help
-> > +	  Enable this option to use the Low Power controller timer
-> > +	  as clock source.
-> > +
-> > +config CLKSRC_ST_LPC_TIMER_SCHED_CLOCK
-> > +	bool
-> > +	depends on ST_LPC_CLOCK
-> 
-> It looks like you meant
->      depends on CLKSRC_ST_LPC_CLOCK
+Sorry Catalin, I don't have a record of having replied to this yet so 
+this is a quite late reply.
 
-Yes your correct, will fix in v2. I did a last minute change to append CLKSRC_,
-and seem to have messed it up.
+The macros were taken from the 32-bit ARM implementation, which in turn 
+looks to be taken from x86/sh/powerpc for 
+HAVE_REGS_AND_STACK_ACCESS_API.  I've replaced the hacky define of cpsr 
+with pstate. The macros create symbolic names that can be looked up by, 
+for example, event tracing strings entered through debugfs.  This is 
+consistent across multiple platforms.
 
-<snip>
-> > --- /dev/null
-> > +++ b/drivers/clocksource/st_lpc.c
-> 
-> > +#ifdef CONFIG_CLKSRC_LPC_TIMER_SCHED_CLOCK
-> 
-> #ifdef CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK here?
-Yes, will fix in v2
-> 
-> > +static u64 notrace st_lpc_sched_clock_read(void)
-> > +{
-> > +	return st_lpc_counter_read();
-> > +}
-> > +#endif
-> 
-> > +#ifdef CONFIG_CLKSRC_LPC_TIMER_SCHED_CLOCK
-> 
-> Again, #ifdef CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK here?
-
-Yes, will fix in v2
-> 
-> > +	sched_clock_register(st_lpc_sched_clock_read, 64, rate);
-> > +#endif
-> 
-> Assuming the above suggestions are correct: checkkconfigsymbols.py, as
-> shipped in linux-next, helps detect stuff like this. See
->     scripts/checkkconfigsymbols.py --help.
-
-Thanks for the pointer to the script, I'd not heard of that before, so
-will take a look.
-
-Thanks for reviewing, 
-
-regards,
-
-Peter.
+-dl
