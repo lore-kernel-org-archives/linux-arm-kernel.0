@@ -1,55 +1,63 @@
-From: ben.hutchings@codethink.co.uk (Ben Hutchings)
-Date: Mon, 20 Apr 2015 09:57:28 +0100
-Subject: [PATCH] ARM: mm: add imprecise abort non-deadly handler
-In-Reply-To: <20150418090845.GH12732@n2100.arm.linux.org.uk>
-References: <1429316083.8341.76.camel@xylophone.i.decadent.org.uk>
- <20150418090845.GH12732@n2100.arm.linux.org.uk>
-Message-ID: <1429520248.8341.82.camel@xylophone.i.decadent.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 20 Apr 2015 10:09:50 +0100
+Subject: kvm vs host (arm64)
+In-Reply-To: <1967946020.115308.1429508745411.JavaMail.yahoo@mail.yahoo.com>
+References: <1967946020.115308.1429508745411.JavaMail.yahoo@mail.yahoo.com>
+Message-ID: <5534C25E.7070702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2015-04-18 at 10:08 +0100, Russell King - ARM Linux wrote:
-> On Sat, Apr 18, 2015 at 01:14:43AM +0100, Ben Hutchings wrote:
-> > From: Ben Dooks <ben.dooks@codethink.co.uk>
-> > 
-> > Given that imprecise aborts may be delivered after the action that
-> > caused them (or even for non-cpu related activities such as bridge
-> > faults from a bus-master) it is possible that the wrong process is
-> > terminated as a result.
-> > 
-> > Add a handler to take and print imprecise aborts and allow the process
-> > to continue. This should ensure that the abort is shown but not kill
-> > the process that was running on the cpu core at the time.
+On 20/04/15 06:45, Mohan G wrote:
+> Hi, 
+> I have got hold of few mustang boards (cortex-a57). Ran a few bench
+
+Mustang is *not* based on Cortex-A57. So which hardware do you have?
+
+> marks to measure perf numbers b/w host and guest (kvm). The numbers 
+> are pretty bad. (drop of about 90% to that of host). I even tried
+> running this simple program .
 > 
-> I'm not happy with this.
+> main(){ 
+> int i=0; 
 > 
-> On older CPUs, you generally get the "imprecise" (aka external) aborts
-> within a few cycles of the faulting instruction, which is good enough
-> to ensure that the appropriate process gets terminated.
-
-Right.
-
-> Yes, this is not true of ARMv7, where such faults can happen a longer
-> time after the access which caused them.
-
-Not only that, but they can apparently be caused by DMA masters.  I
-think Ben ran into a problem like that a while back and this patch dates
-from then, but I don't know the details.
-
-If there was a way to tell whose memory access caused it...
-
-> However, I would argue that merely printing a message to the kernel
-> log is insufficient - especially as the kernel networking layer can
-> spam the log so that such messages yet rotated out of the ring buffer.
+> for(i=0;i<10;i++); 
+> } 
+> Profiling the above shows that same kernel functions in guest takes
+> almost 10x to that of host. sample below
+>
 > 
-> An imprecise abort is a serious condition, one which _ought_ to be very
-> noticable, on the level of panic()ing the kernel.  It's a data loss
-> condition, one which _can_ result in corruption of user data or even
-> filesystems.
+> Host 
+> ==== 
+> 7202              one-3920  [003] 20015.611563: funcgraph_entry:                   |              find_vma() { 
+> 7203              one-3920  [003] 20015.611564: funcgraph_entry:        0.180 us   |                vmacache_find(); 
+> 7204              one-3920  [003] 20015.611565: funcgraph_entry:        0.120 us   |                vmacache_update(); 
+> 7205              one-3920  [003] 20015.611566: funcgraph_exit:         2.320 us   |              } 
+> 
+> 
+> Guest 
+> ===== 
+> 
+> one-751   [000]   206.843300: funcgraph_entry:                   |              find_vma() { 
+> one-751   [000]   206.843312: funcgraph_entry:        4.880 us   |                vmacache_find(); 
+> one-751   [000]   206.843335: funcgraph_entry:        2.656 us   |                vmacache_update(); 
+> one-751   [000]   206.843354: funcgraph_exit:       + 46.256 us  |              } 
 
-Would it make sense to treat this similarly to an x86 Machine Check
-Error, and have a kernel parameter to choose between panic and log?  It
-seems like that would be useful when debugging a driver that is
-triggering this.
 
-Ben.
+I wonder how you manage to profile this, as we don't have any perf
+support in KVM yet (you cannot profile a guest). Can you describe your
+profiling method? Also, can you use a non-trivial test (i.e. something
+that is not pure overhead)?
+
+If that's all your test does, you end up measuring the cost of a stage-2
+page fault, which only happens at startup.
+
+> kernel: 3.18.9 
+
+Is that mainline 3.18.9? Or some special tree? I'm also interested in
+seeing results from a 4.0 kernel.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
