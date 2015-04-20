@@ -1,43 +1,105 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Apr 2015 21:48:40 +0200
-Subject: [PATCH] ARM: sunxi: Enable simplefb in the defconfig
-Message-ID: <1429559320-27519-1-git-send-email-maxime.ripard@free-electrons.com>
+From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
+Date: Mon, 20 Apr 2015 13:19:39 -0700
+Subject: [PATCHv2 1/3] phy: core: Add devm_of_phy_get_by_index to phy-core
+In-Reply-To: <552E3699.4020309@ti.com>
+References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1428963047-23666-2-git-send-email-arun.ramamurthy@broadcom.com>
+ <552E3699.4020309@ti.com>
+Message-ID: <55355F5B.6060504@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have simplefb support, we can enable it in our defconfig. Also
-enable the framebuffer console, so that we are sure that we actually get
-something displayed in any case.
 
-And while we're at it, enable the module support.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/configs/sunxi_defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+On 15-04-15 02:59 AM, Kishon Vijay Abraham I wrote:
+> Hi,
+>
+> On Tuesday 14 April 2015 03:40 AM, Arun Ramamurthy wrote:
+>> Some generic drivers, such as ehci, may use multiple phys and for such
+>> drivers referencing phy(s) by name(s) does not make sense. Instead of
+>> inventing new naming schemes and using custom code to iterate through
+>> them,
+>> such drivers are better of using nameless phy bindings and using this
+>> newly
+>> introduced API to iterate through them.
+>>
+>> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>> ---
+>>   drivers/phy/phy-core.c  | 32 ++++++++++++++++++++++++++++++++
+>>   include/linux/phy/phy.h |  2 ++
+>>   2 files changed, 34 insertions(+)
+>>
+>> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+>> index 3791838..964a84d 100644
+>> --- a/drivers/phy/phy-core.c
+>> +++ b/drivers/phy/phy-core.c
+>> @@ -623,6 +623,38 @@ struct phy *devm_of_phy_get(struct device *dev,
+>> struct device_node *np,
+>>   EXPORT_SYMBOL_GPL(devm_of_phy_get);
+>>
+>>   /**
+>> + * devm_of_phy_get_by_index() - lookup and obtain a reference to a
+>> phy by index.
+>> + * @dev: device that requests this phy
+>> + * @np: node containing the phy
+>> + * @index: index of the phy
+>> + *
+>> + * Gets the phy using _of_phy_get(), and associates a device with it
+>> using
+>> + * devres. On driver detach, release function is invoked on the
+>> devres data,
+>> + * then, devres data is freed.
+>> + *
+>> + */
+>> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct
+>> device_node *np,
+>> +                     int index)
+>> +{
+>> +    struct phy **ptr, *phy;
+>> +
+>> +    ptr = devres_alloc(devm_phy_release, sizeof(*ptr), GFP_KERNEL);
+>> +    if (!ptr)
+>> +        return ERR_PTR(-ENOMEM);
+>> +
+>> +    phy = _of_phy_get(np, index);
+>> +    if (!IS_ERR(phy)) {
+>> +        *ptr = phy;
+>> +        devres_add(dev, ptr);
+>> +    } else {
+>> +        devres_free(ptr);
+>> +    }
+>> +
+>> +    return phy;
+>> +}
+>> +EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index);
+>> +
+>> +/**
+>>    * phy_create() - create a new phy
+>>    * @dev: device that is creating the new phy
+>>    * @node: device node of the phy
+>> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+>> index a0197fa..ae2ffaf 100644
+>> --- a/include/linux/phy/phy.h
+>> +++ b/include/linux/phy/phy.h
+>> @@ -133,6 +133,8 @@ struct phy *devm_phy_get(struct device *dev, const
+>> char *string);
+>>   struct phy *devm_phy_optional_get(struct device *dev, const char
+>> *string);
+>>   struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
+>>                   const char *con_id);
+>> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct
+>> device_node *np,
+>> +                     int index);
+>
+> Add stubs for this function too. Also update the Documentation/phy.txt.
+>
+Kishon, I have added stubs for this function in my next patch set. 
+However I am still unclear on whether I need to make GENERIC_PHY an 
+invisible option or change my "select" to "depend" ? It seems like there 
+was no consensus on this? Do you have any final thoughts before i send 
+out the next patch set? Thanks
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 2c7af0a57cb1..7ebc346bf9fa 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -2,6 +2,7 @@ CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_PERF_EVENTS=y
-+CONFIG_MODULES=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=8
-@@ -86,6 +87,10 @@ CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_AXP20X=y
- CONFIG_REGULATOR_GPIO=y
-+CONFIG_FB=y
-+CONFIG_FB_SIMPLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
--- 
-2.3.5
+> Thanks
+> Kishon
