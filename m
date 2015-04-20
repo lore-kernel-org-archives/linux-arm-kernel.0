@@ -1,54 +1,49 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Apr 2015 15:13:44 +0200
-Subject: [PATCH 1/5] ARM: ux500: define CPU topology
-Message-ID: <1429535624-9225-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon, 20 Apr 2015 15:13:55 +0200
+Subject: [PATCH 2/5] ARM: ux500: get rid of static maps
+Message-ID: <1429535635-9267-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU topology is unspecified for Ux500 but will be needed
-for things like CoreSight. Let's just add it.
+The static mappings of the GPIO blocks, clock/reset controller
+and MTU timer are clearly superfluous. These are all probed
+exclusively from the device tree. Tested on the U8500.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/mach-ux500/cpu-db8500.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index bfd3f1c734b8..bd6bd0926931 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -22,6 +22,32 @@
- 		interrupt-parent = <&intc>;
- 		ranges;
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 6f63954c8bde..537a7753afc1 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -48,25 +48,14 @@ static struct map_desc u8500_uart_io_desc[] __initdata = {
+ 	__IO_DEV_DESC(U8500_UART0_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_UART2_BASE, SZ_4K),
+ };
++
+ /*  U8500 and U9540 common io_desc */
+ static struct map_desc u8500_common_io_desc[] __initdata = {
+ 	/* SCU base also covers GIC CPU BASE and TWD with its 4K page */
+ 	__IO_DEV_DESC(U8500_SCU_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GIC_DIST_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_L2CC_BASE, SZ_4K),
+-	__IO_DEV_DESC(U8500_MTU0_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_BACKUPRAM0_BASE, SZ_8K),
+-
+-	__IO_DEV_DESC(U8500_CLKRST1_BASE, SZ_4K),
+-	__IO_DEV_DESC(U8500_CLKRST2_BASE, SZ_4K),
+-	__IO_DEV_DESC(U8500_CLKRST3_BASE, SZ_4K),
+-	__IO_DEV_DESC(U8500_CLKRST5_BASE, SZ_4K),
+-	__IO_DEV_DESC(U8500_CLKRST6_BASE, SZ_4K),
+-
+-	__IO_DEV_DESC(U8500_GPIO0_BASE, SZ_4K),
+-	__IO_DEV_DESC(U8500_GPIO1_BASE, SZ_4K),
+-	__IO_DEV_DESC(U8500_GPIO2_BASE, SZ_4K),
+-	__IO_DEV_DESC(U8500_GPIO3_BASE, SZ_4K),
+ };
  
-+		cpus {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			cpu-map {
-+				cluster0 {
-+					core0 {
-+						cpu = <&CPU0>;
-+					};
-+					core1 {
-+						cpu = <&CPU1>;
-+					};
-+				};
-+			};
-+			CPU0: cpu at 0 {
-+				device_type = "cpu";
-+				compatible = "arm,cortex-a9";
-+				reg = <0>;
-+			};
-+			CPU1: cpu at 1 {
-+				device_type = "cpu";
-+				compatible = "arm,cortex-a9";
-+				reg = <1>;
-+			};
-+		};
-+
- 		intc: interrupt-controller at a0411000 {
- 			compatible = "arm,cortex-a9-gic";
- 			#interrupt-cells = <3>;
+ /* U8500 IO map specific description */
 -- 
 1.9.3
