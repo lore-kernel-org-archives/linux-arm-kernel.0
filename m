@@ -1,187 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Apr 2015 18:04:38 +0200
-Subject: [PATCH 12/13 v3] coresight: replicator: retrieve and handle atclk
-Message-ID: <1429545878-9221-1-git-send-email-linus.walleij@linaro.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 20 Apr 2015 18:05:45 +0200
+Subject: [tpmdd-devel] [RFC PATCH 1/2] tee: generic TEE subsystem
+In-Reply-To: <20150420155648.GA7676@obsidianresearch.com>
+References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
+ <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
+ <20150417163054.GA28241@obsidianresearch.com>
+ <20150418090147.GF12732@n2100.arm.linux.org.uk>
+ <20150418172923.GA10605@obsidianresearch.com>
+ <20150418215755.GM12732@n2100.arm.linux.org.uk>
+ <20150420050800.GA12928@obsidianresearch.com>
+ <20150420145432.GD7261@kroah.com>
+ <20150420155648.GA7676@obsidianresearch.com>
+Message-ID: <20150420160545.GA11296@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As can be seen from the datasheet of the CoreSight
-Components, DDI0314 table A-4 the funnel has a clock signal
-apart from the AHB interconnect ("amba_pclk", that we're
-already handling) called ATCLK, ARM Trace Clock, that SoC
-implementers may provide from an entirely different clock
-source. So to model this correctly create an optional
-path for handling ATCLK alongside the PCLK so we don't
-break old platforms that only define PCLK ("amba_pclk") but
-still makes it possible for SoCs that have both clock signals
-(such as the DB8500) to fetch and prepare/enable/disable/
-unprepare both clocks.
+On Mon, Apr 20, 2015 at 09:56:48AM -0600, Jason Gunthorpe wrote:
+> On Mon, Apr 20, 2015 at 04:54:32PM +0200, Greg Kroah-Hartman wrote:
+> > On Sun, Apr 19, 2015 at 11:08:00PM -0600, Jason Gunthorpe wrote:
+> > > I still suspect the expected way to write a new mid layer is to create
+> > > your own struct device and not rely on misc_device,
+> > 
+> > Yes, that is the way.  You can not use misc_device for anything other
+> > than creating the char node that your driver can use through the fileops
+> > you pass to it.
+> > 
+> > Do not use a misc_device to create sysfs files for, or anything else, it
+> > will be wrong and racy, as you have pointed out.
+> 
+> Thanks!
+> 
+> Can you quickly comment on when a misc device should be used compared to
+> alloc_chrdev_region & cdev_add ?
 
-The ATCLK is enabled and disabled using the runtime PM
-callbacks. As the replicator is a platform device, the
-code is a bit different from the other CoreSight components
-and the bus core does not activate runtime PM by default,
-so we need a few extra calls.
+If you need more than one character device node, don't use a misc
+device.  If you only need one, and nothing "special" or "fancy", and
+don't want to put sysfs attribute files on your device, then use a misc
+device.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v2->v3:
-- Fixed Ulf's review comments, removed the prematurely
-  added Review-tag.
----
- drivers/hwtracing/coresight/coresight-replicator.c | 71 ++++++++++++++++++++--
- 1 file changed, 67 insertions(+), 4 deletions(-)
+thanks,
 
-diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
-index cdf05537d574..048ce11d86f7 100644
---- a/drivers/hwtracing/coresight/coresight-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator.c
-@@ -18,6 +18,7 @@
- #include <linux/io.h>
- #include <linux/err.h>
- #include <linux/slab.h>
-+#include <linux/pm_runtime.h>
- #include <linux/clk.h>
- #include <linux/of.h>
- #include <linux/coresight.h>
-@@ -27,10 +28,12 @@
- /**
-  * struct replicator_drvdata - specifics associated to a replicator component
-  * @dev:	the device entity associated with this component
-+ * @atclk:	optional clock for the core parts of the replicator.
-  * @csdev:	component vitals needed by the framework
-  */
- struct replicator_drvdata {
- 	struct device		*dev;
-+	struct clk		*atclk;
- 	struct coresight_device	*csdev;
- };
- 
-@@ -39,6 +42,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-+	pm_runtime_get_sync(drvdata->dev);
- 	dev_info(drvdata->dev, "REPLICATOR enabled\n");
- 	return 0;
- }
-@@ -48,6 +52,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-+	pm_runtime_put(drvdata->dev);
- 	dev_info(drvdata->dev, "REPLICATOR disabled\n");
- }
- 
-@@ -62,6 +67,7 @@ static const struct coresight_ops replicator_cs_ops = {
- 
- static int replicator_probe(struct platform_device *pdev)
- {
-+	int ret;
- 	struct device *dev = &pdev->dev;
- 	struct coresight_platform_data *pdata = NULL;
- 	struct replicator_drvdata *drvdata;
-@@ -80,11 +86,22 @@ static int replicator_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	drvdata->dev = &pdev->dev;
-+	drvdata->atclk = devm_clk_get(&pdev->dev, "atclk"); /* optional */
-+	if (!IS_ERR(drvdata->atclk)) {
-+		ret = clk_prepare_enable(drvdata->atclk);
-+		if (ret)
-+			return ret;
-+	}
-+	pm_runtime_get_noresume(&pdev->dev);
-+	pm_runtime_set_active(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
- 	platform_set_drvdata(pdev, drvdata);
- 
- 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
--	if (!desc)
--		return -ENOMEM;
-+	if (!desc) {
-+		ret = -ENOMEM;
-+		goto out_disable_pm;
-+	}
- 
- 	desc->type = CORESIGHT_DEV_TYPE_LINK;
- 	desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
-@@ -92,11 +109,23 @@ static int replicator_probe(struct platform_device *pdev)
- 	desc->pdata = pdev->dev.platform_data;
- 	desc->dev = &pdev->dev;
- 	drvdata->csdev = coresight_register(desc);
--	if (IS_ERR(drvdata->csdev))
--		return PTR_ERR(drvdata->csdev);
-+	if (IS_ERR(drvdata->csdev)) {
-+		ret = PTR_ERR(drvdata->csdev);
-+		goto out_disable_pm;
-+	}
-+
-+	pm_runtime_put(&pdev->dev);
- 
- 	dev_info(dev, "REPLICATOR initialized\n");
- 	return 0;
-+
-+out_disable_pm:
-+	if (!IS_ERR(drvdata->atclk))
-+		clk_disable_unprepare(drvdata->atclk);
-+	pm_runtime_put_noidle(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+
-+	return ret;
- }
- 
- static int replicator_remove(struct platform_device *pdev)
-@@ -104,9 +133,42 @@ static int replicator_remove(struct platform_device *pdev)
- 	struct replicator_drvdata *drvdata = platform_get_drvdata(pdev);
- 
- 	coresight_unregister(drvdata->csdev);
-+	pm_runtime_get_sync(&pdev->dev);
-+	if (!IS_ERR(drvdata->atclk))
-+		clk_disable_unprepare(drvdata->atclk);
-+	pm_runtime_put_noidle(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int replicator_runtime_suspend(struct device *dev)
-+{
-+	struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
-+
-+	if (drvdata && !IS_ERR(drvdata->atclk))
-+		clk_disable_unprepare(drvdata->atclk);
-+
- 	return 0;
- }
- 
-+static int replicator_runtime_resume(struct device *dev)
-+{
-+	struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
-+
-+	if (drvdata && !IS_ERR(drvdata->atclk))
-+		clk_prepare_enable(drvdata->atclk);
-+
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops replicator_dev_pm_ops = {
-+	SET_RUNTIME_PM_OPS(replicator_runtime_suspend,
-+			   replicator_runtime_resume, NULL)
-+};
-+
- static struct of_device_id replicator_match[] = {
- 	{.compatible = "arm,coresight-replicator"},
- 	{}
-@@ -118,6 +180,7 @@ static struct platform_driver replicator_driver = {
- 	.driver         = {
- 		.name   = "coresight-replicator",
- 		.of_match_table = replicator_match,
-+		.pm	= &replicator_dev_pm_ops,
- 	},
- };
- 
--- 
-1.9.3
+greg k-h
