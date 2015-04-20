@@ -1,75 +1,66 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 20 Apr 2015 09:08:41 -0700
-Subject: [PATCH] arm64: Implement 1-,2- byte smp_load_acquire and
- smp_store_release
-In-Reply-To: <1429544753-4120-1-git-send-email-a.ryabinin@samsung.com>
-References: <1429544753-4120-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <20150420160841.GS5561@linux.vnet.ibm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 Apr 2015 09:25:16 -0700
+Subject: Fscking OMAP
+In-Reply-To: <20150420154912.GW4027@n2100.arm.linux.org.uk>
+References: <20150420154912.GW4027@n2100.arm.linux.org.uk>
+Message-ID: <20150420162515.GK18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 06:45:53PM +0300, Andrey Ryabinin wrote:
-> commit 47933ad41a86 ("arch: Introduce smp_load_acquire(), smp_store_release()")
-> allowed only 4- and 8-byte smp_load_acquire, smp_store_release.
-> So 1- and 2-byte cases weren't implemented in arm64.
-> Later commit 536fa402221f ("compiler: Allow 1- and 2-byte smp_load_acquire()
-> 				and smp_store_release()")
-> allowed to use 1 and 2 byte smp_load_acquire and smp_store_release
-> by adjusting the definition of __native_word().
-> However, 1-,2- byte cases in arm64 version left unimplemented.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [150420 08:50]:
+> Guys,
 > 
-> Commit 8053871d0f7f ("smp: Fix smp_call_function_single_async() locking")
-> started to use smp_load_acquire() to load 2-bytes csd->flags.
-> That crashes arm64 kernel during the boot.
+> If you're going to introduce a dependency on some infrastructure which
+> you absolutely require for booting, then _please_ ensure that the
+> configuration system is updated such that pre-existing kernel
+> configurations continue to work.
 > 
-> Implement 1,2 byte cases in arm64's  smp_load_acquire()
-> and smp_store_release() to fix this.
+> Don't leave it such that the infrastructure ends up returning -ENOSYS,
+> which then filters down into your SoC specific code, and aborts the
+> initialisation of critical infrastructure, leaving you with a totally
+> silent boot failure.
 > 
-> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+> In this case, it's the addition of syscon to OMAP internals,
+> specifically in omap_control_init().
+> 
+> This is explicitly targetted at OMAP people, who have wasted much of
+> my day today investigating why their platforms no longer boot in DT
+> mode.
 
-I am introducing a similar smp_load_acquire() case in rcutorture to
-replace use of explicit memory barriers, so thank you!  ;-)
+Ouch, yeah missing dependencies are a pain to debug.
 
-Reviewed-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Looks like we get MFD_SYSCON selected with omap2plus_defconfig,
+but that's not always the case like you pointed out.
 
-> ---
->  arch/arm64/include/asm/barrier.h | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-> index a5abb00..71f19c4 100644
-> --- a/arch/arm64/include/asm/barrier.h
-> +++ b/arch/arm64/include/asm/barrier.h
-> @@ -65,6 +65,14 @@ do {									\
->  do {									\
->  	compiletime_assert_atomic_type(*p);				\
->  	switch (sizeof(*p)) {						\
-> +	case 1:								\
-> +		asm volatile ("stlrb %w1, %0"				\
-> +				: "=Q" (*p) : "r" (v) : "memory");	\
-> +		break;							\
-> +	case 2:								\
-> +		asm volatile ("stlrh %w1, %0"				\
-> +				: "=Q" (*p) : "r" (v) : "memory");	\
-> +		break;							\
->  	case 4:								\
->  		asm volatile ("stlr %w1, %0"				\
->  				: "=Q" (*p) : "r" (v) : "memory");	\
-> @@ -81,6 +89,14 @@ do {									\
->  	typeof(*p) ___p1;						\
->  	compiletime_assert_atomic_type(*p);				\
->  	switch (sizeof(*p)) {						\
-> +	case 1:								\
-> +		asm volatile ("ldarb %w0, %1"				\
-> +			: "=r" (___p1) : "Q" (*p) : "memory");		\
-> +		break;							\
-> +	case 2:								\
-> +		asm volatile ("ldarh %w0, %1"				\
-> +			: "=r" (___p1) : "Q" (*p) : "memory");		\
-> +		break;							\
->  	case 4:								\
->  		asm volatile ("ldar %w0, %1"				\
->  			: "=r" (___p1) : "Q" (*p) : "memory");		\
-> -- 
-> 2.3.5
-> 
+Does the patch below fix the issue for you?
+
+Regards,
+
+Tony
+
+8< -----------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 20 Apr 2015 09:23:25 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix booting with configs that don't have MFD_SYSCON
+
+With the recent changes omaps have developed a dependency to MFD_SYSCON.
+This is used for system control module generic register area and some
+clocks.
+
+We do have it selected in omap2plus_defconfig, but targeted config
+files may not have it selected. Let's make sure it's selected like
+few other ARM platforms are already doing.
+
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -81,6 +81,7 @@ config ARCH_OMAP2PLUS
+ 	select GENERIC_IRQ_CHIP
+ 	select MACH_OMAP_GENERIC
+ 	select MEMORY
++	select MFD_SYSCON
+ 	select OMAP_DM_TIMER
+ 	select OMAP_GPMC
+ 	select PINCTRL
