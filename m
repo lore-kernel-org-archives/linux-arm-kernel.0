@@ -1,79 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 20 Apr 2015 10:20:34 -0700
-Subject: Fscking OMAP
-In-Reply-To: <20150420171421.GY4027@n2100.arm.linux.org.uk>
-References: <20150420154912.GW4027@n2100.arm.linux.org.uk>
- <20150420162515.GK18048@atomide.com>
- <20150420171421.GY4027@n2100.arm.linux.org.uk>
-Message-ID: <20150420172034.GL18048@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 20 Apr 2015 19:29:56 +0200
+Subject: [PATCH] ARM: mvebu: Fix the main PLL frequency on Armada 375,
+ 38x and 39x SoCs
+In-Reply-To: <1429538373-31064-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1429538373-31064-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150420172956.GZ15807@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [150420 10:15]:
-> On Mon, Apr 20, 2015 at 09:25:16AM -0700, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [150420 08:50]:
-> > > Guys,
-> > > 
-> > > If you're going to introduce a dependency on some infrastructure which
-> > > you absolutely require for booting, then _please_ ensure that the
-> > > configuration system is updated such that pre-existing kernel
-> > > configurations continue to work.
-> > > 
-> > > Don't leave it such that the infrastructure ends up returning -ENOSYS,
-> > > which then filters down into your SoC specific code, and aborts the
-> > > initialisation of critical infrastructure, leaving you with a totally
-> > > silent boot failure.
-> > > 
-> > > In this case, it's the addition of syscon to OMAP internals,
-> > > specifically in omap_control_init().
-> > > 
-> > > This is explicitly targetted at OMAP people, who have wasted much of
-> > > my day today investigating why their platforms no longer boot in DT
-> > > mode.
-> > 
-> > Ouch, yeah missing dependencies are a pain to debug.
-> > 
-> > Looks like we get MFD_SYSCON selected with omap2plus_defconfig,
-> > but that's not always the case like you pointed out.
-> > 
-> > Does the patch below fix the issue for you?
+Hi,
+
+On Mon, Apr 20, 2015 at 03:59:33PM +0200, Gregory CLEMENT wrote:
+> Whereas for Armada 370 and XP the main PLL frequency was 2GHz for the
+> Armada 375, 38x and 39x, the frequency is 1GHz. When writting support
+                                                       ^ writing
+
+> for these last SoCs, there was no offical value for the PLL. Now that
+> we have it, this patch fixes it in the device tree.
 > 
-> Yes, that fixes it, thanks.
+> This value is currently only used by the NAND driver for the setting
+> the NAND timing. Fortunately it is not acutally used: all the mainline
+                                         ^ actually
 
-OK let's get this merged immediately and then Tero can add some more
-checks to the init code like you suggested with a follow-up patch.
+> board with a NAND flash comes with a NAND device tree node using the
 
-Regards,
+  ^ boards                ^ come 
 
-Tony
- 
-> > 8< -----------------------
-> > From: Tony Lindgren <tony@atomide.com>
-> > Date: Mon, 20 Apr 2015 09:23:25 -0700
-> > Subject: [PATCH] ARM: OMAP2+: Fix booting with configs that don't have MFD_SYSCON
-> > 
-> > With the recent changes omaps have developed a dependency to MFD_SYSCON.
-> > This is used for system control module generic register area and some
-> > clocks.
-> > 
-> > We do have it selected in omap2plus_defconfig, but targeted config
-> > files may not have it selected. Let's make sure it's selected like
-> > few other ARM platforms are already doing.
-> > 
-> > Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > --- a/arch/arm/mach-omap2/Kconfig
-> > +++ b/arch/arm/mach-omap2/Kconfig
-> > @@ -81,6 +81,7 @@ config ARCH_OMAP2PLUS
-> >  	select GENERIC_IRQ_CHIP
-> >  	select MACH_OMAP_GENERIC
-> >  	select MEMORY
-> > +	select MFD_SYSCON
-> >  	select OMAP_DM_TIMER
-> >  	select OMAP_GPMC
-> >  	select PINCTRL
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+> "marvell,nand-keep-config" property. With this property the timings
+> are not modified in the kernel driver and are kept from the botloader.
+                                                              ^ bootloader
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150420/ebb59058/attachment.sig>
