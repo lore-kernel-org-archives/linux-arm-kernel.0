@@ -1,105 +1,121 @@
-From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Mon, 20 Apr 2015 13:19:39 -0700
-Subject: [PATCHv2 1/3] phy: core: Add devm_of_phy_get_by_index to phy-core
-In-Reply-To: <552E3699.4020309@ti.com>
-References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1428963047-23666-2-git-send-email-arun.ramamurthy@broadcom.com>
- <552E3699.4020309@ti.com>
-Message-ID: <55355F5B.6060504@broadcom.com>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 20 Apr 2015 16:19:41 -0400
+Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
+Message-ID: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: "David A. Long" <dave.long@linaro.org>
 
+This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
+first seen in October 2013. This version attempts to address concerns raised by
+reviewers and also fixes problems discovered during testing.
 
-On 15-04-15 02:59 AM, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Tuesday 14 April 2015 03:40 AM, Arun Ramamurthy wrote:
->> Some generic drivers, such as ehci, may use multiple phys and for such
->> drivers referencing phy(s) by name(s) does not make sense. Instead of
->> inventing new naming schemes and using custom code to iterate through
->> them,
->> such drivers are better of using nameless phy bindings and using this
->> newly
->> introduced API to iterate through them.
->>
->> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
->> Reviewed-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->> ---
->>   drivers/phy/phy-core.c  | 32 ++++++++++++++++++++++++++++++++
->>   include/linux/phy/phy.h |  2 ++
->>   2 files changed, 34 insertions(+)
->>
->> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
->> index 3791838..964a84d 100644
->> --- a/drivers/phy/phy-core.c
->> +++ b/drivers/phy/phy-core.c
->> @@ -623,6 +623,38 @@ struct phy *devm_of_phy_get(struct device *dev,
->> struct device_node *np,
->>   EXPORT_SYMBOL_GPL(devm_of_phy_get);
->>
->>   /**
->> + * devm_of_phy_get_by_index() - lookup and obtain a reference to a
->> phy by index.
->> + * @dev: device that requests this phy
->> + * @np: node containing the phy
->> + * @index: index of the phy
->> + *
->> + * Gets the phy using _of_phy_get(), and associates a device with it
->> using
->> + * devres. On driver detach, release function is invoked on the
->> devres data,
->> + * then, devres data is freed.
->> + *
->> + */
->> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct
->> device_node *np,
->> +                     int index)
->> +{
->> +    struct phy **ptr, *phy;
->> +
->> +    ptr = devres_alloc(devm_phy_release, sizeof(*ptr), GFP_KERNEL);
->> +    if (!ptr)
->> +        return ERR_PTR(-ENOMEM);
->> +
->> +    phy = _of_phy_get(np, index);
->> +    if (!IS_ERR(phy)) {
->> +        *ptr = phy;
->> +        devres_add(dev, ptr);
->> +    } else {
->> +        devres_free(ptr);
->> +    }
->> +
->> +    return phy;
->> +}
->> +EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index);
->> +
->> +/**
->>    * phy_create() - create a new phy
->>    * @dev: device that is creating the new phy
->>    * @node: device node of the phy
->> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
->> index a0197fa..ae2ffaf 100644
->> --- a/include/linux/phy/phy.h
->> +++ b/include/linux/phy/phy.h
->> @@ -133,6 +133,8 @@ struct phy *devm_phy_get(struct device *dev, const
->> char *string);
->>   struct phy *devm_phy_optional_get(struct device *dev, const char
->> *string);
->>   struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
->>                   const char *con_id);
->> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct
->> device_node *np,
->> +                     int index);
->
-> Add stubs for this function too. Also update the Documentation/phy.txt.
->
-Kishon, I have added stubs for this function in my next patch set. 
-However I am still unclear on whether I need to make GENERIC_PHY an 
-invisible option or change my "select" to "depend" ? It seems like there 
-was no consensus on this? Do you have any final thoughts before i send 
-out the next patch set? Thanks
+This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
+and return probes(kretprobes) support for ARM64.
 
-> Thanks
-> Kishon
+The kprobes mechanism makes use of software breakpoint and single stepping
+support available in the ARM v8 kernel.
+
+Changes since v2 include:
+
+1) Removal of NOP padding in kprobe XOL slots. Slots are now exactly one
+instruction long.
+2) Disabling of interrupts during execution in single-step mode.
+3) Fixing of numerous problems in instruction simulation code (mostly
+thanks to Will Cohen).
+4) Support for the HAVE_REGS_AND_STACK_ACCESS_API feature is added, to allow
+access to kprobes through debugfs.
+5) kprobes is *not* enabled in defconfig.
+6) Numerous complaints from checkpatch have been cleaned up, although a couple
+remain as removing the function pointer typedefs results in ugly code.
+
+Changes since v3 include:
+
+1) Remove table-driven instruction parsing and replace with an if statement
+calling out to old and new instruction test functions in insn.c.
+2) I removed the addition of orig_x0 to ptrace.h.
+3) Reorder the patches.
+4) Replace the previous interrupt disabling (from Will Cohen) with
+an improved solution (from Steve Capper).
+
+Changes since v4 include:
+
+1) Added insn.c functions to detect exception instructions and DAIF
+   read/write instructions, and use them to reject probing same.
+2) Changed adr detect function to also recognize adrp. Reject both.
+3) Added missing __kprobes for some new functions.
+4) Added call to kprobes_fault_handler from mm do_page_fault.
+5) Reject all non-simulated branch/ret instructions, not just those
+   that use an immediate offset.
+6) Moved software breakpoint definitions into debug-monitors.h.
+7) Removed "!XIP_KERNEL" from Kconfig.
+8) changed kprobes_condition_check_t and kprobes_prepare_t to probes_*,
+   for future sharing with uprobes.
+9) Removed bogus call to kprobes_restore_local_irqflag() from 
+   trampoline_probe_handler().
+
+Changes since v5 include:
+
+1) Replaced installation of breakpoint hook with direct call from the
+handlers in debug-monitors.c, as requested.
+2) Reject probing of instructions that read the interrupt mask, in
+addition to instructions that set it.
+3) Cleaned up comments describing usage of Debug Mask.
+4) Added KPROBE_REENTER case in reenter_kprobe.
+5) Corrected the ifdef'd definitions for notify_page_fault() to be
+consistent when KPROBES is not configed.
+6) Changed "cpsr" to "pstate" for HAVE_REGS_AND_STACK_ACCESS_API feature.
+7) Added back in missing new files in previous patch.
+8) Changed two instances of pr_warning() to pr_warn().
+
+Note that there seems to be at least a potential issue with kprobes
+on multiple (possibly all) platforms having to do with use of kfree
+inside of the kretprobes trampoline handler.  This has manifested
+occasionally in systemtap testing on arm64.  There does not appear to
+be an simple solution to the problem.
+
+David A. Long (2):
+  arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+  arm64: Add more test functions to insn.c
+
+Sandeepa Prabhu (4):
+  arm64: Kprobes with single stepping support
+  arm64: kprobes instruction simulation support
+  arm64: Add kernel return probes support (kretprobes)
+  kprobes: Add arm64 case in kprobe example module
+
+ arch/arm64/Kconfig                       |   3 +
+ arch/arm64/include/asm/debug-monitors.h  |   5 +
+ arch/arm64/include/asm/insn.h            |  18 +
+ arch/arm64/include/asm/kprobes.h         |  63 +++
+ arch/arm64/include/asm/probes.h          |  50 +++
+ arch/arm64/include/asm/ptrace.h          |  32 +-
+ arch/arm64/include/uapi/asm/ptrace.h     |  36 ++
+ arch/arm64/kernel/Makefile               |   3 +
+ arch/arm64/kernel/debug-monitors.c       |  35 +-
+ arch/arm64/kernel/insn.c                 |  28 ++
+ arch/arm64/kernel/kprobes-arm64.c        | 166 ++++++++
+ arch/arm64/kernel/kprobes-arm64.h        |  30 ++
+ arch/arm64/kernel/kprobes.c              | 676 +++++++++++++++++++++++++++++++
+ arch/arm64/kernel/kprobes.h              |  24 ++
+ arch/arm64/kernel/probes-condn-check.c   | 122 ++++++
+ arch/arm64/kernel/probes-simulate-insn.c | 174 ++++++++
+ arch/arm64/kernel/probes-simulate-insn.h |  33 ++
+ arch/arm64/kernel/ptrace.c               | 116 ++++++
+ arch/arm64/kernel/vmlinux.lds.S          |   1 +
+ arch/arm64/mm/fault.c                    |  25 ++
+ samples/kprobes/kprobe_example.c         |   8 +
+ 21 files changed, 1637 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kprobes.h
+ create mode 100644 arch/arm64/include/asm/probes.h
+ create mode 100644 arch/arm64/kernel/kprobes-arm64.c
+ create mode 100644 arch/arm64/kernel/kprobes-arm64.h
+ create mode 100644 arch/arm64/kernel/kprobes.c
+ create mode 100644 arch/arm64/kernel/kprobes.h
+ create mode 100644 arch/arm64/kernel/probes-condn-check.c
+ create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
+ create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
+
+-- 
+1.8.1.2
