@@ -1,121 +1,122 @@
 From: dave.long@linaro.org (David Long)
-Date: Mon, 20 Apr 2015 16:19:41 -0400
-Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
-Message-ID: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+Date: Mon, 20 Apr 2015 16:19:43 -0400
+Subject: [PATCH v6 2/6] arm64: Add more test functions to insn.c
+In-Reply-To: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+Message-ID: <1429561187-3661-3-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
-first seen in October 2013. This version attempts to address concerns raised by
-reviewers and also fixes problems discovered during testing.
+Certain instructions are hard to execute correctly out-of-line (as in
+kprobes).  Test functions are added to insn.[hc] to identify these.  The
+instructions include any that use PC-relative addressing, change the PC,
+or change interrupt masking. For efficiency and simplicity test
+functions are also added for small collections of related instructions.
 
-This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
-and return probes(kretprobes) support for ARM64.
+Signed-off-by: David A. Long <dave.long@linaro.org>
+---
+ arch/arm64/include/asm/insn.h | 18 ++++++++++++++++++
+ arch/arm64/kernel/insn.c      | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+)
 
-The kprobes mechanism makes use of software breakpoint and single stepping
-support available in the ARM v8 kernel.
-
-Changes since v2 include:
-
-1) Removal of NOP padding in kprobe XOL slots. Slots are now exactly one
-instruction long.
-2) Disabling of interrupts during execution in single-step mode.
-3) Fixing of numerous problems in instruction simulation code (mostly
-thanks to Will Cohen).
-4) Support for the HAVE_REGS_AND_STACK_ACCESS_API feature is added, to allow
-access to kprobes through debugfs.
-5) kprobes is *not* enabled in defconfig.
-6) Numerous complaints from checkpatch have been cleaned up, although a couple
-remain as removing the function pointer typedefs results in ugly code.
-
-Changes since v3 include:
-
-1) Remove table-driven instruction parsing and replace with an if statement
-calling out to old and new instruction test functions in insn.c.
-2) I removed the addition of orig_x0 to ptrace.h.
-3) Reorder the patches.
-4) Replace the previous interrupt disabling (from Will Cohen) with
-an improved solution (from Steve Capper).
-
-Changes since v4 include:
-
-1) Added insn.c functions to detect exception instructions and DAIF
-   read/write instructions, and use them to reject probing same.
-2) Changed adr detect function to also recognize adrp. Reject both.
-3) Added missing __kprobes for some new functions.
-4) Added call to kprobes_fault_handler from mm do_page_fault.
-5) Reject all non-simulated branch/ret instructions, not just those
-   that use an immediate offset.
-6) Moved software breakpoint definitions into debug-monitors.h.
-7) Removed "!XIP_KERNEL" from Kconfig.
-8) changed kprobes_condition_check_t and kprobes_prepare_t to probes_*,
-   for future sharing with uprobes.
-9) Removed bogus call to kprobes_restore_local_irqflag() from 
-   trampoline_probe_handler().
-
-Changes since v5 include:
-
-1) Replaced installation of breakpoint hook with direct call from the
-handlers in debug-monitors.c, as requested.
-2) Reject probing of instructions that read the interrupt mask, in
-addition to instructions that set it.
-3) Cleaned up comments describing usage of Debug Mask.
-4) Added KPROBE_REENTER case in reenter_kprobe.
-5) Corrected the ifdef'd definitions for notify_page_fault() to be
-consistent when KPROBES is not configed.
-6) Changed "cpsr" to "pstate" for HAVE_REGS_AND_STACK_ACCESS_API feature.
-7) Added back in missing new files in previous patch.
-8) Changed two instances of pr_warning() to pr_warn().
-
-Note that there seems to be at least a potential issue with kprobes
-on multiple (possibly all) platforms having to do with use of kfree
-inside of the kretprobes trampoline handler.  This has manifested
-occasionally in systemtap testing on arm64.  There does not appear to
-be an simple solution to the problem.
-
-David A. Long (2):
-  arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-  arm64: Add more test functions to insn.c
-
-Sandeepa Prabhu (4):
-  arm64: Kprobes with single stepping support
-  arm64: kprobes instruction simulation support
-  arm64: Add kernel return probes support (kretprobes)
-  kprobes: Add arm64 case in kprobe example module
-
- arch/arm64/Kconfig                       |   3 +
- arch/arm64/include/asm/debug-monitors.h  |   5 +
- arch/arm64/include/asm/insn.h            |  18 +
- arch/arm64/include/asm/kprobes.h         |  63 +++
- arch/arm64/include/asm/probes.h          |  50 +++
- arch/arm64/include/asm/ptrace.h          |  32 +-
- arch/arm64/include/uapi/asm/ptrace.h     |  36 ++
- arch/arm64/kernel/Makefile               |   3 +
- arch/arm64/kernel/debug-monitors.c       |  35 +-
- arch/arm64/kernel/insn.c                 |  28 ++
- arch/arm64/kernel/kprobes-arm64.c        | 166 ++++++++
- arch/arm64/kernel/kprobes-arm64.h        |  30 ++
- arch/arm64/kernel/kprobes.c              | 676 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/kprobes.h              |  24 ++
- arch/arm64/kernel/probes-condn-check.c   | 122 ++++++
- arch/arm64/kernel/probes-simulate-insn.c | 174 ++++++++
- arch/arm64/kernel/probes-simulate-insn.h |  33 ++
- arch/arm64/kernel/ptrace.c               | 116 ++++++
- arch/arm64/kernel/vmlinux.lds.S          |   1 +
- arch/arm64/mm/fault.c                    |  25 ++
- samples/kprobes/kprobe_example.c         |   8 +
- 21 files changed, 1637 insertions(+), 11 deletions(-)
- create mode 100644 arch/arm64/include/asm/kprobes.h
- create mode 100644 arch/arm64/include/asm/probes.h
- create mode 100644 arch/arm64/kernel/kprobes-arm64.c
- create mode 100644 arch/arm64/kernel/kprobes-arm64.h
- create mode 100644 arch/arm64/kernel/kprobes.c
- create mode 100644 arch/arm64/kernel/kprobes.h
- create mode 100644 arch/arm64/kernel/probes-condn-check.c
- create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
- create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
-
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index d2f4942..0626404 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -223,8 +223,13 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+ { return (val); }
+ 
++__AARCH64_INSN_FUNCS(adr_adrp,	0x1F000000, 0x10000000)
++__AARCH64_INSN_FUNCS(prfm_lit,	0xFF000000, 0xD8000000)
+ __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
+ __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
++__AARCH64_INSN_FUNCS(ldr_lit,	0xBF000000, 0x18000000)
++__AARCH64_INSN_FUNCS(ldrsw_lit,	0xFF000000, 0x98000000)
++__AARCH64_INSN_FUNCS(exclusive,	0x3F000000, 0x08000000)
+ __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
+ __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
+ __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
+@@ -264,19 +269,29 @@ __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
+ __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
+ __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
+ __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
++__AARCH64_INSN_FUNCS(b_bl,	0x7C000000, 0x14000000)
++__AARCH64_INSN_FUNCS(cb,	0x7E000000, 0x34000000)
+ __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
+ __AARCH64_INSN_FUNCS(cbnz,	0x7F000000, 0x35000000)
++__AARCH64_INSN_FUNCS(tb,	0x7E000000, 0x36000000)
+ __AARCH64_INSN_FUNCS(tbz,	0x7F000000, 0x36000000)
+ __AARCH64_INSN_FUNCS(tbnz,	0x7F000000, 0x37000000)
++__AARCH64_INSN_FUNCS(b_bl_cb_tb, 0x5C000000, 0x14000000)
+ __AARCH64_INSN_FUNCS(bcond,	0xFF000010, 0x54000000)
+ __AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
+ __AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
+ __AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
+ __AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
++__AARCH64_INSN_FUNCS(exception,	0xFF000000, 0xD4000000)
+ __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
+ __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
+ __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
++__AARCH64_INSN_FUNCS(br_blr,	0xFFDFFC1F, 0xD61F0000)
+ __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
++__AARCH64_INSN_FUNCS(msr_imm,	0xFFF8F000, 0xD5004000)
++__AARCH64_INSN_FUNCS(msr_reg,	0xFFF00000, 0xD5100000)
++__AARCH64_INSN_FUNCS(set_clr_daif, 0xFFFFF0DF, 0xD50340DF)
++__AARCH64_INSN_FUNCS(rd_wr_daif, 0xFFDFFFE0, 0xD51B4220)
+ 
+ #undef	__AARCH64_INSN_FUNCS
+ 
+@@ -285,6 +300,9 @@ bool aarch64_insn_is_nop(u32 insn);
+ int aarch64_insn_read(void *addr, u32 *insnp);
+ int aarch64_insn_write(void *addr, u32 insn);
+ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
++bool aarch64_insn_uses_literal(u32 insn);
++bool aarch64_insn_is_branch(u32 insn);
++bool aarch64_insn_is_daif_access(u32 insn);
+ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 				  u32 insn, u64 imm);
+ u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index c8eca88..cda1b3b 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -155,6 +155,34 @@ static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
+ 		aarch64_insn_is_nop(insn);
+ }
+ 
++bool __kprobes aarch64_insn_uses_literal(u32 insn)
++{
++	/* ldr/ldrsw (literal), prfm */
++
++	return aarch64_insn_is_ldr_lit(insn) ||
++		aarch64_insn_is_ldrsw_lit(insn) ||
++		aarch64_insn_is_adr_adrp(insn) ||
++		aarch64_insn_is_prfm_lit(insn);
++}
++
++bool __kprobes aarch64_insn_is_branch(u32 insn)
++{
++	/* b, bl, cb*, tb*, b.cond, br, blr */
++
++	return aarch64_insn_is_b_bl_cb_tb(insn) ||
++		aarch64_insn_is_br_blr(insn) ||
++		aarch64_insn_is_ret(insn) ||
++		aarch64_insn_is_bcond(insn);
++}
++
++bool __kprobes aarch64_insn_is_daif_access(u32 insn)
++{
++	/* msr daif, mrs daif, msr daifset, msr daifclr */
++
++	return aarch64_insn_is_rd_wr_daif(insn) ||
++		aarch64_insn_is_set_clr_daif(insn);
++}
++
+ /*
+  * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
+  * Section B2.6.5 "Concurrent modification and execution of instructions":
 -- 
 1.8.1.2
