@@ -1,41 +1,37 @@
 From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Mon, 20 Apr 2015 10:45:36 +0300
-Subject: [PATCH v2 2/7] ARM: dts: qcom: Add PM8941 functions device nodes
+Date: Mon, 20 Apr 2015 10:45:37 +0300
+Subject: [PATCH v2 3/7] ARM: dts: qcom: Add PMA8084 functions device nodes
 In-Reply-To: <1429515941-15334-1-git-send-email-ivan.ivanov@linaro.org>
 References: <1429515941-15334-1-git-send-email-ivan.ivanov@linaro.org>
-Message-ID: <1429515941-15334-3-git-send-email-ivan.ivanov@linaro.org>
+Message-ID: <1429515941-15334-4-git-send-email-ivan.ivanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add configuration nodes for following devices:
 
-* GPIO block, with 36 pins
+* GPIO block, with 22 pins
 * MPP block, with 8 pins
-* Current ADC (IADC)
 * Volatage ADC (VADC), with multiple inputs
 * Thermal sensor device, which is using on chip VADC
-  channel report PMIC die temperature
-* Power key device, which is responsible for clean system
-  reboot or shutdown
-* White LED device
+  channel report PMIC die temperature.
 * RTC device
 
 Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
 ---
- arch/arm/boot/dts/qcom-pm8941.dtsi | 133 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 132 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/qcom-pma8084.dtsi | 92 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-pm8941.dtsi b/arch/arm/boot/dts/qcom-pm8941.dtsi
-index 24c5088..aa774e6 100644
---- a/arch/arm/boot/dts/qcom-pm8941.dtsi
-+++ b/arch/arm/boot/dts/qcom-pm8941.dtsi
+diff --git a/arch/arm/boot/dts/qcom-pma8084.dtsi b/arch/arm/boot/dts/qcom-pma8084.dtsi
+index a5a4fe6..5e240cc 100644
+--- a/arch/arm/boot/dts/qcom-pma8084.dtsi
++++ b/arch/arm/boot/dts/qcom-pma8084.dtsi
 @@ -1,3 +1,5 @@
 +#include <dt-bindings/iio/qcom,spmi-vadc.h>
 +#include <dt-bindings/interrupt-controller/irq.h>
  #include <dt-bindings/spmi/spmi.h>
 
  &spmi_bus {
-@@ -7,12 +9,141 @@
+@@ -7,6 +9,96 @@
  		reg = <0x0 SPMI_USID>;
  		#address-cells = <1>;
  		#size-cells = <0>;
@@ -48,17 +44,9 @@ index 24c5088..aa774e6 100644
 +			interrupts = <0x0 0x61 0x1 IRQ_TYPE_EDGE_RISING>;
 +		};
 +
-+		pwrkey at 800 {
-+			compatible = "qcom,pm8941-pwrkey";
-+			reg = <0x800 0x100>;
-+			interrupts = <0x0 0x8 0 IRQ_TYPE_EDGE_BOTH>;
-+			debounce = <15625>;
-+			bias-pull-up;
-+		};
-+
-+		pm8941_gpios: gpios at c000 {
-+			compatible = "qcom,pm8941-gpio";
-+			reg = <0xc000 0x2400>;
++		pma8084_gpios: gpios at c000 {
++			compatible = "qcom,pma8084-gpio";
++			reg = <0xc000 0x1600>;
 +			gpio-controller;
 +			#gpio-cells = <2>;
 +			interrupts = <0 0xc0 0 IRQ_TYPE_NONE>,
@@ -82,25 +70,11 @@ index 24c5088..aa774e6 100644
 +				     <0 0xd2 0 IRQ_TYPE_NONE>,
 +				     <0 0xd3 0 IRQ_TYPE_NONE>,
 +				     <0 0xd4 0 IRQ_TYPE_NONE>,
-+				     <0 0xd5 0 IRQ_TYPE_NONE>,
-+				     <0 0xd6 0 IRQ_TYPE_NONE>,
-+				     <0 0xd7 0 IRQ_TYPE_NONE>,
-+				     <0 0xd8 0 IRQ_TYPE_NONE>,
-+				     <0 0xd9 0 IRQ_TYPE_NONE>,
-+				     <0 0xda 0 IRQ_TYPE_NONE>,
-+				     <0 0xdb 0 IRQ_TYPE_NONE>,
-+				     <0 0xdc 0 IRQ_TYPE_NONE>,
-+				     <0 0xdd 0 IRQ_TYPE_NONE>,
-+				     <0 0xde 0 IRQ_TYPE_NONE>,
-+				     <0 0xdf 0 IRQ_TYPE_NONE>,
-+				     <0 0xe0 0 IRQ_TYPE_NONE>,
-+				     <0 0xe1 0 IRQ_TYPE_NONE>,
-+				     <0 0xe2 0 IRQ_TYPE_NONE>,
-+				     <0 0xe3 0 IRQ_TYPE_NONE>;
++				     <0 0xd5 0 IRQ_TYPE_NONE>;
 +		};
 +
-+		pm8941_mpps: mpps at a000 {
-+			compatible = "qcom,pm8941-mpp";
++		pma8084_mpps: mpps at a000 {
++			compatible = "qcom,pma8084-mpp";
 +			reg = <0xa000 0x800>;
 +			gpio-controller;
 +			#gpio-cells = <2>;
@@ -114,22 +88,23 @@ index 24c5088..aa774e6 100644
 +				     <0 0xa7 0 IRQ_TYPE_NONE>;
 +		};
 +
-+		pm8941_temp: temp-alarm at 2400 {
++		pma8084_temp: temp-alarm at 2400 {
 +			compatible = "qcom,spmi-temp-alarm";
 +			reg = <0x2400 0x100>;
 +			interrupts = <0 0x24 0 IRQ_TYPE_EDGE_RISING>;
-+			io-channels = <&pm8941_vadc VADC_DIE_TEMP>;
-+			io-channel-names = "thermal";
 +			#thermal-sensor-cells = <0>;
++			io-channels = <&pma8084_vadc VADC_DIE_TEMP>;
++			io-channel-names = "thermal";
 +		};
 +
-+		pm8941_vadc: vadc at 3100 {
++		pma8084_vadc: vadc at 3100 {
 +			compatible = "qcom,spmi-vadc";
 +			reg = <0x3100 0x100>;
 +			interrupts = <0x0 0x31 0x0 IRQ_TYPE_EDGE_RISING>;
 +			#address-cells = <1>;
 +			#size-cells = <0>;
 +			#io-channel-cells = <1>;
++			io-channel-ranges;
 +
 +			die_temp {
 +				reg = <VADC_DIE_TEMP>;
@@ -140,6 +115,9 @@ index 24c5088..aa774e6 100644
 +			ref_1250v {
 +				reg = <VADC_REF_1250MV>;
 +			};
++			ref_buf_625mv {
++				reg = <VADC_SPARE1>;
++			};
 +			ref_gnd {
 +				reg = <VADC_GND_REF>;
 +			};
@@ -147,36 +125,8 @@ index 24c5088..aa774e6 100644
 +				reg = <VADC_VDD_VADC>;
 +			};
 +		};
-+
-+		pm8941_iadc: iadc at 3600 {
-+			compatible = "qcom,pm8941-iadc", "qcom,spmi-iadc";
-+			reg = <0x3600 0x100>,
-+				  <0x12f1 0x1>;
-+			interrupts = <0x0 0x36 0x0 IRQ_TYPE_EDGE_RISING>;
-+			qcom,external-resistor-micro-ohms = <10000>;
-+		};
  	};
 
- 	usid1: pm8941 at 1 {
--		compatible ="qcom,spmi-pmic";
-+		compatible = "qcom,spmi-pmic";
- 		reg = <0x1 SPMI_USID>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+
-+		wled at d800 {
-+			compatible = "qcom,pm8941-wled";
-+			reg = <0xd800 0x100>;
-+			label = "backlight";
-+
-+			qcom,cs-out;
-+			qcom,current-limit = <20>;
-+			qcom,current-boost-limit = <805>;
-+			qcom,switching-freq = <1600>;
-+			qcom,ovp = <29>;
-+			qcom,num-strings = <2>;
-+		};
- 	};
- };
+ 	usid1: pma8084 at 1 {
 --
 1.9.1
