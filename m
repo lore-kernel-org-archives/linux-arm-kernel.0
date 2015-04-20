@@ -1,63 +1,73 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 20 Apr 2015 16:22:54 -0700
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Mon, 20 Apr 2015 16:34:10 -0700
 Subject: [PATCH v3 6/8] selftest/x86: have no dependency on all when cross
  building
-In-Reply-To: <1429571743-27740-1-git-send-email-tyler.baker@linaro.org>
+In-Reply-To: <CALCETrXAPdrw0uQBpC=ZnHGOFyxOSs_=8+-eP_B050_eu35xhw@mail.gmail.com>
 References: <1429571743-27740-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <CALCETrXAPdrw0uQBpC=ZnHGOFyxOSs_=8+-eP_B050_eu35xhw@mail.gmail.com>
+ <CALCETrXAPdrw0uQBpC=ZnHGOFyxOSs_=8+-eP_B050_eu35xhw@mail.gmail.com>
+Message-ID: <CANMBJr4Y2jVEZ7-fqN2upfBEMqjj9cx61uSLLN7gZvrK602NrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 4:15 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
-> If the CROSS_COMPILE is set remove all's dependency on all_32 and all_64.
+On 20 April 2015 at 16:22, Andy Lutomirski <luto@amacapital.net> wrote:
+> On Mon, Apr 20, 2015 at 4:15 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
+>> If the CROSS_COMPILE is set remove all's dependency on all_32 and all_64.
+>>
+>> Cc: Andy Lutomirski <luto@amacapital.net>
+>> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+>> ---
+>>  tools/testing/selftests/x86/Makefile | 8 +++++++-
+>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/tools/testing/selftests/x86/Makefile b/tools/testing/selftests/x86/Makefile
+>> index be93945..a5ca38b 100644
+>> --- a/tools/testing/selftests/x86/Makefile
+>> +++ b/tools/testing/selftests/x86/Makefile
+>> @@ -7,15 +7,21 @@ BINARIES_64 := $(TARGETS_C_BOTHBITS:%=%_64)
+>>
+>>  CFLAGS := -O2 -g -std=gnu99 -pthread -Wall
+>>
+>> +all:
+>> +
 >
-> Cc: Andy Lutomirski <luto@amacapital.net>
-> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
-> ---
->  tools/testing/selftests/x86/Makefile | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
+> This...
 >
-> diff --git a/tools/testing/selftests/x86/Makefile b/tools/testing/selftests/x86/Makefile
-> index be93945..a5ca38b 100644
-> --- a/tools/testing/selftests/x86/Makefile
-> +++ b/tools/testing/selftests/x86/Makefile
-> @@ -7,15 +7,21 @@ BINARIES_64 := $(TARGETS_C_BOTHBITS:%=%_64)
+>>  UNAME_M := $(shell uname -m)
+>>
+>> +ifeq ($(CROSS_COMPILE),)
+>>  # Always build 32-bit tests
+>>  all: all_32
+>> -
+>>  # If we're on a 64-bit host, build 64-bit tests as well
+>>  ifeq ($(UNAME_M),x86_64)
+>>  all: all_64
+>>  endif
+>> +else
+>> +# No dependency on all when cross building
+>> +all:
 >
->  CFLAGS := -O2 -g -std=gnu99 -pthread -Wall
->
-> +all:
-> +
+> ...is redundant with this.  If you delete the "else" and "all:" here, then:
 
-This...
+Ok, I will remove these bits from this patch. However, the else will
+need to be added back in the next patch of the series to override the
+default behavior of EMIT_TESTS and INSTALL_RULE if that you are ok
+with that.
 
->  UNAME_M := $(shell uname -m)
 >
-> +ifeq ($(CROSS_COMPILE),)
->  # Always build 32-bit tests
->  all: all_32
-> -
->  # If we're on a 64-bit host, build 64-bit tests as well
->  ifeq ($(UNAME_M),x86_64)
->  all: all_64
->  endif
-> +else
-> +# No dependency on all when cross building
-> +all:
-
-...is redundant with this.  If you delete the "else" and "all:" here, then:
-
-Acked-by: Andy Lutomirski <luto@kernel.org>
-
-> +endif
+> Acked-by: Andy Lutomirski <luto@kernel.org>
 >
->  all_32: check_build32 $(BINARIES_32)
+>> +endif
+>>
+>>  all_32: check_build32 $(BINARIES_32)
+>>
+>> --
+>> 2.1.4
+>>
+>
+>
 >
 > --
-> 2.1.4
->
+> Andy Lutomirski
+> AMA Capital Management, LLC
 
-
-
--- 
-Andy Lutomirski
-AMA Capital Management, LLC
+Tyler
