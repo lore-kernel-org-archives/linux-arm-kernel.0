@@ -1,65 +1,49 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Mon, 20 Apr 2015 18:45:53 +0300
-Subject: [PATCH] arm64: Implement 1-,2- byte smp_load_acquire and
- smp_store_release
-Message-ID: <1429544753-4120-1-git-send-email-a.ryabinin@samsung.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Mon, 20 Apr 2015 10:42:52 -0500
+Subject: [PATCH RESEND 2/2] ARM: socfpga: remove the need to map uart_io_desc
+In-Reply-To: <1429544572-22421-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1429544572-22421-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1429544572-22421-2-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 47933ad41a86 ("arch: Introduce smp_load_acquire(), smp_store_release()")
-allowed only 4- and 8-byte smp_load_acquire, smp_store_release.
-So 1- and 2-byte cases weren't implemented in arm64.
-Later commit 536fa402221f ("compiler: Allow 1- and 2-byte smp_load_acquire()
-				and smp_store_release()")
-allowed to use 1 and 2 byte smp_load_acquire and smp_store_release
-by adjusting the definition of __native_word().
-However, 1-,2- byte cases in arm64 version left unimplemented.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Commit 8053871d0f7f ("smp: Fix smp_call_function_single_async() locking")
-started to use smp_load_acquire() to load 2-bytes csd->flags.
-That crashes arm64 kernel during the boot.
+All the necessary debug uart mapping is already being done in
+debug_ll_io_init, there's no need for it here.
 
-Implement 1,2 byte cases in arm64's  smp_load_acquire()
-and smp_store_release() to fix this.
-
-Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm64/include/asm/barrier.h | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/mach-socfpga/socfpga.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index a5abb00..71f19c4 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -65,6 +65,14 @@ do {									\
- do {									\
- 	compiletime_assert_atomic_type(*p);				\
- 	switch (sizeof(*p)) {						\
-+	case 1:								\
-+		asm volatile ("stlrb %w1, %0"				\
-+				: "=Q" (*p) : "r" (v) : "memory");	\
-+		break;							\
-+	case 2:								\
-+		asm volatile ("stlrh %w1, %0"				\
-+				: "=Q" (*p) : "r" (v) : "memory");	\
-+		break;							\
- 	case 4:								\
- 		asm volatile ("stlr %w1, %0"				\
- 				: "=Q" (*p) : "r" (v) : "memory");	\
-@@ -81,6 +89,14 @@ do {									\
- 	typeof(*p) ___p1;						\
- 	compiletime_assert_atomic_type(*p);				\
- 	switch (sizeof(*p)) {						\
-+	case 1:								\
-+		asm volatile ("ldarb %w0, %1"				\
-+			: "=r" (___p1) : "Q" (*p) : "memory");		\
-+		break;							\
-+	case 2:								\
-+		asm volatile ("ldarh %w0, %1"				\
-+			: "=r" (___p1) : "Q" (*p) : "memory");		\
-+		break;							\
- 	case 4:								\
- 		asm volatile ("ldar %w0, %1"				\
- 			: "=r" (___p1) : "Q" (*p) : "memory");		\
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index f5e597c..358f2c7 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -39,13 +39,6 @@ static struct map_desc scu_io_desc __initdata = {
+ 	.type		= MT_DEVICE,
+ };
+ 
+-static struct map_desc uart_io_desc __initdata = {
+-	.virtual	= 0xfec02000,
+-	.pfn		= __phys_to_pfn(0xffc02000),
+-	.length		= SZ_8K,
+-	.type		= MT_DEVICE,
+-};
+-
+ static void __init socfpga_scu_map_io(void)
+ {
+ 	unsigned long base;
+@@ -60,8 +53,6 @@ static void __init socfpga_scu_map_io(void)
+ static void __init socfpga_map_io(void)
+ {
+ 	socfpga_scu_map_io();
+-	iotable_init(&uart_io_desc, 1);
+-	early_printk("Early printk initialized\n");
+ }
+ 
+ void __init socfpga_sysmgr_init(void)
 -- 
-2.3.5
+2.2.1
