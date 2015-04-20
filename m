@@ -1,31 +1,53 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Mon, 20 Apr 2015 16:16:19 -0700
-Subject: [PATCH v3 8/8] selftests/exec: do not install subdir as it is already
- created
-Message-ID: <1429571779-28293-1-git-send-email-tyler.baker@linaro.org>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Mon, 20 Apr 2015 16:21:54 -0700
+Subject: [PATCH v3 5/8] selftest/x86: build both bitnesses
+In-Reply-To: <1429571717-27338-1-git-send-email-tyler.baker@linaro.org>
+References: <1429571717-27338-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <CALCETrX7x8k35Hza04dzSRguWSAFp0XGu__USZM5off1=Y9_wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove subdir from DEPS as it is already created at runtime. Without this,
-make install fails.
+On Mon, Apr 20, 2015 at 4:15 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
+> Using uname with the processor flag option in some cases can yield 'unknown'
+> so lets use the machine flag option as it is deterministic. Add a dependency
+> for all_32 when building on a x86 64 bit host so that both bitnesses are
+> built in this case.
+>
 
-Acked-by: Michael Ellerman <mpe@ellerman.id.au>
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
----
- tools/testing/selftests/exec/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Andy Lutomirski <luto@kernel.org>
 
-diff --git a/tools/testing/selftests/exec/Makefile b/tools/testing/selftests/exec/Makefile
-index 4edb7d0..6b76bfd 100644
---- a/tools/testing/selftests/exec/Makefile
-+++ b/tools/testing/selftests/exec/Makefile
-@@ -1,6 +1,6 @@
- CFLAGS = -Wall
- BINARIES = execveat
--DEPS = execveat.symlink execveat.denatured script subdir
-+DEPS = execveat.symlink execveat.denatured script
- all: $(BINARIES) $(DEPS)
- 
- subdir:
+> Cc: Andy Lutomirski <luto@amacapital.net>
+> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> ---
+>  tools/testing/selftests/x86/Makefile | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/tools/testing/selftests/x86/Makefile b/tools/testing/selftests/x86/Makefile
+> index ddf6356..be93945 100644
+> --- a/tools/testing/selftests/x86/Makefile
+> +++ b/tools/testing/selftests/x86/Makefile
+> @@ -7,13 +7,13 @@ BINARIES_64 := $(TARGETS_C_BOTHBITS:%=%_64)
+>
+>  CFLAGS := -O2 -g -std=gnu99 -pthread -Wall
+>
+> -UNAME_P := $(shell uname -p)
+> +UNAME_M := $(shell uname -m)
+>
+>  # Always build 32-bit tests
+>  all: all_32
+>
+>  # If we're on a 64-bit host, build 64-bit tests as well
+> -ifeq ($(shell uname -p),x86_64)
+> +ifeq ($(UNAME_M),x86_64)
+>  all: all_64
+>  endif
+>
+> --
+> 2.1.4
+>
+
+
+
 -- 
-2.1.4
+Andy Lutomirski
+AMA Capital Management, LLC
