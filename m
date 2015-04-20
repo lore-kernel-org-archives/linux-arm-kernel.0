@@ -1,279 +1,275 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Apr 2015 10:24:35 +0100
-Subject: [PATCH] arm64: kill flush_cache_all()
-Message-ID: <1429521875-16893-1-git-send-email-mark.rutland@arm.com>
+From: pi-cheng.chen@linaro.org (pi-cheng.chen)
+Date: Mon, 20 Apr 2015 17:25:50 +0800
+Subject: [PATCH v2] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+Message-ID: <1429521950-16431-1-git-send-email-pi-cheng.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The documented semantics of flush_cache_all are not possible to provide
-for arm64 (short of flushing the entire physical address space by VA),
-and there are currently no users; KVM uses VA maintenance exclusively,
-cpu_reset is never called, and the only two users outside of arch code
-cannot be built for arm64.
+This patch adds CPU mux clocks which are used by Mediatek cpufreq driver for
+intermediate clock source switching. It is based on v11 of common clock support
+for Mediatek MT8135 and MT8173[1]
 
-While cpu_soft_reset and related functions (which call flush_cache_all)
-were thought to be useful for kexec, their current implementations only
-serve to mask bugs. For correctness kexec will need to perform
-maintenance by VA anyway to account for system caches, line migration,
-and other subtleties of the cache architecture. As the extent of this
-cache maintenance will be kexec-specific, it should probably live in the
-kexec code.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/335967.html
 
-This patch removes flush_cache_all, and related unused components,
-preventing further abuse.
+Changes in v2:
+- Remove use of .determine_rate callback
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Geoff Levand <geoff@infradead.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
 ---
- arch/arm64/include/asm/cacheflush.h  |  5 ---
- arch/arm64/include/asm/proc-fns.h    |  4 --
- arch/arm64/include/asm/system_misc.h |  1 -
- arch/arm64/kernel/process.c          | 12 +-----
- arch/arm64/mm/cache.S                | 73 ------------------------------------
- arch/arm64/mm/flush.c                |  1 -
- arch/arm64/mm/proc.S                 | 46 -----------------------
- 7 files changed, 1 insertion(+), 141 deletions(-)
+ drivers/clk/mediatek/Makefile          |   2 +-
+ drivers/clk/mediatek/clk-cpumux.c      | 122 +++++++++++++++++++++++++++++++++
+ drivers/clk/mediatek/clk-cpumux.h      |  31 +++++++++
+ drivers/clk/mediatek/clk-mt8173.c      |  23 +++++++
+ include/dt-bindings/clock/mt8173-clk.h |   4 +-
+ 5 files changed, 180 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clk/mediatek/clk-cpumux.c
+ create mode 100644 drivers/clk/mediatek/clk-cpumux.h
 
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index 67d309c..c75b8d0 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -40,10 +40,6 @@
-  *	the implementation assumes non-aliasing VIPT D-cache and (aliasing)
-  *	VIPT or ASID-tagged VIVT I-cache.
-  *
-- *	flush_cache_all()
-- *
-- *		Unconditionally clean and invalidate the entire cache.
-- *
-  *	flush_cache_mm(mm)
-  *
-  *		Clean and invalidate all user space cache entries
-@@ -69,7 +65,6 @@
-  *		- kaddr  - page address
-  *		- size   - region size
-  */
--extern void flush_cache_all(void);
- extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
- extern void flush_icache_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 4d9ede7..06732c8 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -28,12 +28,8 @@
- struct mm_struct;
- struct cpu_suspend_ctx;
+diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+index 8e4b2a4..299917a 100644
+--- a/drivers/clk/mediatek/Makefile
++++ b/drivers/clk/mediatek/Makefile
+@@ -1,4 +1,4 @@
+-obj-y += clk-mtk.o clk-pll.o clk-gate.o
++obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-cpumux.o
+ obj-$(CONFIG_RESET_CONTROLLER) += reset.o
+ obj-y += clk-mt8135.o
+ obj-y += clk-mt8173.o
+diff --git a/drivers/clk/mediatek/clk-cpumux.c b/drivers/clk/mediatek/clk-cpumux.c
+new file mode 100644
+index 0000000..dc14074
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-cpumux.c
+@@ -0,0 +1,122 @@
++/*
++ * Copyright (c) 2015 Linaro Ltd.
++ * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/mfd/syscon.h>
++#include <linux/slab.h>
++
++#include "clk-mtk.h"
++#include "clk-cpumux.h"
++
++static inline struct mtk_clk_cpumux *to_clk_mux(struct clk_hw *_hw)
++{
++	return container_of(_hw, struct mtk_clk_cpumux, hw);
++}
++
++static u8 clk_cpumux_get_parent(struct clk_hw *hw)
++{
++	struct mtk_clk_cpumux *mux = to_clk_mux(hw);
++	int num_parents = __clk_get_num_parents(hw->clk);
++	u32 val;
++
++	regmap_read(mux->regmap, mux->reg, &val);
++
++	val >>= mux->shift;
++	val &= mux->mask;
++
++	if (val >= num_parents)
++		return -EINVAL;
++
++	return val;
++}
++
++static int clk_cpumux_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct mtk_clk_cpumux *mux = to_clk_mux(hw);
++	u32 mask, val;
++
++	val = index << mux->shift;
++	mask = mux->mask << mux->shift;
++
++	return regmap_update_bits(mux->regmap, mux->reg, mask, val);
++}
++
++static struct clk_ops clk_cpumux_ops = {
++	.get_parent = clk_cpumux_get_parent,
++	.set_parent = clk_cpumux_set_parent,
++};
++
++static struct clk *mtk_clk_register_cpumux(const struct mtk_composite *mux,
++					   struct regmap *regmap)
++{
++	struct mtk_clk_cpumux *cpumux;
++	struct clk *clk;
++	struct clk_init_data init;
++
++	cpumux = kzalloc(sizeof(*cpumux), GFP_KERNEL);
++	if (!cpumux)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = mux->name;
++	init.ops = &clk_cpumux_ops;
++	init.parent_names = mux->parent_names;
++	init.num_parents = mux->num_parents;
++
++	cpumux->reg = mux->mux_reg;
++	cpumux->shift = mux->mux_shift;
++	cpumux->mask = (BIT(mux->mux_width) - 1);
++	cpumux->regmap = regmap;
++	cpumux->hw.init = &init;
++
++	clk = clk_register(NULL, &cpumux->hw);
++	if (IS_ERR(clk))
++		kfree(cpumux);
++
++	return clk;
++}
++
++int mtk_clk_register_cpumuxes(struct device_node *node,
++			      const struct mtk_composite *clks, int num,
++			      struct clk_onecell_data *clk_data)
++{
++	int i;
++	struct clk *clk;
++	struct regmap *regmap;
++
++	if (!clk_data)
++		return -ENOMEM;
++
++	regmap = syscon_node_to_regmap(node);
++	if (IS_ERR(regmap)) {
++		pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
++		       PTR_ERR(regmap));
++		return PTR_ERR(regmap);
++	}
++
++	for (i = 0; i < num; i++) {
++		const struct mtk_composite *mux = &clks[i];
++
++		clk = mtk_clk_register_cpumux(mux, regmap);
++		if (IS_ERR(clk)) {
++			pr_err("Failed to register clk %s: %ld\n",
++			       mux->name, PTR_ERR(clk));
++			continue;
++		}
++
++		clk_data->clks[mux->id] = clk;
++	}
++
++	return 0;
++}
+diff --git a/drivers/clk/mediatek/clk-cpumux.h b/drivers/clk/mediatek/clk-cpumux.h
+new file mode 100644
+index 0000000..b82ad20
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-cpumux.h
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (c) 2015 Linaro Ltd.
++ * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __DRV_CLK_CPUMUX_H
++#define __DRV_CLK_CPUMUX_H
++
++#include <linux/regmap.h>
++
++struct mtk_clk_cpumux {
++	struct clk_hw	hw;
++	struct regmap	*regmap;
++	u32		reg;
++	u32		mask;
++	u8		shift;
++};
++
++int mtk_clk_register_cpumuxes(struct device_node *node,
++			      const struct mtk_composite *clks, int num,
++			      struct clk_onecell_data *clk_data);
++#endif /* __DRV_CLK_CPUMUX_H */
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 0584554..745f9d9 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -19,6 +19,7 @@
  
--extern void cpu_cache_off(void);
- extern void cpu_do_idle(void);
- extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
--extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
--void cpu_soft_restart(phys_addr_t cpu_reset,
--		unsigned long addr) __attribute__((noreturn));
- extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
- extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+ #include "clk-mtk.h"
+ #include "clk-gate.h"
++#include "clk-cpumux.h"
  
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index 7a18fab..659fbf5 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -41,7 +41,6 @@ struct mm_struct;
- extern void show_pte(struct mm_struct *mm, unsigned long addr);
- extern void __show_regs(struct pt_regs *);
+ #include <dt-bindings/clock/mt8173-clk.h>
  
--void soft_restart(unsigned long);
- extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+@@ -517,6 +518,20 @@ static const char * const i2s3_b_ck_parents[] __initconst = {
+ 	"apll2_div5"
+ };
  
- #define UDBG_UNDEFINED	(1 << 0)
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index c6b1f3b9..c506bee 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -58,14 +58,6 @@ unsigned long __stack_chk_guard __read_mostly;
- EXPORT_SYMBOL(__stack_chk_guard);
- #endif
++static const char * const ca53_parents[] __initconst = {
++	"clk26m",
++	"armca7pll",
++	"mainpll",
++	"univpll"
++};
++
++static const char * const ca57_parents[] __initconst = {
++	"clk26m",
++	"armca15pll",
++	"mainpll",
++	"univpll"
++};
++
+ static const struct mtk_composite top_muxes[] __initconst = {
+ 	/* CLK_CFG_0 */
+ 	MUX(TOP_AXI_SEL, "axi_sel", axi_parents, 0x0040, 0, 3),
+@@ -589,6 +604,11 @@ static const struct mtk_composite top_muxes[] __initconst = {
+ 	MUX(TOP_I2S3_B_CK_SEL, "i2s3_b_ck_sel", i2s3_b_ck_parents, 0x120, 8, 1),
+ };
  
--void soft_restart(unsigned long addr)
--{
--	setup_mm_for_reboot();
--	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
--	/* Should never get here */
--	BUG();
--}
--
- /*
-  * Function pointers to optional machine specific functions
-  */
-@@ -136,9 +128,7 @@ void machine_power_off(void)
++static const struct mtk_composite cpu_muxes[] __initconst = {
++	MUX(INFRA_CA53SEL, "infra_ca53_sel", ca53_parents, 0x0000, 0, 2),
++	MUX(INFRA_CA57SEL, "infra_ca57_sel", ca57_parents, 0x0000, 2, 2),
++};
++
+ static void __init mtk_init_clk_topckgen(void __iomem *top_base,
+ 		struct clk_onecell_data *clk_data)
+ {
+@@ -745,6 +765,9 @@ static void __init mtk_infrasys_init(struct device_node *node)
+ 	mtk_clk_register_gates(node, infra_clks, ARRAY_SIZE(infra_clks),
+ 						clk_data);
  
- /*
-  * Restart requires that the secondary CPUs stop performing any activity
-- * while the primary CPU resets the system. Systems with a single CPU can
-- * use soft_restart() as their machine descriptor's .restart hook, since that
-- * will cause the only available CPU to reset. Systems with multiple CPUs must
-+ * while the primary CPU resets the system. Systems with multiple CPUs must
-  * provide a HW restart implementation, to ensure that all CPUs reset at once.
-  * This is required so that any code running after reset on the primary CPU
-  * doesn't have to co-ordinate with other CPUs to ensure they aren't still
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 2560e1e..f563e9a 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -27,79 +27,6 @@
- #include "proc-macros.S"
++	mtk_clk_register_cpumuxes(node, cpu_muxes, ARRAY_SIZE(cpu_muxes),
++						clk_data);
++
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+ 	if (r)
+ 		pr_err("%s(): could not register clock provider: %d\n",
+diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
+index e648b28..2503b03 100644
+--- a/include/dt-bindings/clock/mt8173-clk.h
++++ b/include/dt-bindings/clock/mt8173-clk.h
+@@ -187,7 +187,9 @@
+ #define INFRA_CEC		9
+ #define INFRA_PMICSPI		10
+ #define INFRA_PMICWRAP		11
+-#define INFRA_NR_CLK		12
++#define INFRA_CA53SEL		12
++#define INFRA_CA57SEL		13
++#define INFRA_NR_CLK		14
  
- /*
-- *	__flush_dcache_all()
-- *
-- *	Flush the whole D-cache.
-- *
-- *	Corrupted registers: x0-x7, x9-x11
-- */
--__flush_dcache_all:
--	dmb	sy				// ensure ordering with previous memory accesses
--	mrs	x0, clidr_el1			// read clidr
--	and	x3, x0, #0x7000000		// extract loc from clidr
--	lsr	x3, x3, #23			// left align loc bit field
--	cbz	x3, finished			// if loc is 0, then no need to clean
--	mov	x10, #0				// start clean at cache level 0
--loop1:
--	add	x2, x10, x10, lsr #1		// work out 3x current cache level
--	lsr	x1, x0, x2			// extract cache type bits from clidr
--	and	x1, x1, #7			// mask of the bits for current cache only
--	cmp	x1, #2				// see what cache we have@this level
--	b.lt	skip				// skip if no cache, or just i-cache
--	save_and_disable_irqs x9		// make CSSELR and CCSIDR access atomic
--	msr	csselr_el1, x10			// select current cache level in csselr
--	isb					// isb to sych the new cssr&csidr
--	mrs	x1, ccsidr_el1			// read the new ccsidr
--	restore_irqs x9
--	and	x2, x1, #7			// extract the length of the cache lines
--	add	x2, x2, #4			// add 4 (line length offset)
--	mov	x4, #0x3ff
--	and	x4, x4, x1, lsr #3		// find maximum number on the way size
--	clz	w5, w4				// find bit position of way size increment
--	mov	x7, #0x7fff
--	and	x7, x7, x1, lsr #13		// extract max number of the index size
--loop2:
--	mov	x9, x4				// create working copy of max way size
--loop3:
--	lsl	x6, x9, x5
--	orr	x11, x10, x6			// factor way and cache number into x11
--	lsl	x6, x7, x2
--	orr	x11, x11, x6			// factor index number into x11
--	dc	cisw, x11			// clean & invalidate by set/way
--	subs	x9, x9, #1			// decrement the way
--	b.ge	loop3
--	subs	x7, x7, #1			// decrement the index
--	b.ge	loop2
--skip:
--	add	x10, x10, #2			// increment cache number
--	cmp	x3, x10
--	b.gt	loop1
--finished:
--	mov	x10, #0				// swith back to cache level 0
--	msr	csselr_el1, x10			// select current cache level in csselr
--	dsb	sy
--	isb
--	ret
--ENDPROC(__flush_dcache_all)
--
--/*
-- *	flush_cache_all()
-- *
-- *	Flush the entire cache system.  The data cache flush is now achieved
-- *	using atomic clean / invalidates working outwards from L1 cache. This
-- *	is done using Set/Way based cache maintainance instructions.  The
-- *	instruction cache can still be invalidated back to the point of
-- *	unification in a single instruction.
-- */
--ENTRY(flush_cache_all)
--	mov	x12, lr
--	bl	__flush_dcache_all
--	mov	x0, #0
--	ic	ialluis				// I+BTB cache invalidate
--	ret	x12
--ENDPROC(flush_cache_all)
--
--/*
-  *	flush_icache_range(start,end)
-  *
-  *	Ensure that the I and D caches are coherent within specified region.
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index b6f14e8..4dfa397 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -102,7 +102,6 @@ EXPORT_SYMBOL(flush_dcache_page);
- /*
-  * Additional functions defined in assembly.
-  */
--EXPORT_SYMBOL(flush_cache_all);
- EXPORT_SYMBOL(flush_icache_range);
+ /* PERI_SYS */
  
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index cdd754e..39139a3 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -46,52 +46,6 @@
- #define MAIR(attr, mt)	((attr) << ((mt) * 8))
- 
- /*
-- *	cpu_cache_off()
-- *
-- *	Turn the CPU D-cache off.
-- */
--ENTRY(cpu_cache_off)
--	mrs	x0, sctlr_el1
--	bic	x0, x0, #1 << 2			// clear SCTLR.C
--	msr	sctlr_el1, x0
--	isb
--	ret
--ENDPROC(cpu_cache_off)
--
--/*
-- *	cpu_reset(loc)
-- *
-- *	Perform a soft reset of the system.  Put the CPU into the same state
-- *	as it would be if it had been reset, and branch to what would be the
-- *	reset vector. It must be executed with the flat identity mapping.
-- *
-- *	- loc   - location to jump to for soft reset
-- */
--	.align	5
--ENTRY(cpu_reset)
--	mrs	x1, sctlr_el1
--	bic	x1, x1, #1
--	msr	sctlr_el1, x1			// disable the MMU
--	isb
--	ret	x0
--ENDPROC(cpu_reset)
--
--ENTRY(cpu_soft_restart)
--	/* Save address of cpu_reset() and reset address */
--	mov	x19, x0
--	mov	x20, x1
--
--	/* Turn D-cache off */
--	bl	cpu_cache_off
--
--	/* Push out all dirty data, and ensure cache is empty */
--	bl	flush_cache_all
--
--	mov	x0, x20
--	ret	x19
--ENDPROC(cpu_soft_restart)
--
--/*
-  *	cpu_do_idle()
-  *
-  *	Idle the processor (wait for interrupt).
 -- 
 1.9.1
