@@ -1,34 +1,46 @@
-From: loic.tourlonias@gmail.com (=?UTF-8?Q?lo=C3=AFc_tourlonias?=)
-Date: Tue, 21 Apr 2015 14:52:35 +0200
-Subject: Fwd: [PATCH] usb-otg: atmel-usba-udc: initialize usb_prev to the
- actual value
-In-Reply-To: <CA+XxOSExCVBd0TFuY+wmjL-pxhp148H1FpnQLBtV0q2R5OwHzg@mail.gmail.com>
-References: <CA+XxOSExCVBd0TFuY+wmjL-pxhp148H1FpnQLBtV0q2R5OwHzg@mail.gmail.com>
-Message-ID: <CA+XxOSFO1zYKJLaAQ6qixReUaViizOPve445B1rrKE+Om2xRPQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 Apr 2015 13:54:31 +0100
+Subject: [RESEND PATCH 4.0-rc7 v20 2/6] irqchip: gic: Make
+ gic_raise_softirq FIQ-safe
+In-Reply-To: <1428659511-9590-3-git-send-email-daniel.thompson@linaro.org>
+References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
+ <1428659511-9590-1-git-send-email-daniel.thompson@linaro.org>
+ <1428659511-9590-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <55364887.2000404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During start of the usb gadget device, usb_prev must be initialize to
-the actual value of vbus_pin to avoid missing the first usb host
-detection.
+On 10/04/15 10:51, Daniel Thompson wrote:
+> It is currently possible for FIQ handlers to re-enter gic_raise_softirq()
+> and lock up.
+> 
+>     	gic_raise_softirq()
+> 	   lock(x);
+> -~-> FIQ
+>         handle_fiq()
+> 	   gic_raise_softirq()
+> 	      lock(x);		<-- Lockup
+> 
+> arch/arm/ uses IPIs to implement arch_irq_work_raise(), thus this issue
+> renders it difficult for FIQ handlers to safely defer work to less
+> restrictive calling contexts.
+> 
+> This patch fixes the problem by converting the cpu_map_migration_lock
+> into a rwlock making it safe to re-enter the function.
+> 
+> Note that having made it safe to re-enter gic_raise_softirq() we no
+> longer need to mask interrupts during gic_raise_softirq() because the
+> b.L migration is always performed from task context.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Signed-off-by: ltourlonias <loic.tourlonias@gmail.com>
----
- drivers/usb/gadget/atmel_usba_udc.c |    1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c
-b/drivers/usb/gadget/atmel_usba_udc.c
-index 1d97222..258edf9 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -1796,6 +1796,7 @@ static int atmel_usba_start(struct usb_gadget *gadget,
-  toggle_bias(1);
-  usba_writel(udc, CTRL, USBA_ENABLE_MASK);
-  usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
-+ udc->vbus_prev=1;
-  }
-  spin_unlock_irqrestore(&udc->lock, flags);
-
+	M.
 -- 
-1.7.10.4
+Jazz is not dead. It just smells funny...
