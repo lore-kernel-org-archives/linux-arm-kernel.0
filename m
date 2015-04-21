@@ -1,87 +1,28 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 21 Apr 2015 13:46:08 +0100
-Subject: Standard/common method for booting secondary cores
-In-Reply-To: <553640A4.9090506@free.fr>
-References: <553580F7.7040903@free.fr>
- <20150421113914.GA3638@e103592.cambridge.arm.com>
- <553640A4.9090506@free.fr>
-Message-ID: <20150421124608.GB3638@e103592.cambridge.arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 21 Apr 2015 14:46:22 +0200 (CEST)
+Subject: [RESEND PATCH 4.0-rc7 v20 0/6] irq/arm: Implement
+ arch_trigger_all_cpu_backtrace
+In-Reply-To: <1428659511-9590-1-git-send-email-daniel.thompson@linaro.org>
+References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
+ <1428659511-9590-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <alpine.DEB.2.11.1504211445010.13914@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 02:20:52PM +0200, Mason wrote:
-> Hello Dave,
-> 
-> It seems you and Mark posted within seconds of each other :-)
+On Fri, 10 Apr 2015, Daniel Thompson wrote:
 
-Seems so...  fortunately we didn't argue the opposite to each
-other.
+> Jason/Thomas:
+>   Any chance of taking the first five of these patches via the irqchip
+>   route? The x86 patch has an ack from Ingo, printk has no explicit
+>   maintainer and I've done plenty of bisectability tests on the patchset
+>   so leaving the last patch for the next dev. cycle should be no
+>   trouble.
 
-> On 21/04/2015 13:41, Dave Martin wrote:
-> >On Tue, Apr 21, 2015 at 12:43:03AM +0200, Mason wrote:
-> >>Hello,
-> >>
-> >>With the current push for CONFIG_ARCH_MULTIPLATFORM,
-> >>I'm wondering if things like starting secondary cores
-> >>have been "standardized"/factorized to the point where
-> >>I can just use some default implementation?
-> >>
-> >>I think the implementation I'm using as a starting
-> >>point uses SMC calls. I think we are using "TrustZone"
-> >>where Linux runs in NS (non secure) mode, and a tiny
-> >>proprietary OS runs in secure mode.
-> >
-> >_If_ you're implementing something new
-> 
-> You're talking about software, right?
-> (The hardware already exists.)
+First of all I need an acked/reviewed from Marc or Russell,
+preferrably both of them.
 
-Yes, PSCI is a software interface.
+Once that is sorted out, I can move that lot through a seperate branch.
 
-> As I mentioned we do have a working implementation using
-> SMC to request service from the secure OS, but I have some
-> time to evaluate "better" strategies, as I port the
-> platform to a newer kernel.
-> 
-> >and have a say in what gets implemented in the firmware,
-> >please consider PSCI.
-> 
-> In this context, firmware would be the code run by the
-> secure OS?
+Thanks,
 
-Yes, or at least those parts of the Secure World software that provide
-essential services to the main OS.
-
-> >Without this, little standardisation exists.  Low level CPU
-> >power management must typically involve SMCs, but there's
-> >no standardisation of their exact semantics, which implies that
-> >some platform-specific glue will likely be needed.  The best you can
-> >do is look for one or more backends in the kernel that are
-> >close to what you need (if any), and if so propose some refactoring
-> >to extend support to your platform.
-> 
-> My objective is to minimize platform-specific code, I will
-> look into PSCI.
-> 
-> >>IIUC (which is probably NOT the case), when Linux runs
-> >>in NS mode, some operations that are typically carried
-> >>out at boot/init are not allowed, such as
-> >>
-> >>- starting secondary cores
-> >>- configuring the L2 cache controller
-> >>
-> >>and this must be done by the secure OS via SMC?
-> >
-> >Generally, yes.
-> 
-> Is PSCI involved in L2$ configuration?
-
-That depends on the platform.  Single-cluster systems might
-not have to do very much L2 configuration, but it depends on
-the hardware -- particularly of the L2 is external.
-
-I suggest you take a look at the PSCI spec first -- this
-should make is clearer what the firmware is expected to do.
-
-Cheers
----Dave
+	tglx
