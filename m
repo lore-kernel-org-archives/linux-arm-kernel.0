@@ -1,51 +1,35 @@
-From: g.portay@overkiz.com (=?UTF-8?B?R2HDq2wgUE9SVEFZ?=)
-Date: Tue, 21 Apr 2015 12:03:58 +0200
-Subject: [PATCH] ARM: at91/dt: kizbox: update and rename to at91-kizbox
-In-Reply-To: <20150421091100.6bb8ba36@bbrezillon>
-References: <1429521218-9752-1-git-send-email-g.portay@overkiz.com>
- <20150421091100.6bb8ba36@bbrezillon>
-Message-ID: <5536208E.4060105@overkiz.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 21 Apr 2015 11:05:15 +0100
+Subject: [RESEND RFC PATCH 3/3] ASoC: mediatek: Add AFE platform driver
+In-Reply-To: <1429583233.14794.40.camel@mtksdaap41>
+References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
+ <1428653649-38200-4-git-send-email-koro.chen@mediatek.com>
+ <20150418175139.GG26185@sirena.org.uk>
+ <1429510944.30743.36.camel@mtksdaap41>
+ <20150420205511.GL14892@sirena.org.uk>
+ <1429583233.14794.40.camel@mtksdaap41>
+Message-ID: <20150421100515.GB22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/04/2015 09:11, Boris Brezillon wrote:
-> Hi Gael,
->
-> On Mon, 20 Apr 2015 11:13:38 +0200
-> Ga?l PORTAY <g.portay@overkiz.com> wrote:
->
->> Sort nodes, rename to match Atmel naming convention
-> You should use -M when you generate your patches with format-patch: it
-> keeps track of files that have been renamed instead of considering it
-> as a removal + an addition.
+On Tue, Apr 21, 2015 at 10:27:13AM +0800, Koro Chen wrote:
 
-Ok, thanks, I did not know that option...
+> The SRAM size to be used is defined by params_buffer_bytes(params), not
+> fixed (of course limited by the actual available SRAM size on HW), so
+> the latency should be the same compared to a DRAM having the same size. 
 
->> and update the features
->> below:
->>   - command-line,
->>   - use proper serial uart,
->>   - rename leds and gpio-keys,
->>   - update to pwm-leds and
->>   - fix gpio-key level.
-> Please split this patch so we can easily review the changes.
-> How about the following separation ?
->
-> - rename dts file
-> - use stdout-path
-> - sanitize bootargs
-> - led related changes (rename + pwm-leds)
-> - gpio-key related changes (rename + fix level)
+Right, some systems have the SRAM as essentially a big FIFO but this
+doesn't have that problem.
 
-In fact, each changes were committed in single patch before I submitted 
-them...
+> The SRAM can be used by any memif, and that's why the plan was let DT
+> make the decision.
 
-I just squashed them thinking it would be easier for you to check (only) 
-for the "new" device-tree.... my bad :(
-
-What about the node re-order? Do you prefer in dedicated commit or with 
-the rename patch?
-
-> Best Regards,
->
-> Boris
+OK, if it's for any interface rather than just DL1 like Sascha said then
+it does need to be selectable, but DT doesn't seem the platce to do it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150421/9f438000/attachment.sig>
