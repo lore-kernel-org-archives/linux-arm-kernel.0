@@ -1,31 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 21 Apr 2015 11:15:03 +0100
-Subject: [RESEND RFC PATCH 2/3] ASoC: mediatek: Add AFE connection control
-In-Reply-To: <20150421055041.GQ6325@pengutronix.de>
-References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
- <1428653649-38200-3-git-send-email-koro.chen@mediatek.com>
- <20150418173740.GF26185@sirena.org.uk>
- <20150420045017.GI6325@pengutronix.de>
- <20150420205230.GK14892@sirena.org.uk>
- <20150421055041.GQ6325@pengutronix.de>
-Message-ID: <20150421101503.GD22845@sirena.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 21 Apr 2015 12:18:08 +0200
+Subject: No subject
+Message-ID: <CAKv+Gu9u73+YKn+aR1vk+1eNF_voC71THWRQS96jyAt4HB3BQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 07:50:41AM +0200, Sascha Hauer wrote:
+On 21 April 2015 at 12:13, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Apr 21, 2015 at 12:08:51PM +0200, Ard Biesheuvel wrote:
+>> This updates the PROCINFO offset-to-setup-function fields of the
+>> Thumb2 capable CPU definitions to include the Thumb bit when building
+>> a Thumb2 kernel. This ensures that these function are always called
+>> in the correct mode.
+>
+> I don't think this is necessary, in fact, I think this is positively
+> regression causing.
+>
+> The symbol 'initfunc' is known to the assembler to be a thumb symbol.
+> As we have seen already from the kernel dumps from the V7M kernel, when
+> it calculates initfunc - name in a T2 kernel, the resulting value is an
+> _odd_ number.
+>
 
-> Oh, that's not magic at all, the crossbar switch has inputs and outputs
-> numbered from 0 to MTK_AFE_INTERCONN_NUM_INPUT /
-> MTK_AFE_INTERCONN_NUM_OUTPUT (they have the same numbers in the
-> datasheet. To connect input x with output y look at index [x][y] in the
-> table and write the register values found at that place. If .creg is 0x0
-> then it's not possible to connect the given input with the given output.
+OK, so BSYM() uses '+ 1' rather than ' | 1'? I wasn't expecting that, sorry.
 
-A comment saying that would help then.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150421/563f9fc2/attachment.sig>
+But looking at proc-v7.S again, the problem may just be the missing
+ENDPROC() declarations for a couple of the setup() functions, which
+explains why they are lacking the Thumb annotations.
+
+> Using BSYM() here will increment it to be the next _even_ number, which
+> is wrong as this will potentially point at either half way through a
+> 32-bit T2 instruction, or the second 16-bit T2 instruction.
+>
+
+Agreed.
