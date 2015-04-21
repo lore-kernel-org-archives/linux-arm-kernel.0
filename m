@@ -1,152 +1,211 @@
-From: lee@kernel.org (Lee Jones)
-Date: Tue, 21 Apr 2015 08:33:36 +0100
-Subject: [PATCH 1/3] ARM: ux500: Move GPIO regulator for SD-card into
- board DTSs
-In-Reply-To: <CAPDyKFrDOGBkfg48mmsbktCWFTaNV4WnTm_Fui=Kp30u1yH-tQ@mail.gmail.com>
-References: <1429538553-17366-1-git-send-email-ulf.hansson@linaro.org>
- <1429538553-17366-2-git-send-email-ulf.hansson@linaro.org>
- <20150420182634.GH3447@x1>
- <CAPDyKFrDOGBkfg48mmsbktCWFTaNV4WnTm_Fui=Kp30u1yH-tQ@mail.gmail.com>
-Message-ID: <20150421073336.GJ3447@x1>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 21 Apr 2015 16:42:25 +0900
+Subject: [PATCH 1/3] mailbox: add support for APM X-Gene platform mailbox
+ driver
+In-Reply-To: <1424216448-28665-1-git-send-email-fkan@apm.com>
+References: <1424216448-28665-1-git-send-email-fkan@apm.com>
+Message-ID: <CABb+yY31bGbQ4xipyW9pe+J6QV3con=QFuasEfmpgNNfkKKPVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Apr 2015, Ulf Hansson wrote:
+On Wed, Feb 18, 2015 at 8:40 AM, Feng Kan <fkan@apm.com> wrote:
 
-> On 20 April 2015 at 20:26, Lee Jones <lee@kernel.org> wrote:
-> > On Mon, 20 Apr 2015, Ulf Hansson wrote:
-> >
-> >> The GPIO regulator for the SD-card isn't a ux500 SOC configuration, but
-> >> instead it's specific to the board. Move the definition of it, into the
-> >> board DTSs.
-> >
-> > What makes you think that?
-> 
-> Because of how it was structured today.
-> 
-> ste-dbx5x0.dtsi - common for all ux500 boards, thus I considered this
-> as the SoC configuration.
+> +#define MBOX_CON_NAME                  "slimpro-mbox"
+> +#define MBOX_REG_SET_OFFSET            0x1000
+> +#define MBOX_CNT                       8
+> +#define MBOX_STATUS_AVAIL_MASK         0x00010000
+> +#define MBOX_STATUS_ACK_MASK           0x00000001
+>
+Nit: BIT(16) and BIT(0) is more readable
 
-ste-dbx5x0.dtsi is common for all ux500 and ux540 boards.
+> +/* Configuration and Status Registers */
+> +struct slimpro_mbox_reg {
+> +       u32 in;
+> +       u32 din0;
+> +       u32 din1;
+> +       u32 rsvd1;
+> +       u32 out;
+> +       u32 dout0;
+> +       u32 dout1;
+> +       u32 rsvd2;
+> +       u32 status;
+> +       u32 statusmask;
+> +};
+> +
+Why not the normal way of defining offset macros, like most drivers do?
 
-> Then below are board configs which uses the above dtsi:
-> ste-href.dtsi - common for href boards (used by ste-hrefprev60.dtsi
-> and ste-hrefv60plus.dtsi), have vmmci
-> ste-snowball.dts, have vmmci
-> ste-ccu8540.dts, don't have vmmci
-> ste-ccu9540.dts, don't have vmmci
+> +struct slimpro_mbox_chan {
+> +       struct device *dev;
+> +       struct mbox_chan *chan;
+> +       struct slimpro_mbox_reg __iomem *reg;
+> +       int id;
+> +       int irq;
+> +       u32 rx_msg[3];
+> +};
+> +
+> +struct slimpro_mbox {
+> +       struct mbox_controller mb_ctrl;
+> +       struct slimpro_mbox_chan mc[MBOX_CNT];
+> +       struct mbox_chan chans[MBOX_CNT];
+> +};
+> +
+> +static struct slimpro_mbox_chan *to_slimpro_mbox_chan(struct mbox_chan *chan)
+> +{
+> +       if (!chan || !chan->con_priv)
+> +               return NULL;
+This seems un-necessary. Anyway you don't care for NULL returned :)
+Probably just kill this function?
 
-Ah, got you.  In which case it doesn't belong in ste-dbx5x0.dtsi.
+> +
+> +       return (struct slimpro_mbox_chan *)chan->con_priv;
+> +}
+> +
+> +static void mb_chan_send_msg(struct slimpro_mbox_chan *mb_chan, u32 *msg)
+> +{
+> +       writel(msg[1], &mb_chan->reg->dout0);
+> +       writel(msg[2], &mb_chan->reg->dout1);
+> +       writel(msg[0], &mb_chan->reg->out);
+> +}
+> +
+> +static void mb_chan_recv_msg(struct slimpro_mbox_chan *mb_chan)
+> +{
+> +       mb_chan->rx_msg[1] = readl(&mb_chan->reg->din0);
+> +       mb_chan->rx_msg[2] = readl(&mb_chan->reg->din1);
+> +       mb_chan->rx_msg[0] = readl(&mb_chan->reg->in);
+> +}
+> +
+maybe move the send/recv function inline the caller?
 
-> > We normally place the common pieces (of which there are many in this
-> > node) in the highest level DTSI file, then add the platform specific
-> > ones in the DTS files.
-> 
-> Okay, so maybe it's due to the naming of ste-dbx5x0.dtsi, that I
-> thought this was intended to cover the SoC configuration and not any
-> of the platform specific stuff.
+> +static void mb_chan_enable_int(struct slimpro_mbox_chan *mb_chan, u32 mask)
+> +{
+> +       u32 val = readl(&mb_chan->reg->statusmask);
+> +
+> +       val &= ~mask;
+> +
+> +       writel(val, &mb_chan->reg->statusmask);
+> +}
+> +
+> +static void mb_chan_disable_int(struct slimpro_mbox_chan *mb_chan, u32 mask)
+> +{
+> +       u32 val = readl(&mb_chan->reg->statusmask);
+> +
+> +       val |= mask;
+> +
+> +       writel(val, &mb_chan->reg->statusmask);
+> +}
+> +
+> +static int mb_chan_status_ack(struct slimpro_mbox_chan *mb_chan)
+> +{
+> +       u32 val = readl(&mb_chan->reg->status);
+> +
+> +       if (val & MBOX_STATUS_ACK_MASK) {
+> +               writel(MBOX_STATUS_ACK_MASK, &mb_chan->reg->status);
+> +               return 1;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static int mb_chan_status_avail(struct slimpro_mbox_chan *mb_chan)
+> +{
+> +       u32 val = readl(&mb_chan->reg->status);
+> +
+> +       if (val & MBOX_STATUS_AVAIL_MASK) {
+> +               mb_chan_recv_msg(mb_chan);
+> +               writel(MBOX_STATUS_AVAIL_MASK, &mb_chan->reg->status);
+> +               return 1;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static irqreturn_t slimpro_mbox_irq(int irq, void *id)
+> +{
+> +       struct slimpro_mbox_chan *mb_chan = id;
+> +
+> +       if (mb_chan_status_ack(mb_chan))
+> +               mbox_chan_txdone(mb_chan->chan, 0);
+> +
+> +       if (mb_chan_status_avail(mb_chan)) {
+> +               mb_chan_recv_msg(mb_chan);
+>
+you already did this in mb_chan_status_avail()  is it needed?
 
-ste-dbx5x0.dtsi should cover all pieces which are common to all ux500
-and ux540 devices.  Then the lower level file ste-href-ab8500.dtsi
-should cover all pieces which are common to ux500 devices and finally
-the DTS files should add board specific information.  Duplicate
-nodes and properties are frowned upon.
+> +               mbox_chan_received_data(mb_chan->chan, mb_chan->rx_msg);
+> +       }
+> +
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +static int slimpro_mbox_send_data(struct mbox_chan *chan, void *msg)
+> +{
+> +       struct slimpro_mbox_chan *mb_chan = to_slimpro_mbox_chan(chan);
+> +
+> +       mb_chan_send_msg(mb_chan, msg);
+> +       return 0;
+> +}
+> +
+> +static int slimpro_mbox_startup(struct mbox_chan *chan)
+> +{
+> +       struct slimpro_mbox_chan *mb_chan = to_slimpro_mbox_chan(chan);
+> +       int rc;
+> +
+> +       rc = devm_request_irq(mb_chan->dev, mb_chan->irq, slimpro_mbox_irq, 0,
+> +                             MBOX_CON_NAME, mb_chan);
+>
+You may want to use IRQF_SHARED flag here and make slimpro_mbox_irq()
+aware of that -- some platforms tie together irq lines of all
+instances of a resource, like dma, mbox, so they may share the same
+irq line.
 
-> So what your advise of doing this?
 
-So the file which covers the x500 boards is ste-href-ab8500.dtsi.  I
-would move the node into there instead.  Keep it disabled and enable
-the associated nodes in the 2 DTS files.
+> +static int __init slimpro_mbox_probe(struct platform_device *pdev)
+> +{
+> +       struct slimpro_mbox *ctx;
+> +       struct resource *regs;
+> +       void __iomem *mb_base;
+> +       int rc;
+> +       int i;
+> +
+> +       ctx = devm_kzalloc(&pdev->dev, sizeof(struct slimpro_mbox), GFP_KERNEL);
+> +       if (IS_ERR(ctx))
+> +               return PTR_ERR(ctx);
+> +
+> +       platform_set_drvdata(pdev, ctx);
+> +
+> +       regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       mb_base = devm_ioremap_resource(&pdev->dev, regs);
+> +       if (IS_ERR(mb_base))
+> +               return PTR_ERR(mb_base);
+> +
+> +       /* Setup mailbox links */
+> +       for (i = 0; i < MBOX_CNT; i++) {
+> +               ctx->mc[i].irq = platform_get_irq(pdev, i);
+> +               if (ctx->mc[i].irq < 0) {
+> +                       dev_err(&pdev->dev, "no IRQ at index %d\n",
+> +                               ctx->mc[i].irq);
+> +                       return -ENODEV;
+> +               }
+> +
+> +               ctx->mc[i].dev = &pdev->dev;
+> +               ctx->mc[i].reg = mb_base + i * MBOX_REG_SET_OFFSET;
+> +               ctx->mc[i].id = i;
+> +               ctx->mc[i].chan = &ctx->chans[i];
+> +               ctx->chans[i].con_priv = &ctx->mc[i];
+>
+Note to self: Maybe we should make it possible to populate a channel
+during request/of_xlate.
 
-> >> Fixes: c94a4ab7af3f ("ARM: ux500: Disable the MMCI gpio-regulator by default")
-> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >> ---
-> >>  arch/arm/boot/dts/ste-dbx5x0.dtsi  | 17 -----------------
-> >>  arch/arm/boot/dts/ste-href.dtsi    | 17 +++++++++++++++++
-> >>  arch/arm/boot/dts/ste-snowball.dts | 15 +++++++++++++++
-> >>  3 files changed, 32 insertions(+), 17 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-> >> index bfd3f1c..2201cd5 100644
-> >> --- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-> >> +++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-> >> @@ -1017,23 +1017,6 @@
-> >>                       status = "disabled";
-> >>               };
-> >>
-> >> -             vmmci: regulator-gpio {
-> >> -                     compatible = "regulator-gpio";
-> >> -
-> >> -                     regulator-min-microvolt = <1800000>;
-> >> -                     regulator-max-microvolt = <2900000>;
-> >> -                     regulator-name = "mmci-reg";
-> >> -                     regulator-type = "voltage";
-> >> -
-> >> -                     startup-delay-us = <100>;
-> >> -                     enable-active-high;
-> >> -
-> >> -                     states = <1800000 0x1
-> >> -                               2900000 0x0>;
-> >> -
-> >> -                     status = "disabled";
-> >> -             };
-> >> -
-> >>               mcde at a0350000 {
-> >>                       compatible = "stericsson,mcde";
-> >>                       reg = <0xa0350000 0x1000>, /* MCDE */
-> >> diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-> >> index bf8f0ed..8cf499a 100644
-> >> --- a/arch/arm/boot/dts/ste-href.dtsi
-> >> +++ b/arch/arm/boot/dts/ste-href.dtsi
-> >> @@ -111,6 +111,23 @@
-> >>                       pinctrl-1 = <&i2c3_sleep_mode>;
-> >>               };
-> >>
-> >> +             vmmci: regulator-gpio {
-> >> +                     compatible = "regulator-gpio";
-> >> +
-> >> +                     regulator-min-microvolt = <1800000>;
-> >> +                     regulator-max-microvolt = <2900000>;
-> >> +                     regulator-name = "mmci-reg";
-> >> +                     regulator-type = "voltage";
-> >> +
-> >> +                     startup-delay-us = <100>;
-> >> +                     enable-active-high;
-> >> +
-> >> +                     states = <1800000 0x1
-> >> +                               2900000 0x0>;
-> >> +
-> >> +                     status = "disabled";
-> >> +             };
-> >> +
-> >>               // External Micro SD slot
-> >>               sdi0_per1 at 80126000 {
-> >>                       arm,primecell-periphid = <0x10480180>;
-> >> diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-> >> index 206826a..65a7f63 100644
-> >> --- a/arch/arm/boot/dts/ste-snowball.dts
-> >> +++ b/arch/arm/boot/dts/ste-snowball.dts
-> >> @@ -146,8 +146,23 @@
-> >>               };
-> >>
-> >>               vmmci: regulator-gpio {
-> >> +                     compatible = "regulator-gpio";
-> >> +
-> >>                       gpios = <&gpio7 4 0x4>;
-> >>                       enable-gpio = <&gpio6 25 0x4>;
-> >> +
-> >> +                     regulator-min-microvolt = <1800000>;
-> >> +                     regulator-max-microvolt = <2900000>;
-> >> +                     regulator-name = "mmci-reg";
-> >> +                     regulator-type = "voltage";
-> >> +
-> >> +                     startup-delay-us = <100>;
-> >> +                     enable-active-high;
-> >> +
-> >> +                     states = <1800000 0x1
-> >> +                               2900000 0x0>;
-> >> +
-> >> +                     status = "disabled";
-> >>               };
-> >>
-> >>               // External Micro SD slot
+> +
+> +static int __init slimpro_mbox_init(void)
+> +{
+> +       return platform_driver_register(&slimpro_mbox_driver);
+> +}
+> +
+> +static void __exit slimpro_mbox_exit(void)
+> +{
+> +}
+> +
+> +subsys_initcall(slimpro_mbox_init);
+> +module_exit(slimpro_mbox_exit);
+Why empty module_exit?
+
+regards.
