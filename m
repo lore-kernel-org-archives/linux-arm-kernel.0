@@ -1,49 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 21 Apr 2015 14:52:23 +0200
-Subject: Question about checking rate_spi in pwrap_init_reg_clock
-In-Reply-To: <CABuKBeJqgWHWNYaFXS-BwEayHEtiYGt+56LLXs3QaO3MHUk0bQ@mail.gmail.com>
-References: <1429581487.5994.1.camel@ingics.com>
- <20150421103155.GX6325@pengutronix.de>
- <CABuKBeJqgWHWNYaFXS-BwEayHEtiYGt+56LLXs3QaO3MHUk0bQ@mail.gmail.com>
-Message-ID: <20150421125223.GB6325@pengutronix.de>
+From: loic.tourlonias@gmail.com (=?UTF-8?Q?lo=C3=AFc_tourlonias?=)
+Date: Tue, 21 Apr 2015 14:52:35 +0200
+Subject: Fwd: [PATCH] usb-otg: atmel-usba-udc: initialize usb_prev to the
+ actual value
+In-Reply-To: <CA+XxOSExCVBd0TFuY+wmjL-pxhp148H1FpnQLBtV0q2R5OwHzg@mail.gmail.com>
+References: <CA+XxOSExCVBd0TFuY+wmjL-pxhp148H1FpnQLBtV0q2R5OwHzg@mail.gmail.com>
+Message-ID: <CA+XxOSFO1zYKJLaAQ6qixReUaViizOPve445B1rrKE+Om2xRPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 01:43:19PM +0200, Matthias Brugger wrote:
-> 2015-04-21 12:31 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> > On Tue, Apr 21, 2015 at 09:58:07AM +0800, Axel Lin wrote:
-> >> hi,
-> >> The implementation in pwrap_init_reg_clock seems has off-by-one bug.
-> >> If rate_spi is 26000000, current code set ck_mhz to 18 rather than 26.
-> >>
-> >> I guess it needs below fix, but I'm not 100% sure as I don't have the datasheet.
-> >> Can someone confirm if this is a bug or not?
-> >
-> > Yes, seems to be a bug. Thanks for noting. Will you send a formal patch
-> > or should I do it?
-> 
-> Did you have a look on both datasheets/reference kernels, mt8135 and mt8173?
-> Reading the datasheet and reference kernel code for mt6589 this SPI
-> waveform configuration looks like magic.
-> 
-> But reading the clock frequency which can have clk_spi in mt8135, they
-> are 0 MHz, 26 MHz and bigger then 26 MHz, which leads me to the
-> conclusion that the code is correct. Otherwise the check for bigger
-> then 18 MHz is useless and should be deleted, if we have a similar
-> clock distribution in mt8173.
+During start of the usb gadget device, usb_prev must be initialize to
+the actual value of vbus_pin to avoid missing the first usb host
+detection.
 
-The CSHEXT and CSLEXT registers extend the time the chipselect stays
-high after a SPI transfer or low before a new transfer by the given
-number of spi clk cycles.
-Looking at the code maybe the real question is not whether the border is
-at 25999999Hz or at 26000000Hz, but why the transfers are throttled with
-slower clock frequencies. I would assume the other way round makes
-sense.
+Signed-off-by: ltourlonias <loic.tourlonias@gmail.com>
+---
+ drivers/usb/gadget/atmel_usba_udc.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Sascha
+diff --git a/drivers/usb/gadget/atmel_usba_udc.c
+b/drivers/usb/gadget/atmel_usba_udc.c
+index 1d97222..258edf9 100644
+--- a/drivers/usb/gadget/atmel_usba_udc.c
++++ b/drivers/usb/gadget/atmel_usba_udc.c
+@@ -1796,6 +1796,7 @@ static int atmel_usba_start(struct usb_gadget *gadget,
+  toggle_bias(1);
+  usba_writel(udc, CTRL, USBA_ENABLE_MASK);
+  usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
++ udc->vbus_prev=1;
+  }
+  spin_unlock_irqrestore(&udc->lock, flags);
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
