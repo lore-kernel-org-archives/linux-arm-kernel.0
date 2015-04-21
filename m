@@ -1,149 +1,98 @@
 From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
-Date: Tue, 21 Apr 2015 14:05:13 +0200
-Subject: [PATCH v2 2/7] ARM: at91/dt: at91-kizbox: sanitize file
+Date: Tue, 21 Apr 2015 14:05:16 +0200
+Subject: [PATCH v2 5/7] ARM: at91/dt: at91-kizbox: leds related changes
 In-Reply-To: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
 References: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <1429617918-32086-3-git-send-email-g.portay@overkiz.com>
+Message-ID: <1429617918-32086-6-git-send-email-g.portay@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Consists in:
- * sorting nodes by address as possible or alphabetically,
- * adding myself as new maintainer and
- * update license.
+This:
+ * moves to pwm-leds using tcb-pwm driver and
+ * renames leds to pwm:<color>:<function>.
 
 Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
 ---
- arch/arm/boot/dts/at91-kizbox.dts | 67 +++++++++++++++++++--------------------
- 1 file changed, 32 insertions(+), 35 deletions(-)
+ arch/arm/boot/dts/at91-kizbox.dts | 53 +++++++++++++++++++++++++--------------
+ 1 file changed, 34 insertions(+), 19 deletions(-)
 
 diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index e83e4f9..00c86c1 100644
+index 73e4559..b19f568 100644
 --- a/arch/arm/boot/dts/at91-kizbox.dts
 +++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -1,16 +1,16 @@
- /*
-- * kizbox.dts - Device Tree file for Overkiz Kizbox board
-+ * at91-kizbox.dts - Device Tree file for Overkiz Kizbox board
-  *
-- * Copyright (C) 2012 Boris BREZILLON <linux-arm@overkiz.com>
-+ * Copyright (C) 2012-2014 Boris BREZILLON <b.brezillon@overkiz.com>
-+ *               2014-2015 Ga?l PORTAY <g.portay@overkiz.com>
-  *
-- * Licensed under GPLv2.
-+ * Licensed under GPLv2 or later.
+@@ -8,6 +8,7 @@
   */
  /dts-v1/;
  #include "at91sam9g20.dtsi"
++#include <dt-bindings/pwm/pwm.h>
  
  / {
--
--	model = "Overkiz kizbox";
-+	model = "Overkiz Kizbox";
- 	compatible = "overkiz,kizbox", "atmel,at91sam9g20", "atmel,at91sam9";
+ 	model = "Overkiz Kizbox";
+@@ -112,32 +113,46 @@
+ 		};
+ 	};
  
- 	chosen {
-@@ -38,10 +38,6 @@
+-	leds {
+-		compatible = "gpio-leds";
++	pwm_leds {
++		compatible = "pwm-leds";
  
- 	ahb {
- 		apb {
--			dbgu: serial at fffff200 {
--				status = "okay";
--			};
--
- 			usart0: serial at fffb0000 {
- 				status = "okay";
- 			};
-@@ -57,6 +53,10 @@
- 				status = "okay";
- 			};
- 
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
- 			watchdog at fffffd40 {
- 				timeout-sec = <15>;
- 				atmel,max-heartbeat-sec = <16>;
-@@ -65,6 +65,11 @@
- 			};
+-		led1g {
+-			label = "led1:green";
+-			gpios = <&pioB 0 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "none";
++		network_green {
++			label = "pwm:green:network";
++			pwms = <&tcb_pwm 2 10000000 PWM_POLARITY_INVERTED>;
++			max-brightness = <255>;
++			linux,default-trigger = "default-on";
  		};
  
-+		usb0: ohci at 00500000 {
-+			num-ports = <1>;
-+			status = "okay";
-+		};
+-		led1r {
+-			label = "led1:red";
+-			gpios = <&pioB 1 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "none";
++		network_red {
++			label = "pwm:red:network";
++			pwms = <&tcb_pwm 3 10000000 PWM_POLARITY_INVERTED>;
++			max-brightness = <255>;
++			linux,default-trigger = "default-on";
+ 		};
+ 
+-		led2g {
+-			label = "led2:green";
+-			gpios = <&pioB 2 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "none";
+-			default-state = "on";
++		user_green {
++			label = "pwm:green:user";
++			pwms = <&tcb_pwm 0 10000000 PWM_POLARITY_INVERTED>;
++			max-brightness = <255>;
++			linux,default-trigger = "default-on";
+ 		};
+ 
+-		led2r {
+-			label = "led2:red";
+-			gpios = <&pioB 3 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "none";
++		user_red {
++			label = "pwm:red:user";
++			pwms = <&tcb_pwm 1 10000000 PWM_POLARITY_INVERTED>;
++			max-brightness = <255>;
++			linux,default-trigger = "default-on";
+ 		};
+ 	};
 +
- 		nand0: nand at 40000000 {
- 			nand-bus-width = <8>;
- 			nand-ecc-mode = "soft";
-@@ -79,24 +84,36 @@
- 				label = "ubi";
- 				reg = <0xc0000 0x7f40000>;
- 			};
-+		};
++	tcb_pwm: pwm {
++		compatible = "atmel,tcb-pwm";
++		#pwm-cells = <3>;
++		tc-block = <1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_tcb1_tioa0
++			     &pinctrl_tcb1_tioa1
++			     &pinctrl_tcb1_tioa2
++			     &pinctrl_tcb1_tiob0>;
 +	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 
-+		reset {
-+			label = "reset";
-+			gpios = <&pioB 30 GPIO_ACTIVE_LOW>;
-+			linux,code = <0x100>;
-+			gpio-key,wakeup;
- 		};
- 
--		usb0: ohci at 00500000 {
--			num-ports = <1>;
--			status = "okay";
-+		mode {
-+			label = "mode";
-+			gpios = <&pioB 31 GPIO_ACTIVE_LOW>;
-+			linux,code = <0x101>;
-+			gpio-key,wakeup;
- 		};
- 	};
- 
- 	i2c at 0 {
- 		status = "okay";
- 
--		pcf8563 at 51 {
--			/* nxp pcf8563 rtc */
-+		rtc: pcf8563 at 51 {
- 			compatible = "nxp,pcf8563";
- 			reg = <0x51>;
- 		};
--
- 	};
- 
- 	leds {
-@@ -127,24 +144,4 @@
- 			linux,default-trigger = "none";
- 		};
- 	};
--
--	gpio_keys {
--		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		reset {
--			label = "reset";
--			gpios = <&pioB 30 GPIO_ACTIVE_LOW>;
--			linux,code = <0x100>;
--			gpio-key,wakeup;
--		};
--
--		mode {
--			label = "mode";
--			gpios = <&pioB 31 GPIO_ACTIVE_LOW>;
--			linux,code = <0x101>;
--			gpio-key,wakeup;
--		};
--	};
  };
 -- 
 1.9.1
