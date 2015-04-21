@@ -1,53 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Apr 2015 12:50:02 +0200
-Subject: your mail
-In-Reply-To: <20150421104634.GA3996@e103592.cambridge.arm.com>
-References: <CAKv+Gu9u73+YKn+aR1vk+1eNF_voC71THWRQS96jyAt4HB3BQw@mail.gmail.com>
- <20150421104634.GA3996@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu-3iM2+TvAgfV91FzfgAQuZhr=beeJ8RWmmGjTChbUrtQ@mail.gmail.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Tue, 21 Apr 2015 18:53:32 +0800
+Subject: [PATCH] soc: mediatek: Fix off-by-one checking for rate_spi
+Message-ID: <1429613612.5644.1.camel@ingics.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 April 2015 at 12:46, Dave P Martin <Dave.Martin@arm.com> wrote:
-> On Tue, Apr 21, 2015 at 11:18:08AM +0100, Ard Biesheuvel wrote:
->> On 21 April 2015 at 12:13, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Tue, Apr 21, 2015 at 12:08:51PM +0200, Ard Biesheuvel wrote:
->> >> This updates the PROCINFO offset-to-setup-function fields of the
->> >> Thumb2 capable CPU definitions to include the Thumb bit when building
->> >> a Thumb2 kernel. This ensures that these function are always called
->> >> in the correct mode.
->> >
->> > I don't think this is necessary, in fact, I think this is positively
->> > regression causing.
->> >
->> > The symbol 'initfunc' is known to the assembler to be a thumb symbol.
->> > As we have seen already from the kernel dumps from the V7M kernel, when
->> > it calculates initfunc - name in a T2 kernel, the resulting value is an
->> > _odd_ number.
->> >
->>
->> OK, so BSYM() uses '+ 1' rather than ' | 1'? I wasn't expecting that, sorry.
->
-> '| 1' is more logical, but can't be resolved at link time because
-> there's no relocation for this operation.  Hence '+ 1'.  This matters
-> for local cross-section references that can't be resolved at assembly
-> time.
->
+If rate_spi is 26000000, current code set ck_mhz to 18 rather than 26.
+Fix the off-by-one checking for rate_spi.
 
-OK, that makes sense. But it does appear that the local cross-section
-references are working just fine, i.e., references from other sections
-in the same .o have the thumb bit set correctly even without BSYM()
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+ drivers/soc/mediatek/mtk-pmic-wrap.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
->> But looking at proc-v7.S again, the problem may just be the missing
->> ENDPROC() declarations for a couple of the setup() functions, which
->> explains why they are lacking the Thumb annotations.
->
-> Yes, if any are missing ENDPROC() then it should be added there.
->
-
-I am putting together a v2 with this instead of the BSYM() on the initfn
-
-
-Cheers,
-Ard.
+diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+index db5be1e..e910e19 100644
+--- a/drivers/soc/mediatek/mtk-pmic-wrap.c
++++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+@@ -568,9 +568,9 @@ static int pwrap_init_reg_clock(struct pmic_wrapper *wrp)
+ 
+ 	rate_spi = clk_get_rate(wrp->clk_spi);
+ 
+-	if (rate_spi > 26000000)
++	if (rate_spi >= 26000000)
+ 		ck_mhz = 26;
+-	else if (rate_spi > 18000000)
++	else if (rate_spi >= 18000000)
+ 		ck_mhz = 18;
+ 	else
+ 		ck_mhz = 0;
+-- 
+2.1.0
