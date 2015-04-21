@@ -1,31 +1,31 @@
 From: tyler.baker@linaro.org (Tyler Baker)
-Date: Tue, 21 Apr 2015 15:50:01 -0700
-Subject: [PATCH v4 2/7] selftests/ftrace: install test.d
-Message-ID: <1429656601-9254-1-git-send-email-tyler.baker@linaro.org>
+Date: Tue, 21 Apr 2015 15:50:51 -0700
+Subject: [PATCH v4 3/7] selftests/kdbus: install kdbus-test
+Message-ID: <1429656651-9427-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ftrace test requires the directory test.d and all of it's contents to be
-present during execution. Use TEST_DIRS to ensure this is copied to the
-INSTALL_PATH.
+Set TEST_PROGS so that kdbus-test is installed.
 
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Acked-by: Michael Ellerman <mpe@ellerman.id.au>
 Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
 ---
- tools/testing/selftests/ftrace/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+ tools/testing/selftests/kdbus/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/tools/testing/selftests/ftrace/Makefile b/tools/testing/selftests/ftrace/Makefile
-index 3467206..0acbeca 100644
---- a/tools/testing/selftests/ftrace/Makefile
-+++ b/tools/testing/selftests/ftrace/Makefile
-@@ -1,6 +1,7 @@
- all:
+diff --git a/tools/testing/selftests/kdbus/Makefile b/tools/testing/selftests/kdbus/Makefile
+index de8242f..94ea75b 100644
+--- a/tools/testing/selftests/kdbus/Makefile
++++ b/tools/testing/selftests/kdbus/Makefile
+@@ -41,6 +41,8 @@ include ../lib.mk
+ kdbus-test: $(OBJS)
+ 	$(CC) $(CFLAGS) $^ $(LDLIBS) -o $@
  
- TEST_PROGS := ftracetest
-+TEST_DIRS := test.d/
- 
- include ../lib.mk
++TEST_PROGS := kdbus-test
++
+ run_tests:
+ 	./kdbus-test --tap
  
 -- 
 2.1.4
