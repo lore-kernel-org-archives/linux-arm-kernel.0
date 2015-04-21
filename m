@@ -1,34 +1,60 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Tue, 21 Apr 2015 11:09:55 -0700
-Subject: [PATCH 8/9] ARM: Add MAINTAINERS for 2836.
+Date: Tue, 21 Apr 2015 11:09:56 -0700
+Subject: [PATCH 9/9] ARM: BCM283x: Register fixed clocks for uart in the DT.
 In-Reply-To: <1429639796-2169-1-git-send-email-eric@anholt.net>
 References: <1429639796-2169-1-git-send-email-eric@anholt.net>
-Message-ID: <1429639796-2169-9-git-send-email-eric@anholt.net>
+Message-ID: <1429639796-2169-10-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We were previously relying on the fixed clock registration in
+clk-bcm2835, but there doesn't seem to be any real reason to not just
+define it in the DT (and for the 2836 port, I would have needed to
+change the clock's physical address in clk-bcm2835.c).  Also, because
+we weren't registering the apb_pclk in clk-bcm2835 as a clock device,
+we were picking up the uart clock node as apb_pclk by accident.
+
+This gets serial working on 2836.
+
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/bcm283x-common.dtsi | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddc5a8c..1e3f1f1 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2128,6 +2128,13 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
- S:	Maintained
- N:	bcm2835
+diff --git a/arch/arm/boot/dts/bcm283x-common.dtsi b/arch/arm/boot/dts/bcm283x-common.dtsi
+index c15e309..2ce6661 100644
+--- a/arch/arm/boot/dts/bcm283x-common.dtsi
++++ b/arch/arm/boot/dts/bcm283x-common.dtsi
+@@ -67,8 +67,9 @@
+ 			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
+ 			reg = <0x7e201000 0x1000>;
+ 			interrupts = <2 25>;
+-			clock-frequency = <3000000>;
+ 			arm,primecell-periphid = <0x00241011>;
++			clocks = <&uart0_clk>, <&apb_pclk>;
++			clock-names = "uartclk", "apb_pclk";
+ 		};
  
-+BROADCOM BCM2836 ARM ARCHITECTURE
-+M:	Eric Anholt <eric@anholt.net>
-+L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
-+S:	Maintained
-+N:	bcm2836
+ 		i2s: i2s at 7e203000 {
+@@ -155,5 +156,19 @@
+ 			clock-output-names = "spi";
+ 			clock-frequency = <250000000>;
+ 		};
 +
- BROADCOM BCM33XX MIPS ARCHITECTURE
- M:	Kevin Cernekee <cernekee@gmail.com>
- L:	linux-mips at linux-mips.org
++		apb_pclk: apb_pclk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-output-names = "apb_pclk";
++			clock-frequency = <126000000>;
++		};
++
++		uart0_clk: uart0_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-output-names = "uart0_clk";
++			clock-frequency = <3000000>;
++		};
+ 	};
+ };
 -- 
 2.1.4
