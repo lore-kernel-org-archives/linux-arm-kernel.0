@@ -1,480 +1,107 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 22 Apr 2015 05:43:29 +0800
-Subject: [PATCH v6 10/11] arm: dts: add imx7d-sdb support
+Date: Wed, 22 Apr 2015 05:43:23 +0800
+Subject: [PATCH v6 04/11] Document: dt: binding: imx: update document for
+ imx7d support
 In-Reply-To: <1429652610-25265-1-git-send-email-Frank.Li@freescale.com>
 References: <1429652610-25265-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1429652610-25265-11-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1429652610-25265-5-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Frank Li <Frank.Li@freescale.com>
 
-add imx7d sdb board support
+This part just add necessary change to boot imx7d.
+Update clock, pinctrl and gpt for imx7d
 
 Signed-off-by: Frank Li <Frank.Li@freescale.com>
 ---
- arch/arm/boot/dts/Makefile      |   2 +
- arch/arm/boot/dts/imx7d-sdb.dts | 439 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 441 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx7d-sdb.dts
+ .../devicetree/bindings/clock/imx7d-clock.txt      | 13 +++++++++++
+ .../bindings/pinctrl/fsl,imx-pinctrl.txt           |  3 +++
+ .../bindings/pinctrl/fsl,imx7d-pinctrl.txt         | 27 ++++++++++++++++++++++
+ .../devicetree/bindings/timer/fsl,imxgpt.txt       |  3 +++
+ 4 files changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx7d-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a71d3c7..e062934 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -313,6 +313,8 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-sabreauto.dtb \
- 	imx6sx-sdb-reva.dtb \
- 	imx6sx-sdb.dtb
-+dtb-$(CONFIG_SOC_IMX7D) += \
-+	imx7d-sdb.dtb
- dtb-$(CONFIG_SOC_LS1021A) += \
- 	ls1021a-qds.dtb \
- 	ls1021a-twr.dtb
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+diff --git a/Documentation/devicetree/bindings/clock/imx7d-clock.txt b/Documentation/devicetree/bindings/clock/imx7d-clock.txt
 new file mode 100644
-index 0000000..d8ce3aa
+index 0000000..3db0076
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -0,0 +1,439 @@
-+/*
-+ * Copyright (C) 2015 Freescale Semiconductor, Inc.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
++++ b/Documentation/devicetree/bindings/clock/imx7d-clock.txt
+@@ -0,0 +1,13 @@
++* Clock bindings for Freescale i.MX7 Dual
 +
-+/dts-v1/;
++Required properties:
++- compatible: Should be "fsl,imx7d-ccm"
++- reg: Address and length of the register set
++- #clock-cells: Should be <1>
++- clocks: list of clock specifiers, must contain an entry for each required
++  entry in clock-names
++- clock-names: should include entries "ckil", "osc", "ipp_di0" and "ipp_di1"
 +
-+#include <dt-bindings/input/input.h>
-+#include "imx7d.dtsi"
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx7d-clock.h
++for the full list of i.MX7 Dual clock IDs.
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+index 9fde25f..718a202 100644
+--- a/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+@@ -21,6 +21,9 @@ Required properties for iomux controller:
+ - compatible: "fsl,<soc>-iomuxc"
+   Please refer to each fsl,<soc>-pinctrl.txt binding doc for supported SoCs.
+ 
++  "fsl,<chip>-iomux-lpsr". Some <chip> (imx7d) support one kinds of iomux which
++can keep state when LPSR mode.
 +
-+/ {
-+	model = "Freescale i.MX7 SabreSD Board";
-+	compatible = "fsl,imx7d-sdb", "fsl,imx7d";
+ Required properties for pin configuration node:
+ - fsl,pins: each entry consists of 6 integers and represents the mux and config
+   setting for one pin. The first 5 integers <mux_reg conf_reg input_reg mux_val
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+new file mode 100644
+index 0000000..b537da6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+@@ -0,0 +1,27 @@
++* Freescale i.MX7 Dual IOMUX Controller
 +
-+	memory {
-+		reg = <0x80000000 0x80000000>;
-+	};
++Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
++and usage.
 +
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++Required properties:
++- compatible: "fsl,imx67d-iomuxc"
++- fsl,pins: each entry consists of 6 integers and represents the mux and config
++  setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
++  input_val> are specified using a PIN_FUNC_ID macro, which can be found in
++  imx6sx-pinfunc.h under device tree source folder.  The last integer CONFIG is
++  the pad setting value like pull-up on this pin.  Please refer to i.MX7 Dual
++  Reference Manual for detailed CONFIG settings.
 +
-+		reg_usb_otg1_vbus: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "usb_otg1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
++CONFIG bits definition:
++PAD_CTL_PUS_100K_DOWN           (0 << 5)
++PAD_CTL_PUS_5K_UP               (1 << 5)
++PAD_CTL_PUS_47K_UP              (2 << 5)
++PAD_CTL_PUS_100K_UP             (3 << 5)
++PAD_CTL_PUE                     (1 << 4)
++PAD_CTL_HYS                     (1 << 3)
++PAD_CTL_SRE_SLOW                (1 << 2)
++PAD_CTL_SRE_FAST                (0 << 2)
++PAD_CTL_DSE_X1                  (0 << 0)
++PAD_CTL_DSE_X2                  (1 << 0)
++PAD_CTL_DSE_X3                  (2 << 0)
++PAD_CTL_DSE_X4                  (3 << 0)
+diff --git a/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt b/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
+index 9809b11..c14843b 100644
+--- a/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
++++ b/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
+@@ -7,6 +7,9 @@ Required properties:
+ - interrupts : A list of 4 interrupts; one per timer channel.
+ - clocks : The clocks provided by the SoC to drive the timer.
+ 
++Supported <soc>:
++	imx1,imx27,imx51,imx53,imx6q,imx6dl,imx6sl,imx6sx,imx7d.
 +
-+		reg_usb_otg2_vbus: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "usb_otg2_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+
-+		reg_can2_3v3: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "can2-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio1 7 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		reg_vref_1v8: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "vref-1v8";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+		};
-+
-+		wlreg_on: fixedregulator at 100 {
-+			compatible = "regulator-fixed";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-name = "wlreg_on";
-+			gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+	};
-+};
-+
-+&cpu0 {
-+	arm-supply = <&sw1a_reg>;
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pmic: pfuze3000 at 08 {
-+		compatible = "fsl,pfuze3000";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1a {
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1475000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			/* use sw1c_reg to align with pfuze100/pfuze200 */
-+			sw1c_reg: sw1b {
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1475000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1850000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3 {
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1650000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vldo1 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen2_reg: vldo2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vccsd {
-+				regulator-min-microvolt = <2850000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen4_reg: v33 {
-+				regulator-min-microvolt = <2850000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vldo3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vldo4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+};
-+
-+&i2c4 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c4>;
-+	status = "okay";
-+
-+	codec: wm8960 at 1a {
-+		compatible = "wlf,wm8960";
-+		reg = <0x1a>;
-+		clocks = <&clks IMX7D_AUDIO_MCLK_ROOT_CLK>;
-+		clock-names = "mclk";
-+		wlf,shared-lrclk;
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog_1>;
-+
-+	imx7d-sdb {
-+		pinctrl_hog_1: hoggrp-1 {
-+			fsl,pins = <
-+				MX7D_PAD_UART3_CTS_B__GPIO4_IO7	0x14
-+				MX7D_PAD_ECSPI2_SS0__GPIO4_IO23	 0x34  /* bt reg on */
-+			>;
-+		};
-+
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <
-+				MX7D_PAD_I2C1_SDA__I2C1_SDA	0x4000007f
-+				MX7D_PAD_I2C1_SCL__I2C1_SCL	0x4000007f
-+			>;
-+		};
-+
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				MX7D_PAD_I2C2_SDA__I2C2_SDA	0x4000007f
-+				MX7D_PAD_I2C2_SCL__I2C2_SCL	0x4000007f
-+			>;
-+		};
-+
-+		pinctrl_i2c3: i2c3grp {
-+			fsl,pins = <
-+				MX7D_PAD_I2C3_SDA__I2C3_SDA          0x4000007f
-+				MX7D_PAD_I2C3_SCL__I2C3_SCL          0x4000007f
-+			>;
-+		};
-+
-+		pinctrl_i2c4: i2c4grp {
-+			fsl,pins = <
-+				MX7D_PAD_SAI1_RX_BCLK__I2C4_SDA		0x4000007f
-+				MX7D_PAD_SAI1_RX_SYNC__I2C4_SCL		0x4000007f
-+			>;
-+		};
-+
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX 0x79
-+				MX7D_PAD_UART1_RX_DATA__UART1_DCE_RX 0x79
-+			>;
-+		};
-+
-+		pinctrl_uart5: uart5grp {
-+			fsl,pins = <
-+				MX7D_PAD_SAI1_TX_BCLK__UART5_DCE_TX 0x79
-+				MX7D_PAD_SAI1_RX_DATA__UART5_DCE_RX 0x79
-+				MX7D_PAD_SAI1_TX_SYNC__UART5_DCE_CTS 0x79
-+				MX7D_PAD_SAI1_TX_DATA__UART5_DCE_RTS 0x79
-+			>;
-+		};
-+
-+		pinctrl_uart6: uart6grp {
-+			fsl,pins = <
-+				MX7D_PAD_ECSPI1_MOSI__UART6_DCE_TX 0x79
-+				MX7D_PAD_ECSPI1_SCLK__UART6_DCE_RX 0x79
-+				MX7D_PAD_ECSPI1_SS0__UART6_DCE_CTS 0x79
-+				MX7D_PAD_ECSPI1_MISO__UART6_DCE_RTS 0x79
-+			>;
-+		};
-+
-+		pinctrl_usdhc1: usdhc1grp {
-+			fsl,pins = <
-+				MX7D_PAD_SD1_CMD__SD1_CMD	0x59
-+				MX7D_PAD_SD1_CLK__SD1_CLK	0x19
-+				MX7D_PAD_SD1_DATA0__SD1_DATA0	0x59
-+				MX7D_PAD_SD1_DATA1__SD1_DATA1	0x59
-+				MX7D_PAD_SD1_DATA2__SD1_DATA2	0x59
-+				MX7D_PAD_SD1_DATA3__SD1_DATA3	0x59
-+				MX7D_PAD_SD1_CD_B__GPIO5_IO0	0x59 /* CD */
-+				MX7D_PAD_SD1_WP__GPIO5_IO1	0x59 /* WP */
-+				MX7D_PAD_SD1_RESET_B__GPIO5_IO2	0x59 /* vmmc */
-+			>;
-+		};
-+
-+		pinctrl_usdhc2: usdhc2grp {
-+			fsl,pins = <
-+				MX7D_PAD_SD2_CMD__SD2_CMD       0x59
-+				MX7D_PAD_SD2_CLK__SD2_CLK       0x19
-+				MX7D_PAD_SD2_DATA0__SD2_DATA0   0x59
-+				MX7D_PAD_SD2_DATA1__SD2_DATA1   0x59
-+				MX7D_PAD_SD2_DATA2__SD2_DATA2   0x59
-+				MX7D_PAD_SD2_DATA3__SD2_DATA3   0x59
-+				MX7D_PAD_ECSPI2_MOSI__GPIO4_IO21	0x59 /* WL_REG_ON */
-+			>;
-+		};
-+
-+		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
-+			fsl,pins = <
-+				MX7D_PAD_SD2_CMD__SD2_CMD       0x5a
-+				MX7D_PAD_SD2_CLK__SD2_CLK       0x1a
-+				MX7D_PAD_SD2_DATA0__SD2_DATA0   0x5a
-+				MX7D_PAD_SD2_DATA1__SD2_DATA1   0x5a
-+				MX7D_PAD_SD2_DATA2__SD2_DATA2   0x5a
-+				MX7D_PAD_SD2_DATA3__SD2_DATA3   0x5a
-+			>;
-+		};
-+
-+		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
-+			fsl,pins = <
-+				MX7D_PAD_SD2_CMD__SD2_CMD       0x5b
-+				MX7D_PAD_SD2_CLK__SD2_CLK       0x1b
-+				MX7D_PAD_SD2_DATA0__SD2_DATA0   0x5b
-+				MX7D_PAD_SD2_DATA1__SD2_DATA1   0x5b
-+				MX7D_PAD_SD2_DATA2__SD2_DATA2   0x5b
-+				MX7D_PAD_SD2_DATA3__SD2_DATA3   0x5b
-+			>;
-+		};
-+
-+
-+		pinctrl_usdhc3: usdhc3grp {
-+			fsl,pins = <
-+				MX7D_PAD_SD3_CMD__SD3_CMD	0x59
-+				MX7D_PAD_SD3_CLK__SD3_CLK	0x19
-+				MX7D_PAD_SD3_DATA0__SD3_DATA0	0x59
-+				MX7D_PAD_SD3_DATA1__SD3_DATA1	0x59
-+				MX7D_PAD_SD3_DATA2__SD3_DATA2	0x59
-+				MX7D_PAD_SD3_DATA3__SD3_DATA3	0x59
-+				MX7D_PAD_SD3_DATA4__SD3_DATA4	0x59
-+				MX7D_PAD_SD3_DATA5__SD3_DATA5	0x59
-+				MX7D_PAD_SD3_DATA6__SD3_DATA6	0x59
-+				MX7D_PAD_SD3_DATA7__SD3_DATA7	0x59
-+				MX7D_PAD_SD3_STROBE__SD3_STROBE	0x19
-+			>;
-+		};
-+
-+		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
-+			fsl,pins = <
-+				MX7D_PAD_SD3_CMD__SD3_CMD	0x5a
-+				MX7D_PAD_SD3_CLK__SD3_CLK	0x1a
-+				MX7D_PAD_SD3_DATA0__SD3_DATA0	0x5a
-+				MX7D_PAD_SD3_DATA1__SD3_DATA1	0x5a
-+				MX7D_PAD_SD3_DATA2__SD3_DATA2	0x5a
-+				MX7D_PAD_SD3_DATA3__SD3_DATA3	0x5a
-+				MX7D_PAD_SD3_DATA4__SD3_DATA4	0x5a
-+				MX7D_PAD_SD3_DATA5__SD3_DATA5	0x5a
-+				MX7D_PAD_SD3_DATA6__SD3_DATA6	0x5a
-+				MX7D_PAD_SD3_DATA7__SD3_DATA7	0x5a
-+				MX7D_PAD_SD3_STROBE__SD3_STROBE	0x1a
-+			>;
-+		};
-+
-+		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
-+			fsl,pins = <
-+				MX7D_PAD_SD3_CMD__SD3_CMD	0x5b
-+				MX7D_PAD_SD3_CLK__SD3_CLK	0x1b
-+				MX7D_PAD_SD3_DATA0__SD3_DATA0	0x5b
-+				MX7D_PAD_SD3_DATA1__SD3_DATA1	0x5b
-+				MX7D_PAD_SD3_DATA2__SD3_DATA2	0x5b
-+				MX7D_PAD_SD3_DATA3__SD3_DATA3	0x5b
-+				MX7D_PAD_SD3_DATA4__SD3_DATA4	0x5b
-+				MX7D_PAD_SD3_DATA5__SD3_DATA5	0x5b
-+				MX7D_PAD_SD3_DATA6__SD3_DATA6	0x5b
-+				MX7D_PAD_SD3_DATA7__SD3_DATA7	0x5b
-+				MX7D_PAD_SD3_STROBE__SD3_STROBE	0x1b
-+			>;
-+		};
-+
-+	};
-+};
-+
-+&iomuxc_lpsr {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog_2>;
-+
-+	imx7d-sdb {
-+		pinctrl_hog_2: hoggrp-2 {
-+			fsl,pins = <
-+				MX7D_PAD_GPIO1_IO05__GPIO5_IO5	0x14
-+				MX7D_PAD_GPIO1_IO07__GPIO1_IO7	0x59  /* CAN_STBY */
-+			>;
-+		};
-+		pinctrl_pwm1: pwm1grp {
-+			fsl,pins = <
-+				MX7D_PAD_GPIO1_IO01__PWM1_OUT	0x110b0
-+			>;
-+		};
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	assigned-clocks = <&clks IMX7D_UART1_ROOT_SRC>;
-+	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc1>;
-+	cd-gpios = <&gpio5 0 0>;
-+	wp-gpios = <&gpio5 1 0>;
-+	enable-sdio-wakeup;
-+	keep-power-in-suspend;
-+	status = "okay";
-+};
+ Example:
+ 
+ gpt1: timer at 10003000 {
 -- 
 1.9.1
