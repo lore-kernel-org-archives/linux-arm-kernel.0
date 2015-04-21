@@ -1,27 +1,33 @@
 From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
-Date: Tue, 21 Apr 2015 14:05:11 +0200
-Subject: [PATCH v2 0/7] ARM: at91/dt: kizbox: update and rename to at91-kizbox
-Message-ID: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
+Date: Tue, 21 Apr 2015 14:05:18 +0200
+Subject: [PATCH v2 7/7] ARM: at91/dt: at91-kizbox: update chosen node
+In-Reply-To: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
+References: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
+Message-ID: <1429617918-32086-8-git-send-email-g.portay@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-*** BLURB HERE ***
+Simplify the bootargs since the platform is booting from an initramfs and
+set the kernel stdout path to DBGU.
 
-Ga?l PORTAY (7):
-  ARM: at91/dt: kizbox: rename to at91-kizbox
-  ARM: at91/dt: at91-kizbox: sanitize file
-  ARM: at91/dt: at91-kizbox: user proper serial uart
-  ARM: at91/dt: at91-kizbox: gpio-keys related changes
-  ARM: at91/dt: at91-kizbox: leds related changes
-  ARM: at91/dt: at91-kizbox: re-size nand partitions
-  ARM: at91/dt: at91-kizbox: update chosen node
+Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+---
+ arch/arm/boot/dts/at91-kizbox.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
- arch/arm/boot/dts/Makefile        |   2 +-
- arch/arm/boot/dts/at91-kizbox.dts | 159 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/kizbox.dts      | 150 -----------------------------------
- 3 files changed, 160 insertions(+), 151 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-kizbox.dts
- delete mode 100644 arch/arm/boot/dts/kizbox.dts
-
+diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
+index e739104..b567b5f 100644
+--- a/arch/arm/boot/dts/at91-kizbox.dts
++++ b/arch/arm/boot/dts/at91-kizbox.dts
+@@ -15,7 +15,8 @@
+ 	compatible = "overkiz,kizbox", "atmel,at91sam9g20", "atmel,at91sam9";
+ 
+ 	chosen {
+-		bootargs = "panic=5 ubi.mtd=1 rootfstype=ubifs root=ubi0:root";
++		bootargs = "ubi.mtd=ubi";
++		linux,stdout-path = &dbgu;
+ 	};
+ 
+ 	memory {
 -- 
 1.9.1
