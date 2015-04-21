@@ -1,47 +1,48 @@
 From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
-Date: Tue, 21 Apr 2015 14:05:15 +0200
-Subject: [PATCH v2 4/7] ARM: at91/dt: at91-kizbox: gpio-keys related changes
+Date: Tue, 21 Apr 2015 14:05:14 +0200
+Subject: [PATCH v2 3/7] ARM: at91/dt: at91-kizbox: user proper serial uart
 In-Reply-To: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
 References: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <1429617918-32086-5-git-send-email-g.portay@overkiz.com>
+Message-ID: <1429617918-32086-4-git-send-email-g.portay@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This:
- * fixes active level of GPIO (active high) and
- * renames buttons:
-   - reset (PB_RST), and
-   - mode to user (PB_USER).
+USART3 is the only serial UART accessible.
 
 Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
 ---
- arch/arm/boot/dts/at91-kizbox.dts | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/at91-kizbox.dts | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index 72d5de80..73e4559 100644
+index 00c86c1..72d5de80 100644
 --- a/arch/arm/boot/dts/at91-kizbox.dts
 +++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -89,15 +89,15 @@
- 		#size-cells = <0>;
+@@ -38,14 +38,6 @@
  
- 		reset {
--			label = "reset";
--			gpios = <&pioB 30 GPIO_ACTIVE_LOW>;
-+			label = "PB_RST";
-+			gpios = <&pioB 30 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x100>;
- 			gpio-key,wakeup;
- 		};
+ 	ahb {
+ 		apb {
+-			usart0: serial at fffb0000 {
+-				status = "okay";
+-			};
+-
+-			usart1: serial at fffb4000 {
+-				status = "okay";
+-			};
+-
+ 			macb0: ethernet at fffc4000 {
+ 				phy-mode = "mii";
+ 				pinctrl-0 = <&pinctrl_macb_rmii
+@@ -53,6 +45,10 @@
+ 				status = "okay";
+ 			};
  
--		mode {
--			label = "mode";
--			gpios = <&pioB 31 GPIO_ACTIVE_LOW>;
-+		user {
-+			label = "PB_USER";
-+			gpios = <&pioB 31 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x101>;
- 			gpio-key,wakeup;
- 		};
++			usart3: serial at fffd0000 {
++				status = "okay";
++			};
++
+ 			dbgu: serial@fffff200 {
+ 				status = "okay";
+ 			};
 -- 
 1.9.1
