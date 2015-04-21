@@ -1,64 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 Apr 2015 12:00:39 +0100
-Subject: Programming the boundary between Inner and Outer caches on ARM
- architecture
-In-Reply-To: <CAJWVF-xvca0MpKF1=GoyyffGTzxtvy_LoaZfjhwU27vSuyOHFA@mail.gmail.com>
-References: <CAJWVF-w5YpZjRqnvbz1p70_WTBROL9vDkvYb_sG43nGp=s1vLg@mail.gmail.com>
- <20150420100119.GC24715@e104818-lin.cambridge.arm.com>
- <CAJWVF-xvca0MpKF1=GoyyffGTzxtvy_LoaZfjhwU27vSuyOHFA@mail.gmail.com>
-Message-ID: <20150421110038.GH30114@e104818-lin.cambridge.arm.com>
+From: Dongsheng.Wang@freescale.com (Dongsheng.Wang at freescale.com)
+Date: Tue, 21 Apr 2015 11:01:06 +0000
+Subject: [RESEND PATCH 4/8] layerscape/ftm: Add compatible string for FTM0
+ be used as alarm timer.
+In-Reply-To: <20150421104228.GC8544@leverpostej>
+References: <1427888858-29636-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1427888858-29636-5-git-send-email-bhupesh.sharma@freescale.com>
+ <20150401132400.GF11403@leverpostej>
+ <BN1PR03MB1881AD322072E34DAC380259DEF0@BN1PR03MB188.namprd03.prod.outlook.com>
+ <20150421104228.GC8544@leverpostej>
+Message-ID: <BN1PR03MB18889FA7A501618AD29E1F79DEF0@BN1PR03MB188.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 12:23:17AM +0530, Bhaskara rao Budiredla wrote:
-> Hi Catalin - The above said desired configuration was with respect to
-> a specific requirement of mine on Cortex A15. Seems it is confusing.
-> Let me give you the complete details. Along with PRRR/NMRR registers,
-> I am using [TEX[0], C, B] to configure the memory system attributes.
-> The inner cacheable attribute of NMRR normal memory region is
-> "write-back, write-allocate" and the corresponding outer cacheable
-> attribute is "write-back, no write-allocate".
 
-Any reason why they need to be different or that's just what Linux
-writes in NMRR?
 
-> Since the lowest level
-> (level zero) cache defaults to inner cacheable attribute and the
-> highest level (level two) defaults to outer cacheable attribute,
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Tuesday, April 21, 2015 6:42 PM
+> To: Wang Dongsheng-B40534
+> Cc: Sharma Bhupesh-B45370; arnd at arndb.de; linux-arm-kernel at lists.infradead.org;
+> Marc Zyngier; bhupesh.linux at gmail.com; Catalin Marinas; Yoder Stuart-B08248;
+> olof at lixom.net; Will Deacon
+> Subject: Re: [RESEND PATCH 4/8] layerscape/ftm: Add compatible string for FTM0
+> be used as alarm timer.
+> 
+> > > > +	ftm0: ftm0 at 2800000 {
+> > > > +		compatible = "fsl,ftm-alarm";
+> > > > +		reg = <0x0 0x2800000 0x0 0x10000>;
+> > > > +		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
+> > > > +	};
+> > >
+> > > Missing properties?
+> > >
+> >
+> > The FTM0 alarm timer only need "compatible", "reg" and "interrupts" properties.
+> > I miss something about the properties?
+> 
+> As far as I could tell from the original patch, clocks were also listed as
+> required properties regardless.
+> 
 
-Why do you say that level two defaults to outer cacheable? Actually,
-what do you mean by zero, one, two? Are these the indices in the CLIDR?
-Cortex-A15 has two levels of cache, one and two, both treated as inner.
+Yes, But only one clock can be used for FTM0 as alarm timer. So this node not need to
+"clock" properties. :)
 
-> level one cache is the remaining that I need to program explicitly.
-> Hence the requirement to configure the boundary between the inner and
-> outer cacheable attributes to group the level one cache either with
-> level zero (or) level two.
-
-IIRC, the only CPU where we could configure this was Cortex-A8 via the
-L2ACTLR register ("L2 inner" bit) and from some past discussions, we
-wanted this to be treated as inner cache:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082561.html
-
-(in Linux, we call outer cache some cache that needs separate
-maintenance by PA like the PL310)
-
-> 1. I am unable to find the register name that can be used for the
-> above said purpose from Cortex A15 documentation. Please help me in
-> providing that register details, if there is any such register (or)
-> some other procedure by which the same can be achieved.
-
-No such configuration. L1 and L2 caches are inner on A15.
-
-> 2. Configuration of the boundary between inner and outer caches is not
-> needed for a system where in the inner and outer cacheable attributes
-> are same. Does the current Linux kernel for ARM architecture assumes
-> this?
-
-The outer attributes are sent on the bus in case you have an L3 cache.
-In general, I would set both inner and outer attributes the same. I
-don't understand what your "specific requirement" is.
-
--- 
-Catalin
+Regards,
+-Dongsheng
