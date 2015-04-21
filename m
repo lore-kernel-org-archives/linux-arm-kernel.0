@@ -1,101 +1,80 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Tue, 21 Apr 2015 14:18:03 +0100
-Subject: your mail
-In-Reply-To: <20150421125049.GW12732@n2100.arm.linux.org.uk>
-References: <CAKv+Gu9u73+YKn+aR1vk+1eNF_voC71THWRQS96jyAt4HB3BQw@mail.gmail.com>
- <20150421104634.GA3996@e103592.cambridge.arm.com>
- <CAKv+Gu-3iM2+TvAgfV91FzfgAQuZhr=beeJ8RWmmGjTChbUrtQ@mail.gmail.com>
- <20150421111042.GB3996@e103592.cambridge.arm.com>
- <20150421112420.GV12732@n2100.arm.linux.org.uk>
- <20150421125049.GW12732@n2100.arm.linux.org.uk>
-Message-ID: <20150421131801.GD3996@e103592.cambridge.arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 21 Apr 2015 15:17:50 +0200
+Subject: [PATCH 0/8] cpufreq: add generic cpufreq driver support for
+ Exynos5250/5800 platforms
+Message-ID: <1429622278-12216-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 01:50:50PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Apr 21, 2015 at 12:24:20PM +0100, Russell King - ARM Linux wrote:
-> > We should probably create a badr macro to complement the adr pseudo-op
-> > which incorporates the BSYM thing so make this clearer - and a comment
-> > before it.  This is really the case where BSYM should be used.
-> 
-> Something like this.  Note that I've also removed the BSYM() usage in
-> the KVM code.
+Hi,
 
-Nice.  Wrapping this around adr will make the assembler check that it's
-not a cross-section reference too.
+This patch series adds generic arm_big_little_dt cpufreq driver
+support for Exynos5420/5800 (using the new CPU clock type which
+allows it).  It also:
+- enhances arm_big_little[_dt] driver with CPU cluster regulator
+  support
+- fixes CPU clock configuration data and CPU operating points
+  setup for Exynos5800
+- adds CPU cluster regulator supplies for ODROID-XU3 board
 
->  arch/arm/boot/compressed/head.S          |  4 ++--
->  arch/arm/common/mcpm_head.S              |  2 +-
->  arch/arm/include/asm/assembler.h         | 17 ++++++++++++++++-
->  arch/arm/include/asm/entry-macro-multi.S |  4 ++--
->  arch/arm/include/asm/unified.h           |  2 --
->  arch/arm/kernel/entry-armv.S             | 12 ++++++------
->  arch/arm/kernel/entry-common.S           |  6 +++---
->  arch/arm/kernel/entry-ftrace.S           |  2 +-
->  arch/arm/kernel/head-nommu.S             |  6 +++---
->  arch/arm/kernel/head.S                   |  8 ++++----
->  arch/arm/kernel/sleep.S                  |  2 +-
->  arch/arm/kvm/interrupts.S                |  2 +-
->  arch/arm/lib/call_with_stack.S           |  2 +-
->  arch/arm/mm/proc-v7m.S                   |  2 +-
->  14 files changed, 42 insertions(+), 29 deletions(-)
-> 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 2c45b5709fa4..06e983f59980 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -130,7 +130,7 @@ start:
->                 .endr
->     ARM(                mov     r0, r0          )
->     ARM(                b       1f              )
-> - THUMB(                adr     r12, BSYM(1f)   )
-> + THUMB(                badr    r12, 1f         )
->   THUMB(                bx      r12             )
-> 
->                 .word   _magic_sig      @ Magic numbers to help the loader
-> @@ -447,7 +447,7 @@ dtb_check_done:
-> 
->                 bl      cache_clean_flush
-> 
-> -               adr     r0, BSYM(restart)
-> +               badr    r0, restart
->                 add     r0, r0, r6
->                 mov     pc, r0
-> 
-> diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
-> index e02db4b81a66..08b3bb9bc6a2 100644
-> --- a/arch/arm/common/mcpm_head.S
-> +++ b/arch/arm/common/mcpm_head.S
-> @@ -49,7 +49,7 @@
->  ENTRY(mcpm_entry_point)
-> 
->   ARM_BE8(setend        be)
-> - THUMB(        adr     r12, BSYM(1f)   )
-> + THUMB(        badr    r12, 1f         )
->   THUMB(        bx      r12             )
->   THUMB(        .thumb                  )
->  1:
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index 186270b3e194..4abe57279c66 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -178,6 +178,21 @@
->         .endm
-> 
->  /*
-> + * Assembly version of "adr rd, BSYM(sym)".  This should only be used to
-> + * reference local symbols in the same assembly file which are to be
-> + * resolved by the assembler.  Other usage is undefined.
+This patch series has been tested on Exynos5800 based ODROID-XU3
+board.
 
-BSYM() is gone, so this comment shouldn't refer to it...
+Depends on:
+- next-20150330 branch of linux-next kernel tree
+- "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4210
+  platform" [1]
+- "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+  platform" [2]
+- "[PATCH] cpufreq: exynos: remove dead ->need_apll_change method" [3]
+- "[PATCH 0/4] cpufreq: use generic cpufreq drivers for Exynos5250
+  platform" [4]
 
-> + */
-> +       .irp    c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
+[1] http://www.kernelhub.org/?msg=721136&p=2
+[2] http://marc.info/?l=linux-pm&m=142868881101873&w=2
+[3] https://lkml.org/lkml/2015/3/27/574
+[4] https://lkml.org/lkml/2015/4/13/611
 
-This wrap-macro-with-cc idiom could be factored, but it may not be worth
-it just yet.
+Changes over Thomas' original v12 code:
+- split Exynos5420 and Exynos5800 support
+- moved E5420_[EGL,KFC]_DIV0() macros to clk-exynos5420.c
+- disabled cpufreq if big.LITTLE switcher support is enabled
+- enhanced arm_big_little[_dt] driver with CPU cluster regulator
+  support
+- fixed CPU clock configuration data for Exynos5800
+- fixed CPU operating points setup for Exynos5800
+- added CPU cluster regulator supplies for ODROID-XU3 board
 
-[...]
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-Cheers
----Dave
+
+Bartlomiej Zolnierkiewicz (4):
+  cpufreq: arm_big_little: add cluster regulator support
+  ARM: dts: add cluster regulator supply properties for
+    exynos5422-odroidxu3
+  clk: samsung: exynos5800: fix cpu clock configuration data
+  ARM: dts: Exynos5800: fix CPU OPP
+
+Thomas Abraham (4):
+  clk: samsung: exynos5420: add cpu clock configuration data and
+    instantiate cpu clock
+  ARM: dts: Exynos5420: add CPU OPP and regulator supply property
+  ARM: Exynos: use generic cpufreq driver for Exynos5420
+  ARM: Exynos: use generic cpufreq driver for Exynos5800
+
+ .../bindings/cpufreq/arm_big_little_dt.txt         |    4 +
+ arch/arm/boot/dts/exynos5420.dtsi                  |   38 +++++
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts         |    8 +
+ arch/arm/boot/dts/exynos5800.dtsi                  |   39 +++++
+ arch/arm/mach-exynos/exynos.c                      |    8 +
+ drivers/clk/samsung/clk-exynos5420.c               |   88 ++++++++++-
+ drivers/cpufreq/arm_big_little.c                   |  153 +++++++++++++++++---
+ include/dt-bindings/clock/exynos5420.h             |    2 +
+ 8 files changed, 320 insertions(+), 20 deletions(-)
+
+-- 
+1.7.9.5
