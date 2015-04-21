@@ -1,14 +1,17 @@
 From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
-Date: Tue, 21 Apr 2015 14:05:17 +0200
-Subject: [PATCH v2 6/7] ARM: at91/dt: at91-kizbox: re-size nand partitions
+Date: Tue, 21 Apr 2015 14:05:15 +0200
+Subject: [PATCH v2 4/7] ARM: at91/dt: at91-kizbox: gpio-keys related changes
 In-Reply-To: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
 References: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <1429617918-32086-7-git-send-email-g.portay@overkiz.com>
+Message-ID: <1429617918-32086-5-git-send-email-g.portay@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-size NAND partitions since the bootstrap is able to read volumes from an
-UBI image.
+This:
+ * fixes active level of GPIO (active high) and
+ * renames buttons:
+   - reset (PB_RST), and
+   - mode to user (PB_USER).
 
 Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
 ---
@@ -16,28 +19,29 @@ Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
  1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index b19f568..e739104 100644
+index 72d5de80..73e4559 100644
 --- a/arch/arm/boot/dts/at91-kizbox.dts
 +++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -72,14 +72,14 @@
- 			nand-ecc-mode = "soft";
- 			status = "okay";
+@@ -89,15 +89,15 @@
+ 		#size-cells = <0>;
  
--			bootloaderkernel at 0 {
--				label = "bootloader-kernel";
--				reg = <0x0 0xc0000>;
-+			bootstrap at 0 {
-+				label = "bootstrap";
-+				reg = <0x0 0x20000>;
- 			};
- 
--			ubi at c0000 {
-+			ubi at 20000 {
- 				label = "ubi";
--				reg = <0xc0000 0x7f40000>;
-+				reg = <0x20000 0x7fe0000>;
- 			};
+ 		reset {
+-			label = "reset";
+-			gpios = <&pioB 30 GPIO_ACTIVE_LOW>;
++			label = "PB_RST";
++			gpios = <&pioB 30 GPIO_ACTIVE_HIGH>;
+ 			linux,code = <0x100>;
+ 			gpio-key,wakeup;
  		};
- 	};
+ 
+-		mode {
+-			label = "mode";
+-			gpios = <&pioB 31 GPIO_ACTIVE_LOW>;
++		user {
++			label = "PB_USER";
++			gpios = <&pioB 31 GPIO_ACTIVE_HIGH>;
+ 			linux,code = <0x101>;
+ 			gpio-key,wakeup;
+ 		};
 -- 
 1.9.1
