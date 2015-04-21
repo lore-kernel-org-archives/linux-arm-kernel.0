@@ -1,125 +1,90 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 21 Apr 2015 12:11:01 +0100
-Subject: [Xen-devel] [PATCH] xen: Add __GFP_DMA flag when xen_swiotlb_init
- gets free pages.
-In-Reply-To: <alpine.DEB.2.02.1504211115300.3112@kaball.uk.xensource.com>
-References: <1429526904-27176-1-git-send-email-cbz@baozis.org>
- <5534DABB.5060305@citrix.com> <20150420110729.GA27707@cbz-thinkpad>
- <5534EAE3.8060403@citrix.com>
- <alpine.DEB.2.02.1504201828380.30125@kaball.uk.xensource.com>
- <1429603030.6174.21.camel@citrix.com>
- <alpine.DEB.2.02.1504211115300.3112@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1504211203520.3112@kaball.uk.xensource.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 21 Apr 2015 13:15:54 +0200
+Subject: your mail
+In-Reply-To: <20150421111042.GB3996@e103592.cambridge.arm.com>
+References: <CAKv+Gu9u73+YKn+aR1vk+1eNF_voC71THWRQS96jyAt4HB3BQw@mail.gmail.com>
+ <20150421104634.GA3996@e103592.cambridge.arm.com>
+ <CAKv+Gu-3iM2+TvAgfV91FzfgAQuZhr=beeJ8RWmmGjTChbUrtQ@mail.gmail.com>
+ <20150421111042.GB3996@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu_OUWKZ97PXdxmfA=mLTzV2Xti7rhmpuZtMAmd01=E01w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Apr 2015, Stefano Stabellini wrote:
-> On Tue, 21 Apr 2015, Ian Campbell wrote:
-> > On Mon, 2015-04-20 at 18:54 +0100, Stefano Stabellini wrote:
-> > > This should definitely be done only on ARM and ARM64, as on x86 PVH
-> > > assumes the presence of an IOMMU. We need an ifdef.
-> > > 
-> > > Also we need to figure out a way to try without GFP_DMA in case no ram
-> > > under 4g is available at all, as some arm64 platforms don't have any. Of
-> > > course in those cases we don't need to worry about devices and their dma
-> > > masks.  Maybe we could use memblock for that?
-> > 
-> > It's pretty ugly, but I've not got any better ideas.
-> > 
-> > It would perhaps be less ugly as a an arch-specific
-> > get_me_a_swiotlb_region type function, with the bare __get_free_pages as
-> > the generic fallback.
-> 
-> We could do that, but even open code like this isn't too bad: it might
-> be ugly but at least is very obvious.
+On 21 April 2015 at 13:10, Dave P Martin <Dave.Martin@arm.com> wrote:
+> On Tue, Apr 21, 2015 at 11:50:02AM +0100, Ard Biesheuvel wrote:
+>> On 21 April 2015 at 12:46, Dave P Martin <Dave.Martin@arm.com> wrote:
+>> > On Tue, Apr 21, 2015 at 11:18:08AM +0100, Ard Biesheuvel wrote:
+>> >> On 21 April 2015 at 12:13, Russell King - ARM Linux
+>> >> <linux@arm.linux.org.uk> wrote:
+>> >> > On Tue, Apr 21, 2015 at 12:08:51PM +0200, Ard Biesheuvel wrote:
+>> >> >> This updates the PROCINFO offset-to-setup-function fields of the
+>> >> >> Thumb2 capable CPU definitions to include the Thumb bit when building
+>> >> >> a Thumb2 kernel. This ensures that these function are always called
+>> >> >> in the correct mode.
+>> >> >
+>> >> > I don't think this is necessary, in fact, I think this is positively
+>> >> > regression causing.
+>> >> >
+>> >> > The symbol 'initfunc' is known to the assembler to be a thumb symbol.
+>> >> > As we have seen already from the kernel dumps from the V7M kernel, when
+>> >> > it calculates initfunc - name in a T2 kernel, the resulting value is an
+>> >> > _odd_ number.
+>> >> >
+>> >>
+>> >> OK, so BSYM() uses '+ 1' rather than ' | 1'? I wasn't expecting that, sorry.
+>> >
+>> > '| 1' is more logical, but can't be resolved at link time because
+>> > there's no relocation for this operation.  Hence '+ 1'.  This matters
+>> > for local cross-section references that can't be resolved at assembly
+>> > time.
+>> >
+>>
+>> OK, that makes sense. But it does appear that the local cross-section
+>> references are working just fine, i.e., references from other sections
+>> in the same .o have the thumb bit set correctly even without BSYM()
+>
+> For branch targets, the set of situations where BSYM must be used and
+> the set of situations where it must not be used are mutually exclusive:
+>
+>  * If the assembler resolves the address and the address will be used as a
+>    branch target, BSYM() must be used.  This applies to non-cross-section
+>    references within in single object only.
+>
 
-Chen,
-could you please try the patch below in your repro scenario?
-I have only build tested it.
+Here, 'sym | 1' should work ...
 
----
+>  * If the linker resolves the address, BSYM() must not be used and the
+>    target label must be annotated with ENDPROC().  This applies to
+>    all cross-section or cross-object references.
+>
+> For any address that won't be used as a branch target, BSYM() must not
+> be used.
+>
+> Cross-section non-cross-object references where the target is missing
+> ENDPROC() and BSYM _is_ used will also work, but this should be avoided
+> -- it's an abuse really.
+>
 
-xen: Add __GFP_DMA flag when xen_swiotlb_init gets free pages on ARM
+... and for the other cases, we rely on the assembler to emit
+relocations for the linker to process.
 
-From: Chen Baozi <baozich@gmail.com>
+So in summary, defining BSYM() as 'sym + 1' rather than 'sym | 1' only
+enables cases where BSYM() shouldn't be used in the first place. Or am
+I missing something?
 
-Make sure that xen_swiotlb_init allocates buffers that are DMA capable
-when at least one memblock is available below 4G. Otherwise we assume
-that all devices on the SoC can cope with >4G addresses.
-
-No functional changes on x86.
-
-Signed-off-by: Chen Baozi <baozich@gmail.com>
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index 2f7e6ff..0b579b2 100644
---- a/arch/arm/include/asm/xen/page.h
-+++ b/arch/arm/include/asm/xen/page.h
-@@ -110,5 +110,6 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
- bool xen_arch_need_swiotlb(struct device *dev,
- 			   unsigned long pfn,
- 			   unsigned long mfn);
-+unsigned long xen_get_swiotlb_free_pages(unsigned int order);
- 
- #endif /* _ASM_ARM_XEN_PAGE_H */
-diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-index 793551d..4983250 100644
---- a/arch/arm/xen/mm.c
-+++ b/arch/arm/xen/mm.c
-@@ -4,6 +4,7 @@
- #include <linux/gfp.h>
- #include <linux/highmem.h>
- #include <linux/export.h>
-+#include <linux/memblock.h>
- #include <linux/of_address.h>
- #include <linux/slab.h>
- #include <linux/types.h>
-@@ -21,6 +22,20 @@
- #include <asm/xen/hypercall.h>
- #include <asm/xen/interface.h>
- 
-+unsigned long xen_get_swiotlb_free_pages(unsigned int order)
-+{
-+	struct memblock_region *reg;
-+	gfp_t flags = __GFP_NOWARN;
-+
-+	for_each_memblock(memory, reg) {
-+		if (reg->base < (phys_addr_t)0xffffffff) {
-+			flags |= __GFP_DMA;
-+			break;
-+		}
-+	}
-+	return __get_free_pages(flags, order);
-+}
-+
- enum dma_cache_op {
-        DMA_UNMAP,
-        DMA_MAP,
-diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-index 358dcd3..c44a5d5 100644
---- a/arch/x86/include/asm/xen/page.h
-+++ b/arch/x86/include/asm/xen/page.h
-@@ -269,4 +269,9 @@ static inline bool xen_arch_need_swiotlb(struct device *dev,
- 	return false;
- }
- 
-+static inline unsigned long xen_get_swiotlb_free_pages(unsigned int order)
-+{
-+	return __get_free_pages(__GFP_NOWARN, order);
-+}
-+
- #endif /* _ASM_X86_XEN_PAGE_H */
-diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-index 810ad41..4c54932 100644
---- a/drivers/xen/swiotlb-xen.c
-+++ b/drivers/xen/swiotlb-xen.c
-@@ -235,7 +235,7 @@ retry:
- #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
- #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
- 		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
--			xen_io_tlb_start = (void *)__get_free_pages(__GFP_NOWARN, order);
-+			xen_io_tlb_start = (void *)xen_get_swiotlb_free_pages(order);
- 			if (xen_io_tlb_start)
- 				break;
- 			order--;
+>
+> The reason for these rules is that the assembler doesn't do any Thumb
+> bit handling when taking the address of a local symbol, irrespective
+> of the symbol's type.  This can result in a screwup unless the assembler
+> can't resolve the address and must leave it as a relocation for the
+> linker to process, or if the correct annotation for the linker to do
+> the right fixup is missing.
+>
+>
+> I don't know the history of why this inconsistency exists between the
+> assembler and linker behaviour, but changing it would likely break
+> more stuff than it fixes now.
+>
+> Maybe it would be a good idea to add a comment in asm/unified.h
+> explaining this, assuming (hopefully) that my explanation was right...
+>
