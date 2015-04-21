@@ -1,31 +1,37 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Tue, 21 Apr 2015 09:58:07 +0800
-Subject: Question about checking rate_spi in pwrap_init_reg_clock
-Message-ID: <1429581487.5994.1.camel@ingics.com>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Tue, 21 Apr 2015 10:27:13 +0800
+Subject: [RESEND RFC PATCH 3/3] ASoC: mediatek: Add AFE platform driver
+In-Reply-To: <20150420205511.GL14892@sirena.org.uk>
+References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
+ <1428653649-38200-4-git-send-email-koro.chen@mediatek.com>
+ <20150418175139.GG26185@sirena.org.uk>
+ <1429510944.30743.36.camel@mtksdaap41>
+ <20150420205511.GL14892@sirena.org.uk>
+Message-ID: <1429583233.14794.40.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-The implementation in pwrap_init_reg_clock seems has off-by-one bug.
-If rate_spi is 26000000, current code set ck_mhz to 18 rather than 26.
+On Mon, 2015-04-20 at 21:55 +0100, Mark Brown wrote:
+> On Mon, Apr 20, 2015 at 02:22:24PM +0800, Koro Chen wrote:
+> > On Sat, 2015-04-18 at 18:51 +0100, Mark Brown wrote:
+> > > On Fri, Apr 10, 2015 at 04:14:09PM +0800, Koro Chen wrote:
+> 
+> > > Ah, so the SRAM is directly memory mappable.  Nice.  But we have a
+> > > limited amount of it so need to allocate it to a device somehow based on
+> > > some factor I guess?
+> 
+> > Yes, actually SRAM is only used for the main playback path (which is
+> > memif "DL1") to achieve low power in real use case. Maybe you think it's
+> > better to not describe this in the device tree, but to choose SRAM
+> > automatically if memif "DL1" is chosen?
+> 
+> Since it's directly memory mappable is there actually any cost in
+> latency terms from using the SRAM in low latency cases (or did I misread
+> what the code was doing there)?  If it can only be used with one
+> interface and there's no downside from using it...
+The SRAM size to be used is defined by params_buffer_bytes(params), not
+fixed (of course limited by the actual available SRAM size on HW), so
+the latency should be the same compared to a DRAM having the same size. 
 
-I guess it needs below fix, but I'm not 100% sure as I don't have the datasheet.
-Can someone confirm if this is a bug or not?
-
-
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index db5be1e..e910e19 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -568,9 +568,9 @@ static int pwrap_init_reg_clock(struct pmic_wrapper *wrp)
- 
- 	rate_spi = clk_get_rate(wrp->clk_spi);
- 
--	if (rate_spi > 26000000)
-+	if (rate_spi >= 26000000)
- 		ck_mhz = 26;
--	else if (rate_spi > 18000000)
-+	else if (rate_spi >= 18000000)
- 		ck_mhz = 18;
- 	else
- 		ck_mhz = 0;
+The SRAM can be used by any memif, and that's why the plan was let DT
+make the decision.
