@@ -1,29 +1,32 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 21 Apr 2015 14:01:50 +0100
-Subject: [PATCH v2 3/4] target-arm: kvm - support for single step
-In-Reply-To: <87tww9vdv6.fsf@linaro.org>
-References: <1427816446-31586-1-git-send-email-alex.bennee@linaro.org>
- <1427816446-31586-4-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA_dqx-78AoGiHViv_tMCDkSd7Uf2GpUz+uBm5QbgX0nvg@mail.gmail.com>
- <87tww9vdv6.fsf@linaro.org>
-Message-ID: <CAFEAcA_odo0qmtowmAvEvjBA2RgNbZZKk=WpyfN2UdEccgT1Eg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 Apr 2015 14:08:00 +0100
+Subject: [RESEND PATCH 4.0-rc7 v20 0/6] irq/arm: Implement
+ arch_trigger_all_cpu_backtrace
+In-Reply-To: <alpine.DEB.2.11.1504211445010.13914@nanos>
+References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
+ <1428659511-9590-1-git-send-email-daniel.thompson@linaro.org>
+ <alpine.DEB.2.11.1504211445010.13914@nanos>
+Message-ID: <55364BB0.6060108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 April 2015 at 13:56, Alex Benn?e <alex.bennee@linaro.org> wrote:
->
-> Peter Maydell <peter.maydell@linaro.org> writes:
->>>      switch (hsr_ec) {
->>> +    case HSR_EC_SOFT_STEP:
->>> +        if (cs->singlestep_enabled) {
->>> +            return true;
->>> +        } else {
->>> +            error_report("Came out of SINGLE STEP when not enabled");
->>
->> This can only happen if there's a kernel bug, right?
->
-> Sure. Should we report it differently? abort() out?
+On 21/04/15 13:46, Thomas Gleixner wrote:
+> On Fri, 10 Apr 2015, Daniel Thompson wrote:
+> 
+>> Jason/Thomas:
+>>   Any chance of taking the first five of these patches via the irqchip
+>>   route? The x86 patch has an ack from Ingo, printk has no explicit
+>>   maintainer and I've done plenty of bisectability tests on the patchset
+>>   so leaving the last patch for the next dev. cycle should be no
+>>   trouble.
+> 
+> First of all I need an acked/reviewed from Marc or Russell,
+> preferrably both of them.
 
-Saying 'This would be a kernel bug' in a comment would do...
+I'm on it.
 
--- PMM
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
