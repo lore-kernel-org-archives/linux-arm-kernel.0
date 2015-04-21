@@ -1,58 +1,36 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Tue, 21 Apr 2015 20:42:09 +0900
-Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
-Message-ID: <55363791.4070706@hitachi.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 21 Apr 2015 13:43:19 +0200
+Subject: Question about checking rate_spi in pwrap_init_reg_clock
+In-Reply-To: <20150421103155.GX6325@pengutronix.de>
+References: <1429581487.5994.1.camel@ingics.com>
+ <20150421103155.GX6325@pengutronix.de>
+Message-ID: <CABuKBeJqgWHWNYaFXS-BwEayHEtiYGt+56LLXs3QaO3MHUk0bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2015/04/21 5:19), David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
-> first seen in October 2013. This version attempts to address concerns raised by
-> reviewers and also fixes problems discovered during testing.
-> 
-> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
-> and return probes(kretprobes) support for ARM64.
-> 
-> The kprobes mechanism makes use of software breakpoint and single stepping
-> support available in the ARM v8 kernel.
-> 
-[...]
-> Changes since v5 include:
-> 
-> 1) Replaced installation of breakpoint hook with direct call from the
-> handlers in debug-monitors.c, as requested.
-> 2) Reject probing of instructions that read the interrupt mask, in
-> addition to instructions that set it.
-> 3) Cleaned up comments describing usage of Debug Mask.
-> 4) Added KPROBE_REENTER case in reenter_kprobe.
-> 5) Corrected the ifdef'd definitions for notify_page_fault() to be
-> consistent when KPROBES is not configed.
-> 6) Changed "cpsr" to "pstate" for HAVE_REGS_AND_STACK_ACCESS_API feature.
-> 7) Added back in missing new files in previous patch.
-> 8) Changed two instances of pr_warning() to pr_warn().
+2015-04-21 12:31 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> On Tue, Apr 21, 2015 at 09:58:07AM +0800, Axel Lin wrote:
+>> hi,
+>> The implementation in pwrap_init_reg_clock seems has off-by-one bug.
+>> If rate_spi is 26000000, current code set ck_mhz to 18 rather than 26.
+>>
+>> I guess it needs below fix, but I'm not 100% sure as I don't have the datasheet.
+>> Can someone confirm if this is a bug or not?
+>
+> Yes, seems to be a bug. Thanks for noting. Will you send a formal patch
+> or should I do it?
 
-Looks OK to me:)
-BTW, have you tried to build and test this with CONFIG_KPROBE_EVENT?
-If so, you can also test it by tools/testing/selftests/ftrace/ftracetest.
+Did you have a look on both datasheets/reference kernels, mt8135 and mt8173?
+Reading the datasheet and reference kernel code for mt6589 this SPI
+waveform configuration looks like magic.
 
-> Note that there seems to be at least a potential issue with kprobes
-> on multiple (possibly all) platforms having to do with use of kfree
-> inside of the kretprobes trampoline handler.  This has manifested
-> occasionally in systemtap testing on arm64.  There does not appear to
-> be an simple solution to the problem.
+But reading the clock frequency which can have clk_spi in mt8135, they
+are 0 MHz, 26 MHz and bigger then 26 MHz, which leads me to the
+conclusion that the code is correct. Otherwise the check for bigger
+then 18 MHz is useless and should be deleted, if we have a similar
+clock distribution in mt8173.
 
-No, trampoline handler must call recycle_rp_inst() instead of kfree
-to return kretprobe instance to the pool. Hmm, I should look into it.
+So maybe someone from Mediatek can shed light on this issue.
 
-Thank you,
-
--- 
-Masami HIRAMATSU
-Linux Technology Research Center, System Productivity Research Dept.
-Center for Technology Innovation - Systems Engineering
-Hitachi, Ltd., Research & Development Group
-E-mail: masami.hiramatsu.pt at hitachi.com
+Thanks,
+Matthias
