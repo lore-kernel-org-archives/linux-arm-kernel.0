@@ -1,76 +1,63 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 21 Apr 2015 17:14:41 +0200
-Subject: [PATCH 3/3] ARM: at91/dt: sama5d3 add gpio regulator for vmmc0
-In-Reply-To: <1427391505-29129-4-git-send-email-ben.dooks@codethink.co.uk>
-References: <1427391505-29129-1-git-send-email-ben.dooks@codethink.co.uk>
- <1427391505-29129-4-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20150421151441.GE2245@odux.rfo.atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 Apr 2015 16:19:00 +0100
+Subject: [PATCH v5 2/4] arm64: dts: Add the device tree entry for the
+ APM X-Gene PCIe MSI node
+In-Reply-To: <227f8c75e04110e279b78512924742ba7c7fe5fc.1429586144.git.dhdang@apm.com>
+References: <55310050.7000003@arm.com> <cover.1429586144.git.dhdang@apm.com>
+ <227f8c75e04110e279b78512924742ba7c7fe5fc.1429586144.git.dhdang@apm.com>
+Message-ID: <55366A64.6000907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 05:38:25PM +0000, Ben Dooks wrote:
-> Add gpio regulator for vmmc0 and attach the vmmc for it to the mmc0
-> node on the SAM5D3 Xplained board. This will remove the following
-> warning from the kernel:
+On 21/04/15 05:04, Duc Dang wrote:
+> There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports.
 > 
-> atmel_mci f0000000.mmc: No vmmc regulator found
-> 
-> Note, atmel_defconfig will need gpio regulator support enabled if this
-> is to be used properly.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> --
-> CC: Andrew Victor <linux@maxim.org.za>
-> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
-> CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Pawel Moll <pawel.moll@arm.com>
-> CC: Mark Rutland <mark.rutland@arm.com>
-> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> CC: Kumar Gala <galak@codeaurora.org>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: devicetree at vger.kernel.org
+> Signed-off-by: Duc Dang <dhdang@apm.com>
+> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
 > ---
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 9 +++++++++
->  1 file changed, 9 insertions(+)
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> index 1eb150d..6b6ad5c 100644
-> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> @@ -36,6 +36,7 @@
->  			mmc0: mmc at f0000000 {
->  				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_dat4_7 &pinctrl_mmc0_cd>;
->  				status = "okay";
-> +				vmmc-supply = <&vcc_mmc0_reg>;
->  				vqmmc-supply = <&vcc_3v3_reg>;
->  				slot at 0 {
->  					reg = <0>;
-> @@ -285,6 +286,14 @@
+> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> index f1ad9c2..4b719c9 100644
+> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> @@ -354,6 +354,28 @@
+>  			};
 >  		};
->  	};
 >  
-> +	vcc_mmc0_reg: regulator at 1 {
-> +		compatible = "regualtor-gpio";
+> +		msi: msi at 79000000 {
+> +			compatible = "apm,xgene1-msi";
+> +			msi-controller;
+> +			reg = <0x00 0x79000000 0x0 0x900000>;
 
-typo here and I think it is a fixed regulator and not a gpio one since
-we can't configure voltage.
+I've been repeatedly puzzled by the size of this region. In patch 1, you
+say:
 
-> +		gpio = <&pioE 2 GPIO_ACTIVE_LOW>;
-> +		regulator-name = "mmc0-card-supply";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
->  	gpio_keys {
->  		compatible = "gpio-keys";
->  
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
++ * X-Gene v1 has 16 groups of MSI termination registers MSInIRx, where
++ * n is group number (0..F), x is index of registers in each group (0..7)
++ * The registers layout is like following:
++ * MSI0IR0                     base_addr
++ * MSI0IR1                     base_addr +  0x10000
++ * ...                         ...
++ * MSI0IR6                     base_addr +  0x60000
++ * MSI0IR7                     base_addr +  0x70000
++ * MSI1IR0                     base_addr +  0x80000
++ * MSI1IR1                     base_addr +  0x90000
++ * ...                         ...
++ * MSI1IR7                     base_addr +  0xF0000
++ * MSI2IR0                     base_addr + 0x100000
++ * ...                         ...
++ * MSIFIR0                     base_addr + 0x780000
++ * MSIFIR1                     base_addr + 0x790000
++ * ...                         ...
++ * MSIFIR7                     base_addr + 0x7F0000
+
+which implies that the size of the region is 0x800000. Or is there
+something hidden in the last 16 64k pages?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
