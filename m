@@ -1,81 +1,84 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 21 Apr 2015 15:17:57 +0200
-Subject: [PATCH 7/8] ARM: dts: Exynos5800: fix CPU OPP
+Date: Tue, 21 Apr 2015 15:17:56 +0200
+Subject: [PATCH 6/8] clk: samsung: exynos5800: fix cpu clock configuration data
 In-Reply-To: <1429622278-12216-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1429622278-12216-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1429622278-12216-8-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1429622278-12216-7-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix CPU operating points for Exynos5800 (it uses different
-voltages than Exynos5420 and supports additional frequencies).
-However don't use 2000MHz & 1900MHz OPPs (for A15 cores) and
-1400MHz OPP (for A7 cores) until there is a separate DTS for
-ODROID-XU3 Lite board (which doesn't support these higher
-OPPs).
+Fix cpu clock configuration data for Exynos5800 (it uses
+higher PCLK_DBG divider values than Exynos5420 and supports
+additional frequencies).
 
 Based on Hardkernel's kernel for ODROID-XU3 board.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Doug Anderson <dianders@chromium.org>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Cc: Andreas Faerber <afaerber@suse.de>
-Cc: Sachin Kamat <sachin.kamat@linaro.org>
 Cc: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/boot/dts/exynos5800.dtsi |   39 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ drivers/clk/samsung/clk-exynos5420.c |   36 +++++++++++++++++++++++++++++++---
+ 1 file changed, 33 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5800.dtsi b/arch/arm/boot/dts/exynos5800.dtsi
-index c0bb356..ba7ecd2 100644
---- a/arch/arm/boot/dts/exynos5800.dtsi
-+++ b/arch/arm/boot/dts/exynos5800.dtsi
-@@ -19,6 +19,45 @@
- 	compatible = "samsung,exynos5800", "samsung,exynos5";
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 9398a2d..462aaee 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -1274,10 +1274,34 @@ static const struct exynos_cpuclk_cfg_data exynos5420_eglclk_d[] __initconst = {
+ 	{  0 },
  };
  
-+&cpu0 {
-+	operating-points = <
-+		1800000 1250000
-+		1700000 1250000
-+		1600000 1250000
-+		1500000 1100000
-+		1400000 1100000
-+		1300000 1100000
-+		1200000 1000000
-+		1100000 1000000
-+		1000000 1000000
-+		 900000 1000000
-+		 800000  900000
-+		 700000  900000
-+		 600000  900000
-+		 500000  900000
-+		 400000  900000
-+		 300000  900000
-+		 200000  900000
-+	>;
++static const struct exynos_cpuclk_cfg_data exynos5800_eglclk_d[] __initconst = {
++	{ 2000000, E5420_EGL_DIV0(3, 7, 7, 4), },
++	{ 1900000, E5420_EGL_DIV0(3, 7, 7, 4), },
++	{ 1800000, E5420_EGL_DIV0(3, 7, 7, 4), },
++	{ 1700000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1600000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1500000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1400000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1300000, E5420_EGL_DIV0(3, 7, 7, 2), },
++	{ 1200000, E5420_EGL_DIV0(3, 7, 7, 2), },
++	{ 1100000, E5420_EGL_DIV0(3, 7, 7, 2), },
++	{ 1000000, E5420_EGL_DIV0(3, 7, 6, 2), },
++	{  900000, E5420_EGL_DIV0(3, 7, 6, 2), },
++	{  800000, E5420_EGL_DIV0(3, 7, 5, 2), },
++	{  700000, E5420_EGL_DIV0(3, 7, 5, 2), },
++	{  600000, E5420_EGL_DIV0(3, 7, 4, 2), },
++	{  500000, E5420_EGL_DIV0(3, 7, 3, 2), },
++	{  400000, E5420_EGL_DIV0(3, 7, 3, 2), },
++	{  300000, E5420_EGL_DIV0(3, 7, 3, 2), },
++	{  200000, E5420_EGL_DIV0(3, 7, 3, 2), },
++	{  0 },
 +};
 +
-+&cpu4 {
-+	operating-points = <
-+		1300000 1250000
-+		1200000 1250000
-+		1100000 1250000
-+		1000000 1100000
-+		 900000 1100000
-+		 800000 1100000
-+		 700000 1000000
-+		 600000 1000000
-+		 500000 1000000
-+		 400000 1000000
-+		 300000  900000
-+		 200000  900000
-+	>;
-+};
-+
- &clock {
- 	compatible = "samsung,exynos5800-clock";
- };
+ #define E5420_KFC_DIV(kpll, pclk, aclk)					\
+ 		((((kpll) << 24) | ((pclk) << 20) | ((aclk) << 4)))
+ 
+ static const struct exynos_cpuclk_cfg_data exynos5420_kfcclk_d[] __initconst = {
++	{ 1400000, E5420_KFC_DIV(3, 5, 3), }, /* for Exynos5800 */
+ 	{ 1300000, E5420_KFC_DIV(3, 5, 2), },
+ 	{ 1200000, E5420_KFC_DIV(3, 5, 2), },
+ 	{ 1100000, E5420_KFC_DIV(3, 5, 2), },
+@@ -1357,9 +1381,15 @@ static void __init exynos5x_clk_init(struct device_node *np,
+ 				ARRAY_SIZE(exynos5800_gate_clks));
+ 	}
+ 
+-	exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
+-		mout_cpu_p[0], mout_cpu_p[1], 0x200,
+-		exynos5420_eglclk_d, ARRAY_SIZE(exynos5420_eglclk_d), 0);
++	if (soc == EXYNOS5420) {
++		exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
++			mout_cpu_p[0], mout_cpu_p[1], 0x200,
++			exynos5420_eglclk_d, ARRAY_SIZE(exynos5420_eglclk_d), 0);
++	} else {
++		exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
++			mout_cpu_p[0], mout_cpu_p[1], 0x200,
++			exynos5800_eglclk_d, ARRAY_SIZE(exynos5800_eglclk_d), 0);
++	}
+ 	exynos_register_cpu_clock(ctx, CLK_KFC_CLK, "kfcclk",
+ 		mout_kfc_p[0], mout_kfc_p[1], 0x28200,
+ 		exynos5420_kfcclk_d, ARRAY_SIZE(exynos5420_kfcclk_d), 0);
 -- 
 1.7.9.5
