@@ -1,63 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Apr 2015 16:19:00 +0100
-Subject: [PATCH v5 2/4] arm64: dts: Add the device tree entry for the
- APM X-Gene PCIe MSI node
-In-Reply-To: <227f8c75e04110e279b78512924742ba7c7fe5fc.1429586144.git.dhdang@apm.com>
-References: <55310050.7000003@arm.com> <cover.1429586144.git.dhdang@apm.com>
- <227f8c75e04110e279b78512924742ba7c7fe5fc.1429586144.git.dhdang@apm.com>
-Message-ID: <55366A64.6000907@arm.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Tue, 21 Apr 2015 10:19:35 -0500
+Subject: [PATCH v5 07/11] ARM: imx: add msl support for imx7d
+In-Reply-To: <20150421151225.GZ12732@n2100.arm.linux.org.uk>
+References: <1429628007-8892-1-git-send-email-Frank.Li@freescale.com>
+ <1429628007-8892-8-git-send-email-Frank.Li@freescale.com>
+ <20150421151225.GZ12732@n2100.arm.linux.org.uk>
+Message-ID: <CAHrpEqR+7dnBgP2eYUmYVqX2KeCffUX6HFb6AnXnS1ETKP2_aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/04/15 05:04, Duc Dang wrote:
-> There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports.
-> 
-> Signed-off-by: Duc Dang <dhdang@apm.com>
-> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> ---
->  arch/arm64/boot/dts/apm/apm-storm.dtsi | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index f1ad9c2..4b719c9 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -354,6 +354,28 @@
->  			};
->  		};
->  
-> +		msi: msi at 79000000 {
-> +			compatible = "apm,xgene1-msi";
-> +			msi-controller;
-> +			reg = <0x00 0x79000000 0x0 0x900000>;
+On Tue, Apr 21, 2015 at 10:12 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Apr 21, 2015 at 10:53:23PM +0800, Frank.Li at freescale.com wrote:
+>> diff --git a/arch/arm/mach-imx/mx7.h b/arch/arm/mach-imx/mx7.h
+>> new file mode 100644
+>> index 0000000..bfef936
+>> --- /dev/null
+>> +++ b/arch/arm/mach-imx/mx7.h
+>> @@ -0,0 +1,38 @@
+>> +/*
+>> + * Copyright (C) 2015 Freescale Semiconductor, Inc. All Rights Reserved.
+>> + */
+>> +
+>> +/*
+>> + *  * This program is free software; you can redistribute it and/or modify
+>> + *   * it under the terms of the GNU General Public License version 2 as
+>> + *    * published by the Free Software Foundation.
+>> + *     */
+>
+> Something obviously went wrong here.
 
-I've been repeatedly puzzled by the size of this region. In patch 1, you
-say:
+Sorry for that. I will fix at next version.
 
-+ * X-Gene v1 has 16 groups of MSI termination registers MSInIRx, where
-+ * n is group number (0..F), x is index of registers in each group (0..7)
-+ * The registers layout is like following:
-+ * MSI0IR0                     base_addr
-+ * MSI0IR1                     base_addr +  0x10000
-+ * ...                         ...
-+ * MSI0IR6                     base_addr +  0x60000
-+ * MSI0IR7                     base_addr +  0x70000
-+ * MSI1IR0                     base_addr +  0x80000
-+ * MSI1IR1                     base_addr +  0x90000
-+ * ...                         ...
-+ * MSI1IR7                     base_addr +  0xF0000
-+ * MSI2IR0                     base_addr + 0x100000
-+ * ...                         ...
-+ * MSIFIR0                     base_addr + 0x780000
-+ * MSIFIR1                     base_addr + 0x790000
-+ * ...                         ...
-+ * MSIFIR7                     base_addr + 0x7F0000
-
-which implies that the size of the region is 0x800000. Or is there
-something hidden in the last 16 64k pages?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
