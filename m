@@ -1,99 +1,74 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Tue, 21 Apr 2015 10:37:42 -0700
-Subject: [PATCH v5 3/4] documentation: dts: Add the device tree binding
- for APM X-Gene v1 PCIe MSI device tree node
-In-Reply-To: <20150421154225.GC10164@leverpostej>
+Date: Tue, 21 Apr 2015 11:01:35 -0700
+Subject: [PATCH v5 2/4] arm64: dts: Add the device tree entry for the APM
+ X-Gene PCIe MSI node
+In-Reply-To: <55366A64.6000907@arm.com>
 References: <55310050.7000003@arm.com> <cover.1429586144.git.dhdang@apm.com>
- <cfdb95a38689836bac693df6edb8c09829ea61cd.1429586144.git.dhdang@apm.com>
- <20150421154225.GC10164@leverpostej>
-Message-ID: <CADaLND=GdSK3Swj5meya0hnw7zfObvajkHPt0z_H3p6nsXdgtA@mail.gmail.com>
+ <227f8c75e04110e279b78512924742ba7c7fe5fc.1429586144.git.dhdang@apm.com>
+ <55366A64.6000907@arm.com>
+Message-ID: <CADaLNDkLHfDHOcOPxQ5O+hsC9yS6kTxdtnE5N_73Jvqm85DGnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 8:42 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+On Tue, Apr 21, 2015 at 8:19 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 21/04/15 05:04, Duc Dang wrote:
+>> There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports.
+>>
+>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>> ---
+>>  arch/arm64/boot/dts/apm/apm-storm.dtsi | 27 +++++++++++++++++++++++++++
+>>  1 file changed, 27 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> index f1ad9c2..4b719c9 100644
+>> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> @@ -354,6 +354,28 @@
+>>                       };
+>>               };
+>>
+>> +             msi: msi at 79000000 {
+>> +                     compatible = "apm,xgene1-msi";
+>> +                     msi-controller;
+>> +                     reg = <0x00 0x79000000 0x0 0x900000>;
 >
-> On Tue, Apr 21, 2015 at 05:04:23AM +0100, Duc Dang wrote:
-> > The driver for this binding is under 'drivers/pci/host/pci-xgene-msi.c'
+> I've been repeatedly puzzled by the size of this region. In patch 1, you
+> say:
 >
-> Please provide a bit of description of what this device is, and please
-> place the binding patch _before_ the driver and DTS patches.
+> + * X-Gene v1 has 16 groups of MSI termination registers MSInIRx, where
+> + * n is group number (0..F), x is index of registers in each group (0..7)
+> + * The registers layout is like following:
+> + * MSI0IR0                     base_addr
+> + * MSI0IR1                     base_addr +  0x10000
+> + * ...                         ...
+> + * MSI0IR6                     base_addr +  0x60000
+> + * MSI0IR7                     base_addr +  0x70000
+> + * MSI1IR0                     base_addr +  0x80000
+> + * MSI1IR1                     base_addr +  0x90000
+> + * ...                         ...
+> + * MSI1IR7                     base_addr +  0xF0000
+> + * MSI2IR0                     base_addr + 0x100000
+> + * ...                         ...
+> + * MSIFIR0                     base_addr + 0x780000
+> + * MSIFIR1                     base_addr + 0x790000
+> + * ...                         ...
+> + * MSIFIR7                     base_addr + 0x7F0000
+>
+> which implies that the size of the region is 0x800000. Or is there
+> something hidden in the last 16 64k pages?
 
-I will add in next version of the patch.
+The registers listed in the first patch are termination registers.
+>From offset 0x800000 to 0x8f0000, the MSI controller provides status
+registers for software to check if there is pending MSI interrupt in
+each MSI group (in the code we read MSI_INTx registers starting from
+0x800000 to check if there is an MSI interrupt pending).
 >
+> Thanks,
 >
-> > Signed-off-by: Duc Dang <dhdang@apm.com>
-> > Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> > ---
-> >  .../devicetree/bindings/pci/xgene-pci-msi.txt      | 63 ++++++++++++++++++++++
-> >  1 file changed, 63 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/pci/xgene-pci-msi.txt b/Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
-> > new file mode 100644
-> > index 0000000..0ffdcb3
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
-> > @@ -0,0 +1,63 @@
-> > +* AppliedMicro X-Gene PCIe MSI interface
-> > +
-> > +Required properties:
-> > +
-> > +- compatible: should contain "apm,xgene1-msi" to identify the core.
->
-> What does the core have to do with the MSI controller?
-
-'core' here is the MSI controller block. I will use different word to
-avoid confusion with CPU core.
->
-> > +- msi-controller: indicates that this is X-Gene1 PCIe MSI controller node
-> > +- reg: A list of physical base address and length for each set of controller
-> > +       registers.
->
-> How many? Which ones? In which order? Do you need reg-names?
-
-I will add these details in next version of the patch.
->
-> > +- interrupts: A list of interrupt outputs of the controller.
-
-I will add these details in next version of the patch.
->
-> How many? Which ones? In which order? Do you need interrupt-names?
-
-I will add these details in next version of the patch.
->
-> You need to define these for *this particular binding*, in order for
-> them to actually define the contract. An abstract definition is
-> completely useless for writing or parsing a DT, and as such this
-> document is just noise.
->
-> Please think about the purpose of this document, and write something
-> appropriate.
->
-> [...]
->
-> > +             interrupts = <  0x0 0x10 0x4
-> > +                             0x0 0x11 0x4
-> > +                             0x0 0x12 0x4
-> > +                             0x0 0x13 0x4
-> > +                             0x0 0x14 0x4
-> > +                             0x0 0x15 0x4
-> > +                             0x0 0x16 0x4
-> > +                             0x0 0x17 0x4
-> > +                             0x0 0x18 0x4
-> > +                             0x0 0x19 0x4
-> > +                             0x0 0x1a 0x4
-> > +                             0x0 0x1b 0x4
-> > +                             0x0 0x1c 0x4
-> > +                             0x0 0x1d 0x4
-> > +                             0x0 0x1e 0x4
-> > +                             0x0 0x1f 0x4>;
->
-> Nit: please bracket list entries individually.
-
-Thanks for your comment, I will address them on next version of the patch.
-
->
-> Mark.
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
 
 Regards,
 Duc Dang.
