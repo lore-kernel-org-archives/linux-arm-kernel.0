@@ -1,52 +1,78 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 21 Apr 2015 07:50:41 +0200
-Subject: [RESEND RFC PATCH 2/3] ASoC: mediatek: Add AFE connection control
-In-Reply-To: <20150420205230.GK14892@sirena.org.uk>
-References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
- <1428653649-38200-3-git-send-email-koro.chen@mediatek.com>
- <20150418173740.GF26185@sirena.org.uk>
- <20150420045017.GI6325@pengutronix.de>
- <20150420205230.GK14892@sirena.org.uk>
-Message-ID: <20150421055041.GQ6325@pengutronix.de>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Tue, 21 Apr 2015 07:59:32 +0200
+Subject: [tpmdd-devel] [RFC PATCH 1/2] tee: generic TEE subsystem
+In-Reply-To: <20150420175515.GA31958@obsidianresearch.com>
+References: <1429257057-7935-1-git-send-email-jens.wiklander@linaro.org>
+ <1429257057-7935-2-git-send-email-jens.wiklander@linaro.org>
+ <20150417163054.GA28241@obsidianresearch.com>
+ <20150418090147.GF12732@n2100.arm.linux.org.uk>
+ <20150418172923.GA10605@obsidianresearch.com>
+ <20150420130203.GB25054@ermac>
+ <20150420175515.GA31958@obsidianresearch.com>
+Message-ID: <20150421055932.GA7760@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 09:52:30PM +0100, Mark Brown wrote:
-> On Mon, Apr 20, 2015 at 06:50:17AM +0200, Sascha Hauer wrote:
-> > On Sat, Apr 18, 2015 at 06:37:40PM +0100, Mark Brown wrote:
-> > > On Fri, Apr 10, 2015 at 04:14:08PM +0800, Koro Chen wrote:
+On Mon, Apr 20, 2015 at 11:55:15AM -0600, Jason Gunthorpe wrote:
+> On Mon, Apr 20, 2015 at 03:02:03PM +0200, Jens Wiklander wrote:
+> > > It appeared to me this driver was copying TPM's old architecture,
+> > > which is very much known to be broken.
+> > 
+> > The struct tee_device holds a shared memory pool from which shared
+> > memory objects are allocated. These shared memory objects can be mapped
+> > both by user space and secure world. 
 > 
-> > > > +	[0][0] =   { .creg = 0x020, .cshift =  0, .sreg = 0x020, .sshift = 10},
-> > > > +	[0][1] =   { .creg = 0x020, .cshift = 16, .sreg = 0x020, .sshift = 26},
+> So this is a whole other set of problems besides what was already
+> brought up.
 > 
-> > > It'd also be nice to have less magic numbers in the table, at least for
-> > > the indexes (which I guess correspond to some of the defines in the
-> > > headers)?
+> You need to figure out a lifetime model for this shared memory that
+> works.
 > 
-> > With defines the above two lines would become something like:
+> > To come around the problem with what should happen when the driver
+> > is removed I'm increasing the refcount on the driver for each
+> > allocated shared memory object and created file pointers. As long as
+> > any resource is in use by either user space or secure world the
+> > driver can't be unloaded.
 > 
-> > [0][0] = { .creg = AFE_CONN0, .cshift = CONN0_I00_O00_S, .sreg = AFE_CONN0, .sshift = CONN0_I00_O00_R },
-> > [0][1] = { .creg = AFE_CONN0, .cshift = CONN0_I00_O01_S, .sreg = AFE_CONN0, .sshift = CONN0_I00_O01_S },
+> This isn't how the kernel works. The module refcount effects module
+> unload (it protects the .text) - it does not interact with driver
+> detatch. Userspace can trigger driver detatch (which results in
+> tee_unregister being called) at any time via sysfs.
 > 
-> > For the registers we could use defines, but I think using defines for
-> > the shifts doesn't add much value given they are only used once.
+> If you properly design for that case then module unload sequencing
+> works properly for free.
 > 
-> By indexes I actually meant the [0][0] and so on - they seem the more
-> magic bit.
+> Based on what I gather, I would suggest the following sequence in
+> tee_unregister
+>  - unregister all sysfs and char dev registrations.
+>  - Write lock ops and set to null. This will error future cdev ioctls,
+>    and guarentees no driver ops callbacks are in progress, or will be
+>    started in future.
+>  - Wait until all client accesses to shared memory are
+>    released.
+>  - Command the driver to release it's side of the
+>    shared memory and wait for that to complete
+>  - Free the shared memory
+>  - deref the tee_device's struct device (match ref in tee_register)
+> 
+> Then in your struct tee_device's release function free the tee_device
+> memory.
+> 
+> Replace all the module locking code with an active count in struct
+> tee_device (see something like kernfs_drain for an example).
+> 
+> > * Change to use the pattern (with a struct device etc) as described
+> >   above.
+> 
+> Yes, I think Greg confirmed you need to use a struct device, and purge
+> misc_device from the mid layer.
+> 
+> >   I can't protect the ops with just a mutex since tee_ioctl_cmd() needs to
+> >   be multithreaded.
+> 
+> Then use a sleeping read/write lock - aka an active count.
 
-Oh, that's not magic at all, the crossbar switch has inputs and outputs
-numbered from 0 to MTK_AFE_INTERCONN_NUM_INPUT /
-MTK_AFE_INTERCONN_NUM_OUTPUT (they have the same numbers in the
-datasheet. To connect input x with output y look at index [x][y] in the
-table and write the register values found at that place. If .creg is 0x0
-then it's not possible to connect the given input with the given output.
+Thanks for the clarification, I got it now.
 
-Sascha
-
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Jens
