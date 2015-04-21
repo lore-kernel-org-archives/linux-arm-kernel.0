@@ -1,29 +1,77 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 21 Apr 2015 13:46:51 +0200
-Subject: [PATCH] soc: mediatek: Fix off-by-one checking for rate_spi
-In-Reply-To: <20150421105953.GY6325@pengutronix.de>
-References: <1429613612.5644.1.camel@ingics.com>
- <20150421105953.GY6325@pengutronix.de>
-Message-ID: <CABuKBeL+YTZz4jkMwozm4SbtP_4N8kBiqgeEHh1htoK6StpK_w@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 21 Apr 2015 19:34:40 +0800
+Subject: [PATCH v10 21/29] sparc/PCI: Use pci_scan_host_bridge() for simplicity
+In-Reply-To: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
+References: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1429616088-10249-22-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Now we could use pci_scan_host_bridge() to scan
+pci buses, provide sparc specific pci_host_bridge_ops.
 
-2015-04-21 12:59 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Tue, Apr 21, 2015 at 06:53:32PM +0800, Axel Lin wrote:
->> If rate_spi is 26000000, current code set ck_mhz to 18 rather than 26.
->> Fix the off-by-one checking for rate_spi.
->>
->> Signed-off-by: Axel Lin <axel.lin@ingics.com>
->
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
->
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: "David S. Miller" <davem@davemloft.net>
+CC: sparclinux at vger.kernel.org
+---
+ arch/sparc/kernel/pci.c |   28 ++++++++++++++++++++++------
+ 1 files changed, 22 insertions(+), 6 deletions(-)
 
-Can you please explain why you think this is a bug? Please see my
-concerns here [1].
-
-Best regards,
-Matthias
-
-[1] http://lists.infradead.org/pipermail/linux-mediatek/2015-April/000419.html
+diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
+index 6ff363c..9feaa77 100644
+--- a/arch/sparc/kernel/pci.c
++++ b/arch/sparc/kernel/pci.c
+@@ -650,12 +650,27 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
+ 		pci_claim_bus_resources(child_bus);
+ }
+ 
++static int pci_host_of_scan_bus(
++		struct pci_host_bridge *host)
++{
++	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
++	struct device_node *node = pbm->op->dev.of_node;
++
++	pci_of_scan_bus(pbm, node, host->bus);
++	return pci_bus_child_max_busnr(host->bus);
++}
++
++static struct pci_host_bridge_ops pci_host_ops = {
++	.scan_bus = pci_host_of_scan_bus,
++};
++
+ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+ 				 struct device *parent)
+ {
+ 	LIST_HEAD(resources);
+ 	struct device_node *node = pbm->op->dev.of_node;
+ 	struct pci_bus *bus;
++	struct pci_host_bridge *host;
+ 
+ 	printk("PCI: Scanning PBM %s\n", node->full_name);
+ 
+@@ -667,16 +682,17 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+ 	pbm->busn.end	= pbm->pci_last_busno;
+ 	pbm->busn.flags	= IORESOURCE_BUS;
+ 	pci_add_resource(&resources, &pbm->busn);
+-	bus = pci_create_root_bus(parent, pbm->index,
+-			pbm->pci_ops, pbm, &resources);
+-	if (!bus) {
+-		printk(KERN_ERR "Failed to create bus for %s\n",
+-		       node->full_name);
++	pci_host_ops.pci_ops = pbm->pci_ops;
++	host = pci_scan_host_bridge(parent, pbm->index,
++			pbm, &resources, &pci_host_ops);
++	if (!host) {
++		pr_err("Failed to create host bridge pci%04x:%02x for %s\n",
++		       pbm->index, pbm->pci_first_busno, node->full_name);
+ 		pci_free_resource_list(&resources);
+ 		return NULL;
+ 	}
+ 
+-	pci_of_scan_bus(pbm, node, bus);
++	bus = host->bus;
+ 	pci_bus_register_of_sysfs(bus);
+ 
+ 	pci_claim_bus_resources(bus);
+-- 
+1.7.1
