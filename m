@@ -1,32 +1,59 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Tue, 21 Apr 2015 22:53:27 +0800
-Subject: [PATCH v5 11/11] ARM: config: imx_v6_v7_defconfig add imx7d support
-In-Reply-To: <1429628007-8892-1-git-send-email-Frank.Li@freescale.com>
-References: <1429628007-8892-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1429628007-8892-12-git-send-email-Frank.Li@freescale.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 21 Apr 2015 16:56:46 +0200
+Subject: [PATCH v4 1/4] ARM: UniPhier: add basic support for UniPhier
+ architecture
+In-Reply-To: <1429600890-26713-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1429600890-26713-1-git-send-email-yamada.masahiro@socionext.com>
+ <1429600890-26713-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <4816076.vmWnA5VvTb@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+Am Dienstag, 21. April 2015, 16:21:27 schrieb Masahiro Yamada:
+> Initial commit for a new SoC family, UniPhier, developed by
+> Socionext Inc. (formerly, System LSI Business Division of
+> Panasonic Corporation).
+> 
+> This commit includes a minimal set of components for booting the
+> kernel, including SMP support.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-Add imx7d support
+[...]
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> +static int uniphier_boot_secondary(unsigned int cpu,
+> +				   struct task_struct *idle)
+> +{
+> +	struct regmap *sbcm_regmap;
+> +	int ret;
+> +
+> +	sbcm_regmap = syscon_regmap_lookup_by_compatible(
+> +			"socionext,uniphier-system-bus-controller-misc");
+> +	if (IS_ERR(sbcm_regmap)) {
+> +		pr_err("failed to regmap system-bus-controller-misc\n");
+> +		return PTR_ERR(sbcm_regmap);
+> +	}
+> +
+> +	ret = regmap_write(sbcm_regmap, 0x1208,
+> +			   virt_to_phys(uniphier_secondary_startup));
+> +	if (!ret)
+> +		asm("sev"); /* wake up secondary CPU */
+> +
+> +	return ret;
+> +}
+> +
+> +struct smp_operations uniphier_smp_ops __initdata = {
+> +	.smp_prepare_cpus	= uniphier_smp_prepare_cpus,
+> +	.smp_boot_secondary	= uniphier_boot_secondary,
+> +};
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index fdeb1c8..c9c51e1f 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -38,6 +38,7 @@ CONFIG_SOC_IMX53=y
- CONFIG_SOC_IMX6Q=y
- CONFIG_SOC_IMX6SL=y
- CONFIG_SOC_IMX6SX=y
-+CONFIG_SOC_IMX7D=y
- CONFIG_SOC_VF610=y
- CONFIG_PCI=y
- CONFIG_PCI_IMX6=y
--- 
-1.9.1
+this is more of a drive-by comment, but you're doing the syscon lookup on 
+every boot of a core, which includes walking big parts of the devicetree every 
+time.
+
+Is there anything speaking against doing this once in a .smp_prepare_cpus 
+callback?
+
+
+Heiko
