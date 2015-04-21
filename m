@@ -1,105 +1,104 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 21 Apr 2015 19:34:26 +0800
-Subject: [PATCH v10 07/29] PCI: Allocate busn resource for pci_scan_root_bus()
+Date: Tue, 21 Apr 2015 19:34:25 +0800
+Subject: [PATCH v10 06/29] PCI: Alloc busn resource dynamically for
+ pci_scan_bus()
 In-Reply-To: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
 References: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1429616088-10249-8-git-send-email-wangyijing@huawei.com>
+Message-ID: <1429616088-10249-7-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some pci_scan_root_bus() callers don't supply the busn
-resource, because they don't know the max bus number.
-Currently we insert default busn resource[bus-FF] to root bus,
-and update the max bus number after pci_scan_child_bus().
-We could dynamically allocate busn resource and add it
-to pci_host_bridge, in the later patch, it would be easy
-to check whether new pci_host_bridge busn resource conflict.
+Pci_scan_bus() always add the global busn_resource[00-FF],
+the busn resource added is not accurate, if root bus number
+is not equal to zero, the bus range bellow root bus number
+is pointless, and this inaccurate busn resource would make
+host bridge confuse, this patch dynamically allocate busn
+resource instead of default global one, and add a flag
+to pci_host_bridge, so when pci_host_bridge go to free,
+the dynamic busn resource could also be freed properly.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/probe.c |   43 ++++++++++++++++++++++++++++++-------------
- 1 files changed, 30 insertions(+), 13 deletions(-)
+ drivers/pci/probe.c |   27 +++++++++++++++++++--------
+ include/linux/pci.h |    1 +
+ 2 files changed, 20 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index c425755..0eafda2 100644
+index 52b9257..c425755 100644
 --- a/drivers/pci/probe.c
 +++ b/drivers/pci/probe.c
-@@ -2041,6 +2041,8 @@ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
+@@ -18,13 +18,6 @@
+ #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
+ #define CARDBUS_RESERVE_BUSNR	3
  
- int pci_bus_update_busn_res_end(struct pci_bus *b, int bus_max)
+-static struct resource busn_resource = {
+-	.name	= "PCI busn",
+-	.start	= 0,
+-	.end	= 255,
+-	.flags	= IORESOURCE_BUS,
+-};
+-
+ /* Ugh.  Need to stop exporting this to modules. */
+ LIST_HEAD(pci_root_buses);
+ EXPORT_SYMBOL(pci_root_buses);
+@@ -516,11 +509,17 @@ static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
+ 
+ static void pci_release_host_bridge_dev(struct device *dev)
  {
 +	struct resource_entry *entry;
-+	struct pci_host_bridge *host;
- 	struct resource *res = &b->busn_res;
- 	struct resource old_res = *res;
- 	resource_size_t size;
-@@ -2058,6 +2060,14 @@ int pci_bus_update_busn_res_end(struct pci_bus *b, int bus_max)
- 	if (!ret && !res->parent)
- 		pci_bus_insert_busn_res(b, res->start, res->end);
+ 	struct pci_host_bridge *bridge = to_pci_host_bridge(dev);
  
-+	if (!ret && pci_is_root_bus(b)) {
-+		host = to_pci_host_bridge(b->bridge);
-+		if (host->dynamic_busn) {
-+			entry = pci_busn_resource(&host->windows);
-+			entry->res->end = bus_max;
-+		}
+ 	if (bridge->release_fn)
+ 		bridge->release_fn(bridge);
+ 
++	if (bridge->dynamic_busn) {
++		entry = pci_busn_resource(&bridge->windows);
++		kfree(entry->res);
 +	}
 +
- 	return ret;
- }
+ 	pci_free_resource_list(&bridge->windows);
  
-@@ -2079,32 +2089,39 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int domain,
- 		int bus, struct pci_ops *ops, void *sysdata,
- 		struct list_head *resources)
+ 	kfree(bridge);
+@@ -2117,15 +2116,27 @@ struct pci_bus *pci_scan_bus(int domain, int bus,
  {
--	struct resource_entry *window;
--	bool found = false;
-+	struct resource_entry *entry;
-+	struct resource *busn_resource = NULL;
-+	struct pci_host_bridge *host;
+ 	LIST_HEAD(resources);
  	struct pci_bus *b;
- 	int max;
++	struct resource *busn_resource;
++	struct pci_host_bridge *host;
++
++	busn_resource = kzalloc(sizeof(struct resource), GFP_KERNEL);
++	if (!busn_resource)
++		return NULL;
  
--	resource_list_for_each_entry(window, resources)
--		if (window->res->flags & IORESOURCE_BUS) {
--			found = true;
--			break;
--		}
-+	entry = pci_busn_resource(resources);
-+	if (!entry) {
-+		busn_resource = kzalloc(sizeof (struct resource), GFP_KERNEL);
-+		if (!busn_resource)
-+			return NULL;
-+		busn_resource->start = bus;
-+		busn_resource->end = 255;
-+		busn_resource->flags = IORESOURCE_BUS;
-+		pci_add_resource(resources, busn_resource);
-+		pr_info(
-+		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-+			bus);
-+	}
- 
- 	b = pci_create_root_bus(parent, domain, ops,
- 			sysdata, resources);
- 	if (!b)
- 		return NULL;
- 
--	if (!found) {
--		dev_info(&b->dev,
--		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
--			bus);
--		pci_bus_insert_busn_res(b, bus, 255);
-+	if (busn_resource) {
++	busn_resource->start = bus;
++	busn_resource->end = 255;
++	busn_resource->flags = IORESOURCE_BUS;
+ 	pci_add_resource(&resources, &ioport_resource);
+ 	pci_add_resource(&resources, &iomem_resource);
+-	pci_add_resource(&resources, &busn_resource);
++	pci_add_resource(&resources, busn_resource);
+ 	b = pci_create_root_bus(NULL, domain, ops, sysdata,
+ 			&resources);
+ 	if (b) {
 +		host = to_pci_host_bridge(b->bridge);
 +		host->dynamic_busn = true;
+ 		pci_scan_child_bus(b);
+ 	} else {
++		kfree(busn_resource);
+ 		pci_free_resource_list(&resources);
  	}
- 
- 	max = pci_scan_child_bus(b);
- 
--	if (!found)
-+	if (busn_resource)
- 		pci_bus_update_busn_res_end(b, max);
- 
  	return b;
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index df77a62..0716158 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -402,6 +402,7 @@ static inline int pci_channel_offline(struct pci_dev *pdev)
+ 
+ struct pci_host_bridge {
+ 	int domain;
++	bool dynamic_busn;
+ 	struct device dev;
+ 	struct pci_bus *bus;		/* root bus */
+ 	struct list_head windows;	/* resource_entry */
 -- 
 1.7.1
