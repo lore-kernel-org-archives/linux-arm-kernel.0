@@ -1,55 +1,39 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 21 Apr 2015 16:21:26 +0900
-Subject: [PATCH v4 0/4] ARM: SoC: add a new platform,
- UniPhier (arch/arm/mach-uniphier)
-Message-ID: <1429600890-26713-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Tue, 21 Apr 2015 16:21:30 +0900
+Subject: [PATCH v4 4/4] MAINTAINERS: add myself as ARM/UniPhier maintainer
+In-Reply-To: <1429600890-26713-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1429600890-26713-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1429600890-26713-5-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-This is an initial series for supporting Socionext UniPhier SoCs,
-based on ARM Cortex-A9, mainly used for digital TVs, video recorders, etc.
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-
-Masahiro Yamada (4):
-  ARM: UniPhier: add basic support for UniPhier architecture
-  ARM: multi_v7_defconfig: enable UniPhier SoC family
-  ARM: dts: UniPhier: add support for UniPhier SoCs and boards
-  MAINTAINERS: add myself as ARM/UniPhier maintainer
-
- MAINTAINERS                                  |   7 ++
- arch/arm/Kconfig                             |   2 +
- arch/arm/Makefile                            |   1 +
- arch/arm/boot/dts/Makefile                   |   5 ++
- arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts   |  79 ++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-ld4.dtsi      | 111 +++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts  |  79 ++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-pro4.dtsi     | 118 +++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts  |  80 ++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld3.dtsi     | 118 +++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts  |  79 ++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld8.dtsi     | 111 +++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-support-card.dtsi |  66 +++++++++++++++
- arch/arm/configs/multi_v7_defconfig          |   1 +
- arch/arm/mach-uniphier/Kconfig               |  11 +++
- arch/arm/mach-uniphier/Makefile              |   2 +
- arch/arm/mach-uniphier/platsmp.c             |  85 +++++++++++++++++++
- arch/arm/mach-uniphier/uniphier.c            |  30 +++++++
- 18 files changed, 985 insertions(+)
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
- create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
- create mode 100644 arch/arm/boot/dts/uniphier-support-card.dtsi
- create mode 100644 arch/arm/mach-uniphier/Kconfig
- create mode 100644 arch/arm/mach-uniphier/Makefile
- create mode 100644 arch/arm/mach-uniphier/platsmp.c
- create mode 100644 arch/arm/mach-uniphier/uniphier.c
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ce3eb0f..26b42be 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1533,6 +1533,13 @@ F:	drivers/rtc/rtc-ab3100.c
+ F:	drivers/rtc/rtc-coh901331.c
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+ 
++ARM/UNIPHIER ARCHITECTURE
++M:	Masahiro Yamada <yamada.masahiro@socionext.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-uniphier/
++N:	uniphier
++
+ ARM/Ux500 ARM ARCHITECTURE
+ M:	Linus Walleij <linus.walleij@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
 1.9.1
