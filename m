@@ -1,66 +1,71 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 21 Apr 2015 19:34:42 +0800
-Subject: [PATCH v10 23/29] PCI/mvebu: Use pci_common_init_dev() to simplify
- code
+Date: Tue, 21 Apr 2015 19:34:41 +0800
+Subject: [PATCH v10 22/29] parisc/PCI: Use pci_scan_root_bus() for simplicity
 In-Reply-To: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
 References: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1429616088-10249-24-git-send-email-wangyijing@huawei.com>
+Message-ID: <1429616088-10249-23-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mvebu_pcie_scan_bus() is not necessary, we could use
-pci_common_init_dev() instead of pci_common_init(),
-and pass the device pointer as the parent. Then
-pci_scan_root_bus() will be called to scan the pci busses.
+From: Yijing Wang <wangyijing0307@gmail.com>
 
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Now pci_bus_add_devices() has been ripped out
+from pci_scan_root_bus(), we could use pci_scan_root_bus()
+instead of pci_create_root_bus() + pci_scan_child_bus()
+for simplicity.
+
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-CC: Jason Cooper <jason@lakedaemon.net>
+CC: "James E.J. Bottomley" <jejb@parisc-linux.org>
+CC: linux-parisc at vger.kernel.org
 ---
- drivers/pci/host/pci-mvebu.c |   18 +-----------------
- 1 files changed, 1 insertions(+), 17 deletions(-)
+ drivers/parisc/dino.c    |    6 +++---
+ drivers/parisc/lba_pci.c |    5 +++--
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index c91a8b4..70aa095 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -751,21 +751,6 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	return 1;
- }
+diff --git a/drivers/parisc/dino.c b/drivers/parisc/dino.c
+index 56abc43..146c3ff 100644
+--- a/drivers/parisc/dino.c
++++ b/drivers/parisc/dino.c
+@@ -985,8 +985,8 @@ static int __init dino_probe(struct parisc_device *dev)
+ 	** It's not used to avoid chicken/egg problems
+ 	** with configuration accessor functions.
+ 	*/
+-	dino_dev->hba.hba_bus = bus = pci_create_root_bus(&dev->dev,
+-			 0, &dino_cfg_ops, NULL, &resources);
++	dino_dev->hba.hba_bus = bus = pci_scan_root_bus(&dev->dev,
++			 0, dino_current_bus, &dino_cfg_ops, NULL, &resources);
+ 	if (!bus) {
+ 		printk(KERN_ERR "ERROR: failed to scan PCI bus on %s (duplicate bus number %d?)\n",
+ 		       dev_name(&dev->dev), dino_current_bus);
+@@ -996,7 +996,7 @@ static int __init dino_probe(struct parisc_device *dev)
+ 		return 0;
+ 	}
  
--static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
--{
--	struct mvebu_pcie *pcie = sys_to_pcie(sys);
--	struct pci_bus *bus;
--
--	bus = pci_create_root_bus(&pcie->pdev->dev, -1,
--				  &mvebu_pcie_ops, sys, &sys->resources);
--	if (!bus)
--		return NULL;
--
--	pci_scan_child_bus(bus);
--
--	return bus;
--}
--
- static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 						 const struct resource *res,
- 						 resource_size_t start,
-@@ -809,12 +794,11 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.nr_controllers = 1;
- 	hw.private_data   = (void **)&pcie;
- 	hw.setup          = mvebu_pcie_setup;
--	hw.scan           = mvebu_pcie_scan_bus;
- 	hw.map_irq        = of_irq_parse_and_map_pci;
- 	hw.ops            = &mvebu_pcie_ops;
- 	hw.align_resource = mvebu_pcie_align_resource;
+-	max = pci_scan_child_bus(bus);
++	max = pci_bus_child_max_busnr(bus);
+ 	pci_bus_update_busn_res_end(bus, max);
  
--	pci_common_init(&hw);
-+	pci_common_init_dev(&pcie->pdev->dev, &hw);
- }
+ 	/* This code *depends* on scanning being single threaded
+diff --git a/drivers/parisc/lba_pci.c b/drivers/parisc/lba_pci.c
+index 0b9ed96..24e42bf 100644
+--- a/drivers/parisc/lba_pci.c
++++ b/drivers/parisc/lba_pci.c
+@@ -1563,13 +1563,14 @@ lba_driver_probe(struct parisc_device *dev)
  
- /*
+ 	dev->dev.platform_data = lba_dev;
+ 	lba_bus = lba_dev->hba.hba_bus =
+-		pci_create_root_bus(&dev->dev, 0, cfg_ops, NULL, &resources);
++		pci_scan_root_bus(&dev->dev, 0, lba_dev->hba.bus_num.start,
++				cfg_ops, NULL, &resources);
+ 	if (!lba_bus) {
+ 		pci_free_resource_list(&resources);
+ 		return 0;
+ 	}
+ 
+-	max = pci_scan_child_bus(lba_bus);
++	max = pci_bus_child_max_busnr(lba_bus);
+ 
+ 	/* This is in lieu of calling pci_assign_unassigned_resources() */
+ 	if (is_pdc_pat()) {
 -- 
 1.7.1
