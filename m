@@ -1,28 +1,51 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 21 Apr 2015 14:28:28 -0500
-Subject: [PATCH 1/2] ARM: socfpga: dts: Add multicast bins and unicast
- filter entries
-In-Reply-To: <1429547068-12501-1-git-send-email-vbridger@opensource.altera.com>
-References: <1429547068-12501-1-git-send-email-vbridger@opensource.altera.com>
-Message-ID: <5536A4DC.6000404@opensource.altera.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Tue, 21 Apr 2015 14:34:45 -0500
+Subject: [PATCH v5 05/11] ARM: dts: add imx7d soc dtsi file
+In-Reply-To: <CAHrpEqTCMgaAx_bUG1JEtS-2_DrkwM_EbWphu_j=6YZuebcoSw@mail.gmail.com>
+References: <1429628007-8892-1-git-send-email-Frank.Li@freescale.com>
+ <1429628007-8892-6-git-send-email-Frank.Li@freescale.com>
+ <20150421172834.GF10164@leverpostej>
+ <CAHrpEqTCMgaAx_bUG1JEtS-2_DrkwM_EbWphu_j=6YZuebcoSw@mail.gmail.com>
+Message-ID: <CAHrpEqRqUJ2h2dXiwR3rcugWvszKwt10axy8jGsAJAH6Quafbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2015 11:24 AM, Vince Bridgers wrote:
-> Add multicast-filter-bins and perfect-filter-entries configuration properties
-> to the socfpga devicetree for the Arria 10 socfpga.
-> 
-> Signed-off-by: Vince Bridgers <vbridger@opensource.altera.com>
-> ---
-> This patch is based on patches
-> http://www.spinics.net/lists/devicetree/msg75270.html
-> http://www.spinics.net/lists/devicetree/msg75273.html
-> ---
->  arch/arm/boot/dts/socfpga_arria10.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
+>>> +
+>>> +       clocks {
+>>> +               #address-cells = <1>;
+>>> +               #size-cells = <0>;
+>>> +
+>>> +               ckil: clock at 0 {
+>>> +                       compatible = "fixed-clock";
+>>> +                       reg = <0>;
+>>> +                       #clock-cells = <0>;
+>>> +                       clock-frequency = <32768>;
+>>> +                       clock-output-names = "ckil";
+>>> +               };
+>>> +
+>>> +               osc: clock at 1 {
+>>> +                       compatible = "fixed-clock";
+>>> +                       reg = <1>;
+>>> +                       #clock-cells = <0>;
+>>> +                       clock-frequency = <24000000>;
+>>> +                       clock-output-names = "osc";
+>>> +               };
+>>> +
+>>> +       };
+>>
+>> Get rid of the clocks container node, and put these under the root.
+>
+> Okay.
 
-Both patches applied!
+After remove clocks node.
+There will be warning
 
-Thanks,
-Dinh
+Warning (reg_format): "reg" property in /clock at 0 has invalid length (4
+bytes) (#address-cells == 1, #size-cells == 1)
+Warning (reg_format): "reg" property in /clock at 1 has invalid length (4
+bytes) (#address-cells == 1, #size-cells == 1)
+
+best regards
+Frank Li
+>
+>>
