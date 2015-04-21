@@ -1,83 +1,116 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 22 Apr 2015 01:30:22 +0200
-Subject: [rtc-linux] [PATCH 4/5] RTC/i.MX/DryIce: when locked, do not
- fail silently
-In-Reply-To: <1429002716-19821-5-git-send-email-jbe@pengutronix.de>
-References: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
- <1429002716-19821-5-git-send-email-jbe@pengutronix.de>
-Message-ID: <20150421233022.GE8539@piout.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 21 Apr 2015 16:45:56 -0700
+Subject: [PATCH 0/4] cpufreq: use generic cpufreq drivers for Exynos5250
+ platform
+In-Reply-To: <5439319.JYC6t7bzy4@amdc1032> (Bartlomiej Zolnierkiewicz's
+ message of "Tue, 21 Apr 2015 17:43:30 +0200")
+References: <1428946441-17058-1-git-send-email-b.zolnierkie@samsung.com>
+ <7h1tjeh5ka.fsf@deeprootsystems.com> <5439319.JYC6t7bzy4@amdc1032>
+Message-ID: <7hsibtavuz.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please always include a commit message.
+Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> writes:
 
-On 14/04/2015 at 11:11:55 +0200, Juergen Borleis wrote :
-> Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
-> Signed-off-by: Robert Schwebel <rsc@pengutronix.de>
-> [rsc: got NDA clearance from Freescale]
-> ---
->  drivers/rtc/rtc-imxdi.c | 28 +++++++++++++++++++++++++---
->  1 file changed, 25 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
-> index b04c64f..de1a2e4 100644
-> --- a/drivers/rtc/rtc-imxdi.c
-> +++ b/drivers/rtc/rtc-imxdi.c
-> @@ -581,14 +581,36 @@ static int dryice_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  static int dryice_rtc_set_mmss(struct device *dev, unsigned long secs)
->  {
->  	struct imxdi_dev *imxdi = dev_get_drvdata(dev);
-> +	u32 dcr, dsr;
->  	int rc;
->  
-> +	dcr = __raw_readl(imxdi->ioaddr + DCR);
-> +	dsr = __raw_readl(imxdi->ioaddr + DSR);
-> +
-> +	if (!(dcr & DCR_TCE) || (dsr & DSR_SVF)) {
-> +		if (dcr & DCR_TCHL) {
-> +			/* we are even more out of luck */
-> +			di_what_is_to_be_done(imxdi, "battery");
-> +			return -EPERM;
-> +		}
-> +		if ((dcr & DCR_TCSL) || (dsr & DSR_SVF)) {
-> +			/* we are out of luck for now */
-> +			di_what_is_to_be_done(imxdi, "main");
-> +			return -EPERM;
-> +		}
-> +	}
-> +
->  	/* zero the fractional part first */
->  	rc = di_write_wait(imxdi, 0, DTCLR);
-> -	if (rc == 0)
-> -		rc = di_write_wait(imxdi, secs, DTCMR);
-> +	if (rc != 0)
-> +		return rc;
->  
-> -	return rc;
-> +	rc = di_write_wait(imxdi, secs, DTCMR);
-> +	if (rc != 0)
-> +		return rc;
-> +
-> +	return di_write_wait(imxdi, __raw_readl(imxdi->ioaddr + DCR) |
-> +								DCR_TCE, DCR);
->  }
->  
->  static int dryice_rtc_alarm_irq_enable(struct device *dev,
-> -- 
-> 2.1.4
-> 
-> -- 
-> -- 
-> You received this message because you are subscribed to "rtc-linux".
-> Membership options at http://groups.google.com/group/rtc-linux .
-> Please read http://groups.google.com/group/rtc-linux/web/checklist
-> before submitting a driver.
-> --- 
-> You received this message because you are subscribed to the Google Groups "rtc-linux" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to rtc-linux+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> On Monday, April 20, 2015 02:07:33 PM Kevin Hilman wrote:
+>> Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> writes:
+>> 
+>> > Hi,
+>> >
+>> > This patch series removes the use of Exynos5250 specific support
+>> > from exynos-cpufreq driver and enables the use of cpufreq-dt driver
+>> > for this platform.  The exynos-cpufreq driver itself is also removed
+>> > as it is no longer used/needed after Exynos5250 support removal.
+>> >
+>> > This patch series has been tested on Exynos5250 based Arndale board.
+>> >
+>> > Depends on:
+>> > - next-20150330 branch of linux-next kernel tree
+>> > - "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4210
+>> >   platform" [1]
+>> > - "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+>> >   platform" [2]
+>> > - "[PATCH] cpufreq: exynos: remove dead ->need_apll_change method" [3]
+>> 
+>> Any chance you could prepare a branch with all the dependencies for easy
+>> testing?
+>
+> All cpufreq changes with needed dependencies are now availble in
+>
+>     https://github.com/bzolnier/linux.git
+>
+> repository and the branch is
+>
+>     next-20150330-generic-cpufreq-exynos5420-5800-v2
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Great, thanks.
+
+>> Also, The previous version from Thomas was v12, and this one is neither
+>> versioned nor has any reference to what may have changed since that
+>
+> Please note that Thomas' patchset was split on separate parts (this is
+> part #3) and heavily modified so the previous versioning was dropped.
+>
+> The cover letter of part #1 ("[PATCH 0/6] cpufreq: use generic cpufreq
+> drivers for Exynos4210 platform") contains detailed changelog on what has
+> been changed since Thomas' original v12 patch series.  Individual Thomas'
+> patches which were modified by me also contain such information.
+>
+> Part #2 ("[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+> platform") was entirely new code when compared to Thomas' v12 patchset so
+> its cover letter doesn't contain such detailed changelog as part #1.
+>
+> The newly posted part #4 ("[PATCH 0/8] cpufreq: add generic cpufreq driver
+> support for Exynos5250/5800 platforms" https://lkml.org/lkml/2015/4/21/314)
+> also contains the detailed changelog.
+>
+> However for part #3 (this one, "[PATCH 0/4] cpufreq: use generic cpufreq
+> drivers for Exynos5250 platform") such summary changelog got missed for
+> some reason.  Here it is:
+> - split Exynos5250 support from the original patch
+> - moved E5250_CPU_DIV[0,1]() macros to clk-exynos5250.c
+> - added CPU regulator supply property for Google Spring board
+> - removed exynos-cpufreq driver entirely as it is no longer used/needed
+
+Great, thanks for clarifying.
+
+>> version.  Also, on v12, I had several comments[1] and wonder if they've
+>> been addressed.
+>
+> All issues previously reported should have been fixed.  If you still see
+> some problems please let me know.
+>
+> [ I see now that exynos5420-arndale-octa.dts, exynos5420-peach-pit.dts,
+>   exynos5420-smdk5420.dts and exynos5800-peach-pi.dts should also have
+>   been updated to contain CPU cluster regulator supply properties or else
+>   if the default vdd_arm/vdd_kfc regulator state is set to too low value
+>   there may be problems with stability when switching to higher than
+>   default frequencies.  I have posted v2 version of patch #2/8 of part #4
+>   and pushed v2 combined branch on github.  Sorry for the inconvenience. ]
+
+I've now tested your v2 branch with the bL switcher disabled, CPUidle
+enabled and CPUfreq enabled.  
+
+With the default governor set to performance, it fails to boot.  The last
+kernel messages on the console are:
+
+[...]
+[    3.426021] cpu cpu0: bL_cpufreq_init: CPU 0 initialized
+[    3.431189] cpu cpu4: bL_cpufreq_init: CPU 4 initialized
+
+However, with the default governor set to userspace it boots fine until
+my userspace (ubuntu) tries to enable the ondemand governor, and then it
+hangs. 
+
+For it to boot, I have to disable the ondemand governor, and set the
+default governor to userspace.
+
+As I reported earlier on Thomas' series, I suspect this is related to
+the fact that the higher OPPs aren't really functional without voltage
+scaling also supported. 
+
+I'm also seeing the wait_until_divider_stable errors when switching
+between the available A7 OPPs.  I'd reported this one earlier as well,
+along with the script to reproduce it.
+
+Kevin
