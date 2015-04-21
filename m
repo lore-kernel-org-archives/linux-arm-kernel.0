@@ -1,47 +1,64 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 21 Apr 2015 12:19:48 +0200 (CEST)
-Subject: [PATCH v2] irqchip/gicv3-its: ITS table size should not be
- smaller than PSZ
-In-Reply-To: <1429162259-11344-1-git-send-email-Minghuan.Lian@freescale.com>
-References: <1429162259-11344-1-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <alpine.DEB.2.11.1504211218330.13914@nanos>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 21 Apr 2015 12:21:22 +0200
+Subject: [PATCH] ARM: mvebu: Fix the main PLL frequency on Armada 375,
+ 38x and 39x SoCs
+In-Reply-To: <20150420172956.GZ15807@lukather>
+References: <1429538373-31064-1-git-send-email-gregory.clement@free-electrons.com>
+ <20150420172956.GZ15807@lukather>
+Message-ID: <553624A2.5090504@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Apr 2015, Minghuan Lian wrote:
+Hi Maxime,
 
-> The default page size of ITS table has been changed to 64KB,
-> but for some platforms the real size of allocated memory which
-> calculated by DEVBITS of register GITS_TYPER may be smaller than
-> default size. In this case, the allocation size must be increased
-> to the default size, otherwise, the wrong page number will cause
-> kernel hang.
-
-This changelog fails to explain WHY the kernel hangs if the allocated
-table is smaller than the default
- 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> ---
-> v2-v1:
-> Increase allocation size instead of decreasing PSZ
+On 20/04/2015 19:29, Maxime Ripard wrote:
+> Hi,
 > 
->  drivers/irqchip/irq-gic-v3-its.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> On Mon, Apr 20, 2015 at 03:59:33PM +0200, Gregory CLEMENT wrote:
+>> Whereas for Armada 370 and XP the main PLL frequency was 2GHz for the
+>> Armada 375, 38x and 39x, the frequency is 1GHz. When writting support
+>                                                        ^ writing
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 9687f8a..19ab86d 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -828,7 +828,8 @@ static int its_alloc_tables(struct its_node *its)
->  			u64 typer = readq_relaxed(its->base + GITS_TYPER);
->  			u32 ids = GITS_TYPER_DEVBITS(typer);
->  
-> -			order = get_order((1UL << ids) * entry_size);
-> +			order = max(get_order((1UL << ids) * entry_size),
-> +				    order);
+>> for these last SoCs, there was no offical value for the PLL. Now that
+                                     ^ official
 
-Lacks a comment explaining WHY we do that max() here.
+>> we have it, this patch fixes it in the device tree.
+>>
+>> This value is currently only used by the NAND driver for the setting
+>> the NAND timing. Fortunately it is not acutally used: all the mainline
+>                                          ^ actually
+> 
+>> board with a NAND flash comes with a NAND device tree node using the
+> 
+>   ^ boards                ^ come 
+> 
+>> "marvell,nand-keep-config" property. With this property the timings
+>> are not modified in the kernel driver and are kept from the botloader.
+>                                                               ^ bootloader
+
+It seemed that my flyspell mode was not activated, thanks for your spell check.
+I will send a new patch in a few day, waiting for other review.
+
 
 Thanks,
 
-	tglx
+Gregory
+
+
+> 
+> Maxime
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
