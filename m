@@ -1,115 +1,52 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 21 Apr 2015 11:07:56 +0530
-Subject: [PATCHv2 1/3] phy: core: Add devm_of_phy_get_by_index to phy-core
-In-Reply-To: <55355F5B.6060504@broadcom.com>
-References: <1428963047-23666-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1428963047-23666-2-git-send-email-arun.ramamurthy@broadcom.com>
- <552E3699.4020309@ti.com> <55355F5B.6060504@broadcom.com>
-Message-ID: <5535E234.8010905@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 21 Apr 2015 07:50:41 +0200
+Subject: [RESEND RFC PATCH 2/3] ASoC: mediatek: Add AFE connection control
+In-Reply-To: <20150420205230.GK14892@sirena.org.uk>
+References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
+ <1428653649-38200-3-git-send-email-koro.chen@mediatek.com>
+ <20150418173740.GF26185@sirena.org.uk>
+ <20150420045017.GI6325@pengutronix.de>
+ <20150420205230.GK14892@sirena.org.uk>
+Message-ID: <20150421055041.GQ6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Apr 20, 2015 at 09:52:30PM +0100, Mark Brown wrote:
+> On Mon, Apr 20, 2015 at 06:50:17AM +0200, Sascha Hauer wrote:
+> > On Sat, Apr 18, 2015 at 06:37:40PM +0100, Mark Brown wrote:
+> > > On Fri, Apr 10, 2015 at 04:14:08PM +0800, Koro Chen wrote:
+> 
+> > > > +	[0][0] =   { .creg = 0x020, .cshift =  0, .sreg = 0x020, .sshift = 10},
+> > > > +	[0][1] =   { .creg = 0x020, .cshift = 16, .sreg = 0x020, .sshift = 26},
+> 
+> > > It'd also be nice to have less magic numbers in the table, at least for
+> > > the indexes (which I guess correspond to some of the defines in the
+> > > headers)?
+> 
+> > With defines the above two lines would become something like:
+> 
+> > [0][0] = { .creg = AFE_CONN0, .cshift = CONN0_I00_O00_S, .sreg = AFE_CONN0, .sshift = CONN0_I00_O00_R },
+> > [0][1] = { .creg = AFE_CONN0, .cshift = CONN0_I00_O01_S, .sreg = AFE_CONN0, .sshift = CONN0_I00_O01_S },
+> 
+> > For the registers we could use defines, but I think using defines for
+> > the shifts doesn't add much value given they are only used once.
+> 
+> By indexes I actually meant the [0][0] and so on - they seem the more
+> magic bit.
 
-On Tuesday 21 April 2015 01:49 AM, Arun Ramamurthy wrote:
->
->
-> On 15-04-15 02:59 AM, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Tuesday 14 April 2015 03:40 AM, Arun Ramamurthy wrote:
->>> Some generic drivers, such as ehci, may use multiple phys and for such
->>> drivers referencing phy(s) by name(s) does not make sense. Instead of
->>> inventing new naming schemes and using custom code to iterate through
->>> them,
->>> such drivers are better of using nameless phy bindings and using this
->>> newly
->>> introduced API to iterate through them.
->>>
->>> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
->>> Reviewed-by: Ray Jui <rjui@broadcom.com>
->>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->>> ---
->>>    drivers/phy/phy-core.c  | 32 ++++++++++++++++++++++++++++++++
->>>    include/linux/phy/phy.h |  2 ++
->>>    2 files changed, 34 insertions(+)
->>>
->>> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
->>> index 3791838..964a84d 100644
->>> --- a/drivers/phy/phy-core.c
->>> +++ b/drivers/phy/phy-core.c
->>> @@ -623,6 +623,38 @@ struct phy *devm_of_phy_get(struct device *dev,
->>> struct device_node *np,
->>>    EXPORT_SYMBOL_GPL(devm_of_phy_get);
->>>
->>>    /**
->>> + * devm_of_phy_get_by_index() - lookup and obtain a reference to a
->>> phy by index.
->>> + * @dev: device that requests this phy
->>> + * @np: node containing the phy
->>> + * @index: index of the phy
->>> + *
->>> + * Gets the phy using _of_phy_get(), and associates a device with it
->>> using
->>> + * devres. On driver detach, release function is invoked on the
->>> devres data,
->>> + * then, devres data is freed.
->>> + *
->>> + */
->>> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct
->>> device_node *np,
->>> +                     int index)
->>> +{
->>> +    struct phy **ptr, *phy;
->>> +
->>> +    ptr = devres_alloc(devm_phy_release, sizeof(*ptr), GFP_KERNEL);
->>> +    if (!ptr)
->>> +        return ERR_PTR(-ENOMEM);
->>> +
->>> +    phy = _of_phy_get(np, index);
->>> +    if (!IS_ERR(phy)) {
->>> +        *ptr = phy;
->>> +        devres_add(dev, ptr);
->>> +    } else {
->>> +        devres_free(ptr);
->>> +    }
->>> +
->>> +    return phy;
->>> +}
->>> +EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index);
->>> +
->>> +/**
->>>     * phy_create() - create a new phy
->>>     * @dev: device that is creating the new phy
->>>     * @node: device node of the phy
->>> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
->>> index a0197fa..ae2ffaf 100644
->>> --- a/include/linux/phy/phy.h
->>> +++ b/include/linux/phy/phy.h
->>> @@ -133,6 +133,8 @@ struct phy *devm_phy_get(struct device *dev, const
->>> char *string);
->>>    struct phy *devm_phy_optional_get(struct device *dev, const char
->>> *string);
->>>    struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
->>>                    const char *con_id);
->>> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct
->>> device_node *np,
->>> +                     int index);
->>
->> Add stubs for this function too. Also update the Documentation/phy.txt.
->>
-> Kishon, I have added stubs for this function in my next patch set.
-> However I am still unclear on whether I need to make GENERIC_PHY an
-> invisible option or change my "select" to "depend" ? It seems like there
-> was no consensus on this? Do you have any final thoughts before i send
-> out the next patch set? Thanks
+Oh, that's not magic at all, the crossbar switch has inputs and outputs
+numbered from 0 to MTK_AFE_INTERCONN_NUM_INPUT /
+MTK_AFE_INTERCONN_NUM_OUTPUT (they have the same numbers in the
+datasheet. To connect input x with output y look at index [x][y] in the
+table and write the register values found at that place. If .creg is 0x0
+then it's not possible to connect the given input with the given output.
 
-You can follow Arnd's suggestion. You can have a separate patch to change the 
-GENERIC_PHY to invisible option and change existing PHY drivers to select 
-GENERIC_PHY.
+Sascha
 
-Non-PHY drivers can either use depends on or have no explicit dependency if the 
-PHY is optional for that controller.
 
-Thanks
-Kishon
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
