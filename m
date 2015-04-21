@@ -1,57 +1,70 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 21 Apr 2015 15:37:16 -0500
-Subject: [PATCH v4 05/11] ARM: dts: add imx7d soc dtsi file
-In-Reply-To: <1429563933-3129-6-git-send-email-Frank.Li@freescale.com>
-References: <1429563933-3129-1-git-send-email-Frank.Li@freescale.com>
- <1429563933-3129-6-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAL_JsqLP6ZE9_G1L9XzT-hR=k6Wzx80rKQMTdagp8q80ADN61g@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 21 Apr 2015 13:38:12 -0700
+Subject: [PATCH 7/9] ARM: Add Kconfig support for bcm2836.
+In-Reply-To: <13864545.foFMzEn7Xk@wuerfel>
+References: <1429639796-2169-1-git-send-email-eric@anholt.net>
+ <1429639796-2169-8-git-send-email-eric@anholt.net>
+ <13864545.foFMzEn7Xk@wuerfel>
+Message-ID: <87lhhl9pzf.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 4:05 PM,  <Frank.Li@freescale.com> wrote:
-> From: Frank Li <Frank.Li@freescale.com>
+Arnd Bergmann <arnd@arndb.de> writes:
+
+> On Tuesday 21 April 2015 11:09:54 Eric Anholt wrote:
+>> @@ -116,17 +122,19 @@ config ARCH_BCM283X
+>>  config ARCH_BCM2835
+>>         bool "Broadcom BCM2835 family" if ARCH_MULTI_V6
+>>         select ARCH_BCM283X
+>> -       select ARCH_REQUIRE_GPIOLIB
+>> -       select ARM_AMBA
+>>         select ARM_ERRATA_411920
+>>         select ARM_TIMER_SP804
+>> -       select CLKSRC_OF
+>> -       select PINCTRL
+>> -       select PINCTRL_BCM2835
+>>         help
+>>           This enables support for the Broadcom BCM2835 SoC. This SoC is
+>>           used in the Raspberry Pi and Roku 2 devices.
+>>  
+>> +config ARCH_BCM2836
+>> +       bool "Broadcom BCM2836 family" if ARCH_MULTI_V7
+>> +       select ARCH_BCM283X
+>> +       help
+>> +         This enables support for the Broadcom BCM2836 SoC. This SoC is
+>> +         used in the Raspberry Pi 2
+>> +
 >
-> Add i.mx7d support:
->         imx7d dtsi part
+> The description for the first one says "Broadcom BCM2835 family", and I
+> guess they are both in the same family. How about leaving the
+> CONFIG_BCM2835 symbol to mean one of them, and just duplicating the
+> DEBUG_LL symbols?
 >
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
-> ---
->  arch/arm/boot/dts/imx7d.dtsi | 498 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 498 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx7d.dtsi
+> You could do something like
 >
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> new file mode 100644
-> index 0000000..dd391e2
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -0,0 +1,498 @@
-> +/*
-> + * Copyright 2015 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+> config ARCH_BCM2835
+>         bool "Broadcom BCM2835 family" if ARCH_MULTI_V6 || ARCH_MULTI_V7
+>         select ARCH_BCM283X
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ARM_AMBA
+>         select ARM_ERRATA_411920 if ARCH_MULTI_V6
+>         select ARM_TIMER_SP804 if ARCH_MULTI_V6
+>         select CLKSRC_OF
+>         select PINCTRL
+>         select PINCTRL_BCM2835
+>         help
+>           This enables support for the Broadcom BCM2835 and BCM2836 SoCs.
+> 	  These SoCs is used in the Raspberry Pi and Roku 2 devices.
+>
+> That should make it less confusing to the user, because they don't have
+> to know which specific SoC they are building for, other than enabling
+> the right architecture level.
 
-You should dual license dts files with BSD or MIT for any non-Linux users.
-
-
-> +
-> +       timer {
-> +               compatible = "arm,armv7-timer";
-> +               arm,cpu-registers-not-fw-configured;
-
-Fix your bootloader. This is for broken bootloaders which can't be fixed.
-
-> +               interrupts = <GIC_PPI 13
-> +                       (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +                       <GIC_PPI 14
-> +                       (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> +               interrupt-parent = <&intc>;
-> +               clock-frequency = <8000000>;
-
-Ditto.
-
-Rob
+Seems reasonable to me.  What do the 2835 maintainers think?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150421/aaf0eb6e/attachment.sig>
