@@ -1,69 +1,240 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 21 Apr 2015 16:51:01 +0100
-Subject: your mail
-In-Reply-To: <CAKv+Gu8Wd5MX0Ly5Okx57MpUeGpkNGHhqFCSqxy_HWFbsgtnOQ@mail.gmail.com>
-References: <CAKv+Gu9u73+YKn+aR1vk+1eNF_voC71THWRQS96jyAt4HB3BQw@mail.gmail.com>
- <20150421104634.GA3996@e103592.cambridge.arm.com>
- <CAKv+Gu-3iM2+TvAgfV91FzfgAQuZhr=beeJ8RWmmGjTChbUrtQ@mail.gmail.com>
- <20150421111042.GB3996@e103592.cambridge.arm.com>
- <20150421112420.GV12732@n2100.arm.linux.org.uk>
- <20150421125049.GW12732@n2100.arm.linux.org.uk>
- <CAKv+Gu9TkvEGLz-8K_F3jbvourWw8R-XScGSPagxbaakRXZKpg@mail.gmail.com>
- <20150421132139.GE3996@e103592.cambridge.arm.com>
- <CAKv+Gu8Wd5MX0Ly5Okx57MpUeGpkNGHhqFCSqxy_HWFbsgtnOQ@mail.gmail.com>
-Message-ID: <20150421135720.GA20723@e103592.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 21 Apr 2015 09:08:53 -0700
+Subject: [PATCH 1/1] gpio: omap: Fix PM runtime issue and remove most
+ BANK_USED macros
+Message-ID: <1429632533-23285-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 03:28:14PM +0200, Ard Biesheuvel wrote:
-> On 21 April 2015 at 15:21, Dave P Martin <Dave.Martin@arm.com> wrote:
-> > On Tue, Apr 21, 2015 at 02:10:42PM +0100, Ard Biesheuvel wrote:
-> >> On 21 April 2015 at 14:50, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > On Tue, Apr 21, 2015 at 12:24:20PM +0100, Russell King - ARM Linux wrote:
-> >> >> We should probably create a badr macro to complement the adr pseudo-op
-> >> >> which incorporates the BSYM thing so make this clearer - and a comment
-> >> >> before it.  This is really the case where BSYM should be used.
-> >> >
-> >> > Something like this.  Note that I've also removed the BSYM() usage in
-> >> > the KVM code.
-> >> >
-> >>
-> >> Yes, that is much better. It is a pity that we still can't use '| 1'
-> >> but the fact that you are forced to use 'adr' now probably mostly
-> >> eliminates the risk regarding that.
-> >>
-> >> I did notice that are are 4 or 5 instances (commented inline) of an
-> >> ARM to thumb mode switch which can just as easily be implemented as
-> >> 'blx 1f' instead of using this badr macro (whose use we want to
-> >> discourage, I assume, since the address arithmetic is still slightly
-> >> dodgy). Do you think we should do something about that as well?
-> >
-> > Err, probably.  That just looks like an oversight -- I think I'm
-> > responsible for at least some of those.
-> >
-> > There's no good reason not to replace adr+BSYM+bx.
-> >
-> > For switches from ARM, this could be replaced with bx <label> which
-> > should work just fine.  There shouldn't be any instances of this from
-> > Thumb, because switching instruction set is the whole point here.
-> >
-> > (Thumb doesn't have bx <label>, but blx <label> is available at the cost
-> > of clobbering lr).
-> >
-> 
-> It appears neither have 'bx <label>', but 'add pc, pc, #1; nop' does
+Looks like omap_gpio_irq_type can return early at several places
+leaving a GPIO bank enabled without doing pm_runtime_put if wrong
+GPIO arguments are passed.
 
-Duh, I'm getting myself confused.  Yes, both have blx <label> but not
-bx <label>.
+Instead of adding more complicated BANK_USED macros, let's fix the
+issue properly. We can pass is_irq flag to omap_enable_gpio_module
+and omap_disble_gpio_module. And with that we can remove all the
+similar code elsewhere to get rid of most BANK_USED macros.
 
-Note that blx may result in suboptimal branch prediction because it
-looks like a function call.  But these aren't hot paths, so I doubt
-it matters.
+Note that the reason for the BANK_USED macro is that we need to manage
+PM runtime on per GPIO bank basis. In the long run we want to move to
+using PM runtime counts for each GPIO line to determine if a GPIO
+bank is used. Once we have a solution for omap_enable_gpio_module
+and omap_disable_gpio_module, we can remove the remaining BANK_USED
+macros.
 
-> the job nicely as well.
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
+Cc: Javier Martinez Canillas <jmartinez@softcrates.net>
+Cc: Nishanth Menon <nm@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ drivers/gpio/gpio-omap.c | 111 +++++++++++++++++------------------------------
+ 1 file changed, 40 insertions(+), 71 deletions(-)
 
-Bit icky though...
-
-Cheers
----Dave
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index d44e617..39a6312 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -86,6 +86,7 @@ struct gpio_bank {
+ #define BANK_USED(bank) (bank->mod_usage || bank->irq_usage)
+ #define LINE_USED(line, offset) (line & (BIT(offset)))
+ 
++static void omap_reset_gpio(struct gpio_bank *bank, unsigned offset);
+ static void omap_gpio_unmask_irq(struct irq_data *d);
+ 
+ static inline struct gpio_bank *omap_irq_data_get_bank(struct irq_data *d)
+@@ -419,8 +420,16 @@ static int omap_set_gpio_triggering(struct gpio_bank *bank, int gpio,
+ 	return 0;
+ }
+ 
+-static void omap_enable_gpio_module(struct gpio_bank *bank, unsigned offset)
++static void omap_enable_gpio_module(struct gpio_bank *bank, unsigned offset,
++				    bool is_irq)
+ {
++	unsigned long flags;
++
++	/* PM runtime is per bank, not per GPIO line */
++	if (!BANK_USED(bank))
++		pm_runtime_get_sync(bank->dev);
++
++	spin_lock_irqsave(&bank->lock, flags);
+ 	if (bank->regs->pinctrl) {
+ 		void __iomem *reg = bank->base + bank->regs->pinctrl;
+ 
+@@ -438,11 +447,30 @@ static void omap_enable_gpio_module(struct gpio_bank *bank, unsigned offset)
+ 		writel_relaxed(ctrl, reg);
+ 		bank->context.ctrl = ctrl;
+ 	}
++
++	if (is_irq) {
++		omap_set_gpio_direction(bank, offset, 1);
++		bank->irq_usage |= BIT(offset);
++	} else {
++		omap_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
++		bank->mod_usage |= BIT(offset);
++	}
++	spin_unlock_irqrestore(&bank->lock, flags);
+ }
+ 
+-static void omap_disable_gpio_module(struct gpio_bank *bank, unsigned offset)
++static void omap_disable_gpio_module(struct gpio_bank *bank, unsigned offset,
++				     bool is_irq)
+ {
+ 	void __iomem *base = bank->base;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++	if (is_irq)
++		bank->irq_usage &= ~(BIT(offset));
++	else
++		bank->mod_usage &= ~(BIT(offset));
++
++	omap_reset_gpio(bank, offset);
+ 
+ 	if (bank->regs->wkup_en &&
+ 	    !LINE_USED(bank->mod_usage, offset) &&
+@@ -463,6 +491,11 @@ static void omap_disable_gpio_module(struct gpio_bank *bank, unsigned offset)
+ 		writel_relaxed(ctrl, reg);
+ 		bank->context.ctrl = ctrl;
+ 	}
++	spin_unlock_irqrestore(&bank->lock, flags);
++
++	/* PM runtime is per bank, not per GPIO line */
++	if (!BANK_USED(bank))
++		pm_runtime_put(bank->dev);
+ }
+ 
+ static int omap_gpio_is_input(struct gpio_bank *bank, unsigned offset)
+@@ -472,15 +505,6 @@ static int omap_gpio_is_input(struct gpio_bank *bank, unsigned offset)
+ 	return readl_relaxed(reg) & BIT(offset);
+ }
+ 
+-static void omap_gpio_init_irq(struct gpio_bank *bank, unsigned offset)
+-{
+-	if (!LINE_USED(bank->mod_usage, offset)) {
+-		omap_enable_gpio_module(bank, offset);
+-		omap_set_gpio_direction(bank, offset, 1);
+-	}
+-	bank->irq_usage |= BIT(offset);
+-}
+-
+ static int omap_gpio_irq_type(struct irq_data *d, unsigned type)
+ {
+ 	struct gpio_bank *bank = omap_irq_data_get_bank(d);
+@@ -488,9 +512,6 @@ static int omap_gpio_irq_type(struct irq_data *d, unsigned type)
+ 	unsigned long flags;
+ 	unsigned offset = d->hwirq;
+ 
+-	if (!BANK_USED(bank))
+-		pm_runtime_get_sync(bank->dev);
+-
+ 	if (type & ~IRQ_TYPE_SENSE_MASK)
+ 		return -EINVAL;
+ 
+@@ -498,13 +519,9 @@ static int omap_gpio_irq_type(struct irq_data *d, unsigned type)
+ 		(type & (IRQ_TYPE_LEVEL_LOW|IRQ_TYPE_LEVEL_HIGH)))
+ 		return -EINVAL;
+ 
++	omap_enable_gpio_module(bank, offset, true);
+ 	spin_lock_irqsave(&bank->lock, flags);
+ 	retval = omap_set_gpio_triggering(bank, offset, type);
+-	omap_gpio_init_irq(bank, offset);
+-	if (!omap_gpio_is_input(bank, offset)) {
+-		spin_unlock_irqrestore(&bank->lock, flags);
+-		return -EINVAL;
+-	}
+ 	spin_unlock_irqrestore(&bank->lock, flags);
+ 
+ 	if (type & (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH))
+@@ -659,26 +676,8 @@ static int omap_gpio_wake_enable(struct irq_data *d, unsigned int enable)
+ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
+-	unsigned long flags;
+ 
+-	/*
+-	 * If this is the first gpio_request for the bank,
+-	 * enable the bank module.
+-	 */
+-	if (!BANK_USED(bank))
+-		pm_runtime_get_sync(bank->dev);
+-
+-	spin_lock_irqsave(&bank->lock, flags);
+-	/* Set trigger to none. You need to enable the desired trigger with
+-	 * request_irq() or set_irq_type(). Only do this if the IRQ line has
+-	 * not already been requested.
+-	 */
+-	if (!LINE_USED(bank->irq_usage, offset)) {
+-		omap_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
+-		omap_enable_gpio_module(bank, offset);
+-	}
+-	bank->mod_usage |= BIT(offset);
+-	spin_unlock_irqrestore(&bank->lock, flags);
++	omap_enable_gpio_module(bank, offset, false);
+ 
+ 	return 0;
+ }
+@@ -686,20 +685,8 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
+ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&bank->lock, flags);
+-	bank->mod_usage &= ~(BIT(offset));
+-	omap_disable_gpio_module(bank, offset);
+-	omap_reset_gpio(bank, offset);
+-	spin_unlock_irqrestore(&bank->lock, flags);
+ 
+-	/*
+-	 * If this is the last gpio to be freed in the bank,
+-	 * disable the bank module.
+-	 */
+-	if (!BANK_USED(bank))
+-		pm_runtime_put(bank->dev);
++	omap_disable_gpio_module(bank, offset, false);
+ }
+ 
+ /*
+@@ -788,15 +775,9 @@ exit:
+ static unsigned int omap_gpio_irq_startup(struct irq_data *d)
+ {
+ 	struct gpio_bank *bank = omap_irq_data_get_bank(d);
+-	unsigned long flags;
+ 	unsigned offset = d->hwirq;
+ 
+-	if (!BANK_USED(bank))
+-		pm_runtime_get_sync(bank->dev);
+-
+-	spin_lock_irqsave(&bank->lock, flags);
+-	omap_gpio_init_irq(bank, offset);
+-	spin_unlock_irqrestore(&bank->lock, flags);
++	omap_enable_gpio_module(bank, offset, true);
+ 	omap_gpio_unmask_irq(d);
+ 
+ 	return 0;
+@@ -805,21 +786,9 @@ static unsigned int omap_gpio_irq_startup(struct irq_data *d)
+ static void omap_gpio_irq_shutdown(struct irq_data *d)
+ {
+ 	struct gpio_bank *bank = omap_irq_data_get_bank(d);
+-	unsigned long flags;
+ 	unsigned offset = d->hwirq;
+ 
+-	spin_lock_irqsave(&bank->lock, flags);
+-	bank->irq_usage &= ~(BIT(offset));
+-	omap_disable_gpio_module(bank, offset);
+-	omap_reset_gpio(bank, offset);
+-	spin_unlock_irqrestore(&bank->lock, flags);
+-
+-	/*
+-	 * If this is the last IRQ to be freed in the bank,
+-	 * disable the bank module.
+-	 */
+-	if (!BANK_USED(bank))
+-		pm_runtime_put(bank->dev);
++	omap_disable_gpio_module(bank, offset, true);
+ }
+ 
+ static void omap_gpio_ack_irq(struct irq_data *d)
+-- 
+2.1.4
