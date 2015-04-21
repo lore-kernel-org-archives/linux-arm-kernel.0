@@ -1,75 +1,74 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Tue, 21 Apr 2015 10:07:42 -0400
-Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <55363791.4070706@hitachi.com>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
- <55363791.4070706@hitachi.com>
-Message-ID: <553659AE.4090809@redhat.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Tue, 21 Apr 2015 09:15:36 -0500
+Subject: [PATCH v4 09/11] ARM: imx: add imx7d clk tree support
+In-Reply-To: <20150421102255.GW6325@pengutronix.de>
+References: <1429563933-3129-1-git-send-email-Frank.Li@freescale.com>
+ <1429563933-3129-10-git-send-email-Frank.Li@freescale.com>
+ <20150421102255.GW6325@pengutronix.de>
+Message-ID: <CAHrpEqSuJbAEBDBfVMXdFk-p-xwtwfmHbSw3OsN-2sa9fNmA=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2015 07:42 AM, Masami Hiramatsu wrote:
-> (2015/04/21 5:19), David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
+On Tue, Apr 21, 2015 at 5:22 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Tue, Apr 21, 2015 at 05:05:31AM +0800, Frank.Li at freescale.com wrote:
+>> From: Frank Li <Frank.Li@freescale.com>
 >>
->> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
->> first seen in October 2013. This version attempts to address concerns raised by
->> reviewers and also fixes problems discovered during testing.
+>> Add i.MX7D clk tree support.
 >>
->> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
->> and return probes(kretprobes) support for ARM64.
+>> +
+>> +     clk_register_clkdev(clks[IMX7D_GPT1_ROOT_CLK], "ipg", "imx-gpt.0");
+>> +     clk_register_clkdev(clks[IMX7D_GPT_3M_CLK], "gpt_3m", "imx-gpt.0");
+
+This patch just list all clock root in RM.
+all clock refine have to wait for Dong Aisheng's RFC clock framework
+change's patch.
+
+>
+> What are these good for? These shouldn't be here.
+>
+>> +
+>> +     for (i = 0; i < IMX7D_END_CLK; i++)
+>> +             clk_prepare_enable(clks[i]);
+>
+> Hey, no. You enable *all* clocks here which is certainly wrong. They
+> will never be turned off.
+
+Yes. This patches's purpose is bring up mx7.
+Because imx7 clock design change,  Dong Aisheng send out RFC patch to
+change a little bit framework.
+After that,  we can enable only necessary clock here. Otherwise system
+will halt and block the other part
+upstream.
+
+>
+>> @@ -309,12 +316,20 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+>>       case IMX_PLLV3_ENET:
+>>               ops = &clk_pllv3_enet_ops;
+>>               break;
+>> +     case IMX_PLLV3_SYSV2:
+>> +             ops = &clk_pllv3_ops;
+>> +             break;
+>>       default:
+>>               ops = &clk_pllv3_ops;
+>>       }
+>>       pll->base = base;
+>>       pll->div_mask = div_mask;
 >>
->> The kprobes mechanism makes use of software breakpoint and single stepping
->> support available in the ARM v8 kernel.
->>
-> [...]
->> Changes since v5 include:
->>
->> 1) Replaced installation of breakpoint hook with direct call from the
->> handlers in debug-monitors.c, as requested.
->> 2) Reject probing of instructions that read the interrupt mask, in
->> addition to instructions that set it.
->> 3) Cleaned up comments describing usage of Debug Mask.
->> 4) Added KPROBE_REENTER case in reenter_kprobe.
->> 5) Corrected the ifdef'd definitions for notify_page_fault() to be
->> consistent when KPROBES is not configed.
->> 6) Changed "cpsr" to "pstate" for HAVE_REGS_AND_STACK_ACCESS_API feature.
->> 7) Added back in missing new files in previous patch.
->> 8) Changed two instances of pr_warning() to pr_warn().
-> 
-> Looks OK to me:)
-> BTW, have you tried to build and test this with CONFIG_KPROBE_EVENT?
-> If so, you can also test it by tools/testing/selftests/ftrace/ftracetest.
-> 
->> Note that there seems to be at least a potential issue with kprobes
->> on multiple (possibly all) platforms having to do with use of kfree
->> inside of the kretprobes trampoline handler.  This has manifested
->> occasionally in systemtap testing on arm64.  There does not appear to
->> be an simple solution to the problem.
-> 
-> No, trampoline handler must call recycle_rp_inst() instead of kfree
-> to return kretprobe instance to the pool. Hmm, I should look into it.
-> 
-> Thank you,
-> 
+>> +     if (cpu_is_imx7d() && strcmp(name, "pll_enet_main") == 0)
+>> +             pll->powerdown = ENET_PLL_POWER;
+>> +     else
+>> +             pll->powerdown = BM_PLL_POWER;
+>
+> You should probably add a new PLL type, like IMX_PLLV3_ENET_IMX7 or such
+> instead of using cpu_is_ and strcmp.
 
-Hi,
+Okay I will update it.
 
-I have noticed when running the systemtap testsuite even with this newest revision of the arm64 kprobe patches the system will start spewing the following message:
-
-Unexpected kernel single-step exception at EL1
-
-That is triggered by the functioncallcount.stp test in the systemtap examples.  The test is instrumenting many function calls and returns in the memory management code.  It appears that the problem is triggered during the kfree call/return towards the end of trampoline_probe_handler.  The single_step_handler function in debug-monitors.c calls kprobe_single_step_handler which indicates that the breakpoint is not a kprobe breakpoint.  Thus, single_step_handler starts flagging the breakpoint with the above message.
-
-It would be good if the warning message included and address to be a bit more informative.  I put in some addition code (the attached patch) to print out register information to diagnose what was going on.
-
-Other architecture do use kfree in the kretprobe trampoline handlers but do not seem to encounter this problem. 
-
--Will
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: debug_diag.patch
-Type: text/x-patch
-Size: 915 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150421/dca21984/attachment.bin>
+>
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
