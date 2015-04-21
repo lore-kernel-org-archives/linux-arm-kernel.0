@@ -1,57 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 21 Apr 2015 12:08:17 +0200
-Subject: [PATCH] ARM: at91/dt: kizbox: update and rename to at91-kizbox
-In-Reply-To: <5536208E.4060105@overkiz.com>
-References: <1429521218-9752-1-git-send-email-g.portay@overkiz.com>
- <20150421091100.6bb8ba36@bbrezillon> <5536208E.4060105@overkiz.com>
-Message-ID: <20150421120817.6d368c42@bbrezillon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 21 Apr 2015 12:08:51 +0200
+Subject: [PATCH 1/2] ARM: include Thumb2 bit in PROCINFO setup function offset
+In-Reply-To: <1429607205-7501-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1429607205-7501-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1429610931-14903-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Apr 2015 12:03:58 +0200
-Ga?l PORTAY <g.portay@overkiz.com> wrote:
+This updates the PROCINFO offset-to-setup-function fields of the
+Thumb2 capable CPU definitions to include the Thumb bit when building
+a Thumb2 kernel. This ensures that these function are always called
+in the correct mode.
 
-> On 21/04/2015 09:11, Boris Brezillon wrote:
-> > Hi Gael,
-> >
-> > On Mon, 20 Apr 2015 11:13:38 +0200
-> > Ga?l PORTAY <g.portay@overkiz.com> wrote:
-> >
-> >> Sort nodes, rename to match Atmel naming convention
-> > You should use -M when you generate your patches with format-patch: it
-> > keeps track of files that have been renamed instead of considering it
-> > as a removal + an addition.
-> 
-> Ok, thanks, I did not know that option...
-> 
-> >> and update the features
-> >> below:
-> >>   - command-line,
-> >>   - use proper serial uart,
-> >>   - rename leds and gpio-keys,
-> >>   - update to pwm-leds and
-> >>   - fix gpio-key level.
-> > Please split this patch so we can easily review the changes.
-> > How about the following separation ?
-> >
-> > - rename dts file
-> > - use stdout-path
-> > - sanitize bootargs
-> > - led related changes (rename + pwm-leds)
-> > - gpio-key related changes (rename + fix level)
-> 
-> In fact, each changes were committed in single patch before I submitted 
-> them...
-> 
-> I just squashed them thinking it would be easier for you to check (only) 
-> for the "new" device-tree.... my bad :(
-> 
-> What about the node re-order? Do you prefer in dedicated commit or with 
-> the rename patch?
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/mm/proc-v7.S  | 2 +-
+ arch/arm/mm/proc-v7m.S | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Keep it separated from the rename patch.
-
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3d1054f11a8a..eb3f66cb8ad0 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -492,7 +492,7 @@ __v7_setup_stack:
+ 			PMD_SECT_AF | PMD_FLAGS_UP | \mm_mmuflags)
+ 	.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | \
+ 		PMD_SECT_AP_READ | PMD_SECT_AF | \io_mmuflags
+-	initfn	\initfunc, \name
++	initfn	BSYM(\initfunc), \name
+ 	.long	cpu_arch_name
+ 	.long	cpu_elf_name
+ 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT | \
+diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
+index e08e1f2bab76..e85c3b98d4b6 100644
+--- a/arch/arm/mm/proc-v7m.S
++++ b/arch/arm/mm/proc-v7m.S
+@@ -146,7 +146,7 @@ __v7m_proc_info:
+ 	.long	0x000f0000		@ Mask for ID
+ 	.long   0			@ proc_info_list.__cpu_mm_mmu_flags
+ 	.long   0			@ proc_info_list.__cpu_io_mmu_flags
+-	initfn	__v7m_setup, __v7m_proc_info	@ proc_info_list.__cpu_flush
++	initfn	BSYM(__v7m_setup), __v7m_proc_info	@ proc_info_list.__cpu_flush
+ 	.long	cpu_arch_name
+ 	.long	cpu_elf_name
+ 	.long	HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.8.3.2
