@@ -1,38 +1,34 @@
-From: fainelli@broadcom.com (Florian Fainelli)
-Date: Tue, 21 Apr 2015 11:51:32 -0700
-Subject: [PATCH 0/3] power: reset: BCM63xx reboot support
-In-Reply-To: <1427242632-7971-1-git-send-email-f.fainelli@gmail.com>
-References: <1427242632-7971-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <55369C34.5020201@broadcom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Apr 2015 20:53:04 +0200
+Subject: [PATCH 5/9] ARM: BCM2836: Add io map initialization for bcm2836.
+In-Reply-To: <1429639796-2169-6-git-send-email-eric@anholt.net>
+References: <1429639796-2169-1-git-send-email-eric@anholt.net>
+ <1429639796-2169-6-git-send-email-eric@anholt.net>
+Message-ID: <6559239.zHhRM8VZWD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/15 17:17, Florian Fainelli wrote:
-> Hi all,
-> 
-> This patch series adds support for the BCM6328-style software reset hardware
-> block commonly found on Broadcom BCM63xx DSL SoCs.
-
-Looks like we can utilize the generic syscon reboot driver instead of
-open-coding one, let's do that instead.
-
-> 
-> Thanks!
-> 
-> Florian Fainelli (3):
->   Documentation: bindings: add BCM6328-style soft reset binding
->   power: reset: add Broadcom BCM63xx software reset driver
->   ARM: dts: BCM63xx: add soft-reset node
-> 
->  .../devicetree/bindings/arm/bcm/bcm63138.txt       | 16 +++++
->  arch/arm/boot/dts/bcm63138.dtsi                    |  5 ++
->  drivers/power/reset/Kconfig                        |  7 ++
->  drivers/power/reset/Makefile                       |  1 +
->  drivers/power/reset/bcm63xx-reboot.c               | 80 ++++++++++++++++++++++
->  5 files changed, 109 insertions(+)
->  create mode 100644 drivers/power/reset/bcm63xx-reboot.c
+On Tuesday 21 April 2015 11:09:52 Eric Anholt wrote:
+> +static struct map_desc bcm2836_io_map __initdata = {
+> +       .virtual = BCM2835_PERIPH_VIRT,
+> +       .pfn = __phys_to_pfn(BCM2836_PERIPH_PHYS),
+> +       .length = BCM2835_PERIPH_SIZE,
+> +       .type = MT_DEVICE
+> +};
+> +
+>  static void __init bcm2835_map_io(void)
+>  {
+> -       iotable_init(&io_map, 1);
+> +       iotable_init(&bcm2835_io_map, 1);
+> +}
+> +
+> +static void __init bcm2836_map_io(void)
+> +{
+> +       iotable_init(&bcm2836_io_map, 1);
+>  }
 > 
 
+Can you explain what this is needed for? Most platform ports don't
+do this any more.
 
--- 
-Florian
+	Arnd
