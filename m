@@ -1,71 +1,111 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 21 Apr 2015 09:10:19 -0700
-Subject: [PATCH 1/1] ARM: OMAP2+: Fix omap3 off idle power consumption
- creeping up
-Message-ID: <1429632619-23474-1-git-send-email-tony@atomide.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 21 Apr 2015 18:03:55 +0100
+Subject: your mail
+In-Reply-To: <CAKv+Gu_KsgBau8f8ZmUpBZmD4chmRsD2126LcN5qeNEwcJH+oQ@mail.gmail.com>
+References: <CAKv+Gu9u73+YKn+aR1vk+1eNF_voC71THWRQS96jyAt4HB3BQw@mail.gmail.com>
+ <20150421104634.GA3996@e103592.cambridge.arm.com>
+ <CAKv+Gu-3iM2+TvAgfV91FzfgAQuZhr=beeJ8RWmmGjTChbUrtQ@mail.gmail.com>
+ <20150421111042.GB3996@e103592.cambridge.arm.com>
+ <20150421112420.GV12732@n2100.arm.linux.org.uk>
+ <20150421125049.GW12732@n2100.arm.linux.org.uk>
+ <20150421131801.GD3996@e103592.cambridge.arm.com>
+ <20150421135552.GX12732@n2100.arm.linux.org.uk>
+ <CAKv+Gu_KsgBau8f8ZmUpBZmD4chmRsD2126LcN5qeNEwcJH+oQ@mail.gmail.com>
+Message-ID: <20150421170355.GB20723@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we use a combination of VMODE and I2C4 for retention modes,
-eventually the off idle power consumption will creep up by about
-23mW, even during off mode with I2C4 always staying enabled.
+On Tue, Apr 21, 2015 at 04:06:02PM +0200, Ard Biesheuvel wrote:
+> On 21 April 2015 at 15:55, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Apr 21, 2015 at 02:18:03PM +0100, Dave P Martin wrote:
+> >> On Tue, Apr 21, 2015 at 01:50:50PM +0100, Russell King - ARM Linux wrote:
+> >> > On Tue, Apr 21, 2015 at 12:24:20PM +0100, Russell King - ARM Linux wrote:
+> >> > > We should probably create a badr macro to complement the adr pseudo-op
+> >> > > which incorporates the BSYM thing so make this clearer - and a comment
+> >> > > before it.  This is really the case where BSYM should be used.
+> >> >
+> >> > Something like this.  Note that I've also removed the BSYM() usage in
+> >> > the KVM code.
+> >>
+> >> Nice.  Wrapping this around adr will make the assembler check that it's
+> >> not a cross-section reference too.
+> >
+> > While looking at this, I've become very upset with our toolchain's
+> > abilities.  This is with stock binutils 2.22-2.25, and Ard's suggestion
+> > for using blx:
+> >
+> > 00000000 <secondary_startup_arm>:
+> >    0:   fafffffe        blx     4 <secondary_startup>
+> >
+> > 00000004 <secondary_startup>:
+> >    4:   f7ff fffe       bl      0 <__hyp_stub_install_secondary>
+> >    8:   f3ef 8900       mrs     r9, CPSR
+> >    c:   f089 091a       eor.w   r9, r9, #26
+> >   10:   f019 0f1f       tst.w   r9, #31
+> >
+> > That's fine, but now if we look at the .head.text section (I also added
+> > an ENTRY(start) to try and solve this):
+> >
+> > 00000000 <stext>:
+> >    0:   ffff faff                       ; <UNDEFINED> instruction: 0xfffffaff
+> >
+> > 00000004 <start>:
+> >    4:   fffef7ff        .word   0xfffef7ff
+> >    8:   f3ef 8900       mrs     r9, CPSR
+> >    c:   091af089        .word   0x091af089
+> >   10:   f019 0f1f       tst.w   r9, #31
+> >   14:   091ff029        .word   0x091ff029
+> >   18:   09d3f049        .word   0x09d3f049
+> >   1c:   f049 0920       orr.w   r9, r9, #32
+> >   20:   f449d109        .word   0xf449d109
+> >   24:   f20f7980        .word   0xf20f7980
+> >   28:   0e13            lsrs    r3, r2, #24
+> >   2a:   f399            .short  0xf399
+> >   2c:   8f00            ldrh    r0, [r0, #56]   ; 0x38
+> >   2e:   f38e            .short  0xf38e
+> >   30:   f3de8e30        .word   0xf3de8e30
+> >   34:   8f00            .short  0x8f00
+> >   36:   f389 8100       msr     CPSR_c, r9
+> >
+> > readelf for this shows for section 5:
+> >
+> > Section Headers:
+> >   [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+> >   [ 5] .head.text        PROGBITS        00000000 000290 000254 00  AX  0   0  4
+> > ...
+> >    Num:    Value  Size Type    Bind   Vis      Ndx Name
+> >      4: 00000000     0 SECTION LOCAL  DEFAULT    5
+> >      5: 00000000     0 NOTYPE  LOCAL  DEFAULT    5 $a
+> >      6: 00000004     0 NOTYPE  LOCAL  DEFAULT    5 $t
+> >      7: 0000002e     0 NOTYPE  LOCAL  DEFAULT    5 $d
+> >      8: 00000036     0 NOTYPE  LOCAL  DEFAULT    5 $t
+> > ...
+> >     65: 00000000     4 FUNC    GLOBAL DEFAULT    5 stext
+> >     66: 00000005   122 FUNC    GLOBAL DEFAULT    5 start
+> >
+> > One has to wonder about the toolchain when the stupid $[adt] hack seems
+> > to be going soooo wrong.
+> >
+> > I think I'm going to stop working on this until we have a toolchain
+> > which behaves sensibly... when you can't get the damned thing to
+> > disassemble for confirmation purposes, its best to leave the damned
+> > code alone.
+> >
+> 
+> It indeed seems to be objdump that is failing, but the code itself
+> looks fine to me.  For the record, binutils v2.23.52 works fine
 
-Looks like the only way to fix the extra power consumption is to
-disable I2C4 usage by setting SEL_VMODE for both off idle and
-retention idle. Let's also update the comments accordingly.
+I've come across weird disassembly issues like this in the past.
+The objdump code is something of a fragmented mess (shock, horror),
+but I think there were fixes in the pipeline for some issues of this
+sort.
 
-Fixes: 3b8c4ebb7630 ("ARM: OMAP3: Fix idle mode signaling for sys_clkreq and sys_off_mode")
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/vc.c | 24 ++++++++++++++----------
- 1 file changed, 14 insertions(+), 10 deletions(-)
+If it is possible to manually check most or all of the cases of
+badr, that might be sufficient -- this only gets used in a few,
+specific places.
 
-diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-index be9ef83..f8a2539 100644
---- a/arch/arm/mach-omap2/vc.c
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -284,6 +284,9 @@ void omap3_vc_set_pmic_signaling(int core_next_state)
- 					OMAP3430_PRM_POLCTRL_CLKREQ_POL)
- #define PRM_POLCTRL_TWL_VAL	OMAP3430_PRM_POLCTRL_CLKREQ_POL
- 
-+#define OMAP3_VOLTCTRL_CFG	(OMAP3430_PRM_VOLTCTRL_SEL_VMODE | \
-+					OMAP3430_PRM_VOLTCTRL_SEL_OFF)
-+
- /*
-  * Configure signal polarity for sys_clkreq and sys_off_mode pins
-  * as the default values are wrong and can cause the system to hang
-@@ -309,18 +312,19 @@ static void __init omap3_vc_init_pmic_signaling(struct voltagedomain *voltdm)
- 	}
- 
- 	/*
--	 * By default let's use I2C4 signaling for retention idle
--	 * and sys_off_mode pin signaling for off idle. This way we
--	 * have sys_clk_req pin go down for retention and both
--	 * sys_clk_req and sys_off_mode pins will go down for off
--	 * idle. And we can also scale voltages to zero for off-idle.
--	 * Note that no actual voltage scaling during off-idle will
--	 * happen unless the board specific twl4030 PMIC scripts are
--	 * loaded.
-+	 * By default let's use pin based (VMODE) signaling for retention
-+	 * idle and off idle. Trying to use both VMODE and I2C4 will cause
-+	 * the I2C4 to eventually stay always on consuming extra 23mW even in
-+	 * off idle. With VMODE based configuration, we have sys_clk_req pin
-+	 * go down for retention and both sys_clk_req and sys_off_mode pins
-+	 * will go down for off idle. And we can also scale voltages to zero
-+	 * for off-idle, while I2C4 configuration can only scale down to 0.6V.
-+	 * Note that no actual voltage scaling during off-idle will happen
-+	 * unless the board specific twl4030 PMIC scripts are loaded.
- 	 */
- 	val = voltdm->read(OMAP3_PRM_VOLTCTRL_OFFSET);
--	if (!(val & OMAP3430_PRM_VOLTCTRL_SEL_OFF)) {
--		val |= OMAP3430_PRM_VOLTCTRL_SEL_OFF;
-+	if (!(val & OMAP3_VOLTCTRL_CFG)) {
-+		val |= OMAP3_VOLTCTRL_CFG;
- 		pr_debug("PM: setting voltctrl sys_off_mode signaling to 0x%x\n",
- 			 val);
- 		voltdm->write(val, OMAP3_PRM_VOLTCTRL_OFFSET);
--- 
-2.1.4
+Objdump doesn't inspire much confidence though :(
+
+Cheers
+---Dave
