@@ -1,95 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Apr 2015 16:06:02 +0200
-Subject: your mail
-In-Reply-To: <20150421135552.GX12732@n2100.arm.linux.org.uk>
-References: <CAKv+Gu9u73+YKn+aR1vk+1eNF_voC71THWRQS96jyAt4HB3BQw@mail.gmail.com>
- <20150421104634.GA3996@e103592.cambridge.arm.com>
- <CAKv+Gu-3iM2+TvAgfV91FzfgAQuZhr=beeJ8RWmmGjTChbUrtQ@mail.gmail.com>
- <20150421111042.GB3996@e103592.cambridge.arm.com>
- <20150421112420.GV12732@n2100.arm.linux.org.uk>
- <20150421125049.GW12732@n2100.arm.linux.org.uk>
- <20150421131801.GD3996@e103592.cambridge.arm.com>
- <20150421135552.GX12732@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu_KsgBau8f8ZmUpBZmD4chmRsD2126LcN5qeNEwcJH+oQ@mail.gmail.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Tue, 21 Apr 2015 10:07:42 -0400
+Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <55363791.4070706@hitachi.com>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <55363791.4070706@hitachi.com>
+Message-ID: <553659AE.4090809@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 April 2015 at 15:55, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 21, 2015 at 02:18:03PM +0100, Dave P Martin wrote:
->> On Tue, Apr 21, 2015 at 01:50:50PM +0100, Russell King - ARM Linux wrote:
->> > On Tue, Apr 21, 2015 at 12:24:20PM +0100, Russell King - ARM Linux wrote:
->> > > We should probably create a badr macro to complement the adr pseudo-op
->> > > which incorporates the BSYM thing so make this clearer - and a comment
->> > > before it.  This is really the case where BSYM should be used.
->> >
->> > Something like this.  Note that I've also removed the BSYM() usage in
->> > the KVM code.
+On 04/21/2015 07:42 AM, Masami Hiramatsu wrote:
+> (2015/04/21 5:19), David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
 >>
->> Nice.  Wrapping this around adr will make the assembler check that it's
->> not a cross-section reference too.
->
-> While looking at this, I've become very upset with our toolchain's
-> abilities.  This is with stock binutils 2.22-2.25, and Ard's suggestion
-> for using blx:
->
-> 00000000 <secondary_startup_arm>:
->    0:   fafffffe        blx     4 <secondary_startup>
->
-> 00000004 <secondary_startup>:
->    4:   f7ff fffe       bl      0 <__hyp_stub_install_secondary>
->    8:   f3ef 8900       mrs     r9, CPSR
->    c:   f089 091a       eor.w   r9, r9, #26
->   10:   f019 0f1f       tst.w   r9, #31
->
-> That's fine, but now if we look at the .head.text section (I also added
-> an ENTRY(start) to try and solve this):
->
-> 00000000 <stext>:
->    0:   ffff faff                       ; <UNDEFINED> instruction: 0xfffffaff
->
-> 00000004 <start>:
->    4:   fffef7ff        .word   0xfffef7ff
->    8:   f3ef 8900       mrs     r9, CPSR
->    c:   091af089        .word   0x091af089
->   10:   f019 0f1f       tst.w   r9, #31
->   14:   091ff029        .word   0x091ff029
->   18:   09d3f049        .word   0x09d3f049
->   1c:   f049 0920       orr.w   r9, r9, #32
->   20:   f449d109        .word   0xf449d109
->   24:   f20f7980        .word   0xf20f7980
->   28:   0e13            lsrs    r3, r2, #24
->   2a:   f399            .short  0xf399
->   2c:   8f00            ldrh    r0, [r0, #56]   ; 0x38
->   2e:   f38e            .short  0xf38e
->   30:   f3de8e30        .word   0xf3de8e30
->   34:   8f00            .short  0x8f00
->   36:   f389 8100       msr     CPSR_c, r9
->
-> readelf for this shows for section 5:
->
-> Section Headers:
->   [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
->   [ 5] .head.text        PROGBITS        00000000 000290 000254 00  AX  0   0  4
-> ...
->    Num:    Value  Size Type    Bind   Vis      Ndx Name
->      4: 00000000     0 SECTION LOCAL  DEFAULT    5
->      5: 00000000     0 NOTYPE  LOCAL  DEFAULT    5 $a
->      6: 00000004     0 NOTYPE  LOCAL  DEFAULT    5 $t
->      7: 0000002e     0 NOTYPE  LOCAL  DEFAULT    5 $d
->      8: 00000036     0 NOTYPE  LOCAL  DEFAULT    5 $t
-> ...
->     65: 00000000     4 FUNC    GLOBAL DEFAULT    5 stext
->     66: 00000005   122 FUNC    GLOBAL DEFAULT    5 start
->
-> One has to wonder about the toolchain when the stupid $[adt] hack seems
-> to be going soooo wrong.
->
-> I think I'm going to stop working on this until we have a toolchain
-> which behaves sensibly... when you can't get the damned thing to
-> disassemble for confirmation purposes, its best to leave the damned
-> code alone.
->
+>> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
+>> first seen in October 2013. This version attempts to address concerns raised by
+>> reviewers and also fixes problems discovered during testing.
+>>
+>> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
+>> and return probes(kretprobes) support for ARM64.
+>>
+>> The kprobes mechanism makes use of software breakpoint and single stepping
+>> support available in the ARM v8 kernel.
+>>
+> [...]
+>> Changes since v5 include:
+>>
+>> 1) Replaced installation of breakpoint hook with direct call from the
+>> handlers in debug-monitors.c, as requested.
+>> 2) Reject probing of instructions that read the interrupt mask, in
+>> addition to instructions that set it.
+>> 3) Cleaned up comments describing usage of Debug Mask.
+>> 4) Added KPROBE_REENTER case in reenter_kprobe.
+>> 5) Corrected the ifdef'd definitions for notify_page_fault() to be
+>> consistent when KPROBES is not configed.
+>> 6) Changed "cpsr" to "pstate" for HAVE_REGS_AND_STACK_ACCESS_API feature.
+>> 7) Added back in missing new files in previous patch.
+>> 8) Changed two instances of pr_warning() to pr_warn().
+> 
+> Looks OK to me:)
+> BTW, have you tried to build and test this with CONFIG_KPROBE_EVENT?
+> If so, you can also test it by tools/testing/selftests/ftrace/ftracetest.
+> 
+>> Note that there seems to be at least a potential issue with kprobes
+>> on multiple (possibly all) platforms having to do with use of kfree
+>> inside of the kretprobes trampoline handler.  This has manifested
+>> occasionally in systemtap testing on arm64.  There does not appear to
+>> be an simple solution to the problem.
+> 
+> No, trampoline handler must call recycle_rp_inst() instead of kfree
+> to return kretprobe instance to the pool. Hmm, I should look into it.
+> 
+> Thank you,
+> 
 
-It indeed seems to be objdump that is failing, but the code itself
-looks fine to me.  For the record, binutils v2.23.52 works fine
+Hi,
+
+I have noticed when running the systemtap testsuite even with this newest revision of the arm64 kprobe patches the system will start spewing the following message:
+
+Unexpected kernel single-step exception at EL1
+
+That is triggered by the functioncallcount.stp test in the systemtap examples.  The test is instrumenting many function calls and returns in the memory management code.  It appears that the problem is triggered during the kfree call/return towards the end of trampoline_probe_handler.  The single_step_handler function in debug-monitors.c calls kprobe_single_step_handler which indicates that the breakpoint is not a kprobe breakpoint.  Thus, single_step_handler starts flagging the breakpoint with the above message.
+
+It would be good if the warning message included and address to be a bit more informative.  I put in some addition code (the attached patch) to print out register information to diagnose what was going on.
+
+Other architecture do use kfree in the kretprobe trampoline handlers but do not seem to encounter this problem. 
+
+-Will
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: debug_diag.patch
+Type: text/x-patch
+Size: 915 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150421/dca21984/attachment.bin>
