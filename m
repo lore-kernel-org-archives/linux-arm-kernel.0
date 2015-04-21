@@ -1,90 +1,97 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Apr 2015 15:50:14 +0100
-Subject: [RESEND PATCH 4.0-rc7 v20 3/6] irqchip: gic: Introduce plumbing
- for IPI FIQ
-In-Reply-To: <1428659511-9590-4-git-send-email-daniel.thompson@linaro.org>
-References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
- <1428659511-9590-1-git-send-email-daniel.thompson@linaro.org>
- <1428659511-9590-4-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20150421145007.GB10164@leverpostej>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Tue, 21 Apr 2015 22:53:16 +0800
+Subject: [PATCH v5 00/11] Add Freescale i.mx7d support
+Message-ID: <1429628007-8892-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Frank Li <Frank.Li@freescale.com>
 
-On Fri, Apr 10, 2015 at 10:51:48AM +0100, Daniel Thompson wrote:
-> Currently it is not possible to exploit FIQ for systems with a GIC, even if
-> the systems are otherwise capable of it. This patch makes it possible
-> for IPIs to be delivered using FIQ.
-> 
-> To do so it modifies the register state so that normal interrupts are
-> placed in group 1 and specific IPIs are placed into group 0. It also
-> configures the controller to raise group 0 interrupts using the FIQ
-> signal. It provides a means for architecture code to define which IPIs
-> shall use FIQ and to acknowledge any IPIs that are raised.
-> 
-> All GIC hardware except GICv1-without-TrustZone support provides a means
-> to group exceptions into group 0 and group 1 but the hardware
-> functionality is unavailable to the kernel when a secure monitor is
-> present because access to the grouping registers are prohibited outside
-> "secure world". However when grouping is not available (or in the case
-> of early GICv1 implementations is very hard to configure) the code to
-> change groups does not deploy and all IPIs will be raised via IRQ.
-> 
-> It has been tested and shown working on two systems capable of
-> supporting grouping (Freescale i.MX6 and STiH416). It has also been
-> tested for boot regressions on two systems that do not support grouping
-> (vexpress-a9 and Qualcomm Snapdragon 600).
+add basic support for chip imx7d.
+ - MSL
+ - Clock support. All clock enabled.
+ - pinctrl support
+ - SD Card support
 
-I just gave this a spin on my (non-MCPM) TC2, and secondaries don't come
-up:
+Change from v4 to v5
+ - Remove imx7d_map_io()
+ - Remove  clk_register_clkdev(clks[IMX7D_GPT1_ROOT_CLK], "ipg", "imx-gpt.0");
+ - Remove  clk_register_clkdev(clks[IMX7D_GPT_3M_CLK], "gpt_3m", "imx-gpt.0");
+ - Add comment about enable all clock
+ - Add Type IMX_PLLV3_ENET_IMX7 and remove cpu_is_imx7d()
 
-CPU1: failed to boot: -38
-CPU2: failed to boot: -38
-CPU3: failed to boot: -38
-CPU4: failed to boot: -38
-Brought up 1 CPUs
-SMP: Total of 1 processors activated (48.00 BogoMIPS).
+Change from v3 to v4
+ - Fixed the problem review by Russel king.
+   Remove __mxc_arch_type
+   Remove MXC_ARCH_CA7
+   use new smp_operation for ca7 platform
+ - imx7d.dtsi remove unecessary part for bring up
+ - imx7d-sdb.dsi, just enable uart i2c and sd card
+ - Add device tree binding document for timer, clock and pinctrl
 
-I tried investigating with a debugger. The unbooted CPUs look to be
-stuck at the FW's spin loop, but the text doesn't look right (I see a
-load of ADDEQ r0, r0, r0, #LSL 1 where there was previously a WFI loop).
-That could be a bug with my debugger though.
+Change from v2 to v3
+  - remove unsupport part in imx7d-sdb.dtb
 
-If I pause the CPUs at the right point, they sometimes enter the kernel
-successfully. I don't have a good explanation for that.
+Change from V1 to V2:
+  - split patch1 to three small one to avoid 100k maillist limitation.
+  - fix imx7d.dtsi code style problem
 
-[...]
 
-> @@ -427,6 +535,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->         void __iomem *base = gic_data_cpu_base(gic);
->         unsigned int cpu_mask, cpu = smp_processor_id();
->         int i;
-> +       unsigned long secure_irqs, secure_irq;
+Anson Huang (1):
+  ARM: imx: add msl support for imx7d
 
-I think secure_irq(s) is a misnomer here. It's just a mask of FIQ bits.
+Frank Li (10):
+  ARM: dts: add pinfunc include file to support imx7d
+  ARM: dts: add pinfunc include file gpio1 to support imx7d
+  ARM: dts: add clock include file to support imx7d
+  Document: dt: binding: imx: update document for imx7d support
+  ARM: dts: add imx7d soc dtsi file
+  pinctrl: add imx7d support
+  ARM: imx: add gpt system timer support for imx7d
+  ARM: imx: add imx7d clk tree support
+  arm: dts: add imx7d-sdb support
+  ARM: config: imx_v6_v7_defconfig add imx7d support
 
-> 
->         /*
->          * Get what the GIC says our CPU mask is.
-> @@ -445,6 +554,20 @@ static void gic_cpu_init(struct gic_chip_data *gic)
-> 
->         gic_cpu_config(dist_base, NULL);
-> 
-> +       /*
-> +        * If the distributor is configured to support interrupt grouping
-> +        * then set any PPI and SGI interrupts not set in SMP_IPI_FIQ_MASK
-> +        * to be group1 and ensure any remaining group 0 interrupts have
-> +        * the right priority.
-> +        */
-> +       if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL)) {
-> +               secure_irqs = SMP_IPI_FIQ_MASK;
-> +               writel_relaxed(~secure_irqs, dist_base + GIC_DIST_IGROUP + 0);
-> +               gic->igroup0_shadow = ~secure_irqs;
-> +               for_each_set_bit(secure_irq, &secure_irqs, 16)
-> +                       gic_set_group_irq(gic, secure_irq, 0);
-> +       }
+ .../devicetree/bindings/clock/imx7d-clock.txt      |   13 +
+ .../bindings/pinctrl/fsl,imx-pinctrl.txt           |    3 +
+ .../bindings/pinctrl/fsl,imx7d-pinctrl.txt         |   27 +
+ .../devicetree/bindings/timer/fsl,imxgpt.txt       |    3 +
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/imx7d-pinfunc.h                  | 1153 ++++++++++++++++++++
+ arch/arm/boot/dts/imx7d-sdb.dts                    |  405 +++++++
+ arch/arm/boot/dts/imx7d.dtsi                       |  498 +++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |    1 +
+ arch/arm/mach-imx/Kconfig                          |   11 +
+ arch/arm/mach-imx/Makefile                         |    1 +
+ arch/arm/mach-imx/anatop.c                         |    5 +-
+ arch/arm/mach-imx/clk-imx7d.c                      |  887 +++++++++++++++
+ arch/arm/mach-imx/clk-pllv3.c                      |   16 +-
+ arch/arm/mach-imx/clk.h                            |    9 +
+ arch/arm/mach-imx/common.h                         |    1 +
+ arch/arm/mach-imx/cpu.c                            |    3 +
+ arch/arm/mach-imx/hardware.h                       |    7 +-
+ arch/arm/mach-imx/mach-imx7d.c                     |   47 +
+ arch/arm/mach-imx/mx7.h                            |   38 +
+ arch/arm/mach-imx/mxc.h                            |    8 +-
+ arch/arm/mach-imx/platsmp.c                        |   19 +
+ arch/arm/mach-imx/time.c                           |    3 +-
+ drivers/pinctrl/freescale/Kconfig                  |    7 +
+ drivers/pinctrl/freescale/Makefile                 |    1 +
+ drivers/pinctrl/freescale/pinctrl-imx.c            |    3 +-
+ drivers/pinctrl/freescale/pinctrl-imx.h            |    1 +
+ drivers/pinctrl/freescale/pinctrl-imx7d.c          |  411 +++++++
+ include/dt-bindings/clock/imx7d-clock.h            |  450 ++++++++
+ 29 files changed, 4026 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx7d-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/imx7d-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/imx7d-sdb.dts
+ create mode 100644 arch/arm/boot/dts/imx7d.dtsi
+ create mode 100644 arch/arm/mach-imx/clk-imx7d.c
+ create mode 100644 arch/arm/mach-imx/mach-imx7d.c
+ create mode 100644 arch/arm/mach-imx/mx7.h
+ create mode 100644 drivers/pinctrl/freescale/pinctrl-imx7d.c
+ create mode 100644 include/dt-bindings/clock/imx7d-clock.h
 
-This only pokes GICD registers. Why isn't this in gic_dist_init?
-
-Mark.
+-- 
+1.9.1
