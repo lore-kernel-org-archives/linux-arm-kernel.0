@@ -1,32 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Apr 2015 11:13:30 +0100
-Subject: [PATCH 1/2] ARM: include Thumb2 bit in PROCINFO setup function
- offset
-In-Reply-To: <1429610931-14903-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1429607205-7501-1-git-send-email-ard.biesheuvel@linaro.org>
- <1429610931-14903-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150421101330.GU12732@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 21 Apr 2015 11:14:16 +0100
+Subject: [RESEND RFC PATCH 1/3] ASoC: mediatek: Add binding support for
+ AFE driver
+In-Reply-To: <20150421094926.GU6325@pengutronix.de>
+References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
+ <1428653649-38200-2-git-send-email-koro.chen@mediatek.com>
+ <20150418173407.GE26185@sirena.org.uk>
+ <20150420043747.GH6325@pengutronix.de>
+ <20150420204849.GJ14892@sirena.org.uk>
+ <20150421094926.GU6325@pengutronix.de>
+Message-ID: <20150421101416.GC22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 12:08:51PM +0200, Ard Biesheuvel wrote:
-> This updates the PROCINFO offset-to-setup-function fields of the
-> Thumb2 capable CPU definitions to include the Thumb bit when building
-> a Thumb2 kernel. This ensures that these function are always called
-> in the correct mode.
+On Tue, Apr 21, 2015 at 11:49:26AM +0200, Sascha Hauer wrote:
 
-I don't think this is necessary, in fact, I think this is positively
-regression causing.
+> I think this could be done. I checked the possible connections in the
+> crossbar switch and it seems all memory interfaces can be connected with
+> all relevant external interfaces. So indeed the memory interfaces could
+> be dynamically allocated instead of statically associated to an
+> external interface. There are two problems I see: Some memory interfaces
+> are limited in the rates they support, they can only do 8k/16k/32k (for
+> speech). How can we know such memory interface should be used? Also
+> there are two programmable hardware gain blocks which can be inserted to
+> the digital audio path using the crossbar switch. There must be some
+> mechanism to configure them into different places.
 
-The symbol 'initfunc' is known to the assembler to be a thumb symbol.
-As we have seen already from the kernel dumps from the V7M kernel, when
-it calculates initfunc - name in a T2 kernel, the resulting value is an
-_odd_ number.
-
-Using BSYM() here will increment it to be the next _even_ number, which
-is wrong as this will potentially point at either half way through a
-32-bit T2 instruction, or the second 16-bit T2 instruction.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+This (particularly the gain controls) sounds like you want to expose the
+routing to userspace and use DPCM, the code also seemed to look like it
+was a good fit for DPCM.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150421/e006ea93/attachment.sig>
