@@ -1,98 +1,88 @@
-From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
-Date: Tue, 21 Apr 2015 14:05:16 +0200
-Subject: [PATCH v2 5/7] ARM: at91/dt: at91-kizbox: leds related changes
-In-Reply-To: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
-References: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <1429617918-32086-6-git-send-email-g.portay@overkiz.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 21 Apr 2015 14:20:52 +0200
+Subject: Standard/common method for booting secondary cores
+In-Reply-To: <20150421113914.GA3638@e103592.cambridge.arm.com>
+References: <553580F7.7040903@free.fr>
+ <20150421113914.GA3638@e103592.cambridge.arm.com>
+Message-ID: <553640A4.9090506@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This:
- * moves to pwm-leds using tcb-pwm driver and
- * renames leds to pwm:<color>:<function>.
+Hello Dave,
 
-Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
----
- arch/arm/boot/dts/at91-kizbox.dts | 53 +++++++++++++++++++++++++--------------
- 1 file changed, 34 insertions(+), 19 deletions(-)
+It seems you and Mark posted within seconds of each other :-)
 
-diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index 73e4559..b19f568 100644
---- a/arch/arm/boot/dts/at91-kizbox.dts
-+++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -8,6 +8,7 @@
-  */
- /dts-v1/;
- #include "at91sam9g20.dtsi"
-+#include <dt-bindings/pwm/pwm.h>
- 
- / {
- 	model = "Overkiz Kizbox";
-@@ -112,32 +113,46 @@
- 		};
- 	};
- 
--	leds {
--		compatible = "gpio-leds";
-+	pwm_leds {
-+		compatible = "pwm-leds";
- 
--		led1g {
--			label = "led1:green";
--			gpios = <&pioB 0 GPIO_ACTIVE_LOW>;
--			linux,default-trigger = "none";
-+		network_green {
-+			label = "pwm:green:network";
-+			pwms = <&tcb_pwm 2 10000000 PWM_POLARITY_INVERTED>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
- 		};
- 
--		led1r {
--			label = "led1:red";
--			gpios = <&pioB 1 GPIO_ACTIVE_LOW>;
--			linux,default-trigger = "none";
-+		network_red {
-+			label = "pwm:red:network";
-+			pwms = <&tcb_pwm 3 10000000 PWM_POLARITY_INVERTED>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
- 		};
- 
--		led2g {
--			label = "led2:green";
--			gpios = <&pioB 2 GPIO_ACTIVE_LOW>;
--			linux,default-trigger = "none";
--			default-state = "on";
-+		user_green {
-+			label = "pwm:green:user";
-+			pwms = <&tcb_pwm 0 10000000 PWM_POLARITY_INVERTED>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
- 		};
- 
--		led2r {
--			label = "led2:red";
--			gpios = <&pioB 3 GPIO_ACTIVE_LOW>;
--			linux,default-trigger = "none";
-+		user_red {
-+			label = "pwm:red:user";
-+			pwms = <&tcb_pwm 1 10000000 PWM_POLARITY_INVERTED>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
- 		};
- 	};
-+
-+	tcb_pwm: pwm {
-+		compatible = "atmel,tcb-pwm";
-+		#pwm-cells = <3>;
-+		tc-block = <1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_tcb1_tioa0
-+			     &pinctrl_tcb1_tioa1
-+			     &pinctrl_tcb1_tioa2
-+			     &pinctrl_tcb1_tiob0>;
-+	};
- };
--- 
-1.9.1
+On 21/04/2015 13:41, Dave Martin wrote:
+> On Tue, Apr 21, 2015 at 12:43:03AM +0200, Mason wrote:
+>> Hello,
+>>
+>> With the current push for CONFIG_ARCH_MULTIPLATFORM,
+>> I'm wondering if things like starting secondary cores
+>> have been "standardized"/factorized to the point where
+>> I can just use some default implementation?
+>>
+>> I think the implementation I'm using as a starting
+>> point uses SMC calls. I think we are using "TrustZone"
+>> where Linux runs in NS (non secure) mode, and a tiny
+>> proprietary OS runs in secure mode.
+>
+> _If_ you're implementing something new
+
+You're talking about software, right?
+(The hardware already exists.)
+As I mentioned we do have a working implementation using
+SMC to request service from the secure OS, but I have some
+time to evaluate "better" strategies, as I port the
+platform to a newer kernel.
+
+> and have a say in what gets implemented in the firmware,
+> please consider PSCI.
+
+In this context, firmware would be the code run by the
+secure OS?
+
+> Without this, little standardisation exists.  Low level CPU
+> power management must typically involve SMCs, but there's
+> no standardisation of their exact semantics, which implies that
+> some platform-specific glue will likely be needed.  The best you can
+> do is look for one or more backends in the kernel that are
+> close to what you need (if any), and if so propose some refactoring
+> to extend support to your platform.
+
+My objective is to minimize platform-specific code, I will
+look into PSCI.
+
+>> IIUC (which is probably NOT the case), when Linux runs
+>> in NS mode, some operations that are typically carried
+>> out at boot/init are not allowed, such as
+>>
+>> - starting secondary cores
+>> - configuring the L2 cache controller
+>>
+>> and this must be done by the secure OS via SMC?
+>
+> Generally, yes.
+
+Is PSCI involved in L2$ configuration?
+
+>> I'd be happy to be given pointers to internet references
+>> and do my own reading. I've bookmarked a few on related
+>> subjects:
+>>
+>> http://events.linuxfoundation.org/sites/events/files/slides/clement-smp-bring-up-on-arm-soc.pdf
+>> http://www.linux-arm.org/pub/LinuxPlatform/RealViewLink/Booting_ARM_Linux_SMP_on_MPCore.doc
+>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388g/Beihjjgb.html
+>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.prd29-genc-009492c/index.html
+>
+> For PSCI, you can look at http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/index.html.
+>
+>>
+>> Are the arch/arm/common/mcpm_* files relevant?
+>
+> MCPM is infrastructure for handling _cluster_ powerup/powerdown, in
+> kernels where Linux runs in Secure (or otherwise has a high level of
+> access to power controls).
+>
+> If unsure, say N.
+
+Thanks.
