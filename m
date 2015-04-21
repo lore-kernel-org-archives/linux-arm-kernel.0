@@ -1,38 +1,47 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 21 Apr 2015 15:22:49 -0500
-Subject: [PATCH v5 07/11] ARM: imx: add msl support for imx7d
-In-Reply-To: <CAHrpEqRAEMammfaovi6QQxGJfW-LZsgwg5rX4-3Y=+m6qhqeTg@mail.gmail.com>
+Date: Tue, 21 Apr 2015 15:25:01 -0500
+Subject: [PATCH v5 08/11] ARM: imx: add gpt system timer support for imx7d
+In-Reply-To: <1429628007-8892-9-git-send-email-Frank.Li@freescale.com>
 References: <1429628007-8892-1-git-send-email-Frank.Li@freescale.com>
- <1429628007-8892-8-git-send-email-Frank.Li@freescale.com>
- <20150421173110.GG10164@leverpostej>
- <CAHrpEqRAEMammfaovi6QQxGJfW-LZsgwg5rX4-3Y=+m6qhqeTg@mail.gmail.com>
-Message-ID: <CAL_Jsq+NV5Ok-P6JGZzNyQCD=PdwXbDY39XmwzKB0U+vuyHxVA@mail.gmail.com>
+ <1429628007-8892-9-git-send-email-Frank.Li@freescale.com>
+Message-ID: <CAL_JsqJiYoFvi5K792t8fPAxdsMnNfaXzAvGkaeQcHf=HsQ8bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 1:51 PM, Zhi Li <lznuaa@gmail.com> wrote:
-> On Tue, Apr 21, 2015 at 12:31 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> +static void __init imx_ca7_smp_init_cpus(void)
->>> +{
->>> +       int i, ncores;
->>> +       unsigned long val;
->>> +
->>> +       asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r" (val));
->>> +       ncores = ((val >> 24) & 0x3) + 1;
->>> +       if (setup_max_cpus < ncores)
->>> +               ncores = (setup_max_cpus) ? setup_max_cpus : 1;
->>> +
->>> +       for (i = ncores; i < NR_CPUS; i++)
->>> +               set_cpu_possible(i, false);
->>> +}
->>
->> NAK.
->>
->> The set of available CPUs should come from the DT, as with other
->> platforms.
+On Tue, Apr 21, 2015 at 9:53 AM,  <Frank.Li@freescale.com> wrote:
+> From: Frank Li <Frank.Li@freescale.com>
 >
-> Can you give me a reference platform implement?
+> Add GPT system timer support for i.MX7D, it has same hardware
+> as i.MX6DL.
+>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  arch/arm/mach-imx/time.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
+> index 15d18e1..7c1d8a3 100644
+> --- a/arch/arm/mach-imx/time.c
+> +++ b/arch/arm/mach-imx/time.c
+> @@ -321,7 +321,7 @@ static void __init _mxc_timer_init(int irq,
+>                 tctl_val = V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+>                 if (clk_get_rate(clk_per) == V2_TIMER_RATE_OSC_DIV8) {
+>                         tctl_val |= V2_TCTL_CLK_OSC_DIV8;
+> -                       if (cpu_is_imx6dl() || cpu_is_imx6sx()) {
+> +                       if (cpu_is_imx6dl() || cpu_is_imx6sx() || cpu_is_imx7d()) {
 
-All of the ones with no smp_operations.
+You should get this information from DT so you aren't changing this
+again on the next chip.
 
-Rob
+>                                 /* 24 / 8 = 3 MHz */
+>                                 __raw_writel(7 << V2_TPRER_PRE24M,
+>                                         timer_base + MXC_TPRER);
+> @@ -383,3 +383,4 @@ CLOCKSOURCE_OF_DECLARE(mx53_timer, "fsl,imx53-gpt", mxc_timer_init_dt);
+>  CLOCKSOURCE_OF_DECLARE(mx6q_timer, "fsl,imx6q-gpt", mxc_timer_init_dt);
+>  CLOCKSOURCE_OF_DECLARE(mx6sl_timer, "fsl,imx6sl-gpt", mxc_timer_init_dt);
+>  CLOCKSOURCE_OF_DECLARE(mx6sx_timer, "fsl,imx6sx-gpt", mxc_timer_init_dt);
+> +CLOCKSOURCE_OF_DECLARE(mx7d_timer, "fsl,imx7d-gpt", mxc_timer_init_dt);
+> --
+> 1.9.1
+>
