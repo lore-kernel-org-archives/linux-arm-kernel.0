@@ -1,140 +1,27 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 21 Apr 2015 09:15:14 +0200
-Subject: [PATCH 1/3] ARM: ux500: Move GPIO regulator for SD-card into
- board DTSs
-In-Reply-To: <20150420182634.GH3447@x1>
-References: <1429538553-17366-1-git-send-email-ulf.hansson@linaro.org>
- <1429538553-17366-2-git-send-email-ulf.hansson@linaro.org>
- <20150420182634.GH3447@x1>
-Message-ID: <CAPDyKFrDOGBkfg48mmsbktCWFTaNV4WnTm_Fui=Kp30u1yH-tQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Apr 2015 09:16:49 +0200
+Subject: [PATCH v4 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
+ termination driver
+In-Reply-To: <CAL85gmB_1zTy7wHw2zud5ofmX=dXY1sQ49dLJPysk+Z0N4TiaQ@mail.gmail.com>
+References: <cover.1429263201.git.dhdang@apm.com> <3188893.aaXgNln69B@wuerfel>
+ <CAL85gmB_1zTy7wHw2zud5ofmX=dXY1sQ49dLJPysk+Z0N4TiaQ@mail.gmail.com>
+Message-ID: <2940382.sQOGMMprLX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 April 2015 at 20:26, Lee Jones <lee@kernel.org> wrote:
-> On Mon, 20 Apr 2015, Ulf Hansson wrote:
->
->> The GPIO regulator for the SD-card isn't a ux500 SOC configuration, but
->> instead it's specific to the board. Move the definition of it, into the
->> board DTSs.
->
-> What makes you think that?
+On Monday 20 April 2015 11:49:37 Feng Kan wrote:
+> >
+> > Obviously they appear on the PCI host bridge in order, because that
+> > is a how PCI works. My question was about what happens then. On a lot
+> > of SoCs, there is something like an AXI bus that uses posted
+> > transactions between PCI and RAM, so you have a do a full manual
+> > syncronization of ongoing PIC DMAs when the MSI catcher signals the
+> > top-level interrupt. Do you have a bus between PCI and RAM that does
+> > not require this, or does the MSI catcher have logic to flush all DMAs?
+> 
+> Our hardware has an automatic mechanism to flush the content to DRAM before the
+> MSI write is committed.
 
-Because of how it was structured today.
+Ok, excellent!
 
-ste-dbx5x0.dtsi - common for all ux500 boards, thus I considered this
-as the SoC configuration.
-
-Then below are board configs which uses the above dtsi:
-ste-href.dtsi - common for href boards (used by ste-hrefprev60.dtsi
-and ste-hrefv60plus.dtsi), have vmmci
-ste-snowball.dts, have vmmci
-ste-ccu8540.dts, don't have vmmci
-ste-ccu9540.dts, don't have vmmci
-
->
-> We normally place the common pieces (of which there are many in this
-> node) in the highest level DTSI file, then add the platform specific
-> ones in the DTS files.
-
-Okay, so maybe it's due to the naming of ste-dbx5x0.dtsi, that I
-thought this was intended to cover the SoC configuration and not any
-of the platform specific stuff.
-
-So what your advise of doing this?
-
-Kind regards
-Uffe
-
->
->> Fixes: c94a4ab7af3f ("ARM: ux500: Disable the MMCI gpio-regulator by default")
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>  arch/arm/boot/dts/ste-dbx5x0.dtsi  | 17 -----------------
->>  arch/arm/boot/dts/ste-href.dtsi    | 17 +++++++++++++++++
->>  arch/arm/boot/dts/ste-snowball.dts | 15 +++++++++++++++
->>  3 files changed, 32 insertions(+), 17 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
->> index bfd3f1c..2201cd5 100644
->> --- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
->> +++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
->> @@ -1017,23 +1017,6 @@
->>                       status = "disabled";
->>               };
->>
->> -             vmmci: regulator-gpio {
->> -                     compatible = "regulator-gpio";
->> -
->> -                     regulator-min-microvolt = <1800000>;
->> -                     regulator-max-microvolt = <2900000>;
->> -                     regulator-name = "mmci-reg";
->> -                     regulator-type = "voltage";
->> -
->> -                     startup-delay-us = <100>;
->> -                     enable-active-high;
->> -
->> -                     states = <1800000 0x1
->> -                               2900000 0x0>;
->> -
->> -                     status = "disabled";
->> -             };
->> -
->>               mcde at a0350000 {
->>                       compatible = "stericsson,mcde";
->>                       reg = <0xa0350000 0x1000>, /* MCDE */
->> diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
->> index bf8f0ed..8cf499a 100644
->> --- a/arch/arm/boot/dts/ste-href.dtsi
->> +++ b/arch/arm/boot/dts/ste-href.dtsi
->> @@ -111,6 +111,23 @@
->>                       pinctrl-1 = <&i2c3_sleep_mode>;
->>               };
->>
->> +             vmmci: regulator-gpio {
->> +                     compatible = "regulator-gpio";
->> +
->> +                     regulator-min-microvolt = <1800000>;
->> +                     regulator-max-microvolt = <2900000>;
->> +                     regulator-name = "mmci-reg";
->> +                     regulator-type = "voltage";
->> +
->> +                     startup-delay-us = <100>;
->> +                     enable-active-high;
->> +
->> +                     states = <1800000 0x1
->> +                               2900000 0x0>;
->> +
->> +                     status = "disabled";
->> +             };
->> +
->>               // External Micro SD slot
->>               sdi0_per1 at 80126000 {
->>                       arm,primecell-periphid = <0x10480180>;
->> diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
->> index 206826a..65a7f63 100644
->> --- a/arch/arm/boot/dts/ste-snowball.dts
->> +++ b/arch/arm/boot/dts/ste-snowball.dts
->> @@ -146,8 +146,23 @@
->>               };
->>
->>               vmmci: regulator-gpio {
->> +                     compatible = "regulator-gpio";
->> +
->>                       gpios = <&gpio7 4 0x4>;
->>                       enable-gpio = <&gpio6 25 0x4>;
->> +
->> +                     regulator-min-microvolt = <1800000>;
->> +                     regulator-max-microvolt = <2900000>;
->> +                     regulator-name = "mmci-reg";
->> +                     regulator-type = "voltage";
->> +
->> +                     startup-delay-us = <100>;
->> +                     enable-active-high;
->> +
->> +                     states = <1800000 0x1
->> +                               2900000 0x0>;
->> +
->> +                     status = "disabled";
->>               };
->>
->>               // External Micro SD slot
+	Arnd
