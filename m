@@ -1,171 +1,87 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 21 Apr 2015 19:34:19 +0800
-Subject: [PATCH v10 00/29] Refine PCI scan interfaces and make generic pci
- host bridge
-Message-ID: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 21 Apr 2015 13:46:08 +0100
+Subject: Standard/common method for booting secondary cores
+In-Reply-To: <553640A4.9090506@free.fr>
+References: <553580F7.7040903@free.fr>
+ <20150421113914.GA3638@e103592.cambridge.arm.com>
+ <553640A4.9090506@free.fr>
+Message-ID: <20150421124608.GB3638@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series could be pulled from:
-https://github.com/YijingWang/linux-pci.git enumer10
+On Tue, Apr 21, 2015 at 02:20:52PM +0200, Mason wrote:
+> Hello Dave,
+> 
+> It seems you and Mark posted within seconds of each other :-)
 
-v9->v10:
-	Dynamically allocate busn resource if callers don't supply.
-	Try to adjust busn resource if host bridge busn resource conlict.
-	Rebase whole series on Bjorn's latest pci-next branch.
-	Major v9->v10 changes are in patch 5,6,7,10.
-v8->v9:
-	Add Thierry's Acked-by and Tested-by.
-	Fix the building error for powerpc found by Daniel.
-	Change pci_host_assign_domain_nr() to static.
-v7->v8:
-	Fix some cross building errors found by kbuild test.
-	Drop the rename patch for find_pci_host_bridge().
-v6->v7:
-	Drop previous patch which combined the domain and bus in one argument.
-	Make the pci_host_bridge hold the default busn resource, so we could
-	check whether new host busn resource is conflict with existing ones.
-	Move pci_host_assign_domain_nr() to drivers/pci/host-bridge.c
-	Other changes suggested by Bjorn and Suravee.
-v5->v6:
-	Fix cross building errors found by kbuild test.
-	Export busn_resource to Xen pcifront driver.
-v4->v5:
-	Fix some code style issues and rename some functions suggested by Bjorn.
-	Fix some code flaw(Eg. call pci_bus_add_devices() before resources claim
-	or lack the return checking).
-v3->v4:
-	Fix the rebase issue.
-v2->v3:
-	Rebase this series on v4.0-rc1.
-v1->v2:
-	Split pci_host_bridge_list into a new patch, remove .phb_probe_mode
-	and rework powerpc .phb_of_scan_bus() for simpilicty suggested by
-	Arnd. Refresh some patch description log, and add a new patch to fix
-	build warning in ia64.
+Seems so...  fortunately we didn't argue the opposite to each
+other.
 
-This series is based on Bjorn's pci/enumeration branch.
-You could pull it from https://github.com/YijingWang/linux-pci.git enumer9
+> On 21/04/2015 13:41, Dave Martin wrote:
+> >On Tue, Apr 21, 2015 at 12:43:03AM +0200, Mason wrote:
+> >>Hello,
+> >>
+> >>With the current push for CONFIG_ARCH_MULTIPLATFORM,
+> >>I'm wondering if things like starting secondary cores
+> >>have been "standardized"/factorized to the point where
+> >>I can just use some default implementation?
+> >>
+> >>I think the implementation I'm using as a starting
+> >>point uses SMC calls. I think we are using "TrustZone"
+> >>where Linux runs in NS (non secure) mode, and a tiny
+> >>proprietary OS runs in secure mode.
+> >
+> >_If_ you're implementing something new
+> 
+> You're talking about software, right?
+> (The hardware already exists.)
 
-Now in kernel, we scan pci bus use the following ways:
-1. pci_scan_bus. 
-	parent = NULL, default io/mem/bus resources
-	call pci_bus_add_devices()
+Yes, PSCI is a software interface.
 
-2. pci_scan_bus_parented() + pci_bus_add_devices()
-	default io/mem/bus resources, only used by xen
+> As I mentioned we do have a working implementation using
+> SMC to request service from the secure OS, but I have some
+> time to evaluate "better" strategies, as I port the
+> platform to a newer kernel.
+> 
+> >and have a say in what gets implemented in the firmware,
+> >please consider PSCI.
+> 
+> In this context, firmware would be the code run by the
+> secure OS?
 
-3. pci_scan_root_bus() + pci_bus_add_devices()
+Yes, or at least those parts of the Secure World software that provide
+essential services to the main OS.
 
-4. pci_create_root_bus() + pci_scan_child_bus() + pci_bus_add_devices()
+> >Without this, little standardisation exists.  Low level CPU
+> >power management must typically involve SMCs, but there's
+> >no standardisation of their exact semantics, which implies that
+> >some platform-specific glue will likely be needed.  The best you can
+> >do is look for one or more backends in the kernel that are
+> >close to what you need (if any), and if so propose some refactoring
+> >to extend support to your platform.
+> 
+> My objective is to minimize platform-specific code, I will
+> look into PSCI.
+> 
+> >>IIUC (which is probably NOT the case), when Linux runs
+> >>in NS mode, some operations that are typically carried
+> >>out at boot/init are not allowed, such as
+> >>
+> >>- starting secondary cores
+> >>- configuring the L2 cache controller
+> >>
+> >>and this must be done by the secure OS via SMC?
+> >
+> >Generally, yes.
+> 
+> Is PSCI involved in L2$ configuration?
 
-5. pci_create_root_bus() + xx_of_scan_bus()  +  pci_bus_add_devices()
+That depends on the platform.  Single-cluster systems might
+not have to do very much L2 configuration, but it depends on
+the hardware -- particularly of the L2 is external.
 
-And we have a lot of arch specific pci_domain_nr() and other platform
-specific weak function like pcibios_root_bridge_prepare().
+I suggest you take a look at the PSCI spec first -- this
+should make is clearer what the firmware is expected to do.
 
-After applied this series, we have following scan interfaces:
-
-1. pci_scan_bus() 
-	parent = NULL, default io/mem/bus resources.
-	for legacy pci scan
-
-2. pci_scan_root_bus()
-	for callers provide its own parent and io/mem/bus resources
-	but no platform specific pci_host_bridge operations
-
-3. pci_scan_host_bridge()
-	for callers provide its own parent and io/mem/bus resources
-
-
-
-Arnd Bergmann (1):
-  xen/PCI: Don't use deprecated function pci_scan_bus_parented()
-
-Yijing Wang (28):
-  PCI: Remove deprecated pci_scan_bus_parented()
-  PCI: Save domain in pci_host_bridge
-  PCI: Move pci_bus_assign_domain_nr() declaration into
-    drivers/pci/pci.h
-  PCI: Remove argument bus for pci_create_root_bus()
-  PCI: Alloc busn resource dynamically for pci_scan_bus()
-  PCI: Allocate busn resource for pci_scan_root_bus()
-  PCI: Introduce pci_host_assign_domain_nr() to assign domain
-  PCI: Separate pci_host_bridge creation out of pci_create_root_bus()
-  PCI: Introduce pci_host_bridge_list to manage host bridges
-  PCI: Save sysdata in pci_host_bridge drvdata
-  powerpc/PCI: Rename pcibios_root_bridge_prepare() to
-    pcibios_set_root_bus_speed()
-  PCI: Move pcibios_root_bridge_prepare() to pci_create_host_bridge()
-  PCI: Introduce pci_host_bridge_ops to support host specific
-    operations
-  PCI: Introduce new scan function pci_scan_host_bridge()
-  PCI: Introduce pci_bus_child_max_busnr()
-  x86/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
-  ia64/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
-  powerpc/pci: Use pci_scan_host_bridge() for simplicity
-  PCI: Remove pcibios_root_bridge_prepare() and
-    pcibos_set_root_bus_speed()
-  sparc/PCI: Use pci_scan_host_bridge() for simplicity
-  parisc/PCI: Use pci_scan_root_bus() for simplicity
-  PCI/mvebu: Use pci_common_init_dev() to simplify code
-  PCI/tegra: Remove redundant tegra_pcie_scan_bus()
-  PCI/designware: Use pci_scan_root_bus() for simplicity
-  PCI/xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
-  PCI: Rename __pci_create_root_bus() to pci_create_root_bus()
-  PCI: Remove platform specific pci_domain_nr()
-  PCI: Remove pci_bus_assign_domain_nr()
-
- arch/alpha/include/asm/pci.h             |    2 -
- arch/alpha/kernel/pci.c                  |    4 +-
- arch/alpha/kernel/sys_nautilus.c         |    2 +-
- arch/arm/kernel/bios32.c                 |    2 +-
- arch/arm/mach-dove/pcie.c                |    2 +-
- arch/arm/mach-iop13xx/pci.c              |    4 +-
- arch/arm/mach-mv78xx0/pcie.c             |    2 +-
- arch/arm/mach-orion5x/pci.c              |    4 +-
- arch/frv/mb93090-mb00/pci-vdk.c          |    3 +-
- arch/ia64/include/asm/pci.h              |    1 -
- arch/ia64/pci/pci.c                      |   35 ++--
- arch/ia64/sn/kernel/io_init.c            |    4 +-
- arch/m68k/coldfire/pci.c                 |    2 +-
- arch/microblaze/pci/pci-common.c         |   15 +--
- arch/mips/include/asm/pci.h              |    2 -
- arch/mips/pci/pci.c                      |    4 +-
- arch/mn10300/unit-asb2305/pci.c          |    3 +-
- arch/powerpc/include/asm/machdep.h       |    2 +-
- arch/powerpc/kernel/pci-common.c         |   79 +++++-----
- arch/powerpc/platforms/pseries/pci.c     |    8 +-
- arch/powerpc/platforms/pseries/pseries.h |    2 +-
- arch/powerpc/platforms/pseries/setup.c   |    2 +-
- arch/s390/pci/pci.c                      |   10 +-
- arch/sh/drivers/pci/pci.c                |    4 +-
- arch/sh/include/asm/pci.h                |    2 -
- arch/sparc/kernel/leon_pci.c             |    2 +-
- arch/sparc/kernel/pci.c                  |   45 +++---
- arch/sparc/kernel/pcic.c                 |    2 +-
- arch/tile/include/asm/pci.h              |    2 -
- arch/tile/kernel/pci.c                   |    4 +-
- arch/tile/kernel/pci_gx.c                |    4 +-
- arch/unicore32/kernel/pci.c              |    2 +-
- arch/x86/include/asm/pci.h               |    6 -
- arch/x86/pci/acpi.c                      |   37 +++--
- arch/x86/pci/common.c                    |    2 +-
- arch/xtensa/kernel/pci.c                 |    2 +-
- drivers/parisc/dino.c                    |    6 +-
- drivers/parisc/lba_pci.c                 |    6 +-
- drivers/pci/host-bridge.c                |  223 +++++++++++++++++++++++++
- drivers/pci/host/pci-mvebu.c             |   18 +--
- drivers/pci/host/pci-tegra.c             |   16 --
- drivers/pci/host/pci-versatile.c         |    3 +-
- drivers/pci/host/pci-xgene.c             |    5 +-
- drivers/pci/host/pcie-designware.c       |    6 +-
- drivers/pci/host/pcie-xilinx.c           |    2 +-
- drivers/pci/hotplug/acpiphp_glue.c       |   29 +---
- drivers/pci/hotplug/ibmphp_core.c        |    2 +-
- drivers/pci/pci.c                        |   85 +++-------
- drivers/pci/pci.h                        |    5 +
- drivers/pci/probe.c                      |  265 ++++++++++++++---------------
- drivers/pci/xen-pcifront.c               |   16 ++-
- include/linux/pci.h                      |   45 +++---
- 52 files changed, 573 insertions(+), 467 deletions(-)
+Cheers
+---Dave
