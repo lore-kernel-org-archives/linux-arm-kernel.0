@@ -1,15 +1,22 @@
 From: w.f@huawei.com (Wangfei (William, Euler))
-Date: Tue, 21 Apr 2015 09:09:42 +0000
+Date: Tue, 21 Apr 2015 09:15:43 +0000
 Subject: =?gb2312?B?tPC4tDogW1BBVENIIHYzIDIvMl0gdGhlcm1hbDogaGlzaWxpY29uOiBhZGQg?=
  =?gb2312?Q?new_hisilicon_thermal_sensor=09driver?=
-In-Reply-To: <1428403252-8208-3-git-send-email-kong.kongxinwei@hisilicon.com>
+In-Reply-To: <62D2F9B90E00B742A0ABA02CC88C65EA298E4D81@SZXEMA509-MBX.china.huawei.com>
 References: <1428403252-8208-1-git-send-email-kong.kongxinwei@hisilicon.com>,
- <1428403252-8208-3-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <62D2F9B90E00B742A0ABA02CC88C65EA298E4D81@SZXEMA509-MBX.china.huawei.com>
+ <1428403252-8208-3-git-send-email-kong.kongxinwei@hisilicon.com>,
+ <62D2F9B90E00B742A0ABA02CC88C65EA298E4D81@SZXEMA509-MBX.china.huawei.com>
+Message-ID: <62D2F9B90E00B742A0ABA02CC88C65EA298E4DB4@SZXEMA509-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+________________________________________
+???: Wangfei (William, Euler)
+????: 2015?4?21? 17:09
+???: Xinwei Kong; rui.zhuang at intel.com; edubezval at gmail.com; mporter at konsulko.com; jorge.ramirez-ortiz at linaro.org; haojian.zhuang at linaro.org; linux-pm at vger.kernel.org
+??: devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; Linuxarm; Liguozhu (Kenneth); linux-arm-kernel at lists.infradead.org
+??: ??: [PATCH v3 2/2] thermal: hisilicon: add new hisilicon thermal sensor     driver
 
 -----------------------------------------
 Wang Fei  ?00166449?
