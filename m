@@ -1,37 +1,81 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 22 Apr 2015 01:26:15 +0200
-Subject: [rtc-linux] [PATCH 2nd try] RTC/i.MX/DryICE: add recovery
- routines to the driver
-In-Reply-To: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
+Date: Wed, 22 Apr 2015 01:30:22 +0200
+Subject: [rtc-linux] [PATCH 4/5] RTC/i.MX/DryIce: when locked, do not
+ fail silently
+In-Reply-To: <1429002716-19821-5-git-send-email-jbe@pengutronix.de>
 References: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <20150421232615.GD8539@piout.net>
+ <1429002716-19821-5-git-send-email-jbe@pengutronix.de>
+Message-ID: <20150421233022.GE8539@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Please always include a commit message.
 
-On 14/04/2015 at 11:11:51 +0200, Juergen Borleis wrote :
-> 2nd try, this time with a cover letter... m(
+On 14/04/2015 at 11:11:55 +0200, Juergen Borleis wrote :
+> Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+> Signed-off-by: Robert Schwebel <rsc@pengutronix.de>
+> [rsc: got NDA clearance from Freescale]
+> ---
+>  drivers/rtc/rtc-imxdi.c | 28 +++++++++++++++++++++++++---
+>  1 file changed, 25 insertions(+), 3 deletions(-)
 > 
-> The built-in RTC unit on some i.MX SoCs isn't an RTC only. It is also a tamper
-> monitor unit which can keep some keys. When it does its tamper detection job
-
-Does it have more functions? I would say that it also holds some keys
-but I don't have a handy Freescale representative to contact ;)
-
-I'm fine getting that unlocking done in the RTC driver but maybe in the
-future, it will be necessary to handle that in an MFD driver when adding
-support for the other functions.
-
-> and a tamper violation is detected, this RTC unit locks completely including
-> the real-time counter. In this state the unit is completely useless. The only
-> way to bring it out of this locked state is a power on reset. At the next boot
-> time some flags signals the tamper violation and a specific register access
-> sequence must be done to finaly bring this unit into life again. Until this is
-> done, there is no way to use it again as an RTC.
-> But also without any enabled tamper detection sometimes this unit tends to
-> lock. And in this case the same steps must be done to bring it into life
-> again.
+> diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
+> index b04c64f..de1a2e4 100644
+> --- a/drivers/rtc/rtc-imxdi.c
+> +++ b/drivers/rtc/rtc-imxdi.c
+> @@ -581,14 +581,36 @@ static int dryice_rtc_read_time(struct device *dev, struct rtc_time *tm)
+>  static int dryice_rtc_set_mmss(struct device *dev, unsigned long secs)
+>  {
+>  	struct imxdi_dev *imxdi = dev_get_drvdata(dev);
+> +	u32 dcr, dsr;
+>  	int rc;
+>  
+> +	dcr = __raw_readl(imxdi->ioaddr + DCR);
+> +	dsr = __raw_readl(imxdi->ioaddr + DSR);
+> +
+> +	if (!(dcr & DCR_TCE) || (dsr & DSR_SVF)) {
+> +		if (dcr & DCR_TCHL) {
+> +			/* we are even more out of luck */
+> +			di_what_is_to_be_done(imxdi, "battery");
+> +			return -EPERM;
+> +		}
+> +		if ((dcr & DCR_TCSL) || (dsr & DSR_SVF)) {
+> +			/* we are out of luck for now */
+> +			di_what_is_to_be_done(imxdi, "main");
+> +			return -EPERM;
+> +		}
+> +	}
+> +
+>  	/* zero the fractional part first */
+>  	rc = di_write_wait(imxdi, 0, DTCLR);
+> -	if (rc == 0)
+> -		rc = di_write_wait(imxdi, secs, DTCMR);
+> +	if (rc != 0)
+> +		return rc;
+>  
+> -	return rc;
+> +	rc = di_write_wait(imxdi, secs, DTCMR);
+> +	if (rc != 0)
+> +		return rc;
+> +
+> +	return di_write_wait(imxdi, __raw_readl(imxdi->ioaddr + DCR) |
+> +								DCR_TCE, DCR);
+>  }
+>  
+>  static int dryice_rtc_alarm_irq_enable(struct device *dev,
+> -- 
+> 2.1.4
+> 
+> -- 
+> -- 
+> You received this message because you are subscribed to "rtc-linux".
+> Membership options at http://groups.google.com/group/rtc-linux .
+> Please read http://groups.google.com/group/rtc-linux/web/checklist
+> before submitting a driver.
+> --- 
+> You received this message because you are subscribed to the Google Groups "rtc-linux" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to rtc-linux+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
 
 -- 
 Alexandre Belloni, Free Electrons
