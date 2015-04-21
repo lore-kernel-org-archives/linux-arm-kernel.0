@@ -1,44 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Apr 2015 12:59:43 +0200
-Subject: [PATCH v2 2/2] ARM: Thumb2: use "bx reg" not "mov pc,
- reg" for all registers
-In-Reply-To: <1429613983-22739-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1429613983-22739-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1429613983-22739-3-git-send-email-ard.biesheuvel@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Apr 2015 12:00:39 +0100
+Subject: Programming the boundary between Inner and Outer caches on ARM
+ architecture
+In-Reply-To: <CAJWVF-xvca0MpKF1=GoyyffGTzxtvy_LoaZfjhwU27vSuyOHFA@mail.gmail.com>
+References: <CAJWVF-w5YpZjRqnvbz1p70_WTBROL9vDkvYb_sG43nGp=s1vLg@mail.gmail.com>
+ <20150420100119.GC24715@e104818-lin.cambridge.arm.com>
+ <CAJWVF-xvca0MpKF1=GoyyffGTzxtvy_LoaZfjhwU27vSuyOHFA@mail.gmail.com>
+Message-ID: <20150421110038.GH30114@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 6ebbf2ce437b (ARM: convert all "mov.* pc, reg" to "bx reg"
-for ARMv6+) replaced all occurrences of 'mov pc, <reg>' with the
-'ret' macro. However, this macro only emits the 'bx' instruction
-when used with the 'lr' register, but still uses 'mov pc, <reg>'
-for everything else.
+On Tue, Apr 21, 2015 at 12:23:17AM +0530, Bhaskara rao Budiredla wrote:
+> Hi Catalin - The above said desired configuration was with respect to
+> a specific requirement of mine on Cortex A15. Seems it is confusing.
+> Let me give you the complete details. Along with PRRR/NMRR registers,
+> I am using [TEX[0], C, B] to configure the memory system attributes.
+> The inner cacheable attribute of NMRR normal memory region is
+> "write-back, write-allocate" and the corresponding outer cacheable
+> attribute is "write-back, no write-allocate".
 
-Since ARM/Thumb2 interworking is allowed in the static kernel
-(i.e., inside vmlinux), this is potentially unsafe, since the
-Thumb mov instruction T1 variant that allows PC as the target will
-not switch modes based on the Thumb bit
+Any reason why they need to be different or that's just what Linux
+writes in NMRR?
 
-So when building a Thumb2 kernel, emit the 'bx' instruction for
-all registers, not just the 'lr' register.
+> Since the lowest level
+> (level zero) cache defaults to inner cacheable attribute and the
+> highest level (level two) defaults to outer cacheable attribute,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/include/asm/assembler.h | 2 ++
- 1 file changed, 2 insertions(+)
+Why do you say that level two defaults to outer cacheable? Actually,
+what do you mean by zero, one, two? Are these the indices in the CLIDR?
+Cortex-A15 has two levels of cache, one and two, both treated as inner.
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 186270b3e194..1c057f923258 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -434,6 +434,8 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	.macro	ret\c, reg
- #if __LINUX_ARM_ARCH__ < 6
- 	mov\c	pc, \reg
-+#elif defined(CONFIG_THUMB2_KERNEL)
-+	bx\c	\reg
- #else
- 	.ifeqs	"\reg", "lr"
- 	bx\c	\reg
+> level one cache is the remaining that I need to program explicitly.
+> Hence the requirement to configure the boundary between the inner and
+> outer cacheable attributes to group the level one cache either with
+> level zero (or) level two.
+
+IIRC, the only CPU where we could configure this was Cortex-A8 via the
+L2ACTLR register ("L2 inner" bit) and from some past discussions, we
+wanted this to be treated as inner cache:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082561.html
+
+(in Linux, we call outer cache some cache that needs separate
+maintenance by PA like the PL310)
+
+> 1. I am unable to find the register name that can be used for the
+> above said purpose from Cortex A15 documentation. Please help me in
+> providing that register details, if there is any such register (or)
+> some other procedure by which the same can be achieved.
+
+No such configuration. L1 and L2 caches are inner on A15.
+
+> 2. Configuration of the boundary between inner and outer caches is not
+> needed for a system where in the inner and outer cacheable attributes
+> are same. Does the current Linux kernel for ARM architecture assumes
+> this?
+
+The outer attributes are sent on the bus in case you have an L3 cache.
+In general, I would set both inner and outer attributes the same. I
+don't understand what your "specific requirement" is.
+
 -- 
-1.8.3.2
+Catalin
