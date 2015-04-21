@@ -1,141 +1,78 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 21 Apr 2015 19:34:46 +0800
-Subject: [PATCH v10 27/29] PCI: Rename __pci_create_root_bus() to
- pci_create_root_bus()
+Date: Tue, 21 Apr 2015 19:34:20 +0800
+Subject: [PATCH v10 01/29] xen/PCI: Don't use deprecated function
+ pci_scan_bus_parented()
 In-Reply-To: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
 References: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1429616088-10249-28-git-send-email-wangyijing@huawei.com>
+Message-ID: <1429616088-10249-2-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now no one use pci_create_root_bus(), we could remove it
-and rename __pci_create_root_bus() to pci_create_root_bus().
+From: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: wangyijing at huawei.com
+Use pci_scan_root_bus() instead of deprecated function
+pci_scan_bus_parented().
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: xen-devel at lists.xenproject.org
 ---
- drivers/pci/probe.c |   57 +++++++++++++++-----------------------------------
- include/linux/pci.h |    3 --
- 2 files changed, 17 insertions(+), 43 deletions(-)
+ drivers/pci/xen-pcifront.c |   16 +++++++++++++---
+ 1 files changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 2ba6754..c9bee34 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1858,7 +1858,7 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
+diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
+index b1ffebe..a69e529 100644
+--- a/drivers/pci/xen-pcifront.c
++++ b/drivers/pci/xen-pcifront.c
+@@ -446,9 +446,15 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 				 unsigned int domain, unsigned int bus)
  {
- }
+ 	struct pci_bus *b;
++	LIST_HEAD(resources);
+ 	struct pcifront_sd *sd = NULL;
+ 	struct pci_bus_entry *bus_entry = NULL;
+ 	int err = 0;
++	static struct resource busn_res = {
++		.start = 0,
++		.end = 255,
++		.flags = IORESOURCE_BUS,
++	};
  
--static struct pci_bus *__pci_create_root_bus(
-+static struct pci_bus *pci_create_root_bus(
- 		struct pci_host_bridge *bridge, struct pci_ops *ops)
- {
- 	int error, bus;
-@@ -1947,34 +1947,6 @@ put_bridge:
- }
- EXPORT_SYMBOL_GPL(pci_create_root_bus);
- 
--struct pci_bus *pci_create_root_bus(struct device *parent,
--		int domain, struct pci_ops *ops, void *sysdata,
--		struct list_head *resources)
--{
--	struct resource_entry *busn_res;
--	struct pci_host_bridge *host;
--
--	busn_res = pci_busn_resource(resources);
--	if (!busn_res) {
--		pr_err("No busn resource found\n");
--		return NULL;
--	}
--
--	host = pci_create_host_bridge(parent, domain, sysdata,
--			resources, NULL);
--	if (!host)
--		return NULL;
--
--	host->bus = __pci_create_root_bus(host, ops);
--	if (!host->bus) {
--		pci_free_host_bridge(host);
--		return NULL;
--	}
--
--	return host->bus;
--}
--
--
- int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
- {
- 	struct resource *res = &b->busn_res;
-@@ -2060,7 +2032,7 @@ struct pci_host_bridge *pci_scan_host_bridge(
- 	if (!host)
- 		return NULL;
- 
--	host->bus = __pci_create_root_bus(host, ops->pci_ops);
-+	host->bus = pci_create_root_bus(host, ops->pci_ops);
- 	if (!host->bus) {
- 		pci_free_host_bridge(host);
- 		return NULL;
-@@ -2104,7 +2076,7 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int domain,
- 	if (busn_resource)
- 		host->dynamic_busn = true;
- 
--	host->bus = __pci_create_root_bus(host, ops);
-+	host->bus = pci_create_root_bus(host, ops);
- 	if (!host->bus) {
- 		pci_free_host_bridge(host);
- 		return NULL;
-@@ -2123,7 +2095,6 @@ struct pci_bus *pci_scan_bus(int domain, int bus,
- 		struct pci_ops *ops, void *sysdata)
- {
- 	LIST_HEAD(resources);
--	struct pci_bus *b;
- 	struct resource *busn_resource;
- 	struct pci_host_bridge *host;
- 
-@@ -2137,17 +2108,23 @@ struct pci_bus *pci_scan_bus(int domain, int bus,
- 	pci_add_resource(&resources, &ioport_resource);
- 	pci_add_resource(&resources, &iomem_resource);
- 	pci_add_resource(&resources, busn_resource);
--	b = pci_create_root_bus(NULL, domain, ops, sysdata,
--			&resources);
--	if (b) {
--		host = to_pci_host_bridge(b->bridge);
--		host->dynamic_busn = true;
--		pci_scan_child_bus(b);
--	} else {
-+	host = pci_create_host_bridge(NULL, domain, sysdata,
-+			&resources, NULL);
-+	if (!host) {
- 		kfree(busn_resource);
- 		pci_free_resource_list(&resources);
-+		return NULL;
+ #ifndef CONFIG_PCI_DOMAINS
+ 	if (domain != 0) {
+@@ -470,17 +476,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 		err = -ENOMEM;
+ 		goto err_out;
  	}
--	return b;
-+
-+	host->dynamic_busn = true;
-+	host->bus = pci_create_root_bus(host, ops);
-+	if (!host->bus) {
-+		pci_free_host_bridge(host);
-+		return NULL;
-+	}
-+
-+	pci_scan_child_bus(host->bus);
-+	return host->bus;
- }
- EXPORT_SYMBOL(pci_scan_bus);
++	pci_add_resource(&resources, &ioport_resource);
++	pci_add_resource(&resources, &iomem_resource);
++	pci_add_resource(&resources, &busn_res);
+ 	pcifront_init_sd(sd, domain, bus, pdev);
  
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 41eb672..7a9bd2d 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -785,9 +785,6 @@ struct pci_bus *pci_find_bus(int domain, int busnr);
- void pci_bus_add_devices(const struct pci_bus *bus);
- struct pci_bus *pci_scan_bus(int domain, int bus, struct pci_ops *ops,
- 					void *sysdata);
--struct pci_bus *pci_create_root_bus(struct device *parent, int domain,
--				    struct pci_ops *ops, void *sysdata,
--				    struct list_head *resources);
- int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
- int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
- void pci_bus_release_busn_res(struct pci_bus *b);
+ 	pci_lock_rescan_remove();
+ 
+-	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+-				  &pcifront_bus_ops, sd);
++	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
++				  &pcifront_bus_ops, sd, &resources);
+ 	if (!b) {
+ 		dev_err(&pdev->xdev->dev,
+ 			"Error creating PCI Frontend Bus!\n");
+ 		err = -ENOMEM;
+ 		pci_unlock_rescan_remove();
++		pci_free_resource_list(&resources);
+ 		goto err_out;
+ 	}
+ 
+@@ -488,7 +498,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 
+ 	list_add(&bus_entry->list, &pdev->root_buses);
+ 
+-	/* pci_scan_bus_parented skips devices which do not have a have
++	/* pci_scan_root_bus skips devices which do not have a
+ 	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
+ 	err = pcifront_scan_bus(pdev, domain, bus, b);
+ 
 -- 
 1.7.1
