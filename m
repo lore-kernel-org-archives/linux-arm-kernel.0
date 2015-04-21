@@ -1,47 +1,57 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 21 Apr 2015 13:37:13 -0700
-Subject: [PATCH 5/9] ARM: BCM2836: Add io map initialization for bcm2836.
-In-Reply-To: <6559239.zHhRM8VZWD@wuerfel>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <1429639796-2169-6-git-send-email-eric@anholt.net>
- <6559239.zHhRM8VZWD@wuerfel>
-Message-ID: <87oamh9q12.fsf@eliezer.anholt.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 21 Apr 2015 15:37:16 -0500
+Subject: [PATCH v4 05/11] ARM: dts: add imx7d soc dtsi file
+In-Reply-To: <1429563933-3129-6-git-send-email-Frank.Li@freescale.com>
+References: <1429563933-3129-1-git-send-email-Frank.Li@freescale.com>
+ <1429563933-3129-6-git-send-email-Frank.Li@freescale.com>
+Message-ID: <CAL_JsqLP6ZE9_G1L9XzT-hR=k6Wzx80rKQMTdagp8q80ADN61g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-> On Tuesday 21 April 2015 11:09:52 Eric Anholt wrote:
->> +static struct map_desc bcm2836_io_map __initdata = {
->> +       .virtual = BCM2835_PERIPH_VIRT,
->> +       .pfn = __phys_to_pfn(BCM2836_PERIPH_PHYS),
->> +       .length = BCM2835_PERIPH_SIZE,
->> +       .type = MT_DEVICE
->> +};
->> +
->>  static void __init bcm2835_map_io(void)
->>  {
->> -       iotable_init(&io_map, 1);
->> +       iotable_init(&bcm2835_io_map, 1);
->> +}
->> +
->> +static void __init bcm2836_map_io(void)
->> +{
->> +       iotable_init(&bcm2836_io_map, 1);
->>  }
->> 
+On Mon, Apr 20, 2015 at 4:05 PM,  <Frank.Li@freescale.com> wrote:
+> From: Frank Li <Frank.Li@freescale.com>
 >
-> Can you explain what this is needed for? Most platform ports don't
-> do this any more.
+> Add i.mx7d support:
+>         imx7d dtsi part
+>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx7d.dtsi | 498 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 498 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx7d.dtsi
+>
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> new file mode 100644
+> index 0000000..dd391e2
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -0,0 +1,498 @@
+> +/*
+> + * Copyright 2015 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 
-Nope, I can't!  I'm not sure what the bcm2835 side of it does, and I was
-just replicating that for 2836.
+You should dual license dts files with BSD or MIT for any non-Linux users.
 
-Should it be removed from 2835, too?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150421/d95075d0/attachment.sig>
+
+> +
+> +       timer {
+> +               compatible = "arm,armv7-timer";
+> +               arm,cpu-registers-not-fw-configured;
+
+Fix your bootloader. This is for broken bootloaders which can't be fixed.
+
+> +               interrupts = <GIC_PPI 13
+> +                       (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +                       <GIC_PPI 14
+> +                       (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+> +               interrupt-parent = <&intc>;
+> +               clock-frequency = <8000000>;
+
+Ditto.
+
+Rob
