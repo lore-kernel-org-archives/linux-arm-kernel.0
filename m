@@ -1,47 +1,37 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 21 Apr 2015 15:25:01 -0500
-Subject: [PATCH v5 08/11] ARM: imx: add gpt system timer support for imx7d
-In-Reply-To: <1429628007-8892-9-git-send-email-Frank.Li@freescale.com>
+Date: Tue, 21 Apr 2015 15:30:05 -0500
+Subject: [PATCH v5 09/11] ARM: imx: add imx7d clk tree support
+In-Reply-To: <1429628007-8892-10-git-send-email-Frank.Li@freescale.com>
 References: <1429628007-8892-1-git-send-email-Frank.Li@freescale.com>
- <1429628007-8892-9-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAL_JsqJiYoFvi5K792t8fPAxdsMnNfaXzAvGkaeQcHf=HsQ8bg@mail.gmail.com>
+ <1429628007-8892-10-git-send-email-Frank.Li@freescale.com>
+Message-ID: <CAL_Jsq+V+q78e1QqtZJK2inCDv+rRjWnzcUgRKXComnJ2O3myg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Apr 21, 2015 at 9:53 AM,  <Frank.Li@freescale.com> wrote:
 > From: Frank Li <Frank.Li@freescale.com>
 >
-> Add GPT system timer support for i.MX7D, it has same hardware
-> as i.MX6DL.
+> Add i.MX7D clk tree support.
 >
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> Enable all clock to bring up imx7.
+> Clock framework need be modified a little since imx7d
+> change clock design. otherwise system will halt and block the
+> other part upstream.
+>
+> All clock refine need wait for Dong Aisheng's patch
+> clk: support clocks which requires parent clock on during operation
+> Or other solution ready.
+>
 > Signed-off-by: Anson Huang <b20788@freescale.com>
+> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
 > ---
->  arch/arm/mach-imx/time.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-> index 15d18e1..7c1d8a3 100644
-> --- a/arch/arm/mach-imx/time.c
-> +++ b/arch/arm/mach-imx/time.c
-> @@ -321,7 +321,7 @@ static void __init _mxc_timer_init(int irq,
->                 tctl_val = V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
->                 if (clk_get_rate(clk_per) == V2_TIMER_RATE_OSC_DIV8) {
->                         tctl_val |= V2_TCTL_CLK_OSC_DIV8;
-> -                       if (cpu_is_imx6dl() || cpu_is_imx6sx()) {
-> +                       if (cpu_is_imx6dl() || cpu_is_imx6sx() || cpu_is_imx7d()) {
+>  arch/arm/mach-imx/clk-imx7d.c | 887 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/clk-pllv3.c |  16 +-
+>  arch/arm/mach-imx/clk.h       |   9 +
+>  3 files changed, 911 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/mach-imx/clk-imx7d.c
 
-You should get this information from DT so you aren't changing this
-again on the next chip.
+Why is i.MX clock code not moved to drivers/clk?
 
->                                 /* 24 / 8 = 3 MHz */
->                                 __raw_writel(7 << V2_TPRER_PRE24M,
->                                         timer_base + MXC_TPRER);
-> @@ -383,3 +383,4 @@ CLOCKSOURCE_OF_DECLARE(mx53_timer, "fsl,imx53-gpt", mxc_timer_init_dt);
->  CLOCKSOURCE_OF_DECLARE(mx6q_timer, "fsl,imx6q-gpt", mxc_timer_init_dt);
->  CLOCKSOURCE_OF_DECLARE(mx6sl_timer, "fsl,imx6sl-gpt", mxc_timer_init_dt);
->  CLOCKSOURCE_OF_DECLARE(mx6sx_timer, "fsl,imx6sx-gpt", mxc_timer_init_dt);
-> +CLOCKSOURCE_OF_DECLARE(mx7d_timer, "fsl,imx7d-gpt", mxc_timer_init_dt);
-> --
-> 1.9.1
->
+Rob
