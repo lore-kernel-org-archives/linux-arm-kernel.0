@@ -1,221 +1,114 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 21 Apr 2015 14:14:32 -0700
-Subject: [PATCH 1/3] mailbox: add support for APM X-Gene platform mailbox
- driver
-In-Reply-To: <CABb+yY31bGbQ4xipyW9pe+J6QV3con=QFuasEfmpgNNfkKKPVA@mail.gmail.com>
-References: <1424216448-28665-1-git-send-email-fkan@apm.com>
- <CABb+yY31bGbQ4xipyW9pe+J6QV3con=QFuasEfmpgNNfkKKPVA@mail.gmail.com>
-Message-ID: <CAL85gmC-rSPqmQ2nqs=MDQCjUUh30vSfo7vEMGOcijBia31q8g@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 21 Apr 2015 22:15:20 +0100
+Subject: [RESEND PATCH 4.0-rc7 v20 3/6] irqchip: gic: Introduce plumbing
+ for IPI FIQ
+In-Reply-To: <20150421145007.GB10164@leverpostej>
+References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
+ <1428659511-9590-1-git-send-email-daniel.thompson@linaro.org>
+ <1428659511-9590-4-git-send-email-daniel.thompson@linaro.org>
+ <20150421145007.GB10164@leverpostej>
+Message-ID: <5536BDE8.2030403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 12:42 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Wed, Feb 18, 2015 at 8:40 AM, Feng Kan <fkan@apm.com> wrote:
+On 21/04/15 15:50, Mark Rutland wrote:
+> Hi,
 >
->> +#define MBOX_CON_NAME                  "slimpro-mbox"
->> +#define MBOX_REG_SET_OFFSET            0x1000
->> +#define MBOX_CNT                       8
->> +#define MBOX_STATUS_AVAIL_MASK         0x00010000
->> +#define MBOX_STATUS_ACK_MASK           0x00000001
+> On Fri, Apr 10, 2015 at 10:51:48AM +0100, Daniel Thompson wrote:
+>> Currently it is not possible to exploit FIQ for systems with a GIC, even if
+>> the systems are otherwise capable of it. This patch makes it possible
+>> for IPIs to be delivered using FIQ.
 >>
-> Nit: BIT(16) and BIT(0) is more readable
-will fix
+>> To do so it modifies the register state so that normal interrupts are
+>> placed in group 1 and specific IPIs are placed into group 0. It also
+>> configures the controller to raise group 0 interrupts using the FIQ
+>> signal. It provides a means for architecture code to define which IPIs
+>> shall use FIQ and to acknowledge any IPIs that are raised.
+>>
+>> All GIC hardware except GICv1-without-TrustZone support provides a means
+>> to group exceptions into group 0 and group 1 but the hardware
+>> functionality is unavailable to the kernel when a secure monitor is
+>> present because access to the grouping registers are prohibited outside
+>> "secure world". However when grouping is not available (or in the case
+>> of early GICv1 implementations is very hard to configure) the code to
+>> change groups does not deploy and all IPIs will be raised via IRQ.
+>>
+>> It has been tested and shown working on two systems capable of
+>> supporting grouping (Freescale i.MX6 and STiH416). It has also been
+>> tested for boot regressions on two systems that do not support grouping
+>> (vexpress-a9 and Qualcomm Snapdragon 600).
 >
->> +/* Configuration and Status Registers */
->> +struct slimpro_mbox_reg {
->> +       u32 in;
->> +       u32 din0;
->> +       u32 din1;
->> +       u32 rsvd1;
->> +       u32 out;
->> +       u32 dout0;
->> +       u32 dout1;
->> +       u32 rsvd2;
->> +       u32 status;
->> +       u32 statusmask;
->> +};
->> +
-> Why not the normal way of defining offset macros, like most drivers do?
-I personally don't prefer one way over another, let me know if you want me
-to change to use defines.
+> I just gave this a spin on my (non-MCPM) TC2, and secondaries don't come
+> up:
 >
->> +struct slimpro_mbox_chan {
->> +       struct device *dev;
->> +       struct mbox_chan *chan;
->> +       struct slimpro_mbox_reg __iomem *reg;
->> +       int id;
->> +       int irq;
->> +       u32 rx_msg[3];
->> +};
->> +
->> +struct slimpro_mbox {
->> +       struct mbox_controller mb_ctrl;
->> +       struct slimpro_mbox_chan mc[MBOX_CNT];
->> +       struct mbox_chan chans[MBOX_CNT];
->> +};
->> +
->> +static struct slimpro_mbox_chan *to_slimpro_mbox_chan(struct mbox_chan *chan)
->> +{
->> +       if (!chan || !chan->con_priv)
->> +               return NULL;
-> This seems un-necessary. Anyway you don't care for NULL returned :)
-> Probably just kill this function?
-done
+> CPU1: failed to boot: -38
+> CPU2: failed to boot: -38
+> CPU3: failed to boot: -38
+> CPU4: failed to boot: -38
+> Brought up 1 CPUs
+> SMP: Total of 1 processors activated (48.00 BogoMIPS).
 >
->> +
->> +       return (struct slimpro_mbox_chan *)chan->con_priv;
->> +}
->> +
->> +static void mb_chan_send_msg(struct slimpro_mbox_chan *mb_chan, u32 *msg)
->> +{
->> +       writel(msg[1], &mb_chan->reg->dout0);
->> +       writel(msg[2], &mb_chan->reg->dout1);
->> +       writel(msg[0], &mb_chan->reg->out);
->> +}
->> +
->> +static void mb_chan_recv_msg(struct slimpro_mbox_chan *mb_chan)
->> +{
->> +       mb_chan->rx_msg[1] = readl(&mb_chan->reg->din0);
->> +       mb_chan->rx_msg[2] = readl(&mb_chan->reg->din1);
->> +       mb_chan->rx_msg[0] = readl(&mb_chan->reg->in);
->> +}
->> +
-> maybe move the send/recv function inline the caller?
-done
+> I tried investigating with a debugger. The unbooted CPUs look to be
+> stuck at the FW's spin loop, but the text doesn't look right (I see a
+> load of ADDEQ r0, r0, r0, #LSL 1 where there was previously a WFI loop).
+> That could be a bug with my debugger though.
 >
->> +static void mb_chan_enable_int(struct slimpro_mbox_chan *mb_chan, u32 mask)
->> +{
->> +       u32 val = readl(&mb_chan->reg->statusmask);
->> +
->> +       val &= ~mask;
->> +
->> +       writel(val, &mb_chan->reg->statusmask);
->> +}
->> +
->> +static void mb_chan_disable_int(struct slimpro_mbox_chan *mb_chan, u32 mask)
->> +{
->> +       u32 val = readl(&mb_chan->reg->statusmask);
->> +
->> +       val |= mask;
->> +
->> +       writel(val, &mb_chan->reg->statusmask);
->> +}
->> +
->> +static int mb_chan_status_ack(struct slimpro_mbox_chan *mb_chan)
->> +{
->> +       u32 val = readl(&mb_chan->reg->status);
->> +
->> +       if (val & MBOX_STATUS_ACK_MASK) {
->> +               writel(MBOX_STATUS_ACK_MASK, &mb_chan->reg->status);
->> +               return 1;
+> If I pause the CPUs at the right point, they sometimes enter the kernel
+> successfully. I don't have a good explanation for that.
+>
+> [...]
+
+Rats!
+
+I presume it is patch 3 that causes the regression? Patch 3 is the one 
+that causes the GIC to adopt a different configuration if it find the 
+kernel running in secure world (it sets all interrupts to group 1 and 
+routes group 0 to FIQ).
+
+I only ask because it isn't until patch 6 that we actually place any 
+interrupt sources into group 0.
+
+
+
+>> @@ -427,6 +535,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>          void __iomem *base = gic_data_cpu_base(gic);
+>>          unsigned int cpu_mask, cpu = smp_processor_id();
+>>          int i;
+>> +       unsigned long secure_irqs, secure_irq;
+>
+> I think secure_irq(s) is a misnomer here. It's just a mask of FIQ bits.
+
+I guess so, on GICv2 without security extentions these are not secure 
+irqs. This is one of the places were IRQ, FIQ, irq and hwirq meet 
+together and naming things is hard.
+
+What sort of name do you like: fiq(s), fiq_hwirq(s)?
+
+>>
+>>          /*
+>>           * Get what the GIC says our CPU mask is.
+>> @@ -445,6 +554,20 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>
+>>          gic_cpu_config(dist_base, NULL);
+>>
+>> +       /*
+>> +        * If the distributor is configured to support interrupt grouping
+>> +        * then set any PPI and SGI interrupts not set in SMP_IPI_FIQ_MASK
+>> +        * to be group1 and ensure any remaining group 0 interrupts have
+>> +        * the right priority.
+>> +        */
+>> +       if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL)) {
+>> +               secure_irqs = SMP_IPI_FIQ_MASK;
+>> +               writel_relaxed(~secure_irqs, dist_base + GIC_DIST_IGROUP + 0);
+>> +               gic->igroup0_shadow = ~secure_irqs;
+>> +               for_each_set_bit(secure_irq, &secure_irqs, 16)
+>> +                       gic_set_group_irq(gic, secure_irq, 0);
 >> +       }
->> +       return 0;
->> +}
->> +
->> +static int mb_chan_status_avail(struct slimpro_mbox_chan *mb_chan)
->> +{
->> +       u32 val = readl(&mb_chan->reg->status);
->> +
->> +       if (val & MBOX_STATUS_AVAIL_MASK) {
->> +               mb_chan_recv_msg(mb_chan);
->> +               writel(MBOX_STATUS_AVAIL_MASK, &mb_chan->reg->status);
->> +               return 1;
->> +       }
->> +       return 0;
->> +}
->> +
->> +static irqreturn_t slimpro_mbox_irq(int irq, void *id)
->> +{
->> +       struct slimpro_mbox_chan *mb_chan = id;
->> +
->> +       if (mb_chan_status_ack(mb_chan))
->> +               mbox_chan_txdone(mb_chan->chan, 0);
->> +
->> +       if (mb_chan_status_avail(mb_chan)) {
->> +               mb_chan_recv_msg(mb_chan)
->>
-> you already did this in mb_chan_status_avail()  is it needed?
-removed
 >
->> +               mbox_chan_received_data(mb_chan->chan, mb_chan->rx_msg);
->> +       }
->> +
->> +       return IRQ_HANDLED;
->> +}
->> +
->> +static int slimpro_mbox_send_data(struct mbox_chan *chan, void *msg)
->> +{
->> +       struct slimpro_mbox_chan *mb_chan = to_slimpro_mbox_chan(chan);
->> +
->> +       mb_chan_send_msg(mb_chan, msg);
->> +       return 0;
->> +}
->> +
->> +static int slimpro_mbox_startup(struct mbox_chan *chan)
->> +{
->> +       struct slimpro_mbox_chan *mb_chan = to_slimpro_mbox_chan(chan);
->> +       int rc;
->> +
->> +       rc = devm_request_irq(mb_chan->dev, mb_chan->irq, slimpro_mbox_irq, 0,
->> +                             MBOX_CON_NAME, mb_chan);
->>
-> You may want to use IRQF_SHARED flag here and make slimpro_mbox_irq()
-> aware of that -- some platforms tie together irq lines of all
-> instances of a resource, like dma, mbox, so they may share the same
-> irq line.
-this is an internal dedicated irq line.
->
->
->> +static int __init slimpro_mbox_probe(struct platform_device *pdev)
->> +{
->> +       struct slimpro_mbox *ctx;
->> +       struct resource *regs;
->> +       void __iomem *mb_base;
->> +       int rc;
->> +       int i;
->> +
->> +       ctx = devm_kzalloc(&pdev->dev, sizeof(struct slimpro_mbox), GFP_KERNEL);
->> +       if (IS_ERR(ctx))
->> +               return PTR_ERR(ctx);
->> +
->> +       platform_set_drvdata(pdev, ctx);
->> +
->> +       regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       mb_base = devm_ioremap_resource(&pdev->dev, regs);
->> +       if (IS_ERR(mb_base))
->> +               return PTR_ERR(mb_base);
->> +
->> +       /* Setup mailbox links */
->> +       for (i = 0; i < MBOX_CNT; i++) {
->> +               ctx->mc[i].irq = platform_get_irq(pdev, i);
->> +               if (ctx->mc[i].irq < 0) {
->> +                       dev_err(&pdev->dev, "no IRQ at index %d\n",
->> +                               ctx->mc[i].irq);
->> +                       return -ENODEV;
->> +               }
->> +
->> +               ctx->mc[i].dev = &pdev->dev;
->> +               ctx->mc[i].reg = mb_base + i * MBOX_REG_SET_OFFSET;
->> +               ctx->mc[i].id = i;
->> +               ctx->mc[i].chan = &ctx->chans[i];
->> +               ctx->chans[i].con_priv = &ctx->mc[i];
->>
-> Note to self: Maybe we should make it possible to populate a channel
-> during request/of_xlate.
->
->> +
->> +static int __init slimpro_mbox_init(void)
->> +{
->> +       return platform_driver_register(&slimpro_mbox_driver);
->> +}
->> +
->> +static void __exit slimpro_mbox_exit(void)
->> +{
->> +}
->> +
->> +subsys_initcall(slimpro_mbox_init);
->> +module_exit(slimpro_mbox_exit);
-will remove
-> Why empty module_exit?
->
-> regards.
+> This only pokes GICD registers. Why isn't this in gic_dist_init?
+
+GIC_DIST_IGROUP[0] (which controls grouping for SGIs and PPIs) is banked 
+per-cpu and form part of the per-cpu configuration.
+
+
+Daniel.
