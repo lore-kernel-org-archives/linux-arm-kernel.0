@@ -1,63 +1,105 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 21 Apr 2015 19:34:21 +0800
-Subject: [PATCH v10 02/29] PCI: Remove deprecated pci_scan_bus_parented()
+Date: Tue, 21 Apr 2015 19:34:26 +0800
+Subject: [PATCH v10 07/29] PCI: Allocate busn resource for pci_scan_root_bus()
 In-Reply-To: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
 References: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1429616088-10249-3-git-send-email-wangyijing@huawei.com>
+Message-ID: <1429616088-10249-8-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No one uses pci_scan_bus_parented() any more,
-remove it.
+Some pci_scan_root_bus() callers don't supply the busn
+resource, because they don't know the max bus number.
+Currently we insert default busn resource[bus-FF] to root bus,
+and update the max bus number after pci_scan_child_bus().
+We could dynamically allocate busn resource and add it
+to pci_host_bridge, in the later patch, it would be easy
+to check whether new pci_host_bridge busn resource conflict.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/probe.c |   19 -------------------
- include/linux/pci.h |    2 --
- 2 files changed, 0 insertions(+), 21 deletions(-)
+ drivers/pci/probe.c |   43 ++++++++++++++++++++++++++++++-------------
+ 1 files changed, 30 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 6675a7a..7d6a61c 100644
+index c425755..0eafda2 100644
 --- a/drivers/pci/probe.c
 +++ b/drivers/pci/probe.c
-@@ -2094,25 +2094,6 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- }
- EXPORT_SYMBOL(pci_scan_root_bus);
+@@ -2041,6 +2041,8 @@ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
  
--/* Deprecated; use pci_scan_root_bus() instead */
--struct pci_bus *pci_scan_bus_parented(struct device *parent,
--		int bus, struct pci_ops *ops, void *sysdata)
--{
--	LIST_HEAD(resources);
--	struct pci_bus *b;
--
--	pci_add_resource(&resources, &ioport_resource);
--	pci_add_resource(&resources, &iomem_resource);
--	pci_add_resource(&resources, &busn_resource);
--	b = pci_create_root_bus(parent, bus, ops, sysdata, &resources);
--	if (b)
--		pci_scan_child_bus(b);
--	else
--		pci_free_resource_list(&resources);
--	return b;
--}
--EXPORT_SYMBOL(pci_scan_bus_parented);
--
- struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
- 					void *sysdata)
+ int pci_bus_update_busn_res_end(struct pci_bus *b, int bus_max)
  {
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index e63112f..f0b4f7b 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -773,8 +773,6 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
- void pcibios_scan_specific_bus(int busn);
- struct pci_bus *pci_find_bus(int domain, int busnr);
- void pci_bus_add_devices(const struct pci_bus *bus);
--struct pci_bus *pci_scan_bus_parented(struct device *parent, int bus,
--				      struct pci_ops *ops, void *sysdata);
- struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
- struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 				    struct pci_ops *ops, void *sysdata,
++	struct resource_entry *entry;
++	struct pci_host_bridge *host;
+ 	struct resource *res = &b->busn_res;
+ 	struct resource old_res = *res;
+ 	resource_size_t size;
+@@ -2058,6 +2060,14 @@ int pci_bus_update_busn_res_end(struct pci_bus *b, int bus_max)
+ 	if (!ret && !res->parent)
+ 		pci_bus_insert_busn_res(b, res->start, res->end);
+ 
++	if (!ret && pci_is_root_bus(b)) {
++		host = to_pci_host_bridge(b->bridge);
++		if (host->dynamic_busn) {
++			entry = pci_busn_resource(&host->windows);
++			entry->res->end = bus_max;
++		}
++	}
++
+ 	return ret;
+ }
+ 
+@@ -2079,32 +2089,39 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int domain,
+ 		int bus, struct pci_ops *ops, void *sysdata,
+ 		struct list_head *resources)
+ {
+-	struct resource_entry *window;
+-	bool found = false;
++	struct resource_entry *entry;
++	struct resource *busn_resource = NULL;
++	struct pci_host_bridge *host;
+ 	struct pci_bus *b;
+ 	int max;
+ 
+-	resource_list_for_each_entry(window, resources)
+-		if (window->res->flags & IORESOURCE_BUS) {
+-			found = true;
+-			break;
+-		}
++	entry = pci_busn_resource(resources);
++	if (!entry) {
++		busn_resource = kzalloc(sizeof (struct resource), GFP_KERNEL);
++		if (!busn_resource)
++			return NULL;
++		busn_resource->start = bus;
++		busn_resource->end = 255;
++		busn_resource->flags = IORESOURCE_BUS;
++		pci_add_resource(resources, busn_resource);
++		pr_info(
++		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
++			bus);
++	}
+ 
+ 	b = pci_create_root_bus(parent, domain, ops,
+ 			sysdata, resources);
+ 	if (!b)
+ 		return NULL;
+ 
+-	if (!found) {
+-		dev_info(&b->dev,
+-		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
+-			bus);
+-		pci_bus_insert_busn_res(b, bus, 255);
++	if (busn_resource) {
++		host = to_pci_host_bridge(b->bridge);
++		host->dynamic_busn = true;
+ 	}
+ 
+ 	max = pci_scan_child_bus(b);
+ 
+-	if (!found)
++	if (busn_resource)
+ 		pci_bus_update_busn_res_end(b, max);
+ 
+ 	return b;
 -- 
 1.7.1
