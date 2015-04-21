@@ -1,153 +1,61 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 21 Apr 2015 17:12:27 -0500
-Subject: [PATCH 1/1] ARM: OMAP2+: Fix omap3 off idle power consumption
- creeping up
-In-Reply-To: <20150421214718.GN18048@atomide.com>
-References: <1429632619-23474-1-git-send-email-tony@atomide.com>
- <20150421214718.GN18048@atomide.com>
-Message-ID: <20150421221227.GA9919@kahuna>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Tue, 21 Apr 2015 15:49:34 -0700
+Subject: [PATCH v4 0/7] selftests: fixes for installation and cross compilation
+Message-ID: <1429656574-8411-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:47-20150421, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [150421 09:24]:
-> > If we use a combination of VMODE and I2C4 for retention modes,
-> > eventually the off idle power consumption will creep up by about
-> > 23mW, even during off mode with I2C4 always staying enabled.
-> > 
-> > Looks like the only way to fix the extra power consumption is to
-> > disable I2C4 usage by setting SEL_VMODE for both off idle and
-> > retention idle. Let's also update the comments accordingly.
-> 
-> Thanks Nishanth for pointing me to the related SmartReflex I2C4
-> erratum. No need to disable I2C4 with the SREN workaround :)
-> 
-> Better patch below, presumably this only affects omap3?
-SREN applies to both OMAP3 and 4 - so, the patch looks right.
+This patch set fixes various issues observed when cross building and
+installing selftests.
 
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ------------------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Tue, 21 Apr 2015 14:31:23 -0700
-> Subject: [PATCH] ARM: OMAP2+: Fix omap3 off idle power consumption creeping up
-> 
-> If we use a combination of VMODE and I2C4 for retention modes,
-> eventually the off idle power consumption will creep up by about
-> 23mW, even during off mode with I2C4 always staying enabled.
-> 
-> Turns out this is because of erratum 2.11 "Extra Power Consumed
-I suggest using the unique ID
-i531 - that remains constant across SoCs.
+As I began investigating improving the test output format, I performed an
+audit of the current tests to ensure all tests were able to execute on various
+target architectures. I found that some tests did not install their binaries
+and others required directories to be installed to execute properly. There
+were also cases in which tests were being installed when they were never built.
+With this series applied all tests compile when appropriate and install their
+output properly.
 
-> When Repeated Start Operation Mode Is Enabled on I2C Interface
-> Dedicated for Smart Reflex (I2C4)" as pointed out by Nishanth
-> Menon <nm@ti.com>.
-> 
-> Let's fix the issue by adding i2c_cfg_clear_mask for the bits
-> to clear when initializing the I2C4 adapter so we can clear
-> SREN bit that drives the I2C4 lines low otherwise when there
-> is no traffic.
-> 
-> Fixes: 3b8c4ebb7630 ("ARM: OMAP3: Fix idle mode signaling for
-> sys_clkreq and sys_off_mode")
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> --- a/arch/arm/mach-omap2/prm-regbits-34xx.h
-> +++ b/arch/arm/mach-omap2/prm-regbits-34xx.h
-> @@ -112,6 +112,7 @@
->  #define OMAP3430_VC_CMD_ONLP_SHIFT			16
->  #define OMAP3430_VC_CMD_RET_SHIFT			8
->  #define OMAP3430_VC_CMD_OFF_SHIFT			0
-> +#define OMAP3430_SREN_MASK				(1 << 4)
->  #define OMAP3430_HSEN_MASK				(1 << 3)
->  #define OMAP3430_MCODE_MASK				(0x7 << 0)
->  #define OMAP3430_VALID_MASK				(1 << 24)
-> --- a/arch/arm/mach-omap2/vc.c
-> +++ b/arch/arm/mach-omap2/vc.c
-> @@ -316,7 +316,8 @@ static void __init omap3_vc_init_pmic_signaling(struct voltagedomain *voltdm)
->  	 * idle. And we can also scale voltages to zero for off-idle.
->  	 * Note that no actual voltage scaling during off-idle will
->  	 * happen unless the board specific twl4030 PMIC scripts are
-> -	 * loaded.
-> +	 * loaded. See also omap_vc_i2c_init for comments regarding
-> +	 * erratum 2.11.
+I have tested this series by building, installing and deploying all selftests
+to x86, arm and arm64 targets.
 
-^^ here as well. 2.11 on 3630 is 2.3 on OMAP3430 etc..
->  	 */
->  	val = voltdm->read(OMAP3_PRM_VOLTCTRL_OFFSET);
->  	if (!(val & OMAP3430_PRM_VOLTCTRL_SEL_OFF)) {
-> @@ -704,9 +705,16 @@ static void __init omap_vc_i2c_init(struct voltagedomain *voltdm)
->  		return;
->  	}
->  
-> +	/*
-> +	 * Note that for omap3 OMAP3430_SREN_MASK clears SREN to work around
-> +	 * erratum 2.11 "Extra Power Consumed When Repeated Start Operation
-> +	 * Mode Is Enabled on I2C Interface Dedicated for Smart Reflex (I2C4)".
-> +	 * Otherwise I2C4 eventually leads into about 23mW extran power being
-> +	 * consumed even during off idle using VMODE.
-> +	 */
->  	i2c_high_speed = voltdm->pmic->i2c_high_speed;
->  	if (i2c_high_speed)
-> -		voltdm->rmw(vc->common->i2c_cfg_hsen_mask,
-> +		voltdm->rmw(vc->common->i2c_cfg_clear_mask,
->  			    vc->common->i2c_cfg_hsen_mask,
->  			    vc->common->i2c_cfg_reg);
->  
-> --- a/arch/arm/mach-omap2/vc.h
-> +++ b/arch/arm/mach-omap2/vc.h
-> @@ -34,6 +34,7 @@ struct voltagedomain;
->   * @cmd_ret_shift: RET field shift in PRM_VC_CMD_VAL_* register
->   * @cmd_off_shift: OFF field shift in PRM_VC_CMD_VAL_* register
->   * @i2c_cfg_reg: I2C configuration register offset
-> + * @i2c_cfg_clear_mask: high-speed mode bit clear mask in I2C config register
->   * @i2c_cfg_hsen_mask: high-speed mode bit field mask in I2C config register
->   * @i2c_mcode_mask: MCODE field mask for I2C config register
->   *
-> @@ -52,6 +53,7 @@ struct omap_vc_common {
->  	u8 cmd_ret_shift;
->  	u8 cmd_off_shift;
->  	u8 i2c_cfg_reg;
-> +	u8 i2c_cfg_clear_mask;
->  	u8 i2c_cfg_hsen_mask;
->  	u8 i2c_mcode_mask;
->  };
-> --- a/arch/arm/mach-omap2/vc3xxx_data.c
-> +++ b/arch/arm/mach-omap2/vc3xxx_data.c
-> @@ -28,6 +28,7 @@
->  /*
->   * VC data common to 34xx/36xx chips
->   * XXX This stuff presumably belongs in the vc3xxx.c or vc.c file.
-> + * Note that we must clear SREN to work around erratum 2.11.
->   */
->  static struct omap_vc_common omap3_vc_common = {
->  	.bypass_val_reg	 = OMAP3_PRM_VC_BYPASS_VAL_OFFSET,
-> @@ -40,6 +41,7 @@ static struct omap_vc_common omap3_vc_common = {
->  	.cmd_onlp_shift	 = OMAP3430_VC_CMD_ONLP_SHIFT,
->  	.cmd_ret_shift	 = OMAP3430_VC_CMD_RET_SHIFT,
->  	.cmd_off_shift	 = OMAP3430_VC_CMD_OFF_SHIFT,
-> +	.i2c_cfg_clear_mask = OMAP3430_SREN_MASK,
->  	.i2c_cfg_hsen_mask = OMAP3430_HSEN_MASK,
->  	.i2c_cfg_reg	 = OMAP3_PRM_VC_I2C_CFG_OFFSET,
->  	.i2c_mcode_mask	 = OMAP3430_MCODE_MASK,
-> --- a/arch/arm/mach-omap2/vc44xx_data.c
-> +++ b/arch/arm/mach-omap2/vc44xx_data.c
-> @@ -42,6 +42,7 @@ static const struct omap_vc_common omap4_vc_common = {
->  	.cmd_ret_shift = OMAP4430_RET_SHIFT,
->  	.cmd_off_shift = OMAP4430_OFF_SHIFT,
->  	.i2c_cfg_reg = OMAP4_PRM_VC_CFG_I2C_MODE_OFFSET,
-> +	.i2c_cfg_clear_mask = 0,
->  	.i2c_cfg_hsen_mask = OMAP4430_HSMODEEN_MASK,
->  	.i2c_mcode_mask	 = OMAP4430_HSMCODE_MASK,
->  };
+Changes v3 -> v4:
+* Planning to send a followup series to address the lib.mk issue so I've 
+dropped the breakpoints and x86 installation workaround.
+* x86: Removed redundant else logic block.
+* Applied Andy Lutomirski's ACK to patches 4 and 5.
+* Rebased onto next-20150421.
+
+Changes v2 -> v3:
+* 5/8: Removed duplicate all_32. 
+* 6/8: Ensure the default rule is all in every case.
+* 6/8: Fixed commit message wording for better clarity.
+* Applied Michael Ellerman's ACK to patches 1-4, and 8 as they have not changed.
+* Rebased onto next-20150420.
+
+Changes v1 -> v2:
+* Have no dependency on all when CROSS_COMPILE is set. (Andy Lutomirski)
+* Added Andy on CC for all x86 test patches.
+* Split up the x86 patches for better clarity.
+* Rebased onto next-20150415.
+
+This series is based on next-20150421.
+
+Tyler Baker (7):
+  selftests: copy TEST_DIRS to INSTALL_PATH
+  selftests/ftrace: install test.d
+  selftests/kdbus: install kdbus-test
+  selftest/x86: build both bitnesses
+  selftest/x86: have no dependency on all when cross building
+  selftests/x86: install tests
+  selftests/exec: do not install subdir as it is already created
+
+ tools/testing/selftests/exec/Makefile   |  2 +-
+ tools/testing/selftests/ftrace/Makefile |  1 +
+ tools/testing/selftests/kdbus/Makefile  |  2 ++
+ tools/testing/selftests/lib.mk          |  3 +++
+ tools/testing/selftests/x86/Makefile    | 15 ++++++++++++---
+ 5 files changed, 19 insertions(+), 4 deletions(-)
 
 -- 
-Regards,
-Nishanth Menon
+2.1.4
