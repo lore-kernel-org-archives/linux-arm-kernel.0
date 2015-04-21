@@ -1,49 +1,44 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Apr 2015 12:59:42 +0200
-Subject: [PATCH v2 1/2] ARM: use ENDPROC() to annotate all v7 asm setup
- functions
+Date: Tue, 21 Apr 2015 12:59:43 +0200
+Subject: [PATCH v2 2/2] ARM: Thumb2: use "bx reg" not "mov pc,
+ reg" for all registers
 In-Reply-To: <1429613983-22739-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1429613983-22739-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1429613983-22739-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1429613983-22739-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This declares all v7 setup functions as functions using ENDPROC() so
-that references to it will include the Thumb bit if the function was
-emitted in Thumb mode. This ensures that these function are always called
-in the correct mode.
+Commit 6ebbf2ce437b (ARM: convert all "mov.* pc, reg" to "bx reg"
+for ARMv6+) replaced all occurrences of 'mov pc, <reg>' with the
+'ret' macro. However, this macro only emits the 'bx' instruction
+when used with the 'lr' register, but still uses 'mov pc, <reg>'
+for everything else.
+
+Since ARM/Thumb2 interworking is allowed in the static kernel
+(i.e., inside vmlinux), this is potentially unsafe, since the
+Thumb mov instruction T1 variant that allows PC as the target will
+not switch modes based on the Thumb bit
+
+So when building a Thumb2 kernel, emit the 'bx' instruction for
+all registers, not just the 'lr' register.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/mm/proc-v7.S | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/include/asm/assembler.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 3d1054f11a8a..f85993faeb05 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -278,6 +278,14 @@ __v7_ca17mp_setup:
- 	mcreq	p15, 0, r0, c1, c0, 1
- #endif
- 	b	__v7_setup
-+ENDPROC(__v7_ca5mp_setup)
-+ENDPROC(__v7_ca9mp_setup)
-+ENDPROC(__v7_cr7mp_setup)
-+ENDPROC(__v7_ca7mp_setup)
-+ENDPROC(__v7_ca12mp_setup)
-+ENDPROC(__v7_ca15mp_setup)
-+ENDPROC(__v7_b15mp_setup)
-+ENDPROC(__v7_ca17mp_setup)
- 
- __v7_pj4b_setup:
- #ifdef CONFIG_CPU_PJ4B
-@@ -457,6 +465,7 @@ __v7_setup:
-  THUMB(	orr	r0, r0, #1 << 30	)	@ Thumb exceptions
- 	ret	lr				@ return to head.S:__ret
- ENDPROC(__v7_setup)
-+ENDPROC(__v7_pj4b_setup)
- 
- 	.align	2
- __v7_setup_stack:
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 186270b3e194..1c057f923258 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -434,6 +434,8 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ 	.macro	ret\c, reg
+ #if __LINUX_ARM_ARCH__ < 6
+ 	mov\c	pc, \reg
++#elif defined(CONFIG_THUMB2_KERNEL)
++	bx\c	\reg
+ #else
+ 	.ifeqs	"\reg", "lr"
+ 	bx\c	\reg
 -- 
 1.8.3.2
