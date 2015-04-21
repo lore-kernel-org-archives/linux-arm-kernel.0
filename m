@@ -1,36 +1,134 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 21 Apr 2015 13:43:19 +0200
-Subject: Question about checking rate_spi in pwrap_init_reg_clock
-In-Reply-To: <20150421103155.GX6325@pengutronix.de>
-References: <1429581487.5994.1.camel@ingics.com>
- <20150421103155.GX6325@pengutronix.de>
-Message-ID: <CABuKBeJqgWHWNYaFXS-BwEayHEtiYGt+56LLXs3QaO3MHUk0bQ@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 21 Apr 2015 19:34:35 +0800
+Subject: [PATCH v10 16/29] PCI: Introduce pci_bus_child_max_busnr()
+In-Reply-To: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
+References: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1429616088-10249-17-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-21 12:31 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Tue, Apr 21, 2015 at 09:58:07AM +0800, Axel Lin wrote:
->> hi,
->> The implementation in pwrap_init_reg_clock seems has off-by-one bug.
->> If rate_spi is 26000000, current code set ck_mhz to 18 rather than 26.
->>
->> I guess it needs below fix, but I'm not 100% sure as I don't have the datasheet.
->> Can someone confirm if this is a bug or not?
->
-> Yes, seems to be a bug. Thanks for noting. Will you send a formal patch
-> or should I do it?
+Sometimes, we want to know the highest reserved
+busnr for children bus. Because parent's bus->busn_res
+may have padding in it. For example, some host drivers
+don't know the bus end, so they supply the bus
+resource (root_bus, 255), they want to update the
+max bus number after pci scan complete. But pci scan
+functions won't return the actual max bus number.
+So we could use pci_bus_child_max_busnr() to find
+that.
 
-Did you have a look on both datasheets/reference kernels, mt8135 and mt8173?
-Reading the datasheet and reference kernel code for mt6589 this SPI
-waveform configuration looks like magic.
+Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ drivers/pci/hotplug/acpiphp_glue.c |   29 +----------------------------
+ drivers/pci/pci.c                  |   27 +++++++++++++++++++++++++--
+ include/linux/pci.h                |    2 +-
+ 3 files changed, 27 insertions(+), 31 deletions(-)
 
-But reading the clock frequency which can have clk_spi in mt8135, they
-are 0 MHz, 26 MHz and bigger then 26 MHz, which leads me to the
-conclusion that the code is correct. Otherwise the check for bigger
-then 18 MHz is useless and should be deleted, if we have a similar
-clock distribution in mt8173.
-
-So maybe someone from Mediatek can shed light on this issue.
-
-Thanks,
-Matthias
+diff --git a/drivers/pci/hotplug/acpiphp_glue.c b/drivers/pci/hotplug/acpiphp_glue.c
+index bcb90e4..84f2584 100644
+--- a/drivers/pci/hotplug/acpiphp_glue.c
++++ b/drivers/pci/hotplug/acpiphp_glue.c
+@@ -397,33 +397,6 @@ static void cleanup_bridge(struct acpiphp_bridge *bridge)
+ 	acpi_unlock_hp_context();
+ }
+ 
+-/**
+- * acpiphp_max_busnr - return the highest reserved bus number under the given bus.
+- * @bus: bus to start search with
+- */
+-static unsigned char acpiphp_max_busnr(struct pci_bus *bus)
+-{
+-	struct pci_bus *tmp;
+-	unsigned char max, n;
+-
+-	/*
+-	 * pci_bus_max_busnr will return the highest
+-	 * reserved busnr for all these children.
+-	 * that is equivalent to the bus->subordinate
+-	 * value.  We don't want to use the parent's
+-	 * bus->subordinate value because it could have
+-	 * padding in it.
+-	 */
+-	max = bus->busn_res.start;
+-
+-	list_for_each_entry(tmp, &bus->children, node) {
+-		n = pci_bus_max_busnr(tmp);
+-		if (n > max)
+-			max = n;
+-	}
+-	return max;
+-}
+-
+ static void acpiphp_set_acpi_region(struct acpiphp_slot *slot)
+ {
+ 	struct acpiphp_func *func;
+@@ -489,7 +462,7 @@ static void enable_slot(struct acpiphp_slot *slot)
+ 	LIST_HEAD(add_list);
+ 
+ 	acpiphp_rescan_slot(slot);
+-	max = acpiphp_max_busnr(bus);
++	max = pci_bus_child_max_busnr(bus);
+ 	for (pass = 0; pass < 2; pass++) {
+ 		list_for_each_entry(dev, &bus->devices, bus_list) {
+ 			if (PCI_SLOT(dev->devfn) != slot->device)
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 95ea445..d5cbea8 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -108,7 +108,7 @@ static bool pcie_ari_disabled;
+  * Given a PCI bus, returns the highest PCI bus number present in the set
+  * including the given PCI bus and its list of child PCI buses.
+  */
+-unsigned char pci_bus_max_busnr(struct pci_bus *bus)
++static unsigned char pci_bus_max_busnr(struct pci_bus *bus)
+ {
+ 	struct pci_bus *tmp;
+ 	unsigned char max, n;
+@@ -121,7 +121,30 @@ unsigned char pci_bus_max_busnr(struct pci_bus *bus)
+ 	}
+ 	return max;
+ }
+-EXPORT_SYMBOL_GPL(pci_bus_max_busnr);
++
++unsigned char pci_bus_child_max_busnr(struct pci_bus *bus)
++{
++	struct pci_bus *tmp;
++	unsigned char max, n;
++
++	/*
++	 * pci_bus_max_busnr will return the highest
++	 * reserved busnr for all these children.
++	 * that is equivalent to the bus->subordinate
++	 * value.  We don't want to use the parent's
++	 * bus->subordinate value because it could have
++	 * padding in it.
++	 */
++	max = bus->busn_res.start;
++
++	list_for_each_entry(tmp, &bus->children, node) {
++		n = pci_bus_max_busnr(tmp);
++		if (n > max)
++			max = n;
++	}
++	return max;
++}
++EXPORT_SYMBOL_GPL(pci_bus_child_max_busnr);
+ 
+ #ifdef CONFIG_HAS_IOMEM
+ void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 13edbf1..a82595a 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1188,7 +1188,7 @@ int pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
+ void pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
+ 		  void *userdata);
+ int pci_cfg_space_size(struct pci_dev *dev);
+-unsigned char pci_bus_max_busnr(struct pci_bus *bus);
++unsigned char pci_bus_child_max_busnr(struct pci_bus *bus);
+ void pci_setup_bridge(struct pci_bus *bus);
+ resource_size_t pcibios_window_alignment(struct pci_bus *bus,
+ 					 unsigned long type);
+-- 
+1.7.1
