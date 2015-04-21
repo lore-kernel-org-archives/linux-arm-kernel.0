@@ -1,49 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 21 Apr 2015 12:59:53 +0200
-Subject: [PATCH] soc: mediatek: Fix off-by-one checking for rate_spi
-In-Reply-To: <1429613612.5644.1.camel@ingics.com>
-References: <1429613612.5644.1.camel@ingics.com>
-Message-ID: <20150421105953.GY6325@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 21 Apr 2015 12:59:42 +0200
+Subject: [PATCH v2 1/2] ARM: use ENDPROC() to annotate all v7 asm setup
+ functions
+In-Reply-To: <1429613983-22739-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1429613983-22739-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1429613983-22739-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 06:53:32PM +0800, Axel Lin wrote:
-> If rate_spi is 26000000, current code set ck_mhz to 18 rather than 26.
-> Fix the off-by-one checking for rate_spi.
-> 
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+This declares all v7 setup functions as functions using ENDPROC() so
+that references to it will include the Thumb bit if the function was
+emitted in Thumb mode. This ensures that these function are always called
+in the correct mode.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/mm/proc-v7.S | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index db5be1e..e910e19 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -568,9 +568,9 @@ static int pwrap_init_reg_clock(struct pmic_wrapper *wrp)
->  
->  	rate_spi = clk_get_rate(wrp->clk_spi);
->  
-> -	if (rate_spi > 26000000)
-> +	if (rate_spi >= 26000000)
->  		ck_mhz = 26;
-> -	else if (rate_spi > 18000000)
-> +	else if (rate_spi >= 18000000)
->  		ck_mhz = 18;
->  	else
->  		ck_mhz = 0;
-> -- 
-> 2.1.0
-> 
-> 
-> 
-> 
-
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3d1054f11a8a..f85993faeb05 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -278,6 +278,14 @@ __v7_ca17mp_setup:
+ 	mcreq	p15, 0, r0, c1, c0, 1
+ #endif
+ 	b	__v7_setup
++ENDPROC(__v7_ca5mp_setup)
++ENDPROC(__v7_ca9mp_setup)
++ENDPROC(__v7_cr7mp_setup)
++ENDPROC(__v7_ca7mp_setup)
++ENDPROC(__v7_ca12mp_setup)
++ENDPROC(__v7_ca15mp_setup)
++ENDPROC(__v7_b15mp_setup)
++ENDPROC(__v7_ca17mp_setup)
+ 
+ __v7_pj4b_setup:
+ #ifdef CONFIG_CPU_PJ4B
+@@ -457,6 +465,7 @@ __v7_setup:
+  THUMB(	orr	r0, r0, #1 << 30	)	@ Thumb exceptions
+ 	ret	lr				@ return to head.S:__ret
+ ENDPROC(__v7_setup)
++ENDPROC(__v7_pj4b_setup)
+ 
+ 	.align	2
+ __v7_setup_stack:
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.3.2
