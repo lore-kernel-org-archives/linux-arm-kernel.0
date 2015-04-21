@@ -1,43 +1,47 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 21 Apr 2015 15:37:17 -0500
-Subject: [PATCH v5 07/11] ARM: imx: add msl support for imx7d
-In-Reply-To: <CAL_Jsq+NV5Ok-P6JGZzNyQCD=PdwXbDY39XmwzKB0U+vuyHxVA@mail.gmail.com>
-References: <1429628007-8892-1-git-send-email-Frank.Li@freescale.com>
- <1429628007-8892-8-git-send-email-Frank.Li@freescale.com>
- <20150421173110.GG10164@leverpostej>
- <CAHrpEqRAEMammfaovi6QQxGJfW-LZsgwg5rX4-3Y=+m6qhqeTg@mail.gmail.com>
- <CAL_Jsq+NV5Ok-P6JGZzNyQCD=PdwXbDY39XmwzKB0U+vuyHxVA@mail.gmail.com>
-Message-ID: <CAHrpEqS5qQ7-0bEFEZ3tkeupL0cBU1aPiVnS5RWy=GBW9JAhWw@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 21 Apr 2015 13:37:13 -0700
+Subject: [PATCH 5/9] ARM: BCM2836: Add io map initialization for bcm2836.
+In-Reply-To: <6559239.zHhRM8VZWD@wuerfel>
+References: <1429639796-2169-1-git-send-email-eric@anholt.net>
+ <1429639796-2169-6-git-send-email-eric@anholt.net>
+ <6559239.zHhRM8VZWD@wuerfel>
+Message-ID: <87oamh9q12.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 3:22 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Tue, Apr 21, 2015 at 1:51 PM, Zhi Li <lznuaa@gmail.com> wrote:
->> On Tue, Apr 21, 2015 at 12:31 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>> +static void __init imx_ca7_smp_init_cpus(void)
->>>> +{
->>>> +       int i, ncores;
->>>> +       unsigned long val;
->>>> +
->>>> +       asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r" (val));
->>>> +       ncores = ((val >> 24) & 0x3) + 1;
->>>> +       if (setup_max_cpus < ncores)
->>>> +               ncores = (setup_max_cpus) ? setup_max_cpus : 1;
->>>> +
->>>> +       for (i = ncores; i < NR_CPUS; i++)
->>>> +               set_cpu_possible(i, false);
->>>> +}
->>>
->>> NAK.
->>>
->>> The set of available CPUs should come from the DT, as with other
->>> platforms.
->>
->> Can you give me a reference platform implement?
->
-> All of the ones with no smp_operations.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Okay, I just remove it.
-
+> On Tuesday 21 April 2015 11:09:52 Eric Anholt wrote:
+>> +static struct map_desc bcm2836_io_map __initdata = {
+>> +       .virtual = BCM2835_PERIPH_VIRT,
+>> +       .pfn = __phys_to_pfn(BCM2836_PERIPH_PHYS),
+>> +       .length = BCM2835_PERIPH_SIZE,
+>> +       .type = MT_DEVICE
+>> +};
+>> +
+>>  static void __init bcm2835_map_io(void)
+>>  {
+>> -       iotable_init(&io_map, 1);
+>> +       iotable_init(&bcm2835_io_map, 1);
+>> +}
+>> +
+>> +static void __init bcm2836_map_io(void)
+>> +{
+>> +       iotable_init(&bcm2836_io_map, 1);
+>>  }
+>> 
 >
-> Rob
+> Can you explain what this is needed for? Most platform ports don't
+> do this any more.
+
+Nope, I can't!  I'm not sure what the bcm2835 side of it does, and I was
+just replicating that for 2836.
+
+Should it be removed from 2835, too?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150421/d95075d0/attachment.sig>
