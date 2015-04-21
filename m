@@ -1,51 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Apr 2015 12:24:20 +0100
-Subject: your mail
-In-Reply-To: <20150421111042.GB3996@e103592.cambridge.arm.com>
-References: <CAKv+Gu9u73+YKn+aR1vk+1eNF_voC71THWRQS96jyAt4HB3BQw@mail.gmail.com>
- <20150421104634.GA3996@e103592.cambridge.arm.com>
- <CAKv+Gu-3iM2+TvAgfV91FzfgAQuZhr=beeJ8RWmmGjTChbUrtQ@mail.gmail.com>
- <20150421111042.GB3996@e103592.cambridge.arm.com>
-Message-ID: <20150421112420.GV12732@n2100.arm.linux.org.uk>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 21 Apr 2015 19:34:37 +0800
+Subject: [PATCH v10 18/29] ia64/PCI: Refine pci_acpi_scan_root() with generic
+ pci_host_bridge
+In-Reply-To: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
+References: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1429616088-10249-19-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 12:10:43PM +0100, Dave P Martin wrote:
-> On Tue, Apr 21, 2015 at 11:50:02AM +0100, Ard Biesheuvel wrote:
-> > OK, that makes sense. But it does appear that the local cross-section
-> > references are working just fine, i.e., references from other sections
-> > in the same .o have the thumb bit set correctly even without BSYM()
-> 
-> For branch targets, the set of situations where BSYM must be used and
-> the set of situations where it must not be used are mutually exclusive:
-> 
->  * If the assembler resolves the address and the address will be used as a
->    branch target, BSYM() must be used.  This applies to non-cross-section
->    references within in single object only.
-> 
->  * If the linker resolves the address, BSYM() must not be used and the
->    target label must be annotated with ENDPROC().  This applies to
->    all cross-section or cross-object references.
+From: Yijing Wang <wangyijing0307@gmail.com>
 
-Yes, that agrees with the situation we have for the initfunc stuff.
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Tony Luck <tony.luck@intel.com>
+CC: Fenghua Yu <fenghua.yu@intel.com>
+CC: linux-ia64 at vger.kernel.org
+---
+ arch/ia64/pci/pci.c |   34 +++++++++++++++++++---------------
+ 1 files changed, 19 insertions(+), 15 deletions(-)
 
-> For any address that won't be used as a branch target, BSYM() must not
-> be used.
-> 
-> Cross-section non-cross-object references where the target is missing
-> ENDPROC() and BSYM _is_ used will also work, but this should be avoided
-> -- it's an abuse really.
-
-We should probably create a badr macro to complement the adr pseudo-op
-which incorporates the BSYM thing so make this clearer - and a comment
-before it.  This is really the case where BSYM should be used.
-
-We have one case in the kernel source which is probably buggy:
-
-arch/arm/kvm/interrupts.S:      ldr     r2, =BSYM(panic)
-
-and killing BSYM in favour of a badr macro would prevent this.
-
+diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+index 84f1eb8..7f3b9fb 100644
+--- a/arch/ia64/pci/pci.c
++++ b/arch/ia64/pci/pci.c
+@@ -420,6 +420,19 @@ probe_pci_root_info(struct pci_root_info *info, struct acpi_device *device,
+ 	return 0;
+ }
+ 
++static int pci_host_bridge_prepare(struct pci_host_bridge *bridge)
++{
++	struct pci_controller *controller = bridge->bus->sysdata;
++
++	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
++	return 0;
++}
++
++static struct pci_host_bridge_ops pci_host_ops = {
++	.pci_ops = &pci_root_ops,
++	.prepare = pci_host_bridge_prepare,
++};
++
+ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ {
+ 	struct acpi_device *device = root->device;
+@@ -427,7 +440,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	struct pci_controller *controller;
+ 	struct pci_root_info *info = NULL;
+ 	int busnum = root->secondary.start;
+-	struct pci_bus *pbus;
++	struct pci_host_bridge *host;
+ 	int ret;
+ 
+ 	controller = alloc_pci_controller(domain);
+@@ -464,26 +477,17 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	 * should handle the case here, but it appears that IA64 hasn't
+ 	 * such quirk. So we just ignore the case now.
+ 	 */
+-	pbus = pci_create_root_bus(NULL, domain, &pci_root_ops,
+-			controller, &info->resources);
+-	if (!pbus) {
++	host = pci_scan_host_bridge(NULL, domain, controller,
++			&info->resources, &pci_host_ops);
++	if (!host) {
+ 		pci_free_resource_list(&info->resources);
+ 		__release_pci_root_info(info);
+ 		return NULL;
+ 	}
+ 
+-	pci_set_host_bridge_release(to_pci_host_bridge(pbus->bridge),
++	pci_set_host_bridge_release(host,
+ 			release_pci_root_info, info);
+-	pci_scan_child_bus(pbus);
+-	return pbus;
+-}
+-
+-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+-{
+-	struct pci_controller *controller = bridge->bus->sysdata;
+-
+-	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
+-	return 0;
++	return host->bus;
+ }
+ 
+ void pcibios_fixup_device_resources(struct pci_dev *dev)
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.7.1
