@@ -1,25 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Apr 2015 09:32:40 +0100
-Subject: [PATCH v3 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
- termination driver
-In-Reply-To: <CAL85gmBFpKU7q31Utr+L_iHDM259kxmsL-0X=7WLB4k5xw65CA@mail.gmail.com>
-References: <20150408084448.5f0793b7@why.wild-wind.fr.eu.org>	<cover.1428564115.git.dhdang@apm.com>	<7923ef6ffd60a7c3de3c8c04fe746bbd3c15b5ac.1428564115.git.dhdang@apm.com>	<55280665.9020603@arm.com>	<CADaLNDkrqwnEOX1HgQ7V3-1o4cDJnG4dW1=U4ujod7fUW_PQ0w@mail.gmail.com>	<7a739a984c1b849ae92cb3bb3edc92f2@www.loen.fr>	<CADaLNDmxrpJ-t6fR=DVBzB1q_jp58H94oZnRrxZYtCvDCWJpog@mail.gmail.com>	<20150415091655.02361cdc@arm.com>	<CADaLNDkuXpMVanyPD1oMOK-uvdt+vK2+UabgUxvaK9bBZDmdKg@mail.gmail.com>	<5530DD9D.9020808@arm.com>	<CADaLNDkAu4o6YQkw528+1npWAa_CeX-ZfFED0zWRsz+WAfwf6A@mail.gmail.com>	<55310050.7000003@arm.com>
- <CAL85gmBFpKU7q31Utr+L_iHDM259kxmsL-0X=7WLB4k5xw65CA@mail.gmail.com>
-Message-ID: <55360B28.1060703@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 21 Apr 2015 16:23:12 +0900
+Subject: [PATCH v3 3/4] ARM: dts: UniPhier: add support for UniPhier SoCs
+ and boards
+In-Reply-To: <2809229.iRV9NgGGKe@wuerfel>
+References: <1429285698-11829-1-git-send-email-yamada.masahiro@socionext.com>
+ <1429285698-11829-4-git-send-email-yamada.masahiro@socionext.com>
+ <2809229.iRV9NgGGKe@wuerfel>
+Message-ID: <CAK7LNAQoS4vbU_ZEsf=F8Sy8be8xn8N2taTVkEeJ3ROBQmar=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/04/15 19:51, Feng Kan wrote:
+Hi Arnd,
 
-> Is it possible to use the pci_msi_create_default_irq_domain for the X-Gene MSI
-> driver. Or is this going to be removed in the future. Thanks
 
-This is not the preferred way. pci_msi_create_default_irq_domain is only
-there for legacy purposes, so that we can lookup an MSI without
-specifying the domain. New code shouldn't have to rely on it.
+2015-04-18 0:56 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Saturday 18 April 2015 00:48:17 Masahiro Yamada wrote:
+>> +
+>> +               smp_syscon at 59801208 {
+>> +                       compatible = "socionext,uniphier-smp-reg", "syscon";
+>> +                       reg = <0x59801208 0x4>;
+>> +               };
+>> +
+>>
+>
+> Using syscon here is a good idea, but please name the register area
+> according to what it is called in the data sheet, not according to how
+> it is used in Linux, and list all the registers that belong in this
+> device. It's quite possible that another driver needs a second
+> register from the same syscon.
+>
+> E.g. if there is a device called a foo controller, make this device
+>
+>         foo-controller at 0x59800000 {
+>                 compatible = "socionext,uniphier-foo-controller", "syscon";
+>                 reg = <0x59800000 0x4000>;
+>         };
+>
+> then hardcode the 0x1208 offset in the smp code, or add it as an
+> argument to the property containing the phandle.
+>
 
-Thanks,
+OK, I updated this part in v4.
 
-	M.
+
 -- 
-Jazz is not dead. It just smells funny...
+Best Regards
+Masahiro Yamada
