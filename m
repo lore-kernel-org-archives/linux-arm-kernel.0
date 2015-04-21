@@ -1,46 +1,23 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 21 Apr 2015 15:17:52 +0200
-Subject: [PATCH 2/8] ARM: dts: add cluster regulator supply properties for
- exynos5422-odroidxu3
-In-Reply-To: <1429622278-12216-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1429622278-12216-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1429622278-12216-3-git-send-email-b.zolnierkie@samsung.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Tue, 21 Apr 2015 15:18:50 +0200
+Subject: Fwd: [PATCH] usb-otg: atmel-usba-udc: initialize usb_prev to the
+ actual value
+In-Reply-To: <CA+XxOSFO1zYKJLaAQ6qixReUaViizOPve445B1rrKE+Om2xRPQ@mail.gmail.com>
+References: <CA+XxOSExCVBd0TFuY+wmjL-pxhp148H1FpnQLBtV0q2R5OwHzg@mail.gmail.com>
+ <CA+XxOSFO1zYKJLaAQ6qixReUaViizOPve445B1rrKE+Om2xRPQ@mail.gmail.com>
+Message-ID: <20150421131850.GA11427@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cluster regulator supply properties as a preparation to
-adding generic arm_big_little_dt cpufreq driver support for
-ODROID-XU3 board.
+Helle Lo?c,
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Doug Anderson <dianders@chromium.org>
-Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Cc: Andreas Faerber <afaerber@suse.de>
-Cc: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/boot/dts/exynos5422-odroidxu3.dts |    8 ++++++++
- 1 file changed, 8 insertions(+)
+On Tue, Apr 21, 2015 at 02:52:35PM +0200, lo?c tourlonias wrote:
+> During start of the usb gadget device, usb_prev must be initialize to
+> the actual value of vbus_pin to avoid missing the first usb host
+> detection.
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-index edc25cf..e876016 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -355,6 +355,14 @@
- 	dr_mode = "otg";
- };
- 
-+&cpu0 {
-+	cpu-cluster.0-supply = <&buck2_reg>;
-+};
-+
-+&cpu4 {
-+	cpu-cluster.1-supply = <&buck6_reg>;
-+};
-+
- &i2c_0 {
- 	status = "okay";
- 
--- 
-1.7.9.5
+You are a bit too late, it is already fixed[1].
+
+Sylvain
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=227ab58cff3c26ec279598112887d6bcca677a0c
