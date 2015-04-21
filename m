@@ -1,51 +1,38 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 21 Apr 2015 14:34:45 -0500
-Subject: [PATCH v5 05/11] ARM: dts: add imx7d soc dtsi file
-In-Reply-To: <CAHrpEqTCMgaAx_bUG1JEtS-2_DrkwM_EbWphu_j=6YZuebcoSw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 21 Apr 2015 15:22:49 -0500
+Subject: [PATCH v5 07/11] ARM: imx: add msl support for imx7d
+In-Reply-To: <CAHrpEqRAEMammfaovi6QQxGJfW-LZsgwg5rX4-3Y=+m6qhqeTg@mail.gmail.com>
 References: <1429628007-8892-1-git-send-email-Frank.Li@freescale.com>
- <1429628007-8892-6-git-send-email-Frank.Li@freescale.com>
- <20150421172834.GF10164@leverpostej>
- <CAHrpEqTCMgaAx_bUG1JEtS-2_DrkwM_EbWphu_j=6YZuebcoSw@mail.gmail.com>
-Message-ID: <CAHrpEqRqUJ2h2dXiwR3rcugWvszKwt10axy8jGsAJAH6Quafbg@mail.gmail.com>
+ <1429628007-8892-8-git-send-email-Frank.Li@freescale.com>
+ <20150421173110.GG10164@leverpostej>
+ <CAHrpEqRAEMammfaovi6QQxGJfW-LZsgwg5rX4-3Y=+m6qhqeTg@mail.gmail.com>
+Message-ID: <CAL_Jsq+NV5Ok-P6JGZzNyQCD=PdwXbDY39XmwzKB0U+vuyHxVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Apr 21, 2015 at 1:51 PM, Zhi Li <lznuaa@gmail.com> wrote:
+> On Tue, Apr 21, 2015 at 12:31 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> +static void __init imx_ca7_smp_init_cpus(void)
+>>> +{
+>>> +       int i, ncores;
+>>> +       unsigned long val;
 >>> +
->>> +       clocks {
->>> +               #address-cells = <1>;
->>> +               #size-cells = <0>;
+>>> +       asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r" (val));
+>>> +       ncores = ((val >> 24) & 0x3) + 1;
+>>> +       if (setup_max_cpus < ncores)
+>>> +               ncores = (setup_max_cpus) ? setup_max_cpus : 1;
 >>> +
->>> +               ckil: clock at 0 {
->>> +                       compatible = "fixed-clock";
->>> +                       reg = <0>;
->>> +                       #clock-cells = <0>;
->>> +                       clock-frequency = <32768>;
->>> +                       clock-output-names = "ckil";
->>> +               };
->>> +
->>> +               osc: clock at 1 {
->>> +                       compatible = "fixed-clock";
->>> +                       reg = <1>;
->>> +                       #clock-cells = <0>;
->>> +                       clock-frequency = <24000000>;
->>> +                       clock-output-names = "osc";
->>> +               };
->>> +
->>> +       };
+>>> +       for (i = ncores; i < NR_CPUS; i++)
+>>> +               set_cpu_possible(i, false);
+>>> +}
 >>
->> Get rid of the clocks container node, and put these under the root.
->
-> Okay.
-
-After remove clocks node.
-There will be warning
-
-Warning (reg_format): "reg" property in /clock at 0 has invalid length (4
-bytes) (#address-cells == 1, #size-cells == 1)
-Warning (reg_format): "reg" property in /clock at 1 has invalid length (4
-bytes) (#address-cells == 1, #size-cells == 1)
-
-best regards
-Frank Li
->
+>> NAK.
 >>
+>> The set of available CPUs should come from the DT, as with other
+>> platforms.
+>
+> Can you give me a reference platform implement?
+
+All of the ones with no smp_operations.
+
+Rob
