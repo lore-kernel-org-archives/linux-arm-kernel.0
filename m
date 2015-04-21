@@ -1,70 +1,49 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 21 Apr 2015 13:38:12 -0700
-Subject: [PATCH 7/9] ARM: Add Kconfig support for bcm2836.
-In-Reply-To: <13864545.foFMzEn7Xk@wuerfel>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <1429639796-2169-8-git-send-email-eric@anholt.net>
- <13864545.foFMzEn7Xk@wuerfel>
-Message-ID: <87lhhl9pzf.fsf@eliezer.anholt.net>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Tue, 21 Apr 2015 15:39:38 -0500
+Subject: [PATCH v5 09/11] ARM: imx: add imx7d clk tree support
+In-Reply-To: <CAL_Jsq+V+q78e1QqtZJK2inCDv+rRjWnzcUgRKXComnJ2O3myg@mail.gmail.com>
+References: <1429628007-8892-1-git-send-email-Frank.Li@freescale.com>
+ <1429628007-8892-10-git-send-email-Frank.Li@freescale.com>
+ <CAL_Jsq+V+q78e1QqtZJK2inCDv+rRjWnzcUgRKXComnJ2O3myg@mail.gmail.com>
+Message-ID: <CAHrpEqTNNn1=g6X9-iYDmWdLp58SOYWMerccy-BR++E7TU4M-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Tue, Apr 21, 2015 at 3:30 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Tue, Apr 21, 2015 at 9:53 AM,  <Frank.Li@freescale.com> wrote:
+>> From: Frank Li <Frank.Li@freescale.com>
+>>
+>> Add i.MX7D clk tree support.
+>>
+>> Enable all clock to bring up imx7.
+>> Clock framework need be modified a little since imx7d
+>> change clock design. otherwise system will halt and block the
+>> other part upstream.
+>>
+>> All clock refine need wait for Dong Aisheng's patch
+>> clk: support clocks which requires parent clock on during operation
+>> Or other solution ready.
+>>
+>> Signed-off-by: Anson Huang <b20788@freescale.com>
+>> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+>> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+>> ---
+>>  arch/arm/mach-imx/clk-imx7d.c | 887 ++++++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/mach-imx/clk-pllv3.c |  16 +-
+>>  arch/arm/mach-imx/clk.h       |   9 +
+>>  3 files changed, 911 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm/mach-imx/clk-imx7d.c
+>
+> Why is i.MX clock code not moved to drivers/clk?
 
-> On Tuesday 21 April 2015 11:09:54 Eric Anholt wrote:
->> @@ -116,17 +122,19 @@ config ARCH_BCM283X
->>  config ARCH_BCM2835
->>         bool "Broadcom BCM2835 family" if ARCH_MULTI_V6
->>         select ARCH_BCM283X
->> -       select ARCH_REQUIRE_GPIOLIB
->> -       select ARM_AMBA
->>         select ARM_ERRATA_411920
->>         select ARM_TIMER_SP804
->> -       select CLKSRC_OF
->> -       select PINCTRL
->> -       select PINCTRL_BCM2835
->>         help
->>           This enables support for the Broadcom BCM2835 SoC. This SoC is
->>           used in the Raspberry Pi and Roku 2 devices.
->>  
->> +config ARCH_BCM2836
->> +       bool "Broadcom BCM2836 family" if ARCH_MULTI_V7
->> +       select ARCH_BCM283X
->> +       help
->> +         This enables support for the Broadcom BCM2836 SoC. This SoC is
->> +         used in the Raspberry Pi 2
->> +
->
-> The description for the first one says "Broadcom BCM2835 family", and I
-> guess they are both in the same family. How about leaving the
-> CONFIG_BCM2835 symbol to mean one of them, and just duplicating the
-> DEBUG_LL symbols?
->
-> You could do something like
->
-> config ARCH_BCM2835
->         bool "Broadcom BCM2835 family" if ARCH_MULTI_V6 || ARCH_MULTI_V7
->         select ARCH_BCM283X
->         select ARCH_REQUIRE_GPIOLIB
->         select ARM_AMBA
->         select ARM_ERRATA_411920 if ARCH_MULTI_V6
->         select ARM_TIMER_SP804 if ARCH_MULTI_V6
->         select CLKSRC_OF
->         select PINCTRL
->         select PINCTRL_BCM2835
->         help
->           This enables support for the Broadcom BCM2835 and BCM2836 SoCs.
-> 	  These SoCs is used in the Raspberry Pi and Roku 2 devices.
->
-> That should make it less confusing to the user, because they don't have
-> to know which specific SoC they are building for, other than enabling
-> the right architecture level.
+Guo Shawn:
+        what's plan clock code move to driver/clk?
 
-Seems reasonable to me.  What do the 2835 maintainers think?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150421/aaf0eb6e/attachment.sig>
+Rob:
+       It is not related i.mx7 bring up.
+       There are many upstream work depend on this.
+       we can work on code movement after that.
+       Are you okay?
+
+>
+> Rob
