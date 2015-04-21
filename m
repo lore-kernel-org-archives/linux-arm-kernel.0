@@ -1,36 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Apr 2015 12:18:08 +0200
-Subject: No subject
-Message-ID: <CAKv+Gu9u73+YKn+aR1vk+1eNF_voC71THWRQS96jyAt4HB3BQw@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 21 Apr 2015 12:19:48 +0200 (CEST)
+Subject: [PATCH v2] irqchip/gicv3-its: ITS table size should not be
+ smaller than PSZ
+In-Reply-To: <1429162259-11344-1-git-send-email-Minghuan.Lian@freescale.com>
+References: <1429162259-11344-1-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <alpine.DEB.2.11.1504211218330.13914@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 April 2015 at 12:13, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 21, 2015 at 12:08:51PM +0200, Ard Biesheuvel wrote:
->> This updates the PROCINFO offset-to-setup-function fields of the
->> Thumb2 capable CPU definitions to include the Thumb bit when building
->> a Thumb2 kernel. This ensures that these function are always called
->> in the correct mode.
->
-> I don't think this is necessary, in fact, I think this is positively
-> regression causing.
->
-> The symbol 'initfunc' is known to the assembler to be a thumb symbol.
-> As we have seen already from the kernel dumps from the V7M kernel, when
-> it calculates initfunc - name in a T2 kernel, the resulting value is an
-> _odd_ number.
->
+On Thu, 16 Apr 2015, Minghuan Lian wrote:
 
-OK, so BSYM() uses '+ 1' rather than ' | 1'? I wasn't expecting that, sorry.
+> The default page size of ITS table has been changed to 64KB,
+> but for some platforms the real size of allocated memory which
+> calculated by DEVBITS of register GITS_TYPER may be smaller than
+> default size. In this case, the allocation size must be increased
+> to the default size, otherwise, the wrong page number will cause
+> kernel hang.
 
-But looking at proc-v7.S again, the problem may just be the missing
-ENDPROC() declarations for a couple of the setup() functions, which
-explains why they are lacking the Thumb annotations.
+This changelog fails to explain WHY the kernel hangs if the allocated
+table is smaller than the default
+ 
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> ---
+> v2-v1:
+> Increase allocation size instead of decreasing PSZ
+> 
+>  drivers/irqchip/irq-gic-v3-its.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 9687f8a..19ab86d 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -828,7 +828,8 @@ static int its_alloc_tables(struct its_node *its)
+>  			u64 typer = readq_relaxed(its->base + GITS_TYPER);
+>  			u32 ids = GITS_TYPER_DEVBITS(typer);
+>  
+> -			order = get_order((1UL << ids) * entry_size);
+> +			order = max(get_order((1UL << ids) * entry_size),
+> +				    order);
 
-> Using BSYM() here will increment it to be the next _even_ number, which
-> is wrong as this will potentially point at either half way through a
-> 32-bit T2 instruction, or the second 16-bit T2 instruction.
->
+Lacks a comment explaining WHY we do that max() here.
 
-Agreed.
+Thanks,
+
+	tglx
