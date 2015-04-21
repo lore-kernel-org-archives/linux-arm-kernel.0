@@ -1,72 +1,60 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 21 Apr 2015 09:17:02 -0500
-Subject: [PATCH v4 08/11] ARM: imx: add gpt system timer support for imx7d
-In-Reply-To: <20150421100240.GR12732@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 21 Apr 2015 16:27:47 +0200
+Subject: [PATCH v4 09/11] ARM: imx: add imx7d clk tree support
+In-Reply-To: <CAHrpEqSuJbAEBDBfVMXdFk-p-xwtwfmHbSw3OsN-2sa9fNmA=A@mail.gmail.com>
 References: <1429563933-3129-1-git-send-email-Frank.Li@freescale.com>
- <1429563933-3129-9-git-send-email-Frank.Li@freescale.com>
- <20150421100240.GR12732@n2100.arm.linux.org.uk>
-Message-ID: <CAHrpEqT548H7kkpiCLa_VrWjHaoR5x2_6V-L1S_gWX49=aZK1Q@mail.gmail.com>
+ <1429563933-3129-10-git-send-email-Frank.Li@freescale.com>
+ <20150421102255.GW6325@pengutronix.de>
+ <CAHrpEqSuJbAEBDBfVMXdFk-p-xwtwfmHbSw3OsN-2sa9fNmA=A@mail.gmail.com>
+Message-ID: <20150421142747.GD6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 5:02 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 21, 2015 at 05:05:30AM +0800, Frank.Li at freescale.com wrote:
->> From: Frank Li <Frank.Li@freescale.com>
->>
->> Add GPT system timer support for i.MX7D, it has same hardware
->> as i.MX6DL.
->>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->> Signed-off-by: Anson Huang <b20788@freescale.com>
->> ---
->>  arch/arm/mach-imx/time.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
->> index 15d18e1..7c1d8a3 100644
->> --- a/arch/arm/mach-imx/time.c
->> +++ b/arch/arm/mach-imx/time.c
->> @@ -321,7 +321,7 @@ static void __init _mxc_timer_init(int irq,
->>               tctl_val = V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
->>               if (clk_get_rate(clk_per) == V2_TIMER_RATE_OSC_DIV8) {
->>                       tctl_val |= V2_TCTL_CLK_OSC_DIV8;
->> -                     if (cpu_is_imx6dl() || cpu_is_imx6sx()) {
->> +                     if (cpu_is_imx6dl() || cpu_is_imx6sx() || cpu_is_imx7d()) {
->>                               /* 24 / 8 = 3 MHz */
->>                               __raw_writel(7 << V2_TPRER_PRE24M,
->>                                       timer_base + MXC_TPRER);
->> @@ -383,3 +383,4 @@ CLOCKSOURCE_OF_DECLARE(mx53_timer, "fsl,imx53-gpt", mxc_timer_init_dt);
->>  CLOCKSOURCE_OF_DECLARE(mx6q_timer, "fsl,imx6q-gpt", mxc_timer_init_dt);
->>  CLOCKSOURCE_OF_DECLARE(mx6sl_timer, "fsl,imx6sl-gpt", mxc_timer_init_dt);
->>  CLOCKSOURCE_OF_DECLARE(mx6sx_timer, "fsl,imx6sx-gpt", mxc_timer_init_dt);
->> +CLOCKSOURCE_OF_DECLARE(mx7d_timer, "fsl,imx7d-gpt", mxc_timer_init_dt);
->
-> Hmm, this suggests to me that something is very wrong here, especially
-> those cpu_is_imx*() things.
->
-> Several questions crop up:
->
-> * Shouldn't the code be split between a timer v1 and timer v2 driver,
->   and the appropriate one be selected via the DT compatible?
->
-> * Shouldn't the clock source for the v2 timer be determined from DT?
->   (It looks to me like the v2 timer can be clocked by the perclk or
->   by a 24MHz clock with a built-in prescaler.)
->
-> * Shouldn't the prescaler for the timer be calculated in the driver and
->   the associated divisor automatically set, or specified via DT?
->
-> Had these been fixed, you probably wouldn't need to modify the driver to
-> add iMX7 support here - which is really what DT is supposed to be about.
->
-> I'm not expecting you to fix them - but it would be good to get this
-> properly sorted out so that when iMX8 comes along, the same process
-> doesn't happen again.
+On Tue, Apr 21, 2015 at 09:15:36AM -0500, Zhi Li wrote:
+> On Tue, Apr 21, 2015 at 5:22 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Tue, Apr 21, 2015 at 05:05:31AM +0800, Frank.Li at freescale.com wrote:
+> >> From: Frank Li <Frank.Li@freescale.com>
+> >>
+> >> Add i.MX7D clk tree support.
+> >>
+> >> +
+> >> +     clk_register_clkdev(clks[IMX7D_GPT1_ROOT_CLK], "ipg", "imx-gpt.0");
+> >> +     clk_register_clkdev(clks[IMX7D_GPT_3M_CLK], "gpt_3m", "imx-gpt.0");
+> 
+> This patch just list all clock root in RM.
 
-Thank you for your suggestion. I will do that after this patches.
+Maybe, still the two lines above are unused. The timer code only does a
+of_clk_get_by_name which will never return the clocks you register
+above.
 
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+> all clock refine have to wait for Dong Aisheng's RFC clock framework
+> change's patch.
+> 
+> >
+> > What are these good for? These shouldn't be here.
+> >
+> >> +
+> >> +     for (i = 0; i < IMX7D_END_CLK; i++)
+> >> +             clk_prepare_enable(clks[i]);
+> >
+> > Hey, no. You enable *all* clocks here which is certainly wrong. They
+> > will never be turned off.
+> 
+> Yes. This patches's purpose is bring up mx7.
+> Because imx7 clock design change,  Dong Aisheng send out RFC patch to
+> change a little bit framework.
+> After that,  we can enable only necessary clock here. Otherwise system
+> will halt and block the other part
+> upstream.
+
+If that's the case you should state that in the commit message, add a
+comment to the code that it needs fixing once Dongs patch is in and
+provide a reference to the patch you need.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
