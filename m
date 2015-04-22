@@ -1,173 +1,147 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Apr 2015 18:20:04 +0100
-Subject: [PATCH] irqchip: gic: Drop support for gic_arch_extn
-Message-ID: <1429723204-25868-1-git-send-email-marc.zyngier@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 22 Apr 2015 19:37:43 +0200
+Subject: [PATCH 0/4] cpufreq: use generic cpufreq drivers for Exynos5250
+ platform
+In-Reply-To: <7hsibtavuz.fsf@deeprootsystems.com>
+References: <1428946441-17058-1-git-send-email-b.zolnierkie@samsung.com>
+ <5439319.JYC6t7bzy4@amdc1032> <7hsibtavuz.fsf@deeprootsystems.com>
+Message-ID: <4008289.pQOxzKW0Ir@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the users of gic_arch_extn have been fixed, drop the
-"feature" for good. This leads to the removal of some now useless
-locking.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-This is the final blow for this ill fated son of a hack.
-The last user (iMX6) has been merged via arm-soc, and I don't
-want to leave that thing hanging around for too long!
+On Tuesday, April 21, 2015 04:45:56 PM Kevin Hilman wrote:
+> Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> writes:
+> 
+> > On Monday, April 20, 2015 02:07:33 PM Kevin Hilman wrote:
+> >> Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> writes:
+> >> 
+> >> > Hi,
+> >> >
+> >> > This patch series removes the use of Exynos5250 specific support
+> >> > from exynos-cpufreq driver and enables the use of cpufreq-dt driver
+> >> > for this platform.  The exynos-cpufreq driver itself is also removed
+> >> > as it is no longer used/needed after Exynos5250 support removal.
+> >> >
+> >> > This patch series has been tested on Exynos5250 based Arndale board.
+> >> >
+> >> > Depends on:
+> >> > - next-20150330 branch of linux-next kernel tree
+> >> > - "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4210
+> >> >   platform" [1]
+> >> > - "[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+> >> >   platform" [2]
+> >> > - "[PATCH] cpufreq: exynos: remove dead ->need_apll_change method" [3]
+> >> 
+> >> Any chance you could prepare a branch with all the dependencies for easy
+> >> testing?
+> >
+> > All cpufreq changes with needed dependencies are now availble in
+> >
+> >     https://github.com/bzolnier/linux.git
+> >
+> > repository and the branch is
+> >
+> >     next-20150330-generic-cpufreq-exynos5420-5800-v2
+> 
+> Great, thanks.
+> 
+> >> Also, The previous version from Thomas was v12, and this one is neither
+> >> versioned nor has any reference to what may have changed since that
+> >
+> > Please note that Thomas' patchset was split on separate parts (this is
+> > part #3) and heavily modified so the previous versioning was dropped.
+> >
+> > The cover letter of part #1 ("[PATCH 0/6] cpufreq: use generic cpufreq
+> > drivers for Exynos4210 platform") contains detailed changelog on what has
+> > been changed since Thomas' original v12 patch series.  Individual Thomas'
+> > patches which were modified by me also contain such information.
+> >
+> > Part #2 ("[PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+> > platform") was entirely new code when compared to Thomas' v12 patchset so
+> > its cover letter doesn't contain such detailed changelog as part #1.
+> >
+> > The newly posted part #4 ("[PATCH 0/8] cpufreq: add generic cpufreq driver
+> > support for Exynos5250/5800 platforms" https://lkml.org/lkml/2015/4/21/314)
+> > also contains the detailed changelog.
+> >
+> > However for part #3 (this one, "[PATCH 0/4] cpufreq: use generic cpufreq
+> > drivers for Exynos5250 platform") such summary changelog got missed for
+> > some reason.  Here it is:
+> > - split Exynos5250 support from the original patch
+> > - moved E5250_CPU_DIV[0,1]() macros to clk-exynos5250.c
+> > - added CPU regulator supply property for Google Spring board
+> > - removed exynos-cpufreq driver entirely as it is no longer used/needed
+> 
+> Great, thanks for clarifying.
+> 
+> >> version.  Also, on v12, I had several comments[1] and wonder if they've
+> >> been addressed.
+> >
+> > All issues previously reported should have been fixed.  If you still see
+> > some problems please let me know.
+> >
+> > [ I see now that exynos5420-arndale-octa.dts, exynos5420-peach-pit.dts,
+> >   exynos5420-smdk5420.dts and exynos5800-peach-pi.dts should also have
+> >   been updated to contain CPU cluster regulator supply properties or else
+> >   if the default vdd_arm/vdd_kfc regulator state is set to too low value
+> >   there may be problems with stability when switching to higher than
+> >   default frequencies.  I have posted v2 version of patch #2/8 of part #4
+> >   and pushed v2 combined branch on github.  Sorry for the inconvenience. ]
+> 
+> I've now tested your v2 branch with the bL switcher disabled, CPUidle
+> enabled and CPUfreq enabled.  
+> 
+> With the default governor set to performance, it fails to boot.  The last
+> kernel messages on the console are:
 
- drivers/irqchip/irq-gic.c       | 71 +----------------------------------------
- include/linux/irqchip/arm-gic.h |  2 --
- 2 files changed, 1 insertion(+), 72 deletions(-)
+[ Small explanation for people not following the discussion from
+  the start:
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index a6ce347..dd98914 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -80,19 +80,6 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
- #define NR_GIC_CPU_IF 8
- static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
- 
--/*
-- * Supported arch specific GIC irq extension.
-- * Default make them NULL.
-- */
--struct irq_chip gic_arch_extn = {
--	.irq_eoi	= NULL,
--	.irq_mask	= NULL,
--	.irq_unmask	= NULL,
--	.irq_retrigger	= NULL,
--	.irq_set_type	= NULL,
--	.irq_set_wake	= NULL,
--};
--
- #ifndef MAX_GIC_NR
- #define MAX_GIC_NR	1
- #endif
-@@ -165,34 +152,16 @@ static int gic_peek_irq(struct irq_data *d, u32 offset)
- 
- static void gic_mask_irq(struct irq_data *d)
- {
--	unsigned long flags;
--
--	raw_spin_lock_irqsave(&irq_controller_lock, flags);
- 	gic_poke_irq(d, GIC_DIST_ENABLE_CLEAR);
--	if (gic_arch_extn.irq_mask)
--		gic_arch_extn.irq_mask(d);
--	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
- }
- 
- static void gic_unmask_irq(struct irq_data *d)
- {
--	unsigned long flags;
--
--	raw_spin_lock_irqsave(&irq_controller_lock, flags);
--	if (gic_arch_extn.irq_unmask)
--		gic_arch_extn.irq_unmask(d);
- 	gic_poke_irq(d, GIC_DIST_ENABLE_SET);
--	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
- }
- 
- static void gic_eoi_irq(struct irq_data *d)
- {
--	if (gic_arch_extn.irq_eoi) {
--		raw_spin_lock(&irq_controller_lock);
--		gic_arch_extn.irq_eoi(d);
--		raw_spin_unlock(&irq_controller_lock);
--	}
--
- 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
- }
- 
-@@ -249,8 +218,6 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- {
- 	void __iomem *base = gic_dist_base(d);
- 	unsigned int gicirq = gic_irq(d);
--	unsigned long flags;
--	int ret;
- 
- 	/* Interrupt configuration for SGIs can't be changed */
- 	if (gicirq < 16)
-@@ -261,25 +228,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 			    type != IRQ_TYPE_EDGE_RISING)
- 		return -EINVAL;
- 
--	raw_spin_lock_irqsave(&irq_controller_lock, flags);
--
--	if (gic_arch_extn.irq_set_type)
--		gic_arch_extn.irq_set_type(d, type);
--
--	ret = gic_configure_irq(gicirq, type, base, NULL);
--
--	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
--
--	return ret;
--}
--
--static int gic_retrigger(struct irq_data *d)
--{
--	if (gic_arch_extn.irq_retrigger)
--		return gic_arch_extn.irq_retrigger(d);
--
--	/* the genirq layer expects 0 if we can't retrigger in hardware */
--	return 0;
-+	return gic_configure_irq(gicirq, type, base, NULL);
- }
- 
- #ifdef CONFIG_SMP
-@@ -310,21 +259,6 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- }
- #endif
- 
--#ifdef CONFIG_PM
--static int gic_set_wake(struct irq_data *d, unsigned int on)
--{
--	int ret = -ENXIO;
--
--	if (gic_arch_extn.irq_set_wake)
--		ret = gic_arch_extn.irq_set_wake(d, on);
--
--	return ret;
--}
--
--#else
--#define gic_set_wake	NULL
--#endif
--
- static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
- {
- 	u32 irqstat, irqnr;
-@@ -383,11 +317,9 @@ static struct irq_chip gic_chip = {
- 	.irq_unmask		= gic_unmask_irq,
- 	.irq_eoi		= gic_eoi_irq,
- 	.irq_set_type		= gic_set_type,
--	.irq_retrigger		= gic_retrigger,
- #ifdef CONFIG_SMP
- 	.irq_set_affinity	= gic_set_affinity,
- #endif
--	.irq_set_wake		= gic_set_wake,
- 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
- 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
- };
-@@ -1053,7 +985,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 		set_handle_irq(gic_handle_irq);
- 	}
- 
--	gic_chip.flags |= gic_arch_extn.flags;
- 	gic_dist_init(gic);
- 	gic_cpu_init(gic);
- 	gic_pm_init(gic);
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 36ec4ae..9de976b 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -95,8 +95,6 @@
- 
- struct device_node;
- 
--extern struct irq_chip gic_arch_extn;
--
- void gic_set_irqchip_flags(unsigned long flags);
- void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
- 		    u32 offset, struct device_node *);
--- 
-2.1.4
+  This testing is relevant to part #4 of the rework: "[PATCH 0/8]
+  cpufreq: add generic cpufreq driver support for Exynos5250/5800
+  platforms" (https://lkml.org/lkml/2015/4/21/314"), not this one
+  which is part #3 and has no known issues. ]
+
+> [...]
+> [    3.426021] cpu cpu0: bL_cpufreq_init: CPU 0 initialized
+> [    3.431189] cpu cpu4: bL_cpufreq_init: CPU 4 initialized
+> 
+> However, with the default governor set to userspace it boots fine until
+> my userspace (ubuntu) tries to enable the ondemand governor, and then it
+> hangs. 
+> 
+> For it to boot, I have to disable the ondemand governor, and set the
+> default governor to userspace.
+
+I've tried with ARM big.LITTLE cpuidle support enabled (I've just noticed
+that it is not turned on in exynos_defconfig) and my ODROID-XU3 board
+fails to boot.  This happens even with cpufreq support disabled (hard
+lockup happens during mmc initialization which is done just after cpufreq
+initialization).
+
+Could you please check if disabling cpuidle support helps?
+
+> As I reported earlier on Thomas' series, I suspect this is related to
+> the fact that the higher OPPs aren't really functional without voltage
+> scaling also supported. 
+
+Part #4 contains voltage scaling support for arm_big_little[_dt] driver
+so this should not be a problem any longer.
+
+You may try next-20150330-generic-cpufreq-exynos5420-5800-v2-debug
+branch from my github (with cpufreq debugging printks enabled) to check
+whether the voltage scaling is indeed done on your board.
+
+> I'm also seeing the wait_until_divider_stable errors when switching
+> between the available A7 OPPs.  I'd reported this one earlier as well,
+> along with the script to reproduce it.
+
+I've tried your script and it works fine for me (I only needed to change
+cpu4 to cpu0 as on ODROID-XU3 CPUs 0,5,6,7 are A7 and 1,2,3,4 are A15).
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
