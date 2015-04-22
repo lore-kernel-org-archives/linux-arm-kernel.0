@@ -1,88 +1,82 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 22 Apr 2015 16:40:47 -0600
-Subject: [PATCH 07/11] coresight-etm4x: Controls pertaining to the sequencer
+Date: Wed, 22 Apr 2015 16:40:51 -0600
+Subject: [PATCH 11/11] coresight-etm4x: Controls pertaining to the VM ID
  functions
 In-Reply-To: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1429742451-11465-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1429742451-11465-12-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratik Patel <pratikp@codeaurora.org>
 
-Adding sysfs entries to access the sequencers related registers,
-more specifically the sequencer state, the sequencer state
-transition and the sequencer reset control registers.
+Adding sysfs entries to access and configure specifics about the
+virtual machine ID comparator functions.
 
 Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  25 ++++
- drivers/hwtracing/coresight/coresight-etm4x.c      | 129 +++++++++++++++++++++
- 2 files changed, 154 insertions(+)
+ .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  20 +++
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 178 +++++++++++++++++++++
+ 2 files changed, 198 insertions(+)
 
 diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-index 8cdc4ad10bd6..44723f2e107e 100644
+index 8b32cb7b9723..eb5153891919 100644
 --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
 +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-@@ -191,3 +191,28 @@ Date:		April 2015
- KernelVersion:	4.01
+@@ -273,3 +273,23 @@ KernelVersion:	4.01
  Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
- Description: 	(RW) Used to setup address range comparator values.
+ Description:	(RW) Mask for all 8 context ID comparator value
+ 		registers (if implemented).
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/seq_idx
++What:		/sys/bus/coresight/devices/<memory_map>.etm/vmid_idx
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Select which sequensor.
++Description:	(RW) Select which virtual machine ID comparator to work with.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/seq_state
++What:		/sys/bus/coresight/devices/<memory_map>.etm/vmid_val
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Use this to set, or read, the sequencer state.
++Description:	(RW) Get/Set the virtual machine ID comparator value to
++		trigger on.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/seq_event
++What:		/sys/bus/coresight/devices/<memory_map>.etm/vmid_masks
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Moves the sequencer state to a specific state.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/seq_reset_event
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Moves the sequencer to state 0 when a programmed event
-+		occurs.
++Description:	(RW) Mask for all 8 virtual machine ID comparator value
++		registers (if implemented).
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 439b37109279..7d2af2926967 100644
+index 9bae7b158b20..c3c03c72593e 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -1442,6 +1442,131 @@ static ssize_t addr_context_store(struct device *dev,
+@@ -1964,6 +1964,181 @@ static ssize_t ctxid_masks_store(struct device *dev,
  }
- static DEVICE_ATTR_RW(addr_context);
+ static DEVICE_ATTR_RW(ctxid_masks);
  
-+static ssize_t seq_idx_show(struct device *dev,
-+			    struct device_attribute *attr,
-+			    char *buf)
++static ssize_t vmid_idx_show(struct device *dev,
++			     struct device_attribute *attr,
++			     char *buf)
 +{
 +	unsigned long val;
 +	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
 +
-+	val = drvdata->seq_idx;
++	val = drvdata->vmid_idx;
 +	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
 +}
 +
-+static ssize_t seq_idx_store(struct device *dev,
-+			     struct device_attribute *attr,
-+			     const char *buf, size_t size)
++static ssize_t vmid_idx_store(struct device *dev,
++			      struct device_attribute *attr,
++			      const char *buf, size_t size)
 +{
 +	unsigned long val;
 +	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
 +
 +	if (kstrtoul(buf, 16, &val))
 +		return -EINVAL;
-+	if (val >= drvdata->nrseqstate - 1)
++	if (val >= drvdata->numvmidc)
 +		return -EINVAL;
 +
 +	/*
@@ -90,114 +84,163 @@ index 439b37109279..7d2af2926967 100644
 +	 * dereferenced multiple times within a spinlock block elsewhere.
 +	 */
 +	spin_lock(&drvdata->spinlock);
-+	drvdata->seq_idx = val;
++	drvdata->vmid_idx = val;
 +	spin_unlock(&drvdata->spinlock);
 +	return size;
 +}
-+static DEVICE_ATTR_RW(seq_idx);
++static DEVICE_ATTR_RW(vmid_idx);
 +
-+static ssize_t seq_state_show(struct device *dev,
-+			      struct device_attribute *attr,
-+			      char *buf)
++static ssize_t vmid_val_show(struct device *dev,
++			     struct device_attribute *attr,
++			     char *buf)
 +{
 +	unsigned long val;
 +	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
 +
-+	val = drvdata->seq_state;
++	val = (unsigned long)drvdata->vmid_val[drvdata->vmid_idx];
 +	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
 +}
 +
-+static ssize_t seq_state_store(struct device *dev,
-+			       struct device_attribute *attr,
-+			       const char *buf, size_t size)
-+{
-+	unsigned long val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	if (kstrtoul(buf, 16, &val))
-+		return -EINVAL;
-+	if (val >= drvdata->nrseqstate)
-+		return -EINVAL;
-+
-+	drvdata->seq_state = val;
-+	return size;
-+}
-+static DEVICE_ATTR_RW(seq_state);
-+
-+static ssize_t seq_event_show(struct device *dev,
++static ssize_t vmid_val_store(struct device *dev,
 +			      struct device_attribute *attr,
-+			      char *buf)
++			      const char *buf, size_t size)
 +{
-+	u8 idx;
 +	unsigned long val;
 +	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
 +
-+	spin_lock(&drvdata->spinlock);
-+	idx = drvdata->seq_idx;
-+	val = drvdata->seq_ctrl[idx];
-+	spin_unlock(&drvdata->spinlock);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
-+}
-+
-+static ssize_t seq_event_store(struct device *dev,
-+			       struct device_attribute *attr,
-+			       const char *buf, size_t size)
-+{
-+	u8 idx;
-+	unsigned long val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
++	/*
++	 * only implemented when vmid tracing is enabled, i.e. at least one
++	 * vmid comparator is implemented and at least 8 bit vmid size
++	 */
++	if (!drvdata->vmid_size || !drvdata->numvmidc)
++		return -EINVAL;
 +	if (kstrtoul(buf, 16, &val))
 +		return -EINVAL;
 +
 +	spin_lock(&drvdata->spinlock);
-+	idx = drvdata->seq_idx;
-+	/* RST, bits[7:0] */
-+	drvdata->seq_ctrl[idx] = val & 0xFF;
++	drvdata->vmid_val[drvdata->vmid_idx] = (u64)val;
 +	spin_unlock(&drvdata->spinlock);
 +	return size;
 +}
-+static DEVICE_ATTR_RW(seq_event);
++static DEVICE_ATTR_RW(vmid_val);
 +
-+static ssize_t seq_reset_event_show(struct device *dev,
-+				    struct device_attribute *attr,
-+				    char *buf)
++static ssize_t vmid_masks_show(struct device *dev,
++			       struct device_attribute *attr, char *buf)
 +{
-+	unsigned long val;
++	unsigned long val1, val2;
 +	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
 +
-+	val = drvdata->seq_rst;
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
++	spin_lock(&drvdata->spinlock);
++	val1 = drvdata->vmid_mask0;
++	val2 = drvdata->vmid_mask1;
++	spin_unlock(&drvdata->spinlock);
++	return scnprintf(buf, PAGE_SIZE, "%#lx %#lx\n", val1, val2);
 +}
 +
-+static ssize_t seq_reset_event_store(struct device *dev,
-+				     struct device_attribute *attr,
-+				     const char *buf, size_t size)
++static ssize_t vmid_masks_store(struct device *dev,
++				struct device_attribute *attr,
++				const char *buf, size_t size)
 +{
-+	unsigned long val;
++	u8 i, j, maskbyte;
++	unsigned long val1, val2, mask;
 +	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	if (kstrtoul(buf, 16, &val))
++	/*
++	 * only implemented when vmid tracing is enabled, i.e. at least one
++	 * vmid comparator is implemented and at least 8 bit vmid size
++	 */
++	if (!drvdata->vmid_size || !drvdata->numvmidc)
 +		return -EINVAL;
-+	if (!(drvdata->nrseqstate))
++	if (sscanf(buf, "%lx %lx", &val1, &val2) != 2)
 +		return -EINVAL;
 +
-+	drvdata->seq_rst = val & ETMv4_EVENT_MASK;
++	spin_lock(&drvdata->spinlock);
++
++	/*
++	 * each byte[0..3] controls mask value applied to vmid
++	 * comparator[0..3]
++	 */
++	switch (drvdata->numvmidc) {
++	case 0x1:
++		/* COMP0, bits[7:0] */
++		drvdata->vmid_mask0 = val1 & 0xFF;
++		break;
++	case 0x2:
++		/* COMP1, bits[15:8] */
++		drvdata->vmid_mask0 = val1 & 0xFFFF;
++		break;
++	case 0x3:
++		/* COMP2, bits[23:16] */
++		drvdata->vmid_mask0 = val1 & 0xFFFFFF;
++		break;
++	case 0x4:
++		/* COMP3, bits[31:24] */
++		drvdata->vmid_mask0 = val1;
++		break;
++	case 0x5:
++		/* COMP4, bits[7:0] */
++		drvdata->vmid_mask0 = val1;
++		drvdata->vmid_mask1 = val2 & 0xFF;
++		break;
++	case 0x6:
++		/* COMP5, bits[15:8] */
++		drvdata->vmid_mask0 = val1;
++		drvdata->vmid_mask1 = val2 & 0xFFFF;
++		break;
++	case 0x7:
++		/* COMP6, bits[23:16] */
++		drvdata->vmid_mask0 = val1;
++		drvdata->vmid_mask1 = val2 & 0xFFFFFF;
++		break;
++	case 0x8:
++		/* COMP7, bits[31:24] */
++		drvdata->vmid_mask0 = val1;
++		drvdata->vmid_mask1 = val2;
++		break;
++	default:
++		break;
++	}
++
++	/*
++	 * If software sets a mask bit to 1, it must program relevant byte
++	 * of vmid comparator value 0x0, otherwise behavior is unpredictable.
++	 * For example, if bit[3] of vmid_mask0 is 1, we must clear bits[31:24]
++	 * of vmid comparator0 value (corresponding to byte 0) register.
++	 */
++	mask = drvdata->vmid_mask0;
++	for (i = 0; i < drvdata->numvmidc; i++) {
++		/* mask value of corresponding vmid comparator */
++		maskbyte = mask & ETMv4_EVENT_MASK;
++		/*
++		 * each bit corresponds to a byte of respective vmid comparator
++		 * value register
++		 */
++		for (j = 0; j < 8; j++) {
++			if (maskbyte & 1)
++				drvdata->vmid_val[i] &= ~(0xFF << (j * 8));
++			maskbyte >>= 1;
++		}
++		/* Select the next vmid comparator mask value */
++		if (i == 3)
++			/* vmid comparators[4-7] */
++			mask = drvdata->vmid_mask1;
++		else
++			mask >>= 0x8;
++	}
++	spin_unlock(&drvdata->spinlock);
 +	return size;
 +}
-+static DEVICE_ATTR_RW(seq_reset_event);
++static DEVICE_ATTR_RW(vmid_masks);
 +
  static ssize_t status_show(struct device *dev,
  			   struct device_attribute *attr, char *buf)
  {
-@@ -1614,6 +1739,10 @@ static struct attribute *coresight_etmv4_attrs[] = {
- 	&dev_attr_addr_stop.attr,
- 	&dev_attr_addr_ctxtype.attr,
- 	&dev_attr_addr_context.attr,
-+	&dev_attr_seq_idx.attr,
-+	&dev_attr_seq_state.attr,
-+	&dev_attr_seq_event.attr,
-+	&dev_attr_seq_reset_event.attr,
+@@ -2149,6 +2324,9 @@ static struct attribute *coresight_etmv4_attrs[] = {
+ 	&dev_attr_ctxid_idx.attr,
+ 	&dev_attr_ctxid_val.attr,
+ 	&dev_attr_ctxid_masks.attr,
++	&dev_attr_vmid_idx.attr,
++	&dev_attr_vmid_val.attr,
++	&dev_attr_vmid_masks.attr,
  	&dev_attr_status.attr,
  	&dev_attr_mgmt.attr,
  	&dev_attr_trcidr.attr,
