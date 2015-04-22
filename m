@@ -1,42 +1,119 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 22 Apr 2015 10:46:47 +0100
-Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
- add SW break point support
-In-Reply-To: <CADt_bzh=zhSmoQnKxp5cUski3S=riYG5AnmCsm=qeTSjm=cprA@mail.gmail.com>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
- <CADt_bzh=zhSmoQnKxp5cUski3S=riYG5AnmCsm=qeTSjm=cprA@mail.gmail.com>
-Message-ID: <87383s7awo.fsf@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 22 Apr 2015 12:34:04 +0200
+Subject: [PATCH v9 1/5] Documentation: Add device tree bindings for
+ Freescale i.MX GPC
+In-Reply-To: <20150303023531.GF20455@dragon>
+References: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
+ <1424713215-3357-2-git-send-email-p.zabel@pengutronix.de>
+ <20150303023531.GF20455@dragon>
+Message-ID: <1429698844.2883.8.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Dienstag, den 03.03.2015, 10:35 +0800 schrieb Shawn Guo:
+> On Mon, Feb 23, 2015 at 06:40:11PM +0100, Philipp Zabel wrote:
+> > The i.MX6 contains a power controller that controls power gating and
+> > sequencing for the SoC's power domains.
+> > 
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> The patch (series) looks fine to me.  Can we get DT maintainer's ACK on
+> this, so that I can apply the series for 4.1?
+> 
+> Shawn
+> 
+I'm formally NACKing this series.
 
-Zhichao Huang <zhichao.huang@linaro.org> writes:
+I've talked to Philipp and we decided to change the DT binding slightly
+to better accommodate SoCs with multiple domains like the imx6sx.
 
-> On Tue, Mar 31, 2015 at 04:08:04PM +0100, Alex Benn?e wrote:
->> This adds support for SW breakpoints inserted by userspace.
->>
->> We do this by trapping all BKPT exceptions in the
->> hypervisor (MDCR_EL2_TDE).
->
-> why should we trap all debug exceptions?
->
-> The trap for cp14 register r/w seems enough to record relevant
-> informations to context switch the dbg register while neccessary.
+I will send a new version of this series shortly.
 
-Lets think about this case when the SW breakpoint exception occurs:
+Regards,
+Lucas
 
-If KVM doesn't trap it and pass it back to userspace to handle it would
-have to deliver it to the guest. The guest not having inserted the
-breakpoint in the first place would get very confused.
-
-So what we actually do is re-route the exception to the hypervisor and
-stop the VM and return to userspace with the debug information. Once in
-QEMU we check to see if the SW breakpoint was one of the ones we
-inserted at which point control is passed back to the host GDB (attached
-via the GDB stub in QEMU). If it is not a breakpoint which was set-up by
-the host then it must be one for the guest at which point we need to
-ensure the exception is delivered to the guest for it to process.
+> > ---
+> > Changes since v8:
+> >  - Updated example with IRQ_TYPE_... and IMX6QDL_CLK_... defines
+> > ---
+> >  .../devicetree/bindings/power/fsl,imx-gpc.txt      | 59 ++++++++++++++++++++++
+> >  1 file changed, 59 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> > new file mode 100644
+> > index 0000000..65cc034
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> > @@ -0,0 +1,59 @@
+> > +Freescale i.MX General Power Controller
+> > +=======================================
+> > +
+> > +The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
+> > +counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
+> > +domains.
+> > +
+> > +Required properties:
+> > +- compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
+> > +- reg: should be register base and length as documented in the
+> > +  datasheet
+> > +- interrupts: Should contain GPC interrupt request 1
+> > +- pu-supply: Link to the LDO regulator powering the PU power domain
+> > +- clocks: Clock phandles to devices in the PU power domain that need
+> > +	  to be enabled during domain power-up for reset propagation.
+> > +- #power-domain-cells: Should be 1, see below:
+> > +
+> > +The gpc node is a power-controller as documented by the generic power domain
+> > +bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+> > +
+> > +Example:
+> > +
+> > +	gpc: gpc at 020dc000 {
+> > +		compatible = "fsl,imx6q-gpc";
+> > +		reg = <0x020dc000 0x4000>;
+> > +		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
+> > +			     <0 90 IRQ_TYPE_LEVEL_HIGH>;
+> > +		pu-supply = <&reg_pu>;
+> > +		clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
+> > +			 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
+> > +			 <&clks IMX6QDL_CLK_GPU2D_CORE>,
+> > +			 <&clks IMX6QDL_CLK_GPU2D_AXI>,
+> > +			 <&clks IMX6QDL_CLK_OPENVG_AXI>,
+> > +			 <&clks IMX6QDL_CLK_VPU_AXI>;
+> > +		#power-domain-cells = <1>;
+> > +	};
+> > +
+> > +
+> > +Specifying power domain for IP modules
+> > +======================================
+> > +
+> > +IP cores belonging to a power domain should contain a 'power-domains' property
+> > +that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
+> > +the power domain the device belongs to.
+> > +
+> > +Example of a device that is part of the PU power domain:
+> > +
+> > +	vpu: vpu at 02040000 {
+> > +		reg = <0x02040000 0x3c000>;
+> > +		/* ... */
+> > +		power-domains = <&gpc 1>;
+> > +		/* ... */
+> > +	};
+> > +
+> > +The following DOMAIN_INDEX values are valid for i.MX6Q:
+> > +ARM_DOMAIN     0
+> > +PU_DOMAIN      1
+> > +The following additional DOMAIN_INDEX value is valid for i.MX6SL:
+> > +DISPLAY_DOMAIN 2
+> > -- 
+> > 2.1.4
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Alex Benn?e
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
