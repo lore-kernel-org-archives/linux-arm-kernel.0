@@ -1,121 +1,173 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Apr 2015 18:07:18 +0100
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20150416104008.GB25640@arm.com>
- <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <20150422170718.GG13019@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Apr 2015 18:20:04 +0100
+Subject: [PATCH] irqchip: gic: Drop support for gic_arch_extn
+Message-ID: <1429723204-25868-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stuart,
+Now that the users of gic_arch_extn have been fixed, drop the
+"feature" for good. This leads to the removal of some now useless
+locking.
 
-First of, thanks for taking the time to explain this in more detail.
-Comments inline.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+This is the final blow for this ill fated son of a hack.
+The last user (iMX6) has been merged via arm-soc, and I don't
+want to leave that thing hanging around for too long!
 
-On Fri, Apr 17, 2015 at 03:19:08PM +0100, Stuart Yoder wrote:
-> > On Wed, Apr 15, 2015 at 02:18:13PM +0100, Varun Sethi wrote:
-> > > Yes, deviceid=stream id (i.e. ICID + other bits). I am not sure if TBU ID
-> > > would also be forwarded as a part of stream id to GIC. My understanding is
-> > > that TBU ID is forwarded (as a part of the stream ID) to the TCU in case
-> > > of a TBU translation miss. In case of the LS2085 PCIe controller you would
-> > > have to setup the PCIe device ID to stream ID translation table. We may
-> > > have to restrict the number of entries based on the available number of
-> > > contexts.
-> > 
-> > Unfortunately, I'm having a really hard time parsing this thread (some parts
-> > of it simply don't make sense; others use non-architectural terms and
-> > overall I don't get a feeling for the problem).
-> > 
-> > Please could you explain your system design step by step so that I can
-> > understand (a) what you've built and (b) why the current design of Linux is
-> > causing you problems?
-> > 
-> > Sorry if I'm just being thick, but it's important that we get this right.
-> 
-> I'll try to summarize some key points about the system...
-> 
-> System is using a single SMMU-500 (1 TCU, 6 TBUs) and GICv3-ITS.  There are
-> PCI, fsl-mc, and platform devices that do DMA.  Devices on the PCI and
-> fsl-mc bus generate message interrupts.
+ drivers/irqchip/irq-gic.c       | 71 +----------------------------------------
+ include/linux/irqchip/arm-gic.h |  2 --
+ 2 files changed, 1 insertion(+), 72 deletions(-)
 
-Ah cool, so you have multiple buses sharing a single SMMU? That's going to
-necessitate some ID remapping in the device-tree. Perhaps you could comment
-on Mark Rutland's proposal if it does/doesn't work for you:
-
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333199.html
-
-
-> The flow a message interrupt would take is this:
-> 
->     --------------
->       PCI device
->     --------------
->           |
->           | pcidevid + MSI msg
->           |
->           V
->     --------------
->     PCI controller
->       pcidevid ->
->       streamID
->       mapping
->     --------------
->           |
->           | streamID + MSI msg
->           |
->           V
->     --------------
->         SMMU
->     --------------
->           |
->           | streamID + MSI msg
->           |
->           V
->     --------------
->        CCN-504 (Dickens)
->     --------------
->           |
->           | streamID + MSI msg
->           |
->           V
-
-The streamID here as the same as the one coming out of the SMMU, right?
-(just trying to out why you have the CCN-504 in the picture).
-
->     --------------
->       GICv3 ITS    streamID == ITS deviceID
->     --------------
-> 
-> So, the way things work (at least initially) is that each PCI device maps
-> to a single streamID, and thus each device has a separate ITT in 
-> the ITS.  So, things should be cool.
-> 
-> However, there is an improvement we envision as possible due to 
-> the limited number of SMMU contexts (i.e. 64).  If there are
-> 64 SMMU context registers it means that there is a max of
-> 64 software contexts where things can be isolated.  But, say I have
-> an SRIOV card with 64 VFs, and I want to assign 8 of the VFs
-> to a KVM VM.  Those 8 PCI devices could share the same
-> streamID/ITS-device-ID since they all share the same isolation
-> context.
-> 
-> What would be nice is at the time the 8 VFS are being added
-> to the IOMMU domain is for the pcidevid -> streamID mapping
-> table to be updated dynamically.  It simply lets us make
-> more efficient use of the limited streamIDs we have.
-> 
-> I think it is this improvement that Minghuan had in mind
-> in this patch.
-
-Ok, but in this case it should be possible to use a single context bank for
-all of the VF streamIDs by configuring the appropriate SMR, no? Wouldn't
-that sort of thing be preferable to dynamic StreamID assignment? It would
-certainly make life easier for the MSIs.
-
-Will
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index a6ce347..dd98914 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -80,19 +80,6 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+ #define NR_GIC_CPU_IF 8
+ static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
+ 
+-/*
+- * Supported arch specific GIC irq extension.
+- * Default make them NULL.
+- */
+-struct irq_chip gic_arch_extn = {
+-	.irq_eoi	= NULL,
+-	.irq_mask	= NULL,
+-	.irq_unmask	= NULL,
+-	.irq_retrigger	= NULL,
+-	.irq_set_type	= NULL,
+-	.irq_set_wake	= NULL,
+-};
+-
+ #ifndef MAX_GIC_NR
+ #define MAX_GIC_NR	1
+ #endif
+@@ -165,34 +152,16 @@ static int gic_peek_irq(struct irq_data *d, u32 offset)
+ 
+ static void gic_mask_irq(struct irq_data *d)
+ {
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+ 	gic_poke_irq(d, GIC_DIST_ENABLE_CLEAR);
+-	if (gic_arch_extn.irq_mask)
+-		gic_arch_extn.irq_mask(d);
+-	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+ }
+ 
+ static void gic_unmask_irq(struct irq_data *d)
+ {
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+-	if (gic_arch_extn.irq_unmask)
+-		gic_arch_extn.irq_unmask(d);
+ 	gic_poke_irq(d, GIC_DIST_ENABLE_SET);
+-	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+ }
+ 
+ static void gic_eoi_irq(struct irq_data *d)
+ {
+-	if (gic_arch_extn.irq_eoi) {
+-		raw_spin_lock(&irq_controller_lock);
+-		gic_arch_extn.irq_eoi(d);
+-		raw_spin_unlock(&irq_controller_lock);
+-	}
+-
+ 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+ }
+ 
+@@ -249,8 +218,6 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ {
+ 	void __iomem *base = gic_dist_base(d);
+ 	unsigned int gicirq = gic_irq(d);
+-	unsigned long flags;
+-	int ret;
+ 
+ 	/* Interrupt configuration for SGIs can't be changed */
+ 	if (gicirq < 16)
+@@ -261,25 +228,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ 			    type != IRQ_TYPE_EDGE_RISING)
+ 		return -EINVAL;
+ 
+-	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+-
+-	if (gic_arch_extn.irq_set_type)
+-		gic_arch_extn.irq_set_type(d, type);
+-
+-	ret = gic_configure_irq(gicirq, type, base, NULL);
+-
+-	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+-
+-	return ret;
+-}
+-
+-static int gic_retrigger(struct irq_data *d)
+-{
+-	if (gic_arch_extn.irq_retrigger)
+-		return gic_arch_extn.irq_retrigger(d);
+-
+-	/* the genirq layer expects 0 if we can't retrigger in hardware */
+-	return 0;
++	return gic_configure_irq(gicirq, type, base, NULL);
+ }
+ 
+ #ifdef CONFIG_SMP
+@@ -310,21 +259,6 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ }
+ #endif
+ 
+-#ifdef CONFIG_PM
+-static int gic_set_wake(struct irq_data *d, unsigned int on)
+-{
+-	int ret = -ENXIO;
+-
+-	if (gic_arch_extn.irq_set_wake)
+-		ret = gic_arch_extn.irq_set_wake(d, on);
+-
+-	return ret;
+-}
+-
+-#else
+-#define gic_set_wake	NULL
+-#endif
+-
+ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqstat, irqnr;
+@@ -383,11 +317,9 @@ static struct irq_chip gic_chip = {
+ 	.irq_unmask		= gic_unmask_irq,
+ 	.irq_eoi		= gic_eoi_irq,
+ 	.irq_set_type		= gic_set_type,
+-	.irq_retrigger		= gic_retrigger,
+ #ifdef CONFIG_SMP
+ 	.irq_set_affinity	= gic_set_affinity,
+ #endif
+-	.irq_set_wake		= gic_set_wake,
+ 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
+ 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
+ };
+@@ -1053,7 +985,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 		set_handle_irq(gic_handle_irq);
+ 	}
+ 
+-	gic_chip.flags |= gic_arch_extn.flags;
+ 	gic_dist_init(gic);
+ 	gic_cpu_init(gic);
+ 	gic_pm_init(gic);
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 36ec4ae..9de976b 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -95,8 +95,6 @@
+ 
+ struct device_node;
+ 
+-extern struct irq_chip gic_arch_extn;
+-
+ void gic_set_irqchip_flags(unsigned long flags);
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+ 		    u32 offset, struct device_node *);
+-- 
+2.1.4
