@@ -1,44 +1,135 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Apr 2015 18:40:52 +0100
-Subject: [PATCH] ARM: exynos: Fix wake-up interrupts for Exynos3250
-Message-ID: <1429724452-26563-1-git-send-email-marc.zyngier@arm.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Wed, 22 Apr 2015 18:40:33 +0000
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+In-Reply-To: <20150422170718.GG13019@arm.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+ <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
+ <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20150416104008.GB25640@arm.com>
+ <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150422170718.GG13019@arm.com>
+Message-ID: <BN3PR0301MB121901C218955F709AE892F3EAEE0@BN3PR0301MB1219.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8b283c025443 (ARM: exynos4/5: convert pmu wakeup to
-stacked domains) changed the Exynos PMU code to use stacked
-domains. This has led to a number of interrupt numbers to be
-fixed.
+Hi Will,
 
-In the meantime, support for Exynos 3250 was added, missing
-the required change to this platform. This amounts to revert
-ace283a04a4a (ARM: EXYNOS: Fix wrong hwirq of RTC interrupt
-for Exynos3250 SoC), as the initial patch was right, just a
-bit early...
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Wednesday, April 22, 2015 10:37 PM
+> To: Yoder Stuart-B08248
+> Cc: Sethi Varun-B16395; Lian Minghuan-B31939; linux-pci at vger.kernel.org;
+> Arnd Bergmann; Hu Mingkai-B21284; Zang Roy-R61911; Bjorn Helgaas; Wood
+> Scott-B07421; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> 
+> Hi Stuart,
+> 
+> First of, thanks for taking the time to explain this in more detail.
+> Comments inline.
+> 
+> On Fri, Apr 17, 2015 at 03:19:08PM +0100, Stuart Yoder wrote:
+> > > On Wed, Apr 15, 2015 at 02:18:13PM +0100, Varun Sethi wrote:
+> > > > Yes, deviceid=stream id (i.e. ICID + other bits). I am not sure if
+> > > > TBU ID would also be forwarded as a part of stream id to GIC. My
+> > > > understanding is that TBU ID is forwarded (as a part of the stream
+> > > > ID) to the TCU in case of a TBU translation miss. In case of the
+> > > > LS2085 PCIe controller you would have to setup the PCIe device ID
+> > > > to stream ID translation table. We may have to restrict the number
+> > > > of entries based on the available number of contexts.
+> > >
+> > > Unfortunately, I'm having a really hard time parsing this thread
+> > > (some parts of it simply don't make sense; others use
+> > > non-architectural terms and overall I don't get a feeling for the problem).
+> > >
+> > > Please could you explain your system design step by step so that I
+> > > can understand (a) what you've built and (b) why the current design
+> > > of Linux is causing you problems?
+> > >
+> > > Sorry if I'm just being thick, but it's important that we get this right.
+> >
+> > I'll try to summarize some key points about the system...
+> >
+> > System is using a single SMMU-500 (1 TCU, 6 TBUs) and GICv3-ITS.
+> > There are PCI, fsl-mc, and platform devices that do DMA.  Devices on
+> > the PCI and fsl-mc bus generate message interrupts.
+> 
+> Ah cool, so you have multiple buses sharing a single SMMU? That's going to
+> necessitate some ID remapping in the device-tree. Perhaps you could
+> comment on Mark Rutland's proposal if it does/doesn't work for you:
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
+> March/333199.html
+> 
+> 
+> > The flow a message interrupt would take is this:
+> >
+> >     --------------
+> >       PCI device
+> >     --------------
+> >           |
+> >           | pcidevid + MSI msg
+> >           |
+> >           V
+> >     --------------
+> >     PCI controller
+> >       pcidevid ->
+> >       streamID
+> >       mapping
+> >     --------------
+> >           |
+> >           | streamID + MSI msg
+> >           |
+> >           V
+> >     --------------
+> >         SMMU
+> >     --------------
+> >           |
+> >           | streamID + MSI msg
+> >           |
+> >           V
+> >     --------------
+> >        CCN-504 (Dickens)
+> >     --------------
+> >           |
+> >           | streamID + MSI msg
+> >           |
+> >           V
+> 
+> The streamID here as the same as the one coming out of the SMMU, right?
+> (just trying to out why you have the CCN-504 in the picture).
+> 
+> >     --------------
+> >       GICv3 ITS    streamID == ITS deviceID
+> >     --------------
+> >
+> > So, the way things work (at least initially) is that each PCI device
+> > maps to a single streamID, and thus each device has a separate ITT in
+> > the ITS.  So, things should be cool.
+> >
+> > However, there is an improvement we envision as possible due to the
+> > limited number of SMMU contexts (i.e. 64).  If there are
+> > 64 SMMU context registers it means that there is a max of
+> > 64 software contexts where things can be isolated.  But, say I have an
+> > SRIOV card with 64 VFs, and I want to assign 8 of the VFs to a KVM VM.
+> > Those 8 PCI devices could share the same streamID/ITS-device-ID since
+> > they all share the same isolation context.
+> >
+> > What would be nice is at the time the 8 VFS are being added to the
+> > IOMMU domain is for the pcidevid -> streamID mapping table to be
+> > updated dynamically.  It simply lets us make more efficient use of the
+> > limited streamIDs we have.
+> >
+> > I think it is this improvement that Minghuan had in mind in this
+> > patch.
+> 
+> Ok, but in this case it should be possible to use a single context bank for all of
+> the VF streamIDs by configuring the appropriate SMR, no? Wouldn't that sort
+> of thing be preferable to dynamic StreamID assignment? It would certainly
+> make life easier for the MSIs.
+> 
+Yes, that would happen when the all the VFs are attached to the same domain. But it would be an issue if we have to attach devices to different domains.
 
-Cc: Chanwoo Choi <cw00.choi@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: Kukjin Kim <kgene@kernel.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-exynos/suspend.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index 3e6aea7..40dce36 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -87,8 +87,8 @@ static unsigned int exynos_pmu_spare3;
- static u32 exynos_irqwake_intmask = 0xffffffff;
- 
- static const struct exynos_wkup_irq exynos3250_wkup_irq[] = {
--	{ 105, BIT(1) }, /* RTC alarm */
--	{ 106, BIT(2) }, /* RTC tick */
-+	{ 73, BIT(1) }, /* RTC alarm */
-+	{ 74, BIT(2) }, /* RTC tick */
- 	{ /* sentinel */ },
- };
- 
--- 
-2.1.4
+-Varun
