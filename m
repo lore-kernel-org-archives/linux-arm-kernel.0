@@ -1,102 +1,33 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Wed, 22 Apr 2015 10:14:31 +0200
-Subject: [PATCH 6/8] clk: samsung: exynos5800: fix cpu clock configuration
- data
-In-Reply-To: <1429622278-12216-7-git-send-email-b.zolnierkie@samsung.com>
-References: <1429622278-12216-1-git-send-email-b.zolnierkie@samsung.com>
- <1429622278-12216-7-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20150422101431.43fafb4e@amdc2363>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 22 Apr 2015 09:55:07 +0100
+Subject: [RFC PATCH v2 0/1] ARM: cpuidle: heterogeneous systems extension
+In-Reply-To: <CAMAWPa_fMhgFfL8krDxT9h42mydVogkaYQt1Me1qJTsKeH5dSA@mail.gmail.com>
+References: <1429200617-9546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAMAWPa_fMhgFfL8krDxT9h42mydVogkaYQt1Me1qJTsKeH5dSA@mail.gmail.com>
+Message-ID: <20150422085507.GA22601@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
-
-> Fix cpu clock configuration data for Exynos5800 (it uses
-> higher PCLK_DBG divider values than Exynos5420 and supports
-> additional frequencies).
+On Tue, Apr 21, 2015 at 07:24:54PM +0100, Kevin Hilman wrote:
+> On Thu, Apr 16, 2015 at 9:10 AM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
 > 
-> Based on Hardkernel's kernel for ODROID-XU3 board.
+> [...]
 > 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos5420.c |   36
-> +++++++++++++++++++++++++++++++--- 1 file changed, 33 insertions(+),
-> 3 deletions(-)
+> > This patch sets the maximum number of static CPUidle drivers allowed to
+> > two, since it is hard to foresee systems with more than two sets of CPUs
+> > having different idle states
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c
-> b/drivers/clk/samsung/clk-exynos5420.c index 9398a2d..462aaee 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -1274,10 +1274,34 @@ static const struct exynos_cpuclk_cfg_data
-> exynos5420_eglclk_d[] __initconst = { {  0 },
->  };
->  
-> +static const struct exynos_cpuclk_cfg_data exynos5800_eglclk_d[]
-> __initconst = {
-> +	{ 2000000, E5420_EGL_DIV0(3, 7, 7, 4), },
-> +	{ 1900000, E5420_EGL_DIV0(3, 7, 7, 4), },
-> +	{ 1800000, E5420_EGL_DIV0(3, 7, 7, 4), },
-> +	{ 1700000, E5420_EGL_DIV0(3, 7, 7, 3), },
-> +	{ 1600000, E5420_EGL_DIV0(3, 7, 7, 3), },
-> +	{ 1500000, E5420_EGL_DIV0(3, 7, 7, 3), },
-> +	{ 1400000, E5420_EGL_DIV0(3, 7, 7, 3), },
-> +	{ 1300000, E5420_EGL_DIV0(3, 7, 7, 2), },
-> +	{ 1200000, E5420_EGL_DIV0(3, 7, 7, 2), },
-> +	{ 1100000, E5420_EGL_DIV0(3, 7, 7, 2), },
-> +	{ 1000000, E5420_EGL_DIV0(3, 7, 6, 2), },
-> +	{  900000, E5420_EGL_DIV0(3, 7, 6, 2), },
-> +	{  800000, E5420_EGL_DIV0(3, 7, 5, 2), },
-> +	{  700000, E5420_EGL_DIV0(3, 7, 5, 2), },
-> +	{  600000, E5420_EGL_DIV0(3, 7, 4, 2), },
-> +	{  500000, E5420_EGL_DIV0(3, 7, 3, 2), },
-> +	{  400000, E5420_EGL_DIV0(3, 7, 3, 2), },
-> +	{  300000, E5420_EGL_DIV0(3, 7, 3, 2), },
-> +	{  200000, E5420_EGL_DIV0(3, 7, 3, 2), },
-> +	{  0 },
-> +};
-> +
->  #define E5420_KFC_DIV(kpll, pclk,
-> aclk)					\ ((((kpll) << 24) |
-> ((pclk) << 20) | ((aclk) << 4))) 
->  static const struct exynos_cpuclk_cfg_data exynos5420_kfcclk_d[]
-> __initconst = {
-> +	{ 1400000, E5420_KFC_DIV(3, 5, 3), }, /* for Exynos5800 */
->  	{ 1300000, E5420_KFC_DIV(3, 5, 2), },
->  	{ 1200000, E5420_KFC_DIV(3, 5, 2), },
->  	{ 1100000, E5420_KFC_DIV(3, 5, 2), },
-> @@ -1357,9 +1381,15 @@ static void __init exynos5x_clk_init(struct
-> device_node *np, ARRAY_SIZE(exynos5800_gate_clks));
->  	}
->  
-> -	exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-> -		mout_cpu_p[0], mout_cpu_p[1], 0x200,
-> -		exynos5420_eglclk_d,
-> ARRAY_SIZE(exynos5420_eglclk_d), 0);
-> +	if (soc == EXYNOS5420) {
-> +		exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-> +			mout_cpu_p[0], mout_cpu_p[1], 0x200,
-> +			exynos5420_eglclk_d,
-> ARRAY_SIZE(exynos5420_eglclk_d), 0);
-> +	} else {
-> +		exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-> +			mout_cpu_p[0], mout_cpu_p[1], 0x200,
-> +			exynos5800_eglclk_d,
-> ARRAY_SIZE(exynos5800_eglclk_d), 0);
-> +	}
->  	exynos_register_cpu_clock(ctx, CLK_KFC_CLK, "kfcclk",
->  		mout_kfc_p[0], mout_kfc_p[1], 0x28200,
->  		exynos5420_kfcclk_d,
-> ARRAY_SIZE(exynos5420_kfcclk_d), 0);
+> It's not hard to forsee anymore:
+> 
+>    http://www.cnx-software.com/2015/04/21/mediatek-helio-x20-deca-core-processor/
+>    https://liliputing.com/2015/04/closer-look-at-mediateks-upcoming-10-core-helio-x20-processor.html
 
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
+Eheh I stand corrected :). Not a big deal, drivers can be allocated
+dynamically; it seems that the designs above leave us no choice, the
+idle states are the only differentiating factor when it comes
+to CPUidle driver logical cpumask creation, happy to hear more
+opinions on this, but I do not really see what we can use instead.
 
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Thanks,
+Lorenzo
