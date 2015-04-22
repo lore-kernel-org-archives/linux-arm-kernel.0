@@ -1,21 +1,19 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 22 Apr 2015 22:53:05 +0200
-Subject: [PATCH v3 1/2] clk: track the orphan status of clocks and their
- children
+Date: Wed, 22 Apr 2015 22:53:06 +0200
+Subject: [PATCH v3 2/2] clk: prevent orphan clocks from being used
 In-Reply-To: <1429735986-18592-1-git-send-email-heiko@sntech.de>
 References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
-Message-ID: <1429735986-18592-2-git-send-email-heiko@sntech.de>
+Message-ID: <1429735986-18592-3-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While children of orphan clocks are not carried in the orphan-list itself,
-they're nevertheless orphans in their own right as they also don't have an
-input-rate available. To ease tracking if a clock is an orphan or has an
-orphan in its parent path introduce an orphan field into struct clk and
-update it and the fields in child-clocks when a clock gets added or removed
-from the orphan-list.
+Orphan clocks or children of orphan clocks don't have rate information at
+all and can produce strange results if they're allowed to be used and the
+parent becomes available later on.
 
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+So using the newly introduced orphan status bit defer
+__of_clk_get_from_provider calls for orphan clocks.
+
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
 Cc: Alex Elder <elder@linaro.org>
@@ -44,82 +42,39 @@ Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Michal Simek <michal.simek@xilinx.com>
 ---
- drivers/clk/clk.c | 33 ++++++++++++++++++++++++++++++---
- 1 file changed, 30 insertions(+), 3 deletions(-)
+ drivers/clk/clk.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index b2361d4..341904f 100644
+index 341904f..27d2d4b 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -62,6 +62,7 @@ struct clk_core {
- 	struct clk_core		*new_parent;
- 	struct clk_core		*new_child;
- 	unsigned long		flags;
-+	bool			orphan;
- 	unsigned int		enable_count;
- 	unsigned int		prepare_count;
- 	unsigned long		accuracy;
-@@ -1401,18 +1402,40 @@ static int clk_fetch_parent_index(struct clk_core *clk,
- 	return -EINVAL;
+@@ -2226,6 +2226,14 @@ bool clk_is_match(const struct clk *p, const struct clk *q)
  }
+ EXPORT_SYMBOL_GPL(clk_is_match);
  
-+/*
-+ * Update the orphan status of @clk and all its children.
-+ */
-+static void clk_core_update_orphan_status(struct clk_core *clk, bool is_orphan)
++static bool clk_is_orphan(const struct clk *clk)
 +{
-+	struct clk_core *child;
++	if (!clk)
++		return false;
 +
-+	clk->orphan = is_orphan;
-+
-+	hlist_for_each_entry(child, &clk->children, child_node)
-+		clk_core_update_orphan_status(child, is_orphan);
++	return clk->core->orphan;
 +}
 +
- static void clk_reparent(struct clk_core *clk, struct clk_core *new_parent)
- {
-+	bool was_orphan = clk->orphan;
+ /**
+  * __clk_init - initialize the data structures in a struct clk
+  * @dev:	device initializing this clk, placeholder for now
+@@ -2968,6 +2976,11 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
+ 		if (provider->node == clkspec->np)
+ 			clk = provider->get(clkspec, provider->data);
+ 		if (!IS_ERR(clk)) {
++			if (clk_is_orphan(clk)) {
++				clk = ERR_PTR(-EPROBE_DEFER);
++				break;
++			}
 +
- 	hlist_del(&clk->child_node);
+ 			clk = __clk_create_clk(__clk_get_hw(clk), dev_id,
+ 					       con_id);
  
- 	if (new_parent) {
-+		bool becomes_orphan = new_parent->orphan;
-+
- 		/* avoid duplicate POST_RATE_CHANGE notifications */
- 		if (new_parent->new_child == clk)
- 			new_parent->new_child = NULL;
- 
- 		hlist_add_head(&clk->child_node, &new_parent->children);
-+
-+		if (was_orphan != becomes_orphan)
-+			clk_core_update_orphan_status(clk, becomes_orphan);
- 	} else {
- 		hlist_add_head(&clk->child_node, &clk_orphan_list);
-+		if (!was_orphan)
-+			clk_core_update_orphan_status(clk, true);
- 	}
- 
- 	clk->parent = new_parent;
-@@ -2302,13 +2325,17 @@ static int __clk_init(struct device *dev, struct clk *clk_user)
- 	 * clocks and re-parent any that are children of the clock currently
- 	 * being clk_init'd.
- 	 */
--	if (clk->parent)
-+	if (clk->parent) {
- 		hlist_add_head(&clk->child_node,
- 				&clk->parent->children);
--	else if (clk->flags & CLK_IS_ROOT)
-+		clk->orphan = clk->parent->orphan;
-+	} else if (clk->flags & CLK_IS_ROOT) {
- 		hlist_add_head(&clk->child_node, &clk_root_list);
--	else
-+		clk->orphan = false;
-+	} else {
- 		hlist_add_head(&clk->child_node, &clk_orphan_list);
-+		clk->orphan = true;
-+	}
- 
- 	/*
- 	 * Set clk's accuracy.  The preferred method is to use
 -- 
 2.1.4
