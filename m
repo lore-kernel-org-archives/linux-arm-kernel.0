@@ -1,42 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Apr 2015 09:22:43 +0200
-Subject: [PATCH 5/9] ARM: BCM2836: Add io map initialization for bcm2836.
-In-Reply-To: <87bnihhypw.fsf@eliezer.anholt.net>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <60195891.q3RtUhgfkn@wuerfel> <87bnihhypw.fsf@eliezer.anholt.net>
-Message-ID: <2080047.TSLc2kVvn8@wuerfel>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 22 Apr 2015 09:31:40 +0200
+Subject: [PATCH 1/3] clk: meson: Add support for Meson clock controller
+In-Reply-To: <20150410233135.18916.85534@quantum>
+References: <1425313322-18567-1-git-send-email-carlo@caione.org>
+ <1425313322-18567-2-git-send-email-carlo@caione.org>
+ <20150410233135.18916.85534@quantum>
+Message-ID: <CAOQ7t2b4aD14xjXN96k977OXw+GbKCh3Nu3Yh-Qx7A7Cm0j_tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 April 2015 16:02:19 Eric Anholt wrote:
-> > Hard to know. Does anything reference BCM2835_PERIPH_VIRT? Does it work
-> > if you remove it?
-> Well, that's clear enough. It dies early with:
-> 
-> Uncompressing Linux... done, booting the kernel.
-> [    0.000000] Booting Linux on physical CPU 0xf00
-> [    0.000000] Initializing cgroup subsys cpu
-> [    0.000000] Initializing cgroup subsys cpuacct
-> [    0.000000] Linux version 4.0.0-rc1-v7+ (anholt at eliezer) (gcc version 4.9.2 ( 4.9.2-10) ) #487 SMP PREEMPT Tue Apr 21 15:58:29 PDT 2015
-> [    0.000000] CPU: ARMv7 Processor [410fc075] revision 5 (ARMv7), cr=10c5387d
-> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> [    0.000000] Machine model: Raspberry Pi 2 Model B+
-> [    0.000000] bootconsole [earlycon0] enabled
-> [    0.000000] cma: Reserved 64 MiB at 0x37000000
-> [    0.000000] Memory policy: Data cache writealloc
-> 
-> (hung)
-> 
-> The only thing I see using this 0xf0000000 range is DEBUG_BCM2836's
-> serial stuff, though.
-> 
+On Sat, Apr 11, 2015 at 1:31 AM, Michael Turquette
+<mturquette@linaro.org> wrote:
+> Quoting Carlo Caione (2015-03-02 08:22:00)
+>> +static int meson_clk_cpu_pre_rate_change(struct meson_clk_cpu *clk_cpu,
+>> +                                        struct clk_notifier_data *ndata)
+>> +{
+>> +       u32 cpu_clk_cntl;
+>> +
+>> +       spin_lock(clk_cpu->lock);
+>> +
+>> +       /* switch MUX1 to xtal */
+>> +       cpu_clk_cntl = readl(clk_cpu->base + clk_cpu->reg_off
+>> +                               + MESON_CPU_CLK_CNTL);
+>> +       cpu_clk_cntl &= ~MESON_CPU_CLK_MUX1;
+>> +       writel(cpu_clk_cntl, clk_cpu->base + clk_cpu->reg_off
+>> +                               + MESON_CPU_CLK_CNTL);
+>> +       udelay(100);
+>> +
+>> +       /* switch MUX2 to sys-pll */
+>> +       cpu_clk_cntl |= MESON_CPU_CLK_MUX2;
+>> +       writel(cpu_clk_cntl, clk_cpu->base + clk_cpu->reg_off
+>> +                               + MESON_CPU_CLK_CNTL);
+>> +
+>> +       spin_unlock(clk_cpu->lock);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int meson_clk_cpu_post_rate_change(struct meson_clk_cpu *clk_cpu,
+>> +                                         struct clk_notifier_data *ndata)
+>> +{
+>> +       u32 cpu_clk_cntl;
+>> +
+>> +       spin_lock(clk_cpu->lock);
+>> +
+>> +       /* switch MUX1 to divisors' output */
+>> +       cpu_clk_cntl = readl(clk_cpu->base + clk_cpu->reg_off
+>> +                               + MESON_CPU_CLK_CNTL);
+>> +       cpu_clk_cntl |= MESON_CPU_CLK_MUX1;
+>> +       writel(cpu_clk_cntl, clk_cpu->base + clk_cpu->reg_off
+>> +                               + MESON_CPU_CLK_CNTL);
+>> +       udelay(100);
+>> +
+>> +       spin_unlock(clk_cpu->lock);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +/*
+>> + * This clock notifier is called when the frequency of the of the parent
+>> + * PLL clock is to be changed. We use the xtal input as temporary parent
+>> + * while the PLL frequency is stabilized.
+>> + */
+>> +static int meson_clk_cpu_notifier_cb(struct notifier_block *nb,
+>> +                                    unsigned long event, void *data)
+>> +{
+>> +       struct clk_notifier_data *ndata = data;
+>> +       struct meson_clk_cpu *clk_cpu = to_meson_clk_cpu_nb(nb);
+>> +       int ret = 0;
+>> +
+>> +       if (event == PRE_RATE_CHANGE)
+>> +               ret = meson_clk_cpu_pre_rate_change(clk_cpu, ndata);
+>> +       else if (event == POST_RATE_CHANGE)
+>> +               ret = meson_clk_cpu_post_rate_change(clk_cpu, ndata);
+>> +
+>> +       return notifier_from_errno(ret);
+>> +}
+>
+> Why use a notifier for this? Could you simply call
+> meson_clk_cpu_{pre,post}_rate_change directly from
+> meson_clk_cpu_set_rate?
 
-Ok. Just to be clear: by removing that mapping, I meant removing the
-".map_io = bcm2835_map_io" line as well, so the default debug_ll_io_init()
-function gets called. If you have a map_io function that does not call
-debug_ll_io_init() or something equivalent, you cannot use DEBUG_LL.
+Hi Mike,
 
-It's possible that this mapping was just added for supporting DEBUG_LL,
-using the default debug_ll_io_init() is a better way to do that.
+the notifier is used to reparent the CPU clock when the frequency of
+the parent PLL is changed and before the PLL frequency is actually
+changed.
+IIUC using the {pre,post} hooks from meson_clk_cpu_set_rate doesn't
+achieve the same. The idea is adapted from the CPU clock driver of the
+rockchip SoCs (rockchip/clk-cpu.c).
 
-	Arnd
+Thanks for the review,
+
+-- 
+Carlo Caione
