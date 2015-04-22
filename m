@@ -1,32 +1,43 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Thu, 23 Apr 2015 00:28:22 +0200
-Subject: [BUG?] drivers: net:ethernet: cpsw: add support for VLAN
-Message-ID: <1429741702.29353.28.camel@mars>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 22 Apr 2015 16:40:40 -0600
+Subject: [PATCH 00/11] Support for coresight ETMv4 tracer 
+Message-ID: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Please find in this patchset a driver implementation that conforms
+to the coresight framework and provide support for the Embedded
+Trace Macrocell version 4.
 
- has commit 3b72c2fe0c6bbec42e ("drivers: net:ethernet: cpsw: add
-support for VLAN") introduced a bug by defining CPSW_VLAN_AWARE as
-BIT(1) instead of BIT(2)?
+With this driver support for ARM's juno platform can be added to the
+list of coresight supported architecture.
 
-+#define CPSW_VLAN_AWARE		BIT(1)
-<snip>
- 	/* switch to vlan unaware mode */
--	cpsw_ale_control_set(priv->ale, 0, ALE_VLAN_AWARE, 0);
-+	cpsw_ale_control_set(priv->ale, priv->host_port, ALE_VLAN_AWARE,
-+			     CPSW_ALE_VLAN_AWARE);
-+	control_reg = readl(&priv->regs->control);
-+	control_reg |= CPSW_VLAN_AWARE;
-+	writel(control_reg, &priv->regs->control);
+Best regards,
+Mathieu
 
-See TRM [1] page 1980 (14.5.1.2 CONTROL Register), there bit
-CPSW_VLAN_AWARE is number 2.
+Pratik Patel (11):
+  coresight-etm4x: Adding CoreSight ETM4x driver
+  coresight-etm4x: Controls pertaining to tracer configuration
+  coresight-etm4x: Controls pertaining to the reset, mode, pe and events
+  coresight-etm4x: Controls pertaining to various configuration options
+  coresight-etm4x: Controls pertaining to the ViewInst register
+  coresight-etm4x: Controls pertaining to the address comparator
+    functions
+  coresight-etm4x: Controls pertaining to the sequencer functions
+  coresight-etm4x: Controls pertaining to the counter functions
+  coresight-etm4x: Controls pertaining to the selection of resources
+  coresight-etm4x: Controls pertaining to the context ID functions
+  coresight-etm4x: Controls pertaining to the VM ID functions
 
-I didn't do any tests, just stumbled upon.
+ .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  295 +++
+ drivers/hwtracing/coresight/Kconfig                |   10 +
+ drivers/hwtracing/coresight/Makefile               |    1 +
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 2748 ++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm4x.h      |  391 +++
+ 5 files changed, 3445 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm4x.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm4x.h
 
-[1]: http://www.ti.com/lit/ug/spruh73l/spruh73l.pdf
-
-Thanks
- -- Christoph
+-- 
+1.9.1
