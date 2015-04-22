@@ -1,68 +1,65 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Wed, 22 Apr 2015 22:17:10 +0900
-Subject: [RESEND PATCH v2 3/3] ARM: EXYNOS: Add missing of_node_put() when
- parsing power domains
-In-Reply-To: <1429708630-19810-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1429708630-19810-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1429708630-19810-3-git-send-email-k.kozlowski.k@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 22 Apr 2015 07:50:21 -0600
+Subject: [PATCH 01/13 v2] coresight: etm: print what version of ETM/PTM is
+ detected
+In-Reply-To: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
+References: <1429534746-3068-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CANLsYkx3w=9Atoz0APpom8Nx4gc=L1U2zn+cU7P57tcR5jPDGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On 20 April 2015 at 06:58, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Helpfully report a bit more about the hardware found in the
+> silicon when matching the AMBA device IDs by using the associated
+> .data pointer in the AMBA match.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Rebased on the coresight git tree.
+> ---
+>  drivers/hwtracing/coresight/coresight-etm3x.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+> index c965f5724abd..66e210d5fddd 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+> @@ -1859,7 +1859,7 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+>                 goto err_arch_supported;
+>         }
+>
+> -       dev_info(dev, "ETM initialized\n");
+> +       dev_info(dev, "%s initialized\n", (char *)id->data);
+>
+>         if (boot_enable) {
+>                 coresight_enable(drvdata->csdev);
+> @@ -1890,18 +1890,22 @@ static struct amba_id etm_ids[] = {
+>         {       /* ETM 3.3 */
+>                 .id     = 0x0003b921,
+>                 .mask   = 0x0003ffff,
+> +               .data   = "ETM 3.3",
+>         },
+>         {       /* ETM 3.5 */
+>                 .id     = 0x0003b956,
+>                 .mask   = 0x0003ffff,
+> +               .data   = "ETM 3.5",
+>         },
+>         {       /* PTM 1.0 */
+>                 .id     = 0x0003b950,
+>                 .mask   = 0x0003ffff,
+> +               .data   = "PTM 1.0",
+>         },
+>         {       /* PTM 1.1 */
+>                 .id     = 0x0003b95f,
+>                 .mask   = 0x0003ffff,
+> +               .data   = "PTM 1.1",
+>         },
+>         { 0, 0},
+>  };
+> --
+> 1.9.3
+>
 
-Add missing of_node_put() to:
-1. Error return path if allocating memory for exynos_pm_domain failed.
-2. Second iteration over power domains if a child domain was not present
-   or was incomplete.
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reported-by: Karol Wrona <k.wrona@samsung.com>
-
----
-Changes since v1:
-1. New patch.
----
- arch/arm/mach-exynos/pm_domains.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 61c32ccc9f7a..1a90c5da2fd7 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -138,6 +138,7 @@ static __init int exynos4_pm_init_power_domain(void)
- 		if (!pd) {
- 			pr_err("%s: failed to allocate memory for domain\n",
- 					__func__);
-+			of_node_put(np);
- 			return -ENOMEM;
- 		}
- 
-@@ -209,15 +210,15 @@ no_clk:
- 		args.args_count = 0;
- 		child_domain = of_genpd_get_from_provider(&args);
- 		if (!child_domain)
--			continue;
-+			goto next_pd;
- 
- 		if (of_parse_phandle_with_args(np, "power-domains",
- 					 "#power-domain-cells", 0, &args) != 0)
--			continue;
-+			goto next_pd;
- 
- 		parent_domain = of_genpd_get_from_provider(&args);
- 		if (!parent_domain)
--			continue;
-+			goto next_pd;
- 
- 		if (pm_genpd_add_subdomain(parent_domain, child_domain))
- 			pr_warn("%s failed to add subdomain: %s\n",
-@@ -225,6 +226,7 @@ no_clk:
- 		else
- 			pr_info("%s has as child subdomain: %s.\n",
- 				parent_domain->name, child_domain->name);
-+next_pd:
- 		of_node_put(np);
- 	}
- 
--- 
-2.1.0
+Applied (including the V3 bits).  Thanks for the submission,
+Mathieu
