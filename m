@@ -1,133 +1,109 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Wed, 22 Apr 2015 16:04:12 -0700
-Subject: [PATCHv3 3/4] usb: ehci-platform: Use devm_of_phy_get_by_index
+Date: Wed, 22 Apr 2015 16:04:10 -0700
+Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
 In-Reply-To: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
 References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1429743853-10254-4-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Getting phys by index instead of phy names so that we do
-not have to create a naming scheme when multiple phys
-are present
+Most of the phy providers use "select" to enable GENERIC_PHY. Since select
+is only recommended when the config is not visible, GENERIC_PHY is changed
+an invisible option. To maintain consistency, all phy providers are changed
+to "select" GENERIC_PHY and all non-phy drivers use "depends on" when the
+phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
+dependency, so it is left as "select".
 
 Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/usb/host/ehci-platform.c | 69 ++++++++++++++--------------------------
- 1 file changed, 24 insertions(+), 45 deletions(-)
+ drivers/ata/Kconfig                       | 1 -
+ drivers/media/platform/exynos4-is/Kconfig | 2 +-
+ drivers/phy/Kconfig                       | 4 ++--
+ drivers/usb/host/Kconfig                  | 4 ++--
+ drivers/video/fbdev/exynos/Kconfig        | 2 +-
+ 5 files changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index d8a75a5..145bf19 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -88,15 +88,13 @@ static int ehci_platform_power_on(struct platform_device *dev)
- 	}
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index 5f60155..6d2e881 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -301,7 +301,6 @@ config SATA_MV
+ 	tristate "Marvell SATA support"
+ 	depends on PCI || ARCH_DOVE || ARCH_MV78XX0 || \
+ 		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
+-	select GENERIC_PHY
+ 	help
+ 	  This option enables support for the Marvell Serial ATA family.
+ 	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
+diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+index b7b2e47..b6f3eaa 100644
+--- a/drivers/media/platform/exynos4-is/Kconfig
++++ b/drivers/media/platform/exynos4-is/Kconfig
+@@ -31,7 +31,7 @@ config VIDEO_S5P_FIMC
+ config VIDEO_S5P_MIPI_CSIS
+ 	tristate "S5P/EXYNOS MIPI-CSI2 receiver (MIPI-CSIS) driver"
+ 	depends on REGULATOR
+-	select GENERIC_PHY
++	depends on GENERIC_PHY
+ 	help
+ 	  This is a V4L2 driver for Samsung S5P and EXYNOS4 SoC MIPI-CSI2
+ 	  receiver (MIPI-CSIS) devices.
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 2962de2..edecdb1 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -5,7 +5,7 @@
+ menu "PHY Subsystem"
  
- 	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--		if (priv->phys[phy_num]) {
--			ret = phy_init(priv->phys[phy_num]);
--			if (ret)
--				goto err_exit_phy;
--			ret = phy_power_on(priv->phys[phy_num]);
--			if (ret) {
--				phy_exit(priv->phys[phy_num]);
--				goto err_exit_phy;
--			}
-+		ret = phy_init(priv->phys[phy_num]);
-+		if (ret)
-+			goto err_exit_phy;
-+		ret = phy_power_on(priv->phys[phy_num]);
-+		if (ret) {
-+			phy_exit(priv->phys[phy_num]);
-+			goto err_exit_phy;
- 		}
- 	}
+ config GENERIC_PHY
+-	bool "PHY Core"
++	bool
+ 	help
+ 	  Generic PHY support.
  
-@@ -104,10 +102,8 @@ static int ehci_platform_power_on(struct platform_device *dev)
+@@ -72,7 +72,7 @@ config PHY_MIPHY365X
+ config PHY_RCAR_GEN2
+ 	tristate "Renesas R-Car generation 2 USB PHY driver"
+ 	depends on ARCH_SHMOBILE
+-	depends on GENERIC_PHY
++	select GENERIC_PHY
+ 	help
+ 	  Support for USB PHY found on Renesas R-Car generation 2 SoCs.
  
- err_exit_phy:
- 	while (--phy_num >= 0) {
--		if (priv->phys[phy_num]) {
--			phy_power_off(priv->phys[phy_num]);
--			phy_exit(priv->phys[phy_num]);
--		}
-+		phy_power_off(priv->phys[phy_num]);
-+		phy_exit(priv->phys[phy_num]);
- 	}
- err_disable_clks:
- 	while (--clk >= 0)
-@@ -123,10 +119,8 @@ static void ehci_platform_power_off(struct platform_device *dev)
- 	int clk, phy_num;
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 5ad60e4..e2197e2 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -182,7 +182,7 @@ config USB_EHCI_HCD_SPEAR
+ config USB_EHCI_HCD_STI
+ 	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
+ 	depends on ARCH_STI && OF
+-	select GENERIC_PHY
++	depends on GENERIC_PHY
+ 	select USB_EHCI_HCD_PLATFORM
+ 	help
+ 	  Enable support for the on-chip EHCI controller found on
+@@ -409,7 +409,7 @@ config USB_OHCI_HCD_SPEAR
+ config USB_OHCI_HCD_STI
+ 	tristate "Support for ST STiHxxx on-chip OHCI USB controller"
+ 	depends on ARCH_STI && OF
+-	select GENERIC_PHY
++	depends on GENERIC_PHY
+ 	select USB_OHCI_HCD_PLATFORM
+ 	help
+ 	  Enable support for the on-chip OHCI controller found on
+diff --git a/drivers/video/fbdev/exynos/Kconfig b/drivers/video/fbdev/exynos/Kconfig
+index 1f16b46..6c53894 100644
+--- a/drivers/video/fbdev/exynos/Kconfig
++++ b/drivers/video/fbdev/exynos/Kconfig
+@@ -16,7 +16,7 @@ if EXYNOS_VIDEO
  
- 	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--		if (priv->phys[phy_num]) {
--			phy_power_off(priv->phys[phy_num]);
--			phy_exit(priv->phys[phy_num]);
--		}
-+		phy_power_off(priv->phys[phy_num]);
-+		phy_exit(priv->phys[phy_num]);
- 	}
+ config EXYNOS_MIPI_DSI
+ 	bool "EXYNOS MIPI DSI driver support."
+-	select GENERIC_PHY
++	depends on GENERIC_PHY
+ 	help
+ 	  This enables support for MIPI-DSI device.
  
- 	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
-@@ -154,7 +148,6 @@ static int ehci_platform_probe(struct platform_device *dev)
- 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ehci_platform_priv *priv;
- 	struct ehci_hcd *ehci;
--	const char *phy_name;
- 	int err, irq, phy_num, clk = 0;
- 
- 	if (usb_disabled())
-@@ -204,36 +197,22 @@ static int ehci_platform_probe(struct platform_device *dev)
- 
- 		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
- 				"phys", "#phy-cells");
--		priv->num_phys = priv->num_phys > 0 ? priv->num_phys : 1;
- 
--		priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
--				sizeof(struct phy *), GFP_KERNEL);
--		if (!priv->phys)
--			return -ENOMEM;
-+		if (priv->num_phys > 0) {
-+			priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
-+					    sizeof(struct phy *), GFP_KERNEL);
-+			if (!priv->phys)
-+				return -ENOMEM;
-+		} else
-+			priv->num_phys = 0;
- 
- 		for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--				err = of_property_read_string_index(
--						dev->dev.of_node,
--						"phy-names", phy_num,
--						&phy_name);
--
--				if (err < 0) {
--					if (priv->num_phys > 1) {
--						dev_err(&dev->dev, "phy-names not provided");
--						goto err_put_hcd;
--					} else
--						phy_name = "usb";
--				}
--
--				priv->phys[phy_num] = devm_phy_get(&dev->dev,
--						phy_name);
--				if (IS_ERR(priv->phys[phy_num])) {
--					err = PTR_ERR(priv->phys[phy_num]);
--					if ((priv->num_phys > 1) ||
--					    (err == -EPROBE_DEFER))
--						goto err_put_hcd;
--					priv->phys[phy_num] = NULL;
--				}
-+			priv->phys[phy_num] = devm_of_phy_get_by_index(
-+					&dev->dev, dev->dev.of_node, phy_num);
-+			if (IS_ERR(priv->phys[phy_num])) {
-+				err = PTR_ERR(priv->phys[phy_num]);
-+					goto err_put_hcd;
-+			}
- 		}
- 
- 		for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
 -- 
 2.3.4
