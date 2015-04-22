@@ -1,119 +1,98 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 22 Apr 2015 12:34:04 +0200
-Subject: [PATCH v9 1/5] Documentation: Add device tree bindings for
- Freescale i.MX GPC
-In-Reply-To: <20150303023531.GF20455@dragon>
-References: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
- <1424713215-3357-2-git-send-email-p.zabel@pengutronix.de>
- <20150303023531.GF20455@dragon>
-Message-ID: <1429698844.2883.8.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Apr 2015 11:38:41 +0100
+Subject: [RESEND PATCH 4.0-rc7 v20 3/6] irqchip: gic: Introduce plumbing
+ for IPI FIQ
+In-Reply-To: <5536BDE8.2030403@linaro.org>
+References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
+ <1428659511-9590-1-git-send-email-daniel.thompson@linaro.org>
+ <1428659511-9590-4-git-send-email-daniel.thompson@linaro.org>
+ <20150421145007.GB10164@leverpostej> <5536BDE8.2030403@linaro.org>
+Message-ID: <20150422103841.GC27345@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 03.03.2015, 10:35 +0800 schrieb Shawn Guo:
-> On Mon, Feb 23, 2015 at 06:40:11PM +0100, Philipp Zabel wrote:
-> > The i.MX6 contains a power controller that controls power gating and
-> > sequencing for the SoC's power domains.
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > I just gave this a spin on my (non-MCPM) TC2, and secondaries don't come
+> > up:
+> >
+> > CPU1: failed to boot: -38
+> > CPU2: failed to boot: -38
+> > CPU3: failed to boot: -38
+> > CPU4: failed to boot: -38
+> > Brought up 1 CPUs
+> > SMP: Total of 1 processors activated (48.00 BogoMIPS).
+> >
+> > I tried investigating with a debugger. The unbooted CPUs look to be
+> > stuck at the FW's spin loop, but the text doesn't look right (I see a
+> > load of ADDEQ r0, r0, r0, #LSL 1 where there was previously a WFI loop).
+> > That could be a bug with my debugger though.
+> >
+> > If I pause the CPUs at the right point, they sometimes enter the kernel
+> > successfully. I don't have a good explanation for that.
+> >
+> > [...]
 > 
-> The patch (series) looks fine to me.  Can we get DT maintainer's ACK on
-> this, so that I can apply the series for 4.1?
+> Rats!
 > 
-> Shawn
+> I presume it is patch 3 that causes the regression? Patch 3 is the one 
+> that causes the GIC to adopt a different configuration if it find the 
+> kernel running in secure world (it sets all interrupts to group 1 and 
+> routes group 0 to FIQ).
 > 
-I'm formally NACKing this series.
+> I only ask because it isn't until patch 6 that we actually place any 
+> interrupt sources into group 0.
 
-I've talked to Philipp and we decided to change the DT binding slightly
-to better accommodate SoCs with multiple domains like the imx6sx.
+Patch 3 appears to be to blame. I see the issue with patches 1-3 alone
+applied atop of v4.0. With patch 3 reverted secondaries come up as
+expected.
 
-I will send a new version of this series shortly.
-
-Regards,
-Lucas
-
-> > ---
-> > Changes since v8:
-> >  - Updated example with IRQ_TYPE_... and IMX6QDL_CLK_... defines
-> > ---
-> >  .../devicetree/bindings/power/fsl,imx-gpc.txt      | 59 ++++++++++++++++++++++
-> >  1 file changed, 59 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> > new file mode 100644
-> > index 0000000..65cc034
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> > @@ -0,0 +1,59 @@
-> > +Freescale i.MX General Power Controller
-> > +=======================================
-> > +
-> > +The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
-> > +counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
-> > +domains.
-> > +
-> > +Required properties:
-> > +- compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
-> > +- reg: should be register base and length as documented in the
-> > +  datasheet
-> > +- interrupts: Should contain GPC interrupt request 1
-> > +- pu-supply: Link to the LDO regulator powering the PU power domain
-> > +- clocks: Clock phandles to devices in the PU power domain that need
-> > +	  to be enabled during domain power-up for reset propagation.
-> > +- #power-domain-cells: Should be 1, see below:
-> > +
-> > +The gpc node is a power-controller as documented by the generic power domain
-> > +bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-> > +
-> > +Example:
-> > +
-> > +	gpc: gpc at 020dc000 {
-> > +		compatible = "fsl,imx6q-gpc";
-> > +		reg = <0x020dc000 0x4000>;
-> > +		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 90 IRQ_TYPE_LEVEL_HIGH>;
-> > +		pu-supply = <&reg_pu>;
-> > +		clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
-> > +			 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
-> > +			 <&clks IMX6QDL_CLK_GPU2D_CORE>,
-> > +			 <&clks IMX6QDL_CLK_GPU2D_AXI>,
-> > +			 <&clks IMX6QDL_CLK_OPENVG_AXI>,
-> > +			 <&clks IMX6QDL_CLK_VPU_AXI>;
-> > +		#power-domain-cells = <1>;
-> > +	};
-> > +
-> > +
-> > +Specifying power domain for IP modules
-> > +======================================
-> > +
-> > +IP cores belonging to a power domain should contain a 'power-domains' property
-> > +that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
-> > +the power domain the device belongs to.
-> > +
-> > +Example of a device that is part of the PU power domain:
-> > +
-> > +	vpu: vpu at 02040000 {
-> > +		reg = <0x02040000 0x3c000>;
-> > +		/* ... */
-> > +		power-domains = <&gpc 1>;
-> > +		/* ... */
-> > +	};
-> > +
-> > +The following DOMAIN_INDEX values are valid for i.MX6Q:
-> > +ARM_DOMAIN     0
-> > +PU_DOMAIN      1
-> > +The following additional DOMAIN_INDEX value is valid for i.MX6SL:
-> > +DISPLAY_DOMAIN 2
-> > -- 
-> > 2.1.4
-> > 
+> >> @@ -427,6 +535,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+> >>          void __iomem *base = gic_data_cpu_base(gic);
+> >>          unsigned int cpu_mask, cpu = smp_processor_id();
+> >>          int i;
+> >> +       unsigned long secure_irqs, secure_irq;
+> >
+> > I think secure_irq(s) is a misnomer here. It's just a mask of FIQ bits.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I guess so, on GICv2 without security extentions these are not secure 
+> irqs. This is one of the places were IRQ, FIQ, irq and hwirq meet 
+> together and naming things is hard.
+> 
+> What sort of name do you like: fiq(s), fiq_hwirq(s)?
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+I'd go for fiq_mask and fiq, or group1_mask and group1_irq.
+
+[...]
+
+> >> @@ -445,6 +554,20 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+> >>
+> >>          gic_cpu_config(dist_base, NULL);
+> >>
+> >> +       /*
+> >> +        * If the distributor is configured to support interrupt grouping
+> >> +        * then set any PPI and SGI interrupts not set in SMP_IPI_FIQ_MASK
+> >> +        * to be group1 and ensure any remaining group 0 interrupts have
+> >> +        * the right priority.
+> >> +        */
+> >> +       if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL)) {
+> >> +               secure_irqs = SMP_IPI_FIQ_MASK;
+> >> +               writel_relaxed(~secure_irqs, dist_base + GIC_DIST_IGROUP + 0);
+> >> +               gic->igroup0_shadow = ~secure_irqs;
+> >> +               for_each_set_bit(secure_irq, &secure_irqs, 16)
+> >> +                       gic_set_group_irq(gic, secure_irq, 0);
+> >> +       }
+> >
+> > This only pokes GICD registers. Why isn't this in gic_dist_init?
+> 
+> GIC_DIST_IGROUP[0] (which controls grouping for SGIs and PPIs) is banked 
+> per-cpu and form part of the per-cpu configuration.
+
+Ah. Would you mind adding a note to the comment w.r.t. GICD_IGROUPR0
+being banked per-cpu? I suspect I won't be the only one who fails to
+recall that being the case.
+
+We might want to rethink the gic_dist_init/gic_cpu_init naming if
+they're no longer cleanly split across distributor and cpu interface
+initialisation.
+
+Thanks,
+Mark.
