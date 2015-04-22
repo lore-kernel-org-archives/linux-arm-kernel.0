@@ -1,47 +1,22 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 22 Apr 2015 22:53:04 +0200
-Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
-Message-ID: <1429735986-18592-1-git-send-email-heiko@sntech.de>
+Date: Wed, 22 Apr 2015 22:53:05 +0200
+Subject: [PATCH v3 1/2] clk: track the orphan status of clocks and their
+ children
+In-Reply-To: <1429735986-18592-1-git-send-email-heiko@sntech.de>
+References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
+Message-ID: <1429735986-18592-2-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using orphan clocks can introduce strange behaviour as they don't have
-rate information at all and also of course don't track 
+While children of orphan clocks are not carried in the orphan-list itself,
+they're nevertheless orphans in their own right as they also don't have an
+input-rate available. To ease tracking if a clock is an orphan or has an
+orphan in its parent path introduce an orphan field into struct clk and
+update it and the fields in child-clocks when a clock gets added or removed
+from the orphan-list.
 
-This v2/v3 takes into account suggestions from Stephen Boyd to not try to
-walk the clock tree at runtime but instead keep track of orphan states
-on clock tree changes and making it mandatory for everybody from the
-start as orphaned clocks should not be used at all.
-
-
-This fixes an issue on most rk3288 platforms, where some soc-clocks
-are supplied by a 32khz clock from an external i2c-chip which often
-is only probed later in the boot process and maybe even after the
-drivers using these soc-clocks like the tsadc temperature sensor.
-In this case the driver using the clock should of course defer probing
-until the clock is actually usable.
-
-
-As this changes the behaviour for orphan clocks, it would of course
-benefit from more testing than on my Rockchip boards. To keep the
-recipent-list reasonable and not spam to much I selected one (the topmost)
-from the get_maintainer output of each drivers/clk entry.
-Hopefully some will provide Tested-by-tags :-)
-
-
-Thanks
-Heiko
-
-changes since v2:
-adapt to comments from Stephen Boyd
-- rename to clk_core_update_orphan_status
-- use bools instead of 0/1 for the status
-- remove redundant check in clk_is_orphan
-changes since v1:
-- track orphan status on clock tree changes instead of walking the
-  tree on clk_get operations
-- make get-deferals mandatory for everybody
-
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
 Cc: Alex Elder <elder@linaro.org>
 Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
@@ -68,14 +43,83 @@ Cc: Tero Kristo <t-kristo@ti.com>
 Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Michal Simek <michal.simek@xilinx.com>
+---
+ drivers/clk/clk.c | 33 ++++++++++++++++++++++++++++++---
+ 1 file changed, 30 insertions(+), 3 deletions(-)
 
-
-Heiko Stuebner (2):
-  clk: track the orphan status of clocks and their children
-  clk: prevent orphan clocks from being used
-
- drivers/clk/clk.c | 46 +++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 43 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index b2361d4..341904f 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -62,6 +62,7 @@ struct clk_core {
+ 	struct clk_core		*new_parent;
+ 	struct clk_core		*new_child;
+ 	unsigned long		flags;
++	bool			orphan;
+ 	unsigned int		enable_count;
+ 	unsigned int		prepare_count;
+ 	unsigned long		accuracy;
+@@ -1401,18 +1402,40 @@ static int clk_fetch_parent_index(struct clk_core *clk,
+ 	return -EINVAL;
+ }
+ 
++/*
++ * Update the orphan status of @clk and all its children.
++ */
++static void clk_core_update_orphan_status(struct clk_core *clk, bool is_orphan)
++{
++	struct clk_core *child;
++
++	clk->orphan = is_orphan;
++
++	hlist_for_each_entry(child, &clk->children, child_node)
++		clk_core_update_orphan_status(child, is_orphan);
++}
++
+ static void clk_reparent(struct clk_core *clk, struct clk_core *new_parent)
+ {
++	bool was_orphan = clk->orphan;
++
+ 	hlist_del(&clk->child_node);
+ 
+ 	if (new_parent) {
++		bool becomes_orphan = new_parent->orphan;
++
+ 		/* avoid duplicate POST_RATE_CHANGE notifications */
+ 		if (new_parent->new_child == clk)
+ 			new_parent->new_child = NULL;
+ 
+ 		hlist_add_head(&clk->child_node, &new_parent->children);
++
++		if (was_orphan != becomes_orphan)
++			clk_core_update_orphan_status(clk, becomes_orphan);
+ 	} else {
+ 		hlist_add_head(&clk->child_node, &clk_orphan_list);
++		if (!was_orphan)
++			clk_core_update_orphan_status(clk, true);
+ 	}
+ 
+ 	clk->parent = new_parent;
+@@ -2302,13 +2325,17 @@ static int __clk_init(struct device *dev, struct clk *clk_user)
+ 	 * clocks and re-parent any that are children of the clock currently
+ 	 * being clk_init'd.
+ 	 */
+-	if (clk->parent)
++	if (clk->parent) {
+ 		hlist_add_head(&clk->child_node,
+ 				&clk->parent->children);
+-	else if (clk->flags & CLK_IS_ROOT)
++		clk->orphan = clk->parent->orphan;
++	} else if (clk->flags & CLK_IS_ROOT) {
+ 		hlist_add_head(&clk->child_node, &clk_root_list);
+-	else
++		clk->orphan = false;
++	} else {
+ 		hlist_add_head(&clk->child_node, &clk_orphan_list);
++		clk->orphan = true;
++	}
+ 
+ 	/*
+ 	 * Set clk's accuracy.  The preferred method is to use
 -- 
 2.1.4
