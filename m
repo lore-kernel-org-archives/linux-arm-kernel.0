@@ -1,536 +1,150 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Wed, 22 Apr 2015 13:47:40 +0800
-Subject: =?gbk?Q?=B4=F0=B8=B4=3A_=5BPATCH_v3_2/2=5D_thermal=3A?=
- =?gbk?Q?_hisilicon=3A_add_new_hisilicon_thermal_sensor_dri?=
- =?gbk?Q?ver?=
-In-Reply-To: <62D2F9B90E00B742A0ABA02CC88C65EA298E4D81@SZXEMA509-MBX.china.huawei.com>
-References: <1428403252-8208-1-git-send-email-kong.kongxinwei@hisilicon.com>,
- <1428403252-8208-3-git-send-email-kong.kongxinwei@hisilicon.com>
- <62D2F9B90E00B742A0ABA02CC88C65EA298E4D81@SZXEMA509-MBX.china.huawei.com>
-Message-ID: <553735FC.2020704@hisilicon.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 21 Apr 2015 23:11:08 -0700
+Subject: [GIT PULL 1/9] ARM: SoC fixes for v4.1
+In-Reply-To: <1429683076-19881-1-git-send-email-olof@lixom.net>
+References: <1429683076-19881-1-git-send-email-olof@lixom.net>
+Message-ID: <1429683076-19881-2-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Here's the usual "low-priority fixes that didn't make it into the last
+few -rcs, with a twist: We had a fixes pull request that I didn't send
+in time to get into 4.0, so we'll send some of them to Greg for -stable as
+well.
+
+Contents here is as usual not all that controversial:
+
+- A handful of randconfig fixes from Arnd, in particular for older Samsung
+platforms
+- Exynos fixes, !SMP building, DTS updates for MMC and lid switch
+- Kbuild fix to create output subdirectory for DTB files
+- Misc minor fixes for OMAP
 
 
-On 2015/4/21 17:09, Wangfei (William, Euler) wrote:
-> ???: linuxarm-bounces at huawei.com [linuxarm-bounces at huawei.com] ?? Xinwei Kong [kong.kongxinwei at hisilicon.com]
-> ????: 2015?4?7? 18:40
-> ???: rui.zhuang at intel.com; edubezval at gmail.com; mporter at konsulko.com; jorge.ramirez-ortiz at linaro.org; haojian.zhuang at linaro.org; linux-pm at vger.kernel.org
-> ??: devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; Linuxarm; Liguozhu (Kenneth); linux-arm-kernel at lists.infradead.org
-> ??: [PATCH v3 2/2] thermal: hisilicon: add new hisilicon thermal sensor driver
-> 
-> From: kongxinwei <kong.kongxinwei@hisilicon.com>
-> 
-> This patch adds the support for hisilicon thermal sensor, within
-> hisilicon SoC. there will register sensors for thermal framework
-> and use device tree to bind cooling device.
-> 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
-> ---
->  drivers/thermal/Kconfig        |   8 +
->  drivers/thermal/Makefile       |   1 +
->  drivers/thermal/hisi_thermal.c | 438 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 447 insertions(+)
->  create mode 100644 drivers/thermal/hisi_thermal.c
-> 
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index af40db0..81aee01 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -136,6 +136,14 @@ config THERMAL_EMULATION
->           because userland can easily disable the thermal policy by simply
->           flooding this sysfs node with low temperature values.
-> 
-> +config HISI_THERMAL
-> +       tristate "Hisilicon thermal driver"
-> +       depends on ARCH_HISI && CPU_THERMAL && OF
-> +       help
-> +         Enable this to plug hisilicon's thermal sensor driver into the Linux
-> +         thermal framework. cpufreq is used as the cooling device to throttle
-> +         CPUs when the passive trip is crossed.
-> +
->  config IMX_THERMAL
->         tristate "Temperature sensor driver for Freescale i.MX SoCs"
->         depends on CPU_THERMAL
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index fa0dc48..08ae7ac 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -39,3 +39,4 @@ obj-$(CONFIG_TI_SOC_THERMAL)  += ti-soc-thermal/
->  obj-$(CONFIG_INT340X_THERMAL)  += int340x_thermal/
->  obj-$(CONFIG_ST_THERMAL)       += st/
->  obj-$(CONFIG_TEGRA_SOCTHERM)   += tegra_soctherm.o
-> +obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
-> diff --git a/drivers/thermal/hisi_thermal.c b/drivers/thermal/hisi_thermal.c
-> new file mode 100644
-> index 0000000..50ffb45
-> --- /dev/null
-> +++ b/drivers/thermal/hisi_thermal.c
-> @@ -0,0 +1,438 @@
-> +/*
-> + * Hisilicon thermal sensor driver
-> + *
-> + * Copyright (c) 2014-2015 Hisilicon Limited.
-> + * Copyright (c) 2014-2015 Linaro Limited.
-> + *
-> + * Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> + * Leo Yan <leo.yan@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/cpu_cooling.h>
-> +#include <linux/cpufreq.h>
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +#include <linux/thermal.h>
-> +#include <linux/types.h>
-> +
-> +#include "thermal_core.h"
-> +
-> +#define TEMP0_LAG                      (0x0)
-> +#define TEMP0_TH                       (0x4)
-> +#define TEMP0_RST_TH                   (0x8)
-> +#define TEMP0_CFG                      (0xC)
-> +#define TEMP0_EN                       (0x10)
-> +#define TEMP0_INT_EN                   (0x14)
-> +#define TEMP0_INT_CLR                  (0x18)
-> +#define TEMP0_RST_MSK                  (0x1C)
-> +#define TEMP0_RAW_INT                  (0x20)
-> +#define TEMP0_MSK_INT                  (0x24)
-> +#define TEMP0_VALUE                    (0x28)
-> +
-> +#define HISI_TEMP_BASE                 (-60)
-> +#define HISI_TEMP_RESET                (100000)
-> +#define HISI_TEMP_PASSIVE              (85000)
-> 
-> Don't use it in this drver
+Conflicts: None
 
-Good comment!!
-> 
-> +
-> +#define HISI_MAX_SENSORS               4
-> +
-> +struct hisi_thermal_sensor {
-> +       struct hisi_thermal_data *thermal;
-> +       struct thermal_zone_device *tzd;
-> +       const struct thermal_trip *trip;
-> +
-> +       uint32_t id;
-> +       uint32_t thres_temp;
-> +       uint32_t reset_temp;
-> +};
-> +
-> +struct hisi_thermal_data {
-> +       struct mutex thermal_lock;
-> +       struct platform_device *pdev;
-> +       struct clk *clk;
-> +
-> +       int irq, irq_bind_sensor;
-> +       bool irq_enabled;
-> +
-> +       unsigned int sensors_num;
-> +       long sensor_temp[HISI_MAX_SENSORS];
-> +       struct hisi_thermal_sensor sensors[HISI_MAX_SENSORS];
-> +
-> +       void __iomem *regs;
-> +};
-> +
-> +/* in millicelsius */
-> +static inline int _step_to_temp(int step)
-> +{
-> +       /*
-> +        * Every step equals (1 * 200) / 255 celsius, and finally
-> +        * need convert to millicelsius.
-> +        */
-> +       return (HISI_TEMP_BASE + (step * 200 / 255)) * 1000;
-> +}
-> +
-> +static inline int _temp_to_step(int temp)
-> +{
-> +       return ((temp / 1000 - HISI_TEMP_BASE) * 255 / 200);
-> +}
-> +
-> +static long hisi_thermal_get_sensor_temp(struct hisi_thermal_data *data,
-> +                                        struct hisi_thermal_sensor *sensor)
-> +{
-> +       int val;
-> +
-> +       mutex_lock(&data->thermal_lock);
-> +
-> +       /* disable interrupt */
-> +       writel(0x0, data->regs + TEMP0_INT_EN);
-> +       writel(0x1, data->regs + TEMP0_INT_CLR);
-> +
-> +       /* disable module firstly */
-> +       writel(0x0, data->regs + TEMP0_EN);
-> +
-> +       /* select sensor id */
-> +       writel((sensor->id << 12), data->regs + TEMP0_CFG);
-> +
-> +       /* enable module */
-> +       writel(0x1, data->regs + TEMP0_EN);
-> +
-> +       msleep(5);
-> 
-> usleep_range() replace of msleep(), You can see it: (/Documentation/timers/timers-howto.txt)
-> 
-I will study it and use it, Thanks!!
+----------------------------------------------------------------
 
-> +
-> +       val = readl(data->regs + TEMP0_VALUE);
-> +       val = _step_to_temp(val);
-> +
-> +       /* adjust for negative value */
-> +       val = (val < 0) ? 0 : val;
-> +
-> +       mutex_unlock(&data->thermal_lock);
-> +
-> +       return val;
-> +}
-> +
-> +static void hisi_thermal_bind_irq(struct hisi_thermal_data *data)
-> +{
-> +       struct hisi_thermal_sensor *sensor;
-> +
-> +       sensor = &data->sensors[data->irq_bind_sensor];
-> +
-> +       mutex_lock(&data->thermal_lock);
-> +
-> +       /* setting the hdak time */
-> +       writel(0x0, data->regs + TEMP0_CFG);
-> +
-> +       /* disable module firstly */
-> +       writel(0x0, data->regs + TEMP0_RST_MSK);
-> +       writel(0x0, data->regs + TEMP0_EN);
-> +
-> +       /* select sensor id */
-> +       writel((sensor->id << 12), data->regs + TEMP0_CFG);
-> +
-> +       /* enable for interrupt */
-> +       writel(_temp_to_step(sensor->thres_temp)
-> +                       | 0x0FFFFFF00, data->regs + TEMP0_TH);
-> +
-> +       writel(_temp_to_step(HISI_TEMP_RESET), data->regs + TEMP0_RST_TH);
-> +
-> +       /* enable module */
-> +       writel(0x1, data->regs + TEMP0_RST_MSK);
-> +       writel(0x1, data->regs + TEMP0_EN);
-> +
-> +       writel(0x0, data->regs + TEMP0_INT_CLR);
-> +       writel(0x1, data->regs + TEMP0_INT_EN);
-> +       msleep(5);
-> +
-> +       mutex_unlock(&data->thermal_lock);
-> +
-> +}
-> +
-> +static void hisi_thermal_enable_sensor(struct hisi_thermal_data *data)
-> +{
-> +       hisi_thermal_bind_irq(data);
-> +}
-> +
-> +static void hisi_thermal_disable_sensor(struct hisi_thermal_data *data)
-> +{
-> +
-> +       mutex_lock(&data->thermal_lock);
-> +
-> +       /* disable sensor module */
-> +       writel(0x0, data->regs + TEMP0_INT_EN);
-> +       writel(0x0, data->regs + TEMP0_RST_MSK);
-> +       writel(0x0, data->regs + TEMP0_EN);
-> +
-> +       mutex_unlock(&data->thermal_lock);
-> +
-> +}
-> +
-> +static int hisi_thermal_get_temp(void *_sensor, long *temp)
-> +{
-> +       struct hisi_thermal_sensor *sensor = _sensor;
-> +       struct hisi_thermal_data *data = sensor->thermal;
-> +
-> +       int sensor_id = 0, i;
-> +       long max_temp = 0;
-> +
-> +       *temp = hisi_thermal_get_sensor_temp(data, sensor);
-> +
-> +       data->sensor_temp[sensor->id] = *temp;
-> +
-> +       for (i = 0; i < HISI_MAX_SENSORS; i++) {
-> +               if (data->sensor_temp[i] >= max_temp) {
-> +                       max_temp = data->sensor_temp[i];
-> +                       sensor_id = i;
-> +               }
-> +       }
-> +
-> +       data->irq_bind_sensor = sensor_id;
-> +
-> +       dev_dbg(&data->pdev->dev, "id=%d, irq=%d, temp=%ld, thres=%d\n",
-> +               sensor->id, data->irq_enabled, *temp, sensor->thres_temp);
-> +       /*
-> +        * Bind irq to sensor for two cases:
-> +        *   Reenable alarm IRQ if temperature below threshold;
-> +        *   if irq has been enabled, always set it;
-> +        */
-> +       if (!data->irq_enabled && max_temp < sensor->thres_temp) {
-> +               data->irq_enabled = true;
-> +               hisi_thermal_bind_irq(data);
-> +               enable_irq(data->irq);
-> +       } else if (data->irq_enabled)
-> +               hisi_thermal_bind_irq(data);
-> +
-> +       return 0;
-> +}
-> +
-> +static struct thermal_zone_of_device_ops hisi_of_thermal_ops = {
-> +       .get_temp = hisi_thermal_get_temp,
-> +};
-> +
-> +static irqreturn_t hisi_thermal_alarm_irq(int irq, void *dev)
-> +{
-> +       struct hisi_thermal_data *data = dev;
-> +
-> +       disable_irq_nosync(irq);
-> +       data->irq_enabled = false;
-> +
-> +       return IRQ_WAKE_THREAD;
-> +}
-> +
-> +static irqreturn_t hisi_thermal_alarm_irq_thread(int irq, void *dev)
-> +{
-> +       struct hisi_thermal_data *data = dev;
-> +       struct hisi_thermal_sensor *sensor;
-> +       int i;
-> +
-> +       sensor = &data->sensors[data->irq_bind_sensor];
-> +
-> +       dev_crit(&data->pdev->dev, "THERMAL ALARM: T > %d\n",
-> +                sensor->thres_temp / 1000);
-> +
-> +       for (i = 0; i < data->sensors_num; i++)
-> +               thermal_zone_device_update(data->sensors[i].tzd);
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +static int hisi_thermal_register_sensor(struct platform_device *pdev,
-> +                                       struct hisi_thermal_data *data,
-> +                                       struct hisi_thermal_sensor *sensor,
-> +                                       int index)
-> +{
-> +       int ret, i;
-> +
-> +       sensor->id = index;
-> +       sensor->thermal = data;
-> +
-> +       sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev, sensor->id,
-> +                               sensor, &hisi_of_thermal_ops);
-> +       if (IS_ERR(sensor->tzd)) {
-> +               ret = PTR_ERR(sensor->tzd);
-> +               dev_err(&pdev->dev, "failed to register sensor id %d: %d\n",
-> +                       sensor->id, ret);
-> +               return ret;
-> +       }
-> +
-> +       sensor->trip = of_thermal_get_trip_points(sensor->tzd);
-> +
-> +       for (i = 0; i < of_thermal_get_ntrips(sensor->tzd); i++) {
-> +               if (sensor->trip[i].type == THERMAL_TRIP_PASSIVE) {
-> +                       sensor->thres_temp = sensor->trip[i].temperature;
-> +                       break;
-> +               }
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id of_hisi_thermal_match[] = {
-> +       { .compatible = "hisilicon,tsensor" },
-> +       { /* end */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, of_hisi_thermal_match);
-> +
-> +static void hisi_thermal_toggle_sensor(struct hisi_thermal_sensor *sensor,
-> +                                      bool on)
-> +{
-> +       struct thermal_zone_device *tzd = sensor->tzd;
-> +
-> +       tzd->ops->set_mode(tzd,
-> +               on ? THERMAL_DEVICE_ENABLED : THERMAL_DEVICE_DISABLED);
-> +}
-> +
-> +static int hisi_thermal_probe(struct platform_device *pdev)
-> +{
-> +       struct hisi_thermal_data *data;
-> +       struct resource *res;
-> +       int i;
-> +       int ret;
-> +
-> +       data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +       if (!data)
-> +               return -ENOMEM;
-> +
-> +       mutex_init(&data->thermal_lock);
-> +       data->pdev = pdev;
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       data->regs = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(data->regs)) {
-> +               dev_err(&pdev->dev, "failed to get io address\n");
-> +               return PTR_ERR(data->regs);
-> +       }
-> +
-> +       data->irq = platform_get_irq(pdev, 0);
-> +       if (data->irq < 0)
-> +               return data->irq;
-> +
-> +       ret = devm_request_threaded_irq(&pdev->dev, data->irq,
-> +                       hisi_thermal_alarm_irq, hisi_thermal_alarm_irq_thread,
-> +                       0, "hisi_thermal", data);
-> +       if (ret < 0) {
-> +               dev_err(&pdev->dev, "failed to request alarm irq: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       platform_set_drvdata(pdev, data);
-> +
-> +       data->clk = devm_clk_get(&pdev->dev, "thermal_clk");
-> +       if (IS_ERR(data->clk)) {
-> +               ret = PTR_ERR(data->clk);
-> +               if (ret != -EPROBE_DEFER)
-> +                       dev_err(&pdev->dev,
-> +                               "failed to get thermal clk: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       /* enable clock for thermal */
-> +       ret = clk_prepare_enable(data->clk);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       for (i = 0; i < HISI_MAX_SENSORS; ++i) {
-> +               ret = hisi_thermal_register_sensor(pdev, data,
-> +                                       &data->sensors[i], i);
-> +               if (ret) {
-> +                       dev_err(&pdev->dev,
-> +                       "failed to register thermal sensor: %d\n", ret);
-> +                       goto err_get_sensor_data;
-> +                       return ret;
-> Don't follow return, delete it.
-> 
-> Feiwang
+The following changes since commit f614c8178b0696d070b23f36a2a27b5128f6c372:
 
-OK!!
-> 
+  Merge branch 'parisc-4.1-1' of git://git.kernel.org/pub/scm/linux/kernel/git/deller/parisc-linux
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+
+for you to fetch changes up to cdaa8cf34863028dab238e1498555bf12d693244:
+
+  Merge branch 'fixes' into next/fixes-non-critical
+
+----------------------------------------------------------------
+
+Andreas Faerber (2):
+      ARM: dts: fix mmc node updates for exynos5250-spring
+      ARM: dts: fix lid and power pin-functions for exynos5250-spring
+
+Arnd Bergmann (7):
+      ARM: S3C64XX: add I2C dependencies where needed
+      ARM: S3C64XX: fix building without CONFIG_PM_SLEEP
+      ARM: S3C64XX: fix __initdata section mismatch
+      ARM: S3C24XX: use SAMSUNG_WAKEMASK for s3c2416
+      ARM: S3C24XX: fix building without PM_SLEEP
+      ARM: S3C24XX: fix header file inclusions
+      ARM: S3C24XX: avoid a Kconfig warning
+
+Bartlomiej Zolnierkiewicz (1):
+      ARM: EXYNOS: Fix build breakage cpuidle on !SMP
+
+Felipe Balbi (1):
+      MAINTAINERS: add OMAP defconfigs under OMAP SUPPORT
+
+Gregory CLEMENT (1):
+      ARM: mvebu: Disable CPU Idle on Armada 38x
+
+Julia Lawall (1):
+      ARM: cns3xxx: don't export static symbol
+
+Keerthy (1):
+      ARM: dts: DRA7: Add bandgap and related thermal nodes
+
+Kishon Vijay Abraham I (2):
+      ARM: dts: am4372: Add "ti,am437x-ocp2scp" as compatible string for OCP2SCP
+      bus: ocp2scp: SYNC2 value should be changed to 0x6
+
+Nathan Rossi (1):
+      kbuild: Create directory for target DTB
+
+Nicolas Ferre (1):
+      ARM: at91/dt: sama5d3 xplained: add phy address for macb1
+
+Nishanth Menon (1):
+      ARM: dts: am57xx-beagle-x15: Add thermal map to include fan and tmp102
+
+Olof Johansson (5):
+      Merge tag 'omap-for-v4.1/fixes-0' of git://git.kernel.org/.../tmlind/linux-omap into next/fixes-non-critical
+      Merge tag 'mvebu-fixes-4.0' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into fixes
+      Merge tag 'samsung-fixes-v4.1' of git://git.kernel.org/.../kgene/linux-samsung into next/fixes-non-critical
+      Merge branch 'fixes' into next/fixes-non-critical
+
+Paul Walmsley (1):
+      ARM: OMAP1: PM: fix some build warnings on 1510-only Kconfigs
+
+Praneeth Bajjuri (1):
+      ARM: DRA7: Enable Cortex A15 errata 798181
+
+Stefan Agner (1):
+      ARM: OMAP2+: remove superfluous NULL pointer check
+
+Stefan Hengelein (1):
+      ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688
+
+Tony Lindgren (1):
+      Merge branch 'omap-for-v4.1/ocp2scp' into omap-for-v4.1/fixes-not-urgent
 
 
-> +               }
-> +       }
-> +
-> +       hisi_thermal_enable_sensor(data);
-> +       data->irq_enabled = true;
-> +
-> +       for (i = 0; i < data->sensors_num; i++)
-> +               hisi_thermal_toggle_sensor(&data->sensors[i], true);
-> +
-> +       return 0;
-> +
-> +err_get_sensor_data:
-> +       clk_disable_unprepare(data->clk);
-> +       return ret;
-> +}
-> +
-> +static int hisi_thermal_remove(struct platform_device *pdev)
-> +{
-> +       struct hisi_thermal_data *data = platform_get_drvdata(pdev);
-> +       int i;
-> +
-> +       for (i = 0; i < data->sensors_num; i++) {
-> +               struct hisi_thermal_sensor *sensor = &data->sensors[i];
-> +
-> +               hisi_thermal_toggle_sensor(sensor, false);
-> +               thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
-> +       }
-> +
-> +       hisi_thermal_disable_sensor(data);
-> +       clk_disable_unprepare(data->clk);
-> +       return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int hisi_thermal_suspend(struct device *dev)
-> +{
-> +       struct hisi_thermal_data *data = dev_get_drvdata(dev);
-> +
-> +       hisi_thermal_disable_sensor(data);
-> +       data->irq_enabled = false;
-> +
-> +       clk_disable_unprepare(data->clk);
-> +
-> +       return 0;
-> +}
-> +
-> +static int hisi_thermal_resume(struct device *dev)
-> +{
-> +       struct hisi_thermal_data *data = dev_get_drvdata(dev);
-> +
-> +       clk_prepare_enable(data->clk);
-> +
-> +       data->irq_enabled = true;
-> +       hisi_thermal_enable_sensor(data);
-> +
-> +       return 0;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(hisi_thermal_pm_ops,
-> +                        hisi_thermal_suspend, hisi_thermal_resume);
-> +
-> +static struct platform_driver hisi_thermal_driver = {
-> +       .driver = {
-> +               .name   = "hisi_thermal",
-> +               .owner  = THIS_MODULE,
-> +               .pm     = &hisi_thermal_pm_ops,
-> +               .of_match_table = of_hisi_thermal_match,
-> +       },
-> +       .probe          = hisi_thermal_probe,
-> +       .remove         = hisi_thermal_remove,
-> +};
-> +
-> +module_platform_driver(hisi_thermal_driver);
-> +
-> +MODULE_AUTHOR("Xinwei Kong <kong.kongxinwei@hisilicon.com>");
-> +MODULE_AUTHOR("Leo Yan <leo.yan@linaro.org>");
-> +MODULE_DESCRIPTION("Hisilicon thermal driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
-> 
+ .../devicetree/bindings/bus/omap-ocp2scp.txt    |  3 +-
+ MAINTAINERS                                     |  2 +
+ arch/arm/boot/dts/am4372.dtsi                   |  4 +-
+ arch/arm/boot/dts/am57xx-beagle-x15.dts         | 49 ++++++++++++++
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts     |  6 ++
+ arch/arm/boot/dts/dra7.dtsi                     | 23 +++++++
+ arch/arm/boot/dts/dra72x.dtsi                   |  5 ++
+ arch/arm/boot/dts/dra74x.dtsi                   |  5 ++
+ arch/arm/boot/dts/exynos5250-spring.dts         | 20 ++----
+ arch/arm/boot/dts/omap4-cpu-thermal.dtsi        |  4 +-
+ arch/arm/mach-cns3xxx/pm.c                      |  1 -
+ arch/arm/mach-exynos/exynos.c                   |  2 +-
+ arch/arm/mach-exynos/pm.c                       |  2 +
+ arch/arm/mach-mvebu/pmsu.c                      | 16 ++++-
+ arch/arm/mach-omap1/pm.c                        | 51 +++++++--------
+ arch/arm/mach-omap2/Kconfig                     | 22 +------
+ arch/arm/mach-omap2/common.c                    |  1 -
+ arch/arm/mach-omap2/common.h                    |  3 -
+ arch/arm/mach-omap2/io.c                        |  2 -
+ arch/arm/mach-omap2/mux.c                       |  2 +-
+ arch/arm/mach-omap2/omap-secure.h               |  7 --
+ arch/arm/mach-omap2/omap4-common.c              | 69 --------------------
+ arch/arm/mach-omap2/sleep44xx.S                 |  2 -
+ arch/arm/mach-s3c24xx/Kconfig                   | 19 +++---
+ arch/arm/mach-s3c24xx/Makefile                  |  3 +-
+ arch/arm/mach-s3c24xx/include/mach/pm-core.h    | 24 ++++++-
+ arch/arm/mach-s3c24xx/pm-s3c2416.c              |  3 +-
+ arch/arm/mach-s3c24xx/pm.c                      |  6 +-
+ arch/arm/mach-s3c24xx/s3c2410.c                 |  2 +-
+ arch/arm/mach-s3c24xx/s3c2412.c                 |  2 +-
+ arch/arm/mach-s3c24xx/s3c2416.c                 |  2 +-
+ arch/arm/mach-s3c24xx/s3c2440.c                 |  4 +-
+ arch/arm/mach-s3c24xx/s3c2442.c                 |  4 +-
+ arch/arm/mach-s3c24xx/s3c244x.c                 |  7 +-
+ arch/arm/mach-s3c64xx/Kconfig                   |  4 +-
+ arch/arm/mach-s3c64xx/Makefile                  |  3 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c           |  2 +-
+ arch/arm/mach-s3c64xx/pm.c                      |  2 +
+ arch/arm/plat-samsung/include/plat/pm.h         | 14 +++-
+ arch/arm/plat-samsung/pm-debug.c                |  1 +
+ arch/arm/plat-samsung/pm.c                      | 20 ------
+ drivers/bus/omap-ocp2scp.c                      | 34 ++++++++++
+ drivers/cpuidle/cpuidle-exynos.c                |  3 +-
+ scripts/Makefile.lib                            |  3 +-
+ 44 files changed, 254 insertions(+), 209 deletions(-)
