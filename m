@@ -1,79 +1,56 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 22 Apr 2015 14:13:53 +0200
-Subject: [PATCH RFC v9 11/20] drm/bridge: Add Synopsys DesignWare MIPI DSI
- host controller driver
-In-Reply-To: <552F4B2E.2000209@codeaurora.org>
-References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
- <20150409084353.GD12103@ulmo> <552F4B2E.2000209@codeaurora.org>
-Message-ID: <54991164.nrScLQEecU@diego>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Wed, 22 Apr 2015 14:19:43 +0200
+Subject: I.MX6Q slow pci_dma_sync_single_for_cpu()
+Message-ID: <m3a8y0uzhc.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 16. April 2015, 11:09:58 schrieb Archit Taneja:
-> On 04/09/2015 02:13 PM, Thierry Reding wrote:
-> > On Thu, Feb 12, 2015 at 02:01:34PM +0800, Liu Ying wrote:
-> > [...]
-> > 
-> >> diff --git a/drivers/gpu/drm/bridge/dw_mipi_dsi.c
-> >> b/drivers/gpu/drm/bridge/dw_mipi_dsi.c> 
-> > [...]
-> > 
-> >> +struct dw_mipi_dsi {
-> >> +	struct mipi_dsi_host dsi_host;
-> >> +	struct drm_connector connector;
-> >> +	struct drm_encoder *encoder;
-> >> +	struct drm_bridge *bridge;
-> >> +	struct drm_panel *panel;
-> >> +	struct device *dev;
-> >> +
-> >> +	void __iomem *base;
-> >> +
-> >> +	struct clk *pllref_clk;
-> >> +	struct clk *cfg_clk;
-> >> +	struct clk *pclk;
-> >> +
-> >> +	unsigned int lane_mbps; /* per lane */
-> >> +	u32 channel;
-> >> +	u32 lanes;
-> >> +	u32 format;
-> >> +	struct drm_display_mode *mode;
-> >> +
-> >> +	const struct dw_mipi_dsi_plat_data *pdata;
-> >> +
-> >> +	bool enabled;
-> >> +};
-> > 
-> > While reviewing this I kept thinking whether this is really the right
-> > architectural design. This driver is a MIPI DSI host, a connector and
-> > a bridge, all in one. But it seems to me like it should really be an
-> > encoder/connector and a MIPI DSI host. Why the need for a bridge? The
-> > bridge abstraction targets blocks outside of the SoC, but it is my
-> > understanding that these DesignWare IP blocks are designed into SoCs.
-> 
-> The msm driver uses bridges for blocks within the SoC too. We have too
-> many sub blocks in the display controller that use up crtcs and encoder
-> entities. A bridge is the only option one has if an encoder in the
-> display chain is already taken.
-> 
-> In the above designware configuration, if some one created a board that
-> used an external chip to further convert DSI to some other output
-> format, then we would be completely exhausted of all entities.
-> 
-> I posted a patch that allows us to create a chain of bridges for such
-> cases. It seems to work well as an interim solution. Ideally, it would
-> be better if we could make bridge a special case of an encoder, and let
-> one encoder connect to another encoder.
-> 
-> Such a thing would also help us unify i2c slave encoders and bridge
-> drivers too. A chip designed as an i2c slave encoder would work well
-> with a drm driver that doesn't have an encoder, but won't work for SoCs
-> SoCs that already have an encoder and were expecting a bridge entity
-> instead.
+Hi,
 
-Yeah, having encoder-after-encoder chains would be great. I have the same 
-issue on Rockchip where on the rk3288 the lvds-IP hogs the lcd-pins of the soc 
-which are used both for panels as well as external encoders, while on the 
-older Rockchip SoCs these pins are used by external encoders directly.
+I'm testing a video frame grabber driver on IMX6 (ARMv7 PL310) and I'm
+having a problem with slow pci_dma_sync_single_for_cpu().
 
-So in my current (pending review) patchset the lvds acts as encoder for panels 
-and as bridge if external encoders are in use.
+For tests I'm using buffers which are 811008 bytes long (704 * 576 * 2):
+
+void *virt = kmalloc(811008, GFP_KERNEL);
+phys = pci_map_single(dev->pci_dev, virt, 811008, PCI_DMA_FROMDEVICE);
+
+Now the device (a PCIe bus mastering frame grabber) transfers frame data
+and I'm doing (repeatedly):
+
+pci_dma_sync_single_for_cpu(dev->pci_dev, phys, 811008, PCI_DMA_FROMDEVICE);
+
+The problem is this call takes up to about 20 milliseconds.
+
+I imagine the sync operation should only invalidate the caches - the
+buffers are one way device->cpu only (read-only from the CPU side), so
+there is no need to flush anything out.
+
+It seems pci_dma_sync_single_for_cpu() ends up here:
+
+static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+	size_t size, enum dma_data_direction dir)
+{
+	phys_addr_t paddr = page_to_phys(page) + off;
+
+	/* FIXME: non-speculating: not required */
+	/* in any case, don't bother invalidating if DMA to device */
+	if (dir != DMA_TO_DEVICE) {
+		outer_inv_range(paddr, paddr + size);
+
+		dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
+	}
+	...
+
+the outer_inv_range() usually takes a bit less than half of the time
+(up to 6 ms) while dma_cache_maint_page() takes the rest (up to 14 ms).
+
+The real driver uses SG buffers (of the same size), the SG sync
+operations take as much time as the "single" one.
+
+Any ideas?
+-- 
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
