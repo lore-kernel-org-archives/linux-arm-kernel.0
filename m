@@ -1,154 +1,166 @@
 From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Wed, 22 Apr 2015 14:11:40 +0300
-Subject: [PATCHv7 6/8] watchdog: imx2_wdt: Convert to use new core extensions
+Date: Wed, 22 Apr 2015 14:11:39 +0300
+Subject: [PATCHv7 5/8] watchdog: at91sam9_wdt: Convert to use new watchdog
+ core extensions
 In-Reply-To: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
 References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <1429701102-22320-7-git-send-email-timo.kokkonen@offcode.fi>
+Message-ID: <1429701102-22320-6-git-send-email-timo.kokkonen@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fill in the HW capabilities in watchdog_device structure and call
-watchdgog_init_params() to let watchdog core to init itself
-properly. The watchdog core can then ping stopped watchdog and the
-timer code in the driver can be removed.
+Fill in the new watchdog core parameters and call
+watchdog_init_params() to let core know we are ready to support the
+new core API extensions. This allows the ad hoc timer code to be
+removed from the driver as the watchdog core takes care of petting the
+driver as needed.
 
+Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
 Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
 ---
- drivers/watchdog/imx2_wdt.c | 43 ++++++++++---------------------------------
- 1 file changed, 10 insertions(+), 33 deletions(-)
+ drivers/watchdog/at91sam9_wdt.c | 62 +++++++++++------------------------------
+ 1 file changed, 16 insertions(+), 46 deletions(-)
 
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index 5e6d808..8be8006 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -62,7 +62,6 @@
- struct imx2_wdt_device {
- 	struct clk *clk;
- 	struct regmap *regmap;
--	struct timer_list timer;	/* Pings the watchdog when closed */
- 	struct watchdog_device wdog;
- 	struct notifier_block restart_handler;
+diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+index 1443b3c..053b5b6 100644
+--- a/drivers/watchdog/at91sam9_wdt.c
++++ b/drivers/watchdog/at91sam9_wdt.c
+@@ -29,7 +29,6 @@
+ #include <linux/types.h>
+ #include <linux/watchdog.h>
+ #include <linux/jiffies.h>
+-#include <linux/timer.h>
+ #include <linux/bitops.h>
+ #include <linux/uaccess.h>
+ #include <linux/of.h>
+@@ -83,11 +82,8 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
+ struct at91wdt {
+ 	struct watchdog_device wdd;
+ 	void __iomem *base;
+-	unsigned long next_heartbeat;	/* the next_heartbeat for the timer */
+-	struct timer_list timer;	/* The timer that pings the watchdog */
+ 	u32 mr;
+ 	u32 mr_mask;
+-	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
+ 	bool nowayout;
+ 	unsigned int irq;
  };
-@@ -151,21 +150,13 @@ static int imx2_wdt_ping(struct watchdog_device *wdog)
- 	return 0;
+@@ -115,26 +111,11 @@ static inline void at91_wdt_reset(struct at91wdt *wdt)
+ 	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
  }
  
--static void imx2_wdt_timer_ping(unsigned long arg)
+-/*
+- * Timer tick
+- */
+-static void at91_ping(unsigned long data)
 -{
--	struct watchdog_device *wdog = (struct watchdog_device *)arg;
--	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
--
--	/* ping it every wdog->timeout / 2 seconds to prevent reboot */
--	imx2_wdt_ping(wdog);
--	mod_timer(&wdev->timer, jiffies + wdog->timeout * HZ / 2);
+-	struct at91wdt *wdt = (struct at91wdt *)data;
+-	if (time_before(jiffies, wdt->next_heartbeat) ||
+-	    !watchdog_active(&wdt->wdd)) {
+-		at91_wdt_reset(wdt);
+-		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
+-	} else {
+-		pr_crit("I will reset your machine !\n");
+-	}
 -}
 -
- static int imx2_wdt_set_timeout(struct watchdog_device *wdog,
- 				unsigned int new_timeout)
+ static int at91_wdt_start(struct watchdog_device *wdd)
  {
- 	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
- 
-+	wdog->hw_heartbeat = new_timeout * HZ / 2;
-+	wdog->timeout = new_timeout;
- 	regmap_update_bits(wdev->regmap, IMX2_WDT_WCR, IMX2_WDT_WCR_WT,
- 			   WDOG_SEC_TO_COUNT(new_timeout));
+ 	struct at91wdt *wdt = to_wdt(wdd);
+-	/* calculate when the next userspace timeout will be */
+-	wdt->next_heartbeat = jiffies + wdd->timeout * HZ;
++
++	at91_wdt_reset(wdt);
  	return 0;
-@@ -176,8 +167,6 @@ static int imx2_wdt_start(struct watchdog_device *wdog)
- 	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+ }
  
- 	if (imx2_wdt_is_running(wdev)) {
--		/* delete the timer that pings the watchdog after close */
--		del_timer_sync(&wdev->timer);
- 		imx2_wdt_set_timeout(wdog, wdog->timeout);
- 	} else
- 		imx2_wdt_setup(wdog);
-@@ -191,7 +180,7 @@ static int imx2_wdt_stop(struct watchdog_device *wdog)
- 	 * We don't need a clk_disable, it cannot be disabled once started.
- 	 * We use a timer to ping the watchdog while /dev/watchdog is closed
+@@ -146,7 +127,11 @@ static int at91_wdt_stop(struct watchdog_device *wdd)
+ 
+ static int at91_wdt_set_timeout(struct watchdog_device *wdd, unsigned int new_timeout)
+ {
+-	wdd->timeout = new_timeout;
++	/*
++	 * The watchdog hardware can't be reconfigured, only one
++	 * timeout is supported by the HW.
++	 */
++	wdd->timeout = wdd->hw_max_timeout / HZ;
+ 	return at91_wdt_start(wdd);
+ }
+ 
+@@ -196,11 +181,11 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+ 	 * it at the min_heartbeat period.
  	 */
--	imx2_wdt_timer_ping((unsigned long)wdog);
-+	imx2_wdt_ping(wdog);
- 	return 0;
- }
+ 	if ((max_heartbeat / 4) >= min_heartbeat)
+-		wdt->heartbeat = max_heartbeat / 4;
++		wdt->wdd.hw_heartbeat = max_heartbeat / 4;
+ 	else if ((max_heartbeat / 2) >= min_heartbeat)
+-		wdt->heartbeat = max_heartbeat / 2;
++		wdt->wdd.hw_heartbeat = max_heartbeat / 2;
+ 	else
+-		wdt->heartbeat = min_heartbeat;
++		wdt->wdd.hw_heartbeat = min_heartbeat;
  
-@@ -201,7 +190,7 @@ static inline void imx2_wdt_ping_if_active(struct watchdog_device *wdog)
+ 	if (max_heartbeat < min_heartbeat + 4)
+ 		dev_warn(dev,
+@@ -220,32 +205,15 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+ 			 "watchdog already configured differently (mr = %x expecting %x)\n",
+ 			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
  
- 	if (imx2_wdt_is_running(wdev)) {
- 		imx2_wdt_set_timeout(wdog, wdog->timeout);
--		imx2_wdt_timer_ping((unsigned long)wdog);
-+		imx2_wdt_ping(wdog);
- 	}
- }
- 
-@@ -256,6 +245,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 	wdog->ops		= &imx2_wdt_ops;
- 	wdog->min_timeout	= 1;
- 	wdog->max_timeout	= IMX2_WDT_MAX_TIME;
-+	wdog->hw_max_timeout	= wdog->max_timeout * HZ;
- 
- 	clk_prepare_enable(wdev->clk);
- 
-@@ -267,12 +257,12 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 		dev_warn(&pdev->dev, "Initial timeout out of range! Clamped from %u to %u\n",
- 			 timeout, wdog->timeout);
- 
-+	wdog->timeout = timeout;
-+	wdog->hw_heartbeat = timeout * HZ / 2;
- 	platform_set_drvdata(pdev, wdog);
- 	watchdog_set_drvdata(wdog, wdev);
- 	watchdog_set_nowayout(wdog, nowayout);
--	watchdog_init_timeout(wdog, timeout, &pdev->dev);
+-	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
 -
--	setup_timer(&wdev->timer, imx2_wdt_timer_ping, (unsigned long)wdog);
-+	watchdog_init_params(wdog, &pdev->dev);
+-	/*
+-	 * Use min_heartbeat the first time to avoid spurious watchdog reset:
+-	 * we don't know for how long the watchdog counter is running, and
+-	 *  - resetting it right now might trigger a watchdog fault reset
+-	 *  - waiting for heartbeat time might lead to a watchdog timeout
+-	 *    reset
+-	 */
+-	mod_timer(&wdt->timer, jiffies + min_heartbeat);
++	wdt->wdd.hw_features = WDOG_HW_RUNNING_AT_BOOT;
++	watchdog_init_params(&wdt->wdd, dev);
  
- 	imx2_wdt_ping_if_active(wdog);
- 
-@@ -311,7 +301,6 @@ static int __exit imx2_wdt_remove(struct platform_device *pdev)
- 	watchdog_unregister_device(wdog);
- 
- 	if (imx2_wdt_is_running(wdev)) {
--		del_timer_sync(&wdev->timer);
- 		imx2_wdt_ping(wdog);
- 		dev_crit(&pdev->dev, "Device removed: Expect reboot!\n");
- 	}
-@@ -325,10 +314,9 @@ static void imx2_wdt_shutdown(struct platform_device *pdev)
- 
- 	if (imx2_wdt_is_running(wdev)) {
- 		/*
--		 * We are running, we need to delete the timer but will
--		 * give max timeout before reboot will take place
-+		 * We are running, give max timeout before reboot will
-+		 * take place
- 		 */
--		del_timer_sync(&wdev->timer);
- 		imx2_wdt_set_timeout(wdog, IMX2_WDT_MAX_TIME);
- 		imx2_wdt_ping(wdog);
- 		dev_crit(&pdev->dev, "Device shutdown: Expect reboot!\n");
-@@ -346,10 +334,6 @@ static int imx2_wdt_suspend(struct device *dev)
- 	if (imx2_wdt_is_running(wdev)) {
- 		imx2_wdt_set_timeout(wdog, IMX2_WDT_MAX_TIME);
- 		imx2_wdt_ping(wdog);
+-	/* Try to set timeout from device tree first */
+-	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
+-		watchdog_init_timeout(&wdt->wdd, heartbeat, dev);
+ 	watchdog_set_nowayout(&wdt->wdd, wdt->nowayout);
+ 	err = watchdog_register_device(&wdt->wdd);
+ 	if (err)
+-		goto out_stop_timer;
 -
--		/* The watchdog is not active */
--		if (!watchdog_active(wdog))
--			del_timer_sync(&wdev->timer);
- 	}
- 
- 	clk_disable_unprepare(wdev->clk);
-@@ -378,13 +362,6 @@ static int imx2_wdt_resume(struct device *dev)
- 		/* Resuming from non-deep sleep state. */
- 		imx2_wdt_set_timeout(wdog, wdog->timeout);
- 		imx2_wdt_ping(wdog);
--		/*
--		 * But the watchdog is not active, then start
--		 * the timer again.
--		 */
--		if (!watchdog_active(wdog))
--			mod_timer(&wdev->timer,
--				  jiffies + wdog->timeout * HZ / 2);
- 	}
+-	wdt->next_heartbeat = jiffies + wdt->wdd.timeout * HZ;
++		return err;
  
  	return 0;
+-
+-out_stop_timer:
+-	del_timer(&wdt->timer);
+-	return err;
+ }
+ 
+ /* ......................................................................... */
+@@ -287,6 +255,8 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
+ 		}
+ 	}
+ 
++	wdt->wdd.hw_max_timeout = max * HZ;
++
+ 	min = secs_to_ticks(min);
+ 	max = secs_to_ticks(max);
+ 
+@@ -346,6 +316,7 @@ static int __init at91wdt_probe(struct platform_device *pdev)
+ 	wdt->wdd.timeout = WDT_HEARTBEAT;
+ 	wdt->wdd.min_timeout = 1;
+ 	wdt->wdd.max_timeout = 0xFFFF;
++	wdt->wdd.hw_max_timeout = WDT_COUNTER_MAX_SECS * HZ;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	wdt->base = devm_ioremap_resource(&pdev->dev, r);
+@@ -376,7 +347,6 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
+ 	watchdog_unregister_device(&wdt->wdd);
+ 
+ 	pr_warn("I quit now, hardware will probably reboot!\n");
+-	del_timer(&wdt->timer);
+ 
+ 	return 0;
+ }
 -- 
 2.1.0
