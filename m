@@ -1,112 +1,174 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Wed, 22 Apr 2015 09:33:52 -0500
-Subject: [PATCH 1/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <CALx668W6nJkYR325BhxOXMF1z=i7mkYbh3pyBFDNoZC9NZ0dVw@mail.gmail.com>
-References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
- <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
- <20150420141719.GF27115@jcartwri.amer.corp.natinst.com>
- <CALx668W6nJkYR325BhxOXMF1z=i7mkYbh3pyBFDNoZC9NZ0dVw@mail.gmail.com>
-Message-ID: <20150422143352.GJ27115@jcartwri.amer.corp.natinst.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Apr 2015 07:35:30 -0700
+Subject: [PATCH 1/1] ARM: OMAP2+: Fix omap3 off idle power consumption
+ creeping up
+In-Reply-To: <553702CE.2030308@ti.com>
+References: <1429632619-23474-1-git-send-email-tony@atomide.com>
+ <20150421214718.GN18048@atomide.com> <20150421221227.GA9919@kahuna>
+ <20150422010026.GO18048@atomide.com> <553702CE.2030308@ti.com>
+Message-ID: <20150422143529.GP18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 22, 2015 at 11:11:34AM +0800, Pi-Cheng Chen wrote:
-[..]
-> >> +config ARM_MT8173_CPUFREQ
-> >> +     bool "Mediatek MT8173 CPUFreq support"
-> >> +     depends on ARCH_MEDIATEK && REGULATOR
-> >
-> > I think you want to 'select REGULATOR' here; because REGULATOR isn't
-> > a user-visible option.
+* Nishanth Menon <nm@ti.com> [150421 19:10]:
+> On 04/21/2015 08:00 PM, Tony Lindgren wrote:
+> > +	/*
+> > +	 * Note that for omap3 OMAP3430_SREN_MASK clears SREN to work around
+> > +	 * erratum i531 "Extra Power Consumed When Repeated Start Operation
+> > +	 * Mode Is Enabled on I2C Interface Dedicated for Smart Reflex (I2C4)".
+> > +	 * Otherwise I2C4 eventually leads into about 23mW extran power being
+>
+> nitpick: extran ;)
+
+Thanks fixed.
+ 
+> > @@ -40,6 +40,7 @@ static struct omap_vc_common omap3_vc_common = {
+> >  	.cmd_onlp_shift	 = OMAP3430_VC_CMD_ONLP_SHIFT,
+> >  	.cmd_ret_shift	 = OMAP3430_VC_CMD_RET_SHIFT,
+> >  	.cmd_off_shift	 = OMAP3430_VC_CMD_OFF_SHIFT,
+> > +	.i2c_cfg_clear_mask = OMAP3430_SREN_MASK,
 > 
-> I am not sure but I need it to be "depends on" as other SoC cpufreq
-> drivers. Please check
-> ARM_S3C2416_CPUFREQ_VCORESCALE in drivers/cpufreq/Kconfig.arm
-> By the way, I would like to know more details about the visibility of
-> these configurable
-> options, would you kindly point me out some documents about it?
-
-Paul pointed out that I was wrong, so I'll defer to him.  My knowledge
-has likely been outdated.
-
-[..]
-> >> +/* OPP table for LITTLE cores of MT8173 */
-> >> +struct mtk_cpu_opp mt8173_l_opp[] = {
-> >
-> > static const?
+> I know that the prminst rmw current code does:
+> v &= ~mask;
+> v |= bits;
+> and not
+> v &= ~mask;
+> v |= (bits & mask);
+> but to maintain legacy behavior in case the PRCM cleanup sequences
+> change anything..
 > 
-> Yes. I miss "static" here. But I need those two array to be non-const
-> so that I could
-> fix up the exact voltage values by querying the supported voltages of
-> regulators.
-> Please check the mt8173_cpufreq_cpu_opp_fixup() function below.
-
-Indeed.  Thanks.
-
-[..]
-> >> +static int mtk_cpufreq_voltage_trace(struct cpu_dvfs_info *info,
-> >> +                                  struct mtk_cpu_opp *opp)
-> >> +{
-> >> +     struct regulator *proc_reg = info->proc_reg;
-> >> +     struct regulator *sram_reg = info->sram_reg;
-> >> +     int old_vproc, new_vproc, old_vsram, new_vsram, vsram, vproc, ret;
-> >> +
-> >> +     old_vproc = regulator_get_voltage(proc_reg);
-> >> +     old_vsram = regulator_get_voltage(sram_reg);
-> >> +
-> >> +     new_vproc = opp->vproc;
-> >> +     new_vsram = opp->vsram;
-> >> +
-> >> +     /*
-> >> +      * In the case the voltage is going to be scaled up, Vsram and Vproc
-> >> +      * need to be scaled up step by step. In each step, Vsram needs to be
-> >> +      * set to (Vproc + 200mV) first, then Vproc is set to (Vsram - 100mV).
-> >> +      * Repeat the step until Vsram and Vproc are set to target voltage.
-> >> +      */
-> >> +     if (old_vproc < new_vproc) {
-> >> +next_up_step:
-> >> +             old_vsram = regulator_get_voltage(sram_reg);
-> >> +
-> >> +             vsram = (new_vsram - old_vproc < MAX_VOLT_SHIFT) ?
-> >> +                     new_vsram : old_vproc + MAX_VOLT_SHIFT;
-> >> +             vsram = get_regulator_voltage_floor(sram_reg, vsram);
-> >> +
-> >> +             ret = regulator_set_voltage(sram_reg, vsram, vsram);
-> >> +             if (ret)
-> >> +                     return ret;
-> >> +
-> >> +             vproc = (new_vsram == vsram) ?
-> >> +                     new_vproc : vsram - MIN_VOLT_SHIFT;
-> >> +             vproc = get_regulator_voltage_ceil(proc_reg, vproc);
-> >> +
-> >> +             ret = regulator_set_voltage(proc_reg, vproc, vproc);
-> >> +             if (ret) {
-> >> +                     regulator_set_voltage(sram_reg, old_vsram, old_vsram);
-> >> +                     return ret;
-> >> +             }
-> >> +
-> >> +             if (new_vproc == vproc && new_vsram == vsram)
-> >> +                     return 0;
-> >> +
-> >> +             old_vproc = vproc;
-> >> +             goto next_up_step;
-> >
-> > Perhaps a naive question: but, is this the correct place to do this?  I
-> > would expect this stepping behavior to be implemented in the driver
-> > controlling the regulator you are consuming.  It seems strange to do it
-> > here.
+> 	.i2c_cfg_clear_mask = OMAP3430_SREN_MASK | OMAP3430_HSEN_MASK,
+> ?
+> or
+> 		voltdm->rmw(vc->common->i2c_cfg_clear_mask |
+>   			    vc->common->i2c_cfg_hsen_mask,
+>   			    vc->common->i2c_cfg_hsen_mask,
+>   			    vc->common->i2c_cfg_reg);
 > 
-> This was already discussed in the last round of this series of patches.
-> Please check the discussion[1]. Any suggestion would be welcomed.
-> Thanks.
+> no strong feelings though...
 
-Interesting, thanks.  Sorry for rehashing already-covered territory!
+OK updated to use OMAP3430_SREN_MASK | OMAP3430_HSEN_MASK.
+ 
+> otherwise, please feel to add:
+> Reviewed-by: Nishanth Menon <nm@ti.com>
 
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150422/0c3b0988/attachment-0001.sig>
+Thanks added updated patch below.
+
+Regards,
+
+Tony
+
+8< ----------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 21 Apr 2015 14:31:23 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix omap off idle power consumption creeping up
+
+If we use a combination of VMODE and I2C4 for retention modes,
+eventually the off idle power consumption will creep up by about
+23mW, even during off mode with I2C4 always staying enabled.
+
+Turns out this is because of erratum i531 "Extra Power Consumed
+When Repeated Start Operation Mode Is Enabled on I2C Interface
+Dedicated for Smart Reflex (I2C4)" as pointed out by Nishanth
+Menon <nm@ti.com>.
+
+Let's fix the issue by adding i2c_cfg_clear_mask for the bits
+to clear when initializing the I2C4 adapter so we can clear
+SREN bit that drives the I2C4 lines low otherwise when there
+is no traffic.
+
+Fixes: 3b8c4ebb7630 ("ARM: OMAP3: Fix idle mode signaling for
+sys_clkreq and sys_off_mode")
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Tero Kristo <t-kristo@ti.com>
+Reviewed-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/prm-regbits-34xx.h
++++ b/arch/arm/mach-omap2/prm-regbits-34xx.h
+@@ -112,6 +112,7 @@
+ #define OMAP3430_VC_CMD_ONLP_SHIFT			16
+ #define OMAP3430_VC_CMD_RET_SHIFT			8
+ #define OMAP3430_VC_CMD_OFF_SHIFT			0
++#define OMAP3430_SREN_MASK				(1 << 4)
+ #define OMAP3430_HSEN_MASK				(1 << 3)
+ #define OMAP3430_MCODE_MASK				(0x7 << 0)
+ #define OMAP3430_VALID_MASK				(1 << 24)
+--- a/arch/arm/mach-omap2/prm-regbits-44xx.h
++++ b/arch/arm/mach-omap2/prm-regbits-44xx.h
+@@ -35,6 +35,7 @@
+ #define OMAP4430_GLOBAL_WARM_SW_RST_SHIFT				1
+ #define OMAP4430_GLOBAL_WUEN_MASK					(1 << 16)
+ #define OMAP4430_HSMCODE_MASK						(0x7 << 0)
++#define OMAP4430_SRMODEEN_MASK						(1 << 4)
+ #define OMAP4430_HSMODEEN_MASK						(1 << 3)
+ #define OMAP4430_HSSCLL_SHIFT						24
+ #define OMAP4430_ICEPICK_RST_SHIFT					9
+--- a/arch/arm/mach-omap2/vc.c
++++ b/arch/arm/mach-omap2/vc.c
+@@ -316,7 +316,8 @@ static void __init omap3_vc_init_pmic_signaling(struct voltagedomain *voltdm)
+ 	 * idle. And we can also scale voltages to zero for off-idle.
+ 	 * Note that no actual voltage scaling during off-idle will
+ 	 * happen unless the board specific twl4030 PMIC scripts are
+-	 * loaded.
++	 * loaded. See also omap_vc_i2c_init for comments regarding
++	 * erratum i531.
+ 	 */
+ 	val = voltdm->read(OMAP3_PRM_VOLTCTRL_OFFSET);
+ 	if (!(val & OMAP3430_PRM_VOLTCTRL_SEL_OFF)) {
+@@ -704,9 +705,16 @@ static void __init omap_vc_i2c_init(struct voltagedomain *voltdm)
+ 		return;
+ 	}
+ 
++	/*
++	 * Note that for omap3 OMAP3430_SREN_MASK clears SREN to work around
++	 * erratum i531 "Extra Power Consumed When Repeated Start Operation
++	 * Mode Is Enabled on I2C Interface Dedicated for Smart Reflex (I2C4)".
++	 * Otherwise I2C4 eventually leads into about 23mW extra power being
++	 * consumed even during off idle using VMODE.
++	 */
+ 	i2c_high_speed = voltdm->pmic->i2c_high_speed;
+ 	if (i2c_high_speed)
+-		voltdm->rmw(vc->common->i2c_cfg_hsen_mask,
++		voltdm->rmw(vc->common->i2c_cfg_clear_mask,
+ 			    vc->common->i2c_cfg_hsen_mask,
+ 			    vc->common->i2c_cfg_reg);
+ 
+--- a/arch/arm/mach-omap2/vc.h
++++ b/arch/arm/mach-omap2/vc.h
+@@ -34,6 +34,7 @@ struct voltagedomain;
+  * @cmd_ret_shift: RET field shift in PRM_VC_CMD_VAL_* register
+  * @cmd_off_shift: OFF field shift in PRM_VC_CMD_VAL_* register
+  * @i2c_cfg_reg: I2C configuration register offset
++ * @i2c_cfg_clear_mask: high-speed mode bit clear mask in I2C config register
+  * @i2c_cfg_hsen_mask: high-speed mode bit field mask in I2C config register
+  * @i2c_mcode_mask: MCODE field mask for I2C config register
+  *
+@@ -52,6 +53,7 @@ struct omap_vc_common {
+ 	u8 cmd_ret_shift;
+ 	u8 cmd_off_shift;
+ 	u8 i2c_cfg_reg;
++	u8 i2c_cfg_clear_mask;
+ 	u8 i2c_cfg_hsen_mask;
+ 	u8 i2c_mcode_mask;
+ };
+--- a/arch/arm/mach-omap2/vc3xxx_data.c
++++ b/arch/arm/mach-omap2/vc3xxx_data.c
+@@ -40,6 +40,7 @@ static struct omap_vc_common omap3_vc_common = {
+ 	.cmd_onlp_shift	 = OMAP3430_VC_CMD_ONLP_SHIFT,
+ 	.cmd_ret_shift	 = OMAP3430_VC_CMD_RET_SHIFT,
+ 	.cmd_off_shift	 = OMAP3430_VC_CMD_OFF_SHIFT,
++	.i2c_cfg_clear_mask = OMAP3430_SREN_MASK | OMAP3430_HSEN_MASK,
+ 	.i2c_cfg_hsen_mask = OMAP3430_HSEN_MASK,
+ 	.i2c_cfg_reg	 = OMAP3_PRM_VC_I2C_CFG_OFFSET,
+ 	.i2c_mcode_mask	 = OMAP3430_MCODE_MASK,
+--- a/arch/arm/mach-omap2/vc44xx_data.c
++++ b/arch/arm/mach-omap2/vc44xx_data.c
+@@ -42,6 +42,7 @@ static const struct omap_vc_common omap4_vc_common = {
+ 	.cmd_ret_shift = OMAP4430_RET_SHIFT,
+ 	.cmd_off_shift = OMAP4430_OFF_SHIFT,
+ 	.i2c_cfg_reg = OMAP4_PRM_VC_CFG_I2C_MODE_OFFSET,
++	.i2c_cfg_clear_mask = OMAP4430_SRMODEEN_MASK | OMAP4430_HSMODEEN_MASK,
+ 	.i2c_cfg_hsen_mask = OMAP4430_HSMODEEN_MASK,
+ 	.i2c_mcode_mask	 = OMAP4430_HSMCODE_MASK,
+ };
