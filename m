@@ -1,135 +1,135 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Wed, 22 Apr 2015 18:40:33 +0000
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <20150422170718.GG13019@arm.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20150416104008.GB25640@arm.com>
- <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150422170718.GG13019@arm.com>
-Message-ID: <BN3PR0301MB121901C218955F709AE892F3EAEE0@BN3PR0301MB1219.namprd03.prod.outlook.com>
+From: bhaskarbudiredla@gmail.com (Bhaskara rao Budiredla)
+Date: Thu, 23 Apr 2015 00:12:34 +0530
+Subject: Programming the boundary between Inner and Outer caches on ARM
+ architecture
+In-Reply-To: <20150421110038.GH30114@e104818-lin.cambridge.arm.com>
+References: <CAJWVF-w5YpZjRqnvbz1p70_WTBROL9vDkvYb_sG43nGp=s1vLg@mail.gmail.com>
+ <20150420100119.GC24715@e104818-lin.cambridge.arm.com>
+ <CAJWVF-xvca0MpKF1=GoyyffGTzxtvy_LoaZfjhwU27vSuyOHFA@mail.gmail.com>
+ <20150421110038.GH30114@e104818-lin.cambridge.arm.com>
+Message-ID: <CAJWVF-wg1ROj_rwufJzszCR594NcJc89cW4R85ZSTQtissT4Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Thanks very much Catalin for the help. Please find my comments in line.
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Wednesday, April 22, 2015 10:37 PM
-> To: Yoder Stuart-B08248
-> Cc: Sethi Varun-B16395; Lian Minghuan-B31939; linux-pci at vger.kernel.org;
-> Arnd Bergmann; Hu Mingkai-B21284; Zang Roy-R61911; Bjorn Helgaas; Wood
-> Scott-B07421; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-> 
-> Hi Stuart,
-> 
-> First of, thanks for taking the time to explain this in more detail.
-> Comments inline.
-> 
-> On Fri, Apr 17, 2015 at 03:19:08PM +0100, Stuart Yoder wrote:
-> > > On Wed, Apr 15, 2015 at 02:18:13PM +0100, Varun Sethi wrote:
-> > > > Yes, deviceid=stream id (i.e. ICID + other bits). I am not sure if
-> > > > TBU ID would also be forwarded as a part of stream id to GIC. My
-> > > > understanding is that TBU ID is forwarded (as a part of the stream
-> > > > ID) to the TCU in case of a TBU translation miss. In case of the
-> > > > LS2085 PCIe controller you would have to setup the PCIe device ID
-> > > > to stream ID translation table. We may have to restrict the number
-> > > > of entries based on the available number of contexts.
-> > >
-> > > Unfortunately, I'm having a really hard time parsing this thread
-> > > (some parts of it simply don't make sense; others use
-> > > non-architectural terms and overall I don't get a feeling for the problem).
-> > >
-> > > Please could you explain your system design step by step so that I
-> > > can understand (a) what you've built and (b) why the current design
-> > > of Linux is causing you problems?
-> > >
-> > > Sorry if I'm just being thick, but it's important that we get this right.
-> >
-> > I'll try to summarize some key points about the system...
-> >
-> > System is using a single SMMU-500 (1 TCU, 6 TBUs) and GICv3-ITS.
-> > There are PCI, fsl-mc, and platform devices that do DMA.  Devices on
-> > the PCI and fsl-mc bus generate message interrupts.
-> 
-> Ah cool, so you have multiple buses sharing a single SMMU? That's going to
-> necessitate some ID remapping in the device-tree. Perhaps you could
-> comment on Mark Rutland's proposal if it does/doesn't work for you:
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
-> March/333199.html
-> 
-> 
-> > The flow a message interrupt would take is this:
-> >
-> >     --------------
-> >       PCI device
-> >     --------------
-> >           |
-> >           | pcidevid + MSI msg
-> >           |
-> >           V
-> >     --------------
-> >     PCI controller
-> >       pcidevid ->
-> >       streamID
-> >       mapping
-> >     --------------
-> >           |
-> >           | streamID + MSI msg
-> >           |
-> >           V
-> >     --------------
-> >         SMMU
-> >     --------------
-> >           |
-> >           | streamID + MSI msg
-> >           |
-> >           V
-> >     --------------
-> >        CCN-504 (Dickens)
-> >     --------------
-> >           |
-> >           | streamID + MSI msg
-> >           |
-> >           V
-> 
-> The streamID here as the same as the one coming out of the SMMU, right?
-> (just trying to out why you have the CCN-504 in the picture).
-> 
-> >     --------------
-> >       GICv3 ITS    streamID == ITS deviceID
-> >     --------------
-> >
-> > So, the way things work (at least initially) is that each PCI device
-> > maps to a single streamID, and thus each device has a separate ITT in
-> > the ITS.  So, things should be cool.
-> >
-> > However, there is an improvement we envision as possible due to the
-> > limited number of SMMU contexts (i.e. 64).  If there are
-> > 64 SMMU context registers it means that there is a max of
-> > 64 software contexts where things can be isolated.  But, say I have an
-> > SRIOV card with 64 VFs, and I want to assign 8 of the VFs to a KVM VM.
-> > Those 8 PCI devices could share the same streamID/ITS-device-ID since
-> > they all share the same isolation context.
-> >
-> > What would be nice is at the time the 8 VFS are being added to the
-> > IOMMU domain is for the pcidevid -> streamID mapping table to be
-> > updated dynamically.  It simply lets us make more efficient use of the
-> > limited streamIDs we have.
-> >
-> > I think it is this improvement that Minghuan had in mind in this
-> > patch.
-> 
-> Ok, but in this case it should be possible to use a single context bank for all of
-> the VF streamIDs by configuring the appropriate SMR, no? Wouldn't that sort
-> of thing be preferable to dynamic StreamID assignment? It would certainly
-> make life easier for the MSIs.
-> 
-Yes, that would happen when the all the VFs are attached to the same domain. But it would be an issue if we have to attach devices to different domains.
 
--Varun
+> Hi Catalin - The above said desired configuration was with respect to
+> a specific requirement of mine on Cortex A15. Seems it is confusing.
+> Let me give you the complete details. Along with PRRR/NMRR registers,
+> I am using [TEX[0], C, B] to configure the memory system attributes.
+> The inner cacheable attribute of NMRR normal memory region is
+> "write-back, write-allocate" and the corresponding outer cacheable
+> attribute is "write-back, no write-allocate".
+
+Any reason why they need to be different or that's just what Linux
+writes in NMRR?
+[Bhaskara] I am not sure why those are different. During Linux kernel
+booting, I wrote a function to read the contents of NMRR in
+build_mem_type_table( ) function. May be I need to sync up with boot
+loader folks to check why those are set up with different cacheable
+attributes. This difference was the reason to start this thread.
+
+> Since the lowest level
+> (level zero) cache defaults to inner cacheable attribute and the
+> highest level (level two) defaults to outer cacheable attribute,
+
+Why do you say that level two defaults to outer cacheable? Actually,
+what do you mean by zero, one, two? Are these the indices in the CLIDR?
+Cortex-A15 has two levels of cache, one and two, both treated as inner.
+[Bhaskara] It was my miss understanding. My apologies for that. Yes, I
+was referring to CLIDR indices, same as L1, L2 and L3 caches.
+
+> level one cache is the remaining that I need to program explicitly.
+> Hence the requirement to configure the boundary between the inner and
+> outer cacheable attributes to group the level one cache either with
+> level zero (or) level two.
+
+IIRC, the only CPU where we could configure this was Cortex-A8 via the
+L2ACTLR register ("L2 inner" bit) and from some past discussions, we
+wanted this to be treated as inner cache:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082561.html
+
+(in Linux, we call outer cache some cache that needs separate
+maintenance by PA like the PL310)
+
+> 1. I am unable to find the register name that can be used for the
+> above said purpose from Cortex A15 documentation. Please help me in
+> providing that register details, if there is any such register (or)
+> some other procedure by which the same can be achieved.
+
+No such configuration. L1 and L2 caches are inner on A15.
+[Bhaskara] I see, this is the reason why there is no such
+configuration on Cortex v7
+
+> 2. Configuration of the boundary between inner and outer caches is not
+> needed for a system where in the inner and outer cacheable attributes
+> are same. Does the current Linux kernel for ARM architecture assumes
+> this?
+
+The outer attributes are sent on the bus in case you have an L3 cache.
+In general, I would set both inner and outer attributes the same. I
+don't understand what your "specific requirement" is.
+[Bhaskara]
+
+
+On Tue, Apr 21, 2015 at 4:30 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Tue, Apr 21, 2015 at 12:23:17AM +0530, Bhaskara rao Budiredla wrote:
+>> Hi Catalin - The above said desired configuration was with respect to
+>> a specific requirement of mine on Cortex A15. Seems it is confusing.
+>> Let me give you the complete details. Along with PRRR/NMRR registers,
+>> I am using [TEX[0], C, B] to configure the memory system attributes.
+>> The inner cacheable attribute of NMRR normal memory region is
+>> "write-back, write-allocate" and the corresponding outer cacheable
+>> attribute is "write-back, no write-allocate".
+>
+> Any reason why they need to be different or that's just what Linux
+> writes in NMRR?
+>
+>> Since the lowest level
+>> (level zero) cache defaults to inner cacheable attribute and the
+>> highest level (level two) defaults to outer cacheable attribute,
+>
+> Why do you say that level two defaults to outer cacheable? Actually,
+> what do you mean by zero, one, two? Are these the indices in the CLIDR?
+> Cortex-A15 has two levels of cache, one and two, both treated as inner.
+>
+>> level one cache is the remaining that I need to program explicitly.
+>> Hence the requirement to configure the boundary between the inner and
+>> outer cacheable attributes to group the level one cache either with
+>> level zero (or) level two.
+>
+> IIRC, the only CPU where we could configure this was Cortex-A8 via the
+> L2ACTLR register ("L2 inner" bit) and from some past discussions, we
+> wanted this to be treated as inner cache:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082561.html
+>
+> (in Linux, we call outer cache some cache that needs separate
+> maintenance by PA like the PL310)
+>
+>> 1. I am unable to find the register name that can be used for the
+>> above said purpose from Cortex A15 documentation. Please help me in
+>> providing that register details, if there is any such register (or)
+>> some other procedure by which the same can be achieved.
+>
+> No such configuration. L1 and L2 caches are inner on A15.
+>
+>> 2. Configuration of the boundary between inner and outer caches is not
+>> needed for a system where in the inner and outer cacheable attributes
+>> are same. Does the current Linux kernel for ARM architecture assumes
+>> this?
+>
+> The outer attributes are sent on the bus in case you have an L3 cache.
+> In general, I would set both inner and outer attributes the same. I
+> don't understand what your "specific requirement" is.
+>
+> --
+> Catalin
+
+
+
+-- 
+.
