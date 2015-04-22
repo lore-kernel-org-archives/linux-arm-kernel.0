@@ -1,31 +1,54 @@
 From: fkan@apm.com (Feng Kan)
-Date: Wed, 22 Apr 2015 15:18:41 -0700
-Subject: [PATCH V2 0/4] APM X-Gene Mailbox driver
-Message-ID: <1429741125-29156-1-git-send-email-fkan@apm.com>
+Date: Wed, 22 Apr 2015 15:18:43 -0700
+Subject: [PATCH V2 2/4] mailbox: xgene: add ACPI support for X-Gene mailbox
+ driver
+In-Reply-To: <1429741125-29156-1-git-send-email-fkan@apm.com>
+References: <1429741125-29156-1-git-send-email-fkan@apm.com>
+Message-ID: <1429741125-29156-3-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the mailbox driver for the APM X-Gene SoC
+Add ACPI support for APM X-Gene mailbox driver.
 
-V2 change
-	- Add ACPI support
-	- use defines for reg offset
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ drivers/mailbox/mailbox-xgene-slimpro.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Feng Kan (4):
-  mailbox: add support for APM X-Gene platform mailbox driver
-  mailbox: xgene: add ACPI support for X-Gene mailbox driver
-  Documentation: mailbox: Add APM X-Gene SLIMpro mailbox dts
-    documentation
-  arm64: dts: mailbox device tree node for APM X-Gene platform.
-
- .../bindings/mailbox/xgene-slimpro-mailbox.txt     |  34 +++
- arch/arm64/boot/dts/apm/apm-storm.dtsi             |  14 ++
- drivers/mailbox/Kconfig                            |  10 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/mailbox-xgene-slimpro.c            | 271 +++++++++++++++++++++
- 5 files changed, 331 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
- create mode 100644 drivers/mailbox/mailbox-xgene-slimpro.c
-
+diff --git a/drivers/mailbox/mailbox-xgene-slimpro.c b/drivers/mailbox/mailbox-xgene-slimpro.c
+index 49370e5..890f95b 100644
+--- a/drivers/mailbox/mailbox-xgene-slimpro.c
++++ b/drivers/mailbox/mailbox-xgene-slimpro.c
+@@ -18,6 +18,7 @@
+  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  *
+  */
++#include <linux/acpi.h>
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+@@ -240,6 +241,14 @@ static const struct of_device_id slimpro_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, slimpro_of_match);
+ 
++#ifdef CONFIG_ACPI
++static const struct acpi_device_id slimpro_acpi_ids[] = {
++	{"APMC0D01", 0},
++	{}
++};
++MODULE_DEVICE_TABLE(acpi, slimpro_acpi_ids);
++#endif
++
+ static struct platform_driver slimpro_mbox_driver = {
+ 	.probe	= slimpro_mbox_probe,
+ 	.remove = slimpro_mbox_remove,
+@@ -247,6 +256,7 @@ static struct platform_driver slimpro_mbox_driver = {
+ 		.name = "xgene-slimpro-mbox",
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = of_match_ptr(slimpro_of_match),
++		.acpi_match_table = ACPI_PTR(slimpro_acpi_ids)
+ 	},
+ };
+ 
 -- 
 1.9.1
