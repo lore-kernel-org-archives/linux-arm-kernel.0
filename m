@@ -1,168 +1,258 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Wed, 22 Apr 2015 19:41:02 +0000
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <20150422170718.GG13019@arm.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20150416104008.GB25640@arm.com>
- <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150422170718.GG13019@arm.com>
-Message-ID: <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Thu, 23 Apr 2015 04:49:44 +0800
+Subject: [PATCH 1/1] arm: imx: move clk common part to driver/clk/imx
+Message-ID: <1429735784-32492-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Frank Li <Frank.Li@freescale.com>
 
+move clock common part to driver/clk/imx
+except clk-pllv1.c because it use cpu_is_xxx()
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Wednesday, April 22, 2015 12:07 PM
-> To: Yoder Stuart-B08248
-> Cc: Sethi Varun-B16395; Lian Minghuan-B31939; linux-pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284;
-> Zang Roy-R61911; Bjorn Helgaas; Wood Scott-B07421; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-> 
-> Hi Stuart,
-> 
-> First of, thanks for taking the time to explain this in more detail.
-> Comments inline.
-> 
-> On Fri, Apr 17, 2015 at 03:19:08PM +0100, Stuart Yoder wrote:
-> > > On Wed, Apr 15, 2015 at 02:18:13PM +0100, Varun Sethi wrote:
-> > > > Yes, deviceid=stream id (i.e. ICID + other bits). I am not sure if TBU ID
-> > > > would also be forwarded as a part of stream id to GIC. My understanding is
-> > > > that TBU ID is forwarded (as a part of the stream ID) to the TCU in case
-> > > > of a TBU translation miss. In case of the LS2085 PCIe controller you would
-> > > > have to setup the PCIe device ID to stream ID translation table. We may
-> > > > have to restrict the number of entries based on the available number of
-> > > > contexts.
-> > >
-> > > Unfortunately, I'm having a really hard time parsing this thread (some parts
-> > > of it simply don't make sense; others use non-architectural terms and
-> > > overall I don't get a feeling for the problem).
-> > >
-> > > Please could you explain your system design step by step so that I can
-> > > understand (a) what you've built and (b) why the current design of Linux is
-> > > causing you problems?
-> > >
-> > > Sorry if I'm just being thick, but it's important that we get this right.
-> >
-> > I'll try to summarize some key points about the system...
-> >
-> > System is using a single SMMU-500 (1 TCU, 6 TBUs) and GICv3-ITS.  There are
-> > PCI, fsl-mc, and platform devices that do DMA.  Devices on the PCI and
-> > fsl-mc bus generate message interrupts.
-> 
-> Ah cool, so you have multiple buses sharing a single SMMU? That's going to
-> necessitate some ID remapping in the device-tree. Perhaps you could comment
-> on Mark Rutland's proposal if it does/doesn't work for you:
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333199.html
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ arch/arm/mach-imx/Makefile                         |   5 +-
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/imx/Makefile                           |   4 +
+ {arch/arm/mach-imx => drivers/clk/imx}/clk-busy.c  |   0
+ .../mach-imx => drivers/clk/imx}/clk-fixup-div.c   |   0
+ .../mach-imx => drivers/clk/imx}/clk-fixup-mux.c   |   0
+ .../clk/imx}/clk-gate-exclusive.c                  |   0
+ {arch/arm/mach-imx => drivers/clk/imx}/clk-gate2.c |   0
+ {arch/arm/mach-imx => drivers/clk/imx}/clk-pfd.c   |   0
+ {arch/arm/mach-imx => drivers/clk/imx}/clk-pllv2.c |   0
+ {arch/arm/mach-imx => drivers/clk/imx}/clk-pllv3.c |   0
+ {arch/arm/mach-imx => drivers/clk/imx}/clk.c       |   0
+ drivers/clk/imx/clk.h                              | 139 +++++++++++++++++++++
+ 13 files changed, 145 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/clk/imx/Makefile
+ rename {arch/arm/mach-imx => drivers/clk/imx}/clk-busy.c (100%)
+ rename {arch/arm/mach-imx => drivers/clk/imx}/clk-fixup-div.c (100%)
+ rename {arch/arm/mach-imx => drivers/clk/imx}/clk-fixup-mux.c (100%)
+ rename {arch/arm/mach-imx => drivers/clk/imx}/clk-gate-exclusive.c (100%)
+ rename {arch/arm/mach-imx => drivers/clk/imx}/clk-gate2.c (100%)
+ rename {arch/arm/mach-imx => drivers/clk/imx}/clk-pfd.c (100%)
+ rename {arch/arm/mach-imx => drivers/clk/imx}/clk-pllv2.c (100%)
+ rename {arch/arm/mach-imx => drivers/clk/imx}/clk-pllv3.c (100%)
+ rename {arch/arm/mach-imx => drivers/clk/imx}/clk.c (100%)
+ create mode 100644 drivers/clk/imx/clk.h
 
-Thanks for the pointer, I had not seen that before.  Will read and
-comment on it.
-
-> > The flow a message interrupt would take is this:
-> >
-> >     --------------
-> >       PCI device
-> >     --------------
-> >           |
-> >           | pcidevid + MSI msg
-> >           |
-> >           V
-> >     --------------
-> >     PCI controller
-> >       pcidevid ->
-> >       streamID
-> >       mapping
-> >     --------------
-> >           |
-> >           | streamID + MSI msg
-> >           |
-> >           V
-> >     --------------
-> >         SMMU
-> >     --------------
-> >           |
-> >           | streamID + MSI msg
-> >           |
-> >           V
-> >     --------------
-> >        CCN-504 (Dickens)
-> >     --------------
-> >           |
-> >           | streamID + MSI msg
-> >           |
-> >           V
-> 
-> The streamID here as the same as the one coming out of the SMMU, right?
-
-Yes.
-
-> (just trying to out why you have the CCN-504 in the picture).
-
-It really isn't relevant I guess, just the picture I had in my
-head.
-
-> >     --------------
-> >       GICv3 ITS    streamID == ITS deviceID
-> >     --------------
-> >
-> > So, the way things work (at least initially) is that each PCI device maps
-> > to a single streamID, and thus each device has a separate ITT in
-> > the ITS.  So, things should be cool.
-> >
-> > However, there is an improvement we envision as possible due to
-> > the limited number of SMMU contexts (i.e. 64).  If there are
-> > 64 SMMU context registers it means that there is a max of
-> > 64 software contexts where things can be isolated.  But, say I have
-> > an SRIOV card with 64 VFs, and I want to assign 8 of the VFs
-> > to a KVM VM.  Those 8 PCI devices could share the same
-> > streamID/ITS-device-ID since they all share the same isolation
-> > context.
-> >
-> > What would be nice is at the time the 8 VFS are being added
-> > to the IOMMU domain is for the pcidevid -> streamID mapping
-> > table to be updated dynamically.  It simply lets us make
-> > more efficient use of the limited streamIDs we have.
-> >
-> > I think it is this improvement that Minghuan had in mind
-> > in this patch.
-> 
-> Ok, but in this case it should be possible to use a single context bank for
-> all of the VF streamIDs by configuring the appropriate SMR, no?
-
-Yes, but there are limited SMRs.  In our case there are only
-128 SMRs in SMMU-500 and we have potentially way more masters than
-that.
-
-> Wouldn't
-> that sort of thing be preferable to dynamic StreamID assignment? It would
-> certainly make life easier for the MSIs.
-
-It would be preferable, but given only 128 total stream IDS and
-64 context registers it's potentially an issue.  On our LS2085 SoC it is
-PCI and the fsl-mc bus (see description here:
-https://lkml.org/lkml/2015/3/5/795) that potentially have way
-more masters than streamIDS. So, for those busses we would essentially
-view a streamID as a "context ID"-- each SMR is associated with
-1 context bank register.
-
-For PCI we have a programmable "PCI req ID"-to-"stream ID"
-mapping table in the PCI controller that is dynamically
-programmable.
-
-Looking at it like that means that we could have
-any number of masters but only 64 "contexts"
-and since the masters all all programmable it's
-seems feasbile to envision doing some bus/vendor
-specific set up when a device is added to an
-IOMMU domain.   One thing that would need to be conveyed
-to the SMMU driver if doing dynamic streamID setup
-is what streamIDs are available to be used.
-
-Thanks,
-Stuart
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 8d1b101..91c3fda 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -14,10 +14,7 @@ obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clk-imx35.o ehci-imx35.o pm-imx
+ imx5-pm-$(CONFIG_PM) += pm-imx5.o
+ obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o clk-cpu.o $(imx5-pm-y)
+ 
+-obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
+-			    clk-pfd.o clk-busy.o clk.o \
+-			    clk-fixup-div.o clk-fixup-mux.o \
+-			    clk-gate-exclusive.o
++obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o
+ 
+ obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index d478ceb..ebe86b3 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -70,3 +70,4 @@ obj-$(CONFIG_ARCH_U8500)		+= ux500/
+ obj-$(CONFIG_COMMON_CLK_VERSATILE)	+= versatile/
+ obj-$(CONFIG_X86)			+= x86/
+ obj-$(CONFIG_ARCH_ZYNQ)			+= zynq/
++obj-$(CONFIG_ARCH_MXC)			+= imx/
+diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+new file mode 100644
+index 0000000..b45ff25
+--- /dev/null
++++ b/drivers/clk/imx/Makefile
+@@ -0,0 +1,4 @@
++obj-$(CONFIG_COMMON_CLK) += clk-pllv2.o clk-pllv3.o clk-gate2.o \
++                            clk-pfd.o clk-busy.o clk.o \
++                            clk-fixup-div.o clk-fixup-mux.o \
++			    clk-gate-exclusive.o
+diff --git a/arch/arm/mach-imx/clk-busy.c b/drivers/clk/imx/clk-busy.c
+similarity index 100%
+rename from arch/arm/mach-imx/clk-busy.c
+rename to drivers/clk/imx/clk-busy.c
+diff --git a/arch/arm/mach-imx/clk-fixup-div.c b/drivers/clk/imx/clk-fixup-div.c
+similarity index 100%
+rename from arch/arm/mach-imx/clk-fixup-div.c
+rename to drivers/clk/imx/clk-fixup-div.c
+diff --git a/arch/arm/mach-imx/clk-fixup-mux.c b/drivers/clk/imx/clk-fixup-mux.c
+similarity index 100%
+rename from arch/arm/mach-imx/clk-fixup-mux.c
+rename to drivers/clk/imx/clk-fixup-mux.c
+diff --git a/arch/arm/mach-imx/clk-gate-exclusive.c b/drivers/clk/imx/clk-gate-exclusive.c
+similarity index 100%
+rename from arch/arm/mach-imx/clk-gate-exclusive.c
+rename to drivers/clk/imx/clk-gate-exclusive.c
+diff --git a/arch/arm/mach-imx/clk-gate2.c b/drivers/clk/imx/clk-gate2.c
+similarity index 100%
+rename from arch/arm/mach-imx/clk-gate2.c
+rename to drivers/clk/imx/clk-gate2.c
+diff --git a/arch/arm/mach-imx/clk-pfd.c b/drivers/clk/imx/clk-pfd.c
+similarity index 100%
+rename from arch/arm/mach-imx/clk-pfd.c
+rename to drivers/clk/imx/clk-pfd.c
+diff --git a/arch/arm/mach-imx/clk-pllv2.c b/drivers/clk/imx/clk-pllv2.c
+similarity index 100%
+rename from arch/arm/mach-imx/clk-pllv2.c
+rename to drivers/clk/imx/clk-pllv2.c
+diff --git a/arch/arm/mach-imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+similarity index 100%
+rename from arch/arm/mach-imx/clk-pllv3.c
+rename to drivers/clk/imx/clk-pllv3.c
+diff --git a/arch/arm/mach-imx/clk.c b/drivers/clk/imx/clk.c
+similarity index 100%
+rename from arch/arm/mach-imx/clk.c
+rename to drivers/clk/imx/clk.c
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+new file mode 100644
+index 0000000..6a07903
+--- /dev/null
++++ b/drivers/clk/imx/clk.h
+@@ -0,0 +1,139 @@
++#ifndef __MACH_IMX_CLK_H
++#define __MACH_IMX_CLK_H
++
++#include <linux/spinlock.h>
++#include <linux/clk-provider.h>
++
++extern spinlock_t imx_ccm_lock;
++
++void imx_check_clocks(struct clk *clks[], unsigned int count);
++
++extern void imx_cscmr1_fixup(u32 *val);
++
++struct clk *imx_clk_pllv1(const char *name, const char *parent,
++		void __iomem *base);
++
++struct clk *imx_clk_pllv2(const char *name, const char *parent,
++		void __iomem *base);
++
++enum imx_pllv3_type {
++	IMX_PLLV3_GENERIC,
++	IMX_PLLV3_SYS,
++	IMX_PLLV3_USB,
++	IMX_PLLV3_USB_VF610,
++	IMX_PLLV3_AV,
++	IMX_PLLV3_ENET,
++};
++
++struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
++		const char *parent_name, void __iomem *base, u32 div_mask);
++
++struct clk *clk_register_gate2(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		void __iomem *reg, u8 bit_idx,
++		u8 clk_gate_flags, spinlock_t *lock,
++		unsigned int *share_count);
++
++struct clk * imx_obtain_fixed_clock(
++			const char *name, unsigned long rate);
++
++struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
++	 void __iomem *reg, u8 shift, u32 exclusive_mask);
++
++static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
++		void __iomem *reg, u8 shift)
++{
++	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
++			shift, 0, &imx_ccm_lock, NULL);
++}
++
++static inline struct clk *imx_clk_gate2_shared(const char *name,
++		const char *parent, void __iomem *reg, u8 shift,
++		unsigned int *share_count)
++{
++	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
++			shift, 0, &imx_ccm_lock, share_count);
++}
++
++struct clk *imx_clk_pfd(const char *name, const char *parent_name,
++		void __iomem *reg, u8 idx);
++
++struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
++				 void __iomem *reg, u8 shift, u8 width,
++				 void __iomem *busy_reg, u8 busy_shift);
++
++struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
++			     u8 width, void __iomem *busy_reg, u8 busy_shift,
++			     const char **parent_names, int num_parents);
++
++struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
++				  void __iomem *reg, u8 shift, u8 width,
++				  void (*fixup)(u32 *val));
++
++struct clk *imx_clk_fixup_mux(const char *name, void __iomem *reg,
++			      u8 shift, u8 width, const char **parents,
++			      int num_parents, void (*fixup)(u32 *val));
++
++static inline struct clk *imx_clk_fixed(const char *name, int rate)
++{
++	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
++}
++
++static inline struct clk *imx_clk_divider(const char *name, const char *parent,
++		void __iomem *reg, u8 shift, u8 width)
++{
++	return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
++			reg, shift, width, 0, &imx_ccm_lock);
++}
++
++static inline struct clk *imx_clk_divider_flags(const char *name,
++		const char *parent, void __iomem *reg, u8 shift, u8 width,
++		unsigned long flags)
++{
++	return clk_register_divider(NULL, name, parent, flags,
++			reg, shift, width, 0, &imx_ccm_lock);
++}
++
++static inline struct clk *imx_clk_gate(const char *name, const char *parent,
++		void __iomem *reg, u8 shift)
++{
++	return clk_register_gate(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
++			shift, 0, &imx_ccm_lock);
++}
++
++static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
++		void __iomem *reg, u8 shift)
++{
++	return clk_register_gate(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
++			shift, CLK_GATE_SET_TO_DISABLE, &imx_ccm_lock);
++}
++
++static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
++		u8 shift, u8 width, const char **parents, int num_parents)
++{
++	return clk_register_mux(NULL, name, parents, num_parents,
++			CLK_SET_RATE_NO_REPARENT, reg, shift,
++			width, 0, &imx_ccm_lock);
++}
++
++static inline struct clk *imx_clk_mux_flags(const char *name,
++		void __iomem *reg, u8 shift, u8 width, const char **parents,
++		int num_parents, unsigned long flags)
++{
++	return clk_register_mux(NULL, name, parents, num_parents,
++			flags | CLK_SET_RATE_NO_REPARENT, reg, shift, width, 0,
++			&imx_ccm_lock);
++}
++
++static inline struct clk *imx_clk_fixed_factor(const char *name,
++		const char *parent, unsigned int mult, unsigned int div)
++{
++	return clk_register_fixed_factor(NULL, name, parent,
++			CLK_SET_RATE_PARENT, mult, div);
++}
++
++struct clk *imx_clk_cpu(const char *name, const char *parent_name,
++		struct clk *div, struct clk *mux, struct clk *pll,
++		struct clk *step);
++
++#endif
+-- 
+1.9.1
