@@ -1,58 +1,42 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 22 Apr 2015 14:12:43 +0800
-Subject: [PATCH RFC v1 0/5] clk: support clocks which requires parent
- clock on during operation
-In-Reply-To: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
-References: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <20150422061240.GA25437@shlinux1.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Apr 2015 09:22:43 +0200
+Subject: [PATCH 5/9] ARM: BCM2836: Add io map initialization for bcm2836.
+In-Reply-To: <87bnihhypw.fsf@eliezer.anholt.net>
+References: <1429639796-2169-1-git-send-email-eric@anholt.net>
+ <60195891.q3RtUhgfkn@wuerfel> <87bnihhypw.fsf@eliezer.anholt.net>
+Message-ID: <2080047.TSLc2kVvn8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 15, 2015 at 10:26:34PM +0800, Dong Aisheng wrote:
-> This patch series adds support in clock framework for clocks which operations
-> requires its parent clock is on.
+On Tuesday 21 April 2015 16:02:19 Eric Anholt wrote:
+> > Hard to know. Does anything reference BCM2835_PERIPH_VIRT? Does it work
+> > if you remove it?
+> Well, that's clear enough. It dies early with:
 > 
-> Such clock type is initially met on Freescale i.MX7D platform that all clocks
-> operations, including enable/disable, rate change and re-parent, requires its
-> parent clock on. No sure if any other SoC has the similar clock type.
+> Uncompressing Linux... done, booting the kernel.
+> [    0.000000] Booting Linux on physical CPU 0xf00
+> [    0.000000] Initializing cgroup subsys cpu
+> [    0.000000] Initializing cgroup subsys cpuacct
+> [    0.000000] Linux version 4.0.0-rc1-v7+ (anholt at eliezer) (gcc version 4.9.2 ( 4.9.2-10) ) #487 SMP PREEMPT Tue Apr 21 15:58:29 PDT 2015
+> [    0.000000] CPU: ARMv7 Processor [410fc075] revision 5 (ARMv7), cr=10c5387d
+> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> [    0.000000] Machine model: Raspberry Pi 2 Model B+
+> [    0.000000] bootconsole [earlycon0] enabled
+> [    0.000000] cma: Reserved 64 MiB at 0x37000000
+> [    0.000000] Memory policy: Data cache writealloc
 > 
-> Current clock core can not support such type of clock well.
+> (hung)
 > 
-> This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
-> in clock core that enable its parent clock firstly for each operation and disable
-> it later after operation complete.
-> 
-> The most special case is for set_parent() operation which requires both parent,
-> old one and new one, to be enabled at the same time during the operation.
-> 
-> Patch 1~3 are minor cleanup & fixes.
-> Patch 4 add CLK_SET_PARENT_ON flags in clock core to support such type clocks
-> Patch 5 show the need of introducing clk_core_enable_lock and
-> 	clk_core_disable_lock to easily use and reduce duplicated code.
-> 	It can be merged into patch 4 if required.
-> 
-> The patch series is based on for-next branch of Michael's git:
-> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
-> 
-> Dong Aisheng (5):
->   clk: change clk_core name of __clk_set_parent_after
->   clk: add missing lock when call clk_core_enable in clk_set_parent
->   clk: remove unneeded __clk_enable and __clk_disable
->   clk: core: add CLK_SET_PARENT_ON flags to support clocks require
->     parent on
->   clk: introduce clk_core_enable_lock and clk_core_disable_lock
->     functions
+> The only thing I see using this 0xf0000000 range is DEBUG_BCM2836's
+> serial stuff, though.
 > 
 
-Gentle Ping.
+Ok. Just to be clear: by removing that mapping, I meant removing the
+".map_io = bcm2835_map_io" line as well, so the default debug_ll_io_init()
+function gets called. If you have a map_io function that does not call
+debug_ll_io_init() or something equivalent, you cannot use DEBUG_LL.
 
-Regards
-Dong Aisheng
+It's possible that this mapping was just added for supporting DEBUG_LL,
+using the default debug_ll_io_init() is a better way to do that.
 
->  drivers/clk/clk.c            | 112 ++++++++++++++++++++++++++++++++++---------
->  include/linux/clk-provider.h |   5 ++
->  2 files changed, 94 insertions(+), 23 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
+	Arnd
