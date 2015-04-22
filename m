@@ -1,106 +1,79 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Wed, 22 Apr 2015 14:11:42 +0300
-Subject: [PATCHv7 8/8] watchdog: omap_wdt: Convert to use new core extensions
-In-Reply-To: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
-References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <1429701102-22320-9-git-send-email-timo.kokkonen@offcode.fi>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 22 Apr 2015 14:13:53 +0200
+Subject: [PATCH RFC v9 11/20] drm/bridge: Add Synopsys DesignWare MIPI DSI
+ host controller driver
+In-Reply-To: <552F4B2E.2000209@codeaurora.org>
+References: <1423720903-24806-1-git-send-email-Ying.Liu@freescale.com>
+ <20150409084353.GD12103@ulmo> <552F4B2E.2000209@codeaurora.org>
+Message-ID: <54991164.nrScLQEecU@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new watchdog core extensions to let watchdog core take over
-boot time watchdog behavior. The difference is that early-timeout-sec
-device tree property becomes available for this driver and a running
-watchdog is not stopped unless the core decides to stop it.
+Am Donnerstag, 16. April 2015, 11:09:58 schrieb Archit Taneja:
+> On 04/09/2015 02:13 PM, Thierry Reding wrote:
+> > On Thu, Feb 12, 2015 at 02:01:34PM +0800, Liu Ying wrote:
+> > [...]
+> > 
+> >> diff --git a/drivers/gpu/drm/bridge/dw_mipi_dsi.c
+> >> b/drivers/gpu/drm/bridge/dw_mipi_dsi.c> 
+> > [...]
+> > 
+> >> +struct dw_mipi_dsi {
+> >> +	struct mipi_dsi_host dsi_host;
+> >> +	struct drm_connector connector;
+> >> +	struct drm_encoder *encoder;
+> >> +	struct drm_bridge *bridge;
+> >> +	struct drm_panel *panel;
+> >> +	struct device *dev;
+> >> +
+> >> +	void __iomem *base;
+> >> +
+> >> +	struct clk *pllref_clk;
+> >> +	struct clk *cfg_clk;
+> >> +	struct clk *pclk;
+> >> +
+> >> +	unsigned int lane_mbps; /* per lane */
+> >> +	u32 channel;
+> >> +	u32 lanes;
+> >> +	u32 format;
+> >> +	struct drm_display_mode *mode;
+> >> +
+> >> +	const struct dw_mipi_dsi_plat_data *pdata;
+> >> +
+> >> +	bool enabled;
+> >> +};
+> > 
+> > While reviewing this I kept thinking whether this is really the right
+> > architectural design. This driver is a MIPI DSI host, a connector and
+> > a bridge, all in one. But it seems to me like it should really be an
+> > encoder/connector and a MIPI DSI host. Why the need for a bridge? The
+> > bridge abstraction targets blocks outside of the SoC, but it is my
+> > understanding that these DesignWare IP blocks are designed into SoCs.
+> 
+> The msm driver uses bridges for blocks within the SoC too. We have too
+> many sub blocks in the display controller that use up crtcs and encoder
+> entities. A bridge is the only option one has if an encoder in the
+> display chain is already taken.
+> 
+> In the above designware configuration, if some one created a board that
+> used an external chip to further convert DSI to some other output
+> format, then we would be completely exhausted of all entities.
+> 
+> I posted a patch that allows us to create a chain of bridges for such
+> cases. It seems to work well as an interim solution. Ideally, it would
+> be better if we could make bridge a special case of an encoder, and let
+> one encoder connect to another encoder.
+> 
+> Such a thing would also help us unify i2c slave encoders and bridge
+> drivers too. A chip designed as an i2c slave encoder would work well
+> with a drm driver that doesn't have an encoder, but won't work for SoCs
+> SoCs that already have an encoder and were expecting a bridge entity
+> instead.
 
-Omap watchdog is running by default in the boot up but bootloader
-might have stopped it. Therefore we fill the WDOG_HW_RUNNING_AT_BOOT
-bit depending on the actual watchdog state so that the watchdog core
-can act properly.
+Yeah, having encoder-after-encoder chains would be great. I have the same 
+issue on Rockchip where on the rk3288 the lvds-IP hogs the lcd-pins of the soc 
+which are used both for panels as well as external encoders, while on the 
+older Rockchip SoCs these pins are used by external encoders directly.
 
-Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
----
- drivers/watchdog/omap_wdt.c | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
-index bbaf39a..7164f2e 100644
---- a/drivers/watchdog/omap_wdt.c
-+++ b/drivers/watchdog/omap_wdt.c
-@@ -78,6 +78,13 @@ static void omap_wdt_reload(struct omap_wdt_dev *wdev)
- 	/* reloaded WCRR from WLDR */
- }
- 
-+static int omap_wdt_is_running(struct omap_wdt_dev *wdev)
-+{
-+	void __iomem *base = wdev->base;
-+
-+	return readl_relaxed(base + OMAP_WATCHDOG_SPR) == 0x4444;
-+}
-+
- static void omap_wdt_enable(struct omap_wdt_dev *wdev)
- {
- 	void __iomem *base = wdev->base;
-@@ -183,6 +190,7 @@ static int omap_wdt_set_timeout(struct watchdog_device *wdog,
- 	omap_wdt_enable(wdev);
- 	omap_wdt_reload(wdev);
- 	wdog->timeout = timeout;
-+	wdog->hw_heartbeat = timeout * HZ / 2;
- 	mutex_unlock(&wdev->lock);
- 
- 	return 0;
-@@ -235,12 +243,15 @@ static int omap_wdt_probe(struct platform_device *pdev)
- 	omap_wdt->ops	      = &omap_wdt_ops;
- 	omap_wdt->min_timeout = TIMER_MARGIN_MIN;
- 	omap_wdt->max_timeout = TIMER_MARGIN_MAX;
-+	omap_wdt->hw_max_timeout = TIMER_MARGIN_MAX * HZ;
-+	omap_wdt->hw_features = WDOG_HW_IS_STOPPABLE;
- 
- 	if (timer_margin >= TIMER_MARGIN_MIN &&
- 	    timer_margin <= TIMER_MARGIN_MAX)
- 		omap_wdt->timeout = timer_margin;
- 	else
- 		omap_wdt->timeout = TIMER_MARGIN_DEFAULT;
-+	omap_wdt->hw_heartbeat = omap_wdt->timeout * HZ / 2;
- 
- 	watchdog_set_drvdata(omap_wdt, wdev);
- 	watchdog_set_nowayout(omap_wdt, nowayout);
-@@ -250,6 +261,18 @@ static int omap_wdt_probe(struct platform_device *pdev)
- 	pm_runtime_enable(wdev->dev);
- 	pm_runtime_get_sync(wdev->dev);
- 
-+	if (omap_wdt_is_running(wdev))
-+		omap_wdt->hw_features |= WDOG_HW_RUNNING_AT_BOOT;
-+	else
-+		/*
-+		 * The watchdog should be stopped already by
-+		 * bootloader. But unless we call disable here, the
-+		 * timeout might not be set correctly on the first
-+		 * start. So call disable anyway to make sure the
-+		 * watchdog really is stopped properly.
-+		 */
-+		omap_wdt_disable(wdev);
-+
- 	if (pdata && pdata->read_reset_sources)
- 		rs = pdata->read_reset_sources();
- 	else
-@@ -257,7 +280,9 @@ static int omap_wdt_probe(struct platform_device *pdev)
- 	omap_wdt->bootstatus = (rs & (1 << OMAP_MPU_WD_RST_SRC_ID_SHIFT)) ?
- 				WDIOF_CARDRESET : 0;
- 
--	omap_wdt_disable(wdev);
-+	ret = watchdog_init_params(omap_wdt, &pdev->dev);
-+	if (ret)
-+		goto err_init_params;
- 
- 	ret = watchdog_register_device(omap_wdt);
- 	if (ret)
-@@ -271,6 +296,7 @@ static int omap_wdt_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
-+err_init_params:
- err_register_device:
- 	pm_runtime_disable(wdev->dev);
- err_ioremap:
--- 
-2.1.0
+So in my current (pending review) patchset the lvds acts as encoder for panels 
+and as bridge if external encoders are in use.
