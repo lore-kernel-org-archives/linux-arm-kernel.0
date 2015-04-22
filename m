@@ -1,109 +1,120 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Wed, 22 Apr 2015 16:04:10 -0700
-Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
+Date: Wed, 22 Apr 2015 16:04:11 -0700
+Subject: [PATCHv3 2/4] phy: core: Add devm_of_phy_get_by_index to phy-core
 In-Reply-To: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
 References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <1429743853-10254-3-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the phy providers use "select" to enable GENERIC_PHY. Since select
-is only recommended when the config is not visible, GENERIC_PHY is changed
-an invisible option. To maintain consistency, all phy providers are changed
-to "select" GENERIC_PHY and all non-phy drivers use "depends on" when the
-phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
-dependency, so it is left as "select".
+Some generic drivers, such as ehci, may use multiple phys and for such
+drivers referencing phy(s) by name(s) does not make sense. Instead of
+inventing new naming schemes and using custom code to iterate through them,
+such drivers are better of using nameless phy bindings and using this newly
+introduced API to iterate through them.
 
 Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/ata/Kconfig                       | 1 -
- drivers/media/platform/exynos4-is/Kconfig | 2 +-
- drivers/phy/Kconfig                       | 4 ++--
- drivers/usb/host/Kconfig                  | 4 ++--
- drivers/video/fbdev/exynos/Kconfig        | 2 +-
- 5 files changed, 6 insertions(+), 7 deletions(-)
+ Documentation/phy.txt   |  7 ++++++-
+ drivers/phy/phy-core.c  | 32 ++++++++++++++++++++++++++++++++
+ include/linux/phy/phy.h |  8 ++++++++
+ 3 files changed, 46 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index 5f60155..6d2e881 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -301,7 +301,6 @@ config SATA_MV
- 	tristate "Marvell SATA support"
- 	depends on PCI || ARCH_DOVE || ARCH_MV78XX0 || \
- 		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
--	select GENERIC_PHY
- 	help
- 	  This option enables support for the Marvell Serial ATA family.
- 	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
-diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
-index b7b2e47..b6f3eaa 100644
---- a/drivers/media/platform/exynos4-is/Kconfig
-+++ b/drivers/media/platform/exynos4-is/Kconfig
-@@ -31,7 +31,7 @@ config VIDEO_S5P_FIMC
- config VIDEO_S5P_MIPI_CSIS
- 	tristate "S5P/EXYNOS MIPI-CSI2 receiver (MIPI-CSIS) driver"
- 	depends on REGULATOR
--	select GENERIC_PHY
-+	depends on GENERIC_PHY
- 	help
- 	  This is a V4L2 driver for Samsung S5P and EXYNOS4 SoC MIPI-CSI2
- 	  receiver (MIPI-CSIS) devices.
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 2962de2..edecdb1 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -5,7 +5,7 @@
- menu "PHY Subsystem"
+diff --git a/Documentation/phy.txt b/Documentation/phy.txt
+index 371361c..b388c5a 100644
+--- a/Documentation/phy.txt
++++ b/Documentation/phy.txt
+@@ -76,6 +76,8 @@ struct phy *phy_get(struct device *dev, const char *string);
+ struct phy *phy_optional_get(struct device *dev, const char *string);
+ struct phy *devm_phy_get(struct device *dev, const char *string);
+ struct phy *devm_phy_optional_get(struct device *dev, const char *string);
++struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
++				     int index);
  
- config GENERIC_PHY
--	bool "PHY Core"
-+	bool
- 	help
- 	  Generic PHY support.
+ phy_get, phy_optional_get, devm_phy_get and devm_phy_optional_get can
+ be used to get the PHY. In the case of dt boot, the string arguments
+@@ -86,7 +88,10 @@ successful PHY get. On driver detach, release function is invoked on
+ the the devres data and devres data is freed. phy_optional_get and
+ devm_phy_optional_get should be used when the phy is optional. These
+ two functions will never return -ENODEV, but instead returns NULL when
+-the phy cannot be found.
++the phy cannot be found.Some generic drivers, such as ehci, may use multiple
++phys and for such drivers referencing phy(s) by name(s) does not make sense. In
++this case, devm_of_phy_get_by_index can be used to get a phy reference based on
++the index.
  
-@@ -72,7 +72,7 @@ config PHY_MIPHY365X
- config PHY_RCAR_GEN2
- 	tristate "Renesas R-Car generation 2 USB PHY driver"
- 	depends on ARCH_SHMOBILE
--	depends on GENERIC_PHY
-+	select GENERIC_PHY
- 	help
- 	  Support for USB PHY found on Renesas R-Car generation 2 SoCs.
+ It should be noted that NULL is a valid phy reference. All phy
+ consumer calls on the NULL phy become NOPs. That is the release calls,
+diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+index 3791838..964a84d 100644
+--- a/drivers/phy/phy-core.c
++++ b/drivers/phy/phy-core.c
+@@ -623,6 +623,38 @@ struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
+ EXPORT_SYMBOL_GPL(devm_of_phy_get);
  
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 5ad60e4..e2197e2 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -182,7 +182,7 @@ config USB_EHCI_HCD_SPEAR
- config USB_EHCI_HCD_STI
- 	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
- 	depends on ARCH_STI && OF
--	select GENERIC_PHY
-+	depends on GENERIC_PHY
- 	select USB_EHCI_HCD_PLATFORM
- 	help
- 	  Enable support for the on-chip EHCI controller found on
-@@ -409,7 +409,7 @@ config USB_OHCI_HCD_SPEAR
- config USB_OHCI_HCD_STI
- 	tristate "Support for ST STiHxxx on-chip OHCI USB controller"
- 	depends on ARCH_STI && OF
--	select GENERIC_PHY
-+	depends on GENERIC_PHY
- 	select USB_OHCI_HCD_PLATFORM
- 	help
- 	  Enable support for the on-chip OHCI controller found on
-diff --git a/drivers/video/fbdev/exynos/Kconfig b/drivers/video/fbdev/exynos/Kconfig
-index 1f16b46..6c53894 100644
---- a/drivers/video/fbdev/exynos/Kconfig
-+++ b/drivers/video/fbdev/exynos/Kconfig
-@@ -16,7 +16,7 @@ if EXYNOS_VIDEO
+ /**
++ * devm_of_phy_get_by_index() - lookup and obtain a reference to a phy by index.
++ * @dev: device that requests this phy
++ * @np: node containing the phy
++ * @index: index of the phy
++ *
++ * Gets the phy using _of_phy_get(), and associates a device with it using
++ * devres. On driver detach, release function is invoked on the devres data,
++ * then, devres data is freed.
++ *
++ */
++struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
++				     int index)
++{
++	struct phy **ptr, *phy;
++
++	ptr = devres_alloc(devm_phy_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	phy = _of_phy_get(np, index);
++	if (!IS_ERR(phy)) {
++		*ptr = phy;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return phy;
++}
++EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index);
++
++/**
+  * phy_create() - create a new phy
+  * @dev: device that is creating the new phy
+  * @node: device node of the phy
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index a0197fa..978d5af 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -133,6 +133,8 @@ struct phy *devm_phy_get(struct device *dev, const char *string);
+ struct phy *devm_phy_optional_get(struct device *dev, const char *string);
+ struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
+ 			    const char *con_id);
++struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
++				     int index);
+ void phy_put(struct phy *phy);
+ void devm_phy_put(struct device *dev, struct phy *phy);
+ struct phy *of_phy_get(struct device_node *np, const char *con_id);
+@@ -261,6 +263,12 @@ static inline struct phy *devm_of_phy_get(struct device *dev,
+ 	return ERR_PTR(-ENOSYS);
+ }
  
- config EXYNOS_MIPI_DSI
- 	bool "EXYNOS MIPI DSI driver support."
--	select GENERIC_PHY
-+	depends on GENERIC_PHY
- 	help
- 	  This enables support for MIPI-DSI device.
- 
++struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
++				     int index);
++{
++	return ERR_PTR(-ENOSYS);
++}
++
+ static inline void phy_put(struct phy *phy)
+ {
+ }
 -- 
 2.3.4
