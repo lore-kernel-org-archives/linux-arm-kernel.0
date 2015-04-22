@@ -1,44 +1,32 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed, 22 Apr 2015 15:18:45 -0700
-Subject: [PATCH V2 4/4] arm64: dts: mailbox device tree node for APM X-Gene
- platform.
-In-Reply-To: <1429741125-29156-1-git-send-email-fkan@apm.com>
-References: <1429741125-29156-1-git-send-email-fkan@apm.com>
-Message-ID: <1429741125-29156-5-git-send-email-fkan@apm.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Thu, 23 Apr 2015 00:28:22 +0200
+Subject: [BUG?] drivers: net:ethernet: cpsw: add support for VLAN
+Message-ID: <1429741702.29353.28.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mailbox device tree node for APM X-Gene platform.
+Hi,
 
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ has commit 3b72c2fe0c6bbec42e ("drivers: net:ethernet: cpsw: add
+support for VLAN") introduced a bug by defining CPSW_VLAN_AWARE as
+BIT(1) instead of BIT(2)?
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index c8d3e0e..92e7b6b 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -489,6 +489,20 @@
- 			clocks = <&pcie4clk 0>;
- 		};
- 
-+		mailbox: slimpro-mbox at 10540000 {
-+			compatible = "apm,xgene-slimpro-mbox";
-+			reg = <0x0 0x10540000 0x0 0xa000>;
-+			#mbox-cells = <1>;
-+			interrupts =    <0x0 0x0 0x4>,
-+					<0x0 0x1 0x4>,
-+					<0x0 0x2 0x4>,
-+					<0x0 0x3 0x4>,
-+					<0x0 0x4 0x4>,
-+					<0x0 0x5 0x4>,
-+					<0x0 0x6 0x4>,
-+					<0x0 0x7 0x4>;
-+		};
-+
- 		serial0: serial at 1c020000 {
- 			status = "disabled";
- 			device_type = "serial";
--- 
-1.9.1
++#define CPSW_VLAN_AWARE		BIT(1)
+<snip>
+ 	/* switch to vlan unaware mode */
+-	cpsw_ale_control_set(priv->ale, 0, ALE_VLAN_AWARE, 0);
++	cpsw_ale_control_set(priv->ale, priv->host_port, ALE_VLAN_AWARE,
++			     CPSW_ALE_VLAN_AWARE);
++	control_reg = readl(&priv->regs->control);
++	control_reg |= CPSW_VLAN_AWARE;
++	writel(control_reg, &priv->regs->control);
+
+See TRM [1] page 1980 (14.5.1.2 CONTROL Register), there bit
+CPSW_VLAN_AWARE is number 2.
+
+I didn't do any tests, just stumbled upon.
+
+[1]: http://www.ti.com/lit/ug/spruh73l/spruh73l.pdf
+
+Thanks
+ -- Christoph
