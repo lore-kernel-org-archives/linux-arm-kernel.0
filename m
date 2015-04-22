@@ -1,10 +1,10 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Tue, 21 Apr 2015 23:02:29 -0400
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 21 Apr 2015 23:02:38 -0400
 Subject: [PATCH v5 0/4]PCI: X-Gene: Add APM X-Gene v1 MSI/MSIX termination
  driver
 In-Reply-To: <cover.1429586144.git.dhdang@apm.com>
 References: <55310050.7000003@arm.com> <cover.1429586144.git.dhdang@apm.com>
-Message-ID: <55370F45.2030809@jonmasters.org>
+Message-ID: <55370F4E.6020604@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
