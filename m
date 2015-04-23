@@ -1,60 +1,54 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Thu, 23 Apr 2015 15:05:41 +0200
-Subject: dma_alloc_coherent versus streaming DMA,
- neither works satisfactory
-In-Reply-To: <2757951.K585xX1rYN@wuerfel>
-References: <5538DD02.6050401@topic.nl> <2757951.K585xX1rYN@wuerfel>
-Message-ID: <5538EE25.2030909@topic.nl>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 23 Apr 2015 15:19:15 +0200
+Subject: [PATCH] mmc: core: add missing pm event in mmc_pm_notify to fix
+ hib restore
+In-Reply-To: <1429785823-16939-1-git-send-email-grygorii.strashko@linaro.org>
+References: <1429785823-16939-1-git-send-email-grygorii.strashko@linaro.org>
+Message-ID: <CAPDyKFqA5Wvod_0J-52FJ9Vktt1kdq7H7c9UcX-daJ0hazWU+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?On 23-04-15 14:32, Arnd Bergmann wrote:
-> On Thursday 23 April 2015 13:52:34 Mike Looijmans wrote:
->> Can anyone here offer some advise on this?
->>
+On 23 April 2015 at 12:43,  <grygorii.strashko@linaro.org> wrote:
+> From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 >
-> The problem you are experiencing is a direct result of using hardware
-> without cache-coherency from user space. There is no software workaround
-> for this: If you want data to be cacheable *and* avoid doing manual cache
-> flushes each time data is passed between user space and hardware, you have
-> to use hardware that is cache-coherent.
+> The PM_RESTORE_PREPARE is not handled now in mmc_pm_notify(),
+> as result mmc_rescan() could be scheduled and executed at
+> late hibernation restore stages when MMC device is suspended
+> already - which, in turn, will lead to system crash on TI dra7-evm board:
+>
+> WARNING: CPU: 0 PID: 3188 at drivers/bus/omap_l3_noc.c:148 l3_interrupt_handler+0x258/0x374()
+> 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER1_P3 (Idle): Data Access in User mode during Functional access
+>
+> Hence, add missed PM_RESTORE_PREPARE PM event in mmc_pm_notify().
+>
+> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 
-I can live with manual flushes. I know exactly what and where to flush in the 
-driver.
+Huh, that was an old bug you found. :-)
 
-What bothers me so much is that just invalidating the data cache(s) takes 
-longer than actually reading the data from uncached memory and writing it into 
-cached memory elsewhere. That just does not sound right to me.
+I have applied it for fixes and added the below fixes tag.
 
-> You mentioned that you are using 'Zynq', which supports cache-coherent
-> DMA using the 'accelerator coherency port'. If you are able to connect
-> your device to that port, it should work, otherwise you should consider
-> using a different platform.
+Fixes: 4c2ef25fe0b8 (mmc: fix all hangs related to mmc/sd card
+insert/removal during suspend/resume)
 
-I can probably hook up the DMA controller to the ACP port, however, I would 
-expect this to have serious negative impact on system performance. The 
-transfers are typically in the megabyte range (for example, video frames) so 
-they will not fit into the L2 cache (which is 512k on the Zynq). I'd expect 
-these transfers, when routed through the ACP, to "push" all data out of the L2 
-cache, replacing it with data that isn't going to be read any time soon, and 
-thus interfere with performance too much.
+Thanks and kind regards!
+Uffe
 
-It might be worth a try though to see what will actually happen.
-
-Mike.
-
-
-Kind regards,
-
-Mike Looijmans
-System Expert
-
-TOPIC Embedded Products
-Eindhovenseweg 32-C, NL-5683 KH Best
-Postbus 440, NL-5680 AK Best
-Telefoon: +31 (0) 499 33 69 79
-Telefax: +31 (0) 499 33 69 70
-E-mail: mike.looijmans at topicproducts.com
-Website: www.topicproducts.com
-
-Please consider the environment before printing this e-mail
+> ---
+>  drivers/mmc/core/core.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> index c296bc0..92e7671 100644
+> --- a/drivers/mmc/core/core.c
+> +++ b/drivers/mmc/core/core.c
+> @@ -2651,6 +2651,7 @@ int mmc_pm_notify(struct notifier_block *notify_block,
+>         switch (mode) {
+>         case PM_HIBERNATION_PREPARE:
+>         case PM_SUSPEND_PREPARE:
+> +       case PM_RESTORE_PREPARE:
+>                 spin_lock_irqsave(&host->lock, flags);
+>                 host->rescan_disable = 1;
+>                 spin_unlock_irqrestore(&host->lock, flags);
+> --
+> 1.9.1
+>
