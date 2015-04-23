@@ -1,142 +1,100 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 23 Apr 2015 10:51:05 +0200
-Subject: [PATCH 3/4] tty: serial: 8250_mtk: use pm_runtime callbacks for
- enabling
+Date: Thu, 23 Apr 2015 10:51:06 +0200
+Subject: [PATCH 4/4] tty: serial: 8250_mtk: Add support for bus clock
 In-Reply-To: <1429779066-21406-1-git-send-email-s.hauer@pengutronix.de>
 References: <1429779066-21406-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1429779066-21406-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1429779066-21406-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pm_runtime callbacks already enable and disable the device.
-Use them in probe() and remove() instead of duplicating the
-code. This allows us to concentrate more code for enabling/disabling
-the UART in a single place.
+The mtk 8250 needs two clocks, one for providing the baudrate and
+one that needs to be enabled for register accesses. The latter has
+not been supported, this patch adds support for it. It is optional
+for now since not all SoCs provide a bus clock.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/tty/serial/8250/8250_mtk.c | 69 ++++++++++++++++++++------------------
- 1 file changed, 36 insertions(+), 33 deletions(-)
+ Documentation/devicetree/bindings/serial/mtk-uart.txt |  9 +++++++--
+ drivers/tty/serial/8250/8250_mtk.c                    | 14 +++++++++++++-
+ 2 files changed, 20 insertions(+), 3 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+index 4415226..369b5c3 100644
+--- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
++++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+@@ -14,7 +14,11 @@ Required properties:
+ 
+ - interrupts: A single interrupt specifier.
+ 
+-- clocks: Clock driving the hardware.
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names:
++  - "baud": The clock the baudrate is derived from
++  - "bus": The bus clock for register accesses (optional)
+ 
+ Example:
+ 
+@@ -22,5 +26,6 @@ Example:
+ 		compatible = "mediatek,mt6589-uart", "mediatek,mt6577-uart";
+ 		reg = <0x11006000 0x400>;
+ 		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
+-		clocks = <&uart_clk>;
++		clocks = <&uart_clk>, <&bus_clk>;
++		clock-names = "baud", "bus";
+ 	};
 diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-index bcfaa8dc..2f28bd0 100644
+index 2f28bd0..20c27f0 100644
 --- a/drivers/tty/serial/8250/8250_mtk.c
 +++ b/drivers/tty/serial/8250/8250_mtk.c
-@@ -115,6 +115,29 @@ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
- 		tty_termios_encode_baud_rate(termios, baud, baud);
- }
+@@ -34,6 +34,7 @@
+ struct mtk8250_data {
+ 	int			line;
+ 	struct clk		*uart_clk;
++	struct clk		*bus_clk;
+ };
  
-+static int mtk8250_runtime_suspend(struct device *dev)
-+{
-+	struct mtk8250_data *data = dev_get_drvdata(dev);
-+
-+	clk_disable_unprepare(data->uart_clk);
-+
-+	return 0;
-+}
-+
-+static int mtk8250_runtime_resume(struct device *dev)
-+{
-+	struct mtk8250_data *data = dev_get_drvdata(dev);
-+	int err;
-+
-+	err = clk_prepare_enable(data->uart_clk);
+ static void
+@@ -120,6 +121,7 @@ static int mtk8250_runtime_suspend(struct device *dev)
+ 	struct mtk8250_data *data = dev_get_drvdata(dev);
+ 
+ 	clk_disable_unprepare(data->uart_clk);
++	clk_disable_unprepare(data->bus_clk);
+ 
+ 	return 0;
+ }
+@@ -135,6 +137,12 @@ static int mtk8250_runtime_resume(struct device *dev)
+ 		return err;
+ 	}
+ 
++	err = clk_prepare_enable(data->bus_clk);
 +	if (err) {
-+		dev_warn(dev, "Can't enable clock\n");
++		dev_warn(dev, "Can't enable bus clock\n");
 +		return err;
 +	}
 +
-+	return 0;
-+}
-+
- static void
- mtk8250_do_pm(struct uart_port *port, unsigned int state, unsigned int old)
- {
-@@ -130,19 +153,12 @@ mtk8250_do_pm(struct uart_port *port, unsigned int state, unsigned int old)
+ 	return 0;
+ }
+ 
+@@ -153,7 +161,7 @@ mtk8250_do_pm(struct uart_port *port, unsigned int state, unsigned int old)
  static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
  			   struct mtk8250_data *data)
  {
--	int err;
--
- 	data->uart_clk = devm_clk_get(&pdev->dev, NULL);
+-	data->uart_clk = devm_clk_get(&pdev->dev, NULL);
++	data->uart_clk = devm_clk_get(&pdev->dev, "baud");
  	if (IS_ERR(data->uart_clk)) {
  		dev_warn(&pdev->dev, "Can't get uart clock\n");
  		return PTR_ERR(data->uart_clk);
- 	}
+@@ -161,6 +169,10 @@ static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
  
--	err = clk_prepare_enable(data->uart_clk);
--	if (err) {
--		dev_warn(&pdev->dev, "Can't prepare clock\n");
--		return err;
--	}
  	p->uartclk = clk_get_rate(data->uart_clk);
  
- 	return 0;
-@@ -193,14 +209,18 @@ static int mtk8250_probe(struct platform_device *pdev)
- 	writel(0x0, uart.port.membase +
- 			(MTK_UART_RATE_FIX << uart.port.regshift));
- 
--	data->line = serial8250_register_8250_port(&uart);
--	if (data->line < 0)
--		return data->line;
--
- 	platform_set_drvdata(pdev, data);
- 
--	pm_runtime_set_active(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
-+	if (!pm_runtime_enabled(&pdev->dev)) {
-+		err = mtk8250_runtime_resume(&pdev->dev);
-+		if (err)
-+			return err;
-+	}
-+
-+	data->line = serial8250_register_8250_port(&uart);
-+	if (data->line < 0)
-+		return data->line;
- 
- 	return 0;
- }
-@@ -212,10 +232,13 @@ static int mtk8250_remove(struct platform_device *pdev)
- 	pm_runtime_get_sync(&pdev->dev);
- 
- 	serial8250_unregister_port(data->line);
--	clk_disable_unprepare(data->uart_clk);
- 
- 	pm_runtime_disable(&pdev->dev);
- 	pm_runtime_put_noidle(&pdev->dev);
-+
-+	if (!pm_runtime_status_suspended(&pdev->dev))
-+		mtk8250_runtime_suspend(&pdev->dev);
++	data->bus_clk = devm_clk_get(&pdev->dev, "bus");
++	if (IS_ERR(data->bus_clk))
++		data->bus_clk = NULL;
 +
  	return 0;
  }
  
-@@ -239,26 +262,6 @@ static int mtk8250_resume(struct device *dev)
- }
- #endif /* CONFIG_PM_SLEEP */
- 
--#ifdef CONFIG_PM
--static int mtk8250_runtime_suspend(struct device *dev)
--{
--	struct mtk8250_data *data = dev_get_drvdata(dev);
--
--	clk_disable_unprepare(data->uart_clk);
--
--	return 0;
--}
--
--static int mtk8250_runtime_resume(struct device *dev)
--{
--	struct mtk8250_data *data = dev_get_drvdata(dev);
--
--	clk_prepare_enable(data->uart_clk);
--
--	return 0;
--}
--#endif
--
- static const struct dev_pm_ops mtk8250_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(mtk8250_suspend, mtk8250_resume)
- 	SET_RUNTIME_PM_OPS(mtk8250_runtime_suspend, mtk8250_runtime_resume,
 -- 
 2.1.4
