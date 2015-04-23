@@ -1,36 +1,25 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu, 23 Apr 2015 11:07:10 -0700
-Subject: [PATCH V3 4/4] arm64: dts: add proxy I2C device driver on APM X-Gene
- platform
-In-Reply-To: <1429812430-31631-1-git-send-email-fkan@apm.com>
-References: <1429812430-31631-1-git-send-email-fkan@apm.com>
-Message-ID: <1429812430-31631-5-git-send-email-fkan@apm.com>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 23 Apr 2015 11:07:41 -0700
+Subject: [PATCH v6 0/4] edac: Add APM X-Gene SoC EDAC driver
+In-Reply-To: <20150409174847.GI25434@pd.tnic>
+References: <1426573821-1937-1-git-send-email-lho@apm.com>
+ <CAPw-ZTkOOh=1GgDBQ4a9KoWVA9B7GPXddwNx=VBjVTo44wYdug@mail.gmail.com>
+ <20150409174847.GI25434@pd.tnic>
+Message-ID: <CAPw-ZTngMV_pVKEEx0wZkk7REJYyomG+KWMwfbFiK8xpV13bmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add proxy I2C device driver on APM X-Gene platform.
+Hi,
 
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Hieu Le <hnle@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+>>
+>> Any comment with v6 of the APM EDAC driver?
+>
+> So this thing is being delayed only due to the device tree stuff AFAICT.
+>
+> Can someone of the DT people on To: please have a look already so that I
+> can queue this?
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index a2b9657..d405dd0 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -522,6 +522,11 @@
- 					<0x0 0x7 0x4>;
- 		};
- 
-+		i2cslimpro {
-+			compatible = "apm,xgene-slimpro-i2c";
-+			mboxes = <&mailbox 0>;
-+		};
-+
- 		serial0: serial at 1c020000 {
- 			status = "disabled";
- 			device_type = "serial";
--- 
-1.9.1
+I would really appreciate if someone from the DT community can
+review/approve the DT changes.
+
+-Loc
