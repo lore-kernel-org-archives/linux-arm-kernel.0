@@ -1,87 +1,101 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 23 Apr 2015 11:21:12 +0200
-Subject: [PATCH 1/4] ARM: dts: mediatek: Enable clock support for Mediatek
- MT8135.
-In-Reply-To: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
-References: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1429780875-29096-2-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 23 Apr 2015 11:25:03 +0200
+Subject: [PATCH v11]: clk: Add common clock support for Mediatek MT8135
+ and MT8173
+In-Reply-To: <CABuKBeLaUfseZU84vNmVFR3EeUhNrbrXnKeN=N6PP=abPcnjDQ@mail.gmail.com>
+References: <1427825817-26773-1-git-send-email-s.hauer@pengutronix.de>
+ <CABuKBeJ256HBLP+3WB+acNbMonGknQJgWBnGjEx1VWecWc-Y5g@mail.gmail.com>
+ <20150414100810.GH4946@pengutronix.de>
+ <CABuKBeLxcCcfcunwX7q=hSHRrrHd5-EMgRzSwhx9eSdvNKum=A@mail.gmail.com>
+ <20150414115702.GX9742@pengutronix.de>
+ <CABuKBe+MnmL47FB2FhN=RRKEZV4tR3OyVTTpWfkTYQ4zSZP22Q@mail.gmail.com>
+ <CABuKBeLaUfseZU84vNmVFR3EeUhNrbrXnKeN=N6PP=abPcnjDQ@mail.gmail.com>
+Message-ID: <20150423092503.GL6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Liao <jamesjj.liao@mediatek.com>
+On Wed, Apr 15, 2015 at 05:48:08PM +0200, Matthias Brugger wrote:
+> 2015-04-15 17:11 GMT+02:00 Matthias Brugger <matthias.bgg@gmail.com>:
+> > 2015-04-14 13:57 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> >> On Tue, Apr 14, 2015 at 01:01:30PM +0200, Matthias Brugger wrote:
+> >>> Hi Sascha,
+> >>>
+> >>> 2015-04-14 12:08 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> >>> > Hi Matthias,
+> >>> >
+> >>> > On Tue, Apr 07, 2015 at 01:47:58PM +0200, Matthias Brugger wrote:
+> >>> >> Hi Sascha,
+> >>> >>
+> >>> >>
+> >>> >> 2015-03-31 20:16 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> >>> >> >
+> >>> >> > The following changes since commit 9eccca0843205f87c00404b663188b88eb248051:
+> >>> >> >
+> >>> >> >   Linux 4.0-rc3 (2015-03-08 16:09:09 -0700)
+> >>> >> >
+> >>> >> > are available in the git repository at:
+> >>> >> >
+> >>> >> >   git://git.pengutronix.de/git/imx/linux-2.6.git tags/v4.0-clk-mediatek-v11
+> >>> >> >
+> >>> >> > for you to fetch changes up to ae9129219143cfdefe8b3a463deb8c5cb8955525:
+> >>> >> >
+> >>> >> >   dt-bindings: ARM: Mediatek: Document devicetree bindings for clock/reset controllers (2015-03-31 20:08:46 +0200)
+> >>> >> >
+> >>> >> > ----------------------------------------------------------------
+> >>> >> > This patchset contains the initial common clock support for Mediatek SoCs.
+> >>> >> > Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes
+> >>> >> > and clock gates.
+> >>> >>
+> >>> >> I tried the patch set on my mt8135 eval board. I used the dts bindings
+> >>> >> from a former version of this set [1], but it does not boot the board
+> >>> >> (based on v4.0-rc7).
+> >>> >> Do you have any hint, what is happening, or are the bindings wrong?
+> >>> >
+> >>> > I just tried on a v4.0 with
+> >>> > - this series applied
+> >>> > - the dts patch applied (which is still up-to-date)
+> >>> > - multi_v7_defconfig
+> >>> >
+> >>> > And it still works. What do you mean with "does not boot the board"? No
+> >>> > console output? Could you try with earlyprintk?
+> >>>
+> >>> The probelms I see is, that with the clock patches, I'm not able to
+> >>> boot into a initramfs [1].
+> >>> Whereas if I just comment topckgen and preicfg in the dts, I'm able to
+> >>> get the a serial console of my initramfs [2].
+> >>>
+> >>> I wonder if you are able to get serial console from the initramfs with
+> >>> the clock patches + dts patch?
+> >>
+> >> So you get kernel messages but no output from initramfs? In this case
+> >> the kernel disables the unused clocks in a late_initcall. The UART
+> >> driver still uses the dummy clock provided in the dtsi, so the real
+> >> UART clk gets disabled in the initcall. Try passing clk_ignore_unused to
+> >> the kernel
+> >
+> > OK, I can boot to the initramfs with this kernel parameter, but it
+> > fails to boot, when I change the uart clock. I suppose that PERI_UART3
+> > for debug port uart3 should be fine, but it looks like it doesn't
+> > work.
+> > I can see on the mt6589 datasheet that you have a register
+> > PERI_UART_CK_SOURCE_SEL where you can decide if you want a 26 MHz or a
+> > 52 MHz clock for the UART block.
+> > Does this register exists on mt8135? If so, why is it not implemented?
+> 
+> I found that PERI_UARTx_CK is connected to axi_sel but should be
+> connected to uart_sel. Like this I'm able to reach to initramfs
+> console, but the baud rate values are screwed up.
+> As uart_sel is at 52 MHz, I suppose we need to change the entries in
+> PERI_UART_CK_SOURCE_SEL.
 
-This patch adds MT8135 clock controllers into device tree.
+I sorted the UART clock stuff out. I sent out three series, with all of
+them merged together you should get UART + common clock support working
+properly on MT835.
 
-Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/mt8135.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Sascha
 
-diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-index a161e99..b4017e2 100644
---- a/arch/arm/boot/dts/mt8135.dtsi
-+++ b/arch/arm/boot/dts/mt8135.dtsi
-@@ -12,6 +12,7 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <dt-bindings/clock/mt8135-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include "skeleton64.dtsi"
-@@ -93,6 +94,11 @@
- 			#clock-cells = <0>;
- 		};
- 
-+		clk26m: clk26m {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <26000000>;
-+		};
- 	};
- 
- 	soc {
-@@ -101,6 +107,26 @@
- 		compatible = "simple-bus";
- 		ranges;
- 
-+		topckgen: topckgen at 10000000 {
-+			compatible = "mediatek,mt8135-topckgen";
-+			reg = <0 0x10000000 0 0x1000>;
-+			#clock-cells = <1>;
-+		};
-+
-+		infracfg: infracfg at 10001000 {
-+			#reset-cells = <1>;
-+			#clock-cells = <1>;
-+			compatible = "mediatek,mt8135-infracfg", "syscon";
-+			reg = <0 0x10001000 0 0x1000>;
-+		};
-+
-+		pericfg: pericfg at 10003000 {
-+			#reset-cells = <1>;
-+			#clock-cells = <1>;
-+			compatible = "mediatek,mt8135-pericfg", "syscon";
-+			reg = <0 0x10003000 0 0x1000>;
-+		};
-+
- 		timer: timer at 10008000 {
- 			compatible = "mediatek,mt8135-timer",
- 					"mediatek,mt6577-timer";
-@@ -119,6 +145,12 @@
- 			reg = <0 0x10200030 0 0x1c>;
- 		};
- 
-+		apmixedsys: apmixedsys at 10209000 {
-+			compatible = "mediatek,mt8135-apmixedsys";
-+			reg = <0 0x10209000 0 0x1000>;
-+			#clock-cells = <1>;
-+		};
-+
- 		gic: interrupt-controller at 10211000 {
- 			compatible = "arm,cortex-a15-gic";
- 			interrupt-controller;
 -- 
-2.1.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
