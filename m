@@ -1,48 +1,91 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Fri, 24 Apr 2015 01:34:15 +0800
-Subject: [PATCH] ARM: imx: correct Audio/Video PLL rate calculation formula
-Message-ID: <1429810455-22447-1-git-send-email-b20788@freescale.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 23 Apr 2015 10:47:58 +0100
+Subject: [PATCH] xen: Add __GFP_DMA flag when xen_swiotlb_init gets free
+ pages on ARM
+Message-ID: <alpine.DEB.2.02.1504231045480.2640@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The audio/video PLL's rate calculation formula is as below in RM:
+Make sure that xen_swiotlb_init allocates buffers that are DMA capable
+when at least one memblock is available below 4G. Otherwise we assume
+that all devices on the SoC can cope with >4G addresses.
 
-Fref * (DIV_SELECT + NUM / DENOM),
+No functional changes on x86.
 
-in original clk-pllv3's code, below code is used:
+From: Chen Baozi <baozich@gmail.com>
 
-(parent_rate * div) + ((parent_rate / mfd) * mfn
+Signed-off-by: Chen Baozi <baozich@gmail.com>
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Tested-by: Chen Baozi <baozich@gmail.com>
 
-as it does NOT consider the float data using div, so below
-calculation formula should be used as a decent method:
-
-(parent_rate * div) + ((parent_rate * mfn) / mfd)
-
-and we also need to consider parent_rate * mfd may exceed
-a 32 bit value, 64 bit value should be used.
-
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/mach-imx/clk-pllv3.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
-index 641ebc5..f83cf0d 100644
---- a/arch/arm/mach-imx/clk-pllv3.c
-+++ b/arch/arm/mach-imx/clk-pllv3.c
-@@ -203,8 +203,12 @@ static unsigned long clk_pllv3_av_recalc_rate(struct clk_hw *hw,
- 	u32 mfn = readl_relaxed(pll->base + PLL_NUM_OFFSET);
- 	u32 mfd = readl_relaxed(pll->base + PLL_DENOM_OFFSET);
- 	u32 div = readl_relaxed(pll->base) & pll->div_mask;
-+	u64 temp64 = parent_rate;
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index 2f7e6ff..0b579b2 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -110,5 +110,6 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+ bool xen_arch_need_swiotlb(struct device *dev,
+ 			   unsigned long pfn,
+ 			   unsigned long mfn);
++unsigned long xen_get_swiotlb_free_pages(unsigned int order);
  
--	return (parent_rate * div) + ((parent_rate / mfd) * mfn);
-+	temp64 *= mfn;
-+	do_div(temp64, mfd);
+ #endif /* _ASM_ARM_XEN_PAGE_H */
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+index 793551d..4983250 100644
+--- a/arch/arm/xen/mm.c
++++ b/arch/arm/xen/mm.c
+@@ -4,6 +4,7 @@
+ #include <linux/gfp.h>
+ #include <linux/highmem.h>
+ #include <linux/export.h>
++#include <linux/memblock.h>
+ #include <linux/of_address.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+@@ -21,6 +22,20 @@
+ #include <asm/xen/hypercall.h>
+ #include <asm/xen/interface.h>
+ 
++unsigned long xen_get_swiotlb_free_pages(unsigned int order)
++{
++	struct memblock_region *reg;
++	gfp_t flags = __GFP_NOWARN;
 +
-+	return (parent_rate * div) + temp64;
++	for_each_memblock(memory, reg) {
++		if (reg->base < (phys_addr_t)0xffffffff) {
++			flags |= __GFP_DMA;
++			break;
++		}
++	}
++	return __get_free_pages(flags, order);
++}
++
+ enum dma_cache_op {
+        DMA_UNMAP,
+        DMA_MAP,
+diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
+index 358dcd3..c44a5d5 100644
+--- a/arch/x86/include/asm/xen/page.h
++++ b/arch/x86/include/asm/xen/page.h
+@@ -269,4 +269,9 @@ static inline bool xen_arch_need_swiotlb(struct device *dev,
+ 	return false;
  }
  
- static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
--- 
-1.9.1
++static inline unsigned long xen_get_swiotlb_free_pages(unsigned int order)
++{
++	return __get_free_pages(__GFP_NOWARN, order);
++}
++
+ #endif /* _ASM_X86_XEN_PAGE_H */
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index 810ad41..4c54932 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -235,7 +235,7 @@ retry:
+ #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
+ #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
+ 		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
+-			xen_io_tlb_start = (void *)__get_free_pages(__GFP_NOWARN, order);
++			xen_io_tlb_start = (void *)xen_get_swiotlb_free_pages(order);
+ 			if (xen_io_tlb_start)
+ 				break;
+ 			order--;
