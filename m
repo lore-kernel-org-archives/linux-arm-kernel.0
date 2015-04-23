@@ -1,99 +1,114 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 23 Apr 2015 10:52:20 +0100
-Subject: [PATCH] xen: Add __GFP_DMA flag when xen_swiotlb_init gets free
- pages on ARM
-In-Reply-To: <alpine.DEB.2.02.1504231045480.2640@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1504231045480.2640@kaball.uk.xensource.com>
-Message-ID: <5538C0D4.5050400@citrix.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 23 Apr 2015 10:54:26 +0100
+Subject: [PATCH v2 03/10] KVM: arm: guest debug, define API headers
+In-Reply-To: <20150413120813.GN6186@cbox>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-4-git-send-email-alex.bennee@linaro.org>
+ <20150413120813.GN6186@cbox>
+Message-ID: <87zj5z5fvx.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/04/15 10:47, Stefano Stabellini wrote:
-> Make sure that xen_swiotlb_init allocates buffers that are DMA capable
-> when at least one memblock is available below 4G. Otherwise we assume
-> that all devices on the SoC can cope with >4G addresses.
 
-This commit message must explain why the PFNs (IPAs) are relevant for DMA.
+Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-David
+> On Tue, Mar 31, 2015 at 04:08:01PM +0100, Alex Benn?e wrote:
+>> This commit defines the API headers for guest debugging. There are two
+>> architecture specific debug structures:
+>> 
+>>   - kvm_guest_debug_arch, allows us to pass in HW debug registers
+>>   - kvm_debug_exit_arch, signals the exact debug exit and pc
+>> 
+>> The type of debugging being used is control by the architecture specific
+>> control bits of the kvm_guest_debug->control flags in the ioctl
+>> structure.
+>> 
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> 
+>> ---
+>> v2
+>>    - expose hsr and pc directly to user-space
+>> 
+>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+>> index 3ef77a4..6ee70a0 100644
+>> --- a/arch/arm64/include/uapi/asm/kvm.h
+>> +++ b/arch/arm64/include/uapi/asm/kvm.h
+>> @@ -100,10 +100,24 @@ struct kvm_sregs {
+>>  struct kvm_fpu {
+>>  };
+>>  
+>> +/*
+>> + * See ARM ARM D7.3: Debug Registers
+>
+> see the ARM ARM for ??
+>
+>> + *
+>> + * The control registers are architecturally defined as 32 bits but are
+>> + * stored as 64 bit values along side the value registers and aligned
+>
+> do you mean alongside?
 
-> No functional changes on x86.
-> 
-> From: Chen Baozi <baozich@gmail.com>
-> 
-> Signed-off-by: Chen Baozi <baozich@gmail.com>
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Tested-by: Chen Baozi <baozich@gmail.com>
-> 
-> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-> index 2f7e6ff..0b579b2 100644
-> --- a/arch/arm/include/asm/xen/page.h
-> +++ b/arch/arm/include/asm/xen/page.h
-> @@ -110,5 +110,6 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
->  bool xen_arch_need_swiotlb(struct device *dev,
->  			   unsigned long pfn,
->  			   unsigned long mfn);
-> +unsigned long xen_get_swiotlb_free_pages(unsigned int order);
->  
->  #endif /* _ASM_ARM_XEN_PAGE_H */
-> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-> index 793551d..4983250 100644
-> --- a/arch/arm/xen/mm.c
-> +++ b/arch/arm/xen/mm.c
-> @@ -4,6 +4,7 @@
->  #include <linux/gfp.h>
->  #include <linux/highmem.h>
->  #include <linux/export.h>
-> +#include <linux/memblock.h>
->  #include <linux/of_address.h>
->  #include <linux/slab.h>
->  #include <linux/types.h>
-> @@ -21,6 +22,20 @@
->  #include <asm/xen/hypercall.h>
->  #include <asm/xen/interface.h>
->  
-> +unsigned long xen_get_swiotlb_free_pages(unsigned int order)
-> +{
-> +	struct memblock_region *reg;
-> +	gfp_t flags = __GFP_NOWARN;
-> +
-> +	for_each_memblock(memory, reg) {
-> +		if (reg->base < (phys_addr_t)0xffffffff) {
-> +			flags |= __GFP_DMA;
-> +			break;
-> +		}
-> +	}
-> +	return __get_free_pages(flags, order);
-> +}
-> +
->  enum dma_cache_op {
->         DMA_UNMAP,
->         DMA_MAP,
-> diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-> index 358dcd3..c44a5d5 100644
-> --- a/arch/x86/include/asm/xen/page.h
-> +++ b/arch/x86/include/asm/xen/page.h
-> @@ -269,4 +269,9 @@ static inline bool xen_arch_need_swiotlb(struct device *dev,
->  	return false;
->  }
->  
-> +static inline unsigned long xen_get_swiotlb_free_pages(unsigned int order)
-> +{
-> +	return __get_free_pages(__GFP_NOWARN, order);
-> +}
-> +
->  #endif /* _ASM_X86_XEN_PAGE_H */
-> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> index 810ad41..4c54932 100644
-> --- a/drivers/xen/swiotlb-xen.c
-> +++ b/drivers/xen/swiotlb-xen.c
-> @@ -235,7 +235,7 @@ retry:
->  #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
->  #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
->  		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
-> -			xen_io_tlb_start = (void *)__get_free_pages(__GFP_NOWARN, order);
-> +			xen_io_tlb_start = (void *)xen_get_swiotlb_free_pages(order);
->  			if (xen_io_tlb_start)
->  				break;
->  			order--;
-> 
+sure.
+
+>
+>> + * with the rest 64 bit registers in the normal CPU context.
+>
+> rest of the 64 bit
+>
+>> + */
+>
+> why do we store them as 64 bit values?  There's nothing prevented us
+> from defining them as __u32 is there?  Is this to make the ONE_REG
+> interface accessers more convenient?
+
+No but it will involve more fiddling when we copy them into the CPU
+context which keeps everything as 64 bit aligned. Of course if we want
+to remove the debug registers from the context and put a pointer in
+place then this is fairly moot as we will need to change the hyp.S code
+that copies the registers during the world switch. I was trying to
+minimise the amount of change to the assembler in this series.
+
+>
+>> +#define KVM_ARM_NDBG_REGS 16
+>
+> nit: is NDBG short for something I don't know about or is it
+> the number of debug registers we are noting here, in which case I think
+> KVM_ARM_NUM_DBG_REGS is more clear.
+
+OK.
+
+>
+>>  struct kvm_guest_debug_arch {
+>> +	__u64 dbg_bcr[KVM_ARM_NDBG_REGS];
+>> +	__u64 dbg_bvr[KVM_ARM_NDBG_REGS];
+>> +	__u64 dbg_wcr[KVM_ARM_NDBG_REGS];
+>> +	__u64 dbg_wvr[KVM_ARM_NDBG_REGS];
+>>  };
+>>  
+>>  struct kvm_debug_exit_arch {
+>> +	__u64 pc;
+>> +	__u32 hsr;
+>>  };
+>>  
+>>  struct kvm_sync_regs {
+>> @@ -207,4 +221,11 @@ struct kvm_arch_memory_slot {
+>>  
+>>  #endif
+>>  
+>> +/*
+>> + * Architecture related debug defines - upper 16 bits of
+>> + * kvm_guest_debug->control
+>> + */
+>> +#define KVM_GUESTDBG_USE_SW_BP	        __KVM_GUESTDBG_USE_SW_BP
+>> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
+>> +
+>>  #endif /* __ARM_KVM_H__ */
+>> -- 
+>> 2.3.4
+>> 
+>
+> Thanks,
+> -Christoffer
+
+-- 
+Alex Benn?e
