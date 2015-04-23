@@ -1,251 +1,109 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 23 Apr 2015 16:09:59 -0700
-Subject: [PATCH v2 6/9] ARM: BCM63xx: Add secondary CPU PMB initialization
- sequence
+Date: Thu, 23 Apr 2015 16:09:58 -0700
+Subject: [PATCH v2 5/9] ARM: BCM63xx: Add Broadcom BCM63xx PMB controller
+ helpers
 In-Reply-To: <1429830602-10988-1-git-send-email-f.fainelli@gmail.com>
 References: <1429830602-10988-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1429830602-10988-7-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1429830602-10988-6-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sequence to initialize a secondary CPU using the BCM63138 PMB is
-extremely specific and represents much more code than any other on-chip
-peripheral (AHCI, USB 3.0 or integrated Ethernet switch), as such we
-keep that code local and utilize Device Tree to lookup all the resources
-we need from the CPU device tree node.
+This patch adds both common register definitions and helper functions
+used to issue read/write commands to the Broadcom BCM63xx PMB controller
+which is used to power on and release from reset internal on-chip
+peripherals such as the integrated Ethernet switch, AHCI, USB, as well
+as the secondary CPU core.
+
+This is going to be utilized by the BCM63138 SMP code, as well as by the
+BCM63138 reset controller later.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/mach-bcm/bcm63xx_pmb.c | 221 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 221 insertions(+)
- create mode 100644 arch/arm/mach-bcm/bcm63xx_pmb.c
+ include/linux/bcm63xx_pmb.h | 76 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
+ create mode 100644 include/linux/bcm63xx_pmb.h
 
-diff --git a/arch/arm/mach-bcm/bcm63xx_pmb.c b/arch/arm/mach-bcm/bcm63xx_pmb.c
+diff --git a/include/linux/bcm63xx_pmb.h b/include/linux/bcm63xx_pmb.h
 new file mode 100644
-index 000000000000..08c2c6cf5980
+index 000000000000..2a2ea1bfb6cf
 --- /dev/null
-+++ b/arch/arm/mach-bcm/bcm63xx_pmb.c
-@@ -0,0 +1,221 @@
-+/*
-+ * Broadcom BCM63138 PMB initialization for secondary CPU(s)
-+ *
-+ * Copyright (C) 2015 Broadcom Corporation
-+ * Author: Florian Fainelli <f.fainelli@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+#include <linux/kernel.h>
++++ b/include/linux/bcm63xx_pmb.h
+@@ -0,0 +1,76 @@
++#ifndef __BCM63XX_PMB_H
++#define __BCM63XX_PMB_H
++
 +#include <linux/io.h>
-+#include <linux/spinlock.h>
-+#include <linux/bcm63xx_pmb.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
++#include <linux/types.h>
++#include <linux/delay.h>
 +
-+#include "bcm63xx_smp.h"
++/* PMB Master controller register */
++#define PMB_CTRL		0x00
++#define  PMC_PMBM_START		(1 << 31)
++#define  PMC_PMBM_TIMEOUT	(1 << 30)
++#define  PMC_PMBM_SLAVE_ERR	(1 << 29)
++#define  PMC_PMBM_BUSY		(1 << 28)
++#define  PMC_PMBM_READ		(0 << 20)
++#define  PMC_PMBM_WRITE		(1 << 20)
++#define PMB_WR_DATA		0x04
++#define PMB_TIMEOUT		0x08
++#define PMB_RD_DATA		0x0C
 +
-+/* ARM Control register definitions */
-+#define CORE_PWR_CTRL_SHIFT	0
-+#define CORE_PWR_CTRL_MASK	0x3
-+#define PLL_PWR_ON		BIT(8)
-+#define PLL_LDO_PWR_ON		BIT(9)
-+#define PLL_CLAMP_ON		BIT(10)
-+#define CPU_RESET_N(x)		BIT(13 + (x))
-+#define NEON_RESET_N		BIT(15)
-+#define PWR_CTRL_STATUS_SHIFT	28
-+#define PWR_CTRL_STATUS_MASK	0x3
-+#define PWR_DOWN_SHIFT		30
-+#define PWR_DOWN_MASK		0x3
++#define PMB_BUS_ID_SHIFT	8
 +
-+/* CPU Power control register definitions */
-+#define MEM_PWR_OK		BIT(0)
-+#define MEM_PWR_ON		BIT(1)
-+#define MEM_CLAMP_ON		BIT(2)
-+#define MEM_PWR_OK_STATUS	BIT(4)
-+#define MEM_PWR_ON_STATUS	BIT(5)
-+#define MEM_PDA_SHIFT		8
-+#define MEM_PDA_MASK		0xf
-+#define  MEM_PDA_CPU_MASK	0x1
-+#define  MEM_PDA_NEON_MASK	0xf
-+#define CLAMP_ON		BIT(15)
-+#define PWR_OK_SHIFT		16
-+#define PWR_OK_MASK		0xf
-+#define PWR_ON_SHIFT		20
-+#define  PWR_CPU_MASK		0x03
-+#define  PWR_NEON_MASK		0x01
-+#define PWR_ON_MASK		0xf
-+#define PWR_OK_STATUS_SHIFT	24
-+#define PWR_OK_STATUS_MASK	0xf
-+#define PWR_ON_STATUS_SHIFT	28
-+#define PWR_ON_STATUS_MASK	0xf
-+
-+#define ARM_CONTROL		0x30
-+#define ARM_PWR_CONTROL_BASE	0x34
-+#define ARM_PWR_CONTROL(x)	(ARM_PWR_CONTROL_BASE + (x) * 0x4)
-+#define ARM_NEON_L2		0x3c
-+
-+/* Perform a value write, then spin until the value shifted by
-+ * shift is seen, masked with mask and is different from cond.
++/* Perform the low-level PMB master operation, shared between reads and
++ * writes, caller must hold the spinlock
 + */
-+static int bpcm_wr_rd_mask(void __iomem *master,
-+			   unsigned int addr, u32 off, u32 *val,
-+			   u32 shift, u32 mask, u32 cond)
++static inline int __bpcm_do_op(void __iomem *master, unsigned int addr,
++			       u32 off, u32 op)
 +{
-+	int ret;
++	unsigned int timeout = 1000;
++	u32 cmd;
 +
-+	ret = bpcm_wr(master, addr, off, *val);
-+	if (ret)
-+		return ret;
-+
++	cmd = (PMC_PMBM_START | op | (addr & 0xff) << 12 | off);
++	__raw_writel(cmd, master + PMB_CTRL);
 +	do {
-+		ret = bpcm_rd(master, addr, off, val);
-+		if (ret)
-+			return ret;
++		cmd = __raw_readl(master + PMB_CTRL);
++		if (!(cmd & PMC_PMBM_START))
++			return 0;
 +
-+		cpu_relax();
-+	} while (((*val >> shift) & mask) != cond);
++		if (cmd & PMC_PMBM_SLAVE_ERR)
++			return -EIO;
++
++		if (cmd & PMC_PMBM_TIMEOUT)
++			return -ETIMEDOUT;
++
++		udelay(1);
++	} while (timeout-- > 0);
++
++	return -ETIMEDOUT;
++}
++
++static inline int bpcm_rd(void __iomem *master, unsigned int addr,
++			  u32 off, u32 *val)
++{
++	int ret = 0;
++
++	ret = __bpcm_do_op(master, addr, off >> 2, PMC_PMBM_READ);
++	*val = __raw_readl(master + PMB_RD_DATA);
 +
 +	return ret;
 +}
 +
-+/* Global lock to serialize accesses to the PMB registers while we
-+ * are bringing up the secondary CPU
-+ */
-+static DEFINE_SPINLOCK(pmb_lock);
-+
-+static int bcm63xx_pmb_get_resources(struct device_node *dn,
-+				     void __iomem **base,
-+				     unsigned int *cpu,
-+				     unsigned int *addr)
++static inline int bpcm_wr(void __iomem *master, unsigned int addr,
++			  u32 off, u32 val)
 +{
-+	struct device_node *pmb_dn;
-+	struct of_phandle_args args;
-+	int ret;
++	int ret = 0;
 +
-+	ret = of_property_read_u32(dn, "reg", cpu);
-+	if (ret) {
-+		pr_err("CPU is missing a reg node\n");
-+		return ret;
-+	}
-+
-+	ret = of_parse_phandle_with_args(dn, "resets", "#reset-cells",
-+					 0, &args);
-+	if (ret) {
-+		pr_err("CPU is missing a resets phandle\n");
-+		return ret;
-+	}
-+
-+	pmb_dn = args.np;
-+	if (args.args_count != 2) {
-+		pr_err("reset-controller does not conform to reset-cells\n");
-+		return -EINVAL;
-+	}
-+
-+	*base = of_iomap(args.np, 0);
-+	if (!*base) {
-+		pr_err("failed remapping PMB register\n");
-+		return -ENOMEM;
-+	}
-+
-+	/* We do not need the number of zones */
-+	*addr = args.args[0];
-+
-+	return 0;
-+}
-+
-+int bcm63xx_pmb_power_on_cpu(struct device_node *dn)
-+{
-+	void __iomem *base;
-+	unsigned int cpu, addr;
-+	unsigned long flags;
-+	u32 val, ctrl;
-+	int ret;
-+
-+	ret = bcm63xx_pmb_get_resources(dn, &base, &cpu, &addr);
-+	if (ret)
-+		return ret;
-+
-+	/* We would not know how to enable a third and greater CPU */
-+	WARN_ON(cpu > 1);
-+
-+	spin_lock_irqsave(&pmb_lock, flags);
-+
-+	/* Check if the CPU is already on and save the ARM_CONTROL register
-+	 * value since we will use it later for CPU de-assert once done with
-+	 * the CPU-specific power sequence
++	__raw_writel(val, master + PMB_WR_DATA);
++	/* Ensure that writes to the PMB_WR_DATA registers are taken
++	 * into account before attempting to start the PMB transaction
 +	 */
-+	ret = bpcm_rd(base, addr, ARM_CONTROL, &ctrl);
-+	if (ret)
-+		return ret;
++	mb();
++	ret = __bpcm_do_op(master, addr, off >> 2, PMC_PMBM_WRITE);
 +
-+	if (ctrl & CPU_RESET_N(cpu)) {
-+		pr_info("PMB: CPU%d is already powered on\n", cpu);
-+		ret = 0;
-+		goto out;
-+	}
-+
-+	/* Power on PLL */
-+	ret = bpcm_rd(base, addr, ARM_PWR_CONTROL(cpu), &val);
-+	if (ret)
-+		goto out;
-+
-+	val |= (PWR_CPU_MASK << PWR_ON_SHIFT);
-+
-+	ret = bpcm_wr_rd_mask(base, addr, ARM_PWR_CONTROL(cpu), &val,
-+			PWR_ON_STATUS_SHIFT, PWR_CPU_MASK, PWR_CPU_MASK);
-+	if (ret)
-+		goto out;
-+
-+	val |= (PWR_CPU_MASK << PWR_OK_SHIFT);
-+
-+	ret = bpcm_wr_rd_mask(base, addr, ARM_PWR_CONTROL(cpu), &val,
-+			PWR_OK_STATUS_SHIFT, PWR_CPU_MASK, PWR_CPU_MASK);
-+	if (ret)
-+		goto out;
-+
-+	val &= ~CLAMP_ON;
-+
-+	ret = bpcm_wr(base, addr, ARM_PWR_CONTROL(cpu), val);
-+	if (ret)
-+		goto out;
-+
-+	/* Power on CPU<N> RAM */
-+	val &= ~(MEM_PDA_MASK << MEM_PDA_SHIFT);
-+
-+	ret = bpcm_wr(base, addr, ARM_PWR_CONTROL(cpu), val);
-+	if (ret)
-+		goto out;
-+
-+	val |= MEM_PWR_ON;
-+
-+	ret = bpcm_wr_rd_mask(base, addr, ARM_PWR_CONTROL(cpu), &val,
-+			0, MEM_PWR_ON_STATUS, MEM_PWR_ON_STATUS);
-+	if (ret)
-+		goto out;
-+
-+	val |= MEM_PWR_OK;
-+
-+	ret = bpcm_wr_rd_mask(base, addr, ARM_PWR_CONTROL(cpu), &val,
-+			0, MEM_PWR_OK_STATUS, MEM_PWR_OK_STATUS);
-+	if (ret)
-+		goto out;
-+
-+	val &= ~MEM_CLAMP_ON;
-+
-+	ret = bpcm_wr(base, addr, ARM_PWR_CONTROL(cpu), val);
-+	if (ret)
-+		goto out;
-+
-+	/* De-assert CPU reset */
-+	ctrl |= CPU_RESET_N(cpu);
-+
-+	ret = bpcm_wr(base, addr, ARM_CONTROL, ctrl);
-+out:
-+	spin_unlock_irqrestore(&pmb_lock, flags);
-+	iounmap(base);
 +	return ret;
 +}
++
++#endif /* __BCM63XX_PMB_H */
 -- 
 2.1.0
