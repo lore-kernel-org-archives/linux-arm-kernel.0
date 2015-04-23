@@ -1,9 +1,10 @@
 From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 23 Apr 2015 13:07:33 -0700
-Subject: [PATCH arm 1/2] arm64: Use common outgoing-CPU-notification code
-In-Reply-To: <20150423200603.GA9473@linux.vnet.ibm.com>
+Date: Thu, 23 Apr 2015 13:07:34 -0700
+Subject: [PATCH arm 2/2] arm: Use common outgoing-CPU-notification code
+In-Reply-To: <1429819654-10498-1-git-send-email-paulmck@linux.vnet.ibm.com>
 References: <20150423200603.GA9473@linux.vnet.ibm.com>
-Message-ID: <1429819654-10498-1-git-send-email-paulmck@linux.vnet.ibm.com>
+ <1429819654-10498-1-git-send-email-paulmck@linux.vnet.ibm.com>
+Message-ID: <1429819654-10498-2-git-send-email-paulmck@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,18 +19,17 @@ allow onlining throw an error if the CPU did not go offline properly.
 
 Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm64/kernel/smp.c | 6 ++----
+ arch/arm/kernel/smp.c | 6 ++----
  1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 328b8ce4b007..6dc727a6e73e 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -252,15 +252,13 @@ static int op_cpu_kill(unsigned int cpu)
- 	return cpu_ops[cpu]->cpu_kill(cpu);
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 86ef244c5a24..de309f431463 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -213,15 +213,13 @@ int __cpu_disable(void)
+ 	return 0;
  }
  
 -static DECLARE_COMPLETION(cpu_died);
@@ -42,17 +42,17 @@ index 328b8ce4b007..6dc727a6e73e 100644
  {
 -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
 +	if (!cpu_wait_death(cpu, 5)) {
- 		pr_crit("CPU%u: cpu didn't die\n", cpu);
+ 		pr_err("CPU%u: cpu didn't die\n", cpu);
  		return;
  	}
-@@ -293,7 +291,7 @@ void cpu_die(void)
- 	local_irq_disable();
- 
- 	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+@@ -267,7 +265,7 @@ void __ref cpu_die(void)
+ 	 * this returns, power and/or clocks can be removed at any point
+ 	 * from this CPU and its cache by platform_cpu_kill().
+ 	 */
 -	complete(&cpu_died);
 +	(void)cpu_report_death();
  
  	/*
- 	 * Actually shutdown the CPU. This must never fail. The specific hotplug
+ 	 * Ensure that the cache lines associated with that completion are
 -- 
 1.8.1.5
