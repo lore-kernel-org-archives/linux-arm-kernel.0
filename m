@@ -1,39 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 23 Apr 2015 22:30:24 +0200
-Subject: [PATCH v2] ARM: dts: sun7i: Add dts file for the Jesurun Q5 top
- set box
-In-Reply-To: <1429792010-22359-1-git-send-email-hdegoede@redhat.com>
-References: <1429792010-22359-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150423203024.GG28007@lukather>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Thu, 23 Apr 2015 13:43:45 -0700
+Subject: [PATCH 0/4] ARM: keystone: Enable Netcp driver on K2 EVMs
+In-Reply-To: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
+References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <55395981.8050902@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 23, 2015 at 02:26:50PM +0200, Hans de Goede wrote:
-> The Jesurun Q5 has a black plastic casing with the approximate dimensions
-> of 100mm x 100mm x 24mm with rounded edges. In terms of hardware it
-> features an Allwinner A10 SoC with 1GB RAM and 8GB of NAND flash. The
-> external connectors are: 2x USB-A female supporting USB2.0, 3.5mm female
-> jack for audio, HDMI female, SPDIF, RJ45 LAN and Power. In addition the
-> device has 1x red LED (hard wired to power) and an programmable green led.
-> On the board there is also an unpopulated IR receiver and the UART.
-> The devices is equipped with an AXP209 PMU.
-> 
-> For more details see: http://linux-sunxi.org/Jesurun_Q5
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On 4/23/2015 12:37 PM, Murali Karicheri wrote:
+> NetCP driver support patches are already merged to v4.0.nd v4.1.
+> This series introduce patches to update the DTS bindings and
+> defconfig so that the network driver is fully functional on K2
+> EVMs :- K2HK, K2L and K2E.
+>
+Nice and Thanks Murali for sending these up.
 
-Queued for 4.2, thanks!
+> It will be great if this can be merged to v4.1.
+>
+Its too late for the 4.1 now. For the same reason, we also
+couldn't get the MMU switching fixes in this merge window.
 
-Maxime
+I will queue these for 4.2.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150423/b1dde949/attachment.sig>
+Regards,
+Santosh
