@@ -1,114 +1,27 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 23 Apr 2015 10:54:26 +0100
-Subject: [PATCH v2 03/10] KVM: arm: guest debug, define API headers
-In-Reply-To: <20150413120813.GN6186@cbox>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-4-git-send-email-alex.bennee@linaro.org>
- <20150413120813.GN6186@cbox>
-Message-ID: <87zj5z5fvx.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Apr 2015 10:53:49 +0100
+Subject: Programming the boundary between Inner and Outer caches on ARM
+ architecture
+In-Reply-To: <CAJWVF-wg1ROj_rwufJzszCR594NcJc89cW4R85ZSTQtissT4Bw@mail.gmail.com>
+References: <CAJWVF-w5YpZjRqnvbz1p70_WTBROL9vDkvYb_sG43nGp=s1vLg@mail.gmail.com>
+ <20150420100119.GC24715@e104818-lin.cambridge.arm.com>
+ <CAJWVF-xvca0MpKF1=GoyyffGTzxtvy_LoaZfjhwU27vSuyOHFA@mail.gmail.com>
+ <20150421110038.GH30114@e104818-lin.cambridge.arm.com>
+ <CAJWVF-wg1ROj_rwufJzszCR594NcJc89cW4R85ZSTQtissT4Bw@mail.gmail.com>
+Message-ID: <20150423095349.GB12732@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 23, 2015 at 12:12:34AM +0530, Bhaskara rao Budiredla wrote:
+> I am not sure why those are different. During Linux kernel
+> booting, I wrote a function to read the contents of NMRR in
+> build_mem_type_table( ) function. May be I need to sync up with boot
+> loader folks to check why those are set up with different cacheable
+> attributes. This difference was the reason to start this thread.
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
-
-> On Tue, Mar 31, 2015 at 04:08:01PM +0100, Alex Benn?e wrote:
->> This commit defines the API headers for guest debugging. There are two
->> architecture specific debug structures:
->> 
->>   - kvm_guest_debug_arch, allows us to pass in HW debug registers
->>   - kvm_debug_exit_arch, signals the exact debug exit and pc
->> 
->> The type of debugging being used is control by the architecture specific
->> control bits of the kvm_guest_debug->control flags in the ioctl
->> structure.
->> 
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> 
->> ---
->> v2
->>    - expose hsr and pc directly to user-space
->> 
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index 3ef77a4..6ee70a0 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -100,10 +100,24 @@ struct kvm_sregs {
->>  struct kvm_fpu {
->>  };
->>  
->> +/*
->> + * See ARM ARM D7.3: Debug Registers
->
-> see the ARM ARM for ??
->
->> + *
->> + * The control registers are architecturally defined as 32 bits but are
->> + * stored as 64 bit values along side the value registers and aligned
->
-> do you mean alongside?
-
-sure.
-
->
->> + * with the rest 64 bit registers in the normal CPU context.
->
-> rest of the 64 bit
->
->> + */
->
-> why do we store them as 64 bit values?  There's nothing prevented us
-> from defining them as __u32 is there?  Is this to make the ONE_REG
-> interface accessers more convenient?
-
-No but it will involve more fiddling when we copy them into the CPU
-context which keeps everything as 64 bit aligned. Of course if we want
-to remove the debug registers from the context and put a pointer in
-place then this is fairly moot as we will need to change the hyp.S code
-that copies the registers during the world switch. I was trying to
-minimise the amount of change to the assembler in this series.
-
->
->> +#define KVM_ARM_NDBG_REGS 16
->
-> nit: is NDBG short for something I don't know about or is it
-> the number of debug registers we are noting here, in which case I think
-> KVM_ARM_NUM_DBG_REGS is more clear.
-
-OK.
-
->
->>  struct kvm_guest_debug_arch {
->> +	__u64 dbg_bcr[KVM_ARM_NDBG_REGS];
->> +	__u64 dbg_bvr[KVM_ARM_NDBG_REGS];
->> +	__u64 dbg_wcr[KVM_ARM_NDBG_REGS];
->> +	__u64 dbg_wvr[KVM_ARM_NDBG_REGS];
->>  };
->>  
->>  struct kvm_debug_exit_arch {
->> +	__u64 pc;
->> +	__u32 hsr;
->>  };
->>  
->>  struct kvm_sync_regs {
->> @@ -207,4 +221,11 @@ struct kvm_arch_memory_slot {
->>  
->>  #endif
->>  
->> +/*
->> + * Architecture related debug defines - upper 16 bits of
->> + * kvm_guest_debug->control
->> + */
->> +#define KVM_GUESTDBG_USE_SW_BP	        __KVM_GUESTDBG_USE_SW_BP
->> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
->> +
->>  #endif /* __ARM_KVM_H__ */
->> -- 
->> 2.3.4
->> 
->
-> Thanks,
-> -Christoffer
+NMRR is set by the Linux kernel.  Anything that the boot loader does is
+overwritten during the very early kernel boot.
 
 -- 
-Alex Benn?e
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
