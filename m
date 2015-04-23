@@ -1,54 +1,81 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 23 Apr 2015 15:19:15 +0200
-Subject: [PATCH] mmc: core: add missing pm event in mmc_pm_notify to fix
- hib restore
-In-Reply-To: <1429785823-16939-1-git-send-email-grygorii.strashko@linaro.org>
-References: <1429785823-16939-1-git-send-email-grygorii.strashko@linaro.org>
-Message-ID: <CAPDyKFqA5Wvod_0J-52FJ9Vktt1kdq7H7c9UcX-daJ0hazWU+Q@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 23 Apr 2015 15:19:45 +0200
+Subject: Memory size unaligned to section boundary
+Message-ID: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2015 at 12:43,  <grygorii.strashko@linaro.org> wrote:
-> From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
->
-> The PM_RESTORE_PREPARE is not handled now in mmc_pm_notify(),
-> as result mmc_rescan() could be scheduled and executed at
-> late hibernation restore stages when MMC device is suspended
-> already - which, in turn, will lead to system crash on TI dra7-evm board:
->
-> WARNING: CPU: 0 PID: 3188 at drivers/bus/omap_l3_noc.c:148 l3_interrupt_handler+0x258/0x374()
-> 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER1_P3 (Idle): Data Access in User mode during Functional access
->
-> Hence, add missed PM_RESTORE_PREPARE PM event in mmc_pm_notify().
->
-> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+Hi,
 
-Huh, that was an old bug you found. :-)
+It seems to me that I hit an issue in low memory mapping (map_lowmem).
+I'm using a custom memory size, which leads to an freeze on Linux 4.0
+and also with Linus master on two tested ARMv7-A SoC's (Freescale Vybrid
+and NVIDIA Tegra 3):
 
-I have applied it for fixes and added the below fixes tag.
+With mem=259744K
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.0.0-00189-ga4d2a4c3-dirty
+(ags at trochilidae) (gcc version 4.8.3 20140401 (prerelease) (Linaro GCC
+4.8-2014.04) ) #506 Thu Apr 23 14:13:21 CEST 2015
+[    0.000000] CPU: ARMv7 Processor [410fc051] revision 1 (ARMv7),
+cr=10c5387d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
+instruction cache
+[    0.000000] Machine model: Toradex Colibri VF61 on Colibri Evaluation
+Board
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] cma: Reserved 16 MiB at 0x8e400000
+[    0.000000] Memory policy: Data cache writeback
+<freeze>
 
-Fixes: 4c2ef25fe0b8 (mmc: fix all hangs related to mmc/sd card
-insert/removal during suspend/resume)
+I dug a bit more into that, and it unveiled that when creating the
+mapping for the non-kernel_x part (if (kernel_x_end < end) in
+map_lowmem), the unaligned section at the end leads to the freeze. In
+alloc_init_pmd, if the memory end is section unaligned, alloc_init_pte
+gets called which allocates a PTE outside of the initialized region (in
+early_alloc_aligned). The system freezes@the call of memset in
+early_alloc_aligned function.
 
-Thanks and kind regards!
-Uffe
+With some debug print, this can be better illustrated:
+[    0.000000] pgd 800063f0, addr 8fc00000, end 8fda8000, next 8fda8000
+[    0.000000] pud 800063f0, addr 8fc00000, end 8fda8000, next 8fda8000
+[    0.000000] pmd 800063f0, addr 8fc00000, next 8fda8000
+                         => actual end of memory ^^^^^^^^
+[    0.000000] alloc_init_pte
+[    0.000000] set_pte_ext, pte 00000000, addr 8fc00000, end 8fda8000
+[    0.000000] early_pte_alloc
+[    0.000000] early_alloc_aligned, 00001000, ptr 8fcff000, align
+00001000
+     => PTE allocated outside of initialized area ^^^^^^^^
 
-> ---
->  drivers/mmc/core/core.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index c296bc0..92e7671 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -2651,6 +2651,7 @@ int mmc_pm_notify(struct notifier_block *notify_block,
->         switch (mode) {
->         case PM_HIBERNATION_PREPARE:
->         case PM_SUSPEND_PREPARE:
-> +       case PM_RESTORE_PREPARE:
->                 spin_lock_irqsave(&host->lock, flags);
->                 host->rescan_disable = 1;
->                 spin_unlock_irqrestore(&host->lock, flags);
-> --
-> 1.9.1
->
+It seems that memory gets allocation in the last section. When the last
+section was in the previous PMD, the allocation works, however if the
+last section is within the same PMD, the allocation ends up in the
+non-initialized area. So:
+
+In other words, sizes which end in a upper part of the 2MB sized PMD
+fail, while sizes in the lower part of a PMD work.
+0xFF80000 => fails (mem=261632K)
+0xFE80000 => works (mem=260608K)
+0xFD80000 => fails (mem=261632K)
+...
+
+While I understand the reason for the freeze, I don't know to properly
+fix it. It looks to me that in alloc_init_pmd, we should use
+__map_init_section first to map the last aligned section, before calling
+alloc_init_pte on the non aligned section.
+
+Background: I tried to reuse the boot loader part of the simplefb
+implementation for sunxi. It decreases memory size by the size of the
+framebuffer. Hence the actually memory size can be unaligned, depending
+on the display size used. In the case at hand, a framebuffer of the size
+800x600 worked while 1024x600 did not work... The implementation uses
+device tree to report the memory size, but the kernel arguments show the
+same behavior.
+
+Maybe a regression of e651eab0af ("ARM: 7677/1: LPAE: Fix mapping in
+alloc_init_section for unaligned addresses"). I currently do not have a
+platform at hand which works on that Linux version out of the box.
+
+--
+Stefan
