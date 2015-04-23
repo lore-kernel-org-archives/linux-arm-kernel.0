@@ -1,62 +1,62 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 23 Apr 2015 19:11:33 +0200
-Subject: [PATCH] ARM: dts: sun5i: Utoo P66 add uart node and aliases
-In-Reply-To: <1429807008-7041-1-git-send-email-hdegoede@redhat.com>
-References: <1429807008-7041-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <553927C5.7090809@redhat.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 23 Apr 2015 10:49:11 -0700
+Subject: [PATCH] ARM: BCM2835: Skip doing our own iotable_init()
+ initialization.
+Message-ID: <1429811351-12600-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The only thing we were using this 16MB mapping of IO peripherals for
+was the uart's early debug mapping.  If we just drop the map_io hook,
+the kernel will call debug_ll_io_init() for us, which maps the single
+page needed for the device.
 
-On 23-04-15 18:36, Hans de Goede wrote:
-> Like on most non devel-boards it is still possible to get an uart on
-> the Utoo P66 tablet by soldering some wires to the right pads on the PCB,
-> add support for this to the dts, like we do with all sunxi boards.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ arch/arm/mach-bcm/board_bcm2835.c | 17 -----------------
+ 1 file changed, 17 deletions(-)
 
-This one is no good, the uart cannot be used as it shares a pin with the
-lcd-panel, self-NACK.
-
-Regards,
-
-Hans
-
-> ---
->   arch/arm/boot/dts/sun5i-a13-utoo-p66.dts | 14 ++++++++++++++
->   1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-> index 00bdf28..bb8d61a 100644
-> --- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-> +++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-> @@ -57,6 +57,14 @@
->   	model = "Utoo P66";
->   	compatible = "utoo,p66", "allwinner,sun5i-a13";
->
-> +	aliases {
-> +		serial0 = &uart1;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
->   	i2c_lcd: i2c at 0 {
->   		/* The lcd panel i2c interface is hooked up via gpios */
->   		compatible = "i2c-gpio";
-> @@ -238,6 +246,12 @@
->   	status = "okay";
->   };
->
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart1_pins_b>;
-> +	status = "okay";
-> +};
-> +
->   &usb_otg {
->   	dr_mode = "otg";
->   	status = "okay";
->
+diff --git a/arch/arm/mach-bcm/board_bcm2835.c b/arch/arm/mach-bcm/board_bcm2835.c
+index 70f2f39..9851ee8 100644
+--- a/arch/arm/mach-bcm/board_bcm2835.c
++++ b/arch/arm/mach-bcm/board_bcm2835.c
+@@ -31,10 +31,6 @@
+ #define PM_RSTC_WRCFG_FULL_RESET	0x00000020
+ #define PM_RSTS_HADWRH_SET		0x00000040
+ 
+-#define BCM2835_PERIPH_PHYS	0x20000000
+-#define BCM2835_PERIPH_VIRT	0xf0000000
+-#define BCM2835_PERIPH_SIZE	SZ_16M
+-
+ static void __iomem *wdt_regs;
+ 
+ /*
+@@ -93,18 +89,6 @@ static void bcm2835_power_off(void)
+ 	bcm2835_restart(REBOOT_HARD, "");
+ }
+ 
+-static struct map_desc io_map __initdata = {
+-	.virtual = BCM2835_PERIPH_VIRT,
+-	.pfn = __phys_to_pfn(BCM2835_PERIPH_PHYS),
+-	.length = BCM2835_PERIPH_SIZE,
+-	.type = MT_DEVICE
+-};
+-
+-static void __init bcm2835_map_io(void)
+-{
+-	iotable_init(&io_map, 1);
+-}
+-
+ static void __init bcm2835_init(void)
+ {
+ 	int ret;
+@@ -129,7 +113,6 @@ static const char * const bcm2835_compat[] = {
+ };
+ 
+ DT_MACHINE_START(BCM2835, "BCM2835")
+-	.map_io = bcm2835_map_io,
+ 	.init_irq = irqchip_init,
+ 	.init_machine = bcm2835_init,
+ 	.restart = bcm2835_restart,
+-- 
+2.1.4
