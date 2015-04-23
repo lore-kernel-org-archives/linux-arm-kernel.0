@@ -1,69 +1,36 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 22 Apr 2015 19:59:10 -0700
-Subject: [PATCH v2 5/5] ARM: dts: brcmstb: add nodes for SATA controller and
- PHY
-In-Reply-To: <1429757950-28789-1-git-send-email-computersforpeace@gmail.com>
-References: <1429757950-28789-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1429757950-28789-6-git-send-email-computersforpeace@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 23 Apr 2015 12:36:25 +0900
+Subject: [PATCH v5 2/4] ARM: multi_v7_defconfig: enable UniPhier SoC family
+In-Reply-To: <1429760187-17333-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1429760187-17333-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1429760187-17333-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Add UniPhier, a new citizen in the ARM multi platform.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
-v2:
-  - fix up some typos
-  - account for binding changes in previous patches
 
- arch/arm/boot/dts/bcm7445.dtsi | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
-index 9eaeac8dce1b..2abb639723d2 100644
---- a/arch/arm/boot/dts/bcm7445.dtsi
-+++ b/arch/arm/boot/dts/bcm7445.dtsi
-@@ -108,6 +108,43 @@
- 			brcm,int-map-mask = <0x25c>, <0x7000000>;
- 			brcm,int-fwd-mask = <0x70000>;
- 		};
-+
-+		sata at 45a000 {
-+			compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
-+			reg-names = "ahci", "top-ctrl";
-+			reg = <0x45a000 0xa9c>, <0x458040 0x24>;
-+			interrupts = <GIC_SPI 30 0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			sata0: sata-port at 0 {
-+				reg = <0>;
-+				phys = <&sata_phy0>;
-+			};
-+
-+			sata1: sata-port at 1 {
-+				reg = <1>;
-+				phys = <&sata_phy1>;
-+			};
-+		};
-+
-+		sata_phy: sata-phy at 458100 {
-+			compatible = "brcm,bcm7445-sata-phy", "brcm,phy-sata3";
-+			reg = <0x458100 0x1f00>;
-+			reg-names = "phy";
-+			#address-cells = <0x1>;
-+			#size-cells = <0x0>;
-+
-+			sata_phy0: sata-phy at 0 {
-+				reg = <0>;
-+				#phy-cells = <0>;
-+			};
-+
-+			sata_phy1: sata-phy at 1 {
-+				reg = <1>;
-+				#phy-cells = <0>;
-+			};
-+		};
- 	};
- 
- 	smpboot {
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index dca6983..a80ed4e 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -83,6 +83,7 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
+ CONFIG_ARCH_TEGRA_114_SOC=y
+ CONFIG_ARCH_TEGRA_124_SOC=y
+ CONFIG_TEGRA_EMC_SCALING_ENABLE=y
++CONFIG_ARCH_UNIPHIER=y
+ CONFIG_ARCH_U8500=y
+ CONFIG_MACH_HREFV60=y
+ CONFIG_MACH_SNOWBALL=y
 -- 
 1.9.1
