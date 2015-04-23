@@ -1,68 +1,52 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 23 Apr 2015 09:16:05 -0600
-Subject: [PATCH 10/11] coresight-etm4x: Controls pertaining to the context
- ID functions
-In-Reply-To: <55390B05.1050801@codeaurora.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 23 Apr 2015 11:17:32 -0400
+Subject: [PATCH 01/11] coresight-etm4x: Adding CoreSight ETM4x driver
+In-Reply-To: <1429742451-11465-2-git-send-email-mathieu.poirier@linaro.org>
 References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
- <1429742451-11465-11-git-send-email-mathieu.poirier@linaro.org>
- <55390B05.1050801@codeaurora.org>
-Message-ID: <CANLsYkw-XwEW9gaXVr07fqHspZU+Vo7FukN7Qz6S07L6jC5ENA@mail.gmail.com>
+ <1429742451-11465-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <55390D0C.7000405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2015 at 09:08, Christopher Covington <cov@codeaurora.org> wrote:
-> Hi Mathieu,
->
-> On 04/22/2015 06:40 PM, Mathieu Poirier wrote:
->> From: Pratik Patel <pratikp@codeaurora.org>
->>
->> Adding sysfs entries to access and configure specifics about the
->> context ID comparator functions.
->>
->> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>  .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  19 +++
->>  drivers/hwtracing/coresight/coresight-etm4x.c      | 187 +++++++++++++++++++++
->>  2 files changed, 206 insertions(+)
->>
->> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
->> index b5c0456290ab..8b32cb7b9723 100644
->> --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
->> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
->> @@ -254,3 +254,22 @@ Date:            April 2015
->>  KernelVersion:       4.01
->>  Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
->>  Description:         (RW) Controls the selection of the resources in the trace unit.
->> +
->> +What:                /sys/bus/coresight/devices/<memory_map>.etm/ctxid_idx
->> +Date:                April 2015
->> +KernelVersion:       4.01
->> +Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
->> +Description: (RW) Select which context ID comparator to work with.
->> +
->> +What:                /sys/bus/coresight/devices/<memory_map>.etm/ctxid_val
->> +Date:                April 2015
->> +KernelVersion:       4.01
->> +Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
->> +Description: (RW) Get/Set the context ID comparator value to trigger on.
->
-> If I'm understanding this correctly, ctxid_val is multiplexed using ctxid_idx.
-> Why not just have ctxid_val0, ctxid_val1, ...?
+On 04/22/2015 06:40 PM, Mathieu Poirier wrote:
+> From: Pratik Patel <pratikp@codeaurora.org>
+> 
+> This driver manages the CoreSight ETMv4 (Embedded Trace Macrocell) IP block
+> to support HW assisted tracing on ARMv7 and ARMv8 architectures.
+> 
+> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+> Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  28 +
+>  drivers/hwtracing/coresight/Kconfig                |  10 +
+>  drivers/hwtracing/coresight/Makefile               |   1 +
+>  drivers/hwtracing/coresight/coresight-etm4x.c      | 833 +++++++++++++++++++++
+>  drivers/hwtracing/coresight/coresight-etm4x.h      | 391 ++++++++++
+>  5 files changed, 1263 insertions(+)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+>  create mode 100644 drivers/hwtracing/coresight/coresight-etm4x.c
+>  create mode 100644 drivers/hwtracing/coresight/coresight-etm4x.h
+> 
+> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+> new file mode 100644
+> index 000000000000..a4b623871ca0
+> --- /dev/null
+> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+> @@ -0,0 +1,28 @@
+> +What:		/sys/bus/coresight/devices/<memory_map>.etm/enable_source
+> +Date:		April 2015
+> +KernelVersion:  4.01
+> +Contact:        Mathieu Poirier <mathieu.poirier@linaro.org>
+> +Description:	(RW) Enable/disable tracing on this specific trace entiry.
+                                                                   ^
+                                                                   entry
 
-There can be up to 8 of them on the current implementation and who
-knows how many more in the future.  To me using and index to select
-the context ID to work on scaled better and is introducing less
-clutter in sysfs.
-
-Thanks for the review,
-Mathieu
-
->
-> Thanks,
-> Chris
->
-> --
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> +		Enabling a source implies the source has been configured
+> +		properly and a sink has been identidifed for it.  The path
+                                             ^
+                                             identified
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
