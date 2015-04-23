@@ -1,18 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 23 Apr 2015 15:28:17 +0100
-Subject: [PATCH] arm64: dma-mapping: always clear allocated buffers
-In-Reply-To: <1429789576-19570-1-git-send-email-m.szyprowski@samsung.com>
-References: <1429789576-19570-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20150423142816.GA16621@arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 23 Apr 2015 10:31:42 -0400 (EDT)
+Subject: [PATCHv3 0/4] add devm_of_phy_get_by_index and update platform
+ drivers
+In-Reply-To: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <Pine.LNX.4.44L0.1504231031170.1529-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 23, 2015 at 12:46:16PM +0100, Marek Szyprowski wrote:
-> Buffers allocated by dma_alloc_coherent() are always zeroed on Alpha,
-> ARM (32bit), MIPS, PowerPC, x86/x86_64 and probably other architectures.
+On Wed, 22 Apr 2015, Arun Ramamurthy wrote:
 
-That's pretty compelling, even if it sucks. Maybe we could add a debug
-option to poison DMA buffers if __GFP_ZERO isn't passed? It might help
-others avoid the painful debugging experience you had...
+> This patch set adds a new API to get phy by index when multiple 
+> phys are present. This patch is based on discussion with Arnd Bergmann
+> about dt bindings for multiple phys.
+> 
+> History:
+> v1:
+>     - Removed null pointers on Dmitry's suggestion
+>     - Improved documentation in commit messages
+>     - Exported new phy api
+> v2:
+>     - EHCI and OHCI platform Kconfigs select Generic Phy
+>       to fix build errors in certain configs.
+> v3:
+>     - Made GENERIC_PHY an invisible option so 
+>     that other configs can select it
+>     - Added stubs for devm_of_phy_get_by_index
+>     - Reformated code
+> 
+> Arun Ramamurthy (4):
+>   phy: phy-core: Make GENERIC_PHY an invisible option
+>   phy: core: Add devm_of_phy_get_by_index to phy-core
+>   usb: ehci-platform: Use devm_of_phy_get_by_index
+>   usb: ohci-platform: Use devm_of_phy_get_by_index
 
-Will
+For patches 3 and 4:
+
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
