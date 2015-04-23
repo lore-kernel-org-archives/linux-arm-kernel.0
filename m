@@ -1,118 +1,42 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 23 Apr 2015 20:01:53 +0100
-Subject: [PATCH] KVM: arm64: add active register handling to GICv3 emulation
- as well
-Message-ID: <1429815713-13684-1-git-send-email-andre.przywara@arm.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 23 Apr 2015 15:37:29 -0400
+Subject: [PATCH 1/4] ARM: keystone: defconfig: enable netcp driver by default
+In-Reply-To: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
+References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1429817852-27938-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 47a98b15ba7c ("arm/arm64: KVM: support for un-queuing active
-IRQs") introduced handling of the GICD_I[SC]ACTIVER registers,
-but only for the GICv2 emulation. For the sake of completeness and
-as this is a pre-requisite for save/restore of the GICv3 distributor
-state, we should also emulate their handling in the distributor and
-redistributor frames of an emulated GICv3.
+Enable netcp driver in defconfig for keystone SoCs.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- virt/kvm/arm/vgic-v3-emul.c |   54 +++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 50 insertions(+), 4 deletions(-)
+ arch/arm/configs/keystone_defconfig |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index e9c3a7a..2b369de 100644
---- a/virt/kvm/arm/vgic-v3-emul.c
-+++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -173,6 +173,32 @@ static bool handle_mmio_clear_pending_reg_dist(struct kvm_vcpu *vcpu,
- 	return false;
- }
- 
-+static bool handle_mmio_set_active_reg_dist(struct kvm_vcpu *vcpu,
-+					    struct kvm_exit_mmio *mmio,
-+					    phys_addr_t offset)
-+{
-+	if (likely(offset >= VGIC_NR_PRIVATE_IRQS / 8))
-+		return vgic_handle_set_active_reg(vcpu->kvm, mmio, offset,
-+						   vcpu->vcpu_id);
-+
-+	vgic_reg_access(mmio, NULL, offset,
-+			ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-+	return false;
-+}
-+
-+static bool handle_mmio_clear_active_reg_dist(struct kvm_vcpu *vcpu,
-+					      struct kvm_exit_mmio *mmio,
-+					      phys_addr_t offset)
-+{
-+	if (likely(offset >= VGIC_NR_PRIVATE_IRQS / 8))
-+		return vgic_handle_clear_active_reg(vcpu->kvm, mmio, offset,
-+						    vcpu->vcpu_id);
-+
-+	vgic_reg_access(mmio, NULL, offset,
-+			ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-+	return false;
-+}
-+
- static bool handle_mmio_priority_reg_dist(struct kvm_vcpu *vcpu,
- 					  struct kvm_exit_mmio *mmio,
- 					  phys_addr_t offset)
-@@ -428,13 +454,13 @@ static const struct vgic_io_range vgic_v3_dist_ranges[] = {
- 		.base		= GICD_ISACTIVER,
- 		.len		= 0x80,
- 		.bits_per_irq	= 1,
--		.handle_mmio	= handle_mmio_raz_wi,
-+		.handle_mmio	= handle_mmio_set_active_reg_dist,
- 	},
- 	{
- 		.base		= GICD_ICACTIVER,
- 		.len		= 0x80,
- 		.bits_per_irq	= 1,
--		.handle_mmio	= handle_mmio_raz_wi,
-+		.handle_mmio	= handle_mmio_clear_active_reg_dist,
- 	},
- 	{
- 		.base		= GICD_IPRIORITYR,
-@@ -561,6 +587,26 @@ static bool handle_mmio_clear_enable_reg_redist(struct kvm_vcpu *vcpu,
- 				      ACCESS_WRITE_CLEARBIT);
- }
- 
-+static bool handle_mmio_set_active_reg_redist(struct kvm_vcpu *vcpu,
-+					      struct kvm_exit_mmio *mmio,
-+					      phys_addr_t offset)
-+{
-+	struct kvm_vcpu *redist_vcpu = mmio->private;
-+
-+	return vgic_handle_set_active_reg(vcpu->kvm, mmio, offset,
-+					  redist_vcpu->vcpu_id);
-+}
-+
-+static bool handle_mmio_clear_active_reg_redist(struct kvm_vcpu *vcpu,
-+						struct kvm_exit_mmio *mmio,
-+						phys_addr_t offset)
-+{
-+	struct kvm_vcpu *redist_vcpu = mmio->private;
-+
-+	return vgic_handle_clear_active_reg(vcpu->kvm, mmio, offset,
-+					     redist_vcpu->vcpu_id);
-+}
-+
- static bool handle_mmio_set_pending_reg_redist(struct kvm_vcpu *vcpu,
- 					       struct kvm_exit_mmio *mmio,
- 					       phys_addr_t offset)
-@@ -674,13 +720,13 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
- 		.base		= SGI_base(GICR_ISACTIVER0),
- 		.len		= 0x04,
- 		.bits_per_irq	= 1,
--		.handle_mmio	= handle_mmio_raz_wi,
-+		.handle_mmio	= handle_mmio_set_active_reg_redist,
- 	},
- 	{
- 		.base		= SGI_base(GICR_ICACTIVER0),
- 		.len		= 0x04,
- 		.bits_per_irq	= 1,
--		.handle_mmio	= handle_mmio_raz_wi,
-+		.handle_mmio	= handle_mmio_clear_active_reg_redist,
- 	},
- 	{
- 		.base		= SGI_base(GICR_IPRIORITYR0),
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index f8a1c8f..95ce128 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -123,6 +123,9 @@ CONFIG_EEPROM_AT24=y
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
++CONFIG_TI_KEYSTONE_NETCP=y
++CONFIG_TI_KEYSTONE_NETCP_ETHSS=y
++CONFIG_PHYLIB=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+@@ -152,6 +155,9 @@ CONFIG_USB_DWC3_VERBOSE=y
+ CONFIG_KEYSTONE_USB_PHY=y
+ CONFIG_DMADEVICES=y
+ CONFIG_TI_EDMA=y
++CONFIG_SOC_TI=y
++CONFIG_KEYSTONE_NAVIGATOR_QMSS=y
++CONFIG_KEYSTONE_NAVIGATOR_DMA=y
+ CONFIG_MEMORY=y
+ CONFIG_TI_AEMIF=y
+ CONFIG_EXT4_FS=y
 -- 
 1.7.9.5
