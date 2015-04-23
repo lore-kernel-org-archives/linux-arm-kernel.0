@@ -1,99 +1,45 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 23 Apr 2015 10:35:38 +0200
-Subject: [PATCH 1/6] clk: make strings in parent name arrays const
-In-Reply-To: <1429778143-2074-1-git-send-email-s.hauer@pengutronix.de>
-References: <1429778143-2074-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1429778143-2074-2-git-send-email-s.hauer@pengutronix.de>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu, 23 Apr 2015 14:15:38 +0530
+Subject: [RFC/RFT 0/6] qcom: Add runtime PM support 
+Message-ID: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk functions and structs declare the parent_name arrays as
-'const char **parent_names' which means the parent name strings
-are const, but the array itself is not. Use
-'const char * const * parent_names' instead which also makes
-the array const. This allows us to put the parent_name arrays into
-the __initconst section.
+The patches add runtime PM support (using PM clocks) for 
+devices in qcom SoCs. Also converts serial/sdhci/i2c and
+spi drivers to cleanup clock handling and use runtime PM
+apis instead.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/clk/clk-composite.c  | 2 +-
- drivers/clk/clk-mux.c        | 4 ++--
- include/linux/clk-provider.h | 8 ++++----
- 3 files changed, 7 insertions(+), 7 deletions(-)
+There are a couple [1][2] of other patch series that this one is
+based off, so I have pushed a branch [3] with all the dependecies
+if anyone wants to play with this series.
+I have been able to test the serial and sdhci driver changes to a
+fair extent, i2c for a sucessfull probe and could not test anything
+on spi. So any testing on these drivers is highly appreciated.
 
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index 956b7e5..077f4c714 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -188,7 +188,7 @@ static void clk_composite_disable(struct clk_hw *hw)
- }
- 
- struct clk *clk_register_composite(struct device *dev, const char *name,
--			const char **parent_names, int num_parents,
-+			const char * const *parent_names, int num_parents,
- 			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
- 			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
- 			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 69a094c..1fa2a8d 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -114,7 +114,7 @@ const struct clk_ops clk_mux_ro_ops = {
- EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
- 
- struct clk *clk_register_mux_table(struct device *dev, const char *name,
--		const char **parent_names, u8 num_parents, unsigned long flags,
-+		const char * const *parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u32 mask,
- 		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
- {
-@@ -166,7 +166,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
- EXPORT_SYMBOL_GPL(clk_register_mux_table);
- 
- struct clk *clk_register_mux(struct device *dev, const char *name,
--		const char **parent_names, u8 num_parents, unsigned long flags,
-+		const char * const *parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_mux_flags, spinlock_t *lock)
- {
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 5591ea7..410684d 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -209,7 +209,7 @@ struct clk_ops {
- struct clk_init_data {
- 	const char		*name;
- 	const struct clk_ops	*ops;
--	const char		**parent_names;
-+	const char		* const *parent_names;
- 	u8			num_parents;
- 	unsigned long		flags;
- };
-@@ -426,12 +426,12 @@ extern const struct clk_ops clk_mux_ops;
- extern const struct clk_ops clk_mux_ro_ops;
- 
- struct clk *clk_register_mux(struct device *dev, const char *name,
--		const char **parent_names, u8 num_parents, unsigned long flags,
-+		const char * const *parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_mux_flags, spinlock_t *lock);
- 
- struct clk *clk_register_mux_table(struct device *dev, const char *name,
--		const char **parent_names, u8 num_parents, unsigned long flags,
-+		const char * const *parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u32 mask,
- 		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
- 
-@@ -518,7 +518,7 @@ struct clk_composite {
- };
- 
- struct clk *clk_register_composite(struct device *dev, const char *name,
--		const char **parent_names, int num_parents,
-+		const char * const *parent_names, int num_parents,
- 		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
- 		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
- 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+[1] https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg14157.html
+[2] https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg14268.html
+[3] https://github.com/rrnayak/linux/tree/v4.0/runtime-rfc
+
+Rajendra Nayak (6):
+  PM / clock_ops: Make pm_clk_notify() do nothing in case DT passes
+    power-domains
+  clk: qcom: Add runtime support to handle clocks using PM clocks
+  serial: msm: convert driver to use runtime PM apis
+  mmc: sdhci-msm: convert driver to use runtime PM apis
+  i2c: qup: Get rid of clock handling as its done using runtime
+    callbacks
+  spi: qup: Get rid of clock handling as its done using runtime
+    callbacks
+
+ drivers/base/power/clock_ops.c  |  8 ++++-
+ drivers/clk/qcom/gdsc.c         | 20 +++++++++++
+ drivers/i2c/busses/i2c-qup.c    | 74 +++++++++--------------------------------
+ drivers/mmc/host/sdhci-msm.c    | 46 ++++++-------------------
+ drivers/spi/spi-qup.c           | 54 ++++++------------------------
+ drivers/tty/serial/msm_serial.c | 33 +++++++++---------
+ 6 files changed, 80 insertions(+), 155 deletions(-)
+
 -- 
-2.1.4
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
