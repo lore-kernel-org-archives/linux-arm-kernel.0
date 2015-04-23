@@ -1,41 +1,48 @@
-From: cbz@baozis.org (Chen Baozi)
-Date: Thu, 23 Apr 2015 10:33:08 +0800
-Subject: [Xen-devel] [PATCH] xen: Add __GFP_DMA flag when
- xen_swiotlb_init gets free pages.
-In-Reply-To: <alpine.DEB.2.02.1504211203520.3112@kaball.uk.xensource.com>
-References: <1429526904-27176-1-git-send-email-cbz@baozis.org>
- <5534DABB.5060305@citrix.com> <20150420110729.GA27707@cbz-thinkpad>
- <5534EAE3.8060403@citrix.com>
- <alpine.DEB.2.02.1504201828380.30125@kaball.uk.xensource.com>
- <1429603030.6174.21.camel@citrix.com>
- <alpine.DEB.2.02.1504211115300.3112@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1504211203520.3112@kaball.uk.xensource.com>
-Message-ID: <20150423023308.GB7783@cbz-thinkpad>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 22 Apr 2015 19:59:05 -0700
+Subject: [PATCH v2 0/5] AHCI and SATA PHY support for Broadcom STB SoCs
+Message-ID: <1429757950-28789-1-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 12:11:01PM +0100, Stefano Stabellini wrote:
-> Chen,
-> could you please try the patch below in your repro scenario?
-> I have only build tested it.
-> 
-> ---
-> 
-> xen: Add __GFP_DMA flag when xen_swiotlb_init gets free pages on ARM
-> 
-> From: Chen Baozi <baozich@gmail.com>
-> 
-> Make sure that xen_swiotlb_init allocates buffers that are DMA capable
-> when at least one memblock is available below 4G. Otherwise we assume
-> that all devices on the SoC can cope with >4G addresses.
-> 
-> No functional changes on x86.
-> 
-> Signed-off-by: Chen Baozi <baozich@gmail.com>
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Hi,
 
-Tested-by: Chen Baozi <baozich@gmail.com>
+Here are my updates based on everyone's feedback. I'll try to include most of
+the changelog info in each patch, but a few summary points for v1 -> v2:
 
-Cheers,
+ - reworked the PHY DT binding so that we don't need do any custom xlate in the
+   PHY driver
 
-Baozi
+ - moved all handling of the 'SATA_TOP_CTRL' block into the SATA driver,
+   instead of sharing it between SATA and PHY drivers. This means we have to do
+   a little extra work in sata_brcmstb.c to decide which ports to power on, but
+   at least this way, we're really describing the hardware, not just how the SW
+   frameworks want to use the hardware.
+
+Enjoy,
+Brian
+
+Brian Norris (5):
+  Documentation: devicetree: add Broadcom SATA binding
+  Documentation: devicetree: add Broadcom SATA PHY binding
+  ata: add Broadcom AHCI SATA3 driver for STB chips
+  phy: add Broadcom SATA3 PHY driver for Broadcom STB SoCs
+  ARM: dts: brcmstb: add nodes for SATA controller and PHY
+
+ .../devicetree/bindings/ata/brcm,sata-brcmstb.txt  |  35 +++
+ .../bindings/phy/brcm,brcmstb-sata-phy.txt         |  40 +++
+ arch/arm/boot/dts/bcm7445.dtsi                     |  37 +++
+ drivers/ata/Kconfig                                |   9 +
+ drivers/ata/Makefile                               |   1 +
+ drivers/ata/sata_brcmstb.c                         | 285 +++++++++++++++++++++
+ drivers/phy/Kconfig                                |   9 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-brcmstb-sata.c                     | 216 ++++++++++++++++
+ 9 files changed, 632 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/brcm,sata-brcmstb.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
+ create mode 100644 drivers/ata/sata_brcmstb.c
+ create mode 100644 drivers/phy/phy-brcmstb-sata.c
+
+-- 
+1.9.1
