@@ -1,32 +1,32 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 23 Apr 2015 15:37:31 -0400
-Subject: [PATCH 3/4] ARM: dts: k2e-evm: Add device bindings for netcp driver
+Date: Thu, 23 Apr 2015 15:37:32 -0400
+Subject: [PATCH 4/4] ARM: dts: k2l-evm: Add device bindings for netcp driver
 In-Reply-To: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
 References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1429817852-27938-4-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1429817852-27938-5-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables networking on k2e evm by adding device
-bindings for netcp, knav and qmss. See device binding
-documentation below for details.
+This patch enables networking on k2l evm by providing
+device bindings for netcp, knav, and qmss. See device
+binding documentation at
 
 Documentation/devicetree/bindings/net/keystone-netcp.txt
 
 Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- arch/arm/boot/dts/k2e-evm.dts    |    1 +
- arch/arm/boot/dts/k2e-netcp.dtsi |  206 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/k2e.dtsi       |    1 +
- 3 files changed, 208 insertions(+)
- create mode 100644 arch/arm/boot/dts/k2e-netcp.dtsi
+ arch/arm/boot/dts/k2l-evm.dts    |    1 +
+ arch/arm/boot/dts/k2l-netcp.dtsi |  189 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/k2l.dtsi       |    1 +
+ 3 files changed, 191 insertions(+)
+ create mode 100644 arch/arm/boot/dts/k2l-netcp.dtsi
 
-diff --git a/arch/arm/boot/dts/k2e-evm.dts b/arch/arm/boot/dts/k2e-evm.dts
-index 560d621..50c83c2 100644
---- a/arch/arm/boot/dts/k2e-evm.dts
-+++ b/arch/arm/boot/dts/k2e-evm.dts
-@@ -141,6 +141,7 @@
+diff --git a/arch/arm/boot/dts/k2l-evm.dts b/arch/arm/boot/dts/k2l-evm.dts
+index 85cc7f2..9a69a6b 100644
+--- a/arch/arm/boot/dts/k2l-evm.dts
++++ b/arch/arm/boot/dts/k2l-evm.dts
+@@ -118,6 +118,7 @@
  };
  
  &mdio {
@@ -34,14 +34,14 @@ index 560d621..50c83c2 100644
  	ethphy0: ethernet-phy at 0 {
  		compatible = "marvell,88E1514", "marvell,88E1510", "ethernet-phy-ieee802.3-c22";
  		reg = <0>;
-diff --git a/arch/arm/boot/dts/k2e-netcp.dtsi b/arch/arm/boot/dts/k2e-netcp.dtsi
+diff --git a/arch/arm/boot/dts/k2l-netcp.dtsi b/arch/arm/boot/dts/k2l-netcp.dtsi
 new file mode 100644
-index 0000000..4ab94c3
+index 0000000..a97aeee
 --- /dev/null
-+++ b/arch/arm/boot/dts/k2e-netcp.dtsi
-@@ -0,0 +1,206 @@
++++ b/arch/arm/boot/dts/k2l-netcp.dtsi
+@@ -0,0 +1,189 @@
 +/*
-+ * Device Tree Source for Keystone 2 Edison Netcp driver
++ * Device Tree Source for Keystone 2 Lamarr Netcp driver
 + *
 + * Copyright 2015 Texas Instruments, Inc.
 + *
@@ -59,7 +59,7 @@ index 0000000..4ab94c3
 +	ranges;
 +	queue-range	= <0 0x2000>;
 +	linkram0	= <0x100000 0x4000>;
-+	linkram1	= <0 0x10000>;
++	linkram1	= <0x70000000 0x10000>; /* 1MB OSR mem */
 +
 +	qmgrs {
 +		#address-cells = <1>;
@@ -133,21 +133,20 @@ index 0000000..4ab94c3
 +	#address-cells = <1>;
 +	#size-cells = <1>;
 +	ranges;
-+	ti,navigator-cloud-address = <0x23a80000 0x23a90000
-+				 0x23a80000 0x23a90000>;
++	ti,navigator-cloud-address = <0x23a80000 0x23a90000>;
 +
 +	dma_gbe: dma_gbe at 0 {
-+		reg = <0x24186000 0x100>,
-+			  <0x24187000 0x2a0>,
-+			  <0x24188000 0xb60>,
-+			  <0x24186100 0x80>,
-+			  <0x24189000 0x1000>;
++		reg = <0x26186000 0x100>,
++			  <0x26187000 0x2a0>,
++			  <0x26188000 0xb60>,
++			  <0x26186100 0x80>,
++			  <0x26189000 0x1000>;
 +		reg-names = "global", "txchan", "rxchan",
 +				"txsched", "rxflow";
 +	};
 +};
 +
-+netcp: netcp at 24000000 {
++netcp: netcp at 26000000 {
 +	reg = <0x2620110 0x8>;
 +	reg-names = "efuse";
 +	compatible = "ti,netcp-1.0";
@@ -155,7 +154,7 @@ index 0000000..4ab94c3
 +	#size-cells = <1>;
 +
 +	/* NetCP address range */
-+	ranges = <0 0x24000000 0xffffff>;
++	ranges = <0 0x26000000 0xffffff>;
 +
 +	clocks = <&papllclk>, <&clkcpgmac>, <&chipclk12>;
 +	dma-coherent;
@@ -171,7 +170,7 @@ index 0000000..4ab94c3
 +		ranges;
 +		gbe at 200000 { /* ETHSS */
 +			label = "netcp-gbe";
-+			compatible = "ti,netcp-gbe-9";
++			compatible = "ti,netcp-gbe-5";
 +			reg = <0x200000 0x900>, <0x220000 0x1ffff>;
 +			/* enable-ale; */
 +			tx-queue = <896>;
@@ -197,22 +196,6 @@ index 0000000..4ab94c3
 +				};
 +				port-3 {
 +					slave-port = <3>;
-+					link-interface	= <2>;
-+				};
-+				port-4 {
-+					slave-port = <4>;
-+					link-interface	= <2>;
-+				};
-+				port-5 {
-+					slave-port = <5>;
-+					link-interface	= <2>;
-+				};
-+				port-6 {
-+					slave-port = <6>;
-+					link-interface	= <2>;
-+				};
-+				port-7 {
-+					slave-port = <7>;
 +					link-interface	= <2>;
 +				};
 +			};
@@ -241,20 +224,20 @@ index 0000000..4ab94c3
 +			rx-queue = <529>;
 +			tx-completion-queue = <531>;
 +			efuse-mac = <0>;
-+			local-mac-address = [02 18 31 7e 3e 00];
++			local-mac-address = [02 18 31 7e 3e 7f];
 +			netcp-gbe = <&gbe1>;
 +		};
 +	};
 +};
-diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-index 5fc14683..50e555e 100644
---- a/arch/arm/boot/dts/k2e.dtsi
-+++ b/arch/arm/boot/dts/k2e.dtsi
-@@ -130,6 +130,7 @@
- 					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
- 			};
+diff --git a/arch/arm/boot/dts/k2l.dtsi b/arch/arm/boot/dts/k2l.dtsi
+index e32c3ba..0e00748 100644
+--- a/arch/arm/boot/dts/k2l.dtsi
++++ b/arch/arm/boot/dts/k2l.dtsi
+@@ -79,6 +79,7 @@
+ 			#gpio-cells = <2>;
+ 			gpio,syscon-dev = <&devctrl 0x24c>;
  		};
-+		/include/ "k2e-netcp.dtsi"
++		/include/ "k2l-netcp.dtsi"
  	};
  };
  
