@@ -1,53 +1,21 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 23 Apr 2015 09:24:41 +0900
-Subject: [PATCH] ARM: exynos: Fix wake-up interrupts for Exynos3250
-In-Reply-To: <1429724452-26563-1-git-send-email-marc.zyngier@arm.com>
-References: <1429724452-26563-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55383BC9.5010604@samsung.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 22 Apr 2015 18:18:08 -0700
+Subject: [PATCH v2] ata: ahci_st: fixup layering violations / drvdata
+ errors
+In-Reply-To: <1429537265-22367-1-git-send-email-peter.griffin@linaro.org>
+References: <1429537265-22367-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150423011808.GY32500@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Mon, Apr 20, 2015 at 02:41:04PM +0100, Peter Griffin wrote:
+> Brian - I'm not sure of the correct patch etiquette here. Currently I have
+> taken authorship of the patch and added a "Suggested-by" tag on the V2.
+> Maybe I should have also kept your "Signed-off-by" or done something else?
+> Please let me know if this is OK or if you would like something changed.
 
-On 04/23/2015 02:40 AM, Marc Zyngier wrote:
-> Commit 8b283c025443 (ARM: exynos4/5: convert pmu wakeup to
-> stacked domains) changed the Exynos PMU code to use stacked
-> domains. This has led to a number of interrupt numbers to be
-> fixed.
-> 
-> In the meantime, support for Exynos 3250 was added, missing
-> the required change to this platform. This amounts to revert
-> ace283a04a4a (ARM: EXYNOS: Fix wrong hwirq of RTC interrupt
-> for Exynos3250 SoC), as the initial patch was right, just a
-> bit early...
-> 
-> Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mach-exynos/suspend.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-> index 3e6aea7..40dce36 100644
-> --- a/arch/arm/mach-exynos/suspend.c
-> +++ b/arch/arm/mach-exynos/suspend.c
-> @@ -87,8 +87,8 @@ static unsigned int exynos_pmu_spare3;
->  static u32 exynos_irqwake_intmask = 0xffffffff;
->  
->  static const struct exynos_wkup_irq exynos3250_wkup_irq[] = {
-> -	{ 105, BIT(1) }, /* RTC alarm */
-> -	{ 106, BIT(2) }, /* RTC tick */
-> +	{ 73, BIT(1) }, /* RTC alarm */
-> +	{ 74, BIT(2) }, /* RTC tick */
->  	{ /* sentinel */ },
->  };
->  
-> 
+No problem. 'Suggested-by' seems appropriate to me.
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+For the patch:
 
-Thanks,
-Chanwoo Choi
+Acked-by: Brian Norris <computersforpeace@gmail.com>
