@@ -1,48 +1,60 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 22 Apr 2015 19:59:05 -0700
-Subject: [PATCH v2 0/5] AHCI and SATA PHY support for Broadcom STB SoCs
-Message-ID: <1429757950-28789-1-git-send-email-computersforpeace@gmail.com>
+Date: Wed, 22 Apr 2015 19:59:06 -0700
+Subject: [PATCH v2 1/5] Documentation: devicetree: add Broadcom SATA binding
+In-Reply-To: <1429757950-28789-1-git-send-email-computersforpeace@gmail.com>
+References: <1429757950-28789-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <1429757950-28789-2-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+---
+v2: no change
 
-Here are my updates based on everyone's feedback. I'll try to include most of
-the changelog info in each patch, but a few summary points for v1 -> v2:
-
- - reworked the PHY DT binding so that we don't need do any custom xlate in the
-   PHY driver
-
- - moved all handling of the 'SATA_TOP_CTRL' block into the SATA driver,
-   instead of sharing it between SATA and PHY drivers. This means we have to do
-   a little extra work in sata_brcmstb.c to decide which ports to power on, but
-   at least this way, we're really describing the hardware, not just how the SW
-   frameworks want to use the hardware.
-
-Enjoy,
-Brian
-
-Brian Norris (5):
-  Documentation: devicetree: add Broadcom SATA binding
-  Documentation: devicetree: add Broadcom SATA PHY binding
-  ata: add Broadcom AHCI SATA3 driver for STB chips
-  phy: add Broadcom SATA3 PHY driver for Broadcom STB SoCs
-  ARM: dts: brcmstb: add nodes for SATA controller and PHY
-
- .../devicetree/bindings/ata/brcm,sata-brcmstb.txt  |  35 +++
- .../bindings/phy/brcm,brcmstb-sata-phy.txt         |  40 +++
- arch/arm/boot/dts/bcm7445.dtsi                     |  37 +++
- drivers/ata/Kconfig                                |   9 +
- drivers/ata/Makefile                               |   1 +
- drivers/ata/sata_brcmstb.c                         | 285 +++++++++++++++++++++
- drivers/phy/Kconfig                                |   9 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-brcmstb-sata.c                     | 216 ++++++++++++++++
- 9 files changed, 632 insertions(+)
+ .../devicetree/bindings/ata/brcm,sata-brcmstb.txt  | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/ata/brcm,sata-brcmstb.txt
- create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
- create mode 100644 drivers/ata/sata_brcmstb.c
- create mode 100644 drivers/phy/phy-brcmstb-sata.c
 
+diff --git a/Documentation/devicetree/bindings/ata/brcm,sata-brcmstb.txt b/Documentation/devicetree/bindings/ata/brcm,sata-brcmstb.txt
+new file mode 100644
+index 000000000000..afeede13e195
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/brcm,sata-brcmstb.txt
+@@ -0,0 +1,35 @@
++* Broadcom SATA3 AHCI Controller for STB
++
++SATA nodes are defined to describe on-chip Serial ATA controllers.
++Each SATA controller should have its own node.
++
++Required properties:
++- compatible         : compatible list, may contain "brcm,bcm7445-ahci" and/or
++                       "brcm,sata3-ahci"
++- reg                : register mappings for AHCI and SATA_TOP_CTRL
++- reg-names          : "ahci" and "top-ctrl"
++- interrupts         : interrupt mapping for SATA IRQ
++
++Also see ahci-platform.txt.
++
++Example:
++
++	sata at f045a000 {
++		compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
++		reg = <0xf045a000 0xa9c>, <0xf0458040 0x24>;
++		reg-names = "ahci", "top-ctrl";
++		interrupts = <0 30 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		sata0: sata-port at 0 {
++			reg = <0>;
++			phys = <&sata_phy 0>;
++		};
++
++		sata1: sata-port at 1 {
++			reg = <1>;
++			phys = <&sata_phy 1>;
++		};
++	};
++
 -- 
 1.9.1
