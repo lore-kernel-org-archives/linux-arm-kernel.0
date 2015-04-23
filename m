@@ -1,20 +1,30 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 23 Apr 2015 14:16:12 -0700
-Subject: [RFC/RFT 5/6] i2c: qup: Get rid of clock handling as its done
- using runtime callbacks
-In-Reply-To: <1429778744-13352-6-git-send-email-rnayak@codeaurora.org>
- (Rajendra Nayak's message of "Thu, 23 Apr 2015 14:15:43 +0530")
-References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
- <1429778744-13352-6-git-send-email-rnayak@codeaurora.org>
-Message-ID: <7hoame5yw3.fsf@deeprootsystems.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 23 Apr 2015 16:02:59 -0700
+Subject: [PATCH v2 0/2] ARM: BCM63xx: reboot support
+Message-ID: <1429830181-28338-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@codeaurora.org> writes:
+Hi all,
 
-> Remove all clock handling from the driver as this is not handled from
-> within platform runtime callbacks.
+This patch series allows the use of the generic "syscon-reboot" driver for
+Broadcom's BCM63xx ARM-based SoCs.
 
-s/not/now/  ??
+Let me know your thoughts on this so I can submit these in a future Broadcom
+SoC pull request, thanks!
 
-Kevin
+Changes in v2:
+
+- dropped the custom driver and use "syscon-reboot"
+
+Florian Fainelli (2):
+  dt-bindings: Add documentation for the BCM63138 timer and
+    syscon-reboot
+  ARM: dts: BCM63xx: Add timer and syscon-reboot nodes
+
+ .../devicetree/bindings/arm/bcm/brcm,bcm63138.txt  | 33 ++++++++++++++++++++++
+ arch/arm/boot/dts/bcm63138.dtsi                    | 12 ++++++++
+ 2 files changed, 45 insertions(+)
+
+-- 
+2.1.0
