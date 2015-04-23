@@ -1,113 +1,424 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Thu, 23 Apr 2015 13:52:34 +0200
-Subject: dma_alloc_coherent versus streaming DMA, neither works satisfactory
-Message-ID: <5538DD02.6050401@topic.nl>
+From: rsahu@apm.com (Rameshwar Prasad Sahu)
+Date: Thu, 23 Apr 2015 17:26:45 +0530
+Subject: [PATCH v5] dmaengine: xgene-dma: Fix sparse wannings warnings
+Message-ID: <1429790205-13571-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?I'm writing a driver that transfers data on a Zynq-7000 between the ARM and PL 
-part, using a buffering scheme similar to IIO. So it allocates buffers, which 
-the user can memory-map and then send/receive using ioctl calls.
-The trouble I have it that transitioning these buffers into user space is 
-costing more CPU time than actually copying them.
+v5 changes:
+	* Re-pull v3 changes that I missed in v4
 
+v4 changes:
+	* Re-generate patch on top of latest for-linux git
 
-The self-written DMA controller is in logic, can queue up several transfers 
-and operates fine.
+v3 changes:
+	* Minor changes in length setting in DMA descriptor
 
-The trouble I have with the driver is that for the DMA transfers, I want to 
-use a zero-copy style interface, because the data usually consists of video 
-frames, and moving them around in memory is prohibitively expensive.
+v2 changes:
+	* Code cleanup
+	* Changed way of setting DMA descriptors for big-endian
 
-I based my implementation on what IIO (industrial IO) does, and implemented 
-IOCTL calls to the driver to allocate, free, enqueue and dequeue blocks that 
-are owned by the driver. Each block can be mmapped into user space.
+This patch fixes compilation sparse warnings like incorrect type in assignment
+(different base types), cast to restricted __le64, symbol
+'__UNIQUE_ID_author__COUNTER__' has multiple initializers etc.
 
-Using dma_alloc_coherent to allocate the blocks, and then just using them 
-without any extra measures works just fine. The system can transfer data at 
-600MB/s to and from DDR into logic with very little CPU intervention. However, 
-the memory returned by dma_mmap_coherent appears to be uncached, because 
-accessing this area from userspace is horribly slow (e.g. reading 200MB 
-byte-by-byte in a simple for loop takes 20 seconds, while this takes about a 
-second in malloced memory)
+This patch is based on slave-dma / for-linus branch.
+(commit: 11ebe4c067c7f95adff73594cb5c23f7a5c6d69e
+	dmaengine: fix platform_no_drv_owner.cocci warnings
 
-After reading some documentation, I decided that I should use a streaming DMA 
-interface because my driver knows exactly when logic or CPU "owns" the data 
-blocks. So instead of the "coherent" functions, I just kmalloc these buffers 
-and then use dma_map_single_* to initialize them. Before and after DMA 
-transfers, I call the appropriate dma_sync_single_for_* method.
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+---
+ drivers/dma/xgene-dma.c | 174 ++++++++++++++++++------------------------------
+ 1 file changed, 66 insertions(+), 108 deletions(-)
 
-By mapping the kmalloced memory into user space, I once again have speedy 
-access to this memory, and caching is enabled. Data transfers also work well 
-and extensive testing shows that this works well. However, the in-kernel 
-performance is now completely crippled. The system spends so much time in the 
-dma_sync_single... calls, the the CPU now becomes a limiting factor. This 
-limits the transfer speeds to about only 150MB/s. This method is only about 
-20% more CPU intensive than just copying the data from the DMA buffer into a 
-user buffer using a copy_to_user call!
+diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
+index f52e3750..856610c 100755
+--- a/drivers/dma/xgene-dma.c
++++ b/drivers/dma/xgene-dma.c
+@@ -124,32 +124,8 @@
+ #define XGENE_DMA_DESC_ELERR_POS		46
+ #define XGENE_DMA_DESC_RTYPE_POS		56
+ #define XGENE_DMA_DESC_LERR_POS			60
+-#define XGENE_DMA_DESC_FLYBY_POS		4
+ #define XGENE_DMA_DESC_BUFLEN_POS		48
+ #define XGENE_DMA_DESC_HOENQ_NUM_POS		48
+-
+-#define XGENE_DMA_DESC_NV_SET(m)		\
+-	(((u64 *)(m))[0] |= XGENE_DMA_DESC_NV_BIT)
+-#define XGENE_DMA_DESC_IN_SET(m)		\
+-	(((u64 *)(m))[0] |= XGENE_DMA_DESC_IN_BIT)
+-#define XGENE_DMA_DESC_RTYPE_SET(m, v)		\
+-	(((u64 *)(m))[0] |= ((u64)(v) << XGENE_DMA_DESC_RTYPE_POS))
+-#define XGENE_DMA_DESC_BUFADDR_SET(m, v)	\
+-	(((u64 *)(m))[0] |= (v))
+-#define XGENE_DMA_DESC_BUFLEN_SET(m, v)		\
+-	(((u64 *)(m))[0] |= ((u64)(v) << XGENE_DMA_DESC_BUFLEN_POS))
+-#define XGENE_DMA_DESC_C_SET(m)			\
+-	(((u64 *)(m))[1] |= XGENE_DMA_DESC_C_BIT)
+-#define XGENE_DMA_DESC_FLYBY_SET(m, v)		\
+-	(((u64 *)(m))[2] |= ((v) << XGENE_DMA_DESC_FLYBY_POS))
+-#define XGENE_DMA_DESC_MULTI_SET(m, v, i)	\
+-	(((u64 *)(m))[2] |= ((u64)(v) << (((i) + 1) * 8)))
+-#define XGENE_DMA_DESC_DR_SET(m)		\
+-	(((u64 *)(m))[2] |= XGENE_DMA_DESC_DR_BIT)
+-#define XGENE_DMA_DESC_DST_ADDR_SET(m, v)	\
+-	(((u64 *)(m))[3] |= (v))
+-#define XGENE_DMA_DESC_H0ENQ_NUM_SET(m, v)	\
+-	(((u64 *)(m))[3] |= ((u64)(v) << XGENE_DMA_DESC_HOENQ_NUM_POS))
+ #define XGENE_DMA_DESC_ELERR_RD(m)		\
+ 	(((m) >> XGENE_DMA_DESC_ELERR_POS) & 0x3)
+ #define XGENE_DMA_DESC_LERR_RD(m)		\
+@@ -158,14 +134,7 @@
+ 	(((elerr) << 4) | (lerr))
 
+ /* X-Gene DMA descriptor empty s/w signature */
+-#define XGENE_DMA_DESC_EMPTY_INDEX		0
+ #define XGENE_DMA_DESC_EMPTY_SIGNATURE		~0ULL
+-#define XGENE_DMA_DESC_SET_EMPTY(m)		\
+-	(((u64 *)(m))[XGENE_DMA_DESC_EMPTY_INDEX] =	\
+-	 XGENE_DMA_DESC_EMPTY_SIGNATURE)
+-#define XGENE_DMA_DESC_IS_EMPTY(m)		\
+-	(((u64 *)(m))[XGENE_DMA_DESC_EMPTY_INDEX] ==	\
+-	 XGENE_DMA_DESC_EMPTY_SIGNATURE)
 
-Since my DMA controller is pretty smart, I also experimented with transfers 
-directly from user memory. This boiled down to calling "get_user_pages" and 
-then constructing a scatter-gather list using sg_init_table and then adding 
-those user pages. Then call "dma_map_sg" to translate and coalesce the pages 
-into DMA requests. Just this pagetable housekeeping took about the same amount 
-of processing time as the copy_from_user call, which made me abandon that code 
-before even getting to the point of actually transferring the data.
+ /* X-Gene DMA configurable parameters defines */
+ #define XGENE_DMA_RING_NUM		512
+@@ -184,7 +153,7 @@
+ #define XGENE_DMA_XOR_ALIGNMENT		6	/* 64 Bytes */
+ #define XGENE_DMA_MAX_XOR_SRC		5
+ #define XGENE_DMA_16K_BUFFER_LEN_CODE	0x0
+-#define XGENE_DMA_INVALID_LEN_CODE	0x7800
++#define XGENE_DMA_INVALID_LEN_CODE	0x7800000000000000ULL
 
-Based on that experience, I'd think the dma_sync calls do similar things 
-(walking page tables and changing some attributes) and that is where they 
-spend so much time.
+ /* X-Gene DMA descriptor error codes */
+ #define ERR_DESC_AXI			0x01
+@@ -214,10 +183,10 @@
+ #define ERR_DESC_SRC_INT		0xB
 
-I also tried cheating by not calling the dma_sync methods at all, but this 
-(surprisingly) led to hangups in the driver. I would have only expected data 
-corruption, not "hang". I'm still investigating that route. Specifying 
-"dma-coherent" has the same effect as it basically "nulls" the sync methods.
+ /* X-Gene DMA flyby operation code */
+-#define FLYBY_2SRC_XOR			0x8
+-#define FLYBY_3SRC_XOR			0x9
+-#define FLYBY_4SRC_XOR			0xA
+-#define FLYBY_5SRC_XOR			0xB
++#define FLYBY_2SRC_XOR			0x80
++#define FLYBY_3SRC_XOR			0x90
++#define FLYBY_4SRC_XOR			0xA0
++#define FLYBY_5SRC_XOR			0xB0
 
-Also tried to replace the "dma_mmap_coherent" call by a simple 
-"remap_pfn_range" so as to prevent setting the cache attributes on that 
-region, but that didn't have any effect at all, it appears that the 
-non-cachable property was already applied in the dma_alloc_coherent method.
+ /* X-Gene DMA SW descriptor flags */
+ #define XGENE_DMA_FLAG_64B_DESC		BIT(0)
+@@ -238,10 +207,10 @@
+ 	dev_err(chan->dev, "%s: " fmt, chan->name, ##arg)
 
+ struct xgene_dma_desc_hw {
+-	u64 m0;
+-	u64 m1;
+-	u64 m2;
+-	u64 m3;
++	__le64 m0;
++	__le64 m1;
++	__le64 m2;
++	__le64 m3;
+ };
 
-I added some timing code to the "sync" calls, this is what I get (numbers in 
-microseconds) when using 1MB blocks of streaming DMA transfers:
+ enum xgene_dma_ring_cfgsize {
+@@ -388,18 +357,11 @@ static bool is_pq_enabled(struct xgene_dma *pdma)
+ 	return !(val & XGENE_DMA_PQ_DISABLE_MASK);
+ }
 
-dma_sync_single_for_device(TO_DEVICE): 3336
-dma_sync_single_for_device(FROM_DEVICE): 1991
-dma_sync_single_for_cpu(FROM_DEVICE): 2175
-dma_sync_single_for_cpu(TO_DEVICE): 0
-dma_sync_single_for_device(TO_DEVICE): 3152
-dma_sync_single_for_device(FROM_DEVICE): 1990
-dma_sync_single_for_cpu(FROM_DEVICE): 2193
-dma_sync_single_for_cpu(TO_DEVICE): 0
+-static void xgene_dma_cpu_to_le64(u64 *desc, int count)
+-{
+-	int i;
+-
+-	for (i = 0; i < count; i++)
+-		desc[i] = cpu_to_le64(desc[i]);
+-}
+-
+-static u16 xgene_dma_encode_len(u32 len)
++static u64 xgene_dma_encode_len(size_t len)
+ {
+ 	return (len < XGENE_DMA_MAX_BYTE_CNT) ?
+-		len : XGENE_DMA_16K_BUFFER_LEN_CODE;
++		((u64)len << XGENE_DMA_DESC_BUFLEN_POS) :
++		XGENE_DMA_16K_BUFFER_LEN_CODE;
+ }
 
+ static u8 xgene_dma_encode_xor_flyby(u32 src_cnt)
+@@ -424,34 +386,50 @@ static u32 xgene_dma_ring_desc_cnt(struct xgene_dma_ring *ring)
+ 	return XGENE_DMA_RING_DESC_CNT(ring_state);
+ }
 
-As you can see, the system spends 2 or 3 ms on "housekeeping" for each 
-transition, except the cpu(TO_DEVICE) one which appears to be free which is 
-perfectly logical because returning the outgoing buffer to the CPU should not 
-need any special cache handling. I would have expected the 
-for_device(FROM_DEVICE) to be free as well, but surprisingly this one takes up 
-2ms as well.
+-static void xgene_dma_set_src_buffer(void *ext8, size_t *len,
++static void xgene_dma_set_src_buffer(__le64 *ext8, size_t *len,
+ 				     dma_addr_t *paddr)
+ {
+ 	size_t nbytes = (*len < XGENE_DMA_MAX_BYTE_CNT) ?
+ 			*len : XGENE_DMA_MAX_BYTE_CNT;
 
-Adding the numbers, it takes over 7 ms overhead to transfer 1MB data, hence 
-1MB/0.007s or about 150MB/s would be the maximum possible data transfer rate.
+-	XGENE_DMA_DESC_BUFADDR_SET(ext8, *paddr);
+-	XGENE_DMA_DESC_BUFLEN_SET(ext8, xgene_dma_encode_len(nbytes));
++	*ext8 |= cpu_to_le64(*paddr);
++	*ext8 |= cpu_to_le64(xgene_dma_encode_len(nbytes));
+ 	*len -= nbytes;
+ 	*paddr += nbytes;
+ }
 
+-static void xgene_dma_invalidate_buffer(void *ext8)
++static void xgene_dma_invalidate_buffer(__le64 *ext8)
+ {
+-	XGENE_DMA_DESC_BUFLEN_SET(ext8, XGENE_DMA_INVALID_LEN_CODE);
++	*ext8 |= cpu_to_le64(XGENE_DMA_INVALID_LEN_CODE);
+ }
 
-Can anyone here offer some advise on this?
+-static void *xgene_dma_lookup_ext8(u64 *desc, int idx)
++static __le64 *xgene_dma_lookup_ext8(struct xgene_dma_desc_hw *desc, int idx)
+ {
+-	return (idx % 2) ? (desc + idx - 1) : (desc + idx + 1);
++	switch (idx) {
++	case 0:
++		return &desc->m1;
++	case 1:
++		return &desc->m0;
++	case 2:
++		return &desc->m3;
++	case 3:
++		return &desc->m2;
++	default:
++		pr_err("Invalid dma descriptor index\n");
++	}
++
++	return NULL;
+ }
 
+-static void xgene_dma_init_desc(void *desc, u16 dst_ring_num)
++static void xgene_dma_init_desc(struct xgene_dma_desc_hw *desc,
++				u16 dst_ring_num)
+ {
+-	XGENE_DMA_DESC_C_SET(desc); /* Coherent IO */
+-	XGENE_DMA_DESC_IN_SET(desc);
+-	XGENE_DMA_DESC_H0ENQ_NUM_SET(desc, dst_ring_num);
+-	XGENE_DMA_DESC_RTYPE_SET(desc, XGENE_DMA_RING_OWNER_DMA);
++	desc->m0 |= cpu_to_le64(XGENE_DMA_DESC_IN_BIT);
++	desc->m0 |= cpu_to_le64((u64)XGENE_DMA_RING_OWNER_DMA <<
++				XGENE_DMA_DESC_RTYPE_POS);
++	desc->m1 |= cpu_to_le64(XGENE_DMA_DESC_C_BIT);
++	desc->m3 |= cpu_to_le64((u64)dst_ring_num <<
++				XGENE_DMA_DESC_HOENQ_NUM_POS);
+ }
 
-Kind regards,
+ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
+@@ -459,7 +437,7 @@ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
+ 				    dma_addr_t dst, dma_addr_t src,
+ 				    size_t len)
+ {
+-	void *desc1, *desc2;
++	struct xgene_dma_desc_hw *desc1, *desc2;
+ 	int i;
 
-Mike Looijmans
-System Expert
+ 	/* Get 1st descriptor */
+@@ -467,23 +445,21 @@ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
+ 	xgene_dma_init_desc(desc1, chan->tx_ring.dst_ring_num);
 
-TOPIC Embedded Products
-Eindhovenseweg 32-C, NL-5683 KH Best
-Postbus 440, NL-5680 AK Best
-Telefoon: +31 (0) 499 33 69 79
-Telefax: +31 (0) 499 33 69 70
-E-mail: mike.looijmans at topicproducts.com
-Website: www.topicproducts.com
+ 	/* Set destination address */
+-	XGENE_DMA_DESC_DR_SET(desc1);
+-	XGENE_DMA_DESC_DST_ADDR_SET(desc1, dst);
++	desc1->m2 |= cpu_to_le64(XGENE_DMA_DESC_DR_BIT);
++	desc1->m3 |= cpu_to_le64(dst);
 
-Please consider the environment before printing this e-mail
+ 	/* Set 1st source address */
+-	xgene_dma_set_src_buffer(desc1 + 8, &len, &src);
++	xgene_dma_set_src_buffer(&desc1->m1, &len, &src);
+
+-	if (len <= 0) {
+-		desc2 = NULL;
+-		goto skip_additional_src;
+-	}
++	if (!len)
++		return;
+
+ 	/*
+ 	 * We need to split this source buffer,
+ 	 * and need to use 2nd descriptor
+ 	 */
+ 	desc2 = &desc_sw->desc2;
+-	XGENE_DMA_DESC_NV_SET(desc1);
++	desc1->m0 |= cpu_to_le64(XGENE_DMA_DESC_NV_BIT);
+
+ 	/* Set 2nd to 5th source address */
+ 	for (i = 0; i < 4 && len; i++)
+@@ -496,12 +472,6 @@ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
+
+ 	/* Updated flag that we have prepared 64B descriptor */
+ 	desc_sw->flags |= XGENE_DMA_FLAG_64B_DESC;
+-
+-skip_additional_src:
+-	/* Hardware stores descriptor in little endian format */
+-	xgene_dma_cpu_to_le64(desc1, 4);
+-	if (desc2)
+-		xgene_dma_cpu_to_le64(desc2, 4);
+ }
+
+ static void xgene_dma_prep_xor_desc(struct xgene_dma_chan *chan,
+@@ -510,7 +480,7 @@ static void xgene_dma_prep_xor_desc(struct xgene_dma_chan *chan,
+ 				    u32 src_cnt, size_t *nbytes,
+ 				    const u8 *scf)
+ {
+-	void *desc1, *desc2;
++	struct xgene_dma_desc_hw *desc1, *desc2;
+ 	size_t len = *nbytes;
+ 	int i;
+
+@@ -521,28 +491,24 @@ static void xgene_dma_prep_xor_desc(struct xgene_dma_chan *chan,
+ 	xgene_dma_init_desc(desc1, chan->tx_ring.dst_ring_num);
+
+ 	/* Set destination address */
+-	XGENE_DMA_DESC_DR_SET(desc1);
+-	XGENE_DMA_DESC_DST_ADDR_SET(desc1, *dst);
++	desc1->m2 |= cpu_to_le64(XGENE_DMA_DESC_DR_BIT);
++	desc1->m3 |= cpu_to_le64(*dst);
+
+ 	/* We have multiple source addresses, so need to set NV bit*/
+-	XGENE_DMA_DESC_NV_SET(desc1);
++	desc1->m0 |= cpu_to_le64(XGENE_DMA_DESC_NV_BIT);
+
+ 	/* Set flyby opcode */
+-	XGENE_DMA_DESC_FLYBY_SET(desc1, xgene_dma_encode_xor_flyby(src_cnt));
++	desc1->m2 |= cpu_to_le64(xgene_dma_encode_xor_flyby(src_cnt));
+
+ 	/* Set 1st to 5th source addresses */
+ 	for (i = 0; i < src_cnt; i++) {
+ 		len = *nbytes;
+-		xgene_dma_set_src_buffer((i == 0) ? (desc1 + 8) :
++		xgene_dma_set_src_buffer((i == 0) ? &desc1->m1 :
+ 					 xgene_dma_lookup_ext8(desc2, i - 1),
+ 					 &len, &src[i]);
+-		XGENE_DMA_DESC_MULTI_SET(desc1, scf[i], i);
++		desc1->m2 |= cpu_to_le64((scf[i] << ((i + 1) * 8)));
+ 	}
+
+-	/* Hardware stores descriptor in little endian format */
+-	xgene_dma_cpu_to_le64(desc1, 4);
+-	xgene_dma_cpu_to_le64(desc2, 4);
+-
+ 	/* Update meta data */
+ 	*nbytes = len;
+ 	*dst += XGENE_DMA_MAX_BYTE_CNT;
+@@ -738,7 +704,7 @@ static int xgene_chan_xfer_request(struct xgene_dma_ring *ring,
+  * xgene_chan_xfer_ld_pending - push any pending transactions to hw
+  * @chan : X-Gene DMA channel
+  *
+- * LOCKING: must hold chan->desc_lock
++ * LOCKING: must hold chan->lock
+  */
+ static void xgene_chan_xfer_ld_pending(struct xgene_dma_chan *chan)
+ {
+@@ -808,7 +774,8 @@ static void xgene_dma_cleanup_descriptors(struct xgene_dma_chan *chan)
+ 		desc_hw = &ring->desc_hw[ring->head];
+
+ 		/* Check if this descriptor has been completed */
+-		if (unlikely(XGENE_DMA_DESC_IS_EMPTY(desc_hw)))
++		if (unlikely(le64_to_cpu(desc_hw->m0) ==
++			     XGENE_DMA_DESC_EMPTY_SIGNATURE))
+ 			break;
+
+ 		if (++ring->head == ring->slots)
+@@ -842,7 +809,7 @@ static void xgene_dma_cleanup_descriptors(struct xgene_dma_chan *chan)
+ 		iowrite32(-1, ring->cmd);
+
+ 		/* Mark this hw descriptor as processed */
+-		XGENE_DMA_DESC_SET_EMPTY(desc_hw);
++		desc_hw->m0 = cpu_to_le64(XGENE_DMA_DESC_EMPTY_SIGNATURE);
+
+ 		xgene_dma_run_tx_complete_actions(chan, desc_sw);
+
+@@ -889,7 +856,7 @@ static int xgene_dma_alloc_chan_resources(struct dma_chan *dchan)
+  * @chan: X-Gene DMA channel
+  * @list: the list to free
+  *
+- * LOCKING: must hold chan->desc_lock
++ * LOCKING: must hold chan->lock
+  */
+ static void xgene_dma_free_desc_list(struct xgene_dma_chan *chan,
+ 				     struct list_head *list)
+@@ -900,15 +867,6 @@ static void xgene_dma_free_desc_list(struct xgene_dma_chan *chan,
+ 		xgene_dma_clean_descriptor(chan, desc);
+ }
+
+-static void xgene_dma_free_tx_desc_list(struct xgene_dma_chan *chan,
+-					struct list_head *list)
+-{
+-	struct xgene_dma_desc_sw *desc, *_desc;
+-
+-	list_for_each_entry_safe(desc, _desc, list, node)
+-		xgene_dma_clean_descriptor(chan, desc);
+-}
+-
+ static void xgene_dma_free_chan_resources(struct dma_chan *dchan)
+ {
+ 	struct xgene_dma_chan *chan = to_dma_chan(dchan);
+@@ -985,7 +943,7 @@ fail:
+ 	if (!first)
+ 		return NULL;
+
+-	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
++	xgene_dma_free_desc_list(chan, &first->tx_list);
+ 	return NULL;
+ }
+
+@@ -1093,7 +1051,7 @@ fail:
+ 	if (!first)
+ 		return NULL;
+
+-	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
++	xgene_dma_free_desc_list(chan, &first->tx_list);
+ 	return NULL;
+ }
+
+@@ -1141,7 +1099,7 @@ fail:
+ 	if (!first)
+ 		return NULL;
+
+-	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
++	xgene_dma_free_desc_list(chan, &first->tx_list);
+ 	return NULL;
+ }
+
+@@ -1218,7 +1176,7 @@ fail:
+ 	if (!first)
+ 		return NULL;
+
+-	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
++	xgene_dma_free_desc_list(chan, &first->tx_list);
+ 	return NULL;
+ }
+
+@@ -1316,7 +1274,6 @@ static void xgene_dma_setup_ring(struct xgene_dma_ring *ring)
+ {
+ 	void *ring_cfg = ring->state;
+ 	u64 addr = ring->desc_paddr;
+-	void *desc;
+ 	u32 i, val;
+
+ 	ring->slots = ring->size / XGENE_DMA_RING_WQ_DESC_SIZE;
+@@ -1358,8 +1315,10 @@ static void xgene_dma_setup_ring(struct xgene_dma_ring *ring)
+
+ 	/* Set empty signature to DMA Rx ring descriptors */
+ 	for (i = 0; i < ring->slots; i++) {
++		struct xgene_dma_desc_hw *desc;
++
+ 		desc = &ring->desc_hw[i];
+-		XGENE_DMA_DESC_SET_EMPTY(desc);
++		desc->m0 = cpu_to_le64(XGENE_DMA_DESC_EMPTY_SIGNATURE);
+ 	}
+
+ 	/* Enable DMA Rx ring interrupt */
+@@ -2084,6 +2043,5 @@ module_platform_driver(xgene_dma_driver);
+
+ MODULE_DESCRIPTION("APM X-Gene SoC DMA driver");
+ MODULE_AUTHOR("Rameshwar Prasad Sahu <rsahu@apm.com>");
+-MODULE_AUTHOR("Loc Ho <lho@apm.com>");
+ MODULE_LICENSE("GPL");
+ MODULE_VERSION("1.0");
+--
+1.8.2.1
