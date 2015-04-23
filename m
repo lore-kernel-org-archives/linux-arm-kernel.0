@@ -1,30 +1,102 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 23 Apr 2015 14:03:08 +0530
-Subject: [PATCH 0/5] PM / clock_ops: provide default runtime ops and cleanup
- users
-Message-ID: <1429777993-11702-1-git-send-email-rnayak@codeaurora.org>
+Date: Thu, 23 Apr 2015 14:03:09 +0530
+Subject: [PATCH 1/5] PM / clock_ops: Provide default runtime ops to users
+In-Reply-To: <1429777993-11702-1-git-send-email-rnayak@codeaurora.org>
+References: <1429777993-11702-1-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1429777993-11702-2-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most users of PM clocks do the exact same thing in runtime callbacks.
-Provide default callbacks and cleanup the existing users (keystone/davinci
-/omap1/sh)
+Most users of PM clocks do the extact same things in the runtime
+suspend/resume callbacks. Provide them USE_PM_CLK_RUNTIME_OPS so
+as to avoid/remove boilerplate code.
 
-Rajendra Nayak (5):
-  PM / clock_ops: Provide default runtime ops to users
-  arm: keystone: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
-  arm: omap1: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
-  arm: davinci: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
-  drivers: sh: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ drivers/base/power/clock_ops.c | 38 ++++++++++++++++++++++++++++++++++++++
+ include/linux/pm_clock.h       | 10 ++++++++++
+ 2 files changed, 48 insertions(+)
 
- arch/arm/mach-davinci/pm_domain.c  | 32 +-------------------------
- arch/arm/mach-keystone/pm_domain.c | 33 +-------------------------
- arch/arm/mach-omap1/pm_bus.c       | 37 ++----------------------------
- drivers/base/power/clock_ops.c     | 38 ++++++++++++++++++++++++++++++
- drivers/sh/pm_runtime.c            | 47 ++------------------------------------
- include/linux/pm_clock.h           | 10 ++++++++
- 6 files changed, 54 insertions(+), 143 deletions(-)
-
+diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
+index 7fdd017..8abea66 100644
+--- a/drivers/base/power/clock_ops.c
++++ b/drivers/base/power/clock_ops.c
+@@ -15,6 +15,7 @@
+ #include <linux/clkdev.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
++#include <linux/pm_runtime.h>
+ 
+ #ifdef CONFIG_PM
+ 
+@@ -367,6 +368,43 @@ static int pm_clk_notify(struct notifier_block *nb,
+ 	return 0;
+ }
+ 
++int pm_clk_runtime_suspend(struct device *dev)
++{
++	int ret;
++
++	dev_dbg(dev, "%s\n", __func__);
++
++	ret = pm_generic_runtime_suspend(dev);
++	if (ret) {
++		dev_err(dev, "failed to suspend device\n");
++		return ret;
++	}
++
++	ret = pm_clk_suspend(dev);
++	if (ret) {
++		dev_err(dev, "failed to suspend clock\n");
++		pm_generic_runtime_resume(dev);
++		return ret;
++	}
++
++	return 0;
++}
++
++int pm_clk_runtime_resume(struct device *dev)
++{
++	int ret;
++
++	dev_dbg(dev, "%s\n", __func__);
++
++	ret = pm_clk_resume(dev);
++	if (ret) {
++		dev_err(dev, "failed to resume clock\n");
++		return ret;
++	}
++
++	return pm_generic_runtime_resume(dev);
++}
++
+ #else /* !CONFIG_PM */
+ 
+ /**
+diff --git a/include/linux/pm_clock.h b/include/linux/pm_clock.h
+index 0b00396..25266c6 100644
+--- a/include/linux/pm_clock.h
++++ b/include/linux/pm_clock.h
+@@ -20,6 +20,16 @@ struct pm_clk_notifier_block {
+ 
+ struct clk;
+ 
++#ifdef CONFIG_PM
++extern int pm_clk_runtime_suspend(struct device *dev);
++extern int pm_clk_runtime_resume(struct device *dev);
++#define USE_PM_CLK_RUNTIME_OPS \
++	.runtime_suspend = pm_clk_runtime_suspend, \
++	.runtime_resume = pm_clk_runtime_resume,
++#else
++#define USE_PM_CLK_RUNTIME_OPS
++#endif
++
+ #ifdef CONFIG_PM_CLK
+ static inline bool pm_clk_no_clocks(struct device *dev)
+ {
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
