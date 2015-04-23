@@ -1,42 +1,46 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 23 Apr 2015 16:09:55 -0700
-Subject: [PATCH v2 2/9] ARM: dts: BCM63xx: Add PMB busses nodes
+Date: Thu, 23 Apr 2015 16:09:54 -0700
+Subject: [PATCH v2 1/9] Documentation: DT: Add Broadcom BCM63138 PMB binding
 In-Reply-To: <1429830602-10988-1-git-send-email-f.fainelli@gmail.com>
 References: <1429830602-10988-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1429830602-10988-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1429830602-10988-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the two BCM63138 PMB busses nodes found on this System-on-a-Chip as
-described in their corresponding binding document.
+Add a Device Tree binding for the Broadcom BCM63138 Processor Monitor
+Bus, which is an internal bus used to access different power and reset
+signals within a BCM63138 System-on-a-Chip.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/bcm63138.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ .../devicetree/bindings/reset/brcm,bcm63138-pmb.txt   | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/brcm,bcm63138-pmb.txt
 
-diff --git a/arch/arm/boot/dts/bcm63138.dtsi b/arch/arm/boot/dts/bcm63138.dtsi
-index f46329c8ad75..f5b5c528c26c 100644
---- a/arch/arm/boot/dts/bcm63138.dtsi
-+++ b/arch/arm/boot/dts/bcm63138.dtsi
-@@ -105,6 +105,18 @@
- 			reg = <0x1e620 0x20>;
- 			interrupts = <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>;
- 		};
+diff --git a/Documentation/devicetree/bindings/reset/brcm,bcm63138-pmb.txt b/Documentation/devicetree/bindings/reset/brcm,bcm63138-pmb.txt
+new file mode 100644
+index 000000000000..a98872d27872
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/brcm,bcm63138-pmb.txt
+@@ -0,0 +1,19 @@
++Broadcom BCM63138 Processor Monitor Bus binding
++===============================================
 +
-+		pmb0: reset-controller at 4800c0 {
-+			compatible = "brcm,bcm63138-pmb";
-+			reg = <0x4800c0 0x10>;
-+			#reset-cells = <2>;
-+		};
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
 +
-+		pmb1: reset-controller at 4800e0 {
-+			compatible = "brcm,bcm63138-pmb";
-+			reg = <0x4800e0 0x10>;
-+			#reset-cells = <2>;
-+		};
- 	};
- 
- 	/* Legacy UBUS base */
++Require properties:
++
++- compatible: must be "brcm,bcm63138-pmb"
++- reg: base register address and size for this bus controller
++- #reset-cells: must be 2 first cell is the address within the bus instance designated
++  by the phandle, and the second is the number of zones for this peripheral
++
++Example:
++	pmb0: reset-controller at 4800c0 {
++		compatible = "brcm,bcm63138-pmb";
++		reg = <0x4800c0 0x10>;
++		#reset-cells = <2>;
++	};
 -- 
 2.1.0
