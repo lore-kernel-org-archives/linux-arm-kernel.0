@@ -1,26 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 23 Apr 2015 07:55:36 -0300
-Subject: [PATCH] ARM: dts: imx25: Add missing '#pwm-cells' property for
- pwm4
-In-Reply-To: <20150422141449.GI21413@pengutronix.de>
-References: <1429706430-9495-1-git-send-email-fabio.estevam@freescale.com>
- <20150422141449.GI21413@pengutronix.de>
-Message-ID: <CAOMZO5CyU6nLwdD-dBKQRma6fCxD99-GHXDUYe0D_8ECnDZhrQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 23 Apr 2015 12:00:25 +0100
+Subject: [PATCH] arm64: errata: add workaround for cortex-a53 erratum
+ #845719
+In-Reply-To: <CAMAWPa_NnQ7RSds7jM3bULqC+oMOy5HC6DNTT39Tez8C4MGc=Q@mail.gmail.com>
+References: <1427792898-22297-1-git-send-email-will.deacon@arm.com>
+ <CAMAWPa_NnQ7RSds7jM3bULqC+oMOy5HC6DNTT39Tez8C4MGc=Q@mail.gmail.com>
+Message-ID: <20150423110025.GE1652@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+On Wed, Apr 22, 2015 at 08:37:27PM +0100, Kevin Hilman wrote:
+> Hi Will,
 
-On Wed, Apr 22, 2015 at 11:14 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> Hi Fabio,
->
-> On Wed, Apr 22, 2015 at 09:40:30AM -0300, Fabio Estevam wrote:
->> All pwm ports pass the '#pwm-cells' property, except pw4.
->>
->> Fix it by passing '#pwm-cells' property for pwm4.
->
-> I already sent the same patch a month ago [1]. Forgot to resend it.
+Hi Kevin,
 
-Ok, I haven't seen it. Could you please resend it with stable on Cc?
+> On Tue, Mar 31, 2015 at 2:08 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > When running a compat (AArch32) userspace on Cortex-A53, a load at EL0
+> > from a virtual address that matches the bottom 32 bits of the virtual
+> > address used by a recent load at (AArch64) EL1 might return incorrect
+> > data.
+> >
+> > This patch works around the issue by writing to the contextidr_el1
+> > register on the exception return path when returning to a 32-bit task.
+> > This workaround is patched in at runtime based on the MIDR value of the
+> > processor.
+> >
+> > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Tested-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> Curious if you are planning to flag this for v3.19-stable?  I also
+> noticed that the recent one from Bo Yan[1] for A57 might also be
+> missing from stable/linux-3.19.y.  A quick check suggests they both
+> apply cleanly to stable/linux-3.19.y
 
-Thanks
+I wasn't planning on it, but if somebody wants it for 3.19 they could
+certainly send it to Greg.
+
+> Speaking of stable, is anyone at ARM working on getting these into
+> older versions of stable?
+
+No; although I was under the impression that Linaro had been tasked to do
+the backports for LSK.
+
+> For v3.18, I did a quick backport (and simple boot test on qemu) of
+> Andre's framework plus the errata I'm aware of to stable/linux-3.18.y,
+> and it seems to work (kernel reports "alternative: enabling workaround
+> for ARM erratum 832075) so getting the framework plus errata into
+> stable/linux-3.18.y seems like a good idea too and pretty straight
+> forward too.
+
+Backporting the entire alternatives framework to -stable sounds pretty
+heavyweight to me, particularly if we have to go back as far as 3.10. We
+could unconditionally backport the errata workarounds, but that would
+require us to assess the performance impact on a variety of CPUs for each
+of the backports, which I don't think is a good idea.
+
+Will
