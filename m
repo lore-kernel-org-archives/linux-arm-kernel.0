@@ -1,12 +1,12 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 23 Apr 2015 13:42:52 -0000
+Date: Thu, 23 Apr 2015 13:43:37 -0000
 Subject: [RFC/RFT 4/6] mmc: sdhci-msm: convert driver to use runtime PM
  apis
 In-Reply-To: <CAPDyKFpKPkKXutn-2OAC4r6Um254C2vQoF83SB4Dsk4MmZv=wQ@mail.gmail.com>
 References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
  <1429778744-13352-5-git-send-email-rnayak@codeaurora.org>
  <CAPDyKFpKPkKXutn-2OAC4r6Um254C2vQoF83SB4Dsk4MmZv=wQ@mail.gmail.com>
-Message-ID: <f390840a65cdf503397b162f2f8f8133.squirrel@www.codeaurora.org>
+Message-ID: <09f49e8b5f77fa0a0f80e5cea1467a48.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
