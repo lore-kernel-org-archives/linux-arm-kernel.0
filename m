@@ -1,81 +1,137 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 23 Apr 2015 15:19:45 +0200
-Subject: Memory size unaligned to section boundary
-Message-ID: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 23 Apr 2015 15:21:48 +0200
+Subject: [RFC/RFT 4/6] mmc: sdhci-msm: convert driver to use runtime PM
+ apis
+In-Reply-To: <1429778744-13352-5-git-send-email-rnayak@codeaurora.org>
+References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
+ <1429778744-13352-5-git-send-email-rnayak@codeaurora.org>
+Message-ID: <CAPDyKFpKPkKXutn-2OAC4r6Um254C2vQoF83SB4Dsk4MmZv=wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 23 April 2015 at 10:45, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+> With platform support now in place to manage clocks from within runtime PM
+> callbacks, get rid of all clock handling from the driver and convert the
+> driver to use runtime PM apis.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> Cc: <linux-mmc@vger.kernel.org>
+> ---
+>  drivers/mmc/host/sdhci-msm.c | 46 +++++++++++---------------------------------
+>  1 file changed, 11 insertions(+), 35 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+> index 4a09f76..3c62a77 100644
+> --- a/drivers/mmc/host/sdhci-msm.c
+> +++ b/drivers/mmc/host/sdhci-msm.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/mmc/mmc.h>
+>  #include <linux/slab.h>
+> +#include <linux/pm_runtime.h>
+>
+>  #include "sdhci-pltfm.h"
+>
+> @@ -56,8 +57,6 @@
+>  struct sdhci_msm_host {
+>         struct platform_device *pdev;
+>         void __iomem *core_mem; /* MSM SDCC mapped address */
+> -       struct clk *clk;        /* main SD/MMC bus clock */
+> -       struct clk *pclk;       /* SDHC peripheral bus clock */
+>         struct clk *bus_clk;    /* SDHC bus voter clock */
+>         struct mmc_host *mmc;
+>         struct sdhci_pltfm_data sdhci_msm_pdata;
+> @@ -469,29 +468,8 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+>                         goto pltfm_free;
+>         }
+>
+> -       /* Setup main peripheral bus clock */
+> -       msm_host->pclk = devm_clk_get(&pdev->dev, "iface");
+> -       if (IS_ERR(msm_host->pclk)) {
+> -               ret = PTR_ERR(msm_host->pclk);
+> -               dev_err(&pdev->dev, "Perpheral clk setup failed (%d)\n", ret);
+> -               goto bus_clk_disable;
+> -       }
+> -
+> -       ret = clk_prepare_enable(msm_host->pclk);
+> -       if (ret)
+> -               goto bus_clk_disable;
+> -
+> -       /* Setup SDC MMC clock */
+> -       msm_host->clk = devm_clk_get(&pdev->dev, "core");
+> -       if (IS_ERR(msm_host->clk)) {
+> -               ret = PTR_ERR(msm_host->clk);
+> -               dev_err(&pdev->dev, "SDC MMC clk setup failed (%d)\n", ret);
+> -               goto pclk_disable;
+> -       }
+> -
+> -       ret = clk_prepare_enable(msm_host->clk);
+> -       if (ret)
+> -               goto pclk_disable;
+> +       pm_runtime_enable(&pdev->dev);
+> +       pm_runtime_get_sync(&pdev->dev);
+>
+>         core_memres = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>         msm_host->core_mem = devm_ioremap_resource(&pdev->dev, core_memres);
+> @@ -499,7 +477,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+>         if (IS_ERR(msm_host->core_mem)) {
+>                 dev_err(&pdev->dev, "Failed to remap registers\n");
+>                 ret = PTR_ERR(msm_host->core_mem);
+> -               goto clk_disable;
+> +               goto err;
+>         }
+>
+>         /* Reset the core and Enable SDHC mode */
+> @@ -511,7 +489,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+>         if (readl(msm_host->core_mem + CORE_POWER) & CORE_SW_RST) {
+>                 dev_err(&pdev->dev, "Stuck in reset\n");
+>                 ret = -ETIMEDOUT;
+> -               goto clk_disable;
+> +               goto err;
+>         }
+>
+>         /* Set HC_MODE_EN bit in HC_MODE register */
+> @@ -545,15 +523,13 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+>
+>         ret = sdhci_add_host(host);
+>         if (ret)
+> -               goto clk_disable;
+> +               goto err;
+>
+>         return 0;
+>
+> -clk_disable:
+> -       clk_disable_unprepare(msm_host->clk);
+> -pclk_disable:
+> -       clk_disable_unprepare(msm_host->pclk);
+> -bus_clk_disable:
+> +err:
+> +       pm_runtime_put_sync(&pdev->dev);
+> +       pm_runtime_disable(&pdev->dev);
+>         if (!IS_ERR(msm_host->bus_clk))
+>                 clk_disable_unprepare(msm_host->bus_clk);
+>  pltfm_free:
+> @@ -571,8 +547,8 @@ static int sdhci_msm_remove(struct platform_device *pdev)
+>
+>         sdhci_remove_host(host, dead);
+>         sdhci_pltfm_free(pdev);
+> -       clk_disable_unprepare(msm_host->clk);
+> -       clk_disable_unprepare(msm_host->pclk);
+> +       pm_runtime_put_sync(&pdev->dev);
+> +       pm_runtime_disable(&pdev->dev);
+>         if (!IS_ERR(msm_host->bus_clk))
+>                 clk_disable_unprepare(msm_host->bus_clk);
+>         return 0;
+> --
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+> of Code Aurora Forum, hosted by The Linux Foundation
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-It seems to me that I hit an issue in low memory mapping (map_lowmem).
-I'm using a custom memory size, which leads to an freeze on Linux 4.0
-and also with Linus master on two tested ARMv7-A SoC's (Freescale Vybrid
-and NVIDIA Tegra 3):
+This all looks wrong. The driver will no longer work unless CONFIG_PM is set.
 
-With mem=259744K
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.0.0-00189-ga4d2a4c3-dirty
-(ags at trochilidae) (gcc version 4.8.3 20140401 (prerelease) (Linaro GCC
-4.8-2014.04) ) #506 Thu Apr 23 14:13:21 CEST 2015
-[    0.000000] CPU: ARMv7 Processor [410fc051] revision 1 (ARMv7),
-cr=10c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
-instruction cache
-[    0.000000] Machine model: Toradex Colibri VF61 on Colibri Evaluation
-Board
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] cma: Reserved 16 MiB at 0x8e400000
-[    0.000000] Memory policy: Data cache writeback
-<freeze>
-
-I dug a bit more into that, and it unveiled that when creating the
-mapping for the non-kernel_x part (if (kernel_x_end < end) in
-map_lowmem), the unaligned section at the end leads to the freeze. In
-alloc_init_pmd, if the memory end is section unaligned, alloc_init_pte
-gets called which allocates a PTE outside of the initialized region (in
-early_alloc_aligned). The system freezes@the call of memset in
-early_alloc_aligned function.
-
-With some debug print, this can be better illustrated:
-[    0.000000] pgd 800063f0, addr 8fc00000, end 8fda8000, next 8fda8000
-[    0.000000] pud 800063f0, addr 8fc00000, end 8fda8000, next 8fda8000
-[    0.000000] pmd 800063f0, addr 8fc00000, next 8fda8000
-                         => actual end of memory ^^^^^^^^
-[    0.000000] alloc_init_pte
-[    0.000000] set_pte_ext, pte 00000000, addr 8fc00000, end 8fda8000
-[    0.000000] early_pte_alloc
-[    0.000000] early_alloc_aligned, 00001000, ptr 8fcff000, align
-00001000
-     => PTE allocated outside of initialized area ^^^^^^^^
-
-It seems that memory gets allocation in the last section. When the last
-section was in the previous PMD, the allocation works, however if the
-last section is within the same PMD, the allocation ends up in the
-non-initialized area. So:
-
-In other words, sizes which end in a upper part of the 2MB sized PMD
-fail, while sizes in the lower part of a PMD work.
-0xFF80000 => fails (mem=261632K)
-0xFE80000 => works (mem=260608K)
-0xFD80000 => fails (mem=261632K)
-...
-
-While I understand the reason for the freeze, I don't know to properly
-fix it. It looks to me that in alloc_init_pmd, we should use
-__map_init_section first to map the last aligned section, before calling
-alloc_init_pte on the non aligned section.
-
-Background: I tried to reuse the boot loader part of the simplefb
-implementation for sunxi. It decreases memory size by the size of the
-framebuffer. Hence the actually memory size can be unaligned, depending
-on the display size used. In the case at hand, a framebuffer of the size
-800x600 worked while 1024x600 did not work... The implementation uses
-device tree to report the memory size, but the kernel arguments show the
-same behavior.
-
-Maybe a regression of e651eab0af ("ARM: 7677/1: LPAE: Fix mapping in
-alloc_init_section for unaligned addresses"). I currently do not have a
-platform at hand which works on that Linux version out of the box.
-
---
-Stefan
+Kind regards
+Uffe
