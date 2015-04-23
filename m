@@ -1,46 +1,63 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 23 Apr 2015 11:21:11 +0200
-Subject: Mediatek MT8135 dts updates
-Message-ID: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 23 Apr 2015 11:21:15 +0200
+Subject: [PATCH 4/4] ARM: dts: mediatek mt8135: Use real UART clocks
+In-Reply-To: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
+References: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1429780875-29096-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains the Mediatek MT8135 dts updates for the clock
-support and UART support. This needs these two series:
+We used to provide dummy clocks for the UART. Now that we have
+common clock support we can provide the real clocks to the UART.
 
-[PATCH v12] clk: Add common clock support for Mediatek MT8135 and MT8173
-tty: serial: 8250_mtk: Add support for second clock
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/dts/mt8135.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-Also this adds the PMIC wrapper nodes to the dtsi file and PMIC node to
-the mt8135-evbp1 board. Support for the PMIC wrapper was merged during
-the v4.1 merge window.
-
-This series is meant for testing the new features, not (yet) for inclusion.
-
-----------------------------------------------------------------
-
-The following changes since commit 39a8804455fb23f09157341d3ba7db6d7ae6ee76:
-
-  Linux 4.0 (2015-04-12 15:12:50 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/sha/linux-2.6.git tags/v4.0-mtk-arm-dts
-
-for you to fetch changes up to 5fcd75a6aeded756c24d9581f49e0859b85fb3a0:
-
-  ARM: dts: mediatek mt8135: Use real UART clocks (2015-04-23 11:02:27 +0200)
-
-----------------------------------------------------------------
-
-James Liao (1):
-      ARM: dts: mediatek: Enable clock support for Mediatek MT8135.
-
-Sascha Hauer (3):
-      ARM: dts: mt8135: Add pmic wrapper nodes
-      ARM: dts: mt8135-evbp1: Add PMIC support
-      ARM: dts: mediatek mt8135: Use real UART clocks
-
- arch/arm/boot/dts/mt8135-evbp1.dts | 193 +++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/mt8135.dtsi      |  58 ++++++++++-
- 2 files changed, 247 insertions(+), 4 deletions(-)
+diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+index b0f20fc..4d1ddd9 100644
+--- a/arch/arm/boot/dts/mt8135.dtsi
++++ b/arch/arm/boot/dts/mt8135.dtsi
+@@ -180,7 +180,8 @@
+ 			compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
+ 			reg = <0 0x11006000 0 0x400>;
+ 			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
+-			clocks = <&uart_clk>;
++			clocks = <&pericfg CLK_PERI_UART0_SEL>, <&pericfg CLK_PERI_UART0>;
++			clock-names = "baud", "bus";
+ 			status = "disabled";
+ 		};
+ 
+@@ -188,7 +189,8 @@
+ 			compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
+ 			reg = <0 0x11007000 0 0x400>;
+ 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
+-			clocks = <&uart_clk>;
++			clocks = <&pericfg CLK_PERI_UART1_SEL>, <&pericfg CLK_PERI_UART1>;
++			clock-names = "baud", "bus";
+ 			status = "disabled";
+ 		};
+ 
+@@ -196,7 +198,8 @@
+ 			compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
+ 			reg = <0 0x11008000 0 0x400>;
+ 			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
+-			clocks = <&uart_clk>;
++			clocks = <&pericfg CLK_PERI_UART2_SEL>, <&pericfg CLK_PERI_UART2>;
++			clock-names = "baud", "bus";
+ 			status = "disabled";
+ 		};
+ 
+@@ -204,7 +207,8 @@
+ 			compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
+ 			reg = <0 0x11009000 0 0x400>;
+ 			interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
+-			clocks = <&uart_clk>;
++			clocks = <&pericfg CLK_PERI_UART3_SEL>, <&pericfg CLK_PERI_UART3>;
++			clock-names = "baud", "bus";
+ 			status = "disabled";
+ 		};
+ 
+-- 
+2.1.4
