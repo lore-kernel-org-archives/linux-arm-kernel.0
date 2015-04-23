@@ -1,113 +1,112 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Apr 2015 07:17:28 -0700
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150423102542.GZ4027@n2100.arm.linux.org.uk>
-References: <20150406174245.GJ18048@atomide.com>
- <20150407135713.GL4027@n2100.arm.linux.org.uk>
- <20150407152207.GM18048@atomide.com>
- <20150408230658.GO4027@n2100.arm.linux.org.uk>
- <20150409134843.GQ4027@n2100.arm.linux.org.uk>
- <20150415163108.GB2033@earth> <20150416160858.GH18048@atomide.com>
- <20150417184156.GA3326@earth> <20150420234032.GM18048@atomide.com>
- <20150423102542.GZ4027@n2100.arm.linux.org.uk>
-Message-ID: <20150423141727.GQ18048@atomide.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 23 Apr 2015 15:26:53 +0100
+Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
+ add SW break point support
+In-Reply-To: <20150414082558.GS6186@cbox>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
+ <20150414082558.GS6186@cbox>
+Message-ID: <87y4li6hua.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [150423 03:26]:
-> On Mon, Apr 20, 2015 at 04:40:32PM -0700, Tony Lindgren wrote:
-> > * Sebastian Reichel <sre@kernel.org> [150417 11:43]:
-> > > On Thu, Apr 16, 2015 at 09:08:58AM -0700, Tony Lindgren wrote:
-> > > > * Sebastian Reichel <sre@kernel.org> [150415 09:32]:
-> > > > > Hi,
-> > > > > 
-> > > > > On Thu, Apr 09, 2015 at 02:48:43PM +0100, Russell King - ARM Linux wrote:
-> > > > > > On Thu, Apr 09, 2015 at 12:06:58AM +0100, Russell King - ARM Linux wrote:
-> > > > > > > On Tue, Apr 07, 2015 at 08:22:08AM -0700, Tony Lindgren wrote:
-> > > > > > > > Works for me. The above needs the following fix folded in to build:
-> > > > > > > > 
-> > > > > > > > --- a/arch/arm/mm/proc-v7.S
-> > > > > > > > +++ b/arch/arm/mm/proc-v7.S
-> > > > > > > > @@ -532,7 +532,7 @@ __v7_ca9mp_proc_info:
-> > > > > > > >  __v7_ca8_proc_info:
-> > > > > > > >  	.long	0x410fc080
-> > > > > > > >  	.long	0xff0ffff0
-> > > > > > > > -	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
-> > > > > > > > +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
-> > > > > > > >  	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
-> > > > > > > >  
-> > > > > > > >  #endif	/* CONFIG_ARM_LPAE */
-> > > > > > > 
-> > > > > > > Thanks, merged into the original patch.
-> > > > > > 
-> > > > > > Do you want to give me an ack for this, thanks?
-> > > > > 
-> > > > > I tried to test this together with Tony's follow up patch, but I get
-> > > > > this after applying the patch to v4.0:
-> > > > > 
-> > > > > sre at earth ~/src/linux [430973-fix] % make -j4
-> > > > >   CHK     include/config/kernel.release
-> > > > >   CHK     include/generated/uapi/linux/version.h
-> > > > >   CHK     include/generated/utsrelease.h
-> > > > > make[1]: 'include/generated/mach-types.h' is up to date.
-> > > > >   CALL    scripts/checksyscalls.sh
-> > > > >   CHK     include/generated/compile.h
-> > > > >   AS      arch/arm/mm/proc-v7.o
-> > > > > arch/arm/mm/proc-v7.S: Assembler messages:
-> > > > > arch/arm/mm/proc-v7.S:535: Error: invalid operands (*ABS* and .text sections) for `|'
-> > > > > arch/arm/mm/proc-v7.S:535: Error: invalid operands (*ABS* and .text sections) for `|'
-> > > > > scripts/Makefile.build:294: recipe for target 'arch/arm/mm/proc-v7.o' failed
-> > > > > make[1]: *** [arch/arm/mm/proc-v7.o] Error 1
-> > > > > Makefile:947: recipe for target 'arch/arm/mm' failed
-> > > > > make: *** [arch/arm/mm] Error 2
-> > > > > make: *** Waiting for unfinished jobs....
-> > > > 
-> > > > Maybe test the version in Linux next:
-> > > > 
-> > > > a6d746789825 ("ARM: proc-v7: avoid errata 430973 workaround for non-Cortex A8 CPUs")
-> > > 
-> > > DONE with your your patch added on top:
-> > > 
-> > > Tested-By: Sebastian Reichel <sre@kernel.org>
-> > > 
-> > > (on N900)
-> > 
-> > OK thanks, patch now uploaded to Russell's patch system:
-> > 
-> > http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8345/1
-> 
-> I have a concern with that patch.
-> 
-> The reason that it's disabled for multiplatform is because we can't
-> guarantee that the auxctrl register will be writable.  The solution
-> we came up with for multiplatform was to require firmware to be
-> updated to enable this bit.
-> 
-> Enabling it on a platform where firmware has not been updated, but
-> runs in the non-secure world will lead to the kernel hanging in the
-> early assembly code.
-> 
-> I've discussed it with Catalin, and Catalin's position is that we
-> should not remove the !multiplatform conditional.  That's something
-> which I find that I'm agreeing with Catalin on - any other non-secure
-> Cortex A8 user who is setting this bit in firmware will instantly
-> break if this patch is applied.
-> 
-> However, I don't think anyone is willing to say that they have a
-> solution to this problem - obviously, you can't build OMAP as a
-> non-multiplatform kernel anymore, so in effect you can never have
-> the kernel enable this errata.  And you can't detect whether you're
-> running in secure mode or not.
-> 
-> We could do the "only write the bit if it was originally clear" but
-> we still have the problem that doing so may cause other people
-> regressions.
 
-How about we keep the bit writing part !multiplatform conditional
-(or even remove it) but always do the flush for ca-8?
+Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-Then we could also do a warning for a misconfigured ca-8 later on.
+> On Tue, Mar 31, 2015 at 04:08:04PM +0100, Alex Benn?e wrote:
+>> This adds support for SW breakpoints inserted by userspace.
+>> 
+>> We do this by trapping all BKPT exceptions in the
+>> hypervisor (MDCR_EL2_TDE).
+>
+> you mean trapping all exceptions in the guest to the hypervisor?
+>
+>> The kvm_debug_exit_arch carries the address
+>> of the exception.
+>
+> why?  can userspace not simply read out the PC using GET_ONE_REG?
 
-Regards,
+Yes, I have re-worded and removed PC from the debug information.
 
-Tony
+<snip>
+>>  
+>> +	/* Trap breakpoints? */
+>> +	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
+>> +		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
+>> +	else
+>> +		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
+>
+> so now you're trapping all debug exceptions, right?
+>
+> what happens if the guest is using the hardware to debug debug stuff and
+> generates other kinds of debug exceptions, like a hardware breakpoint,
+> will we not see an unhandled exception and the guest being forcefully
+> killed?
+
+Yes until the later patches which stop the guest using HW debug
+registers while we are using them.
+
+>
+>> +
+>>  }
+>>  
+>>  void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index 524fa25..ed1bbb4 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -82,6 +82,37 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  	return 1;
+>>  }
+>>  
+>> +/**
+>> + * kvm_handle_debug_exception - handle a debug exception instruction
+>
+> handle a software breadkpoint exception
+>
+>> + *
+>> + * @vcpu:	the vcpu pointer
+>> + * @run:	access to the kvm_run structure for results
+>> + *
+>> + * We route all debug exceptions through the same handler as we
+>
+> all debug exceptions?  software breakpoints and all?  then why the above
+> shot text?
+>
+>> + * just need to report the PC and the HSR values to userspace.
+>> + * Userspace may decide to re-inject the exception and deliver it to
+>> + * the guest if it wasn't for the host to deal with.
+>
+> now I'm confused - does userspace setup the guest to receive an
+> exception or does it tell KVM to emulate an exception for the guest or
+> do we execute the breakpoint without trapping the debug exception?
+
+I've made it all go through userspace as we may have to translate the
+hypervisor visible exception code to what the guest was expecting to see.
+
+>
+>> + */
+>> +static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+>> +
+>> +	run->exit_reason = KVM_EXIT_DEBUG;
+>> +	run->debug.arch.hsr = hsr;
+>> +
+>> +	switch (hsr >> ESR_ELx_EC_SHIFT) {
+>> +	case ESR_ELx_EC_BKPT32:
+>> +	case ESR_ELx_EC_BRK64:
+>> +		run->debug.arch.pc = *vcpu_pc(vcpu);
+>> +		break;
+>> +	default:
+>> +		kvm_err("%s: un-handled case hsr: %#08x\n",
+>> +			__func__, (unsigned int) hsr);
+>
+> this should never happen right?
+
+At the moment it could, at the end of the patch series we should cover
+all the cases so it would indicate a bug. I've made it return an error
+code so it fails hard as suggested by David.
+
+-- 
+Alex Benn?e
