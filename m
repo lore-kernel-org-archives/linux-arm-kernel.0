@@ -1,49 +1,57 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 23 Apr 2015 09:35:10 +0200
-Subject: [PATCH 2/2] PCI: designware: use iATU0 for cfg and IO, iATU1
- for MEM
-In-Reply-To: <1429707494-2732-3-git-send-email-jszhang@marvell.com>
-References: <1429707494-2732-1-git-send-email-jszhang@marvell.com>
- <1429707494-2732-3-git-send-email-jszhang@marvell.com>
-Message-ID: <5538A0AE.6050005@st.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 23 Apr 2015 09:42:35 +0200
+Subject: [PATCHv3 0/4] add devm_of_phy_get_by_index and update platform
+ drivers
+In-Reply-To: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
+References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <5538A26B.10302@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
+Hi,
 
-On 04/22/2015 02:58 PM, Jisheng Zhang wrote:
-> Most transactions' type are cfg0 and MEM, so the Current iATU usage is not
-> balanced, iATU0 is hot while iATU1 is rarely used. This patch refactors
-> the iATU usage: iATU0 for cfg and IO, iATU1 for MEM. This allocation
-> ideas comes from Minghuan Lian<Minghuan.Lian@freescale.com>:
+On 23-04-15 01:04, Arun Ramamurthy wrote:
+> This patch set adds a new API to get phy by index when multiple
+> phys are present. This patch is based on discussion with Arnd Bergmann
+> about dt bindings for multiple phys.
 >
->   http://www.spinics.net/lists/linux-pci/msg40440.html
+> History:
+> v1:
+>      - Removed null pointers on Dmitry's suggestion
+>      - Improved documentation in commit messages
+>      - Exported new phy api
+> v2:
+>      - EHCI and OHCI platform Kconfigs select Generic Phy
+>        to fix build errors in certain configs.
+> v3:
+>      - Made GENERIC_PHY an invisible option so
+>      that other configs can select it
+>      - Added stubs for devm_of_phy_get_by_index
+>      - Reformated code
 >
-> Signed-off-by: Jisheng Zhang<jszhang@marvell.com>
-> ---
->   drivers/pci/host/pcie-designware.c | 83 +++++++++++++++++++++-----------------
->   1 file changed, 47 insertions(+), 36 deletions(-)
+> Arun Ramamurthy (4):
+>    phy: phy-core: Make GENERIC_PHY an invisible option
+>    phy: core: Add devm_of_phy_get_by_index to phy-core
+>    usb: ehci-platform: Use devm_of_phy_get_by_index
+>    usb: ohci-platform: Use devm_of_phy_get_by_index
 >
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 1da1446..bb81c8ad 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -508,6 +508,13 @@ int dw_pcie_host_init(struct pcie_port *pp)
->   	if (pp->ops->host_init)
->   		pp->ops->host_init(pp);
->   
-> +	dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX0,
-> +				  PCIE_ATU_TYPE_IO, pp->io_mod_base,
-> +				  pp->io_bus_addr, pp->io_size);
-> +	dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
-> +				  PCIE_ATU_TYPE_MEM, pp->mem_mod_base,
-> +				  pp->mem_bus_addr, pp->mem_size);
-> +
-Some platforms doesn't have support for ATU. I think this is the reason 
-to have
-rd_other_conf / wr_other_conf ops in the driver.
-IMO, this is not suitable to have this in the initialization routine for 
-all platforms.
+>   Documentation/phy.txt                     |  7 +++-
+>   drivers/ata/Kconfig                       |  1 -
+>   drivers/media/platform/exynos4-is/Kconfig |  2 +-
+>   drivers/phy/Kconfig                       |  4 +-
+>   drivers/phy/phy-core.c                    | 32 ++++++++++++++
+>   drivers/usb/host/Kconfig                  |  4 +-
+>   drivers/usb/host/ehci-platform.c          | 69 +++++++++++--------------------
+>   drivers/usb/host/ohci-platform.c          | 69 +++++++++++--------------------
+>   drivers/video/fbdev/exynos/Kconfig        |  2 +-
+>   include/linux/phy/phy.h                   |  8 ++++
+>   10 files changed, 100 insertions(+), 98 deletions(-)
+>
+
+Patch set looks good to me:
+
+Acked-by: Hans de Goede <hdegoede@redhat.com>
 
 Regards,
-Fabrice
+
+Hans
