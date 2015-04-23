@@ -1,58 +1,163 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 23 Apr 2015 14:15:40 +0530
-Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks using
- PM clocks
+Date: Thu, 23 Apr 2015 14:15:43 +0530
+Subject: [RFC/RFT 5/6] i2c: qup: Get rid of clock handling as its done using
+ runtime callbacks
 In-Reply-To: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
 References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1429778744-13352-6-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add runtime PM support to handle (core and iface) clocks for devices
-without a controllable power domain. Once the drivers for these devices
-are converted to use runtime PM apis, all clock handling (for core and
-iface) from these drivers can then be removed.
+Remove all clock handling from the driver as this is not handled from
+within platform runtime callbacks.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/gdsc.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ drivers/i2c/busses/i2c-qup.c | 74 ++++++++++----------------------------------
+ 1 file changed, 16 insertions(+), 58 deletions(-)
 
-diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
-index 480ebf6..92b0f6d 100644
---- a/drivers/clk/qcom/gdsc.c
-+++ b/drivers/clk/qcom/gdsc.c
-@@ -15,6 +15,7 @@
- #include <linux/err.h>
- #include <linux/jiffies.h>
- #include <linux/pm_clock.h>
-+#include <linux/platform_device.h>
- #include <linux/slab.h>
- #include "gdsc.h"
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index fdcbdab..465a2b2 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -104,7 +104,6 @@ struct qup_i2c_dev {
+ 	void __iomem		*base;
+ 	int			irq;
+ 	struct clk		*clk;
+-	struct clk		*pclk;
+ 	struct i2c_adapter	adap;
  
-@@ -226,3 +227,22 @@ void gdsc_unregister(struct device *dev)
+ 	int			clk_ctl;
+@@ -532,24 +531,6 @@ static struct i2c_adapter_quirks qup_i2c_quirks = {
+ 	.max_read_len = QUP_READ_LIMIT,
+ };
+ 
+-static void qup_i2c_enable_clocks(struct qup_i2c_dev *qup)
+-{
+-	clk_prepare_enable(qup->clk);
+-	clk_prepare_enable(qup->pclk);
+-}
+-
+-static void qup_i2c_disable_clocks(struct qup_i2c_dev *qup)
+-{
+-	u32 config;
+-
+-	qup_i2c_change_state(qup, QUP_RESET_STATE);
+-	clk_disable_unprepare(qup->clk);
+-	config = readl(qup->base + QUP_CONFIG);
+-	config |= QUP_CLOCK_AUTO_GATE;
+-	writel(config, qup->base + QUP_CONFIG);
+-	clk_disable_unprepare(qup->pclk);
+-}
+-
+ static int qup_i2c_probe(struct platform_device *pdev)
  {
- 	of_genpd_del_provider(dev->of_node);
+ 	static const int blk_sizes[] = {4, 16, 32};
+@@ -596,13 +577,10 @@ static int qup_i2c_probe(struct platform_device *pdev)
+ 		return PTR_ERR(qup->clk);
+ 	}
+ 
+-	qup->pclk = devm_clk_get(qup->dev, "iface");
+-	if (IS_ERR(qup->pclk)) {
+-		dev_err(qup->dev, "Could not get iface clock\n");
+-		return PTR_ERR(qup->pclk);
+-	}
+-
+-	qup_i2c_enable_clocks(qup);
++	pm_runtime_set_autosuspend_delay(qup->dev, MSEC_PER_SEC);
++	pm_runtime_use_autosuspend(qup->dev);
++	pm_runtime_enable(qup->dev);
++	pm_runtime_get_sync(qup->dev);
+ 
+ 	/*
+ 	 * Bootloaders might leave a pending interrupt on certain QUP's,
+@@ -673,22 +651,15 @@ static int qup_i2c_probe(struct platform_device *pdev)
+ 	qup->adap.dev.of_node = pdev->dev.of_node;
+ 	strlcpy(qup->adap.name, "QUP I2C adapter", sizeof(qup->adap.name));
+ 
+-	pm_runtime_set_autosuspend_delay(qup->dev, MSEC_PER_SEC);
+-	pm_runtime_use_autosuspend(qup->dev);
+-	pm_runtime_set_active(qup->dev);
+-	pm_runtime_enable(qup->dev);
+-
+ 	ret = i2c_add_adapter(&qup->adap);
+ 	if (ret)
+-		goto fail_runtime;
++		goto fail;
+ 
+ 	return 0;
+ 
+-fail_runtime:
++fail:
+ 	pm_runtime_disable(qup->dev);
+ 	pm_runtime_set_suspended(qup->dev);
+-fail:
+-	qup_i2c_disable_clocks(qup);
+ 	return ret;
  }
-+
-+static struct dev_pm_domain default_qcom_pm_domain = {
-+	.ops = {
-+		USE_PM_CLK_RUNTIME_OPS
-+		USE_PLATFORM_PM_SLEEP_OPS
-+	},
-+};
-+
-+static struct pm_clk_notifier_block qcom_pm_notifier = {
-+	.pm_domain	= &default_qcom_pm_domain,
-+	.con_ids	= { "core", "iface" },
-+};
-+
-+static int __init qcom_pm_runtime_init(void)
-+{
-+	pm_clk_add_notifier(&platform_bus_type, &qcom_pm_notifier);
-+	return 0;
-+}
-+core_initcall(qcom_pm_runtime_init);
+ 
+@@ -697,7 +668,6 @@ static int qup_i2c_remove(struct platform_device *pdev)
+ 	struct qup_i2c_dev *qup = platform_get_drvdata(pdev);
+ 
+ 	disable_irq(qup->irq);
+-	qup_i2c_disable_clocks(qup);
+ 	i2c_del_adapter(&qup->adap);
+ 	pm_runtime_disable(qup->dev);
+ 	pm_runtime_set_suspended(qup->dev);
+@@ -707,43 +677,31 @@ static int qup_i2c_remove(struct platform_device *pdev)
+ #ifdef CONFIG_PM
+ static int qup_i2c_pm_suspend_runtime(struct device *device)
+ {
++	u32 config;
+ 	struct qup_i2c_dev *qup = dev_get_drvdata(device);
+ 
+ 	dev_dbg(device, "pm_runtime: suspending...\n");
+-	qup_i2c_disable_clocks(qup);
++	qup_i2c_change_state(qup, QUP_RESET_STATE);
++	config = readl(qup->base + QUP_CONFIG);
++	config |= QUP_CLOCK_AUTO_GATE;
++	writel(config, qup->base + QUP_CONFIG);
+ 	return 0;
+ }
+ 
+ static int qup_i2c_pm_resume_runtime(struct device *device)
+ {
++	u32 config;
+ 	struct qup_i2c_dev *qup = dev_get_drvdata(device);
+ 
+-	dev_dbg(device, "pm_runtime: resuming...\n");
+-	qup_i2c_enable_clocks(qup);
+-	return 0;
+-}
+-#endif
+-
+-#ifdef CONFIG_PM_SLEEP
+-static int qup_i2c_suspend(struct device *device)
+-{
+-	qup_i2c_pm_suspend_runtime(device);
+-	return 0;
+-}
+-
+-static int qup_i2c_resume(struct device *device)
+-{
+-	qup_i2c_pm_resume_runtime(device);
+-	pm_runtime_mark_last_busy(device);
+-	pm_request_autosuspend(device);
++	dev_dbg(device, "pm_runtime: suspending...\n");
++	config = readl(qup->base + QUP_CONFIG);
++	config &= ~QUP_CLOCK_AUTO_GATE;
++	writel(config, qup->base + QUP_CONFIG);
+ 	return 0;
+ }
+ #endif
+ 
+ static const struct dev_pm_ops qup_i2c_qup_pm_ops = {
+-	SET_SYSTEM_SLEEP_PM_OPS(
+-		qup_i2c_suspend,
+-		qup_i2c_resume)
+ 	SET_RUNTIME_PM_OPS(
+ 		qup_i2c_pm_suspend_runtime,
+ 		qup_i2c_pm_resume_runtime,
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
