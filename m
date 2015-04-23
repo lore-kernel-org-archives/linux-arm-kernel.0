@@ -1,63 +1,52 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 23 Apr 2015 11:21:15 +0200
-Subject: [PATCH 4/4] ARM: dts: mediatek mt8135: Use real UART clocks
+Date: Thu, 23 Apr 2015 11:21:13 +0200
+Subject: [PATCH 2/4] ARM: dts: mt8135: Add pmic wrapper nodes
 In-Reply-To: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
 References: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1429780875-29096-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1429780875-29096-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We used to provide dummy clocks for the UART. Now that we have
-common clock support we can provide the real clocks to the UART.
+This adds the pmic wrapper node to the MediaTek MT8135 dtsi file.
+
+This unit is used to access the PMIC on MediaTek boards.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/mt8135.dtsi | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/mt8135.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-index b0f20fc..4d1ddd9 100644
+index b4017e2..b0f20fc 100644
 --- a/arch/arm/boot/dts/mt8135.dtsi
 +++ b/arch/arm/boot/dts/mt8135.dtsi
-@@ -180,7 +180,8 @@
- 			compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
- 			reg = <0 0x11006000 0 0x400>;
- 			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
--			clocks = <&uart_clk>;
-+			clocks = <&pericfg CLK_PERI_UART0_SEL>, <&pericfg CLK_PERI_UART0>;
-+			clock-names = "baud", "bus";
- 			status = "disabled";
+@@ -15,6 +15,7 @@
+ #include <dt-bindings/clock/mt8135-clk.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/reset-controller/mt8135-resets.h>
+ #include "skeleton64.dtsi"
+ 
+ / {
+@@ -127,6 +128,19 @@
+ 			reg = <0 0x10003000 0 0x1000>;
  		};
  
-@@ -188,7 +189,8 @@
- 			compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
- 			reg = <0 0x11007000 0 0x400>;
- 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
--			clocks = <&uart_clk>;
-+			clocks = <&pericfg CLK_PERI_UART1_SEL>, <&pericfg CLK_PERI_UART1>;
-+			clock-names = "baud", "bus";
- 			status = "disabled";
- 		};
- 
-@@ -196,7 +198,8 @@
- 			compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
- 			reg = <0 0x11008000 0 0x400>;
- 			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
--			clocks = <&uart_clk>;
-+			clocks = <&pericfg CLK_PERI_UART2_SEL>, <&pericfg CLK_PERI_UART2>;
-+			clock-names = "baud", "bus";
- 			status = "disabled";
- 		};
- 
-@@ -204,7 +207,8 @@
- 			compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
- 			reg = <0 0x11009000 0 0x400>;
- 			interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
--			clocks = <&uart_clk>;
-+			clocks = <&pericfg CLK_PERI_UART3_SEL>, <&pericfg CLK_PERI_UART3>;
-+			clock-names = "baud", "bus";
- 			status = "disabled";
- 		};
- 
++		pwrap: pwrap at 1000f000 {
++			compatible = "mediatek,mt8135-pwrap";
++			reg = <0 0x1000f000 0 0x1000>,
++				<0 0x11017000 0 0x1000>;
++			reg-names = "pwrap", "pwrap-bridge";
++			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&infracfg MT8135_INFRA_PMIC_WRAP_RST>,
++					<&pericfg MT8135_PERI_PWRAP_BRIDGE_SW_RST>;
++			reset-names = "pwrap", "pwrap-bridge";
++			clocks = <&clk26m>, <&clk26m>;
++			clock-names = "spi", "wrap";
++		};
++
+ 		timer: timer at 10008000 {
+ 			compatible = "mediatek,mt8135-timer",
+ 					"mediatek,mt6577-timer";
 -- 
 2.1.4
