@@ -1,21 +1,41 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 22 Apr 2015 18:18:08 -0700
-Subject: [PATCH v2] ata: ahci_st: fixup layering violations / drvdata
- errors
-In-Reply-To: <1429537265-22367-1-git-send-email-peter.griffin@linaro.org>
-References: <1429537265-22367-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150423011808.GY32500@ld-irv-0074>
+From: cbz@baozis.org (Chen Baozi)
+Date: Thu, 23 Apr 2015 10:33:08 +0800
+Subject: [Xen-devel] [PATCH] xen: Add __GFP_DMA flag when
+ xen_swiotlb_init gets free pages.
+In-Reply-To: <alpine.DEB.2.02.1504211203520.3112@kaball.uk.xensource.com>
+References: <1429526904-27176-1-git-send-email-cbz@baozis.org>
+ <5534DABB.5060305@citrix.com> <20150420110729.GA27707@cbz-thinkpad>
+ <5534EAE3.8060403@citrix.com>
+ <alpine.DEB.2.02.1504201828380.30125@kaball.uk.xensource.com>
+ <1429603030.6174.21.camel@citrix.com>
+ <alpine.DEB.2.02.1504211115300.3112@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1504211203520.3112@kaball.uk.xensource.com>
+Message-ID: <20150423023308.GB7783@cbz-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 02:41:04PM +0100, Peter Griffin wrote:
-> Brian - I'm not sure of the correct patch etiquette here. Currently I have
-> taken authorship of the patch and added a "Suggested-by" tag on the V2.
-> Maybe I should have also kept your "Signed-off-by" or done something else?
-> Please let me know if this is OK or if you would like something changed.
+On Tue, Apr 21, 2015 at 12:11:01PM +0100, Stefano Stabellini wrote:
+> Chen,
+> could you please try the patch below in your repro scenario?
+> I have only build tested it.
+> 
+> ---
+> 
+> xen: Add __GFP_DMA flag when xen_swiotlb_init gets free pages on ARM
+> 
+> From: Chen Baozi <baozich@gmail.com>
+> 
+> Make sure that xen_swiotlb_init allocates buffers that are DMA capable
+> when at least one memblock is available below 4G. Otherwise we assume
+> that all devices on the SoC can cope with >4G addresses.
+> 
+> No functional changes on x86.
+> 
+> Signed-off-by: Chen Baozi <baozich@gmail.com>
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-No problem. 'Suggested-by' seems appropriate to me.
+Tested-by: Chen Baozi <baozich@gmail.com>
 
-For the patch:
+Cheers,
 
-Acked-by: Brian Norris <computersforpeace@gmail.com>
+Baozi
