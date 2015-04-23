@@ -1,44 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 23 Apr 2015 11:46:25 +0100
-Subject: [PATCH 1/2] arm64: Mark PMU interrupt IRQF_NO_THREAD
-In-Reply-To: <1429628755-22492-2-git-send-email-anders.roxell@linaro.org>
-References: <1429628755-22492-1-git-send-email-anders.roxell@linaro.org>
- <1429628755-22492-2-git-send-email-anders.roxell@linaro.org>
-Message-ID: <20150423104624.GD1652@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 23 Apr 2015 07:55:36 -0300
+Subject: [PATCH] ARM: dts: imx25: Add missing '#pwm-cells' property for
+ pwm4
+In-Reply-To: <20150422141449.GI21413@pengutronix.de>
+References: <1429706430-9495-1-git-send-email-fabio.estevam@freescale.com>
+ <20150422141449.GI21413@pengutronix.de>
+Message-ID: <CAOMZO5CyU6nLwdD-dBKQRma6fCxD99-GHXDUYe0D_8ECnDZhrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 21, 2015 at 04:05:54PM +0100, Anders Roxell wrote:
-> Mark the PMU interrupts as non-threadable, as is the case with
-> arch/arm: d9c3365 ARM: 7813/1: Mark pmu interupt IRQF_NO_THREAD
-> 
-> Suggested-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
-> ---
->  arch/arm64/kernel/perf_event.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Markus,
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+On Wed, Apr 22, 2015 at 11:14 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> Hi Fabio,
+>
+> On Wed, Apr 22, 2015 at 09:40:30AM -0300, Fabio Estevam wrote:
+>> All pwm ports pass the '#pwm-cells' property, except pw4.
+>>
+>> Fix it by passing '#pwm-cells' property for pwm4.
+>
+> I already sent the same patch a month ago [1]. Forgot to resend it.
 
-Catalin can queue this for 4.2.
+Ok, I haven't seen it. Could you please resend it with stable on Cc?
 
-Cheers,
-
-Will
-
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 195991d..7db5c84 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -488,7 +488,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->  			}
->  
->  			err = request_irq(irq, armpmu->handle_irq,
-> -					IRQF_NOBALANCING,
-> +					IRQF_NOBALANCING | IRQF_NO_THREAD,
->  					"arm-pmu", armpmu);
->  			if (err) {
->  				pr_err("unable to request IRQ%d for ARM PMU counters\n",
-> -- 
-> 2.1.4
-> 
+Thanks
