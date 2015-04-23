@@ -1,38 +1,67 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 23 Apr 2015 18:55:44 +0200
-Subject: [PATCHv7 0/2] INPUT: Route keyboard LEDs through the generic
- LEDs layer
-In-Reply-To: <20150402144410.GB18125@amd>
-References: <20150217191527.GA9594@type.youpi.perso.aquilenet.fr>
- <201504012200.07408@pali>
- <20150401211140.GI2901@type.youpi.perso.aquilenet.fr>
- <20150402144410.GB18125@amd>
-Message-ID: <20150423165544.GG7646@pali>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 23 Apr 2015 12:59:51 -0400
+Subject: [PATCH 10/11] coresight-etm4x: Controls pertaining to the
+ context ID functions
+In-Reply-To: <CANLsYkw-XwEW9gaXVr07fqHspZU+Vo7FukN7Qz6S07L6jC5ENA@mail.gmail.com>
+References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>	<1429742451-11465-11-git-send-email-mathieu.poirier@linaro.org>	<55390B05.1050801@codeaurora.org>
+ <CANLsYkw-XwEW9gaXVr07fqHspZU+Vo7FukN7Qz6S07L6jC5ENA@mail.gmail.com>
+Message-ID: <55392507.1030103@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 April 2015 16:44:10 Pavel Machek wrote:
-> On Wed 2015-04-01 23:11:40, Samuel Thibault wrote:
-> > Pali Roh?r, le Wed 01 Apr 2015 22:00:07 +0200, a ?crit :
-> > > On Tuesday 17 February 2015 20:15:27 Samuel Thibault wrote:
-> > > > Here is an updated version to fix the initialization of the
-> > > > vt_led_work queues before registering LEDs, and refresh
-> > > > against 3.19.
-> > > 
-> > > Hello! I would like to ask when will be this patch series merged 
-> > > into mainline kernel? Are there still some problems with it?
-> > 
-> > There are no known problems ATM.
+On 04/23/2015 11:16 AM, Mathieu Poirier wrote:
+> On 23 April 2015 at 09:08, Christopher Covington <cov@codeaurora.org> wrote:
+>> Hi Mathieu,
+>>
+>> On 04/22/2015 06:40 PM, Mathieu Poirier wrote:
+>>> From: Pratik Patel <pratikp@codeaurora.org>
+>>>
+>>> Adding sysfs entries to access and configure specifics about the
+>>> context ID comparator functions.
+>>>
+>>> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+>>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> ---
+>>>  .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  19 +++
+>>>  drivers/hwtracing/coresight/coresight-etm4x.c      | 187 +++++++++++++++++++++
+>>>  2 files changed, 206 insertions(+)
+>>>
+>>> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+>>> index b5c0456290ab..8b32cb7b9723 100644
+>>> --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+>>> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+>>> @@ -254,3 +254,22 @@ Date:            April 2015
+>>>  KernelVersion:       4.01
+>>>  Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
+>>>  Description:         (RW) Controls the selection of the resources in the trace unit.
+>>> +
+>>> +What:                /sys/bus/coresight/devices/<memory_map>.etm/ctxid_idx
+>>> +Date:                April 2015
+>>> +KernelVersion:       4.01
+>>> +Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> +Description: (RW) Select which context ID comparator to work with.
+>>> +
+>>> +What:                /sys/bus/coresight/devices/<memory_map>.etm/ctxid_val
+>>> +Date:                April 2015
+>>> +KernelVersion:       4.01
+>>> +Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> +Description: (RW) Get/Set the context ID comparator value to trigger on.
+>>
+>> If I'm understanding this correctly, ctxid_val is multiplexed using ctxid_idx.
+>> Why not just have ctxid_val0, ctxid_val1, ...?
 > 
-> I thought it made it to -next, but apparently not.
-> 
-> Dmitry, can you comment what needs to be done, or just merge it,
-> please?
-> 
-> 									Pavel
+> There can be up to 8 of them on the current implementation and who
+> knows how many more in the future.  To me using and index to select
+> the context ID to work on scaled better and is introducing less
+> clutter in sysfs.
 
-Dmitry, can you merge this patch?
+In theory there's a race condition if two tasks are trying to set the index
+and then the value, which having individually addressable values solves, but I
+don't anticipate trying to use more than one task to configure tracing.
+
+Chris
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
