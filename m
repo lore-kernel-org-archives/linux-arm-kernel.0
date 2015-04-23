@@ -1,57 +1,68 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 23 Apr 2015 11:08:53 -0400
-Subject: [PATCH 10/11] coresight-etm4x: Controls pertaining to the
- context ID functions
-In-Reply-To: <1429742451-11465-11-git-send-email-mathieu.poirier@linaro.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 23 Apr 2015 09:16:05 -0600
+Subject: [PATCH 10/11] coresight-etm4x: Controls pertaining to the context
+ ID functions
+In-Reply-To: <55390B05.1050801@codeaurora.org>
 References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
  <1429742451-11465-11-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <55390B05.1050801@codeaurora.org>
+ <55390B05.1050801@codeaurora.org>
+Message-ID: <CANLsYkw-XwEW9gaXVr07fqHspZU+Vo7FukN7Qz6S07L6jC5ENA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+On 23 April 2015 at 09:08, Christopher Covington <cov@codeaurora.org> wrote:
+> Hi Mathieu,
+>
+> On 04/22/2015 06:40 PM, Mathieu Poirier wrote:
+>> From: Pratik Patel <pratikp@codeaurora.org>
+>>
+>> Adding sysfs entries to access and configure specifics about the
+>> context ID comparator functions.
+>>
+>> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>  .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  19 +++
+>>  drivers/hwtracing/coresight/coresight-etm4x.c      | 187 +++++++++++++++++++++
+>>  2 files changed, 206 insertions(+)
+>>
+>> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+>> index b5c0456290ab..8b32cb7b9723 100644
+>> --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+>> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+>> @@ -254,3 +254,22 @@ Date:            April 2015
+>>  KernelVersion:       4.01
+>>  Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
+>>  Description:         (RW) Controls the selection of the resources in the trace unit.
+>> +
+>> +What:                /sys/bus/coresight/devices/<memory_map>.etm/ctxid_idx
+>> +Date:                April 2015
+>> +KernelVersion:       4.01
+>> +Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
+>> +Description: (RW) Select which context ID comparator to work with.
+>> +
+>> +What:                /sys/bus/coresight/devices/<memory_map>.etm/ctxid_val
+>> +Date:                April 2015
+>> +KernelVersion:       4.01
+>> +Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
+>> +Description: (RW) Get/Set the context ID comparator value to trigger on.
+>
+> If I'm understanding this correctly, ctxid_val is multiplexed using ctxid_idx.
+> Why not just have ctxid_val0, ctxid_val1, ...?
 
-On 04/22/2015 06:40 PM, Mathieu Poirier wrote:
-> From: Pratik Patel <pratikp@codeaurora.org>
-> 
-> Adding sysfs entries to access and configure specifics about the
-> context ID comparator functions.
-> 
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  19 +++
->  drivers/hwtracing/coresight/coresight-etm4x.c      | 187 +++++++++++++++++++++
->  2 files changed, 206 insertions(+)
-> 
-> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-> index b5c0456290ab..8b32cb7b9723 100644
-> --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-> @@ -254,3 +254,22 @@ Date:		April 2015
->  KernelVersion:	4.01
->  Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
->  Description: 	(RW) Controls the selection of the resources in the trace unit.
-> +
-> +What:		/sys/bus/coresight/devices/<memory_map>.etm/ctxid_idx
-> +Date:		April 2015
-> +KernelVersion:	4.01
-> +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-> +Description:	(RW) Select which context ID comparator to work with.
-> +
-> +What:		/sys/bus/coresight/devices/<memory_map>.etm/ctxid_val
-> +Date:		April 2015
-> +KernelVersion:	4.01
-> +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-> +Description:	(RW) Get/Set the context ID comparator value to trigger on.
+There can be up to 8 of them on the current implementation and who
+knows how many more in the future.  To me using and index to select
+the context ID to work on scaled better and is introducing less
+clutter in sysfs.
 
-If I'm understanding this correctly, ctxid_val is multiplexed using ctxid_idx.
-Why not just have ctxid_val0, ctxid_val1, ...?
+Thanks for the review,
+Mathieu
 
-Thanks,
-Chris
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>
+> Thanks,
+> Chris
+>
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
