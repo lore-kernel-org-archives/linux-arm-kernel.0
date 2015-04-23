@@ -1,10 +1,10 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 23 Apr 2015 14:03:11 +0530
-Subject: [PATCH 3/5] arm: omap1: remove boilerplate code and use
+Date: Thu, 23 Apr 2015 14:03:12 +0530
+Subject: [PATCH 4/5] arm: davinci: remove boilerplate code and use
  USE_PM_CLK_RUNTIME_OPS
 In-Reply-To: <1429777993-11702-1-git-send-email-rnayak@codeaurora.org>
 References: <1429777993-11702-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1429777993-11702-4-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1429777993-11702-5-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,19 +17,19 @@ Reviewed-by: Kevin Hilman <khilman@linaro.org>
 Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-omap1/pm_bus.c | 37 ++-----------------------------------
- 1 file changed, 2 insertions(+), 35 deletions(-)
+ arch/arm/mach-davinci/pm_domain.c | 32 +-------------------------------
+ 1 file changed, 1 insertion(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
-index c40e209..667c163 100644
---- a/arch/arm/mach-omap1/pm_bus.c
-+++ b/arch/arm/mach-omap1/pm_bus.c
-@@ -21,48 +21,15 @@
- 
- #include "soc.h"
+diff --git a/arch/arm/mach-davinci/pm_domain.c b/arch/arm/mach-davinci/pm_domain.c
+index 641edc3..78eac2c 100644
+--- a/arch/arm/mach-davinci/pm_domain.c
++++ b/arch/arm/mach-davinci/pm_domain.c
+@@ -14,39 +14,9 @@
+ #include <linux/pm_clock.h>
+ #include <linux/platform_device.h>
  
 -#ifdef CONFIG_PM
--static int omap1_pm_runtime_suspend(struct device *dev)
+-static int davinci_pm_runtime_suspend(struct device *dev)
 -{
 -	int ret;
 -
@@ -48,33 +48,23 @@ index c40e209..667c163 100644
 -	return 0;
 -}
 -
--static int omap1_pm_runtime_resume(struct device *dev)
+-static int davinci_pm_runtime_resume(struct device *dev)
 -{
 -	dev_dbg(dev, "%s\n", __func__);
 -
 -	pm_clk_resume(dev);
 -	return pm_generic_runtime_resume(dev);
 -}
+-#endif
 -
- static struct dev_pm_domain default_pm_domain = {
+ static struct dev_pm_domain davinci_pm_domain = {
  	.ops = {
--		.runtime_suspend = omap1_pm_runtime_suspend,
--		.runtime_resume = omap1_pm_runtime_resume,
+-		SET_RUNTIME_PM_OPS(davinci_pm_runtime_suspend,
+-				   davinci_pm_runtime_resume, NULL)
 +		USE_PM_CLK_RUNTIME_OPS
  		USE_PLATFORM_PM_SLEEP_OPS
  	},
  };
--#define OMAP1_PM_DOMAIN (&default_pm_domain)
--#else
--#define OMAP1_PM_DOMAIN NULL
--#endif /* CONFIG_PM */
- 
- static struct pm_clk_notifier_block platform_bus_notifier = {
--	.pm_domain = OMAP1_PM_DOMAIN,
-+	.pm_domain = &default_pm_domain,
- 	.con_ids = { "ick", "fck", NULL, },
- };
- 
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
