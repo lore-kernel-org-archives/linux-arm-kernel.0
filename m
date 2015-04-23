@@ -1,424 +1,566 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Thu, 23 Apr 2015 17:26:45 +0530
-Subject: [PATCH v5] dmaengine: xgene-dma: Fix sparse wannings warnings
-Message-ID: <1429790205-13571-1-git-send-email-rsahu@apm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 23 Apr 2015 14:01:52 +0200
+Subject: [PATCH 1/2] cpufreq: mediatek: Add MT8173 cpufreq driver
+In-Reply-To: <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
+References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <20150423120152.GM6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v5 changes:
-	* Re-pull v3 changes that I missed in v4
+On Mon, Apr 20, 2015 at 05:27:26PM +0800, pi-cheng.chen wrote:
+> This patch implements MT8173 specific cpufreq driver with OPP table defined
+> in the driver code.
+> 
+> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
+> ---
+>  drivers/cpufreq/Kconfig.arm      |   6 +
+>  drivers/cpufreq/Makefile         |   1 +
+>  drivers/cpufreq/mt8173-cpufreq.c | 509 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 516 insertions(+)
+>  create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
+> 
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 1b06fc4..25643c7 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -132,6 +132,12 @@ config ARM_KIRKWOOD_CPUFREQ
+>  	  This adds the CPUFreq driver for Marvell Kirkwood
+>  	  SoCs.
+>  
+> +config ARM_MT8173_CPUFREQ
+> +	bool "Mediatek MT8173 CPUFreq support"
+> +	depends on ARCH_MEDIATEK && REGULATOR
+> +	help
+> +	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
+> +
+>  config ARM_OMAP2PLUS_CPUFREQ
+>  	bool "TI OMAP2+"
+>  	depends on ARCH_OMAP2PLUS
+> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> index 82a1821..da9d616 100644
+> --- a/drivers/cpufreq/Makefile
+> +++ b/drivers/cpufreq/Makefile
+> @@ -62,6 +62,7 @@ obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
+>  obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
+>  obj-$(CONFIG_ARM_INTEGRATOR)		+= integrator-cpufreq.o
+>  obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
+> +obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
+>  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+>  obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
+>  obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
+> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+> new file mode 100644
+> index 0000000..a310e72
+> --- /dev/null
+> +++ b/drivers/cpufreq/mt8173-cpufreq.c
+> @@ -0,0 +1,509 @@
+> +/*
+> +* Copyright (c) 2015 Linaro Ltd.
+> +* Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> +*
+> +* This program is free software; you can redistribute it and/or modify
+> +* it under the terms of the GNU General Public License version 2 as
+> +* published by the Free Software Foundation.
+> +*
+> +* This program is distributed in the hope that it will be useful,
+> +* but WITHOUT ANY WARRANTY; without even the implied warranty of
+> +* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> +* GNU General Public License for more details.
+> +*/
+> +
+> +#include <linux/clk.h>
+> +#include <linux/cpu.h>
+> +#include <linux/cpufreq.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/slab.h>
+> +
+> +#define MIN_VOLT_SHIFT		100000
+> +#define MAX_VOLT_SHIFT		200000
+> +
+> +#define OPP(f, vp, vs) {		\
+> +		.freq	= f,		\
+> +		.vproc	= vp,		\
+> +		.vsram	= vs,		\
+> +	}
+> +
+> +struct mtk_cpu_opp {
+> +	unsigned int freq;
+> +	int vproc;
+> +	int vsram;
+> +};
+> +
+> +/*
+> + * The struct cpu_dvfs_info holds necessary information for doing CPU DVFS of
+> + * each cluster. For Mediatek SoCs, each CPU cluster in SoC has two voltage
+> + * inputs, Vproc and Vsram. For some cluster in SoC, the two voltage inputs are
+> + * supplied by different PMICs. In this case, when scaling up/down the voltage
+> + * of Vsram and Vproc, the two voltage inputs need to be controlled under a
+> + * hardware limitation: 100mV < Vsram - Vproc < 200mV
+> + * When scaling up/down the clock frequency of a cluster, the clock source need
+> + * to be switched to another stable PLL clock temporarily, and switched back to
+> + * the original PLL after the it becomes stable at target frequency.
+> + * Hence the voltage inputs of cluster need to be set to an intermediate voltage
+> + * before the clock frequency being scaled up/down.
+> + */
+> +
+> +struct cpu_dvfs_info {
+> +	cpumask_t cpus;
+> +
+> +	struct mtk_cpu_opp *opp_tbl;
+> +	struct mtk_cpu_opp *intermediate_opp;
+> +	int nr_opp;
+> +
+> +	struct regulator *proc_reg;
+> +	struct regulator *sram_reg;
+> +	struct clk *cpu_clk;
+> +	struct clk *inter_pll;
+> +};
+> +
+> +/*
+> + * This is a temporary solution until we have new OPPv2 bindings. Therefore we
+> + * could describe the OPPs with (freq, volt, volt) tuple properly in device
+> + * tree.
+> + */
+> +
+> +/* OPP table for LITTLE cores of MT8173 */
+> +struct mtk_cpu_opp mt8173_l_opp[] = {
+> +	OPP(507000000, 859000, 0),
+> +	OPP(702000000, 908000, 0),
+> +	OPP(1001000000, 983000, 0),
+> +	OPP(1105000000, 1009000, 0),
+> +	OPP(1183000000, 1028000, 0),
+> +	OPP(1404000000, 1083000, 0),
+> +	OPP(1508000000, 1109000, 0),
+> +	OPP(1573000000, 1125000, 0),
+> +};
+> +
+> +/* OPP table for big cores of MT8173 */
+> +struct mtk_cpu_opp mt8173_b_opp[] = {
+> +	OPP(507000000, 828000, 928000),
+> +	OPP(702000000, 867000, 967000),
+> +	OPP(1001000000, 927000, 1027000),
+> +	OPP(1209000000, 968000, 1068000),
+> +	OPP(1404000000, 1007000, 1107000),
+> +	OPP(1612000000, 1049000, 1149000),
+> +	OPP(1807000000, 1089000, 1150000),
+> +	OPP(1989000000, 1125000, 1150000),
+> +};
 
-v4 changes:
-	* Re-generate patch on top of latest for-linux git
+Do you really need the SRAM voltages? Isn't the SRAM voltage just CPU
+core voltage + 100mV +- tolerance?
 
-v3 changes:
-	* Minor changes in length setting in DMA descriptor
+> +
+> +static inline int need_voltage_trace(struct cpu_dvfs_info *info)
+> +{
+> +	return (!IS_ERR_OR_NULL(info->proc_reg) &&
+> +		!IS_ERR_OR_NULL(info->sram_reg));
+> +}
+> +
+> +static struct mtk_cpu_opp *cpu_opp_find_freq_ceil(struct mtk_cpu_opp *opp_tbl,
+> +						  int nr_opp,
+> +						  unsigned long rate)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < nr_opp; i++)
+> +		if (opp_tbl[i].freq >= rate)
+> +			return &opp_tbl[i];
+> +
+> +	return NULL;
+> +}
+> +
+> +/*
+> + * Query the exact voltage value that is largest previous to the input voltage
+> + * value supported by the regulator
+> + */
+> +static int get_regulator_voltage_ceil(struct regulator *regulator, int voltage)
+> +{
+> +	int cnt, i, volt = -1;
+> +
+> +	if (IS_ERR_OR_NULL(regulator))
+> +		return -EINVAL;
+> +
+> +	cnt = regulator_count_voltages(regulator);
+> +	for (i = 0; i < cnt && volt < voltage; i++)
+> +		volt = regulator_list_voltage(regulator, i);
+> +
+> +	return (i >= cnt) ? -EINVAL : volt;
+> +}
+> +
+> +/*
+> + * Query the exact voltage value that is smallest following to the input voltage
+> + * value supported by the regulator
+> + */
+> +static int get_regulator_voltage_floor(struct regulator *regulator, int voltage)
+> +{
+> +	int cnt, i, volt = -1;
+> +
+> +	if (IS_ERR_OR_NULL(regulator))
+> +		return -EINVAL;
+> +
+> +	cnt = regulator_count_voltages(regulator);
+> +	/* skip all trailing 0s in the list of supported voltages */
+> +	for (i = cnt - 1; i >= 0 && volt <= 0; i--)
+> +		volt = regulator_list_voltage(regulator, i);
+> +
+> +	for (; i >= 0; i--) {
+> +		volt = regulator_list_voltage(regulator, i);
+> +		if (volt <= voltage)
+> +			return volt;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static int mtk_cpufreq_voltage_trace(struct cpu_dvfs_info *info,
+> +				     struct mtk_cpu_opp *opp)
+> +{
+> +	struct regulator *proc_reg = info->proc_reg;
+> +	struct regulator *sram_reg = info->sram_reg;
+> +	int old_vproc, new_vproc, old_vsram, new_vsram, vsram, vproc, ret;
+> +
+> +	old_vproc = regulator_get_voltage(proc_reg);
+> +	old_vsram = regulator_get_voltage(sram_reg);
+> +
+> +	new_vproc = opp->vproc;
+> +	new_vsram = opp->vsram;
+> +
+> +	/*
+> +	 * In the case the voltage is going to be scaled up, Vsram and Vproc
+> +	 * need to be scaled up step by step. In each step, Vsram needs to be
+> +	 * set to (Vproc + 200mV) first, then Vproc is set to (Vsram - 100mV).
+> +	 * Repeat the step until Vsram and Vproc are set to target voltage.
+> +	 */
+> +	if (old_vproc < new_vproc) {
+> +next_up_step:
+> +		old_vsram = regulator_get_voltage(sram_reg);
+> +
+> +		vsram = (new_vsram - old_vproc < MAX_VOLT_SHIFT) ?
+> +			new_vsram : old_vproc + MAX_VOLT_SHIFT;
+> +		vsram = get_regulator_voltage_floor(sram_reg, vsram);
+> +
+> +		ret = regulator_set_voltage(sram_reg, vsram, vsram);
+> +		if (ret)
+> +			return ret;
 
-v2 changes:
-	* Code cleanup
-	* Changed way of setting DMA descriptors for big-endian
+This introspecting the regulators for possible voltages looks hacky and
+unnecessary. regulator_set_voltage() can be passed minimum and maximum
+values, why don't you use it to increase the voltage within sensible
+limit, like
 
-This patch fixes compilation sparse warnings like incorrect type in assignment
-(different base types), cast to restricted __le64, symbol
-'__UNIQUE_ID_author__COUNTER__' has multiple initializers etc.
+	regulator_set_voltage(sram_reg, old_vsram + 100000, old_vsram + 200000);
 
-This patch is based on slave-dma / for-linus branch.
-(commit: 11ebe4c067c7f95adff73594cb5c23f7a5c6d69e
-	dmaengine: fix platform_no_drv_owner.cocci warnings
+or similar?
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
----
- drivers/dma/xgene-dma.c | 174 ++++++++++++++++++------------------------------
- 1 file changed, 66 insertions(+), 108 deletions(-)
+> +
+> +		vproc = (new_vsram == vsram) ?
+> +			new_vproc : vsram - MIN_VOLT_SHIFT;
+> +		vproc = get_regulator_voltage_ceil(proc_reg, vproc);
+> +
+> +		ret = regulator_set_voltage(proc_reg, vproc, vproc);
+> +		if (ret) {
+> +			regulator_set_voltage(sram_reg, old_vsram, old_vsram);
+> +			return ret;
+> +		}
+> +
+> +		if (new_vproc == vproc && new_vsram == vsram)
+> +			return 0;
 
-diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
-index f52e3750..856610c 100755
---- a/drivers/dma/xgene-dma.c
-+++ b/drivers/dma/xgene-dma.c
-@@ -124,32 +124,8 @@
- #define XGENE_DMA_DESC_ELERR_POS		46
- #define XGENE_DMA_DESC_RTYPE_POS		56
- #define XGENE_DMA_DESC_LERR_POS			60
--#define XGENE_DMA_DESC_FLYBY_POS		4
- #define XGENE_DMA_DESC_BUFLEN_POS		48
- #define XGENE_DMA_DESC_HOENQ_NUM_POS		48
--
--#define XGENE_DMA_DESC_NV_SET(m)		\
--	(((u64 *)(m))[0] |= XGENE_DMA_DESC_NV_BIT)
--#define XGENE_DMA_DESC_IN_SET(m)		\
--	(((u64 *)(m))[0] |= XGENE_DMA_DESC_IN_BIT)
--#define XGENE_DMA_DESC_RTYPE_SET(m, v)		\
--	(((u64 *)(m))[0] |= ((u64)(v) << XGENE_DMA_DESC_RTYPE_POS))
--#define XGENE_DMA_DESC_BUFADDR_SET(m, v)	\
--	(((u64 *)(m))[0] |= (v))
--#define XGENE_DMA_DESC_BUFLEN_SET(m, v)		\
--	(((u64 *)(m))[0] |= ((u64)(v) << XGENE_DMA_DESC_BUFLEN_POS))
--#define XGENE_DMA_DESC_C_SET(m)			\
--	(((u64 *)(m))[1] |= XGENE_DMA_DESC_C_BIT)
--#define XGENE_DMA_DESC_FLYBY_SET(m, v)		\
--	(((u64 *)(m))[2] |= ((v) << XGENE_DMA_DESC_FLYBY_POS))
--#define XGENE_DMA_DESC_MULTI_SET(m, v, i)	\
--	(((u64 *)(m))[2] |= ((u64)(v) << (((i) + 1) * 8)))
--#define XGENE_DMA_DESC_DR_SET(m)		\
--	(((u64 *)(m))[2] |= XGENE_DMA_DESC_DR_BIT)
--#define XGENE_DMA_DESC_DST_ADDR_SET(m, v)	\
--	(((u64 *)(m))[3] |= (v))
--#define XGENE_DMA_DESC_H0ENQ_NUM_SET(m, v)	\
--	(((u64 *)(m))[3] |= ((u64)(v) << XGENE_DMA_DESC_HOENQ_NUM_POS))
- #define XGENE_DMA_DESC_ELERR_RD(m)		\
- 	(((m) >> XGENE_DMA_DESC_ELERR_POS) & 0x3)
- #define XGENE_DMA_DESC_LERR_RD(m)		\
-@@ -158,14 +134,7 @@
- 	(((elerr) << 4) | (lerr))
+Here you assume that the voltages can be exactly reached. That does not
+need to be the case, for example with a different PMIC.
 
- /* X-Gene DMA descriptor empty s/w signature */
--#define XGENE_DMA_DESC_EMPTY_INDEX		0
- #define XGENE_DMA_DESC_EMPTY_SIGNATURE		~0ULL
--#define XGENE_DMA_DESC_SET_EMPTY(m)		\
--	(((u64 *)(m))[XGENE_DMA_DESC_EMPTY_INDEX] =	\
--	 XGENE_DMA_DESC_EMPTY_SIGNATURE)
--#define XGENE_DMA_DESC_IS_EMPTY(m)		\
--	(((u64 *)(m))[XGENE_DMA_DESC_EMPTY_INDEX] ==	\
--	 XGENE_DMA_DESC_EMPTY_SIGNATURE)
+> +
+> +		old_vproc = vproc;
+> +		goto next_up_step;
 
- /* X-Gene DMA configurable parameters defines */
- #define XGENE_DMA_RING_NUM		512
-@@ -184,7 +153,7 @@
- #define XGENE_DMA_XOR_ALIGNMENT		6	/* 64 Bytes */
- #define XGENE_DMA_MAX_XOR_SRC		5
- #define XGENE_DMA_16K_BUFFER_LEN_CODE	0x0
--#define XGENE_DMA_INVALID_LEN_CODE	0x7800
-+#define XGENE_DMA_INVALID_LEN_CODE	0x7800000000000000ULL
+Use C loop instructions to create loops. Using gotos for loops creates
+readable code only in very rare cases (and this is not one of those)
 
- /* X-Gene DMA descriptor error codes */
- #define ERR_DESC_AXI			0x01
-@@ -214,10 +183,10 @@
- #define ERR_DESC_SRC_INT		0xB
+> +
+> +	/*
+> +	 * In the case the voltage is going to be scaled down, Vsram and Vproc
+> +	 * need to be scaled down step by step. In each step, Vproc needs to be
+> +	 * set to (Vsram - 200mV) first, then Vproc is set to (Vproc + 100mV).
+> +	 * Repeat the step until Vsram and Vproc are set to target voltage.
+> +	 */
+> +	} else if (old_vproc > new_vproc) {
+> +next_down_step:
+> +		old_vproc = regulator_get_voltage(proc_reg);
+> +
+> +		vproc = (old_vsram - new_vproc < MAX_VOLT_SHIFT) ?
+> +			new_vproc : old_vsram - MAX_VOLT_SHIFT;
+> +		vproc = get_regulator_voltage_ceil(proc_reg, vproc);
+> +
+> +		ret = regulator_set_voltage(proc_reg, vproc, vproc);
+> +		if (ret)
+> +			return ret;
+> +
+> +		vsram = (new_vproc == vproc) ?
+> +			new_vsram : vproc + MIN_VOLT_SHIFT;
+> +		vsram = get_regulator_voltage_floor(sram_reg, vsram);
+> +
+> +		ret = regulator_set_voltage(sram_reg, vsram, vsram);
+> +		if (ret) {
+> +			regulator_set_voltage(proc_reg, old_vproc, old_vproc);
+> +			return ret;
+> +		}
+> +
+> +		if (new_vproc == vproc && new_vsram == vsram)
+> +			return 0;
+> +
+> +		old_vsram = vsram;
+> +		goto next_down_step;
+> +	}
+> +
+> +	WARN_ON(1);
 
- /* X-Gene DMA flyby operation code */
--#define FLYBY_2SRC_XOR			0x8
--#define FLYBY_3SRC_XOR			0x9
--#define FLYBY_4SRC_XOR			0xA
--#define FLYBY_5SRC_XOR			0xB
-+#define FLYBY_2SRC_XOR			0x80
-+#define FLYBY_3SRC_XOR			0x90
-+#define FLYBY_4SRC_XOR			0xA0
-+#define FLYBY_5SRC_XOR			0xB0
+Why warn? You have nothing to do and that should be just fine.
 
- /* X-Gene DMA SW descriptor flags */
- #define XGENE_DMA_FLAG_64B_DESC		BIT(0)
-@@ -238,10 +207,10 @@
- 	dev_err(chan->dev, "%s: " fmt, chan->name, ##arg)
+> +	return 0;
+> +}
+> +
+> +static int mt8173_cpufreq_set_voltage(struct cpu_dvfs_info *info,
+> +				      struct mtk_cpu_opp *opp)
+> +{
+> +	if (need_voltage_trace(info))
+> +		return mtk_cpufreq_voltage_trace(info, opp);
+> +	else
+> +		return regulator_set_voltage(info->proc_reg, opp->vproc,
+> +					     opp->vproc);
+> +}
+> +
+> +static int mt8173_cpufreq_set_target(struct cpufreq_policy *policy,
+> +				     unsigned int index)
+> +{
+> +	struct cpufreq_frequency_table *freq_table = policy->freq_table;
+> +	struct clk *cpu_clk = policy->clk;
+> +	struct clk *armpll = clk_get_parent(cpu_clk);
+> +	struct cpu_dvfs_info *info;
+> +	struct mtk_cpu_opp *new_opp, *target_opp, *inter_opp, *orig_opp;
+> +	long freq_hz, orig_freq_hz;
+> +	int old_vproc, ret;
+> +
+> +	info = (struct cpu_dvfs_info *)policy->driver_data;
+> +	inter_opp = info->intermediate_opp;
+> +	orig_freq_hz = clk_get_rate(cpu_clk);
+> +	orig_opp = cpu_opp_find_freq_ceil(info->opp_tbl, info->nr_opp,
+> +					  orig_freq_hz);
+> +	if (!orig_opp)
+> +		return -EINVAL;
+> +
+> +	old_vproc = regulator_get_voltage(info->proc_reg);
+> +	freq_hz = freq_table[index].frequency * 1000;
+> +	new_opp = cpu_opp_find_freq_ceil(info->opp_tbl, info->nr_opp, freq_hz);
 
- struct xgene_dma_desc_hw {
--	u64 m0;
--	u64 m1;
--	u64 m2;
--	u64 m3;
-+	__le64 m0;
-+	__le64 m1;
-+	__le64 m2;
-+	__le64 m3;
- };
+Since the frequency table and the opp_tbl have the same indices:
 
- enum xgene_dma_ring_cfgsize {
-@@ -388,18 +357,11 @@ static bool is_pq_enabled(struct xgene_dma *pdma)
- 	return !(val & XGENE_DMA_PQ_DISABLE_MASK);
- }
+	new_opp = info->opp_tbl[index];
 
--static void xgene_dma_cpu_to_le64(u64 *desc, int count)
--{
--	int i;
--
--	for (i = 0; i < count; i++)
--		desc[i] = cpu_to_le64(desc[i]);
--}
--
--static u16 xgene_dma_encode_len(u32 len)
-+static u64 xgene_dma_encode_len(size_t len)
- {
- 	return (len < XGENE_DMA_MAX_BYTE_CNT) ?
--		len : XGENE_DMA_16K_BUFFER_LEN_CODE;
-+		((u64)len << XGENE_DMA_DESC_BUFLEN_POS) :
-+		XGENE_DMA_16K_BUFFER_LEN_CODE;
- }
+> +	target_opp = new_opp;
+> +
+> +	if (!new_opp)
+> +		return -EINVAL;
+> +
+> +	if (target_opp->vproc < inter_opp->vproc)
+> +		target_opp = info->intermediate_opp;
+> +
+> +	if (old_vproc < target_opp->vproc) {
 
- static u8 xgene_dma_encode_xor_flyby(u32 src_cnt)
-@@ -424,34 +386,50 @@ static u32 xgene_dma_ring_desc_cnt(struct xgene_dma_ring *ring)
- 	return XGENE_DMA_RING_DESC_CNT(ring_state);
- }
+old_vproc is used only once, so using regulator_get_voltage(info->proc_reg)
+directly here make the code clearer.
 
--static void xgene_dma_set_src_buffer(void *ext8, size_t *len,
-+static void xgene_dma_set_src_buffer(__le64 *ext8, size_t *len,
- 				     dma_addr_t *paddr)
- {
- 	size_t nbytes = (*len < XGENE_DMA_MAX_BYTE_CNT) ?
- 			*len : XGENE_DMA_MAX_BYTE_CNT;
+> +		ret = mt8173_cpufreq_set_voltage(info, target_opp);
+> +		if (ret) {
+> +			pr_err("cpu%d: failed to scale up voltage!\n",
+> +			       policy->cpu);
+> +			mt8173_cpufreq_set_voltage(info, orig_opp);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	ret = clk_set_parent(cpu_clk, info->inter_pll);
+> +	if (ret) {
+> +		pr_err("cpu%d: failed to re-parent cpu clock!\n",
+> +		       policy->cpu);
+> +		mt8173_cpufreq_set_voltage(info, orig_opp);
+> +		WARN_ON(1);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_set_rate(armpll, freq_hz);
+> +	if (ret) {
+> +		pr_err("cpu%d: failed to scale cpu clock rate!\n",
+> +		       policy->cpu);
+> +		clk_set_parent(cpu_clk, armpll);
+> +		mt8173_cpufreq_set_voltage(info, orig_opp);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_set_parent(cpu_clk, armpll);
+> +	if (ret) {
+> +		pr_err("cpu%d: failed to re-parent cpu clock!\n",
+> +		       policy->cpu);
+> +		mt8173_cpufreq_set_voltage(info, inter_opp);
+> +		WARN_ON(1);
+> +		return ret;
+> +	}
+> +
+> +	if (new_opp->vproc < inter_opp->vproc) {
+> +		ret = mt8173_cpufreq_set_voltage(info, new_opp);
+> +		if (ret) {
+> +			pr_err("cpu%d: failed to scale down voltage!\n",
+> +			       policy->cpu);
+> +			clk_set_parent(cpu_clk, info->inter_pll);
+> +			clk_set_rate(armpll, orig_freq_hz);
+> +			clk_set_parent(cpu_clk, armpll);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int mt8173_cpufreq_cpu_opp_fixup(struct cpu_dvfs_info *info)
+> +{
+> +	struct mtk_cpu_opp *opp_tbl = info->opp_tbl;
+> +	struct regulator *proc_reg = info->proc_reg;
+> +	struct regulator *sram_reg = info->sram_reg;
+> +	int vproc, vsram, i;
+> +
+> +	for (i = 0; i < info->nr_opp; i++) {
+> +		vproc = opp_tbl[i].vproc;
+> +		vsram = opp_tbl[i].vsram;
+> +
+> +		vproc = get_regulator_voltage_ceil(proc_reg, vproc);
+> +
+> +		if (!IS_ERR_OR_NULL(sram_reg))
+> +			vsram = get_regulator_voltage_ceil(sram_reg, vsram);
+> +
+> +		if (vproc < 0 || (!IS_ERR_OR_NULL(sram_reg) && vsram < 0)) {
+> +			pr_err("%s: Failed to get voltage setting of OPPs\n",
+> +			       __func__);
+> +			return -EINVAL;
+> +		}
+> +
+> +		opp_tbl[i].vproc = vproc;
+> +		opp_tbl[i].vsram = vsram;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int mt8173_cpufreq_dvfs_init(struct cpu_dvfs_info *info)
+> +{
+> +	struct device *cpu_dev;
+> +	struct regulator *proc_reg, *sram_reg;
+> +	struct clk *cpu_clk, *inter_pll;
+> +	unsigned long rate;
+> +	int cpu, ret;
+> +
+> +	cpu = cpumask_first(&info->cpus);
+> +
+> +try_next_cpu:
+> +	cpu_dev = get_cpu_device(cpu);
+> +	proc_reg = regulator_get_exclusive(cpu_dev, "proc");
+> +	sram_reg = regulator_get_exclusive(cpu_dev, "sram");
+> +	cpu_clk = clk_get(cpu_dev, "cpu");
+> +	inter_pll = clk_get(cpu_dev, "intermediate");
+> +
+> +	if (IS_ERR_OR_NULL(proc_reg) || IS_ERR_OR_NULL(cpu_clk) ||
+> +	    IS_ERR_OR_NULL(inter_pll)) {
+> +		cpu = cpumask_next(cpu, &info->cpus);
+> +		if (cpu >= nr_cpu_ids)
+> +			return -ENODEV;
+> +
+> +		goto try_next_cpu;
+> +	}
 
--	XGENE_DMA_DESC_BUFADDR_SET(ext8, *paddr);
--	XGENE_DMA_DESC_BUFLEN_SET(ext8, xgene_dma_encode_len(nbytes));
-+	*ext8 |= cpu_to_le64(*paddr);
-+	*ext8 |= cpu_to_le64(xgene_dma_encode_len(nbytes));
- 	*len -= nbytes;
- 	*paddr += nbytes;
- }
+Use a loop.
 
--static void xgene_dma_invalidate_buffer(void *ext8)
-+static void xgene_dma_invalidate_buffer(__le64 *ext8)
- {
--	XGENE_DMA_DESC_BUFLEN_SET(ext8, XGENE_DMA_INVALID_LEN_CODE);
-+	*ext8 |= cpu_to_le64(XGENE_DMA_INVALID_LEN_CODE);
- }
+> +
+> +	/* Both PROC and SRAM regulators are present. This is a big
+> +	 * cluster, and needs to do voltage tracing. */
+> +	if (!(IS_ERR_OR_NULL(proc_reg) || IS_ERR_OR_NULL(sram_reg))) {
+> +		info->opp_tbl = mt8173_b_opp;
+> +		info->nr_opp = sizeof(mt8173_b_opp) / sizeof(mt8173_b_opp[0]);
+> +	} else {
+> +		info->opp_tbl = mt8173_l_opp;
+> +		info->nr_opp = sizeof(mt8173_l_opp) / sizeof(mt8173_l_opp[0]);
+> +	}
+> +
+> +	info->proc_reg = proc_reg;
+> +	info->sram_reg = sram_reg;
+> +	info->cpu_clk = cpu_clk;
+> +	info->inter_pll = inter_pll;
+> +
+> +	ret = mt8173_cpufreq_cpu_opp_fixup(info);
+> +	if (ret) {
+> +		pr_err("%s: Failed to fixup opp table: %d\n", __func__, ret);
+> +		return ret;
+> +	}
+> +
+> +	rate = clk_get_rate(info->inter_pll);
+> +	info->intermediate_opp = cpu_opp_find_freq_ceil(info->opp_tbl,
+> +							info->nr_opp,
+> +							rate);
+> +	if (!info->intermediate_opp) {
+> +		pr_err("%s: Failed to setup intermediate opp\n", __func__);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void mt8173_cpufreq_dvfs_release(struct cpu_dvfs_info *info)
+> +{
+> +	regulator_put(info->proc_reg);
+> +	regulator_put(info->sram_reg);
+> +	clk_put(info->cpu_clk);
+> +	clk_put(info->inter_pll);
+> +
+> +	kfree(info);
+> +}
+> +
+> +static int mt8173_cpufreq_init(struct cpufreq_policy *policy)
+> +{
+> +	struct cpu_dvfs_info *info;
+> +	struct cpufreq_frequency_table *freq_table;
+> +	int ret, i;
+> +
+> +	info = kzalloc(sizeof(*info), GFP_KERNEL);
+> +	if (!info)
+> +		return -ENOMEM;
+> +
+> +	cpumask_copy(&info->cpus, &cpu_topology[policy->cpu].core_sibling);
+> +	ret = mt8173_cpufreq_dvfs_init(info);
+> +	if (ret) {
+> +		pr_err("%s: Failed to initialize DVFS info: %d\n", __func__,
+> +		       ret);
+> +		goto out_dvfs_release;
+> +	}
+> +
+> +	freq_table = kcalloc(info->nr_opp, sizeof(*freq_table), GFP_KERNEL);
+> +	if (!freq_table) {
+> +		ret = -ENOMEM;
+> +		goto out_dvfs_release;
+> +	}
+> +
+> +	for (i = 0; i < info->nr_opp; i++)
+> +		freq_table[i].frequency = info->opp_tbl[i].freq / 1000;
+> +
+> +	freq_table[i].frequency = CPUFREQ_TABLE_END;
 
--static void *xgene_dma_lookup_ext8(u64 *desc, int idx)
-+static __le64 *xgene_dma_lookup_ext8(struct xgene_dma_desc_hw *desc, int idx)
- {
--	return (idx % 2) ? (desc + idx - 1) : (desc + idx + 1);
-+	switch (idx) {
-+	case 0:
-+		return &desc->m1;
-+	case 1:
-+		return &desc->m0;
-+	case 2:
-+		return &desc->m3;
-+	case 3:
-+		return &desc->m2;
-+	default:
-+		pr_err("Invalid dma descriptor index\n");
-+	}
-+
-+	return NULL;
- }
+You are corrupting memory here.
 
--static void xgene_dma_init_desc(void *desc, u16 dst_ring_num)
-+static void xgene_dma_init_desc(struct xgene_dma_desc_hw *desc,
-+				u16 dst_ring_num)
- {
--	XGENE_DMA_DESC_C_SET(desc); /* Coherent IO */
--	XGENE_DMA_DESC_IN_SET(desc);
--	XGENE_DMA_DESC_H0ENQ_NUM_SET(desc, dst_ring_num);
--	XGENE_DMA_DESC_RTYPE_SET(desc, XGENE_DMA_RING_OWNER_DMA);
-+	desc->m0 |= cpu_to_le64(XGENE_DMA_DESC_IN_BIT);
-+	desc->m0 |= cpu_to_le64((u64)XGENE_DMA_RING_OWNER_DMA <<
-+				XGENE_DMA_DESC_RTYPE_POS);
-+	desc->m1 |= cpu_to_le64(XGENE_DMA_DESC_C_BIT);
-+	desc->m3 |= cpu_to_le64((u64)dst_ring_num <<
-+				XGENE_DMA_DESC_HOENQ_NUM_POS);
- }
+Sascha
 
- static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
-@@ -459,7 +437,7 @@ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
- 				    dma_addr_t dst, dma_addr_t src,
- 				    size_t len)
- {
--	void *desc1, *desc2;
-+	struct xgene_dma_desc_hw *desc1, *desc2;
- 	int i;
 
- 	/* Get 1st descriptor */
-@@ -467,23 +445,21 @@ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
- 	xgene_dma_init_desc(desc1, chan->tx_ring.dst_ring_num);
-
- 	/* Set destination address */
--	XGENE_DMA_DESC_DR_SET(desc1);
--	XGENE_DMA_DESC_DST_ADDR_SET(desc1, dst);
-+	desc1->m2 |= cpu_to_le64(XGENE_DMA_DESC_DR_BIT);
-+	desc1->m3 |= cpu_to_le64(dst);
-
- 	/* Set 1st source address */
--	xgene_dma_set_src_buffer(desc1 + 8, &len, &src);
-+	xgene_dma_set_src_buffer(&desc1->m1, &len, &src);
-
--	if (len <= 0) {
--		desc2 = NULL;
--		goto skip_additional_src;
--	}
-+	if (!len)
-+		return;
-
- 	/*
- 	 * We need to split this source buffer,
- 	 * and need to use 2nd descriptor
- 	 */
- 	desc2 = &desc_sw->desc2;
--	XGENE_DMA_DESC_NV_SET(desc1);
-+	desc1->m0 |= cpu_to_le64(XGENE_DMA_DESC_NV_BIT);
-
- 	/* Set 2nd to 5th source address */
- 	for (i = 0; i < 4 && len; i++)
-@@ -496,12 +472,6 @@ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
-
- 	/* Updated flag that we have prepared 64B descriptor */
- 	desc_sw->flags |= XGENE_DMA_FLAG_64B_DESC;
--
--skip_additional_src:
--	/* Hardware stores descriptor in little endian format */
--	xgene_dma_cpu_to_le64(desc1, 4);
--	if (desc2)
--		xgene_dma_cpu_to_le64(desc2, 4);
- }
-
- static void xgene_dma_prep_xor_desc(struct xgene_dma_chan *chan,
-@@ -510,7 +480,7 @@ static void xgene_dma_prep_xor_desc(struct xgene_dma_chan *chan,
- 				    u32 src_cnt, size_t *nbytes,
- 				    const u8 *scf)
- {
--	void *desc1, *desc2;
-+	struct xgene_dma_desc_hw *desc1, *desc2;
- 	size_t len = *nbytes;
- 	int i;
-
-@@ -521,28 +491,24 @@ static void xgene_dma_prep_xor_desc(struct xgene_dma_chan *chan,
- 	xgene_dma_init_desc(desc1, chan->tx_ring.dst_ring_num);
-
- 	/* Set destination address */
--	XGENE_DMA_DESC_DR_SET(desc1);
--	XGENE_DMA_DESC_DST_ADDR_SET(desc1, *dst);
-+	desc1->m2 |= cpu_to_le64(XGENE_DMA_DESC_DR_BIT);
-+	desc1->m3 |= cpu_to_le64(*dst);
-
- 	/* We have multiple source addresses, so need to set NV bit*/
--	XGENE_DMA_DESC_NV_SET(desc1);
-+	desc1->m0 |= cpu_to_le64(XGENE_DMA_DESC_NV_BIT);
-
- 	/* Set flyby opcode */
--	XGENE_DMA_DESC_FLYBY_SET(desc1, xgene_dma_encode_xor_flyby(src_cnt));
-+	desc1->m2 |= cpu_to_le64(xgene_dma_encode_xor_flyby(src_cnt));
-
- 	/* Set 1st to 5th source addresses */
- 	for (i = 0; i < src_cnt; i++) {
- 		len = *nbytes;
--		xgene_dma_set_src_buffer((i == 0) ? (desc1 + 8) :
-+		xgene_dma_set_src_buffer((i == 0) ? &desc1->m1 :
- 					 xgene_dma_lookup_ext8(desc2, i - 1),
- 					 &len, &src[i]);
--		XGENE_DMA_DESC_MULTI_SET(desc1, scf[i], i);
-+		desc1->m2 |= cpu_to_le64((scf[i] << ((i + 1) * 8)));
- 	}
-
--	/* Hardware stores descriptor in little endian format */
--	xgene_dma_cpu_to_le64(desc1, 4);
--	xgene_dma_cpu_to_le64(desc2, 4);
--
- 	/* Update meta data */
- 	*nbytes = len;
- 	*dst += XGENE_DMA_MAX_BYTE_CNT;
-@@ -738,7 +704,7 @@ static int xgene_chan_xfer_request(struct xgene_dma_ring *ring,
-  * xgene_chan_xfer_ld_pending - push any pending transactions to hw
-  * @chan : X-Gene DMA channel
-  *
-- * LOCKING: must hold chan->desc_lock
-+ * LOCKING: must hold chan->lock
-  */
- static void xgene_chan_xfer_ld_pending(struct xgene_dma_chan *chan)
- {
-@@ -808,7 +774,8 @@ static void xgene_dma_cleanup_descriptors(struct xgene_dma_chan *chan)
- 		desc_hw = &ring->desc_hw[ring->head];
-
- 		/* Check if this descriptor has been completed */
--		if (unlikely(XGENE_DMA_DESC_IS_EMPTY(desc_hw)))
-+		if (unlikely(le64_to_cpu(desc_hw->m0) ==
-+			     XGENE_DMA_DESC_EMPTY_SIGNATURE))
- 			break;
-
- 		if (++ring->head == ring->slots)
-@@ -842,7 +809,7 @@ static void xgene_dma_cleanup_descriptors(struct xgene_dma_chan *chan)
- 		iowrite32(-1, ring->cmd);
-
- 		/* Mark this hw descriptor as processed */
--		XGENE_DMA_DESC_SET_EMPTY(desc_hw);
-+		desc_hw->m0 = cpu_to_le64(XGENE_DMA_DESC_EMPTY_SIGNATURE);
-
- 		xgene_dma_run_tx_complete_actions(chan, desc_sw);
-
-@@ -889,7 +856,7 @@ static int xgene_dma_alloc_chan_resources(struct dma_chan *dchan)
-  * @chan: X-Gene DMA channel
-  * @list: the list to free
-  *
-- * LOCKING: must hold chan->desc_lock
-+ * LOCKING: must hold chan->lock
-  */
- static void xgene_dma_free_desc_list(struct xgene_dma_chan *chan,
- 				     struct list_head *list)
-@@ -900,15 +867,6 @@ static void xgene_dma_free_desc_list(struct xgene_dma_chan *chan,
- 		xgene_dma_clean_descriptor(chan, desc);
- }
-
--static void xgene_dma_free_tx_desc_list(struct xgene_dma_chan *chan,
--					struct list_head *list)
--{
--	struct xgene_dma_desc_sw *desc, *_desc;
--
--	list_for_each_entry_safe(desc, _desc, list, node)
--		xgene_dma_clean_descriptor(chan, desc);
--}
--
- static void xgene_dma_free_chan_resources(struct dma_chan *dchan)
- {
- 	struct xgene_dma_chan *chan = to_dma_chan(dchan);
-@@ -985,7 +943,7 @@ fail:
- 	if (!first)
- 		return NULL;
-
--	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
-+	xgene_dma_free_desc_list(chan, &first->tx_list);
- 	return NULL;
- }
-
-@@ -1093,7 +1051,7 @@ fail:
- 	if (!first)
- 		return NULL;
-
--	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
-+	xgene_dma_free_desc_list(chan, &first->tx_list);
- 	return NULL;
- }
-
-@@ -1141,7 +1099,7 @@ fail:
- 	if (!first)
- 		return NULL;
-
--	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
-+	xgene_dma_free_desc_list(chan, &first->tx_list);
- 	return NULL;
- }
-
-@@ -1218,7 +1176,7 @@ fail:
- 	if (!first)
- 		return NULL;
-
--	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
-+	xgene_dma_free_desc_list(chan, &first->tx_list);
- 	return NULL;
- }
-
-@@ -1316,7 +1274,6 @@ static void xgene_dma_setup_ring(struct xgene_dma_ring *ring)
- {
- 	void *ring_cfg = ring->state;
- 	u64 addr = ring->desc_paddr;
--	void *desc;
- 	u32 i, val;
-
- 	ring->slots = ring->size / XGENE_DMA_RING_WQ_DESC_SIZE;
-@@ -1358,8 +1315,10 @@ static void xgene_dma_setup_ring(struct xgene_dma_ring *ring)
-
- 	/* Set empty signature to DMA Rx ring descriptors */
- 	for (i = 0; i < ring->slots; i++) {
-+		struct xgene_dma_desc_hw *desc;
-+
- 		desc = &ring->desc_hw[i];
--		XGENE_DMA_DESC_SET_EMPTY(desc);
-+		desc->m0 = cpu_to_le64(XGENE_DMA_DESC_EMPTY_SIGNATURE);
- 	}
-
- 	/* Enable DMA Rx ring interrupt */
-@@ -2084,6 +2043,5 @@ module_platform_driver(xgene_dma_driver);
-
- MODULE_DESCRIPTION("APM X-Gene SoC DMA driver");
- MODULE_AUTHOR("Rameshwar Prasad Sahu <rsahu@apm.com>");
--MODULE_AUTHOR("Loc Ho <lho@apm.com>");
- MODULE_LICENSE("GPL");
- MODULE_VERSION("1.0");
---
-1.8.2.1
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
