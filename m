@@ -1,106 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Apr 2015 11:25:42 +0100
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150420234032.GM18048@atomide.com>
-References: <5522BEEF.2000405@gmail.com> <20150406174245.GJ18048@atomide.com>
- <20150407135713.GL4027@n2100.arm.linux.org.uk>
- <20150407152207.GM18048@atomide.com>
- <20150408230658.GO4027@n2100.arm.linux.org.uk>
- <20150409134843.GQ4027@n2100.arm.linux.org.uk>
- <20150415163108.GB2033@earth> <20150416160858.GH18048@atomide.com>
- <20150417184156.GA3326@earth> <20150420234032.GM18048@atomide.com>
-Message-ID: <20150423102542.GZ4027@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 23 Apr 2015 07:35:24 -0300
+Subject: [PATCH v4 05/11] ARM: dts: add imx7d soc dtsi file
+In-Reply-To: <CAHrpEqSGuFu-+M39zqiOcpsjS9UOxvoy2tRHHmZFwBdftpiqjw@mail.gmail.com>
+References: <1429563933-3129-1-git-send-email-Frank.Li@freescale.com>
+ <1429563933-3129-6-git-send-email-Frank.Li@freescale.com>
+ <CAL_JsqLP6ZE9_G1L9XzT-hR=k6Wzx80rKQMTdagp8q80ADN61g@mail.gmail.com>
+ <CAHrpEqSGuFu-+M39zqiOcpsjS9UOxvoy2tRHHmZFwBdftpiqjw@mail.gmail.com>
+Message-ID: <CAOMZO5Cq3i-ydMYKYAyvmbXi9D3z37gjZm4aYh9s_hV9BjU1+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 04:40:32PM -0700, Tony Lindgren wrote:
-> * Sebastian Reichel <sre@kernel.org> [150417 11:43]:
-> > On Thu, Apr 16, 2015 at 09:08:58AM -0700, Tony Lindgren wrote:
-> > > * Sebastian Reichel <sre@kernel.org> [150415 09:32]:
-> > > > Hi,
-> > > > 
-> > > > On Thu, Apr 09, 2015 at 02:48:43PM +0100, Russell King - ARM Linux wrote:
-> > > > > On Thu, Apr 09, 2015 at 12:06:58AM +0100, Russell King - ARM Linux wrote:
-> > > > > > On Tue, Apr 07, 2015 at 08:22:08AM -0700, Tony Lindgren wrote:
-> > > > > > > Works for me. The above needs the following fix folded in to build:
-> > > > > > > 
-> > > > > > > --- a/arch/arm/mm/proc-v7.S
-> > > > > > > +++ b/arch/arm/mm/proc-v7.S
-> > > > > > > @@ -532,7 +532,7 @@ __v7_ca9mp_proc_info:
-> > > > > > >  __v7_ca8_proc_info:
-> > > > > > >  	.long	0x410fc080
-> > > > > > >  	.long	0xff0ffff0
-> > > > > > > -	__v7_proc __v7_ca8mp_proc_info, proc_fns = ca8_processor_functions
-> > > > > > > +	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
-> > > > > > >  	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
-> > > > > > >  
-> > > > > > >  #endif	/* CONFIG_ARM_LPAE */
-> > > > > > 
-> > > > > > Thanks, merged into the original patch.
-> > > > > 
-> > > > > Do you want to give me an ack for this, thanks?
-> > > > 
-> > > > I tried to test this together with Tony's follow up patch, but I get
-> > > > this after applying the patch to v4.0:
-> > > > 
-> > > > sre at earth ~/src/linux [430973-fix] % make -j4
-> > > >   CHK     include/config/kernel.release
-> > > >   CHK     include/generated/uapi/linux/version.h
-> > > >   CHK     include/generated/utsrelease.h
-> > > > make[1]: 'include/generated/mach-types.h' is up to date.
-> > > >   CALL    scripts/checksyscalls.sh
-> > > >   CHK     include/generated/compile.h
-> > > >   AS      arch/arm/mm/proc-v7.o
-> > > > arch/arm/mm/proc-v7.S: Assembler messages:
-> > > > arch/arm/mm/proc-v7.S:535: Error: invalid operands (*ABS* and .text sections) for `|'
-> > > > arch/arm/mm/proc-v7.S:535: Error: invalid operands (*ABS* and .text sections) for `|'
-> > > > scripts/Makefile.build:294: recipe for target 'arch/arm/mm/proc-v7.o' failed
-> > > > make[1]: *** [arch/arm/mm/proc-v7.o] Error 1
-> > > > Makefile:947: recipe for target 'arch/arm/mm' failed
-> > > > make: *** [arch/arm/mm] Error 2
-> > > > make: *** Waiting for unfinished jobs....
-> > > 
-> > > Maybe test the version in Linux next:
-> > > 
-> > > a6d746789825 ("ARM: proc-v7: avoid errata 430973 workaround for non-Cortex A8 CPUs")
-> > 
-> > DONE with your your patch added on top:
-> > 
-> > Tested-By: Sebastian Reichel <sre@kernel.org>
-> > 
-> > (on N900)
-> 
-> OK thanks, patch now uploaded to Russell's patch system:
-> 
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8345/1
+Hi Frank,
 
-I have a concern with that patch.
+On Tue, Apr 21, 2015 at 5:47 PM, Zhi Li <lznuaa@gmail.com> wrote:
 
-The reason that it's disabled for multiplatform is because we can't
-guarantee that the auxctrl register will be writable.  The solution
-we came up with for multiplatform was to require firmware to be
-updated to enable this bit.
+>> You should dual license dts files with BSD or MIT for any non-Linux users.
+>
+> Do you have sample BSD/GPL dual license header?
 
-Enabling it on a platform where firmware has not been updated, but
-runs in the non-secure world will lead to the kernel hanging in the
-early assembly code.
-
-I've discussed it with Catalin, and Catalin's position is that we
-should not remove the !multiplatform conditional.  That's something
-which I find that I'm agreeing with Catalin on - any other non-secure
-Cortex A8 user who is setting this bit in firmware will instantly
-break if this patch is applied.
-
-However, I don't think anyone is willing to say that they have a
-solution to this problem - obviously, you can't build OMAP as a
-non-multiplatform kernel anymore, so in effect you can never have
-the kernel enable this errata.  And you can't detect whether you're
-running in secure mode or not.
-
-We could do the "only write the bit if it was originally clear" but
-we still have the problem that doing so may cause other people
-regressions.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Take a look at arch/arm/boot/dts/imx6sl-warp.dts in linux-next.
