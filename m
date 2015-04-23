@@ -1,245 +1,54 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 23 Apr 2015 15:37:32 -0400
-Subject: [PATCH 4/4] ARM: dts: k2l-evm: Add device bindings for netcp driver
-In-Reply-To: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
-References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1429817852-27938-5-git-send-email-m-karicheri2@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 23 Apr 2015 21:35:38 +0200
+Subject: [PATCH v8 2/4] ARM: sunxi: dt: Add DT bindings documentation for
+ SUNXI Security System
+In-Reply-To: <1429771523-2936-3-git-send-email-clabbe.montjoie@gmail.com>
+References: <1429771523-2936-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1429771523-2936-3-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20150423193538.GF28007@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables networking on k2l evm by providing
-device bindings for netcp, knav, and qmss. See device
-binding documentation at
+On Thu, Apr 23, 2015 at 08:45:21AM +0200, LABBE Corentin wrote:
+> This patch adds documentation for Device-Tree bindings for the Security System cryptographic accelerator driver.
+> 
+> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/crypto/sunxi-ss.txt | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/sunxi-ss.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/crypto/sunxi-ss.txt b/Documentation/devicetree/bindings/crypto/sunxi-ss.txt
+> new file mode 100644
+> index 0000000..a566803
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/crypto/sunxi-ss.txt
+> @@ -0,0 +1,9 @@
+> +* Allwinner Security System found on A20 SoC
+> +
+> +Required properties:
+> +- compatible : Should be "allwinner,sun7i-a20-crypto".
+> +- reg: Should contain the Security System register location and length.
+> +- interrupts: Should contain the IRQ line for the Security System.
+> +- clocks : A phandle to the functional clock node of the Security System module
 
-Documentation/devicetree/bindings/net/keystone-netcp.txt
+You actually need two clock references, not just a single phandle.
 
-Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- arch/arm/boot/dts/k2l-evm.dts    |    1 +
- arch/arm/boot/dts/k2l-netcp.dtsi |  189 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/k2l.dtsi       |    1 +
- 3 files changed, 191 insertions(+)
- create mode 100644 arch/arm/boot/dts/k2l-netcp.dtsi
+> +- clock-names : Name of the functional clock, should be "ahb" and "mod".
 
-diff --git a/arch/arm/boot/dts/k2l-evm.dts b/arch/arm/boot/dts/k2l-evm.dts
-index 85cc7f2..9a69a6b 100644
---- a/arch/arm/boot/dts/k2l-evm.dts
-+++ b/arch/arm/boot/dts/k2l-evm.dts
-@@ -118,6 +118,7 @@
- };
- 
- &mdio {
-+	status = "ok";
- 	ethphy0: ethernet-phy at 0 {
- 		compatible = "marvell,88E1514", "marvell,88E1510", "ethernet-phy-ieee802.3-c22";
- 		reg = <0>;
-diff --git a/arch/arm/boot/dts/k2l-netcp.dtsi b/arch/arm/boot/dts/k2l-netcp.dtsi
-new file mode 100644
-index 0000000..a97aeee
---- /dev/null
-+++ b/arch/arm/boot/dts/k2l-netcp.dtsi
-@@ -0,0 +1,189 @@
-+/*
-+ * Device Tree Source for Keystone 2 Lamarr Netcp driver
-+ *
-+ * Copyright 2015 Texas Instruments, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+qmss: qmss at 2a40000 {
-+	compatible = "ti,keystone-navigator-qmss";
-+	dma-coherent;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	clocks = <&chipclk13>;
-+	ranges;
-+	queue-range	= <0 0x2000>;
-+	linkram0	= <0x100000 0x4000>;
-+	linkram1	= <0x70000000 0x10000>; /* 1MB OSR mem */
-+
-+	qmgrs {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		qmgr0 {
-+			managed-queues = <0 0x2000>;
-+			reg = <0x2a40000 0x20000>,
-+			      <0x2a06000 0x400>,
-+			      <0x2a02000 0x1000>,
-+			      <0x2a03000 0x1000>,
-+			      <0x23a80000 0x20000>,
-+			      <0x2a80000 0x20000>;
-+			reg-names = "peek", "status", "config",
-+				    "region", "push", "pop";
-+		};
-+	};
-+	queue-pools {
-+		qpend {
-+			qpend-0 {
-+				qrange = <658 8>;
-+				interrupts =<0 40 0xf04 0 41 0xf04 0 42 0xf04
-+					     0 43 0xf04 0 44 0xf04 0 45 0xf04
-+					     0 46 0xf04 0 47 0xf04>;
-+			};
-+			qpend-1 {
-+				qrange = <528 16>;
-+				interrupts = <0 48 0xf04 0 49 0xf04 0 50 0xf04
-+					      0 51 0xf04 0 52 0xf04 0 53 0xf04
-+					      0 54 0xf04 0 55 0xf04 0 56 0xf04
-+					      0 57 0xf04 0 58 0xf04 0 59 0xf04
-+					      0 60 0xf04 0 61 0xf04 0 62 0xf04
-+					      0 63 0xf04>;
-+				qalloc-by-id;
-+			};
-+			qpend-2 {
-+				qrange = <544 16>;
-+				interrupts = <0 64 0xf04 0 65 0xf04 0 66 0xf04
-+					      0 59 0xf04 0 68 0xf04 0 69 0xf04
-+					      0 70 0xf04 0 71 0xf04 0 72 0xf04
-+					      0 73 0xf04 0 74 0xf04 0 75 0xf04
-+					      0 76 0xf04 0 77 0xf04 0 78 0xf04
-+					      0 79 0xf04>;
-+			};
-+		};
-+		general-purpose {
-+			gp-0 {
-+				qrange = <4000 64>;
-+			};
-+			netcp-tx {
-+				qrange = <896 128>;
-+				qalloc-by-id;
-+			};
-+		};
-+	};
-+	descriptor-regions {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		region-12 {
-+			id = <12>;
-+			region-spec = <8192 128>;	/* num_desc desc_size */
-+			link-index = <0x4000>;
-+		};
-+	};
-+}; /* qmss */
-+
-+knav_dmas: knav_dmas at 0 {
-+	compatible = "ti,keystone-navigator-dma";
-+	clocks = <&papllclk>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+	ti,navigator-cloud-address = <0x23a80000 0x23a90000>;
-+
-+	dma_gbe: dma_gbe at 0 {
-+		reg = <0x26186000 0x100>,
-+			  <0x26187000 0x2a0>,
-+			  <0x26188000 0xb60>,
-+			  <0x26186100 0x80>,
-+			  <0x26189000 0x1000>;
-+		reg-names = "global", "txchan", "rxchan",
-+				"txsched", "rxflow";
-+	};
-+};
-+
-+netcp: netcp at 26000000 {
-+	reg = <0x2620110 0x8>;
-+	reg-names = "efuse";
-+	compatible = "ti,netcp-1.0";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	/* NetCP address range */
-+	ranges = <0 0x26000000 0xffffff>;
-+
-+	clocks = <&papllclk>, <&clkcpgmac>, <&chipclk12>;
-+	dma-coherent;
-+
-+	ti,navigator-dmas = <&dma_gbe 0>,
-+			<&dma_gbe 8>,
-+			<&dma_gbe 0>;
-+	ti,navigator-dma-names = "netrx0", "netrx1", "nettx";
-+
-+	netcp-devices {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		gbe at 200000 { /* ETHSS */
-+			label = "netcp-gbe";
-+			compatible = "ti,netcp-gbe-5";
-+			reg = <0x200000 0x900>, <0x220000 0x1ffff>;
-+			/* enable-ale; */
-+			tx-queue = <896>;
-+			tx-channel = "nettx";
-+
-+			interfaces {
-+				gbe0: interface-0 {
-+					slave-port = <0>;
-+					link-interface	= <1>;
-+					phy-handle	= <&ethphy0>;
-+				};
-+				gbe1: interface-1 {
-+					slave-port = <1>;
-+					link-interface	= <1>;
-+					phy-handle	= <&ethphy1>;
-+				};
-+			};
-+
-+			secondary-slave-ports {
-+				port-2 {
-+					slave-port = <2>;
-+					link-interface	= <2>;
-+				};
-+				port-3 {
-+					slave-port = <3>;
-+					link-interface	= <2>;
-+				};
-+			};
-+		};
-+	};
-+
-+	netcp-interfaces {
-+		interface-0 {
-+			rx-channel = "netrx0";
-+			rx-pool = <1024 12>;
-+			tx-pool = <1024 12>;
-+			rx-queue-depth = <128 128 0 0>;
-+			rx-buffer-size = <1518 4096 0 0>;
-+			rx-queue = <528>;
-+			tx-completion-queue = <530>;
-+			efuse-mac = <1>;
-+			netcp-gbe = <&gbe0>;
-+
-+		};
-+		interface-1 {
-+			rx-channel = "netrx1";
-+			rx-pool = <1024 12>;
-+			tx-pool = <1024 12>;
-+			rx-queue-depth = <128 128 0 0>;
-+			rx-buffer-size = <1518 4096 0 0>;
-+			rx-queue = <529>;
-+			tx-completion-queue = <531>;
-+			efuse-mac = <0>;
-+			local-mac-address = [02 18 31 7e 3e 7f];
-+			netcp-gbe = <&gbe1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/k2l.dtsi b/arch/arm/boot/dts/k2l.dtsi
-index e32c3ba..0e00748 100644
---- a/arch/arm/boot/dts/k2l.dtsi
-+++ b/arch/arm/boot/dts/k2l.dtsi
-@@ -79,6 +79,7 @@
- 			#gpio-cells = <2>;
- 			gpio,syscon-dev = <&devctrl 0x24c>;
- 		};
-+		/include/ "k2l-netcp.dtsi"
- 	};
- };
- 
+And we usually have an example after too.
+
+Thanks!
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150423/32b27854/attachment.sig>
