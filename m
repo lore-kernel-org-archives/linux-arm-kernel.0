@@ -1,7 +1,8 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 23 Apr 2015 14:16:17 +0200
-Subject: [PATCH] ARM: dts: sun7i: Add dts file for the Jesurun Q5 top set box
-Message-ID: <1429791377-9786-1-git-send-email-hdegoede@redhat.com>
+Date: Thu, 23 Apr 2015 14:26:50 +0200
+Subject: [PATCH v2] ARM: dts: sun7i: Add dts file for the Jesurun Q5 top set
+ box
+Message-ID: <1429792010-22359-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,9 +19,12 @@ For more details see: http://linux-sunxi.org/Jesurun_Q5
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
+Changes in v2:
+-Add missing serial0 alias and stdout-path
+---
  arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts | 186 +++++++++++++++++++++++++++++
- 2 files changed, 187 insertions(+)
+ arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts | 194 +++++++++++++++++++++++++++++
+ 2 files changed, 195 insertions(+)
  create mode 100644 arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
@@ -37,10 +41,10 @@ index 13de5d6..29883fe 100644
  	sun4i-a10-mk802.dtb \
 diff --git a/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts b/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
 new file mode 100644
-index 0000000..402df46
+index 0000000..1b0452f
 --- /dev/null
 +++ b/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
-@@ -0,0 +1,186 @@
+@@ -0,0 +1,194 @@
 +/*
 + * Copyright 2015 G?bor Nyers
 + *
@@ -100,6 +104,14 @@ index 0000000..402df46
 +/ {
 +	model = "Jesurun Q5";
 +	compatible = "jesurun,q5", "allwinner,sun4i-a10";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
 +
 +	leds {
 +		compatible = "gpio-leds";
