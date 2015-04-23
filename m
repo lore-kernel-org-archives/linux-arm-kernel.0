@@ -1,56 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Apr 2015 10:20:33 +0100
-Subject: [PATCH] coresight: Add support for Juno platform
-In-Reply-To: <1429742802-13089-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1429742802-13089-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20150423092032.GA16238@leverpostej>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 23 Apr 2015 11:21:11 +0200
+Subject: Mediatek MT8135 dts updates
+Message-ID: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthieu,
+This series contains the Mediatek MT8135 dts updates for the clock
+support and UART support. This needs these two series:
 
-> +	main_funnel at 20040000 {
-> +		compatible = "arm,coresight-funnel", "arm,primecell";
-> +		reg = <0 0x20040000 0 0x1000>;
-> +
-> +		clocks = <&soc_smc50mhz>;
-> +		clock-names = "apb_pclk";
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				main_funnel_out_port: endpoint {
-> +					remote-endpoint =
-> +						<&etf_in_port>;
-> +				};
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <0>;
-> +				main_funnel_in_port0: endpoint {
-> +					slave-mode;
-> +					remote-endpoint =
-> +							<&A57_funnel_out_port>;
-> +				};
-> +			};
-> +
-> +			port at 2 {
-> +				reg = <1>;
-> +				main_funnel_in_port1: endpoint {
-> +					slave-mode;
-> +					remote-endpoint = <&A53_etm0_out_port>;
-> +				};
-> +			};
+[PATCH v12] clk: Add common clock support for Mediatek MT8135 and MT8173
+tty: serial: 8250_mtk: Add support for second clock
 
-What's going on with these reg properties? They aren't matched with
-their nodes' unit-addresses, and the same reg is reused by multiple
-nodes. That doesn't make sense to me.
+Also this adds the PMIC wrapper nodes to the dtsi file and PMIC node to
+the mt8135-evbp1 board. Support for the PMIC wrapper was merged during
+the v4.1 merge window.
 
-Is the mismatch deliberate (against DT conventions), or is this
-mistaken?
+This series is meant for testing the new features, not (yet) for inclusion.
 
-Likewise for the other funnels.
+----------------------------------------------------------------
 
-Mark
+The following changes since commit 39a8804455fb23f09157341d3ba7db6d7ae6ee76:
+
+  Linux 4.0 (2015-04-12 15:12:50 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/sha/linux-2.6.git tags/v4.0-mtk-arm-dts
+
+for you to fetch changes up to 5fcd75a6aeded756c24d9581f49e0859b85fb3a0:
+
+  ARM: dts: mediatek mt8135: Use real UART clocks (2015-04-23 11:02:27 +0200)
+
+----------------------------------------------------------------
+
+James Liao (1):
+      ARM: dts: mediatek: Enable clock support for Mediatek MT8135.
+
+Sascha Hauer (3):
+      ARM: dts: mt8135: Add pmic wrapper nodes
+      ARM: dts: mt8135-evbp1: Add PMIC support
+      ARM: dts: mediatek mt8135: Use real UART clocks
+
+ arch/arm/boot/dts/mt8135-evbp1.dts | 193 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/mt8135.dtsi      |  58 ++++++++++-
+ 2 files changed, 247 insertions(+), 4 deletions(-)
