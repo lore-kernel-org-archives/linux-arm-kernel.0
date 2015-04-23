@@ -1,67 +1,65 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 23 Apr 2015 12:59:51 -0400
-Subject: [PATCH 10/11] coresight-etm4x: Controls pertaining to the
- context ID functions
-In-Reply-To: <CANLsYkw-XwEW9gaXVr07fqHspZU+Vo7FukN7Qz6S07L6jC5ENA@mail.gmail.com>
-References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>	<1429742451-11465-11-git-send-email-mathieu.poirier@linaro.org>	<55390B05.1050801@codeaurora.org>
- <CANLsYkw-XwEW9gaXVr07fqHspZU+Vo7FukN7Qz6S07L6jC5ENA@mail.gmail.com>
-Message-ID: <55392507.1030103@codeaurora.org>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Thu, 23 Apr 2015 19:00:11 +0200 (CEST)
+Subject: [PATCH] ARM: gemini: remove unnecessary mdio-gpio includes
+In-Reply-To: <1429201119-32167-1-git-send-email-vivien.didelot@savoirfairelinux.com>
+References: <1429201119-32167-1-git-send-email-vivien.didelot@savoirfairelinux.com>
+Message-ID: <alpine.LNX.2.00.1504231859370.1901@T520.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2015 11:16 AM, Mathieu Poirier wrote:
-> On 23 April 2015 at 09:08, Christopher Covington <cov@codeaurora.org> wrote:
->> Hi Mathieu,
->>
->> On 04/22/2015 06:40 PM, Mathieu Poirier wrote:
->>> From: Pratik Patel <pratikp@codeaurora.org>
->>>
->>> Adding sysfs entries to access and configure specifics about the
->>> context ID comparator functions.
->>>
->>> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
->>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> ---
->>>  .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  19 +++
->>>  drivers/hwtracing/coresight/coresight-etm4x.c      | 187 +++++++++++++++++++++
->>>  2 files changed, 206 insertions(+)
->>>
->>> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
->>> index b5c0456290ab..8b32cb7b9723 100644
->>> --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
->>> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
->>> @@ -254,3 +254,22 @@ Date:            April 2015
->>>  KernelVersion:       4.01
->>>  Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
->>>  Description:         (RW) Controls the selection of the resources in the trace unit.
->>> +
->>> +What:                /sys/bus/coresight/devices/<memory_map>.etm/ctxid_idx
->>> +Date:                April 2015
->>> +KernelVersion:       4.01
->>> +Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
->>> +Description: (RW) Select which context ID comparator to work with.
->>> +
->>> +What:                /sys/bus/coresight/devices/<memory_map>.etm/ctxid_val
->>> +Date:                April 2015
->>> +KernelVersion:       4.01
->>> +Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
->>> +Description: (RW) Get/Set the context ID comparator value to trigger on.
->>
->> If I'm understanding this correctly, ctxid_val is multiplexed using ctxid_idx.
->> Why not just have ctxid_val0, ctxid_val1, ...?
+
+
+On Thu, 16 Apr 2015, Vivien Didelot wrote:
+
+> Remove the inclusion of linux/mdio-gpio.h in nas4220b, wbd111 and wbd222
+> boards since mdio-gpio is not used.
 > 
-> There can be up to 8 of them on the current implementation and who
-> knows how many more in the future.  To me using and index to select
-> the context ID to work on scaled better and is introducing less
-> clutter in sysfs.
+> Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+> ---
+>  arch/arm/mach-gemini/board-nas4220b.c | 1 -
+>  arch/arm/mach-gemini/board-wbd111.c   | 1 -
+>  arch/arm/mach-gemini/board-wbd222.c   | 1 -
+>  3 files changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-gemini/board-nas4220b.c b/arch/arm/mach-gemini/board-nas4220b.c
+> index ca8a25b..18b1279 100644
+> --- a/arch/arm/mach-gemini/board-nas4220b.c
+> +++ b/arch/arm/mach-gemini/board-nas4220b.c
+> @@ -18,7 +18,6 @@
+>  #include <linux/leds.h>
+>  #include <linux/input.h>
+>  #include <linux/gpio_keys.h>
+> -#include <linux/mdio-gpio.h>
+>  #include <linux/io.h>
+>  
+>  #include <asm/setup.h>
+> diff --git a/arch/arm/mach-gemini/board-wbd111.c b/arch/arm/mach-gemini/board-wbd111.c
+> index 418188c..14c56f3 100644
+> --- a/arch/arm/mach-gemini/board-wbd111.c
+> +++ b/arch/arm/mach-gemini/board-wbd111.c
+> @@ -15,7 +15,6 @@
+>  #include <linux/input.h>
+>  #include <linux/skbuff.h>
+>  #include <linux/gpio_keys.h>
+> -#include <linux/mdio-gpio.h>
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/partitions.h>
+>  #include <asm/mach-types.h>
+> diff --git a/arch/arm/mach-gemini/board-wbd222.c b/arch/arm/mach-gemini/board-wbd222.c
+> index 266b265..6070282 100644
+> --- a/arch/arm/mach-gemini/board-wbd222.c
+> +++ b/arch/arm/mach-gemini/board-wbd222.c
+> @@ -15,7 +15,6 @@
+>  #include <linux/input.h>
+>  #include <linux/skbuff.h>
+>  #include <linux/gpio_keys.h>
+> -#include <linux/mdio-gpio.h>
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/partitions.h>
+>  #include <asm/mach-types.h>
+> -- 
+> 2.3.5
+> 
+> 
 
-In theory there's a race condition if two tasks are trying to set the index
-and then the value, which having individually addressable values solves, but I
-don't anticipate trying to use more than one task to configure tracing.
-
-Chris
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
