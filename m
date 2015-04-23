@@ -1,44 +1,46 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 23 Apr 2015 19:16:12 +0530
-Subject: [RFC 6/7] clk: qcom: gcc-msm8960: add child devices support.
-In-Reply-To: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>
-References: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1429796773-7151-7-git-send-email-rnayak@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 23 Apr 2015 14:58:51 +0100
+Subject: [PATCH 2/4] ARM perf: Fix the pmu node name in warning message
+In-Reply-To: <1429797033-3787-2-git-send-email-will.deacon@arm.com>
+References: <1429797033-3787-1-git-send-email-will.deacon@arm.com>
+ <1429797033-3787-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20150423135851.GE29702@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Thu, Apr 23, 2015 at 02:50:31PM +0100, Will Deacon wrote:
+> With commit 9fd85eb502a7 ("ARM: pmu: add support for interrupt-affinity
+> property"), we print a warning when we find a PMU SPI with a missing
+> missing interrupt-affinity property in a pmu node. Unfortunately, we
+> pass the wrong (NULL) device node to of_node_full_name, resulting in
+> unhelpful messages such as:
+> 
+>  hw perfevents: Failed to parse <no-node>/interrupt-affinity[0]
+> 
+> This patch fixes the name to that of the pmu node.
+> 
+> Fixes: 9fd85eb502a7 (ARM: pmu: add support for interrupt-affinity property)
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-This patch adds support to add child devices to gcc as some of the
-registers mapped by gcc are used by things like thermal sensors.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/clk/qcom/gcc-msm8960.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-index eb6a4f9..2c80d03 100644
---- a/drivers/clk/qcom/gcc-msm8960.c
-+++ b/drivers/clk/qcom/gcc-msm8960.c
-@@ -15,6 +15,7 @@
- #include <linux/bitops.h>
- #include <linux/err.h>
- #include <linux/platform_device.h>
-+#include <linux/of_platform.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-@@ -3520,7 +3521,8 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
- 	if (IS_ERR(clk))
- 		return PTR_ERR(clk);
- 
--	return qcom_cc_probe(pdev, match->data);
-+	qcom_cc_probe(pdev, match->data);
-+	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
- }
- 
- static int gcc_msm8960_remove(struct platform_device *pdev)
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+> ---
+>  arch/arm/kernel/perf_event_cpu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+> index becf7ad6eddc..213919ba326f 100644
+> --- a/arch/arm/kernel/perf_event_cpu.c
+> +++ b/arch/arm/kernel/perf_event_cpu.c
+> @@ -322,7 +322,7 @@ static int of_pmu_irq_cfg(struct platform_device *pdev)
+>  				      i);
+>  		if (!dn) {
+>  			pr_warn("Failed to parse %s/interrupt-affinity[%d]\n",
+> -				of_node_full_name(dn), i);
+> +				of_node_full_name(pdev->dev.of_node), i);
+>  			break;
+>  		}
+>  
+> -- 
+> 2.1.4
+> 
