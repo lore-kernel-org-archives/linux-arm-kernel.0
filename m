@@ -1,52 +1,507 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 23 Apr 2015 11:17:32 -0400
-Subject: [PATCH 01/11] coresight-etm4x: Adding CoreSight ETM4x driver
-In-Reply-To: <1429742451-11465-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
- <1429742451-11465-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <55390D0C.7000405@codeaurora.org>
+From: jbagg@lenbrook.com (Jonathan Bagg)
+Date: Thu, 23 Apr 2015 11:30:37 -0400
+Subject: imx6 sata cdrom driver issue
+Message-ID: <5539101D.1020909@lenbrook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2015 06:40 PM, Mathieu Poirier wrote:
-> From: Pratik Patel <pratikp@codeaurora.org>
-> 
-> This driver manages the CoreSight ETMv4 (Embedded Trace Macrocell) IP block
-> to support HW assisted tracing on ARMv7 and ARMv8 architectures.
-> 
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  28 +
->  drivers/hwtracing/coresight/Kconfig                |  10 +
->  drivers/hwtracing/coresight/Makefile               |   1 +
->  drivers/hwtracing/coresight/coresight-etm4x.c      | 833 +++++++++++++++++++++
->  drivers/hwtracing/coresight/coresight-etm4x.h      | 391 ++++++++++
->  5 files changed, 1263 insertions(+)
->  create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
->  create mode 100644 drivers/hwtracing/coresight/coresight-etm4x.c
->  create mode 100644 drivers/hwtracing/coresight/coresight-etm4x.h
-> 
-> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-> new file mode 100644
-> index 000000000000..a4b623871ca0
-> --- /dev/null
-> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-> @@ -0,0 +1,28 @@
-> +What:		/sys/bus/coresight/devices/<memory_map>.etm/enable_source
-> +Date:		April 2015
-> +KernelVersion:  4.01
-> +Contact:        Mathieu Poirier <mathieu.poirier@linaro.org>
-> +Description:	(RW) Enable/disable tracing on this specific trace entiry.
-                                                                   ^
-                                                                   entry
+On arm imx6, running mainline 3.19, mounting a SATA CDROM fails aprox 
+1/20 times with this error....
 
-> +		Enabling a source implies the source has been configured
-> +		properly and a sink has been identidifed for it.  The path
-                                             ^
-                                             identified
+root at freescale /tmp$ mount /dev/sr0 test/
+UDF-fs: warning (device sr0): udf_fill_super: No partition found (2)
+mount: mounting /dev/sr0 on test/ failed: Invalid argument
+
+I've tried several disks and dvd drivers.  They all experience this 
+issue.  The same disks mount 100% of the time on an x86 machine.  Once 
+mounted, I can read data without issue.  Also tried a HDD on the same 
+SATA link, no issue.
+
+Sometimes the kernel will dump out the attached backtrace on the mount 
+command.
+
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jonathan Bagg
+Embedded Systems Developer
+NAD Electronics | Lenbrook Industries Limited
+633 Granite Court, Pickering, Ontario, Canada L1W 3K1 | 905-831-0799 ext 4478 | http://www.nadelectronics.com
+
+-------------- next part --------------
+
+[ 1828.333210] WARNING: CPU: 0 PID: 1080 at fs/sysfs/dir.c:96 sysfs_remove_dir+0x60/0x80()
+[ 1828.341297] Modules linked in:
+[ 1828.344391] CPU: 0 PID: 1080 Comm: kworker/0:0 Not tainted 3.19.0-00115-gc70616a #450
+[ 1828.352249] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[ 1828.358818] Workqueue: events ata_scsi_hotplug
+[ 1828.363288] Backtrace:
+[ 1828.365797] [<8001127c>] (dump_backtrace) from [<80011418>] (show_stack+0x18/0x1c)
+[ 1828.373375]  r6:80753906 r5:00000000 r4:00000000 r3:bd549380
+[ 1828.379149] [<80011400>] (show_stack) from [<805bbab4>] (dump_stack+0x80/0x9c)
+[ 1828.386409] [<805bba34>] (dump_stack) from [<8002578c>] (warn_slowpath_common+0x8c/0xb4)
+[ 1828.394507]  r5:00000009 r4:00000000
+[ 1828.398163] [<80025700>] (warn_slowpath_common) from [<800257d8>] (warn_slowpath_null+0x24/0x2c)
+[ 1828.406970]  r8:bd838000 r7:ffffffff r6:00000000 r5:80873981 r4:bd4457e0
+[ 1828.413781] [<800257b4>] (warn_slowpath_null) from [<801318c8>] (sysfs_remove_dir+0x60/0x80)
+[ 1828.422260] [<80131868>] (sysfs_remove_dir) from [<8025724c>] (kobject_del+0x1c/0x4c)
+[ 1828.430112]  r5:bd4457e0 r4:bd412808
+[ 1828.433752] [<80257230>] (kobject_del) from [<802351c0>] (elv_unregister_queue+0x30/0x40)
+[ 1828.441950]  r5:bd412808 r4:bd412800
+[ 1828.445605] [<80235190>] (elv_unregister_queue) from [<8023bbd0>] (blk_unregister_queue+0x50/0x7c)
+[ 1828.454590]  r5:bdb71e28 r4:bd417000
+[ 1828.458245] [<8023bb80>] (blk_unregister_queue) from [<80248b88>] (del_gendisk+0xec/0x1b0)
+[ 1828.466526]  r5:bd7c3d40 r4:bd417000
+[ 1828.470158] [<80248a9c>] (del_gendisk) from [<8032fabc>] (sd_remove+0x4c/0xb4)
+[ 1828.477396]  r7:00800000 r6:bd416c08 r5:bd420108 r4:bd416c00
+[ 1828.483142] [<8032fa70>] (sd_remove) from [<8030252c>] (__device_release_driver+0x84/0xc8)
+[ 1828.491421]  r7:bd838000 r6:8085f994 r5:80860128 r4:bd420108
+[ 1828.497171] [<803024a8>] (__device_release_driver) from [<80302598>] (device_release_driver+0x28/0x34)
+[ 1828.506492]  r5:bd420108 r4:bd42013c
+[ 1828.510115] [<80302570>] (device_release_driver) from [<8030216c>] (bus_remove_device+0xe8/0xf8)
+[ 1828.518914]  r5:be1c0a4c r4:bd420108
+[ 1828.522544] [<80302084>] (bus_remove_device) from [<802ff5c4>] (device_del+0x154/0x1e0)
+[ 1828.530564]  r6:bd416818 r5:bd420108 r4:bd420108 r3:00000000
+[ 1828.536316] [<802ff470>] (device_del) from [<8032d108>] (__scsi_remove_device+0x50/0xb8)
+[ 1828.544412]  r6:bdbc10f8 r5:bd420108 r4:bd420000
+[ 1828.549104] [<8032d0b8>] (__scsi_remove_device) from [<8032d19c>] (scsi_remove_device+0x2c/0x38)
+[ 1828.557905]  r5:bd420000 r4:be11c868
+[ 1828.561532] [<8032d170>] (scsi_remove_device) from [<8033e7b0>] (ata_scsi_handle_link_detach+0xf4/0x12c)
+[ 1828.571026]  r5:bd420000 r4:bdbc1490
+[ 1828.574651] [<8033e6bc>] (ata_scsi_handle_link_detach) from [<80341b70>] (ata_scsi_hotplug+0x84/0xac)
+[ 1828.583884]  r10:00000001 r9:00000000 r8:0000fe88 r7:bd83a790 r6:bd83a7d8 r5:000021f0
+[ 1828.591813]  r4:bd838000 r3:bdbc0000
+[ 1828.595447] [<80341aec>] (ata_scsi_hotplug) from [<800395b0>] (process_one_work+0x24c/0x3f0)
+[ 1828.603889]  r8:00000000 r7:bf7a6500 r6:bf7a3080 r5:bd83a7d8 r4:bd519180 r3:80341aec
+[ 1828.611739] [<80039364>] (process_one_work) from [<80039a80>] (worker_thread+0x2f8/0x410)
+[ 1828.619931]  r10:00000000 r9:00000008 r8:bf7a3080 r7:bf7a30b0 r6:bd519198 r5:bf7a3080
+[ 1828.627862]  r4:bd519180
+[ 1828.630427] [<80039788>] (worker_thread) from [<8003e35c>] (kthread+0xec/0x100)
+[ 1828.637752]  r10:00000000 r9:00000000 r8:00000000 r7:80039788 r6:bd519180 r5:bd5b7040
+[ 1828.645680]  r4:00000000 r3:bd549380
+[ 1828.649305] [<8003e270>] (kthread) from [<8000e210>] (ret_from_fork+0x14/0x24)
+[ 1828.656548]  r7:00000000 r6:00000000 r5:8003e270 r4:bd5b7040
+[ 1828.662282] ---[ end trace 47381d9c23938c42 ]---
+[ 1828.666928] ------------[ cut here ]------------
+[ 1828.671562] WARNING: CPU: 0 PID: 1080 at fs/kernfs/dir.c:381 kernfs_get+0x2c/0x50()
+[ 1828.679251] Modules linked in:
+[ 1828.682335] CPU: 0 PID: 1080 Comm: kworker/0:0 Tainted: G W      3.19.0-00115-gc70616a #450
+[ 1828.691311] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[ 1828.697866] Workqueue: events ata_scsi_hotplug
+[ 1828.702331] Backtrace:
+[ 1828.704809] [<8001127c>] (dump_backtrace) from [<80011418>] (show_stack+0x18/0x1c)
+[ 1828.712396]  r6:807536fd r5:00000000 r4:00000000 r3:bd549380
+[ 1828.718154] [<80011400>] (show_stack) from [<805bbab4>] (dump_stack+0x80/0x9c)
+[ 1828.725406] [<805bba34>] (dump_stack) from [<8002578c>] (warn_slowpath_common+0x8c/0xb4)
+[ 1828.733501]  r5:00000009 r4:00000000
+[ 1828.737135] [<80025700>] (warn_slowpath_common) from [<800257d8>] (warn_slowpath_null+0x24/0x2c)
+[ 1828.745936]  r8:bd838000 r7:bd7c3c98 r6:8012f82c r5:bd4457e0 r4:bd4457e0
+[ 1828.752734] [<800257b4>] (warn_slowpath_null) from [<8012e408>] (kernfs_get+0x2c/0x50)
+[ 1828.760674] [<8012e3dc>] (kernfs_get) from [<8012edc8>] (__kernfs_remove+0xc4/0x2dc)
+[ 1828.768433]  r4:bd4457e0 r3:bd7c3c8c
+[ 1828.772084] [<8012ed04>] (__kernfs_remove) from [<8012f82c>] (kernfs_remove+0x28/0x38)
+[ 1828.780059]  r10:00000000 r8:bd838000 r7:ffffffff r6:00000000 r5:bd4457e0 r4:8084dbf8
+[ 1828.788090] [<8012f804>] (kernfs_remove) from [<801318d8>] (sysfs_remove_dir+0x70/0x80)
+[ 1828.796156]  r5:80873981 r4:bd4457e0
+[ 1828.799785] [<80131868>] (sysfs_remove_dir) from [<8025724c>] (kobject_del+0x1c/0x4c)
+[ 1828.807653]  r5:bd4457e0 r4:bd412808
+[ 1828.811327] [<80257230>] (kobject_del) from [<802351c0>] (elv_unregister_queue+0x30/0x40)
+[ 1828.819530]  r5:bd412808 r4:bd412800
+[ 1828.823156] [<80235190>] (elv_unregister_queue) from [<8023bbd0>] (blk_unregister_queue+0x50/0x7c)
+[ 1828.832144]  r5:bdb71e28 r4:bd417000
+[ 1828.835841] [<8023bb80>] (blk_unregister_queue) from [<80248b88>] (del_gendisk+0xec/0x1b0)
+[ 1828.844166]  r5:bd7c3d40 r4:bd417000
+[ 1828.847821] [<80248a9c>] (del_gendisk) from [<8032fabc>] (sd_remove+0x4c/0xb4)
+[ 1828.855048]  r7:00800000 r6:bd416c08 r5:bd420108 r4:bd416c00
+[ 1828.860819] [<8032fa70>] (sd_remove) from [<8030252c>] (__device_release_driver+0x84/0xc8)
+[ 1828.869133]  r7:bd838000 r6:8085f994 r5:80860128 r4:bd420108
+[ 1828.874873] [<803024a8>] (__device_release_driver) from [<80302598>] (device_release_driver+0x28/0x34)
+[ 1828.884213]  r5:bd420108 r4:bd42013c
+[ 1828.887906] [<80302570>] (device_release_driver) from [<8030216c>] (bus_remove_device+0xe8/0xf8)
+[ 1828.896748]  r5:be1c0a4c r4:bd420108
+[ 1828.900377] [<80302084>] (bus_remove_device) from [<802ff5c4>] (device_del+0x154/0x1e0)
+[ 1828.908418]  r6:bd416818 r5:bd420108 r4:bd420108 r3:00000000
+[ 1828.914265] [<802ff470>] (device_del) from [<8032d108>] (__scsi_remove_device+0x50/0xb8)
+[ 1828.922389]  r6:bdbc10f8 r5:bd420108 r4:bd420000
+[ 1828.927151] [<8032d0b8>] (__scsi_remove_device) from [<8032d19c>] (scsi_remove_device+0x2c/0x38)
+[ 1828.935961]  r5:bd420000 r4:be11c868
+[ 1828.939588] [<8032d170>] (scsi_remove_device) from [<8033e7b0>] (ata_scsi_handle_link_detach+0xf4/0x12c)
+[ 1828.949096]  r5:bd420000 r4:bdbc1490
+[ 1828.952762] [<8033e6bc>] (ata_scsi_handle_link_detach) from [<80341b70>] (ata_scsi_hotplug+0x84/0xac)
+[ 1828.962031]  r10:00000001 r9:00000000 r8:0000fe88 r7:bd83a790 r6:bd83a7d8 r5:000021f0
+[ 1828.970089]  r4:bd838000 r3:bdbc0000
+[ 1828.973736] [<80341aec>] (ata_scsi_hotplug) from [<800395b0>] (process_one_work+0x24c/0x3f0)
+[ 1828.982202]  r8:00000000 r7:bf7a6500 r6:bf7a3080 r5:bd83a7d8 r4:bd519180 r3:80341aec
+[ 1828.990124] [<80039364>] (process_one_work) from [<80039a80>] (worker_thread+0x2f8/0x410)
+[ 1828.998334]  r10:00000000 r9:00000008 r8:bf7a3080 r7:bf7a30b0 r6:bd519198 r5:bf7a3080
+[ 1829.006305]  r4:bd519180
+[ 1829.008924] [<80039788>] (worker_thread) from [<8003e35c>] (kthread+0xec/0x100)
+[ 1829.016270]  r10:00000000 r9:00000000 r8:00000000 r7:80039788 r6:bd519180 r5:bd5b7040
+[ 1829.024388]  r4:00000000 r3:bd549380
+[ 1829.028040] [<8003e270>] (kthread) from [<8000e210>] (ret_from_fork+0x14/0x24)
+[ 1829.035267]  r7:00000000 r6:00000000 r5:8003e270 r4:bd5b7040
+[ 1829.041082] ---[ end trace 47381d9c23938c43 ]---
+[ 1829.045761] Unable to handle kernel NULL pointer dereference at virtual address 0000000c
+[ 1829.053858] pgd = 80004000
+[ 1829.056570] [0000000c] *pgd=00000000
+[ 1829.060168] Internal error: Oops: 17 [#1] SMP ARM
+[ 1829.064877] Modules linked in:
+[ 1829.067955] CPU: 0 PID: 1080 Comm: kworker/0:0 Tainted: G W      3.19.0-00115-gc70616a #450
+[ 1829.076916] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[ 1829.083454] Workqueue: events ata_scsi_hotplug
+[ 1829.087917] task: bd549380 ti: bd7c2000 task.ti: bd7c2000
+[ 1829.093327] PC is at ida_remove+0xc/0x15c
+[ 1829.097343] LR is at ida_simple_remove+0x34/0x48
+[ 1829.101967] pc : [<80256d88>]    lr : [<80256fcc>] psr: 60000093
+[ 1829.101967] sp : bd7c3be8  ip : bd7c3c18  fp : bd7c3c14
+[ 1829.113449] r10: 00000000  r9 : 20000013  r8 : 00000008
+[ 1829.118679] r7 : 00000000  r6 : 00000000  r5 : 00000008  r4 : 60000013
+[ 1829.125210] r3 : bd549380  r2 : 00000000  r1 : 00000000  r0 : 00000008
+[ 1829.131743] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM Segment kernel
+[ 1829.139144] Control: 10c5387d  Table: 4d4a804a  DAC: 00000015
+[ 1829.144894] Process kworker/0:0 (pid: 1080, stack limit = 0xbd7c2238)
+[ 1829.151339] Stack: (0xbd7c3be8 to 0xbd7c4000)
+[ 1829.155704] 3be0:                   bd549380 60000013 00000008 00000000 00000000 00000008
+[ 1829.163890] 3c00: 20000013 00000000 bd7c3c34 bd7c3c18 80256fcc 80256d88 00000000 bd4457e0
+[ 1829.172076] 3c20: 00000000 80873979 bd7c3c6c bd7c3c38 8012e8c0 80256fa4 800257d8 8002570c
+[ 1829.180261] 3c40: 00000000 bd4457e0 bd4457e0 8012f82c bd7c3c98 bd838000 20000013 00000000
+[ 1829.188447] 3c60: bd7c3cc4 bd7c3c70 8012ef90 8012e7a0 00000001 00000000 8012f824 bd7c3af4
+[ 1829.196632] 3c80: bd549380 00000000 bd7c3cc4 bd7c3c98 8002579c 80025420 00000060 8084dbf8
+[ 1829.204818] 3ca0: 8084dbf8 bd4457e0 00000000 ffffffff bd838000 00000000 bd7c3cdc bd7c3cc8
+[ 1829.213003] 3cc0: 8012f82c 8012ed10 bd4457e0 80873981 bd7c3cf4 bd7c3ce0 801318d8 8012f810
+[ 1829.221189] 3ce0: bd412808 bd4457e0 bd7c3d0c bd7c3cf8 8025724c 80131874 bd412800 bd412808
+[ 1829.229375] 3d00: bd7c3d24 bd7c3d10 802351c0 8025723c bd417000 bdb71e28 bd7c3d3c bd7c3d28
+[ 1829.237560] 3d20: 8023bbd0 8023519c bd417000 bd7c3d40 bd7c3d6c bd7c3d40 80248b88 8023bb8c
+[ 1829.245746] 3d40: bd417000 00000000 00000000 00000003 bd416c00 bd420108 bd416c08 00800000
+[ 1829.253932] 3d60: bd7c3d94 bd7c3d70 8032fabc 80248aa8 8030b058 805be6f8 bd420108 80860128
+[ 1829.262118] 3d80: 8085f994 bd838000 bd7c3dac bd7c3d98 8030252c 8032fa7c bd42013c bd420108
+[ 1829.270304] 3da0: bd7c3dc4 bd7c3db0 80302598 803024b4 bd420108 be1c0a4c bd7c3de4 bd7c3dc8
+[ 1829.278489] 3dc0: 8030216c 8030257c 00000000 bd420108 bd420108 bd416818 bd7c3e14 bd7c3de8
+[ 1829.286674] 3de0: 802ff5c4 80302090 bd420000 bd420108 bdbc10f8 bd838000 bd7c3e14 bd420000
+[ 1829.294860] 3e00: bd420108 bdbc10f8 bd7c3e2c bd7c3e18 8032d108 802ff47c be11c868 bd420000
+[ 1829.303045] 3e20: bd7c3e44 bd7c3e30 8032d19c 8032d0c4 bdbc1490 bd420000 bd7c3e74 bd7c3e48
+[ 1829.311231] 3e40: 8033e7b0 8032d17c bdbc0000 bd838000 000021f0 bd83a7d8 bd83a790 0000fe88
+[ 1829.319416] 3e60: 00000000 00000001 bd7c3e9c bd7c3e78 80341b70 8033e6c8 80341aec bd519180
+[ 1829.327602] 3e80: bd83a7d8 bf7a3080 bf7a6500 00000000 bd7c3ef4 bd7c3ea0 800395b0 80341af8
+[ 1829.335787] 3ea0: 00000001 00000000 8003953c 800397b4 bf7a3080 00000000 81043cd0 809d4360
+[ 1829.343973] 3ec0: 00000000 8078dd1c 805c3170 bd519180 bf7a3080 bd519198 bf7a30b0 bf7a3080
+[ 1829.352158] 3ee0: 00000008 00000000 bd7c3f24 bd7c3ef8 80039a80 80039370 bd549380 00000000
+[ 1829.360343] 3f00: bd5b7040 bd519180 80039788 00000000 00000000 00000000 bd7c3fac bd7c3f28
+[ 1829.368528] 3f20: 8003e35c 80039794 bd7c3f44 00000000 8005aa8c bd519180 00000000 00000000
+[ 1829.376714] 3f40: dead4ead ffffffff ffffffff 80875610 00000000 00000000 80746bdf bd7c3f5c
+[ 1829.384899] 3f60: bd7c3f5c 00000000 00000000 dead4ead ffffffff ffffffff 80875610 00000000
+[ 1829.393084] 3f80: 00000000 80746bdf bd7c3f88 bd7c3f88 bd5b7040 8003e270 00000000 00000000
+[ 1829.401268] 3fa0: 00000000 bd7c3fb0 8000e210 8003e27c 00000000 00000000 00000000 00000000
+[ 1829.409451] 3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[ 1829.417635] 3fe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 00000000
+[ 1829.425814] Backtrace:
+[ 1829.428288] [<80256d7c>] (ida_remove) from [<80256fcc>] (ida_simple_remove+0x34/0x48)
+[ 1829.436120]  r10:00000000 r9:20000013 r8:00000008 r7:00000000 r6:00000000 r5:00000008
+[ 1829.444031]  r4:60000013 r3:bd549380
+[ 1829.447650] [<80256f98>] (ida_simple_remove) from [<8012e8c0>] (kernfs_put+0x12c/0x1a4)
+[ 1829.455656]  r6:80873979 r5:00000000 r4:bd4457e0 r3:00000000
+[ 1829.461385] [<8012e794>] (kernfs_put) from [<8012ef90>] (__kernfs_remove+0x28c/0x2dc)
+[ 1829.469217]  r10:00000000 r9:20000013 r8:bd838000 r7:bd7c3c98 r6:8012f82c r5:bd4457e0
+[ 1829.477127]  r4:bd4457e0
+[ 1829.479686] [<8012ed04>] (__kernfs_remove) from [<8012f82c>] (kernfs_remove+0x28/0x38)
+[ 1829.487604]  r10:00000000 r8:bd838000 r7:ffffffff r6:00000000 r5:bd4457e0 r4:8084dbf8
+[ 1829.495525] [<8012f804>] (kernfs_remove) from [<801318d8>] (sysfs_remove_dir+0x70/0x80)
+[ 1829.503531]  r5:80873981 r4:bd4457e0
+[ 1829.507146] [<80131868>] (sysfs_remove_dir) from [<8025724c>] (kobject_del+0x1c/0x4c)
+[ 1829.514977]  r5:bd4457e0 r4:bd412808
+[ 1829.518602] [<80257230>] (kobject_del) from [<802351c0>] (elv_unregister_queue+0x30/0x40)
+[ 1829.526782]  r5:bd412808 r4:bd412800
+[ 1829.530402] [<80235190>] (elv_unregister_queue) from [<8023bbd0>] (blk_unregister_queue+0x50/0x7c)
+[ 1829.539364]  r5:bdb71e28 r4:bd417000
+[ 1829.542984] [<8023bb80>] (blk_unregister_queue) from [<80248b88>] (del_gendisk+0xec/0x1b0)
+[ 1829.551250]  r5:bd7c3d40 r4:bd417000
+[ 1829.554871] [<80248a9c>] (del_gendisk) from [<8032fabc>] (sd_remove+0x4c/0xb4)
+[ 1829.562096]  r7:00800000 r6:bd416c08 r5:bd420108 r4:bd416c00
+[ 1829.567830] [<8032fa70>] (sd_remove) from [<8030252c>] (__device_release_driver+0x84/0xc8)
+[ 1829.576096]  r7:bd838000 r6:8085f994 r5:80860128 r4:bd420108
+[ 1829.581825] [<803024a8>] (__device_release_driver) from [<80302598>] (device_release_driver+0x28/0x34)
+[ 1829.591134]  r5:bd420108 r4:bd42013c
+[ 1829.594749] [<80302570>] (device_release_driver) from [<8030216c>] (bus_remove_device+0xe8/0xf8)
+[ 1829.603536]  r5:be1c0a4c r4:bd420108
+[ 1829.607156] [<80302084>] (bus_remove_device) from [<802ff5c4>] (device_del+0x154/0x1e0)
+[ 1829.615163]  r6:bd416818 r5:bd420108 r4:bd420108 r3:00000000
+[ 1829.620895] [<802ff470>] (device_del) from [<8032d108>] (__scsi_remove_device+0x50/0xb8)
+[ 1829.628988]  r6:bdbc10f8 r5:bd420108 r4:bd420000
+[ 1829.633660] [<8032d0b8>] (__scsi_remove_device) from [<8032d19c>] (scsi_remove_device+0x2c/0x38)
+[ 1829.642446]  r5:bd420000 r4:be11c868
+[ 1829.646064] [<8032d170>] (scsi_remove_device) from [<8033e7b0>] (ata_scsi_handle_link_detach+0xf4/0x12c)
+[ 1829.655546]  r5:bd420000 r4:bdbc1490
+[ 1829.659163] [<8033e6bc>] (ata_scsi_handle_link_detach) from [<80341b70>] (ata_scsi_hotplug+0x84/0xac)
+[ 1829.668385]  r10:00000001 r9:00000000 r8:0000fe88 r7:bd83a790 r6:bd83a7d8 r5:000021f0
+[ 1829.676295]  r4:bd838000 r3:bdbc0000
+[ 1829.679912] [<80341aec>] (ata_scsi_hotplug) from [<800395b0>] (process_one_work+0x24c/0x3f0)
+[ 1829.688352]  r8:00000000 r7:bf7a6500 r6:bf7a3080 r5:bd83a7d8 r4:bd519180 r3:80341aec
+[ 1829.696182] [<80039364>] (process_one_work) from [<80039a80>] (worker_thread+0x2f8/0x410)
+[ 1829.704361]  r10:00000000 r9:00000008 r8:bf7a3080 r7:bf7a30b0 r6:bd519198 r5:bf7a3080
+[ 1829.712272]  r4:bd519180
+[ 1829.714831] [<80039788>] (worker_thread) from [<8003e35c>] (kthread+0xec/0x100)
+[ 1829.722142]  r10:00000000 r9:00000000 r8:00000000 r7:80039788 r6:bd519180 r5:bd5b7040
+[ 1829.730052]  r4:00000000 r3:bd549380
+[ 1829.733670] [<8003e270>] (kthread) from [<8000e210>] (ret_from_fork+0x14/0x24)
+[ 1829.740894]  r7:00000000 r6:00000000 r5:8003e270 r4:bd5b7040
+[ 1829.746623] Code: 80255dac e1a0c00d e92ddff8 e24cb004 (e9900120)
+[ 1829.752732] ---[ end trace 47381d9c23938c44 ]---
+[ 1829.757467] Unable to handle kernel paging request at virtual address ffffffd0
+[ 1829.764696] pgd = 80004000
+[ 1829.767409] [ffffffd0] *pgd=4fff6821, *pte=00000000, *ppte=00000000
+[ 1829.773729] Internal error: Oops: 17 [#2] SMP ARM
+[ 1829.778437] Modules linked in:
+[ 1829.781514] CPU: 0 PID: 1080 Comm: kworker/0:0 Tainted: G      D W      3.19.0-00115-gc70616a #450
+[ 1829.790477] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[ 1829.797017] task: bd549380 ti: bd7c2000 task.ti: bd7c2000
+[ 1829.802426] PC is at kthread_data+0x10/0x18
+[ 1829.806615] LR is at wq_worker_sleeping+0x14/0xe8
+[ 1829.811327] pc : [<8003e958>]    lr : [<8003a404>] psr: 00000193
+[ 1829.811327] sp : bd7c38d8  ip : bd7c38e8  fp : bd7c38e4
+[ 1829.822809] r10: 80834680  r9 : 8083e8b8  r8 : bd549560
+[ 1829.828039] r7 : bd5495e4  r6 : 00000000  r5 : bf7a3680  r4 : 00000000
+[ 1829.834571] r3 : 00000000  r2 : 71b98866  r1 : 00000000  r0 : bd549380
+[ 1829.841103] Flags: nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM Segment user
+[ 1829.848331] Control: 10c5387d  Table: 4d4a804a  DAC: 00000015
+[ 1829.854082] Process kworker/0:0 (pid: 1080, stack limit = 0xbd7c2238)
+[ 1829.860526] Stack: (0xbd7c38d8 to 0xbd7c4000)
+[ 1829.864889] 38c0:                                                       bd7c38fc bd7c38e8
+[ 1829.873076] 38e0: 8003a404 8003e954 0420806c bd549380 bd7c398c bd7c3900 805be224 8003a3fc
+[ 1829.881262] 3900: bd7c391c bd7c3910 8005aa8c 8005a8a0 bd7c3934 bd7c3920 805c36e8 8005aa84
+[ 1829.889448] 3920: bdb56070 bdb5607c bd7c3954 bd7c3938 8023d378 805c36b0 bdb56070 bdb5607c
+[ 1829.897634] 3940: 00000001 00000000 bd7c397c bd7c3958 8023d4b0 8023d2f4 bdb56078 bdb56070
+[ 1829.905819] 3960: bd549380 bd549380 bd7c37a8 bd7c39a4 00000000 bd549560 807427e8 00000001
+[ 1829.914005] 3980: bd7c399c bd7c3990 805be7cc 805be134 bd7c39c4 bd7c39a0 8002801c 805be744
+[ 1829.922190] 39a0: bd7c3a12 bd7c39a4 bd7c39a4 bd7c39b8 8002588c 00000000 bd7c3a44 bd7c39c8
+[ 1829.930375] 39c0: 800117b8 800277a4 bd7c2238 0000000b 00000017 80256d88 60000193 00000000
+[ 1829.938561] 39e0: 38062b0c 35353230 20636164 30613165 64303063 32396520 66666464 32652038
+[ 1829.946746] 3a00: 30626334 28203430 30393965 30323130 80002029 805b9c04 80748e8e 0000000c
+[ 1829.954931] 3a20: 00000017 00000000 bd7c3ba0 00000008 00000017 00000000 bd7c3a5c bd7c3a48
+[ 1829.963117] 3a40: 805b89ec 80011428 bd7c3ba0 bd549380 bd7c3af4 bd7c3a60 8001ad60 805b899c
+[ 1829.971302] 3a60: bd7c3a84 bd7c3a70 80028dc4 8006dbfc 00000137 00000000 bd7c3aa4 bd7c3a88
+[ 1829.979488] 3a80: 80063394 80028cec f4000100 bd7c3ac8 8083ea24 bd7c3afc bd549380 80061e34
+[ 1829.987674] 3aa0: 80847bc8 20000093 80054978 0000a198 81031b68 81031b68 00000001 20000093
+[ 1829.995859] 3ac0: 80847b4c 00000000 00000930 00000017 80843224 0000000c bd7c3ba0 00000008
+[ 1830.004044] 3ae0: 20000013 00000000 bd7c3b9c bd7c3af8 80008520 8001aa14 00000223 00000000
+[ 1830.012230] 3b00: bd7c3b5c bd7c3b10 00000000 80854fb8 bd549380 bd549868 00000000 00000006
+[ 1830.020415] 3b20: 00000031 00000001 bd7c3bb4 bd7c3b38 80058868 80057a78 00000006 00000004
+[ 1830.028600] 3b40: 810324ba 60000013 00000000 00000000 000004e8 00000000 443c85c1 2f510b82
+[ 1830.036785] 3b60: 00000000 00000000 00000000 00000000 810324ba 00000024 bd7c3b90 bd7c3be4
+[ 1830.044970] 3b80: 80256d88 60000093 ffffffff bd7c3bd4 bd7c3c14 bd7c3ba0 80011ee4 800084f0
+[ 1830.053155] 3ba0: 00000008 00000000 00000000 bd549380 60000013 00000008 00000000 00000000
+[ 1830.061341] 3bc0: 00000008 20000013 00000000 bd7c3c14 bd7c3c18 bd7c3be8 80256fcc 80256d88
+[ 1830.069526] 3be0: 60000093 ffffffff bd549380 60000013 00000008 00000000 00000000 00000008
+[ 1830.077711] 3c00: 20000013 00000000 bd7c3c34 bd7c3c18 80256fcc 80256d88 00000000 bd4457e0
+[ 1830.085896] 3c20: 00000000 80873979 bd7c3c6c bd7c3c38 8012e8c0 80256fa4 800257d8 8002570c
+[ 1830.094081] 3c40: 00000000 bd4457e0 bd4457e0 8012f82c bd7c3c98 bd838000 20000013 00000000
+[ 1830.102267] 3c60: bd7c3cc4 bd7c3c70 8012ef90 8012e7a0 00000001 00000000 8012f824 bd7c3af4
+[ 1830.110452] 3c80: bd549380 00000000 bd7c3cc4 bd7c3c98 8002579c 80025420 00000060 8084dbf8
+[ 1830.118637] 3ca0: 8084dbf8 bd4457e0 00000000 ffffffff bd838000 00000000 bd7c3cdc bd7c3cc8
+[ 1830.126823] 3cc0: 8012f82c 8012ed10 bd4457e0 80873981 bd7c3cf4 bd7c3ce0 801318d8 8012f810
+[ 1830.135008] 3ce0: bd412808 bd4457e0 bd7c3d0c bd7c3cf8 8025724c 80131874 bd412800 bd412808
+[ 1830.143194] 3d00: bd7c3d24 bd7c3d10 802351c0 8025723c bd417000 bdb71e28 bd7c3d3c bd7c3d28
+[ 1830.151380] 3d20: 8023bbd0 8023519c bd417000 bd7c3d40 bd7c3d6c bd7c3d40 80248b88 8023bb8c
+[ 1830.159565] 3d40: bd417000 00000000 00000000 00000003 bd416c00 bd420108 bd416c08 00800000
+[ 1830.167751] 3d60: bd7c3d94 bd7c3d70 8032fabc 80248aa8 8030b058 805be6f8 bd420108 80860128
+[ 1830.175937] 3d80: 8085f994 bd838000 bd7c3dac bd7c3d98 8030252c 8032fa7c bd42013c bd420108
+[ 1830.184122] 3da0: bd7c3dc4 bd7c3db0 80302598 803024b4 bd420108 be1c0a4c bd7c3de4 bd7c3dc8
+[ 1830.192308] 3dc0: 8030216c 8030257c 00000000 bd420108 bd420108 bd416818 bd7c3e14 bd7c3de8
+[ 1830.200493] 3de0: 802ff5c4 80302090 bd420000 bd420108 bdbc10f8 bd838000 bd7c3e14 bd420000
+[ 1830.208678] 3e00: bd420108 bdbc10f8 bd7c3e2c bd7c3e18 8032d108 802ff47c be11c868 bd420000
+[ 1830.216864] 3e20: bd7c3e44 bd7c3e30 8032d19c 8032d0c4 bdbc1490 bd420000 bd7c3e74 bd7c3e48
+[ 1830.225049] 3e40: 8033e7b0 8032d17c bdbc0000 bd838000 000021f0 bd83a7d8 bd83a790 0000fe88
+[ 1830.233235] 3e60: 00000000 00000001 bd7c3e9c bd7c3e78 80341b70 8033e6c8 80341aec bd519180
+[ 1830.241421] 3e80: bd83a7d8 bf7a3080 bf7a6500 00000000 bd7c3ef4 bd7c3ea0 800395b0 80341af8
+[ 1830.249606] 3ea0: 00000001 00000000 8003953c 800397b4 bf7a3080 00000000 81043cd0 809d4360
+[ 1830.257791] 3ec0: 00000000 8078dd1c 805c3170 bd519180 bf7a3080 bd519198 bf7a30b0 bf7a3080
+[ 1830.265976] 3ee0: 00000008 00000000 bd7c3f24 bd7c3ef8 80039a80 80039370 bd549380 00000000
+[ 1830.274161] 3f00: bd5b7040 bd519180 80039788 00000000 00000000 00000000 bd7c3fac bd7c3f28
+[ 1830.282346] 3f20: 8003e35c 80039794 bd7c3f44 00000000 8005aa8c bd519180 00000000 00000000
+[ 1830.290532] 3f40: dead4ead ffffffff ffffffff 80875610 00000000 00000000 80746bdf bd7c3f5c
+[ 1830.298717] 3f60: bd7c3f5c 00000001 00010001 dead4ead ffffffff ffffffff 80875610 00000000
+[ 1830.306902] 3f80: 00000000 80746bdf bd7c3f88 bd7c3f88 bd5b7040 8003e270 00000000 00000000
+[ 1830.315086] 3fa0: 00000000 bd7c3fb0 8000e210 8003e27c 00000000 00000000 00000000 00000000
+[ 1830.323270] 3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[ 1830.331454] 3fe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 00000000
+[ 1830.339633] Backtrace:
+[ 1830.342106] [<8003e948>] (kthread_data) from [<8003a404>] (wq_worker_sleeping+0x14/0xe8)
+[ 1830.350213] [<8003a3f0>] (wq_worker_sleeping) from [<805be224>] (__schedule+0xfc/0x594)
+[ 1830.358219]  r4:bd549380 r3:0420806c
+[ 1830.361835] [<805be128>] (__schedule) from [<805be7cc>] (schedule+0x94/0x98)
+[ 1830.368886]  r10:00000001 r9:807427e8 r8:bd549560 r7:00000000 r6:bd7c39a4 r5:bd7c37a8
+[ 1830.376798]  r4:bd549380
+[ 1830.379360] [<805be738>] (schedule) from [<8002801c>] (do_exit+0x884/0x8bc)
+[ 1830.386337] [<80027798>] (do_exit) from [<800117b8>] (die+0x39c/0x3f0)
+[ 1830.392867]  r7:00000000
+[ 1830.395428] [<8001141c>] (die) from [<805b89ec>] (__do_kernel_fault.part.11+0x5c/0x7c)
+[ 1830.403347]  r10:00000000 r9:00000017 r8:00000008 r7:bd7c3ba0 r6:00000000 r5:00000017
+[ 1830.411258]  r4:0000000c
+[ 1830.413819] [<805b8990>] (__do_kernel_fault.part.11) from [<8001ad60>] (do_page_fault+0x358/0x378)
+[ 1830.422779]  r7:bd549380 r3:bd7c3ba0
+[ 1830.426394] [<8001aa08>] (do_page_fault) from [<80008520>] (do_DataAbort+0x3c/0xa0)
+[ 1830.434052]  r10:00000000 r9:20000013 r8:00000008 r7:bd7c3ba0 r6:0000000c r5:80843224
+[ 1830.441963]  r4:00000017
+[ 1830.444521] [<800084e4>] (do_DataAbort) from [<80011ee4>] (__dabt_svc+0x44/0x80)
+[ 1830.451920] Exception stack(0xbd7c3ba0 to 0xbd7c3be8)
+[ 1830.456980] 3ba0: 00000008 00000000 00000000 bd549380 60000013 00000008 00000000 00000000
+[ 1830.465165] 3bc0: 00000008 20000013 00000000 bd7c3c14 bd7c3c18 bd7c3be8 80256fcc 80256d88
+[ 1830.473347] 3be0: 60000093 ffffffff
+[ 1830.476838]  r7:bd7c3bd4 r6:ffffffff r5:60000093 r4:80256d88
+[ 1830.482574] [<80256d7c>] (ida_remove) from [<80256fcc>] (ida_simple_remove+0x34/0x48)
+[ 1830.490407]  r10:00000000 r9:20000013 r8:00000008 r7:00000000 r6:00000000 r5:00000008
+[ 1830.498316]  r4:60000013 r3:bd549380
+[ 1830.501936] [<80256f98>] (ida_simple_remove) from [<8012e8c0>] (kernfs_put+0x12c/0x1a4)
+[ 1830.509942]  r6:80873979 r5:00000000 r4:bd4457e0 r3:00000000
+[ 1830.515673] [<8012e794>] (kernfs_put) from [<8012ef90>] (__kernfs_remove+0x28c/0x2dc)
+[ 1830.523505]  r10:00000000 r9:20000013 r8:bd838000 r7:bd7c3c98 r6:8012f82c r5:bd4457e0
+[ 1830.531415]  r4:bd4457e0
+[ 1830.533973] [<8012ed04>] (__kernfs_remove) from [<8012f82c>] (kernfs_remove+0x28/0x38)
+[ 1830.541892]  r10:00000000 r8:bd838000 r7:ffffffff r6:00000000 r5:bd4457e0 r4:8084dbf8
+[ 1830.549812] [<8012f804>] (kernfs_remove) from [<801318d8>] (sysfs_remove_dir+0x70/0x80)
+[ 1830.557818]  r5:80873981 r4:bd4457e0
+[ 1830.561434] [<80131868>] (sysfs_remove_dir) from [<8025724c>] (kobject_del+0x1c/0x4c)
+[ 1830.569267]  r5:bd4457e0 r4:bd412808
+[ 1830.572888] [<80257230>] (kobject_del) from [<802351c0>] (elv_unregister_queue+0x30/0x40)
+[ 1830.581068]  r5:bd412808 r4:bd412800
+[ 1830.584690] [<80235190>] (elv_unregister_queue) from [<8023bbd0>] (blk_unregister_queue+0x50/0x7c)
+[ 1830.593650]  r5:bdb71e28 r4:bd417000
+[ 1830.597270] [<8023bb80>] (blk_unregister_queue) from [<80248b88>] (del_gendisk+0xec/0x1b0)
+[ 1830.605536]  r5:bd7c3d40 r4:bd417000
+[ 1830.609156] [<80248a9c>] (del_gendisk) from [<8032fabc>] (sd_remove+0x4c/0xb4)
+[ 1830.616382]  r7:00800000 r6:bd416c08 r5:bd420108 r4:bd416c00
+[ 1830.622116] [<8032fa70>] (sd_remove) from [<8030252c>] (__device_release_driver+0x84/0xc8)
+[ 1830.630382]  r7:bd838000 r6:8085f994 r5:80860128 r4:bd420108
+[ 1830.636114] [<803024a8>] (__device_release_driver) from [<80302598>] (device_release_driver+0x28/0x34)
+[ 1830.645422]  r5:bd420108 r4:bd42013c
+[ 1830.649037] [<80302570>] (device_release_driver) from [<8030216c>] (bus_remove_device+0xe8/0xf8)
+[ 1830.657824]  r5:be1c0a4c r4:bd420108
+[ 1830.661444] [<80302084>] (bus_remove_device) from [<802ff5c4>] (device_del+0x154/0x1e0)
+[ 1830.669450]  r6:bd416818 r5:bd420108 r4:bd420108 r3:00000000
+[ 1830.675181] [<802ff470>] (device_del) from [<8032d108>] (__scsi_remove_device+0x50/0xb8)
+[ 1830.683274]  r6:bdbc10f8 r5:bd420108 r4:bd420000
+[ 1830.687947] [<8032d0b8>] (__scsi_remove_device) from [<8032d19c>] (scsi_remove_device+0x2c/0x38)
+[ 1830.696734]  r5:bd420000 r4:be11c868
+[ 1830.700353] [<8032d170>] (scsi_remove_device) from [<8033e7b0>] (ata_scsi_handle_link_detach+0xf4/0x12c)
+[ 1830.709835]  r5:bd420000 r4:bdbc1490
+[ 1830.713452] [<8033e6bc>] (ata_scsi_handle_link_detach) from [<80341b70>] (ata_scsi_hotplug+0x84/0xac)
+[ 1830.722673]  r10:00000001 r9:00000000 r8:0000fe88 r7:bd83a790 r6:bd83a7d8 r5:000021f0
+[ 1830.730584]  r4:bd838000 r3:bdbc0000
+[ 1830.734200] [<80341aec>] (ata_scsi_hotplug) from [<800395b0>] (process_one_work+0x24c/0x3f0)
+[ 1830.742640]  r8:00000000 r7:bf7a6500 r6:bf7a3080 r5:bd83a7d8 r4:bd519180 r3:80341aec
+[ 1830.750470] [<80039364>] (process_one_work) from [<80039a80>] (worker_thread+0x2f8/0x410)
+[ 1830.758649]  r10:00000000 r9:00000008 r8:bf7a3080 r7:bf7a30b0 r6:bd519198 r5:bf7a3080
+[ 1830.766559]  r4:bd519180
+[ 1830.769119] [<80039788>] (worker_thread) from [<8003e35c>] (kthread+0xec/0x100)
+[ 1830.776430]  r10:00000000 r9:00000000 r8:00000000 r7:80039788 r6:bd519180 r5:bd5b7040
+[ 1830.784341]  r4:00000000 r3:bd549380
+[ 1830.787959] [<8003e270>] (kthread) from [<8000e210>] (ret_from_fork+0x14/0x24)
+[ 1830.795184]  r7:00000000 r6:00000000 r5:8003e270 r4:bd5b7040
+[ 1830.800913] Code: e1a0c00d e92dd800 e24cb004 e5903238 (e5130030)
+[ 1830.807013] ---[ end trace 47381d9c23938c45 ]---
+[ 1830.811634] Fixing recursive fault but reboot is needed!
+[ 1833.317259] BUG: spinlock lockup suspected on CPU#0, kworker/0:0/1080
+[ 1833.323709]  lock: 0xbf7a3680, .magic: dead4ead, .owner: kworker/0:0/1080, .owner_cpu: 0
+[ 1833.331808] CPU: 0 PID: 1080 Comm: kworker/0:0 Tainted: G      D W      3.19.0-00115-gc70616a #450
+[ 1833.340770] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[ 1833.347305] Backtrace:
+[ 1833.349780] [<8001127c>] (dump_backtrace) from [<80011418>] (show_stack+0x18/0x1c)
+[ 1833.357352]  r6:0039911c r5:00000000 r4:00000000 r3:00000000
+[ 1833.363085] [<80011400>] (show_stack) from [<805bbab4>] (dump_stack+0x80/0x9c)
+[ 1833.370317] [<805bba34>] (dump_stack) from [<805b9b50>] (spin_dump+0x80/0x94)
+[ 1833.377455]  r5:bf7a3680 r4:bd549380
+[ 1833.381075] [<805b9ad0>] (spin_dump) from [<8005d108>] (do_raw_spin_lock+0x124/0x19c)
+[ 1833.388908]  r5:80854f8c r4:bf7a3680
+[ 1833.392525] [<8005cfe4>] (do_raw_spin_lock) from [<805c3170>] (_raw_spin_lock_irq+0x48/0x50)
+[ 1833.400966]  r9:8083e8b8 r8:8003e958 r7:00000000 r6:00000000 r5:805be19c r4:bf7a3680
+[ 1833.408799] [<805c3128>] (_raw_spin_lock_irq) from [<805be19c>] (__schedule+0x74/0x594)
+[ 1833.416805]  r5:bf7a3680 r4:bd549380
+[ 1833.420421] [<805be128>] (__schedule) from [<805be7cc>] (schedule+0x94/0x98)
+[ 1833.427472]  r10:00000008 r9:807427e8 r8:8003e958 r7:00000000 r6:bd7c3702 r5:0000000b
+[ 1833.435383]  r4:bd549380
+[ 1833.437944] [<805be738>] (schedule) from [<800278b4>] (do_exit+0x11c/0x8bc)
+[ 1833.444918] [<80027798>] (do_exit) from [<800117b8>] (die+0x39c/0x3f0)
+[ 1833.451448]  r7:00000000
+[ 1833.454007] [<8001141c>] (die) from [<805b89ec>] (__do_kernel_fault.part.11+0x5c/0x7c)
+[ 1833.461926]  r10:00000000 r9:00000017 r8:bd549560 r7:bd7c3890 r6:00000000 r5:00000017
+[ 1833.469836]  r4:ffffffd0
+[ 1833.472394] [<805b8990>] (__do_kernel_fault.part.11) from [<8001ad60>] (do_page_fault+0x358/0x378)
+[ 1833.481355]  r7:bd549380 r3:bd7c3890
+[ 1833.484969] [<8001aa08>] (do_page_fault) from [<80008520>] (do_DataAbort+0x3c/0xa0)
+[ 1833.492627]  r10:80834680 r9:8083e8b8 r8:bd549560 r7:bd7c3890 r6:ffffffd0 r5:80843224
+[ 1833.500538]  r4:00000017
+[ 1833.503093] [<800084e4>] (do_DataAbort) from [<80011ee4>] (__dabt_svc+0x44/0x80)
+[ 1833.510493] Exception stack(0xbd7c3890 to 0xbd7c38d8)
+[ 1833.515551] 3880:                                     bd549380 00000000 71b98866 00000000
+[ 1833.523737] 38a0: 00000000 bf7a3680 00000000 bd5495e4 bd549560 8083e8b8 80834680 bd7c38e4
+[ 1833.531921] 38c0: bd7c38e8 bd7c38d8 8003a404 8003e958 00000193 ffffffff
+[ 1833.538537]  r7:bd7c38c4 r6:ffffffff r5:00000193 r4:8003e958
+[ 1833.544270] [<8003e948>] (kthread_data) from [<8003a404>] (wq_worker_sleeping+0x14/0xe8)
+[ 1833.552373] [<8003a3f0>] (wq_worker_sleeping) from [<805be224>] (__schedule+0xfc/0x594)
+[ 1833.560379]  r4:bd549380 r3:0420806c
+[ 1833.563994] [<805be128>] (__schedule) from [<805be7cc>] (schedule+0x94/0x98)
+[ 1833.571045]  r10:00000001 r9:807427e8 r8:bd549560 r7:00000000 r6:bd7c39a4 r5:bd7c37a8
+[ 1833.578954]  r4:bd549380
+[ 1833.581513] [<805be738>] (schedule) from [<8002801c>] (do_exit+0x884/0x8bc)
+[ 1833.588485] [<80027798>] (do_exit) from [<800117b8>] (die+0x39c/0x3f0)
+[ 1833.595015]  r7:00000000
+[ 1833.597574] [<8001141c>] (die) from [<805b89ec>] (__do_kernel_fault.part.11+0x5c/0x7c)
+[ 1833.605493]  r10:00000000 r9:00000017 r8:00000008 r7:bd7c3ba0 r6:00000000 r5:00000017
+[ 1833.613403]  r4:0000000c
+[ 1833.615961] [<805b8990>] (__do_kernel_fault.part.11) from [<8001ad60>] (do_page_fault+0x358/0x378)
+[ 1833.624922]  r7:bd549380 r3:bd7c3ba0
+[ 1833.628536] [<8001aa08>] (do_page_fault) from [<80008520>] (do_DataAbort+0x3c/0xa0)
+[ 1833.636194]  r10:00000000 r9:20000013 r8:00000008 r7:bd7c3ba0 r6:0000000c r5:80843224
+[ 1833.644105]  r4:00000017
+[ 1833.646662] [<800084e4>] (do_DataAbort) from [<80011ee4>] (__dabt_svc+0x44/0x80)
+[ 1833.654061] Exception stack(0xbd7c3ba0 to 0xbd7c3be8)
+[ 1833.659121] 3ba0: 00000008 00000000 00000000 bd549380 60000013 00000008 00000000 00000000
+[ 1833.667306] 3bc0: 00000008 20000013 00000000 bd7c3c14 bd7c3c18 bd7c3be8 80256fcc 80256d88
+[ 1833.675487] 3be0: 60000093 ffffffff
+[ 1833.678978]  r7:bd7c3bd4 r6:ffffffff r5:60000093 r4:80256d88
+[ 1833.684715] [<80256d7c>] (ida_remove) from [<80256fcc>] (ida_simple_remove+0x34/0x48)
+[ 1833.692548]  r10:00000000 r9:20000013 r8:00000008 r7:00000000 r6:00000000 r5:00000008
+[ 1833.700460]  r4:60000013 r3:bd549380
+[ 1833.704076] [<80256f98>] (ida_simple_remove) from [<8012e8c0>] (kernfs_put+0x12c/0x1a4)
+[ 1833.712082]  r6:80873979 r5:00000000 r4:bd4457e0 r3:00000000
+[ 1833.717812] [<8012e794>] (kernfs_put) from [<8012ef90>] (__kernfs_remove+0x28c/0x2dc)
+[ 1833.725644]  r10:00000000 r9:20000013 r8:bd838000 r7:bd7c3c98 r6:8012f82c r5:bd4457e0
+[ 1833.733555]  r4:bd4457e0
+[ 1833.736112] [<8012ed04>] (__kernfs_remove) from [<8012f82c>] (kernfs_remove+0x28/0x38)
+[ 1833.744031]  r10:00000000 r8:bd838000 r7:ffffffff r6:00000000 r5:bd4457e0 r4:8084dbf8
+[ 1833.751950] [<8012f804>] (kernfs_remove) from [<801318d8>] (sysfs_remove_dir+0x70/0x80)
+[ 1833.759955]  r5:80873981 r4:bd4457e0
+[ 1833.763572] [<80131868>] (sysfs_remove_dir) from [<8025724c>] (kobject_del+0x1c/0x4c)
+[ 1833.771404]  r5:bd4457e0 r4:bd412808
+[ 1833.775023] [<80257230>] (kobject_del) from [<802351c0>] (elv_unregister_queue+0x30/0x40)
+[ 1833.783203]  r5:bd412808 r4:bd412800
+[ 1833.786823] [<80235190>] (elv_unregister_queue) from [<8023bbd0>] (blk_unregister_queue+0x50/0x7c)
+[ 1833.795784]  r5:bdb71e28 r4:bd417000
+[ 1833.799404] [<8023bb80>] (blk_unregister_queue) from [<80248b88>] (del_gendisk+0xec/0x1b0)
+[ 1833.807670]  r5:bd7c3d40 r4:bd417000
+[ 1833.811289] [<80248a9c>] (del_gendisk) from [<8032fabc>] (sd_remove+0x4c/0xb4)
+[ 1833.818515]  r7:00800000 r6:bd416c08 r5:bd420108 r4:bd416c00
+[ 1833.824250] [<8032fa70>] (sd_remove) from [<8030252c>] (__device_release_driver+0x84/0xc8)
+[ 1833.832517]  r7:bd838000 r6:8085f994 r5:80860128 r4:bd420108
+[ 1833.838248] [<803024a8>] (__device_release_driver) from [<80302598>] (device_release_driver+0x28/0x34)
+[ 1833.847556]  r5:bd420108 r4:bd42013c
+[ 1833.851171] [<80302570>] (device_release_driver) from [<8030216c>] (bus_remove_device+0xe8/0xf8)
+[ 1833.859958]  r5:be1c0a4c r4:bd420108
+[ 1833.863578] [<80302084>] (bus_remove_device) from [<802ff5c4>] (device_del+0x154/0x1e0)
+[ 1833.871584]  r6:bd416818 r5:bd420108 r4:bd420108 r3:00000000
+[ 1833.877316] [<802ff470>] (device_del) from [<8032d108>] (__scsi_remove_device+0x50/0xb8)
+[ 1833.885409]  r6:bdbc10f8 r5:bd420108 r4:bd420000
+[ 1833.890083] [<8032d0b8>] (__scsi_remove_device) from [<8032d19c>] (scsi_remove_device+0x2c/0x38)
+[ 1833.898870]  r5:bd420000 r4:be11c868
+[ 1833.902490] [<8032d170>] (scsi_remove_device) from [<8033e7b0>] (ata_scsi_handle_link_detach+0xf4/0x12c)
+[ 1833.911971]  r5:bd420000 r4:bdbc1490
+[ 1833.915590] [<8033e6bc>] (ata_scsi_handle_link_detach) from [<80341b70>] (ata_scsi_hotplug+0x84/0xac)
+[ 1833.924811]  r10:00000001 r9:00000000 r8:0000fe88 r7:bd83a790 r6:bd83a7d8 r5:000021f0
+[ 1833.932723]  r4:bd838000 r3:bdbc0000
+[ 1833.936341] [<80341aec>] (ata_scsi_hotplug) from [<800395b0>] (process_one_work+0x24c/0x3f0)
+[ 1833.944781]  r8:00000000 r7:bf7a6500 r6:bf7a3080 r5:bd83a7d8 r4:bd519180 r3:80341aec
+[ 1833.952612] [<80039364>] (process_one_work) from [<80039a80>] (worker_thread+0x2f8/0x410)
+[ 1833.960792]  r10:00000000 r9:00000008 r8:bf7a3080 r7:bf7a30b0 r6:bd519198 r5:bf7a3080
+[ 1833.968703]  r4:bd519180
+[ 1833.971262] [<80039788>] (worker_thread) from [<8003e35c>] (kthread+0xec/0x100)
+[ 1833.978573]  r10:00000000 r9:00000000 r8:00000000 r7:80039788 r6:bd519180 r5:bd5b7040
+[ 1833.986484]  r4:00000000 r3:bd549380
+[ 1833.990101] [<8003e270>] (kthread) from [<8000e210>] (ret_from_fork+0x14/0x24)
+[ 1833.997326]  r7:00000000 r6:00000000 r5:8003e270 r4:bd5b7040 
