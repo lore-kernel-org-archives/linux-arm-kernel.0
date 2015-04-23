@@ -1,68 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Apr 2015 07:39:53 -0700
-Subject: [PATCH 1/1] gpio: omap: Fix PM runtime issue and remove most
- BANK_USED macros
-In-Reply-To: <5538D3B6.7060305@linaro.org>
-References: <1429632533-23285-1-git-send-email-tony@atomide.com>
- <5538D3B6.7060305@linaro.org>
-Message-ID: <20150423143952.GR18048@atomide.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 23 Apr 2015 11:08:53 -0400
+Subject: [PATCH 10/11] coresight-etm4x: Controls pertaining to the
+ context ID functions
+In-Reply-To: <1429742451-11465-11-git-send-email-mathieu.poirier@linaro.org>
+References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
+ <1429742451-11465-11-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <55390B05.1050801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii.Strashko at linaro.org <grygorii.strashko@linaro.org> [150423 04:13]:
-> On 04/21/2015 07:08 PM, Tony Lindgren wrote:
-> > @@ -438,11 +447,30 @@ static void omap_enable_gpio_module(struct gpio_bank *bank, unsigned offset)
-> >   		writel_relaxed(ctrl, reg);
-> >   		bank->context.ctrl = ctrl;
-> >   	}
-> > +
-> > +	if (is_irq) {
-> > +		omap_set_gpio_direction(bank, offset, 1);
-> > +		bank->irq_usage |= BIT(offset);
-> > +	} else {
-> > +		omap_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
-> > +		bank->mod_usage |= BIT(offset);
-> > +	}
+Hi Mathieu,
+
+On 04/22/2015 06:40 PM, Mathieu Poirier wrote:
+> From: Pratik Patel <pratikp@codeaurora.org>
 > 
-> The OMAP GPIO driver implements two Core interfaces IRQ-chip and GPIO-chip which, in general,
-> more or less independent. 
+> Adding sysfs entries to access and configure specifics about the
+> context ID comparator functions.
 > 
-> So, I don't think, that it's good to mix GPIO-IRQ-chip specific code with GPIO-chip code.
-> And this even don't really correspond the purpose of omap_enable_gpio_module() :( and might
-> introduce misunderstanding of code. The worst thing is that future fixes in IRQ-chip may 
-> affect on on GPIO-chip and vise versa :(
+> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  19 +++
+>  drivers/hwtracing/coresight/coresight-etm4x.c      | 187 +++++++++++++++++++++
+>  2 files changed, 206 insertions(+)
+> 
+> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+> index b5c0456290ab..8b32cb7b9723 100644
+> --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+> @@ -254,3 +254,22 @@ Date:		April 2015
+>  KernelVersion:	4.01
+>  Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
+>  Description: 	(RW) Controls the selection of the resources in the trace unit.
+> +
+> +What:		/sys/bus/coresight/devices/<memory_map>.etm/ctxid_idx
+> +Date:		April 2015
+> +KernelVersion:	4.01
+> +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
+> +Description:	(RW) Select which context ID comparator to work with.
+> +
+> +What:		/sys/bus/coresight/devices/<memory_map>.etm/ctxid_val
+> +Date:		April 2015
+> +KernelVersion:	4.01
+> +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
+> +Description:	(RW) Get/Set the context ID comparator value to trigger on.
 
-Hmm I'm thinking omap_enable/disable_gpio_module() eventually becomes
-our runtime_resume/suspend(). Currently the enabling and disabling is
-buggy for GPIO for some corner cases.. AFAIK the only difference between
-enabling GPIO vs GPIO-IRQ is the calling of omap_set_gpio_direction
-vs omap_set_gpio_triggering. Or at least that's the way it should be
-unless I'm missing something?
- 
-> Could we keep omap_xxx_gpio_module() functions responsible only for GPIO bank PM and
-> enabling/disabling?
+If I'm understanding this correctly, ctxid_val is multiplexed using ctxid_idx.
+Why not just have ctxid_val0, ctxid_val1, ...?
 
-If you're thinking about just thinking about having separate wrappers around
-it like this::
+Thanks,
+Chris
 
-static void omap_enable_gpio_module(struct gpio_bank *bank, unsigned offset,
-					bool is_irq)
-{
-	...
-}
-
-static void omap_enable_gpio((struct gpio_bank *bank, unsigned offset)
-{
-	omap_enable_gpio_module(bpio_bank, offset, 0);
-}
-
-static void omap_enable_gpio_irq((struct gpio_bank *bank, unsigned offset)
-{
-	omap_enable_gpio_module(bpio_bank, offset, 1);
-}
-
-Then yes makes sense to me. Or do you have something else in mind?
-
-Regards,
-
-Tony
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
