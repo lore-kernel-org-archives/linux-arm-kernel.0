@@ -1,45 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Apr 2015 13:56:23 +0100
-Subject: [PATCH 1/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
-References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
- <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20150423125620.GB29702@leverpostej>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Thu, 23 Apr 2015 15:05:41 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <2757951.K585xX1rYN@wuerfel>
+References: <5538DD02.6050401@topic.nl> <2757951.K585xX1rYN@wuerfel>
+Message-ID: <5538EE25.2030909@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/*
-> + * This is a temporary solution until we have new OPPv2 bindings. Therefore we
-> + * could describe the OPPs with (freq, volt, volt) tuple properly in device
-> + * tree.
-> + */
-> +
-> +/* OPP table for LITTLE cores of MT8173 */
-> +struct mtk_cpu_opp mt8173_l_opp[] = {
-> +       OPP(507000000, 859000, 0),
-> +       OPP(702000000, 908000, 0),
-> +       OPP(1001000000, 983000, 0),
-> +       OPP(1105000000, 1009000, 0),
-> +       OPP(1183000000, 1028000, 0),
-> +       OPP(1404000000, 1083000, 0),
-> +       OPP(1508000000, 1109000, 0),
-> +       OPP(1573000000, 1125000, 0),
-> +};
-> +
-> +/* OPP table for big cores of MT8173 */
-> +struct mtk_cpu_opp mt8173_b_opp[] = {
-> +       OPP(507000000, 828000, 928000),
-> +       OPP(702000000, 867000, 967000),
-> +       OPP(1001000000, 927000, 1027000),
-> +       OPP(1209000000, 968000, 1068000),
-> +       OPP(1404000000, 1007000, 1107000),
-> +       OPP(1612000000, 1049000, 1149000),
-> +       OPP(1807000000, 1089000, 1150000),
-> +       OPP(1989000000, 1125000, 1150000),
-> +};
+?On 23-04-15 14:32, Arnd Bergmann wrote:
+> On Thursday 23 April 2015 13:52:34 Mike Looijmans wrote:
+>> Can anyone here offer some advise on this?
+>>
+>
+> The problem you are experiencing is a direct result of using hardware
+> without cache-coherency from user space. There is no software workaround
+> for this: If you want data to be cacheable *and* avoid doing manual cache
+> flushes each time data is passed between user space and hardware, you have
+> to use hardware that is cache-coherent.
 
-We should sort out the OPP bindings if we need to sort out the OPP
-bindings. We can't remove these once they're in without causing pain for
-everyone with an old DTB.
+I can live with manual flushes. I know exactly what and where to flush in the 
+driver.
 
-Mark.
+What bothers me so much is that just invalidating the data cache(s) takes 
+longer than actually reading the data from uncached memory and writing it into 
+cached memory elsewhere. That just does not sound right to me.
+
+> You mentioned that you are using 'Zynq', which supports cache-coherent
+> DMA using the 'accelerator coherency port'. If you are able to connect
+> your device to that port, it should work, otherwise you should consider
+> using a different platform.
+
+I can probably hook up the DMA controller to the ACP port, however, I would 
+expect this to have serious negative impact on system performance. The 
+transfers are typically in the megabyte range (for example, video frames) so 
+they will not fit into the L2 cache (which is 512k on the Zynq). I'd expect 
+these transfers, when routed through the ACP, to "push" all data out of the L2 
+cache, replacing it with data that isn't going to be read any time soon, and 
+thus interfere with performance too much.
+
+It might be worth a try though to see what will actually happen.
+
+Mike.
+
+
+Kind regards,
+
+Mike Looijmans
+System Expert
+
+TOPIC Embedded Products
+Eindhovenseweg 32-C, NL-5683 KH Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+Telefax: +31 (0) 499 33 69 70
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
