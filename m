@@ -1,267 +1,102 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 23 Apr 2015 16:10:02 -0700
-Subject: [PATCH v2 9/9] ARM: BCM63xx: Add SMP support for BCM63138
-In-Reply-To: <1429830602-10988-1-git-send-email-f.fainelli@gmail.com>
-References: <1429830602-10988-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1429830602-10988-10-git-send-email-f.fainelli@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Apr 2015 16:54:17 -0700
+Subject: [PATCH] gpio: omap: Fix regression for MPUIO interrupts
+Message-ID: <1429833257-28188-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for booting the secondary CPU on BCM63138, this involves:
+At some point with all the GPIO clean-up we've broken the
+MPUIO interrupts. Those are just a little bit different from
+the GPIO interrupts, so we can fix it up just by setting
+different irqchip functions for it. And then we can just
+remove all old code trying to do the same.
 
-- locating the bootlut to write the reset vector
-- powering up the second CPU when we need to using the DT-supplied PMB
-  references
-- disabling VFP when enabled such that we can keep having SMP
-
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Javier Martinez Canillas <javier@dowhile0.org>
+Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Nishanth Menon <nm@ti.com>
+Cc: Santosh Shilimkar <ssantosh@kernel.org>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-bcm/Makefile          |   7 +-
- arch/arm/mach-bcm/bcm63xx_headsmp.S |  23 +++++
- arch/arm/mach-bcm/bcm63xx_smp.c     | 170 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-bcm/bcm63xx_smp.h     |   9 ++
- 4 files changed, 208 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-bcm/bcm63xx_headsmp.S
- create mode 100644 arch/arm/mach-bcm/bcm63xx_smp.c
- create mode 100644 arch/arm/mach-bcm/bcm63xx_smp.h
+ drivers/gpio/gpio-omap.c | 48 +++++++++---------------------------------------
+ 1 file changed, 9 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index 4c38674c73ec..55d3a1213876 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -38,7 +38,12 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
- obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 6553361..b59c3ca 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1023,38 +1023,8 @@ static void omap_gpio_mod_init(struct gpio_bank *bank)
+ 		dev_err(bank->dev, "Could not get gpio dbck\n");
+ }
  
- # BCM63XXx
--obj-$(CONFIG_ARCH_BCM_63XX)	:= bcm63xx.o
-+ifeq ($(CONFIG_ARCH_BCM_63XX),y)
-+CFLAGS_bcm63xx_headsmp.o	+= -march=armv7-a
-+obj-y				+= bcm63xx.o
-+obj-$(CONFIG_SMP)		+= bcm63xx_smp.o bcm63xx_headsmp.o \
-+				   bcm63xx_pmb.o
-+endif
+-static void
+-omap_mpuio_alloc_gc(struct gpio_bank *bank, unsigned int irq_start,
+-		    unsigned int num)
+-{
+-	struct irq_chip_generic *gc;
+-	struct irq_chip_type *ct;
+-
+-	gc = irq_alloc_generic_chip("MPUIO", 1, irq_start, bank->base,
+-				    handle_simple_irq);
+-	if (!gc) {
+-		dev_err(bank->dev, "Memory alloc failed for gc\n");
+-		return;
+-	}
+-
+-	ct = gc->chip_types;
+-
+-	/* NOTE: No ack required, reading IRQ status clears it. */
+-	ct->chip.irq_mask = irq_gc_mask_set_bit;
+-	ct->chip.irq_unmask = irq_gc_mask_clr_bit;
+-	ct->chip.irq_set_type = omap_gpio_irq_type;
+-
+-	if (bank->regs->wkup_en)
+-		ct->chip.irq_set_wake = omap_gpio_wake_enable;
+-
+-	ct->regs.mask = OMAP_MPUIO_GPIO_INT / bank->stride;
+-	irq_setup_generic_chip(gc, IRQ_MSK(num), IRQ_GC_INIT_MASK_CACHE,
+-			       IRQ_NOREQUEST | IRQ_NOPROBE, 0);
+-}
+-
+ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
+ {
+-	int j;
+ 	static int gpio;
+ 	int irq_base = 0;
+ 	int ret;
+@@ -1101,6 +1071,15 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
+ 	}
+ #endif
  
- ifeq ($(CONFIG_ARCH_BRCMSTB),y)
- CFLAGS_platsmp-brcmstb.o	+= -march=armv7-a
-diff --git a/arch/arm/mach-bcm/bcm63xx_headsmp.S b/arch/arm/mach-bcm/bcm63xx_headsmp.S
-new file mode 100644
-index 000000000000..c7af397c7f14
---- /dev/null
-+++ b/arch/arm/mach-bcm/bcm63xx_headsmp.S
-@@ -0,0 +1,23 @@
-+/*
-+ *  Copyright (C) 2015, Broadcom Corporation
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+#include <asm/assembler.h>
-+
-+ENTRY(bcm63138_secondary_startup)
-+ ARM_BE8(setend	be)
-+	/*
-+	 * L1 cache does have unpredictable contents at power-up clean its
-+	 * contents without flushing
-+	 */
-+	bl      v7_invalidate_l1
-+	nop
-+
-+	b	secondary_startup
-+ENDPROC(bcm63138_secondary_startup)
-diff --git a/arch/arm/mach-bcm/bcm63xx_smp.c b/arch/arm/mach-bcm/bcm63xx_smp.c
-new file mode 100644
-index 000000000000..07ddc04c96ce
---- /dev/null
-+++ b/arch/arm/mach-bcm/bcm63xx_smp.c
-@@ -0,0 +1,170 @@
-+/*
-+ * Broadcom BCM63138 DSL SoCs SMP support code
-+ *
-+ * Copyright (C) 2015, Broadcom Corporation
-+ *
-+ * Licensed under the terms of the GPLv2
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/bcm63xx_pmb.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/smp_scu.h>
-+#include <asm/smp_plat.h>
-+#include <asm/vfp.h>
-+
-+#include "bcm63xx_smp.h"
-+
-+/* Size of mapped Cortex A9 SCU address space */
-+#define CORTEX_A9_SCU_SIZE	0x58
-+
-+/*
-+ * Enable the Cortex A9 Snoop Control Unit
-+ *
-+ * By the time this is called we already know there are multiple
-+ * cores present.  We assume we're running on a Cortex A9 processor,
-+ * so any trouble getting the base address register or getting the
-+ * SCU base is a problem.
-+ *
-+ * Return 0 if successful or an error code otherwise.
-+ */
-+static int __init scu_a9_enable(void)
-+{
-+	unsigned long config_base;
-+	void __iomem *scu_base;
-+	unsigned int i, ncores;
-+
-+	if (!scu_a9_has_base()) {
-+		pr_err("no configuration base address register!\n");
-+		return -ENXIO;
++	/* MPUIO is a bit different, reading IRQ status clears it */
++	if (bank->is_mpuio) {
++		irqc->irq_ack = dummy_irq_chip.irq_ack;
++		irqc->irq_mask = irq_gc_mask_set_bit;
++		irqc->irq_unmask = irq_gc_mask_clr_bit;
++		if (!bank->regs->wkup_en)
++			irqc->irq_set_wake = NULL;
 +	}
 +
-+	/* Config base address register value is zero for uniprocessor */
-+	config_base = scu_a9_get_base();
-+	if (!config_base) {
-+		pr_err("hardware reports only one core\n");
-+		return -ENOENT;
-+	}
-+
-+	scu_base = ioremap((phys_addr_t)config_base, CORTEX_A9_SCU_SIZE);
-+	if (!scu_base) {
-+		pr_err("failed to remap config base (%lu/%u) for SCU\n",
-+			config_base, CORTEX_A9_SCU_SIZE);
-+		return -ENOMEM;
-+	}
-+
-+	scu_enable(scu_base);
-+
-+	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
-+
-+	if (ncores > nr_cpu_ids) {
-+		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
-+				ncores, nr_cpu_ids);
-+		ncores = nr_cpu_ids;
-+	}
-+
-+	/* The BCM63138 SoC has two Cortex-A9 CPUs, CPU0 features a complete
-+	 * and fully functional VFP unit that can be used, but CPU1 does not.
-+	 * Since we will not be able to trap kernel-mode NEON to force
-+	 * migration to CPU0, just do not advertise VFP support at all.
-+	 *
-+	 * This will make vfp_init bail out and do not attempt to use VFP at
-+	 * all, for kernel-mode NEON, we do not want to introduce any
-+	 * conditionals in hot-paths, so we just restrict the system to UP.
-+	 */
-+#ifdef CONFIG_VFP
-+	if (ncores > 1) {
-+		pr_warn("SMP: secondary CPUs lack VFP unit, disabling VFP\n");
-+		vfp_disable();
-+
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+		WARN(1, "SMP: kernel-mode NEON enabled, restricting to UP\n");
-+		ncores = 1;
-+#endif
-+	}
-+#endif
-+
-+	for (i = 0; i < ncores; i++)
-+		set_cpu_possible(i, true);
-+
-+	iounmap(scu_base);	/* That's the last we'll need of this */
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id bcm63138_bootlut_ids[] = {
-+	{ .compatible = "brcm,bcm63138-bootlut", },
-+	{ /* sentinel */ },
-+};
-+
-+#define BOOTLUT_RESET_VECT	0x20
-+
-+static int bcm63138_smp_boot_secondary(unsigned int cpu,
-+				       struct task_struct *idle)
-+{
-+	void __iomem *bootlut_base;
-+	struct device_node *dn;
-+	int ret = 0;
-+	u32 val;
-+
-+	dn = of_find_matching_node(NULL, bcm63138_bootlut_ids);
-+	if (!dn) {
-+		pr_err("SMP: unable to find bcm63138 boot LUT node\n");
-+		return -ENODEV;
-+	}
-+
-+	bootlut_base = of_iomap(dn, 0);
-+	of_node_put(dn);
-+
-+	if (!bootlut_base) {
-+		pr_err("SMP: unable to remap boot LUT base register\n");
-+		return -ENOMEM;
-+	}
-+
-+	/* Locate the secondary CPU node */
-+	dn = of_get_cpu_node(cpu_logical_map(cpu), NULL);
-+	if (!dn) {
-+		pr_err("SMP: failed to locate secondary CPU%d node\n", cpu);
-+		ret = -ENODEV;
-+		goto out;
-+	}
-+
-+	/* Write the secondary init routine to the BootLUT reset vector */
-+	val = virt_to_phys(bcm63138_secondary_startup);
-+	writel_relaxed(val, bootlut_base + BOOTLUT_RESET_VECT);
-+
-+	/* Power up the core, will jump straight to its reset vector when we
-+	 * return
-+	 */
-+	ret = bcm63xx_pmb_power_on_cpu(dn);
-+	if (ret)
-+		goto out;
-+out:
-+	iounmap(bootlut_base);
-+
-+	return ret;
-+}
-+
-+static void __init bcm63138_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	int ret;
-+
-+	ret = scu_a9_enable();
-+	if (ret) {
-+		pr_warn("SMP: Cortex-A9 SCU setup failed\n");
-+		return;
-+	}
-+}
-+
-+struct smp_operations bcm63138_smp_ops __initdata = {
-+	.smp_prepare_cpus	= bcm63138_smp_prepare_cpus,
-+	.smp_boot_secondary	= bcm63138_smp_boot_secondary,
-+};
-+
-+CPU_METHOD_OF_DECLARE(bcm63138_smp, "brcm,bcm63138", &bcm63138_smp_ops);
-diff --git a/arch/arm/mach-bcm/bcm63xx_smp.h b/arch/arm/mach-bcm/bcm63xx_smp.h
-new file mode 100644
-index 000000000000..50b76044536e
---- /dev/null
-+++ b/arch/arm/mach-bcm/bcm63xx_smp.h
-@@ -0,0 +1,9 @@
-+#ifndef __BCM63XX_SMP_H
-+#define __BCM63XX_SMP_H
-+
-+struct device_node;
-+
-+extern void bcm63138_secondary_startup(void);
-+extern int bcm63xx_pmb_power_on_cpu(struct device_node *dn);
-+
-+#endif /* __BCM63XX_SMP_H */
+ 	ret = gpiochip_irqchip_add(&bank->chip, irqc,
+ 				   irq_base, omap_gpio_irq_handler,
+ 				   IRQ_TYPE_NONE);
+@@ -1114,15 +1093,6 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
+ 	gpiochip_set_chained_irqchip(&bank->chip, irqc,
+ 				     bank->irq, omap_gpio_irq_handler);
+ 
+-	for (j = 0; j < bank->width; j++) {
+-		int irq = irq_find_mapping(bank->chip.irqdomain, j);
+-		if (bank->is_mpuio) {
+-			omap_mpuio_alloc_gc(bank, irq, bank->width);
+-			irq_set_chip_and_handler(irq, NULL, NULL);
+-			set_irq_flags(irq, 0);
+-		}
+-	}
+-
+ 	return 0;
+ }
+ 
 -- 
-2.1.0
+2.1.4
