@@ -1,87 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Apr 2015 10:53:13 +0100
-Subject: [v2 0/5] arm64: add kdump support
-In-Reply-To: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20150424095312.GD29183@leverpostej>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 24 Apr 2015 12:03:38 +0200
+Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
+ using PM clocks
+In-Reply-To: <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
+References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
+ <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
+Message-ID: <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 23 April 2015 at 10:45, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+> Add runtime PM support to handle (core and iface) clocks for devices
+> without a controllable power domain. Once the drivers for these devices
+> are converted to use runtime PM apis, all clock handling (for core and
+> iface) from these drivers can then be removed.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> ---
+>  drivers/clk/qcom/gdsc.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>
+> diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
+> index 480ebf6..92b0f6d 100644
+> --- a/drivers/clk/qcom/gdsc.c
+> +++ b/drivers/clk/qcom/gdsc.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/err.h>
+>  #include <linux/jiffies.h>
+>  #include <linux/pm_clock.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  #include "gdsc.h"
+>
+> @@ -226,3 +227,22 @@ void gdsc_unregister(struct device *dev)
+>  {
+>         of_genpd_del_provider(dev->of_node);
+>  }
+> +
+> +static struct dev_pm_domain default_qcom_pm_domain = {
+> +       .ops = {
+> +               USE_PM_CLK_RUNTIME_OPS
+> +               USE_PLATFORM_PM_SLEEP_OPS
+> +       },
+> +};
+> +
+> +static struct pm_clk_notifier_block qcom_pm_notifier = {
+> +       .pm_domain      = &default_qcom_pm_domain,
+> +       .con_ids        = { "core", "iface" },
+> +};
+> +
+> +static int __init qcom_pm_runtime_init(void)
+> +{
+> +       pm_clk_add_notifier(&platform_bus_type, &qcom_pm_notifier);
+> +       return 0;
+> +}
+> +core_initcall(qcom_pm_runtime_init);
 
-On Fri, Apr 24, 2015 at 08:53:03AM +0100, AKASHI Takahiro wrote:
-> This patch set enables kdump (crash dump kernel) support on arm64 on top of
-> Geoff's kexec patchset.
-> 
-> In this version, there are some arm64-specific usage/constraints:
-> 1) "mem=" boot parameter must be specified on crash dump kernel
->    if the system starts on uefi.
+First, I don't follow how this code is related to GDSC.
 
-This sounds very painful. Why is this the case, and how do x86 and/or
-ia64 get around that?
+Second, I want to see less users of pm_clk_add_notifier() since it's
+not the proper/long-term way of how to assign PM domain pointers to a
+device. Instead that shall be done at device registration point. In
+your case while parsing the DT nodes and adding devices onto to their
+buses.
 
-> 2) Kvm will not be enabled on crash dump kernel even if configured
-> See commit messages and Documentation/kdump/kdump.txt for details.
-> 
-> The only concern I have is whether or not we can use the exact same kernel
-> as both system kernel and crash dump kernel. The current arm64 kernel is
-> not relocatable in the exact sense but I see no problems in using the same
-> binary when testing kdump.
+Yes, I understand that it will requires quite some work to adopt to
+this behaviour - but that how it shall be done.
 
-Ard has been working on decoupling the kernel text/data, FDT, and linear
-memory mappings, which would allow the kernel to be loaded anywhere and
-still be able to access all of memory [3]. I assume that's what you mean
-by "relocatable"?
+Finally, an important note, you don't need to use PM domains for these
+devices at all and thus you don't need to fix what I propose. Instead
+you only have to implement the runtime PM callbacks for each driver
+and manage the clocks from there. That is probably also a easier
+solution.
 
-> I tested the code with
-> 	- ATF v1.1 + EDK2(UEFI) v3.0-rc0
-> 	- kernel v4.0 + Geoff' kexec v9
-> on
-> 	- Base fast model, and
-> 	- MediaTek MT8173-EVB
-> using my own kexec-tools [1], currently v0.12.
-> 
-> You may want to start a kernel with the following boot parameter:
-> 	crashkernel=64M (or so, on model)
-> and try
-> 	$ kexec -p --load <vmlinux> --append ...
-> 	$ echo c > /proc/sysrq-trigger
-> 
-> To examine vmcore (/proc/vmcore), you should use
-> 	- gdb v7.7 or later
-> 	- crash + a small patch (to recognize v4.0 kernel)
-> 
-> Changes from v1:
-> * rebased to Geoff's v9
-> * tested this patchset on real hardware and fixed bugs:
-> - added cache flush operation in ipi_cpu_stop() when shutting down
->   the system. Otherwise, data saved in vmcore's note sections by
->   crash_save_cpu() might not be flushed to dumped memory and crash command
->   fail to fetch correct data.
-
-We'll need to give this a go on something with a system cache too (e.g.
-Seattle or X-Gene). Even if that's only UP it would give me much greater
-confidence in the cache maintenance.
-
->   I will address Mark's commit[2] after Geoff takes care of it on kexec.
-> - modified to use ioremap_cache() instead of ioremap() when reading
->   crash memory. Otherwise, accessing /proc/vmcore on crash dump kernel
->   might cause an alignment fault.
-> * allows reserve_crashkernel() to handle "crashkernel=xyz[MG]" correctly,
->   thanks to Pratyush Anand. And it now also enforces memory limit.
-
-I worry that there could be potentially bad interaction between this and
-Ard's patches, depending on how the memory area to use is chosen. It is
-probably fine, but we should make sure that it is.
-
-> * moved reserve_crashkernel() and reserve_elfcorehdr() to
->   arm64_memblock_init() to clarify that they should be called before
->   dma_contignuous_reserve().
-> 
-> [1] https://git.linaro.org/people/takahiro.akashi/kexec-tools.git
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/338171.html
-
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/337596.html
-
-Thanks,
-Mark.
+Kind regards
+Uffe
