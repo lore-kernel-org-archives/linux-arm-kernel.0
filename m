@@ -1,125 +1,254 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 24 Apr 2015 11:44:07 +0900
-Subject: [RFC 2/4] livepatch: adjust a patched function's address
+Date: Fri, 24 Apr 2015 11:44:08 +0900
+Subject: [RFC 3/4] arm64: ftrace: add DYNAMIC_TRACE_WITH_REGS version
 In-Reply-To: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1429843449-7388-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1429843449-7388-4-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing livepatch code assumes that a fentry call is inserted before
-a function prolog by -mfentry option of gcc. But the location of mcount()
-can be identified by using ftrace_lookup_mcount(), and which eventually
-allows arch's which don't support -mfentry option, like arm64, to support
-livepatch.
-
-This patch modifies core and x86 code before adding livepatch support for
-arm64.
+CONFIG_DYNAMIC_TRACE_WITH_REGS is a prerequisite for ftrace-based kprobes
+as well as livepatch.
+This patch adds ftrace_regs_caller(), which will pass pt_regs info to
+ftrace handlers, to enable this config.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/x86/include/asm/livepatch.h |    5 +++++
- include/linux/livepatch.h        |    2 ++
- kernel/livepatch/core.c          |   16 ++++++++++++----
- 3 files changed, 19 insertions(+), 4 deletions(-)
+ arch/arm64/Kconfig               |    1 +
+ arch/arm64/include/asm/ftrace.h  |    4 ++
+ arch/arm64/kernel/entry-ftrace.S |  124 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/ftrace.c       |   24 +++++++-
+ 4 files changed, 152 insertions(+), 1 deletion(-)
 
-diff --git a/arch/x86/include/asm/livepatch.h b/arch/x86/include/asm/livepatch.h
-index a455a53..914954a 100644
---- a/arch/x86/include/asm/livepatch.h
-+++ b/arch/x86/include/asm/livepatch.h
-@@ -39,6 +39,11 @@ static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b8e973..c3678ed 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -54,6 +54,7 @@ config ARM64
+ 	select HAVE_DMA_ATTRS
+ 	select HAVE_DMA_CONTIGUOUS
+ 	select HAVE_DYNAMIC_FTRACE
++	select HAVE_DYNAMIC_FTRACE_WITH_REGS
+ 	select HAVE_EFFICIENT_UNALIGNED_ACCESS
+ 	select HAVE_FTRACE_MCOUNT_RECORD
+ 	select HAVE_FUNCTION_TRACER
+diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+index c5534fa..5a14269 100644
+--- a/arch/arm64/include/asm/ftrace.h
++++ b/arch/arm64/include/asm/ftrace.h
+@@ -16,6 +16,10 @@
+ #define MCOUNT_ADDR		((unsigned long)_mcount)
+ #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE
++#define ARCH_SUPPORTS_FTRACE_OPS	1
++#endif
++
+ #ifndef __ASSEMBLY__
+ #include <linux/compat.h>
+ 
+diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
+index 08cafc5..fed28eb 100644
+--- a/arch/arm64/kernel/entry-ftrace.S
++++ b/arch/arm64/kernel/entry-ftrace.S
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include <linux/linkage.h>
++#include <asm/asm-offsets.h>
+ #include <asm/ftrace.h>
+ #include <asm/insn.h>
+ 
+@@ -86,6 +87,95 @@
+ 	add	\reg, \reg, #8
+ 	.endm
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++/*
++ * stack layout after mcount_save_regs in _mcount():
++ *
++ * current sp/fp =>  0:+---------+
++ * in _mcount()        |pt_regs  |
++ *                     |         |
++ *                     |   +-----+
++ *                     |   | x29 | -> instrumented function's fp
++ *                     |   +-----+
++ *                     |   | x30 | -> _mcount()'s lr
++ *                     |   +-----+     (= instrumented function's pc)
++ *       +S_FRAME_SIZE |         |
++ * old sp =>          :+-----+---
++ * when instrumented   |     |
++ * function calls      | ... |
++ * _mcount()           |     |
++ *                     |     |
++ * instrumented => +xx:+-----+
++ * function's fp       | x29 | -> parent's fp
++ *                     +-----+
++ *                     | x30 | -> instrumented function's lr (= parent's pc)
++ *                     +-----+
++ *                     | ... |
++ */
++	.macro mcount_save_regs
++	sub	sp, sp, #S_FRAME_SIZE
++
++	stp	x0, x1, [sp, #8 * 0]
++	stp	x2, x3, [sp, #8 * 2]
++	stp	x4, x5, [sp, #8 * 4]
++	stp	x6, x7, [sp, #8 * 6]
++	stp	x8, x9, [sp, #8 * 8]
++	stp	x10, x11, [sp, #8 * 10]
++	stp	x12, x13, [sp, #8 * 12]
++	stp	x14, x15, [sp, #8 * 14]
++	stp	x16, x17, [sp, #8 * 16]
++	stp	x18, x19, [sp, #8 * 18]
++	stp	x20, x21, [sp, #8 * 20]
++	stp	x22, x23, [sp, #8 * 22]
++	stp	x24, x25, [sp, #8 * 24]
++	stp	x26, x27, [sp, #8 * 26]
++	stp	x28, x29, [sp, #8 * 28]
++
++	ldr	x0, [x29, #8]
++	mcount_adjust_addr	x0, x0
++	str	x0, [sp, #S_LR]
++
++	add	x0, sp, #S_FRAME_SIZE
++	str	x0, [sp, #S_SP]
++
++	mcount_adjust_addr	x0, x30
++	str	x0, [sp, #S_PC]
++
++	ldr	x0, [sp, #8 * 0]
++
++	mov	x29, sp
++	.endm
++
++	/* for instrumented function */
++	.macro mcount_get_lr1 reg
++	ldr	\reg, [x29, #8 * 29]
++	ldr	\reg, [\reg, #8]
++	mcount_adjust_addr	\reg, \reg
++	.endm
++
++	.macro mcount_restore_rest_regs
++	ldp	x0, x1, [sp, #8 * 0]
++	ldp	x2, x3, [sp, #8 * 2]
++	ldp	x4, x5, [sp, #8 * 4]
++	ldp	x6, x7, [sp, #8 * 6]
++	ldp	x8, x9, [sp, #8 * 8]
++	ldp	x10, x11, [sp, #8 * 10]
++	ldp	x12, x13, [sp, #8 * 12]
++	ldp	x14, x15, [sp, #8 * 14]
++	ldp	x16, x17, [sp, #8 * 16]
++	ldp	x18, x19, [sp, #8 * 18]
++	ldp	x20, x21, [sp, #8 * 20]
++	ldp	x22, x23, [sp, #8 * 22]
++	ldp	x24, x25, [sp, #8 * 24]
++	ldp	x26, x27, [sp, #8 * 26]
++	ldp	x28, x29, [sp, #8 * 28]
++	ldr	x30, [sp, #S_LR]
++	add	sp, sp, #S_FRAME_SIZE
++
++	mcount_enter
++	.endm
++#endif /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
++
+ #ifndef CONFIG_DYNAMIC_FTRACE
+ /*
+  * void _mcount(unsigned long return_address)
+@@ -156,6 +246,10 @@ ENTRY(ftrace_caller)
+ 
+ 	mcount_get_pc0	x0		//     function's pc
+ 	mcount_get_lr	x1		//     function's lr
++	adrp x2, function_trace_op
++	add  x2, x2, #:lo12:function_trace_op
++	ldr x2, [x2]			//     current ftrace_ops
++	mov x3, xzr			//     pt_regs (NULL)
+ 
+ 	.global ftrace_call
+ ftrace_call:				// tracer(pc, lr);
+@@ -171,6 +265,36 @@ ftrace_graph_call:			// ftrace_graph_caller();
+ 
+ 	mcount_exit
+ ENDPROC(ftrace_caller)
++
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++/*
++ * void ftrace_regs_caller()
++ */
++ENTRY(ftrace_regs_caller)
++	mcount_save_regs
++
++	mcount_get_pc0	x0		//     function's pc
++	mcount_get_lr1	x1		//     function's lr
++	adrp x2, function_trace_op
++	add  x2, x2, #:lo12:function_trace_op
++	ldr x2, [x2]			//     current ftrace_ops
++	mov x3, sp			//     pt_regs
++
++	.global ftrace_regs_call
++ftrace_regs_call:			// tracer(pc, lr, ops, regs);
++	nop				// This will be replaced with "bl xxx"
++					// where xxx can be any kind of tracer.
++
++	mcount_restore_rest_regs
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	b ftrace_graph_call
++#endif
++
++	mcount_exit
++ENDPROC(ftrace_regs_caller)
++#endif /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
++
+ #endif /* CONFIG_DYNAMIC_FTRACE */
+ 
+ ENTRY(ftrace_stub)
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index c851be7..5440673 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -56,12 +56,21 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
  {
- 	regs->ip = ip;
+ 	unsigned long pc;
+ 	u32 new;
++	int ret;
+ 
+ 	pc = (unsigned long)&ftrace_call;
+ 	new = aarch64_insn_gen_branch_imm(pc, (unsigned long)func,
+ 					  AARCH64_INSN_BRANCH_LINK);
++	ret = ftrace_modify_code(pc, 0, new, false);
+ 
+-	return ftrace_modify_code(pc, 0, new, false);
++	if (!ret) {
++		pc = (unsigned long)&ftrace_regs_call;
++		new = aarch64_insn_gen_branch_imm(pc, (unsigned long)func,
++						  AARCH64_INSN_BRANCH_LINK);
++		ret = ftrace_modify_code(pc, 0, new, false);
++	}
++
++	return ret;
+ }
+ 
+ /*
+@@ -97,6 +106,19 @@ int __init ftrace_dyn_arch_init(void)
+ {
+ 	return 0;
  }
 +
-+static inline unsigned long klp_arch_lookup_mcount(unsigned long addr)
++int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
++		       unsigned long addr)
 +{
-+	return addr;
-+}
- #else
- #error Live patching support is disabled; check CONFIG_LIVEPATCH
- #endif
-diff --git a/include/linux/livepatch.h b/include/linux/livepatch.h
-index 95023fd..fec7800 100644
---- a/include/linux/livepatch.h
-+++ b/include/linux/livepatch.h
-@@ -47,6 +47,7 @@ struct klp_func {
- 	/* external */
- 	const char *old_name;
- 	void *new_func;
-+	unsigned long new_func_mcount;
- 	/*
- 	 * The old_addr field is optional and can be used to resolve
- 	 * duplicate symbol names in the vmlinux object.  If this
-@@ -56,6 +57,7 @@ struct klp_func {
- 	 * way to resolve the ambiguity.
- 	 */
- 	unsigned long old_addr;
-+	unsigned long old_addr_mcount;
- 
- 	/* internal */
- 	struct kobject kobj;
-diff --git a/kernel/livepatch/core.c b/kernel/livepatch/core.c
-index 3f9f1d6..3c7c8070 100644
---- a/kernel/livepatch/core.c
-+++ b/kernel/livepatch/core.c
-@@ -245,6 +245,9 @@ static int klp_find_verify_func_addr(struct klp_object *obj,
- 		ret = klp_verify_vmlinux_symbol(func->old_name,
- 						func->old_addr);
- 
-+	if (func->old_addr && !ret)
-+		func->old_addr_mcount = klp_arch_lookup_mcount(func->old_addr);
++	unsigned long pc = rec->ip;
++	u32 old, new;
 +
- 	return ret;
- }
++	old = aarch64_insn_gen_branch_imm(pc, old_addr,
++						AARCH64_INSN_BRANCH_LINK);
++	new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
++
++	return ftrace_modify_code(pc, old, new, true);
++}
+ #endif /* CONFIG_DYNAMIC_FTRACE */
  
-@@ -330,7 +333,7 @@ static void notrace klp_ftrace_handler(unsigned long ip,
- 	if (WARN_ON_ONCE(!func))
- 		goto unlock;
- 
--	klp_arch_set_pc(regs, (unsigned long)func->new_func);
-+	klp_arch_set_pc(regs, func->new_func_mcount);
- unlock:
- 	rcu_read_unlock();
- }
-@@ -358,7 +361,8 @@ static int klp_disable_func(struct klp_func *func)
- 			return ret;
- 		}
- 
--		ret = ftrace_set_filter_ip(&ops->fops, func->old_addr, 1, 0);
-+		ret = ftrace_set_filter_ip(&ops->fops,
-+			func->old_addr_mcount, 1, 0);
- 		if (ret)
- 			pr_warn("function unregister succeeded but failed to clear the filter\n");
- 
-@@ -401,7 +405,8 @@ static int klp_enable_func(struct klp_func *func)
- 		INIT_LIST_HEAD(&ops->func_stack);
- 		list_add_rcu(&func->stack_node, &ops->func_stack);
- 
--		ret = ftrace_set_filter_ip(&ops->fops, func->old_addr, 0, 0);
-+		ret = ftrace_set_filter_ip(&ops->fops,
-+			func->old_addr_mcount, 0, 0);
- 		if (ret) {
- 			pr_err("failed to set ftrace filter for function '%s' (%d)\n",
- 			       func->old_name, ret);
-@@ -412,7 +417,8 @@ static int klp_enable_func(struct klp_func *func)
- 		if (ret) {
- 			pr_err("failed to register ftrace handler for function '%s' (%d)\n",
- 			       func->old_name, ret);
--			ftrace_set_filter_ip(&ops->fops, func->old_addr, 1, 0);
-+			ftrace_set_filter_ip(&ops->fops,
-+				func->old_addr_mcount, 1, 0);
- 			goto err;
- 		}
- 
-@@ -742,6 +748,8 @@ static int klp_init_func(struct klp_object *obj, struct klp_func *func)
- {
- 	INIT_LIST_HEAD(&func->stack_node);
- 	func->state = KLP_DISABLED;
-+	func->new_func_mcount =
-+		klp_arch_lookup_mcount((unsigned long)func->new_func);
- 
- 	return kobject_init_and_add(&func->kobj, &klp_ktype_func,
- 				    obj->kobj, "%s", func->old_name);
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 -- 
 1.7.9.5
