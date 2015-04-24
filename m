@@ -1,50 +1,53 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 23 Apr 2015 21:30:03 -0600
-Subject: [PATCH 7/9] ARM: Add Kconfig support for bcm2836.
-In-Reply-To: <87lhhl9pzf.fsf@eliezer.anholt.net>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <1429639796-2169-8-git-send-email-eric@anholt.net>
- <13864545.foFMzEn7Xk@wuerfel> <87lhhl9pzf.fsf@eliezer.anholt.net>
-Message-ID: <5539B8BB.3090905@wwwdotorg.org>
+From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
+Date: Fri, 24 Apr 2015 11:51:22 +0800
+Subject: [PATCH v4 1/2] dt-bindings: Document the hi6220 thermal sensor
+ bindings
+In-Reply-To: <1429847483-10552-1-git-send-email-kong.kongxinwei@hisilicon.com>
+References: <1429847483-10552-1-git-send-email-kong.kongxinwei@hisilicon.com>
+Message-ID: <1429847483-10552-2-git-send-email-kong.kongxinwei@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2015 02:38 PM, Eric Anholt wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
->> On Tuesday 21 April 2015 11:09:54 Eric Anholt wrote:
->>> @@ -116,17 +122,19 @@ config ARCH_BCM283X config ARCH_BCM2835 
->>> bool "Broadcom BCM2835 family" if ARCH_MULTI_V6 select
->>> ARCH_BCM283X -       select ARCH_REQUIRE_GPIOLIB -       select
->>> ARM_AMBA select ARM_ERRATA_411920 select ARM_TIMER_SP804 -
->>> select CLKSRC_OF -       select PINCTRL -       select
->>> PINCTRL_BCM2835 help This enables support for the Broadcom
->>> BCM2835 SoC. This SoC is used in the Raspberry Pi and Roku 2
->>> devices.
->>> 
->>> +config ARCH_BCM2836 +       bool "Broadcom BCM2836 family" if
->>> ARCH_MULTI_V7 +       select ARCH_BCM283X +       help +
->>> This enables support for the Broadcom BCM2836 SoC. This SoC is 
->>> +         used in the Raspberry Pi 2 +
->> 
->> The description for the first one says "Broadcom BCM2835 family",
->> and I guess they are both in the same family. How about leaving
->> the CONFIG_BCM2835 symbol to mean one of them, and just
->> duplicating the DEBUG_LL symbols?
->> 
->> You could do something like
->> 
->> config ARCH_BCM2835 bool "Broadcom BCM2835 family" if
->> ARCH_MULTI_V6 || ARCH_MULTI_V7 select ARCH_BCM283X select
->> ARCH_REQUIRE_GPIOLIB select ARM_AMBA select ARM_ERRATA_411920 if
->> ARCH_MULTI_V6 select ARM_TIMER_SP804 if ARCH_MULTI_V6 select
->> CLKSRC_OF select PINCTRL select PINCTRL_BCM2835 help This enables
->> support for the Broadcom BCM2835 and BCM2836 SoCs. These SoCs is
->> used in the Raspberry Pi and Roku 2 devices.
->> 
->> That should make it less confusing to the user, because they
->> don't have to know which specific SoC they are building for,
->> other than enabling the right architecture level.
-> 
-> Seems reasonable to me.  What do the 2835 maintainers think?
+From: kongxinwei <kong.kongxinwei@hisilicon.com>
 
-Yes, sounds reasonable to me.
+This adds documentation of device tree bindings for the
+thermal sensor controller of hi6220 SoC.
+
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
+---
+ .../bindings/thermal/hisilicon-thermal.txt         | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+
+diff --git a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+new file mode 100644
+index 0000000..b2a349f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+@@ -0,0 +1,23 @@
++* Temperature Sensor on hisilicon SoCs
++
++** Required properties :
++
++- compatible: "hisilicon,tsensor".
++- reg: physical base address of thermal sensor and length of memory mapped
++  region.
++- interrupt: The interrupt number to the cpu. Defines the interrupt used
++  by SOCTHERM.
++- clock-names: Input clock name, should be 'thermal_clk'.
++- clocks: phandles for clock specified in "clock-names" property.
++- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
++
++Example :
++
++	tsensor: tsensor at 0,f7030700 {
++		compatible = "hisilicon,tsensor";
++		reg = <0x0 0xf7030700 0x0 0x1000>;
++		interrupts = <0 7 0x4>;
++		clocks = <&clock_sys HI6220_TSENSOR_CLK>;
++		clock-names = "thermal_clk";
++		#thermal-sensor-cells = <1>;
++	}
+-- 
+1.9.1
