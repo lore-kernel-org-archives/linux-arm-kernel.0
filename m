@@ -1,307 +1,37 @@
-From: andrej@inversepath.com (andrej at inversepath.com)
-Date: Fri, 24 Apr 2015 15:33:45 +0200
-Subject: [PATCH] ARM: dts: imx53: add support for USB armory board
-Message-ID: <1429882425-24514-1-git-send-email-andrej@inversepath.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 24 Apr 2015 16:41:49 +0200
+Subject: [PATCH 0/5] PM / clock_ops: provide default runtime ops and
+ cleanup users
+In-Reply-To: <1429777993-11702-1-git-send-email-rnayak@codeaurora.org>
+References: <1429777993-11702-1-git-send-email-rnayak@codeaurora.org>
+Message-ID: <2234398.3O5UMXvvlN@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrej Rosano <andrej@inversepath.com>
+On Thursday, April 23, 2015 02:03:08 PM Rajendra Nayak wrote:
+> Most users of PM clocks do the exact same thing in runtime callbacks.
+> Provide default callbacks and cleanup the existing users (keystone/davinci
+> /omap1/sh)
+> 
+> Rajendra Nayak (5):
+>   PM / clock_ops: Provide default runtime ops to users
+>   arm: keystone: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+>   arm: omap1: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+>   arm: davinci: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+>   drivers: sh: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+> 
+>  arch/arm/mach-davinci/pm_domain.c  | 32 +-------------------------
+>  arch/arm/mach-keystone/pm_domain.c | 33 +-------------------------
+>  arch/arm/mach-omap1/pm_bus.c       | 37 ++----------------------------
+>  drivers/base/power/clock_ops.c     | 38 ++++++++++++++++++++++++++++++
+>  drivers/sh/pm_runtime.c            | 47 ++------------------------------------
+>  include/linux/pm_clock.h           | 10 ++++++++
+>  6 files changed, 54 insertions(+), 143 deletions(-)
 
-Add support for Inverse Path USB armory board, an open source
-flash-drive sized computer based on Freescale i.MX53 SoC.
+It is not particularly clear to me who is supposed to apply this series, but
+I can do that if people don't have problems with that.
 
-http://inversepath.com/usbarmory
 
-As the device can work in either USB device mode or USB host mode,
-two different device tree file are needed along with one common
-include file.
-
-Signed-off-by: Andrej Rosano <andrej@inversepath.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: Chris Kuethe <chris.kuethe@gmail.com>
-Cc: Vagrant Cascadian <vagrant@debian.org>
----
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- arch/arm/boot/dts/imx53-usbarmory-common.dtsi      |  205 ++++++++++++++++++++
- arch/arm/boot/dts/imx53-usbarmory-host.dts         |   18 ++
- arch/arm/boot/dts/imx53-usbarmory.dts              |   18 ++
- 4 files changed, 242 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx53-usbarmory-common.dtsi
- create mode 100644 arch/arm/boot/dts/imx53-usbarmory-host.dts
- create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 83737a3..e7a10ce 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -102,6 +102,7 @@ img	Imagination Technologies Ltd.
- innolux	Innolux Corporation
- intel	Intel Corporation
- intercontrol	Inter Control Group
-+inversepath	Inverse Path, S.r.l.
- isee	ISEE 2007 S.L.
- isil	Intersil
- karo	Ka-Ro electronics GmbH
-diff --git a/arch/arm/boot/dts/imx53-usbarmory-common.dtsi b/arch/arm/boot/dts/imx53-usbarmory-common.dtsi
-new file mode 100644
-index 0000000..4b4feae
---- /dev/null
-+++ b/arch/arm/boot/dts/imx53-usbarmory-common.dtsi
-@@ -0,0 +1,205 @@
-+/*
-+ * USB armory MkI device tree include file
-+ * http://inversepath.com/usbarmory
-+ *
-+ * Copyright (C) 2015, Inverse Path
-+ * Andrej Rosano <andrej@inversepath.com>
-+ *
-+ * Licensed under GPLv2
-+ */
-+
-+#include "imx53.dtsi"
-+
-+/ {
-+	model = "Inverse Path USB armory";
-+	compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
-+};
-+
-+/ {
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	memory {
-+		reg = <0x70000000 0x20000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pin_gpio4_27>;
-+
-+		user {
-+			label = "LED";
-+			gpios = <&gpio4 27 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	soc {
-+		aips at 60000000 {
-+			sahara: crypto at 63ff8000 {
-+				compatible = "fsl,imx53-sahara";
-+				reg = <0x63ff8000 0x4000>;
-+				interrupts = <19 20>;
-+				clocks = <&clks IMX5_CLK_SAHARA_IPG_GATE>,
-+					 <&clks IMX5_CLK_SAHARA_IPG_GATE>;
-+				clock-names = "ipg", "ahb";
-+			};
-+		};
-+	};
-+};
-+
-+&cpu0 {
-+	device_type = "cpu";
-+	compatible = "arm,cortex-a8";
-+	reg = <0x0>;
-+	clocks = <&clks IMX5_CLK_ARM>;
-+	clock-latency = <61036>;
-+	voltage-tolerance = <5>;
-+	operating-points = <
-+		/* kHz */
-+		 166666  850000
-+		 400000  900000
-+		 800000 1050000
-+	>;
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	imx53-usbarmory {
-+		pinctrl_hog: hoggrp {
-+			fsl,pins = <
-+				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
-+				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
-+				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
-+				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
-+				MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
-+				MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
-+				MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
-+				MX53_PAD_PATA_DA_2__GPIO7_8       0x80000000
-+				MX53_PAD_GPIO_16__GPIO7_11        0x80000000
-+			>;
-+		};
-+
-+		led_pin_gpio4_27: led_gpio4_27 at 0 {
-+			fsl,pins = <
-+				MX53_PAD_DISP0_DAT6__GPIO4_27 0x80000000
-+			>;
-+		};
-+
-+		pinctrl_esdhc1: esdhc1grp {
-+			fsl,pins = <
-+				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
-+				MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
-+				MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
-+				MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
-+				MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
-+				MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
-+			>;
-+		};
-+
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <
-+				MX53_PAD_CSI0_DAT8__I2C1_SDA	0xc0000000
-+				MX53_PAD_CSI0_DAT9__I2C1_SCL	0xc0000000
-+			>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
-+				MX53_PAD_CSI0_DAT11__UART1_RXD_MUX	0x1e4
-+			>;
-+		};
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&vpu {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	ltc3589: pmic at 34 {
-+		compatible = "lltc,ltc3589-2";
-+		reg = <0x34>;
-+
-+		regulators {
-+			sw1_reg: sw1 {
-+				regulator-min-microvolt = <591930>;
-+				regulator-max-microvolt = <1224671>;
-+				lltc,fb-voltage-divider = <100000 158000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <704123>;
-+				regulator-max-microvolt = <1456803>;
-+				lltc,fb-voltage-divider = <180000 191000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3_reg: sw3 {
-+				regulator-min-microvolt = <1341250>;
-+				regulator-max-microvolt = <2775000>;
-+				lltc,fb-voltage-divider = <270000 100000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			bb_out_reg: bb-out {
-+				regulator-min-microvolt = <3387341>;
-+				regulator-max-microvolt = <3387341>;
-+				lltc,fb-voltage-divider = <511000 158000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+			ldo1_reg: ldo1 {
-+				regulator-min-microvolt = <1306329>;
-+				regulator-max-microvolt = <1306329>;
-+				lltc,fb-voltage-divider = <100000 158000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo2_reg: ldo2 {
-+				regulator-min-microvolt = <704123>;
-+				regulator-max-microvolt = <1456806>;
-+				lltc,fb-voltage-divider = <180000 191000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo3_reg: ldo3 {
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-boot-on;
-+			};
-+
-+			ldo4_reg: ldo4 {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3200000>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx53-usbarmory-host.dts b/arch/arm/boot/dts/imx53-usbarmory-host.dts
-new file mode 100644
-index 0000000..ea2ea45
---- /dev/null
-+++ b/arch/arm/boot/dts/imx53-usbarmory-host.dts
-@@ -0,0 +1,18 @@
-+/*
-+ * USB armory MkI host mode device tree file
-+ * http://inversepath.com/usbarmory
-+ *
-+ * Copyright (C) 2015, Inverse Path
-+ * Andrej Rosano <andrej@inversepath.com>
-+ *
-+ * Licensed under GPLv2
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx53-usbarmory-common.dtsi"
-+
-+&usbotg {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
-new file mode 100644
-index 0000000..902a73b
---- /dev/null
-+++ b/arch/arm/boot/dts/imx53-usbarmory.dts
-@@ -0,0 +1,18 @@
-+/*
-+ * USB armory MkI device mode device tree file
-+ * http://inversepath.com/usbarmory
-+ *
-+ * Copyright (C) 2015, Inverse Path
-+ * Andrej Rosano <andrej@inversepath.com>
-+ *
-+ * Licensed under GPLv2
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx53-usbarmory-common.dtsi"
-+
-+&usbotg {
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
 -- 
-1.7.10.4
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
