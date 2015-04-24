@@ -1,78 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Apr 2015 17:18:18 +0100
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20150416104008.GB25640@arm.com>
- <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150422170718.GG13019@arm.com>
- <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <20150424161818.GC7313@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 24 Apr 2015 09:22:47 -0700
+Subject: [PATCH] gpio: omap: Allow building as a loadable module
+In-Reply-To: <20150424161127.GG5692@saruman.tx.rr.com>
+References: <1429833382-28532-1-git-send-email-tony@atomide.com>
+ <20150424161127.GG5692@saruman.tx.rr.com>
+Message-ID: <20150424162247.GT18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 22, 2015 at 08:41:02PM +0100, Stuart Yoder wrote:
-> > > However, there is an improvement we envision as possible due to
-> > > the limited number of SMMU contexts (i.e. 64).  If there are
-> > > 64 SMMU context registers it means that there is a max of
-> > > 64 software contexts where things can be isolated.  But, say I have
-> > > an SRIOV card with 64 VFs, and I want to assign 8 of the VFs
-> > > to a KVM VM.  Those 8 PCI devices could share the same
-> > > streamID/ITS-device-ID since they all share the same isolation
-> > > context.
-> > >
-> > > What would be nice is at the time the 8 VFS are being added
-> > > to the IOMMU domain is for the pcidevid -> streamID mapping
-> > > table to be updated dynamically.  It simply lets us make
-> > > more efficient use of the limited streamIDs we have.
-> > >
-> > > I think it is this improvement that Minghuan had in mind
-> > > in this patch.
+* Felipe Balbi <balbi@ti.com> [150424 09:14]:
+> On Thu, Apr 23, 2015 at 04:56:22PM -0700, Tony Lindgren wrote:
+> > We currently get all kinds of errors building the omap gpio driver
+> > as a module starting with:
 > > 
-> > Ok, but in this case it should be possible to use a single context bank for
-> > all of the VF streamIDs by configuring the appropriate SMR, no?
+> > undefined reference to `omap2_gpio_resume_after_idle'
+> > undefined reference to `omap2_gpio_prepare_for_idle'
+> > ...
+> > 
+> > Let's fix the issue by adding inline functions to the header.
+> > Note that we can now also remove the two unused functions for
+> > omap_set_gpio_debounce and omap_set_gpio_debounce_time.
+> > 
+> > Then doing rmmod on the module produces further warnings
+> > because of missing exit related functions. Let's add those.
+> > 
+> > And finally, we can make the Kconfig entry just a tristate
+> > option that's selected for omaps.
+> > 
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> > Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
+> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> > Cc: Nishanth Menon <nm@ti.com>
+> > Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> Yes, but there are limited SMRs.  In our case there are only
-> 128 SMRs in SMMU-500 and we have potentially way more masters than
-> that.
+> Just to be clear: when GPIO is a module, we can't really idle, can we ?
 
-Right, but you still only have 64 context banks at the end of the day, so do
-you really anticipate having more than 128 masters concurrently using the
-SMMU? If so, then we have devices sharing context banks so we could consider
-reusing SMRs across masters, but historically that's not been something that
-we've managed to solve.
+Right we cannot do off idle because of the context loss
+until we have some way to register driver specific idle
+functions.
 
-> > Wouldn't
-> > that sort of thing be preferable to dynamic StreamID assignment? It would
-> > certainly make life easier for the MSIs.
-> 
-> It would be preferable, but given only 128 total stream IDS and
-> 64 context registers it's potentially an issue.  On our LS2085 SoC it is
-> PCI and the fsl-mc bus (see description here:
-> https://lkml.org/lkml/2015/3/5/795) that potentially have way
-> more masters than streamIDS. So, for those busses we would essentially
-> view a streamID as a "context ID"-- each SMR is associated with
-> 1 context bank register.
-> 
-> For PCI we have a programmable "PCI req ID"-to-"stream ID"
-> mapping table in the PCI controller that is dynamically
-> programmable.
-> 
-> Looking at it like that means that we could have
-> any number of masters but only 64 "contexts"
-> and since the masters all all programmable it's
-> seems feasbile to envision doing some bus/vendor
-> specific set up when a device is added to an
-> IOMMU domain.   One thing that would need to be conveyed
-> to the SMMU driver if doing dynamic streamID setup
-> is what streamIDs are available to be used.
+Regards,
 
-Ok, but this is going to make life difficult for the MSI people, I suspect.
-
-Marc...?
-
-Will
+Tony
