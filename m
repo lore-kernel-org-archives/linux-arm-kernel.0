@@ -1,36 +1,33 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 24 Apr 2015 10:03:42 -0700
-Subject: [PATCH 8/9] ARM: Add MAINTAINERS for 2836.
-In-Reply-To: <5539C8C9.1010705@wwwdotorg.org>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <1429639796-2169-9-git-send-email-eric@anholt.net>
- <5539C8C9.1010705@wwwdotorg.org>
-Message-ID: <87y4lhwj9t.fsf@eliezer.anholt.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 24 Apr 2015 11:05:37 -0600
+Subject: [PATCH] ARM: tegra: Add missing HDMI +5V regulator
+In-Reply-To: <1429869954-5909-1-git-send-email-thierry.reding@gmail.com>
+References: <1429869954-5909-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <553A77E1.8030402@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+On 04/24/2015 04:05 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+>
+> Commit fb50a116bbbc ("drm/tegra: hdmi - Add connector supply support")
+> introduced a new supply for HDMI connectors that is used to control the
+> voltage on the +5V pin. Not all boards have had the corresponding supply
+> added to their device tree files, causing the following warning message
+> during boot:
+>
+> 	[    0.859698] 54280000.hdmi supply hdmi not found, using dummy regulator
+>
+> Add such a regulator to the Seaboard DTS to enable the driver to control
+> this voltage and get rid of the warning.
+>
+> Reported-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Hi Stephen,
+>
+> This is completely untested because I don't have a Seaboard. But this is
+> based on the schematics and I think it should work, so it'd be great if
+> you could test it.
 
-> On 04/21/2015 12:09 PM, Eric Anholt wrote:
->
->> diff --git a/MAINTAINERS b/MAINTAINERS
->
->> +BROADCOM BCM2836 ARM ARCHITECTURE
->> +M:	Eric Anholt <eric@anholt.net>
->> +L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
->> +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
->> +S:	Maintained
->> +N:	bcm2836
->
-> I'm tempted to suggest just adding this to the existing bcm2835 entry,
-> since they're almost the same SoC.
-
-Yeah, I'd started out with more changes and as the diff has kept
-getting, I actually dropped the patch from my series yesterday.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150424/7521f899/attachment.sig>
+Tested-by: Stephen Warren <swarren@nvidia.com> (on top of v4.0).
