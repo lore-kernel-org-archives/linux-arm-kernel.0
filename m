@@ -1,31 +1,27 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 24 Apr 2015 09:27:33 +0200
-Subject: [PATCH resend] ARM: dts: imx25: Add #pwm-cells to pwm4
-Message-ID: <1429860453-25356-1-git-send-email-mpa@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Apr 2015 09:28:40 +0200
+Subject: [PATCH V3 2/4] i2c: busses: xgene: add acpi support for i2c xgene
+ SLIMpro driver
+In-Reply-To: <1429812430-31631-3-git-send-email-fkan@apm.com>
+References: <1429812430-31631-1-git-send-email-fkan@apm.com>
+ <1429812430-31631-3-git-send-email-fkan@apm.com>
+Message-ID: <17062291.7gO4LEY2iX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The property '#pwm-cells' is currently missing. It is not possible to
-use pwm4 without this property.
+On Thursday 23 April 2015 11:07:08 Feng Kan wrote:
+> 
+> +#ifdef CONFIG_ACPI
+> +static const struct acpi_device_id xgene_slimpro_i2c_acpi_ids[] = {
+> +       {"PRP0001", 0},
+> +       {}
+> +};
+> +MODULE_DEVICE_TABLE(acpi, slimpro_acpi_ids);
+> +#endif
+> 
 
-Cc: <stable@vger.kernel.org>
-Cc: Fabio Estevam <festevam@gmail.com>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/boot/dts/imx25.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+Sorry, but this is wrong: The PRP0001 name is meant for embedded
+devices that just use the generic properties API for loading, and
+does not require specifying an ACPI device ID.
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index e4d3aecc4ed2..677f81d9dcd5 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -428,6 +428,7 @@
- 
- 			pwm4: pwm at 53fc8000 {
- 				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
-+				#pwm-cells = <2>;
- 				reg = <0x53fc8000 0x4000>;
- 				clocks = <&clks 108>, <&clks 52>;
- 				clock-names = "ipg", "per";
--- 
-2.1.4
+	Arnd
