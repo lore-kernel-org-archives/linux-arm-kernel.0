@@ -1,72 +1,91 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 24 Apr 2015 12:56:40 +0200
-Subject: [PATCH 1/4] tty: serial: 8250_mtk: Use devm_clk_get
-In-Reply-To: <CABuKBeLEui7ufMZ1=wz2kss4Q8yuK2VYt=wDWam6ZkCfd1G+7Q@mail.gmail.com>
-References: <1429779066-21406-1-git-send-email-s.hauer@pengutronix.de>
- <1429779066-21406-2-git-send-email-s.hauer@pengutronix.de>
- <CABuKBe+bACg_5uDQc3BF4BaBUG1-CQ3mH199o3nMsaMfH3ad3w@mail.gmail.com>
- <20150424103151.GP6325@pengutronix.de>
- <CABuKBeLEui7ufMZ1=wz2kss4Q8yuK2VYt=wDWam6ZkCfd1G+7Q@mail.gmail.com>
-Message-ID: <CABuKBeJHABA6gowf97kKKfnBhh9rNmzexuMvb3z1VjFuq53NeA@mail.gmail.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Fri, 24 Apr 2015 16:28:15 +0530
+Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
+ using PM clocks
+In-Reply-To: <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
+References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>	<1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
+ <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
+Message-ID: <553A21C7.4060506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-24 12:53 GMT+02:00 Matthias Brugger <matthias.bgg@gmail.com>:
-> 2015-04-24 12:31 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
->> On Fri, Apr 24, 2015 at 12:28:33PM +0200, Matthias Brugger wrote:
->>> 2015-04-23 10:51 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
->>> > Just because of_clk_get() doesn't mean it should be used. Use devm_clk_get
->>> > which is the correct function when a struct device * is available. Also
->>> > since it's a devm function we can drop the calls to clk_put(). While at
->>> > it also fix a wrong debug message.
->>> >
->>> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->>> > ---
->>> >  drivers/tty/serial/8250/8250_mtk.c | 7 ++-----
->>> >  1 file changed, 2 insertions(+), 5 deletions(-)
->>> >
->>> > diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
->>> > index 7a11fac..c6901dc 100644
->>> > --- a/drivers/tty/serial/8250/8250_mtk.c
->>> > +++ b/drivers/tty/serial/8250/8250_mtk.c
->>> > @@ -131,18 +131,16 @@ static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
->>> >                            struct mtk8250_data *data)
->>> >  {
->>> >         int err;
->>> > -       struct device_node *np = pdev->dev.of_node;
->>> >
->>> > -       data->uart_clk = of_clk_get(np, 0);
->>> > +       data->uart_clk = devm_clk_get(&pdev->dev, NULL);
->>> >         if (IS_ERR(data->uart_clk)) {
->>> > -               dev_warn(&pdev->dev, "Can't get timer clock\n");
->>> > +               dev_warn(&pdev->dev, "Can't get uart clock\n");
->>> >                 return PTR_ERR(data->uart_clk);
->>> >         }
->>> >
->>> >         err = clk_prepare_enable(data->uart_clk);
->>> >         if (err) {
->>> >                 dev_warn(&pdev->dev, "Can't prepare clock\n");
->>> > -               clk_put(data->uart_clk);
->>> >                 return err;
->>> >         }
->>> >         p->uartclk = clk_get_rate(data->uart_clk);
->>> > @@ -216,7 +214,6 @@ static int mtk8250_remove(struct platform_device *pdev)
->>> >         serial8250_unregister_port(data->line);
->>> >         if (!IS_ERR(data->uart_clk)) {
->>> >                 clk_disable_unprepare(data->uart_clk);
->>> > -               clk_put(data->uart_clk);
->>> >         }
->>>
->>> Please delete the braces.
+
+On 04/24/2015 03:33 PM, Ulf Hansson wrote:
+> On 23 April 2015 at 10:45, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+>> Add runtime PM support to handle (core and iface) clocks for devices
+>> without a controllable power domain. Once the drivers for these devices
+>> are converted to use runtime PM apis, all clock handling (for core and
+>> iface) from these drivers can then be removed.
 >>
->> The if() is removed completly in the next patch anyway.
+>> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+>> ---
+>>   drivers/clk/qcom/gdsc.c | 20 ++++++++++++++++++++
+>>   1 file changed, 20 insertions(+)
+>>
+>> diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
+>> index 480ebf6..92b0f6d 100644
+>> --- a/drivers/clk/qcom/gdsc.c
+>> +++ b/drivers/clk/qcom/gdsc.c
+>> @@ -15,6 +15,7 @@
+>>   #include <linux/err.h>
+>>   #include <linux/jiffies.h>
+>>   #include <linux/pm_clock.h>
+>> +#include <linux/platform_device.h>
+>>   #include <linux/slab.h>
+>>   #include "gdsc.h"
+>>
+>> @@ -226,3 +227,22 @@ void gdsc_unregister(struct device *dev)
+>>   {
+>>          of_genpd_del_provider(dev->of_node);
+>>   }
+>> +
+>> +static struct dev_pm_domain default_qcom_pm_domain = {
+>> +       .ops = {
+>> +               USE_PM_CLK_RUNTIME_OPS
+>> +               USE_PLATFORM_PM_SLEEP_OPS
+>> +       },
+>> +};
+>> +
+>> +static struct pm_clk_notifier_block qcom_pm_notifier = {
+>> +       .pm_domain      = &default_qcom_pm_domain,
+>> +       .con_ids        = { "core", "iface" },
+>> +};
+>> +
+>> +static int __init qcom_pm_runtime_init(void)
+>> +{
+>> +       pm_clk_add_notifier(&platform_bus_type, &qcom_pm_notifier);
+>> +       return 0;
+>> +}
+>> +core_initcall(qcom_pm_runtime_init);
 >
-> You are right. I propose to merge patch 2 and 3, so you get a clean code.
-> On the way, can you have a look on the commit message? For me it is
-> not clear what you want to say.
+> First, I don't follow how this code is related to GDSC.
 
-Actually I meant patch 1 and 2 of the series. Sorry for the confusion.
+Actually its not. I should probably move it to a pm_runtime.c someplace
+in drivers/soc/qcom maybe.
 
+>
+> Second, I want to see less users of pm_clk_add_notifier() since it's
+> not the proper/long-term way of how to assign PM domain pointers to a
+> device. Instead that shall be done at device registration point. In
+> your case while parsing the DT nodes and adding devices onto to their
+> buses.
 
--- 
-motzblog.wordpress.com
+but these are devices which do not really have a controllable power
+domain, they just have controllable clocks.
+
+>
+> Yes, I understand that it will requires quite some work to adopt to
+> this behaviour - but that how it shall be done.
+>
+> Finally, an important note, you don't need to use PM domains for these
+> devices at all and thus you don't need to fix what I propose. Instead
+> you only have to implement the runtime PM callbacks for each driver
+> and manage the clocks from there. That is probably also a easier
+> solution.
+
+But that would mean I repeat the same code in all drivers to do a
+clk_get/prepare/enable/disable/unprepare of the same "core" and "iface"
+clocks. I thought we have clock_ops.c just to avoid that (atleast up
+until we have a better way of doing it)
+And there are atleast a few architecture which have used it to avoid the
+duplication across all drivers (omap1/davinci/sh/keystone)
