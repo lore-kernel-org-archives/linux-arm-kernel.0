@@ -1,46 +1,102 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 24 Apr 2015 08:56:39 +0200
-Subject: [PATCH] ARM: dts: imx28: Fix AUART4 TX-DMA interrupt name
-In-Reply-To: <1429845411-9280-1-git-send-email-marex@denx.de>
-References: <1429845411-9280-1-git-send-email-marex@denx.de>
-Message-ID: <5539E927.3080205@i2se.com>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Fri, 24 Apr 2015 15:09:23 +0800
+Subject: [PATCH 2/2] ARM64: mt8173: dts Add MT8173 cpufreq driver support
+In-Reply-To: <20150423125358.GA29702@leverpostej>
+References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1429522047-16675-3-git-send-email-pi-cheng.chen@linaro.org>
+ <20150423125358.GA29702@leverpostej>
+Message-ID: <CALx668UiU73HAwGdezrXDxTm_4_N0HUJQFYa1E_Guv_j3NG00g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Mark,
 
-Am 24.04.2015 um 05:16 schrieb Marek Vasut:
-> Fix a typo in the TX DMA interrupt name for AUART4.
-> This patch makes AUART4 operational again.
+Thanks for reviewing.
+
+On Thu, Apr 23, 2015 at 8:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Apr 20, 2015 at 10:27:27AM +0100, pi-cheng.chen wrote:
+>> This patch adds voltage supplies and clocks used by MT8173 cpufreq driver.
+>>
+>> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
 >
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: stable at vger.kernel.org
-> ---
->  arch/arm/boot/dts/imx28.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> This series has no bindings for these properties.
+
+Will add documents for these.
+
 >
-> NOTE: This bug goes all the way back to at least Linux 3.10
-> NOTE: I am not the author of the patch, but I am not allowed to disclose
->       the name of the original author due to the circumstances.
+>> ---
+>>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 9 +++++++++
+>>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 6 ++++++
+>>  2 files changed, 15 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>> index 96e141c..7a00cfe 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>> @@ -330,3 +330,12 @@
+>>       status = "okay";
+>>       clock-frequency = <100000>;
+>>  };
+>> +
+>> +&cpu0 {
+>> +     proc-supply = <&mt6397_vpca15_reg>;
+>> +};
+>> +
+>> +&cpu2 {
+>> +     proc-supply = <&da9211_vcpu_reg>;
+>> +     sram-supply = <&mt6397_vsramca7_reg>;
+>> +};
 >
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 25e25f8..4e073e8 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -913,7 +913,7 @@
->  					      80 81 68 69
->  					      70 71 72 73
->  					      74 75 76 77>;
-> -				interrupt-names = "auart4-rx", "aurat4-tx", "spdif-tx", "empty",
-> +				interrupt-names = "auart4-rx", "auart4-tx", "spdif-tx", "empty",
->  						  "saif0", "saif1", "i2c0", "i2c1",
->  						  "auart0-rx", "auart0-tx", "auart1-rx", "auart1-tx",
->  						  "auart2-rx", "auart2-tx", "auart3-rx", "auart3-tx";
+>
+> Why do only two CPUs have these properties, and why does one need an
+> sram-supply?
 
-looks good, but shouldn't we patch also the wrong documentation?
+For better description of hardware, I think putting these properties in all CPUs
+share the same supplies is logical.
 
-Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
+For each cluster of MT8173, we have both PROC and SRAM supplies. But only
+on one cluster (cpu2 and cpu3) we need to control both voltage supplies. The
+SRAM supply on cpu0 cluster is controlled by hardware automatically. Therefore
+I put sram-supply only on cpu2. For better description of hardware, it
+might be a
+good idea to put the SRAM supply in cpu0 also though we don't use it in the
+driver, right?
 
-Best regards
-Stefan
+>
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> index d9cc84e..b8a5454 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> @@ -51,6 +51,9 @@
+>>                       device_type = "cpu";
+>>                       compatible = "arm,cortex-a53";
+>>                       reg = <0x000>;
+>> +                     clocks = <&infracfg INFRA_CA53SEL>,
+>> +                              <&apmixedsys APMIXED_MAINPLL>;
+>> +                     clock-names = "cpu", "intermediate";
+>>               };
+>>
+>>               cpu1: cpu at 1 {
+>> @@ -65,6 +68,9 @@
+>>                       compatible = "arm,cortex-a57";
+>>                       reg = <0x100>;
+>>                       enable-method = "psci";
+>> +                     clocks = <&infracfg INFRA_CA57SEL>,
+>> +                              <&apmixedsys APMIXED_MAINPLL>;
+>> +                     clock-names = "cpu", "intermediate";
+>>               };
+>
+> We should really describe this information per-cpu rather than assuming
+> that it's the same for siblings. Arbitrarily making one CPU in each
+> cluster (or other arbitrary grouping) special for the binding is silly.
+
+Yes, I agree with you and same above. I did these because most of the
+platforms in kernel did these. So should I do it the way you suggest?
+
+Thanks.
+
+Best Regards,
+Pi-Cheng
+
+>
+> Mark.
