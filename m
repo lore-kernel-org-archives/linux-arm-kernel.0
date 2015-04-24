@@ -1,77 +1,138 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Fri, 24 Apr 2015 20:14:27 +0200
-Subject: Broadcom 43340 module on iMX6DL
-In-Reply-To: <CACUGKYOheGKjQOSZkxKGkqj_wOWAN8_2geptmTC8jp_L5AOveg@mail.gmail.com>
-References: <CACUGKYMXr3ASbB9fCk+GBnpfMC1kf_+NxDsOF_FODBKRAN9YvQ@mail.gmail.com>	<55393C45.3060105@broadcom.com>	<CACUGKYPHKGoLEfNPNvtHwtCA9jB_ZLamzF_PViDfQnpnc8Y-=A@mail.gmail.com>	<55394141.1080601@broadcom.com>	<CALAqxLU_9Hcbr5atxRBLDhs4WY9JfAdwdyzpszeO5nxCZU9JLA@mail.gmail.com>	<CACUGKYPFk3Qoj3-XgkMwuzuCz_aP-8QCA8S+OSq5-qfoRF9dwg@mail.gmail.com>	<CACUGKYMqFuk6nD82H=7nPRVvHEe9Ot6OkWiixqoV91ED8Cwudw@mail.gmail.com>	<5539FCD5.4050708@broadcom.com>
- <CACUGKYOheGKjQOSZkxKGkqj_wOWAN8_2geptmTC8jp_L5AOveg@mail.gmail.com>
-Message-ID: <553A8803.5010700@broadcom.com>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Fri, 24 Apr 2015 18:18:44 +0000
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+In-Reply-To: <553A72D4.7000801@arm.com>
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+ <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
+ <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20150416104008.GB25640@arm.com>
+ <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150422170718.GG13019@arm.com>
+ <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150424161818.GC7313@arm.com> <553A72D4.7000801@arm.com>
+Message-ID: <CY1PR0301MB074896DF1A06CDEC3A0E09B687EC0@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/15 19:49, John Tobias wrote:
-> Hi Arend,
->
-> I am not pretty sure if the brcm43340 driver for android is the latest
-> one.  May I know repo?.
 
-Not sure what you are asking. I gave the url. Did you try using the 
-brcmfmac4334-sdio.bin firmware file. I would like to know if that one 
-works for your device.
 
-Regards,
-Arend
+> -----Original Message-----
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Friday, April 24, 2015 11:44 AM
+> To: Will Deacon; Yoder Stuart-B08248
+> Cc: Sethi Varun-B16395; Lian Minghuan-B31939; linux-pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284;
+> Zang Roy-R61911; Bjorn Helgaas; Wood Scott-B07421; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> 
+> On 24/04/15 17:18, Will Deacon wrote:
+> > On Wed, Apr 22, 2015 at 08:41:02PM +0100, Stuart Yoder wrote:
+> >>>> However, there is an improvement we envision as possible due to
+> >>>> the limited number of SMMU contexts (i.e. 64).  If there are
+> >>>> 64 SMMU context registers it means that there is a max of
+> >>>> 64 software contexts where things can be isolated.  But, say I have
+> >>>> an SRIOV card with 64 VFs, and I want to assign 8 of the VFs
+> >>>> to a KVM VM.  Those 8 PCI devices could share the same
+> >>>> streamID/ITS-device-ID since they all share the same isolation
+> >>>> context.
+> >>>>
+> >>>> What would be nice is at the time the 8 VFS are being added
+> >>>> to the IOMMU domain is for the pcidevid -> streamID mapping
+> >>>> table to be updated dynamically.  It simply lets us make
+> >>>> more efficient use of the limited streamIDs we have.
+> >>>>
+> >>>> I think it is this improvement that Minghuan had in mind
+> >>>> in this patch.
+> >>>
+> >>> Ok, but in this case it should be possible to use a single context bank for
+> >>> all of the VF streamIDs by configuring the appropriate SMR, no?
+> >>
+> >> Yes, but there are limited SMRs.  In our case there are only
+> >> 128 SMRs in SMMU-500 and we have potentially way more masters than
+> >> that.
+> >
+> > Right, but you still only have 64 context banks at the end of the day, so do
+> > you really anticipate having more than 128 masters concurrently using the
+> > SMMU? If so, then we have devices sharing context banks so we could consider
+> > reusing SMRs across masters, but historically that's not been something that
+> > we've managed to solve.
+> >
+> >>> Wouldn't
+> >>> that sort of thing be preferable to dynamic StreamID assignment? It would
+> >>> certainly make life easier for the MSIs.
+> >>
+> >> It would be preferable, but given only 128 total stream IDS and
+> >> 64 context registers it's potentially an issue.  On our LS2085 SoC it is
+> >> PCI and the fsl-mc bus (see description here:
+> >> https://lkml.org/lkml/2015/3/5/795) that potentially have way
+> >> more masters than streamIDS. So, for those busses we would essentially
+> >> view a streamID as a "context ID"-- each SMR is associated with
+> >> 1 context bank register.
+> >>
+> >> For PCI we have a programmable "PCI req ID"-to-"stream ID"
+> >> mapping table in the PCI controller that is dynamically
+> >> programmable.
+> >>
+> >> Looking at it like that means that we could have
+> >> any number of masters but only 64 "contexts"
+> >> and since the masters all all programmable it's
+> >> seems feasbile to envision doing some bus/vendor
+> >> specific set up when a device is added to an
+> >> IOMMU domain.   One thing that would need to be conveyed
+> >> to the SMMU driver if doing dynamic streamID setup
+> >> is what streamIDs are available to be used.
+> >
+> > Ok, but this is going to make life difficult for the MSI people, I suspect.
+> >
+> > Marc...?
+> 
+> We're really facing two conflicting requirements: in order to minimize
+> SMR usage, we want to alias multiple ReqIDs to a single StreamID
 
-> Regards,
->
-> John
->
-> On Fri, Apr 24, 2015 at 1:20 AM, Arend van Spriel<arend@broadcom.com>  wrote:
->> On 04/24/15 03:04, John Tobias wrote:
->>>
->>> Btw, where I could get a copy of the latest driver?.
->>
->>
->> The open-source bcmdhd is in AOSP [1]. I would stick to the android release
->> branch you are running on your device.
->>
->> Regards,
->> Arend
->>
->> [1] https://android.googlesource.com/platform/hardware/broadcom/wlan/
->>
->>
->>> Regards,
->>>
->>> John
->>>
->>> On Thu, Apr 23, 2015 at 5:59 PM, John Tobias<john.tobias.ph@gmail.com>
->>> wrote:
->>>>
->>>> Hi John,
->>>>
->>>> Is it possible to have a copy of the firmware for 43340?.
->>>>
->>>> Regards,
->>>>
->>>> John
->>>>
->>>> On Thu, Apr 23, 2015 at 5:57 PM, John Stultz<john.stultz@linaro.org>
->>>> wrote:
->>>>>
->>>>> On Thu, Apr 23, 2015 at 12:00 PM, Arend van Spriel<arend@broadcom.com>
->>>>> wrote:
->>>>>>
->>>>>> By the name of the file I suspected you did. Personally, I verified the
->>>>>> firmware works on 43341. John Stultz tested both 43340 and 43341 with
->>>>>> this
->>>>>> firmware.
->>>>>
->>>>>
->>>>> Minor correction here, I only tested on 43341 hardware. The confusion
->>>>> might be that the firmware I originally had access to claimed it was
->>>>> 43340.
->>>>>
->>>>> thanks
->>>>> -john
->>
->>
+Another reason could be the isolation characteristics of the
+hardware...see comment below about PCI bridges.
+
+> but in
+> order to efficiently deal with MSIs, we want to see discrete DeviceIDs
+> (the actual ReqIDs). I don't easily see how we reconcile the two.
+> 
+> We can deal with the aliasing, provided that we extend the level of
+> quirkiness that pci_for_each_dma_alias can deal with. But that doesn't
+> solve any form of hotplug/SR-IOV behaviour.
+> 
+> Somehow, we're going to end-up with grossly oversized ITTs, just to
+> accommodate for the fact that we have no idea how many MSIs we're going
+> to end-up needing. I'm not thrilled with that prospect.
+
+How can we avoid that in the face of hotplug?
+
+And what are we really worried about regarding over-sized ITTs...bytes
+of memory saved?
+
+A fundamental thing built into the IOMMU subsystem in Linux is
+representing iommu groups that can represent things like
+multiple PCI devices that for hardware reasons cannot
+be isolated (and the example I've seen given relates to 
+devices behind PCI bridges).
+
+So, I think the thing we are facing here is that while the
+IOMMU subsystem has accounted for reprsenting the isolation
+characteristics of a system with iommu groups, there is
+no corresponding "msi group" concept.
+
+In the SMMU/GIC-500-ITS world the iommu isolation
+ID (the stream ID) and the GIC-ITS device ID are in
+fact the same ID.
+
+Is there some way we could sanely correlate IOMMU group creation
+(which establishes isolation granularity) with the creation
+of an ITT for the GIC-ITS?
+
+(I don't have a good feel for how device IDs work on x86,
+I know there is an interrupt remapping table in the
+x86 IOMMUs that is distinct from the memory isolation
+page tables)
+
+Thanks,
+Stuart
