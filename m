@@ -1,54 +1,69 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 24 Apr 2015 11:44:05 +0900
-Subject: [RFC 0/4] arm64: add livepatch support
-Message-ID: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
+Date: Fri, 24 Apr 2015 11:44:06 +0900
+Subject: [RFC 1/4] ftrace: add a helper function for livepatch
+In-Reply-To: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1429843449-7388-2-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset enables livepatch support on arm64.
+ftrace_lookup_mcount() will return an address of mcount call in a function.
 
-Livepatch was merged in v4.0, and allows replacying a function dynamically
-based on ftrace framework, but it also requires -mfentry option of gcc.
-Currently arm64 gcc doesn't support it, but by adding a helper function to
-ftrace, we will be able to support livepatch on arch's which don't support
-this option.
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ include/linux/ftrace.h |    2 ++
+ kernel/trace/ftrace.c  |   26 ++++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-I submit this patchset as RFC since I'm not quite sure that I'm doing
-in the right way, or we should definitely support -fentry instead.
-
-Please note that I tested the feature only with livepatch-sample, and
-the code for DYNAMIC_TRACE_WITH_REGS is still rough-edged.
-
-To: Steven Rostedt <rostedt@goodmis.org>
-To: Ingo Molnar <mingo@kernel.org>
-To: Josh Poimboeuf <jpoimboe@redhat.com>
-To: Seth Jennings <sjenning@redhat.com>
-To: Jiri Kosina <jkosina@suse.cz>
-To: Vojtech Pavlik <vojtech@suse.cz>
-To: Catalin Marinas <catalin.marinas@arm.com>
-To: Will Deacon <will.deacon@arm.com>
-
-AKASHI Takahiro (4):
-  ftrace: add a helper function for livepatch
-  livepatch: adjust a patched function's address
-  arm64: ftrace: add DYNAMIC_TRACE_WITH_REGS version
-  arm64: add livepatch support
-
- arch/arm64/Kconfig                 |    4 ++
- arch/arm64/include/asm/ftrace.h    |    4 ++
- arch/arm64/include/asm/livepatch.h |   38 +++++++++++
- arch/arm64/kernel/Makefile         |    1 +
- arch/arm64/kernel/entry-ftrace.S   |  124 ++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/ftrace.c         |   24 ++++++-
- arch/arm64/kernel/livepatch.c      |   68 ++++++++++++++++++++
- arch/x86/include/asm/livepatch.h   |    5 ++
- include/linux/ftrace.h             |    2 +
- include/linux/livepatch.h          |    2 +
- kernel/livepatch/core.c            |   16 +++--
- kernel/trace/ftrace.c              |   26 ++++++++
- 12 files changed, 309 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm64/include/asm/livepatch.h
- create mode 100644 arch/arm64/kernel/livepatch.c
-
+diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+index 1da6029..1d0271f 100644
+--- a/include/linux/ftrace.h
++++ b/include/linux/ftrace.h
+@@ -699,6 +699,8 @@ static inline void __ftrace_enabled_restore(int enabled)
+ # define trace_preempt_off(a0, a1) do { } while (0)
+ #endif
+ 
++extern unsigned long ftrace_lookup_mcount(unsigned long addr);
++
+ #ifdef CONFIG_FTRACE_MCOUNT_RECORD
+ extern void ftrace_init(void);
+ #else
+diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+index 4f22802..fcfb04f 100644
+--- a/kernel/trace/ftrace.c
++++ b/kernel/trace/ftrace.c
+@@ -4857,6 +4857,32 @@ static int ftrace_process_locs(struct module *mod,
+ 	return ret;
+ }
+ 
++unsigned long ftrace_lookup_mcount(unsigned long addr)
++{
++	struct ftrace_page *pg;
++	struct dyn_ftrace *rec;
++	char str[KSYM_SYMBOL_LEN];
++	char *modname;
++	const char *name;
++	unsigned long mcount = 0;
++	unsigned long offset;
++
++	mutex_lock(&ftrace_lock);
++
++	do_for_each_ftrace_rec(pg, rec) {
++		name = kallsyms_lookup(rec->ip, NULL, &offset, &modname, str);
++		if (name && rec->ip == (addr + offset)) {
++			mcount = rec->ip;
++			goto out_unlock;
++		}
++	} while_for_each_ftrace_rec();
++
++ out_unlock:
++	mutex_unlock(&ftrace_lock);
++
++	return mcount;
++}
++
+ #ifdef CONFIG_MODULES
+ 
+ #define next_to_ftrace_page(p) container_of(p, struct ftrace_page, next)
 -- 
 1.7.9.5
