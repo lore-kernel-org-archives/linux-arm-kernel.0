@@ -1,45 +1,70 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Fri, 24 Apr 2015 13:52:15 +0300
-Subject: [PATCH] mmc: core: add missing pm event in mmc_pm_notify to fix
- hib restore
-In-Reply-To: <CAPDyKFqA5Wvod_0J-52FJ9Vktt1kdq7H7c9UcX-daJ0hazWU+Q@mail.gmail.com>
-References: <1429785823-16939-1-git-send-email-grygorii.strashko@linaro.org>
- <CAPDyKFqA5Wvod_0J-52FJ9Vktt1kdq7H7c9UcX-daJ0hazWU+Q@mail.gmail.com>
-Message-ID: <553A205F.6020608@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 24 Apr 2015 12:53:08 +0200
+Subject: [PATCH 1/4] tty: serial: 8250_mtk: Use devm_clk_get
+In-Reply-To: <20150424103151.GP6325@pengutronix.de>
+References: <1429779066-21406-1-git-send-email-s.hauer@pengutronix.de>
+ <1429779066-21406-2-git-send-email-s.hauer@pengutronix.de>
+ <CABuKBe+bACg_5uDQc3BF4BaBUG1-CQ3mH199o3nMsaMfH3ad3w@mail.gmail.com>
+ <20150424103151.GP6325@pengutronix.de>
+Message-ID: <CABuKBeLEui7ufMZ1=wz2kss4Q8yuK2VYt=wDWam6ZkCfd1G+7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2015 04:19 PM, Ulf Hansson wrote:
-> On 23 April 2015 at 12:43,  <grygorii.strashko@linaro.org> wrote:
->> From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+2015-04-24 12:31 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> On Fri, Apr 24, 2015 at 12:28:33PM +0200, Matthias Brugger wrote:
+>> 2015-04-23 10:51 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+>> > Just because of_clk_get() doesn't mean it should be used. Use devm_clk_get
+>> > which is the correct function when a struct device * is available. Also
+>> > since it's a devm function we can drop the calls to clk_put(). While at
+>> > it also fix a wrong debug message.
+>> >
+>> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>> > ---
+>> >  drivers/tty/serial/8250/8250_mtk.c | 7 ++-----
+>> >  1 file changed, 2 insertions(+), 5 deletions(-)
+>> >
+>> > diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+>> > index 7a11fac..c6901dc 100644
+>> > --- a/drivers/tty/serial/8250/8250_mtk.c
+>> > +++ b/drivers/tty/serial/8250/8250_mtk.c
+>> > @@ -131,18 +131,16 @@ static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
+>> >                            struct mtk8250_data *data)
+>> >  {
+>> >         int err;
+>> > -       struct device_node *np = pdev->dev.of_node;
+>> >
+>> > -       data->uart_clk = of_clk_get(np, 0);
+>> > +       data->uart_clk = devm_clk_get(&pdev->dev, NULL);
+>> >         if (IS_ERR(data->uart_clk)) {
+>> > -               dev_warn(&pdev->dev, "Can't get timer clock\n");
+>> > +               dev_warn(&pdev->dev, "Can't get uart clock\n");
+>> >                 return PTR_ERR(data->uart_clk);
+>> >         }
+>> >
+>> >         err = clk_prepare_enable(data->uart_clk);
+>> >         if (err) {
+>> >                 dev_warn(&pdev->dev, "Can't prepare clock\n");
+>> > -               clk_put(data->uart_clk);
+>> >                 return err;
+>> >         }
+>> >         p->uartclk = clk_get_rate(data->uart_clk);
+>> > @@ -216,7 +214,6 @@ static int mtk8250_remove(struct platform_device *pdev)
+>> >         serial8250_unregister_port(data->line);
+>> >         if (!IS_ERR(data->uart_clk)) {
+>> >                 clk_disable_unprepare(data->uart_clk);
+>> > -               clk_put(data->uart_clk);
+>> >         }
 >>
->> The PM_RESTORE_PREPARE is not handled now in mmc_pm_notify(),
->> as result mmc_rescan() could be scheduled and executed at
->> late hibernation restore stages when MMC device is suspended
->> already - which, in turn, will lead to system crash on TI dra7-evm board:
->>
->> WARNING: CPU: 0 PID: 3188 at drivers/bus/omap_l3_noc.c:148 l3_interrupt_handler+0x258/0x374()
->> 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER1_P3 (Idle): Data Access in User mode during Functional access
->>
->> Hence, add missed PM_RESTORE_PREPARE PM event in mmc_pm_notify().
->>
->> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
-> 
-> Huh, that was an old bug you found. :-)
+>> Please delete the braces.
+>
+> The if() is removed completly in the next patch anyway.
 
-oh yes. it's happened thanks to HW issue on my board which
-generates a flood of SDCD IRQs :)
+You are right. I propose to merge patch 2 and 3, so you get a clean code.
+On the way, can you have a look on the commit message? For me it is
+not clear what you want to say.
 
-It's the worst case ever to track wrong/missed PM notifiers (
-
-> 
-> I have applied it for fixes and added the below fixes tag.
-> 
-> Fixes: 4c2ef25fe0b8 (mmc: fix all hangs related to mmc/sd card
-> insert/removal during suspend/resume)
-
-Thanks. 
+Cheers,
+Matthias
 
 -- 
-regards,
--grygorii
+motzblog.wordpress.com
