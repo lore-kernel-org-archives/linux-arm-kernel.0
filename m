@@ -1,46 +1,49 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Fri, 24 Apr 2015 10:20:37 +0200
-Subject: Broadcom 43340 module on iMX6DL
-In-Reply-To: <CACUGKYMqFuk6nD82H=7nPRVvHEe9Ot6OkWiixqoV91ED8Cwudw@mail.gmail.com>
-References: <CACUGKYMXr3ASbB9fCk+GBnpfMC1kf_+NxDsOF_FODBKRAN9YvQ@mail.gmail.com>	<55393C45.3060105@broadcom.com>	<CACUGKYPHKGoLEfNPNvtHwtCA9jB_ZLamzF_PViDfQnpnc8Y-=A@mail.gmail.com>	<55394141.1080601@broadcom.com>	<CALAqxLU_9Hcbr5atxRBLDhs4WY9JfAdwdyzpszeO5nxCZU9JLA@mail.gmail.com>	<CACUGKYPFk3Qoj3-XgkMwuzuCz_aP-8QCA8S+OSq5-qfoRF9dwg@mail.gmail.com>
- <CACUGKYMqFuk6nD82H=7nPRVvHEe9Ot6OkWiixqoV91ED8Cwudw@mail.gmail.com>
-Message-ID: <5539FCD5.4050708@broadcom.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 24 Apr 2015 10:25:12 +0200
+Subject: [PATCH V2 1/4] mailbox: add support for APM X-Gene platform
+ mailbox driver
+In-Reply-To: <1429741125-29156-2-git-send-email-fkan@apm.com>
+References: <1429741125-29156-1-git-send-email-fkan@apm.com>
+ <1429741125-29156-2-git-send-email-fkan@apm.com>
+Message-ID: <1429863912.2927.43.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/15 03:04, John Tobias wrote:
-> Btw, where I could get a copy of the latest driver?.
+On Wed, 2015-04-22 at 15:18 -0700, Feng Kan wrote:
+> --- /dev/null
+> +++ b/drivers/mailbox/mailbox-xgene-slimpro.c
 
-The open-source bcmdhd is in AOSP [1]. I would stick to the android 
-release branch you are running on your device.
+> +static struct platform_driver slimpro_mbox_driver = {
+> +	.probe	= slimpro_mbox_probe,
+> +	.remove = slimpro_mbox_remove,
+> +	.driver	= {
+> +		.name = "xgene-slimpro-mbox",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = of_match_ptr(slimpro_of_match),
+> +	},
+> +};
+> +
+> +static int __init slimpro_mbox_init(void)
+> +{
+> +	return platform_driver_register(&slimpro_mbox_driver);
+> +}
+> +
+> +subsys_initcall(slimpro_mbox_init);
 
-Regards,
-Arend
+After a quick scan of this driver you'd expect something like
+    static void __exit slimpro_mbox_exit(void)
+    {
+	platform_driver_unregister(&slimpro_mbox_driver);
+    }
+    module_exit(slimpro_mbox_exit);
 
-[1] https://android.googlesource.com/platform/hardware/broadcom/wlan/
+too here. At least, I do. Is there some non-obvious (to me) reason this
+driver can't be unloaded if it is built as a module?
 
-> Regards,
->
-> John
->
-> On Thu, Apr 23, 2015 at 5:59 PM, John Tobias<john.tobias.ph@gmail.com>  wrote:
->> Hi John,
->>
->> Is it possible to have a copy of the firmware for 43340?.
->>
->> Regards,
->>
->> John
->>
->> On Thu, Apr 23, 2015 at 5:57 PM, John Stultz<john.stultz@linaro.org>  wrote:
->>> On Thu, Apr 23, 2015 at 12:00 PM, Arend van Spriel<arend@broadcom.com>  wrote:
->>>> By the name of the file I suspected you did. Personally, I verified the
->>>> firmware works on 43341. John Stultz tested both 43340 and 43341 with this
->>>> firmware.
->>>
->>> Minor correction here, I only tested on 43341 hardware. The confusion
->>> might be that the firmware I originally had access to claimed it was
->>> 43340.
->>>
->>> thanks
->>> -john
+> +MODULE_DESCRIPTION("APM X-Gene SLIMpro Mailbox Driver");
+> +MODULE_LICENSE("GPL");
+
+Thanks,
+
+
+Paul Bolle
