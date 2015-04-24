@@ -1,60 +1,84 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Fri, 24 Apr 2015 12:10:43 +0200
-Subject: [rtc-linux] [PATCH 1/5] RTC/i.MX/DryIce: add some background info
- about the states the machine can be in
-In-Reply-To: <20150421220942.GB8539@piout.net>
-References: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
- <1429002716-19821-2-git-send-email-jbe@pengutronix.de>
- <20150421220942.GB8539@piout.net>
-Message-ID: <201504241210.43768.jbe@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Apr 2015 11:11:36 +0100
+Subject: [v2 1/5] arm64: kdump: reserve memory for crash dump kernel
+In-Reply-To: <1429861989-8417-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
+ <1429861989-8417-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20150424101136.GE29183@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+On Fri, Apr 24, 2015 at 08:53:04AM +0100, AKASHI Takahiro wrote:
+> On system kernel, the memory region used by crash dump kernel must be
+> specified by "crashkernel=X at Y" boot parameter. reserve_crashkernel()
+> will allocate the region in "System RAM" and reserve it for later use.
+> 
+> On crash dump kernel, memory region information in system kernel is
+> described in a specific region specified by "elfcorehdr=X at Y" boot parameter.
+> reserve_elfcorehdr() will set aside the region to avoid data destruction
+> by the kernel.
+> 
+> Crash dump kernel will access memory regions in system kernel via
+> copy_oldmem_page(), which reads a page by ioremap'ing it assuming that
+> such pages are not part of main memory of crash dump kernel.
+> This is true under non-UEFI environment because kexec-tools modifies
+> a device tree adding "usablemem" attributes to memory sections.
 
-On Wednesday 22 April 2015 00:09:42 Alexandre Belloni wrote:
-> [...]
-> > ---
-> >  drivers/rtc/rtc-imxdi.c | 43 +++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 43 insertions(+)
-> >
-> > diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
-> > index c666eab..8750477 100644
-> > --- a/drivers/rtc/rtc-imxdi.c
-> > +++ b/drivers/rtc/rtc-imxdi.c
-> > @@ -129,6 +129,49 @@ struct imxdi_dev {
-> >  	struct work_struct work;
-> >  };
-> >
-> > +/* Some background:
-> > + *
-> > + * The DryIce unit is a complex security/tamper monitor device. To be able do
-> > + * its job in a useful manner it runs a bigger statemachine to bring it into
-> > + * security/tamper failure state and once again to bring it out of this state.
-> > + * 
-> > + * This unit can be in one of three states:
-> > + *
-> > + * - "NON-VALID STATE"
-> > + *   always after the battery power was removed
-> > + * - "FAILURE STATE"
-> > + *   if one of the enabled security events have happend
->
->                                  has happened ^
->
-> > + * - "VALID STATE"
-> > + *   if the unit works as expected
-> > + *
-> > + * Everything stops when the unit enters the failure state including the
-> > RTC + * counter (to be able to detect the time the security event
-> > happend).
->
->                                                        happened ^
-> [...]
+I'm not sure what you mean by "usablemem" here.
 
-Thanks for the feedback. Fixed in the next version.
+Do you just mean that the memory nodes are altered such that they only
+cover memory usable by the crash kernel?
 
-Regards,
-Juergen
--- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
-Industrial Linux Solutions               ? ? ?| http://www.pengutronix.de/  |
+Why not _always_ require a command line argument for the crash kernel
+that restricts its memory usage to a particular range? That way it
+doesn't matter whether we're using UEFI or not.
+
+> Under UEFI, however, this is not true because UEFI remove memory sections
+> in a device tree and export all the memory regions, even though they belong
+> to system kernel.
+> 
+> So we should add "mem=X[MG]" boot parameter to limit the memory size and
+> avoid hitting the following assertion in ioremap():
+>         if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
+>                 return NULL;
+
+That looks suspicious. What is being ioremapped at that point?
+
+[...]
+
+> @@ -393,6 +398,7 @@ void __init setup_arch(char **cmdline_p)
+>         local_async_enable();
+> 
+>         efi_init();
+> +
+>         arm64_memblock_init();
+> 
+>         paging_init();
+
+Nit: unrelated whitespace change.
+
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index ae85da6..ea70d41 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -34,6 +34,8 @@
+>  #include <linux/dma-contiguous.h>
+>  #include <linux/efi.h>
+>  #include <linux/swiotlb.h>
+> +#include <linux/kexec.h>
+> +#include <linux/crash_dump.h>
+
+Nit: please keep these ordered.
+
+[...]
+
+> +               if (memblock_reserve(crash_base, crash_size)) {
+> +                       pr_warn("crashkernel reservation failed - out of memory\n");
+> +                       return;
+> +               }
+
+If we can remove this memory rather than reserving it, we can limit the
+first kernel's ability to accidentally clobber the crash kernel, at the
+expense of having to explicitly map/unmap around loading it.
+
+Mark.
