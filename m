@@ -1,44 +1,53 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 24 Apr 2015 14:54:51 -0500
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 24 Apr 2015 14:55:52 -0500
 Subject: [PATCH] bus: omap_l3_noc: Fix master id address decoding for OMAP5
-In-Reply-To: <CAGo_u6rgZhkRZSjpXuvBz5frYByUDtzFrAQFaPB7rxT8hLYBPw@mail.gmail.com>
+In-Reply-To: <553A9F8B.7010205@ti.com>
 References: <1429898060-51944-1-git-send-email-s-anna@ti.com>	<553A8C68.5080903@ti.com>	<553A951A.1080905@ti.com>
  <CAGo_u6rgZhkRZSjpXuvBz5frYByUDtzFrAQFaPB7rxT8hLYBPw@mail.gmail.com>
-Message-ID: <553A9F8B.7010205@ti.com>
+ <553A9F8B.7010205@ti.com>
+Message-ID: <553A9FC8.8060405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2015 02:38 PM, Nishanth Menon wrote:
-> On Fri, Apr 24, 2015 at 2:10 PM, Suman Anna <s-anna@ti.com> wrote:
->> On 04/24/2015 01:33 PM, Nishanth Menon wrote:
->>> On 04/24/2015 12:54 PM, Suman Anna wrote:
-> 
-> ...
->>>> -static struct l3_target_data omap_l3_target_data_clk3[] = {
->>>> -    {0x0100, "EMUSS",},
->>>> -    {0x0300, "DEBUG SOURCE",},
->>>> -    {0x0,   "HOST CLK3",},
-> ^^ this was HOST CLK3
-> ..
->>>>
->>>> +/* OMAP5 data */
->>>> +static struct l3_target_data omap5_l3_target_data_clk3[] = {
->>>> +    {0x0100, "L3INSTR",},
->>>> +    {0x0300, "DEBUGSS",},
->>>> +    {0x0,    "HOSTCLK3",},
->>>
->>> "HOST CLK"
+On 04/24/2015 02:54 PM, Suman Anna wrote:
+> On 04/24/2015 02:38 PM, Nishanth Menon wrote:
+>> On Fri, Apr 24, 2015 at 2:10 PM, Suman Anna <s-anna@ti.com> wrote:
+>>> On 04/24/2015 01:33 PM, Nishanth Menon wrote:
+>>>> On 04/24/2015 12:54 PM, Suman Anna wrote:
 >>
->> Why? I followed the convention used for the other two HOST CLKs for the
+>> ...
+>>>>> -static struct l3_target_data omap_l3_target_data_clk3[] = {
+>>>>> -    {0x0100, "EMUSS",},
+>>>>> -    {0x0300, "DEBUG SOURCE",},
+>>>>> -    {0x0,   "HOST CLK3",},
+>> ^^ this was HOST CLK3
+>> ..
+>>>>>
+>>>>> +/* OMAP5 data */
+>>>>> +static struct l3_target_data omap5_l3_target_data_clk3[] = {
+>>>>> +    {0x0100, "L3INSTR",},
+>>>>> +    {0x0300, "DEBUGSS",},
+>>>>> +    {0x0,    "HOSTCLK3",},
+>>>>
+>>>> "HOST CLK"
+>>>
+>>> Why? I followed the convention used for the other two HOST CLKs for the
+>>
+>> so asked, if it should be HOST<space>CLK3
 > 
-> so asked, if it should be HOST<space>CLK3
+> Aah ok, you missed the trailing number before. In anycase, this was
 
-Aah ok, you missed the trailing number before. In anycase, this was
-intentional to match HOSTCLK1 and HOSTCLK2 on OMAP4/5. Overall, the
-names are somewhat non-standard, some use underscores and some others
-strip out the underscore and do not use any spaces in between either.
-"HOST CLK3" would be the only one to use a space for OMAP4, so I got rid
-of it, so hope that's ok with you.
+Sorry about that..
 
-regards
-Suman
+> intentional to match HOSTCLK1 and HOSTCLK2 on OMAP4/5. Overall, the
+> names are somewhat non-standard, some use underscores and some others
+> strip out the underscore and do not use any spaces in between either.
+> "HOST CLK3" would be the only one to use a space for OMAP4, so I got rid
+> of it, so hope that's ok with you.
+
+would have been nice to cover that in commit message. no biggie for me.
+
+
+-- 
+Regards,
+Nishanth Menon
