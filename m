@@ -1,70 +1,82 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 24 Apr 2015 12:53:08 +0200
-Subject: [PATCH 1/4] tty: serial: 8250_mtk: Use devm_clk_get
-In-Reply-To: <20150424103151.GP6325@pengutronix.de>
-References: <1429779066-21406-1-git-send-email-s.hauer@pengutronix.de>
- <1429779066-21406-2-git-send-email-s.hauer@pengutronix.de>
- <CABuKBe+bACg_5uDQc3BF4BaBUG1-CQ3mH199o3nMsaMfH3ad3w@mail.gmail.com>
- <20150424103151.GP6325@pengutronix.de>
-Message-ID: <CABuKBeLEui7ufMZ1=wz2kss4Q8yuK2VYt=wDWam6ZkCfd1G+7Q@mail.gmail.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Fri, 24 Apr 2015 16:25:02 +0530
+Subject: [PATCH v5 08/11] arm: dts: qcom: Add #power-domain-cells property
+In-Reply-To: <CAPDyKFoph2TQeSS6XE_UpOPHiZy5tRZWFvUSqccv7rjtHOprsg@mail.gmail.com>
+References: <1429017137-20218-1-git-send-email-rnayak@codeaurora.org>	<1429017137-20218-9-git-send-email-rnayak@codeaurora.org>
+ <CAPDyKFoph2TQeSS6XE_UpOPHiZy5tRZWFvUSqccv7rjtHOprsg@mail.gmail.com>
+Message-ID: <553A2106.1030102@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-24 12:31 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Fri, Apr 24, 2015 at 12:28:33PM +0200, Matthias Brugger wrote:
->> 2015-04-23 10:51 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
->> > Just because of_clk_get() doesn't mean it should be used. Use devm_clk_get
->> > which is the correct function when a struct device * is available. Also
->> > since it's a devm function we can drop the calls to clk_put(). While at
->> > it also fix a wrong debug message.
->> >
->> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->> > ---
->> >  drivers/tty/serial/8250/8250_mtk.c | 7 ++-----
->> >  1 file changed, 2 insertions(+), 5 deletions(-)
->> >
->> > diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
->> > index 7a11fac..c6901dc 100644
->> > --- a/drivers/tty/serial/8250/8250_mtk.c
->> > +++ b/drivers/tty/serial/8250/8250_mtk.c
->> > @@ -131,18 +131,16 @@ static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
->> >                            struct mtk8250_data *data)
->> >  {
->> >         int err;
->> > -       struct device_node *np = pdev->dev.of_node;
->> >
->> > -       data->uart_clk = of_clk_get(np, 0);
->> > +       data->uart_clk = devm_clk_get(&pdev->dev, NULL);
->> >         if (IS_ERR(data->uart_clk)) {
->> > -               dev_warn(&pdev->dev, "Can't get timer clock\n");
->> > +               dev_warn(&pdev->dev, "Can't get uart clock\n");
->> >                 return PTR_ERR(data->uart_clk);
->> >         }
->> >
->> >         err = clk_prepare_enable(data->uart_clk);
->> >         if (err) {
->> >                 dev_warn(&pdev->dev, "Can't prepare clock\n");
->> > -               clk_put(data->uart_clk);
->> >                 return err;
->> >         }
->> >         p->uartclk = clk_get_rate(data->uart_clk);
->> > @@ -216,7 +214,6 @@ static int mtk8250_remove(struct platform_device *pdev)
->> >         serial8250_unregister_port(data->line);
->> >         if (!IS_ERR(data->uart_clk)) {
->> >                 clk_disable_unprepare(data->uart_clk);
->> > -               clk_put(data->uart_clk);
->> >         }
+On 04/24/2015 03:15 PM, Ulf Hansson wrote:
+> On 14 April 2015 at 15:12, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+>> msm8974 has gcc and mmcc nodes, and apq8084 has a gcc node which
+>> implement gdsc powerdomains. Add the #power-domain-cells property
+>> to them.
 >>
->> Please delete the braces.
+>> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+>> ---
+>>   arch/arm/boot/dts/qcom-apq8084.dtsi | 1 +
+>>   arch/arm/boot/dts/qcom-msm8974.dtsi | 2 ++
+>>   2 files changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+>> index 1f130bc..55c281c 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+>> @@ -183,6 +183,7 @@
+>>                          compatible = "qcom,gcc-apq8084";
+>>                          #clock-cells = <1>;
+>>                          #reset-cells = <1>;
+>> +                       #power-domain-cells = <1>;
 >
-> The if() is removed completly in the next patch anyway.
+> So the PM domain will be apart of the clock-controller. That's a bit
+> odd, but I guess the hardware is like that!?
 
-You are right. I propose to merge patch 2 and 3, so you get a clean code.
-On the way, can you have a look on the commit message? For me it is
-not clear what you want to say.
+Yes, the gdscs are all part of GCC controller.
 
-Cheers,
-Matthias
+>
+> Anyway, what I fail to understand from this patchset is who will be
+> the actual consumer of the PM domain? In other words, what devices
+> will hold the below property in its DT node?
+>
+> power_domains = <phandle index>;
+>
+> This is needed for genpd to have the device at probe time, attached to
+> its PM domain.
+
+Any device which belongs to the collapsible power domain (gdsc)
+Examples are graphics, camera, video encode/decode block (venus) etc
+
+>
+>>                          reg = <0xfc400000 0x4000>;
+>>                  };
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> index e265ec1..6184d32 100644
+>> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> @@ -179,6 +179,7 @@
+>>                          compatible = "qcom,gcc-msm8974";
+>>                          #clock-cells = <1>;
+>>                          #reset-cells = <1>;
+>> +                       #power-domain-cells = <1>;
+>>                          reg = <0xfc400000 0x4000>;
+>>                  };
+>>
+>> @@ -186,6 +187,7 @@
+>>                          compatible = "qcom,mmcc-msm8974";
+>>                          #clock-cells = <1>;
+>>                          #reset-cells = <1>;
+>> +                       #power-domain-cells = <1>;
+>>                          reg = <0xfd8c0000 0x6000>;
+>>                  };
+>>
+>
+> Kind regards
+> Uffe
+>
 
 -- 
-motzblog.wordpress.com
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
