@@ -1,52 +1,43 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Fri, 24 Apr 2015 17:12:55 +0200
-Subject: [PATCH] bus: mvebu-mbus: do not set WIN_CTRL_SYNCBARRIER on non
- io-coherent platforms.
-In-Reply-To: <20150417132350.329bcace@free-electrons.com>
-References: <20150417132350.329bcace@free-electrons.com>
-Message-ID: <1429888375-15810-1-git-send-email-nschichan@freebox.fr>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 24 Apr 2015 11:15:30 -0400
+Subject: [PATCH 0/4] ARM: keystone: Enable Netcp driver on K2 EVMs
+In-Reply-To: <55395981.8050902@oracle.com>
+References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
+ <55395981.8050902@oracle.com>
+Message-ID: <553A5E12.9040202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O
-synchronization barriers") enabled the usage of automatic I/O
-synchronization barriers by enabling bit WIN_CTRL_SYNCBARRIER in the
-control registers of MBus windows, but on non io-coherent platforms
-(orion5x, kirkwood and dove) the WIN_CTRL_SYNCBARRIER bit in
-the window control register is either reserved (all windows except 6
-and 7) or enables read-only protection (windows 6 and 7).
+On 04/23/2015 04:43 PM, santosh shilimkar wrote:
+> On 4/23/2015 12:37 PM, Murali Karicheri wrote:
+>> NetCP driver support patches are already merged to v4.0.nd v4.1.
+>> This series introduce patches to update the DTS bindings and
+>> defconfig so that the network driver is fully functional on K2
+>> EVMs :- K2HK, K2L and K2E.
+>>
+> Nice and Thanks Murali for sending these up.
+>
+>> It will be great if this can be merged to v4.1.
+>>
+> Its too late for the 4.1 now. For the same reason, we also
+> couldn't get the MMU switching fixes in this merge window.
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: <stable@vger.kernel.org> # v4.0+
-Fixes: a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O synchronization barriers")
+For my reference, can you point me to the MMU switching fixes you are 
+referring to?
 
----
- drivers/bus/mvebu-mbus.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> I will queue these for 4.2.
+>
+Ok. Thanks.
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index fb9ec62..7fa4510 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -70,6 +70,7 @@
-  */
- #define WIN_CTRL_OFF		0x0000
- #define   WIN_CTRL_ENABLE       BIT(0)
-+/* Only on HW I/O coherency capable platforms */
- #define   WIN_CTRL_SYNCBARRIER  BIT(1)
- #define   WIN_CTRL_TGT_MASK     0xf0
- #define   WIN_CTRL_TGT_SHIFT    4
-@@ -323,8 +324,9 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
- 	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
- 		(attr << WIN_CTRL_ATTR_SHIFT)    |
- 		(target << WIN_CTRL_TGT_SHIFT)   |
--		WIN_CTRL_SYNCBARRIER             |
- 		WIN_CTRL_ENABLE;
-+	if (mbus->hw_io_coherency)
-+		ctrl |= WIN_CTRL_SYNCBARRIER;
- 
- 	writel(base & WIN_BASE_LOW, addr + WIN_BASE_OFF);
- 	writel(ctrl, addr + WIN_CTRL_OFF);
+Thanks and regards,
+
+Murali
+> Regards,
+> Santosh
+>
+
+
 -- 
-1.9.1
+Murali Karicheri
+Linux Kernel, Texas Instruments
