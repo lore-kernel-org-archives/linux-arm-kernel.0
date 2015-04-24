@@ -1,36 +1,22 @@
-From: chris.kuethe@gmail.com (Chris Kuethe)
-Date: Fri, 24 Apr 2015 13:08:40 -0700
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 24 Apr 2015 17:26:40 -0300
 Subject: [PATCH] ARM: dts: imx53: add support for USB armory board
 In-Reply-To: <1429882425-24514-1-git-send-email-andrej@inversepath.com>
 References: <1429882425-24514-1-git-send-email-andrej@inversepath.com>
-Message-ID: <CAGHP0p+hHcbqhntLdbYM5+KKa8UPmGMo+KOjsY_vpSZmZzesSg@mail.gmail.com>
+Message-ID: <CAOMZO5BR=ODT6aBsbPJy5Dt9ZF4t9_R7Comqw4G8m2DUz6kumw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't forget to patch the makefile...
-
-Tested-by: Chris Kuethe <chris.kuethe@gmail.com>
-
---- arch/arm/boot/dts/Makefile.orig 2016-04-24 12:54:17.219917799 -0700
-+++ arch/arm/boot/dts/Makefile 2015-04-24 12:55:49.255690003 -0700
-@@ -244,6 +244,8 @@
-  imx53-smd.dtb \
-  imx53-tx53-x03x.dtb \
-  imx53-tx53-x13x.dtb \
-+ imx53-usbarmory.dtb \
-+ imx53-usbarmory-host.dtb \
-  imx53-voipac-bsb.dtb
- dtb-$(CONFIG_SOC_IMX6Q) += \
-  imx6dl-aristainetos_4.dtb \
-
-On Fri, Apr 24, 2015 at 6:33 AM,  <andrej@inversepath.com> wrote:
+On Fri, Apr 24, 2015 at 10:33 AM,  <andrej@inversepath.com> wrote:
 > From: Andrej Rosano <andrej@inversepath.com>
 >
 > Add support for Inverse Path USB armory board, an open source
 > flash-drive sized computer based on Freescale i.MX53 SoC.
 >
 > http://inversepath.com/usbarmory
->
+
+Nice board!
+
 > As the device can work in either USB device mode or USB host mode,
 > two different device tree file are needed along with one common
 > include file.
@@ -60,9 +46,9 @@ On Fri, Apr 24, 2015 at 6:33 AM,  <andrej@inversepath.com> wrote:
 >  intel  Intel Corporation
 >  intercontrol   Inter Control Group
 > +inversepath    Inverse Path, S.r.l.
->  isee   ISEE 2007 S.L.
->  isil   Intersil
->  karo   Ka-Ro electronics GmbH
+
+This should be in a separate patch.
+
 > diff --git a/arch/arm/boot/dts/imx53-usbarmory-common.dtsi b/arch/arm/boot/dts/imx53-usbarmory-common.dtsi
 > new file mode 100644
 > index 0000000..4b4feae
@@ -78,35 +64,10 @@ On Fri, Apr 24, 2015 at 6:33 AM,  <andrej@inversepath.com> wrote:
 > + *
 > + * Licensed under GPLv2
 > + */
-> +
-> +#include "imx53.dtsi"
-> +
-> +/ {
-> +       model = "Inverse Path USB armory";
-> +       compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
-> +};
-> +
-> +/ {
-> +       chosen {
-> +               stdout-path = &uart1;
-> +       };
-> +
-> +       memory {
-> +               reg = <0x70000000 0x20000000>;
-> +       };
-> +
-> +       leds {
-> +               compatible = "gpio-leds";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&led_pin_gpio4_27>;
-> +
-> +               user {
-> +                       label = "LED";
-> +                       gpios = <&gpio4 27 0>;
-> +                       linux,default-trigger = "heartbeat";
-> +               };
-> +       };
-> +
+
+Could you use a dual-license type? Take a look at imx6sl-warp.dts as a
+reference.
+
 > +       soc {
 > +               aips at 60000000 {
 > +                       sahara: crypto at 63ff8000 {
@@ -119,6 +80,9 @@ On Fri, Apr 24, 2015 at 6:33 AM,  <andrej@inversepath.com> wrote:
 > +                       };
 > +               };
 > +       };
+
+There is a sahara node in imx53.dtsi, so no need to put it here.
+
 > +};
 > +
 > +&cpu0 {
@@ -135,6 +99,9 @@ On Fri, Apr 24, 2015 at 6:33 AM,  <andrej@inversepath.com> wrote:
 > +                800000 1050000
 > +       >;
 > +};
+
+Same here. This is also part of imx53.dtsi.
+
 > +
 > +&esdhc1 {
 > +       pinctrl-names = "default";
@@ -159,174 +126,16 @@ On Fri, Apr 24, 2015 at 6:33 AM,  <andrej@inversepath.com> wrote:
 > +                               MX53_PAD_PATA_DA_2__GPIO7_8       0x80000000
 > +                               MX53_PAD_GPIO_16__GPIO7_11        0x80000000
 > +                       >;
-> +               };
-> +
-> +               led_pin_gpio4_27: led_gpio4_27 at 0 {
-> +                       fsl,pins = <
-> +                               MX53_PAD_DISP0_DAT6__GPIO4_27 0x80000000
-> +                       >;
-> +               };
-> +
-> +               pinctrl_esdhc1: esdhc1grp {
-> +                       fsl,pins = <
-> +                               MX53_PAD_SD1_DATA0__ESDHC1_DAT0         0x1d5
-> +                               MX53_PAD_SD1_DATA1__ESDHC1_DAT1         0x1d5
-> +                               MX53_PAD_SD1_DATA2__ESDHC1_DAT2         0x1d5
-> +                               MX53_PAD_SD1_DATA3__ESDHC1_DAT3         0x1d5
-> +                               MX53_PAD_SD1_CMD__ESDHC1_CMD            0x1d5
-> +                               MX53_PAD_SD1_CLK__ESDHC1_CLK            0x1d5
-> +                       >;
-> +               };
-> +
-> +               pinctrl_i2c1: i2c1grp {
-> +                       fsl,pins = <
-> +                               MX53_PAD_CSI0_DAT8__I2C1_SDA    0xc0000000
-> +                               MX53_PAD_CSI0_DAT9__I2C1_SCL    0xc0000000
-> +                       >;
-> +               };
-> +
-> +               pinctrl_uart1: uart1grp {
-> +                       fsl,pins = <
-> +                               MX53_PAD_CSI0_DAT10__UART1_TXD_MUX      0x1e4
-> +                               MX53_PAD_CSI0_DAT11__UART1_RXD_MUX      0x1e4
-> +                       >;
-> +               };
-> +       };
-> +};
-> +
-> +&uart1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart1>;
-> +       status = "okay";
-> +};
-> +
+
+Please don't use 0x80000000 settings. Better to pass the real IOMUX
+values, so that we don't need to rely on the bootloader pin settings.
+
 > +&vpu {
 > +       status = "okay";
 > +};
-> +
-> +&i2c1 {
-> +       ltc3589: pmic at 34 {
-> +               compatible = "lltc,ltc3589-2";
-> +               reg = <0x34>;
-> +
-> +               regulators {
-> +                       sw1_reg: sw1 {
-> +                               regulator-min-microvolt = <591930>;
-> +                               regulator-max-microvolt = <1224671>;
-> +                               lltc,fb-voltage-divider = <100000 158000>;
-> +                               regulator-ramp-delay = <7000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       sw2_reg: sw2 {
-> +                               regulator-min-microvolt = <704123>;
-> +                               regulator-max-microvolt = <1456803>;
-> +                               lltc,fb-voltage-divider = <180000 191000>;
-> +                               regulator-ramp-delay = <7000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       sw3_reg: sw3 {
-> +                               regulator-min-microvolt = <1341250>;
-> +                               regulator-max-microvolt = <2775000>;
-> +                               lltc,fb-voltage-divider = <270000 100000>;
-> +                               regulator-ramp-delay = <7000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       bb_out_reg: bb-out {
-> +                               regulator-min-microvolt = <3387341>;
-> +                               regulator-max-microvolt = <3387341>;
-> +                               lltc,fb-voltage-divider = <511000 158000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +                       ldo1_reg: ldo1 {
-> +                               regulator-min-microvolt = <1306329>;
-> +                               regulator-max-microvolt = <1306329>;
-> +                               lltc,fb-voltage-divider = <100000 158000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       ldo2_reg: ldo2 {
-> +                               regulator-min-microvolt = <704123>;
-> +                               regulator-max-microvolt = <1456806>;
-> +                               lltc,fb-voltage-divider = <180000 191000>;
-> +                               regulator-ramp-delay = <7000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       ldo3_reg: ldo3 {
-> +                               regulator-min-microvolt = <2800000>;
-> +                               regulator-max-microvolt = <2800000>;
-> +                               regulator-boot-on;
-> +                       };
-> +
-> +                       ldo4_reg: ldo4 {
-> +                               regulator-min-microvolt = <1200000>;
-> +                               regulator-max-microvolt = <3200000>;
-> +                       };
-> +               };
-> +       };
-> +};
-> diff --git a/arch/arm/boot/dts/imx53-usbarmory-host.dts b/arch/arm/boot/dts/imx53-usbarmory-host.dts
-> new file mode 100644
-> index 0000000..ea2ea45
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-usbarmory-host.dts
-> @@ -0,0 +1,18 @@
-> +/*
-> + * USB armory MkI host mode device tree file
-> + * http://inversepath.com/usbarmory
-> + *
-> + * Copyright (C) 2015, Inverse Path
-> + * Andrej Rosano <andrej@inversepath.com>
-> + *
-> + * Licensed under GPLv2
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "imx53-usbarmory-common.dtsi"
-> +
-> +&usbotg {
-> +       dr_mode = "host";
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
-> new file mode 100644
-> index 0000000..902a73b
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-usbarmory.dts
-> @@ -0,0 +1,18 @@
-> +/*
-> + * USB armory MkI device mode device tree file
-> + * http://inversepath.com/usbarmory
-> + *
-> + * Copyright (C) 2015, Inverse Path
-> + * Andrej Rosano <andrej@inversepath.com>
-> + *
-> + * Licensed under GPLv2
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "imx53-usbarmory-common.dtsi"
-> +
-> +&usbotg {
-> +       dr_mode = "peripheral";
-> +       status = "okay";
-> +};
-> --
-> 1.7.10.4
->
 
+VPU is already enabled in imx53.dtsi.
 
+Regards,
 
--- 
-GDB has a 'break' feature; why doesn't it have 'fix' too?
+Fabio Estevam
