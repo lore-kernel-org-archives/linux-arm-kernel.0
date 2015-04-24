@@ -1,67 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 24 Apr 2015 12:05:54 +0200
-Subject: [PATCH] ARM: tegra: Add missing HDMI +5V regulator
-Message-ID: <1429869954-5909-1-git-send-email-thierry.reding@gmail.com>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Fri, 24 Apr 2015 12:10:43 +0200
+Subject: [rtc-linux] [PATCH 1/5] RTC/i.MX/DryIce: add some background info
+ about the states the machine can be in
+In-Reply-To: <20150421220942.GB8539@piout.net>
+References: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
+ <1429002716-19821-2-git-send-email-jbe@pengutronix.de>
+ <20150421220942.GB8539@piout.net>
+Message-ID: <201504241210.43768.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Hi Alexandre,
 
-Commit fb50a116bbbc ("drm/tegra: hdmi - Add connector supply support")
-introduced a new supply for HDMI connectors that is used to control the
-voltage on the +5V pin. Not all boards have had the corresponding supply
-added to their device tree files, causing the following warning message
-during boot:
+On Wednesday 22 April 2015 00:09:42 Alexandre Belloni wrote:
+> [...]
+> > ---
+> >  drivers/rtc/rtc-imxdi.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 43 insertions(+)
+> >
+> > diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
+> > index c666eab..8750477 100644
+> > --- a/drivers/rtc/rtc-imxdi.c
+> > +++ b/drivers/rtc/rtc-imxdi.c
+> > @@ -129,6 +129,49 @@ struct imxdi_dev {
+> >  	struct work_struct work;
+> >  };
+> >
+> > +/* Some background:
+> > + *
+> > + * The DryIce unit is a complex security/tamper monitor device. To be able do
+> > + * its job in a useful manner it runs a bigger statemachine to bring it into
+> > + * security/tamper failure state and once again to bring it out of this state.
+> > + * 
+> > + * This unit can be in one of three states:
+> > + *
+> > + * - "NON-VALID STATE"
+> > + *   always after the battery power was removed
+> > + * - "FAILURE STATE"
+> > + *   if one of the enabled security events have happend
+>
+>                                  has happened ^
+>
+> > + * - "VALID STATE"
+> > + *   if the unit works as expected
+> > + *
+> > + * Everything stops when the unit enters the failure state including the
+> > RTC + * counter (to be able to detect the time the security event
+> > happend).
+>
+>                                                        happened ^
+> [...]
 
-	[    0.859698] 54280000.hdmi supply hdmi not found, using dummy regulator
+Thanks for the feedback. Fixed in the next version.
 
-Add such a regulator to the Seaboard DTS to enable the driver to control
-this voltage and get rid of the warning.
-
-Reported-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Hi Stephen,
-
-This is completely untested because I don't have a Seaboard. But this is
-based on the schematics and I think it should work, so it'd be great if
-you could test it.
-
-Thanks,
-Thierry
-
- arch/arm/boot/dts/tegra20-seaboard.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index e2fed2712249..aea8994b35f2 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -31,6 +31,7 @@
- 
- 			vdd-supply = <&hdmi_vdd_reg>;
- 			pll-supply = <&hdmi_pll_reg>;
-+			hdmi-supply = <&vdd_hdmi>;
- 
- 			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
- 			nvidia,hpd-gpio = <&gpio TEGRA_GPIO(N, 7)
-@@ -893,6 +894,17 @@
- 			gpio = <&gpio TEGRA_GPIO(W, 0) GPIO_ACTIVE_HIGH>;
- 			enable-active-high;
- 		};
-+
-+		vdd_hdmi: regulator at 6 {
-+			compatible = "regulator-fixed";
-+			reg = <6>;
-+			regulator-name = "VDDIO_HDMI";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio TEGRA_GPIO(V, 5) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			vin-supply = <&vdd_5v0_reg>;
-+		};
- 	};
- 
- 	sound {
+Regards,
+Juergen
 -- 
-2.3.5
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
+Industrial Linux Solutions               ? ? ?| http://www.pengutronix.de/  |
