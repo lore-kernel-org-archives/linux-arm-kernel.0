@@ -1,97 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Apr 2015 17:44:04 +0100
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <20150424161818.GC7313@arm.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20150416104008.GB25640@arm.com>
- <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150422170718.GG13019@arm.com>
- <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150424161818.GC7313@arm.com>
-Message-ID: <553A72D4.7000801@arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 24 Apr 2015 10:03:42 -0700
+Subject: [PATCH 8/9] ARM: Add MAINTAINERS for 2836.
+In-Reply-To: <5539C8C9.1010705@wwwdotorg.org>
+References: <1429639796-2169-1-git-send-email-eric@anholt.net>
+ <1429639796-2169-9-git-send-email-eric@anholt.net>
+ <5539C8C9.1010705@wwwdotorg.org>
+Message-ID: <87y4lhwj9t.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/15 17:18, Will Deacon wrote:
-> On Wed, Apr 22, 2015 at 08:41:02PM +0100, Stuart Yoder wrote:
->>>> However, there is an improvement we envision as possible due to
->>>> the limited number of SMMU contexts (i.e. 64).  If there are
->>>> 64 SMMU context registers it means that there is a max of
->>>> 64 software contexts where things can be isolated.  But, say I have
->>>> an SRIOV card with 64 VFs, and I want to assign 8 of the VFs
->>>> to a KVM VM.  Those 8 PCI devices could share the same
->>>> streamID/ITS-device-ID since they all share the same isolation
->>>> context.
->>>>
->>>> What would be nice is at the time the 8 VFS are being added
->>>> to the IOMMU domain is for the pcidevid -> streamID mapping
->>>> table to be updated dynamically.  It simply lets us make
->>>> more efficient use of the limited streamIDs we have.
->>>>
->>>> I think it is this improvement that Minghuan had in mind
->>>> in this patch.
->>>
->>> Ok, but in this case it should be possible to use a single context bank for
->>> all of the VF streamIDs by configuring the appropriate SMR, no?
->>
->> Yes, but there are limited SMRs.  In our case there are only
->> 128 SMRs in SMMU-500 and we have potentially way more masters than
->> that.
-> 
-> Right, but you still only have 64 context banks at the end of the day, so do
-> you really anticipate having more than 128 masters concurrently using the
-> SMMU? If so, then we have devices sharing context banks so we could consider
-> reusing SMRs across masters, but historically that's not been something that
-> we've managed to solve.
-> 
->>> Wouldn't
->>> that sort of thing be preferable to dynamic StreamID assignment? It would
->>> certainly make life easier for the MSIs.
->>
->> It would be preferable, but given only 128 total stream IDS and
->> 64 context registers it's potentially an issue.  On our LS2085 SoC it is
->> PCI and the fsl-mc bus (see description here:
->> https://lkml.org/lkml/2015/3/5/795) that potentially have way
->> more masters than streamIDS. So, for those busses we would essentially
->> view a streamID as a "context ID"-- each SMR is associated with
->> 1 context bank register.
->>
->> For PCI we have a programmable "PCI req ID"-to-"stream ID"
->> mapping table in the PCI controller that is dynamically
->> programmable.
->>
->> Looking at it like that means that we could have
->> any number of masters but only 64 "contexts"
->> and since the masters all all programmable it's
->> seems feasbile to envision doing some bus/vendor
->> specific set up when a device is added to an
->> IOMMU domain.   One thing that would need to be conveyed
->> to the SMMU driver if doing dynamic streamID setup
->> is what streamIDs are available to be used.
-> 
-> Ok, but this is going to make life difficult for the MSI people, I suspect.
-> 
-> Marc...?
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-We're really facing two conflicting requirements: in order to minimize
-SMR usage, we want to alias multiple ReqIDs to a single StreamID, but in
-order to efficiently deal with MSIs, we want to see discrete DeviceIDs
-(the actual ReqIDs). I don't easily see how we reconcile the two.
+> On 04/21/2015 12:09 PM, Eric Anholt wrote:
+>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>
+>> +BROADCOM BCM2836 ARM ARCHITECTURE
+>> +M:	Eric Anholt <eric@anholt.net>
+>> +L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
+>> +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
+>> +S:	Maintained
+>> +N:	bcm2836
+>
+> I'm tempted to suggest just adding this to the existing bcm2835 entry,
+> since they're almost the same SoC.
 
-We can deal with the aliasing, provided that we extend the level of
-quirkiness that pci_for_each_dma_alias can deal with. But that doesn't
-solve any form of hotplug/SR-IOV behaviour.
-
-Somehow, we're going to end-up with grossly oversized ITTs, just to
-accommodate for the fact that we have no idea how many MSIs we're going
-to end-up needing. I'm not thrilled with that prospect.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Yeah, I'd started out with more changes and as the diff has kept
+getting, I actually dropped the patch from my series yesterday.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150424/7521f899/attachment.sig>
