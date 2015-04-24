@@ -1,163 +1,73 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Fri, 24 Apr 2015 08:19:25 +0530
-Subject: [RFC 5/7] arm: dts: msm8974: Add thermal zones, tsens and eeprom
- nodes
-In-Reply-To: <20150423165146.GB555@linaro.org>
-References: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>
- <1429796773-7151-6-git-send-email-rnayak@codeaurora.org>
- <20150423165146.GB555@linaro.org>
-Message-ID: <5539AF35.1000600@codeaurora.org>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 23 Apr 2015 22:58:13 -0400
+Subject: [RFC 0/4] arm64: add livepatch support
+In-Reply-To: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20150423225813.093734fa@grimm.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2015 10:21 PM, Lina Iyer wrote:
-> On Thu, Apr 23 2015 at 07:52 -0600, Rajendra Nayak wrote:
->> Add thermal zones, tsens and eeprom nodes
->
-> I dont see corresponding patches for 8084 and 8916.
+On Fri, 24 Apr 2015 11:44:05 +0900
+AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 
-I did not add 8916 as the dts for it isn't upstream (yet), and
-I hadn't tested on 8084 but I can certainly do so and update the
-dts files when I do a respin.
+> This patchset enables livepatch support on arm64.
+> 
+> Livepatch was merged in v4.0, and allows replacying a function dynamically
+> based on ftrace framework, but it also requires -mfentry option of gcc.
+> Currently arm64 gcc doesn't support it, but by adding a helper function to
+> ftrace, we will be able to support livepatch on arch's which don't support
+> this option.
+> 
+> I submit this patchset as RFC since I'm not quite sure that I'm doing
+> in the right way, or we should definitely support -fentry instead.
 
->
-> -- Lina
->>
->> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
->> ---
->> arch/arm/boot/dts/qcom-msm8974.dtsi | 105
->> ++++++++++++++++++++++++++++++++++++
->> 1 file changed, 105 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi
->> b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> index e265ec1..5716e89 100644
->> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
->> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> @@ -57,6 +57,88 @@
->>         };
->>     };
->>
->> +    thermal-zones {
->> +        cpu-thermal0 {
->> +            polling-delay-passive = <250>;
->> +            polling-delay = <1000>;
->> +
->> +            thermal-sensors = <&tsens 5>;
->> +
->> +            trips {
->> +                cpu_alert0: trip at 0 {
->> +                    temperature = <100000>;
->> +                    hysteresis = <2000>;
->> +                    type = "passive";
->> +                };
->> +                cpu_crit0: trip at 1 {
->> +                    temperature = <125000>;
->> +                    hysteresis = <2000>;
->> +                    type = "critical";
->> +                };
->> +            };
->> +        };
->> +
->> +        cpu-thermal1 {
->> +            polling-delay-passive = <250>;
->> +            polling-delay = <1000>;
->> +
->> +            thermal-sensors = <&tsens 6>;
->> +
->> +            trips {
->> +                cpu_alert1: trip at 0 {
->> +                    temperature = <100000>;
->> +                    hysteresis = <2000>;
->> +                    type = "passive";
->> +                };
->> +                cpu_crit1: trip at 1 {
->> +                    temperature = <125000>;
->> +                    hysteresis = <2000>;
->> +                    type = "critical";
->> +                };
->> +            };
->> +        };
->> +
->> +        cpu-thermal2 {
->> +            polling-delay-passive = <250>;
->> +            polling-delay = <1000>;
->> +
->> +            thermal-sensors = <&tsens 7>;
->> +
->> +            trips {
->> +                cpu_alert2: trip at 0 {
->> +                    temperature = <100000>;
->> +                    hysteresis = <2000>;
->> +                    type = "passive";
->> +                };
->> +                cpu_crit2: trip at 1 {
->> +                    temperature = <125000>;
->> +                    hysteresis = <2000>;
->> +                    type = "critical";
->> +                };
->> +            };
->> +        };
->> +
->> +        cpu-thermal3 {
->> +            polling-delay-passive = <250>;
->> +            polling-delay = <1000>;
->> +
->> +            thermal-sensors = <&tsens 8>;
->> +
->> +            trips {
->> +                cpu_alert3: trip at 0 {
->> +                    temperature = <100000>;
->> +                    hysteresis = <2000>;
->> +                    type = "passive";
->> +                };
->> +                cpu_crit3: trip at 1 {
->> +                    temperature = <125000>;
->> +                    hysteresis = <2000>;
->> +                    type = "critical";
->> +                };
->> +            };
->> +        };
->> +    };
->> +
->>     cpu-pmu {
->>         compatible = "qcom,krait-pmu";
->>         interrupts = <1 7 0xf04>;
->> @@ -85,6 +167,29 @@
->>                   <0xf9002000 0x1000>;
->>         };
->>
->> +        qfprom: qfprom at fc4bc000 {
->> +            #address-cells = <1>;
->> +            #size-cells = <1>;
->> +            compatible = "qcom,qfprom";
->> +            reg = <0xfc4bc000 0x1000>;
->> +            tsens_calib: calib at d0 {
->> +                reg = <0xd0 0x18>;
->> +            };
->> +            tsens_backup: backup at 440 {
->> +                reg = <0x440 0x10>;
->> +            };
->> +        };
->> +
->> +        tsens: thermal-sensor at fc4a8000 {
->> +            compatible = "qcom,msm8974-tsens";
->> +            reg = <0xfc4a8000 0x2000>;
->> +            calib = <&tsens_calib>;
->> +            calib_backup = <&tsens_backup>;
->> +            qcom,tsens-slopes = <3200 3200 3200 3200 3200 3200
->> +                3200 3200 3200 3200 3200>;
->> +            #thermal-sensor-cells = <1>;
->> +        };
->> +
->>         timer at f9020000 {
->>             #address-cells = <1>;
->>             #size-cells = <1>;
->> --
->> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
->> of Code Aurora Forum, hosted by The Linux Foundation
->>
+You need to be extremely careful about this. I don't know what arm does
+with mcount but on x86 without -fentry, it sets up the stack frame
+before calling mcount. That is, if mcount returns to a different
+function, it doesn't mean that the registers will match the parameters.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I have to look at what arm64 does when compiled with -pg. Because, if
+it moves registers around before the mcount, you will have a disaster
+on your hands if it returns to a different function that moved the
+registers around differently.
+
+Also, you need to be careful about how link registers are handled.
+
+-- Steve
+
+
+> 
+> Please note that I tested the feature only with livepatch-sample, and
+> the code for DYNAMIC_TRACE_WITH_REGS is still rough-edged.
+> 
+> To: Steven Rostedt <rostedt@goodmis.org>
+> To: Ingo Molnar <mingo@kernel.org>
+> To: Josh Poimboeuf <jpoimboe@redhat.com>
+> To: Seth Jennings <sjenning@redhat.com>
+> To: Jiri Kosina <jkosina@suse.cz>
+> To: Vojtech Pavlik <vojtech@suse.cz>
+> To: Catalin Marinas <catalin.marinas@arm.com>
+> To: Will Deacon <will.deacon@arm.com>
+> 
+> AKASHI Takahiro (4):
+>   ftrace: add a helper function for livepatch
+>   livepatch: adjust a patched function's address
+>   arm64: ftrace: add DYNAMIC_TRACE_WITH_REGS version
+>   arm64: add livepatch support
+> 
+>  arch/arm64/Kconfig                 |    4 ++
+>  arch/arm64/include/asm/ftrace.h    |    4 ++
+>  arch/arm64/include/asm/livepatch.h |   38 +++++++++++
+>  arch/arm64/kernel/Makefile         |    1 +
+>  arch/arm64/kernel/entry-ftrace.S   |  124 ++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/ftrace.c         |   24 ++++++-
+>  arch/arm64/kernel/livepatch.c      |   68 ++++++++++++++++++++
+>  arch/x86/include/asm/livepatch.h   |    5 ++
+>  include/linux/ftrace.h             |    2 +
+>  include/linux/livepatch.h          |    2 +
+>  kernel/livepatch/core.c            |   16 +++--
+>  kernel/trace/ftrace.c              |   26 ++++++++
+>  12 files changed, 309 insertions(+), 5 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/livepatch.h
+>  create mode 100644 arch/arm64/kernel/livepatch.c
+> 
