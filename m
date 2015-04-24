@@ -1,95 +1,97 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 24 Apr 2015 14:55:21 +0200
-Subject: [PATCH 1/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <CALx668VsT60+kx7o-ZM5Wxk7Nn-rXS21O5SDYr++EeY-zEJ6ew@mail.gmail.com>
-References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
- <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
- <20150423120152.GM6325@pengutronix.de>
- <CALx668VsT60+kx7o-ZM5Wxk7Nn-rXS21O5SDYr++EeY-zEJ6ew@mail.gmail.com>
-Message-ID: <20150424125521.GU6325@pengutronix.de>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 24 Apr 2015 09:27:49 -0400
+Subject: [PATCH v2] xen: Add __GFP_DMA flag when xen_swiotlb_init gets
+ free pages on ARM
+In-Reply-To: <alpine.DEB.2.02.1504241015220.2640@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1504241015220.2640@kaball.uk.xensource.com>
+Message-ID: <20150424132749.GA9192@l.oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 02:46:25PM +0800, Pi-Cheng Chen wrote:
-> Hi Sascha,
+On Fri, Apr 24, 2015 at 10:16:40AM +0100, Stefano Stabellini wrote:
+> Make sure that xen_swiotlb_init allocates buffers that are DMA capable
+> when at least one memblock is available below 4G. Otherwise we assume
+> that all devices on the SoC can cope with >4G addresses. We do this on
+> ARM and ARM64, where dom0 is mapped 1:1, so pfn == mfn in this case.
 > 
-> Thanks for reviewing.
+> No functional changes on x86.
 > 
-> On Thu, Apr 23, 2015 at 8:01 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Mon, Apr 20, 2015 at 05:27:26PM +0800, pi-cheng.chen wrote:
-> >> This patch implements MT8173 specific cpufreq driver with OPP table defined
-> >> in the driver code.
-> >>
-> >> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
-> >> ---
-> >>  drivers/cpufreq/Kconfig.arm      |   6 +
-> >>  drivers/cpufreq/Makefile         |   1 +
-> >>  drivers/cpufreq/mt8173-cpufreq.c | 509 +++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 516 insertions(+)
-> >>  create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
-> >>
-> >> +static int mtk_cpufreq_voltage_trace(struct cpu_dvfs_info *info,
-> >> +                                  struct mtk_cpu_opp *opp)
-> >> +{
-> >> +     struct regulator *proc_reg = info->proc_reg;
-> >> +     struct regulator *sram_reg = info->sram_reg;
-> >> +     int old_vproc, new_vproc, old_vsram, new_vsram, vsram, vproc, ret;
-> >> +
-> >> +     old_vproc = regulator_get_voltage(proc_reg);
-> >> +     old_vsram = regulator_get_voltage(sram_reg);
-> >> +
-> >> +     new_vproc = opp->vproc;
-> >> +     new_vsram = opp->vsram;
-> >> +
-> >> +     /*
-> >> +      * In the case the voltage is going to be scaled up, Vsram and Vproc
-> >> +      * need to be scaled up step by step. In each step, Vsram needs to be
-> >> +      * set to (Vproc + 200mV) first, then Vproc is set to (Vsram - 100mV).
-> >> +      * Repeat the step until Vsram and Vproc are set to target voltage.
-> >> +      */
-> >> +     if (old_vproc < new_vproc) {
-> >> +next_up_step:
-> >> +             old_vsram = regulator_get_voltage(sram_reg);
-> >> +
-> >> +             vsram = (new_vsram - old_vproc < MAX_VOLT_SHIFT) ?
-> >> +                     new_vsram : old_vproc + MAX_VOLT_SHIFT;
-> >> +             vsram = get_regulator_voltage_floor(sram_reg, vsram);
-> >> +
-> >> +             ret = regulator_set_voltage(sram_reg, vsram, vsram);
-> >> +             if (ret)
-> >> +                     return ret;
-> >
-> > This introspecting the regulators for possible voltages looks hacky and
-> > unnecessary. regulator_set_voltage() can be passed minimum and maximum
-> > values, why don't you use it to increase the voltage within sensible
-> > limit, like
-> >
-> >         regulator_set_voltage(sram_reg, old_vsram + 100000, old_vsram + 200000);
-> >
-> > or similar?
+> From: Chen Baozi <baozich@gmail.com>
 > 
-> I am sorry I don't understand how could I do it. Would you elaborate?
+> Signed-off-by: Chen Baozi <baozich@gmail.com>
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Tested-by: Chen Baozi <baozich@gmail.com>
 
-You try to set the OPPs to the exact voltages, then next use functions
-to determine the next exact higher voltage and set the regulator voltage
-to an exact value. Instead of doing this you can let the ability to
-specify a voltage range work for you, something like:
-
-	int tolerance = 50000;
-
-	while (vproc < new_vproc) {
-		int next = min(new_vproc - vproc, 200000);
-		int next_sram = next + 100000;
-
-		regulator_set_voltage(sram_reg, next_sram - tolerance, next_sram + tolerance);
-		regulator_set_voltage(vproc_reg, next - tolerance, next + tolerance);
-		vproc = regulator_get_voltage(vproc_reg);
-	}
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> 
+> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> index 2f7e6ff..0b579b2 100644
+> --- a/arch/arm/include/asm/xen/page.h
+> +++ b/arch/arm/include/asm/xen/page.h
+> @@ -110,5 +110,6 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+>  bool xen_arch_need_swiotlb(struct device *dev,
+>  			   unsigned long pfn,
+>  			   unsigned long mfn);
+> +unsigned long xen_get_swiotlb_free_pages(unsigned int order);
+>  
+>  #endif /* _ASM_ARM_XEN_PAGE_H */
+> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+> index 793551d..4983250 100644
+> --- a/arch/arm/xen/mm.c
+> +++ b/arch/arm/xen/mm.c
+> @@ -4,6 +4,7 @@
+>  #include <linux/gfp.h>
+>  #include <linux/highmem.h>
+>  #include <linux/export.h>
+> +#include <linux/memblock.h>
+>  #include <linux/of_address.h>
+>  #include <linux/slab.h>
+>  #include <linux/types.h>
+> @@ -21,6 +22,20 @@
+>  #include <asm/xen/hypercall.h>
+>  #include <asm/xen/interface.h>
+>  
+> +unsigned long xen_get_swiotlb_free_pages(unsigned int order)
+> +{
+> +	struct memblock_region *reg;
+> +	gfp_t flags = __GFP_NOWARN;
+> +
+> +	for_each_memblock(memory, reg) {
+> +		if (reg->base < (phys_addr_t)0xffffffff) {
+> +			flags |= __GFP_DMA;
+> +			break;
+> +		}
+> +	}
+> +	return __get_free_pages(flags, order);
+> +}
+> +
+>  enum dma_cache_op {
+>         DMA_UNMAP,
+>         DMA_MAP,
+> diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
+> index 358dcd3..c44a5d5 100644
+> --- a/arch/x86/include/asm/xen/page.h
+> +++ b/arch/x86/include/asm/xen/page.h
+> @@ -269,4 +269,9 @@ static inline bool xen_arch_need_swiotlb(struct device *dev,
+>  	return false;
+>  }
+>  
+> +static inline unsigned long xen_get_swiotlb_free_pages(unsigned int order)
+> +{
+> +	return __get_free_pages(__GFP_NOWARN, order);
+> +}
+> +
+>  #endif /* _ASM_X86_XEN_PAGE_H */
+> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> index 810ad41..4c54932 100644
+> --- a/drivers/xen/swiotlb-xen.c
+> +++ b/drivers/xen/swiotlb-xen.c
+> @@ -235,7 +235,7 @@ retry:
+>  #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
+>  #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
+>  		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
+> -			xen_io_tlb_start = (void *)__get_free_pages(__GFP_NOWARN, order);
+> +			xen_io_tlb_start = (void *)xen_get_swiotlb_free_pages(order);
+>  			if (xen_io_tlb_start)
+>  				break;
+>  			order--;
