@@ -1,42 +1,38 @@
-From: bobby.prani@gmail.com (Pranith Kumar)
-Date: Fri, 24 Apr 2015 15:32:28 -0400
-Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling to
- the WDT driver.
-In-Reply-To: <1429902534-2348-2-git-send-email-eric@anholt.net>
-References: <1429902534-2348-1-git-send-email-eric@anholt.net>
- <1429902534-2348-2-git-send-email-eric@anholt.net>
-Message-ID: <CAJhHMCAz3ichPmTvdeXx+6+JK7uNvfyh4m4_Jg8mFYi5ZcHRNg@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 24 Apr 2015 14:38:39 -0500
+Subject: [PATCH] bus: omap_l3_noc: Fix master id address decoding for OMAP5
+In-Reply-To: <553A951A.1080905@ti.com>
+References: <1429898060-51944-1-git-send-email-s-anna@ti.com>
+ <553A8C68.5080903@ti.com> <553A951A.1080905@ti.com>
+Message-ID: <CAGo_u6rgZhkRZSjpXuvBz5frYByUDtzFrAQFaPB7rxT8hLYBPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 3:08 PM, Eric Anholt <eric@anholt.net> wrote:
-> Since the WDT is what's used to drive restart and power off, it makes
-> more sense to keep it there, where the regs are already mapped and
-> definitions for them provided.  Note that this means you may need to
-> add CONFIG_BCM2835_WDT to retain functionality of your kernel.
+On Fri, Apr 24, 2015 at 2:10 PM, Suman Anna <s-anna@ti.com> wrote:
+> On 04/24/2015 01:33 PM, Nishanth Menon wrote:
+>> On 04/24/2015 12:54 PM, Suman Anna wrote:
+
+...
+>>> -static struct l3_target_data omap_l3_target_data_clk3[] = {
+>>> -    {0x0100, "EMUSS",},
+>>> -    {0x0300, "DEBUG SOURCE",},
+>>> -    {0x0,   "HOST CLK3",},
+^^ this was HOST CLK3
+
+
+..
+>>>
+>>> +/* OMAP5 data */
+>>> +static struct l3_target_data omap5_l3_target_data_clk3[] = {
+>>> +    {0x0100, "L3INSTR",},
+>>> +    {0x0300, "DEBUGSS",},
+>>> +    {0x0,    "HOSTCLK3",},
+>>
+>> "HOST CLK"
 >
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Cc: linux-watchdog at vger.kernel.org
+> Why? I followed the convention used for the other two HOST CLKs for the
 
-
-Any reason not to select BCM2835_WDT in the config by default then?
-
-Signed-off-by: Pranith Kumar <bobby.prani@gmail.com>
----
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 8b11f44..dd4856d 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -116,6 +116,7 @@ config ARCH_BCM2835
-        select CLKSRC_OF
-        select PINCTRL
-        select PINCTRL_BCM2835
-+       select BCM2835_WDT
-        help
-          This enables support for the Broadcom BCM2835 SoC. This SoC is
-          used in the Raspberry Pi and Roku 2 devices.
-
-
-
--- 
-Pranith
+so asked, if it should be HOST<space>CLK3
+--
+Regards,
+Nishanth Menon
