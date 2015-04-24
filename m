@@ -1,141 +1,98 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 24 Apr 2015 17:26:40 -0300
-Subject: [PATCH] ARM: dts: imx53: add support for USB armory board
-In-Reply-To: <1429882425-24514-1-git-send-email-andrej@inversepath.com>
-References: <1429882425-24514-1-git-send-email-andrej@inversepath.com>
-Message-ID: <CAOMZO5BR=ODT6aBsbPJy5Dt9ZF4t9_R7Comqw4G8m2DUz6kumw@mail.gmail.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Fri, 24 Apr 2015 17:14:10 -0400
+Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <55363791.4070706@hitachi.com>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <55363791.4070706@hitachi.com>
+Message-ID: <553AB222.50609@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 10:33 AM,  <andrej@inversepath.com> wrote:
-> From: Andrej Rosano <andrej@inversepath.com>
->
-> Add support for Inverse Path USB armory board, an open source
-> flash-drive sized computer based on Freescale i.MX53 SoC.
->
-> http://inversepath.com/usbarmory
+On 04/21/2015 07:42 AM, Masami Hiramatsu wrote:
+> (2015/04/21 5:19), David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
+>> first seen in October 2013. This version attempts to address concerns raised by
+>> reviewers and also fixes problems discovered during testing.
+>>
+>> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
+>> and return probes(kretprobes) support for ARM64.
+>>
+>> The kprobes mechanism makes use of software breakpoint and single stepping
+>> support available in the ARM v8 kernel.
+>>
+> [...]
+>> Changes since v5 include:
+>>
+>> 1) Replaced installation of breakpoint hook with direct call from the
+>> handlers in debug-monitors.c, as requested.
+>> 2) Reject probing of instructions that read the interrupt mask, in
+>> addition to instructions that set it.
+>> 3) Cleaned up comments describing usage of Debug Mask.
+>> 4) Added KPROBE_REENTER case in reenter_kprobe.
+>> 5) Corrected the ifdef'd definitions for notify_page_fault() to be
+>> consistent when KPROBES is not configed.
+>> 6) Changed "cpsr" to "pstate" for HAVE_REGS_AND_STACK_ACCESS_API feature.
+>> 7) Added back in missing new files in previous patch.
+>> 8) Changed two instances of pr_warning() to pr_warn().
+> 
+> Looks OK to me:)
+> BTW, have you tried to build and test this with CONFIG_KPROBE_EVENT?
+> If so, you can also test it by tools/testing/selftests/ftrace/ftracetest.
+> 
+>> Note that there seems to be at least a potential issue with kprobes
+>> on multiple (possibly all) platforms having to do with use of kfree
+>> inside of the kretprobes trampoline handler.  This has manifested
+>> occasionally in systemtap testing on arm64.  There does not appear to
+>> be an simple solution to the problem.
+> 
+> No, trampoline handler must call recycle_rp_inst() instead of kfree
+> to return kretprobe instance to the pool. Hmm, I should look into it.
+> 
+> Thank you,
+> 
 
-Nice board!
+Hi All,
 
-> As the device can work in either USB device mode or USB host mode,
-> two different device tree file are needed along with one common
-> include file.
->
-> Signed-off-by: Andrej Rosano <andrej@inversepath.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Chris Kuethe <chris.kuethe@gmail.com>
-> Cc: Vagrant Cascadian <vagrant@debian.org>
-> ---
->  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
->  arch/arm/boot/dts/imx53-usbarmory-common.dtsi      |  205 ++++++++++++++++++++
->  arch/arm/boot/dts/imx53-usbarmory-host.dts         |   18 ++
->  arch/arm/boot/dts/imx53-usbarmory.dts              |   18 ++
->  4 files changed, 242 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-common.dtsi
->  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-host.dts
->  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 83737a3..e7a10ce 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -102,6 +102,7 @@ img Imagination Technologies Ltd.
->  innolux        Innolux Corporation
->  intel  Intel Corporation
->  intercontrol   Inter Control Group
-> +inversepath    Inverse Path, S.r.l.
+At time the kernel with arm64 kprobe patches gets stuck printing out:
 
-This should be in a separate patch.
+Unexpected kernel single-step exception at EL1
 
-> diff --git a/arch/arm/boot/dts/imx53-usbarmory-common.dtsi b/arch/arm/boot/dts/imx53-usbarmory-common.dtsi
-> new file mode 100644
-> index 0000000..4b4feae
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-usbarmory-common.dtsi
-> @@ -0,0 +1,205 @@
-> +/*
-> + * USB armory MkI device tree include file
-> + * http://inversepath.com/usbarmory
-> + *
-> + * Copyright (C) 2015, Inverse Path
-> + * Andrej Rosano <andrej@inversepath.com>
-> + *
-> + * Licensed under GPLv2
-> + */
+I put some instrumentation in debug-monitor.c to print out the kcb and register state when this happens.  Below is an example output:
 
-Could you use a dual-license type? Take a look at imx6sl-warp.dts as a
-reference.
+[14613.263536] Unexpected kernel single-step exception at EL1
+[14613.269001] kcb->ss_ctx.ss_status = 1
+[14613.272643] kcb->ss_ctx.match_addr = fffffdfffc001250 0xfffffdfffc001250
+[14613.279324] instruction_pointer(regs) = fffffe0000093358 el1_da+0x8/0x70
+[14613.286003] 
+[14613.287487] CPU: 3 PID: 621 Comm: irqbalance Tainted: G           OE   4.0.0u4+ #6
+[14613.295019] Hardware name: AppliedMicro Mustang/Mustang, BIOS 1.1.0-rh-0.15 Mar 13 2015
+[14613.302982] task: fffffe01d6806780 ti: fffffe01d68ac000 task.ti: fffffe01d68ac000
+[14613.310430] PC is at el1_da+0x8/0x70
+[14613.313990] LR is at trampoline_probe_handler+0x188/0x1ec
+[14613.319363] pc : [<fffffe0000093358>] lr : [<fffffe0000687590>] pstate: 600001c5
+[14613.326724] sp : fffffe01d68af640
+[14613.330021] x29: fffffe01d68afbf0 x28: fffffe01d68ac000 
+[14613.335328] x27: fffffe00000939cc x26: fffffe0000bb09d0 
+[14613.340634] x25: fffffe01d68afdb0 x24: 0000000000000025 
+[14613.345939] x23: 00000000800003c5 x22: fffffdfffc001284 
+[14613.351245] x21: fffffe01d68af760 x20: fffffe01d7c79a00 
+[14613.356552] x19: 0000000000000000 x18: 000003ffa4b8e600 
+[14613.361858] x17: 000003ffa5480698 x16: fffffe00001f2afc 
+[14613.367164] x15: 0000000000000007 x14: 000003ffeffa8690 
+[14613.372471] x13: 0000000000000001 x12: 000003ffa4baf200 
+[14613.377778] x11: fffffe00006bb328 x10: fffffe00006bb32c 
+[14613.383084] x9 : fffffe01d68afd10 x8 : fffffe01d6806d10 
+[14613.388390] x7 : fffffe01ffd01298 x6 : fffffe000009192c 
+[14613.393696] x5 : fffffe0000c1b398 x4 : 0000000000000000 
+[14613.399001] x3 : 0000000000200200 x2 : 0000000000100100 
+[14613.404306] x1 : 0000000096000006 x0 : 0000000000000015 
+[14613.409610] 
+[14613.411094] BUG: failure at arch/arm64/kernel/debug-monitors.c:276/single_step_handler()!
 
-> +       soc {
-> +               aips at 60000000 {
-> +                       sahara: crypto at 63ff8000 {
-> +                               compatible = "fsl,imx53-sahara";
-> +                               reg = <0x63ff8000 0x4000>;
-> +                               interrupts = <19 20>;
-> +                               clocks = <&clks IMX5_CLK_SAHARA_IPG_GATE>,
-> +                                        <&clks IMX5_CLK_SAHARA_IPG_GATE>;
-> +                               clock-names = "ipg", "ahb";
-> +                       };
-> +               };
-> +       };
+One thing to note is the pstate value 0x600001c5; it has the SS bit set.  I think that sometime during handling the kprobe the SS is being set incorrectly or not cleared in the saved state.  When the register state gets reload a single step is attempted and the debug-monitors code flags it because it doesn't match up to the currently running kprobe.
 
-There is a sahara node in imx53.dtsi, so no need to put it here.
+Is single_step_handler functions setting the flag again with set_regs_spsr_ss(regs) the correct way to handle this if it wasn't previously handled?  If the single step isn't handled the first time, why are the following instructions going to be handled? It is going to spew many warning messages.
 
-> +};
-> +
-> +&cpu0 {
-> +       device_type = "cpu";
-> +       compatible = "arm,cortex-a8";
-> +       reg = <0x0>;
-> +       clocks = <&clks IMX5_CLK_ARM>;
-> +       clock-latency = <61036>;
-> +       voltage-tolerance = <5>;
-> +       operating-points = <
-> +               /* kHz */
-> +                166666  850000
-> +                400000  900000
-> +                800000 1050000
-> +       >;
-> +};
-
-Same here. This is also part of imx53.dtsi.
-
-> +
-> +&esdhc1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_esdhc1>;
-> +       status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_hog>;
-> +
-> +       imx53-usbarmory {
-> +               pinctrl_hog: hoggrp {
-> +                       fsl,pins = <
-> +                               MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
-> +                               MX53_PAD_GPIO_8__GPIO1_8          0x80000000
-> +                               MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
-> +                               MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
-> +                               MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
-> +                               MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
-> +                               MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
-> +                               MX53_PAD_PATA_DA_2__GPIO7_8       0x80000000
-> +                               MX53_PAD_GPIO_16__GPIO7_11        0x80000000
-> +                       >;
-
-Please don't use 0x80000000 settings. Better to pass the real IOMUX
-values, so that we don't need to rely on the bootloader pin settings.
-
-> +&vpu {
-> +       status = "okay";
-> +};
-
-VPU is already enabled in imx53.dtsi.
-
-Regards,
-
-Fabio Estevam
+-Will Cohen
