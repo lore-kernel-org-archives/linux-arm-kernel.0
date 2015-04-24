@@ -1,60 +1,52 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Fri, 24 Apr 2015 18:05:23 +0300
-Subject: [PATCH 01/11] coresight-etm4x: Adding CoreSight ETM4x driver
-In-Reply-To: <1429742451-11465-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
- <1429742451-11465-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1429887923.5211.6.camel@mm-sol.com>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Fri, 24 Apr 2015 17:12:55 +0200
+Subject: [PATCH] bus: mvebu-mbus: do not set WIN_CTRL_SYNCBARRIER on non
+ io-coherent platforms.
+In-Reply-To: <20150417132350.329bcace@free-electrons.com>
+References: <20150417132350.329bcace@free-electrons.com>
+Message-ID: <1429888375-15810-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O
+synchronization barriers") enabled the usage of automatic I/O
+synchronization barriers by enabling bit WIN_CTRL_SYNCBARRIER in the
+control registers of MBus windows, but on non io-coherent platforms
+(orion5x, kirkwood and dove) the WIN_CTRL_SYNCBARRIER bit in
+the window control register is either reserved (all windows except 6
+and 7) or enables read-only protection (windows 6 and 7).
 
-On Wed, 2015-04-22 at 16:40 -0600, Mathieu Poirier wrote:
-> From: Pratik Patel <pratikp@codeaurora.org>
-> 
-> This driver manages the CoreSight ETMv4 (Embedded Trace Macrocell) IP block
-> to support HW assisted tracing on ARMv7 and ARMv8 architectures.
-> 
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
-> Signed-off-by: Mathieu Poirier poirier at linaro.org>
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: <stable@vger.kernel.org> # v4.0+
+Fixes: a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O synchronization barriers")
 
-<snip>
+---
+ drivers/bus/mvebu-mbus.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-> 
-
-> +       pm_runtime_put(&adev->dev);
-> +
-> +       desc->type = CORESIGHT_DEV_TYPE_SOURCE;
-> +       desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
-> +       desc->ops = &etm4_cs_ops;
-> +       desc->pdata = pdata;
-> +       desc->dev = dev;
-> +       desc->groups = coresight_etmv4_groups;
-> +       drvdata->csdev = coresight_register(desc);
-> +       if (IS_ERR(drvdata->csdev)) {
-> +               ret = PTR_ERR(drvdata->csdev);
-> +               goto err_arch_supported;
-
-double runtime put.
-
-> +       }
-> +
-> +       dev_info(dev, "%s initialized\n", (char *)id->data);
-> +
-> +       if (boot_enable) {
-> +               coresight_enable(drvdata->csdev);
-> +               drvdata->boot_enable = true;
-> +       }
-> +
-> +       return 0;
-> +
-> +err_arch_supported:
-> +       pm_runtime_put(&adev->dev);
-> +       if (--etm4_count == 0)
-> +               unregister_hotcpu_notifier(&etm4_cpu_notifier);
-> +       return ret;
-> +}
-
-Regards,
-Ivan
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index fb9ec62..7fa4510 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -70,6 +70,7 @@
+  */
+ #define WIN_CTRL_OFF		0x0000
+ #define   WIN_CTRL_ENABLE       BIT(0)
++/* Only on HW I/O coherency capable platforms */
+ #define   WIN_CTRL_SYNCBARRIER  BIT(1)
+ #define   WIN_CTRL_TGT_MASK     0xf0
+ #define   WIN_CTRL_TGT_SHIFT    4
+@@ -323,8 +324,9 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
+ 	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
+ 		(attr << WIN_CTRL_ATTR_SHIFT)    |
+ 		(target << WIN_CTRL_TGT_SHIFT)   |
+-		WIN_CTRL_SYNCBARRIER             |
+ 		WIN_CTRL_ENABLE;
++	if (mbus->hw_io_coherency)
++		ctrl |= WIN_CTRL_SYNCBARRIER;
+ 
+ 	writel(base & WIN_BASE_LOW, addr + WIN_BASE_OFF);
+ 	writel(ctrl, addr + WIN_CTRL_OFF);
+-- 
+1.9.1
