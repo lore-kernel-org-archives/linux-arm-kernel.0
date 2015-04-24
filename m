@@ -1,58 +1,42 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 24 Apr 2015 12:28:33 +0200
-Subject: [PATCH 1/4] tty: serial: 8250_mtk: Use devm_clk_get
-In-Reply-To: <1429779066-21406-2-git-send-email-s.hauer@pengutronix.de>
-References: <1429779066-21406-1-git-send-email-s.hauer@pengutronix.de>
- <1429779066-21406-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CABuKBe+bACg_5uDQc3BF4BaBUG1-CQ3mH199o3nMsaMfH3ad3w@mail.gmail.com>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Fri, 24 Apr 2015 12:32:30 +0200
+Subject: [rtc-linux] [PATCH 2nd try] RTC/i.MX/DryICE: add recovery
+ routines to the driver
+In-Reply-To: <20150421232615.GD8539@piout.net>
+References: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
+ <20150421232615.GD8539@piout.net>
+Message-ID: <201504241232.30104.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-23 10:51 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> Just because of_clk_get() doesn't mean it should be used. Use devm_clk_get
-> which is the correct function when a struct device * is available. Also
-> since it's a devm function we can drop the calls to clk_put(). While at
-> it also fix a wrong debug message.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/tty/serial/8250/8250_mtk.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-> index 7a11fac..c6901dc 100644
-> --- a/drivers/tty/serial/8250/8250_mtk.c
-> +++ b/drivers/tty/serial/8250/8250_mtk.c
-> @@ -131,18 +131,16 @@ static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
->                            struct mtk8250_data *data)
->  {
->         int err;
-> -       struct device_node *np = pdev->dev.of_node;
->
-> -       data->uart_clk = of_clk_get(np, 0);
-> +       data->uart_clk = devm_clk_get(&pdev->dev, NULL);
->         if (IS_ERR(data->uart_clk)) {
-> -               dev_warn(&pdev->dev, "Can't get timer clock\n");
-> +               dev_warn(&pdev->dev, "Can't get uart clock\n");
->                 return PTR_ERR(data->uart_clk);
->         }
->
->         err = clk_prepare_enable(data->uart_clk);
->         if (err) {
->                 dev_warn(&pdev->dev, "Can't prepare clock\n");
-> -               clk_put(data->uart_clk);
->                 return err;
->         }
->         p->uartclk = clk_get_rate(data->uart_clk);
-> @@ -216,7 +214,6 @@ static int mtk8250_remove(struct platform_device *pdev)
->         serial8250_unregister_port(data->line);
->         if (!IS_ERR(data->uart_clk)) {
->                 clk_disable_unprepare(data->uart_clk);
-> -               clk_put(data->uart_clk);
->         }
+Hi Alexandre,
 
-Please delete the braces.
+On Wednesday 22 April 2015 01:26:15 Alexandre Belloni wrote:
+> On 14/04/2015 at 11:11:51 +0200, Juergen Borleis wrote :
+> > 2nd try, this time with a cover letter... m(
+> >
+> > The built-in RTC unit on some i.MX SoCs isn't an RTC only. It is also a
+> > tamper monitor unit which can keep some keys. When it does its tamper
+> > detection job
+>
+> Does it have more functions? I would say that it also holds some keys
+> but I don't have a handy Freescale representative to contact ;)
 
+Yes it can hold some keys and will delete them if it detects a security 
+violation via its tamper detection feature.
+
+> I'm fine getting that unlocking done in the RTC driver but maybe in the
+> future, it will be necessary to handle that in an MFD driver when adding
+> support for the other functions.
+
+This change set just makes the RTC work again. Observation was, *sometimes* and 
+*somehow* this unit tends to lock even if no of these tamper detection 
+features were enabled nor the externals signals (to detect these security 
+violations) were used.
+
+Regards,
+Juergen
 
 -- 
-motzblog.wordpress.com
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
+Industrial Linux Solutions               ? ? ?| http://www.pengutronix.de/  |
