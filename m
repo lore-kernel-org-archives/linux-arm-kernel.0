@@ -1,255 +1,176 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 24 Apr 2015 14:10:18 -0500
-Subject: [PATCH] bus: omap_l3_noc: Fix master id address decoding for OMAP5
-In-Reply-To: <553A8C68.5080903@ti.com>
-References: <1429898060-51944-1-git-send-email-s-anna@ti.com>
- <553A8C68.5080903@ti.com>
-Message-ID: <553A951A.1080905@ti.com>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Fri, 24 Apr 2015 19:24:35 +0000
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
+ <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
+ <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20150416104008.GB25640@arm.com>
+ <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150422170718.GG13019@arm.com>
+ <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150424161818.GC7313@arm.com> <553A72D4.7000801@arm.com>
+Message-ID: <CY1PR0301MB0748607620CC4BDCE43130EA87EC0@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2015 01:33 PM, Nishanth Menon wrote:
-> On 04/24/2015 12:54 PM, Suman Anna wrote:
->> The L3 Error handling on OMAP5 for the most part is very similar
->> to that of OMAP4, and had leveraged common data structures and
->> register layout definitions so far. Upon closer inspection, there
->> are a few minor differences causing an incorrect decoding and
->> reporting of the master NIU upon an error:
->>
->>   1. The L3_TARG_STDERRLOG_MSTADDR.STDERRLOG_MSTADDR occupies
->>      11 bits on OMAP5 as against 8 bits on OMAP4, with the master
->>      NIU connID encoded in the 6 MSBs of the STDERRLOG_MSTADDR
->>      field.
->>   2. The CLK3 FlagMux component has 1 input source on OMAP4 and 3
->>      input sources on OMAP5. The common DEBUGSS source is at a
->>      different input on each SoC.
->>
->> Fix the above issues by using a OMAP5-specific compatible property
->> and using SoC-specific data where there are differences.
->>
->> Cc: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->>
->> Some validation traces by adding couple of traces and intentionally
->> creating L3 errors from DSP & IPU by accessing invalid Timers
->>
->> Before Patch:
->> OMAP4 [Correct]
->> IPU accessing Timer4
->> [   46.548095] flagmux = 1, err_reg = 0x8000 err_src = 0xf
->> [   46.553344] mstaddr = 0x44 mask = 0xfc masterid = 0x11
->> [   46.553955] ------------[ cut here ]------------
->> [   46.563171] WARNING: CPU: 0 PID: 4 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
->> [   46.564941] 44000000.ocp:L3 Custom Error: MASTER DucatiM3 TARGET L4PER3 (Idle): Data Access in User mode during 
->> Functional access
->>
->> DSP accessing Timer5:
->> [  114.018524] flagmux = 0, err_reg = 0x4 err_src = 0x2
->> [  114.023498] mstaddr = 0x20 mask = 0xfc masterid = 0x8
->> [  114.028564] ------------[ cut here ]------------
->> [  114.033233] WARNING: CPU: 0 PID: 0 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
->> [  114.042572] 44000000.ocp:L3 Custom Error: MASTER DSP TARGET ABE (Idle): Data Access in Supervisor mode during Functional 
->> access
->>
->> OMAP5 [Incorrect]
->> IPU accessing Timer4:
->> [   29.579306] flagmux = 1, err_reg = 0x8000 err_src = 0xf
->> [   29.584550] mstaddr = 0x220 mask = 0xfc masterid = 0x8
->> [   29.589705] ------------[ cut here ]------------
->> [   29.594345] WARNING: CPU: 0 PID: 61 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
->> [   29.603774] 44000000.ocp:L3 Custom Error: MASTER DSP TARGET L4PER3 (Idle): Data Access in User mode during Functional 
->> access
->>
->> DSP accessing Timer5:
->> [   21.347105] flagmux = 0, err_reg = 0x4 err_src = 0x2
->> [   21.352091] mstaddr = 0x100 mask = 0xfc masterid = 0x0
->> [   21.357250] ------------[ cut here ]------------
->> [   21.361896] WARNING: CPU: 0 PID: 0 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
->> [   21.371242] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET ABE (Idle): Data Access in Supervisor mode during Functional 
->> access
->>
->> After Patch:
->> OMAP4 same as above
->>
->> OMAP5 [Corrected]
->> IPU accessing Timer4
->> [   67.896693] flagmux = 1, err_reg = 0x8000 err_src = 0xf
->> [   67.901940] mstaddr = 0x220 mask = 0x7e0 masterid = 0x11
->> [   67.907275] ------------[ cut here ]------------
->> [   67.911924] WARNING: CPU: 0 PID: 61 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
->> [   67.921357] 44000000.ocp:L3 Custom Error: MASTER DucatiM3 TARGET L4PER3 (Idle): Data Access in User mode during 
->> Functional access
->>
->> DSP accessing Timer5
->> [   24.452565] flagmux = 0, err_reg = 0x4 err_src = 0x2
->> [   24.457552] mstaddr = 0x100 mask = 0x7e0 masterid = 0x8
->> [   24.462798] ------------[ cut here ]------------
->> [   24.467449] WARNING: CPU: 0 PID: 0 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
->> [   24.476795] 44000000.ocp:L3 Custom Error: MASTER DSP TARGET ABE (Idle): Data Access in Supervisor mode during Functional
->>  access
->>
->>
->>  .../devicetree/bindings/arm/omap/l3-noc.txt        |  1 +
->>  arch/arm/boot/dts/omap5.dtsi                       |  2 +-
->>  drivers/bus/omap_l3_noc.c                          |  5 ++-
->>  drivers/bus/omap_l3_noc.h                          | 52 ++++++++++++++++------
->>  4 files changed, 44 insertions(+), 16 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/l3-noc.txt b/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
->> index 974624ea68f6..161448da959d 100644
->> --- a/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
->> +++ b/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
->> @@ -6,6 +6,7 @@ provided by Arteris.
->>  Required properties:
->>  - compatible : Should be "ti,omap3-l3-smx" for OMAP3 family
->>                 Should be "ti,omap4-l3-noc" for OMAP4 family
->> +               Should be "ti,omap5-l3-noc" for OMAP5 family
->>  	       Should be "ti,dra7-l3-noc" for DRA7 family
->>                 Should be "ti,am4372-l3-noc" for AM43 family
->>  - reg:	Contains L3 register address range for each noc domain.
->> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
->> index efe5f737f39b..7d24ae0306b5 100644
->> --- a/arch/arm/boot/dts/omap5.dtsi
->> +++ b/arch/arm/boot/dts/omap5.dtsi
->> @@ -128,7 +128,7 @@
->>  	 * hierarchy.
->>  	 */
->>  	ocp {
->> -		compatible = "ti,omap4-l3-noc", "simple-bus";
->> +		compatible = "ti,omap5-l3-noc", "simple-bus";
->>  		#address-cells = <1>;
->>  		#size-cells = <1>;
->>  		ranges;
->> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
->> index 11f7982cbdb3..ebee57d715d2 100644
->> --- a/drivers/bus/omap_l3_noc.c
->> +++ b/drivers/bus/omap_l3_noc.c
->> @@ -1,7 +1,7 @@
->>  /*
->>   * OMAP L3 Interconnect error handling driver
->>   *
->> - * Copyright (C) 2011-2014 Texas Instruments Incorporated - http://www.ti.com/
->> + * Copyright (C) 2011-2015 Texas Instruments Incorporated - http://www.ti.com/
->>   *	Santosh Shilimkar <santosh.shilimkar@ti.com>
->>   *	Sricharan <r.sricharan@ti.com>
->>   *
->> @@ -233,7 +233,8 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
->>  }
->>  
->>  static const struct of_device_id l3_noc_match[] = {
->> -	{.compatible = "ti,omap4-l3-noc", .data = &omap_l3_data},
->> +	{.compatible = "ti,omap4-l3-noc", .data = &omap4_l3_data},
->> +	{.compatible = "ti,omap5-l3-noc", .data = &omap5_l3_data},
->>  	{.compatible = "ti,dra7-l3-noc", .data = &dra_l3_data},
->>  	{.compatible = "ti,am4372-l3-noc", .data = &am4372_l3_data},
->>  	{},
->> diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
->> index 95254585db86..3ba40db7380b 100644
->> --- a/drivers/bus/omap_l3_noc.h
->> +++ b/drivers/bus/omap_l3_noc.h
->> @@ -1,7 +1,7 @@
->>  /*
->>   * OMAP L3 Interconnect  error handling driver header
->>   *
->> - * Copyright (C) 2011-2014 Texas Instruments Incorporated - http://www.ti.com/
->> + * Copyright (C) 2011-2015 Texas Instruments Incorporated - http://www.ti.com/
->>   *	Santosh Shilimkar <santosh.shilimkar@ti.com>
->>   *	sricharan <r.sricharan@ti.com>
->>   *
->> @@ -175,16 +175,14 @@ static struct l3_flagmux_data omap_l3_flagmux_clk2 = {
->>  };
->>  
->>  
->> -static struct l3_target_data omap_l3_target_data_clk3[] = {
->> -	{0x0100, "EMUSS",},
->> -	{0x0300, "DEBUG SOURCE",},
->> -	{0x0,	"HOST CLK3",},
->> +static struct l3_target_data omap4_l3_target_data_clk3[] = {
->> +	{0x0100, "DEBUGSS",},
->>  };
->>  
->> -static struct l3_flagmux_data omap_l3_flagmux_clk3 = {
->> +static struct l3_flagmux_data omap4_l3_flagmux_clk3 = {
->>  	.offset = 0x0200,
->> -	.l3_targ = omap_l3_target_data_clk3,
->> -	.num_targ_data = ARRAY_SIZE(omap_l3_target_data_clk3),
->> +	.l3_targ = omap4_l3_target_data_clk3,
->> +	.num_targ_data = ARRAY_SIZE(omap4_l3_target_data_clk3),
->>  };
->>  
->>  static struct l3_masters_data omap_l3_masters[] = {
->> @@ -215,21 +213,49 @@ static struct l3_masters_data omap_l3_masters[] = {
->>  	{ 0x32, "USBHOSTFS"}
->>  };
->>  
->> -static struct l3_flagmux_data *omap_l3_flagmux[] = {
->> +static struct l3_flagmux_data *omap4_l3_flagmux[] = {
->>  	&omap_l3_flagmux_clk1,
->>  	&omap_l3_flagmux_clk2,
->> -	&omap_l3_flagmux_clk3,
->> +	&omap4_l3_flagmux_clk3,
->>  };
->>  
->> -static const struct omap_l3 omap_l3_data = {
->> -	.l3_flagmux = omap_l3_flagmux,
->> -	.num_modules = ARRAY_SIZE(omap_l3_flagmux),
->> +static const struct omap_l3 omap4_l3_data = {
->> +	.l3_flagmux = omap4_l3_flagmux,
->> +	.num_modules = ARRAY_SIZE(omap4_l3_flagmux),
->>  	.l3_masters = omap_l3_masters,
->>  	.num_masters = ARRAY_SIZE(omap_l3_masters),
->>  	/* The 6 MSBs of register field used to distinguish initiator */
->>  	.mst_addr_mask = 0xFC,
->>  };
->>  
->> +/* OMAP5 data */
->> +static struct l3_target_data omap5_l3_target_data_clk3[] = {
->> +	{0x0100, "L3INSTR",},
->> +	{0x0300, "DEBUGSS",},
->> +	{0x0,	 "HOSTCLK3",},
-> 
-> "HOST CLK"
++Alex W
 
-Why? I followed the convention used for the other two HOST CLKs for the
-OMAP4/5 data, see omap_l3_target_data_clk1 and omap_l3_target_data_clk2.
-The TRM name used is HOST_CLK3 (Table 14-31 Interconnect Flag Mapping,
-Section 14.2.3.9.3 of OMAP543x_ES2.0_Public_TRM_vX.pdf), but the code
-doesn't use the underscores.
+> -----Original Message-----
+> From: Yoder Stuart-B08248
+> Sent: Friday, April 24, 2015 1:19 PM
+> To: 'Marc Zyngier'; Will Deacon
+> Cc: Sethi Varun-B16395; Lian Minghuan-B31939; linux-pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284;
+> Zang Roy-R61911; Bjorn Helgaas; Wood Scott-B07421; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> > Sent: Friday, April 24, 2015 11:44 AM
+> > To: Will Deacon; Yoder Stuart-B08248
+> > Cc: Sethi Varun-B16395; Lian Minghuan-B31939; linux-pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284;
+> > Zang Roy-R61911; Bjorn Helgaas; Wood Scott-B07421; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> >
+> > On 24/04/15 17:18, Will Deacon wrote:
+> > > On Wed, Apr 22, 2015 at 08:41:02PM +0100, Stuart Yoder wrote:
+> > >>>> However, there is an improvement we envision as possible due to
+> > >>>> the limited number of SMMU contexts (i.e. 64).  If there are
+> > >>>> 64 SMMU context registers it means that there is a max of
+> > >>>> 64 software contexts where things can be isolated.  But, say I have
+> > >>>> an SRIOV card with 64 VFs, and I want to assign 8 of the VFs
+> > >>>> to a KVM VM.  Those 8 PCI devices could share the same
+> > >>>> streamID/ITS-device-ID since they all share the same isolation
+> > >>>> context.
+> > >>>>
+> > >>>> What would be nice is at the time the 8 VFS are being added
+> > >>>> to the IOMMU domain is for the pcidevid -> streamID mapping
+> > >>>> table to be updated dynamically.  It simply lets us make
+> > >>>> more efficient use of the limited streamIDs we have.
+> > >>>>
+> > >>>> I think it is this improvement that Minghuan had in mind
+> > >>>> in this patch.
+> > >>>
+> > >>> Ok, but in this case it should be possible to use a single context bank for
+> > >>> all of the VF streamIDs by configuring the appropriate SMR, no?
+> > >>
+> > >> Yes, but there are limited SMRs.  In our case there are only
+> > >> 128 SMRs in SMMU-500 and we have potentially way more masters than
+> > >> that.
+> > >
+> > > Right, but you still only have 64 context banks at the end of the day, so do
+> > > you really anticipate having more than 128 masters concurrently using the
+> > > SMMU? If so, then we have devices sharing context banks so we could consider
+> > > reusing SMRs across masters, but historically that's not been something that
+> > > we've managed to solve.
+> > >
+> > >>> Wouldn't
+> > >>> that sort of thing be preferable to dynamic StreamID assignment? It would
+> > >>> certainly make life easier for the MSIs.
+> > >>
+> > >> It would be preferable, but given only 128 total stream IDS and
+> > >> 64 context registers it's potentially an issue.  On our LS2085 SoC it is
+> > >> PCI and the fsl-mc bus (see description here:
+> > >> https://lkml.org/lkml/2015/3/5/795) that potentially have way
+> > >> more masters than streamIDS. So, for those busses we would essentially
+> > >> view a streamID as a "context ID"-- each SMR is associated with
+> > >> 1 context bank register.
+> > >>
+> > >> For PCI we have a programmable "PCI req ID"-to-"stream ID"
+> > >> mapping table in the PCI controller that is dynamically
+> > >> programmable.
+> > >>
+> > >> Looking at it like that means that we could have
+> > >> any number of masters but only 64 "contexts"
+> > >> and since the masters all all programmable it's
+> > >> seems feasbile to envision doing some bus/vendor
+> > >> specific set up when a device is added to an
+> > >> IOMMU domain.   One thing that would need to be conveyed
+> > >> to the SMMU driver if doing dynamic streamID setup
+> > >> is what streamIDs are available to be used.
+> > >
+> > > Ok, but this is going to make life difficult for the MSI people, I suspect.
+> > >
+> > > Marc...?
+> >
+> > We're really facing two conflicting requirements: in order to minimize
+> > SMR usage, we want to alias multiple ReqIDs to a single StreamID
+> 
+> Another reason could be the isolation characteristics of the
+> hardware...see comment below about PCI bridges.
+> 
+> > but in
+> > order to efficiently deal with MSIs, we want to see discrete DeviceIDs
+> > (the actual ReqIDs). I don't easily see how we reconcile the two.
+> >
+> > We can deal with the aliasing, provided that we extend the level of
+> > quirkiness that pci_for_each_dma_alias can deal with. But that doesn't
+> > solve any form of hotplug/SR-IOV behaviour.
+> >
+> > Somehow, we're going to end-up with grossly oversized ITTs, just to
+> > accommodate for the fact that we have no idea how many MSIs we're going
+> > to end-up needing. I'm not thrilled with that prospect.
+> 
+> How can we avoid that in the face of hotplug?
+> 
+> And what are we really worried about regarding over-sized ITTs...bytes
+> of memory saved?
+> 
+> A fundamental thing built into the IOMMU subsystem in Linux is
+> representing iommu groups that can represent things like
+> multiple PCI devices that for hardware reasons cannot
+> be isolated (and the example I've seen given relates to
+> devices behind PCI bridges).
+> 
+> So, I think the thing we are facing here is that while the
+> IOMMU subsystem has accounted for reprsenting the isolation
+> characteristics of a system with iommu groups, there is
+> no corresponding "msi group" concept.
+> 
+> In the SMMU/GIC-500-ITS world the iommu isolation
+> ID (the stream ID) and the GIC-ITS device ID are in
+> fact the same ID.
+> 
+> Is there some way we could sanely correlate IOMMU group creation
+> (which establishes isolation granularity) with the creation
+> of an ITT for the GIC-ITS?
+> 
+> (I don't have a good feel for how device IDs work on x86,
+> I know there is an interrupt remapping table in the
+> x86 IOMMUs that is distinct from the memory isolation
+> page tables)
 
-regards
-Suman
+For reference see Alex Williamson's description of IOMMU
+isolation scenarios in Documentation/vfio.txt:
 
-> 
->> +};
->> +
->> +static struct l3_flagmux_data omap5_l3_flagmux_clk3 = {
->> +	.offset = 0x0200,
->> +	.l3_targ = omap5_l3_target_data_clk3,
->> +	.num_targ_data = ARRAY_SIZE(omap5_l3_target_data_clk3),
->> +};
->> +
->> +static struct l3_flagmux_data *omap5_l3_flagmux[] = {
->> +	&omap_l3_flagmux_clk1,
->> +	&omap_l3_flagmux_clk2,
->> +	&omap5_l3_flagmux_clk3,
->> +};
->> +
->> +static const struct omap_l3 omap5_l3_data = {
->> +	.l3_flagmux = omap5_l3_flagmux,
->> +	.num_modules = ARRAY_SIZE(omap5_l3_flagmux),
->> +	.l3_masters = omap_l3_masters,
->> +	.num_masters = ARRAY_SIZE(omap_l3_masters),
->> +	/* The 6 MSBs of register field used to distinguish initiator */
->> +	.mst_addr_mask = 0x7E0,
->> +};
->> +
->>  /* DRA7 data */
->>  static struct l3_target_data dra_l3_target_data_clk1[] = {
->>  	{0x2a00, "AES1",},
->>
-> 
-> If tony does not mind dts+driver patch, then except for the above comment:
-> 
-> Acked-by: Nishanth Menon <nm@ti.com>
-> 
+   ...
+   This isolation is not always at the granularity of a single device
+   though.  Even when an IOMMU is capable of this, properties of devices,
+   interconnects, and IOMMU topologies can each reduce this isolation.
+   For instance, an individual device may be part of a larger multi-
+   function enclosure.  While the IOMMU may be able to distinguish
+   between devices within the enclosure, the enclosure may not require
+   transactions between devices to reach the IOMMU.  Examples of this
+   could be anything from a multi-function PCI device with backdoors
+   between functions to a non-PCI-ACS (Access Control Services) capable
+   bridge allowing redirection without reaching the IOMMU.  Topology
+   can also play a factor in terms of hiding devices.  A PCIe-to-PCI
+   bridge masks the devices behind it, making transaction appear as if
+   from the bridge itself.  Obviously IOMMU design plays a major factor
+   as well.
+
+   Therefore, while for the most part an IOMMU may have device level
+   granularity, any system is susceptible to reduced granularity.  The
+   IOMMU API therefore supports a notion of IOMMU groups.  A group is
+   a set of devices which is isolatable from all other devices in the
+   system.  Groups are therefore the unit of ownership used by VFIO.
+   ...
+
+The isolation granularity issues he raises are going to impact how
+we deal with MSIs with GIC ITS because again, isolation ID and 
+GIC ITS device ID are the same.
+
+Stuart
