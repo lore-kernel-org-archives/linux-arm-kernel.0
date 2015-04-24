@@ -1,45 +1,32 @@
 From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Fri, 24 Apr 2015 08:34:33 -0700
-Subject: [PATCH 0/5] PM / clock_ops: provide default runtime ops and
- cleanup users
-In-Reply-To: <2234398.3O5UMXvvlN@vostro.rjw.lan>
-References: <1429777993-11702-1-git-send-email-rnayak@codeaurora.org>
- <2234398.3O5UMXvvlN@vostro.rjw.lan>
-Message-ID: <553A6289.4040001@oracle.com>
+Date: Fri, 24 Apr 2015 08:36:47 -0700
+Subject: [PATCH 0/4] ARM: keystone: Enable Netcp driver on K2 EVMs
+In-Reply-To: <553A5E12.9040202@ti.com>
+References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
+ <55395981.8050902@oracle.com> <553A5E12.9040202@ti.com>
+Message-ID: <553A630F.4060008@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2015 7:41 AM, Rafael J. Wysocki wrote:
-> On Thursday, April 23, 2015 02:03:08 PM Rajendra Nayak wrote:
->> Most users of PM clocks do the exact same thing in runtime callbacks.
->> Provide default callbacks and cleanup the existing users (keystone/davinci
->> /omap1/sh)
+On 4/24/2015 8:15 AM, Murali Karicheri wrote:
+> On 04/23/2015 04:43 PM, santosh shilimkar wrote:
+>> On 4/23/2015 12:37 PM, Murali Karicheri wrote:
+>>> NetCP driver support patches are already merged to v4.0.nd v4.1.
+>>> This series introduce patches to update the DTS bindings and
+>>> defconfig so that the network driver is fully functional on K2
+>>> EVMs :- K2HK, K2L and K2E.
+>>>
+>> Nice and Thanks Murali for sending these up.
 >>
->> Rajendra Nayak (5):
->>    PM / clock_ops: Provide default runtime ops to users
->>    arm: keystone: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
->>    arm: omap1: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
->>    arm: davinci: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
->>    drivers: sh: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
->>
->>   arch/arm/mach-davinci/pm_domain.c  | 32 +-------------------------
->>   arch/arm/mach-keystone/pm_domain.c | 33 +-------------------------
->>   arch/arm/mach-omap1/pm_bus.c       | 37 ++----------------------------
->>   drivers/base/power/clock_ops.c     | 38 ++++++++++++++++++++++++++++++
->>   drivers/sh/pm_runtime.c            | 47 ++------------------------------------
->>   include/linux/pm_clock.h           | 10 ++++++++
->>   6 files changed, 54 insertions(+), 143 deletions(-)
+>>> It will be great if this can be merged to v4.1.
+>>>
+>> Its too late for the 4.1 now. For the same reason, we also
+>> couldn't get the MMU switching fixes in this merge window.
 >
-> It is not particularly clear to me who is supposed to apply this series, but
-> I can do that if people don't have problems with that.
+> For my reference, can you point me to the MMU switching fixes you are
+> referring to?
 >
->
-I am fine by that given dependency with first patch.
-Another way is, you pick up the first patch and give us an
-immutable branch.
-
-Either way is fine by me.
-
+http://www.spinics.net/lists/arm-kernel/msg411178.html
 
 Regards,
 Santosh
