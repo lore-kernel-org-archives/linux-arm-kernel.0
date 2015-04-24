@@ -1,50 +1,44 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Fri, 24 Apr 2015 22:40:15 +0300
-Subject: [PATCH 00/13] Enable CoreSight for the Ux500
-In-Reply-To: <CAPDyKFqdcB6KVVvQNf4SPQXV-YVEO+Nvm5XYiaa78PH-dwjDCw@mail.gmail.com>
-References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
- <1429887211.5211.4.camel@mm-sol.com>
- <CAPDyKFqdcB6KVVvQNf4SPQXV-YVEO+Nvm5XYiaa78PH-dwjDCw@mail.gmail.com>
-Message-ID: <ABFA023B-E9EE-43DF-9DF0-9BE617791BB5@mm-sol.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 24 Apr 2015 14:54:51 -0500
+Subject: [PATCH] bus: omap_l3_noc: Fix master id address decoding for OMAP5
+In-Reply-To: <CAGo_u6rgZhkRZSjpXuvBz5frYByUDtzFrAQFaPB7rxT8hLYBPw@mail.gmail.com>
+References: <1429898060-51944-1-git-send-email-s-anna@ti.com>	<553A8C68.5080903@ti.com>	<553A951A.1080905@ti.com>
+ <CAGo_u6rgZhkRZSjpXuvBz5frYByUDtzFrAQFaPB7rxT8hLYBPw@mail.gmail.com>
+Message-ID: <553A9F8B.7010205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On Apr 24, 2015, at 6:31 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On 04/24/2015 02:38 PM, Nishanth Menon wrote:
+> On Fri, Apr 24, 2015 at 2:10 PM, Suman Anna <s-anna@ti.com> wrote:
+>> On 04/24/2015 01:33 PM, Nishanth Menon wrote:
+>>> On 04/24/2015 12:54 PM, Suman Anna wrote:
 > 
-> On 24 April 2015 at 16:53, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
->> 
->> On Fri, 2015-04-17 at 10:58 +0200, Linus Walleij wrote:
->>> This patch series enables the CoreSight blocks for the Ux500.
->>> 
->>> To do so I ran into a few obstacles, all resolved in this
->>> series:
->>> 
->>> - The Ux500 have two distinct clocks clocking the CS blocks,
->>> APETRACECLK clocking the AHB interconnect, what is usually
->>> referred to as "apb_pclk" in the AMBA primecell abstraction
->>> layer, and another clock called APEATCLK which is connected
->>> to the actual ATCLK on the CS blocks. So I have to add
->>> handling for this second clock as only the PCLK is handled
->>> today.
->>> 
->>> - Doing so I need to use runtime PM, and I discovered that
->>> the current CS drivers go in and grab the PCLK from the
->>> AMBA primecell abstraction which is wrong: this shall be
->>> handled using runtime PM callbacks, see e.g.
->>> drivers/mmc/host/mmci.c. So I made a patch series fixing
->>> this. This also fixes the problem that the PCLK is left
->>> on since none of the drivers call pm_runtime_put() so
->>> the AMBA core can disable the PCLK, instead they are
->>> poking around with the PCLK themselves which is wrong.
->> 
->> Probably stupid question, but.. How this is
->> supposed to work if CONFIG_PM is not enabled?
+> ...
+>>>> -static struct l3_target_data omap_l3_target_data_clk3[] = {
+>>>> -    {0x0100, "EMUSS",},
+>>>> -    {0x0300, "DEBUG SOURCE",},
+>>>> -    {0x0,   "HOST CLK3",},
+> ^^ this was HOST CLK3
+> ..
+>>>>
+>>>> +/* OMAP5 data */
+>>>> +static struct l3_target_data omap5_l3_target_data_clk3[] = {
+>>>> +    {0x0100, "L3INSTR",},
+>>>> +    {0x0300, "DEBUGSS",},
+>>>> +    {0x0,    "HOSTCLK3",},
+>>>
+>>> "HOST CLK"
+>>
+>> Why? I followed the convention used for the other two HOST CLKs for the
 > 
-> The clock(s) will stay enabled after ->probe().
+> so asked, if it should be HOST<space>CLK3
 
+Aah ok, you missed the trailing number before. In anycase, this was
+intentional to match HOSTCLK1 and HOSTCLK2 on OMAP4/5. Overall, the
+names are somewhat non-standard, some use underscores and some others
+strip out the underscore and do not use any spaces in between either.
+"HOST CLK3" would be the only one to use a space for OMAP4, so I got rid
+of it, so hope that's ok with you.
 
-Thanks. I have missed explicit ATCLCK enable in probe.
-
-Regards,
-Ivan
+regards
+Suman
