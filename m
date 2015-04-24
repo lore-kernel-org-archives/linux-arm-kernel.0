@@ -1,44 +1,72 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 24 Apr 2015 10:06:23 -0700
-Subject: [PATCH 9/9] ARM: BCM283x: Register fixed clocks for uart in the
- DT.
-In-Reply-To: <5539CA1A.1040009@wwwdotorg.org>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <1429639796-2169-10-git-send-email-eric@anholt.net>
- <5539CA1A.1040009@wwwdotorg.org>
-Message-ID: <87vbglwj5c.fsf@eliezer.anholt.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 24 Apr 2015 10:08:48 -0700
+Subject: [PATCHv7 1/8] watchdog: Extend kernel API to know about HW
+ limitations
+In-Reply-To: <1429701102-22320-2-git-send-email-timo.kokkonen@offcode.fi>
+References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
+ <1429701102-22320-2-git-send-email-timo.kokkonen@offcode.fi>
+Message-ID: <20150424170848.GA2505@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+On Wed, Apr 22, 2015 at 02:11:35PM +0300, Timo Kokkonen wrote:
+> There is a great deal of diversity in the watchdog hardware found on
+> different devices. Differen hardware have different contstraints on
+> them, many of the constraints that are excessively difficult for the
+> user space to satisfy.
+> 
+> One such constraint is the length of the timeout value, which in many
+> cases can be just a few seconds. Drivers are creating ad hoc solutions
+> with timers and workqueues to extend the timeout in order to give user
+> space more time between updates. Looking at the drivers it is clear
+> that this has resulted to a lot of duplicate code.
+> 
+> Add an extension to the watchdog kernel API that allows the driver to
+> describe tis HW constraints to the watchdog code. A kernel worker in
+> the core is then used to extend the watchdog timeout on behalf of the
+> user space. This allows the drivers to be simplified as core takes
+> over the timer extending.
+> 
+> Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
 
-> On 04/21/2015 12:09 PM, Eric Anholt wrote:
->> We were previously relying on the fixed clock registration in
->> clk-bcm2835, but there doesn't seem to be any real reason to not just
->> define it in the DT (and for the 2836 port, I would have needed to
->> change the clock's physical address in clk-bcm2835.c).  Also, because
->> we weren't registering the apb_pclk in clk-bcm2835 as a clock device,
->> we were picking up the uart clock node as apb_pclk by accident.
->
-> Doesn't the following do just that?
->
-> clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT,
->                               126000000);
+I started twice to review this series, and each time there is a new version
+before I can finish the review. Guess I'll wait until it settles down a bit
+before trying again :-(. Just a quick comment below.
 
-Nope!  You also need the clk_register_clkdev for the type of lookup
-being done by APB to find it.
+> ---
+>  drivers/watchdog/watchdog_core.c | 101 +++++++++++++++++++++++++++++++++++++--
+>  drivers/watchdog/watchdog_dev.c  |  75 ++++++++++++++++++++++++++---
+>  include/linux/watchdog.h         |  23 +++++++++
+>  3 files changed, 189 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+> index cec9b55..fd12489 100644
+> --- a/drivers/watchdog/watchdog_core.c
+> +++ b/drivers/watchdog/watchdog_core.c
+> @@ -99,6 +99,89 @@ int watchdog_init_timeout(struct watchdog_device *wdd,
+>  EXPORT_SYMBOL_GPL(watchdog_init_timeout);
+>  
+>  /**
+> + * watchdog_init_parms() - initialize generic watchdog parameters
+> + * @wdd: Watchdog device to operate
+> + * @dev: Device that stores the device tree properties
+> + *
+> + * Initialize the generic timeout parameters. The driver needs to set
+> + * hw_features bitmask from @wdd prior calling this function in order
+> + * to ensure the core knows how to handle the HW.
+> + *
+> + * A zero is returned on success and -EINVAL for failure.
+> + */
+> +int watchdog_init_params(struct watchdog_device *wdd, struct device *dev)
+> +{
+> +	int ret = 0;
+> +
+> +	ret = watchdog_init_timeout(wdd, wdd->timeout, dev);
 
-> Anyway, with this patch, shouldn't we fix drivers/clk/clk-bcm2835.c not
-> to register clocks that match those that are added to DT in this patch?
-> Actually, to maintain DT ABI (new kernels working with old or new DT),
-> we probably need to keep the code in clk-bcm2835.c, but make it
-> conditional upon whether there's a clock node in the DT file.
+You are changing the semantics of watchdog_init_timeout here;
+for all practical purposes it no longer accepts the timeout passed
+as parameter, but expects the timeout to be configured in wdd->timeout
+instead. Please don't do that.
 
-Yeah, I hadn't modified the .c code because of DT ABI
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150424/388d1819/attachment.sig>
+Guenter
