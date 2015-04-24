@@ -1,43 +1,86 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 24 Apr 2015 17:31:33 +0200
-Subject: [PATCH 00/13] Enable CoreSight for the Ux500
-In-Reply-To: <1429887211.5211.4.camel@mm-sol.com>
-References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
- <1429887211.5211.4.camel@mm-sol.com>
-Message-ID: <CAPDyKFqdcB6KVVvQNf4SPQXV-YVEO+Nvm5XYiaa78PH-dwjDCw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 24 Apr 2015 08:31:57 -0700
+Subject: [PATCH 3/5] arm: omap1: remove boilerplate code and use
+ USE_PM_CLK_RUNTIME_OPS
+In-Reply-To: <1429777993-11702-4-git-send-email-rnayak@codeaurora.org>
+References: <1429777993-11702-1-git-send-email-rnayak@codeaurora.org>
+ <1429777993-11702-4-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20150424153156.GS18048@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 April 2015 at 16:53, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
->
-> On Fri, 2015-04-17 at 10:58 +0200, Linus Walleij wrote:
->> This patch series enables the CoreSight blocks for the Ux500.
->>
->> To do so I ran into a few obstacles, all resolved in this
->> series:
->>
->> - The Ux500 have two distinct clocks clocking the CS blocks,
->>   APETRACECLK clocking the AHB interconnect, what is usually
->>   referred to as "apb_pclk" in the AMBA primecell abstraction
->>   layer, and another clock called APEATCLK which is connected
->>   to the actual ATCLK on the CS blocks. So I have to add
->>   handling for this second clock as only the PCLK is handled
->>   today.
->>
->> - Doing so I need to use runtime PM, and I discovered that
->>   the current CS drivers go in and grab the PCLK from the
->>   AMBA primecell abstraction which is wrong: this shall be
->>   handled using runtime PM callbacks, see e.g.
->>   drivers/mmc/host/mmci.c. So I made a patch series fixing
->>   this. This also fixes the problem that the PCLK is left
->>   on since none of the drivers call pm_runtime_put() so
->>   the AMBA core can disable the PCLK, instead they are
->>   poking around with the PCLK themselves which is wrong.
->
-> Probably stupid question, but.. How this is
-> supposed to work if CONFIG_PM is not enabled?
+* Rajendra Nayak <rnayak@codeaurora.org> [150423 01:34]:
+> USE_PM_CLK_RUNTIME_OPS is introduced so we don't repeat the same code
+> to do runtime_suspend and runtime_resume across users of PM clocks.
+> Use it to remove the boilerplate code.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The clock(s) will stay enabled after ->probe().
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-Kind regards
-Uffe
+> ---
+>  arch/arm/mach-omap1/pm_bus.c | 37 ++-----------------------------------
+>  1 file changed, 2 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
+> index c40e209..667c163 100644
+> --- a/arch/arm/mach-omap1/pm_bus.c
+> +++ b/arch/arm/mach-omap1/pm_bus.c
+> @@ -21,48 +21,15 @@
+>  
+>  #include "soc.h"
+>  
+> -#ifdef CONFIG_PM
+> -static int omap1_pm_runtime_suspend(struct device *dev)
+> -{
+> -	int ret;
+> -
+> -	dev_dbg(dev, "%s\n", __func__);
+> -
+> -	ret = pm_generic_runtime_suspend(dev);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = pm_clk_suspend(dev);
+> -	if (ret) {
+> -		pm_generic_runtime_resume(dev);
+> -		return ret;
+> -	}
+> -
+> -	return 0;
+> -}
+> -
+> -static int omap1_pm_runtime_resume(struct device *dev)
+> -{
+> -	dev_dbg(dev, "%s\n", __func__);
+> -
+> -	pm_clk_resume(dev);
+> -	return pm_generic_runtime_resume(dev);
+> -}
+> -
+>  static struct dev_pm_domain default_pm_domain = {
+>  	.ops = {
+> -		.runtime_suspend = omap1_pm_runtime_suspend,
+> -		.runtime_resume = omap1_pm_runtime_resume,
+> +		USE_PM_CLK_RUNTIME_OPS
+>  		USE_PLATFORM_PM_SLEEP_OPS
+>  	},
+>  };
+> -#define OMAP1_PM_DOMAIN (&default_pm_domain)
+> -#else
+> -#define OMAP1_PM_DOMAIN NULL
+> -#endif /* CONFIG_PM */
+>  
+>  static struct pm_clk_notifier_block platform_bus_notifier = {
+> -	.pm_domain = OMAP1_PM_DOMAIN,
+> +	.pm_domain = &default_pm_domain,
+>  	.con_ids = { "ick", "fck", NULL, },
+>  };
+>  
+> -- 
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+> of Code Aurora Forum, hosted by The Linux Foundation
+> 
