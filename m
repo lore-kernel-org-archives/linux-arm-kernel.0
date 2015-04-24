@@ -1,244 +1,255 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 24 Apr 2015 12:08:54 -0700
-Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling to the
- WDT driver.
-In-Reply-To: <1429902534-2348-1-git-send-email-eric@anholt.net>
-References: <1429902534-2348-1-git-send-email-eric@anholt.net>
-Message-ID: <1429902534-2348-2-git-send-email-eric@anholt.net>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 24 Apr 2015 14:10:18 -0500
+Subject: [PATCH] bus: omap_l3_noc: Fix master id address decoding for OMAP5
+In-Reply-To: <553A8C68.5080903@ti.com>
+References: <1429898060-51944-1-git-send-email-s-anna@ti.com>
+ <553A8C68.5080903@ti.com>
+Message-ID: <553A951A.1080905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the WDT is what's used to drive restart and power off, it makes
-more sense to keep it there, where the regs are already mapped and
-definitions for them provided.  Note that this means you may need to
-add CONFIG_BCM2835_WDT to retain functionality of your kernel.
+On 04/24/2015 01:33 PM, Nishanth Menon wrote:
+> On 04/24/2015 12:54 PM, Suman Anna wrote:
+>> The L3 Error handling on OMAP5 for the most part is very similar
+>> to that of OMAP4, and had leveraged common data structures and
+>> register layout definitions so far. Upon closer inspection, there
+>> are a few minor differences causing an incorrect decoding and
+>> reporting of the master NIU upon an error:
+>>
+>>   1. The L3_TARG_STDERRLOG_MSTADDR.STDERRLOG_MSTADDR occupies
+>>      11 bits on OMAP5 as against 8 bits on OMAP4, with the master
+>>      NIU connID encoded in the 6 MSBs of the STDERRLOG_MSTADDR
+>>      field.
+>>   2. The CLK3 FlagMux component has 1 input source on OMAP4 and 3
+>>      input sources on OMAP5. The common DEBUGSS source is at a
+>>      different input on each SoC.
+>>
+>> Fix the above issues by using a OMAP5-specific compatible property
+>> and using SoC-specific data where there are differences.
+>>
+>> Cc: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>>
+>> Some validation traces by adding couple of traces and intentionally
+>> creating L3 errors from DSP & IPU by accessing invalid Timers
+>>
+>> Before Patch:
+>> OMAP4 [Correct]
+>> IPU accessing Timer4
+>> [   46.548095] flagmux = 1, err_reg = 0x8000 err_src = 0xf
+>> [   46.553344] mstaddr = 0x44 mask = 0xfc masterid = 0x11
+>> [   46.553955] ------------[ cut here ]------------
+>> [   46.563171] WARNING: CPU: 0 PID: 4 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
+>> [   46.564941] 44000000.ocp:L3 Custom Error: MASTER DucatiM3 TARGET L4PER3 (Idle): Data Access in User mode during 
+>> Functional access
+>>
+>> DSP accessing Timer5:
+>> [  114.018524] flagmux = 0, err_reg = 0x4 err_src = 0x2
+>> [  114.023498] mstaddr = 0x20 mask = 0xfc masterid = 0x8
+>> [  114.028564] ------------[ cut here ]------------
+>> [  114.033233] WARNING: CPU: 0 PID: 0 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
+>> [  114.042572] 44000000.ocp:L3 Custom Error: MASTER DSP TARGET ABE (Idle): Data Access in Supervisor mode during Functional 
+>> access
+>>
+>> OMAP5 [Incorrect]
+>> IPU accessing Timer4:
+>> [   29.579306] flagmux = 1, err_reg = 0x8000 err_src = 0xf
+>> [   29.584550] mstaddr = 0x220 mask = 0xfc masterid = 0x8
+>> [   29.589705] ------------[ cut here ]------------
+>> [   29.594345] WARNING: CPU: 0 PID: 61 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
+>> [   29.603774] 44000000.ocp:L3 Custom Error: MASTER DSP TARGET L4PER3 (Idle): Data Access in User mode during Functional 
+>> access
+>>
+>> DSP accessing Timer5:
+>> [   21.347105] flagmux = 0, err_reg = 0x4 err_src = 0x2
+>> [   21.352091] mstaddr = 0x100 mask = 0xfc masterid = 0x0
+>> [   21.357250] ------------[ cut here ]------------
+>> [   21.361896] WARNING: CPU: 0 PID: 0 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
+>> [   21.371242] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET ABE (Idle): Data Access in Supervisor mode during Functional 
+>> access
+>>
+>> After Patch:
+>> OMAP4 same as above
+>>
+>> OMAP5 [Corrected]
+>> IPU accessing Timer4
+>> [   67.896693] flagmux = 1, err_reg = 0x8000 err_src = 0xf
+>> [   67.901940] mstaddr = 0x220 mask = 0x7e0 masterid = 0x11
+>> [   67.907275] ------------[ cut here ]------------
+>> [   67.911924] WARNING: CPU: 0 PID: 61 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
+>> [   67.921357] 44000000.ocp:L3 Custom Error: MASTER DucatiM3 TARGET L4PER3 (Idle): Data Access in User mode during 
+>> Functional access
+>>
+>> DSP accessing Timer5
+>> [   24.452565] flagmux = 0, err_reg = 0x4 err_src = 0x2
+>> [   24.457552] mstaddr = 0x100 mask = 0x7e0 masterid = 0x8
+>> [   24.462798] ------------[ cut here ]------------
+>> [   24.467449] WARNING: CPU: 0 PID: 0 at drivers/bus/omap_l3_noc.c:149 l3_interrupt_handler+0x280/0x388()
+>> [   24.476795] 44000000.ocp:L3 Custom Error: MASTER DSP TARGET ABE (Idle): Data Access in Supervisor mode during Functional
+>>  access
+>>
+>>
+>>  .../devicetree/bindings/arm/omap/l3-noc.txt        |  1 +
+>>  arch/arm/boot/dts/omap5.dtsi                       |  2 +-
+>>  drivers/bus/omap_l3_noc.c                          |  5 ++-
+>>  drivers/bus/omap_l3_noc.h                          | 52 ++++++++++++++++------
+>>  4 files changed, 44 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/l3-noc.txt b/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
+>> index 974624ea68f6..161448da959d 100644
+>> --- a/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
+>> +++ b/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
+>> @@ -6,6 +6,7 @@ provided by Arteris.
+>>  Required properties:
+>>  - compatible : Should be "ti,omap3-l3-smx" for OMAP3 family
+>>                 Should be "ti,omap4-l3-noc" for OMAP4 family
+>> +               Should be "ti,omap5-l3-noc" for OMAP5 family
+>>  	       Should be "ti,dra7-l3-noc" for DRA7 family
+>>                 Should be "ti,am4372-l3-noc" for AM43 family
+>>  - reg:	Contains L3 register address range for each noc domain.
+>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>> index efe5f737f39b..7d24ae0306b5 100644
+>> --- a/arch/arm/boot/dts/omap5.dtsi
+>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>> @@ -128,7 +128,7 @@
+>>  	 * hierarchy.
+>>  	 */
+>>  	ocp {
+>> -		compatible = "ti,omap4-l3-noc", "simple-bus";
+>> +		compatible = "ti,omap5-l3-noc", "simple-bus";
+>>  		#address-cells = <1>;
+>>  		#size-cells = <1>;
+>>  		ranges;
+>> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
+>> index 11f7982cbdb3..ebee57d715d2 100644
+>> --- a/drivers/bus/omap_l3_noc.c
+>> +++ b/drivers/bus/omap_l3_noc.c
+>> @@ -1,7 +1,7 @@
+>>  /*
+>>   * OMAP L3 Interconnect error handling driver
+>>   *
+>> - * Copyright (C) 2011-2014 Texas Instruments Incorporated - http://www.ti.com/
+>> + * Copyright (C) 2011-2015 Texas Instruments Incorporated - http://www.ti.com/
+>>   *	Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>   *	Sricharan <r.sricharan@ti.com>
+>>   *
+>> @@ -233,7 +233,8 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+>>  }
+>>  
+>>  static const struct of_device_id l3_noc_match[] = {
+>> -	{.compatible = "ti,omap4-l3-noc", .data = &omap_l3_data},
+>> +	{.compatible = "ti,omap4-l3-noc", .data = &omap4_l3_data},
+>> +	{.compatible = "ti,omap5-l3-noc", .data = &omap5_l3_data},
+>>  	{.compatible = "ti,dra7-l3-noc", .data = &dra_l3_data},
+>>  	{.compatible = "ti,am4372-l3-noc", .data = &am4372_l3_data},
+>>  	{},
+>> diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
+>> index 95254585db86..3ba40db7380b 100644
+>> --- a/drivers/bus/omap_l3_noc.h
+>> +++ b/drivers/bus/omap_l3_noc.h
+>> @@ -1,7 +1,7 @@
+>>  /*
+>>   * OMAP L3 Interconnect  error handling driver header
+>>   *
+>> - * Copyright (C) 2011-2014 Texas Instruments Incorporated - http://www.ti.com/
+>> + * Copyright (C) 2011-2015 Texas Instruments Incorporated - http://www.ti.com/
+>>   *	Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>   *	sricharan <r.sricharan@ti.com>
+>>   *
+>> @@ -175,16 +175,14 @@ static struct l3_flagmux_data omap_l3_flagmux_clk2 = {
+>>  };
+>>  
+>>  
+>> -static struct l3_target_data omap_l3_target_data_clk3[] = {
+>> -	{0x0100, "EMUSS",},
+>> -	{0x0300, "DEBUG SOURCE",},
+>> -	{0x0,	"HOST CLK3",},
+>> +static struct l3_target_data omap4_l3_target_data_clk3[] = {
+>> +	{0x0100, "DEBUGSS",},
+>>  };
+>>  
+>> -static struct l3_flagmux_data omap_l3_flagmux_clk3 = {
+>> +static struct l3_flagmux_data omap4_l3_flagmux_clk3 = {
+>>  	.offset = 0x0200,
+>> -	.l3_targ = omap_l3_target_data_clk3,
+>> -	.num_targ_data = ARRAY_SIZE(omap_l3_target_data_clk3),
+>> +	.l3_targ = omap4_l3_target_data_clk3,
+>> +	.num_targ_data = ARRAY_SIZE(omap4_l3_target_data_clk3),
+>>  };
+>>  
+>>  static struct l3_masters_data omap_l3_masters[] = {
+>> @@ -215,21 +213,49 @@ static struct l3_masters_data omap_l3_masters[] = {
+>>  	{ 0x32, "USBHOSTFS"}
+>>  };
+>>  
+>> -static struct l3_flagmux_data *omap_l3_flagmux[] = {
+>> +static struct l3_flagmux_data *omap4_l3_flagmux[] = {
+>>  	&omap_l3_flagmux_clk1,
+>>  	&omap_l3_flagmux_clk2,
+>> -	&omap_l3_flagmux_clk3,
+>> +	&omap4_l3_flagmux_clk3,
+>>  };
+>>  
+>> -static const struct omap_l3 omap_l3_data = {
+>> -	.l3_flagmux = omap_l3_flagmux,
+>> -	.num_modules = ARRAY_SIZE(omap_l3_flagmux),
+>> +static const struct omap_l3 omap4_l3_data = {
+>> +	.l3_flagmux = omap4_l3_flagmux,
+>> +	.num_modules = ARRAY_SIZE(omap4_l3_flagmux),
+>>  	.l3_masters = omap_l3_masters,
+>>  	.num_masters = ARRAY_SIZE(omap_l3_masters),
+>>  	/* The 6 MSBs of register field used to distinguish initiator */
+>>  	.mst_addr_mask = 0xFC,
+>>  };
+>>  
+>> +/* OMAP5 data */
+>> +static struct l3_target_data omap5_l3_target_data_clk3[] = {
+>> +	{0x0100, "L3INSTR",},
+>> +	{0x0300, "DEBUGSS",},
+>> +	{0x0,	 "HOSTCLK3",},
+> 
+> "HOST CLK"
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Cc: linux-watchdog at vger.kernel.org
----
+Why? I followed the convention used for the other two HOST CLKs for the
+OMAP4/5 data, see omap_l3_target_data_clk1 and omap_l3_target_data_clk2.
+The TRM name used is HOST_CLK3 (Table 14-31 Interconnect Flag Mapping,
+Section 14.2.3.9.3 of OMAP543x_ES2.0_Public_TRM_vX.pdf), but the code
+doesn't use the underscores.
 
-Note that power off has never worked for me, and just reboots as well.
-So I can't say that I've *really* tested the power off code.
+regards
+Suman
 
- arch/arm/mach-bcm/board_bcm2835.c | 73 ---------------------------------------
- drivers/watchdog/bcm2835_wdt.c    | 62 +++++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+), 73 deletions(-)
-
-diff --git a/arch/arm/mach-bcm/board_bcm2835.c b/arch/arm/mach-bcm/board_bcm2835.c
-index 49dd5b0..0f7b9ea 100644
---- a/arch/arm/mach-bcm/board_bcm2835.c
-+++ b/arch/arm/mach-bcm/board_bcm2835.c
-@@ -12,7 +12,6 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/irqchip.h>
- #include <linux/of_address.h>
-@@ -22,81 +21,10 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
--#define PM_RSTC				0x1c
--#define PM_RSTS				0x20
--#define PM_WDOG				0x24
--
--#define PM_PASSWORD			0x5a000000
--#define PM_RSTC_WRCFG_MASK		0x00000030
--#define PM_RSTC_WRCFG_FULL_RESET	0x00000020
--#define PM_RSTS_HADWRH_SET		0x00000040
--
--static void __iomem *wdt_regs;
--
--/*
-- * The machine restart method can be called from an atomic context so we won't
-- * be able to ioremap the regs then.
-- */
--static void bcm2835_setup_restart(void)
--{
--	struct device_node *np = of_find_compatible_node(NULL, NULL,
--						"brcm,bcm2835-pm-wdt");
--	if (WARN(!np, "unable to setup watchdog restart"))
--		return;
--
--	wdt_regs = of_iomap(np, 0);
--	WARN(!wdt_regs, "failed to remap watchdog regs");
--}
--
--static void bcm2835_restart(enum reboot_mode mode, const char *cmd)
--{
--	u32 val;
--
--	if (!wdt_regs)
--		return;
--
--	/* use a timeout of 10 ticks (~150us) */
--	writel_relaxed(10 | PM_PASSWORD, wdt_regs + PM_WDOG);
--	val = readl_relaxed(wdt_regs + PM_RSTC);
--	val &= ~PM_RSTC_WRCFG_MASK;
--	val |= PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
--	writel_relaxed(val, wdt_regs + PM_RSTC);
--
--	/* No sleeping, possibly atomic. */
--	mdelay(1);
--}
--
--/*
-- * We can't really power off, but if we do the normal reset scheme, and
-- * indicate to bootcode.bin not to reboot, then most of the chip will be
-- * powered off.
-- */
--static void bcm2835_power_off(void)
--{
--	u32 val;
--
--	/*
--	 * We set the watchdog hard reset bit here to distinguish this reset
--	 * from the normal (full) reset. bootcode.bin will not reboot after a
--	 * hard reset.
--	 */
--	val = readl_relaxed(wdt_regs + PM_RSTS);
--	val &= ~PM_RSTC_WRCFG_MASK;
--	val |= PM_PASSWORD | PM_RSTS_HADWRH_SET;
--	writel_relaxed(val, wdt_regs + PM_RSTS);
--
--	/* Continue with normal reset mechanism */
--	bcm2835_restart(REBOOT_HARD, "");
--}
--
- static void __init bcm2835_init(void)
- {
- 	int ret;
- 
--	bcm2835_setup_restart();
--	if (wdt_regs)
--		pm_power_off = bcm2835_power_off;
--
- 	bcm2835_init_clocks();
- 
- 	ret = of_platform_populate(NULL, of_default_bus_match_table, NULL,
-@@ -114,6 +42,5 @@ static const char * const bcm2835_compat[] = {
- 
- DT_MACHINE_START(BCM2835, "BCM2835")
- 	.init_machine = bcm2835_init,
--	.restart = bcm2835_restart,
- 	.dt_compat = bcm2835_compat
- MACHINE_END
-diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
-index 2b5a9bb..7116968 100644
---- a/drivers/watchdog/bcm2835_wdt.c
-+++ b/drivers/watchdog/bcm2835_wdt.c
-@@ -13,20 +13,25 @@
-  * option) any later version.
-  */
- 
-+#include <linux/delay.h>
-+#include <linux/reboot.h>
- #include <linux/types.h>
- #include <linux/module.h>
- #include <linux/io.h>
- #include <linux/watchdog.h>
- #include <linux/platform_device.h>
- #include <linux/of_address.h>
-+#include <linux/of_platform.h>
- 
- #define PM_RSTC				0x1c
-+#define PM_RSTS				0x20
- #define PM_WDOG				0x24
- 
- #define PM_PASSWORD			0x5a000000
- 
- #define PM_WDOG_TIME_SET		0x000fffff
- #define PM_RSTC_WRCFG_CLR		0xffffffcf
-+#define PM_RSTS_HADWRH_SET		0x00000040
- #define PM_RSTC_WRCFG_SET		0x00000030
- #define PM_RSTC_WRCFG_FULL_RESET	0x00000020
- #define PM_RSTC_RESET			0x00000102
-@@ -37,6 +42,7 @@
- struct bcm2835_wdt {
- 	void __iomem		*base;
- 	spinlock_t		lock;
-+	struct notifier_block	restart_handler;
- };
- 
- static unsigned int heartbeat;
-@@ -106,6 +112,53 @@ static struct watchdog_device bcm2835_wdt_wdd = {
- 	.timeout =	WDOG_TICKS_TO_SECS(PM_WDOG_TIME_SET),
- };
- 
-+static int
-+bcm2835_restart(struct notifier_block *this, unsigned long mode, void *cmd)
-+{
-+	struct bcm2835_wdt *wdt = container_of(this, struct bcm2835_wdt,
-+					       restart_handler);
-+	u32 val;
-+
-+	/* use a timeout of 10 ticks (~150us) */
-+	writel_relaxed(10 | PM_PASSWORD, wdt->base + PM_WDOG);
-+	val = readl_relaxed(wdt->base + PM_RSTC);
-+	val &= PM_RSTC_WRCFG_CLR;
-+	val |= PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
-+	writel_relaxed(val, wdt->base + PM_RSTC);
-+
-+	/* No sleeping, possibly atomic. */
-+	mdelay(1);
-+
-+	return 0;
-+}
-+
-+/*
-+ * We can't really power off, but if we do the normal reset scheme, and
-+ * indicate to bootcode.bin not to reboot, then most of the chip will be
-+ * powered off.
-+ */
-+static void bcm2835_power_off(void)
-+{
-+	struct device_node *np =
-+		of_find_compatible_node(NULL, NULL, "brcm,bcm2835-pm-wdt");
-+	struct platform_device *pdev = of_find_device_by_node(np);
-+	struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
-+	u32 val;
-+
-+	/*
-+	 * We set the watchdog hard reset bit here to distinguish this reset
-+	 * from the normal (full) reset. bootcode.bin will not reboot after a
-+	 * hard reset.
-+	 */
-+	val = readl_relaxed(wdt->base + PM_RSTS);
-+	val &= PM_RSTC_WRCFG_CLR;
-+	val |= PM_PASSWORD | PM_RSTS_HADWRH_SET;
-+	writel_relaxed(val, wdt->base + PM_RSTS);
-+
-+	/* Continue with normal reset mechanism */
-+	bcm2835_restart(&wdt->restart_handler, REBOOT_HARD, NULL);
-+}
-+
- static int bcm2835_wdt_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -136,6 +189,12 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
-+	wdt->restart_handler.notifier_call = bcm2835_restart;
-+	wdt->restart_handler.priority = 128;
-+	register_restart_handler(&wdt->restart_handler);
-+	if (pm_power_off == NULL)
-+		pm_power_off = bcm2835_power_off;
-+
- 	dev_info(dev, "Broadcom BCM2835 watchdog timer");
- 	return 0;
- }
-@@ -144,6 +203,9 @@ static int bcm2835_wdt_remove(struct platform_device *pdev)
- {
- 	struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
- 
-+	unregister_restart_handler(&wdt->restart_handler);
-+	if (pm_power_off == bcm2835_power_off)
-+		pm_power_off = NULL;
- 	watchdog_unregister_device(&bcm2835_wdt_wdd);
- 	iounmap(wdt->base);
- 
--- 
-2.1.4
+> 
+>> +};
+>> +
+>> +static struct l3_flagmux_data omap5_l3_flagmux_clk3 = {
+>> +	.offset = 0x0200,
+>> +	.l3_targ = omap5_l3_target_data_clk3,
+>> +	.num_targ_data = ARRAY_SIZE(omap5_l3_target_data_clk3),
+>> +};
+>> +
+>> +static struct l3_flagmux_data *omap5_l3_flagmux[] = {
+>> +	&omap_l3_flagmux_clk1,
+>> +	&omap_l3_flagmux_clk2,
+>> +	&omap5_l3_flagmux_clk3,
+>> +};
+>> +
+>> +static const struct omap_l3 omap5_l3_data = {
+>> +	.l3_flagmux = omap5_l3_flagmux,
+>> +	.num_modules = ARRAY_SIZE(omap5_l3_flagmux),
+>> +	.l3_masters = omap_l3_masters,
+>> +	.num_masters = ARRAY_SIZE(omap_l3_masters),
+>> +	/* The 6 MSBs of register field used to distinguish initiator */
+>> +	.mst_addr_mask = 0x7E0,
+>> +};
+>> +
+>>  /* DRA7 data */
+>>  static struct l3_target_data dra_l3_target_data_clk1[] = {
+>>  	{0x2a00, "AES1",},
+>>
+> 
+> If tony does not mind dts+driver patch, then except for the above comment:
+> 
+> Acked-by: Nishanth Menon <nm@ti.com>
+> 
