@@ -1,54 +1,46 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Fri, 24 Apr 2015 14:50:04 +0800
-Subject: [PATCH 1/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <20150423125620.GB29702@leverpostej>
-References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
- <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
- <20150423125620.GB29702@leverpostej>
-Message-ID: <CALx668W_rj8_UBory5fVa4_i3vLCjgApYCwHoSthXNmx79yH1g@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 24 Apr 2015 08:56:39 +0200
+Subject: [PATCH] ARM: dts: imx28: Fix AUART4 TX-DMA interrupt name
+In-Reply-To: <1429845411-9280-1-git-send-email-marex@denx.de>
+References: <1429845411-9280-1-git-send-email-marex@denx.de>
+Message-ID: <5539E927.3080205@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 23, 2015 at 8:56 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> +/*
->> + * This is a temporary solution until we have new OPPv2 bindings. Therefore we
->> + * could describe the OPPs with (freq, volt, volt) tuple properly in device
->> + * tree.
->> + */
->> +
->> +/* OPP table for LITTLE cores of MT8173 */
->> +struct mtk_cpu_opp mt8173_l_opp[] = {
->> +       OPP(507000000, 859000, 0),
->> +       OPP(702000000, 908000, 0),
->> +       OPP(1001000000, 983000, 0),
->> +       OPP(1105000000, 1009000, 0),
->> +       OPP(1183000000, 1028000, 0),
->> +       OPP(1404000000, 1083000, 0),
->> +       OPP(1508000000, 1109000, 0),
->> +       OPP(1573000000, 1125000, 0),
->> +};
->> +
->> +/* OPP table for big cores of MT8173 */
->> +struct mtk_cpu_opp mt8173_b_opp[] = {
->> +       OPP(507000000, 828000, 928000),
->> +       OPP(702000000, 867000, 967000),
->> +       OPP(1001000000, 927000, 1027000),
->> +       OPP(1209000000, 968000, 1068000),
->> +       OPP(1404000000, 1007000, 1107000),
->> +       OPP(1612000000, 1049000, 1149000),
->> +       OPP(1807000000, 1089000, 1150000),
->> +       OPP(1989000000, 1125000, 1150000),
->> +};
+Hi Marek,
+
+Am 24.04.2015 um 05:16 schrieb Marek Vasut:
+> Fix a typo in the TX DMA interrupt name for AUART4.
+> This patch makes AUART4 operational again.
 >
-> We should sort out the OPP bindings if we need to sort out the OPP
-> bindings. We can't remove these once they're in without causing pain for
-> everyone with an old DTB.
-
-So even we have a new OPP binding to describe the OPP, we have to
-leave these table as they are for backward compatibility?
-
-Best Regards,
-Pi-Cheng
-
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: stable at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/imx28.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> Mark.
+> NOTE: This bug goes all the way back to at least Linux 3.10
+> NOTE: I am not the author of the patch, but I am not allowed to disclose
+>       the name of the original author due to the circumstances.
+>
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 25e25f8..4e073e8 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -913,7 +913,7 @@
+>  					      80 81 68 69
+>  					      70 71 72 73
+>  					      74 75 76 77>;
+> -				interrupt-names = "auart4-rx", "aurat4-tx", "spdif-tx", "empty",
+> +				interrupt-names = "auart4-rx", "auart4-tx", "spdif-tx", "empty",
+>  						  "saif0", "saif1", "i2c0", "i2c1",
+>  						  "auart0-rx", "auart0-tx", "auart1-rx", "auart1-tx",
+>  						  "auart2-rx", "auart2-tx", "auart3-rx", "auart3-tx";
+
+looks good, but shouldn't we patch also the wrong documentation?
+
+Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
+
+Best regards
+Stefan
