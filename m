@@ -1,39 +1,62 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Fri, 24 Apr 2015 17:53:31 +0300
-Subject: [PATCH 00/13] Enable CoreSight for the Ux500
-In-Reply-To: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
-References: <1429261140-13910-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1429887211.5211.4.camel@mm-sol.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 24 Apr 2015 16:54:01 +0200
+Subject: [RFC PATCH] bus: mvebu-mbus: do not set WIN_CTRL_SYNCBARRIER on
+ non io-coherent platforms.
+In-Reply-To: <1429886671-14415-1-git-send-email-nschichan@freebox.fr>
+References: <20150417132350.329bcace@free-electrons.com>
+ <1429886671-14415-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <20150424165401.733666b4@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Nicolas Schichan,
 
-On Fri, 2015-04-17 at 10:58 +0200, Linus Walleij wrote:
-> This patch series enables the CoreSight blocks for the Ux500.
+On Fri, 24 Apr 2015 16:44:31 +0200, Nicolas Schichan wrote:
+> On those platforms (orion5x, kirkwood and dove AFAICS) the
+> WIN_CTRL_SYNCBARRIER bit in the window control register is either
+> reserved (all windows except 6 and 7) or enables read-only protection
+> (windows 6 and 7).
 > 
-> To do so I ran into a few obstacles, all resolved in this
-> series:
+> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+> ---
 > 
-> - The Ux500 have two distinct clocks clocking the CS blocks,
->   APETRACECLK clocking the AHB interconnect, what is usually
->   referred to as "apb_pclk" in the AMBA primecell abstraction
->   layer, and another clock called APEATCLK which is connected
->   to the actual ATCLK on the CS blocks. So I have to add
->   handling for this second clock as only the PCLK is handled
->   today.
+> Hello Thomas,
 > 
-> - Doing so I need to use runtime PM, and I discovered that
->   the current CS drivers go in and grab the PCLK from the
->   AMBA primecell abstraction which is wrong: this shall be
->   handled using runtime PM callbacks, see e.g.
->   drivers/mmc/host/mmci.c. So I made a patch series fixing
->   this. This also fixes the problem that the PCLK is left
->   on since none of the drivers call pm_runtime_put() so
->   the AMBA core can disable the PCLK, instead they are
->   poking around with the PCLK themselves which is wrong.
+> Please find here my attempt at fixing this. I have been relying on the
+> hw_io_coherency field of the struct mvebu_mbus_state which is always
+> false for the platforms without the WIN_CTRL_SYNCBARRIER bit available
+> (orion5x, kirkwood, and dove).
+> 
+> I was going to add a field to mvebu_soc_data documenting the
+> availability of the WIN_CTRL_SYNCBARRIER bit for each platform but for
+> that purpose, the mvebu_mbus_state struct hw_io_coherency field looks
+> to be enough.
+> 
+> This has been tested on mv88f6282 (kirkwood).
 
-Probably stupid question, but.. How this is
-supposed to work if CONFIG_PM is not enabled? 
+Thanks, it looks good to me. Can you resend with:
 
-Regards,
-Ivan
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: <stable@vger.kernel.org> # v4.0+
+Fixes: a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O synchronization barriers")
+
+An addition to the commit log like:
+
+Commit a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O
+synchronization barriers") enabled the usage of automatic I/O
+synchronization barriers by enabling bit WIN_CTRL_SYNCBARRIER in the
+control registers of MBus windows, but....
+
+And in the code, maybe add a comment above the WIN_CTRL_SYNCBARRIER
+definition like:
+
+/* Only on HW I/O coherency capable platforms */
+#define WIN_CTRL_SYNCBARRIER ...
+
+Thanks a lot!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
