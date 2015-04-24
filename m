@@ -1,20 +1,28 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 23 Apr 2015 22:27:14 -0600
-Subject: [PATCH 1/9] dt-bindings: Add root properties for Raspberry Pi 2.
-In-Reply-To: <1429639796-2169-2-git-send-email-eric@anholt.net>
+Date: Thu, 23 Apr 2015 22:28:37 -0600
+Subject: [PATCH 2/9] ARM: BCM2835: Split peripheral definitions off to
+ a common include.
+In-Reply-To: <1429639796-2169-3-git-send-email-eric@anholt.net>
 References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <1429639796-2169-2-git-send-email-eric@anholt.net>
-Message-ID: <5539C622.2020208@wwwdotorg.org>
+ <1429639796-2169-3-git-send-email-eric@anholt.net>
+Message-ID: <5539C675.7020306@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/21/2015 12:09 PM, Eric Anholt wrote:
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  Documentation/devicetree/bindings/arm/bcm2836.txt | 10 ++++++++++
+> The 2836 dts will inherit all of this, because it shares the same
+> peripherals as 2835.
 
-In next-20150423 at least, the bcm2835 equivalent of this file is:
-Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
 
-The file added by this patch should be named consistently. I might be
-tempted to put the new values into the existing file?
+>  #include <dt-bindings/pinctrl/bcm2835.h>
+>  #include "skeleton.dtsi"
+> +#include "bcm283x-common.dtsi"
+
+skeleton is included there.
+
+> diff --git a/arch/arm/boot/dts/bcm283x-common.dtsi b/arch/arm/boot/dts/bcm283x-common.dtsi
+
+> +/include/ "skeleton.dtsi"
+
+So there's no need to include it here.
