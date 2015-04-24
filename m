@@ -1,74 +1,74 @@
 From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Fri, 24 Apr 2015 16:43:21 -0500
-Subject: [PATCH 2/2] ARM: VDSO: use arch_timer_okay_for_vdso
-In-Reply-To: <1429911801-6069-1-git-send-email-nathan_lynch@mentor.com>
-References: <1429911801-6069-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <1429911801-6069-2-git-send-email-nathan_lynch@mentor.com>
+Date: Fri, 24 Apr 2015 16:43:20 -0500
+Subject: [PATCH 1/2] clocksource: arm_arch_timer: add arch_timer_okay_for_vdso
+Message-ID: <1429911801-6069-1-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the facility now provided by the arm_arch_timer driver to
-determine whether there's a usable virtual counter for the VDSO.
+The 32-bit ARM VDSO needs to know whether a generic timer is present
+and whether it is suitable for use by user space.  The VDSO
+initialization code currently duplicates some of the logic from the
+driver to make this determination, but unfortunately it is incomplete;
+it will incorrectly enable the VDSO if HYP mode is available or if no
+interrupt is provided for the virtual timer (see arch_timer_init).  In
+these cases the driver will switch to memory-backed access while the
+VDSO will attempt to access the counter using cp15 reads.
+
+Add an arch_timer_okay_for_vdso API which can reliably inform the VDSO
+init code whether the arch timer is present and usable.
 
 Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
 ---
- arch/arm/kernel/vdso.c | 30 +-----------------------------
- 1 file changed, 1 insertion(+), 29 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 12 ++++++++++++
+ include/clocksource/arm_arch_timer.h |  6 ++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index efe17dd9b921..f06fd6f3f65f 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -21,7 +21,6 @@
- #include <linux/err.h>
- #include <linux/kernel.h>
- #include <linux/mm.h>
--#include <linux/of.h>
- #include <linux/printk.h>
- #include <linux/slab.h>
- #include <linux/timekeeper_internal.h>
-@@ -69,33 +68,6 @@ struct elfinfo {
-  */
- static bool cntvct_ok __read_mostly;
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 0aa135ddbf80..b75215523d2f 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -462,6 +462,18 @@ struct timecounter *arch_timer_get_timecounter(void)
+ 	return &timecounter;
+ }
  
--static bool __init cntvct_functional(void)
--{
--	struct device_node *np;
--	bool ret = false;
--
--	if (!IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
--		goto out;
--
--	/* The arm_arch_timer core should export
--	 * arch_timer_use_virtual or similar so we don't have to do
--	 * this.
--	 */
--	np = of_find_compatible_node(NULL, NULL, "arm,armv7-timer");
--	if (!np)
--		goto out_put;
--
--	if (of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
--		goto out_put;
--
--	ret = true;
--
--out_put:
--	of_node_put(np);
--out:
--	return ret;
--}
--
- static void * __init find_section(Elf32_Ehdr *ehdr, const char *name,
- 				  unsigned long *size)
++/* The ARM VDSO init code needs to know:
++ * - whether a cp15-based arch timer is present; and if so
++ * - whether the physical or virtual counter is being used.
++ */
++bool arch_timer_okay_for_vdso(void)
++{
++	if (!(arch_timers_present & ARCH_CP15_TIMER))
++		return false;
++
++	return arch_timer_use_virtual;
++}
++
+ static void __init arch_counter_register(unsigned type)
  {
-@@ -208,7 +180,7 @@ static int __init vdso_init(void)
- 	vdso_total_pages = 1; /* for the data/vvar page */
- 	vdso_total_pages += text_pages;
+ 	u64 start_count;
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index 9916d0e4eff5..bfc1e95280c4 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -48,6 +48,7 @@ enum arch_timer_reg {
+ extern u32 arch_timer_get_rate(void);
+ extern u64 (*arch_timer_read_counter)(void);
+ extern struct timecounter *arch_timer_get_timecounter(void);
++extern bool arch_timer_okay_for_vdso(void);
  
--	cntvct_ok = cntvct_functional();
-+	cntvct_ok = arch_timer_okay_for_vdso();
+ #else
  
- 	patch_vdso(&vdso_start);
+@@ -66,6 +67,11 @@ static inline struct timecounter *arch_timer_get_timecounter(void)
+ 	return NULL;
+ }
  
++static inline bool arch_timer_okay_for_vdso(void)
++{
++	return false;
++}
++
+ #endif
+ 
+ #endif
 -- 
 1.9.3
