@@ -1,127 +1,87 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 24 Apr 2015 14:28:41 +0200
-Subject: [PATCH] ARM: dts: imx6: Add Embest MarS Board
-In-Reply-To: <CABH3fy_YWYoQZL4E_i1FWaY+rOgidxBVcUNo15GrXfcoS2or0A@mail.gmail.com>
-References: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
- <1427876156.24886.1.camel@pengutronix.de>
- <1427877126.2449.0@mail.essensium.com>
- <CABH3fy_YWYoQZL4E_i1FWaY+rOgidxBVcUNo15GrXfcoS2or0A@mail.gmail.com>
-Message-ID: <1429878521.2872.3.camel@pengutronix.de>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Fri, 24 Apr 2015 14:53:50 +0200
+Subject: [RFC] arm: pick the r2 passed DTB over the appended one
+Message-ID: <1429880030-21473-1-git-send-email-valentin.longchamp@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Thanks to the APPENDED_DTB option, it is possible to append the dtb to
+the kernel's binary image. This is very convenient to accomodate old
+bootloaders that do not pass a dtb.
 
-This may as well be a signaling issue. You could try to slow down the
-the MMC bus speed or play a bit with the pin drive strength values. Note
-that in those cases _reducing_ the drive strength may be the right thing
-to do.
+We have updated a product with a new version of the bootloader that now
+passed the dtb properly in r2. However, we still want to support with
+the same software (i.e. kernel) the old bootloader, where the dtb must
+be appended, but give the priority to to the one passed in r2.
 
-Regards,
-Lucas
+This patch tries cover the above use case. It works for the case a dtb
+is passed in r2 and one is appended (the one pointed by r2 is picked).
+However, when there is only an appended dtb and r2 points to an ATAG
+list, this fails. Somehow, the presumably updated r2 does not point to a
+valid dtb and it gets zeroed by __vet_atags. Below is an example of
+this (end of bootloader, start of kernel):
 
-Am Freitag, den 24.04.2015, 15:22 +0300 schrieb Catalin Crenguta:
-> This is still not working on 4.0 with this devicetree and eMMC enabled.
-> 
-> [    1.467617] Driver 'mmcblk' needs updating - please use bus_type methods
-> [    1.474581] sdhci: Secure Digital Host Controller Interface driver
-> [    1.480776] sdhci: Copyright(c) Pierre Ossman
-> [    1.485229] sdhci-pltfm: SDHCI platform and OF driver helper
-> [    1.491920] sdhci-esdhc-imx 2194000.usdhc: could not get ultra high
-> speed state, work on normal mode
-> [    1.502624] sdhci-esdhc-imx 2194000.usdhc: No vqmmc regulator found
-> [    1.553863] mmc0: SDHCI controller on 2194000.usdhc [2194000.usdhc]
-> using ADMA
-> [    1.562020] sdhci-esdhc-imx 2198000.usdhc: could not get ultra high
-> speed state, work on normal mode
-> [    1.572519] sdhci-esdhc-imx 2198000.usdhc: No vqmmc regulator found
-> [    1.623290] mmc1: SDHCI controller on 2198000.usdhc [2198000.usdhc]
-> using ADMA
-> [    1.632466] usbcore: registered new interface driver usbhid
-> [    1.638080] usbhid: USB HID core driver
-> [    1.648923] TCP: cubic registered
-> [    1.653864] NET: Registered protocol family 10
-> [    1.661093] sit: IPv6 over IPv4 tunneling driver
-> [    1.667826] NET: Registered protocol family 17
-> [    1.672323] can: controller area network core (rev 20120528 abi 9)
-> [    1.678754] NET: Registered protocol family 29
-> [    1.683259] can: raw protocol (rev 20120528)
-> [    1.683659] usb 1-1: new high-speed USB device number 2 using ci_hdrc
-> [    1.694117] can: broadcast manager protocol (rev 20120528 t)
-> [    1.699821] can: netlink gateway (rev 20130117) max_hops=1
-> [    1.705994] Key type dns_resolver registered
-> [    1.715425] Registering SWP/SWPB emulation handler
-> [    1.728171] snvs_rtc 20cc034.snvs-rtc-lp: setting system clock to
-> 1970-01-01 00:00:00 UTC (0)
-> [    1.773338] usb_otg_vbus: disabling
-> [    1.776858] 2P5V: disabling
-> [    1.780066] ALSA device list:
-> [    1.783043]   No soundcards found.
-> [    1.787866] Waiting for root device /dev/mmcblk0p1...
-> [    1.836367] hub 1-1:1.0: USB hub found
-> [    1.840349] hub 1-1:1.0: 4 ports detected
-> [    1.879136] mmc1: MAN_BKOPS_EN bit is not set
-> [    1.893823] mmc1: new high speed MMC card at address 0001
-> [    1.901285] mmcblk0: mmc1:0001 NCard  3.71 GiB
-> [    1.906172] mmcblk0boot0: mmc1:0001 NCard  partition 1 2.00 MiB
-> [    1.912424] mmcblk0boot1: mmc1:0001 NCard  partition 2 2.00 MiB
-> [    1.918676] mmcblk0rpmb: mmc1:0001 NCard  partition 3 128 KiB
-> [    1.928406]  mmcblk0: p1
-> [   12.033443] mmc1: Timeout waiting for hardware interrupt.
-> [   12.039193] mmcblk0: error -110 transferring data, sector 20482, nr
-> 2, cmd response 0x900, card status 0xb00
-> [   12.049118] mmc1: tried to reset card
-> [   12.052804] mmcblk0: retrying using single block read
-> [   22.073257] mmc1: Timeout waiting for hardware interrupt.
-> [   22.078969] mmcblk0: error -110 transferring data, sector 20480, nr
-> 8, cmd response 0x900, card status 0xb00
-> [   22.088897] mmc1: tried to reset card
-> [   22.092585] mmcblk0: retrying using single block read
-> [   22.100654] EXT3-fs (mmcblk0p1): error: magic mismatch
-> [   32.113294] mmc1: Timeout waiting for hardware interrupt.
-> [   32.119153] mmcblk0: error -110 transferring data, sector 20482, nr
-> 2, cmd response 0x900, card status 0xb00
-> [   32.129070] mmc1: tried to reset card
-> [   32.132758] mmcblk0: retrying using single block read
-> [   32.138719] EXT2-fs (mmcblk0p1): error: couldn't mount because of
-> unsupported optional features (4)
-> 
-> On Wed, Apr 1, 2015 at 11:32 AM, Vianney le Cl?ment
-> <vianney.leclement@essensium.com> wrote:
-> > On Wed, Apr 1, 2015 at 10:15 , Lucas Stach <l.stach@pengutronix.de> wrote:
-> >>
-> >> Am Mittwoch, den 01.04.2015, 10:10 +0200 schrieb Vianney le Cl?ment de
-> >> Saint-Marcq:
-> >>>
-> >>>  Add device tree for the Embest/Element 14 MarS Board [1], an i.MX6 Dual
-> >>>  based development board.
-> >>>
-> >>>  The e-MMC chip is disabled because initialization fails (error -110).
-> >>>  A possible cause is described in [2].
-> >>
-> >>
-> >> So if the problem is that there are only 4 connected data lines one the
-> >> board, couldn't you simply add the property bus-width = <4>; to the emmc
-> >> node?
-> >
-> >
-> > It is already the case (imx6qdl.dtsi, line 929), but to no avail.  That is
-> > why I wrote "possible" cause as I did not find any evidence of the described
-> > behaviour in my (admittedly limited) investigations.
-> >
-> >
-> > Vianney le Cl?ment de Saint-Marcq
-> > Embedded Software Developper ? +32 485 84 55 05
-> > Essensium, Mind division ? www.mind.be
-> > GPG: 727B CFE9 355F 1B02 0820 EE1C 9042 3E07 A804 0316
-> >
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+at 02000000 ...
+  Image Name:   Linux-3.10.60-7.2.2-00002-gc6acc
+  Image Type:   ARM Linux Kernel Image (uncompressed)
+  Data Size:    2904550 Bytes = 2.8 MiB
+  Load Address: 00008000
+  Entry Point:  00008000
+  Verifying Checksum ... OK
+  Loading Kernel Image ... OK
+OK
+r2 (0x00000100) points to (size, header): 0x00000005, 0x54410001
 
+Starting kernel ...
+
+Uncompressing Linux... done, booting the kernel.
+e5943000
+trying to parse the FDT
+
+dt_phys (r2) is NULL !
+
+Error: unrecognized/unsupported machine ID (r1 = 0x000008cf).
+
+Available machine support:
+
+ID (hex)	NAME
+ffffffff	Marvell Kirkwood (Flattened Device Tree)
+
+Please check your kernel config and/or bootloader.
+
+Is this patch a correct approach to implement the above use case ? If
+yes, does anyone has an idea why this fails ?
+
+Note: this patch is for the 3.10 stable branch.
+
+Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
+---
+ arch/arm/boot/compressed/head.S | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 032a8d9..a43c8a0 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -244,7 +244,7 @@ restart:	adr	r0, LC0
+  * dtb data will get relocated along with the kernel if necessary.
+  */
+ 
+-		ldr	lr, [r6, #0]
++		ldr	lr, [r6, #0]		@ potential appended dtb ?
+ #ifndef __ARMEB__
+ 		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
+ #else
+@@ -253,6 +253,10 @@ restart:	adr	r0, LC0
+ 		cmp	lr, r1
+ 		bne	dtb_check_done		@ not found
+ 
++		ldr	lr, [r8, #0] 		@ conventionaly passed dtb ?
++		cmp	lr, r1
++		beq	dtb_check_done		@ yes, do not manage it
++
+ #ifdef CONFIG_ARM_ATAG_DTB_COMPAT
+ 		/*
+ 		 * OK... Let's do some funky business here.
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+1.8.0.1
