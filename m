@@ -1,63 +1,112 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 24 Apr 2015 12:57:05 -0600
-Subject: BCM2836 (Raspberry Pi 2) port
-In-Reply-To: <87pp6tweql.fsf@eliezer.anholt.net>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <5539C5A4.5070409@wwwdotorg.org> <87pp6tweql.fsf@eliezer.anholt.net>
-Message-ID: <553A9201.3080308@wwwdotorg.org>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Fri, 24 Apr 2015 21:03:04 +0200
+Subject: Broadcom 43340 module on iMX6DL
+In-Reply-To: <CACUGKYOcgcrM4EPWmV18CeG-P6+nE_ANX5qgWGk3nn3NmWQ72A@mail.gmail.com>
+References: <CACUGKYMXr3ASbB9fCk+GBnpfMC1kf_+NxDsOF_FODBKRAN9YvQ@mail.gmail.com>	<55393C45.3060105@broadcom.com>	<CACUGKYPHKGoLEfNPNvtHwtCA9jB_ZLamzF_PViDfQnpnc8Y-=A@mail.gmail.com>	<55394141.1080601@broadcom.com>	<CALAqxLU_9Hcbr5atxRBLDhs4WY9JfAdwdyzpszeO5nxCZU9JLA@mail.gmail.com>	<CACUGKYPFk3Qoj3-XgkMwuzuCz_aP-8QCA8S+OSq5-qfoRF9dwg@mail.gmail.com>	<CACUGKYMqFuk6nD82H=7nPRVvHEe9Ot6OkWiixqoV91ED8Cwudw@mail.gmail.com>	<5539FCD5.4050708@broadcom.com>	<CACUGKYOheGKjQOSZkxKGkqj_wOWAN8_2geptmTC8jp_L5AOveg@mail.gmail.com>	<553A8803.5010700@broadcom.com>
+ <CACUGKYOcgcrM4EPWmV18CeG-P6+nE_ANX5qgWGk3nn3NmWQ72A@mail.gmail.com>
+Message-ID: <553A9368.9030700@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2015 12:41 PM, Eric Anholt wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
+On 04/24/15 20:24, John Tobias wrote:
+> Hi Arend,
 >
->> On 04/21/2015 12:09 PM, Eric Anholt wrote:
->>> This is my first submission of a Raspberry Pi 2 port.  It can be found
->>> at https://github.com/anholt/linux/tree/bcm2836
+> Apologize for the confusion. I am asking the repo for the device
+> driver for 43340. Looking at the link you sent, it's more userspace
+> support and didn't see the device driver there...
+
+crap. you are right. it is userspace and firmware. You need a kernel 
+repo. There are some on the site I referred to, but you may need to 
+contact Freescale whether they provide it publicly like on github or so.
+
+Regards,
+Arend
+
+> Regards,
+>
+> John
+>
+>
+> On Fri, Apr 24, 2015 at 11:14 AM, Arend van Spriel<arend@broadcom.com>  wrote:
+>> On 04/24/15 19:49, John Tobias wrote:
 >>>
->>> I'm using the 2835 interrupt controller support, without adding the
->>> checks for ARM local interrupts first.  That means no support for IPIs
->>> (and thus no SMP), no PMU events, and no local timer (I'm using the
->>> same 2835 peripheral one).
+>>> Hi Arend,
 >>>
->>> It supports a similar featureset to Pi 1 at this point.  Serial and SD
->>> cards work.  Just one CPU supported.  USB (ethernet) works if you use
->>> U-Boot, or my mailbox series
->>> (https://github.com/anholt/linux/tree/bcm2836-mbox).
+>>> I am not pretty sure if the brcm43340 driver for android is the latest
+>>> one.  May I know repo?.
 >>
->> I can't quite get this to work. I think what's happening is that U-Boot
->> is over-writing the location of the code/data that the CPU1..3 pin loop
->> uses. Do you know what that address is so I can confirm that?
 >>
->> I suspect this because when I load the kernel/DT in U-Boot, or when I
->> jump to the kernel to boot it, I see lots of extra duplicated characters
->> on the UART, like all 4 CPUs are booting Linux. For example:
->
-> Oops, I was just extrapolating that U-Boot would work.  I've quit using
-> it because of the extra configuration work (particularly the compiled
-> text files for the boot scripts).
-
-You don't need any compiled text files if you create an extlinux.conf 
-rather than a boot.scr. extlinux.conf is plain text.
-
-To boot without U-Boot: Could you say what's in your config.txt? I 
-assume I can just copy the kernel zImage as kernel.img, and the DTB from 
-the kernel build tree without renaming it?
-
-> I haven't looked into how SMP works, because I don't have the interrupt
-> support necessary yet (bcm2836-irq branch for hacks in that direction).
->
-> And in further testing, the USB is actually not working and I'm not sure
-> what gave me the idea that it was.
-
-It might be intermittent depending on (GPU) cache content. We need to 
-fix the kernel in a similar fashion to the following U-Boot commits:
-
-> http://git.denx.de/?p=u-boot.git;a=commit;h=79340db7f1f676b8eb5911f4993ebedf27009c0b
-ARM: bcm2835: implement phys_to_bus/bus_to_phys
-
-> http://git.denx.de/?p=u-boot.git;a=commit;h=5c0beb5c58c86d2a6d12dee6330dc85554de5c60
-usb: dwc2: use phys_to_bus/bus_to_phys
-
-> http://git.denx.de/?p=u-boot.git;a=commit;h=122426d46e31391480c4b83b1003e4feca24d491
-ARM: bcm2835: use phys_to_bus() for mbox
+>> Not sure what you are asking. I gave the url. Did you try using the
+>> brcmfmac4334-sdio.bin firmware file. I would like to know if that one works
+>> for your device.
+>>
+>> Regards,
+>> Arend
+>>
+>>
+>>> Regards,
+>>>
+>>> John
+>>>
+>>> On Fri, Apr 24, 2015 at 1:20 AM, Arend van Spriel<arend@broadcom.com>
+>>> wrote:
+>>>>
+>>>> On 04/24/15 03:04, John Tobias wrote:
+>>>>>
+>>>>>
+>>>>> Btw, where I could get a copy of the latest driver?.
+>>>>
+>>>>
+>>>>
+>>>> The open-source bcmdhd is in AOSP [1]. I would stick to the android
+>>>> release
+>>>> branch you are running on your device.
+>>>>
+>>>> Regards,
+>>>> Arend
+>>>>
+>>>> [1] https://android.googlesource.com/platform/hardware/broadcom/wlan/
+>>>>
+>>>>
+>>>>> Regards,
+>>>>>
+>>>>> John
+>>>>>
+>>>>> On Thu, Apr 23, 2015 at 5:59 PM, John Tobias<john.tobias.ph@gmail.com>
+>>>>> wrote:
+>>>>>>
+>>>>>>
+>>>>>> Hi John,
+>>>>>>
+>>>>>> Is it possible to have a copy of the firmware for 43340?.
+>>>>>>
+>>>>>> Regards,
+>>>>>>
+>>>>>> John
+>>>>>>
+>>>>>> On Thu, Apr 23, 2015 at 5:57 PM, John Stultz<john.stultz@linaro.org>
+>>>>>> wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>> On Thu, Apr 23, 2015 at 12:00 PM, Arend van Spriel<arend@broadcom.com>
+>>>>>>> wrote:
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> By the name of the file I suspected you did. Personally, I verified
+>>>>>>>> the
+>>>>>>>> firmware works on 43341. John Stultz tested both 43340 and 43341 with
+>>>>>>>> this
+>>>>>>>> firmware.
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> Minor correction here, I only tested on 43341 hardware. The confusion
+>>>>>>> might be that the firmware I originally had access to claimed it was
+>>>>>>> 43340.
+>>>>>>>
+>>>>>>> thanks
+>>>>>>> -john
+>>>>
+>>>>
+>>>>
+>>
