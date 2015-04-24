@@ -1,173 +1,163 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 24 Apr 2015 11:44:09 +0900
-Subject: [RFC 4/4] arm64: add livepatch support
-In-Reply-To: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1429843449-7388-5-git-send-email-takahiro.akashi@linaro.org>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Fri, 24 Apr 2015 08:19:25 +0530
+Subject: [RFC 5/7] arm: dts: msm8974: Add thermal zones, tsens and eeprom
+ nodes
+In-Reply-To: <20150423165146.GB555@linaro.org>
+References: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>
+ <1429796773-7151-6-git-send-email-rnayak@codeaurora.org>
+ <20150423165146.GB555@linaro.org>
+Message-ID: <5539AF35.1000600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/23/2015 10:21 PM, Lina Iyer wrote:
+> On Thu, Apr 23 2015 at 07:52 -0600, Rajendra Nayak wrote:
+>> Add thermal zones, tsens and eeprom nodes
+>
+> I dont see corresponding patches for 8084 and 8916.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/Kconfig                 |    3 ++
- arch/arm64/include/asm/livepatch.h |   38 ++++++++++++++++++++
- arch/arm64/kernel/Makefile         |    1 +
- arch/arm64/kernel/livepatch.c      |   68 ++++++++++++++++++++++++++++++++++++
- 4 files changed, 110 insertions(+)
- create mode 100644 arch/arm64/include/asm/livepatch.h
- create mode 100644 arch/arm64/kernel/livepatch.c
+I did not add 8916 as the dts for it isn't upstream (yet), and
+I hadn't tested on 8084 but I can certainly do so and update the
+dts files when I do a respin.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c3678ed..d4b5bac 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -61,6 +61,7 @@ config ARM64
- 	select HAVE_FUNCTION_GRAPH_TRACER
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
-+	select HAVE_LIVEPATCH
- 	select HAVE_MEMBLOCK
- 	select HAVE_PATA_PLATFORM
- 	select HAVE_PERF_EVENTS
-@@ -612,6 +613,8 @@ config SETEND_EMULATION
- 	  If unsure, say Y
- endif
- 
-+source "kernel/livepatch/Kconfig"
-+
- endmenu
- 
- menu "Boot options"
-diff --git a/arch/arm64/include/asm/livepatch.h b/arch/arm64/include/asm/livepatch.h
-new file mode 100644
-index 0000000..590d139
---- /dev/null
-+++ b/arch/arm64/include/asm/livepatch.h
-@@ -0,0 +1,38 @@
-+/*
-+ * Copyright (C) 2015 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef __ASM_LIVEPATCH_H
-+#define __ASM_LIVEPATCH_H
-+
-+#include <linux/module.h>
-+#include <linux/ftrace.h>
-+
-+#ifdef CONFIG_LIVEPATCH
-+static inline int klp_check_compiler_support(void)
-+{
-+	return 0;
-+}
-+extern int klp_write_module_reloc(struct module *mod, unsigned long type,
-+				  unsigned long loc, unsigned long value);
-+
-+extern unsigned long ftrace_lookup_mcount(unsigned long addr);
-+
-+static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
-+{
-+	regs->regs[30] = ip;
-+}
-+
-+static inline unsigned long klp_arch_lookup_mcount(unsigned long addr)
-+{
-+	return ftrace_lookup_mcount(addr);
-+}
-+#else
-+#error Live patching support is disabled; check CONFIG_LIVEPATCH
-+#endif
-+
-+#endif /* __ASM_LIVEPATCH_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 5ee07ee..7614990 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -35,6 +35,7 @@ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
- arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
- arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
-+arm64-obj-$(CONFIG_LIVEPATCH)		+= livepatch.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/livepatch.c b/arch/arm64/kernel/livepatch.c
-new file mode 100644
-index 0000000..abe4947
---- /dev/null
-+++ b/arch/arm64/kernel/livepatch.c
-@@ -0,0 +1,68 @@
-+/*
-+ * livepatch.c - arm64-specific Kernel Live Patching Core
-+ *
-+ * Copyright (C) 2015 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <asm/cacheflush.h>
-+#include <asm/elf.h>
-+#include <asm/insn.h>
-+#include <asm/livepatch.h>
-+
-+/**
-+ * klp_write_module_reloc() - write a relocation in a module
-+ * @mod:	module in which the section to be modified is found
-+ * @type:	ELF relocation type (see asm/elf.h)
-+ * @loc:	address that the relocation should be written to
-+ * @value:	relocation value (sym address + addend)
-+ *
-+ * This function writes a relocation to the specified location for
-+ * a particular module.
-+ */
-+int klp_write_module_reloc(struct module *mod, unsigned long type,
-+			   unsigned long loc, unsigned long value)
-+{
-+	unsigned long core = (unsigned long)mod->module_core;
-+	unsigned long core_ro_size = mod->core_ro_size;
-+	unsigned long core_size = mod->core_size;
-+	bool readonly;
-+	u32 new;
-+	int ret;
-+
-+	switch (type) {
-+	case R_AARCH64_NONE:
-+		return 0;
-+	case R_AARCH64_CALL26:
-+		break;
-+	default:
-+		/* unsupported relocation type */
-+		return -EINVAL;
-+	}
-+
-+	if (loc < core || loc >= core + core_size)
-+		/* loc does not point to any symbol inside the module */
-+		return -EINVAL;
-+
-+	if (loc < core + core_ro_size)
-+		readonly = true;
-+	else
-+		readonly = false;
-+
-+	if (readonly)
-+		set_memory_rw(loc & PAGE_MASK, 1);
-+
-+	new = aarch64_insn_gen_branch_imm(loc, value,
-+					  AARCH64_INSN_BRANCH_NOLINK);
-+	ret = aarch64_insn_patch_text_nosync((void *)loc, new);
-+
-+	if (readonly)
-+		set_memory_ro(loc & PAGE_MASK, 1);
-+
-+	return ret;
-+}
+>
+> -- Lina
+>>
+>> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+>> ---
+>> arch/arm/boot/dts/qcom-msm8974.dtsi | 105
+>> ++++++++++++++++++++++++++++++++++++
+>> 1 file changed, 105 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> index e265ec1..5716e89 100644
+>> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> @@ -57,6 +57,88 @@
+>>         };
+>>     };
+>>
+>> +    thermal-zones {
+>> +        cpu-thermal0 {
+>> +            polling-delay-passive = <250>;
+>> +            polling-delay = <1000>;
+>> +
+>> +            thermal-sensors = <&tsens 5>;
+>> +
+>> +            trips {
+>> +                cpu_alert0: trip at 0 {
+>> +                    temperature = <100000>;
+>> +                    hysteresis = <2000>;
+>> +                    type = "passive";
+>> +                };
+>> +                cpu_crit0: trip at 1 {
+>> +                    temperature = <125000>;
+>> +                    hysteresis = <2000>;
+>> +                    type = "critical";
+>> +                };
+>> +            };
+>> +        };
+>> +
+>> +        cpu-thermal1 {
+>> +            polling-delay-passive = <250>;
+>> +            polling-delay = <1000>;
+>> +
+>> +            thermal-sensors = <&tsens 6>;
+>> +
+>> +            trips {
+>> +                cpu_alert1: trip at 0 {
+>> +                    temperature = <100000>;
+>> +                    hysteresis = <2000>;
+>> +                    type = "passive";
+>> +                };
+>> +                cpu_crit1: trip at 1 {
+>> +                    temperature = <125000>;
+>> +                    hysteresis = <2000>;
+>> +                    type = "critical";
+>> +                };
+>> +            };
+>> +        };
+>> +
+>> +        cpu-thermal2 {
+>> +            polling-delay-passive = <250>;
+>> +            polling-delay = <1000>;
+>> +
+>> +            thermal-sensors = <&tsens 7>;
+>> +
+>> +            trips {
+>> +                cpu_alert2: trip at 0 {
+>> +                    temperature = <100000>;
+>> +                    hysteresis = <2000>;
+>> +                    type = "passive";
+>> +                };
+>> +                cpu_crit2: trip at 1 {
+>> +                    temperature = <125000>;
+>> +                    hysteresis = <2000>;
+>> +                    type = "critical";
+>> +                };
+>> +            };
+>> +        };
+>> +
+>> +        cpu-thermal3 {
+>> +            polling-delay-passive = <250>;
+>> +            polling-delay = <1000>;
+>> +
+>> +            thermal-sensors = <&tsens 8>;
+>> +
+>> +            trips {
+>> +                cpu_alert3: trip at 0 {
+>> +                    temperature = <100000>;
+>> +                    hysteresis = <2000>;
+>> +                    type = "passive";
+>> +                };
+>> +                cpu_crit3: trip at 1 {
+>> +                    temperature = <125000>;
+>> +                    hysteresis = <2000>;
+>> +                    type = "critical";
+>> +                };
+>> +            };
+>> +        };
+>> +    };
+>> +
+>>     cpu-pmu {
+>>         compatible = "qcom,krait-pmu";
+>>         interrupts = <1 7 0xf04>;
+>> @@ -85,6 +167,29 @@
+>>                   <0xf9002000 0x1000>;
+>>         };
+>>
+>> +        qfprom: qfprom at fc4bc000 {
+>> +            #address-cells = <1>;
+>> +            #size-cells = <1>;
+>> +            compatible = "qcom,qfprom";
+>> +            reg = <0xfc4bc000 0x1000>;
+>> +            tsens_calib: calib at d0 {
+>> +                reg = <0xd0 0x18>;
+>> +            };
+>> +            tsens_backup: backup at 440 {
+>> +                reg = <0x440 0x10>;
+>> +            };
+>> +        };
+>> +
+>> +        tsens: thermal-sensor at fc4a8000 {
+>> +            compatible = "qcom,msm8974-tsens";
+>> +            reg = <0xfc4a8000 0x2000>;
+>> +            calib = <&tsens_calib>;
+>> +            calib_backup = <&tsens_backup>;
+>> +            qcom,tsens-slopes = <3200 3200 3200 3200 3200 3200
+>> +                3200 3200 3200 3200 3200>;
+>> +            #thermal-sensor-cells = <1>;
+>> +        };
+>> +
+>>         timer at f9020000 {
+>>             #address-cells = <1>;
+>>             #size-cells = <1>;
+>> --
+>> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+>> of Code Aurora Forum, hosted by The Linux Foundation
+>>
+
 -- 
-1.7.9.5
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
