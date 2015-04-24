@@ -1,45 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Apr 2015 09:58:01 +0200
-Subject: imx6 sata cdrom driver issue
-In-Reply-To: <5539101D.1020909@lenbrook.com>
-References: <5539101D.1020909@lenbrook.com>
-Message-ID: <15678294.L2fz4hMtva@wuerfel>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 24 Apr 2015 09:58:08 +0200
+Subject: [PATCH 4/4] ARM: dts: mediatek mt8135: Use real UART clocks
+In-Reply-To: <1429780875-29096-5-git-send-email-s.hauer@pengutronix.de>
+References: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
+ <1429780875-29096-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <CABuKBeKoxAdW3VdrF229VAm+eB8Rku=_QF9bu-nCXfj+T=dMvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 April 2015 11:30:37 Jonathan Bagg wrote:
-> Spam Status: CRM114    
-> On arm imx6, running mainline 3.19, mounting a SATA CDROM fails aprox 
-> 1/20 times with this error....
-> 
-> root at freescale /tmp$ mount /dev/sr0 test/
-> UDF-fs: warning (device sr0): udf_fill_super: No partition found (2)
-> mount: mounting /dev/sr0 on test/ failed: Invalid argument
-> 
-> I've tried several disks and dvd drivers.  They all experience this 
-> issue.  The same disks mount 100% of the time on an x86 machine.  Once 
-> mounted, I can read data without issue.  Also tried a HDD on the same 
-> SATA link, no issue.
-> 
-> Sometimes the kernel will dump out the attached backtrace on the mount 
-> command.
-> 
+2015-04-23 11:21 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> We used to provide dummy clocks for the UART. Now that we have
+> common clock support we can provide the real clocks to the UART.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/mt8135.dtsi | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+> index b0f20fc..4d1ddd9 100644
+> --- a/arch/arm/boot/dts/mt8135.dtsi
+> +++ b/arch/arm/boot/dts/mt8135.dtsi
+> @@ -180,7 +180,8 @@
+>                         compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
+>                         reg = <0 0x11006000 0 0x400>;
+>                         interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
+> -                       clocks = <&uart_clk>;
+> +                       clocks = <&pericfg CLK_PERI_UART0_SEL>, <&pericfg CLK_PERI_UART0>;
+> +                       clock-names = "baud", "bus";
+>                         status = "disabled";
+>                 };
 
-I think  you have a combination of two bugs:
+We can delete the dummy uart_clk, as it is not needed any more.
 
-a) something that mount() does leads to the 'sd' device being unregistered
-b) something goes wrong in the cleanup of that device, which leads to
-   the messages you see.
-
-What is particularly strange here is the error about unregistering the
-/disk/ rather than the cdrom.
-
-Do you have two SATA ports on one controller, with the other one being
-conneced to a disk drive?
-
-My best guess is that something in the error handling of
-drivers/ata/ahci_imx.c causes a reset of the entire bus and that
-triggers the other bugs. Can you instrument that error handling to
-see what's going on?
-
-	Arnd
+-- 
+motzblog.wordpress.com
