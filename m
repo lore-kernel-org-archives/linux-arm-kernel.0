@@ -1,166 +1,168 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 23 Apr 2015 17:15:04 -0700
-Subject: [PATCH v6 3/5] Documentation: Add documentation for the APM
- X-Gene SoC EDAC DTS binding
-In-Reply-To: <CAL_JsqLyoEOw-Xzr2_QC-qbVW50CBEintD4hAtiY=_xwR5EBgw@mail.gmail.com>
-References: <1426573821-1937-1-git-send-email-lho@apm.com>
- <1426573821-1937-2-git-send-email-lho@apm.com>
- <1426573821-1937-3-git-send-email-lho@apm.com>
- <1426573821-1937-4-git-send-email-lho@apm.com>
- <CAL_JsqLyoEOw-Xzr2_QC-qbVW50CBEintD4hAtiY=_xwR5EBgw@mail.gmail.com>
-Message-ID: <CAPw-ZTma9C6QhaCseWEOPn5nmym=TSU=GgBigSL2uc3xMUeUPQ@mail.gmail.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Fri, 24 Apr 2015 00:45:30 -0000
+Subject: [RFC/RFT 4/6] mmc: sdhci-msm: convert driver to use runtime PM
+ apis
+In-Reply-To: <7htww65yxi.fsf@deeprootsystems.com>
+References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
+ <1429778744-13352-5-git-send-email-rnayak@codeaurora.org>
+ <CAPDyKFpKPkKXutn-2OAC4r6Um254C2vQoF83SB4Dsk4MmZv=wQ@mail.gmail.com>
+ <f390840a65cdf503397b162f2f8f8133.squirrel@www.codeaurora.org>
+ <7htww65yxi.fsf@deeprootsystems.com>
+Message-ID: <2312df03541285ac4416508d6fcd865e.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
->> This patch adds documentation for the APM X-Gene SoC EDAC DTS binding.
+> "Rajendra Nayak" <rnayak@codeaurora.org> writes:
+>
+>>> On 23 April 2015 at 10:45, Rajendra Nayak <rnayak@codeaurora.org>
+>>> wrote:
+>>>> With platform support now in place to manage clocks from within
+>>>> runtime
+>>>> PM
+>>>> callbacks, get rid of all clock handling from the driver and convert
+>>>> the
+>>>> driver to use runtime PM apis.
+>>>>
+>>>> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+>>>> Cc: <linux-mmc@vger.kernel.org>
+>>>> ---
+>>>>  drivers/mmc/host/sdhci-msm.c | 46
+>>>> +++++++++++---------------------------------
+>>>>  1 file changed, 11 insertions(+), 35 deletions(-)
+>>>>
+>>>> diff --git a/drivers/mmc/host/sdhci-msm.c
+>>>> b/drivers/mmc/host/sdhci-msm.c
+>>>> index 4a09f76..3c62a77 100644
+>>>> --- a/drivers/mmc/host/sdhci-msm.c
+>>>> +++ b/drivers/mmc/host/sdhci-msm.c
+>>>> @@ -19,6 +19,7 @@
+>>>>  #include <linux/delay.h>
+>>>>  #include <linux/mmc/mmc.h>
+>>>>  #include <linux/slab.h>
+>>>> +#include <linux/pm_runtime.h>
+>>>>
+>>>>  #include "sdhci-pltfm.h"
+>>>>
+>>>> @@ -56,8 +57,6 @@
+>>>>  struct sdhci_msm_host {
+>>>>         struct platform_device *pdev;
+>>>>         void __iomem *core_mem; /* MSM SDCC mapped address */
+>>>> -       struct clk *clk;        /* main SD/MMC bus clock */
+>>>> -       struct clk *pclk;       /* SDHC peripheral bus clock */
+>>>>         struct clk *bus_clk;    /* SDHC bus voter clock */
+>>>>         struct mmc_host *mmc;
+>>>>         struct sdhci_pltfm_data sdhci_msm_pdata;
+>>>> @@ -469,29 +468,8 @@ static int sdhci_msm_probe(struct platform_device
+>>>> *pdev)
+>>>>                         goto pltfm_free;
+>>>>         }
+>>>>
+>>>> -       /* Setup main peripheral bus clock */
+>>>> -       msm_host->pclk = devm_clk_get(&pdev->dev, "iface");
+>>>> -       if (IS_ERR(msm_host->pclk)) {
+>>>> -               ret = PTR_ERR(msm_host->pclk);
+>>>> -               dev_err(&pdev->dev, "Perpheral clk setup failed
+>>>> (%d)\n",
+>>>> ret);
+>>>> -               goto bus_clk_disable;
+>>>> -       }
+>>>> -
+>>>> -       ret = clk_prepare_enable(msm_host->pclk);
+>>>> -       if (ret)
+>>>> -               goto bus_clk_disable;
+>>>> -
+>>>> -       /* Setup SDC MMC clock */
+>>>> -       msm_host->clk = devm_clk_get(&pdev->dev, "core");
+>>>> -       if (IS_ERR(msm_host->clk)) {
+>>>> -               ret = PTR_ERR(msm_host->clk);
+>>>> -               dev_err(&pdev->dev, "SDC MMC clk setup failed (%d)\n",
+>>>> ret);
+>>>> -               goto pclk_disable;
+>>>> -       }
+>>>> -
+>>>> -       ret = clk_prepare_enable(msm_host->clk);
+>>>> -       if (ret)
+>>>> -               goto pclk_disable;
+>>>> +       pm_runtime_enable(&pdev->dev);
+>>>> +       pm_runtime_get_sync(&pdev->dev);
+>>>>
+>>>>         core_memres = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>>>>         msm_host->core_mem = devm_ioremap_resource(&pdev->dev,
+>>>> core_memres);
+>>>> @@ -499,7 +477,7 @@ static int sdhci_msm_probe(struct platform_device
+>>>> *pdev)
+>>>>         if (IS_ERR(msm_host->core_mem)) {
+>>>>                 dev_err(&pdev->dev, "Failed to remap registers\n");
+>>>>                 ret = PTR_ERR(msm_host->core_mem);
+>>>> -               goto clk_disable;
+>>>> +               goto err;
+>>>>         }
+>>>>
+>>>>         /* Reset the core and Enable SDHC mode */
+>>>> @@ -511,7 +489,7 @@ static int sdhci_msm_probe(struct platform_device
+>>>> *pdev)
+>>>>         if (readl(msm_host->core_mem + CORE_POWER) & CORE_SW_RST) {
+>>>>                 dev_err(&pdev->dev, "Stuck in reset\n");
+>>>>                 ret = -ETIMEDOUT;
+>>>> -               goto clk_disable;
+>>>> +               goto err;
+>>>>         }
+>>>>
+>>>>         /* Set HC_MODE_EN bit in HC_MODE register */
+>>>> @@ -545,15 +523,13 @@ static int sdhci_msm_probe(struct
+>>>> platform_device
+>>>> *pdev)
+>>>>
+>>>>         ret = sdhci_add_host(host);
+>>>>         if (ret)
+>>>> -               goto clk_disable;
+>>>> +               goto err;
+>>>>
+>>>>         return 0;
+>>>>
+>>>> -clk_disable:
+>>>> -       clk_disable_unprepare(msm_host->clk);
+>>>> -pclk_disable:
+>>>> -       clk_disable_unprepare(msm_host->pclk);
+>>>> -bus_clk_disable:
+>>>> +err:
+>>>> +       pm_runtime_put_sync(&pdev->dev);
+>>>> +       pm_runtime_disable(&pdev->dev);
+>>>>         if (!IS_ERR(msm_host->bus_clk))
+>>>>                 clk_disable_unprepare(msm_host->bus_clk);
+>>>>  pltfm_free:
+>>>> @@ -571,8 +547,8 @@ static int sdhci_msm_remove(struct platform_device
+>>>> *pdev)
+>>>>
+>>>>         sdhci_remove_host(host, dead);
+>>>>         sdhci_pltfm_free(pdev);
+>>>> -       clk_disable_unprepare(msm_host->clk);
+>>>> -       clk_disable_unprepare(msm_host->pclk);
+>>>> +       pm_runtime_put_sync(&pdev->dev);
+>>>> +       pm_runtime_disable(&pdev->dev);
+>>>>         if (!IS_ERR(msm_host->bus_clk))
+>>>>                 clk_disable_unprepare(msm_host->bus_clk);
+>>>>         return 0;
+[]..
+>>>
+>>> This all looks wrong. The driver will no longer work unless CONFIG_PM
+>>> is
+>>> set.
 >>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> ---
->>  .../devicetree/bindings/edac/apm-xgene-edac.txt    |   82 ++++++++++++++++++++
->>  1 files changed, 82 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
->>
->> diff --git a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
->> new file mode 100644
->> index 0000000..db8c1c4
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
->> @@ -0,0 +1,82 @@
->> +* APM X-Gene SoC EDAC nodes
->> +
->> +EDAC nodes are defined to describe on-chip error detection and correction.
->> +There are four types of EDAC:
->> +
->> +  memory controller    - Memory controller
->> +  PMD (L1/L2)          - Processor module unit (PMD) L1/L2 cache
->> +  L3                   - CPU L3 cache
->> +  SoC                  - SoC IP such as SATA, Ethernet, and etc
->> +
->> +The following section describes the memory controller DT node binding.
->> +
->> +Required properties:
->> +- compatible           : Shall be "apm,xgene-edac-mc".
->> +- reg                  : First resource shall be the PCP resource.
->> +                         Second resource shall be the CSW resource.
->> +                         Third resource shall be the MCB-A resource.
->> +                         Fourth resource shall be the MCB-B resource.
->> +                         Fifth resource shall be the MCU resource.
->> +- interrupts            : Interrupt-specifier for MCU error IRQ(s).
->> +
->> +The following section describes the L1/L2 DT node binding.
->> +
->> +- compatible           : Shall be "apm,xgene-edac-pmd".
->> +- reg                  : First resource shall be the PCP resource.
->> +                         Second resource shall be the PMD resource.
->> +                         Third resource shall be the PMD efuse resource.
->> +- interrupts            : Interrupt-specifier for PMD error IRQ(s).
->> +
->> +The following section describes the L3 DT node binding.
->> +
->> +- compatible           : Shall be "apm,xgene-edac-l3".
->> +- reg                  : First resource shall be the PCP resource.
->> +                         Second resource shall be the L3 resource.
->> +- interrupts            : Interrupt-specifier for L3 error IRQ(s).
->> +
->> +The following section describes the SoC DT node binding.
->> +
->> +- compatible           : Shall be "apm,xgene-edac-soc"".
->> +- reg                  : First resource shall be the PCP resource.
->> +                         Second resource shall be the SoC resource.
->> +                         Third resource shall be the register bus resource.
->> +- interrupts           : Interrupt-specifier for SoC error IRQ(s).
->> +
->> +Example:
->> +       edacmc0: edacmc0 at 7e800000 {
->> +               compatible = "apm,xgene-edac-mc";
->> +               reg = <0x0 0x78800000 0x0 0x1000>,
->> +                     <0x0 0x7e200000 0x0 0x1000>,
->> +                     <0x0 0x7e700000 0x0 0x1000>,
->> +                     <0x0 0x7e720000 0x0 0x1000>,
->> +                     <0x0 0x7e800000 0x0 0x1000>;
->> +               interrupts = <0x0 0x20 0x4>,
->> +                            <0x0 0x21 0x4>;
->> +       };
->> +
->> +       edacl3: edacl3 at 7e600000 {
->> +               compatible = "apm,xgene-edac-l3";
->> +               reg = <0x0 0x78800000 0x0 0x1000>,
+>> Right, I seem to have completely ignored the !CONFIG_PM case.
+>> Will look at how to handle that.
 >
-> You are defining overlapping resources. Don't do that.
->
-> It looks to me like you are creating nodes based on driver functions,
-> not h/w blocks. I would expect to see a memory controller node which
-> contains ECC related registers. If you have blocks with multiple
-> unrelated functions, then you should be using syscon to divide up the
-> functions to different subsystems like EDAC.
->
+> IMO, don't complicate the driver with that.  Just enable (or leave
+> enabled) all the clocks in the clock driver in the !CONFIG_PM case.
 
-How about these bindings:
+so I just looked at what pm_clk_notify() does in !CONFIG_PM case and it
+seems to do just that, leaves all the clocks enabled on
+BUS_NOTIFY_BIND_DRIVER case and disables them for BUS_NOTIFY_UNBOUND_DRIVER
+case. So looks like things are already in place to handle this :)
 
-efuse: efuse at 1054a000 {
-        compatible = "syscon";
-        reg = <0x0 0x1054a000 0x0 0x20>;
-};
+Ulf, does that address your concern or did I miss anything?
 
-pcperror: pcperror at 78800000 {
-        compatible = "syscon";
-        reg = <0x0 0x78800000 0x0 0x100>;
-};
-
-csw: csw at 7e200000 {
-        compatible = "syscon";
-        reg = <0x0 0x7e200000 0x0 0x1000>;
-};
-
-mcba: mcba at 7e700000 {
-        compatible = "syscon";
-        reg = <0x0 0x7e700000 0x0 0x1000>;
-}
-
-mcbb: mcbb at 7e720000 {
-        compatible = "syscon";
-        reg = <0x0 0x7e720000 0x0 0x1000>;
-}
-
-edacmc0: edacmc0 at 7e800000 {
-        compatible = "apm,xgene-edac-mc";
-        pcpmap = <&pcperror>;
-        cswmap = <&csw>;
-        mcbamap = <&mcba>;
-        mcbbmap = <&mcbb>;
-        reg = <0x0 0x7e800000 0x0 0x1000>;
-        interrupts = <0x0 0x20 0x4>,
-                         <0x0 0x21 0x4>;
-};
-
-edacpmd0: edacpmd0 at 7c000000 {
-        compatible = "apm,xgene-edac-pmd";
-        regmap = <&pcperror>;
-        efusemap = <&efuse>;
-        reg = <0x0 0x7c000000 0x0 0x200000>;
-        interrupts = <0x0 0x20 0x4>,
-                         <0x0 0x21 0x4>;
-};
-
-edacl3: edacl3 at 7e600000 {
-        compatible = "apm,xgene-edac-l3";
-        pcpmap = <&pcperror>;
-        reg = <0x0 0x7e600000 0x0 0x1000>;
-        interrupts = <0x0 0x20 0x4>,
-                         <0x0 0x21 0x4>;
-};
-
-edacsoc: edacsoc at 7e930000 {
-        compatible = "apm,xgene-edac-soc";
-        pcpmap = <&pcperror>;
-        reg = <0x0 0x7e930000 0x0 0x1000>,
-                 <0x0 0x7e000000 0x0 0x1000>;
-        interrupts = <0x0 0x20 0x4>,
-                         <0x0 0x21 0x4>,
-                         <0x0 0x27 0x4>;
-};
-
--Loc
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
