@@ -1,20 +1,87 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 24 Apr 2015 08:33:51 -0300
-Subject: [PATCH resend] ARM: dts: imx25: Add #pwm-cells to pwm4
-In-Reply-To: <1429860453-25356-1-git-send-email-mpa@pengutronix.de>
-References: <1429860453-25356-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <CAOMZO5A8d8ODP=GAN04cQ8O09N-1qZu8wS+J7hruc+P2+5cpBQ@mail.gmail.com>
+From: grygorii.strashko@linaro.org (grygorii.strashko at linaro.org)
+Date: Fri, 24 Apr 2015 14:57:10 +0300
+Subject: [PATCH RESEND v2] leds: fix hibernation on arm when gpio-led used
+ with CPU led trigger
+Message-ID: <1429876630-15952-1-git-send-email-grygorii.strashko@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 4:27 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> The property '#pwm-cells' is currently missing. It is not possible to
-> use pwm4 without this property.
->
-> Cc: <stable@vger.kernel.org>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 
-Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
+Setting a dev_pm_ops suspend/resume pair of callbacks but not a set of
+hibernation callbacks means those pm functions will not be
+called upon hibernation - that leads to system crash on ARM during
+freezing if gpio-led is used in combination with CPU led trigger.
+It may happen after freeze_noirq stage (GPIO is suspended)
+and before syscore_suspend stage (CPU led trigger is suspended)
+- usually when disable_nonboot_cpus() is called.
 
-Thanks
+Log:
+  PM: noirq freeze of devices complete after 1.425 msecs
+  Disabling non-boot CPUs ...
+    ^ system may crash or stuck here with message (TI AM572x)
+
+  WARNING: CPU: 0 PID: 3100 at drivers/bus/omap_l3_noc.c:148 l3_interrupt_handler+0x22c/0x370()
+  44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER1_P3 (Idle): Data Access in Supervisor mode during Functional access
+
+  CPU1: shutdown
+    ^ or here
+
+Fix this by using SIMPLE_DEV_PM_OPS, which appropriately
+assigns the suspend and hibernation callbacks and move
+led_suspend/led_resume under CONFIG_PM_SLEEP to avoid
+build warnings.
+
+Fixes: 73e1ab41a80d (leds: Convert led class driver from legacy pm ops to dev_pm_ops)
+Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+---
+
+Hi All,
+
+Could you pls pay attention on this patch?
+
+This trivial patch was posted at Feb 2015 and
+it's missed two merge windows already ((.
+
+Rebased on top of next (4.1).
+
+Changes in v2:
+- fixed compile time warnings when !CONFIG_PM_SLEEP
+- updated commit message
+
+v2:
+  https://lkml.org/lkml/2015/2/5/323
+v1:
+  https://lkml.org/lkml/2015/2/2/476
+
+ drivers/leds/led-class.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/leds/led-class.c b/drivers/leds/led-class.c
+index 728681d..7fb2a19 100644
+--- a/drivers/leds/led-class.c
++++ b/drivers/leds/led-class.c
+@@ -187,6 +187,7 @@ void led_classdev_resume(struct led_classdev *led_cdev)
+ }
+ EXPORT_SYMBOL_GPL(led_classdev_resume);
+ 
++#ifdef CONFIG_PM_SLEEP
+ static int led_suspend(struct device *dev)
+ {
+ 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+@@ -206,11 +207,9 @@ static int led_resume(struct device *dev)
+ 
+ 	return 0;
+ }
++#endif
+ 
+-static const struct dev_pm_ops leds_class_dev_pm_ops = {
+-	.suspend        = led_suspend,
+-	.resume         = led_resume,
+-};
++static SIMPLE_DEV_PM_OPS(leds_class_dev_pm_ops, led_suspend, led_resume);
+ 
+ static int match_name(struct device *dev, const void *data)
+ {
+-- 
+1.9.1
