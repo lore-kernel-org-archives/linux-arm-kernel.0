@@ -1,119 +1,108 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 24 Apr 2015 11:10:28 -0500
-Subject: [PATCH] gpio: omap: Fix regression for MPUIO interrupts
-In-Reply-To: <1429833257-28188-1-git-send-email-tony@atomide.com>
-References: <1429833257-28188-1-git-send-email-tony@atomide.com>
-Message-ID: <20150424161028.GF5692@saruman.tx.rr.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 24 Apr 2015 12:12:00 -0400
+Subject: [PATCH v2] xen: Add __GFP_DMA flag when xen_swiotlb_init gets
+ free pages on ARM
+In-Reply-To: <alpine.DEB.2.02.1504241526490.2640@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1504241015220.2640@kaball.uk.xensource.com>
+ <20150424132749.GA9192@l.oracle.com>
+ <alpine.DEB.2.02.1504241526490.2640@kaball.uk.xensource.com>
+Message-ID: <20150424161200.GB8117@konrad-lan.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 23, 2015 at 04:54:17PM -0700, Tony Lindgren wrote:
-> At some point with all the GPIO clean-up we've broken the
-> MPUIO interrupts. Those are just a little bit different from
-> the GPIO interrupts, so we can fix it up just by setting
-> different irqchip functions for it. And then we can just
-> remove all old code trying to do the same.
+On Fri, Apr 24, 2015 at 03:31:53PM +0100, Stefano Stabellini wrote:
+> On Fri, 24 Apr 2015, Konrad Rzeszutek Wilk wrote:
+> > On Fri, Apr 24, 2015 at 10:16:40AM +0100, Stefano Stabellini wrote:
+> > > Make sure that xen_swiotlb_init allocates buffers that are DMA capable
+> > > when at least one memblock is available below 4G. Otherwise we assume
+> > > that all devices on the SoC can cope with >4G addresses. We do this on
+> > > ARM and ARM64, where dom0 is mapped 1:1, so pfn == mfn in this case.
+> > > 
+> > > No functional changes on x86.
+> > > 
+> > > From: Chen Baozi <baozich@gmail.com>
+> > > 
+> > > Signed-off-by: Chen Baozi <baozich@gmail.com>
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > Tested-by: Chen Baozi <baozich@gmail.com>
+> > 
+> > Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 > 
-> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Thanks! We are still early in the release cycle, should I add it to
+> xentip/stable/for-linus-4.1?
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-> ---
->  drivers/gpio/gpio-omap.c | 48 +++++++++---------------------------------------
->  1 file changed, 9 insertions(+), 39 deletions(-)
+Sure!
 > 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 6553361..b59c3ca 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1023,38 +1023,8 @@ static void omap_gpio_mod_init(struct gpio_bank *bank)
->  		dev_err(bank->dev, "Could not get gpio dbck\n");
->  }
->  
-> -static void
-> -omap_mpuio_alloc_gc(struct gpio_bank *bank, unsigned int irq_start,
-> -		    unsigned int num)
-> -{
-> -	struct irq_chip_generic *gc;
-> -	struct irq_chip_type *ct;
-> -
-> -	gc = irq_alloc_generic_chip("MPUIO", 1, irq_start, bank->base,
-> -				    handle_simple_irq);
-> -	if (!gc) {
-> -		dev_err(bank->dev, "Memory alloc failed for gc\n");
-> -		return;
-> -	}
-> -
-> -	ct = gc->chip_types;
-> -
-> -	/* NOTE: No ack required, reading IRQ status clears it. */
-> -	ct->chip.irq_mask = irq_gc_mask_set_bit;
-> -	ct->chip.irq_unmask = irq_gc_mask_clr_bit;
-> -	ct->chip.irq_set_type = omap_gpio_irq_type;
-> -
-> -	if (bank->regs->wkup_en)
-> -		ct->chip.irq_set_wake = omap_gpio_wake_enable;
-> -
-> -	ct->regs.mask = OMAP_MPUIO_GPIO_INT / bank->stride;
-> -	irq_setup_generic_chip(gc, IRQ_MSK(num), IRQ_GC_INIT_MASK_CACHE,
-> -			       IRQ_NOREQUEST | IRQ_NOPROBE, 0);
-> -}
-> -
->  static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->  {
-> -	int j;
->  	static int gpio;
->  	int irq_base = 0;
->  	int ret;
-> @@ -1101,6 +1071,15 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->  	}
->  #endif
->  
-> +	/* MPUIO is a bit different, reading IRQ status clears it */
-> +	if (bank->is_mpuio) {
-> +		irqc->irq_ack = dummy_irq_chip.irq_ack;
-> +		irqc->irq_mask = irq_gc_mask_set_bit;
-> +		irqc->irq_unmask = irq_gc_mask_clr_bit;
-> +		if (!bank->regs->wkup_en)
-> +			irqc->irq_set_wake = NULL;
-> +	}
-> +
->  	ret = gpiochip_irqchip_add(&bank->chip, irqc,
->  				   irq_base, omap_gpio_irq_handler,
->  				   IRQ_TYPE_NONE);
-> @@ -1114,15 +1093,6 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->  	gpiochip_set_chained_irqchip(&bank->chip, irqc,
->  				     bank->irq, omap_gpio_irq_handler);
->  
-> -	for (j = 0; j < bank->width; j++) {
-> -		int irq = irq_find_mapping(bank->chip.irqdomain, j);
-> -		if (bank->is_mpuio) {
-> -			omap_mpuio_alloc_gc(bank, irq, bank->width);
-> -			irq_set_chip_and_handler(irq, NULL, NULL);
-> -			set_irq_flags(irq, 0);
-> -		}
-> -	}
-> -
->  	return 0;
->  }
->  
-> -- 
-> 2.1.4
 > 
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150424/ad5a0d54/attachment.sig>
+> > > diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> > > index 2f7e6ff..0b579b2 100644
+> > > --- a/arch/arm/include/asm/xen/page.h
+> > > +++ b/arch/arm/include/asm/xen/page.h
+> > > @@ -110,5 +110,6 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+> > >  bool xen_arch_need_swiotlb(struct device *dev,
+> > >  			   unsigned long pfn,
+> > >  			   unsigned long mfn);
+> > > +unsigned long xen_get_swiotlb_free_pages(unsigned int order);
+> > >  
+> > >  #endif /* _ASM_ARM_XEN_PAGE_H */
+> > > diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+> > > index 793551d..4983250 100644
+> > > --- a/arch/arm/xen/mm.c
+> > > +++ b/arch/arm/xen/mm.c
+> > > @@ -4,6 +4,7 @@
+> > >  #include <linux/gfp.h>
+> > >  #include <linux/highmem.h>
+> > >  #include <linux/export.h>
+> > > +#include <linux/memblock.h>
+> > >  #include <linux/of_address.h>
+> > >  #include <linux/slab.h>
+> > >  #include <linux/types.h>
+> > > @@ -21,6 +22,20 @@
+> > >  #include <asm/xen/hypercall.h>
+> > >  #include <asm/xen/interface.h>
+> > >  
+> > > +unsigned long xen_get_swiotlb_free_pages(unsigned int order)
+> > > +{
+> > > +	struct memblock_region *reg;
+> > > +	gfp_t flags = __GFP_NOWARN;
+> > > +
+> > > +	for_each_memblock(memory, reg) {
+> > > +		if (reg->base < (phys_addr_t)0xffffffff) {
+> > > +			flags |= __GFP_DMA;
+> > > +			break;
+> > > +		}
+> > > +	}
+> > > +	return __get_free_pages(flags, order);
+> > > +}
+> > > +
+> > >  enum dma_cache_op {
+> > >         DMA_UNMAP,
+> > >         DMA_MAP,
+> > > diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
+> > > index 358dcd3..c44a5d5 100644
+> > > --- a/arch/x86/include/asm/xen/page.h
+> > > +++ b/arch/x86/include/asm/xen/page.h
+> > > @@ -269,4 +269,9 @@ static inline bool xen_arch_need_swiotlb(struct device *dev,
+> > >  	return false;
+> > >  }
+> > >  
+> > > +static inline unsigned long xen_get_swiotlb_free_pages(unsigned int order)
+> > > +{
+> > > +	return __get_free_pages(__GFP_NOWARN, order);
+> > > +}
+> > > +
+> > >  #endif /* _ASM_X86_XEN_PAGE_H */
+> > > diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> > > index 810ad41..4c54932 100644
+> > > --- a/drivers/xen/swiotlb-xen.c
+> > > +++ b/drivers/xen/swiotlb-xen.c
+> > > @@ -235,7 +235,7 @@ retry:
+> > >  #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
+> > >  #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
+> > >  		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
+> > > -			xen_io_tlb_start = (void *)__get_free_pages(__GFP_NOWARN, order);
+> > > +			xen_io_tlb_start = (void *)xen_get_swiotlb_free_pages(order);
+> > >  			if (xen_io_tlb_start)
+> > >  				break;
+> > >  			order--;
+> > 
