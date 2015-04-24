@@ -1,37 +1,90 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 24 Apr 2015 09:58:08 +0200
-Subject: [PATCH 4/4] ARM: dts: mediatek mt8135: Use real UART clocks
-In-Reply-To: <1429780875-29096-5-git-send-email-s.hauer@pengutronix.de>
-References: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
- <1429780875-29096-5-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CABuKBeKoxAdW3VdrF229VAm+eB8Rku=_QF9bu-nCXfj+T=dMvg@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 24 Apr 2015 17:04:02 +0900
+Subject: [RFC 0/4] arm64: add livepatch support
+In-Reply-To: <5539DD2B.3010603@hitachi.com>
+References: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
+ <5539B782.8060507@huawei.com> <5539DD2B.3010603@hitachi.com>
+Message-ID: <5539F8F2.4070005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-23 11:21 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> We used to provide dummy clocks for the UART. Now that we have
-> common clock support we can provide the real clocks to the UART.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/boot/dts/mt8135.dtsi | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-> index b0f20fc..4d1ddd9 100644
-> --- a/arch/arm/boot/dts/mt8135.dtsi
-> +++ b/arch/arm/boot/dts/mt8135.dtsi
-> @@ -180,7 +180,8 @@
->                         compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
->                         reg = <0 0x11006000 0 0x400>;
->                         interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
-> -                       clocks = <&uart_clk>;
-> +                       clocks = <&pericfg CLK_PERI_UART0_SEL>, <&pericfg CLK_PERI_UART0>;
-> +                       clock-names = "baud", "bus";
->                         status = "disabled";
->                 };
+Steve, Li and Masami,
 
-We can delete the dummy uart_clk, as it is not needed any more.
+Thank you for all your comments. You pointed out the cases that I didn't think of.
+Let me think how I can manage the issues for a while.
+Probably I will talk to gcc guys.
 
--- 
-motzblog.wordpress.com
+-Takahiro AKASHI
+
+On 04/24/2015 03:05 PM, Masami Hiramatsu wrote:
+> (2015/04/24 12:24), Li Bin wrote:
+>> On 2015/4/24 10:44, AKASHI Takahiro wrote:
+>>> This patchset enables livepatch support on arm64.
+>>>
+>>> Livepatch was merged in v4.0, and allows replacying a function dynamically
+>>> based on ftrace framework, but it also requires -mfentry option of gcc.
+>>> Currently arm64 gcc doesn't support it, but by adding a helper function to
+>>> ftrace, we will be able to support livepatch on arch's which don't support
+>>> this option.
+>>>
+>>
+>> This is not correct for the case that the prologue of the old and new function
+>> is different.
+>
+> Hmm, is that possible to support -mfentry on arm64?
+>
+> Of course we can not call a function directly at the first
+> instruction of functions on arm, because it can overwrite
+> link register which stores caller address. However, we can
+> do "store link register to stack and branch with link"
+> on arm. That is actually almost same as -mfentry does :),
+> and that may not depend on the prologue.
+>
+> Thank you,
+>
+>
+>> Thanks,
+>> 	Li Bin
+>>
+>>> I submit this patchset as RFC since I'm not quite sure that I'm doing
+>>> in the right way, or we should definitely support -fentry instead.
+>>>
+>>> Please note that I tested the feature only with livepatch-sample, and
+>>> the code for DYNAMIC_TRACE_WITH_REGS is still rough-edged.
+>>>
+>>> To: Steven Rostedt <rostedt@goodmis.org>
+>>> To: Ingo Molnar <mingo@kernel.org>
+>>> To: Josh Poimboeuf <jpoimboe@redhat.com>
+>>> To: Seth Jennings <sjenning@redhat.com>
+>>> To: Jiri Kosina <jkosina@suse.cz>
+>>> To: Vojtech Pavlik <vojtech@suse.cz>
+>>> To: Catalin Marinas <catalin.marinas@arm.com>
+>>> To: Will Deacon <will.deacon@arm.com>
+>>>
+>>> AKASHI Takahiro (4):
+>>>    ftrace: add a helper function for livepatch
+>>>    livepatch: adjust a patched function's address
+>>>    arm64: ftrace: add DYNAMIC_TRACE_WITH_REGS version
+>>>    arm64: add livepatch support
+>>>
+>>>   arch/arm64/Kconfig                 |    4 ++
+>>>   arch/arm64/include/asm/ftrace.h    |    4 ++
+>>>   arch/arm64/include/asm/livepatch.h |   38 +++++++++++
+>>>   arch/arm64/kernel/Makefile         |    1 +
+>>>   arch/arm64/kernel/entry-ftrace.S   |  124 ++++++++++++++++++++++++++++++++++++
+>>>   arch/arm64/kernel/ftrace.c         |   24 ++++++-
+>>>   arch/arm64/kernel/livepatch.c      |   68 ++++++++++++++++++++
+>>>   arch/x86/include/asm/livepatch.h   |    5 ++
+>>>   include/linux/ftrace.h             |    2 +
+>>>   include/linux/livepatch.h          |    2 +
+>>>   kernel/livepatch/core.c            |   16 +++--
+>>>   kernel/trace/ftrace.c              |   26 ++++++++
+>>>   12 files changed, 309 insertions(+), 5 deletions(-)
+>>>   create mode 100644 arch/arm64/include/asm/livepatch.h
+>>>   create mode 100644 arch/arm64/kernel/livepatch.c
+>>>
+>>
+>>
+>>
+>
+>
