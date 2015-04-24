@@ -1,39 +1,42 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 24 Apr 2015 12:24:36 -0700
-Subject: [PATCH] [media] xilinx: Reflect dma header file move
-Message-ID: <1429903476-24161-1-git-send-email-linux@roeck-us.net>
+From: bobby.prani@gmail.com (Pranith Kumar)
+Date: Fri, 24 Apr 2015 15:32:28 -0400
+Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling to
+ the WDT driver.
+In-Reply-To: <1429902534-2348-2-git-send-email-eric@anholt.net>
+References: <1429902534-2348-1-git-send-email-eric@anholt.net>
+ <1429902534-2348-2-git-send-email-eric@anholt.net>
+Message-ID: <CAJhHMCAz3ichPmTvdeXx+6+JK7uNvfyh4m4_Jg8mFYi5ZcHRNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 937abe88aea3 ("dmaengine: xilinx-dma: move header file to common
-location") moved xilinx_dma.h to a common location but neglected to reflect
-this move in all its users.
+On Fri, Apr 24, 2015 at 3:08 PM, Eric Anholt <eric@anholt.net> wrote:
+> Since the WDT is what's used to drive restart and power off, it makes
+> more sense to keep it there, where the regs are already mapped and
+> definitions for them provided.  Note that this means you may need to
+> add CONFIG_BCM2835_WDT to retain functionality of your kernel.
+>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Cc: linux-watchdog at vger.kernel.org
 
-This causes compile errors for several builds.
 
-drivers/media/platform/xilinx/xilinx-dma.c:15:35:
-	fatal error: linux/amba/xilinx_dma.h: No such file or directory
+Any reason not to select BCM2835_WDT in the config by default then?
 
-Cc: Kedareswara rao Appana <appana.durga.rao@xilinx.com>
-Fixes: 937abe88aea3 ("dmaengine: xilinx-dma: move header file to common
-	location")
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Pranith Kumar <bobby.prani@gmail.com>
 ---
- drivers/media/platform/xilinx/xilinx-dma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 8b11f44..dd4856d 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -116,6 +116,7 @@ config ARCH_BCM2835
+        select CLKSRC_OF
+        select PINCTRL
+        select PINCTRL_BCM2835
++       select BCM2835_WDT
+        help
+          This enables support for the Broadcom BCM2835 SoC. This SoC is
+          used in the Raspberry Pi and Roku 2 devices.
 
-diff --git a/drivers/media/platform/xilinx/xilinx-dma.c b/drivers/media/platform/xilinx/xilinx-dma.c
-index 10209c294168..efde88adf624 100644
---- a/drivers/media/platform/xilinx/xilinx-dma.c
-+++ b/drivers/media/platform/xilinx/xilinx-dma.c
-@@ -12,7 +12,7 @@
-  * published by the Free Software Foundation.
-  */
- 
--#include <linux/amba/xilinx_dma.h>
-+#include <linux/dma/xilinx_dma.h>
- #include <linux/lcm.h>
- #include <linux/list.h>
- #include <linux/module.h>
+
+
 -- 
-2.1.0
+Pranith
