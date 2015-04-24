@@ -1,84 +1,142 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Apr 2015 11:11:36 +0100
-Subject: [v2 1/5] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <1429861989-8417-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
- <1429861989-8417-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20150424101136.GE29183@leverpostej>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Fri, 24 Apr 2015 12:24:02 +0200
+Subject: [rtc-linux] [PATCH 2/5] RTC/i.MX/DryIce: add the unit recovery
+ code
+In-Reply-To: <20150421231411.GC8539@piout.net>
+References: <1429002716-19821-1-git-send-email-jbe@pengutronix.de>
+ <1429002716-19821-3-git-send-email-jbe@pengutronix.de>
+ <20150421231411.GC8539@piout.net>
+Message-ID: <201504241224.02705.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 08:53:04AM +0100, AKASHI Takahiro wrote:
-> On system kernel, the memory region used by crash dump kernel must be
-> specified by "crashkernel=X at Y" boot parameter. reserve_crashkernel()
-> will allocate the region in "System RAM" and reserve it for later use.
-> 
-> On crash dump kernel, memory region information in system kernel is
-> described in a specific region specified by "elfcorehdr=X at Y" boot parameter.
-> reserve_elfcorehdr() will set aside the region to avoid data destruction
-> by the kernel.
-> 
-> Crash dump kernel will access memory regions in system kernel via
-> copy_oldmem_page(), which reads a page by ioremap'ing it assuming that
-> such pages are not part of main memory of crash dump kernel.
-> This is true under non-UEFI environment because kexec-tools modifies
-> a device tree adding "usablemem" attributes to memory sections.
+Hi Alexandre,
 
-I'm not sure what you mean by "usablemem" here.
+On Wednesday 22 April 2015 01:14:11 Alexandre Belloni wrote:
+> On 14/04/2015 at 11:11:53 +0200, Juergen Borleis wrote :
+> > This code is requiered to recover the unit from a security violation.
+>
+>       required ^
 
-Do you just mean that the memory nodes are altered such that they only
-cover memory usable by the crash kernel?
+Sure :)
 
-Why not _always_ require a command line argument for the crash kernel
-that restricts its memory usage to a particular range? That way it
-doesn't matter whether we're using UEFI or not.
+> > [...]
+> > +/* do a write into the unit without interrupt support */
+> > +static void di_write_busy_wait(const struct imxdi_dev *imxdi, u32 val,
+> > +								unsigned reg)
+>
+> Alignment should match the open parenthesis, please fix all occurrences
+> in your patch.
 
-> Under UEFI, however, this is not true because UEFI remove memory sections
-> in a device tree and export all the memory regions, even though they belong
-> to system kernel.
-> 
-> So we should add "mem=X[MG]" boot parameter to limit the memory size and
-> avoid hitting the following assertion in ioremap():
->         if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
->                 return NULL;
+Okay.
 
-That looks suspicious. What is being ioremapped at that point?
+> > +{
+> > +	/* do the register write */
+> > +	__raw_writel(val, imxdi->ioaddr + reg);
+> > +
+> > +	/*
+> > +	 * now it takes four 32,768 kHz clock cycles to take
+> > +	 * the change into effect = 122 us
+> > +	 */
+> > +	udelay(200);
+>
+> As the requirement is not that critical, you may want to use usleep_range()
 
-[...]
+Good point. Will change it.
 
-> @@ -393,6 +398,7 @@ void __init setup_arch(char **cmdline_p)
->         local_async_enable();
-> 
->         efi_init();
-> +
->         arm64_memblock_init();
-> 
->         paging_init();
+> > +}
+> > +
+> > +static void di_report_tamper_info(struct imxdi_dev *imxdi,  u32 dsr)
+> > +{
+> > +	u32 dtcr;
+> > +
+> > +	dtcr = __raw_readl(imxdi->ioaddr + DTCR);
+> > +
+> > +	dev_emerg(&imxdi->pdev->dev, "!! DryIce tamper event detected !!\n");
+> > +	/* the following flags force a transition into the "FAILURE STATE" */
+> > +	if (dsr & DSR_VTD) {
+> > +		dev_emerg(&imxdi->pdev->dev, "!! Voltage Tamper event\n");
+> > +		if (!(dtcr & DTCR_VTE))
+> > +			dev_emerg(&imxdi->pdev->dev,
+> > +				"!! But Voltage Tamper detection wasn't enabled. False positive?\n");
+>
+> I'm not sure about prefixing all the messages with "!! ". dev_emerg()
+> seems important enough to be noticed.
+> I would remove " False positive?". What about
+> 		dev_emerg(&imxdi->pdev->dev,
+> 			  "%sVoltage Tamper event\n",
+> 			  (dtcr & DTCR_VTE) ? "" : "Spurious ");
 
-Nit: unrelated whitespace change.
+"spurious" sounds better. And I will change the messages.
 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index ae85da6..ea70d41 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -34,6 +34,8 @@
->  #include <linux/dma-contiguous.h>
->  #include <linux/efi.h>
->  #include <linux/swiotlb.h>
-> +#include <linux/kexec.h>
-> +#include <linux/crash_dump.h>
+> [...]
+> > +static void di_what_is_to_be_done(struct imxdi_dev *imxdi,
+> > +						const char *power_supply)
+> > +{
+> > +	dev_emerg(&imxdi->pdev->dev, " Please cycle the %s power supply in order to get the DryIce unit working again\n",
+>
+>             remove that heading space ^
 
-Nit: please keep these ordered.
+Yes.
 
-[...]
+> I would also explain that the RTC is part of the DryIce unit.
 
-> +               if (memblock_reserve(crash_base, crash_size)) {
-> +                       pr_warn("crashkernel reservation failed - out of memory\n");
-> +                       return;
-> +               }
+Within this message? Makes sense. Will do so.
 
-If we can remove this memory rather than reserving it, we can limit the
-first kernel's ability to accidentally clobber the crash kernel, at the
-expense of having to explicitly map/unmap around loading it.
+> [...]
+> > +			sec);
+> > +	/*
+> > +	 * the timer cannot be set/modified if
+> > +	 * - the TCHL or TCSL bit is set in DCR
+> > +	 */
+> > +	dcr = __raw_readl(imxdi->ioaddr + DCR);
+> > +	if (!(dcr & DCR_TCE)) {
+> > +		if (dcr & DCR_TCHL) {
+> > +			/* we are out of luck */
+> > +			di_what_is_to_be_done(imxdi, "battery");
+> > +			return -ENODEV;
+> > +		}
+> > +		if (dcr & DCR_TCSL) {
+> > +			di_what_is_to_be_done(imxdi, "main");
+> > +			return -ENODEV;
+> > +		}
+> > +
+>
+> Unnecessary blank line
 
-Mark.
+Ups. Made accidentally.
+
+> [...]
+> > +	/* success? */
+> > +	dsr = __raw_readl(imxdi->ioaddr + DSR);
+> > +	if (dsr & DSR_SVF) {
+> > +		dev_crit(&imxdi->pdev->dev,
+> > +			"Cannot clear the security violation flag. We are ending up in an  endless loop!\n");
+> > +		/* last resourt */ 
+>
+>                  resort ^
+
+.oO(note to myself: update dictionary...)
+
+> [...]
+> > @@ -498,44 +793,6 @@ static int __init dryice_rtc_probe(struct platform_device *pdev) goto err;
+> >  	}
+> >
+> > -	/* put dryice into valid state */
+> > -	if (__raw_readl(imxdi->ioaddr + DSR) & DSR_NVF) {
+> > -		rc = di_write_wait(imxdi, DSR_NVF | DSR_SVF, DSR);
+>
+> Multiple writes have switched from di_write_wait() which is checking
+> for a write error to di_write_busy_wait() which is not doing that check
+> is waiting 200us enough to ensure that the write has been done?
+
+Each write requires four 32 kHz clock cycles. So the 200 us should be enough.
+But I will take a closer look for what have to be really done in the case of
+an access error.
+
+Regards,
+Juergen
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
+Industrial Linux Solutions               ? ? ?| http://www.pengutronix.de/  |
