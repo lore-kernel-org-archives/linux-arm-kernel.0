@@ -1,195 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Apr 2015 09:46:01 +0200
-Subject: [PATCH v2 3/5] ata: add Broadcom AHCI SATA3 driver for STB chips
-In-Reply-To: <20150423164611.GZ32500@ld-irv-0074>
-References: <1429757950-28789-1-git-send-email-computersforpeace@gmail.com>
- <3096499.KSW6zqWKEA@wuerfel> <20150423164611.GZ32500@ld-irv-0074>
-Message-ID: <2143403.KdtLGyP3SG@wuerfel>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 24 Apr 2015 16:53:03 +0900
+Subject: [v2 0/5] arm64: add kdump support
+Message-ID: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 April 2015 09:46:11 Brian Norris wrote:
-> Hi Arnd,
-> 
-> On Thu, Apr 23, 2015 at 09:43:55AM +0200, Arnd Bergmann wrote:
-> > On Wednesday 22 April 2015 19:59:08 Brian Norris wrote:
-> > > Pretty straightforward driver, using the nice library-ization of the
-> > > generic ahci_platform driver.
-> > > 
-> > > Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> > 
-> > There is an alternative way to do this, by writing a separate phy driver
-> > for drivers/phy and using the generic ahci-platform driver. Have you
-> > considered that as well? I don't know which approach works better here,
-> > but in general we should try to have the generic driver handle as many
-> > chips as possible.
-> 
-> Did you read v1 [1]? There was discussion all over the place, with each
-> person recommending their own favorite Right Way. It was suggested in
-> various ways that code be moved into drivers/ata/ or drivers/phy/ at
-> various points. In the end, I couldn't follow all suggestions and
-> instead came up with this:
-> 
-> 1. SATA_TOP_CTRL deals with AHCI-related registers and some high-level
-> PHY bits (power on or off the PHY).
-> 2. There is another discrete bit of hardware that handles analog aspects
-> of the PHY
-> 3. The device tree should describe hardware, not how software wants to
-> use it
-> 4. Software should avoid sharing register ranges
-> 
-> So, this suggested we should have two DT nodes; one for #1 and one for
-> #2. It seemed natural that because #1 modifies the AHCI core (e.g., the
-> endianness of it), that it belongs in a 'SATA' driver. So I use
-> libahci_platform instead of using the generic driver. The bits from #2
-> go in drivers/phy/.
-> 
-> So we have a PHY driver, but it doesn't cover everything. Did you want
-> me to write a second PHY driver?? I'm not sure how that'd work...
+This patch set enables kdump (crash dump kernel) support on arm64 on top of
+Geoff's kexec patchset.
 
-I think this is all fine, I mainly wanted to make sure that it had been
-considered and that a decision was made after comparing the options.
-What I'd really like to see is that you put this summary into the
-patch description, because any reviewer will wonder about this.
-You can use a 'Link: https://lkml.org/lkml/2015/3/18/940' tag behind
-your signed-off-by to reference the earlier discussion, in addition to
-the summary.
+In this version, there are some arm64-specific usage/constraints:
+1) "mem=" boot parameter must be specified on crash dump kernel
+   if the system starts on uefi.
+2) Kvm will not be enabled on crash dump kernel even if configured
+See commit messages and Documentation/kdump/kdump.txt for details.
 
-> > > diff --git a/drivers/ata/sata_brcmstb.c b/drivers/ata/sata_brcmstb.c
-> > > new file mode 100644
-> > > index 000000000000..ab8d2261fa96
-> > > --- /dev/null
-> > > +++ b/drivers/ata/sata_brcmstb.c
-> > > @@ -0,0 +1,285 @@
-> > > +/*
-> > > + * Broadcom SATA3 AHCI Controller Driver
-> > 
-> > Is this AHCI or not? Most AHCI drivers are called ahci_*.c, not sata_*.c
-> 
-> It is AHCI. I can rename if necessary...
-> 
-> If you're wondering about the comment there, SATA3 is left to indicate
-> the difference between earlier (non-AHCI) SATA cores that only supported
-> up to Gen2 SATA.
+The only concern I have is whether or not we can use the exact same kernel
+as both system kernel and crash dump kernel. The current arm64 kernel is
+not relocatable in the exact sense but I see no problems in using the same
+binary when testing kdump.
 
-Up to the ata maintainer of course, but I'd use ahci_brcmstb in the name
-just for consistency with the other drivers.
+I tested the code with
+	- ATF v1.1 + EDK2(UEFI) v3.0-rc0
+	- kernel v4.0 + Geoff' kexec v9
+on
+	- Base fast model, and
+	- MediaTek MT8173-EVB
+using my own kexec-tools [1], currently v0.12.
 
-> > > +#ifdef __BIG_ENDIAN
-> > > +#define DATA_ENDIAN			 2 /* AHCI->DDR inbound accesses */
-> > > +#define MMIO_ENDIAN			 2 /* CPU->AHCI outbound accesses */
-> > > +#else
-> > > +#define DATA_ENDIAN			 0
-> > > +#define MMIO_ENDIAN			 0
-> > > +#endif
-> > 
-> > Is this for MIPS or ARM based chips or both?
-> 
-> Both. (This particular iteration of the driver was only tested on
-> ARM, but this particular code has been the same on MIPS.)
-> 
-> > ARM SoCs should never care
-> > about the endianess of the CPU,
-> 
-> Why do you say that? What makes ARM different than MIPS here? If
-> somebody were using ARM BE, then they would (just like in MIPS) need to
-> configure our AHCI core to pretend like it's in LE mode, as that's what
-> libahci.c assumes.
+You may want to start a kernel with the following boot parameter:
+	crashkernel=64M (or so, on model)
+and try
+	$ kexec -p --load <vmlinux> --append ...
+	$ echo c > /proc/sysrq-trigger
 
-MIPS is special regarding endianess here, because their CPU cores
-use a power-on setting that defines a fixed endianess, while others
-tend to let software decide at runtime.
+To examine vmcore (/proc/vmcore), you should use
+	- gdb v7.7 or later
+	- crash + a small patch (to recognize v4.0 kernel)
 
-Broadcom usually wires peripherals in a way to match the CPU endianess,
-but this is not necessarily what other MIPS chips do, and on most
-architectures that would be considered a mistake in the hardware
-design, because it breaks device drivers.
+Changes from v1:
+* rebased to Geoff's v9
+* tested this patchset on real hardware and fixed bugs:
+- added cache flush operation in ipi_cpu_stop() when shutting down
+  the system. Otherwise, data saved in vmcore's note sections by
+  crash_save_cpu() might not be flushed to dumped memory and crash command
+  fail to fetch correct data.
+  I will address Mark's commit[2] after Geoff takes care of it on kexec.
+- modified to use ioremap_cache() instead of ioremap() when reading
+  crash memory. Otherwise, accessing /proc/vmcore on crash dump kernel
+  might cause an alignment fault.
+* allows reserve_crashkernel() to handle "crashkernel=xyz[MG]" correctly,
+  thanks to Pratyush Anand. And it now also enforces memory limit.
+* moved reserve_crashkernel() and reserve_elfcorehdr() to
+  arm64_memblock_init() to clarify that they should be called before
+  dma_contignuous_reserve().
 
-If you can configure the endianess of the AHCI core through software,
-it would be best to always set it to little-endian unconditionally,
-so you can just use readl() or readl_relaxed() all the time.
+[1] https://git.linaro.org/people/takahiro.akashi/kexec-tools.git
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/338171.html
 
-> > > +static void brcm_sata_phy_enable(struct brcm_ahci_priv *priv, int port)
-> > > +{
-> > > +	void __iomem *phyctrl = priv->top_ctrl + SATA_TOP_CTRL_PHY_CTRL +
-> > > +				(port * SATA_TOP_CTRL_PHY_OFFS);
-> > > +	void __iomem *p;
-> > > +	u32 reg;
-> > > +
-> > > +	/* clear PHY_DEFAULT_POWER_STATE */
-> > > +	p = phyctrl + SATA_TOP_CTRL_PHY_CTRL_1;
-> > > +	reg = __raw_readl(p);
-> > > +	reg &= ~SATA_TOP_CTRL_1_PHY_DEFAULT_POWER_STATE;
-> > > +	__raw_writel(reg, p);
-> > 
-> > Similarly, the use of __raw_readl() is broken on ARM here and won't
-> > work on big-endian kernels. Better use a driver specific helper
-> > function that does the right thing based on the architecture and
-> > endianess. You can use the same conditional as above and do
-> > 
-> > #if defined(__BIG_ENDIAN) && defined(CONFIG_MIPS)
-> > 
-> > static inline brcm_sata_phy_read(struct brcm_ahci_phy *priv, int port int reg)
-> > {
-> > 	void __iomem *phyctrl = priv->regs;
-> > 
-> > 	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(__BIG_ENDIAN))
-> > 		return __raw_readl(regs->reg);
-> > 
-> > 	return readl_relaxed(regs->reg);
-> > }
-> 
-> Huh? I'm fine with a driver-specific helper to abstract this out, but
-> why the MIPS fiddling? I'm fairly confident that in *all*
-> configurations, this piece of the IP is wired up to work in native
-> endianness, so it should never be doing an endian swap. The
-> readl_relaxed() you're adding looks like it would just break the
-> (theoretical) ARM BE case.
-> 
-> I understand that you don't like bare __raw_{read,write}l(), but some IP
-> is just wired this way.
 
-Kevin Cernekee recently introduced the "native-endian" DT property that
-you can use to do runtime detection if that is necessary (i.e. you can't
-tell the endianess from the CPU architecture, and you can't set it either).
+AKASHI Takahiro (5):
+  arm64: kdump: reserve memory for crash dump kernel
+  arm64: kdump: implement machine_crash_shutdown()
+  arm64: kdump: do not go into EL2 before starting a crash dump kernel
+  arm64: add kdump support
+  arm64: enable kdump in the arm64 defconfig
 
-Using __raw_readl() in driver code just means that the driver is not
-endian-aware at all, and we don't do that any more: new drivers that
-can be used on ARM must be written in a way that works on both
-little-endian and big-endian, and it's a good idea to use endian-safe
-code on other architectures too.
+ Documentation/kdump/kdump.txt     |   31 +++++++++++++-
+ arch/arm64/Kconfig                |   12 ++++++
+ arch/arm64/configs/defconfig      |    1 +
+ arch/arm64/include/asm/kexec.h    |   34 ++++++++++++++-
+ arch/arm64/kernel/Makefile        |    1 +
+ arch/arm64/kernel/crash_dump.c    |   71 +++++++++++++++++++++++++++++++
+ arch/arm64/kernel/machine_kexec.c |   55 +++++++++++++++++++++++-
+ arch/arm64/kernel/process.c       |    7 +++-
+ arch/arm64/kernel/setup.c         |    8 +++-
+ arch/arm64/kernel/smp.c           |   12 +++++-
+ arch/arm64/mm/init.c              |   84 +++++++++++++++++++++++++++++++++++++
+ 11 files changed, 309 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm64/kernel/crash_dump.c
 
-It's ok to special-case MIPS here when you know that MIPS is weird. If
-you don't want that, use run-time detection instead.
-
-> > > +static const struct of_device_id ahci_of_match[] = {
-> > > +	{.compatible = "brcm,sata3-ahci"},
-> > > +	{},
-> > 
-> > This sounds awefully generic. Can you guarantee that no part of Broadcom
-> > has produced another ahci-like SATA3 controller in the past, or will
-> > have one in the future?
-> 
-> I know this controller is used by several chips across Broadcom, though
-> I can't guarantee there are not others at the moment. I can look into
-> that.
-
-Ok.
-
-> > If not, please be more specific here, and use the internal specifier for
-> > this version of the IP block. If you can't find out what that is, use the
-> > identifier for the oldest chip you know that has it.
-> 
-> The binding documentation already notes "brcm,bcm7445-ahci", but we just
-> don't bind against it here yet, since that hasn't been necessary. I
-> suppose I can include the revision number, though; I forgot this block
-> had one. (EDIT: in checking two random chips, I see that two cores both
-> say v0.1 but have slightly different register layouts. Chip guys suck
-> sometimes. So I'll stick to chip-based matching instead.)
-
-Ok, I missed the part in the binding. In principle it's ok like you do
-then, but using "brcm,bcm7445-ahci" (or whichever one) as the "most generic"
-string is probably better, because of the PHY registers here that might
-not be present (or might be incompatible) in a future Broadcom chip.
-
-	Arnd
+-- 
+1.7.9.5
