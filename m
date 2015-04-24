@@ -1,102 +1,42 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Fri, 24 Apr 2015 15:09:23 +0800
-Subject: [PATCH 2/2] ARM64: mt8173: dts Add MT8173 cpufreq driver support
-In-Reply-To: <20150423125358.GA29702@leverpostej>
-References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
- <1429522047-16675-3-git-send-email-pi-cheng.chen@linaro.org>
- <20150423125358.GA29702@leverpostej>
-Message-ID: <CALx668UiU73HAwGdezrXDxTm_4_N0HUJQFYa1E_Guv_j3NG00g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Apr 2015 09:16:12 +0200
+Subject: [PATCH 5/9] ARM: BCM2836: Add io map initialization for bcm2836.
+In-Reply-To: <1429639796-2169-6-git-send-email-eric@anholt.net>
+References: <1429639796-2169-1-git-send-email-eric@anholt.net>
+ <1429639796-2169-6-git-send-email-eric@anholt.net>
+Message-ID: <3157838.P6rILgE4M2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Tuesday 21 April 2015 11:09:52 Eric Anholt wrote:
+> +
+> +DT_MACHINE_START(BCM2836, "BCM2836")
+> +       .map_io = bcm2836_map_io,
+> +       .init_irq = irqchip_init,
+> +       .init_machine = bcm2835_init,
+> +       .restart = bcm2835_restart,
+> +       .dt_compat = bcm2836_compat
+> +MACHINE_END
 
-Thanks for reviewing.
+I've just looked at the other callbacks you have here, and I think
+it would be easy enough to remove them as well:
 
-On Thu, Apr 23, 2015 at 8:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Apr 20, 2015 at 10:27:27AM +0100, pi-cheng.chen wrote:
->> This patch adds voltage supplies and clocks used by MT8173 cpufreq driver.
->>
->> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
->
-> This series has no bindings for these properties.
+- .init_irq is already pointless, you can just remove the line here
+  without any effect
 
-Will add documents for these.
+- bcm2835_restart can be moved to the drivers/watchdog/bcm2835_wdt.c
+  driver, which already knows the registers. Just use
+  register_restart_handler() in its probe function, and perhaps add
+  a 'select' statement to ensure that the driver is included in kernel
+  builds
 
->
->> ---
->>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 9 +++++++++
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 6 ++++++
->>  2 files changed, 15 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> index 96e141c..7a00cfe 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> @@ -330,3 +330,12 @@
->>       status = "okay";
->>       clock-frequency = <100000>;
->>  };
->> +
->> +&cpu0 {
->> +     proc-supply = <&mt6397_vpca15_reg>;
->> +};
->> +
->> +&cpu2 {
->> +     proc-supply = <&da9211_vcpu_reg>;
->> +     sram-supply = <&mt6397_vsramca7_reg>;
->> +};
->
->
-> Why do only two CPUs have these properties, and why does one need an
-> sram-supply?
+- I'm not completely sure about the plans for the clock handler, but
+  no proper clock driver has surfaced so far, and the clocks could just
+  all be declared in DT as fixed rate clocks.
 
-For better description of hardware, I think putting these properties in all CPUs
-share the same supplies is logical.
+  Is anyone working on a proper clk driver here?
 
-For each cluster of MT8173, we have both PROC and SRAM supplies. But only
-on one cluster (cpu2 and cpu3) we need to control both voltage supplies. The
-SRAM supply on cpu0 cluster is controlled by hardware automatically. Therefore
-I put sram-supply only on cpu2. For better description of hardware, it
-might be a
-good idea to put the SRAM supply in cpu0 also though we don't use it in the
-driver, right?
+- once bcm2835_restart is gone from bcm2835.c and the clocks are handled
+  in DT, the bcm2835_init() function can be removed as well.
 
->
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index d9cc84e..b8a5454 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -51,6 +51,9 @@
->>                       device_type = "cpu";
->>                       compatible = "arm,cortex-a53";
->>                       reg = <0x000>;
->> +                     clocks = <&infracfg INFRA_CA53SEL>,
->> +                              <&apmixedsys APMIXED_MAINPLL>;
->> +                     clock-names = "cpu", "intermediate";
->>               };
->>
->>               cpu1: cpu at 1 {
->> @@ -65,6 +68,9 @@
->>                       compatible = "arm,cortex-a57";
->>                       reg = <0x100>;
->>                       enable-method = "psci";
->> +                     clocks = <&infracfg INFRA_CA57SEL>,
->> +                              <&apmixedsys APMIXED_MAINPLL>;
->> +                     clock-names = "cpu", "intermediate";
->>               };
->
-> We should really describe this information per-cpu rather than assuming
-> that it's the same for siblings. Arbitrarily making one CPU in each
-> cluster (or other arbitrary grouping) special for the binding is silly.
-
-Yes, I agree with you and same above. I did these because most of the
-platforms in kernel did these. So should I do it the way you suggest?
-
-Thanks.
-
-Best Regards,
-Pi-Cheng
-
->
-> Mark.
+	Arnd
