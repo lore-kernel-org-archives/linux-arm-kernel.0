@@ -1,32 +1,109 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 24 Apr 2015 22:39:06 -0600
-Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling
- to the WDT driver.
-In-Reply-To: <1429902534-2348-2-git-send-email-eric@anholt.net>
-References: <1429902534-2348-1-git-send-email-eric@anholt.net>
- <1429902534-2348-2-git-send-email-eric@anholt.net>
-Message-ID: <553B1A6A.6010205@wwwdotorg.org>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Sat, 25 Apr 2015 10:01:34 +0300
+Subject: [RFC/RFT 5/6] i2c: qup: Get rid of clock handling as its done
+ using runtime callbacks
+In-Reply-To: <1429778744-13352-6-git-send-email-rnayak@codeaurora.org>
+References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
+ <1429778744-13352-6-git-send-email-rnayak@codeaurora.org>
+Message-ID: <70706FC9-46A8-4A34-9E11-558ECD23EDE2@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2015 01:08 PM, Eric Anholt wrote:
-> Since the WDT is what's used to drive restart and power off, it makes
-> more sense to keep it there, where the regs are already mapped and
-> definitions for them provided.  Note that this means you may need to
-> add CONFIG_BCM2835_WDT to retain functionality of your kernel.
+Hi Rajendra,
 
-The series,
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-Tested-by: Stephen Warren <swarren@wwwdotorg.org>
+> On Apr 23, 2015, at 11:45 AM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+> 
+> Remove all clock handling from the driver as this is not handled from
+> within platform runtime callbacks.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> ---
+> drivers/i2c/busses/i2c-qup.c | 74 ++++++++++----------------------------------
+> 1 file changed, 16 insertions(+), 58 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+> index fdcbdab..465a2b2 100644
+> --- a/drivers/i2c/busses/i2c-qup.c
+> +++ b/drivers/i2c/busses/i2c-qup.c
+> @@ -104,7 +104,6 @@ struct qup_i2c_dev {
+> 	void __iomem		*base;
+> 	int			irq;
+> 	struct clk		*clk;
+> -	struct clk		*pclk;
+> 	struct i2c_adapter	adap;
+> 
+> 	int			clk_ctl;
+> @@ -532,24 +531,6 @@ static struct i2c_adapter_quirks qup_i2c_quirks = {
+> 	.max_read_len = QUP_READ_LIMIT,
+> };
+> 
+> -static void qup_i2c_enable_clocks(struct qup_i2c_dev *qup)
+> -{
+> -	clk_prepare_enable(qup->clk);
+> -	clk_prepare_enable(qup->pclk);
+> -}
+> -
+> -static void qup_i2c_disable_clocks(struct qup_i2c_dev *qup)
+> -{
+> -	u32 config;
+> -
+> -	qup_i2c_change_state(qup, QUP_RESET_STATE);
+> -	clk_disable_unprepare(qup->clk);
+> -	config = readl(qup->base + QUP_CONFIG);
+> -	config |= QUP_CLOCK_AUTO_GATE;
+> -	writel(config, qup->base + QUP_CONFIG);
+> -	clk_disable_unprepare(qup->pclk);
+> -}
+> -
+> static int qup_i2c_probe(struct platform_device *pdev)
+> {
+> 	static const int blk_sizes[] = {4, 16, 32};
+> @@ -596,13 +577,10 @@ static int qup_i2c_probe(struct platform_device *pdev)
+> 		return PTR_ERR(qup->clk);
+> 	}
+> 
+> -	qup->pclk = devm_clk_get(qup->dev, "iface");
+> -	if (IS_ERR(qup->pclk)) {
+> -		dev_err(qup->dev, "Could not get iface clock\n");
+> -		return PTR_ERR(qup->pclk);
+> -	}
+> -
+> -	qup_i2c_enable_clocks(qup);
+> +	pm_runtime_set_autosuspend_delay(qup->dev, MSEC_PER_SEC);
+> +	pm_runtime_use_autosuspend(qup->dev);
+> +	pm_runtime_enable(qup->dev);
+> +	pm_runtime_get_sync(qup->dev);
+> 
+> 	/*
+> 	 * Bootloaders might leave a pending interrupt on certain QUP's,
+> @@ -673,22 +651,15 @@ static int qup_i2c_probe(struct platform_device *pdev)
+> 	qup->adap.dev.of_node = pdev->dev.of_node;
+> 	strlcpy(qup->adap.name, "QUP I2C adapter", sizeof(qup->adap.name));
+> 
+> -	pm_runtime_set_autosuspend_delay(qup->dev, MSEC_PER_SEC);
+> -	pm_runtime_use_autosuspend(qup->dev);
+> -	pm_runtime_set_active(qup->dev);
+> -	pm_runtime_enable(qup->dev);
+> -
+> 	ret = i2c_add_adapter(&qup->adap);
+> 	if (ret)
+> -		goto fail_runtime;
+> +		goto fail;
+> 
+> 	return 0;
+> 
+> -fail_runtime:
+> +fail:
+> 	pm_runtime_disable(qup->dev);
+> 	pm_runtime_set_suspended(qup->dev);
+> -fail:
+> -	qup_i2c_disable_clocks(qup);
+> 	return ret;
+> }
 
-> Note that power off has never worked for me, and just reboots as well.
-> So I can't say that I've *really* tested the power off code.
 
-The RPi can't actually power itself off, but it used to be the case that
-if you rebooted it after setting up a certain register configuration,
-the firmware would put the device into a low-power state. This did work
-when it was first upstreamed. However, it no longer works. I believe
-this was due to a change in the firmware, which is why I don't always
-trust the firmware. I should really check what the downstream kernel
-does for power off now; I assume it must have changed since the code was
-upstreamed.
+Same thing like in MMC driver. Clocks should be explicitly
+enabled because CONFIG_PM could be off.
+
+Thanks,
+Ivan
