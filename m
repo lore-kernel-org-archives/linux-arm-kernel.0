@@ -1,37 +1,44 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 26 Apr 2015 11:13:13 +0300
-Subject: [PATCH] arm: improve non-section-aligned low memory mapping
-In-Reply-To: <CAHkaATQPabp9WW0nZnPC373FDG7XdGKztPA2Xx7J1E12+USr8w@mail.gmail.com>
-References: <CAHkaATQPabp9WW0nZnPC373FDG7XdGKztPA2Xx7J1E12+USr8w@mail.gmail.com>
-Message-ID: <20150426081313.GI2258@tarshish>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Sat, 25 Apr 2015 21:21:07 +0200
+Subject: [PATCH 3/3] ARM: sunxi: spi: use proper errno when message is too
+ long.
+In-Reply-To: <cover.1430034797.git.hramrach@gmail.com>
+References: <cover.1430034797.git.hramrach@gmail.com>
+Message-ID: <4c27d44b2bdd759424ce4a4b2e8f6abf5d5a6735.1430034797.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Min-Hua Chen
+Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+---
+ drivers/spi/spi-sun4i.c | 2 +-
+ drivers/spi/spi-sun6i.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-On Sun, Apr 26, 2015 at 03:41:17PM +0800, Min-Hua Chen wrote:
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 2495c8c..6a618f9 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -138,7 +138,7 @@ void show_mem(unsigned int filter)
->  static void __init find_limits(unsigned long *min, unsigned long *max_low,
->         unsigned long *max_high)
->  {
-> - *max_low = PFN_DOWN(memblock_get_current_limit());
-> + *max_low = PFN_DOWN(arm_lowmem_limit);
->   *min = PFN_UP(memblock_start_of_DRAM());
->   *max_high = PFN_DOWN(memblock_end_of_DRAM());
->  }
-
-Your patch is whitespace damaged, and can't be applied as is. Please consider 
-using git send-email to send properly formatted patches. See the EXAMPLE 
-section in http://git-scm.com/docs/git-send-email for example of git 
-send-email using a gmail account.
-
-baruch
-
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index fbb0a4d..8238b4e 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -176,7 +176,7 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 
+ 	/* We don't support transfer larger than the FIFO */
+ 	if (tfr->len > SUN4I_FIFO_DEPTH)
+-		return -EINVAL;
++		return -EMSGSIZE;
+ 
+ 	reinit_completion(&sspi->done);
+ 	sspi->tx_buf = tfr->tx_buf;
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index ac48f59..0f5dd91 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -166,7 +166,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 
+ 	/* We don't support transfer larger than the FIFO */
+ 	if (tfr->len > SUN6I_FIFO_DEPTH)
+-		return -EINVAL;
++		return -EMSGSIZE;
+ 
+ 	reinit_completion(&sspi->done);
+ 	sspi->tx_buf = tfr->tx_buf;
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+2.1.4
