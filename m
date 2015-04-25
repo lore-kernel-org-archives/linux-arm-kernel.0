@@ -1,26 +1,48 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 25 Apr 2015 02:14:58 +0200
-Subject: [PATCH] ARM: rockchip: disable dapswjdp during suspend
-In-Reply-To: <1429077431-31326-1-git-send-email-zyw@rock-chips.com>
-References: <1429077431-31326-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <2083913.tsdTRJp6Sn@diego>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 25 Apr 2015 09:54:52 +0800
+Subject: [PATCH 0/3] ARM: sun9i: Add support for PRCM on Allwinner A80
+ SoC
+In-Reply-To: <20150330215034.GT23664@lukather>
+References: <1425349320-2754-1-git-send-email-wens@csie.org>
+ <20150308173225.GK5085@lukather> <201503100902208865029@allwinnertech.com>
+ <20150310201800.GA5085@lukather> <2015033017191699787718@allwinnertech.com>
+ <20150330215034.GT23664@lukather>
+Message-ID: <CAGb2v66YPXDbSC3ZfTKx1bwYVakCrBENSAYVGTZhwk_f0Ve68g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 15. April 2015, 13:57:11 schrieb Chris Zhong:
-> Reset dapswjdp is controlled by JTAG_TRSTN, if the iomux of this pin is
-> not "jtag_trstn". the AP would think this pin is always high, so it can
-> not reset before resume. When system resume, but the dapswjdp is not in
-> a default state, it may Access some illegal address, it cause system
-> crash during resume.
-> Let's disable this jtag function by clear the dapdeviceen bit, it
-> prohibit the dapswjdp to access memory and registers. This bit would
-> be enable in MASKROM, so we need clear it in suspend everytime.
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Hi Kevin,
 
-applied to a fixes branch for 4.1
+(Dropped a few people from CC.)
+
+On Tue, Mar 31, 2015 at 5:50 AM, maxime.ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Kevin,
+>
+> On Mon, Mar 30, 2015 at 05:19:17PM +0800, kevin at allwinnertech.com wrote:
+>> Hi, Maxime,
+>>
+>> We have add the PRCM module description to the A80 document.
+>> You can download it from the github: https://github.com/allwinner-zh/documents
+>
+> Awesome, thanks a lot.
+>
+> We'll look into it.
+
+I looked at the new PRCM description, which is very detailed.
+I have some questions though:
+
+1. There is a "PLL_AUDIO control". Is this a new PLL? Or just another
+set of mapped
+   registers for PLL_AUDIO in CCU? I assume it is the latter.
+
+2. What is the source of "24 MHz" in the main CCU? The external 24 MHz
+oscillator
+   (HOSC) or the mux after HOSC and CLK16M_RC? (ref: page 331, the
+PRCM block diagram)
+
+Please help clarify them. Thank you.
 
 
-Thanks
-Heiko
+Regards
+ChenYu
