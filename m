@@ -1,172 +1,102 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 25 Apr 2015 11:39:30 +0100
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <CY1PR0301MB074896DF1A06CDEC3A0E09B687EC0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20150416104008.GB25640@arm.com>
- <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150422170718.GG13019@arm.com>
- <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150424161818.GC7313@arm.com> <553A72D4.7000801@arm.com>
- <CY1PR0301MB074896DF1A06CDEC3A0E09B687EC0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <20150425113930.7386a42a@arm.com>
+From: j.anaszewski81@gmail.com (Jacek Anaszewski)
+Date: Sat, 25 Apr 2015 13:51:38 +0200
+Subject: [PATCH RESEND v2] leds: fix hibernation on arm when gpio-led
+ used with CPU led trigger
+In-Reply-To: <1429876630-15952-1-git-send-email-grygorii.strashko@linaro.org>
+References: <1429876630-15952-1-git-send-email-grygorii.strashko@linaro.org>
+Message-ID: <20150425135138.002cb906@ja.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Apr 2015 19:18:44 +0100
-Stuart Yoder <stuart.yoder@freescale.com> wrote:
+Hi Grygorii,
 
-Hi Stuart,
+Thanks for the patch.
 
+On Fri, 24 Apr 2015 14:57:10 +0300
+<grygorii.strashko@linaro.org> wrote:
+
+> From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 > 
+> Setting a dev_pm_ops suspend/resume pair of callbacks but not a set of
+> hibernation callbacks means those pm functions will not be
+> called upon hibernation - that leads to system crash on ARM during
+> freezing if gpio-led is used in combination with CPU led trigger.
+> It may happen after freeze_noirq stage (GPIO is suspended)
+> and before syscore_suspend stage (CPU led trigger is suspended)
+> - usually when disable_nonboot_cpus() is called.
 > 
-> > -----Original Message-----
-> > From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> > Sent: Friday, April 24, 2015 11:44 AM
-> > To: Will Deacon; Yoder Stuart-B08248
-> > Cc: Sethi Varun-B16395; Lian Minghuan-B31939; linux-pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284;
-> > Zang Roy-R61911; Bjorn Helgaas; Wood Scott-B07421; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-> > 
-> > On 24/04/15 17:18, Will Deacon wrote:
-> > > On Wed, Apr 22, 2015 at 08:41:02PM +0100, Stuart Yoder wrote:
-> > >>>> However, there is an improvement we envision as possible due to
-> > >>>> the limited number of SMMU contexts (i.e. 64).  If there are
-> > >>>> 64 SMMU context registers it means that there is a max of
-> > >>>> 64 software contexts where things can be isolated.  But, say I have
-> > >>>> an SRIOV card with 64 VFs, and I want to assign 8 of the VFs
-> > >>>> to a KVM VM.  Those 8 PCI devices could share the same
-> > >>>> streamID/ITS-device-ID since they all share the same isolation
-> > >>>> context.
-> > >>>>
-> > >>>> What would be nice is at the time the 8 VFS are being added
-> > >>>> to the IOMMU domain is for the pcidevid -> streamID mapping
-> > >>>> table to be updated dynamically.  It simply lets us make
-> > >>>> more efficient use of the limited streamIDs we have.
-> > >>>>
-> > >>>> I think it is this improvement that Minghuan had in mind
-> > >>>> in this patch.
-> > >>>
-> > >>> Ok, but in this case it should be possible to use a single context bank for
-> > >>> all of the VF streamIDs by configuring the appropriate SMR, no?
-> > >>
-> > >> Yes, but there are limited SMRs.  In our case there are only
-> > >> 128 SMRs in SMMU-500 and we have potentially way more masters than
-> > >> that.
-> > >
-> > > Right, but you still only have 64 context banks at the end of the day, so do
-> > > you really anticipate having more than 128 masters concurrently using the
-> > > SMMU? If so, then we have devices sharing context banks so we could consider
-> > > reusing SMRs across masters, but historically that's not been something that
-> > > we've managed to solve.
-> > >
-> > >>> Wouldn't
-> > >>> that sort of thing be preferable to dynamic StreamID assignment? It would
-> > >>> certainly make life easier for the MSIs.
-> > >>
-> > >> It would be preferable, but given only 128 total stream IDS and
-> > >> 64 context registers it's potentially an issue.  On our LS2085 SoC it is
-> > >> PCI and the fsl-mc bus (see description here:
-> > >> https://lkml.org/lkml/2015/3/5/795) that potentially have way
-> > >> more masters than streamIDS. So, for those busses we would essentially
-> > >> view a streamID as a "context ID"-- each SMR is associated with
-> > >> 1 context bank register.
-> > >>
-> > >> For PCI we have a programmable "PCI req ID"-to-"stream ID"
-> > >> mapping table in the PCI controller that is dynamically
-> > >> programmable.
-> > >>
-> > >> Looking at it like that means that we could have
-> > >> any number of masters but only 64 "contexts"
-> > >> and since the masters all all programmable it's
-> > >> seems feasbile to envision doing some bus/vendor
-> > >> specific set up when a device is added to an
-> > >> IOMMU domain.   One thing that would need to be conveyed
-> > >> to the SMMU driver if doing dynamic streamID setup
-> > >> is what streamIDs are available to be used.
-> > >
-> > > Ok, but this is going to make life difficult for the MSI people, I suspect.
-> > >
-> > > Marc...?
-> > 
-> > We're really facing two conflicting requirements: in order to minimize
-> > SMR usage, we want to alias multiple ReqIDs to a single StreamID
+> Log:
+>   PM: noirq freeze of devices complete after 1.425 msecs
+>   Disabling non-boot CPUs ...
+>     ^ system may crash or stuck here with message (TI AM572x)
 > 
-> Another reason could be the isolation characteristics of the
-> hardware...see comment below about PCI bridges.
+>   WARNING: CPU: 0 PID: 3100 at drivers/bus/omap_l3_noc.c:148
+> l3_interrupt_handler+0x22c/0x370() 44000000.ocp:L3 Custom Error:
+> MASTER MPU TARGET L4_PER1_P3 (Idle): Data Access in Supervisor mode
+> during Functional access
 > 
-> > but in
-> > order to efficiently deal with MSIs, we want to see discrete DeviceIDs
-> > (the actual ReqIDs). I don't easily see how we reconcile the two.
-> > 
-> > We can deal with the aliasing, provided that we extend the level of
-> > quirkiness that pci_for_each_dma_alias can deal with. But that
-> > doesn't solve any form of hotplug/SR-IOV behaviour.
-> > 
-> > Somehow, we're going to end-up with grossly oversized ITTs, just to
-> > accommodate for the fact that we have no idea how many MSIs we're
-> > going to end-up needing. I'm not thrilled with that prospect.
+>   CPU1: shutdown
+>     ^ or here
 > 
-> How can we avoid that in the face of hotplug?
-
-Fortunately, hotplug is not always synonymous of aliasing. The ITS is
-built around the hypothesis that aliasing doesn't happen, and that you
-know upfront how many LPIs the device will be allowed to generate.
-
-> And what are we really worried about regarding over-sized ITTs...bytes
-> of memory saved?
-
-That's one thing, yes. But more fundamentally, how do you size your MSI
-capacity for a single alias? Do you evenly split your LPI space among
-all possible aliases? Assuming 64 aliases and 16 bits of interrupt ID
-space, you end up with 10 bit per alias. Is that always enough? Or do
-you need something more fine-grained?
-
-> A fundamental thing built into the IOMMU subsystem in Linux is
-> representing iommu groups that can represent things like
-> multiple PCI devices that for hardware reasons cannot
-> be isolated (and the example I've seen given relates to 
-> devices behind PCI bridges).
+> Fix this by using SIMPLE_DEV_PM_OPS, which appropriately
+> assigns the suspend and hibernation callbacks and move
+> led_suspend/led_resume under CONFIG_PM_SLEEP to avoid
+> build warnings.
 > 
-> So, I think the thing we are facing here is that while the
-> IOMMU subsystem has accounted for reprsenting the isolation
-> characteristics of a system with iommu groups, there is
-> no corresponding "msi group" concept.
+> Fixes: 73e1ab41a80d (leds: Convert led class driver from legacy pm
+> ops to dev_pm_ops) Signed-off-by: Grygorii Strashko
+> <Grygorii.Strashko@linaro.org> ---
 > 
-> In the SMMU/GIC-500-ITS world the iommu isolation
-> ID (the stream ID) and the GIC-ITS device ID are in
-> fact the same ID.
+> Hi All,
+> 
+> Could you pls pay attention on this patch?
+> 
+> This trivial patch was posted at Feb 2015 and
+> it's missed two merge windows already ((.
+> 
+> Rebased on top of next (4.1).
+> 
+> Changes in v2:
+> - fixed compile time warnings when !CONFIG_PM_SLEEP
+> - updated commit message
+> 
+> v2:
+>   https://lkml.org/lkml/2015/2/5/323
+> v1:
+>   https://lkml.org/lkml/2015/2/2/476
+> 
+>  drivers/leds/led-class.c | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/leds/led-class.c b/drivers/leds/led-class.c
+> index 728681d..7fb2a19 100644
+> --- a/drivers/leds/led-class.c
+> +++ b/drivers/leds/led-class.c
+> @@ -187,6 +187,7 @@ void led_classdev_resume(struct led_classdev
+> *led_cdev) }
+>  EXPORT_SYMBOL_GPL(led_classdev_resume);
+>  
+> +#ifdef CONFIG_PM_SLEEP
+>  static int led_suspend(struct device *dev)
+>  {
+>  	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+> @@ -206,11 +207,9 @@ static int led_resume(struct device *dev)
+>  
+>  	return 0;
+>  }
+> +#endif
+>  
+> -static const struct dev_pm_ops leds_class_dev_pm_ops = {
+> -	.suspend        = led_suspend,
+> -	.resume         = led_resume,
+> -};
+> +static SIMPLE_DEV_PM_OPS(leds_class_dev_pm_ops, led_suspend,
+> led_resume); 
+>  static int match_name(struct device *dev, const void *data)
+>  {
 
-The DeviceID is the "MSI group" you mention. This is what provides
-isolation at the ITS level.
+Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
 
-> Is there some way we could sanely correlate IOMMU group creation
-> (which establishes isolation granularity) with the creation
-> of an ITT for the GIC-ITS?
-
-The problem you have is that your ITT already exists before you start
-"hotpluging" new devices. Take the following (made up) example:
-
-System boots, device X is discovered, claims 64 MSIs. An ITT for device
-X is allocated, and sized for 64 LPIs. SR-IOV kick is, creates a new X'
-function that is aliased to X, claiming another 64 MSIs. Fail.
-
-What do we do here? The ITT is live (X is generating interrupts), and
-there is no provision to resize it (I've come up with a horrible
-scheme, but that could fail as well). The only sane option would be to
-guess how many MSIs a given alias could possibly use. How wrong is this
-guess going to be?
-
-The problem we have is that IOMMU groups are dynamic, while ITT
-allocation is completely static for a given DeviceID. The architecture
-doesn't give you any mechanism to resize it, and I have the ugly
-feeling that static allocation of the ID space to aliases is too
-rigid...
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+Best Regards,
+Jacek Anaszewski
