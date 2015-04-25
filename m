@@ -1,14 +1,38 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 25 Apr 2015 23:13:23 +0200
-Subject: [PATCH v5 3/3] ARM: pxa: lubbock: use new pxa_cplds driver
+Date: Sat, 25 Apr 2015 23:13:21 +0200
+Subject: [PATCH v5 1/3] ARM: pxa: pxa_cplds: add lubbock and mainstone IO
 In-Reply-To: <1429996403-13644-1-git-send-email-robert.jarzmik@free.fr>
 References: <1429996403-13644-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1429996403-13644-4-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1429996403-13644-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the interrupt handling was transferred to the pxa_cplds driver,
-make the switch in lubbock platform code.
+Historically, this support was in arch/arm/mach-pxa/lubbock.c and
+arch/arm/mach-pxa/mainstone.c. When gpio-pxa was moved to drivers/pxa,
+it became a driver, and its initialization and probing happened at
+postcore initcall. The lubbock code used to install the chained lubbock
+interrupt handler at init_irq() time.
+
+The consequence of the gpio-pxa change is that the installed chained irq
+handler lubbock_irq_handler() was overwritten in pxa_gpio_probe(_dt)(),
+removing :
+ - the handler
+ - the falling edge detection setting of GPIO0, which revealed the
+   interrupt request from the lubbock IO board.
+
+As a fix, move the gpio0 chained handler setup to a place where we have
+the guarantee that pxa_gpio_probe() was called before, so that lubbock
+handler becomes the true IRQ chained handler of GPIO0, demuxing the
+lubbock IO board interrupts.
+
+This patch moves all that handling to a mfd driver. It's only purpose
+for the time being is the interrupt handling, but in the future it
+should encompass all the motherboard CPLDs handling :
+ - leds
+ - switches
+ - hexleds
+
+The same logic applies to mainstone board.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
@@ -19,182 +43,255 @@ Since v1: change the name from cottula to lubbock_io
 	  change the resources to bi-irq ioresource
 	    Discussion between Arnd and Robert to change the gpio
 	    request by a irq request.
-Since v3: rename lubbock_io into lubbock_cplds
-Since v4: rename lubbock_io into pxa_cplds
+Since v2: take into account Mark's review
+      	    Use irq flags from resources (DT case and pdata case).
+	    Change of name from lubbock_io to lubbock-io
+Since v3: take into account Lee's review + Russell's advice
+            whitespace errors fixes
+	    debug/info messages formatting
+	    return X; empty lines
+Since v4: move back to mach-pxa tree
 ---
- arch/arm/mach-pxa/include/mach/lubbock.h |   7 +-
- arch/arm/mach-pxa/lubbock.c              | 108 +++++++++----------------------
- 2 files changed, 33 insertions(+), 82 deletions(-)
+ arch/arm/mach-pxa/Kconfig          |  10 ++
+ arch/arm/mach-pxa/Makefile         |   1 +
+ arch/arm/mach-pxa/pxa_cplds_irqs.c | 200 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 211 insertions(+)
+ create mode 100644 arch/arm/mach-pxa/pxa_cplds_irqs.c
 
-diff --git a/arch/arm/mach-pxa/include/mach/lubbock.h b/arch/arm/mach-pxa/include/mach/lubbock.h
-index 958cd6af..1eecf79 100644
---- a/arch/arm/mach-pxa/include/mach/lubbock.h
-+++ b/arch/arm/mach-pxa/include/mach/lubbock.h
-@@ -37,7 +37,9 @@
- #define LUB_GP			__LUB_REG(LUBBOCK_FPGA_PHYS + 0x100)
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index 8896e71..58c13a12 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -691,4 +691,14 @@ config SHARPSL_PM_MAX1111
+ config PXA310_ULPI
+ 	bool
  
- /* Board specific IRQs */
--#define LUBBOCK_IRQ(x)		(IRQ_BOARD_START + (x))
-+#define LUBBOCK_NR_IRQS		IRQ_BOARD_START
++config PXA_SYSTEMS_CPLDS
++	bool "Motherboard cplds"
++	def_bool ARCH_LUBBOCK || MACH_MAINSTONE
++	select MFD_CORE
++	help
++	  This driver supports the Lubbock and Mainstone multifunction chip
++	  found on the pxa25x development platform system (Lubbock) and pxa27x
++	  development platform system (Mainstone). This IO board supports the
++	  interrupts handling, ethernet controller, flash chips, etc ...
 +
-+#define LUBBOCK_IRQ(x)		(LUBBOCK_NR_IRQS + (x))
- #define LUBBOCK_SD_IRQ		LUBBOCK_IRQ(0)
- #define LUBBOCK_SA1111_IRQ	LUBBOCK_IRQ(1)
- #define LUBBOCK_USB_IRQ		LUBBOCK_IRQ(2)  /* usb connect */
-@@ -47,8 +49,7 @@
- #define LUBBOCK_USB_DISC_IRQ	LUBBOCK_IRQ(6)  /* usb disconnect */
- #define LUBBOCK_LAST_IRQ	LUBBOCK_IRQ(6)
+ endif
+diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
+index eb0bf76..4087d33 100644
+--- a/arch/arm/mach-pxa/Makefile
++++ b/arch/arm/mach-pxa/Makefile
+@@ -90,4 +90,5 @@ obj-$(CONFIG_MACH_RAUMFELD_CONNECTOR)	+= raumfeld.o
+ obj-$(CONFIG_MACH_RAUMFELD_SPEAKER)	+= raumfeld.o
+ obj-$(CONFIG_MACH_ZIPIT2)	+= z2.o
  
--#define LUBBOCK_SA1111_IRQ_BASE	(IRQ_BOARD_START + 16)
--#define LUBBOCK_NR_IRQS		(IRQ_BOARD_START + 16 + 55)
-+#define LUBBOCK_SA1111_IRQ_BASE	(LUBBOCK_NR_IRQS + 32)
- 
- #ifndef __ASSEMBLY__
- extern void lubbock_set_misc_wr(unsigned int mask, unsigned int set);
-diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
-index d8a1be6..4ac9ab8 100644
---- a/arch/arm/mach-pxa/lubbock.c
-+++ b/arch/arm/mach-pxa/lubbock.c
-@@ -12,6 +12,7 @@
-  *  published by the Free Software Foundation.
-  */
- #include <linux/gpio.h>
-+#include <linux/gpio/machine.h>
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-@@ -123,84 +124,6 @@ void lubbock_set_misc_wr(unsigned int mask, unsigned int set)
- }
- EXPORT_SYMBOL(lubbock_set_misc_wr);
- 
--static unsigned long lubbock_irq_enabled;
--
--static void lubbock_mask_irq(struct irq_data *d)
--{
--	int lubbock_irq = (d->irq - LUBBOCK_IRQ(0));
--	LUB_IRQ_MASK_EN = (lubbock_irq_enabled &= ~(1 << lubbock_irq));
--}
--
--static void lubbock_unmask_irq(struct irq_data *d)
--{
--	int lubbock_irq = (d->irq - LUBBOCK_IRQ(0));
--	/* the irq can be acknowledged only if deasserted, so it's done here */
--	LUB_IRQ_SET_CLR &= ~(1 << lubbock_irq);
--	LUB_IRQ_MASK_EN = (lubbock_irq_enabled |= (1 << lubbock_irq));
--}
--
--static struct irq_chip lubbock_irq_chip = {
--	.name		= "FPGA",
--	.irq_ack	= lubbock_mask_irq,
--	.irq_mask	= lubbock_mask_irq,
--	.irq_unmask	= lubbock_unmask_irq,
--};
--
--static void lubbock_irq_handler(unsigned int irq, struct irq_desc *desc)
--{
--	unsigned long pending = LUB_IRQ_SET_CLR & lubbock_irq_enabled;
--	do {
--		/* clear our parent irq */
--		desc->irq_data.chip->irq_ack(&desc->irq_data);
--		if (likely(pending)) {
--			irq = LUBBOCK_IRQ(0) + __ffs(pending);
--			generic_handle_irq(irq);
--		}
--		pending = LUB_IRQ_SET_CLR & lubbock_irq_enabled;
--	} while (pending);
--}
--
--static void __init lubbock_init_irq(void)
--{
--	int irq;
--
--	pxa25x_init_irq();
--
--	/* setup extra lubbock irqs */
--	for (irq = LUBBOCK_IRQ(0); irq <= LUBBOCK_LAST_IRQ; irq++) {
--		irq_set_chip_and_handler(irq, &lubbock_irq_chip,
--					 handle_level_irq);
--		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
--	}
--
--	irq_set_chained_handler(PXA_GPIO_TO_IRQ(0), lubbock_irq_handler);
--	irq_set_irq_type(PXA_GPIO_TO_IRQ(0), IRQ_TYPE_EDGE_FALLING);
--}
--
--#ifdef CONFIG_PM
--
--static void lubbock_irq_resume(void)
--{
--	LUB_IRQ_MASK_EN = lubbock_irq_enabled;
--}
--
--static struct syscore_ops lubbock_irq_syscore_ops = {
--	.resume = lubbock_irq_resume,
--};
--
--static int __init lubbock_irq_device_init(void)
--{
--	if (machine_is_lubbock()) {
--		register_syscore_ops(&lubbock_irq_syscore_ops);
--		return 0;
--	}
--	return -ENODEV;
--}
--
--device_initcall(lubbock_irq_device_init);
--
--#endif
--
- static int lubbock_udc_is_connected(void)
- {
- 	return (LUB_MISC_RD & (1 << 9)) == 0;
-@@ -383,11 +306,38 @@ static struct platform_device lubbock_flash_device[2] = {
- 	},
- };
- 
-+static struct resource lubbock_cplds_resources[] = {
-+	[0] = {
-+		.start	= LUBBOCK_FPGA_PHYS + 0xc0,
-+		.end	= LUBBOCK_FPGA_PHYS + 0xe0 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= PXA_GPIO_TO_IRQ(0),
-+		.end	= PXA_GPIO_TO_IRQ(0),
-+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
-+	},
-+	[2] = {
-+		.start	= LUBBOCK_IRQ(0),
-+		.end	= LUBBOCK_IRQ(6),
-+		.flags	= IORESOURCE_IRQ,
-+	},
++obj-$(CONFIG_PXA_SYSTEMS_CPLDS)	+= pxa_cplds_irqs.o
+ obj-$(CONFIG_TOSA_BT)		+= tosa-bt.o
+diff --git a/arch/arm/mach-pxa/pxa_cplds_irqs.c b/arch/arm/mach-pxa/pxa_cplds_irqs.c
+new file mode 100644
+index 0000000..f1aeb54
+--- /dev/null
++++ b/arch/arm/mach-pxa/pxa_cplds_irqs.c
+@@ -0,0 +1,200 @@
++/*
++ * Intel Reference Systems cplds
++ *
++ * Copyright (C) 2014 Robert Jarzmik
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * Cplds motherboard driver, supporting lubbock and mainstone SoC board.
++ */
++
++#include <linux/bitops.h>
++#include <linux/gpio.h>
++#include <linux/gpio/consumer.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/mfd/core.h>
++#include <linux/module.h>
++#include <linux/of_platform.h>
++
++#define FPGA_IRQ_MASK_EN 0x0
++#define FPGA_IRQ_SET_CLR 0x10
++
++#define CPLDS_NB_IRQ	32
++
++struct cplds {
++	void __iomem *base;
++	int irq;
++	unsigned int irq_mask;
++	struct gpio_desc *gpio0;
++	struct irq_domain *irqdomain;
 +};
 +
-+static struct platform_device lubbock_cplds_device = {
-+	.name		= "pxa_cplds_irqs",
-+	.id		= -1,
-+	.resource	= &lubbock_cplds_resources[0],
-+	.num_resources	= 3,
++static irqreturn_t cplds_irq_handler(int in_irq, void *d)
++{
++	struct cplds *fpga = d;
++	unsigned long pending;
++	unsigned int bit;
++
++	pending = readl(fpga->base + FPGA_IRQ_SET_CLR) & fpga->irq_mask;
++	for_each_set_bit(bit, &pending, CPLDS_NB_IRQ)
++		generic_handle_irq(irq_find_mapping(fpga->irqdomain, bit));
++
++	return IRQ_HANDLED;
++}
++
++static void cplds_irq_mask_ack(struct irq_data *d)
++{
++	struct cplds *fpga = irq_data_get_irq_chip_data(d);
++	unsigned int cplds_irq = irqd_to_hwirq(d);
++	unsigned int set, bit = BIT(cplds_irq);
++
++	fpga->irq_mask &= ~bit;
++	writel(fpga->irq_mask, fpga->base + FPGA_IRQ_MASK_EN);
++	set = readl(fpga->base + FPGA_IRQ_SET_CLR);
++	writel(set & ~bit, fpga->base + FPGA_IRQ_SET_CLR);
++}
++
++static void cplds_irq_unmask(struct irq_data *d)
++{
++	struct cplds *fpga = irq_data_get_irq_chip_data(d);
++	unsigned int cplds_irq = irqd_to_hwirq(d);
++	unsigned int bit = BIT(cplds_irq);
++
++	fpga->irq_mask |= bit;
++	writel(fpga->irq_mask, fpga->base + FPGA_IRQ_MASK_EN);
++}
++
++static struct irq_chip cplds_irq_chip = {
++	.name		= "pxa_cplds",
++	.irq_mask_ack	= cplds_irq_mask_ack,
++	.irq_unmask	= cplds_irq_unmask,
++	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
 +};
 +
++static int cplds_irq_domain_map(struct irq_domain *d, unsigned int irq,
++				   irq_hw_number_t hwirq)
++{
++	struct cplds *fpga = d->host_data;
 +
- static struct platform_device *devices[] __initdata = {
- 	&sa1111_device,
- 	&smc91x_device,
- 	&lubbock_flash_device[0],
- 	&lubbock_flash_device[1],
-+	&lubbock_cplds_device,
- };
- 
- static struct pxafb_mode_info sharp_lm8v31_mode = {
-@@ -648,7 +598,7 @@ MACHINE_START(LUBBOCK, "Intel DBPXA250 Development Platform (aka Lubbock)")
- 	/* Maintainer: MontaVista Software Inc. */
- 	.map_io		= lubbock_map_io,
- 	.nr_irqs	= LUBBOCK_NR_IRQS,
--	.init_irq	= lubbock_init_irq,
-+	.init_irq	= pxa25x_init_irq,
- 	.handle_irq	= pxa25x_handle_irq,
- 	.init_time	= pxa_timer_init,
- 	.init_machine	= lubbock_init,
++	irq_set_chip_and_handler(irq, &cplds_irq_chip, handle_level_irq);
++	irq_set_chip_data(irq, fpga);
++
++	return 0;
++}
++
++static const struct irq_domain_ops cplds_irq_domain_ops = {
++	.xlate = irq_domain_xlate_twocell,
++	.map = cplds_irq_domain_map,
++};
++
++static int cplds_resume(struct platform_device *pdev)
++{
++	struct cplds *fpga = platform_get_drvdata(pdev);
++
++	writel(fpga->irq_mask, fpga->base + FPGA_IRQ_MASK_EN);
++
++	return 0;
++}
++
++static int cplds_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct cplds *fpga;
++	int ret;
++	unsigned int base_irq = 0;
++	unsigned long irqflags = 0;
++
++	fpga = devm_kzalloc(&pdev->dev, sizeof(*fpga), GFP_KERNEL);
++	if (!fpga)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (res) {
++		fpga->irq = (unsigned int)res->start;
++		irqflags = res->flags;
++	}
++	if (!fpga->irq)
++		return -ENODEV;
++
++	base_irq = platform_get_irq(pdev, 1);
++	if (base_irq < 0)
++		base_irq = 0;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	fpga->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(fpga->base))
++		return PTR_ERR(fpga->base);
++
++	platform_set_drvdata(pdev, fpga);
++
++	writel(fpga->irq_mask, fpga->base + FPGA_IRQ_MASK_EN);
++	writel(0, fpga->base + FPGA_IRQ_SET_CLR);
++
++	ret = devm_request_irq(&pdev->dev, fpga->irq, cplds_irq_handler,
++			       irqflags, dev_name(&pdev->dev), fpga);
++	if (ret == -ENOSYS)
++		return -EPROBE_DEFER;
++
++	if (ret) {
++		dev_err(&pdev->dev, "couldn't request main irq%d: %d\n",
++			fpga->irq, ret);
++		return ret;
++	}
++
++	irq_set_irq_wake(fpga->irq, 1);
++	fpga->irqdomain = irq_domain_add_linear(pdev->dev.of_node,
++					       CPLDS_NB_IRQ,
++					       &cplds_irq_domain_ops, fpga);
++	if (!fpga->irqdomain)
++		return -ENODEV;
++
++	if (base_irq) {
++		ret = irq_create_strict_mappings(fpga->irqdomain, base_irq, 0,
++						 CPLDS_NB_IRQ);
++		if (ret) {
++			dev_err(&pdev->dev, "couldn't create the irq mapping %d..%d\n",
++				base_irq, base_irq + CPLDS_NB_IRQ);
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int cplds_remove(struct platform_device *pdev)
++{
++	struct cplds *fpga = platform_get_drvdata(pdev);
++
++	irq_set_chip_and_handler(fpga->irq, NULL, NULL);
++
++	return 0;
++}
++
++static const struct of_device_id cplds_id_table[] = {
++	{ .compatible = "intel,lubbock-cplds-irqs", },
++	{ .compatible = "intel,mainstone-cplds-irqs", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, cplds_id_table);
++
++static struct platform_driver cplds_driver = {
++	.driver		= {
++		.name	= "pxa_cplds_irqs",
++		.of_match_table = of_match_ptr(cplds_id_table),
++	},
++	.probe		= cplds_probe,
++	.remove		= cplds_remove,
++	.resume		= cplds_resume,
++};
++
++module_platform_driver(cplds_driver);
++
++MODULE_DESCRIPTION("PXA Cplds interrupts driver");
++MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
++MODULE_LICENSE("GPL");
 -- 
 2.1.4
