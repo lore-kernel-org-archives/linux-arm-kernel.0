@@ -1,35 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 25 Apr 2015 22:11:40 +0200
-Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling to
- the WDT driver.
-In-Reply-To: <1429902534-2348-2-git-send-email-eric@anholt.net>
-References: <1429902534-2348-1-git-send-email-eric@anholt.net>
- <1429902534-2348-2-git-send-email-eric@anholt.net>
-Message-ID: <12253069.Jm7LIDAreu@wuerfel>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 25 Apr 2015 23:13:20 +0200
+Subject: [PATCH v5 0/3] Fix lubbock and mainstone interrupts
+Message-ID: <1429996403-13644-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 April 2015 12:08:54 Eric Anholt wrote:
-> +/*
-> + * We can't really power off, but if we do the normal reset scheme, and
-> + * indicate to bootcode.bin not to reboot, then most of the chip will be
-> + * powered off.
-> + */
-> +static void bcm2835_power_off(void)
-> +{
-> +       struct device_node *np =
-> +               of_find_compatible_node(NULL, NULL, "brcm,bcm2835-pm-wdt");
-> +       struct platform_device *pdev = of_find_device_by_node(np);
-> +       struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
-> +       u32 val;
-> +
+This serie was submitted to the lak list, then migrated to mfd drivers, to end
+up again here. There was no change since last submission. Let's hope this is the
+last spin and that these platform will be fixed at last.
 
-Instead of doing the lookup again here, I'd suggest using a static variable
-in the driver to store the device pointer for the device used on power_off.
+Robert Jarzmik (3):
+  ARM: pxa: pxa_cplds: add lubbock and mainstone IO
+  ARM: pxa: mainstone: use new pxa_cplds driver
+  ARM: pxa: lubbock: use new pxa_cplds driver
 
-Make sure that the device remove callback assigns it back to NULL though
-and that the function checks for NULL pointer.
+ arch/arm/mach-pxa/Kconfig                  |  10 ++
+ arch/arm/mach-pxa/Makefile                 |   1 +
+ arch/arm/mach-pxa/include/mach/lubbock.h   |   7 +-
+ arch/arm/mach-pxa/include/mach/mainstone.h |   6 +-
+ arch/arm/mach-pxa/lubbock.c                | 108 +++++-----------
+ arch/arm/mach-pxa/mainstone.c              | 115 ++++-------------
+ arch/arm/mach-pxa/pxa_cplds_irqs.c         | 200 +++++++++++++++++++++++++++++
+ 7 files changed, 275 insertions(+), 172 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/pxa_cplds_irqs.c
 
-Aside from this, the patch looks great.
-
-	Arnd
+-- 
+2.1.4
