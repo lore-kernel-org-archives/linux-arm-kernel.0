@@ -1,49 +1,115 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 25 Apr 2015 02:11:14 +0200
-Subject: [GIT PULL] ARM: rockchip: some soc-level fixes for 4.1
-Message-ID: <1612786.HeTW0LsLmg@diego>
+Date: Sat, 25 Apr 2015 02:13:18 +0200
+Subject: [PATCH 1/2] ARM: rockchip: fix undefined instruction of
+ reset_ctrl_regs
+In-Reply-To: <1612786.HeTW0LsLmg@diego>
+References: <1612786.HeTW0LsLmg@diego>
+Message-ID: <5378157.9QgVi1hAmY@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Sometimes the debug module may not work well after resume, since it has
+not been correctly reset when wakeup from suspend. That cause system
+crash during reusme, and a 'undefined instruction' is displayed on the
+console. Set the GRF_FORCE_JTAG bit of RK3288_GRF_SOC_CON0 can ensure
+that debug modul is reset. And we can change the value of
+RK3288_GRF_SOC_CON0 back when system resume.
 
-I've collected some fixes which might be appropriate for 4.1-rc,
-so if they're ok, please pull.
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Tested-by: Caesar Wang <wxt@rock-chips.com>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
 
-Thanks
-Heiko
+According to discussions, there does not seem a better solution available.
+Please also see the potential security implication described in the
+comment inline in the code.
 
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-rockchip/pm.c | 26 ++++++++++++++++++++++++++
+ arch/arm/mach-rockchip/pm.h |  4 ++++
+ 2 files changed, 30 insertions(+)
 
-The following changes since commit a0307d186f5015ee3d77e209e5c06190cbf02478:
-
-  ARM: rockchip: disable watchdog during suspend (2015-03-11 22:41:02 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.1-rockchip-socfixes1
-
-for you to fetch changes up to 2a9fe3ca84afff6259820c4f62e579f41476becc:
-
-  rockchip: make sure timer7 is enabled on rk3288 platforms (2015-04-16 21:22:17 +0200)
-
-----------------------------------------------------------------
-Two fixes from Chris Zhong, fixing some suspend oddities.
-And I've given up on the timer7 issue. While I initially thought
-devices would either have both the grave mmu issue requiring a uboot
-update and the timer7 issue or none, it looks like in all units in the
-field the mmu issue got fixed while the timer7 issue stayed on.
-So instead of making everybody wanting to use mainline jump through a
-hoop just make sure timer7 is on on boot before we init the arch-timer.
-
-----------------------------------------------------------------
-Chris Zhong (2):
-      ARM: rockchip: disable dapswjdp during suspend
-      ARM: rockchip: fix undefined instruction of reset_ctrl_regs
-
-Heiko Stuebner (1):
-      rockchip: make sure timer7 is enabled on rk3288 platforms
-
- arch/arm/mach-rockchip/pm.c       | 33 +++++++++++++++++++++++++++++++++
- arch/arm/mach-rockchip/pm.h       |  8 ++++++++
- arch/arm/mach-rockchip/rockchip.c | 19 +++++++++++++++++++
- 3 files changed, 60 insertions(+)
+diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+index b0dcbe2..22812fe 100644
+--- a/arch/arm/mach-rockchip/pm.c
++++ b/arch/arm/mach-rockchip/pm.c
+@@ -44,9 +44,11 @@ static void __iomem *rk3288_bootram_base;
+ static phys_addr_t rk3288_bootram_phy;
+ 
+ static struct regmap *pmu_regmap;
++static struct regmap *grf_regmap;
+ static struct regmap *sgrf_regmap;
+ 
+ static u32 rk3288_pmu_pwr_mode_con;
++static u32 rk3288_grf_soc_con0;
+ static u32 rk3288_sgrf_soc_con0;
+ 
+ static inline u32 rk3288_l2_config(void)
+@@ -70,12 +72,26 @@ static void rk3288_slp_mode_set(int level)
+ {
+ 	u32 mode_set, mode_set1;
+ 
++	regmap_read(grf_regmap, RK3288_GRF_SOC_CON0, &rk3288_grf_soc_con0);
++
+ 	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0, &rk3288_sgrf_soc_con0);
+ 
+ 	regmap_read(pmu_regmap, RK3288_PMU_PWRMODE_CON,
+ 		    &rk3288_pmu_pwr_mode_con);
+ 
+ 	/*
++	 * We need set this bit GRF_FORCE_JTAG here, for the debug module,
++	 * otherwise, it may become inaccessible after resume.
++	 * This creates a potential security issue, as the sdmmc pins may
++	 * accept jtag data for a short time during resume if no card is
++	 * inserted.
++	 * But this is of course also true for the regular boot, before we
++	 * turn of the jtag/sdmmc autodetect.
++	 */
++	regmap_write(grf_regmap, RK3288_GRF_SOC_CON0, GRF_FORCE_JTAG |
++		     GRF_FORCE_JTAG_WRITE);
++
++	/*
+ 	 * SGRF_FAST_BOOT_EN - system to boot from FAST_BOOT_ADDR
+ 	 * PCLK_WDT_GATE - disable WDT during suspend.
+ 	 */
+@@ -135,6 +151,9 @@ static void rk3288_slp_mode_set_resume(void)
+ 	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
+ 		     rk3288_sgrf_soc_con0 | SGRF_PCLK_WDT_GATE_WRITE
+ 		     | SGRF_FAST_BOOT_EN_WRITE);
++
++	regmap_write(grf_regmap, RK3288_GRF_SOC_CON0, rk3288_grf_soc_con0 |
++		     GRF_FORCE_JTAG_WRITE);
+ }
+ 
+ static int rockchip_lpmode_enter(unsigned long arg)
+@@ -193,6 +212,13 @@ static int rk3288_suspend_init(struct device_node *np)
+ 		return PTR_ERR(pmu_regmap);
+ 	}
+ 
++	grf_regmap = syscon_regmap_lookup_by_compatible(
++				"rockchip,rk3288-grf");
++	if (IS_ERR(grf_regmap)) {
++		pr_err("%s: could not find grf regmap\n", __func__);
++		return PTR_ERR(pmu_regmap);
++	}
++
+ 	sram_np = of_find_compatible_node(NULL, NULL,
+ 					  "rockchip,rk3288-pmu-sram");
+ 	if (!sram_np) {
+diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
+index 3e8d39c..f8a747b 100644
+--- a/arch/arm/mach-rockchip/pm.h
++++ b/arch/arm/mach-rockchip/pm.h
+@@ -48,6 +48,10 @@ static inline void rockchip_suspend_init(void)
+ #define RK3288_PMU_WAKEUP_RST_CLR_CNT	0x44
+ #define RK3288_PMU_PWRMODE_CON1		0x90
+ 
++#define RK3288_GRF_SOC_CON0		0x244
++#define GRF_FORCE_JTAG			BIT(12)
++#define GRF_FORCE_JTAG_WRITE		BIT(28)
++
+ #define RK3288_SGRF_SOC_CON0		(0x0000)
+ #define RK3288_SGRF_FAST_BOOT_ADDR	(0x0120)
+ #define SGRF_PCLK_WDT_GATE		BIT(6)
+-- 
+2.1.4
