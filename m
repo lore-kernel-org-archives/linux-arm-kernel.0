@@ -1,94 +1,126 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 26 Apr 2015 11:16:48 +0300
-Subject: [PATCH 1/4] mtd: nand: mxc_nand: cleanup copy_spare function
-In-Reply-To: <cover.1430034929.git.baruch@tkos.co.il>
-References: <cover.1430034929.git.baruch@tkos.co.il>
-Message-ID: <15bfff1fdffecb6ca7070504aa8d66dbd40feaee.1430034929.git.baruch@tkos.co.il>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 26 Apr 2015 10:39:58 +0200
+Subject: [PATCH 1/3] ARM: dts: sunxi: A10s Olinuxino add missing SPI and
+ simplefb.
+In-Reply-To: <f6e34cb3f0b72fcb0ae18ccf96962fb8a1c477f7.1430034797.git.hramrach@gmail.com>
+References: <cover.1430034797.git.hramrach@gmail.com>
+ <f6e34cb3f0b72fcb0ae18ccf96962fb8a1c477f7.1430034797.git.hramrach@gmail.com>
+Message-ID: <20150426083958.GD5627@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Hi,
 
-To give people without the reference manual at hand a chance to
-understand how spare area is handled in the i.MX nand controller,
-improve commenting, naming of variables and coding style.
+On Mon, Mar 23, 2015 at 03:00:31PM +0100, Michal Suchanek wrote:
+> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
 
-No functional change intended.
+Commit log, please.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-[baruch: declare oob_chunk_size; update comments; reword commit log]
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- drivers/mtd/nand/mxc_nand.c | 46 ++++++++++++++++++++++++++++++---------------
- 1 file changed, 31 insertions(+), 15 deletions(-)
+> ---
+>  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 12 ++++++++++
+>  arch/arm/boot/dts/sun5i-a10s.dtsi                | 28 ++++++++++++++++++++++++
+>  2 files changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+> index aa88ee8..e546b3f 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+> +++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+> @@ -59,6 +59,12 @@
+>  	model = "Olimex A10s-Olinuxino Micro";
+>  	compatible = "olimex,a10s-olinuxino-micro", "allwinner,sun5i-a10s";
+>  
+> +	chosen {
+> +		framebuffer at 0 {
+> +			status = "okay";
+> +		};
+> +	};
+> +
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 372e0e38f59b..33b22b9c0b30 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -807,32 +807,48 @@ static void mxc_nand_select_chip_v2(struct mtd_info *mtd, int chip)
- }
- 
- /*
-- * Function to transfer data to/from spare area.
-+ * The controller splits a page into data chunks of 512 bytes + partial oob.
-+ * There are writesize / 512 such chunks, the size of the partial oob parts is
-+ * oobsize / #chunks rounded down to a multiple of 2. The last oob chunk then
-+ * contains additionally the byte lost by rounding (if any).
-+ * This function handles the needed shuffling between host->data_buf (which
-+ * holds a page in natural order, i.e. writesize bytes data + oobsize bytes
-+ * spare) and the NFC buffer.
-  */
- static void copy_spare(struct mtd_info *mtd, bool bfrom)
- {
- 	struct nand_chip *this = mtd->priv;
- 	struct mxc_nand_host *host = this->priv;
--	u16 i, j;
--	u16 n = mtd->writesize >> 9;
-+	u16 i, oob_chunk_size;
-+	u16 num_chunks = mtd->writesize / 512;
-+
- 	u8 *d = host->data_buf + mtd->writesize;
- 	u8 __iomem *s = host->spare0;
--	u16 t = host->devtype_data->spare_len;
-+	u16 sparebuf_size = host->devtype_data->spare_len;
- 
--	j = (mtd->oobsize / n >> 1) << 1;
-+	/* size of oob chunk for all but possibly the last one */
-+	oob_chunk_size = (mtd->oobsize / num_chunks) & ~1;
- 
- 	if (bfrom) {
--		for (i = 0; i < n - 1; i++)
--			memcpy32_fromio(d + i * j, s + i * t, j);
--
--		/* the last section */
--		memcpy32_fromio(d + i * j, s + i * t, mtd->oobsize - i * j);
-+		for (i = 0; i < num_chunks - 1; i++)
-+			memcpy32_fromio(d + i * oob_chunk_size,
-+					s + i * sparebuf_size,
-+					oob_chunk_size);
-+
-+		/* the last chunk */
-+		memcpy32_fromio(d + i * oob_chunk_size,
-+				s + i * sparebuf_size,
-+				mtd->oobsize - i * oob_chunk_size);
- 	} else {
--		for (i = 0; i < n - 1; i++)
--			memcpy32_toio(&s[i * t], &d[i * j], j);
--
--		/* the last section */
--		memcpy32_toio(&s[i * t], &d[i * j], mtd->oobsize - i * j);
-+		for (i = 0; i < num_chunks - 1; i++)
-+			memcpy32_toio(&s[i * sparebuf_size],
-+				      &d[i * oob_chunk_size],
-+				      oob_chunk_size);
-+
-+		/* the last chunk */
-+		memcpy32_toio(&s[oob_chunk_size * sparebuf_size],
-+			      &d[i * oob_chunk_size],
-+			      mtd->oobsize - i * oob_chunk_size);
- 	}
- }
- 
+This is wrong.
+
+If the bootloader has set a simplefb node, it will enable the right
+one, if not it means that it's not meant to be used.
+
+>  	aliases {
+>  		serial0 = &uart0;
+>  		serial1 = &uart2;
+> @@ -182,6 +188,12 @@
+>  	status = "okay";
+>  };
+>  
+> +&spi2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&spi2_pins_a>;
+> +	status = "okay";
+> +};
+> +
+
+This should be in a separate patch, and the node are to be ordered
+alphabetically.
+
+>  &ohci0 {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index a78c95d..438eba1 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -154,6 +154,20 @@
+>  			clocks = <&apb1_gates 18>;
+>  			status = "disabled";
+>  		};
+> +
+> +		spi2: spi at 01c17000 {
+> +			compatible = "allwinner,sun4i-a10-spi";
+> +			reg = <0x01c17000 0x1000>;
+> +			interrupts = <12>;
+> +			clocks = <&ahb_gates 22>, <&spi2_clk>;
+> +			clock-names = "ahb", "mod";
+> +			dmas = <&dma SUN4I_DMA_DEDICATED 29>,
+> +			       <&dma SUN4I_DMA_DEDICATED 28>;
+> +			dma-names = "rx", "tx";
+> +			status = "disabled";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+>  	};
+>  };
+
+This should be in sun5i.dtsi (and in a separate patch).
+
+> @@ -198,4 +212,18 @@
+>  		allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+>  		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>  	};
+> +
+> +	spi2_pins_a: spi2 at 0 {
+> +		allwinner,pins = "PB11", "PB12", "PB13", "PB14";
+> +		allwinner,function = "spi2";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +
+> +	spi2_pins_b: spi2 at 1 {
+> +		allwinner,pins = "PE00", "PE01", "PE02", "PE03";
+> +		allwinner,function = "spi2";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+>  };
+
+Ditto.
+
+Thanks!
+Maxime
+
 -- 
-2.1.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150426/b5c13222/attachment.sig>
