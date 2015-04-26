@@ -1,59 +1,69 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Sun, 26 Apr 2015 12:07:29 -0700
-Subject: Question about DC-DC frequency handling
-In-Reply-To: <604104768.496325.1430058690855.JavaMail.open-xchange@oxbaltgw00.schlund.de>
-References: <604104768.496325.1430058690855.JavaMail.open-xchange@oxbaltgw00.schlund.de>
-Message-ID: <20150426190729.16410.58019@quantum>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sun, 26 Apr 2015 21:10:22 +0200
+Subject: [PATCH v5 1/3] ARM: pxa: pxa_cplds: add lubbock and mainstone IO
+In-Reply-To: <1429996403-13644-2-git-send-email-robert.jarzmik@free.fr>
+References: <1429996403-13644-1-git-send-email-robert.jarzmik@free.fr>
+ <1429996403-13644-2-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1430075422.2927.131.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stefan Wahren (2015-04-26 07:31:30)
-> Hi,
-> 
-> i'm current working on a regulator driver which should be able to change DC-DC
-> clock frequency.
-> 
-> Now here is my question. What is the prefered way to implement the clock
-> handling?
+On Sat, 2015-04-25 at 23:13 +0200, Robert Jarzmik wrote:
+> --- a/arch/arm/mach-pxa/Kconfig
+> +++ b/arch/arm/mach-pxa/Kconfig
+ 
+> +config PXA_SYSTEMS_CPLDS
+> +	bool "Motherboard cplds"
+> +	def_bool ARCH_LUBBOCK || MACH_MAINSTONE
 
-Fun question. I have a question for you: who are the consumers of this
-DC-DC? Do the downstream, consuming devices care about "clock rate" of
-your regulator?
+Just
+	default ARCH_LUBBOCK || MACH_MAINSTONE
 
-I'll hazard a guess that they do not care. DC-DC switching frequency is
-an important aspect of power supply design, but switching frequency of a
-power supply is not controlled by the clock framework in any example
-that I am aware of.
+should be enough.
 
-> 
-> Option A):
-> 
-> The regulator driver handles all internally (select clock source, set
-> frequency).
+> +	select MFD_CORE
+> +	help
+> +	  This driver supports the Lubbock and Mainstone multifunction chip
+> +	  found on the pxa25x development platform system (Lubbock) and pxa27x
+> +	  development platform system (Mainstone). This IO board supports the
+> +	  interrupts handling, ethernet controller, flash chips, etc ...
 
-Mark should weigh in on this, but I think option A is correct. Maybe
-something like regulator_set_mode could program your switching
-frequency?
+> --- a/arch/arm/mach-pxa/Makefile
+> +++ b/arch/arm/mach-pxa/Makefile
+ 
+> +obj-$(CONFIG_PXA_SYSTEMS_CPLDS)	+= pxa_cplds_irqs.o
 
-> 
-> Option B):
-> 
-> The DC-DC clock domain is implemented in the clock driver and the regulator
-> driver uses the clock framework.
+PXA_SYSTEMS_CPLDS is a bool symbol, so pxa_cplds_irqs.o will never be
+part of a module, correct?
 
-The only reason to use the clock framework is if downstream devices will
-call clk_get and do something with the rate (e.g. clk_get_rate,
-clk_set_rate, clk_enable, clk_disable, etc).
+> --- /dev/null
+> +++ b/arch/arm/mach-pxa/pxa_cplds_irqs.c
 
-It sounds like your downstream devices will want to enable & disable the
-regulator, but probably that's it?
+> +#include <linux/module.h>
 
-Of course I could be wrong about the DC-DC switching frequency stuff
-above, but that's my guess for now.
+Since this is built-in only code this include is probably unneeded.
 
-Regards,
-Mike
+> +MODULE_DEVICE_TABLE(of, cplds_id_table);
 
-> 
-> Best regards
-> Stefan
+MODULE_DEVICE_TABLE() will be preprocessed away for built-in only code.
+
+> +module_platform_driver(cplds_driver);
+
+Speaking from memory: for built-in only code this is equivalent to
+having a wrapper that only calls
+	platform_driver_register(&cplds_driver);
+
+and have that wrapper marked as
+	device_initcall()
+
+> +MODULE_DESCRIPTION("PXA Cplds interrupts driver");
+> +MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
+> +MODULE_LICENSE("GPL");
+
+These three macros will effectively be preprocessed away for built-in
+only code.
+
+Thanks,
+
+
+Paul Bolle
