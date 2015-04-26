@@ -1,93 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 26 Apr 2015 14:52:20 +0200
-Subject: [PATCH 1/3] ARM: dts: sunxi: A10s Olinuxino add missing SPI and
- simplefb.
-In-Reply-To: <CAOMqctTKoDeLqii7YEEv80B+Ru4tsVwiGYB0-u7XLPqNoEiCTQ@mail.gmail.com>
-References: <cover.1430034797.git.hramrach@gmail.com>
- <f6e34cb3f0b72fcb0ae18ccf96962fb8a1c477f7.1430034797.git.hramrach@gmail.com>
- <20150426083958.GD5627@lukather>
- <CAOMqctTKoDeLqii7YEEv80B+Ru4tsVwiGYB0-u7XLPqNoEiCTQ@mail.gmail.com>
-Message-ID: <20150426125220.GG5627@lukather>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Sun, 26 Apr 2015 16:03:28 +0200
+Subject: [PATCH 1/6] ARM: dts: berlin: relicense the berlin2q dtsi under
+ GPLv2/X11
+In-Reply-To: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1430057013-12842-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 26, 2015 at 11:21:34AM +0200, Michal Suchanek wrote:
-> Hello,
-> 
-> On 26 April 2015 at 10:39, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Mon, Mar 23, 2015 at 03:00:31PM +0100, Michal Suchanek wrote:
-> >> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> 
-> >>  &ohci0 {
-> >>       status = "okay";
-> >>  };
-> >> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> >> index a78c95d..438eba1 100644
-> >> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-> >> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> >> @@ -154,6 +154,20 @@
-> >>                       clocks = <&apb1_gates 18>;
-> >>                       status = "disabled";
-> >>               };
-> >> +
-> >> +             spi2: spi at 01c17000 {
-> >> +                     compatible = "allwinner,sun4i-a10-spi";
-> >> +                     reg = <0x01c17000 0x1000>;
-> >> +                     interrupts = <12>;
-> >> +                     clocks = <&ahb_gates 22>, <&spi2_clk>;
-> >> +                     clock-names = "ahb", "mod";
-> >> +                     dmas = <&dma SUN4I_DMA_DEDICATED 29>,
-> >> +                            <&dma SUN4I_DMA_DEDICATED 28>;
-> >> +                     dma-names = "rx", "tx";
-> >> +                     status = "disabled";
-> >> +                     #address-cells = <1>;
-> >> +                     #size-cells = <0>;
-> >> +             };
-> >>       };
-> >>  };
-> >
-> > This should be in sun5i.dtsi (and in a separate patch).
-> >
-> >> @@ -198,4 +212,18 @@
-> >>               allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-> >>               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> >>       };
-> >> +
-> >> +     spi2_pins_a: spi2 at 0 {
-> >> +             allwinner,pins = "PB11", "PB12", "PB13", "PB14";
-> >> +             allwinner,function = "spi2";
-> >> +             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> >> +             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> >> +     };
-> >> +
-> >> +     spi2_pins_b: spi2 at 1 {
-> >> +             allwinner,pins = "PE00", "PE01", "PE02", "PE03";
-> >> +             allwinner,function = "spi2";
-> >> +             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> >> +             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> >> +     };
-> >>  };
-> >
-> > Ditto.
-> >
-> 
-> A13 does not have these pins so maybe not?
+The current GPLv2 only licensing on this dtsi makes it very impractical
+for other software components licensed under another license.
 
-A13 has the PE* pins, but yeah, that's true for the first group.
+In order to make it easier for them to reuse our device trees, relicense
+this dtsi under a GPLv2/X11 dual-license.
 
-Maxime
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/boot/dts/berlin2q.dtsi | 34 +++++++++++++++++++++++++++++++---
+ 1 file changed, 31 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index be5397288d24..703ce384e0d7 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -1,9 +1,37 @@
+ /*
+  * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
+  *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is licensed under the terms of the GNU General Public
++ *     License version 2. This program is licensed "as is" without any
++ *     warranty of any kind, whether express or implied.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+ #include <dt-bindings/clock/berlin2q.h>
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150426/62f0eeab/attachment-0001.sig>
+2.3.6
