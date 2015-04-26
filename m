@@ -1,52 +1,79 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 26 Apr 2015 10:49:26 +0200
-Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
- using PM clocks
-In-Reply-To: <553A21C7.4060506@codeaurora.org>
-References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
- <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
- <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
- <553A21C7.4060506@codeaurora.org>
-Message-ID: <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Sun, 26 Apr 2015 11:21:34 +0200
+Subject: [PATCH 1/3] ARM: dts: sunxi: A10s Olinuxino add missing SPI and
+ simplefb.
+In-Reply-To: <20150426083958.GD5627@lukather>
+References: <cover.1430034797.git.hramrach@gmail.com>
+ <f6e34cb3f0b72fcb0ae18ccf96962fb8a1c477f7.1430034797.git.hramrach@gmail.com>
+ <20150426083958.GD5627@lukather>
+Message-ID: <CAOMqctTKoDeLqii7YEEv80B+Ru4tsVwiGYB0-u7XLPqNoEiCTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 12:58 PM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
->> Second, I want to see less users of pm_clk_add_notifier() since it's
->> not the proper/long-term way of how to assign PM domain pointers to a
->> device. Instead that shall be done at device registration point. In
->> your case while parsing the DT nodes and adding devices onto to their
->> buses.
+Hello,
+
+On 26 April 2015 at 10:39, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
 >
-> but these are devices which do not really have a controllable power
-> domain, they just have controllable clocks.
+> On Mon, Mar 23, 2015 at 03:00:31PM +0100, Michal Suchanek wrote:
+>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+
+>>  &ohci0 {
+>>       status = "okay";
+>>  };
+>> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+>> index a78c95d..438eba1 100644
+>> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+>> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+>> @@ -154,6 +154,20 @@
+>>                       clocks = <&apb1_gates 18>;
+>>                       status = "disabled";
+>>               };
+>> +
+>> +             spi2: spi at 01c17000 {
+>> +                     compatible = "allwinner,sun4i-a10-spi";
+>> +                     reg = <0x01c17000 0x1000>;
+>> +                     interrupts = <12>;
+>> +                     clocks = <&ahb_gates 22>, <&spi2_clk>;
+>> +                     clock-names = "ahb", "mod";
+>> +                     dmas = <&dma SUN4I_DMA_DEDICATED 29>,
+>> +                            <&dma SUN4I_DMA_DEDICATED 28>;
+>> +                     dma-names = "rx", "tx";
+>> +                     status = "disabled";
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +             };
+>>       };
+>>  };
 >
->> Yes, I understand that it will requires quite some work to adopt to
->> this behaviour - but that how it shall be done.
->>
->> Finally, an important note, you don't need to use PM domains for these
->> devices at all and thus you don't need to fix what I propose. Instead
->> you only have to implement the runtime PM callbacks for each driver
->> and manage the clocks from there. That is probably also a easier
->> solution.
+> This should be in sun5i.dtsi (and in a separate patch).
 >
-> But that would mean I repeat the same code in all drivers to do a
-> clk_get/prepare/enable/disable/unprepare of the same "core" and "iface"
-> clocks. I thought we have clock_ops.c just to avoid that (atleast up
-> until we have a better way of doing it)
-> And there are atleast a few architecture which have used it to avoid the
-> duplication across all drivers (omap1/davinci/sh/keystone)
+>> @@ -198,4 +212,18 @@
+>>               allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+>>               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>       };
+>> +
+>> +     spi2_pins_a: spi2 at 0 {
+>> +             allwinner,pins = "PB11", "PB12", "PB13", "PB14";
+>> +             allwinner,function = "spi2";
+>> +             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +     };
+>> +
+>> +     spi2_pins_b: spi2 at 1 {
+>> +             allwinner,pins = "PE00", "PE01", "PE02", "PE03";
+>> +             allwinner,function = "spi2";
+>> +             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +     };
+>>  };
+>
+> Ditto.
+>
 
-At least for arm/shmobile, we're planning to move away from this, cfr.
-http://www.spinics.net/lists/linux-sh/msg41114.html
+A13 does not have these pins so maybe not?
 
-Gr{oetje,eeting}s,
+Thanks
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Michal
