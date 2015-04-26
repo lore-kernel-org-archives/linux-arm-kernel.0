@@ -1,158 +1,52 @@
-From: orca.chen@gmail.com (Min-Hua Chen)
-Date: Sun, 26 Apr 2015 16:47:08 +0800
-Subject: [PATCH v2] arm: improve non-section-aligned low memory mapping
-Message-ID: <1430038028-22625-1-git-send-email-orca.chen@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 26 Apr 2015 10:49:26 +0200
+Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
+ using PM clocks
+In-Reply-To: <553A21C7.4060506@codeaurora.org>
+References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
+ <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
+ <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
+ <553A21C7.4060506@codeaurora.org>
+Message-ID: <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix space errors.
+On Fri, Apr 24, 2015 at 12:58 PM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+>> Second, I want to see less users of pm_clk_add_notifier() since it's
+>> not the proper/long-term way of how to assign PM domain pointers to a
+>> device. Instead that shall be done at device registration point. In
+>> your case while parsing the DT nodes and adding devices onto to their
+>> buses.
+>
+> but these are devices which do not really have a controllable power
+> domain, they just have controllable clocks.
+>
+>> Yes, I understand that it will requires quite some work to adopt to
+>> this behaviour - but that how it shall be done.
+>>
+>> Finally, an important note, you don't need to use PM domains for these
+>> devices at all and thus you don't need to fix what I propose. Instead
+>> you only have to implement the runtime PM callbacks for each driver
+>> and manage the clocks from there. That is probably also a easier
+>> solution.
+>
+> But that would mean I repeat the same code in all drivers to do a
+> clk_get/prepare/enable/disable/unprepare of the same "core" and "iface"
+> clocks. I thought we have clock_ops.c just to avoid that (atleast up
+> until we have a better way of doing it)
+> And there are atleast a few architecture which have used it to avoid the
+> duplication across all drivers (omap1/davinci/sh/keystone)
 
-In current design, the memblock.current_limit is set to
-a section-aligned value in sanity_check_meminfo().
+At least for arm/shmobile, we're planning to move away from this, cfr.
+http://www.spinics.net/lists/linux-sh/msg41114.html
 
-However, the section-aligned memblock may become non-section-aligned
-after arm_memblock_init(). For example, the first section-aligned
-memblock is 0x00000000-0x01000000 and sanity_check_meminfo sets
-current_limit to 0x01000000. After arm_memblock_init, two memory blocks
-[0x00c00000 - 0x00d00000] and [0x00ff0000 - 0x01000000] are reserved
-by memblock_reserve() and make the original memory block
-[0x00000000-0x01000000] becomes:
+Gr{oetje,eeting}s,
 
-[0x00000000-0x00c00000]
-[0x00d00000-0x00ff0000]
+                        Geert
 
-When creating the low memory mapping for [0x00d00000-0x00ff0000],
-since the memory block is non-section-aligned, it will need to create
-a second level page table. But the current_limit is set to 0x01000000,
-and it's possible to allocate a unmapped memory block.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-call flow:
-
-setup_arch
- + sanity_check_meminfo
- + arm_memblock_init
- + paging_init
-    + map_lowmem
-    + bootmem_init
-
-Move the memblock_set_current_limit logic to map_lowmem(), we point
-the memblock current_limit to the first section-aligned memblock block.
-Since map_lowmem() is called after arm_memblock_init(), there is no way to
-change memblock layout. So we can say that the first section-aligned limit
-is valid during map_lowmem(). Hence fix the problem described above.
-
-Another change is change the implementation of find_limits().
-In commit: 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76, the max_low is
-set by memblock_get_current_limit(). However memblock.current_limit
-can be changed by memblock_set_current_limit() anypoint before
-find_limits().
-
-It's better to use arm_lowmem_limit to be max_lowmem in two ways:
-First, arm_lowmem_limit cannot be changed by a public API. Second, the
-high_memory is set by arm_lowmem_limit and is a natural limit of
-low memory area in bootmem_init().
-
-thanks,
-Min-Hua
-
-Signed-off-by: Min-Hua Chen <orca.chen@gmail.com>
----
- arch/arm/mm/init.c |    2 +-
- arch/arm/mm/mmu.c  |   44 ++++++++++----------------------------------
- 2 files changed, 11 insertions(+), 35 deletions(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 2495c8c..6a618f9 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -138,7 +138,7 @@ void show_mem(unsigned int filter)
- static void __init find_limits(unsigned long *min, unsigned long *max_low,
- 			       unsigned long *max_high)
- {
--	*max_low = PFN_DOWN(memblock_get_current_limit());
-+	*max_low = PFN_DOWN(arm_lowmem_limit);
- 	*min = PFN_UP(memblock_start_of_DRAM());
- 	*max_high = PFN_DOWN(memblock_end_of_DRAM());
- }
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 4e6ef89..dbc484d 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1068,7 +1068,6 @@ phys_addr_t arm_lowmem_limit __initdata = 0;
- 
- void __init sanity_check_meminfo(void)
- {
--	phys_addr_t memblock_limit = 0;
- 	int highmem = 0;
- 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
- 	struct memblock_region *reg;
-@@ -1110,43 +1109,10 @@ void __init sanity_check_meminfo(void)
- 				else
- 					arm_lowmem_limit = block_end;
- 			}
--
--			/*
--			 * Find the first non-section-aligned page, and point
--			 * memblock_limit at it. This relies on rounding the
--			 * limit down to be section-aligned, which happens at
--			 * the end of this function.
--			 *
--			 * With this algorithm, the start or end of almost any
--			 * bank can be non-section-aligned. The only exception
--			 * is that the start of the bank 0 must be section-
--			 * aligned, since otherwise memory would need to be
--			 * allocated when mapping the start of bank 0, which
--			 * occurs before any free memory is mapped.
--			 */
--			if (!memblock_limit) {
--				if (!IS_ALIGNED(block_start, SECTION_SIZE))
--					memblock_limit = block_start;
--				else if (!IS_ALIGNED(block_end, SECTION_SIZE))
--					memblock_limit = arm_lowmem_limit;
--			}
--
- 		}
- 	}
- 
- 	high_memory = __va(arm_lowmem_limit - 1) + 1;
--
--	/*
--	 * Round the memblock limit down to a section size.  This
--	 * helps to ensure that we will allocate memory from the
--	 * last full section, which should be mapped.
--	 */
--	if (memblock_limit)
--		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
--	if (!memblock_limit)
--		memblock_limit = arm_lowmem_limit;
--
--	memblock_set_current_limit(memblock_limit);
- }
- 
- static inline void prepare_page_table(void)
-@@ -1331,6 +1297,7 @@ static void __init map_lowmem(void)
- 	struct memblock_region *reg;
- 	phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
- 	phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
-+	phys_addr_t section_block_limit = 0;
- 
- 	/* Map all the lowmem memory banks. */
- 	for_each_memblock(memory, reg) {
-@@ -1384,6 +1351,15 @@ static void __init map_lowmem(void)
- 				create_mapping(&map);
- 			}
- 		}
-+
-+		/*
-+		 * Find the first section-aligned memblock and set
-+		 * memblock_limit at it.
-+		 */
-+		if (!section_memblock_limit && !(end & ~SECTION_MASK)) {
-+			section_memblock_limit = end;
-+			memblock_set_current_limit(section_memblock_limit);
-+		}
- 	}
- }
- 
--- 
-1.7.10.4
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
