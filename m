@@ -1,43 +1,54 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Sun, 26 Apr 2015 17:41:38 +0800
-Subject: [PATCH v1 1/2] ARM: dts: rockchip: add properties for dwc2 usb otg
- controller
-Message-ID: <1430041299-24874-1-git-send-email-lyz@rock-chips.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 26 Apr 2015 12:13:59 +0200
+Subject: twl4030_charger: need changes to get probed?
+In-Reply-To: <CANOLnONc3+F=e3VfYZyGCtnzMOHV3GrX6cUSV1G4WJDPrgGFSg@mail.gmail.com>
+References: <20150224043341.4243.23291.stgit@notabene.brown>
+ <CANOLnONUtfF1UwgW3O5fkAX30UMznZXwbtPkqPFDLR4jFdNqow@mail.gmail.com>
+ <20150306224034.GA20559@amd> <201503062356.06110@pali>
+ <CANOLnONc3+F=e3VfYZyGCtnzMOHV3GrX6cUSV1G4WJDPrgGFSg@mail.gmail.com>
+Message-ID: <20150426101359.GA3933@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add properties for dwc2 usb device controller according to
-Documentation/devicetree/bindings/usb/dwc2.txt
+Hi!
 
-Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
----
+> >> Ok, but:
+> >>
+> >> 1) Why is the twl4030-bci enabled in n900's dts, then
+> >>
+> >
+> > maybe it is bug in n900 dts...
+> >
+> > Grazvydas, is there some runtime check if twl4030/twl5030 chip
+> > has charger or not? or do we need to explicitly disable device
+> > twl4030-bci in DT?
+> 
+> Actually from looking at the schematics, it looks like the charger
+> pins are still there but all connected to ground. So it probably has
+> the charger after all, it's just not connected or used.
+> 
+> I'm not aware or any registers for direct detection, and indirect
+> detection is difficult because BCI mostly disables itself when no
+> charger is connected and most registers read as 0 or have old values
+> from last charging session (which will never happen on n900).
+> 
+> There is IDCODE register on twl4030 itself, but it's documented as not
+> meaningful when accessed over i2c (when is it meaningful then??).
+> 
+> drivers/mfd/twl-core.c has a i2c_device_id table of various twl4030
+> variants, some of which have no charger. N900 has GAIA/twl5030, which
+> differs from twl4030 only by vaux2 regulator according to that file.
+> N900's old board files specify 5030, but .dts does not.
 
- arch/arm/boot/dts/rk3288.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+I have enabled the (not-too-useful) twl4030 charger on my n900, and
+it seems to break boot with kernels
+34c9a0ffc75ad25b6a60f61e27c4a4b1189b8085 and newer.
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index eccc78d..2b55b07 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -432,6 +432,7 @@
- 		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_USBHOST1>;
- 		clock-names = "otg";
-+		dr_mode = "host";
- 		status = "disabled";
- 	};
- 
-@@ -442,6 +443,11 @@
- 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru HCLK_OTG0>;
- 		clock-names = "otg";
-+		dr_mode = "otg";
-+		g-np-tx-fifo-size = <16>;
-+		g-rx-fifo-size = <275>;
-+		g-tx-fifo-size = <256 128 128 64 64 32>;
-+		g-use-dma;
- 		status = "disabled";
- 	};
- 
+I'll probably not have time to investigate it further (charger not
+connected to anything is not too useful), but maybe Neil wants to test
+on his phone...?
+									
+									Pavel
 -- 
-2.0.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
