@@ -1,114 +1,221 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 26 Apr 2015 22:31:08 +0800
-Subject: [PATCH 07/11] ARM: imx6: do not use cpu_is_xxx() in clock driver
+Date: Sun, 26 Apr 2015 22:31:09 +0800
+Subject: [PATCH 08/11] ARM: imx: add clk-pllv1 type support
 In-Reply-To: <1430058672-9267-1-git-send-email-shawn.guo@linaro.org>
 References: <1430058672-9267-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1430058672-9267-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1430058672-9267-9-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to move clock drivers out of arch/arm/mach-imx,
-cpu_is_xxx() shouldn't be used any more.  Let's avoid the call by
-looking at the device tree machine compatible string to determine
-which SoC the clock driver is running on.
+Instead of calling cpu_is_xxx() in clk-pllv1 driver, let's add clk-pllv1
+type support to handle the difference/quirk in particular SoC designs.
+Doing so will help get clk-pllv1 driver ready for being moved out of
+arch/arm/mach-imx folder.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/clk-imx6q.c | 26 ++++++++++++++++++--------
- 1 file changed, 18 insertions(+), 8 deletions(-)
+ arch/arm/mach-imx/clk-imx1.c  |  4 ++--
+ arch/arm/mach-imx/clk-imx21.c |  4 ++--
+ arch/arm/mach-imx/clk-imx25.c |  4 ++--
+ arch/arm/mach-imx/clk-imx27.c |  4 ++--
+ arch/arm/mach-imx/clk-imx31.c |  6 +++---
+ arch/arm/mach-imx/clk-imx35.c |  4 ++--
+ arch/arm/mach-imx/clk-pllv1.c | 31 ++++++++++++++++++++++++-------
+ arch/arm/mach-imx/clk.h       | 13 +++++++++++--
+ 8 files changed, 48 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 5e88038ad51c..d0135c62d21a 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -121,6 +121,16 @@ static unsigned int share_count_ssi2;
- static unsigned int share_count_ssi3;
- static unsigned int share_count_mipi_core_cfg;
+diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
+index 5301d2ebb234..9e68351bb72c 100644
+--- a/arch/arm/mach-imx/clk-imx1.c
++++ b/arch/arm/mach-imx/clk-imx1.c
+@@ -50,9 +50,9 @@ static void __init _mx1_clocks_init(unsigned long fref)
+ 	clk[IMX1_CLK_CLK16M] = imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
+ 	clk[IMX1_CLK_CLK32_PREMULT] = imx_clk_fixed_factor("clk32_premult", "clk32", 512, 1);
+ 	clk[IMX1_CLK_PREM] = imx_clk_mux("prem", CCM_CSCR, 16, 1, prem_sel_clks, ARRAY_SIZE(prem_sel_clks));
+-	clk[IMX1_CLK_MPLL] = imx_clk_pllv1("mpll", "clk32_premult", CCM_MPCTL0);
++	clk[IMX1_CLK_MPLL] = imx_clk_pllv1(IMX_PLLV1_IMX1, "mpll", "clk32_premult", CCM_MPCTL0);
+ 	clk[IMX1_CLK_MPLL_GATE] = imx_clk_gate("mpll_gate", "mpll", CCM_CSCR, 0);
+-	clk[IMX1_CLK_SPLL] = imx_clk_pllv1("spll", "prem", CCM_SPCTL0);
++	clk[IMX1_CLK_SPLL] = imx_clk_pllv1(IMX_PLLV1_IMX1, "spll", "prem", CCM_SPCTL0);
+ 	clk[IMX1_CLK_SPLL_GATE] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
+ 	clk[IMX1_CLK_MCU] = imx_clk_divider("mcu", "clk32_premult", CCM_CSCR, 15, 1);
+ 	clk[IMX1_CLK_FCLK] = imx_clk_divider("fclk", "mpll_gate", CCM_CSCR, 15, 1);
+diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
+index facdf1ddd7f1..bc4254dd40a1 100644
+--- a/arch/arm/mach-imx/clk-imx21.c
++++ b/arch/arm/mach-imx/clk-imx21.c
+@@ -63,9 +63,9 @@ static void __init _mx21_clocks_init(unsigned long lref, unsigned long href)
+ 	clk[IMX21_CLK_USB_DIV] = imx_clk_divider("usb_div", "spll_gate", CCM_CSCR, 26, 3);
+ 	clk[IMX21_CLK_FCLK] = imx_clk_divider("fclk", "mpll_gate", CCM_CSCR, 29, 3);
  
-+static inline int clk_on_imx6q(void)
-+{
-+	return of_machine_is_compatible("fsl,imx6q");
-+}
-+
-+static inline int clk_on_imx6dl(void)
-+{
-+	return of_machine_is_compatible("fsl,imx6dl");
-+}
-+
- static void __init imx6q_clocks_init(struct device_node *ccm_node)
+-	clk[IMX21_CLK_MPLL] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
++	clk[IMX21_CLK_MPLL] = imx_clk_pllv1(IMX_PLLV1_IMX21, "mpll", "mpll_sel", CCM_MPCTL0);
+ 
+-	clk[IMX21_CLK_SPLL] = imx_clk_pllv1("spll", "spll_sel", CCM_SPCTL0);
++	clk[IMX21_CLK_SPLL] = imx_clk_pllv1(IMX_PLLV1_IMX21, "spll", "spll_sel", CCM_SPCTL0);
+ 
+ 	clk[IMX21_CLK_NFC_DIV] = imx_clk_divider("nfc_div", "fclk", CCM_PCDR0, 12, 4);
+ 	clk[IMX21_CLK_SSI1_DIV] = imx_clk_divider("ssi1_div", "ssi1_sel", CCM_PCDR0, 16, 6);
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index 9c2633a9de9f..485d090d2267 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -95,8 +95,8 @@ static int __init __mx25_clocks_init(unsigned long osc_rate,
+ 
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+ 	clk[osc] = imx_clk_fixed("osc", osc_rate);
+-	clk[mpll] = imx_clk_pllv1("mpll", "osc", ccm(CCM_MPCTL));
+-	clk[upll] = imx_clk_pllv1("upll", "osc", ccm(CCM_UPCTL));
++	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "mpll", "osc", ccm(CCM_MPCTL));
++	clk[upll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "upll", "osc", ccm(CCM_UPCTL));
+ 	clk[mpll_cpu_3_4] = imx_clk_fixed_factor("mpll_cpu_3_4", "mpll", 3, 4);
+ 	clk[cpu_sel] = imx_clk_mux("cpu_sel", ccm(CCM_CCTL), 14, 1, cpu_sel_clks, ARRAY_SIZE(cpu_sel_clks));
+ 	clk[cpu] = imx_clk_divider("cpu", "cpu_sel", ccm(CCM_CCTL), 30, 2);
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index aeb19982a36e..530af09c6bc7 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -54,8 +54,8 @@ static void __init _mx27_clocks_init(unsigned long fref)
+ 	clk[IMX27_CLK_CKIH_GATE] = imx_clk_gate_dis("ckih_gate", "ckih", CCM_CSCR, 3);
+ 	clk[IMX27_CLK_MPLL_OSC_SEL] = imx_clk_mux("mpll_osc_sel", CCM_CSCR, 4, 1, mpll_osc_sel_clks, ARRAY_SIZE(mpll_osc_sel_clks));
+ 	clk[IMX27_CLK_MPLL_SEL] = imx_clk_mux("mpll_sel", CCM_CSCR, 16, 1, mpll_sel_clks, ARRAY_SIZE(mpll_sel_clks));
+-	clk[IMX27_CLK_MPLL] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
+-	clk[IMX27_CLK_SPLL] = imx_clk_pllv1("spll", "ckih_gate", CCM_SPCTL0);
++	clk[IMX27_CLK_MPLL] = imx_clk_pllv1(IMX_PLLV1_IMX27, "mpll", "mpll_sel", CCM_MPCTL0);
++	clk[IMX27_CLK_SPLL] = imx_clk_pllv1(IMX_PLLV1_IMX27, "spll", "ckih_gate", CCM_SPCTL0);
+ 	clk[IMX27_CLK_SPLL_GATE] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
+ 	clk[IMX27_CLK_MPLL_MAIN2] = imx_clk_fixed_factor("mpll_main2", "mpll", 2, 3);
+ 
+diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
+index 2aaccadb9e13..caa26ec32152 100644
+--- a/arch/arm/mach-imx/clk-imx31.c
++++ b/arch/arm/mach-imx/clk-imx31.c
+@@ -59,9 +59,9 @@ int __init mx31_clocks_init(unsigned long fref)
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+ 	clk[ckih] = imx_clk_fixed("ckih", fref);
+ 	clk[ckil] = imx_clk_fixed("ckil", 32768);
+-	clk[mpll] = imx_clk_pllv1("mpll", "ckih", base + MXC_CCM_MPCTL);
+-	clk[spll] = imx_clk_pllv1("spll", "ckih", base + MXC_CCM_SRPCTL);
+-	clk[upll] = imx_clk_pllv1("upll", "ckih", base + MXC_CCM_UPCTL);
++	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX31, "mpll", "ckih", base + MXC_CCM_MPCTL);
++	clk[spll] = imx_clk_pllv1(IMX_PLLV1_IMX31, "spll", "ckih", base + MXC_CCM_SRPCTL);
++	clk[upll] = imx_clk_pllv1(IMX_PLLV1_IMX31, "upll", "ckih", base + MXC_CCM_UPCTL);
+ 	clk[mcu_main] = imx_clk_mux("mcu_main", base + MXC_CCM_PMCR0, 31, 1, mcu_main_sel, ARRAY_SIZE(mcu_main_sel));
+ 	clk[hsp] = imx_clk_divider("hsp", "mcu_main", base + MXC_CCM_PDR0, 11, 3);
+ 	clk[ahb] = imx_clk_divider("ahb", "mcu_main", base + MXC_CCM_PDR0, 3, 3);
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index 14f33ec049bc..f53d2b502479 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -92,8 +92,8 @@ int __init mx35_clocks_init(void)
+ 	}
+ 
+ 	clk[ckih] = imx_clk_fixed("ckih", 24000000);
+-	clk[mpll] = imx_clk_pllv1("mpll", "ckih", base + MX35_CCM_MPCTL);
+-	clk[ppll] = imx_clk_pllv1("ppll", "ckih", base + MX35_CCM_PPCTL);
++	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX35, "mpll", "ckih", base + MX35_CCM_MPCTL);
++	clk[ppll] = imx_clk_pllv1(IMX_PLLV1_IMX35, "ppll", "ckih", base + MX35_CCM_PPCTL);
+ 
+ 	clk[mpll] = imx_clk_fixed_factor("mpll_075", "mpll", 3, 4);
+ 
+diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
+index d21d14ca46c1..4e1cb9f39a29 100644
+--- a/arch/arm/mach-imx/clk-pllv1.c
++++ b/arch/arm/mach-imx/clk-pllv1.c
+@@ -26,13 +26,29 @@
+ struct clk_pllv1 {
+ 	struct clk_hw	hw;
+ 	void __iomem	*base;
++	enum imx_pllv1_type type;
+ };
+ 
+ #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
+ 
+-static inline bool mfn_is_negative(unsigned int mfn)
++static inline bool is_imx1_pllv1(struct clk_pllv1 *pll)
  {
- 	struct device_node *np;
-@@ -141,7 +151,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	WARN_ON(!base);
+-	return !cpu_is_mx1() && !cpu_is_mx21() && (mfn & MFN_SIGN);
++	return pll->type == IMX_PLLV1_IMX1;
++}
++
++static inline bool is_imx21_pllv1(struct clk_pllv1 *pll)
++{
++	return pll->type == IMX_PLLV1_IMX21;
++}
++
++static inline bool is_imx27_pllv1(struct clk_pllv1 *pll)
++{
++	return pll->type == IMX_PLLV1_IMX27;
++}
++
++static inline bool mfn_is_negative(struct clk_pllv1 *pll, unsigned int mfn)
++{
++	return !is_imx1_pllv1(pll) && !is_imx21_pllv1(pll) && (mfn & MFN_SIGN);
+ }
  
- 	/* Audio/video PLL post dividers do not work on i.MX6q revision 1.0 */
--	if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_1_0) {
-+	if (clk_on_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_1_0) {
- 		post_div_table[1].div = 1;
- 		post_div_table[2].div = 1;
- 		video_div_table[1].div = 1;
-@@ -248,7 +258,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
- 	clk[IMX6QDL_CLK_GPT_3M]    = imx_clk_fixed_factor("gpt_3m",    "osc",            1, 8);
- 	clk[IMX6QDL_CLK_VIDEO_27M] = imx_clk_fixed_factor("video_27m", "pll3_pfd1_540m", 1, 20);
--	if (cpu_is_imx6dl()) {
-+	if (clk_on_imx6dl()) {
- 		clk[IMX6QDL_CLK_GPU2D_AXI] = imx_clk_fixed_factor("gpu2d_axi", "mmdc_ch0_axi_podf", 1, 1);
- 		clk[IMX6QDL_CLK_GPU3D_AXI] = imx_clk_fixed_factor("gpu3d_axi", "mmdc_ch0_axi_podf", 1, 1);
- 	}
-@@ -273,7 +283,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_ESAI_SEL]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
- 	clk[IMX6QDL_CLK_ASRC_SEL]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
- 	clk[IMX6QDL_CLK_SPDIF_SEL]        = imx_clk_mux("spdif_sel",        base + 0x30, 20, 2, audio_sels,        ARRAY_SIZE(audio_sels));
--	if (cpu_is_imx6q()) {
-+	if (clk_on_imx6q()) {
- 		clk[IMX6QDL_CLK_GPU2D_AXI]        = imx_clk_mux("gpu2d_axi",        base + 0x18, 0,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
- 		clk[IMX6QDL_CLK_GPU3D_AXI]        = imx_clk_mux("gpu3d_axi",        base + 0x18, 1,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
- 	}
-@@ -380,7 +390,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_ECSPI2]       = imx_clk_gate2("ecspi2",        "ecspi_root",        base + 0x6c, 2);
- 	clk[IMX6QDL_CLK_ECSPI3]       = imx_clk_gate2("ecspi3",        "ecspi_root",        base + 0x6c, 4);
- 	clk[IMX6QDL_CLK_ECSPI4]       = imx_clk_gate2("ecspi4",        "ecspi_root",        base + 0x6c, 6);
--	if (cpu_is_imx6dl())
-+	if (clk_on_imx6dl())
- 		clk[IMX6DL_CLK_I2C4]  = imx_clk_gate2("i2c4",          "ipg_per",           base + 0x6c, 8);
- 	else
- 		clk[IMX6Q_CLK_ECSPI5] = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
-@@ -390,7 +400,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_ESAI_MEM]     = imx_clk_gate2_shared("esai_mem", "ahb",             base + 0x6c, 16, &share_count_esai);
- 	clk[IMX6QDL_CLK_GPT_IPG]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
- 	clk[IMX6QDL_CLK_GPT_IPG_PER]  = imx_clk_gate2("gpt_ipg_per",   "ipg_per",           base + 0x6c, 22);
--	if (cpu_is_imx6dl())
-+	if (clk_on_imx6dl())
- 		/*
- 		 * The multiplexer and divider of imx6q clock gpu3d_shader get
- 		 * redefined/reused as gpu2d_core_sel and gpu2d_core_podf on imx6dl.
-@@ -418,7 +428,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_HSI_TX]       = imx_clk_gate2_shared("hsi_tx", "hsi_tx_podf",       base + 0x74, 16, &share_count_mipi_core_cfg);
- 	clk[IMX6QDL_CLK_MIPI_CORE_CFG] = imx_clk_gate2_shared("mipi_core_cfg", "video_27m", base + 0x74, 16, &share_count_mipi_core_cfg);
- 	clk[IMX6QDL_CLK_MIPI_IPG]     = imx_clk_gate2_shared("mipi_ipg", "ipg",             base + 0x74, 16, &share_count_mipi_core_cfg);
--	if (cpu_is_imx6dl())
-+	if (clk_on_imx6dl())
- 		/*
- 		 * The multiplexer and divider of the imx6q clock gpu2d get
- 		 * redefined/reused as mlb_sys_sel and mlb_sys_clk_podf on imx6dl.
-@@ -468,7 +478,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	 * The gpt_3m clock is not available on i.MX6Q TO1.0.  Let's point it
- 	 * to clock gpt_ipg_per to ease the gpt driver code.
+ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+@@ -71,8 +87,8 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 	 * 2's complements number.
+ 	 * On i.MX27 the bit 9 is the sign bit.
  	 */
--	if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_1_0)
-+	if (clk_on_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_1_0)
- 		clk[IMX6QDL_CLK_GPT_3M] = clk[IMX6QDL_CLK_GPT_IPG_PER];
+-	if (mfn_is_negative(mfn)) {
+-		if (cpu_is_mx27())
++	if (mfn_is_negative(pll, mfn)) {
++		if (is_imx27_pllv1(pll))
+ 			mfn_abs = mfn & MFN_MASK;
+ 		else
+ 			mfn_abs = BIT(MFN_BITS) - mfn;
+@@ -85,7 +101,7 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
  
- 	imx_check_clocks(clk, ARRAY_SIZE(clk));
-@@ -480,7 +490,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk_register_clkdev(clk[IMX6QDL_CLK_ENET_REF], "enet_ref", NULL);
+ 	do_div(ll, mfd + 1);
  
- 	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
--	    cpu_is_imx6dl()) {
-+	    clk_on_imx6dl()) {
- 		clk_set_parent(clk[IMX6QDL_CLK_LDB_DI0_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
- 		clk_set_parent(clk[IMX6QDL_CLK_LDB_DI1_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
- 	}
+-	if (mfn_is_negative(mfn))
++	if (mfn_is_negative(pll, mfn))
+ 		ll = -ll;
+ 
+ 	ll = (rate * mfi) + ll;
+@@ -97,8 +113,8 @@ static struct clk_ops clk_pllv1_ops = {
+ 	.recalc_rate = clk_pllv1_recalc_rate,
+ };
+ 
+-struct clk *imx_clk_pllv1(const char *name, const char *parent,
+-		void __iomem *base)
++struct clk *imx_clk_pllv1(enum imx_pllv1_type type, const char *name,
++		const char *parent, void __iomem *base)
+ {
+ 	struct clk_pllv1 *pll;
+ 	struct clk *clk;
+@@ -109,6 +125,7 @@ struct clk *imx_clk_pllv1(const char *name, const char *parent,
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	pll->base = base;
++	pll->type = type;
+ 
+ 	init.name = name;
+ 	init.ops = &clk_pllv1_ops;
+diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+index 6a07903a28bc..b5297e457a8e 100644
+--- a/arch/arm/mach-imx/clk.h
++++ b/arch/arm/mach-imx/clk.h
+@@ -10,8 +10,17 @@ void imx_check_clocks(struct clk *clks[], unsigned int count);
+ 
+ extern void imx_cscmr1_fixup(u32 *val);
+ 
+-struct clk *imx_clk_pllv1(const char *name, const char *parent,
+-		void __iomem *base);
++enum imx_pllv1_type {
++	IMX_PLLV1_IMX1,
++	IMX_PLLV1_IMX21,
++	IMX_PLLV1_IMX25,
++	IMX_PLLV1_IMX27,
++	IMX_PLLV1_IMX31,
++	IMX_PLLV1_IMX35,
++};
++
++struct clk *imx_clk_pllv1(enum imx_pllv1_type type, const char *name,
++		const char *parent, void __iomem *base);
+ 
+ struct clk *imx_clk_pllv2(const char *name, const char *parent,
+ 		void __iomem *base);
 -- 
 1.9.1
