@@ -1,68 +1,27 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Sun, 26 Apr 2015 16:03:32 +0200
-Subject: [PATCH 5/6] ARM: dts: berlin: relicense the berlin2cd dtsi under
- GPLv2/X11
-In-Reply-To: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1430057013-12842-6-git-send-email-antoine.tenart@free-electrons.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 26 Apr 2015 16:31:30 +0200 (CEST)
+Subject: Question about DC-DC frequency handling
+Message-ID: <604104768.496325.1430058690855.JavaMail.open-xchange@oxbaltgw00.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current GPLv2 only licensing on this dtsi makes it very impractical
-for other software components licensed under another license.
+Hi,
 
-In order to make it easier for them to reuse our device trees, relicense
-this dtsi under a GPLv2/X11 dual-license.
+i'm current working on a regulator driver which should be able to change DC-DC
+clock frequency.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2cd.dtsi | 34 +++++++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+Now here is my question. What is the prefered way to implement the clock
+handling?
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 81b670ac494a..cb2a97cb9579 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -6,9 +6,37 @@
-  * based on GPL'ed 2.6 kernel sources
-  *  (c) Marvell International Ltd.
-  *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is licensed under the terms of the GNU General Public
-+ *     License version 2. This program is licensed "as is" without any
-+ *     warranty of any kind, whether express or implied.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- #include "skeleton.dtsi"
--- 
-2.3.6
+Option A):
+
+The regulator driver handles all internally (select clock source, set
+frequency).
+
+Option B):
+
+The DC-DC clock domain is implemented in the clock driver and the regulator
+driver uses the clock framework.
+
+Best regards
+Stefan
