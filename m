@@ -1,59 +1,94 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 26 Apr 2015 11:16:51 +0300
-Subject: [PATCH 4/4] mtd: mxc_nand: generate nand_ecclayout for 8 bit ECC
+Date: Sun, 26 Apr 2015 11:16:48 +0300
+Subject: [PATCH 1/4] mtd: nand: mxc_nand: cleanup copy_spare function
 In-Reply-To: <cover.1430034929.git.baruch@tkos.co.il>
 References: <cover.1430034929.git.baruch@tkos.co.il>
-Message-ID: <c70c70dfe01be9356eeb238072fda699f30672fc.1430034929.git.baruch@tkos.co.il>
+Message-ID: <15bfff1fdffecb6ca7070504aa8d66dbd40feaee.1430034929.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware 8 bit ECC requires a different nand_ecclayout. Instead of adding yet
-another static struct nand_ecclayout, generate it in code.
+From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
+To give people without the reference manual at hand a chance to
+understand how spare area is handled in the i.MX nand controller,
+improve commenting, naming of variables and coding style.
+
+No functional change intended.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+[baruch: declare oob_chunk_size; update comments; reword commit log]
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- drivers/mtd/nand/mxc_nand.c | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/mxc_nand.c | 46 ++++++++++++++++++++++++++++++---------------
+ 1 file changed, 31 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index c05f5e8fef17..07493f0d9eb4 100644
+index 372e0e38f59b..33b22b9c0b30 100644
 --- a/drivers/mtd/nand/mxc_nand.c
 +++ b/drivers/mtd/nand/mxc_nand.c
-@@ -934,6 +934,22 @@ static int get_eccsize(struct mtd_info *mtd)
- 		return 8;
+@@ -807,32 +807,48 @@ static void mxc_nand_select_chip_v2(struct mtd_info *mtd, int chip)
  }
  
-+static void ecc_8bit_layout(struct nand_ecclayout *layout)
-+{
-+	int i, j;
-+
-+	for (i = 0; i < 8; i++)
-+		for (j = 0; j < 18; j++)
-+			layout->eccpos[i*18 + j] = i*26 + j + 7;
-+
-+	layout->oobfree[0].offset = 2;
-+	layout->oobfree[0].length = 4;
-+	for (i = 1; i < 8; i++) {
-+		layout->oobfree[i].offset = i*26;
-+		layout->oobfree[i].length = 7;
-+	}
-+}
-+
- static void preset_v1(struct mtd_info *mtd)
+ /*
+- * Function to transfer data to/from spare area.
++ * The controller splits a page into data chunks of 512 bytes + partial oob.
++ * There are writesize / 512 such chunks, the size of the partial oob parts is
++ * oobsize / #chunks rounded down to a multiple of 2. The last oob chunk then
++ * contains additionally the byte lost by rounding (if any).
++ * This function handles the needed shuffling between host->data_buf (which
++ * holds a page in natural order, i.e. writesize bytes data + oobsize bytes
++ * spare) and the NFC buffer.
+  */
+ static void copy_spare(struct mtd_info *mtd, bool bfrom)
  {
- 	struct nand_chip *nand_chip = mtd->priv;
-@@ -1610,8 +1626,11 @@ static int mxcnd_probe(struct platform_device *pdev)
+ 	struct nand_chip *this = mtd->priv;
+ 	struct mxc_nand_host *host = this->priv;
+-	u16 i, j;
+-	u16 n = mtd->writesize >> 9;
++	u16 i, oob_chunk_size;
++	u16 num_chunks = mtd->writesize / 512;
++
+ 	u8 *d = host->data_buf + mtd->writesize;
+ 	u8 __iomem *s = host->spare0;
+-	u16 t = host->devtype_data->spare_len;
++	u16 sparebuf_size = host->devtype_data->spare_len;
  
- 	if (mtd->writesize == 2048)
- 		this->ecc.layout = host->devtype_data->ecclayout_2k;
--	else if (mtd->writesize == 4096)
-+	else if (mtd->writesize == 4096) {
- 		this->ecc.layout = host->devtype_data->ecclayout_4k;
-+		if (get_eccsize(mtd) == 8)
-+			ecc_8bit_layout(this->ecc.layout);
-+	}
+-	j = (mtd->oobsize / n >> 1) << 1;
++	/* size of oob chunk for all but possibly the last one */
++	oob_chunk_size = (mtd->oobsize / num_chunks) & ~1;
  
- 	if (this->ecc.mode == NAND_ECC_HW) {
- 		if (is_imx21_nfc(host) || is_imx27_nfc(host))
+ 	if (bfrom) {
+-		for (i = 0; i < n - 1; i++)
+-			memcpy32_fromio(d + i * j, s + i * t, j);
+-
+-		/* the last section */
+-		memcpy32_fromio(d + i * j, s + i * t, mtd->oobsize - i * j);
++		for (i = 0; i < num_chunks - 1; i++)
++			memcpy32_fromio(d + i * oob_chunk_size,
++					s + i * sparebuf_size,
++					oob_chunk_size);
++
++		/* the last chunk */
++		memcpy32_fromio(d + i * oob_chunk_size,
++				s + i * sparebuf_size,
++				mtd->oobsize - i * oob_chunk_size);
+ 	} else {
+-		for (i = 0; i < n - 1; i++)
+-			memcpy32_toio(&s[i * t], &d[i * j], j);
+-
+-		/* the last section */
+-		memcpy32_toio(&s[i * t], &d[i * j], mtd->oobsize - i * j);
++		for (i = 0; i < num_chunks - 1; i++)
++			memcpy32_toio(&s[i * sparebuf_size],
++				      &d[i * oob_chunk_size],
++				      oob_chunk_size);
++
++		/* the last chunk */
++		memcpy32_toio(&s[oob_chunk_size * sparebuf_size],
++			      &d[i * oob_chunk_size],
++			      mtd->oobsize - i * oob_chunk_size);
+ 	}
+ }
+ 
 -- 
 2.1.4
