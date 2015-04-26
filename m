@@ -1,69 +1,43 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sun, 26 Apr 2015 21:10:22 +0200
-Subject: [PATCH v5 1/3] ARM: pxa: pxa_cplds: add lubbock and mainstone IO
-In-Reply-To: <1429996403-13644-2-git-send-email-robert.jarzmik@free.fr>
-References: <1429996403-13644-1-git-send-email-robert.jarzmik@free.fr>
- <1429996403-13644-2-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1430075422.2927.131.camel@x220>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 26 Apr 2015 21:28:42 +0200
+Subject: [PATCHv2 1/2] ARM: dts: imx23: Add i2c support
+In-Reply-To: <629731861.499409.1429954110131.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+References: <1429281806-7934-1-git-send-email-harald@ccbib.org>
+ <629731861.499409.1429954110131.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+Message-ID: <201504262128.42347.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2015-04-25 at 23:13 +0200, Robert Jarzmik wrote:
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
- 
-> +config PXA_SYSTEMS_CPLDS
-> +	bool "Motherboard cplds"
-> +	def_bool ARCH_LUBBOCK || MACH_MAINSTONE
+On Saturday, April 25, 2015 at 11:28:30 AM, Stefan Wahren wrote:
+> Hi Harald,
+> 
+> [add Marek and Wolfram]
 
-Just
-	default ARCH_LUBBOCK || MACH_MAINSTONE
+Thanks!
 
-should be enough.
+> > Harald Geyer <harald@ccbib.org> hat am 17. April 2015 um 16:43
+> > geschrieben:
+> > 
+> > 
+> > The imx23-olinuxino board has an i2c interface exposed on UEXT connector.
+> > This patch provides the generic devicetree infrastructure for a follow-up
+> > patch to add support to the actual board files.
+> > Tested all three possible pin groups with MOD-LCD1x9 from Olimex.
+> > 
+> > This patch is based on work by Fadil Berisha with his permission. However
+> > all bugs are mine.
+> > 
+> > Signed-off-by: Harald Geyer <harald@ccbib.org>
+> > ---
+> > changes since v1:
+> > split in generic and board specific patches
+> > arch/arm/boot/dts/imx23.dtsi | 40
+> > +++++++++++++++++++++++++++++++++++++++- 1 file changed, 39
+> > insertions(+), 1 deletion(-)
+> 
+> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-> +	select MFD_CORE
-> +	help
-> +	  This driver supports the Lubbock and Mainstone multifunction chip
-> +	  found on the pxa25x development platform system (Lubbock) and pxa27x
-> +	  development platform system (Mainstone). This IO board supports the
-> +	  interrupts handling, ethernet controller, flash chips, etc ...
+Acked-by: Marek Vasut <marex@denx.de>
 
-> --- a/arch/arm/mach-pxa/Makefile
-> +++ b/arch/arm/mach-pxa/Makefile
- 
-> +obj-$(CONFIG_PXA_SYSTEMS_CPLDS)	+= pxa_cplds_irqs.o
-
-PXA_SYSTEMS_CPLDS is a bool symbol, so pxa_cplds_irqs.o will never be
-part of a module, correct?
-
-> --- /dev/null
-> +++ b/arch/arm/mach-pxa/pxa_cplds_irqs.c
-
-> +#include <linux/module.h>
-
-Since this is built-in only code this include is probably unneeded.
-
-> +MODULE_DEVICE_TABLE(of, cplds_id_table);
-
-MODULE_DEVICE_TABLE() will be preprocessed away for built-in only code.
-
-> +module_platform_driver(cplds_driver);
-
-Speaking from memory: for built-in only code this is equivalent to
-having a wrapper that only calls
-	platform_driver_register(&cplds_driver);
-
-and have that wrapper marked as
-	device_initcall()
-
-> +MODULE_DESCRIPTION("PXA Cplds interrupts driver");
-> +MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
-> +MODULE_LICENSE("GPL");
-
-These three macros will effectively be preprocessed away for built-in
-only code.
-
-Thanks,
-
-
-Paul Bolle
+Best regards,
+Marek Vasut
