@@ -1,32 +1,23 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 26 Apr 2015 21:52:11 +0200
-Subject: [PATCH 3/4] mtd: mxc_nand: fix truncate of unaligned oob copying
-In-Reply-To: <1f8e85fd8e75170e1005473c075942cb3d4479fe.1430034929.git.baruch@tkos.co.il>
-References: <cover.1430034929.git.baruch@tkos.co.il>
- <1f8e85fd8e75170e1005473c075942cb3d4479fe.1430034929.git.baruch@tkos.co.il>
-Message-ID: <20150426195211.GB19431@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 26 Apr 2015 21:58:16 +0200
+Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
+In-Reply-To: <1429735986-18592-1-git-send-email-heiko@sntech.de> (Heiko
+ Stuebner's message of "Wed, 22 Apr 2015 22:53:04 +0200")
+References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
+Message-ID: <87pp6qk6g7.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Baruch,
+Heiko Stuebner <heiko@sntech.de> writes:
 
-On Sun, Apr 26, 2015 at 11:16:50AM +0300, Baruch Siach wrote:
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index c650f0950b20..c05f5e8fef17 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -840,22 +840,22 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
->  		for (i = 0; i < num_chunks - 1; i++)
->  			memcpy32_fromio(d + i * oob_chunk_size,
->  					s + i * sparebuf_size,
-> -					oob_chunk_size);
-> +					ALIGN(oob_chunk_size, 4));
-If oob_chunk_size isn't 32-bit-aligned, d + i * oob_chunk_size isn't
-either for uneven i. That's not nice. I suggest to use memcpy16_fromio.
+> Using orphan clocks can introduce strange behaviour as they don't have
+> rate information at all and also of course don't track
+Ok, everything works as before on some pxa platforms.
 
-Best regards
-Uwe
+As pxa clocks support is not even fully mainline, this test is not the best you
+could get.
+
+Cheers.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Robert
