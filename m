@@ -1,23 +1,25 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 26 Apr 2015 21:58:16 +0200
-Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
-In-Reply-To: <1429735986-18592-1-git-send-email-heiko@sntech.de> (Heiko
- Stuebner's message of "Wed, 22 Apr 2015 22:53:04 +0200")
-References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
-Message-ID: <87pp6qk6g7.fsf@belgarion.home>
+Date: Sun, 26 Apr 2015 21:59:36 +0200
+Subject: [PATCH v2 0/5] Driver for pxa architectures
+In-Reply-To: <87egnf7uqp.fsf@belgarion.home> (Robert Jarzmik's message of
+ "Sun, 19 Apr 2015 22:01:34 +0200")
+References: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
+ <87egnf7uqp.fsf@belgarion.home>
+Message-ID: <87lhhek6dz.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko Stuebner <heiko@sntech.de> writes:
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-> Using orphan clocks can introduce strange behaviour as they don't have
-> rate information at all and also of course don't track
-Ok, everything works as before on some pxa platforms.
-
-As pxa clocks support is not even fully mainline, this test is not the best you
-could get.
-
-Cheers.
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+>
+>> Hi Vinod,
+>>
+>> This is the same serie as in v1, only one fix around irq probing was included in
+>> patch 3/5. I copy-pasted the previous cover letter for reference here :
+>
+> Vinod, any update please ?
+Please ?
 
 -- 
 Robert
