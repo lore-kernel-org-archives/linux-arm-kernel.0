@@ -1,31 +1,31 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Sun, 26 Apr 2015 16:03:33 +0200
-Subject: [PATCH 6/6] ARM: dts: berlin: relicense the BG2CD Google Chromecast
- dts under GPLv2/X11
+Date: Sun, 26 Apr 2015 16:03:32 +0200
+Subject: [PATCH 5/6] ARM: dts: berlin: relicense the berlin2cd dtsi under
+ GPLv2/X11
 In-Reply-To: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1430057013-12842-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1430057013-12842-6-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current GPLv2 only licensing on this dts makes it very impractical
+The current GPLv2 only licensing on this dtsi makes it very impractical
 for other software components licensed under another license.
 
 In order to make it easier for them to reuse our device trees, relicense
-this dts under a GPLv2/X11 dual-license.
+this dtsi under a GPLv2/X11 dual-license.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 34 +++++++++++++++++++++--
+ arch/arm/boot/dts/berlin2cd.dtsi | 34 +++++++++++++++++++++++++++++++---
  1 file changed, 31 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-index 30270be4d0c9..772165ad0a52 100644
---- a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-+++ b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-@@ -3,9 +3,37 @@
-  *
-  * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index 81b670ac494a..cb2a97cb9579 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -6,9 +6,37 @@
+  * based on GPL'ed 2.6 kernel sources
+  *  (c) Marvell International Ltd.
   *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
@@ -63,6 +63,6 @@ index 30270be4d0c9..772165ad0a52 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- /dts-v1/;
+ #include "skeleton.dtsi"
 -- 
 2.3.6
