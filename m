@@ -1,66 +1,158 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 26 Apr 2015 10:42:21 +0200
-Subject: [PATCH 3/3] ARM: sunxi: spi: use proper errno when message is
- too long.
-In-Reply-To: <4c27d44b2bdd759424ce4a4b2e8f6abf5d5a6735.1430034797.git.hramrach@gmail.com>
-References: <cover.1430034797.git.hramrach@gmail.com>
- <4c27d44b2bdd759424ce4a4b2e8f6abf5d5a6735.1430034797.git.hramrach@gmail.com>
-Message-ID: <20150426084221.GE5627@lukather>
+From: orca.chen@gmail.com (Min-Hua Chen)
+Date: Sun, 26 Apr 2015 16:47:08 +0800
+Subject: [PATCH v2] arm: improve non-section-aligned low memory mapping
+Message-ID: <1430038028-22625-1-git-send-email-orca.chen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 25, 2015 at 09:21:07PM +0200, Michal Suchanek wrote:
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+Fix space errors.
 
-No commit log?
+In current design, the memblock.current_limit is set to
+a section-aligned value in sanity_check_meminfo().
 
-> ---
->  drivers/spi/spi-sun4i.c | 2 +-
->  drivers/spi/spi-sun6i.c | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-> index fbb0a4d..8238b4e 100644
-> --- a/drivers/spi/spi-sun4i.c
-> +++ b/drivers/spi/spi-sun4i.c
-> @@ -176,7 +176,7 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
->  
->  	/* We don't support transfer larger than the FIFO */
->  	if (tfr->len > SUN4I_FIFO_DEPTH)
-> -		return -EINVAL;
-> +		return -EMSGSIZE;
+However, the section-aligned memblock may become non-section-aligned
+after arm_memblock_init(). For example, the first section-aligned
+memblock is 0x00000000-0x01000000 and sanity_check_meminfo sets
+current_limit to 0x01000000. After arm_memblock_init, two memory blocks
+[0x00c00000 - 0x00d00000] and [0x00ff0000 - 0x01000000] are reserved
+by memblock_reserve() and make the original memory block
+[0x00000000-0x01000000] becomes:
 
-Is it still a thing? The patch to remove such limit hasn't been merged
-yet?
+[0x00000000-0x00c00000]
+[0x00d00000-0x00ff0000]
 
->  	reinit_completion(&sspi->done);
->  	sspi->tx_buf = tfr->tx_buf;
-> diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-> index ac48f59..0f5dd91 100644
-> --- a/drivers/spi/spi-sun6i.c
-> +++ b/drivers/spi/spi-sun6i.c
-> @@ -166,7 +166,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
->  
->  	/* We don't support transfer larger than the FIFO */
->  	if (tfr->len > SUN6I_FIFO_DEPTH)
-> -		return -EINVAL;
-> +		return -EMSGSIZE;
+When creating the low memory mapping for [0x00d00000-0x00ff0000],
+since the memory block is non-section-aligned, it will need to create
+a second level page table. But the current_limit is set to 0x01000000,
+and it's possible to allocate a unmapped memory block.
 
-Eventually, we should move to using DMA for these messages longer than
-the FIFO.
+call flow:
 
-I should post these patches.
+setup_arch
+ + sanity_check_meminfo
+ + arm_memblock_init
+ + paging_init
+    + map_lowmem
+    + bootmem_init
 
-Maxime
+Move the memblock_set_current_limit logic to map_lowmem(), we point
+the memblock current_limit to the first section-aligned memblock block.
+Since map_lowmem() is called after arm_memblock_init(), there is no way to
+change memblock layout. So we can say that the first section-aligned limit
+is valid during map_lowmem(). Hence fix the problem described above.
 
+Another change is change the implementation of find_limits().
+In commit: 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76, the max_low is
+set by memblock_get_current_limit(). However memblock.current_limit
+can be changed by memblock_set_current_limit() anypoint before
+find_limits().
+
+It's better to use arm_lowmem_limit to be max_lowmem in two ways:
+First, arm_lowmem_limit cannot be changed by a public API. Second, the
+high_memory is set by arm_lowmem_limit and is a natural limit of
+low memory area in bootmem_init().
+
+thanks,
+Min-Hua
+
+Signed-off-by: Min-Hua Chen <orca.chen@gmail.com>
+---
+ arch/arm/mm/init.c |    2 +-
+ arch/arm/mm/mmu.c  |   44 ++++++++++----------------------------------
+ 2 files changed, 11 insertions(+), 35 deletions(-)
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 2495c8c..6a618f9 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -138,7 +138,7 @@ void show_mem(unsigned int filter)
+ static void __init find_limits(unsigned long *min, unsigned long *max_low,
+ 			       unsigned long *max_high)
+ {
+-	*max_low = PFN_DOWN(memblock_get_current_limit());
++	*max_low = PFN_DOWN(arm_lowmem_limit);
+ 	*min = PFN_UP(memblock_start_of_DRAM());
+ 	*max_high = PFN_DOWN(memblock_end_of_DRAM());
+ }
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4e6ef89..dbc484d 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1068,7 +1068,6 @@ phys_addr_t arm_lowmem_limit __initdata = 0;
+ 
+ void __init sanity_check_meminfo(void)
+ {
+-	phys_addr_t memblock_limit = 0;
+ 	int highmem = 0;
+ 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
+ 	struct memblock_region *reg;
+@@ -1110,43 +1109,10 @@ void __init sanity_check_meminfo(void)
+ 				else
+ 					arm_lowmem_limit = block_end;
+ 			}
+-
+-			/*
+-			 * Find the first non-section-aligned page, and point
+-			 * memblock_limit at it. This relies on rounding the
+-			 * limit down to be section-aligned, which happens at
+-			 * the end of this function.
+-			 *
+-			 * With this algorithm, the start or end of almost any
+-			 * bank can be non-section-aligned. The only exception
+-			 * is that the start of the bank 0 must be section-
+-			 * aligned, since otherwise memory would need to be
+-			 * allocated when mapping the start of bank 0, which
+-			 * occurs before any free memory is mapped.
+-			 */
+-			if (!memblock_limit) {
+-				if (!IS_ALIGNED(block_start, SECTION_SIZE))
+-					memblock_limit = block_start;
+-				else if (!IS_ALIGNED(block_end, SECTION_SIZE))
+-					memblock_limit = arm_lowmem_limit;
+-			}
+-
+ 		}
+ 	}
+ 
+ 	high_memory = __va(arm_lowmem_limit - 1) + 1;
+-
+-	/*
+-	 * Round the memblock limit down to a section size.  This
+-	 * helps to ensure that we will allocate memory from the
+-	 * last full section, which should be mapped.
+-	 */
+-	if (memblock_limit)
+-		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
+-	if (!memblock_limit)
+-		memblock_limit = arm_lowmem_limit;
+-
+-	memblock_set_current_limit(memblock_limit);
+ }
+ 
+ static inline void prepare_page_table(void)
+@@ -1331,6 +1297,7 @@ static void __init map_lowmem(void)
+ 	struct memblock_region *reg;
+ 	phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
+ 	phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
++	phys_addr_t section_block_limit = 0;
+ 
+ 	/* Map all the lowmem memory banks. */
+ 	for_each_memblock(memory, reg) {
+@@ -1384,6 +1351,15 @@ static void __init map_lowmem(void)
+ 				create_mapping(&map);
+ 			}
+ 		}
++
++		/*
++		 * Find the first section-aligned memblock and set
++		 * memblock_limit at it.
++		 */
++		if (!section_memblock_limit && !(end & ~SECTION_MASK)) {
++			section_memblock_limit = end;
++			memblock_set_current_limit(section_memblock_limit);
++		}
+ 	}
+ }
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150426/334041e8/attachment.sig>
+1.7.10.4
