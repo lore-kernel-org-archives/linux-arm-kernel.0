@@ -1,59 +1,78 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 26 Apr 2015 22:07:25 +0200
-Subject: [PATCH 2/4] mtd: mxc_nand: limit the size of used oob
-In-Reply-To: <4bd5da1f7d57aa32c5682297f7aa0c768e8c6e49.1430034929.git.baruch@tkos.co.il>
-References: <cover.1430034929.git.baruch@tkos.co.il>
- <4bd5da1f7d57aa32c5682297f7aa0c768e8c6e49.1430034929.git.baruch@tkos.co.il>
-Message-ID: <20150426200725.GC19431@pengutronix.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 26 Apr 2015 23:19:48 +0200
+Subject: [PATCH 1/6] ARM: dts: berlin: relicense the berlin2q dtsi under
+ GPLv2/X11
+In-Reply-To: <1430057013-12842-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1430057013-12842-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20150426211948.GB3872@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 26, 2015 at 11:16:49AM +0300, Baruch Siach wrote:
-> For 4k pages the i.MX NFC hardware uses exactly 218 or 128 bytes for 4bit or
-> 8bit ECC data, respectively. Larger oobsize confuses the logic of copy_spare().
-> Limit the size of used oob size to avoid that.
+On 26/04/2015 at 16:03:28 +0200, Antoine T?nart wrote :
+> The current GPLv2 only licensing on this dtsi makes it very impractical
+> for other software components licensed under another license.
 > 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> In order to make it easier for them to reuse our device trees, relicense
+> this dtsi under a GPLv2/X11 dual-license.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
 > ---
->  drivers/mtd/nand/mxc_nand.c | 15 +++++++++++----
->  1 file changed, 11 insertions(+), 4 deletions(-)
+>  arch/arm/boot/dts/berlin2q.dtsi | 34 +++++++++++++++++++++++++++++++---
+>  1 file changed, 31 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index 33b22b9c0b30..c650f0950b20 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -819,15 +819,22 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
->  {
->  	struct nand_chip *this = mtd->priv;
->  	struct mxc_nand_host *host = this->priv;
-> -	u16 i, oob_chunk_size;
-> +	u16 i, oob_chunk_size, used_oobsize;
->  	u16 num_chunks = mtd->writesize / 512;
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> index be5397288d24..703ce384e0d7 100644
+> --- a/arch/arm/boot/dts/berlin2q.dtsi
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -1,9 +1,37 @@
+>  /*
+>   * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
+>   *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2. This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is licensed under the terms of the GNU General Public
+> + *     License version 2. This program is licensed "as is" without any
+> + *     warranty of any kind, whether express or implied.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
 >  
->  	u8 *d = host->data_buf + mtd->writesize;
->  	u8 __iomem *s = host->spare0;
->  	u16 sparebuf_size = host->devtype_data->spare_len;
->  
-> +	/* hardware can only use 218 or 128 oob bytes for ecc */
-> +	if (mtd->oobsize >= 218)
-IMHO this is the wrong check. What if your part (with 224 bytes spare)
-is used but the machine only uses the small layout e.g. for booting?
-(That would work, wouldn't it?) Moreover the comment is misleading as it
-only applies to 4K flashes. At least the driver works well with (2ki +
-128) bytes pages (while there are only 64 bytes spare used?? Maybe there
-are still more bugs?).
-
-> +		used_oobsize = 218;
-> +	else if (mtd->oobsize >= 128)
-> +		used_oobsize = 128;
-> +	else
-> +		used_oobsize = mtd->oobsize;
-Is it worth to put this check into _probe and put the used size into
-driver data?
-
-Best regards
-Uwe
+>  #include <dt-bindings/clock/berlin2q.h>
+> -- 
+> 2.3.6
+> 
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
