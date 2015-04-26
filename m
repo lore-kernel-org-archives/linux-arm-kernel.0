@@ -1,43 +1,58 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 26 Apr 2015 21:28:42 +0200
-Subject: [PATCHv2 1/2] ARM: dts: imx23: Add i2c support
-In-Reply-To: <629731861.499409.1429954110131.JavaMail.open-xchange@oxbaltgw08.schlund.de>
-References: <1429281806-7934-1-git-send-email-harald@ccbib.org>
- <629731861.499409.1429954110131.JavaMail.open-xchange@oxbaltgw08.schlund.de>
-Message-ID: <201504262128.42347.marex@denx.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 26 Apr 2015 21:38:38 +0200
+Subject: [PATCH v5 1/3] ARM: pxa: pxa_cplds: add lubbock and mainstone IO
+In-Reply-To: <1430075422.2927.131.camel@x220> (Paul Bolle's message of "Sun,
+ 26 Apr 2015 21:10:22 +0200")
+References: <1429996403-13644-1-git-send-email-robert.jarzmik@free.fr>
+ <1429996403-13644-2-git-send-email-robert.jarzmik@free.fr>
+ <1430075422.2927.131.camel@x220>
+Message-ID: <87iocillxd.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, April 25, 2015 at 11:28:30 AM, Stefan Wahren wrote:
-> Hi Harald,
-> 
-> [add Marek and Wolfram]
+Paul Bolle <pebolle@tiscali.nl> writes:
 
-Thanks!
+> On Sat, 2015-04-25 at 23:13 +0200, Robert Jarzmik wrote:
+>> --- a/arch/arm/mach-pxa/Kconfig
+>> +++ b/arch/arm/mach-pxa/Kconfig
+>  
+>> +config PXA_SYSTEMS_CPLDS
+>> +	bool "Motherboard cplds"
+>> +	def_bool ARCH_LUBBOCK || MACH_MAINSTONE
+>
+> Just
+> 	default ARCH_LUBBOCK || MACH_MAINSTONE
+>
+> should be enough.
+Actually this will become a tristate, and I'll take your "default"
+suggestion. For v2.
 
-> > Harald Geyer <harald@ccbib.org> hat am 17. April 2015 um 16:43
-> > geschrieben:
-> > 
-> > 
-> > The imx23-olinuxino board has an i2c interface exposed on UEXT connector.
-> > This patch provides the generic devicetree infrastructure for a follow-up
-> > patch to add support to the actual board files.
-> > Tested all three possible pin groups with MOD-LCD1x9 from Olimex.
-> > 
-> > This patch is based on work by Fadil Berisha with his permission. However
-> > all bugs are mine.
-> > 
-> > Signed-off-by: Harald Geyer <harald@ccbib.org>
-> > ---
-> > changes since v1:
-> > split in generic and board specific patches
-> > arch/arm/boot/dts/imx23.dtsi | 40
-> > +++++++++++++++++++++++++++++++++++++++- 1 file changed, 39
-> > insertions(+), 1 deletion(-)
-> 
-> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> +	select MFD_CORE
+Ah this is an oversight now I see it. In the move from drivers/mfd to arch/arm I
+forgot to remove this. For v2 also.
 
-Acked-by: Marek Vasut <marex@denx.de>
+>> +	help
+>> +	  This driver supports the Lubbock and Mainstone multifunction chip
+>> +	  found on the pxa25x development platform system (Lubbock) and pxa27x
+>> +	  development platform system (Mainstone). This IO board supports the
+>> +	  interrupts handling, ethernet controller, flash chips, etc ...
+>
+>> --- a/arch/arm/mach-pxa/Makefile
+>> +++ b/arch/arm/mach-pxa/Makefile
+>  
+>> +obj-$(CONFIG_PXA_SYSTEMS_CPLDS)	+= pxa_cplds_irqs.o
+>
+> PXA_SYSTEMS_CPLDS is a bool symbol, so pxa_cplds_irqs.o will never be
+> part of a module, correct?
+Euh no, this another mistake of mine, it should capable of being a module, to
+enable the lubbock/mainstone generic device tree support. I'll fix that for v2
+also.
 
-Best regards,
-Marek Vasut
+I removed the below comments as the built-in is an error of mine.
+
+Thanks for the review Paul.
+
+Cheers.
+
+-- 
+Robert
