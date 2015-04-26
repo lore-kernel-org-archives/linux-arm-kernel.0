@@ -1,164 +1,95 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 26 Apr 2015 22:31:04 +0800
-Subject: [PATCH 03/11] ARM: imx: move revision definitions and declarations
- into a header
+Date: Sun, 26 Apr 2015 22:31:05 +0800
+Subject: [PATCH 04/11] ARM: imx5: let pm code map CCM block on its own
 In-Reply-To: <1430058672-9267-1-git-send-email-shawn.guo@linaro.org>
 References: <1430058672-9267-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1430058672-9267-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1430058672-9267-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The revision definitions and declarations are widely used by clock
-drivers.  As a step of moving clock drivers out of arch/arm/mach-imx,
-let's create header include/soc/imx/revision.h to accommodate them.
+We are about to move imx5 clock driver into drivers/clk, so let's get
+imx5 pm code map CCM block on its own rather than relying on clock
+driver to do the mapping.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/common.h   |  4 ----
- arch/arm/mach-imx/hardware.h |  1 +
- arch/arm/mach-imx/mx27.h     |  4 ----
- arch/arm/mach-imx/mx3x.h     |  7 -------
- arch/arm/mach-imx/mxc.h      | 16 ----------------
- include/soc/imx/revision.h   | 37 +++++++++++++++++++++++++++++++++++++
- 6 files changed, 38 insertions(+), 31 deletions(-)
- create mode 100644 include/soc/imx/revision.h
+ arch/arm/mach-imx/clk-imx51-imx53.c | 2 --
+ arch/arm/mach-imx/common.h          | 2 --
+ arch/arm/mach-imx/pm-imx5.c         | 9 ++++-----
+ 3 files changed, 4 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 0f7e536147cb..f341464fe7e9 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -133,8 +133,6 @@ static struct clk_onecell_data clk_data;
+ 
+ static void __init mx5_clocks_common_init(void __iomem *ccm_base)
+ {
+-	imx5_pm_set_ccm_base(ccm_base);
+-
+ 	clk[IMX5_CLK_DUMMY]		= imx_clk_fixed("dummy", 0);
+ 	clk[IMX5_CLK_CKIL]		= imx_obtain_fixed_clock("ckil", 0);
+ 	clk[IMX5_CLK_OSC]		= imx_obtain_fixed_clock("osc", 0);
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 5cddd1534265..3682d094a259 100644
+index 3682d094a259..fe510fbd0c8c 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -56,13 +56,10 @@ struct platform_device *mxc_register_gpio(char *name, int id,
- void mxc_set_cpu_type(unsigned int type);
- void mxc_restart(enum reboot_mode, const char *);
- void mxc_arch_reset_init(void __iomem *);
--int mx51_revision(void);
--int mx53_revision(void);
- void imx_set_aips(void __iomem *);
- void imx_aips_allow_unprivileged_access(const char *compat);
- int mxc_device_init(void);
- void imx_set_soc_revision(unsigned int rev);
--unsigned int imx_get_soc_revision(void);
- void imx_init_revision_from_anatop(void);
- struct device *imx_soc_device_init(void);
- void imx6_enable_rbc(bool enable);
-@@ -87,7 +84,6 @@ enum mx3_cpu_pwr_mode {
+@@ -132,11 +132,9 @@ void imx6q_pm_set_ccm_base(void __iomem *base);
+ #ifdef CONFIG_PM
+ void imx51_pm_init(void);
+ void imx53_pm_init(void);
+-void imx5_pm_set_ccm_base(void __iomem *base);
+ #else
+ static inline void imx51_pm_init(void) {}
+ static inline void imx53_pm_init(void) {}
+-static inline void imx5_pm_set_ccm_base(void __iomem *base) {}
+ #endif
+ 
+ #ifdef CONFIG_NEON
+diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
+index f1f80ab73e69..b04025592d94 100644
+--- a/arch/arm/mach-imx/pm-imx5.c
++++ b/arch/arm/mach-imx/pm-imx5.c
+@@ -50,16 +50,19 @@
+ #define IMX5_DEFAULT_CPU_IDLE_STATE WAIT_UNCLOCKED_POWER_OFF
+ 
+ struct imx5_pm_data {
++	phys_addr_t ccm_addr;
+ 	phys_addr_t cortex_addr;
+ 	phys_addr_t gpc_addr;
  };
  
- void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode);
--void imx_print_silicon_rev(const char *cpu, int srev);
+ static const struct imx5_pm_data imx51_pm_data __initconst = {
++	.ccm_addr = 0x73fd4000,
+ 	.cortex_addr = 0x83fa0000,
+ 	.gpc_addr = 0x73fd8000,
+ };
  
- void imx_enable_cpu(int cpu, bool enable);
- void imx_set_cpu_jump(int cpu, void *jump_addr);
-diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
-index 76af2c03c241..d737f95ebb07 100644
---- a/arch/arm/mach-imx/hardware.h
-+++ b/arch/arm/mach-imx/hardware.h
-@@ -22,6 +22,7 @@
+ static const struct imx5_pm_data imx53_pm_data __initconst = {
++	.ccm_addr = 0x53fd4000,
+ 	.cortex_addr = 0x63fa0000,
+ 	.gpc_addr = 0x53fd8000,
+ };
+@@ -68,11 +71,6 @@ static void __iomem *ccm_base;
+ static void __iomem *cortex_base;
+ static void __iomem *gpc_base;
  
- #ifndef __ASSEMBLY__
- #include <asm/io.h>
-+#include <soc/imx/revision.h>
- #endif
- #include <asm/sizes.h>
- 
-diff --git a/arch/arm/mach-imx/mx27.h b/arch/arm/mach-imx/mx27.h
-index 8a65f192e7f3..f96bb2642677 100644
---- a/arch/arm/mach-imx/mx27.h
-+++ b/arch/arm/mach-imx/mx27.h
-@@ -231,8 +231,4 @@
- #define MX27_DMA_REQ_SDHC3	36
- #define MX27_DMA_REQ_NFC	37
- 
--#ifndef __ASSEMBLY__
--extern int mx27_revision(void);
--#endif
+-void __init imx5_pm_set_ccm_base(void __iomem *base)
+-{
+-	ccm_base = base;
+-}
 -
- #endif /* ifndef __MACH_MX27_H__ */
-diff --git a/arch/arm/mach-imx/mx3x.h b/arch/arm/mach-imx/mx3x.h
-index 96fb4fbc8ad7..6fec6114c2f1 100644
---- a/arch/arm/mach-imx/mx3x.h
-+++ b/arch/arm/mach-imx/mx3x.h
-@@ -185,11 +185,4 @@
+ /*
+  * set cpu low power mode before WFI instruction. This function is called
+  * mx5 because it can be used for mx51, and mx53.
+@@ -208,6 +206,7 @@ static int __init imx5_pm_common_init(const struct imx5_pm_data *data)
  
- #define MX3x_PROD_SIGNATURE		0x1	/* For MX31 */
+ 	arm_pm_idle = imx5_pm_idle;
  
--/* Mandatory defines used globally */
--
--#if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
--extern int mx35_revision(void);
--extern int mx31_revision(void);
--#endif
--
- #endif /* ifndef __MACH_MX3x_H__ */
-diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-index 4c1343df2ba4..8726051fcfca 100644
---- a/arch/arm/mach-imx/mxc.h
-+++ b/arch/arm/mach-imx/mxc.h
-@@ -39,22 +39,6 @@
- #define MXC_CPU_IMX6SX		0x62
- #define MXC_CPU_IMX6Q		0x63
- 
--#define IMX_CHIP_REVISION_1_0		0x10
--#define IMX_CHIP_REVISION_1_1		0x11
--#define IMX_CHIP_REVISION_1_2		0x12
--#define IMX_CHIP_REVISION_1_3		0x13
--#define IMX_CHIP_REVISION_1_4		0x14
--#define IMX_CHIP_REVISION_1_5		0x15
--#define IMX_CHIP_REVISION_2_0		0x20
--#define IMX_CHIP_REVISION_2_1		0x21
--#define IMX_CHIP_REVISION_2_2		0x22
--#define IMX_CHIP_REVISION_2_3		0x23
--#define IMX_CHIP_REVISION_3_0		0x30
--#define IMX_CHIP_REVISION_3_1		0x31
--#define IMX_CHIP_REVISION_3_2		0x32
--#define IMX_CHIP_REVISION_3_3		0x33
--#define IMX_CHIP_REVISION_UNKNOWN	0xff
--
- #define IMX_DDR_TYPE_LPDDR2		1
- 
- #ifndef __ASSEMBLY__
-diff --git a/include/soc/imx/revision.h b/include/soc/imx/revision.h
-new file mode 100644
-index 000000000000..9ea346924c35
---- /dev/null
-+++ b/include/soc/imx/revision.h
-@@ -0,0 +1,37 @@
-+/*
-+ * Copyright 2015 Linaro Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __SOC_IMX_REVISION_H__
-+#define __SOC_IMX_REVISION_H__
-+
-+#define IMX_CHIP_REVISION_1_0		0x10
-+#define IMX_CHIP_REVISION_1_1		0x11
-+#define IMX_CHIP_REVISION_1_2		0x12
-+#define IMX_CHIP_REVISION_1_3		0x13
-+#define IMX_CHIP_REVISION_1_4		0x14
-+#define IMX_CHIP_REVISION_1_5		0x15
-+#define IMX_CHIP_REVISION_2_0		0x20
-+#define IMX_CHIP_REVISION_2_1		0x21
-+#define IMX_CHIP_REVISION_2_2		0x22
-+#define IMX_CHIP_REVISION_2_3		0x23
-+#define IMX_CHIP_REVISION_3_0		0x30
-+#define IMX_CHIP_REVISION_3_1		0x31
-+#define IMX_CHIP_REVISION_3_2		0x32
-+#define IMX_CHIP_REVISION_3_3		0x33
-+#define IMX_CHIP_REVISION_UNKNOWN	0xff
-+
-+int mx27_revision(void);
-+int mx31_revision(void);
-+int mx35_revision(void);
-+int mx51_revision(void);
-+int mx53_revision(void);
-+
-+unsigned int imx_get_soc_revision(void);
-+void imx_print_silicon_rev(const char *cpu, int srev);
-+
-+#endif /* __SOC_IMX_REVISION_H__ */
++	ccm_base = ioremap(data->ccm_addr, SZ_16K);
+ 	cortex_base = ioremap(data->cortex_addr, SZ_16K);
+ 	gpc_base = ioremap(data->gpc_addr, SZ_16K);
+ 	WARN_ON(!ccm_base || !cortex_base || !gpc_base);
 -- 
 1.9.1
