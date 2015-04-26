@@ -1,38 +1,38 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 26 Apr 2015 08:35:57 -0700
-Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling
- to the WDT driver.
-In-Reply-To: <12253069.Jm7LIDAreu@wuerfel>
-References: <1429902534-2348-1-git-send-email-eric@anholt.net>
- <1429902534-2348-2-git-send-email-eric@anholt.net>
- <12253069.Jm7LIDAreu@wuerfel>
-Message-ID: <553D05DD.8080300@roeck-us.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 26 Apr 2015 18:11:57 +0200
+Subject: [PATCH] ARM: sunxi: dts: Add A10 uarts pin muxing options
+In-Reply-To: <1430043338-28982-1-git-send-email-richard.genoud@gmail.com>
+References: <1430043338-28982-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <20150426161157.GM5627@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2015 01:11 PM, Arnd Bergmann wrote:
-> On Friday 24 April 2015 12:08:54 Eric Anholt wrote:
->> +/*
->> + * We can't really power off, but if we do the normal reset scheme, and
->> + * indicate to bootcode.bin not to reboot, then most of the chip will be
->> + * powered off.
->> + */
->> +static void bcm2835_power_off(void)
->> +{
->> +       struct device_node *np =
->> +               of_find_compatible_node(NULL, NULL, "brcm,bcm2835-pm-wdt");
->> +       struct platform_device *pdev = of_find_device_by_node(np);
->> +       struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
->> +       u32 val;
->> +
->
-> Instead of doing the lookup again here, I'd suggest using a static variable
-> in the driver to store the device pointer for the device used on power_off.
->
-> Make sure that the device remove callback assigns it back to NULL though
-> and that the function checks for NULL pointer.
->
+Hi Richard,
 
-Why would that be needed ?
+On Sun, Apr 26, 2015 at 12:15:38PM +0200, Richard Genoud wrote:
+> The A10 has 8 uarts, only uart0 and uart1 where filled.
+> This patch adds all the missing uarts(2 to 7) pin muxing to the dtsi.
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 
-Guenter
+It's obviously correct, but I'd rather not add new pinctrl nodes that
+don't have any users so that it doesn't bloat the DT without any
+particular reason.
+
+Feel free to resubmit this patch if one of these nodes become actually
+useful.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150426/fa36aaa2/attachment-0001.sig>
