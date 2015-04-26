@@ -1,58 +1,83 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 26 Apr 2015 21:38:38 +0200
-Subject: [PATCH v5 1/3] ARM: pxa: pxa_cplds: add lubbock and mainstone IO
-In-Reply-To: <1430075422.2927.131.camel@x220> (Paul Bolle's message of "Sun,
- 26 Apr 2015 21:10:22 +0200")
-References: <1429996403-13644-1-git-send-email-robert.jarzmik@free.fr>
- <1429996403-13644-2-git-send-email-robert.jarzmik@free.fr>
- <1430075422.2927.131.camel@x220>
-Message-ID: <87iocillxd.fsf@belgarion.home>
+From: nicolae.rosia@gmail.com (Nicolae Rosia)
+Date: Sun, 26 Apr 2015 22:45:18 +0300
+Subject: [PATCH 02/11] ARM: imx: use dynamic mapping for CCM
+In-Reply-To: <1430058672-9267-3-git-send-email-shawn.guo@linaro.org>
+References: <1430058672-9267-1-git-send-email-shawn.guo@linaro.org>
+ <1430058672-9267-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAH=tA9G1JQ-smg_V+dUkZLtkERiswh-EK1y013tEua6iNKCbRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle <pebolle@tiscali.nl> writes:
+Hi,
 
-> On Sat, 2015-04-25 at 23:13 +0200, Robert Jarzmik wrote:
->> --- a/arch/arm/mach-pxa/Kconfig
->> +++ b/arch/arm/mach-pxa/Kconfig
->  
->> +config PXA_SYSTEMS_CPLDS
->> +	bool "Motherboard cplds"
->> +	def_bool ARCH_LUBBOCK || MACH_MAINSTONE
+On Sun, Apr 26, 2015 at 5:31 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Replace the static mapping of CCM block in clock drivers with dynamic
+> mapping.
 >
-> Just
-> 	default ARCH_LUBBOCK || MACH_MAINSTONE
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-imx/clk-imx1.c  | 3 ++-
+>  arch/arm/mach-imx/clk-imx31.c | 5 ++++-
+>  arch/arm/mach-imx/clk-imx35.c | 5 ++++-
+>  3 files changed, 10 insertions(+), 3 deletions(-)
 >
-> should be enough.
-Actually this will become a tristate, and I'll take your "default"
-suggestion. For v2.
-
->> +	select MFD_CORE
-Ah this is an oversight now I see it. In the move from drivers/mfd to arch/arm I
-forgot to remove this. For v2 also.
-
->> +	help
->> +	  This driver supports the Lubbock and Mainstone multifunction chip
->> +	  found on the pxa25x development platform system (Lubbock) and pxa27x
->> +	  development platform system (Mainstone). This IO board supports the
->> +	  interrupts handling, ethernet controller, flash chips, etc ...
+> diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
+> index f4a76e841966..5301d2ebb234 100644
+> --- a/arch/arm/mach-imx/clk-imx1.c
+> +++ b/arch/arm/mach-imx/clk-imx1.c
+> @@ -75,7 +75,8 @@ static void __init _mx1_clocks_init(unsigned long fref)
 >
->> --- a/arch/arm/mach-pxa/Makefile
->> +++ b/arch/arm/mach-pxa/Makefile
->  
->> +obj-$(CONFIG_PXA_SYSTEMS_CPLDS)	+= pxa_cplds_irqs.o
+>  int __init mx1_clocks_init(unsigned long fref)
+>  {
+> -       ccm = MX1_IO_ADDRESS(MX1_CCM_BASE_ADDR);
+> +       ccm = ioremap(MX1_CCM_BASE_ADDR, SZ_4K);
+> +       BUG_ON(!ccm);
 >
-> PXA_SYSTEMS_CPLDS is a bool symbol, so pxa_cplds_irqs.o will never be
-> part of a module, correct?
-Euh no, this another mistake of mine, it should capable of being a module, to
-enable the lubbock/mainstone generic device tree support. I'll fix that for v2
-also.
+>         _mx1_clocks_init(fref);
+>
+> diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
+> index 8a103a2c8b68..2aaccadb9e13 100644
+> --- a/arch/arm/mach-imx/clk-imx31.c
+> +++ b/arch/arm/mach-imx/clk-imx31.c
+> @@ -50,9 +50,12 @@ static struct clk_onecell_data clk_data;
+>
+>  int __init mx31_clocks_init(unsigned long fref)
+>  {
+> -       void __iomem *base = MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR);
+> +       void __iomem *base;
+>         struct device_node *np;
+>
+> +       base = ioremap(MX31_CCM_BASE_ADDR, SZ_4K);
+> +       BUG_ON(!base);
+> +
+>         clk[dummy] = imx_clk_fixed("dummy", 0);
+>         clk[ckih] = imx_clk_fixed("ckih", fref);
+>         clk[ckil] = imx_clk_fixed("ckil", 32768);
+> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+> index 4ef1e8bdac5b..14f33ec049bc 100644
+> --- a/arch/arm/mach-imx/clk-imx35.c
+> +++ b/arch/arm/mach-imx/clk-imx35.c
+> @@ -71,11 +71,14 @@ static struct clk *clk[clk_max];
+>
+>  int __init mx35_clocks_init(void)
+>  {
+> -       void __iomem *base = MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR);
+> +       void __iomem *base;
+>         u32 pdr0, consumer_sel, hsp_sel;
+>         struct arm_ahb_div *aad;
+>         unsigned char *hsp_div;
+>
+> +       base = ioremap(MX35_CCM_BASE_ADDR, SZ_4K);
+> +       BUG_ON(base);
+BUG_ON(!base) ?
 
-I removed the below comments as the built-in is an error of mine.
+> +
+>         pdr0 = __raw_readl(base + MXC_CCM_PDR0);
+>         consumer_sel = (pdr0 >> 16) & 0xf;
+>         aad = &clk_consumer[consumer_sel];
+> --
+> 1.9.1
+>
 
-Thanks for the review Paul.
-
-Cheers.
-
--- 
-Robert
+Best regards,
+Nicolae Rosia
