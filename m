@@ -1,7 +1,7 @@
 From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Sun, 26 Apr 2015 18:20:52 +0000
+Date: Sun, 26 Apr 2015 18:26:35 +0000
 Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <20150425113930.7386a42a@arm.com>
+In-Reply-To: <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
 References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
  <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
  <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
@@ -11,180 +11,163 @@ References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
  <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
  <20150422170718.GG13019@arm.com>
  <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150424161818.GC7313@arm.com>	<553A72D4.7000801@arm.com>
- <CY1PR0301MB074896DF1A06CDEC3A0E09B687EC0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150425113930.7386a42a@arm.com>
-Message-ID: <BN1PR0301MB06276181976E880432B8C49AEAEA0@BN1PR0301MB0627.namprd03.prod.outlook.com>
+Message-ID: <BN1PR0301MB0627DCBB2B0D5AE7B5C397DEEAEA0@BN1PR0301MB0627.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Will/Stuart,
 
 > -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Saturday, April 25, 2015 4:10 PM
-> To: Yoder Stuart-B08248
-> Cc: Will Deacon; Sethi Varun-B16395; Lian Minghuan-B31939; linux-
-> pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284; Zang Roy-R61911;
-> Bjorn Helgaas; Wood Scott-B07421; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+> From: Yoder Stuart-B08248
+> Sent: Thursday, April 23, 2015 1:11 AM
+> To: Will Deacon
+> Cc: Sethi Varun-B16395; Lian Minghuan-B31939; linux-pci at vger.kernel.org;
+> Arnd Bergmann; Hu Mingkai-B21284; Zang Roy-R61911; Bjorn Helgaas; Wood
+> Scott-B07421; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
 > 
-> On Fri, 24 Apr 2015 19:18:44 +0100
-> Stuart Yoder <stuart.yoder@freescale.com> wrote:
 > 
-> Hi Stuart,
 > 
+> > -----Original Message-----
+> > From: Will Deacon [mailto:will.deacon at arm.com]
+> > Sent: Wednesday, April 22, 2015 12:07 PM
+> > To: Yoder Stuart-B08248
+> > Cc: Sethi Varun-B16395; Lian Minghuan-B31939;
+> > linux-pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284; Zang
+> > Roy-R61911; Bjorn Helgaas; Wood Scott-B07421;
+> > linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
 > >
+> > Hi Stuart,
 > >
-> > > -----Original Message-----
-> > > From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> > > Sent: Friday, April 24, 2015 11:44 AM
-> > > To: Will Deacon; Yoder Stuart-B08248
-> > > Cc: Sethi Varun-B16395; Lian Minghuan-B31939;
-> > > linux-pci at vger.kernel.org; Arnd Bergmann; Hu Mingkai-B21284; Zang
-> > > Roy-R61911; Bjorn Helgaas; Wood Scott-B07421;
-> > > linux-arm-kernel at lists.infradead.org
-> > > Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-> > >
-> > > On 24/04/15 17:18, Will Deacon wrote:
-> > > > On Wed, Apr 22, 2015 at 08:41:02PM +0100, Stuart Yoder wrote:
-> > > >>>> However, there is an improvement we envision as possible due to
-> > > >>>> the limited number of SMMU contexts (i.e. 64).  If there are
-> > > >>>> 64 SMMU context registers it means that there is a max of
-> > > >>>> 64 software contexts where things can be isolated.  But, say I
-> > > >>>> have an SRIOV card with 64 VFs, and I want to assign 8 of the
-> > > >>>> VFs to a KVM VM.  Those 8 PCI devices could share the same
-> > > >>>> streamID/ITS-device-ID since they all share the same isolation
-> > > >>>> context.
-> > > >>>>
-> > > >>>> What would be nice is at the time the 8 VFS are being added to
-> > > >>>> the IOMMU domain is for the pcidevid -> streamID mapping table
-> > > >>>> to be updated dynamically.  It simply lets us make more
-> > > >>>> efficient use of the limited streamIDs we have.
-> > > >>>>
-> > > >>>> I think it is this improvement that Minghuan had in mind in
-> > > >>>> this patch.
-> > > >>>
-> > > >>> Ok, but in this case it should be possible to use a single
-> > > >>> context bank for all of the VF streamIDs by configuring the
-> appropriate SMR, no?
-> > > >>
-> > > >> Yes, but there are limited SMRs.  In our case there are only
-> > > >> 128 SMRs in SMMU-500 and we have potentially way more masters
-> > > >> than that.
+> > First of, thanks for taking the time to explain this in more detail.
+> > Comments inline.
+> >
+> > On Fri, Apr 17, 2015 at 03:19:08PM +0100, Stuart Yoder wrote:
+> > > > On Wed, Apr 15, 2015 at 02:18:13PM +0100, Varun Sethi wrote:
+> > > > > Yes, deviceid=stream id (i.e. ICID + other bits). I am not sure
+> > > > > if TBU ID would also be forwarded as a part of stream id to GIC.
+> > > > > My understanding is that TBU ID is forwarded (as a part of the
+> > > > > stream ID) to the TCU in case of a TBU translation miss. In case
+> > > > > of the LS2085 PCIe controller you would have to setup the PCIe
+> > > > > device ID to stream ID translation table. We may have to
+> > > > > restrict the number of entries based on the available number of
+> contexts.
 > > > >
-> > > > Right, but you still only have 64 context banks at the end of the
-> > > > day, so do you really anticipate having more than 128 masters
-> > > > concurrently using the SMMU? If so, then we have devices sharing
-> > > > context banks so we could consider reusing SMRs across masters,
-> > > > but historically that's not been something that we've managed to solve.
+> > > > Unfortunately, I'm having a really hard time parsing this thread
+> > > > (some parts of it simply don't make sense; others use
+> > > > non-architectural terms and overall I don't get a feeling for the
+> problem).
 > > > >
-> > > >>> Wouldn't
-> > > >>> that sort of thing be preferable to dynamic StreamID assignment?
-> > > >>> It would certainly make life easier for the MSIs.
-> > > >>
-> > > >> It would be preferable, but given only 128 total stream IDS and
-> > > >> 64 context registers it's potentially an issue.  On our LS2085
-> > > >> SoC it is PCI and the fsl-mc bus (see description here:
-> > > >> https://lkml.org/lkml/2015/3/5/795) that potentially have way
-> > > >> more masters than streamIDS. So, for those busses we would
-> > > >> essentially view a streamID as a "context ID"-- each SMR is
-> > > >> associated with
-> > > >> 1 context bank register.
-> > > >>
-> > > >> For PCI we have a programmable "PCI req ID"-to-"stream ID"
-> > > >> mapping table in the PCI controller that is dynamically
-> > > >> programmable.
-> > > >>
-> > > >> Looking at it like that means that we could have any number of
-> > > >> masters but only 64 "contexts"
-> > > >> and since the masters all all programmable it's seems feasbile to
-> > > >> envision doing some bus/vendor specific set up when a device is
-> > > >> added to an
-> > > >> IOMMU domain.   One thing that would need to be conveyed
-> > > >> to the SMMU driver if doing dynamic streamID setup is what
-> > > >> streamIDs are available to be used.
+> > > > Please could you explain your system design step by step so that I
+> > > > can understand (a) what you've built and (b) why the current
+> > > > design of Linux is causing you problems?
 > > > >
-> > > > Ok, but this is going to make life difficult for the MSI people, I suspect.
-> > > >
-> > > > Marc...?
+> > > > Sorry if I'm just being thick, but it's important that we get this right.
 > > >
-> > > We're really facing two conflicting requirements: in order to
-> > > minimize SMR usage, we want to alias multiple ReqIDs to a single
-> > > StreamID
-> >
-> > Another reason could be the isolation characteristics of the
-> > hardware...see comment below about PCI bridges.
-> >
-> > > but in
-> > > order to efficiently deal with MSIs, we want to see discrete
-> > > DeviceIDs (the actual ReqIDs). I don't easily see how we reconcile the
-> two.
+> > > I'll try to summarize some key points about the system...
 > > >
-> > > We can deal with the aliasing, provided that we extend the level of
-> > > quirkiness that pci_for_each_dma_alias can deal with. But that
-> > > doesn't solve any form of hotplug/SR-IOV behaviour.
+> > > System is using a single SMMU-500 (1 TCU, 6 TBUs) and GICv3-ITS.
+> > > There are PCI, fsl-mc, and platform devices that do DMA.  Devices on
+> > > the PCI and fsl-mc bus generate message interrupts.
+> >
+> > Ah cool, so you have multiple buses sharing a single SMMU? That's
+> > going to necessitate some ID remapping in the device-tree. Perhaps you
+> > could comment on Mark Rutland's proposal if it does/doesn't work for you:
+> >
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/33319
+> > 9.html
+> 
+> Thanks for the pointer, I had not seen that before.  Will read and comment
+> on it.
+> 
+> > > The flow a message interrupt would take is this:
 > > >
-[varun] Can you please elaborate on "extending the quirkiness of pci_for_each_dma_alias". How do you see the case for transparent host bridege being handled? We would see a device ID corresponding to the host bridge for masters behind that bridge.
-
-> > > Somehow, we're going to end-up with grossly oversized ITTs, just to
-> > > accommodate for the fact that we have no idea how many MSIs we're
-> > > going to end-up needing. I'm not thrilled with that prospect.
+> > >     --------------
+> > >       PCI device
+> > >     --------------
+> > >           |
+> > >           | pcidevid + MSI msg
+> > >           |
+> > >           V
+> > >     --------------
+> > >     PCI controller
+> > >       pcidevid ->
+> > >       streamID
+> > >       mapping
+> > >     --------------
+> > >           |
+> > >           | streamID + MSI msg
+> > >           |
+> > >           V
+> > >     --------------
+> > >         SMMU
+> > >     --------------
+> > >           |
+> > >           | streamID + MSI msg
+> > >           |
+> > >           V
+> > >     --------------
+> > >        CCN-504 (Dickens)
+> > >     --------------
+> > >           |
+> > >           | streamID + MSI msg
+> > >           |
+> > >           V
 > >
-> > How can we avoid that in the face of hotplug?
+> > The streamID here as the same as the one coming out of the SMMU, right?
 > 
-> Fortunately, hotplug is not always synonymous of aliasing. The ITS is built
-> around the hypothesis that aliasing doesn't happen, and that you know
-> upfront how many LPIs the device will be allowed to generate.
+> Yes.
 > 
-> > And what are we really worried about regarding over-sized ITTs...bytes
-> > of memory saved?
+> > (just trying to out why you have the CCN-504 in the picture).
 > 
-> That's one thing, yes. But more fundamentally, how do you size your MSI
-> capacity for a single alias? Do you evenly split your LPI space among all
-> possible aliases? Assuming 64 aliases and 16 bits of interrupt ID space, you
-> end up with 10 bit per alias. Is that always enough? Or do you need
-> something more fine-grained?
+> It really isn't relevant I guess, just the picture I had in my head.
 > 
-> > A fundamental thing built into the IOMMU subsystem in Linux is
-> > representing iommu groups that can represent things like multiple PCI
-> > devices that for hardware reasons cannot be isolated (and the example
-> > I've seen given relates to devices behind PCI bridges).
+> > >     --------------
+> > >       GICv3 ITS    streamID == ITS deviceID
+> > >     --------------
+> > >
+> > > So, the way things work (at least initially) is that each PCI device
+> > > maps to a single streamID, and thus each device has a separate ITT
+> > > in the ITS.  So, things should be cool.
+> > >
+> > > However, there is an improvement we envision as possible due to the
+> > > limited number of SMMU contexts (i.e. 64).  If there are
+> > > 64 SMMU context registers it means that there is a max of
+> > > 64 software contexts where things can be isolated.  But, say I have
+> > > an SRIOV card with 64 VFs, and I want to assign 8 of the VFs to a
+> > > KVM VM.  Those 8 PCI devices could share the same
+> > > streamID/ITS-device-ID since they all share the same isolation
+> > > context.
+> > >
+> > > What would be nice is at the time the 8 VFS are being added to the
+> > > IOMMU domain is for the pcidevid -> streamID mapping table to be
+> > > updated dynamically.  It simply lets us make more efficient use of
+> > > the limited streamIDs we have.
+> > >
+> > > I think it is this improvement that Minghuan had in mind in this
+> > > patch.
 > >
-> > So, I think the thing we are facing here is that while the IOMMU
-> > subsystem has accounted for reprsenting the isolation characteristics
-> > of a system with iommu groups, there is no corresponding "msi group"
-> > concept.
-> >
-> > In the SMMU/GIC-500-ITS world the iommu isolation ID (the stream ID)
-> > and the GIC-ITS device ID are in fact the same ID.
+> > Ok, but in this case it should be possible to use a single context
+> > bank for all of the VF streamIDs by configuring the appropriate SMR, no?
 > 
-> The DeviceID is the "MSI group" you mention. This is what provides isolation
-> at the ITS level.
+> Yes, but there are limited SMRs.  In our case there are only
+> 128 SMRs in SMMU-500 and we have potentially way more masters than
+> that.
 > 
-[varun] True, in case of a transparent host bridge device Id won't provide the necessary isolation.
-
-> > Is there some way we could sanely correlate IOMMU group creation
-> > (which establishes isolation granularity) with the creation of an ITT
-> > for the GIC-ITS?
+> > Wouldn't
+> > that sort of thing be preferable to dynamic StreamID assignment? It
+> > would certainly make life easier for the MSIs.
 > 
-> The problem you have is that your ITT already exists before you start
-> "hotpluging" new devices. Take the following (made up) example:
+> It would be preferable, but given only 128 total stream IDS and
+> 64 context registers it's potentially an issue.  On our LS2085 SoC it is PCI and
+> the fsl-mc bus (see description here:
+> https://lkml.org/lkml/2015/3/5/795) that potentially have way more masters
+> than streamIDS. So, for those busses we would essentially view a streamID
+> as a "context ID"-- each SMR is associated with
+> 1 context bank register.
 > 
-> System boots, device X is discovered, claims 64 MSIs. An ITT for device X is
-> allocated, and sized for 64 LPIs. SR-IOV kick is, creates a new X'
-> function that is aliased to X, claiming another 64 MSIs. Fail.
-> 
-> What do we do here? The ITT is live (X is generating interrupts), and there is
-> no provision to resize it (I've come up with a horrible scheme, but that could
-> fail as well). The only sane option would be to guess how many MSIs a given
-> alias could possibly use. How wrong is this guess going to be?
-> 
-> The problem we have is that IOMMU groups are dynamic, while ITT allocation
-> is completely static for a given DeviceID. The architecture doesn't give you
-> any mechanism to resize it, and I have the ugly feeling that static allocation of
-> the ID space to aliases is too rigid...
-
-[varun] One way would be to restrict the number of stream Ids(device Ids) per PCIe controller. In our scheme we have a device id -> stream ID translation table, we can restrict the number of entries in the table. This would restrict number of virtual functions.
+[varun]  On thing to note here is that we would also be hooking up DMA API with the SMMU driver. In that case we would typically require one context per device. We would have to restrict the number of available stream IDs.
 
 -Varun
