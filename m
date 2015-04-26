@@ -1,10 +1,10 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Sun, 26 Apr 2015 16:03:28 +0200
-Subject: [PATCH 1/6] ARM: dts: berlin: relicense the berlin2q dtsi under
+Date: Sun, 26 Apr 2015 16:03:30 +0200
+Subject: [PATCH 3/6] ARM: dts: berlin: relicense the berlin2 dtsi under
  GPLv2/X11
 In-Reply-To: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1430057013-12842-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1430057013-12842-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,19 +16,19 @@ this dtsi under a GPLv2/X11 dual-license.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 34 +++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/berlin2.dtsi | 34 +++++++++++++++++++++++++++++++---
  1 file changed, 31 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index be5397288d24..703ce384e0d7 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -1,9 +1,37 @@
- /*
-  * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 63d00a63cfa6..da9adf8f69da 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -6,9 +6,37 @@
+  * based on GPL'ed 2.6 kernel sources
+  *  (c) Marvell International Ltd.
   *
 - * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
+- * License version 2.  This program is licensed "as is" without any
 - * warranty of any kind, whether express or implied.
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
@@ -63,6 +63,6 @@ index be5397288d24..703ce384e0d7 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- #include <dt-bindings/clock/berlin2q.h>
+ #include "skeleton.dtsi"
 -- 
 2.3.6
