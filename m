@@ -1,83 +1,32 @@
-From: nicolae.rosia@gmail.com (Nicolae Rosia)
-Date: Sun, 26 Apr 2015 22:45:18 +0300
-Subject: [PATCH 02/11] ARM: imx: use dynamic mapping for CCM
-In-Reply-To: <1430058672-9267-3-git-send-email-shawn.guo@linaro.org>
-References: <1430058672-9267-1-git-send-email-shawn.guo@linaro.org>
- <1430058672-9267-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAH=tA9G1JQ-smg_V+dUkZLtkERiswh-EK1y013tEua6iNKCbRQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 26 Apr 2015 21:52:11 +0200
+Subject: [PATCH 3/4] mtd: mxc_nand: fix truncate of unaligned oob copying
+In-Reply-To: <1f8e85fd8e75170e1005473c075942cb3d4479fe.1430034929.git.baruch@tkos.co.il>
+References: <cover.1430034929.git.baruch@tkos.co.il>
+ <1f8e85fd8e75170e1005473c075942cb3d4479fe.1430034929.git.baruch@tkos.co.il>
+Message-ID: <20150426195211.GB19431@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Baruch,
 
-On Sun, Apr 26, 2015 at 5:31 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Replace the static mapping of CCM block in clock drivers with dynamic
-> mapping.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-imx/clk-imx1.c  | 3 ++-
->  arch/arm/mach-imx/clk-imx31.c | 5 ++++-
->  arch/arm/mach-imx/clk-imx35.c | 5 ++++-
->  3 files changed, 10 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
-> index f4a76e841966..5301d2ebb234 100644
-> --- a/arch/arm/mach-imx/clk-imx1.c
-> +++ b/arch/arm/mach-imx/clk-imx1.c
-> @@ -75,7 +75,8 @@ static void __init _mx1_clocks_init(unsigned long fref)
->
->  int __init mx1_clocks_init(unsigned long fref)
->  {
-> -       ccm = MX1_IO_ADDRESS(MX1_CCM_BASE_ADDR);
-> +       ccm = ioremap(MX1_CCM_BASE_ADDR, SZ_4K);
-> +       BUG_ON(!ccm);
->
->         _mx1_clocks_init(fref);
->
-> diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-> index 8a103a2c8b68..2aaccadb9e13 100644
-> --- a/arch/arm/mach-imx/clk-imx31.c
-> +++ b/arch/arm/mach-imx/clk-imx31.c
-> @@ -50,9 +50,12 @@ static struct clk_onecell_data clk_data;
->
->  int __init mx31_clocks_init(unsigned long fref)
->  {
-> -       void __iomem *base = MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR);
-> +       void __iomem *base;
->         struct device_node *np;
->
-> +       base = ioremap(MX31_CCM_BASE_ADDR, SZ_4K);
-> +       BUG_ON(!base);
-> +
->         clk[dummy] = imx_clk_fixed("dummy", 0);
->         clk[ckih] = imx_clk_fixed("ckih", fref);
->         clk[ckil] = imx_clk_fixed("ckil", 32768);
-> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-> index 4ef1e8bdac5b..14f33ec049bc 100644
-> --- a/arch/arm/mach-imx/clk-imx35.c
-> +++ b/arch/arm/mach-imx/clk-imx35.c
-> @@ -71,11 +71,14 @@ static struct clk *clk[clk_max];
->
->  int __init mx35_clocks_init(void)
->  {
-> -       void __iomem *base = MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR);
-> +       void __iomem *base;
->         u32 pdr0, consumer_sel, hsp_sel;
->         struct arm_ahb_div *aad;
->         unsigned char *hsp_div;
->
-> +       base = ioremap(MX35_CCM_BASE_ADDR, SZ_4K);
-> +       BUG_ON(base);
-BUG_ON(!base) ?
+On Sun, Apr 26, 2015 at 11:16:50AM +0300, Baruch Siach wrote:
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index c650f0950b20..c05f5e8fef17 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -840,22 +840,22 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
+>  		for (i = 0; i < num_chunks - 1; i++)
+>  			memcpy32_fromio(d + i * oob_chunk_size,
+>  					s + i * sparebuf_size,
+> -					oob_chunk_size);
+> +					ALIGN(oob_chunk_size, 4));
+If oob_chunk_size isn't 32-bit-aligned, d + i * oob_chunk_size isn't
+either for uneven i. That's not nice. I suggest to use memcpy16_fromio.
 
-> +
->         pdr0 = __raw_readl(base + MXC_CCM_PDR0);
->         consumer_sel = (pdr0 >> 16) & 0xf;
->         aad = &clk_consumer[consumer_sel];
-> --
-> 1.9.1
->
+Best regards
+Uwe
 
-Best regards,
-Nicolae Rosia
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
