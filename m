@@ -1,36 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 26 Apr 2015 12:20:46 +0200
-Subject: n900 in 4.1-rc0
-In-Reply-To: <CANMBJr5G2RpS1sw3N8FYitqzqFu8a2Gqj__i_742FZrMYuusOA@mail.gmail.com>
-References: <20150416093234.GA17423@amd>
- <CANMBJr5G2RpS1sw3N8FYitqzqFu8a2Gqj__i_742FZrMYuusOA@mail.gmail.com>
-Message-ID: <20150426102046.GA4340@amd>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 26 Apr 2015 14:12:04 +0300
+Subject: [PATCH v1 2/2] ARM: dts: rockchip: set dr_mode property for
+ rk3288-firefly board
+In-Reply-To: <1430041299-24874-2-git-send-email-lyz@rock-chips.com>
+References: <1430041299-24874-1-git-send-email-lyz@rock-chips.com>
+ <1430041299-24874-2-git-send-email-lyz@rock-chips.com>
+Message-ID: <553CC804.4050206@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hello.
 
-> > Just tried booting 4.1-rc0 on n900 (commit
-> > 34c9a0ffc75ad25b6a60f61e27c4a4b1189b8085) and it is broken.
-> >
-> > Any ideas?
-> 
-> Looks like DT and legacy booting are working fine in our
-> labs. [0][1]
+On 4/26/2015 12:41 PM, Yunzhi Li wrote:
 
-Interesting web pages, thanks.
+> rk3288-firefly board use the dwc2 usb otg controller as a host
+> controller and the device mode not used, so the dr_mode should be
+> "host" then the dwc2 usb otg controller will work at host only
+> mode
 
-I noticed that legacy booting indicates broken today, but... Is there
-list of your targets somewhere?
+> Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
 
-Best regards,
-									Pavel
+> ---
 
+>   arch/arm/boot/dts/rk3288-firefly.dtsi | 1 +
+>   1 file changed, 1 insertion(+)
 
+> diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+> index e6f873a..a861776 100644
+> --- a/arch/arm/boot/dts/rk3288-firefly.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+> @@ -466,6 +466,7 @@
+>   };
+>
+>   &usb_otg {
+> +	dr_modr = "host";
 
-> [0] http://kernelci.org/boot/omap3-n900/
-> [1] http://kernelci.org/boot/omap3-n900,legacy/
+    You meant to type "dr_mode".
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+WBR, Sergei
