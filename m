@@ -1,37 +1,34 @@
-From: fengguang.wu@intel.com (Fengguang Wu)
-Date: Mon, 27 Apr 2015 13:20:45 +0800
-Subject: [PATCH v3] dmaengine: xgene-dma: Fix sparse wannings and
- coccinelle warnings
-In-Reply-To: <20150427031315.GG2738@intel.com>
-References: <1429212673-22254-1-git-send-email-rsahu@apm.com>
- <20150417182937.GN30624@intel.com>
- <CAFd313y-HfW_us0FVQFEkGAzf-ZCKpRtF6eYweaK0V94MBg4iQ@mail.gmail.com>
- <20150427031315.GG2738@intel.com>
-Message-ID: <20150427052045.GA5199@wfg-t540p.sh.intel.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 27 Apr 2015 07:22:54 +0200
+Subject: [PATCH] [media] xilinx: Reflect dma header file move
+In-Reply-To: <1429903476-24161-1-git-send-email-linux@roeck-us.net>
+References: <1429903476-24161-1-git-send-email-linux@roeck-us.net>
+Message-ID: <fcd18355-b06d-4afd-b8c3-9af9adcf8021@BY2FFO11OLC013.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 08:43:15AM +0530, Vinod Koul wrote:
-> On Mon, Apr 20, 2015 at 08:38:18AM +0530, Rameshwar Sahu wrote:
-> > Hi Vinod,
-> >> >> @@ -2085,6 +2043,5 @@ module_platform_driver(xgene_dma_driver);
-> > >>
-> > >>  MODULE_DESCRIPTION("APM X-Gene SoC DMA driver");
-> > >>  MODULE_AUTHOR("Rameshwar Prasad Sahu <rsahu@apm.com>");
-> > >> -MODULE_AUTHOR("Loc Ho <lho@apm.com>");
-> > > And why this?
-> > 
-> > I saw below warning reported by the kbuild robot test
-> > 
-> > drivers/dma/xgene-dma.c:2088:1: sparse: symbol
-> > '__UNIQUE_ID_author__COUNTER__' has multiple initializers (originally
-> > initialized at drivers/dma/xgene-dma.c:2087)
-> > So, I kept only one author here.
-> No that is not right, sparse shouldn't have cribbed here.
+On 04/24/2015 09:24 PM, Guenter Roeck wrote:
+> Commit 937abe88aea3 ("dmaengine: xilinx-dma: move header file to common
+> location") moved xilinx_dma.h to a common location but neglected to reflect
+> this move in all its users.
 > 
-> Fengguang can we get the bot to ignore this please
+> This causes compile errors for several builds.
+> 
+> drivers/media/platform/xilinx/xilinx-dma.c:15:35:
+> 	fatal error: linux/amba/xilinx_dma.h: No such file or directory
+> 
+> Cc: Kedareswara rao Appana <appana.durga.rao@xilinx.com>
+> Fixes: 937abe88aea3 ("dmaengine: xilinx-dma: move header file to common
+> 	location")
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  drivers/media/platform/xilinx/xilinx-dma.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-OK, sorry for the noises! CC sparse maintainer btw.
+FYI:
+http://www.serverphorums.com/read.php?12,1179281
+
+https://lkml.org/lkml/2015/4/25/25
 
 Thanks,
-Fengguang
+Michal
