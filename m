@@ -1,59 +1,135 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 27 Apr 2015 13:02:02 -0700
-Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
- using PM clocks
-In-Reply-To: <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
- (Geert Uytterhoeven's message of "Sun, 26 Apr 2015 10:49:26 +0200")
-References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
- <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
- <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
- <553A21C7.4060506@codeaurora.org>
- <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
-Message-ID: <7hh9s1xrut.fsf@deeprootsystems.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 27 Apr 2015 22:04:07 +0200
+Subject: [PATCH v2 06/10] KVM: arm64: guest debug, add SW break point
+ support
+In-Reply-To: <87y4li6hua.fsf@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
+ <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
+Message-ID: <20150427200407.GG23335@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> writes:
+On Thu, Apr 23, 2015 at 03:26:53PM +0100, Alex Benn?e wrote:
+> 
+> Christoffer Dall <christoffer.dall@linaro.org> writes:
+> 
+> > On Tue, Mar 31, 2015 at 04:08:04PM +0100, Alex Benn?e wrote:
+> >> This adds support for SW breakpoints inserted by userspace.
+> >> 
+> >> We do this by trapping all BKPT exceptions in the
+> >> hypervisor (MDCR_EL2_TDE).
+> >
+> > you mean trapping all exceptions in the guest to the hypervisor?
+> >
+> >> The kvm_debug_exit_arch carries the address
+> >> of the exception.
+> >
+> > why?  can userspace not simply read out the PC using GET_ONE_REG?
+> 
+> Yes, I have re-worded and removed PC from the debug information.
+> 
+> <snip>
+> >>  
+> >> +	/* Trap breakpoints? */
+> >> +	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
+> >> +		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
+> >> +	else
+> >> +		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
+> >
+> > so now you're trapping all debug exceptions, right?
+> >
+> > what happens if the guest is using the hardware to debug debug stuff and
+> > generates other kinds of debug exceptions, like a hardware breakpoint,
+> > will we not see an unhandled exception and the guest being forcefully
+> > killed?
+> 
+> Yes until the later patches which stop the guest using HW debug
+> registers while we are using them.
+> 
+> >
+> >> +
+> >>  }
+> >>  
+> >>  void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
+> >> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> >> index 524fa25..ed1bbb4 100644
+> >> --- a/arch/arm64/kvm/handle_exit.c
+> >> +++ b/arch/arm64/kvm/handle_exit.c
+> >> @@ -82,6 +82,37 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >>  	return 1;
+> >>  }
+> >>  
+> >> +/**
+> >> + * kvm_handle_debug_exception - handle a debug exception instruction
+> >
+> > handle a software breadkpoint exception
+> >
+> >> + *
+> >> + * @vcpu:	the vcpu pointer
+> >> + * @run:	access to the kvm_run structure for results
+> >> + *
+> >> + * We route all debug exceptions through the same handler as we
+> >
+> > all debug exceptions?  software breakpoints and all?  then why the above
+> > shot text?
+> >
 
-> On Fri, Apr 24, 2015 at 12:58 PM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
->>> Second, I want to see less users of pm_clk_add_notifier() since it's
->>> not the proper/long-term way of how to assign PM domain pointers to a
->>> device. Instead that shall be done at device registration point. In
->>> your case while parsing the DT nodes and adding devices onto to their
->>> buses.
->>
->> but these are devices which do not really have a controllable power
->> domain, they just have controllable clocks.
->>
->>> Yes, I understand that it will requires quite some work to adopt to
->>> this behaviour - but that how it shall be done.
->>>
->>> Finally, an important note, you don't need to use PM domains for these
->>> devices at all and thus you don't need to fix what I propose. Instead
->>> you only have to implement the runtime PM callbacks for each driver
->>> and manage the clocks from there. That is probably also a easier
->>> solution.
->>
->> But that would mean I repeat the same code in all drivers to do a
->> clk_get/prepare/enable/disable/unprepare of the same "core" and "iface"
->> clocks. I thought we have clock_ops.c just to avoid that (atleast up
->> until we have a better way of doing it)
->> And there are atleast a few architecture which have used it to avoid the
->> duplication across all drivers (omap1/davinci/sh/keystone)
->
-> At least for arm/shmobile, we're planning to move away from this, cfr.
-> http://www.spinics.net/lists/linux-sh/msg41114.html
+I think the issue here was "debug exception instruction" making me think
+this is just for software breakpoints...
 
-Just to clarify for Rajendra's sake... 
+Not sure what I meant by 'shot text' - probably 'short text'
 
-SH is moving away from the pm_clk_add_notifier(), but not duplicating
-the clk_get/prepare/enable/disable/unprepare across all the drivers.
+> >> + * just need to report the PC and the HSR values to userspace.
+> >> + * Userspace may decide to re-inject the exception and deliver it to
+> >> + * the guest if it wasn't for the host to deal with.
+> >
+> > now I'm confused - does userspace setup the guest to receive an
+> > exception or does it tell KVM to emulate an exception for the guest or
+> > do we execute the breakpoint without trapping the debug exception?
+> 
+> I've made it all go through userspace as we may have to translate the
+> hypervisor visible exception code to what the guest was expecting to see.
+> 
 
-Rather, they're using a genpd to model the clock domain, and taking
-advantage of the pm_domain speciic attach callback to attach the PM
-clocks.
+ok, so I think you should re-phrase something like:
 
-This should work for qcom also assuming that these device nodes don't
-also need to belong to a different PM domain.
+"Userspace may decide that this exception is caused by the guest using
+debugging itself, and may in that case emulate the guest debug exception
+in userspace before resuming KVM."
 
-Kevin
+But does that really work?  Given that we don't support KVM-TCG
+migration, this sounds a little strange.  Did we test it?
+
+> >
+> >> + */
+> >> +static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >> +{
+> >> +	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+> >> +
+> >> +	run->exit_reason = KVM_EXIT_DEBUG;
+> >> +	run->debug.arch.hsr = hsr;
+> >> +
+> >> +	switch (hsr >> ESR_ELx_EC_SHIFT) {
+> >> +	case ESR_ELx_EC_BKPT32:
+> >> +	case ESR_ELx_EC_BRK64:
+> >> +		run->debug.arch.pc = *vcpu_pc(vcpu);
+> >> +		break;
+> >> +	default:
+> >> +		kvm_err("%s: un-handled case hsr: %#08x\n",
+> >> +			__func__, (unsigned int) hsr);
+> >
+> > this should never happen right?
+> 
+> At the moment it could, at the end of the patch series we should cover
+> all the cases so it would indicate a bug. I've made it return an error
+> code so it fails hard as suggested by David.
+> 
+hmm, ok, so I'm not so worried about that kind of bisectability
+(although it would be nice to keep that working too), but reading
+patches that way is a bit annoying for reviewers, so I recommend you
+deal with the patch ordering in some way that makes it more obvious what
+happens as reviewers read the patches, one at a time.
+
+Thanks,
+-Christoffer
