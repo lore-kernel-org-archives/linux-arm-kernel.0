@@ -1,57 +1,52 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 27 Apr 2015 22:44:56 +0200 (CEST)
-Subject: Question about DC-DC frequency handling
-In-Reply-To: <20150426190729.16410.58019@quantum>
-References: <604104768.496325.1430058690855.JavaMail.open-xchange@oxbaltgw00.schlund.de>
- <20150426190729.16410.58019@quantum>
-Message-ID: <68391817.574800.1430167496498.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+From: vagrant@debian.org (Vagrant Cascadian)
+Date: Mon, 27 Apr 2015 13:48:26 -0700
+Subject: [PATCH] ARM: dts: imx5: Add dts files for USB armory.
+In-Reply-To: <20150427081428.GC9231@dragon>
+References: <87h9t6i40r.fsf@aikidev.net> <20150427081428.GC9231@dragon>
+Message-ID: <87y4ldnvqd.fsf@aikidev.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> Michael Turquette <mturquette@linaro.org> hat am 26. April 2015 um 21:07
-> geschrieben:
+On 2015-04-27, Shawn Guo wrote:
+> On Fri, Mar 27, 2015 at 01:23:00PM -0700, Vagrant Cascadian wrote:
+>> Add support for the USB armory board by Inverse Path. This board
+>> features a Freescale iMX53 SoC, 512MB RAM, and USB OTG operating in
+>> either peripheral or host mode, and 5 GPIO pins.
+>> 
+>> One .dtb is generated for operating in peripheral mode, and one is
+>> generated for operating in host mode.
 >
->
-> Quoting Stefan Wahren (2015-04-26 07:31:30)
-> > Hi,
-> >
-> > i'm current working on a regulator driver which should be able to change
-> > DC-DC
-> > clock frequency.
-> >
-> > Now here is my question. What is the prefered way to implement the clock
-> > handling?
->
-> Fun question. I have a question for you: who are the consumers of this
-> DC-DC? Do the downstream, consuming devices care about "clock rate" of
-> your regulator?
->
-> I'll hazard a guess that they do not care. DC-DC switching frequency is
-> an important aspect of power supply design, but switching frequency of a
-> power supply is not controlled by the clock framework in any example
-> that I am aware of.
+> Is it possible to ask bootloader to patch the dtb instead of maintaining
+> a new one for just changing one USB property?
 
-yes the consumers don't care. My intension for changing the switching frequency
-is
-to avoid interferences on HF band.
+It does appear to be possible with u-boot:
 
->
-> >
-> > Option A):
-> >
-> > The regulator driver handles all internally (select clock source, set
-> > frequency).
->
-> Mark should weigh in on this, but I think option A is correct. Maybe
-> something like regulator_set_mode could program your switching
-> frequency?
+  load mmc 0:1 $fdt_addr_r $fdtfile
+  fdt addr $fdt_addr_r
+  fdt set /soc/aips at 50000000/usb at 53f80000 dr_mode host
 
-A runtime configuration isn't necessary. In a earlier discussion we decided to
-use
-a devicetree property.
+Since the user would have to manually select the appropriate .dtb
+anyways, it may be reasonable to drop the host_mode.dtb and rely on the
+u-boot to tweak the fdt on boot to switch between usb modes.
 
-Thanks
+It is considerably more complicated than setting the fdtfile variable to
+the desired .dtb, as various out-of-the box boot scripts will load the
+.dtb file defined in the fdtfile variable, overwriting any changes made
+with "fdt set".
 
-Stefan
+Given the additional complication in boot scripts, my preference would
+be to ship both .dtb files...
+
+
+Thanks for the time and consideration!
+
+
+live well,
+  vagrant
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150427/bf4f0b42/attachment-0001.sig>
