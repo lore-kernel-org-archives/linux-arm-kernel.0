@@ -1,39 +1,37 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 27 Apr 2015 18:47:53 -0400
-Subject: [PATCH 04/11] arm/mach-rockchip: remove legacy __cpuinit section that
- crept in
-In-Reply-To: <1430174880-27958-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1430174880-27958-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1430174880-27958-5-git-send-email-paul.gortmaker@windriver.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 27 Apr 2015 16:12:53 -0700
+Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling to
+ the WDT driver.
+In-Reply-To: <20150427160517.GA11074@roeck-us.net>
+References: <1429902534-2348-1-git-send-email-eric@anholt.net>
+ <1429902534-2348-2-git-send-email-eric@anholt.net>
+ <20150427160432.GD5701@roeck-us.net> <20150427160517.GA11074@roeck-us.net>
+Message-ID: <877fsx9nd6.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We removed __cpuinit support (leaving no-op stubs) quite some time ago.
-However this one crept back in as of commit a7a2b3118b410fb3cd3a8363b1
-("ARM: rockchip: add smp bringup code").
+Guenter Roeck <linux@roeck-us.net> writes:
 
-Since we want to clobber the stubs soon, get this removed now.
+> On Mon, Apr 27, 2015 at 09:04:32AM -0700, Guenter Roeck wrote:
+>> On Fri, Apr 24, 2015 at 12:08:54PM -0700, Eric Anholt wrote:
+>> > Since the WDT is what's used to drive restart and power off, it makes
+>> > more sense to keep it there, where the regs are already mapped and
+>> > definitions for them provided.  Note that this means you may need to
+>> > add CONFIG_BCM2835_WDT to retain functionality of your kernel.
+>> > 
+>> > Signed-off-by: Eric Anholt <eric@anholt.net>
+>> > Cc: linux-watchdog at vger.kernel.org
+>> 
+>> The patch will require a rebase to v4.0-rc1.
+>> 
+> s/4.0/4.1/
 
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
- arch/arm/mach-rockchip/platsmp.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index 5b4ca3c3c879..fd2f0dc81015 100644
---- a/arch/arm/mach-rockchip/platsmp.c
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -119,8 +119,7 @@ static int pmu_set_power_domain(int pd, bool on)
-  * Handling of CPU cores
-  */
- 
--static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
--					     struct task_struct *idle)
-+static int rockchip_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	int ret;
- 
--- 
-2.2.1
+It will?  It seems to work fine, and the diff's the same.  Is there some
+new thing you were expecting in a rebase?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150427/16bb2623/attachment.sig>
