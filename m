@@ -1,297 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Apr 2015 19:57:48 +0800
-Subject: [PATCH] ARM: dts: imx5: Add dts files for USB armory.
-In-Reply-To: <87h9t6i40r.fsf@aikidev.net>
-References: <87h9t6i40r.fsf@aikidev.net>
-Message-ID: <20150427115747.GA11975@dragon>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 27 Apr 2015 12:03:37 +0000
+Subject: [PATCH] ARM: mvebu: dove: Relicense the device tree under
+ GPLv2+/X11
+In-Reply-To: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20150427120337.GE8069@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Peter
-
-On Fri, Mar 27, 2015 at 01:23:00PM -0700, Vagrant Cascadian wrote:
-> Add support for the USB armory board by Inverse Path. This board
-> features a Freescale iMX53 SoC, 512MB RAM, and USB OTG operating in
-> either peripheral or host mode, and 5 GPIO pins.
+On Mon, Apr 27, 2015 at 11:09:04AM +0200, Sebastian Hesselbarth wrote:
+> The current implicit GPL only licensing on the device tree makes it
+> very impractical for other software components licensed under another
+> license.
 > 
-> One .dtb is generated for operating in peripheral mode, and one is
-> generated for operating in host mode.
-
-Vagrant,
-
-Does that mean this board can work in peripheral or host mode but can
-switch between them at run-time?
-
-Shawn
-
+> In order to make it easier for them to reuse our device trees,
+> relicense our device trees under a GPL/X11 dual-license.
 > 
-> Signed-off-by: Vagrant Cascadian <vagrant@debian.org>
-> Cc: Andrej Rosano <andrej@inversepath.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
->  arch/arm/boot/dts/Makefile                      |   2 +
->  arch/arm/boot/dts/imx53-usbarmory-host_mode.dts |  17 +++
->  arch/arm/boot/dts/imx53-usbarmory.dts           |  13 ++
->  arch/arm/boot/dts/imx53-usbarmory.dtsi          | 183 ++++++++++++++++++++++++
->  4 files changed, 215 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
->  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
->  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dtsi
+> Hi,
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a1c776b..bd2258b 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -244,6 +244,8 @@ dtb-$(CONFIG_SOC_IMX53) += \
->  	imx53-smd.dtb \
->  	imx53-tx53-x03x.dtb \
->  	imx53-tx53-x13x.dtb \
-> +	imx53-usbarmory.dtb \
-> +	imx53-usbarmory-host_mode.dtb \
->  	imx53-voipac-bsb.dtb
->  dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6dl-aristainetos_4.dtb \
-> diff --git a/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts b/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
-> new file mode 100644
-> index 0000000..a94cb1d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
-> @@ -0,0 +1,17 @@
-> +/*
-> + * Copyright 2015 Inverse Path, S.r.l.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx53-usbarmory.dtsi"
-> +
-> +&usbotg {
-> +	dr_mode = "host";
-> +};
-> diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
-> new file mode 100644
-> index 0000000..c86a4d8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-usbarmory.dts
-> @@ -0,0 +1,13 @@
-> +/*
-> + * Copyright 2015 Inverse Path, S.r.l.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx53-usbarmory.dtsi"
-> diff --git a/arch/arm/boot/dts/imx53-usbarmory.dtsi b/arch/arm/boot/dts/imx53-usbarmory.dtsi
-> new file mode 100644
-> index 0000000..b4a9052
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-usbarmory.dtsi
-> @@ -0,0 +1,183 @@
-> +/*
-> + * Copyright 2015 Inverse Path, S.r.l.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include "imx53.dtsi"
-> +
-> +/ {
-> +	model = "Inverse Path USB armory";
-> +	compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
-> +};
-> +
-> +/ {
-> +	chosen {
-> +		stdout-path = &uart1;
-> +	};
-> +
-> +	memory {
-> +		reg = <0x70000000 0x20000000>;
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pin_gpio4_27>;
-> +
-> +		user {
-> +			label = "LED";
-> +			gpios = <&gpio4 27 0>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +};
-> +
-> +&esdhc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_esdhc1>;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog>;
-> +
-> +	imx53-usbarmory {
-> +		pinctrl_hog: hoggrp {
-> +			fsl,pins = <
-> +				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
-> +				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
-> +				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
-> +				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
-> +				MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
-> +				MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
-> +				MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
-> +				MX53_PAD_PATA_DA_2__GPIO7_8	  0x80000000
-> +				MX53_PAD_GPIO_16__GPIO7_11        0x80000000
-> +			>;
-> +		};
-> +
-> +		led_pin_gpio4_27: led_gpio4_27 at 0 {
-> +			fsl,pins = <
-> +				MX53_PAD_DISP0_DAT6__GPIO4_27 0x80000000
-> +			>;
-> +		};
-> +
-> +		pinctrl_esdhc1: esdhc1grp {
-> +			fsl,pins = <
-> +				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
-> +				MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
-> +				MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
-> +				MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
-> +				MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
-> +				MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c1: i2c1grp {
-> +			fsl,pins = <
-> +				MX53_PAD_CSI0_DAT8__I2C1_SDA	0xc0000000
-> +				MX53_PAD_CSI0_DAT9__I2C1_SCL	0xc0000000
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart1: uart1grp {
-> +			fsl,pins = <
-> +				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
-> +				MX53_PAD_CSI0_DAT11__UART1_RXD_MUX	0x1e4
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&vpu {
-> +	status = "okay";
-> +};
-> +
-> +&usbotg {
-> +	dr_mode = "peripheral";
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	ltc3589: pmic at 34 {
-> +		compatible = "lltc,ltc3589-2";
-> +		reg = <0x34>;
-> +
-> +		regulators {
-> +			sw1_reg: sw1 {
-> +				regulator-min-microvolt = <591930>;
-> +				regulator-max-microvolt = <1224671>;
-> +				lltc,fb-voltage-divider = <100000 158000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw2_reg: sw2 {
-> +				regulator-min-microvolt = <704123>;
-> +				regulator-max-microvolt = <1456803>;
-> +				lltc,fb-voltage-divider = <180000 191000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw3_reg: sw3 {
-> +				regulator-min-microvolt = <1341250>;
-> +				regulator-max-microvolt = <2775000>;
-> +				lltc,fb-voltage-divider = <270000 100000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			bb_out_reg: bb-out {
-> +				regulator-min-microvolt = <3387341>;
-> +				regulator-max-microvolt = <3387341>;
-> +				lltc,fb-voltage-divider = <511000 158000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +			ldo1_reg: ldo1 {
-> +				regulator-min-microvolt = <1306329>;
-> +				regulator-max-microvolt = <1306329>;
-> +				lltc,fb-voltage-divider = <100000 158000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo2_reg: ldo2 {
-> +				regulator-min-microvolt = <704123>;
-> +				regulator-max-microvolt = <1456806>;
-> +				lltc,fb-voltage-divider = <180000 191000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo3_reg: ldo3 {
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			ldo4_reg: ldo4 {
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <3200000>;
-> +			};
-> +		};
-> +	};
-> +};
-> -- 
-> 2.1.4
+> with Dove we only have a small set of people who can be git blame'd for
+> the DT files:
+> - Jason Cooper
+> - Ezequiel Garcia
+> - Andrew Lunn
+> - Jean-Francois Moine
+> - Russell King
+> - Myself
 > 
+> so I decided to keep the whole relicensing in a single patch. Please send
+> your Acked-by's in reply to this patch if you are happy with the relicensing.
+> 
+> Thanks,
+>   Sebastian
+> ---
+>  arch/arm/boot/dts/dove-cubox-es.dts | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dove-cubox.dts    | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dove-d2plug.dts   | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dove-d3plug.dts   | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dove-dove-db.dts  | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dove.dtsi         | 42 +++++++++++++++++++++++++++++++++++++
+>  6 files changed, 252 insertions(+)
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
