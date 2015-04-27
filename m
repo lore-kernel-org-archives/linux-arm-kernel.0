@@ -1,117 +1,161 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 27 Apr 2015 09:08:57 +0200
-Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
- using PM clocks
-In-Reply-To: <553A21C7.4060506@codeaurora.org>
-References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
- <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
- <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
- <553A21C7.4060506@codeaurora.org>
-Message-ID: <CAPDyKFonuwRxSNpgUz1pgUmO+ZE=XvxfpzqstzR3K=K5yFTHmA@mail.gmail.com>
+From: rajeevkumar.linux@gmail.com (Rajeev Kumar)
+Date: Mon, 27 Apr 2015 12:40:03 +0530
+Subject: [PATCH] rajeev-dlh.kumar@st.com email-id doesn't exist anymore as I
+ have left the company. Replace ST's id with Rajeev Kumar
+ <rajeevkumar.linux@gmail.com>
+Message-ID: <1430118603-12080-1-git-send-email-rajeevkumar.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 April 2015 at 12:58, Rajendra Nayak <rnayak@codeaurora.org> wrote:
->
-> On 04/24/2015 03:33 PM, Ulf Hansson wrote:
->>
->> On 23 April 2015 at 10:45, Rajendra Nayak <rnayak@codeaurora.org> wrote:
->>>
->>> Add runtime PM support to handle (core and iface) clocks for devices
->>> without a controllable power domain. Once the drivers for these devices
->>> are converted to use runtime PM apis, all clock handling (for core and
->>> iface) from these drivers can then be removed.
->>>
->>> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
->>> ---
->>>   drivers/clk/qcom/gdsc.c | 20 ++++++++++++++++++++
->>>   1 file changed, 20 insertions(+)
->>>
->>> diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
->>> index 480ebf6..92b0f6d 100644
->>> --- a/drivers/clk/qcom/gdsc.c
->>> +++ b/drivers/clk/qcom/gdsc.c
->>> @@ -15,6 +15,7 @@
->>>   #include <linux/err.h>
->>>   #include <linux/jiffies.h>
->>>   #include <linux/pm_clock.h>
->>> +#include <linux/platform_device.h>
->>>   #include <linux/slab.h>
->>>   #include "gdsc.h"
->>>
->>> @@ -226,3 +227,22 @@ void gdsc_unregister(struct device *dev)
->>>   {
->>>          of_genpd_del_provider(dev->of_node);
->>>   }
->>> +
->>> +static struct dev_pm_domain default_qcom_pm_domain = {
->>> +       .ops = {
->>> +               USE_PM_CLK_RUNTIME_OPS
->>> +               USE_PLATFORM_PM_SLEEP_OPS
->>> +       },
->>> +};
->>> +
->>> +static struct pm_clk_notifier_block qcom_pm_notifier = {
->>> +       .pm_domain      = &default_qcom_pm_domain,
->>> +       .con_ids        = { "core", "iface" },
->>> +};
->>> +
->>> +static int __init qcom_pm_runtime_init(void)
->>> +{
->>> +       pm_clk_add_notifier(&platform_bus_type, &qcom_pm_notifier);
->>> +       return 0;
->>> +}
->>> +core_initcall(qcom_pm_runtime_init);
->>
->>
->> First, I don't follow how this code is related to GDSC.
->
->
-> Actually its not. I should probably move it to a pm_runtime.c someplace
-> in drivers/soc/qcom maybe.
->
->>
->> Second, I want to see less users of pm_clk_add_notifier() since it's
->> not the proper/long-term way of how to assign PM domain pointers to a
->> device. Instead that shall be done at device registration point. In
->> your case while parsing the DT nodes and adding devices onto to their
->> buses.
->
->
-> but these are devices which do not really have a controllable power
-> domain, they just have controllable clocks.
+It also updates .mailmap file to fix address for 'git shortlog'
 
-That's true. But I don't see an issue why we shouldn't allow to model
-this in DT through the existing bindings.
+Signed-off-by: Rajeev Kumar <rajeevkumar.linux@gmail.com>
+---
+ .mailmap                                     |    1 +
+ arch/arm/mach-spear/generic.h                |    2 +-
+ arch/arm/mach-spear/include/mach/irqs.h      |    2 +-
+ arch/arm/mach-spear/include/mach/spear.h     |    2 +-
+ arch/arm/mach-spear/spear6xx.c               |    2 +-
+ drivers/input/keyboard/spear-keyboard.c      |    2 +-
+ drivers/rtc/rtc-spear.c                      |    4 ++--
+ include/linux/platform_data/keyboard-spear.h |    2 +-
+ include/sound/designware_i2s.h               |    2 +-
+ include/sound/spear_dma.h                    |    2 +-
+ 10 files changed, 11 insertions(+), 10 deletions(-)
 
-If the DT guys think it's a bad idea, I will anyway think the proper
-way to assign PM domains pointers is at device registration point.
-
->
->>
->> Yes, I understand that it will requires quite some work to adopt to
->> this behaviour - but that how it shall be done.
->>
->> Finally, an important note, you don't need to use PM domains for these
->> devices at all and thus you don't need to fix what I propose. Instead
->> you only have to implement the runtime PM callbacks for each driver
->> and manage the clocks from there. That is probably also a easier
->> solution.
->
->
-> But that would mean I repeat the same code in all drivers to do a
-> clk_get/prepare/enable/disable/unprepare of the same "core" and "iface"
-> clocks. I thought we have clock_ops.c just to avoid that (atleast up
-> until we have a better way of doing it)
-> And there are atleast a few architecture which have used it to avoid the
-> duplication across all drivers (omap1/davinci/sh/keystone)
-
-Yes, the "duplications" are unavoidable if you decide to follow my suggestion.
-
-On the other hand your drivers will be more "standalone" and not
-depending on that you have a PM domain attached to the device to
-actually work. In some cases that might even be useful, when you have
-a cross SOC driver used in various configurations.
-
-Kind regards
-Uffe
+diff --git a/.mailmap b/.mailmap
+index 0d971cf..c570755 100644
+--- a/.mailmap
++++ b/.mailmap
+@@ -96,6 +96,7 @@ Peter A Jonsson <pj@ludd.ltu.se>
+ Peter Oruba <peter@oruba.de>
+ Peter Oruba <peter.oruba@amd.com>
+ Praveen BP <praveenbp@ti.com>
++Rajeev Kumar <rajeevkumar.linux@gmail.com>
+ Rajesh Shah <rajesh.shah@intel.com>
+ Ralf Baechle <ralf@linux-mips.org>
+ Ralf Wildenhues <Ralf.Wildenhues@gmx.de>
+diff --git a/arch/arm/mach-spear/generic.h b/arch/arm/mach-spear/generic.h
+index a99d90a..0bfd2ea 100644
+--- a/arch/arm/mach-spear/generic.h
++++ b/arch/arm/mach-spear/generic.h
+@@ -2,7 +2,7 @@
+  * spear machine family generic header file
+  *
+  * Copyright (C) 2009-2012 ST Microelectronics
+- * Rajeev Kumar <rajeev-dlh.kumar@st.com>
++ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
+  * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+diff --git a/arch/arm/mach-spear/include/mach/irqs.h b/arch/arm/mach-spear/include/mach/irqs.h
+index 92da0a8..022cf98 100644
+--- a/arch/arm/mach-spear/include/mach/irqs.h
++++ b/arch/arm/mach-spear/include/mach/irqs.h
+@@ -2,7 +2,7 @@
+  * IRQ helper macros for spear machine family
+  *
+  * Copyright (C) 2009-2012 ST Microelectronics
+- * Rajeev Kumar <rajeev-dlh.kumar@st.com>
++ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
+  * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
+index f2d6a01..0d2f14d 100644
+--- a/arch/arm/mach-spear/include/mach/spear.h
++++ b/arch/arm/mach-spear/include/mach/spear.h
+@@ -2,7 +2,7 @@
+  * SPEAr3xx/6xx Machine family specific definition
+  *
+  * Copyright (C) 2009,2012 ST Microelectronics
+- * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
+  * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+diff --git a/arch/arm/mach-spear/spear6xx.c b/arch/arm/mach-spear/spear6xx.c
+index da26fa5b..c6dcb0d 100644
+--- a/arch/arm/mach-spear/spear6xx.c
++++ b/arch/arm/mach-spear/spear6xx.c
+@@ -4,7 +4,7 @@
+  * SPEAr6XX machines common source file
+  *
+  * Copyright (C) 2009 ST Microelectronics
+- * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
+  *
+  * Copyright 2012 Stefan Roese <sr@denx.de>
+  *
+diff --git a/drivers/input/keyboard/spear-keyboard.c b/drivers/input/keyboard/spear-keyboard.c
+index f42a543..623d451 100644
+--- a/drivers/input/keyboard/spear-keyboard.c
++++ b/drivers/input/keyboard/spear-keyboard.c
+@@ -3,7 +3,7 @@
+  * Based on omap-keypad driver
+  *
+  * Copyright (C) 2010 ST Microelectronics
+- * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2. This program is licensed "as is" without any
+diff --git a/drivers/rtc/rtc-spear.c b/drivers/rtc/rtc-spear.c
+index d2cdb98..d14be33 100644
+--- a/drivers/rtc/rtc-spear.c
++++ b/drivers/rtc/rtc-spear.c
+@@ -2,7 +2,7 @@
+  * drivers/rtc/rtc-spear.c
+  *
+  * Copyright (C) 2010 ST Microelectronics
+- * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2. This program is licensed "as is" without any
+@@ -504,6 +504,6 @@ static struct platform_driver spear_rtc_driver = {
+ module_platform_driver(spear_rtc_driver);
+ 
+ MODULE_ALIAS("platform:rtc-spear");
+-MODULE_AUTHOR("Rajeev Kumar <rajeev-dlh.kumar@st.com>");
++MODULE_AUTHOR("Rajeev Kumar <rajeevkumar.linux@gmail.com>");
+ MODULE_DESCRIPTION("ST SPEAr Realtime Clock Driver (RTC)");
+ MODULE_LICENSE("GPL");
+diff --git a/include/linux/platform_data/keyboard-spear.h b/include/linux/platform_data/keyboard-spear.h
+index 9248e3a..5e3ff65 100644
+--- a/include/linux/platform_data/keyboard-spear.h
++++ b/include/linux/platform_data/keyboard-spear.h
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright (C) 2010 ST Microelectronics
+- * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2. This program is licensed "as is" without any
+diff --git a/include/sound/designware_i2s.h b/include/sound/designware_i2s.h
+index 26f406e..3a8fca9 100644
+--- a/include/sound/designware_i2s.h
++++ b/include/sound/designware_i2s.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (ST) 2012 Rajeev Kumar (rajeev-dlh.kumar at st.com)
++ * Copyright (ST) 2012 Rajeev Kumar (rajeevkumar.linux at gmail.com)
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+diff --git a/include/sound/spear_dma.h b/include/sound/spear_dma.h
+index 65aca51..e290de4 100644
+--- a/include/sound/spear_dma.h
++++ b/include/sound/spear_dma.h
+@@ -1,7 +1,7 @@
+ /*
+ * linux/spear_dma.h
+ *
+-* Copyright (ST) 2012 Rajeev Kumar (rajeev-dlh.kumar at st.com)
++* Copyright (ST) 2012 Rajeev Kumar (rajeevkumar.linux at gmail.com)
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+-- 
+1.7.9.5
