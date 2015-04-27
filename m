@@ -1,32 +1,33 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 27 Apr 2015 15:53:01 +0200
-Subject: [PATCH 10/10] ARM: shmobile: marzen dts: Use generic names for
- device nodes
-In-Reply-To: <553E3455.9070003@cogentembedded.com>
-References: <1430139334-15272-1-git-send-email-geert+renesas@glider.be>
- <1430139334-15272-11-git-send-email-geert+renesas@glider.be>
- <553E3455.9070003@cogentembedded.com>
-Message-ID: <CAMuHMdWOWmE9CwqEdcW_zm34P6+SifV0j9_KyBsXKT3kJsyg1w@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 27 Apr 2015 15:55:24 +0200
+Subject: [PATCH 2/2] ARM: shmobile: sh73a0 dtsi: Fix SCIFB naming
+In-Reply-To: <1430142924-15777-1-git-send-email-geert+renesas@glider.be>
+References: <1430142924-15777-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1430142924-15777-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 3:06 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
->> -       lan0_pins: lan0 {
->> +       ethernet_pins: ethernet {
->
->
->    Why change the label?
+The single SCIFB on SH-Mobile AG5 is called "scifb", not "scifb8".
 
-If there's only one instance, we usually name the pins like the device node.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Cfr. commit 0b3a0ef613538cae ("ARM: shmobile: r8a73a4: fix scifb* naming")
+---
+ arch/arm/boot/dts/sh73a0.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 0bdb1da60487b431..11e17c5f26e2cae2 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -376,7 +376,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	scifb8: serial at e6c30000 {
++	scifb: serial at e6c30000 {
+ 		compatible = "renesas,scifb-sh73a0", "renesas,scifb";
+ 		reg = <0xe6c30000 0x100>;
+ 		interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+1.9.1
