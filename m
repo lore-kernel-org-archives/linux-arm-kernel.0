@@ -1,107 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 27 Apr 2015 09:20:15 +0200
-Subject: [PATCH v2] rtc: armada38x: Fix concurrency access in
- armada38x_rtc_set_time
-Message-ID: <1430119215-13369-1-git-send-email-gregory.clement@free-electrons.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 27 Apr 2015 10:20:57 +0300
+Subject: [PATCH 2/4] mtd: mxc_nand: limit the size of used oob
+In-Reply-To: <20150427071238.GE19431@pengutronix.de>
+References: <cover.1430034929.git.baruch@tkos.co.il>
+ <4bd5da1f7d57aa32c5682297f7aa0c768e8c6e49.1430034929.git.baruch@tkos.co.il>
+ <20150426200725.GC19431@pengutronix.de>
+ <20150427043906.GR2258@tarshish>
+ <20150427071238.GE19431@pengutronix.de>
+Message-ID: <20150427072057.GT2258@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While setting the time, the RTC TIME register should not be
-accessed. However due to hardware constraints, setting the RTC time
-involves sleeping during 100ms. This sleep was done outside the
-critical section protected by the spinlock, so it was possible to read
-the RTC TIME register and get an incorrect value. This patch
-introduces a mutex for protecting the RTC TIME access, unlike the
-spinlock it is allowed to sleep in a critical section protected by a
-mutex. The RTC STATUS register can still be used from the interrupt
-handler but it has no effect on setting the time.
+Hi Uwe,
 
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: <stable@vger.kernel.org> #v4.0
----
-Hi,
+On Mon, Apr 27, 2015 at 09:12:38AM +0200, Uwe Kleine-K?nig wrote:
+> On Mon, Apr 27, 2015 at 07:39:06AM +0300, Baruch Siach wrote:
+> > On Sun, Apr 26, 2015 at 10:07:25PM +0200, Uwe Kleine-K?nig wrote:
+> > > On Sun, Apr 26, 2015 at 11:16:49AM +0300, Baruch Siach wrote:
+> > > > +	/* hardware can only use 218 or 128 oob bytes for ecc */
+> > > > +	if (mtd->oobsize >= 218)
+> > > IMHO this is the wrong check. What if your part (with 224 bytes spare)
+> > > is used but the machine only uses the small layout e.g. for booting?
+> > > (That would work, wouldn't it?)
+> > 
+> > Yes, but how would I know? I am following here the assumption of get_eccsize() 
+> > that enables 8 bit ECC when there is enough oobsize.
+> Hmm I rechecked the reference manual and found a register to specify the
+> size of the spare area (I didn't notice that one before). Did you try
+> what happens if you set this to 0x70 for 224 bytes oob?
 
-The first version of this patch was sent too late to be part of
-4.1-rc1. However this fix should be part of 4.1.
+Which register is that?
 
-Since the first version I added the acked-by from Alexandre and I
-rebased the patch onto v4.1-rc1.
+> Optimally this would result in the last 6 bytes being written but not 
+> protected by hardware ecc.
 
-Thanks,
+Last 6 bytes of what? AFAIK, hardware ECC does not protect oob at all.
 
-Gregory
+> > > Moreover the comment is misleading as it
+> > > only applies to 4K flashes. At least the driver works well with (2ki +
+> > > 128) bytes pages (while there are only 64 bytes spare used?? Maybe there
+> > > are still more bugs?).
+> > 
+> > I suspect there are more bugs. A simple way to trigger the bug I encountered 
+> > is by doing a sub-page write, that is:
+> > 
+> >   dd if=/dev/zero bs=1024 count=1 of=/dev/mtd2
+> >   dd if=/dev/zero bs=1024 count=1 seek=1 of=/dev/mtd2
+> > 
+> > and then try reading this page. You may need to dirty the (useless; random) 
+> > content of ecccalc to see the bug (you can conveniently use 
+> > mxc_nand_calculate_ecc() for that). What copy_spare() currently do (spread ECC 
+> > chunks evenly over oob) does not match nandv2_hw_eccoob_largepage.
+> I didn't follow, but would be willing to review a fix :-)
 
+OK. I'll try something.
 
- drivers/rtc/rtc-armada38x.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+baruch
 
-diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-index 43e04af39e09..cb70ced7e0db 100644
---- a/drivers/rtc/rtc-armada38x.c
-+++ b/drivers/rtc/rtc-armada38x.c
-@@ -40,6 +40,13 @@ struct armada38x_rtc {
- 	void __iomem	    *regs;
- 	void __iomem	    *regs_soc;
- 	spinlock_t	    lock;
-+	/*
-+	 * While setting the time, the RTC TIME register should not be
-+	 * accessed. Setting the RTC time involves sleeping during
-+	 * 100ms, so a mutex instead of a spinlock is used to protect
-+	 * it
-+	 */
-+	struct mutex	    mutex_time;
- 	int		    irq;
- };
- 
-@@ -59,8 +66,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
- 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
- 	unsigned long time, time_check, flags;
- 
--	spin_lock_irqsave(&rtc->lock, flags);
--
-+	mutex_lock(&rtc->mutex_time);
- 	time = readl(rtc->regs + RTC_TIME);
- 	/*
- 	 * WA for failing time set attempts. As stated in HW ERRATA if
-@@ -71,7 +77,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
- 	if ((time_check - time) > 1)
- 		time_check = readl(rtc->regs + RTC_TIME);
- 
--	spin_unlock_irqrestore(&rtc->lock, flags);
-+	mutex_unlock(&rtc->mutex_time);
- 
- 	rtc_time_to_tm(time_check, tm);
- 
-@@ -94,19 +100,12 @@ static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
- 	 * then wait for 100ms before writing to the time register to be
- 	 * sure that the data will be taken into account.
- 	 */
--	spin_lock_irqsave(&rtc->lock, flags);
--
-+	mutex_lock(&rtc->mutex_time);
- 	rtc_delayed_write(0, rtc, RTC_STATUS);
--
--	spin_unlock_irqrestore(&rtc->lock, flags);
--
- 	msleep(100);
--
--	spin_lock_irqsave(&rtc->lock, flags);
--
- 	rtc_delayed_write(time, rtc, RTC_TIME);
-+	mutex_unlock(&rtc->mutex_time);
- 
--	spin_unlock_irqrestore(&rtc->lock, flags);
- out:
- 	return ret;
- }
-@@ -230,6 +229,7 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	spin_lock_init(&rtc->lock);
-+	mutex_init(&rtc->mutex_time);
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rtc");
- 	rtc->regs = devm_ioremap_resource(&pdev->dev, res);
 -- 
-2.1.0
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
