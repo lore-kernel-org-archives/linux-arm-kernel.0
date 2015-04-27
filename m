@@ -1,73 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 27 Apr 2015 10:25:35 -0500
-Subject: [PATCH] ARM: gic: Document Power and Clock Domain optional
- properties
-In-Reply-To: <1430146811-29862-1-git-send-email-geert+renesas@glider.be>
-References: <1430146811-29862-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAL_JsqKjXuGp0SRFAVWskJRfyeoko6ybtceJQcDzymshuz9wPw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 27 Apr 2015 17:21:53 +0200
+Subject: [PATCH] RFC: let gpiod_get_optional et all return NULL when
+ GPIOLIB is not enabled
+In-Reply-To: <CAAVeFu+0bWSAUSaDGTUmPyj9JxEJn4yxF_hzab4CHp8YV1MuoA@mail.gmail.com>
+References: <1423731809-4800-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdb6KcZx3WfTqUKemhQ0_OsqxBGQb_P5cXXZvgc3riakdA@mail.gmail.com>
+ <20150306085957.GC10717@pengutronix.de>
+ <CACRpkdYq70V8SG4XOPBCGWs__J4ehknZSucpO5OdXpMDj8GPKA@mail.gmail.com>
+ <CAAVeFu+0bWSAUSaDGTUmPyj9JxEJn4yxF_hzab4CHp8YV1MuoA@mail.gmail.com>
+Message-ID: <20150427152153.GN19431@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 10:00 AM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> On some SoCs, the GIC may be part of a PM Domain (hardware Power and/or
-> Clock Domain).  Document the related optional DT properties.
->
-> Note: As the current GIC driver doesn't support Runtime PM yet, PM
-> Domain constraints must be handled elsewhere in e.g. platform code.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hello,
 
-Acked-by: Rob Herring <robh@kernel.org>
+On Thu, Apr 09, 2015 at 11:20:55AM +0900, Alexandre Courbot wrote:
+> I should have replied one month ago, but if gpiolib is disabled, how
+> can we use gpiolib-like logic to check the existence of a GPIO?
+> 
+> Having GPIO disabled means there is no GPIO support, including the
+> ability to look for GPIOs. -ENOSYS is a well-documented error-code
+> which meaning also applies to the gpio_*_optional functions (we don't
+> have support for the operation you requested). If a driver or
+> architecture really, really needs GPIO support they can require or
+> depend on CONFIG_GPIOLIB, and the problem goes away. If they can work
+> with and without gpiolib, then they should check for -ENOSYS when they
+> request GPIOs and behave accordingly.
+What whould be the right behaviour in your eyes? I hope it's not
 
-One comment below.
+	if (ret != -ENOSYS)
+		return ret;
 
-> ---
-> To preserve DT stability, we would like to add these properties to the
-> affected shmobile dtsi files.
->
-> On Thu, Mar 26, 2015 at 11:39 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 25/03/15 21:19, Geert Uytterhoeven wrote:
->>> I would like to add the clock and GIC dependency on the clock in the DTS now,
->>> for reasons of DTS stability. But that means I need a temporary workaround
->>> to avoid the clock from being disabled, until the GIC driver handles this.
->>>
->>> I don't expect a fix for the GIC code to just show up magically. I just wanted
->>> you to be aware of the problem. GIC is not the only problematic module here,
->>> there are others, cfr. the last slide of [2].
->>
->> As long as there is an agreement from the DT people on the presence of
->> that extra property in the GIC node, I'm happy with that. I'd like it to
->> be documented though.
->
-> Full thread at
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331876.html
->
->  Documentation/devicetree/bindings/arm/gic.txt | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> index 2da059a4790cb3c6..b21113b35f085f27 100644
-> --- a/Documentation/devicetree/bindings/arm/gic.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -58,6 +58,14 @@ Optional
->    regions, used when the GIC doesn't have banked registers. The offset is
->    cpu-offset * cpu-nr.
->
-> +- power-domains : A phandle and PM domain specifier as defined by bindings of
-> +                 the power controller specified by phandle, used when the GIC
-> +                 is part of a Power or Clock Domain.
+	/* continue and ignore error */
 
-"or Clock" should be removed?
+> Moving the interpretation of what the absence of gpiolib means down to
+> the GPIO functions themselves is actually what might lead consumers to
+> not know the result of their request. For this reason I would say that
+> -ENOSYS is appropriate here.
+Yeah, I fully agree.
 
-> +
-> +- clocks        : A phandle and clock specifier as defined by bindings of
-> +                 the clock controller specified by phandle, used when the GIC
-> +                 is part of a Clock Domain.
-> +
->  Example:
->
->         intc: interrupt-controller at fff11000 {
-> --
-> 1.9.1
->
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
