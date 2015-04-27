@@ -1,35 +1,24 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 27 Apr 2015 09:22:28 +0000
-Subject: [PATCH] spi: sirf: replace BUG condition by error code for
- unsupported transfer
-Message-ID: <1430126548-8171-1-git-send-email-21cnbao@gmail.com>
+From: catalin.crenguta@gmail.com (Catalin Crenguta)
+Date: Mon, 27 Apr 2015 12:19:52 +0300
+Subject: [PATCH] ARM: dts: imx6: Add Embest MarS Board
+In-Reply-To: <1430118452.1475.0@mail.essensium.com>
+References: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
+ <1427876156.24886.1.camel@pengutronix.de>
+ <1427877126.2449.0@mail.essensium.com>
+ <CABH3fy_YWYoQZL4E_i1FWaY+rOgidxBVcUNo15GrXfcoS2or0A@mail.gmail.com>
+ <1429878521.2872.3.camel@pengutronix.de>
+ <CABH3fy8o8R7d+bpyxS-Q0eSyPgqg0dvuQnF7m1gywLAzjRBXRA@mail.gmail.com>
+ <1430118452.1475.0@mail.essensium.com>
+Message-ID: <CABH3fy-kaEuwW6oxwZgahopPEUheXtwbJRyUk2_9J0mqo89Pzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Qipan Li <Qipan.Li@csr.com>
+> Hi Catalin,
+>
+> Sorry for not being able to answer earlier.  Great that you made eMMC to
+> work.  Can you share your pinmux configuration for usdhc3, so I can send a
+> follow-up patch?
 
-return error for unsupported bits-per-word format, BUG() is not right
-for this scenerios as we are not an ASSERT but an error handler.
-
-Signed-off-by: Qipan Li <Qipan.Li@csr.com>
-Signed-off-by: Barry Song <baohua.song@csr.com>
----
- drivers/spi/spi-sirf.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-index f5715c9..a50ee9b 100644
---- a/drivers/spi/spi-sirf.c
-+++ b/drivers/spi/spi-sirf.c
-@@ -559,7 +559,8 @@ spi_sirfsoc_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
- 		sspi->tx_word = spi_sirfsoc_tx_word_u32;
- 		break;
- 	default:
--		BUG();
-+		dev_err(&spi->dev, "bpw %d not supported\n", bits_per_word);
-+		return -EINVAL;
- 	}
- 
- 	sspi->word_width = DIV_ROUND_UP(bits_per_word, 8);
--- 
-1.9.1
+I have changed the byte 0x59 with 0x09
+0x17059 -> 0x17009
+and 0x10059 -> 0x10009
