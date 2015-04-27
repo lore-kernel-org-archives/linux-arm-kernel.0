@@ -1,92 +1,62 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Mon, 27 Apr 2015 08:41:54 +0300
-Subject: [PATCHv7 1/8] watchdog: Extend kernel API to know about HW
- limitations
-In-Reply-To: <20150424170848.GA2505@roeck-us.net>
-References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
- <1429701102-22320-2-git-send-email-timo.kokkonen@offcode.fi>
- <20150424170848.GA2505@roeck-us.net>
-Message-ID: <553DCC22.1090909@offcode.fi>
+From: sakib@meta.ua (Sergiy Kibrik)
+Date: Mon, 27 Apr 2015 08:29:44 +0300
+Subject: [PATCH] ARM: SAMSUNG: fix clk_enable() WARNing in S3C24XX ADC
+Message-ID: <1430112584-6170-1-git-send-email-sakib@meta.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.04.2015 20:08, Guenter Roeck wrote:
-> On Wed, Apr 22, 2015 at 02:11:35PM +0300, Timo Kokkonen wrote:
->> There is a great deal of diversity in the watchdog hardware found on
->> different devices. Differen hardware have different contstraints on
->> them, many of the constraints that are excessively difficult for the
->> user space to satisfy.
->>
->> One such constraint is the length of the timeout value, which in many
->> cases can be just a few seconds. Drivers are creating ad hoc solutions
->> with timers and workqueues to extend the timeout in order to give user
->> space more time between updates. Looking at the drivers it is clear
->> that this has resulted to a lot of duplicate code.
->>
->> Add an extension to the watchdog kernel API that allows the driver to
->> describe tis HW constraints to the watchdog code. A kernel worker in
->> the core is then used to extend the watchdog timeout on behalf of the
->> user space. This allows the drivers to be simplified as core takes
->> over the timer extending.
->>
->> Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
->> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
->
-> I started twice to review this series, and each time there is a new version
-> before I can finish the review. Guess I'll wait until it settles down a bit
-> before trying again :-(. Just a quick comment below.
->
+Convert clk_enable/clk_disable to clk_prepare_enable/clk_disable_unprepare
+calls as required by common clock framework. Removes this warning on probe:
 
-Yeah, I didn't quite know how much time I had available to work with 
-these patches, so I kept on sending fixed series out in a hope I get 
-some feedback before making too big steps in any false direction.. And I 
-ended up doing a  bit more than I thought at first. But I'm not going to 
-make a new one until I have got enough feedback from this version. So 
-please go ahead and review this version when you have time.
+ ------------[ cut here ]------------
+ WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:889 __clk_enable+0x28/0x9c()
+ Modules linked in:
+ CPU: 0 PID: 1 Comm: swapper Not tainted 3.19.0+ #46
+ [<c0013a98>] (unwind_backtrace) from [<c0010d8c>] (show_stack+0x10/0x14)
+ [<c0010d8c>] (show_stack) from [<c001b018>] (warn_slowpath_common+0x7c/0xa4)
+ [<c001b018>] (warn_slowpath_common) from [<c001b0d0>] (warn_slowpath_null+0x18/0x20)
+ [<c001b0d0>] (warn_slowpath_null) from [<c01a5f80>] (__clk_enable+0x28/0x9c)
+ [<c01a5f80>] (__clk_enable) from [<c01a600c>] (clk_enable+0x18/0x2c)
+ [<c01a600c>] (clk_enable) from [<c001860c>] (s3c_adc_probe+0x11c/0x18c)
+ [<c001860c>] (s3c_adc_probe) from [<c0153a10>] (platform_drv_probe+0x30/0x78)
+ [<c0153a10>] (platform_drv_probe) from [<c01523e0>] (driver_probe_device+0xb0/0x1fc)
+ [<c01523e0>] (driver_probe_device) from [<c01525dc>] (__driver_attach+0x68/0x88)
+ [<c01525dc>] (__driver_attach) from [<c0150df0>] (bus_for_each_dev+0x70/0x94)
+ [<c0150df0>] (bus_for_each_dev) from [<c0151c80>] (bus_add_driver+0xdc/0x1c4)
+ [<c0151c80>] (bus_add_driver) from [<c0152ba4>] (driver_register+0x9c/0xe0)
+ [<c0152ba4>] (driver_register) from [<c03041cc>] (adc_init+0x10/0x34)
+ [<c03041cc>] (adc_init) from [<c00087fc>] (do_one_initcall+0x110/0x1cc)
+ [<c00087fc>] (do_one_initcall) from [<c02ffccc>] (kernel_init_freeable+0xf4/0x1ac)
+ [<c02ffccc>] (kernel_init_freeable) from [<c022f4fc>] (kernel_init+0x8/0xe0)
+ [<c022f4fc>] (kernel_init) from [<c000e098>] (ret_from_fork+0x14/0x3c)
+ ---[ end trace f4a1ea39a114fecf ]---
 
->> ---
->>   drivers/watchdog/watchdog_core.c | 101 +++++++++++++++++++++++++++++++++++++--
->>   drivers/watchdog/watchdog_dev.c  |  75 ++++++++++++++++++++++++++---
->>   include/linux/watchdog.h         |  23 +++++++++
->>   3 files changed, 189 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
->> index cec9b55..fd12489 100644
->> --- a/drivers/watchdog/watchdog_core.c
->> +++ b/drivers/watchdog/watchdog_core.c
->> @@ -99,6 +99,89 @@ int watchdog_init_timeout(struct watchdog_device *wdd,
->>   EXPORT_SYMBOL_GPL(watchdog_init_timeout);
->>
->>   /**
->> + * watchdog_init_parms() - initialize generic watchdog parameters
->> + * @wdd: Watchdog device to operate
->> + * @dev: Device that stores the device tree properties
->> + *
->> + * Initialize the generic timeout parameters. The driver needs to set
->> + * hw_features bitmask from @wdd prior calling this function in order
->> + * to ensure the core knows how to handle the HW.
->> + *
->> + * A zero is returned on success and -EINVAL for failure.
->> + */
->> +int watchdog_init_params(struct watchdog_device *wdd, struct device *dev)
->> +{
->> +	int ret = 0;
->> +
->> +	ret = watchdog_init_timeout(wdd, wdd->timeout, dev);
->
-> You are changing the semantics of watchdog_init_timeout here;
-> for all practical purposes it no longer accepts the timeout passed
-> as parameter, but expects the timeout to be configured in wdd->timeout
-> instead. Please don't do that.
+Signed-off-by: Sergiy Kibrik <sakib@meta.ua>
+---
+ arch/arm/plat-samsung/adc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-hmm.. Yes, this isn't quite right. What I thought it should be is that 
-the driver initializes  the values with sane value (either from module 
-parameter or some default) and then if that's not set (wdd->timeout is 
-zero), watchdog_init_params() gets the value from device tree. If we 
-still don't get any preference for the timeout, then use some reasonable 
-default, such as 60 seconds. How's that?
-
-Right now the module parameter basically gets ignored altogether, which 
-is wrong.
-
--Timo
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index e2be70d..38444b9 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -389,7 +389,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	clk_enable(adc->clk);
++	clk_prepare_enable(adc->clk);
+ 
+ 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
+ 
+@@ -413,7 +413,7 @@ static int s3c_adc_remove(struct platform_device *pdev)
+ {
+ 	struct adc_device *adc = platform_get_drvdata(pdev);
+ 
+-	clk_disable(adc->clk);
++	clk_disable_unprepare(adc->clk);
+ 	regulator_disable(adc->vdd);
+ 
+ 	return 0;
+-- 
+1.9.1
