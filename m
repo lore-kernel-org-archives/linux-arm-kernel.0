@@ -1,42 +1,45 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 27 Apr 2015 14:55:33 +0200
-Subject: [PATCH 09/10] ARM: shmobile: kzm9d dts: Use generic names for device
+Date: Mon, 27 Apr 2015 14:55:34 +0200
+Subject: [PATCH 10/10] ARM: shmobile: marzen dts: Use generic names for device
  nodes
 In-Reply-To: <1430139334-15272-1-git-send-email-geert+renesas@glider.be>
 References: <1430139334-15272-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1430139334-15272-10-git-send-email-geert+renesas@glider.be>
+Message-ID: <1430139334-15272-11-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-lan9220 -> ethernet
-uart -> serial
+lan0 -> ethernet
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/emev2-kzm9d.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7779-marzen.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index 19446273e4a7f832..1dee0aa4f40cc351 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -81,7 +81,7 @@
- 		regulator-boot-on;
+diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
+index 540756cdf3914a2a..20afea6f06ef6735 100644
+--- a/arch/arm/boot/dts/r8a7779-marzen.dts
++++ b/arch/arm/boot/dts/r8a7779-marzen.dts
+@@ -42,10 +42,10 @@
+ 		regulator-always-on;
  	};
  
--	lan9220 at 20000000 {
-+	ethernet at 20000000 {
+-	lan0 at 18000000 {
++	ethernet at 18000000 {
  		compatible = "smsc,lan9220", "smsc,lan9115";
- 		reg = <0x20000000 0x10000>;
- 		phy-mode = "mii";
-@@ -96,7 +96,7 @@
- };
+ 		reg = <0x18000000 0x100>;
+-		pinctrl-0 = <&lan0_pins>;
++		pinctrl-0 = <&ethernet_pins>;
+ 		pinctrl-names = "default";
  
- &pfc {
--	uart1_pins: uart at e1030000 {
-+	uart1_pins: serial at e1030000 {
- 		renesas,groups = "uart1_ctrl", "uart1_data";
- 		renesas,function = "uart1";
+ 		phy-mode = "mii";
+@@ -176,7 +176,7 @@
+ 		};
  	};
+ 
+-	lan0_pins: lan0 {
++	ethernet_pins: ethernet {
+ 		intc {
+ 			renesas,groups = "intc_irq1_b";
+ 			renesas,function = "intc";
 -- 
 1.9.1
