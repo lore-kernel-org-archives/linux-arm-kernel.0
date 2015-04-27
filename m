@@ -1,296 +1,51 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 27 Apr 2015 22:17:18 +0200
-Subject: [PATCH v6 1/3] ARM: pxa: pxa_cplds: add lubbock and mainstone IO
-Message-ID: <1430165840-20101-1-git-send-email-robert.jarzmik@free.fr>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Mon, 27 Apr 2015 13:27:10 -0700
+Subject: [PATCH 0/3] Introduce SET_NOIRQ_SYSTEM_SLEEP_PM_OPS and use it
+In-Reply-To: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
+References: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
+Message-ID: <553E9B9E.4080401@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Historically, this support was in arch/arm/mach-pxa/lubbock.c and
-arch/arm/mach-pxa/mainstone.c. When gpio-pxa was moved to drivers/pxa,
-it became a driver, and its initialization and probing happened at
-postcore initcall. The lubbock code used to install the chained lubbock
-interrupt handler at init_irq() time.
 
-The consequence of the gpio-pxa change is that the installed chained irq
-handler lubbock_irq_handler() was overwritten in pxa_gpio_probe(_dt)(),
-removing :
- - the handler
- - the falling edge detection setting of GPIO0, which revealed the
-   interrupt request from the lubbock IO board.
 
-As a fix, move the gpio0 chained handler setup to a place where we have
-the guarantee that pxa_gpio_probe() was called before, so that lubbock
-handler becomes the true IRQ chained handler of GPIO0, demuxing the
-lubbock IO board interrupts.
+On 4/27/2015 11:24 AM, grygorii.strashko at linaro.org wrote:
+> From: Grygorii Strashko <grygorii.strashko@linaro.org>
+>
+> While working on suspend-to-disk functionality on TI dra7-evm (DRA7xx SoC)
+> i've found that the most common problem I have to dial with is absence
+> of corresponding PM callbacks in drivers and, in particular, noirq callbacks.
+> So, I've fixed one driver first
+> commit 6248015d6867 "ARM: omap-device: add missed callback for suspend-to-disk"
+> but then found another one which need to be fixed too (omap_l3_noc.c).
+> At this moment I decided to make my life easier and added new macro
+> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS using the same approach as for the existing
+> SET_SYSTEM_SLEEP_PM_OPS macro.
+>
+> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS: defined for CONFIG_PM_SLEEP and
+> assigns ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
+> function. Vice versa happens for ->resume_noirq, ->thaw_noirq and
+> ->restore_noirq.
+>
+> Further two patches reuse this newly introduced macro.
+>
+> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS, defined for CONFIG_PM_SLEEP, will
+>      point ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
+>      function. Vice versa happens for ->resume_noirq, ->thaw_noirq and
+>      ->restore_noirq.
+>
+[...]
 
-This patch moves all that handling to a mfd driver. It's only purpose
-for the time being is the interrupt handling, but in the future it
-should encompass all the motherboard CPLDs handling :
- - leds
- - switches
- - hexleds
-
-The same logic applies to mainstone board.
-
-Fixes: 157d2644cb0c ("ARM: pxa: change gpio to platform device")
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v1: change the name from cottula to lubbock_io
-            Dmitry pointed out the Cottula was the pxa25x family name,
-	    lubbock was the pxa25x development board name. Therefore the
-	    name was changed to lubbock_io (lubbock IO board)
-	  change the resources to bi-irq ioresource
-	    Discussion between Arnd and Robert to change the gpio
-	    request by a irq request.
-Since v2: take into account Mark's review
-      	    Use irq flags from resources (DT case and pdata case).
-	    Change of name from lubbock_io to lubbock-io
-Since v3: take into account Lee's review + Russell's advice
-            whitespace errors fixes
-	    debug/info messages formatting
-	    return X; empty lines
-Since v4: move back to mach-pxa tree
-Since v5: Paul's review on Kconfig
----
- arch/arm/mach-pxa/Kconfig          |   9 ++
- arch/arm/mach-pxa/Makefile         |   1 +
- arch/arm/mach-pxa/pxa_cplds_irqs.c | 200 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 210 insertions(+)
- create mode 100644 arch/arm/mach-pxa/pxa_cplds_irqs.c
-
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 8896e71..f096836 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -691,4 +691,13 @@ config SHARPSL_PM_MAX1111
- config PXA310_ULPI
- 	bool
- 
-+config PXA_SYSTEMS_CPLDS
-+	tristate "Motherboard cplds"
-+	default ARCH_LUBBOCK || MACH_MAINSTONE
-+	help
-+	  This driver supports the Lubbock and Mainstone multifunction chip
-+	  found on the pxa25x development platform system (Lubbock) and pxa27x
-+	  development platform system (Mainstone). This IO board supports the
-+	  interrupts handling, ethernet controller, flash chips, etc ...
-+
- endif
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index eb0bf76..4087d33 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -90,4 +90,5 @@ obj-$(CONFIG_MACH_RAUMFELD_CONNECTOR)	+= raumfeld.o
- obj-$(CONFIG_MACH_RAUMFELD_SPEAKER)	+= raumfeld.o
- obj-$(CONFIG_MACH_ZIPIT2)	+= z2.o
- 
-+obj-$(CONFIG_PXA_SYSTEMS_CPLDS)	+= pxa_cplds_irqs.o
- obj-$(CONFIG_TOSA_BT)		+= tosa-bt.o
-diff --git a/arch/arm/mach-pxa/pxa_cplds_irqs.c b/arch/arm/mach-pxa/pxa_cplds_irqs.c
-new file mode 100644
-index 0000000..f1aeb54
---- /dev/null
-+++ b/arch/arm/mach-pxa/pxa_cplds_irqs.c
-@@ -0,0 +1,200 @@
-+/*
-+ * Intel Reference Systems cplds
-+ *
-+ * Copyright (C) 2014 Robert Jarzmik
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * Cplds motherboard driver, supporting lubbock and mainstone SoC board.
-+ */
-+
-+#include <linux/bitops.h>
-+#include <linux/gpio.h>
-+#include <linux/gpio/consumer.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/mfd/core.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+
-+#define FPGA_IRQ_MASK_EN 0x0
-+#define FPGA_IRQ_SET_CLR 0x10
-+
-+#define CPLDS_NB_IRQ	32
-+
-+struct cplds {
-+	void __iomem *base;
-+	int irq;
-+	unsigned int irq_mask;
-+	struct gpio_desc *gpio0;
-+	struct irq_domain *irqdomain;
-+};
-+
-+static irqreturn_t cplds_irq_handler(int in_irq, void *d)
-+{
-+	struct cplds *fpga = d;
-+	unsigned long pending;
-+	unsigned int bit;
-+
-+	pending = readl(fpga->base + FPGA_IRQ_SET_CLR) & fpga->irq_mask;
-+	for_each_set_bit(bit, &pending, CPLDS_NB_IRQ)
-+		generic_handle_irq(irq_find_mapping(fpga->irqdomain, bit));
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static void cplds_irq_mask_ack(struct irq_data *d)
-+{
-+	struct cplds *fpga = irq_data_get_irq_chip_data(d);
-+	unsigned int cplds_irq = irqd_to_hwirq(d);
-+	unsigned int set, bit = BIT(cplds_irq);
-+
-+	fpga->irq_mask &= ~bit;
-+	writel(fpga->irq_mask, fpga->base + FPGA_IRQ_MASK_EN);
-+	set = readl(fpga->base + FPGA_IRQ_SET_CLR);
-+	writel(set & ~bit, fpga->base + FPGA_IRQ_SET_CLR);
-+}
-+
-+static void cplds_irq_unmask(struct irq_data *d)
-+{
-+	struct cplds *fpga = irq_data_get_irq_chip_data(d);
-+	unsigned int cplds_irq = irqd_to_hwirq(d);
-+	unsigned int bit = BIT(cplds_irq);
-+
-+	fpga->irq_mask |= bit;
-+	writel(fpga->irq_mask, fpga->base + FPGA_IRQ_MASK_EN);
-+}
-+
-+static struct irq_chip cplds_irq_chip = {
-+	.name		= "pxa_cplds",
-+	.irq_mask_ack	= cplds_irq_mask_ack,
-+	.irq_unmask	= cplds_irq_unmask,
-+	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
-+};
-+
-+static int cplds_irq_domain_map(struct irq_domain *d, unsigned int irq,
-+				   irq_hw_number_t hwirq)
-+{
-+	struct cplds *fpga = d->host_data;
-+
-+	irq_set_chip_and_handler(irq, &cplds_irq_chip, handle_level_irq);
-+	irq_set_chip_data(irq, fpga);
-+
-+	return 0;
-+}
-+
-+static const struct irq_domain_ops cplds_irq_domain_ops = {
-+	.xlate = irq_domain_xlate_twocell,
-+	.map = cplds_irq_domain_map,
-+};
-+
-+static int cplds_resume(struct platform_device *pdev)
-+{
-+	struct cplds *fpga = platform_get_drvdata(pdev);
-+
-+	writel(fpga->irq_mask, fpga->base + FPGA_IRQ_MASK_EN);
-+
-+	return 0;
-+}
-+
-+static int cplds_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct cplds *fpga;
-+	int ret;
-+	unsigned int base_irq = 0;
-+	unsigned long irqflags = 0;
-+
-+	fpga = devm_kzalloc(&pdev->dev, sizeof(*fpga), GFP_KERNEL);
-+	if (!fpga)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (res) {
-+		fpga->irq = (unsigned int)res->start;
-+		irqflags = res->flags;
-+	}
-+	if (!fpga->irq)
-+		return -ENODEV;
-+
-+	base_irq = platform_get_irq(pdev, 1);
-+	if (base_irq < 0)
-+		base_irq = 0;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	fpga->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(fpga->base))
-+		return PTR_ERR(fpga->base);
-+
-+	platform_set_drvdata(pdev, fpga);
-+
-+	writel(fpga->irq_mask, fpga->base + FPGA_IRQ_MASK_EN);
-+	writel(0, fpga->base + FPGA_IRQ_SET_CLR);
-+
-+	ret = devm_request_irq(&pdev->dev, fpga->irq, cplds_irq_handler,
-+			       irqflags, dev_name(&pdev->dev), fpga);
-+	if (ret == -ENOSYS)
-+		return -EPROBE_DEFER;
-+
-+	if (ret) {
-+		dev_err(&pdev->dev, "couldn't request main irq%d: %d\n",
-+			fpga->irq, ret);
-+		return ret;
-+	}
-+
-+	irq_set_irq_wake(fpga->irq, 1);
-+	fpga->irqdomain = irq_domain_add_linear(pdev->dev.of_node,
-+					       CPLDS_NB_IRQ,
-+					       &cplds_irq_domain_ops, fpga);
-+	if (!fpga->irqdomain)
-+		return -ENODEV;
-+
-+	if (base_irq) {
-+		ret = irq_create_strict_mappings(fpga->irqdomain, base_irq, 0,
-+						 CPLDS_NB_IRQ);
-+		if (ret) {
-+			dev_err(&pdev->dev, "couldn't create the irq mapping %d..%d\n",
-+				base_irq, base_irq + CPLDS_NB_IRQ);
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int cplds_remove(struct platform_device *pdev)
-+{
-+	struct cplds *fpga = platform_get_drvdata(pdev);
-+
-+	irq_set_chip_and_handler(fpga->irq, NULL, NULL);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id cplds_id_table[] = {
-+	{ .compatible = "intel,lubbock-cplds-irqs", },
-+	{ .compatible = "intel,mainstone-cplds-irqs", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, cplds_id_table);
-+
-+static struct platform_driver cplds_driver = {
-+	.driver		= {
-+		.name	= "pxa_cplds_irqs",
-+		.of_match_table = of_match_ptr(cplds_id_table),
-+	},
-+	.probe		= cplds_probe,
-+	.remove		= cplds_remove,
-+	.resume		= cplds_resume,
-+};
-+
-+module_platform_driver(cplds_driver);
-+
-+MODULE_DESCRIPTION("PXA Cplds interrupts driver");
-+MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
-+MODULE_LICENSE("GPL");
--- 
-2.1.4
+>
+> Grygorii Strashko (3):
+>    PM / Sleep: Add macro to define common noirq system PM callbacks
+>    bus: omap_l3_noc: add missed callbacks for suspend-to-disk
+>    ARM: omap-device: use SET_NOIRQ_SYSTEM_SLEEP_PM_OPS
+>
+>   arch/arm/mach-omap2/omap_device.c |  7 ++-----
+>   drivers/bus/omap_l3_noc.c         |  4 ++--
+>   include/linux/pm.h                | 12 ++++++++++++
+>   3 files changed, 16 insertions(+), 7 deletions(-)
+>
+Looks fine to me.....
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
