@@ -1,94 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Apr 2015 21:49:14 +0200
-Subject: [PATCH v2 RESEND 2/2] mmc: host: Add some quirks to be read from
- fdt in sdhci-pltm.c
-In-Reply-To: <CAOHikRDX7RZUkHFUmNs0kY+aYqXra5i=3cukpjz5yOECkcffbQ@mail.gmail.com>
-References: <1429630959-32649-1-git-send-email-stripathi@apm.com>
- <5771531.b7UhrXUGmv@wuerfel>
- <CAOHikRDX7RZUkHFUmNs0kY+aYqXra5i=3cukpjz5yOECkcffbQ@mail.gmail.com>
-Message-ID: <6927395.c8hJ4o34f5@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 27 Apr 2015 20:50:52 +0100
+Subject: [PATCH: RESEND] Update email-id of author
+In-Reply-To: <1430119562-14816-1-git-send-email-rajeevkumar.linux@gmail.com>
+References: <1430119562-14816-1-git-send-email-rajeevkumar.linux@gmail.com>
+Message-ID: <20150427195052.GC22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 April 2015 21:25:20 Suman Tripathi wrote:
-> > On Monday 27 April 2015 20:33:25 Suman Tripathi wrote:
-> > > > On Tuesday 21 April 2015 21:12:39 Suman Tripathi wrote:
-> > > > > +                       host->quirks |= SDHCI_QUIRK_BROKEN_DMA;
-> > > > > +
-> > > > > +               if (of_get_property(np, "no-cmd23", NULL))
-> > > > > +                       host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
-> > > > > 
-> > > > >                 if (of_get_property(np, "no-1-8-v", NULL))
-> > > > >                 
-> > > > >                         host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
-> > > > 
-> > > > Any property you add needs to be documented in the DT binding.
-> > > > If possible, add generic properties for each bug you have mmc.txt
-> > > > rather than the driver specific sdhci.txt, and implement the
-> > > 
-> > > I will add the binding in mmc.txt. I thought this was present but not.
-> > > 
-> > > > parsing in a common function that is used for all mmc hosts.
-> > > 
-> > > As per mine understanding the sdhci_get_of_porperty is a common
-> > > parsing function  . Am I wrong ??
-> 
+On Mon, Apr 27, 2015 at 12:56:02PM +0530, Rajeev Kumar wrote:
 
-A small side note: please fix your email client to use proper attribution
-of the citations. The way you reply, nobody knows what you are saying
-compare to what you quote. Also, reduce the quotation to the parts you
-are replying to.
+>  .mailmap                                     |    1 +
+>  arch/arm/mach-spear/generic.h                |    2 +-
+>  arch/arm/mach-spear/include/mach/irqs.h      |    2 +-
+>  arch/arm/mach-spear/include/mach/spear.h     |    2 +-
+>  arch/arm/mach-spear/spear6xx.c               |    2 +-
+>  drivers/input/keyboard/spear-keyboard.c      |    2 +-
+>  drivers/rtc/rtc-spear.c                      |    4 ++--
+>  include/linux/platform_data/keyboard-spear.h |    2 +-
+>  include/sound/designware_i2s.h               |    2 +-
+>  include/sound/spear_dma.h                    |    2 +-
+>  10 files changed, 11 insertions(+), 10 deletions(-)
 
-> > No, this is only used for sdhci, not for the other controllers.
-> 
-> But our's is a SHCI variant so I added it in this file.
-
-That's my point: a lot of the bugs are independent of the specific
-host controller and could happen with any one of them. We want to
-ensure that nobody tries to add another property with similar
-semantics and a different name just because they are using a
-different driver.
- 
-> > > An alternative would be to set all these bits based on the compatible
-> > > string of your host, if that is the only one that has all these bugs.
-> >
-> > The host driver  (arasan) is reused but this quirks are needed due to
-> > board issues. so I have a control over dtb only to fix this.
-> 
-> What is the nature of the bug on that board? Is there a different
-> way to describe that without introducing six new properties?
-> 
-> Sorry it is board and IP as well SoC errata's,
-> 
-> 1. Delay after power is required due to some voltage issues that will
-> be fixed in next board revision
-
-This is clearly not sdhci-specific, so make that a generic property
-for all mmc.
-
-> 2. We need to support PIO mode as of now because DMA or ADMA requires
-> some kind of translation driver that I am working on.
-
-But this does not describe the hardware properties. Don't add properties
-that describe the lack of a kernel driver. If you can't do DMA yet,
-use a dma-ranges property that lists one empty range to prevent
-dma_set_mask() from working, so it will fall back to PIO mode. You
-may have to fix the driver if that doesn't already work.
-
-What kind of driver do you need here?
-
-> 3. The version of arasan variant we have in our SoC doesn't have the
-> HISPD  bit field in HI-SPEED SD card. So this makes HI-SPEED sdcard
-> work.
-> 
-> 4. NO_CMD23 is required for eMMC cards.
-> 
-> These are not new properties.  Only the fact is I am using it for our
-> SoC from dtb. These quirks are already there in mmc common framework.
-> Nothing is new.
-
-Are you sure that you have version 8.9a of the Arasan SDHCI? This sounds
-like version specific quirks, so they are probably present in each
-SoC that uses the same version.
-
-	Arnd
+Please split this up into per-subsystem patches so it's easier to apply.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150427/8e3fb9fd/attachment.sig>
