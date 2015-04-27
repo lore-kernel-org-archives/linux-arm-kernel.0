@@ -1,162 +1,170 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 27 Apr 2015 23:38:11 +0200
-Subject: [PATCH v2 2/4] doc: dt: add documentation for lpc1850-cgu clk driver
+Date: Mon, 27 Apr 2015 23:38:13 +0200
+Subject: [PATCH v2 4/4] doc: dt: add documentation for lpc1850-ccu clk driver
 In-Reply-To: <1430170693-28303-1-git-send-email-manabian@gmail.com>
 References: <1430170693-28303-1-git-send-email-manabian@gmail.com>
-Message-ID: <1430170693-28303-3-git-send-email-manabian@gmail.com>
+Message-ID: <1430170693-28303-5-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for lpc1850-cgu driver.
+Add DT binding documentation for lpc1850-ccu clk driver.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- .../devicetree/bindings/clock/lpc1850-cgu.txt      | 138 +++++++++++++++++++++
- 1 file changed, 138 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/lpc1850-cgu.txt
+ .../devicetree/bindings/clock/lpc1850-ccu.txt      | 146 +++++++++++++++++++++
+ 1 file changed, 146 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/lpc1850-ccu.txt
 
-diff --git a/Documentation/devicetree/bindings/clock/lpc1850-cgu.txt b/Documentation/devicetree/bindings/clock/lpc1850-cgu.txt
+diff --git a/Documentation/devicetree/bindings/clock/lpc1850-ccu.txt b/Documentation/devicetree/bindings/clock/lpc1850-ccu.txt
 new file mode 100644
-index 000000000000..0b278ca6aee7
+index 000000000000..1b45bc9f004f
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/lpc1850-cgu.txt
-@@ -0,0 +1,138 @@
-+* NXP LPC1850 Clock Generation Unit (CGU)
++++ b/Documentation/devicetree/bindings/clock/lpc1850-ccu.txt
+@@ -0,0 +1,146 @@
++* NXP LPC1850 Clock Control Unit (CCU)
 +
-+The CGU generates multiple independent clocks for the core and the
-+peripheral blocks of the LPC18xx. Each independent clock is called
-+a base clock and itself is one of the inputs to the two Clock
-+Control Units (CCUs) which control the branch clocks to the
-+individual peripherals.
-+
-+The CGU selects the inputs to the clock generators from multiple
-+clock sources, controls the clock generation, and routes the outputs
-+of the clock generators through the clock source bus to the output
-+stages. Each output stage provides an independent clock source and
-+corresponds to one of the base clocks for the LPC18xx.
++Each CGU base clock has several clock branches which can be turned on
++or off independently by the Clock Control Units CCU1 or CCU2. The
++branch clocks are distributed between CCU1 and CCU2.
 +
 + - Above text taken from NXP LPC1850 User Manual.
-+
 +
 +This binding uses the common clock binding:
 +    Documentation/devicetree/bindings/clock/clock-bindings.txt
 +
 +Required properties:
 +- compatible:
-+	Should be "nxp,lpc1850-cgu"
++	Should be "nxp,lpc1850-ccu"
 +- reg:
 +	Shall define the base and range of the address space
 +	containing clock control registers
 +- #clock-cells:
 +	Shall have value <1>.  The permitted clock-specifier values
-+	are the base clock numbers defined below.
++	are the branch clock names defined in table below.
 +- clocks:
-+	Shall contain a list of phandles for the external input
-+	sources to the CGU. The list shall be in the following
-+	order: xtal, 32khz, enet_rx_clk, enet_tx_clk, gp_clkin.
-+- clock-indices:
-+	Shall be an ordered list of numbers defining the base clock
-+	number provided by the CGU.
-+- clock-output-names:
-+	Shall be an ordered list of strings defining the names of
-+	the clocks provided by the CGU.
++	Shall contain a list of phandles for the base clocks routed
++	from the CGU to the specific CCU. See mapping of base clocks
++	and CCU in table below.
 +
-+Which base clocks that are available on the CGU depends on the
-+specific LPC part. Base cloks are numbered from 0 to 27.
++Which brach clocks that are available on the CCU depends on the
++specific LPC part.
 +
-+Number:		Name:			Description:
-+ 0		BASE_SAFE_CLK		Base safe clock (always on) for WWDT
-+ 1		BASE_USB0_CLK		Base clock for USB0
-+ 2		BASE_PERIPH_CLK		Base clock for Cortex-M0SUB subsystem,
-+					SPI, and SGPIO
-+ 3		BASE_USB1_CLK		Base clock for USB1
-+ 4		BASE_CPU_CLK		System base clock for ARM Cortex-M core
-+					and APB peripheral blocks #0 and #2
-+ 5		BASE_SPIFI_CLK		Base clock for SPIFI
-+ 6		BASE_SPI_CLK		Base clock for SPI
-+ 7		BASE_PHY_RX_CLK		Base clock for Ethernet PHY Receive clock
-+ 8		BASE_PHY_TX_CLK		Base clock for Ethernet PHY Transmit clock
-+ 9		BASE_APB1_CLK		Base clock for APB peripheral block # 1
-+10		BASE_APB3_CLK		Base clock for APB peripheral block # 3
-+11		BASE_LCD_CLK		Base clock for LCD
-+12		BASE_ADCHS_CLK		Base clock for ADCHS
-+13		BASE_SDIO_CLK		Base clock for SD/MMC
-+14		BASE_SSP0_CLK		Base clock for SSP0
-+15		BASE_SSP1_CLK		Base clock for SSP1
-+16		BASE_UART0_CLK		Base clock for UART0
-+17		BASE_UART1_CLK		Base clock for UART1
-+18		BASE_UART2_CLK		Base clock for UART2
-+19		BASE_UART3_CLK		Base clock for UART3
-+20		BASE_OUT_CLK		Base clock for CLKOUT pin
-+24-21		-			Reserved
-+25		BASE_AUDIO_CLK		Base clock for audio system (I2S)
-+26 		BASE_CGU_OUT0_CLK	Base clock for CGU_OUT0 clock output
-+27 		BASE_CGU_OUT1_CLK	Base clock for CGU_OUT1 clock output
++CCU1 branch clocks:
++Base clock	Branch clock		Description
++BASE_APB3_CLK	CLK_APB3_BUS		APB3 bus clock.
++		CLK_APB3_I2C1		Clock to the I2C1 register interface
++					and I2C1 peripheral clock.
++		CLK_APB3_DAC		Clock to the DAC register interface.
++		CLK_APB3_ADC0		Clock to the ADC0 register interface
++					and ADC0 peripheral clock.
++		CLK_APB3_ADC1		Clock to the ADC1 register interface
++					and ADC1 peripheral clock.
++		CLK_APB3_CAN0		Clock to the C_CAN0 register interface
++					and C_CAN0 peripheral clock.
++BASE_APB1_CLK	CLK_APB1_BUS		APB1 bus clock.
++		CLK_APB1_MOTOCON_PWM	Clock to the PWM Motor control block and
++					PWM Motor control peripheral clock.
++		CLK_APB1_I2C0		Clock to the I2C0 register interface and
++					I2C0 peripheral clock.
++		CLK_APB1_I2S		Clock to the I2S0 and I2S1 register interfaces
++					and I2S0 and I2S1 peripheral clock.
++		CLK_APB1_CAN1		Clock to the C_CAN1 register interface and
++					C_CAN1 peripheral clock.
++BASE_SPIFI_CLK	CLK_SPIFI		Clock for the SPIFI SCKI clock input.
++BASE_CPU_CLK	CLK_CPU_BUS		M4 bus clock.
++		CLK_CPU_SPIFI		Clock to the SPIFI register interface.
++		CLK_CPU_GPIO		Clock to the GPIO register interface
++		CLK_CPU_LCD		Clock to the LCD register interface.
++		CLK_CPU_ETHERNET	Clock to the Ethernet register interface.
++		CLK_CPU_USB0		Clock to the USB0 register interface.
++		CLK_CPU_EMC		Clock to the External memory controller.
++		CLK_CPU_SDIO		Clock to the SD/MMC register interface.
++		CLK_CPU_DMA		Clock to the DMA register interface.
++		CLK_CPU_CORE		Clock to the Cortex-M core
++		CLK_CPU_SCT		Clock to the SCT register interface.
++		CLK_CPU_USB1		Clock to the USB1 register interface.
++		CLK_CPU_EMC_DIV		Clock to the EMC with clock divider.
++		CLK_CPU_FLASHA		Clock to the flash bank A.
++		CLK_CPU_FLASHB		Clock to the flash bank B.
++		CLK_CPU_M0APP		Clock to the M0APP coprocessor.
++		CLK_CPU_ADCHS		Clock to the ADCHS.
++		CLK_CPU_EEPROM		Clock to the EEPROM.
++		CLK_CPU_WWDT		Clock to the WWDT register interface.
++		CLK_CPU_UART0		Clock to the USART0 register interface.
++		CLK_CPU_UART1		Clock to the UART1 register interface.
++		CLK_CPU_SSP0		Clock to the SSP0 register interface.
++		CLK_CPU_TIMER0		Clock to the timer0 register interface and
++					timer0 peripheral clock.
++		CLK_CPU_TIMER1		Clock to the timer1 register interface and
++					timer1 peripheral clock.
++		CLK_CPU_SCU		Clock to the System control unit register interface.
++		CLK_CPU_CREG		Clock to the CREG register interface.
++		CLK_CPU_RITIMER		Clock to the RI timer register interface and
++					RI timer peripheral clock.
++		CLK_CPU_UART2		Clock to the UART2 register interface.
++		CLK_CPU_UART3		Clock to the UART3 register interface.
++		CLK_CPU_TIMER2		Clock to the timer2 register interface and
++					timer2 peripheral clock.
++		CLK_CPU_TIMER3		Clock to the timer3 register interface and
++					timer3 peripheral clock.
++		CLK_CPU_SSP1		Clock to the SSP1 register interface.
++		CLK_CPU_QEI		Clock to the QEI register interface and
++					QEI peripheral clock.
++BASE_PERIPH_CLK	CLK_PERIPH_BUS		Clock to the peripheral bus and the
++					Cortex-M0 subsystem AHB multilayer matrix.
++		CLK_PERIPH_CORE		Clock to the Cortex-M0 subsystem core.
++		CLK_PERIPH_SGPIO	Clock to the SGPIO interface.
++BASE_USB0_CLK	CLK_USB0		USB0 peripheral clock.
++BASE_USB1_CLK	CLK_USB1		USB1 peripheral clock.
++BASE_SPI_CLK	CLK_SPI			Clock to the SPI interface.
++BASE_ADCHS_CLK	CLK_ADCHS		ADCHS clock.
 +
-+BASE_PERIPH_CLK and BASE_SPI_CLK is only available on LPC43xx.
-+BASE_ADCHS_CLK is only available on LPC4370.
++CCU2 branch clocks:
++BASE_AUDIO_CLK	CLK_AUDIO		Audio system (I2S) clock.
++BASE_UART3_CLK	CLK_APB2_UART3		USART3 peripheral clock.
++BASE_UART2_CLK	CLK_APB2_UART2		USART2 peripheral clock.
++BASE_UART1_CLK	CLK_APB0_UART1		UART1 peripheral clock.
++BASE_UART0_CLK	CLK_APB0_UART0		USART0 peripheral clock.
++BASE_SSP1_CLK	CLK_APB2_SSP1		SSP1 peripheral clock.
++BASE_SSP0_CLK	CLK_APB0_SSP0		SSP0 peripheral clock.
++BASE_SDIO_CLK	CLK_SDIO		SD/MMC peripheral clock.
++
++Not all branch clocks are available on all LPC parts. Check the user
++manual for your specific part.
++
++Note that CLK_M3_x and CLK_M4_x have been renamed to CLK_CPU_x here
++be more generic since both LPC18xx (M3) and LPC43xx (M4) are
++supported.
 +
 +
 +Example board file:
 +
-+/ {
-+	clocks {
-+		xtal: xtal {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <12000000>;
-+		};
-+
-+		xtal32: xtal32 {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+
-+		enet_rx_clk: enet_rx_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "enet_rx_clk";
-+		};
-+
-+		enet_tx_clk: enet_tx_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "enet_tx_clk";
-+		};
-+
-+		gp_clkin: gp_clkin {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "gp_clkin";
-+		};
++soc {
++	ccu1: ccu at 40051000 {
++		compatible = "nxp,lpc1850-ccu";
++		reg = <0x40051000 0x1000>;
++		#clock-cells = <1>;
++		clocks = <&cgu BASE_APB3_CLK>,   <&cgu BASE_APB1_CLK>,
++			 <&cgu BASE_SPIFI_CLK>,  <&cgu BASE_CPU_CLK>,
++			 <&cgu BASE_PERIPH_CLK>, <&cgu BASE_USB0_CLK>,
++			 <&cgu BASE_USB1_CLK>,   <&cgu BASE_SPI_CLK>;
 +	};
 +
-+	soc {
-+		cgu: cgu at 40050000 {
-+			compatible = "nxp,lpc1850-cgu";
-+			reg = <0x40050000 0x1000>;
-+			#clock-cells = <1>;
-+			clocks = <&xtal>, <&creg_clk 1>, <&enet_rx_clk>, <&enet_tx_clk>, <&gp_clkin>;
-+			clock-indices =  <0>,  <1>,  <2>,  <3>,  <4>,  <5>,  <6>,  <7>,
-+					 <8>,  <9>, <10>, <11>, <12>, <13>, <14>, <15>,
-+					<16>, <17>, <18>, <19>, <20>, <25>, <26>, <27>;
-+			clock-output-names = "base_safe_clk",    "base_usb0_clk",
-+					     "base_periph_clk",  "base_usb1_clk",
-+					     "base_cpu_clk",     "base_spifi_clk",
-+					     "base_spi_clk",     "base_phy_rx_clk",
-+					     "base_phy_tx_clk",  "base_apb1_clk",
-+					     "base_apb3_clk",    "base_lcd_clk",
-+					     "base_adchs_clk",   "base_sdio_clk",
-+					     "base_ssp0_clk",    "base_ssp1_clk",
-+					     "base_uart0_clk",   "base_uart1_clk",
-+					     "base_uart2_clk",   "base_uart3_clk",
-+					     "base_out_clk",     "base_audio_clk",
-+					     "base_cgu_out0_clk","base_cgu_out1_clk";
-+		};
++	ccu2: ccu at 40052000 {
++		compatible = "nxp,lpc1850-ccu";
++		reg = <0x40052000 0x1000>;
++		#clock-cells = <1>;
++		clocks = <&cgu BASE_AUDIO_CLK>, <&cgu BASE_UART3_CLK>,
++			 <&cgu BASE_UART2_CLK>, <&cgu BASE_UART1_CLK>,
++			 <&cgu BASE_UART0_CLK>, <&cgu BASE_SSP1_CLK>,
++			 <&cgu BASE_SSP0_CLK>,  <&cgu BASE_SDIO_CLK>;
++	};
++
++	/* A user of CCU brach clocks */
++	uart1: serial at 40082000 {
++		...
++		clocks = <&ccu2 CLK_APB0_UART1>, <&ccu1 CLK_CPU_UART1>;
++		...
 +	};
 +};
 -- 
