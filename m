@@ -1,55 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 27 Apr 2015 16:49:24 +0000 (UTC)
-Subject: Tegra baseline test results for v4.1-rc1
-Message-ID: <alpine.DEB.2.02.1504271642550.31868@utopia.booyaka.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Apr 2015 18:04:23 +0100
+Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
+In-Reply-To: <BN1PR0301MB0627CD95FC31B221DAA644EDEAE90@BN1PR0301MB0627.namprd03.prod.outlook.com>
+References: <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150422170718.GG13019@arm.com>
+ <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150424161818.GC7313@arm.com> <553A72D4.7000801@arm.com>
+ <CY1PR0301MB074896DF1A06CDEC3A0E09B687EC0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150425113930.7386a42a@arm.com>
+ <BN1PR0301MB06276181976E880432B8C49AEAEA0@BN1PR0301MB0627.namprd03.prod.outlook.com>
+ <553DEC20.3010400@arm.com>
+ <BN1PR0301MB0627CD95FC31B221DAA644EDEAE90@BN1PR0301MB0627.namprd03.prod.outlook.com>
+Message-ID: <20150427170423.GC3310@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Apr 27, 2015 at 02:08:10PM +0100, Varun Sethi wrote:
+> > >>> In the SMMU/GIC-500-ITS world the iommu isolation ID (the stream ID)
+> > >>> and the GIC-ITS device ID are in fact the same ID.
+> > >>
+> > >> The DeviceID is the "MSI group" you mention. This is what provides
+> > >> isolation at the ITS level.
+> > >>
+> > > [varun] True, in case of a transparent host bridge device Id won't
+> > > provide the necessary isolation.
+> > 
+> > Well, it depends how you look at it. How necessary is this isolation, since
+> > we've already established that you couldn't distinguish between these
+> > devices at the IOMMU level?
+> > 
+> [varun] Yes, the devices would fall in the same IOMMU group. So, devices
+> would end up sharing the interrupt?
 
-Here are some basic Tegra test results for Linux v4.1-rc1.
-Logs and other details at:
+Well, I think that's the crux of the issue here. If IOMMU groups are also
+needed to relay constraints to the IRQ subsystem, then perhaps we need a
+more general notion of device grouping and ID transformations between
+the different levels of group hierarchy.
 
-    http://nvt.pwsan.com/pub/linux/testlogs/test_v4.1-rc1/20150426183104/
-
-
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 1/ 1): qemu-vexpress64
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.0 (39a8804455fb23f09157341d3ba7db6d7ae6ee76)):
-   text     data      bss    total  kernel
-+330066   +29448    +1472  +360986  multi_v7_defconfig
-+117544    +7768     +612  +125924  tegra_defconfig
-+634958  +147392    +2840  +785190  defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.0 (39a8804455fb23f09157341d3ba7db6d7ae6ee76))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-    -372k     372k        .      20k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-    -144k     144k        .      12k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-    -408k     408k        .      20k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-    -180k     180k        .      12k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-    -364k     364k        .      20k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-    -136k     136k        .      12k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-    -500k     500k        .      20k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-    -272k     272k        .      12k       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Will
