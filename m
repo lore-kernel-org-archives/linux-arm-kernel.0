@@ -1,36 +1,28 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 27 Apr 2015 15:27:24 -0700
-Subject: [PATCH 3/3] ARM: bcm2835: Add the mailbox to the device tree
-In-Reply-To: <1430173644-19099-1-git-send-email-eric@anholt.net>
-References: <1430173644-19099-1-git-send-email-eric@anholt.net>
-Message-ID: <1430173644-19099-4-git-send-email-eric@anholt.net>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 28 Apr 2015 00:30:41 +0200
+Subject: [PATCH 0/2] reset driver for NXP LPC18xx family
+Message-ID: <1430173843-11648-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
----
- arch/arm/boot/dts/bcm2835.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+This patch set adds a reset driver for NXP LPC18xx/43xx devices.
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 4d4c129..664aa25 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -61,6 +61,13 @@
- 			reg = <0x7e104000 0x10>;
- 		};
- 
-+		mailbox: mailbox at 7e00b800 {
-+			compatible = "brcm,bcm2835-mbox";
-+			reg = <0x7e00b880 0x40>;
-+			interrupts = <0 1>;
-+			#mbox-cells = <1>;
-+		};
-+
- 		gpio: gpio at 7e200000 {
- 			compatible = "brcm,bcm2835-gpio";
- 			reg = <0x7e200000 0xb4>;
+There are no dependencies in this patch set. The DTS changes will
+be sent separately to arm-soc once this patch set goes upstream.
+
+Base support for the NXP LPC18xx family can be found here:
+http://marc.info/?l=linux-arm-kernel&m=143016894704253&w=2
+
+Joachim Eastwood (2):
+  reset: add driver for lpc18xx rgu
+  doc: dt: add documentation for lpc1850-rgu reset driver
+
+ .../devicetree/bindings/reset/nxp,lpc1850-rgu.txt  |  38 +++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-lpc18xx.c                      | 260 +++++++++++++++++++++
+ 3 files changed, 299 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt
+ create mode 100644 drivers/reset/reset-lpc18xx.c
+
 -- 
-2.1.4
+1.8.0
