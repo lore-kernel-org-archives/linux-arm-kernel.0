@@ -1,16 +1,20 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Apr 2015 22:46:29 +0800
-Subject: [PATCH V2] ARM: dts: imx28: Fix AUART4 TX-DMA interrupt name
-In-Reply-To: <1429874987-5481-1-git-send-email-marex@denx.de>
-References: <1429874987-5481-1-git-send-email-marex@denx.de>
-Message-ID: <20150427144627.GD1788@dragon>
+Date: Mon, 27 Apr 2015 22:49:34 +0800
+Subject: [PATCH 2/2] ARM: imx: mmdc: Include "common.h" header file
+In-Reply-To: <1428013412-7082-2-git-send-email-festevam@gmail.com>
+References: <1428013412-7082-1-git-send-email-festevam@gmail.com>
+ <1428013412-7082-2-git-send-email-festevam@gmail.com>
+Message-ID: <20150427144921.GE1788@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 01:29:47PM +0200, Marek Vasut wrote:
-> Fix a typo in the TX DMA interrupt name for AUART4.
-> This patch makes AUART4 operational again.
+On Thu, Apr 02, 2015 at 07:23:32PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
+> Include the "common.h" header file to fix the following sparse warning:
+> 
+> arch/arm/mach-imx/mmdc.c:66:5: warning: symbol 'imx_mmdc_get_ddr_type' was not declared. Should it be static?
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
 Applied, thanks.
