@@ -1,68 +1,100 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 27 Apr 2015 09:50:23 +0200
-Subject: [PATCH 2/4] mtd: mxc_nand: limit the size of used oob
-In-Reply-To: <20150427072057.GT2258@tarshish>
-References: <cover.1430034929.git.baruch@tkos.co.il>
- <4bd5da1f7d57aa32c5682297f7aa0c768e8c6e49.1430034929.git.baruch@tkos.co.il>
- <20150426200725.GC19431@pengutronix.de>
- <20150427043906.GR2258@tarshish>
- <20150427071238.GE19431@pengutronix.de>
- <20150427072057.GT2258@tarshish>
-Message-ID: <20150427075023.GF19431@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 27 Apr 2015 09:52:33 +0200
+Subject: [PATCH v5 08/11] arm: dts: qcom: Add #power-domain-cells property
+In-Reply-To: <553D9FB4.6060107@codeaurora.org>
+References: <1429017137-20218-1-git-send-email-rnayak@codeaurora.org>
+ <1429017137-20218-9-git-send-email-rnayak@codeaurora.org>
+ <CAPDyKFoph2TQeSS6XE_UpOPHiZy5tRZWFvUSqccv7rjtHOprsg@mail.gmail.com>
+ <553A2106.1030102@codeaurora.org>
+ <CAPDyKFrUhx-_EHzR=j+tHUUDJPJb1Qw9d4eMV30_z2E-a9r=oA@mail.gmail.com>
+ <553D9FB4.6060107@codeaurora.org>
+Message-ID: <CAPDyKFq1KH7bzRh4+cdoDNJPJKtzbcUbvFDRAbD7g-dEPWSm=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Baruch,
+On 27 April 2015 at 04:32, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+> On 04/24/2015 09:13 PM, Ulf Hansson wrote:
+>>
+>> On 24 April 2015 at 12:55, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+>>>
+>>> On 04/24/2015 03:15 PM, Ulf Hansson wrote:
+>>>>
+>>>>
+>>>> On 14 April 2015 at 15:12, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+>>>>>
+>>>>>
+>>>>> msm8974 has gcc and mmcc nodes, and apq8084 has a gcc node which
+>>>>> implement gdsc powerdomains. Add the #power-domain-cells property
+>>>>> to them.
+>>>>>
+>>>>> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+>>>>> ---
+>>>>>    arch/arm/boot/dts/qcom-apq8084.dtsi | 1 +
+>>>>>    arch/arm/boot/dts/qcom-msm8974.dtsi | 2 ++
+>>>>>    2 files changed, 3 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi
+>>>>> b/arch/arm/boot/dts/qcom-apq8084.dtsi
+>>>>> index 1f130bc..55c281c 100644
+>>>>> --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
+>>>>> +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+>>>>> @@ -183,6 +183,7 @@
+>>>>>                           compatible = "qcom,gcc-apq8084";
+>>>>>                           #clock-cells = <1>;
+>>>>>                           #reset-cells = <1>;
+>>>>> +                       #power-domain-cells = <1>;
+>>>>
+>>>>
+>>>>
+>>>> So the PM domain will be apart of the clock-controller. That's a bit
+>>>> odd, but I guess the hardware is like that!?
+>>>
+>>>
+>>>
+>>> Yes, the gdscs are all part of GCC controller.
+>>>
+>>>>
+>>>> Anyway, what I fail to understand from this patchset is who will be
+>>>> the actual consumer of the PM domain? In other words, what devices
+>>>> will hold the below property in its DT node?
+>>>>
+>>>> power_domains = <phandle index>;
+>>>>
+>>>> This is needed for genpd to have the device at probe time, attached to
+>>>> its PM domain.
+>>>
+>>>
+>>>
+>>> Any device which belongs to the collapsible power domain (gdsc)
+>>> Examples are graphics, camera, video encode/decode block (venus) etc
+>>
+>>
+>> Then I expect those drivers to deploy runtime PM (if not already) and
+>> thus gdsc's PM domain will come into play.
+>
+>
+> Most of these drivers aren;t upstream yet. And one of the reasons I am
+> trying to get gdsc support upstream is so these drivers can then be
+> pushed upstream, with runtime support.
 
-On Mon, Apr 27, 2015 at 10:20:57AM +0300, Baruch Siach wrote:
-> On Mon, Apr 27, 2015 at 09:12:38AM +0200, Uwe Kleine-K?nig wrote:
-> > On Mon, Apr 27, 2015 at 07:39:06AM +0300, Baruch Siach wrote:
-> > > On Sun, Apr 26, 2015 at 10:07:25PM +0200, Uwe Kleine-K?nig wrote:
-> > > > On Sun, Apr 26, 2015 at 11:16:49AM +0300, Baruch Siach wrote:
-> > > > > +	/* hardware can only use 218 or 128 oob bytes for ecc */
-> > > > > +	if (mtd->oobsize >= 218)
-> > > > IMHO this is the wrong check. What if your part (with 224 bytes spare)
-> > > > is used but the machine only uses the small layout e.g. for booting?
-> > > > (That would work, wouldn't it?)
-> > > 
-> > > Yes, but how would I know? I am following here the assumption of get_eccsize() 
-> > > that enables 8 bit ECC when there is enough oobsize.
-> > Hmm I rechecked the reference manual and found a register to specify the
-> > size of the spare area (I didn't notice that one before). Did you try
-> > what happens if you set this to 0x70 for 224 bytes oob?
-> 
-> Which register is that?
-Spare Area Size Register (SPAS) at offset 0x1e10 for the i.MX25 (that's
-what you're using, don't you?).
- 
-> > Optimally this would result in the last 6 bytes being written but not 
-> > protected by hardware ecc.
-> 
-> Last 6 bytes of what? AFAIK, hardware ECC does not protect oob at all.
-I thought it did, might be wrong here.
+That's great news! I am happy to help reviewing, if you like.
 
-> > > > Moreover the comment is misleading as it
-> > > > only applies to 4K flashes. At least the driver works well with (2ki +
-> > > > 128) bytes pages (while there are only 64 bytes spare used?? Maybe there
-> > > > are still more bugs?).
-> > > 
-> > > I suspect there are more bugs. A simple way to trigger the bug I encountered 
-> > > is by doing a sub-page write, that is:
-> > > 
-> > >   dd if=/dev/zero bs=1024 count=1 of=/dev/mtd2
-> > >   dd if=/dev/zero bs=1024 count=1 seek=1 of=/dev/mtd2
-> > > 
-> > > and then try reading this page. You may need to dirty the (useless; random) 
-> > > content of ecccalc to see the bug (you can conveniently use 
-> > > mxc_nand_calculate_ecc() for that). What copy_spare() currently do (spread ECC 
-> > > chunks evenly over oob) does not match nandv2_hw_eccoob_largepage.
-> > I didn't follow, but would be willing to review a fix :-)
-> 
-> OK. I'll try something.
-\o/
+>
+>>
+>> But how will that relate to the GCC controller?
+>>
+>> For example when the gdsc's PM domain is about to be powered off,
+>> since all the devices within it has be runtime PM suspended. What
+>> happens with the GCC controller then?
+>
+>
+> I don;t seem to completely understand what you are asking. Are you
+> asking if the GCC controller itself is part of a collapsible power
+> domain?
 
-Uwe
+Yes. Sorry for being a bit vague...
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+If the gdsc's PM domain is powered off, what happens with the GCC's clocks?
+
+Kind regards
+Uffe
