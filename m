@@ -1,57 +1,36 @@
-From: valentinrothberg@gmail.com (Valentin Rothberg)
-Date: Mon, 27 Apr 2015 08:37:06 +0200
-Subject: ARM: Remove mach-msm: some leftovers
-In-Reply-To: <552460D9.5000807@codeaurora.org>
-References: <CAD3Xx4JnAjrqsStPA=ELavySy0YrmWd2--w5UpJTMZtzd0Fkgg@mail.gmail.com>
- <CAD3Xx4J46RkKMPWQ_m0hqxDfR0bS=+8AiE+2h0MAXcTNbaLZtw@mail.gmail.com>
- <552460D9.5000807@codeaurora.org>
-Message-ID: <CAD3Xx4Jekyh4x+fr0bQ4xq0vOnnbjObHmym_fUT6XnTQi+QbJg@mail.gmail.com>
+From: catalin.crenguta@gmail.com (Catalin Crenguta)
+Date: Mon, 27 Apr 2015 09:47:46 +0300
+Subject: [PATCH] ARM: dts: imx6: Add Embest MarS Board
+In-Reply-To: <1429878521.2872.3.camel@pengutronix.de>
+References: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
+ <1427876156.24886.1.camel@pengutronix.de>
+ <1427877126.2449.0@mail.essensium.com>
+ <CABH3fy_YWYoQZL4E_i1FWaY+rOgidxBVcUNo15GrXfcoS2or0A@mail.gmail.com>
+ <1429878521.2872.3.camel@pengutronix.de>
+Message-ID: <CABH3fy8o8R7d+bpyxS-Q0eSyPgqg0dvuQnF7m1gywLAzjRBXRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Lucas,
 
-this is just a kind reminder that the issue below is still present and
-made its way to v4.1-rc1.  Any news from the maintainers' side?
+On Fri, Apr 24, 2015 at 3:28 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Hi Catalin,
+>
+> This may as well be a signaling issue. You could try to slow down the
+> the MMC bus speed or play a bit with the pin drive strength values. Note
+> that in those cases _reducing_ the drive strength may be the right thing
+> to do.
+>
 
-Kind regards,
- Valentin
+Thank you!
+I have managed to get it working after changing the drive strength to
+260 Ohm and speed to 50 MHz.
+Changing only the speed to 50 MHz didn't work, I had to also change
+the drive strength. I haven't tested other values.
+Maybe this can be pushed to mainline?
 
-On Wed, Apr 8, 2015 at 12:57 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 04/07/15 07:12, Valentin Rothberg wrote:
->> On Tue, Apr 7, 2015 at 4:07 PM, Valentin Rothberg
->> <valentinrothberg@gmail.com> wrote:
->>> Hi Stephen,
->>>
->>> your commit c0c89fafa289 ("ARM: Remove mach-msm and associated ARM
->>> architecture code") removes config ARCH_MSM from Kconfig but leaves a
->>> few references untouched:
->>>
->>> arch/arm/Kconfig.debug:1563:    default "debug/uncompress.h" if
->>> ARCH_MULTIPLATFORM || ARCH_MSM || \
->>> drivers/phy/Kconfig:289:        depends on OF && ARCH_MSM
->>> drivers/scsi/ufs/Kconfig:76:    depends on SCSI_UFSHCD_PLATFORM && ARCH_MSM
->>> drivers/video/fbdev/Kconfig:2331:       depends on FB && ARCH_MSM
->>>
->>> Is there a reason to keep those leftovers or is it an accident?
->>>
->>> I detected this issues with ./scripts/checkkconfigsymbols.py by
->>> comparing today's and the previous linux-next tree (--diff
->>> commit1..commit2).
->>>
->>> Kind regards,
->>>  Valentin
->> Same issue applies to the Kconfig option MSM_SMD:
->>
->> drivers/char/Kconfig:596:       depends on MSM_SMD
->> drivers/tty/serial/Kconfig:1384:        depends on MSM_SMD
->
-> I'm currently waiting on the maintainers of said subsystems to apply the
-> patches that I've already sent to the list. I can resend the series
-> minus the patches that have already been picked up, but I can't do much
-> more than that.
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
->
+> Regards,
+> Lucas
+
+Best regards,
+Catalin
