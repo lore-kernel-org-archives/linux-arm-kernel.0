@@ -1,79 +1,153 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 27 Apr 2015 09:12:38 +0200
-Subject: [PATCH 2/4] mtd: mxc_nand: limit the size of used oob
-In-Reply-To: <20150427043906.GR2258@tarshish>
-References: <cover.1430034929.git.baruch@tkos.co.il>
- <4bd5da1f7d57aa32c5682297f7aa0c768e8c6e49.1430034929.git.baruch@tkos.co.il>
- <20150426200725.GC19431@pengutronix.de>
- <20150427043906.GR2258@tarshish>
-Message-ID: <20150427071238.GE19431@pengutronix.de>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Mon, 27 Apr 2015 00:17:44 -0700
+Subject: Broadcom 43340 module on iMX6DL
+In-Reply-To: <20150427033351.GC26374@shlinux1.ap.freescale.net>
+References: <CACUGKYPHKGoLEfNPNvtHwtCA9jB_ZLamzF_PViDfQnpnc8Y-=A@mail.gmail.com>
+ <55394141.1080601@broadcom.com>
+ <CALAqxLU_9Hcbr5atxRBLDhs4WY9JfAdwdyzpszeO5nxCZU9JLA@mail.gmail.com>
+ <CACUGKYPFk3Qoj3-XgkMwuzuCz_aP-8QCA8S+OSq5-qfoRF9dwg@mail.gmail.com>
+ <CACUGKYMqFuk6nD82H=7nPRVvHEe9Ot6OkWiixqoV91ED8Cwudw@mail.gmail.com>
+ <5539FCD5.4050708@broadcom.com>
+ <CACUGKYOheGKjQOSZkxKGkqj_wOWAN8_2geptmTC8jp_L5AOveg@mail.gmail.com>
+ <553A8803.5010700@broadcom.com>
+ <CACUGKYOcgcrM4EPWmV18CeG-P6+nE_ANX5qgWGk3nn3NmWQ72A@mail.gmail.com>
+ <553A9368.9030700@broadcom.com>
+ <20150427033351.GC26374@shlinux1.ap.freescale.net>
+Message-ID: <CACUGKYMeHr1vcxuxBWu-vFkpxL3rdRn6oUn0aww3eKkHfvJdCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Dong,
 
-On Mon, Apr 27, 2015 at 07:39:06AM +0300, Baruch Siach wrote:
-> On Sun, Apr 26, 2015 at 10:07:25PM +0200, Uwe Kleine-K?nig wrote:
-> > On Sun, Apr 26, 2015 at 11:16:49AM +0300, Baruch Siach wrote:
-> > > For 4k pages the i.MX NFC hardware uses exactly 218 or 128 bytes for 4bit or
-> > > 8bit ECC data, respectively. Larger oobsize confuses the logic of copy_spare().
-> > > Limit the size of used oob size to avoid that.
-> > > 
-> > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > > ---
-> > >  drivers/mtd/nand/mxc_nand.c | 15 +++++++++++----
-> > >  1 file changed, 11 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> > > index 33b22b9c0b30..c650f0950b20 100644
-> > > --- a/drivers/mtd/nand/mxc_nand.c
-> > > +++ b/drivers/mtd/nand/mxc_nand.c
-> > > @@ -819,15 +819,22 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
-> > >  {
-> > >  	struct nand_chip *this = mtd->priv;
-> > >  	struct mxc_nand_host *host = this->priv;
-> > > -	u16 i, oob_chunk_size;
-> > > +	u16 i, oob_chunk_size, used_oobsize;
-> > >  	u16 num_chunks = mtd->writesize / 512;
-> > >  
-> > >  	u8 *d = host->data_buf + mtd->writesize;
-> > >  	u8 __iomem *s = host->spare0;
-> > >  	u16 sparebuf_size = host->devtype_data->spare_len;
-> > >  
-> > > +	/* hardware can only use 218 or 128 oob bytes for ecc */
-> > > +	if (mtd->oobsize >= 218)
-> > IMHO this is the wrong check. What if your part (with 224 bytes spare)
-> > is used but the machine only uses the small layout e.g. for booting?
-> > (That would work, wouldn't it?)
-> 
-> Yes, but how would I know? I am following here the assumption of get_eccsize() 
-> that enables 8 bit ECC when there is enough oobsize.
-Hmm I rechecked the reference manual and found a register to specify the
-size of the spare area (I didn't notice that one before). Did you try
-what happens if you set this to 0x70 for 224 bytes oob? Optimally this
-would result in the last 6 bytes being written but not protected by
-hardware ecc.
+I tested the kerne 4.0 and the driver works (It loads the driver
+correctly, it show's the wlan0 interface and it did not bail out...)
 
-> > Moreover the comment is misleading as it
-> > only applies to 4K flashes. At least the driver works well with (2ki +
-> > 128) bytes pages (while there are only 64 bytes spare used?? Maybe there
-> > are still more bugs?).
-> 
-> I suspect there are more bugs. A simple way to trigger the bug I encountered 
-> is by doing a sub-page write, that is:
-> 
->   dd if=/dev/zero bs=1024 count=1 of=/dev/mtd2
->   dd if=/dev/zero bs=1024 count=1 seek=1 of=/dev/mtd2
-> 
-> and then try reading this page. You may need to dirty the (useless; random) 
-> content of ecccalc to see the bug (you can conveniently use 
-> mxc_nand_calculate_ecc() for that). What copy_spare() currently do (spread ECC 
-> chunks evenly over oob) does not match nandv2_hw_eccoob_largepage.
-I didn't follow, but would be willing to review a fix :-)
+bcrm {
+  compatible = "brcm,bcm4329-fmac";
+  interrupt-parent = <&gpio3>;
+  interrupts = <22 0x2>;
+  interrupt-names = "host-wake";
+};
 
-Best regards
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+
+John
+
+
+
+On Sun, Apr 26, 2015 at 8:33 PM, Dong Aisheng <b29396@freescale.com> wrote:
+> On Fri, Apr 24, 2015 at 09:03:04PM +0200, Arend van Spriel wrote:
+>> On 04/24/15 20:24, John Tobias wrote:
+>> >Hi Arend,
+>> >
+>> >Apologize for the confusion. I am asking the repo for the device
+>> >driver for 43340. Looking at the link you sent, it's more userspace
+>> >support and didn't see the device driver there...
+>>
+>> crap. you are right. it is userspace and firmware. You need a kernel
+>> repo. There are some on the site I referred to, but you may need to
+>> contact Freescale whether they provide it publicly like on github or
+>> so.
+>>
+>
+> One simple question:
+> Does the brcmfmac driver in upstream kernel also work?
+> I mean this one:
+> drivers/net/wireless/brcm80211
+>
+> Regards
+> Dong Aisheng
+>
+>> Regards,
+>> Arend
+>>
+>> >Regards,
+>> >
+>> >John
+>> >
+>> >
+>> >On Fri, Apr 24, 2015 at 11:14 AM, Arend van Spriel<arend@broadcom.com>  wrote:
+>> >>On 04/24/15 19:49, John Tobias wrote:
+>> >>>
+>> >>>Hi Arend,
+>> >>>
+>> >>>I am not pretty sure if the brcm43340 driver for android is the latest
+>> >>>one.  May I know repo?.
+>> >>
+>> >>
+>> >>Not sure what you are asking. I gave the url. Did you try using the
+>> >>brcmfmac4334-sdio.bin firmware file. I would like to know if that one works
+>> >>for your device.
+>> >>
+>> >>Regards,
+>> >>Arend
+>> >>
+>> >>
+>> >>>Regards,
+>> >>>
+>> >>>John
+>> >>>
+>> >>>On Fri, Apr 24, 2015 at 1:20 AM, Arend van Spriel<arend@broadcom.com>
+>> >>>wrote:
+>> >>>>
+>> >>>>On 04/24/15 03:04, John Tobias wrote:
+>> >>>>>
+>> >>>>>
+>> >>>>>Btw, where I could get a copy of the latest driver?.
+>> >>>>
+>> >>>>
+>> >>>>
+>> >>>>The open-source bcmdhd is in AOSP [1]. I would stick to the android
+>> >>>>release
+>> >>>>branch you are running on your device.
+>> >>>>
+>> >>>>Regards,
+>> >>>>Arend
+>> >>>>
+>> >>>>[1] https://android.googlesource.com/platform/hardware/broadcom/wlan/
+>> >>>>
+>> >>>>
+>> >>>>>Regards,
+>> >>>>>
+>> >>>>>John
+>> >>>>>
+>> >>>>>On Thu, Apr 23, 2015 at 5:59 PM, John Tobias<john.tobias.ph@gmail.com>
+>> >>>>>wrote:
+>> >>>>>>
+>> >>>>>>
+>> >>>>>>Hi John,
+>> >>>>>>
+>> >>>>>>Is it possible to have a copy of the firmware for 43340?.
+>> >>>>>>
+>> >>>>>>Regards,
+>> >>>>>>
+>> >>>>>>John
+>> >>>>>>
+>> >>>>>>On Thu, Apr 23, 2015 at 5:57 PM, John Stultz<john.stultz@linaro.org>
+>> >>>>>>wrote:
+>> >>>>>>>
+>> >>>>>>>
+>> >>>>>>>On Thu, Apr 23, 2015 at 12:00 PM, Arend van Spriel<arend@broadcom.com>
+>> >>>>>>>wrote:
+>> >>>>>>>>
+>> >>>>>>>>
+>> >>>>>>>>By the name of the file I suspected you did. Personally, I verified
+>> >>>>>>>>the
+>> >>>>>>>>firmware works on 43341. John Stultz tested both 43340 and 43341 with
+>> >>>>>>>>this
+>> >>>>>>>>firmware.
+>> >>>>>>>
+>> >>>>>>>
+>> >>>>>>>
+>> >>>>>>>Minor correction here, I only tested on 43341 hardware. The confusion
+>> >>>>>>>might be that the firmware I originally had access to claimed it was
+>> >>>>>>>43340.
+>> >>>>>>>
+>> >>>>>>>thanks
+>> >>>>>>>-john
+>> >>>>
+>> >>>>
+>> >>>>
+>> >>
+>>
