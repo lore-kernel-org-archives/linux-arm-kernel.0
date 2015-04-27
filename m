@@ -1,24 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 27 Apr 2015 20:53:39 +0100
-Subject: [PATCH] spi: sirf: replace BUG condition by error code for
- unsupported transfer
-In-Reply-To: <1430126548-8171-1-git-send-email-21cnbao@gmail.com>
-References: <1430126548-8171-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <20150427195339.GD22845@sirena.org.uk>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 27 Apr 2015 13:02:02 -0700
+Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
+ using PM clocks
+In-Reply-To: <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
+ (Geert Uytterhoeven's message of "Sun, 26 Apr 2015 10:49:26 +0200")
+References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
+ <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
+ <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
+ <553A21C7.4060506@codeaurora.org>
+ <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
+Message-ID: <7hh9s1xrut.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 09:22:28AM +0000, Barry Song wrote:
-> From: Qipan Li <Qipan.Li@csr.com>
-> 
-> return error for unsupported bits-per-word format, BUG() is not right
-> for this scenerios as we are not an ASSERT but an error handler.
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150427/c1b17b42/attachment-0001.sig>
+> On Fri, Apr 24, 2015 at 12:58 PM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+>>> Second, I want to see less users of pm_clk_add_notifier() since it's
+>>> not the proper/long-term way of how to assign PM domain pointers to a
+>>> device. Instead that shall be done at device registration point. In
+>>> your case while parsing the DT nodes and adding devices onto to their
+>>> buses.
+>>
+>> but these are devices which do not really have a controllable power
+>> domain, they just have controllable clocks.
+>>
+>>> Yes, I understand that it will requires quite some work to adopt to
+>>> this behaviour - but that how it shall be done.
+>>>
+>>> Finally, an important note, you don't need to use PM domains for these
+>>> devices at all and thus you don't need to fix what I propose. Instead
+>>> you only have to implement the runtime PM callbacks for each driver
+>>> and manage the clocks from there. That is probably also a easier
+>>> solution.
+>>
+>> But that would mean I repeat the same code in all drivers to do a
+>> clk_get/prepare/enable/disable/unprepare of the same "core" and "iface"
+>> clocks. I thought we have clock_ops.c just to avoid that (atleast up
+>> until we have a better way of doing it)
+>> And there are atleast a few architecture which have used it to avoid the
+>> duplication across all drivers (omap1/davinci/sh/keystone)
+>
+> At least for arm/shmobile, we're planning to move away from this, cfr.
+> http://www.spinics.net/lists/linux-sh/msg41114.html
+
+Just to clarify for Rajendra's sake... 
+
+SH is moving away from the pm_clk_add_notifier(), but not duplicating
+the clk_get/prepare/enable/disable/unprepare across all the drivers.
+
+Rather, they're using a genpd to model the clock domain, and taking
+advantage of the pm_domain speciic attach callback to attach the PM
+clocks.
+
+This should work for qcom also assuming that these device nodes don't
+also need to belong to a different PM domain.
+
+Kevin
