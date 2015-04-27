@@ -1,33 +1,35 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 27 Apr 2015 11:15:06 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d4: update pinctrl ranges
-Message-ID: <1430126106-15300-1-git-send-email-ludovic.desroches@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Apr 2015 11:16:17 +0200
+Subject: [PATCH v5 0/3] Fix lubbock and mainstone interrupts
+In-Reply-To: <87pp6rkzha.fsf@belgarion.home>
+References: <1429996403-13644-1-git-send-email-robert.jarzmik@free.fr>
+ <7247485.mMzWTjWY84@wuerfel> <87pp6rkzha.fsf@belgarion.home>
+Message-ID: <5225589.tkUhR6vGoM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the pinctrl ranges property to support pioD controller whose
-mapping is not contiguous with other pio controllers. Without this
-update, getting resource will fail, then pinctrl probe will fail too
-because there is a missing pio controller.
+On Sunday 26 April 2015 11:31:13 Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > On Saturday 25 April 2015 23:13:20 Robert Jarzmik wrote:
+> >> This serie was submitted to the lak list, then migrated to mfd drivers, to end
+> >> up again here. There was no change since last submission. Let's hope this is the
+> >> last spin and that these platform will be fixed at last.
+> >> 
+> >
+> > Should these be marked 'Cc: stable at vger.kernel.org'?
+> I can do this. I thought that 3 patches of 100+ lines, and the fact that these
+> boards were broken since october 2011 would prevent this serie from reaching the
+> stable branch.
+> 
+> Well, I'll resubmit with this information, and after comments stage it to my
+> fixes branch. Let's see what stable tree people will do.
+> 
+> > Can you also add a 'Fixes' tag with the commit that introduced the problem?
+> Sure.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- arch/arm/boot/dts/sama5d4.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+You are right about the size limit, I didn't see how big the patches
+actually are. In this case, leave the 'Fixes' tag, but don't add
+the Cc to stable.
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 8679fa9..2cfc65f 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -1214,7 +1214,8 @@
- 				#address-cells = <1>;
- 				#size-cells = <1>;
- 				compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
--				ranges = <0xfc06a000 0xfc06a000 0x4000>;
-+				ranges = <0xfc068000 0xfc068000 0x100
-+					  0xfc06a000 0xfc06a000 0x4000>;
- 				/* WARNING: revisit as pin spec has changed */
- 				atmel,mux-mask = <
- 					/*   A          B          C  */
--- 
-2.1.4
+	Arnd
