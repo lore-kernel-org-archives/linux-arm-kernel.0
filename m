@@ -1,73 +1,46 @@
 From: jbe@pengutronix.de (Juergen Borleis)
-Date: Mon, 27 Apr 2015 15:59:48 +0200
-Subject: [PATCH 2/6] RTC/i.MX/DryIce: add some background info about the
- states the machine can be in
-In-Reply-To: <1430143192-20667-1-git-send-email-jbe@pengutronix.de>
-References: <1430143192-20667-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <1430143192-20667-3-git-send-email-jbe@pengutronix.de>
+Date: Mon, 27 Apr 2015 15:59:46 +0200
+Subject: [PATCHv2] RTC/i.MX/DryICE: add recovery routines to the driver
+Message-ID: <1430143192-20667-1-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
-Signed-off-by: Robert Schwebel <rsc@pengutronix.de>
-[rsc: got NDA clearance from Freescale]
----
- drivers/rtc/rtc-imxdi.c | 43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+The built-in RTC unit on some i.MX SoCs isn't an RTC only. It is also a tamper
+monitor unit which can keep some (secret) keys. When it does its tamper
+detection job and a security violation is detected, the whole DryICE unit
+including the real-time counter locks completely. In this state the whole unit
+is completely useless. The only way to bring it out of this locked state is a
+power cylce with a POR (most of the case) or additionally a battery power
+cycle which includes the loss of the secret keys.
+At the next boot time some flags signals the security violation and a specific
+register access sequence must be done to finaly bring this unit into life
+again. Until this is done, there is no way to use it again as an RTC.
 
-diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
-index 0c2a064..6db8d1c 100644
---- a/drivers/rtc/rtc-imxdi.c
-+++ b/drivers/rtc/rtc-imxdi.c
-@@ -129,6 +129,49 @@ struct imxdi_dev {
- 	struct work_struct work;
- };
- 
-+/* Some background:
-+ *
-+ * The DryIce unit is a complex security/tamper monitor device. To be able do
-+ * its job in a useful manner it runs a bigger statemachine to bring it into
-+ * security/tamper failure state and once again to bring it out of this state.
-+ *
-+ * This unit can be in one of three states:
-+ *
-+ * - "NON-VALID STATE"
-+ *   always after the battery power was removed
-+ * - "FAILURE STATE"
-+ *   if one of the enabled security events has happened
-+ * - "VALID STATE"
-+ *   if the unit works as expected
-+ *
-+ * Everything stops when the unit enters the failure state including the RTC
-+ * counter (to be able to detect the time the security event happened).
-+ *
-+ * The following events (when enabled) let the DryIce unit enter the failure
-+ * state:
-+ *
-+ * - wire-mesh-tamper detect
-+ * - external tamper B detect
-+ * - external tamper A detect
-+ * - temperature tamper detect
-+ * - clock tamper detect
-+ * - voltage tamper detect
-+ * - RTC counter overflow
-+ * - monotonic counter overflow
-+ * - external boot
-+ *
-+ * If we find the DryIce unit in "FAILURE STATE" and the TDCHL cleared, we
-+ * can only detect this state. In this case the unit is completely locked and
-+ * must force a second "SYSTEM POR" to bring the DryIce into the
-+ * "NON-VALID STATE" + "FAILURE STATE" where a recovery is possible.
-+ * If the TDCHL is set in the "FAILURE STATE" we are out of luck. In this case
-+ * a battery power cycle is required.
-+ *
-+ * In the "NON-VALID STATE" + "FAILURE STATE" we can clear the "FAILURE STATE"
-+ * and recover the DryIce unit. By clearing the "NON-VALID STATE" as the last
-+ * task, we bring back this unit into life.
-+ */
-+
- /*
-  * enable a dryice interrupt
-  */
--- 
-2.1.4
+But also without any enabled tamper detection sometimes this unit tends to
+lock. And in this case the same steps must be done to bring it into life
+again.
+
+The current implementation of the DryIce driver isn't able to unlock the
+device successfully in the case it is locked somehow. Only a full power cycle
+including *battery power* can help in this case.
+
+The attached change set adds the required routines to be able to unlock the
+DryIce unit in the case the driver detects a locked unit. This includes
+unlocking it if it is locked by accident or malfunction and not by a real
+security violation.
+
+The last patch of this series is for reference only and should not be part
+of the kernel. It just adds some code to force a locked DryIce unit to check
+if the new routines are able to unlock it again. This code was required
+because I had no hardware which really uses the tamper detection features of
+this unit.
+
+This is the 2nd version of the patch series. Hopefully I addressed all comments
+from Alexandre.
+
+In this version I added a new patch which replaces all __raw* register functions
+as recommended by Alexandre.
+
+Comments are welcome.
+
+jbe
