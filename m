@@ -1,84 +1,148 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Apr 2015 16:54:27 +0100
-Subject: [PATCH] ARM: gic: Document Power and Clock Domain optional
- properties
-In-Reply-To: <1430146811-29862-1-git-send-email-geert+renesas@glider.be>
-References: <1430146811-29862-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150427155427.GB16191@leverpostej>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Mon, 27 Apr 2015 21:25:20 +0530
+Subject: [PATCH v2 RESEND 2/2] mmc: host: Add some quirks to be read from
+ fdt in sdhci-pltm.c
+In-Reply-To: <5771531.b7UhrXUGmv@wuerfel>
+References: <1429630959-32649-1-git-send-email-stripathi@apm.com>
+ <8525627.D1S9aInyMV@wuerfel>
+ <CAOHikRDkQwG+7EUddXmx427ZpEOjqTt22H_zzozABOE3a963tQ@mail.gmail.com>
+ <5771531.b7UhrXUGmv@wuerfel>
+Message-ID: <CAOHikRDX7RZUkHFUmNs0kY+aYqXra5i=3cukpjz5yOECkcffbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 04:00:11PM +0100, Geert Uytterhoeven wrote:
-> On some SoCs, the GIC may be part of a PM Domain (hardware Power and/or
-> Clock Domain).  Document the related optional DT properties.
-> 
-> Note: As the current GIC driver doesn't support Runtime PM yet, PM
-> Domain constraints must be handled elsewhere in e.g. platform code.
-
-I'm worried that without a current user these properties aren't going to
-see any testing...
-
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> To preserve DT stability, we would like to add these properties to the
-> affected shmobile dtsi files.
-
-... which means that they could be wrong, and will get in the way of
-stability rather than aiding it.
-
-I'm also concerned that the carving up of clock inputs, power domains,
-and other physical details is implementation-specific. I imagine that
-pretty much every user that will care about this is using GIC-400, so
-could we make this specific to GIC-400?
-
-> On Thu, Mar 26, 2015 at 11:39 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On 25/03/15 21:19, Geert Uytterhoeven wrote:
-> >> I would like to add the clock and GIC dependency on the clock in the DTS now,
-> >> for reasons of DTS stability. But that means I need a temporary workaround
-> >> to avoid the clock from being disabled, until the GIC driver handles this.
-> >>
-> >> I don't expect a fix for the GIC code to just show up magically. I just wanted
-> >> you to be aware of the problem. GIC is not the only problematic module here,
-> >> there are others, cfr. the last slide of [2].
+On Monday 27 April 2015 20:33:25 Suman Tripathi wrote:
+> > On Tuesday 21 April 2015 21:12:39 Suman Tripathi wrote:
+> > > index bef250e..9f6a4b9 100644
+> > > --- a/drivers/mmc/host/sdhci-pltfm.c
+> > > +++ b/drivers/mmc/host/sdhci-pltfm.c
+> > > @@ -85,6 +85,21 @@ void sdhci_get_of_property(struct platform_device
+> > > *pdev)
+> > >
+> > >                 if (of_get_property(np, "broken-cd", NULL))
+> > >                         host->quirks |=
+> > >SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+> > >
+> > > +
+> > > +               if (of_get_property(np, "delay-after-power", NULL))
+> > > +                       host->quirks |= SDHCI_QUIRK_DELAY_AFTER_POWER;
+> > > +
+> > > +               if (of_get_property(np, "no-hispd", NULL))
+> > > +                       host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+> > > +
+> > > +               if (of_get_property(np, "broken-adma", NULL))
+> > > +                       host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
+> > > +
+> > > +               if (of_get_property(np, "broken-dma", NULL))
+> > > +                       host->quirks |= SDHCI_QUIRK_BROKEN_DMA;
+> > > +
+> > > +               if (of_get_property(np, "no-cmd23", NULL))
+> > > +                       host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+> > >
+> > >                 if (of_get_property(np, "no-1-8-v", NULL))
+> > >                         host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
 > >
-> > As long as there is an agreement from the DT people on the presence of
-> > that extra property in the GIC node, I'm happy with that. I'd like it to
-> > be documented though.
-> 
-> Full thread at
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331876.html
-> 
->  Documentation/devicetree/bindings/arm/gic.txt | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> index 2da059a4790cb3c6..b21113b35f085f27 100644
-> --- a/Documentation/devicetree/bindings/arm/gic.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -58,6 +58,14 @@ Optional
->    regions, used when the GIC doesn't have banked registers. The offset is
->    cpu-offset * cpu-nr.
->  
-> +- power-domains : A phandle and PM domain specifier as defined by bindings of
-> +		  the power controller specified by phandle, used when the GIC
-> +		  is part of a Power or Clock Domain.
+> > Any property you add needs to be documented in the DT binding.
+> > If possible, add generic properties for each bug you have mmc.txt
+> > rather than the driver specific sdhci.txt, and implement the
+> I will add the binding in mmc.txt. I thought this was present but not.
+>
+> > parsing in a common function that is used for all mmc hosts.
+> As per mine understanding the sdhci_get_of_porperty is a common
+> parsing function  . Am I wrong ??
 
-I imagine that it's possible for the distributor and CPU interfaces to
-be in separate power domains in some implementaitons.
+No, this is only used for sdhci, not for the other controllers.
 
-Which components of the GIC does the apply to? The whole thing? Just the
-GICD?
+But our's is a SHCI variant so I added it in this file.
 
-> +- clocks        : A phandle and clock specifier as defined by bindings of
-> +		  the clock controller specified by phandle, used when the GIC
-> +		  is part of a Clock Domain.
+> > An alternative would be to set all these bits based on the compatible
+> > string of your host, if that is the only one that has all these bugs.
+>
+> The host driver  (arasan) is reused but this quirks are needed due to
+> board issues. so I have a control over dtb only to fix this.
 
-Depending on implementation, a GIC could require multiple clocks, and
-their names would be implementation-specific (that said, GIC-400 has a
-single "CLK" input).
+What is the nature of the bug on that board? Is there a different
+way to describe that without introducing six new properties?
 
-Assuming that you're using GIC-400, could we use clock-names to make
-that explicit?
+Sorry it is board and IP as well SoC errata's,
 
+1. Delay after power is required due to some voltage issues that will
+be fixed in next board revision
+
+2. We need to support PIO mode as of now because DMA or ADMA requires
+some kind of translation driver that I am working on.
+
+3. The version of arasan variant we have in our SoC doesn't have the
+HISPD  bit field in HI-SPEED SD card. So this makes HI-SPEED sdcard
+work.
+
+4. NO_CMD23 is required for eMMC cards.
+
+These are not new properties.  Only the fact is I am using it for our
+SoC from dtb. These quirks are already there in mmc common framework.
+Nothing is new.
+
+
+
+
+
+On Mon, Apr 27, 2015 at 8:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 27 April 2015 20:33:25 Suman Tripathi wrote:
+>> > On Tuesday 21 April 2015 21:12:39 Suman Tripathi wrote:
+>> > > index bef250e..9f6a4b9 100644
+>> > > --- a/drivers/mmc/host/sdhci-pltfm.c
+>> > > +++ b/drivers/mmc/host/sdhci-pltfm.c
+>> > > @@ -85,6 +85,21 @@ void sdhci_get_of_property(struct platform_device
+>> > > *pdev)
+>> > >
+>> > >                 if (of_get_property(np, "broken-cd", NULL))
+>> > >                         host->quirks |=
+>> > >SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+>> > >
+>> > > +
+>> > > +               if (of_get_property(np, "delay-after-power", NULL))
+>> > > +                       host->quirks |= SDHCI_QUIRK_DELAY_AFTER_POWER;
+>> > > +
+>> > > +               if (of_get_property(np, "no-hispd", NULL))
+>> > > +                       host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+>> > > +
+>> > > +               if (of_get_property(np, "broken-adma", NULL))
+>> > > +                       host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
+>> > > +
+>> > > +               if (of_get_property(np, "broken-dma", NULL))
+>> > > +                       host->quirks |= SDHCI_QUIRK_BROKEN_DMA;
+>> > > +
+>> > > +               if (of_get_property(np, "no-cmd23", NULL))
+>> > > +                       host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+>> > >
+>> > >                 if (of_get_property(np, "no-1-8-v", NULL))
+>> > >                         host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
+>> >
+>> > Any property you add needs to be documented in the DT binding.
+>> > If possible, add generic properties for each bug you have mmc.txt
+>> > rather than the driver specific sdhci.txt, and implement the
+>> I will add the binding in mmc.txt. I thought this was present but not.
+>>
+>> > parsing in a common function that is used for all mmc hosts.
+>> As per mine understanding the sdhci_get_of_porperty is a common
+>> parsing function  . Am I wrong ??
+>
+> No, this is only used for sdhci, not for the other controllers.
+>
+>> > An alternative would be to set all these bits based on the compatible
+>> > string of your host, if that is the only one that has all these bugs.
+>>
+>> The host driver  (arasan) is reused but this quirks are needed due to
+>> board issues. so I have a control over dtb only to fix this.
+>
+> What is the nature of the bug on that board? Is there a different
+> way to describe that without introducing six new properties?
+>
+>         Arnd
+
+
+
+-- 
 Thanks,
-Mark.
+with regards,
+Suman Tripathi
