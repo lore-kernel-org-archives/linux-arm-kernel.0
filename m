@@ -1,62 +1,25 @@
-From: sakib@meta.ua (Sergiy Kibrik)
-Date: Mon, 27 Apr 2015 08:29:44 +0300
-Subject: [PATCH] ARM: SAMSUNG: fix clk_enable() WARNing in S3C24XX ADC
-Message-ID: <1430112584-6170-1-git-send-email-sakib@meta.ua>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Mon, 27 Apr 2015 08:50:02 +0300
+Subject: [PATCHv7 7/8] watchdog: omap_wdt: Fix memory leak on probe fail
+In-Reply-To: <553D0503.7050207@roeck-us.net>
+References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
+ <1429701102-22320-8-git-send-email-timo.kokkonen@offcode.fi>
+ <553D0503.7050207@roeck-us.net>
+Message-ID: <553DCE0A.6010906@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert clk_enable/clk_disable to clk_prepare_enable/clk_disable_unprepare
-calls as required by common clock framework. Removes this warning on probe:
+On 26.04.2015 18:32, Guenter Roeck wrote:
+> On 04/22/2015 04:11 AM, Timo Kokkonen wrote:
+>> Structures allocated on the beginning of the probe function must be
+>> freed in case of failure.
+>
+> Really ? The functions are allocated with devm_kzalloc.
+> It might be useful to introduce an error on purpose, have the code
+> jump to your new label, and observe what happens.
 
- ------------[ cut here ]------------
- WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:889 __clk_enable+0x28/0x9c()
- Modules linked in:
- CPU: 0 PID: 1 Comm: swapper Not tainted 3.19.0+ #46
- [<c0013a98>] (unwind_backtrace) from [<c0010d8c>] (show_stack+0x10/0x14)
- [<c0010d8c>] (show_stack) from [<c001b018>] (warn_slowpath_common+0x7c/0xa4)
- [<c001b018>] (warn_slowpath_common) from [<c001b0d0>] (warn_slowpath_null+0x18/0x20)
- [<c001b0d0>] (warn_slowpath_null) from [<c01a5f80>] (__clk_enable+0x28/0x9c)
- [<c01a5f80>] (__clk_enable) from [<c01a600c>] (clk_enable+0x18/0x2c)
- [<c01a600c>] (clk_enable) from [<c001860c>] (s3c_adc_probe+0x11c/0x18c)
- [<c001860c>] (s3c_adc_probe) from [<c0153a10>] (platform_drv_probe+0x30/0x78)
- [<c0153a10>] (platform_drv_probe) from [<c01523e0>] (driver_probe_device+0xb0/0x1fc)
- [<c01523e0>] (driver_probe_device) from [<c01525dc>] (__driver_attach+0x68/0x88)
- [<c01525dc>] (__driver_attach) from [<c0150df0>] (bus_for_each_dev+0x70/0x94)
- [<c0150df0>] (bus_for_each_dev) from [<c0151c80>] (bus_add_driver+0xdc/0x1c4)
- [<c0151c80>] (bus_add_driver) from [<c0152ba4>] (driver_register+0x9c/0xe0)
- [<c0152ba4>] (driver_register) from [<c03041cc>] (adc_init+0x10/0x34)
- [<c03041cc>] (adc_init) from [<c00087fc>] (do_one_initcall+0x110/0x1cc)
- [<c00087fc>] (do_one_initcall) from [<c02ffccc>] (kernel_init_freeable+0xf4/0x1ac)
- [<c02ffccc>] (kernel_init_freeable) from [<c022f4fc>] (kernel_init+0x8/0xe0)
- [<c022f4fc>] (kernel_init) from [<c000e098>] (ret_from_fork+0x14/0x3c)
- ---[ end trace f4a1ea39a114fecf ]---
+Interesting. I wasn't aware of devm_kzalloc. I will have to remove this 
+patch from the series and rework the another omap patch to apply without 
+this. Thanks!
 
-Signed-off-by: Sergiy Kibrik <sakib@meta.ua>
----
- arch/arm/plat-samsung/adc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index e2be70d..38444b9 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -389,7 +389,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	clk_enable(adc->clk);
-+	clk_prepare_enable(adc->clk);
- 
- 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
- 
-@@ -413,7 +413,7 @@ static int s3c_adc_remove(struct platform_device *pdev)
- {
- 	struct adc_device *adc = platform_get_drvdata(pdev);
- 
--	clk_disable(adc->clk);
-+	clk_disable_unprepare(adc->clk);
- 	regulator_disable(adc->vdd);
- 
- 	return 0;
--- 
-1.9.1
+-Timo
