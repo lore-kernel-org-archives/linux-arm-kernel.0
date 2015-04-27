@@ -1,48 +1,54 @@
 From: grygorii.strashko@linaro.org (grygorii.strashko at linaro.org)
-Date: Mon, 27 Apr 2015 21:24:29 +0300
-Subject: [PATCH 0/3] Introduce SET_NOIRQ_SYSTEM_SLEEP_PM_OPS and use it
-Message-ID: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
+Date: Mon, 27 Apr 2015 21:24:30 +0300
+Subject: [PATCH 1/3] PM / Sleep: Add macro to define common noirq system PM
+ callbacks
+In-Reply-To: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
+References: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
+Message-ID: <1430159072-31440-2-git-send-email-grygorii.strashko@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@linaro.org>
+From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 
-While working on suspend-to-disk functionality on TI dra7-evm (DRA7xx SoC)
-i've found that the most common problem I have to dial with is absence
-of corresponding PM callbacks in drivers and, in particular, noirq callbacks.
-So, I've fixed one driver first
-commit 6248015d6867 "ARM: omap-device: add missed callback for suspend-to-disk"
-but then found another one which need to be fixed too (omap_l3_noc.c).
-At this moment I decided to make my life easier and added new macro
-SET_NOIRQ_SYSTEM_SLEEP_PM_OPS using the same approach as for the existing
-SET_SYSTEM_SLEEP_PM_OPS macro.
+The same approach is used as for the existing SET_SYSTEM_SLEEP_PM_OPS,
+but for noirq callbacks.
 
-SET_NOIRQ_SYSTEM_SLEEP_PM_OPS: defined for CONFIG_PM_SLEEP and
-assigns ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
+New SET_NOIRQ_SYSTEM_SLEEP_PM_OPS, defined for CONFIG_PM_SLEEP, will
+point ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
 function. Vice versa happens for ->resume_noirq, ->thaw_noirq and
 ->restore_noirq.
-
-Further two patches reuse this newly introduced macro.
-
-SET_NOIRQ_SYSTEM_SLEEP_PM_OPS, defined for CONFIG_PM_SLEEP, will
-    point ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
-    function. Vice versa happens for ->resume_noirq, ->thaw_noirq and
-    ->restore_noirq.
 
 Cc: Tony Lindgren <tony@atomide.com>
 Cc: Nishanth Menon <nm@ti.com>
 Cc: Kevin Hilman <khilman@linaro.org>
 Cc: Santosh Shilimkar <ssantosh@kernel.org>
+Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+---
+ include/linux/pm.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Grygorii Strashko (3):
-  PM / Sleep: Add macro to define common noirq system PM callbacks
-  bus: omap_l3_noc: add missed callbacks for suspend-to-disk
-  ARM: omap-device: use SET_NOIRQ_SYSTEM_SLEEP_PM_OPS
-
- arch/arm/mach-omap2/omap_device.c |  7 ++-----
- drivers/bus/omap_l3_noc.c         |  4 ++--
- include/linux/pm.h                | 12 ++++++++++++
- 3 files changed, 16 insertions(+), 7 deletions(-)
-
+diff --git a/include/linux/pm.h b/include/linux/pm.h
+index 2d29c64..4890743 100644
+--- a/include/linux/pm.h
++++ b/include/linux/pm.h
+@@ -342,6 +342,18 @@ struct dev_pm_ops {
+ #define SET_LATE_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
+ #endif
+ 
++#ifdef CONFIG_PM_SLEEP
++#define SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
++	.suspend_noirq = suspend_fn, \
++	.resume_noirq = resume_fn, \
++	.freeze_noirq = suspend_fn, \
++	.thaw_noirq = resume_fn, \
++	.poweroff_noirq = suspend_fn, \
++	.restore_noirq = resume_fn,
++#else
++#define SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
++#endif
++
+ #ifdef CONFIG_PM
+ #define SET_RUNTIME_PM_OPS(suspend_fn, resume_fn, idle_fn) \
+ 	.runtime_suspend = suspend_fn, \
 -- 
 1.9.1
