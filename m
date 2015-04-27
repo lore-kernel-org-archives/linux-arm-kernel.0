@@ -1,53 +1,47 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 27 Apr 2015 22:57:34 +0100
-Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
- add SW break point support
-In-Reply-To: <20150427200407.GG23335@cbox>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
- <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
- <20150427200407.GG23335@cbox>
-Message-ID: <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 28 Apr 2015 00:14:07 +0200
+Subject: [PATCH v2 0/2] pinctrl for NXP LPC18xx family
+Message-ID: <1430172849-3147-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 April 2015 at 21:04, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Thu, Apr 23, 2015 at 03:26:53PM +0100, Alex Benn?e wrote:
->>
->> Christoffer Dall <christoffer.dall@linaro.org> writes:
->>
->> > On Tue, Mar 31, 2015 at 04:08:04PM +0100, Alex Benn?e wrote:
->> >> + * just need to report the PC and the HSR values to userspace.
->> >> + * Userspace may decide to re-inject the exception and deliver it to
->> >> + * the guest if it wasn't for the host to deal with.
->> >
->> > now I'm confused - does userspace setup the guest to receive an
->> > exception or does it tell KVM to emulate an exception for the guest or
->> > do we execute the breakpoint without trapping the debug exception?
->>
->> I've made it all go through userspace as we may have to translate the
->> hypervisor visible exception code to what the guest was expecting to see.
->>
->
-> ok, so I think you should re-phrase something like:
->
-> "Userspace may decide that this exception is caused by the guest using
-> debugging itself, and may in that case emulate the guest debug exception
-> in userspace before resuming KVM."
->
-> But does that really work?  Given that we don't support KVM-TCG
-> migration, this sounds a little strange.  Did we test it?
+This patch set adds a pinctrl driver for NXP LPC18xx/43xx devices.
 
-The QEMU patches have a TODO note at the point where you'd want
-to do this... Design-wise you can do the reinjection in the
-kernel or in userspace (ppc QEMU does this in userspace, for
-instance) because it's pretty much just setting registers to fake
-up the exception-entry into EL1. Code-wise QEMU's ARM code isn't
-set up to do it right now, but it shouldn't be too difficult to
-persuade the TCG exception-entry code to work for this case too.
+The pinctrl driver uses the generic muxing and properties DT bindings as
+described in pinctrl-bindings.txt. There is still two TODOs left in the
+pinctrl driver regarding property control of special usb1 pins but I would
+like it merged regardless of this. Support will be added once I get USB up
+and running on the MCU.
 
-Does the kernel already have a conveniently implemented "inject
-exception into guest" lump of code? If so it might be less effort
-to do it that way round, maybe.
+Checkpatch complains a lot about the driver but that's what you get when
+you embedd a large function/pin spec table from the data sheet I guess.
 
--- PMM
+Changes since v1:
+ - minor white space fixes
+ - split pinctrl/gpio patch set
+ - rebase on v4.1-rc1
+
+Since there were no comments on v1. I hope that these drivers can
+make it to Linux 4.1.
+
+There are no dependencies in this patch set. The DTS changes will
+be sent separately to arm-soc once this patch set goes upstream.
+
+Base support for the NXP LPC18xx family can be found here:
+http://marc.info/?l=linux-arm-kernel&m=143016894704253&w=2
+
+
+Joachim Eastwood (2):
+  pinctrl: add lpc18xx pinctrl driver
+  doc: dt: add documentation for lpc1850-scu pinctrl driver
+
+ .../bindings/pinctrl/nxp,lpc1850-scu.txt           |   57 +
+ drivers/pinctrl/Kconfig                            |    9 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/pinctrl-lpc18xx.c                  | 1144 ++++++++++++++++++++
+ 4 files changed, 1211 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/nxp,lpc1850-scu.txt
+ create mode 100644 drivers/pinctrl/pinctrl-lpc18xx.c
+
+-- 
+1.8.0
