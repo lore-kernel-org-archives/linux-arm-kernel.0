@@ -1,146 +1,133 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 27 Apr 2015 09:03:28 +0530
-Subject: [PATCH] dmaengine: at_xdmac: fix slave configuration issue
-In-Reply-To: <1429196640-8703-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1429196640-8703-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20150427033328.GH2738@intel.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Mon, 27 Apr 2015 11:27:04 +0800
+Subject: Broadcom 43340 module on iMX6DL
+In-Reply-To: <553A9368.9030700@broadcom.com>
+References: <CACUGKYPHKGoLEfNPNvtHwtCA9jB_ZLamzF_PViDfQnpnc8Y-=A@mail.gmail.com>
+ <55394141.1080601@broadcom.com>
+ <CALAqxLU_9Hcbr5atxRBLDhs4WY9JfAdwdyzpszeO5nxCZU9JLA@mail.gmail.com>
+ <CACUGKYPFk3Qoj3-XgkMwuzuCz_aP-8QCA8S+OSq5-qfoRF9dwg@mail.gmail.com>
+ <CACUGKYMqFuk6nD82H=7nPRVvHEe9Ot6OkWiixqoV91ED8Cwudw@mail.gmail.com>
+ <5539FCD5.4050708@broadcom.com>
+ <CACUGKYOheGKjQOSZkxKGkqj_wOWAN8_2geptmTC8jp_L5AOveg@mail.gmail.com>
+ <553A8803.5010700@broadcom.com>
+ <CACUGKYOcgcrM4EPWmV18CeG-P6+nE_ANX5qgWGk3nn3NmWQ72A@mail.gmail.com>
+ <553A9368.9030700@broadcom.com>
+Message-ID: <20150427032703.GB26374@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 16, 2015 at 05:04:00PM +0200, Ludovic Desroches wrote:
-> When doing the slave configuration, an error is returned if the maxburst
-> value is not supported. The bug comes from the fact that we always check
-> the maxburst for both directions but in the case of an unidirectional
-> channel, only one is set.
-While setting the slave configuration we are not tied to a channel
-direction, the direction is passed usin prep_ method. So from that
-prespective a channle can be used for tx and rx with same slave config set.
-
-Now if we were invoking at_xdmac_set_slave_config from prep_ calls then it
-would have been fine but here we are checking when the slave config is set
-so this is not right. You should check maxburst at runtime then...
-
--- 
-~Vinod
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: <stable@vger.kernel.org> # 3.19 and later
-> ---
->  drivers/dma/at_xdmac.c | 97 +++++++++++++++++++++++++++-----------------------
->  1 file changed, 52 insertions(+), 45 deletions(-)
+On Fri, Apr 24, 2015 at 09:03:04PM +0200, Arend van Spriel wrote:
+> On 04/24/15 20:24, John Tobias wrote:
+> >Hi Arend,
+> >
+> >Apologize for the confusion. I am asking the repo for the device
+> >driver for 43340. Looking at the link you sent, it's more userspace
+> >support and didn't see the device driver there...
 > 
-> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index d9891d3..30e161b 100644
-> --- a/drivers/dma/at_xdmac.c
-> +++ b/drivers/dma/at_xdmac.c
-> @@ -501,54 +501,61 @@ static int at_xdmac_set_slave_config(struct dma_chan *chan,
->  	u8 dwidth;
->  	int csize;
->  
-> -	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] =
-> -		AT91_XDMAC_DT_PERID(atchan->perid)
-> -		| AT_XDMAC_CC_DAM_INCREMENTED_AM
-> -		| AT_XDMAC_CC_SAM_FIXED_AM
-> -		| AT_XDMAC_CC_DIF(atchan->memif)
-> -		| AT_XDMAC_CC_SIF(atchan->perif)
-> -		| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
-> -		| AT_XDMAC_CC_DSYNC_PER2MEM
-> -		| AT_XDMAC_CC_MBSIZE_SIXTEEN
-> -		| AT_XDMAC_CC_TYPE_PER_TRAN;
-> -	csize = at_xdmac_csize(sconfig->src_maxburst);
-> -	if (csize < 0) {
-> -		dev_err(chan2dev(chan), "invalid src maxburst value\n");
-> -		return -EINVAL;
-> -	}
-> -	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_CSIZE(csize);
-> -	dwidth = ffs(sconfig->src_addr_width) - 1;
-> -	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
-> -
-> -
-> -	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] =
-> -		AT91_XDMAC_DT_PERID(atchan->perid)
-> -		| AT_XDMAC_CC_DAM_FIXED_AM
-> -		| AT_XDMAC_CC_SAM_INCREMENTED_AM
-> -		| AT_XDMAC_CC_DIF(atchan->perif)
-> -		| AT_XDMAC_CC_SIF(atchan->memif)
-> -		| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
-> -		| AT_XDMAC_CC_DSYNC_MEM2PER
-> -		| AT_XDMAC_CC_MBSIZE_SIXTEEN
-> -		| AT_XDMAC_CC_TYPE_PER_TRAN;
-> -	csize = at_xdmac_csize(sconfig->dst_maxburst);
-> -	if (csize < 0) {
-> -		dev_err(chan2dev(chan), "invalid src maxburst value\n");
-> -		return -EINVAL;
-> +	if (sconfig->src_addr) {
-> +		atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] =
-> +			AT91_XDMAC_DT_PERID(atchan->perid)
-> +			| AT_XDMAC_CC_DAM_INCREMENTED_AM
-> +			| AT_XDMAC_CC_SAM_FIXED_AM
-> +			| AT_XDMAC_CC_DIF(atchan->memif)
-> +			| AT_XDMAC_CC_SIF(atchan->perif)
-> +			| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
-> +			| AT_XDMAC_CC_DSYNC_PER2MEM
-> +			| AT_XDMAC_CC_MBSIZE_SIXTEEN
-> +			| AT_XDMAC_CC_TYPE_PER_TRAN;
-> +		csize = at_xdmac_csize(sconfig->src_maxburst);
-> +		if (csize < 0) {
-> +			dev_err(chan2dev(chan), "invalid src maxburst value\n");
-> +			return -EINVAL;
-> +		}
-> +		atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_CSIZE(csize);
-> +		dwidth = ffs(sconfig->src_addr_width) - 1;
-> +		atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
-> +		/* Src addr is needed to configure the link list descriptor. */
-> +		atchan->per_src_addr = sconfig->src_addr;
-> +
-> +		dev_dbg(chan2dev(chan),
-> +			"%s: cfg[dev2mem]=0x%08x, per_src_addr=0x%08x\n",
-> +			__func__, atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG],
-> +			atchan->per_src_addr);
->  	}
-> -	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_CSIZE(csize);
-> -	dwidth = ffs(sconfig->dst_addr_width) - 1;
-> -	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
->  
-> -	/* Src and dst addr are needed to configure the link list descriptor. */
-> -	atchan->per_src_addr = sconfig->src_addr;
-> -	atchan->per_dst_addr = sconfig->dst_addr;
-> +	if (sconfig->dst_addr) {
-> +		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] =
-> +			AT91_XDMAC_DT_PERID(atchan->perid)
-> +			| AT_XDMAC_CC_DAM_FIXED_AM
-> +			| AT_XDMAC_CC_SAM_INCREMENTED_AM
-> +			| AT_XDMAC_CC_DIF(atchan->perif)
-> +			| AT_XDMAC_CC_SIF(atchan->memif)
-> +			| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
-> +			| AT_XDMAC_CC_DSYNC_MEM2PER
-> +			| AT_XDMAC_CC_MBSIZE_SIXTEEN
-> +			| AT_XDMAC_CC_TYPE_PER_TRAN;
-> +		csize = at_xdmac_csize(sconfig->dst_maxburst);
-> +		if (csize < 0) {
-> +			dev_err(chan2dev(chan), "invalid src maxburst value\n");
-> +			return -EINVAL;
-> +		}
-> +		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_CSIZE(csize);
-> +		dwidth = ffs(sconfig->dst_addr_width) - 1;
-> +		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
-> +		/* Dst addr is needed to configure the link list descriptor. */
-> +		atchan->per_dst_addr = sconfig->dst_addr;
->  
-> -	dev_dbg(chan2dev(chan),
-> -		"%s: cfg[dev2mem]=0x%08x, cfg[mem2dev]=0x%08x, per_src_addr=0x%08x, per_dst_addr=0x%08x\n",
-> -		__func__, atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG],
-> -		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG],
-> -		atchan->per_src_addr, atchan->per_dst_addr);
-> +		dev_dbg(chan2dev(chan),
-> +			"%s: cfg[mem2dev]=0x%08x, per_dst_addr=0x%08x\n",
-> +			__func__, atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG],
-> +			atchan->per_dst_addr);
-> +	}
->  
->  	return 0;
->  }
-> -- 
-> 2.2.0
+> crap. you are right. it is userspace and firmware. You need a kernel
+> repo. There are some on the site I referred to, but you may need to
+> contact Freescale whether they provide it publicly like on github or
+> so.
 > 
 
--- 
+Freescale does not provide Broadcom driver currently.
+It might provide it for MX7D release in the future due to MX7D SDB board
+integrated a Broadcom WiFi chip.
+But it depends on whether the SLA signed with Broadcom can be ready
+before the release.
+
+Regards
+Dong Aisheng
+
+> Regards,
+> Arend
+> 
+> >Regards,
+> >
+> >John
+> >
+> >
+> >On Fri, Apr 24, 2015 at 11:14 AM, Arend van Spriel<arend@broadcom.com>  wrote:
+> >>On 04/24/15 19:49, John Tobias wrote:
+> >>>
+> >>>Hi Arend,
+> >>>
+> >>>I am not pretty sure if the brcm43340 driver for android is the latest
+> >>>one.  May I know repo?.
+> >>
+> >>
+> >>Not sure what you are asking. I gave the url. Did you try using the
+> >>brcmfmac4334-sdio.bin firmware file. I would like to know if that one works
+> >>for your device.
+> >>
+> >>Regards,
+> >>Arend
+> >>
+> >>
+> >>>Regards,
+> >>>
+> >>>John
+> >>>
+> >>>On Fri, Apr 24, 2015 at 1:20 AM, Arend van Spriel<arend@broadcom.com>
+> >>>wrote:
+> >>>>
+> >>>>On 04/24/15 03:04, John Tobias wrote:
+> >>>>>
+> >>>>>
+> >>>>>Btw, where I could get a copy of the latest driver?.
+> >>>>
+> >>>>
+> >>>>
+> >>>>The open-source bcmdhd is in AOSP [1]. I would stick to the android
+> >>>>release
+> >>>>branch you are running on your device.
+> >>>>
+> >>>>Regards,
+> >>>>Arend
+> >>>>
+> >>>>[1] https://android.googlesource.com/platform/hardware/broadcom/wlan/
+> >>>>
+> >>>>
+> >>>>>Regards,
+> >>>>>
+> >>>>>John
+> >>>>>
+> >>>>>On Thu, Apr 23, 2015 at 5:59 PM, John Tobias<john.tobias.ph@gmail.com>
+> >>>>>wrote:
+> >>>>>>
+> >>>>>>
+> >>>>>>Hi John,
+> >>>>>>
+> >>>>>>Is it possible to have a copy of the firmware for 43340?.
+> >>>>>>
+> >>>>>>Regards,
+> >>>>>>
+> >>>>>>John
+> >>>>>>
+> >>>>>>On Thu, Apr 23, 2015 at 5:57 PM, John Stultz<john.stultz@linaro.org>
+> >>>>>>wrote:
+> >>>>>>>
+> >>>>>>>
+> >>>>>>>On Thu, Apr 23, 2015 at 12:00 PM, Arend van Spriel<arend@broadcom.com>
+> >>>>>>>wrote:
+> >>>>>>>>
+> >>>>>>>>
+> >>>>>>>>By the name of the file I suspected you did. Personally, I verified
+> >>>>>>>>the
+> >>>>>>>>firmware works on 43341. John Stultz tested both 43340 and 43341 with
+> >>>>>>>>this
+> >>>>>>>>firmware.
+> >>>>>>>
+> >>>>>>>
+> >>>>>>>
+> >>>>>>>Minor correction here, I only tested on 43341 hardware. The confusion
+> >>>>>>>might be that the firmware I originally had access to claimed it was
+> >>>>>>>43340.
+> >>>>>>>
+> >>>>>>>thanks
+> >>>>>>>-john
+> >>>>
+> >>>>
+> >>>>
+> >>
+> 
