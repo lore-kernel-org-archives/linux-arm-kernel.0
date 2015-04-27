@@ -1,31 +1,64 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 27 Apr 2015 15:55:23 +0200
-Subject: [PATCH 1/2] ARM: shmobile: r8a7740 dtsi: Fix SCIFB naming
-Message-ID: <1430142924-15777-1-git-send-email-geert+renesas@glider.be>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Mon, 27 Apr 2015 15:59:51 +0200
+Subject: [PATCH 5/6] RTC/i.MX/DryIce: when locked, do not fail silently
+In-Reply-To: <1430143192-20667-1-git-send-email-jbe@pengutronix.de>
+References: <1430143192-20667-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <1430143192-20667-6-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The single SCIFB on R-Mobile A1 is called "scifb", not "scifb8".
+If the DryICE unit is locked it is impossibe to set the time. Provide an
+error message for this case.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+Signed-off-by: Robert Schwebel <rsc@pengutronix.de>
+[rsc: got NDA clearance from Freescale]
 ---
-Cfr. commit 0b3a0ef613538cae ("ARM: shmobile: r8a73a4: fix scifb* naming")
----
- arch/arm/boot/dts/r8a7740.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/rtc/rtc-imxdi.c | 27 ++++++++++++++++++++++++---
+ 1 file changed, 24 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index f265b6b194e9774d..d84714468cce18df 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -275,7 +275,7 @@
- 		status = "disabled";
- 	};
+diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
+index 8890a62..46bf014 100644
+--- a/drivers/rtc/rtc-imxdi.c
++++ b/drivers/rtc/rtc-imxdi.c
+@@ -566,14 +566,35 @@ static int dryice_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ static int dryice_rtc_set_mmss(struct device *dev, unsigned long secs)
+ {
+ 	struct imxdi_dev *imxdi = dev_get_drvdata(dev);
++	u32 dcr, dsr;
+ 	int rc;
  
--	scifb8: serial at e6c30000 {
-+	scifb: serial at e6c30000 {
- 		compatible = "renesas,scifb-r8a7740", "renesas,scifb";
- 		reg = <0xe6c30000 0x100>;
- 		interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
++	dcr = readl(imxdi->ioaddr + DCR);
++	dsr = readl(imxdi->ioaddr + DSR);
++
++	if (!(dcr & DCR_TCE) || (dsr & DSR_SVF)) {
++		if (dcr & DCR_TCHL) {
++			/* we are even more out of luck */
++			di_what_is_to_be_done(imxdi, "battery");
++			return -EPERM;
++		}
++		if ((dcr & DCR_TCSL) || (dsr & DSR_SVF)) {
++			/* we are out of luck for now */
++			di_what_is_to_be_done(imxdi, "main");
++			return -EPERM;
++		}
++	}
++
+ 	/* zero the fractional part first */
+ 	rc = di_write_wait(imxdi, 0, DTCLR);
+-	if (rc == 0)
+-		rc = di_write_wait(imxdi, secs, DTCMR);
++	if (rc != 0)
++		return rc;
+ 
+-	return rc;
++	rc = di_write_wait(imxdi, secs, DTCMR);
++	if (rc != 0)
++		return rc;
++
++	return di_write_wait(imxdi, readl(imxdi->ioaddr + DCR) | DCR_TCE, DCR);
+ }
+ 
+ static int dryice_rtc_alarm_irq_enable(struct device *dev,
 -- 
-1.9.1
+2.1.4
