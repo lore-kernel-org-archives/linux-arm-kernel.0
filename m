@@ -1,88 +1,318 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 27 Apr 2015 08:15:14 +0000
-Subject: [PATCH 2/2] mmc: sdhci-sirf: fake version and capbility registers
-In-Reply-To: <1430122514-6541-1-git-send-email-21cnbao@gmail.com>
-References: <1430122514-6541-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1430122514-6541-2-git-send-email-21cnbao@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 27 Apr 2015 16:14:29 +0800
+Subject: [PATCH] ARM: dts: imx5: Add dts files for USB armory.
+In-Reply-To: <87h9t6i40r.fsf@aikidev.net>
+References: <87h9t6i40r.fsf@aikidev.net>
+Message-ID: <20150427081428.GC9231@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Weijun Yang <Weijun.Yang@csr.com>
+On Fri, Mar 27, 2015 at 01:23:00PM -0700, Vagrant Cascadian wrote:
+> Add support for the USB armory board by Inverse Path. This board
+> features a Freescale iMX53 SoC, 512MB RAM, and USB OTG operating in
+> either peripheral or host mode, and 5 GPIO pins.
+> 
+> One .dtb is generated for operating in peripheral mode, and one is
+> generated for operating in host mode.
 
-chips have some issues for version and capbility registers, here we fake
-them.
+Is it possible to ask bootloader to patch the dtb instead of maintaining
+a new one for just changing one USB property?
 
-Signed-off-by: Weijun Yang <Weijun.Yang@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/mmc/host/Kconfig      |  1 +
- drivers/mmc/host/sdhci-sirf.c | 35 +++++++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+)
+> 
+> Signed-off-by: Vagrant Cascadian <vagrant@debian.org>
+> Cc: Andrej Rosano <andrej@inversepath.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/Makefile                      |   2 +
+>  arch/arm/boot/dts/imx53-usbarmory-host_mode.dts |  17 +++
+>  arch/arm/boot/dts/imx53-usbarmory.dts           |  13 ++
+>  arch/arm/boot/dts/imx53-usbarmory.dtsi          | 183 ++++++++++++++++++++++++
+>  4 files changed, 215 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
+>  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
+>  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index a1c776b..bd2258b 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -244,6 +244,8 @@ dtb-$(CONFIG_SOC_IMX53) += \
+>  	imx53-smd.dtb \
+>  	imx53-tx53-x03x.dtb \
+>  	imx53-tx53-x13x.dtb \
+> +	imx53-usbarmory.dtb \
+> +	imx53-usbarmory-host_mode.dtb \
+>  	imx53-voipac-bsb.dtb
+>  dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6dl-aristainetos_4.dtb \
+> diff --git a/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts b/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
+> new file mode 100644
+> index 0000000..a94cb1d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
+> @@ -0,0 +1,17 @@
+> +/*
+> + * Copyright 2015 Inverse Path, S.r.l.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index b1f837e..d5e107b 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -219,6 +219,7 @@ config MMC_SDHCI_SIRF
- 	tristate "SDHCI support on CSR SiRFprimaII and SiRFmarco SoCs"
- 	depends on ARCH_SIRF
- 	depends on MMC_SDHCI_PLTFM
-+	select MMC_SDHCI_IO_ACCESSORS
- 	help
- 	  This selects the SDHCI support for SiRF System-on-Chip devices.
- 
-diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-index 2201f76..0110bae 100644
---- a/drivers/mmc/host/sdhci-sirf.c
-+++ b/drivers/mmc/host/sdhci-sirf.c
-@@ -43,6 +43,39 @@ static void sdhci_sirf_set_bus_width(struct sdhci_host *host, int width)
- 	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
- }
- 
-+static u32 sdhci_sirf_readl_le(struct sdhci_host *host, int reg)
-+{
-+	u32 val = readl(host->ioaddr + reg);
-+
-+	if (unlikely((reg == SDHCI_CAPABILITIES_1) &&
-+			(host->mmc->caps & MMC_CAP_UHS_SDR50))) {
-+		/* fake CAP_1 register */
-+		val = SDHCI_SUPPORT_SDR50 | SDHCI_USE_SDR50_TUNING;
-+	}
-+
-+	if (unlikely(reg == SDHCI_SLOT_INT_STATUS)) {
-+		u32 prss = val;
-+		/* fake chips as V3.0 host conreoller */
-+		prss &= ~(0xFF << 16);
-+		val = prss | (SDHCI_SPEC_300 << 16);
-+	}
-+	return val;
-+}
-+
-+static u16 sdhci_sirf_readw_le(struct sdhci_host *host, int reg)
-+{
-+	u16 ret = 0;
-+
-+	ret = readw(host->ioaddr + reg);
-+
-+	if (unlikely(reg == SDHCI_HOST_VERSION)) {
-+		ret = readw(host->ioaddr + SDHCI_HOST_VERSION);
-+		ret |= SDHCI_SPEC_300;
-+	}
-+
-+	return ret;
-+}
-+
- static int sdhci_sirf_execute_tuning(struct sdhci_host *host, u32 opcode)
- {
- 	int tuning_seq_cnt = 3;
-@@ -113,6 +146,8 @@ retry:
- }
- 
- static struct sdhci_ops sdhci_sirf_ops = {
-+	.read_l = sdhci_sirf_readl_le,
-+	.read_w = sdhci_sirf_readw_le,
- 	.platform_execute_tuning = sdhci_sirf_execute_tuning,
- 	.set_clock = sdhci_set_clock,
- 	.get_max_clock	= sdhci_pltfm_clk_get_max_clock,
--- 
-2.3.5
+For new dts file, we suggest to use GPL/X11 dual-license for considering
+non-Linux device tree users.  Below is an example.
+
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/imx6q-hummingboard.dts
+
+> +
+> +/dts-v1/;
+> +#include "imx53-usbarmory.dtsi"
+> +
+> +&usbotg {
+> +	dr_mode = "host";
+> +};
+> diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
+> new file mode 100644
+> index 0000000..c86a4d8
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx53-usbarmory.dts
+> @@ -0,0 +1,13 @@
+> +/*
+> + * Copyright 2015 Inverse Path, S.r.l.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx53-usbarmory.dtsi"
+> diff --git a/arch/arm/boot/dts/imx53-usbarmory.dtsi b/arch/arm/boot/dts/imx53-usbarmory.dtsi
+> new file mode 100644
+> index 0000000..b4a9052
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx53-usbarmory.dtsi
+> @@ -0,0 +1,183 @@
+> +/*
+> + * Copyright 2015 Inverse Path, S.r.l.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include "imx53.dtsi"
+> +
+> +/ {
+> +	model = "Inverse Path USB armory";
+> +	compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
+> +};
+> +
+> +/ {
+> +	chosen {
+> +		stdout-path = &uart1;
+> +	};
+> +
+> +	memory {
+> +		reg = <0x70000000 0x20000000>;
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pin_gpio4_27>;
+> +
+> +		user {
+> +			label = "LED";
+> +			gpios = <&gpio4 27 0>;
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +	};
+> +};
+> +
+> +&esdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_esdhc1>;
+> +	status = "okay";
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	imx53-usbarmory {
+> +		pinctrl_hog: hoggrp {
+> +			fsl,pins = <
+> +				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
+> +				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
+> +				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
+> +				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
+> +				MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
+> +				MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
+> +				MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
+> +				MX53_PAD_PATA_DA_2__GPIO7_8	  0x80000000
+> +				MX53_PAD_GPIO_16__GPIO7_11        0x80000000
+
+Please use a proper pad configuration value instead of using whatever
+comes from firmware.
+
+> +			>;
+> +		};
+> +
+> +		led_pin_gpio4_27: led_gpio4_27 at 0 {
+> +			fsl,pins = <
+> +				MX53_PAD_DISP0_DAT6__GPIO4_27 0x80000000
+
+Ditto
+
+> +			>;
+> +		};
+> +
+> +		pinctrl_esdhc1: esdhc1grp {
+> +			fsl,pins = <
+> +				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
+> +				MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
+> +				MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
+> +				MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
+> +				MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
+> +				MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c1: i2c1grp {
+> +			fsl,pins = <
+> +				MX53_PAD_CSI0_DAT8__I2C1_SDA	0xc0000000
+> +				MX53_PAD_CSI0_DAT9__I2C1_SCL	0xc0000000
+
+Ditto
+
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart1: uart1grp {
+> +			fsl,pins = <
+> +				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
+> +				MX53_PAD_CSI0_DAT11__UART1_RXD_MUX	0x1e4
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1>;
+> +	status = "okay";
+> +};
+> +
+> +&vpu {
+> +	status = "okay";
+> +};
+
+This is unnecessary, as vpu block is always enabled in imx53.dtsi.
+
+> +
+> +&usbotg {
+> +	dr_mode = "peripheral";
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+
+Please sort the node alphabetically in label names.
+
+> +	ltc3589: pmic at 34 {
+> +		compatible = "lltc,ltc3589-2";
+> +		reg = <0x34>;
+> +
+> +		regulators {
+> +			sw1_reg: sw1 {
+> +				regulator-min-microvolt = <591930>;
+> +				regulator-max-microvolt = <1224671>;
+> +				lltc,fb-voltage-divider = <100000 158000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw2_reg: sw2 {
+> +				regulator-min-microvolt = <704123>;
+> +				regulator-max-microvolt = <1456803>;
+> +				lltc,fb-voltage-divider = <180000 191000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw3_reg: sw3 {
+> +				regulator-min-microvolt = <1341250>;
+> +				regulator-max-microvolt = <2775000>;
+> +				lltc,fb-voltage-divider = <270000 100000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			bb_out_reg: bb-out {
+> +				regulator-min-microvolt = <3387341>;
+> +				regulator-max-microvolt = <3387341>;
+> +				lltc,fb-voltage-divider = <511000 158000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+
+Miss a new line here.
+
+Shawn
+
+> +			ldo1_reg: ldo1 {
+> +				regulator-min-microvolt = <1306329>;
+> +				regulator-max-microvolt = <1306329>;
+> +				lltc,fb-voltage-divider = <100000 158000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo2_reg: ldo2 {
+> +				regulator-min-microvolt = <704123>;
+> +				regulator-max-microvolt = <1456806>;
+> +				lltc,fb-voltage-divider = <180000 191000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo3_reg: ldo3 {
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			ldo4_reg: ldo4 {
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <3200000>;
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 2.1.4
+> 
