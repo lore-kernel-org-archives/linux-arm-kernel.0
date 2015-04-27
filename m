@@ -1,35 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Apr 2015 11:16:17 +0200
-Subject: [PATCH v5 0/3] Fix lubbock and mainstone interrupts
-In-Reply-To: <87pp6rkzha.fsf@belgarion.home>
-References: <1429996403-13644-1-git-send-email-robert.jarzmik@free.fr>
- <7247485.mMzWTjWY84@wuerfel> <87pp6rkzha.fsf@belgarion.home>
-Message-ID: <5225589.tkUhR6vGoM@wuerfel>
+Date: Mon, 27 Apr 2015 11:18:25 +0200
+Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling to
+ the WDT driver.
+In-Reply-To: <553D05DD.8080300@roeck-us.net>
+References: <1429902534-2348-1-git-send-email-eric@anholt.net>
+ <12253069.Jm7LIDAreu@wuerfel> <553D05DD.8080300@roeck-us.net>
+Message-ID: <2979294.WseZH0BUZW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 26 April 2015 11:31:13 Robert Jarzmik wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > On Saturday 25 April 2015 23:13:20 Robert Jarzmik wrote:
-> >> This serie was submitted to the lak list, then migrated to mfd drivers, to end
-> >> up again here. There was no change since last submission. Let's hope this is the
-> >> last spin and that these platform will be fixed at last.
-> >> 
+On Sunday 26 April 2015 08:35:57 Guenter Roeck wrote:
+> On 04/25/2015 01:11 PM, Arnd Bergmann wrote:
+> > On Friday 24 April 2015 12:08:54 Eric Anholt wrote:
+> >> +/*
+> >> + * We can't really power off, but if we do the normal reset scheme, and
+> >> + * indicate to bootcode.bin not to reboot, then most of the chip will be
+> >> + * powered off.
+> >> + */
+> >> +static void bcm2835_power_off(void)
+> >> +{
+> >> +       struct device_node *np =
+> >> +               of_find_compatible_node(NULL, NULL, "brcm,bcm2835-pm-wdt");
+> >> +       struct platform_device *pdev = of_find_device_by_node(np);
+> >> +       struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
+> >> +       u32 val;
+> >> +
 > >
-> > Should these be marked 'Cc: stable at vger.kernel.org'?
-> I can do this. I thought that 3 patches of 100+ lines, and the fact that these
-> boards were broken since october 2011 would prevent this serie from reaching the
-> stable branch.
+> > Instead of doing the lookup again here, I'd suggest using a static variable
+> > in the driver to store the device pointer for the device used on power_off.
+> >
+> > Make sure that the device remove callback assigns it back to NULL though
+> > and that the function checks for NULL pointer.
+> >
 > 
-> Well, I'll resubmit with this information, and after comments stage it to my
-> fixes branch. Let's see what stable tree people will do.
-> 
-> > Can you also add a 'Fixes' tag with the commit that introduced the problem?
-> Sure.
+> Why would that be needed ?
 
-You are right about the size limit, I didn't see how big the patches
-actually are. In this case, leave the 'Fixes' tag, but don't add
-the Cc to stable.
+devices can be unbound from drivers through sysfs, or using dynamic DT
+updates. If one does that, the watchdog driver will correctly destroy
+all information it has about the device, so if the power_off function
+still uses that pointer, it will crash.
 
 	Arnd
