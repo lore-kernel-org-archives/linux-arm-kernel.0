@@ -1,30 +1,25 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 27 Apr 2015 22:36:08 +0200
-Subject: [PATCH 01/13] thermal: Make temperatures consistently unsigned
- long
-In-Reply-To: <1427385240-6086-2-git-send-email-s.hauer@pengutronix.de>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150427203608.GD29351@xo-6d-61-c0.localdomain>
+Date: Mon, 27 Apr 2015 22:37:23 +0200
+Subject: [PATCH 0/7] ARM: socfpga: Add support for Arria10 devkit
+In-Reply-To: <1428035998-27542-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1428035998-27542-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <20150427203723.GH29351@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2015-03-26 16:53:48, Sascha Hauer wrote:
-> The thermal framework uses int, long and unsigned long for temperatures
-> in millicelsius. The majority of functions uses unsigned long, so change
-> the remaining functions to use this type aswell.
+On Thu 2015-04-02 23:39:51, dinguyen at opensource.altera.com wrote:
+> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+> 
+> Hi,
+> 
+> This patchset enables and tidy up support for the Arria10 devkit. Along with
+> this patchset and the patch for enabling clocks on the Arria10, the devkit
+> can boot Linux.
 
-Maybe millicelsius_t should be introduced, so that readers immediately know
-what type it is? Some parts of kernel also use decicelsius and decikelvin, IIRC (ACPI).
+For the whole series:
 
-									Pavel
+Acked-by: Pavel Machek <pavel@denx.de>
 
->  	if (trip_type == THERMAL_TRIP_CRITICAL) {
->  		dev_emerg(&tz->device,
-> -			  "critical temperature reached(%d C),shutting down\n",
-> +			  "critical temperature reached(%lu C),shutting down\n",
-
-space after , ?
 
 -- 
 (english) http://www.livejournal.com/~pavelmachek
