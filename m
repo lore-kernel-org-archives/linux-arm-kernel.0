@@ -1,5 +1,5 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 27 Apr 2015 11:27:04 +0800
+Date: Mon, 27 Apr 2015 11:33:52 +0800
 Subject: Broadcom 43340 module on iMX6DL
 In-Reply-To: <553A9368.9030700@broadcom.com>
 References: <CACUGKYPHKGoLEfNPNvtHwtCA9jB_ZLamzF_PViDfQnpnc8Y-=A@mail.gmail.com>
@@ -12,7 +12,7 @@ References: <CACUGKYPHKGoLEfNPNvtHwtCA9jB_ZLamzF_PViDfQnpnc8Y-=A@mail.gmail.com>
  <553A8803.5010700@broadcom.com>
  <CACUGKYOcgcrM4EPWmV18CeG-P6+nE_ANX5qgWGk3nn3NmWQ72A@mail.gmail.com>
  <553A9368.9030700@broadcom.com>
-Message-ID: <20150427032703.GB26374@shlinux1.ap.freescale.net>
+Message-ID: <20150427033351.GC26374@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -30,11 +30,10 @@ On Fri, Apr 24, 2015 at 09:03:04PM +0200, Arend van Spriel wrote:
 > so.
 > 
 
-Freescale does not provide Broadcom driver currently.
-It might provide it for MX7D release in the future due to MX7D SDB board
-integrated a Broadcom WiFi chip.
-But it depends on whether the SLA signed with Broadcom can be ready
-before the release.
+One simple question:
+Does the brcmfmac driver in upstream kernel also work?
+I mean this one:
+drivers/net/wireless/brcm80211
 
 Regards
 Dong Aisheng
