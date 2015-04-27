@@ -1,27 +1,28 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 27 Apr 2015 09:05:17 -0700
-Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling to
- the WDT driver.
-In-Reply-To: <20150427160432.GD5701@roeck-us.net>
-References: <1429902534-2348-1-git-send-email-eric@anholt.net>
- <1429902534-2348-2-git-send-email-eric@anholt.net>
- <20150427160432.GD5701@roeck-us.net>
-Message-ID: <20150427160517.GA11074@roeck-us.net>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 27 Apr 2015 18:16:11 +0200
+Subject: [PATCH V2] ARM: dts: imx28: Fix AUART4 TX-DMA interrupt name
+In-Reply-To: <20150427144627.GD1788@dragon>
+References: <1429874987-5481-1-git-send-email-marex@denx.de>
+ <20150427144627.GD1788@dragon>
+Message-ID: <201504271816.11902.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 09:04:32AM -0700, Guenter Roeck wrote:
-> On Fri, Apr 24, 2015 at 12:08:54PM -0700, Eric Anholt wrote:
-> > Since the WDT is what's used to drive restart and power off, it makes
-> > more sense to keep it there, where the regs are already mapped and
-> > definitions for them provided.  Note that this means you may need to
-> > add CONFIG_BCM2835_WDT to retain functionality of your kernel.
+On Monday, April 27, 2015 at 04:46:29 PM, Shawn Guo wrote:
+> On Fri, Apr 24, 2015 at 01:29:47PM +0200, Marek Vasut wrote:
+> > Fix a typo in the TX DMA interrupt name for AUART4.
+> > This patch makes AUART4 operational again.
 > > 
-> > Signed-off-by: Eric Anholt <eric@anholt.net>
-> > Cc: linux-watchdog at vger.kernel.org
+> > Signed-off-by: Marek Vasut <marex@denx.de>
 > 
-> The patch will require a rebase to v4.0-rc1.
-> 
-s/4.0/4.1/
+> Applied, thanks.
 
-Guenter
+Thanks!
+
+It'd be really great if this could be applied to stable.
+It's rather obvious that AUART4 is not used very much, so
+noone spotted this before, but it'd still be nice to have
+this fixed.
+
+Best regards,
+Marek Vasut
