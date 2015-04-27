@@ -1,59 +1,65 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 27 Apr 2015 15:27:52 +0200
-Subject: [PATCH 4/4] ARM: at91/dt: sama5d4 xplained: add regulators for
- v(q)mmc1 supplies
-In-Reply-To: <1430140753-19998-4-git-send-email-ludovic.desroches@atmel.com>
-References: <1430140753-19998-4-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1430141272-20215-1-git-send-email-ludovic.desroches@atmel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 27 Apr 2015 06:28:46 -0700
+Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling
+ to the WDT driver.
+In-Reply-To: <2465337.STuvDNQht6@wuerfel>
+References: <1429902534-2348-1-git-send-email-eric@anholt.net>
+ <2979294.WseZH0BUZW@wuerfel> <553E2F1E.5070909@roeck-us.net>
+ <2465337.STuvDNQht6@wuerfel>
+Message-ID: <553E398E.7060305@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add vcc_mmc1 fixed regulator to remove the 'no vmmc regulator found' warning
-when probing the mmc1 device.
+On 04/27/2015 05:48 AM, Arnd Bergmann wrote:
+> On Monday 27 April 2015 05:44:14 Guenter Roeck wrote:
+>> On 04/27/2015 02:18 AM, Arnd Bergmann wrote:
+>>> On Sunday 26 April 2015 08:35:57 Guenter Roeck wrote:
+>>>> On 04/25/2015 01:11 PM, Arnd Bergmann wrote:
+>>>>> On Friday 24 April 2015 12:08:54 Eric Anholt wrote:
+>>>>>> +/*
+>>>>>> + * We can't really power off, but if we do the normal reset scheme, and
+>>>>>> + * indicate to bootcode.bin not to reboot, then most of the chip will be
+>>>>>> + * powered off.
+>>>>>> + */
+>>>>>> +static void bcm2835_power_off(void)
+>>>>>> +{
+>>>>>> +       struct device_node *np =
+>>>>>> +               of_find_compatible_node(NULL, NULL, "brcm,bcm2835-pm-wdt");
+>>>>>> +       struct platform_device *pdev = of_find_device_by_node(np);
+>>>>>> +       struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
+>>>>>> +       u32 val;
+>>>>>> +
+>>>>>
+>>>>> Instead of doing the lookup again here, I'd suggest using a static variable
+>>>>> in the driver to store the device pointer for the device used on power_off.
+>>>>>
+>>>>> Make sure that the device remove callback assigns it back to NULL though
+>>>>> and that the function checks for NULL pointer.
+>>>>>
+>>>>
+>>>> Why would that be needed ?
+>>>
+>>> devices can be unbound from drivers through sysfs, or using dynamic DT
+>>> updates. If one does that, the watchdog driver will correctly destroy
+>>> all information it has about the device, so if the power_off function
+>>> still uses that pointer, it will crash.
+>>>
+>> Without calling its remove function ? That sounds odd. Lots of drivers
+>> would break if that was really the case.
+>
+> I'm not sure what you mean now. The remove function gets called to
+> do the final cleanup, and afterwards the device is deleted, so the
+> remove function should make sure that no global variables point to
+> the device any more.
+>
+> This is not a concern for most other drivers, because they do not
+> keep global pointers to device structures.
+>
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
+The pointer to the power-off handler is removed in the device remove callback,
+and thus won't be called after the device is unbound.
 
-Remove the additionnal blank line.
+Ultimately this is similar the the current code, which assumes that the
+call to of_find_device_by_node(np) never fails.
 
- arch/arm/boot/dts/at91-sama5d4_xplained.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-index c740e1a..88a0b9f 100644
---- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-@@ -106,6 +106,8 @@
- 			mmc1: mmc at fc000000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
-+				vmmc-supply = <&vcc_mmc1_reg>;
-+				vqmmc-supply = <&vcc_3v3_reg>;
- 				status = "okay";
- 				slot at 0 {
- 					reg = <0>;
-@@ -238,4 +240,22 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-+
-+	vcc_3v3_reg: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC 3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	vcc_mmc1_reg: fixedregulator at 1 {
-+		compatible = "regulator-fixed";
-+		gpio = <&pioE 4 GPIO_ACTIVE_LOW>;
-+		regulator-name = "VDD MCI1";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		vin-supply = <&vcc_3v3_reg>;
-+	};
- };
--- 
-2.2.0
+Guenter
