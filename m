@@ -1,28 +1,57 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 27 Apr 2015 08:36:02 +0200
-Subject: [PATCH] ARM: sunxi: dts: Add A10 uarts pin muxing options
-In-Reply-To: <20150426161157.GM5627@lukather>
-References: <1430043338-28982-1-git-send-email-richard.genoud@gmail.com>
- <20150426161157.GM5627@lukather>
-Message-ID: <CACQ1gAgkhxpHxWSRSQe3WNG7hj+EEyS3Yzsnf7TpHQV35jFhGw@mail.gmail.com>
+From: valentinrothberg@gmail.com (Valentin Rothberg)
+Date: Mon, 27 Apr 2015 08:37:06 +0200
+Subject: ARM: Remove mach-msm: some leftovers
+In-Reply-To: <552460D9.5000807@codeaurora.org>
+References: <CAD3Xx4JnAjrqsStPA=ELavySy0YrmWd2--w5UpJTMZtzd0Fkgg@mail.gmail.com>
+ <CAD3Xx4J46RkKMPWQ_m0hqxDfR0bS=+8AiE+2h0MAXcTNbaLZtw@mail.gmail.com>
+ <552460D9.5000807@codeaurora.org>
+Message-ID: <CAD3Xx4Jekyh4x+fr0bQ4xq0vOnnbjObHmym_fUT6XnTQi+QbJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-26 18:11 GMT+02:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> Hi Richard,
->
-> On Sun, Apr 26, 2015 at 12:15:38PM +0200, Richard Genoud wrote:
->> The A10 has 8 uarts, only uart0 and uart1 where filled.
->> This patch adds all the missing uarts(2 to 7) pin muxing to the dtsi.
->>
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->
-> It's obviously correct, but I'd rather not add new pinctrl nodes that
-> don't have any users so that it doesn't bloat the DT without any
-> particular reason.
->
-> Feel free to resubmit this patch if one of these nodes become actually
-> useful.
+Hi Stephen,
 
-Ok, I'll resend-it with only the uarts accessible via the cubieboard
-A10 expansion headers.
+this is just a kind reminder that the issue below is still present and
+made its way to v4.1-rc1.  Any news from the maintainers' side?
+
+Kind regards,
+ Valentin
+
+On Wed, Apr 8, 2015 at 12:57 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 04/07/15 07:12, Valentin Rothberg wrote:
+>> On Tue, Apr 7, 2015 at 4:07 PM, Valentin Rothberg
+>> <valentinrothberg@gmail.com> wrote:
+>>> Hi Stephen,
+>>>
+>>> your commit c0c89fafa289 ("ARM: Remove mach-msm and associated ARM
+>>> architecture code") removes config ARCH_MSM from Kconfig but leaves a
+>>> few references untouched:
+>>>
+>>> arch/arm/Kconfig.debug:1563:    default "debug/uncompress.h" if
+>>> ARCH_MULTIPLATFORM || ARCH_MSM || \
+>>> drivers/phy/Kconfig:289:        depends on OF && ARCH_MSM
+>>> drivers/scsi/ufs/Kconfig:76:    depends on SCSI_UFSHCD_PLATFORM && ARCH_MSM
+>>> drivers/video/fbdev/Kconfig:2331:       depends on FB && ARCH_MSM
+>>>
+>>> Is there a reason to keep those leftovers or is it an accident?
+>>>
+>>> I detected this issues with ./scripts/checkkconfigsymbols.py by
+>>> comparing today's and the previous linux-next tree (--diff
+>>> commit1..commit2).
+>>>
+>>> Kind regards,
+>>>  Valentin
+>> Same issue applies to the Kconfig option MSM_SMD:
+>>
+>> drivers/char/Kconfig:596:       depends on MSM_SMD
+>> drivers/tty/serial/Kconfig:1384:        depends on MSM_SMD
+>
+> I'm currently waiting on the maintainers of said subsystems to apply the
+> patches that I've already sent to the list. I can resend the series
+> minus the patches that have already been picked up, but I can't do much
+> more than that.
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
