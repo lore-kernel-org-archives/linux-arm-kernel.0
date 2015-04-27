@@ -1,32 +1,21 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 27 Apr 2015 14:55:26 +0200
-Subject: [PATCH 02/10] ARM: shmobile: r8a7778 dtsi: Use generic names for
- device nodes
-In-Reply-To: <1430139334-15272-1-git-send-email-geert+renesas@glider.be>
-References: <1430139334-15272-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1430139334-15272-3-git-send-email-geert+renesas@glider.be>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Mon, 27 Apr 2015 14:58:23 +0200
+Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling
+ to the WDT driver.
+In-Reply-To: <1429902534-2348-2-git-send-email-eric@anholt.net>
+References: <1429902534-2348-1-git-send-email-eric@anholt.net>
+ <1429902534-2348-2-git-send-email-eric@anholt.net>
+Message-ID: <1430139503.3948.11.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irqpin -> interrupt-controller
+On Fri, 2015-04-24 at 12:08 -0700, Eric Anholt wrote:
+> Since the WDT is what's used to drive restart and power off, it makes
+> more sense to keep it there, where the regs are already mapped and
+> definitions for them provided.  Note that this means you may need to
+> add CONFIG_BCM2835_WDT to retain functionality of your kernel.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Cc: linux-watchdog at vger.kernel.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7778.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index 868f9730953350e9..7ce9f5fd586504f2 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -68,7 +68,7 @@
- 	};
- 
- 	/* irqpin: IRQ0 - IRQ3 */
--	irqpin: irqpin at fe78001c {
-+	irqpin: interrupt-controller at fe78001c {
- 		compatible = "renesas,intc-irqpin-r8a7778", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
--- 
-1.9.1
+Acked-by: Lubomir Rintel <lkundrak@v3.sk>
