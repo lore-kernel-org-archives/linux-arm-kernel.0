@@ -1,118 +1,355 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 27 Apr 2015 13:30:33 +0200
-Subject: [PATCH v2] rtc: armada38x: Fix concurrency access in
- armada38x_rtc_set_time
-In-Reply-To: <1430119215-13369-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1430119215-13369-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150427113033.GD2394@lunn.ch>
+Date: Mon, 27 Apr 2015 13:31:50 +0200
+Subject: [PATCH] ARM: mvebu: dove: Relicense the device tree under
+ GPLv2+/X11
+In-Reply-To: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20150427113150.GE2394@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 09:20:15AM +0200, Gregory CLEMENT wrote:
-> While setting the time, the RTC TIME register should not be
-> accessed. However due to hardware constraints, setting the RTC time
-> involves sleeping during 100ms. This sleep was done outside the
-> critical section protected by the spinlock, so it was possible to read
-> the RTC TIME register and get an incorrect value. This patch
-> introduces a mutex for protecting the RTC TIME access, unlike the
-> spinlock it is allowed to sleep in a critical section protected by a
-> mutex. The RTC STATUS register can still be used from the interrupt
-> handler but it has no effect on setting the time.
+On Mon, Apr 27, 2015 at 11:09:04AM +0200, Sebastian Hesselbarth wrote:
+> The current implicit GPL only licensing on the device tree makes it
+> very impractical for other software components licensed under another
+> license.
 > 
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: <stable@vger.kernel.org> #v4.0
+> In order to make it easier for them to reuse our device trees,
+> relicense our device trees under a GPL/X11 dual-license.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
 > Hi,
 > 
-> The first version of this patch was sent too late to be part of
-> 4.1-rc1. However this fix should be part of 4.1.
-> 
-> Since the first version I added the acked-by from Alexandre and I
-> rebased the patch onto v4.1-rc1.
+> with Dove we only have a small set of people who can be git blame'd for
+> the DT files:
+> - Jason Cooper
+> - Ezequiel Garcia
+> - Andrew Lunn
 
-Given the extra explanation in the follow up emails, this looks O.K.
+Hi Sebastian
 
 Acked-by: Andrew Lunn <andrew@lunn.ch>
 
 	  Andrew
 
+> - Jean-Francois Moine
+> - Russell King
+> - Myself
+> 
+> so I decided to keep the whole relicensing in a single patch. Please send
+> your Acked-by's in reply to this patch if you are happy with the relicensing.
 > 
 > Thanks,
+>   Sebastian
+> ---
+>  arch/arm/boot/dts/dove-cubox-es.dts | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dove-cubox.dts    | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dove-d2plug.dts   | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dove-d3plug.dts   | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dove-dove-db.dts  | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dove.dtsi         | 42 +++++++++++++++++++++++++++++++++++++
+>  6 files changed, 252 insertions(+)
 > 
-> Gregory
-> 
-> 
->  drivers/rtc/rtc-armada38x.c | 24 ++++++++++++------------
->  1 file changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-> index 43e04af39e09..cb70ced7e0db 100644
-> --- a/drivers/rtc/rtc-armada38x.c
-> +++ b/drivers/rtc/rtc-armada38x.c
-> @@ -40,6 +40,13 @@ struct armada38x_rtc {
->  	void __iomem	    *regs;
->  	void __iomem	    *regs_soc;
->  	spinlock_t	    lock;
-> +	/*
-> +	 * While setting the time, the RTC TIME register should not be
-> +	 * accessed. Setting the RTC time involves sleeping during
-> +	 * 100ms, so a mutex instead of a spinlock is used to protect
-> +	 * it
-> +	 */
-> +	struct mutex	    mutex_time;
->  	int		    irq;
->  };
+> diff --git a/arch/arm/boot/dts/dove-cubox-es.dts b/arch/arm/boot/dts/dove-cubox-es.dts
+> index e28ef056dd17..01fd75247c9d 100644
+> --- a/arch/arm/boot/dts/dove-cubox-es.dts
+> +++ b/arch/arm/boot/dts/dove-cubox-es.dts
+> @@ -1,3 +1,45 @@
+> +/*
+> + * Device Tree file for SolidRun CuBox (Engineering Sample)
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+>  #include "dove-cubox.dts"
 >  
-> @@ -59,8 +66,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
->  	unsigned long time, time_check, flags;
+>  / {
+> diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+> index aae7efc09b0b..6e36af3f1628 100644
+> --- a/arch/arm/boot/dts/dove-cubox.dts
+> +++ b/arch/arm/boot/dts/dove-cubox.dts
+> @@ -1,3 +1,45 @@
+> +/*
+> + * Device Tree file for SolidRun CuBox
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+>  /dts-v1/;
 >  
-> -	spin_lock_irqsave(&rtc->lock, flags);
-> -
-> +	mutex_lock(&rtc->mutex_time);
->  	time = readl(rtc->regs + RTC_TIME);
->  	/*
->  	 * WA for failing time set attempts. As stated in HW ERRATA if
-> @@ -71,7 +77,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  	if ((time_check - time) > 1)
->  		time_check = readl(rtc->regs + RTC_TIME);
+>  #include "dove.dtsi"
+> diff --git a/arch/arm/boot/dts/dove-d2plug.dts b/arch/arm/boot/dts/dove-d2plug.dts
+> index c11d3636c8e5..51823434369b 100644
+> --- a/arch/arm/boot/dts/dove-d2plug.dts
+> +++ b/arch/arm/boot/dts/dove-d2plug.dts
+> @@ -1,3 +1,45 @@
+> +/*
+> + * Device Tree file for Globalscale D2Plug
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+>  /dts-v1/;
 >  
-> -	spin_unlock_irqrestore(&rtc->lock, flags);
-> +	mutex_unlock(&rtc->mutex_time);
+>  #include "dove.dtsi"
+> diff --git a/arch/arm/boot/dts/dove-d3plug.dts b/arch/arm/boot/dts/dove-d3plug.dts
+> index f5f59bb5a534..2e0ee2b1ec66 100644
+> --- a/arch/arm/boot/dts/dove-d3plug.dts
+> +++ b/arch/arm/boot/dts/dove-d3plug.dts
+> @@ -1,3 +1,45 @@
+> +/*
+> + * Device Tree file for Globalscale D3Plug
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+>  /dts-v1/;
 >  
->  	rtc_time_to_tm(time_check, tm);
+>  #include "dove.dtsi"
+> diff --git a/arch/arm/boot/dts/dove-dove-db.dts b/arch/arm/boot/dts/dove-dove-db.dts
+> index bb725dca3a10..6f57671c6210 100644
+> --- a/arch/arm/boot/dts/dove-dove-db.dts
+> +++ b/arch/arm/boot/dts/dove-dove-db.dts
+> @@ -1,3 +1,45 @@
+> +/*
+> + * Device Tree file for Marvell DB-MV88AP510-BP Development Board
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+>  /dts-v1/;
 >  
-> @@ -94,19 +100,12 @@ static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
->  	 * then wait for 100ms before writing to the time register to be
->  	 * sure that the data will be taken into account.
->  	 */
-> -	spin_lock_irqsave(&rtc->lock, flags);
-> -
-> +	mutex_lock(&rtc->mutex_time);
->  	rtc_delayed_write(0, rtc, RTC_STATUS);
-> -
-> -	spin_unlock_irqrestore(&rtc->lock, flags);
-> -
->  	msleep(100);
-> -
-> -	spin_lock_irqsave(&rtc->lock, flags);
-> -
->  	rtc_delayed_write(time, rtc, RTC_TIME);
-> +	mutex_unlock(&rtc->mutex_time);
+>  #include "dove.dtsi"
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index 9ad829523a13..8064ad7102f2 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -1,3 +1,45 @@
+> +/*
+> + * Device Tree include for Marvell Dove 88AP510 SoC
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+>  /include/ "skeleton.dtsi"
 >  
-> -	spin_unlock_irqrestore(&rtc->lock, flags);
->  out:
->  	return ret;
->  }
-> @@ -230,6 +229,7 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	spin_lock_init(&rtc->lock);
-> +	mutex_init(&rtc->mutex_time);
->  
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rtc");
->  	rtc->regs = devm_ioremap_resource(&pdev->dev, res);
+>  #include <dt-bindings/gpio/gpio.h>
 > -- 
 > 2.1.0
 > 
