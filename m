@@ -1,50 +1,29 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 27 Apr 2015 12:03:37 +0000
-Subject: [PATCH] ARM: mvebu: dove: Relicense the device tree under
- GPLv2+/X11
-In-Reply-To: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20150427120337.GE8069@io.lakedaemon.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 27 Apr 2015 20:26:35 +0800
+Subject: [PATCH] ARM: dts: imx23-olinuxino: Fix dr_mode of usb0
+In-Reply-To: <1429043846-28731-1-git-send-email-stefan.wahren@i2se.com>
+References: <1429043846-28731-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20150427122633.GJ9231@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 11:09:04AM +0200, Sebastian Hesselbarth wrote:
-> The current implicit GPL only licensing on the device tree makes it
-> very impractical for other software components licensed under another
-> license.
+On Tue, Apr 14, 2015 at 08:37:26PM +0000, Stefan Wahren wrote:
+> The dr_mode of usb0 on imx233-olinuxino is left to default "otg".
+> Since the green LED (GPIO2_1) on imx233-olinuxino is connected to the
+> same pin as USB_OTG_ID it's possible to disable USB host by LED toggling:
 > 
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
+> echo 0 > /sys/class/leds/green/brightness
+> [ 1068.890000] ci_hdrc ci_hdrc.0: remove, state 1
+> [ 1068.890000] usb usb1: USB disconnect, device number 1
+> [ 1068.920000] usb 1-1: USB disconnect, device number 2
+> [ 1068.920000] usb 1-1.1: USB disconnect, device number 3
+> [ 1069.070000] usb 1-1.2: USB disconnect, device number 4
+> [ 1069.450000] ci_hdrc ci_hdrc.0: USB bus 1 deregistered
+> [ 1074.460000] ci_hdrc ci_hdrc.0: timeout waiting for 00000800 in 11
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Hi,
+> This patch fixes the issue by setting dr_mode to "host" in the dts file.
 > 
-> with Dove we only have a small set of people who can be git blame'd for
-> the DT files:
-> - Jason Cooper
-> - Ezequiel Garcia
-> - Andrew Lunn
-> - Jean-Francois Moine
-> - Russell King
-> - Myself
-> 
-> so I decided to keep the whole relicensing in a single patch. Please send
-> your Acked-by's in reply to this patch if you are happy with the relicensing.
-> 
-> Thanks,
->   Sebastian
-> ---
->  arch/arm/boot/dts/dove-cubox-es.dts | 42 +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/dove-cubox.dts    | 42 +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/dove-d2plug.dts   | 42 +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/dove-d3plug.dts   | 42 +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/dove-dove-db.dts  | 42 +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/dove.dtsi         | 42 +++++++++++++++++++++++++++++++++++++
->  6 files changed, 252 insertions(+)
+> Reported-by: Harald Geyer <harald@ccbib.org>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
+Applied, thanks.
