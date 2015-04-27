@@ -1,36 +1,39 @@
-From: catalin.crenguta@gmail.com (Catalin Crenguta)
-Date: Mon, 27 Apr 2015 09:47:46 +0300
-Subject: [PATCH] ARM: dts: imx6: Add Embest MarS Board
-In-Reply-To: <1429878521.2872.3.camel@pengutronix.de>
-References: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
- <1427876156.24886.1.camel@pengutronix.de>
- <1427877126.2449.0@mail.essensium.com>
- <CABH3fy_YWYoQZL4E_i1FWaY+rOgidxBVcUNo15GrXfcoS2or0A@mail.gmail.com>
- <1429878521.2872.3.camel@pengutronix.de>
-Message-ID: <CABH3fy8o8R7d+bpyxS-Q0eSyPgqg0dvuQnF7m1gywLAzjRBXRA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 27 Apr 2015 08:49:53 +0200
+Subject: [PATCH v2] tty: serial: 8250_mtk: Add support for second clock
+Message-ID: <1430117397-13517-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-On Fri, Apr 24, 2015 at 3:28 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Hi Catalin,
->
-> This may as well be a signaling issue. You could try to slow down the
-> the MMC bus speed or play a bit with the pin drive strength values. Note
-> that in those cases _reducing_ the drive strength may be the right thing
-> to do.
->
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-Thank you!
-I have managed to get it working after changing the drive strength to
-260 Ohm and speed to 50 MHz.
-Changing only the speed to 50 MHz didn't work, I had to also change
-the drive strength. I haven't tested other values.
-Maybe this can be pushed to mainline?
+are available in the git repository at:
 
-> Regards,
-> Lucas
+  git://git.pengutronix.de/git/sha/linux-2.6.git tags/v4.1-mtk-uart-clk-v2
 
-Best regards,
-Catalin
+for you to fetch changes up to 02e3f747bea47f6c02dc3f52e40869ea8ce5342a:
+
+  tty: serial: 8250_mtk: Add support for bus clock (2015-04-27 08:39:06 +0200)
+
+----------------------------------------------------------------
+This series adds support for the second clock on the Mediatek UART.
+This is necessary for SoCs needing a bus clock to be enabled before
+the UART can be accessed.
+
+Changes since v1:
+- keep support old binding with unnamed clk
+- hopefully clarify commit message
+- do not leak in if() with unnecessary braces.
+
+----------------------------------------------------------------
+Sascha Hauer (4):
+      tty: serial: 8250_mtk: remove unnecessary test
+      tty: serial: 8250_mtk: Use devm_clk_get
+      tty: serial: 8250_mtk: use pm_runtime callbacks for enabling
+      tty: serial: 8250_mtk: Add support for bus clock
+
+ .../devicetree/bindings/serial/mtk-uart.txt        |  12 ++-
+ drivers/tty/serial/8250/8250_mtk.c                 | 104 ++++++++++++---------
+ 2 files changed, 70 insertions(+), 46 deletions(-)
