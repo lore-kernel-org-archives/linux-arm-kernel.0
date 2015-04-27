@@ -1,101 +1,66 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Mon, 27 Apr 2015 20:45:49 +0200
-Subject: [PATCH v3 2/2] arch: arm: Show the serial number from
- devicetree in cpuinfo
-In-Reply-To: <CAL_Jsq+x5vXTmzxFW8+YSKntRgNVr7AzAS+xAkuBGx1Nmfeaaw@mail.gmail.com>
-References: <1429351135-11842-1-git-send-email-contact@paulk.fr>
- <1429351135-11842-2-git-send-email-contact@paulk.fr>
- <CAL_JsqKkw7n5p1ZH345BeKkyU=GKDrhaLef__0ET7t90Cm0Eog@mail.gmail.com>
- <1430145747.3081.5.camel@collins>
- <CAL_Jsq+x5vXTmzxFW8+YSKntRgNVr7AzAS+xAkuBGx1Nmfeaaw@mail.gmail.com>
-Message-ID: <1430160349.5305.1.camel@collins>
+From: lee@kernel.org (Lee Jones)
+Date: Mon, 27 Apr 2015 19:25:26 +0100
+Subject: [PATCH] ARM: BCM2835: Skip doing our own iotable_init()
+ initialization.
+In-Reply-To: <1429811351-12600-1-git-send-email-eric@anholt.net>
+References: <1429811351-12600-1-git-send-email-eric@anholt.net>
+Message-ID: <20150427182526.GD11956@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le lundi 27 avril 2015 ? 10:20 -0500, Rob Herring a ?crit :
-> On Mon, Apr 27, 2015 at 9:42 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
-> > Le lundi 27 avril 2015 ? 08:48 -0500, Rob Herring a ?crit :
-> >> On Sat, Apr 18, 2015 at 4:58 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
-> >> > This grabs the serial number shown in cpuinfo from the serial-number devicetree
-> >> > property in priority. When booting with ATAGs (and without device-tree), the
-> >> > provided number is still shown instead.
-> >> >
-> >> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> >>
-> >> One comment below, otherwise:
-> >>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >>
-> >> > ---
-> >> >  arch/arm/include/asm/system_info.h |  1 +
-> >> >  arch/arm/kernel/setup.c            | 27 +++++++++++++++++++++++++--
-> >> >  2 files changed, 26 insertions(+), 2 deletions(-)
-> >> >
-> >> > diff --git a/arch/arm/include/asm/system_info.h b/arch/arm/include/asm/system_info.h
-> >> > index 720ea03..3860cbd40 100644
-> >> > --- a/arch/arm/include/asm/system_info.h
-> >> > +++ b/arch/arm/include/asm/system_info.h
-> >> > @@ -17,6 +17,7 @@
-> >> >
-> >> >  /* information about the system we're running on */
-> >> >  extern unsigned int system_rev;
-> >> > +extern const char *system_serial;
-> >> >  extern unsigned int system_serial_low;
-> >> >  extern unsigned int system_serial_high;
-> >> >  extern unsigned int mem_fclk_21285;
-> >> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> >> > index 1d60beb..349790f 100644
-> >> > --- a/arch/arm/kernel/setup.c
-> >> > +++ b/arch/arm/kernel/setup.c
-> >> > @@ -93,6 +93,9 @@ unsigned int __atags_pointer __initdata;
-> >> >  unsigned int system_rev;
-> >> >  EXPORT_SYMBOL(system_rev);
-> >> >
-> >> > +const char *system_serial;
-> >> > +EXPORT_SYMBOL(system_serial);
-> >> > +
-> >> >  unsigned int system_serial_low;
-> >> >  EXPORT_SYMBOL(system_serial_low);
-> >> >
-> >> > @@ -821,8 +824,29 @@ arch_initcall(customize_machine);
-> >> >
-> >> >  static int __init init_machine_late(void)
-> >> >  {
-> >> > +#ifdef CONFIG_OF
-> >> > +       struct device_node *root;
-> >> > +       int ret;
-> >> > +#endif
-> >> > +
-> >> >         if (machine_desc->init_late)
-> >> >                 machine_desc->init_late();
-> >> > +
-> >> > +#ifdef CONFIG_OF
-> >>
-> >> These ifdefs should not be necessary, but please double check.
-> >
-> > Well, of_property_read_string is only defined when CONFIG_OF is set
-> > (base.c is always built in drivers/of but the directory is only included
-> > when CONFIG_OF is set).
-> 
-> Look at include/linux/of.h. There are an empty versions of both functions.
+On Thu, 23 Apr 2015, Eric Anholt wrote:
 
-Oh, you're right, I didn't know it was the case. I'll submit another
-version with those changes then!
+> The only thing we were using this 16MB mapping of IO peripherals for
+> was the uart's early debug mapping.  If we just drop the map_io hook,
+> the kernel will call debug_ll_io_init() for us, which maps the single
+> page needed for the device.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>  arch/arm/mach-bcm/board_bcm2835.c | 17 -----------------
+>  1 file changed, 17 deletions(-)
 
-> > Of course, on ARM, we now expect that it is the case, but it seems like
-> > good practice to check for it, since it could theoretically be disabled.
-> 
-> We still (and will continue to) have non-OF platforms.
-> 
-> > This is also being done a few lines above in customize_machine.
-> 
-> True, but that doesn't mean we want more.
+Applied with Stephen's Ack.
 
-Ack.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150427/75f88604/attachment-0001.sig>
+> diff --git a/arch/arm/mach-bcm/board_bcm2835.c b/arch/arm/mach-bcm/board_bcm2835.c
+> index 70f2f39..9851ee8 100644
+> --- a/arch/arm/mach-bcm/board_bcm2835.c
+> +++ b/arch/arm/mach-bcm/board_bcm2835.c
+> @@ -31,10 +31,6 @@
+>  #define PM_RSTC_WRCFG_FULL_RESET	0x00000020
+>  #define PM_RSTS_HADWRH_SET		0x00000040
+>  
+> -#define BCM2835_PERIPH_PHYS	0x20000000
+> -#define BCM2835_PERIPH_VIRT	0xf0000000
+> -#define BCM2835_PERIPH_SIZE	SZ_16M
+> -
+>  static void __iomem *wdt_regs;
+>  
+>  /*
+> @@ -93,18 +89,6 @@ static void bcm2835_power_off(void)
+>  	bcm2835_restart(REBOOT_HARD, "");
+>  }
+>  
+> -static struct map_desc io_map __initdata = {
+> -	.virtual = BCM2835_PERIPH_VIRT,
+> -	.pfn = __phys_to_pfn(BCM2835_PERIPH_PHYS),
+> -	.length = BCM2835_PERIPH_SIZE,
+> -	.type = MT_DEVICE
+> -};
+> -
+> -static void __init bcm2835_map_io(void)
+> -{
+> -	iotable_init(&io_map, 1);
+> -}
+> -
+>  static void __init bcm2835_init(void)
+>  {
+>  	int ret;
+> @@ -129,7 +113,6 @@ static const char * const bcm2835_compat[] = {
+>  };
+>  
+>  DT_MACHINE_START(BCM2835, "BCM2835")
+> -	.map_io = bcm2835_map_io,
+>  	.init_irq = irqchip_init,
+>  	.init_machine = bcm2835_init,
+>  	.restart = bcm2835_restart,
