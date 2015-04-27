@@ -1,7 +1,7 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Mon, 27 Apr 2015 21:49:44 +0900
-Subject: [PATCH] ARM: OMAP: Constify irq_domain_ops
-Message-ID: <1430138984-3523-1-git-send-email-k.kozlowski.k@gmail.com>
+Date: Mon, 27 Apr 2015 21:49:12 +0900
+Subject: [PATCH] ARM: sa1100: Constify irq_domain_ops
+Message-ID: <1430138952-3410-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,21 +10,21 @@ code accepts pointer to a const data.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- arch/arm/mach-omap2/omap-wakeupgen.c | 2 +-
+ arch/arm/mach-sa1100/irq.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index 3b56722dfd8a..8e52621b5a6b 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -444,7 +444,7 @@ static int wakeupgen_domain_alloc(struct irq_domain *domain,
- 	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
+diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
+index 65aebfa66fe5..ea3eb4144b66 100644
+--- a/arch/arm/mach-sa1100/irq.c
++++ b/arch/arm/mach-sa1100/irq.c
+@@ -73,7 +73,7 @@ static int sa1100_normal_irqdomain_map(struct irq_domain *d,
+ 	return 0;
  }
  
--static struct irq_domain_ops wakeupgen_domain_ops = {
-+static const struct irq_domain_ops wakeupgen_domain_ops = {
- 	.xlate	= wakeupgen_domain_xlate,
- 	.alloc	= wakeupgen_domain_alloc,
- 	.free	= irq_domain_free_irqs_common,
+-static struct irq_domain_ops sa1100_normal_irqdomain_ops = {
++static const struct irq_domain_ops sa1100_normal_irqdomain_ops = {
+ 	.map = sa1100_normal_irqdomain_map,
+ 	.xlate = irq_domain_xlate_onetwocell,
+ };
 -- 
 2.1.0
