@@ -1,58 +1,50 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 27 Apr 2015 16:16:49 -0500
-Subject: [PATCH v2 0/7] ARM: dts: qcom: Add more device coniguration nodes
-In-Reply-To: <1429515941-15334-1-git-send-email-ivan.ivanov@linaro.org>
-References: <1429515941-15334-1-git-send-email-ivan.ivanov@linaro.org>
-Message-ID: <CD4F7F64-3A06-49FC-B361-CB4034823CC5@codeaurora.org>
+Date: Mon, 27 Apr 2015 16:18:10 -0500
+Subject: [PATCH 00/10] ARM: dts: apq8064 dt patches.
+In-Reply-To: <1428567674-10672-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1428567674-10672-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <EE0F175C-C148-43EA-990B-B49EFD243AB2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On Apr 20, 2015, at 2:45 AM, Ivan T. Ivanov <ivan.ivanov@linaro.org> wrote:
+> On Apr 9, 2015, at 3:21 AM, Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
 > 
-> Recent Qualcomm PMIC's devices are accessed over SPMI bus.
-> Every PMIC has several "sub-function" devices inside.
+> Hi Kumar, 
 > 
-> First three patches are adding device nodes to PM8841, PM8941 and PMA8084 PMIC's.
-> Next two are introducing PM8916 PMIC chip with its device nodes. The sixth one
-> add restart device node for MSM8916 chip. And the last one add initial GPIO
-> definitions for APQ8016 SBC board.
+> Now that the rpm redesign dependency is resolved, If its not too late could you
+> queue these dt patches for v4.1 or v4.1-rc1.
 > 
-> checkpatch will complain about "appears un-documented" for several drivers,
-> but I am expecting they to mergeed soon, hopefully during this merge window.
+> I tested these patches on APQ8064 based IFC6410 board with SATA/USB/HDMI.
 > 
-> Changes since v0 [2]:
+> I also rebased these patche on top of your qcom/dt branch.
 > 
-> * Add proper IRQ_TYPE_* specifiers in the interrupt bidings.
 > 
-> Patches are created top of Kumar's kernel tree and tags/qcom-dt-for-4.1 [1].
+> Thanks,
+> srini
 > 
-> [1] https://lkml.org/lkml/2015/3/27/599
-> [2] http://comments.gmane.org/gmane.linux.ports.arm.msm/12610
+> Nicolas Dechesne (2):
+>  ARM: dts: apq8064: Add usb host support to CM QS-600
+>  ARM: dts: apq8064: Add USB OTG support for CM QS-600
 > 
-> Ivan T. Ivanov (7):
->  ARM: dts: qcom: Add PM8841 functions device nodes
->  ARM: dts: qcom: Add PM8941 functions device nodes
->  ARM: dts: qcom: Add PMA8084 functions device nodes
->  arm64: dts: qcom: Add SPMI PMIC Arbiter node for MSM8916
->  arm64: dts: qcom: Add 8x16 chipset SPMI PMIC's nodes
->  arm64: dts: qcom: Add MSM8916 restart device node
->  arm64: dts: qcom: Add initial set of PMIC and SoC pins for APQ8016 SBC
->    board
+> Pramod Gurav (1):
+>  ARM: dts: qcom: Add DT alias for serial port
 > 
-> arch/arm/boot/dts/qcom-pm8841.dtsi                 |  18 +++
-> arch/arm/boot/dts/qcom-pm8941.dtsi                 | 133 ++++++++++++++++++++-
-> arch/arm/boot/dts/qcom-pma8084.dtsi                |  92 ++++++++++++++
-> .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |  30 +++++
-> arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi |  21 ++++
-> arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          |   3 +
-> arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi          |   1 +
-> arch/arm64/boot/dts/qcom/msm8916.dtsi              |  25 +++-
-> arch/arm64/boot/dts/qcom/pm8916.dtsi               |  99 +++++++++++++++
-> 9 files changed, 420 insertions(+), 2 deletions(-)
-> create mode 100644 arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-> create mode 100644 arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
-> create mode 100644 arch/arm64/boot/dts/qcom/pm8916.dtsi
+> Rob Clark (1):
+>  ARM: dts: apq8064: Add MDP support
+> 
+> Srinivas Kandagatla (6):
+>  ARM: dts: apq8064: add RPM regulators support
+>  ARM: dts: apq8064: Add usb host support.
+>  ARM: dts: apq8064: Add USB OTG support
+>  ARM: dts: apq8064: Add SATA controller support.
+>  ARM: dts: Move i2c1 pinctrl to apq8064.dtsi
+>  ARM: dts: apq8064 add i2c3 node for panel.
+> 
+> arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts |  30 ++
+> arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  |  69 +++-
+> arch/arm/boot/dts/qcom-apq8064.dtsi         | 528 +++++++++++++++++++++++++++-
+> 3 files changed, 618 insertions(+), 9 deletions(-)
 
 applied
 
