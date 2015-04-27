@@ -1,42 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Apr 2015 16:48:01 +0800
-Subject: [PATCH] ARM: imx: clk-cpu: Include "clk.h" header file
-In-Reply-To: <1428013412-7082-1-git-send-email-festevam@gmail.com>
-References: <1428013412-7082-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150427084800.GF9231@dragon>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Mon, 27 Apr 2015 16:50:37 +0800
+Subject: [PATCH v3 0/9] Basic support to ZTE ZX296702
+Message-ID: <1430124644-16715-1-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 02, 2015 at 07:23:31PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Include the "clk.h" header file to fix the following sparse warning:
-> 
-> arch/arm/mach-imx/clk-cpu.c:77:12: warning: symbol 'imx_clk_cpu' was not declared. Should it be static?
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-cpu.c | 2 ++
+Rebase patches of v2 to 4.0-rc1. Ready for merge.
 
-The file is being moved into drivers/clk/imx/.
+Jun Nie (9):
+  ARM: zx: add basic support for ZTE ZX296702
+  MAINTAINERS: add entry for ARM ZTE architecture
+  ARM: zx: add low level debug support for zx296702
+  ARM: dts: zx: add an initial zx296702 dts and doc
+  clk: zx: add clock support to zx296702
+  ARM: zx: enable SMP and hotplug for zx296702
+  ARM: zx: Add basic defconfig support for ZX296702
+  uart: pl011: support registers offset with LUT
+  uart: pl011: Add support to ZTE uart
 
-Shawn
+ Documentation/devicetree/bindings/arm/zte.txt      |  15 +
+ .../devicetree/bindings/clock/zx296702-clk.txt     |  35 ++
+ Documentation/devicetree/bindings/serial/pl011.txt |   2 +-
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   9 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Kconfig.debug                             |  14 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/zx296702-ad1.dts                 |  48 ++
+ arch/arm/boot/dts/zx296702.dtsi                    | 139 +++++
+ arch/arm/configs/zx_defconfig                      | 130 ++++
+ arch/arm/include/debug/pl01x.S                     |   7 +
+ arch/arm/mach-zx/Kconfig                           |  18 +
+ arch/arm/mach-zx/Makefile                          |   2 +
+ arch/arm/mach-zx/core.h                            |  19 +
+ arch/arm/mach-zx/headsmp.S                         |  32 +
+ arch/arm/mach-zx/platsmp.c                         | 189 ++++++
+ arch/arm/mach-zx/zx296702.c                        |  31 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/zte/Makefile                           |   2 +
+ drivers/clk/zte/clk-pll.c                          | 180 ++++++
+ drivers/clk/zte/clk-zx296702.c                     | 658 +++++++++++++++++++++
+ drivers/clk/zte/clk.h                              |  30 +
+ drivers/tty/serial/Kconfig                         |   4 +-
+ drivers/tty/serial/amba-pl011.c                    | 527 ++++++++++++-----
+ include/dt-bindings/clock/zx296702-clock.h         | 162 +++++
+ include/linux/amba/serial.h                        |  18 +
+ 28 files changed, 2140 insertions(+), 137 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/zte.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/zx296702-clk.txt
+ create mode 100644 arch/arm/boot/dts/zx296702-ad1.dts
+ create mode 100644 arch/arm/boot/dts/zx296702.dtsi
+ create mode 100644 arch/arm/configs/zx_defconfig
+ create mode 100644 arch/arm/mach-zx/Kconfig
+ create mode 100644 arch/arm/mach-zx/Makefile
+ create mode 100644 arch/arm/mach-zx/core.h
+ create mode 100644 arch/arm/mach-zx/headsmp.S
+ create mode 100644 arch/arm/mach-zx/platsmp.c
+ create mode 100644 arch/arm/mach-zx/zx296702.c
+ create mode 100644 drivers/clk/zte/Makefile
+ create mode 100644 drivers/clk/zte/clk-pll.c
+ create mode 100644 drivers/clk/zte/clk-zx296702.c
+ create mode 100644 drivers/clk/zte/clk.h
+ create mode 100644 include/dt-bindings/clock/zx296702-clock.h
 
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/clk-cpu.c b/arch/arm/mach-imx/clk-cpu.c
-> index aa1c345..a482e66 100644
-> --- a/arch/arm/mach-imx/clk-cpu.c
-> +++ b/arch/arm/mach-imx/clk-cpu.c
-> @@ -13,6 +13,8 @@
->  #include <linux/clk-provider.h>
->  #include <linux/slab.h>
->  
-> +#include "clk.h"
-> +
->  struct clk_cpu {
->  	struct clk_hw	hw;
->  	struct clk	*div;
-> -- 
-> 1.9.1
-> 
+-- 
+1.9.1
