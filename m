@@ -1,318 +1,98 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Apr 2015 16:14:29 +0800
-Subject: [PATCH] ARM: dts: imx5: Add dts files for USB armory.
-In-Reply-To: <87h9t6i40r.fsf@aikidev.net>
-References: <87h9t6i40r.fsf@aikidev.net>
-Message-ID: <20150427081428.GC9231@dragon>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Mon, 27 Apr 2015 10:27:28 +0200
+Subject: [PATCH v3 2/2] arch: arm: Show the serial number from
+ devicetree in cpuinfo
+In-Reply-To: <1429351135-11842-2-git-send-email-contact@paulk.fr>
+References: <1429351135-11842-1-git-send-email-contact@paulk.fr>
+ <1429351135-11842-2-git-send-email-contact@paulk.fr>
+Message-ID: <1430123248.3081.1.camel@collins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 01:23:00PM -0700, Vagrant Cascadian wrote:
-> Add support for the USB armory board by Inverse Path. This board
-> features a Freescale iMX53 SoC, 512MB RAM, and USB OTG operating in
-> either peripheral or host mode, and 5 GPIO pins.
-> 
-> One .dtb is generated for operating in peripheral mode, and one is
-> generated for operating in host mode.
+Le samedi 18 avril 2015 ? 11:58 +0200, Paul Kocialkowski a ?crit :
+> This grabs the serial number shown in cpuinfo from the serial-number devicetree
+> property in priority. When booting with ATAGs (and without device-tree), the
+> provided number is still shown instead.
 
-Is it possible to ask bootloader to patch the dtb instead of maintaining
-a new one for just changing one USB property?
+Any further comment on this?
 
-> 
-> Signed-off-by: Vagrant Cascadian <vagrant@debian.org>
-> Cc: Andrej Rosano <andrej@inversepath.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 > ---
->  arch/arm/boot/dts/Makefile                      |   2 +
->  arch/arm/boot/dts/imx53-usbarmory-host_mode.dts |  17 +++
->  arch/arm/boot/dts/imx53-usbarmory.dts           |  13 ++
->  arch/arm/boot/dts/imx53-usbarmory.dtsi          | 183 ++++++++++++++++++++++++
->  4 files changed, 215 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
->  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
->  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dtsi
+>  arch/arm/include/asm/system_info.h |  1 +
+>  arch/arm/kernel/setup.c            | 27 +++++++++++++++++++++++++--
+>  2 files changed, 26 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a1c776b..bd2258b 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -244,6 +244,8 @@ dtb-$(CONFIG_SOC_IMX53) += \
->  	imx53-smd.dtb \
->  	imx53-tx53-x03x.dtb \
->  	imx53-tx53-x13x.dtb \
-> +	imx53-usbarmory.dtb \
-> +	imx53-usbarmory-host_mode.dtb \
->  	imx53-voipac-bsb.dtb
->  dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6dl-aristainetos_4.dtb \
-> diff --git a/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts b/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
-> new file mode 100644
-> index 0000000..a94cb1d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
-> @@ -0,0 +1,17 @@
-> +/*
-> + * Copyright 2015 Inverse Path, S.r.l.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
+> diff --git a/arch/arm/include/asm/system_info.h b/arch/arm/include/asm/system_info.h
+> index 720ea03..3860cbd40 100644
+> --- a/arch/arm/include/asm/system_info.h
+> +++ b/arch/arm/include/asm/system_info.h
+> @@ -17,6 +17,7 @@
+>  
+>  /* information about the system we're running on */
+>  extern unsigned int system_rev;
+> +extern const char *system_serial;
+>  extern unsigned int system_serial_low;
+>  extern unsigned int system_serial_high;
+>  extern unsigned int mem_fclk_21285;
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 1d60beb..349790f 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -93,6 +93,9 @@ unsigned int __atags_pointer __initdata;
+>  unsigned int system_rev;
+>  EXPORT_SYMBOL(system_rev);
+>  
+> +const char *system_serial;
+> +EXPORT_SYMBOL(system_serial);
+> +
+>  unsigned int system_serial_low;
+>  EXPORT_SYMBOL(system_serial_low);
+>  
+> @@ -821,8 +824,29 @@ arch_initcall(customize_machine);
+>  
+>  static int __init init_machine_late(void)
+>  {
+> +#ifdef CONFIG_OF
+> +	struct device_node *root;
+> +	int ret;
+> +#endif
+> +
+>  	if (machine_desc->init_late)
+>  		machine_desc->init_late();
+> +
+> +#ifdef CONFIG_OF
+> +	root = of_find_node_by_path("/");
+> +	if (root) {
+> +		ret = of_property_read_string(root, "serial-number",
+> +					      &system_serial);
+> +		if (ret)
+> +			system_serial = NULL;
+> +	}
+> +#endif
+> +
+> +	if (!system_serial)
+> +		system_serial = kasprintf(GFP_KERNEL, "%08x%08x",
+> +					  system_serial_high,
+> +					  system_serial_low);
+> +
+>  	return 0;
+>  }
+>  late_initcall(init_machine_late);
+> @@ -1091,8 +1115,7 @@ static int c_show(struct seq_file *m, void *v)
+>  
+>  	seq_printf(m, "Hardware\t: %s\n", machine_name);
+>  	seq_printf(m, "Revision\t: %04x\n", system_rev);
+> -	seq_printf(m, "Serial\t\t: %08x%08x\n",
+> -		   system_serial_high, system_serial_low);
+> +	seq_printf(m, "Serial\t\t: %s\n", system_serial);
+>  
+>  	return 0;
+>  }
 
-For new dts file, we suggest to use GPL/X11 dual-license for considering
-non-Linux device tree users.  Below is an example.
-
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/imx6q-hummingboard.dts
-
-> +
-> +/dts-v1/;
-> +#include "imx53-usbarmory.dtsi"
-> +
-> +&usbotg {
-> +	dr_mode = "host";
-> +};
-> diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
-> new file mode 100644
-> index 0000000..c86a4d8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-usbarmory.dts
-> @@ -0,0 +1,13 @@
-> +/*
-> + * Copyright 2015 Inverse Path, S.r.l.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx53-usbarmory.dtsi"
-> diff --git a/arch/arm/boot/dts/imx53-usbarmory.dtsi b/arch/arm/boot/dts/imx53-usbarmory.dtsi
-> new file mode 100644
-> index 0000000..b4a9052
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-usbarmory.dtsi
-> @@ -0,0 +1,183 @@
-> +/*
-> + * Copyright 2015 Inverse Path, S.r.l.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include "imx53.dtsi"
-> +
-> +/ {
-> +	model = "Inverse Path USB armory";
-> +	compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
-> +};
-> +
-> +/ {
-> +	chosen {
-> +		stdout-path = &uart1;
-> +	};
-> +
-> +	memory {
-> +		reg = <0x70000000 0x20000000>;
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pin_gpio4_27>;
-> +
-> +		user {
-> +			label = "LED";
-> +			gpios = <&gpio4 27 0>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +};
-> +
-> +&esdhc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_esdhc1>;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog>;
-> +
-> +	imx53-usbarmory {
-> +		pinctrl_hog: hoggrp {
-> +			fsl,pins = <
-> +				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
-> +				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
-> +				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
-> +				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
-> +				MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
-> +				MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
-> +				MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
-> +				MX53_PAD_PATA_DA_2__GPIO7_8	  0x80000000
-> +				MX53_PAD_GPIO_16__GPIO7_11        0x80000000
-
-Please use a proper pad configuration value instead of using whatever
-comes from firmware.
-
-> +			>;
-> +		};
-> +
-> +		led_pin_gpio4_27: led_gpio4_27 at 0 {
-> +			fsl,pins = <
-> +				MX53_PAD_DISP0_DAT6__GPIO4_27 0x80000000
-
-Ditto
-
-> +			>;
-> +		};
-> +
-> +		pinctrl_esdhc1: esdhc1grp {
-> +			fsl,pins = <
-> +				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
-> +				MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
-> +				MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
-> +				MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
-> +				MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
-> +				MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c1: i2c1grp {
-> +			fsl,pins = <
-> +				MX53_PAD_CSI0_DAT8__I2C1_SDA	0xc0000000
-> +				MX53_PAD_CSI0_DAT9__I2C1_SCL	0xc0000000
-
-Ditto
-
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart1: uart1grp {
-> +			fsl,pins = <
-> +				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
-> +				MX53_PAD_CSI0_DAT11__UART1_RXD_MUX	0x1e4
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&vpu {
-> +	status = "okay";
-> +};
-
-This is unnecessary, as vpu block is always enabled in imx53.dtsi.
-
-> +
-> +&usbotg {
-> +	dr_mode = "peripheral";
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-
-Please sort the node alphabetically in label names.
-
-> +	ltc3589: pmic at 34 {
-> +		compatible = "lltc,ltc3589-2";
-> +		reg = <0x34>;
-> +
-> +		regulators {
-> +			sw1_reg: sw1 {
-> +				regulator-min-microvolt = <591930>;
-> +				regulator-max-microvolt = <1224671>;
-> +				lltc,fb-voltage-divider = <100000 158000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw2_reg: sw2 {
-> +				regulator-min-microvolt = <704123>;
-> +				regulator-max-microvolt = <1456803>;
-> +				lltc,fb-voltage-divider = <180000 191000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw3_reg: sw3 {
-> +				regulator-min-microvolt = <1341250>;
-> +				regulator-max-microvolt = <2775000>;
-> +				lltc,fb-voltage-divider = <270000 100000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			bb_out_reg: bb-out {
-> +				regulator-min-microvolt = <3387341>;
-> +				regulator-max-microvolt = <3387341>;
-> +				lltc,fb-voltage-divider = <511000 158000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-
-Miss a new line here.
-
-Shawn
-
-> +			ldo1_reg: ldo1 {
-> +				regulator-min-microvolt = <1306329>;
-> +				regulator-max-microvolt = <1306329>;
-> +				lltc,fb-voltage-divider = <100000 158000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo2_reg: ldo2 {
-> +				regulator-min-microvolt = <704123>;
-> +				regulator-max-microvolt = <1456806>;
-> +				lltc,fb-voltage-divider = <180000 191000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo3_reg: ldo3 {
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			ldo4_reg: ldo4 {
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <3200000>;
-> +			};
-> +		};
-> +	};
-> +};
-> -- 
-> 2.1.4
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150427/9c4abe91/attachment.sig>
