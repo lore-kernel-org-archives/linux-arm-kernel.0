@@ -1,320 +1,158 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 27 Apr 2015 23:04:50 +0200
-Subject: [PATCH v2 2/7] clocksource: add lpc32xx timer driver
+Date: Mon, 27 Apr 2015 23:04:55 +0200
+Subject: [PATCH v2 7/7] ARM: lpc18xx: add kernel config
 In-Reply-To: <1430168695-21248-1-git-send-email-manabian@gmail.com>
 References: <1430168695-21248-1-git-send-email-manabian@gmail.com>
-Message-ID: <1430168695-21248-3-git-send-email-manabian@gmail.com>
+Message-ID: <1430168695-21248-8-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for using the NXP LPC timer as clocksource and
-clock event. These timers are present on many NXP devices
-including LPC32xx, LPC17xx, LPC18xx and LPC43xx.
-
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/clocksource/Kconfig        |  10 ++
- drivers/clocksource/Makefile       |   1 +
- drivers/clocksource/time-lpc32xx.c | 258 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 269 insertions(+)
- create mode 100644 drivers/clocksource/time-lpc32xx.c
+ arch/arm/configs/lpc18xx_defconfig | 135 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 135 insertions(+)
+ create mode 100644 arch/arm/configs/lpc18xx_defconfig
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 51d7865fdddb..71c532314f1d 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -106,6 +106,16 @@ config CLKSRC_EFM32
- 	  Support to use the timers of EFM32 SoCs as clock source and clock
- 	  event device.
- 
-+config CLKSRC_LPC32XX
-+	bool "Clocksource for NXP's LPC SoC series" if !ARCH_LPC18XX
-+	depends on OF && ARM && (ARCH_LPC18XX || COMPILE_TEST)
-+	select CLKSRC_MMIO
-+	default ARCH_LPC18XX
-+	help
-+	  Support to use the timers of LPC SoCs as clock source and clock
-+	  event device. These timers are present on many NXP devices
-+	  including LPC32xx, LPC17xx, LPC18xx and LPC43xx.
-+
- config ARM_ARCH_TIMER
- 	bool
- 	select CLKSRC_OF if OF
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 5b85f6adb258..5928e35cb64d 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -37,6 +37,7 @@ obj-$(CONFIG_ARCH_BCM_MOBILE)	+= bcm_kona_timer.o
- obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
- obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
- obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
-+obj-$(CONFIG_CLKSRC_LPC32XX)	+= time-lpc32xx.o
- obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
- obj-$(CONFIG_FSL_FTM_TIMER)	+= fsl_ftm_timer.o
- obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
-diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
+diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
 new file mode 100644
-index 000000000000..8eb4bacceb74
+index 000000000000..0d03853fe462
 --- /dev/null
-+++ b/drivers/clocksource/time-lpc32xx.c
-@@ -0,0 +1,258 @@
-+/*
-+ * Clocksource driver for NXP LPC32xx/18xx/43xx timer
-+ *
-+ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * Based on:
-+ * time-efm32 Copyright (C) 2013 Pengutronix
-+ * mach-lpc32xx/timer.c Copyright (C) 2009 - 2010 NXP Semiconductors
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/sched_clock.h>
-+
-+#define LPC32XX_TIMER_IR		0x000
-+#define  LPC32XX_TIMER_IR_MR0INT	BIT(0)
-+#define LPC32XX_TIMER_TCR		0x004
-+#define  LPC32XX_TIMER_TCR_CEN		BIT(0)
-+#define  LPC32XX_TIMER_TCR_CRST		BIT(1)
-+#define LPC32XX_TIMER_TC		0x008
-+#define LPC32XX_TIMER_PR		0x00c
-+#define LPC32XX_TIMER_MCR		0x014
-+#define  LPC32XX_TIMER_MCR_MR0I		BIT(0)
-+#define  LPC32XX_TIMER_MCR_MR0R		BIT(1)
-+#define  LPC32XX_TIMER_MCR_MR0S		BIT(2)
-+#define LPC32XX_TIMER_MR0		0x018
-+
-+struct lpc32xx_clock_event_ddata {
-+	struct clock_event_device evtdev;
-+	void __iomem *base;
-+};
-+
-+/* Needed for the sched clock */
-+static void __iomem *clocksource_timer_counter;
-+
-+static u64 notrace lpc32xx_read_sched_clock(void)
-+{
-+	return readl(clocksource_timer_counter);
-+}
-+
-+static int lpc32xx_clkevt_next_event(unsigned long delta,
-+				     struct clock_event_device *evtdev)
-+{
-+	struct lpc32xx_clock_event_ddata *ddata =
-+		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
-+
-+	writel_relaxed(LPC32XX_TIMER_TCR_CRST, ddata->base + LPC32XX_TIMER_TCR);
-+	writel_relaxed(delta, ddata->base + LPC32XX_TIMER_PR);
-+	writel_relaxed(LPC32XX_TIMER_TCR_CEN, ddata->base + LPC32XX_TIMER_TCR);
-+
-+	return 0;
-+}
-+
-+static void lpc32xx_clkevt_mode(enum clock_event_mode mode,
-+				struct clock_event_device *evtdev)
-+{
-+	struct lpc32xx_clock_event_ddata *ddata =
-+		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		WARN_ON(1);
-+		break;
-+
-+	case CLOCK_EVT_MODE_ONESHOT:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+		/*
-+		 * Disable the timer. When using oneshot, we must also
-+		 * disable the timer to wait for the first call to
-+		 * set_next_event().
-+		 */
-+		writel_relaxed(0, ddata->base + LPC32XX_TIMER_TCR);
-+		break;
-+
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_RESUME:
-+		break;
-+	}
-+}
-+
-+static irqreturn_t lpc32xx_clock_event_handler(int irq, void *dev_id)
-+{
-+	struct lpc32xx_clock_event_ddata *ddata = dev_id;
-+
-+	/* Clear match */
-+	writel_relaxed(LPC32XX_TIMER_IR_MR0INT, ddata->base + LPC32XX_TIMER_IR);
-+
-+	ddata->evtdev.event_handler(&ddata->evtdev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct lpc32xx_clock_event_ddata lpc32xx_clk_event_ddata = {
-+	.evtdev = {
-+		.name           = "lpc3220 clockevent",
-+		.features       = CLOCK_EVT_FEAT_ONESHOT,
-+		.rating         = 300,
-+		.set_next_event = lpc32xx_clkevt_next_event,
-+		.set_mode       = lpc32xx_clkevt_mode,
-+	},
-+};
-+
-+static struct irqaction lpc32xx_clock_event_irq = {
-+	.name		= "lpc3220 clockevent",
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= lpc32xx_clock_event_handler,
-+	.dev_id		= &lpc32xx_clk_event_ddata,
-+};
-+
-+static int __init lpc32xx_clocksource_init(struct device_node *np)
-+{
-+	void __iomem *base;
-+	unsigned long rate;
-+	struct clk *clk;
-+	int ret;
-+
-+	clk = of_clk_get_by_name(np, "timerclk");
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: clock get failed (%lu)\n", __func__, PTR_ERR(clk));
-+		return PTR_ERR(clk);
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		pr_err("%s: clock enable failed (%d)\n", __func__, ret);
-+		goto err_clk_enable;
-+	}
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_err("%s: unable to map registers\n", __func__);
-+		ret = -EADDRNOTAVAIL;
-+		goto err_iomap;
-+	}
-+
-+	writel_relaxed(LPC32XX_TIMER_TCR_CRST, base + LPC32XX_TIMER_TCR);
-+	writel_relaxed(0, base + LPC32XX_TIMER_PR);
-+	writel_relaxed(0, base + LPC32XX_TIMER_MCR);
-+	writel_relaxed(LPC32XX_TIMER_TCR_CEN, base + LPC32XX_TIMER_TCR);
-+
-+	rate = clk_get_rate(clk);
-+	ret = clocksource_mmio_init(base + LPC32XX_TIMER_TC, "lpc3220 timer",
-+				    rate, 300, 32, clocksource_mmio_readl_up);
-+	if (ret) {
-+		pr_err("failed to init clocksource (%d)\n", ret);
-+		goto err_clocksource_init;
-+	}
-+
-+	clocksource_timer_counter = base + LPC32XX_TIMER_TC;
-+	sched_clock_register(lpc32xx_read_sched_clock, 32, rate);
-+
-+	return 0;
-+
-+err_clocksource_init:
-+	iounmap(base);
-+err_iomap:
-+	clk_disable_unprepare(clk);
-+err_clk_enable:
-+	clk_put(clk);
-+	return ret;
-+}
-+
-+static int __init lpc32xx_clockevent_init(struct device_node *np)
-+{
-+	void __iomem *base;
-+	unsigned long rate;
-+	struct clk *clk;
-+	int ret, irq;
-+
-+	clk = of_clk_get_by_name(np, "timerclk");
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: clock get failed (%lu)\n", __func__, PTR_ERR(clk));
-+		return PTR_ERR(clk);
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		pr_err("%s: clock enable failed (%d)\n", __func__, ret);
-+		goto err_clk_enable;
-+	}
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_err("%s: unable to map registers\n", __func__);
-+		ret = -EADDRNOTAVAIL;
-+		goto err_iomap;
-+	}
-+
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (!irq) {
-+		pr_err("%s: get irq failed\n", __func__);
-+		ret = -ENOENT;
-+		goto err_get_irq;
-+	}
-+
-+	/* Initial timer setup */
-+	writel_relaxed(0, base + LPC32XX_TIMER_TCR);
-+	writel_relaxed(LPC32XX_TIMER_IR_MR0INT, base + LPC32XX_TIMER_IR);
-+	writel_relaxed(1, base + LPC32XX_TIMER_MR0);
-+	writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R |
-+		       LPC32XX_TIMER_MCR_MR0S, base + LPC32XX_TIMER_MCR);
-+
-+	rate = clk_get_rate(clk);
-+	lpc32xx_clk_event_ddata.base = base;
-+	clockevents_config_and_register(&lpc32xx_clk_event_ddata.evtdev,
-+					rate, 1, -1);
-+
-+	setup_irq(irq, &lpc32xx_clock_event_irq);
-+
-+	return 0;
-+
-+err_get_irq:
-+	iounmap(base);
-+err_iomap:
-+	clk_disable_unprepare(clk);
-+err_clk_enable:
-+	clk_put(clk);
-+	return ret;
-+}
-+
-+/*
-+ * This function asserts that we have exactly one clocksource and one
-+ * clock_event_device in the end.
-+ */
-+static void __init lpc32xx_timer_init(struct device_node *np)
-+{
-+	static int has_clocksource, has_clockevent;
-+	int ret;
-+
-+	if (!has_clocksource) {
-+		ret = lpc32xx_clocksource_init(np);
-+		if (!ret) {
-+			has_clocksource = 1;
-+			return;
-+		}
-+	}
-+
-+	if (!has_clockevent) {
-+		ret = lpc32xx_clockevent_init(np);
-+		if (!ret) {
-+			has_clockevent = 1;
-+			return;
-+		}
-+	}
-+}
-+CLOCKSOURCE_OF_DECLARE(lpc32xx_timer, "nxp,lpc3220-timer", lpc32xx_timer_init);
++++ b/arch/arm/configs/lpc18xx_defconfig
+@@ -0,0 +1,135 @@
++CONFIG_CROSS_COMPILE="arm-linux-gnueabihf-"
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BLK_DEV_INITRD=y
++# CONFIG_RD_BZIP2 is not set
++# CONFIG_RD_LZMA is not set
++# CONFIG_RD_XZ is not set
++# CONFIG_RD_LZO is not set
++# CONFIG_RD_LZ4 is not set
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++# CONFIG_UID16 is not set
++# CONFIG_BASE_FULL is not set
++# CONFIG_FUTEX is not set
++# CONFIG_EPOLL is not set
++# CONFIG_SIGNALFD is not set
++# CONFIG_EVENTFD is not set
++# CONFIG_AIO is not set
++CONFIG_EMBEDDED=y
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_SLUB_DEBUG is not set
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++# CONFIG_MMU is not set
++CONFIG_ARCH_LPC18XX=y
++CONFIG_SET_MEM_PARAM=y
++CONFIG_DRAM_BASE=0x28000000
++CONFIG_DRAM_SIZE=0x02000000
++CONFIG_FLASH_MEM_BASE=0x1b000000
++CONFIG_FLASH_SIZE=0x00080000
++CONFIG_PREEMPT=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_BINFMT_FLAT=y
++CONFIG_BINFMT_ZFLAT=y
++CONFIG_BINFMT_SHARED_FLAT=y
++# CONFIG_COREDUMP is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_FW_LOADER is not set
++CONFIG_BLK_DEV_RAM=y
++CONFIG_SRAM=y
++CONFIG_EEPROM_AT24=y
++CONFIG_NETDEVICES=y
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_HISILICON is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_MICROCHIP is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SAMSUNG is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++CONFIG_STMMAC_ETH=y
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++CONFIG_SMSC_PHY=y
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
++CONFIG_KEYBOARD_GPIO_POLLED=y
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_UNIX98_PTYS is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_NONSTANDARD=y
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_SENSORS_LM75=y
++CONFIG_WATCHDOG=y
++CONFIG_WATCHDOG_CORE=y
++CONFIG_MFD_SYSCON=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_ROOT_HUB_TT=y
++CONFIG_MMC=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_PCA9532=y
++CONFIG_LEDS_PCA9532_GPIO=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_RTC_CLASS=y
++CONFIG_DMADEVICES=y
++CONFIG_AMBA_PL08X=y
++CONFIG_EXT2_FS=y
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++# CONFIG_NETWORK_FILESYSTEMS is not set
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_RCU_CPU_STALL_INFO is not set
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_LL_UART_8250=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_CRC_ITU_T=y
++CONFIG_CRC7=y
 -- 
 1.8.0
