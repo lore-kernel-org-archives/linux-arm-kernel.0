@@ -1,89 +1,64 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 27 Apr 2015 10:20:17 -0500
-Subject: [PATCH v3 2/2] arch: arm: Show the serial number from devicetree
- in cpuinfo
-In-Reply-To: <1430145747.3081.5.camel@collins>
-References: <1429351135-11842-1-git-send-email-contact@paulk.fr>
- <1429351135-11842-2-git-send-email-contact@paulk.fr>
- <CAL_JsqKkw7n5p1ZH345BeKkyU=GKDrhaLef__0ET7t90Cm0Eog@mail.gmail.com>
- <1430145747.3081.5.camel@collins>
-Message-ID: <CAL_Jsq+x5vXTmzxFW8+YSKntRgNVr7AzAS+xAkuBGx1Nmfeaaw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Apr 2015 17:25:05 +0200
+Subject: [PATCH v2 RESEND 2/2] mmc: host: Add some quirks to be read from
+ fdt in sdhci-pltm.c
+In-Reply-To: <CAOHikRDkQwG+7EUddXmx427ZpEOjqTt22H_zzozABOE3a963tQ@mail.gmail.com>
+References: <1429630959-32649-1-git-send-email-stripathi@apm.com>
+ <8525627.D1S9aInyMV@wuerfel>
+ <CAOHikRDkQwG+7EUddXmx427ZpEOjqTt22H_zzozABOE3a963tQ@mail.gmail.com>
+Message-ID: <5771531.b7UhrXUGmv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 9:42 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
-> Le lundi 27 avril 2015 ? 08:48 -0500, Rob Herring a ?crit :
->> On Sat, Apr 18, 2015 at 4:58 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
->> > This grabs the serial number shown in cpuinfo from the serial-number devicetree
->> > property in priority. When booting with ATAGs (and without device-tree), the
->> > provided number is still shown instead.
->> >
->> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
->>
->> One comment below, otherwise:
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->>
->> > ---
->> >  arch/arm/include/asm/system_info.h |  1 +
->> >  arch/arm/kernel/setup.c            | 27 +++++++++++++++++++++++++--
->> >  2 files changed, 26 insertions(+), 2 deletions(-)
->> >
->> > diff --git a/arch/arm/include/asm/system_info.h b/arch/arm/include/asm/system_info.h
->> > index 720ea03..3860cbd40 100644
->> > --- a/arch/arm/include/asm/system_info.h
->> > +++ b/arch/arm/include/asm/system_info.h
->> > @@ -17,6 +17,7 @@
->> >
->> >  /* information about the system we're running on */
->> >  extern unsigned int system_rev;
->> > +extern const char *system_serial;
->> >  extern unsigned int system_serial_low;
->> >  extern unsigned int system_serial_high;
->> >  extern unsigned int mem_fclk_21285;
->> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> > index 1d60beb..349790f 100644
->> > --- a/arch/arm/kernel/setup.c
->> > +++ b/arch/arm/kernel/setup.c
->> > @@ -93,6 +93,9 @@ unsigned int __atags_pointer __initdata;
->> >  unsigned int system_rev;
->> >  EXPORT_SYMBOL(system_rev);
->> >
->> > +const char *system_serial;
->> > +EXPORT_SYMBOL(system_serial);
->> > +
->> >  unsigned int system_serial_low;
->> >  EXPORT_SYMBOL(system_serial_low);
->> >
->> > @@ -821,8 +824,29 @@ arch_initcall(customize_machine);
->> >
->> >  static int __init init_machine_late(void)
->> >  {
->> > +#ifdef CONFIG_OF
->> > +       struct device_node *root;
->> > +       int ret;
->> > +#endif
->> > +
->> >         if (machine_desc->init_late)
->> >                 machine_desc->init_late();
->> > +
->> > +#ifdef CONFIG_OF
->>
->> These ifdefs should not be necessary, but please double check.
->
-> Well, of_property_read_string is only defined when CONFIG_OF is set
-> (base.c is always built in drivers/of but the directory is only included
-> when CONFIG_OF is set).
+On Monday 27 April 2015 20:33:25 Suman Tripathi wrote:
+> > On Tuesday 21 April 2015 21:12:39 Suman Tripathi wrote:
+> > > index bef250e..9f6a4b9 100644
+> > > --- a/drivers/mmc/host/sdhci-pltfm.c
+> > > +++ b/drivers/mmc/host/sdhci-pltfm.c
+> > > @@ -85,6 +85,21 @@ void sdhci_get_of_property(struct platform_device
+> > > *pdev)
+> > >
+> > >                 if (of_get_property(np, "broken-cd", NULL))
+> > >                         host->quirks |=
+> > >SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+> > >
+> > > +
+> > > +               if (of_get_property(np, "delay-after-power", NULL))
+> > > +                       host->quirks |= SDHCI_QUIRK_DELAY_AFTER_POWER;
+> > > +
+> > > +               if (of_get_property(np, "no-hispd", NULL))
+> > > +                       host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+> > > +
+> > > +               if (of_get_property(np, "broken-adma", NULL))
+> > > +                       host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
+> > > +
+> > > +               if (of_get_property(np, "broken-dma", NULL))
+> > > +                       host->quirks |= SDHCI_QUIRK_BROKEN_DMA;
+> > > +
+> > > +               if (of_get_property(np, "no-cmd23", NULL))
+> > > +                       host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+> > >
+> > >                 if (of_get_property(np, "no-1-8-v", NULL))
+> > >                         host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
+> > 
+> > Any property you add needs to be documented in the DT binding.
+> > If possible, add generic properties for each bug you have mmc.txt
+> > rather than the driver specific sdhci.txt, and implement the
+> I will add the binding in mmc.txt. I thought this was present but not.
+> 
+> > parsing in a common function that is used for all mmc hosts.
+> As per mine understanding the sdhci_get_of_porperty is a common
+> parsing function  . Am I wrong ??
 
-Look at include/linux/of.h. There are an empty versions of both functions.
+No, this is only used for sdhci, not for the other controllers.
 
-> Of course, on ARM, we now expect that it is the case, but it seems like
-> good practice to check for it, since it could theoretically be disabled.
+> > An alternative would be to set all these bits based on the compatible
+> > string of your host, if that is the only one that has all these bugs.
+> 
+> The host driver  (arasan) is reused but this quirks are needed due to
+> board issues. so I have a control over dtb only to fix this.
 
-We still (and will continue to) have non-OF platforms.
+What is the nature of the bug on that board? Is there a different
+way to describe that without introducing six new properties?
 
-> This is also being done a few lines above in customize_machine.
-
-True, but that doesn't mean we want more.
-
-Rob
+	Arnd
