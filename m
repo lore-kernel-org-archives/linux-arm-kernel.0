@@ -1,434 +1,207 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 27 Apr 2015 23:38:12 +0200
-Subject: [PATCH v2 3/4] clk: add lpc18xx ccu clk driver
-In-Reply-To: <1430170693-28303-1-git-send-email-manabian@gmail.com>
-References: <1430170693-28303-1-git-send-email-manabian@gmail.com>
-Message-ID: <1430170693-28303-4-git-send-email-manabian@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 27 Apr 2015 14:55:41 -0700
+Subject: [PATCH v2 3/5] ata: add Broadcom AHCI SATA3 driver for STB chips
+In-Reply-To: <2143403.KdtLGyP3SG@wuerfel>
+References: <1429757950-28789-1-git-send-email-computersforpeace@gmail.com>
+ <3096499.KSW6zqWKEA@wuerfel> <20150423164611.GZ32500@ld-irv-0074>
+ <2143403.KdtLGyP3SG@wuerfel>
+Message-ID: <20150427215541.GB32500@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for NXP LPC18xx/43xx Clock Control Unit (CCU). The CCU
-provides fine grained gating of most clocks present in the SoC.
+On Fri, Apr 24, 2015 at 09:46:01AM +0200, Arnd Bergmann wrote:
+> On Thursday 23 April 2015 09:46:11 Brian Norris wrote:
+> > On Thu, Apr 23, 2015 at 09:43:55AM +0200, Arnd Bergmann wrote:
+> > > On Wednesday 22 April 2015 19:59:08 Brian Norris wrote:
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- drivers/clk/nxp/Makefile                |   1 +
- drivers/clk/nxp/clk-lpc18xx-ccu.c       | 318 ++++++++++++++++++++++++++++++++
- include/dt-bindings/clock/lpc18xx-ccu.h |  74 ++++++++
- 3 files changed, 393 insertions(+)
- create mode 100644 drivers/clk/nxp/clk-lpc18xx-ccu.c
- create mode 100644 include/dt-bindings/clock/lpc18xx-ccu.h
+[snip]
+> > So we have a PHY driver, but it doesn't cover everything. Did you want
+> > me to write a second PHY driver?? I'm not sure how that'd work...
+> 
+> I think this is all fine, I mainly wanted to make sure that it had been
+> considered and that a decision was made after comparing the options.
+> What I'd really like to see is that you put this summary into the
+> patch description, because any reviewer will wonder about this.
+> You can use a 'Link: https://lkml.org/lkml/2015/3/18/940' tag behind
+> your signed-off-by to reference the earlier discussion, in addition to
+> the summary.
 
-diff --git a/drivers/clk/nxp/Makefile b/drivers/clk/nxp/Makefile
-index aca9d3e4f7fe..7f608b0ad7b4 100644
---- a/drivers/clk/nxp/Makefile
-+++ b/drivers/clk/nxp/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_ARCH_LPC18XX)	+= clk-lpc18xx-cgu.o
-+obj-$(CONFIG_ARCH_LPC18XX)	+= clk-lpc18xx-ccu.o
-diff --git a/drivers/clk/nxp/clk-lpc18xx-ccu.c b/drivers/clk/nxp/clk-lpc18xx-ccu.c
-new file mode 100644
-index 000000000000..01130f31611c
---- /dev/null
-+++ b/drivers/clk/nxp/clk-lpc18xx-ccu.c
-@@ -0,0 +1,318 @@
-+/*
-+ * Clk driver for NXP LPC18xx/LPC43xx Clock Control Unit (CCU)
-+ *
-+ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/string.h>
-+
-+#include <dt-bindings/clock/lpc18xx-cgu.h>
-+#include <dt-bindings/clock/lpc18xx-ccu.h>
-+
-+/* Bit defines for CCU branch configuration register */
-+#define LPC18XX_CCU_RUN		BIT(0)
-+#define LPC18XX_CCU_AUTO	BIT(1)
-+#define LPC18XX_CCU_DIV		BIT(5)
-+#define LPC18XX_CCU_DIVSTAT	BIT(27)
-+
-+/* CCU branch feature bits */
-+#define CCU_BRANCH_IS_BUS	BIT(0)
-+#define CCU_BRANCH_HAVE_DIV2	BIT(1)
-+
-+#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
-+
-+struct lpc18xx_branch_clk_data {
-+	int *base_ids;
-+	int num_base_ids;
-+};
-+
-+struct lpc18xx_clk_branch {
-+	int base_id;
-+	const char *name;
-+	u16 offset;
-+	u16 flags;
-+	struct clk *clk;
-+	struct clk_gate gate;
-+};
-+
-+static struct lpc18xx_clk_branch clk_branches[] = {
-+	{BASE_APB3_CLK, "apb3_bus",		CLK_APB3_BUS,		CCU_BRANCH_IS_BUS},
-+	{BASE_APB3_CLK, "apb3_i2c1",		CLK_APB3_I2C1,		0},
-+	{BASE_APB3_CLK, "apb3_dac",		CLK_APB3_DAC,		0},
-+	{BASE_APB3_CLK, "apb3_adc0",		CLK_APB3_ADC0,		0},
-+	{BASE_APB3_CLK, "apb3_adc1",		CLK_APB3_ADC1,		0},
-+	{BASE_APB3_CLK, "apb3_can0",		CLK_APB3_CAN0,		0},
-+
-+	{BASE_APB1_CLK, "apb1_bus",		CLK_APB1_BUS,		CCU_BRANCH_IS_BUS},
-+	{BASE_APB1_CLK, "apb1_motorcon_pwm",	CLK_APB1_MOTOCON_PWM,	0},
-+	{BASE_APB1_CLK, "apb1_i2c0",		CLK_APB1_I2C0,		0},
-+	{BASE_APB1_CLK, "apb1_i2s",		CLK_APB1_I2S,		0},
-+	{BASE_APB1_CLK, "apb1_can1",		CLK_APB1_CAN1,		0},
-+
-+	{BASE_SPIFI_CLK, "spifi",		CLK_SPIFI,		0},
-+
-+	{BASE_CPU_CLK, "cpu_bus",		CLK_CPU_BUS,		CCU_BRANCH_IS_BUS},
-+	{BASE_CPU_CLK, "cpu_spifi",		CLK_CPU_SPIFI,		0},
-+	{BASE_CPU_CLK, "cpu_gpio",		CLK_CPU_GPIO,		0},
-+	{BASE_CPU_CLK, "cpu_lcd",		CLK_CPU_LCD,		0},
-+	{BASE_CPU_CLK, "cpu_ethernet",		CLK_CPU_ETHERNET,	0},
-+	{BASE_CPU_CLK, "cpu_usb0",		CLK_CPU_USB0,		0},
-+	{BASE_CPU_CLK, "cpu_emc",		CLK_CPU_EMC,		0},
-+	{BASE_CPU_CLK, "cpu_sdio",		CLK_CPU_SDIO,		0},
-+	{BASE_CPU_CLK, "cpu_dma",		CLK_CPU_DMA,		0},
-+	{BASE_CPU_CLK, "cpu_core",		CLK_CPU_CORE,		0},
-+	{BASE_CPU_CLK, "cpu_sct",		CLK_CPU_SCT,		0},
-+	{BASE_CPU_CLK, "cpu_usb1",		CLK_CPU_USB1,		0},
-+	{BASE_CPU_CLK, "cpu_emcdiv",		CLK_CPU_EMCDIV,		CCU_BRANCH_HAVE_DIV2},
-+	{BASE_CPU_CLK, "cpu_flasha",		CLK_CPU_FLASHA,		CCU_BRANCH_HAVE_DIV2},
-+	{BASE_CPU_CLK, "cpu_flashb",		CLK_CPU_FLASHB,		CCU_BRANCH_HAVE_DIV2},
-+	{BASE_CPU_CLK, "cpu_m0app",		CLK_CPU_M0APP,		CCU_BRANCH_HAVE_DIV2},
-+	{BASE_CPU_CLK, "cpu_adchs",		CLK_CPU_ADCHS,		CCU_BRANCH_HAVE_DIV2},
-+	{BASE_CPU_CLK, "cpu_eeprom",		CLK_CPU_EEPROM,		CCU_BRANCH_HAVE_DIV2},
-+	{BASE_CPU_CLK, "cpu_wwdt",		CLK_CPU_WWDT,		0},
-+	{BASE_CPU_CLK, "cpu_uart0",		CLK_CPU_UART0,		0},
-+	{BASE_CPU_CLK, "cpu_uart1",		CLK_CPU_UART1,		0},
-+	{BASE_CPU_CLK, "cpu_ssp0",		CLK_CPU_SSP0,		0},
-+	{BASE_CPU_CLK, "cpu_timer0",		CLK_CPU_TIMER0,		0},
-+	{BASE_CPU_CLK, "cpu_timer1",		CLK_CPU_TIMER1,		0},
-+	{BASE_CPU_CLK, "cpu_scu",		CLK_CPU_SCU,		0},
-+	{BASE_CPU_CLK, "cpu_creg",		CLK_CPU_CREG,		0},
-+	{BASE_CPU_CLK, "cpu_ritimer",		CLK_CPU_RITIMER,	0},
-+	{BASE_CPU_CLK, "cpu_uart2",		CLK_CPU_UART2,		0},
-+	{BASE_CPU_CLK, "cpu_uart3",		CLK_CPU_UART3,		0},
-+	{BASE_CPU_CLK, "cpu_timer2",		CLK_CPU_TIMER2,		0},
-+	{BASE_CPU_CLK, "cpu_timer3",		CLK_CPU_TIMER3,		0},
-+	{BASE_CPU_CLK, "cpu_ssp1",		CLK_CPU_SSP1,		0},
-+	{BASE_CPU_CLK, "cpu_qei",		CLK_CPU_QEI,		0},
-+
-+	{BASE_PERIPH_CLK, "periph_bus",		CLK_PERIPH_BUS,		CCU_BRANCH_IS_BUS},
-+	{BASE_PERIPH_CLK, "periph_core",	CLK_PERIPH_CORE,	0},
-+	{BASE_PERIPH_CLK, "periph_sgpio",	CLK_PERIPH_SGPIO,	0},
-+
-+	{BASE_USB0_CLK,  "usb0",		CLK_USB0,		0},
-+	{BASE_USB1_CLK,  "usb1",		CLK_USB1,		0},
-+	{BASE_SPI_CLK,   "spi",			CLK_SPI,		0},
-+	{BASE_ADCHS_CLK, "adchs",		CLK_ADCHS,		0},
-+
-+	{BASE_AUDIO_CLK, "audio",		CLK_AUDIO,		0},
-+	{BASE_UART3_CLK, "apb2_uart3",		CLK_APB2_UART3,		0},
-+	{BASE_UART2_CLK, "apb2_uart2",		CLK_APB2_UART2,		0},
-+	{BASE_UART1_CLK, "apb0_uart1",		CLK_APB0_UART1,		0},
-+	{BASE_UART0_CLK, "apb0_uart0",		CLK_APB0_UART0,		0},
-+	{BASE_SSP1_CLK,  "apb2_ssp1",		CLK_APB2_SSP1,		0},
-+	{BASE_SSP0_CLK,  "apb0_ssp0",		CLK_APB0_SSP0,		0},
-+	{BASE_SDIO_CLK,  "sdio",		CLK_SDIO,		0},
-+};
-+
-+static int of_clk_get_parent_arg(struct device_node *np, int index)
-+{
-+	struct of_phandle_args clkspec;
-+	int rc;
-+
-+	if (index < 0)
-+		return -EINVAL;
-+
-+	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
-+					&clkspec);
-+	if (rc)
-+		return -EINVAL;
-+
-+	return clkspec.args_count ? clkspec.args[0] : -EINVAL;
-+}
-+
-+static struct clk *lpc18xx_ccu_branch_clk_get(struct of_phandle_args *clkspec,
-+					      void *data)
-+{
-+	struct lpc18xx_branch_clk_data *clk_data = data;
-+	unsigned int offset = clkspec->args[0];
-+	int i, j;
-+
-+	for (i = 0; i < ARRAY_SIZE(clk_branches); i++) {
-+		if (clk_branches[i].offset != offset)
-+			continue;
-+
-+		for (j = 0; j < clk_data->num_base_ids; j++) {
-+			if (clk_data->base_ids[j] == clk_branches[i].base_id)
-+				return clk_branches[i].clk;
-+		}
-+	}
-+
-+	pr_err("%s: invalid clock offset %d\n", __func__, offset);
-+
-+	return ERR_PTR(-EINVAL);
-+}
-+
-+static int lpc18xx_ccu_gate_endisable(struct clk_hw *hw, bool enable)
-+{
-+	struct clk_gate *gate = to_clk_gate(hw);
-+	u32 val;
-+
-+	/*
-+	 * Divider field is write only, so divider stat field must
-+	 * be read so divider field can be set accordingly.
-+	 */
-+	val = clk_readl(gate->reg);
-+	if (val & LPC18XX_CCU_DIVSTAT)
-+		val |= LPC18XX_CCU_DIV;
-+
-+	if (enable) {
-+		val |= LPC18XX_CCU_RUN;
-+	} else {
-+		/*
-+		 * To safely disable a branch clock a squence of two separate
-+		 * writes must be used. First write should set the AUTO bit
-+		 * and the next write should clear the RUN bit.
-+		 */
-+		val |= LPC18XX_CCU_AUTO;
-+		clk_writel(val, gate->reg);
-+
-+		val &= ~LPC18XX_CCU_RUN;
-+	}
-+
-+	clk_writel(val, gate->reg);
-+
-+	return 0;
-+}
-+
-+static int lpc18xx_ccu_gate_enable(struct clk_hw *hw)
-+{
-+	return lpc18xx_ccu_gate_endisable(hw, true);
-+}
-+
-+static void lpc18xx_ccu_gate_disable(struct clk_hw *hw)
-+{
-+	lpc18xx_ccu_gate_endisable(hw, false);
-+}
-+
-+static int lpc18xx_ccu_gate_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_gate *gate = to_clk_gate(hw);
-+
-+	return clk_readl(gate->reg) & LPC18XX_CCU_RUN;
-+}
-+
-+static const struct clk_ops lpc18xx_ccu_gate_ops = {
-+	.enable		= lpc18xx_ccu_gate_enable,
-+	.disable	= lpc18xx_ccu_gate_disable,
-+	.is_enabled	= lpc18xx_ccu_gate_is_enabled,
-+};
-+
-+static void lpc18xx_ccu_register_branch_gate_div(struct lpc18xx_clk_branch *branch,
-+						 void __iomem *base,
-+						 const char *parent)
-+{
-+	const struct clk_ops *div_ops = NULL;
-+	struct clk_divider *div = NULL;
-+	struct clk_hw *div_hw = NULL;
-+
-+	if (branch->flags & CCU_BRANCH_HAVE_DIV2) {
-+		div = kzalloc(sizeof(*div), GFP_KERNEL);
-+		if (!div)
-+			return;
-+
-+		div->reg = branch->offset + base;
-+		div->flags = CLK_DIVIDER_READ_ONLY;
-+		div->shift = 27;
-+		div->width = 1;
-+
-+		div_hw = &div->hw;
-+		div_ops = &clk_divider_ops;
-+	}
-+
-+	branch->gate.reg = branch->offset + base;
-+	branch->gate.bit_idx = 0;
-+
-+	branch->clk = clk_register_composite(NULL, branch->name, &parent, 1,
-+					     NULL, NULL,
-+					     div_hw, div_ops,
-+					     &branch->gate.hw, &lpc18xx_ccu_gate_ops, 0);
-+	if (IS_ERR(branch->clk)) {
-+		kfree(div);
-+		pr_warn("%s: failed to register %s\n", __func__, branch->name);
-+		return;
-+	}
-+
-+	/* Grab essential branch clocks for CPU and SDRAM */
-+	switch (branch->offset) {
-+	case CLK_CPU_EMC:
-+	case CLK_CPU_CORE:
-+	case CLK_CPU_CREG:
-+	case CLK_CPU_EMCDIV:
-+		clk_prepare_enable(branch->clk);
-+	}
-+}
-+
-+static void lpc18xx_ccu_register_branch_clks(void __iomem *base, int base_clk_id,
-+					     const char *parent)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(clk_branches); i++) {
-+		if (clk_branches[i].base_id != base_clk_id)
-+			continue;
-+
-+		lpc18xx_ccu_register_branch_gate_div(&clk_branches[i], base,
-+						     parent);
-+
-+		if (clk_branches[i].flags & CCU_BRANCH_IS_BUS)
-+			parent = clk_branches[i].name;
-+	}
-+}
-+
-+static void __init lpc18xx_ccu_init(struct device_node *np)
-+{
-+	struct lpc18xx_branch_clk_data *clk_data;
-+	int num_base_ids, *base_ids;
-+	void __iomem *base;
-+	const char *parent;
-+	int base_clk_id;
-+	int i;
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_warn("%s: failed to map address range\n", __func__);
-+		return;
-+	}
-+
-+	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
-+	if (!clk_data)
-+		return;
-+
-+	num_base_ids = of_clk_get_parent_count(np);
-+
-+	base_ids = kcalloc(num_base_ids, sizeof(int), GFP_KERNEL);
-+	if (!base_ids) {
-+		kfree(clk_data);
-+		return;
-+	}
-+
-+	clk_data->base_ids = base_ids;
-+	clk_data->num_base_ids = num_base_ids;
-+
-+	for (i = 0; i < num_base_ids; i++) {
-+		parent = of_clk_get_parent_name(np, i);
-+
-+		base_clk_id = of_clk_get_parent_arg(np, i);
-+		if (base_clk_id < 0 && base_clk_id >= BASE_CLK_MAX) {
-+			pr_warn("%s: invalid base clk at idx %d\n", __func__, i);
-+			base_ids[i] = -EINVAL;
-+			continue;
-+		}
-+
-+		clk_data->base_ids[i] = base_clk_id;
-+		lpc18xx_ccu_register_branch_clks(base, base_clk_id, parent);
-+	}
-+
-+	of_clk_add_provider(np, lpc18xx_ccu_branch_clk_get, clk_data);
-+}
-+CLK_OF_DECLARE(lpc18xx_ccu, "nxp,lpc1850-ccu", lpc18xx_ccu_init);
-diff --git a/include/dt-bindings/clock/lpc18xx-ccu.h b/include/dt-bindings/clock/lpc18xx-ccu.h
-new file mode 100644
-index 000000000000..bbfe00b6ab7d
---- /dev/null
-+++ b/include/dt-bindings/clock/lpc18xx-ccu.h
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright (c) 2015 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * This code is released using a dual license strategy: BSD/GPL
-+ * You can choose the licence that better fits your requirements.
-+ *
-+ * Released under the terms of 3-clause BSD License
-+ * Released under the terms of GNU General Public License Version 2.0
-+ *
-+ */
-+
-+/* Clock Control Unit 1 (CCU1) clock offsets */
-+#define CLK_APB3_BUS		0x100
-+#define CLK_APB3_I2C1		0x108
-+#define CLK_APB3_DAC		0x110
-+#define CLK_APB3_ADC0		0x118
-+#define CLK_APB3_ADC1		0x120
-+#define CLK_APB3_CAN0		0x128
-+#define CLK_APB1_BUS		0x200
-+#define CLK_APB1_MOTOCON_PWM	0x208
-+#define CLK_APB1_I2C0		0x210
-+#define CLK_APB1_I2S		0x218
-+#define CLK_APB1_CAN1		0x220
-+#define CLK_SPIFI		0x300
-+#define CLK_CPU_BUS		0x400
-+#define CLK_CPU_SPIFI		0x408
-+#define CLK_CPU_GPIO		0x410
-+#define CLK_CPU_LCD		0x418
-+#define CLK_CPU_ETHERNET	0x420
-+#define CLK_CPU_USB0		0x428
-+#define CLK_CPU_EMC		0x430
-+#define CLK_CPU_SDIO		0x438
-+#define CLK_CPU_DMA		0x440
-+#define CLK_CPU_CORE		0x448
-+#define CLK_CPU_SCT		0x468
-+#define CLK_CPU_USB1		0x470
-+#define CLK_CPU_EMCDIV		0x478
-+#define CLK_CPU_FLASHA		0x480
-+#define CLK_CPU_FLASHB		0x488
-+#define CLK_CPU_M0APP		0x490
-+#define CLK_CPU_ADCHS		0x498
-+#define CLK_CPU_EEPROM		0x4a0
-+#define CLK_CPU_WWDT		0x500
-+#define CLK_CPU_UART0		0x508
-+#define CLK_CPU_UART1		0x510
-+#define CLK_CPU_SSP0		0x518
-+#define CLK_CPU_TIMER0		0x520
-+#define CLK_CPU_TIMER1		0x528
-+#define CLK_CPU_SCU		0x530
-+#define CLK_CPU_CREG		0x538
-+#define CLK_CPU_RITIMER		0x600
-+#define CLK_CPU_UART2		0x608
-+#define CLK_CPU_UART3		0x610
-+#define CLK_CPU_TIMER2		0x618
-+#define CLK_CPU_TIMER3		0x620
-+#define CLK_CPU_SSP1		0x628
-+#define CLK_CPU_QEI		0x630
-+#define CLK_PERIPH_BUS		0x700
-+#define CLK_PERIPH_CORE		0x710
-+#define CLK_PERIPH_SGPIO	0x718
-+#define CLK_USB0		0x800
-+#define CLK_USB1		0x900
-+#define CLK_SPI			0xA00
-+#define CLK_ADCHS		0xB00
-+
-+/* Clock Control Unit 2 (CCU2) clock offsets */
-+#define CLK_AUDIO		0x100
-+#define CLK_APB2_UART3		0x200
-+#define CLK_APB2_UART2		0x300
-+#define CLK_APB0_UART1		0x400
-+#define CLK_APB0_UART0		0x500
-+#define CLK_APB2_SSP1		0x600
-+#define CLK_APB0_SSP0		0x700
-+#define CLK_SDIO		0x800
--- 
-1.8.0
+I summarized most of the conclusions in the cover letter, but I suppose
+a plain link to the original thread could do the job too.
+
+> > > > diff --git a/drivers/ata/sata_brcmstb.c b/drivers/ata/sata_brcmstb.c
+> > > > new file mode 100644
+> > > > index 000000000000..ab8d2261fa96
+> > > > --- /dev/null
+> > > > +++ b/drivers/ata/sata_brcmstb.c
+> > > > @@ -0,0 +1,285 @@
+> > > > +/*
+> > > > + * Broadcom SATA3 AHCI Controller Driver
+> > > 
+> > > Is this AHCI or not? Most AHCI drivers are called ahci_*.c, not sata_*.c
+> > 
+> > It is AHCI. I can rename if necessary...
+> > 
+> > If you're wondering about the comment there, SATA3 is left to indicate
+> > the difference between earlier (non-AHCI) SATA cores that only supported
+> > up to Gen2 SATA.
+> 
+> Up to the ata maintainer of course, but I'd use ahci_brcmstb in the name
+> just for consistency with the other drivers.
+
+OK, maybe I'll do that.
+
+> > > > +#ifdef __BIG_ENDIAN
+> > > > +#define DATA_ENDIAN			 2 /* AHCI->DDR inbound accesses */
+> > > > +#define MMIO_ENDIAN			 2 /* CPU->AHCI outbound accesses */
+> > > > +#else
+> > > > +#define DATA_ENDIAN			 0
+> > > > +#define MMIO_ENDIAN			 0
+> > > > +#endif
+> > > 
+> > > Is this for MIPS or ARM based chips or both?
+> > 
+> > Both. (This particular iteration of the driver was only tested on
+> > ARM, but this particular code has been the same on MIPS.)
+> > 
+> > > ARM SoCs should never care
+> > > about the endianess of the CPU,
+> > 
+> > Why do you say that? What makes ARM different than MIPS here? If
+> > somebody were using ARM BE, then they would (just like in MIPS) need to
+> > configure our AHCI core to pretend like it's in LE mode, as that's what
+> > libahci.c assumes.
+> 
+> MIPS is special regarding endianess here, because their CPU cores
+> use a power-on setting that defines a fixed endianess, while others
+> tend to let software decide at runtime.
+
+I wasn't really considering this. I haven't seen a Broadcom chip where
+runtime switching was used. But I haven't played with too many big
+endian systems, and all have been MIPS.
+
+> Broadcom usually wires peripherals in a way to match the CPU endianess,
+> but this is not necessarily what other MIPS chips do, and on most
+> architectures that would be considered a mistake in the hardware
+> design, because it breaks device drivers.
+
+I understand this. But this has no relevance to Broadcom IP. It's
+probably a good argument for putting good comments, I suppose.
+
+> If you can configure the endianess of the AHCI core through software,
+> it would be best to always set it to little-endian unconditionally,
+> so you can just use readl() or readl_relaxed() all the time.
+
+We're already doing this in the driver as written, at least for the
+three configurations that have been tested (MIPS LE, MIPS BE, ARM LE).
+IIUC, you're focusing on ARM BE? This is not in any support plan for
+these chips.
+
+But to straighten out what you're saying (correct me if I'm wrong), it
+seems like you're saying that on a (theoretical) BCM7xxx ARM in BE mode,
+the chip will come up in LE as normal, all busing will be configured for
+LE mode, and the BE kernel would only later change CPU endianness. This
+would mean that AHCI should be left as it was -- in LE mode -- whereas
+this driver submission would actually configure AHCI to do its own
+internal swapping, effectively making it BE mode again. And that would
+be wrong.
+
+Now I think this has a few problems:
+
+1. ARM BE is not (and won't be) supported on these chips. There has been
+no plan and no testing, and I'm sure we'd run into more problems than
+those you're suggesting here.
+
+2. To get ARM BE working properly, I'm not confident we'd do (only)
+runtime 'setend' endianness switching. We're more likely to get a
+bus-level endianness switch and be back with a native-endian driver
+again. But then, I'm only speculating (as you are).
+
+> > > > +static void brcm_sata_phy_enable(struct brcm_ahci_priv *priv, int port)
+> > > > +{
+> > > > +	void __iomem *phyctrl = priv->top_ctrl + SATA_TOP_CTRL_PHY_CTRL +
+> > > > +				(port * SATA_TOP_CTRL_PHY_OFFS);
+> > > > +	void __iomem *p;
+> > > > +	u32 reg;
+> > > > +
+> > > > +	/* clear PHY_DEFAULT_POWER_STATE */
+> > > > +	p = phyctrl + SATA_TOP_CTRL_PHY_CTRL_1;
+> > > > +	reg = __raw_readl(p);
+> > > > +	reg &= ~SATA_TOP_CTRL_1_PHY_DEFAULT_POWER_STATE;
+> > > > +	__raw_writel(reg, p);
+> > > 
+> > > Similarly, the use of __raw_readl() is broken on ARM here and won't
+> > > work on big-endian kernels. Better use a driver specific helper
+> > > function that does the right thing based on the architecture and
+> > > endianess. You can use the same conditional as above and do
+> > > 
+> > > #if defined(__BIG_ENDIAN) && defined(CONFIG_MIPS)
+> > > 
+> > > static inline brcm_sata_phy_read(struct brcm_ahci_phy *priv, int port int reg)
+> > > {
+> > > 	void __iomem *phyctrl = priv->regs;
+> > > 
+> > > 	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(__BIG_ENDIAN))
+> > > 		return __raw_readl(regs->reg);
+> > > 
+> > > 	return readl_relaxed(regs->reg);
+> > > }
+> > 
+> > Huh? I'm fine with a driver-specific helper to abstract this out, but
+> > why the MIPS fiddling? I'm fairly confident that in *all*
+> > configurations, this piece of the IP is wired up to work in native
+> > endianness, so it should never be doing an endian swap. The
+> > readl_relaxed() you're adding looks like it would just break the
+> > (theoretical) ARM BE case.
+> > 
+> > I understand that you don't like bare __raw_{read,write}l(), but some IP
+> > is just wired this way.
+> 
+> Kevin Cernekee recently introduced the "native-endian" DT property that
+> you can use to do runtime detection if that is necessary (i.e. you can't
+> tell the endianess from the CPU architecture, and you can't set it either).
+
+I've seen that series. That works fine for IP that's shared on other
+systems, and that's what Broadcom has to work with. But I'm not sure
+that's worth doing on Broadcom-only IP, which is *always* accessed in
+native endianness.
+
+> Using __raw_readl() in driver code just means that the driver is not
+> endian-aware at all, and we don't do that any more: new drivers that
+> can be used on ARM must be written in a way that works on both
+> little-endian and big-endian, and it's a good idea to use endian-safe
+> code on other architectures too.
+> 
+> It's ok to special-case MIPS here when you know that MIPS is weird. If
+> you don't want that, use run-time detection instead.
+
+I'm not sure I come to the same conclusions as you. ARM BE is never
+tested on these chips, so if you're really stuck on "handling" it
+(without testing), I'm almost more inclined to put in compile
+dependencies instead. e.g.:
+
+#if defined(CONFIG_ARM) && defined(CONFIG_CPU_BIG_ENDIAN)
+#error ARM BE not supported
+#endif
+
+Or maybe Kconfig deps instead. Or maybe a 'native-endian' DT property,
+and we just fail to probe for !native-endian.
+
+Now, this particular case is pretty trivial, and I'm sure I could just
+do what you say (since really, I don't care about ARM BE anyway), but I
+guarantee these same questions will come up over and over again on
+newly-upstreamed Broadcom drivers, where many of them are intentionally
+written for native endianness (because that's how the hardware works for
+all supported use cases) and have never been tested (and likely never
+will) on big endian ARM. To add extra levels of indirection (either
+conditional, or function pointers) to something as low-level as a
+register access, and for reasons that look almost 100% theoretical,
+seems excessive.
+
+If, however, you really have strong arguments for doing the extra work
+(and not testing it, and almost definitely never using it), then I can
+try and make sure we don't run across these problems in the future. I
+won't be too happy about it, but at least I won't have to waste my time
+on these discussions.
+
+Brian
