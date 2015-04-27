@@ -1,132 +1,277 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 27 Apr 2015 11:33:52 +0800
-Subject: Broadcom 43340 module on iMX6DL
-In-Reply-To: <553A9368.9030700@broadcom.com>
-References: <CACUGKYPHKGoLEfNPNvtHwtCA9jB_ZLamzF_PViDfQnpnc8Y-=A@mail.gmail.com>
- <55394141.1080601@broadcom.com>
- <CALAqxLU_9Hcbr5atxRBLDhs4WY9JfAdwdyzpszeO5nxCZU9JLA@mail.gmail.com>
- <CACUGKYPFk3Qoj3-XgkMwuzuCz_aP-8QCA8S+OSq5-qfoRF9dwg@mail.gmail.com>
- <CACUGKYMqFuk6nD82H=7nPRVvHEe9Ot6OkWiixqoV91ED8Cwudw@mail.gmail.com>
- <5539FCD5.4050708@broadcom.com>
- <CACUGKYOheGKjQOSZkxKGkqj_wOWAN8_2geptmTC8jp_L5AOveg@mail.gmail.com>
- <553A8803.5010700@broadcom.com>
- <CACUGKYOcgcrM4EPWmV18CeG-P6+nE_ANX5qgWGk3nn3NmWQ72A@mail.gmail.com>
- <553A9368.9030700@broadcom.com>
-Message-ID: <20150427033351.GC26374@shlinux1.ap.freescale.net>
+From: dja@axtens.net (Daniel Axtens)
+Date: Mon, 27 Apr 2015 14:09:14 +1000
+Subject: [PATCH v10 00/29] Refine PCI scan interfaces and make generic
+ pci host bridge
+In-Reply-To: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
+References: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1430107754.6073.9.camel@axtens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 09:03:04PM +0200, Arend van Spriel wrote:
-> On 04/24/15 20:24, John Tobias wrote:
-> >Hi Arend,
-> >
-> >Apologize for the confusion. I am asking the repo for the device
-> >driver for 43340. Looking at the link you sent, it's more userspace
-> >support and didn't see the device driver there...
+Hi Yijing,
+
+I'm wondering if you might get some more momentum on these changes if
+we could split them into a few smaller patch sets. I think we might
+then be able to start getting bits of this in for 4.2, which should help
+with getting the rest of it in.
+
+I think there are a few things that would be easy to pull out.
+
+  * #1 (xen/PCI: Don't use deprecated function
+     pci_scan_bus_parented()) can go directly to Xen people and should
+     be easy to merge. #2 (PCI: Remove deprecated
+     pci_scan_bus_parented()) is then an easy fixup.
+
+  * I think #12 (powerpc/PCI: Rename pcibios_root_bridge_prepare() to
+    pcibios_set_root_bus_speed()) could go to the PowerPC folks
+    individually. I'm not sure, however, that it's worth renaming it
+    and creating another function and another hook when no other arch
+    uses it. If mpe and benh don't want to pick it up, it'd be pretty
+    easy to take out set_root_bus_speed from the host_bridge_ops
+    struct, and this way we can still advance other parts of the
+    series.
+
+  * #16 (PCI: Introduce pci_bus_child_max_busnr()) is self-contained
+     and already has a user, so that should go in easily.
+
+  * The domain/bus numbering cleanup stuff could be broken out:
+    #3  (PCI: Save domain in pci_host_bridge)
+    #4  (PCI: Move pci_bus_assign_domain_nr() declaration into
+drivers/pci/pci.h)
+    #8  (PCI: Introduce pci_host_assign_domain_nr() to assign domain),
+    #28 (PCI: Remove platform specific pci_domain_nr())
+    #29 (PCI: Remove pci_bus_assign_domain_nr())
+
+
+
+I've done a bunch of rebasing and compiles to try to make sure all of
+these proposed divisions work and there are no dependencies that I've
+missed. It it's helpful, you can see what I've done at
+https://github.com/daxtens/linux in the YijingWang-enumer10
+branch. Feel free to use it as you wish.
+
+I think the remaining 20 patches could probably be split again at least
+once - it looks like the bus/bus numbering stuff might be easy to split
+out? I might have a look again in a few days.
+
+Regards,
+Daniel
+
+My final set of series, using your original patch names:
+
+Set 1 (Xen cleanup):
+  xen/PCI: Don't use deprecated function pci_scan_bus_parented()
+  PCI: Remove deprecated pci_scan_bus_parented()
+
+Set 2 (PowerPC cleanup):
+  powerpc/PCI: Rename pcibios_root_bridge_prepare() to
+    pcibios_set_root_bus_speed()
+
+Set 3: (could possibly be merged with set 4)
+  PCI: Introduce pci_bus_child_max_busnr()
+
+Set 4: (_nr and friends)
+  PCI: Save domain in pci_host_bridge
+  PCI: Move pci_bus_assign_domain_nr() declaration into
+       drivers/pci/pci.h
+  PCI: Introduce pci_host_assign_domain_nr() to assign domain
+  PCI: Remove platform specific pci_domain_nr()
+  PCI: Remove pci_bus_assign_domain_nr()
+
+Remainder:
+  PCI: Remove argument bus for pci_create_root_bus()
+  PCI: Alloc busn resource dynamically for pci_scan_bus()
+  PCI: Allocate busn resource for pci_scan_root_bus()
+  PCI: Separate pci_host_bridge creation out of pci_create_root_bus()
+  PCI: Introduce pci_host_bridge_list to manage host bridges
+  PCI: Save sysdata in pci_host_bridge drvdata  
+  PCI: Move pcibios_root_bridge_prepare() to pci_create_host_bridge()
+  PCI: Introduce pci_host_bridge_ops to support host specific
+    operations
+  PCI: Introduce new scan function pci_scan_host_bridge()
+  x86/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
+  ia64/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
+  powerpc/pci: Use pci_scan_host_bridge() for simplicity
+  PCI: Remove pcibios_root_bridge_prepare() and
+    pcibos_set_root_bus_speed()
+  sparc/PCI: Use pci_scan_host_bridge() for simplicity
+  parisc/PCI: Use pci_scan_root_bus() for simplicity
+  PCI/mvebu: Use pci_common_init_dev() to simplify code
+  PCI/tegra: Remove redundant tegra_pcie_scan_bus()
+  PCI/designware: Use pci_scan_root_bus() for simplicity
+  PCI/xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
+  PCI: Rename __pci_create_root_bus() to pci_create_root_bus()
+
+On Tue, 2015-04-21 at 19:34 +0800, Yijing Wang wrote:
+> This series could be pulled from:
+> https://github.com/YijingWang/linux-pci.git enumer10
 > 
-> crap. you are right. it is userspace and firmware. You need a kernel
-> repo. There are some on the site I referred to, but you may need to
-> contact Freescale whether they provide it publicly like on github or
-> so.
+> v9->v10:
+> 	Dynamically allocate busn resource if callers don't supply.
+> 	Try to adjust busn resource if host bridge busn resource conlict.
+> 	Rebase whole series on Bjorn's latest pci-next branch.
+> 	Major v9->v10 changes are in patch 5,6,7,10.
+> v8->v9:
+> 	Add Thierry's Acked-by and Tested-by.
+> 	Fix the building error for powerpc found by Daniel.
+> 	Change pci_host_assign_domain_nr() to static.
+> v7->v8:
+> 	Fix some cross building errors found by kbuild test.
+> 	Drop the rename patch for find_pci_host_bridge().
+> v6->v7:
+> 	Drop previous patch which combined the domain and bus in one argument.
+> 	Make the pci_host_bridge hold the default busn resource, so we could
+> 	check whether new host busn resource is conflict with existing ones.
+> 	Move pci_host_assign_domain_nr() to drivers/pci/host-bridge.c
+> 	Other changes suggested by Bjorn and Suravee.
+> v5->v6:
+> 	Fix cross building errors found by kbuild test.
+> 	Export busn_resource to Xen pcifront driver.
+> v4->v5:
+> 	Fix some code style issues and rename some functions suggested by Bjorn.
+> 	Fix some code flaw(Eg. call pci_bus_add_devices() before resources claim
+> 	or lack the return checking).
+> v3->v4:
+> 	Fix the rebase issue.
+> v2->v3:
+> 	Rebase this series on v4.0-rc1.
+> v1->v2:
+> 	Split pci_host_bridge_list into a new patch, remove .phb_probe_mode
+> 	and rework powerpc .phb_of_scan_bus() for simpilicty suggested by
+> 	Arnd. Refresh some patch description log, and add a new patch to fix
+> 	build warning in ia64.
+> 
+> This series is based on Bjorn's pci/enumeration branch.
+> You could pull it from https://github.com/YijingWang/linux-pci.git enumer9
+> 
+> Now in kernel, we scan pci bus use the following ways:
+> 1. pci_scan_bus. 
+> 	parent = NULL, default io/mem/bus resources
+> 	call pci_bus_add_devices()
+> 
+> 2. pci_scan_bus_parented() + pci_bus_add_devices()
+> 	default io/mem/bus resources, only used by xen
+> 
+> 3. pci_scan_root_bus() + pci_bus_add_devices()
+> 
+> 4. pci_create_root_bus() + pci_scan_child_bus() + pci_bus_add_devices()
+> 
+> 5. pci_create_root_bus() + xx_of_scan_bus()  +  pci_bus_add_devices()
+> 
+> And we have a lot of arch specific pci_domain_nr() and other platform
+> specific weak function like pcibios_root_bridge_prepare().
+> 
+> After applied this series, we have following scan interfaces:
+> 
+> 1. pci_scan_bus() 
+> 	parent = NULL, default io/mem/bus resources.
+> 	for legacy pci scan
+> 
+> 2. pci_scan_root_bus()
+> 	for callers provide its own parent and io/mem/bus resources
+> 	but no platform specific pci_host_bridge operations
+> 
+> 3. pci_scan_host_bridge()
+> 	for callers provide its own parent and io/mem/bus resources
+> 
+> 
+> 
+> Arnd Bergmann (1):
+>   xen/PCI: Don't use deprecated function pci_scan_bus_parented()
+> 
+> Yijing Wang (28):
+>   PCI: Remove deprecated pci_scan_bus_parented()
+>   PCI: Save domain in pci_host_bridge
+>   PCI: Move pci_bus_assign_domain_nr() declaration into
+>     drivers/pci/pci.h
+>   PCI: Remove argument bus for pci_create_root_bus()
+>   PCI: Alloc busn resource dynamically for pci_scan_bus()
+>   PCI: Allocate busn resource for pci_scan_root_bus()
+>   PCI: Introduce pci_host_assign_domain_nr() to assign domain
+>   PCI: Separate pci_host_bridge creation out of pci_create_root_bus()
+>   PCI: Introduce pci_host_bridge_list to manage host bridges
+>   PCI: Save sysdata in pci_host_bridge drvdata
+>   powerpc/PCI: Rename pcibios_root_bridge_prepare() to
+>     pcibios_set_root_bus_speed()
+>   PCI: Move pcibios_root_bridge_prepare() to pci_create_host_bridge()
+>   PCI: Introduce pci_host_bridge_ops to support host specific
+>     operations
+>   PCI: Introduce new scan function pci_scan_host_bridge()
+>   PCI: Introduce pci_bus_child_max_busnr()
+>   x86/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
+>   ia64/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
+>   powerpc/pci: Use pci_scan_host_bridge() for simplicity
+>   PCI: Remove pcibios_root_bridge_prepare() and
+>     pcibos_set_root_bus_speed()
+>   sparc/PCI: Use pci_scan_host_bridge() for simplicity
+>   parisc/PCI: Use pci_scan_root_bus() for simplicity
+>   PCI/mvebu: Use pci_common_init_dev() to simplify code
+>   PCI/tegra: Remove redundant tegra_pcie_scan_bus()
+>   PCI/designware: Use pci_scan_root_bus() for simplicity
+>   PCI/xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
+>   PCI: Rename __pci_create_root_bus() to pci_create_root_bus()
+>   PCI: Remove platform specific pci_domain_nr()
+>   PCI: Remove pci_bus_assign_domain_nr()
+> 
+>  arch/alpha/include/asm/pci.h             |    2 -
+>  arch/alpha/kernel/pci.c                  |    4 +-
+>  arch/alpha/kernel/sys_nautilus.c         |    2 +-
+>  arch/arm/kernel/bios32.c                 |    2 +-
+>  arch/arm/mach-dove/pcie.c                |    2 +-
+>  arch/arm/mach-iop13xx/pci.c              |    4 +-
+>  arch/arm/mach-mv78xx0/pcie.c             |    2 +-
+>  arch/arm/mach-orion5x/pci.c              |    4 +-
+>  arch/frv/mb93090-mb00/pci-vdk.c          |    3 +-
+>  arch/ia64/include/asm/pci.h              |    1 -
+>  arch/ia64/pci/pci.c                      |   35 ++--
+>  arch/ia64/sn/kernel/io_init.c            |    4 +-
+>  arch/m68k/coldfire/pci.c                 |    2 +-
+>  arch/microblaze/pci/pci-common.c         |   15 +--
+>  arch/mips/include/asm/pci.h              |    2 -
+>  arch/mips/pci/pci.c                      |    4 +-
+>  arch/mn10300/unit-asb2305/pci.c          |    3 +-
+>  arch/powerpc/include/asm/machdep.h       |    2 +-
+>  arch/powerpc/kernel/pci-common.c         |   79 +++++-----
+>  arch/powerpc/platforms/pseries/pci.c     |    8 +-
+>  arch/powerpc/platforms/pseries/pseries.h |    2 +-
+>  arch/powerpc/platforms/pseries/setup.c   |    2 +-
+>  arch/s390/pci/pci.c                      |   10 +-
+>  arch/sh/drivers/pci/pci.c                |    4 +-
+>  arch/sh/include/asm/pci.h                |    2 -
+>  arch/sparc/kernel/leon_pci.c             |    2 +-
+>  arch/sparc/kernel/pci.c                  |   45 +++---
+>  arch/sparc/kernel/pcic.c                 |    2 +-
+>  arch/tile/include/asm/pci.h              |    2 -
+>  arch/tile/kernel/pci.c                   |    4 +-
+>  arch/tile/kernel/pci_gx.c                |    4 +-
+>  arch/unicore32/kernel/pci.c              |    2 +-
+>  arch/x86/include/asm/pci.h               |    6 -
+>  arch/x86/pci/acpi.c                      |   37 +++--
+>  arch/x86/pci/common.c                    |    2 +-
+>  arch/xtensa/kernel/pci.c                 |    2 +-
+>  drivers/parisc/dino.c                    |    6 +-
+>  drivers/parisc/lba_pci.c                 |    6 +-
+>  drivers/pci/host-bridge.c                |  223 +++++++++++++++++++++++++
+>  drivers/pci/host/pci-mvebu.c             |   18 +--
+>  drivers/pci/host/pci-tegra.c             |   16 --
+>  drivers/pci/host/pci-versatile.c         |    3 +-
+>  drivers/pci/host/pci-xgene.c             |    5 +-
+>  drivers/pci/host/pcie-designware.c       |    6 +-
+>  drivers/pci/host/pcie-xilinx.c           |    2 +-
+>  drivers/pci/hotplug/acpiphp_glue.c       |   29 +---
+>  drivers/pci/hotplug/ibmphp_core.c        |    2 +-
+>  drivers/pci/pci.c                        |   85 +++-------
+>  drivers/pci/pci.h                        |    5 +
+>  drivers/pci/probe.c                      |  265 ++++++++++++++---------------
+>  drivers/pci/xen-pcifront.c               |   16 ++-
+>  include/linux/pci.h                      |   45 +++---
+>  52 files changed, 573 insertions(+), 467 deletions(-)
 > 
 
-One simple question:
-Does the brcmfmac driver in upstream kernel also work?
-I mean this one:
-drivers/net/wireless/brcm80211
-
-Regards
-Dong Aisheng
-
-> Regards,
-> Arend
-> 
-> >Regards,
-> >
-> >John
-> >
-> >
-> >On Fri, Apr 24, 2015 at 11:14 AM, Arend van Spriel<arend@broadcom.com>  wrote:
-> >>On 04/24/15 19:49, John Tobias wrote:
-> >>>
-> >>>Hi Arend,
-> >>>
-> >>>I am not pretty sure if the brcm43340 driver for android is the latest
-> >>>one.  May I know repo?.
-> >>
-> >>
-> >>Not sure what you are asking. I gave the url. Did you try using the
-> >>brcmfmac4334-sdio.bin firmware file. I would like to know if that one works
-> >>for your device.
-> >>
-> >>Regards,
-> >>Arend
-> >>
-> >>
-> >>>Regards,
-> >>>
-> >>>John
-> >>>
-> >>>On Fri, Apr 24, 2015 at 1:20 AM, Arend van Spriel<arend@broadcom.com>
-> >>>wrote:
-> >>>>
-> >>>>On 04/24/15 03:04, John Tobias wrote:
-> >>>>>
-> >>>>>
-> >>>>>Btw, where I could get a copy of the latest driver?.
-> >>>>
-> >>>>
-> >>>>
-> >>>>The open-source bcmdhd is in AOSP [1]. I would stick to the android
-> >>>>release
-> >>>>branch you are running on your device.
-> >>>>
-> >>>>Regards,
-> >>>>Arend
-> >>>>
-> >>>>[1] https://android.googlesource.com/platform/hardware/broadcom/wlan/
-> >>>>
-> >>>>
-> >>>>>Regards,
-> >>>>>
-> >>>>>John
-> >>>>>
-> >>>>>On Thu, Apr 23, 2015 at 5:59 PM, John Tobias<john.tobias.ph@gmail.com>
-> >>>>>wrote:
-> >>>>>>
-> >>>>>>
-> >>>>>>Hi John,
-> >>>>>>
-> >>>>>>Is it possible to have a copy of the firmware for 43340?.
-> >>>>>>
-> >>>>>>Regards,
-> >>>>>>
-> >>>>>>John
-> >>>>>>
-> >>>>>>On Thu, Apr 23, 2015 at 5:57 PM, John Stultz<john.stultz@linaro.org>
-> >>>>>>wrote:
-> >>>>>>>
-> >>>>>>>
-> >>>>>>>On Thu, Apr 23, 2015 at 12:00 PM, Arend van Spriel<arend@broadcom.com>
-> >>>>>>>wrote:
-> >>>>>>>>
-> >>>>>>>>
-> >>>>>>>>By the name of the file I suspected you did. Personally, I verified
-> >>>>>>>>the
-> >>>>>>>>firmware works on 43341. John Stultz tested both 43340 and 43341 with
-> >>>>>>>>this
-> >>>>>>>>firmware.
-> >>>>>>>
-> >>>>>>>
-> >>>>>>>
-> >>>>>>>Minor correction here, I only tested on 43341 hardware. The confusion
-> >>>>>>>might be that the firmware I originally had access to claimed it was
-> >>>>>>>43340.
-> >>>>>>>
-> >>>>>>>thanks
-> >>>>>>>-john
-> >>>>
-> >>>>
-> >>>>
-> >>
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 860 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150427/86490bea/attachment.sig>
