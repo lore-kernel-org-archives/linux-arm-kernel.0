@@ -1,90 +1,87 @@
-From: valentinrothberg@gmail.com (Valentin Rothberg)
-Date: Mon, 27 Apr 2015 08:31:35 +0200
-Subject: ARCH_EXYNOS5433 missing in Kconfig
-In-Reply-To: <54FF95ED.1040003@samsung.com>
-References: <CAD3Xx4Jf5ACBKe-KvGRD=myHKrJ+K_P0vBrtrmfgh+1zNM4hug@mail.gmail.com>
- <54FF95ED.1040003@samsung.com>
-Message-ID: <CAD3Xx4KpTTqNiFA-8EfuPsCR5ow0JkNVo11zM1twkrf8sckJtA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 27 Apr 2015 08:33:01 +0200
+Subject: [PATCH 1/4] tty: serial: 8250_mtk: Use devm_clk_get
+In-Reply-To: <CABuKBeLEui7ufMZ1=wz2kss4Q8yuK2VYt=wDWam6ZkCfd1G+7Q@mail.gmail.com>
+References: <1429779066-21406-1-git-send-email-s.hauer@pengutronix.de>
+ <1429779066-21406-2-git-send-email-s.hauer@pengutronix.de>
+ <CABuKBe+bACg_5uDQc3BF4BaBUG1-CQ3mH199o3nMsaMfH3ad3w@mail.gmail.com>
+ <20150424103151.GP6325@pengutronix.de>
+ <CABuKBeLEui7ufMZ1=wz2kss4Q8yuK2VYt=wDWam6ZkCfd1G+7Q@mail.gmail.com>
+Message-ID: <20150427063301.GW6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On Fri, Apr 24, 2015 at 12:53:08PM +0200, Matthias Brugger wrote:
+> 2015-04-24 12:31 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> > On Fri, Apr 24, 2015 at 12:28:33PM +0200, Matthias Brugger wrote:
+> >> 2015-04-23 10:51 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> >> > Just because of_clk_get() doesn't mean it should be used. Use devm_clk_get
+> >> > which is the correct function when a struct device * is available. Also
+> >> > since it's a devm function we can drop the calls to clk_put(). While at
+> >> > it also fix a wrong debug message.
+> >> >
+> >> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> >> > ---
+> >> >  drivers/tty/serial/8250/8250_mtk.c | 7 ++-----
+> >> >  1 file changed, 2 insertions(+), 5 deletions(-)
+> >> >
+> >> > diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+> >> > index 7a11fac..c6901dc 100644
+> >> > --- a/drivers/tty/serial/8250/8250_mtk.c
+> >> > +++ b/drivers/tty/serial/8250/8250_mtk.c
+> >> > @@ -131,18 +131,16 @@ static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
+> >> >                            struct mtk8250_data *data)
+> >> >  {
+> >> >         int err;
+> >> > -       struct device_node *np = pdev->dev.of_node;
+> >> >
+> >> > -       data->uart_clk = of_clk_get(np, 0);
+> >> > +       data->uart_clk = devm_clk_get(&pdev->dev, NULL);
+> >> >         if (IS_ERR(data->uart_clk)) {
+> >> > -               dev_warn(&pdev->dev, "Can't get timer clock\n");
+> >> > +               dev_warn(&pdev->dev, "Can't get uart clock\n");
+> >> >                 return PTR_ERR(data->uart_clk);
+> >> >         }
+> >> >
+> >> >         err = clk_prepare_enable(data->uart_clk);
+> >> >         if (err) {
+> >> >                 dev_warn(&pdev->dev, "Can't prepare clock\n");
+> >> > -               clk_put(data->uart_clk);
+> >> >                 return err;
+> >> >         }
+> >> >         p->uartclk = clk_get_rate(data->uart_clk);
+> >> > @@ -216,7 +214,6 @@ static int mtk8250_remove(struct platform_device *pdev)
+> >> >         serial8250_unregister_port(data->line);
+> >> >         if (!IS_ERR(data->uart_clk)) {
+> >> >                 clk_disable_unprepare(data->uart_clk);
+> >> > -               clk_put(data->uart_clk);
+> >> >         }
+> >>
+> >> Please delete the braces.
+> >
+> > The if() is removed completly in the next patch anyway.
+> 
+> You are right. I propose to merge patch 2 and 3, so you get a clean code.
 
-this is a kind reminder that the issue mentioned below is still
-present and made its way to v4.1-rc1.
+Patches 1 and 2 are different topics, I see no reason merging them. I
+changed the order of the two patches, maybe this makes it better
+readable.
 
-Kind regards,
- Valentin
+> On the way, can you have a look on the commit message? For me it is
+> not clear what you want to say.
 
-On Wed, Mar 11, 2015 at 2:10 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> Hi Valentin,
->
-> I sent the Exynos5433 clock patch and then separately I'm sending the
-> Exynos5433 devicetree patch-set[1].
-> [1] [PATCH v6 0/9] arm64: Add the support for new Exynos5433 SoC
-> - https://lkml.org/lkml/2015/3/9/1036
->
-> But, according to Arnd bergmann's comment[2], latest Exynos5433 dt patch-set[1]
-> removed the CONFIG_ARCH_EXYNOS5433.
-> [2] https://lkml.org/lkml/2015/2/24/85
->
->
-> So, I have plan to send following patch.
->
-> ---
->     clk: samsung: Use CONFIG_ARCH_EXYNOS instead of Exynos-specific configuration
->
->     This patch removes the CONFIG_ARCH_EXYNOS{5433|7} and then use only the
->     CONFIG_ARCH_EXYNOS for ARM-64bit Exynos SoC.
->
->     Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->     Cc: Tomasz Figa <tomasz.figa@gmail.com>
->     Cc: Arnd Bergmann <arnd@arndb.de>
->     Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  drivers/clk/samsung/Makefile | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-> index 17e9af7..561719d 100644
-> --- a/drivers/clk/samsung/Makefile
-> +++ b/drivers/clk/samsung/Makefile
-> @@ -10,11 +10,11 @@ obj-$(CONFIG_SOC_EXYNOS5250)        += clk-exynos5250.o
->  obj-$(CONFIG_SOC_EXYNOS5260)   += clk-exynos5260.o
->  obj-$(CONFIG_SOC_EXYNOS5410)   += clk-exynos5410.o
->  obj-$(CONFIG_SOC_EXYNOS5420)   += clk-exynos5420.o
-> -obj-$(CONFIG_ARCH_EXYNOS5433)  += clk-exynos5433.o
-> +obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos5433.o
->  obj-$(CONFIG_SOC_EXYNOS5440)   += clk-exynos5440.o
->  obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos-audss.o
->  obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos-clkout.o
->
->
-> Regards,
-> Chanwoo Choi
->
->
-> On 03/11/2015 12:32 AM, Valentin Rothberg wrote:
->> Hi Chanwoo,
->>
->> your commit 96bd6224f07b ("clk: samsung: exynos5433: Add clocks using
->> common clock framework") is included in today's linux-next tree (i.e.,
->> next-20150310).
->>
->> This patch conditionally compiles clk-exynos5433.c depending on the
->> Kconfig option ARCH_EXYNOS5433.  However, this option is not defined
->> in Kconfig, so that the driver cannot be compiled at the current
->> state:
->>
->> +obj-$(CONFIG_ARCH_EXYNOS5433)  += clk-exynos5433.o
->>
->> Is there a patch queued somewhere that adds this Kconfig symbol?  I
->> detected the issue by running undertaker-checkpatch from the
->> Undertaker tool suite (undertaker.cs.fau.de).  There is also a tool in
->> the git tree that can detect such issues (i.e.,
->> scripts/checkkconfigsymbols.py).
->>
->> Kind regards,
->>  Valentin
->>
->
+Changed to:
+
+    When a struct device * is present clk_get should be used rather
+    than of_clk_get. Use the devm variant of this function to be able to
+    drop the clk_put in the error and remove pathes. While at it fix
+    a wrong error message.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
