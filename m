@@ -1,295 +1,146 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 27 Apr 2015 11:21:31 +0800
-Subject: Broadcom 43340 module on iMX6DL
-In-Reply-To: <CACUGKYNxg62zAozJ1K4FEoqxeVwE8B2Wr3L9ZsND=HaWY7sitw@mail.gmail.com>
-References: <CACUGKYMXr3ASbB9fCk+GBnpfMC1kf_+NxDsOF_FODBKRAN9YvQ@mail.gmail.com>
- <55393C45.3060105@broadcom.com>
- <CACUGKYPHKGoLEfNPNvtHwtCA9jB_ZLamzF_PViDfQnpnc8Y-=A@mail.gmail.com>
- <55394141.1080601@broadcom.com>
- <CACUGKYNxg62zAozJ1K4FEoqxeVwE8B2Wr3L9ZsND=HaWY7sitw@mail.gmail.com>
-Message-ID: <20150427032127.GA26374@shlinux1.ap.freescale.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 27 Apr 2015 09:03:28 +0530
+Subject: [PATCH] dmaengine: at_xdmac: fix slave configuration issue
+In-Reply-To: <1429196640-8703-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1429196640-8703-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20150427033328.GH2738@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 23, 2015 at 05:50:33PM -0700, John Tobias wrote:
-> Hello Guys,
-> 
-> I have a follow up questions:
-> 
-> 
-> When the I power up the brcm44340 without loading the driver, the
-> sdhci-esdhc-imx host controller configured it with the following info
-> (cat /sys/kernel/debug/mmc0/ios):
-> clock: 50000000 Hz
-> actual clock: 49500000 Hz
-> vdd: 17 (2.9 ~ 3.0 V)
-> bus mode: 2 (push-pull)
-> chip select: 0 (don't care)
-> power mode: 2 (on)
-> bus width: 2 (4 bits)
-> timing spec: 2 (sd high-speed)
-> signal voltage: 0 (3.30 V)
-> 
-> 
-> Then, when I load the bcmdhd driver, the driver changed the clock to:
+On Thu, Apr 16, 2015 at 05:04:00PM +0200, Ludovic Desroches wrote:
+> When doing the slave configuration, an error is returned if the maxburst
+> value is not supported. The bug comes from the fact that we always check
+> the maxburst for both directions but in the case of an unidirectional
+> channel, only one is set.
+While setting the slave configuration we are not tied to a channel
+direction, the direction is passed usin prep_ method. So from that
+prespective a channle can be used for tx and rx with same slave config set.
 
-It seems the host is re-enumerating the card when load bcmdhd driver...
-This might be required by WiFi driver.
+Now if we were invoking at_xdmac_set_slave_config from prep_ calls then it
+would have been fine but here we are checking when the slave config is set
+so this is not right. You should check maxburst at runtime then...
 
-> clock: 400000 Hz
-> actual clock: 386718 Hz
-> vdd: 17 (2.9 ~ 3.0 V)
-> bus mode: 2 (push-pull)
-> chip select: 0 (don't care)
-> power mode: 2 (on)
-> bus width: 0 (1 bits)
-> timing spec: 0 (legacy)
-> signal voltage: 0 (3.30 V)
+-- 
+~Vinod
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: <stable@vger.kernel.org> # 3.19 and later
+> ---
+>  drivers/dma/at_xdmac.c | 97 +++++++++++++++++++++++++++-----------------------
+>  1 file changed, 52 insertions(+), 45 deletions(-)
 > 
-> Trace from sdhci-esdhc-imx:
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 400000, actual: 386718
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 400000, actual: 386718
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 400000, actual: 386718
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 400000, actual: 386718
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 400000, actual: 386718
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 300000, actual: 281250
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 300000, actual: 281250
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 300000, actual: 281250
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 300000, actual: 281250
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 300000, actual: 281250
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  change pinctrl state for uhs 0
-> MMC0: sdhci-esdhc-imx:  desired SD clock: 200000, actual: 193359
-> 
-> Does the driver need to change the clock when loading the firmware?.
-> 
-> Is it possible to tell to the driver to skip changing the clock?.
-> 
-> Or any work around for the problem?.
+> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+> index d9891d3..30e161b 100644
+> --- a/drivers/dma/at_xdmac.c
+> +++ b/drivers/dma/at_xdmac.c
+> @@ -501,54 +501,61 @@ static int at_xdmac_set_slave_config(struct dma_chan *chan,
+>  	u8 dwidth;
+>  	int csize;
+>  
+> -	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] =
+> -		AT91_XDMAC_DT_PERID(atchan->perid)
+> -		| AT_XDMAC_CC_DAM_INCREMENTED_AM
+> -		| AT_XDMAC_CC_SAM_FIXED_AM
+> -		| AT_XDMAC_CC_DIF(atchan->memif)
+> -		| AT_XDMAC_CC_SIF(atchan->perif)
+> -		| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
+> -		| AT_XDMAC_CC_DSYNC_PER2MEM
+> -		| AT_XDMAC_CC_MBSIZE_SIXTEEN
+> -		| AT_XDMAC_CC_TYPE_PER_TRAN;
+> -	csize = at_xdmac_csize(sconfig->src_maxburst);
+> -	if (csize < 0) {
+> -		dev_err(chan2dev(chan), "invalid src maxburst value\n");
+> -		return -EINVAL;
+> -	}
+> -	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_CSIZE(csize);
+> -	dwidth = ffs(sconfig->src_addr_width) - 1;
+> -	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
+> -
+> -
+> -	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] =
+> -		AT91_XDMAC_DT_PERID(atchan->perid)
+> -		| AT_XDMAC_CC_DAM_FIXED_AM
+> -		| AT_XDMAC_CC_SAM_INCREMENTED_AM
+> -		| AT_XDMAC_CC_DIF(atchan->perif)
+> -		| AT_XDMAC_CC_SIF(atchan->memif)
+> -		| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
+> -		| AT_XDMAC_CC_DSYNC_MEM2PER
+> -		| AT_XDMAC_CC_MBSIZE_SIXTEEN
+> -		| AT_XDMAC_CC_TYPE_PER_TRAN;
+> -	csize = at_xdmac_csize(sconfig->dst_maxburst);
+> -	if (csize < 0) {
+> -		dev_err(chan2dev(chan), "invalid src maxburst value\n");
+> -		return -EINVAL;
+> +	if (sconfig->src_addr) {
+> +		atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] =
+> +			AT91_XDMAC_DT_PERID(atchan->perid)
+> +			| AT_XDMAC_CC_DAM_INCREMENTED_AM
+> +			| AT_XDMAC_CC_SAM_FIXED_AM
+> +			| AT_XDMAC_CC_DIF(atchan->memif)
+> +			| AT_XDMAC_CC_SIF(atchan->perif)
+> +			| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
+> +			| AT_XDMAC_CC_DSYNC_PER2MEM
+> +			| AT_XDMAC_CC_MBSIZE_SIXTEEN
+> +			| AT_XDMAC_CC_TYPE_PER_TRAN;
+> +		csize = at_xdmac_csize(sconfig->src_maxburst);
+> +		if (csize < 0) {
+> +			dev_err(chan2dev(chan), "invalid src maxburst value\n");
+> +			return -EINVAL;
+> +		}
+> +		atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_CSIZE(csize);
+> +		dwidth = ffs(sconfig->src_addr_width) - 1;
+> +		atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
+> +		/* Src addr is needed to configure the link list descriptor. */
+> +		atchan->per_src_addr = sconfig->src_addr;
+> +
+> +		dev_dbg(chan2dev(chan),
+> +			"%s: cfg[dev2mem]=0x%08x, per_src_addr=0x%08x\n",
+> +			__func__, atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG],
+> +			atchan->per_src_addr);
+>  	}
+> -	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_CSIZE(csize);
+> -	dwidth = ffs(sconfig->dst_addr_width) - 1;
+> -	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
+>  
+> -	/* Src and dst addr are needed to configure the link list descriptor. */
+> -	atchan->per_src_addr = sconfig->src_addr;
+> -	atchan->per_dst_addr = sconfig->dst_addr;
+> +	if (sconfig->dst_addr) {
+> +		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] =
+> +			AT91_XDMAC_DT_PERID(atchan->perid)
+> +			| AT_XDMAC_CC_DAM_FIXED_AM
+> +			| AT_XDMAC_CC_SAM_INCREMENTED_AM
+> +			| AT_XDMAC_CC_DIF(atchan->perif)
+> +			| AT_XDMAC_CC_SIF(atchan->memif)
+> +			| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
+> +			| AT_XDMAC_CC_DSYNC_MEM2PER
+> +			| AT_XDMAC_CC_MBSIZE_SIXTEEN
+> +			| AT_XDMAC_CC_TYPE_PER_TRAN;
+> +		csize = at_xdmac_csize(sconfig->dst_maxburst);
+> +		if (csize < 0) {
+> +			dev_err(chan2dev(chan), "invalid src maxburst value\n");
+> +			return -EINVAL;
+> +		}
+> +		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_CSIZE(csize);
+> +		dwidth = ffs(sconfig->dst_addr_width) - 1;
+> +		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
+> +		/* Dst addr is needed to configure the link list descriptor. */
+> +		atchan->per_dst_addr = sconfig->dst_addr;
+>  
+> -	dev_dbg(chan2dev(chan),
+> -		"%s: cfg[dev2mem]=0x%08x, cfg[mem2dev]=0x%08x, per_src_addr=0x%08x, per_dst_addr=0x%08x\n",
+> -		__func__, atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG],
+> -		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG],
+> -		atchan->per_src_addr, atchan->per_dst_addr);
+> +		dev_dbg(chan2dev(chan),
+> +			"%s: cfg[mem2dev]=0x%08x, per_dst_addr=0x%08x\n",
+> +			__func__, atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG],
+> +			atchan->per_dst_addr);
+> +	}
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.2.0
 > 
 
-It is a feature implemented by MMC core that re-try a slower clock
-when enumerate fails.
-See:
-drivers/mmc/core/core.c
-mmc_claim_host(host);
-for (i = 0; i < ARRAY_SIZE(freqs); i++) {
-	if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min)))
-		break;
-	if (freqs[i] <= host->f_min)
-		break;
-}
-mmc_release_host(host);
-
-Regards
-Dong Aisheng
-
-> Note: attached is a verbose logs of the driver.
-> 
-> Regards,
-> 
-> John
-> 
-> On Thu, Apr 23, 2015 at 12:00 PM, Arend van Spriel <arend@broadcom.com> wrote:
-> > + John Stultz
-> >
-> >
-> > On 04/23/15 20:44, John Tobias wrote:
-> >>
-> >> Thanks Dmitry for the info.
-> >>
-> >> Arend:
-> >>
-> >> Yes, it's an android... Here's the info:
-> >>
-> >> 00060e80  de 02 f0 18 8c 00 e8 5e  8f 00 37 a3 00 e0 5e 8a
-> >> |.......^..7...^.|
-> >> 00060e90  f4 77 a2 00 02 de 02 f0  00 00 01 bc 60 03 00 07
-> >> |.w..........`...|
-> >> 00060ea0  aa 01 bc 60 03 00 07 ab  01 bc 60 03 00 07 b7 01
-> >> |...`......`.....|
-> >> 00060eb0  bc 60 13 08 17 a1 00 02  5e 02 f0 01 28 00 b0 40
-> >> |.`......^...(..@|
-> >> 00060ec0  67 00 17 a3 01 80 60 02  03 37 a2 00 02 5e 02 f0
-> >> |g.....`..7...^..|
-> >> 00060ed0  01 2c 00 b0 5e 8f 00 17  a2 00 02 5e 02 f0 01 2c
-> >> |.,..^......^...,|
-> >> 00060ee0  00 02 de 02 f0 00 00 01  bc 60 63 00 10 7b 00 b0
-> >> |.........`c..{..|
-> >> 00060ef0  5e 8b 00 10 7a 01 ac 60  7e f4 30 75 02 87 41 d7
-> >> |^...z..`~.0u..A.|
-> >> 00060f00  00 18 9c 00 02 de 02 f0  00 00 01 bc 60 63 00 10
-> >> |............`c..|
-> >> 00060f10  7b 00 b0 5e 8b 00 10 7a  01 ac 60 be f4 30 75 02
-> >> |{..^...z..`..0u.|
-> >> 00060f20  87 41 d7 00 18 a1 00 02  de 02 f0 00 00 00 00 00
-> >> |.A..............|
-> >> 00060f30  00 00 00 00 7c ac 00 00  2d cb a7 58 06 0a be 31
-> >> |....|...-..X...1|
-> >> 00060f40  b1 8d a0 53 00 5b 07 49  45 13 20 4e 7d 7e 47 28  |...S.[.IE.
-> >> N}~G(|
-> >> 00060f50  08 7c 77 d2 bc 44 87 13  01 bd 32 08 01 00 34 33
-> >> |.|w..D....2...43|
-> >> 00060f60  33 34 31 62 30 2d 72 6f  6d 6c 2f 73 64 69 6f 2d
-> >> |341b0-roml/sdio-|
-> >> 00060f70  61 67 2d 70 6e 6f 2d 70  32 70 2d 63 63 78 2d 65
-> >> |ag-pno-p2p-ccx-e|
-> >> 00060f80  78 74 73 75 70 2d 70 72  6f 70 74 78 73 74 61 74
-> >> |xtsup-proptxstat|
-> >> 00060f90  75 73 2d 64 6d 61 74 78  72 63 2d 72 78 6f 76 2d
-> >> |us-dmatxrc-rxov-|
-> >> 00060fa0  70 6b 74 66 69 6c 74 65  72 2d 6b 65 65 70 61 6c
-> >> |pktfilter-keepal|
-> >> 00060fb0  69 76 65 2d 61 6f 65 2d  76 73 64 62 2d 73 72 2d
-> >> |ive-aoe-vsdb-sr-|
-> >> 00060fc0  77 61 70 69 2d 77 6c 31  31 64 2d 61 75 74 6f 61
-> >> |wapi-wl11d-autoa|
-> >> 00060fd0  62 6e 2d 6c 70 63 2d 70  63 6c 6f 73 65 2d 70 32
-> >> |bn-lpc-pclose-p2|
-> >> 00060fe0  70 6f 2d 77 6c 31 31 75  20 56 65 72 73 69 6f 6e  |po-wl11u
-> >> Version|
-> >> 00060ff0  3a 20 36 2e 31 30 2e 31  39 30 2e 34 39 20 43 52  |: 6.10.190.49
-> >> CR|
-> >> 00061000  43 3a 20 61 37 35 38 33  34 64 32 20 44 61 74 65  |C: a75834d2
-> >> Date|
-> >> 00061010  3a 20 54 75 65 20 32 30  31 34 2d 30 36 2d 31 37  |: Tue
-> >> 2014-06-17|
-> >> 00061020  20 31 31 3a 34 39 3a 32  31 20 50 44 54 20 46 57  | 11:49:21 PDT
-> >> FW|
-> >> 00061030  49 44 20 30 31 2d 38 37  34 34 62 63 64 32 0a 00  |ID
-> >> 01-8744bcd2..|
-> >> 00061040  e2 00                                             |..|
-> >> 00061042
-> >>
-> >>
-> >> I just took the firmware in linux-firmware repo and I am not sure if
-> >> that's the correct one..
-> >
-> >
-> > By the name of the file I suspected you did. Personally, I verified the
-> > firmware works on 43341. John Stultz tested both 43340 and 43341 with this
-> > firmware.
-> >
-> > Your log says: chip:0xa94c rev:0x2
-> >
-> > I will have to check whether that is correct revision for this firmware. I
-> > can check. You could try the brcmfmac4334-sdio.bin file instead. All bets
-> > are off, but it can not get worse. ;-)
-> >
-> > Gr. AvS
-> >
-> >
-> >> Regards,
-> >>
-> >> John
-> >>
-> >>
-> >> On Thu, Apr 23, 2015 at 11:39 AM, Arend van Spriel<arend@broadcom.com>
-> >> wrote:
-> >>>
-> >>> On 04/23/15 20:10, John Tobias wrote:
-> >>>>
-> >>>>
-> >>>> Hello Guys,
-> >>>>
-> >>>> I am trying to use the bcmdhd wifi driver 43340 module on iMX6DL
-> >>>> processor using kernel Freescale GA (3.10.53).
-> >>>>
-> >>>> I am having an issue with the sdio registration. I would like to know
-> >>>> if anyone here had the same issue and how did you solve it?.
-> >>>>
-> >>>>
-> >>>> Entry: wifi_add_dev
-> >>>> Entry: wifi_add_dev
-> >>>> Entry: wifi_probe
-> >>>> wifi_probe: calling wifi_set_power on
-> >>>> Entry: wifi_set_power
-> >>>> wifi_set_power = 1
-> >>>> wifi_set_carddetect = 1
-> >>>> mmc0: queuing unknown CIS tuple 0x80 (7 bytes)
-> >>>> mmc0: queuing unknown CIS tuple 0x80 (6 bytes)
-> >>>> mmc0: queuing unknown CIS tuple 0x91 (3 bytes)
-> >>>> mmc0: new high speed SDIO card at address 0001
-> >>>>
-> >>>> Dongle Host Driver, version 1.88.45 (r)
-> >>>> Compiled in drivers/net/wireless/bcmdhd on Apr 23 2015 at 00:40:05
-> >>>> F1 signature OK, socitype:0x1 chip:0xa94c rev:0x2 pkg:0x0
-> >>>> DHD: dongle ram size is set to 524288(orig 524288) at 0x0
-> >>>> wl_create_event_handler(): thread:wl_event_handler:3ba started
-> >>>> CFG80211-ERROR) wl_event_handler : tsk Enter, tsk = 0x96741444
-> >>>> dhd_attach(): thread:dhd_watchdog_thread:3bb started
-> >>>> dhd_attach(): thread:dhd_dpc:3bc started
-> >>>> dhd_attach(): thread:dhd_rxf:3bd started
-> >>>> dhd_attach(): thread:dhd_sysioc:3be started
-> >>>> wifi_get_mac_addr
-> >>>> dhdsdio_write_vars: Download, Upload and compare of NVRAM succeeded.
-> >>>>
-> >>>>
-> >>>> Times out here...
-> >>>> dhd_module_init: sdio_register_driver timeout or error
-> >>>>
-> >>>> dhd_bus_init: enable 0x06, ready 0x02 (waited 3006383us)
-> >>>
-> >>>
-> >>>
-> >>> This means it failed to enable function 2. My guess would be the firmware
-> >>> did not come up.
-> >>>
-> >>>> dhd_bus_start failed bus is not ready
-> >>>> dhdsdio_probe: dhd_bus_start failed
-> >>>> dhd_detach(): thread:dhd_sysioc:3be terminated OK
-> >>>> dhd_detach(): thread:dhd_watchdog_thread:3bb terminated OK
-> >>>> dhd_dpc_thread: Unexpected up_cnt 0
-> >>>> dhd_detach(): thread:dhd_dpc:3bc terminated OK
-> >>>> dhd_detach(): thread:dhd_rxf:3bd terminated OK
-> >>>> CFG80211-ERROR) wl_event_handler : was terminated
-> >>>> wl_destroy_event_handler(): thread:wl_event_handler:3ba terminated OK
-> >>>> dhd_osl_detach: MEMORY LEAK 156 bytes
-> >>>> ## wifi_remove
-> >>>> Entry: wifi_set_power
-> >>>> wifi_set_power = 0
-> >>>> navdy_wifi_power: 0
-> >>>> wifi_set_carddetect = 0
-> >>>> insmod: init_module '/system/lib/modules/bcmdhd.ko' failed (No such
-> >>>> device)
-> >>>> # mmc0: card 0001 removed
-> >>>>
-> >>>>
-> >>>> Note: I ran the command below to load the driver:
-> >>>> insmod /system/lib/modules/bcmdhd.ko
-> >>>> firmware_path=/system/vendor/firmware/brcmfmac43340-sdio.bin
-> >>>> nvram_path=/system/vendor/firmware/bcmdhd.cal
-> >>>
-> >>>
-> >>>
-> >>> So this is an Android image, right? Can you do hexdump, ie.:
-> >>>
-> >>> $ hexdump -C brcmfmac43340-sdio.bin | tail -30
-> >
-> >
-> >>> Regards,
-> >>> Arend
-> >>>
-> >>>> Regards,
-> >>>>
-> >>>> John
-> >>>> --
-> >>>> To unsubscribe from this list: send the line "unsubscribe linux-kernel"
-> >>>> in
-> >>>> the body of a message to majordomo at vger.kernel.org
-> >>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >>>> Please read the FAQ at  http://www.tux.org/lkml/
-> >>>
-> >>>
-> >>>
-> >
+-- 
