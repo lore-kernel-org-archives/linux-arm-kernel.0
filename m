@@ -1,56 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Apr 2015 14:48:09 +0200
-Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling to
- the WDT driver.
-In-Reply-To: <553E2F1E.5070909@roeck-us.net>
-References: <1429902534-2348-1-git-send-email-eric@anholt.net>
- <2979294.WseZH0BUZW@wuerfel> <553E2F1E.5070909@roeck-us.net>
-Message-ID: <2465337.STuvDNQht6@wuerfel>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Mon, 27 Apr 2015 21:50:46 +0900
+Subject: [PATCH] ARM: pxa: Constify irq_domain_ops
+Message-ID: <1430139046-3618-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 April 2015 05:44:14 Guenter Roeck wrote:
-> On 04/27/2015 02:18 AM, Arnd Bergmann wrote:
-> > On Sunday 26 April 2015 08:35:57 Guenter Roeck wrote:
-> >> On 04/25/2015 01:11 PM, Arnd Bergmann wrote:
-> >>> On Friday 24 April 2015 12:08:54 Eric Anholt wrote:
-> >>>> +/*
-> >>>> + * We can't really power off, but if we do the normal reset scheme, and
-> >>>> + * indicate to bootcode.bin not to reboot, then most of the chip will be
-> >>>> + * powered off.
-> >>>> + */
-> >>>> +static void bcm2835_power_off(void)
-> >>>> +{
-> >>>> +       struct device_node *np =
-> >>>> +               of_find_compatible_node(NULL, NULL, "brcm,bcm2835-pm-wdt");
-> >>>> +       struct platform_device *pdev = of_find_device_by_node(np);
-> >>>> +       struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
-> >>>> +       u32 val;
-> >>>> +
-> >>>
-> >>> Instead of doing the lookup again here, I'd suggest using a static variable
-> >>> in the driver to store the device pointer for the device used on power_off.
-> >>>
-> >>> Make sure that the device remove callback assigns it back to NULL though
-> >>> and that the function checks for NULL pointer.
-> >>>
-> >>
-> >> Why would that be needed ?
-> >
-> > devices can be unbound from drivers through sysfs, or using dynamic DT
-> > updates. If one does that, the watchdog driver will correctly destroy
-> > all information it has about the device, so if the power_off function
-> > still uses that pointer, it will crash.
-> >
-> Without calling its remove function ? That sounds odd. Lots of drivers
-> would break if that was really the case.
+The irq_domain_ops are not modified by the driver and the irqdomain core
+code accepts pointer to a const data.
 
-I'm not sure what you mean now. The remove function gets called to
-do the final cleanup, and afterwards the device is deleted, so the
-remove function should make sure that no global variables point to
-the device any more.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+---
+ arch/arm/mach-pxa/irq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This is not a concern for most other drivers, because they do not
-keep global pointers to device structures.
-
-	Arnd
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index 89a7c06570d3..98608c5575cb 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -138,7 +138,7 @@ static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops pxa_irq_ops = {
++static const struct irq_domain_ops pxa_irq_ops = {
+ 	.map    = pxa_irq_map,
+ 	.xlate  = irq_domain_xlate_onecell,
+ };
+-- 
+2.1.0
