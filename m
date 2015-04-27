@@ -1,39 +1,56 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 27 Apr 2015 08:49:53 +0200
-Subject: [PATCH v2] tty: serial: 8250_mtk: Add support for second clock
-Message-ID: <1430117397-13517-1-git-send-email-s.hauer@pengutronix.de>
+Date: Mon, 27 Apr 2015 08:49:54 +0200
+Subject: [PATCH 1/4] tty: serial: 8250_mtk: remove unnecessary test
+In-Reply-To: <1430117397-13517-1-git-send-email-s.hauer@pengutronix.de>
+References: <1430117397-13517-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1430117397-13517-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+When the driver has probed successfully the clk pointer is always valid,
+so no need to test for it.
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/tty/serial/8250/8250_mtk.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/sha/linux-2.6.git tags/v4.1-mtk-uart-clk-v2
-
-for you to fetch changes up to 02e3f747bea47f6c02dc3f52e40869ea8ce5342a:
-
-  tty: serial: 8250_mtk: Add support for bus clock (2015-04-27 08:39:06 +0200)
-
-----------------------------------------------------------------
-This series adds support for the second clock on the Mediatek UART.
-This is necessary for SoCs needing a bus clock to be enabled before
-the UART can be accessed.
-
-Changes since v1:
-- keep support old binding with unnamed clk
-- hopefully clarify commit message
-- do not leak in if() with unnecessary braces.
-
-----------------------------------------------------------------
-Sascha Hauer (4):
-      tty: serial: 8250_mtk: remove unnecessary test
-      tty: serial: 8250_mtk: Use devm_clk_get
-      tty: serial: 8250_mtk: use pm_runtime callbacks for enabling
-      tty: serial: 8250_mtk: Add support for bus clock
-
- .../devicetree/bindings/serial/mtk-uart.txt        |  12 ++-
- drivers/tty/serial/8250/8250_mtk.c                 | 104 ++++++++++++---------
- 2 files changed, 70 insertions(+), 46 deletions(-)
+diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+index 7a11fac..1297827 100644
+--- a/drivers/tty/serial/8250/8250_mtk.c
++++ b/drivers/tty/serial/8250/8250_mtk.c
+@@ -214,10 +214,8 @@ static int mtk8250_remove(struct platform_device *pdev)
+ 	pm_runtime_get_sync(&pdev->dev);
+ 
+ 	serial8250_unregister_port(data->line);
+-	if (!IS_ERR(data->uart_clk)) {
+-		clk_disable_unprepare(data->uart_clk);
+-		clk_put(data->uart_clk);
+-	}
++	clk_disable_unprepare(data->uart_clk);
++	clk_put(data->uart_clk);
+ 
+ 	pm_runtime_disable(&pdev->dev);
+ 	pm_runtime_put_noidle(&pdev->dev);
+@@ -249,8 +247,7 @@ static int mtk8250_runtime_suspend(struct device *dev)
+ {
+ 	struct mtk8250_data *data = dev_get_drvdata(dev);
+ 
+-	if (!IS_ERR(data->uart_clk))
+-		clk_disable_unprepare(data->uart_clk);
++	clk_disable_unprepare(data->uart_clk);
+ 
+ 	return 0;
+ }
+@@ -259,8 +256,7 @@ static int mtk8250_runtime_resume(struct device *dev)
+ {
+ 	struct mtk8250_data *data = dev_get_drvdata(dev);
+ 
+-	if (!IS_ERR(data->uart_clk))
+-		clk_prepare_enable(data->uart_clk);
++	clk_prepare_enable(data->uart_clk);
+ 
+ 	return 0;
+ }
+-- 
+2.1.4
