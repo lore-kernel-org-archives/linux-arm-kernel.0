@@ -1,64 +1,73 @@
 From: jbe@pengutronix.de (Juergen Borleis)
-Date: Mon, 27 Apr 2015 15:59:51 +0200
-Subject: [PATCH 5/6] RTC/i.MX/DryIce: when locked, do not fail silently
+Date: Mon, 27 Apr 2015 15:59:48 +0200
+Subject: [PATCH 2/6] RTC/i.MX/DryIce: add some background info about the
+ states the machine can be in
 In-Reply-To: <1430143192-20667-1-git-send-email-jbe@pengutronix.de>
 References: <1430143192-20667-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <1430143192-20667-6-git-send-email-jbe@pengutronix.de>
+Message-ID: <1430143192-20667-3-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-If the DryICE unit is locked it is impossibe to set the time. Provide an
-error message for this case.
 
 Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
 Signed-off-by: Robert Schwebel <rsc@pengutronix.de>
 [rsc: got NDA clearance from Freescale]
 ---
- drivers/rtc/rtc-imxdi.c | 27 ++++++++++++++++++++++++---
- 1 file changed, 24 insertions(+), 3 deletions(-)
+ drivers/rtc/rtc-imxdi.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
 diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
-index 8890a62..46bf014 100644
+index 0c2a064..6db8d1c 100644
 --- a/drivers/rtc/rtc-imxdi.c
 +++ b/drivers/rtc/rtc-imxdi.c
-@@ -566,14 +566,35 @@ static int dryice_rtc_read_time(struct device *dev, struct rtc_time *tm)
- static int dryice_rtc_set_mmss(struct device *dev, unsigned long secs)
- {
- 	struct imxdi_dev *imxdi = dev_get_drvdata(dev);
-+	u32 dcr, dsr;
- 	int rc;
+@@ -129,6 +129,49 @@ struct imxdi_dev {
+ 	struct work_struct work;
+ };
  
-+	dcr = readl(imxdi->ioaddr + DCR);
-+	dsr = readl(imxdi->ioaddr + DSR);
++/* Some background:
++ *
++ * The DryIce unit is a complex security/tamper monitor device. To be able do
++ * its job in a useful manner it runs a bigger statemachine to bring it into
++ * security/tamper failure state and once again to bring it out of this state.
++ *
++ * This unit can be in one of three states:
++ *
++ * - "NON-VALID STATE"
++ *   always after the battery power was removed
++ * - "FAILURE STATE"
++ *   if one of the enabled security events has happened
++ * - "VALID STATE"
++ *   if the unit works as expected
++ *
++ * Everything stops when the unit enters the failure state including the RTC
++ * counter (to be able to detect the time the security event happened).
++ *
++ * The following events (when enabled) let the DryIce unit enter the failure
++ * state:
++ *
++ * - wire-mesh-tamper detect
++ * - external tamper B detect
++ * - external tamper A detect
++ * - temperature tamper detect
++ * - clock tamper detect
++ * - voltage tamper detect
++ * - RTC counter overflow
++ * - monotonic counter overflow
++ * - external boot
++ *
++ * If we find the DryIce unit in "FAILURE STATE" and the TDCHL cleared, we
++ * can only detect this state. In this case the unit is completely locked and
++ * must force a second "SYSTEM POR" to bring the DryIce into the
++ * "NON-VALID STATE" + "FAILURE STATE" where a recovery is possible.
++ * If the TDCHL is set in the "FAILURE STATE" we are out of luck. In this case
++ * a battery power cycle is required.
++ *
++ * In the "NON-VALID STATE" + "FAILURE STATE" we can clear the "FAILURE STATE"
++ * and recover the DryIce unit. By clearing the "NON-VALID STATE" as the last
++ * task, we bring back this unit into life.
++ */
 +
-+	if (!(dcr & DCR_TCE) || (dsr & DSR_SVF)) {
-+		if (dcr & DCR_TCHL) {
-+			/* we are even more out of luck */
-+			di_what_is_to_be_done(imxdi, "battery");
-+			return -EPERM;
-+		}
-+		if ((dcr & DCR_TCSL) || (dsr & DSR_SVF)) {
-+			/* we are out of luck for now */
-+			di_what_is_to_be_done(imxdi, "main");
-+			return -EPERM;
-+		}
-+	}
-+
- 	/* zero the fractional part first */
- 	rc = di_write_wait(imxdi, 0, DTCLR);
--	if (rc == 0)
--		rc = di_write_wait(imxdi, secs, DTCMR);
-+	if (rc != 0)
-+		return rc;
- 
--	return rc;
-+	rc = di_write_wait(imxdi, secs, DTCMR);
-+	if (rc != 0)
-+		return rc;
-+
-+	return di_write_wait(imxdi, readl(imxdi->ioaddr + DCR) | DCR_TCE, DCR);
- }
- 
- static int dryice_rtc_alarm_irq_enable(struct device *dev,
+ /*
+  * enable a dryice interrupt
+  */
 -- 
 2.1.4
