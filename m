@@ -1,30 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Apr 2015 15:05:14 +0200
-Subject: [PATCH] RFC: let gpiod_get_optional et all return NULL when
- GPIOLIB is not enabled
-In-Reply-To: <CAAVeFu+0bWSAUSaDGTUmPyj9JxEJn4yxF_hzab4CHp8YV1MuoA@mail.gmail.com>
-References: <1423731809-4800-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdb6KcZx3WfTqUKemhQ0_OsqxBGQb_P5cXXZvgc3riakdA@mail.gmail.com>
- <20150306085957.GC10717@pengutronix.de>
- <CACRpkdYq70V8SG4XOPBCGWs__J4ehknZSucpO5OdXpMDj8GPKA@mail.gmail.com>
- <CAAVeFu+0bWSAUSaDGTUmPyj9JxEJn4yxF_hzab4CHp8YV1MuoA@mail.gmail.com>
-Message-ID: <CACRpkdbLRaEshEw-zCr49VUxULQ-gfT5LnHEL7Gz7jWr7NGOfg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 27 Apr 2015 16:05:08 +0300
+Subject: [PATCH 08/10] ARM: shmobile: armadillo800eva dts: Use generic
+ names for device nodes
+In-Reply-To: <1430139334-15272-9-git-send-email-geert+renesas@glider.be>
+References: <1430139334-15272-1-git-send-email-geert+renesas@glider.be>
+ <1430139334-15272-9-git-send-email-geert+renesas@glider.be>
+Message-ID: <553E3404.6020601@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 9, 2015 at 4:20 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
+Hello.
 
-> Having GPIO disabled means there is no GPIO support, including the
-> ability to look for GPIOs. -ENOSYS is a well-documented error-code
-> which meaning also applies to the gpio_*_optional functions (we don't
-> have support for the operation you requested). If a driver or
-> architecture really, really needs GPIO support they can require or
-> depend on CONFIG_GPIOLIB, and the problem goes away. If they can work
-> with and without gpiolib, then they should check for -ENOSYS when they
-> request GPIOs and behave accordingly.
+On 04/27/2015 03:55 PM, Geert Uytterhoeven wrote:
 
-Makes sense. We have ARCH_WANT_OPTIONAL_GPIOLIB and
-ARCH_REQUIRE_GPIOLIB for this reason.
+> wm8978 -> codec
 
-Yours,
-Linus Walleij
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>   arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+
+> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+> index 9bd0cb439f448d03..2e31d8c01cbf6a74 100644
+> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+> @@ -208,7 +208,7 @@
+>   		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
+>   	};
+>
+> -	wm8978: wm8978 at 1a {
+> +	wm8978: codec at 1a {
+
+     Perhaps sound-codec?
+
+[...]
+
+WBR, Sergei
