@@ -1,51 +1,31 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Mon, 27 Apr 2015 13:27:10 -0700
-Subject: [PATCH 0/3] Introduce SET_NOIRQ_SYSTEM_SLEEP_PM_OPS and use it
-In-Reply-To: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
-References: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
-Message-ID: <553E9B9E.4080401@oracle.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 27 Apr 2015 22:36:08 +0200
+Subject: [PATCH 01/13] thermal: Make temperatures consistently unsigned
+ long
+In-Reply-To: <1427385240-6086-2-git-send-email-s.hauer@pengutronix.de>
+References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+ <1427385240-6086-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150427203608.GD29351@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu 2015-03-26 16:53:48, Sascha Hauer wrote:
+> The thermal framework uses int, long and unsigned long for temperatures
+> in millicelsius. The majority of functions uses unsigned long, so change
+> the remaining functions to use this type aswell.
 
+Maybe millicelsius_t should be introduced, so that readers immediately know
+what type it is? Some parts of kernel also use decicelsius and decikelvin, IIRC (ACPI).
 
-On 4/27/2015 11:24 AM, grygorii.strashko at linaro.org wrote:
-> From: Grygorii Strashko <grygorii.strashko@linaro.org>
->
-> While working on suspend-to-disk functionality on TI dra7-evm (DRA7xx SoC)
-> i've found that the most common problem I have to dial with is absence
-> of corresponding PM callbacks in drivers and, in particular, noirq callbacks.
-> So, I've fixed one driver first
-> commit 6248015d6867 "ARM: omap-device: add missed callback for suspend-to-disk"
-> but then found another one which need to be fixed too (omap_l3_noc.c).
-> At this moment I decided to make my life easier and added new macro
-> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS using the same approach as for the existing
-> SET_SYSTEM_SLEEP_PM_OPS macro.
->
-> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS: defined for CONFIG_PM_SLEEP and
-> assigns ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
-> function. Vice versa happens for ->resume_noirq, ->thaw_noirq and
-> ->restore_noirq.
->
-> Further two patches reuse this newly introduced macro.
->
-> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS, defined for CONFIG_PM_SLEEP, will
->      point ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
->      function. Vice versa happens for ->resume_noirq, ->thaw_noirq and
->      ->restore_noirq.
->
-[...]
+									Pavel
 
->
-> Grygorii Strashko (3):
->    PM / Sleep: Add macro to define common noirq system PM callbacks
->    bus: omap_l3_noc: add missed callbacks for suspend-to-disk
->    ARM: omap-device: use SET_NOIRQ_SYSTEM_SLEEP_PM_OPS
->
->   arch/arm/mach-omap2/omap_device.c |  7 ++-----
->   drivers/bus/omap_l3_noc.c         |  4 ++--
->   include/linux/pm.h                | 12 ++++++++++++
->   3 files changed, 16 insertions(+), 7 deletions(-)
->
-Looks fine to me.....
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+>  	if (trip_type == THERMAL_TRIP_CRITICAL) {
+>  		dev_emerg(&tz->device,
+> -			  "critical temperature reached(%d C),shutting down\n",
+> +			  "critical temperature reached(%lu C),shutting down\n",
+
+space after , ?
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
