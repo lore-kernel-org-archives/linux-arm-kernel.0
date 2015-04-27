@@ -1,277 +1,82 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Mon, 27 Apr 2015 14:09:14 +1000
-Subject: [PATCH v10 00/29] Refine PCI scan interfaces and make generic
- pci host bridge
-In-Reply-To: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
-References: <1429616088-10249-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1430107754.6073.9.camel@axtens.net>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 27 Apr 2015 07:39:06 +0300
+Subject: [PATCH 2/4] mtd: mxc_nand: limit the size of used oob
+In-Reply-To: <20150426200725.GC19431@pengutronix.de>
+References: <cover.1430034929.git.baruch@tkos.co.il>
+ <4bd5da1f7d57aa32c5682297f7aa0c768e8c6e49.1430034929.git.baruch@tkos.co.il>
+ <20150426200725.GC19431@pengutronix.de>
+Message-ID: <20150427043906.GR2258@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yijing,
+Hi Uwe,
 
-I'm wondering if you might get some more momentum on these changes if
-we could split them into a few smaller patch sets. I think we might
-then be able to start getting bits of this in for 4.2, which should help
-with getting the rest of it in.
+On Sun, Apr 26, 2015 at 10:07:25PM +0200, Uwe Kleine-K?nig wrote:
+> On Sun, Apr 26, 2015 at 11:16:49AM +0300, Baruch Siach wrote:
+> > For 4k pages the i.MX NFC hardware uses exactly 218 or 128 bytes for 4bit or
+> > 8bit ECC data, respectively. Larger oobsize confuses the logic of copy_spare().
+> > Limit the size of used oob size to avoid that.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  drivers/mtd/nand/mxc_nand.c | 15 +++++++++++----
+> >  1 file changed, 11 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> > index 33b22b9c0b30..c650f0950b20 100644
+> > --- a/drivers/mtd/nand/mxc_nand.c
+> > +++ b/drivers/mtd/nand/mxc_nand.c
+> > @@ -819,15 +819,22 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
+> >  {
+> >  	struct nand_chip *this = mtd->priv;
+> >  	struct mxc_nand_host *host = this->priv;
+> > -	u16 i, oob_chunk_size;
+> > +	u16 i, oob_chunk_size, used_oobsize;
+> >  	u16 num_chunks = mtd->writesize / 512;
+> >  
+> >  	u8 *d = host->data_buf + mtd->writesize;
+> >  	u8 __iomem *s = host->spare0;
+> >  	u16 sparebuf_size = host->devtype_data->spare_len;
+> >  
+> > +	/* hardware can only use 218 or 128 oob bytes for ecc */
+> > +	if (mtd->oobsize >= 218)
+> IMHO this is the wrong check. What if your part (with 224 bytes spare)
+> is used but the machine only uses the small layout e.g. for booting?
+> (That would work, wouldn't it?)
 
-I think there are a few things that would be easy to pull out.
+Yes, but how would I know? I am following here the assumption of get_eccsize() 
+that enables 8 bit ECC when there is enough oobsize.
 
-  * #1 (xen/PCI: Don't use deprecated function
-     pci_scan_bus_parented()) can go directly to Xen people and should
-     be easy to merge. #2 (PCI: Remove deprecated
-     pci_scan_bus_parented()) is then an easy fixup.
+> Moreover the comment is misleading as it
+> only applies to 4K flashes. At least the driver works well with (2ki +
+> 128) bytes pages (while there are only 64 bytes spare used?? Maybe there
+> are still more bugs?).
 
-  * I think #12 (powerpc/PCI: Rename pcibios_root_bridge_prepare() to
-    pcibios_set_root_bus_speed()) could go to the PowerPC folks
-    individually. I'm not sure, however, that it's worth renaming it
-    and creating another function and another hook when no other arch
-    uses it. If mpe and benh don't want to pick it up, it'd be pretty
-    easy to take out set_root_bus_speed from the host_bridge_ops
-    struct, and this way we can still advance other parts of the
-    series.
+I suspect there are more bugs. A simple way to trigger the bug I encountered 
+is by doing a sub-page write, that is:
 
-  * #16 (PCI: Introduce pci_bus_child_max_busnr()) is self-contained
-     and already has a user, so that should go in easily.
+  dd if=/dev/zero bs=1024 count=1 of=/dev/mtd2
+  dd if=/dev/zero bs=1024 count=1 seek=1 of=/dev/mtd2
 
-  * The domain/bus numbering cleanup stuff could be broken out:
-    #3  (PCI: Save domain in pci_host_bridge)
-    #4  (PCI: Move pci_bus_assign_domain_nr() declaration into
-drivers/pci/pci.h)
-    #8  (PCI: Introduce pci_host_assign_domain_nr() to assign domain),
-    #28 (PCI: Remove platform specific pci_domain_nr())
-    #29 (PCI: Remove pci_bus_assign_domain_nr())
+and then try reading this page. You may need to dirty the (useless; random) 
+content of ecccalc to see the bug (you can conveniently use 
+mxc_nand_calculate_ecc() for that). What copy_spare() currently do (spread ECC 
+chunks evenly over oob) does not match nandv2_hw_eccoob_largepage.
 
+> > +		used_oobsize = 218;
+> > +	else if (mtd->oobsize >= 128)
+> > +		used_oobsize = 128;
+> > +	else
+> > +		used_oobsize = mtd->oobsize;
+> Is it worth to put this check into _probe and put the used size into
+> driver data?
 
+I think you are right. I'll also add checks for smaller page/oob size.
 
-I've done a bunch of rebasing and compiles to try to make sure all of
-these proposed divisions work and there are no dependencies that I've
-missed. It it's helpful, you can see what I've done at
-https://github.com/daxtens/linux in the YijingWang-enumer10
-branch. Feel free to use it as you wish.
+Thanks for reviewing,
+baruch
 
-I think the remaining 20 patches could probably be split again at least
-once - it looks like the bus/bus numbering stuff might be easy to split
-out? I might have a look again in a few days.
-
-Regards,
-Daniel
-
-My final set of series, using your original patch names:
-
-Set 1 (Xen cleanup):
-  xen/PCI: Don't use deprecated function pci_scan_bus_parented()
-  PCI: Remove deprecated pci_scan_bus_parented()
-
-Set 2 (PowerPC cleanup):
-  powerpc/PCI: Rename pcibios_root_bridge_prepare() to
-    pcibios_set_root_bus_speed()
-
-Set 3: (could possibly be merged with set 4)
-  PCI: Introduce pci_bus_child_max_busnr()
-
-Set 4: (_nr and friends)
-  PCI: Save domain in pci_host_bridge
-  PCI: Move pci_bus_assign_domain_nr() declaration into
-       drivers/pci/pci.h
-  PCI: Introduce pci_host_assign_domain_nr() to assign domain
-  PCI: Remove platform specific pci_domain_nr()
-  PCI: Remove pci_bus_assign_domain_nr()
-
-Remainder:
-  PCI: Remove argument bus for pci_create_root_bus()
-  PCI: Alloc busn resource dynamically for pci_scan_bus()
-  PCI: Allocate busn resource for pci_scan_root_bus()
-  PCI: Separate pci_host_bridge creation out of pci_create_root_bus()
-  PCI: Introduce pci_host_bridge_list to manage host bridges
-  PCI: Save sysdata in pci_host_bridge drvdata  
-  PCI: Move pcibios_root_bridge_prepare() to pci_create_host_bridge()
-  PCI: Introduce pci_host_bridge_ops to support host specific
-    operations
-  PCI: Introduce new scan function pci_scan_host_bridge()
-  x86/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
-  ia64/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
-  powerpc/pci: Use pci_scan_host_bridge() for simplicity
-  PCI: Remove pcibios_root_bridge_prepare() and
-    pcibos_set_root_bus_speed()
-  sparc/PCI: Use pci_scan_host_bridge() for simplicity
-  parisc/PCI: Use pci_scan_root_bus() for simplicity
-  PCI/mvebu: Use pci_common_init_dev() to simplify code
-  PCI/tegra: Remove redundant tegra_pcie_scan_bus()
-  PCI/designware: Use pci_scan_root_bus() for simplicity
-  PCI/xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
-  PCI: Rename __pci_create_root_bus() to pci_create_root_bus()
-
-On Tue, 2015-04-21 at 19:34 +0800, Yijing Wang wrote:
-> This series could be pulled from:
-> https://github.com/YijingWang/linux-pci.git enumer10
-> 
-> v9->v10:
-> 	Dynamically allocate busn resource if callers don't supply.
-> 	Try to adjust busn resource if host bridge busn resource conlict.
-> 	Rebase whole series on Bjorn's latest pci-next branch.
-> 	Major v9->v10 changes are in patch 5,6,7,10.
-> v8->v9:
-> 	Add Thierry's Acked-by and Tested-by.
-> 	Fix the building error for powerpc found by Daniel.
-> 	Change pci_host_assign_domain_nr() to static.
-> v7->v8:
-> 	Fix some cross building errors found by kbuild test.
-> 	Drop the rename patch for find_pci_host_bridge().
-> v6->v7:
-> 	Drop previous patch which combined the domain and bus in one argument.
-> 	Make the pci_host_bridge hold the default busn resource, so we could
-> 	check whether new host busn resource is conflict with existing ones.
-> 	Move pci_host_assign_domain_nr() to drivers/pci/host-bridge.c
-> 	Other changes suggested by Bjorn and Suravee.
-> v5->v6:
-> 	Fix cross building errors found by kbuild test.
-> 	Export busn_resource to Xen pcifront driver.
-> v4->v5:
-> 	Fix some code style issues and rename some functions suggested by Bjorn.
-> 	Fix some code flaw(Eg. call pci_bus_add_devices() before resources claim
-> 	or lack the return checking).
-> v3->v4:
-> 	Fix the rebase issue.
-> v2->v3:
-> 	Rebase this series on v4.0-rc1.
-> v1->v2:
-> 	Split pci_host_bridge_list into a new patch, remove .phb_probe_mode
-> 	and rework powerpc .phb_of_scan_bus() for simpilicty suggested by
-> 	Arnd. Refresh some patch description log, and add a new patch to fix
-> 	build warning in ia64.
-> 
-> This series is based on Bjorn's pci/enumeration branch.
-> You could pull it from https://github.com/YijingWang/linux-pci.git enumer9
-> 
-> Now in kernel, we scan pci bus use the following ways:
-> 1. pci_scan_bus. 
-> 	parent = NULL, default io/mem/bus resources
-> 	call pci_bus_add_devices()
-> 
-> 2. pci_scan_bus_parented() + pci_bus_add_devices()
-> 	default io/mem/bus resources, only used by xen
-> 
-> 3. pci_scan_root_bus() + pci_bus_add_devices()
-> 
-> 4. pci_create_root_bus() + pci_scan_child_bus() + pci_bus_add_devices()
-> 
-> 5. pci_create_root_bus() + xx_of_scan_bus()  +  pci_bus_add_devices()
-> 
-> And we have a lot of arch specific pci_domain_nr() and other platform
-> specific weak function like pcibios_root_bridge_prepare().
-> 
-> After applied this series, we have following scan interfaces:
-> 
-> 1. pci_scan_bus() 
-> 	parent = NULL, default io/mem/bus resources.
-> 	for legacy pci scan
-> 
-> 2. pci_scan_root_bus()
-> 	for callers provide its own parent and io/mem/bus resources
-> 	but no platform specific pci_host_bridge operations
-> 
-> 3. pci_scan_host_bridge()
-> 	for callers provide its own parent and io/mem/bus resources
-> 
-> 
-> 
-> Arnd Bergmann (1):
->   xen/PCI: Don't use deprecated function pci_scan_bus_parented()
-> 
-> Yijing Wang (28):
->   PCI: Remove deprecated pci_scan_bus_parented()
->   PCI: Save domain in pci_host_bridge
->   PCI: Move pci_bus_assign_domain_nr() declaration into
->     drivers/pci/pci.h
->   PCI: Remove argument bus for pci_create_root_bus()
->   PCI: Alloc busn resource dynamically for pci_scan_bus()
->   PCI: Allocate busn resource for pci_scan_root_bus()
->   PCI: Introduce pci_host_assign_domain_nr() to assign domain
->   PCI: Separate pci_host_bridge creation out of pci_create_root_bus()
->   PCI: Introduce pci_host_bridge_list to manage host bridges
->   PCI: Save sysdata in pci_host_bridge drvdata
->   powerpc/PCI: Rename pcibios_root_bridge_prepare() to
->     pcibios_set_root_bus_speed()
->   PCI: Move pcibios_root_bridge_prepare() to pci_create_host_bridge()
->   PCI: Introduce pci_host_bridge_ops to support host specific
->     operations
->   PCI: Introduce new scan function pci_scan_host_bridge()
->   PCI: Introduce pci_bus_child_max_busnr()
->   x86/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
->   ia64/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
->   powerpc/pci: Use pci_scan_host_bridge() for simplicity
->   PCI: Remove pcibios_root_bridge_prepare() and
->     pcibos_set_root_bus_speed()
->   sparc/PCI: Use pci_scan_host_bridge() for simplicity
->   parisc/PCI: Use pci_scan_root_bus() for simplicity
->   PCI/mvebu: Use pci_common_init_dev() to simplify code
->   PCI/tegra: Remove redundant tegra_pcie_scan_bus()
->   PCI/designware: Use pci_scan_root_bus() for simplicity
->   PCI/xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
->   PCI: Rename __pci_create_root_bus() to pci_create_root_bus()
->   PCI: Remove platform specific pci_domain_nr()
->   PCI: Remove pci_bus_assign_domain_nr()
-> 
->  arch/alpha/include/asm/pci.h             |    2 -
->  arch/alpha/kernel/pci.c                  |    4 +-
->  arch/alpha/kernel/sys_nautilus.c         |    2 +-
->  arch/arm/kernel/bios32.c                 |    2 +-
->  arch/arm/mach-dove/pcie.c                |    2 +-
->  arch/arm/mach-iop13xx/pci.c              |    4 +-
->  arch/arm/mach-mv78xx0/pcie.c             |    2 +-
->  arch/arm/mach-orion5x/pci.c              |    4 +-
->  arch/frv/mb93090-mb00/pci-vdk.c          |    3 +-
->  arch/ia64/include/asm/pci.h              |    1 -
->  arch/ia64/pci/pci.c                      |   35 ++--
->  arch/ia64/sn/kernel/io_init.c            |    4 +-
->  arch/m68k/coldfire/pci.c                 |    2 +-
->  arch/microblaze/pci/pci-common.c         |   15 +--
->  arch/mips/include/asm/pci.h              |    2 -
->  arch/mips/pci/pci.c                      |    4 +-
->  arch/mn10300/unit-asb2305/pci.c          |    3 +-
->  arch/powerpc/include/asm/machdep.h       |    2 +-
->  arch/powerpc/kernel/pci-common.c         |   79 +++++-----
->  arch/powerpc/platforms/pseries/pci.c     |    8 +-
->  arch/powerpc/platforms/pseries/pseries.h |    2 +-
->  arch/powerpc/platforms/pseries/setup.c   |    2 +-
->  arch/s390/pci/pci.c                      |   10 +-
->  arch/sh/drivers/pci/pci.c                |    4 +-
->  arch/sh/include/asm/pci.h                |    2 -
->  arch/sparc/kernel/leon_pci.c             |    2 +-
->  arch/sparc/kernel/pci.c                  |   45 +++---
->  arch/sparc/kernel/pcic.c                 |    2 +-
->  arch/tile/include/asm/pci.h              |    2 -
->  arch/tile/kernel/pci.c                   |    4 +-
->  arch/tile/kernel/pci_gx.c                |    4 +-
->  arch/unicore32/kernel/pci.c              |    2 +-
->  arch/x86/include/asm/pci.h               |    6 -
->  arch/x86/pci/acpi.c                      |   37 +++--
->  arch/x86/pci/common.c                    |    2 +-
->  arch/xtensa/kernel/pci.c                 |    2 +-
->  drivers/parisc/dino.c                    |    6 +-
->  drivers/parisc/lba_pci.c                 |    6 +-
->  drivers/pci/host-bridge.c                |  223 +++++++++++++++++++++++++
->  drivers/pci/host/pci-mvebu.c             |   18 +--
->  drivers/pci/host/pci-tegra.c             |   16 --
->  drivers/pci/host/pci-versatile.c         |    3 +-
->  drivers/pci/host/pci-xgene.c             |    5 +-
->  drivers/pci/host/pcie-designware.c       |    6 +-
->  drivers/pci/host/pcie-xilinx.c           |    2 +-
->  drivers/pci/hotplug/acpiphp_glue.c       |   29 +---
->  drivers/pci/hotplug/ibmphp_core.c        |    2 +-
->  drivers/pci/pci.c                        |   85 +++-------
->  drivers/pci/pci.h                        |    5 +
->  drivers/pci/probe.c                      |  265 ++++++++++++++---------------
->  drivers/pci/xen-pcifront.c               |   16 ++-
->  include/linux/pci.h                      |   45 +++---
->  52 files changed, 573 insertions(+), 467 deletions(-)
-> 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 860 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150427/86490bea/attachment.sig>
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
