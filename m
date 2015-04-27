@@ -1,131 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 27 Apr 2015 18:43:13 +0200
-Subject: [PATCH] ARM: gic: Document Power and Clock Domain optional
- properties
-In-Reply-To: <20150427155427.GB16191@leverpostej>
-References: <1430146811-29862-1-git-send-email-geert+renesas@glider.be>
- <20150427155427.GB16191@leverpostej>
-Message-ID: <CAMuHMdVT=vzFazUsJtvPsyB8zX-WJqp19RNVYA=UMfWZtHnF=Q@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 27 Apr 2015 16:49:24 +0000 (UTC)
+Subject: Tegra baseline test results for v4.1-rc1
+Message-ID: <alpine.DEB.2.02.1504271642550.31868@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-On Mon, Apr 27, 2015 at 5:54 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Apr 27, 2015 at 04:00:11PM +0100, Geert Uytterhoeven wrote:
->> On some SoCs, the GIC may be part of a PM Domain (hardware Power and/or
->> Clock Domain).  Document the related optional DT properties.
->>
->> Note: As the current GIC driver doesn't support Runtime PM yet, PM
->> Domain constraints must be handled elsewhere in e.g. platform code.
->
-> I'm worried that without a current user these properties aren't going to
-> see any testing...
+Here are some basic Tegra test results for Linux v4.1-rc1.
+Logs and other details at:
 
-Still, DT is supposed to describe the hardware. Even if the driver doesn't
-use the description.
+    http://nvt.pwsan.com/pub/linux/testlogs/test_v4.1-rc1/20150426183104/
 
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> To preserve DT stability, we would like to add these properties to the
->> affected shmobile dtsi files.
->
-> ... which means that they could be wrong, and will get in the way of
-> stability rather than aiding it.
 
-We do know the GIC is part of the power domain, and has a controllable
-clock (on the affected SoCs).
+Test summary
+------------
 
-> I'm also concerned that the carving up of clock inputs, power domains,
-> and other physical details is implementation-specific. I imagine that
-> pretty much every user that will care about this is using GIC-400, so
-> could we make this specific to GIC-400?
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-I have no idea which GIC version is being used.
+Build: Image:
+    Pass: ( 1/ 1): defconfig
 
-This is for Renesas R-Mobile APE6 (r8a73a4) and various R-Car Gen2.
-According to the DTS, they're compatible with "arm,cortex-a15-gic" and
-"arm,cortex-a7-gic", and work with that value.
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
 
->> On Thu, Mar 26, 2015 at 11:39 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> > On 25/03/15 21:19, Geert Uytterhoeven wrote:
->> >> I would like to add the clock and GIC dependency on the clock in the DTS now,
->> >> for reasons of DTS stability. But that means I need a temporary workaround
->> >> to avoid the clock from being disabled, until the GIC driver handles this.
->> >>
->> >> I don't expect a fix for the GIC code to just show up magically. I just wanted
->> >> you to be aware of the problem. GIC is not the only problematic module here,
->> >> there are others, cfr. the last slide of [2].
->> >
->> > As long as there is an agreement from the DT people on the presence of
->> > that extra property in the GIC node, I'm happy with that. I'd like it to
->> > be documented though.
->>
->> Full thread at
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331876.html
->>
->>  Documentation/devicetree/bindings/arm/gic.txt | 8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
->> index 2da059a4790cb3c6..b21113b35f085f27 100644
->> --- a/Documentation/devicetree/bindings/arm/gic.txt
->> +++ b/Documentation/devicetree/bindings/arm/gic.txt
->> @@ -58,6 +58,14 @@ Optional
->>    regions, used when the GIC doesn't have banked registers. The offset is
->>    cpu-offset * cpu-nr.
->>
->> +- power-domains : A phandle and PM domain specifier as defined by bindings of
->> +               the power controller specified by phandle, used when the GIC
->> +               is part of a Power or Clock Domain.
->
-> I imagine that it's possible for the distributor and CPU interfaces to
-> be in separate power domains in some implementaitons.
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
 
-Possibly (then we're gonna need subnodes, each with their own
-power-domains properties?).
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
 
-> Which components of the GIC does the apply to? The whole thing? Just the
-> GICD?
 
-Unfortunately that's not documented...
+vmlinux object size
+(delta in bytes from test_v4.0 (39a8804455fb23f09157341d3ba7db6d7ae6ee76)):
+   text     data      bss    total  kernel
++330066   +29448    +1472  +360986  multi_v7_defconfig
++117544    +7768     +612  +125924  tegra_defconfig
++634958  +147392    +2840  +785190  defconfig
 
->> +- clocks        : A phandle and clock specifier as defined by bindings of
->> +               the clock controller specified by phandle, used when the GIC
->> +               is part of a Clock Domain.
->
-> Depending on implementation, a GIC could require multiple clocks, and
-> their names would be implementation-specific (that said, GIC-400 has a
-> single "CLK" input).
 
-Documentation/devicetree/bindings/arm/gic.txt doesn't mention any clocks
-for GIC-400?
-
-> Assuming that you're using GIC-400, could we use clock-names to make
-> that explicit?
-
-You can. But you have to be careful to avoid conflicts, as the controller
-for the clock domain needs to know which clock to use.
-
-On Renesas SoCs, we always used the first clock for power control.
-For the future, we plan to use "fck" if it exists.
-
-Yes, this can be complicated, as ideally it needs synchronization between
-device DT bindings and platform (clock/power domain) DT bindings.
-
-Please also note that any device (hardware IP core) can be reused on an
-SoC that supports clock and/or power domains, and suddenly starts to rely
-on power-domains and clocks properties.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Boot-time memory difference
+(delta in bytes from test_v4.0 (39a8804455fb23f09157341d3ba7db6d7ae6ee76))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+    -372k     372k        .      20k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+    -144k     144k        .      12k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+    -408k     408k        .      20k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+    -180k     180k        .      12k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+    -364k     364k        .      20k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+    -136k     136k        .      12k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+    -500k     500k        .      20k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+    -272k     272k        .      12k       tegra30-beaver      tegra_defconfig       tegra30-beaver
