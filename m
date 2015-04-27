@@ -1,38 +1,73 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Mon, 27 Apr 2015 09:53:28 +0900
-Subject: [PATCH] ARM: exynos: Fix wake-up interrupts for Exynos3250
-In-Reply-To: <CAJKOXPd45=c5fybCiyExdyRUZcC9p8zdZqZPPYcjiZd5x28sHw@mail.gmail.com>
-References: <1429724452-26563-1-git-send-email-marc.zyngier@arm.com>
- <CAJKOXPd45=c5fybCiyExdyRUZcC9p8zdZqZPPYcjiZd5x28sHw@mail.gmail.com>
-Message-ID: <0d0201d08084$93191f80$b94b5e80$@kernel.org>
+Date: Mon, 27 Apr 2015 09:59:45 +0900
+Subject: [PATCH 2/2] ARM: dts: Fix pinctrl settings for S2MPS11 RTC alarm
+ IRQ on Arndale Octa
+In-Reply-To: <CAJKOXPfbsrkvXT_CBxZeDTLYdbwGMH=+5mnBLoy9Yfyp4thVQg@mail.gmail.com>
+References: <1427985376-20420-1-git-send-email-k.kozlowski@samsung.com>
+ <1427985376-20420-3-git-send-email-k.kozlowski@samsung.com>
+ <CAJKOXPfbsrkvXT_CBxZeDTLYdbwGMH=+5mnBLoy9Yfyp4thVQg@mail.gmail.com>
+Message-ID: <0d3901d08085$73a05f00$5ae11d00$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Krzysztof Kozlowski wrote:
 > 
-> 2015-04-23 2:40 GMT+09:00 Marc Zyngier <marc.zyngier@arm.com>:
-> > Commit 8b283c025443 (ARM: exynos4/5: convert pmu wakeup to
-> > stacked domains) changed the Exynos PMU code to use stacked
-> > domains. This has led to a number of interrupt numbers to be
-> > fixed.
+> 2015-04-02 23:36 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> > On Arndale Octa the S2MPS11 RTC alarm interrupt was not handled at all
+> > because of wrong configuration of interrupt and gpx3-2.
+> > 1. Interrupt is signaled by falling edge.
+> > 2. This GPIO line is hard-wired on the board to PVDD_APIO_1V8 through a
+> >    resistor so pull-up/down must be disabled.
 > >
-> > In the meantime, support for Exynos 3250 was added, missing
-> > the required change to this platform. This amounts to revert
-> > ace283a04a4a (ARM: EXYNOS: Fix wrong hwirq of RTC interrupt
-> > for Exynos3250 SoC), as the initial patch was right, just a
-> > bit early...
-> >
-> > Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> > Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Cc: Kukjin Kim <kgene@kernel.org>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > > ---
-> >  arch/arm/mach-exynos/suspend.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >  arch/arm/boot/dts/exynos5420-arndale-octa.dts | 13 ++++++++++++-
+> >  1 file changed, 12 insertions(+), 1 deletion(-)
 > 
-> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Dear Kukjin,
 > 
-Thanks and applied.
+> Any comments  on this and other patches. A lot of emails waits for
+> your opinion. Is there anything I could do to help you in smooth
+> review or applying?
+> 
+Sorry for the delay and looks good to me.
+
+Will apply into fixes branch and thanks.
 
 - Kukjin
+
+> Best regards,
+> Krzysztof
+> 
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-
+> octa.dts
+> > index d78fcd997ce6..97346df31d41 100644
+> > --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> > +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> > @@ -87,7 +87,9 @@
+> >                         s2mps11,buck4-ramp-enable = <1>;
+> >
+> >                         interrupt-parent = <&gpx3>;
+> > -                       interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
+> > +                       interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
+> > +                       pinctrl-names = "default";
+> > +                       pinctrl-0 = <&s2mps11_irq>;
+> >
+> >                         s2mps11_osc: clocks {
+> >                                 #clock-cells = <1>;
+> > @@ -379,3 +381,12 @@
+> >         clocks = <&clock CLK_RTC>, <&s2mps11_osc S2MPS11_CLK_AP>;
+> >         clock-names = "rtc", "rtc_src";
+> >  };
+> > +
+> > +&pinctrl_0 {
+> > +       s2mps11_irq: s2mps11-irq {
+> > +               samsung,pins = "gpx3-2";
+> > +               samsung,pin-function = <0xf>;
+> > +               samsung,pin-pud = <0>;
+> > +               samsung,pin-drv = <0>;
+> > +       };
+> > +};
+> > --
+> > 1.9.1
