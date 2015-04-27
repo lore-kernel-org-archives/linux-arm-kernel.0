@@ -1,139 +1,318 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Mon, 27 Apr 2015 13:08:10 +0000
-Subject: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-In-Reply-To: <553DEC20.3010400@arm.com>
-References: <1429091364-31939-1-git-send-email-Minghuan.Lian@freescale.com>
- <1429091364-31939-2-git-send-email-Minghuan.Lian@freescale.com>
- <BN3PR0301MB1219110247416097623B4A7CEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <DM2PR0301MB06402A7F6BF42B9A84669D94E2E50@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <BN3PR0301MB121987D3E12F25B79E8C51EFEAE50@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20150416104008.GB25640@arm.com>
- <CY1PR0301MB0748D9259F32CBBC2C580BD187E30@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150422170718.GG13019@arm.com>
- <CY1PR0301MB0748AFF942250831769C40E587EE0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150424161818.GC7313@arm.com>	<553A72D4.7000801@arm.com>
- <CY1PR0301MB074896DF1A06CDEC3A0E09B687EC0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150425113930.7386a42a@arm.com>
- <BN1PR0301MB06276181976E880432B8C49AEAEA0@BN1PR0301MB0627.namprd03.prod.outlook.com>
- <553DEC20.3010400@arm.com>
-Message-ID: <BN1PR0301MB0627CD95FC31B221DAA644EDEAE90@BN1PR0301MB0627.namprd03.prod.outlook.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 27 Apr 2015 21:08:45 +0800
+Subject: [PATCH] ARM: dts: imx53: add support for USB armory board
+In-Reply-To: <1429882425-24514-1-git-send-email-andrej@inversepath.com>
+References: <1429882425-24514-1-git-send-email-andrej@inversepath.com>
+Message-ID: <20150427130844.GM9231@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Fri, Apr 24, 2015 at 03:33:45PM +0200, andrej at inversepath.com wrote:
+> From: Andrej Rosano <andrej@inversepath.com>
+> 
+> Add support for Inverse Path USB armory board, an open source
+> flash-drive sized computer based on Freescale i.MX53 SoC.
+> 
+> http://inversepath.com/usbarmory
+> 
+> As the device can work in either USB device mode or USB host mode,
+> two different device tree file are needed along with one common
+> include file.
+> 
+> Signed-off-by: Andrej Rosano <andrej@inversepath.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Chris Kuethe <chris.kuethe@gmail.com>
+> Cc: Vagrant Cascadian <vagrant@debian.org>
 
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Monday, April 27, 2015 1:28 PM
-> To: Sethi Varun-B16395; Yoder Stuart-B08248
-> Cc: Will Deacon; Lian Minghuan-B31939; linux-pci at vger.kernel.org; Arnd
-> Bergmann; Hu Mingkai-B21284; Zang Roy-R61911; Bjorn Helgaas; Wood Scott-
-> B07421; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] irqchip/gicv3-its: Support share device ID
-> 
-> Hi Varun,
-> 
-> On 26/04/15 19:20, Varun Sethi wrote:
-> > Hi Marc,
-> >
-> >>>> We can deal with the aliasing, provided that we extend the level of
-> >>>> quirkiness that pci_for_each_dma_alias can deal with. But that
-> >>>> doesn't solve any form of hotplug/SR-IOV behaviour.
-> >>>>
-> > [varun] Can you please elaborate on "extending the quirkiness of
-> > pci_for_each_dma_alias". How do you see the case for transparent host
-> > bridege being handled? We would see a device ID corresponding to the
-> > host bridge for masters behind that bridge.
-> 
-> The PCI code already has code to deal with aliases, and can deal with them in
-> a number of cases.
-> 
-> At the moment, this aliasing code can only deal with aliases that belong to
-> the same PCI bus (or aliasing with the bus itself). Given the way the problem
-> has been described, I understand that you can have devices sitting on
-> different buses that will end up with the same DeviceID. This is where
-> expanding the "quirkiness" of pci_for_each_dma_alias comes into play. You
-> need to teach it about this kind of topology.
-> 
-[varun] Agreed, in our case the PCIe controller maintains a stream ID to device ID  translation table. So, we can actually avoid this problem by setting up unique stream IDs across PCIe controllers. We would need a layer to allow translation from device id to stream ID.
+Please also check the comment in thread [1].
 
-> >>>> Somehow, we're going to end-up with grossly oversized ITTs, just to
-> >>>> accommodate for the fact that we have no idea how many MSIs we're
-> >>>> going to end-up needing. I'm not thrilled with that prospect.
-> >>>
-> >>> How can we avoid that in the face of hotplug?
-> >>
-> >> Fortunately, hotplug is not always synonymous of aliasing. The ITS is
-> >> built around the hypothesis that aliasing doesn't happen, and that
-> >> you know upfront how many LPIs the device will be allowed to generate.
-> >>
-> >>> And what are we really worried about regarding over-sized
-> >>> ITTs...bytes of memory saved?
-> >>
-> >> That's one thing, yes. But more fundamentally, how do you size your
-> >> MSI capacity for a single alias? Do you evenly split your LPI space
-> >> among all possible aliases? Assuming 64 aliases and 16 bits of
-> >> interrupt ID space, you end up with 10 bit per alias. Is that always
-> >> enough? Or do you need something more fine-grained?
-> >>
-> >>> A fundamental thing built into the IOMMU subsystem in Linux is
-> >>> representing iommu groups that can represent things like multiple
-> >>> PCI devices that for hardware reasons cannot be isolated (and the
-> >>> example I've seen given relates to devices behind PCI bridges).
-> >>>
-> >>> So, I think the thing we are facing here is that while the IOMMU
-> >>> subsystem has accounted for reprsenting the isolation
-> >>> characteristics of a system with iommu groups, there is no corresponding
-> "msi group"
-> >>> concept.
-> >>>
-> >>> In the SMMU/GIC-500-ITS world the iommu isolation ID (the stream ID)
-> >>> and the GIC-ITS device ID are in fact the same ID.
-> >>
-> >> The DeviceID is the "MSI group" you mention. This is what provides
-> >> isolation at the ITS level.
-> >>
-> > [varun] True, in case of a transparent host bridge device Id won't
-> > provide the necessary isolation.
-> 
-> Well, it depends how you look at it. How necessary is this isolation, since
-> we've already established that you couldn't distinguish between these
-> devices at the IOMMU level?
-> 
-[varun] Yes, the devices would fall in the same IOMMU group. So, devices would end up sharing the interrupt?
+Shawn
 
-> >>> Is there some way we could sanely correlate IOMMU group creation
-> >>> (which establishes isolation granularity) with the creation of an
-> >>> ITT for the GIC-ITS?
-> >>
-> >> The problem you have is that your ITT already exists before you start
-> >> "hotpluging" new devices. Take the following (made up) example:
-> >>
-> >> System boots, device X is discovered, claims 64 MSIs. An ITT for
-> >> device X is allocated, and sized for 64 LPIs. SR-IOV kick is, creates a new X'
-> >> function that is aliased to X, claiming another 64 MSIs. Fail.
-> >>
-> >> What do we do here? The ITT is live (X is generating interrupts), and
-> >> there is no provision to resize it (I've come up with a horrible
-> >> scheme, but that could fail as well). The only sane option would be
-> >> to guess how many MSIs a given alias could possibly use. How wrong is
-> this guess going to be?
-> >>
-> >> The problem we have is that IOMMU groups are dynamic, while ITT
-> >> allocation is completely static for a given DeviceID. The
-> >> architecture doesn't give you any mechanism to resize it, and I have
-> >> the ugly feeling that static allocation of the ID space to aliases is too rigid...
-> >
-> > [varun] One way would be to restrict the number of stream Ids(device
-> > Ids) per PCIe controller. In our scheme we have a device id -> stream
-> > ID translation table, we can restrict the number of entries in the
-> > table. This would restrict number of virtual functions.
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/403682
+
+> ---
+>  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+>  arch/arm/boot/dts/imx53-usbarmory-common.dtsi      |  205 ++++++++++++++++++++
+>  arch/arm/boot/dts/imx53-usbarmory-host.dts         |   18 ++
+>  arch/arm/boot/dts/imx53-usbarmory.dts              |   18 ++
+>  4 files changed, 242 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-common.dtsi
+>  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-host.dts
+>  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
 > 
-> Do you mean reserving a number of StreamIDs per PCIe controller, and
-> letting virtual functions use these spare StreamIDs? This would indeed be
-> more restrictive. But more importantly, who is going to be in charge of this
-> mapping/allocation?
-
-[varun] My understanding is that, as per the new IOMMU API (of_xlate) this would be done in the bus driver code, while setting up the IOMMU groups.
-
--Varun
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 83737a3..e7a10ce 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -102,6 +102,7 @@ img	Imagination Technologies Ltd.
+>  innolux	Innolux Corporation
+>  intel	Intel Corporation
+>  intercontrol	Inter Control Group
+> +inversepath	Inverse Path, S.r.l.
+>  isee	ISEE 2007 S.L.
+>  isil	Intersil
+>  karo	Ka-Ro electronics GmbH
+> diff --git a/arch/arm/boot/dts/imx53-usbarmory-common.dtsi b/arch/arm/boot/dts/imx53-usbarmory-common.dtsi
+> new file mode 100644
+> index 0000000..4b4feae
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx53-usbarmory-common.dtsi
+> @@ -0,0 +1,205 @@
+> +/*
+> + * USB armory MkI device tree include file
+> + * http://inversepath.com/usbarmory
+> + *
+> + * Copyright (C) 2015, Inverse Path
+> + * Andrej Rosano <andrej@inversepath.com>
+> + *
+> + * Licensed under GPLv2
+> + */
+> +
+> +#include "imx53.dtsi"
+> +
+> +/ {
+> +	model = "Inverse Path USB armory";
+> +	compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
+> +};
+> +
+> +/ {
+> +	chosen {
+> +		stdout-path = &uart1;
+> +	};
+> +
+> +	memory {
+> +		reg = <0x70000000 0x20000000>;
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pin_gpio4_27>;
+> +
+> +		user {
+> +			label = "LED";
+> +			gpios = <&gpio4 27 0>;
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +	};
+> +
+> +	soc {
+> +		aips at 60000000 {
+> +			sahara: crypto at 63ff8000 {
+> +				compatible = "fsl,imx53-sahara";
+> +				reg = <0x63ff8000 0x4000>;
+> +				interrupts = <19 20>;
+> +				clocks = <&clks IMX5_CLK_SAHARA_IPG_GATE>,
+> +					 <&clks IMX5_CLK_SAHARA_IPG_GATE>;
+> +				clock-names = "ipg", "ahb";
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&cpu0 {
+> +	device_type = "cpu";
+> +	compatible = "arm,cortex-a8";
+> +	reg = <0x0>;
+> +	clocks = <&clks IMX5_CLK_ARM>;
+> +	clock-latency = <61036>;
+> +	voltage-tolerance = <5>;
+> +	operating-points = <
+> +		/* kHz */
+> +		 166666  850000
+> +		 400000  900000
+> +		 800000 1050000
+> +	>;
+> +};
+> +
+> +&esdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_esdhc1>;
+> +	status = "okay";
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	imx53-usbarmory {
+> +		pinctrl_hog: hoggrp {
+> +			fsl,pins = <
+> +				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
+> +				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
+> +				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
+> +				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
+> +				MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
+> +				MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
+> +				MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
+> +				MX53_PAD_PATA_DA_2__GPIO7_8       0x80000000
+> +				MX53_PAD_GPIO_16__GPIO7_11        0x80000000
+> +			>;
+> +		};
+> +
+> +		led_pin_gpio4_27: led_gpio4_27 at 0 {
+> +			fsl,pins = <
+> +				MX53_PAD_DISP0_DAT6__GPIO4_27 0x80000000
+> +			>;
+> +		};
+> +
+> +		pinctrl_esdhc1: esdhc1grp {
+> +			fsl,pins = <
+> +				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
+> +				MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
+> +				MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
+> +				MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
+> +				MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
+> +				MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c1: i2c1grp {
+> +			fsl,pins = <
+> +				MX53_PAD_CSI0_DAT8__I2C1_SDA	0xc0000000
+> +				MX53_PAD_CSI0_DAT9__I2C1_SCL	0xc0000000
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart1: uart1grp {
+> +			fsl,pins = <
+> +				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
+> +				MX53_PAD_CSI0_DAT11__UART1_RXD_MUX	0x1e4
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1>;
+> +	status = "okay";
+> +};
+> +
+> +&vpu {
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	ltc3589: pmic at 34 {
+> +		compatible = "lltc,ltc3589-2";
+> +		reg = <0x34>;
+> +
+> +		regulators {
+> +			sw1_reg: sw1 {
+> +				regulator-min-microvolt = <591930>;
+> +				regulator-max-microvolt = <1224671>;
+> +				lltc,fb-voltage-divider = <100000 158000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw2_reg: sw2 {
+> +				regulator-min-microvolt = <704123>;
+> +				regulator-max-microvolt = <1456803>;
+> +				lltc,fb-voltage-divider = <180000 191000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw3_reg: sw3 {
+> +				regulator-min-microvolt = <1341250>;
+> +				regulator-max-microvolt = <2775000>;
+> +				lltc,fb-voltage-divider = <270000 100000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			bb_out_reg: bb-out {
+> +				regulator-min-microvolt = <3387341>;
+> +				regulator-max-microvolt = <3387341>;
+> +				lltc,fb-voltage-divider = <511000 158000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +			ldo1_reg: ldo1 {
+> +				regulator-min-microvolt = <1306329>;
+> +				regulator-max-microvolt = <1306329>;
+> +				lltc,fb-voltage-divider = <100000 158000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo2_reg: ldo2 {
+> +				regulator-min-microvolt = <704123>;
+> +				regulator-max-microvolt = <1456806>;
+> +				lltc,fb-voltage-divider = <180000 191000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo3_reg: ldo3 {
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			ldo4_reg: ldo4 {
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <3200000>;
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/imx53-usbarmory-host.dts b/arch/arm/boot/dts/imx53-usbarmory-host.dts
+> new file mode 100644
+> index 0000000..ea2ea45
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx53-usbarmory-host.dts
+> @@ -0,0 +1,18 @@
+> +/*
+> + * USB armory MkI host mode device tree file
+> + * http://inversepath.com/usbarmory
+> + *
+> + * Copyright (C) 2015, Inverse Path
+> + * Andrej Rosano <andrej@inversepath.com>
+> + *
+> + * Licensed under GPLv2
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "imx53-usbarmory-common.dtsi"
+> +
+> +&usbotg {
+> +	dr_mode = "host";
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
+> new file mode 100644
+> index 0000000..902a73b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx53-usbarmory.dts
+> @@ -0,0 +1,18 @@
+> +/*
+> + * USB armory MkI device mode device tree file
+> + * http://inversepath.com/usbarmory
+> + *
+> + * Copyright (C) 2015, Inverse Path
+> + * Andrej Rosano <andrej@inversepath.com>
+> + *
+> + * Licensed under GPLv2
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "imx53-usbarmory-common.dtsi"
+> +
+> +&usbotg {
+> +	dr_mode = "peripheral";
+> +	status = "okay";
+> +};
+> -- 
+> 1.7.10.4
+> 
