@@ -1,26 +1,57 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 27 Apr 2015 22:37:23 +0200
-Subject: [PATCH 0/7] ARM: socfpga: Add support for Arria10 devkit
-In-Reply-To: <1428035998-27542-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1428035998-27542-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20150427203723.GH29351@xo-6d-61-c0.localdomain>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 27 Apr 2015 22:44:56 +0200 (CEST)
+Subject: Question about DC-DC frequency handling
+In-Reply-To: <20150426190729.16410.58019@quantum>
+References: <604104768.496325.1430058690855.JavaMail.open-xchange@oxbaltgw00.schlund.de>
+ <20150426190729.16410.58019@quantum>
+Message-ID: <68391817.574800.1430167496498.JavaMail.open-xchange@oxbaltgw01.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2015-04-02 23:39:51, dinguyen at opensource.altera.com wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
-> 
-> Hi,
-> 
-> This patchset enables and tidy up support for the Arria10 devkit. Along with
-> this patchset and the patch for enabling clocks on the Arria10, the devkit
-> can boot Linux.
+Hi,
 
-For the whole series:
+> Michael Turquette <mturquette@linaro.org> hat am 26. April 2015 um 21:07
+> geschrieben:
+>
+>
+> Quoting Stefan Wahren (2015-04-26 07:31:30)
+> > Hi,
+> >
+> > i'm current working on a regulator driver which should be able to change
+> > DC-DC
+> > clock frequency.
+> >
+> > Now here is my question. What is the prefered way to implement the clock
+> > handling?
+>
+> Fun question. I have a question for you: who are the consumers of this
+> DC-DC? Do the downstream, consuming devices care about "clock rate" of
+> your regulator?
+>
+> I'll hazard a guess that they do not care. DC-DC switching frequency is
+> an important aspect of power supply design, but switching frequency of a
+> power supply is not controlled by the clock framework in any example
+> that I am aware of.
 
-Acked-by: Pavel Machek <pavel@denx.de>
+yes the consumers don't care. My intension for changing the switching frequency
+is
+to avoid interferences on HF band.
 
+>
+> >
+> > Option A):
+> >
+> > The regulator driver handles all internally (select clock source, set
+> > frequency).
+>
+> Mark should weigh in on this, but I think option A is correct. Maybe
+> something like regulator_set_mode could program your switching
+> frequency?
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+A runtime configuration isn't necessary. In a earlier discussion we decided to
+use
+a devicetree property.
+
+Thanks
+
+Stefan
