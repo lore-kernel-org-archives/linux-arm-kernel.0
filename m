@@ -1,24 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Apr 2015 15:32:08 +0200
-Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling to
- the WDT driver.
-In-Reply-To: <553E398E.7060305@roeck-us.net>
-References: <1429902534-2348-1-git-send-email-eric@anholt.net>
- <2465337.STuvDNQht6@wuerfel> <553E398E.7060305@roeck-us.net>
-Message-ID: <17452307.kZG5bCi4C8@wuerfel>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 27 Apr 2015 10:33:01 -0300
+Subject: [PATCH] ARM: mvebu: dove: Relicense the device tree under
+ GPLv2+/X11
+In-Reply-To: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <553E3A8D.5010602@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 April 2015 06:28:46 Guenter Roeck wrote:
-> >
+On 04/27/2015 06:09 AM, Sebastian Hesselbarth wrote:
+> The current implicit GPL only licensing on the device tree makes it
+> very impractical for other software components licensed under another
+> license.
 > 
-> The pointer to the power-off handler is removed in the device remove callback,
-> and thus won't be called after the device is unbound.
+> In order to make it easier for them to reuse our device trees,
+> relicense our device trees under a GPL/X11 dual-license.
 > 
-> Ultimately this is similar the the current code, which assumes that the
-> call to of_find_device_by_node(np) never fails.
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Hi,
+> 
+> with Dove we only have a small set of people who can be git blame'd for
+> the DT files:
+> - Jason Cooper
+> - Ezequiel Garcia
+> - Andrew Lunn
+> - Jean-Francois Moine
+> - Russell King
+> - Myself
+> 
+> so I decided to keep the whole relicensing in a single patch. Please send
+> your Acked-by's in reply to this patch if you are happy with the relicensing.
 > 
 
-Ok, I missed that part. Yes, that works just as well.
-
-	Arnd
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
