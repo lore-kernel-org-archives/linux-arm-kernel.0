@@ -1,17 +1,60 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 27 Apr 2015 15:27:21 -0700
-Subject: [PATCH 0/3] BCM2835 core mailbox support
-Message-ID: <1430173644-19099-1-git-send-email-eric@anholt.net>
+Date: Mon, 27 Apr 2015 15:27:22 -0700
+Subject: [PATCH 1/3 v4] dt/bindings: Add binding for the BCM2835 mailbox driver
+In-Reply-To: <1430173644-19099-1-git-send-email-eric@anholt.net>
+References: <1430173644-19099-1-git-send-email-eric@anholt.net>
+Message-ID: <1430173644-19099-2-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following srwarren's suggestion, I've re-split the mailbox driver I
-had previously submitted so that it only exposes a single channel and
-leaves the previous "channel" notion up to a firmware-specific device
-driver.
+From: Lubomir Rintel <lkundrak@v3.sk>
 
-I'll be submitting the firmware-specific driver in a separate mail
-thread -- hopefully this code is ready now, while I expect to get
-feeback on the other driver.
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+---
 
-This code can also be found at https://github.com/anholt/linux/tree/rpi-mbox-only
+v2: Split into a separate patch for submitting to the devicetree list.
+    Consistently start node docs with a capital letter. device's
+    address in the example shouldn't have "0x". Drop machine-specific
+    interrupt numbers from the docs.  (changes by anholt).
+
+v3: Move the file to just bcm2835-mbox.txt, clean up formatting
+    (changes by anholt, from review by Lee Jones).
+
+v4: Move file back by consensus from various Broadcom platform
+    maintainers (changes by anholt, acked by Lee Jones).
+
+ .../devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+
+diff --git a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+new file mode 100644
+index 0000000..0bb2b9d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+@@ -0,0 +1,19 @@
++Broadcom BCM2835 VideoCore mailbox IPC
++
++Required properties:
++
++- compatible:	Should be "brcm,bcm2835-mbox"
++- reg:		Specifies base physical address and size of the registers
++- interrupts:	The interrupt number
++		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
++- #mbox-cells:	Specifies the number of cells needed to encode a mailbox
++		  channel. The value shall be 1
++
++Example:
++
++mailbox: mailbox at 7e00b800 {
++	compatible = "brcm,bcm2835-mbox";
++	reg = <0x7e00b880 0x40>;
++	interrupts = <0 1>;
++	#mbox-cells = <1>;
++};
+-- 
+2.1.4
