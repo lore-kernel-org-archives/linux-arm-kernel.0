@@ -1,62 +1,63 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 27 Apr 2015 14:30:38 -0500
-Subject: [PATCH 2/3] bus: omap_l3_noc: add missed callbacks for
- suspend-to-disk
-In-Reply-To: <1430159072-31440-3-git-send-email-grygorii.strashko@linaro.org>
-References: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
- <1430159072-31440-3-git-send-email-grygorii.strashko@linaro.org>
-Message-ID: <CAGo_u6pryMrJA1HkM84=SH-PRrN2u+f0dzby-LXUbxSiEh9VYA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 27 Apr 2015 21:31:27 +0200
+Subject: [PATCH 2/4] mtd: mxc_nand: limit the size of used oob
+In-Reply-To: <20150427114341.GW2258@tarshish>
+References: <cover.1430034929.git.baruch@tkos.co.il>
+ <4bd5da1f7d57aa32c5682297f7aa0c768e8c6e49.1430034929.git.baruch@tkos.co.il>
+ <20150426200725.GC19431@pengutronix.de>
+ <20150427043906.GR2258@tarshish>
+ <20150427071238.GE19431@pengutronix.de>
+ <20150427072057.GT2258@tarshish>
+ <20150427075023.GF19431@pengutronix.de>
+ <20150427114341.GW2258@tarshish>
+Message-ID: <20150427193127.GU19431@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 1:24 PM,  <grygorii.strashko@linaro.org> wrote:
-> From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
->
-> Add missed callbacks needed for proper supporting of suspend-to-disk
-> by using recently introduced macro SET_NOIRQ_SYSTEM_SLEEP_PM_OPS.
->
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
-> ---
->  drivers/bus/omap_l3_noc.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-> index 11f7982..6ae3884 100644
-> --- a/drivers/bus/omap_l3_noc.c
-> +++ b/drivers/bus/omap_l3_noc.c
-> @@ -300,7 +300,7 @@ static int omap_l3_probe(struct platform_device *pdev)
->         return ret;
->  }
->
-> -#ifdef CONFIG_PM
-> +#ifdef CONFIG_PM_SLEEP
->
->  /**
->   * l3_resume_noirq() - resume function for l3_noc
-> @@ -346,7 +346,7 @@ static int l3_resume_noirq(struct device *dev)
->  }
->
->  static const struct dev_pm_ops l3_dev_pm_ops = {
-> -       .resume_noirq           = l3_resume_noirq,
-> +       SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(NULL, l3_resume_noirq)
->  };
->
->  #define L3_DEV_PM_OPS (&l3_dev_pm_ops)
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Hello,
 
-Acked-by: Nishanth Menon <nm@ti.com>
+On Mon, Apr 27, 2015 at 02:43:41PM +0300, Baruch Siach wrote:
+> On Mon, Apr 27, 2015 at 09:50:23AM +0200, Uwe Kleine-K?nig wrote:
+> > On Mon, Apr 27, 2015 at 10:20:57AM +0300, Baruch Siach wrote:
+> > > On Mon, Apr 27, 2015 at 09:12:38AM +0200, Uwe Kleine-K?nig wrote:
+> > > > Hmm I rechecked the reference manual and found a register to specify the
+> > > > size of the spare area (I didn't notice that one before). Did you try
+> > > > what happens if you set this to 0x70 for 224 bytes oob?
+> > > 
+> > > Which register is that?
+> > Spare Area Size Register (SPAS) at offset 0x1e10 for the i.MX25 (that's
+> > what you're using, don't you?).
+> 
+> Yes, that's what I'm using.
+> 
+> I tried setting the SPAS register to oobsize/2 (0x70 in my case), but I see no 
+> change in behaviour. Moreover, it turns out the previously Barebox set this 
+> register (apparently wrongly) to 0x20 for spare size of 64. Current Barebox 
+> master still do. For v3 Barebox limits CONFIG2_SPAS to 218 bytes spare size 
+I guess for v21 writing to SPAS is just what the controller assumes
+after reset. I.e. that a 512-byte nand has 16 bytes spare and a 2k-nand
+has 64.
+
+> since Eric B?nard's commit 632c45795065 (nand_imx: update to support onfi & 4k 
+> flashs, 2012-07-05). As you can see, the kernel doesn't touch this register 
+> for v2 NFC.
+right.
+
+> I have no idea what is the effect of the SPAS in v2 (or any other) NFC.
+I didn't try, but I'm surprised it doesn't make a difference. How did
+you test? I'd do in barebox:
+
+	memset -w 0xbb000000 0x55 0x1200
+	set SPAS to 218/2
+	trigger page read
+	check how much of the 0x55 was overwritten
+	set SPAS to 224/2
+	trigger page read
+	compare with above
+
+Best regards
+Uwe
 
 -- 
----
-Regards,
-Nishanth Menon
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
