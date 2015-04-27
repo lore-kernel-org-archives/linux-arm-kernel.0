@@ -1,456 +1,55 @@
-From: catalin.crenguta@gmail.com (Catalin Crenguta)
-Date: Mon, 27 Apr 2015 13:28:07 +0300
-Subject: [PATCH v2] ARM: dts: imx6: Add Embest MarS Board
-In-Reply-To: <1430128172-16376-1-git-send-email-vianney.leclement@essensium.com>
-References: <1430128172-16376-1-git-send-email-vianney.leclement@essensium.com>
-Message-ID: <CABH3fy-53oe+KPGci2WyNBNboUi7Cn=cX=Es-KJi3FYc3fn1yA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Apr 2015 11:55:09 +0100
+Subject: [PATCH 1/2] clocksource: arm_arch_timer: add
+ arch_timer_okay_for_vdso
+In-Reply-To: <1429911801-6069-1-git-send-email-nathan_lynch@mentor.com>
+References: <1429911801-6069-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <20150427105509.GC1544@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is still problematic.
-I can get it to boot from eMMC, but after a little while I get the
-same errors again.
-Does anyone know how this should be configured?
-What drive strength, speed (MHz), pullup?
-
-On Mon, Apr 27, 2015 at 12:49 PM, Vianney le Cl?ment de Saint-Marcq
-<vianney.leclement@essensium.com> wrote:
-> Add device tree for the Embest/Element14 MarS Board [1], an i.MX6 Dual
-> based development board.
->
-> [1] http://www.embest-tech.com/shop/star/marsboard.html
->
-> Signed-off-by: Vianney le Cl?ment de Saint-Marcq <vianney.leclement@essensium.com>
-> Cc: Catalin Crenguta <catalin.crenguta@gmail.com>
->
+On Fri, Apr 24, 2015 at 10:43:20PM +0100, Nathan Lynch wrote:
+> The 32-bit ARM VDSO needs to know whether a generic timer is present
+> and whether it is suitable for use by user space.  The VDSO
+> initialization code currently duplicates some of the logic from the
+> driver to make this determination, but unfortunately it is incomplete;
+> it will incorrectly enable the VDSO if HYP mode is available or if no
+> interrupt is provided for the virtual timer (see arch_timer_init).  In
+> these cases the driver will switch to memory-backed access while the
+> VDSO will attempt to access the counter using cp15 reads.
+> 
+> Add an arch_timer_okay_for_vdso API which can reliably inform the VDSO
+> init code whether the arch timer is present and usable.
+> 
+> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
 > ---
->
-> Changes in v2:
-> * Working eMMC (thanks Catalin and Lucas)
-> * Use definitions from gpio.h more consistently
-> * Remove partition table
-> * Remove unused nodes
-> * Formatting improvements
-> ---
->  arch/arm/boot/dts/Makefile            |   1 +
->  arch/arm/boot/dts/imx6q-marsboard.dts | 396 ++++++++++++++++++++++++++++++++++
->  2 files changed, 397 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-marsboard.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 91bd5bd..06fa33e 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -249,6 +249,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->         imx6q-gw54xx.dtb \
->         imx6q-gw552x.dtb \
->         imx6q-hummingboard.dtb \
-> +       imx6q-marsboard.dtb \
->         imx6q-nitrogen6x.dtb \
->         imx6q-phytec-pbab01.dtb \
->         imx6q-rex-pro.dtb \
-> diff --git a/arch/arm/boot/dts/imx6q-marsboard.dts b/arch/arm/boot/dts/imx6q-marsboard.dts
-> new file mode 100644
-> index 0000000..304d160
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-marsboard.dts
-> @@ -0,0 +1,396 @@
-> +/*
-> + * Copyright 2015 Vianney le Cl?ment de Saint-Marcq, Essensium NV
-> + *  Based on imx6dl-riotboard.dts Copyright Iain Paton.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
+>  drivers/clocksource/arm_arch_timer.c | 12 ++++++++++++
+>  include/clocksource/arm_arch_timer.h |  6 ++++++
+>  2 files changed, 18 insertions(+)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 0aa135ddbf80..b75215523d2f 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -462,6 +462,18 @@ struct timecounter *arch_timer_get_timecounter(void)
+>  	return &timecounter;
+>  }
+>  
+> +/* The ARM VDSO init code needs to know:
+> + * - whether a cp15-based arch timer is present; and if so
+> + * - whether the physical or virtual counter is being used.
 > + */
+> +bool arch_timer_okay_for_vdso(void)
+> +{
+> +	if (!(arch_timers_present & ARCH_CP15_TIMER))
+> +		return false;
 > +
-> +/dts-v1/;
-> +#include "imx6q.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +       model = "MarS Board i.MX6 Dual Board";
-> +       compatible = "embest,imx6q-marsboard", "fsl,imx6q";
-> +
-> +       memory {
-> +               reg = <0x10000000 0x40000000>;
-> +       };
-> +
-> +       regulators {
-> +               compatible = "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               reg_2p5v: regulator at 0 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <0>;
-> +                       regulator-name = "2P5V";
-> +                       regulator-min-microvolt = <2500000>;
-> +                       regulator-max-microvolt = <2500000>;
-> +               };
-> +
-> +               reg_3p3v: regulator at 1 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <1>;
-> +                       regulator-name = "3P3V";
-> +                       regulator-min-microvolt = <3300000>;
-> +                       regulator-max-microvolt = <3300000>;
-> +               };
-> +
-> +               reg_usb_otg_vbus: regulator at 2 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <2>;
-> +                       regulator-name = "usb_otg_vbus";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-> +               };
-> +       };
-> +
-> +       leds {
-> +               compatible = "gpio-leds";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_led>;
-> +
-> +               led0: user1 {
-> +                       gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
-> +                       default-state = "on";
-> +                       linux,default-trigger = "heartbeat";
-> +               };
-> +
-> +               led1: user2 {
-> +                       gpios = <&gpio3 28 GPIO_ACTIVE_LOW>;
-> +                       default-state = "off";
-> +               };
-> +       };
-> +};
-> +
-> +&audmux {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_audmux>;
-> +       status = "okay";
-> +};
-> +
-> +&ecspi1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_ecspi1>;
-> +       cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>;
-> +       fsl,spi-num-chipselects = <1>;
-> +       status = "okay";
-> +
-> +       flash: m25p80 at 0 {
-> +               compatible = "st,sst25vf016b";
-> +               reg = <0>;
-> +               spi-max-frequency = <20000000>;
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +       };
-> +};
-> +
-> +&fec {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_enet>;
-> +       phy-mode = "rgmii";
-> +       status = "okay";
-> +};
-> +
-> +&hdmi {
-> +       ddc-i2c-bus = <&i2c2>;
-> +       status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +       clock-frequency = <100000>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c1>;
-> +       status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +       clock-frequency = <100000>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c2>;
-> +       status = "okay";
-> +};
-> +
-> +&i2c3 {
-> +       clock-frequency = <100000>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c3>;
-> +       status = "okay";
-> +};
-> +
-> +&pwm1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_pwm1>;
-> +       status = "okay";
-> +};
-> +
-> +&pwm2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_pwm2>;
-> +       status = "okay";
-> +};
-> +
-> +&pwm3 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_pwm3>;
-> +       status = "okay";
-> +};
-> +
-> +&pwm4 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_pwm4>;
-> +       status = "okay";
-> +};
-> +
-> +&uart1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart1>;
-> +       status = "okay";
-> +};
-> +
-> +&uart2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart2>;
-> +       status = "okay";
-> +};
-> +
-> +&uart3 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart3>;
-> +       status = "okay";
-> +};
-> +
-> +&uart4 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart4>;
-> +       status = "okay";
-> +};
-> +
-> +&uart5 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart5>;
-> +       status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +       dr_mode = "host";
-> +       disable-over-current;
-> +       status = "okay";
-> +};
-> +
-> +&usbotg {
-> +       vbus-supply = <&reg_usb_otg_vbus>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usbotg>;
-> +       disable-over-current;
-> +       dr_mode = "otg";
-> +       status = "okay";
-> +};
-> +
-> +&usdhc2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usdhc2>;
-> +       cd-gpios = <&gpio1 4 0>;
-> +       vmmc-supply = <&reg_3p3v>;
-> +       status = "okay";
-> +};
-> +
-> +&usdhc3 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usdhc3>;
-> +       vmmc-supply = <&reg_3p3v>;
-> +       non-removable;
-> +       status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +       imx6-marsboard {
-> +               pinctrl_audmux: audmuxgrp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_CSI0_DAT7__AUD3_RXD          0x130b0
-> +                               MX6QDL_PAD_CSI0_DAT4__AUD3_TXC          0x130b0
-> +                               MX6QDL_PAD_CSI0_DAT5__AUD3_TXD          0x110b0
-> +                               MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS         0x130b0
-> +                       >;
-> +               };
-> +
-> +               pinctrl_ecspi1: ecspi1grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_EIM_D16__ECSPI1_SCLK         0x100b1
-> +                               MX6QDL_PAD_EIM_D17__ECSPI1_MISO         0x100b1
-> +                               MX6QDL_PAD_EIM_D18__ECSPI1_MOSI         0x100b1
-> +                               MX6QDL_PAD_EIM_EB2__GPIO2_IO30          0x000b1 /* CS0 */
-> +                       >;
-> +               };
-> +
-> +               pinctrl_ecspi2: ecspi2grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_EIM_CS0__ECSPI2_SCLK         0x100b1
-> +                               MX6QDL_PAD_EIM_CS1__ECSPI2_MOSI         0x100b1
-> +                               MX6QDL_PAD_EIM_OE__ECSPI2_MISO          0x100b1
-> +                               MX6QDL_PAD_EIM_LBA__GPIO2_IO27          0x000b1 /* CS0 */
-> +                               MX6QDL_PAD_EIM_A17__GPIO2_IO21          0x000b1 /* IRQ */
-> +                       >;
-> +               };
-> +
-> +               pinctrl_enet: enetgrp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_ENET_MDIO__ENET_MDIO         0x1b0b0
-> +                               MX6QDL_PAD_ENET_MDC__ENET_MDC           0x1b0b0
-> +                               MX6QDL_PAD_RGMII_TXC__RGMII_TXC         0x1b0b0
-> +                               MX6QDL_PAD_RGMII_TD0__RGMII_TD0         0x1b0b0
-> +                               MX6QDL_PAD_RGMII_TD1__RGMII_TD1         0x1b0b0
-> +                               MX6QDL_PAD_RGMII_TD2__RGMII_TD2         0x1b0b0
-> +                               MX6QDL_PAD_RGMII_TD3__RGMII_TD3         0x1b0b0
-> +                               MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL   0x1b0b0
-> +                               /* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
-> +                               MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK    0x0a0b1
-> +                               /* AR8035 pin strapping: IO voltage: pull up */
-> +                               MX6QDL_PAD_RGMII_RXC__RGMII_RXC         0x1b0b0
-> +                               /* AR8035 pin strapping: PHYADDR#0: pull down */
-> +                               MX6QDL_PAD_RGMII_RD0__RGMII_RD0         0x130b0
-> +                               /* AR8035 pin strapping: PHYADDR#1: pull down */
-> +                               MX6QDL_PAD_RGMII_RD1__RGMII_RD1         0x130b0
-> +                               /* AR8035 pin strapping: MODE#1: pull up */
-> +                               MX6QDL_PAD_RGMII_RD2__RGMII_RD2         0x1b0b0
-> +                               /* AR8035 pin strapping: MODE#3: pull up */
-> +                               MX6QDL_PAD_RGMII_RD3__RGMII_RD3         0x1b0b0
-> +                               /* AR8035 pin strapping: MODE#0: pull down */
-> +                               MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL   0x130b0
-> +                               /* RGMII_nRST */
-> +                               MX6QDL_PAD_EIM_D31__GPIO3_IO31          0x130b0
-> +                               /* AR8035 interrupt */
-> +                               MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28       0x180b0
-> +                       >;
-> +               };
-> +
-> +               pinctrl_i2c1: i2c1grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_CSI0_DAT8__I2C1_SDA          0x4001b8b1
-> +                               MX6QDL_PAD_CSI0_DAT9__I2C1_SCL          0x4001b8b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_i2c2: i2c2grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_KEY_COL3__I2C2_SCL           0x4001b8b1
-> +                               MX6QDL_PAD_KEY_ROW3__I2C2_SDA           0x4001b8b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_i2c3: i2c3grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_GPIO_5__I2C3_SCL             0x4001b8b1
-> +                               MX6QDL_PAD_GPIO_6__I2C3_SDA             0x4001b8b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_led: ledgrp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_EIM_A25__GPIO5_IO02          0x1b0b1
-> +                               MX6QDL_PAD_EIM_D28__GPIO3_IO28          0x1b0b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_pwm1: pwm1grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_GPIO_9__PWM1_OUT             0x1b0b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_pwm2: pwm2grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_SD1_DAT2__PWM2_OUT           0x1b0b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_pwm3: pwm3grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_SD4_DAT1__PWM3_OUT           0x1b0b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_pwm4: pwm4grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_SD4_DAT2__PWM4_OUT           0x1b0b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_uart1: uart1grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA    0x1b0b1
-> +                               MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA    0x1b0b1
-> +                               MX6QDL_PAD_EIM_D19__UART1_CTS_B         0x1b0b1
-> +                               MX6QDL_PAD_EIM_D20__UART1_RTS_B         0x1b0b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_uart2: uart2grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_EIM_D26__UART2_TX_DATA       0x1b0b1
-> +                               MX6QDL_PAD_EIM_D27__UART2_RX_DATA       0x1b0b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_uart3: uart3grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_EIM_D24__UART3_TX_DATA       0x1b0b1
-> +                               MX6QDL_PAD_EIM_D25__UART3_RX_DATA       0x1b0b1
-> +                               MX6QDL_PAD_EIM_EB3__UART3_RTS_B         0x1b0b1
-> +                               MX6QDL_PAD_EIM_D23__UART3_CTS_B         0x1b0b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_uart4: uart4grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_KEY_COL0__UART4_TX_DATA      0x1b0b1
-> +                               MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA      0x1b0b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_uart5: uart5grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_KEY_COL1__UART5_TX_DATA      0x1b0b1
-> +                               MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA      0x1b0b1
-> +                       >;
-> +               };
-> +
-> +               pinctrl_usbotg: usbotggrp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID       0x17059
-> +                               MX6QDL_PAD_EIM_D21__USB_OTG_OC          0x1b0b0
-> +                               MX6QDL_PAD_EIM_D22__GPIO3_IO22          0x000b0 /* PWR */
-> +                       >;
-> +               };
-> +
-> +               pinctrl_usdhc2: usdhc2grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_SD2_CMD__SD2_CMD             0x17059
-> +                               MX6QDL_PAD_SD2_CLK__SD2_CLK             0x10059
-> +                               MX6QDL_PAD_SD2_DAT0__SD2_DATA0          0x17059
-> +                               MX6QDL_PAD_SD2_DAT1__SD2_DATA1          0x17059
-> +                               MX6QDL_PAD_SD2_DAT2__SD2_DATA2          0x17059
-> +                               MX6QDL_PAD_SD2_DAT3__SD2_DATA3          0x17059
-> +                               MX6QDL_PAD_GPIO_4__GPIO1_IO04           0x1b0b0 /* SD2 CD */
-> +                       >;
-> +               };
-> +
-> +               pinctrl_usdhc3: usdhc3grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_SD3_CMD__SD3_CMD             0x17009
-> +                               MX6QDL_PAD_SD3_CLK__SD3_CLK             0x10009
-> +                               MX6QDL_PAD_SD3_DAT0__SD3_DATA0          0x17009
-> +                               MX6QDL_PAD_SD3_DAT1__SD3_DATA1          0x17009
-> +                               MX6QDL_PAD_SD3_DAT2__SD3_DATA2          0x17009
-> +                               MX6QDL_PAD_SD3_DAT3__SD3_DATA3          0x17009
-> +                               MX6QDL_PAD_SD3_RST__GPIO7_IO08          0x17009 /* SD3 RST (eMMC) */
-> +                       >;
-> +               };
-> +       };
-> +};
-> --
-> 2.3.6
->
+> +	return arch_timer_use_virtual;
+> +}
+
+If we're adding this, then it wouldn't hurt to use the same check in
+arch/arm64 when we update_vsyscall(...). Could we also encapsulate the
+`current clocksource' knowledge in there too, to remove the hardcoded
+"arch_sys_counter" check from the arch code?
+
+Will
