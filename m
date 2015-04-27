@@ -1,346 +1,164 @@
-From: andrej@inversepath.com (Andrej Rosano)
-Date: Mon, 27 Apr 2015 15:15:01 +0200
-Subject: [PATCH] ARM: dts: imx53: add support for USB armory board
-In-Reply-To: <CAGHP0p+hHcbqhntLdbYM5+KKa8UPmGMo+KOjsY_vpSZmZzesSg@mail.gmail.com>
-References: <1429882425-24514-1-git-send-email-andrej@inversepath.com>
- <CAGHP0p+hHcbqhntLdbYM5+KKa8UPmGMo+KOjsY_vpSZmZzesSg@mail.gmail.com>
-Message-ID: <20150427131501.GA11598@core.inversepath.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 27 Apr 2015 21:13:44 +0800
+Subject: [PATCH v3 7/9] ARM: zx: Add basic defconfig support for ZX296702
+In-Reply-To: <1430124644-16715-8-git-send-email-jun.nie@linaro.org>
+References: <1430124644-16715-1-git-send-email-jun.nie@linaro.org>
+ <1430124644-16715-8-git-send-email-jun.nie@linaro.org>
+Message-ID: <20150427131343.GN9231@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 01:08:40PM -0700, Chris Kuethe wrote:
-> Don't forget to patch the makefile...
+On Mon, Apr 27, 2015 at 04:50:44PM +0800, Jun Nie wrote:
+> Add basic defconfig support to zx SOC, including uart, mmc
+>  and other common config
 > 
-> Tested-by: Chris Kuethe <chris.kuethe@gmail.com>
+> Signed-off-by: Jun Nie <jun.nie@linaro.org>
+> ---
+>  arch/arm/configs/zx_defconfig | 130 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 130 insertions(+)
+>  create mode 100644 arch/arm/configs/zx_defconfig
 > 
-> --- arch/arm/boot/dts/Makefile.orig 2016-04-24 12:54:17.219917799 -0700
-> +++ arch/arm/boot/dts/Makefile 2015-04-24 12:55:49.255690003 -0700
-> @@ -244,6 +244,8 @@
->   imx53-smd.dtb \
->   imx53-tx53-x03x.dtb \
->   imx53-tx53-x13x.dtb \
-> + imx53-usbarmory.dtb \
-> + imx53-usbarmory-host.dtb \
->   imx53-voipac-bsb.dtb
->  dtb-$(CONFIG_SOC_IMX6Q) += \
->   imx6dl-aristainetos_4.dtb \
+> diff --git a/arch/arm/configs/zx_defconfig b/arch/arm/configs/zx_defconfig
+> new file mode 100644
+> index 0000000..e3447fc
+> --- /dev/null
+> +++ b/arch/arm/configs/zx_defconfig
+> @@ -0,0 +1,130 @@
+> +CONFIG_EXPERIMENTAL=y
+> +CONFIG_SYSVIPC=y
+> +CONFIG_NO_HZ=y
+> +CONFIG_HIGH_RES_TIMERS=y
+> +CONFIG_LOG_BUF_SHIFT=14
+> +CONFIG_CGROUPS=y
+> +CONFIG_CGROUP_DEBUG=y
+> +CONFIG_CGROUP_FREEZER=y
+> +CONFIG_CGROUP_CPUACCT=y
+> +CONFIG_RESOURCE_COUNTERS=y
+> +CONFIG_CGROUP_SCHED=y
+> +CONFIG_RT_GROUP_SCHED=y
+> +CONFIG_NAMESPACES=y
+> +CONFIG_USER_NS=y
+> +CONFIG_BLK_DEV_INITRD=y
+> +CONFIG_INITRAMFS_SOURCE="/home/niej/git/linux/initramfs.cpio.gz"
 
-Sure!
+This is improper to be in the defconfig.
 
-Thanks,
-Andrej
+Shawn
 
-> 
-> On Fri, Apr 24, 2015 at 6:33 AM,  <andrej@inversepath.com> wrote:
-> > From: Andrej Rosano <andrej@inversepath.com>
-> >
-> > Add support for Inverse Path USB armory board, an open source
-> > flash-drive sized computer based on Freescale i.MX53 SoC.
-> >
-> > http://inversepath.com/usbarmory
-> >
-> > As the device can work in either USB device mode or USB host mode,
-> > two different device tree file are needed along with one common
-> > include file.
-> >
-> > Signed-off-by: Andrej Rosano <andrej@inversepath.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> > Cc: Chris Kuethe <chris.kuethe@gmail.com>
-> > Cc: Vagrant Cascadian <vagrant@debian.org>
-> > ---
-> >  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
-> >  arch/arm/boot/dts/imx53-usbarmory-common.dtsi      |  205 ++++++++++++++++++++
-> >  arch/arm/boot/dts/imx53-usbarmory-host.dts         |   18 ++
-> >  arch/arm/boot/dts/imx53-usbarmory.dts              |   18 ++
-> >  4 files changed, 242 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-common.dtsi
-> >  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-host.dts
-> >  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
-> >
-> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > index 83737a3..e7a10ce 100644
-> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > @@ -102,6 +102,7 @@ img Imagination Technologies Ltd.
-> >  innolux        Innolux Corporation
-> >  intel  Intel Corporation
-> >  intercontrol   Inter Control Group
-> > +inversepath    Inverse Path, S.r.l.
-> >  isee   ISEE 2007 S.L.
-> >  isil   Intersil
-> >  karo   Ka-Ro electronics GmbH
-> > diff --git a/arch/arm/boot/dts/imx53-usbarmory-common.dtsi b/arch/arm/boot/dts/imx53-usbarmory-common.dtsi
-> > new file mode 100644
-> > index 0000000..4b4feae
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx53-usbarmory-common.dtsi
-> > @@ -0,0 +1,205 @@
-> > +/*
-> > + * USB armory MkI device tree include file
-> > + * http://inversepath.com/usbarmory
-> > + *
-> > + * Copyright (C) 2015, Inverse Path
-> > + * Andrej Rosano <andrej@inversepath.com>
-> > + *
-> > + * Licensed under GPLv2
-> > + */
-> > +
-> > +#include "imx53.dtsi"
-> > +
-> > +/ {
-> > +       model = "Inverse Path USB armory";
-> > +       compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
-> > +};
-> > +
-> > +/ {
-> > +       chosen {
-> > +               stdout-path = &uart1;
-> > +       };
-> > +
-> > +       memory {
-> > +               reg = <0x70000000 0x20000000>;
-> > +       };
-> > +
-> > +       leds {
-> > +               compatible = "gpio-leds";
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&led_pin_gpio4_27>;
-> > +
-> > +               user {
-> > +                       label = "LED";
-> > +                       gpios = <&gpio4 27 0>;
-> > +                       linux,default-trigger = "heartbeat";
-> > +               };
-> > +       };
-> > +
-> > +       soc {
-> > +               aips at 60000000 {
-> > +                       sahara: crypto at 63ff8000 {
-> > +                               compatible = "fsl,imx53-sahara";
-> > +                               reg = <0x63ff8000 0x4000>;
-> > +                               interrupts = <19 20>;
-> > +                               clocks = <&clks IMX5_CLK_SAHARA_IPG_GATE>,
-> > +                                        <&clks IMX5_CLK_SAHARA_IPG_GATE>;
-> > +                               clock-names = "ipg", "ahb";
-> > +                       };
-> > +               };
-> > +       };
-> > +};
-> > +
-> > +&cpu0 {
-> > +       device_type = "cpu";
-> > +       compatible = "arm,cortex-a8";
-> > +       reg = <0x0>;
-> > +       clocks = <&clks IMX5_CLK_ARM>;
-> > +       clock-latency = <61036>;
-> > +       voltage-tolerance = <5>;
-> > +       operating-points = <
-> > +               /* kHz */
-> > +                166666  850000
-> > +                400000  900000
-> > +                800000 1050000
-> > +       >;
-> > +};
-> > +
-> > +&esdhc1 {
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_esdhc1>;
-> > +       status = "okay";
-> > +};
-> > +
-> > +&iomuxc {
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_hog>;
-> > +
-> > +       imx53-usbarmory {
-> > +               pinctrl_hog: hoggrp {
-> > +                       fsl,pins = <
-> > +                               MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
-> > +                               MX53_PAD_GPIO_8__GPIO1_8          0x80000000
-> > +                               MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
-> > +                               MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
-> > +                               MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
-> > +                               MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
-> > +                               MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
-> > +                               MX53_PAD_PATA_DA_2__GPIO7_8       0x80000000
-> > +                               MX53_PAD_GPIO_16__GPIO7_11        0x80000000
-> > +                       >;
-> > +               };
-> > +
-> > +               led_pin_gpio4_27: led_gpio4_27 at 0 {
-> > +                       fsl,pins = <
-> > +                               MX53_PAD_DISP0_DAT6__GPIO4_27 0x80000000
-> > +                       >;
-> > +               };
-> > +
-> > +               pinctrl_esdhc1: esdhc1grp {
-> > +                       fsl,pins = <
-> > +                               MX53_PAD_SD1_DATA0__ESDHC1_DAT0         0x1d5
-> > +                               MX53_PAD_SD1_DATA1__ESDHC1_DAT1         0x1d5
-> > +                               MX53_PAD_SD1_DATA2__ESDHC1_DAT2         0x1d5
-> > +                               MX53_PAD_SD1_DATA3__ESDHC1_DAT3         0x1d5
-> > +                               MX53_PAD_SD1_CMD__ESDHC1_CMD            0x1d5
-> > +                               MX53_PAD_SD1_CLK__ESDHC1_CLK            0x1d5
-> > +                       >;
-> > +               };
-> > +
-> > +               pinctrl_i2c1: i2c1grp {
-> > +                       fsl,pins = <
-> > +                               MX53_PAD_CSI0_DAT8__I2C1_SDA    0xc0000000
-> > +                               MX53_PAD_CSI0_DAT9__I2C1_SCL    0xc0000000
-> > +                       >;
-> > +               };
-> > +
-> > +               pinctrl_uart1: uart1grp {
-> > +                       fsl,pins = <
-> > +                               MX53_PAD_CSI0_DAT10__UART1_TXD_MUX      0x1e4
-> > +                               MX53_PAD_CSI0_DAT11__UART1_RXD_MUX      0x1e4
-> > +                       >;
-> > +               };
-> > +       };
-> > +};
-> > +
-> > +&uart1 {
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_uart1>;
-> > +       status = "okay";
-> > +};
-> > +
-> > +&vpu {
-> > +       status = "okay";
-> > +};
-> > +
-> > +&i2c1 {
-> > +       ltc3589: pmic at 34 {
-> > +               compatible = "lltc,ltc3589-2";
-> > +               reg = <0x34>;
-> > +
-> > +               regulators {
-> > +                       sw1_reg: sw1 {
-> > +                               regulator-min-microvolt = <591930>;
-> > +                               regulator-max-microvolt = <1224671>;
-> > +                               lltc,fb-voltage-divider = <100000 158000>;
-> > +                               regulator-ramp-delay = <7000>;
-> > +                               regulator-boot-on;
-> > +                               regulator-always-on;
-> > +                       };
-> > +
-> > +                       sw2_reg: sw2 {
-> > +                               regulator-min-microvolt = <704123>;
-> > +                               regulator-max-microvolt = <1456803>;
-> > +                               lltc,fb-voltage-divider = <180000 191000>;
-> > +                               regulator-ramp-delay = <7000>;
-> > +                               regulator-boot-on;
-> > +                               regulator-always-on;
-> > +                       };
-> > +
-> > +                       sw3_reg: sw3 {
-> > +                               regulator-min-microvolt = <1341250>;
-> > +                               regulator-max-microvolt = <2775000>;
-> > +                               lltc,fb-voltage-divider = <270000 100000>;
-> > +                               regulator-ramp-delay = <7000>;
-> > +                               regulator-boot-on;
-> > +                               regulator-always-on;
-> > +                       };
-> > +
-> > +                       bb_out_reg: bb-out {
-> > +                               regulator-min-microvolt = <3387341>;
-> > +                               regulator-max-microvolt = <3387341>;
-> > +                               lltc,fb-voltage-divider = <511000 158000>;
-> > +                               regulator-boot-on;
-> > +                               regulator-always-on;
-> > +                       };
-> > +                       ldo1_reg: ldo1 {
-> > +                               regulator-min-microvolt = <1306329>;
-> > +                               regulator-max-microvolt = <1306329>;
-> > +                               lltc,fb-voltage-divider = <100000 158000>;
-> > +                               regulator-boot-on;
-> > +                               regulator-always-on;
-> > +                       };
-> > +
-> > +                       ldo2_reg: ldo2 {
-> > +                               regulator-min-microvolt = <704123>;
-> > +                               regulator-max-microvolt = <1456806>;
-> > +                               lltc,fb-voltage-divider = <180000 191000>;
-> > +                               regulator-ramp-delay = <7000>;
-> > +                               regulator-boot-on;
-> > +                               regulator-always-on;
-> > +                       };
-> > +
-> > +                       ldo3_reg: ldo3 {
-> > +                               regulator-min-microvolt = <2800000>;
-> > +                               regulator-max-microvolt = <2800000>;
-> > +                               regulator-boot-on;
-> > +                       };
-> > +
-> > +                       ldo4_reg: ldo4 {
-> > +                               regulator-min-microvolt = <1200000>;
-> > +                               regulator-max-microvolt = <3200000>;
-> > +                       };
-> > +               };
-> > +       };
-> > +};
-> > diff --git a/arch/arm/boot/dts/imx53-usbarmory-host.dts b/arch/arm/boot/dts/imx53-usbarmory-host.dts
-> > new file mode 100644
-> > index 0000000..ea2ea45
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx53-usbarmory-host.dts
-> > @@ -0,0 +1,18 @@
-> > +/*
-> > + * USB armory MkI host mode device tree file
-> > + * http://inversepath.com/usbarmory
-> > + *
-> > + * Copyright (C) 2015, Inverse Path
-> > + * Andrej Rosano <andrej@inversepath.com>
-> > + *
-> > + * Licensed under GPLv2
-> > + */
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include "imx53-usbarmory-common.dtsi"
-> > +
-> > +&usbotg {
-> > +       dr_mode = "host";
-> > +       status = "okay";
-> > +};
-> > diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
-> > new file mode 100644
-> > index 0000000..902a73b
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx53-usbarmory.dts
-> > @@ -0,0 +1,18 @@
-> > +/*
-> > + * USB armory MkI device mode device tree file
-> > + * http://inversepath.com/usbarmory
-> > + *
-> > + * Copyright (C) 2015, Inverse Path
-> > + * Andrej Rosano <andrej@inversepath.com>
-> > + *
-> > + * Licensed under GPLv2
-> > + */
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include "imx53-usbarmory-common.dtsi"
-> > +
-> > +&usbotg {
-> > +       dr_mode = "peripheral";
-> > +       status = "okay";
-> > +};
-> > --
-> > 1.7.10.4
-> >
-> 
-> 
-> 
+> +CONFIG_SYSCTL_SYSCALL=y
+> +CONFIG_KALLSYMS_ALL=y
+> +CONFIG_EMBEDDED=y
+> +CONFIG_PERF_EVENTS=y
+> +CONFIG_SLAB=y
+> +# CONFIG_BLK_DEV_BSG is not set
+> +# CONFIG_IOSCHED_CFQ is not set
+> +CONFIG_ARCH_ZX=y
+> +CONFIG_SOC_ZX296702=y
+> +# CONFIG_SWP_EMULATE is not set
+> +CONFIG_ARM_ERRATA_754322=y
+> +CONFIG_ARM_ERRATA_775420=y
+> +CONFIG_SMP=y
+> +CONFIG_VMSPLIT_2G=y
+> +CONFIG_PREEMPT=y
+> +CONFIG_AEABI=y
+> +CONFIG_KSM=y
+> +# CONFIG_IOMMU_SUPPORT is not set
+> +CONFIG_VFP=y
+> +CONFIG_NEON=y
+> +CONFIG_KERNEL_MODE_NEON=y
+> +# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> +CONFIG_HIBERNATION=y
+> +CONFIG_PM_RUNTIME=y
+> +CONFIG_PM_DEBUG=y
+> +CONFIG_SUSPEND_TIME=y
+> +CONFIG_ZBOOT_ROM_TEXT=0x0
+> +CONFIG_ZBOOT_ROM_BSS=0x0
+> +CONFIG_CMDLINE="console=ttyAMA0,115200 debug earlyprintk root=/dev/ram rw rootwait"
+> +#CONFIG_NET is not set
+> +CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+> +CONFIG_DEVTMPFS=y
+> +CONFIG_DEVTMPFS_MOUNT=y
+> +CONFIG_DMA_CMA=y
+> +CONFIG_CMA_SIZE_MBYTES=192
+> +CONFIG_BLK_DEV_LOOP=y
+> +CONFIG_BLK_DEV_RAM=y
+> +CONFIG_BLK_DEV_RAM_COUNT=1
+> +CONFIG_BLK_DEV_RAM_SIZE=8192
+> +CONFIG_UID_STAT=y
+> +CONFIG_SCSI=y
+> +CONFIG_BLK_DEV_SD=y
+> +CONFIG_CHR_DEV_SG=y
+> +CONFIG_CHR_DEV_SCH=y
+> +CONFIG_SCSI_MULTI_LUN=y
+> +CONFIG_MD=y
+> +CONFIG_BLK_DEV_DM=y
+> +CONFIG_DM_CRYPT=y
+> +CONFIG_DM_UEVENT=y
+> +CONFIG_DM_VERITY=y
+> +CONFIG_NETDEVICES=y
+> +# CONFIG_INPUT_MOUSE is not set
+> +CONFIG_SERIO=y
+> +CONFIG_SERIO_LIBPS2=y
+> +CONFIG_SPI=y
+> +CONFIG_LOGO=y
+> +CONFIG_SERIAL_CORE=y
+> +CONFIG_SERIAL_CORE_CONSOLE=y
+> +CONFIG_CONSOLE_POLL=y
+> +CONFIG_SERIAL_AMBA_PL011=y
+> +CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+> +CONFIG_SERIAL_OF_PLATFORM=y
+> +# CONFIG_LEGACY_PTYS is not set
+> +# CONFIG_HW_RANDOM is not set
+> +# CONFIG_HWMON is not set
+> +# CONFIG_USB_SUPPORT is not set
+> +CONFIG_MMC=y
+> +CONFIG_MMC_UNSAFE_RESUME=y
+> +CONFIG_MMC_BLOCK_MINORS=16
+> +CONFIG_MMC_DW=y
+> +CONFIG_MMC_DW_IDMAC=y
+> +CONFIG_EXT2_FS=y
+> +CONFIG_EXT4_FS=y
+> +CONFIG_EXT4_FS_POSIX_ACL=y
+> +CONFIG_EXT4_FS_SECURITY=y
+> +CONFIG_EXT4_DEBUG=y
+> +CONFIG_FUSE_FS=y
+> +CONFIG_MSDOS_FS=y
+> +CONFIG_VFAT_FS=y
+> +CONFIG_FAT_DEFAULT_CODEPAGE=936
+> +CONFIG_TMPFS=y
+> +CONFIG_TMPFS_POSIX_ACL=y
+> +#CONFIG_NFS_FS is not set
+> +CONFIG_NLS_CODEPAGE_936=y
+> +CONFIG_NLS_ISO8859_1=y
+> +CONFIG_NLS_UTF8=y
+> +CONFIG_PRINTK_TIME=y
+> +CONFIG_MAGIC_SYSRQ=y
+> +CONFIG_DEBUG_KERNEL=y
+> +CONFIG_DEBUG_INFO=y
+> +CONFIG_FRAME_WARN=4096
+> +CONFIG_DEBUG_FS=y
+> +CONFIG_DEBUG_MEMORY_INIT=y
+> +CONFIG_PANIC_TIMEOUT=5
+> +# CONFIG_SCHED_DEBUG is not set
+> +CONFIG_SCHEDSTATS=y
+> +CONFIG_TIMER_STATS=y
+> +CONFIG_DEBUG_RT_MUTEXES=y
+> +CONFIG_DEBUG_SPINLOCK=y
+> +CONFIG_DEBUG_MUTEXES=y
+> +CONFIG_RCU_CPU_STALL_TIMEOUT=60
+> +# CONFIG_FTRACE is not set
+> +CONFIG_KGDB=y
+> +CONFIG_KGDB_KDB=y
+> +# CONFIG_ARM_UNWIND is not set
+> +CONFIG_DEBUG_PREEMPT=y
+> +CONFIG_DEBUG_USER=y
+> +CONFIG_DEBUG_LL=y
+> +CONFIG_DYNAMIC_DEBUG=y
+> +CONFIG_STACKTRACE=y
+> +CONFIG_DEBUG_ZTE_ZX=y
+> +CONFIG_EARLY_PRINTK=y
+> +CONFIG_CRYPTO_LZO=y
+> +CONFIG_GPIOLIB=y
 > -- 
-> GDB has a 'break' feature; why doesn't it have 'fix' too?
-
---
-Andrej Rosano                                           Inverse Path Srl
-<andrej@inversepath.com>                      http://www.inversepath.com
-
-0x01939B21            5BB8 574E 68E8 D841 E18F  D5E9 CEAD E0CF 0193 9B21
+> 1.9.1
+> 
