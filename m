@@ -1,28 +1,43 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 27 Apr 2015 18:16:11 +0200
-Subject: [PATCH V2] ARM: dts: imx28: Fix AUART4 TX-DMA interrupt name
-In-Reply-To: <20150427144627.GD1788@dragon>
-References: <1429874987-5481-1-git-send-email-marex@denx.de>
- <20150427144627.GD1788@dragon>
-Message-ID: <201504271816.11902.marex@denx.de>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 27 Apr 2015 18:24:59 +0200
+Subject: [PATCH] ARM: mvebu: dove: Relicense the device tree under
+ GPLv2+/X11
+In-Reply-To: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20150427182459.3fcc4c9e@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 27, 2015 at 04:46:29 PM, Shawn Guo wrote:
-> On Fri, Apr 24, 2015 at 01:29:47PM +0200, Marek Vasut wrote:
-> > Fix a typo in the TX DMA interrupt name for AUART4.
-> > This patch makes AUART4 operational again.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
+On Mon, 27 Apr 2015 11:09:04 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+
+> The current implicit GPL only licensing on the device tree makes it
+> very impractical for other software components licensed under another
+> license.
 > 
-> Applied, thanks.
+> In order to make it easier for them to reuse our device trees,
+> relicense our device trees under a GPL/X11 dual-license.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Hi,
+> 
+> with Dove we only have a small set of people who can be git blame'd for
+> the DT files:
+> - Jason Cooper
+> - Ezequiel Garcia
+> - Andrew Lunn
+> - Jean-Francois Moine
+> - Russell King
+> - Myself
+> 
+> so I decided to keep the whole relicensing in a single patch. Please send
+> your Acked-by's in reply to this patch if you are happy with the relicensing.
 
-Thanks!
+Hi Sebastian,
 
-It'd be really great if this could be applied to stable.
-It's rather obvious that AUART4 is not used very much, so
-noone spotted this before, but it'd still be nice to have
-this fixed.
+Acked-by: Jean-Francois Moine <moinejf@free.fr>
 
-Best regards,
-Marek Vasut
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
