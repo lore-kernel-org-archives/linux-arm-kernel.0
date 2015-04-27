@@ -1,60 +1,46 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 27 Apr 2015 18:47:52 -0400
-Subject: [PATCH 03/11] arm/mach-mvebu: remove legacy __cpuinit sections that
- crept in
+Date: Mon, 27 Apr 2015 18:47:51 -0400
+Subject: [PATCH 02/11] arm/mach-keystone: remove legacy __cpuinit sections
+ that crept in
 In-Reply-To: <1430174880-27958-1-git-send-email-paul.gortmaker@windriver.com>
 References: <1430174880-27958-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1430174880-27958-4-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1430174880-27958-3-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 We removed __cpuinit support (leaving no-op stubs) quite some time
-ago.  However these ones crept back in as of commit 1ee89e2231a1b04dc3476
-("ARM: mvebu: add SMP support for Armada 375 and Armada 38x")
+ago.  However two crept back in as of commit 5eb3da7246a5b2dfac9f38
+("ARM: keystone: Switch over to coherent memory address space")
 
-Since we want to clobber the stubs soon, get this removed now.
-Note that there would normally be a corresponding removal of
-a ".previous" directive for each __CPUINIT in asm files, but in
-this case it appears that this single function file was never
-paired off with one.
+Since we want to clobber the stubs too, get these removed now.
 
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- arch/arm/mach-mvebu/headsmp-a9.S | 3 ---
- arch/arm/mach-mvebu/platsmp-a9.c | 2 +-
- 2 files changed, 1 insertion(+), 4 deletions(-)
+ arch/arm/mach-keystone/platsmp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/headsmp-a9.S b/arch/arm/mach-mvebu/headsmp-a9.S
-index 08d5ed46b996..f6a1b5b153af 100644
---- a/arch/arm/mach-mvebu/headsmp-a9.S
-+++ b/arch/arm/mach-mvebu/headsmp-a9.S
-@@ -13,12 +13,9 @@
-  */
+diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
+index 5f46a7cf907b..7f99550cad46 100644
+--- a/arch/arm/mach-keystone/platsmp.c
++++ b/arch/arm/mach-keystone/platsmp.c
+@@ -40,14 +40,14 @@ static int keystone_smp_boot_secondary(unsigned int cpu,
+ }
  
- #include <linux/linkage.h>
--#include <linux/init.h>
- 
- #include <asm/assembler.h>
- 
--	__CPUINIT
--
- ENTRY(mvebu_cortex_a9_secondary_startup)
- ARM_BE8(setend	be)
- 	bl      v7_invalidate_l1
-diff --git a/arch/arm/mach-mvebu/platsmp-a9.c b/arch/arm/mach-mvebu/platsmp-a9.c
-index df0a9cc5da59..3d5000481c11 100644
---- a/arch/arm/mach-mvebu/platsmp-a9.c
-+++ b/arch/arm/mach-mvebu/platsmp-a9.c
-@@ -24,7 +24,7 @@
- 
- extern void mvebu_cortex_a9_secondary_startup(void);
- 
--static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
-+static int mvebu_cortex_a9_boot_secondary(unsigned int cpu,
- 						    struct task_struct *idle)
+ #ifdef CONFIG_ARM_LPAE
+-static void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
++static void keystone_smp_secondary_initmem(unsigned int cpu)
  {
- 	int ret, hw_cpu;
+ 	pgd_t *pgd0 = pgd_offset_k(0);
+ 	cpu_set_ttbr(1, __pa(pgd0) + TTBR1_OFFSET);
+ 	local_flush_tlb_all();
+ }
+ #else
+-static inline void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
++static inline void keystone_smp_secondary_initmem(unsigned int cpu)
+ {}
+ #endif
+ 
 -- 
 2.2.1
