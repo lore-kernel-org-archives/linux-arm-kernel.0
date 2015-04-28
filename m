@@ -1,64 +1,95 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 28 Apr 2015 17:07:14 +0200
-Subject: [PATCH] ARM: tegra: cpuidle: implement
- cpuidle_state.enter_freeze()
-In-Reply-To: <CAAObsKATZy9+Tn0pJcDCaNzpxLX6GqX0TO_t7w8tgirWQgJF9w@mail.gmail.com>
-References: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
- <20150408115546.GA24271@red-moon> <552643E1.3060200@collabora.com>
- <285738930.THBQOWvsah@vostro.rjw.lan> <20150410100844.GC23730@red-moon>
- <CAAObsKAihF1k1yzZxQEs_jpPnCdV3HQbLaYHWu1QNsNd5zqiOg@mail.gmail.com>
- <20150417140819.GB2347@red-moon>
- <CAAObsKATZy9+Tn0pJcDCaNzpxLX6GqX0TO_t7w8tgirWQgJF9w@mail.gmail.com>
-Message-ID: <CAAObsKBOZM0qdkrtgQFqMhAq3M2UXUHzZ3jqhrrv0vLrqJgyYA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 28 Apr 2015 16:10:27 +0100
+Subject: [PATCH] arm: dma-mapping: fix off-by-one check in
+ arm_setup_iommu_dma_ops
+In-Reply-To: <553F9EA8.7030403@arm.com>
+References: <1430212089-5418-1-git-send-email-m.szyprowski@samsung.com>
+ <553F9EA8.7030403@arm.com>
+Message-ID: <553FA2E3.30402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2015 at 17:02, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> On 17 April 2015 at 16:08, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> On Thu, Apr 16, 2015 at 03:37:19PM +0100, Tomeu Vizoso wrote:
->>
->> [...]
->>
->>> >> I don't know what FIQs are. :-)
->>> >
->>> > In short, fast IRQs, it is a separate IRQ line handled as a separate
->>> > exception source with some private (banked) registers that minimize registers
->>> > saving/restoring. They are not identical to NMI on x86, since
->>> > their behaviour (handling) may be overriden by platforms and they
->>> > can be masked.
->>> >
->>> >> ->enter_freeze is entered with interrupts disabled on the local CPU.  It is
->>> >> not supposed to re-enable them.  That is, while in the ->enter_freeze callback
->>> >> routine, the CPU must not be interrupted aby anything other than NMI.
->>> >
->>> > It boils down to what FIQs handlers are allowed to do with tick frozen
->>> > and what they are (may be) currently used for.
->>> >
->>> > Russell has more insights on this than I do, in particular what FIQs are
->>> > currently used for on ARM and if we can leave them enabled safely with tick
->>> > frozen.
->>>
->>> But even if it's currently safe to leave them enabled, is there any
->>> reason for not disabling them?
->>
->> Ok, the point here is: either it is safe, and you leave them enabled,
->> or it is not and we must disable them *before* enter_freeze() is entered.
->>
->> Disabling them in the platform enter_freeze() hook does not make sense,
->> because this means we run with FIQs enabled with tick frozen, either
->> it is safe or it is not, it can't be both.
+On 28/04/15 15:52, Robin Murphy wrote:
+> Hi Marek,
 >
-> Sure, that's why I proposed doing it in arch_cpu_idle_enter/exit.
+> On 28/04/15 10:08, Marek Szyprowski wrote:
+>> Patch 22b3c181c6c324a46f71aae806d8ddbe61d25761 ("arm: dma-mapping: limit
+>> IOMMU mapping size") added a check for IO address space size. However
+>> this patch broke IOMMU initialization for typical platforms initialized
+>> from device tree, which get the default IO address space size of 4GiB.
+>> This value doesn't fit into size_t and fails a check introduced by that
+>> commit resulting in failed dma-mapping/iommu initialization. This patch
+>> fixes this issue by adding proper support for full 4GiB address space
+>> size.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 >
->> I would ask Russell opinion on this, before making any decision.
+> Much nicer than my hack of just passing in size-1, thanks! I'd offer a
+> tested-by for the default 32-bit case, however...
 >
-> Sure, that would be very welcome.
+>> ---
+>>    arch/arm/include/asm/dma-iommu.h | 2 +-
+>>    arch/arm/mm/dma-mapping.c        | 9 +++------
+>>    2 files changed, 4 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+>> index 8e3fcb924db6..2ef282f96651 100644
+>> --- a/arch/arm/include/asm/dma-iommu.h
+>> +++ b/arch/arm/include/asm/dma-iommu.h
+>> @@ -25,7 +25,7 @@ struct dma_iommu_mapping {
+>>    };
+>>
+>>    struct dma_iommu_mapping *
+>> -arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size);
+>> +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size);
+>>
+>>    void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
+>>
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index 09c5fe3d30c2..b43b762eebc1 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -1878,7 +1878,7 @@ struct dma_map_ops iommu_coherent_ops = {
+>>     * arm_iommu_attach_device function.
+>>     */
+>>    struct dma_iommu_mapping *
+>> -arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
+>> +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size)
+>>    {
+>>    	unsigned int bits = size >> PAGE_SHIFT;
+>
+> ...doesn't this u64->int conversion now have the potential to truncate
+> (if the device has a large enough DMA mask specified) and end up
+> generating a weirdly small mapping rather than failing outright?
+> Admittedly you'd have to have a 44-bit or larger DMA mask, and I'm not
+> sure what the practical likelihood of seeing that even on LPAE systems
+> is, but still I'm a little uneasy about it.
 
-Hi Russell,
+...by which I mean we should move the current size check into 
+arm_iommu_create_mapping itself, rather than relying on the caller, 
+because looking at dependent bits of code in isolation can be confusing ;)
 
-do you think FIQs should be disabled when the tick is frozen when
-going to suspend to idle?
+Robin.
 
-Thanks,
-
-Tomeu
+>>    	unsigned int bitmap_size = BITS_TO_LONGS(bits) * sizeof(long);
+>> @@ -2057,11 +2057,8 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>>    	if (!iommu)
+>>    		return false;
+>>
+>> -	/*
+>> -	 * currently arm_iommu_create_mapping() takes a max of size_t
+>> -	 * for size param. So check this limit for now.
+>> -	 */
+>> -	if (size > SIZE_MAX)
+>> +	/* Only 32-bit DMA address space is supported for now */
+>> +	if (size > DMA_BIT_MASK(32) + 1)
+>>    		return false;
+>>
+>>    	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
+>>
+>
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+>
