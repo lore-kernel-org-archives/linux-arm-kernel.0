@@ -1,32 +1,41 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 28 Apr 2015 13:46:19 +0900
-Subject: [PATCH v2 4/8] clk: tegra: Fix duplicate const for parent names
+Date: Tue, 28 Apr 2015 13:46:20 +0900
+Subject: [PATCH v2 5/8] clk: cdce706: Constify parent names in clock init data
 In-Reply-To: <1430196383-9190-1-git-send-email-k.kozlowski@samsung.com>
 References: <1430196383-9190-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1430196383-9190-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1430196383-9190-6-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace duplicated const keyword for 'emc_parent_clk_names' with proper
-array of const pointers to const strings.
+The array of parent names can be made as array of const pointers to
+const strings.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/clk/tegra/clk-emc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/clk-cdce706.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-emc.c b/drivers/clk/tegra/clk-emc.c
-index 8757feda4a11..59697c61f2f1 100644
---- a/drivers/clk/tegra/clk-emc.c
-+++ b/drivers/clk/tegra/clk-emc.c
-@@ -45,7 +45,7 @@
- #define CLK_SOURCE_EMC_EMC_2X_CLK_SRC(x) (((x) & CLK_SOURCE_EMC_EMC_2X_CLK_SRC_MASK) << \
- 					  CLK_SOURCE_EMC_EMC_2X_CLK_SRC_SHIFT)
- 
--static const char const *emc_parent_clk_names[] = {
-+static const char * const emc_parent_clk_names[] = {
- 	"pll_m", "pll_c", "pll_p", "clk_m", "pll_m_ud",
- 	"pll_c2", "pll_c3", "pll_c_ud"
+diff --git a/drivers/clk/clk-cdce706.c b/drivers/clk/clk-cdce706.c
+index b8e4f8a822e9..8a2dfd0012f3 100644
+--- a/drivers/clk/clk-cdce706.c
++++ b/drivers/clk/clk-cdce706.c
+@@ -94,7 +94,7 @@ static const char * const cdce706_source_name[] = {
+ 	"clk_in0", "clk_in1",
  };
+ 
+-static const char *cdce706_clkin_name[] = {
++static const char * const cdce706_clkin_name[] = {
+ 	"clk_in",
+ };
+ 
+@@ -102,7 +102,7 @@ static const char * const cdce706_pll_name[] = {
+ 	"pll1", "pll2", "pll3",
+ };
+ 
+-static const char *cdce706_divider_parent_name[] = {
++static const char * const cdce706_divider_parent_name[] = {
+ 	"clk_in", "pll1", "pll2", "pll2", "pll3",
+ };
+ 
 -- 
 1.9.1
