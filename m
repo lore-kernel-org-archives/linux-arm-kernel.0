@@ -1,35 +1,51 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 28 Apr 2015 10:34:12 +0100
-Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
- add SW break point support
-In-Reply-To: <87wq0wr6dd.fsf@linaro.org>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
- <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
- <20150427200407.GG23335@cbox>
- <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
- <87wq0wr6dd.fsf@linaro.org>
-Message-ID: <CAFEAcA85i_1JybEFBg91NA3-LpAzYh4RSDnqryOd=rZN7gZP5A@mail.gmail.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Tue, 28 Apr 2015 17:48:38 +0800
+Subject: [PATCH v3 0/7] Add Mediatek MMC driver
+Message-ID: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 April 2015 at 09:42, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> Peter Maydell <peter.maydell@linaro.org> writes:
->> Does the kernel already have a conveniently implemented "inject
->> exception into guest" lump of code? If so it might be less effort
->> to do it that way round, maybe.
->
-> So you pointed out we can't just re-inject the exceptions we get as we
-> need to map from things like ESR_ELx_EC_WATCHPT_LOW to
-> ESR_ELx_EC_WATCHPT_CUR before re-injection.
->
-> Of course if it is as simple as modifying the ESR_EL1 register and
-> returning +ve in the handle_exit path then I can do that but I assumed
-> if any other wrangling needs doing it should be done in userspace.
+This series enables MMC support on the MT8135/MT8173 platform.
+MT8135 has 5 MMC controllers and MT8173 has 4 MMC controllers.
 
-Well, somebody's got to do it, and it's the same amount of work
-either way (fiddling with ESR, making sure we direct the guest
-to the right exception vector entry point, maybe a few other
-things).
+Changes base on Ulf and Sascha's comments
+Remove useless macros and use hex value
+Remove setting for ocr_avail
+Modify the flow of "set clock to 0"
+Fix the race condition of cancel_delayed_work
+Replace some dev_err to WARN_ON()
+Remove useless "ACCESS_ONCE"	
+Use clk_disable_unprepare() to instead of clk_disable() and clk_unprepare()
+Use clk_prepare_enable() to instead  of clk_prepare() and clk_enable()
+Fix the judgment of 1.8V IO
+Fix the judgment of DDR mode
+Make the enable/disable of vqmmc balanced
+Fix runtime pm flow by Ulf and Sascha's comments
 
--- PMM
+
+Chaotian Jing (3):
+  mmc: dt-bindings: add Mediatek MMC bindings
+  mmc: mediatek: Add Mediatek MMC driver
+  mmc: mediatek: Add PM support for MMC driver
+
+Eddie Huang (2):
+  arm64: dts: mediatek: Add MT8173 MMC dts
+  arm64: mediatek: Add Mediatek MMC support in defconfig
+
+Yingjoe Chen (2):
+  ARM: mediatek: dts: Add emmc support to mt8135
+  ARM: multi_v7_defconfig: Enable Mediatek MMC support multi-v7
+
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |   33 +
+ arch/arm/boot/dts/mt8135-evbp1.dts               |  141 +++
+ arch/arm/boot/dts/mt8135.dtsi                    |   26 +
+ arch/arm/configs/multi_v7_defconfig              |    1 +
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  115 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi         |   22 +-
+ arch/arm64/configs/defconfig                     |    1 +
+ drivers/mmc/host/Kconfig                         |    8 +
+ drivers/mmc/host/Makefile                        |    1 +
+ drivers/mmc/host/mtk-sd.c                        | 1464 ++++++++++++++++++++++
+ 10 files changed, 1811 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
+ create mode 100644 drivers/mmc/host/mtk-sd.c
