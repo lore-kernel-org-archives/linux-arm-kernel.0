@@ -1,34 +1,41 @@
-From: andrej.skvortzov@gmail.com (Andrey Skvortsov)
-Date: Tue, 28 Apr 2015 23:32:00 +0300
-Subject: [PATCH] arm: vdso: .gitignore: ignore generated vdso.so.raw and
- vdsomunge
-Message-ID: <1430253120-27568-1-git-send-email-andrej.skvortzov@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 28 Apr 2015 14:32:38 -0600
+Subject: [PATCH 01/11] coresight-etm4x: Adding CoreSight ETM4x driver
+In-Reply-To: <1430209858.1904.1.camel@mm-sol.com>
+References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
+ <1429742451-11465-2-git-send-email-mathieu.poirier@linaro.org>
+ <1429890108.5211.8.camel@mm-sol.com>
+ <CANLsYky6TZhZ=JZuoBxU4dNRWVPYGUj6joMfi+dD9zjaokRE0A@mail.gmail.com>
+ <1430209858.1904.1.camel@mm-sol.com>
+Message-ID: <CANLsYkzDkeWn3x9tBhzSZLR-ZYuhYR+ew0buxD-TZtByvUDFgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After kernel is built 'git status' reports:
+On 28 April 2015 at 02:30, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
+>
+> On Mon, 2015-04-27 at 09:48 -0600, Mathieu Poirier wrote:
+>> On 24 April 2015 at 09:41, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
+>> > On Wed, 2015-04-22 at 16:40 -0600, Mathieu Poirier wrote:
+>> >
+>> > > +static struct amba_id etm4_ids[] = {
+>> > > +       {       /* ETM 4.0 - Hi6220 board */
+>> > > +               .id     = 0x0003b95d,
+>> > > +               .mask   = 0x0003ffff,
+>> > > +               .data   = "ETM 4.0",
+>> > > +       },
+>> > > +       {       /* ETM 4.0 - Juno board */
+>> > > +               .id     = 0x000bb95e,
+>> > > +               .mask   = 0x000bffff,
+>> >
+>> > Mask looks suspicious.
+>>
+>> Can you please expand the "suspicious" part ?
+>
+> Well, 'b' part of the mask. I have to admit that
+> I don't know how this is mapped on this platform.
 
- # Untracked files:
- #   (use "git add <file>..." to include in what will be committed)
- #
- #        arch/arm/vdso/vdso.so.raw
- #        arch/arm/vdso/vdsomunge
+Yes, I see it now - thanks for pointing that out.
 
-These files are created during build process and removed with 'make
-clean'. This patch makes git to ignore them.
-
-Signed-off-by: Andrey Skvortsov <andrej.skvortzov@gmail.com>
----
- arch/arm/vdso/.gitignore | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/vdso/.gitignore b/arch/arm/vdso/.gitignore
-index f8b69d8..6b47f6e 100644
---- a/arch/arm/vdso/.gitignore
-+++ b/arch/arm/vdso/.gitignore
-@@ -1 +1,3 @@
- vdso.lds
-+vdso.so.raw
-+vdsomunge
--- 
-2.1.4
+>
+> Regards,
+> Ivan
