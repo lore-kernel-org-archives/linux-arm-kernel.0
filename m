@@ -1,50 +1,32 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 28 Apr 2015 16:40:14 +0100
-Subject: [RFC 5/6] usb: gadget: atmel_usba: use atmel_io.h to provide
- on-chip IO
-In-Reply-To: <20150427205529.GH25136@saruman.tx.rr.com>
-References: <1427370354-21247-1-git-send-email-ben.dooks@codethink.co.uk>
- <1427370354-21247-6-git-send-email-ben.dooks@codethink.co.uk>
- <20150326115647.GD16148@samfundet.no>
- <20150427205529.GH25136@saruman.tx.rr.com>
-Message-ID: <553FA9DE.20406@codethink.co.uk>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 28 Apr 2015 12:43:50 -0300
+Subject: [PATCH 11/14] s5p_mfc: remove a dead code
+In-Reply-To: <ea067cc285e015d6ba90554d650b0a9df2670252.1430235781.git.mchehab@osg.samsung.com>
+References: <ea067cc285e015d6ba90554d650b0a9df2670252.1430235781.git.mchehab@osg.samsung.com>
+Message-ID: <a36e185fcb27d4e1278c295322c799b0d9d30433.1430235781.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA256
+As reported by smatch:
+	drivers/media/platform/s5p-mfc/s5p_mfc.c:1340 s5p_mfc_runtime_resume() warn: this array is probably non-NULL. 'm_dev->alloc_ctx'
 
+alloc_ctx can never be NULL, as it is embeeded inside the struct
+s5p_mfc_dev.
 
->>> 
->>> /* Register access macros */ -#ifdef CONFIG_AVR32 -#define
->>> usba_io_readl	__raw_readl -#define usba_io_writel	__raw_writel 
->>> -#define usba_io_writew	__raw_writew -#else -#define
->>> usba_io_readl	readl_relaxed -#define usba_io_writel
->>> writel_relaxed -#define usba_io_writew	writew_relaxed -#endif 
->>> +#define usba_io_readl	atmel_oc_readl +#define usba_io_writel
->>> atmel_oc_writel +#define usba_io_writew	atmel_oc_writew
->> 
->> Same comment as earlier patch, it would be nice to remove the
->> define usba_io_{read,write}{l,w} defines in a follow-up patch.
-> 
-> I'm fine with this too. Is this targetted at v4.2 ?
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-Yes, although we may move it to the soc specific include directories
-to avoid adding more to linux/
-
-I will be sorting this out next week.
-
-- -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v2
-
-iQEcBAEBCAAGBQJVP6neAAoJEMuhVOkVU3uz6tQH/jmZ0MszsoDjiKWdTnG+etoy
-WUhAEdnmaqPEfJSaBy2OPCcmj9T1O07wg1L/2rHQHBrVuR9bW0gWY/TyJQahnn3A
-YG81fgfIvOTAwmxIkaF10mG1/haG1LgPQ4P6j7AaKz09Zowath0rsga17AhYuUyh
-bps4Go7yHF/OpjuwB9VxSttMAbVAIHqXbuc5kufN89JAxDT6x5tV/BrqkqEoHpSV
-kW7VvGb/V4Aeax1h9klfdUEBlL2czkVuYYtTnicc9lFN3T9+6XJ+SNwKLtSklEr3
-SLM78DoIQQoKYWCf8vsg0FR0E9LeR1ytgZXPfOpdAoId+iZt39tBk9bMi/XOiBo=
-=ceej
------END PGP SIGNATURE-----
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index 8333fbc2fe96..1263d99d638e 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -1337,8 +1337,6 @@ static int s5p_mfc_runtime_resume(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct s5p_mfc_dev *m_dev = platform_get_drvdata(pdev);
+ 
+-	if (!m_dev->alloc_ctx)
+-		return 0;
+ 	atomic_set(&m_dev->pm.power, 1);
+ 	return 0;
+ }
+-- 
+2.1.0
