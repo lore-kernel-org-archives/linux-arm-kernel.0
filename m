@@ -1,77 +1,101 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 28 Apr 2015 09:38:10 -0700
-Subject: [PATCH Part1 v11 5/5] PCI: iproc: Use pci_scan_root_bus() instead
- of pci_create_root_bus()
-In-Reply-To: <1430204499-19571-6-git-send-email-wangyijing@huawei.com>
-References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
- <1430204499-19571-6-git-send-email-wangyijing@huawei.com>
-Message-ID: <553FB772.1000202@broadcom.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 28 Apr 2015 11:42:35 -0500
+Subject: [PATCH V7 3/9] mailbox: Fix up error handling in
+ mbox_request_channel()
+In-Reply-To: <1430174242-29465-4-git-send-email-abrestic@chromium.org>
+References: <1430174242-29465-1-git-send-email-abrestic@chromium.org>
+ <1430174242-29465-4-git-send-email-abrestic@chromium.org>
+Message-ID: <553FB87B.8000509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Yijing,
-
-On 4/28/2015 12:01 AM, Yijing Wang wrote:
-> Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
-> Now pci_scan_root_bus() == pci_create_root_bus() +
-> pci_scan_child_bus() if busn resource is supplied.
-> iproc added the busn resource to resources list
-> in of_pci_get_host_bridge_resources(). So it should be safe
-> to use pci_scan_root_bus() instead.
+On 04/27/2015 05:37 PM, Andrew Bresticker wrote:
+> From: Benson Leung <bleung@chromium.org>
 > 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> CC: Ray Jui <rjui@broadcom.com>
+> mbox_request_channel() currently returns EBUSY in the event the controller
+> is not present or if of_xlate() fails, but in neither case is EBUSY really
+> appropriate.  Return EPROBE_DEFER if the controller is not yet present
+> and change of_xlate() to return an ERR_PTR instead of NULL so that the
+> error can be propagated back to the caller of mbox_request_channel().
+> 
+> Signed-off-by: Benson Leung <bleung@chromium.org>
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Cc: Jassi Brar <jassisinghbrar@gmail.com>
+> Cc: Suman Anna <s-anna@ti.com>
 > ---
->  drivers/pci/host/pcie-iproc.c |    5 ++---
->  1 files changed, 2 insertions(+), 3 deletions(-)
+> Changes from v6:
+>  - Update omap-mailbox's xlate() to return error codes.
+> No changes from v5.
+> New for v5.
+> ---
+>  drivers/mailbox/mailbox.c      | 11 ++++++++---
+>  drivers/mailbox/omap-mailbox.c |  6 +++---
+
+For the OMAP mailbox portion,
+Acked-by: Suman Anna <s-anna@ti.com>
+
+>  2 files changed, 11 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> index 329e1b5..9622ebf 100644
-> --- a/drivers/pci/host/pcie-iproc.c
-> +++ b/drivers/pci/host/pcie-iproc.c
-> @@ -210,10 +210,10 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
->  
->  	pcie->sysdata.private_data = pcie;
->  
-> -	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
-> +	bus = pci_scan_root_bus(pcie->dev, 0, &iproc_pcie_ops,
->  				  &pcie->sysdata, pcie->resources);
->  	if (!bus) {
-> -		dev_err(pcie->dev, "unable to create PCI root bus\n");
-> +		dev_err(pcie->dev, "unable to scan PCI root bus\n");
->  		ret = -ENOMEM;
->  		goto err_power_off_phy;
+> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+> index 19b491d..c3c42d4 100644
+> --- a/drivers/mailbox/mailbox.c
+> +++ b/drivers/mailbox/mailbox.c
+> @@ -318,7 +318,7 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
+>  		return ERR_PTR(-ENODEV);
 >  	}
-
-iproc_pcie_check_link is called here by using the 'bus' structure
-returned from pci_create_root_bus. In iproc_pcie_check_link, we
-configure root bus class to PCI_CLASS_BRIDGE_PCI and validate to ensure
-a stable link between RC and EP can be detected.
-
-> @@ -227,7 +227,6 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
 >  
->  	iproc_pcie_enable(pcie);
-
-Here we enable INTx support for our RC controller.
-
+> -	chan = NULL;
+> +	chan = ERR_PTR(-EPROBE_DEFER);
+>  	list_for_each_entry(mbox, &mbox_cons, node)
+>  		if (mbox->dev->of_node == spec.np) {
+>  			chan = mbox->of_xlate(mbox, &spec);
+> @@ -327,7 +327,12 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
 >  
-> -	pci_scan_child_bus(bus);
-
-Here, if pci_scan_child_bus is moved to before iproc_pcie_check_link, I
-don't think it would work (although I have not tested this).
-
-An alternative is to use a dummy bus structure to feed into
-iproc_pcie_check_link, and call iproc_pcie_check_link and
-iproc_pcie_enable before pci_scan_root_bus. But the reason I put the
-link check code in between pci_create_root_bus and pci_scan_child_bus
-was to avoid using a dummy bus structure, :)
-
->  	pci_assign_unassigned_bus_resources(bus);
->  	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
->  	pci_bus_add_devices(bus);
+>  	of_node_put(spec.np);
+>  
+> -	if (!chan || chan->cl || !try_module_get(mbox->dev->driver->owner)) {
+> +	if (IS_ERR(chan)) {
+> +		mutex_unlock(&con_mutex);
+> +		return chan;
+> +	}
+> +
+> +	if (chan->cl || !try_module_get(mbox->dev->driver->owner)) {
+>  		dev_dbg(dev, "%s: mailbox not free\n", __func__);
+>  		mutex_unlock(&con_mutex);
+>  		return ERR_PTR(-EBUSY);
+> @@ -390,7 +395,7 @@ of_mbox_index_xlate(struct mbox_controller *mbox,
+>  	int ind = sp->args[0];
+>  
+>  	if (ind >= mbox->num_chans)
+> -		return NULL;
+> +		return ERR_PTR(-EINVAL);
+>  
+>  	return &mbox->chans[ind];
+>  }
+> diff --git a/drivers/mailbox/omap-mailbox.c b/drivers/mailbox/omap-mailbox.c
+> index 0f332c1..e0df27b 100644
+> --- a/drivers/mailbox/omap-mailbox.c
+> +++ b/drivers/mailbox/omap-mailbox.c
+> @@ -639,18 +639,18 @@ static struct mbox_chan *omap_mbox_of_xlate(struct mbox_controller *controller,
+>  
+>  	mdev = container_of(controller, struct omap_mbox_device, controller);
+>  	if (WARN_ON(!mdev))
+> -		return NULL;
+> +		return ERR_PTR(-EINVAL);
+>  
+>  	node = of_find_node_by_phandle(phandle);
+>  	if (!node) {
+>  		pr_err("%s: could not find node phandle 0x%x\n",
+>  		       __func__, phandle);
+> -		return NULL;
+> +		return ERR_PTR(-ENODEV);
+>  	}
+>  
+>  	mbox = omap_mbox_device_find(mdev, node->name);
+>  	of_node_put(node);
+> -	return mbox ? mbox->chan : NULL;
+> +	return mbox ? mbox->chan : ERR_PTR(-ENOENT);
+>  }
+>  
+>  static int omap_mbox_probe(struct platform_device *pdev)
 > 
-
-Thanks,
-
-Ray
