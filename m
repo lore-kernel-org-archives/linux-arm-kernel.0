@@ -1,33 +1,27 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 28 Apr 2015 13:59:43 +0300
-Subject: [PATCH 3/4] MAINTAINERS: add Conexant Digicolor machines entry
-In-Reply-To: <cover.1430217994.git.baruch@tkos.co.il>
-References: <cover.1430217994.git.baruch@tkos.co.il>
-Message-ID: <7e920357dd9b093c1800072212ca3cbb22f91149.1430217995.git.baruch@tkos.co.il>
+Date: Tue, 28 Apr 2015 13:59:40 +0300
+Subject: [PATCH 0/4] ARM: digicolor: dt and config updates
+Message-ID: <cover.1430217994.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+This series enables a couple of digicolor SoC devices for which drives were
+added during the v4.1 cycle. Also, add a MAINTAINERS entry for digicolor, and
+enabled the platform in multi_v7_defconfig.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2e5bbc0d68b2..fc6949f77729 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -990,6 +990,12 @@ F:	drivers/clocksource/timer-prima2.c
- F:	drivers/clocksource/timer-atlas7.c
- N:	[^a-z]sirf
- 
-+ARM/CONEXANT DIGICOLOR MACHINE SUPPORT
-+M:	Baruch Siach <baruch@tkos.co.il>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+N:	digicolor
-+
- ARM/EBSA110 MACHINE SUPPORT
- M:	Russell King <linux@arm.linux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+Based on v4.1-rc1.
+
+Baruch Siach (4):
+  ARM: digicolor: enable CX92755 on-chip RTC device
+  ARM: digicolor: add i2c master controller support
+  MAINTAINERS: add Conexant Digicolor machines entry
+  ARM: multi_v7_defconfig: enable Conexant Digicolor platform
+
+ MAINTAINERS                           |  6 ++++++
+ arch/arm/boot/dts/cx92755.dtsi        | 17 +++++++++++++++++
+ arch/arm/boot/dts/cx92755_equinox.dts |  4 ++++
+ arch/arm/configs/multi_v7_defconfig   |  5 +++++
+ 4 files changed, 32 insertions(+)
+
 -- 
 2.1.4
