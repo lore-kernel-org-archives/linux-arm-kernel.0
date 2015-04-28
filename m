@@ -1,32 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Apr 2015 18:36:24 +0100
-Subject: [PATCH 0/2] Add support for PL172 memory-controller
-In-Reply-To: <1430241879-30046-1-git-send-email-manabian@gmail.com>
-References: <1430241879-30046-1-git-send-email-manabian@gmail.com>
-Message-ID: <20150428173623.GA1573@arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 28 Apr 2015 19:44:45 +0200
+Subject: [PATCH] ARM: mvebu: dove: Relicense the device tree under
+ GPLv2+/X11
+In-Reply-To: <553FB6B4.8020401@gmail.com>
+References: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150428155910.GD12732@n2100.arm.linux.org.uk>
+ <553FB6B4.8020401@gmail.com>
+Message-ID: <20150428194445.2ba2f337@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
+On Tue, 28 Apr 2015 18:35:00 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-On Tue, Apr 28, 2015 at 06:24:37PM +0100, Joachim Eastwood wrote:
-> This patch set adds support for setting up static memory devices on
-> a ARM PrimeCell MultiPort Memory Controller (PL172) from DT. Dynamic
-> memory (SDRAM) is not supported in this patch set.
+> On 28.04.2015 17:59, Russell King - ARM Linux wrote:
+> > On Mon, Apr 27, 2015 at 11:09:04AM +0200, Sebastian Hesselbarth wrote:
+> >> The current implicit GPL only licensing on the device tree makes it
+> >> very impractical for other software components licensed under another
+> >> license.
+> >>
+> >> In order to make it easier for them to reuse our device trees,
+> >> relicense our device trees under a GPL/X11 dual-license.
+> >>
+> [...]
+> >> so I decided to keep the whole relicensing in a single patch. Please send
+> >> your Acked-by's in reply to this patch if you are happy with the relicensing.
+> >
+> > I normally don't include the "or later version" for my license changes
+> > as I've only accepted to contribute under the terms of GPLv2.
 > 
-> DT bindings for PL172 is based on the bindings for the TI AEMIF
-> memory controller. PL172 can be found on a number of NXP devices
-> like the LPC18xx family.
+> Ok, I guess this is a NACK for GPLv2+ but an Acked-by if we limit the
+> GPL part to GPLv2 only?
 > 
-> Tested on Embedded Artists' LPC4357 Developer's Kit with NOR Flash
-> (SST39VF320) and 74LCV16374 (gpio-74x164) on MPMC.
+> If so, is everybody else who already Acked the GPLv2+ part also fine
+> with reducing the GPL version to "version 2 only" ?
 
-Please excuse my ignorance here, but is this memory controller used to
-manage the memory in use by the kernel? If so, how is it safe to reconfigure
-it dynamically at runtime? If not, then it might be worth describing
-some typical use-cases in the binding documentation to motivate the
-existence of this driver.
+Acked-by: Jean-Francois Moine <moinejf@free.fr>
 
-Cheers,
-
-Will
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
