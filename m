@@ -1,28 +1,45 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 28 Apr 2015 15:01:34 +0800
-Subject: [PATCH Part1 v11 0/5] Some cleanup for pcie host drivers
-Message-ID: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
+Date: Tue, 28 Apr 2015 15:01:37 +0800
+Subject: [PATCH Part1 v11 3/5] PCI: designware: Use pci_scan_root_bus() for
+ simplicity
+In-Reply-To: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
+References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1430204499-19571-4-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches are split out from patchset(patch 5 is new)
-"Refine PCI scan interfaces and make generic pci host bridge".
-They are independent of the series, pci_bus_add_devices()
-has been ripped out from pci_scan_root_bus(), so we could
-use pci_scan_root_bus() instead of pci_create_root_bus() + 
-pci_scan_child_bus() for simplicity. Also this is the preparation
-for the series.
+Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
+Now pci_scan_root_bus() == pci_create_root_bus() +
+pci_scan_child_bus() if busn resource is supplied.
+Designware added the busn resource to resources list
+in dw_pcie_setup(). So it should be safe to use
+pci_scan_root_bus() instead.
 
-Yijing Wang (5):
-  PCI: mvebu: Use pci_common_init_dev() to simplify code
-  PCI: tegra: Remove redundant tegra_pcie_scan_bus()
-  PCI: designware: Use pci_scan_root_bus() for simplicity
-  PCI: xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
-  PCI: iproc: Use pci_scan_root_bus() instead of pci_create_root_bus()
-
- drivers/pci/host/pci-mvebu.c       |   18 +-----------------
- drivers/pci/host/pci-tegra.c       |   16 ----------------
- drivers/pci/host/pci-xgene.c       |    3 +--
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Mohit Kumar <mohit.kumar@st.com>
+CC: Jingoo Han <jg1.han@samsung.com>
+---
  drivers/pci/host/pcie-designware.c |    4 +---
- drivers/pci/host/pcie-iproc.c      |    5 ++---
- 5 files changed, 5 insertions(+), 41 deletions(-)
+ 1 files changed, 1 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 2e9f84f..8c80f38 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -728,13 +728,11 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+ 	struct pcie_port *pp = sys_to_pcie(sys);
+ 
+ 	pp->root_bus_nr = sys->busnr;
+-	bus = pci_create_root_bus(pp->dev, sys->busnr,
++	bus = pci_scan_root_bus(pp->dev, sys->busnr,
+ 				  &dw_pcie_ops, sys, &sys->resources);
+ 	if (!bus)
+ 		return NULL;
+ 
+-	pci_scan_child_bus(bus);
+-
+ 	if (bus && pp->ops->scan_bus)
+ 		pp->ops->scan_bus(pp);
+ 
+-- 
+1.7.1
