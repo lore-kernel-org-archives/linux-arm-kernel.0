@@ -1,73 +1,39 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Tue, 28 Apr 2015 17:19:35 +0800
-Subject: [v2 1/5] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <1429861989-8417-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
- <1429861989-8417-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20150428091935.GJ15033@dhcp-16-116.nay.redhat.com>
+From: lee@kernel.org (Lee Jones)
+Date: Tue, 28 Apr 2015 10:22:05 +0100
+Subject: [PATCH 2/2] ARM: BCM2835: Move the restart/power_off handling to
+ the WDT driver.
+In-Reply-To: <553EE4EC.1000403@roeck-us.net>
+References: <1429902534-2348-1-git-send-email-eric@anholt.net>
+ <1429902534-2348-2-git-send-email-eric@anholt.net>
+ <20150427160432.GD5701@roeck-us.net>
+ <20150427160517.GA11074@roeck-us.net>
+ <877fsx9nd6.fsf@eliezer.anholt.net> <553EE4EC.1000403@roeck-us.net>
+Message-ID: <20150428092205.GG11956@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +#ifdef CONFIG_CRASH_DUMP
-> +/*
-> + * reserve_elfcorehdr() - reserves memory for elf core header
-> + *
-> + * This function reserves memory area given in "elfcorehdr=" kernel command
-> + * line parameter. The memory reserved is used by a dump capture kernel to
-> + * identify the memory used by primary kernel.
-> + */
+On Mon, 27 Apr 2015, Guenter Roeck wrote:
 
-Hi AKASHI,
+> On 04/27/2015 04:12 PM, Eric Anholt wrote:
+> >Guenter Roeck <linux@roeck-us.net> writes:
+> >
+> >>On Mon, Apr 27, 2015 at 09:04:32AM -0700, Guenter Roeck wrote:
+> >>>On Fri, Apr 24, 2015 at 12:08:54PM -0700, Eric Anholt wrote:
+> >>>>Since the WDT is what's used to drive restart and power off, it makes
+> >>>>more sense to keep it there, where the regs are already mapped and
+> >>>>definitions for them provided.  Note that this means you may need to
+> >>>>add CONFIG_BCM2835_WDT to retain functionality of your kernel.
+> >>>>
+> >>>>Signed-off-by: Eric Anholt <eric@anholt.net>
+> >>>>Cc: linux-watchdog at vger.kernel.org
+> >>>
+> >>>The patch will require a rebase to v4.0-rc1.
+> >>>
+> >>s/4.0/4.1/
+> >
+> >It will?  It seems to work fine, and the diff's the same.  Is there some
+> >new thing you were expecting in a rebase?
+> >
+> All I can say is that it didn't apply for me. Maybe someone else has more luck.
 
-May I know why elfcorehdr need be reserved separately but not locate a
-memory region in crashkernel reserved region like all other ARCHs? Is
-there any special reason?
-
-Thanks
-Baoquan
-
-> +static void __init reserve_elfcorehdr(void)
-> +{
-> +	if (!elfcorehdr_size)
-> +		return;
-> +
-> +	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
-> +		pr_warn("elfcorehdr reservation failed - memory is in use (0x%llx)\n",
-> +			elfcorehdr_addr);
-> +		return;
-> +	}
-> +
-> +	if (memblock_reserve(elfcorehdr_addr, elfcorehdr_size)) {
-> +		pr_warn("elfcorehdr reservation failed - out of memory\n");
-> +		return;
-> +	}
-> +
-> +	pr_info("Reserving %lldKB of memory at %lldMB for elfcorehdr\n",
-> +		elfcorehdr_size >> 10, elfcorehdr_addr >> 20);
-> +}
-> +#endif /* CONFIG_CRASH_DUMP */
->  /*
->   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
->   * currently assumes that for memory starting above 4G, 32-bit devices will
-> @@ -170,6 +247,13 @@ void __init arm64_memblock_init(void)
->  		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
->  #endif
->  
-> +#ifdef CONFIG_KEXEC
-> +	reserve_crashkernel(memory_limit);
-> +#endif
-> +#ifdef CONFIG_CRASH_DUMP
-> +	reserve_elfcorehdr();
-> +#endif
-> +
->  	early_init_fdt_scan_reserved_mem();
->  
->  	/* 4GB maximum for 32-bit only capable devices */
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+I won't even try without a WDT Ack. ;)
