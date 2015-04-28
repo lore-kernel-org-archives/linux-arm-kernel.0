@@ -1,54 +1,60 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 28 Apr 2015 13:59:44 +0300
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: enable Conexant Digicolor
- platform
-In-Reply-To: <cover.1430217994.git.baruch@tkos.co.il>
-References: <cover.1430217994.git.baruch@tkos.co.il>
-Message-ID: <366dfc6d721aee3d930b9c4ce7abd2b02b3137df.1430217995.git.baruch@tkos.co.il>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 28 Apr 2015 16:32:36 +0530
+Subject: [2/2] ARM: dts: Add missing irq pinctrl for max77686 on smdk5250
+In-Reply-To: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
+References: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
+Message-ID: <553F68CC.6030504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/configs/multi_v7_defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+Hi Kukjin,
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index ab86655c1f4b..46124579ba8c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -30,6 +30,7 @@ CONFIG_ARCH_BERLIN=y
- CONFIG_MACH_BERLIN_BG2=y
- CONFIG_MACH_BERLIN_BG2CD=y
- CONFIG_MACH_BERLIN_BG2Q=y
-+CONFIG_ARCH_DIGICOLOR=y
- CONFIG_ARCH_HIGHBANK=y
- CONFIG_ARCH_HISI=y
- CONFIG_ARCH_HI3xxx=y
-@@ -257,6 +258,8 @@ CONFIG_SERIAL_XILINX_PS_UART=y
- CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
- CONFIG_SERIAL_FSL_LPUART=y
- CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
-+CONFIG_SERIAL_CONEXANT_DIGICOLOR=y
-+CONFIG_SERIAL_CONEXANT_DIGICOLOR_CONSOLE=y
- CONFIG_SERIAL_ST_ASC=y
- CONFIG_SERIAL_ST_ASC_CONSOLE=y
- CONFIG_I2C_CHARDEV=y
-@@ -266,6 +269,7 @@ CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_CADENCE=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_I2C_DIGICOLOR=y
- CONFIG_I2C_GPIO=m
- CONFIG_I2C_EXYNOS5=y
- CONFIG_I2C_MV64XXX=y
-@@ -504,6 +508,7 @@ CONFIG_RTC_DRV_TPS6586X=y
- CONFIG_RTC_DRV_TPS65910=y
- CONFIG_RTC_DRV_S35390A=m
- CONFIG_RTC_DRV_EM3027=y
-+CONFIG_RTC_DRV_DIGICOLOR=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_VT8500=y
- CONFIG_RTC_DRV_SUN6I=y
--- 
-2.1.4
+Any updated for this patch. Without this PMIC RTC is not working on 
+SMDK5250.
+
+Thanks,
+Pankaj Dubey
+
+On Tuesday 18 November 2014 05:38 PM, Yadwinder Singh Brar wrote:
+> This patch adds pinctrl configuration for using configuring gpx3-2 as an
+> external interrupt from max77686. Though max77686 RTC is enabled and gets
+> probed by default, it doesnt work as its unable to get interrupt.
+>
+> This patch makes max77686 RTC work and also configures it as wakeup source.
+>
+> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>
+> ---
+> arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++++++++++
+>   1 files changed, 12 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index 95b5b51..19cd918 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -131,6 +131,9 @@
+>   		reg = <0x09>;
+>   		interrupt-parent = <&gpx3>;
+>   		interrupts = <2 IRQ_TYPE_NONE>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&max77686_irq>;
+> +		wakeup-source;
+>
+>   		voltage-regulators {
+>   			ldo1_reg: LDO1 {
+> @@ -411,3 +414,12 @@
+>   		};
+>   	};
+>   };
+> +
+> +&pinctrl_0 {
+> +	max77686_irq: max77686-irq {
+> +		samsung,pins = "gpx3-2";
+> +		samsung,pin-function = <0xf>;
+> +		samsung,pin-pud = <0>;
+> +		samsung,pin-drv = <0>;
+> +	};
+> +};
+>
