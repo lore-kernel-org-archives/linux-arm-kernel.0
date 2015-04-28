@@ -1,50 +1,61 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 28 Apr 2015 15:01:39 +0800
-Subject: [PATCH Part1 v11 5/5] PCI: iproc: Use pci_scan_root_bus() instead of
- pci_create_root_bus()
+Date: Tue, 28 Apr 2015 15:01:36 +0800
+Subject: [PATCH Part1 v11 2/5] PCI: tegra: Remove redundant
+ tegra_pcie_scan_bus()
 In-Reply-To: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
 References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1430204499-19571-6-git-send-email-wangyijing@huawei.com>
+Message-ID: <1430204499-19571-3-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
-Now pci_scan_root_bus() == pci_create_root_bus() +
-pci_scan_child_bus() if busn resource is supplied.
-iproc added the busn resource to resources list
-in of_pci_get_host_bridge_resources(). So it should be safe
-to use pci_scan_root_bus() instead.
+Now pci_scan_root_bus() is almost similar to
+pci_create_root_bus() + pci_scan_child_bus().
+So we could use common pci_scan_root_bus() in
+pci_common_init_dev() to scan pci busses.
+tegra_pcie_scan_bus() is redundant, remove it.
 
+Tested-by: Thierry Reding <treding@nvidia.com>
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Ray Jui <rjui@broadcom.com>
+Acked-by: Thierry Reding <treding@nvidia.com>
+CC: Thierry Reding <thierry.reding@gmail.com>
+CC: linux-tegra at vger.kernel.org
 ---
- drivers/pci/host/pcie-iproc.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+ drivers/pci/host/pci-tegra.c |   16 ----------------
+ 1 files changed, 0 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index 329e1b5..9622ebf 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -210,10 +210,10 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 00e9272..10c0571 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -630,21 +630,6 @@ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
+ 	return irq;
+ }
  
- 	pcie->sysdata.private_data = pcie;
- 
--	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
-+	bus = pci_scan_root_bus(pcie->dev, 0, &iproc_pcie_ops,
- 				  &pcie->sysdata, pcie->resources);
- 	if (!bus) {
--		dev_err(pcie->dev, "unable to create PCI root bus\n");
-+		dev_err(pcie->dev, "unable to scan PCI root bus\n");
- 		ret = -ENOMEM;
- 		goto err_power_off_phy;
- 	}
-@@ -227,7 +227,6 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
- 
- 	iproc_pcie_enable(pcie);
- 
+-static struct pci_bus *tegra_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+-{
+-	struct tegra_pcie *pcie = sys_to_pcie(sys);
+-	struct pci_bus *bus;
+-
+-	bus = pci_create_root_bus(pcie->dev, sys->busnr, &tegra_pcie_ops, sys,
+-				  &sys->resources);
+-	if (!bus)
+-		return NULL;
+-
 -	pci_scan_child_bus(bus);
- 	pci_assign_unassigned_bus_resources(bus);
- 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
- 	pci_bus_add_devices(bus);
+-
+-	return bus;
+-}
+-
+ static irqreturn_t tegra_pcie_isr(int irq, void *arg)
+ {
+ 	const char *err_msg[] = {
+@@ -1831,7 +1816,6 @@ static int tegra_pcie_enable(struct tegra_pcie *pcie)
+ 	hw.private_data = (void **)&pcie;
+ 	hw.setup = tegra_pcie_setup;
+ 	hw.map_irq = tegra_pcie_map_irq;
+-	hw.scan = tegra_pcie_scan_bus;
+ 	hw.ops = &tegra_pcie_ops;
+ 
+ 	pci_common_init_dev(pcie->dev, &hw);
 -- 
 1.7.1
