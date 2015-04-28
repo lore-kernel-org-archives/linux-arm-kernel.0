@@ -1,27 +1,70 @@
 From: lee@kernel.org (Lee Jones)
-Date: Tue, 28 Apr 2015 10:28:39 +0100
-Subject: [PATCH 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <1430176449-12322-3-git-send-email-eric@anholt.net>
+Date: Tue, 28 Apr 2015 10:33:37 +0100
+Subject: [PATCH 3/3] ARM: bcm2835: Add the necessary firmware driver
+ information to the DT
+In-Reply-To: <1430176449-12322-4-git-send-email-eric@anholt.net>
 References: <1430176449-12322-1-git-send-email-eric@anholt.net>
- <1430176449-12322-3-git-send-email-eric@anholt.net>
-Message-ID: <20150428092839.GI11956@x1>
+ <1430176449-12322-4-git-send-email-eric@anholt.net>
+Message-ID: <20150428093337.GJ11956@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't forget to CC LKML.
+On Mon, 27 Apr 2015, Eric Anholt wrote:
 
-> This gives us a function for making mailbox property channel requests
-> of the firmware, and uses it to control the 3 power domains provided
-> by the firmware.
+> This gets the USB power domain turned on so that DWC2 can probe, even
+> if the bootloader didn't turn it on for us (which is the case if you
+> use the RPi firmware without chainloading U-Boot).
 > 
 > Signed-off-by: Eric Anholt <eric@anholt.net>
 > ---
->  arch/arm/mach-bcm/Kconfig                          |   2 +
->  arch/arm/mach-bcm/Makefile                         |   1 +
->  arch/arm/mach-bcm/raspberrypi-firmware.c           | 285 +++++++++++++++++++++
->  .../dt-bindings/arm/raspberrypi-firmware-power.h   |  16 ++
->  include/soc/bcm2835/raspberrypi-mailbox-property.h | 110 ++++++++
->  5 files changed, 414 insertions(+)
->  create mode 100644 arch/arm/mach-bcm/raspberrypi-firmware.c
->  create mode 100644 include/dt-bindings/arm/raspberrypi-firmware-power.h
->  create mode 100644 include/soc/bcm2835/raspberrypi-mailbox-property.h
+>  arch/arm/boot/dts/bcm2835-rpi.dtsi | 13 +++++++++++++
+>  arch/arm/boot/dts/bcm2835.dtsi     |  2 +-
+>  2 files changed, 14 insertions(+), 1 deletion(-)
+
+Acked-by: Lee Jones <lee@kernel.org>
+
+> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> index 46780bb..fa9afd1 100644
+> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> @@ -1,3 +1,4 @@
+> +#include <dt-bindings/arm/raspberrypi-firmware-power.h>
+>  #include "bcm2835.dtsi"
+>  
+>  / {
+> @@ -14,6 +15,14 @@
+>  			linux,default-trigger = "heartbeat";
+>  		};
+>  	};
+> +
+> +	soc {
+> +		firmware: firmware {
+> +			compatible = "raspberrypi,firmware";
+> +			mboxes = <&mailbox 0>;
+> +			#power-domain-cells = <1>;
+> +		};
+> +	};
+>  };
+>  
+>  &gpio {
+> @@ -49,3 +58,7 @@
+>  	status = "okay";
+>  	bus-width = <4>;
+>  };
+> +
+> +&usb {
+> +	power-domains = <&firmware POWER_DOMAIN_USB>;
+> +};
+> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+> index 664aa25..5734650 100644
+> --- a/arch/arm/boot/dts/bcm2835.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+> @@ -148,7 +148,7 @@
+>  			status = "disabled";
+>  		};
+>  
+> -		usb at 7e980000 {
+> +		usb: usb at 7e980000 {
+>  			compatible = "brcm,bcm2835-usb";
+>  			reg = <0x7e980000 0x10000>;
+>  			interrupts = <1 9>;
