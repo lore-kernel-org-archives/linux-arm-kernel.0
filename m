@@ -1,46 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Apr 2015 09:42:24 +0200
-Subject: [PATCH 01/13] thermal: Make temperatures consistently unsigned
- long
-In-Reply-To: <20150427203608.GD29351@xo-6d-61-c0.localdomain>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
- <1427385240-6086-2-git-send-email-s.hauer@pengutronix.de>
- <20150427203608.GD29351@xo-6d-61-c0.localdomain>
-Message-ID: <20150428074224.GI6325@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 28 Apr 2015 09:45:54 +0200
+Subject: [PATCH v3 1/3] mfd: provide RTC resource in MT6397 MFD
+In-Reply-To: <1430206556-18254-2-git-send-email-eddie.huang@mediatek.com>
+References: <1430206556-18254-1-git-send-email-eddie.huang@mediatek.com>
+ <1430206556-18254-2-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <20150428074554.GZ19431@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 10:36:08PM +0200, Pavel Machek wrote:
-> On Thu 2015-03-26 16:53:48, Sascha Hauer wrote:
-> > The thermal framework uses int, long and unsigned long for temperatures
-> > in millicelsius. The majority of functions uses unsigned long, so change
-> > the remaining functions to use this type aswell.
-> 
-> Maybe millicelsius_t should be introduced, so that readers immediately know
-> what type it is? Some parts of kernel also use decicelsius and decikelvin, IIRC (ACPI).
+Hello,
 
-I have no strong opinion on this. I'll send out the next version without
-typedef for now. Since in my patch I identified most places which need a
-type change anyway it might be a good opportunity to change to a typedef
-if we want to. Any other opinions on this?
-
+On Tue, Apr 28, 2015 at 03:35:54PM +0800, Eddie Huang wrote:
+> Provide MT6397 RTC interrupt, base address, and register in
+> MT6397 MFD.
 > 
-> 									Pavel
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> ---
+>  drivers/mfd/mt6397-core.c | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
 > 
-> >  	if (trip_type == THERMAL_TRIP_CRITICAL) {
-> >  		dev_emerg(&tz->device,
-> > -			  "critical temperature reached(%d C),shutting down\n",
-> > +			  "critical temperature reached(%lu C),shutting down\n",
-> 
-> space after , ?
+> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> index 09bc780..08cfbd1 100644
+> --- a/drivers/mfd/mt6397-core.c
+> +++ b/drivers/mfd/mt6397-core.c
+> @@ -21,9 +21,27 @@
+>  #include <linux/mfd/mt6397/core.h>
+>  #include <linux/mfd/mt6397/registers.h>
+>  
+> +#define MT6397_RTC_BASE		0xe000
+> +#define MT6397_RTC_SIZE		0x3e
+> +
+> +static const struct resource mt6397_rtc_resources[] = {
+> +	{
+> +		.start = MT6397_RTC_BASE,
+> +		.end   = MT6397_RTC_BASE + MT6397_RTC_SIZE,
+> +		.flags  = IORESOURCE_MEM,
+It's definitly a matter of taste if you align the rhs here, but if you
+do, do it consitently. That is, either make sure that all equal signs
+are in a single column (at least per struct resource), or use a single
+space between variable name and =.
 
-Turns out that in the new version of this series I don't have to modify
-this line anymore. Made this a separate patch.
+If you want to hear my personal preference: I always use a single space.
+As if you have to add
+	.somelongvariablename = somevalue
 
-Sascha
+you have to touch all other lines, too, which is ugly.
+
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
