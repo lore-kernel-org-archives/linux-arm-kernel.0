@@ -1,16 +1,30 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Apr 2015 08:59:15 +0800
-Subject: [PATCH] ARM: imx: Constify irq_domain_ops
-In-Reply-To: <1430139099-3673-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430139099-3673-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <20150428005914.GC18776@dragon>
+Date: Tue, 28 Apr 2015 09:10:07 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: remove pinctrl-assert-gpios
+Message-ID: <1430183407-24318-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 09:51:39PM +0900, Krzysztof Kozlowski wrote:
-> The irq_domain_ops are not modified by the driver and the irqdomain core
-> code accepts pointer to a const data.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+The pinctrl-assert-gpios is an invalid pinctrl property.  It was
+probably sneaked from vendor tree.  Remove it.
 
-Applied, thanks.
+Fixes: 4e18a2243a87 ("ARM: imx6qdl-sabreauto.dtsi: add max7310 support")
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 46b2fed7c319..3b24b12651b2 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -185,7 +185,6 @@
+ &i2c3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c3>;
+-	pinctrl-assert-gpios = <&gpio5 4 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ 
+ 	max7310_a: gpio at 30 {
+-- 
+1.9.1
