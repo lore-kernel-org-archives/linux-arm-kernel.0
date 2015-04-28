@@ -1,139 +1,133 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 28 Apr 2015 07:19:30 +0300
-Subject: [PATCH 3/5] ARM: sa1100: use ioremapped memory to access SC registers
+Date: Tue, 28 Apr 2015 07:19:32 +0300
+Subject: [PATCH 5/5] ARM: sa1100: properly split irqchip driver
 In-Reply-To: <1430194772-28474-1-git-send-email-dbaryshkov@gmail.com>
 References: <1430194772-28474-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1430194772-28474-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1430194772-28474-5-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use ioremap() and readl/writel_relaxed() to access IRQ controller
-registers.
+Finally properly split the irq driver into generic init code and irqchip
+driver.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-sa1100/irq.c | 52 ++++++++++++++++++++++++++++++----------------
- 1 file changed, 34 insertions(+), 18 deletions(-)
+ arch/arm/mach-sa1100/generic.c     | 13 +++++++++++++
+ drivers/irqchip/irq-sa11x0.c       | 18 ++++--------------
+ include/linux/irqchip/irq-sa11x0.h | 16 ++++++++++++++++
+ 3 files changed, 33 insertions(+), 14 deletions(-)
+ create mode 100644 include/linux/irqchip/irq-sa11x0.h
 
-diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
-index 6afaa33..08f929e 100644
---- a/arch/arm/mach-sa1100/irq.c
-+++ b/arch/arm/mach-sa1100/irq.c
-@@ -20,13 +20,19 @@
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index c651f6e..345e63f 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -20,6 +20,7 @@
+ #include <linux/ioport.h>
+ #include <linux/platform_device.h>
+ #include <linux/reboot.h>
++#include <linux/irqchip/irq-sa11x0.h>
+ 
+ #include <video/sa1100fb.h>
+ 
+@@ -377,6 +378,18 @@ void __init sa1100_timer_init(void)
+ 	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x90000000), 3686400);
+ }
+ 
++static struct resource irq_resource =
++	DEFINE_RES_MEM_NAMED(0x90050000, SZ_64K, "irqs");
++
++void __init sa1100_init_irq(void)
++{
++	request_resource(&iomem_resource, &irq_resource);
++
++	sa11x0_init_irq_nodt(IRQ_GPIO0_SC, irq_resource.start);
++
++	sa1100_init_gpio();
++}
++
+ /*
+  * Disable the memory bus request/grant signals on the SA1110 to
+  * ensure that we don't receive spurious memory requests.  We set
+diff --git a/drivers/irqchip/irq-sa11x0.c b/drivers/irqchip/irq-sa11x0.c
+index a5e1a54..76b8c1d 100644
+--- a/drivers/irqchip/irq-sa11x0.c
++++ b/drivers/irqchip/irq-sa11x0.c
+@@ -15,16 +15,13 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+-#include <linux/ioport.h>
+ #include <linux/syscore_ops.h>
++#include <linux/irqchip/irq-sa11x0.h>
  
  #include <soc/sa1100/pwer.h>
  
--#include <mach/hardware.h>
- #include <mach/irqs.h>
--#include <asm/mach/irq.h>
+-#include <mach/irqs.h>
  #include <asm/exception.h>
  
- #include "generic.h"
+-#include "../../arch/arm/mach-sa1100/generic.h"
+-
+ #define ICIP	0x00  /* IC IRQ Pending reg. */
+ #define ICMR	0x04  /* IC Mask Reg.        */
+ #define ICLR	0x08  /* IC Level Reg.       */
+@@ -86,9 +83,6 @@ static struct irq_domain_ops sa1100_normal_irqdomain_ops = {
  
-+#define ICIP	0x00  /* IC IRQ Pending reg. */
-+#define ICMR	0x04  /* IC Mask Reg.        */
-+#define ICLR	0x08  /* IC Level Reg.       */
-+#define ICCR	0x0C  /* IC Control Reg.     */
-+#define ICFP	0x10  /* IC FIQ Pending reg. */
-+#define ICPR	0x20  /* IC Pending Reg.     */
-+
-+static void __iomem *iobase;
+ static struct irq_domain *sa1100_normal_irqdomain;
  
- /*
-  * We don't need to ACK IRQs on the SA1100 unless they're GPIOs
-@@ -34,12 +40,20 @@
-  */
- static void sa1100_mask_irq(struct irq_data *d)
+-static struct resource irq_resource =
+-	DEFINE_RES_MEM_NAMED(0x90050000, SZ_64K, "irqs");
+-
+ static struct sa1100irq_state {
+ 	unsigned int	saved;
+ 	unsigned int	icmr;
+@@ -156,11 +150,9 @@ sa1100_handle_irq(struct pt_regs *regs)
+ 	} while (1);
+ }
+ 
+-void __init sa1100_init_irq(void)
++void __init sa11x0_init_irq_nodt(int irq_start, resource_size_t io_start)
  {
--	ICMR &= ~BIT(d->hwirq);
-+	u32 reg;
-+
-+	reg = readl_relaxed(iobase + ICMR);
-+	reg &= ~BIT(d->hwirq);
-+	writel_relaxed(reg, iobase + ICMR);
- }
+-	request_resource(&iomem_resource, &irq_resource);
+-
+-	iobase = ioremap(irq_resource.start, SZ_64K);
++	iobase = ioremap(io_start, SZ_64K);
+ 	if (WARN_ON(!iobase))
+ 		return;
  
- static void sa1100_unmask_irq(struct irq_data *d)
- {
--	ICMR |= BIT(d->hwirq);
-+	u32 reg;
-+
-+	reg = readl_relaxed(iobase + ICMR);
-+	reg |= BIT(d->hwirq);
-+	writel_relaxed(reg, iobase + ICMR);
- }
- 
- static int sa1100_set_wake(struct irq_data *d, unsigned int on)
-@@ -87,16 +101,14 @@ static int sa1100irq_suspend(void)
- 	struct sa1100irq_state *st = &sa1100irq_state;
- 
- 	st->saved = 1;
--	st->icmr = ICMR;
--	st->iclr = ICLR;
--	st->iccr = ICCR;
-+	st->icmr = readl_relaxed(iobase + ICMR);
-+	st->iclr = readl_relaxed(iobase + ICLR);
-+	st->iccr = readl_relaxed(iobase + ICCR);
- 
- 	/*
- 	 * Disable all GPIO-based interrupts.
- 	 */
--	ICMR &= ~(IC_GPIO11_27|IC_GPIO10|IC_GPIO9|IC_GPIO8|IC_GPIO7|
--		  IC_GPIO6|IC_GPIO5|IC_GPIO4|IC_GPIO3|IC_GPIO2|
--		  IC_GPIO1|IC_GPIO0);
-+	writel_relaxed(st->icmr & 0xfffff000, iobase + ICMR);
- 
- 	return 0;
- }
-@@ -106,10 +118,10 @@ static void sa1100irq_resume(void)
- 	struct sa1100irq_state *st = &sa1100irq_state;
- 
- 	if (st->saved) {
--		ICCR = st->iccr;
--		ICLR = st->iclr;
-+		writel_relaxed(st->iccr, iobase + ICCR);
-+		writel_relaxed(st->iclr, iobase + ICLR);
- 
--		ICMR = st->icmr;
-+		writel_relaxed(st->icmr, iobase + ICMR);
- 	}
- }
- 
-@@ -132,8 +144,8 @@ sa1100_handle_irq(struct pt_regs *regs)
- 	uint32_t icip, icmr, mask;
- 
- 	do {
--		icip = (ICIP);
--		icmr = (ICMR);
-+		icip = readl_relaxed(iobase + ICIP);
-+		icmr = readl_relaxed(iobase + ICMR);
- 		mask = icip & icmr;
- 
- 		if (mask == 0)
-@@ -148,17 +160,21 @@ void __init sa1100_init_irq(void)
- {
- 	request_resource(&iomem_resource, &irq_resource);
- 
-+	iobase = ioremap(irq_resource.start, SZ_64K);
-+	if (WARN_ON(!iobase))
-+		return;
-+
- 	/* disable all IRQs */
--	ICMR = 0;
-+	writel_relaxed(0, iobase + ICMR);
- 
- 	/* all IRQs are IRQ, not FIQ */
--	ICLR = 0;
-+	writel_relaxed(0, iobase + ICLR);
- 
- 	/*
- 	 * Whatever the doc says, this has to be set for the wait-on-irq
- 	 * instruction to work... on a SA1100 rev 9 at least.
- 	 */
--	ICCR = 1;
-+	writel_relaxed(1, iobase + ICCR);
+@@ -177,10 +169,8 @@ void __init sa1100_init_irq(void)
+ 	writel_relaxed(1, iobase + ICCR);
  
  	sa1100_normal_irqdomain = irq_domain_add_simple(NULL,
- 			32, IRQ_GPIO0_SC,
+-			32, IRQ_GPIO0_SC,
++			32, irq_start,
+ 			&sa1100_normal_irqdomain_ops, NULL);
+ 
+ 	set_handle_irq(sa1100_handle_irq);
+-
+-	sa1100_init_gpio();
+ }
+diff --git a/include/linux/irqchip/irq-sa11x0.h b/include/linux/irqchip/irq-sa11x0.h
+new file mode 100644
+index 0000000..2f66eca
+--- /dev/null
++++ b/include/linux/irqchip/irq-sa11x0.h
+@@ -0,0 +1,16 @@
++/*
++ * Generic IRQ handling for the SA11x0.
++ *
++ * Copyright (C) 1999-2001 Nicolas Pitre
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __INCLUDE_LINUX_IRQCHIP_IRQ_SA11x0_H
++#define __INCLUDE_LINUX_IRQCHIP_IRQ_SA11x0_H
++
++void __init sa11x0_init_irq_nodt(int irq_start, resource_size_t io_start);
++
++#endif
 -- 
 2.1.4
