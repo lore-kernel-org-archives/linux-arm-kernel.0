@@ -1,43 +1,74 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 28 Apr 2015 14:08:04 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Replace USB_RCAR_GEN2_PHY by
- PHY_RCAR_GEN2
-In-Reply-To: <1430222884-2095-1-git-send-email-geert+renesas@glider.be>
-References: <1430222884-2095-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1430222884-2095-2-git-send-email-geert+renesas@glider.be>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 28 Apr 2015 14:13:16 +0200
+Subject: [PATCH v6 10/15] serial: stm32-usart: Add STM32 USART Driver
+In-Reply-To: <552678E7.4040107@mentor.com>
+References: <1428424234-28572-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1428424234-28572-11-git-send-email-mcoquelin.stm32@gmail.com>
+ <552678E7.4040107@mentor.com>
+Message-ID: <CALszF6CTFgVd4D6Ftkf0jW+Hcp53jqrutOHOagDXT-0705aHHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The legacy-only USB_RCAR_GEN2_PHY driver was replaced by the DT-only
-PHY_RCAR_GEN2 driver.
+Hi Vladimir,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Oops, CONFIG_USB_RCAR_GEN2_PHY shouldn't have been in a multiplatform
-defconfig, as it supports legacy platform data only.
+Thanks for the review, and sorry for the late reply.
 
- arch/arm/configs/multi_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+2015-04-09 15:04 GMT+02:00 Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>:
+> Hi Maxime,
+>
+> On 07.04.2015 19:30, Maxime Coquelin wrote:
+>> This drivers adds support to the STM32 USART controller, which is a
+>> standard serial driver.
+>>
+>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>  drivers/tty/serial/Kconfig       |  17 +
+>>  drivers/tty/serial/Makefile      |   1 +
+>>  drivers/tty/serial/stm32-usart.c | 735 +++++++++++++++++++++++++++++++++++++++
+>>  include/uapi/linux/serial_core.h |   3 +
+>>  4 files changed, 756 insertions(+)
+>>  create mode 100644 drivers/tty/serial/stm32-usart.c
+>
+> [snip]
+>
+>> +static void stm32_console_write(struct console *co, const char *s, unsigned cnt)
+>> +{
+>> +     struct uart_port *port = &stm32_ports[co->index].port;
+>> +     unsigned long flags;
+>> +     u32 old_cr1, new_cr1;
+>> +     int locked = 1;
+>> +
+>> +     if (oops_in_progress) {
+>> +             locked = spin_trylock_irqsave(&port->lock, flags);
+>> +     } else {
+>> +             locked = 1;    ID
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 06e7e887fea550b3..2835ffda3bfed8ed 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -447,7 +447,6 @@ CONFIG_USB_GPIO_VBUS=y
- CONFIG_USB_ISP1301=y
- CONFIG_USB_MXS_PHY=y
- CONFIG_USB_RCAR_PHY=m
--CONFIG_USB_RCAR_GEN2_PHY=m
- CONFIG_USB_GADGET=y
- CONFIG_USB_RENESAS_USBHS_UDC=m
- CONFIG_MMC=y
-@@ -561,6 +560,7 @@ CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
- CONFIG_PHY_MIPHY28LP=y
- CONFIG_PHY_MIPHY365X=y
-+CONFIG_PHY_RCAR_GEN2=m
- CONFIG_PHY_STIH41X_USB=y
- CONFIG_PHY_STIH407_USB=y
- CONFIG_PHY_SUN4I_USB=y
--- 
-1.9.1
+>
+> locked = 1 is done from the declaration.
+Right, I will fix this in next version
+
+>
+> Also do you want to add "if (port->sysrq) locked = 0;" check?
+
+Yes, that makes sense. It will be also in v7.
+>
+>> +             spin_lock_irqsave(&port->lock, flags);
+>> +     }
+>> +
+
+
+>
+> [snip]
+>
+> Everything else is fine from point of view.
+>
+> Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+
+Regards,
+Maxime
+>
+> --
+> With best wishes,
+> Vladimir
