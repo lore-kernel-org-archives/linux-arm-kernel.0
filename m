@@ -1,70 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Apr 2015 14:37:25 +0200
-Subject: [PATCH v3 6/7] ARM: mediatek: dts: Add emmc support to mt8135
-In-Reply-To: <1430214525-19198-7-git-send-email-chaotian.jing@mediatek.com>
-References: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
- <1430214525-19198-7-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <20150428123725.GK6325@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Apr 2015 14:45:58 +0200
+Subject: [GIT PULL] Ux500 fixes
+Message-ID: <CACRpkdZMCaCgJ89xPPy9pMRYDinuWwvBrXm+uKF12Ls4cNxvNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 28, 2015 at 05:48:44PM +0800, Chaotian Jing wrote:
-> From: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> 
-> Add emmc node for mt8135.dtsi & mt8135-evbp1.dts
-> 
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt8135-evbp1.dts | 141 +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/mt8135.dtsi      |  26 +++++++
->  2 files changed, 167 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
-> index 357a91f..6d2fee9 100644
-> --- a/arch/arm/boot/dts/mt8135-evbp1.dts
-> +++ b/arch/arm/boot/dts/mt8135-evbp1.dts
-> @@ -24,6 +24,147 @@
->  	};
->  };
->  
-> +&mmc0 {
-> +	pinctrl-names = "default", "state_uhs";
-> +	pinctrl-0 = <&mmc0_pins_default>;
-> +	pinctrl-1 = <&mmc0_pins_uhs>;
-> +	status = "okay";
-> +	bus-width = <8>;
-> +	max-frequency = <50000000>;
-> +	cap-mmc-highspeed;
-> +	vmmc-supply = <&mt6397_vemc_3v3_reg>;
-> +	non-removable;
-> +	func = "EMMC";
+Hi ARM SoC guys,
 
-...
+this are three patches fixing an issue in the Ux500 with SD/MMC
+GPIO regulators. All DTS fixes. Please pull it in for fixes.
 
-> +	func = "SDCARD";
+Yours,
+Linus Walleij
 
-These have been removed in earlier versions, right?
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-> index 4d1ddd9..2c5c4da 100644
-> --- a/arch/arm/boot/dts/mt8135.dtsi
-> +++ b/arch/arm/boot/dts/mt8135.dtsi
-> @@ -212,5 +212,31 @@
->  			status = "disabled";
->  		};
->  
-> +		mmc0: mmc at 11230000 {
-> +			compatible = "mediatek,mt8135-mmc";
-> +			reg = <0 0x11230000 0 0x108>;
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-Please use the whole register space for the controller here, not only
-the one actually used by the registers.
+are available in the git repository at:
 
-Sascha
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/stericsson-fixes-v4.1
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+for you to fetch changes up to 11133db7a836b0cb411faa048f07a38e994d1382:
+
+  ARM: ux500: Enable GPIO regulator for SD-card for snowball
+(2015-04-27 09:01:02 +0200)
+
+----------------------------------------------------------------
+This fixes an MMC/SD configuration issue present for some time
+in the Ux500 DT but triggered by proper error handling in v4.1-rc1.
+
+----------------------------------------------------------------
+Ulf Hansson (3):
+      ARM: ux500: Move GPIO regulator for SD-card into board DTSs
+      ARM: ux500: Enable GPIO regulator for SD-card for HREF boards
+      ARM: ux500: Enable GPIO regulator for SD-card for snowball
+
+ arch/arm/boot/dts/ste-dbx5x0.dtsi  | 17 -----------------
+ arch/arm/boot/dts/ste-href.dtsi    | 15 +++++++++++++++
+ arch/arm/boot/dts/ste-snowball.dts | 13 +++++++++++++
+ 3 files changed, 28 insertions(+), 17 deletions(-)
