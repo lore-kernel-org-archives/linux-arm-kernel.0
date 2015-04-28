@@ -1,422 +1,60 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Tue, 28 Apr 2015 10:10:15 -0500
-Subject: [PATCHv2 3/4] ARM: socfpga: dts: add clocks to the Arria10 platform
+Date: Tue, 28 Apr 2015 10:10:16 -0500
+Subject: [PATCHv2 4/4] Documentation: DT bindings: document the clocks for
+ Arria10
 In-Reply-To: <1430233816-32635-1-git-send-email-dinguyen@opensource.altera.com>
 References: <1430233816-32635-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1430233816-32635-4-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1430233816-32635-5-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Add all the clock nodes for the Arria10 platform. At the same time, update
-the peripherals with their respective clocks property.
+Update the bindings document for the clocks on the SoCFPGA Arria10 platform.
+Also fix up a spelling error for the "altr,socfpga-perip-clk".
 
 Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
-v2: Add the l4_sys_free_clk node
----
- arch/arm/boot/dts/socfpga_arria10.dtsi | 309 ++++++++++++++++++++++++++++++++-
- 1 file changed, 305 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/clock/altr_socfpga.txt          | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 6c3ad92..ef2c946 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -86,6 +86,21 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
+diff --git a/Documentation/devicetree/bindings/clock/altr_socfpga.txt b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+index f72e80e..317e9cc 100644
+--- a/Documentation/devicetree/bindings/clock/altr_socfpga.txt
++++ b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+@@ -7,11 +7,15 @@ This binding uses the common clock binding[1].
+ Required properties:
+ - compatible : shall be one of the following:
+ 	"altr,socfpga-pll-clock" - for a PLL clock
+-	"altr,socfpga-perip-clock" - The peripheral clock divided from the
++	"altr,socfpga-perip-clk" - The peripheral clock divided from the
+ 		PLL clock.
+ 	"altr,socfpga-gate-clk" - Clocks that directly feed peripherals and
+ 		can get gated.
+-
++	"altr,socfpga-a10-pll-clock" - for a PLL clock on the Arria10.
++	"altr,socfpga-a10-perip-clk" - The peripheral clock divided from the
++		PLL clock on the Arria10.
++	"altr,socfpga-a10-gate-clk" - Clocks that directly feed peripherals and
++		can be gated.
+ - reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
+ - clocks : shall be the input parent clock phandle for the clock. This is
+ 	either an oscillator or a pll output.
+@@ -19,10 +23,11 @@ Required properties:
  
-+					cb_intosc_hs_div2_clk: cb_intosc_hs_div2_clk {
-+						#clock-cells = <0>;
-+						compatible = "fixed-clock";
-+					};
-+
-+					cb_intosc_ls_clk: cb_intosc_ls_clk {
-+						#clock-cells = <0>;
-+						compatible = "fixed-clock";
-+					};
-+
-+					f2s_free_clk: f2s_free_clk {
-+						#clock-cells = <0>;
-+						compatible = "fixed-clock";
-+					};
-+
- 					osc1: osc1 {
- 						#clock-cells = <0>;
- 						compatible = "fixed-clock";
-@@ -95,16 +110,286 @@
- 						#address-cells = <1>;
- 						#size-cells = <0>;
- 						#clock-cells = <0>;
--						compatible = "altr,socfpga-pll-clock";
--						clocks = <&osc1>;
-+						compatible = "altr,socfpga-a10-pll-clock";
-+						clocks = <&osc1>, <&cb_intosc_ls_clk>,
-+							 <&f2s_free_clk>;
-+						reg = <0x40>;
-+
-+						main_mpu_base_clk: main_mpu_base_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&main_pll>;
-+							div-reg = <0x140 0 11>;
-+						};
-+
-+						main_noc_base_clk: main_noc_base_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&main_pll>;
-+							div-reg = <0x144 0 11>;
-+						};
-+
-+						main_emaca_clk: main_emaca_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&main_pll>;
-+							reg = <0x68>;
-+						};
-+
-+						main_emacb_clk: main_emacb_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&main_pll>;
-+							reg = <0x6C>;
-+						};
-+
-+						main_emac_ptp_clk: main_emac_ptp_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&main_pll>;
-+							reg = <0x70>;
-+						};
-+
-+						main_gpio_db_clk: main_gpio_db_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&main_pll>;
-+							reg = <0x74>;
-+						};
-+
-+						main_sdmmc_clk: main_sdmmc_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk"
-+;
-+							clocks = <&main_pll>;
-+							reg = <0x78>;
-+						};
-+
-+						main_s2f_usr0_clk: main_s2f_usr0_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&main_pll>;
-+							reg = <0x7C>;
-+						};
-+
-+						main_s2f_usr1_clk: main_s2f_usr1_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&main_pll>;
-+							reg = <0x80>;
-+						};
-+
-+						main_hmc_pll_ref_clk: main_hmc_pll_ref_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&main_pll>;
-+							reg = <0x84>;
-+						};
-+
-+						main_periph_ref_clk: main_periph_ref_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&main_pll>;
-+							reg = <0x9C>;
-+						};
- 					};
- 
- 					periph_pll: periph_pll {
- 						#address-cells = <1>;
- 						#size-cells = <0>;
- 						#clock-cells = <0>;
--						compatible = "altr,socfpga-pll-clock";
--						clocks = <&osc1>;
-+						compatible = "altr,socfpga-a10-pll-clock";
-+						clocks = <&osc1>, <&cb_intosc_ls_clk>,
-+							 <&f2s_free_clk>, <&main_periph_ref_clk>;
-+						reg = <0xC0>;
-+
-+						peri_mpu_base_clk: peri_mpu_base_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&periph_pll>;
-+							div-reg = <0x140 16 11>;
-+						};
-+
-+						peri_noc_base_clk: peri_noc_base_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&periph_pll>;
-+							div-reg = <0x144 16 11>;
-+						};
-+
-+						peri_emaca_clk: peri_emaca_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&periph_pll>;
-+							reg = <0xE8>;
-+						};
-+
-+						peri_emacb_clk: peri_emacb_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&periph_pll>;
-+							reg = <0xEC>;
-+						};
-+
-+						peri_emac_ptp_clk: peri_emac_ptp_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&periph_pll>;
-+							reg = <0xF0>;
-+						};
-+
-+						peri_gpio_db_clk: peri_gpio_db_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&periph_pll>;
-+							reg = <0xF4>;
-+						};
-+
-+						peri_sdmmc_clk: peri_sdmmc_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&periph_pll>;
-+							reg = <0xF8>;
-+						};
-+
-+						peri_s2f_usr0_clk: peri_s2f_usr0_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&periph_pll>;
-+							reg = <0xFC>;
-+						};
-+
-+						peri_s2f_usr1_clk: peri_s2f_usr1_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&periph_pll>;
-+							reg = <0x100>;
-+						};
-+
-+						peri_hmc_pll_ref_clk: peri_hmc_pll_ref_clk {
-+							#clock-cells = <0>;
-+							compatible = "altr,socfpga-a10-perip-clk";
-+							clocks = <&periph_pll>;
-+							reg = <0x104>;
-+						};
-+					};
-+
-+					mpu_free_clk: mpu_free_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-perip-clk";
-+						clocks = <&main_mpu_base_clk>, <&peri_mpu_base_clk>,
-+							 <&osc1>, <&cb_intosc_hs_div2_clk>,
-+							 <&f2s_free_clk>;
-+						reg = <0x60>;
-+					};
-+
-+					noc_free_clk: noc_free_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-perip-clk";
-+						clocks = <&main_noc_base_clk>, <&peri_noc_base_clk>,
-+							 <&osc1>, <&cb_intosc_hs_div2_clk>,
-+							 <&f2s_free_clk>;
-+						reg = <0x64>;
-+					};
-+
-+					s2f_user1_free_clk: s2f_user1_free_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-perip-clk";
-+						clocks = <&main_s2f_usr1_clk>, <&peri_s2f_usr1_clk>,
-+							 <&osc1>, <&cb_intosc_hs_div2_clk>,
-+							 <&f2s_free_clk>;
-+						reg = <0x104>;
-+					};
-+
-+					sdmmc_free_clk: sdmmc_free_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-perip-clk";
-+						clocks = <&main_sdmmc_clk>, <&peri_sdmmc_clk>,
-+							 <&osc1>, <&cb_intosc_hs_div2_clk>,
-+							 <&f2s_free_clk>;
-+						fixed-divider = <4>;
-+						reg = <0xF8>;
-+					};
-+
-+					l4_sys_free_clk: l4_sys_free_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-perip-clk";
-+						clocks = <&noc_free_clk>;
-+						fixed-divider = <4>;
-+					};
-+
-+					l4_main_clk: l4_main_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-gate-clk";
-+						clocks = <&noc_free_clk>;
-+						div-reg = <0xA8 0 2>;
-+						clk-gate = <0x48 1>;
-+					};
-+
-+					l4_mp_clk: l4_mp_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-gate-clk";
-+						clocks = <&noc_free_clk>;
-+						div-reg = <0xA8 8 2>;
-+						clk-gate = <0x48 2>;
-+					};
-+
-+					l4_sp_clk: l4_sp_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-gate-clk";
-+						clocks = <&noc_free_clk>;
-+						div-reg = <0xA8 16 2>;
-+						clk-gate = <0x48 3>;
-+					};
-+
-+					mpu_periph_clk: mpu_periph_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-gate-clk";
-+						clocks = <&mpu_free_clk>;
-+						fixed-divider = <4>;
-+						clk-gate = <0x48 0>;
-+					};
-+
-+					sdmmc_clk: sdmmc_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-gate-clk";
-+						clocks = <&sdmmc_free_clk>;
-+						clk-gate = <0xC8 5>;
-+					};
-+
-+					qspi_clk: qspi_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-gate-clk";
-+						clocks = <&l4_main_clk>;
-+						clk-gate = <0xC8 11>;
-+					};
-+
-+					nand_clk: nand_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-gate-clk";
-+						clocks = <&l4_mp_clk>;
-+						clk-gate = <0xC8 10>;
-+					};
-+
-+					spi_m_clk: spi_m_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-gate-clk";
-+						clocks = <&l4_main_clk>;
-+						clk-gate = <0xC8 9>;
-+					};
-+
-+					usb_clk: usb_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-gate-clk";
-+						clocks = <&l4_mp_clk>;
-+						clk-gate = <0xC8 8>;
-+					};
-+
-+					s2f_usr1_clk: s2f_usr1_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-a10-gate-clk";
-+						clocks = <&peri_s2f_usr1_clk>;
-+						clk-gate = <0xC8 6>;
- 					};
- 				};
- 		};
-@@ -256,6 +541,8 @@
- 			reg = <0xff808000 0x1000>;
- 			interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
- 			fifo-depth = <0x400>;
-+			clocks = <&l4_mp_clk>, <&sdmmc_free_clk>;
-+			clock-names = "biu", "ciu";
- 			status = "disabled";
- 		};
- 
-@@ -281,30 +568,39 @@
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0xffffc600 0x100>;
- 			interrupts = <1 13 0xf04>;
-+			clocks = <&mpu_periph_clk>;
- 		};
- 
- 		timer0: timer0 at ffc02700 {
- 			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 115 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0xffc02700 0x100>;
-+			clocks = <&l4_sp_clk>;
-+			clock-names = "timer";
- 		};
- 
- 		timer1: timer1 at ffc02800 {
- 			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0xffc02800 0x100>;
-+			clocks = <&l4_sp_clk>;
-+			clock-names = "timer";
- 		};
- 
- 		timer2: timer2 at ffd00000 {
- 			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 117 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0xffd00000 0x100>;
-+			clocks = <&l4_sys_free_clk>;
-+			clock-names = "timer";
- 		};
- 
- 		timer3: timer3 at ffd00100 {
- 			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 118 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0xffd01000 0x100>;
-+			clocks = <&l4_sys_free_clk>;
-+			clock-names = "timer";
- 		};
- 
- 		uart0: serial0 at ffc02000 {
-@@ -322,6 +618,7 @@
- 			interrupts = <0 111 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
-+			clocks = <&l4_sp_clk>;
- 			status = "disabled";
- 		};
- 
-@@ -335,6 +632,8 @@
- 			compatible = "snps,dwc2";
- 			reg = <0xffb00000 0xffff>;
- 			interrupts = <0 95 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&usb_clk>;
-+			clock-names = "otg";
- 			phys = <&usbphy0>;
- 			phy-names = "usb2-phy";
- 			status = "disabled";
-@@ -353,6 +652,7 @@
- 			compatible = "snps,dw-wdt";
- 			reg = <0xffd00200 0x100>;
- 			interrupts = <0 119 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&l4_sys_free_clk>;
- 			status = "disabled";
- 		};
- 
-@@ -360,6 +660,7 @@
- 			compatible = "snps,dw-wdt";
- 			reg = <0xffd00300 0x100>;
- 			interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&l4_sys_free_clk>;
- 			status = "disabled";
- 		};
- 	};
+ Optional properties:
+ - fixed-divider : If clocks have a fixed divider value, use this property.
+-- clk-gate : For "socfpga-gate-clk", clk-gate contains the gating register
+-        and the bit index.
+-- div-reg : For "socfpga-gate-clk" and "socfpga-periph-clock", div-reg contains
+-	the divider register, bit shift, and width.
++- clk-gate : For "socfpga-gate-clk" and "altr,socfpga-a10-gate-clk", clk-gate
++	contains the gating register and the bit index.
++- div-reg : For "socfpga-gate-clk", "socfpga-perip-clk",
++	"altr,socfpga-a10-gate-clk", and "altr,socfpga-a10-perip-clk", div-reg
++	contains the divider register, bit shift, and width.
+ - clk-phase : For the sdmmc_clk, contains the value of the clock phase that controls
+ 	the SDMMC CIU clock. The first value is the clk_sample(smpsel), and the second
+ 	value is the cclk_in_drv(drvsel). The clk-phase is used to enable the correct
 -- 
 2.2.1
