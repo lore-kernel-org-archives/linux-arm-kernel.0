@@ -1,61 +1,43 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 28 Apr 2015 15:01:36 +0800
-Subject: [PATCH Part1 v11 2/5] PCI: tegra: Remove redundant
- tegra_pcie_scan_bus()
+Date: Tue, 28 Apr 2015 15:01:38 +0800
+Subject: [PATCH Part1 v11 4/5] PCI: xgene: Use pci_scan_root_bus() instead of
+ pci_create_root_bus()
 In-Reply-To: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
 References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1430204499-19571-3-git-send-email-wangyijing@huawei.com>
+Message-ID: <1430204499-19571-5-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now pci_scan_root_bus() is almost similar to
-pci_create_root_bus() + pci_scan_child_bus().
-So we could use common pci_scan_root_bus() in
-pci_common_init_dev() to scan pci busses.
-tegra_pcie_scan_bus() is redundant, remove it.
+Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
+Now pci_scan_root_bus() == pci_create_root_bus() +
+pci_scan_child_bus() if busn resource is supplied.
+Xgene added the busn resource to resources list
+in of_pci_get_host_bridge_resources(). So it should be safe
+to use pci_scan_root_bus() instead.
 
-Tested-by: Thierry Reding <treding@nvidia.com>
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
-CC: Thierry Reding <thierry.reding@gmail.com>
-CC: linux-tegra at vger.kernel.org
+CC: Tanmay Inamdar <tinamdar@apm.com>
 ---
- drivers/pci/host/pci-tegra.c |   16 ----------------
- 1 files changed, 0 insertions(+), 16 deletions(-)
+ drivers/pci/host/pci-xgene.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 00e9272..10c0571 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -630,21 +630,6 @@ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
- 	return irq;
- }
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index ee082c0..87e3962 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -499,12 +499,11 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
  
--static struct pci_bus *tegra_pcie_scan_bus(int nr, struct pci_sys_data *sys)
--{
--	struct tegra_pcie *pcie = sys_to_pcie(sys);
--	struct pci_bus *bus;
--
--	bus = pci_create_root_bus(pcie->dev, sys->busnr, &tegra_pcie_ops, sys,
--				  &sys->resources);
--	if (!bus)
--		return NULL;
--
+-	bus = pci_create_root_bus(&pdev->dev, 0,
++	bus = pci_scan_root_bus(&pdev->dev, 0,
+ 					&xgene_pcie_ops, port, &res);
+ 	if (!bus)
+ 		return -ENOMEM;
+ 
 -	pci_scan_child_bus(bus);
--
--	return bus;
--}
--
- static irqreturn_t tegra_pcie_isr(int irq, void *arg)
- {
- 	const char *err_msg[] = {
-@@ -1831,7 +1816,6 @@ static int tegra_pcie_enable(struct tegra_pcie *pcie)
- 	hw.private_data = (void **)&pcie;
- 	hw.setup = tegra_pcie_setup;
- 	hw.map_irq = tegra_pcie_map_irq;
--	hw.scan = tegra_pcie_scan_bus;
- 	hw.ops = &tegra_pcie_ops;
+ 	pci_assign_unassigned_bus_resources(bus);
+ 	pci_bus_add_devices(bus);
  
- 	pci_common_init_dev(pcie->dev, &hw);
 -- 
 1.7.1
