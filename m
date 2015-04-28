@@ -1,53 +1,51 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 28 Apr 2015 13:27:18 +0200
-Subject: [PATCH 0/6] ARM: berlin: relicense the device trees under
- GPLv2/X11
-In-Reply-To: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <553F6E96.10001@gmail.com>
+Date: Tue, 28 Apr 2015 13:27:45 +0200
+Subject: [PATCH] Documentation: bindings: berlin: consider our dt bindings
+ as unstable
+In-Reply-To: <1430057038-12967-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1430057038-12967-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <553F6EB1.3030407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 26.04.2015 16:03, Antoine Tenart wrote:
-> Hi,
+> Because the support of Marvell Berlin SoCs is still a work in progress,
+> add a statement to explicitly consider our device tree files and
+> bindings as unstable.
 >
-> The GPLv2 license makes it impractical for other software components
-> licensed under another license to use our device trees. To fix this,
-> and make our device tree usable by other software components, relicense
-> them under a GPLv2/X11 dual-license.
->
-> In order to get this accepted, we *need* all contributors to the Berlin
-> device tree files to ack-by the patches applying on a file they
-> contributed on. A list of needed ack-by by device tree is shown below:
->
->   * berlin2q.dtsi:
->          Antoine Tenart <antoine.tenart@free-electrons.com>
->          Jisheng Zhang <jszhang@marvell.com>
-> 	Alexandre Belloni <alexandre.belloni@free-electrons.com>
->          Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->
->   * berlin2q-marvell-dmp.dtsi:
->          Antoine Tenart <antoine.tenart@free-electrons.com>
->          Jisheng Zhang <jszhang@marvell.com>
->
->   * berlin2.dtsi:
->          Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->          Antoine Tenart <antoine.tenart@free-electrons.com>
->          Jisheng Zhang <jszhang@marvell.com>
->
->   * berlin2-sony-nsz-gs7.dts:
->          Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->
->   * berlin2cd.dtsi:
->          Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->          Antoine Tenart <antoine.tenart@free-electrons.com>
->          Jisheng Zhang <jszhang@marvell.com>
->
->   * berlin2cd-google-chromecast.dts:
->          Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-Applied to berlin/dt with the corresponding Acked-by's.
+Applied to berlin/dt.
 
 Thanks!
 
 Sebastian
+
+> ---
+>   Documentation/devicetree/bindings/arm/marvell,berlin.txt | 12 ++++++++++++
+>   1 file changed, 12 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+> index a99eb9eb14c0..060daafc14ff 100644
+> --- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+> +++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+> @@ -1,6 +1,18 @@
+>   Marvell Berlin SoC Family Device Tree Bindings
+>   ---------------------------------------------------------------
+>
+> +Work in progress statement:
+> +
+> +Device tree files and bindings applying to Marvell Berlin SoCs and boards are
+> +considered "unstable". Any Marvell Berlin device tree binding may change at any
+> +time. Be sure to use a device tree binary and a kernel image generated from the
+> +same source tree.
+> +
+> +Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
+> +stable binding/ABI.
+> +
+> +---------------------------------------------------------------
+> +
+>   Boards with a SoC of the Marvell Berlin family, e.g. Armada 1500
+>   shall have the following properties:
+>
+>
