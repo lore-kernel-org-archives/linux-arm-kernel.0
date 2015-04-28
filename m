@@ -1,37 +1,31 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Apr 2015 10:25:54 +0200
-Subject: [PATCH 04/13] thermal: remove useless call to
- thermal_zone_device_set_polling
+Date: Tue, 28 Apr 2015 10:25:53 +0200
+Subject: [PATCH 03/13] thermal: trivial: Add missing whitespace in message
 In-Reply-To: <1430209563-647-1-git-send-email-s.hauer@pengutronix.de>
 References: <1430209563-647-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1430209563-647-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1430209563-647-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the thermal zone has no get_temp callback then thermal_zone_device_register()
-calls thermal_zone_device_set_polling() with a polling delay of 0. This
-only cancels the poll_queue. Since the poll_queue hasn't been scheduled this
-is a no-op. Remove it.
+Commas should be followed by a whitespace.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
 ---
- drivers/thermal/thermal_core.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/thermal/thermal_core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index cecebac..ad1d3c9 100644
+index 244784f..cecebac 100644
 --- a/drivers/thermal/thermal_core.c
 +++ b/drivers/thermal/thermal_core.c
-@@ -1571,9 +1571,6 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
+@@ -378,7 +378,7 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
  
- 	INIT_DELAYED_WORK(&(tz->poll_queue), thermal_zone_device_check);
- 
--	if (!tz->ops->get_temp)
--		thermal_zone_device_set_polling(tz, 0);
--
- 	thermal_zone_device_update(tz);
- 
- 	return tz;
+ 	if (trip_type == THERMAL_TRIP_CRITICAL) {
+ 		dev_emerg(&tz->device,
+-			  "critical temperature reached(%d C),shutting down\n",
++			  "critical temperature reached(%d C), shutting down\n",
+ 			  tz->temperature / 1000);
+ 		orderly_poweroff(true);
+ 	}
 -- 
 2.1.4
