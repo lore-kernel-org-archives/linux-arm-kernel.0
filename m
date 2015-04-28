@@ -1,43 +1,50 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 28 Apr 2015 08:40:04 -0700
-Subject: [PATCH 0/3] Introduce SET_NOIRQ_SYSTEM_SLEEP_PM_OPS and use it
-In-Reply-To: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
- (grygorii strashko's message of "Mon, 27 Apr 2015 21:24:29 +0300")
-References: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
-Message-ID: <7hr3r4w9bf.fsf@linaro.org>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 28 Apr 2015 16:40:14 +0100
+Subject: [RFC 5/6] usb: gadget: atmel_usba: use atmel_io.h to provide
+ on-chip IO
+In-Reply-To: <20150427205529.GH25136@saruman.tx.rr.com>
+References: <1427370354-21247-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1427370354-21247-6-git-send-email-ben.dooks@codethink.co.uk>
+ <20150326115647.GD16148@samfundet.no>
+ <20150427205529.GH25136@saruman.tx.rr.com>
+Message-ID: <553FA9DE.20406@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<grygorii.strashko@linaro.org> writes:
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
 
-> From: Grygorii Strashko <grygorii.strashko@linaro.org>
->
-> While working on suspend-to-disk functionality on TI dra7-evm (DRA7xx SoC)
-> i've found that the most common problem I have to dial with is absence
-> of corresponding PM callbacks in drivers and, in particular, noirq callbacks.
-> So, I've fixed one driver first
-> commit 6248015d6867 "ARM: omap-device: add missed callback for suspend-to-disk"
-> but then found another one which need to be fixed too (omap_l3_noc.c).
-> At this moment I decided to make my life easier and added new macro
-> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS using the same approach as for the existing
-> SET_SYSTEM_SLEEP_PM_OPS macro.
->
-> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS: defined for CONFIG_PM_SLEEP and
-> assigns ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
-> function. Vice versa happens for ->resume_noirq, ->thaw_noirq and
-> ->restore_noirq.
->
-> Further two patches reuse this newly introduced macro.
->
-> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS, defined for CONFIG_PM_SLEEP, will
->     point ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
->     function. Vice versa happens for ->resume_noirq, ->thaw_noirq and
->     ->restore_noirq.
 
-For the series:
+>>> 
+>>> /* Register access macros */ -#ifdef CONFIG_AVR32 -#define
+>>> usba_io_readl	__raw_readl -#define usba_io_writel	__raw_writel 
+>>> -#define usba_io_writew	__raw_writew -#else -#define
+>>> usba_io_readl	readl_relaxed -#define usba_io_writel
+>>> writel_relaxed -#define usba_io_writew	writew_relaxed -#endif 
+>>> +#define usba_io_readl	atmel_oc_readl +#define usba_io_writel
+>>> atmel_oc_writel +#define usba_io_writew	atmel_oc_writew
+>> 
+>> Same comment as earlier patch, it would be nice to remove the
+>> define usba_io_{read,write}{l,w} defines in a follow-up patch.
+> 
+> I'm fine with this too. Is this targetted at v4.2 ?
 
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Yes, although we may move it to the soc specific include directories
+to avoid adding more to linux/
 
-And for the omap_device changes:
+I will be sorting this out next week.
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+- -- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iQEcBAEBCAAGBQJVP6neAAoJEMuhVOkVU3uz6tQH/jmZ0MszsoDjiKWdTnG+etoy
+WUhAEdnmaqPEfJSaBy2OPCcmj9T1O07wg1L/2rHQHBrVuR9bW0gWY/TyJQahnn3A
+YG81fgfIvOTAwmxIkaF10mG1/haG1LgPQ4P6j7AaKz09Zowath0rsga17AhYuUyh
+bps4Go7yHF/OpjuwB9VxSttMAbVAIHqXbuc5kufN89JAxDT6x5tV/BrqkqEoHpSV
+kW7VvGb/V4Aeax1h9klfdUEBlL2czkVuYYtTnicc9lFN3T9+6XJ+SNwKLtSklEr3
+SLM78DoIQQoKYWCf8vsg0FR0E9LeR1ytgZXPfOpdAoId+iZt39tBk9bMi/XOiBo=
+=ceej
+-----END PGP SIGNATURE-----
