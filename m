@@ -1,34 +1,52 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 28 Apr 2015 17:48:45 +0800
-Subject: [PATCH 7/7] ARM: multi_v7_defconfig: Enable Mediatek MMC support
- multi-v7
-In-Reply-To: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1430214525-19198-8-git-send-email-chaotian.jing@mediatek.com>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Tue, 28 Apr 2015 11:50:25 +0200
+Subject: [PATCH 2/3 v5] mailbox: Enable BCM2835 mailbox support
+In-Reply-To: <CABb+yY2u_v1uSDrBgP2DRAOrDkXETfs_zmLACm=uRFALVYFjmA@mail.gmail.com>
+References: <1430173644-19099-1-git-send-email-eric@anholt.net>
+ <1430173644-19099-3-git-send-email-eric@anholt.net>
+ <CABb+yY2u_v1uSDrBgP2DRAOrDkXETfs_zmLACm=uRFALVYFjmA@mail.gmail.com>
+Message-ID: <1430214625.3948.28.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yingjoe Chen <yingjoe.chen@mediatek.com>
+On Tue, 2015-04-28 at 11:13 +0530, Jassi Brar wrote:
+> On Tue, Apr 28, 2015 at 3:57 AM, Eric Anholt <eric@anholt.net> wrote:
+> > From: Lubomir Rintel <lkundrak@v3.sk>
+> > 
+> > Implement BCM2835 mailbox support as a device registered with the
+> > general purpose mailbox framework. Implementation based on commits 
+> > by
+> > Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on which to base 
+> > the
+> > implementation.
+> > 
+> > [1] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013
+> > -April/000528.html
+> > [2] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013
+> > -May/000546.html
+> > 
+> We could probably drop the history from changelog. Just talk about
+> what the controller is and any specifics of the driver.
+> 
+> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> > Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+> > Signed-off-by: Suman Anna <s-anna@ti.com>
+> > Signed-off-by: Jassi Brar <jassisinghbrar@gmail.com>
+> > 
+> 
+> How come it has my s-o-b?
 
-Add CONFIG_MMC_MTK=y in defconfig
+A good question. Seems like I've added it, but I can't really remember
+or explain that:
 
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+http://lists.infradead.org/pipermail/linux-rpi-kernel/2014
+-October/001006.html
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index bc673e7..35447b2 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -451,6 +451,7 @@ CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_ROCKCHIP=y
- CONFIG_MMC_SH_MMCIF=y
- CONFIG_MMC_SUNXI=y
-+CONFIG_MMC_MTK=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
--- 
-1.8.1.1.dirty
+It doesn't seem like I've squashed any commit with S-o-b by Jassi Brar
+or Suman Anna in. Maybe I intended to add a Cc: and pasted in a S-o-b
+by accident? I'm sorry for that.
+
+Please remove the two.
+
+Thank you,
+Lubo
