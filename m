@@ -1,144 +1,97 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Wed, 29 Apr 2015 00:57:23 +0300
-Subject: [PATCH 1/1] gpio: omap: Fix PM runtime issue and remove most
- BANK_USED macros
-In-Reply-To: <20150423143952.GR18048@atomide.com>
-References: <1429632533-23285-1-git-send-email-tony@atomide.com>
- <5538D3B6.7060305@linaro.org> <20150423143952.GR18048@atomide.com>
-Message-ID: <55400243.4040504@linaro.org>
+From: lho@apm.com (Loc Ho)
+Date: Tue, 28 Apr 2015 16:10:40 -0600
+Subject: [PATCH v7 0/4] edac: Add APM X-Gene SoC EDAC driver
+Message-ID: <1430259045-19012-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+This patch adds support for the APM X-Gene SoC EDAC driver for DT.
 
-Sorry for delayed reply.
+v7:
+* Update binding documentation for memory controller, PMD, L3, and SoC EDAC
+* Change resource for PCP, CSW, MCBA, MCBB, and efuse to syscon type nodes
+  and updae driver accordingly
+* Fix clearing L2 RTO register properly
+* Fix the MODULE_DEVICE_TABLE for OF
+* Update DT accordingly to binding documentation
 
-On 04/23/2015 05:39 PM, Tony Lindgren wrote:
-> * Grygorii.Strashko at linaro.org <grygorii.strashko@linaro.org> [150423 04:13]:
->> On 04/21/2015 07:08 PM, Tony Lindgren wrote:
->>> @@ -438,11 +447,30 @@ static void omap_enable_gpio_module(struct gpio_bank *bank, unsigned offset)
->>>    		writel_relaxed(ctrl, reg);
->>>    		bank->context.ctrl = ctrl;
->>>    	}
->>> +
->>> +	if (is_irq) {
->>> +		omap_set_gpio_direction(bank, offset, 1);
->>> +		bank->irq_usage |= BIT(offset);
->>> +	} else {
->>> +		omap_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
->>> +		bank->mod_usage |= BIT(offset);
->>> +	}
->>
->> The OMAP GPIO driver implements two Core interfaces IRQ-chip and GPIO-chip which, in general,
->> more or less independent.
->>
->> So, I don't think, that it's good to mix GPIO-IRQ-chip specific code with GPIO-chip code.
->> And this even don't really correspond the purpose of omap_enable_gpio_module() :( and might
->> introduce misunderstanding of code. The worst thing is that future fixes in IRQ-chip may
->> affect on on GPIO-chip and vise versa :(
-> 
-> Hmm I'm thinking omap_enable/disable_gpio_module() eventually becomes
-> our runtime_resume/suspend(). Currently the enabling and disabling is
-> buggy for GPIO for some corner cases.. AFAIK the only difference between
+v6:
+* Rebase to 4.0.0-rc3
+* Add memory scrub stub function and enable ARM64 EDAC support patch
+* Add bit definition defines for L2RTOS registers
+* Remove un-necessary clearing of all L1/L2 software generated registers
+* Remove wrong notification of LSU un-correctable error
+* Change L2 reporting of un-correcable error to correctable error
+* Change clearing of the L2C L2RTO registers
+* Add support for L2 HW version 1 and version 2 or above
+* Add support for L3 HW version 1 and version 2 or above
 
-It might be very helpful if you'd able to share additional info about
-any "corner cases" you know.
+v5:
+* Rebase to 3.17.rc1 (next)
+* Update binding documentation for additional SoC node binding resource
+* Enable MCU correctable and uncorrectable interrupts if not enabled by
+  firmware
+* Enable top level interrupt only after all MCU registered. Otherwise,
+  error interrupt will never get cleared by the corresponding MCU.
+* Remove clearing of L1 and L2 errors during initialization time. Otherwise,
+  they will not be captured between firmware booting and error configuration.
+* Add capture and clearing SoC register bus errors
+* Add register bus resource to SoC DT node
 
-> enabling GPIO vs GPIO-IRQ is the calling of omap_set_gpio_direction
-> vs omap_set_gpio_triggering. Or at least that's the way it should be
-> unless I'm missing something?
+v4:
+* Fix PMD l1/l2 error reading address due to wrong variable type
+* Fix clearing of software generated and HW errors for l1/l2
 
-I think yes. what i'd like to say, first of all, is that it might be not good idea to mix 
-too much functionality in  omap_enable/disable_gpio_module() - especially GPIO-IRQ vs
-GPIO-chip ( Very easy to get lost ;)
+v3:
+* Update binding documentation for PMD DT node and exampples
+* Add binding documentation for SoC DT node
+* Change MC, PMD, and L3C driver error injection to use debugfs
+* Add missing IRQ for MC correctable error (code and DT)
+* Use true/false where appropriate instead 1/0
+* Add bit definition for L1 MMUESR register and fully decode this error
+* Remove the un-necessary dev variable from xgene_edac_pmd_ctx structure
+* Add check for disabled PMD (code and DT)
+* Switch to edac_printk instead pr_err
+* Some minor comments update
 
-For example (1) - your change of omap_gpio_request() looks like invalid:
+v2:
+* Add EDAC entry in MAINTAINERS for APM EDAC driver
+* Remove the MC scrub patch
+* Remove the word 'Caches' from Kconfig
+* Change all MASK defines to use BIT(x)
+* Update comment or remove them
+* Wrap error injection code around CONFIG_EDAC_DEBUG
+* Change function name xgene_edac_mc_hw_init to xgene_edac_mc_irq_ctl
+* Change all function XXX_hw_init to XXX_hw_ctl
+* Fix typo 'activie'
+* Move calling function edac_mc_alloc after resource retrieval
+* Check for NULL on platform_get_resource return if reference directly
+* Add documentation for struct xgene_edac_pmd_ctx
+* Move L1 and L2 check out of function xgene_edac_pmd_check to its own
+  functions
+* Use for loop for configure each CPU of an PMD
+* Replace /2 by >> 1
+* Remove unnecessary comment on edac_device_add_device failure
+* Make mem_err_ip static const
+* Unwind EDAC register correctly if failed
+---
+Loc Ho (5):
+  arm64: Enable EDAC on ARM64
+  MAINTAINERS: Add entry for APM X-Gene SoC EDAC driver
+  Documentation: Add documentation for the APM X-Gene SoC EDAC DTS
+    binding
+  edac: Add APM X-Gene SoC EDAC driver
+  arm64: Add APM X-Gene SoC EDAC DTS entries
 
-  static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
-  {
-  	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
--	unsigned long flags;
-  
--	/*
--	 * If this is the first gpio_request for the bank,
--	 * enable the bank module.
--	 */
--	if (!BANK_USED(bank))
--		pm_runtime_get_sync(bank->dev);
--
--	spin_lock_irqsave(&bank->lock, flags);
--	/* Set trigger to none. You need to enable the desired trigger with
--	 * request_irq() or set_irq_type(). Only do this if the IRQ line has
--	 * not already been requested.
--	 */
--	if (!LINE_USED(bank->irq_usage, offset)) {
--		omap_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
--		omap_enable_gpio_module(bank, offset);
-
-	^^ above two line should be executed only if GPIO line was not requested as IRQ before
-
--	}
-
-
--	bank->mod_usage |= BIT(offset);
--	spin_unlock_irqrestore(&bank->lock, flags);
-+	omap_enable_gpio_module(bank, offset, false);
-
-^^ after your change, it looks like omap_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE)
-   will be called always and GPIO triggering configuration might be lost
-  
-  	return 0;
-  }
-
-Example (2)
- I've found commit 55b6019ae294 "OMAP: GPIO: clear/restore level/edge detect settings on mask/unmask"
- which does the following
-  gpio_mask_irq()
-   |-  _set_gpio_triggering(bank, get_gpio_index(gpio), IRQ_TYPE_NONE);
-  
-  gpio_unmask_irq()
-   |- u32 trigger = irqd_get_trigger_type(d);
-      if (trigger)
-             omap_set_gpio_triggering(bank, offset, trigger);
-
-  As result, it seems unreasonable to physically configure IRQ triggering type in GPIO bank registers 
-  inside omap_gpio_irq_type(). Of course, such assumption should be double checked taking into account that 
-  __irq_set_trigger() can be called any time even before request_irq().
-  Also, seems the same could be applied to omap_enable_gpio_module and omap_set_gpio_direction and they
-  could be removed from omap_gpio_irq_type().
-  
->   
->> Could we keep omap_xxx_gpio_module() functions responsible only for GPIO bank PM and
->> enabling/disabling?
-> 
-> If you're thinking about just thinking about having separate wrappers around
-> it like this::
-> 
-> static void omap_enable_gpio_module(struct gpio_bank *bank, unsigned offset,
-> 					bool is_irq)
-> {
-> 	...
-> }
-> 
-> static void omap_enable_gpio((struct gpio_bank *bank, unsigned offset)
-> {
-> 	omap_enable_gpio_module(bpio_bank, offset, 0);
-> }
-> 
-> static void omap_enable_gpio_irq((struct gpio_bank *bank, unsigned offset)
-> {
-> 	omap_enable_gpio_module(bpio_bank, offset, 1);
-> }
-> 
-> Then yes makes sense to me. Or do you have something else in mind?
-
-Yep. Commented above.
-
-Also, it probably could work if we will set GPIO_CTRL.DISABLEMODULE=1
-in omap_gpio_runtime_resume and GPIO_CTRL.DISABLEMODULE=0 in _runtime_suspend,
-but it may require from us to split CPUIdle and suspend code path (
-
-
--- 
-regards,
--grygorii
+ .../devicetree/bindings/edac/apm-xgene-edac.txt    |  107 +
+ MAINTAINERS                                        |    8 +
+ arch/arm64/Kconfig                                 |    1 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |  123 ++
+ arch/arm64/include/asm/edac.h                      |   31 +
+ drivers/edac/Kconfig                               |    9 +-
+ drivers/edac/Makefile                              |    1 +
+ drivers/edac/xgene_edac.c                          | 2175 ++++++++++++++++++++
+ 8 files changed, 2454 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+ create mode 100644 arch/arm64/include/asm/edac.h
+ create mode 100644 drivers/edac/xgene_edac.c
