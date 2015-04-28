@@ -1,128 +1,75 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 28 Apr 2015 09:11:39 -0400
-Subject: [PATCH v4 2/2] firmware: qcom: scm: Add support for ARM64 SoCs
-In-Reply-To: <1430169836-1999-2-git-send-email-galak@codeaurora.org>
-References: <1430169836-1999-1-git-send-email-galak@codeaurora.org>
- <1430169836-1999-2-git-send-email-galak@codeaurora.org>
-Message-ID: <553F870B.9040606@codeaurora.org>
+From: houpengyang@huawei.com (Hou Pengyang)
+Date: Tue, 28 Apr 2015 13:20:48 +0000
+Subject: [PATCH] arm64: perf: Fix callchain parse error with kernel tracepoint
+ events
+Message-ID: <1430227248-19657-1-git-send-email-houpengyang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kumar,
+For ARM64, when tracing with tracepoint events, the IP and cpsr are set
+to 0, preventing the perf code parsing the callchain and resolving the
+symbols correctly.
 
-On 04/27/2015 05:23 PM, Kumar Gala wrote:
+ ./perf record -e sched:sched_switch -g --call-graph dwarf ls
+	[ perf record: Captured and wrote 0.146 MB perf.data ]
+ ./perf report -f
+    Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194
+    Children      Self    Command  Shared Object     Symbol
+	100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
 
-> --- /dev/null
-> +++ b/drivers/firmware/qcom_scm-64.c
-> @@ -0,0 +1,465 @@
-> +/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-> + * 02110-1301, USA.
-> + */
-> +
-> +#include <linux/cpumask.h>
-> +#include <linux/delay.h>
-> +#include <linux/mutex.h>
-> +#include <linux/slab.h>
-> +#include <linux/types.h>
-> +#include <linux/qcom_scm.h>
-> +
-> +#include <asm/cacheflush.h>
-> +#include <asm/compiler.h>
-> +#include <asm/smp_plat.h>
-> +
-> +#include "qcom_scm.h"
-> +
-> +#define QCOM_SCM_SIP_FNID(s, c) (((((s) & 0xFF) << 8) | ((c) & 0xFF)) | 0x02000000)
-> +
-> +#define MAX_QCOM_SCM_ARGS 10
-> +#define MAX_QCOM_SCM_RETS 3
-> +
-> +#define QCOM_SCM_ARGS_IMPL(num, a, b, c, d, e, f, g, h, i, j, ...) (\
-> +			(((a) & 0xff) << 4) | \
-> +			(((b) & 0xff) << 6) | \
-> +			(((c) & 0xff) << 8) | \
-> +			(((d) & 0xff) << 10) | \
-> +			(((e) & 0xff) << 12) | \
-> +			(((f) & 0xff) << 14) | \
-> +			(((g) & 0xff) << 16) | \
-> +			(((h) & 0xff) << 18) | \
-> +			(((i) & 0xff) << 20) | \
-> +			(((j) & 0xff) << 22) | \
-> +			(num & 0xffff))
-> +
-> +#define QCOM_SCM_ARGS(...) QCOM_SCM_ARGS_IMPL(__VA_ARGS__, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-> +
-> +/**
-> + * struct qcom_scm_desc
-> + * @arginfo: Metadata describing the arguments in args[]
-> + * @args: The array of arguments for the secure syscall
-> + * @ret: The values returned by the secure syscall
-> + * @extra_arg_buf: The buffer containing extra arguments
-> +		   (that don't fit in available registers)
-> + * @x5: The 4rd argument to the secure syscall or physical address of
-> +	extra_arg_buf
-> + */
-> +struct qcom_scm_desc {
-> +	u32 arginfo;
-> +	u64 args[MAX_QCOM_SCM_ARGS];
-> +	u64 ret[MAX_QCOM_SCM_RETS];
-> +
-> +	/* private */
-> +	void *extra_arg_buf;
-> +	u64 x5;
-> +};
-> +
-> +
-> +#define QCOM_SCM_ENOMEM		-5
-> +#define QCOM_SCM_EOPNOTSUPP	-4
-> +#define QCOM_SCM_EINVAL_ADDR	-3
-> +#define QCOM_SCM_EINVAL_ARG	-2
-> +#define QCOM_SCM_ERROR		-1
-> +#define QCOM_SCM_INTERRUPTED	1
-> +#define QCOM_SCM_EBUSY		-55
-> +#define QCOM_SCM_V2_EBUSY	-12
+The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
+several necessary registers used for callchain unwinding, including pc,sp,
+fp and psr .
 
-Any reason to duplicate ENOMEM through INTERRUPTED rather than put them in the
-common header?
+With this patch, callchain can be parsed correctly as follows:
 
-> +static DEFINE_MUTEX(qcom_scm_lock);
-> +
-> +#define QCOM_SCM_EBUSY_WAIT_MS 30
-> +#define QCOM_SCM_EBUSY_MAX_RETRY 20
-> +
-> +#define N_EXT_QCOM_SCM_ARGS 7
-> +#define FIRST_EXT_ARG_IDX 3
-> +#define SMC_ATOMIC_SYSCALL 31
-> +#define N_REGISTER_ARGS (MAX_QCOM_SCM_ARGS - N_EXT_QCOM_SCM_ARGS + 1)
-> +#define SMC64_MASK 0x40000000
-> +#define SMC_ATOMIC_MASK 0x80000000
-> +#define IS_CALL_AVAIL_CMD 1
-> +
-> +#define R0_STR "x0"
-> +#define R1_STR "x1"
-> +#define R2_STR "x2"
-> +#define R3_STR "x3"
-> +#define R4_STR "x4"
-> +#define R5_STR "x5"
+     ......
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
+-    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
+     pfkey_send_policy_notify
+     pfkey_get
+     v9fs_vfs_rename
+     page_follow_link_light
+     link_path_walk
+     el0_svc_naked
+    .......
 
-What is the purpose of these macros?
+For tracepoint event, stack parsing also doesn't work well for ARM. Jean Pihet
+comed up a patch:
+http://thread.gmane.org/gmane.linux.kernel/1734283/focus=1734280
 
-Chris
+Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
+---
+ arch/arm64/include/asm/perf_event.h | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
+diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+index d26d1d5..16a074f 100644
+--- a/arch/arm64/include/asm/perf_event.h
++++ b/arch/arm64/include/asm/perf_event.h
+@@ -24,4 +24,20 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
+ #define perf_misc_flags(regs)	perf_misc_flags(regs)
+ #endif
+ 
++#define perf_arch_fetch_caller_regs(regs, __ip) { \
++   unsigned long sp;   \
++   __asm__ ("mov %[sp], sp\n" : [sp] "=r" (sp)); \
++       (regs)->pc = (__ip);    \
++       __asm__ (      \
++               "str %[sp],  %[_arm64_sp]  \n\t"    \
++               "str x29, %[_arm64_fp]  \n\t"    \
++               "mrs %[_arm64_cpsr], spsr_el1 \n\t"     \
++               : [_arm64_sp] "=m" (regs->sp),      \
++                 [_arm64_fp] "=m" (regs->regs[29]),  \
++                 [_arm64_cpsr] "=r" (regs->pstate) \
++       : [sp] "r" (sp)     \
++       );      \
++}
++
++
+ #endif
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.8.3.4
