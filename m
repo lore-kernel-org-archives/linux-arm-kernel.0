@@ -1,87 +1,121 @@
-From: rajeevkumar.linux@gmail.com (Rajeev Kumar)
-Date: Tue, 28 Apr 2015 11:08:19 +0530
-Subject: [PATCH V2] Update email-id of author
-Message-ID: <1430199499-16278-1-git-send-email-rajeevkumar.linux@gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 28 Apr 2015 11:13:31 +0530
+Subject: [PATCH 2/3 v5] mailbox: Enable BCM2835 mailbox support
+In-Reply-To: <1430173644-19099-3-git-send-email-eric@anholt.net>
+References: <1430173644-19099-1-git-send-email-eric@anholt.net>
+ <1430173644-19099-3-git-send-email-eric@anholt.net>
+Message-ID: <CABb+yY2u_v1uSDrBgP2DRAOrDkXETfs_zmLACm=uRFALVYFjmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rajeev-dlh.kumar at st.com email-id doesn't exist anymore as I have left the
-company.  Replace ST's id with Rajeev Kumar <rajeevkumar.linux@gmail.com>
+On Tue, Apr 28, 2015 at 3:57 AM, Eric Anholt <eric@anholt.net> wrote:
+> From: Lubomir Rintel <lkundrak@v3.sk>
+>
+> Implement BCM2835 mailbox support as a device registered with the
+> general purpose mailbox framework. Implementation based on commits by
+> Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on which to base the
+> implementation.
+>
+> [1] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-April/000528.html
+> [2] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-May/000546.html
+>
+We could probably drop the history from changelog. Just talk about
+what the controller is and any specifics of the driver.
 
-It also updates .mailmap file to fix address for 'git shortlog'
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> Signed-off-by: Jassi Brar <jassisinghbrar@gmail.com>
+>
+How come it has my s-o-b?
 
-Signed-off-by: Rajeev Kumar <rajeevkumar.linux@gmail.com>
----
- .mailmap                                 |    1 +
- arch/arm/mach-spear/generic.h            |    2 +-
- arch/arm/mach-spear/include/mach/irqs.h  |    2 +-
- arch/arm/mach-spear/include/mach/spear.h |    2 +-
- arch/arm/mach-spear/spear6xx.c           |    2 +-
- 5 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/.mailmap b/.mailmap
-index 0d971cf..6e5cb4c 100644
---- a/.mailmap
-+++ b/.mailmap
-@@ -96,6 +96,7 @@ Peter A Jonsson <pj@ludd.ltu.se>
- Peter Oruba <peter@oruba.de>
- Peter Oruba <peter.oruba@amd.com>
- Praveen BP <praveenbp@ti.com>
-+Rajeev Kumar <rajeevkumar.linux@gmail.com> <rajeev-dlh.kumar@st.com>
- Rajesh Shah <rajesh.shah@intel.com>
- Ralf Baechle <ralf@linux-mips.org>
- Ralf Wildenhues <Ralf.Wildenhues@gmx.de>
-diff --git a/arch/arm/mach-spear/generic.h b/arch/arm/mach-spear/generic.h
-index a99d90a..0bfd2ea 100644
---- a/arch/arm/mach-spear/generic.h
-+++ b/arch/arm/mach-spear/generic.h
-@@ -2,7 +2,7 @@
-  * spear machine family generic header file
-  *
-  * Copyright (C) 2009-2012 ST Microelectronics
-- * Rajeev Kumar <rajeev-dlh.kumar@st.com>
-+ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
-  * Viresh Kumar <viresh.linux@gmail.com>
-  *
-  * This file is licensed under the terms of the GNU General Public
-diff --git a/arch/arm/mach-spear/include/mach/irqs.h b/arch/arm/mach-spear/include/mach/irqs.h
-index 92da0a8..022cf98 100644
---- a/arch/arm/mach-spear/include/mach/irqs.h
-+++ b/arch/arm/mach-spear/include/mach/irqs.h
-@@ -2,7 +2,7 @@
-  * IRQ helper macros for spear machine family
-  *
-  * Copyright (C) 2009-2012 ST Microelectronics
-- * Rajeev Kumar <rajeev-dlh.kumar@st.com>
-+ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
-  * Viresh Kumar <viresh.linux@gmail.com>
-  *
-  * This file is licensed under the terms of the GNU General Public
-diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
-index f2d6a01..0d2f14d 100644
---- a/arch/arm/mach-spear/include/mach/spear.h
-+++ b/arch/arm/mach-spear/include/mach/spear.h
-@@ -2,7 +2,7 @@
-  * SPEAr3xx/6xx Machine family specific definition
-  *
-  * Copyright (C) 2009,2012 ST Microelectronics
-- * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-+ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
-  * Viresh Kumar <viresh.linux@gmail.com>
-  *
-  * This file is licensed under the terms of the GNU General Public
-diff --git a/arch/arm/mach-spear/spear6xx.c b/arch/arm/mach-spear/spear6xx.c
-index da26fa5b..c6dcb0d 100644
---- a/arch/arm/mach-spear/spear6xx.c
-+++ b/arch/arm/mach-spear/spear6xx.c
-@@ -4,7 +4,7 @@
-  * SPEAr6XX machines common source file
-  *
-  * Copyright (C) 2009 ST Microelectronics
-- * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-+ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
-  *
-  * Copyright 2012 Stefan Roese <sr@denx.de>
-  *
--- 
-1.7.9.5
+> diff --git a/drivers/mailbox/bcm2835-mailbox.c b/drivers/mailbox/bcm2835-mailbox.c
+> new file mode 100644
+> index 0000000..6910c71
+> --- /dev/null
+> +++ b/drivers/mailbox/bcm2835-mailbox.c
+> @@ -0,0 +1,220 @@
+> +/*
+> + *  Copyright (C) 2010 Broadcom
+> + *  Copyright (C) 2013-2014 Lubomir Rintel
+> + *  Copyright (C) 2013 Craig McGeachie
+> + *
+You may want to make it 2015
+
+
+> +
+> +/* Status register: FIFO state. */
+> +#define ARM_MS_FULL            0x80000000
+> +#define ARM_MS_EMPTY           0x40000000
+>
+nit:  BIT(31) and BIT(30)
+
+> +
+> +/* Configuration register: Enable interrupts. */
+> +#define ARM_MC_IHAVEDATAIRQEN  0x00000001
+>
+nit: BIT(0)
+
+> +
+> +struct bcm2835_mbox {
+> +       struct device *dev;
+> +       void __iomem *regs;
+> +       spinlock_t lock;
+> +       bool started;
+> +       struct mbox_controller controller;
+> +};
+> +
+> +struct bcm2835_mbox *mbox;
+> +
+Bad omen. You assume any platform will ever have just one instance of
+the mailbox controller. Which may come true, but still is a taboo to
+think of.
+
+
+> +static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
+> +{
+> +       struct device *dev = mbox->dev;
+>
+.... and you are wasting 'dev_id' here, which could have been 'mbox'
+
+
+> +       struct mbox_chan *link = &mbox->controller.chans[0];
+> +
+> +       while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
+> +               u32 msg = readl(mbox->regs + MAIL0_RD);
+> +
+> +               if (!mbox->started) {
+> +                       dev_err(dev, "Reply 0x%08x with no client attached\n",
+> +                               msg);
+>
+This shouldn't happen unless the remote could send asynchronous
+commands to Linux. And even if it does, we shouldn't be seeing them
+before we are ready. Please move the "Enable the interrupt on data
+reception" from probe to bcm2835_startup(), and disable interrupts in
+bcm2835_shutdown()
+
+
+> +static int bcm2835_send_data(struct mbox_chan *link, void *data)
+> +{
+> +       int ret = 0;
+> +       u32 msg = *(u32 *)data;
+> +
+Sorry, this is seen as an abuse. Please pass pointer to a u32 and not
+typecast the value.
+
+> +       if (!mbox->started)
+> +               return -ENODEV;
+>
+This 'started' flag is unnecessary. API won't call send_data() before
+startup() or after shutdown().
+
+> +       if (readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL) {
+> +               ret = -EBUSY;
+> +               goto end;
+> +       }
+>
+This check is unnecessary too. API would have already called
+last_tx_done() already to make sure this never hits.
+
+Cheers.
