@@ -1,38 +1,33 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 28 Apr 2015 12:29:20 +0200
-Subject: [PATCH 0/3] ARM: shmobile: Use generic names for sound device nodes
-Message-ID: <1430216963-8161-1-git-send-email-geert+renesas@glider.be>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 28 Apr 2015 13:59:43 +0300
+Subject: [PATCH 3/4] MAINTAINERS: add Conexant Digicolor machines entry
+In-Reply-To: <cover.1430217994.git.baruch@tkos.co.il>
+References: <cover.1430217994.git.baruch@tkos.co.il>
+Message-ID: <7e920357dd9b093c1800072212ca3cbb22f91149.1430217995.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Magnus, Simon,
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-This patch series gets rid of the "sound-codec" device nodes names in
-the shmobile DTS files, and replaces them by "codec", as the former
-doesn't appear in any binding document.
-
-Thanks for applying!
-
-Geert Uytterhoeven (3):
-  ARM: shmobile: bockw dts: Use generic names for device nodes
-  ARM: shmobile: lager dts: Use generic names for device nodes
-  ARM: shmobile: koelsch dts: Use generic names for device nodes
-
- arch/arm/boot/dts/r8a7778-bockw.dts   | 2 +-
- arch/arm/boot/dts/r8a7790-lager.dts   | 2 +-
- arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2e5bbc0d68b2..fc6949f77729 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -990,6 +990,12 @@ F:	drivers/clocksource/timer-prima2.c
+ F:	drivers/clocksource/timer-atlas7.c
+ N:	[^a-z]sirf
+ 
++ARM/CONEXANT DIGICOLOR MACHINE SUPPORT
++M:	Baruch Siach <baruch@tkos.co.il>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++N:	digicolor
++
+ ARM/EBSA110 MACHINE SUPPORT
+ M:	Russell King <linux@arm.linux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
-1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+2.1.4
