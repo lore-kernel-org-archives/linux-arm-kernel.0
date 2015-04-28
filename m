@@ -1,78 +1,51 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 28 Apr 2015 13:41:33 +0800
-Subject: [PATCH 0/6] ARM: berlin: relicense the device trees under
- GPLv2/X11
-In-Reply-To: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1430057013-12842-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20150428134133.5ada5804@xhacker>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 28 Apr 2015 08:45:24 +0200
+Subject: [PATCH] RFC: let gpiod_get_optional et all return NULL when
+ GPIOLIB is not enabled
+In-Reply-To: <CAAVeFuKMiHhT8o1PCETNTys8EATcVdy7xfy+P+o_2r6BwAXEgw@mail.gmail.com>
+References: <1423731809-4800-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdb6KcZx3WfTqUKemhQ0_OsqxBGQb_P5cXXZvgc3riakdA@mail.gmail.com>
+ <20150306085957.GC10717@pengutronix.de>
+ <CACRpkdYq70V8SG4XOPBCGWs__J4ehknZSucpO5OdXpMDj8GPKA@mail.gmail.com>
+ <CAAVeFu+0bWSAUSaDGTUmPyj9JxEJn4yxF_hzab4CHp8YV1MuoA@mail.gmail.com>
+ <20150427152153.GN19431@pengutronix.de>
+ <CAAVeFuKMiHhT8o1PCETNTys8EATcVdy7xfy+P+o_2r6BwAXEgw@mail.gmail.com>
+Message-ID: <20150428064524.GV19431@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Antoine,
+Hello,
 
-On Sun, 26 Apr 2015 07:03:27 -0700
-Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+On Tue, Apr 28, 2015 at 12:31:37PM +0900, Alexandre Courbot wrote:
+> On Tue, Apr 28, 2015 at 12:21 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > On Thu, Apr 09, 2015 at 11:20:55AM +0900, Alexandre Courbot wrote:
+> >> Having GPIO disabled means there is no GPIO support, including the
+> >> ability to look for GPIOs. -ENOSYS is a well-documented error-code
+> >> which meaning also applies to the gpio_*_optional functions (we don't
+> >> have support for the operation you requested). If a driver or
+> >> architecture really, really needs GPIO support they can require or
+> >> depend on CONFIG_GPIOLIB, and the problem goes away. If they can work
+> >> with and without gpiolib, then they should check for -ENOSYS when they
+> >> request GPIOs and behave accordingly.
+> > What whould be the right behaviour in your eyes? I hope it's not
+> >
+> >         if (ret != -ENOSYS)
+> >                 return ret;
+> >
+> >         /* continue and ignore error */
+> 
+> If a consumer absolutely needs a GPIO (most of the drivers out there I
+> believe), then -ENOSYS can be handled like any other error. If it
+> doesn't, and the driver is fine without GPIO support as well (meaning
+> that it can somehow work even if a GPIO is declared, but GPIO support
+> is not compiled in), then it will need to explicitly handle that
+> particular error. That case should be rare though - most drivers will
+> want to propagate -ENOSYS.
+Ack.
 
-> Hi,
-> 
-> The GPLv2 license makes it impractical for other software components
-> licensed under another license to use our device trees. To fix this,
-> and make our device tree usable by other software components, relicense
-> them under a GPLv2/X11 dual-license.
-> 
-> In order to get this accepted, we *need* all contributors to the Berlin
-> device tree files to ack-by the patches applying on a file they
-> contributed on. A list of needed ack-by by device tree is shown below:
+Uwe
 
-For all of them:
-
-Acked-by: Jisheng Zhang <jszhang@marvell.com>
-
-> 
->  * berlin2q.dtsi:
->         Antoine Tenart <antoine.tenart@free-electrons.com>
->         Jisheng Zhang <jszhang@marvell.com>
-> 	Alexandre Belloni <alexandre.belloni@free-electrons.com>
->         Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> 
->  * berlin2q-marvell-dmp.dtsi:
->         Antoine Tenart <antoine.tenart@free-electrons.com>
->         Jisheng Zhang <jszhang@marvell.com>
-> 
->  * berlin2.dtsi:
->         Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->         Antoine Tenart <antoine.tenart@free-electrons.com>
->         Jisheng Zhang <jszhang@marvell.com>
-> 
->  * berlin2-sony-nsz-gs7.dts:
->         Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> 
->  * berlin2cd.dtsi:
->         Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->         Antoine Tenart <antoine.tenart@free-electrons.com>
->         Jisheng Zhang <jszhang@marvell.com>
-> 
->  * berlin2cd-google-chromecast.dts:
->         Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> 
-> Thanks!
-> 
-> Antoine
-> 
-> Antoine Tenart (6):
->   ARM: dts: berlin: relicense the berlin2q dtsi under GPLv2/X11
->   ARM: dts: berlin: relicense the BG2Q Marvell DMP dts under GPLv2/X11
->   ARM: dts: berlin: relicense the berlin2 dtsi under GPLv2/X11
->   ARM: dts: berlin: relicense the BG2 Sony NSZ-GS7 dts under GPLv2/X11
->   ARM: dts: berlin: relicense the berlin2cd dtsi under GPLv2/X11
->   ARM: dts: berlin: relicense the BG2CD Google Chromecast dts under
->     GPLv2/X11
-> 
->  arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts        | 34 +++++++++++++++++++++--
->  arch/arm/boot/dts/berlin2.dtsi                    | 34 +++++++++++++++++++++--
->  arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 34 +++++++++++++++++++++--
->  arch/arm/boot/dts/berlin2cd.dtsi                  | 34 +++++++++++++++++++++--
->  arch/arm/boot/dts/berlin2q-marvell-dmp.dts        | 34 +++++++++++++++++++++--
->  arch/arm/boot/dts/berlin2q.dtsi                   | 34 +++++++++++++++++++++--
->  6 files changed, 186 insertions(+), 18 deletions(-)
-> 
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
