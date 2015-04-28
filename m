@@ -1,157 +1,38 @@
-From: lho@apm.com (Loc Ho)
-Date: Tue, 28 Apr 2015 16:10:45 -0600
-Subject: [PATCH 5/5] arm64: Add APM X-Gene SoC EDAC DTS entries
-In-Reply-To: <1430259045-19012-5-git-send-email-lho@apm.com>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <1430259045-19012-2-git-send-email-lho@apm.com>
- <1430259045-19012-3-git-send-email-lho@apm.com>
- <1430259045-19012-4-git-send-email-lho@apm.com>
- <1430259045-19012-5-git-send-email-lho@apm.com>
-Message-ID: <1430259045-19012-6-git-send-email-lho@apm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 29 Apr 2015 01:34:37 +0200
+Subject: [PATCH v2 2/7] ARM: at91/dt: at91-kizbox: sanitize file
+In-Reply-To: <1429617918-32086-3-git-send-email-g.portay@overkiz.com>
+References: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
+ <1429617918-32086-3-git-send-email-g.portay@overkiz.com>
+Message-ID: <20150428233437.GI3687@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds APM X-Gene SoC EDAC DTS entries.
+On 21/04/2015 at 14:05:13 +0200, Ga?l PORTAY wrote :
+> Consists in:
+>  * sorting nodes by address as possible or alphabetically,
+>  * adding myself as new maintainer and
+>  * update license.
+> 
+> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+> ---
+>  arch/arm/boot/dts/at91-kizbox.dts | 67 +++++++++++++++++++--------------------
+>  1 file changed, 32 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
+> index e83e4f9..00c86c1 100644
+> --- a/arch/arm/boot/dts/at91-kizbox.dts
+> +++ b/arch/arm/boot/dts/at91-kizbox.dts
+> @@ -1,16 +1,16 @@
+>  /*
+> - * kizbox.dts - Device Tree file for Overkiz Kizbox board
+> + * at91-kizbox.dts - Device Tree file for Overkiz Kizbox board
+>   *
 
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Loc Ho <lho@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi |  123 ++++++++++++++++++++++++++++++++
- 1 files changed, 123 insertions(+), 0 deletions(-)
+My guess is that this should be part of the previous patch
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index c8d3e0e..7ccb289 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -374,6 +374,129 @@
- 			};
- 		};
- 
-+		efuse: efuse at 1054a000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x1054a000 0x0 0x20>;
-+		};
-+
-+		pcperror: pcperror at 78800000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x78800000 0x0 0x100>;
-+		};
-+
-+		csw: csw at 7e200000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x7e200000 0x0 0x1000>;
-+		};
-+
-+		mcba: mcba at 7e700000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x7e700000 0x0 0x1000>;
-+		};
-+
-+		mcbb: mcbb at 7e720000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x7e720000 0x0 0x1000>;
-+		};
-+
-+		edacmc0: edacmc0 at 7e800000 {
-+			compatible = "apm,xgene-edac-mc";
-+			regmap-pcp = <&pcperror>;
-+			regmap-csw = <&csw>;
-+			regmap-mcba = <&mcba>;
-+			regmap-mcbb = <&mcbb>;
-+			reg = <0x0 0x7e800000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacmc1: edacmc1 at 7e840000 {
-+			compatible = "apm,xgene-edac-mc";
-+			regmap-pcp = <&pcperror>;
-+			regmap-csw = <&csw>;
-+			regmap-mcba = <&mcba>;
-+			regmap-mcbb = <&mcbb>;
-+			reg = <0x0 0x7e840000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacmc2: edacmc2 at 7e880000 {
-+			compatible = "apm,xgene-edac-mc";
-+			regmap-pcp = <&pcperror>;
-+			regmap-csw = <&csw>;
-+			regmap-mcba = <&mcba>;
-+			regmap-mcbb = <&mcbb>;
-+			reg = <0x0 0x7e880000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacmc3: edacmc3 at 7e8c0000 {
-+			compatible = "apm,xgene-edac-mc";
-+			regmap-pcp = <&pcperror>;
-+			regmap-csw = <&csw>;
-+			regmap-mcba = <&mcba>;
-+			regmap-mcbb = <&mcbb>;
-+			reg = <0x0 0x7e8c0000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd0: edacpmd0 at 7c000000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			regmap-pcp = <&pcperror>;
-+			regmap-efuse = <&efuse>;
-+			reg = <0x0 0x7c000000 0x0 0x200000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd1: edacpmd1 at 7c200000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			regmap-pcp = <&pcperror>;
-+			regmap-efuse = <&efuse>;
-+			reg = <0x0 0x7c200000 0x0 0x200000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd2: edacpmd2 at 7c400000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			regmap-pcp = <&pcperror>;
-+			regmap-efuse = <&efuse>;
-+			reg = <0x0 0x7c400000 0x0 0x200000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd3: edacpmd3 at 7c600000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			regmap-pcp = <&pcperror>;
-+			regmap-efuse = <&efuse>;
-+			reg = <0x0 0x7c600000 0x0 0x200000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacl3: edacl3 at 7e600000 {
-+			compatible = "apm,xgene-edac-l3";
-+			regmap-pcp = <&pcperror>;
-+			reg = <0x0 0x7e600000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacsoc: edacsoc at 7e930000 {
-+			compatible = "apm,xgene-edac-soc";
-+			regmap-pcp = <&pcperror>;
-+			reg = <0x0 0x7e930000 0x0 0x1000>,
-+			      <0x0 0x7e000000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>,
-+				     <0x0 0x27 0x4>;
-+		};
-+
- 		pcie0: pcie at 1f2b0000 {
- 			status = "disabled";
- 			device_type = "pci";
+
 -- 
-1.7.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
