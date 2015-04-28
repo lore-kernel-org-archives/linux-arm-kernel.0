@@ -1,41 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Apr 2015 19:13:00 +0100
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150423141727.GQ18048@atomide.com>
-References: <20150407135713.GL4027@n2100.arm.linux.org.uk>
- <20150407152207.GM18048@atomide.com>
- <20150408230658.GO4027@n2100.arm.linux.org.uk>
- <20150409134843.GQ4027@n2100.arm.linux.org.uk>
- <20150415163108.GB2033@earth> <20150416160858.GH18048@atomide.com>
- <20150417184156.GA3326@earth> <20150420234032.GM18048@atomide.com>
- <20150423102542.GZ4027@n2100.arm.linux.org.uk>
- <20150423141727.GQ18048@atomide.com>
-Message-ID: <20150428181300.GB4027@n2100.arm.linux.org.uk>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 28 Apr 2015 11:42:48 -0700
+Subject: [PATCH 05/11] ARM: imx6: set initial power mode in pm function
+In-Reply-To: <1430058672-9267-6-git-send-email-shawn.guo@linaro.org>
+References: <1430058672-9267-1-git-send-email-shawn.guo@linaro.org>
+ <1430058672-9267-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAMAWPa8cyybpdgO+Po=7YUnCFkrnyHKKihgddzrUpHfAW=7brA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 23, 2015 at 07:17:28AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150423 03:26]:
-> > However, I don't think anyone is willing to say that they have a
-> > solution to this problem - obviously, you can't build OMAP as a
-> > non-multiplatform kernel anymore, so in effect you can never have
-> > the kernel enable this errata.  And you can't detect whether you're
-> > running in secure mode or not.
-> > 
-> > We could do the "only write the bit if it was originally clear" but
-> > we still have the problem that doing so may cause other people
-> > regressions.
-> 
-> How about we keep the bit writing part !multiplatform conditional
-> (or even remove it) but always do the flush for ca-8?
-> 
-> Then we could also do a warning for a misconfigured ca-8 later on.
+Hi Shawn,
 
-Yes, we could do this - we'll have to rely on the boot loader doing
-the right thing and setting this bit appropriately.  For those
-platforms where this doesn't apply, I don't see any solution as (iirc)
-OMAP now requires MULTIPLATFORM to be enabled.
+On Sun, Apr 26, 2015 at 7:31 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Rather than setting initial low-power mode in every single i.MX6 clock
+> initialization function, we should really do that in pm code.  Let's
+> move imx6q_set_lpm(WAIT_CLOCKED) call into imx6_pm_common_init().
+>
+> While at it, let's rename the function to imx6_set_lpm() since it's
+> actually common for all i.MX6 SoCs.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Some boot failures on imx6[1] (multi_v7_defconfig) were bisected down
+to this patch.  A simple revert doesn't build, so I was unable tot
+test a direct revert.  However, from the boot failures you can see
+that while multi_v7_defconfig boots fail, the imx_v6_v7_defconfig
+boots fine.  Disabling CONFIG_CPU_IDLE in multi_v7_defconfig allows
+this to start booting again on my wandboard quad, so I think there is
+something wrong with the cpuidle changes.
+
+Kevin
+
+[1] http://kernelci.org/boot/?next-20150428&imx6
