@@ -1,36 +1,69 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Tue, 28 Apr 2015 11:30:58 +0300
-Subject: [PATCH 01/11] coresight-etm4x: Adding CoreSight ETM4x driver
-In-Reply-To: <CANLsYky6TZhZ=JZuoBxU4dNRWVPYGUj6joMfi+dD9zjaokRE0A@mail.gmail.com>
-References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
- <1429742451-11465-2-git-send-email-mathieu.poirier@linaro.org>
- <1429890108.5211.8.camel@mm-sol.com>
- <CANLsYky6TZhZ=JZuoBxU4dNRWVPYGUj6joMfi+dD9zjaokRE0A@mail.gmail.com>
-Message-ID: <1430209858.1904.1.camel@mm-sol.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 28 Apr 2015 16:31:07 +0800
+Subject: [PATCH v6 1/3] dt-bindings: Add I2C bindings for mt65xx/mt81xx.
+In-Reply-To: <1430209869-6631-1-git-send-email-eddie.huang@mediatek.com>
+References: <1430209869-6631-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1430209869-6631-2-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Xudong Chen <xudong.chen@mediatek.com>
 
-On Mon, 2015-04-27 at 09:48 -0600, Mathieu Poirier wrote:
-> On 24 April 2015 at 09:41, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
-> > On Wed, 2015-04-22 at 16:40 -0600, Mathieu Poirier wrote:
-> > 
-> > > +static struct amba_id etm4_ids[] = {
-> > > +       {       /* ETM 4.0 - Hi6220 board */
-> > > +               .id     = 0x0003b95d,
-> > > +               .mask   = 0x0003ffff,
-> > > +               .data   = "ETM 4.0",
-> > > +       },
-> > > +       {       /* ETM 4.0 - Juno board */
-> > > +               .id     = 0x000bb95e,
-> > > +               .mask   = 0x000bffff,
-> > 
-> > Mask looks suspicious.
-> 
-> Can you please expand the "suspicious" part ?
+Add devicetree bindings for Mediatek Soc I2C driver.
 
-Well, 'b' part of the mask. I have to admit that
-I don't know how this is mapped on this platform.
+Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+---
+ .../devicetree/bindings/i2c/i2c-mt6577.txt         | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
 
-Regards,
-Ivan
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+new file mode 100644
+index 0000000..0ce6fa3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+@@ -0,0 +1,41 @@
++* Mediatek's I2C controller
++
++The Mediatek's I2C controller is used to interface with I2C devices.
++
++Required properties:
++  - compatible: value should be either of the following.
++      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
++      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
++      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
++      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
++      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
++  - reg: physical base address of the controller and dma base, length of memory
++    mapped region.
++  - interrupts: interrupt number to the cpu.
++  - clock-div: the fixed value for frequency divider of clock source in i2c
++    module. Each IC may be different.
++  - clocks: clock name from clock manager
++  - clock-names: Must include "main" and "dma", if enable have-pmic need include
++    "pmic" extra.
++
++Optional properties:
++  - clock-frequency: Frequency in Hz of the bus when transfer, the default value
++    is 100000.
++  - mediatek,have-pmic: platform can control i2c form special pmic side.
++    Only mt6589 and mt8135 support this feature.
++  - mediatek,use-push-pull: IO config use push-pull mode.
++
++Example:
++
++	i2c0: i2c at 1100d000 {
++			compatible = "mediatek,mt6577-i2c";
++			reg = <0x1100d000 0x70>,
++			      <0x11000300 0x80>;
++			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
++			clock-frequency = <400000>;
++			mediatek,have-pmic;
++			clock-div = <16>;
++			clocks = <&i2c0_ck>, <&ap_dma_ck>;
++			clock-names = "main", "dma";
++	};
++
+-- 
+1.8.1.1.dirty
