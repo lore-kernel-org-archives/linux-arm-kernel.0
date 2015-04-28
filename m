@@ -1,43 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Apr 2015 17:35:52 +0100
-Subject: Request for additional arm64 branch in linux-next
-In-Reply-To: <20150326111055.273aa644@canb.auug.org.au>
-References: <20150325172002.GN24636@arm.com>
- <20150326111055.273aa644@canb.auug.org.au>
-Message-ID: <20150428163552.GB14963@arm.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 28 Apr 2015 09:38:10 -0700
+Subject: [PATCH Part1 v11 5/5] PCI: iproc: Use pci_scan_root_bus() instead
+ of pci_create_root_bus()
+In-Reply-To: <1430204499-19571-6-git-send-email-wangyijing@huawei.com>
+References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
+ <1430204499-19571-6-git-send-email-wangyijing@huawei.com>
+Message-ID: <553FB772.1000202@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 12:10:55AM +0000, Stephen Rothwell wrote:
-> Hi Will,
 
-Hi again Stephen,
+Hi Yijing,
 
-> On Wed, 25 Mar 2015 17:20:03 +0000 Will Deacon <will.deacon@arm.com> wrote:
-> >
-> > We've got a series of patches introducing ACPI support for arm64 that
-> > are tentatively targetting the 4.1 merge window. Whilst there are
-> > face-to-face discussions set to happen in the next day or so around this
-> > topic, could you please pull this into linux-next under the assumption
-> > that we decide to go ahead for mainline inclusion?
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/acpi
-> > 
-> > I've kept the series separate from the usual arm64 branch (for-next/core)
-> > but they merge without conflicts. Merging with today's next, I see two
-> > trivial Kconfig conflicts (resolution below).
+On 4/28/2015 12:01 AM, Yijing Wang wrote:
+> Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
+> Now pci_scan_root_bus() == pci_create_root_bus() +
+> pci_scan_child_bus() if busn resource is supplied.
+> iproc added the busn resource to resources list
+> in of_pci_get_host_bridge_resources(). So it should be safe
+> to use pci_scan_root_bus() instead.
 > 
-> Added from today (and thanks for the hints).  Will this be merged via
-> another tree, or go directly to Linus?
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> CC: Ray Jui <rjui@broadcom.com>
+> ---
+>  drivers/pci/host/pcie-iproc.c |    5 ++---
+>  1 files changed, 2 insertions(+), 3 deletions(-)
 > 
-> > I'll let you know when the branch is no longer needed.
-> 
-> Excellent.
+> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> index 329e1b5..9622ebf 100644
+> --- a/drivers/pci/host/pcie-iproc.c
+> +++ b/drivers/pci/host/pcie-iproc.c
+> @@ -210,10 +210,10 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
+>  
+>  	pcie->sysdata.private_data = pcie;
+>  
+> -	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+> +	bus = pci_scan_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+>  				  &pcie->sysdata, pcie->resources);
+>  	if (!bus) {
+> -		dev_err(pcie->dev, "unable to create PCI root bus\n");
+> +		dev_err(pcie->dev, "unable to scan PCI root bus\n");
+>  		ret = -ENOMEM;
+>  		goto err_power_off_phy;
+>  	}
 
-Just to say that, since the ACPI support code for arm64 was merged in the
-recent merge window, this branch is no longer required and can be dropped
-from linux-next.
+iproc_pcie_check_link is called here by using the 'bus' structure
+returned from pci_create_root_bus. In iproc_pcie_check_link, we
+configure root bus class to PCI_CLASS_BRIDGE_PCI and validate to ensure
+a stable link between RC and EP can be detected.
+
+> @@ -227,7 +227,6 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
+>  
+>  	iproc_pcie_enable(pcie);
+
+Here we enable INTx support for our RC controller.
+
+>  
+> -	pci_scan_child_bus(bus);
+
+Here, if pci_scan_child_bus is moved to before iproc_pcie_check_link, I
+don't think it would work (although I have not tested this).
+
+An alternative is to use a dummy bus structure to feed into
+iproc_pcie_check_link, and call iproc_pcie_check_link and
+iproc_pcie_enable before pci_scan_root_bus. But the reason I put the
+link check code in between pci_create_root_bus and pci_scan_child_bus
+was to avoid using a dummy bus structure, :)
+
+>  	pci_assign_unassigned_bus_resources(bus);
+>  	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+>  	pci_bus_add_devices(bus);
+> 
 
 Thanks,
 
-Will
+Ray
