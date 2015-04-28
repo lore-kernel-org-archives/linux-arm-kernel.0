@@ -1,762 +1,518 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Apr 2015 19:45:25 +0100
-Subject: [PATCH v2 01/17] mfd: add new driver for Sharp LoCoMo
-In-Reply-To: <1430178954-11138-2-git-send-email-dbaryshkov@gmail.com>
-References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
- <1430178954-11138-2-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20150428184525.GJ9169@x1>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 28 Apr 2015 14:23:58 -0500
+Subject: [PATCH v5 2/2] firmware: qcom: scm: Add support for ARM64 SoCs
+In-Reply-To: <1430249038-30987-1-git-send-email-galak@codeaurora.org>
+References: <1430249038-30987-1-git-send-email-galak@codeaurora.org>
+Message-ID: <1430249038-30987-2-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Apr 2015, Dmitry Eremin-Solenikov wrote:
-
-> LoCoMo is a GA used on Sharp Zaurus SL-5x00. Current driver does has
-> several design issues (special bus instead of platform bus, doesn't use
-> mfd-core, etc).
-> 
-> Implement 'core' parts of locomo support as an mfd driver.
-> 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
->  drivers/mfd/Kconfig        |  10 ++
->  drivers/mfd/Makefile       |   1 +
->  drivers/mfd/locomo.c       | 356 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/locomo.h | 173 ++++++++++++++++++++++
->  4 files changed, 540 insertions(+)
->  create mode 100644 drivers/mfd/locomo.c
->  create mode 100644 include/linux/mfd/locomo.h
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index d5ad04d..8c33940 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -1430,6 +1430,16 @@ config MFD_STW481X
->  	  in various ST Microelectronics and ST-Ericsson embedded
->  	  Nomadik series.
->  
-> +config MFD_LOCOMO
-> +	bool "Sharp LoCoMo support"
-> +	depends on ARM
-> +	select MFD_CORE
-> +	select IRQ_DOMAIN
-> +	select REGMAP_MMIO
-> +	help
-> +	  Support for Sharp LoCoMo Grid Array found in Sharp SL-5x00
-> +          PDA family.
-
-Are people really still using this stuff?
-
->  menu "Multimedia Capabilities Port drivers"
->  	depends on ARCH_SA1100
->  
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index 0e5cfeb..6c23b73 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -181,6 +181,7 @@ obj-$(CONFIG_MFD_HI6421_PMIC)	+= hi6421-pmic-core.o
->  obj-$(CONFIG_MFD_DLN2)		+= dln2.o
->  obj-$(CONFIG_MFD_RT5033)	+= rt5033.o
->  obj-$(CONFIG_MFD_SKY81452)	+= sky81452.o
-> +obj-$(CONFIG_MFD_LOCOMO)	+= locomo.o
->  
->  intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
->  obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
-> diff --git a/drivers/mfd/locomo.c b/drivers/mfd/locomo.c
-> new file mode 100644
-> index 0000000..f981c94
-> --- /dev/null
-> +++ b/drivers/mfd/locomo.c
-> @@ -0,0 +1,356 @@
-> +/*
-> + * Sharp LoCoMo support
-> + *
-> + * Based on old driver at arch/arm/common/locomo.c
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This file contains all generic LoCoMo support.
-> + *
-> + * All initialization functions provided here are intended to be called
-> + * from machine specific code with proper arguments when required.
-> + */
-
-'\n'
-
-> +#include <linux/delay.h>
-> +#include <linux/gpio.h>
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mfd/core.h>
-> +#include <linux/mfd/locomo.h>
-> +
-> +/* LoCoMo Interrupts */
-> +#define IRQ_LOCOMO_KEY		(0)
-> +#define IRQ_LOCOMO_GPIO		(1)
-> +#define IRQ_LOCOMO_LT		(2)
-> +#define IRQ_LOCOMO_SPI		(3)
-> +
-> +#define LOCOMO_NR_IRQS		(4)
-
-No need for all this added () protection.
-
-> +/* the following is the overall data for the locomo chip */
-> +struct locomo {
-> +	struct device *dev;
-> +	unsigned int irq;
-> +	spinlock_t lock;
-> +	struct irq_domain *domain;
-> +	struct regmap *regmap;
-> +};
-> +
-> +static struct resource locomo_kbd_resources[] = {
-> +	DEFINE_RES_IRQ(IRQ_LOCOMO_KEY),
-> +};
-> +
-> +static struct resource locomo_gpio_resources[] = {
-> +	DEFINE_RES_IRQ(IRQ_LOCOMO_GPIO),
-> +};
-> +
-> +/* Filled in locomo_probe() function. */
-> +static struct locomo_gpio_platform_data locomo_gpio_pdata;
-
-I'd prefer you didn't use globals for this.
-
-> +static struct resource locomo_lt_resources[] = {
-> +	DEFINE_RES_IRQ(IRQ_LOCOMO_LT),
-> +};
-> +
-> +static struct resource locomo_spi_resources[] = {
-> +	DEFINE_RES_IRQ(IRQ_LOCOMO_SPI),
-> +};
-> +
-> +/* Filled in locomo_probe() function. */
-> +static struct locomo_lcd_platform_data locomo_lcd_pdata;
-> +
-> +static struct mfd_cell locomo_cells[] = {
-> +	{
-> +		.name = "locomo-kbd",
-> +		.resources = locomo_kbd_resources,
-> +		.num_resources = ARRAY_SIZE(locomo_kbd_resources),
-> +	},
-> +	{
-> +		.name = "locomo-gpio",
-> +		.resources = locomo_gpio_resources,
-> +		.num_resources = ARRAY_SIZE(locomo_gpio_resources),
-> +		.platform_data = &locomo_gpio_pdata,
-> +		.pdata_size = sizeof(locomo_gpio_pdata),
-> +	},
-> +	{
-> +		.name = "locomo-lt", /* Long time timer */
-> +		.resources = locomo_lt_resources,
-> +		.num_resources = ARRAY_SIZE(locomo_lt_resources),
-> +	},
-> +	{
-> +		.name = "locomo-spi",
-> +		.resources = locomo_spi_resources,
-> +		.num_resources = ARRAY_SIZE(locomo_spi_resources),
-> +	},
-> +	{
-> +		.name = "locomo-led",
-> +	},
-> +	{
-> +		.name = "locomo-backlight",
-> +	},
-
-Please make these:
-
-> +	{ .name = "locomo-led" },
-> +	{ .name = "locomo-backlight" },
-
-... and put them at the bottom.
-
-> +	{
-> +		.name = "locomo-lcd",
-> +		.platform_data = &locomo_lcd_pdata,
-> +		.pdata_size = sizeof(locomo_lcd_pdata),
-> +	},
-> +	{
-> +		.name = "locomo-i2c",
-> +	},
-> +};
-> +
-> +/* IRQ support */
-> +static void locomo_handler(unsigned int irq, struct irq_desc *desc)
-> +{
-> +	struct locomo *lchip = irq_get_handler_data(irq);
-> +	struct irq_chip *irqchip = irq_desc_get_chip(desc);
-> +	unsigned int req;
-> +
-> +	chained_irq_enter(irqchip, desc);
-> +
-> +	/* check why this interrupt was generated */
-
-Start comments with an uppercase character.
-
-> +	while (1) {
-> +		regmap_read(lchip->regmap, LOCOMO_ICR, &req);
-> +		req &= 0x0f00;
-
-What is this magic number?  Please #define it.
-
-> +		if (!req)
-> +			break;
-> +
-> +		irq = ffs(req) - 9;
-
-Minus another random number?  Either define it or enter a comment.
-
-> +		generic_handle_irq(irq_find_mapping(lchip->domain, irq));
-> +	}
-> +
-> +	chained_irq_exit(irqchip, desc);
-> +}
-> +
-> +static void locomo_ack_irq(struct irq_data *d)
-> +{
-> +}
-
-Not sure you need this.  Please check.
-
-If you do, please fix the caller, as it should be checked for NULL
-prior to invocation.
-
-> +static void locomo_mask_irq(struct irq_data *d)
-> +{
-> +	struct locomo *lchip = irq_data_get_irq_chip_data(d);
-> +
-> +	regmap_update_bits(lchip->regmap, LOCOMO_ICR,
-> +		0x0010 << d->hwirq,
-> +		0);
-
-Why the forced line break here.
-
-More magic numbers -- please define.
-
-> +}
-> +
-> +static void locomo_unmask_irq(struct irq_data *d)
-> +{
-> +	struct locomo *lchip = irq_data_get_irq_chip_data(d);
-> +
-> +	regmap_update_bits(lchip->regmap, LOCOMO_ICR,
-> +		(0x0010 << d->hwirq),
-> +		(0x0010 << d->hwirq));
-
-This looks hacky.  Please define a proper mask and value.
-
-> +}
-> +
-> +static struct irq_chip locomo_chip = {
-> +	.name		= "LOCOMO",
-
-Any reason why this has to be uppercase?
-
-> +	.irq_ack	= locomo_ack_irq,
-> +	.irq_mask	= locomo_mask_irq,
-> +	.irq_unmask	= locomo_unmask_irq,
-> +};
-> +
-> +static int locomo_irq_map(struct irq_domain *d, unsigned int virq,
-> +				irq_hw_number_t hwirq)
-> +{
-> +	struct locomo *locomo = d->host_data;
-> +
-> +	irq_set_chip_data(virq, locomo);
-> +	irq_set_chip_and_handler(virq, &locomo_chip,
-> +				handle_level_irq);
-> +	set_irq_flags(virq, IRQF_VALID);
-> +
-> +	return 0;
-> +}
-> +
-> +static void locomo_irq_unmap(struct irq_domain *d, unsigned int virq)
-> +{
-> +	set_irq_flags(virq, 0);
-> +	irq_set_chip_and_handler(virq, NULL, NULL);
-> +	irq_set_chip_data(virq, NULL);
-> +}
-> +
-> +static struct irq_domain_ops locomo_irq_ops = {
-> +	.map    = locomo_irq_map,
-> +	.unmap  = locomo_irq_unmap,
-> +	.xlate  = irq_domain_xlate_onecell,
-> +};
-> +
-> +static int locomo_setup_irq(struct locomo *lchip)
-> +{
-> +	lchip->domain = irq_domain_add_simple(NULL, LOCOMO_NR_IRQS, 0,
-> +			&locomo_irq_ops, lchip);
-
-Please line up line breaks with the '('.
-
-> +	if (!lchip->domain) {
-> +		dev_err(lchip->dev, "Failed to register irqdomain\n");
-
-No need for this.  The IRQ domain handling with print one out for you.
-
-> +		return -ENOMEM;
-> +	}
-> +
-> +	/*
-> +	 * Install handler for IRQ_LOCOMO_HW.
-> +	 */
-> +	irq_set_irq_type(lchip->irq, IRQ_TYPE_EDGE_FALLING);
-> +	irq_set_handler_data(lchip->irq, lchip);
-> +	irq_set_chained_handler(lchip->irq, locomo_handler);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int locomo_suspend(struct device *dev)
-> +{
-> +	struct locomo *lchip = dev_get_drvdata(dev);
-> +
-> +	/* AUDIO */
-
-WHY ARE YOU SHOUTING?  Ironic eh? ;)
-
-> +	regmap_write(lchip->regmap, LOCOMO_PAIF, 0x00);
-> +
-> +	/*
-> +	 * Original code disabled the clock depending on leds settings
-> +	 * However we disable leds before suspend, thus it's safe
-> +	 * to just assume this setting.
-> +	 */
-> +	/* CLK32 off */
-> +	regmap_write(lchip->regmap, LOCOMO_C32K, 0x00);
-> +
-> +	/* 22MHz/24MHz clock off */
-> +	regmap_write(lchip->regmap, LOCOMO_ACC, 0x00);
-> +
-> +	return 0;
-> +}
-> +
-> +static int locomo_resume(struct device *dev)
-> +{
-> +	struct locomo *lchip = dev_get_drvdata(dev);
-
-Do audio and clk sort themselves out?
-
-> +	regmap_write(lchip->regmap, LOCOMO_C32K, 0x00);
-> +
-> +	return 0;
-> +}
-> +
-> +static SIMPLE_DEV_PM_OPS(locomo_pm, locomo_suspend, locomo_resume);
-
-Put this outside of CONFIG_PM_SLEEP and SIMPLE_DEV_PM_OPS() will take
-care of this for you.
-
-> +#define LOCOMO_PM	(&locomo_pm)
-> +
-> +#else
-> +#define LOCOMO_PM/	NULL
-
-This you can remove all of this.
-
-> +#endif
-> +
-> +static const struct regmap_config locomo_regmap_config = {
-> +	.name = "LoCoMo",
-> +	.reg_bits = 8,
-> +	.reg_stride = 4,
-> +	.val_bits = 16,
-> +	.cache_type = REGCACHE_NONE,
-> +	.max_register = 0xec,
-> +};
-> +
-> +static int locomo_probe(struct platform_device *dev)
-
-s/dev/pdev/
-
-dev is usually used for 'struct device' pointers.
-
-> +{
-> +	struct locomo_platform_data *pdata = dev_get_platdata(&dev->dev);
-> +	struct resource *mem;
-
-Nit: res is more commonplace.
-
-> +	void __iomem *base;
-> +	struct locomo *lchip;
-
-I always quite like ldev.
-
-> +	unsigned int r;
-
-r is not a good variable name.
-
-> +	int ret = -ENODEV;
-
-No need to initialise.
-
-> +	lchip = devm_kzalloc(&dev->dev, sizeof(struct locomo), GFP_KERNEL);
-
-s/struct locomo/*lchip/
-
-> +	if (!lchip)
-> +		return -ENOMEM;
-> +
-> +	spin_lock_init(&lchip->lock);
-> +	lchip->dev = &dev->dev;
-> +
-> +	lchip->irq = platform_get_irq(dev, 0);
-> +	if (lchip->irq < 0)
-> +		return -ENXIO;
-
-Why are you making up your own return codes?
-
-return lchip->irq;
-
-> +	mem = platform_get_resource(dev, IORESOURCE_MEM, 0);
-> +	base = devm_ioremap_resource(&dev->dev, mem);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-> +	lchip->regmap = devm_regmap_init_mmio(&dev->dev, base,
-> +			&locomo_regmap_config);
-
-Line up with '('.
-
-> +	if (IS_ERR(lchip->regmap))
-> +		return PTR_ERR(lchip->regmap);
-> +
-> +	if (pdata) {
-> +		locomo_gpio_pdata.gpio_base = pdata->gpio_base;
-> +		locomo_lcd_pdata.comadj = pdata->comadj;
-> +	} else {
-> +		locomo_gpio_pdata.gpio_base = -1;
-> +		locomo_lcd_pdata.comadj = 128;
-> +	}
-
-struct locomo_gpio_platform_data locomo_gpio_pdata;
-
-locomo_gpio_pdata = devm_kzalloc(<blah>);
-
-locomo_cells[GPIO].platform_data = locomo_gpio_pdata;
-
-> +	platform_set_drvdata(dev, lchip);
-> +
-> +	regmap_read(lchip->regmap, LOCOMO_VER, &r);
-> +	dev_info(&dev->dev, "LoCoMo Chip: %04x\n", r);
-
-s/r/rev/
-
-or
-
-s/r/id/
-
-> +	/* locomo initialize */
-> +	regmap_write(lchip->regmap, LOCOMO_ICR, 0);
-
-What does initialize mean?  Enable? Reset IRQs? Reset chip?
-
-> +	/* Longtime timer */
-> +	regmap_write(lchip->regmap, LOCOMO_LTINT, 0);
-> +
-> +	/*
-> +	 * The interrupt controller must be initialised before any
-> +	 * other device to ensure that the interrupts are available.
-> +	 */
-
-That's pretty normal isn't it?
-
-> +	ret = locomo_setup_irq(lchip);
-> +	if (ret < 0)
-> +		goto err_add;
-
-What if ret > 0?
-
-Suggest:
-  if (ret)
-
-> +	ret = mfd_add_devices(&dev->dev, dev->id,
-> +			locomo_cells, ARRAY_SIZE(locomo_cells),
-> +			mem, -1, lchip->domain);
-
-s/mem/base/
-
-> +	if (ret)
-> +		goto err_add;
-> +
-> +	return 0;
-> +
-> +err_add:
-
-What does err_add mean?
-
-> +	irq_set_chained_handler(lchip->irq, NULL);
-> +	irq_set_handler_data(lchip->irq, NULL);
-> +	if (lchip->domain)
-> +		irq_domain_remove(lchip->domain);
-> +
-> +	return ret;
-> +}
-> +
-> +static int locomo_remove(struct platform_device *dev)
-> +{
-> +	struct locomo *lchip = platform_get_drvdata(dev);
-> +
-> +	if (!lchip)
-> +		return 0;
-
-Is that even possible?
-
-> +	mfd_remove_devices(&dev->dev);
-> +
-> +	irq_set_chained_handler(lchip->irq, NULL);
-> +	irq_set_handler_data(lchip->irq, NULL);
-
-'\n'
-
-> +	if (lchip->domain)
-> +		irq_domain_remove(lchip->domain);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver locomo_device_driver = {
-> +	.probe		= locomo_probe,
-> +	.remove		= locomo_remove,
-> +	.driver		= {
-> +		.name	= "locomo",
-> +		.pm	= LOCOMO_PM,
-> +	},
-> +};
-
-Lining these up looks weird.  Especially as the stuff in .driver is
-*meant* to be indented.
-
-> +module_platform_driver(locomo_device_driver);
-> +
-> +MODULE_DESCRIPTION("Sharp LoCoMo core driver");
-> +MODULE_LICENSE("GPL");
-
-GPL v2
-
-> +MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
-> +MODULE_ALIAS("platform:locomo");
-> diff --git a/include/linux/mfd/locomo.h b/include/linux/mfd/locomo.h
-> new file mode 100644
-> index 0000000..6729767
-> --- /dev/null
-> +++ b/include/linux/mfd/locomo.h
-
-This whole file needs a jolly good tidy-up.
-
-> @@ -0,0 +1,173 @@
-> +/*
-> + * include/linux/mfd/locomo.h
-
-Remove this.  We know what file it's in.
-
-> + * This file contains the definitions for the LoCoMo G/A Chip
-> + *
-> + * (C) Copyright 2004 John Lenz
-
-This is out of date.
-
-> + * May be copied or modified under the terms of the GNU General Public
-> + * License.  See linux/COPYING for more information.
-> + *
-> + * Based on sa1111.h
-> + */
-
-'/n'
-
-> +#ifndef _ASM_ARCH_LOCOMO
-> +#define _ASM_ARCH_LOCOMO
-> +
-> +/* LOCOMO version */
-> +#define LOCOMO_VER	0x00
-
-This is misleading.
-
-The version is not 0, this is the register address.
-
-> +/* Pin status */
-> +#define LOCOMO_ST	0x04
-> +
-> +/* Pin status */
-> +#define LOCOMO_C32K	0x08
-> +
-> +/* Interrupt controller */
-> +#define LOCOMO_ICR	0x0C
-> +
-> +/* MCS decoder for boot selecting */
-> +#define LOCOMO_MCSX0	0x10
-> +#define LOCOMO_MCSX1	0x14
-> +#define LOCOMO_MCSX2	0x18
-> +#define LOCOMO_MCSX3	0x1c
-
-These are pretty cryptic.  Any way of making them easier to identify.
-
-> +/* Touch panel controller */
-> +#define LOCOMO_ASD	0x20		/* AD start delay */
-> +#define LOCOMO_HSD	0x28		/* HSYS delay */
-> +#define LOCOMO_HSC	0x2c		/* HSYS period */
-> +#define LOCOMO_TADC	0x30		/* tablet ADC clock */
-> +
-> +/* Backlight controller: TFT signal */
-> +#define LOCOMO_TC	0x38		/* TFT control signal */
-> +#define LOCOMO_CPSD	0x3c		/* CPS delay */
-> +
-> +/* Keyboard controller */
-> +#define LOCOMO_KIB	0x40	/* KIB level */
-> +#define LOCOMO_KSC	0x44	/* KSTRB control */
-> +#define LOCOMO_KCMD	0x48	/* KSTRB command */
-> +#define LOCOMO_KIC	0x4c	/* Key interrupt */
-> +
-> +/* Audio clock */
-> +#define LOCOMO_ACC	0x54	/* Audio clock */
-> +#define	LOCOMO_ACC_XON		0x80
-> +#define	LOCOMO_ACC_XEN		0x40
-> +#define	LOCOMO_ACC_XSEL0	0x00
-> +#define	LOCOMO_ACC_XSEL1	0x20
-> +#define	LOCOMO_ACC_MCLKEN	0x10
-> +#define	LOCOMO_ACC_64FSEN	0x08
-> +#define	LOCOMO_ACC_CLKSEL000	0x00	/* mclk  2 */
-> +#define	LOCOMO_ACC_CLKSEL001	0x01	/* mclk  3 */
-> +#define	LOCOMO_ACC_CLKSEL010	0x02	/* mclk  4 */
-> +#define	LOCOMO_ACC_CLKSEL011	0x03	/* mclk  6 */
-> +#define	LOCOMO_ACC_CLKSEL100	0x04	/* mclk  8 */
-> +#define	LOCOMO_ACC_CLKSEL101	0x05	/* mclk 12 */
-
-I think you have an issue with spaces and tabs here.
-
-> +/* SPI interface */
-> +#define LOCOMO_SPIMD	0x60		/* SPI mode setting */
-> +#define LOCOMO_SPIMD_LOOPBACK (1 << 15)	/* loopback tx to rx */
-
-Use BIT() for all '1 <<'s.
-
-> +#define LOCOMO_SPIMD_MSB1ST   (1 << 14)	/* send MSB first */
-> +#define LOCOMO_SPIMD_DOSTAT   (1 << 13)	/* transmit line is idle high */
-> +#define LOCOMO_SPIMD_TCPOL    (1 << 11)	/* transmit CPOL (maybe affects CPHA) */
-> +#define LOCOMO_SPIMD_RCPOL    (1 << 10)	/* receive CPOL (maybe affects CPHA) */
-> +#define	LOCOMO_SPIMD_TDINV    (1 << 9)	/* invert transmit line */
-
-Why is this different?
-
-> +#define LOCOMO_SPIMD_RDINV    (1 << 8)	/* invert receive line */
-> +#define LOCOMO_SPIMD_XON      (1 << 7)	/* enable spi controller clock */
-> +#define LOCOMO_SPIMD_XEN      (1 << 6)	/* clock bit write enable */
-> +#define LOCOMO_SPIMD_XSEL     0x0018	/* clock select */
-> +/* xon must be off when enabling xen, wait 300 us before xon -> 1 */
-> +#define CLOCK_18MHZ	    0		/* 18,432 MHz clock */
-> +#define CLOCK_22MHZ	    1		/* 22,5792 MHz clock */
-> +#define CLOCK_25MHZ	    2		/* 24,576 MHz clock */
-> +#define LOCOMO_SPIMD_CLKSEL   0x7
-> +#define DIV_1		    0		/* don't divide clock   */
-> +#define DIV_2		    1		/* divide clock by two	*/
-> +#define DIV_4		    2		/* divide clock by four */
-> +#define DIV_8		    3		/* divide clock by eight*/
-> +#define DIV_64		    4		/* divide clock by 64 */
-
-Better to line all of these up along with the rest of the file.
-
-> +#define LOCOMO_SPICT	0x64		/* SPI mode control */
-> +#define LOCOMO_SPICT_CRC16_7_B	(1 << 15)	/* 0: crc16 1: crc7 */
-> +#define LOCOMO_SPICT_CRCRX_TX_B	(1 << 14)
-> +#define LOCOMO_SPICT_CRCRESET_B	(1 << 13)
-> +#define LOCOMO_SPICT_CEN	(1 << 7)	/* ?? enable */
-> +#define LOCOMO_SPICT_CS		(1 << 6)	/* chip select */
-> +#define LOCOMO_SPICT_UNIT16	(1 << 5)	/* 0: 8 bit, 1: 16 bit*/
-> +#define LOCOMO_SPICT_ALIGNEN	(1 << 2)	/* align transfer enable */
-> +#define LOCOMO_SPICT_RXWEN	(1 << 1)	/* continuous receive */
-> +#define LOCOMO_SPICT_RXUEN	(1 << 0)	/* aligned receive */
-> +
-> +#define LOCOMO_SPIST	0x68		/* SPI status */
-> +#define	LOCOMO_SPI_TEND	(1 << 3)	/* Transfer end bit */
-> +#define	LOCOMO_SPI_REND	(1 << 2)	/* Receive end bit */
-> +#define	LOCOMO_SPI_RFW	(1 << 1)	/* write buffer bit */
-> +#define	LOCOMO_SPI_RFR	(1)		/* read buffer bit */
-> +
-> +#define LOCOMO_SPIIS	0x70		/* SPI interrupt status */
-> +#define LOCOMO_SPIWE	0x74		/* SPI interrupt status write enable */
-> +#define LOCOMO_SPIIE	0x78		/* SPI interrupt enable */
-> +#define LOCOMO_SPIIR	0x7c		/* SPI interrupt request */
-> +#define LOCOMO_SPITD	0x80		/* SPI transfer data write */
-> +#define LOCOMO_SPIRD	0x84		/* SPI receive data read */
-> +#define LOCOMO_SPITS	0x88		/* SPI transfer data shift */
-> +#define LOCOMO_SPIRS	0x8C		/* SPI receive data shift */
-> +
-> +/* GPIO */
-> +#define LOCOMO_GPD	0x90	/* GPIO direction */
-> +#define LOCOMO_GPE	0x94	/* GPIO input enable */
-> +#define LOCOMO_GPL	0x98	/* GPIO level */
-> +#define LOCOMO_GPO	0x9c	/* GPIO out data setting */
-> +#define LOCOMO_GRIE	0xa0	/* GPIO rise detection */
-> +#define LOCOMO_GFIE	0xa4	/* GPIO fall detection */
-> +#define LOCOMO_GIS	0xa8	/* GPIO edge detection status */
-> +#define LOCOMO_GWE	0xac	/* GPIO status write enable */
-> +#define LOCOMO_GIE	0xb0	/* GPIO interrupt enable */
-> +#define LOCOMO_GIR	0xb4	/* GPIO interrupt request */
-> +
-> +/* Front light adjustment controller */
-> +#define LOCOMO_ALS	0xc8	/* Adjust light cycle */
-> +#define LOCOMO_ALS_EN		0x8000
-> +#define LOCOMO_ALD	0xcc	/* Adjust light duty */
-> +
-> +/* PCM audio interface */
-> +#define LOCOMO_PAIF	0xd0	/* PCM audio interface */
-> +#define	LOCOMO_PAIF_SCINV	0x20
-> +#define	LOCOMO_PAIF_SCEN	0x10
-> +#define	LOCOMO_PAIF_LRCRST	0x08
-> +#define	LOCOMO_PAIF_LRCEVE	0x04
-> +#define	LOCOMO_PAIF_LRCINV	0x02
-> +#define	LOCOMO_PAIF_LRCEN	0x01
-> +
-> +/* Long time timer */
-> +#define LOCOMO_LTC	0xd8		/* LTC interrupt setting */
-> +#define LOCOMO_LTINT	0xdc		/* LTC interrupt */
-> +
-> +/* DAC control signal for LCD (COMADJ ) */
-> +#define LOCOMO_DAC	0xe0
-> +/* DAC control */
-> +#define	LOCOMO_DAC_SCLOEB	0x08	/* SCL pin output data       */
-> +#define	LOCOMO_DAC_TEST		0x04	/* Test bit                  */
-> +#define	LOCOMO_DAC_SDA		0x02	/* SDA pin level (read-only) */
-> +#define	LOCOMO_DAC_SDAOEB	0x01	/* SDA pin output data       */
-> +
-> +/* LED controller */
-> +#define LOCOMO_LPT0	0xe8
-> +#define LOCOMO_LPT1	0xec
-> +#define LOCOMO_LPT_TOFH		0x80
-> +#define LOCOMO_LPT_TOFL		0x08
-> +#define LOCOMO_LPT_TOH(TOH)	((TOH & 0x7) << 4)
-> +#define LOCOMO_LPT_TOL(TOL)	((TOL & 0x7))
-> +
-> +struct locomo_gpio_platform_data {
-> +	unsigned int gpio_base;
-> +};
-
-A struct for a single int seems overkill.
-
-> +struct locomo_lcd_platform_data {
-> +	u8 comadj;
-> +};
-> +
-> +struct locomo_platform_data {
-> +	unsigned int gpio_base;
-> +	u8 comadj;
-> +};
-
-Why do you need to pass gpio_base twice?
-
-> +#endif
-
+Add an implementation of the SCM interface that works on ARM64/64-bit SoCs
+
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+* v5:
+- use common error defines from qcom_scm.h
+- removed R*_STR defines 
+
+* v4:
+- Folded in change to qcom_scm_cpu_power_down to remove HOTPLUG flag
+  from Lina.
+
+ arch/arm64/Kconfig             |   1 +
+ drivers/firmware/Makefile      |   4 +
+ drivers/firmware/qcom_scm-64.c | 452 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 457 insertions(+)
+ create mode 100644 drivers/firmware/qcom_scm-64.c
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4269dba..8878800 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -190,6 +190,7 @@ config ARCH_MEDIATEK
+ config ARCH_QCOM
+ 	bool "Qualcomm Platforms"
+ 	select PINCTRL
++	select QCOM_SCM
+ 	help
+ 	  This enables support for the ARMv8 based Qualcomm chipsets.
+ 
+diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+index 3001f1a..c79751a 100644
+--- a/drivers/firmware/Makefile
++++ b/drivers/firmware/Makefile
+@@ -12,7 +12,11 @@ obj-$(CONFIG_ISCSI_IBFT_FIND)	+= iscsi_ibft_find.o
+ obj-$(CONFIG_ISCSI_IBFT)	+= iscsi_ibft.o
+ obj-$(CONFIG_FIRMWARE_MEMMAP)	+= memmap.o
+ obj-$(CONFIG_QCOM_SCM)		+= qcom_scm.o
++ifdef CONFIG_64BIT
++obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-64.o
++else
+ obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-32.o
++endif
+ CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+ 
+ obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
+diff --git a/drivers/firmware/qcom_scm-64.c b/drivers/firmware/qcom_scm-64.c
+new file mode 100644
+index 0000000..a95fd9b
+--- /dev/null
++++ b/drivers/firmware/qcom_scm-64.c
+@@ -0,0 +1,452 @@
++/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ */
++
++#include <linux/cpumask.h>
++#include <linux/delay.h>
++#include <linux/mutex.h>
++#include <linux/slab.h>
++#include <linux/types.h>
++#include <linux/qcom_scm.h>
++
++#include <asm/cacheflush.h>
++#include <asm/compiler.h>
++#include <asm/smp_plat.h>
++
++#include "qcom_scm.h"
++
++#define QCOM_SCM_SIP_FNID(s, c) (((((s) & 0xFF) << 8) | ((c) & 0xFF)) | 0x02000000)
++
++#define MAX_QCOM_SCM_ARGS 10
++#define MAX_QCOM_SCM_RETS 3
++
++#define QCOM_SCM_ARGS_IMPL(num, a, b, c, d, e, f, g, h, i, j, ...) (\
++			(((a) & 0xff) << 4) | \
++			(((b) & 0xff) << 6) | \
++			(((c) & 0xff) << 8) | \
++			(((d) & 0xff) << 10) | \
++			(((e) & 0xff) << 12) | \
++			(((f) & 0xff) << 14) | \
++			(((g) & 0xff) << 16) | \
++			(((h) & 0xff) << 18) | \
++			(((i) & 0xff) << 20) | \
++			(((j) & 0xff) << 22) | \
++			(num & 0xffff))
++
++#define QCOM_SCM_ARGS(...) QCOM_SCM_ARGS_IMPL(__VA_ARGS__, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
++
++/**
++ * struct qcom_scm_desc
++ * @arginfo: Metadata describing the arguments in args[]
++ * @args: The array of arguments for the secure syscall
++ * @ret: The values returned by the secure syscall
++ * @extra_arg_buf: The buffer containing extra arguments
++		   (that don't fit in available registers)
++ * @x5: The 4rd argument to the secure syscall or physical address of
++	extra_arg_buf
++ */
++struct qcom_scm_desc {
++	u32 arginfo;
++	u64 args[MAX_QCOM_SCM_ARGS];
++	u64 ret[MAX_QCOM_SCM_RETS];
++
++	/* private */
++	void *extra_arg_buf;
++	u64 x5;
++};
++
++
++#define QCOM_SCM_EBUSY		-55
++#define QCOM_SCM_V2_EBUSY	-12
++
++static DEFINE_MUTEX(qcom_scm_lock);
++
++#define QCOM_SCM_EBUSY_WAIT_MS 30
++#define QCOM_SCM_EBUSY_MAX_RETRY 20
++
++#define N_EXT_QCOM_SCM_ARGS 7
++#define FIRST_EXT_ARG_IDX 3
++#define SMC_ATOMIC_SYSCALL 31
++#define N_REGISTER_ARGS (MAX_QCOM_SCM_ARGS - N_EXT_QCOM_SCM_ARGS + 1)
++#define SMC64_MASK 0x40000000
++#define SMC_ATOMIC_MASK 0x80000000
++#define IS_CALL_AVAIL_CMD 1
++
++static int qcom_scm_remap_error(int err)
++{
++	switch (err) {
++	case QCOM_SCM_ERROR:
++		return -EIO;
++	case QCOM_SCM_EINVAL_ADDR:
++	case QCOM_SCM_EINVAL_ARG:
++		return -EINVAL;
++	case QCOM_SCM_EOPNOTSUPP:
++		return -EOPNOTSUPP;
++	case QCOM_SCM_ENOMEM:
++		return -ENOMEM;
++	case QCOM_SCM_EBUSY:
++		return QCOM_SCM_EBUSY;
++	case QCOM_SCM_V2_EBUSY:
++		return QCOM_SCM_V2_EBUSY;
++	}
++	return -EINVAL;
++}
++
++int __qcom_scm_call_armv8_64(u64 x0, u64 x1, u64 x2, u64 x3, u64 x4, u64 x5,
++				u64 *ret1, u64 *ret2, u64 *ret3)
++{
++	register u64 r0 asm("r0") = x0;
++	register u64 r1 asm("r1") = x1;
++	register u64 r2 asm("r2") = x2;
++	register u64 r3 asm("r3") = x3;
++	register u64 r4 asm("r4") = x4;
++	register u64 r5 asm("r5") = x5;
++
++	do {
++		asm volatile(
++			__asmeq("%0", "x0")
++			__asmeq("%1", "x1")
++			__asmeq("%2", "x2")
++			__asmeq("%3", "x3")
++			__asmeq("%4", "x0")
++			__asmeq("%5", "x1")
++			__asmeq("%6", "x2")
++			__asmeq("%7", "x3")
++			__asmeq("%8", "x4")
++			__asmeq("%9", "x5")
++#ifdef REQUIRES_SEC
++			".arch_extension sec\n"
++#endif
++			"smc	#0\n"
++			: "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)
++			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
++			  "r" (r5)
++			: "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
++			  "x14", "x15", "x16", "x17");
++	} while (r0 == QCOM_SCM_INTERRUPTED);
++
++	if (ret1)
++		*ret1 = r1;
++	if (ret2)
++		*ret2 = r2;
++	if (ret3)
++		*ret3 = r3;
++
++	return r0;
++}
++
++int __qcom_scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
++				u64 *ret1, u64 *ret2, u64 *ret3)
++{
++	register u32 r0 asm("r0") = w0;
++	register u32 r1 asm("r1") = w1;
++	register u32 r2 asm("r2") = w2;
++	register u32 r3 asm("r3") = w3;
++	register u32 r4 asm("r4") = w4;
++	register u32 r5 asm("r5") = w5;
++
++	do {
++		asm volatile(
++			__asmeq("%0", "x0")
++			__asmeq("%1", "x1")
++			__asmeq("%2", "x2")
++			__asmeq("%3", "x3")
++			__asmeq("%4", "x0")
++			__asmeq("%5", "x1")
++			__asmeq("%6", "x2")
++			__asmeq("%7", "x3")
++			__asmeq("%8", "x4")
++			__asmeq("%9", "x5")
++#ifdef REQUIRES_SEC
++			".arch_extension sec\n"
++#endif
++			"smc	#0\n"
++			: "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)
++			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
++			  "r" (r5)
++			: "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
++			"x14", "x15", "x16", "x17");
++
++	} while (r0 == QCOM_SCM_INTERRUPTED);
++
++	if (ret1)
++		*ret1 = r1;
++	if (ret2)
++		*ret2 = r2;
++	if (ret3)
++		*ret3 = r3;
++
++	return r0;
++}
++
++struct qcom_scm_extra_arg {
++	union {
++		u32 args32[N_EXT_QCOM_SCM_ARGS];
++		u64 args64[N_EXT_QCOM_SCM_ARGS];
++	};
++};
++
++static enum qcom_scm_interface_version {
++	QCOM_SCM_UNKNOWN,
++	QCOM_SCM_LEGACY,
++	QCOM_SCM_ARMV8_32,
++	QCOM_SCM_ARMV8_64,
++} qcom_scm_version = QCOM_SCM_UNKNOWN;
++
++/* This will be set to specify SMC32 or SMC64 */
++static u32 qcom_scm_version_mask;
++
++/*
++ * If there are more than N_REGISTER_ARGS, allocate a buffer and place
++ * the additional arguments in it. The extra argument buffer will be
++ * pointed to by X5.
++ */
++static int allocate_extra_arg_buffer(struct qcom_scm_desc *desc, gfp_t flags)
++{
++	int i, j;
++	struct qcom_scm_extra_arg *argbuf;
++	int arglen = desc->arginfo & 0xf;
++	size_t argbuflen = PAGE_ALIGN(sizeof(struct qcom_scm_extra_arg));
++
++	desc->x5 = desc->args[FIRST_EXT_ARG_IDX];
++
++	if (likely(arglen <= N_REGISTER_ARGS)) {
++		desc->extra_arg_buf = NULL;
++		return 0;
++	}
++
++	argbuf = kzalloc(argbuflen, flags);
++	if (!argbuf) {
++		pr_err("qcom_scm_call: failed to alloc mem for extended argument buffer\n");
++		return -ENOMEM;
++	}
++
++	desc->extra_arg_buf = argbuf;
++
++	j = FIRST_EXT_ARG_IDX;
++	if (qcom_scm_version == QCOM_SCM_ARMV8_64)
++		for (i = 0; i < N_EXT_QCOM_SCM_ARGS; i++)
++			argbuf->args64[i] = desc->args[j++];
++	else
++		for (i = 0; i < N_EXT_QCOM_SCM_ARGS; i++)
++			argbuf->args32[i] = desc->args[j++];
++	desc->x5 = virt_to_phys(argbuf);
++	__flush_dcache_area(argbuf, argbuflen);
++
++	return 0;
++}
++
++/**
++ * qcom_scm_call() - Invoke a syscall in the secure world
++ * @svc_id: service identifier
++ * @cmd_id: command identifier
++ * @fn_id: The function ID for this syscall
++ * @desc: Descriptor structure containing arguments and return values
++ *
++ * Sends a command to the SCM and waits for the command to finish processing.
++ * This should *only* be called in pre-emptible context.
++ *
++ * A note on cache maintenance:
++ * Note that any buffers that are expected to be accessed by the secure world
++ * must be flushed before invoking qcom_scm_call and invalidated in the cache
++ * immediately after qcom_scm_call returns. An important point that must be noted
++ * is that on ARMV8 architectures, invalidation actually also causes a dirty
++ * cache line to be cleaned (flushed + unset-dirty-bit). Therefore it is of
++ * paramount importance that the buffer be flushed before invoking qcom_scm_call,
++ * even if you don't care about the contents of that buffer.
++ *
++ * Note that cache maintenance on the argument buffer (desc->args) is taken care
++ * of by qcom_scm_call; however, callers are responsible for any other cached
++ * buffers passed over to the secure world.
++*/
++static int qcom_scm_call(u32 svc_id, u32 cmd_id, struct qcom_scm_desc *desc)
++{
++	int arglen = desc->arginfo & 0xf;
++	int ret, retry_count = 0;
++	u32 fn_id = QCOM_SCM_SIP_FNID(svc_id, cmd_id);
++	u64 x0;
++
++	ret = allocate_extra_arg_buffer(desc, GFP_KERNEL);
++	if (ret)
++		return ret;
++
++	x0 = fn_id | qcom_scm_version_mask;
++
++	do {
++		mutex_lock(&qcom_scm_lock);
++
++		desc->ret[0] = desc->ret[1] = desc->ret[2] = 0;
++
++		pr_debug("qcom_scm_call: func id %#llx, args: %#x, %#llx, %#llx, %#llx, %#llx\n",
++			x0, desc->arginfo, desc->args[0], desc->args[1],
++			desc->args[2], desc->x5);
++
++		if (qcom_scm_version == QCOM_SCM_ARMV8_64)
++			ret = __qcom_scm_call_armv8_64(x0, desc->arginfo,
++						  desc->args[0], desc->args[1],
++						  desc->args[2], desc->x5,
++						  &desc->ret[0], &desc->ret[1],
++						  &desc->ret[2]);
++		else
++			ret = __qcom_scm_call_armv8_32(x0, desc->arginfo,
++						  desc->args[0], desc->args[1],
++						  desc->args[2], desc->x5,
++						  &desc->ret[0], &desc->ret[1],
++						  &desc->ret[2]);
++		mutex_unlock(&qcom_scm_lock);
++
++		if (ret == QCOM_SCM_V2_EBUSY)
++			msleep(QCOM_SCM_EBUSY_WAIT_MS);
++	}  while (ret == QCOM_SCM_V2_EBUSY && (retry_count++ < QCOM_SCM_EBUSY_MAX_RETRY));
++
++	if (ret < 0)
++		pr_err("qcom_scm_call failed: func id %#llx, arginfo: %#x, args: %#llx, %#llx, %#llx, %#llx, ret: %d, syscall returns: %#llx, %#llx, %#llx\n",
++			x0, desc->arginfo, desc->args[0], desc->args[1],
++			desc->args[2], desc->x5, ret, desc->ret[0],
++			desc->ret[1], desc->ret[2]);
++
++	if (arglen > N_REGISTER_ARGS)
++		kfree(desc->extra_arg_buf);
++	if (ret < 0)
++		return qcom_scm_remap_error(ret);
++	return 0;
++}
++
++/**
++ * qcom_scm_call_atomic() - Invoke a syscall in the secure world
++ *
++ * Similar to qcom_scm_call except that this can be invoked in atomic context.
++ * There is also no retry mechanism implemented. Please ensure that the
++ * secure world syscall can be executed in such a context and can complete
++ * in a timely manner.
++ */
++static int qcom_scm_call_atomic(u32 s, u32 c, struct qcom_scm_desc *desc)
++{
++	int arglen = desc->arginfo & 0xf;
++	int ret;
++	u32 fn_id = QCOM_SCM_SIP_FNID(s, c);
++	u64 x0;
++
++	ret = allocate_extra_arg_buffer(desc, GFP_ATOMIC);
++	if (ret)
++		return ret;
++
++	x0 = fn_id | BIT(SMC_ATOMIC_SYSCALL) | qcom_scm_version_mask;
++
++	pr_debug("qcom_scm_call: func id %#llx, args: %#x, %#llx, %#llx, %#llx, %#llx\n",
++		x0, desc->arginfo, desc->args[0], desc->args[1],
++		desc->args[2], desc->x5);
++
++	if (qcom_scm_version == QCOM_SCM_ARMV8_64)
++		ret = __qcom_scm_call_armv8_64(x0, desc->arginfo, desc->args[0],
++					  desc->args[1], desc->args[2],
++					  desc->x5, &desc->ret[0],
++					  &desc->ret[1], &desc->ret[2]);
++	else
++		ret = __qcom_scm_call_armv8_32(x0, desc->arginfo, desc->args[0],
++					  desc->args[1], desc->args[2],
++					  desc->x5, &desc->ret[0],
++					  &desc->ret[1], &desc->ret[2]);
++	if (ret < 0)
++		pr_err("qcom_scm_call failed: func id %#llx, arginfo: %#x, args: %#llx, %#llx, %#llx, %#llx, ret: %d, syscall returns: %#llx, %#llx, %#llx\n",
++			x0, desc->arginfo, desc->args[0], desc->args[1],
++			desc->args[2], desc->x5, ret, desc->ret[0],
++			desc->ret[1], desc->ret[2]);
++
++	if (arglen > N_REGISTER_ARGS)
++		kfree(desc->extra_arg_buf);
++	if (ret < 0)
++		return qcom_scm_remap_error(ret);
++	return ret;
++}
++
++static int qcom_scm_set_boot_addr(void *entry, const cpumask_t *cpus, int flags)
++{
++	struct qcom_scm_desc desc = {0};
++	unsigned int cpu = cpumask_first(cpus);
++	u64 mpidr_el1 = cpu_logical_map(cpu);
++
++	/* For now we assume only a single cpu is set in the mask */
++	WARN_ON(cpumask_weight(cpus) != 1);
++
++	if (mpidr_el1 & ~MPIDR_HWID_BITMASK) {
++		pr_err("CPU%d:Failed to set boot address\n", cpu);
++		return -ENOSYS;
++	}
++
++	desc.args[0] = virt_to_phys(entry);
++	desc.args[1] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 0));
++	desc.args[2] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 1));
++	desc.args[3] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 2));
++	desc.args[4] = ~0ULL;
++	desc.args[5] = QCOM_SCM_FLAG_HLOS | flags;
++	desc.arginfo = QCOM_SCM_ARGS(6);
++
++	return qcom_scm_call(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR_MC, &desc);
++}
++
++int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
++{
++	int flags = QCOM_SCM_FLAG_COLDBOOT_MC;
++
++	return qcom_scm_set_boot_addr(entry, cpus, flags);
++}
++
++int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
++{
++	int flags = QCOM_SCM_FLAG_WARMBOOT_MC;
++
++	return qcom_scm_set_boot_addr(entry, cpus, flags);
++}
++
++void __qcom_scm_cpu_power_down(u32 flags)
++{
++	struct qcom_scm_desc desc = {0};
++	desc.args[0] = flags & QCOM_SCM_FLUSH_FLAG_MASK;
++	desc.arginfo = QCOM_SCM_ARGS(1);
++
++	qcom_scm_call_atomic(QCOM_SCM_SVC_BOOT, QCOM_SCM_CMD_TERMINATE_PC, &desc);
++}
++
++#define QCOM_SCM_SVC_INFO              0x6
++static int __init qcom_scm_init(void)
++{
++	int ret;
++	u64 ret1 = 0, x0;
++
++	/* First try a SMC64 call */
++	qcom_scm_version = QCOM_SCM_ARMV8_64;
++	x0 = QCOM_SCM_SIP_FNID(QCOM_SCM_SVC_INFO, IS_CALL_AVAIL_CMD) | SMC_ATOMIC_MASK;
++	ret = __qcom_scm_call_armv8_64(x0 | SMC64_MASK, QCOM_SCM_ARGS(1), x0, 0, 0, 0,
++				  &ret1, NULL, NULL);
++	if (ret || !ret1) {
++		/* Try SMC32 call */
++		ret1 = 0;
++		ret = __qcom_scm_call_armv8_32(x0, QCOM_SCM_ARGS(1), x0, 0, 0,
++						0, &ret1, NULL, NULL);
++		if (ret || !ret1)
++			qcom_scm_version = QCOM_SCM_LEGACY;
++		else
++			qcom_scm_version = QCOM_SCM_ARMV8_32;
++	} else
++		qcom_scm_version_mask = SMC64_MASK;
++
++	pr_debug("qcom_scm_call: qcom_scm version is %x, mask is %x\n",
++		 qcom_scm_version, qcom_scm_version_mask);
++
++	return 0;
++}
++early_initcall(qcom_scm_init);
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
