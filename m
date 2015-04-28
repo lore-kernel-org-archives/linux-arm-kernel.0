@@ -1,74 +1,107 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 28 Apr 2015 14:13:16 +0200
-Subject: [PATCH v6 10/15] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <552678E7.4040107@mentor.com>
-References: <1428424234-28572-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1428424234-28572-11-git-send-email-mcoquelin.stm32@gmail.com>
- <552678E7.4040107@mentor.com>
-Message-ID: <CALszF6CTFgVd4D6Ftkf0jW+Hcp53jqrutOHOagDXT-0705aHHQ@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 28 Apr 2015 15:19:18 +0300
+Subject: [PATCH v3 1/2] mtd: nand: dt binding documentation for digicolor NFC
+Message-ID: <2bba276e3a1808a9fc49d30cabe8d9de8bc60efd.1430223559.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+The CX92755 SoC is one of Conexant Digicolor series of SoCs. This devicetree
+binding document describes the NAND flash controller the is shared by some SoCs
+in the Digicolor series.
 
-Thanks for the review, and sorry for the late reply.
+Not all of the properties are currently actually used by the driver.
+Specifically, the driver doesn't make use of interrupts. This may change in the
+future.
 
-2015-04-09 15:04 GMT+02:00 Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>:
-> Hi Maxime,
->
-> On 07.04.2015 19:30, Maxime Coquelin wrote:
->> This drivers adds support to the STM32 USART controller, which is a
->> standard serial driver.
->>
->> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> ---
->>  drivers/tty/serial/Kconfig       |  17 +
->>  drivers/tty/serial/Makefile      |   1 +
->>  drivers/tty/serial/stm32-usart.c | 735 +++++++++++++++++++++++++++++++++++++++
->>  include/uapi/linux/serial_core.h |   3 +
->>  4 files changed, 756 insertions(+)
->>  create mode 100644 drivers/tty/serial/stm32-usart.c
->
-> [snip]
->
->> +static void stm32_console_write(struct console *co, const char *s, unsigned cnt)
->> +{
->> +     struct uart_port *port = &stm32_ports[co->index].port;
->> +     unsigned long flags;
->> +     u32 old_cr1, new_cr1;
->> +     int locked = 1;
->> +
->> +     if (oops_in_progress) {
->> +             locked = spin_trylock_irqsave(&port->lock, flags);
->> +     } else {
->> +             locked = 1;    ID
+Also worth noting that the only supported ECC mode is "hw_syndrome". In the
+future the driver may add support for additional modes.
 
->
-> locked = 1 is done from the declaration.
-Right, I will fix this in next version
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+v3:
+   Make all generic nand binding properties for child nodes optional as
+   suggested by Boris Brezillon.
+---
+ .../devicetree/bindings/mtd/digicolor-nand.txt     | 71 ++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/digicolor-nand.txt
 
->
-> Also do you want to add "if (port->sysrq) locked = 0;" check?
-
-Yes, that makes sense. It will be also in v7.
->
->> +             spin_lock_irqsave(&port->lock, flags);
->> +     }
->> +
-
-
->
-> [snip]
->
-> Everything else is fine from point of view.
->
-> Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-
-Regards,
-Maxime
->
-> --
-> With best wishes,
-> Vladimir
+diff --git a/Documentation/devicetree/bindings/mtd/digicolor-nand.txt b/Documentation/devicetree/bindings/mtd/digicolor-nand.txt
+new file mode 100644
+index 000000000000..f2b725580885
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/digicolor-nand.txt
+@@ -0,0 +1,71 @@
++Conexant Digicolor NAND Flash Controller (NFC)
++
++Required properties:
++- compatible : "cnxt,cx92755-nfc".
++- reg : shall contain registers location and length for data and reg.
++- interrupts : shall define the nand controller interrupt.
++- #address-cells: shall be set to 1. Encode the nand CS.
++- #size-cells : shall be set to 0.
++- clocks : shall reference nand controller clocks.
++
++Optional children nodes:
++Children nodes represent the available nand chips.
++
++Optional children properties:
++- nand-ecc-mode : defaults be "hw_syndrome".
++- nand-ecc-strength : must be one of 6, 7, 8, 24, 28, 30.
++- nand-ecc-step-size : must be either 512 or 1024.
++
++see Documentation/devicetree/bindings/mtd/nand.txt for generic bindings.
++
++Each nand chip child node may optionally have partition sub-nodes. See
++Documentation/devicetree/bindings/mtd/partition.txt for partitions binding.
++
++Example:
++nfc: nfc at f00a4000 {
++	compatible = "cnxt,cx92755-nfc";
++	reg = <0xf00a4000 0x200>;
++	interrupts = <26>;
++	clocks = <&main_clk>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	nand at 0 {
++		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		nand-ecc-mode = "hw_syndrome";
++		nand-ecc-step-size = <1024>;
++		nand-ecc-strength = <28>;
++
++		partition at 0 {
++			label = "boot";
++			reg = <0x00000000 0x00700000>;
++		};
++
++		partition at 700000 {
++			label = "splash";
++			reg = <0x00700000 0x00500000>;
++		};
++
++		partition at c00000 {
++			label = "maint";
++			reg = <0x00c00000 0x00500000>;
++		};
++
++		partition at 1100000 {
++			label = "kernel";
++			reg = <0x01100000 0x00500000>;
++		};
++
++		partition at 1600000 {
++			label = "rootfs";
++			reg = <0x01600000 0x18000000>;
++		};
++
++		partition at 19600000 {
++			label = "data1";
++			reg = <0x19600000 0x66a00000>;
++		};
++	};
++};
+-- 
+2.1.4
