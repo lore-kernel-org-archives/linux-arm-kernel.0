@@ -1,47 +1,28 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Tue, 28 Apr 2015 09:01:58 +0200
-Subject: [PATCH v2] thermal: exynos: Add the support for Exynos5433 TMU
-In-Reply-To: <553D9CE6.5040505@samsung.com>
-References: <1425954224-31035-1-git-send-email-cw00.choi@samsung.com>
- <5508C4A9.50705@samsung.com> <20150318083913.528119f4@amdc2363>
- <553D9CE6.5040505@samsung.com>
-Message-ID: <20150428090158.2d008a7b@amdc2363>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 28 Apr 2015 15:01:34 +0800
+Subject: [PATCH Part1 v11 0/5] Some cleanup for pcie host drivers
+Message-ID: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+These patches are split out from patchset(patch 5 is new)
+"Refine PCI scan interfaces and make generic pci host bridge".
+They are independent of the series, pci_bus_add_devices()
+has been ripped out from pci_scan_root_bus(), so we could
+use pci_scan_root_bus() instead of pci_create_root_bus() + 
+pci_scan_child_bus() for simplicity. Also this is the preparation
+for the series.
 
-> Hi Eduardo and Lukasz,
-> 
-> I checked this patch merged on linux-next.git.
-> But, this patch is not merged on Linux 4.1-rc1.
+Yijing Wang (5):
+  PCI: mvebu: Use pci_common_init_dev() to simplify code
+  PCI: tegra: Remove redundant tegra_pcie_scan_bus()
+  PCI: designware: Use pci_scan_root_bus() for simplicity
+  PCI: xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
+  PCI: iproc: Use pci_scan_root_bus() instead of pci_create_root_bus()
 
-This is indeed strange. Eduardo do you have any idea why this patch
-is missing?
-
-> 
-> Thanks,
-> Chanwoo Choi
-> 
-> On 03/18/2015 04:39 PM, Lukasz Majewski wrote:
-> > Hi Chanwoo,
-> > 
-> >> Hi Lukasz,
-> >>
-> >> Genlty Ping.
-> > 
-> > I've got your patches at the back of my head :-)
-> > 
-> > I will try to review them today or tomorrow.
-> > 
-> >>
-> >> Best Regards,
-> >> Chanwoo Choi
-> >>
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+ drivers/pci/host/pci-mvebu.c       |   18 +-----------------
+ drivers/pci/host/pci-tegra.c       |   16 ----------------
+ drivers/pci/host/pci-xgene.c       |    3 +--
+ drivers/pci/host/pcie-designware.c |    4 +---
+ drivers/pci/host/pcie-iproc.c      |    5 ++---
+ 5 files changed, 5 insertions(+), 41 deletions(-)
