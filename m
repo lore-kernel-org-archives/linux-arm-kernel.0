@@ -1,42 +1,32 @@
-From: ao2@ao2.it (Antonio Ospite)
-Date: Tue, 28 Apr 2015 13:11:23 +0200
-Subject: [PATCH 04/12] trivial: ARM: lib/lib1funcs.S: fix typo
- s/substractions/subtractions/
-In-Reply-To: <1430219491-5076-1-git-send-email-ao2@ao2.it>
-References: <1430219491-5076-1-git-send-email-ao2@ao2.it>
-Message-ID: <1430219491-5076-5-git-send-email-ao2@ao2.it>
+From: gregkh@linuxfoundation.org ('Greg Kroah-Hartman')
+Date: Tue, 28 Apr 2015 13:17:08 +0200
+Subject: [PATCH 4/5] dmaengine: hsu: Fix memory leak when stopping a
+ running transfer
+In-Reply-To: <20150330173732.GK7192@intel.com>
+References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
+ <1427456155-28990-5-git-send-email-peter.ujfalusi@ti.com>
+ <1427457718.14897.428.camel@linux.intel.com>
+ <20150330173732.GK7192@intel.com>
+Message-ID: <20150428111708.GB16174@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Antonio Ospite <ao2@ao2.it>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/lib/lib1funcs.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Mon, Mar 30, 2015 at 11:07:32PM +0530, Vinod Koul wrote:
+> On Fri, Mar 27, 2015 at 02:01:58PM +0200, Andy Shevchenko wrote:
+> > On Fri, 2015-03-27 at 13:35 +0200, Peter Ujfalusi wrote:
+> > > The vd->node is removed from the lists when the transfer started so the
+> > > vchan_get_all_descriptors() will not find it. This results memory leak.
+> > > 
+> > 
+> > Acked-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Acked-by: Vinod Koul <vinod.koul@intel.com>
+> 
+> Greg,
+> 
+> Please apply this in your queue for next
 
-diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
-index 947567f..af2267f 100644
---- a/arch/arm/lib/lib1funcs.S
-+++ b/arch/arm/lib/lib1funcs.S
-@@ -167,7 +167,7 @@ Boston, MA 02111-1307, USA.  */
- 
- #endif
- 
--	@ Perform all needed substractions to keep only the reminder.
-+	@ Perform all needed subtractions to keep only the reminder.
- 	@ Do comparisons in batch of 4 first.
- 	subs	\order, \order, #3		@ yes, 3 is intended here
- 	blt	2f
-@@ -189,7 +189,7 @@ Boston, MA 02111-1307, USA.  */
- 	teqne	\dividend, #0
- 	beq	5f
- 
--	@ Either 1, 2 or 3 comparison/substractions are left.
-+	@ Either 1, 2 or 3 comparison/subtractions are left.
- 2:	cmn	\order, #2
- 	blt	4f
- 	beq	3f
--- 
-2.1.4
+Apply what?  Can someone resend this in a format I can apply it in?
+
+thanks,
+
+gregk -h
