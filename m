@@ -1,33 +1,72 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Apr 2015 08:43:37 +0800
-Subject: [PATCH V2] ARM: dts: imx28: Fix AUART4 TX-DMA interrupt name
-In-Reply-To: <201504271816.11902.marex@denx.de>
-References: <1429874987-5481-1-git-send-email-marex@denx.de>
- <20150427144627.GD1788@dragon> <201504271816.11902.marex@denx.de>
-Message-ID: <20150428004336.GA18776@dragon>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 28 Apr 2015 09:46:19 +0900
+Subject: [PATCH 0/5] PM / clock_ops: provide default runtime ops and
+ cleanup users
+In-Reply-To: <553A6289.4040001@oracle.com>
+ <CAMuHMdWMjULD8jQDA-U6tumnCd=Q7jhZ2koha4CKU-K50tJXmw@mail.gmail.com>
+Message-ID: <20150428004618.GA1807@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 06:16:11PM +0200, Marek Vasut wrote:
-> On Monday, April 27, 2015 at 04:46:29 PM, Shawn Guo wrote:
-> > On Fri, Apr 24, 2015 at 01:29:47PM +0200, Marek Vasut wrote:
-> > > Fix a typo in the TX DMA interrupt name for AUART4.
-> > > This patch makes AUART4 operational again.
-> > > 
-> > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > 
-> > Applied, thanks.
+On Fri, Apr 24, 2015 at 04:51:03PM +0200, Geert Uytterhoeven wrote:
+> On Fri, Apr 24, 2015 at 4:41 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Thursday, April 23, 2015 02:03:08 PM Rajendra Nayak wrote:
+> >> Most users of PM clocks do the exact same thing in runtime callbacks.
+> >> Provide default callbacks and cleanup the existing users (keystone/davinci
+> >> /omap1/sh)
+> >>
+> >> Rajendra Nayak (5):
+> >>   PM / clock_ops: Provide default runtime ops to users
+> >>   arm: keystone: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+> >>   arm: omap1: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+> >>   arm: davinci: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+> >>   drivers: sh: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+> >>
+> >>  arch/arm/mach-davinci/pm_domain.c  | 32 +-------------------------
+> >>  arch/arm/mach-keystone/pm_domain.c | 33 +-------------------------
+> >>  arch/arm/mach-omap1/pm_bus.c       | 37 ++----------------------------
+> >>  drivers/base/power/clock_ops.c     | 38 ++++++++++++++++++++++++++++++
+> >>  drivers/sh/pm_runtime.c            | 47 ++------------------------------------
+> >>  include/linux/pm_clock.h           | 10 ++++++++
+> >>  6 files changed, 54 insertions(+), 143 deletions(-)
+> >
+> > It is not particularly clear to me who is supposed to apply this series, but
+> > I can do that if people don't have problems with that.
 > 
-> Thanks!
+> All later patches depend on the first patch.
 > 
-> It'd be really great if this could be applied to stable.
-> It's rather obvious that AUART4 is not used very much, so
-> noone spotted this before, but it'd still be nice to have
-> this fixed.
+> For shmobile, Simon has queued up changes for drivers/sh/pm_runtime.c,
+> but I think they don't conflict with this series.
 
-The stable Cc tag in the patch [1] will just do the job.
+Yes, that is the case. I have some patches (from Geert) queued up for v4.1.
+I have confirmed that they do not conflict with the shmobile (last) patch
+if this series.
 
-Shawn
+<details>
+The patches are in the sh-drivers-for-v4.1 branch of my renesas tree; I
+rebased them yesterday; they should hit next today if there is a next
+today; I plan to send a pull request to Linus in the not to distant future;
+and I envisage they should end up in v4.1-rc2 or rc3.  </details>
 
-[1]
-https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/fixes&id=4ada77e37a773168fea484899201e272ab44ba8b
+On Fri, Apr 24, 2015 at 08:34:33AM -0700, santosh shilimkar wrote:
+> On 4/24/2015 7:41 AM, Rafael J. Wysocki wrote:
+> >On Thursday, April 23, 2015 02:03:08 PM Rajendra Nayak wrote:
+
+[snip]
+
+> >It is not particularly clear to me who is supposed to apply this series, but
+> >I can do that if people don't have problems with that.
+> >
+> >
+> I am fine by that given dependency with first patch.
+> Another way is, you pick up the first patch and give us an
+> immutable branch.
+> 
+> Either way is fine by me.
+
+Likewise.
+
+Here is an ack for the shmobile (last) patch if you decide to take it
+through your tree.
+
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
