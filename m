@@ -1,32 +1,32 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 28 Apr 2015 14:22:10 +0200
-Subject: [PATCH] earlycon: Fix uart_parse_earlycon() if
- !CONFIG_SERIAL_CORE_CONSOLE
-In-Reply-To: <1428763356-29158-1-git-send-email-peter@hurleysoftware.com>
-References: <1428763356-29158-1-git-send-email-peter@hurleysoftware.com>
-Message-ID: <20150428122210.GA16972@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Apr 2015 14:23:43 +0200
+Subject: [PATCH 01/11] coresight-etm4x: Adding CoreSight ETM4x driver
+In-Reply-To: <1429890108.5211.8.camel@mm-sol.com>
+References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
+ <1429742451-11465-2-git-send-email-mathieu.poirier@linaro.org>
+ <1429890108.5211.8.camel@mm-sol.com>
+Message-ID: <CACRpkdYKmq3giv_Wyy+94puHpxaNxgooQFEtwhv-sH0sMK739g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 11, 2015 at 10:42:36AM -0400, Peter Hurley wrote:
-> Arnd Bergmann wrote:
-> > A configuration that enables earlycon but not the core console
-> > code causes a link error:
-> >
-> > drivers/built-in.o: In function `setup_earlycon':
-> > drivers/tty/serial/earlycon.c:70: undefined reference to `uart_parse_earlycon'
-> 
-> CONFIG_SERIAL_EARLYCON should not require CONFIG_SERIAL_CORE_CONSOLE.
-> Move uart_parse_earlycon() and compile if either CONFIG_SERIAL_CORE_CONSOLE
-> or CONFIG_SERIAL_EARLYCON.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
-> ---
-> 
-> NB: The diff moves everything else around uart_parse_earlycon() :/
-> 
->  drivers/tty/serial/serial_core.c | 90 ++++++++++++++++++++--------------------
->  1 file changed, 46 insertions(+), 44 deletions(-)
+On Fri, Apr 24, 2015 at 5:41 PM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
+> On Wed, 2015-04-22 at 16:40 -0600, Mathieu Poirier wrote:
+>>
+>
+>> +static struct amba_id etm4_ids[] = {
+>> +       {       /* ETM 4.0 - Hi6220 board */
+>> +               .id     = 0x0003b95d,
+>> +               .mask   = 0x0003ffff,
+>> +               .data   = "ETM 4.0",
+>> +       },
+>> +       {       /* ETM 4.0 - Juno board */
+>> +               .id     = 0x000bb95e,
+>> +               .mask   = 0x000bffff,
+>
+> Mask looks suspicious.
 
-This doesn't apply to my tty-next branch :(
+I'm thinking that maybe we should have some masks predefined in
+<linux/amba/bus.h> for bits in this field so we get it right.
+
+Yours,
+Linus Walleij
