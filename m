@@ -1,84 +1,51 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 28 Apr 2015 09:29:56 +0200
-Subject: [PATCH v4 2/2] arch: arm: Show the serial number from devicetree in
- cpuinfo
-In-Reply-To: <1430206196-3483-1-git-send-email-contact@paulk.fr>
-References: <1430206196-3483-1-git-send-email-contact@paulk.fr>
-Message-ID: <1430206196-3483-2-git-send-email-contact@paulk.fr>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 28 Apr 2015 15:35:54 +0800
+Subject: [PATCH v3 1/3] mfd: provide RTC resource in MT6397 MFD
+In-Reply-To: <1430206556-18254-1-git-send-email-eddie.huang@mediatek.com>
+References: <1430206556-18254-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1430206556-18254-2-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This grabs the serial number shown in cpuinfo from the serial-number devicetree
-property in priority. When booting with ATAGs (and without device-tree), the
-provided number is still shown instead.
+Provide MT6397 RTC interrupt, base address, and register in
+MT6397 MFD.
 
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
 ---
- arch/arm/include/asm/system_info.h |  1 +
- arch/arm/kernel/setup.c            | 23 +++++++++++++++++++++--
- 2 files changed, 22 insertions(+), 2 deletions(-)
+ drivers/mfd/mt6397-core.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/include/asm/system_info.h b/arch/arm/include/asm/system_info.h
-index 720ea03..3860cbd40 100644
---- a/arch/arm/include/asm/system_info.h
-+++ b/arch/arm/include/asm/system_info.h
-@@ -17,6 +17,7 @@
+diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+index 09bc780..08cfbd1 100644
+--- a/drivers/mfd/mt6397-core.c
++++ b/drivers/mfd/mt6397-core.c
+@@ -21,9 +21,27 @@
+ #include <linux/mfd/mt6397/core.h>
+ #include <linux/mfd/mt6397/registers.h>
  
- /* information about the system we're running on */
- extern unsigned int system_rev;
-+extern const char *system_serial;
- extern unsigned int system_serial_low;
- extern unsigned int system_serial_high;
- extern unsigned int mem_fclk_21285;
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 1d60beb..b501754 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -93,6 +93,9 @@ unsigned int __atags_pointer __initdata;
- unsigned int system_rev;
- EXPORT_SYMBOL(system_rev);
- 
-+const char *system_serial;
-+EXPORT_SYMBOL(system_serial);
++#define MT6397_RTC_BASE		0xe000
++#define MT6397_RTC_SIZE		0x3e
 +
- unsigned int system_serial_low;
- EXPORT_SYMBOL(system_serial_low);
- 
-@@ -821,8 +824,25 @@ arch_initcall(customize_machine);
- 
- static int __init init_machine_late(void)
- {
-+	struct device_node *root;
-+	int ret;
++static const struct resource mt6397_rtc_resources[] = {
++	{
++		.start = MT6397_RTC_BASE,
++		.end   = MT6397_RTC_BASE + MT6397_RTC_SIZE,
++		.flags  = IORESOURCE_MEM,
++	},
++	{
++		.start = MT6397_IRQ_RTC,
++		.end   = MT6397_IRQ_RTC,
++		.flags  = IORESOURCE_IRQ,
++	},
++};
 +
- 	if (machine_desc->init_late)
- 		machine_desc->init_late();
-+
-+	root = of_find_node_by_path("/");
-+	if (root) {
-+		ret = of_property_read_string(root, "serial-number",
-+					      &system_serial);
-+		if (ret)
-+			system_serial = NULL;
-+	}
-+
-+	if (!system_serial)
-+		system_serial = kasprintf(GFP_KERNEL, "%08x%08x",
-+					  system_serial_high,
-+					  system_serial_low);
-+
- 	return 0;
- }
- late_initcall(init_machine_late);
-@@ -1091,8 +1111,7 @@ static int c_show(struct seq_file *m, void *v)
- 
- 	seq_printf(m, "Hardware\t: %s\n", machine_name);
- 	seq_printf(m, "Revision\t: %04x\n", system_rev);
--	seq_printf(m, "Serial\t\t: %08x%08x\n",
--		   system_serial_high, system_serial_low);
-+	seq_printf(m, "Serial\t\t: %s\n", system_serial);
- 
- 	return 0;
- }
+ static const struct mfd_cell mt6397_devs[] = {
+ 	{
+ 		.name = "mt6397-rtc",
++		.num_resources = ARRAY_SIZE(mt6397_rtc_resources),
++		.resources = mt6397_rtc_resources,
+ 		.of_compatible = "mediatek,mt6397-rtc",
+ 	}, {
+ 		.name = "mt6397-regulator",
 -- 
-1.9.1
+1.8.1.1.dirty
