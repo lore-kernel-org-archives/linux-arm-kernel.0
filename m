@@ -1,35 +1,45 @@
 From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 28 Apr 2015 21:40:31 +0800
-Subject: [PATCH v3 0/3] tty: serial: Add earlycon support to MT8173 SoC 
-Message-ID: <1430228434-31779-1-git-send-email-eddie.huang@mediatek.com>
+Date: Tue, 28 Apr 2015 21:40:33 +0800
+Subject: [PATCH v3 2/3] tty: serial: 8250_mtk: Add earlycon
+In-Reply-To: <1430228434-31779-1-git-send-email-eddie.huang@mediatek.com>
+References: <1430228434-31779-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1430228434-31779-3-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add earlycon support to MT8173 SoC platform.
-To use earlycon, need
-1. Add earlycon in boot parameters
-2. Add "linux,sdtout-path" property in device tree file
+Add 8250 MTK UART driver to support earlycon device tree.
+Earlycon take effect by
+  add "earlycon" in kernel boot argument
+  add "linux,sdtout-path" property in device tree file
 
-This patch based on 4.1-rc1.
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+---
+ drivers/tty/serial/8250/8250_mtk.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Change in v3:
-Remove noinit options, not necessary, because 8250_early.c will not init hardware
-if not provide baudrate.
-
-Change v2:
-1. Add noinit options.
-2. Remove duplicate code in 8250_mtk.c, reuse the 8250_early.c existed function.
-
-Eddie Huang (3):
-  tty: serial: 8250: export early_serial8250_setup function
-  tty: serial: 8250_mtk: Add earlycon
-  arm64: dts: Add mediatek MT8173 earlycon support
-
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts |  4 +++-
- drivers/tty/serial/8250/8250_early.c        |  2 +-
- drivers/tty/serial/8250/8250_mtk.c          | 13 +++++++++++++
- include/linux/serial_8250.h                 |  2 ++
- 4 files changed, 19 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+index 7a11fac..8b2a666 100644
+--- a/drivers/tty/serial/8250/8250_mtk.c
++++ b/drivers/tty/serial/8250/8250_mtk.c
+@@ -289,6 +289,19 @@ static struct platform_driver mtk8250_platform_driver = {
+ };
+ module_platform_driver(mtk8250_platform_driver);
+ 
++static int __init early_mtk8250_setup(struct earlycon_device *device,
++					const char *options)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	device->port.iotype = UPIO_MEM32;
++
++	return early_serial8250_setup(device, NULL);
++}
++
++OF_EARLYCON_DECLARE(mtk8250, "mediatek,mt6577-uart", early_mtk8250_setup);
++
+ MODULE_AUTHOR("Matthias Brugger");
+ MODULE_LICENSE("GPL");
+ MODULE_DESCRIPTION("Mediatek 8250 serial port driver");
 -- 
 1.8.1.1.dirty
