@@ -1,331 +1,330 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 28 Apr 2015 16:20:00 +0800
-Subject: [PATCH] ARM: dts: imx5: Add dts files for USB armory.
-In-Reply-To: <20150427133708.GC11598@core.inversepath.com>
-References: <87h9t6i40r.fsf@aikidev.net> <20150427115747.GA11975@dragon>
- <20150427133708.GC11598@core.inversepath.com>
-Message-ID: <20150428081959.GA32234@shlinux2>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 28 Apr 2015 10:26:01 +0200
+Subject: [PATCH 11/13] thermal: Make struct thermal_zone_device_ops const
+In-Reply-To: <1430209563-647-1-git-send-email-s.hauer@pengutronix.de>
+References: <1430209563-647-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1430209563-647-12-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 03:37:08PM +0200, Andrej Rosano wrote:
-> Hi Shawn,
-> 
-> On Mon, Apr 27, 2015 at 07:57:48PM +0800, Shawn Guo wrote:
-> > +Peter
-> > 
-> > On Fri, Mar 27, 2015 at 01:23:00PM -0700, Vagrant Cascadian wrote:
-> > > Add support for the USB armory board by Inverse Path. This board
-> > > features a Freescale iMX53 SoC, 512MB RAM, and USB OTG operating in
-> > > either peripheral or host mode, and 5 GPIO pins.
-> > > 
-> > > One .dtb is generated for operating in peripheral mode, and one is
-> > > generated for operating in host mode.
-> > 
-> > Vagrant,
-> > 
-> > Does that mean this board can work in peripheral or host mode but can
-> > switch between them at run-time?
-> 
-> The board can switch between host and peripheral mode without any
-> hardware modification, but it need to reboot itself to pick up the
-> corresponding dtb file. I am not sure if there is possible using the
-> devicetree overlay feature to switch between the two modes runtime.
-> 
+Now that the of thermal support no longer changes the
+thermal_zone_device_ops it can be const again.
 
-Not a good way, it is just one board with two different usb cables.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ Documentation/thermal/sysfs-api.txt                    | 2 +-
+ drivers/acpi/thermal.c                                 | 2 +-
+ drivers/platform/x86/acerhdf.c                         | 2 +-
+ drivers/platform/x86/intel_mid_thermal.c               | 2 +-
+ drivers/power/power_supply_core.c                      | 2 +-
+ drivers/thermal/armada_thermal.c                       | 2 +-
+ drivers/thermal/db8500_thermal.c                       | 2 +-
+ drivers/thermal/dove_thermal.c                         | 2 +-
+ drivers/thermal/imx_thermal.c                          | 2 +-
+ drivers/thermal/int340x_thermal/int3400_thermal.c      | 2 +-
+ drivers/thermal/int340x_thermal/int340x_thermal_zone.c | 2 +-
+ drivers/thermal/intel_soc_dts_thermal.c                | 2 +-
+ drivers/thermal/kirkwood_thermal.c                     | 2 +-
+ drivers/thermal/of-thermal.c                           | 2 +-
+ drivers/thermal/rcar_thermal.c                         | 2 +-
+ drivers/thermal/spear_thermal.c                        | 2 +-
+ drivers/thermal/st/st_thermal.c                        | 2 +-
+ drivers/thermal/thermal_core.c                         | 2 +-
+ drivers/thermal/ti-soc-thermal/ti-thermal-common.c     | 2 +-
+ drivers/thermal/x86_pkg_temp_thermal.c                 | 2 +-
+ include/linux/thermal.h                                | 6 +++---
+ 21 files changed, 23 insertions(+), 23 deletions(-)
 
-Current chipidea usb driver supports role switch function well, if you
-have a gpio or id pin for it.
-
-Peter
-
-> Andrej
-> 
-> > 
-> > Shawn
-> > 
-> > > 
-> > > Signed-off-by: Vagrant Cascadian <vagrant@debian.org>
-> > > Cc: Andrej Rosano <andrej@inversepath.com>
-> > > Cc: Rob Herring <robh+dt@kernel.org>
-> > > Cc: Pawel Moll <pawel.moll@arm.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > > Cc: Kumar Gala <galak@codeaurora.org>
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: devicetree at vger.kernel.org
-> > > Cc: linux-arm-kernel at lists.infradead.org
-> > > Cc: linux-kernel at vger.kernel.org
-> > > ---
-> > >  arch/arm/boot/dts/Makefile                      |   2 +
-> > >  arch/arm/boot/dts/imx53-usbarmory-host_mode.dts |  17 +++
-> > >  arch/arm/boot/dts/imx53-usbarmory.dts           |  13 ++
-> > >  arch/arm/boot/dts/imx53-usbarmory.dtsi          | 183 ++++++++++++++++++++++++
-> > >  4 files changed, 215 insertions(+)
-> > >  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
-> > >  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
-> > >  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dtsi
-> > > 
-> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > > index a1c776b..bd2258b 100644
-> > > --- a/arch/arm/boot/dts/Makefile
-> > > +++ b/arch/arm/boot/dts/Makefile
-> > > @@ -244,6 +244,8 @@ dtb-$(CONFIG_SOC_IMX53) += \
-> > >  	imx53-smd.dtb \
-> > >  	imx53-tx53-x03x.dtb \
-> > >  	imx53-tx53-x13x.dtb \
-> > > +	imx53-usbarmory.dtb \
-> > > +	imx53-usbarmory-host_mode.dtb \
-> > >  	imx53-voipac-bsb.dtb
-> > >  dtb-$(CONFIG_SOC_IMX6Q) += \
-> > >  	imx6dl-aristainetos_4.dtb \
-> > > diff --git a/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts b/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
-> > > new file mode 100644
-> > > index 0000000..a94cb1d
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
-> > > @@ -0,0 +1,17 @@
-> > > +/*
-> > > + * Copyright 2015 Inverse Path, S.r.l.
-> > > + *
-> > > + * The code contained herein is licensed under the GNU General Public
-> > > + * License. You may obtain a copy of the GNU General Public License
-> > > + * Version 2 or later at the following locations:
-> > > + *
-> > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > + * http://www.gnu.org/copyleft/gpl.html
-> > > + */
-> > > +
-> > > +/dts-v1/;
-> > > +#include "imx53-usbarmory.dtsi"
-> > > +
-> > > +&usbotg {
-> > > +	dr_mode = "host";
-> > > +};
-> > > diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
-> > > new file mode 100644
-> > > index 0000000..c86a4d8
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/imx53-usbarmory.dts
-> > > @@ -0,0 +1,13 @@
-> > > +/*
-> > > + * Copyright 2015 Inverse Path, S.r.l.
-> > > + *
-> > > + * The code contained herein is licensed under the GNU General Public
-> > > + * License. You may obtain a copy of the GNU General Public License
-> > > + * Version 2 or later at the following locations:
-> > > + *
-> > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > + * http://www.gnu.org/copyleft/gpl.html
-> > > + */
-> > > +
-> > > +/dts-v1/;
-> > > +#include "imx53-usbarmory.dtsi"
-> > > diff --git a/arch/arm/boot/dts/imx53-usbarmory.dtsi b/arch/arm/boot/dts/imx53-usbarmory.dtsi
-> > > new file mode 100644
-> > > index 0000000..b4a9052
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/imx53-usbarmory.dtsi
-> > > @@ -0,0 +1,183 @@
-> > > +/*
-> > > + * Copyright 2015 Inverse Path, S.r.l.
-> > > + *
-> > > + * The code contained herein is licensed under the GNU General Public
-> > > + * License. You may obtain a copy of the GNU General Public License
-> > > + * Version 2 or later at the following locations:
-> > > + *
-> > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > + * http://www.gnu.org/copyleft/gpl.html
-> > > + */
-> > > +
-> > > +#include "imx53.dtsi"
-> > > +
-> > > +/ {
-> > > +	model = "Inverse Path USB armory";
-> > > +	compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
-> > > +};
-> > > +
-> > > +/ {
-> > > +	chosen {
-> > > +		stdout-path = &uart1;
-> > > +	};
-> > > +
-> > > +	memory {
-> > > +		reg = <0x70000000 0x20000000>;
-> > > +	};
-> > > +
-> > > +	leds {
-> > > +		compatible = "gpio-leds";
-> > > +		pinctrl-names = "default";
-> > > +		pinctrl-0 = <&led_pin_gpio4_27>;
-> > > +
-> > > +		user {
-> > > +			label = "LED";
-> > > +			gpios = <&gpio4 27 0>;
-> > > +			linux,default-trigger = "heartbeat";
-> > > +		};
-> > > +	};
-> > > +};
-> > > +
-> > > +&esdhc1 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_esdhc1>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&iomuxc {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_hog>;
-> > > +
-> > > +	imx53-usbarmory {
-> > > +		pinctrl_hog: hoggrp {
-> > > +			fsl,pins = <
-> > > +				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
-> > > +				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
-> > > +				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
-> > > +				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
-> > > +				MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
-> > > +				MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
-> > > +				MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
-> > > +				MX53_PAD_PATA_DA_2__GPIO7_8	  0x80000000
-> > > +				MX53_PAD_GPIO_16__GPIO7_11        0x80000000
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		led_pin_gpio4_27: led_gpio4_27 at 0 {
-> > > +			fsl,pins = <
-> > > +				MX53_PAD_DISP0_DAT6__GPIO4_27 0x80000000
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_esdhc1: esdhc1grp {
-> > > +			fsl,pins = <
-> > > +				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
-> > > +				MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
-> > > +				MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
-> > > +				MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
-> > > +				MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
-> > > +				MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_i2c1: i2c1grp {
-> > > +			fsl,pins = <
-> > > +				MX53_PAD_CSI0_DAT8__I2C1_SDA	0xc0000000
-> > > +				MX53_PAD_CSI0_DAT9__I2C1_SCL	0xc0000000
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_uart1: uart1grp {
-> > > +			fsl,pins = <
-> > > +				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
-> > > +				MX53_PAD_CSI0_DAT11__UART1_RXD_MUX	0x1e4
-> > > +			>;
-> > > +		};
-> > > +	};
-> > > +};
-> > > +
-> > > +&uart1 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_uart1>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&vpu {
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&usbotg {
-> > > +	dr_mode = "peripheral";
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&i2c1 {
-> > > +	ltc3589: pmic at 34 {
-> > > +		compatible = "lltc,ltc3589-2";
-> > > +		reg = <0x34>;
-> > > +
-> > > +		regulators {
-> > > +			sw1_reg: sw1 {
-> > > +				regulator-min-microvolt = <591930>;
-> > > +				regulator-max-microvolt = <1224671>;
-> > > +				lltc,fb-voltage-divider = <100000 158000>;
-> > > +				regulator-ramp-delay = <7000>;
-> > > +				regulator-boot-on;
-> > > +				regulator-always-on;
-> > > +			};
-> > > +
-> > > +			sw2_reg: sw2 {
-> > > +				regulator-min-microvolt = <704123>;
-> > > +				regulator-max-microvolt = <1456803>;
-> > > +				lltc,fb-voltage-divider = <180000 191000>;
-> > > +				regulator-ramp-delay = <7000>;
-> > > +				regulator-boot-on;
-> > > +				regulator-always-on;
-> > > +			};
-> > > +
-> > > +			sw3_reg: sw3 {
-> > > +				regulator-min-microvolt = <1341250>;
-> > > +				regulator-max-microvolt = <2775000>;
-> > > +				lltc,fb-voltage-divider = <270000 100000>;
-> > > +				regulator-ramp-delay = <7000>;
-> > > +				regulator-boot-on;
-> > > +				regulator-always-on;
-> > > +			};
-> > > +
-> > > +			bb_out_reg: bb-out {
-> > > +				regulator-min-microvolt = <3387341>;
-> > > +				regulator-max-microvolt = <3387341>;
-> > > +				lltc,fb-voltage-divider = <511000 158000>;
-> > > +				regulator-boot-on;
-> > > +				regulator-always-on;
-> > > +			};
-> > > +			ldo1_reg: ldo1 {
-> > > +				regulator-min-microvolt = <1306329>;
-> > > +				regulator-max-microvolt = <1306329>;
-> > > +				lltc,fb-voltage-divider = <100000 158000>;
-> > > +				regulator-boot-on;
-> > > +				regulator-always-on;
-> > > +			};
-> > > +
-> > > +			ldo2_reg: ldo2 {
-> > > +				regulator-min-microvolt = <704123>;
-> > > +				regulator-max-microvolt = <1456806>;
-> > > +				lltc,fb-voltage-divider = <180000 191000>;
-> > > +				regulator-ramp-delay = <7000>;
-> > > +				regulator-boot-on;
-> > > +				regulator-always-on;
-> > > +			};
-> > > +
-> > > +			ldo3_reg: ldo3 {
-> > > +				regulator-min-microvolt = <2800000>;
-> > > +				regulator-max-microvolt = <2800000>;
-> > > +				regulator-boot-on;
-> > > +			};
-> > > +
-> > > +			ldo4_reg: ldo4 {
-> > > +				regulator-min-microvolt = <1200000>;
-> > > +				regulator-max-microvolt = <3200000>;
-> > > +			};
-> > > +		};
-> > > +	};
-> > > +};
-> > > -- 
-> > > 2.1.4
-> > > 
-> > 
-> > 
-> 
-> --
-> Andrej Rosano                                           Inverse Path Srl
-> <andrej@inversepath.com>                      http://www.inversepath.com
-> 
-> 0x01939B21            5BB8 574E 68E8 D841 E18F  D5E9 CEAD E0CF 0193 9B21
-
+diff --git a/Documentation/thermal/sysfs-api.txt b/Documentation/thermal/sysfs-api.txt
+index 87519cb..bb346a2 100644
+--- a/Documentation/thermal/sysfs-api.txt
++++ b/Documentation/thermal/sysfs-api.txt
+@@ -33,7 +33,7 @@ temperature) and throttle appropriate devices.
+ 1.1 thermal zone device interface
+ 1.1.1 struct thermal_zone_device *thermal_zone_device_register(char *type,
+ 		int trips, int mask, void *devdata,
+-		struct thermal_zone_device_ops *ops,
++		const struct thermal_zone_device_ops *ops,
+ 		const struct thermal_zone_params *tzp,
+ 		int passive_delay, int polling_delay))
+ 
+diff --git a/drivers/acpi/thermal.c b/drivers/acpi/thermal.c
+index 68bff60..6b11462 100644
+--- a/drivers/acpi/thermal.c
++++ b/drivers/acpi/thermal.c
+@@ -869,7 +869,7 @@ acpi_thermal_unbind_cooling_device(struct thermal_zone_device *thermal,
+ 	return acpi_thermal_cooling_device_cb(thermal, cdev, false);
+ }
+ 
+-static struct thermal_zone_device_ops acpi_thermal_zone_ops = {
++static const struct thermal_zone_device_ops acpi_thermal_zone_ops = {
+ 	.bind = acpi_thermal_bind_cooling_device,
+ 	.unbind	= acpi_thermal_unbind_cooling_device,
+ 	.get_temp = thermal_get_temp,
+diff --git a/drivers/platform/x86/acerhdf.c b/drivers/platform/x86/acerhdf.c
+index f2ce63c..bae9ca0 100644
+--- a/drivers/platform/x86/acerhdf.c
++++ b/drivers/platform/x86/acerhdf.c
+@@ -482,7 +482,7 @@ static int acerhdf_get_crit_temp(struct thermal_zone_device *thermal,
+ }
+ 
+ /* bind callback functions to thermalzone */
+-static struct thermal_zone_device_ops acerhdf_dev_ops = {
++static const struct thermal_zone_device_ops acerhdf_dev_ops = {
+ 	.bind = acerhdf_bind,
+ 	.unbind = acerhdf_unbind,
+ 	.get_temp = acerhdf_get_ec_temp,
+diff --git a/drivers/platform/x86/intel_mid_thermal.c b/drivers/platform/x86/intel_mid_thermal.c
+index 0944e83..069d36b 100644
+--- a/drivers/platform/x86/intel_mid_thermal.c
++++ b/drivers/platform/x86/intel_mid_thermal.c
+@@ -460,7 +460,7 @@ static int read_curr_temp(struct thermal_zone_device *tzd, unsigned long *temp)
+ }
+ 
+ /* Can't be const */
+-static struct thermal_zone_device_ops tzd_ops = {
++static const struct thermal_zone_device_ops tzd_ops = {
+ 	.get_temp = read_curr_temp,
+ };
+ 
+diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
+index 87e2fd1..878cb4e 100644
+--- a/drivers/power/power_supply_core.c
++++ b/drivers/power/power_supply_core.c
+@@ -509,7 +509,7 @@ static int power_supply_read_temp(struct thermal_zone_device *tzd,
+ 	return ret;
+ }
+ 
+-static struct thermal_zone_device_ops psy_tzd_ops = {
++static const struct thermal_zone_device_ops psy_tzd_ops = {
+ 	.get_temp = power_supply_read_temp,
+ };
+ 
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 6feb25d..8d9c689 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -183,7 +183,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+ 	return 0;
+ }
+ 
+-static struct thermal_zone_device_ops ops = {
++static const struct thermal_zone_device_ops ops = {
+ 	.get_temp = armada_get_temp,
+ };
+ 
+diff --git a/drivers/thermal/db8500_thermal.c b/drivers/thermal/db8500_thermal.c
+index b3eca71..38d6aab9 100644
+--- a/drivers/thermal/db8500_thermal.c
++++ b/drivers/thermal/db8500_thermal.c
+@@ -210,7 +210,7 @@ static int db8500_sys_get_crit_temp(struct thermal_zone_device *thermal,
+ 	return -EINVAL;
+ }
+ 
+-static struct thermal_zone_device_ops thdev_ops = {
++static const struct thermal_zone_device_ops thdev_ops = {
+ 	.bind = db8500_cdev_bind,
+ 	.unbind = db8500_cdev_unbind,
+ 	.get_temp = db8500_sys_get_temp,
+diff --git a/drivers/thermal/dove_thermal.c b/drivers/thermal/dove_thermal.c
+index a0bc9de..e8fd627 100644
+--- a/drivers/thermal/dove_thermal.c
++++ b/drivers/thermal/dove_thermal.c
+@@ -118,7 +118,7 @@ static int dove_get_temp(struct thermal_zone_device *thermal,
+ 	return 0;
+ }
+ 
+-static struct thermal_zone_device_ops ops = {
++static const struct thermal_zone_device_ops ops = {
+ 	.get_temp = dove_get_temp,
+ };
+ 
+diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+index f1424f0..8a3cfed 100644
+--- a/drivers/thermal/imx_thermal.c
++++ b/drivers/thermal/imx_thermal.c
+@@ -332,7 +332,7 @@ static int imx_unbind(struct thermal_zone_device *tz,
+ 	return 0;
+ }
+ 
+-static struct thermal_zone_device_ops imx_tz_ops = {
++static const struct thermal_zone_device_ops imx_tz_ops = {
+ 	.bind = imx_bind,
+ 	.unbind = imx_unbind,
+ 	.get_temp = imx_get_temp,
+diff --git a/drivers/thermal/int340x_thermal/int3400_thermal.c b/drivers/thermal/int340x_thermal/int3400_thermal.c
+index 031018e..96bdf8a 100644
+--- a/drivers/thermal/int340x_thermal/int3400_thermal.c
++++ b/drivers/thermal/int340x_thermal/int3400_thermal.c
+@@ -231,7 +231,7 @@ static int int3400_thermal_set_mode(struct thermal_zone_device *thermal,
+ 	return result;
+ }
+ 
+-static struct thermal_zone_device_ops int3400_thermal_ops = {
++static const struct thermal_zone_device_ops int3400_thermal_ops = {
+ 	.get_temp = int3400_thermal_get_temp,
+ };
+ 
+diff --git a/drivers/thermal/int340x_thermal/int340x_thermal_zone.c b/drivers/thermal/int340x_thermal/int340x_thermal_zone.c
+index b9b2666..bd9f9e8 100644
+--- a/drivers/thermal/int340x_thermal/int340x_thermal_zone.c
++++ b/drivers/thermal/int340x_thermal/int340x_thermal_zone.c
+@@ -154,7 +154,7 @@ static int int340x_thermal_get_trip_hyst(struct thermal_zone_device *zone,
+ 	return 0;
+ }
+ 
+-static struct thermal_zone_device_ops int340x_thermal_zone_ops = {
++static const struct thermal_zone_device_ops int340x_thermal_zone_ops = {
+ 	.get_temp       = int340x_thermal_get_zone_temp,
+ 	.get_trip_temp	= int340x_thermal_get_trip_temp,
+ 	.get_trip_type	= int340x_thermal_get_trip_type,
+diff --git a/drivers/thermal/intel_soc_dts_thermal.c b/drivers/thermal/intel_soc_dts_thermal.c
+index fd550b9..625ba6f 100644
+--- a/drivers/thermal/intel_soc_dts_thermal.c
++++ b/drivers/thermal/intel_soc_dts_thermal.c
+@@ -270,7 +270,7 @@ static int sys_get_curr_temp(struct thermal_zone_device *tzd, int *temp)
+ 	return 0;
+ }
+ 
+-static struct thermal_zone_device_ops tzone_ops = {
++static const struct thermal_zone_device_ops tzone_ops = {
+ 	.get_temp = sys_get_curr_temp,
+ 	.get_trip_temp = sys_get_trip_temp,
+ 	.get_trip_type = sys_get_trip_type,
+diff --git a/drivers/thermal/kirkwood_thermal.c b/drivers/thermal/kirkwood_thermal.c
+index 11041fe..abba3e2 100644
+--- a/drivers/thermal/kirkwood_thermal.c
++++ b/drivers/thermal/kirkwood_thermal.c
+@@ -60,7 +60,7 @@ static int kirkwood_get_temp(struct thermal_zone_device *thermal,
+ 	return 0;
+ }
+ 
+-static struct thermal_zone_device_ops ops = {
++static const struct thermal_zone_device_ops ops = {
+ 	.get_temp = kirkwood_get_temp,
+ };
+ 
+diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
+index b9c35bd..bd3185e 100644
+--- a/drivers/thermal/of-thermal.c
++++ b/drivers/thermal/of-thermal.c
+@@ -365,7 +365,7 @@ static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
+ 	return -EINVAL;
+ }
+ 
+-static struct thermal_zone_device_ops of_thermal_ops = {
++static const struct thermal_zone_device_ops of_thermal_ops = {
+ 	.get_temp = of_thermal_get_temp,
+ 	.get_trend = of_thermal_get_trend,
+ 	.set_emul_temp = of_thermal_set_emul_temp,
+diff --git a/drivers/thermal/rcar_thermal.c b/drivers/thermal/rcar_thermal.c
+index 5d4ae7d..320ceac 100644
+--- a/drivers/thermal/rcar_thermal.c
++++ b/drivers/thermal/rcar_thermal.c
+@@ -270,7 +270,7 @@ static int rcar_thermal_notify(struct thermal_zone_device *zone,
+ 	return 0;
+ }
+ 
+-static struct thermal_zone_device_ops rcar_thermal_zone_ops = {
++static const struct thermal_zone_device_ops rcar_thermal_zone_ops = {
+ 	.get_temp	= rcar_thermal_get_temp,
+ 	.get_trip_type	= rcar_thermal_get_trip_type,
+ 	.get_trip_temp	= rcar_thermal_get_trip_temp,
+diff --git a/drivers/thermal/spear_thermal.c b/drivers/thermal/spear_thermal.c
+index 534dd91..ec07743 100644
+--- a/drivers/thermal/spear_thermal.c
++++ b/drivers/thermal/spear_thermal.c
+@@ -50,7 +50,7 @@ static inline int thermal_get_temp(struct thermal_zone_device *thermal,
+ 	return 0;
+ }
+ 
+-static struct thermal_zone_device_ops ops = {
++static const struct thermal_zone_device_ops ops = {
+ 	.get_temp = thermal_get_temp,
+ };
+ 
+diff --git a/drivers/thermal/st/st_thermal.c b/drivers/thermal/st/st_thermal.c
+index 44cbba9..0cb5c19 100644
+--- a/drivers/thermal/st/st_thermal.c
++++ b/drivers/thermal/st/st_thermal.c
+@@ -175,7 +175,7 @@ static int st_thermal_get_trip_temp(struct thermal_zone_device *th,
+ 	return 0;
+ }
+ 
+-static struct thermal_zone_device_ops st_tz_ops = {
++static const struct thermal_zone_device_ops st_tz_ops = {
+ 	.get_temp	= st_thermal_get_temp,
+ 	.get_trip_type	= st_thermal_get_trip_type,
+ 	.get_trip_temp	= st_thermal_get_trip_temp,
+diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+index 0f3d26c..420c702 100644
+--- a/drivers/thermal/thermal_core.c
++++ b/drivers/thermal/thermal_core.c
+@@ -1451,7 +1451,7 @@ static void remove_trip_attrs(struct thermal_zone_device *tz)
+  */
+ struct thermal_zone_device *thermal_zone_device_register(const char *type,
+ 	int trips, int mask, void *devdata,
+-	struct thermal_zone_device_ops *ops,
++	const struct thermal_zone_device_ops *ops,
+ 	const struct thermal_zone_params *tzp,
+ 	int passive_delay, int polling_delay)
+ {
+diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+index ade78eb..e9c82fc 100644
+--- a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
++++ b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+@@ -281,7 +281,7 @@ static const struct thermal_zone_of_device_ops ti_of_thermal_ops = {
+ 	.get_trend = __ti_thermal_get_trend,
+ };
+ 
+-static struct thermal_zone_device_ops ti_thermal_ops = {
++static const struct thermal_zone_device_ops ti_thermal_ops = {
+ 	.get_temp = ti_thermal_get_temp,
+ 	.get_trend = ti_thermal_get_trend,
+ 	.bind = ti_thermal_bind,
+diff --git a/drivers/thermal/x86_pkg_temp_thermal.c b/drivers/thermal/x86_pkg_temp_thermal.c
+index 054c6d45..bb2b975 100644
+--- a/drivers/thermal/x86_pkg_temp_thermal.c
++++ b/drivers/thermal/x86_pkg_temp_thermal.c
+@@ -274,7 +274,7 @@ static int sys_get_trip_type(struct thermal_zone_device *thermal,
+ }
+ 
+ /* Thermal zone callback registry */
+-static struct thermal_zone_device_ops tzone_ops = {
++static const struct thermal_zone_device_ops tzone_ops = {
+ 	.get_temp = sys_get_curr_temp,
+ 	.get_trip_temp = sys_get_trip_temp,
+ 	.get_trip_type = sys_get_trip_type,
+diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+index 5c6a589..07bd5e8 100644
+--- a/include/linux/thermal.h
++++ b/include/linux/thermal.h
+@@ -181,7 +181,7 @@ struct thermal_zone_device {
+ 	int emul_temperature;
+ 	int passive;
+ 	unsigned int forced_passive;
+-	struct thermal_zone_device_ops *ops;
++	const struct thermal_zone_device_ops *ops;
+ 	const struct thermal_zone_params *tzp;
+ 	struct thermal_governor *governor;
+ 	struct list_head thermal_instances;
+@@ -313,7 +313,7 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
+ 
+ #if IS_ENABLED(CONFIG_THERMAL)
+ struct thermal_zone_device *thermal_zone_device_register(const char *, int, int,
+-		void *, struct thermal_zone_device_ops *,
++		void *, const struct thermal_zone_device_ops *,
+ 		const struct thermal_zone_params *, int, int);
+ void thermal_zone_device_unregister(struct thermal_zone_device *);
+ 
+@@ -341,7 +341,7 @@ void thermal_notify_framework(struct thermal_zone_device *, int);
+ #else
+ static inline struct thermal_zone_device *thermal_zone_device_register(
+ 	const char *type, int trips, int mask, void *devdata,
+-	struct thermal_zone_device_ops *ops,
++	const struct thermal_zone_device_ops *ops,
+ 	const struct thermal_zone_params *tzp,
+ 	int passive_delay, int polling_delay)
+ { return ERR_PTR(-ENODEV); }
 -- 
-
-Best Regards,
-Peter Chen
+2.1.4
