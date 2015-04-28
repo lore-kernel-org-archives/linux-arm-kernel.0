@@ -1,268 +1,301 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Tue, 28 Apr 2015 13:52:40 -0700
-Subject: [PATCH net-next v1 4/4] drivers: net: xgene: Add SGMII based 1GbE
- support with ring manager v2
-In-Reply-To: <1430254360-23698-1-git-send-email-isubramanian@apm.com>
-References: <1430254360-23698-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1430254360-23698-5-git-send-email-isubramanian@apm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 28 Apr 2015 13:54:20 -0700
+Subject: [PATCH 2/3 v6] mailbox: Enable BCM2835 mailbox support
+In-Reply-To: <1430173644-19099-3-git-send-email-eric@anholt.net>
+References: <1430173644-19099-3-git-send-email-eric@anholt.net>
+Message-ID: <1430254460-26754-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
----
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  1 -
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 26 +++++++---
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |  1 -
- drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c | 62 ++++++++++++++++-------
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h |  7 ++-
- 5 files changed, 68 insertions(+), 29 deletions(-)
+From: Lubomir Rintel <lkundrak@v3.sk>
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-index 5176fcb..541bed0 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-@@ -104,7 +104,6 @@ enum xgene_enet_rm {
- #define BLOCK_ETH_RING_IF_OFFSET	0x9000
- #define BLOCK_ETH_CLKRST_CSR_OFFSET	0xc000
- #define BLOCK_ETH_DIAG_CSR_OFFSET	0xD000
--
- #define BLOCK_ETH_MAC_OFFSET		0x0000
- #define BLOCK_ETH_MAC_CSR_OFFSET	0x2800
- 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index 513bfa4..735d7c6 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -876,14 +876,21 @@ static int xgene_get_port_id(struct device *dev, struct xgene_enet_pdata *pdata)
- 	int ret;
- 
- 	ret = device_property_read_u32(dev, "port-id", &id);
--	if (!ret && id > 1) {
--		dev_err(dev, "Incorrect port-id specified\n");
--		return -ENODEV;
--	}
- 
--	pdata->port_id = id;
-+	switch (ret) {
-+	case -EINVAL:
-+		pdata->port_id = 0;
-+		ret = 0;
-+		break;
-+	case 0:
-+		pdata->port_id = id & BIT(0);
-+		break;
-+	default:
-+		dev_err(dev, "Incorrect port-id specified: errno: %d\n", ret);
-+		break;
-+	}
- 
--	return 0;
-+	return ret;
- }
- 
- static int xgene_get_mac_address(struct device *dev,
-@@ -928,6 +935,7 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
- 	struct device *dev;
- 	struct resource *res;
- 	void __iomem *base_addr;
-+	u32 offset;
- 	int ret;
- 
- 	pdev = pdata->pdev;
-@@ -1024,7 +1032,10 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
- 	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII ||
- 	    pdata->phy_mode == PHY_INTERFACE_MODE_SGMII) {
- 		pdata->mcx_mac_addr = pdata->base_addr + BLOCK_ETH_MAC_OFFSET;
--		pdata->mcx_mac_csr_addr = base_addr + BLOCK_ETH_MAC_CSR_OFFSET;
-+		offset = (pdata->enet_id == XGENE_ENET1) ?
-+			  BLOCK_ETH_MAC_CSR_OFFSET :
-+			  X2_BLOCK_ETH_MAC_CSR_OFFSET;
-+		pdata->mcx_mac_csr_addr = base_addr + offset;
- 	} else {
- 		pdata->mcx_mac_addr = base_addr + BLOCK_AXG_MAC_OFFSET;
- 		pdata->mcx_mac_csr_addr = base_addr + BLOCK_AXG_MAC_CSR_OFFSET;
-@@ -1266,6 +1277,7 @@ static const struct of_device_id xgene_enet_of_match[] = {
- 	{.compatible = "apm,xgene-enet",    .data = (void *)XGENE_ENET1},
- 	{.compatible = "apm,xgene1-sgenet", .data = (void *)XGENE_ENET1},
- 	{.compatible = "apm,xgene1-xgenet", .data = (void *)XGENE_ENET1},
-+	{.compatible = "apm,xgene2-sgenet", .data = (void *)XGENE_ENET2},
- 	{.compatible = "apm,xgene2-xgenet", .data = (void *)XGENE_ENET2},
- 	{},
- };
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-index ef1887b..19a0427 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-@@ -56,7 +56,6 @@
- #define X2_START_ETH_BUFNUM_0	0
- #define X2_START_BP_BUFNUM_0	0x20
- #define X2_START_RING_NUM_0	0
--
- #define X2_START_CPU_BUFNUM_1	0xc
- #define X2_START_ETH_BUFNUM_1	0
- #define X2_START_BP_BUFNUM_1	0x20
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-index f27fb6f..ff240b3 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-@@ -21,6 +21,7 @@
- #include "xgene_enet_main.h"
- #include "xgene_enet_hw.h"
- #include "xgene_enet_sgmac.h"
-+#include "xgene_enet_xgmac.h"
- 
- static void xgene_enet_wr_csr(struct xgene_enet_pdata *p, u32 offset, u32 val)
- {
-@@ -39,6 +40,14 @@ static void xgene_enet_wr_diag_csr(struct xgene_enet_pdata *p,
- 	iowrite32(val, p->eth_diag_csr_addr + offset);
- }
- 
-+static void xgene_enet_wr_mcx_csr(struct xgene_enet_pdata *pdata,
-+				  u32 offset, u32 val)
-+{
-+	void __iomem *addr = pdata->mcx_mac_csr_addr + offset;
+This mailbox driver provides a single mailbox channel to write 32-bit
+values to the VPU and get a 32-bit response.  The Raspberry Pi
+firmware uses this mailbox channel to implement firmware calls, while
+Roku 2 (despite being derived from the same firmware tree) doesn't.
+
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Jassi Brar <jassisinghbrar@gmail.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: linux-rpi-kernel at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+
+v2: Squashed Craig's work for review, carried over to new version of
+    Mailbox framework (changes by Lubomir)
+
+v3: Fix multi-line comment style.  Refer to the documentation by
+    filename.  Only declare one MODULE_AUTHOR.  Alphabetize includes.
+    Drop some excessive dev_dbg()s (changes by anholt).
+
+v4: Use the new bcm2835_peripheral_read_workaround(), drop the
+    unnecessary wmb()s, make the messages be a pointer to u32, rather
+    than u32-cast-as-pointer, fold in small static functions, drop
+    extra error messages, clean up sizeof() arg for malloc, disable
+    interrupts on unload (changes by anholt).
+
+v5: Rewrite as a single-channel driver, where the old notion of
+    channels will now be interpreted by an rpi-specific driver.  Minor
+    style fix.  Drop peripheral_read_workaround() since it's been
+    noted that readl() covers the non-interrupt half of it, and I
+    found that we would need to resolve read ordering in the interrupt
+    handler anyway (changes by anholt).
+
+v6: rewrite commit message, only turn on interrupts when a client is
+    present, drop the started flag, use BIT() macro, update Broadcom
+    copyright (changes by anholt, from Jassi's review).  Drop s-o-b of
+    Jassi and Suman, who appear to have been accidentally added by
+    Craig (noted by Lubomir).
+
+ drivers/mailbox/Kconfig           |   8 ++
+ drivers/mailbox/Makefile          |   2 +
+ drivers/mailbox/bcm2835-mailbox.c | 208 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 218 insertions(+)
+ create mode 100644 drivers/mailbox/bcm2835-mailbox.c
+
+diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+index 84b0a2d..ab574da 100644
+--- a/drivers/mailbox/Kconfig
++++ b/drivers/mailbox/Kconfig
+@@ -60,4 +60,12 @@ config ALTERA_MBOX
+ 	  An implementation of the Altera Mailbox soft core. It is used
+ 	  to send message between processors. Say Y here if you want to use the
+ 	  Altera mailbox support.
 +
-+	iowrite32(val, addr);
++config BCM2835_MBOX
++	tristate "BCM2835 Mailbox"
++	depends on ARCH_BCM2835
++	help
++	  An implementation of the BCM2385 Mailbox.  It is used to invoke
++	  the services of the Videocore. Say Y here if you want to use the
++	  BCM2835 Mailbox.
+ endif
+diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+index b18201e..8e6d822 100644
+--- a/drivers/mailbox/Makefile
++++ b/drivers/mailbox/Makefile
+@@ -11,3 +11,5 @@ obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
+ obj-$(CONFIG_PCC)		+= pcc.o
+ 
+ obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
++
++obj-$(CONFIG_BCM2835_MBOX)	+= bcm2835-mailbox.o
+diff --git a/drivers/mailbox/bcm2835-mailbox.c b/drivers/mailbox/bcm2835-mailbox.c
+new file mode 100644
+index 0000000..3d85d89
+--- /dev/null
++++ b/drivers/mailbox/bcm2835-mailbox.c
+@@ -0,0 +1,208 @@
++/*
++ *  Copyright (C) 2010,2015 Broadcom
++ *  Copyright (C) 2013-2014 Lubomir Rintel
++ *  Copyright (C) 2013 Craig McGeachie
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This device provides a mechanism for writing to the mailboxes,
++ * that are shared between the ARM and the VideoCore processor
++ *
++ * Parts of the driver are based on:
++ *  - arch/arm/mach-bcm2708/vcio.c file written by Gray Girling that was
++ *    obtained from branch "rpi-3.6.y" of git://github.com/raspberrypi/
++ *    linux.git
++ *  - drivers/mailbox/bcm2835-ipc.c by Lubomir Rintel at
++ *    https://github.com/hackerspace/rpi-linux/blob/lr-raspberry-pi/drivers/
++ *    mailbox/bcm2835-ipc.c
++ *  - documentation available on the following web site:
++ *    https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
++ */
++
++#include <linux/device.h>
++#include <linux/dma-mapping.h>
++#include <linux/err.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
++#include <linux/mailbox_controller.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/platform_device.h>
++#include <linux/spinlock.h>
++
++/* Mailboxes */
++#define ARM_0_MAIL0	0x00
++#define ARM_0_MAIL1	0x20
++
++/*
++ * Mailbox registers. We basically only support mailbox 0 & 1. We
++ * deliver to the VC in mailbox 1, it delivers to us in mailbox 0. See
++ * BCM2835-ARM-Peripherals.pdf section 1.3 for an explanation about
++ * the placement of memory barriers.
++ */
++#define MAIL0_RD	(ARM_0_MAIL0 + 0x00)
++#define MAIL0_POL	(ARM_0_MAIL0 + 0x10)
++#define MAIL0_STA	(ARM_0_MAIL0 + 0x18)
++#define MAIL0_CNF	(ARM_0_MAIL0 + 0x1C)
++#define MAIL1_WRT	(ARM_0_MAIL1 + 0x00)
++
++/* Status register: FIFO state. */
++#define ARM_MS_FULL		BIT(31)
++#define ARM_MS_EMPTY		BIT(30)
++
++/* Configuration register: Enable interrupts. */
++#define ARM_MC_IHAVEDATAIRQEN	BIT(0)
++
++struct bcm2835_mbox {
++	struct device *dev;
++	void __iomem *regs;
++	spinlock_t lock;
++	struct mbox_controller controller;
++};
++
++struct bcm2835_mbox *mbox;
++
++static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
++{
++	struct device *dev = mbox->dev;
++	struct mbox_chan *link = &mbox->controller.chans[0];
++
++	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
++		u32 msg = readl(mbox->regs + MAIL0_RD);
++		dev_dbg(dev, "Reply 0x%08X\n", msg);
++		mbox_chan_received_data(link, &msg);
++	}
++	return IRQ_HANDLED;
 +}
 +
- static bool xgene_enet_wr_indirect(struct xgene_indirect_ctl *ctl,
- 				   u32 wr_addr, u32 wr_data)
- {
-@@ -140,8 +149,9 @@ static int xgene_enet_ecc_init(struct xgene_enet_pdata *p)
- 
- static void xgene_enet_config_ring_if_assoc(struct xgene_enet_pdata *p)
- {
--	u32 val = 0xffffffff;
-+	u32 val;
- 
-+	val = (p->enet_id == XGENE_ENET1) ? 0xffffffff : 0;
- 	xgene_enet_wr_ring_if(p, ENET_CFGSSQMIWQASSOC_ADDR, val);
- 	xgene_enet_wr_ring_if(p, ENET_CFGSSQMIFPQASSOC_ADDR, val);
- }
-@@ -227,6 +237,8 @@ static void xgene_sgmac_init(struct xgene_enet_pdata *p)
- {
- 	u32 data, loop = 10;
- 	u32 offset = p->port_id * 4;
-+	u32 enet_spare_cfg_reg, rsif_config_reg;
-+	u32 cfg_bypass_reg, rx_dv_gate_reg;
- 
- 	xgene_sgmac_reset(p);
- 
-@@ -239,7 +251,7 @@ static void xgene_sgmac_init(struct xgene_enet_pdata *p)
- 					  SGMII_STATUS_ADDR >> 2);
- 		if ((data & AUTO_NEG_COMPLETE) && (data & LINK_STATUS))
- 			break;
--		usleep_range(10, 20);
-+		usleep_range(1000, 2000);
- 	}
- 	if (!(data & AUTO_NEG_COMPLETE) || !(data & LINK_STATUS))
- 		netdev_err(p->ndev, "Auto-negotiation failed\n");
-@@ -249,33 +261,38 @@ static void xgene_sgmac_init(struct xgene_enet_pdata *p)
- 	xgene_enet_wr_mac(p, MAC_CONFIG_2_ADDR, data | FULL_DUPLEX2);
- 	xgene_enet_wr_mac(p, INTERFACE_CONTROL_ADDR, ENET_GHD_MODE);
- 
--	data = xgene_enet_rd_csr(p, ENET_SPARE_CFG_REG_ADDR);
-+	if (p->enet_id == XGENE_ENET1) {
-+		enet_spare_cfg_reg = ENET_SPARE_CFG_REG_ADDR;
-+		rsif_config_reg = RSIF_CONFIG_REG_ADDR;
-+		cfg_bypass_reg = CFG_BYPASS_ADDR;
-+		rx_dv_gate_reg = SG_RX_DV_GATE_REG_0_ADDR;
-+	} else {
-+		enet_spare_cfg_reg = XG_ENET_SPARE_CFG_REG_ADDR;
-+		rsif_config_reg = XG_RSIF_CONFIG_REG_ADDR;
-+		cfg_bypass_reg = XG_CFG_BYPASS_ADDR;
-+		rx_dv_gate_reg = XG_MCX_RX_DV_GATE_REG_0_ADDR;
++static int bcm2835_send_data(struct mbox_chan *link, void *data)
++{
++	int ret = 0;
++	u32 msg = *(u32 *)data;
++
++	spin_lock(&mbox->lock);
++	if (readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL) {
++		ret = -EBUSY;
++		goto end;
++	}
++	writel(msg, mbox->regs + MAIL1_WRT);
++	dev_dbg(mbox->dev, "Request 0x%08X\n", msg);
++end:
++	spin_unlock(&mbox->lock);
++	return ret;
++}
++
++static int bcm2835_startup(struct mbox_chan *link)
++{
++	/* Enable the interrupt on data reception */
++	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
++
++	return 0;
++}
++
++static void bcm2835_shutdown(struct mbox_chan *link)
++{
++	writel(0, mbox->regs + MAIL0_CNF);
++}
++
++static bool bcm2835_last_tx_done(struct mbox_chan *link)
++{
++	bool ret;
++
++	spin_lock(&mbox->lock);
++	ret = !(readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL);
++	spin_unlock(&mbox->lock);
++	return ret;
++}
++
++static struct mbox_chan_ops bcm2835_mbox_chan_ops = {
++	.send_data	= bcm2835_send_data,
++	.startup	= bcm2835_startup,
++	.shutdown	= bcm2835_shutdown,
++	.last_tx_done	= bcm2835_last_tx_done
++};
++
++static int bcm2835_mbox_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	int ret = 0;
++	struct resource *iomem;
++
++	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
++	if (mbox == NULL)
++		return -ENOMEM;
++	mbox->dev = dev;
++	spin_lock_init(&mbox->lock);
++
++	ret = devm_request_irq(dev, irq_of_parse_and_map(dev->of_node, 0),
++			       bcm2835_mbox_irq, 0, dev_name(dev), mbox);
++	if (ret) {
++		dev_err(dev, "Failed to register a mailbox IRQ handler: %d\n",
++			ret);
++		mbox = NULL;
++		return -ENODEV;
 +	}
 +
-+	data = xgene_enet_rd_csr(p, enet_spare_cfg_reg);
- 	data |= MPA_IDLE_WITH_QMI_EMPTY;
--	xgene_enet_wr_csr(p, ENET_SPARE_CFG_REG_ADDR, data);
-+	xgene_enet_wr_csr(p, enet_spare_cfg_reg, data);
- 
- 	xgene_sgmac_set_mac_addr(p);
- 
--	data = xgene_enet_rd_csr(p, DEBUG_REG_ADDR);
--	data |= CFG_BYPASS_UNISEC_TX | CFG_BYPASS_UNISEC_RX;
--	xgene_enet_wr_csr(p, DEBUG_REG_ADDR, data);
--
- 	/* Adjust MDC clock frequency */
- 	data = xgene_enet_rd_mac(p, MII_MGMT_CONFIG_ADDR);
- 	MGMT_CLOCK_SEL_SET(&data, 7);
- 	xgene_enet_wr_mac(p, MII_MGMT_CONFIG_ADDR, data);
- 
- 	/* Enable drop if bufpool not available */
--	data = xgene_enet_rd_csr(p, RSIF_CONFIG_REG_ADDR);
-+	data = xgene_enet_rd_csr(p, rsif_config_reg);
- 	data |= CFG_RSIF_FPBUFF_TIMEOUT_EN;
--	xgene_enet_wr_csr(p, RSIF_CONFIG_REG_ADDR, data);
--
--	/* Rtype should be copied from FP */
--	xgene_enet_wr_csr(p, RSIF_RAM_DBG_REG0_ADDR, 0);
-+	xgene_enet_wr_csr(p, rsif_config_reg, data);
- 
- 	/* Bypass traffic gating */
--	xgene_enet_wr_csr(p, CFG_LINK_AGGR_RESUME_0_ADDR + offset, TX_PORT0);
--	xgene_enet_wr_csr(p, CFG_BYPASS_ADDR, RESUME_TX);
--	xgene_enet_wr_csr(p, SG_RX_DV_GATE_REG_0_ADDR + offset, RESUME_RX0);
-+	xgene_enet_wr_csr(p, XG_ENET_SPARE_CFG_REG_1_ADDR, 0x84);
-+	xgene_enet_wr_csr(p, cfg_bypass_reg, RESUME_TX);
-+	xgene_enet_wr_mcx_csr(p, rx_dv_gate_reg + offset, RESUME_RX0);
- }
- 
- static void xgene_sgmac_rxtx(struct xgene_enet_pdata *p, u32 bits, bool set)
-@@ -331,14 +348,23 @@ static void xgene_enet_cle_bypass(struct xgene_enet_pdata *p,
- 				  u32 dst_ring_num, u16 bufpool_id)
- {
- 	u32 data, fpsel;
-+	u32 cle_bypass_reg0, cle_bypass_reg1;
- 	u32 offset = p->port_id * MAC_OFFSET;
- 
-+	if (p->enet_id == XGENE_ENET1) {
-+		cle_bypass_reg0 = CLE_BYPASS_REG0_0_ADDR;
-+		cle_bypass_reg1 = CLE_BYPASS_REG1_0_ADDR;
-+	} else {
-+		cle_bypass_reg0 = XCLE_BYPASS_REG0_ADDR;
-+		cle_bypass_reg1 = XCLE_BYPASS_REG1_ADDR;
++	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mbox->regs = devm_ioremap_resource(&pdev->dev, iomem);
++	if (IS_ERR(mbox->regs)) {
++		ret = PTR_ERR(mbox->regs);
++		dev_err(&pdev->dev, "Failed to remap mailbox regs: %d\n", ret);
++		mbox = NULL;
++		return ret;
 +	}
 +
- 	data = CFG_CLE_BYPASS_EN0;
--	xgene_enet_wr_csr(p, CLE_BYPASS_REG0_0_ADDR + offset, data);
-+	xgene_enet_wr_csr(p, cle_bypass_reg0 + offset, data);
- 
- 	fpsel = xgene_enet_ring_bufnum(bufpool_id) - 0x20;
- 	data = CFG_CLE_DSTQID0(dst_ring_num) | CFG_CLE_FPSEL0(fpsel);
--	xgene_enet_wr_csr(p, CLE_BYPASS_REG1_0_ADDR + offset, data);
-+	xgene_enet_wr_csr(p, cle_bypass_reg1 + offset, data);
- }
- 
- static void xgene_enet_shutdown(struct xgene_enet_pdata *p)
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-index d07ee5e..bf0a994 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-@@ -21,11 +21,13 @@
- #ifndef __XGENE_ENET_XGMAC_H__
- #define __XGENE_ENET_XGMAC_H__
- 
-+#define X2_BLOCK_ETH_MAC_CSR_OFFSET	0x3000
- #define BLOCK_AXG_MAC_OFFSET		0x0800
- #define BLOCK_AXG_MAC_CSR_OFFSET	0x2000
- 
--#define XGENET_SRST_ADDR		0x0000
--#define XGENET_CLKEN_ADDR		0x0008
-+#define XGENET_CONFIG_REG_ADDR		0x20
-+#define XGENET_SRST_ADDR		0x00
-+#define XGENET_CLKEN_ADDR		0x08
- 
- #define CSR_CLK		BIT(0)
- #define XGENET_CLK	BIT(1)
-@@ -55,6 +57,7 @@
- #define HSTMACADR_MSW_ADDR		0x0014
- #define HSTMAXFRAME_LENGTH_ADDR		0x0020
- 
-+#define XG_MCX_RX_DV_GATE_REG_0_ADDR	0x0004
- #define XG_RSIF_CONFIG_REG_ADDR		0x00a0
- #define XCLE_BYPASS_REG0_ADDR           0x0160
- #define XCLE_BYPASS_REG1_ADDR           0x0164
++	mbox->controller.txdone_poll = true;
++	mbox->controller.txpoll_period = 5;
++	mbox->controller.ops = &bcm2835_mbox_chan_ops;
++	mbox->controller.dev = dev;
++	mbox->controller.num_chans = 1;
++	mbox->controller.chans = devm_kzalloc(dev,
++		sizeof(*mbox->controller.chans), GFP_KERNEL);
++	if (!mbox->controller.chans) {
++		mbox = NULL;
++		return -ENOMEM;
++	}
++
++	ret  = mbox_controller_register(&mbox->controller);
++	if (ret) {
++		mbox = NULL;
++		return ret;
++	}
++
++	dev_info(dev, "mailbox enabled\n");
++
++	return ret;
++}
++
++static int bcm2835_mbox_remove(struct platform_device *pdev)
++{
++	mbox_controller_unregister(&mbox->controller);
++	mbox = NULL;
++	return 0;
++}
++
++static const struct of_device_id bcm2835_mbox_of_match[] = {
++	{ .compatible = "brcm,bcm2835-mbox", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, bcm2835_mbox_of_match);
++
++static struct platform_driver bcm2835_mbox_driver = {
++	.driver = {
++		.name = "bcm2835-mbox",
++		.owner = THIS_MODULE,
++		.of_match_table = bcm2835_mbox_of_match,
++	},
++	.probe		= bcm2835_mbox_probe,
++	.remove		= bcm2835_mbox_remove,
++};
++module_platform_driver(bcm2835_mbox_driver);
++
++MODULE_AUTHOR("Lubomir Rintel <lkundrak@v3.sk>");
++MODULE_DESCRIPTION("BCM2835 mailbox IPC driver");
++MODULE_LICENSE("GPL v2");
 -- 
-1.9.1
+2.1.4
