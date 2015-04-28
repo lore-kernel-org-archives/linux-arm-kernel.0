@@ -1,109 +1,58 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Tue, 28 Apr 2015 09:08:43 -0500
-Subject: [PATCH 1/2] clocksource: arm_arch_timer: add
- arch_timer_okay_for_vdso
-In-Reply-To: <20150427105509.GC1544@arm.com>
-References: <1429911801-6069-1-git-send-email-nathan_lynch@mentor.com>
- <20150427105509.GC1544@arm.com>
-Message-ID: <553F946B.7030306@mentor.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 28 Apr 2015 22:10:20 +0800
+Subject: [PATCH 2/4] ARM: dts: mt8135: Add pmic wrapper nodes
+In-Reply-To: <1429780875-29096-3-git-send-email-s.hauer@pengutronix.de>
+References: <1429780875-29096-1-git-send-email-s.hauer@pengutronix.de>
+ <1429780875-29096-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1430230220.32537.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2015 05:55 AM, Will Deacon wrote:
-> On Fri, Apr 24, 2015 at 10:43:20PM +0100, Nathan Lynch wrote:
->> The 32-bit ARM VDSO needs to know whether a generic timer is present
->> and whether it is suitable for use by user space.  The VDSO
->> initialization code currently duplicates some of the logic from the
->> driver to make this determination, but unfortunately it is incomplete;
->> it will incorrectly enable the VDSO if HYP mode is available or if no
->> interrupt is provided for the virtual timer (see arch_timer_init).  In
->> these cases the driver will switch to memory-backed access while the
->> VDSO will attempt to access the counter using cp15 reads.
->>
->> Add an arch_timer_okay_for_vdso API which can reliably inform the VDSO
->> init code whether the arch timer is present and usable.
->>
->> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
->> ---
->>  drivers/clocksource/arm_arch_timer.c | 12 ++++++++++++
->>  include/clocksource/arm_arch_timer.h |  6 ++++++
->>  2 files changed, 18 insertions(+)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index 0aa135ddbf80..b75215523d2f 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -462,6 +462,18 @@ struct timecounter *arch_timer_get_timecounter(void)
->>  	return &timecounter;
->>  }
->>  
->> +/* The ARM VDSO init code needs to know:
->> + * - whether a cp15-based arch timer is present; and if so
->> + * - whether the physical or virtual counter is being used.
->> + */
->> +bool arch_timer_okay_for_vdso(void)
->> +{
->> +	if (!(arch_timers_present & ARCH_CP15_TIMER))
->> +		return false;
->> +
->> +	return arch_timer_use_virtual;
->> +}
+On Thu, 2015-04-23 at 11:21 +0200, Sascha Hauer wrote:
+> This adds the pmic wrapper node to the MediaTek MT8135 dtsi file.
 > 
-> If we're adding this, then it wouldn't hurt to use the same check in
-> arch/arm64 when we update_vsyscall(...). Could we also encapsulate the
-> `current clocksource' knowledge in there too, to remove the hardcoded
-> "arch_sys_counter" check from the arch code?
+> This unit is used to access the PMIC on MediaTek boards.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/mt8135.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+> index b4017e2..b0f20fc 100644
+> --- a/arch/arm/boot/dts/mt8135.dtsi
+> +++ b/arch/arm/boot/dts/mt8135.dtsi
+> @@ -15,6 +15,7 @@
+>  #include <dt-bindings/clock/mt8135-clk.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/reset-controller/mt8135-resets.h>
+>  #include "skeleton64.dtsi"
+>  
+>  / {
+> @@ -127,6 +128,19 @@
+>  			reg = <0 0x10003000 0 0x1000>;
+>  		};
+>  
+> +		pwrap: pwrap at 1000f000 {
+> +			compatible = "mediatek,mt8135-pwrap";
+> +			reg = <0 0x1000f000 0 0x1000>,
+> +				<0 0x11017000 0 0x1000>;
+> +			reg-names = "pwrap", "pwrap-bridge";
+> +			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
+> +			resets = <&infracfg MT8135_INFRA_PMIC_WRAP_RST>,
+> +					<&pericfg MT8135_PERI_PWRAP_BRIDGE_SW_RST>;
+> +			reset-names = "pwrap", "pwrap-bridge";
+> +			clocks = <&clk26m>, <&clk26m>;
+> +			clock-names = "spi", "wrap";
+> +		};
+> +
+>  		timer: timer at 10008000 {
 
-While I think it makes sense to consolidate the current clocksource check,
-I view that as distinct from this (which needs to run at boot, before
-anything uses the vdso).
+Hi Sascha,
 
-I'm actually now unsure about whether the implementation I have here
-is correct.  Take arch_timer_init:
+It seems we have many 8135 dtsi updates recently.
+Please sort according to node instance address so it will be easier to
+merge or resolve conflict.
 
-static void __init arch_timer_init(void)
-{
-	/*
-	 * If HYP mode is available, we know that the physical timer
-	 * has been configured to be accessible from PL1. Use it, so
-	 * that a guest can use the virtual timer instead.
-	 *
-	 * If no interrupt provided for virtual timer, we'll have to
-	 * stick to the physical timer. It'd better be accessible...
-	 */
-	if (is_hyp_mode_available() || !arch_timer_ppi[VIRT_PPI]) {
-		arch_timer_use_virtual = false;
-
-		if (!arch_timer_ppi[PHYS_SECURE_PPI] ||
-		    !arch_timer_ppi[PHYS_NONSECURE_PPI]) {
-			pr_warn("arch_timer: No interrupt available, giving up\n");
-			return;
-		}
-	}
-
-	arch_timer_register();
-	arch_timer_common_init();
-}
-
-I assume this has been working fine for arm64 up to this point --
-i.e. arch_timer_use_virtual is false, but the VDSO continues to use
-the virtual counter and gets correct results?  If so, I don't see any
-reason this wouldn't be true for ARM.  So I'm thinking
-arch_timer_use_virtual isn't the right proxy for determining
-whether the VDSO can work correctly.
-
-The reason I initially turned to arch_timer_use_virtual is in
-arch_timer_of_init:
-
-	/*
-	 * If we cannot rely on firmware initializing the timer registers then
-	 * we should use the physical timers instead.
-	 */
-	if (IS_ENABLED(CONFIG_ARM) &&
-	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
-			arch_timer_use_virtual = false;
-
-I definitely need to catch that case, and this is currently duplicated in
-arch/arm/kernel/vdso.c.  Maybe this should toggle an additional boolean,
-say "arch_timer_cntvct_ok", which captures the information that is truly
-of interest with respect to the VDSO using the virtual counter.
+Joe.C
