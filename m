@@ -1,66 +1,50 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 28 Apr 2015 15:01:35 +0800
-Subject: [PATCH Part1 v11 1/5] PCI: mvebu: Use pci_common_init_dev() to
- simplify code
+Date: Tue, 28 Apr 2015 15:01:39 +0800
+Subject: [PATCH Part1 v11 5/5] PCI: iproc: Use pci_scan_root_bus() instead of
+ pci_create_root_bus()
 In-Reply-To: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
 References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1430204499-19571-2-git-send-email-wangyijing@huawei.com>
+Message-ID: <1430204499-19571-6-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mvebu_pcie_scan_bus() is not necessary, we could use
-pci_common_init_dev() instead of pci_common_init(),
-and pass the device pointer as the parent. Then
-pci_scan_root_bus() will be called to scan the pci busses.
+Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
+Now pci_scan_root_bus() == pci_create_root_bus() +
+pci_scan_child_bus() if busn resource is supplied.
+iproc added the busn resource to resources list
+in of_pci_get_host_bridge_resources(). So it should be safe
+to use pci_scan_root_bus() instead.
 
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-CC: Jason Cooper <jason@lakedaemon.net>
+CC: Ray Jui <rjui@broadcom.com>
 ---
- drivers/pci/host/pci-mvebu.c |   18 +-----------------
- 1 files changed, 1 insertions(+), 17 deletions(-)
+ drivers/pci/host/pcie-iproc.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 1ab8635..70aa095 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -751,21 +751,6 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	return 1;
- }
+diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+index 329e1b5..9622ebf 100644
+--- a/drivers/pci/host/pcie-iproc.c
++++ b/drivers/pci/host/pcie-iproc.c
+@@ -210,10 +210,10 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
  
--static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
--{
--	struct mvebu_pcie *pcie = sys_to_pcie(sys);
--	struct pci_bus *bus;
--
--	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
--				  &mvebu_pcie_ops, sys, &sys->resources);
--	if (!bus)
--		return NULL;
--
+ 	pcie->sysdata.private_data = pcie;
+ 
+-	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
++	bus = pci_scan_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+ 				  &pcie->sysdata, pcie->resources);
+ 	if (!bus) {
+-		dev_err(pcie->dev, "unable to create PCI root bus\n");
++		dev_err(pcie->dev, "unable to scan PCI root bus\n");
+ 		ret = -ENOMEM;
+ 		goto err_power_off_phy;
+ 	}
+@@ -227,7 +227,6 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
+ 
+ 	iproc_pcie_enable(pcie);
+ 
 -	pci_scan_child_bus(bus);
--
--	return bus;
--}
--
- static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 						 const struct resource *res,
- 						 resource_size_t start,
-@@ -809,12 +794,11 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.nr_controllers = 1;
- 	hw.private_data   = (void **)&pcie;
- 	hw.setup          = mvebu_pcie_setup;
--	hw.scan           = mvebu_pcie_scan_bus;
- 	hw.map_irq        = of_irq_parse_and_map_pci;
- 	hw.ops            = &mvebu_pcie_ops;
- 	hw.align_resource = mvebu_pcie_align_resource;
- 
--	pci_common_init(&hw);
-+	pci_common_init_dev(&pcie->pdev->dev, &hw);
- }
- 
- /*
+ 	pci_assign_unassigned_bus_resources(bus);
+ 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+ 	pci_bus_add_devices(bus);
 -- 
 1.7.1
