@@ -1,32 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Apr 2015 14:56:11 +0200
-Subject: [PATCH 0/2] gpio: Allow userspace export from DT
-In-Reply-To: <CAL_JsqJorndYh4ROdKbJfpG1KY=Xosjc6BMFYRPrb+BsauFsnQ@mail.gmail.com>
-References: <20150413110515.9681.58848.stgit@localhost>
- <CAL_JsqJorndYh4ROdKbJfpG1KY=Xosjc6BMFYRPrb+BsauFsnQ@mail.gmail.com>
-Message-ID: <CACRpkdYw6fY0CKonAO+HtUosjCt5oJjCy3RoRxsDyLCgJCMfLw@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 28 Apr 2015 14:56:45 +0200
+Subject: [PATCH v2 06/10] KVM: arm64: guest debug, add SW break point
+ support
+In-Reply-To: <CAFEAcA85i_1JybEFBg91NA3-LpAzYh4RSDnqryOd=rZN7gZP5A@mail.gmail.com>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
+ <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
+ <20150427200407.GG23335@cbox>
+ <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
+ <87wq0wr6dd.fsf@linaro.org>
+ <CAFEAcA85i_1JybEFBg91NA3-LpAzYh4RSDnqryOd=rZN7gZP5A@mail.gmail.com>
+Message-ID: <20150428125645.GA4137@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 15, 2015 at 3:19 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Mon, Apr 13, 2015 at 6:05 AM, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
+On Tue, Apr 28, 2015 at 10:34:12AM +0100, Peter Maydell wrote:
+> On 28 April 2015 at 09:42, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> > Peter Maydell <peter.maydell@linaro.org> writes:
+> >> Does the kernel already have a conveniently implemented "inject
+> >> exception into guest" lump of code? If so it might be less effort
+> >> to do it that way round, maybe.
+> >
+> > So you pointed out we can't just re-inject the exceptions we get as we
+> > need to map from things like ESR_ELx_EC_WATCHPT_LOW to
+> > ESR_ELx_EC_WATCHPT_CUR before re-injection.
+> >
+> > Of course if it is as simple as modifying the ESR_EL1 register and
+> > returning +ve in the handle_exit path then I can do that but I assumed
+> > if any other wrangling needs doing it should be done in userspace.
+> 
+> Well, somebody's got to do it, and it's the same amount of work
+> either way (fiddling with ESR, making sure we direct the guest
+> to the right exception vector entry point, maybe a few other
+> things).
+> 
+We already have code in the kernel to inject data/instruction aborts,
+but not sure how much benefit there is in re-using that.  It's up to you
+really, but I think the kernel code should be clear about what the
+intention is so that we don't end up in a situation where: (1) The
+intended behavior is unclear/vague, and (2) it doesn't actually work in
+practice so nobody can follow the code.
 
->> That number, in the case of gpio drviers using dynamic allocation, is not fixed,
->> and may change when:
->> * The kernel version changes and ARCH_NR_GPIOS is changed (happened in 3.17)
->> * The kernel version changes and probe order changes for gpio chips.
->> * The kernel configuration is changed if CONFIG_ARCH_NR_GPIO is used
->> * The board is redesigned (eg switching an externally visible signal from a
->> SoC provided GPIO to an I2C expander chip or vice versa).
->> * Other GPIO chips are added to the system.
->
-> Isn't there some plan/desire to fix the GPIO sysfs interface?
-
-Desire yes. But well noone seems to do it...
-
-There is also the perpetual abuse of sysfs to do things that should
-be done in the kernel, like driving LEDs or reading switches.
-But that's another problem I guess.
-
-Yours,
-Linus Walleij
+Thanks,
+-Christoffer
