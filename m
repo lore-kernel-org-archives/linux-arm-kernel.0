@@ -1,40 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 Apr 2015 17:09:09 +0000
-Subject: [PATCH] ARM: mvebu: dove: Relicense the device tree under
- GPLv2+/X11
-In-Reply-To: <553FB6B4.8020401@gmail.com>
-References: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20150428155910.GD12732@n2100.arm.linux.org.uk>
- <553FB6B4.8020401@gmail.com>
-Message-ID: <20150428170909.GG8069@io.lakedaemon.net>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 28 Apr 2015 19:24:37 +0200
+Subject: [PATCH 0/2] Add support for PL172 memory-controller
+Message-ID: <1430241879-30046-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 28, 2015 at 06:35:00PM +0200, Sebastian Hesselbarth wrote:
-> On 28.04.2015 17:59, Russell King - ARM Linux wrote:
-> >On Mon, Apr 27, 2015 at 11:09:04AM +0200, Sebastian Hesselbarth wrote:
-> >>The current implicit GPL only licensing on the device tree makes it
-> >>very impractical for other software components licensed under another
-> >>license.
-> >>
-> >>In order to make it easier for them to reuse our device trees,
-> >>relicense our device trees under a GPL/X11 dual-license.
-> >>
-> [...]
-> >>so I decided to keep the whole relicensing in a single patch. Please send
-> >>your Acked-by's in reply to this patch if you are happy with the relicensing.
-> >
-> >I normally don't include the "or later version" for my license changes
-> >as I've only accepted to contribute under the terms of GPLv2.
-> 
-> Ok, I guess this is a NACK for GPLv2+ but an Acked-by if we limit the
-> GPL part to GPLv2 only?
-> 
-> If so, is everybody else who already Acked the GPLv2+ part also fine
-> with reducing the GPL version to "version 2 only" ?
+This patch set adds support for setting up static memory devices on
+a ARM PrimeCell MultiPort Memory Controller (PL172) from DT. Dynamic
+memory (SDRAM) is not supported in this patch set.
 
-Re-Acked-by: Jason Cooper <jason@lakedaemon.net>
+DT bindings for PL172 is based on the bindings for the TI AEMIF
+memory controller. PL172 can be found on a number of NXP devices
+like the LPC18xx family.
 
-thx,
+Tested on Embedded Artists' LPC4357 Developer's Kit with NOR Flash
+(SST39VF320) and 74LCV16374 (gpio-74x164) on MPMC.
 
-Jason.
+Joachim Eastwood (2):
+  memory: add ARM PL172 MultiPort Memory Controller driver
+  doc: dt: add documentation for pl172 memory bindings
+
+ .../bindings/memory-controllers/arm,pl172.txt      | 125 +++++++++
+ drivers/memory/Kconfig                             |   8 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/pl172.c                             | 302 +++++++++++++++++++++
+ 4 files changed, 436 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt
+ create mode 100644 drivers/memory/pl172.c
+
+-- 
+1.8.0
