@@ -1,75 +1,37 @@
-From: houpengyang@huawei.com (Hou Pengyang)
-Date: Tue, 28 Apr 2015 13:20:48 +0000
-Subject: [PATCH] arm64: perf: Fix callchain parse error with kernel tracepoint
- events
-Message-ID: <1430227248-19657-1-git-send-email-houpengyang@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Apr 2015 15:30:12 +0200
+Subject: [PATCH v2] mtd: nand: pxa3xx: Switch FIFO draining to
+ jiffies-based timeout
+In-Reply-To: <1428413565-27644-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1428413565-27644-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150428133012.GF10950@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For ARM64, when tracing with tracepoint events, the IP and cpsr are set
-to 0, preventing the perf code parsing the callchain and resolving the
-symbols correctly.
+Hi Brian,
 
- ./perf record -e sched:sched_switch -g --call-graph dwarf ls
-	[ perf record: Captured and wrote 0.146 MB perf.data ]
- ./perf report -f
-    Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194
-    Children      Self    Command  Shared Object     Symbol
-	100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
+On Tue, Apr 07, 2015 at 03:32:45PM +0200, Maxime Ripard wrote:
+> Now that the driver handles the FIFO draining in a threaded interrupt, we can
+> base our timeout on jiffies and sleeping, instead of using mdelay.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
-several necessary registers used for callchain unwinding, including pc,sp,
-fp and psr .
+Ping?
 
-With this patch, callchain can be parsed correctly as follows:
+You were the one that asked for this patch in the first place, so I
+was kind of expecting you would merge it :)
 
-     ......
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
--    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
-     pfkey_send_policy_notify
-     pfkey_get
-     v9fs_vfs_rename
-     page_follow_link_light
-     link_path_walk
-     el0_svc_naked
-    .......
+Thanks,
+Maxime
 
-For tracepoint event, stack parsing also doesn't work well for ARM. Jean Pihet
-comed up a patch:
-http://thread.gmane.org/gmane.linux.kernel/1734283/focus=1734280
-
-Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
----
- arch/arm64/include/asm/perf_event.h | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-index d26d1d5..16a074f 100644
---- a/arch/arm64/include/asm/perf_event.h
-+++ b/arch/arm64/include/asm/perf_event.h
-@@ -24,4 +24,20 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
- #define perf_misc_flags(regs)	perf_misc_flags(regs)
- #endif
- 
-+#define perf_arch_fetch_caller_regs(regs, __ip) { \
-+   unsigned long sp;   \
-+   __asm__ ("mov %[sp], sp\n" : [sp] "=r" (sp)); \
-+       (regs)->pc = (__ip);    \
-+       __asm__ (      \
-+               "str %[sp],  %[_arm64_sp]  \n\t"    \
-+               "str x29, %[_arm64_fp]  \n\t"    \
-+               "mrs %[_arm64_cpsr], spsr_el1 \n\t"     \
-+               : [_arm64_sp] "=m" (regs->sp),      \
-+                 [_arm64_fp] "=m" (regs->regs[29]),  \
-+                 [_arm64_cpsr] "=r" (regs->pstate) \
-+       : [sp] "r" (sp)     \
-+       );      \
-+}
-+
-+
- #endif
 -- 
-1.8.3.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150428/f257d4a9/attachment-0001.sig>
