@@ -1,44 +1,41 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 28 Apr 2015 21:34:43 +0200
-Subject: [PATCH v2 0/7] ARM: at91/dt: kizbox: update and rename to
- at91-kizbox
-In-Reply-To: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
-References: <1429617918-32086-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <20150428213443.4fe481bc@bbrezillon>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 28 Apr 2015 21:35:12 +0200
+Subject: [PATCH v2 14/17] ARM: pxa: poodle: use new LoCoMo driver
+In-Reply-To: <1430178954-11138-15-git-send-email-dbaryshkov@gmail.com> (Dmitry
+ Eremin-Solenikov's message of "Tue, 28 Apr 2015 02:55:51 +0300")
+References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
+ <1430178954-11138-15-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <87a8xsjbbj.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Apr 2015 14:05:11 +0200
-Ga?l PORTAY <g.portay@overkiz.com> wrote:
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
 
-> *** BLURB HERE ***
-We usually replace this line by a description ;-).
+> -#define POODLE_LOCOMO_GPIO_AMP_ON      LOCOMO_GPIO(8)
+> -#define POODLE_LOCOMO_GPIO_MUTE_L      LOCOMO_GPIO(10)
+> -#define POODLE_LOCOMO_GPIO_MUTE_R      LOCOMO_GPIO(11)
+> -#define POODLE_LOCOMO_GPIO_232VCC_ON   LOCOMO_GPIO(12)
+> -#define POODLE_LOCOMO_GPIO_JK_B        LOCOMO_GPIO(13)
+> +#define POODLE_LOCOMO_GPIO_BASE	(PXA_NR_BUILTIN_GPIO + 12)
+I missed that in the v1 serie : why twelve ?
 
-Anyway, to the whole series:
+> +#define POODLE_GPIO_LCD_VSHA_ON	(POODLE_LOCOMO_GPIO_BASE + 4)
+> +#define POODLE_GPIO_LCD_VSHD_ON	(POODLE_LOCOMO_GPIO_BASE + 5)
+> +#define POODLE_GPIO_LCD_VEE_ON	(POODLE_LOCOMO_GPIO_BASE + 6)
+> +#define POODLE_GPIO_LCD_MOD	(POODLE_LOCOMO_GPIO_BASE + 7)
+> +#define POODLE_GPIO_AMP_ON	(POODLE_LOCOMO_GPIO_BASE + 8)
+> +#define POODLE_GPIO_FL_VR	(POODLE_LOCOMO_GPIO_BASE + 9)
+> +#define POODLE_GPIO_MUTE_L	(POODLE_LOCOMO_GPIO_BASE + 10)
+> +#define POODLE_GPIO_MUTE_R	(POODLE_LOCOMO_GPIO_BASE + 11)
+> +#define POODLE_GPIO_232VCC_ON	(POODLE_LOCOMO_GPIO_BASE + 12)
+> +#define POODLE_GPIO_JK_B	(POODLE_LOCOMO_GPIO_BASE + 13)
+Why not keep the LOCOMO_GPIO() defines, and redevice LOCOMO_GPIO(x) to
+(POODLE_LOCOMO_GPIO_BASE + (x)) ?
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+No comments on the remaining part, as long as it's tested, you know me by now
+...
 
-> 
-> Ga?l PORTAY (7):
->   ARM: at91/dt: kizbox: rename to at91-kizbox
->   ARM: at91/dt: at91-kizbox: sanitize file
->   ARM: at91/dt: at91-kizbox: user proper serial uart
->   ARM: at91/dt: at91-kizbox: gpio-keys related changes
->   ARM: at91/dt: at91-kizbox: leds related changes
->   ARM: at91/dt: at91-kizbox: re-size nand partitions
->   ARM: at91/dt: at91-kizbox: update chosen node
-> 
->  arch/arm/boot/dts/Makefile        |   2 +-
->  arch/arm/boot/dts/at91-kizbox.dts | 159 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/kizbox.dts      | 150 -----------------------------------
->  3 files changed, 160 insertions(+), 151 deletions(-)
->  create mode 100644 arch/arm/boot/dts/at91-kizbox.dts
->  delete mode 100644 arch/arm/boot/dts/kizbox.dts
-> 
-
-
+Cheers.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Robert
