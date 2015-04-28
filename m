@@ -1,52 +1,331 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 28 Apr 2015 10:15:10 +0200
-Subject: [PATCH Part1 v11 3/5] PCI: designware: Use pci_scan_root_bus()
- for simplicity
-In-Reply-To: <1430204499-19571-4-git-send-email-wangyijing@huawei.com>
-References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
- <1430204499-19571-4-git-send-email-wangyijing@huawei.com>
-Message-ID: <1430208910.3428.15.camel@pengutronix.de>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 28 Apr 2015 16:20:00 +0800
+Subject: [PATCH] ARM: dts: imx5: Add dts files for USB armory.
+In-Reply-To: <20150427133708.GC11598@core.inversepath.com>
+References: <87h9t6i40r.fsf@aikidev.net> <20150427115747.GA11975@dragon>
+ <20150427133708.GC11598@core.inversepath.com>
+Message-ID: <20150428081959.GA32234@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 28.04.2015, 15:01 +0800 schrieb Yijing Wang:
-> Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
-> Now pci_scan_root_bus() == pci_create_root_bus() +
-> pci_scan_child_bus() if busn resource is supplied.
-> Designware added the busn resource to resources list
-> in dw_pcie_setup(). So it should be safe to use
-> pci_scan_root_bus() instead.
+On Mon, Apr 27, 2015 at 03:37:08PM +0200, Andrej Rosano wrote:
+> Hi Shawn,
 > 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> CC: Mohit Kumar <mohit.kumar@st.com>
-> CC: Jingoo Han <jg1.han@samsung.com>
-
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-
-> ---
->  drivers/pci/host/pcie-designware.c |    4 +---
->  1 files changed, 1 insertions(+), 3 deletions(-)
+> On Mon, Apr 27, 2015 at 07:57:48PM +0800, Shawn Guo wrote:
+> > +Peter
+> > 
+> > On Fri, Mar 27, 2015 at 01:23:00PM -0700, Vagrant Cascadian wrote:
+> > > Add support for the USB armory board by Inverse Path. This board
+> > > features a Freescale iMX53 SoC, 512MB RAM, and USB OTG operating in
+> > > either peripheral or host mode, and 5 GPIO pins.
+> > > 
+> > > One .dtb is generated for operating in peripheral mode, and one is
+> > > generated for operating in host mode.
+> > 
+> > Vagrant,
+> > 
+> > Does that mean this board can work in peripheral or host mode but can
+> > switch between them at run-time?
 > 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 2e9f84f..8c80f38 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -728,13 +728,11 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
->  	struct pcie_port *pp = sys_to_pcie(sys);
->  
->  	pp->root_bus_nr = sys->busnr;
-> -	bus = pci_create_root_bus(pp->dev, sys->busnr,
-> +	bus = pci_scan_root_bus(pp->dev, sys->busnr,
->  				  &dw_pcie_ops, sys, &sys->resources);
->  	if (!bus)
->  		return NULL;
->  
-> -	pci_scan_child_bus(bus);
-> -
->  	if (bus && pp->ops->scan_bus)
->  		pp->ops->scan_bus(pp);
->  
+> The board can switch between host and peripheral mode without any
+> hardware modification, but it need to reboot itself to pick up the
+> corresponding dtb file. I am not sure if there is possible using the
+> devicetree overlay feature to switch between the two modes runtime.
+> 
+
+Not a good way, it is just one board with two different usb cables.
+
+Current chipidea usb driver supports role switch function well, if you
+have a gpio or id pin for it.
+
+Peter
+
+> Andrej
+> 
+> > 
+> > Shawn
+> > 
+> > > 
+> > > Signed-off-by: Vagrant Cascadian <vagrant@debian.org>
+> > > Cc: Andrej Rosano <andrej@inversepath.com>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: Pawel Moll <pawel.moll@arm.com>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > > Cc: Kumar Gala <galak@codeaurora.org>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: devicetree at vger.kernel.org
+> > > Cc: linux-arm-kernel at lists.infradead.org
+> > > Cc: linux-kernel at vger.kernel.org
+> > > ---
+> > >  arch/arm/boot/dts/Makefile                      |   2 +
+> > >  arch/arm/boot/dts/imx53-usbarmory-host_mode.dts |  17 +++
+> > >  arch/arm/boot/dts/imx53-usbarmory.dts           |  13 ++
+> > >  arch/arm/boot/dts/imx53-usbarmory.dtsi          | 183 ++++++++++++++++++++++++
+> > >  4 files changed, 215 insertions(+)
+> > >  create mode 100644 arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
+> > >  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
+> > >  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dtsi
+> > > 
+> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > > index a1c776b..bd2258b 100644
+> > > --- a/arch/arm/boot/dts/Makefile
+> > > +++ b/arch/arm/boot/dts/Makefile
+> > > @@ -244,6 +244,8 @@ dtb-$(CONFIG_SOC_IMX53) += \
+> > >  	imx53-smd.dtb \
+> > >  	imx53-tx53-x03x.dtb \
+> > >  	imx53-tx53-x13x.dtb \
+> > > +	imx53-usbarmory.dtb \
+> > > +	imx53-usbarmory-host_mode.dtb \
+> > >  	imx53-voipac-bsb.dtb
+> > >  dtb-$(CONFIG_SOC_IMX6Q) += \
+> > >  	imx6dl-aristainetos_4.dtb \
+> > > diff --git a/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts b/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
+> > > new file mode 100644
+> > > index 0000000..a94cb1d
+> > > --- /dev/null
+> > > +++ b/arch/arm/boot/dts/imx53-usbarmory-host_mode.dts
+> > > @@ -0,0 +1,17 @@
+> > > +/*
+> > > + * Copyright 2015 Inverse Path, S.r.l.
+> > > + *
+> > > + * The code contained herein is licensed under the GNU General Public
+> > > + * License. You may obtain a copy of the GNU General Public License
+> > > + * Version 2 or later at the following locations:
+> > > + *
+> > > + * http://www.opensource.org/licenses/gpl-license.html
+> > > + * http://www.gnu.org/copyleft/gpl.html
+> > > + */
+> > > +
+> > > +/dts-v1/;
+> > > +#include "imx53-usbarmory.dtsi"
+> > > +
+> > > +&usbotg {
+> > > +	dr_mode = "host";
+> > > +};
+> > > diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
+> > > new file mode 100644
+> > > index 0000000..c86a4d8
+> > > --- /dev/null
+> > > +++ b/arch/arm/boot/dts/imx53-usbarmory.dts
+> > > @@ -0,0 +1,13 @@
+> > > +/*
+> > > + * Copyright 2015 Inverse Path, S.r.l.
+> > > + *
+> > > + * The code contained herein is licensed under the GNU General Public
+> > > + * License. You may obtain a copy of the GNU General Public License
+> > > + * Version 2 or later at the following locations:
+> > > + *
+> > > + * http://www.opensource.org/licenses/gpl-license.html
+> > > + * http://www.gnu.org/copyleft/gpl.html
+> > > + */
+> > > +
+> > > +/dts-v1/;
+> > > +#include "imx53-usbarmory.dtsi"
+> > > diff --git a/arch/arm/boot/dts/imx53-usbarmory.dtsi b/arch/arm/boot/dts/imx53-usbarmory.dtsi
+> > > new file mode 100644
+> > > index 0000000..b4a9052
+> > > --- /dev/null
+> > > +++ b/arch/arm/boot/dts/imx53-usbarmory.dtsi
+> > > @@ -0,0 +1,183 @@
+> > > +/*
+> > > + * Copyright 2015 Inverse Path, S.r.l.
+> > > + *
+> > > + * The code contained herein is licensed under the GNU General Public
+> > > + * License. You may obtain a copy of the GNU General Public License
+> > > + * Version 2 or later at the following locations:
+> > > + *
+> > > + * http://www.opensource.org/licenses/gpl-license.html
+> > > + * http://www.gnu.org/copyleft/gpl.html
+> > > + */
+> > > +
+> > > +#include "imx53.dtsi"
+> > > +
+> > > +/ {
+> > > +	model = "Inverse Path USB armory";
+> > > +	compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
+> > > +};
+> > > +
+> > > +/ {
+> > > +	chosen {
+> > > +		stdout-path = &uart1;
+> > > +	};
+> > > +
+> > > +	memory {
+> > > +		reg = <0x70000000 0x20000000>;
+> > > +	};
+> > > +
+> > > +	leds {
+> > > +		compatible = "gpio-leds";
+> > > +		pinctrl-names = "default";
+> > > +		pinctrl-0 = <&led_pin_gpio4_27>;
+> > > +
+> > > +		user {
+> > > +			label = "LED";
+> > > +			gpios = <&gpio4 27 0>;
+> > > +			linux,default-trigger = "heartbeat";
+> > > +		};
+> > > +	};
+> > > +};
+> > > +
+> > > +&esdhc1 {
+> > > +	pinctrl-names = "default";
+> > > +	pinctrl-0 = <&pinctrl_esdhc1>;
+> > > +	status = "okay";
+> > > +};
+> > > +
+> > > +&iomuxc {
+> > > +	pinctrl-names = "default";
+> > > +	pinctrl-0 = <&pinctrl_hog>;
+> > > +
+> > > +	imx53-usbarmory {
+> > > +		pinctrl_hog: hoggrp {
+> > > +			fsl,pins = <
+> > > +				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
+> > > +				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
+> > > +				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
+> > > +				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
+> > > +				MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
+> > > +				MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
+> > > +				MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
+> > > +				MX53_PAD_PATA_DA_2__GPIO7_8	  0x80000000
+> > > +				MX53_PAD_GPIO_16__GPIO7_11        0x80000000
+> > > +			>;
+> > > +		};
+> > > +
+> > > +		led_pin_gpio4_27: led_gpio4_27 at 0 {
+> > > +			fsl,pins = <
+> > > +				MX53_PAD_DISP0_DAT6__GPIO4_27 0x80000000
+> > > +			>;
+> > > +		};
+> > > +
+> > > +		pinctrl_esdhc1: esdhc1grp {
+> > > +			fsl,pins = <
+> > > +				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
+> > > +				MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
+> > > +				MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
+> > > +				MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
+> > > +				MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
+> > > +				MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
+> > > +			>;
+> > > +		};
+> > > +
+> > > +		pinctrl_i2c1: i2c1grp {
+> > > +			fsl,pins = <
+> > > +				MX53_PAD_CSI0_DAT8__I2C1_SDA	0xc0000000
+> > > +				MX53_PAD_CSI0_DAT9__I2C1_SCL	0xc0000000
+> > > +			>;
+> > > +		};
+> > > +
+> > > +		pinctrl_uart1: uart1grp {
+> > > +			fsl,pins = <
+> > > +				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
+> > > +				MX53_PAD_CSI0_DAT11__UART1_RXD_MUX	0x1e4
+> > > +			>;
+> > > +		};
+> > > +	};
+> > > +};
+> > > +
+> > > +&uart1 {
+> > > +	pinctrl-names = "default";
+> > > +	pinctrl-0 = <&pinctrl_uart1>;
+> > > +	status = "okay";
+> > > +};
+> > > +
+> > > +&vpu {
+> > > +	status = "okay";
+> > > +};
+> > > +
+> > > +&usbotg {
+> > > +	dr_mode = "peripheral";
+> > > +	status = "okay";
+> > > +};
+> > > +
+> > > +&i2c1 {
+> > > +	ltc3589: pmic at 34 {
+> > > +		compatible = "lltc,ltc3589-2";
+> > > +		reg = <0x34>;
+> > > +
+> > > +		regulators {
+> > > +			sw1_reg: sw1 {
+> > > +				regulator-min-microvolt = <591930>;
+> > > +				regulator-max-microvolt = <1224671>;
+> > > +				lltc,fb-voltage-divider = <100000 158000>;
+> > > +				regulator-ramp-delay = <7000>;
+> > > +				regulator-boot-on;
+> > > +				regulator-always-on;
+> > > +			};
+> > > +
+> > > +			sw2_reg: sw2 {
+> > > +				regulator-min-microvolt = <704123>;
+> > > +				regulator-max-microvolt = <1456803>;
+> > > +				lltc,fb-voltage-divider = <180000 191000>;
+> > > +				regulator-ramp-delay = <7000>;
+> > > +				regulator-boot-on;
+> > > +				regulator-always-on;
+> > > +			};
+> > > +
+> > > +			sw3_reg: sw3 {
+> > > +				regulator-min-microvolt = <1341250>;
+> > > +				regulator-max-microvolt = <2775000>;
+> > > +				lltc,fb-voltage-divider = <270000 100000>;
+> > > +				regulator-ramp-delay = <7000>;
+> > > +				regulator-boot-on;
+> > > +				regulator-always-on;
+> > > +			};
+> > > +
+> > > +			bb_out_reg: bb-out {
+> > > +				regulator-min-microvolt = <3387341>;
+> > > +				regulator-max-microvolt = <3387341>;
+> > > +				lltc,fb-voltage-divider = <511000 158000>;
+> > > +				regulator-boot-on;
+> > > +				regulator-always-on;
+> > > +			};
+> > > +			ldo1_reg: ldo1 {
+> > > +				regulator-min-microvolt = <1306329>;
+> > > +				regulator-max-microvolt = <1306329>;
+> > > +				lltc,fb-voltage-divider = <100000 158000>;
+> > > +				regulator-boot-on;
+> > > +				regulator-always-on;
+> > > +			};
+> > > +
+> > > +			ldo2_reg: ldo2 {
+> > > +				regulator-min-microvolt = <704123>;
+> > > +				regulator-max-microvolt = <1456806>;
+> > > +				lltc,fb-voltage-divider = <180000 191000>;
+> > > +				regulator-ramp-delay = <7000>;
+> > > +				regulator-boot-on;
+> > > +				regulator-always-on;
+> > > +			};
+> > > +
+> > > +			ldo3_reg: ldo3 {
+> > > +				regulator-min-microvolt = <2800000>;
+> > > +				regulator-max-microvolt = <2800000>;
+> > > +				regulator-boot-on;
+> > > +			};
+> > > +
+> > > +			ldo4_reg: ldo4 {
+> > > +				regulator-min-microvolt = <1200000>;
+> > > +				regulator-max-microvolt = <3200000>;
+> > > +			};
+> > > +		};
+> > > +	};
+> > > +};
+> > > -- 
+> > > 2.1.4
+> > > 
+> > 
+> > 
+> 
+> --
+> Andrej Rosano                                           Inverse Path Srl
+> <andrej@inversepath.com>                      http://www.inversepath.com
+> 
+> 0x01939B21            5BB8 574E 68E8 D841 E18F  D5E9 CEAD E0CF 0193 9B21
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+
+Best Regards,
+Peter Chen
