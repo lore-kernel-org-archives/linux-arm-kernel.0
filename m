@@ -1,38 +1,45 @@
-From: valentinrothberg@gmail.com (Valentin Rothberg)
-Date: Tue, 28 Apr 2015 18:45:29 +0200
-Subject: [PATCH] arch/arm/mm/proc-arm925.S: remove dead #ifdef block
-Message-ID: <1430239529-15726-1-git-send-email-valentinrothberg@gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 28 Apr 2015 11:49:44 -0500
+Subject: [PATCH V7 2/9] mailbox: Make struct mbox_controller's ops field
+ const
+In-Reply-To: <1430174242-29465-3-git-send-email-abrestic@chromium.org>
+References: <1430174242-29465-1-git-send-email-abrestic@chromium.org>
+ <1430174242-29465-3-git-send-email-abrestic@chromium.org>
+Message-ID: <553FBA28.40403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The block could never be compiled;  CPU_ICACHE_STREAMING_DISABLE has not
-been defined in Kconfig since the very first Git commit.  Hence, we can
-safely remove the entire block.
+Hi Andrew,
 
-Signed-off-by: Valentin Rothberg <valentinrothberg@gmail.com>
----
-There is a similar looking option 'CPU_ICACHE_DISABLE'.  However, I
-decided to remove the entire block since it could not be compiled for
-such a long time.
+On 04/27/2015 05:37 PM, Andrew Bresticker wrote:
+> The mailbox controller's channel ops ought to be read-only.
 
-I detected this issue with scripts/checkkconfigsymbols.py
----
- arch/arm/mm/proc-arm925.S | 3 ---
- 1 file changed, 3 deletions(-)
+We ought to change this on all the existing controllers as well.
 
-diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
-index ede8c54ab4aa..32a47cc19076 100644
---- a/arch/arm/mm/proc-arm925.S
-+++ b/arch/arm/mm/proc-arm925.S
-@@ -441,9 +441,6 @@ ENTRY(cpu_arm925_set_pte_ext)
- 	.type	__arm925_setup, #function
- __arm925_setup:
- 	mov	r0, #0
--#if defined(CONFIG_CPU_ICACHE_STREAMING_DISABLE)
--        orr     r0,r0,#1 << 7
--#endif
- 
- 	/* Transparent on, D-cache clean & flush mode. See  NOTE2 above */
-         orr     r0,r0,#1 << 1			@ transparent mode on
--- 
-2.1.4
+regards
+Suman
+
+> 
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Cc: Jassi Brar <jassisinghbrar@gmail.com>
+> ---
+> No changes from v5/v6.
+> New for v5.
+> ---
+>  include/linux/mailbox_controller.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/mailbox_controller.h b/include/linux/mailbox_controller.h
+> index d4cf96f..68c4245 100644
+> --- a/include/linux/mailbox_controller.h
+> +++ b/include/linux/mailbox_controller.h
+> @@ -72,7 +72,7 @@ struct mbox_chan_ops {
+>   */
+>  struct mbox_controller {
+>  	struct device *dev;
+> -	struct mbox_chan_ops *ops;
+> +	const struct mbox_chan_ops *ops;
+>  	struct mbox_chan *chans;
+>  	int num_chans;
+>  	bool txdone_irq;
+> 
