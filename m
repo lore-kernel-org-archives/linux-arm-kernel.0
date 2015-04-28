@@ -1,92 +1,46 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Tue, 28 Apr 2015 20:04:47 +0200
-Subject: [PATCH] ARM: sunxi: dts: split IR pins for A10 and A20
-Message-ID: <1430244287-29309-1-git-send-email-codekipper@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Apr 2015 19:11:10 +0100
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <CAALWOA_3wfn=K3qt9MzWYXMGTM7mZvqY03Biqk5T2wVF4uMVxQ@mail.gmail.com>
+References: <20150407135713.GL4027@n2100.arm.linux.org.uk>
+ <20150407152207.GM18048@atomide.com>
+ <20150408230658.GO4027@n2100.arm.linux.org.uk>
+ <20150409134843.GQ4027@n2100.arm.linux.org.uk>
+ <20150415163108.GB2033@earth> <20150416160858.GH18048@atomide.com>
+ <20150417184156.GA3326@earth> <20150420234032.GM18048@atomide.com>
+ <20150423102542.GZ4027@n2100.arm.linux.org.uk>
+ <CAALWOA_3wfn=K3qt9MzWYXMGTM7mZvqY03Biqk5T2wVF4uMVxQ@mail.gmail.com>
+Message-ID: <20150428181109.GA4027@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On Fri, Apr 24, 2015 at 10:54:29AM +0200, Matthijs van Duin wrote:
+> On 23 April 2015 at 12:25, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > And you can't detect whether you're running in secure mode or not.
+> 
+> If not, you get an undefined instruction exception, which you could trap.
+> 
+> This may not be convenient, but "can't detect" is an overstatement.
 
-Currently none of the target boards nor the driver supports
-IR TX. However this pin is used in a few instances as a GPIO.
-Split the pin ctrl descriptions so that only the IR RX is
-configured to be used.
+It's these kinds of statements that really piss me off.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 18 ++++++++++++++++--
- arch/arm/boot/dts/sun7i-a20.dtsi | 18 ++++++++++++++++--
- 2 files changed, 32 insertions(+), 4 deletions(-)
+At this stage in the boot, there's no memory allocators.  There's no
+MMU.  There's really not very much.  There's no guarantee that the
+location where the vectors are is writable on all platforms.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 1d7fd68..50df9b7 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -798,14 +798,28 @@
- 			};
- 
- 			ir0_pins_a: ir0 at 0 {
--				allwinner,pins = "PB3","PB4";
-+				allwinner,pins = "PB4";
-+				allwinner,function = "ir0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			ir0_pins_b: ir0 at 1 {
-+				allwinner,pins = "PB3";
- 				allwinner,function = "ir0";
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			ir1_pins_a: ir1 at 0 {
--				allwinner,pins = "PB22","PB23";
-+				allwinner,pins = "PB23";
-+				allwinner,function = "ir1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			ir1_pins_b: ir1 at 1 {
-+				allwinner,pins = "PB22";
- 				allwinner,function = "ir1";
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 4163ade..6168a9f 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -1001,14 +1001,28 @@
- 			};
- 
- 			ir0_pins_a: ir0 at 0 {
--				    allwinner,pins = "PB3","PB4";
-+				    allwinner,pins = "PB4";
-+				    allwinner,function = "ir0";
-+				    allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				    allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			ir0_pins_b: ir0 at 1 {
-+				    allwinner,pins = "PB3";
- 				    allwinner,function = "ir0";
- 				    allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				    allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			ir1_pins_a: ir1 at 0 {
--				    allwinner,pins = "PB22","PB23";
-+				    allwinner,pins = "PB23";
-+				    allwinner,function = "ir1";
-+				    allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				    allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			ir1_pins_b: ir1 at 1 {
-+				    allwinner,pins = "PB22";
- 				    allwinner,function = "ir1";
- 				    allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				    allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+It's pretty much _impossible_ to do generically.
+
+"Can't detect" is _not_ an overstatement.  It's a statement that I'm
+giving you through my experience and knowledge of the Linux kernel,
+the ARM archtecture, the capabilities of the platforms we have to
+deal with, and how we want the kernel to work.
+
+Sure, we _can_ detect it if (and only if) we code specifically for a
+platform which has RAM at the CPU vector location.  Unfortunately,
+that's a _very_ small proportion which approximates a number very
+close to zero.
+
 -- 
-2.3.6
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
