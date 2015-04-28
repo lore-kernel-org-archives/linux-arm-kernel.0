@@ -1,51 +1,55 @@
 From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 28 Apr 2015 15:35:54 +0800
-Subject: [PATCH v3 1/3] mfd: provide RTC resource in MT6397 MFD
-In-Reply-To: <1430206556-18254-1-git-send-email-eddie.huang@mediatek.com>
-References: <1430206556-18254-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1430206556-18254-2-git-send-email-eddie.huang@mediatek.com>
+Date: Tue, 28 Apr 2015 15:35:53 +0800
+Subject: [PATCH v3 0/3] Add Mediatek SoC RTC driver 
+Message-ID: <1430206556-18254-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide MT6397 RTC interrupt, base address, and register in
-MT6397 MFD.
+RTC is one submodule of Mediatek MT6397 PMIC chip[1]. This series
+support RTC driver that work with Mediatek SoC like MT8135, MT8173.
+It implements second counter and also provide alarm function.
 
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- drivers/mfd/mt6397-core.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+This series base on 4.1-rc1, Test ok on MT8173 platform.
 
-diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-index 09bc780..08cfbd1 100644
---- a/drivers/mfd/mt6397-core.c
-+++ b/drivers/mfd/mt6397-core.c
-@@ -21,9 +21,27 @@
- #include <linux/mfd/mt6397/core.h>
- #include <linux/mfd/mt6397/registers.h>
- 
-+#define MT6397_RTC_BASE		0xe000
-+#define MT6397_RTC_SIZE		0x3e
-+
-+static const struct resource mt6397_rtc_resources[] = {
-+	{
-+		.start = MT6397_RTC_BASE,
-+		.end   = MT6397_RTC_BASE + MT6397_RTC_SIZE,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	{
-+		.start = MT6397_IRQ_RTC,
-+		.end   = MT6397_IRQ_RTC,
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+};
-+
- static const struct mfd_cell mt6397_devs[] = {
- 	{
- 		.name = "mt6397-rtc",
-+		.num_resources = ARRAY_SIZE(mt6397_rtc_resources),
-+		.resources = mt6397_rtc_resources,
- 		.of_compatible = "mediatek,mt6397-rtc",
- 	}, {
- 		.name = "mt6397-regulator",
--- 
+[1] https://lkml.org/lkml/2015/1/23/325
+
+Change in v3:
+1. Replace magic number in mt6397-core.c
+2. Add comment for some equation and write trigger.
+3. Use regmap_bulk_read and regmap_bulk_write to avoid muliple regmap_read
+   and regmap_write
+4. Replace devm_request_threaded_irq with request_threaded_irq and add
+   irq_dispose_mapping
+5. Fix Tomasz Figa review comment.
+
+Change in v2:
+1. Move RTC address and interrupt to mt6397-core.c, and register
+   these resource in mfd_cell.
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323239.html
+2. Remove dt-binding document due to register resouce in mfd_cell, not from
+   device tree.
+3. Update MAINTAINER file to add Mediatek RTC mainainter.
+4. Add prefix mtk_ to some internal functions.
+5. Fix racy condition
+6. Check return value of regmap_read and regmap_write
+7. Remove some unnecessary register readback, clear, then write.
+8. Add disable alarm in mtk_rtc_set_alarm function
+9. Fix Uwe Kleine-K?nig review comment
+
+Eddie Huang (2):
+  mfd: provide RTC resource in MT6397 MFD
+  MAINTAINERS: add Mediatek RTC driver
+
+Tianping Fang (1):
+  rtc: mediatek: Add MT6397 RTC driver
+
+ MAINTAINERS               |   7 +
+ drivers/mfd/mt6397-core.c |  18 +++
+ drivers/rtc/Kconfig       |  10 ++
+ drivers/rtc/Makefile      |   1 +
+ drivers/rtc/rtc-mt6397.c  | 388 ++++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 424 insertions(+)
+ create mode 100644 drivers/rtc/rtc-mt6397.c
+
+--
 1.8.1.1.dirty
