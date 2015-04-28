@@ -1,54 +1,58 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 28 Apr 2015 15:37:01 +0100
-Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
- add SW break point support
-In-Reply-To: <20150428125645.GA4137@cbox>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
- <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
- <20150427200407.GG23335@cbox>
- <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
- <87wq0wr6dd.fsf@linaro.org>
- <CAFEAcA85i_1JybEFBg91NA3-LpAzYh4RSDnqryOd=rZN7gZP5A@mail.gmail.com>
- <20150428125645.GA4137@cbox>
-Message-ID: <87tww0qqh9.fsf@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 28 Apr 2015 16:40:04 +0200
+Subject: [PATCH 04/12] trivial: ARM: lib/lib1funcs.S: fix typo
+ s/substractions/subtractions/
+In-Reply-To: <1430219491-5076-5-git-send-email-ao2@ao2.it>
+References: <1430219491-5076-1-git-send-email-ao2@ao2.it>
+ <1430219491-5076-5-git-send-email-ao2@ao2.it>
+Message-ID: <CAKv+Gu-7SRFaPbXQynfu6OiZCnS5xA2qMkRYWmgf0+T9SWdDRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 28 April 2015 at 13:11, Antonio Ospite <ao2@ao2.it> wrote:
+> Signed-off-by: Antonio Ospite <ao2@ao2.it>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/lib/lib1funcs.S | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
+> index 947567f..af2267f 100644
+> --- a/arch/arm/lib/lib1funcs.S
+> +++ b/arch/arm/lib/lib1funcs.S
+> @@ -167,7 +167,7 @@ Boston, MA 02111-1307, USA.  */
+>
+>  #endif
+>
+> -       @ Perform all needed substractions to keep only the reminder.
+> +       @ Perform all needed subtractions to keep only the reminder.
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
+While you're at it, you should perhaps correct the other typo in this
+line as well?
+(remAinder)
 
-> On Tue, Apr 28, 2015 at 10:34:12AM +0100, Peter Maydell wrote:
->> On 28 April 2015 at 09:42, Alex Benn?e <alex.bennee@linaro.org> wrote:
->> > Peter Maydell <peter.maydell@linaro.org> writes:
->> >> Does the kernel already have a conveniently implemented "inject
->> >> exception into guest" lump of code? If so it might be less effort
->> >> to do it that way round, maybe.
->> >
->> > So you pointed out we can't just re-inject the exceptions we get as we
->> > need to map from things like ESR_ELx_EC_WATCHPT_LOW to
->> > ESR_ELx_EC_WATCHPT_CUR before re-injection.
->> >
->> > Of course if it is as simple as modifying the ESR_EL1 register and
->> > returning +ve in the handle_exit path then I can do that but I assumed
->> > if any other wrangling needs doing it should be done in userspace.
->> 
->> Well, somebody's got to do it, and it's the same amount of work
->> either way (fiddling with ESR, making sure we direct the guest
->> to the right exception vector entry point, maybe a few other
->> things).
->> 
-> We already have code in the kernel to inject data/instruction aborts,
-> but not sure how much benefit there is in re-using that.  It's up to you
-> really, but I think the kernel code should be clear about what the
-> intention is so that we don't end up in a situation where: (1) The
-> intended behavior is unclear/vague, and (2) it doesn't actually work in
-> practice so nobody can follow the code.
+>         @ Do comparisons in batch of 4 first.
+>         subs    \order, \order, #3              @ yes, 3 is intended here
+>         blt     2f
+> @@ -189,7 +189,7 @@ Boston, MA 02111-1307, USA.  */
+>         teqne   \dividend, #0
+>         beq     5f
+>
+> -       @ Either 1, 2 or 3 comparison/substractions are left.
+> +       @ Either 1, 2 or 3 comparison/subtractions are left.
 
-Certainly there are some cases where the kernel doesn't have all the
-information. For example it doesn't know if the soft break was inserted
-by the guest or the host. That to me favours the "let userspace deal
-with the ugly" approach.
+Same here -> comparisonS (plural)
 
--- 
-Alex Benn?e
+>  2:     cmn     \order, #2
+>         blt     4f
+>         beq     3f
+> --
+> 2.1.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
