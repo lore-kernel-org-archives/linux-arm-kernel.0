@@ -1,37 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Apr 2015 15:30:12 +0200
-Subject: [PATCH v2] mtd: nand: pxa3xx: Switch FIFO draining to
- jiffies-based timeout
-In-Reply-To: <1428413565-27644-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1428413565-27644-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150428133012.GF10950@lukather>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 28 Apr 2015 21:40:31 +0800
+Subject: [PATCH v3 0/3] tty: serial: Add earlycon support to MT8173 SoC 
+Message-ID: <1430228434-31779-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+This patch add earlycon support to MT8173 SoC platform.
+To use earlycon, need
+1. Add earlycon in boot parameters
+2. Add "linux,sdtout-path" property in device tree file
 
-On Tue, Apr 07, 2015 at 03:32:45PM +0200, Maxime Ripard wrote:
-> Now that the driver handles the FIFO draining in a threaded interrupt, we can
-> base our timeout on jiffies and sleeping, instead of using mdelay.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+This patch based on 4.1-rc1.
 
-Ping?
+Change in v3:
+Remove noinit options, not necessary, because 8250_early.c will not init hardware
+if not provide baudrate.
 
-You were the one that asked for this patch in the first place, so I
-was kind of expecting you would merge it :)
+Change v2:
+1. Add noinit options.
+2. Remove duplicate code in 8250_mtk.c, reuse the 8250_early.c existed function.
 
-Thanks,
-Maxime
+Eddie Huang (3):
+  tty: serial: 8250: export early_serial8250_setup function
+  tty: serial: 8250_mtk: Add earlycon
+  arm64: dts: Add mediatek MT8173 earlycon support
+
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts |  4 +++-
+ drivers/tty/serial/8250/8250_early.c        |  2 +-
+ drivers/tty/serial/8250/8250_mtk.c          | 13 +++++++++++++
+ include/linux/serial_8250.h                 |  2 ++
+ 4 files changed, 19 insertions(+), 2 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150428/f257d4a9/attachment-0001.sig>
+1.8.1.1.dirty
