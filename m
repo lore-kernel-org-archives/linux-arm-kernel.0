@@ -1,58 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Apr 2015 16:40:04 +0200
-Subject: [PATCH 04/12] trivial: ARM: lib/lib1funcs.S: fix typo
- s/substractions/subtractions/
-In-Reply-To: <1430219491-5076-5-git-send-email-ao2@ao2.it>
-References: <1430219491-5076-1-git-send-email-ao2@ao2.it>
- <1430219491-5076-5-git-send-email-ao2@ao2.it>
-Message-ID: <CAKv+Gu-7SRFaPbXQynfu6OiZCnS5xA2qMkRYWmgf0+T9SWdDRQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 28 Apr 2015 15:52:24 +0100
+Subject: [PATCH] arm: dma-mapping: fix off-by-one check in
+ arm_setup_iommu_dma_ops
+In-Reply-To: <1430212089-5418-1-git-send-email-m.szyprowski@samsung.com>
+References: <1430212089-5418-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <553F9EA8.7030403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 April 2015 at 13:11, Antonio Ospite <ao2@ao2.it> wrote:
-> Signed-off-by: Antonio Ospite <ao2@ao2.it>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
+Hi Marek,
+
+On 28/04/15 10:08, Marek Szyprowski wrote:
+> Patch 22b3c181c6c324a46f71aae806d8ddbe61d25761 ("arm: dma-mapping: limit
+> IOMMU mapping size") added a check for IO address space size. However
+> this patch broke IOMMU initialization for typical platforms initialized
+> from device tree, which get the default IO address space size of 4GiB.
+> This value doesn't fit into size_t and fails a check introduced by that
+> commit resulting in failed dma-mapping/iommu initialization. This patch
+> fixes this issue by adding proper support for full 4GiB address space
+> size.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+Much nicer than my hack of just passing in size-1, thanks! I'd offer a 
+tested-by for the default 32-bit case, however...
+
 > ---
->  arch/arm/lib/lib1funcs.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>   arch/arm/include/asm/dma-iommu.h | 2 +-
+>   arch/arm/mm/dma-mapping.c        | 9 +++------
+>   2 files changed, 4 insertions(+), 7 deletions(-)
 >
-> diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
-> index 947567f..af2267f 100644
-> --- a/arch/arm/lib/lib1funcs.S
-> +++ b/arch/arm/lib/lib1funcs.S
-> @@ -167,7 +167,7 @@ Boston, MA 02111-1307, USA.  */
+> diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+> index 8e3fcb924db6..2ef282f96651 100644
+> --- a/arch/arm/include/asm/dma-iommu.h
+> +++ b/arch/arm/include/asm/dma-iommu.h
+> @@ -25,7 +25,7 @@ struct dma_iommu_mapping {
+>   };
 >
->  #endif
+>   struct dma_iommu_mapping *
+> -arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size);
+> +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size);
 >
-> -       @ Perform all needed substractions to keep only the reminder.
-> +       @ Perform all needed subtractions to keep only the reminder.
+>   void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 09c5fe3d30c2..b43b762eebc1 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1878,7 +1878,7 @@ struct dma_map_ops iommu_coherent_ops = {
+>    * arm_iommu_attach_device function.
+>    */
+>   struct dma_iommu_mapping *
+> -arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
+> +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size)
+>   {
+>   	unsigned int bits = size >> PAGE_SHIFT;
 
-While you're at it, you should perhaps correct the other typo in this
-line as well?
-(remAinder)
+...doesn't this u64->int conversion now have the potential to truncate 
+(if the device has a large enough DMA mask specified) and end up 
+generating a weirdly small mapping rather than failing outright? 
+Admittedly you'd have to have a 44-bit or larger DMA mask, and I'm not 
+sure what the practical likelihood of seeing that even on LPAE systems 
+is, but still I'm a little uneasy about it.
 
->         @ Do comparisons in batch of 4 first.
->         subs    \order, \order, #3              @ yes, 3 is intended here
->         blt     2f
-> @@ -189,7 +189,7 @@ Boston, MA 02111-1307, USA.  */
->         teqne   \dividend, #0
->         beq     5f
->
-> -       @ Either 1, 2 or 3 comparison/substractions are left.
-> +       @ Either 1, 2 or 3 comparison/subtractions are left.
+Robin.
 
-Same here -> comparisonS (plural)
-
->  2:     cmn     \order, #2
->         blt     4f
->         beq     3f
-> --
-> 2.1.4
+>   	unsigned int bitmap_size = BITS_TO_LONGS(bits) * sizeof(long);
+> @@ -2057,11 +2057,8 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>   	if (!iommu)
+>   		return false;
 >
+> -	/*
+> -	 * currently arm_iommu_create_mapping() takes a max of size_t
+> -	 * for size param. So check this limit for now.
+> -	 */
+> -	if (size > SIZE_MAX)
+> +	/* Only 32-bit DMA address space is supported for now */
+> +	if (size > DMA_BIT_MASK(32) + 1)
+>   		return false;
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
+>
