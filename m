@@ -1,41 +1,35 @@
-From: lee@kernel.org (Lee Jones)
-Date: Tue, 28 Apr 2015 10:34:16 +0100
-Subject: [PATCH 1/3] dt/bindings: Add binding for the Raspberry Pi
- firmware driver
-In-Reply-To: <1430176449-12322-2-git-send-email-eric@anholt.net>
-References: <1430176449-12322-1-git-send-email-eric@anholt.net>
- <1430176449-12322-2-git-send-email-eric@anholt.net>
-Message-ID: <20150428093416.GK11956@x1>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 28 Apr 2015 10:34:12 +0100
+Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
+ add SW break point support
+In-Reply-To: <87wq0wr6dd.fsf@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
+ <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
+ <20150427200407.GG23335@cbox>
+ <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
+ <87wq0wr6dd.fsf@linaro.org>
+Message-ID: <CAFEAcA85i_1JybEFBg91NA3-LpAzYh4RSDnqryOd=rZN7gZP5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Apr 2015, Eric Anholt wrote:
+On 28 April 2015 at 09:42, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> Peter Maydell <peter.maydell@linaro.org> writes:
+>> Does the kernel already have a conveniently implemented "inject
+>> exception into guest" lump of code? If so it might be less effort
+>> to do it that way round, maybe.
+>
+> So you pointed out we can't just re-inject the exceptions we get as we
+> need to map from things like ESR_ELx_EC_WATCHPT_LOW to
+> ESR_ELx_EC_WATCHPT_CUR before re-injection.
+>
+> Of course if it is as simple as modifying the ESR_EL1 register and
+> returning +ve in the handle_exit path then I can do that but I assumed
+> if any other wrangling needs doing it should be done in userspace.
 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  .../devicetree/bindings/arm/bcm/raspberrypi,firmware.txt   | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt
-> new file mode 100644
-> index 0000000..a74c966
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt
-> @@ -0,0 +1,14 @@
-> +Raspberry Pi VideoCore firmware driver
-> +
-> +Required properties:
-> +
-> +- compatible:	Should be "rasbperrypi,firmware"
-> +- mboxes:	Single-entry list which specifies which mailbox controller
-> +		  and channel is used.
+Well, somebody's got to do it, and it's the same amount of work
+either way (fiddling with ESR, making sure we direct the guest
+to the right exception vector entry point, maybe a few other
+things).
 
-#power-domain-cells?
-
-> +Example:
-> +
-> +firmware {
-> +	compatible = "rasbperrypi,firmware";
-> +	mboxes = <&mailbox 0>
-> +};
+-- PMM
