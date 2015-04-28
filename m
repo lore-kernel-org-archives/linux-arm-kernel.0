@@ -1,56 +1,69 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 28 Apr 2015 10:36:17 +0200
-Subject: [PATCH v6 3/3] I2C: mediatek: Add driver for MediaTek
- MT8173 I2C controller
-In-Reply-To: <1430209869-6631-4-git-send-email-eddie.huang@mediatek.com>
-References: <1430209869-6631-1-git-send-email-eddie.huang@mediatek.com>
- <1430209869-6631-4-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <553F4681.7040404@pengutronix.de>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 28 Apr 2015 09:42:38 +0100
+Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
+ add SW break point support
+In-Reply-To: <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
+ <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
+ <20150427200407.GG23335@cbox>
+ <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
+Message-ID: <87wq0wr6dd.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2015 10:31 AM, Eddie Huang wrote:
-> Add mediatek MT8173 I2C controller driver. Compare to I2C controller
-> of earlier mediatek SoC, MT8173 fix write-then-read limitation, and
-> also increase message size to 64kb.
-> 
-> Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
-> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> ---
->  drivers/i2c/busses/i2c-mt65xx.c | 106 +++++++++++++++++++++++++++++-----------
->  1 file changed, 77 insertions(+), 29 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-> index 2ecf0d1..c501421 100644
-> --- a/drivers/i2c/busses/i2c-mt65xx.c
-> +++ b/drivers/i2c/busses/i2c-mt65xx.c
-[...]
 
->  static const struct of_device_id mtk_i2c_of_match[] = {
->  	{ .compatible = "mediatek,mt6577-i2c", .data = (void *)&mt6577_compat },
->  	{ .compatible = "mediatek,mt6589-i2c", .data = (void *)&mt6589_compat },
-> +	{ .compatible = "mediatek,mt8173-i2c", .data = (void *)&mt8173_compat },
->  	{}
->  };
-> -MODULE_DEVICE_TABLE(of, mtk_i2c_match);
-> +MODULE_DEVICE_TABLE(of, mtk_i2c_of_match);
+Peter Maydell <peter.maydell@linaro.org> writes:
 
-This should go into the previous patch, as 2/3 will probably not compile
-without this change.
+> On 27 April 2015 at 21:04, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>> On Thu, Apr 23, 2015 at 03:26:53PM +0100, Alex Benn?e wrote:
+>>>
+>>> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>>>
+>>> > On Tue, Mar 31, 2015 at 04:08:04PM +0100, Alex Benn?e wrote:
+>>> >> + * just need to report the PC and the HSR values to userspace.
+>>> >> + * Userspace may decide to re-inject the exception and deliver it to
+>>> >> + * the guest if it wasn't for the host to deal with.
+>>> >
+>>> > now I'm confused - does userspace setup the guest to receive an
+>>> > exception or does it tell KVM to emulate an exception for the guest or
+>>> > do we execute the breakpoint without trapping the debug exception?
+>>>
+>>> I've made it all go through userspace as we may have to translate the
+>>> hypervisor visible exception code to what the guest was expecting to see.
+>>>
+>>
+>> ok, so I think you should re-phrase something like:
+>>
+>> "Userspace may decide that this exception is caused by the guest using
+>> debugging itself, and may in that case emulate the guest debug exception
+>> in userspace before resuming KVM."
+>>
+>> But does that really work?  Given that we don't support KVM-TCG
+>> migration, this sounds a little strange.  Did we test it?
+>
+> The QEMU patches have a TODO note at the point where you'd want
+> to do this... Design-wise you can do the reinjection in the
+> kernel or in userspace (ppc QEMU does this in userspace, for
+> instance) because it's pretty much just setting registers to fake
+> up the exception-entry into EL1. Code-wise QEMU's ARM code isn't
+> set up to do it right now, but it shouldn't be too difficult to
+> persuade the TCG exception-entry code to work for this case too.
+>
+> Does the kernel already have a conveniently implemented "inject
+> exception into guest" lump of code? If so it might be less effort
+> to do it that way round, maybe.
 
-Marc
+So you pointed out we can't just re-inject the exceptions we get as we
+need to map from things like ESR_ELx_EC_WATCHPT_LOW to
+ESR_ELx_EC_WATCHPT_CUR before re-injection.
+
+Of course if it is as simple as modifying the ESR_EL1 register and
+returning +ve in the handle_exit path then I can do that but I assumed
+if any other wrangling needs doing it should be done in userspace.
+
+>
+> -- PMM
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150428/feac6525/attachment.sig>
+Alex Benn?e
