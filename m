@@ -1,330 +1,132 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Apr 2015 10:26:01 +0200
-Subject: [PATCH 11/13] thermal: Make struct thermal_zone_device_ops const
+Date: Tue, 28 Apr 2015 10:26:00 +0200
+Subject: [PATCH 10/13] thermal: of: always set sensor related callbacks
 In-Reply-To: <1430209563-647-1-git-send-email-s.hauer@pengutronix.de>
 References: <1430209563-647-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1430209563-647-12-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1430209563-647-11-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the of thermal support no longer changes the
-thermal_zone_device_ops it can be const again.
+Now that the thermal core treats -ENOSYS like the callbacks were
+not present at all we no longer have to overwrite the ops during
+runtime but instead can always set them and return -ENOSYS if no
+sensor is registered.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- Documentation/thermal/sysfs-api.txt                    | 2 +-
- drivers/acpi/thermal.c                                 | 2 +-
- drivers/platform/x86/acerhdf.c                         | 2 +-
- drivers/platform/x86/intel_mid_thermal.c               | 2 +-
- drivers/power/power_supply_core.c                      | 2 +-
- drivers/thermal/armada_thermal.c                       | 2 +-
- drivers/thermal/db8500_thermal.c                       | 2 +-
- drivers/thermal/dove_thermal.c                         | 2 +-
- drivers/thermal/imx_thermal.c                          | 2 +-
- drivers/thermal/int340x_thermal/int3400_thermal.c      | 2 +-
- drivers/thermal/int340x_thermal/int340x_thermal_zone.c | 2 +-
- drivers/thermal/intel_soc_dts_thermal.c                | 2 +-
- drivers/thermal/kirkwood_thermal.c                     | 2 +-
- drivers/thermal/of-thermal.c                           | 2 +-
- drivers/thermal/rcar_thermal.c                         | 2 +-
- drivers/thermal/spear_thermal.c                        | 2 +-
- drivers/thermal/st/st_thermal.c                        | 2 +-
- drivers/thermal/thermal_core.c                         | 2 +-
- drivers/thermal/ti-soc-thermal/ti-thermal-common.c     | 2 +-
- drivers/thermal/x86_pkg_temp_thermal.c                 | 2 +-
- include/linux/thermal.h                                | 6 +++---
- 21 files changed, 23 insertions(+), 23 deletions(-)
+ drivers/thermal/of-thermal.c | 33 +++++++++++++--------------------
+ 1 file changed, 13 insertions(+), 20 deletions(-)
 
-diff --git a/Documentation/thermal/sysfs-api.txt b/Documentation/thermal/sysfs-api.txt
-index 87519cb..bb346a2 100644
---- a/Documentation/thermal/sysfs-api.txt
-+++ b/Documentation/thermal/sysfs-api.txt
-@@ -33,7 +33,7 @@ temperature) and throttle appropriate devices.
- 1.1 thermal zone device interface
- 1.1.1 struct thermal_zone_device *thermal_zone_device_register(char *type,
- 		int trips, int mask, void *devdata,
--		struct thermal_zone_device_ops *ops,
-+		const struct thermal_zone_device_ops *ops,
- 		const struct thermal_zone_params *tzp,
- 		int passive_delay, int polling_delay))
- 
-diff --git a/drivers/acpi/thermal.c b/drivers/acpi/thermal.c
-index 68bff60..6b11462 100644
---- a/drivers/acpi/thermal.c
-+++ b/drivers/acpi/thermal.c
-@@ -869,7 +869,7 @@ acpi_thermal_unbind_cooling_device(struct thermal_zone_device *thermal,
- 	return acpi_thermal_cooling_device_cb(thermal, cdev, false);
- }
- 
--static struct thermal_zone_device_ops acpi_thermal_zone_ops = {
-+static const struct thermal_zone_device_ops acpi_thermal_zone_ops = {
- 	.bind = acpi_thermal_bind_cooling_device,
- 	.unbind	= acpi_thermal_unbind_cooling_device,
- 	.get_temp = thermal_get_temp,
-diff --git a/drivers/platform/x86/acerhdf.c b/drivers/platform/x86/acerhdf.c
-index f2ce63c..bae9ca0 100644
---- a/drivers/platform/x86/acerhdf.c
-+++ b/drivers/platform/x86/acerhdf.c
-@@ -482,7 +482,7 @@ static int acerhdf_get_crit_temp(struct thermal_zone_device *thermal,
- }
- 
- /* bind callback functions to thermalzone */
--static struct thermal_zone_device_ops acerhdf_dev_ops = {
-+static const struct thermal_zone_device_ops acerhdf_dev_ops = {
- 	.bind = acerhdf_bind,
- 	.unbind = acerhdf_unbind,
- 	.get_temp = acerhdf_get_ec_temp,
-diff --git a/drivers/platform/x86/intel_mid_thermal.c b/drivers/platform/x86/intel_mid_thermal.c
-index 0944e83..069d36b 100644
---- a/drivers/platform/x86/intel_mid_thermal.c
-+++ b/drivers/platform/x86/intel_mid_thermal.c
-@@ -460,7 +460,7 @@ static int read_curr_temp(struct thermal_zone_device *tzd, unsigned long *temp)
- }
- 
- /* Can't be const */
--static struct thermal_zone_device_ops tzd_ops = {
-+static const struct thermal_zone_device_ops tzd_ops = {
- 	.get_temp = read_curr_temp,
- };
- 
-diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
-index 87e2fd1..878cb4e 100644
---- a/drivers/power/power_supply_core.c
-+++ b/drivers/power/power_supply_core.c
-@@ -509,7 +509,7 @@ static int power_supply_read_temp(struct thermal_zone_device *tzd,
- 	return ret;
- }
- 
--static struct thermal_zone_device_ops psy_tzd_ops = {
-+static const struct thermal_zone_device_ops psy_tzd_ops = {
- 	.get_temp = power_supply_read_temp,
- };
- 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 6feb25d..8d9c689 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -183,7 +183,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 	return 0;
- }
- 
--static struct thermal_zone_device_ops ops = {
-+static const struct thermal_zone_device_ops ops = {
- 	.get_temp = armada_get_temp,
- };
- 
-diff --git a/drivers/thermal/db8500_thermal.c b/drivers/thermal/db8500_thermal.c
-index b3eca71..38d6aab9 100644
---- a/drivers/thermal/db8500_thermal.c
-+++ b/drivers/thermal/db8500_thermal.c
-@@ -210,7 +210,7 @@ static int db8500_sys_get_crit_temp(struct thermal_zone_device *thermal,
- 	return -EINVAL;
- }
- 
--static struct thermal_zone_device_ops thdev_ops = {
-+static const struct thermal_zone_device_ops thdev_ops = {
- 	.bind = db8500_cdev_bind,
- 	.unbind = db8500_cdev_unbind,
- 	.get_temp = db8500_sys_get_temp,
-diff --git a/drivers/thermal/dove_thermal.c b/drivers/thermal/dove_thermal.c
-index a0bc9de..e8fd627 100644
---- a/drivers/thermal/dove_thermal.c
-+++ b/drivers/thermal/dove_thermal.c
-@@ -118,7 +118,7 @@ static int dove_get_temp(struct thermal_zone_device *thermal,
- 	return 0;
- }
- 
--static struct thermal_zone_device_ops ops = {
-+static const struct thermal_zone_device_ops ops = {
- 	.get_temp = dove_get_temp,
- };
- 
-diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-index f1424f0..8a3cfed 100644
---- a/drivers/thermal/imx_thermal.c
-+++ b/drivers/thermal/imx_thermal.c
-@@ -332,7 +332,7 @@ static int imx_unbind(struct thermal_zone_device *tz,
- 	return 0;
- }
- 
--static struct thermal_zone_device_ops imx_tz_ops = {
-+static const struct thermal_zone_device_ops imx_tz_ops = {
- 	.bind = imx_bind,
- 	.unbind = imx_unbind,
- 	.get_temp = imx_get_temp,
-diff --git a/drivers/thermal/int340x_thermal/int3400_thermal.c b/drivers/thermal/int340x_thermal/int3400_thermal.c
-index 031018e..96bdf8a 100644
---- a/drivers/thermal/int340x_thermal/int3400_thermal.c
-+++ b/drivers/thermal/int340x_thermal/int3400_thermal.c
-@@ -231,7 +231,7 @@ static int int3400_thermal_set_mode(struct thermal_zone_device *thermal,
- 	return result;
- }
- 
--static struct thermal_zone_device_ops int3400_thermal_ops = {
-+static const struct thermal_zone_device_ops int3400_thermal_ops = {
- 	.get_temp = int3400_thermal_get_temp,
- };
- 
-diff --git a/drivers/thermal/int340x_thermal/int340x_thermal_zone.c b/drivers/thermal/int340x_thermal/int340x_thermal_zone.c
-index b9b2666..bd9f9e8 100644
---- a/drivers/thermal/int340x_thermal/int340x_thermal_zone.c
-+++ b/drivers/thermal/int340x_thermal/int340x_thermal_zone.c
-@@ -154,7 +154,7 @@ static int int340x_thermal_get_trip_hyst(struct thermal_zone_device *zone,
- 	return 0;
- }
- 
--static struct thermal_zone_device_ops int340x_thermal_zone_ops = {
-+static const struct thermal_zone_device_ops int340x_thermal_zone_ops = {
- 	.get_temp       = int340x_thermal_get_zone_temp,
- 	.get_trip_temp	= int340x_thermal_get_trip_temp,
- 	.get_trip_type	= int340x_thermal_get_trip_type,
-diff --git a/drivers/thermal/intel_soc_dts_thermal.c b/drivers/thermal/intel_soc_dts_thermal.c
-index fd550b9..625ba6f 100644
---- a/drivers/thermal/intel_soc_dts_thermal.c
-+++ b/drivers/thermal/intel_soc_dts_thermal.c
-@@ -270,7 +270,7 @@ static int sys_get_curr_temp(struct thermal_zone_device *tzd, int *temp)
- 	return 0;
- }
- 
--static struct thermal_zone_device_ops tzone_ops = {
-+static const struct thermal_zone_device_ops tzone_ops = {
- 	.get_temp = sys_get_curr_temp,
- 	.get_trip_temp = sys_get_trip_temp,
- 	.get_trip_type = sys_get_trip_type,
-diff --git a/drivers/thermal/kirkwood_thermal.c b/drivers/thermal/kirkwood_thermal.c
-index 11041fe..abba3e2 100644
---- a/drivers/thermal/kirkwood_thermal.c
-+++ b/drivers/thermal/kirkwood_thermal.c
-@@ -60,7 +60,7 @@ static int kirkwood_get_temp(struct thermal_zone_device *thermal,
- 	return 0;
- }
- 
--static struct thermal_zone_device_ops ops = {
-+static const struct thermal_zone_device_ops ops = {
- 	.get_temp = kirkwood_get_temp,
- };
- 
 diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
-index b9c35bd..bd3185e 100644
+index c84404d..b9c35bd 100644
 --- a/drivers/thermal/of-thermal.c
 +++ b/drivers/thermal/of-thermal.c
-@@ -365,7 +365,7 @@ static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
- 	return -EINVAL;
- }
- 
--static struct thermal_zone_device_ops of_thermal_ops = {
-+static const struct thermal_zone_device_ops of_thermal_ops = {
- 	.get_temp = of_thermal_get_temp,
- 	.get_trend = of_thermal_get_trend,
- 	.set_emul_temp = of_thermal_set_emul_temp,
-diff --git a/drivers/thermal/rcar_thermal.c b/drivers/thermal/rcar_thermal.c
-index 5d4ae7d..320ceac 100644
---- a/drivers/thermal/rcar_thermal.c
-+++ b/drivers/thermal/rcar_thermal.c
-@@ -270,7 +270,7 @@ static int rcar_thermal_notify(struct thermal_zone_device *zone,
- 	return 0;
- }
- 
--static struct thermal_zone_device_ops rcar_thermal_zone_ops = {
-+static const struct thermal_zone_device_ops rcar_thermal_zone_ops = {
- 	.get_temp	= rcar_thermal_get_temp,
- 	.get_trip_type	= rcar_thermal_get_trip_type,
- 	.get_trip_temp	= rcar_thermal_get_trip_temp,
-diff --git a/drivers/thermal/spear_thermal.c b/drivers/thermal/spear_thermal.c
-index 534dd91..ec07743 100644
---- a/drivers/thermal/spear_thermal.c
-+++ b/drivers/thermal/spear_thermal.c
-@@ -50,7 +50,7 @@ static inline int thermal_get_temp(struct thermal_zone_device *thermal,
- 	return 0;
- }
- 
--static struct thermal_zone_device_ops ops = {
-+static const struct thermal_zone_device_ops ops = {
- 	.get_temp = thermal_get_temp,
- };
- 
-diff --git a/drivers/thermal/st/st_thermal.c b/drivers/thermal/st/st_thermal.c
-index 44cbba9..0cb5c19 100644
---- a/drivers/thermal/st/st_thermal.c
-+++ b/drivers/thermal/st/st_thermal.c
-@@ -175,7 +175,7 @@ static int st_thermal_get_trip_temp(struct thermal_zone_device *th,
- 	return 0;
- }
- 
--static struct thermal_zone_device_ops st_tz_ops = {
-+static const struct thermal_zone_device_ops st_tz_ops = {
- 	.get_temp	= st_thermal_get_temp,
- 	.get_trip_type	= st_thermal_get_trip_type,
- 	.get_trip_temp	= st_thermal_get_trip_temp,
-diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index 0f3d26c..420c702 100644
---- a/drivers/thermal/thermal_core.c
-+++ b/drivers/thermal/thermal_core.c
-@@ -1451,7 +1451,7 @@ static void remove_trip_attrs(struct thermal_zone_device *tz)
-  */
- struct thermal_zone_device *thermal_zone_device_register(const char *type,
- 	int trips, int mask, void *devdata,
--	struct thermal_zone_device_ops *ops,
-+	const struct thermal_zone_device_ops *ops,
- 	const struct thermal_zone_params *tzp,
- 	int passive_delay, int polling_delay)
+@@ -91,7 +91,7 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
  {
-diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-index ade78eb..e9c82fc 100644
---- a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-+++ b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-@@ -281,7 +281,7 @@ static const struct thermal_zone_of_device_ops ti_of_thermal_ops = {
- 	.get_trend = __ti_thermal_get_trend,
- };
+ 	struct __thermal_zone *data = tz->devdata;
  
--static struct thermal_zone_device_ops ti_thermal_ops = {
-+static const struct thermal_zone_device_ops ti_thermal_ops = {
- 	.get_temp = ti_thermal_get_temp,
- 	.get_trend = ti_thermal_get_trend,
- 	.bind = ti_thermal_bind,
-diff --git a/drivers/thermal/x86_pkg_temp_thermal.c b/drivers/thermal/x86_pkg_temp_thermal.c
-index 054c6d45..bb2b975 100644
---- a/drivers/thermal/x86_pkg_temp_thermal.c
-+++ b/drivers/thermal/x86_pkg_temp_thermal.c
-@@ -274,7 +274,7 @@ static int sys_get_trip_type(struct thermal_zone_device *thermal,
+-	if (!data->ops->get_temp)
++	if (!data->ops)
+ 		return -EINVAL;
+ 
+ 	return data->ops->get_temp(data->sensor_data, temp);
+@@ -178,7 +178,7 @@ static int of_thermal_set_emul_temp(struct thermal_zone_device *tz,
+ 	struct __thermal_zone *data = tz->devdata;
+ 
+ 	if (!data->ops || !data->ops->set_emul_temp)
+-		return -EINVAL;
++		return -ENOSYS;
+ 
+ 	return data->ops->set_emul_temp(data->sensor_data, temp);
+ }
+@@ -189,8 +189,8 @@ static int of_thermal_get_trend(struct thermal_zone_device *tz, int trip,
+ 	struct __thermal_zone *data = tz->devdata;
+ 	int r;
+ 
+-	if (!data->ops->get_trend)
+-		return -EINVAL;
++	if (!data->ops || !data->ops->get_trend)
++		return -ENOSYS;
+ 
+ 	r = data->ops->get_trend(data->sensor_data, trip, trend);
+ 	if (r)
+@@ -366,6 +366,10 @@ static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
  }
  
- /* Thermal zone callback registry */
--static struct thermal_zone_device_ops tzone_ops = {
-+static const struct thermal_zone_device_ops tzone_ops = {
- 	.get_temp = sys_get_curr_temp,
- 	.get_trip_temp = sys_get_trip_temp,
- 	.get_trip_type = sys_get_trip_type,
-diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-index 5c6a589..07bd5e8 100644
---- a/include/linux/thermal.h
-+++ b/include/linux/thermal.h
-@@ -181,7 +181,7 @@ struct thermal_zone_device {
- 	int emul_temperature;
- 	int passive;
- 	unsigned int forced_passive;
+ static struct thermal_zone_device_ops of_thermal_ops = {
++	.get_temp = of_thermal_get_temp,
++	.get_trend = of_thermal_get_trend,
++	.set_emul_temp = of_thermal_set_emul_temp,
++
+ 	.get_mode = of_thermal_get_mode,
+ 	.set_mode = of_thermal_set_mode,
+ 
+@@ -399,13 +403,13 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+ 	if (!ops)
+ 		return ERR_PTR(-EINVAL);
+ 
++	if (!ops->get_temp)
++		return ERR_PTR(-EINVAL);
++
+ 	mutex_lock(&tzd->lock);
+ 	tz->ops = ops;
+ 	tz->sensor_data = data;
+ 
+-	tzd->ops->get_temp = of_thermal_get_temp;
+-	tzd->ops->get_trend = of_thermal_get_trend;
+-	tzd->ops->set_emul_temp = of_thermal_set_emul_temp;
+ 	mutex_unlock(&tzd->lock);
+ 
+ 	return tzd;
+@@ -535,9 +539,6 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
+ 		return;
+ 
+ 	mutex_lock(&tzd->lock);
+-	tzd->ops->get_temp = NULL;
+-	tzd->ops->get_trend = NULL;
+-	tzd->ops->set_emul_temp = NULL;
+ 
+ 	tz->ops = NULL;
+ 	tz->sensor_data = NULL;
+@@ -845,7 +846,6 @@ int __init of_parse_thermal_zones(void)
+ {
+ 	struct device_node *np, *child;
+ 	struct __thermal_zone *tz;
 -	struct thermal_zone_device_ops *ops;
-+	const struct thermal_zone_device_ops *ops;
- 	const struct thermal_zone_params *tzp;
- 	struct thermal_governor *governor;
- 	struct list_head thermal_instances;
-@@ -313,7 +313,7 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
  
- #if IS_ENABLED(CONFIG_THERMAL)
- struct thermal_zone_device *thermal_zone_device_register(const char *, int, int,
--		void *, struct thermal_zone_device_ops *,
-+		void *, const struct thermal_zone_device_ops *,
- 		const struct thermal_zone_params *, int, int);
- void thermal_zone_device_unregister(struct thermal_zone_device *);
+ 	np = of_find_node_by_name(NULL, "thermal-zones");
+ 	if (!np) {
+@@ -869,29 +869,22 @@ int __init of_parse_thermal_zones(void)
+ 			continue;
+ 		}
  
-@@ -341,7 +341,7 @@ void thermal_notify_framework(struct thermal_zone_device *, int);
- #else
- static inline struct thermal_zone_device *thermal_zone_device_register(
- 	const char *type, int trips, int mask, void *devdata,
--	struct thermal_zone_device_ops *ops,
-+	const struct thermal_zone_device_ops *ops,
- 	const struct thermal_zone_params *tzp,
- 	int passive_delay, int polling_delay)
- { return ERR_PTR(-ENODEV); }
+-		ops = kmemdup(&of_thermal_ops, sizeof(*ops), GFP_KERNEL);
+-		if (!ops)
+-			goto exit_free;
+-
+ 		tzp = kzalloc(sizeof(*tzp), GFP_KERNEL);
+-		if (!tzp) {
+-			kfree(ops);
++		if (!tzp)
+ 			goto exit_free;
+-		}
+ 
+ 		/* No hwmon because there might be hwmon drivers registering */
+ 		tzp->no_hwmon = true;
+ 
+ 		zone = thermal_zone_device_register(child->name, tz->ntrips,
+ 						    0, tz,
+-						    ops, tzp,
++						    &of_thermal_ops, tzp,
+ 						    tz->passive_delay,
+ 						    tz->polling_delay);
+ 		if (IS_ERR(zone)) {
+ 			pr_err("Failed to build %s zone %ld\n", child->name,
+ 			       PTR_ERR(zone));
+ 			kfree(tzp);
+-			kfree(ops);
+ 			of_thermal_free_zone(tz);
+ 			/* attempting to build remaining zones still */
+ 		}
 -- 
 2.1.4
