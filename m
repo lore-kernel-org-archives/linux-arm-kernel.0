@@ -1,103 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 29 Apr 2015 10:25:45 +0100
-Subject: [PATCH V7 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
-In-Reply-To: <1430174242-29465-5-git-send-email-abrestic@chromium.org>
-References: <1430174242-29465-1-git-send-email-abrestic@chromium.org>
- <1430174242-29465-5-git-send-email-abrestic@chromium.org>
-Message-ID: <20150429092545.GR9169@x1>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Wed, 29 Apr 2015 11:47:37 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <20150429091714.GH12732@n2100.arm.linux.org.uk>
+References: <5538DD02.6050401@topic.nl> <2757951.K585xX1rYN@wuerfel>
+ <55409A89.5070008@topic.nl> <4351847.Ycu9R2FQB8@wuerfel>
+ <20150429091714.GH12732@n2100.arm.linux.org.uk>
+Message-ID: <5540A8B9.7010100@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Apr 2015, Andrew Bresticker wrote:
+?On 29-04-15 11:17, Russell King - ARM Linux wrote:
+> On Wed, Apr 29, 2015 at 11:01:35AM +0200, Arnd Bergmann wrote:
+>> You still need to synchronize MMIO register accesses with write buffers,
+>> as the readl() and writel() functions do in the kernel.
+>>
+>> In particular, after you have written a buffer to memory from the CPU,
+>> you will need to do an outer_sync() before the MMIO write that triggers
+>> the DMA. This is still much cheaper than doing the cache flush though.
+>
+> Note that outer_sync() is already done by readl/writel and/or the write
+> memory barriers (mb()/wmb()).
 
-> Add a binding document for the XUSB host complex on NVIDIA Tegra124
-> and later SoCs.  The XUSB host complex includes a mailbox for
-> communication with the XUSB micro-controller and an xHCI host-controller.
-> 
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> ---
-> New for v7.
-> ---
->  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> new file mode 100644
-> index 0000000..6a46680
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> @@ -0,0 +1,46 @@
-> +NVIDIA Tegra XUSB host copmlex
-> +==============================
-> +
-> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
-> +controller and a mailbox for communication with the XUSB micro-controller.
-> +
-> +Required properties:
-> +--------------------
-> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
-> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
-> +   where <chip> is tegra132.
+I initiate the DMA transfers using iowrite32() so if I understand correctly, 
+I'm already doing the right thing here.
 
-Okay.  Why?
+Just to be completely clear, there is no direct register access from user 
+space, the driver does all MMIO. Userspace only gets an mmap for DMA buffers, 
+and uses ioctl to initiate transfers.
 
-> + - reg: Must contain register base and length for each register set listed
-> +   in reg-names.
+>> Another possible problem would be if the driver mmaps the buffer in
+>> uncached mode to user space. This is something your kernel driver has
+>> to get right, it won't be handled automatically by setting the
+>> "dma-coherent" property in DT.
+>
+> The buffer should also be mapped into userspace with the same memory
+> type and cache attributes as the kernel side mapping.  If using ACP,
+> then you probably want "normal memory, cacheable, writeback, read
+> allocate" or in the case of SMP, the same but "read/write allocate".
 
-You've mentioned 2 of the cells, what about the remaining 2?
+I currently use dma_alloc_coherent() to allocate buffers and 
+dma_mmap_coherent() to map them to user space. I was under the assumption that 
+these would do the right thing. Is that correct? If not, then what should I use?
 
-> + - reg-names: Must include the following entries:
-> +   - xhci
-> +   - fpci
-> +   - ipfs
-> + - interrupts: Must contain an interrupt for each entry in interrupt-names.
-> + - interrupt-names: Must include the following entries:
-> +   - host
-> +   - smi
-> +   - pme
-> +
-> +Example:
-> +--------
-> +	usb at 0,70090000 {
-> +		compatible = "nvidia,tegra124-xusb";
-> +		reg = <0x0 0x70090000 0x0 0x8000>,
-> +		      <0x0 0x70098000 0x0 0x1000>,
-> +		      <0x0 0x70099000 0x0 0x1000>;
-> +		reg-names = "xhci", "fpci", "ipfs";
-> +		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 40 IRQ_TYPE_LEVEL_HGIH>,
-> +			     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-names = "host", "smi", "pme";
 
-Are these resources used by both children?
 
-If not, place them into the children and ioremap() them from the
-associated child drivers.
 
-Using an MFD driver to pull all of this out an disseminate it is a bit
-bonkers.
+Kind regards,
 
-> +		usb-host {
-> +			compatible = "nvidia,tegra124-xhci";
-> +			...
-> +		};
-> +
-> +		mailbox {
-> +			compatible = "nvidia,tegra124-xusb-mbox";
-> +			...
-> +		};
-> +	};
+Mike Looijmans
+System Expert
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+TOPIC Embedded Products
+Eindhovenseweg 32-C, NL-5683 KH Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+Telefax: +31 (0) 499 33 69 70
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
