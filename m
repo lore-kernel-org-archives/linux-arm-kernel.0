@@ -1,82 +1,67 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 29 Apr 2015 09:53:59 +0200
-Subject: [PATCH v2] arm: dma-mapping: fix off-by-one check in
- arm_setup_iommu_dma_ops
-Message-ID: <1430294039-25218-1-git-send-email-m.szyprowski@samsung.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 29 Apr 2015 10:10:47 +0200
+Subject: [PATCH v2 06/10] KVM: arm64: guest debug, add SW break point
+ support
+In-Reply-To: <87tww0qqh9.fsf@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
+ <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
+ <20150427200407.GG23335@cbox>
+ <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
+ <87wq0wr6dd.fsf@linaro.org>
+ <CAFEAcA85i_1JybEFBg91NA3-LpAzYh4RSDnqryOd=rZN7gZP5A@mail.gmail.com>
+ <20150428125645.GA4137@cbox> <87tww0qqh9.fsf@linaro.org>
+Message-ID: <20150429081047.GB4137@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 22b3c181c6c324a46f71aae806d8ddbe61d25761 ("arm: dma-mapping: limit
-IOMMU mapping size") added a check for IO address space size. However
-this patch broke IOMMU initialization for typical platforms initialized
-from device tree, which get the default IO address space size of 4GiB.
-This value doesn't fit into size_t and fails a check introduced by that
-commit resulting in failed dma-mapping/iommu initialization. This patch
-fixes this issue by adding proper support for full 4GiB address space
-size.
+On Tue, Apr 28, 2015 at 03:37:01PM +0100, Alex Benn?e wrote:
+> 
+> Christoffer Dall <christoffer.dall@linaro.org> writes:
+> 
+> > On Tue, Apr 28, 2015 at 10:34:12AM +0100, Peter Maydell wrote:
+> >> On 28 April 2015 at 09:42, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> >> > Peter Maydell <peter.maydell@linaro.org> writes:
+> >> >> Does the kernel already have a conveniently implemented "inject
+> >> >> exception into guest" lump of code? If so it might be less effort
+> >> >> to do it that way round, maybe.
+> >> >
+> >> > So you pointed out we can't just re-inject the exceptions we get as we
+> >> > need to map from things like ESR_ELx_EC_WATCHPT_LOW to
+> >> > ESR_ELx_EC_WATCHPT_CUR before re-injection.
+> >> >
+> >> > Of course if it is as simple as modifying the ESR_EL1 register and
+> >> > returning +ve in the handle_exit path then I can do that but I assumed
+> >> > if any other wrangling needs doing it should be done in userspace.
+> >> 
+> >> Well, somebody's got to do it, and it's the same amount of work
+> >> either way (fiddling with ESR, making sure we direct the guest
+> >> to the right exception vector entry point, maybe a few other
+> >> things).
+> >> 
+> > We already have code in the kernel to inject data/instruction aborts,
+> > but not sure how much benefit there is in re-using that.  It's up to you
+> > really, but I think the kernel code should be clear about what the
+> > intention is so that we don't end up in a situation where: (1) The
+> > intended behavior is unclear/vague, and (2) it doesn't actually work in
+> > practice so nobody can follow the code.
+> 
+> Certainly there are some cases where the kernel doesn't have all the
+> information. For example it doesn't know if the soft break was inserted
+> by the guest or the host. That to me favours the "let userspace deal
+> with the ugly" approach.
+> 
+Not sure I follow.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
-Changelog:
-v2:
-- moved check from arm_setup_iommu_dma_ops() to arm_iommu_create_mapping()
+If it's an exception for the guest, then that must be because the guest
+put in the breakpoint instruction, right?
 
-v1: http://www.spinics.net/lists/arm-kernel/msg414483.html
----
- arch/arm/include/asm/dma-iommu.h |  2 +-
- arch/arm/mm/dma-mapping.c        | 13 +++++--------
- 2 files changed, 6 insertions(+), 9 deletions(-)
+However, that's a separate discussion from that of *how* userspace or
+the kernel then injects an exception to the guest.
 
-diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
-index 8e3fcb924db6..2ef282f96651 100644
---- a/arch/arm/include/asm/dma-iommu.h
-+++ b/arch/arm/include/asm/dma-iommu.h
-@@ -25,7 +25,7 @@ struct dma_iommu_mapping {
- };
- 
- struct dma_iommu_mapping *
--arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size);
-+arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size);
- 
- void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
- 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 09c5fe3d30c2..143c0735cb58 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1878,7 +1878,7 @@ struct dma_map_ops iommu_coherent_ops = {
-  * arm_iommu_attach_device function.
-  */
- struct dma_iommu_mapping *
--arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
-+arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size)
- {
- 	unsigned int bits = size >> PAGE_SHIFT;
- 	unsigned int bitmap_size = BITS_TO_LONGS(bits) * sizeof(long);
-@@ -1886,6 +1886,10 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
- 	int extensions = 1;
- 	int err = -ENOMEM;
- 
-+	/* currently ony 32-bit DMA address space is supported */
-+	if (size > DMA_BIT_MASK(32) + 1)
-+		return ERR_PTR(-EINVAL);
-+
- 	if (!bitmap_size)
- 		return ERR_PTR(-EINVAL);
- 
-@@ -2057,13 +2061,6 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 	if (!iommu)
- 		return false;
- 
--	/*
--	 * currently arm_iommu_create_mapping() takes a max of size_t
--	 * for size param. So check this limit for now.
--	 */
--	if (size > SIZE_MAX)
--		return false;
--
- 	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
- 	if (IS_ERR(mapping)) {
- 		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
--- 
-1.9.2
+By using some QEMU TCG functionality or by QEMU calling back into KVM
+and asking it to inject an exception for it.
+
+What am I missing?
+
+-Christoffer
