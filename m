@@ -1,65 +1,79 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 29 Apr 2015 00:33:42 -0400
-Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <55363791.4070706@hitachi.com>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
- <55363791.4070706@hitachi.com>
-Message-ID: <55405F26.4010607@linaro.org>
+From: rajeevkumar.linux@gmail.com (rajeev kumar)
+Date: Wed, 29 Apr 2015 10:48:25 +0530
+Subject: [PATCH v6 1/3] dt-bindings: Add I2C bindings for mt65xx/mt81xx.
+In-Reply-To: <1430209869-6631-2-git-send-email-eddie.huang@mediatek.com>
+References: <1430209869-6631-1-git-send-email-eddie.huang@mediatek.com>
+ <1430209869-6631-2-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <CAA7nrtgcAU8RpUO=GPAWQH5hrsMg5jDzOJ-NqN_c19t_GPmTjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/15 07:42, Masami Hiramatsu wrote:
-> (2015/04/21 5:19), David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
->> first seen in October 2013. This version attempts to address concerns raised by
->> reviewers and also fixes problems discovered during testing.
->>
->> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
->> and return probes(kretprobes) support for ARM64.
->>
->> The kprobes mechanism makes use of software breakpoint and single stepping
->> support available in the ARM v8 kernel.
->>
-> [...]
->> Changes since v5 include:
->>
->> 1) Replaced installation of breakpoint hook with direct call from the
->> handlers in debug-monitors.c, as requested.
->> 2) Reject probing of instructions that read the interrupt mask, in
->> addition to instructions that set it.
->> 3) Cleaned up comments describing usage of Debug Mask.
->> 4) Added KPROBE_REENTER case in reenter_kprobe.
->> 5) Corrected the ifdef'd definitions for notify_page_fault() to be
->> consistent when KPROBES is not configed.
->> 6) Changed "cpsr" to "pstate" for HAVE_REGS_AND_STACK_ACCESS_API feature.
->> 7) Added back in missing new files in previous patch.
->> 8) Changed two instances of pr_warning() to pr_warn().
-> 
-> Looks OK to me:)
-> BTW, have you tried to build and test this with CONFIG_KPROBE_EVENT?
-> If so, you can also test it by tools/testing/selftests/ftrace/ftracetest.
-> 
+On Tue, Apr 28, 2015 at 2:01 PM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+> From: Xudong Chen <xudong.chen@mediatek.com>
+>
+> Add devicetree bindings for Mediatek Soc I2C driver.
+>
+> Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-mt6577.txt         | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> new file mode 100644
+> index 0000000..0ce6fa3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> @@ -0,0 +1,41 @@
+> +* Mediatek's I2C controller
+> +
+> +The Mediatek's I2C controller is used to interface with I2C devices.
+> +
+> +Required properties:
+> +  - compatible: value should be either of the following.
+> +      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
+> +      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
+> +      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
+> +      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
+> +      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
+> +  - reg: physical base address of the controller and dma base, length of memory
+> +    mapped region.
+> +  - interrupts: interrupt number to the cpu.
+> +  - clock-div: the fixed value for frequency divider of clock source in i2c
+> +    module. Each IC may be different.
+> +  - clocks: clock name from clock manager
+> +  - clock-names: Must include "main" and "dma", if enable have-pmic need include
+> +    "pmic" extra.
+> +
+> +Optional properties:
+> +  - clock-frequency: Frequency in Hz of the bus when transfer, the default value
+> +    is 100000.
 
-Yes, it builds with CONFIG_KPROBE_EVENT.  Thanks for the suggestion
-regarding ftracetest, I was not actually aware of that test.  I ran it
-with no failures, 11 "PASS", and 4 "UNSUPPORTED" tests.
+100000 HZ ...
 
->> Note that there seems to be at least a potential issue with kprobes
->> on multiple (possibly all) platforms having to do with use of kfree
->> inside of the kretprobes trampoline handler.  This has manifested
->> occasionally in systemtap testing on arm64.  There does not appear to
->> be an simple solution to the problem.
-> 
-> No, trampoline handler must call recycle_rp_inst() instead of kfree
-> to return kretprobe instance to the pool. Hmm, I should look into it.
-> 
-
-I think all architectures call both from the kretprobe trampoline.  In
-the arm64 case at least the kfree call apparently is very infrequent,
-and very problematic for now if anything it subsequently calls has a
-kretprobe set.
-
-Thanks,
--dl
+> +  - mediatek,have-pmic: platform can control i2c form special pmic side.
+> +    Only mt6589 and mt8135 support this feature.
+> +  - mediatek,use-push-pull: IO config use push-pull mode.
+> +
+> +Example:
+> +
+> +       i2c0: i2c at 1100d000 {
+> +                       compatible = "mediatek,mt6577-i2c";
+> +                       reg = <0x1100d000 0x70>,
+> +                             <0x11000300 0x80>;
+> +                       interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
+> +                       clock-frequency = <400000>;
+> +                       mediatek,have-pmic;
+> +                       clock-div = <16>;
+> +                       clocks = <&i2c0_ck>, <&ap_dma_ck>;
+> +                       clock-names = "main", "dma";
+> +       };
+> +
+> --
+> 1.8.1.1.dirty
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
