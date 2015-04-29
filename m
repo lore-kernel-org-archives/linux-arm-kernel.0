@@ -1,44 +1,56 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 29 Apr 2015 16:30:51 +0200
-Subject: [PATCH v2] ata: ahci_st: fixup layering violations / drvdata
- errors
-In-Reply-To: <1429537265-22367-2-git-send-email-peter.griffin@linaro.org>
-References: <1429537265-22367-1-git-send-email-peter.griffin@linaro.org>
- <1429537265-22367-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <5540EB1B.10505@st.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 29 Apr 2015 09:31:03 -0500
+Subject: [PATCH 1/2] arm/arm64: ACPI: Introduce CONFIG_ACPI_MUST_HAVE_CCA
+In-Reply-To: <20150429140445.GA18867@e104818-lin.cambridge.arm.com>
+References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1430315049-4663-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20150429140445.GA18867@e104818-lin.cambridge.arm.com>
+Message-ID: <5540EB27.8060507@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
 
-On 04/20/2015 03:41 PM, Peter Griffin wrote:
-> Brian noticed while working on another SATA driver that uses libahci_platform,
-> an error in this driver; it tries to the the driver data for its
-> device, while libata also thinks it can set the driver data. See:
+
+On 04/29/2015 09:04 AM, Catalin Marinas wrote:
+> On Wed, Apr 29, 2015 at 08:44:08AM -0500, Suravee Suthikulpanit wrote:
+>>  From ACPIv6 (http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf),
+>> section 6.2.17 _CCA states that ARM platforms require ACPI _CCA object to be
+>> specified for DMA-cabpable devices. This patch introduces ACPI_MUST_HAVE_CCA
+>> in arm and arm64 Kconfig to specify such requirement.
+>>
+>> Note that when _CCA is required, if it is missing in the DSDT. ACPI driver
+>> will default to setting up devices as non-coherent.
+>>
+>> Signed-off-by: Mark Salter <msalter@redhat.com>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> ---
+>>   arch/arm/Kconfig     | 1 +
+>>   arch/arm64/Kconfig   | 1 +
+>>   drivers/acpi/Kconfig | 3 +++
+>>   3 files changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 45df48b..2a0d036 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -1,6 +1,7 @@
+>>   config ARM
+>>   	bool
+>>   	default y
+>> +	select ACPI_MUST_HAVE_CCA if ACPI
+>>   	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+>>   	select ARCH_HAS_ELF_RANDOMIZE
+>>   	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
 >
->    ahci_platform_init_host()
->    -> ata_host_alloc_pinfo()
->       -> ata_host_alloc()
->          -> dev_set_drvdata()
->
-> So instead of sticking the IP-specific platform data into drvdata, let's
-> use the plat_data variable that is reserved for this use.
->
-> Addtionally plat_data isn't set until ahci_platform_init_host() has been
-> called further down in probe(). So re-work the st_ahci_probe_resets and
-> st_ahci_deassert_resets functions to take ahci_host_priv *hpriv as a
-> parameter.
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Suggested-by: Brian Norris <computersforpeace@gmail.com>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-> Cc: Maxime Coquelin <maxime.coquelin@st.com>
-> Cc: Patrice Chotard <patrice.chotard@st.com>
-> ---
+> Any plans for ACPI on 32-bit ARM?
 >
 
-You can add my:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+Not that I am aware, but I could be totally wrong. The reason I am 
+adding this here for 32-bit ARM is because the ACPI spec mentioned this.
 
-Thanks!
-Maxime
+If you think this is not necessary until we introduce ACPI for ARM32, it 
+can be removed.
+
+Thanks,
+
+Suravee
