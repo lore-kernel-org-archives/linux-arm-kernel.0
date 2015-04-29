@@ -1,60 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 29 Apr 2015 17:47:46 -0600
-Subject: [PATCH 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <87oam6q0v1.fsf@eliezer.anholt.net>
-References: <1430176449-12322-1-git-send-email-eric@anholt.net>
- <1430176449-12322-3-git-send-email-eric@anholt.net>
- <55403AD1.4030103@wwwdotorg.org> <87oam6q0v1.fsf@eliezer.anholt.net>
-Message-ID: <55416DA2.5040902@wwwdotorg.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 30 Apr 2015 08:56:50 +0900
+Subject: [RFT PATCH] drm/exynos: Enable DP clock to fix display on
+ Exynos5250 and other
+In-Reply-To: <7h8udau9he.fsf@deeprootsystems.com>
+References: <1427471856-20918-1-git-send-email-k.kozlowski@samsung.com>
+ <7h8udau9he.fsf@deeprootsystems.com>
+Message-ID: <CAJKOXPc6Epy_L+djManggcaYLaOrQ_c2S0=_GgU=dikuY1UU0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/15 11:51, Eric Anholt wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
+2015-04-30 2:31 GMT+09:00 Kevin Hilman <khilman@kernel.org>:
+> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
 >
->> On 04/27/2015 05:14 PM, Eric Anholt wrote:
->>> This gives us a function for making mailbox property channel requests
->>> of the firmware, and uses it to control the 3 power domains provided
->>> by the firmware.
+>> After adding display power domain for Exynos5250 in commit
+>> 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
+>> display on Chromebook Snow and others stopped working after boot.
 >>
->>> diff --git a/arch/arm/mach-bcm/raspberrypi-firmware.c b/arch/arm/mach-bcm/raspberrypi-firmware.c
+>> The reason for this suggested Andrzej Hajda: the DP clock was disabled.
+>> This clock is required by Display Port and is enabled by bootloader.
+>> However when FIMD driver probing was deferred, the display power domain
+>> was turned off. This effectively reset the value of DP clock enable
+>> register.
 >>
->>> +/*
->>> + * Submits a set of concatenated tags to the VPU firmware through the
->>> + * mailbox property interface.
->>> + *
->>> + * The buffer header and the ending tag are added by this function and
->>> + * don't need to be supplied, just the actual tags for your operation.
->>> + * See struct raspberrypi_firmware_property_tag_header for the per-tag structure.
->>> + */
->>> +int raspberrypi_firmware_property(void *data, size_t tag_size)
->>> +{
->>> +	size_t size = tag_size + 12;
->>> +	u32 *buf;
->>> +	dma_addr_t bus_addr;
->>> +	int ret = 0;
->>> +
->>> +	if (!firmware)
->>> +		return -EPROBE_DEFER;
+>> When exynos-dp is later probed, the clock is not enabled and display is
+>> not properly configured:
 >>
->> I think it'd make more sense if the clients looked up the firmware
->> driver via phandle at their probe time. This would mean:
+>> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
+>> exynos-dp 145b0000.dp-controller: unable to config video
 >>
->> * No need for global "firmware", since clients could pass the firmware
->> driver handle into this function.
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
+>> Cc: <stable@vger.kernel.org>
 >>
->> * Clients resolve deferred probe at their probe time. That way, they
->> won't register themselves with subsystems asserting they can provide
->> services, but find out they can't yet provide the service at that time.
+>> ---
+>>
+>> This should fix issue reported by Javier [1][2].
+>>
+>> Tested on Chromebook Snow (Exynos 5250). More testing would be great,
+>> especially on other Exynos 5xxx products.
 >
-> The one client so far (vc4) was resolving deferred probe at its probe
-> time, but not taking a reference on the firmware driver.  I figure I'll
-> have it do the phandle lookup and refcount -- do you still want the
-> struct platform_device passed in here?  If we de-global firmware, it's
-> going to mean some faffing in the power domain side of things to find
-> the device again, it seems.
+> I hoped to try this on my exynos5 boards, but it doesn't seem to apply
+> to linux-next or to Linus' master branch.
+>
+> Are there some other dependencies here?
 
-I think I'd expect the API in the firmware driver to require the client 
-to pass the client DT node pointer plus a property name, and do all the 
-lookup itself. That's what most DT resource lookup APIs in the kernel do 
-now.
+It is already applied:
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1c363c7cccf64128087002b0779986ad16aff6dc
+
+Best regards,
+Krzysztof
