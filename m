@@ -1,48 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Apr 2015 16:42:01 +0200
-Subject: [RFC PATCH 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150429142554.GI2992@jayachandranc.netlogicmicro.com>
-References: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
- <6662179.AoBfCMOsxD@wuerfel>
- <20150429142554.GI2992@jayachandranc.netlogicmicro.com>
-Message-ID: <2265507.Ss5WpSD2vL@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 Apr 2015 15:42:32 +0100
+Subject: [PATCH 1/2] arm/arm64: ACPI: Introduce CONFIG_ACPI_MUST_HAVE_CCA
+In-Reply-To: <5540EB27.8060507@amd.com>
+References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1430315049-4663-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20150429140445.GA18867@e104818-lin.cambridge.arm.com>
+ <5540EB27.8060507@amd.com>
+Message-ID: <20150429144232.GC18867@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 April 2015 19:55:55 Jayachandran C. wrote:
-> On Wed, Apr 29, 2015 at 02:34:20PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 29 April 2015 17:09:58 Jayachandran C wrote:
-> > > The current code in pci-host-generic.c uses pci_common_init_dev()
-> > > from the arch/arm/ to do a part of the PCI initialization, and this
-> > > prevents it from being used on arm64.
-> > > 
-> > > The initialization done by pci_common_init_dev() that is really
-> > > needed by pci-host-generic.c can be done in the same file without
-> > > using the hw_pci API of ARM.
-> > > 
-> > > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
-> > > this is be handled by setting up 'struct gen_pci' to embed a
-> > > pci_sys_data variable as the first element on the ARM platform.
-> > > 
-> > > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> > 
-> > This seems very useful
+On Wed, Apr 29, 2015 at 09:31:03AM -0500, Suravee Suthikulpanit wrote:
 > 
-> I have tried to ensure that the new code is as much as possible
-> functionally equivalent to the call to pci_common_init_dev on ARM.
 > 
-> I should have added this as a note to the patch.
+> On 04/29/2015 09:04 AM, Catalin Marinas wrote:
+> >On Wed, Apr 29, 2015 at 08:44:08AM -0500, Suravee Suthikulpanit wrote:
+> >> From ACPIv6 (http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf),
+> >>section 6.2.17 _CCA states that ARM platforms require ACPI _CCA object to be
+> >>specified for DMA-cabpable devices. This patch introduces ACPI_MUST_HAVE_CCA
+> >>in arm and arm64 Kconfig to specify such requirement.
+> >>
+> >>Note that when _CCA is required, if it is missing in the DSDT. ACPI driver
+> >>will default to setting up devices as non-coherent.
+> >>
+> >>Signed-off-by: Mark Salter <msalter@redhat.com>
+> >>Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >>---
+> >>  arch/arm/Kconfig     | 1 +
+> >>  arch/arm64/Kconfig   | 1 +
+> >>  drivers/acpi/Kconfig | 3 +++
+> >>  3 files changed, 5 insertions(+)
+> >>
+> >>diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >>index 45df48b..2a0d036 100644
+> >>--- a/arch/arm/Kconfig
+> >>+++ b/arch/arm/Kconfig
+> >>@@ -1,6 +1,7 @@
+> >>  config ARM
+> >>  	bool
+> >>  	default y
+> >>+	select ACPI_MUST_HAVE_CCA if ACPI
+> >>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+> >>  	select ARCH_HAS_ELF_RANDOMIZE
+> >>  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+> >
+> >Any plans for ACPI on 32-bit ARM?
 > 
-> Ideally, I would like this patch to be functionally equivalent
-> to the existing code, and make further improvements with follow up
-> patches, but I can make the changes you suggest if it is needed.
+> Not that I am aware, but I could be totally wrong. The reason I am adding
+> this here for 32-bit ARM is because the ACPI spec mentioned this.
+> 
+> If you think this is not necessary until we introduce ACPI for ARM32, it can
+> be removed.
 
-I believe the driver is only used in virtual machines at the moment,
-so it should be easy enough to test the relevant cases on arm32
-and make it as simple as possible.
+I think it should be removed (as long as ACPI cannot be selected on
+arm32).
 
-For bisection purposes, it could however be better to start with your
-current patch and then follow it up with a second patch that removes
-the unnecessary parts again immediately.
-
-	Arnd
+-- 
+Catalin
