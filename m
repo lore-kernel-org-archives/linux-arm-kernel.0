@@ -1,63 +1,86 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 29 Apr 2015 11:57:18 +0200
-Subject: [PATCH v2] MAINTAINERS: replace an AT91 maintainer
-In-Reply-To: <1430293252-9167-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1430293252-9167-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1430301438-11839-1-git-send-email-nicolas.ferre@atmel.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 29 Apr 2015 12:02:52 +0200
+Subject: [PATCH] arm: dma-mapping: fix off-by-one check in
+ arm_setup_iommu_dma_ops
+Message-ID: <1430301772-21852-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As some help is needed from an active maintainer, replace Andrew Victor
-by Alexandre Belloni in the ARM/Atmel MAINTAINERS' entry (aka AT91).
-Add an entry to the CREDITS file.
+Patch 22b3c181c6c324a46f71aae806d8ddbe61d25761 ("arm: dma-mapping: limit
+IOMMU mapping size") added a check for IO address space size. However
+this patch broke IOMMU initialization for typical platforms initialized
+from device tree, which get the default IO address space size of 4GiB.
+This value doesn't fit into size_t and fails a check introduced by that
+commit resulting in failed dma-mapping/iommu initialization. This patch
+fixes this issue by adding proper support for full 4GiB address space
+size.
 
-Thanks Andrew for the great role you played during the early days of this
-product family.
-
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Andrew Victor <linux@maxim.org.za>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
 ---
-Changes for v2:
-- add the CREDITS enty
+Changelog:
+v3:
+- fixed typo and changed error code to ERANGE
 
- CREDITS     | 7 +++++++
- MAINTAINERS | 3 +--
- 2 files changed, 8 insertions(+), 2 deletions(-)
+v2:
+- moved check from arm_setup_iommu_dma_ops() to arm_iommu_create_mapping()
 
-diff --git a/CREDITS b/CREDITS
-index 40cc4bfb34db..ec7e6c7fdd1b 100644
---- a/CREDITS
-+++ b/CREDITS
-@@ -3709,6 +3709,13 @@ N: Dirk Verworner
- D: Co-author of German book ``Linux-Kernel-Programmierung''
- D: Co-founder of Berlin Linux User Group
+v1: http://www.spinics.net/lists/arm-kernel/msg414483.html
+---
+ arch/arm/include/asm/dma-iommu.h |  2 +-
+ arch/arm/mm/dma-mapping.c        | 13 +++++--------
+ 2 files changed, 6 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+index 8e3fcb924db6..2ef282f96651 100644
+--- a/arch/arm/include/asm/dma-iommu.h
++++ b/arch/arm/include/asm/dma-iommu.h
+@@ -25,7 +25,7 @@ struct dma_iommu_mapping {
+ };
  
-+N: Andrew Victor
-+E: linux at maxim.org.za
-+W: http://maxim.org.za/at91_26.html
-+D: First maintainer of Atmel ARM-based SoC, aka AT91
-+D: Introduced support for at91rm9200, the first chip of AT91 family
-+S: South Africa
+ struct dma_iommu_mapping *
+-arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size);
++arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size);
+ 
+ void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
+ 
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 09c5fe3d30c2..7e7583ddd607 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1878,7 +1878,7 @@ struct dma_map_ops iommu_coherent_ops = {
+  * arm_iommu_attach_device function.
+  */
+ struct dma_iommu_mapping *
+-arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
++arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size)
+ {
+ 	unsigned int bits = size >> PAGE_SHIFT;
+ 	unsigned int bitmap_size = BITS_TO_LONGS(bits) * sizeof(long);
+@@ -1886,6 +1886,10 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
+ 	int extensions = 1;
+ 	int err = -ENOMEM;
+ 
++	/* currently only 32-bit DMA address space is supported */
++	if (size > DMA_BIT_MASK(32) + 1)
++		return ERR_PTR(-ERANGE);
 +
- N: Riku Voipio
- E: riku.voipio at iki.fi
- D: Author of PCA9532 LED and Fintek f75375s hwmon driver
-diff --git a/MAINTAINERS b/MAINTAINERS
-index be26fc584cc6..1512e958082a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -892,11 +892,10 @@ S:	Maintained
- F:	arch/arm/mach-alpine/
+ 	if (!bitmap_size)
+ 		return ERR_PTR(-EINVAL);
  
- ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
--M:	Andrew Victor <linux@maxim.org.za>
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
-+M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
- M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://maxim.org.za/at91_26.html
- W:	http://www.linux4sam.org
- S:	Supported
- F:	arch/arm/mach-at91/
+@@ -2057,13 +2061,6 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 	if (!iommu)
+ 		return false;
+ 
+-	/*
+-	 * currently arm_iommu_create_mapping() takes a max of size_t
+-	 * for size param. So check this limit for now.
+-	 */
+-	if (size > SIZE_MAX)
+-		return false;
+-
+ 	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
+ 	if (IS_ERR(mapping)) {
+ 		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
 -- 
-2.1.3
+1.9.2
