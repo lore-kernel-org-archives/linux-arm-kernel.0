@@ -1,65 +1,69 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 29 Apr 2015 14:08:58 +0800
-Subject: [PATCH] ARM: imx: correct Audio/Video PLL rate calculation formula
-In-Reply-To: <20150428094657.GA15036@shlinux1.ap.freescale.net>
-References: <1429810455-22447-1-git-send-email-b20788@freescale.com>
- <20150427142941.GA1788@dragon>
- <20150428094657.GA15036@shlinux1.ap.freescale.net>
-Message-ID: <20150429060857.GB27573@dragon>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 29 Apr 2015 09:18:53 +0300
+Subject: [PATCH 2/4] mtd: mxc_nand: limit the size of used oob
+In-Reply-To: <20150427193127.GU19431@pengutronix.de>
+References: <cover.1430034929.git.baruch@tkos.co.il>
+ <4bd5da1f7d57aa32c5682297f7aa0c768e8c6e49.1430034929.git.baruch@tkos.co.il>
+ <20150426200725.GC19431@pengutronix.de>
+ <20150427043906.GR2258@tarshish>
+ <20150427071238.GE19431@pengutronix.de>
+ <20150427072057.GT2258@tarshish>
+ <20150427075023.GF19431@pengutronix.de>
+ <20150427114341.GW2258@tarshish>
+ <20150427193127.GU19431@pengutronix.de>
+Message-ID: <20150429061853.GB2258@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+Hi Uwe,
 
-On Tue, Apr 28, 2015 at 05:47:00PM +0800, Anson Huang wrote:
-> On Mon, Apr 27, 2015 at 10:29:43PM +0800, Shawn Guo wrote:
-> > On Fri, Apr 24, 2015 at 01:34:15AM +0800, Anson Huang wrote:
-> > > The audio/video PLL's rate calculation formula is as below in RM:
-> > > 
-> > > Fref * (DIV_SELECT + NUM / DENOM),
-> > > 
-> > > in original clk-pllv3's code, below code is used:
-> > > 
-> > > (parent_rate * div) + ((parent_rate / mfd) * mfn
-> > > 
-> > > as it does NOT consider the float data using div, so below
-> > > calculation formula should be used as a decent method:
-> > > 
-> > > (parent_rate * div) + ((parent_rate * mfn) / mfd)
-> > > 
-> > > and we also need to consider parent_rate * mfd may exceed
-> > > a 32 bit value, 64 bit value should be used.
+On Mon, Apr 27, 2015 at 09:31:27PM +0200, Uwe Kleine-K?nig wrote:
+> On Mon, Apr 27, 2015 at 02:43:41PM +0300, Baruch Siach wrote:
+> > On Mon, Apr 27, 2015 at 09:50:23AM +0200, Uwe Kleine-K?nig wrote:
+> > > On Mon, Apr 27, 2015 at 10:20:57AM +0300, Baruch Siach wrote:
+> > > > On Mon, Apr 27, 2015 at 09:12:38AM +0200, Uwe Kleine-K?nig wrote:
+> > > > > Hmm I rechecked the reference manual and found a register to specify the
+> > > > > size of the spare area (I didn't notice that one before). Did you try
+> > > > > what happens if you set this to 0x70 for 224 bytes oob?
+> > > > 
+> > > > Which register is that?
+> > > Spare Area Size Register (SPAS) at offset 0x1e10 for the i.MX25 (that's
+> > > what you're using, don't you?).
 > > 
-> > Can you provide some real world data (PLL output frequency) to
-> > demonstrate the difference between old and new formula?
+> > Yes, that's what I'm using.
 > > 
-> > Shawn
-> > 
+> > I tried setting the SPAS register to oobsize/2 (0x70 in my case), but I see no 
+> > change in behaviour. Moreover, it turns out the previously Barebox set this 
+> > register (apparently wrongly) to 0x20 for spare size of 64. Current Barebox 
+> > master still do. For v3 Barebox limits CONFIG2_SPAS to 218 bytes spare size 
+> I guess for v21 writing to SPAS is just what the controller assumes
+> after reset. I.e. that a 512-byte nand has 16 bytes spare and a 2k-nand
+> has 64.
 > 
-> I happen to meet this issue on i.MX7D, on i.MX7D, DRAM PLL is a
-> Audio/Video type PLL, the target freq is 1066MHz, the register
-> settings are as below:
+> > since Eric B?nard's commit 632c45795065 (nand_imx: update to support onfi & 4k 
+> > flashs, 2012-07-05). As you can see, the kernel doesn't touch this register 
+> > for v2 NFC.
+> right.
 > 
-> PLL_DDRn: 8060202C   -> div = 0x2C
-> DDR_NUM: 06AAAC4D    -> mfn = 0x6AAAC4D
-> DDR_DENOM: 100003EC  -> mfd = 0x100003EC
+> > I have no idea what is the effect of the SPAS in v2 (or any other) NFC.
+> I didn't try, but I'm surprised it doesn't make a difference. How did
+> you test? I'd do in barebox:
 > 
-> parent_rate = 24MHz.
-> 
-> with old formula, the (parent_rate / mfd) * mfn = 0
-> with new formula, the (parent_rate * mfn) / mfd = 10
-> 
-> so old formula gets PLL_DDR = 1056MHz, new formuls gets
-> PLL_DDR = 1066MHz.
-> 
-> For other Audio/Video PLL, the result is also different, but
-> the difference is less then 1MHz.
-> 
-> That is why I do this patch.
+> 	memset -w 0xbb000000 0x55 0x1200
+> 	set SPAS to 218/2
+> 	trigger page read
+> 	check how much of the 0x55 was overwritten
+> 	set SPAS to 224/2
+> 	trigger page read
+> 	compare with above
 
-Okay.  Can you please add these data into commit log and resend the
-patch?  Also, all i.MX clock drivers are being moved into
-drivers/clk/imx/, so please rebase your patch on my imx/clk-move
-branch.
+Just did this test. No matter how I set SPAS, Only first 26 bytes of each 64 
+bytes spare data buffer chunk are overwritten. I tried setting SPAS to 224/2 
+(0x70), 218/2 (0x6d), and 128/2 (0x40).
 
-Shawn
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
