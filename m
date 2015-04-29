@@ -1,86 +1,60 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 29 Apr 2015 12:02:52 +0200
-Subject: [PATCH] arm: dma-mapping: fix off-by-one check in
- arm_setup_iommu_dma_ops
-Message-ID: <1430301772-21852-1-git-send-email-m.szyprowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Apr 2015 12:07:10 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <5540A8B9.7010100@topic.nl>
+References: <5538DD02.6050401@topic.nl>
+ <20150429091714.GH12732@n2100.arm.linux.org.uk> <5540A8B9.7010100@topic.nl>
+Message-ID: <2919263.vEuyzce5K7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 22b3c181c6c324a46f71aae806d8ddbe61d25761 ("arm: dma-mapping: limit
-IOMMU mapping size") added a check for IO address space size. However
-this patch broke IOMMU initialization for typical platforms initialized
-from device tree, which get the default IO address space size of 4GiB.
-This value doesn't fit into size_t and fails a check introduced by that
-commit resulting in failed dma-mapping/iommu initialization. This patch
-fixes this issue by adding proper support for full 4GiB address space
-size.
+On Wednesday 29 April 2015 11:47:37 Mike Looijmans wrote:
+> On 29-04-15 11:17, Russell King - ARM Linux wrote:
+> > On Wed, Apr 29, 2015 at 11:01:35AM +0200, Arnd Bergmann wrote:
+> >> You still need to synchronize MMIO register accesses with write buffers,
+> >> as the readl() and writel() functions do in the kernel.
+> >>
+> >> In particular, after you have written a buffer to memory from the CPU,
+> >> you will need to do an outer_sync() before the MMIO write that triggers
+> >> the DMA. This is still much cheaper than doing the cache flush though.
+> >
+> > Note that outer_sync() is already done by readl/writel and/or the write
+> > memory barriers (mb()/wmb()).
+> 
+> I initiate the DMA transfers using iowrite32() so if I understand correctly, 
+> I'm already doing the right thing here.
+> 
+> Just to be completely clear, there is no direct register access from user 
+> space, the driver does all MMIO. Userspace only gets an mmap for DMA buffers, 
+> and uses ioctl to initiate transfers.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
-Changelog:
-v3:
-- fixed typo and changed error code to ERANGE
+Ok, that seems all fine then.
 
-v2:
-- moved check from arm_setup_iommu_dma_ops() to arm_iommu_create_mapping()
+> >> Another possible problem would be if the driver mmaps the buffer in
+> >> uncached mode to user space. This is something your kernel driver has
+> >> to get right, it won't be handled automatically by setting the
+> >> "dma-coherent" property in DT.
+> >
+> > The buffer should also be mapped into userspace with the same memory
+> > type and cache attributes as the kernel side mapping.  If using ACP,
+> > then you probably want "normal memory, cacheable, writeback, read
+> > allocate" or in the case of SMP, the same but "read/write allocate".
+> 
+> I currently use dma_alloc_coherent() to allocate buffers and 
+> dma_mmap_coherent() to map them to user space. I was under the assumption that 
+> these would do the right thing. Is that correct? If not, then what should I use?
 
-v1: http://www.spinics.net/lists/arm-kernel/msg414483.html
----
- arch/arm/include/asm/dma-iommu.h |  2 +-
- arch/arm/mm/dma-mapping.c        | 13 +++++--------
- 2 files changed, 6 insertions(+), 9 deletions(-)
+dma_mmap_coherent() is the right interface, but I've just looked at the
+implementation of arm_dma_mmap() and I'm not sure that it actually uses the
+correct vma->vm_page_prot value here, because I don't see where it takes
+into account whether the device is coherent or not. Most ARM machines have
+only noncoherent devices, and dma_mmap_coherent() is used rarely by drivers,
+so it's quite possible that this interface got broken without anybody
+noticing.
 
-diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
-index 8e3fcb924db6..2ef282f96651 100644
---- a/arch/arm/include/asm/dma-iommu.h
-+++ b/arch/arm/include/asm/dma-iommu.h
-@@ -25,7 +25,7 @@ struct dma_iommu_mapping {
- };
- 
- struct dma_iommu_mapping *
--arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size);
-+arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size);
- 
- void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
- 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 09c5fe3d30c2..7e7583ddd607 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1878,7 +1878,7 @@ struct dma_map_ops iommu_coherent_ops = {
-  * arm_iommu_attach_device function.
-  */
- struct dma_iommu_mapping *
--arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
-+arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size)
- {
- 	unsigned int bits = size >> PAGE_SHIFT;
- 	unsigned int bitmap_size = BITS_TO_LONGS(bits) * sizeof(long);
-@@ -1886,6 +1886,10 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
- 	int extensions = 1;
- 	int err = -ENOMEM;
- 
-+	/* currently only 32-bit DMA address space is supported */
-+	if (size > DMA_BIT_MASK(32) + 1)
-+		return ERR_PTR(-ERANGE);
-+
- 	if (!bitmap_size)
- 		return ERR_PTR(-EINVAL);
- 
-@@ -2057,13 +2061,6 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 	if (!iommu)
- 		return false;
- 
--	/*
--	 * currently arm_iommu_create_mapping() takes a max of size_t
--	 * for size param. So check this limit for now.
--	 */
--	if (size > SIZE_MAX)
--		return false;
--
- 	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
- 	if (IS_ERR(mapping)) {
- 		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
--- 
-1.9.2
+If my suspicion is correct, we should either change arm_coherent_dma_ops()
+to refer to a different mmap() callback that does the right thing for
+coherent devices, or change arm_dma_mmap() to look at dev->is_coherent.
+
+	Arnd
