@@ -1,37 +1,42 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 29 Apr 2015 14:08:31 +0530
-Subject: [PATCH 4/5] ARM: EXYNOS: DTS: add SROM device node for exynos5
+Date: Wed, 29 Apr 2015 14:08:32 +0530
+Subject: [PATCH 5/5] Documentation: dt-bindings: add exynos-srom binding
+ information
 In-Reply-To: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1430296712-10287-5-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1430296712-10287-6-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SROM device node for exynos5.
+This patch adds exynos-srom binding information for SROM Controller
+driver on Exynos SoCs.
 
 CC: Rob Herring <robh+dt@kernel.org>
 CC: Mark Rutland <mark.rutland@arm.com>
 CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- arch/arm/boot/dts/exynos5.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ .../devicetree/bindings/arm/samsung/exynos-srom.txt          | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
 
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index a0cc0b6..d3be361 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -30,6 +30,11 @@
- 		reg = <0x10000000 0x100>;
- 	};
- 
-+	sromc at 12250000 {
-+		compatible = "samsung,exynos-srom";
-+		reg = <0x12250000 0x100>;
-+	};
+diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+new file mode 100644
+index 0000000..482d1cd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+@@ -0,0 +1,12 @@
++SAMSUNG Exynos SoCs SROM Controller driver.
 +
- 	combiner: interrupt-controller at 10440000 {
- 		compatible = "samsung,exynos4210-combiner";
- 		#interrupt-cells = <2>;
++Required properties:
++- compatible : Should at least contain "samsung,exynos-srom".
++
++- reg: offset and length of the register set
++
++Example:
++	sromc at 12570000 {
++		compatible = "samsung,exynos-srom";
++		reg = <0x12570000 0x100>;
++	};
 -- 
 2.2.0
