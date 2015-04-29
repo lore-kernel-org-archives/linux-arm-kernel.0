@@ -1,53 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Apr 2015 15:13:47 +0200
-Subject: dma_alloc_coherent versus streaming DMA,
- neither works satisfactory
-In-Reply-To: <5540D356.50708@topic.nl>
-References: <5538DD02.6050401@topic.nl> <3382997.5hgfVKmNXP@wuerfel>
- <5540D356.50708@topic.nl>
-Message-ID: <9622793.RaVBbeJMCx@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 29 Apr 2015 14:21:52 +0100
+Subject: [PATCH v7 0/9] mfd: watchdog: rtc: New driver for ST's LPC IP
+In-Reply-To: <1428590854-14095-1-git-send-email-lee.jones@linaro.org>
+References: <1428590854-14095-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150429132152.GQ9169@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 April 2015 14:49:26 Mike Looijmans wrote:
-> On 29-04-15 12:41, Arnd Bergmann wrote:
-> > On Wednesday 29 April 2015 12:33:00 Mike Looijmans wrote:
-> >> On 29-04-15 12:07, Arnd Bergmann wrote:
-> >>> On Wednesday 29 April 2015 11:47:37 Mike Looijmans wrote:
-> >>>> On 29-04-15 11:17, Russell King - ARM Linux wrote:
-> >>>>> The buffer should also be mapped into userspace with the same memory
-> >>>>> type and cache attributes as the kernel side mapping.  If using ACP,
-> >>>>> then you probably want "normal memory, cacheable, writeback, read
-> >>>>> allocate" or in the case of SMP, the same but "read/write allocate".
-> >>>
-> >>> If my suspicion is correct, we should either change arm_coherent_dma_ops()
-> >>> to refer to a different mmap() callback that does the right thing for
-> >>> coherent devices, or change arm_dma_mmap() to look at dev->is_coherent.
-> >>
-> >> Following the route, arch/arm/mm/dma-mapping.c uses pgprot_dmacoherent() which
-> >> is defined in arch/arm/include/asm/pgtable.h and that just returns uncached
-> >> memory.
-> >>
-> >> If you can give me some hints as to what the correct flags would be, I can
-> >> patch my kernel and test it.
-> >
-> > Use the flags that Russell listed above.
-> 
-> I would if I had a clue how to do that. For one thing, I don't understand all 
-> the L_PTE_... flag juggling that happens here.
-> 
-> I also tried just using kmalloc() to allocate the buffer, and then 
-> dma_map_single that. This is what the DMA documentation told me to do for 
-> non-coherent mappings. This works fine for the streaming-dma mode using the 
-> HP, but using dma-coherent this not only fails to work, it tends to completely 
-> lock the system.
-> 
-> Avoiding the streaming mapping and using only the coherent modes prevents the 
-> system locking up, it then doesn't do more harm than just corrupting data in 
-> the buffers.
+> [Alessandro: This just needs RTC Acks now]
 
-If I understand it right, you basically just skip the 'vma->vm_page_prot =
-__get_dma_pgprot(attrs, vma->vm_page_prot);' step and get the right mapping
-here, i.e. the pgprot value we use for all normal memory.
+Given this patch-set has been on the list for some time now and we
+haven't heard from Alessandro in all that time, I'm going to just
+apply the set and send out a pull-request to the other Maintainers.
 
-	Arnd
+No point waiting any longer IMHO.
+
+> ST's Low Power Controller (LPC) controls two devices; watchdog and RTC.
+> Only one of the devices can be used at any one time, which is enforced
+> by the Device Driver model.
+>  
+> This driver set provides everything you need to choose one (and only
+> one) of the LPC devices to run per I/P block, of which there are two
+> on the enabled STiH407 h/w.
+> 
+> Version 7:
+>  - Fix 2 legacy typos in the binding documentation compatible string
+>    examples.  
+>  
+> Version 6:
+>  - RTC: GPL v2 => GPL to reflect the information in the header
+>  - Applied another Reviewed-by from Guenter
+>  
+> Version 5:
+>  - Disable WDT clock over suspend
+>  - WDT: GPL v2 => GPL to reflect the information in the header
+>  - Change module name in Kconfig help and file header
+>  
+> Version 4:
+>  - Use {readl,writel}_relaxed() calls
+>  - Add Guenter's Reviewed-by
+>  - Rebased onto v4.0-rc1
+>  
+> Version 3:
+>  - Move Regmap pointer into core device data structure
+>  - Remove error message from devm_ioremap_resource
+> 
+> Version 2:
+>  - Only calculate keepalive once in probe()
+>  - Check for a 0 clk_rate
+>  - Set limits using predefined attributes from watchdog_device
+>  - CONFIG_PM => CONFIG_SLEEP
+>  - Call st_wdog_setup() on resume
+>  - Remove MFD driver -- instead rely on driver probing mechanism
+>    which continues attempting to bind to different drivers until
+>    one does not return -ENODEV
+> 
+> Lee Jones (9):
+>   mfd: dt-bindings: Provide human readable defines for LPC mode choosing
+>   ARM: multi_v7_defconfig: Enable support for ST's LPC Watchdog
+>   ARM: multi_v7_defconfig: Enable support for ST's LPC RTC
+>   ARM: STi: DT: STiH407: Add Device Tree node for the LPC
+>   watchdog: bindings: Provide ST bindings for ST's LPC Watchdog device
+>   watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+>   rtc: bindings: Provide ST bindings for ST's LPC RTC device
+>   rtc: st: add new driver for ST's LPC RTC
+>   MAINTAINERS: Add Watchdog and RTC files to STI's maintainer entry
+> 
+>  .../devicetree/bindings/rtc/rtc-st-lpc.txt         |  25 ++
+>  .../devicetree/bindings/watchdog/st_lpc_wdt.txt    |  38 +++
+>  MAINTAINERS                                        |   2 +
+>  arch/arm/boot/dts/stih407-family.dtsi              |  20 ++
+>  arch/arm/configs/multi_v7_defconfig                |   2 +
+>  drivers/rtc/Kconfig                                |  12 +
+>  drivers/rtc/Makefile                               |   1 +
+>  drivers/rtc/rtc-st-lpc.c                           | 354 +++++++++++++++++++++
+>  drivers/watchdog/Kconfig                           |  13 +
+>  drivers/watchdog/Makefile                          |   1 +
+>  drivers/watchdog/st_lpc_wdt.c                      | 344 ++++++++++++++++++++
+>  include/dt-bindings/mfd/st-lpc.h                   |  15 +
+>  12 files changed, 827 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+>  create mode 100644 drivers/rtc/rtc-st-lpc.c
+>  create mode 100644 drivers/watchdog/st_lpc_wdt.c
+>  create mode 100644 include/dt-bindings/mfd/st-lpc.h
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
