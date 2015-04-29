@@ -1,52 +1,37 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 29 Apr 2015 18:25:27 +0300
-Subject: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
- independent of SoCs.
-In-Reply-To: <BL2PR03MB37005C844BCB89007D176F683D70@BL2PR03MB370.namprd03.prod.outlook.com>
-References: <1430316881-4668-1-git-send-email-shenwei.wang@freescale.com>
- <20150429142614.GE2258@tarshish>
- <BL2PR03MB3703DA9D4D52EC9524D627C83D70@BL2PR03MB370.namprd03.prod.outlook.com>
- <20150429150824.GF2258@tarshish>
- <BL2PR03MB37005C844BCB89007D176F683D70@BL2PR03MB370.namprd03.prod.outlook.com>
-Message-ID: <20150429152527.GH2258@tarshish>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Wed, 29 Apr 2015 08:29:45 -0700
+Subject: [OT] Profiling on ARM Linux systems: how?
+In-Reply-To: <mhqrbj$vlu$1@ger.gmane.org>
+References: <mhqrbj$vlu$1@ger.gmane.org>
+Message-ID: <1516029.oc3LenLXRM@jclayton-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shenwei Wang,
-On Wed, Apr 29, 2015 at 03:19:19PM +0000, Shenwei Wang wrote:
-> > -----Original Message-----
-> > From: Baruch Siach [mailto:baruch at tkos.co.il]
-> > Sent: 2015?4?29? 10:08
-> > To: Wang Shenwei-B38339
-> > Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org;
-> > devicetree at vger.kernel.org
-> > Subject: Re: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
-> > independent of SoCs.
-> >
-> > When several SoC share the same IP block the usual convention is to name 
-> > it in
-> > the compatible property string after the first SoC it appeared on. Just look at
-> > some binding documentation from Documentation/devicetree/bindings/timer/ to
-> > find examples. The allwinner,sun5i-a13-hstimer property is shared by A10s and
-> > A13 SoCs. The amlogic,meson6-timer is shared by Meson6 and Meson8 SoCs, and
-> > so on.
->
-> If the same IP block is shared with several SoCs, why we gave them different compatible 
-> strings? If no changes in an IP block, I assume no changes in the relating driver as well. 
-> In this assumption, I don't see any need to introduce a new compatible string for an 
-> unchanged IP block in a new SoC.
+On Wednesday, April 29, 2015 02:54:43 PM Grant Edwards wrote:
+> This might be a little off-topic. If so I apologize.
+Probably.
 
-That is exactly what I meant to say. Sorry that I was not clear enough.
+> 
+> I have a problem with excessive CPU usage on an embedded ARM926
+> system.  There are three main apps, all of which have multiple
+> threads. The total CPU usage is too high.  I'm trying to figure out
+> where the CPU time is "going" so we know were to concentrate
+> optimization efforts.
+> 
+> The "top" utility is useless because it samples at a fixed interval.
+> Almost all of the threads are driven by timers on fixed cycles (or
+> data from threads that are). The 'top' sampling method appears to
+> cause aliasing which renders the numbers shown by top meaningless.
+> 
+...
 
-When the same IP block is used in a newer generation SoC the same compatible 
-property string is used. For that reason you can find in sun5i-a10s.dtsi the 
-line
+> 
+> Any advice?
 
-	compatible = "allwinner,sun5i-a13-hstimer";
-
-baruch
+At my company we have found perf top more useful than top
+for finding performance problems that might include kernel interaction.
+perf has a number of other goodies as well that are worth a look.
+Beyond that, idk.
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+~Joshua Clayton
