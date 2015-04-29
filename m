@@ -1,37 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Apr 2015 14:35:52 +0200
-Subject: dma_alloc_coherent versus streaming DMA,
- neither works satisfactory
-In-Reply-To: <5540BBD1.6020202@topic.nl>
-References: <5538DD02.6050401@topic.nl> <2919263.vEuyzce5K7@wuerfel>
- <5540BBD1.6020202@topic.nl>
-Message-ID: <45324330.YETo6pO2cB@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 29 Apr 2015 13:36:15 +0100
+Subject: [PATCH RESEND v6 4/6] regulator: axp20x: add support for AXP22X
+ regulators
+In-Reply-To: <20150410154809.GN6023@sirena.org.uk>
+References: <1428638946-24890-1-git-send-email-wens@csie.org>
+ <1428638946-24890-5-git-send-email-wens@csie.org>
+ <20150410154809.GN6023@sirena.org.uk>
+Message-ID: <20150429123615.GM9169@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 April 2015 13:09:05 Mike Looijmans wrote:
-> On 29-04-15 12:07, Arnd Bergmann wrote:
-> > On Wednesday 29 April 2015 11:47:37 Mike Looijmans wrote:
-> >> I currently use dma_alloc_coherent() to allocate buffers and
-> >> dma_mmap_coherent() to map them to user space. I was under the assumption that
-> >> these would do the right thing. Is that correct? If not, then what should I use?
-> >
-> > dma_mmap_coherent() is the right interface, but I've just looked at the
-> > implementation of arm_dma_mmap() and I'm not sure that it actually uses the
-> > correct vma->vm_page_prot value here, because I don't see where it takes
-> > into account whether the device is coherent or not. Most ARM machines have
-> > only noncoherent devices, and dma_mmap_coherent() is used rarely by drivers,
-> > so it's quite possible that this interface got broken without anybody
-> > noticing.
+On Fri, 10 Apr 2015, Mark Brown wrote:
+
+> On Fri, Apr 10, 2015 at 12:09:04PM +0800, Chen-Yu Tsai wrote:
 > 
-> My driver also supports 'classic' read/write by copying data to/from userspace 
-> using a DMA ringbuffer, which is also allocated using dma_alloc_coherent. That 
-> would suggest that the kernel mapping for this memory is also incorrect, I 
-> also get corrupted data in these transfers. These buffers are not being mapped 
-> to userspace at all. These tests all use page aligned transfer sizes.
+> > This patch depends on the previous patch "regulator: axp20x: prepare
+> > support for multiple AXP chip families" and the mfd header from the
+> > first patch "mfd: axp20x: add AXP22x PMIC support".
+> 
+> > Could we merge both regulator patches through the mfd tree, with the
+> > other patches in the series? There are no other external dependencies.
+> 
+> Yes, of course we can - that's the whole point of me sending a
+> Reviewed-by!  Half of what I'm trying to do with that is to cut down on
+> the number of reposts of MFD series I get sent :(
 
-Ok, if it's broken when you only use a kernel mapping and no user space
-mapping, arm_dma_mmap() is not your (only) problem, but we should probably
-still fix that if it's broken.
+Okay, I'm ready to take this now.
 
-	Arnd
+Mark,
+
+  Do you want a pull-request, or are you happy for me to just apply?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
