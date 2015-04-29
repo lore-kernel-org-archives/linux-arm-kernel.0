@@ -1,445 +1,263 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 29 Apr 2015 22:20:05 +0800
-Subject: [PATCH V7 05/10] pinctrl: add imx7d support
+Date: Wed, 29 Apr 2015 22:20:06 +0800
+Subject: [PATCH V7 06/10] ARM: imx: add msl support for imx7d
 In-Reply-To: <1430317210-18333-1-git-send-email-Frank.Li@freescale.com>
 References: <1430317210-18333-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1430317210-18333-6-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1430317210-18333-7-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+From: Anson Huang <b20788@freescale.com>
 
-Add i.MX7D pinctrl driver support
+Add i.MX7D MSL support.
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
 Signed-off-by: Anson Huang <b20788@freescale.com>
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
 ---
- drivers/pinctrl/freescale/Kconfig         |   7 +
- drivers/pinctrl/freescale/Makefile        |   1 +
- drivers/pinctrl/freescale/pinctrl-imx7d.c | 385 ++++++++++++++++++++++++++++++
- 3 files changed, 393 insertions(+)
- create mode 100644 drivers/pinctrl/freescale/pinctrl-imx7d.c
+ arch/arm/mach-imx/Kconfig      | 11 ++++++++++
+ arch/arm/mach-imx/Makefile     |  1 +
+ arch/arm/mach-imx/anatop.c     |  5 ++++-
+ arch/arm/mach-imx/cpu.c        |  3 +++
+ arch/arm/mach-imx/hardware.h   |  7 ++++++-
+ arch/arm/mach-imx/mach-imx7d.c | 46 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mx7.h        | 38 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mxc.h        |  8 +++++++-
+ 8 files changed, 116 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-imx/mach-imx7d.c
+ create mode 100644 arch/arm/mach-imx/mx7.h
 
-diff --git a/drivers/pinctrl/freescale/Kconfig b/drivers/pinctrl/freescale/Kconfig
-index 16aac38..12ef544 100644
---- a/drivers/pinctrl/freescale/Kconfig
-+++ b/drivers/pinctrl/freescale/Kconfig
-@@ -87,6 +87,13 @@ config PINCTRL_IMX6SX
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 3a3d3e9..162f2c3 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -582,6 +582,17 @@ config SOC_IMX6SX
  	help
- 	  Say Y here to enable the imx6sx pinctrl driver
+ 	  This enables support for Freescale i.MX6 SoloX processor.
  
-+config PINCTRL_IMX7D
-+	bool "IMX7D pinctrl driver"
-+	depends on SOC_IMX7D
-+	select PINCTRL_IMX
-+	help
-+	  Say Y here to enable the imx7d pinctrl driver
++config SOC_IMX7
++	bool
++	select ARM_GIC
 +
- config PINCTRL_VF610
- 	bool "Freescale Vybrid VF610 pinctrl driver"
- 	depends on SOC_VF610
-diff --git a/drivers/pinctrl/freescale/Makefile b/drivers/pinctrl/freescale/Makefile
-index bba73c2..343cb43 100644
---- a/drivers/pinctrl/freescale/Makefile
-+++ b/drivers/pinctrl/freescale/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_PINCTRL_IMX6Q)	+= pinctrl-imx6q.o
- obj-$(CONFIG_PINCTRL_IMX6Q)	+= pinctrl-imx6dl.o
- obj-$(CONFIG_PINCTRL_IMX6SL)	+= pinctrl-imx6sl.o
- obj-$(CONFIG_PINCTRL_IMX6SX)	+= pinctrl-imx6sx.o
-+obj-$(CONFIG_PINCTRL_IMX7D)	+= pinctrl-imx7d.o
- obj-$(CONFIG_PINCTRL_VF610)	+= pinctrl-vf610.o
- obj-$(CONFIG_PINCTRL_MXS)	+= pinctrl-mxs.o
- obj-$(CONFIG_PINCTRL_IMX23)	+= pinctrl-imx23.o
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
++config SOC_IMX7D
++	bool "i.MX7 Dual support"
++	select SOC_IMX7
++	select PINCTRL_IMX7D
++	help
++		This enables support for Freescale i.MX7 Dual processor.
++
+ config SOC_VF610
+ 	bool "Vybrid Family VF610 support"
+ 	select IRQ_DOMAIN_HIERARCHY
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 0622ced..40df12a 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -85,6 +85,7 @@ endif
+ obj-$(CONFIG_SOC_IMX6Q) += mach-imx6q.o
+ obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
+ obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
++obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+ 
+ ifeq ($(CONFIG_SUSPEND),y)
+ AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+index 7f262fe..231bb25 100644
+--- a/arch/arm/mach-imx/anatop.c
++++ b/arch/arm/mach-imx/anatop.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ * Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License. You may obtain a copy of the GNU General Public License
+@@ -28,6 +28,7 @@
+ #define ANADIG_USB2_CHRG_DETECT	0x210
+ #define ANADIG_DIGPROG		0x260
+ #define ANADIG_DIGPROG_IMX6SL	0x280
++#define ANADIG_DIGPROG_IMX7D	0x800
+ 
+ #define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
+ #define BM_ANADIG_REG_2P5_ENABLE_PULLDOWN	0x8
+@@ -121,6 +122,8 @@ void __init imx_init_revision_from_anatop(void)
+ 	WARN_ON(!anatop_base);
+ 	if (of_device_is_compatible(np, "fsl,imx6sl-anatop"))
+ 		offset = ANADIG_DIGPROG_IMX6SL;
++	if (of_device_is_compatible(np, "fsl,imx7d-anatop"))
++		offset = ANADIG_DIGPROG_IMX7D;
+ 	digprog = readl_relaxed(anatop_base + offset);
+ 	iounmap(anatop_base);
+ 
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index df42c14..a7fa92a 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -130,6 +130,9 @@ struct device * __init imx_soc_device_init(void)
+ 	case MXC_CPU_IMX6Q:
+ 		soc_id = "i.MX6Q";
+ 		break;
++	case MXC_CPU_IMX7D:
++		soc_id = "i.MX7D";
++		break;
+ 	default:
+ 		soc_id = "Unknown";
+ 	}
+diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
+index d737f95..907ec2c 100644
+--- a/arch/arm/mach-imx/hardware.h
++++ b/arch/arm/mach-imx/hardware.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2004-2007, 2014 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2004-2007, 2014-2015 Freescale Semiconductor, Inc.
+  * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
+  *
+  * This program is free software; you can redistribute it and/or
+@@ -94,6 +94,10 @@
+  *	CCM	0x020c4000+0x004000	->	0xf42c4000+0x004000
+  *	ANATOP	0x020c8000+0x004000	->	0xf42c8000+0x004000
+  *	UART4	0x021f0000+0x004000	->	0xf42f0000+0x004000
++ * mx7d:
++ *	CCM	0x30380000+0x010000	->	0xf5380000+0x010000
++ *	ANATOP	0x30360000+0x010000	->	0xf5360000+0x010000
++ *	UART1	0x30860000+0x010000	->	0xf5860000+0x010000
+  */
+ #define IMX_IO_P2V(x)	(						\
+ 			(((x) & 0x80000000) >> 7) |			\
+@@ -113,6 +117,7 @@
+ #include "mx21.h"
+ #include "mx27.h"
+ #include "mx1.h"
++#include "mx7.h"
+ 
+ #define imx_map_entry(soc, name, _type)	{				\
+ 	.virtual = soc ## _IO_P2V(soc ## _ ## name ## _BASE_ADDR),	\
+diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
 new file mode 100644
-index 0000000..d8ab17e
+index 0000000..cca6ee6
 --- /dev/null
-+++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-@@ -0,0 +1,385 @@
++++ b/arch/arm/mach-imx/mach-imx7d.c
+@@ -0,0 +1,46 @@
 +/*
-+ * Copyright (C) 2014-2015 Freescale Semiconductor, Inc.
++ * Copyright (C) 2015 Freescale Semiconductor, Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/pinctrl.h>
++#include <linux/irqchip.h>
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <linux/phy.h>
 +
-+#include "pinctrl-imx.h"
++#include "common.h"
 +
-+enum imx7d_pads {
-+	MX7D_PAD_RESERVE0 = 0,
-+	MX7D_PAD_RESERVE1 = 1,
-+	MX7D_PAD_RESERVE2 = 2,
-+	MX7D_PAD_RESERVE3 = 3,
-+	MX7D_PAD_RESERVE4 = 4,
-+	MX7D_PAD_GPIO1_IO08 = 5,
-+	MX7D_PAD_GPIO1_IO09 = 6,
-+	MX7D_PAD_GPIO1_IO10 = 7,
-+	MX7D_PAD_GPIO1_IO11 = 8,
-+	MX7D_PAD_GPIO1_IO12 = 9,
-+	MX7D_PAD_GPIO1_IO13 = 10,
-+	MX7D_PAD_GPIO1_IO14 = 11,
-+	MX7D_PAD_GPIO1_IO15 = 12,
-+	MX7D_PAD_EPDC_DATA00 = 13,
-+	MX7D_PAD_EPDC_DATA01 = 14,
-+	MX7D_PAD_EPDC_DATA02 = 15,
-+	MX7D_PAD_EPDC_DATA03 = 16,
-+	MX7D_PAD_EPDC_DATA04 = 17,
-+	MX7D_PAD_EPDC_DATA05 = 18,
-+	MX7D_PAD_EPDC_DATA06 = 19,
-+	MX7D_PAD_EPDC_DATA07 = 20,
-+	MX7D_PAD_EPDC_DATA08 = 21,
-+	MX7D_PAD_EPDC_DATA09 = 22,
-+	MX7D_PAD_EPDC_DATA10 = 23,
-+	MX7D_PAD_EPDC_DATA11 = 24,
-+	MX7D_PAD_EPDC_DATA12 = 25,
-+	MX7D_PAD_EPDC_DATA13 = 26,
-+	MX7D_PAD_EPDC_DATA14 = 27,
-+	MX7D_PAD_EPDC_DATA15 = 28,
-+	MX7D_PAD_EPDC_SDCLK = 29,
-+	MX7D_PAD_EPDC_SDLE = 30,
-+	MX7D_PAD_EPDC_SDOE = 31,
-+	MX7D_PAD_EPDC_SDSHR = 32,
-+	MX7D_PAD_EPDC_SDCE0 = 33,
-+	MX7D_PAD_EPDC_SDCE1 = 34,
-+	MX7D_PAD_EPDC_SDCE2 = 35,
-+	MX7D_PAD_EPDC_SDCE3 = 36,
-+	MX7D_PAD_EPDC_GDCLK = 37,
-+	MX7D_PAD_EPDC_GDOE = 38,
-+	MX7D_PAD_EPDC_GDRL = 39,
-+	MX7D_PAD_EPDC_GDSP = 40,
-+	MX7D_PAD_EPDC_BDR0 = 41,
-+	MX7D_PAD_EPDC_BDR1 = 42,
-+	MX7D_PAD_EPDC_PWR_COM = 43,
-+	MX7D_PAD_EPDC_PWR_STAT = 44,
-+	MX7D_PAD_LCD_CLK = 45,
-+	MX7D_PAD_LCD_ENABLE = 46,
-+	MX7D_PAD_LCD_HSYNC = 47,
-+	MX7D_PAD_LCD_VSYNC = 48,
-+	MX7D_PAD_LCD_RESET = 49,
-+	MX7D_PAD_LCD_DATA00 = 50,
-+	MX7D_PAD_LCD_DATA01 = 51,
-+	MX7D_PAD_LCD_DATA02 = 52,
-+	MX7D_PAD_LCD_DATA03 = 53,
-+	MX7D_PAD_LCD_DATA04 = 54,
-+	MX7D_PAD_LCD_DATA05 = 55,
-+	MX7D_PAD_LCD_DATA06 = 56,
-+	MX7D_PAD_LCD_DATA07 = 57,
-+	MX7D_PAD_LCD_DATA08 = 58,
-+	MX7D_PAD_LCD_DATA09 = 59,
-+	MX7D_PAD_LCD_DATA10 = 60,
-+	MX7D_PAD_LCD_DATA11 = 61,
-+	MX7D_PAD_LCD_DATA12 = 62,
-+	MX7D_PAD_LCD_DATA13 = 63,
-+	MX7D_PAD_LCD_DATA14 = 64,
-+	MX7D_PAD_LCD_DATA15 = 65,
-+	MX7D_PAD_LCD_DATA16 = 66,
-+	MX7D_PAD_LCD_DATA17 = 67,
-+	MX7D_PAD_LCD_DATA18 = 68,
-+	MX7D_PAD_LCD_DATA19 = 69,
-+	MX7D_PAD_LCD_DATA20 = 70,
-+	MX7D_PAD_LCD_DATA21 = 71,
-+	MX7D_PAD_LCD_DATA22 = 72,
-+	MX7D_PAD_LCD_DATA23 = 73,
-+	MX7D_PAD_UART1_RX_DATA = 74,
-+	MX7D_PAD_UART1_TX_DATA = 75,
-+	MX7D_PAD_UART2_RX_DATA = 76,
-+	MX7D_PAD_UART2_TX_DATA = 77,
-+	MX7D_PAD_UART3_RX_DATA = 78,
-+	MX7D_PAD_UART3_TX_DATA = 79,
-+	MX7D_PAD_UART3_RTS_B = 80,
-+	MX7D_PAD_UART3_CTS_B = 81,
-+	MX7D_PAD_I2C1_SCL = 82,
-+	MX7D_PAD_I2C1_SDA = 83,
-+	MX7D_PAD_I2C2_SCL = 84,
-+	MX7D_PAD_I2C2_SDA = 85,
-+	MX7D_PAD_I2C3_SCL = 86,
-+	MX7D_PAD_I2C3_SDA = 87,
-+	MX7D_PAD_I2C4_SCL = 88,
-+	MX7D_PAD_I2C4_SDA = 89,
-+	MX7D_PAD_ECSPI1_SCLK = 90,
-+	MX7D_PAD_ECSPI1_MOSI = 91,
-+	MX7D_PAD_ECSPI1_MISO = 92,
-+	MX7D_PAD_ECSPI1_SS0 = 93,
-+	MX7D_PAD_ECSPI2_SCLK = 94,
-+	MX7D_PAD_ECSPI2_MOSI = 95,
-+	MX7D_PAD_ECSPI2_MISO = 96,
-+	MX7D_PAD_ECSPI2_SS0 = 97,
-+	MX7D_PAD_SD1_CD_B = 98,
-+	MX7D_PAD_SD1_WP = 99,
-+	MX7D_PAD_SD1_RESET_B = 100,
-+	MX7D_PAD_SD1_CLK = 101,
-+	MX7D_PAD_SD1_CMD = 102,
-+	MX7D_PAD_SD1_DATA0 = 103,
-+	MX7D_PAD_SD1_DATA1 = 104,
-+	MX7D_PAD_SD1_DATA2 = 105,
-+	MX7D_PAD_SD1_DATA3 = 106,
-+	MX7D_PAD_SD2_CD_B = 107,
-+	MX7D_PAD_SD2_WP = 108,
-+	MX7D_PAD_SD2_RESET_B = 109,
-+	MX7D_PAD_SD2_CLK = 110,
-+	MX7D_PAD_SD2_CMD = 111,
-+	MX7D_PAD_SD2_DATA0 = 112,
-+	MX7D_PAD_SD2_DATA1 = 113,
-+	MX7D_PAD_SD2_DATA2 = 114,
-+	MX7D_PAD_SD2_DATA3 = 115,
-+	MX7D_PAD_SD3_CLK = 116,
-+	MX7D_PAD_SD3_CMD = 117,
-+	MX7D_PAD_SD3_DATA0 = 118,
-+	MX7D_PAD_SD3_DATA1 = 119,
-+	MX7D_PAD_SD3_DATA2 = 120,
-+	MX7D_PAD_SD3_DATA3 = 121,
-+	MX7D_PAD_SD3_DATA4 = 122,
-+	MX7D_PAD_SD3_DATA5 = 123,
-+	MX7D_PAD_SD3_DATA6 = 124,
-+	MX7D_PAD_SD3_DATA7 = 125,
-+	MX7D_PAD_SD3_STROBE = 126,
-+	MX7D_PAD_SD3_RESET_B = 127,
-+	MX7D_PAD_SAI1_RX_DATA = 128,
-+	MX7D_PAD_SAI1_TX_BCLK = 129,
-+	MX7D_PAD_SAI1_TX_SYNC = 130,
-+	MX7D_PAD_SAI1_TX_DATA = 131,
-+	MX7D_PAD_SAI1_RX_SYNC = 132,
-+	MX7D_PAD_SAI1_RX_BCLK = 133,
-+	MX7D_PAD_SAI1_MCLK = 134,
-+	MX7D_PAD_SAI2_TX_SYNC = 135,
-+	MX7D_PAD_SAI2_TX_BCLK = 136,
-+	MX7D_PAD_SAI2_RX_DATA = 137,
-+	MX7D_PAD_SAI2_TX_DATA = 138,
-+	MX7D_PAD_ENET1_RGMII_RD0 = 139,
-+	MX7D_PAD_ENET1_RGMII_RD1 = 140,
-+	MX7D_PAD_ENET1_RGMII_RD2 = 141,
-+	MX7D_PAD_ENET1_RGMII_RD3 = 142,
-+	MX7D_PAD_ENET1_RGMII_RX_CTL = 143,
-+	MX7D_PAD_ENET1_RGMII_RXC = 144,
-+	MX7D_PAD_ENET1_RGMII_TD0 = 145,
-+	MX7D_PAD_ENET1_RGMII_TD1 = 146,
-+	MX7D_PAD_ENET1_RGMII_TD2 = 147,
-+	MX7D_PAD_ENET1_RGMII_TD3 = 148,
-+	MX7D_PAD_ENET1_RGMII_TX_CTL = 149,
-+	MX7D_PAD_ENET1_RGMII_TXC = 150,
-+	MX7D_PAD_ENET1_TX_CLK = 151,
-+	MX7D_PAD_ENET1_RX_CLK = 152,
-+	MX7D_PAD_ENET1_CRS = 153,
-+	MX7D_PAD_ENET1_COL = 154,
-+};
-+
-+/* Pad names for the pinmux subsystem */
-+static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
-+	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE0),
-+	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE1),
-+	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE2),
-+	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE3),
-+	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE4),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO08),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO09),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO10),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO11),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO12),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO13),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO14),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO15),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA00),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA01),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA02),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA03),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA04),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA05),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA06),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA07),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA08),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA09),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA10),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA11),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA12),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA13),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA14),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_DATA15),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDCLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDLE),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDOE),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDSHR),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDCE0),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDCE1),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDCE2),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_SDCE3),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_GDCLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_GDOE),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_GDRL),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_GDSP),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_BDR0),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_BDR1),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_PWR_COM),
-+	IMX_PINCTRL_PIN(MX7D_PAD_EPDC_PWR_STAT),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_CLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_ENABLE),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_HSYNC),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_VSYNC),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_RESET),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA00),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA01),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA02),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA03),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA04),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA05),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA06),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA07),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA08),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA09),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA10),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA11),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA12),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA13),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA14),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA15),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA16),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA17),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA18),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA19),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA20),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA21),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA22),
-+	IMX_PINCTRL_PIN(MX7D_PAD_LCD_DATA23),
-+	IMX_PINCTRL_PIN(MX7D_PAD_UART1_RX_DATA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_UART1_TX_DATA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_UART2_RX_DATA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_UART2_TX_DATA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_UART3_RX_DATA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_UART3_TX_DATA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_UART3_RTS_B),
-+	IMX_PINCTRL_PIN(MX7D_PAD_UART3_CTS_B),
-+	IMX_PINCTRL_PIN(MX7D_PAD_I2C1_SCL),
-+	IMX_PINCTRL_PIN(MX7D_PAD_I2C1_SDA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_I2C2_SCL),
-+	IMX_PINCTRL_PIN(MX7D_PAD_I2C2_SDA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_I2C3_SCL),
-+	IMX_PINCTRL_PIN(MX7D_PAD_I2C3_SDA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_I2C4_SCL),
-+	IMX_PINCTRL_PIN(MX7D_PAD_I2C4_SDA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI1_SCLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI1_MOSI),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI1_MISO),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI1_SS0),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI2_SCLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI2_MOSI),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI2_MISO),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ECSPI2_SS0),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD1_CD_B),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD1_WP),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD1_RESET_B),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD1_CLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD1_CMD),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD1_DATA0),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD1_DATA1),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD1_DATA2),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD1_DATA3),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD2_CD_B),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD2_WP),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD2_RESET_B),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD2_CLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD2_CMD),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD2_DATA0),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD2_DATA1),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD2_DATA2),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD2_DATA3),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_CLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_CMD),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA0),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA1),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA2),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA3),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA4),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA5),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA6),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_DATA7),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_STROBE),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SD3_RESET_B),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_RX_DATA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_TX_BCLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_TX_SYNC),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_TX_DATA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_RX_SYNC),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_RX_BCLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI1_MCLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI2_TX_SYNC),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI2_TX_BCLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI2_RX_DATA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_SAI2_TX_DATA),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RD0),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RD1),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RD2),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RD3),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RX_CTL),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_RXC),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TD0),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TD1),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TD2),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TD3),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TX_CTL),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RGMII_TXC),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_TX_CLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RX_CLK),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_CRS),
-+	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
-+};
-+
-+static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
-+	.pins = imx7d_pinctrl_pads,
-+	.npins = ARRAY_SIZE(imx7d_pinctrl_pads),
-+};
-+
-+static struct of_device_id imx7d_pinctrl_of_match[] = {
-+	{ .compatible = "fsl,imx7d-iomuxc", .data = &imx7d_pinctrl_info, },
-+	{ /* sentinel */ }
-+};
-+
-+static int imx7d_pinctrl_probe(struct platform_device *pdev)
++static void __init imx7d_init_machine(void)
 +{
-+	const struct of_device_id *match;
-+	struct imx_pinctrl_soc_info *pinctrl_info;
++	struct device *parent;
 +
-+	match = of_match_device(imx7d_pinctrl_of_match, &pdev->dev);
++	parent = imx_soc_device_init();
++	if (parent == NULL)
++		pr_warn("failed to initialize soc device\n");
 +
-+	if (!match)
-+		return -ENODEV;
-+
-+	pinctrl_info = (struct imx_pinctrl_soc_info *) match->data;
-+
-+	return imx_pinctrl_probe(pdev, pinctrl_info);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	imx_anatop_init();
 +}
 +
-+static struct platform_driver imx7d_pinctrl_driver = {
-+	.driver = {
-+		.name = "imx7d-pinctrl",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(imx7d_pinctrl_of_match),
-+	},
-+	.probe = imx7d_pinctrl_probe,
-+	.remove = imx_pinctrl_remove,
++static void __init imx7d_init_irq(void)
++{
++	imx_init_revision_from_anatop();
++	imx_src_init();
++	irqchip_init();
++}
++
++static const char *imx7d_dt_compat[] __initconst = {
++	"fsl,imx7d",
++	NULL,
 +};
 +
-+static int __init imx7d_pinctrl_init(void)
-+{
-+	return platform_driver_register(&imx7d_pinctrl_driver);
-+}
-+arch_initcall(imx7d_pinctrl_init);
++DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
++	.init_irq	= imx7d_init_irq,
++	.init_machine	= imx7d_init_machine,
++	.dt_compat	= imx7d_dt_compat,
++	.restart	= mxc_restart,
++MACHINE_END
+diff --git a/arch/arm/mach-imx/mx7.h b/arch/arm/mach-imx/mx7.h
+new file mode 100644
+index 0000000..4aa673f
+--- /dev/null
++++ b/arch/arm/mach-imx/mx7.h
+@@ -0,0 +1,38 @@
++/*
++ * Copyright (C) 2015 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
 +
-+static void __exit imx7d_pinctrl_exit(void)
-+{
-+	platform_driver_unregister(&imx7d_pinctrl_driver);
-+}
-+module_exit(imx7d_pinctrl_exit);
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+MODULE_AUTHOR("Anson Huang <Anson.Huang@freescale.com>");
-+MODULE_DESCRIPTION("Freescale imx7d pinctrl driver");
-+MODULE_LICENSE("GPL v2");
++#ifndef __ASM_ARCH_MX7_IOMAP_H__
++#define __ASM_ARCH_MX7_IOMAP_H__
++
++#define MX7D_IO_P2V(x)                  IMX_IO_P2V(x)
++#define MX7D_IO_ADDRESS(x)              IOMEM(MX7D_IO_P2V(x))
++
++#define MX7D_CCM_BASE_ADDR              0x30380000
++#define MX7D_CCM_SIZE                   0x10000
++#define MX7D_IOMUXC_BASE_ADDR           0x30330000
++#define MX7D_IOMUXC_SIZE                0x10000
++#define MX7D_ANATOP_BASE_ADDR           0x30360000
++#define MX7D_ANATOP_SIZE                0x10000
++#define MX7D_GPC_BASE_ADDR              0x303a0000
++#define MX7D_GPC_SIZE                   0x10000
++#define MX7D_SRC_BASE_ADDR              0x30390000
++#define MX7D_SRC_SIZE                   0x10000
++#define MX7D_DDRC_BASE_ADDR             0x307a0000
++#define MX7D_DDRC_SIZE                  0x10000
++#define MX7D_AIPS1_BASE_ADDR            0x30000000
++#define MX7D_AIPS1_SIZE                 0x400000
++#define MX7D_AIPS2_BASE_ADDR            0x30400000
++#define MX7D_AIPS2_SIZE                 0x400000
++#define MX7D_AIPS3_BASE_ADDR            0x30900000
++#define MX7D_AIPS3_SIZE                 0x300000
++
++#define TT_ATTRIB_NON_CACHEABLE_1M	0x802
++#define MX7_IRAM_TLB_SIZE		0x4000
++#endif
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index 8726051..c4436d4 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2004-2007, 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2004-2007, 2010-2015 Freescale Semiconductor, Inc.
+  * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
+  *
+  * This program is free software; you can redistribute it and/or
+@@ -38,6 +38,7 @@
+ #define MXC_CPU_IMX6DL		0x61
+ #define MXC_CPU_IMX6SX		0x62
+ #define MXC_CPU_IMX6Q		0x63
++#define MXC_CPU_IMX7D		0x72
+ 
+ #define IMX_DDR_TYPE_LPDDR2		1
+ 
+@@ -169,6 +170,11 @@ static inline bool cpu_is_imx6q(void)
+ 	return __mxc_cpu_type == MXC_CPU_IMX6Q;
+ }
+ 
++static inline bool cpu_is_imx7d(void)
++{
++	return __mxc_cpu_type == MXC_CPU_IMX7D;
++}
++
+ struct cpu_op {
+ 	u32 cpu_rate;
+ };
 -- 
 1.9.1
