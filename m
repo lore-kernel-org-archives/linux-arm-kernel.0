@@ -1,58 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 29 Apr 2015 15:40:32 +0100
-Subject: [PATCH v7 1/5] arm64: Enable EDAC on ARM64
-In-Reply-To: <1430259045-19012-2-git-send-email-lho@apm.com>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <1430259045-19012-2-git-send-email-lho@apm.com>
-Message-ID: <20150429144031.GB18867@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Apr 2015 16:42:01 +0200
+Subject: [RFC PATCH 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150429142554.GI2992@jayachandranc.netlogicmicro.com>
+References: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
+ <6662179.AoBfCMOsxD@wuerfel>
+ <20150429142554.GI2992@jayachandranc.netlogicmicro.com>
+Message-ID: <2265507.Ss5WpSD2vL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 28, 2015 at 04:10:41PM -0600, Loc Ho wrote:
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/edac.h
-> @@ -0,0 +1,31 @@
-> +/*
-> + * ARM64 EDAC Header File 
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef ASM_EDAC_H
-> +#define ASM_EDAC_H
+On Wednesday 29 April 2015 19:55:55 Jayachandran C. wrote:
+> On Wed, Apr 29, 2015 at 02:34:20PM +0200, Arnd Bergmann wrote:
+> > On Wednesday 29 April 2015 17:09:58 Jayachandran C wrote:
+> > > The current code in pci-host-generic.c uses pci_common_init_dev()
+> > > from the arch/arm/ to do a part of the PCI initialization, and this
+> > > prevents it from being used on arm64.
+> > > 
+> > > The initialization done by pci_common_init_dev() that is really
+> > > needed by pci-host-generic.c can be done in the same file without
+> > > using the hw_pci API of ARM.
+> > > 
+> > > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
+> > > this is be handled by setting up 'struct gen_pci' to embed a
+> > > pci_sys_data variable as the first element on the ARM platform.
+> > > 
+> > > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> > 
+> > This seems very useful
+> 
+> I have tried to ensure that the new code is as much as possible
+> functionally equivalent to the call to pci_common_init_dev on ARM.
+> 
+> I should have added this as a note to the patch.
+> 
+> Ideally, I would like this patch to be functionally equivalent
+> to the existing code, and make further improvements with follow up
+> patches, but I can make the changes you suggest if it is needed.
 
-For consistency, please use __ASM_EDAC_H.
+I believe the driver is only used in virtual machines at the moment,
+so it should be easy enough to test the relevant cases on arm32
+and make it as simple as possible.
 
-> +/*
-> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
-> + * Implements the per arch atomic_scrub() that EDAC use for software
-> + * ECC scrubbing.  It reads memory and then writes back the original
-> + * value, allowing the hardware to detect and correct memory errors.
-> + */
+For bisection purposes, it could however be better to start with your
+current patch and then follow it up with a second patch that removes
+the unnecessary parts again immediately.
 
-The comment here is misleading since the function doesn't do anything.
-
-> +static inline void atomic_scrub(void *va, u32 size)
-> +{
-> +	/* Stub function for now until an ARM64 HW has a way to test it. */
-> +}
-
-Can we have a WARN_ONCE() here?
-
-We had some discussions last year, restarted this year and the
-conclusion was to leave this function as a no-op since it is not safe in
-the presence of KVM or non-coherent DMA:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/326986.html
-
--- 
-Catalin
+	Arnd
