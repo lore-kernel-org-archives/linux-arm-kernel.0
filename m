@@ -1,33 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Apr 2015 18:15:40 +0200
-Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
- device coherency
-In-Reply-To: <5540FB2D.4080905@linaro.org>
-References: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
- <5540FB2D.4080905@linaro.org>
-Message-ID: <2718230.tGqneBjFr2@wuerfel>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 29 Apr 2015 11:18:04 -0500
+Subject: [PATCH v5 2/2] firmware: qcom: scm: Add support for ARM64 SoCs
+In-Reply-To: <20150429154231.GB8781@leverpostej>
+References: <1430249038-30987-1-git-send-email-galak@codeaurora.org>
+ <1430249038-30987-2-git-send-email-galak@codeaurora.org>
+ <20150429154231.GB8781@leverpostej>
+Message-ID: <CF235ECE-3429-48D3-BEF9-85204E6DBD98@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 April 2015 09:39:25 Al Stone wrote:
+
+> On Apr 29, 2015, at 10:42 AM, Mark Rutland <mark.rutland@arm.com> wrote:
 > 
-> When the spec was being changed for _CCA, it was determined by the ASWG
-> that there was no reasonable default -- either choice would break something.
-> Multiple OSs, SoC vendors, and platform vendors were asked.  So, the spec
-> says for ARMv8, _CCA must be specified when needed and is not assumed to have
-> any value.  Obviously, any OS can choose to behave differently, but that's
-> what was specified and why it was specified that way.
+> Hi Kumar,
+> 
+> On Tue, Apr 28, 2015 at 08:23:58PM +0100, Kumar Gala wrote:
+>> Add an implementation of the SCM interface that works on ARM64/64-bit SoCs
+> 
+> What is the intended use of this on arm64 SoCs?
+> 
+> Given the negative reaction to the SMP bringup [1] code that seems to be
+> the only user, I'm somewhat confused as to why this is being pushed as a
+> non-RFC in the mean time.
+> 
+> Are there other users of this interface code? If so, could you please
+> mention that in the commit message. I'd also ask that you would Cc me on
+> future postings of this series.
+> 
+> [?]
 
-Ok, so it was essentially a CYA strategy. As we know that for Linux we're
-only interested in server parts here, but we also want to be compliant,
-I'd still argue that we check the property value and just disallow DMA
-for any device that is lacking CCA or contains zero here.
+The SCM interface is needed for other things like display:
 
-The current patch actually implements non-standard behavior: if _CCA
-is missing, it registers the device as dma-capable with coherency turned
-off, where my interpretation of the cited standard would be that we
-treat a missing _CCA as not being able to perform DMA. What I'd like
-to see instead is to only enable DMA support if _CCA is present and
-enabled.
+https://patchwork.kernel.org/patch/6198691/
 
-	Arnd
+> 
+>> +static int qcom_scm_set_boot_addr(void *entry, const cpumask_t *cpus, int flags)
+>> +{
+>> +       struct qcom_scm_desc desc = {0};
+>> +       unsigned int cpu = cpumask_first(cpus);
+>> +       u64 mpidr_el1 = cpu_logical_map(cpu);
+>> +
+>> +       /* For now we assume only a single cpu is set in the mask */
+>> +       WARN_ON(cpumask_weight(cpus) != 1);
+>> +
+>> +       if (mpidr_el1 & ~MPIDR_HWID_BITMASK) {
+>> +               pr_err("CPU%d:Failed to set boot address\n", cpu);
+>> +               return -ENOSYS;
+>> +       }
+>> +
+>> +       desc.args[0] = virt_to_phys(entry);
+>> +       desc.args[1] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 0));
+>> +       desc.args[2] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 1));
+>> +       desc.args[3] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 2));
+>> +       desc.args[4] = ~0ULL;
+>> +       desc.args[5] = QCOM_SCM_FLAG_HLOS | flags;
+>> +       desc.arginfo = QCOM_SCM_ARGS(6);
+>> +
+>> +       return qcom_scm_call(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR_MC, &desc);
+>> +}
+>> +
+>> +int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
+>> +{
+>> +       int flags = QCOM_SCM_FLAG_COLDBOOT_MC;
+>> +
+>> +       return qcom_scm_set_boot_addr(entry, cpus, flags);
+>> +}
+>> +
+>> +int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
+>> +{
+>> +       int flags = QCOM_SCM_FLAG_WARMBOOT_MC;
+>> +
+>> +       return qcom_scm_set_boot_addr(entry, cpus, flags);
+>> +}
+>> +
+>> +void __qcom_scm_cpu_power_down(u32 flags)
+>> +{
+>> +       struct qcom_scm_desc desc = {0};
+>> +       desc.args[0] = flags & QCOM_SCM_FLUSH_FLAG_MASK;
+>> +       desc.arginfo = QCOM_SCM_ARGS(1);
+>> +
+>> +       qcom_scm_call_atomic(QCOM_SCM_SVC_BOOT, QCOM_SCM_CMD_TERMINATE_PC, &desc);
+>> +}
+> 
+> As mentioned in the other thread, I don't want to see this for arm64,
+> and must NAK this portion.
+
+I can have these return an error code, but we want to keep the interface the same between the 32-bit and 64-bit.
+
+- k
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
