@@ -1,28 +1,72 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 29 Apr 2015 20:06:09 -0300
-Subject: [PATCH 24/27] s5p-mfc: fix bad indentation
-In-Reply-To: <89e5bc8de1ae960f10bd5ea465e7e4f7c6b8812a.1430348725.git.mchehab@osg.samsung.com>
-References: <89e5bc8de1ae960f10bd5ea465e7e4f7c6b8812a.1430348725.git.mchehab@osg.samsung.com>
-Message-ID: <b8e07cb142bc9dba58b8858f4930db281bfc6fc5.1430348725.git.mchehab@osg.samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 29 Apr 2015 17:41:41 -0600
+Subject: [PATCH 1/3 v5] dt/bindings: Add binding for the BCM2835 mailbox
+ driver
+In-Reply-To: <87vbgeq478.fsf@eliezer.anholt.net>
+References: <1430173644-19099-2-git-send-email-eric@anholt.net>
+ <1430253868-11138-1-git-send-email-eric@anholt.net>
+ <55403446.1040207@wwwdotorg.org> <87vbgeq478.fsf@eliezer.anholt.net>
+Message-ID: <55416C35.1030001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c:187 s5p_mfc_alloc_codec_buffers_v5() warn: inconsistent indenting
+On 04/29/15 10:39, Eric Anholt wrote:
+> Stephen Warren <swarren@wwwdotorg.org> writes:
+>
+>> On 04/28/2015 02:44 PM, Eric Anholt wrote:
+>>> From: Lubomir Rintel <lkundrak@v3.sk>
+>>>
+>>> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+>>> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+>>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+>>> ---
+>>>
+>>> v2: Split into a separate patch for submitting to the devicetree list.
+>>>      Consistently start node docs with a capital letter. device's
+>>>      address in the example shouldn't have "0x". Drop machine-specific
+>>>      interrupt numbers from the docs.  (changes by anholt).
+>>>
+>>> v3: Move the file to just bcm2835-mbox.txt, clean up formatting
+>>>      (changes by anholt, from review by Lee Jones).
+>>>
+>>> v4: Move file back by consensus from various Broadcom platform
+>>>      maintainers (changes by anholt, acked by Lee Jones).
+>>>
+>>> v5: Document that the mailbox cell should be 0 in clients, and add an
+>>>      example of a client (changes by anholt, from review by Jassi).
+>>
+>> Some mention of what you changed in the patch might be nice, since it
+>> was originally authored by someone else, and there's quite a changelog.
+>
+> I've been taking this changelog stuff out of the patch and putting it
+> below '---' because when I was submitting this series before, I got
+> chided for putting it in the patch!
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+A changelog and a description of the changes you've made aren't quite 
+the same thing.
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
-index b09bcd140491..c7adc3d26792 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
-@@ -184,7 +184,7 @@ static int s5p_mfc_alloc_codec_buffers_v5(struct s5p_mfc_ctx *ctx)
- 		ret = s5p_mfc_alloc_priv_buf(dev->mem_dev_r, &ctx->bank2);
- 		if (ret) {
- 			mfc_err("Failed to allocate Bank2 temporary buffer\n");
--		s5p_mfc_release_priv_buf(ctx->dev->mem_dev_l, &ctx->bank1);
-+			s5p_mfc_release_priv_buf(ctx->dev->mem_dev_l, &ctx->bank1);
- 			return ret;
- 		}
- 		BUG_ON(ctx->bank2.dma & ((1 << MFC_BANK2_ALIGN_ORDER) - 1));
--- 
-2.1.0
+There should be some mention in the commit description of what you 
+changed relative to the patch that someone else authored, so they don't 
+get blaimed/praised for any of your changes. The format of that 
+description wouldn't usually be a detailed patch revision changelog 
+though, just a description of the overall changes that were left in the 
+final version.
+
+>>> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+>>
+>>> +- #mbox-cells:	Specifies the number of cells needed to encode a mailbox
+>>> +		  channel. The value shall be 1.  Clients should supply a value
+>>> +		  of 0 for the mailbox channel, because there is only one
+>>> +		  exposed
+>>
+>> Can't you use #mbox-cells = <0> if there's no data to provide?
+>
+> of_mbox_index_xlate looks like it's always dereferencing the first arg.
+
+Is it possible to fix that?
+
+That said, last I looked at the HW I thought there were actually 
+multiple channels possible, so perhaps having a cell for future 
+expansion is reasonable.
