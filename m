@@ -1,47 +1,137 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 29 Apr 2015 10:31:41 -0700
-Subject: [RFT PATCH] drm/exynos: Enable DP clock to fix display on
- Exynos5250 and other
-In-Reply-To: <1427471856-20918-1-git-send-email-k.kozlowski@samsung.com>
- (Krzysztof Kozlowski's message of "Fri, 27 Mar 2015 16:57:36 +0100")
-References: <1427471856-20918-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <7h8udau9he.fsf@deeprootsystems.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 29 Apr 2015 11:16:33 -0600
+Subject: [PATCH v2 09/11] coresight-etm4x: Controls pertaining to the
+ selection of resources
+In-Reply-To: <1430327795-10710-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1430327795-10710-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1430327795-10710-10-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+From: Pratik Patel <pratikp@codeaurora.org>
 
-> After adding display power domain for Exynos5250 in commit
-> 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
-> display on Chromebook Snow and others stopped working after boot.
->
-> The reason for this suggested Andrzej Hajda: the DP clock was disabled.
-> This clock is required by Display Port and is enabled by bootloader.
-> However when FIMD driver probing was deferred, the display power domain
-> was turned off. This effectively reset the value of DP clock enable
-> register.
->
-> When exynos-dp is later probed, the clock is not enabled and display is
-> not properly configured:
->
-> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
-> exynos-dp 145b0000.dp-controller: unable to config video
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
-> Cc: <stable@vger.kernel.org>
->
-> ---
->
-> This should fix issue reported by Javier [1][2].
->
-> Tested on Chromebook Snow (Exynos 5250). More testing would be great,
-> especially on other Exynos 5xxx products.
+Adding sysfs entries to control the selection of the resources the
+trace unit will use as triggers to perform a trace run.
 
-I hoped to try this on my exynos5 boards, but it doesn't seem to apply
-to linux-next or to Linus' master branch.
+Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ .../ABI/testing/sysfs-bus-coresight-devices-etm4x  | 12 ++++
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 75 ++++++++++++++++++++++
+ 2 files changed, 87 insertions(+)
 
-Are there some other dependencies here?
-
-Kevin
+diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+index b4581c9426d3..b5c0456290ab 100644
+--- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
++++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+@@ -242,3 +242,15 @@ Date:		April 2015
+ KernelVersion:	4.01
+ Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
+ Description: 	(RW) Controls the operation of the selected counter.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/res_idx
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RW) Select which resource selection unit to work with.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/res_ctrl
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RW) Controls the selection of the resources in the trace unit.
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index cd6a1d51ad66..a9fda8ad8c2e 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -1707,6 +1707,79 @@ static ssize_t cntr_ctrl_store(struct device *dev,
+ }
+ static DEVICE_ATTR_RW(cntr_ctrl);
+ 
++static ssize_t res_idx_show(struct device *dev,
++			    struct device_attribute *attr,
++			    char *buf)
++{
++	unsigned long val;
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
++
++	val = drvdata->res_idx;
++	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
++}
++
++static ssize_t res_idx_store(struct device *dev,
++			     struct device_attribute *attr,
++			     const char *buf, size_t size)
++{
++	unsigned long val;
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
++
++	if (kstrtoul(buf, 16, &val))
++		return -EINVAL;
++	/* Resource selector pair 0 is always implemented and reserved */
++	if ((val == 0) || (val >= drvdata->nr_resource))
++		return -EINVAL;
++
++	/*
++	 * Use spinlock to ensure index doesn't change while it gets
++	 * dereferenced multiple times within a spinlock block elsewhere.
++	 */
++	spin_lock(&drvdata->spinlock);
++	drvdata->res_idx = val;
++	spin_unlock(&drvdata->spinlock);
++	return size;
++}
++static DEVICE_ATTR_RW(res_idx);
++
++static ssize_t res_ctrl_show(struct device *dev,
++			     struct device_attribute *attr,
++			     char *buf)
++{
++	u8 idx;
++	unsigned long val;
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
++
++	spin_lock(&drvdata->spinlock);
++	idx = drvdata->res_idx;
++	val = drvdata->res_ctrl[idx];
++	spin_unlock(&drvdata->spinlock);
++	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
++}
++
++static ssize_t res_ctrl_store(struct device *dev,
++			      struct device_attribute *attr,
++			      const char *buf, size_t size)
++{
++	u8 idx;
++	unsigned long val;
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
++
++	if (kstrtoul(buf, 16, &val))
++		return -EINVAL;
++
++	spin_lock(&drvdata->spinlock);
++	idx = drvdata->res_idx;
++	/* For odd idx pair inversal bit is RES0 */
++	if (idx % 2 != 0)
++		/* PAIRINV, bit[21] */
++		val &= ~BIT(21);
++	drvdata->res_ctrl[idx] = val;
++	spin_unlock(&drvdata->spinlock);
++	return size;
++}
++static DEVICE_ATTR_RW(res_ctrl);
++
+ static ssize_t status_show(struct device *dev,
+ 			   struct device_attribute *attr, char *buf)
+ {
+@@ -1887,6 +1960,8 @@ static struct attribute *coresight_etmv4_attrs[] = {
+ 	&dev_attr_cntrldvr.attr,
+ 	&dev_attr_cntr_val.attr,
+ 	&dev_attr_cntr_ctrl.attr,
++	&dev_attr_res_idx.attr,
++	&dev_attr_res_ctrl.attr,
+ 	&dev_attr_status.attr,
+ 	&dev_attr_mgmt.attr,
+ 	&dev_attr_trcidr.attr,
+-- 
+1.9.1
