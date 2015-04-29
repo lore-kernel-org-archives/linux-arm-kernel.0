@@ -1,149 +1,437 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 28 Apr 2015 17:16:39 -0700
-Subject: [RFC/RFT 3/6] serial: msm: convert driver to use runtime PM apis
-In-Reply-To: <1429778744-13352-4-git-send-email-rnayak@codeaurora.org>
-References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
- <1429778744-13352-4-git-send-email-rnayak@codeaurora.org>
-Message-ID: <554022E7.90407@codeaurora.org>
+From: fkan@apm.com (Feng Kan)
+Date: Tue, 28 Apr 2015 17:38:52 -0700
+Subject: [PATCH V3] arm64: optimized copy_to_user and copy_from_user assembly
+ code
+Message-ID: <1430267932-17730-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/15 01:45, Rajendra Nayak wrote:
-> With platform support now in place to manage clocks from within runtime PM
-> callbacks, get rid of all clock handling from the driver and convert the
-> driver to use runtime PM apis.
->
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> Cc: <linux-serial@vger.kernel.org>
+Using the glibc cortex string work work authored by Linaro as base to
+create new copy to/from user kernel routine.
 
-Pramod is changing the same file in the same area. Please work together
-if necessary.
+Iperf performance increase:
+		-l (size)		1 core result
+Optimized 	64B			44-51Mb/s
+		1500B			4.9Gb/s
+		30000B			16.2Gb/s
+Original	64B			34-50.7Mb/s
+		1500B			4.7Gb/s
+		30000B			14.5Gb/s
 
--Stephen
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ arch/arm64/lib/copy_from_user.S |  92 +++++++++++------
+ arch/arm64/lib/copy_template.S  | 213 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/lib/copy_to_user.S   |  56 ++++++-----
+ 3 files changed, 302 insertions(+), 59 deletions(-)
+ create mode 100644 arch/arm64/lib/copy_template.S
 
-> ---
->  drivers/tty/serial/msm_serial.c | 33 ++++++++++++++++-----------------
->  1 file changed, 16 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-> index b73889c..eb66502 100644
-> --- a/drivers/tty/serial/msm_serial.c
-> +++ b/drivers/tty/serial/msm_serial.c
-> @@ -33,6 +33,7 @@
->  #include <linux/serial.h>
->  #include <linux/clk.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/delay.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> @@ -50,11 +51,11 @@ struct msm_port {
->  	struct uart_port	uart;
->  	char			name[16];
->  	struct clk		*clk;
-> -	struct clk		*pclk;
->  	unsigned int		imr;
->  	int			is_uartdm;
->  	unsigned int		old_snap_state;
->  	bool			break_detected;
-> +	struct device		*dev;
->  };
->  
->  static inline void wait_for_xmitr(struct uart_port *port)
-> @@ -464,12 +465,11 @@ static int msm_set_baud_rate(struct uart_port *port, unsigned int baud)
->  	return baud;
->  }
->  
-> -static void msm_init_clock(struct uart_port *port)
-> +static void msm_init(struct uart_port *port)
->  {
->  	struct msm_port *msm_port = UART_TO_MSM(port);
->  
-> -	clk_prepare_enable(msm_port->clk);
-> -	clk_prepare_enable(msm_port->pclk);
-> +	pm_runtime_get_sync(msm_port->dev);
->  	msm_serial_set_mnd_regs(port);
->  }
->  
-> @@ -487,7 +487,7 @@ static int msm_startup(struct uart_port *port)
->  	if (unlikely(ret))
->  		return ret;
->  
-> -	msm_init_clock(port);
-> +	msm_init(port);
->  
->  	if (likely(port->fifosize > 12))
->  		rfr_level = port->fifosize - 12;
-> @@ -511,7 +511,7 @@ static void msm_shutdown(struct uart_port *port)
->  	msm_port->imr = 0;
->  	msm_write(port, 0, UART_IMR); /* disable interrupts */
->  
-> -	clk_disable_unprepare(msm_port->clk);
-> +	pm_runtime_put_sync(msm_port->dev);
->  
->  	free_irq(port->irq, port);
->  }
-> @@ -669,12 +669,10 @@ static void msm_power(struct uart_port *port, unsigned int state,
->  
->  	switch (state) {
->  	case 0:
-> -		clk_prepare_enable(msm_port->clk);
-> -		clk_prepare_enable(msm_port->pclk);
-> +		pm_runtime_get_sync(msm_port->dev);
->  		break;
->  	case 3:
-> -		clk_disable_unprepare(msm_port->clk);
-> -		clk_disable_unprepare(msm_port->pclk);
-> +		pm_runtime_put_sync(msm_port->dev);
->  		break;
->  	default:
->  		pr_err("msm_serial: Unknown PM state %d\n", state);
-> @@ -933,7 +931,7 @@ static int __init msm_console_setup(struct console *co, char *options)
->  	if (unlikely(!port->membase))
->  		return -ENXIO;
->  
-> -	msm_init_clock(port);
-> +	msm_init(port);
->  
->  	if (options)
->  		uart_parse_options(options, &baud, &parity, &bits, &flow);
-> @@ -1057,13 +1055,10 @@ static int msm_serial_probe(struct platform_device *pdev)
->  	if (IS_ERR(msm_port->clk))
->  		return PTR_ERR(msm_port->clk);
->  
-> -	if (msm_port->is_uartdm) {
-> -		msm_port->pclk = devm_clk_get(&pdev->dev, "iface");
-> -		if (IS_ERR(msm_port->pclk))
-> -			return PTR_ERR(msm_port->pclk);
-> -
-> +	if (msm_port->is_uartdm)
->  		clk_set_rate(msm_port->clk, 1843200);
-> -	}
-> +
-> +	msm_port->dev = &pdev->dev;
->  
->  	port->uartclk = clk_get_rate(msm_port->clk);
->  	dev_info(&pdev->dev, "uartclk = %d\n", port->uartclk);
-> @@ -1080,13 +1075,17 @@ static int msm_serial_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, port);
->  
-> +	pm_runtime_enable(&pdev->dev);
-> +
->  	return uart_add_one_port(&msm_uart_driver, port);
->  }
->  
->  static int msm_serial_remove(struct platform_device *pdev)
->  {
->  	struct uart_port *port = platform_get_drvdata(pdev);
-> +	struct msm_port *msm_port = UART_TO_MSM(port);
->  
-> +	pm_runtime_disable(msm_port->dev);
->  	uart_remove_one_port(&msm_uart_driver, port);
->  
->  	return 0;
-
-
+diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
+index 5e27add..0e79ed9 100644
+--- a/arch/arm64/lib/copy_from_user.S
++++ b/arch/arm64/lib/copy_from_user.S
+@@ -15,7 +15,6 @@
+  */
+ 
+ #include <linux/linkage.h>
+-#include <asm/assembler.h>
+ 
+ /*
+  * Copy from user space to a kernel buffer (alignment handled by the hardware)
+@@ -28,39 +27,68 @@
+  *	x0 - bytes not copied
+  */
+ ENTRY(__copy_from_user)
+-	add	x4, x1, x2			// upper user buffer boundary
+-	subs	x2, x2, #8
+-	b.mi	2f
+-1:
+-USER(9f, ldr	x3, [x1], #8	)
+-	subs	x2, x2, #8
+-	str	x3, [x0], #8
+-	b.pl	1b
+-2:	adds	x2, x2, #4
+-	b.mi	3f
+-USER(9f, ldr	w3, [x1], #4	)
+-	sub	x2, x2, #4
+-	str	w3, [x0], #4
+-3:	adds	x2, x2, #2
+-	b.mi	4f
+-USER(9f, ldrh	w3, [x1], #2	)
+-	sub	x2, x2, #2
+-	strh	w3, [x0], #2
+-4:	adds	x2, x2, #1
+-	b.mi	5f
+-USER(9f, ldrb	w3, [x1]	)
+-	strb	w3, [x0]
+-5:	mov	x0, #0
+-	ret
++#include "copy_template.S"
+ ENDPROC(__copy_from_user)
+ 
+ 	.section .fixup,"ax"
+-	.align	2
+-9:	sub	x2, x4, x1
+-	mov	x3, x2
+-10:	strb	wzr, [x0], #1			// zero remaining buffer space
+-	subs	x3, x3, #1
+-	b.ne	10b
+-	mov	x0, x2				// bytes not copied
++	.align    2
++9:
++	/*
++	 * count is accurate
++	 * dst is accurate
++	 */
++	mov	x0, count
++	sub	dst, dst, tmp1
++	b	.Lfinalize
++
++10:
++	/*
++	 * count is in the last 15 bytes
++	 * dst is somewhere in there
++	 */
++	mov	x0, count
++	sub	dst, limit, count
++	b	.Lfinalize
++11:
++	/*
++	 * count over counted by tmp2
++	 * dst could be anywhere in there
++	 */
++	add	x0, count, tmp2
++	sub	dst, limit, x0
++	b	.Lfinalize
++12:
++	/*
++	 * (count + 64) bytes remain
++	 * dst is accurate
++	 */
++	adds	x0, count, #64
++	b	.Lfinalize
++13:
++	/*
++	 * (count + 128) bytes remain
++	 * dst is pre-biased to (dst + 16)
++	 */
++	adds	x0, count, #128
++	add	dst, dst, #16
++	b	.Lfinalize
++14:
++	/*
++	 * (count + 64) bytes remain
++	 * dst is pre-biased to (dst + 16)
++	 */
++	adds	x0, count, #64
++	add	dst, dst, #16
++
++.Lfinalize:
++	/*
++	 * Zeroize remaining destination-buffer
++	 */
++	mov	count, x0
++20:
++	/* Zero remaining buffer space */
++	strb	wzr, [dst], #1
++	subs	count, count, #1
++	b.ne	20b
+ 	ret
+ 	.previous
+diff --git a/arch/arm64/lib/copy_template.S b/arch/arm64/lib/copy_template.S
+new file mode 100644
+index 0000000..7a22c6b
+--- /dev/null
++++ b/arch/arm64/lib/copy_template.S
+@@ -0,0 +1,213 @@
++/*
++ * Copyright (c) 2013, Applied Micro Circuits Corporation
++ * Copyright (c) 2012-2013, Linaro Limited
++ *
++ * Author: Feng Kan <fkan@apm.com>
++ * Author: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
++ *
++ * The code is adopted from the memcpy routine by Linaro Limited.
++ *
++ * This file is free software: you may copy, redistribute and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation, either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * This file is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * This file incorporates work covered by the following copyright and
++ * permission notice:
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *      1 Redistributions of source code must retain the above copyright
++ *        notice, this list of conditions and the following disclaimer.
++ *      2 Redistributions in binary form must reproduce the above copyright
++ *        notice, this list of conditions and the following disclaimer in the
++ *        documentation and/or other materials provided with the distribution.
++ *      3 Neither the name of the Linaro nor the
++ *        names of its contributors may be used to endorse or promote products
++ *        derived from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++#include <asm/assembler.h>
++#include <asm/cache.h>
++
++dstin	.req x0
++src	.req x1
++count	.req x2
++tmp1	.req x3
++tmp1w	.req w3
++tmp2	.req x4
++tmp2w	.req w4
++limit	.req x5
++dst	.req x6
++
++A_l	.req x7
++A_h	.req x8
++B_l	.req x9
++B_h	.req x10
++C_l	.req x11
++C_h	.req x12
++D_l	.req x13
++D_h	.req x14
++
++	mov	dst, dstin
++	add	limit, dst, count
++	cmp	count, #16
++	b.lo	.Ltail15
++
++	/*
++	 * We don't much care about the alignment of DST, but we want SRC
++	 * to be 128-bit (16 byte) aligned so that we don't cross cache line
++	 * boundaries on both loads and stores.
++	 */
++	ands	tmp2, src, #15
++	b.eq	.LSrcAligned
++	sub	count, count, tmp2
++
++	tbz	tmp2, #0, 1f
++	USER(11f, ldrb	tmp1w, [src], #1)
++	USER(11f, strb	tmp1w, [dst], #1)
++1:
++	tbz	tmp2, #1, 2f
++	USER(11f, ldrh	tmp1w, [src], #2)
++	USER(11f, strh	tmp1w, [dst], #2)
++2:
++	tbz	tmp2, #2, 3f
++	USER(11f, ldr	tmp1w, [src], #4)
++	USER(11f, str	tmp1w, [dst], #4)
++3:
++	tbz	tmp2, #3, .LSrcAligned
++	USER(11f, ldr	tmp1, [src], #8)
++	USER(11f, str	tmp1, [dst], #8)
++
++.LSrcAligned:
++	/* There may be less than 63 bytes to go now.  */
++	cmp	count, #64
++	b.ge	.Lcpy_over64
++
++	/*
++	 * Deal with small copies quickly by dropping straight into the
++	 * exit block.
++	 */
++.Ltail63:
++	/*
++	 * Copy up to 48 bytes of data.  At this point we only need the
++	 * bottom 6 bits of count to be accurate.
++	 */
++	ands	tmp1, count, #0x30
++	b.eq	.Ltail15
++	add	dst, dst, tmp1
++	add	src, src, tmp1
++	cmp	tmp1w, #0x20
++	b.eq	1f
++	b.lt	2f
++	USER(9f, ldp A_l, A_h, [src, #-48])
++	USER(9f, stp A_l, A_h, [dst, #-48])
++1:
++	USER(9f, ldp A_l, A_h, [src, #-32])
++	USER(9f, stp A_l, A_h, [dst, #-32])
++2:
++	USER(9f, ldp A_l, A_h, [src, #-16])
++	USER(9f, stp A_l, A_h, [dst, #-16])
++
++.Ltail15:
++	ands	count, count, #15
++	beq	.Lsuccess	/* Quick exit if we are done*/
++	/*
++	 * Copy up to 15 bytes of data.  Does not assume additional data
++	 * being copied.
++	 */
++	tbz	count, #3, 1f
++	USER(10f, ldr tmp1, [src], #8)
++	USER(10f, str tmp1, [dst], #8)
++1:
++	tbz	count, #2, 1f
++	USER(10f, ldr tmp1w, [src], #4)
++	USER(10f, str tmp1w, [dst], #4)
++1:
++	tbz	count, #1, 1f
++	USER(10f, ldrh tmp1w, [src], #2)
++	USER(10f, strh tmp1w, [dst], #2)
++1:
++	tbz	count, #0, 1f
++	USER(10f, ldrb tmp1w, [src], #1)
++	USER(10f, strb tmp1w, [dst], #1)
++1:
++	b	.Lsuccess
++
++.Lcpy_over64:
++	subs	count, count, #128
++	b.ge	.Lcpy_body_large
++	/*
++	 * Less than 128 bytes to copy, so handle 64 here and then jump
++	 * to the tail.
++	 */
++	adds	count, count, #64
++	USER(12f, ldp A_l, A_h, [src])
++	USER(12f, ldp B_l, B_h, [src, #16])
++	USER(12f, ldp C_l, C_h, [src, #32])
++	USER(12f, ldp D_l, D_h, [src, #48])
++	USER(12f, stp A_l, A_h, [dst])
++	USER(12f, stp B_l, B_h, [dst, #16])
++	USER(12f, stp C_l, C_h, [dst, #32])
++	USER(12f, stp D_l, D_h, [dst, #48])
++	add	src, src, #64
++	add	dst, dst, #64
++	tst	count, #0x3f
++	b.ne	.Ltail63
++	b	.Lsuccess
++
++	/*
++	 * Critical loop.  Start at a new cache line boundary.  Assuming
++	 * 64 bytes per line this ensures the entire loop is in one line.
++	 */
++	.p2align L1_CACHE_SHIFT
++.Lcpy_body_large:
++	/* There are at least 128 bytes to copy.  */
++	sub	dst, dst, #16			/* Pre-bias.  */
++	USER(13f, ldp A_l, A_h, [src, #0])
++	USER(13f, ldp B_l, B_h, [src, #16])
++	USER(13f, ldp C_l, C_h, [src, #32])
++	USER(13f, ldp D_l, D_h, [src, #48]!)	/* src += 64 - Pre-bias. */
++1:
++	USER(13f, stp A_l, A_h, [dst, #16])
++	USER(13f, ldp A_l, A_h, [src, #16])
++	USER(13f, stp B_l, B_h, [dst, #32])
++	USER(13f, ldp B_l, B_h, [src, #32])
++	USER(13f, stp C_l, C_h, [dst, #48])
++	USER(13f, ldp C_l, C_h, [src, #48])
++	USER(14f, stp D_l, D_h, [dst, #64]!)
++	USER(14f, ldp D_l, D_h, [src, #64]!)
++	subs	count, count, #64
++	b.ge	1b
++	USER(13f, stp A_l, A_h, [dst, #16])
++	USER(13f, stp B_l, B_h, [dst, #32])
++	USER(13f, stp C_l, C_h, [dst, #48])
++	USER(13f, stp D_l, D_h, [dst, #64])
++	add	src, src, #16
++	add	dst, dst, #80		/* 64 bytes + 16 prebias */
++	adds	count, count, #64
++	tst	count, #0x3f
++	b.ne	.Ltail63
++.Lsuccess:
++	/* Nothing left to copy */
++	mov	x0, #0
++	ret
+diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
+index a0aeeb9..2ce36de 100644
+--- a/arch/arm64/lib/copy_to_user.S
++++ b/arch/arm64/lib/copy_to_user.S
+@@ -15,7 +15,6 @@
+  */
+ 
+ #include <linux/linkage.h>
+-#include <asm/assembler.h>
+ 
+ /*
+  * Copy to user space from a kernel buffer (alignment handled by the hardware)
+@@ -28,34 +27,37 @@
+  *	x0 - bytes not copied
+  */
+ ENTRY(__copy_to_user)
+-	add	x4, x0, x2			// upper user buffer boundary
+-	subs	x2, x2, #8
+-	b.mi	2f
+-1:
+-	ldr	x3, [x1], #8
+-	subs	x2, x2, #8
+-USER(9f, str	x3, [x0], #8	)
+-	b.pl	1b
+-2:	adds	x2, x2, #4
+-	b.mi	3f
+-	ldr	w3, [x1], #4
+-	sub	x2, x2, #4
+-USER(9f, str	w3, [x0], #4	)
+-3:	adds	x2, x2, #2
+-	b.mi	4f
+-	ldrh	w3, [x1], #2
+-	sub	x2, x2, #2
+-USER(9f, strh	w3, [x0], #2	)
+-4:	adds	x2, x2, #1
+-	b.mi	5f
+-	ldrb	w3, [x1]
+-USER(9f, strb	w3, [x0]	)
+-5:	mov	x0, #0
+-	ret
++#include "copy_template.S"
+ ENDPROC(__copy_to_user)
+ 
+ 	.section .fixup,"ax"
+-	.align	2
+-9:	sub	x0, x4, x0			// bytes not copied
++	.align    2
++9:
++10:
++	/*
++	 * count is accurate
++	 */
++	mov	x0, count
++	b	.Lfinalize
++11:
++	/*
++	 * count is over accounted by tmp2
++	 */
++	add	x0, count, tmp2
++	b	.Lfinalize
++12:
++14:
++	/*
++	 * (count + 64) bytes remain
++	 * dst is accurate
++	 */
++	adds	x0, count, #64
++	b	.Lfinalize
++13:
++	/*
++	 * (count + 128) bytes remain
++	 */
++	add	x0, count, #128
++.Lfinalize:
+ 	ret
+ 	.previous
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
