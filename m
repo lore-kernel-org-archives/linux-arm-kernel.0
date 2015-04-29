@@ -1,112 +1,45 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 29 Apr 2015 16:08:51 +0100
-Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
- add SW break point support
-In-Reply-To: <20150429103814.GC4137@cbox>
-References: <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
- <20150427200407.GG23335@cbox>
- <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
- <87wq0wr6dd.fsf@linaro.org>
- <CAFEAcA85i_1JybEFBg91NA3-LpAzYh4RSDnqryOd=rZN7gZP5A@mail.gmail.com>
- <20150428125645.GA4137@cbox> <87tww0qqh9.fsf@linaro.org>
- <20150429081047.GB4137@cbox> <87r3r31eed.fsf@linaro.org>
- <20150429103814.GC4137@cbox>
-Message-ID: <87oam70y64.fsf@linaro.org>
+From: dnelson@redhat.com (Dean Nelson)
+Date: Wed, 29 Apr 2015 11:09:18 -0400
+Subject: [PATCH] arm64: add missing PAGE_ALIGN() to __dma_free()
+Message-ID: <20150429150917.14395.31269.email-sent-by-dnelson@teal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+__dma_alloc() does a PAGE_ALIGN() on the passed in size argument before
+doing anything else. __dma_free() does not. And because it doesn't, it is
+possible to leak memory should size not be an integer multiple of PAGE_SIZE.
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
+The solution is to add a PAGE_ALIGN() to __dma_free() like is done in
+__dma_alloc().
 
-> On Wed, Apr 29, 2015 at 10:18:18AM +0100, Alex Benn?e wrote:
->> 
->> Christoffer Dall <christoffer.dall@linaro.org> writes:
->> 
->> > On Tue, Apr 28, 2015 at 03:37:01PM +0100, Alex Benn?e wrote:
->> >> 
->> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
->> >> 
->> >> > On Tue, Apr 28, 2015 at 10:34:12AM +0100, Peter Maydell wrote:
->> >> >> On 28 April 2015 at 09:42, Alex Benn?e <alex.bennee@linaro.org> wrote:
->> >> >> > Peter Maydell <peter.maydell@linaro.org> writes:
->> >> >> >> Does the kernel already have a conveniently implemented "inject
->> >> >> >> exception into guest" lump of code? If so it might be less effort
->> >> >> >> to do it that way round, maybe.
->> >> >> >
-<snip>
->> >> 
->> >> Certainly there are some cases where the kernel doesn't have all the
->> >> information. For example it doesn't know if the soft break was inserted
->> >> by the guest or the host. That to me favours the "let userspace deal
->> >> with the ugly" approach.
->> >> 
->> > Not sure I follow.
->> >
->> > If it's an exception for the guest, then that must be because the guest
->> > put in the breakpoint instruction, right?
->> 
->> No the host can add breakpoint instructions as well. They both generate
->> the same (redirected) exception to the hypervisor which then has to
->> figure out who planted the breakpoint and where the eventual exception
->> will be handled.
->
-> I understand this; let's just rewind here.
->
-> If you've concluded that the exception is for the guest, then the guest
-> must have placed the breakpoint instruction there, correct?  Otherwise,
-> the exception is for the hypervisor and the discussion about how to
-> inject an exception for the guest is invalid.
+Additionally, this patch removes a redundant PAGE_ALIGN() from
+__dma_alloc_coherent(), since __dma_alloc_coherent() can only be called
+from __dma_alloc(), which already does a PAGE_ALIGN() before the call.
 
-But only userspace has enough information to make that conclusion (after
-searching the list of breakpoints it added to the code). So from
-userspace we can:
+Signed-off-by: Dean Nelson <dnelson@redhat.com>
+Cc: stable at vger.kernel.org
+---
+ arch/arm64/mm/dma-mapping.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-  - re-enter KVM telling it to re-route the exception it just delivered
-    to userspace somehow
-
-  or
-
-  - make the changes to deliver the exception in userspace and re-enter
-    KVM as normal.
-
-It seems to me if we have already exited into userspace it may as well
-clean up if it has all the information it needs?
-
-> Or are you talking about the corner case where the host uses a soft
-> breakpoint to get a breakpoint on an instruction which is also a
-> breakpoint in the guest?
-
-I think in this case host debugging just wins.
-
->
->> 
->> > However, that's a separate discussion from that of *how* userspace or
->> > the kernel then injects an exception to the guest.
->> >
->> > By using some QEMU TCG functionality or by QEMU calling back into KVM
->> > and asking it to inject an exception for it.
->> 
->> I don't know if there is explicit TCG functionality to use but QEMU can
->> set the registers and PC up for exception entry and re-enter KVM.
->> 
->
-> I also understand this.  I think Peter's point was exactly that if we
-> have existing code somewhere which we can reuse, then we should consider
-> reusing it.
-
-I'm not sure such code exists. The only injection code I know of in KVMs
-handle_exit code where a +ve return value signals KVM to deliver the
-exception to the guest. This is used by the hvc and svc handlers after
-calling kvm_inject_undefined() and the wfx handler which advances the PC
-first.
-
-> Again, I don't care particularly which way, I just want the expected
-> working behavior to be clearly defined.
-
-I think it makes sense to do it in userspace. I have the kernels
-inject_fault code for reference for what needs setting up but I'll see
-if I can find anything in QEMU that already handles this for some other
-thing (although I don't think it does at first glance).
-
--- 
-Alex Benn?e
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index ef7d112..6e5e687 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -105,7 +105,6 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
+ 		struct page *page;
+ 		void *addr;
+ 
+-		size = PAGE_ALIGN(size);
+ 		page = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
+ 							get_order(size));
+ 		if (!page)
+@@ -195,6 +194,8 @@ static void __dma_free(struct device *dev, size_t size,
+ {
+ 	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+ 
++	size = PAGE_ALIGN(size);
++
+ 	if (!is_device_dma_coherent(dev)) {
+ 		if (__free_from_pool(vaddr, size))
+ 			return;
