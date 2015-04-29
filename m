@@ -1,114 +1,104 @@
-From: jchandra@broadcom.com (Jayachandran C.)
-Date: Wed, 29 Apr 2015 19:55:55 +0530
-Subject: [RFC PATCH 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <6662179.AoBfCMOsxD@wuerfel>
-References: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
- <6662179.AoBfCMOsxD@wuerfel>
-Message-ID: <20150429142554.GI2992@jayachandranc.netlogicmicro.com>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Wed, 29 Apr 2015 22:20:00 +0800
+Subject: [PATCH V7 00/10] Add Freescale i.mx7d support
+Message-ID: <1430317210-18333-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+From: Frank Li <Frank.Li@freescale.com>
 
-On Wed, Apr 29, 2015 at 02:34:20PM +0200, Arnd Bergmann wrote:
-> On Wednesday 29 April 2015 17:09:58 Jayachandran C wrote:
-> > The current code in pci-host-generic.c uses pci_common_init_dev()
-> > from the arch/arm/ to do a part of the PCI initialization, and this
-> > prevents it from being used on arm64.
-> > 
-> > The initialization done by pci_common_init_dev() that is really
-> > needed by pci-host-generic.c can be done in the same file without
-> > using the hw_pci API of ARM.
-> > 
-> > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
-> > this is be handled by setting up 'struct gen_pci' to embed a
-> > pci_sys_data variable as the first element on the ARM platform.
-> > 
-> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> 
-> This seems very useful
+Add basic support for chip imx7d.
+ - MSL
+ - Clock support. All clock enabled.
+ - pinctrl support
+ - SD Card support
 
-I have tried to ensure that the new code is as much as possible
-functionally equivalent to the call to pci_common_init_dev on ARM.
+Change from v6 to v7
+ - Move clk to driver/clk/imx
+ - Remove iomux-lpsr part
+ - Remove parents clocks node in imx7d.dtsi
 
-I should have added this as a note to the patch.
+Change from v5 to v6
+ - dual license for dts
+ - fix typo statue
+ - Remove smp_operations
+ - Remove GPT check cpu_is_mx7() by use old compatible mode
+ - Remove dts arch_timer part, which not used in this patch series
+ - correct GIC reg map
 
-Ideally, I would like this patch to be functionally equivalent
-to the existing code, and make further improvements with follow up
-patches, but I can make the changes you suggest if it is needed.
+Change from v4 to v5
+ - Remove imx7d_map_io()
+ - Remove  clk_register_clkdev(clks[IMX7D_GPT1_ROOT_CLK], "ipg", "imx-gpt.0");
+ - Remove  clk_register_clkdev(clks[IMX7D_GPT_3M_CLK], "gpt_3m", "imx-gpt.0");
+ - Add comment about enable all clock
+ - Add Type IMX_PLLV3_ENET_IMX7 and remove cpu_is_imx7d()
 
-> 
-> >  
-> > -static int gen_pci_setup(int nr, struct pci_sys_data *sys)
-> > +static int gen_pci_init(struct device *dev, struct gen_pci *pci)
-> >  {
-> > -	struct gen_pci *pci = sys->private_data;
-> > -	list_splice_init(&pci->resources, &sys->resources);
-> > -	return 1;
-> > +	struct pci_bus *bus;
-> > +
-> > +	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
-> 
-> Do we want to set that flag unconditionally? At least for servers,
-> the resources should get assigned by firmware, and things might
-> go wrong if Linux tries to reassign them. This is probably the
-> case on kvmtool as well.
-> 
-> > +	bus = pci_scan_root_bus(dev, 0, &gen_pci_ops, pci, &pci->resources);
-> > +	if (!bus) {
-> > +		dev_err(dev, "Scanning rootbus failed");
-> > +		return -ENODEV;
-> > +	}
-> > +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-> 
-> I thought this was done by default now. If it is not, can
-> we make the of_irq swizzling the default?
-> 
-> > +	if (!pci_has_flag(PCI_PROBE_ONLY)) {
-> > +		pci_bus_size_bridges(bus);
-> > +		pci_bus_assign_resources(bus);
-> > +	}
-> > +	pci_bus_add_devices(bus);
-> > +
-> > +	/* Configure PCI Express settings */
-> > +	if (pci_has_flag(PCI_PROBE_ONLY)) {
-> > +		struct pci_bus *child;
-> > +
-> > +		list_for_each_entry(child, &bus->children, node)
-> > +			pcie_bus_configure_settings(child);
-> > +	}
-> > +	return 0;
-> >  }
-> 
-> We should also try to come up wtih a way to make that
-> pcie_bus_configure_settings() automatic if it's required here.
-> 
-> >  static int gen_pci_probe(struct platform_device *pdev)
-> > @@ -214,13 +237,6 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >  	struct device *dev = &pdev->dev;
-> >  	struct device_node *np = dev->of_node;
-> >  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> > -	struct hw_pci hw = {
-> > -		.nr_controllers	= 1,
-> > -		.private_data	= (void **)&pci,
-> > -		.setup		= gen_pci_setup,
-> > -		.map_irq	= of_irq_parse_and_map_pci,
-> > -		.ops		= &gen_pci_ops,
-> > -	};
-> >  
-> >  	if (!pci)
-> >  		return -ENOMEM;
-> > @@ -258,8 +274,7 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >  		return err;
-> >  	}
-> >  
-> > -	pci_common_init_dev(dev, &hw);
-> > -	return 0;
-> > +	return gen_pci_init(dev, pci);
-> 
-> How about moving the new code right into the probe() function?
-> 
-> 	Arnd
+Change from v3 to v4
+ - Fixed the problem review by Russel king.
+   Remove __mxc_arch_type
+   Remove MXC_ARCH_CA7
+   use new smp_operation for ca7 platform
+ - imx7d.dtsi remove unecessary part for bring up
+ - imx7d-sdb.dsi, just enable uart i2c and sd card
+ - Add device tree binding document for timer, clock and pinctrl
 
-Thanks,
-JC.
+Change from v2 to v3
+  - remove unsupport part in imx7d-sdb.dtb
+
+Change from V1 to V2:
+  - split patch1 to three small one to avoid 100k maillist limitation.
+  - fix imx7d.dtsi code style problem
+
+Anson Huang (1):
+  ARM: imx: add msl support for imx7d
+
+Frank Li (9):
+  ARM: dts: add pinfunc include file to support imx7d
+  ARM: dts: add clock include file to support imx7d
+  Document: dt: binding: imx: update document for imx7d support
+  ARM: dts: add imx7d soc dtsi file
+  pinctrl: add imx7d support
+  ARM: imx: add gpt system timer support for imx7d
+  ARM: imx: add imx7d clk tree support
+  arm: dts: add imx7d-sdb support
+  ARM: config: imx_v6_v7_defconfig add imx7d support
+
+ .../devicetree/bindings/clock/imx7d-clock.txt      |   13 +
+ .../bindings/pinctrl/fsl,imx7d-pinctrl.txt         |   27 +
+ .../devicetree/bindings/timer/fsl,imxgpt.txt       |    3 +
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/imx7d-pinfunc.h                  | 1038 ++++++++++++++++++++
+ arch/arm/boot/dts/imx7d-sdb.dts                    |  420 ++++++++
+ arch/arm/boot/dts/imx7d.dtsi                       |  497 ++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |    1 +
+ arch/arm/mach-imx/Kconfig                          |   11 +
+ arch/arm/mach-imx/Makefile                         |    1 +
+ arch/arm/mach-imx/anatop.c                         |    5 +-
+ arch/arm/mach-imx/cpu.c                            |    3 +
+ arch/arm/mach-imx/hardware.h                       |    7 +-
+ arch/arm/mach-imx/mach-imx7d.c                     |   46 +
+ arch/arm/mach-imx/mx7.h                            |   38 +
+ arch/arm/mach-imx/mxc.h                            |    8 +-
+ arch/arm/mach-imx/time.c                           |    1 +
+ drivers/clk/imx/Makefile                           |    1 +
+ drivers/clk/imx/clk-imx7d.c                        |  886 +++++++++++++++++
+ drivers/clk/imx/clk-pllv3.c                        |   14 +-
+ drivers/clk/imx/clk.h                              |    9 +
+ drivers/pinctrl/freescale/Kconfig                  |    7 +
+ drivers/pinctrl/freescale/Makefile                 |    1 +
+ drivers/pinctrl/freescale/pinctrl-imx7d.c          |  385 ++++++++
+ include/dt-bindings/clock/imx7d-clock.h            |  450 +++++++++
+ 25 files changed, 3870 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx7d-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/imx7d-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/imx7d-sdb.dts
+ create mode 100644 arch/arm/boot/dts/imx7d.dtsi
+ create mode 100644 arch/arm/mach-imx/mach-imx7d.c
+ create mode 100644 arch/arm/mach-imx/mx7.h
+ create mode 100644 drivers/clk/imx/clk-imx7d.c
+ create mode 100644 drivers/pinctrl/freescale/pinctrl-imx7d.c
+ create mode 100644 include/dt-bindings/clock/imx7d-clock.h
+
+-- 
+1.9.1
