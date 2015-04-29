@@ -1,721 +1,299 @@
-From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Wed, 29 Apr 2015 09:14:41 -0500
-Subject: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
- independent of SoCs.
-Message-ID: <1430316881-4668-1-git-send-email-shenwei.wang@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 29 Apr 2015 15:17:51 +0100
+Subject: [PATCH v6 4/4] clk: dt: Introduce binding for always-on clock
+ support
+In-Reply-To: <20150422093446.GA28007@lukather>
+References: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
+ <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
+ <20150407191746.GA26727@lukather> <20150408081450.GB5162@x1>
+ <20150408094349.GC26727@lukather> <20150408103832.GG5162@x1>
+ <20150408155705.GF26727@lukather> <20150408172344.GH5162@x1>
+ <20150422093446.GA28007@lukather>
+Message-ID: <20150429141751.GR9169@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are 4 versions of the timer hardware on Freescale MXC hardware.
---Version 0: MX1/MXL
---Version 1: MX21, MX27.
---Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q
---Version 3: MX6DL, MX6SX
+On Wed, 22 Apr 2015, Maxime Ripard wrote:
 
-This patch has removed the SoC related codes, and implemented the driver
-directly upon the hardware timer IP version.
+> On Wed, Apr 08, 2015 at 06:23:44PM +0100, Lee Jones wrote:
+> > On Wed, 08 Apr 2015, Maxime Ripard wrote:
+> > 
+> > > On Wed, Apr 08, 2015 at 11:38:32AM +0100, Lee Jones wrote:
+> > > > On Wed, 08 Apr 2015, Maxime Ripard wrote:
+> > > > 
+> > > > > On Wed, Apr 08, 2015 at 09:14:50AM +0100, Lee Jones wrote:
+> > > > > > > > +
+> > > > > > > > +		    This property is not to be abused.  It is only to be used to
+> > > > > > > > +		    protect platforms from being crippled by gated clocks, not
+> > > > > > > > +		    as a convenience function to avoid using the framework
+> > > > > > > > +		    correctly inside device drivers.
+> > > > > > > 
+> > > > > > > Disregarding what's stated here, I'm pretty sure that this will
+> > > > > > > actually happen. Where do you place the cursor?
+> > > > > > 
+> > > > > > That's up to Mike.
+> > > > > 
+> > > > > Except that Mike won't review any of the DT changes, so he won't be
+> > > > > able to refrain users from using it. Let alone out-of-tree DTs using a
+> > > > > mainline kernel.
+> > > > 
+> > > > Ideally Mike should be Cc'ed on patches using clock bindings, but if
+> > > > he isn't the DT guys are smart enough to either make the right
+> > > > decisions themselves (Rob has Acked these bindings already, so will be
+> > > > on the lookout for misuse, I'm sure), or ask for Mike's help.
+> > > 
+> > > Yeah, right, as if this strategy really worked in the past....
+> > > 
+> > > Do we really want to look at even the DT bindings that have actually
+> > > been reviewed by maintainers that got merged?
+> > > 
+> > > They don't have time for that, which is totally fine, but we really
+> > > should bury our head in the sand by actually thinking they will review
+> > > every single DT-related patch.
+> > > 
+> > > Using that as an argument is just plain denial of what really happened
+> > > for the past 4 years.
+> > 
+> > I agree that it's a problem, but this is a process problem and has
+> > nothing to do with this set.  If you have a problem with the current
+> > process and have a better alternative, submit your thoughts to the DT
+> > list.  Rejecting all new bindings because you are frightened that they
+> > will be used in a manner that they were not intended is not the way to
+> > go though.
+> 
+> I'm not saying that this binding should not go in because of a process
+> issue.
+> 
+> I'm saying that discarding arguments against your binding by adding
+> restrictions that cannot be enforced is not reasonable.
 
-The new driver can be installed via device tree or the direct function
-call to mxc_timer_init in order to support imx legacy systems like MX21
-and MX27.
+I'm open to constructive suggestions/alternatives.
 
-For the device tree implementation, the driver is compatible with the current
-bindings like "fsl,imx6q-gpt", but for future dts file, the string like
-"fsl,imx-gpt-v2" without SoC information is recommended.
+Hand rolling this stuff in C per vendor is not of of them.
 
-Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
----
- arch/arm/mach-imx/clk-imx1.c  |   2 +-
- arch/arm/mach-imx/clk-imx21.c |   3 +-
- arch/arm/mach-imx/clk-imx27.c |   3 +-
- arch/arm/mach-imx/clk-imx31.c |   3 +-
- arch/arm/mach-imx/clk-imx35.c |   5 +-
- arch/arm/mach-imx/common.h    |   2 +-
- arch/arm/mach-imx/time.c      | 435 ++++++++++++++++++++++++++++++------------
- 7 files changed, 328 insertions(+), 125 deletions(-)
+> > > > > > > Should we create a new driver for our RAM controller, or do we want to
+> > > > > > > use clock-always-on?
+> > > > > > 
+> > > > > > I would say that if all the driver did was to enable clocks, then you
+> > > > > > should use this instead.  This binding was designed specifically for
+> > > > > > that purpose.
+> > > > > > 
+> > > > > > However, if the aforementioned driver clock can be safely gated, then
+> > > > > > it should not be an always-on clock.
+> > > > > 
+> > > > > Yeah, of course, I understand the original intent of it, but that
+> > > > > argument, which might very well be true at one point in time, might
+> > > > > not be true anymore two or three releases later.
+> > > > 
+> > > > Why?  The H/W isn't going to change in two or three releases.  The
+> > > > clocks designated as 'always-on' will have to be on forever, or
+> > > > synonymously, 'always'.
+> > > >
+> > > > > And that driver might actually rely on the fact that the clock is shut
+> > > > > down, which won't be the case.
+> > > > 
+> > > > I think you are missing the point of this binding.  The driver can
+> > > > never rely on that in this use-case.  If the clock is off, there is no
+> > > > device driver, period. 
+> > > 
+> > > Ok. So CPU hotplug or cpuidle is not a thing then? I'm pretty sure the
+> > > PM guys will be happy to hear that.
+> > > 
+> > > And they are not device drivers, are not mandatory in the system, and
+> > > it's usually a good thing to keep the CPU running whenever you don't
+> > > have such drivers.
+> > > 
+> > > > > Introducing a DT interface solely by refering to the current state of
+> > > > > a driver is a bit odd.
+> > > > 
+> > > > I'm not sure I get your point.  This binding has nothing to do with
+> > > > drivers.
+> > > 
+> > > It's all about drivers. Or rather all about missing drivers.
+> > 
+> > I think you are going to have to be more forthcoming with your issues
+> > with this binding, because I'm struggling to understand what your
+> > problem with it is.  You have already pointed me to vendors which have
+> > a genuine/valid need for it.  But instead you'd prefer they hand-roll
+> > their own implementations over multiple lines of C code (each).
+> 
+> I told you already.
+> 
+> If you have that property, there's absolutely no way to do any kind of
+> clock management in the future.
+> 
+> It might be fine for your use case, but see my point about the
+> unreasonable restriction. People are going to use it for clocks that
+> just don't have a driver *yet*, and when that driver will be merged we
+> will end up with a driver that (for example) makes the assumption that
+> the clock has been shut down to reset the IP, that might or might not
+> be the case, depending on how old the DT is exactly.
 
-diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
-index 37c307a..57ba8d5 100644
---- a/arch/arm/mach-imx/clk-imx1.c
-+++ b/arch/arm/mach-imx/clk-imx1.c
-@@ -98,7 +98,7 @@ int __init mx1_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-fb.0");
- 	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ahb", "imx1-fb.0");
- 
--	mxc_timer_init(MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR), MX1_TIM1_INT);
-+	mxc_timer_init(MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR), MX1_TIM1_INT, 0);
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
-index 4b4c753..21a1061 100644
---- a/arch/arm/mach-imx/clk-imx21.c
-+++ b/arch/arm/mach-imx/clk-imx21.c
-@@ -153,7 +153,8 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
- 	clk_register_clkdev(clk[IMX21_CLK_I2C_GATE], NULL, "imx21-i2c.0");
- 	clk_register_clkdev(clk[IMX21_CLK_OWIRE_GATE], NULL, "mxc_w1.0");
- 
--	mxc_timer_init(MX21_IO_ADDRESS(MX21_GPT1_BASE_ADDR), MX21_INT_GPT1);
-+	/*Timer version in MX21 is v1*/
-+	mxc_timer_init(MX21_IO_ADDRESS(MX21_GPT1_BASE_ADDR), MX21_INT_GPT1, 1);
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index ab6349e..0cf532c 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -229,7 +229,8 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[IMX27_CLK_EMMA_AHB_GATE], "ahb", "m2m-emmaprp.0");
- 	clk_register_clkdev(clk[IMX27_CLK_EMMA_IPG_GATE], "ipg", "m2m-emmaprp.0");
- 
--	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
-+	/*Timer version in MX27 is v1*/
-+	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1, 1);
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-index 286ef422..c863390 100644
---- a/arch/arm/mach-imx/clk-imx31.c
-+++ b/arch/arm/mach-imx/clk-imx31.c
-@@ -182,7 +182,8 @@ int __init mx31_clocks_init(unsigned long fref)
- 	mx31_revision();
- 	clk_disable_unprepare(clk[iim_gate]);
- 
--	mxc_timer_init(MX31_IO_ADDRESS(MX31_GPT1_BASE_ADDR), MX31_INT_GPT);
-+	/*Timer version in MX31 is v2*/
-+	mxc_timer_init(MX31_IO_ADDRESS(MX31_GPT1_BASE_ADDR), MX31_INT_GPT, 2);
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index a0d2b57..532fc21 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -128,7 +128,7 @@ int __init mx35_clocks_init(void)
- 	clk[esdhc3_div] = imx_clk_divider("esdhc3_div", "esdhc_sel", base + MX35_CCM_PDR3, 16, 6);
- 
- 	clk[spdif_sel] = imx_clk_mux("spdif_sel", base + MX35_CCM_PDR3, 22, 1, std_sel, ARRAY_SIZE(std_sel));
--	clk[spdif_div_pre] = imx_clk_divider("spdif_div_pre", "spdif_sel", base + MX35_CCM_PDR3, 29, 3); /* divide by 1 not allowed */ 
-+	clk[spdif_div_pre] = imx_clk_divider("spdif_div_pre", "spdif_sel", base + MX35_CCM_PDR3, 29, 3); /* divide by 1 not allowed */
- 	clk[spdif_div_post] = imx_clk_divider("spdif_div_post", "spdif_div_pre", base + MX35_CCM_PDR3, 23, 6);
- 
- 	clk[ssi_sel] = imx_clk_mux("ssi_sel", base + MX35_CCM_PDR2, 6, 1, std_sel, ARRAY_SIZE(std_sel));
-@@ -279,7 +279,8 @@ int __init mx35_clocks_init(void)
- #ifdef CONFIG_MXC_USE_EPIT
- 	epit_timer_init(MX35_IO_ADDRESS(MX35_EPIT1_BASE_ADDR), MX35_INT_EPIT1);
- #else
--	mxc_timer_init(MX35_IO_ADDRESS(MX35_GPT1_BASE_ADDR), MX35_INT_GPT);
-+	/*Timer version in MX35 is v2*/
-+	mxc_timer_init(MX35_IO_ADDRESS(MX35_GPT1_BASE_ADDR), MX35_INT_GPT, 2);
- #endif
- 
- 	return 0;
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 0f04e30..851ae58 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -44,7 +44,7 @@ void imx27_soc_init(void);
- void imx31_soc_init(void);
- void imx35_soc_init(void);
- void epit_timer_init(void __iomem *base, int irq);
--void mxc_timer_init(void __iomem *, int);
-+void mxc_timer_init(void __iomem *, int, int);
- int mx1_clocks_init(unsigned long fref);
- int mx21_clocks_init(unsigned long lref, unsigned long fref);
- int mx27_clocks_init(unsigned long fref);
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index 15d18e1..2543f8e 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -31,6 +31,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <linux/slab.h>
- 
- #include <asm/mach/time.h>
- 
-@@ -38,9 +39,11 @@
- #include "hardware.h"
- 
- /*
-- * There are 2 versions of the timer hardware on Freescale MXC hardware.
-- * Version 1: MX1/MXL, MX21, MX27.
-- * Version 2: MX25, MX31, MX35, MX37, MX51
-+ * There are 4 versions of the timer hardware on Freescale MXC hardware.
-+ * Version 0: MX1/MXL
-+ * Version 1: MX21, MX27.
-+ * Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q
-+ * Version 3: MX6DL, MX6SX
-  */
- 
- /* defines common for all i.MX */
-@@ -76,46 +79,67 @@
- 
- #define V2_TIMER_RATE_OSC_DIV8	3000000
- 
--#define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx21() || cpu_is_mx27())
--#define timer_is_v2()	(!timer_is_v1())
-+#define IMX_TIMER_V0         (0)
-+#define IMX_TIMER_V1         (1)
-+#define IMX_TIMER_V2         (2)
-+#define IMX_TIMER_V3         (3)
-+
-+struct imx_timer {
-+	void __iomem *timer_base;
-+	int version;
-+	struct clock_event_device evt;
-+	struct irqaction act;
-+	void (*gpt_irq_enable)(struct imx_timer *);
-+	void (*gpt_irq_disable)(struct imx_timer *);
-+	void (*gpt_irq_acknowledge)(struct imx_timer *);
-+};
-+
-+static void gpt_irq_disable_v0_v1(struct imx_timer *tm)
-+{
-+	unsigned int tmp;
- 
--static struct clock_event_device clockevent_mxc;
--static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
-+	tmp = __raw_readl(tm->timer_base + MXC_TCTL);
-+	__raw_writel(tmp & ~MX1_2_TCTL_IRQEN, tm->timer_base + MXC_TCTL);
- 
--static void __iomem *timer_base;
-+}
- 
--static inline void gpt_irq_disable(void)
-+static void gpt_irq_disable_v2_v3(struct imx_timer *tm)
- {
--	unsigned int tmp;
-+	__raw_writel(0, tm->timer_base + V2_IR);
- 
--	if (timer_is_v2())
--		__raw_writel(0, timer_base + V2_IR);
--	else {
--		tmp = __raw_readl(timer_base + MXC_TCTL);
--		__raw_writel(tmp & ~MX1_2_TCTL_IRQEN, timer_base + MXC_TCTL);
--	}
- }
- 
--static inline void gpt_irq_enable(void)
-+static void gpt_irq_enable_v0_v1(struct imx_timer *tm)
- {
--	if (timer_is_v2())
--		__raw_writel(1<<0, timer_base + V2_IR);
--	else {
--		__raw_writel(__raw_readl(timer_base + MXC_TCTL) | MX1_2_TCTL_IRQEN,
--			timer_base + MXC_TCTL);
--	}
-+	__raw_writel(__raw_readl(tm->timer_base + MXC_TCTL) | MX1_2_TCTL_IRQEN,
-+			tm->timer_base + MXC_TCTL);
-+}
-+
-+static void gpt_irq_enable_v2_v3(struct imx_timer *tm)
-+{
-+	__raw_writel(1, tm->timer_base + V2_IR);
-+}
-+
-+static void gpt_irq_acknowledge_v0(struct imx_timer *tm)
-+{
-+	__raw_readl(tm->timer_base + MX1_2_TSTAT);
-+
-+	__raw_writel(0, tm->timer_base + MX1_2_TSTAT);
- }
- 
--static void gpt_irq_acknowledge(void)
-+static void gpt_irq_acknowledge_v1(struct imx_timer *tm)
- {
--	if (timer_is_v1()) {
--		if (cpu_is_mx1())
--			__raw_writel(0, timer_base + MX1_2_TSTAT);
--		else
--			__raw_writel(MX2_TSTAT_CAPT | MX2_TSTAT_COMP,
--				timer_base + MX1_2_TSTAT);
--	} else if (timer_is_v2())
--		__raw_writel(V2_TSTAT_OF1, timer_base + V2_TSTAT);
-+	__raw_readl(tm->timer_base + MX1_2_TSTAT);
-+
-+	__raw_writel(MX2_TSTAT_CAPT | MX2_TSTAT_COMP,
-+			tm->timer_base + MX1_2_TSTAT);
-+}
-+
-+static void gpt_irq_acknowledge_v2_v3(struct imx_timer *tm)
-+{
-+	__raw_readl(tm->timer_base + V2_TSTAT);
-+
-+	__raw_writel(V2_TSTAT_OF1, tm->timer_base + V2_TSTAT);
- }
- 
- static void __iomem *sched_clock_reg;
-@@ -132,10 +156,11 @@ static unsigned long imx_read_current_timer(void)
- 	return __raw_readl(sched_clock_reg);
- }
- 
--static int __init mxc_clocksource_init(struct clk *timer_clk)
-+static int __init mxc_clocksource_init(struct clk *timer_clk, void __iomem *reg)
- {
- 	unsigned int c = clk_get_rate(timer_clk);
--	void __iomem *reg = timer_base + (timer_is_v2() ? V2_TCN : MX1_2_TCN);
-+
-+	BUG_ON(!reg);
- 
- 	imx_delay_timer.read_current_timer = &imx_read_current_timer;
- 	imx_delay_timer.freq = c;
-@@ -150,30 +175,32 @@ static int __init mxc_clocksource_init(struct clk *timer_clk)
- 
- /* clock event */
- 
--static int mx1_2_set_next_event(unsigned long evt,
--			      struct clock_event_device *unused)
-+static int mx1_2_set_next_event(unsigned long event,
-+			      struct clock_event_device *evt_dev)
- {
- 	unsigned long tcmp;
-+	struct imx_timer *tm = container_of(evt_dev, struct imx_timer, evt);
- 
--	tcmp = __raw_readl(timer_base + MX1_2_TCN) + evt;
-+	tcmp = __raw_readl(tm->timer_base + MX1_2_TCN) + event;
- 
--	__raw_writel(tcmp, timer_base + MX1_2_TCMP);
-+	__raw_writel(tcmp, tm->timer_base + MX1_2_TCMP);
- 
--	return (int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)) < 0 ?
-+	return (int)(tcmp - __raw_readl(tm->timer_base + MX1_2_TCN)) < 0 ?
- 				-ETIME : 0;
- }
- 
--static int v2_set_next_event(unsigned long evt,
--			      struct clock_event_device *unused)
-+static int v2_set_next_event(unsigned long event,
-+			      struct clock_event_device *evt_dev)
- {
- 	unsigned long tcmp;
-+	struct imx_timer *tm = container_of(evt_dev, struct imx_timer, evt);
- 
--	tcmp = __raw_readl(timer_base + V2_TCN) + evt;
-+	tcmp = __raw_readl(tm->timer_base + V2_TCN) + event;
- 
--	__raw_writel(tcmp, timer_base + V2_TCMP);
-+	__raw_writel(tcmp, tm->timer_base + V2_TCMP);
- 
--	return evt < 0x7fffffff &&
--		(int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
-+	return event < 0x7fffffff &&
-+		(int)(tcmp - __raw_readl(tm->timer_base + V2_TCN)) < 0 ?
- 				-ETIME : 0;
- }
- 
-@@ -188,9 +215,11 @@ static const char *clock_event_mode_label[] = {
- #endif /* DEBUG */
- 
- static void mxc_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *evt)
-+				struct clock_event_device *evt_dev)
- {
- 	unsigned long flags;
-+	static enum clock_event_mode last_mode = CLOCK_EVT_MODE_UNUSED;
-+	struct imx_timer *tm = container_of(evt_dev, struct imx_timer, evt);
- 
- 	/*
- 	 * The timer interrupt generation is disabled@least
-@@ -199,29 +228,24 @@ static void mxc_set_mode(enum clock_event_mode mode,
- 	local_irq_save(flags);
- 
- 	/* Disable interrupt in GPT module */
--	gpt_irq_disable();
-+	tm->gpt_irq_disable(tm);
- 
--	if (mode != clockevent_mode) {
-+	if (mode != last_mode) {
- 		/* Set event time into far-far future */
--		if (timer_is_v2())
--			__raw_writel(__raw_readl(timer_base + V2_TCN) - 3,
--					timer_base + V2_TCMP);
--		else
--			__raw_writel(__raw_readl(timer_base + MX1_2_TCN) - 3,
--					timer_base + MX1_2_TCMP);
-+		evt_dev->set_next_event(-3, evt_dev);
- 
- 		/* Clear pending interrupt */
--		gpt_irq_acknowledge();
-+		tm->gpt_irq_acknowledge(tm);
- 	}
- 
- #ifdef DEBUG
- 	printk(KERN_INFO "mxc_set_mode: changing mode from %s to %s\n",
--		clock_event_mode_label[clockevent_mode],
-+		clock_event_mode_label[last_mode],
- 		clock_event_mode_label[mode]);
- #endif /* DEBUG */
- 
- 	/* Remember timer mode */
--	clockevent_mode = mode;
-+	last_mode = mode;
- 	local_irq_restore(flags);
- 
- 	switch (mode) {
-@@ -237,7 +261,7 @@ static void mxc_set_mode(enum clock_event_mode mode,
- 	 * mode switching
- 	 */
- 		local_irq_save(flags);
--		gpt_irq_enable();
-+		tm->gpt_irq_enable(tm);
- 		local_irq_restore(flags);
- 		break;
- 	case CLOCK_EVT_MODE_SHUTDOWN:
-@@ -253,50 +277,33 @@ static void mxc_set_mode(enum clock_event_mode mode,
-  */
- static irqreturn_t mxc_timer_interrupt(int irq, void *dev_id)
- {
--	struct clock_event_device *evt = &clockevent_mxc;
--	uint32_t tstat;
-+	struct imx_timer *tm = dev_id;
-+	void (*event_handler)(struct clock_event_device *);
- 
--	if (timer_is_v2())
--		tstat = __raw_readl(timer_base + V2_TSTAT);
--	else
--		tstat = __raw_readl(timer_base + MX1_2_TSTAT);
-+	BUG_ON(!tm);
- 
--	gpt_irq_acknowledge();
-+	tm->gpt_irq_acknowledge(tm);
- 
--	evt->event_handler(evt);
-+	event_handler = ACCESS_ONCE(tm->evt.event_handler);
-+	if (event_handler)
-+		event_handler(&tm->evt);
- 
- 	return IRQ_HANDLED;
- }
- 
--static struct irqaction mxc_timer_irq = {
--	.name		= "i.MX Timer Tick",
--	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= mxc_timer_interrupt,
--};
--
--static struct clock_event_device clockevent_mxc = {
--	.name		= "mxc_timer1",
--	.features	= CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode	= mxc_set_mode,
--	.set_next_event	= mx1_2_set_next_event,
--	.rating		= 200,
--};
--
--static int __init mxc_clockevent_init(struct clk *timer_clk)
-+static int __init mxc_clockevent_init(struct clk *timer_clk,
-+		struct imx_timer *tm)
- {
--	if (timer_is_v2())
--		clockevent_mxc.set_next_event = v2_set_next_event;
--
--	clockevent_mxc.cpumask = cpumask_of(0);
--	clockevents_config_and_register(&clockevent_mxc,
-+	tm->evt.cpumask = cpumask_of(0);
-+	clockevents_config_and_register(&tm->evt,
- 					clk_get_rate(timer_clk),
- 					0xff, 0xfffffffe);
- 
- 	return 0;
- }
- 
--static void __init _mxc_timer_init(int irq,
--				   struct clk *clk_per, struct clk *clk_ipg)
-+static void __init _mxc_timer_init_v0_v1(int irq, struct clk *clk_per,
-+		struct clk *clk_ipg, struct imx_timer *tm)
- {
- 	uint32_t tctl_val;
- 
-@@ -314,56 +321,231 @@ static void __init _mxc_timer_init(int irq,
- 	 * Initialise to a known state (all timers off, and timing reset)
- 	 */
- 
--	__raw_writel(0, timer_base + MXC_TCTL);
--	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
--
--	if (timer_is_v2()) {
--		tctl_val = V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
--		if (clk_get_rate(clk_per) == V2_TIMER_RATE_OSC_DIV8) {
--			tctl_val |= V2_TCTL_CLK_OSC_DIV8;
--			if (cpu_is_imx6dl() || cpu_is_imx6sx()) {
--				/* 24 / 8 = 3 MHz */
--				__raw_writel(7 << V2_TPRER_PRE24M,
--					timer_base + MXC_TPRER);
--				tctl_val |= V2_TCTL_24MEN;
--			}
--		} else {
--			tctl_val |= V2_TCTL_CLK_PER;
--		}
-+	__raw_writel(0, tm->timer_base + MXC_TCTL);
-+	__raw_writel(0, tm->timer_base + MXC_TPRER); /* see datasheet note */
-+
-+	tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
-+
-+	__raw_writel(tctl_val, tm->timer_base + MXC_TCTL);
-+
-+	/* init and register the timer to the framework */
-+	mxc_clocksource_init(clk_per, tm->timer_base + MX1_2_TCN);
-+
-+	tm->evt.set_next_event = mx1_2_set_next_event;
-+	mxc_clockevent_init(clk_per, tm);
-+
-+	/* Make irqs happen */
-+	setup_irq(irq, &tm->act);
-+}
-+
-+static void __init _mxc_timer_init_v2(int irq, struct clk *clk_per,
-+		struct clk *clk_ipg, struct imx_timer *tm)
-+{
-+	uint32_t tctl_val;
-+
-+	if (IS_ERR(clk_per)) {
-+		pr_err("i.MX timer: unable to get clk\n");
-+		return;
-+	}
-+
-+	if (!IS_ERR(clk_ipg))
-+		clk_prepare_enable(clk_ipg);
-+
-+	clk_prepare_enable(clk_per);
-+
-+	/*
-+	 * Initialise to a known state (all timers off, and timing reset)
-+	 */
-+
-+	__raw_writel(0, tm->timer_base + MXC_TCTL);
-+	__raw_writel(0, tm->timer_base + MXC_TPRER); /* see datasheet note */
-+
-+	tctl_val = V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
-+
-+	if (clk_get_rate(clk_per) == V2_TIMER_RATE_OSC_DIV8)
-+		tctl_val |= V2_TCTL_CLK_OSC_DIV8;
-+	else
-+		tctl_val |= V2_TCTL_CLK_PER;
-+
-+	__raw_writel(tctl_val, tm->timer_base + MXC_TCTL);
-+
-+	/* init and register the timer to the framework */
-+	mxc_clocksource_init(clk_per, tm->timer_base + V2_TCN);
-+
-+	tm->evt.set_next_event = v2_set_next_event;
-+	mxc_clockevent_init(clk_per, tm);
-+
-+	/* Make irqs happen */
-+	setup_irq(irq, &tm->act);
-+}
-+
-+static void __init _mxc_timer_init_v3(int irq, struct clk *clk_per,
-+		struct clk *clk_ipg, struct imx_timer *tm)
-+{
-+	uint32_t tctl_val;
-+
-+	if (IS_ERR(clk_per)) {
-+		pr_err("i.MX timer: unable to get clk\n");
-+		return;
-+	}
-+
-+	if (!IS_ERR(clk_ipg))
-+		clk_prepare_enable(clk_ipg);
-+
-+	clk_prepare_enable(clk_per);
-+
-+	/*
-+	 * Initialise to a known state (all timers off, and timing reset)
-+	 */
-+
-+	__raw_writel(0, tm->timer_base + MXC_TCTL);
-+	__raw_writel(0, tm->timer_base + MXC_TPRER); /* see datasheet note */
-+
-+	tctl_val = V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
-+
-+	if (clk_get_rate(clk_per) == V2_TIMER_RATE_OSC_DIV8) {
-+		tctl_val |= V2_TCTL_CLK_OSC_DIV8;
-+		/* 24 / 8 = 3 MHz */
-+		__raw_writel(7 << V2_TPRER_PRE24M,
-+					tm->timer_base + MXC_TPRER);
-+		tctl_val |= V2_TCTL_24MEN;
- 	} else {
--		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
-+		tctl_val |= V2_TCTL_CLK_PER;
- 	}
- 
--	__raw_writel(tctl_val, timer_base + MXC_TCTL);
-+	__raw_writel(tctl_val, tm->timer_base + MXC_TCTL);
- 
- 	/* init and register the timer to the framework */
--	mxc_clocksource_init(clk_per);
--	mxc_clockevent_init(clk_per);
-+	mxc_clocksource_init(clk_per, tm->timer_base + V2_TCN);
-+
-+	tm->evt.set_next_event = v2_set_next_event;
-+	mxc_clockevent_init(clk_per, tm);
- 
- 	/* Make irqs happen */
--	setup_irq(irq, &mxc_timer_irq);
-+	setup_irq(irq, &tm->act);
- }
- 
--void __init mxc_timer_init(void __iomem *base, int irq)
-+static void __init _mxc_timer_init(int irq, struct clk *clk_per,
-+		struct clk *clk_ipg, struct imx_timer *tm)
- {
-+
-+	switch (tm->version) {
-+	case IMX_TIMER_V0:
-+		tm->gpt_irq_enable = gpt_irq_enable_v0_v1;
-+		tm->gpt_irq_disable = gpt_irq_disable_v0_v1;
-+		tm->gpt_irq_acknowledge = gpt_irq_acknowledge_v0;
-+		_mxc_timer_init_v0_v1(irq, clk_per, clk_ipg, tm);
-+		break;
-+
-+	case IMX_TIMER_V1:
-+		tm->gpt_irq_enable = gpt_irq_enable_v0_v1;
-+		tm->gpt_irq_disable = gpt_irq_disable_v0_v1;
-+		tm->gpt_irq_acknowledge = gpt_irq_acknowledge_v1;
-+		_mxc_timer_init_v0_v1(irq, clk_per, clk_ipg, tm);
-+		break;
-+
-+	case IMX_TIMER_V2:
-+		tm->gpt_irq_enable = gpt_irq_enable_v2_v3;
-+		tm->gpt_irq_disable = gpt_irq_disable_v2_v3;
-+		tm->gpt_irq_acknowledge = gpt_irq_acknowledge_v2_v3;
-+		_mxc_timer_init_v2(irq, clk_per, clk_ipg, tm);
-+		break;
-+
-+	case IMX_TIMER_V3:
-+		tm->gpt_irq_enable = gpt_irq_enable_v2_v3;
-+		tm->gpt_irq_disable = gpt_irq_disable_v2_v3;
-+		tm->gpt_irq_acknowledge = gpt_irq_acknowledge_v2_v3;
-+		_mxc_timer_init_v3(irq, clk_per, clk_ipg, tm);
-+		break;
-+
-+	default:
-+		pr_err("<%s> timer device node is not supported\r\n", __func__);
-+		break;
-+
-+	}
-+}
-+
-+void __init mxc_timer_init(void __iomem *base, int irq, int ver)
-+{
-+	struct imx_timer *timer;
- 	struct clk *clk_per = clk_get_sys("imx-gpt.0", "per");
- 	struct clk *clk_ipg = clk_get_sys("imx-gpt.0", "ipg");
- 
--	timer_base = base;
--
--	_mxc_timer_init(irq, clk_per, clk_ipg);
-+	timer = kzalloc(sizeof(struct imx_timer), GFP_KERNEL);
-+	if (!timer)
-+		panic("Can't allocate timer struct\n");
-+
-+	timer->timer_base = base;
-+	timer->version = ver;
-+	timer->evt.name = "mxc_timer1";
-+	timer->evt.rating = 200;
-+	timer->evt.features = CLOCK_EVT_FEAT_ONESHOT;
-+	timer->evt.set_mode = mxc_set_mode;
-+	timer->evt.set_next_event = v2_set_next_event;
-+	timer->act.name = "i.MX Timer Tick";
-+	timer->act.flags = IRQF_TIMER | IRQF_IRQPOLL;
-+	timer->act.dev_id = timer;
-+	timer->act.handler = mxc_timer_interrupt;
-+
-+	_mxc_timer_init(irq, clk_per, clk_ipg, timer);
- }
- 
-+
-+struct imx_timer_ip_combo {
-+	const char	*compat;
-+	int		version;
-+};
-+
-+static struct imx_timer_ip_combo imx_timer_tables[] = {
-+	{"fsl,imx-gpt-v0",	IMX_TIMER_V0},
-+	{"fsl,imx-gpt-v1",	IMX_TIMER_V1},
-+	{"fsl,imx-gpt-v2",	IMX_TIMER_V2},
-+	{"fsl,imx-gpt-v3",	IMX_TIMER_V3},
-+	{"fsl,imx1-gpt",	IMX_TIMER_V0},
-+	{"fsl,imx25-gpt",	IMX_TIMER_V2},
-+	{"fsl,imx25-gpt",	IMX_TIMER_V2},
-+	{"fsl,imx50-gpt",	IMX_TIMER_V2},
-+	{"fsl,imx51-gpt",	IMX_TIMER_V2},
-+	{"fsl,imx53-gpt",	IMX_TIMER_V2},
-+	{"fsl,imx6q-gpt",	IMX_TIMER_V2},
-+	{"fsl,imx6sl-gpt",	IMX_TIMER_V3},
-+	{"fsl,imx6sx-gpt",	IMX_TIMER_V3},
-+};
-+
-+
-+
- static void __init mxc_timer_init_dt(struct device_node *np)
- {
- 	struct clk *clk_per, *clk_ipg;
--	int irq;
-+	int irq, i, ret, ver;
-+	struct imx_timer *timer;
-+
-+	if (sched_clock_reg)
-+		return;
-+
-+	for (i =  0; i < sizeof(imx_timer_tables) /
-+			sizeof(struct imx_timer_ip_combo); i++) {
-+		ret = of_device_is_compatible(np, imx_timer_tables[i].compat);
-+		if (ret) {
-+			ver = imx_timer_tables[i].version;
-+			pr_err("<%s> compatible=%s timer_version=%d\r\n",
-+				__func__, imx_timer_tables[i].compat, ver);
-+			break;
-+		}
-+	}
- 
--	if (timer_base)
-+	if (!ret) {
-+		pr_err("<%s> timer device node is not supported\r\n", __func__);
- 		return;
-+	}
-+
-+	timer = kzalloc(sizeof(struct imx_timer), GFP_KERNEL);
-+	if (!timer)
-+		panic("Can't allocate timer struct\n");
-+
-+	timer->timer_base = of_iomap(np, 0);
-+	WARN_ON(!timer->timer_base || !ret);
- 
--	timer_base = of_iomap(np, 0);
--	WARN_ON(!timer_base);
- 	irq = irq_of_parse_and_map(np, 0);
- 
- 	clk_ipg = of_clk_get_by_name(np, "ipg");
-@@ -373,8 +555,25 @@ static void __init mxc_timer_init_dt(struct device_node *np)
- 	if (IS_ERR(clk_per))
- 		clk_per = of_clk_get_by_name(np, "per");
- 
--	_mxc_timer_init(irq, clk_per, clk_ipg);
-+
-+	timer->version = ver;
-+	timer->evt.name = np->name;
-+	timer->evt.rating = 200;
-+	timer->evt.features = CLOCK_EVT_FEAT_ONESHOT;
-+	timer->evt.set_mode = mxc_set_mode;
-+	timer->evt.set_next_event = v2_set_next_event;
-+	timer->act.name = np->name;
-+	timer->act.flags = IRQF_TIMER | IRQF_IRQPOLL;
-+	timer->act.dev_id = timer;
-+	timer->act.handler = mxc_timer_interrupt;
-+
-+	_mxc_timer_init(irq, clk_per, clk_ipg, timer);
- }
-+
-+CLOCKSOURCE_OF_DECLARE(mx_timer_v0, "fsl,imx-gpt-v0", mxc_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(mx_timer_v1, "fsl,imx-gpt-v1", mxc_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(mx_timer_v2, "fsl,imx-gpt-v2", mxc_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(mx_timer_v3, "fsl,imx-gpt-v3", mxc_timer_init_dt);
- CLOCKSOURCE_OF_DECLARE(mx1_timer, "fsl,imx1-gpt", mxc_timer_init_dt);
- CLOCKSOURCE_OF_DECLARE(mx25_timer, "fsl,imx25-gpt", mxc_timer_init_dt);
- CLOCKSOURCE_OF_DECLARE(mx50_timer, "fsl,imx50-gpt", mxc_timer_init_dt);
+There is a need for this binding, but as you say, it must not be
+abused.  So how to we get people not to use it willy-nilly?
+
+IMO, if people choose to ignore the stark warning in the documentation
+then that's they're lookout.  I guess you'd like to wrap them in more
+cotton wool than I would.  That's fine too, but how.
+
+> This will be even a bigger madness if you ask me.
+> 
+> > > > > > > Do we really want to enforce this if we ever gain a driver that would
+> > > > > > > actually be able to manage its clock (like do we want the CPU clock to
+> > > > > > > never *ever* be gated just because we don't have a cpuidle/hotplug
+> > > > > > > driver yet?)
+> > > > > > 
+> > > > > > As I've just mentioned, if a clock 'can' be turned off, this binding
+> > > > > > should never be used. Situations where using always-on as a stop-gap
+> > > > > > due to a lack of current functionality is what the paragraph above is
+> > > > > > trying to mitigate.
+> > > > > 
+> > > > > But it's not really what this property is about. What this property
+> > > > > describes is that these clocks should never be gated. Any point in
+> > > > > time during the life of the system AND with in any kernel version.
+> > > > 
+> > > > You got it, that's correct -- these clocks should never be gated.
+> > > > 
+> > > > So why would that ever change?  If that is likely (or even possible)
+> > > > to change in the future then this binding should not be used.
+> > > >
+> > > > To reiterate; this binding should be used on ungatable clocks only.
+> > > > Non-negotiable, non-changeable either by the introduction of new
+> > > > functionality/support or kernel version.
+> > > 
+> > > I'm pretty sure that if that patch gets merged, by the end of the
+> > > year, there will be "incorrect" users by your standards.
+> > 
+> > It's possible to abuse any binding.  I don't see why you are so
+> > offended of this one in particular.
+> 
+> I'm not offended, I just tried to push the same kind of patches two
+> years ago, with Mike pushing back, and actually came to see that he
+> was right a few monthes down the road.
+
+Well this was suggested by Mike.  I even have his Ack already.  So I
+guess he too has changed the error of his ways. :)
+
+> And yeah, your point that any binding can be abused is true. This one
+> is only so easy to abuse it's not even funny.
+> 
+> > > If you introduce a feature, you should expect people to use
+> > > it.  If not, what's the point?
+> > 
+> > By your own admission, there are genuine users for this binding and I
+> > expect people to use it.
+> 
+> The only thing that we really disagree upon is that whether that
+> restriction will really be followed. You expect people to, I
+> don't. It's the fundamental disagreement we have, that really prevent
+> any purely technical discussion.
+> 
+> Maybe we can try to address that before moving forward?
+
+I'd like that.
+
+If a firm warning isn't good enough, then what will be?
+
+> > > > > > > Have you seen the numerous NAK on such approach Mike did?
+> > > > > > 
+> > > > > > I haven't, but the folks reviewing previous versions have.  Do you
+> > > > > > have something specific in mind that you'd like to bring to my
+> > > > > > attention?
+> > > > > 
+> > > > > Unfortunately, I haven't been able to dig out such mails. But it's why
+> > > > > we ended up with clock protection code in various clock drivers
+> > > > > including:
+> > > > > 
+> > > > > AT91: http://lxr.free-electrons.com/source/drivers/clk/at91/clk-slow.c#L484
+> > > > > iMX28: http://lxr.free-electrons.com/source/drivers/clk/mxs/clk-imx28.c#L154
+> > > > > Rockchip: http://lxr.free-electrons.com/source/drivers/clk/rockchip/clk.c#L320
+> > > > > sunXi: http://lxr.free-electrons.com/source/drivers/clk/sunxi/clk-sunxi.c#L1183
+> > > > > Zynq: http://lxr.free-electrons.com/source/drivers/clk/zynq/clkc.c#L504
+> > > > > 
+> > > > > Which is much more flexible, since you won't have to modify the DT to
+> > > > > change which clocks are to be left enabled, as well as way easier to
+> > > > > debug if you ever have to remove that property from the DT.
+> > > > 
+> > > > You're right, you don't have the change the DT in these cases.  You
+> > > > have to write new C code, which is _less_ flexible.
+> > > 
+> > > I'm sorry to learn that you never heard of that stable-DT thing.
+> > > 
+> > > And a bit sorry to see that a maintainer is really seeing C as not
+> > > flexible.
+> > 
+> > You're putting words in my mouth.  I didn't say C was not flexible.
+> > 
+> > I'm referencing the original DT pros i.e. it is possible to supply a
+> > different configuration without the need to compile the kernel.
+> > That's certainly true in this case.  We can provide a clk-provider and
+> > tag it as always-on, all without re-compile.
+> > 
+> > > > So all these platforms are adding their own hand-rolled version of
+> > > > this binding, adding more duplication and cruft to the kernel.
+> > > > Instead they can use this 'always-on' and we can consolidate and strip
+> > > > it all out.
+> > > 
+> > > Except that all these platforms are actually not implementing a
+> > > binding, ie not an interface with the DT they are bound to. Each and
+> > > every of these platforms can change that list whenever they wish, just
+> > > by sending a single one-liner patch (just like the DT, really.).
+> > > 
+> > > Which is not something that you can achieve with a DT binding.
+> > 
+> > Once again, can you give me more information about why you have such a
+> > problem with this binding.  I wish for it to be stable/ABI, I wish for
+> > it never to be removed, I envisage it will always be needed, so what's
+> > the problem? 
+> > 
+> > Do you have a vested interest that I am missing?
+> > 
+> > Perhaps an example of possible calamity will help convince me that
+> > you're not completely wrong and blowing everything out of proportion
+> > for no good reason.
+> 
+> Let's say you've introduced such a clock in kernel 4.0 for the memory
+> clock.
+> 
+> At some point down the road, you create a ddrfreq driver (if that ever
+> exists). You have a new driver, which will manage the clock.
+> 
+> In that driver, for some reason, you have to shutdown the clock to
+> reset the DDR controller. Of course that also means that you will be
+> removing the clk-always-on property from your DT.
+> 
+> You will have in your driver something like:
+> 
+> /* Reset our controller */
+> clk_disable(clk);
+> clk_enable(clk):
+> 
+> And then, you expect your controller to be in its out-of-reset
+> state. Which will be the case with a new DT, and not with the old one,
+> probably creating all kind of very entertaining issues to debug.
+> 
+> All of this wouldn't be the case if you had this inside the kernel,
+> since (hopefully) the kernel is consistent with itself.
+
+Surely you must have realised already that DTBs are more tightly
+coupled to kernel versions than we would have initially liked?  It's
+naive to assume that old DTBs will 'just-work' with newer kernels.
+
+Wrong decisions related to DT are being made daily.  Adding mistakenly
+or foolhardily adding 'clk-always-on' to a DTS is not going to be the
+sole cause of breakage somewhere down the line.
+
+Pushing back on the acceptance of this binding based on idealistic,
+possibly already out-of-date premise is just frustrating.
+
+This useful binding should be accepted and people should not abuse
+it.  If they do and the vendor Maintainer's review and accept then
+they have no foundation for recourse.
+
+Would you prefer it if I made the warning starker?
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
