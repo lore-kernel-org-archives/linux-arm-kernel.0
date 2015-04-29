@@ -1,42 +1,33 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 29 Apr 2015 14:08:32 +0530
-Subject: [PATCH 5/5] Documentation: dt-bindings: add exynos-srom binding
- information
-In-Reply-To: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1430296712-10287-6-git-send-email-pankaj.dubey@samsung.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 29 Apr 2015 10:42:19 +0200
+Subject: [PATCH 2/2] Regulator: add driver for Freescale MC34708
+In-Reply-To: <20150428141740.16243.79036.stgit@localhost>
+References: <20150428141736.16243.57292.stgit@localhost>
+ <20150428141740.16243.79036.stgit@localhost>
+Message-ID: <1430296939.2411.103.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds exynos-srom binding information for SROM Controller
-driver on Exynos SoCs.
+Just a nit: a license mismatch.
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- .../devicetree/bindings/arm/samsung/exynos-srom.txt          | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+On Tue, 2015-04-28 at 16:17 +0200, Martin Fuzzey wrote:
+> --- /dev/null
+> +++ b/drivers/regulator/mc34708-regulator.c
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
-new file mode 100644
-index 0000000..482d1cd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
-@@ -0,0 +1,12 @@
-+SAMSUNG Exynos SoCs SROM Controller driver.
-+
-+Required properties:
-+- compatible : Should at least contain "samsung,exynos-srom".
-+
-+- reg: offset and length of the register set
-+
-+Example:
-+	sromc at 12570000 {
-+		compatible = "samsung,exynos-srom";
-+		reg = <0x12570000 0x100>;
-+	};
--- 
-2.2.0
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of the
+> + * License, or (at your option) any later version.
+
+This states the license is GPL v2 or later.
+
+> +MODULE_LICENSE("GPL v2");
+
+And, according to inlcude/linux/module.h, this states the license is
+(just) GPL v2. So I think either to comment at the top of this file or
+the ident used in the MODULE_LICENSE() macro should be changed.
+
+Thanks,
+
+
+Paul Bolle
