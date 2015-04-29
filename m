@@ -1,33 +1,37 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 28 Apr 2015 23:59:26 -0300
-Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: Enable RTC PCF8523 support
-Message-ID: <1430276367-18068-1-git-send-email-festevam@gmail.com>
+Date: Tue, 28 Apr 2015 23:59:27 -0300
+Subject: [PATCH 2/2] ARM: dts: imx6q-cubox-i: Disable the internal RTC
+In-Reply-To: <1430276367-18068-1-git-send-email-festevam@gmail.com>
+References: <1430276367-18068-1-git-send-email-festevam@gmail.com>
+Message-ID: <1430276367-18068-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-RTC PCF8523 is used on some mx6 cubox-i boards.
+The internal SNVS RTC on imx6q-cubox-i is not battery backed and there
+is a PCF8523 that is battery backed on CuBox-i2eX and CuBox-i4Pro models.
 
-Let it work by default.
+Disable the internal RTC in favour of the battery backed one, so that
+we can have a valid clock setting right after boot.
 
 Reported-by: Rick Thomas <rbthomas@cube.rcthomas.org>
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6q-cubox-i.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index fdeb1c8..1d93fe9 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -283,6 +283,7 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_INTF_DEV_UIE_EMUL=y
- CONFIG_RTC_DRV_DS1307=y
- CONFIG_RTC_DRV_ISL1208=y
-+CONFIG_RTC_DRV_PCF8523=y
- CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
+diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
+index 670bd8c..cff041a 100644
+--- a/arch/arm/boot/dts/imx6q-cubox-i.dts
++++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
+@@ -56,3 +56,7 @@
+ 	fsl,transmit-atten-16ths = <9>;
+ 	fsl,no-spread-spectrum;
+ };
++
++&snvs_rtc {
++	status = "disabled";
++};
 -- 
 1.9.1
