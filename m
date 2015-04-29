@@ -1,39 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Apr 2015 16:03:19 +0200
-Subject: [PATCH 2/2] ACPI / scan: Parse _CCA and setup device coherency
-In-Reply-To: <1430315049-4663-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 Apr 2015 15:04:46 +0100
+Subject: [PATCH 1/2] arm/arm64: ACPI: Introduce CONFIG_ACPI_MUST_HAVE_CCA
+In-Reply-To: <1430315049-4663-2-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1430315049-4663-3-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <5542288.z0SSOZ4xV7@wuerfel>
+ <1430315049-4663-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <20150429140445.GA18867@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 April 2015 08:44:09 Suravee Suthikulpanit wrote:
-> +                       device->flags.cca_seen = 1;
-> +               } else if (IS_ENABLED(CONFIG_ACPI_MUST_HAVE_CCA)) {
-> +                       /*
-> +                        * Architecture has specified that if the device
-> +                        * can do DMA, it must have ACPI _CCA object.
-> +                        * Here, there could be two cases:
-> +                        *   1. Not DMA-able device.
-> +                        *   2. DMA-able device, but missing _CCA object.
-> +                        *
-> +                        * In both cases, we will default to dma non-coherent.
-> +                        */
-> +                       cca = 0;
-> +               } else {
-> +                       /*
-> +                        * If architecture does not specify that device must
-> +                        * specify ACPI _CCA (e.g. x86), we default to use
-> +                        * dma coherent.
-> +                        */
-> +                       cca = 1;
-> +               }
+On Wed, Apr 29, 2015 at 08:44:08AM -0500, Suravee Suthikulpanit wrote:
+> From ACPIv6 (http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf),
+> section 6.2.17 _CCA states that ARM platforms require ACPI _CCA object to be
+> specified for DMA-cabpable devices. This patch introduces ACPI_MUST_HAVE_CCA
+> in arm and arm64 Kconfig to specify such requirement.
 > 
+> Note that when _CCA is required, if it is missing in the DSDT. ACPI driver
+> will default to setting up devices as non-coherent.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+>  arch/arm/Kconfig     | 1 +
+>  arch/arm64/Kconfig   | 1 +
+>  drivers/acpi/Kconfig | 3 +++
+>  3 files changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 45df48b..2a0d036 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1,6 +1,7 @@
+>  config ARM
+>  	bool
+>  	default y
+> +	select ACPI_MUST_HAVE_CCA if ACPI
+>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+>  	select ARCH_HAS_ELF_RANDOMIZE
+>  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
 
-What does it mean here if a device does DMA but is not coherent? Do you
-have an example of a server that needs this?
+Any plans for ACPI on 32-bit ARM?
 
-Can we please make the default for ARM64 cca=1 as well?
-
-	Arnd
+-- 
+Catalin
