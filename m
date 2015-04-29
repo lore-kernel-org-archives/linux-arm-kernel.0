@@ -1,74 +1,93 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Wed, 29 Apr 2015 16:34:33 +0000
-Subject: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
- independent of SoCs.
-In-Reply-To: <20150429152527.GH2258@tarshish>
-References: <1430316881-4668-1-git-send-email-shenwei.wang@freescale.com>
- <20150429142614.GE2258@tarshish>
- <BL2PR03MB3703DA9D4D52EC9524D627C83D70@BL2PR03MB370.namprd03.prod.outlook.com>
- <20150429150824.GF2258@tarshish>
- <BL2PR03MB37005C844BCB89007D176F683D70@BL2PR03MB370.namprd03.prod.outlook.com>
- <20150429152527.GH2258@tarshish>
-Message-ID: <BL2PR03MB370B0B1622F9EE980A6835883D70@BL2PR03MB370.namprd03.prod.outlook.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 29 Apr 2015 09:35:28 -0700
+Subject: [PATCH 05/11] ARM: imx6: set initial power mode in pm function
+In-Reply-To: <20150429060446.GA27573@dragon> (Shawn Guo's message of "Wed, 29
+ Apr 2015 14:04:58 +0800")
+References: <1430058672-9267-1-git-send-email-shawn.guo@linaro.org>
+ <1430058672-9267-6-git-send-email-shawn.guo@linaro.org>
+ <CAMAWPa8cyybpdgO+Po=7YUnCFkrnyHKKihgddzrUpHfAW=7brA@mail.gmail.com>
+ <20150429060446.GA27573@dragon>
+Message-ID: <7h383ix57z.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+Shawn Guo <shawn.guo@linaro.org> writes:
 
-> -----Original Message-----
-> From: Baruch Siach [mailto:baruch at tkos.co.il]
-> Sent: 2015?4?29? 10:25
-> To: Wang Shenwei-B38339
-> Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org
-> Subject: Re: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
-> independent of SoCs.
-> 
-> Hi Shenwei Wang,
-> On Wed, Apr 29, 2015 at 03:19:19PM +0000, Shenwei Wang wrote:
-> > > -----Original Message-----
-> > > From: Baruch Siach [mailto:baruch at tkos.co.il]
-> > > Sent: 2015?4?29? 10:08
-> > > To: Wang Shenwei-B38339
-> > > Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org;
-> > > devicetree at vger.kernel.org
-> > > Subject: Re: [PATCH 1/1] ARM: imx: make the imx timer driver
-> > > implementation independent of SoCs.
-> > >
-> > > When several SoC share the same IP block the usual convention is to
-> > > name it in the compatible property string after the first SoC it
-> > > appeared on. Just look at some binding documentation from
-> > > Documentation/devicetree/bindings/timer/ to find examples. The
-> > > allwinner,sun5i-a13-hstimer property is shared by A10s and
-> > > A13 SoCs. The amlogic,meson6-timer is shared by Meson6 and Meson8
-> > > SoCs, and so on.
-> >
-> > If the same IP block is shared with several SoCs, why we gave them
-> > different compatible strings? If no changes in an IP block, I assume no changes
-> in the relating driver as well.
-> > In this assumption, I don't see any need to introduce a new compatible
-> > string for an unchanged IP block in a new SoC.
-> 
-> That is exactly what I meant to say. Sorry that I was not clear enough.
-> 
-> When the same IP block is used in a newer generation SoC the same compatible
-> property string is used. For that reason you can find in sun5i-a10s.dtsi the line
-> 
-> 	compatible = "allwinner,sun5i-a13-hstimer";
-> 
-That is what has been supported in this patch. Besides that, it can also support
-different IP block versions in a SoC with different revision. For example,
-Let's say: 
-	hstimer version 1  in A13 revision 1.0
-	hstimer version 2  in A13 revision 1.1
+> Hi Kevin,
+>
+> On Tue, Apr 28, 2015 at 11:42:48AM -0700, Kevin Hilman wrote:
+>> Hi Shawn,
+>> 
+>> On Sun, Apr 26, 2015 at 7:31 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> > Rather than setting initial low-power mode in every single i.MX6 clock
+>> > initialization function, we should really do that in pm code.  Let's
+>> > move imx6q_set_lpm(WAIT_CLOCKED) call into imx6_pm_common_init().
+>> >
+>> > While at it, let's rename the function to imx6_set_lpm() since it's
+>> > actually common for all i.MX6 SoCs.
+>> >
+>> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>> 
+>> Some boot failures on imx6[1] (multi_v7_defconfig) were bisected down
+>> to this patch.  A simple revert doesn't build, so I was unable tot
+>> test a direct revert.  However, from the boot failures you can see
+>> that while multi_v7_defconfig boots fail, the imx_v6_v7_defconfig
+>> boots fine.
+>
+> This reminds me that cpuidle support is not turned on in
+> imx_v6_v7_defconfig.  I will send a patch to enable it for testing
+> coverage.
+>
+>> Disabling CONFIG_CPU_IDLE in multi_v7_defconfig allows
+>> this to start booting again on my wandboard quad, so I think there is
+>> something wrong with the cpuidle changes.
+>
+> I just tracked down the issue, and sent a fix like below.
 
-Shenwei
+Thanks for the quick fix.
 
+> The kernelci.org boot automation farm helps.  Thanks.
 
-> baruch
-> 
-> --
->      http://baruch.siach.name/blog/                  ~. .~   Tk Open
-> Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
->    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Glad it's useful.  We're doing a build/boot test of your fix now, and
+will keep you updated.
+
+In the mean time..., 
+
+> ----8<-------------------------------
+> From 056a5da1b56a057762eccd52b5b6b920c7f56b14 Mon Sep 17 00:00:00 2001
+> From: Shawn Guo <shawn.guo@linaro.org>
+> Date: Wed, 29 Apr 2015 13:07:03 +0800
+> Subject: [PATCH] ARM: imx6: initialize CCM_CLPCR_LPM into RUN mode earlier
+>
+> Commit 4631960d26da ("ARM: imx6: set initial power mode in pm function")
+> moves imx6_set_lpm() from clock init function into
+> imx6_pm_common_init().  This causes a hang when cpuidle support is
+> enabled.  The reason for that is ARM core clock is shut down
+> unexpectedly by WAIT mode.  It happens with the following call stack:
+>
+>     cpuidle_register_governor()
+>         cpuidle_switch_governor()
+>             cpuidle_uninstall_idle_handler()
+>                 synchronize_sched()
+>                     wait_rcu_gp()
+>                         wait_for_completion()
+>
+> When wait_for_completion() is called as above, all cores are idle/WFI.
+> Hence, the reset value of CCM_CLPCR_LPM - WAIT mode, will trigger a
+> hardware shutdown of the ARM core clock.
+>
+> To fix the regression, we need to ensure that CCM_CLPCR_LPM is
+> initialized into RUN mode earlier than cpuidle governor registration,
+> which is a postcore_initcall.  This patch creates function
+> imx6_pm_ccm_init() to map CCM block and initialize CCM_CLPCR_LPM into
+> RUN mode, and have the function called from machine .init_irq hook,
+> which should be early enough.
+>
+> Reported-by: Kevin Hilman <khilman@kernel.org>
+> Fixes: 4631960d26da ("ARM: imx6: set initial power mode in pm function")
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+
+...I did a quick test of this locally on my wandboard-quad, and it's now
+booting with multi_v7_defconfig too.
+
+Tested-by: Kevin Hilman <khilman@linaro.org>
