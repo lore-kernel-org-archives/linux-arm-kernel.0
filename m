@@ -1,45 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 29 Apr 2015 16:05:16 +0200
-Subject: Regression: Kirkwood fails to boot because of bf35706f3d0929b
-Message-ID: <20150429140516.GA32151@lunn.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 29 Apr 2015 11:11:41 -0300
+Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable RTC PCF8523 support
+Message-ID: <1430316701-5912-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-It seems as thought all Kirkwood boards are dead in v4.1-rc1. They
-fail to boot with the message:
+RTC PCF8523 is used on some mx6 cubox-i boards.
 
-Starting kernel ...                                                             
-                                                                                
-Uncompressing Linux... done, booting the kernel.                                
-                                                                                
-Error: unrecognized/unsupported processor variant (0x56251311).
+Let it work by default.
 
-With a bit of testing, Ezequiel and Florian have found the guilty
-commit is:
+Reported-by: Rick Thomas <rbthomas@cube.rcthomas.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- None, just re-send it without being part of a patch series
 
-bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with relative offset")
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date:   Wed Mar 18 07:29:32 2015 +0100
-
-    ARM: 8314/1: replace PROCINFO embedded branch with relative offset
-    
-    This patch replaces the 'branch to setup()' instructions embedded
-    in the PROCINFO structs with the offset to that setup function
-    relative to the base of the struct. This preserves the position
-    independent nature of that field, but uses a data item rather
-    than an instruction.
-    
-    This is mainly done to prevent linker failures on large kernels,
-    where the setup function is out of reach for the branch.
-
-
-Kirkwood uses arch/arm/mm/proc-feroceon.S.
-
-Please can you have this patch either fixed or reverted. Come by
-#mvlinux if you want to chat with us, ask for testing, etc.
-
-Thanks
-	Andrew
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index fdeb1c8..1d93fe9 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -283,6 +283,7 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_INTF_DEV_UIE_EMUL=y
+ CONFIG_RTC_DRV_DS1307=y
+ CONFIG_RTC_DRV_ISL1208=y
++CONFIG_RTC_DRV_PCF8523=y
+ CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_MC13XXX=y
+ CONFIG_RTC_DRV_MXC=y
+-- 
+1.9.1
