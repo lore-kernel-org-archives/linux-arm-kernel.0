@@ -1,39 +1,40 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Wed, 29 Apr 2015 15:37:37 +0200
-Subject: [PATCH 4/4] ARM: net fix emit_udiv() for BPF_ALU | BPF_DIV | BPF_K
- intruction.
-In-Reply-To: <1430314657-2552-1-git-send-email-nschichan@freebox.fr>
-References: <1430314657-2552-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1430314657-2552-5-git-send-email-nschichan@freebox.fr>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 29 Apr 2015 08:44:07 -0500
+Subject: [PATCH 0/2] ACPI : Introduce support for _CCA object
+Message-ID: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In that case, emit_udiv() will be called with rn == ARM_R0 (r_scratch)
-and loading rm first into ARM_R0 will result in jit_udiv() function
-being called the same dividend and divisor. Fix that by loading rn
-first into ARM_R1 and then rm into ARM_R0.
+This patch series introduce support for _CCA object, which is currently
+used mainly by ARM64 platform to specify DMA coherency attribute for
+devices when booting with ACPI.
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/arm/net/bpf_jit_32.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+A copy of ACPIv6 can be found here:
+    http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index b5f470d..ffaf311 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -449,10 +449,10 @@ static inline void emit_udiv(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx)
- 		return;
- 	}
- #endif
--	if (rm != ARM_R0)
--		emit(ARM_MOV_R(ARM_R0, rm), ctx);
- 	if (rn != ARM_R1)
- 		emit(ARM_MOV_R(ARM_R1, rn), ctx);
-+	if (rm != ARM_R0)
-+		emit(ARM_MOV_R(ARM_R0, rm), ctx);
- 
- 	ctx->seen |= SEEN_CALL;
- 	emit_mov_i(ARM_R3, (u32)jit_udiv, ctx);
+This has been tested on AMD-Seattle platform, which implements _CCA 
+object as described in the AMD Opteron A1100 Series Processor ACPI Porting Guide:
+
+http://amd-dev.wpengine.netdna-cdn.com/wordpress/media/2012/10/Seattle_ACPI_Guide.pdf
+
+Changes From RFC: (https://lkml.org/lkml/2015/4/1/389)
+    * New logic for deriving and propagating coherent attribute from
+      parent devices. (by Mark)
+    * Introducing acpi_dma_is_coherent() API (Per Tom suggestion)
+    * Introducing CONFIG_ACPI_MUST_HAVE_CCA kernel configuration.
+    * Rebased to linux-4.1-rc1
+
+Suravee Suthikulpanit (2):
+  arm/arm64: ACPI: Introduce CONFIG_ACPI_MUST_HAVE_CCA
+  ACPI / scan: Parse _CCA and setup device coherency
+
+ arch/arm/Kconfig             |  1 +
+ arch/arm64/Kconfig           |  1 +
+ drivers/acpi/Kconfig         |  3 +++
+ drivers/acpi/acpi_platform.c |  5 ++++-
+ drivers/acpi/scan.c          | 45 ++++++++++++++++++++++++++++++++++++++++++++
+ include/acpi/acpi_bus.h      |  9 ++++++++-
+ 6 files changed, 62 insertions(+), 2 deletions(-)
+
 -- 
-1.9.1
+2.1.0
