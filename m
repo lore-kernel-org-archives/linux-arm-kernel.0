@@ -1,98 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 29 Apr 2015 17:38:08 +0100
-Subject: [PATCH v5 2/2] firmware: qcom: scm: Add support for ARM64 SoCs
-In-Reply-To: <CF235ECE-3429-48D3-BEF9-85204E6DBD98@codeaurora.org>
-References: <1430249038-30987-1-git-send-email-galak@codeaurora.org>
- <1430249038-30987-2-git-send-email-galak@codeaurora.org>
- <20150429154231.GB8781@leverpostej>
- <CF235ECE-3429-48D3-BEF9-85204E6DBD98@codeaurora.org>
-Message-ID: <20150429163808.GE8781@leverpostej>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 29 Apr 2015 09:39:23 -0700
+Subject: [PATCH 1/3 v5] dt/bindings: Add binding for the BCM2835 mailbox
+ driver
+In-Reply-To: <55403446.1040207@wwwdotorg.org>
+References: <1430173644-19099-2-git-send-email-eric@anholt.net>
+ <1430253868-11138-1-git-send-email-eric@anholt.net>
+ <55403446.1040207@wwwdotorg.org>
+Message-ID: <87vbgeq478.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 29, 2015 at 05:18:04PM +0100, Kumar Gala wrote:
-> 
-> > On Apr 29, 2015, at 10:42 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > Hi Kumar,
-> > 
-> > On Tue, Apr 28, 2015 at 08:23:58PM +0100, Kumar Gala wrote:
-> >> Add an implementation of the SCM interface that works on ARM64/64-bit SoCs
-> > 
-> > What is the intended use of this on arm64 SoCs?
-> > 
-> > Given the negative reaction to the SMP bringup [1] code that seems to be
-> > the only user, I'm somewhat confused as to why this is being pushed as a
-> > non-RFC in the mean time.
-> > 
-> > Are there other users of this interface code? If so, could you please
-> > mention that in the commit message. I'd also ask that you would Cc me on
-> > future postings of this series.
-> > 
-> > [?]
-> 
-> The SCM interface is needed for other things like display:
-> 
-> https://patchwork.kernel.org/patch/6198691/
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-Thanks for the link. It would be good if you could mention some users in
-the commit message.
+> On 04/28/2015 02:44 PM, Eric Anholt wrote:
+>> From: Lubomir Rintel <lkundrak@v3.sk>
+>> 
+>> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+>> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+>> ---
+>> 
+>> v2: Split into a separate patch for submitting to the devicetree list.
+>>     Consistently start node docs with a capital letter. device's
+>>     address in the example shouldn't have "0x". Drop machine-specific
+>>     interrupt numbers from the docs.  (changes by anholt).
+>> 
+>> v3: Move the file to just bcm2835-mbox.txt, clean up formatting
+>>     (changes by anholt, from review by Lee Jones).
+>> 
+>> v4: Move file back by consensus from various Broadcom platform
+>>     maintainers (changes by anholt, acked by Lee Jones).
+>> 
+>> v5: Document that the mailbox cell should be 0 in clients, and add an
+>>     example of a client (changes by anholt, from review by Jassi).
+>
+> Some mention of what you changed in the patch might be nice, since it
+> was originally authored by someone else, and there's quite a changelog.
 
-> >> +static int qcom_scm_set_boot_addr(void *entry, const cpumask_t *cpus, int flags)
-> >> +{
-> >> +       struct qcom_scm_desc desc = {0};
-> >> +       unsigned int cpu = cpumask_first(cpus);
-> >> +       u64 mpidr_el1 = cpu_logical_map(cpu);
-> >> +
-> >> +       /* For now we assume only a single cpu is set in the mask */
-> >> +       WARN_ON(cpumask_weight(cpus) != 1);
-> >> +
-> >> +       if (mpidr_el1 & ~MPIDR_HWID_BITMASK) {
-> >> +               pr_err("CPU%d:Failed to set boot address\n", cpu);
-> >> +               return -ENOSYS;
-> >> +       }
-> >> +
-> >> +       desc.args[0] = virt_to_phys(entry);
-> >> +       desc.args[1] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 0));
-> >> +       desc.args[2] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 1));
-> >> +       desc.args[3] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 2));
-> >> +       desc.args[4] = ~0ULL;
-> >> +       desc.args[5] = QCOM_SCM_FLAG_HLOS | flags;
-> >> +       desc.arginfo = QCOM_SCM_ARGS(6);
-> >> +
-> >> +       return qcom_scm_call(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR_MC, &desc);
-> >> +}
-> >> +
-> >> +int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
-> >> +{
-> >> +       int flags = QCOM_SCM_FLAG_COLDBOOT_MC;
-> >> +
-> >> +       return qcom_scm_set_boot_addr(entry, cpus, flags);
-> >> +}
-> >> +
-> >> +int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
-> >> +{
-> >> +       int flags = QCOM_SCM_FLAG_WARMBOOT_MC;
-> >> +
-> >> +       return qcom_scm_set_boot_addr(entry, cpus, flags);
-> >> +}
-> >> +
-> >> +void __qcom_scm_cpu_power_down(u32 flags)
-> >> +{
-> >> +       struct qcom_scm_desc desc = {0};
-> >> +       desc.args[0] = flags & QCOM_SCM_FLUSH_FLAG_MASK;
-> >> +       desc.arginfo = QCOM_SCM_ARGS(1);
-> >> +
-> >> +       qcom_scm_call_atomic(QCOM_SCM_SVC_BOOT, QCOM_SCM_CMD_TERMINATE_PC, &desc);
-> >> +}
-> > 
-> > As mentioned in the other thread, I don't want to see this for arm64,
-> > and must NAK this portion.
-> 
-> I can have these return an error code, but we want to keep the interface the same between the 32-bit and 64-bit.
+I've been taking this changelog stuff out of the patch and putting it
+below '---' because when I was submitting this series before, I got
+chided for putting it in the patch!
 
-I don't follow. If nothing calls these on the 64-bit side, then there's
-no interface they need to be there for.
+>> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+>
+>> +- #mbox-cells:	Specifies the number of cells needed to encode a mailbox
+>> +		  channel. The value shall be 1.  Clients should supply a value
+>> +		  of 0 for the mailbox channel, because there is only one
+>> +		  exposed
+>
+> Can't you use #mbox-cells = <0> if there's no data to provide?
 
-Thanks,
-Mark.
+of_mbox_index_xlate looks like it's always dereferencing the first arg.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150429/6c9852e1/attachment-0001.sig>
