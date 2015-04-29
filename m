@@ -1,75 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 28 Apr 2015 19:58:41 -0600
-Subject: [PATCH 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <1430176449-12322-3-git-send-email-eric@anholt.net>
-References: <1430176449-12322-1-git-send-email-eric@anholt.net>
- <1430176449-12322-3-git-send-email-eric@anholt.net>
-Message-ID: <55403AD1.4030103@wwwdotorg.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 29 Apr 2015 07:37:25 +0530
+Subject: [PATCH 2/3 v5] mailbox: Enable BCM2835 mailbox support
+In-Reply-To: <87618g6nk8.fsf@eliezer.anholt.net>
+References: <1430173644-19099-1-git-send-email-eric@anholt.net>
+ <1430173644-19099-3-git-send-email-eric@anholt.net>
+ <CABb+yY2u_v1uSDrBgP2DRAOrDkXETfs_zmLACm=uRFALVYFjmA@mail.gmail.com>
+ <87618g6nk8.fsf@eliezer.anholt.net>
+Message-ID: <CABb+yY2OLOPNf=9YyEmw_9m4h4a+sx5FAOkRK9Yc1ZKxDMFd1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2015 05:14 PM, Eric Anholt wrote:
-> This gives us a function for making mailbox property channel requests
-> of the firmware, and uses it to control the 3 power domains provided
-> by the firmware.
+On Wed, Apr 29, 2015 at 1:19 AM, Eric Anholt <eric@anholt.net> wrote:
+> Jassi Brar <jassisinghbrar@gmail.com> writes:
+>
+>>> +
+>>> +struct bcm2835_mbox {
+>>> +       struct device *dev;
+>>> +       void __iomem *regs;
+>>> +       spinlock_t lock;
+>>> +       bool started;
+>>> +       struct mbox_controller controller;
+>>> +};
+>>> +
+>>> +struct bcm2835_mbox *mbox;
+>>> +
+>> Bad omen. You assume any platform will ever have just one instance of
+>> the mailbox controller. Which may come true, but still is a taboo to
+>> think of.
+>
+> On the other hand, when I've submitted to other subsystems people have
+> complained about how I have these extra lookups/container_ofs, instead
+> of just storing the obviously-only-one-of-them thing in a global.
+>
+> I think a global makes definite sense for this driver.
+>
+0) Why is 'mbox' not even static?
+1) It makes sense for system wide entities like stack/protocol
+instance. But this is _one_ controller instance with _one_ mailbox
+instance. You think any platform will ever only need one mailbox or
+use two classes of controllers?
+2) "Avoidable global statics are generally bad"
 
-> diff --git a/arch/arm/mach-bcm/raspberrypi-firmware.c b/arch/arm/mach-bcm/raspberrypi-firmware.c
-
-> +/*
-> + * Submits a set of concatenated tags to the VPU firmware through the
-> + * mailbox property interface.
-> + *
-> + * The buffer header and the ending tag are added by this function and
-> + * don't need to be supplied, just the actual tags for your operation.
-> + * See struct raspberrypi_firmware_property_tag_header for the per-tag structure.
-> + */
-> +int raspberrypi_firmware_property(void *data, size_t tag_size)
-> +{
-> +	size_t size = tag_size + 12;
-> +	u32 *buf;
-> +	dma_addr_t bus_addr;
-> +	int ret = 0;
-> +
-> +	if (!firmware)
-> +		return -EPROBE_DEFER;
-
-I think it'd make more sense if the clients looked up the firmware
-driver via phandle at their probe time. This would mean:
-
-* No need for global "firmware", since clients could pass the firmware
-driver handle into this function.
-
-* Clients resolve deferred probe at their probe time. That way, they
-won't register themselves with subsystems asserting they can provide
-services, but find out they can't yet provide the service at that time.
-
-> +static int raspberrypi_firmware_probe(struct platform_device *pdev)
-
-BTW if you wanted, a s/raspberrypi/rpi/ in all symbols and filenames
-seems reasonable. I'm not really bothered either way.
-
-> +{
-
-> +	firmware->chan = mbox_request_channel(&firmware->cl, 0);
-> +	if (IS_ERR(firmware->chan)) {
-> +		ret = PTR_ERR(firmware->chan);
-> +		/* An -EBUSY from the core means it couldn't find our
-> +		 * channel, because the mailbox driver hadn't
-> +		 * registered yet.
-> +		 */
-> +		if (ret == -EBUSY)
-> +			ret = -EPROBE_DEFER;
-> +		else
-> +			dev_err(dev, "Failed to get mbox channel: %d\n", ret);
-
-I would have hoped that mbox_request_channel() returned -EPROBE_DEFER
-itself. It really should...
-
-> +static int raspberrypi_firmware_remove(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +
-> +	of_genpd_del_provider(dev->of_node);
-> +	mbox_free_channel(firmware->chan);
-
-firmware = NULL; ?
+>>> +       if (readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL) {
+>>> +               ret = -EBUSY;
+>>> +               goto end;
+>>> +       }
+>>>
+>> This check is unnecessary too. API would have already called
+>> last_tx_done() already to make sure this never hits.
+>
+> Dropped.
+>
+I see it's not yet.
