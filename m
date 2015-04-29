@@ -1,115 +1,83 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 29 Apr 2015 18:43:57 +0100
-Subject: [RFC PATCH 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <6662179.AoBfCMOsxD@wuerfel>
-References: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
- <6662179.AoBfCMOsxD@wuerfel>
-Message-ID: <20150429174356.GA20947@red-moon>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 29 Apr 2015 10:51:30 -0700
+Subject: [PATCH 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <55403AD1.4030103@wwwdotorg.org>
+References: <1430176449-12322-1-git-send-email-eric@anholt.net>
+ <1430176449-12322-3-git-send-email-eric@anholt.net>
+ <55403AD1.4030103@wwwdotorg.org>
+Message-ID: <87oam6q0v1.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 29, 2015 at 01:34:20PM +0100, Arnd Bergmann wrote:
-> On Wednesday 29 April 2015 17:09:58 Jayachandran C wrote:
-> > The current code in pci-host-generic.c uses pci_common_init_dev()
-> > from the arch/arm/ to do a part of the PCI initialization, and this
-> > prevents it from being used on arm64.
-> > 
-> > The initialization done by pci_common_init_dev() that is really
-> > needed by pci-host-generic.c can be done in the same file without
-> > using the hw_pci API of ARM.
-> > 
-> > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
-> > this is be handled by setting up 'struct gen_pci' to embed a
-> > pci_sys_data variable as the first element on the ARM platform.
-> > 
-> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> 
-> This seems very useful
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-Yes, it is getting less awful, waiting for pci_sys_data to disappear.
+> On 04/27/2015 05:14 PM, Eric Anholt wrote:
+>> This gives us a function for making mailbox property channel requests
+>> of the firmware, and uses it to control the 3 power domains provided
+>> by the firmware.
+>
+>> diff --git a/arch/arm/mach-bcm/raspberrypi-firmware.c b/arch/arm/mach-bcm/raspberrypi-firmware.c
+>
+>> +/*
+>> + * Submits a set of concatenated tags to the VPU firmware through the
+>> + * mailbox property interface.
+>> + *
+>> + * The buffer header and the ending tag are added by this function and
+>> + * don't need to be supplied, just the actual tags for your operation.
+>> + * See struct raspberrypi_firmware_property_tag_header for the per-tag structure.
+>> + */
+>> +int raspberrypi_firmware_property(void *data, size_t tag_size)
+>> +{
+>> +	size_t size = tag_size + 12;
+>> +	u32 *buf;
+>> +	dma_addr_t bus_addr;
+>> +	int ret = 0;
+>> +
+>> +	if (!firmware)
+>> +		return -EPROBE_DEFER;
+>
+> I think it'd make more sense if the clients looked up the firmware
+> driver via phandle at their probe time. This would mean:
+>
+> * No need for global "firmware", since clients could pass the firmware
+> driver handle into this function.
+>
+> * Clients resolve deferred probe at their probe time. That way, they
+> won't register themselves with subsystems asserting they can provide
+> services, but find out they can't yet provide the service at that time.
 
-> > -static int gen_pci_setup(int nr, struct pci_sys_data *sys)
-> > +static int gen_pci_init(struct device *dev, struct gen_pci *pci)
-> >  {
-> > -	struct gen_pci *pci = sys->private_data;
-> > -	list_splice_init(&pci->resources, &sys->resources);
-> > -	return 1;
-> > +	struct pci_bus *bus;
-> > +
-> > +	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
-> 
-> Do we want to set that flag unconditionally? At least for servers,
-> the resources should get assigned by firmware, and things might
-> go wrong if Linux tries to reassign them. This is probably the
-> case on kvmtool as well.
+The one client so far (vc4) was resolving deferred probe at its probe
+time, but not taking a reference on the firmware driver.  I figure I'll
+have it do the phandle lookup and refcount -- do you still want the
+struct platform_device passed in here?  If we de-global firmware, it's
+going to mean some faffing in the power domain side of things to find
+the device again, it seems.
 
-I will give it a go on kvmtool, but at first glance concern is
-shared.
+>> +static int raspberrypi_firmware_probe(struct platform_device *pdev)
+>
+> BTW if you wanted, a s/raspberrypi/rpi/ in all symbols and filenames
+> seems reasonable. I'm not really bothered either way.
 
-> > +	bus = pci_scan_root_bus(dev, 0, &gen_pci_ops, pci, &pci->resources);
-> > +	if (!bus) {
-> > +		dev_err(dev, "Scanning rootbus failed");
-> > +		return -ENODEV;
-> > +	}
-> > +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-> 
-> I thought this was done by default now. If it is not, can
-> we make the of_irq swizzling the default?
+I lean slightly toward avoiding the abbreviation, but I could go either
+way as well.
 
-Possibly yes.
+> I would have hoped that mbox_request_channel() returned -EPROBE_DEFER
+> itself. It really should...
+>
+>> +static int raspberrypi_firmware_remove(struct platform_device *pdev)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +
+>> +	of_genpd_del_provider(dev->of_node);
+>> +	mbox_free_channel(firmware->chan);
+>
+> firmware = NULL; ?
 
-> > +	if (!pci_has_flag(PCI_PROBE_ONLY)) {
-> > +		pci_bus_size_bridges(bus);
-> > +		pci_bus_assign_resources(bus);
-> > +	}
-> > +	pci_bus_add_devices(bus);
-> > +
-> > +	/* Configure PCI Express settings */
-> > +	if (pci_has_flag(PCI_PROBE_ONLY)) {
-> > +		struct pci_bus *child;
-> > +
-> > +		list_for_each_entry(child, &bus->children, node)
-> > +			pcie_bus_configure_settings(child);
-> > +	}
-> > +	return 0;
-> >  }
-> 
-> We should also try to come up wtih a way to make that
-> pcie_bus_configure_settings() automatic if it's required here.
-> 
-> >  static int gen_pci_probe(struct platform_device *pdev)
-> > @@ -214,13 +237,6 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >  	struct device *dev = &pdev->dev;
-> >  	struct device_node *np = dev->of_node;
-> >  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> > -	struct hw_pci hw = {
-> > -		.nr_controllers	= 1,
-> > -		.private_data	= (void **)&pci,
-> > -		.setup		= gen_pci_setup,
-> > -		.map_irq	= of_irq_parse_and_map_pci,
-> > -		.ops		= &gen_pci_ops,
-> > -	};
-> >  
-> >  	if (!pci)
-> >  		return -ENOMEM;
-> > @@ -258,8 +274,7 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >  		return err;
-> >  	}
-> >  
-> > -	pci_common_init_dev(dev, &hw);
-> > -	return 0;
-> > +	return gen_pci_init(dev, pci);
-> 
-> How about moving the new code right into the probe() function?
-
-+1.
-
-I suspect the PCI_PROBE_ONLY case was not tested on arm64, since we
-still need a patch to prevent resources enablement there (in the
-pcibios_enable_device call - actually the check for PCI_PROBE_ONLY
-should be moved to the default pcibios_enable_device function in
-drivers/pci/pci.c).
-
-The other bit missing is MSI handling, that should still be implemented.
-
-Lorenzo
+Done.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150429/eaf6b107/attachment.sig>
