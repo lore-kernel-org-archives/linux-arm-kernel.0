@@ -1,62 +1,29 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Wed, 29 Apr 2015 11:47:37 +0200
-Subject: dma_alloc_coherent versus streaming DMA,
- neither works satisfactory
-In-Reply-To: <20150429091714.GH12732@n2100.arm.linux.org.uk>
-References: <5538DD02.6050401@topic.nl> <2757951.K585xX1rYN@wuerfel>
- <55409A89.5070008@topic.nl> <4351847.Ycu9R2FQB8@wuerfel>
- <20150429091714.GH12732@n2100.arm.linux.org.uk>
-Message-ID: <5540A8B9.7010100@topic.nl>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 29 Apr 2015 15:19:23 +0530
+Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
+ using PM clocks
+In-Reply-To: <CAMuHMdW8OKDODHTw=A=vCFR9PN3KUr_fiGSiNkn0Q7Q16axU6g@mail.gmail.com>
+References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>	<1429778744-13352-3-git-send-email-rnayak@codeaurora.org>	<CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>	<553A21C7.4060506@codeaurora.org>	<CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>	<7hh9s1xrut.fsf@deeprootsystems.com>	<553EF5D4.60900@codeaurora.org>
+ <CAMuHMdW8OKDODHTw=A=vCFR9PN3KUr_fiGSiNkn0Q7Q16axU6g@mail.gmail.com>
+Message-ID: <5540A923.8000104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?On 29-04-15 11:17, Russell King - ARM Linux wrote:
-> On Wed, Apr 29, 2015 at 11:01:35AM +0200, Arnd Bergmann wrote:
->> You still need to synchronize MMIO register accesses with write buffers,
->> as the readl() and writel() functions do in the kernel.
->>
->> In particular, after you have written a buffer to memory from the CPU,
->> you will need to do an outer_sync() before the MMIO write that triggers
->> the DMA. This is still much cheaper than doing the cache flush though.
+[]..
+
+>> I guess I can also control the rest of the devices the same way, just
+>> that the genpd on/off for them would do nothing.
+>> That way I don't have to use pm_clk_add_notifier() and can also
+>> associate the power domain (with no on/off control) to devices
+>> through DT (and there isn;t any duplication of code in the drivers)
 >
-> Note that outer_sync() is already done by readl/writel and/or the write
-> memory barriers (mb()/wmb()).
+> That looks similar to what we have on R-Mobile: some devices are in
+> controllable power areas, other are in an "always on" power area. All (most)
+> devices have controllable clocks, which we also control through the PM
+> domain. "git grep sysc-rmobile" will point you to the related code and DTS.
 
-I initiate the DMA transfers using iowrite32() so if I understand correctly, 
-I'm already doing the right thing here.
+Geert, thanks, I was wondering how you handle the !CONFIG_PM case for
+rmobile. I mean who turns the clocks on for the devices when you build
+with CONFIG_PM disabled?
 
-Just to be completely clear, there is no direct register access from user 
-space, the driver does all MMIO. Userspace only gets an mmap for DMA buffers, 
-and uses ioctl to initiate transfers.
-
->> Another possible problem would be if the driver mmaps the buffer in
->> uncached mode to user space. This is something your kernel driver has
->> to get right, it won't be handled automatically by setting the
->> "dma-coherent" property in DT.
 >
-> The buffer should also be mapped into userspace with the same memory
-> type and cache attributes as the kernel side mapping.  If using ACP,
-> then you probably want "normal memory, cacheable, writeback, read
-> allocate" or in the case of SMP, the same but "read/write allocate".
-
-I currently use dma_alloc_coherent() to allocate buffers and 
-dma_mmap_coherent() to map them to user space. I was under the assumption that 
-these would do the right thing. Is that correct? If not, then what should I use?
-
-
-
-
-Kind regards,
-
-Mike Looijmans
-System Expert
-
-TOPIC Embedded Products
-Eindhovenseweg 32-C, NL-5683 KH Best
-Postbus 440, NL-5680 AK Best
-Telefoon: +31 (0) 499 33 69 79
-Telefax: +31 (0) 499 33 69 70
-E-mail: mike.looijmans at topicproducts.com
-Website: www.topicproducts.com
-
-Please consider the environment before printing this e-mail
