@@ -1,44 +1,51 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 29 Apr 2015 16:56:55 +0200
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Apr 2015 17:05:12 +0200
 Subject: [PATCH] ARM: proc-feroceon: Fix feroceon_proc_info macro
-In-Reply-To: <20150429140516.GA32151@lunn.ch>
+In-Reply-To: <1430319415-6421-1-git-send-email-andrew@lunn.ch>
 References: <20150429140516.GA32151@lunn.ch>
-Message-ID: <1430319415-6421-1-git-send-email-andrew@lunn.ch>
+ <1430319415-6421-1-git-send-email-andrew@lunn.ch>
+Message-ID: <CAKv+Gu_KNRAeEPKihVyDaduRoDGUFScyo3xcj-6_bnKLEXtqOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with
-relative offset") broke booting for Kirkwood. The kernel would say:
+On 29 April 2015 at 16:56, Andrew Lunn <andrew@lunn.ch> wrote:
+> bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with
+> relative offset") broke booting for Kirkwood. The kernel would say:
+>
+> Starting kernel ...
+>
+> Uncompressing Linux... done, booting the kernel.
+>
+> Error: unrecognized/unsupported processor variant (0x56251311).
+>
+> Fix it by removing the extraneous .long __feroceon_setup from the
+> feroceon_proc_info macro.
+>
+> Reported-by: Florian Fainelli <f.fainelli@gmail.com>
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Fixes: bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with relative offset")
 
-Starting kernel ...
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Uncompressing Linux... done, booting the kernel.
 
-Error: unrecognized/unsupported processor variant (0x56251311).
-
-Fix it by removing the extraneous .long __feroceon_setup from the
-feroceon_proc_info macro.
-
-Reported-by: Florian Fainelli <f.fainelli@gmail.com>
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Fixes: bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with relative offset")
----
- arch/arm/mm/proc-feroceon.S | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-index e494d6d6acbe..92e08bf37aad 100644
---- a/arch/arm/mm/proc-feroceon.S
-+++ b/arch/arm/mm/proc-feroceon.S
-@@ -602,7 +602,6 @@ __\name\()_proc_info:
- 		PMD_SECT_AP_WRITE | \
- 		PMD_SECT_AP_READ
- 	initfn	__feroceon_setup, __\name\()_proc_info
--	.long __feroceon_setup
- 	.long	cpu_arch_name
- 	.long	cpu_elf_name
- 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
--- 
-2.1.4
+> ---
+>  arch/arm/mm/proc-feroceon.S | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+> index e494d6d6acbe..92e08bf37aad 100644
+> --- a/arch/arm/mm/proc-feroceon.S
+> +++ b/arch/arm/mm/proc-feroceon.S
+> @@ -602,7 +602,6 @@ __\name\()_proc_info:
+>                 PMD_SECT_AP_WRITE | \
+>                 PMD_SECT_AP_READ
+>         initfn  __feroceon_setup, __\name\()_proc_info
+> -       .long __feroceon_setup
+>         .long   cpu_arch_name
+>         .long   cpu_elf_name
+>         .long   HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+> --
+> 2.1.4
+>
