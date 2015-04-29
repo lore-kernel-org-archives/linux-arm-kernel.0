@@ -1,269 +1,63 @@
-From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Wed, 29 Apr 2015 15:20:00 +0300
-Subject: [PATCH 2/2] arm64: dts: qcom: Add msm8916 CoreSight components
-In-Reply-To: <1430310000-10867-1-git-send-email-ivan.ivanov@linaro.org>
-References: <1430310000-10867-1-git-send-email-ivan.ivanov@linaro.org>
-Message-ID: <1430310000-10867-3-git-send-email-ivan.ivanov@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 29 Apr 2015 14:31:44 +0200
+Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
+ using PM clocks
+In-Reply-To: <CAMuHMdWWv5qADWP4CMj5Kj62v_FK9JxMP6NXOpyN8GTk05raAQ@mail.gmail.com>
+References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
+ <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
+ <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
+ <553A21C7.4060506@codeaurora.org>
+ <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
+ <7hh9s1xrut.fsf@deeprootsystems.com>
+ <553EF5D4.60900@codeaurora.org>
+ <CAMuHMdW8OKDODHTw=A=vCFR9PN3KUr_fiGSiNkn0Q7Q16axU6g@mail.gmail.com>
+ <5540A923.8000104@codeaurora.org>
+ <CAMuHMdWWv5qADWP4CMj5Kj62v_FK9JxMP6NXOpyN8GTk05raAQ@mail.gmail.com>
+Message-ID: <CAPDyKFoja9OZf+X2eaBGwTXoqFHchOz9vopLYF+wiguHXwznzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
+On 29 April 2015 at 13:30, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> Hi Rajendra,
+>
+> On Wed, Apr 29, 2015 at 11:49 AM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+>>>> I guess I can also control the rest of the devices the same way, just
+>>>> that the genpd on/off for them would do nothing.
+>>>> That way I don't have to use pm_clk_add_notifier() and can also
+>>>> associate the power domain (with no on/off control) to devices
+>>>> through DT (and there isn;t any duplication of code in the drivers)
+>>>
+>>>
+>>> That looks similar to what we have on R-Mobile: some devices are in
+>>> controllable power areas, other are in an "always on" power area. All
+>>> (most)
+>>> devices have controllable clocks, which we also control through the PM
+>>> domain. "git grep sysc-rmobile" will point you to the related code and
+>>> DTS.
+>>
+>> Geert, thanks, I was wondering how you handle the !CONFIG_PM case for
+>> rmobile. I mean who turns the clocks on for the devices when you build
+>> with CONFIG_PM disabled?
+>
+> We still use pm_clk_add_notifier() in drivers/sh/pm_runtime.c if
+> CONFIG_PM_GENERIC_DOMAINS_OF=n. Hence the second instance of
+> pm_clk_notify() will enable the clocks at driver binding time.
+> Hardware power domains are assumed enabled by reset state/the boot
+> loader.
 
-Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi | 244 ++++++++++++++++++++++++
- 1 file changed, 244 insertions(+)
- create mode 100644 arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
+Yes, it a bit tricky - but I guess that's the current only viable
+solution if we have when using the pm_clk API.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
-new file mode 100644
-index 0000000..08d8582
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
-@@ -0,0 +1,244 @@
-+/*
-+ * Copyright (c) 2013 - 2015, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+&soc {
-+
-+	tpiu at 820000 {
-+		compatible = "arm,coresight-tpiu", "arm,primecell";
-+		reg = <0x820000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		port {
-+			tpiu_in: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out1>;
-+			};
-+		};
-+	};
-+
-+	funnel at 821000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0x821000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 4 {
-+				reg = <4>;
-+				funnel0_in4: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&funnel1_out>;
-+				};
-+			};
-+			port at 8 {
-+				reg = <0>;
-+				funnel0_out: endpoint {
-+					remote-endpoint = <&etf_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	replicator at 824000 {
-+		compatible = "qcom,coresight-replicator", "arm,primecell";
-+		reg = <0x824000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				replicator_out0: endpoint {
-+					remote-endpoint = <&etr_in>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				replicator_out1: endpoint {
-+					remote-endpoint = <&tpiu_in>;
-+				};
-+			};
-+			port at 2 {
-+				reg = <0>;
-+				replicator_in: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etf_out>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etf at 825000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0x825000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				etf_out: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&funnel0_out>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <0>;
-+				etf_in: endpoint {
-+					remote-endpoint = <&replicator_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etr at 826000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0x826000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		port {
-+			etr_in: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out0>;
-+			};
-+		};
-+	};
-+
-+	funnel at 841000 {	/* APSS */
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0x841000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				funnel1_in0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm0_out>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				funnel1_in1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm1_out>;
-+				};
-+			};
-+			port at 2 {
-+				reg = <2>;
-+				funnel1_in2: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm2_out>;
-+				};
-+			};
-+			port at 3 {
-+				reg = <3>;
-+				funnel1_in3: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm3_out>;
-+				};
-+			};
-+			port at 4 {
-+				reg = <0>;
-+				funnel1_out: endpoint {
-+					remote-endpoint = <&funnel0_in4>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etm at 85c000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0x85c000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		cpu = <&CPU0>;
-+
-+		port {
-+			etm0_out: endpoint {
-+				remote-endpoint = <&funnel1_in0>;
-+			};
-+		};
-+	};
-+
-+	etm at 85d000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0x85d000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		cpu = <&CPU1>;
-+
-+		port {
-+			etm1_out: endpoint {
-+				remote-endpoint = <&funnel1_in1>;
-+			};
-+		};
-+	};
-+
-+	etm at 85e000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0x85e000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		cpu = <&CPU2>;
-+
-+		port {
-+			etm2_out: endpoint {
-+				remote-endpoint = <&funnel1_in2>;
-+			};
-+		};
-+	};
-+
-+	etm at 85f000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0x85f000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		cpu = <&CPU3>;
-+
-+		port {
-+			etm3_out: endpoint {
-+				remote-endpoint = <&funnel1_in3>;
-+			};
-+		};
-+	};
-+};
---
-1.9.1
+>
+> Given the amount of PM infrastructure involved when hardware power and
+> clock domains are involved, I think at one point we'll have to start restricting
+> our builds to CONFIG_PM=y.
+
+I don't think that would solve the problem, since you may still have
+cross SoC drivers which may be used without CONFIG_PM.
+
+So all SoC that uses a driver which expects clocks to be managed using
+PM clocks from a PM domain, will need the above "trick". Right?
+
+Kind regards
+Uffe
