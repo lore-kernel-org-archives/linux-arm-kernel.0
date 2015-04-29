@@ -1,78 +1,44 @@
-From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
-Date: Wed, 29 Apr 2015 14:57:10 +0000
-Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
- device coherency
-In-Reply-To: <3246744.xVj4sLRlWl@wuerfel>
-Message-ID: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 29 Apr 2015 16:56:55 +0200
+Subject: [PATCH] ARM: proc-feroceon: Fix feroceon_proc_info macro
+In-Reply-To: <20150429140516.GA32151@lunn.ch>
+References: <20150429140516.GA32151@lunn.ch>
+Message-ID: <1430319415-6421-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with
+relative offset") broke booting for Kirkwood. The kernel would say:
 
+Starting kernel ...
 
-On 4/29/15, 09:47, "Arnd Bergmann" <arnd@arndb.de> wrote:
+Uncompressing Linux... done, booting the kernel.
 
->On Wednesday 29 April 2015 09:45:43 Suravee Suthikulpanit wrote:
->> On 04/29/2015 09:03 AM, Arnd Bergmann wrote:
->> > On Wednesday 29 April 2015 08:44:09 Suravee Suthikulpanit wrote:
->> >> +                       device->flags.cca_seen = 1;
->> >> +               } else if (IS_ENABLED(CONFIG_ACPI_MUST_HAVE_CCA)) {
->> >> +                       /*
->> >> +                        * Architecture has specified that if the
->>device
->> >> +                        * can do DMA, it must have ACPI _CCA object.
->> >> +                        * Here, there could be two cases:
->> >> +                        *   1. Not DMA-able device.
->> >> +                        *   2. DMA-able device, but missing _CCA
->>object.
->> >> +                        *
->> >> +                        * In both cases, we will default to dma
->>non-coherent.
->> >> +                        */
->> >> +                       cca = 0;
->> >> +               } else {
->> >> +                       /*
->> >> +                        * If architecture does not specify that
->>device must
->> >> +                        * specify ACPI _CCA (e.g. x86), we default
->>to use
->> >> +                        * dma coherent.
->> >> +                        */
->> >> +                       cca = 1;
->> >> +               }
->> >>
->> >
->> > What does it mean here if a device does DMA but is not coherent? Do
->>you
->> > have an example of a server that needs this?
->> >
->> > Can we please make the default for ARM64 cca=1 as well?
->> >
->> >       Arnd
->> >
->> 
->> Actually, I am trying to implement the logic for when missing _CCA to
->>be 
->> consistent with the behavior when the devicetree entry does not specify
->> "dma-coherent" property. IIUC, in such case, Linux will default to
->>using 
->> non-coherent DMA.
->
->Why?
->
->	Arnd
+Error: unrecognized/unsupported processor variant (0x56251311).
 
-Otherwise, it would seem inconsistent with what states in the ACPI spec:
- 
-  CCA objects are only relevant for devices that can access CPU-visible
-memory,
-  such as devices that are DMA capable. On ARM based systems, the _CCA
-object 
-  must be supplied all such devices. On Intel platforms, if the _CCA
-object is 
-  not supplied, the OSPM will assume the devices are hardware cache
-coherent.
+Fix it by removing the extraneous .long __feroceon_setup from the
+feroceon_proc_info macro.
 
->From the statement above, I interpreted as if it is not present, it would
-be non-coherent.
+Reported-by: Florian Fainelli <f.fainelli@gmail.com>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Fixes: bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with relative offset")
+---
+ arch/arm/mm/proc-feroceon.S | 1 -
+ 1 file changed, 1 deletion(-)
 
-Suravee
+diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+index e494d6d6acbe..92e08bf37aad 100644
+--- a/arch/arm/mm/proc-feroceon.S
++++ b/arch/arm/mm/proc-feroceon.S
+@@ -602,7 +602,6 @@ __\name\()_proc_info:
+ 		PMD_SECT_AP_WRITE | \
+ 		PMD_SECT_AP_READ
+ 	initfn	__feroceon_setup, __\name\()_proc_info
+-	.long __feroceon_setup
+ 	.long	cpu_arch_name
+ 	.long	cpu_elf_name
+ 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+-- 
+2.1.4
