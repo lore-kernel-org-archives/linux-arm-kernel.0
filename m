@@ -1,114 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Apr 2015 15:51:48 +0200
-Subject: [RFC PATCH] ARM: add fixmap based earlycon support
-Message-ID: <1430315508-7582-1-git-send-email-ard.biesheuvel@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 29 Apr 2015 09:58:36 -0400 (EDT)
+Subject: [RFC] arm: pick the r2 passed DTB over the appended one
+In-Reply-To: <5540A0DA.9060409@keymile.com>
+References: <1429880030-21473-1-git-send-email-valentin.longchamp@keymile.com>
+ <alpine.LFD.2.11.1504282315320.1582@knanqh.ubzr>
+ <5540A0DA.9060409@keymile.com>
+Message-ID: <alpine.LFD.2.11.1504290929090.1582@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for fixmap based earlycon by moving the fixmap
-initialization to an earlier stage and introducing the Kconfig symbol
-that wires up the existing code.
+On Wed, 29 Apr 2015, Valentin Longchamp wrote:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/Kconfig              |  3 +++
- arch/arm/include/asm/fixmap.h |  6 ++++++
- arch/arm/kernel/setup.c       |  2 ++
- arch/arm/mm/mmu.c             | 16 +++++++++++++---
- 4 files changed, 24 insertions(+), 3 deletions(-)
+> On 04/29/2015 05:50 AM, Nicolas Pitre wrote:
+> > On Fri, 24 Apr 2015, Valentin Longchamp wrote:
+> > 
+> >> Uncompressing Linux... done, booting the kernel.
+> >> e5943000
+> > 
+> > Where is this value from? This looks like an ARM opcode ("ldr r3, [r4]").
+> 
+> This value that I print out actually is the content of the memory pointed by the
+> r2 register, printed from __vet_atags (head-common.S)
+> 
+> It can very well be an ARM opcode from the kernel binary since the r2 register
+> does not point to a DTB but to some other location.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 45df48ba0b12..0076330789f5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -287,6 +287,9 @@ config GENERIC_BUG
- 	def_bool y
- 	depends on BUG
- 
-+config FIX_EARLYCON_MEM
-+	def_bool y
-+
- config PGTABLE_LEVELS
- 	int
- 	default 3 if ARM_LPAE
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 0415eae1df27..e0abd3a150ee 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -1,6 +1,10 @@
- #ifndef _ASM_FIXMAP_H
- #define _ASM_FIXMAP_H
- 
-+#include <asm/pgtable.h>
-+
-+#define FIXMAP_PAGE_IO		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY
-+
- #define FIXADDR_START		0xffc00000UL
- #define FIXADDR_END		0xfff00000UL
- #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
-@@ -11,6 +15,8 @@ enum fixed_addresses {
- 	FIX_KMAP_BEGIN,
- 	FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
- 
-+	FIX_EARLYCON_MEM_BASE,
-+
- 	/* Support writing RO kernel text via kprobes, jump labels, etc. */
- 	FIX_TEXT_POKE0,
- 	FIX_TEXT_POKE1,
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 6c777e908a24..2e4b3c22be4d 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -80,6 +80,7 @@ extern void early_paging_init(const struct machine_desc *,
- extern void sanity_check_meminfo(void);
- extern enum reboot_mode reboot_mode;
- extern void setup_dma_zone(const struct machine_desc *desc);
-+extern void early_fixmap_init(void);
- 
- unsigned int processor_id;
- EXPORT_SYMBOL(processor_id);
-@@ -915,6 +916,7 @@ void __init setup_arch(char **cmdline_p)
- 	const struct machine_desc *mdesc;
- 
- 	setup_processor();
-+	early_fixmap_init();
- 	mdesc = setup_machine_fdt(__atags_pointer);
- 	if (!mdesc)
- 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 4e6ef896c619..d072726c3781 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1231,7 +1231,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
- 
- 	early_trap_init(vectors);
- 
--	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
-+	for (addr = VMALLOC_START; addr < FIXADDR_START; addr += PMD_SIZE)
-+		pmd_clear(pmd_off_k(addr));
-+	for (addr = round_up(FIXADDR_END, PMD_SIZE); addr; addr += PMD_SIZE)
- 		pmd_clear(pmd_off_k(addr));
- 
- 	/*
-@@ -1321,9 +1323,17 @@ static void __init kmap_init(void)
- 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
- 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
- #endif
-+}
-+
-+void __init early_fixmap_init(void)
-+{
-+	static u8 fixmap_pte[PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE] __page_aligned_bss;
-+	pmd_t *pmd = pmd_off_k(FIXADDR_START);
-+
-+	if (pmd_none(*pmd))
-+		__pmd_populate(pmd, __pa(fixmap_pte), _PAGE_KERNEL_TABLE);
- 
--	early_pte_alloc(pmd_off_k(FIXADDR_START), FIXADDR_START,
--			_PAGE_KERNEL_TABLE);
-+	BUG_ON(pmd_bad(*pmd));
- }
- 
- static void __init map_lowmem(void)
--- 
-1.9.1
+What is the value of r2 at that point?
+
+> I now have further debugged this and I now understand why it does not work as I
+> expect it: I have noticed that (at least with our kernel and our system) this
+> code gets executed twice. This is has the consequence for the case where the DTB
+> is appended and atags are passed to r2, my check is valid the first time this
+> code is run. However, the second time, r8 (pointer to atags/dtb) was updated
+> with r6 (pointer to _edata/appended dtb), which means that my additional check
+> will cause the code to jump to dtb_check_done. So the DTB is not copied over
+> with the rest of the kernel binary, because r6, r10 and sp and not "relocated"
+> past the dtb !
+> 
+> Now my question is: is this normal that this code is executed twice or is a
+> problem on our side ? If it is normal, I need to add further checks. If not, I
+> would rather keep my implementation roughly as it is and rather troubleshoot
+> this "double execution".
+
+The double execution is "normal".  The code checks if itself and the 
+compressed payload is in the way of the decompressed kernel. If it is 
+then it relocates itself to avoid being overwritten. Once relocated, 
+execution starts over again to keep things simple.
+
+When a DTB is appended to zImage, then it has to be relocated alongside 
+the compressed payload for the same reasons. For this, we need to 
+determine the actual size of the DTB. That's where r6 is adjusted to 
+pretend the DTB is part of the actual zImage.
+
+Yet if CONFIG_ARM_ATAG_DTB_COMPAT is set, this has to be performed 
+before the relocation as it may well change the size of the DTB.
+
+Now, to fix your test, you'd simply have to augment it with:
+
++		cmp	r6, r8		@ is r8 pointing to the appended DTB?
++		beq	1f
+		ldr	lr, [r8, #0]	@ conventionaly passed dtb ?
+		cmp	lr, r1
+		beq	dtb_check_done	@ yes, do not manage it
++1:
+
+
+Nicolas
