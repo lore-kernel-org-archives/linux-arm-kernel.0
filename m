@@ -1,48 +1,60 @@
-From: grant.b.edwards@gmail.com (Grant Edwards)
-Date: Wed, 29 Apr 2015 14:54:43 +0000 (UTC)
-Subject: [OT] Profiling on ARM Linux systems: how?
-Message-ID: <mhqrbj$vlu$1@ger.gmane.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 29 Apr 2015 22:53:22 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 4.1
+Message-ID: <20150429145321.GA20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This might be a little off-topic. If so I apologize.
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-I have a problem with excessive CPU usage on an embedded ARM926
-system.  There are three main apps, all of which have multiple
-threads. The total CPU usage is too high.  I'm trying to figure out
-where the CPU time is "going" so we know were to concentrate
-optimization efforts.
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-The "top" utility is useless because it samples at a fixed interval.
-Almost all of the threads are driven by timers on fixed cycles (or
-data from threads that are). The 'top' sampling method appears to
-cause aliasing which renders the numbers shown by top meaningless.
+are available in the git repository at:
 
-I have written a small "idle" app that I can run with the least
-possible priority to get a pretty decent measure of total combined CPU
-usage by everything else.  By starting and stopping pieces and
-measuring the change in total CPU usage, we get some moderately usable
-numbers, but stopping piece A also changes the load on piece B and
-piece C, so it's not very accurate.
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.1
 
-That method also doesn't let us understand which threads within an
-application are using the most CPU time.
+for you to fetch changes up to 68ce9a1f24b8e8894955032a4af74998315be9fe:
 
-It would be helpful if I could just get a reliable measurement of
-system vs. user CPU usage.
+  ARM: dts: imx6qdl-sabreauto: remove pinctrl-assert-gpios (2015-04-28 09:05:21 +0800)
 
-We've tried and failed to get oprofile working for our platform (at91
-running 2.6.33).  If I was confident that oprofile could provide
-useful information, I would put some more effort into getting it
-running.
+----------------------------------------------------------------
+The i.MX fixes for 4.1:
+ - A couple of imx23-olinuxino device tree fixes regarding to LED GPIO
+   polarity and USB dr_mode setting
+ - One i.MX28 device tree fix on AUART4 TX-DMA interrupt name
+ - Add missing pwm-cells to PWM4 for i.MX25 device tree
+ - Fix imx6q-phytec device tree to get correct USB VBUS control
+ - Drop invalid pinctrl-assert-gpios property from imx6qdl-sabreauto
+   device tree, which was sneaked in from vendor device tree
+ - One fix on Wolfram's broken email address
 
-I have been able to get systemtap working on our platform and can
-trace kernel-space events, but my understanding is that systemtap
-doesn't support analysis of user-space processes on ARM.
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: dts: imx23-olinuxino: Fix polarity of LED GPIO
 
-Any advice?
+Marek Vasut (1):
+      ARM: dts: imx28: Fix AUART4 TX-DMA interrupt name
 
--- 
-Grant Edwards               grant.b.edwards        Yow! Life is a POPULARITY
-                                  at               CONTEST!  I'm REFRESHINGLY
-                              gmail.com            CANDID!!
+Markus Pargmann (1):
+      ARM: dts: imx25: Add #pwm-cells to pwm4
+
+Philipp Zabel (1):
+      ARM: dts: imx6: phyFLEX: USB VBUS control is active-high
+
+Shawn Guo (1):
+      ARM: dts: imx6qdl-sabreauto: remove pinctrl-assert-gpios
+
+Stefan Wahren (1):
+      ARM: dts: imx23-olinuxino: Fix dr_mode of usb0
+
+Wolfram Sang (1):
+      ARM: mach-imx: devices: platform-sdhci-esdhc-imx: fix broken email address
+
+ Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt | 2 +-
+ arch/arm/boot/dts/imx23-olinuxino.dts                 | 4 +++-
+ arch/arm/boot/dts/imx25.dtsi                          | 1 +
+ arch/arm/boot/dts/imx28.dtsi                          | 2 +-
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi          | 2 ++
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi              | 1 -
+ arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c  | 2 +-
+ 7 files changed, 9 insertions(+), 5 deletions(-)
