@@ -1,39 +1,54 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 29 Apr 2015 09:29:26 -0700
-Subject: [PATCH 3/3] ARM: bcm2835: Add the necessary firmware driver
- information to the DT
-In-Reply-To: <55403787.7010407@wwwdotorg.org>
-References: <1430176449-12322-1-git-send-email-eric@anholt.net>
- <1430176449-12322-4-git-send-email-eric@anholt.net>
- <55403787.7010407@wwwdotorg.org>
-Message-ID: <87y4laq4nt.fsf@eliezer.anholt.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 29 Apr 2015 09:33:12 -0700
+Subject: [PATCH] ARM: proc-feroceon: Fix feroceon_proc_info macro
+In-Reply-To: <1430319415-6421-1-git-send-email-andrew@lunn.ch>
+References: <20150429140516.GA32151@lunn.ch>
+ <1430319415-6421-1-git-send-email-andrew@lunn.ch>
+Message-ID: <554107C8.7050701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+On 29/04/15 07:56, Andrew Lunn wrote:
+> bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with
+> relative offset") broke booting for Kirkwood. The kernel would say:
+> 
+> Starting kernel ...
+> 
+> Uncompressing Linux... done, booting the kernel.
+> 
+> Error: unrecognized/unsupported processor variant (0x56251311).
+> 
+> Fix it by removing the extraneous .long __feroceon_setup from the
+> feroceon_proc_info macro.
+> 
+> Reported-by: Florian Fainelli <f.fainelli@gmail.com>
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-> On 04/27/2015 05:14 PM, Eric Anholt wrote:
->> This gets the USB power domain turned on so that DWC2 can probe, even
->> if the bootloader didn't turn it on for us (which is the case if you
->> use the RPi firmware without chainloading U-Boot).
->
->> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
->
->> +&usb {
->> +	power-domains = <&firmware POWER_DOMAIN_USB>;
->> +};
->
-> That property doesn't seem to be documented in
-> Documentation/devicetree/bindings/usb/dwc2.txt (which defines compatible
-> = "brcm,bcm2835-usb"). Is it implemented?
+Tested-by: Florian Fainelli <f.fainelli@gmail.com>
 
-power-domains is a generic property that's parsed by
-drivers/base/power/domain.c.  See also
-Documentation/devicetree/bindings/power/power_domain.txt&
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150429/915b498e/attachment-0001.sig>
+Thanks everyone!
+
+> Fixes: bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with relative offset")
+> ---
+>  arch/arm/mm/proc-feroceon.S | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+> index e494d6d6acbe..92e08bf37aad 100644
+> --- a/arch/arm/mm/proc-feroceon.S
+> +++ b/arch/arm/mm/proc-feroceon.S
+> @@ -602,7 +602,6 @@ __\name\()_proc_info:
+>  		PMD_SECT_AP_WRITE | \
+>  		PMD_SECT_AP_READ
+>  	initfn	__feroceon_setup, __\name\()_proc_info
+> -	.long __feroceon_setup
+>  	.long	cpu_arch_name
+>  	.long	cpu_elf_name
+>  	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+> 
+
+
+-- 
+Florian
