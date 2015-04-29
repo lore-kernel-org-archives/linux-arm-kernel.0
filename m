@@ -1,48 +1,99 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Apr 2015 10:31:05 -0500
-Subject: [PATCH] devicetree: Add vendor prefix for Foxlink Group
-In-Reply-To: <5540F5DD.5010101@atmel.com>
-References: <1427213575-27340-1-git-send-email-nicolas.ferre@atmel.com>
- <5540F5DD.5010101@atmel.com>
-Message-ID: <CAL_Jsq+r3YYTZ-w8JCeRgsbfwhNJ+mvjzkWH-152BJiEZbRN7w@mail.gmail.com>
+From: al.stone@linaro.org (Al Stone)
+Date: Wed, 29 Apr 2015 09:39:25 -0600
+Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup device
+ coherency
+In-Reply-To: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
+References: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
+Message-ID: <5540FB2D.4080905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 29, 2015 at 10:16 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Le 24/03/2015 17:12, Nicolas Ferre a ?crit :
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->> Thierry,
+On 04/29/2015 08:57 AM, Suthikulpanit, Suravee wrote:
+> 
+> 
+> On 4/29/15, 09:47, "Arnd Bergmann" <arnd@arndb.de> wrote:
+> 
+>> On Wednesday 29 April 2015 09:45:43 Suravee Suthikulpanit wrote:
+>>> On 04/29/2015 09:03 AM, Arnd Bergmann wrote:
+>>>> On Wednesday 29 April 2015 08:44:09 Suravee Suthikulpanit wrote:
+>>>>> +                       device->flags.cca_seen = 1;
+>>>>> +               } else if (IS_ENABLED(CONFIG_ACPI_MUST_HAVE_CCA)) {
+>>>>> +                       /*
+>>>>> +                        * Architecture has specified that if the
+>>> device
+>>>>> +                        * can do DMA, it must have ACPI _CCA object.
+>>>>> +                        * Here, there could be two cases:
+>>>>> +                        *   1. Not DMA-able device.
+>>>>> +                        *   2. DMA-able device, but missing _CCA
+>>> object.
+>>>>> +                        *
+>>>>> +                        * In both cases, we will default to dma
+>>> non-coherent.
+>>>>> +                        */
+>>>>> +                       cca = 0;
+>>>>> +               } else {
+>>>>> +                       /*
+>>>>> +                        * If architecture does not specify that
+>>> device must
+>>>>> +                        * specify ACPI _CCA (e.g. x86), we default
+>>> to use
+>>>>> +                        * dma coherent.
+>>>>> +                        */
+>>>>> +                       cca = 1;
+>>>>> +               }
+>>>>>
+>>>>
+>>>> What does it mean here if a device does DMA but is not coherent? Do
+>>> you
+>>>> have an example of a server that needs this?
+>>>>
+>>>> Can we please make the default for ARM64 cca=1 as well?
+>>>>
+>>>>       Arnd
+>>>>
+>>>
+>>> Actually, I am trying to implement the logic for when missing _CCA to
+>>> be 
+>>> consistent with the behavior when the devicetree entry does not specify
+>>> "dma-coherent" property. IIUC, in such case, Linux will default to
+>>> using 
+>>> non-coherent DMA.
 >>
->> Boris added the support for a Foxlink panel in this commit: 102932b0e474
->> (drm/panel: add support for Foxlink FL500WVR00-A0T panel). Here is the vendor
->> prefix.
->
-> Ping?
+>> Why?
+>>
+>> 	Arnd
+> 
+> Otherwise, it would seem inconsistent with what states in the ACPI spec:
+>  
+>   CCA objects are only relevant for devices that can access CPU-visible
+> memory,
+>   such as devices that are DMA capable. On ARM based systems, the _CCA
+> object 
+>   must be supplied all such devices. On Intel platforms, if the _CCA
+> object is 
+>   not supplied, the OSPM will assume the devices are hardware cache
+> coherent.
+> 
+> From the statement above, I interpreted as if it is not present, it would
+> be non-coherent.
+> 
+> Suravee
 
-Acked-by: Rob Herring <robh@kernel.org>
+A little background to Suravee's statement...
 
->
->>
->> Bye,
->>
->>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index 1b0f5b797cd5..e9fca088ba1a 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -73,6 +73,7 @@ everspin    Everspin Technologies, Inc.
->>  excito       Excito
->>  fcs  Fairchild Semiconductor
->>  firefly      Firefly
->> +foxlink      Foxlink Group
->>  fsl  Freescale Semiconductor
->>  GEFanuc      GE Fanuc Intelligent Platforms Embedded Systems, Inc.
->>  gef  GE Fanuc Intelligent Platforms Embedded Systems, Inc.
->>
->
->
-> --
-> Nicolas Ferre
+When the spec was being changed for _CCA, it was determined by the ASWG
+that there was no reasonable default -- either choice would break something.
+Multiple OSs, SoC vendors, and platform vendors were asked.  So, the spec
+says for ARMv8, _CCA must be specified when needed and is not assumed to have
+any value.  Obviously, any OS can choose to behave differently, but that's
+what was specified and why it was specified that way.
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
