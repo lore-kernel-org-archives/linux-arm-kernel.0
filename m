@@ -1,26 +1,25 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 28 Apr 2015 19:42:32 -0600
-Subject: [PATCH 1/3] dt/bindings: Add binding for the Raspberry Pi firmware
- driver
-In-Reply-To: <1430176449-12322-2-git-send-email-eric@anholt.net>
+Date: Tue, 28 Apr 2015 19:44:39 -0600
+Subject: [PATCH 3/3] ARM: bcm2835: Add the necessary firmware driver
+ information to the DT
+In-Reply-To: <1430176449-12322-4-git-send-email-eric@anholt.net>
 References: <1430176449-12322-1-git-send-email-eric@anholt.net>
- <1430176449-12322-2-git-send-email-eric@anholt.net>
-Message-ID: <55403708.7080406@wwwdotorg.org>
+ <1430176449-12322-4-git-send-email-eric@anholt.net>
+Message-ID: <55403787.7010407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/27/2015 05:14 PM, Eric Anholt wrote:
+> This gets the USB power domain turned on so that DWC2 can probe, even
+> if the bootloader didn't turn it on for us (which is the case if you
+> use the RPi firmware without chainloading U-Boot).
 
-This one really needs a patch description, to indicate what kind of
-thing this patch introduces a binding for.
+> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt
+> +&usb {
+> +	power-domains = <&firmware POWER_DOMAIN_USB>;
+> +};
 
-> +Required properties:
-> +
-> +- compatible:	Should be "rasbperrypi,firmware"
-> +- mboxes:	Single-entry list which specifies which mailbox controller
-> +		  and channel is used.
-
-It'd be nice to mention that ../../mailbox/mailbox.txt defines the
-semantics of this property.
+That property doesn't seem to be documented in
+Documentation/devicetree/bindings/usb/dwc2.txt (which defines compatible
+= "brcm,bcm2835-usb"). Is it implemented?
