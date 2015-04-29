@@ -1,65 +1,100 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Apr 2015 16:37:16 +0200
-Subject: Regression: Kirkwood fails to boot because of bf35706f3d0929b
-In-Reply-To: <20150429140516.GA32151@lunn.ch>
-References: <20150429140516.GA32151@lunn.ch>
-Message-ID: <CAKv+Gu_CeMzWKJ-obW6hX7d5vM7fkr8vOAvbMQ74GZ3ZkU8Kow@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 29 Apr 2015 07:40:12 -0700
+Subject: ARM errata 430973 on multi platform kernels
+In-Reply-To: <20150428181300.GB4027@n2100.arm.linux.org.uk>
+References: <20150407152207.GM18048@atomide.com>
+ <20150408230658.GO4027@n2100.arm.linux.org.uk>
+ <20150409134843.GQ4027@n2100.arm.linux.org.uk>
+ <20150415163108.GB2033@earth> <20150416160858.GH18048@atomide.com>
+ <20150417184156.GA3326@earth> <20150420234032.GM18048@atomide.com>
+ <20150423102542.GZ4027@n2100.arm.linux.org.uk>
+ <20150423141727.GQ18048@atomide.com>
+ <20150428181300.GB4027@n2100.arm.linux.org.uk>
+Message-ID: <20150429144011.GB24469@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 April 2015 at 16:05, Andrew Lunn <andrew@lunn.ch> wrote:
-> Hi Ard
->
-> It seems as thought all Kirkwood boards are dead in v4.1-rc1. They
-> fail to boot with the message:
->
-> Starting kernel ...
->
-> Uncompressing Linux... done, booting the kernel.
->
-> Error: unrecognized/unsupported processor variant (0x56251311).
->
-> With a bit of testing, Ezequiel and Florian have found the guilty
-> commit is:
->
-> bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with relative offset")
->
-> Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Date:   Wed Mar 18 07:29:32 2015 +0100
->
->     ARM: 8314/1: replace PROCINFO embedded branch with relative offset
->
->     This patch replaces the 'branch to setup()' instructions embedded
->     in the PROCINFO structs with the offset to that setup function
->     relative to the base of the struct. This preserves the position
->     independent nature of that field, but uses a data item rather
->     than an instruction.
->
->     This is mainly done to prevent linker failures on large kernels,
->     where the setup function is out of reach for the branch.
->
->
-> Kirkwood uses arch/arm/mm/proc-feroceon.S.
->
-> Please can you have this patch either fixed or reverted. Come by
-> #mvlinux if you want to chat with us, ask for testing, etc.
->
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [150428 11:14]:
+> On Thu, Apr 23, 2015 at 07:17:28AM -0700, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [150423 03:26]:
+> > > However, I don't think anyone is willing to say that they have a
+> > > solution to this problem - obviously, you can't build OMAP as a
+> > > non-multiplatform kernel anymore, so in effect you can never have
+> > > the kernel enable this errata.  And you can't detect whether you're
+> > > running in secure mode or not.
+> > > 
+> > > We could do the "only write the bit if it was originally clear" but
+> > > we still have the problem that doing so may cause other people
+> > > regressions.
+> > 
+> > How about we keep the bit writing part !multiplatform conditional
+> > (or even remove it) but always do the flush for ca-8?
+> > 
+> > Then we could also do a warning for a misconfigured ca-8 later on.
+> 
+> Yes, we could do this - we'll have to rely on the boot loader doing
+> the right thing and setting this bit appropriately.  For those
+> platforms where this doesn't apply, I don't see any solution as (iirc)
+> OMAP now requires MULTIPLATFORM to be enabled.
 
-Apologies for the breakage. Does this fix it?
-
-diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-index e494d6d6acbe..92e08bf37aad 100644
---- a/arch/arm/mm/proc-feroceon.S
-+++ b/arch/arm/mm/proc-feroceon.S
-@@ -602,7 +602,6 @@ __\name\()_proc_info:
-                PMD_SECT_AP_WRITE | \
-                PMD_SECT_AP_READ
-        initfn  __feroceon_setup, __\name\()_proc_info
--       .long __feroceon_setup
-        .long   cpu_arch_name
-        .long   cpu_elf_name
-        .long   HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-
+OK, here's an updated patch. I've kept Sebastian's Tested-by as we know
+the init part is a nop on n900 that he tested with.
 
 Regards,
-Ard.
+
+Tony
+
+8< ---------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 27 Apr 2015 10:18:14 -0700
+Subject: [PATCH] ARM: mm: Fix Cortex-A8 erratum 430973 segfaults for bootloaders and multiarch
+
+Looks like apps can be made to segfault easily on armhf distros
+just by running cpuburn-a8 in the background, then starting apt
+get update unless erratum 430973 workaround is enabled. This happens
+on r3p2 also, which has 430973 fixed in hardware.
+
+Turns out the reason for this is some bootloaders incorrectly
+setting the auxilary register IBE bit, which probably causes us
+to hit erratum 687067 on Cortex-A8 later than r1p2.
+
+If the bootloader incorrectly sets the IBE bit in the auxilary control
+register for Cortex-A8 revisions with 430973 fixed in hardware, we
+need to call flush BTAC/BTB to avoid segfaults probably caused by
+erratum 687067. So let's flush BTAC/BTB unconditionally for Cortex-A8.
+It won't do anything unless the IBE bit is set.
+
+Note that we keep the erratum 430973 Kconfig option still around and
+disabled for multiarch as it may be unsafe to enable for some secure
+SoC. It is known safe to be enabled for n900, but won't do anything
+on n900 as the IBE bit needs to be set with SMC.
+
+Also note that SoCs probably should also add checks and print warnings
+for the misconfigured IBE bit depending on the Cortex-A8 revision
+so the bootloaders can be fixed Cortex-A8 revisions later than
+r1p2 to not set the IBE bit.
+
+Tested-By: Sebastian Reichel <sre@kernel.org>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -36,14 +36,16 @@
+  *
+  *	It is assumed that:
+  *	- we are not using split page tables
++ *
++ *	Note that we always need to flush BTAC/BTB if IBE is set
++ *	even on Cortex-A8 revisions not affected by 430973.
++ *	If IBE is not set, the flush BTAC/BTB won't do anything.
+  */
+ ENTRY(cpu_ca8_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mov	r2, #0
+-#ifdef CONFIG_ARM_ERRATA_430973
+ 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+ #endif
+-#endif
+ ENTRY(cpu_v7_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mmid	r1, r1				@ get mm->context.id
