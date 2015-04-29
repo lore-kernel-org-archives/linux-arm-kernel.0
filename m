@@ -1,40 +1,102 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 28 Apr 2015 20:41:45 -0700
-Subject: BCM2836 (Raspberry Pi 2) port
-In-Reply-To: <5540443C.8070604@wwwdotorg.org>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <5540443C.8070604@wwwdotorg.org>
-Message-ID: <554052F9.5040305@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 28 Apr 2015 23:50:41 -0400 (EDT)
+Subject: [RFC] arm: pick the r2 passed DTB over the appended one
+In-Reply-To: <1429880030-21473-1-git-send-email-valentin.longchamp@keymile.com>
+References: <1429880030-21473-1-git-send-email-valentin.longchamp@keymile.com>
+Message-ID: <alpine.LFD.2.11.1504282315320.1582@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/28/15 19:38, Stephen Warren a ?crit :
-> On 04/21/2015 12:09 PM, Eric Anholt wrote:
->> This is my first submission of a Raspberry Pi 2 port.  It can be found
->> at https://github.com/anholt/linux/tree/bcm2836
->>
->> I'm using the 2835 interrupt controller support, without adding the
->> checks for ARM local interrupts first.  That means no support for IPIs
->> (and thus no SMP), no PMU events, and no local timer (I'm using the
->> same 2835 peripheral one).
->>
->> It supports a similar featureset to Pi 1 at this point.  Serial and SD
->> cards work.  Just one CPU supported.  USB (ethernet) works if you use
->> U-Boot, or my mailbox series
->> (https://github.com/anholt/linux/tree/bcm2836-mbox).
+On Fri, 24 Apr 2015, Valentin Longchamp wrote:
+
+> Thanks to the APPENDED_DTB option, it is possible to append the dtb to
+> the kernel's binary image. This is very convenient to accomodate old
+> bootloaders that do not pass a dtb.
 > 
-> Tested-by: Stephen Warren <swarren@wwwdotorg.org>
+> We have updated a product with a new version of the bootloader that now
+> passed the dtb properly in r2. However, we still want to support with
+> the same software (i.e. kernel) the old bootloader, where the dtb must
+> be appended, but give the priority to to the one passed in r2.
 > 
-> I applied the patches on top of korg's linux-rpi.git for-rpi-next,
-> resolved the io_map conflicts, and tested without U-Boot.
+> This patch tries cover the above use case. It works for the case a dtb
+> is passed in r2 and one is appended (the one pointed by r2 is picked).
+> However, when there is only an appended dtb and r2 points to an ATAG
+> list, this fails. Somehow, the presumably updated r2 does not point to a
+> valid dtb and it gets zeroed by __vet_atags.
 
-Should we start thinking about routing bcm2835/36 changes through the
-same Broadcom pull request as we do for the every other SoCs within
-mach-bcm: 63xx, 53xx/47xx, brcmstb, cygnus at some point?
+Do you have CONFIG_ARM_ATAG_DTB_COMPAT set?
 
-I don't have any strong feelings either way, just curious if this is
-something remotely desireable from an arm-soc maintainer role perspective.
+I don't see how this could be related, but you should consider adding 
+commit c2607f74aa to your kernel if not already there.
 
-Thanks!
---
-Florian
+> Below is an example of this (end of bootloader, start of kernel):
+> 
+> at 02000000 ...
+>   Image Name:   Linux-3.10.60-7.2.2-00002-gc6acc
+>   Image Type:   ARM Linux Kernel Image (uncompressed)
+>   Data Size:    2904550 Bytes = 2.8 MiB
+>   Load Address: 00008000
+>   Entry Point:  00008000
+>   Verifying Checksum ... OK
+>   Loading Kernel Image ... OK
+> OK
+> r2 (0x00000100) points to (size, header): 0x00000005, 0x54410001
+> 
+> Starting kernel ...
+> 
+> Uncompressing Linux... done, booting the kernel.
+> e5943000
+
+Where is this value from? This looks like an ARM opcode ("ldr r3, [r4]").
+
+> trying to parse the FDT
+> 
+> dt_phys (r2) is NULL !
+> 
+> Error: unrecognized/unsupported machine ID (r1 = 0x000008cf).
+> 
+> Available machine support:
+> 
+> ID (hex)	NAME
+> ffffffff	Marvell Kirkwood (Flattened Device Tree)
+> 
+> Please check your kernel config and/or bootloader.
+> 
+> Is this patch a correct approach to implement the above use case ? If
+> yes, does anyone has an idea why this fails ?
+> 
+> Note: this patch is for the 3.10 stable branch.
+> 
+> Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
+> ---
+>  arch/arm/boot/compressed/head.S | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 032a8d9..a43c8a0 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -244,7 +244,7 @@ restart:	adr	r0, LC0
+>   * dtb data will get relocated along with the kernel if necessary.
+>   */
+>  
+> -		ldr	lr, [r6, #0]
+> +		ldr	lr, [r6, #0]		@ potential appended dtb ?
+>  #ifndef __ARMEB__
+>  		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
+>  #else
+> @@ -253,6 +253,10 @@ restart:	adr	r0, LC0
+>  		cmp	lr, r1
+>  		bne	dtb_check_done		@ not found
+>  
+> +		ldr	lr, [r8, #0] 		@ conventionaly passed dtb ?
+> +		cmp	lr, r1
+> +		beq	dtb_check_done		@ yes, do not manage it
+> +
+>  #ifdef CONFIG_ARM_ATAG_DTB_COMPAT
+>  		/*
+>  		 * OK... Let's do some funky business here.
+> -- 
+> 1.8.0.1
+> 
+> 
