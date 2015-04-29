@@ -1,49 +1,88 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Wed, 29 Apr 2015 21:12:28 +0200
-Subject: [PATCH v2] ARM: vexpress: Add unified-cache Device Tree property
-In-Reply-To: <1426671298-2012-1-git-send-email-r.schwebel@pengutronix.de>
-References: <5509437E.6060806@arm.com>
- <1426671298-2012-1-git-send-email-r.schwebel@pengutronix.de>
-Message-ID: <20150429191228.GO15254@pengutronix.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 29 Apr 2015 21:20:12 +0200
+Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
+ add SW break point support
+In-Reply-To: <87oam70y64.fsf@linaro.org>
+References: <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
+ <20150427200407.GG23335@cbox>
+ <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
+ <87wq0wr6dd.fsf@linaro.org>
+ <CAFEAcA85i_1JybEFBg91NA3-LpAzYh4RSDnqryOd=rZN7gZP5A@mail.gmail.com>
+ <20150428125645.GA4137@cbox> <87tww0qqh9.fsf@linaro.org>
+ <20150429081047.GB4137@cbox> <87r3r31eed.fsf@linaro.org>
+ <20150429103814.GC4137@cbox> <87oam70y64.fsf@linaro.org>
+Message-ID: <CAMJs5B-qs9euMo4yW1-prnakBHo37qvhcDvtVPVXqPoyA_J1Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
+On Wed, Apr 29, 2015 at 5:08 PM, Alex Benn?e <alex.bennee@linaro.org> wrote:
+>
+> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>
+>> On Wed, Apr 29, 2015 at 10:18:18AM +0100, Alex Benn?e wrote:
+>>>
+>>> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>>>
+>>> > On Tue, Apr 28, 2015 at 03:37:01PM +0100, Alex Benn?e wrote:
+>>> >>
+>>> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>>> >>
+>>> >> > On Tue, Apr 28, 2015 at 10:34:12AM +0100, Peter Maydell wrote:
+>>> >> >> On 28 April 2015 at 09:42, Alex Benn?e <alex.bennee@linaro.org> wrote:
+>>> >> >> > Peter Maydell <peter.maydell@linaro.org> writes:
+>>> >> >> >> Does the kernel already have a conveniently implemented "inject
+>>> >> >> >> exception into guest" lump of code? If so it might be less effort
+>>> >> >> >> to do it that way round, maybe.
+>>> >> >> >
+> <snip>
+>>> >>
+>>> >> Certainly there are some cases where the kernel doesn't have all the
+>>> >> information. For example it doesn't know if the soft break was inserted
+>>> >> by the guest or the host. That to me favours the "let userspace deal
+>>> >> with the ugly" approach.
+>>> >>
+>>> > Not sure I follow.
+>>> >
+>>> > If it's an exception for the guest, then that must be because the guest
+>>> > put in the breakpoint instruction, right?
+>>>
+>>> No the host can add breakpoint instructions as well. They both generate
+>>> the same (redirected) exception to the hypervisor which then has to
+>>> figure out who planted the breakpoint and where the eventual exception
+>>> will be handled.
+>>
+>> I understand this; let's just rewind here.
+>>
+>> If you've concluded that the exception is for the guest, then the guest
+>> must have placed the breakpoint instruction there, correct?  Otherwise,
+>> the exception is for the hypervisor and the discussion about how to
+>> inject an exception for the guest is invalid.
+>
+> But only userspace has enough information to make that conclusion (after
+> searching the list of breakpoints it added to the code). So from
+> userspace we can:
+>
+>   - re-enter KVM telling it to re-route the exception it just delivered
+>     to userspace somehow
+>
+>   or
+>
+>   - make the changes to deliver the exception in userspace and re-enter
+>     KVM as normal.
+>
 
-On Wed, Mar 18, 2015 at 10:34:58AM +0100, Robert Schwebel wrote:
-> Without this property, we get this boot warning:
-> 
-> "L2C: device tree omits to specify unified cache"
-> 
-> Signed-off-by: Robert Schwebel <r.schwebel@pengutronix.de>
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm/boot/dts/vexpress-v2p-ca9.dts | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> Changes since v1:
->  * fix typo in patch description
-> 
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> index 23662b5..a411274 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> @@ -170,6 +170,7 @@
->  		compatible = "arm,pl310-cache";
->  		reg = <0x1e00a000 0x1000>;
->  		interrupts = <0 43 4>;
-> +		cache-unified;
->  		cache-level = <2>;
->  		arm,data-latency = <1 1 1>;
->  		arm,tag-latency = <1 1 1>;
-> -- 
-> 2.1.4
+ok, we agree and are talking about the same thing.  good.
 
-Gentle ping, this patch didn't make it into 4.1-rc1.
+> It seems to me if we have already exited into userspace it may as well
+> clean up if it has all the information it needs?
+>
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+depends on the complexity and size of the code really, imho.
+
+>> Or are you talking about the corner case where the host uses a soft
+>> breakpoint to get a breakpoint on an instruction which is also a
+>> breakpoint in the guest?
+>
+> I think in this case host debugging just wins.
+>
+ok
