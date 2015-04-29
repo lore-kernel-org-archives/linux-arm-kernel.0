@@ -1,23 +1,33 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 28 Apr 2015 19:35:21 -0700
-Subject: [2/2] ARM: BCM2835: Move the restart/power_off handling to the
- WDT driver.
-In-Reply-To: <1429902534-2348-2-git-send-email-eric@anholt.net>
-References: <1429902534-2348-2-git-send-email-eric@anholt.net>
-Message-ID: <20150429023521.GA29594@roeck-us.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 28 Apr 2015 20:38:52 -0600
+Subject: BCM2836 (Raspberry Pi 2) port
+In-Reply-To: <1429639796-2169-1-git-send-email-eric@anholt.net>
+References: <1429639796-2169-1-git-send-email-eric@anholt.net>
+Message-ID: <5540443C.8070604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 12:08:54PM -0700, Eric Anholt wrote:
-> Since the WDT is what's used to drive restart and power off, it makes
-> more sense to keep it there, where the regs are already mapped and
-> definitions for them provided.  Note that this means you may need to
-> add CONFIG_BCM2835_WDT to retain functionality of your kernel.
+On 04/21/2015 12:09 PM, Eric Anholt wrote:
+> This is my first submission of a Raspberry Pi 2 port.  It can be found
+> at https://github.com/anholt/linux/tree/bcm2836
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Cc: linux-watchdog at vger.kernel.org
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> Tested-by: Stephen Warren <swarren@wwwdotorg.org>
-> Acked-by: Lubomir Rintel <lkundrak@v3.sk>
+> I'm using the 2835 interrupt controller support, without adding the
+> checks for ARM local interrupts first.  That means no support for IPIs
+> (and thus no SMP), no PMU events, and no local timer (I'm using the
+> same 2835 peripheral one).
+> 
+> It supports a similar featureset to Pi 1 at this point.  Serial and SD
+> cards work.  Just one CPU supported.  USB (ethernet) works if you use
+> U-Boot, or my mailbox series
+> (https://github.com/anholt/linux/tree/bcm2836-mbox).
 
-Acked-by: Guenter Roeck <linux@roeck-us.net>
+Tested-by: Stephen Warren <swarren@wwwdotorg.org>
+
+I applied the patches on top of korg's linux-rpi.git for-rpi-next,
+resolved the io_map conflicts, and tested without U-Boot.
+
+I'll try to work out why it doesn't work with U-Boot. I can't
+immediately see anything in /proc/device-tree that indicates the RPi
+firmware is modifying the DT that's passed to the kernel to exclude any
+CPU1..3 spin tables, so either the kernel isn't hitting those purely by
+luck, or I'm guessing wrong re: the issue with U-Boot.
