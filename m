@@ -1,301 +1,47 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 29 Apr 2015 10:09:34 -0700
-Subject: [PATCH 2/3 v7] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <1430254460-26754-1-git-send-email-eric@anholt.net>
-References: <1430254460-26754-1-git-send-email-eric@anholt.net>
-Message-ID: <1430327374-6562-1-git-send-email-eric@anholt.net>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 29 Apr 2015 11:16:24 -0600
+Subject: [PATCH v2 00/11] Support for coresight ETMv4 tracer 
+Message-ID: <1430327795-10710-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lubomir Rintel <lkundrak@v3.sk>
+Please find in this patchset a driver implementation that conforms
+to the coresight framework and provide support for the Embedded
+Trace Macrocell version 4.
 
-This mailbox driver provides a single mailbox channel to write 32-bit
-values to the VPU and get a 32-bit response.  The Raspberry Pi
-firmware uses this mailbox channel to implement firmware calls, while
-Roku 2 (despite being derived from the same firmware tree) doesn't.
+Regards,
+Mathieu
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Cc: Jassi Brar <jassisinghbrar@gmail.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: linux-rpi-kernel at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+Changes for v2:
+- Rebased on v4.1-rc1. 
+- Fixed mask in the amba_id cells.
+- Fixed double pm_runtime_put() in error path. 
 ---
 
-v2: Squashed Craig's work for review, carried over to new version of
-    Mailbox framework (changes by Lubomir)
+Pratik Patel (11):
+  coresight-etm4x: Adding CoreSight ETM4x driver
+  coresight-etm4x: Controls pertaining to tracer configuration
+  coresight-etm4x: Controls pertaining to the reset, mode, pe and events
+  coresight-etm4x: Controls pertaining to various configuration options
+  coresight-etm4x: Controls pertaining to the ViewInst register
+  coresight-etm4x: Controls pertaining to the address comparator
+    functions
+  coresight-etm4x: Controls pertaining to the sequencer functions
+  coresight-etm4x: Controls pertaining to the counter functions
+  coresight-etm4x: Controls pertaining to the selection of resources
+  coresight-etm4x: Controls pertaining to the context ID functions
+  coresight-etm4x: Controls pertaining to the VM ID functions
 
-v3: Fix multi-line comment style.  Refer to the documentation by
-    filename.  Only declare one MODULE_AUTHOR.  Alphabetize includes.
-    Drop some excessive dev_dbg()s (changes by anholt).
+ .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  295 +++
+ drivers/hwtracing/coresight/Kconfig                |   10 +
+ drivers/hwtracing/coresight/Makefile               |    1 +
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 2744 ++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm4x.h      |  391 +++
+ 5 files changed, 3441 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm4x.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm4x.h
 
-v4: Use the new bcm2835_peripheral_read_workaround(), drop the
-    unnecessary wmb()s, make the messages be a pointer to u32, rather
-    than u32-cast-as-pointer, fold in small static functions, drop
-    extra error messages, clean up sizeof() arg for malloc, disable
-    interrupts on unload (changes by anholt).
-
-v5: Rewrite as a single-channel driver, where the old notion of
-    channels will now be interpreted by an rpi-specific driver.  Minor
-    style fix.  Drop peripheral_read_workaround() since it's been
-    noted that readl() covers the non-interrupt half of it, and I
-    found that we would need to resolve read ordering in the interrupt
-    handler anyway (changes by anholt).
-
-v6: rewrite commit message, only turn on interrupts when a client is
-    present, drop the started flag, use BIT() macro, update Broadcom
-    copyright (changes by anholt, from Jassi's review).  Drop s-o-b of
-    Jassi and Suman, who appear to have been accidentally added by
-    Craig (noted by Lubomir).
-
-v7: Drop the txdone-style check in send_data, since the core will make
-    sure we're not called until the previous one is done.  Fix "mbox"
-    to be static (changes by anholt, from review by Jassi).
-
- drivers/mailbox/Kconfig           |   8 ++
- drivers/mailbox/Makefile          |   2 +
- drivers/mailbox/bcm2835-mailbox.c | 204 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 214 insertions(+)
- create mode 100644 drivers/mailbox/bcm2835-mailbox.c
-
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index 84b0a2d..ab574da 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -60,4 +60,12 @@ config ALTERA_MBOX
- 	  An implementation of the Altera Mailbox soft core. It is used
- 	  to send message between processors. Say Y here if you want to use the
- 	  Altera mailbox support.
-+
-+config BCM2835_MBOX
-+	tristate "BCM2835 Mailbox"
-+	depends on ARCH_BCM2835
-+	help
-+	  An implementation of the BCM2385 Mailbox.  It is used to invoke
-+	  the services of the Videocore. Say Y here if you want to use the
-+	  BCM2835 Mailbox.
- endif
-diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index b18201e..8e6d822 100644
---- a/drivers/mailbox/Makefile
-+++ b/drivers/mailbox/Makefile
-@@ -11,3 +11,5 @@ obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
- obj-$(CONFIG_PCC)		+= pcc.o
- 
- obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
-+
-+obj-$(CONFIG_BCM2835_MBOX)	+= bcm2835-mailbox.o
-diff --git a/drivers/mailbox/bcm2835-mailbox.c b/drivers/mailbox/bcm2835-mailbox.c
-new file mode 100644
-index 0000000..f8b9c51
---- /dev/null
-+++ b/drivers/mailbox/bcm2835-mailbox.c
-@@ -0,0 +1,204 @@
-+/*
-+ *  Copyright (C) 2010,2015 Broadcom
-+ *  Copyright (C) 2013-2014 Lubomir Rintel
-+ *  Copyright (C) 2013 Craig McGeachie
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This device provides a mechanism for writing to the mailboxes,
-+ * that are shared between the ARM and the VideoCore processor
-+ *
-+ * Parts of the driver are based on:
-+ *  - arch/arm/mach-bcm2708/vcio.c file written by Gray Girling that was
-+ *    obtained from branch "rpi-3.6.y" of git://github.com/raspberrypi/
-+ *    linux.git
-+ *  - drivers/mailbox/bcm2835-ipc.c by Lubomir Rintel at
-+ *    https://github.com/hackerspace/rpi-linux/blob/lr-raspberry-pi/drivers/
-+ *    mailbox/bcm2835-ipc.c
-+ *  - documentation available on the following web site:
-+ *    https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/mailbox_controller.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/platform_device.h>
-+#include <linux/spinlock.h>
-+
-+/* Mailboxes */
-+#define ARM_0_MAIL0	0x00
-+#define ARM_0_MAIL1	0x20
-+
-+/*
-+ * Mailbox registers. We basically only support mailbox 0 & 1. We
-+ * deliver to the VC in mailbox 1, it delivers to us in mailbox 0. See
-+ * BCM2835-ARM-Peripherals.pdf section 1.3 for an explanation about
-+ * the placement of memory barriers.
-+ */
-+#define MAIL0_RD	(ARM_0_MAIL0 + 0x00)
-+#define MAIL0_POL	(ARM_0_MAIL0 + 0x10)
-+#define MAIL0_STA	(ARM_0_MAIL0 + 0x18)
-+#define MAIL0_CNF	(ARM_0_MAIL0 + 0x1C)
-+#define MAIL1_WRT	(ARM_0_MAIL1 + 0x00)
-+
-+/* Status register: FIFO state. */
-+#define ARM_MS_FULL		BIT(31)
-+#define ARM_MS_EMPTY		BIT(30)
-+
-+/* Configuration register: Enable interrupts. */
-+#define ARM_MC_IHAVEDATAIRQEN	BIT(0)
-+
-+struct bcm2835_mbox {
-+	struct device *dev;
-+	void __iomem *regs;
-+	spinlock_t lock;
-+	struct mbox_controller controller;
-+};
-+
-+static struct bcm2835_mbox *mbox;
-+
-+static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
-+{
-+	struct device *dev = mbox->dev;
-+	struct mbox_chan *link = &mbox->controller.chans[0];
-+
-+	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
-+		u32 msg = readl(mbox->regs + MAIL0_RD);
-+		dev_dbg(dev, "Reply 0x%08X\n", msg);
-+		mbox_chan_received_data(link, &msg);
-+	}
-+	return IRQ_HANDLED;
-+}
-+
-+static int bcm2835_send_data(struct mbox_chan *link, void *data)
-+{
-+	int ret = 0;
-+	u32 msg = *(u32 *)data;
-+
-+	spin_lock(&mbox->lock);
-+	writel(msg, mbox->regs + MAIL1_WRT);
-+	dev_dbg(mbox->dev, "Request 0x%08X\n", msg);
-+end:
-+	spin_unlock(&mbox->lock);
-+	return ret;
-+}
-+
-+static int bcm2835_startup(struct mbox_chan *link)
-+{
-+	/* Enable the interrupt on data reception */
-+	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
-+
-+	return 0;
-+}
-+
-+static void bcm2835_shutdown(struct mbox_chan *link)
-+{
-+	writel(0, mbox->regs + MAIL0_CNF);
-+}
-+
-+static bool bcm2835_last_tx_done(struct mbox_chan *link)
-+{
-+	bool ret;
-+
-+	spin_lock(&mbox->lock);
-+	ret = !(readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL);
-+	spin_unlock(&mbox->lock);
-+	return ret;
-+}
-+
-+static struct mbox_chan_ops bcm2835_mbox_chan_ops = {
-+	.send_data	= bcm2835_send_data,
-+	.startup	= bcm2835_startup,
-+	.shutdown	= bcm2835_shutdown,
-+	.last_tx_done	= bcm2835_last_tx_done
-+};
-+
-+static int bcm2835_mbox_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	int ret = 0;
-+	struct resource *iomem;
-+
-+	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
-+	if (mbox == NULL)
-+		return -ENOMEM;
-+	mbox->dev = dev;
-+	spin_lock_init(&mbox->lock);
-+
-+	ret = devm_request_irq(dev, irq_of_parse_and_map(dev->of_node, 0),
-+			       bcm2835_mbox_irq, 0, dev_name(dev), mbox);
-+	if (ret) {
-+		dev_err(dev, "Failed to register a mailbox IRQ handler: %d\n",
-+			ret);
-+		mbox = NULL;
-+		return -ENODEV;
-+	}
-+
-+	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mbox->regs = devm_ioremap_resource(&pdev->dev, iomem);
-+	if (IS_ERR(mbox->regs)) {
-+		ret = PTR_ERR(mbox->regs);
-+		dev_err(&pdev->dev, "Failed to remap mailbox regs: %d\n", ret);
-+		mbox = NULL;
-+		return ret;
-+	}
-+
-+	mbox->controller.txdone_poll = true;
-+	mbox->controller.txpoll_period = 5;
-+	mbox->controller.ops = &bcm2835_mbox_chan_ops;
-+	mbox->controller.dev = dev;
-+	mbox->controller.num_chans = 1;
-+	mbox->controller.chans = devm_kzalloc(dev,
-+		sizeof(*mbox->controller.chans), GFP_KERNEL);
-+	if (!mbox->controller.chans) {
-+		mbox = NULL;
-+		return -ENOMEM;
-+	}
-+
-+	ret  = mbox_controller_register(&mbox->controller);
-+	if (ret) {
-+		mbox = NULL;
-+		return ret;
-+	}
-+
-+	dev_info(dev, "mailbox enabled\n");
-+
-+	return ret;
-+}
-+
-+static int bcm2835_mbox_remove(struct platform_device *pdev)
-+{
-+	mbox_controller_unregister(&mbox->controller);
-+	mbox = NULL;
-+	return 0;
-+}
-+
-+static const struct of_device_id bcm2835_mbox_of_match[] = {
-+	{ .compatible = "brcm,bcm2835-mbox", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, bcm2835_mbox_of_match);
-+
-+static struct platform_driver bcm2835_mbox_driver = {
-+	.driver = {
-+		.name = "bcm2835-mbox",
-+		.owner = THIS_MODULE,
-+		.of_match_table = bcm2835_mbox_of_match,
-+	},
-+	.probe		= bcm2835_mbox_probe,
-+	.remove		= bcm2835_mbox_remove,
-+};
-+module_platform_driver(bcm2835_mbox_driver);
-+
-+MODULE_AUTHOR("Lubomir Rintel <lkundrak@v3.sk>");
-+MODULE_DESCRIPTION("BCM2835 mailbox IPC driver");
-+MODULE_LICENSE("GPL v2");
 -- 
-2.1.4
+1.9.1
