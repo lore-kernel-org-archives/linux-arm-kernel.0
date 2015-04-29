@@ -1,40 +1,60 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 29 Apr 2015 17:43:32 -0600
-Subject: [PATCH 3/3] ARM: bcm2835: Add the necessary firmware driver
- information to the DT
-In-Reply-To: <87y4laq4nt.fsf@eliezer.anholt.net>
+Date: Wed, 29 Apr 2015 17:47:46 -0600
+Subject: [PATCH 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <87oam6q0v1.fsf@eliezer.anholt.net>
 References: <1430176449-12322-1-git-send-email-eric@anholt.net>
- <1430176449-12322-4-git-send-email-eric@anholt.net>
- <55403787.7010407@wwwdotorg.org> <87y4laq4nt.fsf@eliezer.anholt.net>
-Message-ID: <55416CA4.6040000@wwwdotorg.org>
+ <1430176449-12322-3-git-send-email-eric@anholt.net>
+ <55403AD1.4030103@wwwdotorg.org> <87oam6q0v1.fsf@eliezer.anholt.net>
+Message-ID: <55416DA2.5040902@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/15 10:29, Eric Anholt wrote:
+On 04/29/15 11:51, Eric Anholt wrote:
 > Stephen Warren <swarren@wwwdotorg.org> writes:
 >
 >> On 04/27/2015 05:14 PM, Eric Anholt wrote:
->>> This gets the USB power domain turned on so that DWC2 can probe, even
->>> if the bootloader didn't turn it on for us (which is the case if you
->>> use the RPi firmware without chainloading U-Boot).
+>>> This gives us a function for making mailbox property channel requests
+>>> of the firmware, and uses it to control the 3 power domains provided
+>>> by the firmware.
 >>
->>> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+>>> diff --git a/arch/arm/mach-bcm/raspberrypi-firmware.c b/arch/arm/mach-bcm/raspberrypi-firmware.c
 >>
->>> +&usb {
->>> +	power-domains = <&firmware POWER_DOMAIN_USB>;
->>> +};
+>>> +/*
+>>> + * Submits a set of concatenated tags to the VPU firmware through the
+>>> + * mailbox property interface.
+>>> + *
+>>> + * The buffer header and the ending tag are added by this function and
+>>> + * don't need to be supplied, just the actual tags for your operation.
+>>> + * See struct raspberrypi_firmware_property_tag_header for the per-tag structure.
+>>> + */
+>>> +int raspberrypi_firmware_property(void *data, size_t tag_size)
+>>> +{
+>>> +	size_t size = tag_size + 12;
+>>> +	u32 *buf;
+>>> +	dma_addr_t bus_addr;
+>>> +	int ret = 0;
+>>> +
+>>> +	if (!firmware)
+>>> +		return -EPROBE_DEFER;
 >>
->> That property doesn't seem to be documented in
->> Documentation/devicetree/bindings/usb/dwc2.txt (which defines compatible
->> = "brcm,bcm2835-usb"). Is it implemented?
+>> I think it'd make more sense if the clients looked up the firmware
+>> driver via phandle at their probe time. This would mean:
+>>
+>> * No need for global "firmware", since clients could pass the firmware
+>> driver handle into this function.
+>>
+>> * Clients resolve deferred probe at their probe time. That way, they
+>> won't register themselves with subsystems asserting they can provide
+>> services, but find out they can't yet provide the service at that time.
 >
-> power-domains is a generic property that's parsed by
-> drivers/base/power/domain.c.  See also
-> Documentation/devicetree/bindings/power/power_domain.txt&
+> The one client so far (vc4) was resolving deferred probe at its probe
+> time, but not taking a reference on the firmware driver.  I figure I'll
+> have it do the phandle lookup and refcount -- do you still want the
+> struct platform_device passed in here?  If we de-global firmware, it's
+> going to mean some faffing in the power domain side of things to find
+> the device again, it seems.
 
-Sure, but the binding for the node still needs to mention that it's 
-acceptable for that property to exist (a/k/a that the USB binding 
-inherits from or aggregates the power domains binding). Part of 
-mentioning that would be a description of what the entries in the 
-power-domains property mean (how many are legal, what each index 
-represents).
+I think I'd expect the API in the firmware driver to require the client 
+to pass the client DT node pointer plus a property name, and do all the 
+lookup itself. That's what most DT resource lookup APIs in the kernel do 
+now.
