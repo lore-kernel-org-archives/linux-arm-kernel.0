@@ -1,50 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Apr 2015 17:54:02 +0200
-Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
- device coherency
-In-Reply-To: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
-References: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
-Message-ID: <2817500.sgztgK2NzB@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 29 Apr 2015 16:59:24 +0100
+Subject: [PATCH 1/1] mailbox: Add ability for clients to request channels by
+ name
+Message-ID: <1430323164-26945-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 April 2015 14:57:10 Suthikulpanit, Suravee wrote:
-> Otherwise, it would seem inconsistent with what states in the ACPI spec:
->  
->   CCA objects are only relevant for devices that can access CPU-visible
-> memory,
->   such as devices that are DMA capable. On ARM based systems, the _CCA
-> object 
->   must be supplied all such devices. On Intel platforms, if the _CCA
-> object is 
->   not supplied, the OSPM will assume the devices are hardware cache
-> coherent.
-> 
-> From the statement above, I interpreted as if it is not present, it would
-> be non-coherent.
-> 
+This patch supplies a new framework API; mbox_request_channel_byname().
 
-My guess is that this section was included for Windows Phone, which runs
-on embedded SoCs that usually have noncoherent DMA in a particular way.
+It works by supplying the usual client pointer as the first argument and
+a string as the second.  The API will search the client's node for a
+'mbox-names' property then request a channel in the normal way using the
+requested string's index as the expected second 'index' argument.
 
-Linux however only uses ACPI for servers, so that case does not happen.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mailbox/mailbox.c      | 23 +++++++++++++++++++++++
+ include/linux/mailbox_client.h |  2 ++
+ 2 files changed, 25 insertions(+)
 
-I guess it would be reasonable to add a run-time warning here if you
-try to do DMA on a device that does not have CCA set, and you should
-probably set the DMA mask to 0 in that case as well.
-
-Note that there are lots of ways in which you could have noncoherent DMA:
-the default on ARM32 is that it requires uncached access or explicit
-cache flushes, but it's also possible to have an SMP system where a device
-is only coherent with some of the CPUs and requires explicit synchronization
-(not flushes) otherwise. In a multi-level cache hierarchy, there could be
-all sorts of combinations of flushes and syncs you would need to do.
-
-With DT, we handle this using SoC-specific overrides for platforms that
-are noncoherent in funny ways, see
-http://lxr.free-electrons.com/source/arch/arm/mach-mvebu/coherency.c?v=3.18#L263
-for instance. If we just disallow DMA to devices that are marked with _CCA=0
-in ACPI, we can avoid this case, or discuss it by the time someone has hardware
-that wants it, and then make a more informed decision about it.
-
-	Arnd
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index 19b491d..981a76cb 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -357,6 +357,29 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
+ }
+ EXPORT_SYMBOL_GPL(mbox_request_channel);
+ 
++struct mbox_chan *mbox_request_channel_byname(struct mbox_client *cl,
++					      const char *name)
++{
++	struct device_node *np = cl->dev->of_node;
++	struct property *prop;
++	const char *mbox_name;
++	int index = 0;
++
++	if (!np) {
++		dev_err(cl->dev, "%s() only supports DT\n", __func__);
++		return ERR_PTR(-ENOSYS);
++	}
++
++	of_property_for_each_string(np, "mbox-names", prop, mbox_name) {
++		if (!strncmp(name, mbox_name, strlen(name)))
++			break;
++		index++;
++	}
++
++	return mbox_request_channel(cl, index);
++}
++EXPORT_SYMBOL_GPL(mbox_request_channel_byname);
++
+ /**
+  * mbox_free_channel - The client relinquishes control of a mailbox
+  *			channel by this call.
+diff --git a/include/linux/mailbox_client.h b/include/linux/mailbox_client.h
+index 1726ccb..4434871 100644
+--- a/include/linux/mailbox_client.h
++++ b/include/linux/mailbox_client.h
+@@ -40,6 +40,8 @@ struct mbox_client {
+ 	void (*tx_done)(struct mbox_client *cl, void *mssg, int r);
+ };
+ 
++struct mbox_chan *mbox_request_channel_byname(struct mbox_client *cl,
++					      const char *name);
+ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index);
+ int mbox_send_message(struct mbox_chan *chan, void *mssg);
+ void mbox_client_txdone(struct mbox_chan *chan, int r); /* atomic */
+-- 
+1.9.1
