@@ -1,146 +1,114 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 29 Apr 2015 08:44:09 -0500
-Subject: [PATCH 2/2] ACPI / scan: Parse _CCA and setup device coherency
-In-Reply-To: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1430315049-4663-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Apr 2015 15:51:48 +0200
+Subject: [RFC PATCH] ARM: add fixmap based earlycon support
+Message-ID: <1430315508-7582-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements support for ACPI _CCA object, which is introduced in
-ACPIv5.1, can be used for specifying device DMA coherency attribute.
+This adds support for fixmap based earlycon by moving the fixmap
+initialization to an earlier stage and introducing the Kconfig symbol
+that wires up the existing code.
 
-The parsing logic traverses device namespace to parse coherency
-information, and stores it in acpi_device_flags. Then uses it to call
-arch_setup_dma_ops() when creating each device enumerated in DSDT
-during ACPI scan.
-
-This patch also introduces acpi_dma_is_coherent(), which provides
-an interface for device drivers to check the coherency information
-similarly to the of_dma_is_coherent().
-
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/acpi/acpi_platform.c |  5 ++++-
- drivers/acpi/scan.c          | 45 ++++++++++++++++++++++++++++++++++++++++++++
- include/acpi/acpi_bus.h      |  9 ++++++++-
- 3 files changed, 57 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig              |  3 +++
+ arch/arm/include/asm/fixmap.h |  6 ++++++
+ arch/arm/kernel/setup.c       |  2 ++
+ arch/arm/mm/mmu.c             | 16 +++++++++++++---
+ 4 files changed, 24 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
-index 4bf7559..a4db208 100644
---- a/drivers/acpi/acpi_platform.c
-+++ b/drivers/acpi/acpi_platform.c
-@@ -108,9 +108,12 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
- 	if (IS_ERR(pdev))
- 		dev_err(&adev->dev, "platform device creation failed: %ld\n",
- 			PTR_ERR(pdev));
--	else
-+	else {
-+		arch_setup_dma_ops(&pdev->dev, 0, 0, NULL,
-+				   adev->flags.is_coherent);
- 		dev_dbg(&adev->dev, "created platform device %s\n",
- 			dev_name(&pdev->dev));
-+	}
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 45df48ba0b12..0076330789f5 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -287,6 +287,9 @@ config GENERIC_BUG
+ 	def_bool y
+ 	depends on BUG
  
- 	kfree(resources);
- 	return pdev;
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 849b699..509d0157 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -11,6 +11,7 @@
- #include <linux/kthread.h>
- #include <linux/dmi.h>
- #include <linux/nls.h>
-+#include <linux/dma-mapping.h>
- 
- #include <asm/pgtable.h>
- 
-@@ -2137,6 +2138,49 @@ void acpi_free_pnp_ids(struct acpi_device_pnp *pnp)
- 	kfree(pnp->unique_id);
- }
- 
-+static void acpi_init_coherency(struct acpi_device *device)
-+{
-+	unsigned long long cca;
-+	acpi_status status;
-+	struct acpi_device *parent = device->parent;
++config FIX_EARLYCON_MEM
++	def_bool y
 +
-+	if (parent && parent->flags.cca_seen) {
-+		/*
-+		 * From ACPIv5.1, OSPM will ignore _CCA if an ancestor
-+		 * already saw one.
-+		 */
-+		device->flags.cca_seen = 1;
-+		cca = acpi_dma_is_coherent(parent);
-+	} else {
-+		status = acpi_evaluate_integer(device->handle, "_CCA",
-+					       NULL, &cca);
-+		if (ACPI_SUCCESS(status)) {
-+			device->flags.cca_seen = 1;
-+		} else if (IS_ENABLED(CONFIG_ACPI_MUST_HAVE_CCA)) {
-+			/*
-+			 * Architecture has specified that if the device
-+			 * can do DMA, it must have ACPI _CCA object.
-+			 * Here, there could be two cases:
-+			 *   1. Not DMA-able device.
-+			 *   2. DMA-able device, but missing _CCA object.
-+			 *
-+			 * In both cases, we will default to dma non-coherent.
-+			 */
-+			cca = 0;
-+		} else {
-+			/*
-+			 * If architecture does not specify that device must
-+			 * specify ACPI _CCA (e.g. x86), we default to use
-+			 * dma coherent.
-+			 */
-+			cca = 1;
-+		}
-+	}
+ config PGTABLE_LEVELS
+ 	int
+ 	default 3 if ARM_LPAE
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 0415eae1df27..e0abd3a150ee 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -1,6 +1,10 @@
+ #ifndef _ASM_FIXMAP_H
+ #define _ASM_FIXMAP_H
+ 
++#include <asm/pgtable.h>
 +
-+	device->flags.is_coherent = cca;
-+	arch_setup_dma_ops(&device->dev, 0, 0, NULL, cca);
++#define FIXMAP_PAGE_IO		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY
++
+ #define FIXADDR_START		0xffc00000UL
+ #define FIXADDR_END		0xfff00000UL
+ #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+@@ -11,6 +15,8 @@ enum fixed_addresses {
+ 	FIX_KMAP_BEGIN,
+ 	FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
+ 
++	FIX_EARLYCON_MEM_BASE,
++
+ 	/* Support writing RO kernel text via kprobes, jump labels, etc. */
+ 	FIX_TEXT_POKE0,
+ 	FIX_TEXT_POKE1,
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 6c777e908a24..2e4b3c22be4d 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -80,6 +80,7 @@ extern void early_paging_init(const struct machine_desc *,
+ extern void sanity_check_meminfo(void);
+ extern enum reboot_mode reboot_mode;
+ extern void setup_dma_zone(const struct machine_desc *desc);
++extern void early_fixmap_init(void);
+ 
+ unsigned int processor_id;
+ EXPORT_SYMBOL(processor_id);
+@@ -915,6 +916,7 @@ void __init setup_arch(char **cmdline_p)
+ 	const struct machine_desc *mdesc;
+ 
+ 	setup_processor();
++	early_fixmap_init();
+ 	mdesc = setup_machine_fdt(__atags_pointer);
+ 	if (!mdesc)
+ 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4e6ef896c619..d072726c3781 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1231,7 +1231,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
+ 
+ 	early_trap_init(vectors);
+ 
+-	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
++	for (addr = VMALLOC_START; addr < FIXADDR_START; addr += PMD_SIZE)
++		pmd_clear(pmd_off_k(addr));
++	for (addr = round_up(FIXADDR_END, PMD_SIZE); addr; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
+ 	/*
+@@ -1321,9 +1323,17 @@ static void __init kmap_init(void)
+ 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
+ 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
+ #endif
 +}
 +
- void acpi_init_device_object(struct acpi_device *device, acpi_handle handle,
- 			     int type, unsigned long long sta)
- {
-@@ -2155,6 +2199,7 @@ void acpi_init_device_object(struct acpi_device *device, acpi_handle handle,
- 	device->flags.visited = false;
- 	device_initialize(&device->dev);
- 	dev_set_uevent_suppress(&device->dev, true);
-+	acpi_init_coherency(device);
++void __init early_fixmap_init(void)
++{
++	static u8 fixmap_pte[PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE] __page_aligned_bss;
++	pmd_t *pmd = pmd_off_k(FIXADDR_START);
++
++	if (pmd_none(*pmd))
++		__pmd_populate(pmd, __pa(fixmap_pte), _PAGE_KERNEL_TABLE);
+ 
+-	early_pte_alloc(pmd_off_k(FIXADDR_START), FIXADDR_START,
+-			_PAGE_KERNEL_TABLE);
++	BUG_ON(pmd_bad(*pmd));
  }
  
- void acpi_device_add_finalize(struct acpi_device *device)
-diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-index 8de4fa9..7e8cd4c 100644
---- a/include/acpi/acpi_bus.h
-+++ b/include/acpi/acpi_bus.h
-@@ -208,7 +208,9 @@ struct acpi_device_flags {
- 	u32 visited:1;
- 	u32 hotplug_notify:1;
- 	u32 is_dock_station:1;
--	u32 reserved:23;
-+	u32 is_coherent:1;
-+	u32 cca_seen:1;
-+	u32 reserved:21;
- };
- 
- /* File System */
-@@ -380,6 +382,11 @@ struct acpi_device {
- 	void (*remove)(struct acpi_device *);
- };
- 
-+static inline bool acpi_dma_is_coherent(struct acpi_device *adev)
-+{
-+	return adev && adev->flags.is_coherent;
-+}
-+
- static inline bool is_acpi_node(struct fwnode_handle *fwnode)
- {
- 	return fwnode && fwnode->type == FWNODE_ACPI;
+ static void __init map_lowmem(void)
 -- 
-2.1.0
+1.9.1
