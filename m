@@ -1,22 +1,55 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 30 Apr 2015 00:04:31 +0200
-Subject: [PATCH v6 1/3] ARM: pxa: pxa_cplds: add lubbock and mainstone IO
-In-Reply-To: <1430165840-20101-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Mon, 27 Apr 2015 22:17:18 +0200")
-References: <1430165840-20101-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <87wq0u4mmo.fsf@belgarion.home>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 30 Apr 2015 00:08:30 +0200
+Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <CAPw-ZTmoash48S3F8kBxsovD0mEPYBO8=XDaJ2peDu60yaGrZQ@mail.gmail.com>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <1430259045-19012-2-git-send-email-lho@apm.com>
+ <1430259045-19012-3-git-send-email-lho@apm.com>
+ <1430259045-19012-4-git-send-email-lho@apm.com>
+ <CAL_Jsq+nhPUxHxrStB9cdy1YzE7tVPFVR1MrWq3Bz-JUa=3Rvg@mail.gmail.com>
+ <CAPw-ZTnLR10Zr_p8L3-1nBZ+jKE1HCwERDmO=S5as2GLqime3A@mail.gmail.com>
+ <20150429214924.GH5498@pd.tnic>
+ <CAPw-ZTmoash48S3F8kBxsovD0mEPYBO8=XDaJ2peDu60yaGrZQ@mail.gmail.com>
+Message-ID: <20150429220830.GI5498@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+On Wed, Apr 29, 2015 at 02:56:25PM -0700, Loc Ho wrote:
+> Hi,
+> 
+> >> > Similar comments for the rest. I would define memory controller
+> >> > bindings and EDAC driver, then worry about the rest.
+> >>
+> >> Okay.. As comment in following emails, I will break up the driver into
+> >> multiple drivers and focus only on the memory controller driver first.
+> >
+> > Please no multiple EDAC drivers. Or do you mean something else here?
+> 
+> We will have the following:
+> 
+> xgene-edac-mc.c
+> xgene-edac-pmd.c
+> xgene-edac-l3.c
+> xgene-edac-soc.c
+> 
+> Or what would you suggest.
 
-Hi Arnd,
+xgene-edac.c
 
-I'm intending to queue that in pxa/fixes and then request pulling.
-As you've been involved in the review from the beginning, can I have a
-"Reviewed-by" ?
+This granularity is insane. On x86 we have single EDAC drivers for
+multiple CPU families and platforms.
 
-Cheers.
+You can start carving out stuff when this is absolutely needed, i.e.
+when an IP block is in multiple hw incarnations. And even then I'd be
+sceptical and would really want to know whether it is even worth it to
+have an EDAC module for it.
 
+So let's be conservative please.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
 --
-Robert
