@@ -1,33 +1,35 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 29 Apr 2015 10:42:19 +0200
-Subject: [PATCH 2/2] Regulator: add driver for Freescale MC34708
-In-Reply-To: <20150428141740.16243.79036.stgit@localhost>
-References: <20150428141736.16243.57292.stgit@localhost>
- <20150428141740.16243.79036.stgit@localhost>
-Message-ID: <1430296939.2411.103.camel@x220>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 29 Apr 2015 09:59:02 +0200
+Subject: [PATCH 3/4] ARM: dts: sunxi: A10s Olinuxino Micro: add spi2.
+In-Reply-To: <cover.1430295711.git.hramrach@gmail.com>
+References: <cover.1430295711.git.hramrach@gmail.com>
+Message-ID: <8b0c262adb5fb987a33c0fee7f2d52c6e2105554.1430295711.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a nit: a license mismatch.
+spi2 is exposed on the UEXT connector.
 
-On Tue, 2015-04-28 at 16:17 +0200, Martin Fuzzey wrote:
-> --- /dev/null
-> +++ b/drivers/regulator/mc34708-regulator.c
+Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+---
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of the
-> + * License, or (at your option) any later version.
-
-This states the license is GPL v2 or later.
-
-> +MODULE_LICENSE("GPL v2");
-
-And, according to inlcude/linux/module.h, this states the license is
-(just) GPL v2. So I think either to comment at the top of this file or
-the ident used in the MODULE_LICENSE() macro should be changed.
-
-Thanks,
-
-
-Paul Bolle
+diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+index aa88ee8..cd8d08a 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+@@ -182,6 +182,12 @@
+ 	status = "okay";
+ };
+ 
++&spi2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi2_pins_a>;
++	status = "okay";
++};
++
+ &ohci0 {
+ 	status = "okay";
+ };
+-- 
+2.1.4
