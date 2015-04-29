@@ -1,73 +1,85 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 29 Apr 2015 12:24:59 +0200
-Subject: [PATCH v2] MAINTAINERS: replace an AT91 maintainer
-In-Reply-To: <1430301438-11839-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1430293252-9167-1-git-send-email-nicolas.ferre@atmel.com>
- <1430301438-11839-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150429102459.GA3242@piout.net>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Wed, 29 Apr 2015 12:33:00 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <2919263.vEuyzce5K7@wuerfel>
+References: <5538DD02.6050401@topic.nl>
+ <20150429091714.GH12732@n2100.arm.linux.org.uk> <5540A8B9.7010100@topic.nl>
+ <2919263.vEuyzce5K7@wuerfel>
+Message-ID: <5540B35C.4050002@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/04/2015 at 11:57:18 +0200, Nicolas Ferre wrote :
-> As some help is needed from an active maintainer, replace Andrew Victor
-> by Alexandre Belloni in the ARM/Atmel MAINTAINERS' entry (aka AT91).
-> Add an entry to the CREDITS file.
-> 
-> Thanks Andrew for the great role you played during the early days of this
-> product family.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Andrew Victor <linux@maxim.org.za>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+?On 29-04-15 12:07, Arnd Bergmann wrote:
+> On Wednesday 29 April 2015 11:47:37 Mike Looijmans wrote:
+>> On 29-04-15 11:17, Russell King - ARM Linux wrote:
+>>> On Wed, Apr 29, 2015 at 11:01:35AM +0200, Arnd Bergmann wrote:
+>>>> You still need to synchronize MMIO register accesses with write buffers,
+>>>> as the readl() and writel() functions do in the kernel.
+>>>>
+>>>> In particular, after you have written a buffer to memory from the CPU,
+>>>> you will need to do an outer_sync() before the MMIO write that triggers
+>>>> the DMA. This is still much cheaper than doing the cache flush though.
+>>>
+>>> Note that outer_sync() is already done by readl/writel and/or the write
+>>> memory barriers (mb()/wmb()).
+>>
+>> I initiate the DMA transfers using iowrite32() so if I understand correctly,
+>> I'm already doing the right thing here.
+>>
+>> Just to be completely clear, there is no direct register access from user
+>> space, the driver does all MMIO. Userspace only gets an mmap for DMA buffers,
+>> and uses ioctl to initiate transfers.
+>
+> Ok, that seems all fine then.
+>
+>>>> Another possible problem would be if the driver mmaps the buffer in
+>>>> uncached mode to user space. This is something your kernel driver has
+>>>> to get right, it won't be handled automatically by setting the
+>>>> "dma-coherent" property in DT.
+>>>
+>>> The buffer should also be mapped into userspace with the same memory
+>>> type and cache attributes as the kernel side mapping.  If using ACP,
+>>> then you probably want "normal memory, cacheable, writeback, read
+>>> allocate" or in the case of SMP, the same but "read/write allocate".
+>>
+>> I currently use dma_alloc_coherent() to allocate buffers and
+>> dma_mmap_coherent() to map them to user space. I was under the assumption that
+>> these would do the right thing. Is that correct? If not, then what should I use?
+>
+> dma_mmap_coherent() is the right interface, but I've just looked at the
+> implementation of arm_dma_mmap() and I'm not sure that it actually uses the
+> correct vma->vm_page_prot value here, because I don't see where it takes
+> into account whether the device is coherent or not. Most ARM machines have
+> only noncoherent devices, and dma_mmap_coherent() is used rarely by drivers,
+> so it's quite possible that this interface got broken without anybody
+> noticing.
+>
+> If my suspicion is correct, we should either change arm_coherent_dma_ops()
+> to refer to a different mmap() callback that does the right thing for
+> coherent devices, or change arm_dma_mmap() to look at dev->is_coherent.
 
-> ---
-> Changes for v2:
-> - add the CREDITS enty
-> 
->  CREDITS     | 7 +++++++
->  MAINTAINERS | 3 +--
->  2 files changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/CREDITS b/CREDITS
-> index 40cc4bfb34db..ec7e6c7fdd1b 100644
-> --- a/CREDITS
-> +++ b/CREDITS
-> @@ -3709,6 +3709,13 @@ N: Dirk Verworner
->  D: Co-author of German book ``Linux-Kernel-Programmierung''
->  D: Co-founder of Berlin Linux User Group
->  
-> +N: Andrew Victor
-> +E: linux at maxim.org.za
-> +W: http://maxim.org.za/at91_26.html
-> +D: First maintainer of Atmel ARM-based SoC, aka AT91
-> +D: Introduced support for at91rm9200, the first chip of AT91 family
-> +S: South Africa
-> +
->  N: Riku Voipio
->  E: riku.voipio at iki.fi
->  D: Author of PCA9532 LED and Fintek f75375s hwmon driver
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index be26fc584cc6..1512e958082a 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -892,11 +892,10 @@ S:	Maintained
->  F:	arch/arm/mach-alpine/
->  
->  ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
-> -M:	Andrew Victor <linux@maxim.org.za>
->  M:	Nicolas Ferre <nicolas.ferre@atmel.com>
-> +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
->  M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -W:	http://maxim.org.za/at91_26.html
->  W:	http://www.linux4sam.org
->  S:	Supported
->  F:	arch/arm/mach-at91/
-> -- 
-> 2.1.3
-> 
+Following the route, arch/arm/mm/dma-mapping.c uses pgprot_dmacoherent() which 
+is defined in arch/arm/include/asm/pgtable.h and that just returns uncached 
+memory.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+If you can give me some hints as to what the correct flags would be, I can 
+patch my kernel and test it.
+
+
+
+
+Kind regards,
+
+Mike Looijmans
+System Expert
+
+TOPIC Embedded Products
+Eindhovenseweg 32-C, NL-5683 KH Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+Telefax: +31 (0) 499 33 69 70
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
