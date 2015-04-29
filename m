@@ -1,60 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Apr 2015 12:07:10 +0200
-Subject: dma_alloc_coherent versus streaming DMA,
- neither works satisfactory
-In-Reply-To: <5540A8B9.7010100@topic.nl>
-References: <5538DD02.6050401@topic.nl>
- <20150429091714.GH12732@n2100.arm.linux.org.uk> <5540A8B9.7010100@topic.nl>
-Message-ID: <2919263.vEuyzce5K7@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 Apr 2015 11:12:34 +0100
+Subject: [PATCH] arm64: perf: Fix callchain parse error with kernel
+ tracepoint events
+In-Reply-To: <1430227248-19657-1-git-send-email-houpengyang@huawei.com>
+References: <1430227248-19657-1-git-send-email-houpengyang@huawei.com>
+Message-ID: <20150429101234.GJ8236@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 April 2015 11:47:37 Mike Looijmans wrote:
-> On 29-04-15 11:17, Russell King - ARM Linux wrote:
-> > On Wed, Apr 29, 2015 at 11:01:35AM +0200, Arnd Bergmann wrote:
-> >> You still need to synchronize MMIO register accesses with write buffers,
-> >> as the readl() and writel() functions do in the kernel.
-> >>
-> >> In particular, after you have written a buffer to memory from the CPU,
-> >> you will need to do an outer_sync() before the MMIO write that triggers
-> >> the DMA. This is still much cheaper than doing the cache flush though.
-> >
-> > Note that outer_sync() is already done by readl/writel and/or the write
-> > memory barriers (mb()/wmb()).
+Hello,
+
+On Tue, Apr 28, 2015 at 02:20:48PM +0100, Hou Pengyang wrote:
+> For ARM64, when tracing with tracepoint events, the IP and cpsr are set
+> to 0, preventing the perf code parsing the callchain and resolving the
+> symbols correctly.
 > 
-> I initiate the DMA transfers using iowrite32() so if I understand correctly, 
-> I'm already doing the right thing here.
+>  ./perf record -e sched:sched_switch -g --call-graph dwarf ls
+> 	[ perf record: Captured and wrote 0.146 MB perf.data ]
+>  ./perf report -f
+>     Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194
+>     Children      Self    Command  Shared Object     Symbol
+> 	100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
 > 
-> Just to be completely clear, there is no direct register access from user 
-> space, the driver does all MMIO. Userspace only gets an mmap for DMA buffers, 
-> and uses ioctl to initiate transfers.
-
-Ok, that seems all fine then.
-
-> >> Another possible problem would be if the driver mmaps the buffer in
-> >> uncached mode to user space. This is something your kernel driver has
-> >> to get right, it won't be handled automatically by setting the
-> >> "dma-coherent" property in DT.
-> >
-> > The buffer should also be mapped into userspace with the same memory
-> > type and cache attributes as the kernel side mapping.  If using ACP,
-> > then you probably want "normal memory, cacheable, writeback, read
-> > allocate" or in the case of SMP, the same but "read/write allocate".
+> The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
+> several necessary registers used for callchain unwinding, including pc,sp,
+> fp and psr .
 > 
-> I currently use dma_alloc_coherent() to allocate buffers and 
-> dma_mmap_coherent() to map them to user space. I was under the assumption that 
-> these would do the right thing. Is that correct? If not, then what should I use?
+> With this patch, callchain can be parsed correctly as follows:
+> 
+>      ......
+> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
+> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
+> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
+> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
+> -    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
+>      pfkey_send_policy_notify
+>      pfkey_get
+>      v9fs_vfs_rename
+>      page_follow_link_light
+>      link_path_walk
+>      el0_svc_naked
+>     .......
+> 
+> For tracepoint event, stack parsing also doesn't work well for ARM. Jean Pihet
+> comed up a patch:
+> http://thread.gmane.org/gmane.linux.kernel/1734283/focus=1734280
 
-dma_mmap_coherent() is the right interface, but I've just looked at the
-implementation of arm_dma_mmap() and I'm not sure that it actually uses the
-correct vma->vm_page_prot value here, because I don't see where it takes
-into account whether the device is coherent or not. Most ARM machines have
-only noncoherent devices, and dma_mmap_coherent() is used rarely by drivers,
-so it's quite possible that this interface got broken without anybody
-noticing.
+Any chance you could revive that series too, please? I'd like to update both
+arm and arm64 together, since we're currently working at merging the two
+perf backends and introducing discrepencies is going to delay that even
+longer.
 
-If my suspicion is correct, we should either change arm_coherent_dma_ops()
-to refer to a different mmap() callback that does the right thing for
-coherent devices, or change arm_dma_mmap() to look at dev->is_coherent.
+> Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
+> ---
+>  arch/arm64/include/asm/perf_event.h | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+> index d26d1d5..16a074f 100644
+> --- a/arch/arm64/include/asm/perf_event.h
+> +++ b/arch/arm64/include/asm/perf_event.h
+> @@ -24,4 +24,20 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
+>  #define perf_misc_flags(regs)	perf_misc_flags(regs)
+>  #endif
+>  
+> +#define perf_arch_fetch_caller_regs(regs, __ip) { \
+> +   unsigned long sp;   \
+> +   __asm__ ("mov %[sp], sp\n" : [sp] "=r" (sp)); \
+> +       (regs)->pc = (__ip);    \
+> +       __asm__ (      \
+> +               "str %[sp],  %[_arm64_sp]  \n\t"    \
+> +               "str x29, %[_arm64_fp]  \n\t"    \
+> +               "mrs %[_arm64_cpsr], spsr_el1 \n\t"     \
+> +               : [_arm64_sp] "=m" (regs->sp),      \
+> +                 [_arm64_fp] "=m" (regs->regs[29]),  \
+> +                 [_arm64_cpsr] "=r" (regs->pstate) \
 
-	Arnd
+Does this really all need to be in assembly code? Ideally we'd use something
+like __builtin_stack_pointer and __builtin_frame_pointer. That just leaves
+the CPSR, but given that it's (a) only used for user_mode_regs tests and (b)
+this macro is only used by ftrace, then we just set it to a static value
+indicating that we're at EL1.
+
+So I *think* we should be able to write this as three lines of C.
+
+Will
