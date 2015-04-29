@@ -1,62 +1,65 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 29 Apr 2015 09:39:23 -0700
-Subject: [PATCH 1/3 v5] dt/bindings: Add binding for the BCM2835 mailbox
- driver
-In-Reply-To: <55403446.1040207@wwwdotorg.org>
-References: <1430173644-19099-2-git-send-email-eric@anholt.net>
- <1430253868-11138-1-git-send-email-eric@anholt.net>
- <55403446.1040207@wwwdotorg.org>
-Message-ID: <87vbgeq478.fsf@eliezer.anholt.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 29 Apr 2015 12:43:04 -0400 (EDT)
+Subject: [RFC] arm: pick the r2 passed DTB over the appended one
+In-Reply-To: <5540FD7A.8040002@keymile.com>
+References: <1429880030-21473-1-git-send-email-valentin.longchamp@keymile.com>
+ <alpine.LFD.2.11.1504282315320.1582@knanqh.ubzr>
+ <5540A0DA.9060409@keymile.com>
+ <alpine.LFD.2.11.1504290929090.1582@knanqh.ubzr>
+ <5540FD7A.8040002@keymile.com>
+Message-ID: <alpine.LFD.2.11.1504291157110.1582@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+On Wed, 29 Apr 2015, Valentin Longchamp wrote:
 
-> On 04/28/2015 02:44 PM, Eric Anholt wrote:
->> From: Lubomir Rintel <lkundrak@v3.sk>
->> 
->> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
->> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> Acked-by: Lee Jones <lee.jones@linaro.org>
->> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
->> ---
->> 
->> v2: Split into a separate patch for submitting to the devicetree list.
->>     Consistently start node docs with a capital letter. device's
->>     address in the example shouldn't have "0x". Drop machine-specific
->>     interrupt numbers from the docs.  (changes by anholt).
->> 
->> v3: Move the file to just bcm2835-mbox.txt, clean up formatting
->>     (changes by anholt, from review by Lee Jones).
->> 
->> v4: Move file back by consensus from various Broadcom platform
->>     maintainers (changes by anholt, acked by Lee Jones).
->> 
->> v5: Document that the mailbox cell should be 0 in clients, and add an
->>     example of a client (changes by anholt, from review by Jassi).
->
-> Some mention of what you changed in the patch might be nice, since it
-> was originally authored by someone else, and there's quite a changelog.
+> On 04/29/2015 03:58 PM, Nicolas Pitre wrote:
+> > Now, to fix your test, you'd simply have to augment it with:
+> > 
+> > +		cmp	r6, r8		@ is r8 pointing to the appended DTB?
+> > +		beq	1f
+> > 		ldr	lr, [r8, #0]	@ conventionaly passed dtb ?
+> > 		cmp	lr, r1
+> > 		beq	dtb_check_done	@ yes, do not manage it
+> > +1:
+> > 
+> 
+> I had thought the same and implemented a similar test as you propose (patch
+> attached, with some more debug code - please excuse my poor assembler). However
+> it does not work ! The reason for it is that on the second run, r6 contains
+> another value. As the output below seems to show, this 2nd run r6 value seems to
+> point to a DTB since the first jump to dtb_check_done is not performed. However,
+> since r8 now points to the "initial" appended DTB, the 2nd test jumps to
+> dtb_check_done. Please see the output below.
 
-I've been taking this changelog stuff out of the patch and putting it
-below '---' because when I was submitting this series before, I got
-chided for putting it in the patch!
+Right.  On the second run, r6 points at the relocated DTB.  That's the 
+one that should be used. r8 points at the initial, non relocated and 
+about to be overwritten DTB. By giving priority to r8 with your patch, 
+you're picking the wrong one.
 
->> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
->
->> +- #mbox-cells:	Specifies the number of cells needed to encode a mailbox
->> +		  channel. The value shall be 1.  Clients should supply a value
->> +		  of 0 for the mailbox channel, because there is only one
->> +		  exposed
->
-> Can't you use #mbox-cells = <0> if there's no data to provide?
+The following should fix this issue:
 
-of_mbox_index_xlate looks like it's always dereferencing the first arg.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150429/6c9852e1/attachment-0001.sig>
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index c41a793b51..bbce6a0f0d 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -399,6 +399,16 @@ dtb_check_done:
+ 1:
+ #endif
+ 
++#ifdef CONFIG_ARM_APPENDED_DTB
++		/*
++		 * If r8 refers to an appended DTB, it is no longer valid
++		 * and should be revalidated once relocated.
++		 */
++		cmp	r8, r5
++		cmpcs	r6, r8
++		movcs	r8, #0
++#endif
++
+ 		sub	r9, r6, r5		@ size to copy
+ 		add	r9, r9, #31		@ rounded up to a multiple
+ 		bic	r9, r9, #31		@ ... of 32 bytes
+
+
+Nicolas
