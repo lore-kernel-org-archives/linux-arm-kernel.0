@@ -1,53 +1,35 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 29 Apr 2015 09:45:43 -0500
-Subject: [PATCH 2/2] ACPI / scan: Parse _CCA and setup device coherency
-In-Reply-To: <5542288.z0SSOZ4xV7@wuerfel>
-References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1430315049-4663-3-git-send-email-Suravee.Suthikulpanit@amd.com>
- <5542288.z0SSOZ4xV7@wuerfel>
-Message-ID: <5540EE97.70202@amd.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Wed, 29 Apr 2015 10:46:51 -0400
+Subject: [PATCH v7 1/5] arm64: Enable EDAC on ARM64
+In-Reply-To: <20150429144031.GB18867@e104818-lin.cambridge.arm.com>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <1430259045-19012-2-git-send-email-lho@apm.com>
+ <20150429144031.GB18867@e104818-lin.cambridge.arm.com>
+Message-ID: <5540EEDB.9010002@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/29/2015 10:40 AM, Catalin Marinas wrote:
+> On Tue, Apr 28, 2015 at 04:10:41PM -0600, Loc Ho wrote:
 
+>> +/*
+>> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
+>> + * Implements the per arch atomic_scrub() that EDAC use for software
+>> + * ECC scrubbing.  It reads memory and then writes back the original
+>> + * value, allowing the hardware to detect and correct memory errors.
+>> + */
+> 
+> The comment here is misleading since the function doesn't do anything.
 
-On 04/29/2015 09:03 AM, Arnd Bergmann wrote:
-> On Wednesday 29 April 2015 08:44:09 Suravee Suthikulpanit wrote:
->> +                       device->flags.cca_seen = 1;
->> +               } else if (IS_ENABLED(CONFIG_ACPI_MUST_HAVE_CCA)) {
->> +                       /*
->> +                        * Architecture has specified that if the device
->> +                        * can do DMA, it must have ACPI _CCA object.
->> +                        * Here, there could be two cases:
->> +                        *   1. Not DMA-able device.
->> +                        *   2. DMA-able device, but missing _CCA object.
->> +                        *
->> +                        * In both cases, we will default to dma non-coherent.
->> +                        */
->> +                       cca = 0;
->> +               } else {
->> +                       /*
->> +                        * If architecture does not specify that device must
->> +                        * specify ACPI _CCA (e.g. x86), we default to use
->> +                        * dma coherent.
->> +                        */
->> +                       cca = 1;
->> +               }
->>
->
-> What does it mean here if a device does DMA but is not coherent? Do you
-> have an example of a server that needs this?
->
-> Can we please make the default for ARM64 cca=1 as well?
->
-> 	Arnd
->
+Well, on the other hand, it is "safe" (joke) ;)
 
-Actually, I am trying to implement the logic for when missing _CCA to be 
-consistent with the behavior when the devicetree entry does not specify 
-"dma-coherent" property. IIUC, in such case, Linux will default to using 
-non-coherent DMA.
+Suggest a documented few line summary of the status from earlier this
+year/last year be there instead. Essentially atomic scrubbing is only
+safe when you're dealing with a fully coherent system. We captured
+various examples of things that could go wrong in the thread link.
 
-Thanks,
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/326986.html
 
-Suravee
+Thanks Loc and team.
+
+Jon.
