@@ -1,65 +1,39 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 29 Apr 2015 12:43:04 -0400 (EDT)
-Subject: [RFC] arm: pick the r2 passed DTB over the appended one
-In-Reply-To: <5540FD7A.8040002@keymile.com>
-References: <1429880030-21473-1-git-send-email-valentin.longchamp@keymile.com>
- <alpine.LFD.2.11.1504282315320.1582@knanqh.ubzr>
- <5540A0DA.9060409@keymile.com>
- <alpine.LFD.2.11.1504290929090.1582@knanqh.ubzr>
- <5540FD7A.8040002@keymile.com>
-Message-ID: <alpine.LFD.2.11.1504291157110.1582@knanqh.ubzr>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Wed, 29 Apr 2015 09:46:14 -0700
+Subject: [PATCH 0/4] Seccomp filter JIT support on ARM.
+In-Reply-To: <1430314657-2552-1-git-send-email-nschichan@freebox.fr>
+References: <1430314657-2552-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <20150429164607.GA12410@Alexeis-MBP.westell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Apr 2015, Valentin Longchamp wrote:
-
-> On 04/29/2015 03:58 PM, Nicolas Pitre wrote:
-> > Now, to fix your test, you'd simply have to augment it with:
-> > 
-> > +		cmp	r6, r8		@ is r8 pointing to the appended DTB?
-> > +		beq	1f
-> > 		ldr	lr, [r8, #0]	@ conventionaly passed dtb ?
-> > 		cmp	lr, r1
-> > 		beq	dtb_check_done	@ yes, do not manage it
-> > +1:
-> > 
+On Wed, Apr 29, 2015 at 03:37:33PM +0200, Nicolas Schichan wrote:
+> Greetings,
 > 
-> I had thought the same and implemented a similar test as you propose (patch
-> attached, with some more debug code - please excuse my poor assembler). However
-> it does not work ! The reason for it is that on the second run, r6 contains
-> another value. As the output below seems to show, this 2nd run r6 value seems to
-> point to a DTB since the first jump to dtb_check_done is not performed. However,
-> since r8 now points to the "initial" appended DTB, the 2nd test jumps to
-> dtb_check_done. Please see the output below.
+> The following patches allow the use of the existing JIT code under
+> arch/arm for seccomp filters.
+> 
+> The first patch makes bpf_migrate_filter() available so that seccomp
+> code can use it.
+> 
+> The second patch invokes the classic BPF JIT code and if this fails
+> reverts to the internal BPF. The open coded double call to
+> bpf_convert_filter() and bpf_prog_select_runtime() is replaced by
+> bpf_migrate_filter()
+> 
+> The third patch adds support for loads from the seccomp_data structure in
+> the ARM BPF JIT code.
 
-Right.  On the second run, r6 points at the relocated DTB.  That's the 
-one that should be used. r8 points at the initial, non relocated and 
-about to be overwritten DTB. By giving priority to r8 with your patch, 
-you're picking the wrong one.
+the patches 1,2,3 look fine.
 
-The following should fix this issue:
+> The fourth and final patch fixes a bug in the emit_udiv() function
+> when used to convert a BPF_ALU | BPF_DIV | BPF_K instruction in the
+> ARM BPF JIT code.
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index c41a793b51..bbce6a0f0d 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -399,6 +399,16 @@ dtb_check_done:
- 1:
- #endif
- 
-+#ifdef CONFIG_ARM_APPENDED_DTB
-+		/*
-+		 * If r8 refers to an appended DTB, it is no longer valid
-+		 * and should be revalidated once relocated.
-+		 */
-+		cmp	r8, r5
-+		cmpcs	r6, r8
-+		movcs	r8, #0
-+#endif
-+
- 		sub	r9, r6, r5		@ size to copy
- 		add	r9, r9, #31		@ rounded up to a multiple
- 		bic	r9, r9, #31		@ ... of 32 bytes
+this one looks independent from first three and probably should
+be sent to stable?
 
-
-Nicolas
+Your cc list is different for every patch, why? What tree are you
+thinking to go through? 1st patch is trivial, but 2nd belongs in
+seccomp, 3rd and 4th are in arm32... I'd would say arm tree if Kees
+is ok with it.
