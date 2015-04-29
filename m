@@ -1,56 +1,40 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 29 Apr 2015 09:31:03 -0500
-Subject: [PATCH 1/2] arm/arm64: ACPI: Introduce CONFIG_ACPI_MUST_HAVE_CCA
-In-Reply-To: <20150429140445.GA18867@e104818-lin.cambridge.arm.com>
-References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1430315049-4663-2-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20150429140445.GA18867@e104818-lin.cambridge.arm.com>
-Message-ID: <5540EB27.8060507@amd.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 29 Apr 2015 16:33:11 +0200
+Subject: [PATCH v6 4/4] clk: dt: Introduce binding for always-on clock
+ support
+In-Reply-To: <20150429141751.GR9169@x1>
+References: <1428432239-4114-1-git-send-email-lee.jones@linaro.org>
+ <1428432239-4114-5-git-send-email-lee.jones@linaro.org>
+ <20150407191746.GA26727@lukather> <20150408081450.GB5162@x1>
+ <20150408094349.GC26727@lukather> <20150408103832.GG5162@x1>
+ <20150408155705.GF26727@lukather> <20150408172344.GH5162@x1>
+ <20150422093446.GA28007@lukather> <20150429141751.GR9169@x1>
+Message-ID: <CAMuHMdVdtoXGhK97Ky5hoVcjM6XZAZXKWELL64MFQebMpFr2Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Lee,
 
-
-On 04/29/2015 09:04 AM, Catalin Marinas wrote:
-> On Wed, Apr 29, 2015 at 08:44:08AM -0500, Suravee Suthikulpanit wrote:
->>  From ACPIv6 (http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf),
->> section 6.2.17 _CCA states that ARM platforms require ACPI _CCA object to be
->> specified for DMA-cabpable devices. This patch introduces ACPI_MUST_HAVE_CCA
->> in arm and arm64 Kconfig to specify such requirement.
->>
->> Note that when _CCA is required, if it is missing in the DSDT. ACPI driver
->> will default to setting up devices as non-coherent.
->>
->> Signed-off-by: Mark Salter <msalter@redhat.com>
->> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> ---
->>   arch/arm/Kconfig     | 1 +
->>   arch/arm64/Kconfig   | 1 +
->>   drivers/acpi/Kconfig | 3 +++
->>   3 files changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 45df48b..2a0d036 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1,6 +1,7 @@
->>   config ARM
->>   	bool
->>   	default y
->> +	select ACPI_MUST_HAVE_CCA if ACPI
->>   	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->>   	select ARCH_HAS_ELF_RANDOMIZE
->>   	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+On Wed, Apr 29, 2015 at 4:17 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> This useful binding should be accepted and people should not abuse
+> it.  If they do and the vendor Maintainer's review and accept then
+> they have no foundation for recourse.
 >
-> Any plans for ACPI on 32-bit ARM?
->
+> Would you prefer it if I made the warning starker?
 
-Not that I am aware, but I could be totally wrong. The reason I am 
-adding this here for 32-bit ARM is because the ACPI spec mentioned this.
+Perhaps you can add a check for "clock-always-on" to scripts/checkpatch.pl,
+to make people aware they should think twice?
 
-If you think this is not necessary until we introduce ACPI for ARM32, it 
-can be removed.
+Nah, people don't read documentation, don't run checkpatch, ignore compiler
+warnings, etc...
 
-Thanks,
+Gr{oetje,eeting}s,
 
-Suravee
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
