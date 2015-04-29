@@ -1,63 +1,97 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 29 Apr 2015 14:31:44 +0200
-Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
- using PM clocks
-In-Reply-To: <CAMuHMdWWv5qADWP4CMj5Kj62v_FK9JxMP6NXOpyN8GTk05raAQ@mail.gmail.com>
-References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
- <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
- <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
- <553A21C7.4060506@codeaurora.org>
- <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
- <7hh9s1xrut.fsf@deeprootsystems.com>
- <553EF5D4.60900@codeaurora.org>
- <CAMuHMdW8OKDODHTw=A=vCFR9PN3KUr_fiGSiNkn0Q7Q16axU6g@mail.gmail.com>
- <5540A923.8000104@codeaurora.org>
- <CAMuHMdWWv5qADWP4CMj5Kj62v_FK9JxMP6NXOpyN8GTk05raAQ@mail.gmail.com>
-Message-ID: <CAPDyKFoja9OZf+X2eaBGwTXoqFHchOz9vopLYF+wiguHXwznzw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Apr 2015 14:34:20 +0200
+Subject: [RFC PATCH 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
+References: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
+Message-ID: <6662179.AoBfCMOsxD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 April 2015 at 13:30, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Rajendra,
->
-> On Wed, Apr 29, 2015 at 11:49 AM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
->>>> I guess I can also control the rest of the devices the same way, just
->>>> that the genpd on/off for them would do nothing.
->>>> That way I don't have to use pm_clk_add_notifier() and can also
->>>> associate the power domain (with no on/off control) to devices
->>>> through DT (and there isn;t any duplication of code in the drivers)
->>>
->>>
->>> That looks similar to what we have on R-Mobile: some devices are in
->>> controllable power areas, other are in an "always on" power area. All
->>> (most)
->>> devices have controllable clocks, which we also control through the PM
->>> domain. "git grep sysc-rmobile" will point you to the related code and
->>> DTS.
->>
->> Geert, thanks, I was wondering how you handle the !CONFIG_PM case for
->> rmobile. I mean who turns the clocks on for the devices when you build
->> with CONFIG_PM disabled?
->
-> We still use pm_clk_add_notifier() in drivers/sh/pm_runtime.c if
-> CONFIG_PM_GENERIC_DOMAINS_OF=n. Hence the second instance of
-> pm_clk_notify() will enable the clocks at driver binding time.
-> Hardware power domains are assumed enabled by reset state/the boot
-> loader.
+On Wednesday 29 April 2015 17:09:58 Jayachandran C wrote:
+> The current code in pci-host-generic.c uses pci_common_init_dev()
+> from the arch/arm/ to do a part of the PCI initialization, and this
+> prevents it from being used on arm64.
+> 
+> The initialization done by pci_common_init_dev() that is really
+> needed by pci-host-generic.c can be done in the same file without
+> using the hw_pci API of ARM.
+> 
+> The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
+> this is be handled by setting up 'struct gen_pci' to embed a
+> pci_sys_data variable as the first element on the ARM platform.
+> 
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 
-Yes, it a bit tricky - but I guess that's the current only viable
-solution if we have when using the pm_clk API.
+This seems very useful
 
->
-> Given the amount of PM infrastructure involved when hardware power and
-> clock domains are involved, I think at one point we'll have to start restricting
-> our builds to CONFIG_PM=y.
+>  
+> -static int gen_pci_setup(int nr, struct pci_sys_data *sys)
+> +static int gen_pci_init(struct device *dev, struct gen_pci *pci)
+>  {
+> -	struct gen_pci *pci = sys->private_data;
+> -	list_splice_init(&pci->resources, &sys->resources);
+> -	return 1;
+> +	struct pci_bus *bus;
+> +
+> +	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
 
-I don't think that would solve the problem, since you may still have
-cross SoC drivers which may be used without CONFIG_PM.
+Do we want to set that flag unconditionally? At least for servers,
+the resources should get assigned by firmware, and things might
+go wrong if Linux tries to reassign them. This is probably the
+case on kvmtool as well.
 
-So all SoC that uses a driver which expects clocks to be managed using
-PM clocks from a PM domain, will need the above "trick". Right?
+> +	bus = pci_scan_root_bus(dev, 0, &gen_pci_ops, pci, &pci->resources);
+> +	if (!bus) {
+> +		dev_err(dev, "Scanning rootbus failed");
+> +		return -ENODEV;
+> +	}
+> +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
 
-Kind regards
-Uffe
+I thought this was done by default now. If it is not, can
+we make the of_irq swizzling the default?
+
+> +	if (!pci_has_flag(PCI_PROBE_ONLY)) {
+> +		pci_bus_size_bridges(bus);
+> +		pci_bus_assign_resources(bus);
+> +	}
+> +	pci_bus_add_devices(bus);
+> +
+> +	/* Configure PCI Express settings */
+> +	if (pci_has_flag(PCI_PROBE_ONLY)) {
+> +		struct pci_bus *child;
+> +
+> +		list_for_each_entry(child, &bus->children, node)
+> +			pcie_bus_configure_settings(child);
+> +	}
+> +	return 0;
+>  }
+
+We should also try to come up wtih a way to make that
+pcie_bus_configure_settings() automatic if it's required here.
+
+>  static int gen_pci_probe(struct platform_device *pdev)
+> @@ -214,13 +237,6 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *np = dev->of_node;
+>  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> -	struct hw_pci hw = {
+> -		.nr_controllers	= 1,
+> -		.private_data	= (void **)&pci,
+> -		.setup		= gen_pci_setup,
+> -		.map_irq	= of_irq_parse_and_map_pci,
+> -		.ops		= &gen_pci_ops,
+> -	};
+>  
+>  	if (!pci)
+>  		return -ENOMEM;
+> @@ -258,8 +274,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  		return err;
+>  	}
+>  
+> -	pci_common_init_dev(dev, &hw);
+> -	return 0;
+> +	return gen_pci_init(dev, pci);
+
+How about moving the new code right into the probe() function?
+
+	Arnd
