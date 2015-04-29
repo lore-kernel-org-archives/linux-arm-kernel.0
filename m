@@ -1,155 +1,281 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Apr 2015 11:47:53 -0500
-Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
- X-Gene SoC EDAC DTS binding
-In-Reply-To: <1430259045-19012-4-git-send-email-lho@apm.com>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <1430259045-19012-2-git-send-email-lho@apm.com>
- <1430259045-19012-3-git-send-email-lho@apm.com>
- <1430259045-19012-4-git-send-email-lho@apm.com>
-Message-ID: <CAL_Jsq+nhPUxHxrStB9cdy1YzE7tVPFVR1MrWq3Bz-JUa=3Rvg@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 29 Apr 2015 10:49:44 -0600
+Subject: [PATCH 2/2] arm64: dts: qcom: Add msm8916 CoreSight components
+In-Reply-To: <1430310000-10867-3-git-send-email-ivan.ivanov@linaro.org>
+References: <1430310000-10867-1-git-send-email-ivan.ivanov@linaro.org>
+ <1430310000-10867-3-git-send-email-ivan.ivanov@linaro.org>
+Message-ID: <CANLsYkxE9xieUW+OMgb4LbnJHRdCtTM=uzcwPzC6bs4x4pP3MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 28, 2015 at 5:10 PM, Loc Ho <lho@apm.com> wrote:
-> This patch adds documentation for the APM X-Gene SoC EDAC DTS binding.
+On 29 April 2015 at 06:20, Ivan T. Ivanov <ivan.ivanov@linaro.org> wrote:
+> Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
 >
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
 > ---
->  .../devicetree/bindings/edac/apm-xgene-edac.txt    |  107 ++++++++++++++++++++
->  1 files changed, 107 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+>  arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi | 244 ++++++++++++++++++++++++
+>  1 file changed, 244 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
 >
-> diff --git a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
 > new file mode 100644
-> index 0000000..548299a
+> index 0000000..08d8582
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
-> @@ -0,0 +1,107 @@
-> +* APM X-Gene SoC EDAC nodes
+> +++ b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
+> @@ -0,0 +1,244 @@
+> +/*
+> + * Copyright (c) 2013 - 2015, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
 > +
-> +EDAC nodes are defined to describe on-chip error detection and correction.
-> +There are four types of EDAC:
+> +&soc {
 > +
-> +  memory controller    - Memory controller
-> +  PMD (L1/L2)          - Processor module unit (PMD) L1/L2 cache
-> +  L3                   - CPU L3 cache
-> +  SoC                  - SoC IP such as SATA, Ethernet, and etc
+> +       tpiu at 820000 {
+> +               compatible = "arm,coresight-tpiu", "arm,primecell";
+> +               reg = <0x820000 0x1000>;
 > +
-> +The following section describes the memory controller DT node binding.
+> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +               clock-names = "apb_pclk", "atclk";
 > +
-> +Required properties:
-> +- compatible           : Shall be "apm,xgene-edac-mc".
-
-You are still describing what you want for EDAC driver not what the
-h/w looks like AFAICT.
-
-> +- regmap-pcp           : Regmap of the PCP resource.
-> +- regmap-csw           : Regmap of the CSW resource.
-> +- regmap-mcba          : Regmap of the MCB-A resource.
-> +- regmap-mcbb          : Regmap of the MCB-B resource.
-
-What are these blocks? Regardless, I doubt the linkage here belongs in DT.
-
-> +- reg                  : First resource shall be the MCU resource.
-> +- interrupts            : Interrupt-specifier for MCU error IRQ(s).
-
-What is MCU?
-
-> +
-> +The following section describes the L1/L2 DT node binding.
-
-Similar comments for the rest. I would define memory controller
-bindings and EDAC driver, then worry about the rest.
-
-Rob
-
-> +
-> +- compatible           : Shall be "apm,xgene-edac-pmd".
-> +- regmap-pcp           : Regmap of the PCP resource.
-> +- regmap-efuse         : Regmap of the PMD efuse resource.
-> +- reg                  : First resource shall be the PMD resource.
-> +- interrupts            : Interrupt-specifier for PMD error IRQ(s).
-> +
-> +The following section describes the L3 DT node binding.
-> +
-> +- compatible           : Shall be "apm,xgene-edac-l3".
-> +- regmap-pcp           : Regmap of the PCP resource.
-> +- reg                  : First resource shall be the L3 resource.
-> +- interrupts            : Interrupt-specifier for L3 error IRQ(s).
-> +
-> +The following section describes the SoC DT node binding.
-> +
-> +- compatible           : Shall be "apm,xgene-edac-soc"".
-> +- regmap-pcp           : Regmap of the PCP resource.
-> +- reg                  : First resource shall be the SoC resource.
-> +                         Second resource shall be the register bus resource.
-> +- interrupts           : Interrupt-specifier for SoC error IRQ(s).
-> +
-> +Example:
-> +       efuse: efuse at 1054a000 {
-> +               compatible = "syscon";
-> +               reg = <0x0 0x1054a000 0x0 0x20>;
+> +               port {
+> +                       tpiu_in: endpoint {
+> +                               slave-mode;
+> +                               remote-endpoint = <&replicator_out1>;
+> +                       };
+> +               };
 > +       };
 > +
-> +       pcperror: pcperror at 78800000 {
-> +               compatible = "syscon";
-> +               reg = <0x0 0x78800000 0x0 0x100>;
+> +       funnel at 821000 {
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0x821000 0x1000>;
+> +
+> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +               clock-names = "apb_pclk", "atclk";
+> +
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       port at 4 {
+> +                               reg = <4>;
+> +                               funnel0_in4: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&funnel1_out>;
+> +                               };
+> +                       };
+> +                       port at 8 {
+> +                               reg = <0>;
+> +                               funnel0_out: endpoint {
+> +                                       remote-endpoint = <&etf_in>;
+> +                               };
+> +                       };
+
+Please add a comment indicating what the other ports are connected to.
+
+> +               };
 > +       };
 > +
-> +       csw: csw at 7e200000 {
-> +               compatible = "syscon";
-> +               reg = <0x0 0x7e200000 0x0 0x1000>;
+> +       replicator at 824000 {
+> +               compatible = "qcom,coresight-replicator", "arm,primecell";
+> +               reg = <0x824000 0x1000>;
+> +
+> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +               clock-names = "apb_pclk", "atclk";
+> +
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               replicator_out0: endpoint {
+> +                                       remote-endpoint = <&etr_in>;
+> +                               };
+> +                       };
+> +                       port at 1 {
+> +                               reg = <1>;
+> +                               replicator_out1: endpoint {
+> +                                       remote-endpoint = <&tpiu_in>;
+> +                               };
+> +                       };
+> +                       port at 2 {
+> +                               reg = <0>;
+> +                               replicator_in: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etf_out>;
+> +                               };
+> +                       };
+
+Same comment as with the funnel component.
+
+> +               };
 > +       };
 > +
-> +       mcba: mcba at 7e700000 {
-> +               compatible = "syscon";
-> +               reg = <0x0 0x7e700000 0x0 0x1000>;
+> +       etf at 825000 {
+> +               compatible = "arm,coresight-tmc", "arm,primecell";
+> +               reg = <0x825000 0x1000>;
+> +
+> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +               clock-names = "apb_pclk", "atclk";
+> +
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               etf_out: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&funnel0_out>;
+> +                               };
+> +                       };
+> +                       port at 1 {
+> +                               reg = <0>;
+> +                               etf_in: endpoint {
+> +                                       remote-endpoint = <&replicator_in>;
+> +                               };
+> +                       };
+> +               };
 > +       };
 > +
-> +       mcbb: mcbb at 7e720000 {
-> +               compatible = "syscon";
-> +               reg = <0x0 0x7e720000 0x0 0x1000>;
+> +       etr at 826000 {
+> +               compatible = "arm,coresight-tmc", "arm,primecell";
+> +               reg = <0x826000 0x1000>;
+> +
+> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +               clock-names = "apb_pclk", "atclk";
+> +
+> +               port {
+> +                       etr_in: endpoint {
+> +                               slave-mode;
+> +                               remote-endpoint = <&replicator_out0>;
+> +                       };
+> +               };
 > +       };
 > +
-> +       edacmc0: edacmc0 at 7e800000 {
-> +               compatible = "apm,xgene-edac-mc";
-> +               regmap-pcp = <&pcperror>;
-> +               regmap-csw = <&csw>;
-> +               regmap-mcba = <&mcba>;
-> +               regmap-mcbb = <&mcbb>;
-> +               reg = <0x0 0x7e800000 0x0 0x1000>;
-> +               interrupts = <0x0 0x20 0x4>,
-> +                            <0x0 0x21 0x4>;
+> +       funnel at 841000 { /* APSS */
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0x841000 0x1000>;
+> +
+> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +               clock-names = "apb_pclk", "atclk";
+> +
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               funnel1_in0: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etm0_out>;
+> +                               };
+> +                       };
+> +                       port at 1 {
+> +                               reg = <1>;
+> +                               funnel1_in1: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etm1_out>;
+> +                               };
+> +                       };
+> +                       port at 2 {
+> +                               reg = <2>;
+> +                               funnel1_in2: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etm2_out>;
+> +                               };
+> +                       };
+> +                       port at 3 {
+> +                               reg = <3>;
+> +                               funnel1_in3: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etm3_out>;
+> +                               };
+> +                       };
+> +                       port at 4 {
+> +                               reg = <0>;
+> +                               funnel1_out: endpoint {
+> +                                       remote-endpoint = <&funnel0_in4>;
+> +                               };
+> +                       };
+
+Same comment as with the funnel component.
+
+> +               };
 > +       };
 > +
-> +       edacpmd0: edacpmd0 at 7c000000 {
-> +               compatible = "apm,xgene-edac-pmd";
-> +               regmap-pcp = <&pcperror>;
-> +               regmap-efuse = <&efuse>;
-> +               reg = <0x0 0x7c000000 0x0 0x200000>;
-> +               interrupts = <0x0 0x20 0x4>,
-> +                            <0x0 0x21 0x4>;
+> +       etm at 85c000 {
+> +               compatible = "arm,coresight-etm4x", "arm,primecell";
+> +               reg = <0x85c000 0x1000>;
+> +
+> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +               clock-names = "apb_pclk", "atclk";
+> +
+> +               cpu = <&CPU0>;
+> +
+> +               port {
+> +                       etm0_out: endpoint {
+> +                               remote-endpoint = <&funnel1_in0>;
+> +                       };
+> +               };
 > +       };
 > +
-> +       edacl3: edacl3 at 7e600000 {
-> +               compatible = "apm,xgene-edac-l3";
-> +               regmap-pcp = <&pcperror>;
-> +               reg = <0x0 0x7e600000 0x0 0x1000>;
-> +               interrupts = <0x0 0x20 0x4>,
-> +                            <0x0 0x21 0x4>;
+> +       etm at 85d000 {
+> +               compatible = "arm,coresight-etm4x", "arm,primecell";
+> +               reg = <0x85d000 0x1000>;
+> +
+> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +               clock-names = "apb_pclk", "atclk";
+> +
+> +               cpu = <&CPU1>;
+> +
+> +               port {
+> +                       etm1_out: endpoint {
+> +                               remote-endpoint = <&funnel1_in1>;
+> +                       };
+> +               };
 > +       };
 > +
-> +       edacsoc: edacsoc at 7e930000 {
-> +               compatible = "apm,xgene-edac-soc";
-> +               regmap-pcp = <&pcperror>;
-> +               reg = <0x0 0x7e930000 0x0 0x1000>,
-> +                     <0x0 0x7e000000 0x0 0x1000>;
-> +               interrupts = <0x0 0x20 0x4>,
-> +                            <0x0 0x21 0x4>,
-> +                            <0x0 0x27 0x4>;
+> +       etm at 85e000 {
+> +               compatible = "arm,coresight-etm4x", "arm,primecell";
+> +               reg = <0x85e000 0x1000>;
+> +
+> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +               clock-names = "apb_pclk", "atclk";
+> +
+> +               cpu = <&CPU2>;
+> +
+> +               port {
+> +                       etm2_out: endpoint {
+> +                               remote-endpoint = <&funnel1_in2>;
+> +                       };
+> +               };
 > +       };
+> +
+> +       etm at 85f000 {
+> +               compatible = "arm,coresight-etm4x", "arm,primecell";
+> +               reg = <0x85f000 0x1000>;
+> +
+> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +               clock-names = "apb_pclk", "atclk";
+> +
+> +               cpu = <&CPU3>;
+> +
+> +               port {
+> +                       etm3_out: endpoint {
+> +                               remote-endpoint = <&funnel1_in3>;
+> +                       };
+> +               };
+> +       };
+> +};
 > --
-> 1.7.1
+> 1.9.1
 >
