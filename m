@@ -1,67 +1,37 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 29 Apr 2015 09:44:47 -0500
-Subject: [PATCH 1/2] arm/arm64: ACPI: Introduce CONFIG_ACPI_MUST_HAVE_CCA
-In-Reply-To: <20150429144232.GC18867@e104818-lin.cambridge.arm.com>
-References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1430315049-4663-2-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20150429140445.GA18867@e104818-lin.cambridge.arm.com>
- <5540EB27.8060507@amd.com>
- <20150429144232.GC18867@e104818-lin.cambridge.arm.com>
-Message-ID: <5540EE5F.1060305@amd.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Apr 2015 16:45:30 +0200
+Subject: [PATCH v2 RESEND 2/2] mmc: host: Add some quirks to be read from
+ fdt in sdhci-pltm.c
+In-Reply-To: <CAOHikRD6enDS2VyYH4Nz_+wz_m2v-61QyBDLixZxm-Y0qYtojA@mail.gmail.com>
+References: <1429630959-32649-1-git-send-email-stripathi@apm.com>
+ <17258495.kJWOqBBcrn@wuerfel>
+ <CAOHikRD6enDS2VyYH4Nz_+wz_m2v-61QyBDLixZxm-Y0qYtojA@mail.gmail.com>
+Message-ID: <2511590.IBzkZm5Ibi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 29 April 2015 19:55:53 Suman Tripathi wrote:
+> >
+> > The above assumes that the limitation is enforced by the bus (e.g. an
+> > AHB bus can only do 32-bit DMA). It would be a little different if you
+> > have a 64-bit AXI bus and the Arasan device itself is limited to 32-bit
+> > independent of the width of the bus it is connected to. Can you find out
+> > which of these two cases you have?
+> >
+> 
+> We have 64 bit AXI and Arasan device or controller is 32 bit . So there is
+> 64 bit AXI to 32 bit AHB translation.
 
+Please be very specific here. If this is an AHB based MMC controller, you
+should model that AHB bus in DT, with the 32-bit dma-ranges.
 
-On 04/29/2015 09:42 AM, Catalin Marinas wrote:
-> On Wed, Apr 29, 2015 at 09:31:03AM -0500, Suravee Suthikulpanit wrote:
->>
->>
->> On 04/29/2015 09:04 AM, Catalin Marinas wrote:
->>> On Wed, Apr 29, 2015 at 08:44:08AM -0500, Suravee Suthikulpanit wrote:
->>>>  From ACPIv6 (http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf),
->>>> section 6.2.17 _CCA states that ARM platforms require ACPI _CCA object to be
->>>> specified for DMA-cabpable devices. This patch introduces ACPI_MUST_HAVE_CCA
->>>> in arm and arm64 Kconfig to specify such requirement.
->>>>
->>>> Note that when _CCA is required, if it is missing in the DSDT. ACPI driver
->>>> will default to setting up devices as non-coherent.
->>>>
->>>> Signed-off-by: Mark Salter <msalter@redhat.com>
->>>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>>> ---
->>>>   arch/arm/Kconfig     | 1 +
->>>>   arch/arm64/Kconfig   | 1 +
->>>>   drivers/acpi/Kconfig | 3 +++
->>>>   3 files changed, 5 insertions(+)
->>>>
->>>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>>> index 45df48b..2a0d036 100644
->>>> --- a/arch/arm/Kconfig
->>>> +++ b/arch/arm/Kconfig
->>>> @@ -1,6 +1,7 @@
->>>>   config ARM
->>>>   	bool
->>>>   	default y
->>>> +	select ACPI_MUST_HAVE_CCA if ACPI
->>>>   	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->>>>   	select ARCH_HAS_ELF_RANDOMIZE
->>>>   	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
->>>
->>> Any plans for ACPI on 32-bit ARM?
->>
->> Not that I am aware, but I could be totally wrong. The reason I am adding
->> this here for 32-bit ARM is because the ACPI spec mentioned this.
->>
->> If you think this is not necessary until we introduce ACPI for ARM32, it can
->> be removed.
->
-> I think it should be removed (as long as ACPI cannot be selected on
-> arm32).
->
+However, if this is an AXI based MMC controller that is limited to 32-bit
+DMA, the correct change would be to make ensure that the driver never
+asks for a 64-bit DMA mask with this hardware.
 
-Ok, I'll remove that in V2.
+Both will result in a 32-bit dma mask being used, and high DMA handled
+through the block bounce code or swiotlb, but it's best to ensure that
+the DT representation matches the actual hardware as closely as possible,
+so it keeps working when you change something in a future chip.
 
-Thanks,
-
-Suravee
+	Arnd
