@@ -1,51 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Apr 2015 17:05:12 +0200
-Subject: [PATCH] ARM: proc-feroceon: Fix feroceon_proc_info macro
-In-Reply-To: <1430319415-6421-1-git-send-email-andrew@lunn.ch>
-References: <20150429140516.GA32151@lunn.ch>
- <1430319415-6421-1-git-send-email-andrew@lunn.ch>
-Message-ID: <CAKv+Gu_KNRAeEPKihVyDaduRoDGUFScyo3xcj-6_bnKLEXtqOw@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 29 Apr 2015 18:08:24 +0300
+Subject: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
+ independent of SoCs.
+In-Reply-To: <BL2PR03MB3703DA9D4D52EC9524D627C83D70@BL2PR03MB370.namprd03.prod.outlook.com>
+References: <1430316881-4668-1-git-send-email-shenwei.wang@freescale.com>
+ <20150429142614.GE2258@tarshish>
+ <BL2PR03MB3703DA9D4D52EC9524D627C83D70@BL2PR03MB370.namprd03.prod.outlook.com>
+Message-ID: <20150429150824.GF2258@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 April 2015 at 16:56, Andrew Lunn <andrew@lunn.ch> wrote:
-> bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with
-> relative offset") broke booting for Kirkwood. The kernel would say:
->
-> Starting kernel ...
->
-> Uncompressing Linux... done, booting the kernel.
->
-> Error: unrecognized/unsupported processor variant (0x56251311).
->
-> Fix it by removing the extraneous .long __feroceon_setup from the
-> feroceon_proc_info macro.
->
-> Reported-by: Florian Fainelli <f.fainelli@gmail.com>
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Fixes: bf35706f3d09 ("ARM: 8314/1: replace PROCINFO embedded branch with relative offset")
+Hi Shenwei Wang,
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-
-> ---
->  arch/arm/mm/proc-feroceon.S | 1 -
->  1 file changed, 1 deletion(-)
+On Wed, Apr 29, 2015 at 02:55:52PM +0000, Shenwei Wang wrote:
+> > -----Original Message-----
+> > From: Baruch Siach [mailto:baruch at tkos.co.il]
+> > Sent: 2015?4?29? 9:26
+> > To: Wang Shenwei-B38339
+> > Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org;
+> > devicetree at vger.kernel.org
+> > Subject: Re: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
+> > independent of SoCs.
+> > 
+> > On Wed, Apr 29, 2015 at 09:14:41AM -0500, Shenwei Wang wrote:
+> > > There are 4 versions of the timer hardware on Freescale MXC hardware.
+> > > --Version 0: MX1/MXL
+> > > --Version 1: MX21, MX27.
+> > > --Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q
+> > > --Version 3: MX6DL, MX6SX
+> > >
+> > > This patch has removed the SoC related codes, and implemented the
+> > > driver directly upon the hardware timer IP version.
+> > >
+> > > The new driver can be installed via device tree or the direct function
+> > > call to mxc_timer_init in order to support imx legacy systems like
+> > > MX21 and MX27.
+> > >
+> > > For the device tree implementation, the driver is compatible with the
+> > > current bindings like "fsl,imx6q-gpt", but for future dts file, the
+> > > string like "fsl,imx-gpt-v2" without SoC information is recommended.
+> > 
+> > That is not the usual convention for IP block versions.
+> > 
+> > Please Cc the devicetree list (added).
 >
-> diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-> index e494d6d6acbe..92e08bf37aad 100644
-> --- a/arch/arm/mm/proc-feroceon.S
-> +++ b/arch/arm/mm/proc-feroceon.S
-> @@ -602,7 +602,6 @@ __\name\()_proc_info:
->                 PMD_SECT_AP_WRITE | \
->                 PMD_SECT_AP_READ
->         initfn  __feroceon_setup, __\name\()_proc_info
-> -       .long __feroceon_setup
->         .long   cpu_arch_name
->         .long   cpu_elf_name
->         .long   HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-> --
-> 2.1.4
->
+> Thank you for the comments. What is the current naming rules for IP block 
+> version? It would be appreciated if you could provide an example.
+
+When several SoC share the same IP block the usual convention is to name it in 
+the compatible property string after the first SoC it appeared on. Just look 
+at some binding documentation from Documentation/devicetree/bindings/timer/ to 
+find examples. The allwinner,sun5i-a13-hstimer property is shared by A10s and 
+A13 SoCs. The amlogic,meson6-timer is shared by Meson6 and Meson8 SoCs, and so 
+on.
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
