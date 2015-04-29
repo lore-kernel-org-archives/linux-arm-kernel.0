@@ -1,42 +1,37 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 29 Apr 2015 14:39:27 -0700
-Subject: [PATCH v7 1/5] arm64: Enable EDAC on ARM64
-In-Reply-To: <20150429144031.GB18867@e104818-lin.cambridge.arm.com>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <1430259045-19012-2-git-send-email-lho@apm.com>
- <20150429144031.GB18867@e104818-lin.cambridge.arm.com>
-Message-ID: <CAPw-ZTn0m1h=RW5E+CECYn6Ujp-O1E4ckynCyGSGG238rqYiAQ@mail.gmail.com>
+From: shenwei.wang@freescale.com (Shenwei Wang)
+Date: Wed, 29 Apr 2015 16:40:27 -0500
+Subject: [PATCH 1/1] ARM: imx: Correct the comments in time.c
+Message-ID: <1430343627-60688-1-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The comments were corrected as the following to reflect
+the real situation of Freescale MXC timer IP block.
+There are totally 4 version of the timer on Freescale i.MX SoCs.
 
->> +/*
->> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
->> + * Implements the per arch atomic_scrub() that EDAC use for software
->> + * ECC scrubbing.  It reads memory and then writes back the original
->> + * value, allowing the hardware to detect and correct memory errors.
->> + */
->
-> The comment here is misleading since the function doesn't do anything.
+Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+---
+ arch/arm/mach-imx/time.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Okay.. I will leave only this line:
-
-ECC atomic, DMA, SMP and interrupt safe scrub function.
-
->> +static inline void atomic_scrub(void *va, u32 size)
->> +{
->> +     /* Stub function for now until an ARM64 HW has a way to test it. */
->> +}
->
-> Can we have a WARN_ONCE() here?
->
-> We had some discussions last year, restarted this year and the
-> conclusion was to leave this function as a no-op since it is not safe in
-> the presence of KVM or non-coherent DMA:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/326986.html
-
-I will leave WARN_ONCE.
-
--Loc
+diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
+index acb1ff5..b1698e1 100644
+--- a/arch/arm/mach-imx/time.c
++++ b/arch/arm/mach-imx/time.c
+@@ -38,9 +38,11 @@
+ #include "hardware.h"
+ 
+ /*
+- * There are 2 versions of the timer hardware on Freescale MXC hardware.
+- * Version 1: MX1/MXL, MX21, MX27.
+- * Version 2: MX25, MX31, MX35, MX37, MX51
++ * There are 4 versions of the timer hardware on Freescale MXC hardware.
++ * Version 0: MX1/MXL
++ * Version 1: MX21, MX27.
++ * Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q(rev1.0)
++ * Version 3: MX6DL, MX6SX, MX6Q(rev1.1+)
+  */
+ 
+ /* defines common for all i.MX */
+-- 
+1.9.1
