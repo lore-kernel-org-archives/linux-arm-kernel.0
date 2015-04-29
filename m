@@ -1,59 +1,115 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 29 Apr 2015 10:40:07 -0700
-Subject: [PATCH 1/1] Revert "ARM: dts: add display power domain for
- exynos5250"
-In-Reply-To: <1427107800-21668-1-git-send-email-javier.martinez@collabora.co.uk>
- (Javier Martinez Canillas's message of "Mon, 23 Mar 2015 11:49:59
- +0100")
-References: <1427107800-21668-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <7hr3r2suiw.fsf@deeprootsystems.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 29 Apr 2015 18:43:57 +0100
+Subject: [RFC PATCH 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <6662179.AoBfCMOsxD@wuerfel>
+References: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
+ <6662179.AoBfCMOsxD@wuerfel>
+Message-ID: <20150429174356.GA20947@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
+On Wed, Apr 29, 2015 at 01:34:20PM +0100, Arnd Bergmann wrote:
+> On Wednesday 29 April 2015 17:09:58 Jayachandran C wrote:
+> > The current code in pci-host-generic.c uses pci_common_init_dev()
+> > from the arch/arm/ to do a part of the PCI initialization, and this
+> > prevents it from being used on arm64.
+> > 
+> > The initialization done by pci_common_init_dev() that is really
+> > needed by pci-host-generic.c can be done in the same file without
+> > using the hw_pci API of ARM.
+> > 
+> > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
+> > this is be handled by setting up 'struct gen_pci' to embed a
+> > pci_sys_data variable as the first element on the ARM platform.
+> > 
+> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> 
+> This seems very useful
 
-> This reverts commit 2d2c9a8d0a4f90e298315d2f4a282d8bd5d45e5c
-> ("ARM: dts: add display power domain for exynos5250").
->
-> The mentioned commit added a domain definition for the DISP1
-> power domain and references to it in the appropriate devices
-> but this change breaks the display in at least the Exynos5250
-> based Snow and Spring Chromebooks.
->
-> On these machines, the boot-loader enables the DISP1 domain and
-> before the mentioned commit, the kernel didn't know about it so
-> the power domain remained always enabled.
->
-> But after that commit when the exynos-dp probe is deferred,
-> the DISP1 domain is powered off and on again but the exynos-dp
-> driver fails to configure the video showing the following error:
->
-> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
-> exynos-dp 145b0000.dp-controller: unable to config video
->
-> The same issue happens when the display is turned off and on
-> again using DPMS.
->
-> So, it seems the DISP1 power domain definition is not complete
-> since the display works with the initialization made by the boot
-> loader but it does not work when the power domain is enabled by
-> the kernel.
->
-> Having the definition in the DTS makes the power domain to be
-> powered on when needed and powered off when not needed which is
-> better in terms of power consumption but for now is safer to just
-> revert the commit to avoid adding a regression in some machines.
->
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Yes, it is getting less awful, waiting for pci_sys_data to disappear.
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+> > -static int gen_pci_setup(int nr, struct pci_sys_data *sys)
+> > +static int gen_pci_init(struct device *dev, struct gen_pci *pci)
+> >  {
+> > -	struct gen_pci *pci = sys->private_data;
+> > -	list_splice_init(&pci->resources, &sys->resources);
+> > -	return 1;
+> > +	struct pci_bus *bus;
+> > +
+> > +	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+> 
+> Do we want to set that flag unconditionally? At least for servers,
+> the resources should get assigned by firmware, and things might
+> go wrong if Linux tries to reassign them. This is probably the
+> case on kvmtool as well.
 
-FWIW, this patch fixes the boot panics when using MMC rootfs on
-exynos5800-peach-pi with current linux-next that have been happening
-for awhile.
+I will give it a go on kvmtool, but at first glance concern is
+shared.
 
-For several months now, DRM/display related stuff is very routinely
-breaking basic booting on exynos5, which gives the rather strong
-impression that the DRM stuff is not tested well enough to be merged.
+> > +	bus = pci_scan_root_bus(dev, 0, &gen_pci_ops, pci, &pci->resources);
+> > +	if (!bus) {
+> > +		dev_err(dev, "Scanning rootbus failed");
+> > +		return -ENODEV;
+> > +	}
+> > +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> 
+> I thought this was done by default now. If it is not, can
+> we make the of_irq swizzling the default?
 
-Kevin
+Possibly yes.
+
+> > +	if (!pci_has_flag(PCI_PROBE_ONLY)) {
+> > +		pci_bus_size_bridges(bus);
+> > +		pci_bus_assign_resources(bus);
+> > +	}
+> > +	pci_bus_add_devices(bus);
+> > +
+> > +	/* Configure PCI Express settings */
+> > +	if (pci_has_flag(PCI_PROBE_ONLY)) {
+> > +		struct pci_bus *child;
+> > +
+> > +		list_for_each_entry(child, &bus->children, node)
+> > +			pcie_bus_configure_settings(child);
+> > +	}
+> > +	return 0;
+> >  }
+> 
+> We should also try to come up wtih a way to make that
+> pcie_bus_configure_settings() automatic if it's required here.
+> 
+> >  static int gen_pci_probe(struct platform_device *pdev)
+> > @@ -214,13 +237,6 @@ static int gen_pci_probe(struct platform_device *pdev)
+> >  	struct device *dev = &pdev->dev;
+> >  	struct device_node *np = dev->of_node;
+> >  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> > -	struct hw_pci hw = {
+> > -		.nr_controllers	= 1,
+> > -		.private_data	= (void **)&pci,
+> > -		.setup		= gen_pci_setup,
+> > -		.map_irq	= of_irq_parse_and_map_pci,
+> > -		.ops		= &gen_pci_ops,
+> > -	};
+> >  
+> >  	if (!pci)
+> >  		return -ENOMEM;
+> > @@ -258,8 +274,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+> >  		return err;
+> >  	}
+> >  
+> > -	pci_common_init_dev(dev, &hw);
+> > -	return 0;
+> > +	return gen_pci_init(dev, pci);
+> 
+> How about moving the new code right into the probe() function?
+
++1.
+
+I suspect the PCI_PROBE_ONLY case was not tested on arm64, since we
+still need a patch to prevent resources enablement there (in the
+pcibios_enable_device call - actually the check for PCI_PROBE_ONLY
+should be moved to the default pcibios_enable_device function in
+drivers/pci/pci.c).
+
+The other bit missing is MSI handling, that should still be implemented.
+
+Lorenzo
