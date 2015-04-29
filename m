@@ -1,70 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 29 Apr 2015 15:08:09 +0200
-Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
- using PM clocks
-In-Reply-To: <CAPDyKFoja9OZf+X2eaBGwTXoqFHchOz9vopLYF+wiguHXwznzw@mail.gmail.com>
-References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
- <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
- <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
- <553A21C7.4060506@codeaurora.org>
- <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
- <7hh9s1xrut.fsf@deeprootsystems.com>
- <553EF5D4.60900@codeaurora.org>
- <CAMuHMdW8OKDODHTw=A=vCFR9PN3KUr_fiGSiNkn0Q7Q16axU6g@mail.gmail.com>
- <5540A923.8000104@codeaurora.org>
- <CAMuHMdWWv5qADWP4CMj5Kj62v_FK9JxMP6NXOpyN8GTk05raAQ@mail.gmail.com>
- <CAPDyKFoja9OZf+X2eaBGwTXoqFHchOz9vopLYF+wiguHXwznzw@mail.gmail.com>
-Message-ID: <CAMuHMdXXkgTDjdYanQNUJFXqUXLtGrLCOugs94MaCvg9O7wbXA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Apr 2015 15:13:47 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <5540D356.50708@topic.nl>
+References: <5538DD02.6050401@topic.nl> <3382997.5hgfVKmNXP@wuerfel>
+ <5540D356.50708@topic.nl>
+Message-ID: <9622793.RaVBbeJMCx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Wednesday 29 April 2015 14:49:26 Mike Looijmans wrote:
+> On 29-04-15 12:41, Arnd Bergmann wrote:
+> > On Wednesday 29 April 2015 12:33:00 Mike Looijmans wrote:
+> >> On 29-04-15 12:07, Arnd Bergmann wrote:
+> >>> On Wednesday 29 April 2015 11:47:37 Mike Looijmans wrote:
+> >>>> On 29-04-15 11:17, Russell King - ARM Linux wrote:
+> >>>>> The buffer should also be mapped into userspace with the same memory
+> >>>>> type and cache attributes as the kernel side mapping.  If using ACP,
+> >>>>> then you probably want "normal memory, cacheable, writeback, read
+> >>>>> allocate" or in the case of SMP, the same but "read/write allocate".
+> >>>
+> >>> If my suspicion is correct, we should either change arm_coherent_dma_ops()
+> >>> to refer to a different mmap() callback that does the right thing for
+> >>> coherent devices, or change arm_dma_mmap() to look at dev->is_coherent.
+> >>
+> >> Following the route, arch/arm/mm/dma-mapping.c uses pgprot_dmacoherent() which
+> >> is defined in arch/arm/include/asm/pgtable.h and that just returns uncached
+> >> memory.
+> >>
+> >> If you can give me some hints as to what the correct flags would be, I can
+> >> patch my kernel and test it.
+> >
+> > Use the flags that Russell listed above.
+> 
+> I would if I had a clue how to do that. For one thing, I don't understand all 
+> the L_PTE_... flag juggling that happens here.
+> 
+> I also tried just using kmalloc() to allocate the buffer, and then 
+> dma_map_single that. This is what the DMA documentation told me to do for 
+> non-coherent mappings. This works fine for the streaming-dma mode using the 
+> HP, but using dma-coherent this not only fails to work, it tends to completely 
+> lock the system.
+> 
+> Avoiding the streaming mapping and using only the coherent modes prevents the 
+> system locking up, it then doesn't do more harm than just corrupting data in 
+> the buffers.
 
-On Wed, Apr 29, 2015 at 2:31 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> Geert, thanks, I was wondering how you handle the !CONFIG_PM case for
->>> rmobile. I mean who turns the clocks on for the devices when you build
->>> with CONFIG_PM disabled?
->>
->> We still use pm_clk_add_notifier() in drivers/sh/pm_runtime.c if
->> CONFIG_PM_GENERIC_DOMAINS_OF=n. Hence the second instance of
->> pm_clk_notify() will enable the clocks at driver binding time.
->> Hardware power domains are assumed enabled by reset state/the boot
->> loader.
->
-> Yes, it a bit tricky - but I guess that's the current only viable
-> solution if we have when using the pm_clk API.
->
->> Given the amount of PM infrastructure involved when hardware power and
->> clock domains are involved, I think at one point we'll have to start restricting
->> our builds to CONFIG_PM=y.
->
-> I don't think that would solve the problem, since you may still have
-> cross SoC drivers which may be used without CONFIG_PM.
+If I understand it right, you basically just skip the 'vma->vm_page_prot =
+__get_dma_pgprot(attrs, vma->vm_page_prot);' step and get the right mapping
+here, i.e. the pgprot value we use for all normal memory.
 
-That's not as much of a problem as it sounds:
-  - If the driver cares (needs to know) about the clock, it should already
-    manage it itself.
-  - If it doesn't care about the clock, it just needs Runtime PM support.
-    That will do the right thing on platforms with (needs PM=y) and without
-    (doesn't care about PM=x) clock domains.
-So the bigger "problem" is making sure all drivers have at least minimal
-Runtime PM support, else they can't be reused as-is on systems with PM
-domains.
-
-> So all SoC that uses a driver which expects clocks to be managed using
-> PM clocks from a PM domain, will need the above "trick". Right?
-
-One remaining issue with pm_clk_add_notifier() is that it applies to all
-platform devices in the system, not just the on-SoC devices. Hence it may
-inadvertently manage clocks for off-SoC devices it's not supposed to touch.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
