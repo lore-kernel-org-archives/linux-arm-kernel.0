@@ -1,40 +1,44 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 29 Apr 2015 17:26:14 +0300
-Subject: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
- independent of SoCs.
-In-Reply-To: <1430316881-4668-1-git-send-email-shenwei.wang@freescale.com>
-References: <1430316881-4668-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <20150429142614.GE2258@tarshish>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 29 Apr 2015 16:30:51 +0200
+Subject: [PATCH v2] ata: ahci_st: fixup layering violations / drvdata
+ errors
+In-Reply-To: <1429537265-22367-2-git-send-email-peter.griffin@linaro.org>
+References: <1429537265-22367-1-git-send-email-peter.griffin@linaro.org>
+ <1429537265-22367-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <5540EB1B.10505@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shenwei Wang,
+Hi Peter,
 
-On Wed, Apr 29, 2015 at 09:14:41AM -0500, Shenwei Wang wrote:
-> There are 4 versions of the timer hardware on Freescale MXC hardware.
-> --Version 0: MX1/MXL
-> --Version 1: MX21, MX27.
-> --Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q
-> --Version 3: MX6DL, MX6SX
-> 
-> This patch has removed the SoC related codes, and implemented the driver
-> directly upon the hardware timer IP version.
-> 
-> The new driver can be installed via device tree or the direct function
-> call to mxc_timer_init in order to support imx legacy systems like MX21
-> and MX27.
-> 
-> For the device tree implementation, the driver is compatible with the current
-> bindings like "fsl,imx6q-gpt", but for future dts file, the string like
-> "fsl,imx-gpt-v2" without SoC information is recommended.
+On 04/20/2015 03:41 PM, Peter Griffin wrote:
+> Brian noticed while working on another SATA driver that uses libahci_platform,
+> an error in this driver; it tries to the the driver data for its
+> device, while libata also thinks it can set the driver data. See:
+>
+>    ahci_platform_init_host()
+>    -> ata_host_alloc_pinfo()
+>       -> ata_host_alloc()
+>          -> dev_set_drvdata()
+>
+> So instead of sticking the IP-specific platform data into drvdata, let's
+> use the plat_data variable that is reserved for this use.
+>
+> Addtionally plat_data isn't set until ahci_platform_init_host() has been
+> called further down in probe(). So re-work the st_ahci_probe_resets and
+> st_ahci_deassert_resets functions to take ahci_host_priv *hpriv as a
+> parameter.
+>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Suggested-by: Brian Norris <computersforpeace@gmail.com>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+> Cc: Maxime Coquelin <maxime.coquelin@st.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> ---
+>
 
-That is not the usual convention for IP block versions.
+You can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-Please Cc the devicetree list (added).
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Thanks!
+Maxime
