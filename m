@@ -1,97 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Apr 2015 14:34:20 +0200
-Subject: [RFC PATCH 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
-References: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <6662179.AoBfCMOsxD@wuerfel>
+Date: Wed, 29 Apr 2015 14:35:52 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <5540BBD1.6020202@topic.nl>
+References: <5538DD02.6050401@topic.nl> <2919263.vEuyzce5K7@wuerfel>
+ <5540BBD1.6020202@topic.nl>
+Message-ID: <45324330.YETo6pO2cB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 April 2015 17:09:58 Jayachandran C wrote:
-> The current code in pci-host-generic.c uses pci_common_init_dev()
-> from the arch/arm/ to do a part of the PCI initialization, and this
-> prevents it from being used on arm64.
+On Wednesday 29 April 2015 13:09:05 Mike Looijmans wrote:
+> On 29-04-15 12:07, Arnd Bergmann wrote:
+> > On Wednesday 29 April 2015 11:47:37 Mike Looijmans wrote:
+> >> I currently use dma_alloc_coherent() to allocate buffers and
+> >> dma_mmap_coherent() to map them to user space. I was under the assumption that
+> >> these would do the right thing. Is that correct? If not, then what should I use?
+> >
+> > dma_mmap_coherent() is the right interface, but I've just looked at the
+> > implementation of arm_dma_mmap() and I'm not sure that it actually uses the
+> > correct vma->vm_page_prot value here, because I don't see where it takes
+> > into account whether the device is coherent or not. Most ARM machines have
+> > only noncoherent devices, and dma_mmap_coherent() is used rarely by drivers,
+> > so it's quite possible that this interface got broken without anybody
+> > noticing.
 > 
-> The initialization done by pci_common_init_dev() that is really
-> needed by pci-host-generic.c can be done in the same file without
-> using the hw_pci API of ARM.
-> 
-> The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
-> this is be handled by setting up 'struct gen_pci' to embed a
-> pci_sys_data variable as the first element on the ARM platform.
-> 
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> My driver also supports 'classic' read/write by copying data to/from userspace 
+> using a DMA ringbuffer, which is also allocated using dma_alloc_coherent. That 
+> would suggest that the kernel mapping for this memory is also incorrect, I 
+> also get corrupted data in these transfers. These buffers are not being mapped 
+> to userspace at all. These tests all use page aligned transfer sizes.
 
-This seems very useful
-
->  
-> -static int gen_pci_setup(int nr, struct pci_sys_data *sys)
-> +static int gen_pci_init(struct device *dev, struct gen_pci *pci)
->  {
-> -	struct gen_pci *pci = sys->private_data;
-> -	list_splice_init(&pci->resources, &sys->resources);
-> -	return 1;
-> +	struct pci_bus *bus;
-> +
-> +	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
-
-Do we want to set that flag unconditionally? At least for servers,
-the resources should get assigned by firmware, and things might
-go wrong if Linux tries to reassign them. This is probably the
-case on kvmtool as well.
-
-> +	bus = pci_scan_root_bus(dev, 0, &gen_pci_ops, pci, &pci->resources);
-> +	if (!bus) {
-> +		dev_err(dev, "Scanning rootbus failed");
-> +		return -ENODEV;
-> +	}
-> +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-
-I thought this was done by default now. If it is not, can
-we make the of_irq swizzling the default?
-
-> +	if (!pci_has_flag(PCI_PROBE_ONLY)) {
-> +		pci_bus_size_bridges(bus);
-> +		pci_bus_assign_resources(bus);
-> +	}
-> +	pci_bus_add_devices(bus);
-> +
-> +	/* Configure PCI Express settings */
-> +	if (pci_has_flag(PCI_PROBE_ONLY)) {
-> +		struct pci_bus *child;
-> +
-> +		list_for_each_entry(child, &bus->children, node)
-> +			pcie_bus_configure_settings(child);
-> +	}
-> +	return 0;
->  }
-
-We should also try to come up wtih a way to make that
-pcie_bus_configure_settings() automatic if it's required here.
-
->  static int gen_pci_probe(struct platform_device *pdev)
-> @@ -214,13 +237,6 @@ static int gen_pci_probe(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	struct device_node *np = dev->of_node;
->  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> -	struct hw_pci hw = {
-> -		.nr_controllers	= 1,
-> -		.private_data	= (void **)&pci,
-> -		.setup		= gen_pci_setup,
-> -		.map_irq	= of_irq_parse_and_map_pci,
-> -		.ops		= &gen_pci_ops,
-> -	};
->  
->  	if (!pci)
->  		return -ENOMEM;
-> @@ -258,8 +274,7 @@ static int gen_pci_probe(struct platform_device *pdev)
->  		return err;
->  	}
->  
-> -	pci_common_init_dev(dev, &hw);
-> -	return 0;
-> +	return gen_pci_init(dev, pci);
-
-How about moving the new code right into the probe() function?
+Ok, if it's broken when you only use a kernel mapping and no user space
+mapping, arm_dma_mmap() is not your (only) problem, but we should probably
+still fix that if it's broken.
 
 	Arnd
