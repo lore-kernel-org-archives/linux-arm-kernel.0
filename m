@@ -1,62 +1,112 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 29 Apr 2015 18:08:24 +0300
-Subject: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
- independent of SoCs.
-In-Reply-To: <BL2PR03MB3703DA9D4D52EC9524D627C83D70@BL2PR03MB370.namprd03.prod.outlook.com>
-References: <1430316881-4668-1-git-send-email-shenwei.wang@freescale.com>
- <20150429142614.GE2258@tarshish>
- <BL2PR03MB3703DA9D4D52EC9524D627C83D70@BL2PR03MB370.namprd03.prod.outlook.com>
-Message-ID: <20150429150824.GF2258@tarshish>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 29 Apr 2015 16:08:51 +0100
+Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
+ add SW break point support
+In-Reply-To: <20150429103814.GC4137@cbox>
+References: <20150414082558.GS6186@cbox> <87y4li6hua.fsf@linaro.org>
+ <20150427200407.GG23335@cbox>
+ <CAFEAcA-Kh7Tn+kw9psL=gqme9ogAn+mM8Uco_HcJy=cqg72hbw@mail.gmail.com>
+ <87wq0wr6dd.fsf@linaro.org>
+ <CAFEAcA85i_1JybEFBg91NA3-LpAzYh4RSDnqryOd=rZN7gZP5A@mail.gmail.com>
+ <20150428125645.GA4137@cbox> <87tww0qqh9.fsf@linaro.org>
+ <20150429081047.GB4137@cbox> <87r3r31eed.fsf@linaro.org>
+ <20150429103814.GC4137@cbox>
+Message-ID: <87oam70y64.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shenwei Wang,
 
-On Wed, Apr 29, 2015 at 02:55:52PM +0000, Shenwei Wang wrote:
-> > -----Original Message-----
-> > From: Baruch Siach [mailto:baruch at tkos.co.il]
-> > Sent: 2015?4?29? 9:26
-> > To: Wang Shenwei-B38339
-> > Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org;
-> > devicetree at vger.kernel.org
-> > Subject: Re: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
-> > independent of SoCs.
-> > 
-> > On Wed, Apr 29, 2015 at 09:14:41AM -0500, Shenwei Wang wrote:
-> > > There are 4 versions of the timer hardware on Freescale MXC hardware.
-> > > --Version 0: MX1/MXL
-> > > --Version 1: MX21, MX27.
-> > > --Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q
-> > > --Version 3: MX6DL, MX6SX
-> > >
-> > > This patch has removed the SoC related codes, and implemented the
-> > > driver directly upon the hardware timer IP version.
-> > >
-> > > The new driver can be installed via device tree or the direct function
-> > > call to mxc_timer_init in order to support imx legacy systems like
-> > > MX21 and MX27.
-> > >
-> > > For the device tree implementation, the driver is compatible with the
-> > > current bindings like "fsl,imx6q-gpt", but for future dts file, the
-> > > string like "fsl,imx-gpt-v2" without SoC information is recommended.
-> > 
-> > That is not the usual convention for IP block versions.
-> > 
-> > Please Cc the devicetree list (added).
+Christoffer Dall <christoffer.dall@linaro.org> writes:
+
+> On Wed, Apr 29, 2015 at 10:18:18AM +0100, Alex Benn?e wrote:
+>> 
+>> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>> 
+>> > On Tue, Apr 28, 2015 at 03:37:01PM +0100, Alex Benn?e wrote:
+>> >> 
+>> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>> >> 
+>> >> > On Tue, Apr 28, 2015 at 10:34:12AM +0100, Peter Maydell wrote:
+>> >> >> On 28 April 2015 at 09:42, Alex Benn?e <alex.bennee@linaro.org> wrote:
+>> >> >> > Peter Maydell <peter.maydell@linaro.org> writes:
+>> >> >> >> Does the kernel already have a conveniently implemented "inject
+>> >> >> >> exception into guest" lump of code? If so it might be less effort
+>> >> >> >> to do it that way round, maybe.
+>> >> >> >
+<snip>
+>> >> 
+>> >> Certainly there are some cases where the kernel doesn't have all the
+>> >> information. For example it doesn't know if the soft break was inserted
+>> >> by the guest or the host. That to me favours the "let userspace deal
+>> >> with the ugly" approach.
+>> >> 
+>> > Not sure I follow.
+>> >
+>> > If it's an exception for the guest, then that must be because the guest
+>> > put in the breakpoint instruction, right?
+>> 
+>> No the host can add breakpoint instructions as well. They both generate
+>> the same (redirected) exception to the hypervisor which then has to
+>> figure out who planted the breakpoint and where the eventual exception
+>> will be handled.
 >
-> Thank you for the comments. What is the current naming rules for IP block 
-> version? It would be appreciated if you could provide an example.
+> I understand this; let's just rewind here.
+>
+> If you've concluded that the exception is for the guest, then the guest
+> must have placed the breakpoint instruction there, correct?  Otherwise,
+> the exception is for the hypervisor and the discussion about how to
+> inject an exception for the guest is invalid.
 
-When several SoC share the same IP block the usual convention is to name it in 
-the compatible property string after the first SoC it appeared on. Just look 
-at some binding documentation from Documentation/devicetree/bindings/timer/ to 
-find examples. The allwinner,sun5i-a13-hstimer property is shared by A10s and 
-A13 SoCs. The amlogic,meson6-timer is shared by Meson6 and Meson8 SoCs, and so 
-on.
+But only userspace has enough information to make that conclusion (after
+searching the list of breakpoints it added to the code). So from
+userspace we can:
 
-baruch
+  - re-enter KVM telling it to re-route the exception it just delivered
+    to userspace somehow
+
+  or
+
+  - make the changes to deliver the exception in userspace and re-enter
+    KVM as normal.
+
+It seems to me if we have already exited into userspace it may as well
+clean up if it has all the information it needs?
+
+> Or are you talking about the corner case where the host uses a soft
+> breakpoint to get a breakpoint on an instruction which is also a
+> breakpoint in the guest?
+
+I think in this case host debugging just wins.
+
+>
+>> 
+>> > However, that's a separate discussion from that of *how* userspace or
+>> > the kernel then injects an exception to the guest.
+>> >
+>> > By using some QEMU TCG functionality or by QEMU calling back into KVM
+>> > and asking it to inject an exception for it.
+>> 
+>> I don't know if there is explicit TCG functionality to use but QEMU can
+>> set the registers and PC up for exception entry and re-enter KVM.
+>> 
+>
+> I also understand this.  I think Peter's point was exactly that if we
+> have existing code somewhere which we can reuse, then we should consider
+> reusing it.
+
+I'm not sure such code exists. The only injection code I know of in KVMs
+handle_exit code where a +ve return value signals KVM to deliver the
+exception to the guest. This is used by the hvc and svc handlers after
+calling kvm_inject_undefined() and the wfx handler which advances the PC
+first.
+
+> Again, I don't care particularly which way, I just want the expected
+> working behavior to be clearly defined.
+
+I think it makes sense to do it in userspace. I have the kernels
+inject_fault code for reference for what needs setting up but I'll see
+if I can find anything in QEMU that already handles this for some other
+thing (although I don't think it does at first glance).
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Alex Benn?e
