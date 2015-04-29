@@ -1,12 +1,12 @@
 From: rbthomas@pobox.com (Rick Thomas)
-Date: Tue, 28 Apr 2015 22:46:38 -0700
+Date: Tue, 28 Apr 2015 22:48:29 -0700
 Subject: Bug#782364: linux-image-3.16.0-4-armmp: please configure drivers
  for both Cubox i4pro real time clocks
 In-Reply-To: <CAOMZO5BrWbxarSEEC52Kb7=QR4K2e1qyAmMz3Rx+nq9r1vbdcw@mail.gmail.com>
 References: <20150410232854.23367.58862.reportbug@cube.rcthomas.org>
  <1428710930.29665.17.camel@decadent.org.uk>
  <CAOMZO5BrWbxarSEEC52Kb7=QR4K2e1qyAmMz3Rx+nq9r1vbdcw@mail.gmail.com>
-Message-ID: <B77ED00A-C66E-4ED8-B10D-6B5E8A8854F5@pobox.com>
+Message-ID: <74D54565-F9AE-4BE5-B48D-FFC8903CEF9D@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -36,6 +36,4 @@ On Apr 28, 2015, at 8:02 PM, Fabio Estevam <festevam@gmail.com> wrote:
 > 
 > Fabio Estevam
 
-Cool? Thanks!  Any idea when we?ll see it in the kernel from Sid/Unstable repo?s?
-
-Rick
+I don?t know if this makes any difference, but please remember that this box comes in several flavors.  Only the i4pro flavor has the battery-backed clock turned on in the hardware.
