@@ -1,102 +1,65 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 28 Apr 2015 23:50:41 -0400 (EDT)
-Subject: [RFC] arm: pick the r2 passed DTB over the appended one
-In-Reply-To: <1429880030-21473-1-git-send-email-valentin.longchamp@keymile.com>
-References: <1429880030-21473-1-git-send-email-valentin.longchamp@keymile.com>
-Message-ID: <alpine.LFD.2.11.1504282315320.1582@knanqh.ubzr>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 29 Apr 2015 00:33:42 -0400
+Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <55363791.4070706@hitachi.com>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <55363791.4070706@hitachi.com>
+Message-ID: <55405F26.4010607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Apr 2015, Valentin Longchamp wrote:
+On 04/21/15 07:42, Masami Hiramatsu wrote:
+> (2015/04/21 5:19), David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
+>> first seen in October 2013. This version attempts to address concerns raised by
+>> reviewers and also fixes problems discovered during testing.
+>>
+>> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
+>> and return probes(kretprobes) support for ARM64.
+>>
+>> The kprobes mechanism makes use of software breakpoint and single stepping
+>> support available in the ARM v8 kernel.
+>>
+> [...]
+>> Changes since v5 include:
+>>
+>> 1) Replaced installation of breakpoint hook with direct call from the
+>> handlers in debug-monitors.c, as requested.
+>> 2) Reject probing of instructions that read the interrupt mask, in
+>> addition to instructions that set it.
+>> 3) Cleaned up comments describing usage of Debug Mask.
+>> 4) Added KPROBE_REENTER case in reenter_kprobe.
+>> 5) Corrected the ifdef'd definitions for notify_page_fault() to be
+>> consistent when KPROBES is not configed.
+>> 6) Changed "cpsr" to "pstate" for HAVE_REGS_AND_STACK_ACCESS_API feature.
+>> 7) Added back in missing new files in previous patch.
+>> 8) Changed two instances of pr_warning() to pr_warn().
+> 
+> Looks OK to me:)
+> BTW, have you tried to build and test this with CONFIG_KPROBE_EVENT?
+> If so, you can also test it by tools/testing/selftests/ftrace/ftracetest.
+> 
 
-> Thanks to the APPENDED_DTB option, it is possible to append the dtb to
-> the kernel's binary image. This is very convenient to accomodate old
-> bootloaders that do not pass a dtb.
-> 
-> We have updated a product with a new version of the bootloader that now
-> passed the dtb properly in r2. However, we still want to support with
-> the same software (i.e. kernel) the old bootloader, where the dtb must
-> be appended, but give the priority to to the one passed in r2.
-> 
-> This patch tries cover the above use case. It works for the case a dtb
-> is passed in r2 and one is appended (the one pointed by r2 is picked).
-> However, when there is only an appended dtb and r2 points to an ATAG
-> list, this fails. Somehow, the presumably updated r2 does not point to a
-> valid dtb and it gets zeroed by __vet_atags.
+Yes, it builds with CONFIG_KPROBE_EVENT.  Thanks for the suggestion
+regarding ftracetest, I was not actually aware of that test.  I ran it
+with no failures, 11 "PASS", and 4 "UNSUPPORTED" tests.
 
-Do you have CONFIG_ARM_ATAG_DTB_COMPAT set?
+>> Note that there seems to be at least a potential issue with kprobes
+>> on multiple (possibly all) platforms having to do with use of kfree
+>> inside of the kretprobes trampoline handler.  This has manifested
+>> occasionally in systemtap testing on arm64.  There does not appear to
+>> be an simple solution to the problem.
+> 
+> No, trampoline handler must call recycle_rp_inst() instead of kfree
+> to return kretprobe instance to the pool. Hmm, I should look into it.
+> 
 
-I don't see how this could be related, but you should consider adding 
-commit c2607f74aa to your kernel if not already there.
+I think all architectures call both from the kretprobe trampoline.  In
+the arm64 case at least the kfree call apparently is very infrequent,
+and very problematic for now if anything it subsequently calls has a
+kretprobe set.
 
-> Below is an example of this (end of bootloader, start of kernel):
-> 
-> at 02000000 ...
->   Image Name:   Linux-3.10.60-7.2.2-00002-gc6acc
->   Image Type:   ARM Linux Kernel Image (uncompressed)
->   Data Size:    2904550 Bytes = 2.8 MiB
->   Load Address: 00008000
->   Entry Point:  00008000
->   Verifying Checksum ... OK
->   Loading Kernel Image ... OK
-> OK
-> r2 (0x00000100) points to (size, header): 0x00000005, 0x54410001
-> 
-> Starting kernel ...
-> 
-> Uncompressing Linux... done, booting the kernel.
-> e5943000
-
-Where is this value from? This looks like an ARM opcode ("ldr r3, [r4]").
-
-> trying to parse the FDT
-> 
-> dt_phys (r2) is NULL !
-> 
-> Error: unrecognized/unsupported machine ID (r1 = 0x000008cf).
-> 
-> Available machine support:
-> 
-> ID (hex)	NAME
-> ffffffff	Marvell Kirkwood (Flattened Device Tree)
-> 
-> Please check your kernel config and/or bootloader.
-> 
-> Is this patch a correct approach to implement the above use case ? If
-> yes, does anyone has an idea why this fails ?
-> 
-> Note: this patch is for the 3.10 stable branch.
-> 
-> Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
-> ---
->  arch/arm/boot/compressed/head.S | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 032a8d9..a43c8a0 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -244,7 +244,7 @@ restart:	adr	r0, LC0
->   * dtb data will get relocated along with the kernel if necessary.
->   */
->  
-> -		ldr	lr, [r6, #0]
-> +		ldr	lr, [r6, #0]		@ potential appended dtb ?
->  #ifndef __ARMEB__
->  		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
->  #else
-> @@ -253,6 +253,10 @@ restart:	adr	r0, LC0
->  		cmp	lr, r1
->  		bne	dtb_check_done		@ not found
->  
-> +		ldr	lr, [r8, #0] 		@ conventionaly passed dtb ?
-> +		cmp	lr, r1
-> +		beq	dtb_check_done		@ yes, do not manage it
-> +
->  #ifdef CONFIG_ARM_ATAG_DTB_COMPAT
->  		/*
->  		 * OK... Let's do some funky business here.
-> -- 
-> 1.8.0.1
-> 
-> 
+Thanks,
+-dl
