@@ -1,32 +1,23 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 29 Apr 2015 07:44:02 +0530
-Subject: [PATCH 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <55403AD1.4030103@wwwdotorg.org>
-References: <1430176449-12322-1-git-send-email-eric@anholt.net>
- <1430176449-12322-3-git-send-email-eric@anholt.net>
- <55403AD1.4030103@wwwdotorg.org>
-Message-ID: <CABb+yY1Lj9L_aJQRgDuabw0MRVo9Fn6sYt=U0M3SOAQUrjQT0w@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 28 Apr 2015 19:35:21 -0700
+Subject: [2/2] ARM: BCM2835: Move the restart/power_off handling to the
+ WDT driver.
+In-Reply-To: <1429902534-2348-2-git-send-email-eric@anholt.net>
+References: <1429902534-2348-2-git-send-email-eric@anholt.net>
+Message-ID: <20150429023521.GA29594@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 29, 2015 at 7:28 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/27/2015 05:14 PM, Eric Anholt wrote:
->
->> +     firmware->chan = mbox_request_channel(&firmware->cl, 0);
->> +     if (IS_ERR(firmware->chan)) {
->> +             ret = PTR_ERR(firmware->chan);
->> +             /* An -EBUSY from the core means it couldn't find our
->> +              * channel, because the mailbox driver hadn't
->> +              * registered yet.
->> +              */
->> +             if (ret == -EBUSY)
->> +                     ret = -EPROBE_DEFER;
->> +             else
->> +                     dev_err(dev, "Failed to get mbox channel: %d\n", ret);
->
-> I would have hoped that mbox_request_channel() returned -EPROBE_DEFER
-> itself. It really should...
->
-Yes, it should. Let me look into it.
+On Fri, Apr 24, 2015 at 12:08:54PM -0700, Eric Anholt wrote:
+> Since the WDT is what's used to drive restart and power off, it makes
+> more sense to keep it there, where the regs are already mapped and
+> definitions for them provided.  Note that this means you may need to
+> add CONFIG_BCM2835_WDT to retain functionality of your kernel.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Cc: linux-watchdog at vger.kernel.org
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> Tested-by: Stephen Warren <swarren@wwwdotorg.org>
+> Acked-by: Lubomir Rintel <lkundrak@v3.sk>
 
-Thanks.
+Acked-by: Guenter Roeck <linux@roeck-us.net>
