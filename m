@@ -1,72 +1,40 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 29 Apr 2015 17:41:41 -0600
-Subject: [PATCH 1/3 v5] dt/bindings: Add binding for the BCM2835 mailbox
- driver
-In-Reply-To: <87vbgeq478.fsf@eliezer.anholt.net>
-References: <1430173644-19099-2-git-send-email-eric@anholt.net>
- <1430253868-11138-1-git-send-email-eric@anholt.net>
- <55403446.1040207@wwwdotorg.org> <87vbgeq478.fsf@eliezer.anholt.net>
-Message-ID: <55416C35.1030001@wwwdotorg.org>
+Date: Wed, 29 Apr 2015 17:43:32 -0600
+Subject: [PATCH 3/3] ARM: bcm2835: Add the necessary firmware driver
+ information to the DT
+In-Reply-To: <87y4laq4nt.fsf@eliezer.anholt.net>
+References: <1430176449-12322-1-git-send-email-eric@anholt.net>
+ <1430176449-12322-4-git-send-email-eric@anholt.net>
+ <55403787.7010407@wwwdotorg.org> <87y4laq4nt.fsf@eliezer.anholt.net>
+Message-ID: <55416CA4.6040000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/15 10:39, Eric Anholt wrote:
+On 04/29/15 10:29, Eric Anholt wrote:
 > Stephen Warren <swarren@wwwdotorg.org> writes:
 >
->> On 04/28/2015 02:44 PM, Eric Anholt wrote:
->>> From: Lubomir Rintel <lkundrak@v3.sk>
->>>
->>> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
->>> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
->>> Signed-off-by: Eric Anholt <eric@anholt.net>
->>> Acked-by: Lee Jones <lee.jones@linaro.org>
->>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
->>> ---
->>>
->>> v2: Split into a separate patch for submitting to the devicetree list.
->>>      Consistently start node docs with a capital letter. device's
->>>      address in the example shouldn't have "0x". Drop machine-specific
->>>      interrupt numbers from the docs.  (changes by anholt).
->>>
->>> v3: Move the file to just bcm2835-mbox.txt, clean up formatting
->>>      (changes by anholt, from review by Lee Jones).
->>>
->>> v4: Move file back by consensus from various Broadcom platform
->>>      maintainers (changes by anholt, acked by Lee Jones).
->>>
->>> v5: Document that the mailbox cell should be 0 in clients, and add an
->>>      example of a client (changes by anholt, from review by Jassi).
+>> On 04/27/2015 05:14 PM, Eric Anholt wrote:
+>>> This gets the USB power domain turned on so that DWC2 can probe, even
+>>> if the bootloader didn't turn it on for us (which is the case if you
+>>> use the RPi firmware without chainloading U-Boot).
 >>
->> Some mention of what you changed in the patch might be nice, since it
->> was originally authored by someone else, and there's quite a changelog.
+>>> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+>>
+>>> +&usb {
+>>> +	power-domains = <&firmware POWER_DOMAIN_USB>;
+>>> +};
+>>
+>> That property doesn't seem to be documented in
+>> Documentation/devicetree/bindings/usb/dwc2.txt (which defines compatible
+>> = "brcm,bcm2835-usb"). Is it implemented?
 >
-> I've been taking this changelog stuff out of the patch and putting it
-> below '---' because when I was submitting this series before, I got
-> chided for putting it in the patch!
+> power-domains is a generic property that's parsed by
+> drivers/base/power/domain.c.  See also
+> Documentation/devicetree/bindings/power/power_domain.txt&
 
-A changelog and a description of the changes you've made aren't quite 
-the same thing.
-
-There should be some mention in the commit description of what you 
-changed relative to the patch that someone else authored, so they don't 
-get blaimed/praised for any of your changes. The format of that 
-description wouldn't usually be a detailed patch revision changelog 
-though, just a description of the overall changes that were left in the 
-final version.
-
->>> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
->>
->>> +- #mbox-cells:	Specifies the number of cells needed to encode a mailbox
->>> +		  channel. The value shall be 1.  Clients should supply a value
->>> +		  of 0 for the mailbox channel, because there is only one
->>> +		  exposed
->>
->> Can't you use #mbox-cells = <0> if there's no data to provide?
->
-> of_mbox_index_xlate looks like it's always dereferencing the first arg.
-
-Is it possible to fix that?
-
-That said, last I looked at the HW I thought there were actually 
-multiple channels possible, so perhaps having a cell for future 
-expansion is reasonable.
+Sure, but the binding for the node still needs to mention that it's 
+acceptable for that property to exist (a/k/a that the USB binding 
+inherits from or aggregates the power domains binding). Part of 
+mentioning that would be a description of what the entries in the 
+power-domains property mean (how many are legal, what each index 
+represents).
