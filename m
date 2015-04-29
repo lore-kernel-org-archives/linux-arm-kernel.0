@@ -1,99 +1,82 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Wed, 29 Apr 2015 09:39:25 -0600
-Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup device
- coherency
-In-Reply-To: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
-References: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
-Message-ID: <5540FB2D.4080905@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 29 Apr 2015 16:42:31 +0100
+Subject: [PATCH v5 2/2] firmware: qcom: scm: Add support for ARM64 SoCs
+In-Reply-To: <1430249038-30987-2-git-send-email-galak@codeaurora.org>
+References: <1430249038-30987-1-git-send-email-galak@codeaurora.org>
+ <1430249038-30987-2-git-send-email-galak@codeaurora.org>
+Message-ID: <20150429154231.GB8781@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2015 08:57 AM, Suthikulpanit, Suravee wrote:
-> 
-> 
-> On 4/29/15, 09:47, "Arnd Bergmann" <arnd@arndb.de> wrote:
-> 
->> On Wednesday 29 April 2015 09:45:43 Suravee Suthikulpanit wrote:
->>> On 04/29/2015 09:03 AM, Arnd Bergmann wrote:
->>>> On Wednesday 29 April 2015 08:44:09 Suravee Suthikulpanit wrote:
->>>>> +                       device->flags.cca_seen = 1;
->>>>> +               } else if (IS_ENABLED(CONFIG_ACPI_MUST_HAVE_CCA)) {
->>>>> +                       /*
->>>>> +                        * Architecture has specified that if the
->>> device
->>>>> +                        * can do DMA, it must have ACPI _CCA object.
->>>>> +                        * Here, there could be two cases:
->>>>> +                        *   1. Not DMA-able device.
->>>>> +                        *   2. DMA-able device, but missing _CCA
->>> object.
->>>>> +                        *
->>>>> +                        * In both cases, we will default to dma
->>> non-coherent.
->>>>> +                        */
->>>>> +                       cca = 0;
->>>>> +               } else {
->>>>> +                       /*
->>>>> +                        * If architecture does not specify that
->>> device must
->>>>> +                        * specify ACPI _CCA (e.g. x86), we default
->>> to use
->>>>> +                        * dma coherent.
->>>>> +                        */
->>>>> +                       cca = 1;
->>>>> +               }
->>>>>
->>>>
->>>> What does it mean here if a device does DMA but is not coherent? Do
->>> you
->>>> have an example of a server that needs this?
->>>>
->>>> Can we please make the default for ARM64 cca=1 as well?
->>>>
->>>>       Arnd
->>>>
->>>
->>> Actually, I am trying to implement the logic for when missing _CCA to
->>> be 
->>> consistent with the behavior when the devicetree entry does not specify
->>> "dma-coherent" property. IIUC, in such case, Linux will default to
->>> using 
->>> non-coherent DMA.
->>
->> Why?
->>
->> 	Arnd
-> 
-> Otherwise, it would seem inconsistent with what states in the ACPI spec:
->  
->   CCA objects are only relevant for devices that can access CPU-visible
-> memory,
->   such as devices that are DMA capable. On ARM based systems, the _CCA
-> object 
->   must be supplied all such devices. On Intel platforms, if the _CCA
-> object is 
->   not supplied, the OSPM will assume the devices are hardware cache
-> coherent.
-> 
-> From the statement above, I interpreted as if it is not present, it would
-> be non-coherent.
-> 
-> Suravee
+Hi Kumar,
 
-A little background to Suravee's statement...
+On Tue, Apr 28, 2015 at 08:23:58PM +0100, Kumar Gala wrote:
+> Add an implementation of the SCM interface that works on ARM64/64-bit SoCs
 
-When the spec was being changed for _CCA, it was determined by the ASWG
-that there was no reasonable default -- either choice would break something.
-Multiple OSs, SoC vendors, and platform vendors were asked.  So, the spec
-says for ARMv8, _CCA must be specified when needed and is not assumed to have
-any value.  Obviously, any OS can choose to behave differently, but that's
-what was specified and why it was specified that way.
+What is the intended use of this on arm64 SoCs?
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+Given the negative reaction to the SMP bringup [1] code that seems to be
+the only user, I'm somewhat confused as to why this is being pushed as a
+non-RFC in the mean time.
+
+Are there other users of this interface code? If so, could you please
+mention that in the commit message. I'd also ask that you would Cc me on
+future postings of this series.
+
+[...]
+
+> +static int qcom_scm_set_boot_addr(void *entry, const cpumask_t *cpus, int flags)
+> +{
+> +       struct qcom_scm_desc desc = {0};
+> +       unsigned int cpu = cpumask_first(cpus);
+> +       u64 mpidr_el1 = cpu_logical_map(cpu);
+> +
+> +       /* For now we assume only a single cpu is set in the mask */
+> +       WARN_ON(cpumask_weight(cpus) != 1);
+> +
+> +       if (mpidr_el1 & ~MPIDR_HWID_BITMASK) {
+> +               pr_err("CPU%d:Failed to set boot address\n", cpu);
+> +               return -ENOSYS;
+> +       }
+> +
+> +       desc.args[0] = virt_to_phys(entry);
+> +       desc.args[1] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 0));
+> +       desc.args[2] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 1));
+> +       desc.args[3] = BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 2));
+> +       desc.args[4] = ~0ULL;
+> +       desc.args[5] = QCOM_SCM_FLAG_HLOS | flags;
+> +       desc.arginfo = QCOM_SCM_ARGS(6);
+> +
+> +       return qcom_scm_call(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR_MC, &desc);
+> +}
+> +
+> +int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
+> +{
+> +       int flags = QCOM_SCM_FLAG_COLDBOOT_MC;
+> +
+> +       return qcom_scm_set_boot_addr(entry, cpus, flags);
+> +}
+> +
+> +int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
+> +{
+> +       int flags = QCOM_SCM_FLAG_WARMBOOT_MC;
+> +
+> +       return qcom_scm_set_boot_addr(entry, cpus, flags);
+> +}
+> +
+> +void __qcom_scm_cpu_power_down(u32 flags)
+> +{
+> +       struct qcom_scm_desc desc = {0};
+> +       desc.args[0] = flags & QCOM_SCM_FLUSH_FLAG_MASK;
+> +       desc.arginfo = QCOM_SCM_ARGS(1);
+> +
+> +       qcom_scm_call_atomic(QCOM_SCM_SVC_BOOT, QCOM_SCM_CMD_TERMINATE_PC, &desc);
+> +}
+
+As mentioned in the other thread, I don't want to see this for arm64,
+and must NAK this portion.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/336534.html
