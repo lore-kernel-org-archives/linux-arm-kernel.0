@@ -1,394 +1,136 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 30 Apr 2015 09:01:31 -0700
-Subject: [PATCH] ARM: dts: Gateworks GW5510 support (i.MX6)
-Message-ID: <1430409691-15963-1-git-send-email-tharvey@gateworks.com>
+Date: Thu, 30 Apr 2015 09:02:37 -0700
+Subject: [PATCH] imx: thermal: use CPU temperature grade info for thresholds
+Message-ID: <1430409757-16195-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Gateworks GW5510 board featuring:
- * i.MX6 SoC
- * up to 512MB DDR3
- * up to 2GB NAND flash
- * 1x miniPCIe socket (with USB)
- * HDMI out (micro-HDMI)
- * HDMI in (micro-HDMI) (currently supported by only vendor kernel)
- * TTL level I/O (supported by GW16111 breakout board):
-  * I2C
-  * 2x UART
-  * CAN
-  * 2x DIO (GPIO/PWM)
-  * USB OTG
+The IMX6Q/IMX6DL SoC's have a 2-bit temperature grade stored in OTP. Instead
+of assuming 85C for passive cooling threshold and 105C for critical use
+the thermal grade for these configurations. For IMX6SX which does not have
+a temperature grade in OTP (according to the ref manual) assume 105C critical.
+We will default the user-settable passive threshold to crit - 20C.
 
-For more details see:
- http://www.gateworks.com/product/item/ventana-gw5510-single-board-computer
-
+Cc: Anson Huang <b20788@freescale.com>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- arch/arm/boot/dts/Makefile            |   2 +
- arch/arm/boot/dts/imx6dl-gw551x.dts   |  19 +++
- arch/arm/boot/dts/imx6q-gw551x.dts    |  19 +++
- arch/arm/boot/dts/imx6qdl-gw551x.dtsi | 281 ++++++++++++++++++++++++++++++++++
- 4 files changed, 321 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-gw551x.dts
- create mode 100644 arch/arm/boot/dts/imx6q-gw551x.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-gw551x.dtsi
+ drivers/thermal/imx_thermal.c | 64 +++++++++++++++++++++++++++++++++----------
+ 1 file changed, 49 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b..1b17f2e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -254,6 +254,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-gw52xx.dtb \
- 	imx6dl-gw53xx.dtb \
- 	imx6dl-gw54xx.dtb \
-+	imx6dl-gw551x.dtb \
- 	imx6dl-gw552x.dtb \
- 	imx6dl-hummingboard.dtb \
- 	imx6dl-nitrogen6x.dtb \
-@@ -280,6 +281,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-gw53xx.dtb \
- 	imx6q-gw5400-a.dtb \
- 	imx6q-gw54xx.dtb \
-+	imx6q-gw551x.dtb \
- 	imx6q-gw552x.dtb \
- 	imx6q-hummingboard.dtb \
- 	imx6q-nitrogen6x.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-gw551x.dts b/arch/arm/boot/dts/imx6dl-gw551x.dts
-new file mode 100644
-index 0000000..64d31d0
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-gw551x.dts
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright 2014 Gateworks Corporation
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+index 2ccbc07..c6a4eed 100644
+--- a/drivers/thermal/imx_thermal.c
++++ b/drivers/thermal/imx_thermal.c
+@@ -55,6 +55,7 @@
+ #define TEMPSENSE2_PANIC_VALUE_SHIFT	16
+ #define TEMPSENSE2_PANIC_VALUE_MASK	0xfff0000
+ 
++#define OCOTP_MEM0			0x0480
+ #define OCOTP_ANA1			0x04e0
+ 
+ /* The driver supports 1 passive trip point and 1 critical trip point */
+@@ -64,12 +65,6 @@ enum imx_thermal_trip {
+ 	IMX_TRIP_NUM,
+ };
+ 
+-/*
+- * It defines the temperature in millicelsius for passive trip point
+- * that will trigger cooling action when crossed.
+- */
+-#define IMX_TEMP_PASSIVE		85000
+-
+ #define IMX_POLLING_DELAY		2000 /* millisecond */
+ #define IMX_PASSIVE_DELAY		1000
+ 
+@@ -106,6 +101,7 @@ struct imx_thermal_data {
+ 	int irq;
+ 	struct clk *thermal_clk;
+ 	const struct thermal_soc_data *socdata;
++	const char *temp_grade;
+ };
+ 
+ static void imx_set_panic_temp(struct imx_thermal_data *data,
+@@ -289,7 +285,8 @@ static int imx_set_trip_temp(struct thermal_zone_device *tz, int trip,
+ 	if (trip == IMX_TRIP_CRITICAL)
+ 		return -EPERM;
+ 
+-	if (temp > IMX_TEMP_PASSIVE)
++	/* do not allow passive to be set higher than critical - 20C */
++	if (temp > (data->temp_critical - (1000 * 20)))
+ 		return -EINVAL;
+ 
+ 	data->temp_passive = temp;
+@@ -404,17 +401,50 @@ static int imx_get_sensor_data(struct platform_device *pdev)
+ 	data->c1 = temp64;
+ 	data->c2 = n1 * data->c1 + 1000 * t1;
+ 
+-	/*
+-	 * Set the default passive cooling trip point,
+-	 * can be changed from userspace.
+-	 */
+-	data->temp_passive = IMX_TEMP_PASSIVE;
++	/* Assume Extended Commercial temperature grade limits (105C max) */
++	data->temp_grade = "unknown";
++	data->temp_critical = 105000;
 +
-+/dts-v1/;
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-gw551x.dtsi"
++	/* For IMX6Q use OTP for thermal grade */
++	if (data->socdata->version == TEMPMON_IMX6Q) {
++		ret = regmap_read(map, OCOTP_MEM0, &val);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to read temp grade: %d\n",
++				ret);
++			return ret;
++		}
 +
-+/ {
-+	model = "Gateworks Ventana i.MX6 DualLite/Solo GW551X";
-+	compatible = "gw,imx6dl-gw551x", "gw,ventana", "fsl,imx6dl";
-+};
-diff --git a/arch/arm/boot/dts/imx6q-gw551x.dts b/arch/arm/boot/dts/imx6q-gw551x.dts
-new file mode 100644
-index 0000000..d3d9a97
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-gw551x.dts
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright 2014 Gateworks Corporation
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
++		if (val == 0 || val == ~0) {
++			dev_err(&pdev->dev, "invalid temp grade data\n");
++			return -EINVAL;
++		}
 +
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+#include "imx6qdl-gw551x.dtsi"
++		/* The maximum die temp is specified by the Temperature Grade */
++		switch ((val >> 6) & 0x3) {
++		case 0: /* Commercial (0 to 95C) */
++			data->temp_grade = "Commercial";
++			data->temp_critical = 95000;
++			break;
++		case 1: /* Extended Commercial (-20 to 105C) */
++			data->temp_grade = "Extended Commercial";
++			data->temp_critical = 105000;
++			break;
++		case 2: /* Industrial (-40 to 105C) */
++			data->temp_grade = "Industrial";
++			data->temp_critical = 105000;
++			break;
++		case 3: /* Automotive (-40 to 125C) */
++			data->temp_grade = "Automotive";
++			data->temp_critical = 125000;
++			break;
++		}
++	}
+ 
+ 	/*
+-	 * The maximum die temperature set to 20 C higher than
+-	 * IMX_TEMP_PASSIVE.
++	 * Set the default passive cooling trip point to critical - 20C
++	 * (can be changed from userspace)
+ 	 */
+-	data->temp_critical = 1000 * 20 + data->temp_passive;
++	data->temp_passive = data->temp_critical - (1000 * 20);
+ 
+ 	return 0;
+ }
+@@ -559,6 +589,10 @@ static int imx_thermal_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	dev_info(&pdev->dev, "%s CPU temperature grade - "
++		 "thresholds: crit:%ldC passive:%ldC\n", data->temp_grade,
++		 data->temp_critical / 1000, data->temp_passive / 1000);
 +
-+/ {
-+	model = "Gateworks Ventana i.MX6 Dual/Quad GW551X";
-+	compatible = "gw,imx6q-gw551x", "gw,ventana", "fsl,imx6q";
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-new file mode 100644
-index 0000000..6a993337
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-@@ -0,0 +1,281 @@
-+/*
-+ * Copyright 2014 Gateworks Corporation
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	/* these are used by bootloader for disabling nodes */
-+	aliases {
-+		led0 = &led0;
-+		nand = &gpmi;
-+		ssi0 = &ssi1;
-+		usb0 = &usbh1;
-+		usb1 = &usbotg;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttymxc1,115200";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_leds>;
-+
-+		led0: user1 {
-+			label = "user1";
-+			gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;
-+			default-state = "on";
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	memory {
-+		reg = <0x10000000 0x20000000>;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_5p0v: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "5P0V";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-always-on;
-+		};
-+
-+		reg_usb_h1_vbus: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "usb_h1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-always-on;
-+		};
-+
-+		reg_usb_otg_vbus: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "usb_otg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-always-on;
-+		};
-+	};
-+};
-+
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	status = "okay";
-+};
-+
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2c3>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	eeprom1: eeprom at 50 {
-+		compatible = "atmel,24c02";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+
-+	eeprom2: eeprom at 51 {
-+		compatible = "atmel,24c02";
-+		reg = <0x51>;
-+		pagesize = <16>;
-+	};
-+
-+	eeprom3: eeprom at 52 {
-+		compatible = "atmel,24c02";
-+		reg = <0x52>;
-+		pagesize = <16>;
-+	};
-+
-+	eeprom4: eeprom at 53 {
-+		compatible = "atmel,24c02";
-+		reg = <0x53>;
-+		pagesize = <16>;
-+	};
-+
-+	gpio: pca9555 at 23 {
-+		compatible = "nxp,pca9555";
-+		reg = <0x23>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+
-+	rtc: ds1672 at 68 {
-+		compatible = "dallas,ds1672";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+
-+	gpio_exp: pca9555 at 24 {
-+		compatible = "nxp,pca9555";
-+		reg = <0x24>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+
-+};
-+
-+&pcie {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pcie>;
-+	reset-gpio = <&gpio1 0 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&ssi1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usb_h1_vbus>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	imx6qdl-gw51xx {
-+		pinctrl_flexcan1: flexcan1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX	0x1b0b1
-+				MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX	0x1b0b1
-+				MX6QDL_PAD_GPIO_9__GPIO1_IO09		0x4001b0b0 /* CAN_STBY */
-+			>;
-+		};
-+
-+		pinctrl_gpio_leds: gpioledsgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_ROW0__GPIO4_IO07   0x1b0b0
-+			>;
-+		};
-+
-+		pinctrl_gpmi_nand: gpminandgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
-+				MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
-+				MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
-+				MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
-+				MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
-+				MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
-+				MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
-+				MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
-+				MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
-+				MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
-+				MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
-+				MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
-+				MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
-+				MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
-+				MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
-+				MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
-+			>;
-+		};
-+
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
-+				MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
-+			>;
-+		};
-+
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-+				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-+			>;
-+		};
-+
-+		pinctrl_i2c3: i2c3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
-+				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
-+			>;
-+		};
-+
-+		pinctrl_pcie: pciegrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_0__GPIO1_IO00		0x1b0b0 /* PCIE RST */
-+			>;
-+		};
-+
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_uart3: uart3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
-+				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_usbotg: usbotggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
-+			>;
-+		};
-+	};
-+};
+ 	/* Enable measurements at ~ 10 Hz */
+ 	regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
+ 	measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
 -- 
 1.9.1
