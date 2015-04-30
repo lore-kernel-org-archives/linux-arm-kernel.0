@@ -1,45 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 30 Apr 2015 15:38:52 +0100
-Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
-In-Reply-To: <1430402587.24034.68.camel@deneb.redhat.com>
-References: <20150409144029.GE9648@leverpostej>
- <1428591425-17330-1-git-send-email-msalter@redhat.com>
- <20150409153629.GI9648@leverpostej> <20150413124121.GF2869@arm.com>
- <55420A18.7080203@arm.com>
- <1430400394.24034.67.camel@deneb.redhat.com>
- <20150430133333.GB32190@leverpostej>
- <1430402587.24034.68.camel@deneb.redhat.com>
-Message-ID: <20150430143852.GC32190@leverpostej>
+From: shenwei.wang@freescale.com (Shenwei Wang)
+Date: Thu, 30 Apr 2015 09:44:15 -0500
+Subject: [PATCH 00/18] ARM: imx: make the imx timer driver implementation
+ independent of SoCs.
+Message-ID: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 03:03:07PM +0100, Mark Salter wrote:
-> On Thu, 2015-04-30 at 14:33 +0100, Mark Rutland wrote:
-> > > > Could you please send this to arm-soc as suggested by Will, with the 
-> > > > relevant acks/reviews  ?
-> > > > 
-> > > 
-> > > I sent it on Tuesday. Did it not show up? Is arm at kernel.org the correct
-> > > address? I got the cc:
-> > > 
-> > > From: Mark Salter <msalter@redhat.com>
-> > > To: arm at kernel.org
-> > > Cc: Mark Salter <msalter@redhat.com>
-> > > Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
-> > > Date: Tue, 28 Apr 2015 13:09:32 -0400
-> > > Message-Id: <1430240972-16386-1-git-send-email-msalter@redhat.com>
-> > 
-> > That's the right address, but that only goes to the maintainers, and
-> > doesn't get copied to any list. In future, please Cc linux-arm-kernel in
-> > addition.
-> 
-> That's where I sent it originally.
+There are 4 versions of the timer hardware on Freescale MXC hardware.
+--Version 0: MX1/MXL
+--Version 1: MX21, MX27.
+--Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q(Rev1.0)
+--Version 3: MX6DL, MX6SX, MX6Q(Rev1.1+)
 
-Sure, but it's good to Cc when sending to arm-soc so as to make it
-visible that the patches have been sent. Doing so avoids the necessity
-of queries like Suzuki's, and makes it possible for others to reply to
-the version sent to arm at kernel.org in the case of conflicts or other
-issues.
+This patch has removed the SoC related codes, and implemented the driver directly upon
+the hardware timer IP version. The new timer driver has redesigned the
+internal APIs, and limited the use of global variables as well.
 
-Thanks,
-Mark.
+As the new driver has become independent of the SoCs, it has
+been moved from the directory arch/arm/mach-imx into the
+directory drivers/clocksources.
+
+
+Shenwei Wang (18):
+  ARM: imx: Add a parameter to mxc_timer_init
+  ARM: imx: Add the definitions for imx_timer and its versions
+  ARM: imx: Add an array of timer IP block versions
+  ARM: imx: Added one more parameter for mxc_clockevent_init
+  ARM: imx: Added one more parameter for mxc_clocksource_init
+  ARM: imx: New timer driver APIs based on IP block
+  ARM: imx: Initialize the imx_timer structure
+  ARM: imx: Reimplemented the _mxc_timer_init based on IP version
+  ARM: imx: Removed the SoC relating codes in mxc_timer_interrupt
+  ARM: imx: Removed the SoC relating codes in mxc_set_mode
+  ARM: imx: Enabled the unused parameter
+  ARM: imx: Remove one global variable in mxc_clocksource_init
+  ARM: imx: Removed the unused functions and variables
+  ARM: imx: Removed the global variable "timer_base"
+  ARM: imx: Remove the SoC relating codes in mxc_clockevent_init
+  ARM: imx: Move the  variable clockevent_mode into mxc_set_mode
+  ARM: imx: Codes clean up
+  ARM: imx: Move time.c into drivers/clocksources
+
+ arch/arm/mach-imx/Makefile      |   2 +-
+ arch/arm/mach-imx/time.c        | 388 ---------------------------
+ drivers/clk/imx/clk-imx1.c      |   3 +-
+ drivers/clk/imx/clk-imx21.c     |   3 +-
+ drivers/clk/imx/clk-imx27.c     |   3 +-
+ drivers/clk/imx/clk-imx31.c     |   3 +-
+ drivers/clk/imx/clk-imx35.c     |   5 +-
+ drivers/clk/imx/clk.h           |   2 +-
+ drivers/clocksource/Makefile    |   1 +
+ drivers/clocksource/timer-gpt.c | 572 ++++++++++++++++++++++++++++++++++++++++
+ 10 files changed, 586 insertions(+), 396 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/time.c
+ create mode 100644 drivers/clocksource/timer-gpt.c
+
+--
+1.9.1
