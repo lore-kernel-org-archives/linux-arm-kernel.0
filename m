@@ -1,83 +1,49 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Thu, 30 Apr 2015 18:26:39 +0300
-Subject: [PATCH v5 09/11] clk: qcom: gdsc: Use PM clocks to control gdsc
- clocks
-In-Reply-To: <1429017137-20218-10-git-send-email-rnayak@codeaurora.org>
-References: <1429017137-20218-1-git-send-email-rnayak@codeaurora.org>
- <1429017137-20218-10-git-send-email-rnayak@codeaurora.org>
-Message-ID: <554249AF.6070909@mm-sol.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 30 Apr 2015 23:25:49 +0800
+Subject: [PATCH] ARM: imx6: initialize CCM_CLPCR_LPM into RUN mode earlier
+In-Reply-To: <CANMBJr47q9uhdEFgogmdwwbLoFzkcX5SnN6oeaEEkXTnXq3PWg@mail.gmail.com>
+References: <1430287119-5268-1-git-send-email-shawn.guo@linaro.org>
+ <CANMBJr47q9uhdEFgogmdwwbLoFzkcX5SnN6oeaEEkXTnXq3PWg@mail.gmail.com>
+Message-ID: <20150430152547.GC20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Rajendra,
-
-On 04/14/2015 04:12 PM, Rajendra Nayak wrote:
-> The devices within a gdsc power domain, quite often have additional
-> clocks to be turned on/off along with the power domain itself.
-> Once the drivers for these devices are converted to use runtime PM,
-> it would be possible to remove all clock handling from the drivers if
-> the gdsc driver can handle it.
-> Use PM clocks to add support for this. A list of con_ids[] specified
-> per gdsc would be the clocks turned on/off on every device start/stop
-> callbacks.
+On Wed, Apr 29, 2015 at 01:43:39PM -0700, Tyler Baker wrote:
+> On 28 April 2015 at 22:58, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > Commit 4631960d26da ("ARM: imx6: set initial power mode in pm function")
+> > moves imx6_set_lpm() from clock init function into
+> > imx6_pm_common_init().  This causes a hang when cpuidle support is
+> > enabled.  The reason for that is ARM core clock is shut down
+> > unexpectedly by WAIT mode.  It happens with the following call stack:
+> >
+> >     cpuidle_register_governor()
+> >         cpuidle_switch_governor()
+> >             cpuidle_uninstall_idle_handler()
+> >                 synchronize_sched()
+> >                     wait_rcu_gp()
+> >                         wait_for_completion()
+> >
+> > When wait_for_completion() is called as above, all cores are idle/WFI.
+> > Hence, the reset value of CCM_CLPCR_LPM - WAIT mode, will trigger a
+> > hardware shutdown of the ARM core clock.
+> >
+> > To fix the regression, we need to ensure that CCM_CLPCR_LPM is
+> > initialized into RUN mode earlier than cpuidle governor registration,
+> > which is a postcore_initcall.  This patch creates function
+> > imx6_pm_ccm_init() to map CCM block and initialize CCM_CLPCR_LPM into
+> > RUN mode, and have the function called from machine .init_irq hook,
+> > which should be early enough.
+> >
+> > Reported-by: Kevin Hilman <khilman@kernel.org>
+> > Fixes: 4631960d26da ("ARM: imx6: set initial power mode in pm function")
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > 
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> ---
->  drivers/clk/qcom/gdsc.c | 43 +++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/qcom/gdsc.h |  2 ++
->  2 files changed, 45 insertions(+)
+> Tested-by: Tyler Baker <tyler.baker@linaro.org>
+> 
+> I have applied this patch on top of next-20150429[1] and build/boot
+> tested it with the kernelci.org farm. With these results[2], I can
+> confirm the IMX6 boot regression reported is fixed by this patch.
 
-<snip>
+Thanks for testing, Tyler.  I added your test tag to the patch.
 
->  
-> +static int gdsc_attach(struct generic_pm_domain *domain, struct device *dev)
-> +{
-> +	int ret;
-> +	struct gdsc *sc = domain_to_gdsc(domain);
-> +	char **con_id;
-> +
-> +	if (!sc->con_ids[0])
-> +		return 0;
-
-Did you test this on your side? It panic kernel badly cause the flexible
-array is not initialised.
-
-Could you revisit the above check. Or you could add below initialisation
-for every gdsc structure in gcc-xxx.c files.
-
-static struct gdsc venus_gdsc = {
-	.gdscr = 0x4c018,
-	.pd = {
-		.name = "venus",
-	},
-	.con_ids = { NULL },
-};
-
-
-> +
-> +	ret = pm_clk_create(dev);
-> +	if (ret) {
-> +		dev_err(dev, "pm_clk_create failed %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	for (con_id = sc->con_ids; *con_id; con_id++) {
-> +		ret = pm_clk_add(dev, *con_id);
-> +		if (ret) {
-> +			dev_err(dev, "pm_clk_add failed %d\n", ret);
-> +			goto fail;
-> +		}
-> +	}
-> +	return 0;
-> +fail:
-> +	pm_clk_destroy(dev);
-> +	return ret;
-> +};
-> +
-
-<snip>
-
-
--- 
-regards,
-Stan
+Shawn
