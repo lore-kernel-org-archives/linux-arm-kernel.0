@@ -1,93 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 30 Apr 2015 16:55:14 +0100
-Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
- device coherency
-In-Reply-To: <2797677.7Ghz879K9z@wuerfel>
-References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <2597359.pR23oR6gM8@wuerfel> <20150430131345.GG32373@arm.com>
- <2797677.7Ghz879K9z@wuerfel>
-Message-ID: <20150430155513.GC27755@e104818-lin.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 30 Apr 2015 08:57:22 -0700
+Subject: [RFT PATCH] drm/exynos: Enable DP clock to fix display on
+ Exynos5250 and other
+In-Reply-To: <7h8ud9pqmm.fsf@deeprootsystems.com>
+References: <1427471856-20918-1-git-send-email-k.kozlowski@samsung.com>
+ <7h8udau9he.fsf@deeprootsystems.com>
+ <CAJKOXPc6Epy_L+djManggcaYLaOrQ_c2S0=_GgU=dikuY1UU0g@mail.gmail.com>
+ <7h8ud9pqmm.fsf@deeprootsystems.com>
+Message-ID: <CAOesGMiHbcVK+BjiidPphGuoETyUroXtKgKqcVEgdSBiZQ+GmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 03:52:17PM +0200, Arnd Bergmann wrote:
-> On Thursday 30 April 2015 14:13:45 Will Deacon wrote:
-> > On Thu, Apr 30, 2015 at 02:03:00PM +0100, Arnd Bergmann wrote:
-> > > On Thursday 30 April 2015 12:46:15 Will Deacon wrote:
-> > > > Cache sync doesn't exist in the ARM/arm64architecture, what are the
-> > > > semantics supposed to be? Maybe it's just DSB for us (complete all pending
-> > > > maintenance).
-> > > 
-> > > It ensures that a state of a buffer as observed by CPU and device is
-> > > identical. It's possible that we removed all platforms that did something
-> > > interesting here, so it's one of these:
-> > > 
-> > > a) On architectures that are mostly coherent, it's a barrier
-> > >    that is broadcast to all devices, like I assume DSB is. IA64
-> > >    currently does this for all machines, but IIRC it used to 
-> > >    access some cluster interconnect at some point to enforce a
-> > >    flush.
-> > >    The ARM32 based ArmadaXP also falls into this model if the cache
-> > >    coherency fabric is enabled, as that needs to be synchronized
+On Thu, Apr 30, 2015 at 8:44 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+>
+>> 2015-04-30 2:31 GMT+09:00 Kevin Hilman <khilman@kernel.org>:
+>>> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+>>>
+>>>> After adding display power domain for Exynos5250 in commit
+>>>> 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
+>>>> display on Chromebook Snow and others stopped working after boot.
+>>>>
+>>>> The reason for this suggested Andrzej Hajda: the DP clock was disabled.
+>>>> This clock is required by Display Port and is enabled by bootloader.
+>>>> However when FIMD driver probing was deferred, the display power domain
+>>>> was turned off. This effectively reset the value of DP clock enable
+>>>> register.
+>>>>
+>>>> When exynos-dp is later probed, the clock is not enabled and display is
+>>>> not properly configured:
+>>>>
+>>>> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
+>>>> exynos-dp 145b0000.dp-controller: unable to config video
+>>>>
+>>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>>> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
+>>>> Cc: <stable@vger.kernel.org>
+>>>>
+>>>> ---
+>>>>
+>>>> This should fix issue reported by Javier [1][2].
+>>>>
+>>>> Tested on Chromebook Snow (Exynos 5250). More testing would be great,
+>>>> especially on other Exynos 5xxx products.
+>>>
+>>> I hoped to try this on my exynos5 boards, but it doesn't seem to apply
+>>> to linux-next or to Linus' master branch.
+>>>
+>>> Are there some other dependencies here?
+>>
+>> It is already applied:
+>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1c363c7cccf64128087002b0779986ad16aff6dc
+>
+> Er, yup.  That would explain it. ;)
+>
+> Sorry for the noise,
 
-I'm getting confused by the ArmadaXP case. IIRC, the point of the
-arm,io-coherent property to the PL310 was precisely to make the
-outer_sync a no-op when the coherency is enabled. So basically an mb()
-would only issue a DSB on such platform without the PL310 cache sync.
+Well, noise or not, Exynos is still broken in mainline and was broken
+on -next for so long in different ways that bisecting it is a futile
+exercise in frustration.
 
-On coherent systems, devices usually snoop the inner/CPU cache and not
-the system cache, that's further down the line. So a DSB would ensure
-the visibility at the coherent interconnect level before the system
-cache. I don't think it needs to be broadcast all the way to devices.
+It doesn't seem to show up with a trivial boot using only ramdisk, but
+when booting a real distro from disk, it certainly does.
 
-> > > b) On architectures where the device may not see the state of the cache,
-> > >    but the CPU is always aware of anything the device sends it,
-> > >    it flushes the cache. This seems to be the case on parisc,
-> > >    and in particular, there are some variants that do not support
-> > >    dma_alloc_coherent but only dma_alloc_noncoherent.
-> > > c) On architectures that need the synchronization both ways,
-> > >    it does (almost) the same invalidate/clean/flush thing as
-> > >    ARM, except it doesn't have to worry about cache lines from
-> > >    speculative prefetch which make it impossible to implement on
-> > >    ARM.
-> > 
-> > Okey doke, thanks for the explanation. It sounds like we can just build
-> > the primitive out of the existing cache maintenance routines if we need
-> > to implement it.
-> 
-> Cases a) and b) yes, but not c), otherwise we could simplify
-> the ARM dma-mapping implementation and just merge __dma_page_cpu_to_dev
-> and __dma_page_dev_to_cpu into one function.
+For example:
 
-I don't fully understand c) or b). Wouldn't the non-coherent ops cover
-them both, though potentially not as efficient?
+http://arm-soc.lixom.net/bootlogs/mainline/v4.1-rc1-56-g3d99e3f/pi-arm-exynos_defconfig.html
 
-> And a) and b) are both for systems that are more coherent than what
-> our noncoherent dma_map_ops implement, but less coherent than what
-> the coherent dma_map_ops do, and that is specifically what the ACPI
-> binding cannot describe, unless you argue that either ACPI or ARMv8
-> forbids both of these models.
+Disabling CONFIG_DRM makes it boot reliably.
 
-In general, a DSB should work as described in the ARM ARM without the
-need to poke additional devices (PL310 is an example not to follow).
+Arndale doesn't show it for me, but it also doesn't have working graphics.
 
-> > > I guess we could handle that case as well, by requiring any ACPI based
-> > > firmware to turn off the coherency fabric on that system and just making
-> > > it dog slow.
-> > 
-> > We already require something similar in Documentation/arm64/booting.txt:
-> > 
-> >   `System caches which do not respect architected cache maintenance by VA
-> >    operations (not recommended) must be configured and disabled.'
-> 
-> Hmm, does that rule really get violated here? I think it fully respects
-> the cache maintenance (flush/invalidate/clean) operations, but it does
-> not fully respect the dsb/dmb instructions, which is something else.
 
-If it fully respects the cache maintenance, it should also respect the
-completion and ordering requirements of the cache maintenance
-operations. That means that a DSB guarantees completion of such
-operations.
-
--- 
-Catalin
+-Olof
