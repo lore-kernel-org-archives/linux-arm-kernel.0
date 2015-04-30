@@ -1,41 +1,52 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Thu, 30 Apr 2015 14:51:48 +0200
-Subject: [PATCH 0/4] Seccomp filter JIT support on ARM.
-In-Reply-To: <55422193.9010905@freebox.fr>
-References: <1430314657-2552-1-git-send-email-nschichan@freebox.fr>
- <554108CC.6000801@iogearbox.net> <55422193.9010905@freebox.fr>
-Message-ID: <55422564.2030106@iogearbox.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Apr 2015 14:52:52 +0200
+Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <20150430123300.GE3488@pd.tnic>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <3900315.9fjubb6CtE@wuerfel> <20150430123300.GE3488@pd.tnic>
+Message-ID: <17860828.NGjfVanSol@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2015 02:35 PM, Nicolas Schichan wrote:
-> On 04/29/2015 06:37 PM, Daniel Borkmann wrote:
->> On 04/29/2015 03:37 PM, Nicolas Schichan wrote:
->> ...
->>> The fourth and final patch fixes a bug in the emit_udiv() function
->>> when used to convert a BPF_ALU | BPF_DIV | BPF_K instruction in the
->>> ARM BPF JIT code.
->>
->> Shouldn't that fix go separately, so it can be included into 4.1
->> resp. -stable?
->
-> Sure, shall I resend that separately from the v2 of the serie or is it fine in
-> its current form ?
+On Thursday 30 April 2015 14:33:00 Borislav Petkov wrote:
+> 
+> > The point where it gets silly is when you try to handle multiple
+> > unrelated devices in the same driver and you get a probe function
+> > that just does:
+> 
+> Ok, what if they're related through RAS?
+> 
+> I.e., xgene_edac contains all RAS-specific functionality of the xgene IP
+> blocks. This doesn't sound silly to me, frankly, and it concentrates it
+> all in one place. Communication between blocks is trivial and there's no
+> code duplication.
 
-Would be great if you could send that as an individual patch, since
-it's a stand-alone fix and independent from the (feature) patch set.
+My point is that with the current implementation, there is no communication
+at all: you have four separate drivers that just live in the same file.
 
->> Would be good if you also Cc Mircea, who wrote the code. Was that
->> caught by lib/test_bpf.c suite (if not, would be good to add a test
->> case for it) ?
->
-> It was detected by an internal test suite we have here. I see that there are
-> some BPF_ALU | BPF_DIV | BPF_K instructions so it might also be caught by
-> lib/test_bpf.c as well.
+> Other vendors using those IP blocks would simply add new DT descriptions.
+> 
+> > apm_edac_probe(struct platform_device *dev)
+> > {
+> >       if (dev_is_xgene_mc(dev))
+> >               return apm_probe_xgene_mc(dev);
+> >       if (dev_is_xgene_l2(dev))
+> >               return apm_probe_xgene_l2(dev);
+> >       if (dev_is_ygene_mc(dev))
+> >               ...
+> 
+> So we do that on x86 - amd64_edac does AMD per-family setup and sb_edac
+> too, for the last 4 Intel uarches. And it works just fine. So if "silly"
+> is the only problem, I can certainly live with it.
 
-If there are some additional tests that are not yet covered by lib/test_bpf.c,
-I'd be happy if you could add them there. This can also be as a follow-up,
-but if we can increase coverage for others as well, the better.
+This is different, because in your examples, there is still some shared
+code between the CPU families, fact most of the driver looks like it's
+shared, and even the family-specific code is mostly shared. E.g.
+f1x_early_channel_count() is used on almost all families.
 
-Thanks again,
-Daniel
+What I mean with silly is the case where none of the code behind those
+is shared at all, and the only common part is the probe() function
+that contains the multiplexer.
+
+	Arnd
