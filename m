@@ -1,52 +1,55 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 01 May 2015 00:21:20 +0200
-Subject: [PATCH 0/4] clk: si5351: Some fixes
-In-Reply-To: <20150430212059.GA14026@deathray>
-References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20150430193317.GC22000@deathray> <55429417.4070103@gmail.com>
- <20150430212059.GA14026@deathray>
-Message-ID: <5542AAE0.5020204@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 01 May 2015 00:47 +0200
+Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <CAL_JsqL7emqq=bSaWSi_0G5qSJqO+nVH_JH7VY+ynbrHhaSf_g@mail.gmail.com>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <CAPw-ZTksYNDE2zVD=ZjGzpKfXQN8KgW85ZnHoQ2eVmSGdSdMOw@mail.gmail.com>
+ <CAL_JsqL7emqq=bSaWSi_0G5qSJqO+nVH_JH7VY+ynbrHhaSf_g@mail.gmail.com>
+Message-ID: <3511052.xgXf75lT96@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.04.2015 23:20, Michael Welling wrote:
-> On Thu, Apr 30, 2015 at 10:44:07PM +0200, Sebastian Hesselbarth wrote:
-[...]
->> What I noticed about your clk2 that you always measure as 0 Hz is
->> that none of your clocks is prepared/enabled.
->>
->> Currently, the si5351 driver only ensures the output is enabled
->> when si5351_clkout_prepare() is called.
->>
->> As long as you do not have a clk consumer that properly prepare/enables
->> the clock output, it may remain disabled.
->>
->> We should probably have additional DT properties and corresponding
->> pdata to force clkoutN always on.
->
-> Does the silabs,disable-state of 3 (SI5351_DISABLE_NEVER) take care
-> of this?
+On Thursday 30 April 2015 17:36:16 Rob Herring wrote:
+> > Now let us discuss the DT layout if it is an single driver:
+> >
+> > xgeneedac: xgeneedac at 7e800000 {
+> >         compatible = "apm,xgene-edac";
+> >         regmap-efuse = <&efuse>; /* efuse */
+> >         reg = <0x0 0x78800000 0x0 0x100>, /* Top level interrupt
+> > status resource */
+> >                 <0x0 0x7e200000 0x0 0x1000>, /* CSW for MCB active resource
+> >                 <0x0 0x7e700000 0x0 0x1000>, /* MCB A resource */
+> >                 <0x0 0x7e720000 0x0 0x1000>, /* MCB B resource */
+> >                 <0x0 0x7e800000 0x0 0x1000>, /* MCU 0 resource */
+> >                 <0x0 0x7e840000 0x0 0x1000>, /* MCU 1 resource */
+> >                 <0x0 0x7e880000 0x0 0x1000>, /* MCU 2 resource */
+> >                 <0x0 0x7e8c0000 0x0 0x1000>, /* MCU 3 resource */
+> >                 <0x0 0x7c000000 0x0 0x200000>, /* CPU 0 domain for L1 and L2 */
+> >                 <0x0 0x7c200000 0x0 0x200000>, /* CPU 1 domain for L1 and L2 */
+> >                 <0x0 0x7c400000 0x0 0x200000>, /* CPU 2 domain for L1 and L2 */
+> >                 <0x0 0x7c600000 0x0 0x200000>, /* CPU 3 domain for L1 and L2 */
+> >                 <0x0 0x7e600000 0x0 0x1000>, /* L3 resource */
+> >                 <0x0 0x7e930000 0x0 0x1000>, /* SoC bus resource */
+> >                 <0x0 0x7e000000 0x0 0x1000>, /* SoC device resource */
+> 
+> Uggg, no. You were on the right track earlier in the thread. One node
+> per instance of each block.
+> 
 
-That would be the HW version of never disabling the clock output.
-I never really tried the property, does it work as expected?
+I agree these should be separate nodes, but I also think that we want a
+separate node for the pcp/pcperror/xgeneedac device. The compatible
+string for that should match whatever the datasheet calls that block,
+no idea why we now have the third name for that.
 
-> Otherwise is there a simple registration that will do this?
+The specific parts could either be subnodes of the pcperror device,
+or they could be separate device nodes that reference the pcperror
+device through a phandle, so the driver can make the connection between
+them. This probably depends on what exactly all those nodes are:
+if the registers in there are all exclusively related to EDAC handling
+of the pcperror, subnodes would be best, but if the registers also
+contain functionality that is not related to EDAC handling, we
+probably want to have separate top-level nodes that a driver could
+bind to, e.g. for doing power management on the memory controller.
 
-The SW version of such a property would involve CLK_IGNORE_UNUSED
-and enabling all requested clock outputs on probe().
-
-If above HW property already works, I think it should be enough.
-
-[...]
->>> It should be noted that if I program the device's register map in the
->>> bootloader the device keeps the correct frequency outputs.
->>
->> "keeps"? You mean "generates", don't you?
->>
->
-> Yes the clocks are generated and do not get effected by the driver.
-
-IIRC, clk API does check if requested rate and current rate match
-already. If they do, it does not request the same rate again.
-
-Sebastian
+	Arnd
