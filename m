@@ -1,60 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Apr 2015 16:52:52 +0200
-Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
-In-Reply-To: <1430405173.24034.73.camel@deneb.redhat.com>
-References: <20150409144029.GE9648@leverpostej>
- <20150430143852.GC32190@leverpostej>
- <1430405173.24034.73.camel@deneb.redhat.com>
-Message-ID: <11222709.dl2MIreEVj@wuerfel>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 30 Apr 2015 07:59:09 -0700
+Subject: [PATCH 1/1] Revert "ARM: dts: add display power domain for
+ exynos5250"
+In-Reply-To: <55417967.80304@collabora.co.uk> (Javier Martinez Canillas's
+ message of "Thu, 30 Apr 2015 02:37:59 +0200")
+References: <1427107800-21668-1-git-send-email-javier.martinez@collabora.co.uk>
+ <7hr3r2suiw.fsf@deeprootsystems.com>
+ <1430336716.19504.92.camel@collabora.co.uk>
+ <55417967.80304@collabora.co.uk>
+Message-ID: <7hk2wtpsqq.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 April 2015 10:46:13 Mark Salter wrote:
-> On Thu, 2015-04-30 at 15:38 +0100, Mark Rutland wrote:
-> > On Thu, Apr 30, 2015 at 03:03:07PM +0100, Mark Salter wrote:
-> > > On Thu, 2015-04-30 at 14:33 +0100, Mark Rutland wrote:
-> > > > > > Could you please send this to arm-soc as suggested by Will, with the 
-> > > > > > relevant acks/reviews  ?
-> > > > > > 
-> > > > > 
-> > > > > I sent it on Tuesday. Did it not show up? Is arm at kernel.org the correct
-> > > > > address? I got the cc:
-> > > > > 
-> > > > > From: Mark Salter <msalter@redhat.com>
-> > > > > To: arm at kernel.org
-> > > > > Cc: Mark Salter <msalter@redhat.com>
-> > > > > Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
-> > > > > Date: Tue, 28 Apr 2015 13:09:32 -0400
-> > > > > Message-Id: <1430240972-16386-1-git-send-email-msalter@redhat.com>
-> > > > 
-> > > > That's the right address, but that only goes to the maintainers, and
-> > > > doesn't get copied to any list. In future, please Cc linux-arm-kernel in
-> > > > addition.
-> > > 
-> > > That's where I sent it originally.
-> > 
-> > Sure, but it's good to Cc when sending to arm-soc so as to make it
-> > visible that the patches have been sent. Doing so avoids the necessity
-> > of queries like Suzuki's, and makes it possible for others to reply to
-> > the version sent to arm at kernel.org in the case of conflicts or other
-> > issues.
-> 
-> But why did it need to be sent to a private maintainer's list in the
-> first place? I think that the destination addresses of the original
-> posting was perfectly reasonable given output from get_maintainer.pl
-> and that sending me to a private list was an unnecessary hoop to
-> jump through.
+Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
 
-The purpose of the arm at kernel.org alias is for subarch maintainers to send
-us stuff, it's not really meant for normal developers, unless specifically
-advised by a maintainer. Each file we maintain through arm-soc normally
-belongs to one subarch, so we tend to not pick up any patches on the mailing
-list and instead wait for that subarch maintainer to pick them up and forward
-the changes to us.
+> Hello,
+>
+> On 04/29/2015 09:45 PM, Sjoerd Simons wrote:
+>> On Wed, 2015-04-29 at 10:40 -0700, Kevin Hilman wrote:
+>>> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
+>> 
+>>> Tested-by: Kevin Hilman <khilman@linaro.org>
+>>> 
+>>> FWIW, this patch fixes the boot panics when using MMC rootfs on
+>>> exynos5800-peach-pi with current linux-next that have been happening
+>>> for awhile.
+>> 
+>> That seems unlikely as this patch changes things in the exynos5250.dtsi,
+>> which isn't used by exynos5800-peach-pi.?
+>>
+>
+> Indeed, it will be surprising if $subject changes any behavior on
+> Exynos5420/5422/5800 machines.
+>
+> FWIW, this patch is not needed anymore since the right fix is Krzysztof's
+> "drm/exynos: Enable DP clock to fix display on Exynos5250 and other" patch
+> which is already in linux-next.
+>
+> The regression on Exynos5420/5422/5800 that has been for a while is fixed
+> by "ARM: dts: Make DP a consumer of DISP1 power domain on Exynos5420" [0]
+> which has been posted many weeks ago.
 
-That model model breaks down to some degree for drivers/bus, in particular
-for stuff that is not specific to just one SoC. I have the patch in my
-todo list now, sorry about missing that earlier. We should probably come up
-with a better way to handle patches like this one.
+Thanks for clarifying.
 
-	Arnd
+I'm not sure how this worked for me.  Seems like sometimes, even with
+the imprecise aborts it does actually finish booting to a shell, so I
+must've gotten successful boot and thought it was because of this
+revert.
+
+Kevin
