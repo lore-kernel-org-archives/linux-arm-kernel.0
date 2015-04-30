@@ -1,136 +1,82 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 30 Apr 2015 09:02:37 -0700
-Subject: [PATCH] imx: thermal: use CPU temperature grade info for thresholds
-Message-ID: <1430409757-16195-1-git-send-email-tharvey@gateworks.com>
+From: matthias.bgg@gmail.com (Matthias Brugger_0)
+Date: Thu, 30 Apr 2015 18:09:02 +0200
+Subject: [PATCH 1/2] ARM: dts: mt8135: Add pinctrl/GPIO/EINT node for
+ mt8135.
+In-Reply-To: <1430213037-23831-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1430213037-23831-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <7612069.RRCsOqAebC@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IMX6Q/IMX6DL SoC's have a 2-bit temperature grade stored in OTP. Instead
-of assuming 85C for passive cooling threshold and 105C for critical use
-the thermal grade for these configurations. For IMX6SX which does not have
-a temperature grade in OTP (according to the ref manual) assume 105C critical.
-We will default the user-settable passive threshold to crit - 20C.
+On Tuesday, April 28, 2015 05:23:56 PM Yingjoe Chen wrote:
+> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> 
+> 
+> Matthias,
+> 
+> Since mt8135 pinctrl node patch is not in v4.1-rc1, I'd like to make some
+> minor change to follow dts convention.
+> 
+> Let me know what you think.
+> Thanks.
+> 
+> Joe.C
+> 
+> ---8<--------------------------------------------------------------------
+> Add pinctrl,GPIO and EINT node to mt8135.dtsi.
+> 
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/boot/dts/mt8135-pinfunc.h | 1302
+> ++++++++++++++++++++++++++++++++++++ arch/arm/boot/dts/mt8135.dtsi      |  
+> 31 +
+>  2 files changed, 1333 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
+> 
+> diff --git a/arch/arm/boot/dts/mt8135-pinfunc.h
+> b/arch/arm/boot/dts/mt8135-pinfunc.h new file mode 100644
+> index 0000000..5a60987
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt8135-pinfunc.h
+[...]
+> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+> index 2c5c4da..d6c1f14 100644
+> --- a/arch/arm/boot/dts/mt8135.dtsi
+> +++ b/arch/arm/boot/dts/mt8135.dtsi
+> @@ -17,6 +17,7 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/reset-controller/mt8135-resets.h>
+>  #include "skeleton64.dtsi"
+> +#include "mt8135-pinfunc.h"
+> 
+>  / {
+>  	compatible = "mediatek,mt8135";
+> @@ -141,6 +142,36 @@
+>  			clock-names = "spi", "wrap";
+>  		};
+> 
+> +		/* Provide regmap for pinctrl driver */
 
-Cc: Anson Huang <b20788@freescale.com>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- drivers/thermal/imx_thermal.c | 64 +++++++++++++++++++++++++++++++++----------
- 1 file changed, 49 insertions(+), 15 deletions(-)
+I think from the DTS it is quite clear for what the node is used for.
+Please delete the comment.
 
-diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-index 2ccbc07..c6a4eed 100644
---- a/drivers/thermal/imx_thermal.c
-+++ b/drivers/thermal/imx_thermal.c
-@@ -55,6 +55,7 @@
- #define TEMPSENSE2_PANIC_VALUE_SHIFT	16
- #define TEMPSENSE2_PANIC_VALUE_MASK	0xfff0000
- 
-+#define OCOTP_MEM0			0x0480
- #define OCOTP_ANA1			0x04e0
- 
- /* The driver supports 1 passive trip point and 1 critical trip point */
-@@ -64,12 +65,6 @@ enum imx_thermal_trip {
- 	IMX_TRIP_NUM,
- };
- 
--/*
-- * It defines the temperature in millicelsius for passive trip point
-- * that will trigger cooling action when crossed.
-- */
--#define IMX_TEMP_PASSIVE		85000
--
- #define IMX_POLLING_DELAY		2000 /* millisecond */
- #define IMX_PASSIVE_DELAY		1000
- 
-@@ -106,6 +101,7 @@ struct imx_thermal_data {
- 	int irq;
- 	struct clk *thermal_clk;
- 	const struct thermal_soc_data *socdata;
-+	const char *temp_grade;
- };
- 
- static void imx_set_panic_temp(struct imx_thermal_data *data,
-@@ -289,7 +285,8 @@ static int imx_set_trip_temp(struct thermal_zone_device *tz, int trip,
- 	if (trip == IMX_TRIP_CRITICAL)
- 		return -EPERM;
- 
--	if (temp > IMX_TEMP_PASSIVE)
-+	/* do not allow passive to be set higher than critical - 20C */
-+	if (temp > (data->temp_critical - (1000 * 20)))
- 		return -EINVAL;
- 
- 	data->temp_passive = temp;
-@@ -404,17 +401,50 @@ static int imx_get_sensor_data(struct platform_device *pdev)
- 	data->c1 = temp64;
- 	data->c2 = n1 * data->c1 + 1000 * t1;
- 
--	/*
--	 * Set the default passive cooling trip point,
--	 * can be changed from userspace.
--	 */
--	data->temp_passive = IMX_TEMP_PASSIVE;
-+	/* Assume Extended Commercial temperature grade limits (105C max) */
-+	data->temp_grade = "unknown";
-+	data->temp_critical = 105000;
-+
-+	/* For IMX6Q use OTP for thermal grade */
-+	if (data->socdata->version == TEMPMON_IMX6Q) {
-+		ret = regmap_read(map, OCOTP_MEM0, &val);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to read temp grade: %d\n",
-+				ret);
-+			return ret;
-+		}
-+
-+		if (val == 0 || val == ~0) {
-+			dev_err(&pdev->dev, "invalid temp grade data\n");
-+			return -EINVAL;
-+		}
-+
-+		/* The maximum die temp is specified by the Temperature Grade */
-+		switch ((val >> 6) & 0x3) {
-+		case 0: /* Commercial (0 to 95C) */
-+			data->temp_grade = "Commercial";
-+			data->temp_critical = 95000;
-+			break;
-+		case 1: /* Extended Commercial (-20 to 105C) */
-+			data->temp_grade = "Extended Commercial";
-+			data->temp_critical = 105000;
-+			break;
-+		case 2: /* Industrial (-40 to 105C) */
-+			data->temp_grade = "Industrial";
-+			data->temp_critical = 105000;
-+			break;
-+		case 3: /* Automotive (-40 to 125C) */
-+			data->temp_grade = "Automotive";
-+			data->temp_critical = 125000;
-+			break;
-+		}
-+	}
- 
- 	/*
--	 * The maximum die temperature set to 20 C higher than
--	 * IMX_TEMP_PASSIVE.
-+	 * Set the default passive cooling trip point to critical - 20C
-+	 * (can be changed from userspace)
- 	 */
--	data->temp_critical = 1000 * 20 + data->temp_passive;
-+	data->temp_passive = data->temp_critical - (1000 * 20);
- 
- 	return 0;
- }
-@@ -559,6 +589,10 @@ static int imx_thermal_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	dev_info(&pdev->dev, "%s CPU temperature grade - "
-+		 "thresholds: crit:%ldC passive:%ldC\n", data->temp_grade,
-+		 data->temp_critical / 1000, data->temp_passive / 1000);
-+
- 	/* Enable measurements at ~ 10 Hz */
- 	regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
- 	measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
--- 
-1.9.1
+> +		syscfg_pctl_a: syscfg_pctl_a at 10005000 {
+> +			compatible = "mediatek,mt8135-pctl-a-syscfg", "syscon";
+> +			reg = <0 0x10005000 0 0x1000>;
+> +		};
+> +
+> +		/* Provide regmap for pinctrl driver */
+
+Same here.
+
+> +		syscfg_pctl_b: syscfg_pctl_b at 1020c000 {
+> +			compatible = "mediatek,mt8135-pctl-b-syscfg", "syscon";
+> +			reg = <0 0x1020c000 0 0x1000>;
+> +		};
+
+Please sort the nodes by it's address.
+
+Cheers,
+Matthias
