@@ -1,49 +1,34 @@
 From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
-Date: Thu, 30 Apr 2015 09:33:34 +0200
-Subject: [PATCH v3 3/7] ARM: at91/dt: at91-kizbox: user proper serial uart
+Date: Thu, 30 Apr 2015 09:33:38 +0200
+Subject: [PATCH v3 7/7] ARM: at91/dt: at91-kizbox: update chosen node
 In-Reply-To: <1430379218-13758-1-git-send-email-g.portay@overkiz.com>
 References: <1430379218-13758-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <1430379218-13758-4-git-send-email-g.portay@overkiz.com>
+Message-ID: <1430379218-13758-8-git-send-email-g.portay@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USART3 is the only serial UART accessible.
+Simplify the bootargs since the platform is booting from an initramfs and
+set the kernel stdout path to DBGU.
 
 Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
 Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/boot/dts/at91-kizbox.dts | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/at91-kizbox.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index 00c86c1..72d5de80 100644
+index e739104..b567b5f 100644
 --- a/arch/arm/boot/dts/at91-kizbox.dts
 +++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -38,14 +38,6 @@
+@@ -15,7 +15,8 @@
+ 	compatible = "overkiz,kizbox", "atmel,at91sam9g20", "atmel,at91sam9";
  
- 	ahb {
- 		apb {
--			usart0: serial at fffb0000 {
--				status = "okay";
--			};
--
--			usart1: serial at fffb4000 {
--				status = "okay";
--			};
--
- 			macb0: ethernet at fffc4000 {
- 				phy-mode = "mii";
- 				pinctrl-0 = <&pinctrl_macb_rmii
-@@ -53,6 +45,10 @@
- 				status = "okay";
- 			};
+ 	chosen {
+-		bootargs = "panic=5 ubi.mtd=1 rootfstype=ubifs root=ubi0:root";
++		bootargs = "ubi.mtd=ubi";
++		linux,stdout-path = &dbgu;
+ 	};
  
-+			usart3: serial at fffd0000 {
-+				status = "okay";
-+			};
-+
- 			dbgu: serial@fffff200 {
- 				status = "okay";
- 			};
+ 	memory {
 -- 
 1.9.1
