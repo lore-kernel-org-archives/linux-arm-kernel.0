@@ -1,21 +1,37 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 30 Apr 2015 19:53:31 -0300
-Subject: [PATCH] ARM: dts: imx6sl-warp: Fix unused regulator
-In-Reply-To: <1430333887-13252-1-git-send-email-festevam@gmail.com>
-References: <1430333887-13252-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5AoZFXzHeQeY+QiMp=zmt=ohW+KkksC_DMsW=R+mJddTA@mail.gmail.com>
+Date: Thu, 30 Apr 2015 19:55:28 -0300
+Subject: [PATCH 1/3] ARM: dts: imx6sl-warp: Remove unused regulator
+Message-ID: <1430434530-12605-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Wed, Apr 29, 2015 at 3:58 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> The 'reg_1p8v' regulator is not used anywhere, so let's remove it.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+The 'reg_1p8v' regulator is not used anywhere, so let's remove it.
 
-Please discard this one.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6sl-warp.dts | 8 --------
+ 1 file changed, 8 deletions(-)
 
-I will include it as part of a series.
+diff --git a/arch/arm/boot/dts/imx6sl-warp.dts b/arch/arm/boot/dts/imx6sl-warp.dts
+index 64f7dec..232597a 100644
+--- a/arch/arm/boot/dts/imx6sl-warp.dts
++++ b/arch/arm/boot/dts/imx6sl-warp.dts
+@@ -82,14 +82,6 @@
+ 			gpio = <&gpio4 2 0>;
+ 			enable-active-high;
+ 		};
+-
+-		reg_1p8v: regulator at 2 {
+-			compatible = "regulator-fixed";
+-			reg = <2>;
+-			regulator-name = "1P8V";
+-			regulator-min-microvolt = <1800000>;
+-			regulator-max-microvolt = <1800000>;
+-		};
+ 	};
+ 
+ 	usdhc3_pwrseq: usdhc3_pwrseq {
+-- 
+1.9.1
