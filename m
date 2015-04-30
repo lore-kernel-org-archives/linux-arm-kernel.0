@@ -1,44 +1,49 @@
-From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Thu, 30 Apr 2015 09:44:20 -0500
-Subject: [PATCH 05/18] ARM: imx: Added one more parameter for
- mxc_clocksource_init
-In-Reply-To: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <1430405073-13106-6-git-send-email-shenwei.wang@freescale.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 30 Apr 2015 10:46:13 -0400
+Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+In-Reply-To: <20150430143852.GC32190@leverpostej>
+References: <20150409144029.GE9648@leverpostej>
+ <1428591425-17330-1-git-send-email-msalter@redhat.com>
+ <20150409153629.GI9648@leverpostej> <20150413124121.GF2869@arm.com>
+ <55420A18.7080203@arm.com> <1430400394.24034.67.camel@deneb.redhat.com>
+ <20150430133333.GB32190@leverpostej>
+ <1430402587.24034.68.camel@deneb.redhat.com>
+ <20150430143852.GC32190@leverpostej>
+Message-ID: <1430405173.24034.73.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One more parameter was added for the function of
-mxc_clocksource_init, so that we could remove the
-global variables later.
+On Thu, 2015-04-30 at 15:38 +0100, Mark Rutland wrote:
+> On Thu, Apr 30, 2015 at 03:03:07PM +0100, Mark Salter wrote:
+> > On Thu, 2015-04-30 at 14:33 +0100, Mark Rutland wrote:
+> > > > > Could you please send this to arm-soc as suggested by Will, with the 
+> > > > > relevant acks/reviews  ?
+> > > > > 
+> > > > 
+> > > > I sent it on Tuesday. Did it not show up? Is arm at kernel.org the correct
+> > > > address? I got the cc:
+> > > > 
+> > > > From: Mark Salter <msalter@redhat.com>
+> > > > To: arm at kernel.org
+> > > > Cc: Mark Salter <msalter@redhat.com>
+> > > > Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+> > > > Date: Tue, 28 Apr 2015 13:09:32 -0400
+> > > > Message-Id: <1430240972-16386-1-git-send-email-msalter@redhat.com>
+> > > 
+> > > That's the right address, but that only goes to the maintainers, and
+> > > doesn't get copied to any list. In future, please Cc linux-arm-kernel in
+> > > addition.
+> > 
+> > That's where I sent it originally.
+> 
+> Sure, but it's good to Cc when sending to arm-soc so as to make it
+> visible that the patches have been sent. Doing so avoids the necessity
+> of queries like Suzuki's, and makes it possible for others to reply to
+> the version sent to arm at kernel.org in the case of conflicts or other
+> issues.
 
-Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
----
- arch/arm/mach-imx/time.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index f7403ab..4db233f 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -149,7 +149,8 @@ static unsigned long imx_read_current_timer(void)
- 	return __raw_readl(sched_clock_reg);
- }
- 
--static int __init mxc_clocksource_init(struct clk *timer_clk)
-+static int __init mxc_clocksource_init(struct clk *timer_clk,
-+				void __iomem *addr)
- {
- 	unsigned int c = clk_get_rate(timer_clk);
- 	void __iomem *reg = timer_base + (timer_is_v2() ? V2_TCN : MX1_2_TCN);
-@@ -355,7 +356,7 @@ static void __init _mxc_timer_init(int irq,
- 	__raw_writel(tctl_val, timer_base + MXC_TCTL);
- 
- 	/* init and register the timer to the framework */
--	mxc_clocksource_init(clk_per);
-+	mxc_clocksource_init(clk_per, 0);
- 	mxc_clockevent_init(clk_per, 0);
- 
- 	/* Make irqs happen */
--- 
-1.9.1
+But why did it need to be sent to a private maintainer's list in the
+first place? I think that the destination addresses of the original
+posting was perfectly reasonable given output from get_maintainer.pl
+and that sending me to a private list was an unnecessary hoop to
+jump through.
