@@ -1,101 +1,82 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 30 Apr 2015 14:57:48 +0100
-Subject: [PATCH] arm64: dts: Add idle-states for Juno
-Message-ID: <1430402268.2868.20.camel@linaro.org>
+From: houpengyang@huawei.com (Hou Pengyang)
+Date: Thu, 30 Apr 2015 13:58:52 +0000
+Subject: [PATCH v2] arm & arm64: perf: Fix callchain parse error with kernel
+ tracepoint events
+Message-ID: <1430402332-52750-1-git-send-email-houpengyang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Medhurst <tixy@linaro.org>
+For ARM & ARM64, when tracing with tracepoint events, the IP and cpsr are 
+set to 0, preventing the perf code parsing the callchain and resolving the 
+symbols correctly.
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
+ ./perf record -e sched:sched_switch -g --call-graph dwarf ls
+    [ perf record: Captured and wrote 0.146 MB perf.data ]
+ ./perf report -f
+    Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194 
+    Children      Self    Command  Shared Object     Symbol
+    100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
+
+The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
+several necessary registers used for callchain unwinding, including pc,sp,
+fp and psr .
+
+With this patch, callchain can be parsed correctly as follows:
+
+     ......
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
+-    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
+     pfkey_send_policy_notify
+     pfkey_get
+     v9fs_vfs_rename
+     page_follow_link_light
+     link_path_walk
+     el0_svc_naked
+    .......
+
+Jean Pihet found this in ARM and come up with a patch:
+http://thread.gmane.org/gmane.linux.kernel/1734283/focus=1734280
+
+Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
 ---
+ arch/arm/include/asm/perf_event.h   | 7 +++++++
+ arch/arm64/include/asm/perf_event.h | 7 +++++++
+ 2 files changed, 14 insertions(+)
 
-These have been kicking around out of tree for ages, any reason they
-shouldn't be in mainline? Also, was unsure of what to put in commit
-message.
-
- arch/arm64/boot/dts/arm/juno.dts | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index 133ee59..7a9a449 100644
---- a/arch/arm64/boot/dts/arm/juno.dts
-+++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -34,12 +34,35 @@
- 		#address-cells = <2>;
- 		#size-cells = <0>;
+diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
+index d9cf138..17705e2b 100644
+--- a/arch/arm/include/asm/perf_event.h
++++ b/arch/arm/include/asm/perf_event.h
+@@ -19,4 +19,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
+ #define perf_misc_flags(regs)	perf_misc_flags(regs)
+ #endif
  
-+		idle-states {
-+			entry-method = "arm,psci";
++#define perf_arch_fetch_caller_regs(regs, __ip) { \
++    (regs)->ARM_pc = (__ip); \
++    (regs)->ARM_fp = (unsigned long) __builtin_frame_address(0); \
++    (regs)->ARM_sp = current_stack_pointer; \
++    (regs)->ARM_cpsr |= SYSTEM_MODE; \
++}
 +
-+			CPU_SLEEP_0: cpu-sleep-0 {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x0010000>;
-+				local-timer-stop;
-+				entry-latency-us = <100>;
-+				exit-latency-us = <250>;
-+				min-residency-us = <2000>;
-+			};
+ #endif /* __ARM_PERF_EVENT_H__ */
+diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+index d26d1d5..e6911a4 100644
+--- a/arch/arm64/include/asm/perf_event.h
++++ b/arch/arm64/include/asm/perf_event.h
+@@ -24,4 +24,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
+ #define perf_misc_flags(regs)	perf_misc_flags(regs)
+ #endif
+	 
++#define perf_arch_fetch_caller_regs(regs, __ip) { \
++    (regs)->ARM_pc = (__ip);    \
++    (regs)->ARM_fp = (unsigned long) __builtin_frame_address(0); \
++    (regs)->ARM_sp = current_stack_pointer; \
++    (regs)->ARM_cpsr |= PSR_MODE_EL1h;	\
++}
 +
-+			CLUSTER_SLEEP_0: cluster-sleep-0 {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1010000>;
-+				local-timer-stop;
-+				entry-latency-us = <800>;
-+				exit-latency-us = <700>;
-+				min-residency-us = <2500>;
-+			};
-+		};
-+
- 		A57_0: cpu at 0 {
- 			compatible = "arm,cortex-a57","arm,armv8";
- 			reg = <0x0 0x0>;
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A57_L2>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		A57_1: cpu at 1 {
-@@ -48,6 +71,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A57_L2>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		A53_0: cpu at 100 {
-@@ -56,6 +80,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		A53_1: cpu at 101 {
-@@ -64,6 +89,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		A53_2: cpu at 102 {
-@@ -72,6 +98,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		A53_3: cpu at 103 {
-@@ -80,6 +107,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		A57_L2: l2-cache0 {
+ #endif
 -- 
-2.1.4
+1.8.5.2
