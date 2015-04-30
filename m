@@ -1,110 +1,70 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 30 Apr 2015 07:15:43 +0200
-Subject: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
- independent of SoCs.
-In-Reply-To: <BL2PR03MB370C3AEE0CB1200EDDDD0FE83D70@BL2PR03MB370.namprd03.prod.outlook.com>
-References: <1430316881-4668-1-git-send-email-shenwei.wang@freescale.com>
- <20150429185736.GA27777@pengutronix.de>
- <BL2PR03MB370C3AEE0CB1200EDDDD0FE83D70@BL2PR03MB370.namprd03.prod.outlook.com>
-Message-ID: <20150430051543.GX6325@pengutronix.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 30 Apr 2015 10:56:33 +0530
+Subject: [PATCH 2/3 v7] mailbox: Enable BCM2835 mailbox support
+In-Reply-To: <1430327374-6562-1-git-send-email-eric@anholt.net>
+References: <1430254460-26754-1-git-send-email-eric@anholt.net>
+ <1430327374-6562-1-git-send-email-eric@anholt.net>
+Message-ID: <CABb+yY0+Dd6RMJfmcqWrJfsSkPS8KjtpctJteoTZrj3QttJ71g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 29, 2015 at 07:56:57PM +0000, Shenwei Wang wrote:
-> Hi Sacha,
-> 
-> > -----Original Message-----
-> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > Sent: 2015?4?29? 13:58
-> > To: Wang Shenwei-B38339
-> > Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
-> > independent of SoCs.
-> > 
-> > On Wed, Apr 29, 2015 at 09:14:41AM -0500, Shenwei Wang wrote:
-> > > There are 4 versions of the timer hardware on Freescale MXC hardware.
-> > > --Version 0: MX1/MXL
-> > > --Version 1: MX21, MX27.
-> > > --Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q --Version 3: MX6DL,
-> > > MX6SX
-> > >
-> > > This patch has removed the SoC related codes, and implemented the
-> > > driver directly upon the hardware timer IP version.
-> > >
-> > > The new driver can be installed via device tree or the direct function
-> > > call to mxc_timer_init in order to support imx legacy systems like
-> > > MX21 and MX27.
-> > >
-> > > For the device tree implementation, the driver is compatible with the
-> > > current bindings like "fsl,imx6q-gpt", but for future dts file, the
-> > > string like "fsl,imx-gpt-v2" without SoC information is recommended.
-> > 
-> > [...]
-> > 
-> > > +
-> > > +CLOCKSOURCE_OF_DECLARE(mx_timer_v0, "fsl,imx-gpt-v0",
-> > > +mxc_timer_init_dt); CLOCKSOURCE_OF_DECLARE(mx_timer_v1,
-> > > +"fsl,imx-gpt-v1", mxc_timer_init_dt);
-> > > +CLOCKSOURCE_OF_DECLARE(mx_timer_v2, "fsl,imx-gpt-v2",
-> > > +mxc_timer_init_dt); CLOCKSOURCE_OF_DECLARE(mx_timer_v3,
-> > > +"fsl,imx-gpt-v3", mxc_timer_init_dt);
-> > >  CLOCKSOURCE_OF_DECLARE(mx1_timer, "fsl,imx1-gpt", mxc_timer_init_dt);
-> > > CLOCKSOURCE_OF_DECLARE(mx25_timer, "fsl,imx25-gpt",
-> > > mxc_timer_init_dt);  CLOCKSOURCE_OF_DECLARE(mx50_timer,
-> > > "fsl,imx50-gpt", mxc_timer_init_dt);
-> > 
-> > Don't make it more complicated than it is. Instead of using mxc_timer_init_dt for
-> > all different timers and dispatch the different versions later introduce
-> > mxc_timer_init_v[0123] and put this directly into the function callbacks here.
-> > 
-> > Overall this patch has much too many changes in it. It changes the compatible
-> > entries, changes the implementation, splits the two timer versions into four,
-> > changes the scope of the clockevent_mode variable and renames it to last_mode.
-> > This should be split up into different patches.
-> > 
-> The patch did create some trouble for review. I am going to split it into several small patches.
-> 
-> 
-> > I don't like these fsl,imx-gpt-vx compatibles at all. They seem to be pretty useless
-> > since all device trees already have a oldest compatible version as second
-> > compatible entry. There's no need to create new compatibles.
-> > 
-> The second compatible string is useless at all in this case. Because the driver will only run correctly 
-> on the specified version of IP block. For example, you can not specify a compatible string of "fsl,imx25-gpt"
-> in imx6sx dts file and then suppose it could work on the imx6sx platform. There are still some real needs to
-> let the version of the IP block. For example, there are two revisions of imx6q SoCs. One revision has a v2 timer 
-> IP block, and the other revision has a v3 one. Since both revisions are imx6q, one way has to be selected to 
-> identify them. So I don't think it is useless. "fsl,imx-gpt-vx" is not a beautiful name, but I think it is a better 
-> name than the current one.
+On Wed, Apr 29, 2015 at 10:39 PM, Eric Anholt <eric@anholt.net> wrote:
 
-The policy so far is:
+> +
+> +struct bcm2835_mbox {
+> +       struct device *dev;
+> +       void __iomem *regs;
+> +       spinlock_t lock;
+> +       struct mbox_controller controller;
+> +};
+> +
+> +static struct bcm2835_mbox *mbox;
+> +
+> +static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
+> +{
+> +       struct device *dev = mbox->dev;
+> +       struct mbox_chan *link = &mbox->controller.chans[0];
+> +
+I learn from Stephen's other post that the controller could have
+multiple channels. In which case this driver is poorly setup. Actually
+if the driver was designed properly there isn't anything special to be
+done.
+ Here you choose to waste 'dev_id' and hard-code dereferencing to channel-0
 
-- use the exact SoC name as primary compatible string
-- Use the oldest SoC we *think* is compatible at the time of writing as
-  secondary compatible.
+> +       while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
+> +               u32 msg = readl(mbox->regs + MAIL0_RD);
+> +               dev_dbg(dev, "Reply 0x%08X\n", msg);
+> +               mbox_chan_received_data(link, &msg);
+> +       }
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +static int bcm2835_send_data(struct mbox_chan *link, void *data)
+> +{
+> +       int ret = 0;
+> +       u32 msg = *(u32 *)data;
+> +
+> +       spin_lock(&mbox->lock);
+> +       writel(msg, mbox->regs + MAIL1_WRT);
+> +       dev_dbg(mbox->dev, "Request 0x%08X\n", msg);
+> +end:
+>
+Did you compile check the driver for errors and warnings?
 
-This way we can always match to the oldest compatible in the driver
-(Thus i.MX7 could get a "i.MX6sx" compatible or whatever). Should we
-realize later that there are slight differences between timers that we
-thought would be identical, then we can still change the driver to match
-against the exact compatible string.
-
-Whether we use the SoC name or Vxy doesn't matter at all. With Vxy we
-still need to increase the counter with each new SoC since there might
-be differences discovered later. We can't really say for sure that
-there only four versions of the timer, only that by now we have
-identified four versions. On i.MX we chose to match to the SoC name not
-only for the timer but for all other devices aswell, so let's keep it
-that way.
-
-That i.MX6q has two different versions of the timer is unfortunate, that
-needs a new compatible string, but whether that is fsl,imx-gpt-v3 or
-fsl,imx6q-gpt-newone again doesn't matter.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> +static int bcm2835_mbox_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       int ret = 0;
+> +       struct resource *iomem;
+> +
+> +       mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
+> +       if (mbox == NULL)
+> +               return -ENOMEM;
+> +       mbox->dev = dev;
+> +       spin_lock_init(&mbox->lock);
+> +
+> +       ret = devm_request_irq(dev, irq_of_parse_and_map(dev->of_node, 0),
+> +                              bcm2835_mbox_irq, 0, dev_name(dev), mbox);
+>
+Why even pass 'mbox' when you insist on ignoring 'dev_id' and access
+the global variable again directly :D
