@@ -1,172 +1,118 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 30 Apr 2015 17:38:01 +0530
-Subject: [PATCH V4 3/3] OPP: Add 'opp-next' in operating-points-v2 bindings
-In-Reply-To: <cover.1430394884.git.viresh.kumar@linaro.org>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
-Message-ID: <1ee98ae5b45083e681c7f530e0ae9195e5636119.1430394884.git.viresh.kumar@linaro.org>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 30 Apr 2015 14:33:00 +0200
+Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <3900315.9fjubb6CtE@wuerfel>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <7128860.xHITr0VFap@wuerfel> <20150430094134.GD3488@pd.tnic>
+ <3900315.9fjubb6CtE@wuerfel>
+Message-ID: <20150430123300.GE3488@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many platforms require to switch to a intermediate frequency before
-switching to a final frequency. Or they can switch to only particular
-OPPs from any OPP.
+On Thu, Apr 30, 2015 at 12:21:14PM +0200, Arnd Bergmann wrote:
+> They don't normally change stuff intentionally, but you can have
+> drivers for the same hardware that are written so differently that
+> it becomes hard to spot that they are doing the same thing.
+> 
+> We have a bunch of XGMAC drivers for the same basic licensed IP block,
+> each one configured a bit differently and extended with some soc-specific
+> bits, and drivers written from scratch.
 
-For these add another property in OPP-v2, 'opp-next'.
+So not nice.
 
-Refer to the bindings for more details.
+> I would also not assume that people are trying hard to hide something
+> from you, it's more that some guy is given the task to write a driver
+> for an IP block, but is not told who made that, so the binding will
+> just come with the name of the company he's working for.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- Documentation/devicetree/bindings/power/opp.txt | 130 ++++++++++++++++++++++++
- 1 file changed, 130 insertions(+)
+So I'd home some guy would go grep the sources and hopefully find that
+very similar functionality is already present.
 
-diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-index 07959903ec32..c96dc77121b7 100644
---- a/Documentation/devicetree/bindings/power/opp.txt
-+++ b/Documentation/devicetree/bindings/power/opp.txt
-@@ -72,6 +72,9 @@ properties.
- 
- - clock-latency-ns: Specifies the maximum possible transition latency (in
-   nanoseconds) for switching to this OPP from any other OPP.
-+- opp-next: It contains a list of phandles to other OPPs, to which we can switch
-+  directly from this OPP (Explained later with examples). Missing property means
-+  no restriction on switching to other OPPs.
- - turbo-mode: Marks the OPP to be used only for turbo modes.
- - status: Marks the node enabled/disabled.
- 
-@@ -363,6 +366,133 @@ Example 4: Handling multiple regulators
- 	};
- };
- 
-+Example 5: How to use "opp-next" property ?
-+
-+1.) Switch to a intermediate OPP (entry00) before switching to any other OPP.
-+
-+/ {
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+			clocks = <&clk_controller 0>;
-+			clock-names = "cpu";
-+			opp-supply = <&cpu_supply0>;
-+			operating-points-v2 = <&cpu0_opp>;
-+		};
-+	};
-+
-+	cpu0_opp: opp0 {
-+		compatible = "operating-points-v2";
-+		shared-opp;
-+
-+		opp_next: entry00 {
-+			opp-khz = <500000>;
-+			opp-microvolt = <800000>;
-+			clock-latency-ns = <300000>;
-+			/* Can switch to any OPP from here */
-+		};
-+		entry01 {
-+			opp-khz = <600000>;
-+			opp-microvolt = <800000>;
-+			clock-latency-ns = <300000>;
-+			opp-next = <&opp_next>;
-+		};
-+		entry02 {
-+			opp-khz = <900000>;
-+			opp-microvolt = <970000 975000 985000>;
-+			clock-latency-ns = <300000>;
-+			opp-next = <&opp_next>;
-+		};
-+		entry03 {
-+			opp-khz = <1000000>;
-+			opp-microvolt = <970000 975000 985000>;
-+			clock-latency-ns = <300000>;
-+			opp-next = <&opp_next>;
-+		};
-+		entry04 {
-+			opp-khz = <1100000>;
-+			opp-microvolt = <980000 1000000 1010000>;
-+			clock-latency-ns = <310000>;
-+			opp-next = <&opp_next>;
-+		};
-+		entry05 {
-+			opp-khz = <1200000>;
-+			opp-microvolt = <1025000>;
-+			clock-latency-ns = <290000>;
-+			opp-next = <&opp_next>;
-+			turbo-mode;
-+		};
-+	};
-+};
-+
-+2.) Can only switch to the next or previous OPP directly.
-+
-+/ {
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+			clocks = <&clk_controller 0>;
-+			clock-names = "cpu";
-+			opp-supply = <&cpu_supply0>;
-+			operating-points-v2 = <&cpu0_opp>;
-+		};
-+	};
-+
-+	cpu0_opp: opp0 {
-+		compatible = "operating-points-v2";
-+		shared-opp;
-+
-+		opp_next0: entry00 {
-+			opp-khz = <500000>;
-+			opp-microvolt = <800000>;
-+			clock-latency-ns = <300000>;
-+			opp-next = <&opp_next1>;
-+		};
-+		opp_next1: entry01 {
-+			opp-khz = <600000>;
-+			opp-microvolt = <800000>;
-+			clock-latency-ns = <300000>;
-+			opp-next = <&opp_next0>, <&opp_next2>;
-+		};
-+		opp_next2: entry02 {
-+			opp-khz = <900000>;
-+			opp-microvolt = <970000 975000 985000>;
-+			clock-latency-ns = <300000>;
-+			opp-next = <&opp_next1>, <&opp_next3>;
-+		};
-+		opp_next3: entry03 {
-+			opp-khz = <1000000>;
-+			opp-microvolt = <970000 975000 985000>;
-+			clock-latency-ns = <300000>;
-+			opp-next = <&opp_next2>, <&opp_next4>;
-+		};
-+		opp_next4: entry04 {
-+			opp-khz = <1100000>;
-+			opp-microvolt = <980000 1000000 1010000>;
-+			clock-latency-ns = <310000>;
-+			opp-next = <&opp_next3>, <&opp_next5>;
-+		};
-+		opp_next5: entry05 {
-+			opp-khz = <1200000>;
-+			opp-microvolt = <1025000>;
-+			clock-latency-ns = <290000>;
-+			opp-next = <&opp_next4>;
-+			turbo-mode;
-+		};
-+	};
-+};
-+
-+
- 
- Deprecated Bindings
- -------------------
+> Right, but they would then also have to load the code for the other
+> blocks they did not license.
+
+That's a problem? I mean, the other code is inactive anyway and is only
+a couple of KBytes. So not a big deal IMO.
+
+If that becomes a problem with embedded, we can always do ugly ifdeffery
+and Kconfig games if absolutely necessary.
+
+> > xgene_edac_mc
+> > xgene_edac_mc-v2
+> > xgene_edac_l3
+> > xgene_edac-l2
+> > ...
+> 
+> Not following you here, what is the problem here?
+
+The unnecessary fragmentation of xgene_edac functionality. I would like,
+if possible, to concentrate all xgene RAS stuff in one file, like x86
+does. And then there's the talking between the two aspect below...
+
+> Agreed. If the drivers need to talk to one another, that is a clear
+> sign that the devices are not actually independent and that they
+> really belong into a single driver. That's not the case I'm thinking
+> of here.
+
+But if we split <vendor>_edac stuff per IP block, that will become a
+problem. So we better talk about it now.
+
+> The devicetree just describes the available hardware blocks. Typically
+> you have one node for one block (e.g. a memory controller), and then
+> have one driver for that block.
+>
+> Things get a little funny if you want to have multiple drivers for
+> the same device, e.g. you want a driver in drivers/memory/ to support
+> autorefresh in sleep states and another driver in drivers/edac to
+> support error handling. If you get something like this, you need
+> some coordination between the two drivers, but that is unrelated to
+> devicetree or not.
+> 
+> A platform driver should match against a set of similar devices that are
+> identified by a "compatible" string, and we try to list the name of the
+> ip block here, which could be something like "arm,pl12345rev1.2" if it
+> is licensed from another company, or if that is not known, describe it
+> by using the product number of the first chip it appeared in, e.g.
+> "amcc,405ez-memory-controller". APM does not use numbers for their
+> chips, so "apm,xgene-memory-controller" would refer to the memory
+> controller used in the "xgene" chip. If they come out with a second
+> product that uses the same one, they would use the same string, or
+> use "apm,ygene-memory-controller" for the one that is in "ygene" if
+> that is slightly different. The driver can then match against both
+> and handle the differences based on the compatible string.
+
+Thanks for that background info, it helps a lot.
+
+> The point where it gets silly is when you try to handle multiple
+> unrelated devices in the same driver and you get a probe function
+> that just does:
+
+Ok, what if they're related through RAS?
+
+I.e., xgene_edac contains all RAS-specific functionality of the xgene IP
+blocks. This doesn't sound silly to me, frankly, and it concentrates it
+all in one place. Communication between blocks is trivial and there's no
+code duplication.
+
+Other vendors using those IP blocks would simply add new DT descriptions.
+
+> apm_edac_probe(struct platform_device *dev)
+> {
+> 	if (dev_is_xgene_mc(dev))
+> 		return apm_probe_xgene_mc(dev);
+> 	if (dev_is_xgene_l2(dev))
+> 		return apm_probe_xgene_l2(dev);
+> 	if (dev_is_ygene_mc(dev))
+> 		...
+
+So we do that on x86 - amd64_edac does AMD per-family setup and sb_edac
+too, for the last 4 Intel uarches. And it works just fine. So if "silly"
+is the only problem, I can certainly live with it.
+
 -- 
-2.3.0.rc0.44.ga94655d
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
