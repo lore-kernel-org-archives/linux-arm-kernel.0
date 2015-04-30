@@ -1,38 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 30 Apr 2015 21:12:07 +0100
-Subject: [RESEND RFC PATCH 1/3] ASoC: mediatek: Add binding support for
- AFE driver
-In-Reply-To: <1429672640.14162.55.camel@mtksdaap41>
-References: <1428653649-38200-1-git-send-email-koro.chen@mediatek.com>
- <1428653649-38200-2-git-send-email-koro.chen@mediatek.com>
- <20150418173407.GE26185@sirena.org.uk>
- <20150420043747.GH6325@pengutronix.de>
- <20150420204849.GJ14892@sirena.org.uk>
- <1429672640.14162.55.camel@mtksdaap41>
-Message-ID: <20150430201207.GK22845@sirena.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 30 Apr 2015 15:37:12 -0500
+Subject: [PATCH v2 3/4] ARM: sa1100: remove unused RTC register definitions
+In-Reply-To: <1430426233-7461-1-git-send-email-robh@kernel.org>
+References: <1430426233-7461-1-git-send-email-robh@kernel.org>
+Message-ID: <1430426233-7461-4-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 22, 2015 at 11:17:20AM +0800, Koro Chen wrote:
+Now that register definitions have been moved to the driver, we can remove
+them from machine specific code.
 
-> If using DPCM, it seems the most suitable FE DAIs will be memif, and
-> external interface like I2S should be BE DAIs. Do you think it is
-> suitable for our memif to be FE DAIs? Then which memif to used can be
-> described in a machine driver's FE DAIs. But I think this has a problem
-> that our memif is one-direction, playback or capture. So the binded pcm
-> device cannot have playback and capture capability together. May it
-> cause trouble for user space apps that assumes there will be pcmC0D0p,
-> pcmC0D0c?
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+v2:
+- Rebase to v4.1-rc1
 
-I think the only userspace application you really have to worry about
-here is PulseAudio which (at least with UCM) should be able to cope
-since it needs to handle things like USB microphones.  I think
-everything else I can think of can either cope or has to handle the same
-use cases as PulseAudio does so should have support.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150430/243c1ad7/attachment.sig>
+ arch/arm/mach-sa1100/include/mach/SA-1100.h | 34 -----------------------------
+ 1 file changed, 34 deletions(-)
+
+diff --git a/arch/arm/mach-sa1100/include/mach/SA-1100.h b/arch/arm/mach-sa1100/include/mach/SA-1100.h
+index 0ac6cc0..7972617 100644
+--- a/arch/arm/mach-sa1100/include/mach/SA-1100.h
++++ b/arch/arm/mach-sa1100/include/mach/SA-1100.h
+@@ -858,40 +858,6 @@
+
+
+ /*
+- * Real-Time Clock (RTC) control registers
+- *
+- * Registers
+- *    RTAR      	Real-Time Clock (RTC) Alarm Register (read/write).
+- *    RCNR      	Real-Time Clock (RTC) CouNt Register (read/write).
+- *    RTTR      	Real-Time Clock (RTC) Trim Register (read/write).
+- *    RTSR      	Real-Time Clock (RTC) Status Register (read/write).
+- *
+- * Clocks
+- *    frtx, Trtx	Frequency, period of the real-time clock crystal
+- *              	(32.768 kHz nominal).
+- *    frtc, Trtc	Frequency, period of the real-time clock counter
+- *              	(1 Hz nominal).
+- */
+-
+-#define RTAR		__REG(0x90010000)  /* RTC Alarm Reg. */
+-#define RCNR		__REG(0x90010004)  /* RTC CouNt Reg. */
+-#define RTTR		__REG(0x90010008)  /* RTC Trim Reg. */
+-#define RTSR		__REG(0x90010010)  /* RTC Status Reg. */
+-
+-#define RTTR_C  	Fld (16, 0)	/* clock divider Count - 1         */
+-#define RTTR_D  	Fld (10, 16)	/* trim Delete count               */
+-                	        	/* frtc = (1023*(C + 1) - D)*frtx/ */
+-                	        	/*        (1023*(C + 1)^2)         */
+-                	        	/* Trtc = (1023*(C + 1)^2)*Trtx/   */
+-                	        	/*        (1023*(C + 1) - D)       */
+-
+-#define RTSR_AL 	0x00000001	/* ALarm detected                  */
+-#define RTSR_HZ 	0x00000002	/* 1 Hz clock detected             */
+-#define RTSR_ALE	0x00000004	/* ALarm interrupt Enable          */
+-#define RTSR_HZE	0x00000008	/* 1 Hz clock interrupt Enable     */
+-
+-
+-/*
+  * Power Manager (PM) control registers
+  *
+  * Registers
+--
+2.1.0
