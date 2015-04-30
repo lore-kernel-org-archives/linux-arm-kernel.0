@@ -1,66 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Apr 2015 11:41:02 +0100
-Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
- device coherency
-In-Reply-To: <6513459.YvvHTY3yyJ@wuerfel>
-References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <2968069.n1L1S3Mp2q@wuerfel> <554152C6.7020600@amd.com>
- <6513459.YvvHTY3yyJ@wuerfel>
-Message-ID: <20150430104101.GD32373@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Apr 2015 12:42:48 +0200
+Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <20150430094134.GD3488@pd.tnic>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <7128860.xHITr0VFap@wuerfel> <20150430094134.GD3488@pd.tnic>
+Message-ID: <10227049.9i19zDi2y3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Thu, Apr 30, 2015 at 09:23:59AM +0100, Arnd Bergmann wrote:
-> On Wednesday 29 April 2015 16:53:10 Suravee Suthikulpanit wrote:
-> > As for the case where _CCA=0, I think the ACPI driver should essentially 
-> > communicate the information as HW is non-coherent as described in the 
-> > spec, and should be calling arch_setup_dma_ops(dev, false). It is true 
-> > that this in probably less-likely for the ARM64 server platforms. 
-> > However, I would think that the ACPI driver should not be making such 
-> > assumption.
+On Thursday 30 April 2015 11:41:34 Borislav Petkov wrote:
+> But if those three vendors went and created an EDAC module each for
+> their system, it would be a lot of repeated copy'pasting and bloat.
 > 
-> Can you add a description to the ACPI spec then to describe in detail what
-> "non-coherent" is supposed to mean, and which action the OS is supposed to
-> take when accessing data from device or CPU?
+> Now, the other dimension doesn't look better either:
+> 
+> xgene_edac_mc
+> xgene_edac_mc-v2
+> xgene_edac_l3
+> xgene_edac-l2
+> ...
+> 
+> Also, in both cases, if any of those drivers need to talk to each other
+> or know of one another in any way, the situation becomes really funny as
+> they need to create something ad-hoc each time.
+> 
 
-You may be interested in the IORT ACPI companion spec here:
+I've looked at the driver in a little more detail now, and found that
+it is a weird conglomerate at the moment. Basically you have four
+drivers in one file here, appended to one another, but not sharing
+any common functions except the module_init() that registers the four
+drivers. This is what Rob was referring to when he suggested splitting
+it up into four files, and these would in total be smaller than the
+common file (by being able to use module_platform_driver()).
 
-  http://infocenter.arm.com/help/topic/com.arm.doc.den0049a/DEN0049A_IO_Remapping_Table.pdf
+However, there is another dimension to this, which supports your point
+about making it one driver for the platform: The split into four drivers
+is completely artificial, because all four use the same IRQs and
+implement four separate interrupt handlers for it (using IRQF_SHARED),
+each handling only the events they are interested in. Similarly, they
+all access the same register set ("pcperror"), aside from having their
+own separate registers, and they use the "syscon" framework to get to
+the registers.  This seems to be an inferior design, as the pcperror
+stuff apparently is the real EDAC block on the system and that should
+have a device driver for itself, with proper interfaces. syscon in
+contrast is designed for the case where you have a badly designed
+IP block that has lots of registers for functions all over the place
+for which no clear abstraction is possible.
 
-On CCA, it says:
+There is also the "efuse" that is listed as "syscon" here, but should
+really use a separate framework that has been under discussion for a
+while.
 
-  `This value must match the value returned by the _CCA object defined in
-   the DSDT for the device represented by this node. The attribute can take
-   the following values:
-
-   - 0x1: The device is fully coherent. No cache maintenance[1] is required for
-     memory shared with the device which is mapped on CPUs as
-     Inner Write-Back (IWB), Outer Write-back (OWB), and Inner
-     shareable (ISH). In addition, during system initialization at cold
-     boot, or after wakeup from low-power state, if the cache
-     coherency requires an SMMU override or some specific device
-     configuration, the platform firmware has to ensure that this has
-     been done. Therefore the semantics represented by a value of
-     0x1 are always correct at the time of hand-off from firmware to
-     OS.
-
-   - 0x0: The device is not coherent. Therefore:
-     * Cache maintenance is required for memory shared with the
-       device that is mapped on CPUs as IWB-OWB-ISH.
-     * No cache maintenance is required for memory shared with the
-       device that is mapped on the CPU as device or Non-cacheable.
-
-   All other values are reserved.
-
-[1] Note: Caching operations described in this document apply to the CPU
-    caches and any other caches in the system where device memory accesses
-    can hit.'
-
-This aside, the documented introduces some useful, related concepts such
-as CPM (coherent path to memory) and DACS (device attributes are cacheable
-and inner shareable) for describing different IO subsystems. It also has
-mechanisms to descibe ID repainting from PCI->SMMU->ITS.
-
-Will
+	Arnd
