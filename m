@@ -1,76 +1,134 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Apr 2015 11:56:17 +0200
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <20150430092953.GA32190@leverpostej>
-References: <55417F5A.4040300@linaro.org>
- <CAFEAcA_VSkPPhmMmn+M+AoX5wjB0r66xq0ygMLSfR7zg0yiXnw@mail.gmail.com>
- <20150430092953.GA32190@leverpostej>
-Message-ID: <10771707.5UNQMOWJlc@wuerfel>
+From: jchandra@broadcom.com (Jayachandran C.)
+Date: Thu, 30 Apr 2015 15:29:50 +0530
+Subject: [RFC PATCH 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150429174356.GA20947@red-moon>
+References: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
+ <6662179.AoBfCMOsxD@wuerfel> <20150429174356.GA20947@red-moon>
+Message-ID: <20150430095949.GJ2992@jayachandranc.netlogicmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 April 2015 10:29:53 Mark Rutland wrote:
-> On Thu, Apr 30, 2015 at 10:08:05AM +0100, Peter Maydell wrote:
-> > On 30 April 2015 at 09:03, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Thursday 30 April 2015 09:03:22 Shannon Zhao wrote:
-> > >>
-> > >> I am looking at adding support for external power down and reboot to
-> > >> ARM VMs.  With ACPI this is fairly straight forward and requires only
-> > >> adding a GPIO controller to the virt machine model and extending ACPI
-> > >> appropriately (see code here [1]). In addition Linaro LEG also have
-> > >> done a test that uses GPIO as power button to shutdown OS on fast model
-> > >> (see detail here [2]).
-> > >>
-> > >> However, we would like for this to work in systems that do not use
-> > >> ACPI as well. Adding a GPIO controller will still work, but we would
-> > >> need a generic way to tell Linux how to handle the GPIO events without
-> > >> adding any board-specific code to the VIRT platform. And what guest
-> > >> kernel driver do we need? Do we need another user-level daemon like acpid?
-> > >>
-> > >> Note that external shutdown can also be accomplished using the qemu
-> > >> guest agent [3], but maybe this is not a sufficiently stable approach.
-> > >>
-> > >> Any input on the approach to take here is very welcome.
-> > >
-> > > I would expect drivers/power/reset/gpio-poweroff.c to work in an identical
-> > > way with ACPI and DT, once you have added an ACPI binding for it.
+On Wed, Apr 29, 2015 at 06:43:57PM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Apr 29, 2015 at 01:34:20PM +0100, Arnd Bergmann wrote:
+> > On Wednesday 29 April 2015 17:09:58 Jayachandran C wrote:
+> > > The current code in pci-host-generic.c uses pci_common_init_dev()
+> > > from the arch/arm/ to do a part of the PCI initialization, and this
+> > > prevents it from being used on arm64.
+> > > 
+> > > The initialization done by pci_common_init_dev() that is really
+> > > needed by pci-host-generic.c can be done in the same file without
+> > > using the hw_pci API of ARM.
+> > > 
+> > > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
+> > > this is be handled by setting up 'struct gen_pci' to embed a
+> > > pci_sys_data variable as the first element on the ARM platform.
+> > > 
+> > > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 > > 
-> > Looking at Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
-> > that appears to be for "let the guest kernel turn off the system
-> > from the inside by toggling a GPIO line". What we want is the
-> > opposite: the external system (QEMU, in this case) toggles a GPIO
-> > line in order to request the guest kernel to do a clean shutdown
-> > or reboot. Or have I misunderstood what gpio-poweroff can do?
+> > This seems very useful
 > 
-> No, you're correct.
+> Yes, it is getting less awful, waiting for pci_sys_data to disappear.
 > 
-> There are a few "power button" bindings around, but it looks like they
-> all rely on platform details and aren't that generic.
+> > > -static int gen_pci_setup(int nr, struct pci_sys_data *sys)
+> > > +static int gen_pci_init(struct device *dev, struct gen_pci *pci)
+> > >  {
+> > > -	struct gen_pci *pci = sys->private_data;
+> > > -	list_splice_init(&pci->resources, &sys->resources);
+> > > -	return 1;
+> > > +	struct pci_bus *bus;
+> > > +
+> > > +	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+> > 
+> > Do we want to set that flag unconditionally? At least for servers,
+> > the resources should get assigned by firmware, and things might
+> > go wrong if Linux tries to reassign them. This is probably the
+> > case on kvmtool as well.
+
+I can skip setting this flag if PCI_PROBE_ONLY is set. Adding another
+device tree parameter for this may not be needed.
+
+> I will give it a go on kvmtool, but at first glance concern is
+> shared.
 > 
-> With ACPI what events may be singalled? Just power off, or reset, etc?
+> > > +	bus = pci_scan_root_bus(dev, 0, &gen_pci_ops, pci, &pci->resources);
+> > > +	if (!bus) {
+> > > +		dev_err(dev, "Scanning rootbus failed");
+> > > +		return -ENODEV;
+> > > +	}
+> > > +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> > 
+> > I thought this was done by default now. If it is not, can
+> > we make the of_irq swizzling the default?
 > 
-> Which of these do we need to be able to handle with DT?
+> Possibly yes.
 
-Actually, there are at least three different ways to do this:
+I am not sure I understand this, I thought pci_fixup_irqs needs to be
+called at this point.
 
-a) have an input device send the KEY_POWEROFF or KEY_REBOOT events to
-   user space, and have some process (e.g. desktop environment, or daemon)
-   handle the event by doing an appropriate action. This seems to be
-   what ACPI does on x86, and a lot of device tree based systems do
-   the same thing using gpio-keys.
+> > > +	if (!pci_has_flag(PCI_PROBE_ONLY)) {
+> > > +		pci_bus_size_bridges(bus);
+> > > +		pci_bus_assign_resources(bus);
+> > > +	}
+> > > +	pci_bus_add_devices(bus);
+> > > +
+> > > +	/* Configure PCI Express settings */
+> > > +	if (pci_has_flag(PCI_PROBE_ONLY)) {
+> > > +		struct pci_bus *child;
+> > > +
+> > > +		list_for_each_entry(child, &bus->children, node)
+> > > +			pcie_bus_configure_settings(child);
+> > > +	}
+> > > +	return 0;
+> > >  }
+> > 
+> > We should also try to come up wtih a way to make that
+> > pcie_bus_configure_settings() automatic if it's required here.
+> > 
+> > >  static int gen_pci_probe(struct platform_device *pdev)
+> > > @@ -214,13 +237,6 @@ static int gen_pci_probe(struct platform_device *pdev)
+> > >  	struct device *dev = &pdev->dev;
+> > >  	struct device_node *np = dev->of_node;
+> > >  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> > > -	struct hw_pci hw = {
+> > > -		.nr_controllers	= 1,
+> > > -		.private_data	= (void **)&pci,
+> > > -		.setup		= gen_pci_setup,
+> > > -		.map_irq	= of_irq_parse_and_map_pci,
+> > > -		.ops		= &gen_pci_ops,
+> > > -	};
+> > >  
+> > >  	if (!pci)
+> > >  		return -ENOMEM;
+> > > @@ -258,8 +274,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+> > >  		return err;
+> > >  	}
+> > >  
+> > > -	pci_common_init_dev(dev, &hw);
+> > > -	return 0;
+> > > +	return gen_pci_init(dev, pci);
+> > 
+> > How about moving the new code right into the probe() function?
+> 
+> +1.
 
-b) Have a special driver that calls orderly_poweroff or orderly_reboot.
-   Only PowerPC (OPAL) uses the orderly_reboot() here, but a few platforms
-   (Xen, fsl_hypervisor, and some sparc and powerpc machines) as well
-   as some device drivers (thermal management etc) call this as well.
-   The effect is to call a user-configured binary (/sbin/reboot and
-   /sbin/poweroff by default).
+I will add this to patch v2.
+ 
+> I suspect the PCI_PROBE_ONLY case was not tested on arm64, since we
+> still need a patch to prevent resources enablement there (in the
+> pcibios_enable_device call - actually the check for PCI_PROBE_ONLY
+> should be moved to the default pcibios_enable_device function in
+> drivers/pci/pci.c).
+> 
+> The other bit missing is MSI handling, that should still be implemented.
 
-c) call ctrl_alt_del(): a bunch of platforms do this, and user space
-   has to configure whether this immediately calls kernel_restart(),
-   or sends SIGINT to the init process, which can then do an orderly
-   reboot. Again, highbank does this as the reboot action, but very
-   few other systems seem to do it, aside from the vt keyboard driver
-   that is used on all machines that have normal keyboard.
+I think we should parse msi-parent and set ->msi on the root bus in
+pci-host-generic.c. The implementation of pcibios_msi_controller() for
+arm/arm64 can go up the bus hierarchy and return the first msi
+controller it finds. This would be trivial to add to arm/arm64.
+I can post a follow up patch for this if you are interested.
 
-	Arnd
+If there are no additional concerns, I can post v2 of the patch after
+testing on arm.
+
+Thanks,
+JC.
