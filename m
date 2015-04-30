@@ -1,67 +1,65 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Apr 2015 16:05:25 +0900
-Subject: [PATCH v3 2/2] ARM: dts: Use last parent for clocks during power
- domain on/off
-In-Reply-To: <1430377525-3145-1-git-send-email-k.kozlowski@samsung.com>
-References: <1430377525-3145-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1430377525-3145-2-git-send-email-k.kozlowski@samsung.com>
+From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
+Date: Thu, 30 Apr 2015 10:21:06 +0300
+Subject: [PATCH 1/2] coresight: replicator: Add Qualcomm CoreSight
+ Replicator driver
+In-Reply-To: <CANLsYkwfDYjTqBUvXp2da6E=SA8F2EbH7_Mi20Sba9NpJm9Y7g@mail.gmail.com>
+References: <1430310000-10867-1-git-send-email-ivan.ivanov@linaro.org>
+ <1430310000-10867-2-git-send-email-ivan.ivanov@linaro.org>
+ <CANLsYkwfDYjTqBUvXp2da6E=SA8F2EbH7_Mi20Sba9NpJm9Y7g@mail.gmail.com>
+Message-ID: <1430378466.2400.8.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace fixed parent with last parent (obtained with clk_get_parent())
-of clocks for devices in mfc and disp power domains. This should improve
-behavior if such clocks were reparented by the drivers and new parents
-are different than those specified in DTS.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+On Wed, 2015-04-29 at 10:28 -0600, Mathieu Poirier wrote:
+> On 29 April 2015 at 06:19, Ivan T. Ivanov ivanov at linaro.org> wrote:
 
----
+<snip>
 
-Changes since v2:
-1. None.
+> >                 - "arm,coresight-etm4x", "arm,primecell";
+> > +               - "qcom,coresight-replicator", "arm,primecell";
+> 
+> Is there some sort of versioning information we can add like it was
+> done for the "coresight-etmXY" bindings?  It makes things a lot
+> cleaner when a new (and possibly not backward compatible) version gets
+> released.
+> 
 
-Changes since v1:
-1. Add Javier's reviewed/tested tags. Thanks!
----
- arch/arm/boot/dts/exynos5420.dtsi | 13 ++++---------
- 1 file changed, 4 insertions(+), 9 deletions(-)
+>From what I can see, it is version 1. I could add it to compatible
+string, but suldn't we use amba_id for this reason.
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index f67b23f303c3..2e6c95702ced 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -264,9 +264,8 @@
- 	mfc_pd: power-domain at 10044060 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044060 0x20>;
--		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK333>,
--			<&clock CLK_MOUT_USER_ACLK333>;
--		clock-names = "oscclk", "pclk0", "clk0";
-+		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_USER_ACLK333>;
-+		clock-names = "oscclk", "clk0";
- 		#power-domain-cells = <0>;
- 	};
- 
-@@ -280,16 +279,12 @@
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x100440C0 0x20>;
- 		#power-domain-cells = <0>;
--		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK200>,
-+		clocks = <&clock CLK_FIN_PLL>,
- 			 <&clock CLK_MOUT_USER_ACLK200_DISP1>,
--			 <&clock CLK_MOUT_SW_ACLK300>,
- 			 <&clock CLK_MOUT_USER_ACLK300_DISP1>,
--			 <&clock CLK_MOUT_SW_ACLK400>,
- 			 <&clock CLK_MOUT_USER_ACLK400_DISP1>,
- 			 <&clock CLK_FIMD1>, <&clock CLK_MIXER>;
--		clock-names = "oscclk", "pclk0", "clk0",
--			      "pclk1", "clk1", "pclk2", "clk2",
--			      "asb0", "asb1";
-+		clock-names = "oscclk", "clk0", "clk1", "clk2", "asb0", "asb1";
- 	};
- 
- 	pinctrl_0: pinctrl at 13400000 {
--- 
-1.9.1
+> >         * reg: physical base address and length of the register
+> >           set(s) of the component.
+> > diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+> > index 6b331d4..165b681 100644
+> > --- a/drivers/hwtracing/coresight/Kconfig
+> > +++ b/drivers/hwtracing/coresight/Kconfig
+> > @@ -68,4 +68,13 @@ config CORESIGHT_SOURCE_ETM4X
+> >           instructions that a processor is executing. This is primarily useful
+> >           for instruction level tracing. Depending on the implemented version
+> >           data tracing may also be available.
+> > +
+> > +config CORESIGHT_QCOM_REPLICATOR
+> > +       bool "Qualcomm CoreSight Replicator driver"
+> > +       help
+> > +         This enables support for CoreSight link and sink driver that are
+> > +         responsible for transporting and collecting the trace data
+> > +         respectively. Link and sinks are dynamically aggregated with a trace
+> > +         entity at run time to form a complete trace path.
+> 
+> The replicator is only a link entity.  It is only transporting trace
+> data information rather than collecting it.  Please review the
+> comment.  
+
+True, sorry. copy and paste from CORESIGHT_LINKS_AND_SINKS.
+
+> Also, can this specific version run on both V7 and V8
+> architecture.  If not the proper "depends" should be added.
+> 
+
+Same driver/device on both architectures.
+
+Will fix rest of the comments and will resend.
+
+Thank you,
+Ivan
