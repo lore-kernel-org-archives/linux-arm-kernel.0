@@ -1,35 +1,31 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 30 Apr 2015 15:07:38 -0300
-Subject: [PATCH V7 04/10] ARM: dts: add imx7d soc dtsi file
-In-Reply-To: <1430317210-18333-5-git-send-email-Frank.Li@freescale.com>
-References: <1430317210-18333-1-git-send-email-Frank.Li@freescale.com>
- <1430317210-18333-5-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAOMZO5C2ye2GHi_CxFd_AKuK1k3okBBVgNoXN_31hjeCuzdXpA@mail.gmail.com>
+Date: Thu, 30 Apr 2015 15:20:38 -0300
+Subject: [PATCH 3/4] clk: si5351: Do not pass struct clk in platform_data
+In-Reply-To: <1430415954-29517-4-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1430415954-29517-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CAOMZO5BYnE2epGrWbnNnaqEt1r6+xoPYWKtjc8w-Ze22aitgXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
+On Thu, Apr 30, 2015 at 2:45 PM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
 
-On Wed, Apr 29, 2015 at 11:20 AM,  <Frank.Li@freescale.com> wrote:
-
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
+>          * property silabs,pll-source : <num src>, [<..>]
+>          * allow to selectively set pll source
+> @@ -1328,8 +1321,17 @@ static int si5351_i2c_probe(struct i2c_client *client,
+>         i2c_set_clientdata(client, drvdata);
+>         drvdata->client = client;
+>         drvdata->variant = variant;
+> -       drvdata->pxtal = pdata->clk_xtal;
+> -       drvdata->pclkin = pdata->clk_clkin;
+> +       drvdata->pxtal = devm_clk_get(&client->dev, "xtal");
+> +       drvdata->pclkin = devm_clk_get(&client->dev, "clkin");
 > +
-> +               cpu0: cpu at 0 {
-> +                       compatible = "arm,cortex-a7";
-> +                       device_type = "cpu";
-> +                       reg = <0>;
-> +                       operating-points = <
-> +                               /* KHz  uV */
-> +                               996000  1075000
-> +                               792000  975000
-> +                       >;
-> +                       clock-latency = <61036>; /* two CLK32 periods */
-> +                       clocks = <&clks IMX7D_ARM_A7_ROOT_CLK>, <&clks IMX7D_ARM_A7_ROOT_SRC>,
-> +                                <&clks IMX7D_PLL_ARM_MAIN_CLK>, <&clks IMX7D_PLL_SYS_MAIN_CLK>;
-> +                       clock-names = "arm", "arm_root_src", "pll_arm", "pll_sys_main";
-> +               };
-> +       };
+> +       if (PTR_ERR(drvdata->pxtal) == -EPROBE_DEFER ||
+> +           PTR_ERR(drvdata->pclkin) == -EPROBE_DEFER)
+> +               return -EPROBE_DEFER;
+> +
+> +       if (IS_ERR(drvdata->pxtal) && IS_ERR(drvdata->pclkin)) {
 
-That's a dual core, so you also need to pass cpu1 ;-)
+Don't you want || instead?
