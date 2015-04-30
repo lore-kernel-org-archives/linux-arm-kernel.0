@@ -1,78 +1,61 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 30 Apr 2015 21:38:32 +0800
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <20150430092953.GA32190@leverpostej>
-References: <55417F5A.4040300@linaro.org> <3341308.O9mDCt0NEl@wuerfel>
- <CAFEAcA_VSkPPhmMmn+M+AoX5wjB0r66xq0ygMLSfR7zg0yiXnw@mail.gmail.com>
- <20150430092953.GA32190@leverpostej>
-Message-ID: <55423058.8010509@linaro.org>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 30 Apr 2015 14:45:37 +0100
+Subject: [PATCH v2] ARM: vexpress: Add unified-cache Device Tree property
+In-Reply-To: <20150430133011.GE15254@pengutronix.de>
+References: <5509437E.6060806@arm.com>
+ <1426671298-2012-1-git-send-email-r.schwebel@pengutronix.de>
+ <20150429191228.GO15254@pengutronix.de>
+ <20150430110853.GN7440@e106497-lin.cambridge.arm.com>
+ <20150430133011.GE15254@pengutronix.de>
+Message-ID: <20150430134537.GP7440@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?04?30? 17:29, Mark Rutland wrote:
-> On Thu, Apr 30, 2015 at 10:08:05AM +0100, Peter Maydell wrote:
->> On 30 April 2015 at 09:03, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Thursday 30 April 2015 09:03:22 Shannon Zhao wrote:
->>>>
->>>> I am looking at adding support for external power down and reboot to
->>>> ARM VMs.  With ACPI this is fairly straight forward and requires only
->>>> adding a GPIO controller to the virt machine model and extending ACPI
->>>> appropriately (see code here [1]). In addition Linaro LEG also have
->>>> done a test that uses GPIO as power button to shutdown OS on fast model
->>>> (see detail here [2]).
->>>>
->>>> However, we would like for this to work in systems that do not use
->>>> ACPI as well. Adding a GPIO controller will still work, but we would
->>>> need a generic way to tell Linux how to handle the GPIO events without
->>>> adding any board-specific code to the VIRT platform. And what guest
->>>> kernel driver do we need? Do we need another user-level daemon like acpid?
->>>>
->>>> Note that external shutdown can also be accomplished using the qemu
->>>> guest agent [3], but maybe this is not a sufficiently stable approach.
->>>>
->>>> Any input on the approach to take here is very welcome.
->>>
->>> I would expect drivers/power/reset/gpio-poweroff.c to work in an identical
->>> way with ACPI and DT, once you have added an ACPI binding for it.
->>
->> Looking at Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
->> that appears to be for "let the guest kernel turn off the system
->> from the inside by toggling a GPIO line". What we want is the
->> opposite: the external system (QEMU, in this case) toggles a GPIO
->> line in order to request the guest kernel to do a clean shutdown
->> or reboot. Or have I misunderstood what gpio-poweroff can do?
->
-> No, you're correct.
->
-> There are a few "power button" bindings around, but it looks like they
-> all rely on platform details and aren't that generic.
->
-> With ACPI what events may be singalled? Just power off, or reset, etc?
+On Thu, Apr 30, 2015 at 02:30:11PM +0100, Robert Schwebel wrote:
+> Hi Liviu,
+> 
+> On Thu, Apr 30, 2015 at 12:08:53PM +0100, Liviu Dudau wrote:
+> > Sorry Robert, this fell through the cracks. VExpress gets very few
+> > patches in general and we're new to this :(
+> 
+> Thanks for the help!
+> 
+> I still see these errors with 4.1-rc1:
+> 
+> [    0.000000] L2C: platform modifies aux control register: 0x02020000 -> 0x02420000
+> [    0.000000] L2C: DT/platform modifies aux control register: 0x02020000 -> 0x02420000
+> [    0.268626] platform 10000000.sysreg: Error -2 creating of_node link
+> [    0.271997] platform basic-mmio-gpio.1.auto: Error -2 creating of_node link
+> [    0.272266] platform basic-mmio-gpio.2.auto: Error -2 creating of_node link
+> [    0.272681] platform basic-mmio-gpio.3.auto: Error -2 creating of_node link
+> [    0.426298] of_amba_device_create(): amba_device_add() failed (-19) for /memory-controller at 100e0000
+> [    0.426799] of_amba_device_create(): amba_device_add() failed (-19) for /memory-controller at 100e1000
+> [    0.427099] of_amba_device_create(): amba_device_add() failed (-19) for /watchdog at 100e5000
+> [    0.433206] of_amba_device_create(): amba_device_add() failed (-19) for /smb/motherboard/iofpga at 7,00000000/sysctl at 01000
+> [    0.438165] of_amba_device_create(): amba_device_add() failed (-19) for /smb/motherboard/iofpga at 7,00000000/wdt at 0f000
+> 
+> Do you have an idea what might go wrong?
 
-For the ACPI events, we generally have three events:
-  - sleep event
-  - power off event
-  - wakeup event
+No, not yet. I will give it a go on my TC2 board.
 
->
-> Which of these do we need to be able to handle with DT?
+Best regards,
+Liviu
 
-I think power off event is the most used event, sleep
-and wakeup events are often used for laptops.
+> 
+> rsc
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
 
-For ACPI based power off, there will be a GPIO singled
-event (hardware reduced platform such as ARM64) or a
-special interrupt called SCI signaled to OS to let
-OS know there is a button event happened, then there is
-a driver handle this interrupt to tell the detail event,
-the driver will send the event to user space using input
-framework(deprecated) or netlink event.
-
-I think DT can do it in a similar way, using input framework
-or netlink sending power button to user space and shutdown
-the system.
-
-If any detail information needed, please let me know.
-
-Thanks
-Hanjun
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
