@@ -1,95 +1,80 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 30 Apr 2015 11:02:07 +0200
-Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
- using PM clocks
-In-Reply-To: <CAPDyKFqXZtKxSnwXwUSSDA6vFtaJ_FoGWn495KdU5=17k7Um5w@mail.gmail.com>
-References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
- <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
- <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
- <553A21C7.4060506@codeaurora.org>
- <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
- <7hh9s1xrut.fsf@deeprootsystems.com>
- <553EF5D4.60900@codeaurora.org>
- <CAMuHMdW8OKDODHTw=A=vCFR9PN3KUr_fiGSiNkn0Q7Q16axU6g@mail.gmail.com>
- <5540A923.8000104@codeaurora.org>
- <CAMuHMdWWv5qADWP4CMj5Kj62v_FK9JxMP6NXOpyN8GTk05raAQ@mail.gmail.com>
- <CAPDyKFoja9OZf+X2eaBGwTXoqFHchOz9vopLYF+wiguHXwznzw@mail.gmail.com>
- <CAMuHMdXXkgTDjdYanQNUJFXqUXLtGrLCOugs94MaCvg9O7wbXA@mail.gmail.com>
- <CAPDyKFqXZtKxSnwXwUSSDA6vFtaJ_FoGWn495KdU5=17k7Um5w@mail.gmail.com>
-Message-ID: <CAPDyKFo87XPWK14gwgdGpn9LGWKyDeFhfEFC+0gtkESCw27tDw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Apr 2015 11:01:43 +0200
+Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <20150430084549.GB3488@pd.tnic>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <4411194.KCIZ9l536O@wuerfel> <20150430084549.GB3488@pd.tnic>
+Message-ID: <7128860.xHITr0VFap@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 April 2015 at 08:21, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 29 April 2015 at 15:08, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> Hi Ulf,
->>
->> On Wed, Apr 29, 2015 at 2:31 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>>> Geert, thanks, I was wondering how you handle the !CONFIG_PM case for
->>>>> rmobile. I mean who turns the clocks on for the devices when you build
->>>>> with CONFIG_PM disabled?
->>>>
->>>> We still use pm_clk_add_notifier() in drivers/sh/pm_runtime.c if
->>>> CONFIG_PM_GENERIC_DOMAINS_OF=n. Hence the second instance of
->>>> pm_clk_notify() will enable the clocks at driver binding time.
->>>> Hardware power domains are assumed enabled by reset state/the boot
->>>> loader.
->>>
->>> Yes, it a bit tricky - but I guess that's the current only viable
->>> solution if we have when using the pm_clk API.
->>>
->>>> Given the amount of PM infrastructure involved when hardware power and
->>>> clock domains are involved, I think at one point we'll have to start restricting
->>>> our builds to CONFIG_PM=y.
->>>
->>> I don't think that would solve the problem, since you may still have
->>> cross SoC drivers which may be used without CONFIG_PM.
->>
->> That's not as much of a problem as it sounds:
->>   - If the driver cares (needs to know) about the clock, it should already
->>     manage it itself.
->
-> Agree!
->
->>   - If it doesn't care about the clock, it just needs Runtime PM support.
->>     That will do the right thing on platforms with (needs PM=y) and without
->>     (doesn't care about PM=x) clock domains.
->
-> How about those drivers that cares about clocks and thus manages them,
-> but also cares about runtime PM?
->
-> I believe we will get a clock reference count issue in these cases,
-> since both the PM domain and the driver will manage the clocks.
->
-> I assume that's why we have had a few attempts to have "runtime PM
-> clocks" specially marked, one was via DT, to have clear distinguish
-> between who will be responsible to manage them.
->
-> Those attempts did get nacked, so the problem is still there I assume.
->
->> So the bigger "problem" is making sure all drivers have at least minimal
->> Runtime PM support, else they can't be reused as-is on systems with PM
->> domains.
->>
->>> So all SoC that uses a driver which expects clocks to be managed using
->>> PM clocks from a PM domain, will need the above "trick". Right?
->>
->> One remaining issue with pm_clk_add_notifier() is that it applies to all
->> platform devices in the system, not just the on-SoC devices. Hence it may
->> inadvertently manage clocks for off-SoC devices it's not supposed to touch.
->
-> Yes. That's really bad. :-)
->
-> Additionally, it means devices that isn't part of the platform bus
-> isn't able to use PM clk domains at all.
+On Thursday 30 April 2015 10:45:50 Borislav Petkov wrote:
+> On Thu, Apr 30, 2015 at 10:31:12AM +0200, Arnd Bergmann wrote:
+> > The problem with your approach is that a lot of these blocks are not
+> > vendor specific. You will probably see a server chip that contains a
+> > memory controller from DesignWare, a cache controller from ARM, and
+> > some other device from the chip vendor, and each of them comes with
+> > EDAC support. Then you get three other vendors that have various
+> > combinations of the same memory controller, cache controller and
+> > other EDAC devices. Not all of these chips would have ARM CPU cores,
+> > some may be e.g. MIPS or PowerPC.
+> 
+> I don't mean system-vendor specific but IP-block vendor specific. So
+> doing a designware-edac, arm-edac, apm-edac and so on...
 
-Correction: Of course they can register one PM clk notifier per bus
-type. The API currently also provides this option.
+Ok, but I'd also do multiple drivers for one vendor if they have several
+blocks that are clearly unrelated. My understanding was that this is the
+case here, but I have not looked too closely.
 
->
-> Within this context, I find it hard to advise people to use PM clk
-> domains (via pm_clk_add_notifier()), since there just so many open
-> issues. What works a _little_ better is to use PM clks via genpd.
->
-> Kind regards
-> Uffe
+Note that a lot of vendors do not like to say who they licensed IP
+blocks from, or they are contractually required not to say it.
+
+> Also, I really want for people thinking of writing EDAC drivers to think
+> hard before doing so. Whether it is even worth to expose *every* RAS
+> functionality in some driver. And to consider that exposing it might
+> cause more trouble than benefit.
+
+Definitely agreed on this point.
+
+> We've had that experience on x86 with reporting innocuous DRAM ECC
+> errors which were corrected by the hardware. People weren't even reading
+> the error message and running around wanting to RMA their processors
+> because something in dmesg screamed "Hardware Error".
+> 
+> And now APEI does the firmware-first thing where it gets to look at the
+> error first and then decide to report it up to the OS or not.
+> 
+> Which is a good thing because in most cases it unnecessarily upsets the
+> user.
+
+Yes, that is helpful feedback, but seems unrelated to the discussion
+about how to split this driver or not.
+
+> So to get back on track: I think having the IP-block vendor stuff in one
+> EDAC module would make this whole heterogeneity much more manageable.
+> 
+> On that system above, we will load - if I can count correctly - 6 EDAC
+> drivers anyway. But the EDAC pile would remain sane.
+
+Ok, let me try to state what I think we agree on:
+
+- For EDAC devices that are clearly unrelated (in particular, made by
+  different vendors, but possibly part of the same chip), there should
+  be one module per device type that registers one platform_driver.
+
+- For EDAC drivers that are variants of one another (e.g. different
+  generations of the same memory controller), we want one module with
+  one platform_driver that can handle all variants.
+
+Let me know if you disagree with the above. If that's fine, I think it
+leaves the case where we have one chip that has multiple EDAC blocks
+and we can't easily tell if those blocks are all inter-related or not.
+For this case, I would like to rely on your judgment as subsystem
+maintainer on whether the parts look related enough to have a single
+driver (with matching all device variants) or one driver for each
+class of device, as well as spotting cases where a part already has
+a driver from a different chip vendor that was licensing the same IP
+block.
+
+	Arnd
