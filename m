@@ -1,49 +1,46 @@
 From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Thu, 30 Apr 2015 09:44:32 -0500
-Subject: [PATCH 17/18] ARM: imx: Codes clean up
+Date: Thu, 30 Apr 2015 09:44:33 -0500
+Subject: [PATCH 18/18] ARM: imx: Move time.c into drivers/clocksources
 In-Reply-To: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
 References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <1430405073-13106-18-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <1430405073-13106-19-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed the unused SoC relating codes.
+The time.c was moved from arch/arm/mach-imx to
+drivers/clocksources, and its name was changed
+to timer-gpt.c.
 
 Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
 ---
- arch/arm/mach-imx/time.c | 6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm/mach-imx/Makefile                                  | 2 +-
+ drivers/clocksource/Makefile                                | 1 +
+ arch/arm/mach-imx/time.c => drivers/clocksource/timer-gpt.c | 0
+ 3 files changed, 2 insertions(+), 1 deletion(-)
+ rename arch/arm/mach-imx/time.c => drivers/clocksource/timer-gpt.c (100%)
 
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index da4dc29..f8dd53d 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -35,8 +35,6 @@
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 0622ced..08dc2f1 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -1,4 +1,4 @@
+-obj-y := time.o cpu.o system.o irq-common.o
++obj-y := cpu.o system.o irq-common.o
  
- #include <asm/mach/time.h>
- 
--#include "common.h"
--#include "hardware.h"
- 
- /*
-  * There are 4 versions of the timer hardware on Freescale MXC hardware.
-@@ -79,8 +77,6 @@
- 
- #define V2_TIMER_RATE_OSC_DIV8	3000000
- 
--#define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx21() || cpu_is_mx27())
--#define timer_is_v2()	(!timer_is_v1())
- 
- #define IMX_TIMER_V0         (0)
- #define IMX_TIMER_V1         (1)
-@@ -97,8 +93,6 @@ struct imx_timer {
- 	void (*gpt_irq_acknowledge)(struct imx_timer *);
- };
- 
--static struct clock_event_device clockevent_mxc;
--
- static void gpt_irq_disable_v0_v1(struct imx_timer *tm)
- {
- 	unsigned int tmp;
+ obj-$(CONFIG_SOC_IMX1) += mm-imx1.o
+ obj-$(CONFIG_SOC_IMX21) += mm-imx21.o
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 5b85f6a..28bb2e6 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -52,3 +52,4 @@ obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= timer-integrator-ap.o
+ obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
+ obj-$(CONFIG_CLKSRC_MIPS_GIC)		+= mips-gic-timer.o
+ obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
++obj-$(CONFIG_ARCH_MXC)			+= timer-gpt.o
+diff --git a/arch/arm/mach-imx/time.c b/drivers/clocksource/timer-gpt.c
+similarity index 100%
+rename from arch/arm/mach-imx/time.c
+rename to drivers/clocksource/timer-gpt.c
 -- 
 1.9.1
