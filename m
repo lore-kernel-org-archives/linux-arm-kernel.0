@@ -1,82 +1,138 @@
-From: matthias.bgg@gmail.com (Matthias Brugger_0)
-Date: Thu, 30 Apr 2015 18:09:02 +0200
-Subject: [PATCH 1/2] ARM: dts: mt8135: Add pinctrl/GPIO/EINT node for
- mt8135.
-In-Reply-To: <1430213037-23831-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1430213037-23831-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <7612069.RRCsOqAebC@ubix>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 30 Apr 2015 18:20:29 +0200
+Subject: [PATCH v7 00/15] Add support to STMicroelectronics STM32 family
+Message-ID: <1430410844-16062-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 28, 2015 05:23:56 PM Yingjoe Chen wrote:
-> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> 
-> 
-> Matthias,
-> 
-> Since mt8135 pinctrl node patch is not in v4.1-rc1, I'd like to make some
-> minor change to follow dts convention.
-> 
-> Let me know what you think.
-> Thanks.
-> 
-> Joe.C
-> 
-> ---8<--------------------------------------------------------------------
-> Add pinctrl,GPIO and EINT node to mt8135.dtsi.
-> 
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/boot/dts/mt8135-pinfunc.h | 1302
-> ++++++++++++++++++++++++++++++++++++ arch/arm/boot/dts/mt8135.dtsi      |  
-> 31 +
->  2 files changed, 1333 insertions(+)
->  create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
-> 
-> diff --git a/arch/arm/boot/dts/mt8135-pinfunc.h
-> b/arch/arm/boot/dts/mt8135-pinfunc.h new file mode 100644
-> index 0000000..5a60987
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/mt8135-pinfunc.h
-[...]
-> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-> index 2c5c4da..d6c1f14 100644
-> --- a/arch/arm/boot/dts/mt8135.dtsi
-> +++ b/arch/arm/boot/dts/mt8135.dtsi
-> @@ -17,6 +17,7 @@
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/reset-controller/mt8135-resets.h>
->  #include "skeleton64.dtsi"
-> +#include "mt8135-pinfunc.h"
-> 
->  / {
->  	compatible = "mediatek,mt8135";
-> @@ -141,6 +142,36 @@
->  			clock-names = "spi", "wrap";
->  		};
-> 
-> +		/* Provide regmap for pinctrl driver */
+In this seventh round, the series has been rebased on top of 4.1-rc1.
+The series also fixes sysrq support in serial driver.
 
-I think from the DTS it is quite clear for what the node is used for.
-Please delete the comment.
+STM32 MCUs are Cortex-M CPU, used in various applications (consumer
+electronics, industrial applications, hobbyists...).
+Datasheets, user and programming manuals are publicly available on
+STMicroelectronics website.
 
-> +		syscfg_pctl_a: syscfg_pctl_a at 10005000 {
-> +			compatible = "mediatek,mt8135-pctl-a-syscfg", "syscon";
-> +			reg = <0 0x10005000 0 0x1000>;
-> +		};
-> +
-> +		/* Provide regmap for pinctrl driver */
+With this series applied, the STM32F419 Discovery can boot succesfully.
 
-Same here.
+Changes since v6:
+-----------------
+ - serial: Fix locking in case of sysrq (Vladimir)
+ - Rebase on top of v4.1-rc1
+ - Apply Acked-by and Reviewed-by
+ - Clean-up stm32_defconfig
 
-> +		syscfg_pctl_b: syscfg_pctl_b at 1020c000 {
-> +			compatible = "mediatek,mt8135-pctl-b-syscfg", "syscon";
-> +			reg = <0 0x1020c000 0 0x1000>;
-> +		};
+Changes since v5:
+-----------------
+ - Change st,hw-flow-ctrl property to auto-flow-control (Rob)
+ - Constify stm32_uart_ops (Joe)
+ - Propagate request_irq error in USART driver (Andy)
+ - Applies Acked-by and Reviewed-by (Rob, Peter)
 
-Please sort the nodes by it's address.
+Changes since v4:
+-----------------
+ - Cosmetic changes in USART driver (Andy)
+ - Apply Acks on reset driver & bindings (Philipp & Rob)
 
-Cheers,
-Matthias
+Changes since v3:
+-----------------
+ - Fix and simplify error path in ARMv7-M Systick driver (Daniel)
+ - Improve reset bindings documentation (Philipp)
+ - Fix trailing lines anf typos in reset driver & doc (Philipp & Chanwoo)
+ - Fix MODULE_LICENCE in USART driver (Paul)
+ - Refactor USART baudrate calculation (Peter & Andy)
+ - Fix error path in USART init (Peter & Russell)
+ - Fix HW flow control in USART driver (Peter)
+ - Fix serial port type number to unused one (Peter)
+ - Applies Chanwoo's Tested-by on the series
+
+Changes since v2:
+-----------------
+ - Remove pinctrl driver from the series. 
+ - Remove reset_controller_of_init(), and reset the timers in the bootloader
+ - Add HW flow contrl property for serial driver
+ - Lots of changes in the DTS file, as per Andreas recommendations
+ - Some Kconfig clean-ups
+ - Adapt the config to be compatible with Andreas' bootwrapper, except UART port.
+ - Various fixes in documentation
+
+Changes since v1:
+-----------------
+ - Move bindings documentation in their own patches (Andreas)
+ - Rename ARM System timer to armv7m-systick (Rob)
+ - Add clock-frequency property handling in armv7m-systick (Rob)
+ - Re-factor the reset controllers into a single controller (Philipp)
+ - Add kerneldoc to reset_controller_of_init (Philipp)
+ - Add named constants in include/dt-bindings/reset/ (Philipp)
+ - Make pinctrl driver to depend on ARCH_STM32 or COMPILE_TEST (Geert)
+ - Introduce CPUV7M_NUM_IRQ config flag to indicate the number of interrupts
+supported by the MCU, in order to limit memory waste in vectors' table (Uwe)
+
+Maxime Coquelin (15):
+  scripts: link-vmlinux: Don't pass page offset to kallsyms if XIP
+    Kernel
+  ARM: ARMv7-M: Enlarge vector table up to 256 entries
+  dt-bindings: Document the ARM System timer bindings
+  clocksource/drivers: Add ARM System timer driver
+  dt-bindings: Document the STM32 reset bindings
+  drivers: reset: Add STM32 reset driver
+  dt-bindings: Document the STM32 timer bindings
+  clockevents/drivers: Add STM32 Timer driver
+  dt-bindings: Document the STM32 USART bindings
+  serial: stm32-usart: Add STM32 USART Driver
+  ARM: Add STM32 family machine
+  ARM: dts: Add ARM System timer as clocksource in armv7m
+  ARM: dts: Introduce STM32F429 MCU
+  ARM: configs: Add STM32 defconfig
+  MAINTAINERS: Add entry for STM32 MCUs
+
+ Documentation/arm/stm32/overview.txt               |  32 +
+ Documentation/arm/stm32/stm32f429-overview.txt     |  22 +
+ .../devicetree/bindings/arm/armv7m_systick.txt     |  26 +
+ .../devicetree/bindings/reset/st,stm32-rcc.txt     | 107 +++
+ .../devicetree/bindings/serial/st,stm32-usart.txt  |  32 +
+ .../devicetree/bindings/timer/st,stm32-timer.txt   |  22 +
+ MAINTAINERS                                        |   8 +
+ arch/arm/Kconfig                                   |  18 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/armv7-m.dtsi                     |   6 +
+ arch/arm/boot/dts/stm32f429-disco.dts              |  71 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   | 226 +++++++
+ arch/arm/configs/stm32_defconfig                   |  69 ++
+ arch/arm/kernel/entry-v7m.S                        |  13 +-
+ arch/arm/mach-stm32/Makefile                       |   1 +
+ arch/arm/mach-stm32/Makefile.boot                  |   3 +
+ arch/arm/mach-stm32/board-dt.c                     |  19 +
+ arch/arm/mm/Kconfig                                |  15 +
+ drivers/clocksource/Kconfig                        |  15 +
+ drivers/clocksource/Makefile                       |   2 +
+ drivers/clocksource/armv7m_systick.c               |  79 +++
+ drivers/clocksource/timer-stm32.c                  | 184 +++++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-stm32.c                        | 124 ++++
+ drivers/tty/serial/Kconfig                         |  17 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/stm32-usart.c                   | 737 +++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |   3 +
+ scripts/link-vmlinux.sh                            |   2 +-
+ 30 files changed, 1852 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/arm/stm32/overview.txt
+ create mode 100644 Documentation/arm/stm32/stm32f429-overview.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/armv7m_systick.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/st,stm32-timer.txt
+ create mode 100644 arch/arm/boot/dts/stm32f429-disco.dts
+ create mode 100644 arch/arm/boot/dts/stm32f429.dtsi
+ create mode 100644 arch/arm/configs/stm32_defconfig
+ create mode 100644 arch/arm/mach-stm32/Makefile
+ create mode 100644 arch/arm/mach-stm32/Makefile.boot
+ create mode 100644 arch/arm/mach-stm32/board-dt.c
+ create mode 100644 drivers/clocksource/armv7m_systick.c
+ create mode 100644 drivers/clocksource/timer-stm32.c
+ create mode 100644 drivers/reset/reset-stm32.c
+ create mode 100644 drivers/tty/serial/stm32-usart.c
+
+-- 
+1.9.1
