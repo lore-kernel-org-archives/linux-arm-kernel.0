@@ -1,53 +1,34 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 30 Apr 2015 14:30:46 +0100
-Subject: [PATCH v3 0/6] Add dwc3 usb3 DT node and various phy cleanup
-Message-ID: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
+Date: Thu, 30 Apr 2015 14:30:47 +0100
+Subject: [PATCH v3 1/6] ARM: DT: STi: STiH407: Update picophyreset for the
+ usb3 controllers usb2 phy
+In-Reply-To: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
+References: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1430400652-3366-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Ths picophyreset is incorrectly defined, which stops the usb2 phy being
+taken out of reset.
 
-This series primarily adds the dwc3 DT node which activates the usb3 controller on
-the stih407-b2120, stih410-b2120 and stih418-b2199 platforms.
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih407-family.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-As part of getting this working I noticed an error with the picophyreset which 
-stops the controller working which I've also fixed.
-
-regards,
-
-Peter.
-
-Changes in v3:
-- Add miphys8lp options properties for stih418 (Pete)
-- Add support for stih418-b2199 (Max)
-- Only enable usb3 controller in the board file (Max)
-- Fix superflous '\n' (Lee)
-- Rebase series on v4.1-rc1 (Pete)
-
-NB: Since v2 some patches were taken into the phy and ahci trees which I've now
-removed from the series.
-
-Changes in v2:
-- Update commit to explicitly say no ABI breakage (Rob)
-- Rebase series on v4.0-rc6 (Pete)
-- Collect up Acks (Pete)
-
-Peter Griffin (6):
-  ARM: DT: STi: STiH407: Update picophyreset for the usb3 controllers
-    usb2 phy
-  ARM: DT: STi: STiH407: Add dwc3 usb3 DT node.
-  usb: dwc3: dwc3-st: Update the incorrect DT dwc3 example.
-  ARM: DT: STi: stihxxx-b2120: Enable USB3 port on stih407-b2120 and
-    stih410-b2120
-  ARM: DT: STi: STiH418: Add miphy28lp optional oscillator clock
-    properties
-  ARM: DT: STi: STiH418: Enable USB3 port on stih418-b2199.
-
- Documentation/devicetree/bindings/usb/dwc3-st.txt |  7 +++---
- arch/arm/boot/dts/stih407-family.dtsi             | 30 ++++++++++++++++++++++-
- arch/arm/boot/dts/stih418-b2199.dts               | 15 ++++++++++++
- arch/arm/boot/dts/stihxxx-b2120.dtsi              |  5 ++++
- 4 files changed, 52 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index c06a546..186412d 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -280,7 +280,7 @@
+ 			#phy-cells = <0>;
+ 			st,syscfg = <&syscfg_core 0x100 0xf4>;
+ 			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+-				 <&picophyreset STIH407_PICOPHY0_RESET>;
++				 <&picophyreset STIH407_PICOPHY2_RESET>;
+ 			reset-names = "global", "port";
+ 		};
+ 
 -- 
 1.9.1
