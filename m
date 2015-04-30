@@ -1,31 +1,45 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Thu, 30 Apr 2015 09:38:00 -0500
-Subject: Bulid regression with VDSO enabled
-In-Reply-To: <679194be9498c72543073a833e4a1719@agner.ch>
-References: <679194be9498c72543073a833e4a1719@agner.ch>
-Message-ID: <55423E48.7000506@mentor.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 30 Apr 2015 15:38:52 +0100
+Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+In-Reply-To: <1430402587.24034.68.camel@deneb.redhat.com>
+References: <20150409144029.GE9648@leverpostej>
+ <1428591425-17330-1-git-send-email-msalter@redhat.com>
+ <20150409153629.GI9648@leverpostej> <20150413124121.GF2869@arm.com>
+ <55420A18.7080203@arm.com>
+ <1430400394.24034.67.camel@deneb.redhat.com>
+ <20150430133333.GB32190@leverpostej>
+ <1430402587.24034.68.camel@deneb.redhat.com>
+Message-ID: <20150430143852.GC32190@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2015 06:44 AM, Stefan Agner wrote:
->   OBJCOPY arch/arm/vdso/vdso.so
-> BFD: arch/arm/vdso/vdso.so: Not enough room for program headers, try
-> linking with -N
-> arm-angstrom-linux-gnueabi-objcopy:arch/arm/vdso/vdso.so[.hash]: Bad
-> value
-> BFD: arch/arm/vdso/vdso.so: Not enough room for program headers, try
-> linking with -N
-> arm-angstrom-linux-gnueabi-objcopy:arch/arm/vdso/vdso.so: Bad value
-> make[2]: *** [arch/arm/vdso/vdso.so] Error 1
-> make[1]: *** [arch/arm/vdso] Error 2
-> make[1]: *** Waiting for unfinished jobs....
+On Thu, Apr 30, 2015 at 03:03:07PM +0100, Mark Salter wrote:
+> On Thu, 2015-04-30 at 14:33 +0100, Mark Rutland wrote:
+> > > > Could you please send this to arm-soc as suggested by Will, with the 
+> > > > relevant acks/reviews  ?
+> > > > 
+> > > 
+> > > I sent it on Tuesday. Did it not show up? Is arm at kernel.org the correct
+> > > address? I got the cc:
+> > > 
+> > > From: Mark Salter <msalter@redhat.com>
+> > > To: arm at kernel.org
+> > > Cc: Mark Salter <msalter@redhat.com>
+> > > Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+> > > Date: Tue, 28 Apr 2015 13:09:32 -0400
+> > > Message-Id: <1430240972-16386-1-git-send-email-msalter@redhat.com>
+> > 
+> > That's the right address, but that only goes to the maintainers, and
+> > doesn't get copied to any list. In future, please Cc linux-arm-kernel in
+> > addition.
 > 
-> I'm using GCC 4.8.3 (Linaro GCC 4.8-2014.04) on Fedora 21. Any specific
-> new requirements to the toolchain or a bug?
+> That's where I sent it originally.
 
-I've not encountered this before, and I'm not able to recreate it with
-that toolchain.
+Sure, but it's good to Cc when sending to arm-soc so as to make it
+visible that the patches have been sent. Doing so avoids the necessity
+of queries like Suzuki's, and makes it possible for others to reply to
+the version sent to arm at kernel.org in the case of conflicts or other
+issues.
 
-If you're using the Linaro toolchain I would expect the name of objcopy
-to be arm-linux-gnueabihf-objcopy, but your log shows
-arm-angstrom-linux-gnueabi-objcopy.  What's going on there?
+Thanks,
+Mark.
