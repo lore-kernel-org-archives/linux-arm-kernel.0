@@ -1,35 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Apr 2015 10:03:21 +0200
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <55417F5A.4040300@linaro.org>
-References: <55417F5A.4040300@linaro.org>
-Message-ID: <3341308.O9mDCt0NEl@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 30 Apr 2015 10:03:03 +0200
+Subject: [PATCH v3 0/7] ARM: at91/dt: kizbox: update and rename to
+ at91-kizbox
+In-Reply-To: <1430379218-13758-1-git-send-email-g.portay@overkiz.com>
+References: <1430379218-13758-1-git-send-email-g.portay@overkiz.com>
+Message-ID: <5541E1B7.7080602@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 April 2015 09:03:22 Shannon Zhao wrote:
+Le 30/04/2015 09:33, Ga?l PORTAY a ?crit :
+> Hi,
 > 
-> I am looking at adding support for external power down and reboot to
-> ARM VMs.  With ACPI this is fairly straight forward and requires only
-> adding a GPIO controller to the virt machine model and extending ACPI
-> appropriately (see code here [1]). In addition Linaro LEG also have
-> done a test that uses GPIO as power button to shutdown OS on fast model
-> (see detail here [2]).
+> This patchset renames the kizbox board into at91-kizbox to match AT91 naming
+> convention, sanitize and sorts nodes by address when possible (or
+> alphabetically if not applicable).
 > 
-> However, we would like for this to work in systems that do not use
-> ACPI as well. Adding a GPIO controller will still work, but we would
-> need a generic way to tell Linux how to handle the GPIO events without
-> adding any board-specific code to the VIRT platform. And what guest
-> kernel driver do we need? Do we need another user-level daemon like acpid?
+> It also updates the following features:
+> - uses proper serial uart (only USART3 is accessible),
+> - fixes gpio-keys active level and rename,
+> - moves leds to pwm support (using tcb-pwm driver) and rename as well,
+> - re-sizes nand mtd partitions and
+> - updates chosen-node (bootargs + set linux stdout path to DBGU),
 > 
-> Note that external shutdown can also be accomplished using the qemu
-> guest agent [3], but maybe this is not a sufficiently stable approach.
+> Regards,
+> Ga?l PORTAY
 > 
-> Any input on the approach to take here is very welcome.
+> Changes since v1:
+> - Split into patches for review
+> 
+> Changes since v2:
+> - Rebase onto v4.0.1
+> - Change board-name in comments at rename (patch 1)
+> 
+> Ga?l PORTAY (7):
+>   ARM: at91/dt: kizbox: rename to at91-kizbox
+>   ARM: at91/dt: at91-kizbox: sanitize file
+>   ARM: at91/dt: at91-kizbox: user proper serial uart
+>   ARM: at91/dt: at91-kizbox: gpio-keys related changes
+>   ARM: at91/dt: at91-kizbox: leds related changes
+>   ARM: at91/dt: at91-kizbox: re-size nand partitions
+>   ARM: at91/dt: at91-kizbox: update chosen node
 
-I would expect drivers/power/reset/gpio-poweroff.c to work in an identical
-way with ACPI and DT, once you have added an ACPI binding for it.
+On the whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-You can add further properties if you need to drive the GPIO differently.
+Stacked on at91-4.2-dt (should also appear shortly in linux-next).
 
-	Arnd
+Thanks Ga?l, bye.
+
+>  arch/arm/boot/dts/Makefile        |   2 +-
+>  arch/arm/boot/dts/at91-kizbox.dts | 159 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/kizbox.dts      | 150 -----------------------------------
+>  3 files changed, 160 insertions(+), 151 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/at91-kizbox.dts
+>  delete mode 100644 arch/arm/boot/dts/kizbox.dts
+> 
+
+
+-- 
+Nicolas Ferre
