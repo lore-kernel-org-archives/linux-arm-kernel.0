@@ -1,42 +1,35 @@
 From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 30 Apr 2015 13:13:00 +0200
-Subject: [GIT PULL] Immutable branch between MFD and ARM [STi]
-In-Reply-To: <20150430104826.GA4047@x1>
-References: <20150430104826.GA4047@x1>
-Message-ID: <55420E3C.1080807@st.com>
+Date: Thu, 30 Apr 2015 13:16:53 +0200
+Subject: [STLinux Kernel] [PATCH v7 2/9] ARM: multi_v7_defconfig: Enable
+ support for ST's LPC Watchdog
+In-Reply-To: <1428590854-14095-3-git-send-email-lee.jones@linaro.org>
+References: <1428590854-14095-1-git-send-email-lee.jones@linaro.org>
+ <1428590854-14095-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <55420F25.2080205@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 04/30/2015 12:48 PM, Lee Jones wrote:
-> Hi Maxime,
+On 04/09/2015 04:47 PM, Lee Jones wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   arch/arm/configs/multi_v7_defconfig | 1 +
+>   1 file changed, 1 insertion(+)
 >
-> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
->
->    Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
->
-> are available in the git repository at:
->
->    git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-arm-v4.2
->
-> for you to fetch changes up to 0b30d25d08ab2033fd6e7fced7fa0d77f9eaa7de:
->
->    mfd: dt-bindings: Provide human readable defines for LPC mode choosing (2015-04-30 11:43:09 +0100)
->
-> ----------------------------------------------------------------
-> Immutable branch between MFD and ARM due for v4.2
->
-> ----------------------------------------------------------------
-> Lee Jones (1):
->        mfd: dt-bindings: Provide human readable defines for LPC mode choosing
->
->   include/dt-bindings/mfd/st-lpc.h | 15 +++++++++++++++
->   1 file changed, 15 insertions(+)
->   create mode 100644 include/dt-bindings/mfd/st-lpc.h
->
-
-Merged into sti-dt-for-v4.2.
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index b7e6b6fb..138e68a 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -324,6 +324,7 @@ CONFIG_WATCHDOG=y
+>   CONFIG_XILINX_WATCHDOG=y
+>   CONFIG_ARM_SP805_WATCHDOG=y
+>   CONFIG_ORION_WATCHDOG=y
+> +CONFIG_ST_LPC_WATCHDOG=y
+>   CONFIG_SUNXI_WATCHDOG=y
+>   CONFIG_MESON_WATCHDOG=y
+>   CONFIG_MFD_AS3711=y
+Applied to sti_defconfig-for_v4.2.
 
 Thanks!
 Maxime
