@@ -1,82 +1,33 @@
-From: houpengyang@huawei.com (Hou Pengyang)
-Date: Thu, 30 Apr 2015 13:58:52 +0000
-Subject: [PATCH v2] arm & arm64: perf: Fix callchain parse error with kernel
- tracepoint events
-Message-ID: <1430402332-52750-1-git-send-email-houpengyang@huawei.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 30 Apr 2015 10:03:07 -0400
+Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+In-Reply-To: <20150430133333.GB32190@leverpostej>
+References: <20150409144029.GE9648@leverpostej>
+ <1428591425-17330-1-git-send-email-msalter@redhat.com>
+ <20150409153629.GI9648@leverpostej> <20150413124121.GF2869@arm.com>
+ <55420A18.7080203@arm.com> <1430400394.24034.67.camel@deneb.redhat.com>
+ <20150430133333.GB32190@leverpostej>
+Message-ID: <1430402587.24034.68.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For ARM & ARM64, when tracing with tracepoint events, the IP and cpsr are 
-set to 0, preventing the perf code parsing the callchain and resolving the 
-symbols correctly.
+On Thu, 2015-04-30 at 14:33 +0100, Mark Rutland wrote:
+> > > Could you please send this to arm-soc as suggested by Will, with the 
+> > > relevant acks/reviews  ?
+> > > 
+> > 
+> > I sent it on Tuesday. Did it not show up? Is arm at kernel.org the correct
+> > address? I got the cc:
+> > 
+> > From: Mark Salter <msalter@redhat.com>
+> > To: arm at kernel.org
+> > Cc: Mark Salter <msalter@redhat.com>
+> > Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+> > Date: Tue, 28 Apr 2015 13:09:32 -0400
+> > Message-Id: <1430240972-16386-1-git-send-email-msalter@redhat.com>
+> 
+> That's the right address, but that only goes to the maintainers, and
+> doesn't get copied to any list. In future, please Cc linux-arm-kernel in
+> addition.
 
- ./perf record -e sched:sched_switch -g --call-graph dwarf ls
-    [ perf record: Captured and wrote 0.146 MB perf.data ]
- ./perf report -f
-    Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194 
-    Children      Self    Command  Shared Object     Symbol
-    100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
-
-The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
-several necessary registers used for callchain unwinding, including pc,sp,
-fp and psr .
-
-With this patch, callchain can be parsed correctly as follows:
-
-     ......
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
--    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
-     pfkey_send_policy_notify
-     pfkey_get
-     v9fs_vfs_rename
-     page_follow_link_light
-     link_path_walk
-     el0_svc_naked
-    .......
-
-Jean Pihet found this in ARM and come up with a patch:
-http://thread.gmane.org/gmane.linux.kernel/1734283/focus=1734280
-
-Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
----
- arch/arm/include/asm/perf_event.h   | 7 +++++++
- arch/arm64/include/asm/perf_event.h | 7 +++++++
- 2 files changed, 14 insertions(+)
-
-diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
-index d9cf138..17705e2b 100644
---- a/arch/arm/include/asm/perf_event.h
-+++ b/arch/arm/include/asm/perf_event.h
-@@ -19,4 +19,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
- #define perf_misc_flags(regs)	perf_misc_flags(regs)
- #endif
- 
-+#define perf_arch_fetch_caller_regs(regs, __ip) { \
-+    (regs)->ARM_pc = (__ip); \
-+    (regs)->ARM_fp = (unsigned long) __builtin_frame_address(0); \
-+    (regs)->ARM_sp = current_stack_pointer; \
-+    (regs)->ARM_cpsr |= SYSTEM_MODE; \
-+}
-+
- #endif /* __ARM_PERF_EVENT_H__ */
-diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-index d26d1d5..e6911a4 100644
---- a/arch/arm64/include/asm/perf_event.h
-+++ b/arch/arm64/include/asm/perf_event.h
-@@ -24,4 +24,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
- #define perf_misc_flags(regs)	perf_misc_flags(regs)
- #endif
-	 
-+#define perf_arch_fetch_caller_regs(regs, __ip) { \
-+    (regs)->ARM_pc = (__ip);    \
-+    (regs)->ARM_fp = (unsigned long) __builtin_frame_address(0); \
-+    (regs)->ARM_sp = current_stack_pointer; \
-+    (regs)->ARM_cpsr |= PSR_MODE_EL1h;	\
-+}
-+
- #endif
--- 
-1.8.5.2
+That's where I sent it originally.
