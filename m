@@ -1,84 +1,92 @@
-From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Thu, 30 Apr 2015 12:24:34 +0300
-Subject: [PATCH 2/2] arm64: dts: qcom: Add msm8916 CoreSight components
-In-Reply-To: <CANLsYkxE9xieUW+OMgb4LbnJHRdCtTM=uzcwPzC6bs4x4pP3MA@mail.gmail.com>
-References: <1430310000-10867-1-git-send-email-ivan.ivanov@linaro.org>
- <1430310000-10867-3-git-send-email-ivan.ivanov@linaro.org>
- <CANLsYkxE9xieUW+OMgb4LbnJHRdCtTM=uzcwPzC6bs4x4pP3MA@mail.gmail.com>
-Message-ID: <1430385874.2400.13.camel@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 30 Apr 2015 10:25:34 +0100
+Subject: [PATCH] ARM64: juno: add sp810 support and fix sp804 clock frequency
+Message-ID: <1430385934-5001-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The clock generator in IOFPGA generates the two source clocks: 32kHz and
+1MHz for the SP810 System Controller.
 
-On Wed, 2015-04-29 at 10:49 -0600, Mathieu Poirier wrote:
-> On 29 April 2015 at 06:20, Ivan T. Ivanov ivanov at linaro.org> wrote:
+The SP810 System Controller selects 32kHz or 1MHz as the sources for
+TIM_CLK[3:0], the SP804 timer clocks. The powerup default is 32kHz but
+the maximum of "refclk" and "timclk" is chosen by the SP810 driver.
 
+This patch adds support for SP810 system controller and  also fixes the
+SP804 timer clock frequency.
 
-> > +
-> > +???????funnel at 821000 {
-> > +               compatible = "arm,coresight-funnel", "arm,primecell";
-> > +               reg = <0x821000 0x1000>;
-> > +
-> > +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-> > +               clock-names = "apb_pclk", "atclk";
-> > +
-> > +               ports {
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <0>;
-> > +
-> > +???????????????????????port at 4 {
-> > +                               reg = <4>;
-> > +                               funnel0_in4: endpoint {
-> > +                                       slave-mode;
-> > +                                       remote-endpoint = <&funnel1_out>;
-> > +                               };
-> > +                       };
-> > +???????????????????????port at 8 {
-> > +                               reg = <0>;
-> > +                               funnel0_out: endpoint {
-> > +                                       remote-endpoint = <&etf_in>;
-> > +                               };
-> > +                       };
-> 
-> Please add a comment indicating what the other ports are connected to.
-> 
-> > +               };
-> > +       };
-> > +
-> > +???????replicator at 824000 {
-> > +               compatible = "qcom,coresight-replicator", "arm,primecell";
-> > +               reg = <0x824000 0x1000>;
-> > +
-> > +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-> > +               clock-names = "apb_pclk", "atclk";
-> > +
-> > +               ports {
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <0>;
-> > +
-> > +???????????????????????port at 0 {
-> > +                               reg = <0>;
-> > +                               replicator_out0: endpoint {
-> > +                                       remote-endpoint = <&etr_in>;
-> > +                               };
-> > +                       };
-> > +???????????????????????port at 1 {
-> > +                               reg = <1>;
-> > +                               replicator_out1: endpoint {
-> > +                                       remote-endpoint = <&tpiu_in>;
-> > +                               };
-> > +                       };
-> > +???????????????????????port at 2 {
-> > +                               reg = <0>;
-> > +                               replicator_in: endpoint {
-> > +                                       slave-mode;
-> > +                                       remote-endpoint = <&etf_out>;
-> > +                               };
-> > +                       };
-> 
-> Same comment as with the funnel component.
+Fixes: 71f867ec130e ("arm64: Add Juno board device tree.")
+Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 31 +++++++++++++++++++++++----
+ 1 file changed, 27 insertions(+), 4 deletions(-)
 
-Sorry, but what do you mean here?
+diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+index c138b95a8356..351c95bda89e 100644
+--- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+@@ -21,6 +21,20 @@
+ 			clock-output-names = "juno_mb:clk25mhz";
+ 		};
 
-Regards,
-Ivan
++		v2m_refclk1mhz: refclk1mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <1000000>;
++			clock-output-names = "juno_mb:refclk1mhz";
++		};
++
++		v2m_refclk32khz: refclk32khz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++			clock-output-names = "juno_mb:refclk32khz";
++		};
++
+ 		motherboard {
+ 			compatible = "arm,vexpress,v2p-p1", "simple-bus";
+ 			#address-cells = <2>;  /* SMB chipselect number and offset */
+@@ -66,6 +80,15 @@
+ 				#size-cells = <1>;
+ 				ranges = <0 3 0 0x200000>;
+
++				v2m_sysctl: sysctl at 020000 {
++					compatible = "arm,sp810", "arm,primecell";
++					reg = <0x020000 0x1000>;
++					clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&mb_clk24mhz>;
++					clock-names = "refclk", "timclk", "apb_pclk";
++					#clock-cells = <1>;
++					clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
++				};
++
+ 				mmci at 050000 {
+ 					compatible = "arm,pl180", "arm,primecell";
+ 					reg = <0x050000 0x1000>;
+@@ -106,16 +129,16 @@
+ 					compatible = "arm,sp804", "arm,primecell";
+ 					reg = <0x110000 0x10000>;
+ 					interrupts = <9>;
+-					clocks = <&mb_clk24mhz>, <&soc_smc50mhz>;
+-					clock-names = "timclken1", "apb_pclk";
++					clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&mb_clk24mhz>;
++					clock-names = "timclken1", "timclken2", "apb_pclk";
+ 				};
+
+ 				v2m_timer23: timer at 120000 {
+ 					compatible = "arm,sp804", "arm,primecell";
+ 					reg = <0x120000 0x10000>;
+ 					interrupts = <9>;
+-					clocks = <&mb_clk24mhz>, <&soc_smc50mhz>;
+-					clock-names = "timclken1", "apb_pclk";
++					clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&mb_clk24mhz>;
++					clock-names = "timclken1", "timclken2", "apb_pclk";
+ 				};
+
+ 				rtc at 170000 {
+--
+1.9.1
