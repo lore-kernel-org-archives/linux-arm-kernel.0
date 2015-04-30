@@ -1,89 +1,141 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 30 Apr 2015 08:21:40 +0200
-Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
- using PM clocks
-In-Reply-To: <CAMuHMdXXkgTDjdYanQNUJFXqUXLtGrLCOugs94MaCvg9O7wbXA@mail.gmail.com>
-References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
- <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
- <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
- <553A21C7.4060506@codeaurora.org>
- <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
- <7hh9s1xrut.fsf@deeprootsystems.com>
- <553EF5D4.60900@codeaurora.org>
- <CAMuHMdW8OKDODHTw=A=vCFR9PN3KUr_fiGSiNkn0Q7Q16axU6g@mail.gmail.com>
- <5540A923.8000104@codeaurora.org>
- <CAMuHMdWWv5qADWP4CMj5Kj62v_FK9JxMP6NXOpyN8GTk05raAQ@mail.gmail.com>
- <CAPDyKFoja9OZf+X2eaBGwTXoqFHchOz9vopLYF+wiguHXwznzw@mail.gmail.com>
- <CAMuHMdXXkgTDjdYanQNUJFXqUXLtGrLCOugs94MaCvg9O7wbXA@mail.gmail.com>
-Message-ID: <CAPDyKFqXZtKxSnwXwUSSDA6vFtaJ_FoGWn495KdU5=17k7Um5w@mail.gmail.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Thu, 30 Apr 2015 08:33:13 +0200
+Subject: [RFC PATCH V2 0/2] generic TEE subsystem
+Message-ID: <1430375595-30600-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 April 2015 at 15:08, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Ulf,
->
-> On Wed, Apr 29, 2015 at 2:31 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>> Geert, thanks, I was wondering how you handle the !CONFIG_PM case for
->>>> rmobile. I mean who turns the clocks on for the devices when you build
->>>> with CONFIG_PM disabled?
->>>
->>> We still use pm_clk_add_notifier() in drivers/sh/pm_runtime.c if
->>> CONFIG_PM_GENERIC_DOMAINS_OF=n. Hence the second instance of
->>> pm_clk_notify() will enable the clocks at driver binding time.
->>> Hardware power domains are assumed enabled by reset state/the boot
->>> loader.
->>
->> Yes, it a bit tricky - but I guess that's the current only viable
->> solution if we have when using the pm_clk API.
->>
->>> Given the amount of PM infrastructure involved when hardware power and
->>> clock domains are involved, I think at one point we'll have to start restricting
->>> our builds to CONFIG_PM=y.
->>
->> I don't think that would solve the problem, since you may still have
->> cross SoC drivers which may be used without CONFIG_PM.
->
-> That's not as much of a problem as it sounds:
->   - If the driver cares (needs to know) about the clock, it should already
->     manage it itself.
+Hi,
 
-Agree!
+This patch set introduces a generic TEE subsystem. The TEE subsystem will be
+able contain drivers for various TEE implementations. A TEE (Trusted
+Execution Environment) is a trusted OS running in some secure environment,
+for example, TrustZone on ARM cpus, or a separate secure co-processor etc.
 
->   - If it doesn't care about the clock, it just needs Runtime PM support.
->     That will do the right thing on platforms with (needs PM=y) and without
->     (doesn't care about PM=x) clock domains.
+Regarding use cases, TrustZone has traditionally been used for
+offloading secure tasks to the secure world. Examples include banking
+applications, Digital Rights Management (DRM), or specific secure
+solutions.
 
-How about those drivers that cares about clocks and thus manages them,
-but also cares about runtime PM?
+This TEE subsystem can serve a TEE driver for a Global Platform compliant
+TEE, but it's not limited to only Global Platform TEEs.  One reason why I'm
+doing this to be able to get an OP-TEE (https://github.com/OP-TEE/optee_os)
+driver upstream.
 
-I believe we will get a clock reference count issue in these cases,
-since both the PM domain and the driver will manage the clocks.
+The first patch brings in the generic TEE subsystem which helps when
+writing a driver for a specific TEE, for example, OP-TEE.
 
-I assume that's why we have had a few attempts to have "runtime PM
-clocks" specially marked, one was via DT, to have clear distinguish
-between who will be responsible to manage them.
+The second patch is an OP-TEE driver which uses the subsystem to do its
+work.
 
-Those attempts did get nacked, so the problem is still there I assume.
+Javier is also working on a driver for another TEE so we will soon have at
+least two TEE drivers under the TEE subsystem.
 
-> So the bigger "problem" is making sure all drivers have at least minimal
-> Runtime PM support, else they can't be reused as-is on systems with PM
-> domains.
->
->> So all SoC that uses a driver which expects clocks to be managed using
->> PM clocks from a PM domain, will need the above "trick". Right?
->
-> One remaining issue with pm_clk_add_notifier() is that it applies to all
-> platform devices in the system, not just the on-SoC devices. Hence it may
-> inadvertently manage clocks for off-SoC devices it's not supposed to touch.
+Questions:
+* Where should we put this in the tree? I'm proposing drivers/tee
+  Another place could be drivers/firmware/tee. I don't have a strong
+  opinion on either place.
 
-Yes. That's really bad. :-)
+* What should we have in the .compatible field in FDT for the OP-TEE driver?
+  I'm proposing "optee,optee-tz" as OP-TEE doesn't really have a vendor.
+  OP-TEE isn't limited to TrustZone, it can run in other environments too so
+  "optee-tz" could be a way of keeping different options apart. I need
+  advice here.
 
-Additionally, it means devices that isn't part of the platform bus
-isn't able to use PM clk domains at all.
+* Who will maintain this? I'm willing to do it together with Javier.
 
-Within this context, I find it hard to advise people to use PM clk
-domains (via pm_clk_add_notifier()), since there just so many open
-issues. What works a _little_ better is to use PM clks via genpd.
+This patch set has been prepared in cooperation with Javier Gonz?lez who
+proposed "Generic TrustZone Driver in Linux Kernel" patches 28 Nov 2014,
+https://lwn.net/Articles/623380/ . We've since then changed the scope to
+TEE instead of TrustZone.
 
-Kind regards
-Uffe
+We have discussed the design on tee-dev at lists.linaro.org (archive at
+https://lists.linaro.org/pipermail/tee-dev/) with people from other
+companies, including Valentin Manea <valentin.manea@huawei.com>,
+Emmanuel MICHEL <emmanuel.michel@st.com>,
+Jean-michel DELORME <jean-michel.delorme@st.com>,
+and Joakim Bech <joakim.bech@linaro.org>. Our main concern has been to
+agree on something that is generic enough to support many different
+TEEs while still keeping the interface together.
+
+Open issues from last review:
+* Comment from Arnd Bergmann on many empty dma-buf callbacks:
+  I haven't planned fill in more in those functions for this patch set.
+  Fixing those empty bma-buf callbacks requires changes in dma-buf, can we
+  take that outside this patch set?
+
+* There has been some concerns about TEE_IOC_CMD, hopefully the
+  OP-TEE driver will make the purpose more clear now.
+
+v2:
+* Replaced the stubbed OP-TEE driver with a real OP-TEE driver
+* Removed most APIs not needed by OP-TEE in current state
+* Update Documentation/ioctl/ioctl-number.txt with correct path to tee.h
+* Rename tee_shm_pool_alloc_cma() to tee_shm_pool_alloc()
+* Moved tee.h into include/uapi/linux/
+* Redefined tee.h IOCTL macros to be directly based on _IOR and friends
+* Removed version info on the API to user space, a data blob which
+  can contain an UUID is left for user space to be able to tell which
+  protocol to use in TEE_IOC_CMD
+* Changed user space exposed structures to only have types with __ prefix
+* Dropped THIS_MODULE from tee_fops
+* Reworked how the driver is registered and ref counted:
+  - moved from using an embedded struct miscdevice to an embedded struct
+    device.
+  - uses an struct rw_semaphore as synchronization for driver detachment
+  - uses alloc/register pattern from TPM
+
+
+Regards,
+Jens
+
+
+Jens Wiklander (2):
+  tee: generic TEE subsystem
+  tee: add OP-TEE driver
+
+ Documentation/ioctl/ioctl-number.txt |   1 +
+ drivers/Kconfig                      |   2 +
+ drivers/Makefile                     |   1 +
+ drivers/tee/Kconfig                  |  18 ++
+ drivers/tee/Makefile                 |   4 +
+ drivers/tee/optee/Kconfig            |  19 ++
+ drivers/tee/optee/Makefile           |  13 +
+ drivers/tee/optee/call.c             | 294 ++++++++++++++++++++
+ drivers/tee/optee/core.c             | 509 ++++++++++++++++++++++++++++++++++
+ drivers/tee/optee/optee_private.h    | 138 ++++++++++
+ drivers/tee/optee/optee_smc.h        | 510 +++++++++++++++++++++++++++++++++++
+ drivers/tee/optee/rpc.c              | 282 +++++++++++++++++++
+ drivers/tee/optee/smc_a32.S          |  30 +++
+ drivers/tee/optee/smc_a64.S          |  37 +++
+ drivers/tee/optee/supp.c             | 327 ++++++++++++++++++++++
+ drivers/tee/tee.c                    | 340 +++++++++++++++++++++++
+ drivers/tee/tee_private.h            |  74 +++++
+ drivers/tee/tee_shm.c                | 321 ++++++++++++++++++++++
+ drivers/tee/tee_shm_pool.c           | 246 +++++++++++++++++
+ include/linux/tee_drv.h              | 281 +++++++++++++++++++
+ include/uapi/linux/optee_msg.h       | 368 +++++++++++++++++++++++++
+ include/uapi/linux/tee.h             | 118 ++++++++
+ 22 files changed, 3933 insertions(+)
+ create mode 100644 drivers/tee/Kconfig
+ create mode 100644 drivers/tee/Makefile
+ create mode 100644 drivers/tee/optee/Kconfig
+ create mode 100644 drivers/tee/optee/Makefile
+ create mode 100644 drivers/tee/optee/call.c
+ create mode 100644 drivers/tee/optee/core.c
+ create mode 100644 drivers/tee/optee/optee_private.h
+ create mode 100644 drivers/tee/optee/optee_smc.h
+ create mode 100644 drivers/tee/optee/rpc.c
+ create mode 100644 drivers/tee/optee/smc_a32.S
+ create mode 100644 drivers/tee/optee/smc_a64.S
+ create mode 100644 drivers/tee/optee/supp.c
+ create mode 100644 drivers/tee/tee.c
+ create mode 100644 drivers/tee/tee_private.h
+ create mode 100644 drivers/tee/tee_shm.c
+ create mode 100644 drivers/tee/tee_shm_pool.c
+ create mode 100644 include/linux/tee_drv.h
+ create mode 100644 include/uapi/linux/optee_msg.h
+ create mode 100644 include/uapi/linux/tee.h
+
+-- 
+1.9.1
