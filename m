@@ -1,71 +1,45 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 30 Apr 2015 10:37:36 +0800
-Subject: [PATCH RFC v1 0/5] clk: support clocks which requires parent
- clock on during operation
-In-Reply-To: <20150422061240.GA25437@shlinux1.ap.freescale.net>
-References: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
- <20150422061240.GA25437@shlinux1.ap.freescale.net>
-Message-ID: <20150430023734.GA12685@shlinux1.ap.freescale.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 30 Apr 2015 13:42:51 +0900
+Subject: [PATCH 1/3] clocksource: exynos_mct: Change exynos4_mct_tick_clear
+ return type to void
+Message-ID: <1430368973-23786-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guys,
+Return value of exynos4_mct_tick_clear() was never checked so it can
+be safely changed to void.
 
-On Wed, Apr 22, 2015 at 02:12:43PM +0800, Dong Aisheng wrote:
-> On Wed, Apr 15, 2015 at 10:26:34PM +0800, Dong Aisheng wrote:
-> > This patch series adds support in clock framework for clocks which operations
-> > requires its parent clock is on.
-> > 
-> > Such clock type is initially met on Freescale i.MX7D platform that all clocks
-> > operations, including enable/disable, rate change and re-parent, requires its
-> > parent clock on. No sure if any other SoC has the similar clock type.
-> > 
-> > Current clock core can not support such type of clock well.
-> > 
-> > This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
-> > in clock core that enable its parent clock firstly for each operation and disable
-> > it later after operation complete.
-> > 
-> > The most special case is for set_parent() operation which requires both parent,
-> > old one and new one, to be enabled at the same time during the operation.
-> > 
-> > Patch 1~3 are minor cleanup & fixes.
-> > Patch 4 add CLK_SET_PARENT_ON flags in clock core to support such type clocks
-> > Patch 5 show the need of introducing clk_core_enable_lock and
-> > 	clk_core_disable_lock to easily use and reduce duplicated code.
-> > 	It can be merged into patch 4 if required.
-> > 
-> > The patch series is based on for-next branch of Michael's git:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
-> > 
-> > Dong Aisheng (5):
-> >   clk: change clk_core name of __clk_set_parent_after
-> >   clk: add missing lock when call clk_core_enable in clk_set_parent
-> >   clk: remove unneeded __clk_enable and __clk_disable
-> >   clk: core: add CLK_SET_PARENT_ON flags to support clocks require
-> >     parent on
-> >   clk: introduce clk_core_enable_lock and clk_core_disable_lock
-> >     functions
-> > 
-> 
-> Gentle Ping.
-> 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/clocksource/exynos_mct.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-Ping again..
-
-Any comments about this patch series?
-
-
-Regards
-Dong Aisheng
-
-> Regards
-> Dong Aisheng
-> 
-> >  drivers/clk/clk.c            | 112 ++++++++++++++++++++++++++++++++++---------
-> >  include/linux/clk-provider.h |   5 ++
-> >  2 files changed, 94 insertions(+), 23 deletions(-)
-> > 
-> > -- 
-> > 1.9.1
-> > 
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 83564c9cfdbe..87c2e558c465 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -413,7 +413,7 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+ 	}
+ }
+ 
+-static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
++static void exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ {
+ 	struct clock_event_device *evt = &mevt->evt;
+ 
+@@ -426,12 +426,8 @@ static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ 		exynos4_mct_tick_stop(mevt);
+ 
+ 	/* Clear the MCT tick interrupt */
+-	if (readl_relaxed(reg_base + mevt->base + MCT_L_INT_CSTAT_OFFSET) & 1) {
++	if (readl_relaxed(reg_base + mevt->base + MCT_L_INT_CSTAT_OFFSET) & 1)
+ 		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
+-		return 1;
+-	} else {
+-		return 0;
+-	}
+ }
+ 
+ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
+-- 
+1.9.1
