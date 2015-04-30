@@ -1,43 +1,22 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 30 Apr 2015 17:23:05 +0200
-Subject: [PATCH 1/1] Revert "ARM: dts: add display power domain for
- exynos5250"
-In-Reply-To: <7hk2wtpsqq.fsf@deeprootsystems.com>
-References: <1427107800-21668-1-git-send-email-javier.martinez@collabora.co.uk>	<7hr3r2suiw.fsf@deeprootsystems.com>	<1430336716.19504.92.camel@collabora.co.uk>	<55417967.80304@collabora.co.uk>
- <7hk2wtpsqq.fsf@deeprootsystems.com>
-Message-ID: <554248D9.4030203@collabora.co.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 30 Apr 2015 23:22:39 +0800
+Subject: [PATCH 05/11] ARM: imx6: set initial power mode in pm function
+In-Reply-To: <7h383ix57z.fsf@deeprootsystems.com>
+References: <1430058672-9267-1-git-send-email-shawn.guo@linaro.org>
+ <1430058672-9267-6-git-send-email-shawn.guo@linaro.org>
+ <CAMAWPa8cyybpdgO+Po=7YUnCFkrnyHKKihgddzrUpHfAW=7brA@mail.gmail.com>
+ <20150429060446.GA27573@dragon>
+ <7h383ix57z.fsf@deeprootsystems.com>
+Message-ID: <20150430152237.GB20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kevin,
-
-On 04/30/2015 04:59 PM, Kevin Hilman wrote:
-> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
->>
->> The regression on Exynos5420/5422/5800 that has been for a while is fixed
->> by "ARM: dts: Make DP a consumer of DISP1 power domain on Exynos5420" [0]
->> which has been posted many weeks ago.
+On Wed, Apr 29, 2015 at 09:35:28AM -0700, Kevin Hilman wrote:
+> ...I did a quick test of this locally on my wandboard-quad, and it's now
+> booting with multi_v7_defconfig too.
 > 
-> Thanks for clarifying.
-> 
-> I'm not sure how this worked for me.  Seems like sometimes, even with
-> the imprecise aborts it does actually finish booting to a shell, so I
-> must've gotten successful boot and thought it was because of this
-> revert.
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 
-That is correct, the imprecise external abort error most of the times
-lead to a kernel panic but sometimes it doesn't and the the system finish
-booting to user-space even after the error.
+Thanks for testing, Kevin.
 
-I've pinged Kukjin again yesterday to pick the fix and he said that will
-do it this weekend [0]. So hopefully exynos5420 machines will boot again
-in linux-next soon after being broken for weeks.
-
-> 
-> Kevin
->
-
-Best regards,
-Javier
-
-[0]: https://lkml.org/lkml/2015/4/29/781
+Shawn
