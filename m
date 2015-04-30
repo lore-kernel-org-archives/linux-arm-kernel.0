@@ -1,33 +1,22 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 30 Apr 2015 10:03:07 -0400
-Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
-In-Reply-To: <20150430133333.GB32190@leverpostej>
-References: <20150409144029.GE9648@leverpostej>
- <1428591425-17330-1-git-send-email-msalter@redhat.com>
- <20150409153629.GI9648@leverpostej> <20150413124121.GF2869@arm.com>
- <55420A18.7080203@arm.com> <1430400394.24034.67.camel@deneb.redhat.com>
- <20150430133333.GB32190@leverpostej>
-Message-ID: <1430402587.24034.68.camel@deneb.redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 30 Apr 2015 09:09:47 -0500
+Subject: [PATCH 1/2] ARM: simplify timer initialisation and remove
+ arm_timer.h inclusion
+In-Reply-To: <1430390662-18246-2-git-send-email-sudeep.holla@arm.com>
+References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
+ <1430390662-18246-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAL_JsqK8pPLCkrVFHaWr-RhOkPzaF+D_kZ5h9BahvN7CoYZO0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-04-30 at 14:33 +0100, Mark Rutland wrote:
-> > > Could you please send this to arm-soc as suggested by Will, with the 
-> > > relevant acks/reviews  ?
-> > > 
-> > 
-> > I sent it on Tuesday. Did it not show up? Is arm at kernel.org the correct
-> > address? I got the cc:
-> > 
-> > From: Mark Salter <msalter@redhat.com>
-> > To: arm at kernel.org
-> > Cc: Mark Salter <msalter@redhat.com>
-> > Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
-> > Date: Tue, 28 Apr 2015 13:09:32 -0400
-> > Message-Id: <1430240972-16386-1-git-send-email-msalter@redhat.com>
-> 
-> That's the right address, but that only goes to the maintainers, and
-> doesn't get copied to any list. In future, please Cc linux-arm-kernel in
-> addition.
+On Thu, Apr 30, 2015 at 5:44 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> The header asm/hardware/arm_timer.h is included in various machine
+> specific files to access TIMER_CTRL and initialise to a known state.
+> However that's not required as the clock{source,event} driver timer-sp
+> initialises all the timer being used.
 
-That's where I sent it originally.
+I believe the idea is not to initialize the timers being used, but the
+ones not being used and perhaps left running by the bootloader. Cases
+where the interrupt is shared could cause a problem.
+
+Rob
