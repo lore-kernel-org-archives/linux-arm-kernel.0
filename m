@@ -1,66 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Apr 2015 12:07:18 +0100
-Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
- device coherency
-In-Reply-To: <2575874.Qzlb7P3t1y@wuerfel>
-References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <6513459.YvvHTY3yyJ@wuerfel> <20150430104101.GD32373@arm.com>
- <2575874.Qzlb7P3t1y@wuerfel>
-Message-ID: <20150430110718.GE32373@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 30 Apr 2015 12:08:53 +0100
+Subject: [PATCH v2] ARM: vexpress: Add unified-cache Device Tree property
+In-Reply-To: <20150429191228.GO15254@pengutronix.de>
+References: <5509437E.6060806@arm.com>
+ <1426671298-2012-1-git-send-email-r.schwebel@pengutronix.de>
+ <20150429191228.GO15254@pengutronix.de>
+Message-ID: <20150430110853.GN7440@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 11:47:46AM +0100, Arnd Bergmann wrote:
-> On Thursday 30 April 2015 11:41:02 Will Deacon wrote:
-> >    - 0x0: The device is not coherent. Therefore:
-> >      * Cache maintenance is required for memory shared with the
-> >        device that is mapped on CPUs as IWB-OWB-ISH.
+On Wed, Apr 29, 2015 at 08:12:28PM +0100, Robert Schwebel wrote:
+> Hi Liviu,
 > 
-> This still seems insufficient. I guess this excludes having to
-> synchronize external bridges or write buffers, but it does not specify
-> what cache maintenance is required. Should there be an "outer-flush"?
-> Should the CPU cache be invalidated or flushed (or both), and do
-> we need to care about caches inside of the device or just inside of
-> the CPU?
+> On Wed, Mar 18, 2015 at 10:34:58AM +0100, Robert Schwebel wrote:
+> > Without this property, we get this boot warning:
+> > 
+> > "L2C: device tree omits to specify unified cache"
+> > 
+> > Signed-off-by: Robert Schwebel <r.schwebel@pengutronix.de>
+> > Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> > ---
+> >  arch/arm/boot/dts/vexpress-v2p-ca9.dts | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > Changes since v1:
+> >  * fix typo in patch description
+> > 
+> > diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> > index 23662b5..a411274 100644
+> > --- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> > +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> > @@ -170,6 +170,7 @@
+> >  		compatible = "arm,pl310-cache";
+> >  		reg = <0x1e00a000 0x1000>;
+> >  		interrupts = <0 43 4>;
+> > +		cache-unified;
+> >  		cache-level = <2>;
+> >  		arm,data-latency = <1 1 1>;
+> >  		arm,tag-latency = <1 1 1>;
+> > -- 
+> > 2.1.4
+> 
+> Gentle ping, this patch didn't make it into 4.1-rc1.
 
-See the note below:
+Sorry Robert, this fell through the cracks. VExpress gets very few
+patches in general and we're new to this :(
 
-> > [1] Note: Caching operations described in this document apply to the CPU
-> >     caches and any other caches in the system where device memory accesses
-> >     can hit.'
+Arnd/Olof, can we add this and Sudeep's patch for Juno into one of the
+later 4.1-rc pull requests?
 
-So for the CPU caches we'd do the usual clean to push dirty lines to the device
-and (clean+)invalidate before reading data from the device. For the "other
-caches in the system" we currently assume (for ARM64) that cache maintenance
-will be broadcast and therefore I wouldn't anticipate doing anything extra.
+Best regards,
+Liviu
 
-If people want to build system caches that don't respect broadcast cache
-maintenance and require explicit management (e.g outer_flush), then I
-consider that a broken system and we should try to disable the cache before
-entering the kernel. ARMv8 explicitly prohibits this type of cache in the
-architecture (type 1 below):
+> 
+> rsc
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-  `Conceptually, three classes of system cache can be envisaged:
-
-   1. System caches which lie before the point of coherency and cannot
-      be managed by any cache maintenance instructions. Such systems
-      fundamentally undermine the concept of cache maintenance
-      instructions operating to the point of coherency, as they imply
-      the use of non-architecture mechanisms to manage coherency. The
-      use of such systems in the ARM architecture is explicitly
-      prohibited.
-
-   2. System caches which lie before the point of coherency and can be
-      managed by cache maintenance by address instructions that apply to
-      the point of coherency, but cannot be managed by cache maintenance
-      by set/way instructions. Where maintenance of the entirety of such
-      a cache must be performed, as in the case for power management, it
-      must be performed using non-architectural mechanisms.
-
-   3. System caches which lie beyond the point of coherency and so are
-      invisible to the software. The management of such caches is
-      outside the scope of the architecture.'
-
-(sorry to keep throwing the book at you!)
-
-Will
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
