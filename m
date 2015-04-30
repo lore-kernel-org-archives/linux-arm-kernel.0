@@ -1,92 +1,52 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 30 Apr 2015 10:25:34 +0100
-Subject: [PATCH] ARM64: juno: add sp810 support and fix sp804 clock frequency
-Message-ID: <1430385934-5001-1-git-send-email-sudeep.holla@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 30 Apr 2015 10:29:53 +0100
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <CAFEAcA_VSkPPhmMmn+M+AoX5wjB0r66xq0ygMLSfR7zg0yiXnw@mail.gmail.com>
+References: <55417F5A.4040300@linaro.org> <3341308.O9mDCt0NEl@wuerfel>
+ <CAFEAcA_VSkPPhmMmn+M+AoX5wjB0r66xq0ygMLSfR7zg0yiXnw@mail.gmail.com>
+Message-ID: <20150430092953.GA32190@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock generator in IOFPGA generates the two source clocks: 32kHz and
-1MHz for the SP810 System Controller.
+On Thu, Apr 30, 2015 at 10:08:05AM +0100, Peter Maydell wrote:
+> On 30 April 2015 at 09:03, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 30 April 2015 09:03:22 Shannon Zhao wrote:
+> >>
+> >> I am looking at adding support for external power down and reboot to
+> >> ARM VMs.  With ACPI this is fairly straight forward and requires only
+> >> adding a GPIO controller to the virt machine model and extending ACPI
+> >> appropriately (see code here [1]). In addition Linaro LEG also have
+> >> done a test that uses GPIO as power button to shutdown OS on fast model
+> >> (see detail here [2]).
+> >>
+> >> However, we would like for this to work in systems that do not use
+> >> ACPI as well. Adding a GPIO controller will still work, but we would
+> >> need a generic way to tell Linux how to handle the GPIO events without
+> >> adding any board-specific code to the VIRT platform. And what guest
+> >> kernel driver do we need? Do we need another user-level daemon like acpid?
+> >>
+> >> Note that external shutdown can also be accomplished using the qemu
+> >> guest agent [3], but maybe this is not a sufficiently stable approach.
+> >>
+> >> Any input on the approach to take here is very welcome.
+> >
+> > I would expect drivers/power/reset/gpio-poweroff.c to work in an identical
+> > way with ACPI and DT, once you have added an ACPI binding for it.
+> 
+> Looking at Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+> that appears to be for "let the guest kernel turn off the system
+> from the inside by toggling a GPIO line". What we want is the
+> opposite: the external system (QEMU, in this case) toggles a GPIO
+> line in order to request the guest kernel to do a clean shutdown
+> or reboot. Or have I misunderstood what gpio-poweroff can do?
 
-The SP810 System Controller selects 32kHz or 1MHz as the sources for
-TIM_CLK[3:0], the SP804 timer clocks. The powerup default is 32kHz but
-the maximum of "refclk" and "timclk" is chosen by the SP810 driver.
+No, you're correct.
 
-This patch adds support for SP810 system controller and  also fixes the
-SP804 timer clock frequency.
+There are a few "power button" bindings around, but it looks like they
+all rely on platform details and aren't that generic.
 
-Fixes: 71f867ec130e ("arm64: Add Juno board device tree.")
-Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 31 +++++++++++++++++++++++----
- 1 file changed, 27 insertions(+), 4 deletions(-)
+With ACPI what events may be singalled? Just power off, or reset, etc?
 
-diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-index c138b95a8356..351c95bda89e 100644
---- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-@@ -21,6 +21,20 @@
- 			clock-output-names = "juno_mb:clk25mhz";
- 		};
+Which of these do we need to be able to handle with DT?
 
-+		v2m_refclk1mhz: refclk1mhz {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <1000000>;
-+			clock-output-names = "juno_mb:refclk1mhz";
-+		};
-+
-+		v2m_refclk32khz: refclk32khz {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+			clock-output-names = "juno_mb:refclk32khz";
-+		};
-+
- 		motherboard {
- 			compatible = "arm,vexpress,v2p-p1", "simple-bus";
- 			#address-cells = <2>;  /* SMB chipselect number and offset */
-@@ -66,6 +80,15 @@
- 				#size-cells = <1>;
- 				ranges = <0 3 0 0x200000>;
-
-+				v2m_sysctl: sysctl at 020000 {
-+					compatible = "arm,sp810", "arm,primecell";
-+					reg = <0x020000 0x1000>;
-+					clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&mb_clk24mhz>;
-+					clock-names = "refclk", "timclk", "apb_pclk";
-+					#clock-cells = <1>;
-+					clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
-+				};
-+
- 				mmci at 050000 {
- 					compatible = "arm,pl180", "arm,primecell";
- 					reg = <0x050000 0x1000>;
-@@ -106,16 +129,16 @@
- 					compatible = "arm,sp804", "arm,primecell";
- 					reg = <0x110000 0x10000>;
- 					interrupts = <9>;
--					clocks = <&mb_clk24mhz>, <&soc_smc50mhz>;
--					clock-names = "timclken1", "apb_pclk";
-+					clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&mb_clk24mhz>;
-+					clock-names = "timclken1", "timclken2", "apb_pclk";
- 				};
-
- 				v2m_timer23: timer at 120000 {
- 					compatible = "arm,sp804", "arm,primecell";
- 					reg = <0x120000 0x10000>;
- 					interrupts = <9>;
--					clocks = <&mb_clk24mhz>, <&soc_smc50mhz>;
--					clock-names = "timclken1", "apb_pclk";
-+					clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&mb_clk24mhz>;
-+					clock-names = "timclken1", "timclken2", "apb_pclk";
- 				};
-
- 				rtc at 170000 {
---
-1.9.1
+Mark.
