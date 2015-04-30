@@ -1,47 +1,66 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 30 Apr 2015 20:44:03 +0200
-Subject: [PATCH 3/4] clk: si5351: Do not pass struct clk in platform_data
-In-Reply-To: <20150430183043.GA21890@deathray>
+From: mwelling@ieee.org (Michael Welling)
+Date: Thu, 30 Apr 2015 13:47:42 -0500
+Subject: [PATCH 0/4] clk: si5351: Some fixes
+In-Reply-To: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1430415954-29517-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <CAOMZO5BYnE2epGrWbnNnaqEt1r6+xoPYWKtjc8w-Ze22aitgXA@mail.gmail.com>
- <20150430183043.GA21890@deathray>
-Message-ID: <554277F3.7060500@gmail.com>
+Message-ID: <20150430184742.GA22000@deathray>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.04.2015 20:30, Michael Welling wrote:
-> On Thu, Apr 30, 2015 at 03:20:38PM -0300, Fabio Estevam wrote:
->> On Thu, Apr 30, 2015 at 2:45 PM, Sebastian Hesselbarth
->> <sebastian.hesselbarth@gmail.com> wrote:
->>> @@ -1328,8 +1321,17 @@ static int si5351_i2c_probe(struct i2c_client *client,
->>>          i2c_set_clientdata(client, drvdata);
->>>          drvdata->client = client;
->>>          drvdata->variant = variant;
->>> -       drvdata->pxtal = pdata->clk_xtal;
->>> -       drvdata->pclkin = pdata->clk_clkin;
->>> +       drvdata->pxtal = devm_clk_get(&client->dev, "xtal");
->>> +       drvdata->pclkin = devm_clk_get(&client->dev, "clkin");
->>> +
->>> +       if (PTR_ERR(drvdata->pxtal) == -EPROBE_DEFER ||
->>> +           PTR_ERR(drvdata->pclkin) == -EPROBE_DEFER)
->>> +               return -EPROBE_DEFER;
->>> +
->>> +       if (IS_ERR(drvdata->pxtal) && IS_ERR(drvdata->pclkin)) {
->>
->> Don't you want || instead?
->
-> I doubt it. He is checking if both are not available.
->
-> The driver could work with only one of them.
->
-> If you use || then you assume to need both.
+On Thu, Apr 30, 2015 at 07:45:50PM +0200, Sebastian Hesselbarth wrote:
+> For Si5351 clock driver, Michael Welling and Jean-Francois Moine reported
+> issues with recent v4.x kernels due to broken/missing/wrong parent clock
+> claming. This patch set now deals with the issues reported.
+> 
+> Patch 1 amends the binding documentation mention clock-names property
+> for the "xtal" and "clkin" parent clock inputs of Si5351 variants.
+> 
+> Patch 2 adds the clock-names property for the SolidRun CuBox using Si5351
+> with a fixed oscillator connected to "xtal" input.
+> 
+> Patch 3 reworks the way we claim parent clocks by using devm_clk_get()
+> for both DT and platform_data based registration. Also, properly check
+> for errors returned by devm_clk_get() and prepare/enable the parent clocks.
+> 
+> Patch 4 introduces a function to reset PLLs on rate change. This should
+> improve generated clock output stability. I currently have no scope at hand
+> to actually test that properly, so there may be more issues remaining.
+> 
+> @Michael, Jean-Francois: Please test and report if there are still
+> issues remaining.
 
-Fabio,
+I am in the process of testing this patch series.
 
-Michael is right, the check is for bailing out if none of the parent
-clocks is available.
+Hopefully this fixes some issues.
 
-But thanks for looking at it and I appreciate the review.
-
-Sebastian
+> 
+> Sebastian
+> 
+> Sebastian Hesselbarth (4):
+>   clk: si5351: Mention clock-names in the binding documentation
+>   ARM: dove: Add clock-names to CuBox Si5351 clk generator
+>   clk: si5351: Do not pass struct clk in platform_data
+>   clk: si5351: Reset PLL after rate change
+> 
+>  .../devicetree/bindings/clock/silabs,si5351.txt    |  4 +-
+>  arch/arm/boot/dts/dove-cubox.dts                   |  1 +
+>  drivers/clk/clk-si5351.c                           | 87 +++++++++++++++++-----
+>  include/linux/platform_data/si5351.h               |  4 -
+>  4 files changed, 73 insertions(+), 23 deletions(-)
+> 
+> ---
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Jean-Francois Moine <moinejf@free.fr>
+> Cc: Michael Welling <mwelling@ieee.org>
+> Cc: Russell King <rmk+linux@arm.linux.org.uk>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-clk at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> -- 
+> 2.1.0
+> 
