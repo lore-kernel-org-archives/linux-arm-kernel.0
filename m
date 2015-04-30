@@ -1,22 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 30 Apr 2015 23:22:39 +0800
-Subject: [PATCH 05/11] ARM: imx6: set initial power mode in pm function
-In-Reply-To: <7h383ix57z.fsf@deeprootsystems.com>
-References: <1430058672-9267-1-git-send-email-shawn.guo@linaro.org>
- <1430058672-9267-6-git-send-email-shawn.guo@linaro.org>
- <CAMAWPa8cyybpdgO+Po=7YUnCFkrnyHKKihgddzrUpHfAW=7brA@mail.gmail.com>
- <20150429060446.GA27573@dragon>
- <7h383ix57z.fsf@deeprootsystems.com>
-Message-ID: <20150430152237.GB20956@dragon>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 30 Apr 2015 17:25:22 +0200
+Subject: [PATCH 0/3] power: reset: BCM63xx reboot support
+In-Reply-To: <55369C34.5020201@broadcom.com>
+References: <1427242632-7971-1-git-send-email-f.fainelli@gmail.com>
+ <55369C34.5020201@broadcom.com>
+Message-ID: <20150430152522.GB6133@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 29, 2015 at 09:35:28AM -0700, Kevin Hilman wrote:
-> ...I did a quick test of this locally on my wandboard-quad, and it's now
-> booting with multi_v7_defconfig too.
+Hi,
+
+On Tue, Apr 21, 2015 at 11:51:32AM -0700, Florian Fainelli wrote:
+> On 24/03/15 17:17, Florian Fainelli wrote:
+> > Hi all,
+> > 
+> > This patch series adds support for the BCM6328-style software reset hardware
+> > block commonly found on Broadcom BCM63xx DSL SoCs.
 > 
-> Tested-by: Kevin Hilman <khilman@linaro.org>
+> Looks like we can utilize the generic syscon reboot driver instead of
+> open-coding one, let's do that instead.
 
-Thanks for testing, Kevin.
+Thanks, that's preferred.
 
-Shawn
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150430/9bfc27ed/attachment.sig>
