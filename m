@@ -1,49 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 30 Apr 2015 10:50:55 +0100
-Subject: [PATCH arm 1/2] arm64: Use common outgoing-CPU-notification code
-In-Reply-To: <1429819654-10498-1-git-send-email-paulmck@linux.vnet.ibm.com>
-References: <20150423200603.GA9473@linux.vnet.ibm.com>
- <1429819654-10498-1-git-send-email-paulmck@linux.vnet.ibm.com>
-Message-ID: <20150430095055.GI18867@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Apr 2015 11:56:17 +0200
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <20150430092953.GA32190@leverpostej>
+References: <55417F5A.4040300@linaro.org>
+ <CAFEAcA_VSkPPhmMmn+M+AoX5wjB0r66xq0ygMLSfR7zg0yiXnw@mail.gmail.com>
+ <20150430092953.GA32190@leverpostej>
+Message-ID: <10771707.5UNQMOWJlc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Thursday 30 April 2015 10:29:53 Mark Rutland wrote:
+> On Thu, Apr 30, 2015 at 10:08:05AM +0100, Peter Maydell wrote:
+> > On 30 April 2015 at 09:03, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Thursday 30 April 2015 09:03:22 Shannon Zhao wrote:
+> > >>
+> > >> I am looking at adding support for external power down and reboot to
+> > >> ARM VMs.  With ACPI this is fairly straight forward and requires only
+> > >> adding a GPIO controller to the virt machine model and extending ACPI
+> > >> appropriately (see code here [1]). In addition Linaro LEG also have
+> > >> done a test that uses GPIO as power button to shutdown OS on fast model
+> > >> (see detail here [2]).
+> > >>
+> > >> However, we would like for this to work in systems that do not use
+> > >> ACPI as well. Adding a GPIO controller will still work, but we would
+> > >> need a generic way to tell Linux how to handle the GPIO events without
+> > >> adding any board-specific code to the VIRT platform. And what guest
+> > >> kernel driver do we need? Do we need another user-level daemon like acpid?
+> > >>
+> > >> Note that external shutdown can also be accomplished using the qemu
+> > >> guest agent [3], but maybe this is not a sufficiently stable approach.
+> > >>
+> > >> Any input on the approach to take here is very welcome.
+> > >
+> > > I would expect drivers/power/reset/gpio-poweroff.c to work in an identical
+> > > way with ACPI and DT, once you have added an ACPI binding for it.
+> > 
+> > Looking at Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+> > that appears to be for "let the guest kernel turn off the system
+> > from the inside by toggling a GPIO line". What we want is the
+> > opposite: the external system (QEMU, in this case) toggles a GPIO
+> > line in order to request the guest kernel to do a clean shutdown
+> > or reboot. Or have I misunderstood what gpio-poweroff can do?
+> 
+> No, you're correct.
+> 
+> There are a few "power button" bindings around, but it looks like they
+> all rely on platform details and aren't that generic.
+> 
+> With ACPI what events may be singalled? Just power off, or reset, etc?
+> 
+> Which of these do we need to be able to handle with DT?
 
-On Thu, Apr 23, 2015 at 01:07:33PM -0700, Paul E. McKenney wrote:
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 328b8ce4b007..6dc727a6e73e 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -252,15 +252,13 @@ static int op_cpu_kill(unsigned int cpu)
->  	return cpu_ops[cpu]->cpu_kill(cpu);
->  }
->  
-> -static DECLARE_COMPLETION(cpu_died);
-> -
->  /*
->   * called on the thread which is asking for a CPU to be shutdown -
->   * waits until shutdown has completed, or it is timed out.
->   */
->  void __cpu_die(unsigned int cpu)
->  {
-> -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
-> +	if (!cpu_wait_death(cpu, 5)) {
->  		pr_crit("CPU%u: cpu didn't die\n", cpu);
->  		return;
->  	}
-> @@ -293,7 +291,7 @@ void cpu_die(void)
->  	local_irq_disable();
->  
->  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> -	complete(&cpu_died);
-> +	(void)cpu_report_death();
->  
->  	/*
->  	 * Actually shutdown the CPU. This must never fail. The specific hotplug
+Actually, there are at least three different ways to do this:
 
-Are these functions are only defined when HOTPLUG_CPU is enabled? On
-arm64 we can end up with this option disabled if SUSPEND is disabled.
+a) have an input device send the KEY_POWEROFF or KEY_REBOOT events to
+   user space, and have some process (e.g. desktop environment, or daemon)
+   handle the event by doing an appropriate action. This seems to be
+   what ACPI does on x86, and a lot of device tree based systems do
+   the same thing using gpio-keys.
 
--- 
-Catalin
+b) Have a special driver that calls orderly_poweroff or orderly_reboot.
+   Only PowerPC (OPAL) uses the orderly_reboot() here, but a few platforms
+   (Xen, fsl_hypervisor, and some sparc and powerpc machines) as well
+   as some device drivers (thermal management etc) call this as well.
+   The effect is to call a user-configured binary (/sbin/reboot and
+   /sbin/poweroff by default).
+
+c) call ctrl_alt_del(): a bunch of platforms do this, and user space
+   has to configure whether this immediately calls kernel_restart(),
+   or sends SIGINT to the init process, which can then do an orderly
+   reboot. Again, highbank does this as the reboot action, but very
+   few other systems seem to do it, aside from the vt keyboard driver
+   that is used on all machines that have normal keyboard.
+
+	Arnd
