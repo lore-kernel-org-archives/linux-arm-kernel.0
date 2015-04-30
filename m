@@ -1,80 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Apr 2015 11:01:43 +0200
-Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
- X-Gene SoC EDAC DTS binding
-In-Reply-To: <20150430084549.GB3488@pd.tnic>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <4411194.KCIZ9l536O@wuerfel> <20150430084549.GB3488@pd.tnic>
-Message-ID: <7128860.xHITr0VFap@wuerfel>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 30 Apr 2015 10:08:05 +0100
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <3341308.O9mDCt0NEl@wuerfel>
+References: <55417F5A.4040300@linaro.org> <3341308.O9mDCt0NEl@wuerfel>
+Message-ID: <CAFEAcA_VSkPPhmMmn+M+AoX5wjB0r66xq0ygMLSfR7zg0yiXnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 April 2015 10:45:50 Borislav Petkov wrote:
-> On Thu, Apr 30, 2015 at 10:31:12AM +0200, Arnd Bergmann wrote:
-> > The problem with your approach is that a lot of these blocks are not
-> > vendor specific. You will probably see a server chip that contains a
-> > memory controller from DesignWare, a cache controller from ARM, and
-> > some other device from the chip vendor, and each of them comes with
-> > EDAC support. Then you get three other vendors that have various
-> > combinations of the same memory controller, cache controller and
-> > other EDAC devices. Not all of these chips would have ARM CPU cores,
-> > some may be e.g. MIPS or PowerPC.
-> 
-> I don't mean system-vendor specific but IP-block vendor specific. So
-> doing a designware-edac, arm-edac, apm-edac and so on...
+On 30 April 2015 at 09:03, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 30 April 2015 09:03:22 Shannon Zhao wrote:
+>>
+>> I am looking at adding support for external power down and reboot to
+>> ARM VMs.  With ACPI this is fairly straight forward and requires only
+>> adding a GPIO controller to the virt machine model and extending ACPI
+>> appropriately (see code here [1]). In addition Linaro LEG also have
+>> done a test that uses GPIO as power button to shutdown OS on fast model
+>> (see detail here [2]).
+>>
+>> However, we would like for this to work in systems that do not use
+>> ACPI as well. Adding a GPIO controller will still work, but we would
+>> need a generic way to tell Linux how to handle the GPIO events without
+>> adding any board-specific code to the VIRT platform. And what guest
+>> kernel driver do we need? Do we need another user-level daemon like acpid?
+>>
+>> Note that external shutdown can also be accomplished using the qemu
+>> guest agent [3], but maybe this is not a sufficiently stable approach.
+>>
+>> Any input on the approach to take here is very welcome.
+>
+> I would expect drivers/power/reset/gpio-poweroff.c to work in an identical
+> way with ACPI and DT, once you have added an ACPI binding for it.
 
-Ok, but I'd also do multiple drivers for one vendor if they have several
-blocks that are clearly unrelated. My understanding was that this is the
-case here, but I have not looked too closely.
+Looking at Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+that appears to be for "let the guest kernel turn off the system
+from the inside by toggling a GPIO line". What we want is the
+opposite: the external system (QEMU, in this case) toggles a GPIO
+line in order to request the guest kernel to do a clean shutdown
+or reboot. Or have I misunderstood what gpio-poweroff can do?
 
-Note that a lot of vendors do not like to say who they licensed IP
-blocks from, or they are contractually required not to say it.
+[I would expect the shutdown itself to be done via PSCI.]
 
-> Also, I really want for people thinking of writing EDAC drivers to think
-> hard before doing so. Whether it is even worth to expose *every* RAS
-> functionality in some driver. And to consider that exposing it might
-> cause more trouble than benefit.
-
-Definitely agreed on this point.
-
-> We've had that experience on x86 with reporting innocuous DRAM ECC
-> errors which were corrected by the hardware. People weren't even reading
-> the error message and running around wanting to RMA their processors
-> because something in dmesg screamed "Hardware Error".
-> 
-> And now APEI does the firmware-first thing where it gets to look at the
-> error first and then decide to report it up to the OS or not.
-> 
-> Which is a good thing because in most cases it unnecessarily upsets the
-> user.
-
-Yes, that is helpful feedback, but seems unrelated to the discussion
-about how to split this driver or not.
-
-> So to get back on track: I think having the IP-block vendor stuff in one
-> EDAC module would make this whole heterogeneity much more manageable.
-> 
-> On that system above, we will load - if I can count correctly - 6 EDAC
-> drivers anyway. But the EDAC pile would remain sane.
-
-Ok, let me try to state what I think we agree on:
-
-- For EDAC devices that are clearly unrelated (in particular, made by
-  different vendors, but possibly part of the same chip), there should
-  be one module per device type that registers one platform_driver.
-
-- For EDAC drivers that are variants of one another (e.g. different
-  generations of the same memory controller), we want one module with
-  one platform_driver that can handle all variants.
-
-Let me know if you disagree with the above. If that's fine, I think it
-leaves the case where we have one chip that has multiple EDAC blocks
-and we can't easily tell if those blocks are all inter-related or not.
-For this case, I would like to rely on your judgment as subsystem
-maintainer on whether the parts look related enough to have a single
-driver (with matching all device variants) or one driver for each
-class of device, as well as spotting cases where a part already has
-a driver from a different chip vendor that was licensing the same IP
-block.
-
-	Arnd
+thanks
+-- PMM
