@@ -1,153 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Apr 2015 12:21:14 +0200
-Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
- X-Gene SoC EDAC DTS binding
-In-Reply-To: <20150430094134.GD3488@pd.tnic>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <7128860.xHITr0VFap@wuerfel> <20150430094134.GD3488@pd.tnic>
-Message-ID: <3900315.9fjubb6CtE@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Apr 2015 11:41:02 +0100
+Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
+ device coherency
+In-Reply-To: <6513459.YvvHTY3yyJ@wuerfel>
+References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <2968069.n1L1S3Mp2q@wuerfel> <554152C6.7020600@amd.com>
+ <6513459.YvvHTY3yyJ@wuerfel>
+Message-ID: <20150430104101.GD32373@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 April 2015 11:41:34 Borislav Petkov wrote:
-> On Thu, Apr 30, 2015 at 11:01:43AM +0200, Arnd Bergmann wrote:
-> > Ok, but I'd also do multiple drivers for one vendor if they have several
-> > blocks that are clearly unrelated. My understanding was that this is the
-> > case here, but I have not looked too closely.
+Hi Arnd,
+
+On Thu, Apr 30, 2015 at 09:23:59AM +0100, Arnd Bergmann wrote:
+> On Wednesday 29 April 2015 16:53:10 Suravee Suthikulpanit wrote:
+> > As for the case where _CCA=0, I think the ACPI driver should essentially 
+> > communicate the information as HW is non-coherent as described in the 
+> > spec, and should be calling arch_setup_dma_ops(dev, false). It is true 
+> > that this in probably less-likely for the ARM64 server platforms. 
+> > However, I would think that the ACPI driver should not be making such 
+> > assumption.
 > 
-> AFAIU, this is a driver for a bunch of xgene IP blocks.
-> 
-> Now, if someone integrates xgene memory controller in some other hw
-> platform, we could still serve it with the same xgene-edac driver -
-> it'll simply use only the memory controller part of the functionality.
-> 
-> > Note that a lot of vendors do not like to say who they licensed IP
-> > blocks from, or they are contractually required not to say it.
-> 
-> Then there's that :-\
-> 
-> But the moment they supply an EDAC driver, one can recognize the IP
-> block from the registers and functionality, no? Or do they change stuff
-> a little bit so that it looks sufficiently different?
+> Can you add a description to the ACPI spec then to describe in detail what
+> "non-coherent" is supposed to mean, and which action the OS is supposed to
+> take when accessing data from device or CPU?
 
-They don't normally change stuff intentionally, but you can have
-drivers for the same hardware that are written so differently that
-it becomes hard to spot that they are doing the same thing.
+You may be interested in the IORT ACPI companion spec here:
 
-We have a bunch of XGMAC drivers for the same basic licensed IP block,
-each one configured a bit differently and extended with some soc-specific
-bits, and drivers written from scratch.
+  http://infocenter.arm.com/help/topic/com.arm.doc.den0049a/DEN0049A_IO_Remapping_Table.pdf
 
-I would also not assume that people are trying hard to hide something
-from you, it's more that some guy is given the task to write a driver
-for an IP block, but is not told who made that, so the binding will
-just come with the name of the company he's working for.
+On CCA, it says:
 
-> > Ok, let me try to state what I think we agree on:
-> > 
-> > - For EDAC devices that are clearly unrelated (in particular, made by
-> >   different vendors, but possibly part of the same chip), there should
-> >   be one module per device type that registers one platform_driver.
-> > 
-> > - For EDAC drivers that are variants of one another (e.g. different
-> >   generations of the same memory controller), we want one module with
-> >   one platform_driver that can handle all variants.
-> > 
-> > Let me know if you disagree with the above. If that's fine, I think it
-> > leaves the case where we have one chip that has multiple EDAC blocks
-> > and we can't easily tell if those blocks are all inter-related or not.
-> > For this case, I would like to rely on your judgment as subsystem
-> > maintainer on whether the parts look related enough to have a single
-> > driver (with matching all device variants) or one driver for each
-> > class of device, as well as spotting cases where a part already has
-> > a driver from a different chip vendor that was licensing the same IP
-> > block.
-> 
-> Well, so the way I see it is, if we could map the EDAC drivers to the IP
-> blocks. I.e., I'd like to have EDAC drivers mapped to the *IP* *blocks*
-> vendor *instead* of the platform vendor.
-> 
-> We will have to be able to load multiple EDAC drivers anyway but it'll
-> be much easier this way.
-> 
-> So let's have an example:
-> 
-> Let's say there's one xgene_edac driver which contains all the RAS
-> functionality of xgene IP blocks. Memory controller, L3 cache,
-> whatever...
-> 
-> Now, three *platform* vendors license, say, the xgene memory controller.
-> 
-> With my scheme, xgene_edac will be loaded on all those three vendors'
-> Linux. Done.
+  `This value must match the value returned by the _CCA object defined in
+   the DSDT for the device represented by this node. The attribute can take
+   the following values:
 
-Right, but they would then also have to load the code for the other
-blocks they did not license.
+   - 0x1: The device is fully coherent. No cache maintenance[1] is required for
+     memory shared with the device which is mapped on CPUs as
+     Inner Write-Back (IWB), Outer Write-back (OWB), and Inner
+     shareable (ISH). In addition, during system initialization at cold
+     boot, or after wakeup from low-power state, if the cache
+     coherency requires an SMMU override or some specific device
+     configuration, the platform firmware has to ensure that this has
+     been done. Therefore the semantics represented by a value of
+     0x1 are always correct at the time of hand-off from firmware to
+     OS.
 
-> But if those three vendors went and created an EDAC module each for
-> their system, it would be a lot of repeated copy'pasting and bloat.
+   - 0x0: The device is not coherent. Therefore:
+     * Cache maintenance is required for memory shared with the
+       device that is mapped on CPUs as IWB-OWB-ISH.
+     * No cache maintenance is required for memory shared with the
+       device that is mapped on the CPU as device or Non-cacheable.
 
-Yes, and I would expect you to reject any such driver submission.
+   All other values are reserved.
 
-> Now, the other dimension doesn't look better either:
-> 
-> xgene_edac_mc
-> xgene_edac_mc-v2
-> xgene_edac_l3
-> xgene_edac-l2
-> ...
+[1] Note: Caching operations described in this document apply to the CPU
+    caches and any other caches in the system where device memory accesses
+    can hit.'
 
-Not following you here, what is the problem here?
+This aside, the documented introduces some useful, related concepts such
+as CPM (coherent path to memory) and DACS (device attributes are cacheable
+and inner shareable) for describing different IO subsystems. It also has
+mechanisms to descibe ID repainting from PCI->SMMU->ITS.
 
-> Also, in both cases, if any of those drivers need to talk to each other
-> or know of one another in any way, the situation becomes really funny as
-> they need to create something ad-hoc each time.
-
-Agreed. If the drivers need to talk to one another, that is a clear
-sign that the devices are not actually independent and that they
-really belong into a single driver. That's not the case I'm thinking
-of here.
-
-> And this all can be avoided by having a single IP-blocks RAS driver.
-> 
-> Does that make more sense? Can it even be done with devicetree and all?
-
-The devicetree just describes the available hardware blocks. Typically
-you have one node for one block (e.g. a memory controller), and then
-have one driver for that block. Things get a little funny if you want
-to have multiple drivers for the same device, e.g. you want a driver
-in drivers/memory/ to support autorefresh in sleep states and another
-driver in drivers/edac to support error handling. If you get something
-like this, you need some coordination between the two drivers, but that
-is unrelated to devicetree or not.
-
-A platform driver should match against a set of similar devices that are
-identified by a "compatible" string, and we try to list the name of the
-ip block here, which could be something like "arm,pl12345rev1.2" if it
-is licensed from another company, or if that is not known, describe it
-by using the product number of the first chip it appeared in, e.g.
-"amcc,405ez-memory-controller". APM does not use numbers for their
-chips, so "apm,xgene-memory-controller" would refer to the memory
-controller used in the "xgene" chip. If they come out with a second
-product that uses the same one, they would use the same string, or
-use "apm,ygene-memory-controller" for the one that is in "ygene" if
-that is slightly different. The driver can then match against both
-and handle the differences based on the compatible string.
-
-The point where it gets silly is when you try to handle multiple
-unrelated devices in the same driver and you get a probe function
-that just does:
-
-apm_edac_probe(struct platform_device *dev)
-{
-	if (dev_is_xgene_mc(dev))
-		return apm_probe_xgene_mc(dev);
-	if (dev_is_xgene_l2(dev))
-		return apm_probe_xgene_l2(dev);
-	if (dev_is_ygene_mc(dev))
-		...
-}
-
-with each of the called functions implemented in a separate file.
-
-	Arnd
+Will
