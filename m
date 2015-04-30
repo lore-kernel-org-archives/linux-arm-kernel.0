@@ -1,43 +1,87 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Apr 2015 13:42:53 +0900
-Subject: [PATCH 3/3] clocksource: exynos_mct: Remove old platform mct_init()
-In-Reply-To: <1430368973-23786-1-git-send-email-k.kozlowski@samsung.com>
-References: <1430368973-23786-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1430368973-23786-3-git-send-email-k.kozlowski@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 30 Apr 2015 10:23:53 +0530
+Subject: [PATCH 1/3 v5] dt/bindings: Add binding for the BCM2835 mailbox
+ driver
+In-Reply-To: <55416C35.1030001@wwwdotorg.org>
+References: <1430173644-19099-2-git-send-email-eric@anholt.net>
+ <1430253868-11138-1-git-send-email-eric@anholt.net>
+ <55403446.1040207@wwwdotorg.org>
+ <87vbgeq478.fsf@eliezer.anholt.net>
+ <55416C35.1030001@wwwdotorg.org>
+Message-ID: <CABb+yY3by37AGmVHfNH2RZF8KcU3GUYDJj_xQZTGCBDb2PsHQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 228e3023eb04 ("Merge tag 'mct-exynos-for-v3.10' of ...") the
-mct_init() was superseded by mct_init_dt() and is not referenced
-anywhere. Remove it.
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/clocksource/exynos_mct.c | 12 ------------
- 1 file changed, 12 deletions(-)
-
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 8b2a9fc66dcc..935b05936dbd 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -560,18 +560,6 @@ out_irq:
- 	free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
- }
- 
--void __init mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1)
--{
--	mct_irqs[MCT_G0_IRQ] = irq_g0;
--	mct_irqs[MCT_L0_IRQ] = irq_l0;
--	mct_irqs[MCT_L1_IRQ] = irq_l1;
--	mct_int_type = MCT_INT_SPI;
--
--	exynos4_timer_resources(NULL, base);
--	exynos4_clocksource_init();
--	exynos4_clockevent_init();
--}
--
- static void __init mct_init_dt(struct device_node *np, unsigned int int_type)
- {
- 	u32 nr_irqs, i;
--- 
-1.9.1
+On Thu, Apr 30, 2015 at 5:11 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 04/29/15 10:39, Eric Anholt wrote:
+>>
+>> Stephen Warren <swarren@wwwdotorg.org> writes:
+>>
+>>> On 04/28/2015 02:44 PM, Eric Anholt wrote:
+>>>>
+>>>> From: Lubomir Rintel <lkundrak@v3.sk>
+>>>>
+>>>> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+>>>> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+>>>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>>>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+>>>> ---
+>>>>
+>>>> v2: Split into a separate patch for submitting to the devicetree list.
+>>>>      Consistently start node docs with a capital letter. device's
+>>>>      address in the example shouldn't have "0x". Drop machine-specific
+>>>>      interrupt numbers from the docs.  (changes by anholt).
+>>>>
+>>>> v3: Move the file to just bcm2835-mbox.txt, clean up formatting
+>>>>      (changes by anholt, from review by Lee Jones).
+>>>>
+>>>> v4: Move file back by consensus from various Broadcom platform
+>>>>      maintainers (changes by anholt, acked by Lee Jones).
+>>>>
+>>>> v5: Document that the mailbox cell should be 0 in clients, and add an
+>>>>      example of a client (changes by anholt, from review by Jassi).
+>>>
+>>>
+>>> Some mention of what you changed in the patch might be nice, since it
+>>> was originally authored by someone else, and there's quite a changelog.
+>>
+>>
+>> I've been taking this changelog stuff out of the patch and putting it
+>> below '---' because when I was submitting this series before, I got
+>> chided for putting it in the patch!
+>
+>
+> A changelog and a description of the changes you've made aren't quite the
+> same thing.
+>
+> There should be some mention in the commit description of what you changed
+> relative to the patch that someone else authored, so they don't get
+> blaimed/praised for any of your changes. The format of that description
+> wouldn't usually be a detailed patch revision changelog though, just a
+> description of the overall changes that were left in the final version.
+>
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+>>>> b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+>>>
+>>>
+>>>> +- #mbox-cells: Specifies the number of cells needed to encode a mailbox
+>>>> +                 channel. The value shall be 1.  Clients should supply
+>>>> a value
+>>>> +                 of 0 for the mailbox channel, because there is only
+>>>> one
+>>>> +                 exposed
+>>>
+>>>
+>>> Can't you use #mbox-cells = <0> if there's no data to provide?
+>>
+>>
+>> of_mbox_index_xlate looks like it's always dereferencing the first arg.
+>
+>
+> Is it possible to fix that?
+>
+The driver specific of_xlate() is meant to be provided during
+mbox_controller_register() in which case the default 1-cell xlate
+won't be used.
