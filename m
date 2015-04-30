@@ -1,40 +1,49 @@
 From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Thu, 30 Apr 2015 09:44:31 -0500
-Subject: [PATCH 16/18] ARM: imx: Move the variable clockevent_mode into
- mxc_set_mode
+Date: Thu, 30 Apr 2015 09:44:32 -0500
+Subject: [PATCH 17/18] ARM: imx: Codes clean up
 In-Reply-To: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
 References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <1430405073-13106-17-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <1430405073-13106-18-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The global variable "clockevent_mode" was moved into the
-function of mxc_set_mode.
+Removed the unused SoC relating codes.
 
 Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
 ---
- arch/arm/mach-imx/time.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-imx/time.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
 diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index 836d255..da4dc29 100644
+index da4dc29..f8dd53d 100644
 --- a/arch/arm/mach-imx/time.c
 +++ b/arch/arm/mach-imx/time.c
-@@ -98,7 +98,6 @@ struct imx_timer {
+@@ -35,8 +35,6 @@
+ 
+ #include <asm/mach/time.h>
+ 
+-#include "common.h"
+-#include "hardware.h"
+ 
+ /*
+  * There are 4 versions of the timer hardware on Freescale MXC hardware.
+@@ -79,8 +77,6 @@
+ 
+ #define V2_TIMER_RATE_OSC_DIV8	3000000
+ 
+-#define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx21() || cpu_is_mx27())
+-#define timer_is_v2()	(!timer_is_v1())
+ 
+ #define IMX_TIMER_V0         (0)
+ #define IMX_TIMER_V1         (1)
+@@ -97,8 +93,6 @@ struct imx_timer {
+ 	void (*gpt_irq_acknowledge)(struct imx_timer *);
  };
  
- static struct clock_event_device clockevent_mxc;
--static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
- 
+-static struct clock_event_device clockevent_mxc;
+-
  static void gpt_irq_disable_v0_v1(struct imx_timer *tm)
  {
-@@ -226,6 +225,7 @@ static void mxc_set_mode(enum clock_event_mode mode,
- {
- 	unsigned long flags;
- 	struct imx_timer *tm = container_of(evt, struct imx_timer, evt);
-+	static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
- 
- 	/*
- 	 * The timer interrupt generation is disabled at least
+ 	unsigned int tmp;
 -- 
 1.9.1
