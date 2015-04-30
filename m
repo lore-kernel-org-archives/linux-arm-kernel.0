@@ -1,30 +1,35 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Thu, 30 Apr 2015 19:55:41 +0200
-Subject: [PATCH 2/2] ARM: vexpress: Add interrupt-affinity
-In-Reply-To: <1430416448-25203-1-git-send-email-r.schwebel@pengutronix.de>
-References: <1430416448-25203-1-git-send-email-r.schwebel@pengutronix.de>
-Message-ID: <20150430175541.GL15254@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 30 Apr 2015 15:07:38 -0300
+Subject: [PATCH V7 04/10] ARM: dts: add imx7d soc dtsi file
+In-Reply-To: <1430317210-18333-5-git-send-email-Frank.Li@freescale.com>
+References: <1430317210-18333-1-git-send-email-Frank.Li@freescale.com>
+ <1430317210-18333-5-git-send-email-Frank.Li@freescale.com>
+Message-ID: <CAOMZO5C2ye2GHi_CxFd_AKuK1k3okBBVgNoXN_31hjeCuzdXpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 07:54:08PM +0200, Robert Schwebel wrote:
-> Without this property, we get this boot warning:
-> 
-> [    0.459361] CPU PMU: Failed to parse <no-node>/interrupt-affinity[0]
-> 
-> Signed-off-by: Robert Schwebel <r.schwebel@pengutronix.de>
+Hi Frank,
 
-However, with this patch applied, the messages above disappear, but I
-still get this:
+On Wed, Apr 29, 2015 at 11:20 AM,  <Frank.Li@freescale.com> wrote:
 
-[    0.495280] CPU PMU: Failed to find logical CPU for cpu
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu0: cpu at 0 {
+> +                       compatible = "arm,cortex-a7";
+> +                       device_type = "cpu";
+> +                       reg = <0>;
+> +                       operating-points = <
+> +                               /* KHz  uV */
+> +                               996000  1075000
+> +                               792000  975000
+> +                       >;
+> +                       clock-latency = <61036>; /* two CLK32 periods */
+> +                       clocks = <&clks IMX7D_ARM_A7_ROOT_CLK>, <&clks IMX7D_ARM_A7_ROOT_SRC>,
+> +                                <&clks IMX7D_PLL_ARM_MAIN_CLK>, <&clks IMX7D_PLL_SYS_MAIN_CLK>;
+> +                       clock-names = "arm", "arm_root_src", "pll_arm", "pll_sys_main";
+> +               };
+> +       };
 
-on a kernel configured with CONFIG_SMP=n. nr_cpu_ids is 1 there, while 
-the loop still loops over all available cores. Ths makes the logic fail.
-
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+That's a dual core, so you also need to pass cpu1 ;-)
