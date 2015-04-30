@@ -1,105 +1,118 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 30 Apr 2015 11:41:34 +0200
-Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
- X-Gene SoC EDAC DTS binding
-In-Reply-To: <7128860.xHITr0VFap@wuerfel>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <4411194.KCIZ9l536O@wuerfel> <20150430084549.GB3488@pd.tnic>
- <7128860.xHITr0VFap@wuerfel>
-Message-ID: <20150430094134.GD3488@pd.tnic>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 30 Apr 2015 10:46:53 +0100
+Subject: [PATCH] ARM64: juno: add sp810 support and fix sp804 clock
+ frequency
+In-Reply-To: <1430385934-5001-1-git-send-email-sudeep.holla@arm.com>
+References: <1430385934-5001-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20150430094652.GM7440@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 11:01:43AM +0200, Arnd Bergmann wrote:
-> Ok, but I'd also do multiple drivers for one vendor if they have several
-> blocks that are clearly unrelated. My understanding was that this is the
-> case here, but I have not looked too closely.
-
-AFAIU, this is a driver for a bunch of xgene IP blocks.
-
-Now, if someone integrates xgene memory controller in some other hw
-platform, we could still serve it with the same xgene-edac driver -
-it'll simply use only the memory controller part of the functionality.
-
-> Note that a lot of vendors do not like to say who they licensed IP
-> blocks from, or they are contractually required not to say it.
-
-Then there's that :-\
-
-But the moment they supply an EDAC driver, one can recognize the IP
-block from the registers and functionality, no? Or do they change stuff
-a little bit so that it looks sufficiently different?
-
-> Yes, that is helpful feedback, but seems unrelated to the discussion
-> about how to split this driver or not.
-
-Yeah, I know. I just wanted to mention that in the discussion because
-I get the impression that people are throwing out EDAC drivers just
-because the hw functionality is there. So I wanted to remind people to
-step back and consider the usefullness of such a driver first.
-
-> Ok, let me try to state what I think we agree on:
+On Thu, Apr 30, 2015 at 10:25:34AM +0100, Sudeep Holla wrote:
+> The clock generator in IOFPGA generates the two source clocks: 32kHz and
+> 1MHz for the SP810 System Controller.
 > 
-> - For EDAC devices that are clearly unrelated (in particular, made by
->   different vendors, but possibly part of the same chip), there should
->   be one module per device type that registers one platform_driver.
+> The SP810 System Controller selects 32kHz or 1MHz as the sources for
+> TIM_CLK[3:0], the SP804 timer clocks. The powerup default is 32kHz but
+> the maximum of "refclk" and "timclk" is chosen by the SP810 driver.
 > 
-> - For EDAC drivers that are variants of one another (e.g. different
->   generations of the same memory controller), we want one module with
->   one platform_driver that can handle all variants.
+> This patch adds support for SP810 system controller and  also fixes the
+> SP804 timer clock frequency.
 > 
-> Let me know if you disagree with the above. If that's fine, I think it
-> leaves the case where we have one chip that has multiple EDAC blocks
-> and we can't easily tell if those blocks are all inter-related or not.
-> For this case, I would like to rely on your judgment as subsystem
-> maintainer on whether the parts look related enough to have a single
-> driver (with matching all device variants) or one driver for each
-> class of device, as well as spotting cases where a part already has
-> a driver from a different chip vendor that was licensing the same IP
-> block.
+> Fixes: 71f867ec130e ("arm64: Add Juno board device tree.")
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Well, so the way I see it is, if we could map the EDAC drivers to the IP
-blocks. I.e., I'd like to have EDAC drivers mapped to the *IP* *blocks*
-vendor *instead* of the platform vendor.
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-We will have to be able to load multiple EDAC drivers anyway but it'll
-be much easier this way.
+Sudeep, I would also mention in the comment area that this patch, while fixing the hardware
+description for the board, becomes more useful when your other patches that enable SP804 for
+arm64 are applied. That is no reason, from my point of view, not to apply this patch as a fix
+for v4.1.
 
-So let's have an example:
+Best regards,
+Liviu
 
-Let's say there's one xgene_edac driver which contains all the RAS
-functionality of xgene IP blocks. Memory controller, L3 cache,
-whatever...
-
-Now, three *platform* vendors license, say, the xgene memory controller.
-
-With my scheme, xgene_edac will be loaded on all those three vendors'
-Linux. Done.
-
-But if those three vendors went and created an EDAC module each for
-their system, it would be a lot of repeated copy'pasting and bloat.
-
-Now, the other dimension doesn't look better either:
-
-xgene_edac_mc
-xgene_edac_mc-v2
-xgene_edac_l3
-xgene_edac-l2
-...
-
-Also, in both cases, if any of those drivers need to talk to each other
-or know of one another in any way, the situation becomes really funny as
-they need to create something ad-hoc each time.
-
-And this all can be avoided by having a single IP-blocks RAS driver.
-
-Does that make more sense? Can it even be done with devicetree and all?
-
-Thanks.
+> ---
+>  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 31 +++++++++++++++++++++++----
+>  1 file changed, 27 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> index c138b95a8356..351c95bda89e 100644
+> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> @@ -21,6 +21,20 @@
+>  			clock-output-names = "juno_mb:clk25mhz";
+>  		};
+> 
+> +		v2m_refclk1mhz: refclk1mhz {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <1000000>;
+> +			clock-output-names = "juno_mb:refclk1mhz";
+> +		};
+> +
+> +		v2m_refclk32khz: refclk32khz {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <32768>;
+> +			clock-output-names = "juno_mb:refclk32khz";
+> +		};
+> +
+>  		motherboard {
+>  			compatible = "arm,vexpress,v2p-p1", "simple-bus";
+>  			#address-cells = <2>;  /* SMB chipselect number and offset */
+> @@ -66,6 +80,15 @@
+>  				#size-cells = <1>;
+>  				ranges = <0 3 0 0x200000>;
+> 
+> +				v2m_sysctl: sysctl at 020000 {
+> +					compatible = "arm,sp810", "arm,primecell";
+> +					reg = <0x020000 0x1000>;
+> +					clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&mb_clk24mhz>;
+> +					clock-names = "refclk", "timclk", "apb_pclk";
+> +					#clock-cells = <1>;
+> +					clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
+> +				};
+> +
+>  				mmci at 050000 {
+>  					compatible = "arm,pl180", "arm,primecell";
+>  					reg = <0x050000 0x1000>;
+> @@ -106,16 +129,16 @@
+>  					compatible = "arm,sp804", "arm,primecell";
+>  					reg = <0x110000 0x10000>;
+>  					interrupts = <9>;
+> -					clocks = <&mb_clk24mhz>, <&soc_smc50mhz>;
+> -					clock-names = "timclken1", "apb_pclk";
+> +					clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&mb_clk24mhz>;
+> +					clock-names = "timclken1", "timclken2", "apb_pclk";
+>  				};
+> 
+>  				v2m_timer23: timer at 120000 {
+>  					compatible = "arm,sp804", "arm,primecell";
+>  					reg = <0x120000 0x10000>;
+>  					interrupts = <9>;
+> -					clocks = <&mb_clk24mhz>, <&soc_smc50mhz>;
+> -					clock-names = "timclken1", "apb_pclk";
+> +					clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&mb_clk24mhz>;
+> +					clock-names = "timclken1", "timclken2", "apb_pclk";
+>  				};
+> 
+>  				rtc at 170000 {
+> --
+> 1.9.1
+> 
 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
