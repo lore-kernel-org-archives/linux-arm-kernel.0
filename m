@@ -1,66 +1,49 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 30 Apr 2015 14:30:48 +0100
-Subject: [PATCH v3 2/6] ARM: DT: STi: STiH407: Add dwc3 usb3 DT node.
+Date: Thu, 30 Apr 2015 14:30:49 +0100
+Subject: [PATCH v3 3/6] usb: dwc3: dwc3-st: Update the incorrect DT dwc3
+ example.
 In-Reply-To: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
 References: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1430400652-3366-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1430400652-3366-4-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that both usb2 and usb3 phy drivers, and also the ST dwc3 glue code
-are all present upstream, we can add the dwc3 DT node and have a working
-usb3 controller on stih407-b2120 and stih410-b2020.
+There is a subtle typo phys-names should be phy-names. Using the
+current example means you don't have working usb (as you fail to
+obtain the phys). Also update the example to use the generic phy
+type constants which are now used for miphy28.
+
+Additionally also remove the unnecessary new line in the example.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- arch/arm/boot/dts/stih407-family.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ Documentation/devicetree/bindings/usb/dwc3-st.txt | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 186412d..821598e 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -7,6 +7,7 @@
-  * publishhed by the Free Software Foundation.
-  */
- #include "stih407-pinctrl.dtsi"
-+#include <dt-bindings/phy/phy.h>
- #include <dt-bindings/reset-controller/stih407-resets.h>
- / {
- 	#address-cells = <1>;
-@@ -336,5 +337,32 @@
- 				resets = <&softreset STIH407_MIPHY2_SOFTRESET>;
- 			};
- 		};
-+
-+		st_dwc3: dwc3 at 8f94000 {
-+			compatible	= "st,stih407-dwc3";
-+			reg		= <0x08f94000 0x1000>, <0x110 0x4>;
-+			reg-names	= "reg-glue", "syscfg-reg";
-+			st,syscfg	= <&syscfg_core>;
-+			resets		= <&powerdown STIH407_USB3_POWERDOWN>,
-+					  <&softreset STIH407_MIPHY2_SOFTRESET>;
-+			reset-names	= "powerdown", "softreset";
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			pinctrl-names	= "default";
-+			pinctrl-0	= <&pinctrl_usb3>;
-+			ranges;
-+
-+			status = "disabled";
-+
-+			dwc3: dwc3 at 9900000 {
-+				compatible	= "snps,dwc3";
-+				reg		= <0x09900000 0x100000>;
-+				interrupts	= <GIC_SPI 155 IRQ_TYPE_NONE>;
-+				dr_mode		= "host";
-+				phy-names	= "usb2-phy", "usb3-phy";
-+				phys		= <&usb2_picophy0>,
-+						  <&phy_port2 PHY_TYPE_USB3>;
-+			};
-+		};
+diff --git a/Documentation/devicetree/bindings/usb/dwc3-st.txt b/Documentation/devicetree/bindings/usb/dwc3-st.txt
+index f9d7025..01c71b1 100644
+--- a/Documentation/devicetree/bindings/usb/dwc3-st.txt
++++ b/Documentation/devicetree/bindings/usb/dwc3-st.txt
+@@ -49,8 +49,7 @@ st_dwc3: dwc3 at 8f94000 {
+ 	st,syscfg	= <&syscfg_core>;
+ 	resets		= <&powerdown STIH407_USB3_POWERDOWN>,
+ 			  <&softreset STIH407_MIPHY2_SOFTRESET>;
+-	reset-names	= "powerdown",
+-			  "softreset";
++	reset-names	= "powerdown", "softreset";
+ 	#address-cells	= <1>;
+ 	#size-cells	= <1>;
+ 	pinctrl-names	= "default";
+@@ -62,7 +61,7 @@ st_dwc3: dwc3 at 8f94000 {
+ 		reg		= <0x09900000 0x100000>;
+ 		interrupts	= <GIC_SPI 155 IRQ_TYPE_NONE>;
+ 		dr_mode		= "host";
+-		phys-names      = "usb2-phy", "usb3-phy";
+-		phys            = <&usb2_picophy2>, <&phy_port2 MIPHY_TYPE_USB>;
++		phy-names	= "usb2-phy", "usb3-phy";
++		phys		= <&usb2_picophy2>, <&phy_port2 PHY_TYPE_USB3>;
  	};
  };
 -- 
