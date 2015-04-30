@@ -1,66 +1,52 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Apr 2015 09:19:04 +0900
-Subject: [PATCH 1/2] ARM: shmobile: defconfig: Replace USB_RCAR_GEN2_PHY
- by PHY_RCAR_GEN2
-In-Reply-To: <1430222884-2095-1-git-send-email-geert+renesas@glider.be>
-References: <1430222884-2095-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150430001903.GG17758@verge.net.au>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 30 Apr 2015 02:32:16 +0200
+Subject: [PATCH 1/1] ARM: dts: Make DP a consumer of DISP1 power domain
+ on Exynos5420
+In-Reply-To: <552F6750.6020306@collabora.co.uk>
+References: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
+ <552F6750.6020306@collabora.co.uk>
+Message-ID: <55417810.6070202@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 28, 2015 at 02:08:03PM +0200, Geert Uytterhoeven wrote:
-> The legacy-only USB_RCAR_GEN2_PHY driver was replaced by the DT-only
-> PHY_RCAR_GEN2 driver.
-> 
-> Refresh the defconfig using "make savedefconfig" while we're at it.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Oops, CONFIG_USB_RCAR_GEN2_PHY shouldn't have been in a multiplatform
-> defconfig, as it supports legacy platform data only.
+Hello Kukjin,
 
-Thanks for cleaning this up.
+On 04/16/2015 09:40 AM, Javier Martinez Canillas wrote:
+> 
+> On 04/12/2015 10:30 PM, Javier Martinez Canillas wrote:
+>> Commit ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
+>> added a device node for the Exynos5420 DISP1 power domain but dit not
+>> make the DP controller a consumer of that power domain.
+>> 
+>> This causes an "Unhandled fault: imprecise external abort" error if the
+>> exynos-dp driver tries to access the DP controller registers and the PD
+>> was turned off. This lead to a kernel panic and a complete system hang.
+>> 
+>> Make the DP controller device node a consumer of the DISP1 power domain
+>> to ensure that the PD is turned on when the exynos-dp driver is probed.
+>> 
+>> Fixes: ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> 
+> Any comments about this patch?
+> 
+> It's very trivial but fixes a very important regression on Exynos5420 boards
+> with display panel and Peach Pit and Pi have been broken since next-20150401.
+> 
+> This [0] is the Peach Pit boot log with yesteday's linux-next for example.
+> 
+> Best regards,
+> Javier
+> 
+> [0]: http://arm-soc.lixom.net/bootlogs/next/next-20150415/pit-arm-exynos_defconfig.html
+> 
 
-I have queued this up for v4.2.
+It has been many weeks since this patch has been posted and linux-next
+is still broken:
 
-> 
->  arch/arm/configs/shmobile_defconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> index b58618e2d13c51c8..9961fbd633f8d165 100644
-> --- a/arch/arm/configs/shmobile_defconfig
-> +++ b/arch/arm/configs/shmobile_defconfig
-> @@ -121,7 +121,6 @@ CONFIG_WATCHDOG=y
->  CONFIG_DA9063_WATCHDOG=y
->  CONFIG_MFD_AS3711=y
->  CONFIG_MFD_DA9063=y
-> -CONFIG_REGULATOR=y
->  CONFIG_REGULATOR_AS3711=y
->  CONFIG_REGULATOR_DA9210=y
->  CONFIG_REGULATOR_GPIO=y
-> @@ -160,7 +159,6 @@ CONFIG_USB_OHCI_HCD=y
->  CONFIG_USB_R8A66597_HCD=y
->  CONFIG_USB_RENESAS_USBHS=y
->  CONFIG_USB_RCAR_PHY=y
-> -CONFIG_USB_RCAR_GEN2_PHY=y
->  CONFIG_USB_GADGET=y
->  CONFIG_USB_RENESAS_USBHS_UDC=y
->  CONFIG_USB_ETH=y
-> @@ -182,6 +180,8 @@ CONFIG_IIO=y
->  CONFIG_AK8975=y
->  CONFIG_PWM=y
->  CONFIG_PWM_RENESAS_TPU=y
-> +CONFIG_GENERIC_PHY=y
-> +CONFIG_PHY_RCAR_GEN2=y
->  # CONFIG_DNOTIFY is not set
->  CONFIG_MSDOS_FS=y
->  CONFIG_VFAT_FS=y
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+http://arm-soc.lixom.net/bootlogs/next/next-20150429/pi-arm-exynos_defconfig.html
+
+Could you please apply $subject to fix the imprecise external abort issue.
+
+Best regards,
+Javier
