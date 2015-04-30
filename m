@@ -1,14 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 30 Apr 2015 19:45:54 +0200
-Subject: [PATCH 4/4] clk: si5351: Reset PLL after rate change
+Date: Thu, 30 Apr 2015 19:45:51 +0200
+Subject: [PATCH 1/4] clk: si5351: Mention clock-names in the binding
+ documentation
 In-Reply-To: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1430415954-29517-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1430415954-29517-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When changing PLL rate significantly, PLLs have to be reset. Add a function
-to perform and check for successful PLL reset.
+Since the introduction of clk-si5351 the way we should deal with DT provided
+clocks has changed from indexed to named clock phandles. Amend the binding
+documentation to reflect named clock phandles by clock-names property.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -22,55 +24,30 @@ Cc: linux-clk at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/clk-si5351.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ Documentation/devicetree/bindings/clock/silabs,si5351.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-index beeb57bbb04c..9b97c134e3c1 100644
---- a/drivers/clk/clk-si5351.c
-+++ b/drivers/clk/clk-si5351.c
-@@ -366,6 +366,32 @@ static const struct clk_ops si5351_vxco_ops = {
-  *         = (MSNx_P1*MSNx_P3 + MSNx_P2 + 512*MSNx_P3)/(128*MSNx_P3)
-  *
-  */
-+static int si5351_pll_reset(struct si5351_hw_data *hwdata)
-+{
-+	unsigned long timeout;
-+	u8 mask = (hwdata->num == 0) ?
-+		SI5351_STATUS_LOL_A : SI5351_STATUS_LOL_B;
-+
-+	si5351_reg_write(hwdata->drvdata, SI5351_PLL_RESET,
-+			 (hwdata->num == 0) ? SI5351_PLL_RESET_A :
-+			 SI5351_PLL_RESET_B);
-+	timeout = jiffies + msecs_to_jiffies(100);
-+	do {
-+		if ((si5351_reg_read(hwdata->drvdata, SI5351_DEVICE_STATUS) &
-+		     mask) == 0)
-+			break;
-+		if (time_after(jiffies, timeout)) {
-+			dev_err(&hwdata->drvdata->client->dev,
-+				"timeout waiting for pll %d reset\n",
-+				hwdata->num);
-+			return -EBUSY;
-+		};
-+		udelay(250);
-+	} while (true);
-+
-+	return 0;
-+}
-+
- static int _si5351_pll_reparent(struct si5351_driver_data *drvdata,
- 				int num, enum si5351_pll_src parent)
- {
-@@ -519,6 +545,9 @@ static int si5351_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 		SI5351_CLK_INTEGER_MODE,
- 		(hwdata->params.p2 == 0) ? SI5351_CLK_INTEGER_MODE : 0);
+diff --git a/Documentation/devicetree/bindings/clock/silabs,si5351.txt b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
+index c40711e8e8f7..28b28309f535 100644
+--- a/Documentation/devicetree/bindings/clock/silabs,si5351.txt
++++ b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
+@@ -17,7 +17,8 @@ Required properties:
+ - #clock-cells: from common clock binding; shall be set to 1.
+ - clocks: from common clock binding; list of parent clock
+   handles, shall be xtal reference clock or xtal and clkin for
+-  si5351c only.
++  si5351c only. Corresponding clock input names are "xtal" and
++  "clkin" respectively.
+ - #address-cells: shall be set to 1.
+ - #size-cells: shall be set to 0.
  
-+	/* reset pll after rate change */
-+	si5351_pll_reset(hwdata);
-+
- 	dev_dbg(&hwdata->drvdata->client->dev,
- 		"%s - %s: p1 = %lu, p2 = %lu, p3 = %lu, parent_rate = %lu, rate = %lu\n",
- 		__func__, __clk_get_name(hwdata->hw.clk),
+@@ -71,6 +72,7 @@ i2c-master-node {
+ 
+ 		/* connect xtal input to 25MHz reference */
+ 		clocks = <&ref25>;
++		clock-names = "xtal";
+ 
+ 		/* connect xtal input as source of pll0 and pll1 */
+ 		silabs,pll-source = <0 0>, <1 0>;
 -- 
 2.1.0
