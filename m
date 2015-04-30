@@ -1,38 +1,40 @@
 From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Thu, 30 Apr 2015 09:44:30 -0500
-Subject: [PATCH 15/18] ARM: imx: Remove the SoC relating codes in
- mxc_clockevent_init
+Date: Thu, 30 Apr 2015 09:44:31 -0500
+Subject: [PATCH 16/18] ARM: imx: Move the variable clockevent_mode into
+ mxc_set_mode
 In-Reply-To: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
 References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <1430405073-13106-16-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <1430405073-13106-17-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed the SoC relating codes in the function of
-mxc_clockevent_init.
+The global variable "clockevent_mode" was moved into the
+function of mxc_set_mode.
 
 Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
 ---
- arch/arm/mach-imx/time.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ arch/arm/mach-imx/time.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index 29105ca..836d255 100644
+index 836d255..da4dc29 100644
 --- a/arch/arm/mach-imx/time.c
 +++ b/arch/arm/mach-imx/time.c
-@@ -300,11 +300,8 @@ static irqreturn_t mxc_timer_interrupt(int irq, void *dev_id)
- static int __init mxc_clockevent_init(struct clk *timer_clk,
- 		struct imx_timer *tm)
- {
--	if (timer_is_v2())
--		clockevent_mxc.set_next_event = v2_set_next_event;
--
--	clockevent_mxc.cpumask = cpumask_of(0);
--	clockevents_config_and_register(&clockevent_mxc,
-+	tm->evt.cpumask = cpumask_of(0);
-+	clockevents_config_and_register(&tm->evt,
- 					clk_get_rate(timer_clk),
- 					0xff, 0xfffffffe);
+@@ -98,7 +98,6 @@ struct imx_timer {
+ };
  
+ static struct clock_event_device clockevent_mxc;
+-static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
+ 
+ static void gpt_irq_disable_v0_v1(struct imx_timer *tm)
+ {
+@@ -226,6 +225,7 @@ static void mxc_set_mode(enum clock_event_mode mode,
+ {
+ 	unsigned long flags;
+ 	struct imx_timer *tm = container_of(evt, struct imx_timer, evt);
++	static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
+ 
+ 	/*
+ 	 * The timer interrupt generation is disabled at least
 -- 
 1.9.1
