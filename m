@@ -1,34 +1,39 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 30 Apr 2015 14:39:35 -0700
-Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
- X-Gene SoC EDAC DTS binding
-In-Reply-To: <20150430213045.GK3488@pd.tnic>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <7128860.xHITr0VFap@wuerfel> <20150430094134.GD3488@pd.tnic>
- <10227049.9i19zDi2y3@wuerfel> <20150430130028.GF3488@pd.tnic>
- <CAPw-ZTnuyB2ne1C2-38qAxM_ANwdr9nuCYUMj=aTx7c90sVg+Q@mail.gmail.com>
- <20150430171846.GJ3488@pd.tnic>
- <CAPw-ZTksYNDE2zVD=ZjGzpKfXQN8KgW85ZnHoQ2eVmSGdSdMOw@mail.gmail.com>
- <20150430213045.GK3488@pd.tnic>
-Message-ID: <CAPw-ZTkBob6Z41bVq_Tdavz3OjNC2XzwwPgtqDORqS8Ay0pNGA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 30 Apr 2015 14:44:07 -0700
+Subject: [PATCH] i2c: rk3x: Increase wait timeout to 1 second
+Message-ID: <1430430247-9632-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+While it's not sensible for an i2c command to _actually_ need more
+than 200ms to complete, let's increase the timeout anyway.  Why?  It
+turns out that if you've got a large number of printks going out to a
+serial console, interrupts on a CPU can be disabled for hundreds of
+milliseconds. That's not a great situation to be in to start with
+(maybe we should put a cap in vprintk_emit()) but it's pretty annoying
+to start seeing unexplained i2c timeouts.
 
->> The top level interrupt may be different and APM specific unless other
->> vendors adapt the same bit definitions. I highly doubt other vendor
->> will use the same bit definitions. The CSW is APM only. The MCB A, MCB
->> B, and memory controller are APM only. The L3, and SoC are APM specify
->> only. For L1 and L2, I will need to check with the CPU designer - but
->> likely APM specific.
->
-> So it sounds to me like this whole driver will control APM-specific hw
-> so a single driver should be fine.
+A normal system shouldn't see i2c timeouts anyway, so increasing the
+timeout should help people debugging without hurting other people
+excessively.
 
-Okay... But I would like Rob agrees on the DT binding before I
-generate this new patch.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/i2c/busses/i2c-rk3x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Rob, can you comment on the DT binding in previous email thread?
-
--Loc
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 019d542..72e97e30 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -72,7 +72,7 @@ enum {
+ #define REG_INT_ALL       0x7f
+ 
+ /* Constants */
+-#define WAIT_TIMEOUT      200 /* ms */
++#define WAIT_TIMEOUT      1000 /* ms */
+ #define DEFAULT_SCL_RATE  (100 * 1000) /* Hz */
+ 
+ enum rk3x_i2c_state {
+-- 
+2.2.0.rc0.207.ga3a616c
