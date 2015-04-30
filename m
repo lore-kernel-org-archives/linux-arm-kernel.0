@@ -1,30 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 30 Apr 2015 19:56:57 +0100
-Subject: [PATCH 1/2] Regulator: mc34708: Add DT binding documentation
-In-Reply-To: <20150428141738.16243.18377.stgit@localhost>
-References: <20150428141736.16243.57292.stgit@localhost>
- <20150428141738.16243.18377.stgit@localhost>
-Message-ID: <20150430185657.GB22845@sirena.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 30 Apr 2015 20:58:10 +0200
+Subject: [PATCH 4/4] clk: si5351: Reset PLL after rate change
+In-Reply-To: <20150430184932.GB22000@deathray>
+References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1430415954-29517-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150430184932.GB22000@deathray>
+Message-ID: <55427B42.9060902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 28, 2015 at 04:17:38PM +0200, Martin Fuzzey wrote:
+On 30.04.2015 20:49, Michael Welling wrote:
+> On Thu, Apr 30, 2015 at 07:45:54PM +0200, Sebastian Hesselbarth wrote:
+>> When changing PLL rate significantly, PLLs have to be reset. Add a function
+>> to perform and check for successful PLL reset.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> ---
+[...]
+>> @@ -519,6 +545,9 @@ static int si5351_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+>>   		SI5351_CLK_INTEGER_MODE,
+>>   		(hwdata->params.p2 == 0) ? SI5351_CLK_INTEGER_MODE : 0);
+>>
+>> +	/* reset pll after rate change */
+>> +	si5351_pll_reset(hwdata);
+>> +
+>
+> What is the point of having a return code if it is not being used?
 
-> +			pmic_sw3_reg: sw3 {
-> +				regulator-name = "SW3";
-> +				regulator-min-microvolt = <650000>;
-> +				regulator-max-microvolt = <1425000>;
-> +			};
+Good point, I'll pass that on to the return value of .set_rate()
+callback for v2.
 
-These examples look awfully like you're just listiong the maximum range
-allowed by the PMIC for all the supplies which is almost never something
-someone would want to do on a real board.  Similarly all the names are
-just the name of the regulator rather than something that looks like a
-board specific name.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150430/f3d90701/attachment-0001.sig>
+Sebastian
