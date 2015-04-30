@@ -1,87 +1,110 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 30 Apr 2015 10:23:53 +0530
-Subject: [PATCH 1/3 v5] dt/bindings: Add binding for the BCM2835 mailbox
- driver
-In-Reply-To: <55416C35.1030001@wwwdotorg.org>
-References: <1430173644-19099-2-git-send-email-eric@anholt.net>
- <1430253868-11138-1-git-send-email-eric@anholt.net>
- <55403446.1040207@wwwdotorg.org>
- <87vbgeq478.fsf@eliezer.anholt.net>
- <55416C35.1030001@wwwdotorg.org>
-Message-ID: <CABb+yY3by37AGmVHfNH2RZF8KcU3GUYDJj_xQZTGCBDb2PsHQg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 30 Apr 2015 07:15:43 +0200
+Subject: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
+ independent of SoCs.
+In-Reply-To: <BL2PR03MB370C3AEE0CB1200EDDDD0FE83D70@BL2PR03MB370.namprd03.prod.outlook.com>
+References: <1430316881-4668-1-git-send-email-shenwei.wang@freescale.com>
+ <20150429185736.GA27777@pengutronix.de>
+ <BL2PR03MB370C3AEE0CB1200EDDDD0FE83D70@BL2PR03MB370.namprd03.prod.outlook.com>
+Message-ID: <20150430051543.GX6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 5:11 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/29/15 10:39, Eric Anholt wrote:
->>
->> Stephen Warren <swarren@wwwdotorg.org> writes:
->>
->>> On 04/28/2015 02:44 PM, Eric Anholt wrote:
->>>>
->>>> From: Lubomir Rintel <lkundrak@v3.sk>
->>>>
->>>> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
->>>> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
->>>> Signed-off-by: Eric Anholt <eric@anholt.net>
->>>> Acked-by: Lee Jones <lee.jones@linaro.org>
->>>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
->>>> ---
->>>>
->>>> v2: Split into a separate patch for submitting to the devicetree list.
->>>>      Consistently start node docs with a capital letter. device's
->>>>      address in the example shouldn't have "0x". Drop machine-specific
->>>>      interrupt numbers from the docs.  (changes by anholt).
->>>>
->>>> v3: Move the file to just bcm2835-mbox.txt, clean up formatting
->>>>      (changes by anholt, from review by Lee Jones).
->>>>
->>>> v4: Move file back by consensus from various Broadcom platform
->>>>      maintainers (changes by anholt, acked by Lee Jones).
->>>>
->>>> v5: Document that the mailbox cell should be 0 in clients, and add an
->>>>      example of a client (changes by anholt, from review by Jassi).
->>>
->>>
->>> Some mention of what you changed in the patch might be nice, since it
->>> was originally authored by someone else, and there's quite a changelog.
->>
->>
->> I've been taking this changelog stuff out of the patch and putting it
->> below '---' because when I was submitting this series before, I got
->> chided for putting it in the patch!
->
->
-> A changelog and a description of the changes you've made aren't quite the
-> same thing.
->
-> There should be some mention in the commit description of what you changed
-> relative to the patch that someone else authored, so they don't get
-> blaimed/praised for any of your changes. The format of that description
-> wouldn't usually be a detailed patch revision changelog though, just a
-> description of the overall changes that were left in the final version.
->
->>>> diff --git
->>>> a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
->>>> b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
->>>
->>>
->>>> +- #mbox-cells: Specifies the number of cells needed to encode a mailbox
->>>> +                 channel. The value shall be 1.  Clients should supply
->>>> a value
->>>> +                 of 0 for the mailbox channel, because there is only
->>>> one
->>>> +                 exposed
->>>
->>>
->>> Can't you use #mbox-cells = <0> if there's no data to provide?
->>
->>
->> of_mbox_index_xlate looks like it's always dereferencing the first arg.
->
->
-> Is it possible to fix that?
->
-The driver specific of_xlate() is meant to be provided during
-mbox_controller_register() in which case the default 1-cell xlate
-won't be used.
+On Wed, Apr 29, 2015 at 07:56:57PM +0000, Shenwei Wang wrote:
+> Hi Sacha,
+> 
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: 2015?4?29? 13:58
+> > To: Wang Shenwei-B38339
+> > Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
+> > independent of SoCs.
+> > 
+> > On Wed, Apr 29, 2015 at 09:14:41AM -0500, Shenwei Wang wrote:
+> > > There are 4 versions of the timer hardware on Freescale MXC hardware.
+> > > --Version 0: MX1/MXL
+> > > --Version 1: MX21, MX27.
+> > > --Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q --Version 3: MX6DL,
+> > > MX6SX
+> > >
+> > > This patch has removed the SoC related codes, and implemented the
+> > > driver directly upon the hardware timer IP version.
+> > >
+> > > The new driver can be installed via device tree or the direct function
+> > > call to mxc_timer_init in order to support imx legacy systems like
+> > > MX21 and MX27.
+> > >
+> > > For the device tree implementation, the driver is compatible with the
+> > > current bindings like "fsl,imx6q-gpt", but for future dts file, the
+> > > string like "fsl,imx-gpt-v2" without SoC information is recommended.
+> > 
+> > [...]
+> > 
+> > > +
+> > > +CLOCKSOURCE_OF_DECLARE(mx_timer_v0, "fsl,imx-gpt-v0",
+> > > +mxc_timer_init_dt); CLOCKSOURCE_OF_DECLARE(mx_timer_v1,
+> > > +"fsl,imx-gpt-v1", mxc_timer_init_dt);
+> > > +CLOCKSOURCE_OF_DECLARE(mx_timer_v2, "fsl,imx-gpt-v2",
+> > > +mxc_timer_init_dt); CLOCKSOURCE_OF_DECLARE(mx_timer_v3,
+> > > +"fsl,imx-gpt-v3", mxc_timer_init_dt);
+> > >  CLOCKSOURCE_OF_DECLARE(mx1_timer, "fsl,imx1-gpt", mxc_timer_init_dt);
+> > > CLOCKSOURCE_OF_DECLARE(mx25_timer, "fsl,imx25-gpt",
+> > > mxc_timer_init_dt);  CLOCKSOURCE_OF_DECLARE(mx50_timer,
+> > > "fsl,imx50-gpt", mxc_timer_init_dt);
+> > 
+> > Don't make it more complicated than it is. Instead of using mxc_timer_init_dt for
+> > all different timers and dispatch the different versions later introduce
+> > mxc_timer_init_v[0123] and put this directly into the function callbacks here.
+> > 
+> > Overall this patch has much too many changes in it. It changes the compatible
+> > entries, changes the implementation, splits the two timer versions into four,
+> > changes the scope of the clockevent_mode variable and renames it to last_mode.
+> > This should be split up into different patches.
+> > 
+> The patch did create some trouble for review. I am going to split it into several small patches.
+> 
+> 
+> > I don't like these fsl,imx-gpt-vx compatibles at all. They seem to be pretty useless
+> > since all device trees already have a oldest compatible version as second
+> > compatible entry. There's no need to create new compatibles.
+> > 
+> The second compatible string is useless at all in this case. Because the driver will only run correctly 
+> on the specified version of IP block. For example, you can not specify a compatible string of "fsl,imx25-gpt"
+> in imx6sx dts file and then suppose it could work on the imx6sx platform. There are still some real needs to
+> let the version of the IP block. For example, there are two revisions of imx6q SoCs. One revision has a v2 timer 
+> IP block, and the other revision has a v3 one. Since both revisions are imx6q, one way has to be selected to 
+> identify them. So I don't think it is useless. "fsl,imx-gpt-vx" is not a beautiful name, but I think it is a better 
+> name than the current one.
+
+The policy so far is:
+
+- use the exact SoC name as primary compatible string
+- Use the oldest SoC we *think* is compatible at the time of writing as
+  secondary compatible.
+
+This way we can always match to the oldest compatible in the driver
+(Thus i.MX7 could get a "i.MX6sx" compatible or whatever). Should we
+realize later that there are slight differences between timers that we
+thought would be identical, then we can still change the driver to match
+against the exact compatible string.
+
+Whether we use the SoC name or Vxy doesn't matter at all. With Vxy we
+still need to increase the counter with each new SoC since there might
+be differences discovered later. We can't really say for sure that
+there only four versions of the timer, only that by now we have
+identified four versions. On i.MX we chose to match to the SoC name not
+only for the timer but for all other devices aswell, so let's keep it
+that way.
+
+That i.MX6q has two different versions of the timer is unfortunate, that
+needs a new compatible string, but whether that is fsl,imx-gpt-v3 or
+fsl,imx6q-gpt-newone again doesn't matter.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
