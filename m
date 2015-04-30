@@ -1,178 +1,89 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 30 Apr 2015 08:08:06 +0200
-Subject: [RFC] clk: introduce critical clocks
-Message-ID: <20150430060806.GY6325@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 30 Apr 2015 08:21:40 +0200
+Subject: [RFC/RFT 2/6] clk: qcom: Add runtime support to handle clocks
+ using PM clocks
+In-Reply-To: <CAMuHMdXXkgTDjdYanQNUJFXqUXLtGrLCOugs94MaCvg9O7wbXA@mail.gmail.com>
+References: <1429778744-13352-1-git-send-email-rnayak@codeaurora.org>
+ <1429778744-13352-3-git-send-email-rnayak@codeaurora.org>
+ <CAPDyKFpVXWGeO_kbOvPbdy83aN6wxkC77ydH_2C3Bo=5QsspoA@mail.gmail.com>
+ <553A21C7.4060506@codeaurora.org>
+ <CAMuHMdV_WD7vay-5VC20izUWFjc8rSW4wZQq6Y3xAa+SU0Quig@mail.gmail.com>
+ <7hh9s1xrut.fsf@deeprootsystems.com>
+ <553EF5D4.60900@codeaurora.org>
+ <CAMuHMdW8OKDODHTw=A=vCFR9PN3KUr_fiGSiNkn0Q7Q16axU6g@mail.gmail.com>
+ <5540A923.8000104@codeaurora.org>
+ <CAMuHMdWWv5qADWP4CMj5Kj62v_FK9JxMP6NXOpyN8GTk05raAQ@mail.gmail.com>
+ <CAPDyKFoja9OZf+X2eaBGwTXoqFHchOz9vopLYF+wiguHXwznzw@mail.gmail.com>
+ <CAMuHMdXXkgTDjdYanQNUJFXqUXLtGrLCOugs94MaCvg9O7wbXA@mail.gmail.com>
+Message-ID: <CAPDyKFqXZtKxSnwXwUSSDA6vFtaJ_FoGWn495KdU5=17k7Um5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks are so critical to the system that they must never be turned
-off unless explicitly requested. Normally unused clocks get disabled in
-the clk_disable_unused initcall. Currently there are two ways for
-keeping clocks enabled even if they are unused, both with their own
-drawbacks:
+On 29 April 2015 at 15:08, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> Hi Ulf,
+>
+> On Wed, Apr 29, 2015 at 2:31 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>> Geert, thanks, I was wondering how you handle the !CONFIG_PM case for
+>>>> rmobile. I mean who turns the clocks on for the devices when you build
+>>>> with CONFIG_PM disabled?
+>>>
+>>> We still use pm_clk_add_notifier() in drivers/sh/pm_runtime.c if
+>>> CONFIG_PM_GENERIC_DOMAINS_OF=n. Hence the second instance of
+>>> pm_clk_notify() will enable the clocks at driver binding time.
+>>> Hardware power domains are assumed enabled by reset state/the boot
+>>> loader.
+>>
+>> Yes, it a bit tricky - but I guess that's the current only viable
+>> solution if we have when using the pm_clk API.
+>>
+>>> Given the amount of PM infrastructure involved when hardware power and
+>>> clock domains are involved, I think at one point we'll have to start restricting
+>>> our builds to CONFIG_PM=y.
+>>
+>> I don't think that would solve the problem, since you may still have
+>> cross SoC drivers which may be used without CONFIG_PM.
+>
+> That's not as much of a problem as it sounds:
+>   - If the driver cares (needs to know) about the clock, it should already
+>     manage it itself.
 
-- The CLK_IGNORE_UNUSED flag. Clocks with this flags are not disabled
-  during clk_disable_unused. The problem with this is that these clocks
-  are skipped during the clk_disable_unused initcall, but can get
-  disabled due to normal clk_enable/disable at any time, not necessarily
-  even on operations on the critical clocks themselves but on operations
-  on their ancestors, siblings or children.
+Agree!
 
-- call clk_prepare_enable right after registration in the clock
-  driver. This works properly, but due to the increased enable counter
-  the clock will never get disabled, even not when a proper user
-  comes along who knows when the clock can safely be disabled.
+>   - If it doesn't care about the clock, it just needs Runtime PM support.
+>     That will do the right thing on platforms with (needs PM=y) and without
+>     (doesn't care about PM=x) clock domains.
 
-This patch solves this by introducing two new API calls:
+How about those drivers that cares about clocks and thus manages them,
+but also cares about runtime PM?
 
-clk_prepare_enable_critical() will call clk_prepare_enable() on a clock
-and additionally set a 'critical' flag on the clock. This call is
-intended for clock providers which provide a critical clock.
+I believe we will get a clock reference count issue in these cases,
+since both the PM domain and the driver will manage the clocks.
 
-clk_disable_unprepare_critical() is intended for consumers of a critical
-clock.  Consumers should first call clk_prepare_enable() on a clock to
-get their own prepare/enable reference and call
-clk_disable_unprepare_critical() afterwards.  This will clear the
-'critical' flag from the clock and decrease the prepare/enable counter.
-The ownership of the clock is now transferred to the consumer. Calling
-clk_disable_unprepare_critical() on a clock which doesn't have the
-'critical' flag set is just a no-op, so consumers can safely call this
-on their clocks.
+I assume that's why we have had a few attempts to have "runtime PM
+clocks" specially marked, one was via DT, to have clear distinguish
+between who will be responsible to manage them.
 
-To make this more versatile a clk flag could be introduced which could
-be set during registration so that clk providers would not have to make
-this API call on each critical clock. I haven't implemented this yet
-because it turned out not to be trivial. clk_prepare_enable can only
-be called when the clock is not orphaned which may not be the case
-during registration time. I can implement this if this way of handling
-critical clocks is considered suitable for mainline.
+Those attempts did get nacked, so the problem is still there I assume.
 
+> So the bigger "problem" is making sure all drivers have at least minimal
+> Runtime PM support, else they can't be reused as-is on systems with PM
+> domains.
+>
+>> So all SoC that uses a driver which expects clocks to be managed using
+>> PM clocks from a PM domain, will need the above "trick". Right?
+>
+> One remaining issue with pm_clk_add_notifier() is that it applies to all
+> platform devices in the system, not just the on-SoC devices. Hence it may
+> inadvertently manage clocks for off-SoC devices it's not supposed to touch.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/clk/clk.c            | 46 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h |  2 ++
- include/linux/clk.h          | 10 ++++++++++
- 3 files changed, 58 insertions(+)
+Yes. That's really bad. :-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 459ce9d..d57d4fd 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -64,6 +64,7 @@ struct clk_core {
- 	unsigned long		flags;
- 	unsigned int		enable_count;
- 	unsigned int		prepare_count;
-+	bool			enable_critical;
- 	unsigned long		accuracy;
- 	int			phase;
- 	struct hlist_head	children;
-@@ -940,7 +941,13 @@ void clk_unprepare(struct clk *clk)
- 		return;
- 
- 	clk_prepare_lock();
-+
-+	if (clk->core->enable_critical)
-+		goto out;
-+
- 	clk_core_unprepare(clk->core);
-+
-+out:
- 	clk_prepare_unlock();
- }
- EXPORT_SYMBOL_GPL(clk_unprepare);
-@@ -995,7 +1002,9 @@ int clk_prepare(struct clk *clk)
- 		return 0;
- 
- 	clk_prepare_lock();
-+
- 	ret = clk_core_prepare(clk->core);
-+
- 	clk_prepare_unlock();
- 
- 	return ret;
-@@ -2250,6 +2259,43 @@ bool clk_is_match(const struct clk *p, const struct clk *q)
- }
- EXPORT_SYMBOL_GPL(clk_is_match);
- 
-+int clk_prepare_enable_critical(struct clk *clk)
-+{
-+	if (!clk)
-+		return 0;
-+
-+	clk_prepare_lock();
-+	if (clk->core->enable_critical) {
-+		clk_prepare_unlock();
-+		return -EBUSY;
-+	}
-+
-+	clk->core->enable_critical = true;
-+
-+	clk_prepare_unlock();
-+
-+	return clk_prepare_enable(clk);
-+
-+}
-+
-+void clk_disable_unprepare_critical(struct clk *clk)
-+{
-+	if (!clk)
-+		return;
-+
-+	clk_prepare_lock();
-+	if (!clk->core->enable_critical) {
-+		clk_prepare_unlock();
-+		return;
-+	}
-+
-+	clk->core->enable_critical = false;
-+
-+	clk_prepare_unlock();
-+
-+	clk_disable_unprepare(clk);
-+}
-+
- /**
-  * __clk_init - initialize the data structures in a struct clk
-  * @dev:	device initializing this clk, placeholder for now
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index df69531..8727c12 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -694,5 +694,7 @@ struct dentry *clk_debugfs_add_file(struct clk_hw *hw, char *name, umode_t mode,
- 				void *data, const struct file_operations *fops);
- #endif
- 
-+int clk_prepare_enable_critical(struct clk *clk);
-+
- #endif /* CONFIG_COMMON_CLK */
- #endif /* CLK_PROVIDER_H */
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 68c16a6..b259e36 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -138,6 +138,16 @@ int clk_get_phase(struct clk *clk);
-  */
- bool clk_is_match(const struct clk *p, const struct clk *q);
- 
-+/**
-+ * clk_disable_unprepare_critical - remove critical flag from clock
-+ * @clk: clock source
-+ *
-+ * This removes the critical flag from a clock and disables it. The
-+ * consumer should have enabled the clock by itself now if it wants
-+ * to keep the clock enabled.
-+ */
-+void clk_disable_unprepare_critical(struct clk *clk);
-+
- #else
- 
- static inline long clk_get_accuracy(struct clk *clk)
--- 
-2.1.4
+Additionally, it means devices that isn't part of the platform bus
+isn't able to use PM clk domains at all.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Within this context, I find it hard to advise people to use PM clk
+domains (via pm_clk_add_notifier()), since there just so many open
+issues. What works a _little_ better is to use PM clks via genpd.
+
+Kind regards
+Uffe
