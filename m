@@ -1,44 +1,39 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Thu, 30 Apr 2015 13:25:05 -0500
-Subject: [PATCH V7 04/10] ARM: dts: add imx7d soc dtsi file
-In-Reply-To: <CAOMZO5C2ye2GHi_CxFd_AKuK1k3okBBVgNoXN_31hjeCuzdXpA@mail.gmail.com>
-References: <1430317210-18333-1-git-send-email-Frank.Li@freescale.com>
- <1430317210-18333-5-git-send-email-Frank.Li@freescale.com>
- <CAOMZO5C2ye2GHi_CxFd_AKuK1k3okBBVgNoXN_31hjeCuzdXpA@mail.gmail.com>
-Message-ID: <CAHrpEqRn-KWVzBaY1OtcLHivPVp-17Vw7qZaCzGts52_rv1eug@mail.gmail.com>
+From: mwelling@ieee.org (Michael Welling)
+Date: Thu, 30 Apr 2015 13:30:43 -0500
+Subject: [PATCH 3/4] clk: si5351: Do not pass struct clk in platform_data
+In-Reply-To: <CAOMZO5BYnE2epGrWbnNnaqEt1r6+xoPYWKtjc8w-Ze22aitgXA@mail.gmail.com>
+References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1430415954-29517-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CAOMZO5BYnE2epGrWbnNnaqEt1r6+xoPYWKtjc8w-Ze22aitgXA@mail.gmail.com>
+Message-ID: <20150430183043.GA21890@deathray>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 1:07 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Frank,
->
-> On Wed, Apr 29, 2015 at 11:20 AM,  <Frank.Li@freescale.com> wrote:
->
->> +       cpus {
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +
->> +               cpu0: cpu at 0 {
->> +                       compatible = "arm,cortex-a7";
->> +                       device_type = "cpu";
->> +                       reg = <0>;
->> +                       operating-points = <
->> +                               /* KHz  uV */
->> +                               996000  1075000
->> +                               792000  975000
->> +                       >;
->> +                       clock-latency = <61036>; /* two CLK32 periods */
->> +                       clocks = <&clks IMX7D_ARM_A7_ROOT_CLK>, <&clks IMX7D_ARM_A7_ROOT_SRC>,
->> +                                <&clks IMX7D_PLL_ARM_MAIN_CLK>, <&clks IMX7D_PLL_SYS_MAIN_CLK>;
->> +                       clock-names = "arm", "arm_root_src", "pll_arm", "pll_sys_main";
->> +               };
->> +       };
->
-> That's a dual core, so you also need to pass cpu1 ;-)
+On Thu, Apr 30, 2015 at 03:20:38PM -0300, Fabio Estevam wrote:
+> On Thu, Apr 30, 2015 at 2:45 PM, Sebastian Hesselbarth
+> <sebastian.hesselbarth@gmail.com> wrote:
+> 
+> >          * property silabs,pll-source : <num src>, [<..>]
+> >          * allow to selectively set pll source
+> > @@ -1328,8 +1321,17 @@ static int si5351_i2c_probe(struct i2c_client *client,
+> >         i2c_set_clientdata(client, drvdata);
+> >         drvdata->client = client;
+> >         drvdata->variant = variant;
+> > -       drvdata->pxtal = pdata->clk_xtal;
+> > -       drvdata->pclkin = pdata->clk_clkin;
+> > +       drvdata->pxtal = devm_clk_get(&client->dev, "xtal");
+> > +       drvdata->pclkin = devm_clk_get(&client->dev, "clkin");
+> > +
+> > +       if (PTR_ERR(drvdata->pxtal) == -EPROBE_DEFER ||
+> > +           PTR_ERR(drvdata->pclkin) == -EPROBE_DEFER)
+> > +               return -EPROBE_DEFER;
+> > +
+> > +       if (IS_ERR(drvdata->pxtal) && IS_ERR(drvdata->pclkin)) {
+> 
+> Don't you want || instead?
 
-SMP is not enabled yet.
-cpu1 will be added when enable SMP.
-I am working on that.
+I doubt it. He is checking if both are not available.
 
-best regards
-Frank Li
+The driver could work with only one of them.
+
+If you use || then you assume to need both.
