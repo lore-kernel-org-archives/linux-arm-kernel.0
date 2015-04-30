@@ -1,69 +1,33 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 30 Apr 2015 15:37:12 -0500
-Subject: [PATCH v2 3/4] ARM: sa1100: remove unused RTC register definitions
-In-Reply-To: <1430426233-7461-1-git-send-email-robh@kernel.org>
-References: <1430426233-7461-1-git-send-email-robh@kernel.org>
-Message-ID: <1430426233-7461-4-git-send-email-robh@kernel.org>
+Date: Thu, 30 Apr 2015 15:37:09 -0500
+Subject: [PATCH v2 0/4] SA1100 RTC clean-up for ARM64
+Message-ID: <1430426233-7461-1-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that register definitions have been moved to the driver, we can remove
-them from machine specific code.
+This series enables building the SA1100 RTC driver for ARM64 in
+preparation for enabling CONFIG_ARCH_MMP on ARM64. This is needed for
+supporting the PXA1928 SOC.
 
-Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
----
-v2:
-- Rebase to v4.1-rc1
+The previous version can be found here[1]. This is mostly an update to
+summarize the discussion about SA1100 and PXA RTC support.
 
- arch/arm/mach-sa1100/include/mach/SA-1100.h | 34 -----------------------------
- 1 file changed, 34 deletions(-)
+Rob
 
-diff --git a/arch/arm/mach-sa1100/include/mach/SA-1100.h b/arch/arm/mach-sa1100/include/mach/SA-1100.h
-index 0ac6cc0..7972617 100644
---- a/arch/arm/mach-sa1100/include/mach/SA-1100.h
-+++ b/arch/arm/mach-sa1100/include/mach/SA-1100.h
-@@ -858,40 +858,6 @@
+[1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/391410
 
+Rob Herring (4):
+  ARM: pxa: add memory resource to RTC device
+  rtc: sa1100: convert to run-time register mapping
+  ARM: sa1100: remove unused RTC register definitions
+  ARM: mmp: remove unused RTC register definitions
 
- /*
-- * Real-Time Clock (RTC) control registers
-- *
-- * Registers
-- *    RTAR      	Real-Time Clock (RTC) Alarm Register (read/write).
-- *    RCNR      	Real-Time Clock (RTC) CouNt Register (read/write).
-- *    RTTR      	Real-Time Clock (RTC) Trim Register (read/write).
-- *    RTSR      	Real-Time Clock (RTC) Status Register (read/write).
-- *
-- * Clocks
-- *    frtx, Trtx	Frequency, period of the real-time clock crystal
-- *              	(32.768 kHz nominal).
-- *    frtc, Trtc	Frequency, period of the real-time clock counter
-- *              	(1 Hz nominal).
-- */
--
--#define RTAR		__REG(0x90010000)  /* RTC Alarm Reg. */
--#define RCNR		__REG(0x90010004)  /* RTC CouNt Reg. */
--#define RTTR		__REG(0x90010008)  /* RTC Trim Reg. */
--#define RTSR		__REG(0x90010010)  /* RTC Status Reg. */
--
--#define RTTR_C  	Fld (16, 0)	/* clock divider Count - 1         */
--#define RTTR_D  	Fld (10, 16)	/* trim Delete count               */
--                	        	/* frtc = (1023*(C + 1) - D)*frtx/ */
--                	        	/*        (1023*(C + 1)^2)         */
--                	        	/* Trtc = (1023*(C + 1)^2)*Trtx/   */
--                	        	/*        (1023*(C + 1) - D)       */
--
--#define RTSR_AL 	0x00000001	/* ALarm detected                  */
--#define RTSR_HZ 	0x00000002	/* 1 Hz clock detected             */
--#define RTSR_ALE	0x00000004	/* ALarm interrupt Enable          */
--#define RTSR_HZE	0x00000008	/* 1 Hz clock interrupt Enable     */
--
--
--/*
-  * Power Manager (PM) control registers
-  *
-  * Registers
+ arch/arm/mach-mmp/include/mach/regs-rtc.h   | 23 --------
+ arch/arm/mach-pxa/devices.c                 | 18 +-----
+ arch/arm/mach-sa1100/include/mach/SA-1100.h | 34 ------------
+ drivers/rtc/rtc-sa1100.c                    | 86 ++++++++++++++++++++---------
+ 4 files changed, 61 insertions(+), 100 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/regs-rtc.h
+
 --
 2.1.0
