@@ -1,76 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 30 Apr 2015 08:57:22 -0700
-Subject: [RFT PATCH] drm/exynos: Enable DP clock to fix display on
- Exynos5250 and other
-In-Reply-To: <7h8ud9pqmm.fsf@deeprootsystems.com>
-References: <1427471856-20918-1-git-send-email-k.kozlowski@samsung.com>
- <7h8udau9he.fsf@deeprootsystems.com>
- <CAJKOXPc6Epy_L+djManggcaYLaOrQ_c2S0=_GgU=dikuY1UU0g@mail.gmail.com>
- <7h8ud9pqmm.fsf@deeprootsystems.com>
-Message-ID: <CAOesGMiHbcVK+BjiidPphGuoETyUroXtKgKqcVEgdSBiZQ+GmQ@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 30 Apr 2015 08:58:16 -0700
+Subject: [PATCH 2/2] ARM: dts: Fix pinctrl settings for S2MPS11 RTC alarm
+ IRQ on Arndale Octa
+In-Reply-To: <CAJKOXPfbsrkvXT_CBxZeDTLYdbwGMH=+5mnBLoy9Yfyp4thVQg@mail.gmail.com>
+ (Krzysztof Kozlowski's message of "Fri, 17 Apr 2015 22:30:38 +0900")
+References: <1427985376-20420-1-git-send-email-k.kozlowski@samsung.com>
+ <1427985376-20420-3-git-send-email-k.kozlowski@samsung.com>
+ <CAJKOXPfbsrkvXT_CBxZeDTLYdbwGMH=+5mnBLoy9Yfyp4thVQg@mail.gmail.com>
+Message-ID: <7hy4l9liav.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 8:44 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
->
->> 2015-04-30 2:31 GMT+09:00 Kevin Hilman <khilman@kernel.org>:
->>> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
->>>
->>>> After adding display power domain for Exynos5250 in commit
->>>> 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
->>>> display on Chromebook Snow and others stopped working after boot.
->>>>
->>>> The reason for this suggested Andrzej Hajda: the DP clock was disabled.
->>>> This clock is required by Display Port and is enabled by bootloader.
->>>> However when FIMD driver probing was deferred, the display power domain
->>>> was turned off. This effectively reset the value of DP clock enable
->>>> register.
->>>>
->>>> When exynos-dp is later probed, the clock is not enabled and display is
->>>> not properly configured:
->>>>
->>>> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
->>>> exynos-dp 145b0000.dp-controller: unable to config video
->>>>
->>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>>> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
->>>> Cc: <stable@vger.kernel.org>
->>>>
->>>> ---
->>>>
->>>> This should fix issue reported by Javier [1][2].
->>>>
->>>> Tested on Chromebook Snow (Exynos 5250). More testing would be great,
->>>> especially on other Exynos 5xxx products.
->>>
->>> I hoped to try this on my exynos5 boards, but it doesn't seem to apply
->>> to linux-next or to Linus' master branch.
->>>
->>> Are there some other dependencies here?
+Hi Krzystof,
+
+Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+
+> 2015-04-02 23:36 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+>> On Arndale Octa the S2MPS11 RTC alarm interrupt was not handled at all
+>> because of wrong configuration of interrupt and gpx3-2.
+>> 1. Interrupt is signaled by falling edge.
+>> 2. This GPIO line is hard-wired on the board to PVDD_APIO_1V8 through a
+>>    resistor so pull-up/down must be disabled.
 >>
->> It is already applied:
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1c363c7cccf64128087002b0779986ad16aff6dc
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5420-arndale-octa.dts | 13 ++++++++++++-
+>>  1 file changed, 12 insertions(+), 1 deletion(-)
 >
-> Er, yup.  That would explain it. ;)
+> Dear Kukjin,
 >
-> Sorry for the noise,
+> Any comments  on this and other patches. A lot of emails waits for
+> your opinion. Is there anything I could do to help you in smooth
+> review or applying?
 
-Well, noise or not, Exynos is still broken in mainline and was broken
-on -next for so long in different ways that bisecting it is a futile
-exercise in frustration.
+IMO, I think you you should just start collecting fixes and features and
+queuing them for Kukjin and then start working as a co-maintainer.
 
-It doesn't seem to show up with a trivial boot using only ramdisk, but
-when booting a real distro from disk, it certainly does.
+The samsung platforms have been in a near constant state of breakage
+over the last *several* cycles, and something really needs to change in
+how these are being monitored and maintained.
 
-For example:
+If someone else is paying closer attention, especially to important
+fixes like this and the recent ones for other imprecies aborts etc.,
+all of us who are trying to use these Exynos platforms with mainline
+will be in much better shape.
 
-http://arm-soc.lixom.net/bootlogs/mainline/v4.1-rc1-56-g3d99e3f/pi-arm-exynos_defconfig.html
-
-Disabling CONFIG_DRM makes it boot reliably.
-
-Arndale doesn't show it for me, but it also doesn't have working graphics.
-
-
--Olof
+Kevin
