@@ -1,85 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 30 Apr 2015 11:12:04 -0400 (EDT)
-Subject: [RFC] arm: pick the r2 passed DTB over the appended one
-In-Reply-To: <55422267.2050206@keymile.com>
-References: <1429880030-21473-1-git-send-email-valentin.longchamp@keymile.com>
- <alpine.LFD.2.11.1504282315320.1582@knanqh.ubzr>
- <5540A0DA.9060409@keymile.com>
- <alpine.LFD.2.11.1504290929090.1582@knanqh.ubzr>
- <5540FD7A.8040002@keymile.com>
- <alpine.LFD.2.11.1504291157110.1582@knanqh.ubzr>
- <55422267.2050206@keymile.com>
-Message-ID: <alpine.LFD.2.11.1504301107330.1582@knanqh.ubzr>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Thu, 30 Apr 2015 15:16:42 +0000
+Subject: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
+ independent of SoCs.
+In-Reply-To: <20150430051543.GX6325@pengutronix.de>
+References: <1430316881-4668-1-git-send-email-shenwei.wang@freescale.com>
+ <20150429185736.GA27777@pengutronix.de>
+ <BL2PR03MB370C3AEE0CB1200EDDDD0FE83D70@BL2PR03MB370.namprd03.prod.outlook.com>
+ <20150430051543.GX6325@pengutronix.de>
+Message-ID: <BL2PR03MB3704B9B39885D8EF1ED141B83D60@BL2PR03MB370.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Apr 2015, Valentin Longchamp wrote:
 
-> On 04/29/2015 06:43 PM, Nicolas Pitre wrote:
-> > On Wed, 29 Apr 2015, Valentin Longchamp wrote:
-> > 
-> >> On 04/29/2015 03:58 PM, Nicolas Pitre wrote:
-> >>> Now, to fix your test, you'd simply have to augment it with:
-> >>>
-> >>> +		cmp	r6, r8		@ is r8 pointing to the appended DTB?
-> >>> +		beq	1f
-> >>> 		ldr	lr, [r8, #0]	@ conventionaly passed dtb ?
-> >>> 		cmp	lr, r1
-> >>> 		beq	dtb_check_done	@ yes, do not manage it
-> >>> +1:
-> >>>
-> >>
-> >> I had thought the same and implemented a similar test as you propose (patch
-> >> attached, with some more debug code - please excuse my poor assembler). However
-> >> it does not work ! The reason for it is that on the second run, r6 contains
-> >> another value. As the output below seems to show, this 2nd run r6 value seems to
-> >> point to a DTB since the first jump to dtb_check_done is not performed. However,
-> >> since r8 now points to the "initial" appended DTB, the 2nd test jumps to
-> >> dtb_check_done. Please see the output below.
-> > 
-> > Right.  On the second run, r6 points at the relocated DTB.  That's the 
-> > one that should be used. r8 points at the initial, non relocated and 
-> > about to be overwritten DTB. By giving priority to r8 with your patch, 
-> > you're picking the wrong one.
-> > 
-> > The following should fix this issue:
-> > 
-> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> > index c41a793b51..bbce6a0f0d 100644
-> > --- a/arch/arm/boot/compressed/head.S
-> > +++ b/arch/arm/boot/compressed/head.S
-> > @@ -399,6 +399,16 @@ dtb_check_done:
-> >  1:
-> >  #endif
-> >  
-> > +#ifdef CONFIG_ARM_APPENDED_DTB
-> > +		/*
-> > +		 * If r8 refers to an appended DTB, it is no longer valid
-> > +		 * and should be revalidated once relocated.
-> > +		 */
-> > +		cmp	r8, r5
-> > +		cmpcs	r6, r8
-> > +		movcs	r8, #0
-> > +#endif
-> > +
-> >  		sub	r9, r6, r5		@ size to copy
-> >  		add	r9, r9, #31		@ rounded up to a multiple
-> >  		bic	r9, r9, #31		@ ... of 32 bytes
-> > 
-> > 
-> > Nicolas
-> > 
+
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: 2015?4?30? 0:16
+> To: Wang Shenwei-B38339
+> Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/1] ARM: imx: make the imx timer driver implementation
+> independent of SoCs.
 > 
-> Thank you very much for your help Nicolas, this fixed the issue indeed. I now
-> have the behavior I wanted.
 > 
-> Do you think it makes sense to send the updated patch for mainline inclusion or
-> is this a too "exotic" use case ?
+> The policy so far is:
+> 
+> - use the exact SoC name as primary compatible string
+> - Use the oldest SoC we *think* is compatible at the time of writing as
+>   secondary compatible.
+> 
+> This way we can always match to the oldest compatible in the driver (Thus i.MX7
+> could get a "i.MX6sx" compatible or whatever). Should we realize later that there
+> are slight differences between timers that we thought would be identical, then
+> we can still change the driver to match against the exact compatible string.
+> 
+> Whether we use the SoC name or Vxy doesn't matter at all. With Vxy we still
+> need to increase the counter with each new SoC since there might be differences
+> discovered later. We can't really say for sure that there only four versions of the
+> timer, only that by now we have identified four versions. On i.MX we chose to
+> match to the SoC name not only for the timer but for all other devices aswell, so
+> let's keep it that way.
+> 
+> That i.MX6q has two different versions of the timer is unfortunate, that needs a
+> new compatible string, but whether that is fsl,imx-gpt-v3 or
+> fsl,imx6q-gpt-newone again doesn't matter.
 
-I don't know.  We can't be sure this won't break someone else's use case 
-i.e. overriding the bootloader's DTB by appending one to zImage.
+As it is a rule, we should follow it. But I don?t' think it is a good idea to bind the SoC name 
+with the IP block. It seems even ugly especially in this case. You will have to create a new
+string for each new SoC even the IP block has no changes at all. Otherwise, you will 
+have to re-use a string containing another SoC's name.
 
-I'd suggest we wait to see if more people require this feature.
 
-
-Nicolas
+> 
+> Sascha
+> 
+> --
+> Pengutronix e.K.                           |
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
+> |
