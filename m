@@ -1,102 +1,64 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 30 Apr 2015 10:28:53 +0200
-Subject: [PATCH v5 0/9] Add sd/emmc support for stih407 family silicon
-In-Reply-To: <CAPDyKFouXDCbPB9Ow6vzRdHdWkscDs3fjThCX69mA97fwZ+Lfw@mail.gmail.com>
-References: <1428658831-14308-1-git-send-email-peter.griffin@linaro.org>
- <CAPDyKFouXDCbPB9Ow6vzRdHdWkscDs3fjThCX69mA97fwZ+Lfw@mail.gmail.com>
-Message-ID: <5541E7C5.1000903@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Apr 2015 10:31:12 +0200
+Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <20150430082051.GA3488@pd.tnic>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <CAL_JsqL8UnDco14Z8H7ZcxS=fLNiYgSb6ivv=zzpVctiD0FptA@mail.gmail.com>
+ <20150430082051.GA3488@pd.tnic>
+Message-ID: <4411194.KCIZ9l536O@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Thursday 30 April 2015 10:20:51 Borislav Petkov wrote:
+> On Wed, Apr 29, 2015 at 06:02:14PM -0500, Rob Herring wrote:
+> >  I think that it is silly to group otherwise independent things
+> > together and generally not what we do anywhere else in the kernel.
+> > They all likely have different capabilities and control mechanisms.
+> 
+> So let's look at the other extremity here: the moment someone releases
+> yet another "independent" IP block with some RAS functionality, same
+> someone will create yet another <vendor>_edac_<ip_block> driver. How
+> many independent IP blocks are there with RAS functionality? 10, 20,
+> 100...? That number is most likely growing, I'd bet.
 
-On 04/10/2015 01:06 PM, Ulf Hansson wrote:
-> On 10 April 2015 at 11:40, Peter Griffin <peter.griffin@linaro.org> wrote:
->> Hi,
->>
->> This series adds sd/emmc support to the sdhci-st.c driver for stih407
->> family silicon. The changes mainly involve configuring some extra glue
->> registers in the flashSS which configure the Arasan controller.
->>
->> This series also adds support for UHS modes for eMMC. To allow
->> UHS HS200/SD104 modes to function correctly, due to the
->> tight timing constriants, support for delay management is also added.
->> Two types of delay management are supported, static delay management and
->> dynamic delay management, this delay management is only available
->> on eMMC pads on stih410 and later silicon.
->>
->> This series has been tested with stih410-b2120 revd on eMMC and sd, at
->> various clock speeds. As part of this testing a bug was also found in the
->> upstream flexgen clock set_rate implementation (now fixed upstream).
->>
->>      max-frequency = 200Mhz
->>      /dev/mmcblk0p1:
->>       Timing buffered disk reads: 270 MB in  3.02 seconds =  89.54 MB/sec
->>
->>      max-frequency = 100Mhz
->>      root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
->>      /dev/mmcblk0p1:
->>       Timing buffered disk reads: 210 MB in  3.00 seconds =  70.00 MB/sec
->>
->>      max-frequency = 50Mhz
->>      root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
->>      /dev/mmcblk0p1:
->>       Timing buffered disk reads: 118 MB in  3.00 seconds =  39.28 MB/sec
->>
->> It has also been tested on stih416-b2020 to ensure we have caused no
->> regressions. Finally the dt documentation has been updated to reflect
->> the changes in the driver code. Intrestingly it seems we are the first
->> upstream platform to be using some of the uhs bindings such as
->> sd-uhs-sdr104.
->>
->> Changes since v4:
->>   - Fixup typo (Pete)
->>
->> Changes since v3:
->>   - Rebased on Ulf's mmc next branch (rc5 based) (Ulf)
->>
->> Changes since v2:
->>   - Some whitespace fixups (Max)
->>   - if (!ioaddr) suggestion (Max)
->>   - Add stih418-b2199 suport (Max)
->>   - Stih410 to STiH410 fixes (Max)
->>   - rebased on v4.0-rc6 (Pete)
->>
->> Changes since v1:
->>   - Partition the changes into smaller patches to aid review process (Ulf)
->>
->> Peter Griffin (9):
->>    mmc: sdhci-st: Add macros for register offsets and bitfields for mmcss
->>      glue regs
->>    mmc: sdhci-st: Add support for de-asserting reset signal and top regs
->>      resource
->>    mmc: sdhci-st: Add delay management functions for top registers
->>      (eMMC).
->>    mmc: sdhci-st: Add st_mmcss_cconfig function to configure mmcss glue
->>      registers.
->>    mmc: sdhci-st: Add sdhci_st_set_uhs_signaling function.
->>    mmc: sdhci-st: Update the quirks for this controller.
->>    mmc: sdhci-st: Update ST SDHCI binding documentation.
->>    ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
->>    ARM: STi: DT: STiH418: Add dt nodes for sdhci and emmc.
->>
->>   Documentation/devicetree/bindings/mmc/sdhci-st.txt | 100 +++++-
->>   arch/arm/boot/dts/stih407-family.dtsi              |  30 ++
->>   arch/arm/boot/dts/stih410-b2120.dts                |  10 +
->>   arch/arm/boot/dts/stih418-b2199.dts                |  12 +
->>   arch/arm/boot/dts/stihxxx-b2120.dtsi               |   8 +
->>   drivers/mmc/host/sdhci-st.c                        | 354 ++++++++++++++++++++-
->>   6 files changed, 500 insertions(+), 14 deletions(-)
->>
->> --
->> 1.9.1
->>
-> Thanks! Applied.
-Do you confirm you didn't applied the DT patches?
+That should be a safe assumption.
 
-Thanks,
-Maxime
+> Oh, and then there'll probably be functionality which is needed by two
+> IP blocks so it needs to be shared. So we either copy'paste stuff or
+> create a lib only for that functionality...
+> 
+> Even worse, what if two EDAC drivers for two IP blocks would need to
+> talk to each other. That'll be fun.
+> 
+> Or there'll be a v2 of the IP block which has almost the same
+> functionality but no 100% - just a *little* different. So then we go
+> create <vendor>_edac_<ip_block-v2> driver. Yuck!
+> 
+> What I would prefer is to concentrate all vendor-specific RAS
+> functionality in one single driver. Shared functionality is then taken
+> care of automagically with all the synergies (I hate that word!)
+> involved and no unnecessary too finer-grained splitting.
+> 
+> In that case, we would only have to enable loading more than one EDAC
+> drivers on a system which has different RAS IP blocks. Now *that* is a
+> much cleaner solution IMO which will keep the sanity in EDAC-land above
+> 0.
 
->
-> Kind regards
-> Uffe
+The problem with your approach is that a lot of these blocks are not
+vendor specific. You will probably see a server chip that contains a
+memory controller from DesignWare, a cache controller from ARM, and
+some other device from the chip vendor, and each of them comes with
+EDAC support. Then you get three other vendors that have various
+combinations of the same memory controller, cache controller and
+other EDAC devices. Not all of these chips would have ARM CPU cores,
+some may be e.g. MIPS or PowerPC.
+
+This is very much what we see in all other subsystems (timers,
+irqchips, gpio, ...) and the answer is always to have one driver
+per device type, and have that driver handle all the variations
+of that device, but not group devices into one driver just because
+they happen to be on the same chip for one vendor who is merely
+integrating them.
+
+	Arnd
