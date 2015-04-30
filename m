@@ -1,46 +1,54 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 30 Apr 2015 19:37:35 +0200
-Subject: [PATCH 0/3] Introduce SET_NOIRQ_SYSTEM_SLEEP_PM_OPS and use it
-In-Reply-To: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
-References: <1430159072-31440-1-git-send-email-grygorii.strashko@linaro.org>
-Message-ID: <20150430173735.GC23579@amd>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 30 Apr 2015 18:40:31 +0100
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <1430415404.2868.49.camel@linaro.org>
+References: <1430402268.2868.20.camel@linaro.org> <554251B4.2030808@arm.com>	
+ <1430412035.2868.40.camel@linaro.org> <20150430171701.GA31834@red-moon>
+ <1430415404.2868.49.camel@linaro.org>
+Message-ID: <5542690F.5060001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2015-04-27 21:24:29, grygorii.strashko at linaro.org wrote:
-> From: Grygorii Strashko <grygorii.strashko@linaro.org>
-> 
-> While working on suspend-to-disk functionality on TI dra7-evm (DRA7xx SoC)
-> i've found that the most common problem I have to dial with is absence
-> of corresponding PM callbacks in drivers and, in particular, noirq callbacks.
-> So, I've fixed one driver first
-> commit 6248015d6867 "ARM: omap-device: add missed callback for suspend-to-disk"
-> but then found another one which need to be fixed too (omap_l3_noc.c).
-> At this moment I decided to make my life easier and added new macro
-> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS using the same approach as for the existing
-> SET_SYSTEM_SLEEP_PM_OPS macro.
-> 
-> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS: defined for CONFIG_PM_SLEEP and
-> assigns ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
-> function. Vice versa happens for ->resume_noirq, ->thaw_noirq and
-> ->restore_noirq.
-> 
-> Further two patches reuse this newly introduced macro.
-> 
-> SET_NOIRQ_SYSTEM_SLEEP_PM_OPS, defined for CONFIG_PM_SLEEP, will
->     point ->suspend_noirq, ->freeze_noirq and ->poweroff_noirq to the same
->     function. Vice versa happens for ->resume_noirq, ->thaw_noirq and
->     ->restore_noirq.
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
 
-Looks ok to me.
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
+On 30/04/15 18:36, Jon Medhurst (Tixy) wrote:
+> On Thu, 2015-04-30 at 18:17 +0100, Lorenzo Pieralisi wrote:
+>> On Thu, Apr 30, 2015 at 05:40:35PM +0100, Jon Medhurst (Tixy) wrote:
+>>> On Thu, 2015-04-30 at 17:00 +0100, Sudeep Holla wrote:
+>>>>
+>>>> On 30/04/15 14:57, Jon Medhurst (Tixy) wrote:
+>>>>> From: Jon Medhurst <tixy@linaro.org>
+>>>>>
+>>>>> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+>>>>> ---
+>>>>>
+>>>>> These have been kicking around out of tree for ages, any reason they
+>>>>> shouldn't be in mainline?
+>>>>
+>>>> One possible reason could be that these values are not tuned(e.g.
+>>>> latency values, can they be same for both clusters ?)
+>>>
+>>> I thought that both clusters being the same was questionable.
+>>>
+>>>>   Though these
+>>>> reasons are not blocking and this patch will not cause any
+>>>> functionality break even if is merged as is.
+>>>
+>>> My main purpose with trying to get this merged is so that people using
+>>> Juno for general testing and validation will actually have cpuidle
+>>> running and so potentially find more bugs.
+>>
+>> I am reluctant to enable idle states in the default Juno dts, they
+>> will affect latencies and performance tests significantly. I should
+>> find a way to disable them by default and possibly have a DT property
+>> to enabled them explicitly, we can't merge the dts as it is we have
+>> to change the CPUidle code first.
+>
+> Presumably the same argument goes for cpufreq? That'll upset people
+> doing performance benchmarks, so shouldn't be enabled by default?
+>
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Or we can have cpufreq enabled with performance governor as default ;)
+
+Regards,
+Sudeep
