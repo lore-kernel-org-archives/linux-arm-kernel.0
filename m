@@ -1,33 +1,62 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 30 Apr 2015 15:37:09 -0500
-Subject: [PATCH v2 0/4] SA1100 RTC clean-up for ARM64
-Message-ID: <1430426233-7461-1-git-send-email-robh@kernel.org>
+Date: Thu, 30 Apr 2015 15:37:10 -0500
+Subject: [PATCH v2 1/4] ARM: pxa: add memory resource to RTC device
+In-Reply-To: <1430426233-7461-1-git-send-email-robh@kernel.org>
+References: <1430426233-7461-1-git-send-email-robh@kernel.org>
+Message-ID: <1430426233-7461-2-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables building the SA1100 RTC driver for ARM64 in
-preparation for enabling CONFIG_ARCH_MMP on ARM64. This is needed for
-supporting the PXA1928 SOC.
+Add the memory resource for the sa1100-rtc device. Since the memory
+resource is already present in the pxa_rtc_resources, that makes
+sa1100_rtc_resources and pxa_rtc_resources equivalent, so use
+pxa_rtc_resources for both devices and remove the duplicate
+sa1100_rtc_resources.
 
-The previous version can be found here[1]. This is mostly an update to
-summarize the discussion about SA1100 and PXA RTC support.
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Daniel Mack <daniel@zonque.org>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+v2:
+- Rebase to v4.1-rc1
 
-Rob
+ arch/arm/mach-pxa/devices.c | 18 ++----------------
+ 1 file changed, 2 insertions(+), 16 deletions(-)
 
-[1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/391410
+diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+index 3543466..b598db6 100644
+--- a/arch/arm/mach-pxa/devices.c
++++ b/arch/arm/mach-pxa/devices.c
+@@ -439,25 +439,11 @@ struct platform_device pxa_device_rtc = {
+ 	.resource       = pxa_rtc_resources,
+ };
 
-Rob Herring (4):
-  ARM: pxa: add memory resource to RTC device
-  rtc: sa1100: convert to run-time register mapping
-  ARM: sa1100: remove unused RTC register definitions
-  ARM: mmp: remove unused RTC register definitions
+-static struct resource sa1100_rtc_resources[] = {
+-	{
+-		.start  = IRQ_RTC1Hz,
+-		.end    = IRQ_RTC1Hz,
+-		.name	= "rtc 1Hz",
+-		.flags  = IORESOURCE_IRQ,
+-	}, {
+-		.start  = IRQ_RTCAlrm,
+-		.end    = IRQ_RTCAlrm,
+-		.name	= "rtc alarm",
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-};
+-
+ struct platform_device sa1100_device_rtc = {
+ 	.name		= "sa1100-rtc",
+ 	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(sa1100_rtc_resources),
+-	.resource	= sa1100_rtc_resources,
++	.num_resources  = ARRAY_SIZE(pxa_rtc_resources),
++	.resource       = pxa_rtc_resources,
+ };
 
- arch/arm/mach-mmp/include/mach/regs-rtc.h   | 23 --------
- arch/arm/mach-pxa/devices.c                 | 18 +-----
- arch/arm/mach-sa1100/include/mach/SA-1100.h | 34 ------------
- drivers/rtc/rtc-sa1100.c                    | 86 ++++++++++++++++++++---------
- 4 files changed, 61 insertions(+), 100 deletions(-)
- delete mode 100644 arch/arm/mach-mmp/include/mach/regs-rtc.h
-
+ static struct resource pxa_ac97_resources[] = {
 --
 2.1.0
