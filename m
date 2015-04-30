@@ -1,63 +1,65 @@
 From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Thu, 30 Apr 2015 09:44:25 -0500
-Subject: [PATCH 10/18] ARM: imx: Removed the SoC relating codes in mxc_set_mode
+Date: Thu, 30 Apr 2015 09:44:26 -0500
+Subject: [PATCH 11/18] ARM: imx: Enabled the unused parameter
 In-Reply-To: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
 References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <1430405073-13106-11-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <1430405073-13106-12-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabled the use of parameter *evt, and removed the SoC relating
-codes in mxc_set_mode.
+Enabled the unused parameter in the following two functions:
+mx1_2_set_next_event
+v2_set_next_event
+and removed the use of the global variable of "timer_base".
 
 Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
 ---
- arch/arm/mach-imx/time.c | 14 +++++---------
- 1 file changed, 5 insertions(+), 9 deletions(-)
+ arch/arm/mach-imx/time.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index e41bad9..ddbb3e7 100644
+index ddbb3e7..b20ee80 100644
 --- a/arch/arm/mach-imx/time.c
 +++ b/arch/arm/mach-imx/time.c
-@@ -258,6 +258,7 @@ static void mxc_set_mode(enum clock_event_mode mode,
- 				struct clock_event_device *evt)
+@@ -218,29 +218,31 @@ static int __init mxc_clocksource_init(struct clk *timer_clk,
+ /* clock event */
+ 
+ static int mx1_2_set_next_event(unsigned long evt,
+-			      struct clock_event_device *unused)
++			      struct clock_event_device *evt_dev)
  {
- 	unsigned long flags;
-+	struct imx_timer *tm = container_of(evt, struct imx_timer, evt);
+ 	unsigned long tcmp;
++	struct imx_timer *tm = container_of(evt_dev, struct imx_timer, evt);
  
- 	/*
- 	 * The timer interrupt generation is disabled at least
-@@ -266,19 +267,14 @@ static void mxc_set_mode(enum clock_event_mode mode,
- 	local_irq_save(flags);
+-	tcmp = __raw_readl(timer_base + MX1_2_TCN) + evt;
++	tcmp = __raw_readl(tm->timer_base + MX1_2_TCN) + evt;
  
- 	/* Disable interrupt in GPT module */
--	gpt_irq_disable();
-+	tm->gpt_irq_disable(tm);
+-	__raw_writel(tcmp, timer_base + MX1_2_TCMP);
++	__raw_writel(tcmp, tm->timer_base + MX1_2_TCMP);
  
- 	if (mode != clockevent_mode) {
- 		/* Set event time into far-far future */
--		if (timer_is_v2())
--			__raw_writel(__raw_readl(timer_base + V2_TCN) - 3,
--					timer_base + V2_TCMP);
--		else
--			__raw_writel(__raw_readl(timer_base + MX1_2_TCN) - 3,
--					timer_base + MX1_2_TCMP);
-+		evt->set_next_event(-3, evt);
+-	return (int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)) < 0 ?
++	return (int)(tcmp - __raw_readl(tm->timer_base + MX1_2_TCN)) < 0 ?
+ 				-ETIME : 0;
+ }
  
- 		/* Clear pending interrupt */
--		gpt_irq_acknowledge();
-+		tm->gpt_irq_acknowledge(tm);
- 	}
+ static int v2_set_next_event(unsigned long evt,
+-			      struct clock_event_device *unused)
++			      struct clock_event_device *evt_dev)
+ {
+ 	unsigned long tcmp;
++	struct imx_timer *tm = container_of(evt_dev, struct imx_timer, evt);
  
- #ifdef DEBUG
-@@ -304,7 +300,7 @@ static void mxc_set_mode(enum clock_event_mode mode,
- 	 * mode switching
- 	 */
- 		local_irq_save(flags);
--		gpt_irq_enable();
-+		tm->gpt_irq_enable(tm);
- 		local_irq_restore(flags);
- 		break;
- 	case CLOCK_EVT_MODE_SHUTDOWN:
+-	tcmp = __raw_readl(timer_base + V2_TCN) + evt;
++	tcmp = __raw_readl(tm->timer_base + V2_TCN) + evt;
+ 
+-	__raw_writel(tcmp, timer_base + V2_TCMP);
++	__raw_writel(tcmp, tm->timer_base + V2_TCMP);
+ 
+ 	return evt < 0x7fffffff &&
+-		(int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
++		(int)(tcmp - __raw_readl(tm->timer_base + V2_TCN)) < 0 ?
+ 				-ETIME : 0;
+ }
+ 
 -- 
 1.9.1
