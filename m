@@ -1,74 +1,45 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 30 Apr 2015 18:40:27 +0200
-Subject: [RFT PATCH] drm/exynos: Enable DP clock to fix display on
- Exynos5250 and other
-In-Reply-To: <CAOesGMiHbcVK+BjiidPphGuoETyUroXtKgKqcVEgdSBiZQ+GmQ@mail.gmail.com>
-References: <1427471856-20918-1-git-send-email-k.kozlowski@samsung.com>	<7h8udau9he.fsf@deeprootsystems.com>	<CAJKOXPc6Epy_L+djManggcaYLaOrQ_c2S0=_GgU=dikuY1UU0g@mail.gmail.com>	<7h8ud9pqmm.fsf@deeprootsystems.com>
- <CAOesGMiHbcVK+BjiidPphGuoETyUroXtKgKqcVEgdSBiZQ+GmQ@mail.gmail.com>
-Message-ID: <55425AFB.8020904@collabora.co.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 30 Apr 2015 13:46:55 -0300
+Subject: [PATCH] ARM: dts: Gateworks GW5510 support (i.MX6)
+In-Reply-To: <1430409691-15963-1-git-send-email-tharvey@gateworks.com>
+References: <1430409691-15963-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <CAOMZO5Aa67XvmgBU0ABVZSE36V_=Hj2PMsW=TDbxzNr4Ka_GsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Olof,
+Hi Tim,
 
-On 04/30/2015 05:57 PM, Olof Johansson wrote:
-> On Thu, Apr 30, 2015 at 8:44 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
->>>>>
->>>>> This should fix issue reported by Javier [1][2].
->>>>>
->>>>> Tested on Chromebook Snow (Exynos 5250). More testing would be great,
->>>>> especially on other Exynos 5xxx products.
->>>>
->>>> I hoped to try this on my exynos5 boards, but it doesn't seem to apply
->>>> to linux-next or to Linus' master branch.
->>>>
->>>> Are there some other dependencies here?
->>>
->>> It is already applied:
->>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1c363c7cccf64128087002b0779986ad16aff6dc
->>
->> Er, yup.  That would explain it. ;)
->>
->> Sorry for the noise,
-> 
-> Well, noise or not, Exynos is still broken in mainline and was broken
-> on -next for so long in different ways that bisecting it is a futile
-> exercise in frustration.
-> 
-> It doesn't seem to show up with a trivial boot using only ramdisk, but
-> when booting a real distro from disk, it certainly does.
-> 
-> For example:
-> 
-> http://arm-soc.lixom.net/bootlogs/mainline/v4.1-rc1-56-g3d99e3f/pi-arm-exynos_defconfig.html
-> 
-> Disabling CONFIG_DRM makes it boot reliably.
-> 
-> Arndale doesn't show it for me, but it also doesn't have working graphics.
->
+On Thu, Apr 30, 2015 at 1:01 PM, Tim Harvey <tharvey@gateworks.com> wrote:
 
-Both Exynos5250 and Exynos5420 had similar issues and $subject is the fix
-for 5250 while 5420 is fixed by my "ARM: dts: Make DP a consumer of DISP1
-power domain on Exynos5420" patch that was posted a long time ago. I have
-pinged Kukjin several times about this patch and he said that he will pick
-it this weekend [0].
+> +++ b/arch/arm/boot/dts/imx6dl-gw551x.dts
+> @@ -0,0 +1,19 @@
+> +/*
+> + * Copyright 2014 Gateworks Corporation
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
 
-It is indeed very frustrating how many Exynos patches seems to be falling
-through the crack, even important fixes like these ones that allow boards
-to boot again.
+The recommendation for new dts files is to use a dual-license type scheme.
 
-Kevin suggested that Krzysztof could collect and queue patches [1] to help
-Kukjin and start acting as a co-maintatiner which I think it's a very good
-idea and Krzysztof already did for some patches during the 4.1 cycle.
+Please check imx6sl-warp for an example.
 
-> 
-> -Olof
->
+> +       regulators {
+> +               compatible = "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               reg_5p0v: regulator at 0 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <0>;
+> +                       regulator-name = "5P0V";
+> +                       regulator-min-microvolt = <5000000>;
+> +                       regulator-max-microvolt = <5000000>;
+> +                       regulator-always-on;
 
-Best regards,
-Javier
-
-[0]: https://lkml.org/lkml/2015/4/29/781
-[1]: https://lkml.org/lkml/2015/4/30/576
-[2]: https://lkml.org/lkml/2015/3/11/403
+This ' regulator-always-on' can be removed. Same applies to the other
+occurrences.
