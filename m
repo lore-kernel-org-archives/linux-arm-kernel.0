@@ -1,32 +1,83 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 30 Apr 2015 17:25:22 +0200
-Subject: [PATCH 0/3] power: reset: BCM63xx reboot support
-In-Reply-To: <55369C34.5020201@broadcom.com>
-References: <1427242632-7971-1-git-send-email-f.fainelli@gmail.com>
- <55369C34.5020201@broadcom.com>
-Message-ID: <20150430152522.GB6133@earth>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Thu, 30 Apr 2015 18:26:39 +0300
+Subject: [PATCH v5 09/11] clk: qcom: gdsc: Use PM clocks to control gdsc
+ clocks
+In-Reply-To: <1429017137-20218-10-git-send-email-rnayak@codeaurora.org>
+References: <1429017137-20218-1-git-send-email-rnayak@codeaurora.org>
+ <1429017137-20218-10-git-send-email-rnayak@codeaurora.org>
+Message-ID: <554249AF.6070909@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Rajendra,
 
-On Tue, Apr 21, 2015 at 11:51:32AM -0700, Florian Fainelli wrote:
-> On 24/03/15 17:17, Florian Fainelli wrote:
-> > Hi all,
-> > 
-> > This patch series adds support for the BCM6328-style software reset hardware
-> > block commonly found on Broadcom BCM63xx DSL SoCs.
+On 04/14/2015 04:12 PM, Rajendra Nayak wrote:
+> The devices within a gdsc power domain, quite often have additional
+> clocks to be turned on/off along with the power domain itself.
+> Once the drivers for these devices are converted to use runtime PM,
+> it would be possible to remove all clock handling from the drivers if
+> the gdsc driver can handle it.
+> Use PM clocks to add support for this. A list of con_ids[] specified
+> per gdsc would be the clocks turned on/off on every device start/stop
+> callbacks.
 > 
-> Looks like we can utilize the generic syscon reboot driver instead of
-> open-coding one, let's do that instead.
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> ---
+>  drivers/clk/qcom/gdsc.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/qcom/gdsc.h |  2 ++
+>  2 files changed, 45 insertions(+)
 
-Thanks, that's preferred.
+<snip>
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150430/9bfc27ed/attachment.sig>
+>  
+> +static int gdsc_attach(struct generic_pm_domain *domain, struct device *dev)
+> +{
+> +	int ret;
+> +	struct gdsc *sc = domain_to_gdsc(domain);
+> +	char **con_id;
+> +
+> +	if (!sc->con_ids[0])
+> +		return 0;
+
+Did you test this on your side? It panic kernel badly cause the flexible
+array is not initialised.
+
+Could you revisit the above check. Or you could add below initialisation
+for every gdsc structure in gcc-xxx.c files.
+
+static struct gdsc venus_gdsc = {
+	.gdscr = 0x4c018,
+	.pd = {
+		.name = "venus",
+	},
+	.con_ids = { NULL },
+};
+
+
+> +
+> +	ret = pm_clk_create(dev);
+> +	if (ret) {
+> +		dev_err(dev, "pm_clk_create failed %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	for (con_id = sc->con_ids; *con_id; con_id++) {
+> +		ret = pm_clk_add(dev, *con_id);
+> +		if (ret) {
+> +			dev_err(dev, "pm_clk_add failed %d\n", ret);
+> +			goto fail;
+> +		}
+> +	}
+> +	return 0;
+> +fail:
+> +	pm_clk_destroy(dev);
+> +	return ret;
+> +};
+> +
+
+<snip>
+
+
+-- 
+regards,
+Stan
