@@ -1,94 +1,57 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 30 Apr 2015 10:56:21 +0200
-Subject: [PATCH v5 0/9] Add sd/emmc support for stih407 family silicon
-In-Reply-To: <1428658831-14308-1-git-send-email-peter.griffin@linaro.org>
-References: <1428658831-14308-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <5541EE35.2070002@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Apr 2015 09:59:49 +0100
+Subject: [PATCH] arm64: perf: Fix callchain parse error with kernel
+ tracepoint events
+In-Reply-To: <55418A4D.5010900@huawei.com>
+References: <1430227248-19657-1-git-send-email-houpengyang@huawei.com>
+ <20150429101234.GJ8236@arm.com> <55418A4D.5010900@huawei.com>
+Message-ID: <20150430085949.GA32373@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 30, 2015 at 02:50:05AM +0100, Hou Pengyang wrote:
+> On 2015/4/29 18:12, Will Deacon wrote:
+> > On Tue, Apr 28, 2015 at 02:20:48PM +0100, Hou Pengyang wrote:
+> >> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+> >> index d26d1d5..16a074f 100644
+> >> --- a/arch/arm64/include/asm/perf_event.h
+> >> +++ b/arch/arm64/include/asm/perf_event.h
+> >> @@ -24,4 +24,20 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
+> >>   #define perf_misc_flags(regs)	perf_misc_flags(regs)
+> >>   #endif
+> >>
+> >> +#define perf_arch_fetch_caller_regs(regs, __ip) { \
+> >> +   unsigned long sp;   \
+> >> +   __asm__ ("mov %[sp], sp\n" : [sp] "=r" (sp)); \
+> >> +       (regs)->pc = (__ip);    \
+> >> +       __asm__ (      \
+> >> +               "str %[sp],  %[_arm64_sp]  \n\t"    \
+> >> +               "str x29, %[_arm64_fp]  \n\t"    \
+> >> +               "mrs %[_arm64_cpsr], spsr_el1 \n\t"     \
+> >> +               : [_arm64_sp] "=m" (regs->sp),      \
+> >> +                 [_arm64_fp] "=m" (regs->regs[29]),  \
+> >> +                 [_arm64_cpsr] "=r" (regs->pstate) \
+> >
+> > Does this really all need to be in assembly code? Ideally we'd use something
+> > like __builtin_stack_pointer and __builtin_frame_pointer. That just leaves
+> > the CPSR, but given that it's (a) only used for user_mode_regs tests and (b)
+> > this macro is only used by ftrace, then we just set it to a static value
+> > indicating that we're at EL1.
+> >
+> > So I *think* we should be able to write this as three lines of C.
+> >
+> Hi, will, as you said, we can get fp by __builtin_frame_address() and 
+> pstate by setting it to a static value. However, for sp, there isn't a 
+> gcc builtin fuction like __builtin_stack_pointer, so assembly code is 
+> needed. What's more, if CONFIG_FRAME_POINTER is close, can fp be got by 
+> __builtin_frame_address()?
 
+Ah yes, I forgot the history of __builtin_stack_pointer (I think the LLVM
+guys proposed it and it was rejected by GCC). Anyway, we can use
+current_stack_pointer() instead.
 
-On 04/10/2015 11:40 AM, Peter Griffin wrote:
-> Hi,
->
-> This series adds sd/emmc support to the sdhci-st.c driver for stih407
-> family silicon. The changes mainly involve configuring some extra glue
-> registers in the flashSS which configure the Arasan controller.
->
-> This series also adds support for UHS modes for eMMC. To allow
-> UHS HS200/SD104 modes to function correctly, due to the
-> tight timing constriants, support for delay management is also added.
-> Two types of delay management are supported, static delay management and
-> dynamic delay management, this delay management is only available
-> on eMMC pads on stih410 and later silicon.
->
-> This series has been tested with stih410-b2120 revd on eMMC and sd, at
-> various clock speeds. As part of this testing a bug was also found in the
-> upstream flexgen clock set_rate implementation (now fixed upstream).
->
->      max-frequency = 200Mhz
->      /dev/mmcblk0p1:
->       Timing buffered disk reads: 270 MB in  3.02 seconds =  89.54 MB/sec
->      
->      max-frequency = 100Mhz
->      root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
->      /dev/mmcblk0p1:
->       Timing buffered disk reads: 210 MB in  3.00 seconds =  70.00 MB/sec
->      
->      max-frequency = 50Mhz
->      root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
->      /dev/mmcblk0p1:
->       Timing buffered disk reads: 118 MB in  3.00 seconds =  39.28 MB/sec
->
-> It has also been tested on stih416-b2020 to ensure we have caused no
-> regressions. Finally the dt documentation has been updated to reflect
-> the changes in the driver code. Intrestingly it seems we are the first
-> upstream platform to be using some of the uhs bindings such as
-> sd-uhs-sdr104.
->
-> Changes since v4:
->   - Fixup typo (Pete)
->
-> Changes since v3:
->   - Rebased on Ulf's mmc next branch (rc5 based) (Ulf)
->
-> Changes since v2:
->   - Some whitespace fixups (Max)
->   - if (!ioaddr) suggestion (Max)
->   - Add stih418-b2199 suport (Max)
->   - Stih410 to STiH410 fixes (Max)
->   - rebased on v4.0-rc6 (Pete)
->
-> Changes since v1:
->   - Partition the changes into smaller patches to aid review process (Ulf)
->
-> Peter Griffin (9):
->    mmc: sdhci-st: Add macros for register offsets and bitfields for mmcss
->      glue regs
->    mmc: sdhci-st: Add support for de-asserting reset signal and top regs
->      resource
->    mmc: sdhci-st: Add delay management functions for top registers
->      (eMMC).
->    mmc: sdhci-st: Add st_mmcss_cconfig function to configure mmcss glue
->      registers.
->    mmc: sdhci-st: Add sdhci_st_set_uhs_signaling function.
->    mmc: sdhci-st: Update the quirks for this controller.
->    mmc: sdhci-st: Update ST SDHCI binding documentation.
->    ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
->    ARM: STi: DT: STiH418: Add dt nodes for sdhci and emmc.
->
->   Documentation/devicetree/bindings/mmc/sdhci-st.txt | 100 +++++-
->   arch/arm/boot/dts/stih407-family.dtsi              |  30 ++
->   arch/arm/boot/dts/stih410-b2120.dts                |  10 +
->   arch/arm/boot/dts/stih418-b2199.dts                |  12 +
->   arch/arm/boot/dts/stihxxx-b2120.dtsi               |   8 +
->   drivers/mmc/host/sdhci-st.c                        | 354 ++++++++++++++++++++-
->   6 files changed, 500 insertions(+), 14 deletions(-)
->
+I don't think CONFIG_FRAME_POINTER is relevant here; if you don't have
+frame pointers then you won't be able to backtrace. The same issue happens
+with your proposed patch.
 
-
-Patches 8 & 9 applied to STi DT branch.
-
-Thanks,
-Maxime
+Will
