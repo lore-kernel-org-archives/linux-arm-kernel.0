@@ -1,195 +1,205 @@
-From: mwelling@ieee.org (Michael Welling)
-Date: Thu, 30 Apr 2015 14:33:17 -0500
-Subject: [PATCH 0/4] clk: si5351: Some fixes
-In-Reply-To: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20150430193317.GC22000@deathray>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 30 Apr 2015 20:45:52 +0100
+Subject: [PATCH 2/2] Regulator: add driver for Freescale MC34708
+In-Reply-To: <20150428141740.16243.79036.stgit@localhost>
+References: <20150428141740.16243.79036.stgit@localhost>
+Message-ID: <20150430194552.GE22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 07:45:50PM +0200, Sebastian Hesselbarth wrote:
-> For Si5351 clock driver, Michael Welling and Jean-Francois Moine reported
-> issues with recent v4.x kernels due to broken/missing/wrong parent clock
-> claming. This patch set now deals with the issues reported.
-> 
-> Patch 1 amends the binding documentation mention clock-names property
-> for the "xtal" and "clkin" parent clock inputs of Si5351 variants.
-> 
-> Patch 2 adds the clock-names property for the SolidRun CuBox using Si5351
-> with a fixed oscillator connected to "xtal" input.
-> 
-> Patch 3 reworks the way we claim parent clocks by using devm_clk_get()
-> for both DT and platform_data based registration. Also, properly check
-> for errors returned by devm_clk_get() and prepare/enable the parent clocks.
-> 
-> Patch 4 introduces a function to reset PLLs on rate change. This should
-> improve generated clock output stability. I currently have no scope at hand
-> to actually test that properly, so there may be more issues remaining.
-> 
-> @Michael, Jean-Francois: Please test and report if there are still
-> issues remaining.
->
+On Tue, Apr 28, 2015 at 04:17:40PM +0200, Martin Fuzzey wrote:
+> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 
-Okay, the results are in and they are mixed. Firstly the clocks register
-unlike before. This is a positive step that was certianly expected.
+Please use subject lines reflecting the style for the subsystem.
 
-Second the reported and measured clock frequencies do not match the
-device tree entries.
+> +static int mc34708_read_bits(struct mc34708_regulator *mc34708_reg,
+> +			     unsigned int reg, u32 mask)
+> +{
+> +	int ret;
+> +	u32 val;
+> +
+> +	ret = mc13xxx_reg_read(mc34708_reg->mc13xxx, reg, &val);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	val &= mask;
+> +	val >>= ffs(mask) - 1;
 
-Measured frequencies:
-clk0 12.5Mhz
-clk1 5.357Mhz
-clk2 0 Hz
+Ick, this looks confusing - it's wrapping something which should hopefully
+be a regmap in multiple layer.  The bitfield access helper does seem
+reasonable though.
 
-Reported frequencies:
-root at som3517-som200:~# head -n 15 /sys/kernel/debug/clk/clk_summary 
-   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
-----------------------------------------------------------------------------------------
- ref27                                    1            1    27000000          0 0  
-    xtal                                  0            0    27000000          0 0  
-       pllb                               0            0   599999994          0 0  
-          ms2                             0            0    12288000          0 0  
-             clk2                         0            0    12288000          0 0  
-          ms0                             0            0    12499999          0 0  
-             clk0                         0            0    12499999          0 0  
-       plla                               0            0   599999994          0 0  
-          ms1                             0            0     5357142          0 0  
-             clk1                         0            0     5357142          0 0  
- tclkin_ck                                0            0    12000000          0 0  
- virt_26000000_ck                         1            1    26000000          0 0  
-    sys_clkin_ck                         11           23    26000000          0 0 
+> +static int mc34708_update_bits(struct mc34708_regulator *mc34708_reg,
+> +			       unsigned int reg, u32 mask, u32 val)
+> +{
+> +	val <<= ffs(mask) - 1;
+> +
+> +	return mc13xxx_reg_rmw(mc34708_reg->mc13xxx, reg, mask, val);
 
-Device tree entry:
-        si5351: clock-generator {
-                #address-cells = <1>;
-                #size-cells = <0>;
-                #clock-cells = <1>;
-                compatible = "silabs,si5351a-msop";
-                reg = <0x60>;
-                status = "okay";
+This is a wrapper for the widely used _update_bits() interface which has
+a different interface - that's *definitely* confusing.
 
-                /* connect xtal input to 27MHz reference */
-                clocks = <&ref27>;
-                clock-names = "xtal";
+> +static int mc34708_get_voltage_sel(struct regulator_dev *rdev)
+> +{
+> +	struct mc34708_regulator *mc34708_reg = rdev->reg_data;
+> +
+> +	return mc34708_read_bits(mc34708_reg,
+> +				rdev->desc->vsel_reg, rdev->desc->vsel_mask);
+> +}
 
-                /* connect xtal input as source of pll0 and pll1 */
-                silabs,pll-source = <0 0>, <1 0>;
+Don't open code this, use the standard regmap helpers.
 
-                clkout0: clkout0 {
-                        reg = <0>;
-                        silabs,drive-strength = <8>;
-                        silabs,multisynth-source = <1>;
-                        silabs,clock-source = <0>;
-                        silabs,pll-master;
-                        clock-frequency = <18432000>;
-                 };
+> +	val = mc34708_read_bits(mc34708_reg,
+> +				mc34708_reg->def->mode_reg,
+> +				mc34708_reg->def->mode_mask);
+> +	if (val < 0)
+> +		return ERR_PTR(val);
+> +
+> +	BUG_ON(val >= mc34708_reg->def->kind->num_hw_modes);
 
-                clkout1: clkout1 {
-                        reg = <1>;
-                        silabs,drive-strength = <8>;
-                        silabs,multisynth-source = <0>;
-                        silabs,clock-source = <0>;
-                        silabs,pll-master;
-                        clock-frequency = <8000000>;
-                };
+This is too severe, could be a hardware error.
 
-                clkout2: clkout2 {
-                        reg = <2>;
-                        silabs,drive-strength = <8>;
-                        silabs,multisynth-source = <1>;
-                        silabs,clock-source = <0>;
-                        clock-frequency = <12288000>;
-                };
-        };
+> +static int mc34708_sw_find_hw_mode_sel(
+> +	const struct mc34708_regulator_kind *kind,
+> +	unsigned int normal,
+> +	unsigned int standby)
+> +{
+> +	const struct mc34708_hw_mode *mode;
+> +	int i;
+> +
+> +	for (i = 0, mode = kind->hw_modes;
+> +			i < kind->num_hw_modes; i++, mode++) {
+> +		if (mode->normal == -1 || mode->standby == -1)
+> +			continue;
+> +
+> +		if (mode->standby != standby)
+> +			continue;
+> +
+> +		if ((mode->normal == normal) ||
+> +		    (normal && (mode->alt_normal == normal)))
+> +			return i;
+> +	}
 
-Lastly if #define DEBUG is added the behavior is different.
+I honestly don't really know what the above is supposed to do.  It's
+mapping something to something but what exactly is unclear...  skipping
+most of the rest of the mode code.
 
-Debugging output:
-[    2.970753] si5351 0-0060: si5351_clkout_round_rate - clk0: rdiv = 1, parent_rate = 18432000, rate = 18432000
-[    2.981207] si5351 0-0060: si5351_msynth_round_rate - ms0: a = 48, b = 0, c = 1, divby4 = 0, parent_rate = 884736000, rate = 18432000
-[    2.993777] si5351 0-0060: si5351_pll_round_rate - pllb: a = 32, b = 96, c = 125, parent_rate = 27000000, rate = 884736000
-[    3.005362] si5351 0-0060: si5351_msynth_recalc_rate - ms0: p1 = 5632, p2 = 0, p3 = 1, m = 6144, parent_rate = 884736000, rate = 18432000
-[    3.026281] si5351 0-0060: si5351_pll_set_rate - pllb: p1 = 3682, p2 = 38, p3 = 125, parent_rate = 27000000, rate = 884736000
-[    3.038151] si5351 0-0060: si5351_pll_recalc_rate - pllb: p1 = 3682, p2 = 38, p3 = 125, parent_rate = 27000000, rate = 884736000
-[    3.053933] si5351 0-0060: si5351_msynth_set_rate - ms2: p1 = 0, p2 = 0, p3 = 0, divby4 = 1, parent_rate = 884736000, rate = 884736000
-[    3.068067] si5351 0-0060: si5351_msynth_set_rate - ms0: p1 = 5632, p2 = 0, p3 = 1, divby4 = 0, parent_rate = 884736000, rate = 18432000
-[    3.080913] si5351 0-0060: si5351_msynth_recalc_rate - ms0: p1 = 5632, p2 = 0, p3 = 1, m = 6144, parent_rate = 884736000, rate = 18432000
-[    3.093843] si5351 0-0060: si5351_clkout_set_rate - clk0: rdiv = 1, parent_rate = 18432000, rate = 18432000
-[    3.104184] si5351 0-0060: si5351_clkout_round_rate - clk1: rdiv = 1, parent_rate = 8000000, rate = 8000000
-[    3.114408] si5351 0-0060: si5351_msynth_round_rate - ms1: a = 112, b = 0, c = 1, divby4 = 0, parent_rate = 896000000, rate = 8000000
-[    3.126973] si5351 0-0060: si5351_pll_round_rate - plla: a = 33, b = 37037, c = 200000, parent_rate = 27000000, rate = 895999995
-[    3.139085] si5351 0-0060: si5351_msynth_recalc_rate - ms1: p1 = 13824, p2 = 0, p3 = 1, m = 14336, parent_rate = 895999995, rate = 7999999
-[    3.155510] si5351 0-0060: si5351_pll_set_rate - plla: p1 = 3735, p2 = 140736, p3 = 200000, parent_rate = 27000000, rate = 895999995
-[    3.167993] si5351 0-0060: si5351_pll_recalc_rate - plla: p1 = 3735, p2 = 140736, p3 = 200000, parent_rate = 27000000, rate = 895999995
-[    3.182186] si5351 0-0060: si5351_msynth_set_rate - ms1: p1 = 13824, p2 = 0, p3 = 1, divby4 = 0, parent_rate = 895999995, rate = 8000000
-[    3.195028] si5351 0-0060: si5351_msynth_recalc_rate - ms1: p1 = 13824, p2 = 0, p3 = 1, m = 14336, parent_rate = 895999995, rate = 7999999
-[    3.208046] si5351 0-0060: si5351_clkout_set_rate - clk1: rdiv = 1, parent_rate = 7999999, rate = 8000000
-[    3.218150] si5351 0-0060: si5351_clkout_round_rate - clk2: rdiv = 1, parent_rate = 12288000, rate = 12288000
-[    3.228544] si5351 0-0060: si5351_msynth_round_rate - ms2: a = 72, b = 0, c = 1, divby4 = 0, parent_rate = 884736000, rate = 12288000
-[    3.242565] si5351 0-0060: si5351_msynth_set_rate - ms2: p1 = 8704, p2 = 0, p3 = 1, divby4 = 0, parent_rate = 884736000, rate = 12288000
-[    3.255416] si5351 0-0060: si5351_msynth_recalc_rate - ms2: p1 = 8704, p2 = 0, p3 = 1, m = 9216, parent_rate = 884736000, rate = 12288000
-[    3.268345] si5351 0-0060: si5351_clkout_set_rate - clk2: rdiv = 1, parent_rate = 12288000, rate = 12288000
+> +static int mc34708_swbst_mode_to_hwmode(unsigned int mode)
+> +{
+> +	switch (mode) {
+> +	case REGULATOR_MODE_IDLE:
+> +	case REGULATOR_MODE_STANDBY:
+> +		return  MC34708_SW_OPMODE_PFM;
 
+No, this is broken - you're mapping two different modes to one hardware
+setting.  If the device doesn't support something it just doesn't
+support it, let the upper layers work out how to handle that.
 
-Measured frequencies:
-clk0 18.432Mhz
-clk1 8Mhz
-clk2 0Hz
+Also an extra space there.
 
-Reported frequencies:
-root at som3517-som200:~# head -n 15 /sys/kernel/debug/clk/clk_summary
-   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
-----------------------------------------------------------------------------------------
- ref27                                    1            1    27000000          0 0  
-    xtal                                  0            0    27000000          0 0  
-       pllb                               0            0   884736000          0 0  
-          ms2                             0            0    12288000          0 0  
-             clk2                         0            0    12288000          0 0  
-          ms0                             0            0    18432000          0 0  
-             clk0                         0            0    18432000          0 0  
-       plla                               0            0   895999995          0 0  
-          ms1                             0            0     7999999          0 0  
-             clk1                         0            0     7999999          0 0  
- tclkin_ck                                0            0    12000000          0 0  
- virt_26000000_ck                         1            1    26000000          0 0  
-    sys_clkin_ck                         11           23    26000000          0 0
+> +static int mc34708_swbst_setup(struct mc34708_regulator *mc34708_reg)
+> +{
+> +	int val, mode;
+> +
+> +	val = mc34708_read_bits(mc34708_reg,
+> +				mc34708_reg->def->mode_reg,
+> +				mc34708_reg->def->mode_mask);
+> +	if (val < 0)
+> +		return val;
+> +
+> +	if (val > 0) {
+> +		mode = mc34708_swbst_hwmode_to_mode(val);
+> +		if (mode < 0)
+> +			return mode;
+> +
+> +		mc34708_reg->req_mode_normal = mode;
+> +	} else {
+> +		/*
+> +		 * If regulator is intially off we don't know the mode
+> +		 * but we need a mode to be able to enable it later.
+> +		 */
+> +		mc34708_reg->req_mode_normal = REGULATOR_MODE_NORMAL;
+> +	}
 
-It should be noted that if I program the device's register map in the
-bootloader the device keeps the correct frequency outputs.
+I don't really understand what the above is supposed to do, some
+comments would probably help.
 
-So the patch series appears to fix the registration issue but there is still
-more work to be done.
+> +static int mc34708_swbst_enable(struct regulator_dev *rdev)
+> +{
+> +	struct mc34708_regulator *mc34708_reg = rdev->reg_data;
+> +
+> +	return mc34708_update_bits(mc34708_reg,
+> +					mc34708_reg->def->mode_reg,
+> +					mc34708_reg->def->mode_mask,
+> +					mc34708_reg->req_mode_normal);
+> +}
 
-Still not sure how to explain the difference when DEBUG is defined.
-I will dig into the datasheet and see what I can find.
+Again use the standard regmap helpers.
 
-> Sebastian
-> 
-> Sebastian Hesselbarth (4):
->   clk: si5351: Mention clock-names in the binding documentation
->   ARM: dove: Add clock-names to CuBox Si5351 clk generator
->   clk: si5351: Do not pass struct clk in platform_data
->   clk: si5351: Reset PLL after rate change
-> 
->  .../devicetree/bindings/clock/silabs,si5351.txt    |  4 +-
->  arch/arm/boot/dts/dove-cubox.dts                   |  1 +
->  drivers/clk/clk-si5351.c                           | 87 +++++++++++++++++-----
->  include/linux/platform_data/si5351.h               |  4 -
->  4 files changed, 73 insertions(+), 23 deletions(-)
-> 
-> ---
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Jean-Francois Moine <moinejf@free.fr>
-> Cc: Michael Welling <mwelling@ieee.org>
-> Cc: Russell King <rmk+linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-clk at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> -- 
-> 2.1.0
-> 
+> +static int mc34708_ldo_set_suspend_enable(struct regulator_dev *rdev)
+> +{
+> +	struct mc34708_regulator *mc34708_reg = rdev->reg_data;
+> +	int ret;
+> +
+> +	ret = mc34708_update_hw_mode(mc34708_reg,
+> +				     mc34708_reg->req_mode_normal,
+> +				     mc34708_reg->req_mode_standby);
+> +	if (!ret)
+> +		mc34708_reg->suspend_off = false;
+
+This looks like it should be a noop.  It also seems very familiar from
+some of the other code.
+
+> +static int mc34708_ldo_set_suspend_mode(struct regulator_dev *rdev,
+> +					unsigned int mode)
+> +{
+> +	struct mc34708_regulator *mc34708_reg = rdev->reg_data;
+> +	int ret;
+> +
+> +	if (!mc34708_ldo_has_mode_bit(mc34708_reg))
+> +		return 0;
+
+Again, if the driver doesn't support something don't implement it.
+
+> +static const unsigned int mc34708_vgen1_volt_table[] = {
+> +	1200000, 1250000, 1300000, 1350000, 1400000, 1450000, 1500000, 1550000
+> +};
+
+This looks like a linear mapping, use the standard helpers please.
+
+> +/*
+> + * Setting some LDO standby states also requires changing the normal state.
+> + * Therefore save the LDO configuration register on suspend and restore it
+> + * on resume.
+> + *
+> + * This works because .set_suspend_X are called by the platform suspend handler
+> + * AFTER device suspend
+> + */
+
+That's not something you can rely on, I suggest omitting this for now
+and doing it separately.
+
+> +	num_regs = of_get_child_count(regs_np);
+> +	mc34708_data = devm_kzalloc(dev, sizeof(*mc34708_data) +
+> +					num_regs * sizeof(*mc34708_reg),
+> +					GFP_KERNEL);
+> +	if (!mc34708_data) {
+> +		ret = -ENOMEM;
+> +		goto out;
+> +	}
+> +
+> +	dev_set_drvdata(dev, mc34708_data);
+> +
+> +	mc34708_reg = mc34708_data->regulators;
+> +	for_each_child_of_node(regs_np, reg_np) {
+
+No, this is broken - your driver should like all the others register all
+the regulators on the device uncondtionally.  It should also be using
+.of_match to allow the core to look up the init data.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150430/2c35161e/attachment.sig>
