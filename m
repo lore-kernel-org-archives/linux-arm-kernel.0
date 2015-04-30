@@ -1,79 +1,34 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 30 Apr 2015 23:29:57 +0200
-Subject: [PATCH v2 01/11] coresight-etm4x: Adding CoreSight ETM4x driver
-In-Reply-To: <1430327795-10710-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1430327795-10710-1-git-send-email-mathieu.poirier@linaro.org>
- <1430327795-10710-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1430429397.2187.34.camel@x220>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 30 Apr 2015 23:30:46 +0200
+Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <CAPw-ZTksYNDE2zVD=ZjGzpKfXQN8KgW85ZnHoQ2eVmSGdSdMOw@mail.gmail.com>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <7128860.xHITr0VFap@wuerfel> <20150430094134.GD3488@pd.tnic>
+ <10227049.9i19zDi2y3@wuerfel> <20150430130028.GF3488@pd.tnic>
+ <CAPw-ZTnuyB2ne1C2-38qAxM_ANwdr9nuCYUMj=aTx7c90sVg+Q@mail.gmail.com>
+ <20150430171846.GJ3488@pd.tnic>
+ <CAPw-ZTksYNDE2zVD=ZjGzpKfXQN8KgW85ZnHoQ2eVmSGdSdMOw@mail.gmail.com>
+Message-ID: <20150430213045.GK3488@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-04-29 at 11:16 -0600, Mathieu Poirier wrote:
-> --- a/drivers/hwtracing/coresight/Kconfig
-> +++ b/drivers/hwtracing/coresight/Kconfig
+On Thu, Apr 30, 2015 at 02:19:44PM -0700, Loc Ho wrote:
+> The top level interrupt may be different and APM specific unless other
+> vendors adapt the same bit definitions. I highly doubt other vendor
+> will use the same bit definitions. The CSW is APM only. The MCB A, MCB
+> B, and memory controller are APM only. The L3, and SoC are APM specify
+> only. For L1 and L2, I will need to check with the CPU designer - but
+> likely APM specific.
 
-> +config CORESIGHT_SOURCE_ETM4X
-> +	bool "CoreSight Embedded Trace Macrocell 4.x driver"
-> +	depends on ARM64
-> +	select CORESIGHT_LINKS_AND_SINKS
-> +	help
-> +	  This driver provides support for the ETM4.x tracer module, tracing the
-> +	  instructions that a processor is executing. This is primarily useful
-> +	  for instruction level tracing. Depending on the implemented version
-> +	  data tracing may also be available.
+So it sounds to me like this whole driver will control APM-specific hw
+so a single driver should be fine.
 
-(Please add an empty line here.)
+Thanks.
 
->  endif
+-- 
+Regards/Gruss,
+    Boris.
 
-> --- a/drivers/hwtracing/coresight/Makefile
-> +++ b/drivers/hwtracing/coresight/Makefile
-
-> +obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o
-
-CORESIGHT_SOURCE_ETM4X is a bool symbol, so coresight-etm4x.o can never
-be part of a module, right?
-
-(If I'm wrong, we're done here.)
-
-> --- /dev/null
-> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-
-> +#include <linux/module.h>
-
-Is this include needed?
-
-> +static struct amba_driver etm4x_driver = {
-> +	.drv = {
-> +		.name   = "coresight-etm4x",
-> +		.owner  = THIS_MODULE,
-
-For built-in code this is basically equivalent to NULL (see
-include/linux/export.h).
-
-> +	},
-> +	.probe		= etm4_probe,
-> +	.remove		= etm4_remove,
-> +	.id_table	= etm4_ids,
-> +};
-> +
-> +module_amba_driver(etm4x_driver);
-
-In a message I sent a short while ago, I suggested that for built-in
-only code this is equivalent to calling
-    amba_driver_register(&etm4x_driver);
-
-from within a function marked with some sort of *initcall(). Please
-double check.
-
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_DESCRIPTION("CoreSight Embedded Trace Macrocell v4 driver");
-
-These macros will be effectively be preprocessed away for built-in only
-code.
-
-(There is also a reference to module_param_named(). I don't know by
-heart how that works for built-in only code, sorry.)
-
-
-Paul Bolle
+ECO tip #101: Trim your mails when you reply.
+--
