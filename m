@@ -1,49 +1,45 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 30 Apr 2015 15:14:58 +0100
-Subject: [PATCH v2] ARM: vexpress: Add unified-cache Device Tree property
-In-Reply-To: <20150430141152.GG15254@pengutronix.de>
-References: <5509437E.6060806@arm.com>
- <1426671298-2012-1-git-send-email-r.schwebel@pengutronix.de>
- <20150429191228.GO15254@pengutronix.de>
- <20150430110853.GN7440@e106497-lin.cambridge.arm.com>
- <20150430133011.GE15254@pengutronix.de> <55423316.70408@arm.com>
- <20150430141152.GG15254@pengutronix.de>
-Message-ID: <554238E2.9090405@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 30 Apr 2015 22:14:43 +0800
+Subject: [PATCH 1/2] arm/arm64: ACPI: Introduce CONFIG_ACPI_MUST_HAVE_CCA
+In-Reply-To: <20150430135018.GH32373@arm.com>
+References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1430315049-4663-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20150429140445.GA18867@e104818-lin.cambridge.arm.com>
+ <5540EB27.8060507@amd.com>
+ <20150429144232.GC18867@e104818-lin.cambridge.arm.com>
+ <55423261.4050008@linaro.org> <20150430135018.GH32373@arm.com>
+Message-ID: <554238D3.7050806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 30/04/15 15:11, Robert Schwebel wrote:
-> On Thu, Apr 30, 2015 at 02:50:14PM +0100, Sudeep Holla wrote:
->>> [    0.000000] L2C: platform modifies aux control register: 0x02020000 -> 0x02420000
->>> [    0.000000] L2C: DT/platform modifies aux control register: 0x02020000 -> 0x02420000
->>> [    0.268626] platform 10000000.sysreg: Error -2 creating of_node link
->>> [    0.271997] platform basic-mmio-gpio.1.auto: Error -2 creating of_node link
->>> [    0.272266] platform basic-mmio-gpio.2.auto: Error -2 creating of_node link
->>> [    0.272681] platform basic-mmio-gpio.3.auto: Error -2 creating of_node link
->>
->> I see above errors even on my Vexpress TC2, but
->>
->>> [    0.426298] of_amba_device_create(): amba_device_add() failed (-19) for /memory-controller at 100e0000
->>> [    0.426799] of_amba_device_create(): amba_device_add() failed (-19) for /memory-controller at 100e1000
->>> [    0.427099] of_amba_device_create(): amba_device_add() failed (-19) for /watchdog at 100e5000
->>> [    0.433206] of_amba_device_create(): amba_device_add() failed (-19) for /smb/motherboard/iofpga at 7,00000000/sysctl at 01000
->>> [    0.438165] of_amba_device_create(): amba_device_add() failed (-19) for /smb/motherboard/iofpga at 7,00000000/wdt at 0f000
+On 2015?04?30? 21:50, Will Deacon wrote:
+> On Thu, Apr 30, 2015 at 02:47:13PM +0100, Hanjun Guo wrote:
+>> On 2015?04?29? 22:42, Catalin Marinas wrote:
+>>> On Wed, Apr 29, 2015 at 09:31:03AM -0500, Suravee Suthikulpanit wrote:
+>>>> On 04/29/2015 09:04 AM, Catalin Marinas wrote:
+>>>>> On Wed, Apr 29, 2015 at 08:44:08AM -0500, Suravee Suthikulpanit wrote:
+>>>>> Any plans for ACPI on 32-bit ARM?
+>>>>
+>>>> Not that I am aware, but I could be totally wrong. The reason I am adding
+>>>> this here for 32-bit ARM is because the ACPI spec mentioned this.
+>>>>
+>>>> If you think this is not necessary until we introduce ACPI for ARM32, it can
+>>>> be removed.
 >>>
->> .. not theses ones
+>>> I think it should be removed (as long as ACPI cannot be selected on
+>>> arm32).
 >>
->>> Do you have an idea what might go wrong?
->>>
+>> I agree.
 >>
->> I will give it a spin on my CA9 coretile.
+>> Now there is no plan for ARM32 ACPI as I know, ACPI for ARM targets
+>> for ARM64 based enterprise system at now.
 >
-> I'm testing on qemu (and not even the latest one), so this might be a
-> reason.
+> While we're at it, do we *really* need to support CONFIG_ACPI_PROCFS_POWER
+> on arm64? It's a deprecated /proc/acpi interface and it would be nice to
+> avoid introducing deprecated behaviour if we can avoid it.
 
-OK, I tried on my CA9 coretile and don't see these errors on it either.
-However the "... creating of_node link" is present on both and I will
-look at that issue.
+I agree. It is used for laptop ac adapter and battery, I will look
+into that and clean it up for ARM64.
 
-Regards,
-Sudeep
+Thanks
+Hanjun
