@@ -1,59 +1,45 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 30 Apr 2015 08:44:49 -0700
-Subject: [RFT PATCH] drm/exynos: Enable DP clock to fix display on
- Exynos5250 and other
-In-Reply-To: <CAJKOXPc6Epy_L+djManggcaYLaOrQ_c2S0=_GgU=dikuY1UU0g@mail.gmail.com>
- (Krzysztof Kozlowski's message of "Thu, 30 Apr 2015 08:56:50 +0900")
-References: <1427471856-20918-1-git-send-email-k.kozlowski@samsung.com>
- <7h8udau9he.fsf@deeprootsystems.com>
- <CAJKOXPc6Epy_L+djManggcaYLaOrQ_c2S0=_GgU=dikuY1UU0g@mail.gmail.com>
-Message-ID: <7h8ud9pqmm.fsf@deeprootsystems.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Thu, 30 Apr 2015 10:48:33 -0500
+Subject: Bulid regression with VDSO enabled
+In-Reply-To: <087d88d067bde8159185670b82357f0a@agner.ch>
+References: <679194be9498c72543073a833e4a1719@agner.ch>
+ <55423E48.7000506@mentor.com> <087d88d067bde8159185670b82357f0a@agner.ch>
+Message-ID: <55424ED1.9030005@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
-
-> 2015-04-30 2:31 GMT+09:00 Kevin Hilman <khilman@kernel.org>:
->> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+On 04/30/2015 10:20 AM, Stefan Agner wrote:
+> On 2015-04-30 16:38, Nathan Lynch wrote:
+>> On 04/30/2015 06:44 AM, Stefan Agner wrote:
+>>>   OBJCOPY arch/arm/vdso/vdso.so
+>>> BFD: arch/arm/vdso/vdso.so: Not enough room for program headers, try
+>>> linking with -N
+>>> arm-angstrom-linux-gnueabi-objcopy:arch/arm/vdso/vdso.so[.hash]: Bad
+>>> value
+>>> BFD: arch/arm/vdso/vdso.so: Not enough room for program headers, try
+>>> linking with -N
+>>> arm-angstrom-linux-gnueabi-objcopy:arch/arm/vdso/vdso.so: Bad value
+>>> make[2]: *** [arch/arm/vdso/vdso.so] Error 1
+>>> make[1]: *** [arch/arm/vdso] Error 2
+>>> make[1]: *** Waiting for unfinished jobs....
+>>>
+>>> I'm using GCC 4.8.3 (Linaro GCC 4.8-2014.04) on Fedora 21. Any specific
+>>> new requirements to the toolchain or a bug?
 >>
->>> After adding display power domain for Exynos5250 in commit
->>> 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
->>> display on Chromebook Snow and others stopped working after boot.
->>>
->>> The reason for this suggested Andrzej Hajda: the DP clock was disabled.
->>> This clock is required by Display Port and is enabled by bootloader.
->>> However when FIMD driver probing was deferred, the display power domain
->>> was turned off. This effectively reset the value of DP clock enable
->>> register.
->>>
->>> When exynos-dp is later probed, the clock is not enabled and display is
->>> not properly configured:
->>>
->>> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
->>> exynos-dp 145b0000.dp-controller: unable to config video
->>>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
->>> Cc: <stable@vger.kernel.org>
->>>
->>> ---
->>>
->>> This should fix issue reported by Javier [1][2].
->>>
->>> Tested on Chromebook Snow (Exynos 5250). More testing would be great,
->>> especially on other Exynos 5xxx products.
+>> I've not encountered this before, and I'm not able to recreate it with
+>> that toolchain.
 >>
->> I hoped to try this on my exynos5 boards, but it doesn't seem to apply
->> to linux-next or to Linus' master branch.
->>
->> Are there some other dependencies here?
->
-> It is already applied:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1c363c7cccf64128087002b0779986ad16aff6dc
+>> If you're using the Linaro toolchain I would expect the name of objcopy
+>> to be arm-linux-gnueabihf-objcopy, but your log shows
+>> arm-angstrom-linux-gnueabi-objcopy.  What's going on there?
+> 
+> The toolchain is built by the OpenEmbedded build system. I used the
+> Angstrom distribution, which uses the Linaro Layer (daisy branch) which
+> built that toolchain:
+> https://git.linaro.org/openembedded/meta-linaro.git/shortlog/refs/heads/daisy
+> 
+> I tried the official release and I also could not reproduce the issue,
+> so it seems to be toolchain related...?
 
-Er, yup.  That would explain it. ;)
-
-Sorry for the noise,
-
-Kevin
+Okay thanks, that gives me more to go on.  I probably won't be able to
+devote more time to this today, but hopefully tomorrow.
