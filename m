@@ -1,44 +1,43 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 30 Apr 2015 17:20:00 +0200
-Subject: Bulid regression with VDSO enabled
-In-Reply-To: <55423E48.7000506@mentor.com>
-References: <679194be9498c72543073a833e4a1719@agner.ch>
- <55423E48.7000506@mentor.com>
-Message-ID: <087d88d067bde8159185670b82357f0a@agner.ch>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 30 Apr 2015 17:23:05 +0200
+Subject: [PATCH 1/1] Revert "ARM: dts: add display power domain for
+ exynos5250"
+In-Reply-To: <7hk2wtpsqq.fsf@deeprootsystems.com>
+References: <1427107800-21668-1-git-send-email-javier.martinez@collabora.co.uk>	<7hr3r2suiw.fsf@deeprootsystems.com>	<1430336716.19504.92.camel@collabora.co.uk>	<55417967.80304@collabora.co.uk>
+ <7hk2wtpsqq.fsf@deeprootsystems.com>
+Message-ID: <554248D9.4030203@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-04-30 16:38, Nathan Lynch wrote:
-> On 04/30/2015 06:44 AM, Stefan Agner wrote:
->>   OBJCOPY arch/arm/vdso/vdso.so
->> BFD: arch/arm/vdso/vdso.so: Not enough room for program headers, try
->> linking with -N
->> arm-angstrom-linux-gnueabi-objcopy:arch/arm/vdso/vdso.so[.hash]: Bad
->> value
->> BFD: arch/arm/vdso/vdso.so: Not enough room for program headers, try
->> linking with -N
->> arm-angstrom-linux-gnueabi-objcopy:arch/arm/vdso/vdso.so: Bad value
->> make[2]: *** [arch/arm/vdso/vdso.so] Error 1
->> make[1]: *** [arch/arm/vdso] Error 2
->> make[1]: *** Waiting for unfinished jobs....
+Hello Kevin,
+
+On 04/30/2015 04:59 PM, Kevin Hilman wrote:
+> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
 >>
->> I'm using GCC 4.8.3 (Linaro GCC 4.8-2014.04) on Fedora 21. Any specific
->> new requirements to the toolchain or a bug?
+>> The regression on Exynos5420/5422/5800 that has been for a while is fixed
+>> by "ARM: dts: Make DP a consumer of DISP1 power domain on Exynos5420" [0]
+>> which has been posted many weeks ago.
 > 
-> I've not encountered this before, and I'm not able to recreate it with
-> that toolchain.
+> Thanks for clarifying.
 > 
-> If you're using the Linaro toolchain I would expect the name of objcopy
-> to be arm-linux-gnueabihf-objcopy, but your log shows
-> arm-angstrom-linux-gnueabi-objcopy.  What's going on there?
+> I'm not sure how this worked for me.  Seems like sometimes, even with
+> the imprecise aborts it does actually finish booting to a shell, so I
+> must've gotten successful boot and thought it was because of this
+> revert.
 
-The toolchain is built by the OpenEmbedded build system. I used the
-Angstrom distribution, which uses the Linaro Layer (daisy branch) which
-built that toolchain:
-https://git.linaro.org/openembedded/meta-linaro.git/shortlog/refs/heads/daisy
+That is correct, the imprecise external abort error most of the times
+lead to a kernel panic but sometimes it doesn't and the the system finish
+booting to user-space even after the error.
 
-I tried the official release and I also could not reproduce the issue,
-so it seems to be toolchain related...?
+I've pinged Kukjin again yesterday to pick the fix and he said that will
+do it this weekend [0]. So hopefully exynos5420 machines will boot again
+in linux-next soon after being broken for weeks.
 
---
-Stefan
+> 
+> Kevin
+>
+
+Best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2015/4/29/781
