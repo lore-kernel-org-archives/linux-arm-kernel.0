@@ -1,70 +1,49 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 30 Apr 2015 09:57:46 -0700
-Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
- X-Gene SoC EDAC DTS binding
-In-Reply-To: <20150430130028.GF3488@pd.tnic>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <7128860.xHITr0VFap@wuerfel> <20150430094134.GD3488@pd.tnic>
- <10227049.9i19zDi2y3@wuerfel> <20150430130028.GF3488@pd.tnic>
-Message-ID: <CAPw-ZTnuyB2ne1C2-38qAxM_ANwdr9nuCYUMj=aTx7c90sVg+Q@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 30 Apr 2015 17:57:51 +0100
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <1430412035.2868.40.camel@linaro.org>
+References: <1430402268.2868.20.camel@linaro.org> <554251B4.2030808@arm.com>
+ <1430412035.2868.40.camel@linaro.org>
+Message-ID: <55425F0F.6010805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
->> I've looked at the driver in a little more detail now, and found that
->> it is a weird conglomerate at the moment. Basically you have four
->> drivers in one file here, appended to one another, but not sharing
->> any common functions except the module_init() that registers the four
->> drivers. This is what Rob was referring to when he suggested splitting
->> it up into four files, and these would in total be smaller than the
->> common file (by being able to use module_platform_driver()).
+
+On 30/04/15 17:40, Jon Medhurst (Tixy) wrote:
+> On Thu, 2015-04-30 at 17:00 +0100, Sudeep Holla wrote:
 >>
->> However, there is another dimension to this, which supports your point
->> about making it one driver for the platform: The split into four drivers
->> is completely artificial, because all four use the same IRQs and
->> implement four separate interrupt handlers for it (using IRQF_SHARED),
->> each handling only the events they are interested in. Similarly, they
->> all access the same register set ("pcperror"), aside from having their
->> own separate registers, and they use the "syscon" framework to get to
->> the registers.  This seems to be an inferior design, as the pcperror
+>> On 30/04/15 14:57, Jon Medhurst (Tixy) wrote:
+>>> From: Jon Medhurst <tixy@linaro.org>
+>>>
+>>> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+>>> ---
+>>>
+>>> These have been kicking around out of tree for ages, any reason they
+>>> shouldn't be in mainline?
+>>
+>> One possible reason could be that these values are not tuned(e.g.
+>> latency values, can they be same for both clusters ?)
 >
-> Doh, now that you mention it...
+> I thought that both clusters being the same was questionable.
 >
-> So why isn't this thing registering a single IRQ handler which
-> multiplexes between the _check routines depending on the bits set in
-> PCPHPERRINTSTS/MEMERRINTSTS? (L3 alternatively, ctx->dev_csr + L3C_ESR).
+>>   Though these
+>> reasons are not blocking and this patch will not cause any
+>> functionality break even if is merged as is.
 >
-> This would really make it a single driver which acts according to the
-> bits set in those error registers. It can't get any simpler than that.
+> My main purpose with trying to get this merged is so that people using
+> Juno for general testing and validation will actually have cpuidle
+> running and so potentially find more bugs.
 >
-> Loc?
+> If we wait until ARM have finished tweaking their firmware and tuning
+> benchmark runs to get 'optimum' values for their main usecases then I
+> suspect we'll be waiting a long time ;-)
+>
 
-I had read all the emails interaction. Yes I can write a single EDAC
-driver. But I actually have multiple instances and single instance of
-the same IP's. For example, I have 4 DDR controllers, 4 CPU domains,
-one L3 and one SoC. If you can suggest to me how this would work with
-devicetree, I might be able to make it works. But from HW point of
-view (take the memory controller as an example), there is really 4
-hardware blocks and some shared IP's block for status. It is much
-simple representation with multiple instance of the driver. In
-addition, should one day we have 6 memory controllers, I would just
-add two more instances in the DT node.
+Agreed, I am not blocking the patch, it can be merged in its current
+state. Since we had always seen stability issues with firmware until
+recently, we were hesitant to push this change. Now that we have
+established that it's stable enough, it's ready to go ;)
 
-I think we should first agreed on the DT binding and let's not worry
-about APEI. Then, whether we have one file or multiple file. Again,
-the HW consist of:
-
-1. One top level interrupt and status registers
-2. CSW, MCB A and MCB B for detection of any active memory controllers
-3. 4 individual memory controller instance
-4. 4 CPU domain instance with its own individual L2 registers
-5. Each CPU has instance own L1
-6. One L3 instance
-7. One SoC instance
-
-As for as what is useful, we find that the memory controller and the
-L1 and L2 are useful as it provides info for errors - for HW/system
-debugging as well as margin of DDR.
-
--Loc
+Regards,
+Sudeep
