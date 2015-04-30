@@ -1,51 +1,20 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 30 Apr 2015 18:17:01 +0100
-Subject: [PATCH] arm64: dts: Add idle-states for Juno
-In-Reply-To: <1430412035.2868.40.camel@linaro.org>
-References: <1430402268.2868.20.camel@linaro.org> <554251B4.2030808@arm.com>
- <1430412035.2868.40.camel@linaro.org>
-Message-ID: <20150430171701.GA31834@red-moon>
+From: ast@plumgrid.com (Alexei Starovoitov)
+Date: Thu, 30 Apr 2015 10:17:10 -0700
+Subject: [PATCH 0/4] Seccomp filter JIT support on ARM.
+In-Reply-To: <55422564.2030106@iogearbox.net>
+References: <1430314657-2552-1-git-send-email-nschichan@freebox.fr>
+ <554108CC.6000801@iogearbox.net> <55422193.9010905@freebox.fr>
+ <55422564.2030106@iogearbox.net>
+Message-ID: <55426396.6090304@plumgrid.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 05:40:35PM +0100, Jon Medhurst (Tixy) wrote:
-> On Thu, 2015-04-30 at 17:00 +0100, Sudeep Holla wrote:
-> > 
-> > On 30/04/15 14:57, Jon Medhurst (Tixy) wrote:
-> > > From: Jon Medhurst <tixy@linaro.org>
-> > >
-> > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > > ---
-> > >
-> > > These have been kicking around out of tree for ages, any reason they
-> > > shouldn't be in mainline?
-> > 
-> > One possible reason could be that these values are not tuned(e.g.
-> > latency values, can they be same for both clusters ?)
-> 
-> I thought that both clusters being the same was questionable.
-> 
-> >  Though these
-> > reasons are not blocking and this patch will not cause any
-> > functionality break even if is merged as is.
-> 
-> My main purpose with trying to get this merged is so that people using
-> Juno for general testing and validation will actually have cpuidle
-> running and so potentially find more bugs.
+On 4/30/15 5:51 AM, Daniel Borkmann wrote:
+>
+> If there are some additional tests that are not yet covered by
+> lib/test_bpf.c,
+> I'd be happy if you could add them there. This can also be as a follow-up,
+> but if we can increase coverage for others as well, the better.
 
-I am reluctant to enable idle states in the default Juno dts, they
-will affect latencies and performance tests significantly. I should
-find a way to disable them by default and possibly have a DT property
-to enabled them explicitly, we can't merge the dts as it is we have
-to change the CPUidle code first.
-
-Lorenzo
-
-> 
-> If we wait until ARM have finished tweaking their firmware and tuning
-> benchmark runs to get 'optimum' values for their main usecases then I
-> suspect we'll be waiting a long time ;-)
-> 
-> -- 
-> Tixy
-> 
+btw, Michael have been working on adding 173 new tests to test_bpf.
+Michael, could you submit them to net-next ?
