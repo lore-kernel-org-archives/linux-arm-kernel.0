@@ -1,32 +1,41 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 30 Apr 2015 15:19:01 +0100
-Subject: [PATCH 1/2] ARM: simplify timer initialisation and remove
- arm_timer.h inclusion
-In-Reply-To: <CAL_JsqK8pPLCkrVFHaWr-RhOkPzaF+D_kZ5h9BahvN7CoYZO0w@mail.gmail.com>
-References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
- <1430390662-18246-2-git-send-email-sudeep.holla@arm.com>
- <CAL_JsqK8pPLCkrVFHaWr-RhOkPzaF+D_kZ5h9BahvN7CoYZO0w@mail.gmail.com>
-Message-ID: <554239D5.4080301@arm.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 30 Apr 2015 16:31:07 +0200
+Subject: [PATCH v4 04/10] mtd: pxa3xx_nand: rework flash detection and
+ timing setup
+In-Reply-To: <552FEA74.5020909@free-electrons.com>
+References: <1429118648-19416-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1429118648-19416-5-git-send-email-antoine.tenart@free-electrons.com>
+ <552EB7F0.2090106@gmail.com> <552FB4DF.1030403@free-electrons.com>
+ <552FBC0E.20004@gmail.com> <552FEA74.5020909@free-electrons.com>
+Message-ID: <20150430143106.GE4433@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 16, 2015 at 01:59:32PM -0300, Ezequiel Garcia wrote:
+> On 04/16/2015 10:41 AM, Sebastian Hesselbarth wrote:
+> 
+> > All we need is a function to convert sdr_timings to sane driver
+> > timings. And we really need to split this patch into tiny pieces
+> > otherwise it is not reviewable - or at least I need a full overview
+> > about the driver first.
+> > 
+> 
+> I think that's a bit of a different issue. This patch seems to be doing
+> two things: it removes the in-driver flash detection *and* reworks
+> timing setup.
+> 
+> How about we split this in two or even three patches? Along these lines:
+> 1) introduce timing helpers, 2) rework timing setup, 3) remove in-driver
+> flash detection. Not sure how feasible it is.
 
+That's quite difficult, as you cannot have 1) without having the changes
+made in 2). Flash detection and timing reworks are linked and I'm not
+sure we can have this split into 2 or 3 patches without having a state
+where the driver does not work.
 
-On 30/04/15 15:09, Rob Herring wrote:
-> On Thu, Apr 30, 2015 at 5:44 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> The header asm/hardware/arm_timer.h is included in various machine
->> specific files to access TIMER_CTRL and initialise to a known state.
->> However that's not required as the clock{source,event} driver timer-sp
->> initialises all the timer being used.
->
-> I believe the idea is not to initialize the timers being used, but the
-> ones not being used and perhaps left running by the bootloader. Cases
-> where the interrupt is shared could cause a problem.
->
+Antoine
 
-Ah OK, makes sense. I will wait for Russell to confirm. The main idea
-was to keep the header file having offsets local to driver/clocksource
-and avoid sharing it in include/linux but looks like that's not possible.
-
-Regards,
-Sudeep
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
