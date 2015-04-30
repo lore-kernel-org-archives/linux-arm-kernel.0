@@ -1,56 +1,27 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Thu, 30 Apr 2015 09:53:41 +0800
-Subject: [PATCH RESEND 2/3] clk: mmp: Fix the wrong factor table for uart PLL
-In-Reply-To: <1430358822-4699-1-git-send-email-chao.xie@marvell.com>
-References: <1430358822-4699-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1430358822-4699-3-git-send-email-chao.xie@marvell.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 29 Apr 2015 23:22:11 -0300
+Subject: [PATCH] ARM: dts: imx5: Add dts files for USB armory.
+In-Reply-To: <20150428081959.GA32234@shlinux2>
+References: <87h9t6i40r.fsf@aikidev.net> <20150427115747.GA11975@dragon>
+ <20150427133708.GC11598@core.inversepath.com>
+ <20150428081959.GA32234@shlinux2>
+Message-ID: <CAOMZO5B5bAXhvdv_MUBL9DoMvfv0p25B6eGMLbO1pJuK8HFLVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+Hi Peter,
 
-The suggested value in the mmp2 manual is wrong.
-There are only 13 bits for numerator, but some suggested
-value has 14 bits.
-Fix the factor tabled and remove the unused items.
+On Tue, Apr 28, 2015 at 5:20 AM, Peter Chen <peter.chen@freescale.com> wrote:
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- drivers/clk/mmp/clk-mmp2.c    | 4 +---
- drivers/clk/mmp/clk-of-mmp2.c | 4 +---
- 2 files changed, 2 insertions(+), 6 deletions(-)
+> Current chipidea usb driver supports role switch function well, if you
+> have a gpio or id pin for it.
 
-diff --git a/drivers/clk/mmp/clk-mmp2.c b/drivers/clk/mmp/clk-mmp2.c
-index 5c90a42..09d2832 100644
---- a/drivers/clk/mmp/clk-mmp2.c
-+++ b/drivers/clk/mmp/clk-mmp2.c
-@@ -63,10 +63,8 @@ static struct mmp_clk_factor_masks uart_factor_masks = {
- };
- 
- static struct mmp_clk_factor_tbl uart_factor_tbl[] = {
--	{.num = 14634, .den = 2165},	/*14.745MHZ */
-+	{.num = 8125, .den = 1536},	/*14.745MHZ */
- 	{.num = 3521, .den = 689},	/*19.23MHZ */
--	{.num = 9679, .den = 5728},	/*58.9824MHZ */
--	{.num = 15850, .den = 9451},	/*59.429MHZ */
- };
- 
- static const char *uart_parent[] = {"uart_pll", "vctcxo"};
-diff --git a/drivers/clk/mmp/clk-of-mmp2.c b/drivers/clk/mmp/clk-of-mmp2.c
-index 2cbc2b4..b7e0b89 100644
---- a/drivers/clk/mmp/clk-of-mmp2.c
-+++ b/drivers/clk/mmp/clk-of-mmp2.c
-@@ -98,10 +98,8 @@ static struct mmp_clk_factor_masks uart_factor_masks = {
- };
- 
- static struct mmp_clk_factor_tbl uart_factor_tbl[] = {
--	{.num = 14634, .den = 2165},	/*14.745MHZ */
-+	{.num = 8125, .den = 1536},	/*14.745MHZ */
- 	{.num = 3521, .den = 689},	/*19.23MHZ */
--	{.num = 9679, .den = 5728},	/*58.9824MHZ */
--	{.num = 15850, .den = 9451},	/*59.429MHZ */
- };
- 
- static void mmp2_pll_init(struct mmp2_clk_unit *pxa_unit)
--- 
-1.8.3.2
+On mx6 we are able to perform OTG role-switch funtion as they have the
+OTG_ID pins.
+
+We are talking about mx53 here, which does not have such OTG_ID pins,
+so not sure how they can perform role-switch in run-time?
+
+Regards,
+
+Fabio Estevam
