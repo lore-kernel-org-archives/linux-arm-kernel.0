@@ -1,45 +1,48 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Thu, 30 Apr 2015 10:48:33 -0500
-Subject: Bulid regression with VDSO enabled
-In-Reply-To: <087d88d067bde8159185670b82357f0a@agner.ch>
-References: <679194be9498c72543073a833e4a1719@agner.ch>
- <55423E48.7000506@mentor.com> <087d88d067bde8159185670b82357f0a@agner.ch>
-Message-ID: <55424ED1.9030005@mentor.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 30 Apr 2015 16:51:33 +0100
+Subject: [RFC PATCH v2 0/1] ARM: cpuidle: heterogeneous systems extension
+In-Reply-To: <1429200617-9546-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1429200617-9546-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20150430155133.GA9863@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2015 10:20 AM, Stefan Agner wrote:
-> On 2015-04-30 16:38, Nathan Lynch wrote:
->> On 04/30/2015 06:44 AM, Stefan Agner wrote:
->>>   OBJCOPY arch/arm/vdso/vdso.so
->>> BFD: arch/arm/vdso/vdso.so: Not enough room for program headers, try
->>> linking with -N
->>> arm-angstrom-linux-gnueabi-objcopy:arch/arm/vdso/vdso.so[.hash]: Bad
->>> value
->>> BFD: arch/arm/vdso/vdso.so: Not enough room for program headers, try
->>> linking with -N
->>> arm-angstrom-linux-gnueabi-objcopy:arch/arm/vdso/vdso.so: Bad value
->>> make[2]: *** [arch/arm/vdso/vdso.so] Error 1
->>> make[1]: *** [arch/arm/vdso] Error 2
->>> make[1]: *** Waiting for unfinished jobs....
->>>
->>> I'm using GCC 4.8.3 (Linaro GCC 4.8-2014.04) on Fedora 21. Any specific
->>> new requirements to the toolchain or a bug?
->>
->> I've not encountered this before, and I'm not able to recreate it with
->> that toolchain.
->>
->> If you're using the Linaro toolchain I would expect the name of objcopy
->> to be arm-linux-gnueabihf-objcopy, but your log shows
->> arm-angstrom-linux-gnueabi-objcopy.  What's going on there?
+On Thu, Apr 16, 2015 at 05:10:16PM +0100, Lorenzo Pieralisi wrote:
+> This patch is a v2 of a previous posting:
 > 
-> The toolchain is built by the OpenEmbedded build system. I used the
-> Angstrom distribution, which uses the Linaro Layer (daisy branch) which
-> built that toolchain:
-> https://git.linaro.org/openembedded/meta-linaro.git/shortlog/refs/heads/daisy
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/328192.html
 > 
-> I tried the official release and I also could not reproduce the issue,
-> so it seems to be toolchain related...?
+> v1 -> v2:
+> 
+> - Rebased against 4.0
+> - Removed DT affinity probe interface
+> - Improved and optimized idle states comparison and cpumask creation
+> - Merged DT idle states vetting code in the ARM CPUidle driver
+> 
+> This patch aims at enabling the generic CPUidle driver on ARM systems
+> with heterogeneous idle states. In the CPUidle context the kernel
+> considers cpus equal (and group them together through a CPUidle driver)
+> if they share the same set of idle states.
+> Since the idle states represent the differentiation point when it comes
+> to creating CPUidle drivers (their states and related cpu logical mask),
+> the idle states can be used as a means to create logical masks of cpus
+> for which the CPUidle driver applies.
+> 
+> This patch sets the maximum number of static CPUidle drivers allowed to
+> two, since it is hard to foresee systems with more than two sets of CPUs
+> having different idle states; it is meant to keep allocation simple
+> while keeping functionality.
+> 
+> The code carrying out idle states comparison is completely generic
+> and borrowed from OF unit tests; it overrides the OF API entirely
+> though to carry out properties (ie phandles list) comparison in the
+> fastest possible way. If deemed worthwhile it can be moved to generic OF
+> layer.
+> 
+> Tested through several dts idle states permutations on Juno board with
+> CPUidle and related idle states enabled.
 
-Okay thanks, that gives me more to go on.  I probably won't be able to
-devote more time to this today, but hopefully tomorrow.
+Are there any comments/opinions on this patch ?
+
+Thanks,
+Lorenzo
