@@ -1,67 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 30 Apr 2015 09:42:18 +0200
-Subject: [PATCH 1/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
-References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
- <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20150430074218.GH4946@pengutronix.de>
+From: g.portay@overkiz.com (=?windows-1252?Q?Ga=EBl_PORTAY?=)
+Date: Thu, 30 Apr 2015 09:48:59 +0200
+Subject: [PATCH v3 0/7] ARM: at91/dt: kizbox: update and rename to
+ at91-kizbox
+In-Reply-To: <20150430074206.GE3242@piout.net>
+References: <1430379218-13758-1-git-send-email-g.portay@overkiz.com>
+ <20150430074206.GE3242@piout.net>
+Message-ID: <5541DE6B.9010801@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 05:27:26PM +0800, pi-cheng.chen wrote:
-> This patch implements MT8173 specific cpufreq driver with OPP table defined
-> in the driver code.
-> 
-> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
-> ---
->  drivers/cpufreq/Kconfig.arm      |   6 +
->  drivers/cpufreq/Makefile         |   1 +
->  drivers/cpufreq/mt8173-cpufreq.c | 509 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 516 insertions(+)
->  create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
-> 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 1b06fc4..25643c7 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> +
-> +static int mt8173_cpufreq_dvfs_init(struct cpu_dvfs_info *info)
-> +{
-> +	struct device *cpu_dev;
-> +	struct regulator *proc_reg, *sram_reg;
-> +	struct clk *cpu_clk, *inter_pll;
-> +	unsigned long rate;
-> +	int cpu, ret;
-> +
-> +	cpu = cpumask_first(&info->cpus);
-> +
-> +try_next_cpu:
-> +	cpu_dev = get_cpu_device(cpu);
-> +	proc_reg = regulator_get_exclusive(cpu_dev, "proc");
-> +	sram_reg = regulator_get_exclusive(cpu_dev, "sram");
-> +	cpu_clk = clk_get(cpu_dev, "cpu");
-> +	inter_pll = clk_get(cpu_dev, "intermediate");
-> +
-> +	if (IS_ERR_OR_NULL(proc_reg) || IS_ERR_OR_NULL(cpu_clk) ||
-> +	    IS_ERR_OR_NULL(inter_pll)) {
-> +		cpu = cpumask_next(cpu, &info->cpus);
-> +		if (cpu >= nr_cpu_ids)
-> +			return -ENODEV;
-> +
-> +		goto try_next_cpu;
-> +	}
+On 30/04/2015 09:42, Alexandre Belloni wrote:
+> On 30/04/2015 at 09:33:31 +0200, Ga?l PORTAY wrote :
+>> Hi,
+>>
+>> This patchset renames the kizbox board into at91-kizbox to match AT91 naming
+>> convention, sanitize and sorts nodes by address when possible (or
+>> alphabetically if not applicable).
+>>
+>> It also updates the following features:
+>> - uses proper serial uart (only USART3 is accessible),
+>> - fixes gpio-keys active level and rename,
+>> - moves leds to pwm support (using tcb-pwm driver) and rename as well,
+>> - re-sizes nand mtd partitions and
+>> - updates chosen-node (bootargs + set linux stdout path to DBGU),
+>>
+> The whole series is
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>
 
-Please keep an eye on the error pathes. This one is quite broken. You
-get references to resources here which you never release. Also
--EPROBE_DEFER is a valid return value from regulator_get which is not
-handled here.
-
-Also IS_ERR_OR_NULL() is most probably wrong here. Should be IS_ERR().
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks
