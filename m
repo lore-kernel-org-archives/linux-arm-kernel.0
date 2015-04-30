@@ -1,118 +1,49 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 30 Apr 2015 10:46:53 +0100
-Subject: [PATCH] ARM64: juno: add sp810 support and fix sp804 clock
- frequency
-In-Reply-To: <1430385934-5001-1-git-send-email-sudeep.holla@arm.com>
-References: <1430385934-5001-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150430094652.GM7440@e106497-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 30 Apr 2015 10:50:55 +0100
+Subject: [PATCH arm 1/2] arm64: Use common outgoing-CPU-notification code
+In-Reply-To: <1429819654-10498-1-git-send-email-paulmck@linux.vnet.ibm.com>
+References: <20150423200603.GA9473@linux.vnet.ibm.com>
+ <1429819654-10498-1-git-send-email-paulmck@linux.vnet.ibm.com>
+Message-ID: <20150430095055.GI18867@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 10:25:34AM +0100, Sudeep Holla wrote:
-> The clock generator in IOFPGA generates the two source clocks: 32kHz and
-> 1MHz for the SP810 System Controller.
-> 
-> The SP810 System Controller selects 32kHz or 1MHz as the sources for
-> TIM_CLK[3:0], the SP804 timer clocks. The powerup default is 32kHz but
-> the maximum of "refclk" and "timclk" is chosen by the SP810 driver.
-> 
-> This patch adds support for SP810 system controller and  also fixes the
-> SP804 timer clock frequency.
-> 
-> Fixes: 71f867ec130e ("arm64: Add Juno board device tree.")
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Hi Paul,
 
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+On Thu, Apr 23, 2015 at 01:07:33PM -0700, Paul E. McKenney wrote:
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 328b8ce4b007..6dc727a6e73e 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -252,15 +252,13 @@ static int op_cpu_kill(unsigned int cpu)
+>  	return cpu_ops[cpu]->cpu_kill(cpu);
+>  }
+>  
+> -static DECLARE_COMPLETION(cpu_died);
+> -
+>  /*
+>   * called on the thread which is asking for a CPU to be shutdown -
+>   * waits until shutdown has completed, or it is timed out.
+>   */
+>  void __cpu_die(unsigned int cpu)
+>  {
+> -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
+> +	if (!cpu_wait_death(cpu, 5)) {
+>  		pr_crit("CPU%u: cpu didn't die\n", cpu);
+>  		return;
+>  	}
+> @@ -293,7 +291,7 @@ void cpu_die(void)
+>  	local_irq_disable();
+>  
+>  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+> -	complete(&cpu_died);
+> +	(void)cpu_report_death();
+>  
+>  	/*
+>  	 * Actually shutdown the CPU. This must never fail. The specific hotplug
 
-Sudeep, I would also mention in the comment area that this patch, while fixing the hardware
-description for the board, becomes more useful when your other patches that enable SP804 for
-arm64 are applied. That is no reason, from my point of view, not to apply this patch as a fix
-for v4.1.
-
-Best regards,
-Liviu
-
-> ---
->  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 31 +++++++++++++++++++++++----
->  1 file changed, 27 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> index c138b95a8356..351c95bda89e 100644
-> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> @@ -21,6 +21,20 @@
->  			clock-output-names = "juno_mb:clk25mhz";
->  		};
-> 
-> +		v2m_refclk1mhz: refclk1mhz {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <1000000>;
-> +			clock-output-names = "juno_mb:refclk1mhz";
-> +		};
-> +
-> +		v2m_refclk32khz: refclk32khz {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <32768>;
-> +			clock-output-names = "juno_mb:refclk32khz";
-> +		};
-> +
->  		motherboard {
->  			compatible = "arm,vexpress,v2p-p1", "simple-bus";
->  			#address-cells = <2>;  /* SMB chipselect number and offset */
-> @@ -66,6 +80,15 @@
->  				#size-cells = <1>;
->  				ranges = <0 3 0 0x200000>;
-> 
-> +				v2m_sysctl: sysctl at 020000 {
-> +					compatible = "arm,sp810", "arm,primecell";
-> +					reg = <0x020000 0x1000>;
-> +					clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&mb_clk24mhz>;
-> +					clock-names = "refclk", "timclk", "apb_pclk";
-> +					#clock-cells = <1>;
-> +					clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
-> +				};
-> +
->  				mmci at 050000 {
->  					compatible = "arm,pl180", "arm,primecell";
->  					reg = <0x050000 0x1000>;
-> @@ -106,16 +129,16 @@
->  					compatible = "arm,sp804", "arm,primecell";
->  					reg = <0x110000 0x10000>;
->  					interrupts = <9>;
-> -					clocks = <&mb_clk24mhz>, <&soc_smc50mhz>;
-> -					clock-names = "timclken1", "apb_pclk";
-> +					clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&mb_clk24mhz>;
-> +					clock-names = "timclken1", "timclken2", "apb_pclk";
->  				};
-> 
->  				v2m_timer23: timer at 120000 {
->  					compatible = "arm,sp804", "arm,primecell";
->  					reg = <0x120000 0x10000>;
->  					interrupts = <9>;
-> -					clocks = <&mb_clk24mhz>, <&soc_smc50mhz>;
-> -					clock-names = "timclken1", "apb_pclk";
-> +					clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&mb_clk24mhz>;
-> +					clock-names = "timclken1", "timclken2", "apb_pclk";
->  				};
-> 
->  				rtc at 170000 {
-> --
-> 1.9.1
-> 
+Are these functions are only defined when HOTPLUG_CPU is enabled? On
+arm64 we can end up with this option disabled if SUSPEND is disabled.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Catalin
