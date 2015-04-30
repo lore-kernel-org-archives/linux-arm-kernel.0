@@ -1,59 +1,55 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 30 Apr 2015 09:36:23 +0900
-Subject: [PATCH 1/1] ARM: dts: Make DP a consumer of DISP1 power domain on
- Exynos5420
-In-Reply-To: <55417810.6070202@collabora.co.uk>
-References: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
- <552F6750.6020306@collabora.co.uk> <55417810.6070202@collabora.co.uk>
-Message-ID: <126501d082dd$af818a30$0e849e90$@kernel.org>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 30 Apr 2015 02:37:59 +0200
+Subject: [PATCH 1/1] Revert "ARM: dts: add display power domain for
+ exynos5250"
+In-Reply-To: <1430336716.19504.92.camel@collabora.co.uk>
+References: <1427107800-21668-1-git-send-email-javier.martinez@collabora.co.uk>	
+ <7hr3r2suiw.fsf@deeprootsystems.com>
+ <1430336716.19504.92.camel@collabora.co.uk>
+Message-ID: <55417967.80304@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
-> 
-> Hello Kukjin,
-> 
-Hi,
+Hello,
 
-> On 04/16/2015 09:40 AM, Javier Martinez Canillas wrote:
-> >
-> > On 04/12/2015 10:30 PM, Javier Martinez Canillas wrote:
-> >> Commit ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
-> >> added a device node for the Exynos5420 DISP1 power domain but dit not
-> >> make the DP controller a consumer of that power domain.
-> >>
-> >> This causes an "Unhandled fault: imprecise external abort" error if the
-> >> exynos-dp driver tries to access the DP controller registers and the PD
-> >> was turned off. This lead to a kernel panic and a complete system hang.
-> >>
-> >> Make the DP controller device node a consumer of the DISP1 power domain
-> >> to ensure that the PD is turned on when the exynos-dp driver is probed.
-> >>
-> >> Fixes: ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
-> >> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >
-> > Any comments about this patch?
-> >
-> > It's very trivial but fixes a very important regression on Exynos5420 boards
-> > with display panel and Peach Pit and Pi have been broken since next-20150401.
-> >
-> > This [0] is the Peach Pit boot log with yesteday's linux-next for example.
-> >
-> > Best regards,
-> > Javier
-> >
-> > [0]: http://arm-soc.lixom.net/bootlogs/next/next-20150415/pit-arm-exynos_defconfig.html
-> >
+On 04/29/2015 09:45 PM, Sjoerd Simons wrote:
+> On Wed, 2015-04-29 at 10:40 -0700, Kevin Hilman wrote:
+>> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
 > 
-> It has been many weeks since this patch has been posted and linux-next
-> is still broken:
+>> Tested-by: Kevin Hilman <khilman@linaro.org>
+>> 
+>> FWIW, this patch fixes the boot panics when using MMC rootfs on
+>> exynos5800-peach-pi with current linux-next that have been happening
+>> for awhile.
 > 
-> http://arm-soc.lixom.net/bootlogs/next/next-20150429/pi-arm-exynos_defconfig.html
-> 
-> Could you please apply $subject to fix the imprecise external abort issue.
-> 
-Sure I'll in this weekend.
+> That seems unlikely as this patch changes things in the exynos5250.dtsi,
+> which isn't used by exynos5800-peach-pi.?
+>
 
-Thanks for your gentle reminder ;-)
+Indeed, it will be surprising if $subject changes any behavior on
+Exynos5420/5422/5800 machines.
 
-- Kukjin
+FWIW, this patch is not needed anymore since the right fix is Krzysztof's
+"drm/exynos: Enable DP clock to fix display on Exynos5250 and other" patch
+which is already in linux-next.
+
+The regression on Exynos5420/5422/5800 that has been for a while is fixed
+by "ARM: dts: Make DP a consumer of DISP1 power domain on Exynos5420" [0]
+which has been posted many weeks ago.
+ 
+>> For several months now, DRM/display related stuff is very routinely
+>> breaking basic booting on exynos5, which gives the rather strong
+>> impression that the DRM stuff is not tested well enough to be merged.
+> 
+> Unfortunately it seems to have been that way for ages, but only has
+> started being visible since Javier turned on the various exynos DRM
+> drivers on in exynos_defconfig.. So now we're actually seeing bugs
+> rather then just having broken code sit around :/
+>
+
+Agreed.
+
+Best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2015/4/12/153
