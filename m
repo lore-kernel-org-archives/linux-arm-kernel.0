@@ -1,64 +1,45 @@
 From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Thu, 30 Apr 2015 09:44:26 -0500
-Subject: [PATCH 11/18] ARM: imx: Enabled the unused parameter
+Date: Thu, 30 Apr 2015 09:44:27 -0500
+Subject: [PATCH 12/18] ARM: imx: Remove one global variable in
+ mxc_clocksource_init
 In-Reply-To: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
 References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <1430405073-13106-12-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <1430405073-13106-13-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabled the unused parameter in the following two functions:
-mx1_2_set_next_event
-v2_set_next_event
-and removed the use of the global variable of "timer_base".
+Removed the use of global variable "timer_base" in the function of
+mxc_clocksource_init, and get the register address from the
+input parameter.
 
 Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
 ---
- arch/arm/mach-imx/time.c | 18 ++++++++++--------
- 1 file changed, 10 insertions(+), 8 deletions(-)
+ arch/arm/mach-imx/time.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index ddbb3e7..b20ee80 100644
+index b20ee80..4a6c625 100644
 --- a/arch/arm/mach-imx/time.c
 +++ b/arch/arm/mach-imx/time.c
-@@ -218,29 +218,31 @@ static int __init mxc_clocksource_init(struct clk *timer_clk,
- /* clock event */
- 
- static int mx1_2_set_next_event(unsigned long evt,
--			      struct clock_event_device *unused)
-+			      struct clock_event_device *evt_dev)
+@@ -202,16 +202,17 @@ static int __init mxc_clocksource_init(struct clk *timer_clk,
+ 				void __iomem *addr)
  {
- 	unsigned long tcmp;
-+	struct imx_timer *tm = container_of(evt_dev, struct imx_timer, evt);
+ 	unsigned int c = clk_get_rate(timer_clk);
+-	void __iomem *reg = timer_base + (timer_is_v2() ? V2_TCN : MX1_2_TCN);
++
++	BUG_ON(!addr);
  
--	tcmp = __raw_readl(timer_base + MX1_2_TCN) + evt;
-+	tcmp = __raw_readl(tm->timer_base + MX1_2_TCN) + evt;
+ 	imx_delay_timer.read_current_timer = &imx_read_current_timer;
+ 	imx_delay_timer.freq = c;
+ 	register_current_timer_delay(&imx_delay_timer);
  
--	__raw_writel(tcmp, timer_base + MX1_2_TCMP);
-+	__raw_writel(tcmp, tm->timer_base + MX1_2_TCMP);
+-	sched_clock_reg = reg;
++	sched_clock_reg = addr;
  
--	return (int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)) < 0 ?
-+	return (int)(tcmp - __raw_readl(tm->timer_base + MX1_2_TCN)) < 0 ?
- 				-ETIME : 0;
- }
- 
- static int v2_set_next_event(unsigned long evt,
--			      struct clock_event_device *unused)
-+			      struct clock_event_device *evt_dev)
- {
- 	unsigned long tcmp;
-+	struct imx_timer *tm = container_of(evt_dev, struct imx_timer, evt);
- 
--	tcmp = __raw_readl(timer_base + V2_TCN) + evt;
-+	tcmp = __raw_readl(tm->timer_base + V2_TCN) + evt;
- 
--	__raw_writel(tcmp, timer_base + V2_TCMP);
-+	__raw_writel(tcmp, tm->timer_base + V2_TCMP);
- 
- 	return evt < 0x7fffffff &&
--		(int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
-+		(int)(tcmp - __raw_readl(tm->timer_base + V2_TCN)) < 0 ?
- 				-ETIME : 0;
+ 	sched_clock_register(mxc_read_sched_clock, 32, c);
+-	return clocksource_mmio_init(reg, "mxc_timer1", c, 200, 32,
++	return clocksource_mmio_init(addr, "mxc_timer1", c, 200, 32,
+ 			clocksource_mmio_readl_up);
  }
  
 -- 
