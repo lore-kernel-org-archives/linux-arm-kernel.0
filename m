@@ -1,46 +1,60 @@
-From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Thu, 30 Apr 2015 09:44:33 -0500
-Subject: [PATCH 18/18] ARM: imx: Move time.c into drivers/clocksources
-In-Reply-To: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <1430405073-13106-19-git-send-email-shenwei.wang@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Apr 2015 16:52:52 +0200
+Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+In-Reply-To: <1430405173.24034.73.camel@deneb.redhat.com>
+References: <20150409144029.GE9648@leverpostej>
+ <20150430143852.GC32190@leverpostej>
+ <1430405173.24034.73.camel@deneb.redhat.com>
+Message-ID: <11222709.dl2MIreEVj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The time.c was moved from arch/arm/mach-imx to
-drivers/clocksources, and its name was changed
-to timer-gpt.c.
+On Thursday 30 April 2015 10:46:13 Mark Salter wrote:
+> On Thu, 2015-04-30 at 15:38 +0100, Mark Rutland wrote:
+> > On Thu, Apr 30, 2015 at 03:03:07PM +0100, Mark Salter wrote:
+> > > On Thu, 2015-04-30 at 14:33 +0100, Mark Rutland wrote:
+> > > > > > Could you please send this to arm-soc as suggested by Will, with the 
+> > > > > > relevant acks/reviews  ?
+> > > > > > 
+> > > > > 
+> > > > > I sent it on Tuesday. Did it not show up? Is arm at kernel.org the correct
+> > > > > address? I got the cc:
+> > > > > 
+> > > > > From: Mark Salter <msalter@redhat.com>
+> > > > > To: arm at kernel.org
+> > > > > Cc: Mark Salter <msalter@redhat.com>
+> > > > > Subject: [PATCH V2] drivers: CCI: fix used_mask init in validate_group()
+> > > > > Date: Tue, 28 Apr 2015 13:09:32 -0400
+> > > > > Message-Id: <1430240972-16386-1-git-send-email-msalter@redhat.com>
+> > > > 
+> > > > That's the right address, but that only goes to the maintainers, and
+> > > > doesn't get copied to any list. In future, please Cc linux-arm-kernel in
+> > > > addition.
+> > > 
+> > > That's where I sent it originally.
+> > 
+> > Sure, but it's good to Cc when sending to arm-soc so as to make it
+> > visible that the patches have been sent. Doing so avoids the necessity
+> > of queries like Suzuki's, and makes it possible for others to reply to
+> > the version sent to arm at kernel.org in the case of conflicts or other
+> > issues.
+> 
+> But why did it need to be sent to a private maintainer's list in the
+> first place? I think that the destination addresses of the original
+> posting was perfectly reasonable given output from get_maintainer.pl
+> and that sending me to a private list was an unnecessary hoop to
+> jump through.
 
-Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
----
- arch/arm/mach-imx/Makefile                                  | 2 +-
- drivers/clocksource/Makefile                                | 1 +
- arch/arm/mach-imx/time.c => drivers/clocksource/timer-gpt.c | 0
- 3 files changed, 2 insertions(+), 1 deletion(-)
- rename arch/arm/mach-imx/time.c => drivers/clocksource/timer-gpt.c (100%)
+The purpose of the arm at kernel.org alias is for subarch maintainers to send
+us stuff, it's not really meant for normal developers, unless specifically
+advised by a maintainer. Each file we maintain through arm-soc normally
+belongs to one subarch, so we tend to not pick up any patches on the mailing
+list and instead wait for that subarch maintainer to pick them up and forward
+the changes to us.
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 0622ced..08dc2f1 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -1,4 +1,4 @@
--obj-y := time.o cpu.o system.o irq-common.o
-+obj-y := cpu.o system.o irq-common.o
- 
- obj-$(CONFIG_SOC_IMX1) += mm-imx1.o
- obj-$(CONFIG_SOC_IMX21) += mm-imx21.o
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 5b85f6a..28bb2e6 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -52,3 +52,4 @@ obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= timer-integrator-ap.o
- obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
- obj-$(CONFIG_CLKSRC_MIPS_GIC)		+= mips-gic-timer.o
- obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
-+obj-$(CONFIG_ARCH_MXC)			+= timer-gpt.o
-diff --git a/arch/arm/mach-imx/time.c b/drivers/clocksource/timer-gpt.c
-similarity index 100%
-rename from arch/arm/mach-imx/time.c
-rename to drivers/clocksource/timer-gpt.c
--- 
-1.9.1
+That model model breaks down to some degree for drivers/bus, in particular
+for stuff that is not specific to just one SoC. I have the patch in my
+todo list now, sorry about missing that earlier. We should probably come up
+with a better way to handle patches like this one.
+
+	Arnd
