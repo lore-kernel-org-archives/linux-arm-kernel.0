@@ -1,235 +1,78 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 30 Apr 2015 11:44:22 +0100
-Subject: [PATCH 2/2] ARM: move Dual-Timer SP804 driver to drivers/clocksource
-In-Reply-To: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
-References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1430390662-18246-3-git-send-email-sudeep.holla@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Apr 2015 12:47:46 +0200
+Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
+ device coherency
+In-Reply-To: <20150430104101.GD32373@arm.com>
+References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <6513459.YvvHTY3yyJ@wuerfel> <20150430104101.GD32373@arm.com>
+Message-ID: <2575874.Qzlb7P3t1y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM Dual-Timer SP804 module is peripheral found not only on ARM32
-platforms but also on ARM64 platforms.
+On Thursday 30 April 2015 11:41:02 Will Deacon wrote:
+> Hi Arnd,
+> 
+> On Thu, Apr 30, 2015 at 09:23:59AM +0100, Arnd Bergmann wrote:
+> > On Wednesday 29 April 2015 16:53:10 Suravee Suthikulpanit wrote:
+> > > As for the case where _CCA=0, I think the ACPI driver should essentially 
+> > > communicate the information as HW is non-coherent as described in the 
+> > > spec, and should be calling arch_setup_dma_ops(dev, false). It is true 
+> > > that this in probably less-likely for the ARM64 server platforms. 
+> > > However, I would think that the ACPI driver should not be making such 
+> > > assumption.
+> > 
+> > Can you add a description to the ACPI spec then to describe in detail what
+> > "non-coherent" is supposed to mean, and which action the OS is supposed to
+> > take when accessing data from device or CPU?
+> 
+> You may be interested in the IORT ACPI companion spec here:
+> 
+>   http://infocenter.arm.com/help/topic/com.arm.doc.den0049a/DEN0049A_IO_Remapping_Table.pdf
+> 
+> On CCA, it says:
+> 
+>   `This value must match the value returned by the _CCA object defined in
+>    the DSDT for the device represented by this node. The attribute can take
+>    the following values:
+> 
+>    - 0x1: The device is fully coherent. No cache maintenance[1] is required for
+>      memory shared with the device which is mapped on CPUs as
+>      Inner Write-Back (IWB), Outer Write-back (OWB), and Inner
+>      shareable (ISH). In addition, during system initialization at cold
+>      boot, or after wakeup from low-power state, if the cache
+>      coherency requires an SMMU override or some specific device
+>      configuration, the platform firmware has to ensure that this has
+>      been done. Therefore the semantics represented by a value of
+>      0x1 are always correct at the time of hand-off from firmware to
+>      OS.
 
-This patch moves the driver out of arch/arm to driver/clocksource
-so that it can be used on ARM64 platforms also.
+Ok, this part absolutely makes sense.
 
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Olof Johansson <olof@lixom.net>
----
- arch/arm/Kconfig                                                   | 5 -----
- arch/arm/common/Makefile                                           | 1 -
- arch/arm/mach-nspire/nspire.c                                      | 2 --
- arch/arm/mach-realview/core.c                                      | 4 ++--
- arch/arm/mach-versatile/core.c                                     | 3 ++-
- drivers/clocksource/Kconfig                                        | 5 +++++
- drivers/clocksource/Makefile                                       | 1 +
- drivers/clocksource/timer-integrator-ap.c                          | 3 ++-
- .../asm/hardware/arm_timer.h => drivers/clocksource/timer-sp.h     | 5 -----
- arch/arm/common/timer-sp.c => drivers/clocksource/timer-sp804.c    | 7 ++++---
- .../asm/hardware/timer-sp.h => include/clocksource/timer-sp804.h   | 4 ++++
- 11 files changed, 20 insertions(+), 20 deletions(-)
- rename arch/arm/include/asm/hardware/arm_timer.h => drivers/clocksource/timer-sp.h (93%)
- rename arch/arm/common/timer-sp.c => drivers/clocksource/timer-sp804.c (98%)
- rename arch/arm/include/asm/hardware/timer-sp.h => include/clocksource/timer-sp804.h (90%)
+>    - 0x0: The device is not coherent. Therefore:
+>      * Cache maintenance is required for memory shared with the
+>        device that is mapped on CPUs as IWB-OWB-ISH.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 45df48ba0b12..3a1eb1bdac03 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -975,11 +975,6 @@ config PLAT_PXA
- config PLAT_VERSATILE
- 	bool
+This still seems insufficient. I guess this excludes having to
+synchronize external bridges or write buffers, but it does not specify
+what cache maintenance is required. Should there be an "outer-flush"?
+Should the CPU cache be invalidated or flushed (or both), and do
+we need to care about caches inside of the device or just inside of
+the CPU?
 
--config ARM_TIMER_SP804
--	bool
--	select CLKSRC_MMIO
--	select CLKSRC_OF if OF
--
- source "arch/arm/firmware/Kconfig"
+>      * No cache maintenance is required for memory shared with the
+>        device that is mapped on the CPU as device or Non-cacheable.
+> 
+>    All other values are reserved.
+> 
+> [1] Note: Caching operations described in this document apply to the CPU
+>     caches and any other caches in the system where device memory accesses
+>     can hit.'
+> 
+> This aside, the documented introduces some useful, related concepts such
+> as CPM (coherent path to memory) and DACS (device attributes are cacheable
+> and inner shareable) for describing different IO subsystems. It also has
+> mechanisms to descibe ID repainting from PCI->SMMU->ITS.
 
- source arch/arm/mm/Kconfig
-diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-index 70b1eff477b3..6ee5959a813b 100644
---- a/arch/arm/common/Makefile
-+++ b/arch/arm/common/Makefile
-@@ -11,7 +11,6 @@ obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
- obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
- obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
- obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
--obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
- obj-$(CONFIG_MCPM)		+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
- CFLAGS_REMOVE_mcpm_entry.o	= -pg
- AFLAGS_mcpm_head.o		:= -march=armv7-a
-diff --git a/arch/arm/mach-nspire/nspire.c b/arch/arm/mach-nspire/nspire.c
-index 3445a5686805..34c2a1b32e7d 100644
---- a/arch/arm/mach-nspire/nspire.c
-+++ b/arch/arm/mach-nspire/nspire.c
-@@ -22,8 +22,6 @@
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
+Ah, good.
 
--#include <asm/hardware/timer-sp.h>
--
- #include "mmio.h"
- #include "clcd.h"
-
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index dd9c12d995db..21e6088dce30 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -35,6 +35,8 @@
- #include <linux/mtd/physmap.h>
- #include <linux/memblock.h>
-
-+#include <clocksource/timer-sp804.h>
-+
- #include <mach/hardware.h>
- #include <asm/irq.h>
- #include <asm/mach-types.h>
-@@ -44,10 +46,8 @@
- #include <asm/mach/irq.h>
- #include <asm/mach/map.h>
-
--
- #include <mach/platform.h>
- #include <mach/irqs.h>
--#include <asm/hardware/timer-sp.h>
-
- #include <plat/sched_clock.h>
-
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index a5a57e453698..79aaed6d8d8c 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -41,6 +41,8 @@
- #include <linux/bitops.h>
- #include <linux/reboot.h>
-
-+#include <clocksource/timer-sp804.h>
-+
- #include <asm/irq.h>
- #include <asm/hardware/icst.h>
- #include <asm/mach-types.h>
-@@ -51,7 +53,6 @@
- #include <asm/mach/map.h>
- #include <mach/hardware.h>
- #include <mach/platform.h>
--#include <asm/hardware/timer-sp.h>
-
- #include <plat/sched_clock.h>
-
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 51d7865fdddb..0f1c0e7f86da 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -132,6 +132,11 @@ config ARM_GLOBAL_TIMER
- 	help
- 	  This options enables support for the ARM global timer unit
-
-+config ARM_TIMER_SP804
-+	bool "Support for Dual Timer SP804 module"
-+	select CLKSRC_MMIO
-+	select CLKSRC_OF if OF
-+
- config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 	bool
- 	depends on ARM_GLOBAL_TIMER
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 5b85f6adb258..5ca59f9b377f 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -45,6 +45,7 @@ obj-$(CONFIG_MTK_TIMER)		+= mtk_timer.o
-
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
-+obj-$(CONFIG_ARM_TIMER_SP804)		+= timer-sp804.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
- obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
- obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
-diff --git a/drivers/clocksource/timer-integrator-ap.c b/drivers/clocksource/timer-integrator-ap.c
-index b9efd30513d5..d7d21e4dcef0 100644
---- a/drivers/clocksource/timer-integrator-ap.c
-+++ b/drivers/clocksource/timer-integrator-ap.c
-@@ -26,7 +26,8 @@
- #include <linux/clockchips.h>
- #include <linux/interrupt.h>
- #include <linux/sched_clock.h>
--#include <asm/hardware/arm_timer.h>
-+
-+#include "timer-sp.h"
-
- static void __iomem * sched_clk_base;
-
-diff --git a/arch/arm/include/asm/hardware/arm_timer.h b/drivers/clocksource/timer-sp.h
-similarity index 93%
-rename from arch/arm/include/asm/hardware/arm_timer.h
-rename to drivers/clocksource/timer-sp.h
-index d6030ff599db..050d88561e9c 100644
---- a/arch/arm/include/asm/hardware/arm_timer.h
-+++ b/drivers/clocksource/timer-sp.h
-@@ -1,6 +1,3 @@
--#ifndef __ASM_ARM_HARDWARE_ARM_TIMER_H
--#define __ASM_ARM_HARDWARE_ARM_TIMER_H
--
- /*
-  * ARM timer implementation, found in Integrator, Versatile and Realview
-  * platforms.  Not all platforms support all registers and bits in these
-@@ -31,5 +28,3 @@
- #define TIMER_RIS	0x10			/*  CVR ro */
- #define TIMER_MIS	0x14			/*  CVR ro */
- #define TIMER_BGLOAD	0x18			/*  CVR rw */
--
--#endif
-diff --git a/arch/arm/common/timer-sp.c b/drivers/clocksource/timer-sp804.c
-similarity index 98%
-rename from arch/arm/common/timer-sp.c
-rename to drivers/clocksource/timer-sp804.c
-index 19211324772f..f1141c227a61 100644
---- a/arch/arm/common/timer-sp.c
-+++ b/drivers/clocksource/timer-sp804.c
-@@ -1,5 +1,5 @@
- /*
-- *  linux/arch/arm/common/timer-sp.c
-+ *  linux/drivers/clocksource/timer-sp.c
-  *
-  *  Copyright (C) 1999 - 2003 ARM Limited
-  *  Copyright (C) 2000 Deep Blue Solutions Ltd
-@@ -30,8 +30,9 @@
- #include <linux/of_irq.h>
- #include <linux/sched_clock.h>
-
--#include <asm/hardware/arm_timer.h>
--#include <asm/hardware/timer-sp.h>
-+#include <clocksource/timer-sp804.h>
-+
-+#include "timer-sp.h"
-
- static long __init sp804_get_clock_rate(struct clk *clk)
- {
-diff --git a/arch/arm/include/asm/hardware/timer-sp.h b/include/clocksource/timer-sp804.h
-similarity index 90%
-rename from arch/arm/include/asm/hardware/timer-sp.h
-rename to include/clocksource/timer-sp804.h
-index bb28af7c32de..63bb88e183ca 100644
---- a/arch/arm/include/asm/hardware/timer-sp.h
-+++ b/include/clocksource/timer-sp804.h
-@@ -1,3 +1,6 @@
-+#ifndef __CLKSOURCE_TIMER_SP_H
-+#define __CLKSOURCE_TIMER_SP_H
-+
- struct clk;
-
- void __sp804_clocksource_and_sched_clock_init(void __iomem *,
-@@ -21,3 +24,4 @@ static inline void sp804_clockevents_init(void __iomem *base, unsigned int irq,
- 	__sp804_clockevents_init(base, irq, NULL, name);
-
- }
-+#endif
---
-1.9.1
+	Arnd
