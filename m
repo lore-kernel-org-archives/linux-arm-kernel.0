@@ -1,35 +1,51 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri,  1 May 2015 18:36:26 +0100
-Subject: [PATCH 1/5] bus: arm-ccn: Fix node->XP config conversion
-In-Reply-To: <1430501790-26918-1-git-send-email-pawel.moll@arm.com>
-References: <1430501790-26918-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1430501790-26918-2-git-send-email-pawel.moll@arm.com>
+Date: Fri,  1 May 2015 18:36:25 +0100
+Subject: [PATCH 0/5] ARM CCN driver updates
+Message-ID: <1430501790-26918-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Events defined as watchpoints on nodes must have their config values
-converted so that they apply to the respective node's XP. The
-function setting new values was using wrong mask for the "port" field,
-resulting in corrupted value. Fixed now.
+Arnd, Olof, Kevin,
 
-Cc: stable at vger.kernel.org # 3.17+
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- drivers/bus/arm-ccn.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Here's a short set of updates to the ARM CCN driver, aiming at 4.2.
 
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index aaa0f2a..60397ec 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -212,7 +212,7 @@ static int arm_ccn_node_to_xp_port(int node)
- 
- static void arm_ccn_pmu_config_set(u64 *config, u32 node_xp, u32 type, u32 port)
- {
--	*config &= ~((0xff << 0) | (0xff << 8) | (0xff << 24));
-+	*config &= ~((0xff << 0) | (0xff << 8) | (0x3 << 24));
- 	*config |= (node_xp << 0) | (type << 8) | (port << 24);
- }
- 
+No major functional changes, just a bunch of smaller and larger bug
+fixes and getting the driver in line with the latest perf tool
+features.
+
+The series can be also pulled:
+
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/pawel.moll/linux.git tags/ccn/updates-for-4.2
+
+for you to fetch changes up to 57006d3e6f62def53c01ae3ffc338caebd866e89:
+
+  bus: arm-ccn: Allocate event when it is being added, not initialised (2015-05-01 17:51:05 +0100)
+
+----------------------------------------------------------------
+Set of ARM CCN PMU driver updates:
+- fixed a nasty bitfield mangling bug
+- added new hints to the perf userspace tool
+- pinned events processing to a single PMU
+- modified events initialisation so they can be rotated now
+
+----------------------------------------------------------------
+
+Pawel Moll (5):
+  bus: arm-ccn: Fix node->XP config conversion
+  bus: arm-ccn: cpumask attribute
+  bus: arm-ccn: Provide required event arguments
+  bus: arm-ccn: Do not group CCN events with other PMUs
+  bus: arm-ccn: Allocate event when it is being added, not initialised
+
+ Documentation/arm/CCN.txt |  17 +--
+ drivers/bus/arm-ccn.c     | 273 ++++++++++++++++++++++++++++++++++++----------
+ 2 files changed, 226 insertions(+), 64 deletions(-)
+
 -- 
 2.1.0
