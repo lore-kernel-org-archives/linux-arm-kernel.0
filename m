@@ -1,9 +1,7 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 00:54:28 +0900
-Subject: [PATCH 4/4] i2c: s4c2410: Constify platform_device_id
-In-Reply-To: <1430495668-31878-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430495668-31878-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1430495668-31878-4-git-send-email-k.kozlowski.k@gmail.com>
+Date: Sat,  2 May 2015 00:56:36 +0900
+Subject: [PATCH] drm/exynos: mixer: Constify platform_device_id
+Message-ID: <1430495796-32016-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +10,21 @@ const.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- drivers/i2c/busses/i2c-s3c2410.c | 2 +-
+ drivers/gpu/drm/exynos/exynos_mixer.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 958c8db4ec30..c1f0e62d1bb1 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -132,7 +132,7 @@ struct s3c24xx_i2c {
- 	unsigned int		sys_i2c_cfg;
+diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
+index fbec750574e6..512549a35e96 100644
+--- a/drivers/gpu/drm/exynos/exynos_mixer.c
++++ b/drivers/gpu/drm/exynos/exynos_mixer.c
+@@ -1156,7 +1156,7 @@ static struct mixer_drv_data exynos4210_mxr_drv_data = {
+ 	.has_sclk = 1,
  };
  
--static struct platform_device_id s3c24xx_driver_ids[] = {
-+static const struct platform_device_id s3c24xx_driver_ids[] = {
+-static struct platform_device_id mixer_driver_types[] = {
++static const struct platform_device_id mixer_driver_types[] = {
  	{
- 		.name		= "s3c2410-i2c",
- 		.driver_data	= 0,
+ 		.name		= "s5p-mixer",
+ 		.driver_data	= (unsigned long)&exynos4210_mxr_drv_data,
 -- 
 2.1.4
