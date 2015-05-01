@@ -1,51 +1,54 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri,  1 May 2015 18:36:25 +0100
-Subject: [PATCH 0/5] ARM CCN driver updates
-Message-ID: <1430501790-26918-1-git-send-email-pawel.moll@arm.com>
+Date: Fri,  1 May 2015 18:36:29 +0100
+Subject: [PATCH 4/5] bus: arm-ccn: Do not group CCN events with other PMUs
+In-Reply-To: <1430501790-26918-1-git-send-email-pawel.moll@arm.com>
+References: <1430501790-26918-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1430501790-26918-5-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Groups must not mix events from different PMUs (software events are
+allowed). Unfortunately the core does not ensures that, so it is
+necessary to validate the group at the PMU driver level.
 
-Here's a short set of updates to the ARM CCN driver, aiming at 4.2.
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ drivers/bus/arm-ccn.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-No major functional changes, just a bunch of smaller and larger bug
-fixes and getting the driver in line with the latest perf tool
-features.
-
-The series can be also pulled:
-
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawel.moll/linux.git tags/ccn/updates-for-4.2
-
-for you to fetch changes up to 57006d3e6f62def53c01ae3ffc338caebd866e89:
-
-  bus: arm-ccn: Allocate event when it is being added, not initialised (2015-05-01 17:51:05 +0100)
-
-----------------------------------------------------------------
-Set of ARM CCN PMU driver updates:
-- fixed a nasty bitfield mangling bug
-- added new hints to the perf userspace tool
-- pinned events processing to a single PMU
-- modified events initialisation so they can be rotated now
-
-----------------------------------------------------------------
-
-Pawel Moll (5):
-  bus: arm-ccn: Fix node->XP config conversion
-  bus: arm-ccn: cpumask attribute
-  bus: arm-ccn: Provide required event arguments
-  bus: arm-ccn: Do not group CCN events with other PMUs
-  bus: arm-ccn: Allocate event when it is being added, not initialised
-
- Documentation/arm/CCN.txt |  17 +--
- drivers/bus/arm-ccn.c     | 273 ++++++++++++++++++++++++++++++++++++----------
- 2 files changed, 226 insertions(+), 64 deletions(-)
-
+diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+index 572360f..fb589d4 100644
+--- a/drivers/bus/arm-ccn.c
++++ b/drivers/bus/arm-ccn.c
+@@ -660,6 +660,7 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ 	int valid, bit;
+ 	struct arm_ccn_component *source;
+ 	int i;
++	struct perf_event *sibling;
+ 
+ 	if (event->attr.type != event->pmu->type)
+ 		return -ENOENT;
+@@ -762,6 +763,21 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ 				node_xp, type, port);
+ 	}
+ 
++	/*
++	 * We must NOT create groups containing mixed PMUs, although software
++	 * events are acceptable (for example to create a CCN group
++	 * periodically read when a hrtimer aka cpu-clock leader triggers).
++	 */
++	if (event->group_leader->pmu != event->pmu &&
++			!is_software_event(event->group_leader))
++		return -EINVAL;
++
++	list_for_each_entry(sibling, &event->group_leader->sibling_list,
++			group_entry)
++		if (sibling->pmu != event->pmu &&
++				!is_software_event(sibling))
++			return -EINVAL;
++
+ 	/* Allocate the cycle counter */
+ 	if (type == CCN_TYPE_CYCLES) {
+ 		if (test_and_set_bit(CCN_IDX_PMU_CYCLE_COUNTER,
 -- 
 2.1.0
