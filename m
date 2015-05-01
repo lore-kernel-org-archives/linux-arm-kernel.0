@@ -1,9 +1,9 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 00:49:19 +0900
-Subject: [PATCH 3/6] mmc: rtsx: Constify platform_device_id
-In-Reply-To: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1430495362-31506-3-git-send-email-k.kozlowski.k@gmail.com>
+Date: Sat,  2 May 2015 00:50:02 +0900
+Subject: [PATCH 2/3] mtd: s3c2410: Constify platform_device_id
+In-Reply-To: <1430495403-31560-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430495403-31560-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1430495403-31560-2-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,35 +12,21 @@ const.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- drivers/mmc/host/rtsx_pci_sdmmc.c | 2 +-
- drivers/mmc/host/rtsx_usb_sdmmc.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/s3c2410.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/rtsx_pci_sdmmc.c b/drivers/mmc/host/rtsx_pci_sdmmc.c
-index 1d3d6c4bfdc6..93137483ecde 100644
---- a/drivers/mmc/host/rtsx_pci_sdmmc.c
-+++ b/drivers/mmc/host/rtsx_pci_sdmmc.c
-@@ -1474,7 +1474,7 @@ static int rtsx_pci_sdmmc_drv_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+index 0e02be47ce1d..381f67ac6b5a 100644
+--- a/drivers/mtd/nand/s3c2410.c
++++ b/drivers/mtd/nand/s3c2410.c
+@@ -1105,7 +1105,7 @@ static int s3c24xx_nand_resume(struct platform_device *dev)
  
--static struct platform_device_id rtsx_pci_sdmmc_ids[] = {
-+static const struct platform_device_id rtsx_pci_sdmmc_ids[] = {
- 	{
- 		.name = DRV_NAME_RTSX_PCI_SDMMC,
- 	}, {
-diff --git a/drivers/mmc/host/rtsx_usb_sdmmc.c b/drivers/mmc/host/rtsx_usb_sdmmc.c
-index 88af827e086b..6c71fc9f76c7 100644
---- a/drivers/mmc/host/rtsx_usb_sdmmc.c
-+++ b/drivers/mmc/host/rtsx_usb_sdmmc.c
-@@ -1439,7 +1439,7 @@ static int rtsx_usb_sdmmc_drv_remove(struct platform_device *pdev)
- 	return 0;
- }
+ /* driver device registration */
  
--static struct platform_device_id rtsx_usb_sdmmc_ids[] = {
-+static const struct platform_device_id rtsx_usb_sdmmc_ids[] = {
+-static struct platform_device_id s3c24xx_driver_ids[] = {
++static const struct platform_device_id s3c24xx_driver_ids[] = {
  	{
- 		.name = "rtsx_usb_sdmmc",
- 	}, {
+ 		.name		= "s3c2410-nand",
+ 		.driver_data	= TYPE_S3C2410,
 -- 
 2.1.4
