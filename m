@@ -1,157 +1,57 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri,  1 May 2015 10:45:48 -0400
-Subject: [PATCH] arm64/perf: add ACPI support
-Message-ID: <1430491548-9896-1-git-send-email-msalter@redhat.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 1 May 2015 08:08:48 -0700
+Subject: [PATCH arm 1/2] arm64: Use common outgoing-CPU-notification code
+In-Reply-To: <20150430095055.GI18867@e104818-lin.cambridge.arm.com>
+References: <20150423200603.GA9473@linux.vnet.ibm.com>
+ <1429819654-10498-1-git-send-email-paulmck@linux.vnet.ibm.com>
+ <20150430095055.GI18867@e104818-lin.cambridge.arm.com>
+Message-ID: <20150501150848.GC5381@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using ACPI, the perf_event irq info needs to be parsed
-from the MADT and a corresponding platform device needs to
-be created and registered. The only change to the existing
-driver is a check to avoid unnecessary devicetree parsing.
+On Thu, Apr 30, 2015 at 10:50:55AM +0100, Catalin Marinas wrote:
+> Hi Paul,
+> 
+> On Thu, Apr 23, 2015 at 01:07:33PM -0700, Paul E. McKenney wrote:
+> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> > index 328b8ce4b007..6dc727a6e73e 100644
+> > --- a/arch/arm64/kernel/smp.c
+> > +++ b/arch/arm64/kernel/smp.c
+> > @@ -252,15 +252,13 @@ static int op_cpu_kill(unsigned int cpu)
+> >  	return cpu_ops[cpu]->cpu_kill(cpu);
+> >  }
+> >  
+> > -static DECLARE_COMPLETION(cpu_died);
+> > -
+> >  /*
+> >   * called on the thread which is asking for a CPU to be shutdown -
+> >   * waits until shutdown has completed, or it is timed out.
+> >   */
+> >  void __cpu_die(unsigned int cpu)
+> >  {
+> > -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
+> > +	if (!cpu_wait_death(cpu, 5)) {
+> >  		pr_crit("CPU%u: cpu didn't die\n", cpu);
+> >  		return;
+> >  	}
+> > @@ -293,7 +291,7 @@ void cpu_die(void)
+> >  	local_irq_disable();
+> >  
+> >  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+> > -	complete(&cpu_died);
+> > +	(void)cpu_report_death();
+> >  
+> >  	/*
+> >  	 * Actually shutdown the CPU. This must never fail. The specific hotplug
+> 
+> Are these functions are only defined when HOTPLUG_CPU is enabled? On
+> arm64 we can end up with this option disabled if SUSPEND is disabled.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/arm64/kernel/perf_event.c | 106 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 106 insertions(+)
+Yep, only with HOTPLUG_CPU.  And yes, both SUSPEND and HIBERNATION can
+force HOTPLUG_CPU, so if you have neiter SUSPEND nor HIBERNATION, you
+won't have HOTPLUG_CPU.  This -should- be OK, because you should also
+not have __cpu_die() if !HOTPLUG_CPU.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 195991d..1e53b26 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -31,6 +31,7 @@
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/uaccess.h>
-+#include <linux/acpi.h>
- 
- #include <asm/cputype.h>
- #include <asm/irq.h>
-@@ -1315,6 +1316,10 @@ static int armpmu_device_probe(struct platform_device *pdev)
- 	if (!cpu_pmu)
- 		return -ENODEV;
- 
-+	/* skip the devicetree parsing if we're using ACPI */
-+	if (!acpi_disabled)
-+		goto done;
-+
- 	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
- 	if (!irqs)
- 		return -ENOMEM;
-@@ -1350,6 +1355,7 @@ static int armpmu_device_probe(struct platform_device *pdev)
- 	else
- 		kfree(irqs);
- 
-+done:
- 	cpu_pmu->plat_device = pdev;
- 	return 0;
- }
-@@ -1368,6 +1374,106 @@ static int __init register_pmu_driver(void)
- }
- device_initcall(register_pmu_driver);
- 
-+#ifdef CONFIG_ACPI
-+struct acpi_pmu_irq {
-+	int gsi;
-+	int trigger;
-+};
-+
-+static struct acpi_pmu_irq acpi_pmu_irqs[NR_CPUS] __initdata;
-+
-+static int __init
-+acpi_parse_pmu_irqs(struct acpi_subtable_header *header,
-+		    const unsigned long end)
-+{
-+	struct acpi_madt_generic_interrupt *gic;
-+	int cpu;
-+	u64 mpidr;
-+
-+	gic = (struct acpi_madt_generic_interrupt *)header;
-+	if (BAD_MADT_ENTRY(gic, end))
-+		return -EINVAL;
-+
-+	mpidr = gic->arm_mpidr & MPIDR_HWID_BITMASK;
-+
-+	for_each_possible_cpu(cpu) {
-+		if (cpu_logical_map(cpu) != mpidr)
-+			continue;
-+
-+		acpi_pmu_irqs[cpu].gsi = gic->performance_interrupt;
-+		if (gic->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
-+			acpi_pmu_irqs[cpu].trigger = ACPI_EDGE_SENSITIVE;
-+		else
-+			acpi_pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
-+		return 0;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+static int __init pmu_acpi_init(void)
-+{
-+	struct platform_device *pdev;
-+	struct acpi_pmu_irq *pirq = acpi_pmu_irqs;
-+	struct resource	*res, *r;
-+	int err = -ENOMEM;
-+	int i, count, irq;
-+
-+	if (acpi_disabled)
-+		return 0;
-+
-+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-+				      acpi_parse_pmu_irqs, num_possible_cpus());
-+	/* Must have irq for boot boot cpu, at least */
-+	if (count <= 0 || pirq->gsi == 0)
-+		return -EINVAL;
-+
-+	irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
-+				ACPI_ACTIVE_HIGH);
-+
-+	if (irq_is_percpu(irq))
-+		count = 1;
-+
-+	pdev = platform_device_alloc("arm-pmu", -1);
-+	if (!pdev)
-+		goto err_free_gsi;
-+
-+	res = kcalloc(count, sizeof(*res), GFP_KERNEL);
-+	if (!res)
-+		goto err_free_device;
-+
-+	for (i = 0, r = res; i < count; i++, pirq++, r++) {
-+		if (i)
-+			irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
-+						ACPI_ACTIVE_HIGH);
-+		r->start = r->end = irq;
-+		r->flags = IORESOURCE_IRQ;
-+		if (pirq->trigger == ACPI_EDGE_SENSITIVE)
-+			r->flags |= IORESOURCE_IRQ_HIGHEDGE;
-+		else
-+			r->flags |= IORESOURCE_IRQ_HIGHLEVEL;
-+	}
-+
-+	err = platform_device_add_resources(pdev, res, count);
-+	if (!err)
-+		err = platform_device_add(pdev);
-+	kfree(res);
-+	if (!err)
-+		return 0;
-+
-+err_free_device:
-+	platform_device_put(pdev);
-+
-+err_free_gsi:
-+	for (i = 0; i < count; i++)
-+		acpi_unregister_gsi(acpi_pmu_irqs[i].gsi);
-+
-+	return err;
-+}
-+arch_initcall(pmu_acpi_init);
-+
-+#endif /* ACPI */
-+
- static struct pmu_hw_events *armpmu_get_cpu_events(void)
- {
- 	return this_cpu_ptr(&cpu_hw_events);
--- 
-1.8.3.1
+Or am I missing your point?
+
+							Thanx, Paul
