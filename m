@@ -1,45 +1,45 @@
-From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
-Date: Fri, 1 May 2015 10:00:58 +0100
-Subject: [PATCH v3] ARM: AM43xx: hwmod: add VPFE hwmod entries
-In-Reply-To: <alpine.DEB.2.02.1504102248590.19540@utopia.booyaka.com>
-References: <1422260488-380-1-git-send-email-prabhakar.csengg@gmail.com>
- <20150128193247.GH2570@ti.com>
- <alpine.DEB.2.02.1502102310010.3767@utopia.booyaka.com>
- <CA+V-a8vx=A8qQh4CtD7tjFwgBmkFPX7sUVuak8e4rH9N39gwfA@mail.gmail.com>
- <alpine.DEB.2.02.1504102248590.19540@utopia.booyaka.com>
-Message-ID: <CA+V-a8uH0NupSx0a668dnD7is_A+tXGhN4Kw1S1CTc5aRDSsLg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 1 May 2015 10:02:02 +0100
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <20150430171701.GA31834@red-moon>
+References: <1430402268.2868.20.camel@linaro.org> <554251B4.2030808@arm.com>
+ <1430412035.2868.40.camel@linaro.org>
+ <20150430171701.GA31834@red-moon>
+Message-ID: <20150501090201.GE27755@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:51 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi Prabhakar
->
-> On Fri, 10 Apr 2015, Lad, Prabhakar wrote:
->
->> Hi Paul,
->>
->> On Tue, Feb 10, 2015 at 11:10 PM, Paul Walmsley <paul@pwsan.com> wrote:
->> > On Wed, 28 Jan 2015, Benoit Parrot wrote:
->> >
->> >> Suspend/resume is functional with this patch.
->> >>
->> >> Tested-by: Benoit Parrot <bparrot@ti.com>
->> >
->> > Thanks folks, queued for v3.21.
->> >
->> >
->> I see that this patch is not into linux-next yet.
->
-> thanks for the ping.  This slipped through the cracks here due to the
-> kernel version number change from 3.21 to 4.1 :-(  Sorry about that; I
-> will requeue for either 4.1-rc or 4.2.
->
-> Unfortunately I don't have an AM43xx board.  Is suspend/resume broken
-> without this patch?  If so, then v4.1-rc seems like the appropriate
-> target.
->
->
-Ping..
+On Thu, Apr 30, 2015 at 06:17:01PM +0100, Lorenzo Pieralisi wrote:
+> On Thu, Apr 30, 2015 at 05:40:35PM +0100, Jon Medhurst (Tixy) wrote:
+> > On Thu, 2015-04-30 at 17:00 +0100, Sudeep Holla wrote:
+> > > On 30/04/15 14:57, Jon Medhurst (Tixy) wrote:
+> > > > From: Jon Medhurst <tixy@linaro.org>
+> > > >
+> > > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > > > ---
+> > > >
+> > > > These have been kicking around out of tree for ages, any reason they
+> > > > shouldn't be in mainline?
+> > > 
+> > > One possible reason could be that these values are not tuned(e.g.
+> > > latency values, can they be same for both clusters ?)
+> > 
+> > I thought that both clusters being the same was questionable.
+> > 
+> > >  Though these
+> > > reasons are not blocking and this patch will not cause any
+> > > functionality break even if is merged as is.
+> > 
+> > My main purpose with trying to get this merged is so that people using
+> > Juno for general testing and validation will actually have cpuidle
+> > running and so potentially find more bugs.
+> 
+> I am reluctant to enable idle states in the default Juno dts, they
+> will affect latencies and performance tests significantly.
 
-Cheers,
---Prabhakar Lad
+OTOH, I guess they will improve the power benchmarks. IMO, we should
+place in the DT whatever the hardware and firmware supports. It's up to
+those doing benchmarks to disable CPU suspend.
+
+-- 
+Catalin
