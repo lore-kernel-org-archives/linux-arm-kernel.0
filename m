@@ -1,9 +1,7 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 01:00:12 +0900
-Subject: [PATCH 2/4] ASoC: bt-sco: Constify platform_device_id
-In-Reply-To: <1430496014-32309-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430496014-32309-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1430496014-32309-2-git-send-email-k.kozlowski.k@gmail.com>
+Date: Sat,  2 May 2015 00:59:45 +0900
+Subject: [PATCH] ARM: plat-samsung: Constify platform_device_id
+Message-ID: <1430495985-32265-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +10,21 @@ const.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- sound/soc/codecs/bt-sco.c | 2 +-
+ arch/arm/plat-samsung/adc.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/codecs/bt-sco.c b/sound/soc/codecs/bt-sco.c
-index e7238b8904bc..9d0b794d3005 100644
---- a/sound/soc/codecs/bt-sco.c
-+++ b/sound/soc/codecs/bt-sco.c
-@@ -63,7 +63,7 @@ static int bt_sco_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index e2be70df06c6..8a2e07c9b5fe 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -475,7 +475,7 @@ static int s3c_adc_resume(struct device *dev)
+ #define s3c_adc_resume NULL
+ #endif
  
--static struct platform_device_id bt_sco_driver_ids[] = {
-+static const struct platform_device_id bt_sco_driver_ids[] = {
+-static struct platform_device_id s3c_adc_driver_ids[] = {
++static const struct platform_device_id s3c_adc_driver_ids[] = {
  	{
- 		.name		= "dfbmcs320",
- 	},
+ 		.name           = "s3c24xx-adc",
+ 		.driver_data    = TYPE_ADCV1,
 -- 
 2.1.4
