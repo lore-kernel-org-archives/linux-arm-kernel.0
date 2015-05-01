@@ -1,9 +1,9 @@
 From: sasukewxt@163.com (Caesar Wang)
-Date: Fri, 01 May 2015 11:40:37 +0800
+Date: Fri, 01 May 2015 11:42:53 +0800
 Subject: [PATCH] i2c: rk3x: Increase wait timeout to 1 second
 In-Reply-To: <1430430247-9632-1-git-send-email-dianders@chromium.org>
 References: <1430430247-9632-1-git-send-email-dianders@chromium.org>
-Message-ID: <5542F5B5.9000206@163.com>
+Message-ID: <5542F63D.3000402@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,15 +37,13 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >   /* Constants */
 > -#define WAIT_TIMEOUT      200 /* ms */
 > +#define WAIT_TIMEOUT      1000 /* ms */
-Yeah, verified on veyron device.
+Yeah,verified on veyron device.
 
 Tested-by: Caesar Wang <wxt@rock-chips.com>
 
-
-
 Thanks.
-
 Caesar
+
 >   #define DEFAULT_SCL_RATE  (100 * 1000) /* Hz */
 >   
 >   enum rk3x_i2c_state {
