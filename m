@@ -1,58 +1,55 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri,  1 May 2015 10:41:10 +0100
-Subject: [PATCH] drivers: mfd: check ACPI device companion before checking
- resources
-Message-ID: <1430473270-11359-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Fri, 1 May 2015 11:12:11 +0100
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <20150501090201.GE27755@e104818-lin.cambridge.arm.com>
+References: <1430402268.2868.20.camel@linaro.org> <554251B4.2030808@arm.com>
+ <1430412035.2868.40.camel@linaro.org>
+ <20150430171701.GA31834@red-moon>
+ <20150501090201.GE27755@e104818-lin.cambridge.arm.com>
+Message-ID: <20150501101211.GB11403@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current code in mfd-core calls into ACPI to check resources even
-on a system that booted with a DT (on kernels with both DT and ACPI
-support compiled in). This triggers ACPI exceptions since we may
-end up calling the ACPI interpreter when it has not been initialized:
+On Fri, May 01, 2015 at 10:02:02AM +0100, Catalin Marinas wrote:
+> On Thu, Apr 30, 2015 at 06:17:01PM +0100, Lorenzo Pieralisi wrote:
+> > On Thu, Apr 30, 2015 at 05:40:35PM +0100, Jon Medhurst (Tixy) wrote:
+> > > On Thu, 2015-04-30 at 17:00 +0100, Sudeep Holla wrote:
+> > > > On 30/04/15 14:57, Jon Medhurst (Tixy) wrote:
+> > > > > From: Jon Medhurst <tixy@linaro.org>
+> > > > >
+> > > > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > > > > ---
+> > > > >
+> > > > > These have been kicking around out of tree for ages, any reason they
+> > > > > shouldn't be in mainline?
+> > > > 
+> > > > One possible reason could be that these values are not tuned(e.g.
+> > > > latency values, can they be same for both clusters ?)
+> > > 
+> > > I thought that both clusters being the same was questionable.
+> > > 
+> > > >  Though these
+> > > > reasons are not blocking and this patch will not cause any
+> > > > functionality break even if is merged as is.
+> > > 
+> > > My main purpose with trying to get this merged is so that people using
+> > > Juno for general testing and validation will actually have cpuidle
+> > > running and so potentially find more bugs.
+> > 
+> > I am reluctant to enable idle states in the default Juno dts, they
+> > will affect latencies and performance tests significantly.
+> 
+> OTOH, I guess they will improve the power benchmarks. IMO, we should
+> place in the DT whatever the hardware and firmware supports. It's up to
+> those doing benchmarks to disable CPU suspend.
 
-"ACPI Exception: AE_BAD_PARAMETER, Thread 2064154624 could not acquire
-Mutex [0x1] (20150410/utmutex-285)"
+I am ok with DT defining whatever HW and FW support, the question is
+whether we want CPUidle (and CPUfreq) enabled by default in the
+defconfig then.
 
-This patch fixes the issues by adding a check for an ACPI companion
-device before carrying out ACPI resources checks to avoid calling
-the ACPI interpreter if the fwnode representing the device is an OF one.
+This will certainly trigger mainline regressions from a latency/performance
+standpoint (true, some tests disable idle states by default ie cyclic
+test), unless we disable CPUidle via command line parameter or we
+force people carrying out tests to disable idle states through sysfs knobs.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
----
-Lee, Samuel,
-
-I could not test it on X86 and I do not know if you prefer setting
-ignore_resource_conflicts in the respective mfd cells (ie vexpress),
-just let me know how do you want to fix it.
-
-Thanks,
 Lorenzo
-
- drivers/mfd/mfd-core.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
-index 1aed3b7..14fd5cb 100644
---- a/drivers/mfd/mfd-core.c
-+++ b/drivers/mfd/mfd-core.c
-@@ -207,9 +207,11 @@ static int mfd_add_device(struct device *parent, int id,
- 		}
- 
- 		if (!cell->ignore_resource_conflicts) {
--			ret = acpi_check_resource_conflict(&res[r]);
--			if (ret)
--				goto fail_alias;
-+			if (has_acpi_companion(&pdev->dev)) {
-+				ret = acpi_check_resource_conflict(&res[r]);
-+				if (ret)
-+					goto fail_alias;
-+			}
- 		}
- 	}
- 
--- 
-2.2.1
