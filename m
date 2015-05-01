@@ -1,64 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 May 2015 10:29:45 +0100
-Subject: [GIT PULL] arm64: post merge-window fixes for 4.1
-Message-ID: <20150501092945.GC1561@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 01 May 2015 11:30:18 +0200
+Subject: [PATCH 0/4] clk: si5351: Some fixes
+In-Reply-To: <20150501111406.0aa23c7b@armhf>
+References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150501111406.0aa23c7b@armhf>
+Message-ID: <554347AA.3070502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 01.05.2015 11:14, Jean-Francois Moine wrote:
+> On Thu, 30 Apr 2015 19:45:50 +0200
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>> For Si5351 clock driver, Michael Welling and Jean-Francois Moine reported
+>> issues with recent v4.x kernels due to broken/missing/wrong parent clock
+>> claming. This patch set now deals with the issues reported.
+>>
+>> Patch 1 amends the binding documentation mention clock-names property
+>> for the "xtal" and "clkin" parent clock inputs of Si5351 variants.
+>>
+>> Patch 2 adds the clock-names property for the SolidRun CuBox using Si5351
+>> with a fixed oscillator connected to "xtal" input.
+>>
+>> Patch 3 reworks the way we claim parent clocks by using devm_clk_get()
+>> for both DT and platform_data based registration. Also, properly check
+>> for errors returned by devm_clk_get() and prepare/enable the parent clocks.
+[...]
+>
+> I applied the patches 2 and 3, and the audio and video in the Cubox
+> work fine again. Thanks.
 
-Please pull the following arm64 fixes for 4.1. Not too much here, but
-we've addressed a couple of nasty issues in the dma-mapping code as well
-as adding the halfword and byte variants of load_acquire/store_release
-following on from the CSD locking bug that you fixed in the core.
+Ok, good. You mentioned that on v3.19-rc1 it still "works" i.e. despite
+the broken/missing clk_get/clk_prepare_enable?
 
-Thanks,
+Can you check the stable (v3.19, v4.0) versions and see how far we
+should backport the fix?
 
-Will
-
---->8
-
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 8291fd04d86b97869bd34e796bcac3141b9d5432:
-
-  arm64: perf: Fix the pmu node name in warning message (2015-04-30 12:11:30 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-- Fix perf devicetree warnings at probe time
-- Fix memory leak in __dma_free()
-- Ensure DMA buffers are always zeroed
-- Show IRQ trigger in /proc/interrupts (for parity with ARM)
-- Implement byte and halfword access for smp_{load_acquire,store_release}
-
-----------------------------------------------------------------
-Andre Przywara (1):
-      arm64: add missing data types in smp_load_acquire/smp_store_release
-
-Dean Nelson (1):
-      arm64: add missing PAGE_ALIGN() to __dma_free()
-
-Marek Szyprowski (1):
-      arm64: dma-mapping: always clear allocated buffers
-
-Sudeep Holla (1):
-      ARM64: Enable CONFIG_GENERIC_IRQ_SHOW_LEVEL
-
-Suzuki K. Poulose (1):
-      arm64: perf: Fix the pmu node name in warning message
-
-Will Deacon (1):
-      arm64: perf: don't warn about missing interrupt-affinity property for PPIs
-
- arch/arm64/Kconfig               |  1 +
- arch/arm64/include/asm/barrier.h | 16 ++++++++++++++++
- arch/arm64/kernel/perf_event.c   |  9 +++++++--
- arch/arm64/mm/dma-mapping.c      |  9 ++++-----
- 4 files changed, 28 insertions(+), 7 deletions(-)
+Sebastian
