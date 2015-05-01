@@ -1,84 +1,109 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 1 May 2015 10:09:10 +0900
-Subject: [PATCH 0/5] PM / clock_ops: provide default runtime ops and
- cleanup users
-In-Reply-To: <20150428004618.GA1807@verge.net.au>
-References: <553A6289.4040001@oracle.com>
- <CAMuHMdWMjULD8jQDA-U6tumnCd=Q7jhZ2koha4CKU-K50tJXmw@mail.gmail.com>
- <20150428004618.GA1807@verge.net.au>
-Message-ID: <20150501010909.GI13754@verge.net.au>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 1 May 2015 09:55:03 +0800
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <1430402268.2868.20.camel@linaro.org>
+References: <1430402268.2868.20.camel@linaro.org>
+Message-ID: <20150501015502.GA4679@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 28, 2015 at 09:46:18AM +0900, Simon Horman wrote:
-> On Fri, Apr 24, 2015 at 04:51:03PM +0200, Geert Uytterhoeven wrote:
-> > On Fri, Apr 24, 2015 at 4:41 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > > On Thursday, April 23, 2015 02:03:08 PM Rajendra Nayak wrote:
-> > >> Most users of PM clocks do the exact same thing in runtime callbacks.
-> > >> Provide default callbacks and cleanup the existing users (keystone/davinci
-> > >> /omap1/sh)
-> > >>
-> > >> Rajendra Nayak (5):
-> > >>   PM / clock_ops: Provide default runtime ops to users
-> > >>   arm: keystone: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
-> > >>   arm: omap1: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
-> > >>   arm: davinci: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
-> > >>   drivers: sh: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
-> > >>
-> > >>  arch/arm/mach-davinci/pm_domain.c  | 32 +-------------------------
-> > >>  arch/arm/mach-keystone/pm_domain.c | 33 +-------------------------
-> > >>  arch/arm/mach-omap1/pm_bus.c       | 37 ++----------------------------
-> > >>  drivers/base/power/clock_ops.c     | 38 ++++++++++++++++++++++++++++++
-> > >>  drivers/sh/pm_runtime.c            | 47 ++------------------------------------
-> > >>  include/linux/pm_clock.h           | 10 ++++++++
-> > >>  6 files changed, 54 insertions(+), 143 deletions(-)
-> > >
-> > > It is not particularly clear to me who is supposed to apply this series, but
-> > > I can do that if people don't have problems with that.
-> > 
-> > All later patches depend on the first patch.
-> > 
-> > For shmobile, Simon has queued up changes for drivers/sh/pm_runtime.c,
-> > but I think they don't conflict with this series.
+On Thu, Apr 30, 2015 at 02:57:48PM +0100, Jon Medhurst (Tixy) wrote:
+> From: Jon Medhurst <tixy@linaro.org>
 > 
-> Yes, that is the case. I have some patches (from Geert) queued up for v4.1.
-> I have confirmed that they do not conflict with the shmobile (last) patch
-> if this series.
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> ---
 > 
-> <details>
-> The patches are in the sh-drivers-for-v4.1 branch of my renesas tree; I
-> rebased them yesterday; they should hit next today if there is a next
-> today; I plan to send a pull request to Linus in the not to distant future;
-> and I envisage they should end up in v4.1-rc2 or rc3.
+> These have been kicking around out of tree for ages, any reason they
+> shouldn't be in mainline? Also, was unsure of what to put in commit
+> message.
+> 
+>  arch/arm64/boot/dts/arm/juno.dts | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index 133ee59..7a9a449 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -34,12 +34,35 @@
+>  		#address-cells = <2>;
+>  		#size-cells = <0>;
+>  
+> +		idle-states {
+> +			entry-method = "arm,psci";
+> +
+> +			CPU_SLEEP_0: cpu-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010000>;
+> +				local-timer-stop;
 
-The above mentioned changes were tagged as renesas-sh-drivers-for-v4.1 in
-my renesas tree; were merged into in Linus's tree yesterday; and should
-thus be included in v4.1-rc2.
+Just want to figure out the best way for big.LITTLE system; so have
+one question: CA53 and CA57 have different power domain for arch
+timer, right? If this is the case, should we define two kinds of cpu
+sleep states, one of them will not migrate to broadcast timer and
+keep using arch timer after cpu has been powered down?
 
-I do not have any other changes to drivers/sh/pm_runtime.c pending at this time.
-
-> </details>
-> 
-> On Fri, Apr 24, 2015 at 08:34:33AM -0700, santosh shilimkar wrote:
-> > On 4/24/2015 7:41 AM, Rafael J. Wysocki wrote:
-> > >On Thursday, April 23, 2015 02:03:08 PM Rajendra Nayak wrote:
-> 
-> [snip]
-> 
-> > >It is not particularly clear to me who is supposed to apply this series, but
-> > >I can do that if people don't have problems with that.
-> > >
-> > >
-> > I am fine by that given dependency with first patch.
-> > Another way is, you pick up the first patch and give us an
-> > immutable branch.
-> > 
-> > Either way is fine by me.
-> 
-> Likewise.
-> 
-> Here is an ack for the shmobile (last) patch if you decide to take it
-> through your tree.
-> 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> 
+> +				entry-latency-us = <100>;
+> +				exit-latency-us = <250>;
+> +				min-residency-us = <2000>;
+> +			};
+> +
+> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x1010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <800>;
+> +				exit-latency-us = <700>;
+> +				min-residency-us = <2500>;
+> +			};
+> +		};
+> +
+>  		A57_0: cpu at 0 {
+>  			compatible = "arm,cortex-a57","arm,armv8";
+>  			reg = <0x0 0x0>;
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_1: cpu at 1 {
+> @@ -48,6 +71,7 @@
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_0: cpu at 100 {
+> @@ -56,6 +80,7 @@
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_1: cpu at 101 {
+> @@ -64,6 +89,7 @@
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_2: cpu at 102 {
+> @@ -72,6 +98,7 @@
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_3: cpu at 103 {
+> @@ -80,6 +107,7 @@
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_L2: l2-cache0 {
