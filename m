@@ -1,109 +1,51 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 1 May 2015 09:55:03 +0800
-Subject: [PATCH] arm64: dts: Add idle-states for Juno
-In-Reply-To: <1430402268.2868.20.camel@linaro.org>
-References: <1430402268.2868.20.camel@linaro.org>
-Message-ID: <20150501015502.GA4679@leoy-linaro>
+From: sasukewxt@163.com (Caesar Wang)
+Date: Fri, 01 May 2015 11:40:37 +0800
+Subject: [PATCH] i2c: rk3x: Increase wait timeout to 1 second
+In-Reply-To: <1430430247-9632-1-git-send-email-dianders@chromium.org>
+References: <1430430247-9632-1-git-send-email-dianders@chromium.org>
+Message-ID: <5542F5B5.9000206@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 02:57:48PM +0100, Jon Medhurst (Tixy) wrote:
-> From: Jon Medhurst <tixy@linaro.org>
-> 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+
+
+? 2015?05?01? 05:44, Doug Anderson ??:
+> While it's not sensible for an i2c command to _actually_ need more
+> than 200ms to complete, let's increase the timeout anyway.  Why?  It
+> turns out that if you've got a large number of printks going out to a
+> serial console, interrupts on a CPU can be disabled for hundreds of
+> milliseconds. That's not a great situation to be in to start with
+> (maybe we should put a cap in vprintk_emit()) but it's pretty annoying
+> to start seeing unexplained i2c timeouts.
+>
+> A normal system shouldn't see i2c timeouts anyway, so increasing the
+> timeout should help people debugging without hurting other people
+> excessively.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 > ---
-> 
-> These have been kicking around out of tree for ages, any reason they
-> shouldn't be in mainline? Also, was unsure of what to put in commit
-> message.
-> 
->  arch/arm64/boot/dts/arm/juno.dts | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> index 133ee59..7a9a449 100644
-> --- a/arch/arm64/boot/dts/arm/juno.dts
-> +++ b/arch/arm64/boot/dts/arm/juno.dts
-> @@ -34,12 +34,35 @@
->  		#address-cells = <2>;
->  		#size-cells = <0>;
->  
-> +		idle-states {
-> +			entry-method = "arm,psci";
-> +
-> +			CPU_SLEEP_0: cpu-sleep-0 {
-> +				compatible = "arm,idle-state";
-> +				arm,psci-suspend-param = <0x0010000>;
-> +				local-timer-stop;
+>   drivers/i2c/busses/i2c-rk3x.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index 019d542..72e97e30 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -72,7 +72,7 @@ enum {
+>   #define REG_INT_ALL       0x7f
+>   
+>   /* Constants */
+> -#define WAIT_TIMEOUT      200 /* ms */
+> +#define WAIT_TIMEOUT      1000 /* ms */
+Yeah, verified on veyron device.
 
-Just want to figure out the best way for big.LITTLE system; so have
-one question: CA53 and CA57 have different power domain for arch
-timer, right? If this is the case, should we define two kinds of cpu
-sleep states, one of them will not migrate to broadcast timer and
-keep using arch timer after cpu has been powered down?
+Tested-by: Caesar Wang <wxt@rock-chips.com>
 
-> +				entry-latency-us = <100>;
-> +				exit-latency-us = <250>;
-> +				min-residency-us = <2000>;
-> +			};
-> +
-> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
-> +				compatible = "arm,idle-state";
-> +				arm,psci-suspend-param = <0x1010000>;
-> +				local-timer-stop;
-> +				entry-latency-us = <800>;
-> +				exit-latency-us = <700>;
-> +				min-residency-us = <2500>;
-> +			};
-> +		};
-> +
->  		A57_0: cpu at 0 {
->  			compatible = "arm,cortex-a57","arm,armv8";
->  			reg = <0x0 0x0>;
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A57_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A57_1: cpu at 1 {
-> @@ -48,6 +71,7 @@
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A57_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_0: cpu at 100 {
-> @@ -56,6 +80,7 @@
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_1: cpu at 101 {
-> @@ -64,6 +89,7 @@
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_2: cpu at 102 {
-> @@ -72,6 +98,7 @@
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_3: cpu at 103 {
-> @@ -80,6 +107,7 @@
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A57_L2: l2-cache0 {
+
+
+Thanks.
+
+Caesar
+>   #define DEFAULT_SCL_RATE  (100 * 1000) /* Hz */
+>   
+>   enum rk3x_i2c_state {
