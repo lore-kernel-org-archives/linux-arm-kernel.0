@@ -1,52 +1,104 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 01 May 2015 14:44:45 +0100
-Subject: [PATCH 2/2] ARM: vexpress: Add interrupt-affinity
-In-Reply-To: <20150430175541.GL15254@pengutronix.de>
-References: <1430416448-25203-1-git-send-email-r.schwebel@pengutronix.de>
- <20150430175541.GL15254@pengutronix.de>
-Message-ID: <5543834D.6040506@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 1 May 2015 14:58:11 +0100
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <20150501115507.GB16842@leoy-linaro>
+References: <1430402268.2868.20.camel@linaro.org>
+ <20150501015502.GA4679@leoy-linaro>
+ <1430475751.3045.40.camel@linaro.org>
+ <20150501104506.GA12330@red-moon>
+ <20150501115507.GB16842@leoy-linaro>
+Message-ID: <20150501135811.GW7440@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 01, 2015 at 12:55:07PM +0100, Leo Yan wrote:
+> On Fri, May 01, 2015 at 11:45:06AM +0100, Lorenzo Pieralisi wrote:
+> > On Fri, May 01, 2015 at 11:22:31AM +0100, Jon Medhurst (Tixy) wrote:
+> > > On Fri, 2015-05-01 at 09:55 +0800, Leo Yan wrote:
+> > > [...]
+> > > > >  arch/arm64/boot/dts/arm/juno.dts | 28 ++++++++++++++++++++++++++++
+> > > > >  1 file changed, 28 insertions(+)
+> > > > > 
+> > > > > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> > > > > index 133ee59..7a9a449 100644
+> > > > > --- a/arch/arm64/boot/dts/arm/juno.dts
+> > > > > +++ b/arch/arm64/boot/dts/arm/juno.dts
+> > > > > @@ -34,12 +34,35 @@
+> > > > >  		#address-cells = <2>;
+> > > > >  		#size-cells = <0>;
+> > > > >  
+> > > > > +		idle-states {
+> > > > > +			entry-method = "arm,psci";
+> > > > > +
+> > > > > +			CPU_SLEEP_0: cpu-sleep-0 {
+> > > > > +				compatible = "arm,idle-state";
+> > > > > +				arm,psci-suspend-param = <0x0010000>;
+> > > > > +				local-timer-stop;
+> > > > 
+> > > > Just want to figure out the best way for big.LITTLE system; so have
+> > > > one question: CA53 and CA57 have different power domain for arch
+> > > > timer, right?
+> > > 
+> > > I'm not sure of the answer to that. The documentation I have does seem
+> > > to state the timer is lost on cluster power down, which would imply that
+> > > it's not when just powering down a cpu, but I'm not at all clear on the
+> > > matter.
+> > > 
+> > > >  If this is the case, should we define two kinds of cpu
+> > > > sleep states, one of them will not migrate to broadcast timer and
+> > > > keep using arch timer after cpu has been powered down?
+> > > 
+> > > Do you mean that if the local timer is not lost (and so we should not
+> > > have local-timer-stop above), then we should have another identical idle
+> > > state except that it _does_ specify local-timer-stop to force the
+> > > broadcast time to be used? If so, would that second state ever be more
+> > > power efficient than the first? (I don't know the answer to that, this
+> > > whole area is pretty new to me).
+> > 
+> > Ok, to start with, if we want the generic CPUidle driver to work on bL
+> > systems, we should get this patch merged:
+> > 
+> > http://www.spinics.net/lists/arm-kernel/msg412790.html
+> 
+> Thanks pointing out this.
+> 
+> > Architected timer is always lost on power down, unless we are talking
+> > about a logic retention state (or if we are talking about local timers
+> > that are not the architected ones). Anyway, with the patch above, different
+> > cpus can have different idle states, so different behaviours when it
+> > comes to the local timer behaviour. If, say, on a A53/A57 system, A53
+> > cpus lose the local timer on idle state entry and A57 cpus do not
+> > (that's a non-existing example though), those cpus will have different
+> > idle states so different local-timer-stop flags.
+> 
+> For A57, not sure if arch timer will be powered off if cpu has been
+> powered off.
+> 
+> From A53's TRM figure 2-1 Cortex-A53 processor block diagram, the arch
+> timer is not within CPU power domain, so likey arch timer still will
+> work even cpu has been powered off (PDCPU/PDADVSIMD both have been off).
+> This looks like is not aligning w/t your upper description. Could u
+> confirm this understanding is right?
 
+Not quite. Behind the architected timers there is a system shared counter
+that is used as a basis for the local CPU's counter. So when a CPU is being
+powered off the system counter still counts and the CPU's copy gets updated
+on power on by the firmware (hopefully).
 
-On 30/04/15 18:55, Robert Schwebel wrote:
-> On Thu, Apr 30, 2015 at 07:54:08PM +0200, Robert Schwebel wrote:
->> Without this property, we get this boot warning:
->>
->> [    0.459361] CPU PMU: Failed to parse <no-node>/interrupt-affinity[0]
->>
->> Signed-off-by: Robert Schwebel <r.schwebel@pengutronix.de>
+Best regards,
+Liviu
 
-May be you can also mention the commit introducing the change in the log
-something like:
+> 
+> Thanks,
+> Leo Yan
+> 
 
-"
-Commit 9fd85eb502a7 ("ARM: pmu: add support for interrupt-affinity
-property") added optional optional "interrupt-affinity" property, to
-specify CPU affinity for each SPI listed in the interrupts property.
-
-Without this property, we get this boot warning:
-	CPU PMU: Failed to parse <no-node>/interrupt-affinity[0]
-
-This patch add interrupt-affinity to the PMU node in CA9x4 device tree.
-"
-
-Otherwise:
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-
->
-> However, with this patch applied, the messages above disappear, but I
-> still get this:
->
-> [    0.495280] CPU PMU: Failed to find logical CPU for cpu
->
-> on a kernel configured with CONFIG_SMP=n. nr_cpu_ids is 1 there, while
-> the loop still loops over all available cores. Ths makes the logic fail.
-
-This is a different issue. You must also see warning from devtree.c when
-parsing CPUs complaining about more CPU nodes found in DT. IIUC the
-functionality still works fine.
-
-Regards,
-Sudeep
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
