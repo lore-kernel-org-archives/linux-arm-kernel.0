@@ -1,30 +1,36 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 01:00:11 +0900
-Subject: [PATCH 1/4] ASoC: au1x: Constify platform_device_id
-Message-ID: <1430496014-32309-1-git-send-email-k.kozlowski.k@gmail.com>
+Date: Sat,  2 May 2015 01:02:47 +0900
+Subject: [PATCH 1/2] clk: s3c2410: Staticize local symbols
+Message-ID: <1430496168-32408-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_device_id is not modified by the driver and core uses it as
-const.
+Staticize symbols not exported and not used outside of file.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- sound/soc/au1x/db1200.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/samsung/clk-s3c2410-dclk.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/au1x/db1200.c b/sound/soc/au1x/db1200.c
-index c75995f2779c..58c3164802b8 100644
---- a/sound/soc/au1x/db1200.c
-+++ b/sound/soc/au1x/db1200.c
-@@ -21,7 +21,7 @@
- #include "../codecs/wm8731.h"
- #include "psc.h"
+diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
+index f4f29ed6bd25..db6fddb211d4 100644
+--- a/drivers/clk/samsung/clk-s3c2410-dclk.c
++++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
+@@ -81,13 +81,13 @@ static int s3c24xx_clkout_set_parent(struct clk_hw *hw, u8 index)
+ 	return ret;
+ }
  
--static struct platform_device_id db1200_pids[] = {
-+static const struct platform_device_id db1200_pids[] = {
- 	{
- 		.name		= "db1200-ac97",
- 		.driver_data	= 0,
+-const struct clk_ops s3c24xx_clkout_ops = {
++static const struct clk_ops s3c24xx_clkout_ops = {
+ 	.get_parent = s3c24xx_clkout_get_parent,
+ 	.set_parent = s3c24xx_clkout_set_parent,
+ 	.determine_rate = __clk_mux_determine_rate,
+ };
+ 
+-struct clk *s3c24xx_register_clkout(struct device *dev, const char *name,
++static struct clk *s3c24xx_register_clkout(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents,
+ 		u8 shift, u32 mask)
+ {
 -- 
 2.1.4
