@@ -1,40 +1,92 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 01 May 2015 19:20:00 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.1
-Message-ID: <5543B5C0.4080200@free-electrons.com>
+Date: Fri, 01 May 2015 19:25:02 +0200
+Subject: [PATCH v2] ARM: mvebu: Fix the main PLL frequency on Armada 375,
+ 38x and 39x SoCs
+In-Reply-To: <1430117718-11818-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1430117718-11818-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5543B6EE.4070300@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 27/04/2015 08:55, Gregory CLEMENT wrote:
+> Whereas for Armada 370 and XP the main PLL frequency was 2GHz for the
+> Armada 375, 38x and 39x, the frequency is 1GHz. When writing support
+> for these last SoCs, there was no official value for the PLL. Now that
+> we have it, this patch fixes it in the device tree.
+> 
+> This value is currently only used by the NAND driver for the setting
+> the NAND timing. Fortunately it is not actually used: all the mainline
+> board with a NAND flash comes with a NAND device tree node using the
+> "marvell,nand-keep-config" property. With this property the timings
+> are not modified in the kernel driver and are kept from the
+> bootloader.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Here is the first pull request for fixes for mvebu for v4.1. There
-are more which will come later but which have not been yet in linux-next.
+applied on mvebu/fixes with Andrew and Marcin Acked-by.
+
+Thanks,
 
 Gregory
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+> ---
+> Hi,
+> 
+> The only change for this patch is the spell fixes and it was also
+> rebased onto v4.1-rc1. Unless there is any objection I will apply it
+> on mvebu/fixes for 4.1.
+> 
+> Thanks,
+> 
+> Gregroy
+> 
+>  arch/arm/boot/dts/armada-375.dtsi | 2 +-
+>  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+>  arch/arm/boot/dts/armada-39x.dtsi | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> index c675257f2377..f076ff856d8b 100644
+> --- a/arch/arm/boot/dts/armada-375.dtsi
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -69,7 +69,7 @@
+>  		mainpll: mainpll {
+>  			compatible = "fixed-clock";
+>  			#clock-cells = <0>;
+> -			clock-frequency = <2000000000>;
+> +			clock-frequency = <1000000000>;
+>  		};
+>  		/* 25 MHz reference crystal */
+>  		refclk: oscillator {
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index ed2dd8ba4080..218a2acd36e5 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -585,7 +585,7 @@
+>  		mainpll: mainpll {
+>  			compatible = "fixed-clock";
+>  			#clock-cells = <0>;
+> -			clock-frequency = <2000000000>;
+> +			clock-frequency = <1000000000>;
+>  		};
+>  
+>  		/* 25 MHz reference crystal */
+> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+> index 0e85fc15ceda..ecd1318109ba 100644
+> --- a/arch/arm/boot/dts/armada-39x.dtsi
+> +++ b/arch/arm/boot/dts/armada-39x.dtsi
+> @@ -502,7 +502,7 @@
+>  		mainpll: mainpll {
+>  			compatible = "fixed-clock";
+>  			#clock-cells = <0>;
+> -			clock-frequency = <2000000000>;
+> +			clock-frequency = <1000000000>;
+>  		};
+>  	};
+>  };
+> 
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.1
-
-for you to fetch changes up to 750e30d4076ae5e02ad13a376e96c95a2627742c:
-
-  ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal RTC (2015-04-27 09:27:18 +0200)
-
-----------------------------------------------------------------
-mvebu fix for 4.1
-
-Disable the unused internal RTC in the dts of the OpenBlock AX3
-
-----------------------------------------------------------------
-Gregory CLEMENT (1):
-      ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal RTC
-
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 4 ++++
- 1 file changed, 4 insertions(+)
 -- 
 Gregory Clement, Free Electrons
 Kernel, drivers, real-time and embedded Linux
