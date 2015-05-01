@@ -1,13 +1,13 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 1 May 2015 15:43:29 +0800
-Subject: [PATCH 6/7] ARM: dts: mt8135: enable basic SMP bringup for mt8135
+Date: Fri, 1 May 2015 15:43:30 +0800
+Subject: [PATCH 7/7] ARM: dts: mt8127: enable basic SMP bringup for mt8127
 In-Reply-To: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1430466210-22963-7-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1430466210-22963-8-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add arch timer node to enable arch-timer support. MT8135 firmware
+Add arch timer node to enable arch-timer support. MT8127 firmware
 doesn't correctly setup arch-timer frequency and CNTVOFF, add
 properties to workaround this.
 
@@ -15,23 +15,23 @@ This also set cpu enable-method to enable SMP.
 
 Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 ---
- arch/arm/boot/dts/mt8135.dtsi | 16 ++++++++++++++++
+ arch/arm/boot/dts/mt8127.dtsi | 16 ++++++++++++++++
  1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-index 612bd22..eb5e06f 100644
---- a/arch/arm/boot/dts/mt8135.dtsi
-+++ b/arch/arm/boot/dts/mt8135.dtsi
-@@ -46,6 +46,7 @@
+diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
+index aaa7862..7c2090d 100644
+--- a/arch/arm/boot/dts/mt8127.dtsi
++++ b/arch/arm/boot/dts/mt8127.dtsi
+@@ -23,6 +23,7 @@
  	cpus {
  		#address-cells = <1>;
  		#size-cells = <0>;
 +		enable-method = "mediatek,mt81xx-tz-smp";
  
- 		cpu0: cpu at 0 {
+ 		cpu at 0 {
  			device_type = "cpu";
-@@ -103,6 +104,21 @@
- 		};
+@@ -72,6 +73,21 @@
+                 };
  	};
  
 +	timer {
