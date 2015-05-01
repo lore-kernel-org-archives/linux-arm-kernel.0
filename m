@@ -1,36 +1,32 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 01:02:47 +0900
-Subject: [PATCH 1/2] clk: s3c2410: Staticize local symbols
-Message-ID: <1430496168-32408-1-git-send-email-k.kozlowski.k@gmail.com>
+Date: Sat,  2 May 2015 01:02:48 +0900
+Subject: [PATCH 2/2] clk: s3c2410: Constify platform_device_id
+In-Reply-To: <1430496168-32408-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430496168-32408-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1430496168-32408-2-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Staticize symbols not exported and not used outside of file.
+The platform_device_id is not modified by the driver and core uses it as
+const.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- drivers/clk/samsung/clk-s3c2410-dclk.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/samsung/clk-s3c2410-dclk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
-index f4f29ed6bd25..db6fddb211d4 100644
+index db6fddb211d4..e56df5064889 100644
 --- a/drivers/clk/samsung/clk-s3c2410-dclk.c
 +++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
-@@ -81,13 +81,13 @@ static int s3c24xx_clkout_set_parent(struct clk_hw *hw, u8 index)
- 	return ret;
- }
- 
--const struct clk_ops s3c24xx_clkout_ops = {
-+static const struct clk_ops s3c24xx_clkout_ops = {
- 	.get_parent = s3c24xx_clkout_get_parent,
- 	.set_parent = s3c24xx_clkout_set_parent,
- 	.determine_rate = __clk_mux_determine_rate,
+@@ -404,7 +404,7 @@ static struct s3c24xx_dclk_drv_data dclk_variants[] = {
+ 	},
  };
  
--struct clk *s3c24xx_register_clkout(struct device *dev, const char *name,
-+static struct clk *s3c24xx_register_clkout(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents,
- 		u8 shift, u32 mask)
- {
+-static struct platform_device_id s3c24xx_dclk_driver_ids[] = {
++static const struct platform_device_id s3c24xx_dclk_driver_ids[] = {
+ 	{
+ 		.name		= "s3c2410-dclk",
+ 		.driver_data	= (kernel_ulong_t)&dclk_variants[S3C2410],
 -- 
 2.1.4
