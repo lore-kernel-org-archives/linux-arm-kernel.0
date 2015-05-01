@@ -1,7 +1,7 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 00:59:45 +0900
-Subject: [PATCH] ARM: plat-samsung: Constify platform_device_id
-Message-ID: <1430495985-32265-1-git-send-email-k.kozlowski.k@gmail.com>
+Date: Sat,  2 May 2015 01:00:11 +0900
+Subject: [PATCH 1/4] ASoC: au1x: Constify platform_device_id
+Message-ID: <1430496014-32309-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,21 +10,21 @@ const.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- arch/arm/plat-samsung/adc.c | 2 +-
+ sound/soc/au1x/db1200.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index e2be70df06c6..8a2e07c9b5fe 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -475,7 +475,7 @@ static int s3c_adc_resume(struct device *dev)
- #define s3c_adc_resume NULL
- #endif
+diff --git a/sound/soc/au1x/db1200.c b/sound/soc/au1x/db1200.c
+index c75995f2779c..58c3164802b8 100644
+--- a/sound/soc/au1x/db1200.c
++++ b/sound/soc/au1x/db1200.c
+@@ -21,7 +21,7 @@
+ #include "../codecs/wm8731.h"
+ #include "psc.h"
  
--static struct platform_device_id s3c_adc_driver_ids[] = {
-+static const struct platform_device_id s3c_adc_driver_ids[] = {
+-static struct platform_device_id db1200_pids[] = {
++static const struct platform_device_id db1200_pids[] = {
  	{
- 		.name           = "s3c24xx-adc",
- 		.driver_data    = TYPE_ADCV1,
+ 		.name		= "db1200-ac97",
+ 		.driver_data	= 0,
 -- 
 2.1.4
