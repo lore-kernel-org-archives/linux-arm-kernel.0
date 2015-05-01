@@ -1,60 +1,21 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 May 2015 17:29:15 +0100
-Subject: [PATCH arm 1/2] arm64: Use common outgoing-CPU-notification code
-In-Reply-To: <20150501150848.GC5381@linux.vnet.ibm.com>
-References: <20150423200603.GA9473@linux.vnet.ibm.com>
- <1429819654-10498-1-git-send-email-paulmck@linux.vnet.ibm.com>
- <20150430095055.GI18867@e104818-lin.cambridge.arm.com>
- <20150501150848.GC5381@linux.vnet.ibm.com>
-Message-ID: <20150501162915.GI27755@e104818-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 1 May 2015 17:37:35 +0100
+Subject: [PATCH 1/4] spi: imx: Constify platform_device_id
+In-Reply-To: <1430495047-31122-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430495047-31122-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <20150501163735.GH22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 01, 2015 at 08:08:48AM -0700, Paul E. McKenney wrote:
-> On Thu, Apr 30, 2015 at 10:50:55AM +0100, Catalin Marinas wrote:
-> > On Thu, Apr 23, 2015 at 01:07:33PM -0700, Paul E. McKenney wrote:
-> > > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> > > index 328b8ce4b007..6dc727a6e73e 100644
-> > > --- a/arch/arm64/kernel/smp.c
-> > > +++ b/arch/arm64/kernel/smp.c
-> > > @@ -252,15 +252,13 @@ static int op_cpu_kill(unsigned int cpu)
-> > >  	return cpu_ops[cpu]->cpu_kill(cpu);
-> > >  }
-> > >  
-> > > -static DECLARE_COMPLETION(cpu_died);
-> > > -
-> > >  /*
-> > >   * called on the thread which is asking for a CPU to be shutdown -
-> > >   * waits until shutdown has completed, or it is timed out.
-> > >   */
-> > >  void __cpu_die(unsigned int cpu)
-> > >  {
-> > > -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
-> > > +	if (!cpu_wait_death(cpu, 5)) {
-> > >  		pr_crit("CPU%u: cpu didn't die\n", cpu);
-> > >  		return;
-> > >  	}
-> > > @@ -293,7 +291,7 @@ void cpu_die(void)
-> > >  	local_irq_disable();
-> > >  
-> > >  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> > > -	complete(&cpu_died);
-> > > +	(void)cpu_report_death();
-> > >  
-> > >  	/*
-> > >  	 * Actually shutdown the CPU. This must never fail. The specific hotplug
-> > 
-> > Are these functions are only defined when HOTPLUG_CPU is enabled? On
-> > arm64 we can end up with this option disabled if SUSPEND is disabled.
-> 
-> Yep, only with HOTPLUG_CPU.  And yes, both SUSPEND and HIBERNATION can
-> force HOTPLUG_CPU, so if you have neiter SUSPEND nor HIBERNATION, you
-> won't have HOTPLUG_CPU.  This -should- be OK, because you should also
-> not have __cpu_die() if !HOTPLUG_CPU.
+On Sat, May 02, 2015 at 12:44:04AM +0900, Krzysztof Kozlowski wrote:
+> The platform_device_id is not modified by the driver and core uses it as
+> const.
 
-Ah, you are right. I got myself confused.
-
-So is this patch ready for upstreaming or just for our information?
-
--- 
-Catalin
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150501/0a48169a/attachment.sig>
