@@ -1,67 +1,192 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 1 May 2015 12:18:24 -0700
-Subject: [PATCH arm 1/2] arm64: Use common outgoing-CPU-notification code
-In-Reply-To: <20150501162915.GI27755@e104818-lin.cambridge.arm.com>
-References: <20150423200603.GA9473@linux.vnet.ibm.com>
- <1429819654-10498-1-git-send-email-paulmck@linux.vnet.ibm.com>
- <20150430095055.GI18867@e104818-lin.cambridge.arm.com>
- <20150501150848.GC5381@linux.vnet.ibm.com>
- <20150501162915.GI27755@e104818-lin.cambridge.arm.com>
-Message-ID: <20150501191824.GG5381@linux.vnet.ibm.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 1 May 2015 14:27:02 -0500
+Subject: [PATCH] ARM: OMAP2+: PRM: Fix am437x module reset
+Message-ID: <1430508422-64913-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 01, 2015 at 05:29:15PM +0100, Catalin Marinas wrote:
-> On Fri, May 01, 2015 at 08:08:48AM -0700, Paul E. McKenney wrote:
-> > On Thu, Apr 30, 2015 at 10:50:55AM +0100, Catalin Marinas wrote:
-> > > On Thu, Apr 23, 2015 at 01:07:33PM -0700, Paul E. McKenney wrote:
-> > > > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> > > > index 328b8ce4b007..6dc727a6e73e 100644
-> > > > --- a/arch/arm64/kernel/smp.c
-> > > > +++ b/arch/arm64/kernel/smp.c
-> > > > @@ -252,15 +252,13 @@ static int op_cpu_kill(unsigned int cpu)
-> > > >  	return cpu_ops[cpu]->cpu_kill(cpu);
-> > > >  }
-> > > >  
-> > > > -static DECLARE_COMPLETION(cpu_died);
-> > > > -
-> > > >  /*
-> > > >   * called on the thread which is asking for a CPU to be shutdown -
-> > > >   * waits until shutdown has completed, or it is timed out.
-> > > >   */
-> > > >  void __cpu_die(unsigned int cpu)
-> > > >  {
-> > > > -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
-> > > > +	if (!cpu_wait_death(cpu, 5)) {
-> > > >  		pr_crit("CPU%u: cpu didn't die\n", cpu);
-> > > >  		return;
-> > > >  	}
-> > > > @@ -293,7 +291,7 @@ void cpu_die(void)
-> > > >  	local_irq_disable();
-> > > >  
-> > > >  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> > > > -	complete(&cpu_died);
-> > > > +	(void)cpu_report_death();
-> > > >  
-> > > >  	/*
-> > > >  	 * Actually shutdown the CPU. This must never fail. The specific hotplug
-> > > 
-> > > Are these functions are only defined when HOTPLUG_CPU is enabled? On
-> > > arm64 we can end up with this option disabled if SUSPEND is disabled.
-> > 
-> > Yep, only with HOTPLUG_CPU.  And yes, both SUSPEND and HIBERNATION can
-> > force HOTPLUG_CPU, so if you have neiter SUSPEND nor HIBERNATION, you
-> > won't have HOTPLUG_CPU.  This -should- be OK, because you should also
-> > not have __cpu_die() if !HOTPLUG_CPU.
-> 
-> Ah, you are right. I got myself confused.
-> 
-> So is this patch ready for upstreaming or just for our information?
+When moving to using the OMAP4+ PRM driver on am437x, we switched
+to using all omap4 ops for module reset management. However, reset
+register layout on am437x is more similar to am335x than omap4 because
+of the the need for an st_shift for the *_RST bits in certain *_RSTST
+registers, like WKUP_PROC_LRST in the PRCM_RM_WKUP_RSTST. Without this
+we cannot bring the Wakeup M3 IP out of reset.
 
-It does need some testing, and I don't have access to an arm64 system.
-That said, very similar patches have worked for other architectures.
-So if it works on one of your systems, it should be ready to go upstream.
-Which would be better than me sending it individually to people who
-run into the new more-strict diagnostics.  ;-)
+Because of this, we must use the am33xx prm ops for the hardreset
+functionality while continuing to use all other omap4 ops. To accomplish
+this we split out the common portion of omap44xx_prm_init and add an
+am437x_prm_init to register the prm_ll_data struct specific to am437x.
 
-							Thanx, Paul
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c   |  6 +++---
+ arch/arm/mach-omap2/prm33xx.c      | 14 +++++++-------
+ arch/arm/mach-omap2/prm33xx.h      |  7 +++++++
+ arch/arm/mach-omap2/prm44xx.c      | 32 +++++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/prm44xx_54xx.h |  1 +
+ arch/arm/mach-omap2/prm_common.c   |  2 +-
+ 6 files changed, 50 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 982380b..4b13882 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -3924,9 +3924,9 @@ void __init omap_hwmod_init(void)
+ 		soc_ops.enable_module = _omap4_enable_module;
+ 		soc_ops.disable_module = _omap4_disable_module;
+ 		soc_ops.wait_target_ready = _omap4_wait_target_ready;
+-		soc_ops.assert_hardreset = _omap4_assert_hardreset;
+-		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
+-		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
++		soc_ops.assert_hardreset = _am33xx_assert_hardreset;
++		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
++		soc_ops.is_hardreset_asserted = _am33xx_is_hardreset_asserted;
+ 		soc_ops.init_clkdm = _init_clkdm;
+ 	} else if (cpu_is_ti816x() || soc_is_am33xx()) {
+ 		soc_ops.enable_module = _omap4_enable_module;
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index dcb5001..0a43bfe 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -64,8 +64,8 @@ static u32 am33xx_prm_rmw_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx)
+  * 0 if the (sub)module hardreset line is not currently asserted, or
+  * -EINVAL upon parameter error.
+  */
+-static int am33xx_prm_is_hardreset_asserted(u8 shift, u8 part, s16 inst,
+-					    u16 rstctrl_offs)
++int am33xx_prm_is_hardreset_asserted(u8 shift, u8 part, s16 inst,
++				     u16 rstctrl_offs)
+ {
+ 	u32 v;
+ 
+@@ -90,8 +90,8 @@ static int am33xx_prm_is_hardreset_asserted(u8 shift, u8 part, s16 inst,
+  * place the submodule into reset.  Returns 0 upon success or -EINVAL
+  * upon an argument error.
+  */
+-static int am33xx_prm_assert_hardreset(u8 shift, u8 part, s16 inst,
+-				       u16 rstctrl_offs)
++int am33xx_prm_assert_hardreset(u8 shift, u8 part, s16 inst,
++				u16 rstctrl_offs)
+ {
+ 	u32 mask = 1 << shift;
+ 
+@@ -119,9 +119,9 @@ static int am33xx_prm_assert_hardreset(u8 shift, u8 part, s16 inst,
+  * -EINVAL upon an argument error, -EEXIST if the submodule was already out
+  * of reset, or -EBUSY if the submodule did not exit reset promptly.
+  */
+-static int am33xx_prm_deassert_hardreset(u8 shift, u8 st_shift, u8 part,
+-					 s16 inst, u16 rstctrl_offs,
+-					 u16 rstst_offs)
++int am33xx_prm_deassert_hardreset(u8 shift, u8 st_shift, u8 part,
++				  s16 inst, u16 rstctrl_offs,
++				  u16 rstst_offs)
+ {
+ 	int c;
+ 	u32 mask = 1 << st_shift;
+diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
+index 2bc4ec5..2754e9f 100644
+--- a/arch/arm/mach-omap2/prm33xx.h
++++ b/arch/arm/mach-omap2/prm33xx.h
+@@ -120,5 +120,12 @@
+ #ifndef __ASSEMBLER__
+ int am33xx_prm_init(const struct omap_prcm_init_data *data);
+ 
++int am33xx_prm_is_hardreset_asserted(u8 shift, u8 part, s16 inst,
++				     u16 rstctrl_offs);
++int am33xx_prm_assert_hardreset(u8 shift, u8 part, s16 inst,
++				u16 rstctrl_offs);
++int am33xx_prm_deassert_hardreset(u8 shift, u8 st_shift, u8 part,
++				  s16 inst, u16 rstctrl_offs,
++				  u16 rstst_offs);
+ #endif /* ASSEMBLER */
+ #endif
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index 4541700..3fc6971 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -24,6 +24,7 @@
+ #include "iomap.h"
+ #include "common.h"
+ #include "vp.h"
++#include "prm33xx.h"
+ #include "prm44xx.h"
+ #include "prm-regbits-44xx.h"
+ #include "prcm44xx.h"
+@@ -705,7 +706,7 @@ static struct prm_ll_data omap44xx_prm_ll_data = {
+ 
+ static const struct omap_prcm_init_data *prm_init_data;
+ 
+-int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
++static void omap44xx_prm_init_common(const struct omap_prcm_init_data *data)
+ {
+ 	omap_prm_base_init();
+ 
+@@ -718,7 +719,11 @@ int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
+ 		prm_features |= PRM_HAS_VOLTAGE;
+ 
+ 	omap4_prminst_set_prm_dev_inst(data->device_inst_offset);
++}
+ 
++int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
++{
++	omap44xx_prm_init_common(data);
+ 	return prm_register(&omap44xx_prm_ll_data);
+ }
+ 
+@@ -762,3 +767,28 @@ static void __exit omap44xx_prm_exit(void)
+ 	prm_unregister(&omap44xx_prm_ll_data);
+ }
+ __exitcall(omap44xx_prm_exit);
++
++#ifdef CONFIG_SOC_AM43XX
++static struct prm_ll_data am43xx_prm_ll_data = {
++	.read_reset_sources = &omap44xx_prm_read_reset_sources,
++	.was_any_context_lost_old = &omap44xx_prm_was_any_context_lost_old,
++	.clear_context_loss_flags_old = &omap44xx_prm_clear_context_loss_flags_old,
++	.late_init = &omap44xx_prm_late_init,
++	.assert_hardreset	= am33xx_prm_assert_hardreset,
++	.deassert_hardreset	= am33xx_prm_deassert_hardreset,
++	.is_hardreset_asserted	= am33xx_prm_is_hardreset_asserted,
++	.reset_system		= omap4_prminst_global_warm_sw_reset,
++};
++
++int __init am43xx_prm_init(const struct omap_prcm_init_data *data)
++{
++	omap44xx_prm_init_common(data);
++	return prm_register(&am43xx_prm_ll_data);
++}
++
++static void __exit am43xx_prm_exit(void)
++{
++	prm_unregister(&am43xx_prm_ll_data);
++}
++__exitcall(am43xx_prm_exit);
++#endif /* CONFIG_SOC_AM43XX */
+diff --git a/arch/arm/mach-omap2/prm44xx_54xx.h b/arch/arm/mach-omap2/prm44xx_54xx.h
+index 3f139eb..3e90d6a 100644
+--- a/arch/arm/mach-omap2/prm44xx_54xx.h
++++ b/arch/arm/mach-omap2/prm44xx_54xx.h
+@@ -36,6 +36,7 @@ extern u32 omap4_prm_vcvp_read(u8 offset);
+ extern void omap4_prm_vcvp_write(u32 val, u8 offset);
+ extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+ 
++int __init am43xx_prm_init(const struct omap_prcm_init_data *data);
+ int __init omap44xx_prm_init(const struct omap_prcm_init_data *data);
+ 
+ #endif
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 7add799..730fd24 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -694,7 +694,7 @@ static struct omap_prcm_init_data dra7_prm_data __initdata = {
+ #ifdef CONFIG_SOC_AM43XX
+ static struct omap_prcm_init_data am4_prm_data __initdata = {
+ 	.index = TI_CLKM_PRM,
+-	.init = omap44xx_prm_init,
++	.init = am43xx_prm_init,
+ 	.device_inst_offset = AM43XX_PRM_DEVICE_INST,
+ };
+ #endif
+-- 
+2.3.6
