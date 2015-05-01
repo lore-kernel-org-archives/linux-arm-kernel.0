@@ -1,94 +1,66 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 01 May 2015 19:25:02 +0200
-Subject: [PATCH v2] ARM: mvebu: Fix the main PLL frequency on Armada 375,
- 38x and 39x SoCs
-In-Reply-To: <1430117718-11818-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1430117718-11818-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <5543B6EE.4070300@free-electrons.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri,  1 May 2015 18:36:28 +0100
+Subject: [PATCH 3/5] bus: arm-ccn: Provide required event arguments
+In-Reply-To: <1430501790-26918-1-git-send-email-pawel.moll@arm.com>
+References: <1430501790-26918-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1430501790-26918-4-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/04/2015 08:55, Gregory CLEMENT wrote:
-> Whereas for Armada 370 and XP the main PLL frequency was 2GHz for the
-> Armada 375, 38x and 39x, the frequency is 1GHz. When writing support
-> for these last SoCs, there was no official value for the PLL. Now that
-> we have it, this patch fixes it in the device tree.
-> 
-> This value is currently only used by the NAND driver for the setting
-> the NAND timing. Fortunately it is not actually used: all the mainline
-> board with a NAND flash comes with a NAND device tree node using the
-> "marvell,nand-keep-config" property. With this property the timings
-> are not modified in the kernel driver and are kept from the
-> bootloader.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Since 688d4dfcdd624192cbf03c08402e444d1d11f294 "perf tools: Support
+parsing parameterized events" the perf userspace tools understands
+"argument=?" syntax in the events file, making sure that required
+arguments are provided by the user and not defaulting to 0, causing
+confusion.
 
-applied on mvebu/fixes with Andrew and Marcin Acked-by.
+This patch adds the required arguments lists for CCN events.
 
-Thanks,
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ Documentation/arm/CCN.txt |  2 +-
+ drivers/bus/arm-ccn.c     | 17 +++++++++++++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
 
-Gregory
-
-> ---
-> Hi,
-> 
-> The only change for this patch is the spell fixes and it was also
-> rebased onto v4.1-rc1. Unless there is any objection I will apply it
-> on mvebu/fixes for 4.1.
-> 
-> Thanks,
-> 
-> Gregroy
-> 
->  arch/arm/boot/dts/armada-375.dtsi | 2 +-
->  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
->  arch/arm/boot/dts/armada-39x.dtsi | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index c675257f2377..f076ff856d8b 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -69,7 +69,7 @@
->  		mainpll: mainpll {
->  			compatible = "fixed-clock";
->  			#clock-cells = <0>;
-> -			clock-frequency = <2000000000>;
-> +			clock-frequency = <1000000000>;
->  		};
->  		/* 25 MHz reference crystal */
->  		refclk: oscillator {
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index ed2dd8ba4080..218a2acd36e5 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -585,7 +585,7 @@
->  		mainpll: mainpll {
->  			compatible = "fixed-clock";
->  			#clock-cells = <0>;
-> -			clock-frequency = <2000000000>;
-> +			clock-frequency = <1000000000>;
->  		};
->  
->  		/* 25 MHz reference crystal */
-> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-> index 0e85fc15ceda..ecd1318109ba 100644
-> --- a/arch/arm/boot/dts/armada-39x.dtsi
-> +++ b/arch/arm/boot/dts/armada-39x.dtsi
-> @@ -502,7 +502,7 @@
->  		mainpll: mainpll {
->  			compatible = "fixed-clock";
->  			#clock-cells = <0>;
-> -			clock-frequency = <2000000000>;
-> +			clock-frequency = <1000000000>;
->  		};
->  	};
->  };
-> 
-
-
+diff --git a/Documentation/arm/CCN.txt b/Documentation/arm/CCN.txt
+index 3a76048..ffca443 100644
+--- a/Documentation/arm/CCN.txt
++++ b/Documentation/arm/CCN.txt
+@@ -45,7 +45,7 @@ Example of perf tool use:
+ / # perf list | grep ccn
+   ccn/cycles/                                        [Kernel PMU event]
+ <...>
+-  ccn/xp_valid_flit/                                 [Kernel PMU event]
++  ccn/xp_valid_flit,xp=?,port=?,vc=?,dir=?/          [Kernel PMU event]
+ <...>
+ 
+ / # perf stat -a -e ccn/cycles/,ccn/xp_valid_flit,xp=1,port=0,vc=1,dir=1/ \
+diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+index 3374dcb..572360f 100644
+--- a/drivers/bus/arm-ccn.c
++++ b/drivers/bus/arm-ccn.c
+@@ -340,6 +340,23 @@ static ssize_t arm_ccn_pmu_event_show(struct device *dev,
+ 	if (event->mask)
+ 		res += snprintf(buf + res, PAGE_SIZE - res, ",mask=0x%x",
+ 				event->mask);
++
++	/* Arguments required by an event */
++	switch (event->type) {
++	case CCN_TYPE_CYCLES:
++		break;
++	case CCN_TYPE_XP:
++		res += snprintf(buf + res, PAGE_SIZE - res,
++				",xp=?,port=?,vc=?,dir=?");
++		if (event->event == CCN_EVENT_WATCHPOINT)
++			res += snprintf(buf + res, PAGE_SIZE - res,
++					",cmp_l=?,cmp_h=?,mask=?");
++		break;
++	default:
++		res += snprintf(buf + res, PAGE_SIZE - res, ",node=?");
++		break;
++	}
++
+ 	res += snprintf(buf + res, PAGE_SIZE - res, "\n");
+ 
+ 	return res;
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.0
