@@ -1,43 +1,35 @@
-From: ttnguyen@apm.com (Tai Nguyen)
-Date: Fri,  1 May 2015 13:11:14 -0700
-Subject: [PATCH 2/2] power: reset: Add syscon poweroff device node for APM
- X-Gene platform
-In-Reply-To: <1430511074-32229-1-git-send-email-ttnguyen@apm.com>
-References: <1430511074-32229-1-git-send-email-ttnguyen@apm.com>
-Message-ID: <1430511074-32229-3-git-send-email-ttnguyen@apm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 01 May 2015 22:13:32 +0200
+Subject: [PATCH v2 0/5] Driver for pxa architectures
+In-Reply-To: <87lhhek6dz.fsf@belgarion.home> (Robert Jarzmik's message of
+ "Sun, 26 Apr 2015 21:59:36 +0200")
+References: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
+ <87egnf7uqp.fsf@belgarion.home> <87lhhek6dz.fsf@belgarion.home>
+Message-ID: <87egn0jbtf.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds syscon poweroff device node to support poweroff feature
-on APM X-Gene Mustang platform
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
----
- arch/arm64/boot/dts/apm/apm-mustang.dts |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+>
+>> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+>>
+>>> Hi Vinod,
+>>>
+>>> This is the same serie as in v1, only one fix around irq probing was included in
+>>> patch 3/5. I copy-pasted the previous cover letter for reference here :
+>>
+>> Vinod, any update please ?
+> Please ?
 
-diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
-index 83578e7..910d561 100644
---- a/arch/arm64/boot/dts/apm/apm-mustang.dts
-+++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
-@@ -23,6 +23,18 @@
- 		device_type = "memory";
- 		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
- 	};
-+
-+	poweroff_mbox: poweroff_mbox at 10548000 {
-+		compatible = "syscon";
-+		reg = <0x0 0x10548000 0x0 0x30>;
-+	};
-+
-+	poweroff: poweroff at 10548010 {
-+		compatible = "syscon-poweroff";
-+		regmap = <&poweroff_mbox>;
-+		offset = <0x10>;
-+		mask = <0x1>;
-+	};
- };
- 
- &pcie0clk {
+Vinod, it's been 3 weeks and no news.
+
+Would it be possible that I take that through the pxa tree, even it stays in
+drivers/dmaengine ? I want that to land in the next cycle, and I'll take the
+fixes and maintainance anyway on my back.
+
+Cheers.
+
 -- 
-1.7.9.5
+Robert
