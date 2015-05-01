@@ -1,75 +1,93 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Fri, 1 May 2015 09:01:33 +0200
-Subject: dma_alloc_coherent versus streaming DMA,
- neither works satisfactory
-In-Reply-To: <55431852.2000302@topic.nl>
-References: <5538DD02.6050401@topic.nl> <9622793.RaVBbeJMCx@wuerfel>
- <55423317.7000401@topic.nl> <2309938.la6bU0Xy8o@wuerfel>
- <55431852.2000302@topic.nl>
-Message-ID: <554324CD.3060807@topic.nl>
+From: ayyappa.ch.linux@gmail.com (Ayyappa Ch)
+Date: Fri, 1 May 2015 13:03:55 +0530
+Subject: [Patchv2] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
+Message-ID: <CAPyr0yJ0JjxdrY7Gc+ANSM8JCMVOUGvpPxsSetWa9NHqPmidBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?On 01-05-15 08:08, Mike Looijmans wrote:
-> On 30-04-15 15:54, Arnd Bergmann wrote:
->> On Thursday 30 April 2015 15:50:15 Mike Looijmans wrote:
->>>
->>> Just to give you a status update, I tried that too (by adding a
->>> dma_mmap_coherent variant that omits the "prot" change, and some printks to
->>> verify that it actually does as expected).
->>>
->>> Current status is that the ACP behaves exactly like the HP port, which it
->>> should not do. If I send data from logic via the ACP port through the L2
->>> cache, using a version of dma_sync that just invalidates the cache could
->>> (should?) result in data corruption. Instead, the data gets corrupted only if
->>> you do not invalidate the line. This is what the (non-coherent) HP port
->>> behaves like, as it writes directly to DDR.
->>>
->>> Currently I'm assuming that the tools did something wrong in the bitstream,
->>> for example, wiring the "AWCACHE" and similar signals on the ACP to logic "0"
->>> instead of "1" while claiming to have wired them to "1" in the UI. A bug like
->>> that would also explain the behaviour I'm seeing now.
->>>
->>> I'll let you know once I find out more.
->>
->> Ok, maybe you have to configure the SCU to include the ACP in the
->> cache coherency? That might not be done by default. I don't really
->> know anything about the SCU or the ACP, so I'm just taking wild
->> guesses here.
->
-> The issue seems to be in these signals, the tool falsely claimed to have them
-> set high, but it actually only sets half of them, which thus has no effect at
-> all. I'll be able to test that in an hour or so once the bitstream is ready.
+Following Anders Roxell  patch on "Enable PREEMPT_RT_FULL" , observed
+one issue with Cyclic test while running floating point operations. So
+, modified below changes for that.
 
-Indeed, controlling the signals manually instead of relying on the tools makes 
-the ACP operate correctly.
+>From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+Date: Tue, 28 Apr 2015 11:53:00 +0530
+Subject: [PATCH ] floating point realtime fix
 
-> Interestingly, the coherency is not a property of the port or of the device
-> itself, it is a property of the DMA transaction. One single master on this
-> post can do both coherent and non-coherent transfers.
-> Now there's an interesting challenge, since the kernel appears to assume that
-> one device can only do one type. My 'hardware' actually has multiple masters,
-> which could potentially be tied to different ports or busses.
+---
+ arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-Measurements show that this is going to be important. Writing larger blocks to 
-DDR using coherency transfers data at about 240MB/s, while without coherency 
-it's 600MB/s. Have yet to test small datasets, I expect opposite results 
-there, since they'll remain in the L2 cache.
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 2438497..3dca156 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+  */
+ void fpsimd_preserve_current_state(void)
+ {
+- preempt_disable();
++ migrate_disable();
+  if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+  fpsimd_save_state(&current->thread.fpsimd_state);
+- preempt_enable();
++ migrate_enable();
+ }
 
+ /*
+@@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+  */
+ void fpsimd_restore_current_state(void)
+ {
+- preempt_disable();
++ migrate_disable();
+  if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+  struct fpsimd_state *st = &current->thread.fpsimd_state;
 
+@@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+  this_cpu_write(fpsimd_last_state, st);
+  st->cpu = smp_processor_id();
+  }
+- preempt_enable();
++ migrate_enable();
+ }
 
+ /*
+@@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+  */
+ void fpsimd_update_current_state(struct fpsimd_state *state)
+ {
+- preempt_disable();
++ migrate_disable();
+  fpsimd_load_state(state);
+  if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+  struct fpsimd_state *st = &current->thread.fpsimd_state;
+@@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+  this_cpu_write(fpsimd_last_state, st);
+  st->cpu = smp_processor_id();
+  }
+- preempt_enable();
++ migrate_enable();
+ }
 
-Kind regards,
-
-Mike Looijmans
-System Expert
-
-TOPIC Embedded Products
-Eindhovenseweg 32-C, NL-5683 KH Best
-Postbus 440, NL-5680 AK Best
-Telefoon: +31 (0) 499 33 69 79
-Telefax: +31 (0) 499 33 69 70
-E-mail: mike.looijmans at topicproducts.com
-Website: www.topicproducts.com
-
-Please consider the environment before printing this e-mail
+ /*
+@@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+  * that there is no longer userland FPSIMD state in the
+  * registers.
+  */
+- preempt_disable();
++ migrate_disable();
+  if (current->mm &&
+     !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+  fpsimd_save_state(&current->thread.fpsimd_state);
+@@ -255,7 +255,7 @@ void kernel_neon_end(void)
+  in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+  fpsimd_load_partial_state(s);
+  } else {
+- preempt_enable();
++ migrate_enable();
+  }
+ }
+ EXPORT_SYMBOL(kernel_neon_end);
+-- 
+1.9.1
