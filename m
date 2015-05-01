@@ -1,92 +1,21 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 May 2015 17:43:38 +0100
-Subject: [PATCH v2] arm & arm64: perf: Fix callchain parse error with
- kernel tracepoint events
-In-Reply-To: <1430402332-52750-1-git-send-email-houpengyang@huawei.com>
-References: <1430402332-52750-1-git-send-email-houpengyang@huawei.com>
-Message-ID: <20150501164338.GE25524@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 1 May 2015 17:46:24 +0100
+Subject: [PATCH 1/4] ASoC: au1x: Constify platform_device_id
+In-Reply-To: <1430496014-32309-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430496014-32309-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <20150501164624.GM22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 02:58:52PM +0100, Hou Pengyang wrote:
-> For ARM & ARM64, when tracing with tracepoint events, the IP and cpsr are 
-> set to 0, preventing the perf code parsing the callchain and resolving the 
-> symbols correctly.
-> 
->  ./perf record -e sched:sched_switch -g --call-graph dwarf ls
->     [ perf record: Captured and wrote 0.146 MB perf.data ]
->  ./perf report -f
->     Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194 
->     Children      Self    Command  Shared Object     Symbol
->     100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
-> 
-> The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
-> several necessary registers used for callchain unwinding, including pc,sp,
-> fp and psr .
+On Sat, May 02, 2015 at 01:00:11AM +0900, Krzysztof Kozlowski wrote:
+> The platform_device_id is not modified by the driver and core uses it as
+> const.
 
-Thanks for the v2.
-
-> With this patch, callchain can be parsed correctly as follows:
-> 
->      ......
-> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
-> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
-> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
-> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
-> -    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
->      pfkey_send_policy_notify
->      pfkey_get
->      v9fs_vfs_rename
->      page_follow_link_light
->      link_path_walk
->      el0_svc_naked
->     .......
-> 
-> Jean Pihet found this in ARM and come up with a patch:
-> http://thread.gmane.org/gmane.linux.kernel/1734283/focus=1734280
-> 
-> Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
-> ---
->  arch/arm/include/asm/perf_event.h   | 7 +++++++
->  arch/arm64/include/asm/perf_event.h | 7 +++++++
->  2 files changed, 14 insertions(+)
-
-Can you split this into two patches, please?
-
-> diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
-> index d9cf138..17705e2b 100644
-> --- a/arch/arm/include/asm/perf_event.h
-> +++ b/arch/arm/include/asm/perf_event.h
-> @@ -19,4 +19,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
->  #define perf_misc_flags(regs)	perf_misc_flags(regs)
->  #endif
->  
-> +#define perf_arch_fetch_caller_regs(regs, __ip) { \
-> +    (regs)->ARM_pc = (__ip); \
-> +    (regs)->ARM_fp = (unsigned long) __builtin_frame_address(0); \
-> +    (regs)->ARM_sp = current_stack_pointer; \
-> +    (regs)->ARM_cpsr |= SYSTEM_MODE; \
-
-You don't need to |= (just = is fine, perf memset's the thing to 0 anyway)
-and this should be SVC_MODE not SYSTEM_MODE.
-
-> +}
-> +
->  #endif /* __ARM_PERF_EVENT_H__ */
-> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-> index d26d1d5..e6911a4 100644
-> --- a/arch/arm64/include/asm/perf_event.h
-> +++ b/arch/arm64/include/asm/perf_event.h
-> @@ -24,4 +24,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
->  #define perf_misc_flags(regs)	perf_misc_flags(regs)
->  #endif
-> 	 
-> +#define perf_arch_fetch_caller_regs(regs, __ip) { \
-> +    (regs)->ARM_pc = (__ip);    \
-> +    (regs)->ARM_fp = (unsigned long) __builtin_frame_address(0); \
-> +    (regs)->ARM_sp = current_stack_pointer; \
-> +    (regs)->ARM_cpsr |= PSR_MODE_EL1h;	\
-
-Similarly here, just use an assignment.
-
-Will
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150501/4970dca8/attachment.sig>
