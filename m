@@ -1,147 +1,90 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 01 May 2015 09:08:07 +0100
-Subject: [PATCH v7 05/15] dt-bindings: Document the STM32 reset bindings
-In-Reply-To: <1430410844-16062-6-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1430410844-16062-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1430410844-16062-6-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <55433467.2010603@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 01 May 2015 10:17:35 +0200
+Subject: [PATCH 0/4] clk: si5351: Some fixes
+In-Reply-To: <20150430223603.GA18006@deathray>
+References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150430193317.GC22000@deathray> <55429417.4070103@gmail.com>
+ <20150430212059.GA14026@deathray> <5542AAE0.5020204@gmail.com>
+ <20150430223603.GA18006@deathray>
+Message-ID: <5543369F.2070207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/04/15 17:20, Maxime Coquelin wrote:
-> This adds documentation of device tree bindings for the
-> STM32 reset controller.
+On 01.05.2015 00:36, Michael Welling wrote:
+> On Fri, May 01, 2015 at 12:21:20AM +0200, Sebastian Hesselbarth wrote:
+>> On 30.04.2015 23:20, Michael Welling wrote:
+>>> On Thu, Apr 30, 2015 at 10:44:07PM +0200, Sebastian Hesselbarth wrote:
+>> [...]
+>>>> What I noticed about your clk2 that you always measure as 0 Hz is
+>>>> that none of your clocks is prepared/enabled.
+>>>>
+>>>> Currently, the si5351 driver only ensures the output is enabled
+>>>> when si5351_clkout_prepare() is called.
+>>>>
+>>>> As long as you do not have a clk consumer that properly prepare/enables
+>>>> the clock output, it may remain disabled.
+>>>>
+>>>> We should probably have additional DT properties and corresponding
+>>>> pdata to force clkoutN always on.
+>>>
+>>> Does the silabs,disable-state of 3 (SI5351_DISABLE_NEVER) take care
+>>> of this?
+>>
+>> That would be the HW version of never disabling the clock output.
+>> I never really tried the property, does it work as expected?
 >
-> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> ---
->   .../devicetree/bindings/reset/st,stm32-rcc.txt     | 107 +++++++++++++++++++++
->   1 file changed, 107 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+> This did not appear to effect the behavior.
+
+I think it is also a good idea to expose register values to debugfs,
+so we can easily check what is really written into internal registers.
+
+>>
+>>> Otherwise is there a simple registration that will do this?
+>>
+>> The SW version of such a property would involve CLK_IGNORE_UNUSED
+>> and enabling all requested clock outputs on probe().
+>>
+>> If above HW property already works, I think it should be enough.
+>>
+>> [...]
+>>>>> It should be noted that if I program the device's register map in the
+>>>>> bootloader the device keeps the correct frequency outputs.
+>>>>
+>>>> "keeps"? You mean "generates", don't you?
+>>>>
+>>>
+>>> Yes the clocks are generated and do not get effected by the driver.
+>>
+>> IIRC, clk API does check if requested rate and current rate match
+>> already. If they do, it does not request the same rate again.
 >
-> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-> new file mode 100644
-> index 0000000..c1b0f8d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-> @@ -0,0 +1,107 @@
-> +STMicroelectronics STM32 Peripheral Reset Controller
-> +====================================================
-> +
-> +The RCC IP is both a reset and a clock controller. This documentation only
-> +documents the reset part.
-> +
-> +Please also refer to reset.txt in this directory for common reset
-> +controller binding usage.
-> +
-> +Required properties:
-> +- compatible: Should be "st,stm32-rcc"
-> +- reg: should be register base and length as documented in the
-> +  datasheet
-> +- #reset-cells: 1, see below
-> +
-> +example:
-> +
-> +rcc: reset at 40023800 {
-> +	#reset-cells = <1>;
-> +	compatible = "st,stm32-rcc";
+> So I found that the audio codec that I am driving with clk2 could
+> register the clock and allowed the clock to be enabled and disabled
+> by playing audio.
+>
+> This is when I noticed some strange behavior. The first time I attempt
+> to play audio the clock does not turn on blocking the audio from playing.
+> After I interrupt and the clock is disabled for the first time, the
+> successive clock enables work as expected.
 
-Do you intend the clock driver to use the same compatible string (given 
-it is the same bit of hardware).
+Does "does not turn on" mean you cannot measure any clock on the
+output or is it just a guess because audio does not play?
 
-If so, is it better to use st,stm32f4-rcc here? It seems unlikey to me 
-that the register layout of the PLLs and dividers can be the same on the 
-f7 parts (and later).
+It could be that we just need to add some delay when we enable a clock
+output. Datasheet just says 10us max from OEB pin pulled low to valid
+clock output - not exactly what we are looking for but it could be a
+good start.
 
-> +	reg = <0x40023800 0x400>;
-> +};
-> +
-> +Specifying softreset control of devices
-> +=======================================
-> +
-> +Device nodes should specify the reset channel required in their "resets"
-> +property, containing a phandle to the reset device node and an index specifying
-> +which channel to use.
-> +The index is the bit number within the RCC registers bank, starting from RCC
-> +base address.
-> +It is calculated as: index = register_offset / 4 * 32 + bit_offset.
-> +Where bit_offset is the bit offset within the register.
-> +For example, for CRC reset:
-> +  crc = AHB1RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x10 / 4 * 32 + 12 = 140
-> +
-> +example:
-> +
-> +	timer2 {
-> +		resets			= <&rcc 256>;
-> +	};
-> +
-> +List of valid indices for STM32F429:
-> + - gpioa: 128
-> + - gpiob: 129
-> + - gpioc: 130
-> + - gpiod: 131
-> + - gpioe: 132
-> + - gpiof: 133
-> + - gpiog: 134
-> + - gpioh: 135
-> + - gpioi: 136
-> + - gpioj: 137
-> + - gpiok: 138
-> + - crc: 140
-> + - dma1: 149
-> + - dma2: 150
-> + - dma2d: 151
-> + - ethmac: 153
-> + - otghs: 157
-> + - dcmi: 160
-> + - cryp: 164
-> + - hash: 165
-> + - rng: 166
-> + - otgfs: 167
-> + - fmc: 192
-> + - tim2: 256
-> + - tim3: 257
-> + - tim4: 258
-> + - tim5: 259
-> + - tim6: 260
-> + - tim7: 261
-> + - tim12: 262
-> + - tim13: 263
-> + - tim14: 264
-> + - wwdg: 267
-> + - spi2: 270
-> + - spi3: 271
-> + - uart2: 273
-> + - uart3: 274
-> + - uart4: 275
-> + - uart5: 276
-> + - i2c1: 277
-> + - i2c2: 278
-> + - i2c3: 279
-> + - can1: 281
-> + - can2: 282
-> + - pwr: 284
-> + - dac: 285
-> + - uart7: 286
-> + - uart8: 287
-> + - tim1: 288
-> + - tim8: 289
-> + - usart1: 292
-> + - usart6: 293
-> + - adc: 296
-> + - sdio: 299
-> + - spi1: 300
-> + - spi4: 301
-> + - syscfg: 302
-> + - tim9: 304
-> + - tim10: 305
-> + - tim11: 306
-> + - spi5: 308
-> + - spi6: 309
-> + - sai1: 310
-> + - ltdc: 314
+> Something tells me that a fault off some kind is occurring on initial
+> configuration.
 
-These numbers are stable for all STM32F4 family parts. Should this table 
-go into a dt-bindings header file?
+What I noticed when adding the pll reset and checking DEVICE_STATUS is
+that SYS_INIT is still set. According to the datasheet, the meaning of
+the bit is that si5351 is still copying NVM content to its internal
+registers and therefore, we shouldn't try to access them.
+
+What really irritates me about it is that it is seconds after power-up
+and copying the contents shouldn't really take _that_ long. However,
+the datasheet does not mention anything about how long it may take.
+
+Sebastian
