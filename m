@@ -1,35 +1,37 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 01 May 2015 22:13:32 +0200
-Subject: [PATCH v2 0/5] Driver for pxa architectures
-In-Reply-To: <87lhhek6dz.fsf@belgarion.home> (Robert Jarzmik's message of
- "Sun, 26 Apr 2015 21:59:36 +0200")
-References: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
- <87egnf7uqp.fsf@belgarion.home> <87lhhek6dz.fsf@belgarion.home>
-Message-ID: <87egn0jbtf.fsf@belgarion.home>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 1 May 2015 22:15:55 +0200
+Subject: [PATCH] ARM: mvebu: dove: Relicense the device tree under
+ GPLv2+/X11
+In-Reply-To: <553FB6B4.8020401@gmail.com>
+References: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150428155910.GD12732@n2100.arm.linux.org.uk>
+ <553FB6B4.8020401@gmail.com>
+Message-ID: <20150501201555.GB19710@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+On Tue, Apr 28, 2015 at 06:35:00PM +0200, Sebastian Hesselbarth wrote:
+> On 28.04.2015 17:59, Russell King - ARM Linux wrote:
+> >On Mon, Apr 27, 2015 at 11:09:04AM +0200, Sebastian Hesselbarth wrote:
+> >>The current implicit GPL only licensing on the device tree makes it
+> >>very impractical for other software components licensed under another
+> >>license.
+> >>
+> >>In order to make it easier for them to reuse our device trees,
+> >>relicense our device trees under a GPL/X11 dual-license.
+> >>
+> [...]
+> >>so I decided to keep the whole relicensing in a single patch. Please send
+> >>your Acked-by's in reply to this patch if you are happy with the relicensing.
+> >
+> >I normally don't include the "or later version" for my license changes
+> >as I've only accepted to contribute under the terms of GPLv2.
+> 
+> Ok, I guess this is a NACK for GPLv2+ but an Acked-by if we limit the
+> GPL part to GPLv2 only?
 
-> Robert Jarzmik <robert.jarzmik@free.fr> writes:
->
->> Robert Jarzmik <robert.jarzmik@free.fr> writes:
->>
->>> Hi Vinod,
->>>
->>> This is the same serie as in v1, only one fix around irq probing was included in
->>> patch 3/5. I copy-pasted the previous cover letter for reference here :
->>
->> Vinod, any update please ?
-> Please ?
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Vinod, it's been 3 weeks and no news.
+For GPLv2 only.
 
-Would it be possible that I take that through the pxa tree, even it stays in
-drivers/dmaengine ? I want that to land in the next cycle, and I'll take the
-fixes and maintainance anyway on my back.
-
-Cheers.
-
--- 
-Robert
+    Andrew
