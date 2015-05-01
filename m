@@ -1,54 +1,33 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 1 May 2015 15:43:25 +0800
-Subject: [PATCH 2/7] clocksource: mediatek: Use GPT as sched clock source
+Date: Fri, 1 May 2015 15:43:27 +0800
+Subject: [PATCH 4/7] devicetree: bindings: add new SMP enable method Mediatek
+ SoC
 In-Reply-To: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1430466210-22963-3-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1430466210-22963-5-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When cpu is in deep idle, arch timer will stop counting. Setup GPT as
-sched clock source so it can keep counting in idle.
+This commit add new cpu enable method "mediatek,mt65xx-smp" and
+"mediatek,mt81xx-tz-smp".
 
 Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 ---
- drivers/clocksource/mtk_timer.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index 85e0ab5..9a90c7b 100644
---- a/drivers/clocksource/mtk_timer.c
-+++ b/drivers/clocksource/mtk_timer.c
-@@ -24,6 +24,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <linux/sched_clock.h>
- #include <linux/slab.h>
- 
- #define GPT_IRQ_EN_REG		0x00
-@@ -59,6 +60,13 @@ struct mtk_clock_event_device {
- 	struct clock_event_device dev;
- };
- 
-+static void __iomem *gpt_base __read_mostly;
-+
-+static u64 notrace mtk_read_sched_clock(void)
-+{
-+	return readl_relaxed(gpt_base + TIMER_CNT_REG(GPT_CLK_SRC));
-+}
-+
- static inline struct mtk_clock_event_device *to_mtk_clk(
- 				struct clock_event_device *c)
- {
-@@ -239,6 +247,8 @@ static void __init mtk_timer_init(struct device_node *node)
- 	mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN);
- 	clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
- 			node->name, rate, 300, 32, clocksource_mmio_readl_up);
-+	gpt_base = evt->gpt_base;
-+	sched_clock_register(mtk_read_sched_clock, 32, rate);
- 
- 	/* Configure clock event */
- 	mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT);
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 6aa331d..ac2903d 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -194,6 +194,8 @@ nodes to be present and contain the properties described below.
+ 			    "marvell,armada-380-smp"
+ 			    "marvell,armada-390-smp"
+ 			    "marvell,armada-xp-smp"
++			    "mediatek,mt65xx-smp"
++			    "mediatek,mt81xx-tz-smp"
+ 			    "qcom,gcc-msm8660"
+ 			    "qcom,kpss-acc-v1"
+ 			    "qcom,kpss-acc-v2"
 -- 
 1.8.1.1.dirty
