@@ -1,148 +1,336 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 01 May 2015 13:52:47 -0700
-Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
-In-Reply-To: <1981330.kGUrTurMy5@diego>
-References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
- <20150501001901.GC32407@codeaurora.org> <1981330.kGUrTurMy5@diego>
-Message-ID: <5543E79F.2080400@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri,  1 May 2015 23:07:49 +0200
+Subject: [PATCH v2] ARM: mvebu: dove: Relicense the device tree under GPLv2/X11
+Message-ID: <1430514469-2897-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/15 12:59, Heiko St?bner wrote:
-> Am Donnerstag, 30. April 2015, 17:19:01 schrieb Stephen Boyd:
->> On 04/22, Heiko Stuebner wrote:
->>> Using orphan clocks can introduce strange behaviour as they don't have
->>> rate information at all and also of course don't track
->>>
->>> This v2/v3 takes into account suggestions from Stephen Boyd to not try to
->>> walk the clock tree at runtime but instead keep track of orphan states
->>> on clock tree changes and making it mandatory for everybody from the
->>> start as orphaned clocks should not be used at all.
->>>
->>>
->>> This fixes an issue on most rk3288 platforms, where some soc-clocks
->>> are supplied by a 32khz clock from an external i2c-chip which often
->>> is only probed later in the boot process and maybe even after the
->>> drivers using these soc-clocks like the tsadc temperature sensor.
->>> In this case the driver using the clock should of course defer probing
->>> until the clock is actually usable.
->>>
->>>
->>> As this changes the behaviour for orphan clocks, it would of course
->>> benefit from more testing than on my Rockchip boards. To keep the
->>> recipent-list reasonable and not spam to much I selected one (the topmost)
->>> from the get_maintainer output of each drivers/clk entry.
->>> Hopefully some will provide Tested-by-tags :-)
->> <grumble> I don't see any Tested-by: tags yet </grumble>. I've
->> put these two patches on a separate branch "defer-orphans" and
->> pushed it to clk-next so we can give it some more exposure.
->>
->> Unfortunately this doesn't solve the orphan problem for non-OF
->> providers. What if we did the orphan check in __clk_create_clk()
->> instead and returned an error pointer for orphans? I suspect that
->> will solve all cases, right?
-> hmm, clk_register also uses __clk_create_clk, which in turn would prevent
-> registering orphan-clocks at all, I'd think.
-> As on my platform I'm dependant on orphan clocks (the soc-level clock gets
-> registerted as part of the big clock controller way before the i2c-based
-> supplying clock), I'd rather not touch this :-) .
+The current implicit GPL only licensing on the device tree makes it
+very impractical for other software components licensed under another
+license.
 
-Have no fear! We should just change clk_register() to call a
-__clk_create_clk() type function that doesn't check for orphan status.
+In order to make it easier for them to reuse our device trees,
+relicense our device trees under a GPLv2/X11 dual-license.
 
->
-> Instead I guess we could hook it less deep into clk_get_sys, like in the
-> following patch?
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Acked-by: Jean-Francois Moine <moinejf@free.fr>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Changelog:
+v1->v2:
+- Limit GPL scope to GPLv2 only excluding later GPL versions
+  (Requested by Russell King)
+---
+ arch/arm/boot/dts/dove-cubox-es.dts | 42 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dove-cubox.dts    | 42 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dove-d2plug.dts   | 42 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dove-d3plug.dts   | 42 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dove-dove-db.dts  | 42 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dove.dtsi         | 42 +++++++++++++++++++++++++++++++++++++
+ 6 files changed, 252 insertions(+)
 
-It looks like it will work at least, but still I'd prefer to keep the
-orphan check contained to clk.c. How about this compile tested only patch?
-
-This also brings up an existing problem with clk_unregister() where
-orphaned clocks are sitting out there useable by drivers when their
-parent is unregistered. That code could use some work to atomically
-switch all the orphaned clocks over to use the nodrv_ops.
-
-----8<-----
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 30d45c657a07..1d23daa42dd2 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2221,14 +2221,6 @@ static inline void clk_debug_unregister(struct clk_core *core)
- }
- #endif
- 
--static bool clk_is_orphan(const struct clk *clk)
--{
--	if (!clk)
--		return false;
--
--	return clk->core->orphan;
--}
--
- /**
-  * __clk_init - initialize the data structures in a struct clk
-  * @dev:	device initializing this clk, placeholder for now
-@@ -2420,15 +2412,11 @@ out:
- 	return ret;
- }
- 
--struct clk *__clk_create_clk(struct clk_hw *hw, const char *dev_id,
--			     const char *con_id)
-+static struct clk *clk_hw_create_clk(struct clk_hw *hw, const char *dev_id,
-+				     const char *con_id)
- {
- 	struct clk *clk;
- 
--	/* This is to allow this function to be chained to others */
--	if (!hw || IS_ERR(hw))
--		return (struct clk *) hw;
--
- 	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
- 	if (!clk)
- 		return ERR_PTR(-ENOMEM);
-@@ -2445,6 +2433,19 @@ struct clk *__clk_create_clk(struct clk_hw *hw, const char *dev_id,
- 	return clk;
- }
- 
-+struct clk *__clk_create_clk(struct clk_hw *hw, const char *dev_id,
-+			     const char *con_id)
-+{
-+	/* This is to allow this function to be chained to others */
-+	if (!hw || IS_ERR(hw))
-+		return (struct clk *) hw;
+diff --git a/arch/arm/boot/dts/dove-cubox-es.dts b/arch/arm/boot/dts/dove-cubox-es.dts
+index e28ef056dd17..5eb633e79c98 100644
+--- a/arch/arm/boot/dts/dove-cubox-es.dts
++++ b/arch/arm/boot/dts/dove-cubox-es.dts
+@@ -1,3 +1,45 @@
++/*
++ * Device Tree file for SolidRun CuBox (Engineering Sample)
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; version 2 of the
++ *     License.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+	if (hw->core->orphan)
-+		return ERR_PTR(-EPROBE_DEFER);
+ #include "dove-cubox.dts"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+index aae7efc09b0b..50e89036214b 100644
+--- a/arch/arm/boot/dts/dove-cubox.dts
++++ b/arch/arm/boot/dts/dove-cubox.dts
+@@ -1,3 +1,45 @@
++/*
++ * Device Tree file for SolidRun CuBox
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; version 2 of the
++ *     License.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+	return clk_hw_create_clk(hw, dev_id, con_id);
-+}
+ /dts-v1/;
+ 
+ #include "dove.dtsi"
+diff --git a/arch/arm/boot/dts/dove-d2plug.dts b/arch/arm/boot/dts/dove-d2plug.dts
+index c11d3636c8e5..abb595a90054 100644
+--- a/arch/arm/boot/dts/dove-d2plug.dts
++++ b/arch/arm/boot/dts/dove-d2plug.dts
+@@ -1,3 +1,45 @@
++/*
++ * Device Tree file for Globalscale D2Plug
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; version 2 of the
++ *     License.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
- void __clk_free_clk(struct clk *clk)
- {
- 	clk_prepare_lock();
-@@ -2511,7 +2512,7 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
+ /dts-v1/;
  
- 	INIT_HLIST_HEAD(&core->clks);
+ #include "dove.dtsi"
+diff --git a/arch/arm/boot/dts/dove-d3plug.dts b/arch/arm/boot/dts/dove-d3plug.dts
+index f5f59bb5a534..2481e25ebbbb 100644
+--- a/arch/arm/boot/dts/dove-d3plug.dts
++++ b/arch/arm/boot/dts/dove-d3plug.dts
+@@ -1,3 +1,45 @@
++/*
++ * Device Tree file for Globalscale D3Plug
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; version 2 of the
++ *     License.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
+ /dts-v1/;
  
--	hw->clk = __clk_create_clk(hw, NULL, NULL);
-+	hw->clk = clk_hw_create_clk(hw, NULL, NULL);
- 	if (IS_ERR(hw->clk)) {
- 		ret = PTR_ERR(hw->clk);
- 		goto fail_parent_names_copy;
-@@ -2958,10 +2959,6 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
- 		if (provider->node == clkspec->np)
- 			clk = provider->get(clkspec, provider->data);
- 		if (!IS_ERR(clk)) {
--			if (clk_is_orphan(clk)) {
--				clk = ERR_PTR(-EPROBE_DEFER);
--				break;
--			}
+ #include "dove.dtsi"
+diff --git a/arch/arm/boot/dts/dove-dove-db.dts b/arch/arm/boot/dts/dove-dove-db.dts
+index bb725dca3a10..29a57865d8d8 100644
+--- a/arch/arm/boot/dts/dove-dove-db.dts
++++ b/arch/arm/boot/dts/dove-dove-db.dts
+@@ -1,3 +1,45 @@
++/*
++ * Device Tree file for Marvell DB-MV88AP510-BP Development Board
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; version 2 of the
++ *     License.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
+ /dts-v1/;
  
- 			clk = __clk_create_clk(__clk_get_hw(clk), dev_id,
- 					       con_id);
-
-
+ #include "dove.dtsi"
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 9ad829523a13..14382a24b795 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -1,3 +1,45 @@
++/*
++ * Device Tree include for Marvell Dove 88AP510 SoC
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; version 2 of the
++ *     License.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
+ /include/ "skeleton.dtsi"
+ 
+ #include <dt-bindings/gpio/gpio.h>
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.0
