@@ -1,15 +1,17 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 May 2015 15:07:56 +0100
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 May 2015 15:07:57 +0100
 Subject: [PATCH 2/4] ARM perf: Fix the pmu node name in warning message
 In-Reply-To: <554386C2.6020609@arm.com>
 References: <1429797033-3787-1-git-send-email-will.deacon@arm.com>
  <1429797033-3787-2-git-send-email-will.deacon@arm.com>
  <554386C2.6020609@arm.com>
-Message-ID: <20150501140755.GD1561@arm.com>
+Message-ID: <20150501140757.GC28975@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, May 01, 2015 at 02:59:30PM +0100, Sudeep Holla wrote:
+> 
+> 
 > On 23/04/15 14:50, Will Deacon wrote:
 > > With commit 9fd85eb502a7 ("ARM: pmu: add support for interrupt-affinity
 > > property"), we print a warning when we find a PMU SPI with a missing
@@ -44,9 +46,11 @@ On Fri, May 01, 2015 at 02:59:30PM +0100, Sudeep Holla wrote:
 > CPU number and continues to work, does it make sense to update the
 > warning accordingly ?
 
-Dunno; it doesn't work on Juno, for example. I've also already sent the
-arm64 pull, so it would need to be a separate patch if you wanted to
-print something different and we'd need a way to detect the cases where
-the routing is actually wrong.
+The issue is that while it may work in that configuration, it can easily
+be made to not work. So even if things happen to align, we should warn
+when we don't have explicit information regarding the affinity.
 
-Will
+Do you have a suggestion for a better error message to cover that?
+
+Thanks
+Mark.
