@@ -1,9 +1,9 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 00:50:03 +0900
-Subject: [PATCH 3/3] mtd: samsung: Constify platform_device_id
-In-Reply-To: <1430495403-31560-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430495403-31560-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1430495403-31560-3-git-send-email-k.kozlowski.k@gmail.com>
+Date: Sat,  2 May 2015 00:49:22 +0900
+Subject: [PATCH 6/6] mmc: sdhc-s3c: Constify platform_device_id
+In-Reply-To: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1430495362-31506-6-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +12,21 @@ const.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- drivers/mtd/onenand/samsung.c | 2 +-
+ drivers/mmc/host/sdhci-s3c.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/onenand/samsung.c b/drivers/mtd/onenand/samsung.c
-index 19cfb97adbc0..739259513055 100644
---- a/drivers/mtd/onenand/samsung.c
-+++ b/drivers/mtd/onenand/samsung.c
-@@ -1083,7 +1083,7 @@ static const struct dev_pm_ops s3c_pm_ops = {
- 	.resume		= s3c_pm_ops_resume,
- };
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index c6d2dd7317c1..70c724bc6fc7 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -736,7 +736,7 @@ static struct sdhci_s3c_drv_data exynos4_sdhci_drv_data = {
+ #define EXYNOS4_SDHCI_DRV_DATA ((kernel_ulong_t)NULL)
+ #endif
  
--static struct platform_device_id s3c_onenand_driver_ids[] = {
-+static const struct platform_device_id s3c_onenand_driver_ids[] = {
+-static struct platform_device_id sdhci_s3c_driver_ids[] = {
++static const struct platform_device_id sdhci_s3c_driver_ids[] = {
  	{
- 		.name		= "s3c6400-onenand",
- 		.driver_data	= TYPE_S3C6400,
+ 		.name		= "s3c-sdhci",
+ 		.driver_data	= (kernel_ulong_t)NULL,
 -- 
 2.1.4
