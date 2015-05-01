@@ -1,41 +1,35 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 1 May 2015 15:43:23 +0800
-Subject: [PATCH 0/7] Add SMP bringup support for mt65xx socs
-Message-ID: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
+Date: Fri, 1 May 2015 15:43:24 +0800
+Subject: [PATCH 1/7] clocksource: mediatek: Don't run event_handler if it is
+ NULL
+In-Reply-To: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1430466210-22963-2-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add SMP brinup support for mediatek SoCs. This is based
-on v4.1-rc1.
+Spurious timer interrupt is noticed in mtk timer and cause kernel
+crash. In mtk_timer_interrupt(), only run event_handler if it is
+not NULL.
 
-There are 2 similar but different SMP bringup up methods on Mediatek
-mt65xx and mt81xx. On MT8135 & MT8127, system boots with a trustzone
-firmware. Others, like MT6589, doesn't have trustzone, and run kernel
-directly in secure world.
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+ drivers/clocksource/mtk_timer.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Patch 1~3 fix issues in mtk_timer(GPT) and enable arch timer support.
-Patch 4,5 add support for cpu enable-method "mediatek,mt65xx-smp" and
-"mediatek,mt81xx-tz-smp", which support Mediatek SMP bringup for non-TZ
-and TZ platform.
-Patch 6,7 finally enable SMP bringup for mt8135 and mt8127.
-
-Matthias Brugger (1):
-  arm: mediatek: enable gpt6 on boot up to make arch timer working
-
-Yingjoe Chen (6):
-  clocksource: mediatek: Don't run event_handler if it is NULL
-  clocksource: mediatek: Use GPT as sched clock source
-  devicetree: bindings: add new SMP enable method Mediatek SoC
-  ARM: mediatek: add smp bringup code
-  ARM: dts: mt8135: enable basic SMP bringup for mt8135
-  ARM: dts: mt8127: enable basic SMP bringup for mt8127
-
- Documentation/devicetree/bindings/arm/cpus.txt |   2 +
- arch/arm/boot/dts/mt8127.dtsi                  |  16 +++
- arch/arm/boot/dts/mt8135.dtsi                  |  16 +++
- arch/arm/mach-mediatek/Makefile                |   3 +
- arch/arm/mach-mediatek/mediatek.c              |  29 +++++
- arch/arm/mach-mediatek/platsmp.c               | 145 +++++++++++++++++++++++++
- drivers/clocksource/mtk_timer.c                |  13 ++-
- 7 files changed, 223 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-mediatek/platsmp.c
+diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+index 68ab423..85e0ab5 100644
+--- a/drivers/clocksource/mtk_timer.c
++++ b/drivers/clocksource/mtk_timer.c
+@@ -143,7 +143,8 @@ static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
+ 
+ 	/* Acknowledge timer0 irq */
+ 	writel(GPT_IRQ_ACK(GPT_CLK_EVT), evt->gpt_base + GPT_IRQ_ACK_REG);
+-	evt->dev.event_handler(&evt->dev);
++	if (evt->dev.event_handler)
++		evt->dev.event_handler(&evt->dev);
+ 
+ 	return IRQ_HANDLED;
+ }
+-- 
+1.8.1.1.dirty
