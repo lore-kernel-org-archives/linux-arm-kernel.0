@@ -1,7 +1,9 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 00:50:01 +0900
-Subject: [PATCH 1/3] mtd: mxc-nand: Constify platform_device_id
-Message-ID: <1430495403-31560-1-git-send-email-k.kozlowski.k@gmail.com>
+Date: Sat,  2 May 2015 00:49:18 +0900
+Subject: [PATCH 2/6] mmc: mxs: Constify platform_device_id
+In-Reply-To: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1430495362-31506-2-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,21 +12,21 @@ const.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- drivers/mtd/nand/mxc_nand.c | 2 +-
+ drivers/mmc/host/mxs-mmc.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 372e0e38f59b..2c46489eeee0 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -1350,7 +1350,7 @@ static inline int is_imx53_nfc(struct mxc_nand_host *host)
- 	return host->devtype_data == &imx53_nand_devtype_data;
- }
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index a82411a2c024..d839147e591d 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -549,7 +549,7 @@ static const struct mmc_host_ops mxs_mmc_ops = {
+ 	.enable_sdio_irq = mxs_mmc_enable_sdio_irq,
+ };
  
--static struct platform_device_id mxcnd_devtype[] = {
-+static const struct platform_device_id mxcnd_devtype[] = {
+-static struct platform_device_id mxs_ssp_ids[] = {
++static const struct platform_device_id mxs_ssp_ids[] = {
  	{
- 		.name = "imx21-nand",
- 		.driver_data = (kernel_ulong_t) &imx21_nand_devtype_data,
+ 		.name = "imx23-mmc",
+ 		.driver_data = IMX23_SSP,
 -- 
 2.1.4
