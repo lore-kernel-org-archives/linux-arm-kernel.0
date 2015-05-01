@@ -1,114 +1,132 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 01 May 2015 12:06:32 -0400
-Subject: [PATCH 5/5] ARM: MCPM: remove residency argument from
- mcpm_cpu_suspend()
+Date: Fri, 01 May 2015 12:06:29 -0400
+Subject: [PATCH 2/5] ARM: MCPM: remove backward compatibility code
 In-Reply-To: <1430496392-15956-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1430496392-15956-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1430496392-15956-6-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1430496392-15956-3-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is currently unused.
-
-If a suspend must be limited to CPU level only by preventing the last man
-from triggering a cluster level suspend then this should be determined
-according to many other criteria the MCPM layer is currently not aware of.
-It is unlikely that mcpm_cpu_suspend() would be the proper conduit for
-that information anyway.
+Now that no one uses the old callbacks anymore, let's remove them
+and associated support code.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/common/mcpm_entry.c         |  2 +-
- arch/arm/include/asm/mcpm.h          | 15 +++++----------
- arch/arm/mach-exynos/suspend.c       |  8 +-------
- drivers/cpuidle/cpuidle-big_little.c |  8 +-------
- 4 files changed, 8 insertions(+), 25 deletions(-)
+ arch/arm/common/mcpm_entry.c | 45 +++++---------------------------------------
+ arch/arm/include/asm/mcpm.h  |  6 ------
+ 2 files changed, 5 insertions(+), 46 deletions(-)
 
 diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-index 492467587c..a923524d10 100644
+index 5f8a52ac7e..0908f96278 100644
 --- a/arch/arm/common/mcpm_entry.c
 +++ b/arch/arm/common/mcpm_entry.c
-@@ -321,7 +321,7 @@ int mcpm_wait_for_cpu_powerdown(unsigned int cpu, unsigned int cluster)
- 	return ret;
- }
+@@ -78,16 +78,11 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
+ 	bool cpu_is_down, cluster_is_down;
+ 	int ret = 0;
  
--void mcpm_cpu_suspend(u64 expected_residency)
-+void mcpm_cpu_suspend(void)
- {
++	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+ 	if (!platform_ops)
+ 		return -EUNATCH; /* try not to shadow power_up errors */
+ 	might_sleep();
+ 
+-	/* backward compatibility callback */
+-	if (platform_ops->power_up)
+-		return platform_ops->power_up(cpu, cluster);
+-
+-	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+-
+ 	/*
+ 	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
+ 	 * variant exists, we need to disable IRQs manually here.
+@@ -128,29 +123,17 @@ void mcpm_cpu_power_down(void)
+ 	bool cpu_going_down, last_man;
+ 	phys_reset_t phys_reset;
+ 
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+ 	if (WARN_ON_ONCE(!platform_ops))
+ 	       return;
+ 	BUG_ON(!irqs_disabled());
+ 
+-	/*
+-	 * Do this before calling into the power_down method,
+-	 * as it might not always be safe to do afterwards.
+-	 */
+ 	setup_mm_for_reboot();
+ 
+-	/* backward compatibility callback */
+-	if (platform_ops->power_down) {
+-		platform_ops->power_down();
+-		goto not_dead;
+-	}
+-
+-	mpidr = read_cpuid_mpidr();
+-	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+-	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+-	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+-
+ 	__mcpm_cpu_going_down(cpu, cluster);
+-
+ 	arch_spin_lock(&mcpm_lock);
+ 	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+ 
+@@ -187,7 +170,6 @@ void mcpm_cpu_power_down(void)
+ 	if (cpu_going_down)
+ 		wfi();
+ 
+-not_dead:
+ 	/*
+ 	 * It is possible for a power_up request to happen concurrently
+ 	 * with a power_down request for the same CPU. In this case the
+@@ -224,17 +206,6 @@ void mcpm_cpu_suspend(u64 expected_residency)
  	if (WARN_ON_ONCE(!platform_ops))
  		return;
+ 
+-	/* backward compatibility callback */
+-	if (platform_ops->suspend) {
+-		phys_reset_t phys_reset;
+-		BUG_ON(!irqs_disabled());
+-		setup_mm_for_reboot();
+-		platform_ops->suspend(expected_residency);
+-		phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+-		phys_reset(virt_to_phys(mcpm_entry_point));
+-		BUG();
+-	}
+-
+ 	/* Some platforms might have to enable special resume modes, etc. */
+ 	if (platform_ops->cpu_suspend_prepare) {
+ 		unsigned int mpidr = read_cpuid_mpidr();
+@@ -256,12 +227,6 @@ int mcpm_cpu_powered_up(void)
+ 	if (!platform_ops)
+ 		return -EUNATCH;
+ 
+-	/* backward compatibility callback */
+-	if (platform_ops->powered_up) {
+-		platform_ops->powered_up();
+-		return 0;
+-	}
+-
+ 	mpidr = read_cpuid_mpidr();
+ 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
 diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
-index 6a40d5f8db..acd4983d9b 100644
+index 50b378f59e..e2118c941d 100644
 --- a/arch/arm/include/asm/mcpm.h
 +++ b/arch/arm/include/asm/mcpm.h
-@@ -137,17 +137,12 @@ int mcpm_wait_for_cpu_powerdown(unsigned int cpu, unsigned int cluster);
- /**
-  * mcpm_cpu_suspend - bring the calling CPU in a suspended state
-  *
-- * @expected_residency: duration in microseconds the CPU is expected
-- *			to remain suspended, or 0 if unknown/infinity.
-- *
-- * The calling CPU is suspended.  The expected residency argument is used
-- * as a hint by the platform specific backend to implement the appropriate
-- * sleep state level according to the knowledge it has on wake-up latency
-- * for the given hardware.
-+ * The calling CPU is suspended.  This is similar to mcpm_cpu_power_down()
-+ * except for possible extra platform specific configuration steps to allow
-+ * an asynchronous wake-up e.g. with a pending interrupt.
-  *
-  * If this CPU is found to be the "last man standing" in the cluster
-- * then the cluster may be prepared for power-down too, if the expected
-- * residency makes it worthwhile.
-+ * then the cluster may be prepared for power-down too.
-  *
-  * This must be called with interrupts disabled.
-  *
-@@ -157,7 +152,7 @@ int mcpm_wait_for_cpu_powerdown(unsigned int cpu, unsigned int cluster);
-  * This will return if mcpm_platform_register() has not been called
-  * previously in which case the caller should take appropriate action.
-  */
--void mcpm_cpu_suspend(u64 expected_residency);
-+void mcpm_cpu_suspend(void);
+@@ -234,12 +234,6 @@ struct mcpm_platform_ops {
+ 	void (*cpu_is_up)(unsigned int cpu, unsigned int cluster);
+ 	void (*cluster_is_up)(unsigned int cluster);
+ 	int (*wait_for_powerdown)(unsigned int cpu, unsigned int cluster);
+-
+-	/* deprecated callbacks */
+-	int (*power_up)(unsigned int cpu, unsigned int cluster);
+-	void (*power_down)(void);
+-	void (*suspend)(u64);
+-	void (*powered_up)(void);
+ };
  
  /**
-  * mcpm_cpu_powered_up - housekeeping workafter a CPU has been powered up
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index 3e6aea7f83..372bd0b099 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -311,13 +311,7 @@ static int exynos5420_cpu_suspend(unsigned long arg)
- 
- 	if (IS_ENABLED(CONFIG_EXYNOS5420_MCPM)) {
- 		mcpm_set_entry_vector(cpu, cluster, exynos_cpu_resume);
--
--		/*
--		 * Residency value passed to mcpm_cpu_suspend back-end
--		 * has to be given clear semantics. Set to 0 as a
--		 * temporary value.
--		 */
--		mcpm_cpu_suspend(0);
-+		mcpm_cpu_suspend();
- 	}
- 
- 	pr_info("Failed to suspend the system\n");
-diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-index 40c34faffe..db2ede565f 100644
---- a/drivers/cpuidle/cpuidle-big_little.c
-+++ b/drivers/cpuidle/cpuidle-big_little.c
-@@ -108,13 +108,7 @@ static int notrace bl_powerdown_finisher(unsigned long arg)
- 	unsigned int cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
- 
- 	mcpm_set_entry_vector(cpu, cluster, cpu_resume);
--
--	/*
--	 * Residency value passed to mcpm_cpu_suspend back-end
--	 * has to be given clear semantics. Set to 0 as a
--	 * temporary value.
--	 */
--	mcpm_cpu_suspend(0);
-+	mcpm_cpu_suspend();
- 
- 	/* return value != 0 means failure */
- 	return 1;
 -- 
 2.1.0
