@@ -1,32 +1,32 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 01:00:13 +0900
-Subject: [PATCH 3/4] ASoC: fsl: Constify platform_device_id
-In-Reply-To: <1430496014-32309-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430496014-32309-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1430496014-32309-3-git-send-email-k.kozlowski.k@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 01 May 2015 18:17:45 +0200
+Subject: [PATCH v2 1/4] ARM: pxa: add memory resource to RTC device
+In-Reply-To: <1430426233-7461-2-git-send-email-robh@kernel.org> (Rob Herring's
+ message of "Thu, 30 Apr 2015 15:37:10 -0500")
+References: <1430426233-7461-1-git-send-email-robh@kernel.org>
+ <1430426233-7461-2-git-send-email-robh@kernel.org>
+Message-ID: <87ioccjmqe.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_device_id is not modified by the driver and core uses it as
-const.
+Rob Herring <robh@kernel.org> writes:
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
----
- sound/soc/fsl/imx-audmux.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Add the memory resource for the sa1100-rtc device. Since the memory
+> resource is already present in the pxa_rtc_resources, that makes
+> sa1100_rtc_resources and pxa_rtc_resources equivalent, so use
+> pxa_rtc_resources for both devices and remove the duplicate
+> sa1100_rtc_resources.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Daniel Mack <daniel@zonque.org>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+> v2:
+> - Rebase to v4.1-rc1
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-diff --git a/sound/soc/fsl/imx-audmux.c b/sound/soc/fsl/imx-audmux.c
-index d9050d946ae7..fc57da341d61 100644
---- a/sound/soc/fsl/imx-audmux.c
-+++ b/sound/soc/fsl/imx-audmux.c
-@@ -184,7 +184,7 @@ static enum imx_audmux_type {
- 	IMX31_AUDMUX,
- } audmux_type;
- 
--static struct platform_device_id imx_audmux_ids[] = {
-+static const struct platform_device_id imx_audmux_ids[] = {
- 	{
- 		.name = "imx21-audmux",
- 		.driver_data = IMX21_AUDMUX,
 -- 
-2.1.4
+Robert
