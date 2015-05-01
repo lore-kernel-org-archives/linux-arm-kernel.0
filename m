@@ -1,51 +1,82 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 01 May 2015 13:42:57 +0200
-Subject: [GIT PULL] pxa fixes for v4.1
-Message-ID: <87r3r0jzge.fsf@belgarion.home>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 1 May 2015 19:55:07 +0800
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <20150501104506.GA12330@red-moon>
+References: <1430402268.2868.20.camel@linaro.org>
+ <20150501015502.GA4679@leoy-linaro>
+ <1430475751.3045.40.camel@linaro.org>
+ <20150501104506.GA12330@red-moon>
+Message-ID: <20150501115507.GB16842@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd, Kevin, Olof,
+On Fri, May 01, 2015 at 11:45:06AM +0100, Lorenzo Pieralisi wrote:
+> On Fri, May 01, 2015 at 11:22:31AM +0100, Jon Medhurst (Tixy) wrote:
+> > On Fri, 2015-05-01 at 09:55 +0800, Leo Yan wrote:
+> > [...]
+> > > >  arch/arm64/boot/dts/arm/juno.dts | 28 ++++++++++++++++++++++++++++
+> > > >  1 file changed, 28 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> > > > index 133ee59..7a9a449 100644
+> > > > --- a/arch/arm64/boot/dts/arm/juno.dts
+> > > > +++ b/arch/arm64/boot/dts/arm/juno.dts
+> > > > @@ -34,12 +34,35 @@
+> > > >  		#address-cells = <2>;
+> > > >  		#size-cells = <0>;
+> > > >  
+> > > > +		idle-states {
+> > > > +			entry-method = "arm,psci";
+> > > > +
+> > > > +			CPU_SLEEP_0: cpu-sleep-0 {
+> > > > +				compatible = "arm,idle-state";
+> > > > +				arm,psci-suspend-param = <0x0010000>;
+> > > > +				local-timer-stop;
+> > > 
+> > > Just want to figure out the best way for big.LITTLE system; so have
+> > > one question: CA53 and CA57 have different power domain for arch
+> > > timer, right?
+> > 
+> > I'm not sure of the answer to that. The documentation I have does seem
+> > to state the timer is lost on cluster power down, which would imply that
+> > it's not when just powering down a cpu, but I'm not at all clear on the
+> > matter.
+> > 
+> > >  If this is the case, should we define two kinds of cpu
+> > > sleep states, one of them will not migrate to broadcast timer and
+> > > keep using arch timer after cpu has been powered down?
+> > 
+> > Do you mean that if the local timer is not lost (and so we should not
+> > have local-timer-stop above), then we should have another identical idle
+> > state except that it _does_ specify local-timer-stop to force the
+> > broadcast time to be used? If so, would that second state ever be more
+> > power efficient than the first? (I don't know the answer to that, this
+> > whole area is pretty new to me).
+> 
+> Ok, to start with, if we want the generic CPUidle driver to work on bL
+> systems, we should get this patch merged:
+> 
+> http://www.spinics.net/lists/arm-kernel/msg412790.html
 
-Please consider this pull request for pxa, repairing lubbock and mainstone.
+Thanks pointing out this.
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+> Architected timer is always lost on power down, unless we are talking
+> about a logic retention state (or if we are talking about local timers
+> that are not the architected ones). Anyway, with the patch above, different
+> cpus can have different idle states, so different behaviours when it
+> comes to the local timer behaviour. If, say, on a A53/A57 system, A53
+> cpus lose the local timer on idle state entry and A57 cpus do not
+> (that's a non-existing example though), those cpus will have different
+> idle states so different local-timer-stop flags.
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+For A57, not sure if arch timer will be powered off if cpu has been
+powered off.
 
-are available in the git repository at:
+>From A53's TRM figure 2-1 Cortex-A53 processor block diagram, the arch
+timer is not within CPU power domain, so likey arch timer still will
+work even cpu has been powered off (PDCPU/PDADVSIMD both have been off).
+This looks like is not aligning w/t your upper description. Could u
+confirm this understanding is right?
 
-  https://github.com/rjarzmik/linux.git tags/fixes-for-v4.1-rc2
-
-for you to fetch changes up to fc9e38c0f4d38bfc68b405cf48365d65f7b6319e:
-
-  ARM: pxa: lubbock: use new pxa_cplds driver (2015-04-30 22:52:51 +0200)
-
-----------------------------------------------------------------
-ARM: pxa: fixes for v4.1-rc2
-
-These fixes reenable the lubbock(pxa25x) and mainstone(pxa27x)
-platforms, which were broken since the gpio handling was
-converted to a driver, and the interrupt ordering broke the
-external interrupts of these systems.
-
-----------------------------------------------------------------
-Robert Jarzmik (3):
-      ARM: pxa: pxa_cplds: add lubbock and mainstone IO
-      ARM: pxa: mainstone: use new pxa_cplds driver
-      ARM: pxa: lubbock: use new pxa_cplds driver
-
- arch/arm/mach-pxa/Kconfig                  |   9 ++
- arch/arm/mach-pxa/Makefile                 |   1 +
- arch/arm/mach-pxa/include/mach/lubbock.h   |   7 +-
- arch/arm/mach-pxa/include/mach/mainstone.h |   6 +-
- arch/arm/mach-pxa/lubbock.c                | 108 +++++-----------
- arch/arm/mach-pxa/mainstone.c              | 115 ++++-------------
- arch/arm/mach-pxa/pxa_cplds_irqs.c         | 200 +++++++++++++++++++++++++++++
- 7 files changed, 274 insertions(+), 172 deletions(-)
- create mode 100644 arch/arm/mach-pxa/pxa_cplds_irqs.c
-
-Cheers.
-
--- 
-Robert
+Thanks,
+Leo Yan
