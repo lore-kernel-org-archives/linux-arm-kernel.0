@@ -1,42 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 May 2015 21:21:55 +0100
-Subject: [PATCH] ARM: mvebu: dove: Relicense the device tree under
- GPLv2+/X11
-In-Reply-To: <553FB6B4.8020401@gmail.com>
-References: <1430125744-3550-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20150428155910.GD12732@n2100.arm.linux.org.uk>
- <553FB6B4.8020401@gmail.com>
-Message-ID: <20150501202155.GQ12732@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 1 May 2015 22:22:18 +0200
+Subject: [PATCH 1/4] ARM: dts: sunxi: sun5i: add spi2_pins_b.
+In-Reply-To: <bda468ecf45ca063098f756bdaba85b6f5f42263.1430295711.git.hramrach@gmail.com>
+References: <cover.1430295711.git.hramrach@gmail.com>
+ <bda468ecf45ca063098f756bdaba85b6f5f42263.1430295711.git.hramrach@gmail.com>
+Message-ID: <20150501202218.GK6062@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 28, 2015 at 06:35:00PM +0200, Sebastian Hesselbarth wrote:
-> On 28.04.2015 17:59, Russell King - ARM Linux wrote:
-> >On Mon, Apr 27, 2015 at 11:09:04AM +0200, Sebastian Hesselbarth wrote:
-> >>The current implicit GPL only licensing on the device tree makes it
-> >>very impractical for other software components licensed under another
-> >>license.
-> >>
-> >>In order to make it easier for them to reuse our device trees,
-> >>relicense our device trees under a GPL/X11 dual-license.
-> >>
-> [...]
-> >>so I decided to keep the whole relicensing in a single patch. Please send
-> >>your Acked-by's in reply to this patch if you are happy with the relicensing.
-> >
-> >I normally don't include the "or later version" for my license changes
-> >as I've only accepted to contribute under the terms of GPLv2.
-> 
-> Ok, I guess this is a NACK for GPLv2+ but an Acked-by if we limit the
-> GPL part to GPLv2 only?
-> 
-> If so, is everybody else who already Acked the GPLv2+ part also fine
-> with reducing the GPL version to "version 2 only" ?
+On Wed, Apr 29, 2015 at 10:00:27AM +0200, Michal Suchanek wrote:
+> spi2_pins_a are only available on A10s
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+spi2_pins_a doesn't mean anything without any context.
 
-Thanks.
+Anyone should be able to read this commit log alone and understand
+what it's about and why you are doing it.
+
+It's clearly not the case here.
+
+> 
+> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun5i.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+> index 186d25f..9f22c28 100644
+> --- a/arch/arm/boot/dts/sun5i.dtsi
+> +++ b/arch/arm/boot/dts/sun5i.dtsi
+> @@ -551,6 +551,13 @@
+>  				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+>  				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>  			};
+> +
+> +			spi2_pins_b: spi2 at 1 {
+
+You should probably name that group spi2_pins_a. It feels a bit weird
+to have a spi2_pins_b group without its "a" counterpart.
+
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150501/7496b708/attachment-0001.sig>
