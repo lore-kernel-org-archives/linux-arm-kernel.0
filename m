@@ -1,55 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 May 2015 00:47 +0200
-Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
- X-Gene SoC EDAC DTS binding
-In-Reply-To: <CAL_JsqL7emqq=bSaWSi_0G5qSJqO+nVH_JH7VY+ynbrHhaSf_g@mail.gmail.com>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <CAPw-ZTksYNDE2zVD=ZjGzpKfXQN8KgW85ZnHoQ2eVmSGdSdMOw@mail.gmail.com>
- <CAL_JsqL7emqq=bSaWSi_0G5qSJqO+nVH_JH7VY+ynbrHhaSf_g@mail.gmail.com>
-Message-ID: <3511052.xgXf75lT96@wuerfel>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 1 May 2015 10:09:10 +0900
+Subject: [PATCH 0/5] PM / clock_ops: provide default runtime ops and
+ cleanup users
+In-Reply-To: <20150428004618.GA1807@verge.net.au>
+References: <553A6289.4040001@oracle.com>
+ <CAMuHMdWMjULD8jQDA-U6tumnCd=Q7jhZ2koha4CKU-K50tJXmw@mail.gmail.com>
+ <20150428004618.GA1807@verge.net.au>
+Message-ID: <20150501010909.GI13754@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 April 2015 17:36:16 Rob Herring wrote:
-> > Now let us discuss the DT layout if it is an single driver:
-> >
-> > xgeneedac: xgeneedac at 7e800000 {
-> >         compatible = "apm,xgene-edac";
-> >         regmap-efuse = <&efuse>; /* efuse */
-> >         reg = <0x0 0x78800000 0x0 0x100>, /* Top level interrupt
-> > status resource */
-> >                 <0x0 0x7e200000 0x0 0x1000>, /* CSW for MCB active resource
-> >                 <0x0 0x7e700000 0x0 0x1000>, /* MCB A resource */
-> >                 <0x0 0x7e720000 0x0 0x1000>, /* MCB B resource */
-> >                 <0x0 0x7e800000 0x0 0x1000>, /* MCU 0 resource */
-> >                 <0x0 0x7e840000 0x0 0x1000>, /* MCU 1 resource */
-> >                 <0x0 0x7e880000 0x0 0x1000>, /* MCU 2 resource */
-> >                 <0x0 0x7e8c0000 0x0 0x1000>, /* MCU 3 resource */
-> >                 <0x0 0x7c000000 0x0 0x200000>, /* CPU 0 domain for L1 and L2 */
-> >                 <0x0 0x7c200000 0x0 0x200000>, /* CPU 1 domain for L1 and L2 */
-> >                 <0x0 0x7c400000 0x0 0x200000>, /* CPU 2 domain for L1 and L2 */
-> >                 <0x0 0x7c600000 0x0 0x200000>, /* CPU 3 domain for L1 and L2 */
-> >                 <0x0 0x7e600000 0x0 0x1000>, /* L3 resource */
-> >                 <0x0 0x7e930000 0x0 0x1000>, /* SoC bus resource */
-> >                 <0x0 0x7e000000 0x0 0x1000>, /* SoC device resource */
+On Tue, Apr 28, 2015 at 09:46:18AM +0900, Simon Horman wrote:
+> On Fri, Apr 24, 2015 at 04:51:03PM +0200, Geert Uytterhoeven wrote:
+> > On Fri, Apr 24, 2015 at 4:41 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > > On Thursday, April 23, 2015 02:03:08 PM Rajendra Nayak wrote:
+> > >> Most users of PM clocks do the exact same thing in runtime callbacks.
+> > >> Provide default callbacks and cleanup the existing users (keystone/davinci
+> > >> /omap1/sh)
+> > >>
+> > >> Rajendra Nayak (5):
+> > >>   PM / clock_ops: Provide default runtime ops to users
+> > >>   arm: keystone: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+> > >>   arm: omap1: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+> > >>   arm: davinci: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+> > >>   drivers: sh: remove boilerplate code and use USE_PM_CLK_RUNTIME_OPS
+> > >>
+> > >>  arch/arm/mach-davinci/pm_domain.c  | 32 +-------------------------
+> > >>  arch/arm/mach-keystone/pm_domain.c | 33 +-------------------------
+> > >>  arch/arm/mach-omap1/pm_bus.c       | 37 ++----------------------------
+> > >>  drivers/base/power/clock_ops.c     | 38 ++++++++++++++++++++++++++++++
+> > >>  drivers/sh/pm_runtime.c            | 47 ++------------------------------------
+> > >>  include/linux/pm_clock.h           | 10 ++++++++
+> > >>  6 files changed, 54 insertions(+), 143 deletions(-)
+> > >
+> > > It is not particularly clear to me who is supposed to apply this series, but
+> > > I can do that if people don't have problems with that.
+> > 
+> > All later patches depend on the first patch.
+> > 
+> > For shmobile, Simon has queued up changes for drivers/sh/pm_runtime.c,
+> > but I think they don't conflict with this series.
 > 
-> Uggg, no. You were on the right track earlier in the thread. One node
-> per instance of each block.
+> Yes, that is the case. I have some patches (from Geert) queued up for v4.1.
+> I have confirmed that they do not conflict with the shmobile (last) patch
+> if this series.
 > 
+> <details>
+> The patches are in the sh-drivers-for-v4.1 branch of my renesas tree; I
+> rebased them yesterday; they should hit next today if there is a next
+> today; I plan to send a pull request to Linus in the not to distant future;
+> and I envisage they should end up in v4.1-rc2 or rc3.
 
-I agree these should be separate nodes, but I also think that we want a
-separate node for the pcp/pcperror/xgeneedac device. The compatible
-string for that should match whatever the datasheet calls that block,
-no idea why we now have the third name for that.
+The above mentioned changes were tagged as renesas-sh-drivers-for-v4.1 in
+my renesas tree; were merged into in Linus's tree yesterday; and should
+thus be included in v4.1-rc2.
 
-The specific parts could either be subnodes of the pcperror device,
-or they could be separate device nodes that reference the pcperror
-device through a phandle, so the driver can make the connection between
-them. This probably depends on what exactly all those nodes are:
-if the registers in there are all exclusively related to EDAC handling
-of the pcperror, subnodes would be best, but if the registers also
-contain functionality that is not related to EDAC handling, we
-probably want to have separate top-level nodes that a driver could
-bind to, e.g. for doing power management on the memory controller.
+I do not have any other changes to drivers/sh/pm_runtime.c pending at this time.
 
-	Arnd
+> </details>
+> 
+> On Fri, Apr 24, 2015 at 08:34:33AM -0700, santosh shilimkar wrote:
+> > On 4/24/2015 7:41 AM, Rafael J. Wysocki wrote:
+> > >On Thursday, April 23, 2015 02:03:08 PM Rajendra Nayak wrote:
+> 
+> [snip]
+> 
+> > >It is not particularly clear to me who is supposed to apply this series, but
+> > >I can do that if people don't have problems with that.
+> > >
+> > >
+> > I am fine by that given dependency with first patch.
+> > Another way is, you pick up the first patch and give us an
+> > immutable branch.
+> > 
+> > Either way is fine by me.
+> 
+> Likewise.
+> 
+> Here is an ack for the shmobile (last) patch if you decide to take it
+> through your tree.
+> 
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> 
