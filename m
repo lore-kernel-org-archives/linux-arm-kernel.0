@@ -1,83 +1,64 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 1 May 2015 18:14:55 +0900
-Subject: [RFT PATCH] drm/exynos: Enable DP clock to fix display on
- Exynos5250 and other
-In-Reply-To: <CAOesGMiA7DCGCg2xgLwu_r_rRYKUjpw2HUePCW5Q9ewU61WbdA@mail.gmail.com>
-References: <1427471856-20918-1-git-send-email-k.kozlowski@samsung.com>
- <7h8udau9he.fsf@deeprootsystems.com>
- <CAJKOXPc6Epy_L+djManggcaYLaOrQ_c2S0=_GgU=dikuY1UU0g@mail.gmail.com>
- <7h8ud9pqmm.fsf@deeprootsystems.com>
- <CAOesGMiHbcVK+BjiidPphGuoETyUroXtKgKqcVEgdSBiZQ+GmQ@mail.gmail.com>
- <55425AFB.8020904@collabora.co.uk>
- <CAOesGMiA7DCGCg2xgLwu_r_rRYKUjpw2HUePCW5Q9ewU61WbdA@mail.gmail.com>
-Message-ID: <CAJKOXPfFYs2nob5tKi2WgihV05SNPg9aHCE6PU_eivTYkkpzBg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 1 May 2015 10:29:45 +0100
+Subject: [GIT PULL] arm64: post merge-window fixes for 4.1
+Message-ID: <20150501092945.GC1561@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-01 1:50 GMT+09:00 Olof Johansson <olof@lixom.net>:
-> On Thu, Apr 30, 2015 at 9:40 AM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> Hello Olof,
->>
->> On 04/30/2015 05:57 PM, Olof Johansson wrote:
->>> On Thu, Apr 30, 2015 at 8:44 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>>> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
->>>>>>>
->>>>>>> This should fix issue reported by Javier [1][2].
->>>>>>>
->>>>>>> Tested on Chromebook Snow (Exynos 5250). More testing would be great,
->>>>>>> especially on other Exynos 5xxx products.
->>>>>>
->>>>>> I hoped to try this on my exynos5 boards, but it doesn't seem to apply
->>>>>> to linux-next or to Linus' master branch.
->>>>>>
->>>>>> Are there some other dependencies here?
->>>>>
->>>>> It is already applied:
->>>>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1c363c7cccf64128087002b0779986ad16aff6dc
->>>>
->>>> Er, yup.  That would explain it. ;)
->>>>
->>>> Sorry for the noise,
->>>
->>> Well, noise or not, Exynos is still broken in mainline and was broken
->>> on -next for so long in different ways that bisecting it is a futile
->>> exercise in frustration.
->>>
->>> It doesn't seem to show up with a trivial boot using only ramdisk, but
->>> when booting a real distro from disk, it certainly does.
->>>
->>> For example:
->>>
->>> http://arm-soc.lixom.net/bootlogs/mainline/v4.1-rc1-56-g3d99e3f/pi-arm-exynos_defconfig.html
->>>
->>> Disabling CONFIG_DRM makes it boot reliably.
->>>
->>> Arndale doesn't show it for me, but it also doesn't have working graphics.
->>>
->>
->> Both Exynos5250 and Exynos5420 had similar issues and $subject is the fix
->> for 5250 while 5420 is fixed by my "ARM: dts: Make DP a consumer of DISP1
->> power domain on Exynos5420" patch that was posted a long time ago. I have
->> pinged Kukjin several times about this patch and he said that he will pick
->> it this weekend [0].
->>
->> It is indeed very frustrating how many Exynos patches seems to be falling
->> through the crack, even important fixes like these ones that allow boards
->> to boot again.
->>
->> Kevin suggested that Krzysztof could collect and queue patches [1] to help
->> Kukjin and start acting as a co-maintatiner which I think it's a very good
->> idea and Krzysztof already did for some patches during the 4.1 cycle.
+Hi Linus,
 
-Yes, I did. It turned quite well, most of the patches I collected were
-pulled :) .
+Please pull the following arm64 fixes for 4.1. Not too much here, but
+we've addressed a couple of nasty issues in the dma-mapping code as well
+as adding the halfword and byte variants of load_acquire/store_release
+following on from the CSD locking bug that you fixed in the core.
 
-> Yes, that's a much needed improvement. I suggest starting out by
-> collecting critical fixes like these, and we'd be happy to merge them
-> directly if going through Kukjin will add latency.
->
-> Krzysztof, if you can, make sure you get a PGP key setup and start
-> collecting signatures from kernel developers.
+Thanks,
 
-Sure, I'll start right away!
+Will
+
+--->8
+
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 8291fd04d86b97869bd34e796bcac3141b9d5432:
+
+  arm64: perf: Fix the pmu node name in warning message (2015-04-30 12:11:30 +0100)
+
+----------------------------------------------------------------
+arm64 fixes:
+- Fix perf devicetree warnings at probe time
+- Fix memory leak in __dma_free()
+- Ensure DMA buffers are always zeroed
+- Show IRQ trigger in /proc/interrupts (for parity with ARM)
+- Implement byte and halfword access for smp_{load_acquire,store_release}
+
+----------------------------------------------------------------
+Andre Przywara (1):
+      arm64: add missing data types in smp_load_acquire/smp_store_release
+
+Dean Nelson (1):
+      arm64: add missing PAGE_ALIGN() to __dma_free()
+
+Marek Szyprowski (1):
+      arm64: dma-mapping: always clear allocated buffers
+
+Sudeep Holla (1):
+      ARM64: Enable CONFIG_GENERIC_IRQ_SHOW_LEVEL
+
+Suzuki K. Poulose (1):
+      arm64: perf: Fix the pmu node name in warning message
+
+Will Deacon (1):
+      arm64: perf: don't warn about missing interrupt-affinity property for PPIs
+
+ arch/arm64/Kconfig               |  1 +
+ arch/arm64/include/asm/barrier.h | 16 ++++++++++++++++
+ arch/arm64/kernel/perf_event.c   |  9 +++++++--
+ arch/arm64/mm/dma-mapping.c      |  9 ++++-----
+ 4 files changed, 28 insertions(+), 7 deletions(-)
