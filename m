@@ -1,45 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 May 2015 10:02:02 +0100
-Subject: [PATCH] arm64: dts: Add idle-states for Juno
-In-Reply-To: <20150430171701.GA31834@red-moon>
-References: <1430402268.2868.20.camel@linaro.org> <554251B4.2030808@arm.com>
- <1430412035.2868.40.camel@linaro.org>
- <20150430171701.GA31834@red-moon>
-Message-ID: <20150501090201.GE27755@e104818-lin.cambridge.arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 1 May 2015 11:14:06 +0200
+Subject: [PATCH 0/4] clk: si5351: Some fixes
+In-Reply-To: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20150501111406.0aa23c7b@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 06:17:01PM +0100, Lorenzo Pieralisi wrote:
-> On Thu, Apr 30, 2015 at 05:40:35PM +0100, Jon Medhurst (Tixy) wrote:
-> > On Thu, 2015-04-30 at 17:00 +0100, Sudeep Holla wrote:
-> > > On 30/04/15 14:57, Jon Medhurst (Tixy) wrote:
-> > > > From: Jon Medhurst <tixy@linaro.org>
-> > > >
-> > > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > > > ---
-> > > >
-> > > > These have been kicking around out of tree for ages, any reason they
-> > > > shouldn't be in mainline?
-> > > 
-> > > One possible reason could be that these values are not tuned(e.g.
-> > > latency values, can they be same for both clusters ?)
-> > 
-> > I thought that both clusters being the same was questionable.
-> > 
-> > >  Though these
-> > > reasons are not blocking and this patch will not cause any
-> > > functionality break even if is merged as is.
-> > 
-> > My main purpose with trying to get this merged is so that people using
-> > Juno for general testing and validation will actually have cpuidle
-> > running and so potentially find more bugs.
-> 
-> I am reluctant to enable idle states in the default Juno dts, they
-> will affect latencies and performance tests significantly.
+On Thu, 30 Apr 2015 19:45:50 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-OTOH, I guess they will improve the power benchmarks. IMO, we should
-place in the DT whatever the hardware and firmware supports. It's up to
-those doing benchmarks to disable CPU suspend.
+> For Si5351 clock driver, Michael Welling and Jean-Francois Moine reported
+> issues with recent v4.x kernels due to broken/missing/wrong parent clock
+> claming. This patch set now deals with the issues reported.
+> 
+> Patch 1 amends the binding documentation mention clock-names property
+> for the "xtal" and "clkin" parent clock inputs of Si5351 variants.
+> 
+> Patch 2 adds the clock-names property for the SolidRun CuBox using Si5351
+> with a fixed oscillator connected to "xtal" input.
+> 
+> Patch 3 reworks the way we claim parent clocks by using devm_clk_get()
+> for both DT and platform_data based registration. Also, properly check
+> for errors returned by devm_clk_get() and prepare/enable the parent clocks.
+> 
+> Patch 4 introduces a function to reset PLLs on rate change. This should
+> improve generated clock output stability. I currently have no scope at hand
+> to actually test that properly, so there may be more issues remaining.
+> 
+> @Michael, Jean-Francois: Please test and report if there are still
+> issues remaining.
+
+I applied the patches 2 and 3, and the audio and video in the Cubox
+work fine again. Thanks.
 
 -- 
-Catalin
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
