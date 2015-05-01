@@ -1,9 +1,7 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 00:49:22 +0900
-Subject: [PATCH 6/6] mmc: sdhc-s3c: Constify platform_device_id
-In-Reply-To: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1430495362-31506-6-git-send-email-k.kozlowski.k@gmail.com>
+Date: Sat,  2 May 2015 00:54:25 +0900
+Subject: [PATCH 1/4] i2c: imx: Constify platform_device_id
+Message-ID: <1430495668-31878-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +10,21 @@ const.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- drivers/mmc/host/sdhci-s3c.c | 2 +-
+ drivers/i2c/busses/i2c-imx.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index c6d2dd7317c1..70c724bc6fc7 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -736,7 +736,7 @@ static struct sdhci_s3c_drv_data exynos4_sdhci_drv_data = {
- #define EXYNOS4_SDHCI_DRV_DATA ((kernel_ulong_t)NULL)
- #endif
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index a53a7dd66945..785aa674a4da 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -241,7 +241,7 @@ static struct imx_i2c_hwdata vf610_i2c_hwdata = {
  
--static struct platform_device_id sdhci_s3c_driver_ids[] = {
-+static const struct platform_device_id sdhci_s3c_driver_ids[] = {
+ };
+ 
+-static struct platform_device_id imx_i2c_devtype[] = {
++static const struct platform_device_id imx_i2c_devtype[] = {
  	{
- 		.name		= "s3c-sdhci",
- 		.driver_data	= (kernel_ulong_t)NULL,
+ 		.name = "imx1-i2c",
+ 		.driver_data = (kernel_ulong_t)&imx1_i2c_hwdata,
 -- 
 2.1.4
