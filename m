@@ -1,38 +1,58 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 01 May 2015 11:30:18 +0200
-Subject: [PATCH 0/4] clk: si5351: Some fixes
-In-Reply-To: <20150501111406.0aa23c7b@armhf>
-References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20150501111406.0aa23c7b@armhf>
-Message-ID: <554347AA.3070502@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri,  1 May 2015 10:41:10 +0100
+Subject: [PATCH] drivers: mfd: check ACPI device companion before checking
+ resources
+Message-ID: <1430473270-11359-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.05.2015 11:14, Jean-Francois Moine wrote:
-> On Thu, 30 Apr 2015 19:45:50 +0200
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->> For Si5351 clock driver, Michael Welling and Jean-Francois Moine reported
->> issues with recent v4.x kernels due to broken/missing/wrong parent clock
->> claming. This patch set now deals with the issues reported.
->>
->> Patch 1 amends the binding documentation mention clock-names property
->> for the "xtal" and "clkin" parent clock inputs of Si5351 variants.
->>
->> Patch 2 adds the clock-names property for the SolidRun CuBox using Si5351
->> with a fixed oscillator connected to "xtal" input.
->>
->> Patch 3 reworks the way we claim parent clocks by using devm_clk_get()
->> for both DT and platform_data based registration. Also, properly check
->> for errors returned by devm_clk_get() and prepare/enable the parent clocks.
-[...]
->
-> I applied the patches 2 and 3, and the audio and video in the Cubox
-> work fine again. Thanks.
+Current code in mfd-core calls into ACPI to check resources even
+on a system that booted with a DT (on kernels with both DT and ACPI
+support compiled in). This triggers ACPI exceptions since we may
+end up calling the ACPI interpreter when it has not been initialized:
 
-Ok, good. You mentioned that on v3.19-rc1 it still "works" i.e. despite
-the broken/missing clk_get/clk_prepare_enable?
+"ACPI Exception: AE_BAD_PARAMETER, Thread 2064154624 could not acquire
+Mutex [0x1] (20150410/utmutex-285)"
 
-Can you check the stable (v3.19, v4.0) versions and see how far we
-should backport the fix?
+This patch fixes the issues by adding a check for an ACPI companion
+device before carrying out ACPI resources checks to avoid calling
+the ACPI interpreter if the fwnode representing the device is an OF one.
 
-Sebastian
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+---
+Lee, Samuel,
+
+I could not test it on X86 and I do not know if you prefer setting
+ignore_resource_conflicts in the respective mfd cells (ie vexpress),
+just let me know how do you want to fix it.
+
+Thanks,
+Lorenzo
+
+ drivers/mfd/mfd-core.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
+index 1aed3b7..14fd5cb 100644
+--- a/drivers/mfd/mfd-core.c
++++ b/drivers/mfd/mfd-core.c
+@@ -207,9 +207,11 @@ static int mfd_add_device(struct device *parent, int id,
+ 		}
+ 
+ 		if (!cell->ignore_resource_conflicts) {
+-			ret = acpi_check_resource_conflict(&res[r]);
+-			if (ret)
+-				goto fail_alias;
++			if (has_acpi_companion(&pdev->dev)) {
++				ret = acpi_check_resource_conflict(&res[r]);
++				if (ret)
++					goto fail_alias;
++			}
+ 		}
+ 	}
+ 
+-- 
+2.2.1
