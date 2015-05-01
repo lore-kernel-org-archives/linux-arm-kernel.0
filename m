@@ -1,32 +1,31 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 01:02:48 +0900
-Subject: [PATCH 2/2] clk: s3c2410: Constify platform_device_id
-In-Reply-To: <1430496168-32408-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430496168-32408-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1430496168-32408-2-git-send-email-k.kozlowski.k@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 01 May 2015 12:06:27 -0400
+Subject: [PATCH 0/5] Second round of MCPM refactoring
+Message-ID: <1430496392-15956-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_device_id is not modified by the driver and core uses it as
-const.
+This is the sequel to the first episode that started here:
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
----
- drivers/clk/samsung/clk-s3c2410-dclk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+	http://article.gmane.org/gmane.linux.ports.arm.kernel/401353
 
-diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
-index db6fddb211d4..e56df5064889 100644
---- a/drivers/clk/samsung/clk-s3c2410-dclk.c
-+++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
-@@ -404,7 +404,7 @@ static struct s3c24xx_dclk_drv_data dclk_variants[] = {
- 	},
- };
- 
--static struct platform_device_id s3c24xx_dclk_driver_ids[] = {
-+static const struct platform_device_id s3c24xx_dclk_driver_ids[] = {
- 	{
- 		.name		= "s3c2410-dclk",
- 		.driver_data	= (kernel_ulong_t)&dclk_variants[S3C2410],
--- 
-2.1.4
+Now that most of the first set has been merged upstream, here's the last
+set to complete the cleanup. This mainly includes the removal of the
+backward compatibility support plus some cosmetic changes.
+
+The hisi04 backend, though, is instead converted to raw SMP operations
+as it currently doesn't benefit from MCPM at all and doesn't fit well
+with the new backend structure.
+
+This series can also be obtained from the following Git repository:
+
+	http://git.linaro.org/people/nicolas.pitre/linux.git mcpm
+
+The diffstat shows more code removal again:
+
+ arch/arm/common/mcpm_entry.c         | 281 +++++++++++++----------------
+ arch/arm/include/asm/mcpm.h          |  73 +++-----
+ arch/arm/mach-exynos/suspend.c       |   8 +-
+ arch/arm/mach-hisi/platmcpm.c        | 127 +++++--------
+ drivers/cpuidle/cpuidle-big_little.c |   8 +-
+ 5 files changed, 198 insertions(+), 299 deletions(-)
