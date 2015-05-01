@@ -1,93 +1,60 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 1 May 2015 12:20:20 +0100
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 1 May 2015 19:39:51 +0800
 Subject: [PATCH] arm64: dts: Add idle-states for Juno
-In-Reply-To: <20150501102202.GU7440@e106497-lin.cambridge.arm.com>
-References: <1430402268.2868.20.camel@linaro.org> <554251B4.2030808@arm.com>
- <1430412035.2868.40.camel@linaro.org>
- <20150430171701.GA31834@red-moon>
- <20150501090201.GE27755@e104818-lin.cambridge.arm.com>
- <20150501101211.GB11403@red-moon>
- <20150501102202.GU7440@e106497-lin.cambridge.arm.com>
-Message-ID: <20150501112020.GB12330@red-moon>
+In-Reply-To: <1430475751.3045.40.camel@linaro.org>
+References: <1430402268.2868.20.camel@linaro.org>
+ <20150501015502.GA4679@leoy-linaro>
+ <1430475751.3045.40.camel@linaro.org>
+Message-ID: <20150501113951.GA16842@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 01, 2015 at 11:22:02AM +0100, Liviu Dudau wrote:
-> On Fri, May 01, 2015 at 11:12:11AM +0100, Lorenzo Pieralisi wrote:
-> > On Fri, May 01, 2015 at 10:02:02AM +0100, Catalin Marinas wrote:
-> > > On Thu, Apr 30, 2015 at 06:17:01PM +0100, Lorenzo Pieralisi wrote:
-> > > > On Thu, Apr 30, 2015 at 05:40:35PM +0100, Jon Medhurst (Tixy) wrote:
-> > > > > On Thu, 2015-04-30 at 17:00 +0100, Sudeep Holla wrote:
-> > > > > > On 30/04/15 14:57, Jon Medhurst (Tixy) wrote:
-> > > > > > > From: Jon Medhurst <tixy@linaro.org>
-> > > > > > >
-> > > > > > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > > > > > > ---
-> > > > > > >
-> > > > > > > These have been kicking around out of tree for ages, any reason they
-> > > > > > > shouldn't be in mainline?
-> > > > > > 
-> > > > > > One possible reason could be that these values are not tuned(e.g.
-> > > > > > latency values, can they be same for both clusters ?)
-> > > > > 
-> > > > > I thought that both clusters being the same was questionable.
-> > > > > 
-> > > > > >  Though these
-> > > > > > reasons are not blocking and this patch will not cause any
-> > > > > > functionality break even if is merged as is.
-> > > > > 
-> > > > > My main purpose with trying to get this merged is so that people using
-> > > > > Juno for general testing and validation will actually have cpuidle
-> > > > > running and so potentially find more bugs.
-> > > > 
-> > > > I am reluctant to enable idle states in the default Juno dts, they
-> > > > will affect latencies and performance tests significantly.
+On Fri, May 01, 2015 at 11:22:31AM +0100, Jon Medhurst (Tixy) wrote:
+> On Fri, 2015-05-01 at 09:55 +0800, Leo Yan wrote:
+> [...]
+> > >  arch/arm64/boot/dts/arm/juno.dts | 28 ++++++++++++++++++++++++++++
+> > >  1 file changed, 28 insertions(+)
 > > > 
-> > > OTOH, I guess they will improve the power benchmarks. IMO, we should
-> > > place in the DT whatever the hardware and firmware supports. It's up to
-> > > those doing benchmarks to disable CPU suspend.
+> > > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> > > index 133ee59..7a9a449 100644
+> > > --- a/arch/arm64/boot/dts/arm/juno.dts
+> > > +++ b/arch/arm64/boot/dts/arm/juno.dts
+> > > @@ -34,12 +34,35 @@
+> > >  		#address-cells = <2>;
+> > >  		#size-cells = <0>;
+> > >  
+> > > +		idle-states {
+> > > +			entry-method = "arm,psci";
+> > > +
+> > > +			CPU_SLEEP_0: cpu-sleep-0 {
+> > > +				compatible = "arm,idle-state";
+> > > +				arm,psci-suspend-param = <0x0010000>;
+> > > +				local-timer-stop;
 > > 
-> > I am ok with DT defining whatever HW and FW support, the question is
-> > whether we want CPUidle (and CPUfreq) enabled by default in the
-> > defconfig then.
-> > 
-> > This will certainly trigger mainline regressions from a latency/performance
-> > standpoint (true, some tests disable idle states by default ie cyclic
-> > test), unless we disable CPUidle via command line parameter or we
-> > force people carrying out tests to disable idle states through sysfs knobs.
+> > Just want to figure out the best way for big.LITTLE system; so have
+> > one question: CA53 and CA57 have different power domain for arch
+> > timer, right?
 > 
-> Hi Lorenzo,
+> I'm not sure of the answer to that. The documentation I have does seem
+> to state the timer is lost on cluster power down, which would imply that
+> it's not when just powering down a cpu, but I'm not at all clear on the
+> matter.
 > 
-> Do you have any specific tests in mind that you are afraid of breaking? Would
-> enabling the performance CPUfreq driver by default not be enough to cover those
-> tests, like Sudeep suggested?
-
-We are talking about separate things here. Every test/benchmark affected by
-latency will regress if we enable idle states, regardless of CPUfreq.
-
-If we agree that it is left to people carrying out performance tests to
-disable those features in the kernel, that's fine by me, I am pretty sure it
-won't take us long to notice by the time we merge this patch in the
-mainline, I just wanted to avoid forcing features upon users who may not
-find energy savings a useful feature, that's it.
-
-I will review the idle states dts content then.
-
-Lorenzo
-
-> Best regards,
-> Liviu
+> >  If this is the case, should we define two kinds of cpu
+> > sleep states, one of them will not migrate to broadcast timer and
+> > keep using arch timer after cpu has been powered down?
 > 
-> > 
-> > Lorenzo
-> > 
-> 
-> -- 
-> ====================
-> | I would like to |
-> | fix the world,  |
-> | but they're not |
-> | giving me the   |
->  \ source code!  /
->   ---------------
->     ??\_(???)_/??
+> Do you mean that if the local timer is not lost (and so we should not
+> have local-timer-stop above), then we should have another identical idle
+> state except that it _does_ specify local-timer-stop to force the
+> broadcast time to be used? If so, would that second state ever be more
+> power efficient than the first? (I don't know the answer to that, this
+> whole area is pretty new to me).
+
+Yes, the second state will have better power efficient. But if the
+arch timer can keep working after the cpu is powered off, we also
+can get benefit for cpuidle's latency, this is because s/w don't need
+migrate the cpu timers to broad cast timer list anymore.
+
+Thanks,
+Leo Yan
