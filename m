@@ -1,109 +1,93 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 May 2015 12:06:44 +0100
-Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
- device coherency
-In-Reply-To: <2817500.sgztgK2NzB@wuerfel>
-References: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
- <2817500.sgztgK2NzB@wuerfel>
-Message-ID: <20150501110644.GF27755@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 1 May 2015 12:20:20 +0100
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <20150501102202.GU7440@e106497-lin.cambridge.arm.com>
+References: <1430402268.2868.20.camel@linaro.org> <554251B4.2030808@arm.com>
+ <1430412035.2868.40.camel@linaro.org>
+ <20150430171701.GA31834@red-moon>
+ <20150501090201.GE27755@e104818-lin.cambridge.arm.com>
+ <20150501101211.GB11403@red-moon>
+ <20150501102202.GU7440@e106497-lin.cambridge.arm.com>
+Message-ID: <20150501112020.GB12330@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 29, 2015 at 05:54:02PM +0200, Arnd Bergmann wrote:
-> On Wednesday 29 April 2015 14:57:10 Suthikulpanit, Suravee wrote:
-> > Otherwise, it would seem inconsistent with what states in the ACPI spec:
-> >  
-> >   CCA objects are only relevant for devices that can access
-> >   CPU-visible memory, such as devices that are DMA capable. On ARM
-> >   based systems, the _CCA object must be supplied all such devices.
-> >   On Intel platforms, if the _CCA object is not supplied, the OSPM
-> >   will assume the devices are hardware cache coherent.
+On Fri, May 01, 2015 at 11:22:02AM +0100, Liviu Dudau wrote:
+> On Fri, May 01, 2015 at 11:12:11AM +0100, Lorenzo Pieralisi wrote:
+> > On Fri, May 01, 2015 at 10:02:02AM +0100, Catalin Marinas wrote:
+> > > On Thu, Apr 30, 2015 at 06:17:01PM +0100, Lorenzo Pieralisi wrote:
+> > > > On Thu, Apr 30, 2015 at 05:40:35PM +0100, Jon Medhurst (Tixy) wrote:
+> > > > > On Thu, 2015-04-30 at 17:00 +0100, Sudeep Holla wrote:
+> > > > > > On 30/04/15 14:57, Jon Medhurst (Tixy) wrote:
+> > > > > > > From: Jon Medhurst <tixy@linaro.org>
+> > > > > > >
+> > > > > > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > > > > > > ---
+> > > > > > >
+> > > > > > > These have been kicking around out of tree for ages, any reason they
+> > > > > > > shouldn't be in mainline?
+> > > > > > 
+> > > > > > One possible reason could be that these values are not tuned(e.g.
+> > > > > > latency values, can they be same for both clusters ?)
+> > > > > 
+> > > > > I thought that both clusters being the same was questionable.
+> > > > > 
+> > > > > >  Though these
+> > > > > > reasons are not blocking and this patch will not cause any
+> > > > > > functionality break even if is merged as is.
+> > > > > 
+> > > > > My main purpose with trying to get this merged is so that people using
+> > > > > Juno for general testing and validation will actually have cpuidle
+> > > > > running and so potentially find more bugs.
+> > > > 
+> > > > I am reluctant to enable idle states in the default Juno dts, they
+> > > > will affect latencies and performance tests significantly.
+> > > 
+> > > OTOH, I guess they will improve the power benchmarks. IMO, we should
+> > > place in the DT whatever the hardware and firmware supports. It's up to
+> > > those doing benchmarks to disable CPU suspend.
 > > 
-> > From the statement above, I interpreted as if it is not present, it would
-> > be non-coherent.
+> > I am ok with DT defining whatever HW and FW support, the question is
+> > whether we want CPUidle (and CPUfreq) enabled by default in the
+> > defconfig then.
+> > 
+> > This will certainly trigger mainline regressions from a latency/performance
+> > standpoint (true, some tests disable idle states by default ie cyclic
+> > test), unless we disable CPUidle via command line parameter or we
+> > force people carrying out tests to disable idle states through sysfs knobs.
 > 
-> My guess is that this section was included for Windows Phone, which runs
-> on embedded SoCs that usually have noncoherent DMA in a particular way.
+> Hi Lorenzo,
 > 
-> Linux however only uses ACPI for servers, so that case does not happen.
+> Do you have any specific tests in mind that you are afraid of breaking? Would
+> enabling the performance CPUfreq driver by default not be enough to cover those
+> tests, like Sudeep suggested?
+
+We are talking about separate things here. Every test/benchmark affected by
+latency will regress if we enable idle states, regardless of CPUfreq.
+
+If we agree that it is left to people carrying out performance tests to
+disable those features in the kernel, that's fine by me, I am pretty sure it
+won't take us long to notice by the time we merge this patch in the
+mainline, I just wanted to avoid forcing features upon users who may not
+find energy savings a useful feature, that's it.
+
+I will review the idle states dts content then.
+
+Lorenzo
+
+> Best regards,
+> Liviu
 > 
-> I guess it would be reasonable to add a run-time warning here if you
-> try to do DMA on a device that does not have CCA set, and you should
-> probably set the DMA mask to 0 in that case as well.
-
-I agree, if _CCA isn't present, we should not allow DMA. With DT, the
-default dma_ops point to non-coherent but with ACPI, we could change
-the default to a dummy set of dma_ops which don't do anything (or just
-return NULL). Something like below, untested:
-
-
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 9437e3dc5833..3fd6ef019c8f 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -31,10 +31,14 @@ extern struct dma_map_ops *dma_ops;
- 
- static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
- {
--	if (unlikely(!dev) || !dev->archdata.dma_ops)
-+	if (!dev)
- 		return dma_ops;
--	else
-+	else if (dev->archdata.dma_ops)
- 		return dev->archdata.dma_ops;
-+	else if (!acpi_disabled)
-+		return dummy_dma_ops;
-+	else
-+		return dma_ops;
- }
- 
- static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-@@ -48,6 +52,8 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
- static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 				      struct iommu_ops *iommu, bool coherent)
- {
-+	if (!acpi_disabled && !dev->archdata.dma_ops)
-+		dev->archdata.dma_ops = dma_ops;
- 	dev->archdata.dma_coherent = coherent;
- }
- #define arch_setup_dma_ops	arch_setup_dma_ops
-
-
-The core code should not call arch_setup_dma_ops() if no _CCA option is
-found.
-
-> Note that there are lots of ways in which you could have noncoherent DMA:
-> the default on ARM32 is that it requires uncached access or explicit
-> cache flushes, but it's also possible to have an SMP system where a device
-> is only coherent with some of the CPUs and requires explicit synchronization
-> (not flushes) otherwise. In a multi-level cache hierarchy, there could be
-> all sorts of combinations of flushes and syncs you would need to do.
+> > 
+> > Lorenzo
+> > 
 > 
-> With DT, we handle this using SoC-specific overrides for platforms that
-> are noncoherent in funny ways, see
-> http://lxr.free-electrons.com/source/arch/arm/mach-mvebu/coherency.c?v=3.18#L263
-> for instance.
-
-It looks like mach-mvebu no longer needs this, according to commit
-1bd4d8a6de5c (ARM: mvebu: use arm_coherent_dma_ops and re-enable hardware
-I/O coherency).
-
-Even if some hardware needs this, it's usually because it has some
-broken assumptions about barriers which most likely are architecture
-non-compliant. We can work around it on a case by case basis (SoC
-quirks). One option would be to disable coherency altogether for that
-device, even if the performance is affected (e.g. no partial coherency).
-Another possibility may be to add a bus driver for that broken
-interconnect which installs its own dma ops for each device attached.
-
-> If we just disallow DMA to devices that are marked with _CCA=0
-> in ACPI, we can avoid this case, or discuss it by the time someone has hardware
-> that wants it, and then make a more informed decision about it.
-
-I don't think we should disallow DMA to devices with _CCA == 0 (only to
-those that don't have a _CCA property at all) as long as _CCA == 0 has
-clear semantics like only architected cache maintenance required (and
-that's what the ARMv8 ARM requires from compliant system caches).
-
--- 
-Catalin
+> -- 
+> ====================
+> | I would like to |
+> | fix the world,  |
+> | but they're not |
+> | giving me the   |
+>  \ source code!  /
+>   ---------------
+>     ??\_(???)_/??
