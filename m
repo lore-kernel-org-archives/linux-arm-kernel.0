@@ -1,9 +1,9 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 00:51:02 +0900
-Subject: [PATCH 3/4] media: platform: s3c-camif: Constify platform_device_id
-In-Reply-To: <1430495463-31633-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430495463-31633-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1430495463-31633-3-git-send-email-k.kozlowski.k@gmail.com>
+Date: Sat,  2 May 2015 00:49:20 +0900
+Subject: [PATCH 4/6] mmc: s3cmci: Constify platform_device_id
+In-Reply-To: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1430495362-31506-4-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +12,21 @@ const.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- drivers/media/platform/s3c-camif/camif-core.c | 2 +-
+ drivers/mmc/host/s3cmci.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/s3c-camif/camif-core.c b/drivers/media/platform/s3c-camif/camif-core.c
-index 2d5bd3ac7f81..f47b332f0418 100644
---- a/drivers/media/platform/s3c-camif/camif-core.c
-+++ b/drivers/media/platform/s3c-camif/camif-core.c
-@@ -628,7 +628,7 @@ static struct s3c_camif_drvdata s3c6410_camif_drvdata = {
- 	.bus_clk_freq	= 133000000UL,
- };
+diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+index 94cddf381ba3..6291d5042ef2 100644
+--- a/drivers/mmc/host/s3cmci.c
++++ b/drivers/mmc/host/s3cmci.c
+@@ -1856,7 +1856,7 @@ static int s3cmci_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
--static struct platform_device_id s3c_camif_driver_ids[] = {
-+static const struct platform_device_id s3c_camif_driver_ids[] = {
+-static struct platform_device_id s3cmci_driver_ids[] = {
++static const struct platform_device_id s3cmci_driver_ids[] = {
  	{
- 		.name		= "s3c2440-camif",
- 		.driver_data	= (unsigned long)&s3c244x_camif_drvdata,
+ 		.name	= "s3c2410-sdi",
+ 		.driver_data	= 0,
 -- 
 2.1.4
