@@ -1,33 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 May 2015 21:40:40 +0200
-Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
- for cygnus
-In-Reply-To: <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
-References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
- <5543CD73.2030902@broadcom.com> <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
-Message-ID: <9193036.7UYD2OGJHk@wuerfel>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 1 May 2015 12:59:56 -0700
+Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <CAL_JsqL7emqq=bSaWSi_0G5qSJqO+nVH_JH7VY+ynbrHhaSf_g@mail.gmail.com>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <7128860.xHITr0VFap@wuerfel> <20150430094134.GD3488@pd.tnic>
+ <10227049.9i19zDi2y3@wuerfel> <20150430130028.GF3488@pd.tnic>
+ <CAPw-ZTnuyB2ne1C2-38qAxM_ANwdr9nuCYUMj=aTx7c90sVg+Q@mail.gmail.com>
+ <20150430171846.GJ3488@pd.tnic>
+ <CAPw-ZTksYNDE2zVD=ZjGzpKfXQN8KgW85ZnHoQ2eVmSGdSdMOw@mail.gmail.com>
+ <CAL_JsqL7emqq=bSaWSi_0G5qSJqO+nVH_JH7VY+ynbrHhaSf_g@mail.gmail.com>
+Message-ID: <CAPw-ZTnNEiTA-MJthY04yCrc9RdZOUFaNjzBHFV1fWzkBqRCyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 May 2015 20:30:04 One Thousand Gnomes wrote:
-> 
-> > channel control, unless I'm missing something. If people are flexible
-> > with extending that I could propose something. Let me know which way you
-> > prefer to go. Thanks.
-> 
-> I would strongly favour fixing PTP to do this right. Otherwise we will
-> have 2 or 3 adhoc drivers, then end up moving them to PTP and then end up
-> dealing with the compat mess.
+Hi Rob,
 
-Agreed. I was hoping that there was already a subsystem in the kernel that
-could be extended to work with this driver. If all that is needed is to
-pass more fields of the existing timex to ptp drivers, that should be
-fairly easy to do.
+>>>> I think we should first agreed on the DT binding and let's not worry
+>>>> about APEI. Then, whether we have one file or multiple file. Again,
+>>>> the HW consist of:
+>>>>
+>>>> 1. One top level interrupt and status registers
+>
+> For these registers, are there ECC specific functions here or just
+> normal interrupt control/status bits (mask/unmask/status)? Assuming
+> the later, then you should make this block an interrupt-controller.
+> Then this is the interrupt-parent for the rest of the blocks.
+>
 
-We also have some padding bytes available in struct timex in case some
-extra data needs to be passed, or we could add another clock_* system call
-if it's absolutely required to have another entry into the driver, and
-connect that through struct k_clock and posix_clock_operations(). I would
-hope we don't even need that.
+This is the only item remain before I generate an patch with just the
+memory controller. Most of the code that I see are actually an
+interrupt controller HW. As it is just an interrupt mask and status
+registers, is there an example in Linux that I can model after? Also,
+I am not quite convince as to why we can't just share the interrupt
+and request it by each memory controller?
 
-	Arnd
+-Loc
