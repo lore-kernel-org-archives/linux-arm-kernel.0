@@ -1,75 +1,42 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Fri,  1 May 2015 19:11:26 +0200
-Subject: [PATCH] ARM: vexpress: Add interrupt-affinity
-Message-ID: <1430500286-10337-1-git-send-email-r.schwebel@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 01 May 2015 19:20:00 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.1
+Message-ID: <5543B5C0.4080200@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9fd85eb502a7 ("ARM: pmu: add support for interrupt-affinity
-property") added an optional "interrupt-affinity" property, to specify
-the CPU affinity for each SPI listed in the interrupts property.
+Hi,
 
-Without this property, we get this boot warning:
+Here is the first pull request for fixes for mvebu for v4.1. There
+are more which will come later but which have not been yet in linux-next.
 
-  CPU PMU: Failed to parse <no-node>/interrupt-affinity[0]
+Gregory
 
-This patch adds interrupt-affinity to the PMU node in the
-vexpress-v2p-ca9 device tree.
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-Signed-off-by: Robert Schwebel <r.schwebel@pengutronix.de>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/boot/dts/vexpress-v2p-ca9.dts | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-index a411274..9d71493 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-@@ -33,28 +33,28 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		A9_0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <0>;
- 			next-level-cache = <&L2>;
- 		};
- 
--		cpu at 1 {
-+		A9_1: cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <1>;
- 			next-level-cache = <&L2>;
- 		};
- 
--		cpu at 2 {
-+		A9_2: cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <2>;
- 			next-level-cache = <&L2>;
- 		};
- 
--		cpu at 3 {
-+		A9_3: cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <3>;
-@@ -182,6 +182,11 @@
- 			     <0 61 4>,
- 			     <0 62 4>,
- 			     <0 63 4>;
-+		interrupt-affinity = <&A9_0>,
-+		                     <&A9_1>,
-+		                     <&A9_2>,
-+		                     <&A9_3>;
-+
- 	};
- 
- 	dcc {
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.1
+
+for you to fetch changes up to 750e30d4076ae5e02ad13a376e96c95a2627742c:
+
+  ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal RTC (2015-04-27 09:27:18 +0200)
+
+----------------------------------------------------------------
+mvebu fix for 4.1
+
+Disable the unused internal RTC in the dts of the OpenBlock AX3
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal RTC
+
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 -- 
-2.1.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
