@@ -1,61 +1,58 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 01 May 2015 09:52:28 +0100
-Subject: [PATCH] arm64: dts: Add idle-states for Juno
-In-Reply-To: <5542690F.5060001@arm.com>
-References: <1430402268.2868.20.camel@linaro.org> <554251B4.2030808@arm.com>
- <1430412035.2868.40.camel@linaro.org> <20150430171701.GA31834@red-moon>
- <1430415404.2868.49.camel@linaro.org> <5542690F.5060001@arm.com>
-Message-ID: <1430470348.3045.10.camel@linaro.org>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Fri, 1 May 2015 09:55:42 +0100
+Subject: [PATCH] ARM: dts: am437x-gp-evm: add DT nodes for ov2659 sensor
+In-Reply-To: <CA+V-a8u-Y7M9ynJDD05=XeMjZMsb_0Utd-TuwJzEuRziPksvGQ@mail.gmail.com>
+References: <1426203501-32115-1-git-send-email-prabhakar.csengg@gmail.com>
+ <20150316221740.GQ12397@atomide.com>
+ <CA+V-a8uWqjze32ukOGonQAACByPmW6WDbpFrA9EFipnNJeD58A@mail.gmail.com>
+ <20150317022344.GB31346@atomide.com>
+ <CA+V-a8u-Y7M9ynJDD05=XeMjZMsb_0Utd-TuwJzEuRziPksvGQ@mail.gmail.com>
+Message-ID: <CA+V-a8tk+CzcktcJSWpODpSsyue1J4vVQDNra5TpqWZeGieaOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-04-30 at 18:40 +0100, Sudeep Holla wrote:
-> 
-> On 30/04/15 18:36, Jon Medhurst (Tixy) wrote:
-> > On Thu, 2015-04-30 at 18:17 +0100, Lorenzo Pieralisi wrote:
-> >> On Thu, Apr 30, 2015 at 05:40:35PM +0100, Jon Medhurst (Tixy) wrote:
-> >>> On Thu, 2015-04-30 at 17:00 +0100, Sudeep Holla wrote:
-> >>>>
-> >>>> On 30/04/15 14:57, Jon Medhurst (Tixy) wrote:
-> >>>>> From: Jon Medhurst <tixy@linaro.org>
-> >>>>>
-> >>>>> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> >>>>> ---
-> >>>>>
-> >>>>> These have been kicking around out of tree for ages, any reason they
-> >>>>> shouldn't be in mainline?
-> >>>>
-> >>>> One possible reason could be that these values are not tuned(e.g.
-> >>>> latency values, can they be same for both clusters ?)
-> >>>
-> >>> I thought that both clusters being the same was questionable.
-> >>>
-> >>>>   Though these
-> >>>> reasons are not blocking and this patch will not cause any
-> >>>> functionality break even if is merged as is.
-> >>>
-> >>> My main purpose with trying to get this merged is so that people using
-> >>> Juno for general testing and validation will actually have cpuidle
-> >>> running and so potentially find more bugs.
-> >>
-> >> I am reluctant to enable idle states in the default Juno dts, they
-> >> will affect latencies and performance tests significantly. I should
-> >> find a way to disable them by default and possibly have a DT property
-> >> to enabled them explicitly, we can't merge the dts as it is we have
-> >> to change the CPUidle code first.
-> >
-> > Presumably the same argument goes for cpufreq? That'll upset people
-> > doing performance benchmarks, so shouldn't be enabled by default?
-> >
-> 
-> Or we can have cpufreq enabled with performance governor as default ;)
+On Fri, Apr 10, 2015 at 9:22 PM, Lad, Prabhakar
+<prabhakar.csengg@gmail.com> wrote:
+> Hi Tony,
+>
+> On Tue, Mar 17, 2015 at 2:23 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> * Lad, Prabhakar <prabhakar.csengg@gmail.com> [150316 18:20]:
+>>> Hi Tony,
+>>>
+>>> On Mon, Mar 16, 2015 at 10:17 PM, Tony Lindgren <tony@atomide.com> wrote:
+>>> > * Lad Prabhakar <prabhakar.csengg@gmail.com> [150312 16:38]:
+>>> >> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>> >>
+>>> >> this patch does the following:
+>>> >> 1: adds DT node for fixed oscillator.
+>>> >> 2: adds DT node entries for ov2659 sensor
+>>> >> 3: adds remote-endpoint entry for VPFE.
+>>> >>
+>>> >> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>> >
+>>> > Applying into omap-for-v4.1/dt thanks.
+>>> >
+>>> I would like to get this one in via media tree to avoid dependency
+>>> as I am still waiting for Acks from DT maintainers for the sensor
+>>> driver.
+>>
+>> OK dropping it.
+>>
+>>> If I can get your Ack on this I'll queue it up along with sensor
+>>> driver via media tree.
+>>
+>> Sorry the chances are too big for pointless merge conflicts with
+>> these files with constant patching going on.
+>>
+>> Please just resend this patch alone again to me later on once the
+>> driver changes are merged into Linux next and on their way to the
+>> mainline kernel.
+>>
+> the sensor driver is now present in linux-next and the same patch
+> applies cleanly, can you pick up the same or do you want me to
+> resend the patch ?
+>
+Ping...
 
-Which will crank the cpu clock up to max (1.1GHz on the A57s), which is
-higher than what you get without cpufreq in the kernel (850MHz) so
-everyone's performance measurements will suddenly go faster.
-
-I don't know if that is a problem for the usecase's Lorenzo wants the
-default Juno setup to satisfy.
-
--- 
-Tixy
+Cheers,
+--Prabhakar Lad
