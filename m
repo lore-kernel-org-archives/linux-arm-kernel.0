@@ -1,48 +1,39 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 01 May 2015 14:59:30 +0100
-Subject: [PATCH 2/4] ARM perf: Fix the pmu node name in warning message
-In-Reply-To: <1429797033-3787-2-git-send-email-will.deacon@arm.com>
-References: <1429797033-3787-1-git-send-email-will.deacon@arm.com>
- <1429797033-3787-2-git-send-email-will.deacon@arm.com>
-Message-ID: <554386C2.6020609@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 1 May 2015 15:03:21 +0100
+Subject: [PATCH 1/2] Regulator: mc34708: Add DT binding documentation
+In-Reply-To: <1816610654.762513.1430483624334.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+References: <20150428141736.16243.57292.stgit@localhost>
+ <20150428141738.16243.18377.stgit@localhost>
+ <1345809430.776937.1430476461635.JavaMail.open-xchange@oxbaltgw07.schlund.de>
+ <20150501110123.GU22845@sirena.org.uk>
+ <1816610654.762513.1430483624334.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+Message-ID: <20150501140321.GZ22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 01, 2015 at 02:33:44PM +0200, Stefan Wahren wrote:
+> > Mark Brown <broonie@kernel.org> hat am 1. Mai 2015 um 13:01 geschrieben:
 
+> > On Fri, May 01, 2015 at 12:34:21PM +0200, Stefan Wahren wrote:
 
-On 23/04/15 14:50, Will Deacon wrote:
-> With commit 9fd85eb502a7 ("ARM: pmu: add support for interrupt-affinity
-> property"), we print a warning when we find a PMU SPI with a missing
-> missing interrupt-affinity property in a pmu node. Unfortunately, we
-> pass the wrong (NULL) device node to of_node_full_name, resulting in
-> unhelpful messages such as:
->
->   hw perfevents: Failed to parse <no-node>/interrupt-affinity[0]
->
-> This patch fixes the name to that of the pmu node.
->
-> Fixes: 9fd85eb502a7 (ARM: pmu: add support for interrupt-affinity property)
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm/kernel/perf_event_cpu.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-> index becf7ad6eddc..213919ba326f 100644
-> --- a/arch/arm/kernel/perf_event_cpu.c
-> +++ b/arch/arm/kernel/perf_event_cpu.c
-> @@ -322,7 +322,7 @@ static int of_pmu_irq_cfg(struct platform_device *pdev)
->   				      i);
->   		if (!dn) {
->   			pr_warn("Failed to parse %s/interrupt-affinity[%d]\n",
-> -				of_node_full_name(dn), i);
-> +				of_node_full_name(pdev->dev.of_node), i);
->   			break;
+> > > a commit message would be nice and the subject should specify dt-bindings
+> > > instead of regulator subsystem.
 
-With old DT we will see this message and one might think perf is broken.
-But since the code still assumes SPIs are listed in order of *logical*
-CPU number and continues to work, does it make sense to update the
-warning accordingly ?
+> > No, it shouldn't. DT bindings for a subsystem go through the subsystem
+> > and the subsystem maintainer needs to see them to read them.
 
-Regards,
-Sudeep
+> sorry for my bad expressing. 
+
+> I tought the subject line should be something like:
+
+> DT: add binding documentation for mc34708 regulator
+
+No, it shouldn't.  The subject line should start "regulator: " like all
+other regulator commits.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150501/8ee4b2e6/attachment.sig>
