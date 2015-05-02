@@ -1,19 +1,27 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sat, 2 May 2015 11:45:29 +0300
-Subject: [PATCH v3 0/4] remoteproc: Introduce wkup_m3_rproc driver
-In-Reply-To: <55410143.1080209@ti.com>
-References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
- <55410143.1080209@ti.com>
-Message-ID: <CAK=Wgba1j_BL5TZzsg2efrBaLs7otY1w1nFEQ9WM025kYnkahQ@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sat, 2 May 2015 10:53:44 +0200
+Subject: [PATCH 0/4] clk: si5351: Some fixes
+In-Reply-To: <554347AA.3070502@gmail.com>
+References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150501111406.0aa23c7b@armhf> <554347AA.3070502@gmail.com>
+Message-ID: <20150502105344.5b78bd20@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+On Fri, 01 May 2015 11:30:18 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-On Wed, Apr 29, 2015 at 7:05 PM, Suman Anna <s-anna@ti.com> wrote:
-> Ping, do you have any comments on this series?
+> > I applied the patches 2 and 3, and the audio and video in the Cubox
+> > work fine again. Thanks.  
+> 
+> Ok, good. You mentioned that on v3.19-rc1 it still "works" i.e. despite
+> the broken/missing clk_get/clk_prepare_enable?
+> 
+> Can you check the stable (v3.19, v4.0) versions and see how far we
+> should backport the fix?
 
-I'll get to review this next week.
+v3.19 works, v4.0 does not.
 
-Thanks,
-Ohad.
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
