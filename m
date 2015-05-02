@@ -1,85 +1,96 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  2 May 2015 13:24:37 +0200
-Subject: [PATCH 6/8] ARM: sunxi: Add PLL2 support
+Date: Sat,  2 May 2015 13:24:39 +0200
+Subject: [PATCH 8/8] ARM: sun7i: Add mod1 clock nodes
 In-Reply-To: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1430565879-28113-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1430565879-28113-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Emilio L?pez <emilio@elopez.com.ar>
 
-This commit adds the PLL2 definition to the sun4i, sun5i and sun7i device
-trees. PLL2 is used to clock audio devices.
+This commit adds all the mod1 clocks available on A20 to its device
+tree. This list was created by looking at the A20 user manual.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 9 +++++++++
- arch/arm/boot/dts/sun5i.dtsi     | 9 +++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
- 3 files changed, 27 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 1d7fd68bea1d..2ed3a0b43131 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -198,6 +198,15 @@
- 			clock-output-names = "pll1";
- 		};
- 
-+		pll2: clk at 01c20008 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-a10-b-pll2-clk";
-+			reg = <0x01c20008 0x8>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll2-1x", "pll2-2x",
-+					     "pll2-4x", "pll2-8x";
-+		};
-+
- 		pll4: clk at 01c20018 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-pll1-clk";
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 8c04f240f2e9..b291c165966f 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -107,6 +107,15 @@
- 			clock-output-names = "pll1";
- 		};
- 
-+		pll2: clk at 01c20008 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-a10-b-pll2-clk";
-+			reg = <0x01c20008 0x8>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll2-1x", "pll2-2x",
-+					     "pll2-4x", "pll2-8x";
-+		};
-+
- 		pll4: clk at 01c20018 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-pll1-clk";
 diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 4163ade867cb..7c850dc1b197 100644
+index 8a5418a0e795..8111458f364b 100644
 --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -203,6 +203,15 @@
- 			clock-output-names = "pll1";
+@@ -456,6 +456,39 @@
+ 			clock-output-names = "ir1";
  		};
  
-+		pll2: clk at 01c20008 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-a10-b-pll2-clk";
-+			reg = <0x01c20008 0x8>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll2-1x", "pll2-2x",
-+					     "pll2-4x", "pll2-8x";
++		iis0_clk: clk at 01c200b8 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod1-clk";
++			reg = <0x01c200b8 0x4>;
++			clocks = <&pll2 SUN4I_A10_PLL2_1X>,
++				 <&pll2 SUN4I_A10_PLL2_2X>,
++				 <&pll2 SUN4I_A10_PLL2_4X>,
++				 <&pll2 SUN4I_A10_PLL2_8X>;
++			clock-output-names = "iis0";
 +		};
 +
- 		pll4: clk at 01c20018 {
++		ac97_clk: clk at 01c200bc {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod1-clk";
++			reg = <0x01c200bc 0x4>;
++			clocks = <&pll2 SUN4I_A10_PLL2_8X>,
++				 <&pll2 SUN4I_A10_PLL2_4X>,
++				 <&pll2 SUN4I_A10_PLL2_2X>,
++				 <&pll2 SUN4I_A10_PLL2_1X>;
++			clock-output-names = "ac97";
++		};
++
++		spdif_clk: clk at 01c200c0 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod1-clk";
++			reg = <0x01c200c0 0x4>;
++			clocks = <&pll2 SUN4I_A10_PLL2_8X>,
++				 <&pll2 SUN4I_A10_PLL2_4X>,
++				 <&pll2 SUN4I_A10_PLL2_2X>,
++				 <&pll2 SUN4I_A10_PLL2_1X>;
++			clock-output-names = "spdif";
++		};
++
+ 		usb_clk: clk at 01c200cc {
+ 			#clock-cells = <1>;
+ 		        #reset-cells = <1>;
+@@ -473,6 +506,28 @@
+ 			clock-output-names = "spi3";
+ 		};
+ 
++		iis1_clk: clk at 01c200d8 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod1-clk";
++			reg = <0x01c200d8 0x4>;
++			clocks = <&pll2 SUN4I_A10_PLL2_1X>,
++				 <&pll2 SUN4I_A10_PLL2_2X>,
++				 <&pll2 SUN4I_A10_PLL2_4X>,
++				 <&pll2 SUN4I_A10_PLL2_8X>;
++			clock-output-names = "iis1";
++		};
++
++		iis2_clk: clk at 01c200dc {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod1-clk";
++			reg = <0x01c200dc 0x4>;
++			clocks = <&pll2 SUN4I_A10_PLL2_1X>,
++				 <&pll2 SUN4I_A10_PLL2_2X>,
++				 <&pll2 SUN4I_A10_PLL2_4X>,
++				 <&pll2 SUN4I_A10_PLL2_8X>;
++			clock-output-names = "iis2";
++		};
++
+ 		codec_clk: clk at 01c20140 {
  			#clock-cells = <0>;
- 			compatible = "allwinner,sun7i-a20-pll4-clk";
+ 			compatible = "allwinner,sun4i-a10-codec-clk";
 -- 
 2.3.6
