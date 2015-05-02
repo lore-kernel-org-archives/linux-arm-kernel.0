@@ -1,51 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  2 May 2015 13:24:31 +0200
-Subject: [PATCH 0/8] clk: sunxi: Add support for the Audio PLL
-Message-ID: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sat,  2 May 2015 13:24:33 +0200
+Subject: [PATCH 2/8] clk: sunxi: factors: Add a parameter for N and M zeros
+In-Reply-To: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1430565879-28113-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On some clocks, N and M set to 0 in the register actually mean a value of
+'1', but any other value doesn't have that shift anymore.
 
-This serie adds support for the PLL2 aka the Audio PLL on the
-Allwinner A10 and the later SoCs.
+Add parameters to the factors clock to handle this.
 
-This is the first stepping stone to get the audio support merged.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi/clk-factors.c | 6 ++++++
+ drivers/clk/sunxi/clk-factors.h | 3 +++
+ 2 files changed, 9 insertions(+)
 
-Thanks!
-Maxime
-
-Emilio L?pez (5):
-  clk: sunxi: codec clock support
-  clk: sunxi: mod1 clock support
-  ARM: sunxi: Add PLL2 support
-  ARM: sunxi: Add codec clock support
-  ARM: sun7i: Add mod1 clock nodes
-
-Maxime Ripard (3):
-  clk: sunxi: factors: Add m_start parameters
-  clk: sunxi: factors: Add a parameter for N and M zeros
-  clk: sunxi: Add a driver for the PLL2
-
- arch/arm/boot/dts/sun4i-a10.dtsi           |  18 +++
- arch/arm/boot/dts/sun5i.dtsi               |  18 +++
- arch/arm/boot/dts/sun7i-a20.dtsi           |  73 ++++++++++++
- drivers/clk/sunxi/Makefile                 |   3 +
- drivers/clk/sunxi/clk-a10-codec.c          |  45 ++++++++
- drivers/clk/sunxi/clk-a10-mod1.c           |  85 ++++++++++++++
- drivers/clk/sunxi/clk-a10-pll2.c           | 176 +++++++++++++++++++++++++++++
- drivers/clk/sunxi/clk-factors.c            |  17 ++-
- drivers/clk/sunxi/clk-factors.h            |   5 +
- drivers/clk/sunxi/clk-mod0.c               |   2 +
- drivers/clk/sunxi/clk-sun8i-mbus.c         |   2 +
- drivers/clk/sunxi/clk-sun9i-core.c         |   6 +
- drivers/clk/sunxi/clk-sunxi.c              |  10 ++
- include/dt-bindings/clock/sun4i-a10-pll2.h |  53 +++++++++
- 14 files changed, 512 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/sunxi/clk-a10-codec.c
- create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
- create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
- create mode 100644 include/dt-bindings/clock/sun4i-a10-pll2.h
-
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index 100a711c3e3d..632926a13c26 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -69,6 +69,12 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
+ 	if (config->pwidth != SUNXI_FACTORS_NOT_APPLICABLE)
+ 		p = FACTOR_GET(config->pshift, config->pwidth, reg);
+ 
++	if (!n && config->n_zero)
++		n = config->n_zero;
++
++	if (!m && config->m_zero)
++		m = config->m_zero;
++
+ 	/* Calculate the rate */
+ 	rate = parent_rate * (n + config->n_start);
+ 	rate *= k + 1;
+diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
+index 735d756d2923..fb182d9ccde6 100644
+--- a/drivers/clk/sunxi/clk-factors.h
++++ b/drivers/clk/sunxi/clk-factors.h
+@@ -19,6 +19,9 @@ struct clk_factors_config {
+ 
+ 	u8 m_start;
+ 	u8 n_start;
++
++	u8 n_zero;
++	u8 m_zero;
+ };
+ 
+ struct factors_data {
 -- 
 2.3.6
