@@ -1,53 +1,88 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  2 May 2015 13:24:33 +0200
-Subject: [PATCH 2/8] clk: sunxi: factors: Add a parameter for N and M zeros
+Date: Sat,  2 May 2015 13:24:35 +0200
+Subject: [PATCH 4/8] clk: sunxi: codec clock support
 In-Reply-To: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1430565879-28113-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1430565879-28113-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some clocks, N and M set to 0 in the register actually mean a value of
-'1', but any other value doesn't have that shift anymore.
+From: Emilio L?pez <emilio@elopez.com.ar>
 
-Add parameters to the factors clock to handle this.
+The codec clock on sun4i, sun5i and sun7i is a simple gate with PLL2 as
+parent. Add a driver for such a clock.
 
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi/clk-factors.c | 6 ++++++
- drivers/clk/sunxi/clk-factors.h | 3 +++
- 2 files changed, 9 insertions(+)
+ drivers/clk/sunxi/Makefile        |  1 +
+ drivers/clk/sunxi/clk-a10-codec.c | 45 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+)
+ create mode 100644 drivers/clk/sunxi/clk-a10-codec.c
 
-diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-index 100a711c3e3d..632926a13c26 100644
---- a/drivers/clk/sunxi/clk-factors.c
-+++ b/drivers/clk/sunxi/clk-factors.c
-@@ -69,6 +69,12 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
- 	if (config->pwidth != SUNXI_FACTORS_NOT_APPLICABLE)
- 		p = FACTOR_GET(config->pshift, config->pwidth, reg);
+diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+index eb36c38d4120..6fa845e13067 100644
+--- a/drivers/clk/sunxi/Makefile
++++ b/drivers/clk/sunxi/Makefile
+@@ -3,6 +3,7 @@
+ #
  
-+	if (!n && config->n_zero)
-+		n = config->n_zero;
+ obj-y += clk-sunxi.o clk-factors.o
++obj-y += clk-a10-codec.o
+ obj-y += clk-a10-hosc.o
+ obj-y += clk-a10-pll2.o
+ obj-y += clk-a20-gmac.o
+diff --git a/drivers/clk/sunxi/clk-a10-codec.c b/drivers/clk/sunxi/clk-a10-codec.c
+new file mode 100644
+index 000000000000..aaeccf8cde39
+--- /dev/null
++++ b/drivers/clk/sunxi/clk-a10-codec.c
+@@ -0,0 +1,45 @@
++/*
++ * Copyright 2013 Emilio L?pez
++ *
++ * Emilio L?pez <emilio@elopez.com.ar>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+	if (!m && config->m_zero)
-+		m = config->m_zero;
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
 +
- 	/* Calculate the rate */
- 	rate = parent_rate * (n + config->n_start);
- 	rate *= k + 1;
-diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
-index 735d756d2923..fb182d9ccde6 100644
---- a/drivers/clk/sunxi/clk-factors.h
-+++ b/drivers/clk/sunxi/clk-factors.h
-@@ -19,6 +19,9 @@ struct clk_factors_config {
- 
- 	u8 m_start;
- 	u8 n_start;
++#define SUN4I_CODEC_GATE	31
 +
-+	u8 n_zero;
-+	u8 m_zero;
- };
- 
- struct factors_data {
++static void __init sun4i_codec_clk_setup(struct device_node *node)
++{
++	struct clk *clk;
++	const char *clk_name = node->name, *parent_name;
++	void __iomem *reg;
++
++	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
++	if (IS_ERR(reg))
++		return;
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	clk = clk_register_gate(NULL, clk_name, parent_name,
++				CLK_SET_RATE_PARENT, reg,
++				SUN4I_CODEC_GATE, 0, NULL);
++
++	if (!IS_ERR(clk))
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(sun4i_codec, "allwinner,sun4i-a10-codec-clk",
++	       sun4i_codec_clk_setup);
 -- 
 2.3.6
