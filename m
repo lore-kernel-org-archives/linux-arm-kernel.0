@@ -1,35 +1,39 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sat, 02 May 2015 17:46:22 +0200
-Subject: [PATCH v3 2/2] arch: arm: Show the serial number from
- devicetree in cpuinfo
-In-Reply-To: <20150428160910.GE12732@n2100.arm.linux.org.uk>
-References: <1429351135-11842-1-git-send-email-contact@paulk.fr>
- <1429351135-11842-2-git-send-email-contact@paulk.fr>
- <CAL_JsqKkw7n5p1ZH345BeKkyU=GKDrhaLef__0ET7t90Cm0Eog@mail.gmail.com>
- <1430145747.3081.5.camel@collins>
- <20150428160910.GE12732@n2100.arm.linux.org.uk>
-Message-ID: <1430581582.5339.0.camel@collins>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Sat, 02 May 2015 17:01:04 +0100
+Subject: Bug#782364: linux-image-3.16.0-4-armmp: please configure
+ drivers for both Cubox i4pro real time clocks
+In-Reply-To: <20150429085705.GG12732@n2100.arm.linux.org.uk>
+References: <20150410232854.23367.58862.reportbug@cube.rcthomas.org>
+ <1428710930.29665.17.camel@decadent.org.uk>
+ <20150429085705.GG12732@n2100.arm.linux.org.uk>
+Message-ID: <1430582464.15640.186.camel@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi 28 avril 2015 ? 17:09 +0100, Russell King - ARM Linux a ?crit :
-> On Mon, Apr 27, 2015 at 04:42:27PM +0200, Paul Kocialkowski wrote:
-> > Well, of_property_read_string is only defined when CONFIG_OF is set
-> > (base.c is always built in drivers/of but the directory is only included
-> > when CONFIG_OF is set).
-> > 
-> > Of course, on ARM, we now expect that it is the case, but it seems like
-> > good practice to check for it, since it could theoretically be disabled.
+On Wed, 2015-04-29 at 09:57 +0100, Russell King - ARM Linux wrote:
+> On Sat, Apr 11, 2015 at 01:08:50AM +0100, Ben Hutchings wrote:
+> > If this RTC is not battery backed, it seems like it ought to be disabled
+> > in this board's device tree.
 > 
-> That is _not_ "is the case" - there are a number of non-OF platforms...
-> including some which will probably never be converted.
+> It's not that simple.
+> 
+> On the lower-end models, the on-SoC RTC is the only RTC there is.  If
+> it were disabled, there would be no RTC available at all, so there
+> would be no preservation of time-of-day across reboots.
+> 
+> On the Pro models, the battery backed RTC is fitted.  However, the
+> battery backed RTC has no wakeup facility.
+> 
+> Only the on-SoC RTC has that ability, so in order to perform time-based
+> wakeup, the on-SoC RTC needs to be synchronised with the current ToD
+> and its alarm set.
+> 
+> Not having the on-SoC RTC enabled means that there is no ToD based
+> wakeup possible.
 
-Right, so I think v4 should be fine too, given the empty functions in
-case CONFIG_OF is not set.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150502/487217c6/attachment.sig>
+So is your advice for a multi platform kernel supporting all Cubox
+devices to just enable both and to sort out any syncing/naming etc in
+userspace?
+
+Thanks,
+Ian.
