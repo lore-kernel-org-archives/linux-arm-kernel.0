@@ -1,75 +1,89 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sun, 3 May 2015 00:44:49 +0200
-Subject: [PATCHv7 0/2] INPUT: Route keyboard LEDs through the generic LEDs
- layer
-In-Reply-To: <CAKdAkRSk4t2PKHB33f0=V2-zAhV9LXABp1TQ9NsiFLBQet66BQ@mail.gmail.com>
-References: <20150217191527.GA9594@type.youpi.perso.aquilenet.fr>
- <20150423165544.GG7646@pali>
- <CAKdAkRSk4t2PKHB33f0=V2-zAhV9LXABp1TQ9NsiFLBQet66BQ@mail.gmail.com>
-Message-ID: <201505030044.49464@pali>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Sat, 02 May 2015 19:48:54 -0300
+Subject: [PATCH v2 1/7] ARM: lpc18xx: add basic support for NXP
+ LPC18xx/43xx SoCs
+In-Reply-To: <1430168695-21248-2-git-send-email-manabian@gmail.com>
+References: <1430168695-21248-1-git-send-email-manabian@gmail.com>
+ <1430168695-21248-2-git-send-email-manabian@gmail.com>
+Message-ID: <55455456.6010503@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 April 2015 19:04:49 Dmitry Torokhov wrote:
-> On Thu, Apr 23, 2015 at 9:55 AM, Pali Roh?r
-> <pali.rohar@gmail.com> wrote:
-> > On Thursday 02 April 2015 16:44:10 Pavel Machek wrote:
-> >> On Wed 2015-04-01 23:11:40, Samuel Thibault wrote:
-> >> > Pali Roh?r, le Wed 01 Apr 2015 22:00:07 +0200, a ?crit :
-> >> > > On Tuesday 17 February 2015 20:15:27 Samuel Thibault
-> >> > > wrote:
-> >> > > > Here is an updated version to fix the initialization
-> >> > > > of the vt_led_work queues before registering LEDs,
-> >> > > > and refresh against 3.19.
-> >> > > 
-> >> > > Hello! I would like to ask when will be this patch
-> >> > > series merged into mainline kernel? Are there still
-> >> > > some problems with it?
-> >> > 
-> >> > There are no known problems ATM.
-> >> 
-> >> I thought it made it to -next, but apparently not.
-> >> 
-> >> Dmitry, can you comment what needs to be done, or just
-> >> merge it, please?
-> >> 
-> >>                                                        Pavel
-> > 
-> > Dmitry, can you merge this patch?
-> 
-> Sorry, I keep intending to go back to it and keep getting
-> distracted with other items. Last time I tried it it did not
-> appear to work for some scenarios that I tried, but I did not
-> document it to provide reasonable feedback to Samuel.
-> 
-> One thing that I know we'd have to fix is that input device
-> must be "opened" before we can engage it, right now LED
-> interface violates this requirement. It works right now
-> because keyboard handler attaches to most input devices with
-> LEDs early enough for it to be unnoticeable, but it does not
-> mean that it is correct. It might be as easy as calling
-> input_open() unconditionally if devices has LEDs.
-> 
-> Another issue is that I do not think we should be introducing
-> virtual VT leds. I believe LEDs should belong to real
-> devices; multiplexing several into one usually ends up with
-> problems (like the whole mousedev and various users having to
-> "grab" touchpads to exclude their data form mousedev to avoid
-> duplicate movement/button presses).
-> 
-> Hopefully I will have more coherent response RSN.
-> 
-> Thanks and sorry.
 
-Samuel, can you look at those issues?
 
+On 04/27/2015 06:04 PM, Joachim Eastwood wrote:
+> Add support for NXP's LPC18xx (Cortex-M3) and LPC43xx (Cortex-M4)
+> SoCs. These SoCs are NXP's high preformance MCU line and can run at
+> clock speeds up to 180 MHz for LPC18xx and 204 MHz for LPC43xx.
+> 
+> LPC43xx is more or less a LPC18xx with a Cortex-M4F core and a few
+> extra peripherals. The LPC43xx series also features one or two
+> Cortex-M0 cores that can be used to offload the main M4 core.
+> 
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  arch/arm/Kconfig                    | 20 ++++++++++++++++++++
+>  arch/arm/Kconfig.debug              |  8 +++++---
+>  arch/arm/Makefile                   |  1 +
+>  arch/arm/mach-lpc18xx/Makefile      |  1 +
+>  arch/arm/mach-lpc18xx/Makefile.boot |  3 +++
+>  arch/arm/mach-lpc18xx/board-dt.c    | 22 ++++++++++++++++++++++
+>  6 files changed, 52 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/mach-lpc18xx/Makefile
+>  create mode 100644 arch/arm/mach-lpc18xx/Makefile.boot
+>  create mode 100644 arch/arm/mach-lpc18xx/board-dt.c
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 45df48ba0b12..fba149165229 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -586,6 +586,26 @@ config ARCH_W90X900
+>  	  <http://www.nuvoton.com/hq/enu/ProductAndSales/ProductLines/
+>  		ConsumerElectronicsIC/ARMMicrocontroller/ARMMicrocontroller>
+>  
+> +config ARCH_LPC18XX
+> +	bool "NXP LPC18xx/LPC43xx"
+> +	depends on !MMU
+> +	select ARCH_HAS_RESET_CONTROLLER
+> +	select ARCH_REQUIRE_GPIOLIB
+> +	select ARM_AMBA
+> +	select ARM_NVIC
+> +	select AUTO_ZRELADDR
+> +	select CLKSRC_OF
+> +	select COMMON_CLK
+> +	select CPU_V7M
+> +	select GENERIC_CLOCKEVENTS
+> +	select NO_IOPORT_MAP
+> +	select PINCTRL
+> +	select SPARSE_IRQ
+> +	select USE_OF
+> +	help
+> +	  Support for NXP's LPC18xx Cortex-M3 and LPC43xx Cortex-M4
+> +	  high performance microcontrollers.
+> +
+>  config ARCH_LPC32XX
+>  	bool "NXP LPC32XX"
+>  	select ARCH_REQUIRE_GPIOLIB
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 0c12ffb155a2..468202308adf 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -1317,8 +1317,9 @@ config DEBUG_UART_8250
+>  	def_bool ARCH_DOVE || ARCH_EBSA110 || \
+>  		(FOOTBRIDGE && !DEBUG_DC21285_PORT) || \
+>  		ARCH_GEMINI || ARCH_IOP13XX || ARCH_IOP32X || \
+> -		ARCH_IOP33X || ARCH_IXP4XX || \
+> -		ARCH_LPC32XX || ARCH_MV78XX0 || ARCH_ORION5X || ARCH_RPC
+> +		ARCH_IOP33X || ARCH_IXP4XX || ARCH_LPC18XX || \
+>  
+Are you sure this change is needed?
+
+I *think* it should be enough to select CONFIG_DEBUG_LL_UART_8250,
+but don't have a board to test this for now (I will soon).
+
+Other than that, it looks good:
+
+Reviewed-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150503/50985102/attachment.sig>
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
