@@ -1,36 +1,29 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat,  2 May 2015 13:08:26 +0900
-Subject: [PATCH] drm/exynos: Fix build breakage on !DRM_EXYNOS_FIMD
-Message-ID: <1430539706-2945-1-git-send-email-k.kozlowski.k@gmail.com>
+From: houpengyang@huawei.com (Hou Pengyang)
+Date: Sat, 2 May 2015 05:42:03 +0000
+Subject: [PATCH v3 0/2] arm & arm64: perf: Fix callchain parse error with
+Message-ID: <1430545325-80326-1-git-send-email-houpengyang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Selecting CONFIG_FB_S3C disables CONFIG_DRM_EXYNOS_FIMD leading to build
-error:
+For arm & arm64, when tracing with tracepoint events, the IP and cpsr 
+are set to 0, preventing the perf code parsing the callchain and 
+resolving the symbols correctly. 
 
-drivers/built-in.o: In function `exynos_dp_dpms':
-binder.c:(.text+0xd6a840): undefined reference to `fimd_dp_clock_enable'
-binder.c:(.text+0xd6ab54): undefined reference to `fimd_dp_clock_enable'
+These two patches fix this by implementing perf_arch_fetch_caller_regs
+for arm and arm64, which fills several necessary register info for 
+callchain unwinding and symbol resolving.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
----
- drivers/gpu/drm/exynos/exynos_drm_fimd.h | 4 ++++
- 1 file changed, 4 insertions(+)
+v2->v3:
+ - split the original patch into two, one for arm and the other arm64;
+ - change '|=' to '=' when setting cpsr. 
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.h b/drivers/gpu/drm/exynos/exynos_drm_fimd.h
-index b4fcaa568456..db67f3d9786d 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimd.h
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.h
-@@ -10,6 +10,10 @@
- #ifndef _EXYNOS_DRM_FIMD_H_
- #define _EXYNOS_DRM_FIMD_H_
- 
-+#ifdef CONFIG_DRM_EXYNOS_FIMD
- extern void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable);
-+#else
-+static inline void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable) {};
-+#endif
- 
- #endif /* _EXYNOS_DRM_FIMD_H_ */
+Hou Pengyang (2):
+  arm: perf: Fix callchain parse error with kernel tracepoint events
+  arm64: perf: Fix callchain parse error with kernel tracepoint events
+
+ arch/arm/include/asm/perf_event.h   | 7 +++++++
+ arch/arm64/include/asm/perf_event.h | 7 +++++++
+ 2 files changed, 14 insertions(+)
+
 -- 
-2.1.4
+1.8.3.4
