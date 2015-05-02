@@ -1,29 +1,19 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 2 May 2015 10:37:09 +0200
-Subject: [RFC PATCH] ARM: add fixmap based earlycon support
-In-Reply-To: <20150501161812.GN12732@n2100.arm.linux.org.uk>
-References: <1430315508-7582-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150501161812.GN12732@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu-8ixKQtkpf=umHB76OZxo-dfGkOiQqDO7=evMebyDdUA@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sat, 2 May 2015 11:45:29 +0300
+Subject: [PATCH v3 0/4] remoteproc: Introduce wkup_m3_rproc driver
+In-Reply-To: <55410143.1080209@ti.com>
+References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
+ <55410143.1080209@ti.com>
+Message-ID: <CAK=Wgba1j_BL5TZzsg2efrBaLs7otY1w1nFEQ9WM025kYnkahQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 May 2015 at 18:18, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Wed, Apr 29, 2015 at 03:51:48PM +0200, Ard Biesheuvel wrote:
->> This adds support for fixmap based earlycon by moving the fixmap
->> initialization to an earlier stage and introducing the Kconfig symbol
->> that wires up the existing code.
->
-> I don't see the patches for this fixmap based earlycon.  What's the
-> status of those, and how are they getting into mainline?
->
+Hi Suman,
 
-They are already /in/ mainline. This single patch is all that is
-required to wire it up for ARM.
+On Wed, Apr 29, 2015 at 7:05 PM, Suman Anna <s-anna@ti.com> wrote:
+> Ping, do you have any comments on this series?
 
-However, I did notice after sending this that another implementation
-had been proposed already:
-http://lkml.iu.edu/hypermail/linux/kernel/1412.3/00855.html
+I'll get to review this next week.
 
-I am not sure which one is more correct, but the general idea is the
-same, i.e., to allocate the fixmap PTEs from bss rather than the heap.
+Thanks,
+Ohad.
