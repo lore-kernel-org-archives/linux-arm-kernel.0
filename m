@@ -1,106 +1,341 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  2 May 2015 13:24:38 +0200
-Subject: [PATCH 7/8] ARM: sunxi: Add codec clock support
-In-Reply-To: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1430565879-28113-8-git-send-email-maxime.ripard@free-electrons.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sat,  2 May 2015 13:36:20 +0200
+Subject: [linux-sunxi] ARM: sunxi: dts: split IR pins for A10 and A20
+Message-ID: <1430566580-14295-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+From: Marcus Cooper <codekipper@gmail.com>
 
-This commit adds the codec clock definition to the sun4i, sun5i and
-sun7i device trees. The codec clock is used in the analog codec block.
+Currently none of the target boards nor the driver supports
+IR TX. However this pin is used in a few instances as a GPIO.
+Split the pin ctrl descriptions so that only the IR RX is
+configured to be used.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 9 +++++++++
- arch/arm/boot/dts/sun5i.dtsi     | 9 +++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
- 3 files changed, 27 insertions(+)
+ arch/arm/boot/dts/sun4i-a10-a1000.dts         |  2 +-
+ arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts    |  2 +-
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts    |  2 +-
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts     |  2 +-
+ arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts    |  2 +-
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts    |  4 ++--
+ arch/arm/boot/dts/sun4i-a10.dtsi              | 22 ++++++++++++++++++----
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts      |  2 +-
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts     |  2 +-
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts   |  2 +-
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts    |  2 +-
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts   |  2 +-
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts     |  2 +-
+ arch/arm/boot/dts/sun7i-a20-m3.dts            |  2 +-
+ arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts |  2 +-
+ arch/arm/boot/dts/sun7i-a20-orangepi.dts      |  2 +-
+ arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts |  2 +-
+ arch/arm/boot/dts/sun7i-a20-pcduino3.dts      |  2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi              | 22 ++++++++++++++++++----
+ 19 files changed, 54 insertions(+), 26 deletions(-)
 
+diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+index f032814..57970d0 100644
+--- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
++++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+@@ -130,7 +130,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts b/arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts
+index 1a3c7dd..62e4b36 100644
+--- a/arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts
++++ b/arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts
+@@ -96,7 +96,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index 0ba67d7..db204b1 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -126,7 +126,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+index f443788..835eb30 100644
+--- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
++++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+@@ -93,7 +93,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts b/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
+index 1b0452f..4281782 100644
+--- a/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
++++ b/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
+@@ -126,7 +126,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+index 0f24914..132ace5 100644
+--- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
++++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+@@ -92,11 +92,11 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+-&ir0_pins_a {
++&ir0_rx_pins_a {
+ 	/* The ir receiver is not always populated */
+ 	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ };
 diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 2ed3a0b43131..f4dead8cde2c 100644
+index 1d7fd68..7529857 100644
 --- a/arch/arm/boot/dts/sun4i-a10.dtsi
 +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -50,6 +50,7 @@
+@@ -797,15 +797,29 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 			};
  
- #include <dt-bindings/thermal/thermal.h>
+-			ir0_pins_a: ir0 at 0 {
+-				allwinner,pins = "PB3","PB4";
++			ir0_rx_pins_a: ir0 at 0 {
++				allwinner,pins = "PB4";
+ 				allwinner,function = "ir0";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
  
-+#include <dt-bindings/clock/sun4i-a10-pll2.h>
- #include <dt-bindings/dma/sun4i-a10.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
-@@ -457,6 +458,14 @@
- 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
- 			clock-output-names = "spi3";
- 		};
+-			ir1_pins_a: ir1 at 0 {
+-				allwinner,pins = "PB22","PB23";
++			ir0_tx_pins_a: ir0 at 1 {
++				allwinner,pins = "PB3";
++				allwinner,function = "ir0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
-+		codec_clk: clk at 01c20140 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-codec-clk";
-+			reg = <0x01c20140 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_1X>;
-+			clock-output-names = "codec";
-+		};
- 	};
- 
- 	/*
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index b291c165966f..38cb77c378ec 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -49,6 +49,7 @@
- 
- #include "skeleton.dtsi"
- 
-+#include <dt-bindings/clock/sun4i-a10-pll2.h>
- #include <dt-bindings/dma/sun4i-a10.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
-@@ -298,6 +299,14 @@
- 			clock-output-names = "usb_ohci0", "usb_phy";
- 		};
- 
-+		codec_clk: clk at 01c20140 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-codec-clk";
-+			reg = <0x01c20140 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_1X>;
-+			clock-output-names = "codec";
-+		};
++			ir1_rx_pins_a: ir1 at 0 {
++				allwinner,pins = "PB23";
++				allwinner,function = "ir1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
- 		mbus_clk: clk at 01c2015c {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun5i-a13-mbus-clk";
++			ir1_tx_pins_a: ir1 at 1 {
++				allwinner,pins = "PB22";
+ 				allwinner,function = "ir1";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+index b952ac4..ecc2a4d 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+@@ -142,7 +142,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+index 9d9027f..d408bbc 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+@@ -154,7 +154,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+index 3c817ac..930ea80d 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+@@ -133,7 +133,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index 613a19e..8a83c99 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -160,7 +160,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
+index d3f15c2..9a4d783 100644
+--- a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
++++ b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
+@@ -160,7 +160,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+index 3f99b3f..d9782c4 100644
+--- a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
++++ b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+@@ -157,7 +157,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-m3.dts b/arch/arm/boot/dts/sun7i-a20-m3.dts
+index f2fb26e..39b4a80 100644
+--- a/arch/arm/boot/dts/sun7i-a20-m3.dts
++++ b/arch/arm/boot/dts/sun7i-a20-m3.dts
+@@ -117,7 +117,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts b/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
+index 0556938..bf6dd25 100644
+--- a/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
++++ b/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
+@@ -137,7 +137,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-orangepi.dts b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
+index 7e6405c..b282dda 100644
+--- a/arch/arm/boot/dts/sun7i-a20-orangepi.dts
++++ b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
+@@ -132,7 +132,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+index 810c5f7..f14cd60 100644
+--- a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
++++ b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+@@ -125,7 +125,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
+index cd05267..2578959 100644
+--- a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
++++ b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
+@@ -154,7 +154,7 @@
+ 
+ &ir0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&ir0_pins_a>;
++	pinctrl-0 = <&ir0_rx_pins_a>;
+ 	status = "okay";
+ };
+ 
 diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 7c850dc1b197..8a5418a0e795 100644
+index 4163ade..89d7206 100644
 --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -52,6 +52,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/thermal/thermal.h>
+@@ -1000,15 +1000,29 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
  
-+#include <dt-bindings/clock/sun4i-a10-pll2.h>
- #include <dt-bindings/dma/sun4i-a10.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
+-			ir0_pins_a: ir0 at 0 {
+-				    allwinner,pins = "PB3","PB4";
++			ir0_rx_pins_a: ir0 at 0 {
++				    allwinner,pins = "PB4";
+ 				    allwinner,function = "ir0";
+ 				    allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				    allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
  
-@@ -472,6 +473,14 @@
- 			clock-output-names = "spi3";
- 		};
- 
-+		codec_clk: clk at 01c20140 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-codec-clk";
-+			reg = <0x01c20140 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_1X>;
-+			clock-output-names = "codec";
-+		};
+-			ir1_pins_a: ir1 at 0 {
+-				    allwinner,pins = "PB22","PB23";
++			ir0_tx_pins_a: ir0 at 1 {
++				    allwinner,pins = "PB3";
++				    allwinner,function = "ir0";
++				    allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				    allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
- 		mbus_clk: clk at 01c2015c {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun5i-a13-mbus-clk";
++			ir1_rx_pins_a: ir1 at 0 {
++				    allwinner,pins = "PB23";
++				    allwinner,function = "ir1";
++				    allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				    allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			ir1_tx_pins_a: ir1 at 1 {
++				    allwinner,pins = "PB22";
+ 				    allwinner,function = "ir1";
+ 				    allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				    allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -- 
 2.3.6
