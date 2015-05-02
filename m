@@ -1,50 +1,35 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 2 May 2015 16:00:25 +0200
-Subject: [2/3] rtc: rtc-s3c: Add spin_lock_irq in s3c_rtc_setaie
-In-Reply-To: <1289865774-31073-3-git-send-email-kgene.kim@samsung.com>
-References: <1289865774-31073-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20150502140025.GL12076@piout.net>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sat, 02 May 2015 17:46:22 +0200
+Subject: [PATCH v3 2/2] arch: arm: Show the serial number from
+ devicetree in cpuinfo
+In-Reply-To: <20150428160910.GE12732@n2100.arm.linux.org.uk>
+References: <1429351135-11842-1-git-send-email-contact@paulk.fr>
+ <1429351135-11842-2-git-send-email-contact@paulk.fr>
+ <CAL_JsqKkw7n5p1ZH345BeKkyU=GKDrhaLef__0ET7t90Cm0Eog@mail.gmail.com>
+ <1430145747.3081.5.camel@collins>
+ <20150428160910.GE12732@n2100.arm.linux.org.uk>
+Message-ID: <1430581582.5339.0.camel@collins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
-
-On 16/11/2010 at 09:02:53 +0900, Kukjin Kim wrote :
-> This patch adds spin_lock_irq() and spin_unlock_irq() during
-> alarm interrupt configuration to avoid interrupt missing.
+Le mardi 28 avril 2015 ? 17:09 +0100, Russell King - ARM Linux a ?crit :
+> On Mon, Apr 27, 2015 at 04:42:27PM +0200, Paul Kocialkowski wrote:
+> > Well, of_property_read_string is only defined when CONFIG_OF is set
+> > (base.c is always built in drivers/of but the directory is only included
+> > when CONFIG_OF is set).
+> > 
+> > Of course, on ARM, we now expect that it is the case, but it seems like
+> > good practice to check for it, since it could theoretically be disabled.
 > 
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> That is _not_ "is the case" - there are a number of non-OF platforms...
+> including some which will probably never be converted.
 
-This patch never made it in the mainline, is it still necessary?
-
-> ---
->  drivers/rtc/rtc-s3c.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-> index e2636ff..bb88027 100644
-> --- a/drivers/rtc/rtc-s3c.c
-> +++ b/drivers/rtc/rtc-s3c.c
-> @@ -82,12 +82,14 @@ static int s3c_rtc_setaie(struct device *dev, unsigned int enabled)
->  
->  	pr_debug("%s: aie=%d\n", __func__, enabled);
->  
-> +	spin_lock_irq(&s3c_rtc_pie_lock);
->  	tmp = readb(s3c_rtc_base + S3C2410_RTCALM) & ~S3C2410_RTCALM_ALMEN;
->  
->  	if (enabled)
->  		tmp |= S3C2410_RTCALM_ALMEN;
->  
->  	writeb(tmp, s3c_rtc_base + S3C2410_RTCALM);
-> +	spin_unlock_irq(&s3c_rtc_pie_lock);
->  
->  	return 0;
->  }
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Right, so I think v4 should be fine too, given the empty functions in
+case CONFIG_OF is not set.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150502/487217c6/attachment.sig>
