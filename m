@@ -1,151 +1,51 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Sat, 02 May 2015 11:01:13 +0100
-Subject: [PATCH v7 05/15] dt-bindings: Document the STM32 reset bindings
-In-Reply-To: <CALszF6Bw900E9MtpaVmvkFxsrOODRkNg+RxRXz5V3WghHtsxbw@mail.gmail.com>
-References: <1430410844-16062-1-git-send-email-mcoquelin.stm32@gmail.com>	<1430410844-16062-6-git-send-email-mcoquelin.stm32@gmail.com>	<55433467.2010603@linaro.org>
- <CALszF6Bw900E9MtpaVmvkFxsrOODRkNg+RxRXz5V3WghHtsxbw@mail.gmail.com>
-Message-ID: <5544A069.5000808@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat,  2 May 2015 13:24:31 +0200
+Subject: [PATCH 0/8] clk: sunxi: Add support for the Audio PLL
+Message-ID: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/15 08:55, Maxime Coquelin wrote:
-> 2015-05-01 10:08 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
->> On 30/04/15 17:20, Maxime Coquelin wrote:
->>>
->>> This adds documentation of device tree bindings for the
->>> STM32 reset controller.
->>>
->>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>> ---
->>>    .../devicetree/bindings/reset/st,stm32-rcc.txt     | 107
->>> +++++++++++++++++++++
->>>    1 file changed, 107 insertions(+)
->>>    create mode 100644
->>> Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
->>> b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
->>> new file mode 100644
->>> index 0000000..c1b0f8d
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
->>> @@ -0,0 +1,107 @@
->>> +STMicroelectronics STM32 Peripheral Reset Controller
->>> +====================================================
->>> +
->>> +The RCC IP is both a reset and a clock controller. This documentation
->>> only
->>> +documents the reset part.
->>> +
->>> +Please also refer to reset.txt in this directory for common reset
->>> +controller binding usage.
->>> +
->>> +Required properties:
->>> +- compatible: Should be "st,stm32-rcc"
->>> +- reg: should be register base and length as documented in the
->>> +  datasheet
->>> +- #reset-cells: 1, see below
->>> +
->>> +example:
->>> +
->>> +rcc: reset at 40023800 {
->>> +       #reset-cells = <1>;
->>> +       compatible = "st,stm32-rcc";
->>
->>
->> Do you intend the clock driver to use the same compatible string (given it
->> is the same bit of hardware).
->>
->> If so, is it better to use st,stm32f4-rcc here? It seems unlikey to me that
->> the register layout of the PLLs and dividers can be the same on the f7 parts
->> (and later).
->
-> I agree we need a compatible dedicate to f4 series for clocks, and
-> maybe even one for f429 (to be checked).
-> For the reset part, we don't have this need.
->
-> So either we use only "st,stm32f4" as you suggest, or we can have both
-> in device tree:
->
-> rcc: reset at 40023800 {
->      #reset-cells = <1>;
->      compatible = "st,stm32f4-rcc", "st,stm32-rcc";
->      reg = <0x40023800 0x400>;
-> };
->
-> What do you think?
+Hi,
 
-Having both makes sense. The reset driver probably doesn't care about 
-differences between F4 and F7 (I know very little about F7 but I can't 
-think of any obvious h/ware evolution that would confuse the current 
-reset driver).
+This serie adds support for the PLL2 aka the Audio PLL on the
+Allwinner A10 and the later SoCs.
 
+This is the first stepping stone to get the audio support merged.
 
->>> +       reg = <0x40023800 0x400>;
->>> +};
->>> +
->>> +Specifying softreset control of devices
->>> +=======================================
->>> +
->>> +Device nodes should specify the reset channel required in their "resets"
->>> +property, containing a phandle to the reset device node and an index
->>> specifying
->>> +which channel to use.
->>> +The index is the bit number within the RCC registers bank, starting from
->>> RCC
->>> +base address.
->>> +It is calculated as: index = register_offset / 4 * 32 + bit_offset.
->>> +Where bit_offset is the bit offset within the register.
->>> +For example, for CRC reset:
->>> +  crc = AHB1RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x10 / 4 * 32 + 12
->>> = 140
->>> +
->>> +example:
->>> +
->>> +       timer2 {
->>> +               resets                  = <&rcc 256>;
->>> +       };
->>> +
->>> +List of valid indices for STM32F429:
->>> + - gpioa: 128
->>> + - gpiob: 129
->>> ...
->>> <snip>
->>> ...
->>> + - sai1: 310
->>> + - ltdc: 314
->>
->>
->> These numbers are stable for all STM32F4 family parts. Should this table go
->> into a dt-bindings header file?
->>
->
-> This has already been discussed with Philipp and Arnd in earlier
-> versions of this series [0].
-> I initially created a header file, and we  decided going this way finally.
+Thanks!
+Maxime
 
-Thanks for the link. I had overlooked that (I only really started paying 
-attention at v5; I should probably have looked further back before 
-commenting).
+Emilio L?pez (5):
+  clk: sunxi: codec clock support
+  clk: sunxi: mod1 clock support
+  ARM: sunxi: Add PLL2 support
+  ARM: sunxi: Add codec clock support
+  ARM: sun7i: Add mod1 clock nodes
 
-However...
+Maxime Ripard (3):
+  clk: sunxi: factors: Add m_start parameters
+  clk: sunxi: factors: Add a parameter for N and M zeros
+  clk: sunxi: Add a driver for the PLL2
 
-Arnd's concerns about mergability of headers can also be met by using 
-h/ware values in the header file can't there. To be honest my comment 
-was pretty heavily influenced after having read a recent patch from Rob 
-Herring ( https://lkml.org/lkml/2015/5/1/14 ) which does exactly this.
+ arch/arm/boot/dts/sun4i-a10.dtsi           |  18 +++
+ arch/arm/boot/dts/sun5i.dtsi               |  18 +++
+ arch/arm/boot/dts/sun7i-a20.dtsi           |  73 ++++++++++++
+ drivers/clk/sunxi/Makefile                 |   3 +
+ drivers/clk/sunxi/clk-a10-codec.c          |  45 ++++++++
+ drivers/clk/sunxi/clk-a10-mod1.c           |  85 ++++++++++++++
+ drivers/clk/sunxi/clk-a10-pll2.c           | 176 +++++++++++++++++++++++++++++
+ drivers/clk/sunxi/clk-factors.c            |  17 ++-
+ drivers/clk/sunxi/clk-factors.h            |   5 +
+ drivers/clk/sunxi/clk-mod0.c               |   2 +
+ drivers/clk/sunxi/clk-sun8i-mbus.c         |   2 +
+ drivers/clk/sunxi/clk-sun9i-core.c         |   6 +
+ drivers/clk/sunxi/clk-sunxi.c              |  10 ++
+ include/dt-bindings/clock/sun4i-a10-pll2.h |  53 +++++++++
+ 14 files changed, 512 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/sunxi/clk-a10-codec.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+ create mode 100644 include/dt-bindings/clock/sun4i-a10-pll2.h
 
-The main reason I got interested in having a header is that the reset 
-bits and the clock gate bits are encoded using the same bit patterns so 
-I wondering it we could express that only once.
-
-I guess it doesn't matter that much, especially given there is only one 
-.dtsi file, and we can add a header later and remain binary compatible. 
-However if the same number set does end up repeated in different .dtsi 
-files I think that would motivate adding a header for F4 family.
-
-
-Daniel.
+-- 
+2.3.6
