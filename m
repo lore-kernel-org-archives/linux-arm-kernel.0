@@ -1,47 +1,43 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat,  2 May 2015 18:40:40 +0200
-Subject: [PATCH 0/2] stmac: add glue for NXP LPC18xx family
-Message-ID: <1430584842-23408-1-git-send-email-manabian@gmail.com>
+Date: Sat,  2 May 2015 18:40:42 +0200
+Subject: [PATCH 2/2] doc: dt: add documentation for nxp,lpc1850-dwmac
+In-Reply-To: <1430584842-23408-1-git-send-email-manabian@gmail.com>
+References: <1430584842-23408-1-git-send-email-manabian@gmail.com>
+Message-ID: <1430584842-23408-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This small patch set adds support for using the stmmac on the NXP
-LPC18xx/43xx Cortex-M3/4 MCU family and add binding documentation.
-
-Base support for the family can be found here:
-http://marc.info/?l=linux-arm-kernel&m=143016894704253&w=2
-
-DTS changes will be posted once base support, clk support and
-reset are upstream. All this has been posted on the relevant
-lists and my hope is that it will make it into Linux 4.1.
-
-Below is the boot log from the stmmac driver:
-[    2.831037] stmmac - user ID: 0x11, Synopsys ID: 0x36
-[    2.837085]  Ring mode enabled
-[    2.840559]  DMA HW capability register supported
-[    2.845457]  Enhanced/Alternate descriptors
-[    2.850866]  Enabled extended descriptors
-[    2.855351]  RX Checksum Offload Engine supported (type 2)
-[    2.861847]  TX Checksum insertion supported
-[    2.867106]  Wake-Up On Lan supported
-[    2.873938]  Enable RX Mitigation via HW Watchdog Timer
-[    2.923122] libphy: stmmac: probed
-[    2.927750] eth0: PHY ID 0007c0f1 at 1 IRQ POLL (stmmac-0:01) active
-[   94.735120]  No MAC Management Counters available
-[   97.767758] stmmaceth 40010000.ethernet eth0: Link is Up - 100Mbps/Full - flow control off
-
-Joachim Eastwood (2):
-  stmac: add dwmac glue for NXP 18xx/43xx family
-  doc: dt: add documentation for nxp,lpc1850-dwmac
-
- .../devicetree/bindings/net/nxp,lpc1850-dwmac.txt  | 20 ++++++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |  3 +-
- .../net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c    | 76 ++++++++++++++++++++++
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  1 +
- .../net/ethernet/stmicro/stmmac/stmmac_platform.h  |  1 +
- 5 files changed, 100 insertions(+), 1 deletion(-)
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ .../devicetree/bindings/net/nxp,lpc1850-dwmac.txt    | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/nxp,lpc1850-dwmac.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c
 
+diff --git a/Documentation/devicetree/bindings/net/nxp,lpc1850-dwmac.txt b/Documentation/devicetree/bindings/net/nxp,lpc1850-dwmac.txt
+new file mode 100644
+index 000000000000..7edba1264f6f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/nxp,lpc1850-dwmac.txt
+@@ -0,0 +1,20 @@
++* NXP LPC1850 GMAC ethernet controller
++
++This device is a platform glue layer for stmmac.
++Please see stmmac.txt for the other unchanged properties.
++
++Required properties:
++ - compatible:  Should contain "nxp,lpc1850-dwmac"
++
++Examples:
++
++mac: ethernet at 40010000 {
++	compatible = "nxp,lpc1850-dwmac", "snps,dwmac-3.611", "snps,dwmac";
++	reg = <0x40010000 0x2000>;
++	interrupts = <5>;
++	interrupt-names = "macirq";
++	clocks = <&ccu1 CLK_CPU_ETHERNET>;
++	clock-names = "stmmaceth";
++	resets = <&rgu 22>;
++	reset-names = "stmmaceth";
++}
 -- 
 1.8.0
