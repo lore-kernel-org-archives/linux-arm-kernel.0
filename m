@@ -1,75 +1,29 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat, 02 May 2015 14:49:46 +0900
-Subject: [2/2] ARM: dts: Add missing irq pinctrl for max77686 on smdk5250
-In-Reply-To: <553F68CC.6030504@samsung.com>
-References: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
- <553F68CC.6030504@samsung.com>
-Message-ID: <5544657A.7010006@gmail.com>
+From: houpengyang@huawei.com (Hou Pengyang)
+Date: Sat, 2 May 2015 05:58:15 +0000
+Subject: [PATCH v3 0/2] arm & arm64: perf: Fix callchain parse error with
+Message-ID: <1430546297-80481-1-git-send-email-houpengyang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 28.04.2015 o 20:02, Pankaj Dubey pisze:
-> Hi Kukjin,
-> 
-> Any updated for this patch. Without this PMIC RTC is not working on
-> SMDK5250.
-> 
+For arm & arm64, when tracing with tracepoint events, the IP and cpsr 
+are set to 0, preventing the perf code parsing the callchain and 
+resolving the symbols correctly. 
 
-Could you resend the patch after rebasing it?
+These two patches fix this by implementing perf_arch_fetch_caller_regs
+for arm and arm64, which fills several necessary register info for 
+callchain unwinding and symbol resolving.
 
-Best regards,
-Krzysztof
+v2->v3:
+ - split the original patch into two, one for arm and the other arm64;
+ - change '|=' to '=' when setting cpsr. 
 
-> Thanks,
-> Pankaj Dubey
-> 
-> On Tuesday 18 November 2014 05:38 PM, Yadwinder Singh Brar wrote:
->> This patch adds pinctrl configuration for using configuring gpx3-2 as an
->> external interrupt from max77686. Though max77686 RTC is enabled and gets
->> probed by default, it doesnt work as its unable to get interrupt.
->>
->> This patch makes max77686 RTC work and also configures it as wakeup
->> source.
->>
->> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
->> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>
->> ---
->> arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++++++++++
->>   1 files changed, 12 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> index 95b5b51..19cd918 100644
->> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> @@ -131,6 +131,9 @@
->>           reg = <0x09>;
->>           interrupt-parent = <&gpx3>;
->>           interrupts = <2 IRQ_TYPE_NONE>;
->> +        pinctrl-names = "default";
->> +        pinctrl-0 = <&max77686_irq>;
->> +        wakeup-source;
->>
->>           voltage-regulators {
->>               ldo1_reg: LDO1 {
->> @@ -411,3 +414,12 @@
->>           };
->>       };
->>   };
->> +
->> +&pinctrl_0 {
->> +    max77686_irq: max77686-irq {
->> +        samsung,pins = "gpx3-2";
->> +        samsung,pin-function = <0xf>;
->> +        samsung,pin-pud = <0>;
->> +        samsung,pin-drv = <0>;
->> +    };
->> +};
->>
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe
-> linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Hou Pengyang (2):
+  arm: perf: Fix callchain parse error with kernel tracepoint events
+  arm64: perf: Fix callchain parse error with kernel tracepoint events
+
+ arch/arm/include/asm/perf_event.h   | 7 +++++++
+ arch/arm64/include/asm/perf_event.h | 7 +++++++
+ 2 files changed, 14 insertions(+)
+
+-- 
+1.8.3.4
