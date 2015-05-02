@@ -1,48 +1,35 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 2 May 2015 22:48:59 +0200
-Subject: [PATCH 1/2] stmac: add dwmac glue for NXP 18xx/43xx family
-In-Reply-To: <3200125.o3jqXuyPfG@wuerfel>
-References: <1430584842-23408-1-git-send-email-manabian@gmail.com>
- <1430584842-23408-2-git-send-email-manabian@gmail.com>
- <3200125.o3jqXuyPfG@wuerfel>
-Message-ID: <CAGhQ9VypQsxZZfdyMLhhNoMpCLRf8XSwUoGuhHPgev1gRitTsA@mail.gmail.com>
+Date: Sat,  2 May 2015 23:11:33 +0200
+Subject: [PATCH v2 0/2] gpio driver for NXP LPC18xx family
+Message-ID: <1430601095-31984-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+This patch set adds a gpio driver for NXP LPC18xx/43xx devices.
+Patchset is based on Linus master 4.1-rc1.
 
-On 2 May 2015 at 21:31, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 02 May 2015 18:40:41 Joachim Eastwood wrote:
->> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
->> @@ -36,6 +36,7 @@ static const struct of_device_id stmmac_dt_ids[] = {
->>         { .compatible = "rockchip,rk3288-gmac", .data = &rk3288_gmac_data},
->>         { .compatible = "amlogic,meson6-dwmac", .data = &meson6_dwmac_data},
->>         { .compatible = "allwinner,sun7i-a20-gmac", .data = &sun7i_gmac_data},
->> +       { .compatible = "nxp,lpc1850-dwmac", .data = &lpc18xx_dwmac_data},
->>         { .compatible = "st,stih415-dwmac", .data = &stih4xx_dwmac_data},
->>         { .compatible = "st,stih416-dwmac", .data = &stih4xx_dwmac_data},
->>         { .compatible = "st,stid127-dwmac", .data = &stid127_dwmac_data},
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
->>
->
-> Any chance you could turn this around and do the probing in the normal
-> order, with a platform driver that registers to your compatible string
-> and calls into a common base module?
+changes in v2:
+ - use PBYTE register for gpio set/get
+ - refactor direction setup
+ - add lock for direction set RMW cycle
+ - expand doc example
 
-I can see what I can come up with.
+Base support for the family can be found here:
+http://marc.info/?l=linux-arm-kernel&m=143016894704253&w=2
 
-> Unfortunately, something went wrong when we first started adding platform
-> specific hacks to the driver. I tried to fix it up back then, and IIRC
-> it was agreed that it should be changed but my patches for some reason
-> missed out on getting merged and the mistake propagated afterwards.
+DTS changes will come once base support and clk patches goes upstream.
 
-Do you happen to have a link to these patches so I could take a look?
+Joachim Eastwood (2):
+  gpio: add lpc18xx gpio driver
+  doc: dt: add documentation for lpc1850-gpio driver
 
-> It should be fairly straightforward to split the probe function
-> into two and export a function that takes a device and a stmmac_of_data
-> pointer as arguments, and declare a module_platform_driver in your
-> code.
+ .../devicetree/bindings/gpio/nxp,lpc1850-gpio.txt  |  39 +++++
+ drivers/gpio/Kconfig                               |   8 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-lpc18xx.c                        | 180 +++++++++++++++++++++
+ 4 files changed, 228 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/nxp,lpc1850-gpio.txt
+ create mode 100644 drivers/gpio/gpio-lpc18xx.c
 
-regards,
-Joachim Eastwood
+-- 
+1.8.0
