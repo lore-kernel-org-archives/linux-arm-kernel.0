@@ -1,42 +1,186 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sat, 02 May 2015 16:15:00 +0900
-Subject: [PATCH] ARM: SAMSUNG: fix clk_enable() WARNing in S3C24XX ADC
-In-Reply-To: <1430112584-6170-1-git-send-email-sakib@meta.ua>
-References: <1430112584-6170-1-git-send-email-sakib@meta.ua>
-Message-ID: <55447974.4050209@gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Sat, 2 May 2015 09:55:26 +0200
+Subject: [PATCH v7 05/15] dt-bindings: Document the STM32 reset bindings
+In-Reply-To: <55433467.2010603@linaro.org>
+References: <1430410844-16062-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1430410844-16062-6-git-send-email-mcoquelin.stm32@gmail.com>
+ <55433467.2010603@linaro.org>
+Message-ID: <CALszF6Bw900E9MtpaVmvkFxsrOODRkNg+RxRXz5V3WghHtsxbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 27.04.2015 o 14:29, Sergiy Kibrik pisze:
-> Convert clk_enable/clk_disable to clk_prepare_enable/clk_disable_unprepare
-> calls as required by common clock framework. Removes this warning on probe:
-> 
->  ------------[ cut here ]------------
->  WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:889 __clk_enable+0x28/0x9c()
->  Modules linked in:
->  CPU: 0 PID: 1 Comm: swapper Not tainted 3.19.0+ #46
->  [<c0013a98>] (unwind_backtrace) from [<c0010d8c>] (show_stack+0x10/0x14)
->  [<c0010d8c>] (show_stack) from [<c001b018>] (warn_slowpath_common+0x7c/0xa4)
->  [<c001b018>] (warn_slowpath_common) from [<c001b0d0>] (warn_slowpath_null+0x18/0x20)
->  [<c001b0d0>] (warn_slowpath_null) from [<c01a5f80>] (__clk_enable+0x28/0x9c)
->  [<c01a5f80>] (__clk_enable) from [<c01a600c>] (clk_enable+0x18/0x2c)
->  [<c01a600c>] (clk_enable) from [<c001860c>] (s3c_adc_probe+0x11c/0x18c)
->  [<c001860c>] (s3c_adc_probe) from [<c0153a10>] (platform_drv_probe+0x30/0x78)
->  [<c0153a10>] (platform_drv_probe) from [<c01523e0>] (driver_probe_device+0xb0/0x1fc)
->  [<c01523e0>] (driver_probe_device) from [<c01525dc>] (__driver_attach+0x68/0x88)
->  [<c01525dc>] (__driver_attach) from [<c0150df0>] (bus_for_each_dev+0x70/0x94)
->  [<c0150df0>] (bus_for_each_dev) from [<c0151c80>] (bus_add_driver+0xdc/0x1c4)
->  [<c0151c80>] (bus_add_driver) from [<c0152ba4>] (driver_register+0x9c/0xe0)
->  [<c0152ba4>] (driver_register) from [<c03041cc>] (adc_init+0x10/0x34)
->  [<c03041cc>] (adc_init) from [<c00087fc>] (do_one_initcall+0x110/0x1cc)
->  [<c00087fc>] (do_one_initcall) from [<c02ffccc>] (kernel_init_freeable+0xf4/0x1ac)
->  [<c02ffccc>] (kernel_init_freeable) from [<c022f4fc>] (kernel_init+0x8/0xe0)
->  [<c022f4fc>] (kernel_init) from [<c000e098>] (ret_from_fork+0x14/0x3c)
->  ---[ end trace f4a1ea39a114fecf ]---
-> 
-> Signed-off-by: Sergiy Kibrik <sakib@meta.ua>
+2015-05-01 10:08 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
+> On 30/04/15 17:20, Maxime Coquelin wrote:
+>>
+>> This adds documentation of device tree bindings for the
+>> STM32 reset controller.
+>>
+>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>   .../devicetree/bindings/reset/st,stm32-rcc.txt     | 107
+>> +++++++++++++++++++++
+>>   1 file changed, 107 insertions(+)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>> b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>> new file mode 100644
+>> index 0000000..c1b0f8d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>> @@ -0,0 +1,107 @@
+>> +STMicroelectronics STM32 Peripheral Reset Controller
+>> +====================================================
+>> +
+>> +The RCC IP is both a reset and a clock controller. This documentation
+>> only
+>> +documents the reset part.
+>> +
+>> +Please also refer to reset.txt in this directory for common reset
+>> +controller binding usage.
+>> +
+>> +Required properties:
+>> +- compatible: Should be "st,stm32-rcc"
+>> +- reg: should be register base and length as documented in the
+>> +  datasheet
+>> +- #reset-cells: 1, see below
+>> +
+>> +example:
+>> +
+>> +rcc: reset at 40023800 {
+>> +       #reset-cells = <1>;
+>> +       compatible = "st,stm32-rcc";
+>
+>
+> Do you intend the clock driver to use the same compatible string (given it
+> is the same bit of hardware).
+>
+> If so, is it better to use st,stm32f4-rcc here? It seems unlikey to me that
+> the register layout of the PLLs and dividers can be the same on the f7 parts
+> (and later).
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+I agree we need a compatible dedicate to f4 series for clocks, and
+maybe even one for f429 (to be checked).
+For the reset part, we don't have this need.
 
-Best regards,
-Krzysztof
+So either we use only "st,stm32f4" as you suggest, or we can have both
+in device tree:
+
+rcc: reset at 40023800 {
+    #reset-cells = <1>;
+    compatible = "st,stm32f4-rcc", "st,stm32-rcc";
+    reg = <0x40023800 0x400>;
+};
+
+What do you think?
+
+>
+>
+>> +       reg = <0x40023800 0x400>;
+>> +};
+>> +
+>> +Specifying softreset control of devices
+>> +=======================================
+>> +
+>> +Device nodes should specify the reset channel required in their "resets"
+>> +property, containing a phandle to the reset device node and an index
+>> specifying
+>> +which channel to use.
+>> +The index is the bit number within the RCC registers bank, starting from
+>> RCC
+>> +base address.
+>> +It is calculated as: index = register_offset / 4 * 32 + bit_offset.
+>> +Where bit_offset is the bit offset within the register.
+>> +For example, for CRC reset:
+>> +  crc = AHB1RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x10 / 4 * 32 + 12
+>> = 140
+>> +
+>> +example:
+>> +
+>> +       timer2 {
+>> +               resets                  = <&rcc 256>;
+>> +       };
+>> +
+>> +List of valid indices for STM32F429:
+>> + - gpioa: 128
+>> + - gpiob: 129
+>> + - gpioc: 130
+>> + - gpiod: 131
+>> + - gpioe: 132
+>> + - gpiof: 133
+>> + - gpiog: 134
+>> + - gpioh: 135
+>> + - gpioi: 136
+>> + - gpioj: 137
+>> + - gpiok: 138
+>> + - crc: 140
+>> + - dma1: 149
+>> + - dma2: 150
+>> + - dma2d: 151
+>> + - ethmac: 153
+>> + - otghs: 157
+>> + - dcmi: 160
+>> + - cryp: 164
+>> + - hash: 165
+>> + - rng: 166
+>> + - otgfs: 167
+>> + - fmc: 192
+>> + - tim2: 256
+>> + - tim3: 257
+>> + - tim4: 258
+>> + - tim5: 259
+>> + - tim6: 260
+>> + - tim7: 261
+>> + - tim12: 262
+>> + - tim13: 263
+>> + - tim14: 264
+>> + - wwdg: 267
+>> + - spi2: 270
+>> + - spi3: 271
+>> + - uart2: 273
+>> + - uart3: 274
+>> + - uart4: 275
+>> + - uart5: 276
+>> + - i2c1: 277
+>> + - i2c2: 278
+>> + - i2c3: 279
+>> + - can1: 281
+>> + - can2: 282
+>> + - pwr: 284
+>> + - dac: 285
+>> + - uart7: 286
+>> + - uart8: 287
+>> + - tim1: 288
+>> + - tim8: 289
+>> + - usart1: 292
+>> + - usart6: 293
+>> + - adc: 296
+>> + - sdio: 299
+>> + - spi1: 300
+>> + - spi4: 301
+>> + - syscfg: 302
+>> + - tim9: 304
+>> + - tim10: 305
+>> + - tim11: 306
+>> + - spi5: 308
+>> + - spi6: 309
+>> + - sai1: 310
+>> + - ltdc: 314
+>
+>
+> These numbers are stable for all STM32F4 family parts. Should this table go
+> into a dt-bindings header file?
+>
+
+This has already been discussed with Philipp and Arnd in earlier
+versions of this series [0].
+I initially created a header file, and we  decided going this way finally.
+
+Regards,
+Maxime
+
+[0]: https://lkml.org/lkml/2015/3/10/692
