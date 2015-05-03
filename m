@@ -1,36 +1,28 @@
-From: rric@kernel.org (Robert Richter)
-Date: Sun,  3 May 2015 22:49:32 +0200
-Subject: [PATCH 4/4] arm64: gicv3: its: Increase FORCE_MAX_ZONEORDER for
- Cavium ThunderX
-In-Reply-To: <1430686172-18222-1-git-send-email-rric@kernel.org>
-References: <1430686172-18222-1-git-send-email-rric@kernel.org>
-Message-ID: <1430686172-18222-5-git-send-email-rric@kernel.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 3 May 2015 22:50:43 +0200
+Subject: [PATCH v3 0/1] ARM: mvebu: dts: Add dts file for DLink DNS-327L
+In-Reply-To: <1430663256-22714-1-git-send-email-andrew@ncrmnt.org>
+References: <1430663256-22714-1-git-send-email-andrew@ncrmnt.org>
+Message-ID: <20150503205043.GA23342@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+Hi Andrew
 
-In case of ARCH_THUNDER, there is a need to allocate the GICv3 ITS table
-which is bigger than the allowed max order. So we are forcing it only in
-case of 4KB page size.
+> DNS-327L is a 2-bay NAS with the following specs:     
+>      - 512MiB RAM
+>      - 128MiB NAND Flash
+>      - 1 GbE interface (Marvell PHY)
 
-Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+...
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1b8e97331ffb..c519f3777453 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -542,6 +542,7 @@ config XEN
- config FORCE_MAX_ZONEORDER
- 	int
- 	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
-+	default "13" if (ARCH_THUNDER && !ARM64_64K_PAGES)
- 	default "11"
- 
- menuconfig ARMV8_DEPRECATED
--- 
-2.1.1
+> /* Set RGMII voltage to 1.8v, according to public docs. Nice! */
+> mw.l 0xd00184e0 0xa8a; 
+> /* Some weird magic that goes into phy registers, no public docs */
+> phyWrite 0 16 2; 
+> phyWrite 0 19 77; 
+> phyWrite 0 18 5747; 
+
+Take a look at the marvell,reg-init property. Might do what you need.
+
+     Andrew
