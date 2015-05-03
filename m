@@ -1,94 +1,267 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun,  3 May 2015 10:18:51 +0300
-Subject: [PATCH v2 1/4] mtd: nand: mxc_nand: cleanup copy_spare function
-In-Reply-To: <cover.1430636819.git.baruch@tkos.co.il>
-References: <cover.1430636819.git.baruch@tkos.co.il>
-Message-ID: <782c879fdfa0125211fb1a3a2fcd143687c541fc.1430636819.git.baruch@tkos.co.il>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun,  3 May 2015 09:47:16 +0200
+Subject: [PATCH] ARM: sunxi: dt: Split the SPI pinctrl groups
+Message-ID: <1430639236-10785-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+The pinctrl groups for SPI until now were also adding the chip selects in
+the SPI pinctrl group.
 
-To give people without the reference manual at hand a chance to
-understand how spare area is handled in the i.MX nand controller,
-improve commenting, naming of variables and coding style.
+This was causing a few issues, since a board was forced to use a random
+number of chipselects, even though it might use one of these chip selects
+for another pin.
 
-No functional change intended.
+The number of chipselects defined was also not the same from one group to
+another because of different needs at the time these groups have been
+introduced, resulting in no clear view from the board DTS on what exactly
+is being muxed, which even might change in the future.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-[baruch: declare oob_chunk_size; update comments; reword commit log]
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Solve this by creating different pinctrl groups for the chipselects and the
+standard SPI pins (CLK, MOSI and MISO) so that we fix both issues.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/mtd/nand/mxc_nand.c | 46 ++++++++++++++++++++++++++++++---------------
- 1 file changed, 31 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts      |  3 +-
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts       |  3 +-
+ arch/arm/boot/dts/sun4i-a10.dtsi                | 36 ++++++++++++++++++---
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts        |  4 ++-
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts       |  4 ++-
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts     |  3 +-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |  6 ++--
+ arch/arm/boot/dts/sun7i-a20.dtsi                | 43 ++++++++++++++++++++++---
+ 8 files changed, 87 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 372e0e38f59b..33b22b9c0b30 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -807,32 +807,48 @@ static void mxc_nand_select_chip_v2(struct mtd_info *mtd, int chip)
- }
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index 0ba67d79c2b4..85046ddce532 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -206,7 +206,8 @@
  
- /*
-- * Function to transfer data to/from spare area.
-+ * The controller splits a page into data chunks of 512 bytes + partial oob.
-+ * There are writesize / 512 such chunks, the size of the partial oob parts is
-+ * oobsize / #chunks rounded down to a multiple of 2. The last oob chunk then
-+ * contains additionally the byte lost by rounding (if any).
-+ * This function handles the needed shuffling between host->data_buf (which
-+ * holds a page in natural order, i.e. writesize bytes data + oobsize bytes
-+ * spare) and the NFC buffer.
-  */
- static void copy_spare(struct mtd_info *mtd, bool bfrom)
- {
- 	struct nand_chip *this = mtd->priv;
- 	struct mxc_nand_host *host = this->priv;
--	u16 i, j;
--	u16 n = mtd->writesize >> 9;
-+	u16 i, oob_chunk_size;
-+	u16 num_chunks = mtd->writesize / 512;
+ &spi0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&spi0_pins_a>;
++	pinctrl-0 = <&spi0_pins_a>,
++		    <&spi0_cs0_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+index 00c54d2a1824..826d25b66823 100644
+--- a/arch/arm/boot/dts/sun4i-a10-marsboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+@@ -174,7 +174,8 @@
+ 
+ &spi0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&spi0_pins_a>;
++	pinctrl-0 = <&spi0_pins_a>,
++		    <&spi0_cs0_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 1d7fd68bea1d..174a45390b4e 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -812,28 +812,56 @@
+ 			};
+ 
+ 			spi0_pins_a: spi0 at 0 {
+-				allwinner,pins = "PI10", "PI11", "PI12", "PI13";
++				allwinner,pins = "PI11", "PI12", "PI13";
++				allwinner,function = "spi0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
- 	u8 *d = host->data_buf + mtd->writesize;
- 	u8 __iomem *s = host->spare0;
--	u16 t = host->devtype_data->spare_len;
-+	u16 sparebuf_size = host->devtype_data->spare_len;
++			spi0_cs0_pins_a: spi0_cs0 at 0 {
++				allwinner,pins = "PI10";
+ 				allwinner,function = "spi0";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
  
--	j = (mtd->oobsize / n >> 1) << 1;
-+	/* size of oob chunk for all but possibly the last one */
-+	oob_chunk_size = (mtd->oobsize / num_chunks) & ~1;
- 
- 	if (bfrom) {
--		for (i = 0; i < n - 1; i++)
--			memcpy32_fromio(d + i * j, s + i * t, j);
--
--		/* the last section */
--		memcpy32_fromio(d + i * j, s + i * t, mtd->oobsize - i * j);
-+		for (i = 0; i < num_chunks - 1; i++)
-+			memcpy32_fromio(d + i * oob_chunk_size,
-+					s + i * sparebuf_size,
-+					oob_chunk_size);
+ 			spi1_pins_a: spi1 at 0 {
+-				allwinner,pins = "PI16", "PI17", "PI18", "PI19";
++				allwinner,pins = "PI17", "PI18", "PI19";
++				allwinner,function = "spi1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
-+		/* the last chunk */
-+		memcpy32_fromio(d + i * oob_chunk_size,
-+				s + i * sparebuf_size,
-+				mtd->oobsize - i * oob_chunk_size);
- 	} else {
--		for (i = 0; i < n - 1; i++)
--			memcpy32_toio(&s[i * t], &d[i * j], j);
--
--		/* the last section */
--		memcpy32_toio(&s[i * t], &d[i * j], mtd->oobsize - i * j);
-+		for (i = 0; i < num_chunks - 1; i++)
-+			memcpy32_toio(&s[i * sparebuf_size],
-+				      &d[i * oob_chunk_size],
-+				      oob_chunk_size);
-+
-+		/* the last chunk */
-+		memcpy32_toio(&s[oob_chunk_size * sparebuf_size],
-+			      &d[i * oob_chunk_size],
-+			      mtd->oobsize - i * oob_chunk_size);
- 	}
- }
++			spi1_cs0_pins_a: spi1_cs0 at 0 {
++				allwinner,pins = "PI16";
+ 				allwinner,function = "spi1";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
  
+ 			spi2_pins_a: spi2 at 0 {
+-				allwinner,pins = "PB14", "PB15", "PB16", "PB17";
++				allwinner,pins = "PC20", "PC21", "PC22";
+ 				allwinner,function = "spi2";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
+ 			spi2_pins_b: spi2 at 1 {
+-				allwinner,pins = "PC19", "PC20", "PC21", "PC22";
++				allwinner,pins = "PB15", "PB16", "PB17";
++				allwinner,function = "spi2";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spi2_cs0_pins_a: spi2_cs0 at 0 {
++				allwinner,pins = "PC19";
++				allwinner,function = "spi2";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spi2_cs0_pins_b: spi2_cs0 at 1 {
++				allwinner,pins = "PB14";
+ 				allwinner,function = "spi2";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+index b952ac445504..074df2b10c69 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+@@ -197,7 +197,9 @@
+ 
+ &spi0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&spi0_pins_a>;
++	pinctrl-0 = <&spi0_pins_a>,
++		    <&spi0_cs0_pins_a>,
++		    <&spi0_cs1_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+index 9d9027f25a44..115e73fc7f85 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+@@ -243,7 +243,9 @@
+ 
+ &spi0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&spi0_pins_a>;
++	pinctrl-0 = <&spi0_pins_a>,
++		    <&spi0_cs0_pins_a>,
++		    <&spi0_cs1_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
+index d3f15c2e721e..de66b8c80a14 100644
+--- a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
++++ b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
+@@ -245,7 +245,8 @@
+ 
+ &spi2 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&spi2_pins_b>;
++	pinctrl-0 = <&spi2_pins_b>,
++		    <&spi2_cs0_pins_b>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+index 82802b6cb192..719e7f175019 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -250,13 +250,15 @@
+ 
+ &spi1 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&spi1_pins_a>;
++	pinctrl-0 = <&spi1_pins_a>,
++		    <&spi1_cs0_pins_a>;
+ 	status = "okay";
+ };
+ 
+ &spi2 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&spi2_pins_a>;
++	pinctrl-0 = <&spi2_pins_a>,
++		    <&spi2_cs0_pins_a>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 4163ade867cb..824914ebea82 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -945,28 +945,63 @@
+ 			};
+ 
+ 			spi0_pins_a: spi0 at 0 {
+-				allwinner,pins = "PI10", "PI11", "PI12", "PI13", "PI14";
++				allwinner,pins = "PI11", "PI12", "PI13";
++				allwinner,function = "spi0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spi0_cs0_pins_a: spi0_cs0 at 0 {
++				allwinner,pins = "PI10";
++				allwinner,function = "spi0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spi0_cs1_pins_a: spi0_cs1 at 0 {
++				allwinner,pins = "PI14";
+ 				allwinner,function = "spi0";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
+ 			spi1_pins_a: spi1 at 0 {
+-				allwinner,pins = "PI16", "PI17", "PI18", "PI19";
++				allwinner,pins = "PI17", "PI18", "PI19";
++				allwinner,function = "spi1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spi1_cs0_pins_a: spi1_cs0 at 0 {
++				allwinner,pins = "PI16";
+ 				allwinner,function = "spi1";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
+ 			spi2_pins_a: spi2 at 0 {
+-				allwinner,pins = "PC19", "PC20", "PC21", "PC22";
++				allwinner,pins = "PC20", "PC21", "PC22";
+ 				allwinner,function = "spi2";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
+ 			spi2_pins_b: spi2 at 1 {
+-				allwinner,pins = "PB14", "PB15", "PB16", "PB17";
++				allwinner,pins = "PB15", "PB16", "PB17";
++				allwinner,function = "spi2";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spi2_cs0_pins_a: spi2_cs0 at 0 {
++				allwinner,pins = "PC19";
++				allwinner,function = "spi2";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spi2_cs0_pins_b: spi2_cs0 at 1 {
++				allwinner,pins = "PB14";
+ 				allwinner,function = "spi2";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -- 
-2.1.4
+2.3.6
