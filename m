@@ -1,32 +1,36 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Sun, 3 May 2015 17:13:54 +0200
-Subject: [rtc-linux] [PATCHv2] RTC/i.MX/DryICE: add recovery routines to
- the driver
-In-Reply-To: <20150503151203.GY12076@piout.net>
-References: <1430143192-20667-1-git-send-email-jbe@pengutronix.de>
- <20150503151203.GY12076@piout.net>
-Message-ID: <55463B32.3010508@pengutronix.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 3 May 2015 20:53:00 +0530
+Subject: [PATCH v2 0/5] Driver for pxa architectures
+In-Reply-To: <87egn0jbtf.fsf@belgarion.home>
+References: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
+ <87egnf7uqp.fsf@belgarion.home> <87lhhek6dz.fsf@belgarion.home>
+ <87egn0jbtf.fsf@belgarion.home>
+Message-ID: <20150503152300.GU3521@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2015 05:12 PM, Alexandre Belloni wrote:
-> BTW, I guess your email address has been recycled as patchwork recognize
-> it has belonging to Juergen Beisert ;)
-
-No, J?rgen just got a new name, but stuck to his old email address.
-
-Marc
+On Fri, May 01, 2015 at 10:13:32PM +0200, Robert Jarzmik wrote:
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+> 
+> > Robert Jarzmik <robert.jarzmik@free.fr> writes:
+> >
+> >> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+> >>
+> >>> Hi Vinod,
+> >>>
+> >>> This is the same serie as in v1, only one fix around irq probing was included in
+> >>> patch 3/5. I copy-pasted the previous cover letter for reference here :
+> >>
+> >> Vinod, any update please ?
+> > Please ?
+> 
+> Vinod, it's been 3 weeks and no news.
+> 
+> Would it be possible that I take that through the pxa tree, even it stays in
+> drivers/dmaengine ? I want that to land in the next cycle, and I'll take the
+> fixes and maintainance anyway on my back.
+Sorry about the delay, I should be able to get this done in next few days
+and if all ggod then it should in next before eow.
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150503/086eab6d/attachment.sig>
+~Vinod
