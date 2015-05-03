@@ -1,132 +1,68 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 3 May 2015 15:51:50 +0200
-Subject: [rtc-linux] [PATCH v2] rtc: armada38x: Fix concurrency access in
- armada38x_rtc_set_time
-In-Reply-To: <1430119215-13369-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1430119215-13369-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150503135150.GX12076@piout.net>
+From: andrew@ncrmnt.org (Andrew Andrianov)
+Date: Sun,  3 May 2015 17:27:35 +0300
+Subject: [PATCH v3 0/1] ARM: mvebu: dts: Add dts file for DLink DNS-327L
+Message-ID: <1430663256-22714-1-git-send-email-andrew@ncrmnt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Rebased and fixed against 4.1-rc1
+This is the resubmit of the patch with fixes based on reviews by Andrew Lunn
+and Sebastian Hesselbarth
 
-Do you mind sending that one to Linus in the 4.1 cycle?
+It looks like UART1 MPP defaults (mpp41, mpp42) introduced in 
+f8afeaea9611b5183b7919de4fb9333dedc72896 don't play well with DNS-327L and 
+break both ttyS1 and NAND if used.
+I have fixed the mappings for DNS-327L in this patch
 
-Thanks!
+Changelog since last respin: 
+* All the style fixes
+* pinctrl fixes for uart1
 
-On 27/04/2015 at 09:20:15 +0200, Gregory CLEMENT wrote :
-> While setting the time, the RTC TIME register should not be
-> accessed. However due to hardware constraints, setting the RTC time
-> involves sleeping during 100ms. This sleep was done outside the
-> critical section protected by the spinlock, so it was possible to read
-> the RTC TIME register and get an incorrect value. This patch
-> introduces a mutex for protecting the RTC TIME access, unlike the
-> spinlock it is allowed to sleep in a critical section protected by a
-> mutex. The RTC STATUS register can still be used from the interrupt
-> handler but it has no effect on setting the time.
-> 
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: <stable@vger.kernel.org> #v4.0
-> ---
-> Hi,
-> 
-> The first version of this patch was sent too late to be part of
-> 4.1-rc1. However this fix should be part of 4.1.
-> 
-> Since the first version I added the acked-by from Alexandre and I
-> rebased the patch onto v4.1-rc1.
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> 
->  drivers/rtc/rtc-armada38x.c | 24 ++++++++++++------------
->  1 file changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-> index 43e04af39e09..cb70ced7e0db 100644
-> --- a/drivers/rtc/rtc-armada38x.c
-> +++ b/drivers/rtc/rtc-armada38x.c
-> @@ -40,6 +40,13 @@ struct armada38x_rtc {
->  	void __iomem	    *regs;
->  	void __iomem	    *regs_soc;
->  	spinlock_t	    lock;
-> +	/*
-> +	 * While setting the time, the RTC TIME register should not be
-> +	 * accessed. Setting the RTC time involves sleeping during
-> +	 * 100ms, so a mutex instead of a spinlock is used to protect
-> +	 * it
-> +	 */
-> +	struct mutex	    mutex_time;
->  	int		    irq;
->  };
->  
-> @@ -59,8 +66,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
->  	unsigned long time, time_check, flags;
->  
-> -	spin_lock_irqsave(&rtc->lock, flags);
-> -
-> +	mutex_lock(&rtc->mutex_time);
->  	time = readl(rtc->regs + RTC_TIME);
->  	/*
->  	 * WA for failing time set attempts. As stated in HW ERRATA if
-> @@ -71,7 +77,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  	if ((time_check - time) > 1)
->  		time_check = readl(rtc->regs + RTC_TIME);
->  
-> -	spin_unlock_irqrestore(&rtc->lock, flags);
-> +	mutex_unlock(&rtc->mutex_time);
->  
->  	rtc_time_to_tm(time_check, tm);
->  
-> @@ -94,19 +100,12 @@ static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
->  	 * then wait for 100ms before writing to the time register to be
->  	 * sure that the data will be taken into account.
->  	 */
-> -	spin_lock_irqsave(&rtc->lock, flags);
-> -
-> +	mutex_lock(&rtc->mutex_time);
->  	rtc_delayed_write(0, rtc, RTC_STATUS);
-> -
-> -	spin_unlock_irqrestore(&rtc->lock, flags);
-> -
->  	msleep(100);
-> -
-> -	spin_lock_irqsave(&rtc->lock, flags);
-> -
->  	rtc_delayed_write(time, rtc, RTC_TIME);
-> +	mutex_unlock(&rtc->mutex_time);
->  
-> -	spin_unlock_irqrestore(&rtc->lock, flags);
->  out:
->  	return ret;
->  }
-> @@ -230,6 +229,7 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	spin_lock_init(&rtc->lock);
-> +	mutex_init(&rtc->mutex_time);
->  
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rtc");
->  	rtc->regs = devm_ioremap_resource(&pdev->dev, res);
-> -- 
-> 2.1.0
-> 
-> -- 
-> -- 
-> You received this message because you are subscribed to "rtc-linux".
-> Membership options at http://groups.google.com/group/rtc-linux .
-> Please read http://groups.google.com/group/rtc-linux/web/checklist
-> before submitting a driver.
-> --- 
-> You received this message because you are subscribed to the Google Groups "rtc-linux" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to rtc-linux+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Fixed and updated description of the patch from my first email follows.
+
+DNS-327L is a 2-bay NAS with the following specs:     
+     - 512MiB RAM
+     - 128MiB NAND Flash
+     - 1 GbE interface (Marvell PHY)
+     - 1 rear USB 3.0 port (via PCIe USB 3.0 controller)
+     - 2 internal SATA ports handled by the Armada 370: 
+       	 uses 2 gpios for power control
+     - two front 2-color leds (amber + white) for both discs, 
+        controlled by the SoC
+     - One white LED handled by SoC (USB)
+     - 3 buttons. Power handled by weltrend, USB and 
+       RESET (on the bottom) are wired via GPIOs 
+     - Unidentified i2c device at address 0x13 (via i2cdetect)
+     - UART0 providing serial console
+     - Weltrend MCU serving for RTC, temperature, fan control, 
+       and power button handling interfaced via UART1 
+       (Handled via userspace dns320l-daemon)
+
+Hardware notes follow: 
+Everything's supported, save for mysterious i2c device at 
+address 0x13 (any ideas what can it be?) that I couldn't even find 
+on the PCB.
+
+Stock firmware performs some messing with PHY registers (that 
+have no public documentation) using a userspace script. Using 
+upstream kernel it is possible to match the stock behavior using 
+the following in u-boot prompt:
+
+/* Set RGMII voltage to 1.8v, according to public docs. Nice! */
+mw.l 0xd00184e0 0xa8a; 
+/* Some weird magic that goes into phy registers, no public docs */
+phyWrite 0 16 2; 
+phyWrite 0 19 77; 
+phyWrite 0 18 5747; 
+
+
+Andrew Andrianov (1):
+  ARM: mvebu: dts: Add dts file for DLink DNS-327L
+
+ arch/arm/boot/dts/Makefile                     |    1 +
+ arch/arm/boot/dts/armada-370-dlink-dns327l.dts |  349 ++++++++++++++++++++++++
+ 2 files changed, 350 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-370-dlink-dns327l.dts
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.10.4
