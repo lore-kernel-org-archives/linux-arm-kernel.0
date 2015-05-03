@@ -1,407 +1,68 @@
-From: andrew@ncrmnt.org (Andrew Andrianov)
-Date: Sun,  3 May 2015 17:27:36 +0300
-Subject: [PATCH v3 1/1] ARM: mvebu: dts: Add dts file for DLink DNS-327L
-In-Reply-To: <1430663256-22714-1-git-send-email-andrew@ncrmnt.org>
-References: <1430663256-22714-1-git-send-email-andrew@ncrmnt.org>
-Message-ID: <1430663256-22714-2-git-send-email-andrew@ncrmnt.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 3 May 2015 17:12:03 +0200
+Subject: [rtc-linux] [PATCHv2] RTC/i.MX/DryICE: add recovery routines to
+ the driver
+In-Reply-To: <1430143192-20667-1-git-send-email-jbe@pengutronix.de>
+References: <1430143192-20667-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <20150503151203.GY12076@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DNS-327L is a 2-bay NAS with the following specs:
-     - 512MiB RAM
-     - 128MiB NAND Flash
-     - 1 GbE interface (Marvell PHY)
-     - 1 rear USB 3.0 port (via PCIe USB 3.0 controller)
-     - 2 internal SATA ports handled by the Armada 370:
-       	 uses 2 gpios for power control
-     - two front 2-color leds (amber + white) for both discs,
-        controlled by the SoC
-     - One white LED handled by SoC (USB)
-     - 3 buttons. Power handled by weltrend, USB and
-       RESET (on the bottom) are wired via GPIOs
-     - Unidentified i2c device at address 0x13 (via i2cdetect)
-     - UART0 providing serial console
-     - Weltrend MCU serving for RTC, temperature, fan control,
-       and power button handling interfaced via UART1
-       (Handled via userspace dns320l-daemon)
+Hi,
 
-Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
----
- arch/arm/boot/dts/Makefile                     |    1 +
- arch/arm/boot/dts/armada-370-dlink-dns327l.dts |  353 ++++++++++++++++++++++++
- 2 files changed, 354 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-370-dlink-dns327l.dts
+On 27/04/2015 at 15:59:46 +0200, Juergen Borleis wrote :
+> The built-in RTC unit on some i.MX SoCs isn't an RTC only. It is also a tamper
+> monitor unit which can keep some (secret) keys. When it does its tamper
+> detection job and a security violation is detected, the whole DryICE unit
+> including the real-time counter locks completely. In this state the whole unit
+> is completely useless. The only way to bring it out of this locked state is a
+> power cylce with a POR (most of the case) or additionally a battery power
+> cycle which includes the loss of the secret keys.
+> At the next boot time some flags signals the security violation and a specific
+> register access sequence must be done to finaly bring this unit into life
+> again. Until this is done, there is no way to use it again as an RTC.
+> 
+> But also without any enabled tamper detection sometimes this unit tends to
+> lock. And in this case the same steps must be done to bring it into life
+> again.
+> 
+> The current implementation of the DryIce driver isn't able to unlock the
+> device successfully in the case it is locked somehow. Only a full power cycle
+> including *battery power* can help in this case.
+> 
+> The attached change set adds the required routines to be able to unlock the
+> DryIce unit in the case the driver detects a locked unit. This includes
+> unlocking it if it is locked by accident or malfunction and not by a real
+> security violation.
+> 
+> The last patch of this series is for reference only and should not be part
+> of the kernel. It just adds some code to force a locked DryIce unit to check
+> if the new routines are able to unlock it again. This code was required
+> because I had no hardware which really uses the tamper detection features of
+> this unit.
+> 
+> This is the 2nd version of the patch series. Hopefully I addressed all comments
+> from Alexandre.
+> 
+> In this version I added a new patch which replaces all __raw* register functions
+> as recommended by Alexandre.
+> 
+> Comments are welcome.
+> 
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 86217db..58fa9f6 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -624,6 +624,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
- 	zynq-zybo.dtb
- dtb-$(CONFIG_MACH_ARMADA_370) += \
- 	armada-370-db.dtb \
-+	armada-370-dlink-dns327l.dtb \
- 	armada-370-mirabox.dtb \
- 	armada-370-netgear-rn102.dtb \
- 	armada-370-netgear-rn104.dtb \
-diff --git a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
-new file mode 100644
-index 0000000..6ab8fab
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
-@@ -0,0 +1,353 @@
-+/*
-+ * Device Tree file for D-Link DNS-327L
-+ *
-+ * Copyright (C) 2015, Andrew Andrianov <andrew@ncrmnt.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/* Remaining unsolved:
-+ * There's still some unknown device on i2c address 0x13
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include "armada-370.dtsi"
-+
-+/ {
-+	model = "D-Link DNS-327L";
-+	compatible = "dlink,dns327l",
-+		"marvell,armada370",
-+		"marvell,armada-370-xp";
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>; /* 512 MiB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+			MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+
-+		internal-regs {
-+			sata at a0000 {
-+				nr-ports = <2>;
-+				status = "okay";
-+			};
-+
-+			usb at 50000 {
-+				status = "okay";
-+			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+
-+				partition at 0 {
-+					label = "u-boot";
-+					/* 1.0 MiB */
-+					reg = <0x0000000 0x100000>;
-+					read-only;
-+				};
-+
-+				partition at 100000 {
-+					label = "u-boot-env";
-+					/* 128 KiB */
-+					reg = <0x100000 0x20000>;
-+					read-only;
-+				};
-+
-+				partition at 120000 {
-+					label = "uImage";
-+					/* 7 MiB */
-+					reg = <0x120000 0x700000>;
-+				};
-+
-+				partition at 820000 {
-+					label = "ubifs";
-+					/* ~ 84 MiB */
-+					reg = <0x820000 0x54e0000>;
-+				};
-+
-+				/* Hardcoded into stock bootloader */
-+				partition at 5d00000 {
-+					label = "failsafe-uImage";
-+					/* 5 MiB */
-+					reg = <0x5d00000 0x500000>;
-+				};
-+
-+				partition at 6200000 {
-+					label = "failsafe-fs";
-+					/* 29 MiB */
-+					reg = <0x6200000 0x1d00000>;
-+				};
-+
-+				partition at 7f00000 {
-+					label = "bbt";
-+					/* 1 MiB for BBT */
-+					reg = <0x7f00000 0x100000>;
-+				};
-+			};
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-0 = <
-+			&backup_button_pin
-+			&power_button_pin
-+			&reset_button_pin>;
-+		pinctrl-names = "default";
-+
-+		power-button {
-+			label = "Power Button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		backup-button {
-+			label = "Backup Button";
-+			linux,code = <KEY_COPY>;
-+			gpios = <&gpio1 31 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		reset-button {
-+			label = "Reset Button";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <
-+			&sata_l_amber_pin
-+			&sata_r_amber_pin
-+			&backup_led_pin
-+			/* Ensure these are managed by hardware */
-+			&sata_l_white_pin
-+			&sata_r_white_pin>;
-+
-+		pinctrl-names = "default";
-+
-+		sata-r-amber-pin {
-+			label = "dns327l:amber:sata-r";
-+			gpios = <&gpio1 20 GPIO_ACTIVE_HIGH>;
-+			default-state = "keep";
-+		};
-+
-+		sata-l-amber-pin {
-+			label = "dns327l:amber:sata-l";
-+			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
-+			default-state = "keep";
-+		};
-+
-+		backup-led-pin {
-+			label = "dns327l:white:usb";
-+			gpios = <&gpio1 29 GPIO_ACTIVE_HIGH>;
-+			default-state = "keep";
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&xhci_pwr_pin
-+			&sata_l_pwr_pin
-+			&sata_r_pwr_pin>;
-+
-+		pinctrl-names = "default";
-+
-+		usb_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB3.0 Port Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-boot-on;
-+			regulator-always-on;
-+			gpio = <&gpio0 13 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		sata_r_power: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "SATA-R Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			startup-delay-us = <2000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio1 22 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		sata_l_power: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "SATA-L Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			startup-delay-us = <4000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio1 24 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	sata_l_white_pin: sata-l-white-pin {
-+		marvell,pins = "mpp57";
-+		marvell,function = "sata0";
-+	};
-+
-+	sata_r_white_pin: sata-r-white-pin {
-+		marvell,pins = "mpp55";
-+		marvell,function = "sata1";
-+	};
-+
-+	sata_r_amber_pin: sata-r-amber-pin {
-+		marvell,pins = "mpp52";
-+		marvell,function = "gpio";
-+	};
-+
-+
-+	sata_l_amber_pin: sata-l-amber-pin {
-+		marvell,pins = "mpp53";
-+		marvell,function = "gpio";
-+	};
-+
-+	backup_led_pin: backup-led-pin {
-+		marvell,pins = "mpp61";
-+		marvell,function = "gpo";
-+	};
-+
-+	xhci_pwr_pin: xhci-pwr-pin {
-+		marvell,pins = "mpp13";
-+		marvell,function = "gpio";
-+	};
-+
-+	sata_r_pwr_pin: sata-r-pwr-pin {
-+		marvell,pins = "mpp54";
-+		marvell,function = "gpio";
-+	};
-+
-+	sata_l_pwr_pin: sata-l-pwr-pin {
-+		marvell,pins = "mpp56";
-+		marvell,function = "gpio";
-+	};
-+
-+	uart1_pins: uart1-pins {
-+		marvell,pins = "mpp60", "mpp61";
-+		marvell,function = "uart1";
-+	};
-+
-+	power_button_pin: power-button-pin {
-+		marvell,pins = "mpp65";
-+		marvell,function = "gpio";
-+	};
-+
-+	backup_button_pin: backup-button-pin {
-+		marvell,pins = "mpp63";
-+		marvell,function = "gpio";
-+	};
-+
-+	reset_button_pin: reset-button-pin {
-+		marvell,pins = "mpp64";
-+		marvell,function = "gpio";
-+	};
-+};
-+
-+/* Serial console */
-+&uart0 {
-+	status = "okay";
-+};
-+
-+/* Connected to Weltrend MCU */
-+&uart1 {
-+	pinctrl-0 = <&uart1_pins>;
-+	status = "okay";
-+};
-+
-+&mdio {
-+	phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
-+		reg = <0>;
-+	};
-+};
-+
-+&eth1 {
-+	phy = <&phy0>;
-+	phy-mode = "rgmii-id";
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	compatible = "marvell,mv64xxx-i2c";
-+	clock-frequency = <100000>;
-+	status = "okay";
-+};
+I've applied 1-5 after fixing a few parenthesis alignments you missed.
+I've also reworked the commit subject prefix to the more concise "rtc:
+imdi:" and you forgot the commit message in patch 2, you can check it
+here:
+https://github.com/alexandrebelloni/linux/commit/eff76de33878687dc1877f40ac2cc34794f499e0
+
+Tell me if you have any objection.
+
+BTW, I guess your email address has been recycled as patchwork recognize
+it has belonging to Juergen Beisert ;)
+
+
 -- 
-1.7.10.4
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
