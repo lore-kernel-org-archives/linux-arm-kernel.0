@@ -1,41 +1,99 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun,  3 May 2015 21:15:10 +0300
-Subject: [PATCH 3/3] ARM: s3c24xx: H1940: Move gpiochip_add call into
- core_init() callback
-In-Reply-To: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
-References: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1430676910-30657-3-git-send-email-anarsoul@gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 3 May 2015 20:25:08 +0200
+Subject: [PATCH v2 1/7] ARM: lpc18xx: add basic support for NXP
+ LPC18xx/43xx SoCs
+In-Reply-To: <55455456.6010503@vanguardiasur.com.ar>
+References: <1430168695-21248-1-git-send-email-manabian@gmail.com>
+ <1430168695-21248-2-git-send-email-manabian@gmail.com>
+ <55455456.6010503@vanguardiasur.com.ar>
+Message-ID: <CAGhQ9VxVF-scj4jssMZVCeKhgxmg4NjZ679vhjSL64mNjqqgvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpiochip_add() allocates memory, however it's not possible anymore from
-machine map_io() callback thus it failed and prevented machine from booting
-properly.
+On 3 May 2015 at 00:48, Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote:
+>
+>
+> On 04/27/2015 06:04 PM, Joachim Eastwood wrote:
+>> Add support for NXP's LPC18xx (Cortex-M3) and LPC43xx (Cortex-M4)
+>> SoCs. These SoCs are NXP's high preformance MCU line and can run at
+>> clock speeds up to 180 MHz for LPC18xx and 204 MHz for LPC43xx.
+>>
+>> LPC43xx is more or less a LPC18xx with a Cortex-M4F core and a few
+>> extra peripherals. The LPC43xx series also features one or two
+>> Cortex-M0 cores that can be used to offload the main M4 core.
+>>
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> ---
+>>  arch/arm/Kconfig                    | 20 ++++++++++++++++++++
+>>  arch/arm/Kconfig.debug              |  8 +++++---
+>>  arch/arm/Makefile                   |  1 +
+>>  arch/arm/mach-lpc18xx/Makefile      |  1 +
+>>  arch/arm/mach-lpc18xx/Makefile.boot |  3 +++
+>>  arch/arm/mach-lpc18xx/board-dt.c    | 22 ++++++++++++++++++++++
+>>  6 files changed, 52 insertions(+), 3 deletions(-)
+>>  create mode 100644 arch/arm/mach-lpc18xx/Makefile
+>>  create mode 100644 arch/arm/mach-lpc18xx/Makefile.boot
+>>  create mode 100644 arch/arm/mach-lpc18xx/board-dt.c
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 45df48ba0b12..fba149165229 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -586,6 +586,26 @@ config ARCH_W90X900
+>>         <http://www.nuvoton.com/hq/enu/ProductAndSales/ProductLines/
+>>               ConsumerElectronicsIC/ARMMicrocontroller/ARMMicrocontroller>
+>>
+>> +config ARCH_LPC18XX
+>> +     bool "NXP LPC18xx/LPC43xx"
+>> +     depends on !MMU
+>> +     select ARCH_HAS_RESET_CONTROLLER
+>> +     select ARCH_REQUIRE_GPIOLIB
+>> +     select ARM_AMBA
+>> +     select ARM_NVIC
+>> +     select AUTO_ZRELADDR
+>> +     select CLKSRC_OF
+>> +     select COMMON_CLK
+>> +     select CPU_V7M
+>> +     select GENERIC_CLOCKEVENTS
+>> +     select NO_IOPORT_MAP
+>> +     select PINCTRL
+>> +     select SPARSE_IRQ
+>> +     select USE_OF
+>> +     help
+>> +       Support for NXP's LPC18xx Cortex-M3 and LPC43xx Cortex-M4
+>> +       high performance microcontrollers.
+>> +
+>>  config ARCH_LPC32XX
+>>       bool "NXP LPC32XX"
+>>       select ARCH_REQUIRE_GPIOLIB
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index 0c12ffb155a2..468202308adf 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -1317,8 +1317,9 @@ config DEBUG_UART_8250
+>>       def_bool ARCH_DOVE || ARCH_EBSA110 || \
+>>               (FOOTBRIDGE && !DEBUG_DC21285_PORT) || \
+>>               ARCH_GEMINI || ARCH_IOP13XX || ARCH_IOP32X || \
+>> -             ARCH_IOP33X || ARCH_IXP4XX || \
+>> -             ARCH_LPC32XX || ARCH_MV78XX0 || ARCH_ORION5X || ARCH_RPC
+>> +             ARCH_IOP33X || ARCH_IXP4XX || ARCH_LPC18XX || \
+>>
+> Are you sure this change is needed?
+>
+> I *think* it should be enough to select CONFIG_DEBUG_LL_UART_8250,
+> but don't have a board to test this for now (I will soon).
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- arch/arm/mach-s3c24xx/mach-h1940.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+Looking through Kconfig.debug it seems that just DEBUG_LL_UART_8250 is
+indeed sufficient.
 
-diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
-index 86d9ec7..744aa4f 100644
---- a/arch/arm/mach-s3c24xx/mach-h1940.c
-+++ b/arch/arm/mach-s3c24xx/mach-h1940.c
-@@ -777,9 +777,14 @@ static void __init h1940_map_io(void)
- 
- 	/* Add latch gpio chip, set latch initial value */
- 	h1940_latch_control(0, 0);
--	WARN_ON(gpiochip_add(&h1940_latch_gpiochip));
- }
- 
-+static __init int h1940_gpiolib_init(void)
-+{
-+	return gpiochip_add(&h1940_latch_gpiochip);
-+}
-+core_initcall(h1940_gpiolib_init);
-+
- static void __init h1940_init_time(void)
- {
- 	s3c2410_init_clocks(12000000);
--- 
-2.3.5
+I'll remove this patch chunk in the next version.
+
+> Other than that, it looks good:
+>
+> Reviewed-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+
+Thanks for your time. I'll fix up the above and add your review tag in
+the next version.
+
+regards,
+Joachm Eastwood
