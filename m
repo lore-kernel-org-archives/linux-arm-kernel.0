@@ -1,51 +1,42 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Sun, 3 May 2015 16:06:15 -0500
-Subject: [RFC PATCH 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150429174356.GA20947@red-moon>
-References: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
- <6662179.AoBfCMOsxD@wuerfel> <20150429174356.GA20947@red-moon>
-Message-ID: <55468DC7.6090003@amd.com>
+From: andrew@ncrmnt.org (Andrew)
+Date: Mon, 04 May 2015 01:05:56 +0300
+Subject: [PATCH v3 0/1] ARM: mvebu: dts: Add dts file for DLink DNS-327L
+In-Reply-To: <20150503205043.GA23342@lunn.ch>
+References: <1430663256-22714-1-git-send-email-andrew@ncrmnt.org>
+ <20150503205043.GA23342@lunn.ch>
+Message-ID: <ad0fbb28b4b74de4c6685a5ddd21010c@mail.ncrmnt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Andrew Lunn ????? 03.05.2015 23:50:
+> Hi Andrew
+> 
+>> DNS-327L is a 2-bay NAS with the following specs:
+>>      - 512MiB RAM
+>>      - 128MiB NAND Flash
+>>      - 1 GbE interface (Marvell PHY)
+> 
+> ...
+> 
+>> /* Set RGMII voltage to 1.8v, according to public docs. Nice! */
+>> mw.l 0xd00184e0 0xa8a;
+>> /* Some weird magic that goes into phy registers, no public docs */
+>> phyWrite 0 16 2;
+>> phyWrite 0 19 77;
+>> phyWrite 0 18 5747;
+> 
+> Take a look at the marvell,reg-init property. Might do what you need.
+> 
+>      Andrew
+
+Thanks for the tip. So far I'm solving it via u-boot.
+You have to set RGMII voltage there anyway if you want tftp for the 
+updates,
+so it looks like the right place to do this kind of stuff.
 
 
-On 4/29/15 12:43, Lorenzo Pieralisi wrote:
-> On Wed, Apr 29, 2015 at 01:34:20PM +0100, Arnd Bergmann wrote:
->> >On Wednesday 29 April 2015 17:09:58 Jayachandran C wrote:
->>> > >The current code in pci-host-generic.c uses pci_common_init_dev()
->>> > >from the arch/arm/ to do a part of the PCI initialization, and this
->>> > >prevents it from being used on arm64.
->>> > >
->>> > >The initialization done by pci_common_init_dev() that is really
->>> > >needed by pci-host-generic.c can be done in the same file without
->>> > >using the hw_pci API of ARM.
->>> > >
->>> > >The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
->>> > >this is be handled by setting up 'struct gen_pci' to embed a
->>> > >pci_sys_data variable as the first element on the ARM platform.
->>> > >
->>> > >Signed-off-by: Jayachandran C<jchandra@broadcom.com>
->> >
->> >This seems very useful
-> Yes, it is getting less awful, waiting for pci_sys_data to disappear.
->
+I'll add the proper magic to the dts file and resend tomorrow.
 
-Lorenzo,
-
-A while back, you mentioned here (https://lkml.org/lkml/2015/2/16/364) 
-that the ARM32 pcibios_align_resource() implementation requires
-pci_sys_data, so we _still_ rely on pci_common_init_dev to create one
-for us. Is this still the case?
-
-I am looking at the arch/arm32/kernel/bios32.c: pcibios_init_hw() and 
-see that it setup the pci_sys_data.align_resource to 
-hw_pci.align_resource (see here 
-http://lxr.free-electrons.com/source/arch/arm/kernel/bios32.c#L471).
-
-However it seems that the hw_pci.align_resource is never setup in the 
-pci-host-generic.c.  Am I missing something here?
-
-Thanks,
-
-Suravee
+-- 
+Regards,
+Andrew
