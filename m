@@ -1,73 +1,132 @@
-From: andrew@ncrmnt.org (Andrew)
-Date: Sun, 03 May 2015 14:37:59 +0300
-Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
- DNS-327L
-In-Reply-To: <5545FF6D.9040205@gmail.com>
-References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
- <552A6209.9040903@gmail.com>
- <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
- <20150412145857.GA14038@lunn.ch>
- <b172d775afa24cea69a9490f531c6b37@mail.ncrmnt.org>
- <20150412194735.GA27921@lunn.ch> <552BCFAA.2020109@free-electrons.com>
- <1ec8906f00468ca5a9fa227f8c83fe69@mail.ncrmnt.org>
- <55351569.7000307@free-electrons.com>
- <d28764ea5d0d5f4c2e5d3e9ca1d7217a@mail.ncrmnt.org>
- <55351898.60604@free-electrons.com>
- <4e7e91562aac6a260885bf2d12174060@mail.ncrmnt.org>
- <5545FF6D.9040205@gmail.com>
-Message-ID: <072d4c1171194abcb0bf753ce5a2e776@mail.ncrmnt.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 3 May 2015 15:51:50 +0200
+Subject: [rtc-linux] [PATCH v2] rtc: armada38x: Fix concurrency access in
+ armada38x_rtc_set_time
+In-Reply-To: <1430119215-13369-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1430119215-13369-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150503135150.GX12076@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian Hesselbarth ????? 03.05.2015 13:58:
-> On 03.05.2015 12:18, Andrew wrote:
-> [...]
->> Sorry for the long delay with testing, but here come the results.
->> I've rebased everything to 4.1-rc1
->> 
->> 1. WFI + DeepIdle => freeze after approx:
->>    * 1 hours and 30 minutes, first test
->>    * 3 hours and 40 minutes, second test
->> 2. WFI only (DeepIdle disabled via sysfs) => Still alive after 13 
->> hours
->> and counting
->> 
->> The proper patchset will follow as soon as I figure out what change 
->> broke
->> dns320l-daemon (The utility that speaks to weltrend mcu on ttyS1)
->> It was working on 3.18.6, on 3.19 and up - it writes data to the port
->> (and mcu acks it),
->> but can't read any responses.
->> 
->> Same thing happens to the python (pyserial inside) implementation of 
->> the
->> fan-daemon:
->> https://github.com/martignlo/DNS-320L
-> 
-> Andrew,
-> 
-> did you realize that you request a non-standard UART baudrate in your
-> python code above:
-> 
-> port = serial.Serial("/dev/ttyS1", 115600, 8, "N", 1, 0.1)
-> 
-> s/115600/115200/
-> 
-> Does that fix your communication issues?
-> 
-> Sebastian
+Hi Andrew,
 
+Do you mind sending that one to Linus in the 4.1 cycle?
 
-If life was that simple ;-)
-Unfortunately that's not the issue.
-dns320l-daemon ( http://www.aboehler.at/hg/dns320l-daemon ) uses correct 
-115200 baud and
-doesn't work either.
-Since I can transmit, but can't receive, I will be first checking out 
-mpp settings
-If that doesn't help, I guess it's git-bisect time.
+Thanks!
 
+On 27/04/2015 at 09:20:15 +0200, Gregory CLEMENT wrote :
+> While setting the time, the RTC TIME register should not be
+> accessed. However due to hardware constraints, setting the RTC time
+> involves sleeping during 100ms. This sleep was done outside the
+> critical section protected by the spinlock, so it was possible to read
+> the RTC TIME register and get an incorrect value. This patch
+> introduces a mutex for protecting the RTC TIME access, unlike the
+> spinlock it is allowed to sleep in a critical section protected by a
+> mutex. The RTC STATUS register can still be used from the interrupt
+> handler but it has no effect on setting the time.
+> 
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: <stable@vger.kernel.org> #v4.0
+> ---
+> Hi,
+> 
+> The first version of this patch was sent too late to be part of
+> 4.1-rc1. However this fix should be part of 4.1.
+> 
+> Since the first version I added the acked-by from Alexandre and I
+> rebased the patch onto v4.1-rc1.
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> 
+>  drivers/rtc/rtc-armada38x.c | 24 ++++++++++++------------
+>  1 file changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
+> index 43e04af39e09..cb70ced7e0db 100644
+> --- a/drivers/rtc/rtc-armada38x.c
+> +++ b/drivers/rtc/rtc-armada38x.c
+> @@ -40,6 +40,13 @@ struct armada38x_rtc {
+>  	void __iomem	    *regs;
+>  	void __iomem	    *regs_soc;
+>  	spinlock_t	    lock;
+> +	/*
+> +	 * While setting the time, the RTC TIME register should not be
+> +	 * accessed. Setting the RTC time involves sleeping during
+> +	 * 100ms, so a mutex instead of a spinlock is used to protect
+> +	 * it
+> +	 */
+> +	struct mutex	    mutex_time;
+>  	int		    irq;
+>  };
+>  
+> @@ -59,8 +66,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
+>  	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
+>  	unsigned long time, time_check, flags;
+>  
+> -	spin_lock_irqsave(&rtc->lock, flags);
+> -
+> +	mutex_lock(&rtc->mutex_time);
+>  	time = readl(rtc->regs + RTC_TIME);
+>  	/*
+>  	 * WA for failing time set attempts. As stated in HW ERRATA if
+> @@ -71,7 +77,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
+>  	if ((time_check - time) > 1)
+>  		time_check = readl(rtc->regs + RTC_TIME);
+>  
+> -	spin_unlock_irqrestore(&rtc->lock, flags);
+> +	mutex_unlock(&rtc->mutex_time);
+>  
+>  	rtc_time_to_tm(time_check, tm);
+>  
+> @@ -94,19 +100,12 @@ static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
+>  	 * then wait for 100ms before writing to the time register to be
+>  	 * sure that the data will be taken into account.
+>  	 */
+> -	spin_lock_irqsave(&rtc->lock, flags);
+> -
+> +	mutex_lock(&rtc->mutex_time);
+>  	rtc_delayed_write(0, rtc, RTC_STATUS);
+> -
+> -	spin_unlock_irqrestore(&rtc->lock, flags);
+> -
+>  	msleep(100);
+> -
+> -	spin_lock_irqsave(&rtc->lock, flags);
+> -
+>  	rtc_delayed_write(time, rtc, RTC_TIME);
+> +	mutex_unlock(&rtc->mutex_time);
+>  
+> -	spin_unlock_irqrestore(&rtc->lock, flags);
+>  out:
+>  	return ret;
+>  }
+> @@ -230,6 +229,7 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	spin_lock_init(&rtc->lock);
+> +	mutex_init(&rtc->mutex_time);
+>  
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rtc");
+>  	rtc->regs = devm_ioremap_resource(&pdev->dev, res);
+> -- 
+> 2.1.0
+> 
+> -- 
+> -- 
+> You received this message because you are subscribed to "rtc-linux".
+> Membership options at http://groups.google.com/group/rtc-linux .
+> Please read http://groups.google.com/group/rtc-linux/web/checklist
+> before submitting a driver.
+> --- 
+> You received this message because you are subscribed to the Google Groups "rtc-linux" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to rtc-linux+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
 
 -- 
-Regards,
-Andrew
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
