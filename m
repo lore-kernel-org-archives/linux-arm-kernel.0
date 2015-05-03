@@ -1,37 +1,36 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun,  3 May 2015 21:15:09 +0300
-Subject: [PATCH 2/3] ARM: s3c24xx: Add DMA resources for SDI and I2S
-In-Reply-To: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
-References: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1430676910-30657-2-git-send-email-anarsoul@gmail.com>
+Date: Sun,  3 May 2015 21:15:08 +0300
+Subject: [PATCH 1/3] ARM: s3c24xx: add dma_coherent_mask for DMA devices
+Message-ID: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Otherwise dma_alloc_coherent() fails.
+
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/plat-samsung/devs.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-s3c24xx/common.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 83c7d15..62edcab 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -564,6 +564,8 @@ void __init s3c_i2c7_set_platdata(struct s3c2410_platform_i2c *pd)
- #ifdef CONFIG_PLAT_S3C24XX
- static struct resource s3c_iis_resource[] = {
- 	[0] = DEFINE_RES_MEM(S3C24XX_PA_IIS, S3C24XX_SZ_IIS),
-+	[1] = DEFINE_RES_DMA(DMACH_I2S_OUT),
-+	[2] = DEFINE_RES_DMA(DMACH_I2S_IN),
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index bf50328..7ed0853 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -355,6 +355,7 @@ struct platform_device s3c2410_device_dma = {
+ 	.resource	= s3c2410_dma_resource,
+ 	.dev	= {
+ 		.platform_data	= &s3c2410_dma_platdata,
++		.coherent_dma_mask = ~0,
+ 	},
  };
- 
- struct platform_device s3c_device_iis = {
-@@ -863,6 +865,7 @@ struct platform_device s3c_device_rtc = {
- static struct resource s3c_sdi_resource[] = {
- 	[0] = DEFINE_RES_MEM(S3C24XX_PA_SDI, S3C24XX_SZ_SDI),
- 	[1] = DEFINE_RES_IRQ(IRQ_SDI),
-+	[2] = DEFINE_RES_DMA(DMACH_SDI),
+ #endif
+@@ -452,6 +453,7 @@ struct platform_device s3c2440_device_dma = {
+ 	.resource	= s3c2410_dma_resource,
+ 	.dev	= {
+ 		.platform_data	= &s3c2440_dma_platdata,
++		.coherent_dma_mask = ~0,
+ 	},
  };
- 
- struct platform_device s3c_device_sdi = {
+ #endif
 -- 
 2.3.5
