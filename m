@@ -1,154 +1,119 @@
-From: andrew@ncrmnt.org (Andrew)
-Date: Sun, 03 May 2015 13:18:22 +0300
-Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
- DNS-327L
-In-Reply-To: <55351898.60604@free-electrons.com>
-References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
- <552A6209.9040903@gmail.com>
- <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
- <20150412145857.GA14038@lunn.ch>
- <b172d775afa24cea69a9490f531c6b37@mail.ncrmnt.org>
- <20150412194735.GA27921@lunn.ch> <552BCFAA.2020109@free-electrons.com>
- <1ec8906f00468ca5a9fa227f8c83fe69@mail.ncrmnt.org>
- <55351569.7000307@free-electrons.com>
- <d28764ea5d0d5f4c2e5d3e9ca1d7217a@mail.ncrmnt.org>
- <55351898.60604@free-electrons.com>
-Message-ID: <4e7e91562aac6a260885bf2d12174060@mail.ncrmnt.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun,  3 May 2015 10:30:12 +0000
+Subject: [PATCH v2] spi: sirf: request and free cs gpio in setup and cleanup
+ callbacks
+Message-ID: <1430649012-1694-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory CLEMENT ????? 20.04.2015 18:17:
-> On 20/04/2015 17:15, Andrew wrote:
->> Gregory CLEMENT ????? 20.04.2015 18:04:
->>> Hi Andrew,
->>> 
->>> On 13/04/2015 16:32, Andrew wrote:
->>>> Gregory CLEMENT ????? 13.04.2015 17:16:
->>>>> Hi Andrew(s),
->>>>> 
->>>>> On 12/04/2015 21:47, Andrew Lunn wrote:
->>>>>> On Sun, Apr 12, 2015 at 06:41:31PM +0300, Andrew wrote:
->>>>>>> Andrew Lunn ?????????? 12.04.2015 17:58:
->>>>>>>>> Okay, got it.
->>>>>>>>> I'll file a bug about this issue to the the bugzilla. However
->>>>>>>>> something
->>>>>>>>> tells me it might not be cpuidle, but D-link. This one's sounds
->>>>>>>>> nasty
->>>>>>>>> and it has been around since 3.16.x. How could it go unnoticed?
->>>>>>>>> Unfortunately I have no other armada-370 hardware to test it.
->>>>>>>> 
->>>>>>>> Hi Andrew
->>>>>>>> 
->>>>>>>> A few of us here do have hardware to test with. Please give a
->>>>>>>> detailed
->>>>>>>> description of how you reproduce the issue, and your kernel
->>>>>>>> configuration, if different from mvebu_v7_defconfig, or
->>>>>>>> multi_v7_defconfig.
->>>>>>>> 
->>>>>>>> 	Thanks
->>>>>>>> 		Andrew
->>>>>>> 
->>>>>>> 
->>>>>>> arch/arm/configs/mvebu_v7_defconfig has
->>>>>>> CONFIG_ARM_MVEBU_V7_CPUIDLE=y,
->>>>>>> so it should be sufficient to reproduce the issue. I first
->>>>>>> encountered
->>>>>>> this issue using that very config and observed it on 2 DNS-327L
->>>>>>> boxes
->>>>>>> I
->>>>>>> own.
->>>>>>> 
->>>>>>> All I have to do to trigger the bug - enable cpuidle driver and 
->>>>>>> let
->>>>>>> the box
->>>>>>> sit for some 4-12 hours, till it hard-freezes. If wdt is enabled 
->>>>>>> -
->>>>>>> wdt reboot
->>>>>>> will happen.
->>>>>> 
->>>>>> That simple! Well i've got a 370RD which has been sat mostly idle
->>>>>> for
->>>>>> weeks, using the mvebu_v7_defconfig, with a few addition things
->>>>>> turned
->>>>>> on for testing the Ethernet switch on the board. I've not had that
->>>>>> lockup.
->>>>>> 
->>>>>> One thing you can try to narrow it down is the disable the second
->>>>>> idle
->>>>>> mode. Take a look at armada370_idle_driver. Keep the
->>>>>> ARM_CPUIDLE_WFI_STATE but disable the "Deep Idle" state.
->>>>> 
->>>>> Actually you don't have to modify the kernel you can setup the CPU
->>>>> idle
->>>>> level
->>>>> you want at runtime:
->>>>> 
->>>>> echo 1 > /sys/devices/system/cpu/cpu0/cpuidle/state1/disable
->>>>> 
->>>>> will disable the state1. By doing this on Armada 370 then you
->>>>> will only use the WFI state.
->>>>> 
->>>>> Do you still have this issue on v4.0-rc7?
->>>> 
->>>> Yep, I can confirm having this issue on 4.0-rc7. I will only be able
->>>> to
->>>> test if
->>>> disabling state1 fixes it the next weekend.
->>> 
->>> Did you manage to do some test this week-end?
->>> 
->>> Thanks,
->>> 
->>> Gregory
->>> 
->>> 
->>>> 
->>>>> 
->>>>> Thanks,
->>>>> 
->>>>> Gregory
->>>>> 
->>>>> 
->>>>> 
->>>>>> 
->>>>>>       Andrew
->>>>>> 
->>>> 
->> 
->> Sorry, I've been away for the weekend but managed to take the
-> 
-> No problem
-> 
->> hardware home on my way back. I'll rig it for a long test today
->> in the evening. Expect some test results somewhere around Wednesday.
->> (Guess it doesn't count unless it's stable for 24+ hours).
-> 
-> 
-> great! thanks to take care of it.
-> 
-> Gregory
->> 
+From: Qipan Li <Qipan.Li@csr.com>
 
-Sorry for the long delay with testing, but here come the results.
-I've rebased everything to 4.1-rc1
+move spi controller's gpio request work out from probe() to spi device
+register stage, so after spi device register spi controller can deactive
+device's gpio chipselect. old code can't do it because gpio request has
+not be done until device register is finised in spi_bitbang_start.
+and add cleanup function to free CS gpio.
 
-1. WFI + DeepIdle => freeze after approx:
-   * 1 hours and 30 minutes, first test
-   * 3 hours and 40 minutes, second test
-2. WFI only (DeepIdle disabled via sysfs) => Still alive after 13 hours 
-and counting
+Signed-off-by: Qipan Li <Qipan.Li@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ -v2: rebase on v4.1-rc1
 
-The proper patchset will follow as soon as I figure out what change 
-broke
-dns320l-daemon (The utility that speaks to weltrend mcu on ttyS1)
-It was working on 3.18.6, on 3.19 and up - it writes data to the port 
-(and mcu acks it),
-but can't read any responses.
+ drivers/spi/spi-sirf.c | 55 +++++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 37 insertions(+), 18 deletions(-)
 
-Same thing happens to the python (pyserial inside) implementation of the 
-fan-daemon:
-https://github.com/martignlo/DNS-320L
-
+diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
+index a50ee9b..a69ccb7 100644
+--- a/drivers/spi/spi-sirf.c
++++ b/drivers/spi/spi-sirf.c
+@@ -631,14 +631,47 @@ spi_sirfsoc_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
+ static int spi_sirfsoc_setup(struct spi_device *spi)
+ {
+ 	struct sirfsoc_spi *sspi;
++	int ret = 0;
+ 
+ 	sspi = spi_master_get_devdata(spi->master);
+ 
+ 	if (spi->cs_gpio == -ENOENT)
+ 		sspi->hw_cs = true;
+-	else
++	else {
+ 		sspi->hw_cs = false;
+-	return spi_sirfsoc_setup_transfer(spi, NULL);
++		if (!spi_get_ctldata(spi)) {
++			void *cs = kmalloc(sizeof(int), GFP_KERNEL);
++			if (!cs) {
++				ret = -ENOMEM;
++				goto exit;
++			}
++			ret = gpio_is_valid(spi->cs_gpio);
++			if (!ret) {
++				dev_err(&spi->dev, "no valid gpio\n");
++				ret = -ENOENT;
++				goto exit;
++			}
++			ret = gpio_request(spi->cs_gpio, DRIVER_NAME);
++			if (ret) {
++				dev_err(&spi->dev, "failed to request gpio\n");
++				goto exit;
++			}
++			spi_set_ctldata(spi, cs);
++		}
++	}
++	writel(readl(sspi->base + SIRFSOC_SPI_CTRL) | SIRFSOC_SPI_CS_IO_MODE,
++			sspi->base + SIRFSOC_SPI_CTRL);
++	spi_sirfsoc_chipselect(spi, BITBANG_CS_INACTIVE);
++exit:
++	return ret;
++}
++
++static void spi_sirfsoc_cleanup(struct spi_device *spi)
++{
++	if (spi_get_ctldata(spi)) {
++		gpio_free(spi->cs_gpio);
++		kfree(spi_get_ctldata(spi));
++	}
+ }
+ 
+ static int spi_sirfsoc_probe(struct platform_device *pdev)
+@@ -647,7 +680,7 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	struct spi_master *master;
+ 	struct resource *mem_res;
+ 	int irq;
+-	int i, ret;
++	int ret;
+ 
+ 	ret = device_reset(&pdev->dev);
+ 	if (ret) {
+@@ -685,6 +718,7 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	sspi->bitbang.setup_transfer = spi_sirfsoc_setup_transfer;
+ 	sspi->bitbang.txrx_bufs = spi_sirfsoc_transfer;
+ 	sspi->bitbang.master->setup = spi_sirfsoc_setup;
++	sspi->bitbang.master->cleanup = spi_sirfsoc_cleanup;
+ 	master->bus_num = pdev->id;
+ 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST | SPI_CS_HIGH;
+ 	master->bits_per_word_mask = SPI_BPW_MASK(8) | SPI_BPW_MASK(12) |
+@@ -733,21 +767,6 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	ret = spi_bitbang_start(&sspi->bitbang);
+ 	if (ret)
+ 		goto free_dummypage;
+-	for (i = 0; master->cs_gpios && i < master->num_chipselect; i++) {
+-		if (master->cs_gpios[i] == -ENOENT)
+-			continue;
+-		if (!gpio_is_valid(master->cs_gpios[i])) {
+-			dev_err(&pdev->dev, "no valid gpio\n");
+-			ret = -EINVAL;
+-			goto free_dummypage;
+-		}
+-		ret = devm_gpio_request(&pdev->dev,
+-				master->cs_gpios[i], DRIVER_NAME);
+-		if (ret) {
+-			dev_err(&pdev->dev, "failed to request gpio\n");
+-			goto free_dummypage;
+-		}
+-	}
+ 	dev_info(&pdev->dev, "registerred, bus number = %d\n", master->bus_num);
+ 
+ 	return 0;
 -- 
-Regards,
-Andrew
+1.9.1
