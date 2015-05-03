@@ -1,73 +1,43 @@
 From: rric@kernel.org (Robert Richter)
-Date: Sun,  3 May 2015 22:49:30 +0200
-Subject: [PATCH 2/4] arm64: gicv3: its: Add range check for number of
- allocated pages
+Date: Sun,  3 May 2015 22:49:31 +0200
+Subject: [PATCH 3/4] arm64: gicv3: its: Read typer register outside the loop
 In-Reply-To: <1430686172-18222-1-git-send-email-rric@kernel.org>
 References: <1430686172-18222-1-git-send-email-rric@kernel.org>
-Message-ID: <1430686172-18222-3-git-send-email-rric@kernel.org>
+Message-ID: <1430686172-18222-4-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Richter <rrichter@cavium.com>
 
-The number of pages for the its table may exceed the maximum of 256.
-Adding a range check and limitting the number to its maximum.
-
-Based on a patch from Tirumalesh Chalamarla <tchalamarla@cavium.com>.
+No need to read the typer register in the loop. Values do not change.
 
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 11 ++++++++++-
- include/linux/irqchip/arm-gic-v3.h |  1 +
- 2 files changed, 11 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-gic-v3-its.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e30b4de04c6c..a2619a1d5bb3 100644
+index a2619a1d5bb3..916c4724c771 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -810,6 +810,7 @@ static int its_alloc_tables(struct its_node *its)
- 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
- 		int order = get_order(psz);
- 		int alloc_size;
-+		int alloc_pages;
- 		u64 tmp;
- 		void *base;
+@@ -803,6 +803,8 @@ static int its_alloc_tables(struct its_node *its)
+ 	int psz = SZ_64K;
+ 	u64 shr = GITS_BASER_InnerShareable;
+ 	u64 cache = GITS_BASER_WaWb;
++	u64 typer = readq_relaxed(its->base + GITS_TYPER);
++	u32 ids = GITS_TYPER_DEVBITS(typer);
  
-@@ -837,6 +838,14 @@ static int its_alloc_tables(struct its_node *its)
- 		}
- 
- 		alloc_size = (1 << order) * PAGE_SIZE;
-+		alloc_pages = (alloc_size / psz);
-+		if (alloc_pages > GITS_BASER_PAGES_MAX) {
-+			alloc_pages = GITS_BASER_PAGES_MAX;
-+			order = get_order(GITS_BASER_PAGES_MAX * psz);
-+			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
-+				its->msi_chip.of_node->full_name, order, alloc_pages);
-+		}
-+
- 		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
- 		if (!base) {
- 			err = -ENOMEM;
-@@ -865,7 +874,7 @@ static int its_alloc_tables(struct its_node *its)
- 			break;
- 		}
- 
--		val |= (alloc_size / psz) - 1;
-+		val |= alloc_pages - 1;
- 
- 		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
- 		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index ffbc034c8810..f28da189c4aa 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -229,6 +229,7 @@
- #define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
- #define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
- #define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
-+#define GITS_BASER_PAGES_MAX		256
- 
- #define GITS_BASER_TYPE_NONE		0
- #define GITS_BASER_TYPE_DEVICE		1
+ 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+ 		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
+@@ -826,9 +828,6 @@ static int its_alloc_tables(struct its_node *its)
+ 		 * For other tables, only allocate a single page.
+ 		 */
+ 		if (type == GITS_BASER_TYPE_DEVICE) {
+-			u64 typer = readq_relaxed(its->base + GITS_TYPER);
+-			u32 ids = GITS_TYPER_DEVBITS(typer);
+-
+ 			order = get_order((1UL << ids) * entry_size);
+ 			if (order >= MAX_ORDER) {
+ 				order = MAX_ORDER - 1;
 -- 
 2.1.1
