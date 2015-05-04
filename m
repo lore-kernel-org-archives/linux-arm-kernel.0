@@ -1,109 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 May 2015 07:24:13 -0700
-Subject: ARM errata 430973 on multi platform kernels
-In-Reply-To: <20150429144011.GB24469@atomide.com>
-References: <20150408230658.GO4027@n2100.arm.linux.org.uk>
- <20150409134843.GQ4027@n2100.arm.linux.org.uk>
- <20150415163108.GB2033@earth> <20150416160858.GH18048@atomide.com>
- <20150417184156.GA3326@earth> <20150420234032.GM18048@atomide.com>
- <20150423102542.GZ4027@n2100.arm.linux.org.uk>
- <20150423141727.GQ18048@atomide.com>
- <20150428181300.GB4027@n2100.arm.linux.org.uk>
- <20150429144011.GB24469@atomide.com>
-Message-ID: <20150504142413.GE24469@atomide.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 4 May 2015 16:31:05 +0200
+Subject: [PATCH 6/7] ARM: dts: mt8135: enable basic SMP bringup for mt8135
+In-Reply-To: <1430466210-22963-7-git-send-email-yingjoe.chen@mediatek.com>
+References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1430466210-22963-7-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <20150504143105.GK4946@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150429 07:42]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150428 11:14]:
-> > On Thu, Apr 23, 2015 at 07:17:28AM -0700, Tony Lindgren wrote:
-> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [150423 03:26]:
-> > > > However, I don't think anyone is willing to say that they have a
-> > > > solution to this problem - obviously, you can't build OMAP as a
-> > > > non-multiplatform kernel anymore, so in effect you can never have
-> > > > the kernel enable this errata.  And you can't detect whether you're
-> > > > running in secure mode or not.
-> > > > 
-> > > > We could do the "only write the bit if it was originally clear" but
-> > > > we still have the problem that doing so may cause other people
-> > > > regressions.
-> > > 
-> > > How about we keep the bit writing part !multiplatform conditional
-> > > (or even remove it) but always do the flush for ca-8?
-> > > 
-> > > Then we could also do a warning for a misconfigured ca-8 later on.
-> > 
-> > Yes, we could do this - we'll have to rely on the boot loader doing
-> > the right thing and setting this bit appropriately.  For those
-> > platforms where this doesn't apply, I don't see any solution as (iirc)
-> > OMAP now requires MULTIPLATFORM to be enabled.
+On Fri, May 01, 2015 at 03:43:29PM +0800, Yingjoe Chen wrote:
+> Add arch timer node to enable arch-timer support. MT8135 firmware
+> doesn't correctly setup arch-timer frequency and CNTVOFF, add
+> properties to workaround this.
 > 
-> OK, here's an updated patch. I've kept Sebastian's Tested-by as we know
-> the init part is a nop on n900 that he tested with.
+> This also set cpu enable-method to enable SMP.
+> 
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt8135.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+> index 612bd22..eb5e06f 100644
+> --- a/arch/arm/boot/dts/mt8135.dtsi
+> +++ b/arch/arm/boot/dts/mt8135.dtsi
+> @@ -46,6 +46,7 @@
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> +		enable-method = "mediatek,mt81xx-tz-smp";
+>  
+>  		cpu0: cpu at 0 {
+>  			device_type = "cpu";
+> @@ -103,6 +104,21 @@
+>  		};
+>  	};
+>  
+> +	timer {
+> +		compatible = "arm,armv7-timer";
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
+> +					  IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) |
+> +					  IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) |
+> +					  IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) |
+> +					  IRQ_TYPE_LEVEL_LOW)>;
+> +		clock-frequency = <13000000>;
+> +		arm,cpu-registers-not-fw-configured;
+> +	};
 
-I've posted this updated version into Russell's patch system:
+This is the SoC dtsi file. What you say here is that all MT8135
+present and future firmwares on all boards do this wrong.
+Shouldn't you fix the firmware instead? Shouldn't this property be board
+specific?
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8353/1
+Sascha
 
-Regards,
-
-Tony
- 
-> 8< ---------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Mon, 27 Apr 2015 10:18:14 -0700
-> Subject: [PATCH] ARM: mm: Fix Cortex-A8 erratum 430973 segfaults for bootloaders and multiarch
-> 
-> Looks like apps can be made to segfault easily on armhf distros
-> just by running cpuburn-a8 in the background, then starting apt
-> get update unless erratum 430973 workaround is enabled. This happens
-> on r3p2 also, which has 430973 fixed in hardware.
-> 
-> Turns out the reason for this is some bootloaders incorrectly
-> setting the auxilary register IBE bit, which probably causes us
-> to hit erratum 687067 on Cortex-A8 later than r1p2.
-> 
-> If the bootloader incorrectly sets the IBE bit in the auxilary control
-> register for Cortex-A8 revisions with 430973 fixed in hardware, we
-> need to call flush BTAC/BTB to avoid segfaults probably caused by
-> erratum 687067. So let's flush BTAC/BTB unconditionally for Cortex-A8.
-> It won't do anything unless the IBE bit is set.
-> 
-> Note that we keep the erratum 430973 Kconfig option still around and
-> disabled for multiarch as it may be unsafe to enable for some secure
-> SoC. It is known safe to be enabled for n900, but won't do anything
-> on n900 as the IBE bit needs to be set with SMC.
-> 
-> Also note that SoCs probably should also add checks and print warnings
-> for the misconfigured IBE bit depending on the Cortex-A8 revision
-> so the bootloaders can be fixed Cortex-A8 revisions later than
-> r1p2 to not set the IBE bit.
-> 
-> Tested-By: Sebastian Reichel <sre@kernel.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> --- a/arch/arm/mm/proc-v7-2level.S
-> +++ b/arch/arm/mm/proc-v7-2level.S
-> @@ -36,14 +36,16 @@
->   *
->   *	It is assumed that:
->   *	- we are not using split page tables
-> + *
-> + *	Note that we always need to flush BTAC/BTB if IBE is set
-> + *	even on Cortex-A8 revisions not affected by 430973.
-> + *	If IBE is not set, the flush BTAC/BTB won't do anything.
->   */
->  ENTRY(cpu_ca8_switch_mm)
->  #ifdef CONFIG_MMU
->  	mov	r2, #0
-> -#ifdef CONFIG_ARM_ERRATA_430973
->  	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
->  #endif
-> -#endif
->  ENTRY(cpu_v7_switch_mm)
->  #ifdef CONFIG_MMU
->  	mmid	r1, r1				@ get mm->context.id
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
