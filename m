@@ -1,68 +1,74 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 04 May 2015 10:16:01 +0200
-Subject: [PATCH v6 06/25] iommu: exynos: remove unused functions
+Date: Mon, 04 May 2015 10:16:04 +0200
+Subject: [PATCH v6 09/25] iommu: exynos: remove unused functions, part 2
 In-Reply-To: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
 References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1430727380-10912-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1430727380-10912-10-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes two unneeded functions, which are not a part of
-generic IOMMU API and were never used by any other driver.
+After refactoring functions to use pointer to struct sysmmu_drvdata
+directly, some functions became useless and thus never used, so remove
+them completely.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 31 -------------------------------
- 1 file changed, 31 deletions(-)
+ drivers/iommu/exynos-iommu.c | 43 -------------------------------------------
+ 1 file changed, 43 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 3861485f0689..98aa7e9c2507 100644
+index 0c23b69022cd..7d62715ab51e 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -496,13 +496,6 @@ static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
+@@ -463,49 +463,6 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
  	return ret;
  }
  
--int exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable)
+-/* __exynos_sysmmu_enable: Enables System MMU
+- *
+- * returns -error if an error occurred and System MMU is not enabled,
+- * 0 if the System MMU has been just enabled and 1 if System MMU was already
+- * enabled before.
+- */
+-static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
+-				  struct iommu_domain *domain)
 -{
--	BUG_ON(!memblock_is_memory(pgtable));
--
--	return __exynos_sysmmu_enable(dev, pgtable, NULL);
--}
--
- static bool exynos_sysmmu_disable(struct device *dev)
- {
- 	unsigned long flags;
-@@ -594,30 +587,6 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
- 	spin_unlock_irqrestore(&data->lock, flags);
- }
- 
--void exynos_sysmmu_tlb_invalidate(struct device *dev)
--{
--	struct exynos_iommu_owner *owner = dev->archdata.iommu;
+-	int ret = 0;
 -	unsigned long flags;
+-	struct exynos_iommu_owner *owner = dev->archdata.iommu;
 -	struct sysmmu_drvdata *data;
+-
+-	BUG_ON(!has_sysmmu(dev));
 -
 -	data = dev_get_drvdata(owner->sysmmu);
 -
--	spin_lock_irqsave(&data->lock, flags);
--	if (is_sysmmu_active(data)) {
--		if (!IS_ERR(data->clk_master))
--			clk_enable(data->clk_master);
--		if (sysmmu_block(data->sfrbase)) {
--			__sysmmu_tlb_invalidate(data->sfrbase);
--			sysmmu_unblock(data->sfrbase);
--		}
--		if (!IS_ERR(data->clk_master))
--			clk_disable(data->clk_master);
--	} else {
--		dev_dbg(dev, "disabled. Skipping TLB invalidation\n");
--	}
--	spin_unlock_irqrestore(&data->lock, flags);
+-	ret = __sysmmu_enable(data, pgtable, domain);
+-	if (ret >= 0)
+-		data->master = dev;
+-
+-	return ret;
 -}
 -
- static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+-static bool exynos_sysmmu_disable(struct device *dev)
+-{
+-	unsigned long flags;
+-	bool disabled = true;
+-	struct exynos_iommu_owner *owner = dev->archdata.iommu;
+-	struct sysmmu_drvdata *data;
+-
+-	BUG_ON(!has_sysmmu(dev));
+-
+-	data = dev_get_drvdata(owner->sysmmu);
+-
+-	disabled = __sysmmu_disable(data);
+-	if (disabled)
+-		data->master = NULL;
+-
+-	return disabled;
+-}
+-
+ static void __sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
+ 					      sysmmu_iova_t iova)
  {
- 	int irq, ret;
 -- 
 1.9.2
