@@ -1,36 +1,115 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  4 May 2015 13:57:42 +0200
-Subject: [GIT PULL] ARM: tegra: Device tree fixes for v4.1-rc3
-Message-ID: <1430740662-30151-1-git-send-email-thierry.reding@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 4 May 2015 14:06:51 +0200
+Subject: [PATCH 3/4] tty: serial: 8250_mtk: use pm_runtime callbacks for
+ enabling
+In-Reply-To: <CABuKBeJwduxLuyXcy7Ho+k+_Ye3+nHiGvdr8vTFsJzdHDBQPSA@mail.gmail.com>
+References: <1430117397-13517-1-git-send-email-s.hauer@pengutronix.de>
+ <1430117397-13517-4-git-send-email-s.hauer@pengutronix.de>
+ <CABuKBeJwduxLuyXcy7Ho+k+_Ye3+nHiGvdr8vTFsJzdHDBQPSA@mail.gmail.com>
+Message-ID: <20150504120651.GR6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Mon, May 04, 2015 at 01:05:27PM +0200, Matthias Brugger wrote:
+> 2015-04-27 8:49 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> > The pm_runtime callbacks already enable and disable the device.
+> > Use them in probe() and remove() instead of duplicating the
+> > code. This allows us to concentrate more code for enabling/disabling
+> > the UART in a single place.
+> >
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  drivers/tty/serial/8250/8250_mtk.c | 69 ++++++++++++++++++++------------------
+> >  1 file changed, 36 insertions(+), 33 deletions(-)
+> >
+> > diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+> > index bcfaa8dc..2f28bd0 100644
+> > --- a/drivers/tty/serial/8250/8250_mtk.c
+> > +++ b/drivers/tty/serial/8250/8250_mtk.c
+> > @@ -115,6 +115,29 @@ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
+> >                 tty_termios_encode_baud_rate(termios, baud, baud);
+> >  }
+> >
+> > +static int mtk8250_runtime_suspend(struct device *dev)
+> > +{
+> > +       struct mtk8250_data *data = dev_get_drvdata(dev);
+> > +
+> > +       clk_disable_unprepare(data->uart_clk);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static int mtk8250_runtime_resume(struct device *dev)
+> > +{
+> > +       struct mtk8250_data *data = dev_get_drvdata(dev);
+> > +       int err;
+> > +
+> > +       err = clk_prepare_enable(data->uart_clk);
+> > +       if (err) {
+> > +               dev_warn(dev, "Can't enable clock\n");
+> > +               return err;
+> > +       }
+> > +
+> > +       return 0;
+> > +}
+> > +
+> >  static void
+> >  mtk8250_do_pm(struct uart_port *port, unsigned int state, unsigned int old)
+> >  {
+> > @@ -130,19 +153,12 @@ mtk8250_do_pm(struct uart_port *port, unsigned int state, unsigned int old)
+> >  static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
+> >                            struct mtk8250_data *data)
+> >  {
+> > -       int err;
+> > -
+> >         data->uart_clk = devm_clk_get(&pdev->dev, NULL);
+> >         if (IS_ERR(data->uart_clk)) {
+> >                 dev_warn(&pdev->dev, "Can't get uart clock\n");
+> >                 return PTR_ERR(data->uart_clk);
+> >         }
+> >
+> > -       err = clk_prepare_enable(data->uart_clk);
+> > -       if (err) {
+> > -               dev_warn(&pdev->dev, "Can't prepare clock\n");
+> > -               return err;
+> > -       }
+> >         p->uartclk = clk_get_rate(data->uart_clk);
+> >
+> >         return 0;
+> > @@ -193,14 +209,18 @@ static int mtk8250_probe(struct platform_device *pdev)
+> >         writel(0x0, uart.port.membase +
+> >                         (MTK_UART_RATE_FIX << uart.port.regshift));
+> >
+> > -       data->line = serial8250_register_8250_port(&uart);
+> > -       if (data->line < 0)
+> > -               return data->line;
+> > -
+> >         platform_set_drvdata(pdev, data);
+> >
+> > -       pm_runtime_set_active(&pdev->dev);
+> >         pm_runtime_enable(&pdev->dev);
+> > +       if (!pm_runtime_enabled(&pdev->dev)) {
+> > +               err = mtk8250_runtime_resume(&pdev->dev);
+> > +               if (err)
+> > +                       return err;
+> > +       }
+> > +
+> > +       data->line = serial8250_register_8250_port(&uart);
+> > +       if (data->line < 0)
+> > +               return data->line;
+> 
+> Why do you delete pm_runtime_set_active here?
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+pm_runtime_set_active() communicates the initial state of the device to
+the pm core. Previously the driver activated the device manually by
+directly calling clk_prepare_enable(). Since this manual enabling of
+the clock is removed in this patch, the device is no longer active,
+hence pm_runtime_set_active() has to be removed.
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+Sascha
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.1-fixes-for-rc3
-
-for you to fetch changes up to a4b6916cb3578b05f30ef520cd6deb7f8fd97dda:
-
-  ARM: tegra: Correct which USB controller has the UTMI pad registers (2015-04-28 16:47:38 +0200)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-ARM: tegra: Device tree fixes for v4.1-rc3
-
-This contains a fix for a bug that was introduced a couple of months ago
-by a patch that git misapplied because of a lack of context.
-
-----------------------------------------------------------------
-Tomeu Vizoso (1):
-      ARM: tegra: Correct which USB controller has the UTMI pad registers
-
- arch/arm/boot/dts/tegra124.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
