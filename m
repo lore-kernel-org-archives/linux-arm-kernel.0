@@ -1,78 +1,33 @@
-From: noralf@tronnes.org (=?windows-1252?Q?Noralf_Tr=F8nnes?=)
-Date: Mon, 04 May 2015 22:25:30 +0200
-Subject: [PATCH] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to
- SDRAM.
-In-Reply-To: <1430768034-12734-1-git-send-email-eric@anholt.net>
-References: <1430768034-12734-1-git-send-email-eric@anholt.net>
-Message-ID: <5547D5BA.5070407@tronnes.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 May 2015 13:35:56 -0700
+Subject: [GIT PULL] one n900 audio regression fix for v4.0-rc cycle
+In-Reply-To: <20150403230344.GA18048@atomide.com>
+References: <20150403230344.GA18048@atomide.com>
+Message-ID: <20150504203555.GA4810@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Tony Lindgren <tony@atomide.com> [150403 16:08]:
+> The following changes since commit 599c376c49323127c9bdbb0fa61a3d4743819bc2:
+> 
+>   ARM: dts: Fix gpio interrupts for dm816x (2015-03-18 13:41:34 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/oamp-for-v4.0/fix-audio
+> 
+> for you to fetch changes up to 6f7cedbdac1278e1bacfb9ef79769178fcd6a0b3:
+> 
+>   ARM: dts: OMAP3-N900: Add microphone bias voltages (2015-04-01 12:32:40 -0700)
+> 
+> ----------------------------------------------------------------
+> One audio regression fix for n900 that would be good to get
+> into v4.0 as people are already playing with audio call support
+> for n900 using mainline kernel.
 
-Den 04.05.2015 21:33, skrev Eric Anholt:
-> There exists a tiny MMU, configurable only by the VC (running the
-> closed firmware), which maps from the ARM's physical addresses to bus
-> addresses.  These bus addresses determine the caching behavior in the
-> VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
-> 2 bits.  The bits in the bus address mean:
->
->  From the VideoCore processor:
-> 0x0... L1 and L2 cache allocating and coherent
-> 0x4... L1 non-allocating, but coherent. L2 allocating and coherent
-> 0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
-> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
->
->  From the GPU peripherals (note: all peripherals bypass the L1
-> cache. The ARM will see this view once through the VC MMU):
-> 0x0... Do not use
-> 0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
-> 0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
-> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
->
-> The 2835 firmware always configures the MMU to turn ARM physical
-> addresses with 0x0 top bits to 0x4, meaning present in L2 but
-> incoherent with L1.  However, any bus addresses we were generating in
-> the kernel to be passed to a device had 0x0 bits.  That would be a
-> reserved (possibly totally incoherent) value if sent to a GPU
-> peripheral like USB, or L1 allocating if sent to the VC (like a
-> firmware property request).  By setting dma-ranges, all of the devices
-> below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
-> friends return addresses with 0x4 bits and avoid cache incoherency.
->
-> This matches the behavior in the downstream 2708 kernel (see
-> BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Cc: popcornmix at gmail.com
-> ---
->   arch/arm/boot/dts/bcm2835.dtsi | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-> index 5734650..2df1b5c 100644
-> --- a/arch/arm/boot/dts/bcm2835.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835.dtsi
-> @@ -15,6 +15,7 @@
->   		#address-cells = <1>;
->   		#size-cells = <1>;
->   		ranges = <0x7e000000 0x20000000 0x02000000>;
-> +		dma-ranges = <0x40000000 0x00000000 0x1f000000>;
->   
->   		timer at 7e003000 {
->   			compatible = "brcm,bcm2835-system-timer";
-
-This was quite a coincidence. I discovered the need for 'dma-ranges'
-yesterday while trying to get the downstream bcm2708_fb driver to
-work with ARCH_BCM2835. The driver is using the mailbox to get info
-about the framebuffer from the firmware. When it failed I discovered
-that the bus address was wrong.
-
-What I don't understand, is that mmc and spi works fine with a "wrong"
-bus address. It's only the framebuffer driver and the vchiq driver
-when using mailbox that fails.
-
-Tested-by: Noralf Tr?nnes <noralf@tronnes.org>
-
+Looks like this did not make it so please just ignore this one.
+I'll send a new pull request for fixes with this patch in it.
 
 Regards,
-Noralf Tr?nnes
+
+Tony
