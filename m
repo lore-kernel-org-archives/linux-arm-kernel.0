@@ -1,36 +1,44 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 4 May 2015 18:38:37 +0800
-Subject: [PATCH RFC v1 5/5] clk: introduce clk_core_enable_lock and
- clk_core_disable_lock functions
-In-Reply-To: <20150501011043.GF32407@codeaurora.org>
-References: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
- <1429107999-24413-6-git-send-email-aisheng.dong@freescale.com>
- <20150501011043.GF32407@codeaurora.org>
-Message-ID: <20150504103836.GE4082@shlinux1.ap.freescale.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 4 May 2015 16:34:04 +0530
+Subject: [PATCH 4/5] dmaengine: hsu: Fix memory leak when stopping a
+ running transfer
+In-Reply-To: <20150428111708.GB16174@kroah.com>
+References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
+ <1427456155-28990-5-git-send-email-peter.ujfalusi@ti.com>
+ <1427457718.14897.428.camel@linux.intel.com>
+ <20150330173732.GK7192@intel.com>
+ <20150428111708.GB16174@kroah.com>
+Message-ID: <20150504110404.GH3521@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 06:10:43PM -0700, Stephen Boyd wrote:
-> On 04/15, Dong Aisheng wrote:
-> > This can be usefully when clock core wants to enable/disable clocks.
-> > Then we don't have to convert the struct clk_core to struct clk to call
-> > clk_enable/clk_disable which is a bit un-align with exist using.
+On Tue, Apr 28, 2015 at 01:17:08PM +0200, 'Greg Kroah-Hartman' wrote:
+> On Mon, Mar 30, 2015 at 11:07:32PM +0530, Vinod Koul wrote:
+> > On Fri, Mar 27, 2015 at 02:01:58PM +0200, Andy Shevchenko wrote:
+> > > On Fri, 2015-03-27 at 13:35 +0200, Peter Ujfalusi wrote:
+> > > > The vd->node is removed from the lists when the transfer started so the
+> > > > vchan_get_all_descriptors() will not find it. This results memory leak.
+> > > > 
+> > > 
+> > > Acked-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> > Acked-by: Vinod Koul <vinod.koul@intel.com>
 > > 
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
-> > ---
+> > Greg,
+> > 
+> > Please apply this in your queue for next
 > 
-> Yeah let's add this patch either before patch 4 or squash it into
-> patch 4. Also, avoid adding more function prototypes please.
+> Apply what?  Can someone resend this in a format I can apply it in?
+
+Ah sorry Greg, I thought you were cced in the orignal patch as well, so..
+
+Peter, can you resend, now that this is in my next I will apply it
+
+-- 
+~Vinod
+
 > 
+> thanks,
+> 
+> gregk -h
 
-Will do it.
-Thanks for the suggestion.
-
-Regards
-Dong Aisheng
-
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+-- 
