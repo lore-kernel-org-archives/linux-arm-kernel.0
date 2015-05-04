@@ -1,94 +1,59 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 4 May 2015 21:27:53 +0200
-Subject: [PATCH 1/2] stmac: add dwmac glue for NXP 18xx/43xx family
-In-Reply-To: <90049936.xgdXKqK565@wuerfel>
-References: <3200125.o3jqXuyPfG@wuerfel>
- <1430691251-28119-1-git-send-email-manabian@gmail.com>
- <90049936.xgdXKqK565@wuerfel>
-Message-ID: <CAGhQ9VwX7SVnZ3xjWgMx4=8cRcA4sRL+pJCUhetF7-GQX5JFQw@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon,  4 May 2015 12:33:54 -0700
+Subject: [PATCH] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to SDRAM.
+Message-ID: <1430768034-12734-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 May 2015 at 20:46, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 04 May 2015 00:14:11 Joachim Eastwood wrote:
-> => >It should be fairly straightforward to split the probe function
->> >into two and export a function that takes a device and a stmmac_of_data
->> >pointer as arguments, and declare a module_platform_driver in your
->> >code.
->>
->> How about something like the patch below. All it does is to play a
->> little trick with the of_match_device in the dt config function and
->> export the probe/remove/pm stuff for the driver.
->>
->> The dwmac-lpc18xx would then become something like this:
->>
->> static const struct stmmac_of_data lpc18xx_dwmac_data = {
->>       .has_gmac = 1,
->>       .setup = lpc18xx_dwmac_setup,
->>       .init = lpc18xx_dwmac_init,
->> };
->>
->> static const struct of_device_id lpc18xx_dwmac_match[] = {
->>       { .compatible = "nxp,lpc1850-dwmac", .data = &lpc18xx_dwmac_data },
->>       { }
->> };
->> MODULE_DEVICE_TABLE(of, lpc18xx_dwmac_match);
->>
->> static struct platform_driver lpc18xx_dwmac_driver = {
->>       .probe  = stmmac_pltfr_probe,
->>       .remove = stmmac_pltfr_remove,
->>       .driver = {
->>               .name           = "lpc18xx-dwmac",
->>               .pm             = &stmmac_pltfr_pm_ops,
->>               .of_match_table = lpc18xx_dwmac_match,
->>       },
->> };
->> module_platform_driver(lpc18xx_dwmac_driver);
->>
->> All though this seem to work, stmmac_platform.c could benefit from
->> some refactoring. But this patch and then fixing the other DT users
->> could be a first step.
->
-> Sounds good, yes.
->
->> -     device = of_match_device(stmmac_dt_ids, &pdev->dev);
->> +     device = of_match_device(dev->driver->of_match_table, dev);
->>       if (!device)
->>               return -ENODEV;
->
-> Ah, that is a nice trick to avoid passing the various match tables
-> from a lot of duplicated probe functions.
->
-> I wonder if we could generalize that for use by any driver and
-> introduce a common helper
+There exists a tiny MMU, configurable only by the VC (running the
+closed firmware), which maps from the ARM's physical addresses to bus
+addresses.  These bus addresses determine the caching behavior in the
+VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
+2 bits.  The bits in the bus address mean:
 
-I realised that and posted kinda of a RFC to the devicetree list yesterday.
-http://marc.info/?l=devicetree&m=143068795621692&w=2
+>From the VideoCore processor:
+0x0... L1 and L2 cache allocating and coherent
+0x4... L1 non-allocating, but coherent. L2 allocating and coherent
+0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
+0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
 
-> void *of_platform_match_data(struct device *dev)
-> {
->         struct of_device_id *id;
->
->         if (!dev || !dev->of_node)
->                 return NULL;
->
->         id = of_match_device(dev->driver->of_match_table, dev);
->         if (!id)
->                 return NULL;
->
->         return id->data;
-> }
-> EXPORT_SYMBOL_GPL(of_platform_match_data);
+>From the GPU peripherals (note: all peripherals bypass the L1
+cache. The ARM will see this view once through the VC MMU):
+0x0... Do not use
+0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
+0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
+0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
 
-Almost the same as your proposal except for the dev pointer checking
-and the name.
+The 2835 firmware always configures the MMU to turn ARM physical
+addresses with 0x0 top bits to 0x4, meaning present in L2 but
+incoherent with L1.  However, any bus addresses we were generating in
+the kernel to be passed to a device had 0x0 bits.  That would be a
+reserved (possibly totally incoherent) value if sent to a GPU
+peripheral like USB, or L1 allocating if sent to the VC (like a
+firmware property request).  By setting dma-ranges, all of the devices
+below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
+friends return addresses with 0x4 bits and avoid cache incoherency.
 
-> I think that could save a few lines from many drivers, and it had not
-> occurred to me that we can take this shortcut.
->
-> The rest of your patch also looks great to me.
+This matches the behavior in the downstream 2708 kernel (see
+BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
 
-Great, I'll put together a new series of patches.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Cc: popcornmix at gmail.com
+---
+ arch/arm/boot/dts/bcm2835.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-regards,
-Joachim
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 5734650..2df1b5c 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -15,6 +15,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges = <0x7e000000 0x20000000 0x02000000>;
++		dma-ranges = <0x40000000 0x00000000 0x1f000000>;
+ 
+ 		timer at 7e003000 {
+ 			compatible = "brcm,bcm2835-system-timer";
+-- 
+2.1.4
