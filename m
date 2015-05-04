@@ -1,89 +1,83 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 May 2015 20:37:42 +0200
-Subject: imx6 sata cdrom driver issue
-In-Reply-To: <55439CA1.4030601@lenbrook.com>
-References: <5539101D.1020909@lenbrook.com> <15678294.L2fz4hMtva@wuerfel>
- <55439CA1.4030601@lenbrook.com>
-Message-ID: <3757889.IHh7sEV0GH@wuerfel>
+Date: Mon, 04 May 2015 20:46:13 +0200
+Subject: [PATCH 1/2] stmac: add dwmac glue for NXP 18xx/43xx family
+In-Reply-To: <1430691251-28119-1-git-send-email-manabian@gmail.com>
+References: <3200125.o3jqXuyPfG@wuerfel>
+ <1430691251-28119-1-git-send-email-manabian@gmail.com>
+Message-ID: <90049936.xgdXKqK565@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 May 2015 11:32:49 Jonathan Bagg wrote:
-> On 15-04-24 03:58 AM, Arnd Bergmann wrote:
-> > On Thursday 23 April 2015 11:30:37 Jonathan Bagg wrote:
-> >
-> > Do you have two SATA ports on one controller, with the other one being
-> > conneced to a disk drive?
-> Not when this error happened, but the CD-ROM was connected through a 
-> port multiplier.  One time I noticed sda device appear so I mounted it 
-> and it was the CD-ROM filesystem!
-
-Very strange, I'm sure something went wrong there and either the SATA
-host or the CDROM driver does not work well with a port multiplier.
-
-Is there a way for you to reproduce the problem without the multiplier?
-
-> > My best guess is that something in the error handling of
-> > drivers/ata/ahci_imx.c causes a reset of the entire bus and that
-> > triggers the other bugs. Can you instrument that error handling to
-> > see what's going on?
-> >
-> Also tried a cubox 
-> <https://www.solid-run.com/products/cubox-i-mini-computer/>, (imx6) 
-> running  Linux OpenELEC 3.14.18 #1 SMP Sun Sep 14 12:22:14 EDT 2014 
-> armv7l GNU/Linux
-
-Can you find out if there is a port multiplier in that machine?
-
-Does it list the sda device in /proc/partitions, or just the /dev/sr0?
-
-> Most of the time mount /dev/sr0 /tmp/test succeeds with....
+On Monday 04 May 2015 00:14:11 Joachim Eastwood wrote:
+=> >It should be fairly straightforward to split the probe function
+> >into two and export a function that takes a device and a stmmac_of_data
+> >pointer as arguments, and declare a module_platform_driver in your
+> >code.
 > 
-> [  954.355669] ISO 9660 Extensions: Microsoft Joliet Level 3
-> [  954.530595] ISOFS: changing to secondary root
+> How about something like the patch below. All it does is to play a
+> little trick with the of_match_device in the dt config function and
+> export the probe/remove/pm stuff for the driver.
 > 
-> one time once it succeed but needed to reset the link....
+> The dwmac-lpc18xx would then become something like this:
 > 
-> [ 1272.000951] ata1.00: exception Emask 0x0 SAct 0x0 SErr 0x0 action 0x6 
-> frozen
-> [ 1272.000969] ata1.00: failed command: IDENTIFY PACKET DEVICE
-> [ 1272.000993] ata1.00: cmd a1/00:01:00:00:00/00:00:00:00:00/00 tag 2 
-> pio 512 in
-> [ 1272.000993]          res 40/00:03:00:16:00/00:00:00:00:00/a0 Emask 
-> 0x4 (timeout)
-> [ 1272.001004] ata1.00: status: { DRDY }
-> [ 1272.001021] ata1: hard resetting link
-> [ 1272.487628] ata1: SATA link up 1.5 Gbps (SStatus 113 SControl 300)
-> [ 1272.495523] ata1.00: configured for UDMA/100
-> [ 1272.500917] ata1: EH complete
-> [ 1290.746222] ISO 9660 Extensions: Microsoft Joliet Level 3
+> static const struct stmmac_of_data lpc18xx_dwmac_data = {
+> 	.has_gmac = 1,
+> 	.setup = lpc18xx_dwmac_setup,
+> 	.init = lpc18xx_dwmac_init,
+> };
 > 
-> rarely if fails with this....
+> static const struct of_device_id lpc18xx_dwmac_match[] = {
+> 	{ .compatible = "nxp,lpc1850-dwmac", .data = &lpc18xx_dwmac_data },
+> 	{ }
+> };
+> MODULE_DEVICE_TABLE(of, lpc18xx_dwmac_match);
 > 
-> [  724.697232] ISO 9660 Extensions: Microsoft Joliet Level 3
-> [  724.827435] ISOFS: changing to secondary root
-> [  724.910232] isofs_fill_super: root inode is not a directory. 
-> Corrupted media?
-> [  725.133516] UDF-fs: warning (device sr0): udf_fill_super: No 
-> partition found (2)
-> [  725.351106] F2FS-fs (sr0): Magic Mismatch, valid(0xf2f52010) - read(0x0)
-> [  725.351132] F2FS-fs (sr0): Can't find valid F2FS filesystem in 1th 
-> superblock
-> [  725.352029] F2FS-fs (sr0): Magic Mismatch, valid(0xf2f52010) - read(0x0)
-> [  725.352052] F2FS-fs (sr0): Can't find valid F2FS filesystem in 2th 
-> superblock
+> static struct platform_driver lpc18xx_dwmac_driver = {
+> 	.probe  = stmmac_pltfr_probe,
+> 	.remove = stmmac_pltfr_remove,
+> 	.driver = {
+> 		.name           = "lpc18xx-dwmac",
+> 		.pm             = &stmmac_pltfr_pm_ops,
+> 		.of_match_table = lpc18xx_dwmac_match,
+> 	},
+> };
+> module_platform_driver(lpc18xx_dwmac_driver);
 > 
-> 
-> Specifying read only (mount -o ro /dev/sr0 /tmp/test) has worked 100% of 
-> the time on both the cubox and sabre boards.
+> All though this seem to work, stmmac_platform.c could benefit from
+> some refactoring. But this patch and then fixing the other DT users
+> could be a first step.
 
-Interesting. That would indicate that something actually tries to write
-to the device on normal mount.  Can you try if 
+Sounds good, yes.
 
-mount -t iso9660 /dev/sr0 /tmp/test
+> -	device = of_match_device(stmmac_dt_ids, &pdev->dev);
+> +	device = of_match_device(dev->driver->of_match_table, dev);
+>  	if (!device)
+>  		return -ENODEV;
 
-avoids that problem as well? That file system should never attempt to write
-to the device, so if it's the failed write that causes the host reset,
-that should solve it too.
+Ah, that is a nice trick to avoid passing the various match tables
+from a lot of duplicated probe functions.
+
+I wonder if we could generalize that for use by any driver and
+introduce a common helper
+
+void *of_platform_match_data(struct device *dev)
+{
+	struct of_device_id *id;
+
+	if (!dev || !dev->of_node)
+		return NULL;
+
+	id = of_match_device(dev->driver->of_match_table, dev);
+	if (!id)
+		return NULL;
+
+	return id->data;
+}
+EXPORT_SYMBOL_GPL(of_platform_match_data);
+
+I think that could save a few lines from many drivers, and it had not
+occurred to me that we can take this shortcut.
+
+The rest of your patch also looks great to me.
 
 	Arnd
