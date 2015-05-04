@@ -1,108 +1,49 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  4 May 2015 17:24:27 +0200
-Subject: [PATCH v3 1/6] ARM: l2c: Add DT support for Shared Override
+Date: Mon,  4 May 2015 17:24:32 +0200
+Subject: [PATCH v3 6/6] ARM: shmobile: r8a7740 dtsi: Add L1 cache information
+ to CPU node
 In-Reply-To: <1430753072-17145-1-git-send-email-geert+renesas@glider.be>
 References: <1430753072-17145-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1430753072-17145-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1430753072-17145-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"CoreLink Level 2 Cache Controller L2C-310", p. 2-15, section 2.3.2
-Shareable attribute" states:
+Describe the L1 cache in the CPU node:
+  - L1 instruction cache: 32 KiB (8 KiB x 4 ways),
+  - L1 data cache: 32 KiB (8 KiB x 4 ways).
 
-    "The default behavior of the cache controller with respect to the
-     shareable attribute is to transform Normal Memory Non-cacheable
-     transactions into:
-        - cacheable no allocate for reads
-        - write through no write allocate for writes."
-
-Depending on the system architecture, this may cause memory corruption
-in the presence of bus mastering devices (e.g. OHCI). To avoid such
-corruption, the default behavior can be disabled by setting the Shared
-Override bit in the Auxiliary Control register.
-
-Currently the Shared Override bit can be set only using C code:
-  - by calling l2x0_init() directly, which is deprecated,
-  - by setting/clearing the bit in the machine_desc.l2c_aux_val/mask
-    fields, but using values differing from 0/~0 is also deprecated.
-
-Hence add support for an "arm,shared-override" device tree property for
-the l2c device node. By specifying this property, affected systems can
-indicate that non-cacheable transactions must not be transformed.
-
-If specified, the actual behavior of the kernel depends on whether CMA
-is available or not:
-  - If CMA is available, nothing needs to be done, as there won't be a
-    kernel linear mappings and cacheable aliases for the DMA buffers,
-  - If CMA is not available, the "shared attribute override enable" bit
-    will be set.
-
-See also commit 1a8e41cd672f894b ("ARM: 6395/1: VExpress: Set bit 22 in
-the PL310 (cache controller) AuxCtlr register"):
-
-    "Clearing bit 22 in the PL310 Auxiliary Control register (shared
-     attribute override enable) has the side effect of transforming
-     Normal Shared Non-cacheable reads into Cacheable no-allocate reads.
-
-     Coherent DMA buffers in Linux always have a Cacheable alias via the
-     kernel linear mapping and the processor can speculatively load
-     cache lines into the PL310 controller. With bit 22 cleared,
-     Non-cacheable reads would unexpectedly hit such cache lines leading
-     to buffer corruption."
+Add a link to the L2 cache.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v3:
+  - No changes,
+
+v2:
   - New.
 ---
- Documentation/devicetree/bindings/arm/l2cc.txt |  6 ++++++
- arch/arm/mm/cache-l2x0.c                       | 10 ++++++++++
- 2 files changed, 16 insertions(+)
+ arch/arm/boot/dts/r8a7740.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index 0dbabe9a6b0abb91..f6f81b263a9cf56d 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -67,6 +67,12 @@ Optional properties:
-   disable if zero.
- - arm,prefetch-offset : Override prefetch offset value. Valid values are
-   0-7, 15, 23, and 31.
-+- arm,shared-override : As of r2p0, the default behavior of the pl310 cache
-+  controller with respect to the shareable attribute is to transform "normal
-+  memory non-cacheable transactions" into "cacheable no allocate" (for reads)
-+  or "write through no write allocate" (for writes).
-+  On systems where this may cause DMA buffer corruption, this property must be
-+  specified to indicate that such transforms are precluded.
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index ddef5b1c68fa06b3..3aaab195132bfc2c 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -26,6 +26,15 @@
+ 			reg = <0x0>;
+ 			clock-frequency = <800000000>;
+ 			power-domains = <&pd_a3sm>;
++			i-cache-size = <0x8000>;
++			i-cache-sets = <256>;
++			i-cache-block-size = <32>;
++			i-cache-line-size = <32>;
++			d-cache-size = <0x8000>;
++			d-cache-sets = <256>;
++			d-cache-block-size = <32>;
++			d-cache-line-size = <32>;
++			next-level-cache = <&L2>;
+ 		};
+ 	};
  
- Example:
- 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index e309c8f35af5af61..535b575ac3d7a52f 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -17,6 +17,7 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-  */
- #include <linux/cpu.h>
-+#include <linux/dma-contiguous.h>
- #include <linux/err.h>
- #include <linux/init.h>
- #include <linux/smp.h>
-@@ -1149,6 +1150,15 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		}
- 	}
- 
-+	if (of_property_read_bool(np, "arm,shared-override")) {
-+		if (dev_get_cma_area(NULL)) {
-+			pr_info("L2C-310 ignoring arm,shared-override when CMA is enabled\n");
-+		} else {
-+			*aux_val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
-+			*aux_mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
-+		}
-+	}
-+
- 	prefetch = l2x0_saved_regs.prefetch_ctrl;
- 
- 	ret = of_property_read_u32(np, "arm,double-linefill", &val);
 -- 
 1.9.1
