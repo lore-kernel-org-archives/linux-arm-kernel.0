@@ -1,103 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 May 2015 17:12:00 -0500
-Subject: [PATCH v6 01/25] arm: dma-mapping: add support for creating
- reserved mappings in iova space
-In-Reply-To: <1430727380-10912-2-git-send-email-m.szyprowski@samsung.com>
-References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
- <1430727380-10912-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAL_JsqKB4F8tspydBFrL-PH3gXcyu-pwQwBETMizJzTpAF3yzg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 4 May 2015 17:36:19 -0500
+Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <CAPw-ZTnNEiTA-MJthY04yCrc9RdZOUFaNjzBHFV1fWzkBqRCyQ@mail.gmail.com>
+References: <1430259045-19012-1-git-send-email-lho@apm.com>
+ <7128860.xHITr0VFap@wuerfel> <20150430094134.GD3488@pd.tnic>
+ <10227049.9i19zDi2y3@wuerfel> <20150430130028.GF3488@pd.tnic>
+ <CAPw-ZTnuyB2ne1C2-38qAxM_ANwdr9nuCYUMj=aTx7c90sVg+Q@mail.gmail.com>
+ <20150430171846.GJ3488@pd.tnic>
+ <CAPw-ZTksYNDE2zVD=ZjGzpKfXQN8KgW85ZnHoQ2eVmSGdSdMOw@mail.gmail.com>
+ <CAL_JsqL7emqq=bSaWSi_0G5qSJqO+nVH_JH7VY+ynbrHhaSf_g@mail.gmail.com>
+ <CAPw-ZTnNEiTA-MJthY04yCrc9RdZOUFaNjzBHFV1fWzkBqRCyQ@mail.gmail.com>
+Message-ID: <CAL_JsqLyyBCd3DcwjWw57XCQ0fEWHXo_0dkWeBo=TVDoXM_zhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 4, 2015 at 3:15 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Some devices (like frame buffers) are enabled by bootloader and configured
-> to perform DMA operations automatically (like displaying boot logo or splash
-> screen). Such devices operate and perform DMA operation usually until the
-> proper driver for them is loaded and probed. However before that happens,
-> system usually loads IOMMU drivers and configures dma parameters for each
-> device. When such initial configuration is created and enabled, it usually
-> contains empty translation rules betweem IO address space and physical
-> memory, because no buffers nor memory regions have been requested by the
-> respective driver.
+On Fri, May 1, 2015 at 2:59 PM, Loc Ho <lho@apm.com> wrote:
+> Hi Rob,
 >
-> This patch adds support for "iommu-reserved-mapping", which can be used
-> to provide definitions for mappings that need to be created on system
-> boot to let such devices (enabled by bootloader) to operate properly
-> until respective driver is probed.
+>>>>> I think we should first agreed on the DT binding and let's not worry
+>>>>> about APEI. Then, whether we have one file or multiple file. Again,
+>>>>> the HW consist of:
+>>>>>
+>>>>> 1. One top level interrupt and status registers
+>>
+>> For these registers, are there ECC specific functions here or just
+>> normal interrupt control/status bits (mask/unmask/status)? Assuming
+>> the later, then you should make this block an interrupt-controller.
+>> Then this is the interrupt-parent for the rest of the blocks.
+>>
 >
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  Documentation/devicetree/bindings/iommu/iommu.txt |  44 +++++++++
->  arch/arm/mm/dma-mapping.c                         | 112 ++++++++++++++++++++++
->  2 files changed, 156 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
-> index 5a8b4624defc..fd54e6b597f0 100644
-> --- a/Documentation/devicetree/bindings/iommu/iommu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
-> @@ -86,6 +86,35 @@ have a means to turn off translation. But it is invalid in such cases to
->  disable the IOMMU's device tree node in the first place because it would
->  prevent any driver from properly setting up the translations.
->
-> +Optional properties:
-> +--------------------
-> +- iommu-reserved-mapping: A list of entries describing additional
-> +  reserved mapping, that will be inserted to the default IO address space
-> +  created for given master device. Each entry consist of IO address,
-> +  physical memory address and size of the region.
-> +
-> +Some devices (like frame buffers) are enabled by bootloader and configured
-> +to perform DMA operations automatically (like displaying boot logo or splash
-> +screen). Such devices operate and perform DMA operation usually until the
-> +proper driver for them is loaded and probed. However before that happens,
-> +system usually loads IOMMU drivers and configures dma parameters for each
+> This is the only item remain before I generate an patch with just the
+> memory controller. Most of the code that I see are actually an
+> interrupt controller HW. As it is just an interrupt mask and status
+> registers, is there an example in Linux that I can model after? Also,
+> I am not quite convince as to why we can't just share the interrupt
+> and request it by each memory controller?
 
-s/dma/DMA/
-
-> +device. When such initial configuration is created and enabled, it usually
-> +contains empty translation rules betweem IO address space and physical
-
-s/betweem/between/
-
-> +memory, because no buffers nor memory regions have been requested by the
-> +respective driver.
-> +
-> +To avoid IOMMU page fault, one can provide "iommu-reserved-mapping"
-> +property, which defines all memory regions which must be mapped to IO
-> +address space to boot properly when device has been enabled by the
-> +bootloader. More than one region can be defined for given master device.
-> +Each region is defined by the following triplet: first entry is IO
-> +address (encoded in "address" cells), second is base physical memory
-> +address for this regions (also encoded in "address" cells) and the last
-> +is size of the region (encoded in "size" cells). To ensure that that
-> +given master device will not trigger page fault after enabling IOMMU,
-> +one should define identity mapping between physical memory and IO
-> +address space for the range of addresses accessed by the device.
-> +
->
->  Notes:
->  ======
-> @@ -113,6 +142,21 @@ Single-master IOMMU:
->                 iommus = <&{/iommu}>;
->         };
->
-> +
-> +Single-master IOMMU, which has been left enabled by bootloader:
-> +---------------------------------------------------------------
-> +
-> +       iommu {
-> +               #iommu-cells = <0>;
-> +       };
-> +
-> +       master {
-> +               iommus = <&{/iommu}>;
-> +               /* bootloader configures framebuffer at 0x40000000 (32MiB)
-> +               iommu-reserved-mapping = <0x40000000 0x40000000 0x2000000>;
-
-Is there not an ordering problem if kernel initializes the IOMMU
-before parsing this for each master? I would think the IOMMU driver
-needs to find all of these mappings and cleanly switch the page tables
-with the new reserved mapping.
+Pretty much anything that calls irq_set_chained_handler. If you don't
+need to touch the shared registers and can set them up once at boot
+time, then you could just do shared irq handlers. But if you have to
+clear the interrupt within the PCP, you need a demuxer.
 
 Rob
