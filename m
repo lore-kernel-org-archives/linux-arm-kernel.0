@@ -1,326 +1,322 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  4 May 2015 13:46:45 +0200
-Subject: [PATCH 7/8] soc/tegra: fuse: Add Tegra210 support
+Date: Mon,  4 May 2015 13:46:46 +0200
+Subject: [PATCH 8/8] soc/tegra: fuse: Rename core_* to soc_*
 In-Reply-To: <1430740006-29539-1-git-send-email-thierry.reding@gmail.com>
 References: <1430740006-29539-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1430740006-29539-8-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1430740006-29539-9-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-Add Tegra210 support to the fuses driver and add Tegra210-specific
-speedo definitions.
+There's a mixture of core_* and soc_* prefixes for variables storing
+information related to the VDD_CORE rail. Choose one (soc_*) and use it
+more consistently.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- drivers/soc/tegra/fuse/Makefile          |   1 +
- drivers/soc/tegra/fuse/fuse-tegra.c      |   4 +
- drivers/soc/tegra/fuse/fuse-tegra30.c    |  16 ++-
- drivers/soc/tegra/fuse/fuse.h            |   8 ++
- drivers/soc/tegra/fuse/speedo-tegra210.c | 184 +++++++++++++++++++++++++++++++
- include/soc/tegra/fuse.h                 |   4 +-
- 6 files changed, 215 insertions(+), 2 deletions(-)
- create mode 100644 drivers/soc/tegra/fuse/speedo-tegra210.c
+ drivers/soc/tegra/fuse/fuse-tegra.c      |  8 ++++----
+ drivers/soc/tegra/fuse/fuse-tegra20.c    |  2 +-
+ drivers/soc/tegra/fuse/fuse-tegra30.c    |  2 +-
+ drivers/soc/tegra/fuse/speedo-tegra114.c | 16 ++++++++--------
+ drivers/soc/tegra/fuse/speedo-tegra124.c | 12 ++++++------
+ drivers/soc/tegra/fuse/speedo-tegra20.c  | 22 +++++++++++-----------
+ drivers/soc/tegra/fuse/speedo-tegra30.c  | 26 +++++++++++++-------------
+ include/soc/tegra/fuse.h                 |  2 +-
+ 8 files changed, 45 insertions(+), 45 deletions(-)
 
-diff --git a/drivers/soc/tegra/fuse/Makefile b/drivers/soc/tegra/fuse/Makefile
-index 4adfce09d3a9..21bc27580178 100644
---- a/drivers/soc/tegra/fuse/Makefile
-+++ b/drivers/soc/tegra/fuse/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= speedo-tegra30.o
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= speedo-tegra114.o
- obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= speedo-tegra124.o
- obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= speedo-tegra124.o
-+obj-$(CONFIG_ARCH_TEGRA_210_SOC)	+= speedo-tegra210.o
 diff --git a/drivers/soc/tegra/fuse/fuse-tegra.c b/drivers/soc/tegra/fuse/fuse-tegra.c
-index de81eb6b4e92..45496c0d9b29 100644
+index 45496c0d9b29..daba1894bb1a 100644
 --- a/drivers/soc/tegra/fuse/fuse-tegra.c
 +++ b/drivers/soc/tegra/fuse/fuse-tegra.c
-@@ -91,6 +91,7 @@ static const struct of_device_id car_match[] __initconst = {
- 	{ .compatible = "nvidia,tegra114-car", },
- 	{ .compatible = "nvidia,tegra124-car", },
- 	{ .compatible = "nvidia,tegra132-car", },
-+	{ .compatible = "nvidia,tegra210-car", },
- 	{},
- };
+@@ -304,12 +304,12 @@ static int __init tegra_init_fuse(void)
  
-@@ -100,6 +101,9 @@ static struct tegra_fuse *fuse = &(struct tegra_fuse) {
- };
+ 	fuse->soc->init(fuse);
  
- static const struct of_device_id tegra_fuse_match[] = {
-+#ifdef CONFIG_ARCH_TEGRA_210_SOC
-+	{ .compatible = "nvidia,tegra210-efuse", .data = &tegra210_fuse_soc },
-+#endif
- #ifdef CONFIG_ARCH_TEGRA_132_SOC
- 	{ .compatible = "nvidia,tegra132-efuse", .data = &tegra124_fuse_soc },
- #endif
+-	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
++	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d SoC Process: %d\n",
+ 		tegra_revision_name[tegra_sku_info.revision],
+ 		tegra_sku_info.sku_id, tegra_sku_info.cpu_process_id,
+-		tegra_sku_info.core_process_id);
+-	pr_debug("Tegra CPU Speedo ID %d, Soc Speedo ID %d\n",
+-		tegra_sku_info.cpu_speedo_id, tegra_sku_info.soc_speedo_id);
++		tegra_sku_info.soc_process_id);
++	pr_debug("Tegra CPU Speedo ID %d, SoC Speedo ID %d\n",
++		 tegra_sku_info.cpu_speedo_id, tegra_sku_info.soc_speedo_id);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/soc/tegra/fuse/fuse-tegra20.c b/drivers/soc/tegra/fuse/fuse-tegra20.c
+index f695799c69d4..70c7cecff917 100644
+--- a/drivers/soc/tegra/fuse/fuse-tegra20.c
++++ b/drivers/soc/tegra/fuse/fuse-tegra20.c
+@@ -140,7 +140,7 @@ static void __init tegra20_fuse_add_randomness(void)
+ 	randomness[1] = tegra_read_straps();
+ 	randomness[2] = tegra_read_chipid();
+ 	randomness[3] = tegra_sku_info.cpu_process_id << 16;
+-	randomness[3] |= tegra_sku_info.core_process_id;
++	randomness[3] |= tegra_sku_info.soc_process_id;
+ 	randomness[4] = tegra_sku_info.cpu_speedo_id << 16;
+ 	randomness[4] |= tegra_sku_info.soc_speedo_id;
+ 	randomness[5] = tegra_fuse_read_early(FUSE_UID_LOW);
 diff --git a/drivers/soc/tegra/fuse/fuse-tegra30.c b/drivers/soc/tegra/fuse/fuse-tegra30.c
-index 4a7f207171ad..a9c6c925ff19 100644
+index a9c6c925ff19..5a6c533417fc 100644
 --- a/drivers/soc/tegra/fuse/fuse-tegra30.c
 +++ b/drivers/soc/tegra/fuse/fuse-tegra30.c
-@@ -45,7 +45,8 @@
- #if defined(CONFIG_ARCH_TEGRA_3x_SOC) || \
-     defined(CONFIG_ARCH_TEGRA_114_SOC) || \
-     defined(CONFIG_ARCH_TEGRA_124_SOC) || \
--    defined(CONFIG_ARCH_TEGRA_132_SOC)
-+    defined(CONFIG_ARCH_TEGRA_132_SOC) || \
-+    defined(CONFIG_ARCH_TEGRA_210_SOC)
- static u32 tegra30_fuse_read(struct tegra_fuse *fuse, unsigned int offset)
- {
- 	u32 val;
-@@ -137,3 +138,16 @@ const struct tegra_fuse_soc tegra124_fuse_soc = {
- 	.info = &tegra124_fuse_info,
+@@ -75,7 +75,7 @@ static void __init tegra30_fuse_add_randomness(void)
+ 	randomness[1] = tegra_read_straps();
+ 	randomness[2] = tegra_read_chipid();
+ 	randomness[3] = tegra_sku_info.cpu_process_id << 16;
+-	randomness[3] |= tegra_sku_info.core_process_id;
++	randomness[3] |= tegra_sku_info.soc_process_id;
+ 	randomness[4] = tegra_sku_info.cpu_speedo_id << 16;
+ 	randomness[4] |= tegra_sku_info.soc_speedo_id;
+ 	randomness[5] = tegra_fuse_read_early(FUSE_VENDOR_CODE);
+diff --git a/drivers/soc/tegra/fuse/speedo-tegra114.c b/drivers/soc/tegra/fuse/speedo-tegra114.c
+index 554c54b98b0c..1ba41ebbb23d 100644
+--- a/drivers/soc/tegra/fuse/speedo-tegra114.c
++++ b/drivers/soc/tegra/fuse/speedo-tegra114.c
+@@ -22,7 +22,7 @@
+ 
+ #include "fuse.h"
+ 
+-#define CORE_PROCESS_CORNERS	2
++#define SOC_PROCESS_CORNERS	2
+ #define CPU_PROCESS_CORNERS	2
+ 
+ enum {
+@@ -31,7 +31,7 @@ enum {
+ 	THRESHOLD_INDEX_COUNT,
  };
- #endif
-+
-+#if defined(CONFIG_ARCH_TEGRA_210_SOC)
-+static const struct tegra_fuse_info tegra210_fuse_info = {
-+	.read = tegra30_fuse_read,
-+	.size = 0x300,
-+};
-+
-+const struct tegra_fuse_soc tegra210_fuse_soc = {
-+	.init = tegra30_fuse_init,
-+	.speedo_init = tegra210_init_speedo_data,
-+	.info = &tegra210_fuse_info,
-+};
-+#endif
-diff --git a/drivers/soc/tegra/fuse/fuse.h b/drivers/soc/tegra/fuse/fuse.h
-index 2a32bf9381ce..10c2076d5089 100644
---- a/drivers/soc/tegra/fuse/fuse.h
-+++ b/drivers/soc/tegra/fuse/fuse.h
-@@ -81,6 +81,10 @@ void tegra114_init_speedo_data(struct tegra_sku_info *sku_info);
- void tegra124_init_speedo_data(struct tegra_sku_info *sku_info);
- #endif
  
-+#ifdef CONFIG_ARCH_TEGRA_210_SOC
-+void tegra210_init_speedo_data(struct tegra_sku_info *sku_info);
-+#endif
-+
- #ifdef CONFIG_ARCH_TEGRA_2x_SOC
- extern const struct tegra_fuse_soc tegra20_fuse_soc;
- #endif
-@@ -97,4 +101,8 @@ extern const struct tegra_fuse_soc tegra114_fuse_soc;
- extern const struct tegra_fuse_soc tegra124_fuse_soc;
- #endif
- 
-+#ifdef CONFIG_ARCH_TEGRA_210_SOC
-+extern const struct tegra_fuse_soc tegra210_fuse_soc;
-+#endif
-+
- #endif
-diff --git a/drivers/soc/tegra/fuse/speedo-tegra210.c b/drivers/soc/tegra/fuse/speedo-tegra210.c
-new file mode 100644
-index 000000000000..303f5a7dc614
---- /dev/null
-+++ b/drivers/soc/tegra/fuse/speedo-tegra210.c
-@@ -0,0 +1,184 @@
-+/*
-+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/kernel.h>
-+#include <linux/bug.h>
-+
-+#include <soc/tegra/fuse.h>
-+
-+#include "fuse.h"
-+
-+#define CPU_PROCESS_CORNERS	2
-+#define GPU_PROCESS_CORNERS	2
-+#define SOC_PROCESS_CORNERS	3
-+
-+#define FUSE_CPU_SPEEDO_0	0x014
-+#define FUSE_CPU_SPEEDO_1	0x02c
-+#define FUSE_CPU_SPEEDO_2	0x030
-+#define FUSE_SOC_SPEEDO_0	0x034
-+#define FUSE_SOC_SPEEDO_1	0x038
-+#define FUSE_SOC_SPEEDO_2	0x03c
-+#define FUSE_CPU_IDDQ		0x018
-+#define FUSE_SOC_IDDQ		0x040
-+#define FUSE_GPU_IDDQ		0x128
-+#define FUSE_FT_REV		0x028
-+
-+enum {
-+	THRESHOLD_INDEX_0,
-+	THRESHOLD_INDEX_1,
-+	THRESHOLD_INDEX_COUNT,
-+};
-+
-+static const u32 __initconst cpu_process_speedos[][CPU_PROCESS_CORNERS] = {
-+	{ 2119, UINT_MAX },
-+	{ 2119, UINT_MAX },
-+};
-+
-+static const u32 __initconst gpu_process_speedos[][GPU_PROCESS_CORNERS] = {
-+	{ UINT_MAX, UINT_MAX },
-+	{ UINT_MAX, UINT_MAX },
-+};
-+
+-static const u32 __initconst core_process_speedos[][CORE_PROCESS_CORNERS] = {
 +static const u32 __initconst soc_process_speedos[][SOC_PROCESS_CORNERS] = {
-+	{ 1950, 2100, UINT_MAX },
-+	{ 1950, 2100, UINT_MAX },
-+};
-+
-+static u8 __init get_speedo_revision(void)
-+{
-+	return tegra30_spare_fuse(4) << 2 |
-+	       tegra30_spare_fuse(3) << 1 |
-+	       tegra30_spare_fuse(2) << 0;
-+}
-+
-+static void __init rev_sku_to_speedo_ids(struct tegra_sku_info *sku_info,
-+					 u8 speedo_rev, int *threshold)
-+{
-+	int sku = sku_info->sku_id;
-+
-+	/* Assign to default */
-+	sku_info->cpu_speedo_id = 0;
-+	sku_info->soc_speedo_id = 0;
-+	sku_info->gpu_speedo_id = 0;
-+	*threshold = THRESHOLD_INDEX_0;
-+
-+	switch (sku) {
-+	case 0x00: /* Engineering SKU */
-+	case 0x01: /* Engineering SKU */
-+	case 0x07:
-+	case 0x17:
-+	case 0x27:
-+		if (speedo_rev >= 2)
-+			sku_info->gpu_speedo_id = 1;
-+		break;
-+
-+	case 0x13:
-+		if (speedo_rev >= 2)
-+			sku_info->gpu_speedo_id = 1;
-+
-+		sku_info->cpu_speedo_id = 1;
-+		break;
-+
-+	default:
-+		pr_err("Tegra210: unknown SKU %#04x\n", sku);
-+		/* Using the default for the error case */
-+		break;
-+	}
-+}
-+
-+static int get_process_id(int value, const u32 *speedos, unsigned int num)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < num; i++)
-+		if (value < speedos[num])
-+			return i;
-+
-+	return -EINVAL;
-+}
-+
-+void __init tegra210_init_speedo_data(struct tegra_sku_info *sku_info)
-+{
-+	int cpu_speedo[3], soc_speedo[3], cpu_iddq, gpu_iddq, soc_iddq;
-+	unsigned int index;
-+	u8 speedo_revision;
-+
-+	BUILD_BUG_ON(ARRAY_SIZE(cpu_process_speedos) !=
-+			THRESHOLD_INDEX_COUNT);
-+	BUILD_BUG_ON(ARRAY_SIZE(gpu_process_speedos) !=
-+			THRESHOLD_INDEX_COUNT);
+ 	{1123,     UINT_MAX},
+ 	{0,        UINT_MAX},
+ };
+@@ -84,27 +84,27 @@ static void __init rev_sku_to_speedo_ids(struct tegra_sku_info *sku_info,
+ void __init tegra114_init_speedo_data(struct tegra_sku_info *sku_info)
+ {
+ 	u32 cpu_speedo_val;
+-	u32 core_speedo_val;
++	u32 soc_speedo_val;
+ 	int threshold;
+ 	int i;
+ 
+ 	BUILD_BUG_ON(ARRAY_SIZE(cpu_process_speedos) !=
+ 			THRESHOLD_INDEX_COUNT);
+-	BUILD_BUG_ON(ARRAY_SIZE(core_process_speedos) !=
 +	BUILD_BUG_ON(ARRAY_SIZE(soc_process_speedos) !=
-+			THRESHOLD_INDEX_COUNT);
-+
-+	/* Read speedo/IDDQ fuses */
-+	cpu_speedo[0] = tegra30_fuse_readl(FUSE_CPU_SPEEDO_0);
-+	cpu_speedo[1] = tegra30_fuse_readl(FUSE_CPU_SPEEDO_1);
-+	cpu_speedo[2] = tegra30_fuse_readl(FUSE_CPU_SPEEDO_2);
-+
-+	soc_speedo[0] = tegra30_fuse_readl(FUSE_SOC_SPEEDO_0);
-+	soc_speedo[1] = tegra30_fuse_readl(FUSE_SOC_SPEEDO_1);
-+	soc_speedo[2] = tegra30_fuse_readl(FUSE_CPU_SPEEDO_2);
-+
-+	cpu_iddq = tegra30_fuse_readl(FUSE_CPU_IDDQ) * 4;
-+	soc_iddq = tegra30_fuse_readl(FUSE_SOC_IDDQ) * 4;
-+	gpu_iddq = tegra30_fuse_readl(FUSE_GPU_IDDQ) * 5;
-+
-+	/*
-+	 * Determine CPU, GPU and SoC speedo values depending on speedo fusing
-+	 * revision. Note that GPU speedo value is fused in CPU_SPEEDO_2.
-+	 */
-+	speedo_revision = get_speedo_revision();
-+	pr_info("Speedo Revision %u\n", speedo_revision);
-+
-+	if (speedo_revision >= 3) {
-+		sku_info->cpu_speedo_value = cpu_speedo[0];
-+		sku_info->gpu_speedo_value = cpu_speedo[2];
-+		sku_info->soc_speedo_value = soc_speedo[0];
-+	} else if (speedo_revision == 2) {
-+		sku_info->cpu_speedo_value = (-1938 + (1095 * cpu_speedo[0] / 100)) / 10;
-+		sku_info->gpu_speedo_value = (-1662 + (1082 * cpu_speedo[2] / 100)) / 10;
-+		sku_info->soc_speedo_value = ( -705 + (1037 * soc_speedo[0] / 100)) / 10;
-+	} else {
-+		sku_info->cpu_speedo_value = 2100;
-+		sku_info->gpu_speedo_value = cpu_speedo[2] - 75;
-+		sku_info->soc_speedo_value = 1900;
-+	}
-+
-+	if ((sku_info->cpu_speedo_value <= 0) ||
-+	    (sku_info->gpu_speedo_value <= 0) ||
-+	    (sku_info->soc_speedo_value <= 0)) {
-+		WARN(1, "speedo value not fused\n");
-+		return;
-+	}
-+
-+	rev_sku_to_speedo_ids(sku_info, speedo_revision, &index);
-+
-+	sku_info->gpu_process_id = get_process_id(sku_info->gpu_speedo_value,
-+						  gpu_process_speedos[index],
-+						  GPU_PROCESS_CORNERS);
-+
-+	sku_info->cpu_process_id = get_process_id(sku_info->cpu_speedo_value,
-+						  cpu_process_speedos[index],
-+						  CPU_PROCESS_CORNERS);
-+
-+	sku_info->soc_process_id = get_process_id(sku_info->soc_speedo_value,
-+						  soc_process_speedos[index],
-+						  SOC_PROCESS_CORNERS);
-+
-+	pr_debug("Tegra GPU Speedo ID=%d, Speedo Value=%d\n",
-+		 sku_info->gpu_speedo_id, sku_info->gpu_speedo_value);
-+}
+ 			THRESHOLD_INDEX_COUNT);
+ 
+ 	rev_sku_to_speedo_ids(sku_info, &threshold);
+ 
+ 	cpu_speedo_val = tegra_fuse_read_early(0x12c) + 1024;
+-	core_speedo_val = tegra_fuse_read_early(0x134);
++	soc_speedo_val = tegra_fuse_read_early(0x134);
+ 
+ 	for (i = 0; i < CPU_PROCESS_CORNERS; i++)
+ 		if (cpu_speedo_val < cpu_process_speedos[threshold][i])
+ 			break;
+ 	sku_info->cpu_process_id = i;
+ 
+-	for (i = 0; i < CORE_PROCESS_CORNERS; i++)
+-		if (core_speedo_val < core_process_speedos[threshold][i])
++	for (i = 0; i < SOC_PROCESS_CORNERS; i++)
++		if (soc_speedo_val < soc_process_speedos[threshold][i])
+ 			break;
+-	sku_info->core_process_id = i;
++	sku_info->soc_process_id = i;
+ }
+diff --git a/drivers/soc/tegra/fuse/speedo-tegra124.c b/drivers/soc/tegra/fuse/speedo-tegra124.c
+index d1e896d8d8a2..a63a134101ab 100644
+--- a/drivers/soc/tegra/fuse/speedo-tegra124.c
++++ b/drivers/soc/tegra/fuse/speedo-tegra124.c
+@@ -24,7 +24,7 @@
+ 
+ #define CPU_PROCESS_CORNERS	2
+ #define GPU_PROCESS_CORNERS	2
+-#define CORE_PROCESS_CORNERS	2
++#define SOC_PROCESS_CORNERS	2
+ 
+ #define FUSE_CPU_SPEEDO_0	0x14
+ #define FUSE_CPU_SPEEDO_1	0x2c
+@@ -53,7 +53,7 @@ static const u32 __initconst gpu_process_speedos[][GPU_PROCESS_CORNERS] = {
+ 	{0,	UINT_MAX},
+ };
+ 
+-static const u32 __initconst core_process_speedos[][CORE_PROCESS_CORNERS] = {
++static const u32 __initconst soc_process_speedos[][SOC_PROCESS_CORNERS] = {
+ 	{2101,	UINT_MAX},
+ 	{0,	UINT_MAX},
+ };
+@@ -119,7 +119,7 @@ void __init tegra124_init_speedo_data(struct tegra_sku_info *sku_info)
+ 			THRESHOLD_INDEX_COUNT);
+ 	BUILD_BUG_ON(ARRAY_SIZE(gpu_process_speedos) !=
+ 			THRESHOLD_INDEX_COUNT);
+-	BUILD_BUG_ON(ARRAY_SIZE(core_process_speedos) !=
++	BUILD_BUG_ON(ARRAY_SIZE(soc_process_speedos) !=
+ 			THRESHOLD_INDEX_COUNT);
+ 
+ 	cpu_speedo_0_value = tegra_fuse_read_early(FUSE_CPU_SPEEDO_0);
+@@ -157,11 +157,11 @@ void __init tegra124_init_speedo_data(struct tegra_sku_info *sku_info)
+ 				break;
+ 	sku_info->cpu_process_id = i;
+ 
+-	for (i = 0; i < CORE_PROCESS_CORNERS; i++)
++	for (i = 0; i < SOC_PROCESS_CORNERS; i++)
+ 		if (soc_speedo_0_value <
+-			core_process_speedos[threshold][i])
++			soc_process_speedos[threshold][i])
+ 			break;
+-	sku_info->core_process_id = i;
++	sku_info->soc_process_id = i;
+ 
+ 	pr_debug("Tegra GPU Speedo ID=%d, Speedo Value=%d\n",
+ 		 sku_info->gpu_speedo_id, sku_info->gpu_speedo_value);
+diff --git a/drivers/soc/tegra/fuse/speedo-tegra20.c b/drivers/soc/tegra/fuse/speedo-tegra20.c
+index ed5180b01e17..5f7818bf6072 100644
+--- a/drivers/soc/tegra/fuse/speedo-tegra20.c
++++ b/drivers/soc/tegra/fuse/speedo-tegra20.c
+@@ -28,11 +28,11 @@
+ #define CPU_SPEEDO_REDUND_MSBIT		39
+ #define CPU_SPEEDO_REDUND_OFFS	(CPU_SPEEDO_REDUND_MSBIT - CPU_SPEEDO_MSBIT)
+ 
+-#define CORE_SPEEDO_LSBIT		40
+-#define CORE_SPEEDO_MSBIT		47
+-#define CORE_SPEEDO_REDUND_LSBIT	48
+-#define CORE_SPEEDO_REDUND_MSBIT	55
+-#define CORE_SPEEDO_REDUND_OFFS	(CORE_SPEEDO_REDUND_MSBIT - CORE_SPEEDO_MSBIT)
++#define SOC_SPEEDO_LSBIT		40
++#define SOC_SPEEDO_MSBIT		47
++#define SOC_SPEEDO_REDUND_LSBIT		48
++#define SOC_SPEEDO_REDUND_MSBIT		55
++#define SOC_SPEEDO_REDUND_OFFS	(SOC_SPEEDO_REDUND_MSBIT - SOC_SPEEDO_MSBIT)
+ 
+ #define SPEEDO_MULT			4
+ 
+@@ -56,7 +56,7 @@ static const u32 __initconst cpu_process_speedos[][PROCESS_CORNERS_NUM] = {
+ 	{316, 331, 383, UINT_MAX},
+ };
+ 
+-static const u32 __initconst core_process_speedos[][PROCESS_CORNERS_NUM] = {
++static const u32 __initconst soc_process_speedos[][PROCESS_CORNERS_NUM] = {
+ 	{165, 195, 224, UINT_MAX},
+ 	{165, 195, 224, UINT_MAX},
+ 	{165, 195, 224, UINT_MAX},
+@@ -69,7 +69,7 @@ void __init tegra20_init_speedo_data(struct tegra_sku_info *sku_info)
+ 	int i;
+ 
+ 	BUILD_BUG_ON(ARRAY_SIZE(cpu_process_speedos) != SPEEDO_ID_COUNT);
+-	BUILD_BUG_ON(ARRAY_SIZE(core_process_speedos) != SPEEDO_ID_COUNT);
++	BUILD_BUG_ON(ARRAY_SIZE(soc_process_speedos) != SPEEDO_ID_COUNT);
+ 
+ 	if (SPEEDO_ID_SELECT_0(sku_info->revision))
+ 		sku_info->soc_speedo_id = SPEEDO_ID_0;
+@@ -94,17 +94,17 @@ void __init tegra20_init_speedo_data(struct tegra_sku_info *sku_info)
+ 	sku_info->cpu_process_id = i;
+ 
+ 	val = 0;
+-	for (i = CORE_SPEEDO_MSBIT; i >= CORE_SPEEDO_LSBIT; i--) {
++	for (i = SOC_SPEEDO_MSBIT; i >= SOC_SPEEDO_LSBIT; i--) {
+ 		reg = tegra_fuse_read_spare(i) |
+-			tegra_fuse_read_spare(i + CORE_SPEEDO_REDUND_OFFS);
++			tegra_fuse_read_spare(i + SOC_SPEEDO_REDUND_OFFS);
+ 		val = (val << 1) | (reg & 0x1);
+ 	}
+ 	val = val * SPEEDO_MULT;
+ 	pr_debug("Core speedo value %u\n", val);
+ 
+ 	for (i = 0; i < (PROCESS_CORNERS_NUM - 1); i++) {
+-		if (val <= core_process_speedos[sku_info->soc_speedo_id][i])
++		if (val <= soc_process_speedos[sku_info->soc_speedo_id][i])
+ 			break;
+ 	}
+-	sku_info->core_process_id = i;
++	sku_info->soc_process_id = i;
+ }
+diff --git a/drivers/soc/tegra/fuse/speedo-tegra30.c b/drivers/soc/tegra/fuse/speedo-tegra30.c
+index fd0cefae54ef..9b010b3ef009 100644
+--- a/drivers/soc/tegra/fuse/speedo-tegra30.c
++++ b/drivers/soc/tegra/fuse/speedo-tegra30.c
+@@ -22,7 +22,7 @@
+ 
+ #include "fuse.h"
+ 
+-#define CORE_PROCESS_CORNERS	1
++#define SOC_PROCESS_CORNERS	1
+ #define CPU_PROCESS_CORNERS	6
+ 
+ #define FUSE_SPEEDO_CALIB_0	0x14
+@@ -54,7 +54,7 @@ enum {
+ 	THRESHOLD_INDEX_COUNT,
+ };
+ 
+-static const u32 __initconst core_process_speedos[][CORE_PROCESS_CORNERS] = {
++static const u32 __initconst soc_process_speedos[][SOC_PROCESS_CORNERS] = {
+ 	{180},
+ 	{170},
+ 	{195},
+@@ -246,19 +246,19 @@ static void __init rev_sku_to_speedo_ids(struct tegra_sku_info *sku_info)
+ void __init tegra30_init_speedo_data(struct tegra_sku_info *sku_info)
+ {
+ 	u32 cpu_speedo_val;
+-	u32 core_speedo_val;
++	u32 soc_speedo_val;
+ 	int i;
+ 
+ 	BUILD_BUG_ON(ARRAY_SIZE(cpu_process_speedos) !=
+ 			THRESHOLD_INDEX_COUNT);
+-	BUILD_BUG_ON(ARRAY_SIZE(core_process_speedos) !=
++	BUILD_BUG_ON(ARRAY_SIZE(soc_process_speedos) !=
+ 			THRESHOLD_INDEX_COUNT);
+ 
+ 
+ 	rev_sku_to_speedo_ids(sku_info);
+-	fuse_speedo_calib(&cpu_speedo_val, &core_speedo_val);
++	fuse_speedo_calib(&cpu_speedo_val, &soc_speedo_val);
+ 	pr_debug("Tegra CPU speedo value %u\n", cpu_speedo_val);
+-	pr_debug("Tegra Core speedo value %u\n", core_speedo_val);
++	pr_debug("Tegra Core speedo value %u\n", soc_speedo_val);
+ 
+ 	for (i = 0; i < CPU_PROCESS_CORNERS; i++) {
+ 		if (cpu_speedo_val < cpu_process_speedos[threshold_index][i])
+@@ -273,16 +273,16 @@ void __init tegra30_init_speedo_data(struct tegra_sku_info *sku_info)
+ 		sku_info->cpu_speedo_id = 1;
+ 	}
+ 
+-	for (i = 0; i < CORE_PROCESS_CORNERS; i++) {
+-		if (core_speedo_val < core_process_speedos[threshold_index][i])
++	for (i = 0; i < SOC_PROCESS_CORNERS; i++) {
++		if (soc_speedo_val < soc_process_speedos[threshold_index][i])
+ 			break;
+ 	}
+-	sku_info->core_process_id = i - 1;
++	sku_info->soc_process_id = i - 1;
+ 
+-	if (sku_info->core_process_id == -1) {
+-		pr_warn("Tegra CORE speedo value %3d out of range",
+-				 core_speedo_val);
+-		sku_info->core_process_id = 0;
++	if (sku_info->soc_process_id == -1) {
++		pr_warn("Tegra SoC speedo value %3d out of range",
++			soc_speedo_val);
++		sku_info->soc_process_id = 0;
+ 		sku_info->soc_speedo_id = 1;
+ 	}
+ }
 diff --git a/include/soc/tegra/fuse.h b/include/soc/tegra/fuse.h
-index b5f7b5f8d008..0b4209c75b8c 100644
+index 0b4209c75b8c..de10788b518a 100644
 --- a/include/soc/tegra/fuse.h
 +++ b/include/soc/tegra/fuse.h
-@@ -22,6 +22,7 @@
- #define TEGRA114	0x35
- #define TEGRA124	0x40
- #define TEGRA132	0x13
-+#define TEGRA210	0x21
- 
- #define TEGRA_FUSE_SKU_CALIB_0	0xf0
- #define TEGRA30_FUSE_SATA_CALIB	0x124
-@@ -49,8 +50,9 @@ struct tegra_sku_info {
+@@ -48,7 +48,7 @@ struct tegra_sku_info {
+ 	int cpu_speedo_id;
+ 	int cpu_speedo_value;
  	int cpu_iddq_value;
- 	int core_process_id;
+-	int core_process_id;
++	int soc_process_id;
  	int soc_speedo_id;
--	int gpu_speedo_id;
-+	int soc_speedo_value;
+ 	int soc_speedo_value;
  	int gpu_process_id;
-+	int gpu_speedo_id;
- 	int gpu_speedo_value;
- 	enum tegra_revision revision;
- };
 -- 
 2.3.5
