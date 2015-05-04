@@ -1,65 +1,52 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 04 May 2015 10:44:18 +0200
-Subject: [PATCH 1/7] clocksource: mediatek: Don't run event_handler if
- it is NULL
-In-Reply-To: <CABuKBeKBcg+zCDSx8PNCsRC3A8Lo9ripw5ZYCC0c+GjJN8dp6Q@mail.gmail.com>
-References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>	<1430466210-22963-2-git-send-email-yingjoe.chen@mediatek.com>	<55472A80.9020904@linaro.org>
- <CABuKBeKBcg+zCDSx8PNCsRC3A8Lo9ripw5ZYCC0c+GjJN8dp6Q@mail.gmail.com>
-Message-ID: <55473162.5010608@linaro.org>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Mon, 4 May 2015 16:35:51 +0800
+Subject: [PATCH RFC v1 2/5] clk: add missing lock when call
+ clk_core_enable in clk_set_parent
+In-Reply-To: <55427D83.3060900@codeaurora.org>
+References: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
+ <1429107999-24413-3-git-send-email-aisheng.dong@freescale.com>
+ <55427D83.3060900@codeaurora.org>
+Message-ID: <20150504083549.GC4082@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2015 10:34 AM, Matthias Brugger wrote:
-> 2015-05-04 10:14 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 05/01/2015 09:43 AM, Yingjoe Chen wrote:
->>>
->>> Spurious timer interrupt is noticed in mtk timer and cause kernel
->>> crash. In mtk_timer_interrupt(), only run event_handler if it is
->>> not NULL.
->>>
->>> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
->>> ---
->>>    drivers/clocksource/mtk_timer.c | 3 ++-
->>>    1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clocksource/mtk_timer.c
->>> b/drivers/clocksource/mtk_timer.c
->>> index 68ab423..85e0ab5 100644
->>> --- a/drivers/clocksource/mtk_timer.c
->>> +++ b/drivers/clocksource/mtk_timer.c
->>> @@ -143,7 +143,8 @@ static irqreturn_t mtk_timer_interrupt(int irq, void
->>> *dev_id)
->>>
->>>          /* Acknowledge timer0 irq */
->>>          writel(GPT_IRQ_ACK(GPT_CLK_EVT), evt->gpt_base + GPT_IRQ_ACK_REG);
->>> -       evt->dev.event_handler(&evt->dev);
->>> +       if (evt->dev.event_handler)
->>> +               evt->dev.event_handler(&evt->dev);
->>>
->>>          return IRQ_HANDLED;
->>>    }
->>>
->>
->> This fix does not look good.
->>
->> Could you try by requesting the irq *after* clockevents_config_and_register
->> in the init sequence [1] ?
->>
->
->  From my understanding [1] should already fix this.
->
-> [1] https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/commit/drivers/clocksource/mtk_timer.c?id=d4a19eb3b15a4ba98f627182f48d5bc0cffae670
+On Thu, Apr 30, 2015 at 12:07:47PM -0700, Stephen Boyd wrote:
+> On 04/15/15 07:26, Dong Aisheng wrote:
+> > clk_core_enable is executed without &enable_clock in clk_set_parent function.
+> > Adding it to avoid potential race condition issue.
+> >
+> > Fixes: 035a61c314eb ("clk: Make clk API return per-user struct clk instances")
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
+> > ---
+> 
+> Can you please describe the race condition? From what I can tell there
+> is not a race condition here and we've gone around on this part of the
+> code before to fix any race conditions.
+> 
 
-Indeed it seems to fix it. But I think request_irq should be done after 
-clockevents_config_and_register in any case.
+Do you mean we do not need to acquire enable lock when execute clk_core_enable
+in set_parent function? Can you help explain a bit more why?
 
-Yingjoe, are the spurious interrupts occurring with the fix Matthias 
-mentions ?
+The clk doc looks to me says the enable lock should be held across calls to
+the .enable, .disable and .is_enabled operations.
 
+And before the commit
+035a61c314eb ("clk: Make clk API return per-user struct clk instances"),
+all the clk_enable/disable in set_parent() is executed with lock.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+A rough thinking of race condition is assuming Thread A calls
+clk_set_parent(x, y) while Thread B calls clk_enable(x), clock x is disabled
+but prepared initially, due to clk_core_enable in set_parent() is not
+executed with enable clock, the clk_core_enable may be reentrant during
+the locking time executed by B.
+Won't this be a race condition?
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards
+Dong Aisheng
+
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
