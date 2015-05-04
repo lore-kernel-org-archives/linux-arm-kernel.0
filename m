@@ -1,89 +1,82 @@
-From: g.portay@overkiz.com (=?UTF-8?B?R2HDq2wgUE9SVEFZ?=)
-Date: Mon, 04 May 2015 18:08:28 +0200
-Subject: [PATCH] ARM: at91/dt: drop deprecated mainck node from pmc
-In-Reply-To: <20150416144553.1eed24dc@bbrezillon>
-References: <1429187145-10741-1-git-send-email-g.portay@overkiz.com>
- <20150416144553.1eed24dc@bbrezillon>
-Message-ID: <5547997C.3090501@overkiz.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 4 May 2015 09:08:12 -0700
+Subject: [PATCHv7 8/8] watchdog: omap_wdt: Convert to use new core
+ extensions
+In-Reply-To: <55470AA7.9050605@offcode.fi>
+References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
+ <1429701102-22320-9-git-send-email-timo.kokkonen@offcode.fi>
+ <20150503185601.GD25193@pengutronix.de>
+ <55470AA7.9050605@offcode.fi>
+Message-ID: <20150504160812.GC9602@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/04/2015 14:45, Boris Brezillon wrote:
-> On Thu, 16 Apr 2015 14:25:44 +0200
-> Ga?l PORTAY <g.portay@overkiz.com> wrote:
->
->> The clock-frequency property became obsolete since the rework of the main
->> clock driver in 3.16 (see commit 27cb1c2083373a44130d50d4d2fb64cf7eff2d90).
->>
->> It now get and uses the clock-frequency from the main_xtal node.
->>
->> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->
->> ---
->>   arch/arm/boot/dts/at91-sama5d3_xplained.dts | 6 ------
->>   arch/arm/boot/dts/at91sam9rlek.dts          | 6 ------
->>   arch/arm/boot/dts/sama5d3xcm.dtsi           | 6 ------
->>   3 files changed, 18 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
->> index fec1fca..1721e9b 100644
->> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
->> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
->> @@ -204,12 +204,6 @@
->>   					};
->>   				};
->>   			};
->> -
->> -			pmc: pmc at fffffc00 {
->> -				main: mainck {
->> -					clock-frequency = <12000000>;
->> -				};
->> -			};
->>   		};
->>   
->>   		nand0: nand at 60000000 {
->> diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
->> index 9be5b54..d9299be3 100644
->> --- a/arch/arm/boot/dts/at91sam9rlek.dts
->> +++ b/arch/arm/boot/dts/at91sam9rlek.dts
->> @@ -181,12 +181,6 @@
->>   				};
->>   			};
->>   
->> -			pmc: pmc at fffffc00 {
->> -				main: mainck {
->> -					clock-frequency = <12000000>;
->> -				};
->> -			};
->> -
->>   			watchdog at fffffd40 {
->>   				status = "okay";
->>   			};
->> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
->> index 7d6babd..ef404e9 100644
->> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
->> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
->> @@ -67,12 +67,6 @@
->>   					rxd3-skew-ps = <400>;
->>   				};
->>   			};
->> -
->> -			pmc: pmc at fffffc00 {
->> -				main: mainck {
->> -					clock-frequency = <12000000>;
->> -				};
->> -			};
->>   		};
->>   
->>   		nand0: nand at 60000000 {
->>
+On Mon, May 04, 2015 at 08:59:03AM +0300, Timo Kokkonen wrote:
+> Hi, 03.05.2015 21:56, Uwe Kleine-K?nig wrote:
+> >Hello,
+> >
+> >On Wed, Apr 22, 2015 at 02:11:42PM +0300, Timo Kokkonen wrote:
+> >>Use the new watchdog core extensions to let watchdog core take over
+> >>boot time watchdog behavior. The difference is that early-timeout-sec
+> >>device tree property becomes available for this driver and a running
+> >>watchdog is not stopped unless the core decides to stop it.
+> >>
+> >>Omap watchdog is running by default in the boot up but bootloader
+> >>might have stopped it. Therefore we fill the WDOG_HW_RUNNING_AT_BOOT
+> >>bit depending on the actual watchdog state so that the watchdog core
+> >>can act properly.
+> >>
+> >>Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+> >>---
+> >>  drivers/watchdog/omap_wdt.c | 28 +++++++++++++++++++++++++++-
+> >>  1 file changed, 27 insertions(+), 1 deletion(-)
+> >>
+> >>diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+> >>index bbaf39a..7164f2e 100644
+> >>--- a/drivers/watchdog/omap_wdt.c
+> >>+++ b/drivers/watchdog/omap_wdt.c
+> >>@@ -78,6 +78,13 @@ static void omap_wdt_reload(struct omap_wdt_dev *wdev)
+> >>  	/* reloaded WCRR from WLDR */
+> >>  }
+> >>
+> >>+static int omap_wdt_is_running(struct omap_wdt_dev *wdev)
+> >>+{
+> >>+	void __iomem *base = wdev->base;
+> >>+
+> >>+	return readl_relaxed(base + OMAP_WATCHDOG_SPR) == 0x4444;
+> >>+}
+> >This isn't reliable. The sequence needed to enable the watchdog is
+> >	writel(0xbbbb, base + OMAP_WATCHDOG_SPR);
+> >	writel(0x4444, base + OMAP_WATCHDOG_SPR);
+> >
+> >The sequence to stop is:
+> >	writel(0xaaaa, base + OMAP_WATCHDOG_SPR);
+> >	writel(0x5555, base + OMAP_WATCHDOG_SPR);
+> >
+> >But:
+> >
+> >barebox at TI AM335x BeagleBone black:/ md 0x44e35048+4
+> >44e35048: 00005555                                           UU..
+> >barebox at TI AM335x BeagleBone black:/ mw 0x44e35048 0x4444
+> >barebox at TI AM335x BeagleBone black:/ md 0x44e35048+4
+> >44e35048: 00004444                                           DD..
+> >
+> >So the register contains 0x4444 but the timer doesn't run. So at best
+> >testing for 0x4444 is a good heuristic.
+> 
+> Yeah.. I don't think we can get any better than that. Unless we start
+> checking the counter register and see whether it really counts or not, and I
+> think that's a bit overkill.. So I'd say we should be safe when assuming
 
-Hi everyone,
+You sure ? I would prefer Uwe's suggestion to check the counter
 
-Any news about this patch ?
+> bootloader is doing things correctly. Although, we could add a comment to
 
-Best regards,
-Ga?l PORTAY
+... because I don't really trust the bootloader that much. If people are not
+happy with the resulting 4ms added boot time, they should fix the hardware.
 
-PS: I hope this mail does not sound insistent :)
+Otherwise we'll have to deal with people submitting bug reports because their
+system experiences "unexpected" resets, and I don't really want to have to deal
+with this.
+
+Guenter
