@@ -1,47 +1,65 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 4 May 2015 13:55:36 +0530
-Subject: [PATCH] dmaengine: at_xdmac: fix slave configuration issue
-In-Reply-To: <20150427083358.GG26450@odux.rfo.atmel.com>
-References: <1429196640-8703-1-git-send-email-ludovic.desroches@atmel.com>
- <20150427033328.GH2738@intel.com>
- <20150427083358.GG26450@odux.rfo.atmel.com>
-Message-ID: <20150504082536.GB3521@localhost>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Mon, 4 May 2015 16:15:24 +0800
+Subject: [PATCH RFC v1 1/5] clk: change clk_core name of
+ __clk_set_parent_after
+In-Reply-To: <55427D25.3040904@codeaurora.org>
+References: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
+ <1429107999-24413-2-git-send-email-aisheng.dong@freescale.com>
+ <55427D25.3040904@codeaurora.org>
+Message-ID: <20150504081518.GA4082@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 10:33:58AM +0200, Ludovic Desroches wrote:
-> Hi Vinod,
+On Thu, Apr 30, 2015 at 12:06:13PM -0700, Stephen Boyd wrote:
+> On 04/15/15 07:26, Dong Aisheng wrote:
+> > To align with __clk_set_parent_before and some others functions,
+> > change the host clk name to 'clk' instead of 'core'.
+> >
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
+> > ---
 > 
-> On Mon, Apr 27, 2015 at 09:03:28AM +0530, Vinod Koul wrote:
-> > On Thu, Apr 16, 2015 at 05:04:00PM +0200, Ludovic Desroches wrote:
-> > > When doing the slave configuration, an error is returned if the maxburst
-> > > value is not supported. The bug comes from the fact that we always check
-> > > the maxburst for both directions but in the case of an unidirectional
-> > > channel, only one is set.
-> > While setting the slave configuration we are not tied to a channel
-> > direction, the direction is passed usin prep_ method. So from that
-> > prespective a channle can be used for tx and rx with same slave config set.
-> > 
-> > Now if we were invoking at_xdmac_set_slave_config from prep_ calls then it
-> > would have been fine but here we are checking when the slave config is set
-> > so this is not right. You should check maxburst at runtime then...
-> > 
+> No thanks. We should go and rename all clk_core pointers in this file
+> from clk to core now that we're done splitting the two. I'll go do that now.
 > 
-> I don't understand why we should wait before checking the
-> configuration... Some channels are unidirectionnal so implicitly we know
-> the direction at configuration time because the device will fill only a
-> part of the dma_slave_config structure. For example, the atmel usart
-> requests a tx and a rx channels. When configuring the tx channel, only
-> the dst_ fields of the dma_slave_config structure are filled. Is it a
-> bad behavior?
-> 
-> The change introduced by this patch doesn't really care about the
-> direction, it only tells that if the device only fills src_ fields then
-> I don't have to check fields not configured.
-Well that is because we started with the assumption that channels are
-uni-direction and we know that. From client side we shouldn't care
-how channel looks like and which dma controller we are talking. The point is
-to make clients unaware and use the dmaengine API
 
--- 
-~Vinod
+Understand.
+Thanks for this information.
+
+Regards
+Dong Aisheng
+
+> >  drivers/clk/clk.c | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index 459ce9d..cc56ba2 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -1487,7 +1487,7 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *clk,
+> >  	return old_parent;
+> >  }
+> >  
+> > -static void __clk_set_parent_after(struct clk_core *core,
+> > +static void __clk_set_parent_after(struct clk_core *clk,
+> >  				   struct clk_core *parent,
+> >  				   struct clk_core *old_parent)
+> >  {
+> > @@ -1495,8 +1495,8 @@ static void __clk_set_parent_after(struct clk_core *core,
+> >  	 * Finish the migration of prepare state and undo the changes done
+> >  	 * for preventing a race with clk_enable().
+> >  	 */
+> > -	if (core->prepare_count) {
+> > -		clk_core_disable(core);
+> > +	if (clk->prepare_count) {
+> > +		clk_core_disable(clk);
+> >  		clk_core_disable(old_parent);
+> >  		clk_core_unprepare(old_parent);
+> >  	}
+> 
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
