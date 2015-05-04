@@ -1,55 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 May 2015 17:49:44 +0200
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <5546D4C0.5090105@linaro.org>
-References: <55417F5A.4040300@linaro.org> <10771707.5UNQMOWJlc@wuerfel>
- <5546D4C0.5090105@linaro.org>
-Message-ID: <2953543.GNxjbWV8RC@wuerfel>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 4 May 2015 08:57:46 -0700
+Subject: [PATCH 1/1] ARM: dts: Make DP a consumer of DISP1 power domain on
+ Exynos5420
+In-Reply-To: <126501d082dd$af818a30$0e849e90$@kernel.org>
+References: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
+ <552F6750.6020306@collabora.co.uk>
+ <55417810.6070202@collabora.co.uk>
+ <126501d082dd$af818a30$0e849e90$@kernel.org>
+Message-ID: <CAMAWPa85HcQ66eqg-WaoVqVm+vByTQXZ69jZCmhsaGqLjfKFxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 May 2015 10:09:04 Shannon Zhao wrote:
-> On 2015/4/30 17:56, Arnd Bergmann wrote:
-> > On Thursday 30 April 2015 10:29:53 Mark Rutland wrote:
+Hi Kukjin,
 
-> > a) have an input device send the KEY_POWEROFF or KEY_REBOOT events to
-> >    user space, and have some process (e.g. desktop environment, or daemon)
-> 
-> About this daemon, do we need a doc or spec to standardize it?
+On Wed, Apr 29, 2015 at 5:36 PM, Kukjin Kim <kgene@kernel.org> wrote:
 
-There is probably documentation about this that we just need to locate.
-On my workstation, the power button device is owned by "systemd-logind",
-I'd assume something like that to be present elsewhere as well. 
+[...]
 
-> > b) Have a special driver that calls orderly_poweroff or orderly_reboot.
-> >    Only PowerPC (OPAL) uses the orderly_reboot() here, but a few platforms
-> >    (Xen, fsl_hypervisor, and some sparc and powerpc machines) as well
-> >    as some device drivers (thermal management etc) call this as well.
-> >    The effect is to call a user-configured binary (/sbin/reboot and
-> >    /sbin/poweroff by default).
-> > 
-> 
-> This looks good which reuses existing user space process.
-> 
-> > c) call ctrl_alt_del(): a bunch of platforms do this, and user space
-> >    has to configure whether this immediately calls kernel_restart(),
-> >    or sends SIGINT to the init process, which can then do an orderly
-> >    reboot. Again, highbank does this as the reboot action, but very
-> >    few other systems seem to do it, aside from the vt keyboard driver
-> >    that is used on all machines that have normal keyboard.
-> > 
-> 
-> This only supports reboot, but we also need poweroff.
+>>
+>> Could you please apply $subject to fix the imprecise external abort issue.
+>>
+> Sure I'll in this weekend.
 
-Well, I think these traditionally go together, and a lot of platforms
-use c) for reboot and b) for poweroff, because c) was there first
-and b) was introduced later to provide the reboot handling. The
-orderly_reboot in turn was only just introduced last month.
+This patch is still not in linux-next.
 
-Joel Stanly wrote that patch for PowerPC, maybe he can explain why
-this PowerPC is doing it this way instead of having an input device
-that sends KEY_RESTART. It's probably a good idea to have ARM and
-PowerPC normally do the same thing here, especially if there are
-problems with just using a gpio-key device.
+Also I think this fix is needed as a fix for mainline v4.1-rc as well,
+where the same is happening.
 
-	Arnd
+Krzysztof has generously offered to help collecting/queuing/submitting
+patches to help improve the maintenance of exynos.  Please work
+closely with him share the responsibility of improving the state of
+mainline exynos support.
+
+Thanks,
+
+Kevin
