@@ -1,82 +1,59 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 4 May 2015 09:08:12 -0700
-Subject: [PATCHv7 8/8] watchdog: omap_wdt: Convert to use new core
- extensions
-In-Reply-To: <55470AA7.9050605@offcode.fi>
-References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
- <1429701102-22320-9-git-send-email-timo.kokkonen@offcode.fi>
- <20150503185601.GD25193@pengutronix.de>
- <55470AA7.9050605@offcode.fi>
-Message-ID: <20150504160812.GC9602@roeck-us.net>
+From: jbagg@lenbrook.com (Jonathan Bagg)
+Date: Mon, 4 May 2015 12:15:02 -0400
+Subject: imx6 sata cdrom driver issue
+In-Reply-To: <15678294.L2fz4hMtva@wuerfel>
+References: <5539101D.1020909@lenbrook.com> <15678294.L2fz4hMtva@wuerfel>
+Message-ID: <55479B06.7090006@lenbrook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 04, 2015 at 08:59:03AM +0300, Timo Kokkonen wrote:
-> Hi, 03.05.2015 21:56, Uwe Kleine-K?nig wrote:
-> >Hello,
-> >
-> >On Wed, Apr 22, 2015 at 02:11:42PM +0300, Timo Kokkonen wrote:
-> >>Use the new watchdog core extensions to let watchdog core take over
-> >>boot time watchdog behavior. The difference is that early-timeout-sec
-> >>device tree property becomes available for this driver and a running
-> >>watchdog is not stopped unless the core decides to stop it.
-> >>
-> >>Omap watchdog is running by default in the boot up but bootloader
-> >>might have stopped it. Therefore we fill the WDOG_HW_RUNNING_AT_BOOT
-> >>bit depending on the actual watchdog state so that the watchdog core
-> >>can act properly.
-> >>
-> >>Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
-> >>---
-> >>  drivers/watchdog/omap_wdt.c | 28 +++++++++++++++++++++++++++-
-> >>  1 file changed, 27 insertions(+), 1 deletion(-)
-> >>
-> >>diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
-> >>index bbaf39a..7164f2e 100644
-> >>--- a/drivers/watchdog/omap_wdt.c
-> >>+++ b/drivers/watchdog/omap_wdt.c
-> >>@@ -78,6 +78,13 @@ static void omap_wdt_reload(struct omap_wdt_dev *wdev)
-> >>  	/* reloaded WCRR from WLDR */
-> >>  }
-> >>
-> >>+static int omap_wdt_is_running(struct omap_wdt_dev *wdev)
-> >>+{
-> >>+	void __iomem *base = wdev->base;
-> >>+
-> >>+	return readl_relaxed(base + OMAP_WATCHDOG_SPR) == 0x4444;
-> >>+}
-> >This isn't reliable. The sequence needed to enable the watchdog is
-> >	writel(0xbbbb, base + OMAP_WATCHDOG_SPR);
-> >	writel(0x4444, base + OMAP_WATCHDOG_SPR);
-> >
-> >The sequence to stop is:
-> >	writel(0xaaaa, base + OMAP_WATCHDOG_SPR);
-> >	writel(0x5555, base + OMAP_WATCHDOG_SPR);
-> >
-> >But:
-> >
-> >barebox at TI AM335x BeagleBone black:/ md 0x44e35048+4
-> >44e35048: 00005555                                           UU..
-> >barebox at TI AM335x BeagleBone black:/ mw 0x44e35048 0x4444
-> >barebox at TI AM335x BeagleBone black:/ md 0x44e35048+4
-> >44e35048: 00004444                                           DD..
-> >
-> >So the register contains 0x4444 but the timer doesn't run. So at best
-> >testing for 0x4444 is a good heuristic.
-> 
-> Yeah.. I don't think we can get any better than that. Unless we start
-> checking the counter register and see whether it really counts or not, and I
-> think that's a bit overkill.. So I'd say we should be safe when assuming
+On 15-04-24 03:58 AM, Arnd Bergmann wrote:
+> On Thursday 23 April 2015 11:30:37 Jonathan Bagg wrote:
+>> Spam Status: CRM114
+>> On arm imx6, running mainline 3.19, mounting a SATA CDROM fails aprox
+>> 1/20 times with this error....
+>>
+>> root at freescale /tmp$ mount /dev/sr0 test/
+>> UDF-fs: warning (device sr0): udf_fill_super: No partition found (2)
+>> mount: mounting /dev/sr0 on test/ failed: Invalid argument
+>>
+>> I've tried several disks and dvd drivers.  They all experience this
+>> issue.  The same disks mount 100% of the time on an x86 machine.  Once
+>> mounted, I can read data without issue.  Also tried a HDD on the same
+>> SATA link, no issue.
+>>
+>> Sometimes the kernel will dump out the attached backtrace on the mount
+>> command.
+>>
+> I think  you have a combination of two bugs:
+>
+> a) something that mount() does leads to the 'sd' device being unregistered
+> b) something goes wrong in the cleanup of that device, which leads to
+>     the messages you see.
+>
+> What is particularly strange here is the error about unregistering the
+> /disk/ rather than the cdrom.
+>
+> Do you have two SATA ports on one controller, with the other one being
+> conneced to a disk drive?
+>
+> My best guess is that something in the error handling of
+> drivers/ata/ahci_imx.c causes a reset of the entire bus and that
+> triggers the other bugs. Can you instrument that error handling to
+> see what's going on?
+>
+> 	Arnd
+How do I enable ATA error / debug messages?  I've tried adding
 
-You sure ? I would prefer Uwe's suggestion to check the counter
+debug
+ignore_loglevel
+log_buf_len=10M
 
-> bootloader is doing things correctly. Although, we could add a comment to
+to my bootargs and confirmed they are added by checking /proc/cmdline?  
+(I'm a userspace developer)
 
-... because I don't really trust the bootloader that much. If people are not
-happy with the resulting 4ms added boot time, they should fix the hardware.
-
-Otherwise we'll have to deal with people submitting bug reports because their
-system experiences "unexpected" resets, and I don't really want to have to deal
-with this.
-
-Guenter
+-- 
+Jonathan Bagg
+Embedded Systems Developer
+NAD Electronics | Lenbrook Industries Limited
+633 Granite Court, Pickering, Ontario, Canada L1W 3K1 | 905-831-0799 ext 4478 | http://www.nadelectronics.com
