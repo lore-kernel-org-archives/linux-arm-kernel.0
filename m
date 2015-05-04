@@ -1,115 +1,71 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 May 2015 14:06:51 +0200
-Subject: [PATCH 3/4] tty: serial: 8250_mtk: use pm_runtime callbacks for
- enabling
-In-Reply-To: <CABuKBeJwduxLuyXcy7Ho+k+_Ye3+nHiGvdr8vTFsJzdHDBQPSA@mail.gmail.com>
-References: <1430117397-13517-1-git-send-email-s.hauer@pengutronix.de>
- <1430117397-13517-4-git-send-email-s.hauer@pengutronix.de>
- <CABuKBeJwduxLuyXcy7Ho+k+_Ye3+nHiGvdr8vTFsJzdHDBQPSA@mail.gmail.com>
-Message-ID: <20150504120651.GR6325@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon,  4 May 2015 14:27:00 +0200
+Subject: [PATCH v2 1/7] crypto: mv_cesa: request registers memory region
+In-Reply-To: <1430742426-21202-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1430742426-21202-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1430742426-21202-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 04, 2015 at 01:05:27PM +0200, Matthias Brugger wrote:
-> 2015-04-27 8:49 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> > The pm_runtime callbacks already enable and disable the device.
-> > Use them in probe() and remove() instead of duplicating the
-> > code. This allows us to concentrate more code for enabling/disabling
-> > the UART in a single place.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  drivers/tty/serial/8250/8250_mtk.c | 69 ++++++++++++++++++++------------------
-> >  1 file changed, 36 insertions(+), 33 deletions(-)
-> >
-> > diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-> > index bcfaa8dc..2f28bd0 100644
-> > --- a/drivers/tty/serial/8250/8250_mtk.c
-> > +++ b/drivers/tty/serial/8250/8250_mtk.c
-> > @@ -115,6 +115,29 @@ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
-> >                 tty_termios_encode_baud_rate(termios, baud, baud);
-> >  }
-> >
-> > +static int mtk8250_runtime_suspend(struct device *dev)
-> > +{
-> > +       struct mtk8250_data *data = dev_get_drvdata(dev);
-> > +
-> > +       clk_disable_unprepare(data->uart_clk);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int mtk8250_runtime_resume(struct device *dev)
-> > +{
-> > +       struct mtk8250_data *data = dev_get_drvdata(dev);
-> > +       int err;
-> > +
-> > +       err = clk_prepare_enable(data->uart_clk);
-> > +       if (err) {
-> > +               dev_warn(dev, "Can't enable clock\n");
-> > +               return err;
-> > +       }
-> > +
-> > +       return 0;
-> > +}
-> > +
-> >  static void
-> >  mtk8250_do_pm(struct uart_port *port, unsigned int state, unsigned int old)
-> >  {
-> > @@ -130,19 +153,12 @@ mtk8250_do_pm(struct uart_port *port, unsigned int state, unsigned int old)
-> >  static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
-> >                            struct mtk8250_data *data)
-> >  {
-> > -       int err;
-> > -
-> >         data->uart_clk = devm_clk_get(&pdev->dev, NULL);
-> >         if (IS_ERR(data->uart_clk)) {
-> >                 dev_warn(&pdev->dev, "Can't get uart clock\n");
-> >                 return PTR_ERR(data->uart_clk);
-> >         }
-> >
-> > -       err = clk_prepare_enable(data->uart_clk);
-> > -       if (err) {
-> > -               dev_warn(&pdev->dev, "Can't prepare clock\n");
-> > -               return err;
-> > -       }
-> >         p->uartclk = clk_get_rate(data->uart_clk);
-> >
-> >         return 0;
-> > @@ -193,14 +209,18 @@ static int mtk8250_probe(struct platform_device *pdev)
-> >         writel(0x0, uart.port.membase +
-> >                         (MTK_UART_RATE_FIX << uart.port.regshift));
-> >
-> > -       data->line = serial8250_register_8250_port(&uart);
-> > -       if (data->line < 0)
-> > -               return data->line;
-> > -
-> >         platform_set_drvdata(pdev, data);
-> >
-> > -       pm_runtime_set_active(&pdev->dev);
-> >         pm_runtime_enable(&pdev->dev);
-> > +       if (!pm_runtime_enabled(&pdev->dev)) {
-> > +               err = mtk8250_runtime_resume(&pdev->dev);
-> > +               if (err)
-> > +                       return err;
-> > +       }
-> > +
-> > +       data->line = serial8250_register_8250_port(&uart);
-> > +       if (data->line < 0)
-> > +               return data->line;
-> 
-> Why do you delete pm_runtime_set_active here?
+The mv_cesa driver does not request the CESA registers memory region.
+Since we're about to add a new CESA driver, we need to make sure only one
+of these drivers probe the CESA device, and requesting the registers memory
+region is a good way to achieve that.
 
-pm_runtime_set_active() communicates the initial state of the device to
-the pm core. Previously the driver activated the device manually by
-directly calling clk_prepare_enable(). Since this manual enabling of
-the clock is removed in this patch, the device is no longer active,
-hence pm_runtime_set_active() has to be removed.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/crypto/mv_cesa.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
-Sascha
-
+diff --git a/drivers/crypto/mv_cesa.c b/drivers/crypto/mv_cesa.c
+index f91f15d..27b2373 100644
+--- a/drivers/crypto/mv_cesa.c
++++ b/drivers/crypto/mv_cesa.c
+@@ -1041,23 +1041,23 @@ static int mv_probe(struct platform_device *pdev)
+ 
+ 	spin_lock_init(&cp->lock);
+ 	crypto_init_queue(&cp->queue, 50);
+-	cp->reg = ioremap(res->start, resource_size(res));
+-	if (!cp->reg) {
+-		ret = -ENOMEM;
++	cp->reg = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(cp->reg)) {
++		ret = PTR_ERR(cp->reg);
+ 		goto err;
+ 	}
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "sram");
+ 	if (!res) {
+ 		ret = -ENXIO;
+-		goto err_unmap_reg;
++		goto err;
+ 	}
+ 	cp->sram_size = resource_size(res);
+ 	cp->max_req_size = cp->sram_size - SRAM_CFG_SPACE;
+ 	cp->sram = ioremap(res->start, cp->sram_size);
+ 	if (!cp->sram) {
+ 		ret = -ENOMEM;
+-		goto err_unmap_reg;
++		goto err;
+ 	}
+ 
+ 	if (pdev->dev.of_node)
+@@ -1136,8 +1136,6 @@ err_thread:
+ 	kthread_stop(cp->queue_th);
+ err_unmap_sram:
+ 	iounmap(cp->sram);
+-err_unmap_reg:
+-	iounmap(cp->reg);
+ err:
+ 	kfree(cp);
+ 	cpg = NULL;
+@@ -1158,7 +1156,6 @@ static int mv_remove(struct platform_device *pdev)
+ 	free_irq(cp->irq, cp);
+ 	memset(cp->sram, 0, cp->sram_size);
+ 	iounmap(cp->sram);
+-	iounmap(cp->reg);
+ 
+ 	if (!IS_ERR(cp->clk)) {
+ 		clk_disable_unprepare(cp->clk);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.9.1
