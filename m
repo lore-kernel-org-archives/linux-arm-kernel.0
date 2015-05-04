@@ -1,96 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 May 2015 07:11:03 -0700
-Subject: EDMA oftree entry for AM335x
-In-Reply-To: <20150504064323.GU15254@pengutronix.de>
-References: <20150504064323.GU15254@pengutronix.de>
-Message-ID: <20150504141103.GD24469@atomide.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 4 May 2015 16:13:23 +0200
+Subject: [PATCH v4 3/3] Documentation: mmc: Update Arasan SDHC
+ documentation to support 4.9a version of Arasan SDHC controller.
+In-Reply-To: <1430746792-32574-4-git-send-email-stripathi@apm.com>
+References: <1430746792-32574-1-git-send-email-stripathi@apm.com>
+ <1430746792-32574-4-git-send-email-stripathi@apm.com>
+Message-ID: <eb09e430-53dd-47ac-8395-6b5becf62517@BN1AFFO11FD044.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Adding Peter to Cc as well.
-
-* Robert Schwebel <r.schwebel@pengutronix.de> [150503 23:44]:
-> Hi,
+On 05/04/2015 03:39 PM, Suman Tripathi wrote:
+> This patch updates Arasan SDHC documentation to support
+> 4.9a version of Arasan SDHC controller.
 > 
-> since 5e863c561, I get this warning for an AM335x board:
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
->   omap_hwmod: tptc0 using broken dt data from edma
->   omap_hwmod: tptc1 using broken dt data from edma
->   omap_hwmod: tptc2 using broken dt data from edma
+> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> index 98ee2ab..6dd3d60 100644
+> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> @@ -8,7 +8,8 @@ Device Tree Bindings for the Arasan SDHCI Controller
+>    [3] Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
 > 
-> It seems like the code in arch/arm/mach-omap2/omap_hwmod.c expects the oftree
-> entry to look differently than what we currently have in
-> arch/arm/boot/dts/am33xx.dtsi:
+>  Required Properties:
+> -  - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a'
+> +  - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a' or
+> +                'arasan,sdhci-4.9a'
+>    - reg: From mmc bindings: Register location and length.
+>    - clocks: From clock bindings: Handles to clock inputs.
+>    - clock-names: From clock bindings: Tuple including "clk_xin" and "clk_ahb"
+> --
+> 1.8.2.1
 > 
->   edma: edma at 49000000 {
->           compatible = "ti,edma3";
->           ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";    <==========
->           reg =   <0x49000000 0x10000>,
->                   <0x44e10f90 0x40>;
->           interrupts = <12 13 14>;
->           #dma-cells = <1>;
->   };
-> 
-> The patch description says the device should be split into more devices instead
-> of specifying several ti,hwmods entries, but unfortunately the Documentation
-> still suggests the above format in Documentation/devicetree/bindings/dma/ti-edma.txt.
-> 
-> How would a correct entry look like?
 
-Each tptc instance has it's own sysconfig register. This means each
-one of them can be clocked and idled independently. They should be
-treated as separate device instances. I believe the interrupts all
-belong to the tpcc, which should be also treated as a separate
-device instance.
+Reviewed-by: Michal Simek <michal.simek@xilinx.com>
 
-In order to get rid of the ti,hwmods property, we want to have a
-1-1-1 mapping of the compatible property, ti,hwmod property, and
-the device entry.
-
-Looking at the TRM "Table 2-1. L3 Memory Map", these all are on
-the L3, so they should be like this for now (assuming the
-interrupts all belong to tpcc):
-
-ocp {
-	...
-
-	edma: tpcc at 49000000 {
-		compatible = "ti,edma3";
-		ti,hwmods = "tpcc"; 
-		reg = <0x49000000 0x10000>;
-		interrupts = <12 13 14>;
-		#dma-cells = <1>;
-	};
-
-	tptc0: tptc at 49800000 {
-		compatible = "ti,tptc3";
-		ti,hwmods = "tptc0";
-		reg = <0x49800000 0x10000>;
-	};
-
-	tptc1: tptc at 49900000 {
-		compatible = "ti,tptc3";
-		ti,hwmods = "tptc1";
-		reg = <0x49900000 0x10000>;
-	};
-
-	tptc2: tptc at 49a00000 {
-		compatible = "ti,tptc3";
-		ti,hwmods = "tptc2";
-		reg = <0x49a00000 0x10000>;
-	};
-	...
-};
-
-Then eventually we can deprecate the ti,hwmods property and just
-leave it out.
-
-Changing thing this way means each tptc instance should register
-itself separately with tpcc when probed. Other than that, I think
-that's pretty much the only changes needed here to fix up things.
-
-Regards,
-
-Tony
+Thanks,
+Michal
