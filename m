@@ -1,53 +1,199 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Mon, 04 May 2015 16:43:53 +0900
-Subject: [PATCH] drm/exynos: Fix build breakage on !DRM_EXYNOS_FIMD
-In-Reply-To: <1430539706-2945-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430539706-2945-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <55472339.8040408@samsung.com>
+From: rric@kernel.org (Robert Richter)
+Date: Mon,  4 May 2015 09:45:37 +0200
+Subject: [PATCH v2] AHCI: Add generic MSI-X interrupt support to SATA PCI
+ driver
+Message-ID: <1430725538-22162-1-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015? 05? 02? 13:08, Krzysztof Kozlowski wrote:
-> Selecting CONFIG_FB_S3C disables CONFIG_DRM_EXYNOS_FIMD leading to build
-> error:
+From: Robert Richter <rrichter@cavium.com>
 
-No, eDP has no any dependency of FIMD but DECON. Just add dependency
-code like below,
+This patch adds generic support for MSI-X interrupts to the SATA PCI
+driver. Only single interrupt support is implemented. Thus, per-port
+interrupts can not yet be enabled.
 
- config DRM_EXYNOS7_DECON
-        bool "Exynos DRM DECON"
--       depends on DRM_EXYNOS
-+       depends on DRM_EXYNOS && !FB_S3C
+The driver now checks the device for the existence of MSI-X and tries
+to enable the interrupt. Otherwise, if a device is not MSI-X capable,
+the initialization is skipped and MSI or intx interrupts are
+configured.
 
-> 
-> drivers/built-in.o: In function `exynos_dp_dpms':
-> binder.c:(.text+0xd6a840): undefined reference to `fimd_dp_clock_enable'
-> binder.c:(.text+0xd6ab54): undefined reference to `fimd_dp_clock_enable'
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_fimd.h | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.h b/drivers/gpu/drm/exynos/exynos_drm_fimd.h
-> index b4fcaa568456..db67f3d9786d 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_fimd.h
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.h
-> @@ -10,6 +10,10 @@
->  #ifndef _EXYNOS_DRM_FIMD_H_
->  #define _EXYNOS_DRM_FIMD_H_
->  
-> +#ifdef CONFIG_DRM_EXYNOS_FIMD
->  extern void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable);
-> +#else
-> +static inline void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable) {};
-> +#endif
+This patch also enables AHCI for Cavium Thunder SoCs that uses MSI-X.
 
-So above codes are unnecessary. It's really not good to add #ifdef ~ #endif.
+v2:
+ * determine irq vector from pci_dev->msi_list
 
-Thanks,
-Inki Dae
+Based on a patch from Sunil Goutham <sgoutham@cavium.com>.
 
->  
->  #endif /* _EXYNOS_DRM_FIMD_H_ */
-> 
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ arch/arm64/Kconfig |  1 +
+ drivers/ata/ahci.c | 79 ++++++++++++++++++++++++++++++++++++++++++++++++++----
+ 2 files changed, 75 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index b1f9a20a3677..2d95bbc0557e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -157,6 +157,7 @@ config ARCH_THUNDER
+ 	bool "Cavium Inc. Thunder SoC Family"
+ 	help
+ 	  This enables support for Cavium's Thunder Family of SoCs.
++	select SATA_AHCI
+ 
+ config ARCH_VEXPRESS
+ 	bool "ARMv8 software model (Versatile Express)"
+diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
+index 49f1e6890587..36c88f6d8490 100644
+--- a/drivers/ata/ahci.c
++++ b/drivers/ata/ahci.c
+@@ -42,6 +42,7 @@
+ #include <linux/device.h>
+ #include <linux/dmi.h>
+ #include <linux/gfp.h>
++#include <linux/msi.h>
+ #include <scsi/scsi_host.h>
+ #include <scsi/scsi_cmnd.h>
+ #include <linux/libata.h>
+@@ -52,6 +53,7 @@
+ 
+ enum {
+ 	AHCI_PCI_BAR_STA2X11	= 0,
++	AHCI_PCI_BAR_CAVIUM	= 0,
+ 	AHCI_PCI_BAR_ENMOTUS	= 2,
+ 	AHCI_PCI_BAR_STANDARD	= 5,
+ };
+@@ -500,6 +502,9 @@ static const struct pci_device_id ahci_pci_tbl[] = {
+ 	/* Enmotus */
+ 	{ PCI_DEVICE(0x1c44, 0x8000), board_ahci },
+ 
++	/* Cavium */
++	{ PCI_DEVICE(0x177d, 0xa01c), .driver_data = board_ahci },
++
+ 	/* Generic, PCI class code for AHCI */
+ 	{ PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
+ 	  PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff, board_ahci },
+@@ -1202,11 +1207,41 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
+ {}
+ #endif
+ 
+-static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
+-				struct ahci_host_priv *hpriv)
++static int ahci_init_msix(struct pci_dev *pdev, unsigned int n_ports,
++			  struct ahci_host_priv *hpriv)
++{
++	int rc, nvec;
++	struct msix_entry entry = {};
++
++	/* check if msix is supported */
++	nvec = pci_msix_vec_count(pdev);
++	if (nvec <= 0)
++		return 0;
++
++	/* per-port msix interrupts are not supported */
++	if (n_ports > 1 && nvec >= n_ports)
++		return -ENOSYS;
++
++	/* only enable the first entry (entry.entry = 0) */
++	rc = pci_enable_msix_exact(pdev, &entry, 1);
++	if (rc < 0)
++		return rc;
++
++	return 1;
++}
++
++static int __ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
++				  struct ahci_host_priv *hpriv)
+ {
+ 	int rc, nvec;
+ 
++	nvec = ahci_init_msix(pdev, n_ports, hpriv);
++	if (nvec > 0)
++		return nvec;
++
++	if (nvec && nvec != -ENOSYS)
++		dev_err(&pdev->dev, "failed to enable MSI-X: %d", nvec);
++
+ 	if (hpriv->flags & AHCI_HFLAG_NO_MSI)
+ 		goto intx;
+ 
+@@ -1250,6 +1285,35 @@ static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
+ 	return 0;
+ }
+ 
++static struct msi_desc *msix_get_desc(struct pci_dev *dev, u16 entry)
++{
++	struct msi_desc *desc;
++
++	list_for_each_entry(desc, &dev->msi_list, list) {
++		if (desc->msi_attrib.entry_nr == entry)
++			return desc;
++	}
++
++	return NULL;
++}
++
++static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
++				struct ahci_host_priv *hpriv)
++{
++	struct msi_desc *desc;
++
++	__ahci_init_interrupts(pdev, n_ports, hpriv);
++
++	if (!pdev->msix_enabled)
++		return pdev->irq;
++
++	desc = msix_get_desc(pdev, 0);	/* first entry */
++	if (!desc)
++		return -ENODEV;
++
++	return desc->irq;
++}
++
+ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ {
+ 	unsigned int board_id = ent->driver_data;
+@@ -1260,6 +1324,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	struct ata_host *host;
+ 	int n_ports, i, rc;
+ 	int ahci_pci_bar = AHCI_PCI_BAR_STANDARD;
++	int irq;
+ 
+ 	VPRINTK("ENTER\n");
+ 
+@@ -1285,11 +1350,13 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 		dev_info(&pdev->dev,
+ 			 "PDC42819 can only drive SATA devices with this driver\n");
+ 
+-	/* Both Connext and Enmotus devices use non-standard BARs */
++	/* Some devices use non-standard BARs */
+ 	if (pdev->vendor == PCI_VENDOR_ID_STMICRO && pdev->device == 0xCC06)
+ 		ahci_pci_bar = AHCI_PCI_BAR_STA2X11;
+ 	else if (pdev->vendor == 0x1c44 && pdev->device == 0x8000)
+ 		ahci_pci_bar = AHCI_PCI_BAR_ENMOTUS;
++	else if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
++		ahci_pci_bar = AHCI_PCI_BAR_CAVIUM;
+ 
+ 	/*
+ 	 * The JMicron chip 361/363 contains one SATA controller and one
+@@ -1411,7 +1478,9 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	 */
+ 	n_ports = max(ahci_nr_ports(hpriv->cap), fls(hpriv->port_map));
+ 
+-	ahci_init_interrupts(pdev, n_ports, hpriv);
++	irq = ahci_init_interrupts(pdev, n_ports, hpriv);
++	if (irq < 0)
++		return irq;
+ 
+ 	host = ata_host_alloc_pinfo(&pdev->dev, ppi, n_ports);
+ 	if (!host)
+@@ -1463,7 +1532,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 
+ 	pci_set_master(pdev);
+ 
+-	return ahci_host_activate(host, pdev->irq, &ahci_sht);
++	return ahci_host_activate(host, irq, &ahci_sht);
+ }
+ 
+ module_pci_driver(ahci_pci_driver);
+-- 
+2.1.1
