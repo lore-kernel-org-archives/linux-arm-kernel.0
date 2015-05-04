@@ -1,84 +1,67 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  4 May 2015 17:24:26 +0200
-Subject: [PATCH v3 0/6] ARM: l2c / shmobile: r8a7740 : Shared Override
-Message-ID: <1430753072-17145-1-git-send-email-geert+renesas@glider.be>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 4 May 2015 23:25:18 +0800
+Subject: [PATCH v2 4/5] ARM: dts: sun9i: Add A80 PRCM clocks and reset
+ control nodes
+In-Reply-To: <20150504130546.GC3274@lukather>
+References: <1430410206-4410-1-git-send-email-wens@csie.org>
+ <1430410206-4410-5-git-send-email-wens@csie.org>
+ <20150504130546.GC3274@lukather>
+Message-ID: <CAGb2v676gpGKm+9vHLnfvhJ=tCyRAkE2G7Pi87oNsWmJJ5+ROg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi all,
+On Mon, May 4, 2015 at 9:05 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, May 01, 2015 at 12:10:05AM +0800, Chen-Yu Tsai wrote:
+>> This adds the PRCM clocks and reset controls to the A80 dtsi.
+>>
+>> The list of apbs clock gates is incomplete. Tests show that bits 0~20
+>> are mutable. We will need documents from Allwinner to complete the
+>> support.
+>>
+>> Also update clock and reset phandles for r_uart.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun9i-a80.dtsi | 64 +++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 63 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+>> index d3dece2eea72..f0869ff8006f 100644
+>> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+>> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+>> @@ -169,6 +169,14 @@
+>>                                            "usb_phy2", "usb_hsic_12M";
+>>               };
+>>
+>> +             pll3: clk at 06000008 {
+>> +                     /* placeholder until implemented */
+>> +                     #clock-cells = <0>;
+>> +                     compatible = "fixed-clock";
+>> +                     clock-rate = <0>;
+>> +                     clock-output-names = "pll3";
+>> +             };
+>> +
+>>               pll4: clk at 0600000c {
+>>                       #clock-cells = <0>;
+>>                       compatible = "allwinner,sun9i-a80-pll4-clk";
+>> @@ -751,13 +759,67 @@
+>>                       interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+>>               };
+>>
+>> +             prcm at 08001400 {
+>> +                     compatible = "allwinner,sun9i-a80-prcm";
+>> +                     reg = <0x08001400 0x200>;
+>> +
+>> +                     cpus_clk: cpus_clk {
+>
+> I wonder whether it would not be more readable to have this as
+> clk@<prcm_offset>, just like all the other clocks?
 
-This patch series migrates the shmobile DT-based generic r8a7740 and
-armadillo legacy platforms from calling l2x0_of_init() to the generic
-l2c OF initialization.
+I agree it is more readable, though it is purely aesthetics. What offset
+did you have in mind? Offset from PRCM base (0x08001400)? Or the complete
+address?
 
-It was sent before as "[PATCH v2 0/5] ARM: shmobile: r8a7740/armadillo:
-Migrate to generic l2c OF". Major changes in v3 are the introduction of
-the "arm,shared-override" property in DT, and only setting the Shared
-Override bit if CMA is not available. Note that not setting this bit may
-lead to memory corruption in the presence of other bus masters.
+Since I'm sending a new version anyway, I can make this change.
 
-For shmobile, this conversion should be done on sh73a0, r8a7778, and
-r8a7779, too.
-
-Several other ARM platforms (berlin, cns3xxx, nomadik, omap, realview,
-sti, tegra, vexpress) currently set the Shared Override bit in various
-ways. As soon as the first patch in this series is accepted, they can
-start specifying the "arm,shared-override" property in their DTSes, and
-remove the corresponding board code.
-
-Changes in v3:
-  - Add DT support for Shared Override,
-  - Setting Shared Override is done only if CMA is not available (as
-    Russell claims it's not needed if CMA is available),
-  - Use 0/~0 in machine_desc.l2c_aux_{val,mask}, as DT now supports
-    "arm,shared-override".
-
-Changes in v2:
-  - Fix interrupt reference in DT,
-  - Describe L2 better in DT,
-  - Keep only {,~}L2C_AUX_CTRL_SHARED_OVERRIDE in
-    machine_desc.l2c_aux_{val,mask}, as there's no DT property for
-    this.
-  - Add L1 cache to DT.
-
-Dependencies:
-  - Although there are separate patches for ARM code, dtsi, SoC code, and
-    board code, there are dependencies among the individual patches:
-      - patches 3 and 4 depend on patches 1 and 2,
-      - patch 5 depends on patches 3 and 4,
-      - patch 6 depends on patch 2.
-
-This was tested on armadillo-legacy and armadillo-multiplatform.
-
-Thanks!
-
-Geert Uytterhoeven (6):
-  ARM: l2c: Add DT support for Shared Override
-  ARM: shmobile: r8a7740 dtsi: Add L2 cache-controller node
-  ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
-  ARM: shmobile: armadillo legacy: Migrate to generic l2c OF
-    initialization
-  ARM: shmobile: r8a7740: Remove mapping of L2 cache controller
-    registers
-  ARM: shmobile: r8a7740 dtsi: Add L1 cache information to CPU node
-
- Documentation/devicetree/bindings/arm/l2cc.txt |  6 ++++++
- arch/arm/boot/dts/r8a7740.dtsi                 | 25 +++++++++++++++++++++++++
- arch/arm/mach-shmobile/board-armadillo800eva.c |  8 ++------
- arch/arm/mach-shmobile/setup-r8a7740.c         | 18 ++----------------
- arch/arm/mm/cache-l2x0.c                       | 10 ++++++++++
- 5 files changed, 45 insertions(+), 22 deletions(-)
-
--- 
-1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+ChenYu
