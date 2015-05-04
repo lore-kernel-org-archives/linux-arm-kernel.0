@@ -1,74 +1,65 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 May 2015 10:38:52 +0200
-Subject: [PATCH 6/6] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for clock/reset controllers
-In-Reply-To: <20150501012039.GG32407@codeaurora.org>
-References: <1429778143-2074-1-git-send-email-s.hauer@pengutronix.de>
- <1429778143-2074-7-git-send-email-s.hauer@pengutronix.de>
- <20150501012039.GG32407@codeaurora.org>
-Message-ID: <20150504083852.GJ4946@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 04 May 2015 10:44:18 +0200
+Subject: [PATCH 1/7] clocksource: mediatek: Don't run event_handler if
+ it is NULL
+In-Reply-To: <CABuKBeKBcg+zCDSx8PNCsRC3A8Lo9ripw5ZYCC0c+GjJN8dp6Q@mail.gmail.com>
+References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>	<1430466210-22963-2-git-send-email-yingjoe.chen@mediatek.com>	<55472A80.9020904@linaro.org>
+ <CABuKBeKBcg+zCDSx8PNCsRC3A8Lo9ripw5ZYCC0c+GjJN8dp6Q@mail.gmail.com>
+Message-ID: <55473162.5010608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 06:20:39PM -0700, Stephen Boyd wrote:
-> On 04/23, Sascha Hauer wrote:
-> > This adds the binding documentation for the apmixedsys, perisys and
-> > infracfg controllers found on Mediatek SoCs.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Please Cc devicetree reviewers on bindings (CCed now).
-> 
-> > ---
-> >  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  | 23 +++++++++++++++++
-> >  .../bindings/arm/mediatek/mediatek,infracfg.txt    | 30 ++++++++++++++++++++++
-> >  .../bindings/arm/mediatek/mediatek,pericfg.txt     | 30 ++++++++++++++++++++++
-> >  .../bindings/arm/mediatek/mediatek,topckgen.txt    | 23 +++++++++++++++++
-> >  4 files changed, 106 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> > new file mode 100644
-> > index 0000000..5af6d73
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> > @@ -0,0 +1,23 @@
-> > +Mediatek apmixedsys controller
-> > +==============================
-> > +
-> > +The Mediatek apmixedsys controller provides the PLLs to the system.
-> > +
-> > +Required Properties:
-> > +
-> > +- compatible: Should be:
-> > +	- "mediatek,mt8135-apmixedsys"
-> > +	- "mediatek,mt8173-apmixedsys"
-> > +- #clock-cells: Must be 1
-> > +
-> > +The apmixedsys controller uses the common clk binding from
-> > +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> > +
-> > +Example:
-> > +
-> > +apmixedsys: apmixedsys at 10209000 {
-> 
-> apmixedsys: clock-controller at 10209000 {
-> 
-> would be more standard. The same comment applies throughout this
-> patch. Otherwise it looks good to me.
+On 05/04/2015 10:34 AM, Matthias Brugger wrote:
+> 2015-05-04 10:14 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+>> On 05/01/2015 09:43 AM, Yingjoe Chen wrote:
+>>>
+>>> Spurious timer interrupt is noticed in mtk timer and cause kernel
+>>> crash. In mtk_timer_interrupt(), only run event_handler if it is
+>>> not NULL.
+>>>
+>>> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+>>> ---
+>>>    drivers/clocksource/mtk_timer.c | 3 ++-
+>>>    1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/clocksource/mtk_timer.c
+>>> b/drivers/clocksource/mtk_timer.c
+>>> index 68ab423..85e0ab5 100644
+>>> --- a/drivers/clocksource/mtk_timer.c
+>>> +++ b/drivers/clocksource/mtk_timer.c
+>>> @@ -143,7 +143,8 @@ static irqreturn_t mtk_timer_interrupt(int irq, void
+>>> *dev_id)
+>>>
+>>>          /* Acknowledge timer0 irq */
+>>>          writel(GPT_IRQ_ACK(GPT_CLK_EVT), evt->gpt_base + GPT_IRQ_ACK_REG);
+>>> -       evt->dev.event_handler(&evt->dev);
+>>> +       if (evt->dev.event_handler)
+>>> +               evt->dev.event_handler(&evt->dev);
+>>>
+>>>          return IRQ_HANDLED;
+>>>    }
+>>>
+>>
+>> This fix does not look good.
+>>
+>> Could you try by requesting the irq *after* clockevents_config_and_register
+>> in the init sequence [1] ?
+>>
+>
+>  From my understanding [1] should already fix this.
+>
+> [1] https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/commit/drivers/clocksource/mtk_timer.c?id=d4a19eb3b15a4ba98f627182f48d5bc0cffae670
 
-For apmixed this I agree, but the others are also reset controllers, so
-I'm not sure if clock-controller is appropriate. Personally I don't care
-much, I'll change to whatever you like.
+Indeed it seems to fix it. But I think request_irq should be done after 
+clockevents_config_and_register in any case.
 
-Sascha
+Yingjoe, are the spurious interrupts occurring with the fix Matthias 
+mentions ?
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
