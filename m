@@ -1,89 +1,34 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 04 May 2015 10:15:57 +0200
-Subject: [PATCH v6 02/25] arm: exynos: pm_domains: register power domain driver
- from core_initcall
+Date: Mon, 04 May 2015 10:15:58 +0200
+Subject: [PATCH v6 03/25] drm/exynos: iommu: detach from default dma-mapping
+ domain on init
 In-Reply-To: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
 References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1430727380-10912-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1430727380-10912-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SYSMMU devices are registered very early in arch_initcall, so ensure
-that they can get access to power domains by registering power domain
-driver from earlier initcall. This change requires dropping usage of the
-platform device associated with each power domain and replacing clock
-calls with respective of_clk_* equivalents.
+This patch adds code, which detach sub-device nodes from default iommu
+domain if such has been configured.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-exynos/pm_domains.c | 18 +++++++-----------
- 1 file changed, 7 insertions(+), 11 deletions(-)
+ drivers/gpu/drm/exynos/exynos_drm_iommu.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index cbe56b35aea0..708eb88aa677 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -117,16 +117,11 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_iommu.c b/drivers/gpu/drm/exynos/exynos_drm_iommu.c
+index b32b291f88ff..323601a52a25 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_iommu.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_iommu.c
+@@ -100,6 +100,9 @@ int drm_iommu_attach_device(struct drm_device *drm_dev,
  
- static __init int exynos4_pm_init_power_domain(void)
- {
--	struct platform_device *pdev;
- 	struct device_node *np;
+ 	dma_set_max_seg_size(subdrv_dev, 0xffffffffu);
  
- 	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
- 		struct exynos_pm_domain *pd;
- 		int on, i;
--		struct device *dev;
--
--		pdev = of_find_device_by_node(np);
--		dev = &pdev->dev;
- 
- 		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
- 		if (!pd) {
-@@ -135,7 +130,8 @@ static __init int exynos4_pm_init_power_domain(void)
- 			return -ENOMEM;
- 		}
- 
--		pd->pd.name = kstrdup(dev_name(dev), GFP_KERNEL);
-+		pd->pd.name = kstrdup_const(strrchr(np->full_name, '/') + 1,
-+					    GFP_KERNEL);
- 		pd->name = pd->pd.name;
- 		pd->base = of_iomap(np, 0);
- 		pd->pd.power_off = exynos_pd_power_off;
-@@ -145,12 +141,12 @@ static __init int exynos4_pm_init_power_domain(void)
- 			char clk_name[8];
- 
- 			snprintf(clk_name, sizeof(clk_name), "asb%d", i);
--			pd->asb_clk[i] = clk_get(dev, clk_name);
-+			pd->asb_clk[i] = of_clk_get_by_name(np, clk_name);
- 			if (IS_ERR(pd->asb_clk[i]))
- 				break;
- 		}
- 
--		pd->oscclk = clk_get(dev, "oscclk");
-+		pd->oscclk = of_clk_get_by_name(np, "oscclk");
- 		if (IS_ERR(pd->oscclk))
- 			goto no_clk;
- 
-@@ -158,11 +154,11 @@ static __init int exynos4_pm_init_power_domain(void)
- 			char clk_name[8];
- 
- 			snprintf(clk_name, sizeof(clk_name), "clk%d", i);
--			pd->clk[i] = clk_get(dev, clk_name);
-+			pd->clk[i] = of_clk_get_by_name(np, clk_name);
- 			if (IS_ERR(pd->clk[i]))
- 				break;
- 			snprintf(clk_name, sizeof(clk_name), "pclk%d", i);
--			pd->pclk[i] = clk_get(dev, clk_name);
-+			pd->pclk[i] = of_clk_get_by_name(np, clk_name);
- 			if (IS_ERR(pd->pclk[i])) {
- 				clk_put(pd->clk[i]);
- 				pd->clk[i] = ERR_PTR(-EINVAL);
-@@ -210,4 +206,4 @@ no_clk:
- 
- 	return 0;
- }
--arch_initcall(exynos4_pm_init_power_domain);
-+core_initcall(exynos4_pm_init_power_domain);
++	if (subdrv_dev->archdata.mapping)
++		arm_iommu_detach_device(subdrv_dev);
++
+ 	ret = arm_iommu_attach_device(subdrv_dev, dev->archdata.mapping);
+ 	if (ret < 0) {
+ 		DRM_DEBUG_KMS("failed iommu attach.\n");
 -- 
 1.9.2
