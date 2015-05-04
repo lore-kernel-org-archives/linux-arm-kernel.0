@@ -1,141 +1,53 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon,  4 May 2015 10:36:38 -0700
-Subject: [PATCH v8 5/9] mfd: Add driver for NVIDIA Tegra XUSB
-In-Reply-To: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
-References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1430761002-9327-6-git-send-email-abrestic@chromium.org>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 4 May 2015 20:54:47 +0300
+Subject: [PATCH 1/3] ARM: s3c24xx: add dma_coherent_mask for DMA devices
+In-Reply-To: <CAJKOXPfbF0RDPisY-PvKKKVT1kHDrR60b7VmcjTkco5UPm-WTg@mail.gmail.com>
+References: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
+ <CAJKOXPfbF0RDPisY-PvKKKVT1kHDrR60b7VmcjTkco5UPm-WTg@mail.gmail.com>
+Message-ID: <CA+E=qVf5MLsdV+U82Smv-weKQ3eJAEob7J+hdbhtZ-E1qrOsYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an MFD driver for the XUSB host complex found on NVIDIA Tegra124
-and later SoCs.
+On Mon, May 4, 2015 at 6:42 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> 2015-05-04 3:15 GMT+09:00 Vasily Khoruzhick <anarsoul@gmail.com>:
+>> Otherwise dma_alloc_coherent() fails.
+>
+> Could you say few more words about the failure?
+> Also the patch looks like a candidate for CC-stable along with Fixes tag.
 
-Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
----
-Changes from v7:
- - Have child nodes get non-shared memory and interrupts from DT.
- - Use of_platform_populate rather than mfd_add_devices.
- - Get rid of struct tegra_xusb.
-New for v7.
----
- drivers/mfd/Kconfig      |  7 +++++
- drivers/mfd/Makefile     |  1 +
- drivers/mfd/tegra-xusb.c | 75 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 83 insertions(+)
- create mode 100644 drivers/mfd/tegra-xusb.c
+Hm, any call of dma_alloc_coherent() will fail for s3c24xx-dmac
+device. For example, asoc dmaengine driver. What exactly do
+you want me to precise?
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index d5ad04d..61872b4 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -1430,6 +1430,13 @@ config MFD_STW481X
- 	  in various ST Microelectronics and ST-Ericsson embedded
- 	  Nomadik series.
- 
-+config MFD_TEGRA_XUSB
-+	tristate "NVIDIA Tegra XUSB"
-+	depends on ARCH_TEGRA
-+	select MFD_CORE
-+	help
-+	  Support for the XUSB complex found on NVIDIA Tegra124 and later SoCs.
-+
- menu "Multimedia Capabilities Port drivers"
- 	depends on ARCH_SA1100
- 
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 0e5cfeb..7588caf 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -181,6 +181,7 @@ obj-$(CONFIG_MFD_HI6421_PMIC)	+= hi6421-pmic-core.o
- obj-$(CONFIG_MFD_DLN2)		+= dln2.o
- obj-$(CONFIG_MFD_RT5033)	+= rt5033.o
- obj-$(CONFIG_MFD_SKY81452)	+= sky81452.o
-+obj-$(CONFIG_MFD_TEGRA_XUSB)	+= tegra-xusb.o
- 
- intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
- obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
-diff --git a/drivers/mfd/tegra-xusb.c b/drivers/mfd/tegra-xusb.c
-new file mode 100644
-index 0000000..e11fa23
---- /dev/null
-+++ b/drivers/mfd/tegra-xusb.c
-@@ -0,0 +1,75 @@
-+/*
-+ * NVIDIA Tegra XUSB MFD driver
-+ *
-+ * Copyright (C) 2015 Google, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/mfd/core.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+
-+static const struct of_device_id tegra_xusb_of_match[] = {
-+	{ .compatible = "nvidia,tegra124-xusb", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, tegra_xusb_of_match);
-+
-+static struct regmap_config tegra_fpci_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+};
-+
-+static int tegra_xusb_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct regmap *fpci_regs;
-+	void __iomem *fpci_base;
-+	int ret;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	fpci_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(fpci_base))
-+		return PTR_ERR(fpci_base);
-+
-+	tegra_fpci_regmap_config.max_register = res->end - res->start - 3;
-+	fpci_regs = devm_regmap_init_mmio(&pdev->dev, fpci_base,
-+					  &tegra_fpci_regmap_config);
-+	if (IS_ERR(fpci_regs)) {
-+		ret = PTR_ERR(fpci_regs);
-+		dev_err(&pdev->dev, "Failed to init regmap: %d\n", ret);
-+		return ret;
-+	}
-+	platform_set_drvdata(pdev, fpci_regs);
-+
-+	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to add sub-devices: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct platform_driver tegra_xusb_driver = {
-+	.probe = tegra_xusb_probe,
-+	.driver = {
-+		.name = "tegra-xusb",
-+		.of_match_table = tegra_xusb_of_match,
-+	},
-+};
-+module_platform_driver(tegra_xusb_driver);
-+
-+MODULE_DESCRIPTION("NVIDIA Tegra XUSB MFD");
-+MODULE_AUTHOR("Andrew Bresticker <abrestic@chromium.org>");
-+MODULE_LICENSE("GPL v2");
--- 
-2.2.0.rc0.207.ga3a616c
+>>
+>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>> ---
+>>  arch/arm/mach-s3c24xx/common.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+>> index bf50328..7ed0853 100644
+>> --- a/arch/arm/mach-s3c24xx/common.c
+>> +++ b/arch/arm/mach-s3c24xx/common.c
+>> @@ -355,6 +355,7 @@ struct platform_device s3c2410_device_dma = {
+>>         .resource       = s3c2410_dma_resource,
+>>         .dev    = {
+>>                 .platform_data  = &s3c2410_dma_platdata,
+>> +               .coherent_dma_mask = ~0,
+>
+> DMA_BIT_MASK(32)?
+>
+>>         },
+>>  };
+>>  #endif
+>> @@ -452,6 +453,7 @@ struct platform_device s3c2440_device_dma = {
+>>         .resource       = s3c2410_dma_resource,
+>>         .dev    = {
+>>                 .platform_data  = &s3c2440_dma_platdata,
+>> +               .coherent_dma_mask = ~0,
+>
+> Ditto.
+>
+> Best regards,
+> Krzysztof
