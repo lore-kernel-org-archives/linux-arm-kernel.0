@@ -1,59 +1,51 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Mon, 4 May 2015 22:13:11 +0530
-Subject: [PATCH v3 1/2] libahci: Add support to handle HOST_IRQ_STAT as
- edge trigger latch.
-In-Reply-To: <20150504154726.GA1971@htj.duckdns.org>
-References: <1430667220-23477-1-git-send-email-stripathi@apm.com>
- <1430667220-23477-2-git-send-email-stripathi@apm.com>
- <20150504154726.GA1971@htj.duckdns.org>
-Message-ID: <CAOHikRCZimsE+_-6dqTiCT6qRTFLp9VGt6=WHWA_Z86GBn+WRg@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 04 May 2015 09:51:01 -0700
+Subject: [PATCH] arm64: mm: Fix build error with CONFIG_SPARSEMEM_VMEMMAP
+ disabled
+In-Reply-To: <1430735628-14455-1-git-send-email-js07.lee@gmail.com>
+References: <1430735628-14455-1-git-send-email-js07.lee@gmail.com>
+Message-ID: <5547A375.7040903@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 4, 2015 at 9:17 PM, Tejun Heo <tj@kernel.org> wrote:
-> On Sun, May 03, 2015 at 09:03:39PM +0530, Suman Tripathi wrote:
->> This patch adds the support to handle HOST_IRQ_STAT as edge trigger
->> latch.
-> ...
->> +     /*
->> +      * HOST_IRQ_STAT behaves as edge trigger latch. When HOST_IRQ_STAT
->> +      * detects a egde from PORT_IRQ_STAT, it happens to loose interrupts
->> +      * when interrupts are triggered from both ports. So handling of
->> +      * the residual interrupt is required.
->> +      */
->> +     if (hpriv->flags & AHCI_HFLAG_EDGE_TRIG_IRQ) {
->> +             for (i = 0; i < host->n_ports; i++) {
->> +                     struct ata_port *ap;
->> +
->> +                     ap = host->ports[i];
->> +                     if (ap) {
->> +                             ahci_port_intr(ap);
->> +                             VPRINTK("Residual irq from port %u\n", i);
->> +                     }
->> +                     handled = 1;
->> +             }
->> +     }
+On 05/04/2015 03:33 AM, Jungseung Lee wrote:
+> This fix the below build error:
 >
-> This is kinda gross.  The right thing do is clearing irq stat
-> registers before handling the events, right?  That shouldn't be too
-> difficult to implement.  Create a separate set of irq functions which
-> clear irqs before processing rather than after.
-
-AFAIK clearing host_irq_stat means we have handled port interrupts .
-Now for our case we still have interrupts left because it didn't get
-detected on
-first ahci_port_intr.  So you  mean to handle that residual irq in the
-next cycle (i mean next call intr handler ) ??
-
+> arch/arm64/mm/dump.c: In function ?ptdump_init?:
+> arch/arm64/mm/dump.c:331:18: error: ?VMEMMAP_START_NR? undeclared (first use in this function)
+>    address_markers[VMEMMAP_START_NR].start_address =
+>                    ^
+> arch/arm64/mm/dump.c:331:18: note: each undeclared identifier is reported only once for each
+> function it appears in
+> arch/arm64/mm/dump.c:333:18: error: ?VMEMMAP_END_NR? undeclared (first use in this function)
+>    address_markers[VMEMMAP_END_NR].start_address =
+>                    ^
 >
-> Thanks.
+> Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
+> ---
+>   arch/arm64/mm/dump.c | 2 ++
+>   1 file changed, 2 insertions(+)
 >
-> --
-> tejun
+> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> index 74c2567..f3d6221 100644
+> --- a/arch/arm64/mm/dump.c
+> +++ b/arch/arm64/mm/dump.c
+> @@ -328,10 +328,12 @@ static int ptdump_init(void)
+>   			for (j = 0; j < pg_level[i].num; j++)
+>   				pg_level[i].mask |= pg_level[i].bits[j].mask;
+>
+> +#ifdef CONFIG_SPARSEMEM_VMEMMAP
+>   	address_markers[VMEMMAP_START_NR].start_address =
+>   				(unsigned long)virt_to_page(PAGE_OFFSET);
+>   	address_markers[VMEMMAP_END_NR].start_address =
+>   				(unsigned long)virt_to_page(high_memory);
+> +#endif
+>
+>   	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
+>   				 &ptdump_fops);
+>
 
+Acked-by: Laura Abbott <labbott@redhat.com>
 
-
--- 
-Thanks,
-with regards,
-Suman Tripathi
+Did something change recently to make SPARSEMEM_VMEMMAP actually
+deselectable? For some reason I thought that couldn't be turned off.
