@@ -1,62 +1,71 @@
-From: zhengjunling@huawei.com (Junling Zheng)
-Date: Mon, 4 May 2015 03:48:31 +0000
-Subject: [RFC PATCH 2/2] ARM: hisi: replace a few spaces with tabs
-In-Reply-To: <1430711311-20758-1-git-send-email-zhengjunling@huawei.com>
-References: <1430711311-20758-1-git-send-email-zhengjunling@huawei.com>
-Message-ID: <1430711311-20758-2-git-send-email-zhengjunling@huawei.com>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Mon, 4 May 2015 10:03:49 +0530
+Subject: [PATCH v3 2/2] ata: ahci_xgene: Add AHCI Support for 2nd HW
+ version of APM X-Gene SoC AHCI SATA Host controller.
+In-Reply-To: <CAGRGNgX8d0vMDzTH2mPnkwgBk7RJGWVReSyMC3nS=G0z0XvdYQ@mail.gmail.com>
+References: <1430667220-23477-1-git-send-email-stripathi@apm.com>
+ <1430667220-23477-3-git-send-email-stripathi@apm.com>
+ <CAGRGNgWGk9jkg3Kui5BdFNhpCKOhD=SCW4apmzqMNHKfVbKMmw@mail.gmail.com>
+ <CAOHikRDsnywXaSW8XZiOq-uq9fHiwhp0uxXzHF-ysUO_VmQYFw@mail.gmail.com>
+ <CAGRGNgX8d0vMDzTH2mPnkwgBk7RJGWVReSyMC3nS=G0z0XvdYQ@mail.gmail.com>
+Message-ID: <CAOHikRA218vae6Ch+j5SeK0=3uTuZnTDi=W+dtEnYRDZasV2Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace a few spaces with tabs in mach-hisi to keep the code style.
+Hi Julian,
 
-Signed-off-by: Junling Zheng <zhengjunling@huawei.com>
----
- arch/arm/mach-hisi/hotplug.c |  4 ++--
- arch/arm/mach-hisi/platsmp.c | 10 +++++-----
- 2 files changed, 7 insertions(+), 7 deletions(-)
+On Mon, May 4, 2015 at 8:52 AM, Julian Calaby <julian.calaby@gmail.com> wrote:
+> Hi Suman,
+>
+> On Mon, May 4, 2015 at 12:51 PM, Suman Tripathi <stripathi@apm.com> wrote:
+>> Hi Julian.
+>>
+>> On Mon, May 4, 2015 at 5:56 AM, Julian Calaby <julian.calaby@gmail.com> wrote:
+>>> Hi Suman,
+>>>
+>>> On Mon, May 4, 2015 at 1:33 AM, Suman Tripathi <stripathi@apm.com> wrote:
+>>>> This patch enables full AHCI feature support for APM X-Gene SoC SATA
+>>>> host controller. The following errata's are removed:
+>>>>
+>>>> 1. 2a0bdff6b95 ("ahci-xgene: fix the dma state machine lockup for the
+>>>>                  IDENTIFY DEVICE PIO mode command")
+>>>> 2. 09c32aaa368 ("ahci_xgene: Fix the dma state machine lockup for the
+>>>>                  ATA_CMD_SMART PIO mode command")
+>>>> 3. 1540035da71 ("ahci_xgene: Implement the xgene_ahci_poll_reg_val to
+>>>>                  support PMP")
+>>>> 4. a3a84bc7c88 ("ahci_xgene: Implement the workaround to support PMP
+>>>>                  enumeration and discovery")
+>>>> 5. 1102407bb71 ("ahci_xgene: Fix the DMA state machine lockup for the
+>>>>                  ATA_CMD_PACKET PIO mode command")
+>>>> 6. 72f79f9e35b ("ahci_xgene: Removing NCQ support from the APM X-Gene
+>>>>                 SoC AHCI SATA Host Controller driver")
+>>>
+>>> Won't this mean that the 1st HW version won't work properly?
+>>
+>> No it doesn't mean that, It means whatever workaround we had in 1st HW
+>> version has been
+>> fixed in 2nd HW version.
+>
+> I'm sorry, I read the description and assumed that these fixes were
+> being removed from the driver, hence breaking support for the 1st
+> hardware version.
+>
+> Sorry for the confusion.
 
-diff --git a/arch/arm/mach-hisi/hotplug.c b/arch/arm/mach-hisi/hotplug.c
-index a129aae..8cd314c 100644
---- a/arch/arm/mach-hisi/hotplug.c
-+++ b/arch/arm/mach-hisi/hotplug.c
-@@ -65,8 +65,8 @@
- #define PMC0_CPU1_PMC_ENABLE		(1 << 7)
- #define PMC0_CPU1_POWERDOWN		(1 << 3)
- 
--#define HIP01_PERI9                    0x50
--#define PERI9_CPU1_RESET               (1 << 1)
-+#define HIP01_PERI9			0x50
-+#define PERI9_CPU1_RESET		(1 << 1)
- 
- enum {
- 	HI3620_CTRL,
-diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
-index 8880c8e..808a3a1 100644
---- a/arch/arm/mach-hisi/platsmp.c
-+++ b/arch/arm/mach-hisi/platsmp.c
-@@ -135,9 +135,9 @@ struct smp_operations hix5hd2_smp_ops __initdata = {
- };
- 
- 
--#define SC_SCTL_REMAP_CLR      0x00000100
--#define HIP01_BOOT_ADDRESS     0x80000000
--#define REG_SC_CTRL            0x000
-+#define SC_SCTL_REMAP_CLR	0x00000100
-+#define HIP01_BOOT_ADDRESS	0x80000000
-+#define REG_SC_CTRL		0x000
- 
- void hip01_set_boot_addr(phys_addr_t start_addr, phys_addr_t jump_addr)
- {
-@@ -177,8 +177,8 @@ static int hip01_boot_secondary(unsigned int cpu, struct task_struct *idle)
- }
- 
- struct smp_operations hip01_smp_ops __initdata = {
--	.smp_prepare_cpus       = hisi_common_smp_prepare_cpus,
--	.smp_boot_secondary     = hip01_boot_secondary,
-+	.smp_prepare_cpus	= hisi_common_smp_prepare_cpus,
-+	.smp_boot_secondary	= hip01_boot_secondary,
- };
- 
- CPU_METHOD_OF_DECLARE(hi3xxx_smp, "hisilicon,hi3620-smp", &hi3xxx_smp_ops);
+No probs ..
+
+>
+> Thanks,
+>
+> --
+> Julian Calaby
+>
+> Email: julian.calaby at gmail.com
+> Profile: http://www.google.com/profiles/julian.calaby/
+
+
+
 -- 
-1.8.3.4
+Thanks,
+with regards,
+Suman Tripathi
