@@ -1,71 +1,64 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  4 May 2015 14:27:02 +0200
-Subject: [PATCH v2 3/7] crypto: marvell/CESA: update DT bindings documentation
+Date: Mon,  4 May 2015 14:27:03 +0200
+Subject: [PATCH v2 4/7] ARM: marvell/dt: add crypto node to armada-xp SoC
 In-Reply-To: <1430742426-21202-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1430742426-21202-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1430742426-21202-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1430742426-21202-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings documentation for the new marvell-cesa driver.
-
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- .../devicetree/bindings/crypto/marvell-cesa.txt    | 46 ++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/marvell-cesa.txt
+ arch/arm/boot/dts/armada-xp.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/crypto/marvell-cesa.txt b/Documentation/devicetree/bindings/crypto/marvell-cesa.txt
-new file mode 100644
-index 0000000..4ce9bc5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/marvell-cesa.txt
-@@ -0,0 +1,46 @@
-+Marvell Cryptographic Engines And Security Accelerator
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 8291723..3393b7a 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -218,6 +218,18 @@
+ 				};
+ 			};
+ 
++			crypto at 90000 {
++				compatible = "marvell,armada-xp-crypto";
++				reg = <0x90000 0x10000>;
++				reg-names = "regs";
++				interrupts = <48>, <49>;
++				clocks = <&gateclk 23>, <&gateclk 23>;
++				clock-names = "cesa0", "cesa1";
++				marvell,crypto-srams = <&crypto_sram0>, <&crypto_sram1>;
++				marvell,crypto-sram-size = <0x600>;
++				status = "okay";
++			};
 +
-+Required properties:
-+- compatible: should be one of the following string
-+	      "marvell,orion-crypto"
-+	      "marvell,kirkwood-crypto"
-+	      "marvell,armada-370-crypto"
-+	      "marvell,armada-xp-crypto"
-+	      "marvell,armada-375-crypto"
-+	      "marvell,armada-38x-crypto"
-+- reg: base physical address of the engine and length of memory mapped
-+       region
-+- reg-names: "regs"
-+- interrupts: interrupt number
-+- clocks: reference to the crypto engines clocks. This property is not
-+	  required for orion and kirkwood platforms
-+- clock-names: "cesaX" and "cesazX", X should be replaced by the crypto engine
-+	       id.
-+	       This property is not required for the orion and kirkwoord
-+	       platforms.
-+	       "cesazX" clocks are not required on armada-370 platforms
-+- marvell,crypto-srams: phandle to crypto SRAM definitions
+ 			xor at f0900 {
+ 				compatible = "marvell,orion-xor";
+ 				reg = <0xF0900 0x100
+@@ -238,6 +250,24 @@
+ 				};
+ 			};
+ 		};
 +
-+Optional properties:
-+- marvell,crypto-sram-size: SRAM size reserved for crypto operations, if not
-+			    specified the whole SRAM is used (2KB)
++		crypto_sram0: sa-sram0 {
++			compatible = "mmio-sram";
++			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 MBUS_ID(0x09, 0x09) 0 0x800>;
++			status = "okay";
++		};
 +
-+Deprecated properties:
-+- reg: base physical address of the engine and length of memory mapped
-+       region, followed by base physical address of sram and its memory
-+       length
-+- reg-names: "regs" , "sram"
-+
-+Examples:
-+
-+	crypto at 90000 {
-+		compatible = "marvell,armada-xp-crypto";
-+		reg = <0x90000 0x10000>;
-+		reg-names = "regs";
-+		interrupts = <48>, <49>;
-+		clocks = <&gateclk 23>, <&gateclk 23>;
-+		clock-names = "cesa0", "cesa1";
-+		marvell,crypto-srams = <&crypto_sram0>, <&crypto_sram1>;
-+		marvell,crypto-sram-size = <0x600>;
-+		status = "okay";
-+	};
++		crypto_sram1: sa-sram1 {
++			compatible = "mmio-sram";
++			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 MBUS_ID(0x09, 0x05) 0 0x800>;
++			status = "okay";
++		};
+ 	};
+ 
+ 	clocks {
 -- 
 1.9.1
