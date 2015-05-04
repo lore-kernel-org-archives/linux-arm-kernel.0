@@ -1,37 +1,44 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 4 May 2015 08:57:46 -0700
-Subject: [PATCH 1/1] ARM: dts: Make DP a consumer of DISP1 power domain on
- Exynos5420
-In-Reply-To: <126501d082dd$af818a30$0e849e90$@kernel.org>
-References: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
- <552F6750.6020306@collabora.co.uk>
- <55417810.6070202@collabora.co.uk>
- <126501d082dd$af818a30$0e849e90$@kernel.org>
-Message-ID: <CAMAWPa85HcQ66eqg-WaoVqVm+vByTQXZ69jZCmhsaGqLjfKFxQ@mail.gmail.com>
+From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
+Date: Mon,  4 May 2015 17:59:05 +0200
+Subject: [PATCH v5 0/2] ARM: at91/dt: add support for at91-kizboxmini
+Message-ID: <1430755147-12086-1-git-send-email-g.portay@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi,
 
-On Wed, Apr 29, 2015 at 5:36 PM, Kukjin Kim <kgene@kernel.org> wrote:
+Here are two patches to bring support for a new hardware based on SAM9G25 SoC.
 
-[...]
+The first one adds the PIN controller definition for PWM0.
+The second defines the new board.
 
->>
->> Could you please apply $subject to fix the imprecise external abort issue.
->>
-> Sure I'll in this weekend.
+Changes since v1:
+- drop useless comments
+- move pwm0 pinctrl's node close to tcb0
+- drop ek boards from compatible machine
+- add at91sam9g25 board to compatible machine
 
-This patch is still not in linux-next.
+Changes since v2:
+- update to v4.0
+- fix alphabetical order between gpio_keys and pwm_leds
 
-Also I think this fix is needed as a fix for mainline v4.1-rc as well,
-where the same is happening.
+Changes since v3:
+- add num-ports = <1> attribute to ohci node
 
-Krzysztof has generously offered to help collecting/queuing/submitting
-patches to help improve the maintenance of exynos.  Please work
-closely with him share the responsibility of improving the state of
-mainline exynos support.
+Changes since v4:
+- update to v4.0.1
+- update "Acked-by" list
 
-Thanks,
+Best regards,
+Ga?l PORTAY (2):
+  ARM: at91/dt: sam9x5: add pinctrl for pwm0
+  ARM: at91/dt: add support for kizboxmini
 
-Kevin
+ arch/arm/boot/dts/Makefile            |   1 +
+ arch/arm/boot/dts/at91-kizboxmini.dts | 130 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi     |  46 ++++++++++++
+ 3 files changed, 177 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
+
+-- 
+1.9.1
