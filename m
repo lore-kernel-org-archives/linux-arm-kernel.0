@@ -1,65 +1,75 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 May 2015 16:31:05 +0200
-Subject: [PATCH 6/7] ARM: dts: mt8135: enable basic SMP bringup for mt8135
-In-Reply-To: <1430466210-22963-7-git-send-email-yingjoe.chen@mediatek.com>
-References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
- <1430466210-22963-7-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <20150504143105.GK4946@pengutronix.de>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 4 May 2015 23:31:38 +0900
+Subject: [PATCH] drm/exynos: Fix build breakage on !DRM_EXYNOS_FIMD
+In-Reply-To: <CAPj87rM-utcjuWD+ZB7_m01X3qUsNnwJmabCYZAAQUkAdRabaQ@mail.gmail.com>
+References: <1430539706-2945-1-git-send-email-k.kozlowski.k@gmail.com>
+ <55472339.8040408@samsung.com>
+ <CAPj87rM-utcjuWD+ZB7_m01X3qUsNnwJmabCYZAAQUkAdRabaQ@mail.gmail.com>
+Message-ID: <CAAQKjZM7ROus=zUK5n2Sk2psobEUMZo_Aom-u5eWaTu4S+0aEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 01, 2015 at 03:43:29PM +0800, Yingjoe Chen wrote:
-> Add arch timer node to enable arch-timer support. MT8135 firmware
-> doesn't correctly setup arch-timer frequency and CNTVOFF, add
-> properties to workaround this.
-> 
-> This also set cpu enable-method to enable SMP.
-> 
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt8135.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-> index 612bd22..eb5e06f 100644
-> --- a/arch/arm/boot/dts/mt8135.dtsi
-> +++ b/arch/arm/boot/dts/mt8135.dtsi
-> @@ -46,6 +46,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "mediatek,mt81xx-tz-smp";
->  
->  		cpu0: cpu at 0 {
->  			device_type = "cpu";
-> @@ -103,6 +104,21 @@
->  		};
->  	};
->  
-> +	timer {
-> +		compatible = "arm,armv7-timer";
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
-> +					  IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) |
-> +					  IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) |
-> +					  IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) |
-> +					  IRQ_TYPE_LEVEL_LOW)>;
-> +		clock-frequency = <13000000>;
-> +		arm,cpu-registers-not-fw-configured;
-> +	};
+2015-05-04 20:34 GMT+09:00 Daniel Stone <daniel@fooishbar.org>:
+> Hi,
+>
+> On 4 May 2015 at 08:43, Inki Dae <inki.dae@samsung.com> wrote:
+>> On 2015? 05? 02? 13:08, Krzysztof Kozlowski wrote:
+>>> Selecting CONFIG_FB_S3C disables CONFIG_DRM_EXYNOS_FIMD leading to build
+>>> error:
+>>
+>> No, eDP has no any dependency of FIMD but DECON. Just add dependency
+>> code like below,
+>>
+>>  config DRM_EXYNOS7_DECON
+>>         bool "Exynos DRM DECON"
+>> -       depends on DRM_EXYNOS
+>> +       depends on DRM_EXYNOS && !FB_S3C
+>
+> But it does clearly and explicitly call fimd_dp_clock_enable from
+> exynos_dp_powero{n,ff}. So the dependency you're proposing seems
+> backwards: it's not an expression of the requirements of the current
+> code (that FIMD DP code be available, i.e. CONFIG_DRM_EXYNOS_FIMD is
+> selected), but an indirect expression of another dependency
+> (CONFIG_FB_S3C disables CONFIG_DRM_EXYNOS_FIMD, so disable
+> CONFIG_FB_S3C).
+>
+> Additionally, as the call comes from exynos_dp_core.c, which is built
+> by CONFIG_DRM_EXYNOS_DP (an explicitly user-selectable option), why
+> shouldn't the dependency be there? Ah, because the dependency on DP is
+> for (DECON || FIMD), but as DECON doesn't provide
+> fimd_dp_clock_enable(), it doesn't seem like it would compile if you
 
-This is the SoC dtsi file. What you say here is that all MT8135
-present and future firmwares on all boards do this wrong.
-Shouldn't you fix the firmware instead? Shouldn't this property be board
-specific?
+Please know that the output data of DECON and FIMD can go to DSI or
+Panel directly not through eDP. This means that they - FIMD and eDP or
+DECON and eDP - have hardware dependency each other. DECON driver
+missed this - only one of Linux framebuffer and DRM KMS driver should
+be selected because Linux framebuffer and DRM KMS drivers control same
+hardware. So the reason that DECON driver should have dependency on
+eDP is not because dp core functions are called by FIMD driver.
 
-Sascha
+In addition, from hw point of view, eDP has depencency on DECON and
+FIMD because eDP cannot work itself without DECON or FIMD. Therefore,
+if DECON or FIMD is not selected, then eDP should also be disabled  so
+that user cannot disable eDP with FIMD because FIMD driver calls eDP's
+functions directly. My missing point was that even though we add
+!S3C_FB to DECON Kconfig, we can disable eDP with FIMD so build error
+can still occur. The best way to resolve this issue would be to move
+the functions called by FIMD driver directly to Exynos specific KMS
+structure such as exynos crtc - eDP driver implements encoder which
+know crtc to FIMD or DECON. The directly call was not good way.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Inki Dae
+
+> selected DECON and not FIMD.
+>
+> So, for me, the cleanest solution would be config DRM_EXYNOS_DP gains
+> a hard dependency on DRM_EXYNOS_FIMD, at least until it can be fixed
+> to compile without FIMD.
+>
+> Cheers,
+> Daniel
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
