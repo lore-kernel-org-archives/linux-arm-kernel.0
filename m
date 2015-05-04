@@ -1,103 +1,94 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 4 May 2015 14:22:41 -0500
-Subject: [PATCH v8 2/9] mailbox: Make mbox_chan_ops const
-In-Reply-To: <1430761002-9327-3-git-send-email-abrestic@chromium.org>
-References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
- <1430761002-9327-3-git-send-email-abrestic@chromium.org>
-Message-ID: <5547C701.8010305@ti.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 4 May 2015 21:27:53 +0200
+Subject: [PATCH 1/2] stmac: add dwmac glue for NXP 18xx/43xx family
+In-Reply-To: <90049936.xgdXKqK565@wuerfel>
+References: <3200125.o3jqXuyPfG@wuerfel>
+ <1430691251-28119-1-git-send-email-manabian@gmail.com>
+ <90049936.xgdXKqK565@wuerfel>
+Message-ID: <CAGhQ9VwX7SVnZ3xjWgMx4=8cRcA4sRL+pJCUhetF7-GQX5JFQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2015 12:36 PM, Andrew Bresticker wrote:
-> The mailbox controller's channel ops ought to be read-only.  Update
-> all the mailbox drivers to make their mbox_chan_ops const as well.
-> 
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Suman Anna <s-anna@ti.com>
-> Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> Cc: Ley Foon Tan <lftan@altera.com>
+On 4 May 2015 at 20:46, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 04 May 2015 00:14:11 Joachim Eastwood wrote:
+> => >It should be fairly straightforward to split the probe function
+>> >into two and export a function that takes a device and a stmmac_of_data
+>> >pointer as arguments, and declare a module_platform_driver in your
+>> >code.
+>>
+>> How about something like the patch below. All it does is to play a
+>> little trick with the of_match_device in the dt config function and
+>> export the probe/remove/pm stuff for the driver.
+>>
+>> The dwmac-lpc18xx would then become something like this:
+>>
+>> static const struct stmmac_of_data lpc18xx_dwmac_data = {
+>>       .has_gmac = 1,
+>>       .setup = lpc18xx_dwmac_setup,
+>>       .init = lpc18xx_dwmac_init,
+>> };
+>>
+>> static const struct of_device_id lpc18xx_dwmac_match[] = {
+>>       { .compatible = "nxp,lpc1850-dwmac", .data = &lpc18xx_dwmac_data },
+>>       { }
+>> };
+>> MODULE_DEVICE_TABLE(of, lpc18xx_dwmac_match);
+>>
+>> static struct platform_driver lpc18xx_dwmac_driver = {
+>>       .probe  = stmmac_pltfr_probe,
+>>       .remove = stmmac_pltfr_remove,
+>>       .driver = {
+>>               .name           = "lpc18xx-dwmac",
+>>               .pm             = &stmmac_pltfr_pm_ops,
+>>               .of_match_table = lpc18xx_dwmac_match,
+>>       },
+>> };
+>> module_platform_driver(lpc18xx_dwmac_driver);
+>>
+>> All though this seem to work, stmmac_platform.c could benefit from
+>> some refactoring. But this patch and then fixing the other DT users
+>> could be a first step.
+>
+> Sounds good, yes.
+>
+>> -     device = of_match_device(stmmac_dt_ids, &pdev->dev);
+>> +     device = of_match_device(dev->driver->of_match_table, dev);
+>>       if (!device)
+>>               return -ENODEV;
+>
+> Ah, that is a nice trick to avoid passing the various match tables
+> from a lot of duplicated probe functions.
+>
+> I wonder if we could generalize that for use by any driver and
+> introduce a common helper
 
-Thanks, the new patch looks good.
+I realised that and posted kinda of a RFC to the devicetree list yesterday.
+http://marc.info/?l=devicetree&m=143068795621692&w=2
 
-Acked-by: Suman Anna <s-anna@ti.com>
+> void *of_platform_match_data(struct device *dev)
+> {
+>         struct of_device_id *id;
+>
+>         if (!dev || !dev->of_node)
+>                 return NULL;
+>
+>         id = of_match_device(dev->driver->of_match_table, dev);
+>         if (!id)
+>                 return NULL;
+>
+>         return id->data;
+> }
+> EXPORT_SYMBOL_GPL(of_platform_match_data);
 
-> ---
-> Changes from v7:
->  - Constify all drivers' mbox_chan_ops.
-> No changes from v5/v6.
-> New for v5.
-> ---
->  drivers/mailbox/arm_mhu.c          | 2 +-
->  drivers/mailbox/mailbox-altera.c   | 2 +-
->  drivers/mailbox/omap-mailbox.c     | 2 +-
->  drivers/mailbox/pcc.c              | 2 +-
->  include/linux/mailbox_controller.h | 2 +-
->  5 files changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mailbox/arm_mhu.c b/drivers/mailbox/arm_mhu.c
-> index ac693c6..d9e99f9 100644
-> --- a/drivers/mailbox/arm_mhu.c
-> +++ b/drivers/mailbox/arm_mhu.c
-> @@ -110,7 +110,7 @@ static void mhu_shutdown(struct mbox_chan *chan)
->  	free_irq(mlink->irq, chan);
->  }
->  
-> -static struct mbox_chan_ops mhu_ops = {
-> +static const struct mbox_chan_ops mhu_ops = {
->  	.send_data = mhu_send_data,
->  	.startup = mhu_startup,
->  	.shutdown = mhu_shutdown,
-> diff --git a/drivers/mailbox/mailbox-altera.c b/drivers/mailbox/mailbox-altera.c
-> index a266265..bb682c9 100644
-> --- a/drivers/mailbox/mailbox-altera.c
-> +++ b/drivers/mailbox/mailbox-altera.c
-> @@ -285,7 +285,7 @@ static void altera_mbox_shutdown(struct mbox_chan *chan)
->  	}
->  }
->  
-> -static struct mbox_chan_ops altera_mbox_ops = {
-> +static const struct mbox_chan_ops altera_mbox_ops = {
->  	.send_data = altera_mbox_send_data,
->  	.startup = altera_mbox_startup,
->  	.shutdown = altera_mbox_shutdown,
-> diff --git a/drivers/mailbox/omap-mailbox.c b/drivers/mailbox/omap-mailbox.c
-> index 0f332c1..03f8545 100644
-> --- a/drivers/mailbox/omap-mailbox.c
-> +++ b/drivers/mailbox/omap-mailbox.c
-> @@ -604,7 +604,7 @@ static int omap_mbox_chan_send_data(struct mbox_chan *chan, void *data)
->  	return ret;
->  }
->  
-> -static struct mbox_chan_ops omap_mbox_chan_ops = {
-> +static const struct mbox_chan_ops omap_mbox_chan_ops = {
->  	.startup        = omap_mbox_chan_startup,
->  	.send_data      = omap_mbox_chan_send_data,
->  	.shutdown       = omap_mbox_chan_shutdown,
-> diff --git a/drivers/mailbox/pcc.c b/drivers/mailbox/pcc.c
-> index 7e91d68..26d121d 100644
-> --- a/drivers/mailbox/pcc.c
-> +++ b/drivers/mailbox/pcc.c
-> @@ -198,7 +198,7 @@ static int pcc_send_data(struct mbox_chan *chan, void *data)
->  	return 0;
->  }
->  
-> -static struct mbox_chan_ops pcc_chan_ops = {
-> +static const struct mbox_chan_ops pcc_chan_ops = {
->  	.send_data = pcc_send_data,
->  };
->  
-> diff --git a/include/linux/mailbox_controller.h b/include/linux/mailbox_controller.h
-> index d4cf96f..68c4245 100644
-> --- a/include/linux/mailbox_controller.h
-> +++ b/include/linux/mailbox_controller.h
-> @@ -72,7 +72,7 @@ struct mbox_chan_ops {
->   */
->  struct mbox_controller {
->  	struct device *dev;
-> -	struct mbox_chan_ops *ops;
-> +	const struct mbox_chan_ops *ops;
->  	struct mbox_chan *chans;
->  	int num_chans;
->  	bool txdone_irq;
-> 
+Almost the same as your proposal except for the dev pointer checking
+and the name.
+
+> I think that could save a few lines from many drivers, and it had not
+> occurred to me that we can take this shortcut.
+>
+> The rest of your patch also looks great to me.
+
+Great, I'll put together a new series of patches.
+
+regards,
+Joachim
