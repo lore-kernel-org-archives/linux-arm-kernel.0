@@ -1,44 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 4 May 2015 10:33:12 +0200
-Subject: [PATCH] i2c: rk3x: Increase wait timeout to 1 second
-In-Reply-To: <1430430247-9632-1-git-send-email-dianders@chromium.org>
-References: <1430430247-9632-1-git-send-email-dianders@chromium.org>
-Message-ID: <20150504083312.GN25193@pengutronix.de>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 4 May 2015 10:34:04 +0200
+Subject: [PATCH 1/7] clocksource: mediatek: Don't run event_handler if it
+ is NULL
+In-Reply-To: <55472A80.9020904@linaro.org>
+References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1430466210-22963-2-git-send-email-yingjoe.chen@mediatek.com>
+ <55472A80.9020904@linaro.org>
+Message-ID: <CABuKBeKBcg+zCDSx8PNCsRC3A8Lo9ripw5ZYCC0c+GjJN8dp6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 02:44:07PM -0700, Doug Anderson wrote:
-> While it's not sensible for an i2c command to _actually_ need more
-> than 200ms to complete, let's increase the timeout anyway.  Why?  It
-> turns out that if you've got a large number of printks going out to a
-> serial console, interrupts on a CPU can be disabled for hundreds of
-> milliseconds. That's not a great situation to be in to start with
-> (maybe we should put a cap in vprintk_emit()) but it's pretty annoying
-> to start seeing unexplained i2c timeouts.
-> 
-> A normal system shouldn't see i2c timeouts anyway, so increasing the
-> timeout should help people debugging without hurting other people
-> excessively.
-Hmm, correct me if I'm wrong: You say that the following can happen:
+2015-05-04 10:14 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 05/01/2015 09:43 AM, Yingjoe Chen wrote:
+>>
+>> Spurious timer interrupt is noticed in mtk timer and cause kernel
+>> crash. In mtk_timer_interrupt(), only run event_handler if it is
+>> not NULL.
+>>
+>> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+>> ---
+>>   drivers/clocksource/mtk_timer.c | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clocksource/mtk_timer.c
+>> b/drivers/clocksource/mtk_timer.c
+>> index 68ab423..85e0ab5 100644
+>> --- a/drivers/clocksource/mtk_timer.c
+>> +++ b/drivers/clocksource/mtk_timer.c
+>> @@ -143,7 +143,8 @@ static irqreturn_t mtk_timer_interrupt(int irq, void
+>> *dev_id)
+>>
+>>         /* Acknowledge timer0 irq */
+>>         writel(GPT_IRQ_ACK(GPT_CLK_EVT), evt->gpt_base + GPT_IRQ_ACK_REG);
+>> -       evt->dev.event_handler(&evt->dev);
+>> +       if (evt->dev.event_handler)
+>> +               evt->dev.event_handler(&evt->dev);
+>>
+>>         return IRQ_HANDLED;
+>>   }
+>>
+>
+> This fix does not look good.
+>
+> Could you try by requesting the irq *after* clockevents_config_and_register
+> in the init sequence [1] ?
+>
 
-	rk3x_i2c_xfer calls wait_event_timeout and blocks
-	schedule ... disable_irqs ... xfer complete ... do some work ... enable_irqs
-	control back to i2c driver after timeout elapsed
-	wait_event_timeout returned 0
+>From my understanding [1] should already fix this.
 
-The documentation of wait_event_timeout tells:
+[1] https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/commit/drivers/clocksource/mtk_timer.c?id=d4a19eb3b15a4ba98f627182f48d5bc0cffae670
 
- * Returns:
- * 0 if the @condition evaluated to %false after the @timeout elapsed,
- * 1 if the @condition evaluated to %true after the @timeout elapsed,
- * or the remaining jiffies (at least 1) if the @condition evaluated
- * to %true before the @timeout elapsed.
-
-Where is the misunderstanding?
-
-Best regards
-Uwe
+Regards,
+Matthias
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+motzblog.wordpress.com
