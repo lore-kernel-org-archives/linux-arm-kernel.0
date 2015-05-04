@@ -1,194 +1,275 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 04 May 2015 10:00:27 +0200
-Subject: [PATCH 1/2] reset: add driver for lpc18xx rgu
-In-Reply-To: <1430173843-11648-2-git-send-email-manabian@gmail.com>
-References: <1430173843-11648-1-git-send-email-manabian@gmail.com>
- <1430173843-11648-2-git-send-email-manabian@gmail.com>
-Message-ID: <1430726427.3722.15.camel@pengutronix.de>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 04 May 2015 10:02:40 +0200
+Subject: High-resolution timers not supported when using smp_twd on Cortex A9
+Message-ID: <554727A0.3040601@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
+[ Resending to LAKML, add clocksource description ]
 
-thank you for the patch! Some comments below:
+Hello,
 
-Am Dienstag, den 28.04.2015, 00:30 +0200 schrieb Joachim Eastwood:
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  drivers/reset/Makefile        |   1 +
->  drivers/reset/reset-lpc18xx.c | 260 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 261 insertions(+)
->  create mode 100644 drivers/reset/reset-lpc18xx.c
-> 
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index 157d421f755b..1d41feeb2dce 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -1,4 +1,5 @@
->  obj-$(CONFIG_RESET_CONTROLLER) += core.o
-> +obj-$(CONFIG_ARCH_LPC18XX) += reset-lpc18xx.o
->  obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
->  obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
->  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
-> diff --git a/drivers/reset/reset-lpc18xx.c b/drivers/reset/reset-lpc18xx.c
-> new file mode 100644
-> index 000000000000..9564d78ab9d2
-> --- /dev/null
-> +++ b/drivers/reset/reset-lpc18xx.c
-> @@ -0,0 +1,260 @@
-> +/*
-> + * Reset driver for NXP LPC18xx/43xx Reset Generation Unit (RGU).
-> + *
-> + * Copyright (C) 2014 Joachim Eastwood <manabian@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reboot.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/slab.h>
-> +#include <linux/types.h>
-> +
-> +#include <asm/system_misc.h>
+I wanted to enable high-resolution timers on this Cortex A9 system,
+but it seems there is more to it than just enabling
 
-Are all of these necessary? I don't see why of_address.h and
-system_misc.h are included, for example.
+  CONFIG_HIGH_RES_TIMERS=y
 
-> +/* LPC18xx RGU registers */
-> +#define LPC18XX_RGU_CTRL0		0x100
-> +#define LPC18XX_RGU_CTRL1		0x104
-> +#define LPC18XX_RGU_ACTIVE_STATUS0	0x150
-> +#define LPC18XX_RGU_ACTIVE_STATUS1	0x154
-> +
-> +#define LPC18XX_RGU_RESETS_PER_REG	32
-> +
-> +/* Internal reset outputs */
-> +#define LPC18XX_RGU_CORE_RST	0
-> +#define LPC18XX_RGU_M0SUB_RST	12
-> +#define LPC18XX_RGU_M0APP_RST	56
+(The system is limited to jiffy resolution.)
 
-In the LPC18xx User Manual these are marked as reserved, I think using
-the LPC43XX_ prefix here could avoid confusion. Or are there also
-LPC18xx that have these reset lines?
+#
+# Timers subsystem
+#
+CONFIG_TICK_ONESHOT=y
+CONFIG_NO_HZ_COMMON=y
+# CONFIG_HZ_PERIODIC is not set
+CONFIG_NO_HZ_IDLE=y
+# CONFIG_NO_HZ_FULL is not set
+CONFIG_NO_HZ=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_HZ=300
 
-> +
-> +struct lpc18xx_rgu_data {
-> +	struct reset_controller_dev rcdev;
-> +	struct clk *clk_delay;
-> +	struct clk *clk_reg;
-> +	void __iomem *base;
-> +	spinlock_t lock;
-> +	u32 delay_us;
-> +};
-> +
-> +#define to_rgu_data(rcdev) container_of(rcdev, struct lpc18xx_rgu_data, rcdev)
-> +
-> +static void __iomem *rgu_base;
-> +
-> +static int lpc18xx_rgu_restart(struct notifier_block *this, unsigned long mode,
-> +			       void *cmd)
-> +{
-> +	writel(BIT(LPC18XX_RGU_CORE_RST), rgu_base + LPC18XX_RGU_CTRL0);
-> +	mdelay(2000);
-> +
-> +	pr_emerg("%s: unable to restart system\n", __func__);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static struct notifier_block lpc18xx_rgu_restart_nb = {
-> +	.notifier_call = lpc18xx_rgu_restart,
-> +	.priority = 192,
-> +};
-> +
-> +/*
-> + * The LPC18xx RGU has mostly self-deasserting resets except for the
-> + * two reset lines going to the internal Cortex-M0 cores.
-> + *
-> + * To prevent the M0 cores from accidentally getting deasserting the
+/proc/timer_list output attached
 
-"To prevent the M0 core resets from accidentally getting deasserted" ?
+I'm using the TWD block (private timer and watchdog) for clock events.
+Registered with twd_local_timer_register(&tangox_twd);
 
-> + * status register must be check and bits in control register set to
-> + * preserve the state.
-> + */
-> +static void lpc18xx_rgu_setclear_reset(struct reset_controller_dev *rcdev,
-> +				       unsigned long id, bool set)
-> +{
-> +	struct lpc18xx_rgu_data *rc = to_rgu_data(rcdev);
-> +	u32 stat_offset = LPC18XX_RGU_ACTIVE_STATUS0;
-> +	u32 ctrl_offset = LPC18XX_RGU_CTRL0;
-> +	unsigned long flags;
-> +	u32 stat, rst_bit;
-> +
-> +	stat_offset += (id / LPC18XX_RGU_RESETS_PER_REG) * sizeof(u32);
-> +	ctrl_offset += (id / LPC18XX_RGU_RESETS_PER_REG) * sizeof(u32);
-> +	rst_bit = 1 << (id % LPC18XX_RGU_RESETS_PER_REG);
-> +
-> +	spin_lock_irqsave(&rc->lock, flags);
-> +	stat = ~readl(rc->base + stat_offset);
-> +	if (set)
-> +		writel(stat | rst_bit, rc->base + ctrl_offset);
-> +	else
-> +		writel(stat & ~rst_bit, rc->base + ctrl_offset);
-> +	spin_unlock_irqrestore(&rc->lock, flags);
-> +}
-> +
-> +static int lpc18xx_rgu_reset(struct reset_controller_dev *rcdev,
-> +			     unsigned long id)
-> +{
-> +	struct lpc18xx_rgu_data *rc = to_rgu_data(rcdev);
-> +
-> +	lpc18xx_rgu_setclear_reset(rcdev, id, true);
-> +	udelay(rc->delay_us);
-> +
-> +	return 0;
-> +}
+"4.1 About the private timer and watchdog blocks
+The private timer and watchdog blocks have the following features:
+- a 32-bit counter that generates an interrupt when it reaches zero
+- an eight-bit prescaler value to qualify the clock period
+- configurable single-shot or auto-reload modes
+- configurable starting values for the counter
+- the clock for these blocks is PERIPHCLK."
 
-This is missing a deassert for the M0 resets, see below.
+arch/arm/kernel/smp_twd.c
 
-> +
-> +static int lpc18xx_rgu_assert(struct reset_controller_dev *rcdev,
-> +			      unsigned long id)
-> +{
-> +	return lpc18xx_rgu_reset(rcdev, id);
-> +}
+http://elinux.org/High_Resolution_Timers states
 
-lpc18xx_rgu_assert shouldn't include the delay. Could you have
-lpc18xx_rgu_assert call lpc18xx_rgu_setclear_reset directly?
+> 2. Check the event_handler for the Tick Device. If the event handlers
+> is 'hrtimer_interrupt' then the clock is set up for high resolution
+> handling. If the event handler is 'tick_handle_periodic', then the
+> device is set up for regular tick-based handling.
 
-Let lpc18xx_rgu_reset then call lpc18xx_rgu_assert, udelay, and
-lpc18xx_rgu_deassert. Or could you wait for the active status bit to
-clear instead of the fixed delay for the self-clearing resets?
+And indeed:
 
-> +/* Only M0 cores require explicit reset deassert */
-> +static int lpc18xx_rgu_deassert(struct reset_controller_dev *rcdev,
-> +				unsigned long id)
-> +{
-> +	switch (id) {
-> +	case LPC18XX_RGU_M0SUB_RST:
-> +	case LPC18XX_RGU_M0APP_RST:
-> +		lpc18xx_rgu_setclear_reset(rcdev, id, false);
-> +	}
-> +
-> +	return 0;
-> +}
+Tick Device: mode:     0
+Per CPU device: 0
+Clock Event Device: local_timer
+ max_delta_ns:   8598533124
+ min_delta_ns:   1000
+ mult:           2145336164
+ shift:          32
+ mode:           2
+ next_event:     9223372036854775807 nsecs
+ set_next_event: twd_set_next_event
+ set_mode:       twd_set_mode
+ event_handler:  tick_handle_periodic
+ retries:        0
 
-If writing 0 to the self-clearing reset bits does nothing,
-lpc18xx_rgu_setclear_reset(... false) could be called unconditionally.
 
-[...]
+  clk->name = "local_timer";
+  clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_C3STOP;
+  clk->rating = 350;
+  clk->set_mode = twd_set_mode;
+  clk->set_next_event = twd_set_next_event;
+  clk->irq = twd_ppi;
+  clk->cpumask = cpumask_of(cpu);
 
-regards
-Philipp
+/*
+ * x86(64) specific misfeatures:
+ *
+ * - Clockevent source stops in C3 State and needs broadcast support.
+ */
+#define CLOCK_EVT_FEAT_C3STOP		0x000008
+
+
+$ git show 5388a6b2 arch/arm/kernel/smp_twd.c
+commit 5388a6b266e9c3357353332ba0cd5549082887f1
+Author: Russell King <rmk+kernel@arm.linux.org.uk>
+Date:   Mon Jul 26 13:19:43 2010 +0100
+
+    ARM: SMP: Always enable clock event broadcast support
+    
+    The TWD local timers are unable to wake up the CPU when it is placed
+    into a low power mode, eg. C3.  Therefore, we need to adapt things
+    such that the TWD code can cope with this.
+    
+    We do this by always providing a broadcast tick function, and marking
+    the fact that the TWD local timer will stop in low power modes.  This
+    means that when the CPU is placed into a low power mode, the core
+    timer code marks this fact, and allows an IPI to be given to the core.
+    
+    Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+    Cc: Catalin Marinas <catalin.marinas@arm.com>
+    Cc: Thomas Gleixner <tglx@linutronix.de>
+
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 7c5f0c0..35882fb 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -132,7 +132,8 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+        twd_calibrate_rate();
+ 
+        clk->name = "local_timer";
+-       clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
++       clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
++                       CLOCK_EVT_FEAT_C3STOP;
+        clk->rating = 350;
+        clk->set_mode = twd_set_mode;
+        clk->set_next_event = twd_set_next_event;
+
+
+(The system's clocksource is a 27 MHz 32-bit counter.)
+
+If I remove the CLOCK_EVT_FEAT_C3STOP flag, then hrtimers are enabled,
+but I assume I would then run into problems in low-power mode, going by
+Russell's commit message.
+
+Do I have to use a platform-specific clockevent source if I want
+high-resolution timers on the system?
+
+Regards.
+
+-------------- next part --------------
+Timer List Version: v0.7
+HRTIMER_MAX_CLOCK_BASES: 4
+now at 12676030854 nsecs
+
+cpu: 0
+ clock 0:
+  .base:       e7ae51e8
+  .index:      0
+  .resolution: 3333333 nsecs
+  .get_time:   ktime_get
+  .offset:     0 nsecs
+active timers:
+ #0: sched_clock_timer, sched_clock_poll, S:01
+ # expires at 139188754399-139188754399 nsecs [in 126512723545 to 126512723545 nsecs]
+ clock 1:
+  .base:       e7ae5220
+  .index:      1
+  .resolution: 3333333 nsecs
+  .get_time:   ktime_get_real
+  .offset:     0 nsecs
+active timers:
+ clock 2:
+  .base:       e7ae5258
+  .index:      2
+  .resolution: 3333333 nsecs
+  .get_time:   ktime_get_boottime
+  .offset:     0 nsecs
+active timers:
+ clock 3:
+  .base:       e7ae5290
+  .index:      3
+  .resolution: 3333333 nsecs
+  .get_time:   ktime_get_clocktai
+  .offset:     0 nsecs
+active timers:
+  .expires_next   : 9223372036854775807 nsecs
+  .hres_active    : 0
+  .nr_events      : 0
+  .nr_retries     : 0
+  .nr_hangs       : 0
+  .max_hang_time  : 0 nsecs
+  .nohz_mode      : 0
+  .last_tick      : 0 nsecs
+  .tick_stopped   : 0
+  .idle_jiffies   : 0
+  .idle_calls     : 0
+  .idle_sleeps    : 0
+  .idle_entrytime : 12674854298 nsecs
+  .idle_waketime  : 0 nsecs
+  .idle_exittime  : 0 nsecs
+  .idle_sleeptime : 10273031792 nsecs
+  .iowait_sleeptime: 10232749 nsecs
+  .last_jiffies   : 0
+  .next_jiffies   : 0
+  .idle_expires   : 0 nsecs
+jiffies: 4294880982
+
+cpu: 1
+ clock 0:
+  .base:       e7aed1e8
+  .index:      0
+  .resolution: 3333333 nsecs
+  .get_time:   ktime_get
+  .offset:     0 nsecs
+active timers:
+ clock 1:
+  .base:       e7aed220
+  .index:      1
+  .resolution: 3333333 nsecs
+  .get_time:   ktime_get_real
+  .offset:     0 nsecs
+active timers:
+ clock 2:
+  .base:       e7aed258
+  .index:      2
+  .resolution: 3333333 nsecs
+  .get_time:   ktime_get_boottime
+  .offset:     0 nsecs
+active timers:
+ clock 3:
+  .base:       e7aed290
+  .index:      3
+  .resolution: 3333333 nsecs
+  .get_time:   ktime_get_clocktai
+  .offset:     0 nsecs
+active timers:
+  .expires_next   : 9223372036854775807 nsecs
+  .hres_active    : 0
+  .nr_events      : 0
+  .nr_retries     : 0
+  .nr_hangs       : 0
+  .max_hang_time  : 0 nsecs
+  .nohz_mode      : 0
+  .last_tick      : 0 nsecs
+  .tick_stopped   : 0
+  .idle_jiffies   : 0
+  .idle_calls     : 0
+  .idle_sleeps    : 0
+  .idle_entrytime : 12673422372 nsecs
+  .idle_waketime  : 0 nsecs
+  .idle_exittime  : 0 nsecs
+  .idle_sleeptime : 12455789892 nsecs
+  .iowait_sleeptime: 15649739 nsecs
+  .last_jiffies   : 0
+  .next_jiffies   : 0
+  .idle_expires   : 0 nsecs
+jiffies: 4294880982
+
+Tick Device: mode:     0
+Broadcast device
+Clock Event Device: <NULL>
+tick_broadcast_mask: 00000000
+tick_broadcast_oneshot_mask: 00000000
+
+Tick Device: mode:     0
+Per CPU device: 0
+Clock Event Device: local_timer
+ max_delta_ns:   8598533124
+ min_delta_ns:   1000
+ mult:           2145336164
+ shift:          32
+ mode:           2
+ next_event:     9223372036854775807 nsecs
+ set_next_event: twd_set_next_event
+ set_mode:       twd_set_mode
+ event_handler:  tick_handle_periodic
+ retries:        0
+
+Tick Device: mode:     0
+Per CPU device: 1
+Clock Event Device: local_timer
+ max_delta_ns:   8598533124
+ min_delta_ns:   1000
+ mult:           2145336164
+ shift:          32
+ mode:           2
+ next_event:     9223372036854775807 nsecs
+ set_next_event: twd_set_next_event
+ set_mode:       twd_set_mode
+ event_handler:  tick_handle_periodic
+ retries:        0
