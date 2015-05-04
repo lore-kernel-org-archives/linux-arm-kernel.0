@@ -1,58 +1,53 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 4 May 2015 09:08:24 +0200
-Subject: [PATCH 6/7] ARM: dts: mt8135: enable basic SMP bringup for mt8135
-In-Reply-To: <1430466210-22963-7-git-send-email-yingjoe.chen@mediatek.com>
-References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
- <1430466210-22963-7-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <CABuKBeLXjKYXyPTtR=C887PKfiF-a5dB306zoZsya4s0ir_DVQ@mail.gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 04 May 2015 16:43:53 +0900
+Subject: [PATCH] drm/exynos: Fix build breakage on !DRM_EXYNOS_FIMD
+In-Reply-To: <1430539706-2945-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430539706-2945-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <55472339.8040408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-01 9:43 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> Add arch timer node to enable arch-timer support. MT8135 firmware
-> doesn't correctly setup arch-timer frequency and CNTVOFF, add
-> properties to workaround this.
->
-> This also set cpu enable-method to enable SMP.
->
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt8135.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-> index 612bd22..eb5e06f 100644
-> --- a/arch/arm/boot/dts/mt8135.dtsi
-> +++ b/arch/arm/boot/dts/mt8135.dtsi
-> @@ -46,6 +46,7 @@
->         cpus {
->                 #address-cells = <1>;
->                 #size-cells = <0>;
-> +               enable-method = "mediatek,mt81xx-tz-smp";
->
->                 cpu0: cpu at 0 {
->                         device_type = "cpu";
-> @@ -103,6 +104,21 @@
->                 };
->         };
->
-> +       timer {
-> +               compatible = "arm,armv7-timer";
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
-> +                                         IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) |
-> +                                         IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) |
-> +                                         IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) |
-> +                                         IRQ_TYPE_LEVEL_LOW)>;
-> +               clock-frequency = <13000000>;
-> +               arm,cpu-registers-not-fw-configured;
-> +       };
-> +
+On 2015? 05? 02? 13:08, Krzysztof Kozlowski wrote:
+> Selecting CONFIG_FB_S3C disables CONFIG_DRM_EXYNOS_FIMD leading to build
+> error:
 
-This does not apply cleanly on v4.1-rc1, please rebase.
+No, eDP has no any dependency of FIMD but DECON. Just add dependency
+code like below,
+
+ config DRM_EXYNOS7_DECON
+        bool "Exynos DRM DECON"
+-       depends on DRM_EXYNOS
++       depends on DRM_EXYNOS && !FB_S3C
+
+> 
+> drivers/built-in.o: In function `exynos_dp_dpms':
+> binder.c:(.text+0xd6a840): undefined reference to `fimd_dp_clock_enable'
+> binder.c:(.text+0xd6ab54): undefined reference to `fimd_dp_clock_enable'
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.h | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.h b/drivers/gpu/drm/exynos/exynos_drm_fimd.h
+> index b4fcaa568456..db67f3d9786d 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fimd.h
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.h
+> @@ -10,6 +10,10 @@
+>  #ifndef _EXYNOS_DRM_FIMD_H_
+>  #define _EXYNOS_DRM_FIMD_H_
+>  
+> +#ifdef CONFIG_DRM_EXYNOS_FIMD
+>  extern void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable);
+> +#else
+> +static inline void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable) {};
+> +#endif
+
+So above codes are unnecessary. It's really not good to add #ifdef ~ #endif.
 
 Thanks,
-Matthias
+Inki Dae
+
+>  
+>  #endif /* _EXYNOS_DRM_FIMD_H_ */
+> 
