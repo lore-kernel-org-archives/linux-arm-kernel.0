@@ -1,122 +1,89 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 4 May 2015 12:06:52 -0400
-Subject: [PATCH v2] AHCI: Add generic MSI-X interrupt support to SATA PCI
- driver
-In-Reply-To: <1430725538-22162-1-git-send-email-rric@kernel.org>
-References: <1430725538-22162-1-git-send-email-rric@kernel.org>
-Message-ID: <20150504160652.GB1971@htj.duckdns.org>
+From: g.portay@overkiz.com (=?UTF-8?B?R2HDq2wgUE9SVEFZ?=)
+Date: Mon, 04 May 2015 18:08:28 +0200
+Subject: [PATCH] ARM: at91/dt: drop deprecated mainck node from pmc
+In-Reply-To: <20150416144553.1eed24dc@bbrezillon>
+References: <1429187145-10741-1-git-send-email-g.portay@overkiz.com>
+ <20150416144553.1eed24dc@bbrezillon>
+Message-ID: <5547997C.3090501@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Robert. (cc'ing Alexander for ahci msi)
+On 16/04/2015 14:45, Boris Brezillon wrote:
+> On Thu, 16 Apr 2015 14:25:44 +0200
+> Ga?l PORTAY <g.portay@overkiz.com> wrote:
+>
+>> The clock-frequency property became obsolete since the rework of the main
+>> clock driver in 3.16 (see commit 27cb1c2083373a44130d50d4d2fb64cf7eff2d90).
+>>
+>> It now get and uses the clock-frequency from the main_xtal node.
+>>
+>> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>
+>> ---
+>>   arch/arm/boot/dts/at91-sama5d3_xplained.dts | 6 ------
+>>   arch/arm/boot/dts/at91sam9rlek.dts          | 6 ------
+>>   arch/arm/boot/dts/sama5d3xcm.dtsi           | 6 ------
+>>   3 files changed, 18 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+>> index fec1fca..1721e9b 100644
+>> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+>> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+>> @@ -204,12 +204,6 @@
+>>   					};
+>>   				};
+>>   			};
+>> -
+>> -			pmc: pmc at fffffc00 {
+>> -				main: mainck {
+>> -					clock-frequency = <12000000>;
+>> -				};
+>> -			};
+>>   		};
+>>   
+>>   		nand0: nand at 60000000 {
+>> diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
+>> index 9be5b54..d9299be3 100644
+>> --- a/arch/arm/boot/dts/at91sam9rlek.dts
+>> +++ b/arch/arm/boot/dts/at91sam9rlek.dts
+>> @@ -181,12 +181,6 @@
+>>   				};
+>>   			};
+>>   
+>> -			pmc: pmc at fffffc00 {
+>> -				main: mainck {
+>> -					clock-frequency = <12000000>;
+>> -				};
+>> -			};
+>> -
+>>   			watchdog at fffffd40 {
+>>   				status = "okay";
+>>   			};
+>> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+>> index 7d6babd..ef404e9 100644
+>> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+>> @@ -67,12 +67,6 @@
+>>   					rxd3-skew-ps = <400>;
+>>   				};
+>>   			};
+>> -
+>> -			pmc: pmc at fffffc00 {
+>> -				main: mainck {
+>> -					clock-frequency = <12000000>;
+>> -				};
+>> -			};
+>>   		};
+>>   
+>>   		nand0: nand at 60000000 {
+>>
 
-On Mon, May 04, 2015 at 09:45:37AM +0200, Robert Richter wrote:
-> From: Robert Richter <rrichter@cavium.com>
-> 
-> This patch adds generic support for MSI-X interrupts to the SATA PCI
-> driver. Only single interrupt support is implemented. Thus, per-port
-> interrupts can not yet be enabled.
-> 
-> The driver now checks the device for the existence of MSI-X and tries
-> to enable the interrupt. Otherwise, if a device is not MSI-X capable,
-> the initialization is skipped and MSI or intx interrupts are
-> configured.
-> 
-> This patch also enables AHCI for Cavium Thunder SoCs that uses MSI-X.
+Hi everyone,
 
-Please don't mix these two changes in the same patch.
+Any news about this patch ?
 
-> @@ -1202,11 +1207,41 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
->  {}
->  #endif
->  
-> -static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
-> -				struct ahci_host_priv *hpriv)
-> +static int ahci_init_msix(struct pci_dev *pdev, unsigned int n_ports,
-> +			  struct ahci_host_priv *hpriv)
-> +{
-> +	int rc, nvec;
-> +	struct msix_entry entry = {};
-> +
-> +	/* check if msix is supported */
-> +	nvec = pci_msix_vec_count(pdev);
-> +	if (nvec <= 0)
-> +		return 0;
-> +
-> +	/* per-port msix interrupts are not supported */
-> +	if (n_ports > 1 && nvec >= n_ports)
-> +		return -ENOSYS;
+Best regards,
+Ga?l PORTAY
 
-Hmm... can you please elaborate why the condition isn't nvec > 1?
-Also, shouldn't we be printing a warning message here explaining why
-probing is failing?
-
-> +
-> +	/* only enable the first entry (entry.entry = 0) */
-> +	rc = pci_enable_msix_exact(pdev, &entry, 1);
-
-So, enabling the first msix works if nvec > 1 && nvec < n_ports but
-not if nvec >= n_ports?
-
-> +	if (rc < 0)
-> +		return rc;
-> +
-> +	return 1;
-> +}
-> +
-> +static int __ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
-> +				  struct ahci_host_priv *hpriv)
->  {
->  	int rc, nvec;
->  
-> +	nvec = ahci_init_msix(pdev, n_ports, hpriv);
-> +	if (nvec > 0)
-> +		return nvec;
-> +
-> +	if (nvec && nvec != -ENOSYS)
-> +		dev_err(&pdev->dev, "failed to enable MSI-X: %d", nvec);
-> +
->  	if (hpriv->flags & AHCI_HFLAG_NO_MSI)
->  		goto intx;
->  
-> @@ -1250,6 +1285,35 @@ static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
->  	return 0;
->  }
->  
-> +static struct msi_desc *msix_get_desc(struct pci_dev *dev, u16 entry)
-> +{
-> +	struct msi_desc *desc;
-> +
-> +	list_for_each_entry(desc, &dev->msi_list, list) {
-> +		if (desc->msi_attrib.entry_nr == entry)
-> +			return desc;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
-> +static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
-> +				struct ahci_host_priv *hpriv)
-> +{
-> +	struct msi_desc *desc;
-> +
-> +	__ahci_init_interrupts(pdev, n_ports, hpriv);
-> +
-> +	if (!pdev->msix_enabled)
-> +		return pdev->irq;
-> +
-> +	desc = msix_get_desc(pdev, 0);	/* first entry */
-> +	if (!desc)
-> +		return -ENODEV;
-> +
-> +	return desc->irq;
-> +}
-
-Can we please do this properly?  We should be able to move port priv
-allocation to host allocaotion time and add and use pp->irq instead,
-right?
-
-Thanks.
-
--- 
-tejun
+PS: I hope this mail does not sound insistent :)
