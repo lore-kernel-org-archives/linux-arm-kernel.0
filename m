@@ -1,57 +1,97 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 May 2015 13:36:48 +0100
-Subject: [PATCH V2 5/6] regulator: add mxs on-chip regulator driver
-In-Reply-To: <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
-References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
- <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20150504123648.GU15510@sirena.org.uk>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 04 May 2015 15:15:13 +0200
+Subject: [PATCH] drm/exynos: Fix build breakage on !DRM_EXYNOS_FIMD
+In-Reply-To: <5547696D.8000300@gmail.com>
+References: <1430539706-2945-1-git-send-email-k.kozlowski.k@gmail.com>
+ <55472339.8040408@samsung.com>
+ <CAPj87rM-utcjuWD+ZB7_m01X3qUsNnwJmabCYZAAQUkAdRabaQ@mail.gmail.com>
+ <5547696D.8000300@gmail.com>
+Message-ID: <554770E1.2000401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 29, 2015 at 10:32:26PM +0000, Stefan Wahren wrote:
+Hi,
 
-> +static struct regulator_ops mxs_dcdc_ops = {
-> +	.is_enabled		= regulator_is_enabled_regmap,
-> +};
 
-Why do we have an is_enabled() operation but no enable or disable
-operation?  I'm also not 100% clear what code the DCDCs and LDOs are
-sharing here...
+On 05/04/2015 02:43 PM, Krzysztof Kozlowski wrote:
+> 2015-05-04 20:34 GMT+09:00 Daniel Stone <daniel@fooishbar.org>:
+>> Hi,
+>>
+>> On 4 May 2015 at 08:43, Inki Dae <inki.dae@samsung.com> wrote:
+>>> On 2015? 05? 02? 13:08, Krzysztof Kozlowski wrote:
+>>>> Selecting CONFIG_FB_S3C disables CONFIG_DRM_EXYNOS_FIMD leading to build
+>>>> error:
+>>>
+>>> No, eDP has no any dependency of FIMD but DECON. Just add dependency
+>>> code like below,
+>>>
+>>>  config DRM_EXYNOS7_DECON
+>>>         bool "Exynos DRM DECON"
+>>> -       depends on DRM_EXYNOS
+>>> +       depends on DRM_EXYNOS && !FB_S3C
+> 
+> Actually my commit message was not detailed enough. The FB_S3C here
+> won't solve the issue because you may:
+> 1, disable FIMD and FB_S3C,
+> 2, enabke DECON and DP,
+> and it won't compile.
+> 
+> Currently the FIMD must be enabled if DRM_EXYNOS_DP is enabled.
+> 
+>>
+>> But it does clearly and explicitly call fimd_dp_clock_enable from
+>> exynos_dp_powero{n,ff}. So the dependency you're proposing seems
+>> backwards: it's not an expression of the requirements of the current
+>> code (that FIMD DP code be available, i.e. CONFIG_DRM_EXYNOS_FIMD is
+>> selected), but an indirect expression of another dependency
+>> (CONFIG_FB_S3C disables CONFIG_DRM_EXYNOS_FIMD, so disable
+>> CONFIG_FB_S3C).
+>>
+>> Additionally, as the call comes from exynos_dp_core.c, which is built
+>> by CONFIG_DRM_EXYNOS_DP (an explicitly user-selectable option), why
+>> shouldn't the dependency be there? Ah, because the dependency on DP is
+>> for (DECON || FIMD), but as DECON doesn't provide
+>> fimd_dp_clock_enable(), it doesn't seem like it would compile if you
+>> selected DECON and not FIMD.
+>>
+>> So, for me, the cleanest solution would be config DRM_EXYNOS_DP gains
+>> a hard dependency on DRM_EXYNOS_FIMD, at least until it can be fixed
+>> to compile without FIMD.
+> 
+> Right, you correctly pointed current dependencies. Still it looks little
+> hacky because EXYNOS_DP may work with FIMD or DECON. 
 
-> +	initdata = of_get_regulator_init_data(dev, dev->of_node, &info->desc);
-> +	if (!initdata) {
-> +		dev_err(dev, "missing regulator init data\n");
-> +		return -EINVAL;
-> +	}
+Are you sure? I have not seen any chipset having DECON and DP. In all
+chipsets known to me DP is always accompanied by FIMD. I guess it can
+change in the future, but for now hard dependency on FIMD seems to be OK
+- it just reflects hardware design.
+Of course this is just my humble opinion :)
 
-This is not an error, init data is totally optional.
+Regards
+Andrzej
 
-> +	rdev = devm_regulator_register(dev, &info->desc, &config);
-> +	if (IS_ERR(rdev)) {
-> +		int ret = PTR_ERR(rdev);
-> +
-> +		dev_err(dev, "%s: failed to register regulator(%d)\n",
-> +			__func__, ret);
-> +		return ret;
-> +	}
-> +
-> +	if (!of_property_read_u32(dev->of_node, "switching-frequency",
-> +				  &switch_freq))
-> +		mxs_set_dcdc_freq(rdev, switch_freq);
-
-why are we registering the regulator before we've finished parsing the
-DT - I'd expect us to do this first rather than have things potentially
-start using the regulator with the confguration not completed.
-
-> +	platform_set_drvdata(pdev, rdev);
-
-This looks unsafe - either we don't need to set this at all or one of
-the ops could be invoked when the regulator is registered and try to use
-the driver data before it is set.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150504/083c0c5d/attachment.sig>
+It does not really
+> need FIMD. Using ifdefs in headers is not uncommon - many core
+> subsystems do this that way to provide stubs.
+> 
+> Probably the cleanest way would be to provide by FIMD and DECON a common
+> interface for DP for such operation, something like:
+> struct exynos_drm_crtc {
+> 	struct drm_crtc                 base;
+> 	...
+> 	void (*clock_enable)(struct exynos_drm_crtc *crtc, bool enable)
+> );
+> 
+> which, if non-NULL, will be called by exynos_dp_core.c:
+> static void exynos_dp_poweron(struct exynos_dp_device *dp)
+> {
+> 	...
+> 	if (crtc->clock_enable)
+> 		crtc->clock_enable(crtc, true);
+> }
+> 
+> What do you think?
+> 
+> Best regards,
+> Krzysztof
+> 
