@@ -1,69 +1,89 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 04 May 2015 10:16:09 +0200
-Subject: [PATCH v6 14/25] iommu: exynos: use struct exynos_iommu_domain in
- internal structures
+Date: Mon, 04 May 2015 10:16:10 +0200
+Subject: [PATCH v6 15/25] iommu: exynos: document internal structures
 In-Reply-To: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
 References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1430727380-10912-15-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1430727380-10912-16-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace all remaining usage of struct iommu_domain with struct
-exynos_iommu_domain in all internal structures and functions.
+Add a few words of comment to all internal structures used by the driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/iommu/exynos-iommu.c | 49 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 33 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index a58f4a4c91d0..67e0633b8080 100644
+index 67e0633b8080..6a0199570b00 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -206,7 +206,7 @@ struct sysmmu_drvdata {
- 	struct clk *clk_master;
- 	int activations;
- 	spinlock_t lock;
--	struct iommu_domain *domain;
-+	struct exynos_iommu_domain *domain;
- 	struct list_head domain_node;
- 	struct list_head owner_node;
- 	phys_addr_t pgtable;
-@@ -338,7 +338,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
- 		show_fault_information(dev_name(data->sysmmu),
- 					itype, base, addr);
- 		if (data->domain)
--			ret = report_iommu_fault(data->domain,
-+			ret = report_iommu_fault(&data->domain->domain,
- 					data->master, addr, itype);
- 	}
+@@ -184,33 +184,50 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
+ 	"UNKNOWN FAULT"
+ };
  
-@@ -437,7 +437,7 @@ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
- }
+-/* attached to dev.archdata.iommu of the master device */
++/*
++ * This structure is attached to dev.archdata.iommu of the master device
++ * on device add, contains a list of SYSMMU controllers defined by device tree,
++ * which are bound to given master device. It is usually referenced by 'owner'
++ * pointer.
++*/
+ struct exynos_iommu_owner {
+-	struct list_head clients;
++	struct list_head clients; /* list of sysmmu_drvdata.owner_node */
+ };
  
- static int __sysmmu_enable(struct sysmmu_drvdata *data, phys_addr_t pgtable,
--			   struct iommu_domain *iommu_domain)
-+			   struct exynos_iommu_domain *domain)
- {
- 	int ret = 0;
- 	unsigned long flags;
-@@ -445,7 +445,7 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data, phys_addr_t pgtable,
- 	spin_lock_irqsave(&data->lock, flags);
- 	if (set_sysmmu_active(data)) {
- 		data->pgtable = pgtable;
--		data->domain = iommu_domain;
-+		data->domain = domain;
++/*
++ * This structure exynos specific generalization of struct iommu_domain.
++ * It contains list of SYSMMU controllers from all master devices, which has
++ * been attached to this domain and page tables of IO address space defined by
++ * it. It is usually referenced by 'domain' pointer.
++ */
+ struct exynos_iommu_domain {
+-	struct list_head clients; /* list of sysmmu_drvdata.node */
++	struct list_head clients; /* list of sysmmu_drvdata.domain_node */
+ 	sysmmu_pte_t *pgtable; /* lv1 page table, 16KB */
+ 	short *lv2entcnt; /* free lv2 entry counter for each section */
+-	spinlock_t lock; /* lock for this structure */
++	spinlock_t lock; /* lock for modyfying list of clients */
+ 	spinlock_t pgtablelock; /* lock for modifying page table @ pgtable */
+ 	struct iommu_domain domain; /* generic domain data structure */
+ };
  
- 		__sysmmu_enable_nocount(data);
++/*
++ * This structure hold all data of a single SYSMMU controller, this includes
++ * hw resources like registers and clocks, pointers and list nodes to connect
++ * it to all other structures, internal state and parameters read from device
++ * tree. It is usually referenced by 'data' pointer.
++ */
+ struct sysmmu_drvdata {
+-	struct device *sysmmu;	/* System MMU's device descriptor */
+-	struct device *master;	/* Owner of system MMU */
+-	void __iomem *sfrbase;
+-	struct clk *clk;
+-	struct clk *clk_master;
+-	int activations;
+-	spinlock_t lock;
+-	struct exynos_iommu_domain *domain;
+-	struct list_head domain_node;
+-	struct list_head owner_node;
+-	phys_addr_t pgtable;
+-	int version;
++	struct device *sysmmu; /* SYSMMU controller device */
++	struct device *master; /* master device (owner of given SYSMMU) */
++	void __iomem *sfrbase; /* our registers */
++	struct clk *clk; /* SYSMMU's clock */
++	struct clk *clk_master; /* master's device clock */
++	int activations; /* number of calls to sysmmu_enable */
++	spinlock_t lock; /* lock for modyfying enable/disable state */
++	struct exynos_iommu_domain *domain; /* domain we belong to */
++	struct list_head domain_node; /* node for domain clients list */
++	struct list_head owner_node; /* node for owner clients list */
++	phys_addr_t pgtable; /* assigned page table structure */
++	int version; /* our version */
+ };
  
-@@ -703,7 +703,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *iommu_domain,
- 
- 	list_for_each_entry(data, &owner->clients, owner_node) {
- 		pm_runtime_get_sync(data->sysmmu);
--		ret = __sysmmu_enable(data, pagetable, iommu_domain);
-+		ret = __sysmmu_enable(data, pagetable, domain);
- 		if (ret >= 0) {
- 			data->master = dev;
- 
+ static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
 -- 
 1.9.2
