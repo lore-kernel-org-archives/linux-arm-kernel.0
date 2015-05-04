@@ -1,99 +1,65 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 4 May 2015 13:05:27 +0200
-Subject: [PATCH 3/4] tty: serial: 8250_mtk: use pm_runtime callbacks for
- enabling
-In-Reply-To: <1430117397-13517-4-git-send-email-s.hauer@pengutronix.de>
-References: <1430117397-13517-1-git-send-email-s.hauer@pengutronix.de>
- <1430117397-13517-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CABuKBeJwduxLuyXcy7Ho+k+_Ye3+nHiGvdr8vTFsJzdHDBQPSA@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 4 May 2015 13:11:48 +0200
+Subject: [PATCH v7 05/15] dt-bindings: Document the STM32 reset bindings
+In-Reply-To: <1430735320.3722.34.camel@pengutronix.de>
+References: <1430410844-16062-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1430410844-16062-6-git-send-email-mcoquelin.stm32@gmail.com>
+ <55433467.2010603@linaro.org>
+ <CALszF6Bw900E9MtpaVmvkFxsrOODRkNg+RxRXz5V3WghHtsxbw@mail.gmail.com>
+ <5544A069.5000808@linaro.org>
+ <1430735320.3722.34.camel@pengutronix.de>
+Message-ID: <CALszF6DpwfeaXRnOyyL+EJv2dYoGuUQtXZsiMisuaAj1_jCLFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-27 8:49 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> The pm_runtime callbacks already enable and disable the device.
-> Use them in probe() and remove() instead of duplicating the
-> code. This allows us to concentrate more code for enabling/disabling
-> the UART in a single place.
+2015-05-04 12:28 GMT+02:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> Am Samstag, den 02.05.2015, 11:01 +0100 schrieb Daniel Thompson:
+>> On 02/05/15 08:55, Maxime Coquelin wrote:
+>> > 2015-05-01 10:08 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
+> [...]
+>> >> Do you intend the clock driver to use the same compatible string (given it
+>> >> is the same bit of hardware).
+>> >>
+>> >> If so, is it better to use st,stm32f4-rcc here? It seems unlikey to me that
+>> >> the register layout of the PLLs and dividers can be the same on the f7 parts
+>> >> (and later).
+>> >
+>> > I agree we need a compatible dedicate to f4 series for clocks, and
+>> > maybe even one for f429 (to be checked).
+>> > For the reset part, we don't have this need.
+>> >
+>> > So either we use only "st,stm32f4" as you suggest, or we can have both
+>> > in device tree:
+>> >
+>> > rcc: reset at 40023800 {
+>> >      #reset-cells = <1>;
+>> >      compatible = "st,stm32f4-rcc", "st,stm32-rcc";
+>> >      reg = <0x40023800 0x400>;
+>> > };
+>> >
+>> > What do you think?
+>>
+>> Having both makes sense. The reset driver probably doesn't care about
+>> differences between F4 and F7 (I know very little about F7 but I can't
+>> think of any obvious h/ware evolution that would confuse the current
+>> reset driver).
 >
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/tty/serial/8250/8250_mtk.c | 69 ++++++++++++++++++++------------------
->  1 file changed, 36 insertions(+), 33 deletions(-)
->
-> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-> index bcfaa8dc..2f28bd0 100644
-> --- a/drivers/tty/serial/8250/8250_mtk.c
-> +++ b/drivers/tty/serial/8250/8250_mtk.c
-> @@ -115,6 +115,29 @@ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
->                 tty_termios_encode_baud_rate(termios, baud, baud);
->  }
->
-> +static int mtk8250_runtime_suspend(struct device *dev)
-> +{
-> +       struct mtk8250_data *data = dev_get_drvdata(dev);
-> +
-> +       clk_disable_unprepare(data->uart_clk);
-> +
-> +       return 0;
-> +}
-> +
-> +static int mtk8250_runtime_resume(struct device *dev)
-> +{
-> +       struct mtk8250_data *data = dev_get_drvdata(dev);
-> +       int err;
-> +
-> +       err = clk_prepare_enable(data->uart_clk);
-> +       if (err) {
-> +               dev_warn(dev, "Can't enable clock\n");
-> +               return err;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
->  static void
->  mtk8250_do_pm(struct uart_port *port, unsigned int state, unsigned int old)
->  {
-> @@ -130,19 +153,12 @@ mtk8250_do_pm(struct uart_port *port, unsigned int state, unsigned int old)
->  static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
->                            struct mtk8250_data *data)
->  {
-> -       int err;
-> -
->         data->uart_clk = devm_clk_get(&pdev->dev, NULL);
->         if (IS_ERR(data->uart_clk)) {
->                 dev_warn(&pdev->dev, "Can't get uart clock\n");
->                 return PTR_ERR(data->uart_clk);
->         }
->
-> -       err = clk_prepare_enable(data->uart_clk);
-> -       if (err) {
-> -               dev_warn(&pdev->dev, "Can't prepare clock\n");
-> -               return err;
-> -       }
->         p->uartclk = clk_get_rate(data->uart_clk);
->
->         return 0;
-> @@ -193,14 +209,18 @@ static int mtk8250_probe(struct platform_device *pdev)
->         writel(0x0, uart.port.membase +
->                         (MTK_UART_RATE_FIX << uart.port.regshift));
->
-> -       data->line = serial8250_register_8250_port(&uart);
-> -       if (data->line < 0)
-> -               return data->line;
-> -
->         platform_set_drvdata(pdev, data);
->
-> -       pm_runtime_set_active(&pdev->dev);
->         pm_runtime_enable(&pdev->dev);
-> +       if (!pm_runtime_enabled(&pdev->dev)) {
-> +               err = mtk8250_runtime_resume(&pdev->dev);
-> +               if (err)
-> +                       return err;
-> +       }
-> +
-> +       data->line = serial8250_register_8250_port(&uart);
-> +       if (data->line < 0)
-> +               return data->line;
+> Seconded, this is exactly the way compatible string lists are supposed
+> to be used.
 
-Why do you delete pm_runtime_set_active here?
+Ok good, so we all agree.
+
+I propose I keep "st,stm32-rcc" only for this series, as it does not
+contain the clock driver.
+The series adding the clock driver will add "st,stm32f4-rcc", or
+"st,stm32f429-rcc" depending on clock driver needs.
+
+Thanks,
+Maxime
+
+>
+> [...]
+>
+> regards
+> Philipp
+>
