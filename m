@@ -1,80 +1,38 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Mon, 04 May 2015 21:43:25 +0900
-Subject: [PATCH] drm/exynos: Fix build breakage on !DRM_EXYNOS_FIMD
-In-Reply-To: <CAPj87rM-utcjuWD+ZB7_m01X3qUsNnwJmabCYZAAQUkAdRabaQ@mail.gmail.com>
-References: <1430539706-2945-1-git-send-email-k.kozlowski.k@gmail.com>
- <55472339.8040408@samsung.com>
- <CAPj87rM-utcjuWD+ZB7_m01X3qUsNnwJmabCYZAAQUkAdRabaQ@mail.gmail.com>
-Message-ID: <5547696D.8000300@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 4 May 2015 14:53:31 +0200
+Subject: [PATCH v2 3/5] mfd: sun6i-prcm: Add support for PRCM found on
+ Allwinner A80 SoC
+In-Reply-To: <1430410206-4410-4-git-send-email-wens@csie.org>
+References: <1430410206-4410-1-git-send-email-wens@csie.org>
+ <1430410206-4410-4-git-send-email-wens@csie.org>
+Message-ID: <20150504125331.GB3274@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-04 20:34 GMT+09:00 Daniel Stone <daniel@fooishbar.org>:
-> Hi,
->
-> On 4 May 2015 at 08:43, Inki Dae <inki.dae@samsung.com> wrote:
->> On 2015? 05? 02? 13:08, Krzysztof Kozlowski wrote:
->>> Selecting CONFIG_FB_S3C disables CONFIG_DRM_EXYNOS_FIMD leading to build
->>> error:
->>
->> No, eDP has no any dependency of FIMD but DECON. Just add dependency
->> code like below,
->>
->>  config DRM_EXYNOS7_DECON
->>         bool "Exynos DRM DECON"
->> -       depends on DRM_EXYNOS
->> +       depends on DRM_EXYNOS && !FB_S3C
+On Fri, May 01, 2015 at 12:10:04AM +0800, Chen-Yu Tsai wrote:
+> This patch adds support for the PRCM on the A80 SoC. There is little
+> to no document for this at the moment. Only register offsets are
+> available. However with some testing, the clock and reset controls
+> seem to be the similar to the ones on the A31.
+> 
+> One thing that needs verifying is whether the apbs divider is the same
+> as the A31 or the A23. The lowest divider is different between those
+> 2 implementations.
 
-Actually my commit message was not detailed enough. The FB_S3C here
-won't solve the issue because you may:
-1, disable FIMD and FB_S3C,
-2, enabke DECON and DP,
-and it won't compile.
+Is this commit log still true now that we have access to documentation
+the PRCM?
 
-Currently the FIMD must be enabled if DRM_EXYNOS_DP is enabled.
+Thanks,
+Maxime
 
->
-> But it does clearly and explicitly call fimd_dp_clock_enable from
-> exynos_dp_powero{n,ff}. So the dependency you're proposing seems
-> backwards: it's not an expression of the requirements of the current
-> code (that FIMD DP code be available, i.e. CONFIG_DRM_EXYNOS_FIMD is
-> selected), but an indirect expression of another dependency
-> (CONFIG_FB_S3C disables CONFIG_DRM_EXYNOS_FIMD, so disable
-> CONFIG_FB_S3C).
->
-> Additionally, as the call comes from exynos_dp_core.c, which is built
-> by CONFIG_DRM_EXYNOS_DP (an explicitly user-selectable option), why
-> shouldn't the dependency be there? Ah, because the dependency on DP is
-> for (DECON || FIMD), but as DECON doesn't provide
-> fimd_dp_clock_enable(), it doesn't seem like it would compile if you
-> selected DECON and not FIMD.
->
-> So, for me, the cleanest solution would be config DRM_EXYNOS_DP gains
-> a hard dependency on DRM_EXYNOS_FIMD, at least until it can be fixed
-> to compile without FIMD.
-
-Right, you correctly pointed current dependencies. Still it looks little
-hacky because EXYNOS_DP may work with FIMD or DECON. It does not really
-need FIMD. Using ifdefs in headers is not uncommon - many core
-subsystems do this that way to provide stubs.
-
-Probably the cleanest way would be to provide by FIMD and DECON a common
-interface for DP for such operation, something like:
-struct exynos_drm_crtc {
-	struct drm_crtc                 base;
-	...
-	void (*clock_enable)(struct exynos_drm_crtc *crtc, bool enable)
-);
-
-which, if non-NULL, will be called by exynos_dp_core.c:
-static void exynos_dp_poweron(struct exynos_dp_device *dp)
-{
-	...
-	if (crtc->clock_enable)
-		crtc->clock_enable(crtc, true);
-}
-
-What do you think?
-
-Best regards,
-Krzysztof
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150504/022c3510/attachment.sig>
