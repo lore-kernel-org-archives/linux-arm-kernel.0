@@ -1,80 +1,97 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon,  4 May 2015 10:36:34 -0700
-Subject: [PATCH v8 1/9] xhci: Set shared HCD's hcd_priv in xhci_gen_setup
+Date: Mon,  4 May 2015 10:36:35 -0700
+Subject: [PATCH v8 2/9] mailbox: Make mbox_chan_ops const
 In-Reply-To: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
 References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1430761002-9327-2-git-send-email-abrestic@chromium.org>
+Message-ID: <1430761002-9327-3-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-xhci_gen_setup() sets the hcd_priv field for the primary HCD, but not
-for the shared HCD, requiring xHCI host-controller drivers to set it
-between usb_create_shared_hcd() and usb_add_hcd().  There's no reason
-xhci_gen_setup() can't set the shared HCD's hcd_priv as well, so move
-that bit out of the host-controller drivers and into xhci_gen_setup().
+The mailbox controller's channel ops ought to be read-only.  Update
+all the mailbox drivers to make their mbox_chan_ops const as well.
 
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-Cc: Mathias Nyman <mathias.nyman@intel.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jassi Brar <jassisinghbrar@gmail.com>
+Cc: Suman Anna <s-anna@ti.com>
+Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+Cc: Ley Foon Tan <lftan@altera.com>
 ---
-No changes from v5/v6/v7.
+Changes from v7:
+ - Constify all drivers' mbox_chan_ops.
+No changes from v5/v6.
 New for v5.
-Peviously posted here: https://lkml.org/lkml/2014/10/30/726
 ---
- drivers/usb/host/xhci-pci.c  | 5 -----
- drivers/usb/host/xhci-plat.c | 5 -----
- drivers/usb/host/xhci.c      | 6 +++---
- 3 files changed, 3 insertions(+), 13 deletions(-)
+ drivers/mailbox/arm_mhu.c          | 2 +-
+ drivers/mailbox/mailbox-altera.c   | 2 +-
+ drivers/mailbox/omap-mailbox.c     | 2 +-
+ drivers/mailbox/pcc.c              | 2 +-
+ include/linux/mailbox_controller.h | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
-index 2af32e2..f9ce741 100644
---- a/drivers/usb/host/xhci-pci.c
-+++ b/drivers/usb/host/xhci-pci.c
-@@ -247,11 +247,6 @@ static int xhci_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
- 		goto dealloc_usb2_hcd;
+diff --git a/drivers/mailbox/arm_mhu.c b/drivers/mailbox/arm_mhu.c
+index ac693c6..d9e99f9 100644
+--- a/drivers/mailbox/arm_mhu.c
++++ b/drivers/mailbox/arm_mhu.c
+@@ -110,7 +110,7 @@ static void mhu_shutdown(struct mbox_chan *chan)
+ 	free_irq(mlink->irq, chan);
+ }
+ 
+-static struct mbox_chan_ops mhu_ops = {
++static const struct mbox_chan_ops mhu_ops = {
+ 	.send_data = mhu_send_data,
+ 	.startup = mhu_startup,
+ 	.shutdown = mhu_shutdown,
+diff --git a/drivers/mailbox/mailbox-altera.c b/drivers/mailbox/mailbox-altera.c
+index a266265..bb682c9 100644
+--- a/drivers/mailbox/mailbox-altera.c
++++ b/drivers/mailbox/mailbox-altera.c
+@@ -285,7 +285,7 @@ static void altera_mbox_shutdown(struct mbox_chan *chan)
  	}
+ }
  
--	/* Set the xHCI pointer before xhci_pci_setup() (aka hcd_driver.reset)
--	 * is called by usb_add_hcd().
--	 */
--	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
--
- 	retval = usb_add_hcd(xhci->shared_hcd, dev->irq,
- 			IRQF_SHARED);
- 	if (retval)
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 783e819..852b1e9 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -147,11 +147,6 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
- 			(pdata && pdata->usb3_lpm_capable))
- 		xhci->quirks |= XHCI_LPM_SUPPORT;
--	/*
--	 * Set the xHCI pointer before xhci_plat_setup() (aka hcd_driver.reset)
--	 * is called by usb_add_hcd().
--	 */
--	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
+-static struct mbox_chan_ops altera_mbox_ops = {
++static const struct mbox_chan_ops altera_mbox_ops = {
+ 	.send_data = altera_mbox_send_data,
+ 	.startup = altera_mbox_startup,
+ 	.shutdown = altera_mbox_shutdown,
+diff --git a/drivers/mailbox/omap-mailbox.c b/drivers/mailbox/omap-mailbox.c
+index 0f332c1..03f8545 100644
+--- a/drivers/mailbox/omap-mailbox.c
++++ b/drivers/mailbox/omap-mailbox.c
+@@ -604,7 +604,7 @@ static int omap_mbox_chan_send_data(struct mbox_chan *chan, void *data)
+ 	return ret;
+ }
  
- 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
- 		xhci->shared_hcd->can_do_streams = 1;
-diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
-index ec8ac16..2901a67 100644
---- a/drivers/usb/host/xhci.c
-+++ b/drivers/usb/host/xhci.c
-@@ -4849,9 +4849,9 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
- 		 */
- 		hcd->has_tt = 1;
- 	} else {
--		/* xHCI private pointer was set in xhci_pci_probe for the second
--		 * registered roothub.
--		 */
-+		xhci = hcd_to_xhci(hcd->primary_hcd);
-+		*((struct xhci_hcd **) hcd->hcd_priv) = xhci;
-+
- 		return 0;
- 	}
+-static struct mbox_chan_ops omap_mbox_chan_ops = {
++static const struct mbox_chan_ops omap_mbox_chan_ops = {
+ 	.startup        = omap_mbox_chan_startup,
+ 	.send_data      = omap_mbox_chan_send_data,
+ 	.shutdown       = omap_mbox_chan_shutdown,
+diff --git a/drivers/mailbox/pcc.c b/drivers/mailbox/pcc.c
+index 7e91d68..26d121d 100644
+--- a/drivers/mailbox/pcc.c
++++ b/drivers/mailbox/pcc.c
+@@ -198,7 +198,7 @@ static int pcc_send_data(struct mbox_chan *chan, void *data)
+ 	return 0;
+ }
  
+-static struct mbox_chan_ops pcc_chan_ops = {
++static const struct mbox_chan_ops pcc_chan_ops = {
+ 	.send_data = pcc_send_data,
+ };
+ 
+diff --git a/include/linux/mailbox_controller.h b/include/linux/mailbox_controller.h
+index d4cf96f..68c4245 100644
+--- a/include/linux/mailbox_controller.h
++++ b/include/linux/mailbox_controller.h
+@@ -72,7 +72,7 @@ struct mbox_chan_ops {
+  */
+ struct mbox_controller {
+ 	struct device *dev;
+-	struct mbox_chan_ops *ops;
++	const struct mbox_chan_ops *ops;
+ 	struct mbox_chan *chans;
+ 	int num_chans;
+ 	bool txdone_irq;
 -- 
 2.2.0.rc0.207.ga3a616c
