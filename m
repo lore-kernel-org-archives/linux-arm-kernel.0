@@ -1,89 +1,67 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 04 May 2015 10:16:10 +0200
-Subject: [PATCH v6 15/25] iommu: exynos: document internal structures
+Date: Mon, 04 May 2015 10:16:13 +0200
+Subject: [PATCH v6 18/25] iommu: exynos: add callback for initializing devices
+ from device tree
 In-Reply-To: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
 References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1430727380-10912-16-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1430727380-10912-19-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a few words of comment to all internal structures used by the driver.
+This patch adds implementation of of_xlate callback, which prepares
+masters device for attaching to IOMMU. This callback is called during
+creating devices from device tree.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 49 +++++++++++++++++++++++++++++---------------
- 1 file changed, 33 insertions(+), 16 deletions(-)
+ drivers/iommu/exynos-iommu.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 67e0633b8080..6a0199570b00 100644
+index 94fbd870ede6..6e6b502ee2c9 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -184,33 +184,50 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
- 	"UNKNOWN FAULT"
+@@ -1082,6 +1082,33 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *iommu_domain,
+ 	return phys;
+ }
+ 
++static int exynos_iommu_of_xlate(struct device *dev,
++				 struct of_phandle_args *spec)
++{
++	struct exynos_iommu_owner *owner = dev->archdata.iommu;
++	struct platform_device *sysmmu = of_find_device_by_node(spec->np);
++	struct sysmmu_drvdata *data;
++
++	if (!sysmmu)
++		return -ENODEV;
++
++	data = platform_get_drvdata(sysmmu);
++	if (!data)
++		return -ENODEV;
++
++	if (!owner) {
++		owner = kzalloc(sizeof(*owner), GFP_KERNEL);
++		if (!owner)
++			return -ENOMEM;
++
++		INIT_LIST_HEAD(&owner->clients);
++		dev->archdata.iommu = owner;
++	}
++
++	list_add_tail(&data->owner_node, &owner->clients);
++	return 0;
++}
++
+ static struct iommu_ops exynos_iommu_ops = {
+ 	.domain_alloc = exynos_iommu_domain_alloc,
+ 	.domain_free = exynos_iommu_domain_free,
+@@ -1092,6 +1119,7 @@ static struct iommu_ops exynos_iommu_ops = {
+ 	.map_sg = default_iommu_map_sg,
+ 	.iova_to_phys = exynos_iommu_iova_to_phys,
+ 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
++	.of_xlate = exynos_iommu_of_xlate,
  };
  
--/* attached to dev.archdata.iommu of the master device */
-+/*
-+ * This structure is attached to dev.archdata.iommu of the master device
-+ * on device add, contains a list of SYSMMU controllers defined by device tree,
-+ * which are bound to given master device. It is usually referenced by 'owner'
-+ * pointer.
-+*/
- struct exynos_iommu_owner {
--	struct list_head clients;
-+	struct list_head clients; /* list of sysmmu_drvdata.owner_node */
- };
- 
-+/*
-+ * This structure exynos specific generalization of struct iommu_domain.
-+ * It contains list of SYSMMU controllers from all master devices, which has
-+ * been attached to this domain and page tables of IO address space defined by
-+ * it. It is usually referenced by 'domain' pointer.
-+ */
- struct exynos_iommu_domain {
--	struct list_head clients; /* list of sysmmu_drvdata.node */
-+	struct list_head clients; /* list of sysmmu_drvdata.domain_node */
- 	sysmmu_pte_t *pgtable; /* lv1 page table, 16KB */
- 	short *lv2entcnt; /* free lv2 entry counter for each section */
--	spinlock_t lock; /* lock for this structure */
-+	spinlock_t lock; /* lock for modyfying list of clients */
- 	spinlock_t pgtablelock; /* lock for modifying page table @ pgtable */
- 	struct iommu_domain domain; /* generic domain data structure */
- };
- 
-+/*
-+ * This structure hold all data of a single SYSMMU controller, this includes
-+ * hw resources like registers and clocks, pointers and list nodes to connect
-+ * it to all other structures, internal state and parameters read from device
-+ * tree. It is usually referenced by 'data' pointer.
-+ */
- struct sysmmu_drvdata {
--	struct device *sysmmu;	/* System MMU's device descriptor */
--	struct device *master;	/* Owner of system MMU */
--	void __iomem *sfrbase;
--	struct clk *clk;
--	struct clk *clk_master;
--	int activations;
--	spinlock_t lock;
--	struct exynos_iommu_domain *domain;
--	struct list_head domain_node;
--	struct list_head owner_node;
--	phys_addr_t pgtable;
--	int version;
-+	struct device *sysmmu; /* SYSMMU controller device */
-+	struct device *master; /* master device (owner of given SYSMMU) */
-+	void __iomem *sfrbase; /* our registers */
-+	struct clk *clk; /* SYSMMU's clock */
-+	struct clk *clk_master; /* master's device clock */
-+	int activations; /* number of calls to sysmmu_enable */
-+	spinlock_t lock; /* lock for modyfying enable/disable state */
-+	struct exynos_iommu_domain *domain; /* domain we belong to */
-+	struct list_head domain_node; /* node for domain clients list */
-+	struct list_head owner_node; /* node for owner clients list */
-+	phys_addr_t pgtable; /* assigned page table structure */
-+	int version; /* our version */
- };
- 
- static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
+ static bool init_done;
 -- 
 1.9.2
