@@ -1,99 +1,44 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 4 May 2015 16:16:10 +0800
-Subject: [PATCH RFC v1 3/5] clk: remove unneeded __clk_enable and
- __clk_disable
-In-Reply-To: <20150430220548.GA31047@codeaurora.org>
-References: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
- <1429107999-24413-4-git-send-email-aisheng.dong@freescale.com>
- <55427DDE.4090907@codeaurora.org> <20150430220548.GA31047@codeaurora.org>
-Message-ID: <20150504081609.GB4082@shlinux1.ap.freescale.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 4 May 2015 10:33:12 +0200
+Subject: [PATCH] i2c: rk3x: Increase wait timeout to 1 second
+In-Reply-To: <1430430247-9632-1-git-send-email-dianders@chromium.org>
+References: <1430430247-9632-1-git-send-email-dianders@chromium.org>
+Message-ID: <20150504083312.GN25193@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 03:05:48PM -0700, Stephen Boyd wrote:
-> On 04/30, Stephen Boyd wrote:
-> > On 04/15/15 07:26, Dong Aisheng wrote:
-> > > The only thing __clk_enable/__clk_disable does is NULL pointer checking
-> > > of clk except calling clk_core_{enable|disable} which is already handled
-> > > by clk_core_{enable|disable}.
-> > > So remove this unneeded function.
-> > >
-> > > Cc: Mike Turquette <mturquette@linaro.org>
-> > > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
-> > > ---
-> > 
-> > No. You can call clk_enable() and clk_disable() with NULL and it should
-> > be a no-op. With this change it would cause a NULL pointer exception.
-> > 
+On Thu, Apr 30, 2015 at 02:44:07PM -0700, Doug Anderson wrote:
+> While it's not sensible for an i2c command to _actually_ need more
+> than 200ms to complete, let's increase the timeout anyway.  Why?  It
+> turns out that if you've got a large number of printks going out to a
+> serial console, interrupts on a CPU can be disabled for hundreds of
+> milliseconds. That's not a great situation to be in to start with
+> (maybe we should put a cap in vprintk_emit()) but it's pretty annoying
+> to start seeing unexplained i2c timeouts.
 > 
-> Here's the proper patch. I'll leave you as author.
-> 
+> A normal system shouldn't see i2c timeouts anyway, so increasing the
+> timeout should help people debugging without hurting other people
+> excessively.
+Hmm, correct me if I'm wrong: You say that the following can happen:
 
-Got your point.
-Thanks for the change.
+	rk3x_i2c_xfer calls wait_event_timeout and blocks
+	schedule ... disable_irqs ... xfer complete ... do some work ... enable_irqs
+	control back to i2c driver after timeout elapsed
+	wait_event_timeout returned 0
 
-Regards
-Dong Aisheng
+The documentation of wait_event_timeout tells:
 
-> ---8<---
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 0227ac3d5b1a..e45255226ffa 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1023,14 +1023,6 @@ static void clk_core_disable(struct clk_core *core)
->  	clk_core_disable(core->parent);
->  }
->  
-> -static void __clk_disable(struct clk *clk)
-> -{
-> -	if (!clk)
-> -		return;
-> -
-> -	clk_core_disable(clk->core);
-> -}
-> -
->  /**
->   * clk_disable - gate a clock
->   * @clk: the clk being gated
-> @@ -1051,7 +1043,7 @@ void clk_disable(struct clk *clk)
->  		return;
->  
->  	flags = clk_enable_lock();
-> -	__clk_disable(clk);
-> +	clk_core_disable(clk->core);
->  	clk_enable_unlock(flags);
->  }
->  EXPORT_SYMBOL_GPL(clk_disable);
-> @@ -1089,14 +1081,6 @@ static int clk_core_enable(struct clk_core *core)
->  	return 0;
->  }
->  
-> -static int __clk_enable(struct clk *clk)
-> -{
-> -	if (!clk)
-> -		return 0;
-> -
-> -	return clk_core_enable(clk->core);
-> -}
-> -
->  /**
->   * clk_enable - ungate a clock
->   * @clk: the clk being ungated
-> @@ -1115,8 +1099,11 @@ int clk_enable(struct clk *clk)
->  	unsigned long flags;
->  	int ret;
->  
-> +	if (!clk)
-> +		return 0;
-> +
->  	flags = clk_enable_lock();
-> -	ret = __clk_enable(clk);
-> +	ret = clk_core_enable(clk->core);
->  	clk_enable_unlock(flags);
->  
->  	return ret;
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+ * Returns:
+ * 0 if the @condition evaluated to %false after the @timeout elapsed,
+ * 1 if the @condition evaluated to %true after the @timeout elapsed,
+ * or the remaining jiffies (at least 1) if the @condition evaluated
+ * to %true before the @timeout elapsed.
+
+Where is the misunderstanding?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
