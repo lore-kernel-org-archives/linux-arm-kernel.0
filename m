@@ -1,23 +1,22 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 4 May 2015 14:34:11 +0900
-Subject: multi_v7_defconfig failure on socfpga
-In-Reply-To: <5546FEB0.8070902@opensource.altera.com>
-References: <5546FEB0.8070902@opensource.altera.com>
-Message-ID: <CAJKOXPfN1MBzqyDxZM+9yiZU2p9e2igNWLa0UrrRZrU5dAyJnQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 4 May 2015 11:08:51 +0530
+Subject: [PATCH v5 3/8] dmaengine: Add driver for TI DMA crossbar on DRA7x
+In-Reply-To: <1428572154-3548-4-git-send-email-peter.ujfalusi@ti.com>
+References: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
+ <1428572154-3548-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20150504053851.GY3521@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-04 14:08 GMT+09:00 Dinh Nguyen <dinguyen@opensource.altera.com>:
-> Hi Olof,
->
-> Just wanted to drop you a note on the failure on the SoCFPGA for
-> multi_v7_defconfig. I have posted a patch that should fix the failure.
->
-> https://lkml.org/lkml/2015/5/4/3
+On Thu, Apr 09, 2015 at 12:35:49PM +0300, Peter Ujfalusi wrote:
+> +int omap_dmaxbar_init(void)
+> +{
+> +	return platform_driver_register(&ti_dma_xbar_driver);
+> +}
+> +arch_initcall(omap_dmaxbar_init);
+All looks fine except this bit, I think I did point out this last time as
+well, though dont recall your answer. We rather depend on defered probe and
+not rely on module ordering.
 
-The patch does not mention anything about failure. Neither this
-email... except that there is some kind of issue. Could you describe
-it?
-
-Best regards,
-Krzysztof
+-- 
+~Vinod
