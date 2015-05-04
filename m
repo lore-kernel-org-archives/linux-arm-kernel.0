@@ -1,48 +1,74 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 4 May 2015 11:25:03 +0530
-Subject: [PATCH v5] dmaengine: xgene-dma: Fix sparse wannings warnings
-In-Reply-To: <1429790205-13571-1-git-send-email-rsahu@apm.com>
-References: <1429790205-13571-1-git-send-email-rsahu@apm.com>
-Message-ID: <20150504055503.GA3521@localhost>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Mon, 04 May 2015 08:59:03 +0300
+Subject: [PATCHv7 8/8] watchdog: omap_wdt: Convert to use new core
+ extensions
+In-Reply-To: <20150503185601.GD25193@pengutronix.de>
+References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
+ <1429701102-22320-9-git-send-email-timo.kokkonen@offcode.fi>
+ <20150503185601.GD25193@pengutronix.de>
+Message-ID: <55470AA7.9050605@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 23, 2015 at 05:26:45PM +0530, Rameshwar Prasad Sahu wrote:
+Hi, 03.05.2015 21:56, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Wed, Apr 22, 2015 at 02:11:42PM +0300, Timo Kokkonen wrote:
+>> Use the new watchdog core extensions to let watchdog core take over
+>> boot time watchdog behavior. The difference is that early-timeout-sec
+>> device tree property becomes available for this driver and a running
+>> watchdog is not stopped unless the core decides to stop it.
+>>
+>> Omap watchdog is running by default in the boot up but bootloader
+>> might have stopped it. Therefore we fill the WDOG_HW_RUNNING_AT_BOOT
+>> bit depending on the actual watchdog state so that the watchdog core
+>> can act properly.
+>>
+>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+>> ---
+>>   drivers/watchdog/omap_wdt.c | 28 +++++++++++++++++++++++++++-
+>>   1 file changed, 27 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+>> index bbaf39a..7164f2e 100644
+>> --- a/drivers/watchdog/omap_wdt.c
+>> +++ b/drivers/watchdog/omap_wdt.c
+>> @@ -78,6 +78,13 @@ static void omap_wdt_reload(struct omap_wdt_dev *wdev)
+>>   	/* reloaded WCRR from WLDR */
+>>   }
+>>
+>> +static int omap_wdt_is_running(struct omap_wdt_dev *wdev)
+>> +{
+>> +	void __iomem *base = wdev->base;
+>> +
+>> +	return readl_relaxed(base + OMAP_WATCHDOG_SPR) == 0x4444;
+>> +}
+> This isn't reliable. The sequence needed to enable the watchdog is
+> 	writel(0xbbbb, base + OMAP_WATCHDOG_SPR);
+> 	writel(0x4444, base + OMAP_WATCHDOG_SPR);
+>
+> The sequence to stop is:
+> 	writel(0xaaaa, base + OMAP_WATCHDOG_SPR);
+> 	writel(0x5555, base + OMAP_WATCHDOG_SPR);
+>
+> But:
+>
+> barebox at TI AM335x BeagleBone black:/ md 0x44e35048+4
+> 44e35048: 00005555                                           UU..
+> barebox at TI AM335x BeagleBone black:/ mw 0x44e35048 0x4444
+> barebox at TI AM335x BeagleBone black:/ md 0x44e35048+4
+> 44e35048: 00004444                                           DD..
+>
+> So the register contains 0x4444 but the timer doesn't run. So at best
+> testing for 0x4444 is a good heuristic.
 
-Suject line should mention the fixes you are doing and not tool!
-> v5 changes:
-> 	* Re-pull v3 changes that I missed in v4
-> 
-> v4 changes:
-> 	* Re-generate patch on top of latest for-linux git
-> 
-> v3 changes:
-> 	* Minor changes in length setting in DMA descriptor
-> 
-> v2 changes:
-> 	* Code cleanup
-> 	* Changed way of setting DMA descriptors for big-endian
-This is *not* supposed to be part of changelog!
+Yeah.. I don't think we can get any better than that. Unless we start 
+checking the counter register and see whether it really counts or not, 
+and I think that's a bit overkill.. So I'd say we should be safe when 
+assuming bootloader is doing things correctly. Although, we could add a 
+comment to the code that the test may not be 100% reliable in case the 
+start sequence have not been issued properly.
 
-You can add this after the S-O-B line!!
-> 
-> This patch fixes compilation sparse warnings like incorrect type in assignment
-> (different base types), cast to restricted __le64, symbol
-> '__UNIQUE_ID_author__COUNTER__' has multiple initializers etc.
-> 
-> This patch is based on slave-dma / for-linus branch.
-> (commit: 11ebe4c067c7f95adff73594cb5c23f7a5c6d69e
-> 	dmaengine: fix platform_no_drv_owner.cocci warnings
-this too :(
-> 
-> Reported-by: kbuild test robot <fengguang.wu@intel.com>
-> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+Thanks for pointing this out!
 
-> 
->  MODULE_DESCRIPTION("APM X-Gene SoC DMA driver");
->  MODULE_AUTHOR("Rameshwar Prasad Sahu <rsahu@apm.com>");
-> -MODULE_AUTHOR("Loc Ho <lho@apm.com>");
-Pls drop this
-
--- 
-~Vinod
+-Timo
