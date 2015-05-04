@@ -1,206 +1,227 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 May 2015 14:24:57 -0700
-Subject: EDMA oftree entry for AM335x
-In-Reply-To: <20150504211150.GU15254@pengutronix.de>
-References: <20150504064323.GU15254@pengutronix.de>
- <20150504141103.GD24469@atomide.com>
- <20150504211150.GU15254@pengutronix.de>
-Message-ID: <20150504212457.GB4810@atomide.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 4 May 2015 23:29:47 +0200
+Subject: [PATCH 1/2] reset: add driver for lpc18xx rgu
+In-Reply-To: <1430726427.3722.15.camel@pengutronix.de>
+References: <1430173843-11648-1-git-send-email-manabian@gmail.com>
+ <1430173843-11648-2-git-send-email-manabian@gmail.com>
+ <1430726427.3722.15.camel@pengutronix.de>
+Message-ID: <CAGhQ9VzBEmTSQU9cz3XoPnh3Lz1rJrbWowp-N9YK6F-DH8ir4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Schwebel <r.schwebel@pengutronix.de> [150504 14:13]:
-> Hi Tony,
-> 
-> On Mon, May 04, 2015 at 07:11:03AM -0700, Tony Lindgren wrote:
-> > Adding Peter to Cc as well.
-> 
-> You didn't :)
+On 4 May 2015 at 10:00, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Hi Joachim,
+>
+> thank you for the patch! Some comments below:
+>
+> Am Dienstag, den 28.04.2015, 00:30 +0200 schrieb Joachim Eastwood:
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> ---
+>>  drivers/reset/Makefile        |   1 +
+>>  drivers/reset/reset-lpc18xx.c | 260 ++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 261 insertions(+)
+>>  create mode 100644 drivers/reset/reset-lpc18xx.c
+>>
+>> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+>> index 157d421f755b..1d41feeb2dce 100644
+>> --- a/drivers/reset/Makefile
+>> +++ b/drivers/reset/Makefile
+>> @@ -1,4 +1,5 @@
+>>  obj-$(CONFIG_RESET_CONTROLLER) += core.o
+>> +obj-$(CONFIG_ARCH_LPC18XX) += reset-lpc18xx.o
+>>  obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+>>  obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
+>>  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+>> diff --git a/drivers/reset/reset-lpc18xx.c b/drivers/reset/reset-lpc18xx.c
+>> new file mode 100644
+>> index 000000000000..9564d78ab9d2
+>> --- /dev/null
+>> +++ b/drivers/reset/reset-lpc18xx.c
+>> @@ -0,0 +1,260 @@
+>> +/*
+>> + * Reset driver for NXP LPC18xx/43xx Reset Generation Unit (RGU).
+>> + *
+>> + * Copyright (C) 2014 Joachim Eastwood <manabian@gmail.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/reboot.h>
+>> +#include <linux/reset-controller.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/types.h>
+>> +
+>> +#include <asm/system_misc.h>
+>
+> Are all of these necessary? I don't see why of_address.h and
+> system_misc.h are included, for example.
 
-Trying again :)
-  
-> > > The patch description says the device should be split into more devices instead
-> > > of specifying several ti,hwmods entries, but unfortunately the Documentation
-> > > still suggests the above format in Documentation/devicetree/bindings/dma/ti-edma.txt.
-> > > 
-> > > How would a correct entry look like?
-> > 
-> > Each tptc instance has it's own sysconfig register. This means each
-> > one of them can be clocked and idled independently. They should be
-> > treated as separate device instances. I believe the interrupts all
-> > belong to the tpcc, which should be also treated as a separate
-> > device instance.
-> > 
-> > In order to get rid of the ti,hwmods property, we want to have a
-> > 1-1-1 mapping of the compatible property, ti,hwmod property, and
-> > the device entry.
-> > 
-> > Looking at the TRM "Table 2-1. L3 Memory Map", these all are on
-> > the L3, so they should be like this for now (assuming the
-> > interrupts all belong to tpcc):
-> > 
-> > ocp {
-> > 	...
-> > 
-> > 	edma: tpcc at 49000000 {
-> > 		compatible = "ti,edma3";
-> > 		ti,hwmods = "tpcc"; 
-> > 		reg = <0x49000000 0x10000>;
-> > 		interrupts = <12 13 14>;
-> > 		#dma-cells = <1>;
-> > 	};
-> > 
-> > 	tptc0: tptc at 49800000 {
-> > 		compatible = "ti,tptc3";
-> > 		ti,hwmods = "tptc0";
-> > 		reg = <0x49800000 0x10000>;
-> > 	};
-> > 
-> > 	tptc1: tptc at 49900000 {
-> > 		compatible = "ti,tptc3";
-> > 		ti,hwmods = "tptc1";
-> > 		reg = <0x49900000 0x10000>;
-> > 	};
-> > 
-> > 	tptc2: tptc at 49a00000 {
-> > 		compatible = "ti,tptc3";
-> > 		ti,hwmods = "tptc2";
-> > 		reg = <0x49a00000 0x10000>;
-> > 	};
-> > 	...
-> > };
-> 
-> I tried this, with the patch below, but it doesn't work:
+You are right, I'll clean them up.
 
-With the above the tptc instances are being probed as separate
-device entries that do not register with tpcc without the
-related driver changes. I don't think we even parse the
-compatible = "ti,tptc3" property currently.
+>> +/* LPC18xx RGU registers */
+>> +#define LPC18XX_RGU_CTRL0            0x100
+>> +#define LPC18XX_RGU_CTRL1            0x104
+>> +#define LPC18XX_RGU_ACTIVE_STATUS0   0x150
+>> +#define LPC18XX_RGU_ACTIVE_STATUS1   0x154
+>> +
+>> +#define LPC18XX_RGU_RESETS_PER_REG   32
+>> +
+>> +/* Internal reset outputs */
+>> +#define LPC18XX_RGU_CORE_RST 0
+>> +#define LPC18XX_RGU_M0SUB_RST        12
+>> +#define LPC18XX_RGU_M0APP_RST        56
+>
+> In the LPC18xx User Manual these are marked as reserved, I think using
+> the LPC43XX_ prefix here could avoid confusion. Or are there also
+> LPC18xx that have these reset lines?
 
-Regards,
+No, they are only used on the 43xx series. I'll change the prefix.
 
-Tony
- 
-> ----------8<---------- Output with 4.1-rc1 vanilla ----------8<----------
-> 
-> Loading ARM Linux zImage '/mnt/mmc0.1//boot/zImage'
-> Loading devicetree from '/mnt/mmc0.1//boot/am335x-afi-gf.dtb'
-> commandline: console=ttyO2,115200n8     root=/dev/mmcblk0p2 rootfstype=ext4 rootwait loglevel=6
-> [    0.000000] Linux version 4.1.0-rc1 (rsc at callisto) (gcc version 4.8.3 20131111 (prerelease) (OSELAS.Toolchain-2013.12.2 linaro-4.8-2013.11) ) #9 PREEMPT Mon May 4 22:24:41 CEST 2015
-> [    0.000000] earlycon: no match for ttyO2,115200n8
-> [    0.000000] Kernel command line: console=ttyO2,115200n8     root=/dev/mmcblk0p2 rootfstype=ext4 rootwait loglevel=6
-> [    0.000000] Virtual kernel memory layout:
-> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-> [    0.000000]     vmalloc : 0xd0800000 - 0xff000000   ( 744 MB)
-> [    0.000000]     lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
-> [    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-> [    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-> [    0.000000]       .text : 0xc0008000 - 0xc0674ed4   (6580 kB)
-> [    0.000000]       .init : 0xc0675000 - 0xc06b2000   ( 244 kB)
-> [    0.000000]       .data : 0xc06b2000 - 0xc06fd3e8   ( 301 kB)
-> [    0.000000]        .bss : 0xc0700000 - 0xc073a5d8   ( 234 kB)
-> [    0.145038] omap_hwmod: tptc0 using broken dt data from edma
-> [    0.145247] omap_hwmod: tptc1 using broken dt data from edma
-> [    0.145425] omap_hwmod: tptc2 using broken dt data from edma
-> [    0.151051] omap_hwmod: debugss: _wait_target_disable failed
-> [    0.323079] SCSI subsystem initialized
-> [    0.356218] NFS: Registering the id_resolver key type
-> [    0.356339] Key type id_resolver registered
-> [    0.356354] Key type id_legacy registered
-> [    0.518782] 47401300.usb-phy supply vcc not found, using dummy regulator
-> [    0.532356] 47401b00.usb-phy supply vcc not found, using dummy regulator
-> [    0.554370] Key type dns_resolver registered
-> [    0.559333] omap_voltage_late_init: Voltage driver support not added
-> [    0.775905] mmc0: host does not support reading read-only switch, assuming write-enable
-> [    1.140875] musb-hdrc musb-hdrc.0.auto: VBUS_ERROR in a_wait_vrise (80, <SessEnd), retry #3, port1 0008010c
-> [    1.561977] random: systemd urandom read with 17 bits of entropy available
-> 
-> Welcome to PTXdist / af inventions-GF!
-> 
-> <userspace starts>
-> 
-> ----------8<---------- Output with patch ----------8<----------
-> 
-> [    0.000000] Linux version 4.1.0-rc1+ (rsc at callisto) (gcc version 4.8.3 20131111 (prerelease) (OSELAS.Toolchain-2013.12.2 linaro-4.8-2013.11) ) #10 PREEMPT Mon May 4 23:03:27 CEST 2015
-> [    0.000000] earlycon: no match for ttyO2,115200n8
-> [    0.000000] Kernel command line: console=ttyO2,115200n8     root=/dev/mmcblk0p2 rootfstype=ext4 rootwait loglevel=6
-> [    0.000000] Virtual kernel memory layout:
-> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-> [    0.000000]     vmalloc : 0xd0800000 - 0xff000000   ( 744 MB)
-> [    0.000000]     lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
-> [    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-> [    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-> [    0.000000]       .text : 0xc0008000 - 0xc0674ed4   (6580 kB)
-> [    0.000000]       .init : 0xc0675000 - 0xc06b2000   ( 244 kB)
-> [    0.000000]       .data : 0xc06b2000 - 0xc06fd3e8   ( 301 kB)
-> [    0.000000]        .bss : 0xc0700000 - 0xc073a5d8   ( 234 kB)
-> [    0.151101] omap_hwmod: debugss: _wait_target_disable failed
-> [    0.278517] edma 49000000.tpcc: failed to get DT data
-> [    0.278670] edma: probe of 49000000.tpcc failed with error -12
-> [    0.312864] SCSI subsystem initialized
-> [    0.345860] NFS: Registering the id_resolver key type
-> [    0.345977] Key type id_resolver registered
-> [    0.345992] Key type id_legacy registered
-> [    0.493001] spi spi1.0: not using DMA for McSPI
-> [    0.498211] spi spi1.1: not using DMA for McSPI
-> [    0.511199] 47401300.usb-phy supply vcc not found, using dummy regulator
-> [    0.524715] 47401b00.usb-phy supply vcc not found, using dummy regulator
-> [    0.546556] Key type dns_resolver registered
-> [    0.551522] omap_voltage_late_init: Voltage driver support not added
-> [    0.644175] omap_hsmmc 48060000.mmc: unable to obtain RX DMA engine channel 3473832464
-> [    1.133193] musb-hdrc musb-hdrc.0.auto: VBUS_ERROR in a_wait_vrise (80, <SessEnd), retry #3, port1 0008010c
-> 
-> <hangs>
-> 
-> ----------8<---------- patch ----------8<----------
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 21fcc44..34eb437 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -156,15 +156,32 @@
->  			reg = <0x48200000 0x1000>;
->  		};
->  
-> -		edma: edma at 49000000 {
-> +		edma: tpcc at 49000000 {
->  			compatible = "ti,edma3";
-> -			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-> -			reg =	<0x49000000 0x10000>,
-> -				<0x44e10f90 0x40>;
-> +			ti,hwmods = "tpcc";
-> +			reg = <0x49000000 0x10000>;
->  			interrupts = <12 13 14>;
->  			#dma-cells = <1>;
->  		};
->  
-> +		tptc0: tptc at 49800000 {
-> +			compatible = "ti,tptc3";
-> +			ti,hwmods = "tptc0";
-> +			reg = <0x49800000 0x10000>;
-> +		};
-> +
-> +		tptc1: tptc at 49900000 {
-> +			compatible = "ti,tptc3";
-> +			ti,hwmods = "tptc1";
-> +			reg = <0x49900000 0x10000>;
-> +		};
-> +
-> +		tptc2: tptc at 49a00000 {
-> +			compatible = "ti,tptc3";
-> +			ti,hwmods = "tptc2";
-> +			reg = <0x49a00000 0x10000>;
-> +		};
-> +
->  		gpio0: gpio at 44e07000 {
->  			compatible = "ti,omap4-gpio";
->  			ti,hwmods = "gpio1";
-> 
-> rsc
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I'll also add some comments in the DT doc on which reset lines that
+are available on the different devices.
+
+>> +
+>> +struct lpc18xx_rgu_data {
+>> +     struct reset_controller_dev rcdev;
+>> +     struct clk *clk_delay;
+>> +     struct clk *clk_reg;
+>> +     void __iomem *base;
+>> +     spinlock_t lock;
+>> +     u32 delay_us;
+>> +};
+>> +
+>> +#define to_rgu_data(rcdev) container_of(rcdev, struct lpc18xx_rgu_data, rcdev)
+>> +
+>> +static void __iomem *rgu_base;
+>> +
+>> +static int lpc18xx_rgu_restart(struct notifier_block *this, unsigned long mode,
+>> +                            void *cmd)
+>> +{
+>> +     writel(BIT(LPC18XX_RGU_CORE_RST), rgu_base + LPC18XX_RGU_CTRL0);
+>> +     mdelay(2000);
+>> +
+>> +     pr_emerg("%s: unable to restart system\n", __func__);
+>> +
+>> +     return NOTIFY_DONE;
+>> +}
+>> +
+>> +static struct notifier_block lpc18xx_rgu_restart_nb = {
+>> +     .notifier_call = lpc18xx_rgu_restart,
+>> +     .priority = 192,
+>> +};
+>> +
+>> +/*
+>> + * The LPC18xx RGU has mostly self-deasserting resets except for the
+>> + * two reset lines going to the internal Cortex-M0 cores.
+>> + *
+>> + * To prevent the M0 cores from accidentally getting deasserting the
+>
+> "To prevent the M0 core resets from accidentally getting deasserted" ?
+
+That sounds better. I'll use it in the next version.
+
+>> + * status register must be check and bits in control register set to
+>> + * preserve the state.
+>> + */
+>> +static void lpc18xx_rgu_setclear_reset(struct reset_controller_dev *rcdev,
+>> +                                    unsigned long id, bool set)
+>> +{
+>> +     struct lpc18xx_rgu_data *rc = to_rgu_data(rcdev);
+>> +     u32 stat_offset = LPC18XX_RGU_ACTIVE_STATUS0;
+>> +     u32 ctrl_offset = LPC18XX_RGU_CTRL0;
+>> +     unsigned long flags;
+>> +     u32 stat, rst_bit;
+>> +
+>> +     stat_offset += (id / LPC18XX_RGU_RESETS_PER_REG) * sizeof(u32);
+>> +     ctrl_offset += (id / LPC18XX_RGU_RESETS_PER_REG) * sizeof(u32);
+>> +     rst_bit = 1 << (id % LPC18XX_RGU_RESETS_PER_REG);
+>> +
+>> +     spin_lock_irqsave(&rc->lock, flags);
+>> +     stat = ~readl(rc->base + stat_offset);
+>> +     if (set)
+>> +             writel(stat | rst_bit, rc->base + ctrl_offset);
+>> +     else
+>> +             writel(stat & ~rst_bit, rc->base + ctrl_offset);
+>> +     spin_unlock_irqrestore(&rc->lock, flags);
+>> +}
+>> +
+>> +static int lpc18xx_rgu_reset(struct reset_controller_dev *rcdev,
+>> +                          unsigned long id)
+>> +{
+>> +     struct lpc18xx_rgu_data *rc = to_rgu_data(rcdev);
+>> +
+>> +     lpc18xx_rgu_setclear_reset(rcdev, id, true);
+>> +     udelay(rc->delay_us);
+>> +
+>> +     return 0;
+>> +}
+>
+> This is missing a deassert for the M0 resets, see below.
+>
+>> +
+>> +static int lpc18xx_rgu_assert(struct reset_controller_dev *rcdev,
+>> +                           unsigned long id)
+>> +{
+>> +     return lpc18xx_rgu_reset(rcdev, id);
+>> +}
+>
+> lpc18xx_rgu_assert shouldn't include the delay. Could you have
+> lpc18xx_rgu_assert call lpc18xx_rgu_setclear_reset directly?
+
+I agree. I'll change it.
+
+> Let lpc18xx_rgu_reset then call lpc18xx_rgu_assert, udelay, and
+> lpc18xx_rgu_deassert.
+
+Ok, that does indeed sound like a better call chain. I'll reorganize
+the code a bit.
+
+> Or could you wait for the active status bit to
+> clear instead of the fixed delay for the self-clearing resets?
+
+I am not sure. The manual explicitly mentions a software delay.
+
+>From manual:
+  Remark: The reset delay is counted in IRC clock cycles. If the
+  core frequency CCLK is much higher than the IRC frequency, add
+  a software delay of fCCLK/fIRC clock cycles between resetting
+  and accessing any of the peripheral blocks.
+
+So I think it's best to keep using the delay.
+
+>> +/* Only M0 cores require explicit reset deassert */
+>> +static int lpc18xx_rgu_deassert(struct reset_controller_dev *rcdev,
+>> +                             unsigned long id)
+>> +{
+>> +     switch (id) {
+>> +     case LPC18XX_RGU_M0SUB_RST:
+>> +     case LPC18XX_RGU_M0APP_RST:
+>> +             lpc18xx_rgu_setclear_reset(rcdev, id, false);
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>
+> If writing 0 to the self-clearing reset bits does nothing,
+> lpc18xx_rgu_setclear_reset(... false) could be called unconditionally.
+
+I added the check to document that the M0 reset are special. The next
+version of the patch set will move it around a bit. If you still don't
+like it can remove it then.
+
+
+Thanks for your time reviewing.
+
+regards,
+Joachim Eastwood
