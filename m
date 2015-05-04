@@ -1,71 +1,43 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 May 2015 09:26:09 -0700
-Subject: [PATCH] ARM: dts: dra7: Fix efuse register size for ABB
-In-Reply-To: <1429221394-18896-1-git-send-email-nm@ti.com>
-References: <1429221394-18896-1-git-send-email-nm@ti.com>
-Message-ID: <20150504162609.GN24469@atomide.com>
+Date: Mon, 4 May 2015 09:27:32 -0700
+Subject: [PATCH] bus: omap_l3_noc: Fix offset for DRA7 CLK1_HOST_CLK1_2
+ instance
+In-Reply-To: <1429224150-28712-1-git-send-email-nm@ti.com>
+References: <1429224150-28712-1-git-send-email-nm@ti.com>
+Message-ID: <20150504162731.GO24469@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [150416 14:57]:
-> Fix a typo in DRA7 dtsi where 12 bytes are needed for register
-> description of ABB efuse registers, however only 8 bytes are provided
-> to map. For some weird reason, this does not generate abort at offset
-> 0x8, probably due to default maps already provided in io.c for the bus
-> register ranges.
+* Nishanth Menon <nm@ti.com> [150416 15:43]:
+> From: Illia Smyrnov <illia.smyrnov@globallogic.com>
 > 
-> Reported-by: Matt Gessner <Matt.Gessner@windriver.com>
-> Reported-by: Suman Anna <s-anna@ti.com>
+> The base address for DRA7 CLK1_HOST_CLK1_2 host instance is
+> 0x44800000, so correct offset is 0x800000. DRA7 TRM rev X(fewb 2015)
+> has updates for this information.
+> 
+> With wrong offset these errors are not correctly cleared by the L3
+> IRQ handler and cause an continuous interrupt scenario and system lockup.
+> 
+> Signed-off-by: Illia Smyrnov <illia.smyrnov@globallogic.com>
 > Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  drivers/bus/omap_l3_noc.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
+> index 95254585db86..a314d800f394 100644
+> --- a/drivers/bus/omap_l3_noc.h
+> +++ b/drivers/bus/omap_l3_noc.h
+> @@ -274,7 +274,7 @@ static struct l3_flagmux_data dra_l3_flagmux_clk1 = {
+>  
+>  static struct l3_target_data dra_l3_target_data_clk2[] = {
+>  	{0x0,	"HOST CLK1",},
+> -	{0x0,	"HOST CLK2",},
+> +	{0x800000, "HOST CLK2",},
+>  	{0xdead, L3_TARGET_NOT_SUPPORTED,},
+>  	{0x3400, "SHA2_2",},
+>  	{0x0900, "BB2D",},
 
 Applying into omap-for-v4.1/fixes thanks.
 
 Tony
-
-> ---
->  arch/arm/boot/dts/dra7.dtsi |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index 5332b57b4950..92b8bb873f43 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -911,7 +911,7 @@
->  			ti,clock-cycles = <16>;
->  
->  			reg = <0x4ae07ddc 0x4>, <0x4ae07de0 0x4>,
-> -			      <0x4ae06014 0x4>, <0x4a003b20 0x8>,
-> +			      <0x4ae06014 0x4>, <0x4a003b20 0xc>,
->  			      <0x4ae0c158 0x4>;
->  			reg-names = "setup-address", "control-address",
->  				    "int-address", "efuse-address",
-> @@ -944,7 +944,7 @@
->  			ti,clock-cycles = <16>;
->  
->  			reg = <0x4ae07e34 0x4>, <0x4ae07e24 0x4>,
-> -			      <0x4ae06010 0x4>, <0x4a0025cc 0x8>,
-> +			      <0x4ae06010 0x4>, <0x4a0025cc 0xc>,
->  			      <0x4a002470 0x4>;
->  			reg-names = "setup-address", "control-address",
->  				    "int-address", "efuse-address",
-> @@ -977,7 +977,7 @@
->  			ti,clock-cycles = <16>;
->  
->  			reg = <0x4ae07e30 0x4>, <0x4ae07e20 0x4>,
-> -			      <0x4ae06010 0x4>, <0x4a0025e0 0x8>,
-> +			      <0x4ae06010 0x4>, <0x4a0025e0 0xc>,
->  			      <0x4a00246c 0x4>;
->  			reg-names = "setup-address", "control-address",
->  				    "int-address", "efuse-address",
-> @@ -1010,7 +1010,7 @@
->  			ti,clock-cycles = <16>;
->  
->  			reg = <0x4ae07de4 0x4>, <0x4ae07de8 0x4>,
-> -			      <0x4ae06010 0x4>, <0x4a003b08 0x8>,
-> +			      <0x4ae06010 0x4>, <0x4a003b08 0xc>,
->  			      <0x4ae0c154 0x4>;
->  			reg-names = "setup-address", "control-address",
->  				    "int-address", "efuse-address",
-> -- 
-> 1.7.9.5
-> 
