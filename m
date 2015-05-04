@@ -1,74 +1,78 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 4 May 2015 22:20:50 +0200 (CEST)
-Subject: [PATCH V2 4/6] DT: add binding for mxs on-chip regulators
-In-Reply-To: <201505041551.26355.jbe@pengutronix.de>
-References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
- <1430346747-28728-5-git-send-email-stefan.wahren@i2se.com>
- <201505041551.26355.jbe@pengutronix.de>
-Message-ID: <1858103470.878923.1430770850541.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+From: noralf@tronnes.org (=?windows-1252?Q?Noralf_Tr=F8nnes?=)
+Date: Mon, 04 May 2015 22:25:30 +0200
+Subject: [PATCH] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to
+ SDRAM.
+In-Reply-To: <1430768034-12734-1-git-send-email-eric@anholt.net>
+References: <1430768034-12734-1-git-send-email-eric@anholt.net>
+Message-ID: <5547D5BA.5070407@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Juergen,
 
-> J?rgen Borleis <jbe@pengutronix.de> hat am 4. Mai 2015 um 15:51 geschrieben:
+Den 04.05.2015 21:33, skrev Eric Anholt:
+> There exists a tiny MMU, configurable only by the VC (running the
+> closed firmware), which maps from the ARM's physical addresses to bus
+> addresses.  These bus addresses determine the caching behavior in the
+> VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
+> 2 bits.  The bits in the bus address mean:
 >
+>  From the VideoCore processor:
+> 0x0... L1 and L2 cache allocating and coherent
+> 0x4... L1 non-allocating, but coherent. L2 allocating and coherent
+> 0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
+> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
 >
-> Hi Stefan,
+>  From the GPU peripherals (note: all peripherals bypass the L1
+> cache. The ARM will see this view once through the VC MMU):
+> 0x0... Do not use
+> 0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
+> 0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
+> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
 >
-> for the i.MX23 the regulator daisy chain looks a little bit different:
+> The 2835 firmware always configures the MMU to turn ARM physical
+> addresses with 0x0 top bits to 0x4, meaning present in L2 but
+> incoherent with L1.  However, any bus addresses we were generating in
+> the kernel to be passed to a device had 0x0 bits.  That would be a
+> reserved (possibly totally incoherent) value if sent to a GPU
+> peripheral like USB, or L1 allocating if sent to the VC (like a
+> firmware property request).  By setting dma-ranges, all of the devices
+> below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
+> friends return addresses with 0x4 bits and avoid cache incoherency.
 >
-> +------------+     VDD5V  +---------+  VDDIO
-> | DC-DC      |   +--------> LINREG  +--------->+
-> |            |            | VDDIO   |          |
-> |            |            +---------+          |
-> | DCDC_VDDIO +->-+-----------------------------+
-> |            |   |
-> |            |   | VDDIO  +---------+ VDDMEM
-> |            |   +--------> LINREG  +--------->
-> |            |   |        | VDDMEM  |
-> |            |   |        +---------+
-> |            |   | VDDIO  +---------+  VDDA
-> |            |   +--------> LINREG  +--------->+
-> |            |            | VDDA    |          |
-> |            |            +---------+          |
-> | DCDC_VDDA  +->-+-----------------------------+
-> |            |   | VDDA   +---------+  VDDD
-> |            |   +--------> LINREG  +--------->+
-> |            |            | VDDD    |          |
-> |            |            +---------+          |
-> | DCDC_VDDD  +->-------------------------------+
-> +------------+                                 |
->                                                v
-
-damn! I didn't noticed that VDDMEM is powered by VDDIO and VDD1P5 is powered by
-VDDA. Thank you very much.
-
->From my understanding VDDMEM and VDD1P5 describe the same regulator function
-(provides power to external memory such as SDRAM and mDDR which doesn't fit to
-VDDD, VDDIO or VDDA). But the usage of
-the name is not consistent across the documentation:
-                   
-                  | i.MX23 | i.MX28 
-------------------------------------
-Application note  | VDDMEM | VDD1P5
-Reference manual  | VDDMEM | VDDMEM
-Data sheet        | -      | VDD1P5
-
-I would suggest to use VDDMEM, because the registers are always called HW_VDDMEM
-(for both SoCs).
-
-I think we have 3 options here:
-
-a) add the regulator daisy chain for the i.MX23 too
-b) remove VDD1P5 from the i.MX28 diagram so it would fit for both again
-c) remove the diagram complete
-
-I would prefer option b. What's your opinion?
-
+> This matches the behavior in the downstream 2708 kernel (see
+> BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
 >
-> Regards,
-> Juergen
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Cc: popcornmix at gmail.com
+> ---
+>   arch/arm/boot/dts/bcm2835.dtsi | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+> index 5734650..2df1b5c 100644
+> --- a/arch/arm/boot/dts/bcm2835.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+> @@ -15,6 +15,7 @@
+>   		#address-cells = <1>;
+>   		#size-cells = <1>;
+>   		ranges = <0x7e000000 0x20000000 0x02000000>;
+> +		dma-ranges = <0x40000000 0x00000000 0x1f000000>;
+>   
+>   		timer at 7e003000 {
+>   			compatible = "brcm,bcm2835-system-timer";
 
-Best regards
-Stefan
+This was quite a coincidence. I discovered the need for 'dma-ranges'
+yesterday while trying to get the downstream bcm2708_fb driver to
+work with ARCH_BCM2835. The driver is using the mailbox to get info
+about the framebuffer from the firmware. When it failed I discovered
+that the bus address was wrong.
+
+What I don't understand, is that mmc and spi works fine with a "wrong"
+bus address. It's only the framebuffer driver and the vchiq driver
+when using mailbox that fails.
+
+Tested-by: Noralf Tr?nnes <noralf@tronnes.org>
+
+
+Regards,
+Noralf Tr?nnes
