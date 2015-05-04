@@ -1,59 +1,63 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon,  4 May 2015 12:33:54 -0700
-Subject: [PATCH] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to SDRAM.
-Message-ID: <1430768034-12734-1-git-send-email-eric@anholt.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon,  4 May 2015 12:52:18 -0700
+Subject: [PATCH 0/4] Enable SPARSE_IRQ for omap1
+Message-ID: <1430769142-3921-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There exists a tiny MMU, configurable only by the VC (running the
-closed firmware), which maps from the ARM's physical addresses to bus
-addresses.  These bus addresses determine the caching behavior in the
-VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
-2 bits.  The bits in the bus address mean:
+Hi all,
 
->From the VideoCore processor:
-0x0... L1 and L2 cache allocating and coherent
-0x4... L1 non-allocating, but coherent. L2 allocating and coherent
-0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
-0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+Here are few patches to enable SPARSE_IRQ on omap1.
 
->From the GPU peripherals (note: all peripherals bypass the L1
-cache. The ARM will see this view once through the VC MMU):
-0x0... Do not use
-0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
-0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
-0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+Note that after this set removing the users for irqs.h
+and making omap1 use the clock framework are needed to
+get close to multiarch booting on omap1.
 
-The 2835 firmware always configures the MMU to turn ARM physical
-addresses with 0x0 top bits to 0x4, meaning present in L2 but
-incoherent with L1.  However, any bus addresses we were generating in
-the kernel to be passed to a device had 0x0 bits.  That would be a
-reserved (possibly totally incoherent) value if sent to a GPU
-peripheral like USB, or L1 allocating if sent to the VC (like a
-firmware property request).  By setting dma-ranges, all of the devices
-below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
-friends return addresses with 0x4 bits and avoid cache incoherency.
+These are against v4.1-rc1, and also require the MPUIO fix:
 
-This matches the behavior in the downstream 2708 kernel (see
-BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
+[PATCH] gpio: omap: Fix regression for MPUIO interrupts
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Cc: popcornmix at gmail.com
----
- arch/arm/boot/dts/bcm2835.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+Regards,
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 5734650..2df1b5c 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -15,6 +15,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges = <0x7e000000 0x20000000 0x02000000>;
-+		dma-ranges = <0x40000000 0x00000000 0x1f000000>;
- 
- 		timer at 7e003000 {
- 			compatible = "brcm,bcm2835-system-timer";
+Tony
+
+Tony Lindgren (4):
+  ARM: OMAP1: Move UART defines to prepare for sparse IRQ
+  ARM: OMAP1: Switch to use generic irqchip in preparation for sparse
+    IRQ
+  ARM: omap1: Switch to use MULTI_IRQ
+  ARM: OMAP1: Change interrupt numbering for sparse IRQ
+
+ arch/arm/Kconfig                               |   2 +
+ arch/arm/mach-omap1/ams-delta-fiq-handler.S    |   3 +-
+ arch/arm/mach-omap1/board-ams-delta.c          |   1 +
+ arch/arm/mach-omap1/board-fsample.c            |   1 +
+ arch/arm/mach-omap1/board-generic.c            |   1 +
+ arch/arm/mach-omap1/board-h2.c                 |   1 +
+ arch/arm/mach-omap1/board-h3.c                 |   1 +
+ arch/arm/mach-omap1/board-htcherald.c          |   1 +
+ arch/arm/mach-omap1/board-innovator.c          |   1 +
+ arch/arm/mach-omap1/board-nokia770.c           |   1 +
+ arch/arm/mach-omap1/board-osk.c                |   1 +
+ arch/arm/mach-omap1/board-palmte.c             |   1 +
+ arch/arm/mach-omap1/board-palmtt.c             |   1 +
+ arch/arm/mach-omap1/board-palmz71.c            |   1 +
+ arch/arm/mach-omap1/board-perseus2.c           |   1 +
+ arch/arm/mach-omap1/board-sx1.c                |   1 +
+ arch/arm/mach-omap1/board-voiceblue.c          |   1 +
+ arch/arm/mach-omap1/common.h                   |   5 +-
+ arch/arm/mach-omap1/dma.c                      |   2 +-
+ arch/arm/mach-omap1/i2c.c                      |   3 +-
+ arch/arm/mach-omap1/include/mach/entry-macro.S |  39 ------
+ arch/arm/mach-omap1/include/mach/irqs.h        | 124 ++++++++++---------
+ arch/arm/mach-omap1/include/mach/serial.h      |   5 -
+ arch/arm/mach-omap1/include/mach/soc.h         |   4 +
+ arch/arm/mach-omap1/irq.c                      | 157 +++++++++++++++----------
+ arch/arm/mach-omap1/timer.c                    |   4 +-
+ arch/arm/plat-omap/dma.c                       |   4 +
+ include/uapi/linux/serial_reg.h                |   3 +
+ 28 files changed, 190 insertions(+), 180 deletions(-)
+ delete mode 100644 arch/arm/mach-omap1/include/mach/entry-macro.S
+
 -- 
 2.1.4
