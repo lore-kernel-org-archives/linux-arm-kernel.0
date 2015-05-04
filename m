@@ -1,428 +1,194 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 4 May 2015 09:58:01 +0200
-Subject: [PATCHv7 1/8] watchdog: Extend kernel API to know about HW
- limitations
-In-Reply-To: <1429701102-22320-2-git-send-email-timo.kokkonen@offcode.fi>
-References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
- <1429701102-22320-2-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <20150504075801.GF25193@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 04 May 2015 10:00:27 +0200
+Subject: [PATCH 1/2] reset: add driver for lpc18xx rgu
+In-Reply-To: <1430173843-11648-2-git-send-email-manabian@gmail.com>
+References: <1430173843-11648-1-git-send-email-manabian@gmail.com>
+ <1430173843-11648-2-git-send-email-manabian@gmail.com>
+Message-ID: <1430726427.3722.15.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Timo,
+Hi Joachim,
 
-On Wed, Apr 22, 2015 at 02:11:35PM +0300, Timo Kokkonen wrote:
-> There is a great deal of diversity in the watchdog hardware found on
-> different devices. Differen hardware have different contstraints on
-s/Differen/Different/; s/contstraints/constraints/
+thank you for the patch! Some comments below:
 
-> them, many of the constraints that are excessively difficult for the
-> user space to satisfy.
-> 
-> One such constraint is the length of the timeout value, which in many
-> cases can be just a few seconds. Drivers are creating ad hoc solutions
-> with timers and workqueues to extend the timeout in order to give user
-> space more time between updates. Looking at the drivers it is clear
-> that this has resulted to a lot of duplicate code.
-> 
-> Add an extension to the watchdog kernel API that allows the driver to
-> describe tis HW constraints to the watchdog code. A kernel worker in
-s/tis/its/
-
-> the core is then used to extend the watchdog timeout on behalf of the
-> user space. This allows the drivers to be simplified as core takes
-> over the timer extending.
-In general a nice idea.
-
-> Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+Am Dienstag, den 28.04.2015, 00:30 +0200 schrieb Joachim Eastwood:
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 > ---
->  drivers/watchdog/watchdog_core.c | 101 +++++++++++++++++++++++++++++++++++++--
->  drivers/watchdog/watchdog_dev.c  |  75 ++++++++++++++++++++++++++---
->  include/linux/watchdog.h         |  23 +++++++++
->  3 files changed, 189 insertions(+), 10 deletions(-)
+>  drivers/reset/Makefile        |   1 +
+>  drivers/reset/reset-lpc18xx.c | 260 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 261 insertions(+)
+>  create mode 100644 drivers/reset/reset-lpc18xx.c
 > 
-> diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-> index cec9b55..fd12489 100644
-> --- a/drivers/watchdog/watchdog_core.c
-> +++ b/drivers/watchdog/watchdog_core.c
-> @@ -99,6 +99,89 @@ int watchdog_init_timeout(struct watchdog_device *wdd,
->  EXPORT_SYMBOL_GPL(watchdog_init_timeout);
->  
->  /**
-> + * watchdog_init_parms() - initialize generic watchdog parameters
-> + * @wdd: Watchdog device to operate
-> + * @dev: Device that stores the device tree properties
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 157d421f755b..1d41feeb2dce 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -1,4 +1,5 @@
+>  obj-$(CONFIG_RESET_CONTROLLER) += core.o
+> +obj-$(CONFIG_ARCH_LPC18XX) += reset-lpc18xx.o
+>  obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+>  obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
+>  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+> diff --git a/drivers/reset/reset-lpc18xx.c b/drivers/reset/reset-lpc18xx.c
+> new file mode 100644
+> index 000000000000..9564d78ab9d2
+> --- /dev/null
+> +++ b/drivers/reset/reset-lpc18xx.c
+> @@ -0,0 +1,260 @@
+> +/*
+> + * Reset driver for NXP LPC18xx/43xx Reset Generation Unit (RGU).
 > + *
-> + * Initialize the generic timeout parameters. The driver needs to set
-> + * hw_features bitmask from @wdd prior calling this function in order
-> + * to ensure the core knows how to handle the HW.
+> + * Copyright (C) 2014 Joachim Eastwood <manabian@gmail.com>
 > + *
-> + * A zero is returned on success and -EINVAL for failure.
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
 > + */
-> +int watchdog_init_params(struct watchdog_device *wdd, struct device *dev)
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reboot.h>
+> +#include <linux/reset-controller.h>
+> +#include <linux/slab.h>
+> +#include <linux/types.h>
+> +
+> +#include <asm/system_misc.h>
+
+Are all of these necessary? I don't see why of_address.h and
+system_misc.h are included, for example.
+
+> +/* LPC18xx RGU registers */
+> +#define LPC18XX_RGU_CTRL0		0x100
+> +#define LPC18XX_RGU_CTRL1		0x104
+> +#define LPC18XX_RGU_ACTIVE_STATUS0	0x150
+> +#define LPC18XX_RGU_ACTIVE_STATUS1	0x154
+> +
+> +#define LPC18XX_RGU_RESETS_PER_REG	32
+> +
+> +/* Internal reset outputs */
+> +#define LPC18XX_RGU_CORE_RST	0
+> +#define LPC18XX_RGU_M0SUB_RST	12
+> +#define LPC18XX_RGU_M0APP_RST	56
+
+In the LPC18xx User Manual these are marked as reserved, I think using
+the LPC43XX_ prefix here could avoid confusion. Or are there also
+LPC18xx that have these reset lines?
+
+> +
+> +struct lpc18xx_rgu_data {
+> +	struct reset_controller_dev rcdev;
+> +	struct clk *clk_delay;
+> +	struct clk *clk_reg;
+> +	void __iomem *base;
+> +	spinlock_t lock;
+> +	u32 delay_us;
+> +};
+> +
+> +#define to_rgu_data(rcdev) container_of(rcdev, struct lpc18xx_rgu_data, rcdev)
+> +
+> +static void __iomem *rgu_base;
+> +
+> +static int lpc18xx_rgu_restart(struct notifier_block *this, unsigned long mode,
+> +			       void *cmd)
 > +{
-> +	int ret = 0;
+> +	writel(BIT(LPC18XX_RGU_CORE_RST), rgu_base + LPC18XX_RGU_CTRL0);
+> +	mdelay(2000);
 > +
-> +	ret = watchdog_init_timeout(wdd, wdd->timeout, dev);
-> +	if (ret < 0)
-> +		return ret;
-As Guenter pointed out, using wdd->timeout is unfortunate here.
-
+> +	pr_emerg("%s: unable to restart system\n", __func__);
 > +
-> +	/*
-> +	 * Max HW timeout needs to be set so that core knows when to
-> +	 * use a kernel worker to support longer watchdog timeouts
-> +	 */
-> +	if (!wdd->hw_max_timeout)
-> +		return -EINVAL;
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(watchdog_init_params);
-> +
-> +static void watchdog_worker(struct work_struct *work)
-> +{
-> +	struct watchdog_device *wdd = container_of(to_delayed_work(work),
-> +						struct watchdog_device, work);
-please align the follow-up line to the opening (.
-
-> +	bool boot_keepalive;
-> +	bool active_keepalive;
-> +
-> +	mutex_lock(&wdd->lock);
-> +
-> +	boot_keepalive = !watchdog_active(wdd) &&
-I'm not sure about the semantic of watchdog_active here. Would be nice
-to clearify this. Does it mean /dev/watchdog is open, or the watchdog is
-running? Maybe introduce watchdog_running(wdd) and watchdog_opened(wdd)?
-Is this related to the topic of this patch? You didn't mention anything
-in the commit log about the time until userspace comes up.
-
-> +		!watchdog_is_stoppable(wdd);
-> +
-> +	active_keepalive = watchdog_active(wdd) &&
-> +		wdd->hw_max_timeout < wdd->timeout * HZ;
-> +
-> +	if (time_after(jiffies, wdd->expires) && watchdog_active(wdd)) {
-> +		pr_crit("I will reset your machine !\n");
-> +		mutex_unlock(&wdd->lock);
-> +		return;
-> +	}
-I'd replace the pr_crit by a code comment. Also "I will reset your
-machine!" is wrong, the core just stops petting the watchdog. If
-userspace comes in in time there is no harm, right?
-
-> +	if (boot_keepalive || active_keepalive) {
-> +		if (wdd->ops->ping)
-> +			wdd->ops->ping(wdd);
-> +		else
-> +			wdd->ops->start(wdd);
-if (boot_keepalive || active_keepalive)
-	_watchdog_ping(wdd);
-
-> +
-> +		schedule_delayed_work(&wdd->work,  wdd->hw_heartbeat);
-s/  / /; Would it be sensible to assume hw_heartbeat to be timeout / 2
-always?
-
-> +	}
-> +
-> +	mutex_unlock(&wdd->lock);
+> +	return NOTIFY_DONE;
 > +}
 > +
-> +static int prepare_watchdog(struct watchdog_device *wdd)
-> +{
-> +	int err = 0;
+> +static struct notifier_block lpc18xx_rgu_restart_nb = {
+> +	.notifier_call = lpc18xx_rgu_restart,
+> +	.priority = 192,
+> +};
 > +
-> +	/* Stop the watchdog now before user space opens the device */
-> +	if (watchdog_is_stoppable(wdd) &&
-> +		wdd->hw_features & WDOG_HW_RUNNING_AT_BOOT) {
-> +		err = wdd->ops->stop(wdd);
-> +
-> +	} else if (!watchdog_is_stoppable(wdd) &&
-> +		wdd->hw_features & WDOG_HW_RUNNING_AT_BOOT) {
-> +		/*
-> +		 * Can't stop it, use a delayed worker to tick it
-> +		 * until it's open by user space
-> +		 */
-I'd add a ping here because if the driver comes up a big part of the
-initial timeout setup by the bootloader might already be over.
+> +/*
+> + * The LPC18xx RGU has mostly self-deasserting resets except for the
+> + * two reset lines going to the internal Cortex-M0 cores.
+> + *
+> + * To prevent the M0 cores from accidentally getting deasserting the
 
-Note that at least for the omap watchdog driver the assignment to
-timeout doesn't relate in any way to the timeout actually setup in
-hardware.
+"To prevent the M0 core resets from accidentally getting deasserted" ?
 
-> +		schedule_delayed_work(&wdd->work, wdd->hw_heartbeat);
-> +	}
-> +	return err;
-> +}
-> +
-> +/**
->   * watchdog_register_device() - register a watchdog device
->   * @wdd: watchdog device
->   *
-> @@ -156,13 +239,24 @@ int watchdog_register_device(struct watchdog_device *wdd)
->  	wdd->dev = device_create(watchdog_class, wdd->parent, devno,
->  					NULL, "watchdog%d", wdd->id);
->  	if (IS_ERR(wdd->dev)) {
-> -		watchdog_dev_unregister(wdd);
-> -		ida_simple_remove(&watchdog_ida, id);
->  		ret = PTR_ERR(wdd->dev);
-> -		return ret;
-> +		goto dev_create_fail;
-> +	}
-> +
-> +	INIT_DELAYED_WORK(&wdd->work, watchdog_worker);
-> +
-> +	if (wdd->hw_max_timeout) {
-> +		ret = prepare_watchdog(wdd);
-> +		if (ret)
-> +			goto dev_create_fail;
-	} else {
-		dev_warn("Incomplete watchdog driver implementation, please report or fix\n")
->  	}
->  
->  	return 0;
-> +
-> +dev_create_fail:
-> +	watchdog_dev_unregister(wdd);
-> +	ida_simple_remove(&watchdog_ida, id);
-> +	return ret;
->  }
->  EXPORT_SYMBOL_GPL(watchdog_register_device);
->  
-> @@ -181,6 +275,7 @@ void watchdog_unregister_device(struct watchdog_device *wdd)
->  	if (wdd == NULL)
->  		return;
->  
-> +	cancel_delayed_work_sync(&wdd->work);
->  	devno = wdd->cdev.dev;
->  	ret = watchdog_dev_unregister(wdd);
->  	if (ret)
-> diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
-> index 6aaefba..04ac68c 100644
-> --- a/drivers/watchdog/watchdog_dev.c
-> +++ b/drivers/watchdog/watchdog_dev.c
-> @@ -49,6 +49,14 @@ static dev_t watchdog_devt;
->  /* the watchdog device behind /dev/watchdog */
->  static struct watchdog_device *old_wdd;
->  
-> +static int _watchdog_ping(struct watchdog_device *wddev)
+> + * status register must be check and bits in control register set to
+> + * preserve the state.
+> + */
+> +static void lpc18xx_rgu_setclear_reset(struct reset_controller_dev *rcdev,
+> +				       unsigned long id, bool set)
 > +{
-> +	if (wddev->ops->ping)
-> +		return wddev->ops->ping(wddev);  /* ping the watchdog */
+> +	struct lpc18xx_rgu_data *rc = to_rgu_data(rcdev);
+> +	u32 stat_offset = LPC18XX_RGU_ACTIVE_STATUS0;
+> +	u32 ctrl_offset = LPC18XX_RGU_CTRL0;
+> +	unsigned long flags;
+> +	u32 stat, rst_bit;
+> +
+> +	stat_offset += (id / LPC18XX_RGU_RESETS_PER_REG) * sizeof(u32);
+> +	ctrl_offset += (id / LPC18XX_RGU_RESETS_PER_REG) * sizeof(u32);
+> +	rst_bit = 1 << (id % LPC18XX_RGU_RESETS_PER_REG);
+> +
+> +	spin_lock_irqsave(&rc->lock, flags);
+> +	stat = ~readl(rc->base + stat_offset);
+> +	if (set)
+> +		writel(stat | rst_bit, rc->base + ctrl_offset);
 > +	else
-> +		return wddev->ops->start(wddev); /* restart watchdog */
+> +		writel(stat & ~rst_bit, rc->base + ctrl_offset);
+> +	spin_unlock_irqrestore(&rc->lock, flags);
 > +}
 > +
->  /*
->   *	watchdog_ping: ping the watchdog.
->   *	@wddev: the watchdog device to ping
-> @@ -73,10 +81,13 @@ static int watchdog_ping(struct watchdog_device *wddev)
->  	if (!watchdog_active(wddev))
->  		goto out_ping;
->  
-> -	if (wddev->ops->ping)
-> -		err = wddev->ops->ping(wddev);  /* ping the watchdog */
-> -	else
-> -		err = wddev->ops->start(wddev); /* restart watchdog */
-> +	err = _watchdog_ping(wddev);
-> +
-> +	if (wddev->hw_max_timeout &&
-> +		wddev->timeout * HZ > wddev->hw_max_timeout) {
-> +		wddev->expires = jiffies + wddev->timeout * HZ;
-> +		schedule_delayed_work(&wddev->work, wddev->hw_heartbeat);
-> +	}
->  
->  out_ping:
->  	mutex_unlock(&wddev->lock);
-> @@ -110,6 +121,13 @@ static int watchdog_start(struct watchdog_device *wddev)
->  	if (err == 0)
->  		set_bit(WDOG_ACTIVE, &wddev->status);
->  
-> +	if (wddev->hw_max_timeout &&
-> +		wddev->timeout * HZ > wddev->hw_max_timeout) {
-> +		wddev->expires = jiffies + wddev->timeout * HZ;
-> +		schedule_delayed_work(&wddev->work, wddev->hw_heartbeat);
-> +	} else
-> +		cancel_delayed_work(&wddev->work);
-> +
->  out_start:
->  	mutex_unlock(&wddev->lock);
->  	return err;
-> @@ -145,9 +163,21 @@ static int watchdog_stop(struct watchdog_device *wddev)
->  		goto out_stop;
->  	}
->  
-> -	err = wddev->ops->stop(wddev);
-> -	if (err == 0)
-> +	if (!wddev->hw_max_timeout || watchdog_is_stoppable(wddev)) {
-> +		cancel_delayed_work(&wddev->work);
-> +		err = wddev->ops->stop(wddev);
-> +		if (err == 0)
-> +			clear_bit(WDOG_ACTIVE, &wddev->status);
-> +	} else {
-> +		/* Unstoppable watchdogs need the worker to keep them alive */
->  		clear_bit(WDOG_ACTIVE, &wddev->status);
-> +		/*
-> +		 * Ping it once as we don't know how much time there
-> +		 * is left in the watchdog timer.
-> +		 */
-> +		err = _watchdog_ping(wddev);
-> +		schedule_delayed_work(&wddev->work, wddev->hw_heartbeat);
-> +	}
-Why not do:
-
-	err = wddev->ops->stop(wddev);
-	clear_bit(WDOG_ACTIVE, &wddev->status);
-	if (err != 0) {
-		err = _watchdog_ping(wddev);
-		if (err) {
-			dev_crit(...);
-		schedule_delayed_work(...);
-	}
-
-This way you (maybe?) don't need to expand all drivers to tell you if
-the watchdog timer is stoppable, just assert that the stop callback
-fails which IMHO is easier and more natural.
-
->  
->  out_stop:
->  	mutex_unlock(&wddev->lock);
-> @@ -194,7 +224,38 @@ out_status:
->  static int watchdog_set_timeout(struct watchdog_device *wddev,
->  							unsigned int timeout)
->  {
-> -	int err;
-> +	int err = 0;
-> +
-> +	if (wddev->hw_max_timeout) {
-> +		int hw_timeout;
-> +		/*
-> +		 * We can't support too short timeout values. There is
-> +		 * really no maximu however, anything longer than HW
-s/maximu/maximum/
-
-> +		 * maximum will be supported by the watchdog core on
-> +		 * behalf of the actual HW.
-> +		 */
-> +		if (timeout < wddev->min_timeout)
-> +			return -EINVAL;
-Is it save to read min_timout without holding the lock?
-> +
-> +		mutex_lock(&wddev->lock);
-> +		if (test_bit(WDOG_UNREGISTERED, &wddev->status)) {
-> +			err = -ENODEV;
-> +			goto out_timeout;
-> +		}
-> +
-> +		if (timeout * HZ > wddev->hw_max_timeout)
-> +			schedule_delayed_work(&wddev->work,
-> +					wddev->hw_heartbeat);
-> +
-> +		hw_timeout = min(timeout, wddev->hw_max_timeout / HZ);
-If you'd keep hw_max_timeout in seconds (i.e. what is used for timeout)
-you wouldn't need to divide here. If my watchdog has hw_max_timeout =
-0.5s then you do wddev->ops->set_timeout(0) here.
-
-> +		if (wddev->info->options & WDIOF_SETTIMEOUT)
-> +			err = wddev->ops->set_timeout(wddev, hw_timeout);
-The case of not having WDIOF_SETTIMEOUT isn't handled here, right? Other
-places check for WDIOF_SETTIMEOUT and wddev->ops->set_timeout?!
-
-> +
-> +		if (hw_timeout < timeout)
-> +			wddev->timeout = timeout;
-What is the semantic of wddev->timeout? Does it hold the value
-set by userspace or the value the hardware is set to? You'd need to
-clarify that by adding more comments. Is this if correct?
-
-> +
-> +		goto out_timeout;
-> +	}
->  
->  	if ((wddev->ops->set_timeout == NULL) ||
->  	    !(wddev->info->options & WDIOF_SETTIMEOUT))
-> diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-> index 395b70e..027c99d 100644
-> --- a/include/linux/watchdog.h
-> +++ b/include/linux/watchdog.h
-> @@ -12,6 +12,7 @@
->  #include <linux/bitops.h>
->  #include <linux/device.h>
->  #include <linux/cdev.h>
-> +#include <linux/workqueue.h>
->  #include <uapi/linux/watchdog.h>
->  
->  struct watchdog_ops;
-> @@ -62,9 +63,13 @@ struct watchdog_ops {
->   * @timeout:	The watchdog devices timeout value.
->   * @min_timeout:The watchdog devices minimum timeout value.
->   * @max_timeout:The watchdog devices maximum timeout value.
-> + * @hw_max_timeout:The watchdog hardware maximum timeout value.
-> + * @hw_heartbeat:Time interval in HW between timer pings.
->   * @driver-data:Pointer to the drivers private data.
->   * @lock:	Lock for watchdog core internal use only.
-> + * @work:	Worker used to provide longer timeouts than hardware supports.
->   * @status:	Field that contains the devices internal status bits.
-> + * @hw_features:Feature bits describing how the watchdog HW works.
->   *
->   * The watchdog_device structure contains all information about a
->   * watchdog timer device.
-> @@ -86,8 +91,12 @@ struct watchdog_device {
->  	unsigned int timeout;
->  	unsigned int min_timeout;
->  	unsigned int max_timeout;
-> +	unsigned int hw_max_timeout; /* in jiffies */
-> +	unsigned int hw_heartbeat; /* in jiffies */
-> +	unsigned long int expires; /* for keepalive worker */
->  	void *driver_data;
->  	struct mutex lock;
-> +	struct delayed_work work;
-I'd group things together here that belong together.
-
->  	unsigned long status;
->  /* Bit numbers for status flags */
->  #define WDOG_ACTIVE		0	/* Is the watchdog running/active */
-> @@ -95,6 +104,14 @@ struct watchdog_device {
->  #define WDOG_ALLOW_RELEASE	2	/* Did we receive the magic char ? */
->  #define WDOG_NO_WAY_OUT		3	/* Is 'nowayout' feature set ? */
->  #define WDOG_UNREGISTERED	4	/* Has the device been unregistered */
-> +
-> +/* Bits describing features supported by the HW */
-> +	unsigned long hw_features;
-> +
-> +/* Can the watchdog be stopped and started */
-> +#define WDOG_HW_IS_STOPPABLE		BIT(0)
-> +/* Is the watchdog already running when the driver starts up */
-> +#define WDOG_HW_RUNNING_AT_BOOT		BIT(1)
->  };
->  
->  #define WATCHDOG_NOWAYOUT		IS_BUILTIN(CONFIG_WATCHDOG_NOWAYOUT)
-> @@ -120,6 +137,11 @@ static inline bool watchdog_timeout_invalid(struct watchdog_device *wdd, unsigne
->  		(t < wdd->min_timeout || t > wdd->max_timeout));
->  }
->  
-> +static inline bool watchdog_is_stoppable(struct watchdog_device *wdd)
+> +static int lpc18xx_rgu_reset(struct reset_controller_dev *rcdev,
+> +			     unsigned long id)
 > +{
-> +	return wdd->hw_features & WDOG_HW_IS_STOPPABLE;
-> +}
+> +	struct lpc18xx_rgu_data *rc = to_rgu_data(rcdev);
 > +
->  /* Use the following functions to manipulate watchdog driver specific data */
->  static inline void watchdog_set_drvdata(struct watchdog_device *wdd, void *data)
->  {
-> @@ -134,6 +156,7 @@ static inline void *watchdog_get_drvdata(struct watchdog_device *wdd)
->  /* drivers/watchdog/watchdog_core.c */
->  extern int watchdog_init_timeout(struct watchdog_device *wdd,
->  				  unsigned int timeout_parm, struct device *dev);
-> +int watchdog_init_params(struct watchdog_device *wdd, struct device *dev);
-This needs commenting and probably embrace watchdog_init_timeout
-properly. i.e. remove watchdog_init_timeout.
+> +	lpc18xx_rgu_setclear_reset(rcdev, id, true);
+> +	udelay(rc->delay_us);
+> +
+> +	return 0;
+> +}
 
-Best regards
-Uwe
+This is missing a deassert for the M0 resets, see below.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> +
+> +static int lpc18xx_rgu_assert(struct reset_controller_dev *rcdev,
+> +			      unsigned long id)
+> +{
+> +	return lpc18xx_rgu_reset(rcdev, id);
+> +}
+
+lpc18xx_rgu_assert shouldn't include the delay. Could you have
+lpc18xx_rgu_assert call lpc18xx_rgu_setclear_reset directly?
+
+Let lpc18xx_rgu_reset then call lpc18xx_rgu_assert, udelay, and
+lpc18xx_rgu_deassert. Or could you wait for the active status bit to
+clear instead of the fixed delay for the self-clearing resets?
+
+> +/* Only M0 cores require explicit reset deassert */
+> +static int lpc18xx_rgu_deassert(struct reset_controller_dev *rcdev,
+> +				unsigned long id)
+> +{
+> +	switch (id) {
+> +	case LPC18XX_RGU_M0SUB_RST:
+> +	case LPC18XX_RGU_M0APP_RST:
+> +		lpc18xx_rgu_setclear_reset(rcdev, id, false);
+> +	}
+> +
+> +	return 0;
+> +}
+
+If writing 0 to the self-clearing reset bits does nothing,
+lpc18xx_rgu_setclear_reset(... false) could be called unconditionally.
+
+[...]
+
+regards
+Philipp
