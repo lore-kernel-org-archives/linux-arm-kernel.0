@@ -1,57 +1,48 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Mon, 4 May 2015 13:22:03 +1000
-Subject: [PATCH v3 2/2] ata: ahci_xgene: Add AHCI Support for 2nd HW
- version of APM X-Gene SoC AHCI SATA Host controller.
-In-Reply-To: <CAOHikRDsnywXaSW8XZiOq-uq9fHiwhp0uxXzHF-ysUO_VmQYFw@mail.gmail.com>
-References: <1430667220-23477-1-git-send-email-stripathi@apm.com>
- <1430667220-23477-3-git-send-email-stripathi@apm.com>
- <CAGRGNgWGk9jkg3Kui5BdFNhpCKOhD=SCW4apmzqMNHKfVbKMmw@mail.gmail.com>
- <CAOHikRDsnywXaSW8XZiOq-uq9fHiwhp0uxXzHF-ysUO_VmQYFw@mail.gmail.com>
-Message-ID: <CAGRGNgX8d0vMDzTH2mPnkwgBk7RJGWVReSyMC3nS=G0z0XvdYQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 4 May 2015 12:23:39 +0900
+Subject: [PATCH 3/3] ARM: s3c24xx: H1940: Move gpiochip_add call into
+ core_init() callback
+In-Reply-To: <1430676910-30657-3-git-send-email-anarsoul@gmail.com>
+References: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
+ <1430676910-30657-3-git-send-email-anarsoul@gmail.com>
+Message-ID: <CAJKOXPd8XgpcoS2knB8JYNeRVRjO=jetwM64tVYW9hPCYN8UoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+2015-05-04 3:15 GMT+09:00 Vasily Khoruzhick <anarsoul@gmail.com>:
+> gpiochip_add() allocates memory, however it's not possible anymore
 
-On Mon, May 4, 2015 at 12:51 PM, Suman Tripathi <stripathi@apm.com> wrote:
-> Hi Julian.
+"...to call it..."? Something is missing in the sentence.
+
+> from
+> machine map_io() callback thus it failed and prevented machine from booting
+> properly.
 >
-> On Mon, May 4, 2015 at 5:56 AM, Julian Calaby <julian.calaby@gmail.com> wrote:
->> Hi Suman,
->>
->> On Mon, May 4, 2015 at 1:33 AM, Suman Tripathi <stripathi@apm.com> wrote:
->>> This patch enables full AHCI feature support for APM X-Gene SoC SATA
->>> host controller. The following errata's are removed:
->>>
->>> 1. 2a0bdff6b95 ("ahci-xgene: fix the dma state machine lockup for the
->>>                  IDENTIFY DEVICE PIO mode command")
->>> 2. 09c32aaa368 ("ahci_xgene: Fix the dma state machine lockup for the
->>>                  ATA_CMD_SMART PIO mode command")
->>> 3. 1540035da71 ("ahci_xgene: Implement the xgene_ahci_poll_reg_val to
->>>                  support PMP")
->>> 4. a3a84bc7c88 ("ahci_xgene: Implement the workaround to support PMP
->>>                  enumeration and discovery")
->>> 5. 1102407bb71 ("ahci_xgene: Fix the DMA state machine lockup for the
->>>                  ATA_CMD_PACKET PIO mode command")
->>> 6. 72f79f9e35b ("ahci_xgene: Removing NCQ support from the APM X-Gene
->>>                 SoC AHCI SATA Host Controller driver")
->>
->> Won't this mean that the 1st HW version won't work properly?
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  arch/arm/mach-s3c24xx/mach-h1940.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 >
-> No it doesn't mean that, It means whatever workaround we had in 1st HW
-> version has been
-> fixed in 2nd HW version.
+> diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
+> index 86d9ec7..744aa4f 100644
+> --- a/arch/arm/mach-s3c24xx/mach-h1940.c
+> +++ b/arch/arm/mach-s3c24xx/mach-h1940.c
+> @@ -777,9 +777,14 @@ static void __init h1940_map_io(void)
+>
+>         /* Add latch gpio chip, set latch initial value */
+>         h1940_latch_control(0, 0);
+> -       WARN_ON(gpiochip_add(&h1940_latch_gpiochip));
+>  }
+>
+> +static __init int h1940_gpiolib_init(void)
+> +{
+> +       return gpiochip_add(&h1940_latch_gpiochip);
+> +}
+> +core_initcall(h1940_gpiolib_init);
+> +
 
-I'm sorry, I read the description and assumed that these fixes were
-being removed from the driver, hence breaking support for the 1st
-hardware version.
+arch_initcall() or init_machine() callback seems more appropriate.
+What do you think?
 
-Sorry for the confusion.
-
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Best regards,
+Krzysztof
