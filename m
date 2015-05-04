@@ -1,43 +1,45 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 May 2015 09:27:32 -0700
-Subject: [PATCH] bus: omap_l3_noc: Fix offset for DRA7 CLK1_HOST_CLK1_2
- instance
-In-Reply-To: <1429224150-28712-1-git-send-email-nm@ti.com>
-References: <1429224150-28712-1-git-send-email-nm@ti.com>
-Message-ID: <20150504162731.GO24469@atomide.com>
+Date: Mon, 4 May 2015 09:31:14 -0700
+Subject: [PATCH] bus: omap_l3_noc: Fix master id address decoding for OMAP5
+In-Reply-To: <553A8C68.5080903@ti.com>
+References: <1429898060-51944-1-git-send-email-s-anna@ti.com>
+ <553A8C68.5080903@ti.com>
+Message-ID: <20150504163113.GP24469@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [150416 15:43]:
-> From: Illia Smyrnov <illia.smyrnov@globallogic.com>
+* Nishanth Menon <nm@ti.com> [150424 11:34]:
+> On 04/24/2015 12:54 PM, Suman Anna wrote:
+> > The L3 Error handling on OMAP5 for the most part is very similar
+> > to that of OMAP4, and had leveraged common data structures and
+> > register layout definitions so far. Upon closer inspection, there
+> > are a few minor differences causing an incorrect decoding and
+> > reporting of the master NIU upon an error:
+> > 
+> >   1. The L3_TARG_STDERRLOG_MSTADDR.STDERRLOG_MSTADDR occupies
+> >      11 bits on OMAP5 as against 8 bits on OMAP4, with the master
+> >      NIU connID encoded in the 6 MSBs of the STDERRLOG_MSTADDR
+> >      field.
+> >   2. The CLK3 FlagMux component has 1 input source on OMAP4 and 3
+> >      input sources on OMAP5. The common DEBUGSS source is at a
+> >      different input on each SoC.
+> > 
+> > Fix the above issues by using a OMAP5-specific compatible property
+> > and using SoC-specific data where there are differences.
+> > 
+> > Cc: Nishanth Menon <nm@ti.com>
+> > Signed-off-by: Suman Anna <s-anna@ti.com>
+...
+ 
+> If tony does not mind dts+driver patch, then except for the above comment:
 > 
-> The base address for DRA7 CLK1_HOST_CLK1_2 host instance is
-> 0x44800000, so correct offset is 0x800000. DRA7 TRM rev X(fewb 2015)
-> has updates for this information.
-> 
-> With wrong offset these errors are not correctly cleared by the L3
-> IRQ handler and cause an continuous interrupt scenario and system lockup.
-> 
-> Signed-off-by: Illia Smyrnov <illia.smyrnov@globallogic.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->  drivers/bus/omap_l3_noc.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
-> index 95254585db86..a314d800f394 100644
-> --- a/drivers/bus/omap_l3_noc.h
-> +++ b/drivers/bus/omap_l3_noc.h
-> @@ -274,7 +274,7 @@ static struct l3_flagmux_data dra_l3_flagmux_clk1 = {
->  
->  static struct l3_target_data dra_l3_target_data_clk2[] = {
->  	{0x0,	"HOST CLK1",},
-> -	{0x0,	"HOST CLK2",},
-> +	{0x800000, "HOST CLK2",},
->  	{0xdead, L3_TARGET_NOT_SUPPORTED,},
->  	{0x3400, "SHA2_2",},
->  	{0x0900, "BB2D",},
+> Acked-by: Nishanth Menon <nm@ti.com>
 
-Applying into omap-for-v4.1/fixes thanks.
+Looks OK to me for a fix. In general we want to have the .dts
+changes separated from the driver changes though.
+
+Applying into omap-for-v4.1/fixes.
+
+Regards,
 
 Tony
