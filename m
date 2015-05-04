@@ -1,19 +1,31 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon,  4 May 2015 23:04:14 +0200
-Subject: [PATCH v2 1/3] clk: si5351: Mention clock-names in the binding
- documentation
+Date: Mon,  4 May 2015 23:04:16 +0200
+Subject: [PATCH v2 3/3] clk: si5351: Do not pass struct clk in platform_data
 In-Reply-To: <1430773456-15203-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1430773456-15203-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1430773456-15203-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1430773456-15203-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the introduction of clk-si5351 the way we should deal with DT provided
-clocks has changed from indexed to named clock phandles. Amend the binding
-documentation to reflect named clock phandles by clock-names property.
+When registering clk-si5351 by platform_data, we should not pass struct clk
+for the reference clocks. Drop struct clk from platform_data and rework the
+driver to use devm_clk_get of named clock references.
+
+While at it, check for at least one valid input clock and properly prepare/
+enable valid reference clocks.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Reported-by: Michael Welling <mwelling@ieee.org>
+Reported-by: Jean-Francois Moine <moinejf@free.fr>
+Reported-by: Russell King <rmk+linux@arm.linux.org.uk>
+Tested-by: Michael Welling <mwelling@ieee.org>
+Tested-by: Jean-Francois Moine <moinejf@free.fr>
 ---
+Changelog:
+v1->v2:
+- Reword parent clock check error message and add a comment about
+  the required parent clocks per variant. (Suggested by Fabio Estevam)
+
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Jean-Francois Moine <moinejf@free.fr>
@@ -26,30 +38,178 @@ Cc: linux-clk at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- Documentation/devicetree/bindings/clock/silabs,si5351.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/clk/clk-si5351.c             | 63 +++++++++++++++++++++++++-----------
+ include/linux/platform_data/si5351.h |  4 ---
+ 2 files changed, 45 insertions(+), 22 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/silabs,si5351.txt b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
-index c40711e8e8f7..28b28309f535 100644
---- a/Documentation/devicetree/bindings/clock/silabs,si5351.txt
-+++ b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
-@@ -17,7 +17,8 @@ Required properties:
- - #clock-cells: from common clock binding; shall be set to 1.
- - clocks: from common clock binding; list of parent clock
-   handles, shall be xtal reference clock or xtal and clkin for
--  si5351c only.
-+  si5351c only. Corresponding clock input names are "xtal" and
-+  "clkin" respectively.
- - #address-cells: shall be set to 1.
- - #size-cells: shall be set to 0.
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index 44ea107cfc67..30335d3b99af 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -1128,13 +1128,6 @@ static int si5351_dt_parse(struct i2c_client *client,
+ 	if (!pdata)
+ 		return -ENOMEM;
  
-@@ -71,6 +72,7 @@ i2c-master-node {
+-	pdata->clk_xtal = of_clk_get(np, 0);
+-	if (!IS_ERR(pdata->clk_xtal))
+-		clk_put(pdata->clk_xtal);
+-	pdata->clk_clkin = of_clk_get(np, 1);
+-	if (!IS_ERR(pdata->clk_clkin))
+-		clk_put(pdata->clk_clkin);
+-
+ 	/*
+ 	 * property silabs,pll-source : <num src>, [<..>]
+ 	 * allow to selectively set pll source
+@@ -1328,8 +1321,22 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 	i2c_set_clientdata(client, drvdata);
+ 	drvdata->client = client;
+ 	drvdata->variant = variant;
+-	drvdata->pxtal = pdata->clk_xtal;
+-	drvdata->pclkin = pdata->clk_clkin;
++	drvdata->pxtal = devm_clk_get(&client->dev, "xtal");
++	drvdata->pclkin = devm_clk_get(&client->dev, "clkin");
++
++	if (PTR_ERR(drvdata->pxtal) == -EPROBE_DEFER ||
++	    PTR_ERR(drvdata->pclkin) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
++
++	/*
++	 * Check for valid parent clock: VARIANT_A and VARIANT_B need XTAL,
++	 *   VARIANT_C can have CLKIN instead.
++	 */
++	if (IS_ERR(drvdata->pxtal) &&
++	    (drvdata->variant != SI5351_VARIANT_C || IS_ERR(drvdata->pclkin))) {
++		dev_err(&client->dev, "missing parent clock\n");
++		return -EINVAL;
++	}
  
- 		/* connect xtal input to 25MHz reference */
- 		clocks = <&ref25>;
-+		clock-names = "xtal";
+ 	drvdata->regmap = devm_regmap_init_i2c(client, &si5351_regmap_config);
+ 	if (IS_ERR(drvdata->regmap)) {
+@@ -1393,6 +1400,11 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 		}
+ 	}
  
- 		/* connect xtal input as source of pll0 and pll1 */
- 		silabs,pll-source = <0 0>, <1 0>;
++	if (!IS_ERR(drvdata->pxtal))
++		clk_prepare_enable(drvdata->pxtal);
++	if (!IS_ERR(drvdata->pclkin))
++		clk_prepare_enable(drvdata->pclkin);
++
+ 	/* register xtal input clock gate */
+ 	memset(&init, 0, sizeof(init));
+ 	init.name = si5351_input_names[0];
+@@ -1407,7 +1419,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 	clk = devm_clk_register(&client->dev, &drvdata->xtal);
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&client->dev, "unable to register %s\n", init.name);
+-		return PTR_ERR(clk);
++		ret = PTR_ERR(clk);
++		goto err_clk;
+ 	}
+ 
+ 	/* register clkin input clock gate */
+@@ -1425,7 +1438,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 		if (IS_ERR(clk)) {
+ 			dev_err(&client->dev, "unable to register %s\n",
+ 				init.name);
+-			return PTR_ERR(clk);
++			ret = PTR_ERR(clk);
++			goto err_clk;
+ 		}
+ 	}
+ 
+@@ -1447,7 +1461,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 	clk = devm_clk_register(&client->dev, &drvdata->pll[0].hw);
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&client->dev, "unable to register %s\n", init.name);
+-		return -EINVAL;
++		ret = PTR_ERR(clk);
++		goto err_clk;
+ 	}
+ 
+ 	/* register PLLB or VXCO (Si5351B) */
+@@ -1471,7 +1486,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 	clk = devm_clk_register(&client->dev, &drvdata->pll[1].hw);
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&client->dev, "unable to register %s\n", init.name);
+-		return -EINVAL;
++		ret = PTR_ERR(clk);
++		goto err_clk;
+ 	}
+ 
+ 	/* register clk multisync and clk out divider */
+@@ -1492,8 +1508,10 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 		num_clocks * sizeof(*drvdata->onecell.clks), GFP_KERNEL);
+ 
+ 	if (WARN_ON(!drvdata->msynth || !drvdata->clkout ||
+-		    !drvdata->onecell.clks))
+-		return -ENOMEM;
++		    !drvdata->onecell.clks)) {
++		ret = -ENOMEM;
++		goto err_clk;
++	}
+ 
+ 	for (n = 0; n < num_clocks; n++) {
+ 		drvdata->msynth[n].num = n;
+@@ -1511,7 +1529,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 		if (IS_ERR(clk)) {
+ 			dev_err(&client->dev, "unable to register %s\n",
+ 				init.name);
+-			return -EINVAL;
++			ret = PTR_ERR(clk);
++			goto err_clk;
+ 		}
+ 	}
+ 
+@@ -1538,7 +1557,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 		if (IS_ERR(clk)) {
+ 			dev_err(&client->dev, "unable to register %s\n",
+ 				init.name);
+-			return -EINVAL;
++			ret = PTR_ERR(clk);
++			goto err_clk;
+ 		}
+ 		drvdata->onecell.clks[n] = clk;
+ 
+@@ -1557,10 +1577,17 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 				  &drvdata->onecell);
+ 	if (ret) {
+ 		dev_err(&client->dev, "unable to add clk provider\n");
+-		return ret;
++		goto err_clk;
+ 	}
+ 
+ 	return 0;
++
++err_clk:
++	if (!IS_ERR(drvdata->pxtal))
++		clk_disable_unprepare(drvdata->pxtal);
++	if (!IS_ERR(drvdata->pclkin))
++		clk_disable_unprepare(drvdata->pclkin);
++	return ret;
+ }
+ 
+ static const struct i2c_device_id si5351_i2c_ids[] = {
+diff --git a/include/linux/platform_data/si5351.h b/include/linux/platform_data/si5351.h
+index a947ab8b441a..533d9807e543 100644
+--- a/include/linux/platform_data/si5351.h
++++ b/include/linux/platform_data/si5351.h
+@@ -5,8 +5,6 @@
+ #ifndef __LINUX_PLATFORM_DATA_SI5351_H__
+ #define __LINUX_PLATFORM_DATA_SI5351_H__
+ 
+-struct clk;
+-
+ /**
+  * enum si5351_pll_src - Si5351 pll clock source
+  * @SI5351_PLL_SRC_DEFAULT: default, do not change eeprom config
+@@ -107,8 +105,6 @@ struct si5351_clkout_config {
+  * @clkout: array of clkout configuration
+  */
+ struct si5351_platform_data {
+-	struct clk *clk_xtal;
+-	struct clk *clk_clkin;
+ 	enum si5351_pll_src pll_src[2];
+ 	struct si5351_clkout_config clkout[8];
+ };
 -- 
 2.1.0
