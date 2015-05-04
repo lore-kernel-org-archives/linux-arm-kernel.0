@@ -1,15 +1,15 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon,  4 May 2015 10:36:37 -0700
-Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
+Date: Mon,  4 May 2015 10:36:39 -0700
+Subject: [PATCH v8 6/9] mailbox: Add NVIDIA Tegra XUSB mailbox binding
 In-Reply-To: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
 References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1430761002-9327-5-git-send-email-abrestic@chromium.org>
+Message-ID: <1430761002-9327-7-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a binding document for the XUSB host complex on NVIDIA Tegra124
-and later SoCs.  The XUSB host complex includes a mailbox for
-communication with the XUSB micro-controller and an xHCI host-controller.
+Add device-tree bindings for the Tegra XUSB mailbox which will be used
+for communication between the Tegra xHCI controller's firmware and the
+host processor.
 
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 Cc: Rob Herring <robh+dt@kernel.org>
@@ -17,59 +17,60 @@ Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Jassi Brar <jassisinghbrar@gmail.com>
 ---
 Changes from v7:
- - Move non-shared resources into child nodes.
-New for v7.
+ - Added back interrupts property.
+Changes from v6:
+ - Removed reg/interrupts properties.
+No changes from v3/v4/v5.
+Changes from v2:
+ - Dropped channel specifier.
+ - Added pointer to mailbox documentation.
+Changes from v1:
+ - Updated to use common mailbox bindings.
 ---
- .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+ .../bindings/mailbox/nvidia,tegra124-xusb-mbox.txt | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
 
-diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
 new file mode 100644
-index 0000000..bc50110
+index 0000000..7eb72ce
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-@@ -0,0 +1,37 @@
-+NVIDIA Tegra XUSB host copmlex
-+==============================
++++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
+@@ -0,0 +1,32 @@
++NVIDIA Tegra XUSB mailbox
++=========================
 +
-+The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
-+controller and a mailbox for communication with the XUSB micro-controller.
++The Tegra XUSB mailbox is used by the Tegra xHCI controller's firmware to
++communicate requests to the host and PHY drivers.
++
++Refer to ./mailbox.txt for generic information about mailbox device-tree
++bindings.
 +
 +Required properties:
 +--------------------
-+ - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
-+   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
-+   where <chip> is tegra132.
-+ - reg: Must contain the base and length of the XUSB FPCI registers.
-+ - ranges: Bus address mapping for the XUSB block.  Can be empty since the
-+   mapping is 1:1.
-+ - #address-cells: Must be 2.
-+ - #size-cells: Must be 2.
++ - compatible: For Tegra124, must contain "nvidia,tegra124-xusb-mbox".
++   Otherwise, must contain '"nvidia,<chip>-xusb-mbox",
++   "nvidia,tegra124-xusb-mbox"' where <chip> is tegra132.
++ - interrupts: Must contain the XUSB mailbox interrupt.
++ - #mbox-cells: Should be 0.  There is only one physical channel.
 +
 +Example:
 +--------
-+	usb at 0,70098000 {
-+		compatible = "nvidia,tegra124-xusb";
-+		reg = <0x0 0x70098000 0x0 0x1000>;
-+		ranges;
++	xusb_mbox: mailbox {
++		compatible = "nvidia,tegra124-xusb-mbox";
++		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
 +
-+		#address-cells = <2>;
-+		#size-cells = <2>;
++		#mbox-cells = <0>;
++	};
 +
-+		usb-host at 0,70090000 {
-+			compatible = "nvidia,tegra124-xhci";
-+			...
-+		};
-+
-+		mailbox {
-+			compatible = "nvidia,tegra124-xusb-mbox";
-+			...
-+		};
++	usb-host at 0,70090000 {
++		...
++		mboxes = <&xusb_mbox>;
++		mbox-names = "xusb";
++		...
 +	};
 -- 
 2.2.0.rc0.207.ga3a616c
