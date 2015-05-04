@@ -1,74 +1,39 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 04 May 2015 10:16:04 +0200
-Subject: [PATCH v6 09/25] iommu: exynos: remove unused functions, part 2
+Date: Mon, 04 May 2015 10:16:07 +0200
+Subject: [PATCH v6 12/25] iommu: exynos: add support for runtime_pm
 In-Reply-To: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
 References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1430727380-10912-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1430727380-10912-13-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After refactoring functions to use pointer to struct sysmmu_drvdata
-directly, some functions became useless and thus never used, so remove
-them completely.
+This patch fixes support for runtime power management for SYSMMU
+controllers, so they are enabled when master device is attached.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 43 -------------------------------------------
- 1 file changed, 43 deletions(-)
+ drivers/iommu/exynos-iommu.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 0c23b69022cd..7d62715ab51e 100644
+index 598660c87410..734107ec78fa 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -463,49 +463,6 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
- 	return ret;
- }
+@@ -702,6 +702,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
+ 		return -ENODEV;
  
--/* __exynos_sysmmu_enable: Enables System MMU
-- *
-- * returns -error if an error occurred and System MMU is not enabled,
-- * 0 if the System MMU has been just enabled and 1 if System MMU was already
-- * enabled before.
-- */
--static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
--				  struct iommu_domain *domain)
--{
--	int ret = 0;
--	unsigned long flags;
--	struct exynos_iommu_owner *owner = dev->archdata.iommu;
--	struct sysmmu_drvdata *data;
--
--	BUG_ON(!has_sysmmu(dev));
--
--	data = dev_get_drvdata(owner->sysmmu);
--
--	ret = __sysmmu_enable(data, pgtable, domain);
--	if (ret >= 0)
--		data->master = dev;
--
--	return ret;
--}
--
--static bool exynos_sysmmu_disable(struct device *dev)
--{
--	unsigned long flags;
--	bool disabled = true;
--	struct exynos_iommu_owner *owner = dev->archdata.iommu;
--	struct sysmmu_drvdata *data;
--
--	BUG_ON(!has_sysmmu(dev));
--
--	data = dev_get_drvdata(owner->sysmmu);
--
--	disabled = __sysmmu_disable(data);
--	if (disabled)
--		data->master = NULL;
--
--	return disabled;
--}
--
- static void __sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
- 					      sysmmu_iova_t iova)
- {
+ 	list_for_each_entry(data, &owner->clients, owner_node) {
++		pm_runtime_get_sync(data->sysmmu);
+ 		ret = __sysmmu_enable(data, pagetable, domain);
+ 		if (ret >= 0) {
+ 			data->master = dev;
+@@ -743,6 +744,7 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
+ 				data->master = NULL;
+ 				list_del_init(&data->domain_node);
+ 			}
++			pm_runtime_put(data->sysmmu);
+ 			found = true;
+ 		}
+ 	}
 -- 
 1.9.2
