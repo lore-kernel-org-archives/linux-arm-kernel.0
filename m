@@ -1,52 +1,66 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 4 May 2015 16:35:51 +0800
-Subject: [PATCH RFC v1 2/5] clk: add missing lock when call
- clk_core_enable in clk_set_parent
-In-Reply-To: <55427D83.3060900@codeaurora.org>
-References: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
- <1429107999-24413-3-git-send-email-aisheng.dong@freescale.com>
- <55427D83.3060900@codeaurora.org>
-Message-ID: <20150504083549.GC4082@shlinux1.ap.freescale.net>
+From: johan@kernel.org (Johan Hovold)
+Date: Mon, 4 May 2015 10:49:25 +0200
+Subject: [PATCH  0/2] gpio: Allow userspace export from DT
+In-Reply-To: <20150413110515.9681.58848.stgit@localhost>
+References: <20150413110515.9681.58848.stgit@localhost>
+Message-ID: <20150504084925.GB4047@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 12:07:47PM -0700, Stephen Boyd wrote:
-> On 04/15/15 07:26, Dong Aisheng wrote:
-> > clk_core_enable is executed without &enable_clock in clk_set_parent function.
-> > Adding it to avoid potential race condition issue.
-> >
-> > Fixes: 035a61c314eb ("clk: Make clk API return per-user struct clk instances")
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
-> > ---
+On Mon, Apr 13, 2015 at 01:05:15PM +0200, Martin Fuzzey wrote:
+> Currently the gpio sysfs interface allows userspace to access simple hardware
+> where no kernel driver exists or would be useful.
 > 
-> Can you please describe the race condition? From what I can tell there
-> is not a race condition here and we've gone around on this part of the
-> code before to fix any race conditions.
+> However it requires userspace to know the gpio number that has been assigned
+> by the kernel.
 > 
-
-Do you mean we do not need to acquire enable lock when execute clk_core_enable
-in set_parent function? Can you help explain a bit more why?
-
-The clk doc looks to me says the enable lock should be held across calls to
-the .enable, .disable and .is_enabled operations.
-
-And before the commit
-035a61c314eb ("clk: Make clk API return per-user struct clk instances"),
-all the clk_enable/disable in set_parent() is executed with lock.
-
-A rough thinking of race condition is assuming Thread A calls
-clk_set_parent(x, y) while Thread B calls clk_enable(x), clock x is disabled
-but prepared initially, due to clk_core_enable in set_parent() is not
-executed with enable clock, the clk_core_enable may be reentrant during
-the locking time executed by B.
-Won't this be a race condition?
-
-Regards
-Dong Aisheng
-
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> That number, in the case of gpio drviers using dynamic allocation, is not fixed,
+> and may change when:
+> * The kernel version changes and ARCH_NR_GPIOS is changed (happened in 3.17)
+> * The kernel version changes and probe order changes for gpio chips.
+> * The kernel configuration is changed if CONFIG_ARCH_NR_GPIO is used
+> * The board is redesigned (eg switching an externally visible signal from a
+> SoC provided GPIO to an I2C expander chip or vice versa).
+> * Other GPIO chips are added to the system.
 > 
+> The above means that, in order to export the GPIO to userspace via
+> /sys/class/gpio/export the userspace code must know the exact hardware and
+> kernel version information.
+
+Not quite. You can still determine the gpio number in the above cases by
+walking the sysfs tree to find the chip and it's base. This is the only
+way to do this for dynamic buses such as USB.
+
+The only case for which this fails is if a pin function is moved (e.g.
+your i2c-expander case above).
+
+> Furthermore, in many cases, it makes no sense to allow userspace to
+> change the signal direction; even if the GPIO itself allows it the
+> circuitry connected to the pin often does not (eg a signal dedicated
+> to an output function driving a  transistor).
+
+Indeed. The current sysfs-interface is a hack (which I personally think
+never should have been merged).
+
+Firmware should describe pin directionality and function, and undefined
+pins should never be allowed to be accessed from userspace.
+
+Sure, the current GPIO-sysfs-interface is useful during development and
+for one-off hacks, but I'm convinced it's detrimental in the long run as
+it removes the incentives to fix the driver code that it's used to work
+around (e.g. custom init script to toggle enable lines of some radio
+chips).
+
+> This patch series solves both problems by performing the external
+> signal => GPIO mapping in the device tree.
+
+As Rob already mentioned, what we want is some way to declare pin
+functions. These could then be requested from userspace (or used in DT,
+something which should allow for further refactoring there as well)
+unless a driver has already claimed them.
+
+We don't want to add more dependencies on the current sysfs-based
+interface, which I hope we'll one day will be able to retire in favour
+of a more sane one.
+
+Johan
