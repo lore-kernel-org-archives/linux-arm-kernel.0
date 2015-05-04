@@ -1,55 +1,89 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 4 May 2015 21:27:43 +0300
-Subject: [PATCH 3/3] ARM: s3c24xx: H1940: Move gpiochip_add call into
- core_init() callback
-In-Reply-To: <CAJKOXPd8XgpcoS2knB8JYNeRVRjO=jetwM64tVYW9hPCYN8UoA@mail.gmail.com>
-References: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
- <1430676910-30657-3-git-send-email-anarsoul@gmail.com>
- <CAJKOXPd8XgpcoS2knB8JYNeRVRjO=jetwM64tVYW9hPCYN8UoA@mail.gmail.com>
-Message-ID: <CA+E=qVeYgddYLxK8izaJk2ta+d9OT+e-2Je7KZUpwbj3AAQsPQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 May 2015 20:37:42 +0200
+Subject: imx6 sata cdrom driver issue
+In-Reply-To: <55439CA1.4030601@lenbrook.com>
+References: <5539101D.1020909@lenbrook.com> <15678294.L2fz4hMtva@wuerfel>
+ <55439CA1.4030601@lenbrook.com>
+Message-ID: <3757889.IHh7sEV0GH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 4, 2015 at 6:23 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> 2015-05-04 3:15 GMT+09:00 Vasily Khoruzhick <anarsoul@gmail.com>:
->> gpiochip_add() allocates memory, however it's not possible anymore
->
-> "...to call it..."? Something is missing in the sentence.
+On Friday 01 May 2015 11:32:49 Jonathan Bagg wrote:
+> On 15-04-24 03:58 AM, Arnd Bergmann wrote:
+> > On Thursday 23 April 2015 11:30:37 Jonathan Bagg wrote:
+> >
+> > Do you have two SATA ports on one controller, with the other one being
+> > conneced to a disk drive?
+> Not when this error happened, but the CD-ROM was connected through a 
+> port multiplier.  One time I noticed sda device appear so I mounted it 
+> and it was the CD-ROM filesystem!
 
-"it" replaces "memory allocation" here (kzalloc fails)
+Very strange, I'm sure something went wrong there and either the SATA
+host or the CDROM driver does not work well with a port multiplier.
 
->> from
->> machine map_io() callback thus it failed and prevented machine from booting
->> properly.
->>
->> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->> ---
->>  arch/arm/mach-s3c24xx/mach-h1940.c | 7 ++++++-
->>  1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
->> index 86d9ec7..744aa4f 100644
->> --- a/arch/arm/mach-s3c24xx/mach-h1940.c
->> +++ b/arch/arm/mach-s3c24xx/mach-h1940.c
->> @@ -777,9 +777,14 @@ static void __init h1940_map_io(void)
->>
->>         /* Add latch gpio chip, set latch initial value */
->>         h1940_latch_control(0, 0);
->> -       WARN_ON(gpiochip_add(&h1940_latch_gpiochip));
->>  }
->>
->> +static __init int h1940_gpiolib_init(void)
->> +{
->> +       return gpiochip_add(&h1940_latch_gpiochip);
->> +}
->> +core_initcall(h1940_gpiolib_init);
->> +
->
-> arch_initcall() or init_machine() callback seems more appropriate.
-> What do you think?
+Is there a way for you to reproduce the problem without the multiplier?
 
-I did the same way as Kukjin Kim did in samsung gpio driver.
+> > My best guess is that something in the error handling of
+> > drivers/ata/ahci_imx.c causes a reset of the entire bus and that
+> > triggers the other bugs. Can you instrument that error handling to
+> > see what's going on?
+> >
+> Also tried a cubox 
+> <https://www.solid-run.com/products/cubox-i-mini-computer/>, (imx6) 
+> running  Linux OpenELEC 3.14.18 #1 SMP Sun Sep 14 12:22:14 EDT 2014 
+> armv7l GNU/Linux
 
-> Best regards,
-> Krzysztof
+Can you find out if there is a port multiplier in that machine?
+
+Does it list the sda device in /proc/partitions, or just the /dev/sr0?
+
+> Most of the time mount /dev/sr0 /tmp/test succeeds with....
+> 
+> [  954.355669] ISO 9660 Extensions: Microsoft Joliet Level 3
+> [  954.530595] ISOFS: changing to secondary root
+> 
+> one time once it succeed but needed to reset the link....
+> 
+> [ 1272.000951] ata1.00: exception Emask 0x0 SAct 0x0 SErr 0x0 action 0x6 
+> frozen
+> [ 1272.000969] ata1.00: failed command: IDENTIFY PACKET DEVICE
+> [ 1272.000993] ata1.00: cmd a1/00:01:00:00:00/00:00:00:00:00/00 tag 2 
+> pio 512 in
+> [ 1272.000993]          res 40/00:03:00:16:00/00:00:00:00:00/a0 Emask 
+> 0x4 (timeout)
+> [ 1272.001004] ata1.00: status: { DRDY }
+> [ 1272.001021] ata1: hard resetting link
+> [ 1272.487628] ata1: SATA link up 1.5 Gbps (SStatus 113 SControl 300)
+> [ 1272.495523] ata1.00: configured for UDMA/100
+> [ 1272.500917] ata1: EH complete
+> [ 1290.746222] ISO 9660 Extensions: Microsoft Joliet Level 3
+> 
+> rarely if fails with this....
+> 
+> [  724.697232] ISO 9660 Extensions: Microsoft Joliet Level 3
+> [  724.827435] ISOFS: changing to secondary root
+> [  724.910232] isofs_fill_super: root inode is not a directory. 
+> Corrupted media?
+> [  725.133516] UDF-fs: warning (device sr0): udf_fill_super: No 
+> partition found (2)
+> [  725.351106] F2FS-fs (sr0): Magic Mismatch, valid(0xf2f52010) - read(0x0)
+> [  725.351132] F2FS-fs (sr0): Can't find valid F2FS filesystem in 1th 
+> superblock
+> [  725.352029] F2FS-fs (sr0): Magic Mismatch, valid(0xf2f52010) - read(0x0)
+> [  725.352052] F2FS-fs (sr0): Can't find valid F2FS filesystem in 2th 
+> superblock
+> 
+> 
+> Specifying read only (mount -o ro /dev/sr0 /tmp/test) has worked 100% of 
+> the time on both the cubox and sabre boards.
+
+Interesting. That would indicate that something actually tries to write
+to the device on normal mount.  Can you try if 
+
+mount -t iso9660 /dev/sr0 /tmp/test
+
+avoids that problem as well? That file system should never attempt to write
+to the device, so if it's the failed write that causes the host reset,
+that should solve it too.
+
+	Arnd
