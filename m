@@ -1,39 +1,55 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 4 May 2015 14:26:18 -0400
-Subject: [PATCH v3 1/2] libahci: Add support to handle HOST_IRQ_STAT as
- edge trigger latch.
-In-Reply-To: <CAOHikRCZimsE+_-6dqTiCT6qRTFLp9VGt6=WHWA_Z86GBn+WRg@mail.gmail.com>
-References: <1430667220-23477-1-git-send-email-stripathi@apm.com>
- <1430667220-23477-2-git-send-email-stripathi@apm.com>
- <20150504154726.GA1971@htj.duckdns.org>
- <CAOHikRCZimsE+_-6dqTiCT6qRTFLp9VGt6=WHWA_Z86GBn+WRg@mail.gmail.com>
-Message-ID: <20150504182618.GG1971@htj.duckdns.org>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 4 May 2015 21:27:43 +0300
+Subject: [PATCH 3/3] ARM: s3c24xx: H1940: Move gpiochip_add call into
+ core_init() callback
+In-Reply-To: <CAJKOXPd8XgpcoS2knB8JYNeRVRjO=jetwM64tVYW9hPCYN8UoA@mail.gmail.com>
+References: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
+ <1430676910-30657-3-git-send-email-anarsoul@gmail.com>
+ <CAJKOXPd8XgpcoS2knB8JYNeRVRjO=jetwM64tVYW9hPCYN8UoA@mail.gmail.com>
+Message-ID: <CA+E=qVeYgddYLxK8izaJk2ta+d9OT+e-2Je7KZUpwbj3AAQsPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, May 4, 2015 at 6:23 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> 2015-05-04 3:15 GMT+09:00 Vasily Khoruzhick <anarsoul@gmail.com>:
+>> gpiochip_add() allocates memory, however it's not possible anymore
+>
+> "...to call it..."? Something is missing in the sentence.
 
-On Mon, May 04, 2015 at 10:13:11PM +0530, Suman Tripathi wrote:
-> AFAIK clearing host_irq_stat means we have handled port interrupts .
-> Now for our case we still have interrupts left because it didn't get
-> detected on
-> first ahci_port_intr.  So you  mean to handle that residual irq in the
-> next cycle (i mean next call intr handler ) ??
+"it" replaces "memory allocation" here (kzalloc fails)
 
-Heh, I think we're talking past each other.  For level triggered IRQs,
-the latched IRQ bits should be cleared after handling the events;
-otherwise, the latched bits are gonna get set immediately as the
-events are still pending.  Also, this doesn't lose any events as
-they're level triggered latches - if any event is pending, the IRQ is
-gonna be raised again.
+>> from
+>> machine map_io() callback thus it failed and prevented machine from booting
+>> properly.
+>>
+>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>> ---
+>>  arch/arm/mach-s3c24xx/mach-h1940.c | 7 ++++++-
+>>  1 file changed, 6 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
+>> index 86d9ec7..744aa4f 100644
+>> --- a/arch/arm/mach-s3c24xx/mach-h1940.c
+>> +++ b/arch/arm/mach-s3c24xx/mach-h1940.c
+>> @@ -777,9 +777,14 @@ static void __init h1940_map_io(void)
+>>
+>>         /* Add latch gpio chip, set latch initial value */
+>>         h1940_latch_control(0, 0);
+>> -       WARN_ON(gpiochip_add(&h1940_latch_gpiochip));
+>>  }
+>>
+>> +static __init int h1940_gpiolib_init(void)
+>> +{
+>> +       return gpiochip_add(&h1940_latch_gpiochip);
+>> +}
+>> +core_initcall(h1940_gpiolib_init);
+>> +
+>
+> arch_initcall() or init_machine() callback seems more appropriate.
+> What do you think?
 
-Edge triggered latches are the other way around.  You should clear the
-latches before actually handling and clearing the events.  The pending
-events won't trigger the latches again as it's edge-triggered and the
-events which happens after this irq handling starts won't get lost as
-they'll be latched for the next round.
+I did the same way as Kukjin Kim did in samsung gpio driver.
 
-Thanks.
-
--- 
-tejun
+> Best regards,
+> Krzysztof
