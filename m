@@ -1,40 +1,23 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 4 May 2015 22:34:55 +0200 (CEST)
-Subject: [PATCH V2 5/6] regulator: add mxs on-chip regulator driver
-In-Reply-To: <20150504123648.GU15510@sirena.org.uk>
-References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
- <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
- <20150504123648.GU15510@sirena.org.uk>
-Message-ID: <1693367404.879766.1430771695242.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+From: robertemmee02@outlook.fr (Mr. Michael Uba)
+Date: Tue, 05 May 2015 00:58:04 +0400
+Subject: CONTACT QUICK EXPRESS COURIER OFFICE.
+Message-ID: <201505042058.t44K1klr018553@kremail.lf2.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+CONTACT QUICK EXPRESS COURIER OFFICE. 
 
-> Mark Brown <broonie@kernel.org> hat am 4. Mai 2015 um 14:36 geschrieben:
->
->
-> On Wed, Apr 29, 2015 at 10:32:26PM +0000, Stefan Wahren wrote:
->
-> > +static struct regulator_ops mxs_dcdc_ops = {
-> > + .is_enabled = regulator_is_enabled_regmap,
-> > +};
->
-> Why do we have an is_enabled() operation but no enable or disable
-> operation? 
+  
+I have deposited your ATM Debit Card with the (QECD) delivery service . All you have to do is to contact them at:- (quickexpresscourier at vmail.me) they will give you direction on how your ATM card will be delivered to you. 
 
-i'm sorry, i forgot the following point in the changelog:
+  
+My agreement with them is to withdraw $5,000 USD daily until the whole of $1.5 USD is completed. I have paid them their delivery charges & insurance coverage fee. 
+  
 
-- move dcdc handling from mxs_power to mxs-regulator
+The only fee you will send to them before the delivery is $175 USD for security and paper works only. Also forward your full details to them for confirmation, here is your registration code. QU254522 please, send this code to them to enable them know your parcel. 
 
-I hope the change is okay. I implemented only is_enabled() to have at least 1
-operation.
-But it's not really necessary.
+  
+Thank you. 
 
-> I'm also not 100% clear what code the DCDCs and LDOs are
-> sharing here...
-
-Actually only probing and the regulator info structure.
-
-Best regards
-Stefan
+  
+Mr. Michael Uba
