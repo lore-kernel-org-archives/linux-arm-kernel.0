@@ -1,28 +1,39 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 4 May 2015 21:10:27 +0300
-Subject: [PATCH 2/3] ARM: s3c24xx: Add DMA resources for SDI and I2S
-In-Reply-To: <CAJKOXPewZb_26GgA27T8fkXvTrg3FEYMkErapqoaMaSHDNy3ug@mail.gmail.com>
-References: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
- <1430676910-30657-2-git-send-email-anarsoul@gmail.com>
- <CAJKOXPewZb_26GgA27T8fkXvTrg3FEYMkErapqoaMaSHDNy3ug@mail.gmail.com>
-Message-ID: <CA+E=qVeyDvySOfLRL9PKYm5c9YkZhdt3OHrh4n1sXOusgy+qJw@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 4 May 2015 14:26:18 -0400
+Subject: [PATCH v3 1/2] libahci: Add support to handle HOST_IRQ_STAT as
+ edge trigger latch.
+In-Reply-To: <CAOHikRCZimsE+_-6dqTiCT6qRTFLp9VGt6=WHWA_Z86GBn+WRg@mail.gmail.com>
+References: <1430667220-23477-1-git-send-email-stripathi@apm.com>
+ <1430667220-23477-2-git-send-email-stripathi@apm.com>
+ <20150504154726.GA1971@htj.duckdns.org>
+ <CAOHikRCZimsE+_-6dqTiCT6qRTFLp9VGt6=WHWA_Z86GBn+WRg@mail.gmail.com>
+Message-ID: <20150504182618.GG1971@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 4, 2015 at 6:45 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> 2015-05-04 3:15 GMT+09:00 Vasily Khoruzhick <anarsoul@gmail.com>:
->> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->
-> "Add DMA resources for SDI and I2S".,.. what for? why? The commit
-> message would be appropriate place to put such details.
+Hello,
 
-Because SDI and I2S drivers need these resources to setup DMA channel properly.
-Would you like me to resend the patch with this explanation?
+On Mon, May 04, 2015 at 10:13:11PM +0530, Suman Tripathi wrote:
+> AFAIK clearing host_irq_stat means we have handled port interrupts .
+> Now for our case we still have interrupts left because it didn't get
+> detected on
+> first ahci_port_intr.  So you  mean to handle that residual irq in the
+> next cycle (i mean next call intr handler ) ??
 
-> The patch itself looks good.
->
-> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
-> Best regards,
-> Krzysztof
+Heh, I think we're talking past each other.  For level triggered IRQs,
+the latched IRQ bits should be cleared after handling the events;
+otherwise, the latched bits are gonna get set immediately as the
+events are still pending.  Also, this doesn't lose any events as
+they're level triggered latches - if any event is pending, the IRQ is
+gonna be raised again.
+
+Edge triggered latches are the other way around.  You should clear the
+latches before actually handling and clearing the events.  The pending
+events won't trigger the latches again as it's edge-triggered and the
+events which happens after this irq handling starts won't get lost as
+they'll be latched for the next round.
+
+Thanks.
+
+-- 
+tejun
