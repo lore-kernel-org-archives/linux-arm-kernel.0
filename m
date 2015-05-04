@@ -1,22 +1,39 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 4 May 2015 12:45:01 +0900
-Subject: [PATCH 2/3] ARM: s3c24xx: Add DMA resources for SDI and I2S
-In-Reply-To: <1430676910-30657-2-git-send-email-anarsoul@gmail.com>
-References: <1430676910-30657-1-git-send-email-anarsoul@gmail.com>
- <1430676910-30657-2-git-send-email-anarsoul@gmail.com>
-Message-ID: <CAJKOXPewZb_26GgA27T8fkXvTrg3FEYMkErapqoaMaSHDNy3ug@mail.gmail.com>
+From: zhengjunling@huawei.com (Junling Zheng)
+Date: Mon, 4 May 2015 03:48:30 +0000
+Subject: [RFC PATCH 1/2] ARM: hisi: fix the indentations in Kconfig
+Message-ID: <1430711311-20758-1-git-send-email-zhengjunling@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-04 3:15 GMT+09:00 Vasily Khoruzhick <anarsoul@gmail.com>:
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Fix the indentations using tabs instead of spaces to align our code.
 
-"Add DMA resources for SDI and I2S".,.. what for? why? The commit
-message would be appropriate place to put such details.
+Signed-off-by: Junling Zheng <zhengjunling@huawei.com>
+---
+ arch/arm/mach-hisi/Kconfig | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-The patch itself looks good.
-
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index 83061ad..a12b764 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -23,12 +23,12 @@ config ARCH_HI3xxx
+ 	  Support for Hisilicon Hi36xx SoC family
+ 
+ config ARCH_HIP01
+-       bool "Hisilicon HIP01 family" if ARCH_MULTI_V7
+-       select HAVE_ARM_SCU if SMP
+-       select HAVE_ARM_TWD if SMP
+-       select ARM_GLOBAL_TIMER
+-       help
+-         Support for Hisilicon HIP01 SoC family
++	bool "Hisilicon HIP01 family" if ARCH_MULTI_V7
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if SMP
++	select ARM_GLOBAL_TIMER
++	help
++	  Support for Hisilicon HIP01 SoC family
+ 
+ config ARCH_HIP04
+ 	bool "Hisilicon HiP04 Cortex A15 family" if ARCH_MULTI_V7
+-- 
+1.8.3.4
