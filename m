@@ -1,79 +1,44 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 04 May 2015 10:51:05 +0200
-Subject: [PATCH 2/2] doc: dt: add documentation for lpc1850-rgu reset
- driver
-In-Reply-To: <1430173843-11648-3-git-send-email-manabian@gmail.com>
-References: <1430173843-11648-1-git-send-email-manabian@gmail.com>
- <1430173843-11648-3-git-send-email-manabian@gmail.com>
-Message-ID: <1430729465.3722.26.camel@pengutronix.de>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 4 May 2015 10:56:12 +0200
+Subject: [PATCH 0/2] get pinctrl more flexible for per pin muxing controllers
+Message-ID: <1430729776-27797-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
+Hi,
 
-please Cc: devicetree at vger.kernel.org for new device tree binding
-documentation.
+The way pins, groups and functions are tied is too constraining for some
+controllers. It concerns mainly the ones we don't care about groups and
+functions, each pin can be muxed to any functions.
+The goal of these two patches is too remove some of the constraints.
 
-Am Dienstag, den 28.04.2015, 00:30 +0200 schrieb Joachim Eastwood:
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  .../devicetree/bindings/reset/nxp,lpc1850-rgu.txt  | 38 ++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt b/Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt
-> new file mode 100644
-> index 000000000000..45dbd6087731
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt
-> @@ -0,0 +1,38 @@
-> +NXP LPC1850  Reset Generation Unit (RGU)
-> +========================================
-> +
-> +Please also refer to reset.txt in this directory for common reset
-> +controller binding usage.
-> +
-> +Required properties:
-> +- compatible: Should be "nxp,lpc1850-rgu"
-> +- reg: register base and length
-> +- clocks: phandle and clock specifier to RGU clocks
-> +- clock-names: should contain "delay" and "reg"
-> +- #reset-cells: should be 1
-> +
-> +Refer to NXP LPC18xx or LPC43xx user manual for a description of the
-> +reset signals and the connected block/peripheral.
-> +
-> +Reset provider example:
-> +rgu: reset-controller at 40053000 {
-> +	compatible = "nxp,lpc1850-rgu";
-> +	reg = <0x40053000 0x1000>;
-> +	clocks = <&cgu BASE_SAFE_CLK>, <&ccu1 CLK_CPU_BUS>;
-> +	clock-names = "delay", "reg";
-> +	#reset-cells = <1>;
-> +};
-> +
-> +Reset consumer example:
-> +mac: ethernet at 40010000 {
-> +	compatible = "nxp,lpc1850-dwmac", "snps,dwmac-3.611", "snps,dwmac";
-> +	reg = <0x40010000 0x2000>;
-> +	interrupts = <5>;
-> +	interrupt-names = "macirq";
-> +	clocks = <&ccu1 CLK_CPU_ETHERNET>;
-> +	clock-names = "stmmaceth";
-> +	resets = <&rgu 22>;
+I have added the prototype of a pin controller and device tree to show the
+way I want to use these changes. I couldn't test it on boards using generic
+pinconf so I am not sure that I don't break something...
 
-I'd like the reset numbers to be documented in the binding docs. The
-reset ordering seems to be the same across all users of this core?
 
-Personally, I'd even prefer #defines like you have for the clock
-indices. I know others dislike this, though.
+Ludovic Desroches (4):
+  pinctrl: change function behavior for per pin muxing controllers
+  pinctrl: introduce complex pin description
+  pinctrl: rough draft for a future controller
+  ARM: at91/dt: proto dt
 
-> +	reset-names = "stmmaceth";
-> +	status = "disabled";
-> +};
-> +
- ^^
-Superfluous whitespace.
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/at91-sama5d4ek_proto.dts | 243 ++++++++++
+ arch/arm/boot/dts/sama5d4_proto-pinfunc.h  | 463 +++++++++++++++++++
+ arch/arm/boot/dts/sama5d4_proto.dtsi       | 716 +++++++++++++++++++++++++++++
+ drivers/pinctrl/Kconfig                    |  10 +
+ drivers/pinctrl/Makefile                   |   1 +
+ drivers/pinctrl/pinconf-generic.c          |  44 +-
+ drivers/pinctrl/pinctrl-at91-pio4.c        | 625 +++++++++++++++++++++++++
+ drivers/pinctrl/pinmux.c                   |  58 +--
+ include/linux/pinctrl/pinctrl.h            |   6 +
+ include/linux/pinctrl/pinmux.h             |   3 +
+ 11 files changed, 2134 insertions(+), 36 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d4ek_proto.dts
+ create mode 100644 arch/arm/boot/dts/sama5d4_proto-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/sama5d4_proto.dtsi
+ create mode 100644 drivers/pinctrl/pinctrl-at91-pio4.c
 
-regards
-Philipp
+-- 
+2.2.0
