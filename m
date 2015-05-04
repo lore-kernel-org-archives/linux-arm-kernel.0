@@ -1,256 +1,351 @@
 From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Mon,  4 May 2015 15:42:16 +0300
-Subject: [PATCH v2 3/5] DT: PCI: qcom: Document PCIe devicetree bindings
+Date: Mon,  4 May 2015 15:42:15 +0300
+Subject: [PATCH v2 2/5] phy: qcom: Add Qualcomm PCIe PHY
 In-Reply-To: <1430743338-10441-1-git-send-email-svarbanov@mm-sol.com>
 References: <1430743338-10441-1-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <1430743338-10441-4-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <1430743338-10441-3-git-send-email-svarbanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document Qualcomm PCIe driver devicetree bindings.
+Add a PCIe PHY driver used by PCIe host controller driver
+on Qualcomm SoCs like Snapdragon 805.
 
 Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
 ---
- .../devicetree/bindings/pci/qcom,pcie.txt          |  231 ++++++++++++++++++++
- 1 files changed, 231 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/qcom,pcie.txt
+ drivers/phy/Kconfig         |    9 ++
+ drivers/phy/Makefile        |    1 +
+ drivers/phy/phy-qcom-pcie.c |  291 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 301 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/phy/phy-qcom-pcie.c
 
-diff --git a/Documentation/devicetree/bindings/pci/qcom,pcie.txt b/Documentation/devicetree/bindings/pci/qcom,pcie.txt
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index a53bd5b..6cf9065 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -257,6 +257,15 @@ config PHY_QCOM_IPQ806X_SATA
+ 	depends on OF
+ 	select GENERIC_PHY
+ 
++config PHY_QCOM_PCIE
++	tristate "Qualcomm PCIe SerDes/PHY driver"
++	depends on ARCH_QCOM
++	depends on HAS_IOMEM
++	depends on OF
++	select GENERIC_PHY
++	help
++	  Enable support for PCIe phy driver
++
+ config PHY_ROCKCHIP_USB
+ 	tristate "Rockchip USB2 PHY Driver"
+ 	depends on ARCH_ROCKCHIP && OF
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index f126251..d80b99b 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -32,6 +32,7 @@ obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+ obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
+ obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
+ obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
++obj-$(CONFIG_PHY_QCOM_PCIE)		+= phy-qcom-pcie.o
+ obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
+ obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
+ obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+diff --git a/drivers/phy/phy-qcom-pcie.c b/drivers/phy/phy-qcom-pcie.c
 new file mode 100644
-index 0000000..dcf7348
+index 0000000..0ce2fc6
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/qcom,pcie.txt
-@@ -0,0 +1,231 @@
-+* Qualcomm PCI express root complex
++++ b/drivers/phy/phy-qcom-pcie.c
+@@ -0,0 +1,291 @@
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+- compatible:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: Value shall include
-+		    - "qcom,pcie-v0" for apq/ipq8064
-+		    - "qcom,pcie-v1" for apq8084
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/phy/phy.h>
++#include <linux/platform_device.h>
++#include <linux/reset.h>
 +
-+- reg:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: Register ranges as listed in the reg-names property
++#define QSERDES_COM_PLL_CP_SETI			0x024
++#define QSERDES_COM_PLL_IP_SETP			0x028
++#define QSERDES_COM_PLL_CP_SETP			0x02c
++#define QSERDES_COM_SYSCLK_EN_SEL		0x038
++#define QSERDES_COM_RESETSM_CNTRL		0x040
++#define QSERDES_COM_PLLLOCK_CMP1		0x044
++#define QSERDES_COM_PLLLOCK_CMP2		0x048
++#define QSERDES_COM_PLLLOCK_CMP_EN		0x050
++#define QSERDES_COM_DEC_START1			0x064
++#define QSERDES_COM_DIV_FRAC_START1		0x098
++#define QSERDES_COM_DIV_FRAC_START2		0x09c
++#define QSERDES_COM_DIV_FRAC_START3		0x0a0
++#define QSERDES_COM_DEC_START2			0x0a4
++#define QSERDES_COM_PLL_RXTXEPCLK_EN		0x0a8
++#define QSERDES_COM_PLL_CRCTRL			0x0ac
 +
-+- reg-names:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: Must include the following entries
-+		    - "parf"   Qualcomm specific registers
-+		    - "dbi"    Designware PCIe registers
-+		    - "elbi"   External local bus interface registers
-+		    - "config" PCIe configuration space
++#define QSERDES_RX_CDR_CONTROL			0x400
++#define QSERDES_RX_CDR_CONTROL2			0x410
++#define QSERDES_RX_RX_TERM_HIGHZ_CM_AC_COUPLE	0x42c
++#define QSERDES_RX_RX_EQ_GAIN12			0x430
 +
-+- device_type:
-+	Usage: required
-+	Value type: <string>
-+	Definition: Should be "pci". As specified in designware-pcie.txt
++#define PCIE_PHY_SW_RESET			0x600
++#define PCIE_PHY_POWER_DOWN_CONTROL		0x604
++#define PCIE_PHY_START				0x608
++#define PCIE_PHY_ENDPOINT_REFCLK_DRIVE		0x648
++#define PCIE_PHY_POWER_STATE_CONFIG1		0x650
++#define PCIE_PHY_POWER_STATE_CONFIG2		0x654
++#define PCIE_PHY_PWRUP_RESET_DLY_TIME_SYSCLK	0x678
++#define PCIE_PHY_PWRUP_RESET_DLY_TIME_AUXCLK	0x67c
++#define PCIE_PHY_PCS_STATUS			0x6c8
 +
-+- #address-cells:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: Should be set to 3. As specified in designware-pcie.txt
++#define PHY_DELAY_MIN_US			995
++#define PHY_DELAY_MAX_US			1005
++#define PHY_RETRIES_COUNT			10
 +
-+- #size-cells:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: Should be set 2. As specified in designware-pcie.txt
++#define PIPE_CLK_DELAY_MIN_US			5000
++#define PIPE_CLK_DELAY_MAX_US			5100
++#define PIPE_CLK_RETRIES_COUNT			10
 +
-+- ranges:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: As specified in designware-pcie.txt
++struct qcom_pcie_phy {
++	void __iomem *base;
++	struct clk *clk;
++	struct reset_control *res_phy;
++	struct regulator *vdda_pll;
++	struct device *dev;
++};
 +
-+- interrupts:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: MSI interrupt
++struct phy_regs {
++	u32 reg_offset;
++	u32 val;
++};
 +
-+- interrupt-names:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: Should contain "msi"
++static const struct phy_regs pcie_phy_pwrup[] = {
++	{ PCIE_PHY_POWER_DOWN_CONTROL,			0x03 },
++	{ QSERDES_COM_SYSCLK_EN_SEL,			0x08 },
++	{ QSERDES_COM_DEC_START1,			0x82 },
++	{ QSERDES_COM_DEC_START2,			0x03 },
++	{ QSERDES_COM_DIV_FRAC_START1,			0xd5 },
++	{ QSERDES_COM_DIV_FRAC_START2,			0xaa },
++	{ QSERDES_COM_DIV_FRAC_START3,			0x13 },
++	{ QSERDES_COM_PLLLOCK_CMP_EN,			0x01 },
++	{ QSERDES_COM_PLLLOCK_CMP1,			0x2b },
++	{ QSERDES_COM_PLLLOCK_CMP2,			0x68 },
++	{ QSERDES_COM_PLL_CRCTRL,			0xff },
++	{ QSERDES_COM_PLL_CP_SETI,			0x3f },
++	{ QSERDES_COM_PLL_IP_SETP,			0x07 },
++	{ QSERDES_COM_PLL_CP_SETP,			0x03 },
++	{ QSERDES_RX_CDR_CONTROL,			0xf3 },
++	{ QSERDES_RX_CDR_CONTROL2,			0x6b },
++	{ QSERDES_COM_RESETSM_CNTRL,			0x10 },
++	{ QSERDES_RX_RX_TERM_HIGHZ_CM_AC_COUPLE,	0x87 },
++	{ QSERDES_RX_RX_EQ_GAIN12,			0x54 },
++	{ PCIE_PHY_POWER_STATE_CONFIG1,			0xa3 },
++	{ PCIE_PHY_POWER_STATE_CONFIG2,			0xcb },
++	{ QSERDES_COM_PLL_RXTXEPCLK_EN,			0x10 },
++	{ PCIE_PHY_ENDPOINT_REFCLK_DRIVE,		0x10 },
++	{ PCIE_PHY_SW_RESET,				0x00 },
++	{ PCIE_PHY_START,				0x03 },
++};
 +
-+- #interrupt-cells:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: Should be 1. As specified in designware-pcie.txt
++static const struct phy_regs pcie_phy_pwrdown[] = {
++	{ PCIE_PHY_SW_RESET,				0x01 },
++	{ PCIE_PHY_POWER_DOWN_CONTROL,			0x00 },
++};
 +
-+- interrupt-map-mask:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: As specified in designware-pcie.txt
++static void qcom_pcie_phy_pwr(struct qcom_pcie_phy *pcie,
++			      const struct phy_regs *regs, int arr_size)
++{
++	int i;
 +
-+- interrupt-map:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: As specified in designware-pcie.txt
++	for (i = 0; i < arr_size; i++)
++		writel(regs[i].val, pcie->base + regs[i].reg_offset);
++}
 +
-+- clocks:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: List of phandle and clock specifier pairs as listed
-+		    in clock-names property
++static void qcom_pcie_phy_pwrup(struct qcom_pcie_phy *pcie)
++{
++	qcom_pcie_phy_pwr(pcie, pcie_phy_pwrup, ARRAY_SIZE(pcie_phy_pwrup));
++}
 +
-+- clock-names:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: Should contain the following entries
-+		    * should be populated for v0 and v1
-+		    	- "iface"      Configuration AHB clock
++static void qcom_pcie_phy_pwrdown(struct qcom_pcie_phy *pcie)
++{
++	qcom_pcie_phy_pwr(pcie, pcie_phy_pwrdown, ARRAY_SIZE(pcie_phy_pwrdown));
++}
 +
-+		    * should be populated for v0
-+		    	- "core"       Clocks the pcie hw block
-+		    	- "phy"        Clocks the pcie PHY block
++static bool qcom_pcie_phy_is_ready(struct qcom_pcie_phy *pcie)
++{
++	u32 val = readl(pcie->base + PCIE_PHY_PCS_STATUS);
 +
-+		    * should be populated for v1
-+			- "aux"        Auxiliary (AUX) clock
-+		    	- "bus_master" Master AXI clock
-+		    	- "bus_slave"  Slave AXI clock
++	return val & BIT(6) ? false : true;
++}
 +
-+- resets:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: List of phandle and reset specifier pairs as listed
-+		    in reset-names property
++static int qcom_pcie_phy_power_on(struct phy *phy)
++{
++	struct qcom_pcie_phy *pcie = phy_get_drvdata(phy);
++	struct device *dev = pcie->dev;
++	int ret, retries;
 +
-+- reset-names:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: Should contain the following entries
-+		    * should be populated for v0
-+			- "axi"  AXI reset
-+			- "ahb"  AHB reset
-+			- "por"  POR reset
-+			- "pci"  PCI reset
-+			- "phy"  PHY reset
++	ret = regulator_enable(pcie->vdda_pll);
++	if (ret) {
++		dev_err(dev, "cannot enable vdda_pll regulator\n");
++		return ret;
++	}
 +
-+		    * should be populated for v1
-+			- "core" Core reset
++	ret = reset_control_deassert(pcie->res_phy);
++	if (ret) {
++		dev_err(dev, "cannot deassert phy reset\n");
++		goto fail_vdda_pll;
++	}
 +
-+- power-domains:
-+	Usage: required (for v1 only)
-+	Value type: <prop-encoded-array>
-+	Definition: A phandle and power domain specifier pair to the
-+		    power domain which is responsible for collapsing
-+		    and restoring power to the peripheral
++	qcom_pcie_phy_pwrup(pcie);
 +
-+- <name>-supply:
-+	Usage: required
-+	Value type: <phandle>
-+	Definition: List of phandles to the power supply regulator(s)
-+		    * should be populated for v0 and v1
-+			- "vdda"        core analog power supply
++	ret = clk_set_rate(pcie->clk, ~0);
++	if (ret) {
++		dev_err(dev, "cannot set phy clock rate\n");
++		goto fail_res;
++	}
 +
-+		    * should be populated for v0
-+			- "vdda_phy"    analog power supply for PHY
-+			- "vdda_refclk" analog power supply for IC which generate
-+					reference clock
++	/*
++	 * setting pipe rate takes time, try arbitrary delay before enabling
++	 * the clock
++	 */
++	retries = PIPE_CLK_RETRIES_COUNT;
++	do {
++		usleep_range(PIPE_CLK_DELAY_MIN_US, PIPE_CLK_DELAY_MAX_US);
 +
-+- phys:
-+	Usage: required (for v1 only)
-+	Value type: <phandle>
-+	Definition: List of phandle(s) as listed in phy-names property
++		ret = clk_prepare_enable(pcie->clk);
++		if (!ret)
++			break;
++	} while (retries--);
 +
-+- phy-names:
-+	Usage: required (for v1 only)
-+	Value type: <stringlist>
-+	Definition: Should contain "pciephy"
++	if (retries < 0) {
++		dev_err(dev, "cannot enable phy clock\n");
++		goto fail_res;
++	}
 +
-+- <name>-gpio:
-+	Usage: optional
-+	Value type: <prop-encoded-array>
-+	Definition: List of phandle and gpio specifier pairs. Should contain
-+		    - "perst"  PCIe endpoint reset signal line
-+		    - "pewake" PCIe endpoint wake signal line
++	retries = PHY_RETRIES_COUNT;
++	do {
++		ret = qcom_pcie_phy_is_ready(pcie);
++		if (ret)
++			break;
++		usleep_range(PHY_DELAY_MIN_US, PHY_DELAY_MAX_US);
++	} while (retries--);
 +
-+- pinctrl-0:
-+	Usage: required
-+	Value type: <phandle>
-+	Definition: List of phandles pointing at a pin(s) configuration
++	if (retries < 0) {
++		dev_err(dev, "cannot power on phy\n");
++		ret = -ETIMEDOUT;
++		goto fail;
++	}
 +
-+- pinctrl-names
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: List of names of pinctrl-0 state
++	return 0;
 +
-+* Example for v0
-+	pcie0: pci at 1b500000 {
-+		compatible = "qcom,pcie-v0";
-+		reg = <0x1b500000 0x1000
-+		       0x1b502000 0x80
-+		       0x1b600000 0x100
-+		       0x0ff00000 0x100000>;
-+		reg-names = "dbi", "elbi", "parf", "config";
-+		device_type = "pci";
-+		linux,pci-domain = <0>;
-+		bus-range = <0x00 0xff>;
-+		num-lanes = <1>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		ranges = <0x81000000 0 0	  0x0fe00000 0 0x00100000   /* I/O */
-+			  0x82000000 0 0x00000000 0x08000000 0 0x07e00000>; /* memory */
-+		interrupts = <GIC_SPI 35 IRQ_TYPE_NONE>;
-+		interrupt-names = "msi";
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0x7>;
-+		interrupt-map = <0 0 0 1 &intc 0 36 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+				<0 0 0 2 &intc 0 37 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+				<0 0 0 3 &intc 0 38 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+				<0 0 0 4 &intc 0 39 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-+		clocks = <&gcc PCIE_A_CLK>,
-+			 <&gcc PCIE_H_CLK>,
-+			 <&gcc PCIE_PHY_CLK>;
-+		clock-names = "core", "iface", "phy";
-+		resets = <&gcc PCIE_ACLK_RESET>,
-+			 <&gcc PCIE_HCLK_RESET>,
-+			 <&gcc PCIE_POR_RESET>,
-+			 <&gcc PCIE_PCI_RESET>,
-+			 <&gcc PCIE_PHY_RESET>;
-+		reset-names = "axi", "ahb", "por", "pci", "phy";
-+	};
++fail:
++	clk_disable_unprepare(pcie->clk);
++fail_res:
++	reset_control_assert(pcie->res_phy);
++fail_vdda_pll:
++	regulator_disable(pcie->vdda_pll);
 +
-+* Example for v1
-+	pcie0 at fc520000 {
-+		compatible = "qcom,pcie-v1";
-+		reg = <0xfc520000 0x2000>,
-+		      <0xff000000 0x1000>,
-+		      <0xff001000 0x1000>,
-+		      <0xff002000 0x2000>;
-+		reg-names = "parf", "dbi", "elbi", "config";
-+		device_type = "pci";
-+		linux,pci-domain = <0>;
-+		bus-range = <0x00 0xff>;
-+		num-lanes = <1>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		ranges = <0x81000000 0 0          0xff200000 0 0x00100000   /* I/O */
-+			  0x82000000 0 0x00300000 0xff300000 0 0x00d00000>; /* memory */
-+		interrupts = <GIC_SPI 243 IRQ_TYPE_NONE>;
-+		interrupt-names = "msi";
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0x7>;
-+		interrupt-map = <0 0 0 1 &intc 0 244 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+				<0 0 0 2 &intc 0 245 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+				<0 0 0 3 &intc 0 247 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+				<0 0 0 4 &intc 0 248 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-+		clocks = <&gcc GCC_PCIE_0_CFG_AHB_CLK>,
-+			 <&gcc GCC_PCIE_0_MSTR_AXI_CLK>,
-+			 <&gcc GCC_PCIE_0_SLV_AXI_CLK>,
-+			 <&gcc GCC_PCIE_0_AUX_CLK>;
-+		clock-names = "iface", "master_bus", "slave_bus", "aux";
-+		resets = <&gcc GCC_PCIE_0_BCR>;
-+		reset-names = "core";
-+		power-domains = <&gcc PCIE0_GDSC>;
-+		vdda-supply = <&pma8084_l3>;
-+		phys = <&pciephy0>;
-+		phy-names = "pciephy";
-+		perst-gpio = <&tlmm 70 GPIO_ACTIVE_LOW>;
-+		pinctrl-0 = <&pcie0_pins_default>;
-+		pinctrl-names = "default";
-+	};
++	return ret;
++}
++
++static int qcom_pcie_phy_power_off(struct phy *phy)
++{
++	struct qcom_pcie_phy *pcie = phy_get_drvdata(phy);
++
++	clk_disable_unprepare(pcie->clk);
++	qcom_pcie_phy_pwrdown(pcie);
++	reset_control_assert(pcie->res_phy);
++	regulator_disable(pcie->vdda_pll);
++
++	return 0;
++}
++
++static const struct phy_ops qcom_pcie_phy_ops = {
++	.power_on = qcom_pcie_phy_power_on,
++	.power_off = qcom_pcie_phy_power_off,
++	.owner = THIS_MODULE,
++};
++
++static int qcom_pcie_phy_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct phy_provider *provider;
++	struct qcom_pcie_phy *pcie;
++	struct resource *res;
++	struct phy *phy;
++
++	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
++	if (!pcie)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	pcie->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(pcie->base))
++		return PTR_ERR(pcie->base);
++
++	pcie->clk = devm_clk_get(dev, "core");
++	if (IS_ERR(pcie->clk))
++		return PTR_ERR(pcie->clk);
++
++	pcie->vdda_pll = devm_regulator_get(dev, "vdda_pll");
++	if (IS_ERR(pcie->vdda_pll))
++		return PTR_ERR(pcie->vdda_pll);
++
++	pcie->res_phy = devm_reset_control_get(dev, "core");
++	if (IS_ERR(pcie->res_phy))
++		return PTR_ERR(pcie->res_phy);
++
++	phy = devm_phy_create(dev, NULL, &qcom_pcie_phy_ops);
++	if (IS_ERR(phy)) {
++		dev_err(dev, "cannot create phy\n");
++		return PTR_ERR(phy);
++	}
++
++	provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
++	if (IS_ERR(provider)) {
++		dev_err(dev, "cannot register phy provider\n");
++		return PTR_ERR(provider);
++	}
++
++	pcie->dev = dev;
++	phy_set_drvdata(phy, pcie);
++	platform_set_drvdata(pdev, pcie);
++
++	return 0;
++}
++
++static const struct of_device_id qcom_pcie_phy_of_match[] = {
++	{ .compatible = "qcom,pcie-phy" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, qcom_pcie_phy_of_match);
++
++static struct platform_driver qcom_pcie_phy_driver = {
++	.probe = qcom_pcie_phy_probe,
++	.driver = {
++		.name = "pcie-phy",
++		.of_match_table = qcom_pcie_phy_of_match,
++	}
++};
++
++module_platform_driver(qcom_pcie_phy_driver);
++
++MODULE_AUTHOR("Stanimir Varbanov <svarbanov@mm-sol.com>");
++MODULE_DESCRIPTION("Qualcomm PCIe PHY driver");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:pcie-phy");
 -- 
 1.7.0.4
