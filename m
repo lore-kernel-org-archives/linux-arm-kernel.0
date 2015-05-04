@@ -1,71 +1,61 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Mon, 4 May 2015 10:03:49 +0530
-Subject: [PATCH v3 2/2] ata: ahci_xgene: Add AHCI Support for 2nd HW
- version of APM X-Gene SoC AHCI SATA Host controller.
-In-Reply-To: <CAGRGNgX8d0vMDzTH2mPnkwgBk7RJGWVReSyMC3nS=G0z0XvdYQ@mail.gmail.com>
-References: <1430667220-23477-1-git-send-email-stripathi@apm.com>
- <1430667220-23477-3-git-send-email-stripathi@apm.com>
- <CAGRGNgWGk9jkg3Kui5BdFNhpCKOhD=SCW4apmzqMNHKfVbKMmw@mail.gmail.com>
- <CAOHikRDsnywXaSW8XZiOq-uq9fHiwhp0uxXzHF-ysUO_VmQYFw@mail.gmail.com>
- <CAGRGNgX8d0vMDzTH2mPnkwgBk7RJGWVReSyMC3nS=G0z0XvdYQ@mail.gmail.com>
-Message-ID: <CAOHikRA218vae6Ch+j5SeK0=3uTuZnTDi=W+dtEnYRDZasV2Xg@mail.gmail.com>
+From: jchandra@broadcom.com (Jayachandran C.)
+Date: Mon, 4 May 2015 10:21:24 +0530
+Subject: [RFC PATCH 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <55468DC7.6090003@amd.com>
+References: <1430307599-20536-1-git-send-email-jchandra@broadcom.com>
+ <6662179.AoBfCMOsxD@wuerfel> <20150429174356.GA20947@red-moon>
+ <55468DC7.6090003@amd.com>
+Message-ID: <20150504045122.GA24361@jayachandranc.netlogicmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julian,
+On Sun, May 03, 2015 at 04:06:15PM -0500, Suravee Suthikulpanit wrote:
+> 
+> 
+> On 4/29/15 12:43, Lorenzo Pieralisi wrote:
+> >On Wed, Apr 29, 2015 at 01:34:20PM +0100, Arnd Bergmann wrote:
+> >>>On Wednesday 29 April 2015 17:09:58 Jayachandran C wrote:
+> >>>> >The current code in pci-host-generic.c uses pci_common_init_dev()
+> >>>> >from the arch/arm/ to do a part of the PCI initialization, and this
+> >>>> >prevents it from being used on arm64.
+> >>>> >
+> >>>> >The initialization done by pci_common_init_dev() that is really
+> >>>> >needed by pci-host-generic.c can be done in the same file without
+> >>>> >using the hw_pci API of ARM.
+> >>>> >
+> >>>> >The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
+> >>>> >this is be handled by setting up 'struct gen_pci' to embed a
+> >>>> >pci_sys_data variable as the first element on the ARM platform.
+> >>>> >
+> >>>> >Signed-off-by: Jayachandran C<jchandra@broadcom.com>
+> >>>
+> >>>This seems very useful
+> >Yes, it is getting less awful, waiting for pci_sys_data to disappear.
+> >
+> 
+> Lorenzo,
+> 
+> A while back, you mentioned here
+> (https://lkml.org/lkml/2015/2/16/364) that the ARM32
+> pcibios_align_resource() implementation requires
+> pci_sys_data, so we _still_ rely on pci_common_init_dev to create one
+> for us. Is this still the case?
+> 
+> I am looking at the arch/arm32/kernel/bios32.c: pcibios_init_hw()
+> and see that it setup the pci_sys_data.align_resource to
+> hw_pci.align_resource (see here
+> http://lxr.free-electrons.com/source/arch/arm/kernel/bios32.c#L471).
+> 
+> However it seems that the hw_pci.align_resource is never setup in
+> the pci-host-generic.c.  Am I missing something here?
 
-On Mon, May 4, 2015 at 8:52 AM, Julian Calaby <julian.calaby@gmail.com> wrote:
-> Hi Suman,
->
-> On Mon, May 4, 2015 at 12:51 PM, Suman Tripathi <stripathi@apm.com> wrote:
->> Hi Julian.
->>
->> On Mon, May 4, 2015 at 5:56 AM, Julian Calaby <julian.calaby@gmail.com> wrote:
->>> Hi Suman,
->>>
->>> On Mon, May 4, 2015 at 1:33 AM, Suman Tripathi <stripathi@apm.com> wrote:
->>>> This patch enables full AHCI feature support for APM X-Gene SoC SATA
->>>> host controller. The following errata's are removed:
->>>>
->>>> 1. 2a0bdff6b95 ("ahci-xgene: fix the dma state machine lockup for the
->>>>                  IDENTIFY DEVICE PIO mode command")
->>>> 2. 09c32aaa368 ("ahci_xgene: Fix the dma state machine lockup for the
->>>>                  ATA_CMD_SMART PIO mode command")
->>>> 3. 1540035da71 ("ahci_xgene: Implement the xgene_ahci_poll_reg_val to
->>>>                  support PMP")
->>>> 4. a3a84bc7c88 ("ahci_xgene: Implement the workaround to support PMP
->>>>                  enumeration and discovery")
->>>> 5. 1102407bb71 ("ahci_xgene: Fix the DMA state machine lockup for the
->>>>                  ATA_CMD_PACKET PIO mode command")
->>>> 6. 72f79f9e35b ("ahci_xgene: Removing NCQ support from the APM X-Gene
->>>>                 SoC AHCI SATA Host Controller driver")
->>>
->>> Won't this mean that the 1st HW version won't work properly?
->>
->> No it doesn't mean that, It means whatever workaround we had in 1st HW
->> version has been
->> fixed in 2nd HW version.
->
-> I'm sorry, I read the description and assumed that these fixes were
-> being removed from the driver, hence breaking support for the 1st
-> hardware version.
->
-> Sorry for the confusion.
+ARM32 needs a sysdata because functions like pcibios_align_resource()
+will dereference and access members of this structure. However having
+an allocated but zeroed sysdata is fine, since the function pointers
+in sysdata (as well as things like busnr, msi_ctrl) will be 0/NULL
+and pcibios_align_resource will do the default handling.
 
-No probs ..
+If this patch needs changes to work on your platform please let me know.
 
->
-> Thanks,
->
-> --
-> Julian Calaby
->
-> Email: julian.calaby at gmail.com
-> Profile: http://www.google.com/profiles/julian.calaby/
-
-
-
--- 
 Thanks,
-with regards,
-Suman Tripathi
+JC.
