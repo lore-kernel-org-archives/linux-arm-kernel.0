@@ -1,27 +1,45 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 4 May 2015 20:05:57 +0530
-Subject: [PATCH v2 2/5] phy: qcom: Add Qualcomm PCIe PHY
-In-Reply-To: <1430743338-10441-3-git-send-email-svarbanov@mm-sol.com>
-References: <1430743338-10441-1-git-send-email-svarbanov@mm-sol.com>
- <1430743338-10441-3-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <554783CD.50708@ti.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon,  4 May 2015 16:37:16 +0200
+Subject: [PATCH] gpio: xilinx: Fix kernel-doc warnings
+Message-ID: <6680ac72661b4be9c4de4a3e2589a0b466fdda74.1430750234.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Fix kernel-doc format:
+- Add gpio-width description
+- Remove additional "inited" variable description
+- Add return value description - xgpio_remove
 
-On Monday 04 May 2015 06:12 PM, Stanimir Varbanov wrote:
-> Add a PCIe PHY driver used by PCIe host controller driver
-> on Qualcomm SoCs like Snapdragon 805.
->
-> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-> ---
->   drivers/phy/Kconfig         |    9 ++
->   drivers/phy/Makefile        |    1 +
->   drivers/phy/phy-qcom-pcie.c |  291 +++++++++++++++++++++++++++++++++++++++++++
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Why do you need a new PHY driver for this? Why not use the existing QCOM PHY 
-driver. I can see the registers used here in phy-qcom-ufs-qmp-14nm.h?
+ drivers/gpio/gpio-xilinx.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Thanks
-Kishon
+diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
+index 61243d177740..77fe5d3cb105 100644
+--- a/drivers/gpio/gpio-xilinx.c
++++ b/drivers/gpio/gpio-xilinx.c
+@@ -41,10 +41,10 @@
+ /**
+  * struct xgpio_instance - Stores information about GPIO device
+  * @mmchip: OF GPIO chip for memory mapped banks
++ * @gpio_width: GPIO width for every channel
+  * @gpio_state: GPIO state shadow register
+  * @gpio_dir: GPIO direction shadow register
+  * @gpio_lock: Lock used for synchronization
+- * @inited: True if the port has been inited
+  */
+ struct xgpio_instance {
+ 	struct of_mm_gpio_chip mmchip;
+@@ -231,6 +231,8 @@ static void xgpio_save_regs(struct of_mm_gpio_chip *mm_gc)
+  * @pdev: pointer to the platform device
+  *
+  * This function remove gpiochips and frees all the allocated resources.
++ *
++ * Return: 0 always
+  */
+ static int xgpio_remove(struct platform_device *pdev)
+ {
+-- 
+2.3.5
