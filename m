@@ -1,51 +1,56 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  4 May 2015 14:27:05 +0200
-Subject: [PATCH v2 6/7] ARM: marvell/dt: add crypto node to armada 370 SoC
-In-Reply-To: <1430742426-21202-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1430742426-21202-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1430742426-21202-7-git-send-email-boris.brezillon@free-electrons.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Mon,  4 May 2015 15:39:09 +0300
+Subject: [PATCH v2 0/5] Qualcomm PCIe and PCIe/PHY drivers
+Message-ID: <1430743154-10120-1-git-send-email-svarbanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnaud Ebalard <arno@natisbad.org>
+From: Stanimir Varbanov <stanimir.varbanov@linaro.org>
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
- arch/arm/boot/dts/armada-370.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+Hi,
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 27397f1..a04f5aa 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -306,6 +306,28 @@
- 					dmacap,memset;
- 				};
- 			};
-+
-+			crypto at 90000 {
-+				compatible = "marvell,armada-370-crypto";
-+				reg = <0x90000 0x10000>;
-+				reg-names = "regs";
-+				interrupts = <48>;
-+				clocks = <&gateclk 23>;
-+				clock-names = "cesa0";
-+				marvell,crypto-srams = <&crypto_sram>;
-+				marvell,crypto-sram-size = <0x800>;
-+				status = "okay";
-+			};
-+		};
-+
-+		crypto_sram: sa-sram {
-+			compatible = "mmio-sram";
-+			reg = <MBUS_ID(0x09, 0x01) 0 0x800>;
-+			reg-names = "sram";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 MBUS_ID(0x09, 0x01) 0 0x800>;
-+			status = "okay";
- 		};
- 	};
- };
--- 
-1.9.1
+Here is a v2 of the patchset. The chages since v1 are:
+
+ - take into accoint the review comments from the inital version
+ - add support for pcie IP found on Snapdragon 600 (ipq/apq8064)
+
+Version 1 of the patchset can be found at: 
+
+https://lkml.org/lkml/2014/12/12/557
+
+Commenst are welcome!
+
+-------------------------------------------------------------------------------
+
+This patchset introduces a Qualcomm PCIe root complex driver for
+Snapdragon 805 (APQ8084). It also adds a PCIe PHY driver in generic
+phy framework. The PCIe hardware use Designware IP core plus
+Qualcomm application specific hw.
+
+The first two patches add a PHY driver binding document and the 
+PHY driver. Patches 3/5 and 4/5 add PCIe DT document and the driver.
+Last 5/5 adds APQ8084 in mach-qcom as next multiplatform Qualcomm
+SoC.
+
+Stanimir Varbanov (5):
+  DT: phy: qcom: Add PCIe PHY devicetree bindings
+  phy: qcom: Add Qualcomm PCIe PHY
+  DT: PCI: qcom: Document PCIe devicetree bindings
+  PCI: qcom: Add Qualcomm PCIe controller driver
+  ARM: qcom: Add Qualcomm APQ8084 SoC
+
+ .../devicetree/bindings/pci/qcom,pcie.txt          |  231 +++++++
+ .../devicetree/bindings/phy/qcom-pcie-phy.txt      |   60 ++
+ MAINTAINERS                                        |    7 +
+ arch/arm/mach-qcom/Kconfig                         |    7 +
+ drivers/pci/host/Kconfig                           |    9 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pcie-qcom.c                       |  677 ++++++++++++++++++++
+ drivers/phy/Kconfig                                |    9 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-qcom-pcie.c                        |  291 +++++++++
+ 10 files changed, 1293 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/qcom,pcie.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/qcom-pcie-phy.txt
+ create mode 100644 drivers/pci/host/pcie-qcom.c
+ create mode 100644 drivers/phy/phy-qcom-pcie.c
