@@ -1,33 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 May 2015 13:35:56 -0700
-Subject: [GIT PULL] one n900 audio regression fix for v4.0-rc cycle
-In-Reply-To: <20150403230344.GA18048@atomide.com>
-References: <20150403230344.GA18048@atomide.com>
-Message-ID: <20150504203555.GA4810@atomide.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 4 May 2015 22:34:55 +0200 (CEST)
+Subject: [PATCH V2 5/6] regulator: add mxs on-chip regulator driver
+In-Reply-To: <20150504123648.GU15510@sirena.org.uk>
+References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
+ <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
+ <20150504123648.GU15510@sirena.org.uk>
+Message-ID: <1693367404.879766.1430771695242.JavaMail.open-xchange@oxbaltgw08.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150403 16:08]:
-> The following changes since commit 599c376c49323127c9bdbb0fa61a3d4743819bc2:
-> 
->   ARM: dts: Fix gpio interrupts for dm816x (2015-03-18 13:41:34 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/oamp-for-v4.0/fix-audio
-> 
-> for you to fetch changes up to 6f7cedbdac1278e1bacfb9ef79769178fcd6a0b3:
-> 
->   ARM: dts: OMAP3-N900: Add microphone bias voltages (2015-04-01 12:32:40 -0700)
-> 
-> ----------------------------------------------------------------
-> One audio regression fix for n900 that would be good to get
-> into v4.0 as people are already playing with audio call support
-> for n900 using mainline kernel.
+Hi Mark,
 
-Looks like this did not make it so please just ignore this one.
-I'll send a new pull request for fixes with this patch in it.
+> Mark Brown <broonie@kernel.org> hat am 4. Mai 2015 um 14:36 geschrieben:
+>
+>
+> On Wed, Apr 29, 2015 at 10:32:26PM +0000, Stefan Wahren wrote:
+>
+> > +static struct regulator_ops mxs_dcdc_ops = {
+> > + .is_enabled = regulator_is_enabled_regmap,
+> > +};
+>
+> Why do we have an is_enabled() operation but no enable or disable
+> operation? 
 
-Regards,
+i'm sorry, i forgot the following point in the changelog:
 
-Tony
+- move dcdc handling from mxs_power to mxs-regulator
+
+I hope the change is okay. I implemented only is_enabled() to have at least 1
+operation.
+But it's not really necessary.
+
+> I'm also not 100% clear what code the DCDCs and LDOs are
+> sharing here...
+
+Actually only probing and the regulator info structure.
+
+Best regards
+Stefan
