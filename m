@@ -1,97 +1,97 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon,  4 May 2015 10:36:35 -0700
-Subject: [PATCH v8 2/9] mailbox: Make mbox_chan_ops const
+Date: Mon,  4 May 2015 10:36:36 -0700
+Subject: [PATCH v8 3/9] mailbox: Fix up error handling in
+ mbox_request_channel()
 In-Reply-To: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
 References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1430761002-9327-3-git-send-email-abrestic@chromium.org>
+Message-ID: <1430761002-9327-4-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mailbox controller's channel ops ought to be read-only.  Update
-all the mailbox drivers to make their mbox_chan_ops const as well.
+From: Benson Leung <bleung@chromium.org>
 
+mbox_request_channel() currently returns EBUSY in the event the controller
+is not present or if of_xlate() fails, but in neither case is EBUSY really
+appropriate.  Return EPROBE_DEFER if the controller is not yet present
+and change of_xlate() to return an ERR_PTR instead of NULL so that the
+error can be propagated back to the caller of mbox_request_channel().
+
+Signed-off-by: Benson Leung <bleung@chromium.org>
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+Acked-by: Suman Anna <s-anna@ti.com>
 Cc: Jassi Brar <jassisinghbrar@gmail.com>
-Cc: Suman Anna <s-anna@ti.com>
-Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-Cc: Ley Foon Tan <lftan@altera.com>
 ---
-Changes from v7:
- - Constify all drivers' mbox_chan_ops.
-No changes from v5/v6.
+No changes from v7.
+Changes from v6:
+ - Update omap-mailbox's xlate() to return error codes.
+No changes from v5.
 New for v5.
 ---
- drivers/mailbox/arm_mhu.c          | 2 +-
- drivers/mailbox/mailbox-altera.c   | 2 +-
- drivers/mailbox/omap-mailbox.c     | 2 +-
- drivers/mailbox/pcc.c              | 2 +-
- include/linux/mailbox_controller.h | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/mailbox/mailbox.c      | 11 ++++++++---
+ drivers/mailbox/omap-mailbox.c |  6 +++---
+ 2 files changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/mailbox/arm_mhu.c b/drivers/mailbox/arm_mhu.c
-index ac693c6..d9e99f9 100644
---- a/drivers/mailbox/arm_mhu.c
-+++ b/drivers/mailbox/arm_mhu.c
-@@ -110,7 +110,7 @@ static void mhu_shutdown(struct mbox_chan *chan)
- 	free_irq(mlink->irq, chan);
- }
- 
--static struct mbox_chan_ops mhu_ops = {
-+static const struct mbox_chan_ops mhu_ops = {
- 	.send_data = mhu_send_data,
- 	.startup = mhu_startup,
- 	.shutdown = mhu_shutdown,
-diff --git a/drivers/mailbox/mailbox-altera.c b/drivers/mailbox/mailbox-altera.c
-index a266265..bb682c9 100644
---- a/drivers/mailbox/mailbox-altera.c
-+++ b/drivers/mailbox/mailbox-altera.c
-@@ -285,7 +285,7 @@ static void altera_mbox_shutdown(struct mbox_chan *chan)
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index 19b491d..c3c42d4 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -318,7 +318,7 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
+ 		return ERR_PTR(-ENODEV);
  	}
- }
  
--static struct mbox_chan_ops altera_mbox_ops = {
-+static const struct mbox_chan_ops altera_mbox_ops = {
- 	.send_data = altera_mbox_send_data,
- 	.startup = altera_mbox_startup,
- 	.shutdown = altera_mbox_shutdown,
+-	chan = NULL;
++	chan = ERR_PTR(-EPROBE_DEFER);
+ 	list_for_each_entry(mbox, &mbox_cons, node)
+ 		if (mbox->dev->of_node == spec.np) {
+ 			chan = mbox->of_xlate(mbox, &spec);
+@@ -327,7 +327,12 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
+ 
+ 	of_node_put(spec.np);
+ 
+-	if (!chan || chan->cl || !try_module_get(mbox->dev->driver->owner)) {
++	if (IS_ERR(chan)) {
++		mutex_unlock(&con_mutex);
++		return chan;
++	}
++
++	if (chan->cl || !try_module_get(mbox->dev->driver->owner)) {
+ 		dev_dbg(dev, "%s: mailbox not free\n", __func__);
+ 		mutex_unlock(&con_mutex);
+ 		return ERR_PTR(-EBUSY);
+@@ -390,7 +395,7 @@ of_mbox_index_xlate(struct mbox_controller *mbox,
+ 	int ind = sp->args[0];
+ 
+ 	if (ind >= mbox->num_chans)
+-		return NULL;
++		return ERR_PTR(-EINVAL);
+ 
+ 	return &mbox->chans[ind];
+ }
 diff --git a/drivers/mailbox/omap-mailbox.c b/drivers/mailbox/omap-mailbox.c
-index 0f332c1..03f8545 100644
+index 03f8545..a3dbfd9 100644
 --- a/drivers/mailbox/omap-mailbox.c
 +++ b/drivers/mailbox/omap-mailbox.c
-@@ -604,7 +604,7 @@ static int omap_mbox_chan_send_data(struct mbox_chan *chan, void *data)
- 	return ret;
+@@ -639,18 +639,18 @@ static struct mbox_chan *omap_mbox_of_xlate(struct mbox_controller *controller,
+ 
+ 	mdev = container_of(controller, struct omap_mbox_device, controller);
+ 	if (WARN_ON(!mdev))
+-		return NULL;
++		return ERR_PTR(-EINVAL);
+ 
+ 	node = of_find_node_by_phandle(phandle);
+ 	if (!node) {
+ 		pr_err("%s: could not find node phandle 0x%x\n",
+ 		       __func__, phandle);
+-		return NULL;
++		return ERR_PTR(-ENODEV);
+ 	}
+ 
+ 	mbox = omap_mbox_device_find(mdev, node->name);
+ 	of_node_put(node);
+-	return mbox ? mbox->chan : NULL;
++	return mbox ? mbox->chan : ERR_PTR(-ENOENT);
  }
  
--static struct mbox_chan_ops omap_mbox_chan_ops = {
-+static const struct mbox_chan_ops omap_mbox_chan_ops = {
- 	.startup        = omap_mbox_chan_startup,
- 	.send_data      = omap_mbox_chan_send_data,
- 	.shutdown       = omap_mbox_chan_shutdown,
-diff --git a/drivers/mailbox/pcc.c b/drivers/mailbox/pcc.c
-index 7e91d68..26d121d 100644
---- a/drivers/mailbox/pcc.c
-+++ b/drivers/mailbox/pcc.c
-@@ -198,7 +198,7 @@ static int pcc_send_data(struct mbox_chan *chan, void *data)
- 	return 0;
- }
- 
--static struct mbox_chan_ops pcc_chan_ops = {
-+static const struct mbox_chan_ops pcc_chan_ops = {
- 	.send_data = pcc_send_data,
- };
- 
-diff --git a/include/linux/mailbox_controller.h b/include/linux/mailbox_controller.h
-index d4cf96f..68c4245 100644
---- a/include/linux/mailbox_controller.h
-+++ b/include/linux/mailbox_controller.h
-@@ -72,7 +72,7 @@ struct mbox_chan_ops {
-  */
- struct mbox_controller {
- 	struct device *dev;
--	struct mbox_chan_ops *ops;
-+	const struct mbox_chan_ops *ops;
- 	struct mbox_chan *chans;
- 	int num_chans;
- 	bool txdone_irq;
+ static int omap_mbox_probe(struct platform_device *pdev)
 -- 
 2.2.0.rc0.207.ga3a616c
