@@ -1,31 +1,141 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 May 2015 17:27:11 +0200
-Subject: [PATCH v4 0/3] Add SDHCI support for APM X-Gene SoC using ARASAN
- SDHCI controller.
-In-Reply-To: <1430746792-32574-1-git-send-email-stripathi@apm.com>
-References: <1430746792-32574-1-git-send-email-stripathi@apm.com>
-Message-ID: <8897362.mqzfqi11lX@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 May 2015 08:38:31 -0700
+Subject: [PATCH 1/1] gpio: omap: Fix PM runtime issue and remove most
+ BANK_USED macros
+In-Reply-To: <5544FB09.5020604@linaro.org>
+References: <1429632533-23285-1-git-send-email-tony@atomide.com>
+ <5538D3B6.7060305@linaro.org> <20150423143952.GR18048@atomide.com>
+ <55400243.4040504@linaro.org> <20150429142626.GA10572@atomide.com>
+ <55427E3B.2090408@linaro.org> <20150430211254.GC24469@atomide.com>
+ <5544FB09.5020604@linaro.org>
+Message-ID: <20150504153830.GG24469@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 May 2015 19:09:49 Suman Tripathi wrote:
-> This patch adds the SDHCI support for APM X-Gene SoC using ARASAN SDHCI controller.
+* Grygorii.Strashko at linaro.org <grygorii.strashko@linaro.org> [150502 09:29]:
+> Hi Tony,
 > 
-> v1 change:
->  * Use the CONFIG_ARM64_DMA_HAS_IOMMU for dma-mapping.
+> On 05/01/2015 12:12 AM, Tony Lindgren wrote:
+> > * Grygorii.Strashko at linaro.org <grygorii.strashko@linaro.org> [150430 12:12]:
+> >> On 04/29/2015 05:26 PM, Tony Lindgren wrote:
+> >>>
+> >>> In general removing 30 lines of duplicate code to fix freeing
+> >>> of resources makes sense :) I'd rather do that than add more similar
+> >>> code to fix it for sure. That will make further changes easier too.
+> >>
+> >> Unfortunately I'm not sure ( at least not for this driver.
+> >> Future fixes most probably will eat all these removed lines and
+> >> will just add anther "if else" but in different places (see description or corner case below).
+> >>
+> >> In my opinion, It might be better to review each interface function first as for GPIO chip
+> >> as for GPIOIRQ chip and ensure that they are doing exactly what need to be done
+> >> (as part this job - get rid of over-optimized functions like omap_reset_gpio or
+> >> omap_gpio_init_irq). And after that do further optimization.
+> > 
+> > In general I agree that a minimal fix is preferred. Unfortunately in
+> > this case "fixing" it gets us deeper into the mess with BANK_USED :)
+> >   
+> >> --- a/drivers/gpio/gpio-omap.c
+> >> +++ b/drivers/gpio/gpio-omap.c
+> >> @@ -488,9 +488,6 @@ static int omap_gpio_irq_type(struct irq_data *d, unsigned type)
+> >>          unsigned long flags;
+> >>          unsigned offset = d->hwirq;
+> >>   
+> >> -       if (!BANK_USED(bank))
+> >> -               pm_runtime_get_sync(bank->dev);
+> >> -
+> >>          if (type & ~IRQ_TYPE_SENSE_MASK)
+> >>                  return -EINVAL;
+> >>   
+> >> @@ -498,13 +495,11 @@ static int omap_gpio_irq_type(struct irq_data *d, unsigned type)
+> >>                  (type & (IRQ_TYPE_LEVEL_LOW|IRQ_TYPE_LEVEL_HIGH)))
+> >>                  return -EINVAL;
+> >>   
+> >> +       if (!BANK_USED(bank))
+> >> +               pm_runtime_get_sync(bank->dev);
+> >> +
+> >>          spin_lock_irqsave(&bank->lock, flags);
+> >>          retval = omap_set_gpio_triggering(bank, offset, type);
+> >> -       omap_gpio_init_irq(bank, offset);
+> >> -       if (!omap_gpio_is_input(bank, offset)) {
+> >> -               spin_unlock_irqrestore(&bank->lock, flags);
+> >> -               return -EINVAL;
+> >> -       }
+> >>          spin_unlock_irqrestore(&bank->lock, flags);
+> >>   
+> >>          if (type & (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH))
+> >> @@ -512,6 +507,9 @@ static int omap_gpio_irq_type(struct irq_data *d, unsigned type)
+> >>          else if (type & (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
+> >>                  __irq_set_handler_locked(d->irq, handle_edge_irq);
+> >>   
+> >> +       if (!BANK_USED(bank))
+> >> +               pm_runtime_put(bank->dev);
+> >> +
+> >>          return retval;
+> >>   }
+> > 
+> > Hmm I don't think we can remove the call to omap_gpio_init_irq as with
+> > request_irq there's nothing ensuring the GPIO line is configured in
+> > the device tree case for example?
+> > 
+> > And then removing the check for omap_gpio_is_input is not good.. We
+> > should just call omap_set_gpio_direction to set it to input instead
+> > like I'm doing.
 > 
-> v2 change:
->  * Drop the IOMMU support and switching to PIO mode for arasan.
->    controller integrated inside APM X-Gene SoC.
+> I think, We can remove all these calls from omap_gpio_irq_type() because
+> the following call sequence is executed when IRQ is requested:
 > 
-> v3 change:
->  * Change the sdhci-of-arasan.c to support arasan4.9a.
->  * Add quirks for arasan4.9a.
+>  request_threaded_irq() - or - __irq_set_handler(is_chained==true)
+>  __setup_irq()
+>  irq_startup()
+>  desc->irq_data.chip->irq_startup()
+>  omap_gpio_irq_startup()
+>    omap_gpio_init_irq()
+>    omap_gpio_unmask_irq()
 > 
-> v4 change:
->  * Cleanup the Documentation and dts.
-> 
+> The check for omap_gpio_is_input should be done in startup omap_gpio_irq_startup()
+> in case if GPIO was requested before, and if not - GPIO should be configured as input.
+> (we just need to continue reviewing process as for me)
 
-All three patches
+Oh OK. Yes it seems that with omap_gpio_irq_startup we can now
+remove the omap_enable_gpio_module and omap_set_gpio_direction
+calls from omap_gpio_irq_type.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > And looking at it more, omap_set_gpio_triggering can fail so we should
+> > check the return value (also with my patch). And if that fails, then we
+> > currently need a flag to keep track if we enabled the bank in
+> > omap_gpio_irq_type or not.. So piling up yet more BANK_USED tinkering.
+> > 
+> > I still think we're better of just removing it all. Below is my patch
+> > updated with the omap_set_gpio_triggering error handling. We can just
+> > make omap_enable_gpio_module return a value, it might provide us with
+> > more info where things go wrong :)
+> > 
+> >> There is another corner case :) - easy to reproduce
+> >> and it's present in old code.
+> >>
+> >> GPIOn is used as IRQ by some dev:
+> >> - in my case PCF8575.INT ->  gpio6.11
+> >> - PCFx driver knows nothing about type of IRQ line (GPIO or not)
+> >>    so it doesn't request gpio and just do request_irq()
+> >>
+> >> If I'll export gpio6.11 through sysfs and then unxeport it
+> >> then IRQs from PCFx will not be received any more.
+> >>
+> >> Seems omap_reset_gpio has to be split for GPIO and GPIO-IRQ cases.
+> > 
+> > OK, that sounds like a separate fix though if I understand your
+> > right. We should not allow exporting GPIOs to sysfs if they are
+> > being used.
+> 
+> Why not? It's good for IRQ debugging at least, but changing of GPIO
+> direction should be prohibited.
+
+Well the sysfs interface should behave in a consistent way both for
+GPIOs and interrupts. I believe reserved GPIOs are not exported to
+sysfs at all currently. I don't have a problem making them read-only
+though.
+
+Regards,
+
+Tony
