@@ -1,39 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 May 2015 12:29:52 +0200
-Subject: [PATCH v4 00/24] ILP32 for ARM64
-In-Reply-To: <6299275.Ntfb3Dzi12@wuerfel>
-References: <025BB233-8D14-457A-B3B2-C6BD6C3B32EF@theobroma-systems.com>
- <0394DFCE-2D52-4028-A9F5-BE4285AFC5D9@theobroma-systems.com>
- <6299275.Ntfb3Dzi12@wuerfel>
-Message-ID: <3908616.DHRS6D2Ytk@wuerfel>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 04 May 2015 12:30:26 +0200
+Subject: [PATCH v6 27/26] iommu: exynos: add system suspend/resume support
+In-Reply-To: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
+References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1430735426-23172-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 18 April 2015 21:24:19 Arnd Bergmann wrote:
-> Given Catalin's comments from yesterday, I think we can just fix the
-> definitions of 'struct stat64' for asm-generic to make it have the same
-> layout as the 64-bit version of 'struct stat', and use that for aarch64-ilp32.
-> 
-> Similarly for the four sysvipc headers, we can have a modified version of
-> the asm-generic ones in arch/arm64/uapi/asm, which will use the same layout
-> for ilp32 and lp64 without having to set __kernel_ulong_t to 64-bit.
+When system goes into suspend state, iommu should save it's state and
+restore after system resume. This is handled by 'late' pm ops to ensure
+that sysmmu will be suspended after its master devices and restored
+before them.
 
-To pick up that earlier thread, I now have a prototype implementation for
-converting all 32-bit architectures to use 64-bit time_t.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+Hello,
 
-For 'struct stat', I ended up introducing a new structure on arm32 that
-matches the layout of arm64 (and I did the same for all other 32-bit
-architectures that have a 64-bit counterpart). This means we can share
-the same system calls between arm64-lp64, arm64-ilp32 and arm32 with
-64-bit time_t and arm64-aarch32 emulation for 32-bit time_t, while
-using the existing compat handling for the original 'struct stat'
-emulation in both arm32 and arm64-aarch32.
+This patch got lost in the rebase, I'm really sorry. Please process it
+together with other iommu patches from "[PATCH v6 00/25] Exynos SYSMMU
+(IOMMU) integration with DT and DMA-mapping subsystem" patchset.
 
-However, for ipc, the situation is different: I found a way to use
-extra padding fields in semid64_ds/shmid64_ds/msqid64_ds, so the
-ipc system calls will still use normal 32-bit data structures
-on arm32 and arm64-aarch64, but you cannot use them arm64-ilp32,
-and will have to #ifdef the three header files there to choose between
-the two implementations.
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+---
+ drivers/iommu/exynos-iommu.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-	Arnd
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 821797328c52..074e6cb05cc8 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -606,6 +606,36 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int exynos_sysmmu_suspend(struct device *dev)
++{
++	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
++
++	dev_dbg(dev, "suspend\n");
++	if (is_sysmmu_active(data)) {
++		__sysmmu_disable_nocount(data);
++		pm_runtime_put(dev);
++	}
++	return 0;
++}
++
++static int exynos_sysmmu_resume(struct device *dev)
++{
++	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
++
++	dev_dbg(dev, "resume\n");
++	if (is_sysmmu_active(data)) {
++		pm_runtime_get_sync(dev);
++		__sysmmu_enable_nocount(data);
++	}
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops sysmmu_pm_ops = {
++	SET_LATE_SYSTEM_SLEEP_PM_OPS(exynos_sysmmu_suspend, exynos_sysmmu_resume)
++};
++
+ static const struct of_device_id sysmmu_of_match[] __initconst = {
+ 	{ .compatible	= "samsung,exynos-sysmmu", },
+ 	{ },
+@@ -616,6 +646,7 @@ static struct platform_driver exynos_sysmmu_driver __refdata = {
+ 	.driver	= {
+ 		.name		= "exynos-sysmmu",
+ 		.of_match_table	= sysmmu_of_match,
++		.pm		= &sysmmu_pm_ops,
+ 	}
+ };
+ 
+-- 
+1.9.2
