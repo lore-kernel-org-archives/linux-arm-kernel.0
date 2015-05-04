@@ -1,215 +1,193 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon,  4 May 2015 23:04:16 +0200
-Subject: [PATCH v2 3/3] clk: si5351: Do not pass struct clk in platform_data
-In-Reply-To: <1430773456-15203-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1430773456-15203-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1430773456-15203-4-git-send-email-sebastian.hesselbarth@gmail.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Mon, 4 May 2015 23:11:50 +0200
+Subject: EDMA oftree entry for AM335x
+In-Reply-To: <20150504141103.GD24469@atomide.com>
+References: <20150504064323.GU15254@pengutronix.de>
+ <20150504141103.GD24469@atomide.com>
+Message-ID: <20150504211150.GU15254@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When registering clk-si5351 by platform_data, we should not pass struct clk
-for the reference clocks. Drop struct clk from platform_data and rework the
-driver to use devm_clk_get of named clock references.
+Hi Tony,
 
-While at it, check for at least one valid input clock and properly prepare/
-enable valid reference clocks.
+On Mon, May 04, 2015 at 07:11:03AM -0700, Tony Lindgren wrote:
+> Adding Peter to Cc as well.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reported-by: Michael Welling <mwelling@ieee.org>
-Reported-by: Jean-Francois Moine <moinejf@free.fr>
-Reported-by: Russell King <rmk+linux@arm.linux.org.uk>
-Tested-by: Michael Welling <mwelling@ieee.org>
-Tested-by: Jean-Francois Moine <moinejf@free.fr>
----
-Changelog:
-v1->v2:
-- Reword parent clock check error message and add a comment about
-  the required parent clocks per variant. (Suggested by Fabio Estevam)
+You didn't :)
+ 
+> > The patch description says the device should be split into more devices instead
+> > of specifying several ti,hwmods entries, but unfortunately the Documentation
+> > still suggests the above format in Documentation/devicetree/bindings/dma/ti-edma.txt.
+> > 
+> > How would a correct entry look like?
+> 
+> Each tptc instance has it's own sysconfig register. This means each
+> one of them can be clocked and idled independently. They should be
+> treated as separate device instances. I believe the interrupts all
+> belong to the tpcc, which should be also treated as a separate
+> device instance.
+> 
+> In order to get rid of the ti,hwmods property, we want to have a
+> 1-1-1 mapping of the compatible property, ti,hwmod property, and
+> the device entry.
+> 
+> Looking at the TRM "Table 2-1. L3 Memory Map", these all are on
+> the L3, so they should be like this for now (assuming the
+> interrupts all belong to tpcc):
+> 
+> ocp {
+> 	...
+> 
+> 	edma: tpcc at 49000000 {
+> 		compatible = "ti,edma3";
+> 		ti,hwmods = "tpcc"; 
+> 		reg = <0x49000000 0x10000>;
+> 		interrupts = <12 13 14>;
+> 		#dma-cells = <1>;
+> 	};
+> 
+> 	tptc0: tptc at 49800000 {
+> 		compatible = "ti,tptc3";
+> 		ti,hwmods = "tptc0";
+> 		reg = <0x49800000 0x10000>;
+> 	};
+> 
+> 	tptc1: tptc at 49900000 {
+> 		compatible = "ti,tptc3";
+> 		ti,hwmods = "tptc1";
+> 		reg = <0x49900000 0x10000>;
+> 	};
+> 
+> 	tptc2: tptc at 49a00000 {
+> 		compatible = "ti,tptc3";
+> 		ti,hwmods = "tptc2";
+> 		reg = <0x49a00000 0x10000>;
+> 	};
+> 	...
+> };
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Jean-Francois Moine <moinejf@free.fr>
-Cc: Michael Welling <mwelling@ieee.org>
-Cc: Russell King <rmk+linux@arm.linux.org.uk>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: linux-clk at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/clk/clk-si5351.c             | 63 +++++++++++++++++++++++++-----------
- include/linux/platform_data/si5351.h |  4 ---
- 2 files changed, 45 insertions(+), 22 deletions(-)
+I tried this, with the patch below, but it doesn't work:
 
-diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-index 44ea107cfc67..30335d3b99af 100644
---- a/drivers/clk/clk-si5351.c
-+++ b/drivers/clk/clk-si5351.c
-@@ -1128,13 +1128,6 @@ static int si5351_dt_parse(struct i2c_client *client,
- 	if (!pdata)
- 		return -ENOMEM;
+----------8<---------- Output with 4.1-rc1 vanilla ----------8<----------
+
+Loading ARM Linux zImage '/mnt/mmc0.1//boot/zImage'
+Loading devicetree from '/mnt/mmc0.1//boot/am335x-afi-gf.dtb'
+commandline: console=ttyO2,115200n8     root=/dev/mmcblk0p2 rootfstype=ext4 rootwait loglevel=6
+[    0.000000] Linux version 4.1.0-rc1 (rsc@callisto) (gcc version 4.8.3 20131111 (prerelease) (OSELAS.Toolchain-2013.12.2 linaro-4.8-2013.11) ) #9 PREEMPT Mon May 4 22:24:41 CEST 2015
+[    0.000000] earlycon: no match for ttyO2,115200n8
+[    0.000000] Kernel command line: console=ttyO2,115200n8     root=/dev/mmcblk0p2 rootfstype=ext4 rootwait loglevel=6
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+[    0.000000]     vmalloc : 0xd0800000 - 0xff000000   ( 744 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
+[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc0674ed4   (6580 kB)
+[    0.000000]       .init : 0xc0675000 - 0xc06b2000   ( 244 kB)
+[    0.000000]       .data : 0xc06b2000 - 0xc06fd3e8   ( 301 kB)
+[    0.000000]        .bss : 0xc0700000 - 0xc073a5d8   ( 234 kB)
+[    0.145038] omap_hwmod: tptc0 using broken dt data from edma
+[    0.145247] omap_hwmod: tptc1 using broken dt data from edma
+[    0.145425] omap_hwmod: tptc2 using broken dt data from edma
+[    0.151051] omap_hwmod: debugss: _wait_target_disable failed
+[    0.323079] SCSI subsystem initialized
+[    0.356218] NFS: Registering the id_resolver key type
+[    0.356339] Key type id_resolver registered
+[    0.356354] Key type id_legacy registered
+[    0.518782] 47401300.usb-phy supply vcc not found, using dummy regulator
+[    0.532356] 47401b00.usb-phy supply vcc not found, using dummy regulator
+[    0.554370] Key type dns_resolver registered
+[    0.559333] omap_voltage_late_init: Voltage driver support not added
+[    0.775905] mmc0: host does not support reading read-only switch, assuming write-enable
+[    1.140875] musb-hdrc musb-hdrc.0.auto: VBUS_ERROR in a_wait_vrise (80, <SessEnd), retry #3, port1 0008010c
+[    1.561977] random: systemd urandom read with 17 bits of entropy available
+
+Welcome to PTXdist / af inventions-GF!
+
+<userspace starts>
+
+----------8<---------- Output with patch ----------8<----------
+
+[    0.000000] Linux version 4.1.0-rc1+ (rsc@callisto) (gcc version 4.8.3 20131111 (prerelease) (OSELAS.Toolchain-2013.12.2 linaro-4.8-2013.11) ) #10 PREEMPT Mon May 4 23:03:27 CEST 2015
+[    0.000000] earlycon: no match for ttyO2,115200n8
+[    0.000000] Kernel command line: console=ttyO2,115200n8     root=/dev/mmcblk0p2 rootfstype=ext4 rootwait loglevel=6
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+[    0.000000]     vmalloc : 0xd0800000 - 0xff000000   ( 744 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
+[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc0674ed4   (6580 kB)
+[    0.000000]       .init : 0xc0675000 - 0xc06b2000   ( 244 kB)
+[    0.000000]       .data : 0xc06b2000 - 0xc06fd3e8   ( 301 kB)
+[    0.000000]        .bss : 0xc0700000 - 0xc073a5d8   ( 234 kB)
+[    0.151101] omap_hwmod: debugss: _wait_target_disable failed
+[    0.278517] edma 49000000.tpcc: failed to get DT data
+[    0.278670] edma: probe of 49000000.tpcc failed with error -12
+[    0.312864] SCSI subsystem initialized
+[    0.345860] NFS: Registering the id_resolver key type
+[    0.345977] Key type id_resolver registered
+[    0.345992] Key type id_legacy registered
+[    0.493001] spi spi1.0: not using DMA for McSPI
+[    0.498211] spi spi1.1: not using DMA for McSPI
+[    0.511199] 47401300.usb-phy supply vcc not found, using dummy regulator
+[    0.524715] 47401b00.usb-phy supply vcc not found, using dummy regulator
+[    0.546556] Key type dns_resolver registered
+[    0.551522] omap_voltage_late_init: Voltage driver support not added
+[    0.644175] omap_hsmmc 48060000.mmc: unable to obtain RX DMA engine channel 3473832464
+[    1.133193] musb-hdrc musb-hdrc.0.auto: VBUS_ERROR in a_wait_vrise (80, <SessEnd), retry #3, port1 0008010c
+
+<hangs>
+
+----------8<---------- patch ----------8<----------
+
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 21fcc44..34eb437 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -156,15 +156,32 @@
+ 			reg = <0x48200000 0x1000>;
+ 		};
  
--	pdata->clk_xtal = of_clk_get(np, 0);
--	if (!IS_ERR(pdata->clk_xtal))
--		clk_put(pdata->clk_xtal);
--	pdata->clk_clkin = of_clk_get(np, 1);
--	if (!IS_ERR(pdata->clk_clkin))
--		clk_put(pdata->clk_clkin);
--
- 	/*
- 	 * property silabs,pll-source : <num src>, [<..>]
- 	 * allow to selectively set pll source
-@@ -1328,8 +1321,22 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 	i2c_set_clientdata(client, drvdata);
- 	drvdata->client = client;
- 	drvdata->variant = variant;
--	drvdata->pxtal = pdata->clk_xtal;
--	drvdata->pclkin = pdata->clk_clkin;
-+	drvdata->pxtal = devm_clk_get(&client->dev, "xtal");
-+	drvdata->pclkin = devm_clk_get(&client->dev, "clkin");
+-		edma: edma at 49000000 {
++		edma: tpcc at 49000000 {
+ 			compatible = "ti,edma3";
+-			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+-			reg =	<0x49000000 0x10000>,
+-				<0x44e10f90 0x40>;
++			ti,hwmods = "tpcc";
++			reg = <0x49000000 0x10000>;
+ 			interrupts = <12 13 14>;
+ 			#dma-cells = <1>;
+ 		};
+ 
++		tptc0: tptc at 49800000 {
++			compatible = "ti,tptc3";
++			ti,hwmods = "tptc0";
++			reg = <0x49800000 0x10000>;
++		};
 +
-+	if (PTR_ERR(drvdata->pxtal) == -EPROBE_DEFER ||
-+	    PTR_ERR(drvdata->pclkin) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
++		tptc1: tptc at 49900000 {
++			compatible = "ti,tptc3";
++			ti,hwmods = "tptc1";
++			reg = <0x49900000 0x10000>;
++		};
 +
-+	/*
-+	 * Check for valid parent clock: VARIANT_A and VARIANT_B need XTAL,
-+	 *   VARIANT_C can have CLKIN instead.
-+	 */
-+	if (IS_ERR(drvdata->pxtal) &&
-+	    (drvdata->variant != SI5351_VARIANT_C || IS_ERR(drvdata->pclkin))) {
-+		dev_err(&client->dev, "missing parent clock\n");
-+		return -EINVAL;
-+	}
- 
- 	drvdata->regmap = devm_regmap_init_i2c(client, &si5351_regmap_config);
- 	if (IS_ERR(drvdata->regmap)) {
-@@ -1393,6 +1400,11 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 		}
- 	}
- 
-+	if (!IS_ERR(drvdata->pxtal))
-+		clk_prepare_enable(drvdata->pxtal);
-+	if (!IS_ERR(drvdata->pclkin))
-+		clk_prepare_enable(drvdata->pclkin);
++		tptc2: tptc at 49a00000 {
++			compatible = "ti,tptc3";
++			ti,hwmods = "tptc2";
++			reg = <0x49a00000 0x10000>;
++		};
 +
- 	/* register xtal input clock gate */
- 	memset(&init, 0, sizeof(init));
- 	init.name = si5351_input_names[0];
-@@ -1407,7 +1419,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 	clk = devm_clk_register(&client->dev, &drvdata->xtal);
- 	if (IS_ERR(clk)) {
- 		dev_err(&client->dev, "unable to register %s\n", init.name);
--		return PTR_ERR(clk);
-+		ret = PTR_ERR(clk);
-+		goto err_clk;
- 	}
- 
- 	/* register clkin input clock gate */
-@@ -1425,7 +1438,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 		if (IS_ERR(clk)) {
- 			dev_err(&client->dev, "unable to register %s\n",
- 				init.name);
--			return PTR_ERR(clk);
-+			ret = PTR_ERR(clk);
-+			goto err_clk;
- 		}
- 	}
- 
-@@ -1447,7 +1461,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 	clk = devm_clk_register(&client->dev, &drvdata->pll[0].hw);
- 	if (IS_ERR(clk)) {
- 		dev_err(&client->dev, "unable to register %s\n", init.name);
--		return -EINVAL;
-+		ret = PTR_ERR(clk);
-+		goto err_clk;
- 	}
- 
- 	/* register PLLB or VXCO (Si5351B) */
-@@ -1471,7 +1486,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 	clk = devm_clk_register(&client->dev, &drvdata->pll[1].hw);
- 	if (IS_ERR(clk)) {
- 		dev_err(&client->dev, "unable to register %s\n", init.name);
--		return -EINVAL;
-+		ret = PTR_ERR(clk);
-+		goto err_clk;
- 	}
- 
- 	/* register clk multisync and clk out divider */
-@@ -1492,8 +1508,10 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 		num_clocks * sizeof(*drvdata->onecell.clks), GFP_KERNEL);
- 
- 	if (WARN_ON(!drvdata->msynth || !drvdata->clkout ||
--		    !drvdata->onecell.clks))
--		return -ENOMEM;
-+		    !drvdata->onecell.clks)) {
-+		ret = -ENOMEM;
-+		goto err_clk;
-+	}
- 
- 	for (n = 0; n < num_clocks; n++) {
- 		drvdata->msynth[n].num = n;
-@@ -1511,7 +1529,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 		if (IS_ERR(clk)) {
- 			dev_err(&client->dev, "unable to register %s\n",
- 				init.name);
--			return -EINVAL;
-+			ret = PTR_ERR(clk);
-+			goto err_clk;
- 		}
- 	}
- 
-@@ -1538,7 +1557,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 		if (IS_ERR(clk)) {
- 			dev_err(&client->dev, "unable to register %s\n",
- 				init.name);
--			return -EINVAL;
-+			ret = PTR_ERR(clk);
-+			goto err_clk;
- 		}
- 		drvdata->onecell.clks[n] = clk;
- 
-@@ -1557,10 +1577,17 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 				  &drvdata->onecell);
- 	if (ret) {
- 		dev_err(&client->dev, "unable to add clk provider\n");
--		return ret;
-+		goto err_clk;
- 	}
- 
- 	return 0;
-+
-+err_clk:
-+	if (!IS_ERR(drvdata->pxtal))
-+		clk_disable_unprepare(drvdata->pxtal);
-+	if (!IS_ERR(drvdata->pclkin))
-+		clk_disable_unprepare(drvdata->pclkin);
-+	return ret;
- }
- 
- static const struct i2c_device_id si5351_i2c_ids[] = {
-diff --git a/include/linux/platform_data/si5351.h b/include/linux/platform_data/si5351.h
-index a947ab8b441a..533d9807e543 100644
---- a/include/linux/platform_data/si5351.h
-+++ b/include/linux/platform_data/si5351.h
-@@ -5,8 +5,6 @@
- #ifndef __LINUX_PLATFORM_DATA_SI5351_H__
- #define __LINUX_PLATFORM_DATA_SI5351_H__
- 
--struct clk;
--
- /**
-  * enum si5351_pll_src - Si5351 pll clock source
-  * @SI5351_PLL_SRC_DEFAULT: default, do not change eeprom config
-@@ -107,8 +105,6 @@ struct si5351_clkout_config {
-  * @clkout: array of clkout configuration
-  */
- struct si5351_platform_data {
--	struct clk *clk_xtal;
--	struct clk *clk_clkin;
- 	enum si5351_pll_src pll_src[2];
- 	struct si5351_clkout_config clkout[8];
- };
+ 		gpio0: gpio at 44e07000 {
+ 			compatible = "ti,omap4-gpio";
+ 			ti,hwmods = "gpio1";
+
+rsc
 -- 
-2.1.0
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
