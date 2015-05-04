@@ -1,51 +1,22 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 04 May 2015 09:51:01 -0700
-Subject: [PATCH] arm64: mm: Fix build error with CONFIG_SPARSEMEM_VMEMMAP
- disabled
-In-Reply-To: <1430735628-14455-1-git-send-email-js07.lee@gmail.com>
-References: <1430735628-14455-1-git-send-email-js07.lee@gmail.com>
-Message-ID: <5547A375.7040903@redhat.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 4 May 2015 19:10:58 +0200
+Subject: [PATCH] ARM: at91/dt: drop deprecated mainck node from pmc
+In-Reply-To: <5547997C.3090501@overkiz.com>
+References: <1429187145-10741-1-git-send-email-g.portay@overkiz.com>
+ <20150416144553.1eed24dc@bbrezillon> <5547997C.3090501@overkiz.com>
+Message-ID: <20150504171058.GA4276@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2015 03:33 AM, Jungseung Lee wrote:
-> This fix the below build error:
->
-> arch/arm64/mm/dump.c: In function ?ptdump_init?:
-> arch/arm64/mm/dump.c:331:18: error: ?VMEMMAP_START_NR? undeclared (first use in this function)
->    address_markers[VMEMMAP_START_NR].start_address =
->                    ^
-> arch/arm64/mm/dump.c:331:18: note: each undeclared identifier is reported only once for each
-> function it appears in
-> arch/arm64/mm/dump.c:333:18: error: ?VMEMMAP_END_NR? undeclared (first use in this function)
->    address_markers[VMEMMAP_END_NR].start_address =
->                    ^
->
-> Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
-> ---
->   arch/arm64/mm/dump.c | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index 74c2567..f3d6221 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -328,10 +328,12 @@ static int ptdump_init(void)
->   			for (j = 0; j < pg_level[i].num; j++)
->   				pg_level[i].mask |= pg_level[i].bits[j].mask;
->
-> +#ifdef CONFIG_SPARSEMEM_VMEMMAP
->   	address_markers[VMEMMAP_START_NR].start_address =
->   				(unsigned long)virt_to_page(PAGE_OFFSET);
->   	address_markers[VMEMMAP_END_NR].start_address =
->   				(unsigned long)virt_to_page(high_memory);
-> +#endif
->
->   	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
->   				 &ptdump_fops);
->
+On 04/05/2015 at 18:08:28 +0200, Ga?l PORTAY wrote :
+> Any news about this patch ?
+> 
 
-Acked-by: Laura Abbott <labbott@redhat.com>
+We are still quite early in the development cycle and Nicolas is not
+available right now. Be patient ;)
 
-Did something change recently to make SPARSEMEM_VMEMMAP actually
-deselectable? For some reason I thought that couldn't be turned off.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
