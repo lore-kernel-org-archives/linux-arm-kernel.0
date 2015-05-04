@@ -1,56 +1,118 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  4 May 2015 13:46:38 +0200
-Subject: [PATCH 0/8] soc/tegra: More unification and cleanup for 64-bit
-Message-ID: <1430740006-29539-1-git-send-email-thierry.reding@gmail.com>
+Date: Mon,  4 May 2015 13:46:39 +0200
+Subject: [PATCH 1/8] soc/tegra: pmc: Restrict legacy code to 32-bit ARM
+In-Reply-To: <1430740006-29539-1-git-send-email-thierry.reding@gmail.com>
+References: <1430740006-29539-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1430740006-29539-2-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-This set of patches restricts the legacy code to 32-bit ARM for the PMC
-and FUSE drivers and follows up by adding Tegra210 support. Note how in
-particular the FUSE driver required quite a few changes to unify it for
-all SoC families. This makes it easier to test and extend in the future
-as new SoC support is added.
+For backwards-compatibility with old device trees, if no PMC node exists
+this driver hard-codes the I/O memory region. All 64-bit ARM device tree
+files are recent enough that they can be required to have this node, and
+therefore the legacy code path is not required on 64-bit ARM.
 
-Mark, you requested the restriction of the legacy compatibility code in
-an earlier version that Paul posted. Can you take a look at this series
-and see if it matches your expectations? I've kept soc_is_tegra() to be
-consistent across all generations, but legacy code paths are guarded by
-an IS_ENABLED(CONFIG_ARM). I think that's a good compromise between the
-options that had been discussed earlier, but let me know if you want to
-see this done differently.
+Based on work done by Paul Walmsley <pwalmsley@nvidia.com>.
 
-Thierry
+Cc: Paul Walmsley <pwalmsley@nvidia.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/soc/tegra/pmc.c | 56 ++++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 41 insertions(+), 15 deletions(-)
 
-Thierry Reding (8):
-  soc/tegra: pmc: Restrict legacy code to 32-bit ARM
-  soc/tegra: pmc: Add Tegra210 support
-  soc/tegra: Add Tegra132 support
-  soc/tegra: Add Tegra210 support
-  soc/tegra: fuse: Restrict legacy code to 32-bit ARM
-  soc/tegra: fuse: Unify Tegra20 and Tegra30 drivers
-  soc/tegra: fuse: Add Tegra210 support
-  soc/tegra: fuse: Rename core_* to soc_*
-
- arch/arm/mach-tegra/iomap.h              |   3 -
- drivers/soc/tegra/common.c               |   2 +
- drivers/soc/tegra/fuse/Makefile          |   2 +
- drivers/soc/tegra/fuse/fuse-tegra.c      | 255 ++++++++++++++++++++++++-------
- drivers/soc/tegra/fuse/fuse-tegra20.c    | 172 ++++++++-------------
- drivers/soc/tegra/fuse/fuse-tegra30.c    | 221 +++++++++------------------
- drivers/soc/tegra/fuse/fuse.h            |  95 ++++++++----
- drivers/soc/tegra/fuse/speedo-tegra114.c |  22 +--
- drivers/soc/tegra/fuse/speedo-tegra124.c |  26 ++--
- drivers/soc/tegra/fuse/speedo-tegra20.c  |  28 ++--
- drivers/soc/tegra/fuse/speedo-tegra210.c | 184 ++++++++++++++++++++++
- drivers/soc/tegra/fuse/speedo-tegra30.c  |  48 +++---
- drivers/soc/tegra/fuse/tegra-apbmisc.c   |  76 +++++++--
- drivers/soc/tegra/pmc.c                  | 104 +++++++++++--
- include/soc/tegra/fuse.h                 |   6 +-
- include/soc/tegra/pmc.h                  |   5 +
- 16 files changed, 815 insertions(+), 434 deletions(-)
- create mode 100644 drivers/soc/tegra/fuse/speedo-tegra210.c
-
+diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+index c956395cf46f..500339985dbe 100644
+--- a/drivers/soc/tegra/pmc.c
++++ b/drivers/soc/tegra/pmc.c
+@@ -17,6 +17,8 @@
+  *
+  */
+ 
++#define pr_fmt(fmt) "tegra-pmc: " fmt
++
+ #include <linux/kernel.h>
+ #include <linux/clk.h>
+ #include <linux/clk/tegra.h>
+@@ -992,6 +994,7 @@ static const struct tegra_pmc_soc tegra124_pmc_soc = {
+ };
+ 
+ static const struct of_device_id tegra_pmc_match[] = {
++	{ .compatible = "nvidia,tegra132-pmc", .data = &tegra124_pmc_soc },
+ 	{ .compatible = "nvidia,tegra124-pmc", .data = &tegra124_pmc_soc },
+ 	{ .compatible = "nvidia,tegra114-pmc", .data = &tegra114_pmc_soc },
+ 	{ .compatible = "nvidia,tegra30-pmc", .data = &tegra30_pmc_soc },
+@@ -1024,25 +1027,44 @@ static int __init tegra_pmc_early_init(void)
+ 	bool invert;
+ 	u32 value;
+ 
+-	if (!soc_is_tegra())
+-		return 0;
+-
+ 	np = of_find_matching_node_and_match(NULL, tegra_pmc_match, &match);
+ 	if (!np) {
+-		pr_warn("PMC device node not found, disabling powergating\n");
+-
+-		regs.start = 0x7000e400;
+-		regs.end = 0x7000e7ff;
+-		regs.flags = IORESOURCE_MEM;
+-
+-		pr_warn("Using memory region %pR\n", &regs);
++		/*
++		 * Fall back to legacy initialization for 32-bit ARM only. All
++		 * 64-bit ARM device tree files for Tegra are required to have
++		 * a PMC node.
++		 *
++		 * This is for backwards-compatibility with old device trees
++		 * that didn't contain a PMC node. Note that in this case the
++		 * SoC data can't be matched and therefore powergating is
++		 * disabled.
++		 */
++		if (IS_ENABLED(CONFIG_ARM) && soc_is_tegra()) {
++			pr_warn("DT node not found, powergating disabled\n");
++
++			regs.start = 0x7000e400;
++			regs.end = 0x7000e7ff;
++			regs.flags = IORESOURCE_MEM;
++
++			pr_warn("Using memory region %pR\n", &regs);
++		} else {
++			/*
++			 * At this point we're not running on Tegra, so play
++			 * nice with multi-platform kernels.
++			 */
++			return 0;
++		}
+ 	} else {
+-		pmc->soc = match->data;
+-	}
++		/*
++		 * Extract information from the device tree if we've found a
++		 * matching node.
++		 */
++		if (of_address_to_resource(np, 0, &regs) < 0) {
++			pr_err("failed to get PMC registers\n");
++			return -ENXIO;
++		}
+ 
+-	if (of_address_to_resource(np, 0, &regs) < 0) {
+-		pr_err("failed to get PMC registers\n");
+-		return -ENXIO;
++		pmc->soc = match->data;
+ 	}
+ 
+ 	pmc->base = ioremap_nocache(regs.start, resource_size(&regs));
+@@ -1053,6 +1075,10 @@ static int __init tegra_pmc_early_init(void)
+ 
+ 	mutex_init(&pmc->powergates_lock);
+ 
++	/*
++	 * Invert the interrupt polarity if a PMC device tree node exists and
++	 * contains the nvidia,invert-interrupt property.
++	 */
+ 	invert = of_property_read_bool(np, "nvidia,invert-interrupt");
+ 
+ 	value = tegra_pmc_readl(PMC_CNTRL);
 -- 
 2.3.5
