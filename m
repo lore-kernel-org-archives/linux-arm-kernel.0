@@ -1,57 +1,67 @@
 From: g.portay@overkiz.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
-Date: Mon,  4 May 2015 17:59:07 +0200
-Subject: [PATCH v5 2/2] ARM: at91/dt: add support for kizboxmini
-In-Reply-To: <1430755147-12086-1-git-send-email-g.portay@overkiz.com>
-References: <1430755147-12086-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <1430755147-12086-3-git-send-email-g.portay@overkiz.com>
+Date: Mon,  4 May 2015 17:59:57 +0200
+Subject: [PATCH v4] ARM: at91/dt: add support for kizbox2
+Message-ID: <1430755197-12193-1-git-send-email-g.portay@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT file for Kizbox mini board.
-This board is based on Atmel's AT91SAM9G25 SoC.
+Add DT file for Kizbox 2 board.
+This board is based on Atmel's SAMA5D31 Cortex-A5 SoC.
 
 Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
 Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/Makefile            |   1 +
- arch/arm/boot/dts/at91-kizboxmini.dts | 130 ++++++++++++++++++++++++++++++++++
- 2 files changed, 131 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
+Changes since v1:
+- drop ek boards from compatible machine
+- drop useless pmc node
+
+Changes since v2:
+- update to v4.0
+- fix alphabetical order between gpio_keys and pwm_leds
+
+Changes since v3:
+- update to v4.0.1
+- update "Acked-by" list
+
+ arch/arm/boot/dts/Makefile         |   1 +
+ arch/arm/boot/dts/at91-kizbox2.dts | 217 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 218 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-kizbox2.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 21726fd..4bf72c0 100644
+index 21726fd..375f81aa 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -30,6 +30,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
- 	at91sam9rlek.dtb \
- 	at91-ariag25.dtb \
- 	at91-cosino_mega2560.dtb \
-+	at91-kizboxmini.dtb \
- 	at91sam9g15ek.dtb \
- 	at91sam9g25ek.dtb \
- 	at91sam9g35ek.dtb \
-diff --git a/arch/arm/boot/dts/at91-kizboxmini.dts b/arch/arm/boot/dts/at91-kizboxmini.dts
+@@ -36,6 +36,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+ 	at91sam9x25ek.dtb \
+ 	at91sam9x35ek.dtb
+ dtb-$(CONFIG_SOC_SAM_V7) += \
++	at91-kizbox2.dtb \
+ 	at91-sama5d3_xplained.dtb \
+ 	sama5d31ek.dtb \
+ 	sama5d33ek.dtb \
+diff --git a/arch/arm/boot/dts/at91-kizbox2.dts b/arch/arm/boot/dts/at91-kizbox2.dts
 new file mode 100644
-index 0000000..7a899ca
+index 0000000..a0f2003
 --- /dev/null
-+++ b/arch/arm/boot/dts/at91-kizboxmini.dts
-@@ -0,0 +1,130 @@
++++ b/arch/arm/boot/dts/at91-kizbox2.dts
+@@ -0,0 +1,217 @@
 +/*
-+ * at91-kizboxmini.dts - Device Tree file for Overkiz Kizbox mini board
++ * at91-kizbox2.dts - Device Tree file for Overkiz Kizbox 2 board
 + *
 + * Copyright (C) 2014 Ga?l PORTAY <g.portay@overkiz.com>
 + *
 + * Licensed under GPLv2 or later.
 + */
 +/dts-v1/;
-+#include "at91sam9g25.dtsi"
-+#include "at91sam9x5.dtsi"
++#include "sama5d31.dtsi"
++#include "sama5d3_emac.dtsi"
 +#include <dt-bindings/pwm/pwm.h>
 +
 +/ {
-+	model = "Overkiz Kizbox mini";
-+	compatible = "overkiz,kizboxmini", "atmel,at91sam9g25", "atmel,at91sam9x5", "atmel,at91sam9";
++	model = "Overkiz Kizbox 2";
++	compatible = "overkiz,kizbox2", "atmel,sama5d31", "atmel,sama5d3", "atmel,sama5";
 +
 +	chosen {
 +		bootargs = "ubi.mtd=ubi";
@@ -59,7 +69,7 @@ index 0000000..7a899ca
 +	};
 +
 +	memory {
-+		reg = <0x20000000 0x8000000>;
++		reg = <0x20000000 0x10000000>;
 +	};
 +
 +	clocks {
@@ -74,23 +84,97 @@ index 0000000..7a899ca
 +
 +	ahb {
 +		apb {
-+			usart0: serial at f801c000 {
++			i2c1: i2c at f0018000 {
++				status = "okay";
++
++				pmic: act8865 at 5b {
++					compatible = "active-semi,act8865";
++					reg = <0x5b>;
++					status = "okay";
++
++					regulators {
++						vcc_1v8_reg: DCDC_REG1 {
++							regulator-name = "VCC_1V8";
++							regulator-min-microvolt = <1800000>;
++							regulator-max-microvolt = <1800000>;
++							regulator-always-on;
++						};
++
++						vcc_1v2_reg: DCDC_REG2 {
++							regulator-name = "VCC_1V2";
++							regulator-min-microvolt = <1200000>;
++							regulator-max-microvolt = <1200000>;
++							regulator-always-on;
++						};
++
++						vcc_3v3_reg: DCDC_REG3 {
++							regulator-name = "VCC_3V3";
++							regulator-min-microvolt = <3300000>;
++							regulator-max-microvolt = <3300000>;
++							regulator-always-on;
++						};
++
++						vddfuse_reg: LDO_REG1 {
++							regulator-name = "FUSE_2V5";
++							regulator-min-microvolt = <2500000>;
++							regulator-max-microvolt = <2500000>;
++						};
++
++						vddana_reg: LDO_REG2 {
++							regulator-name = "VDDANA";
++							regulator-min-microvolt = <3300000>;
++							regulator-max-microvolt = <3300000>;
++							regulator-always-on;
++						};
++
++						vled_reg: LDO_REG3 {
++							regulator-name = "VLED";
++							regulator-min-microvolt = <3300000>;
++							regulator-max-microvolt = <3300000>;
++							regulator-always-on;
++						};
++
++						v3v8_rf_reg: LDO_REG4 {
++							regulator-name = "V3V8_RF";
++							regulator-min-microvolt = <3800000>;
++							regulator-max-microvolt = <3800000>;
++							regulator-always-on;
++						};
++					};
++				};
++			};
++
++			usart0: serial at f001c000 {
 +				status = "okay";
 +			};
 +
-+			macb0: ethernet at f802c000 {
++			usart1: serial at f0020000 {
++				status = "okay";
++			};
++
++			pwm0: pwm at f002c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_pwm0_pwmh0_1
++					     &pinctrl_pwm0_pwmh1_1
++					     &pinctrl_pwm0_pwmh2_0>;
++				status = "okay";
++			};
++
++			adc0: adc at f8018000 {
++				atmel,adc-vref = <3333>;
++				status = "okay";
++			};
++
++			usart2: serial at f8020000 {
++				status = "okay";
++			};
++
++			macb1: ethernet at f802c000 {
 +				phy-mode = "rmii";
 +				status = "okay";
 +			};
 +
-+			pwm0: pwm at f8034000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_pwm0_pwm0_1
-+					     &pinctrl_pwm0_pwm1_1>;
-+				status = "okay";
-+			};
-+
-+			dbgu: serial at fffff200 {
++			dbgu: serial at ffffee00 {
 +				status = "okay";
 +			};
 +
@@ -99,16 +183,15 @@ index 0000000..7a899ca
 +			};
 +		};
 +
-+		usb0: ohci at 00600000 {
-+			num-ports = <1>;
++		usb1: ohci at 00600000 {
 +			status = "okay";
 +		};
 +
-+		usb1: ehci at 00700000 {
++		usb2: ehci at 00700000 {
 +			status = "okay";
 +		};
 +
-+		nand0: nand at 40000000 {
++		nand0: nand at 60000000 {
 +			nand-bus-width = <8>;
 +			nand-ecc-mode = "hw";
 +			atmel,has-pmecc;
@@ -136,15 +219,22 @@ index 0000000..7a899ca
 +
 +		prog {
 +			label = "PB_PROG";
-+			gpios = <&pioC 17 GPIO_ACTIVE_LOW>;
++			gpios = <&pioE 27 GPIO_ACTIVE_LOW>;
 +			linux,code = <0x102>;
 +			gpio-key,wakeup;
 +		};
 +
 +		reset {
 +			label = "PB_RST";
-+			gpios = <&pioC 16 GPIO_ACTIVE_LOW>;
++			gpios = <&pioE 29 GPIO_ACTIVE_LOW>;
 +			linux,code = <0x100>;
++			gpio-key,wakeup;
++		};
++
++		user {
++			label = "PB_USER";
++			gpios = <&pioE 31 GPIO_ACTIVE_HIGH>;
++			linux,code = <0x101>;
 +			gpio-key,wakeup;
 +		};
 +	};
@@ -152,16 +242,23 @@ index 0000000..7a899ca
 +	pwm_leds {
 +		compatible = "pwm-leds";
 +
++		blue {
++			label = "pwm:blue:user";
++			pwms = <&pwm0 2 10000000 0>;
++			max-brightness = <255>;
++			linux,default-trigger = "default-on";
++		};
++
 +		green {
 +			label = "pwm:green:user";
-+			pwms = <&pwm0 0 10000000 0>;
++			pwms = <&pwm0 1 10000000 0>;
 +			max-brightness = <255>;
 +			linux,default-trigger = "default-on";
 +		};
 +
 +		red {
 +			label = "pwm:red:user";
-+			pwms = <&pwm0 1 10000000 0>;
++			pwms = <&pwm0 0 10000000 0>;
 +			max-brightness = <255>;
 +			linux,default-trigger = "default-on";
 +		};
