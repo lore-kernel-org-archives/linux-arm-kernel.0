@@ -1,31 +1,38 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 5 May 2015 14:08:52 +0200
-Subject: [PATCH 5/9] ARM: tegra: fix hda2codec_2x clock name in Tegra124
- device tree
-In-Reply-To: <4d791b76e1b363b2446a2b6a6bfb84869d9f94e8.1428700856.git.marcel.ziswiler@toradex.com>
-References: <cover.1428700856.git.marcel.ziswiler@toradex.com>
- <4d791b76e1b363b2446a2b6a6bfb84869d9f94e8.1428700856.git.marcel.ziswiler@toradex.com>
-Message-ID: <20150505120850.GE30501@ulmo.nvidia.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 5 May 2015 20:09:27 +0800
+Subject: [PATCH] serial/amba-pl011: fix minor bugs for pio mode
+In-Reply-To: <20150505111155.GA16868@e103592.cambridge.arm.com>
+References: <1430794825-14367-1-git-send-email-leo.yan@linaro.org>
+ <20150505111155.GA16868@e103592.cambridge.arm.com>
+Message-ID: <20150505120927.GB5513@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:36:00PM +0200, Marcel Ziswiler wrote:
-> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+On Tue, May 05, 2015 at 12:11:56PM +0100, Dave P Martin wrote:
+> On Tue, May 05, 2015 at 04:00:25AM +0100, Leo Yan wrote:
+> [...]
 > 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> ---
->  arch/arm/boot/dts/tegra124.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Thanks for the fixes, but I already posted patches that probably fix the
+> issues you are observing, And Greg took them into his tty-testing branch.
+> 
+> Can you give them a try instead of your patches?
+> 
+> Dave Martin (2):
+>       Revert "serial/amba-pl011: Leave the TX IRQ alone when the UART is not open"
+>       serial/amba-pl011: Refactor and simplify TX FIFO handling
+> 
+> from
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
+> 
+> 
+> It would be good to have some feedback on them.
 
-I have this exact commit locally in my tree, so I've just taken the
-commit message from that and applied this for v4.2.
+Tested w/t your two patches, it can fix issues quite well;
+Also will back port them into local branch. Thanks u and Daniel
+pointing out this.
+
+Tested-by: Leo Yan <leo.yan@linaro.com>
 
 Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/d1449cd1/attachment.sig>
+Leo Yan
