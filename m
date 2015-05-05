@@ -1,69 +1,43 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 05 May 2015 12:53:09 -0700
-Subject: [PATCH] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to
- SDRAM.
-In-Reply-To: <55491A12.3070608@wwwdotorg.org>
-References: <1430768034-12734-1-git-send-email-eric@anholt.net>
- <55491A12.3070608@wwwdotorg.org>
-Message-ID: <87wq0mol7e.fsf@eliezer.anholt.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 5 May 2015 22:00:10 +0200
+Subject: [rtc-linux] [PATCH v3 2/3] rtc: mediatek: Add MT6397 RTC driver
+In-Reply-To: <1430206556-18254-3-git-send-email-eddie.huang@mediatek.com>
+References: <1430206556-18254-1-git-send-email-eddie.huang@mediatek.com>
+ <1430206556-18254-3-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <20150505200010.GP4276@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+Hi,
 
-> On 05/04/2015 01:33 PM, Eric Anholt wrote:
->> There exists a tiny MMU, configurable only by the VC (running the
->> closed firmware), which maps from the ARM's physical addresses to bus
->> addresses.  These bus addresses determine the caching behavior in the
->> VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
->> 2 bits.  The bits in the bus address mean:
->>
->>  From the VideoCore processor:
->> 0x0... L1 and L2 cache allocating and coherent
->> 0x4... L1 non-allocating, but coherent. L2 allocating and coherent
->> 0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
->> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
->>
->>  From the GPU peripherals (note: all peripherals bypass the L1
->> cache. The ARM will see this view once through the VC MMU):
->> 0x0... Do not use
->> 0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
->> 0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
->> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
->>
->> The 2835 firmware always configures the MMU to turn ARM physical
->> addresses with 0x0 top bits to 0x4, meaning present in L2 but
->> incoherent with L1.  However, any bus addresses we were generating in
->> the kernel to be passed to a device had 0x0 bits.  That would be a
->> reserved (possibly totally incoherent) value if sent to a GPU
->> peripheral like USB, or L1 allocating if sent to the VC (like a
->> firmware property request).  By setting dma-ranges, all of the devices
->> below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
->> friends return addresses with 0x4 bits and avoid cache incoherency.
->>
->> This matches the behavior in the downstream 2708 kernel (see
->> BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
->
->> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
->
->>   		#address-cells = <1>;
->>   		#size-cells = <1>;
->>   		ranges = <0x7e000000 0x20000000 0x02000000>;
->> +		dma-ranges = <0x40000000 0x00000000 0x1f000000>;
->
-> Oh well that's a nice and simple patch; I had been avoiding looking into 
-> fixing the kernel for this since I was worried it'd be rather complex!
->
-> I'm puzzled why the length cell of ranges and dma-ranges differs though? 
-> Assuming there's a good explanation for that,
+This looks mostly good. Could you align the wrapped function parameters
+to the open parenthesis (use checkpatch --strict)?
 
-Nope, you're right, it should be 0x20000000.  '0x1f' came from going
-back from the '0x3f' on the pi2, but pi2 just has a chunk lost to the
-bus mapping.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/67d252b1/attachment.sig>
+On 28/04/2015 at 15:35:55 +0800, Eddie Huang wrote :
+> +static int mtk_rtc_write_trigger(struct mt6397_rtc *rtc)
+> +{
+> +	unsigned long timeout = jiffies + HZ;
+> +	int ret;
+> +	u32 data;
+> +
+> +	ret = regmap_write(rtc->regmap, rtc->addr_base + RTC_WRTGR, 1);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	do {
+> +		cpu_relax();
+> +		ret = regmap_read(rtc->regmap, rtc->addr_base + RTC_BBPU,
+> +				&data);
+> +		if (ret < 0)
+> +			goto exit;
+> +	} while ((data & RTC_BBPU_CBUSY) && time_after(timeout, jiffies));
+> +
+
+Shouldn't you return -ETIMEDOUT if the loop breaks because of time_after?
+
+Thanks,
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
