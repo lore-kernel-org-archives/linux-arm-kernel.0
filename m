@@ -1,65 +1,57 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Tue, 5 May 2015 16:54:07 +0200
-Subject: [PATCH 0/3] Drop more omap3 legacy board-*.c files for v4.2
-In-Reply-To: <20150505144308.GA21061@atomide.com>
-References: <1430769717-4088-1-git-send-email-tony@atomide.com>
- <2213391.JZ0TJA9KXB@wuerfel> <20150505144308.GA21061@atomide.com>
-Message-ID: <20150505145407.GK18002@pali>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 5 May 2015 16:55:02 +0200
+Subject: [PATCH v3 1/6] ARM: l2c: Add DT support for Shared Override
+In-Reply-To: <20150505142211.GH22384@e104818-lin.cambridge.arm.com>
+References: <1430753072-17145-1-git-send-email-geert+renesas@glider.be>
+ <1430753072-17145-2-git-send-email-geert+renesas@glider.be>
+ <20150505112145.GG22384@e104818-lin.cambridge.arm.com>
+ <CAMuHMdWE3HjGk73gCN3P-bBVEGrMbgfJ=FqvcTtGecs15R=A_g@mail.gmail.com>
+ <20150505142211.GH22384@e104818-lin.cambridge.arm.com>
+Message-ID: <CAMuHMdXpStgQpq6A7GDc2iXNgmBNWjP82E5TykzTUS=6hrWVRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 May 2015 07:43:08 Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [150505 03:56]:
-> > On Monday 04 May 2015 13:01:54 Tony Lindgren wrote:
-> > > 
-> > > For dropping the remaining omap3 legacy boot support, we still
-> > > have the following board-*.c files:
-> > > 
-> > > BOARD                   REASON NEEDED
-> > > board-ldp.c             Still used in RMKs boot test system
-> > > board-omap3logic.c      Getting a .dts file for v4.2
-> > > board-omap3pandora.c    Got a .dts file for v4.1
-> > > board-rx51-*.c          Needs /proc/atags support for user space
-> > > 
-> > > I'm hoping we can drop those for v4.3 merge window, then keep
-> > > the platform data around for one more merge window in case of
-> > > reverting needed, then drop the platform data too for v4.4
-> > > if no issues needing reverting are found.
-> > 
-> > Sounds great. Has there been a conclusion about what to do for the
-> > rx51 /proc/atags support?
-> 
-> I believe we just need to enable /proc/atags also for device tree
-> based booting if CONFIG_ARM_ATAG_DTB_COMPAT. Pali may have more
-> info on that.
-> 
-> Then looks like Pali's two patches for showing the revision are
-> still pending in thread "[PATCH v2 0/2] ARM: /proc/cpuinfo: DT:
-> Add support for Revision":
-> 
-> http://www.spinics.net/lists/arm-kernel/msg401535.html
-> 
-> Regards,
-> 
-> Tony
+Hi Catalin,
 
-I think I already sent all need patches to ML. But I did not check if
-you merged them or not. I did not get any new comments for them for a
-while and right now I do not have time for looking at it again.
+On Tue, May 5, 2015 at 4:22 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, May 05, 2015 at 01:42:21PM +0200, Geert Uytterhoeven wrote:
+>> On Tue, May 5, 2015 at 1:21 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Mon, May 04, 2015 at 05:24:27PM +0200, Geert Uytterhoeven wrote:
+>> >> Hence add support for an "arm,shared-override" device tree property for
+>> >> the l2c device node. By specifying this property, affected systems can
+>> >> indicate that non-cacheable transactions must not be transformed.
+>> >>
+>> >> If specified, the actual behavior of the kernel depends on whether CMA
+>> >> is available or not:
+>> >>   - If CMA is available, nothing needs to be done, as there won't be a
+>> >>     kernel linear mappings and cacheable aliases for the DMA buffers,
+>> >
+>> > I don't think this is true. See this thread:
+>> >
+>> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/329492.html
+>>
+>> Doh, and I had hoped to please Russell...
+>>
+>> To bad, will drop this.
+>
+> You should only drop the "if (dev_get_cma_area(NULL))" check.
 
-I'm against removing board-rx51*.c files before /proc/cpuinfo and
-/proc/atags will be available also for DT booted machine...
+Of course.
 
-Plus there were some other regression for DT booted N900 (not only /proc
-files), but I do not remember them now. I sent more emails where I
-wrote it. Maybe it is fixed, maybe not, just search into archive for my
-emails.
+> BTW, your patch mentions r2p0. My reading of the PL310 TRM shows this
+> bit as default from r0p0.
 
-I can try to find some time at the weekend (this or next) to test
-4.1-rc* kernel on N900 and report what is working...
+Arnd told me he had read the documentation for r0p0 and couldn't find it.
+The r3p2 manual lists the following changes between r1p0-r2p0:
+  - new behavior linked to the Shared attribute.
 
-Thanks!
+Gr{oetje,eeting}s,
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
