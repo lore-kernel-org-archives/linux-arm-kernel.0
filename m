@@ -1,54 +1,149 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 4 May 2015 16:39:36 -0700
-Subject: [PATCH v7 3/5] Documentation: Add documentation for the APM
- X-Gene SoC EDAC DTS binding
-In-Reply-To: <CAL_JsqLyyBCd3DcwjWw57XCQ0fEWHXo_0dkWeBo=TVDoXM_zhQ@mail.gmail.com>
-References: <1430259045-19012-1-git-send-email-lho@apm.com>
- <7128860.xHITr0VFap@wuerfel> <20150430094134.GD3488@pd.tnic>
- <10227049.9i19zDi2y3@wuerfel> <20150430130028.GF3488@pd.tnic>
- <CAPw-ZTnuyB2ne1C2-38qAxM_ANwdr9nuCYUMj=aTx7c90sVg+Q@mail.gmail.com>
- <20150430171846.GJ3488@pd.tnic>
- <CAPw-ZTksYNDE2zVD=ZjGzpKfXQN8KgW85ZnHoQ2eVmSGdSdMOw@mail.gmail.com>
- <CAL_JsqL7emqq=bSaWSi_0G5qSJqO+nVH_JH7VY+ynbrHhaSf_g@mail.gmail.com>
- <CAPw-ZTnNEiTA-MJthY04yCrc9RdZOUFaNjzBHFV1fWzkBqRCyQ@mail.gmail.com>
- <CAL_JsqLyyBCd3DcwjWw57XCQ0fEWHXo_0dkWeBo=TVDoXM_zhQ@mail.gmail.com>
-Message-ID: <CAPw-ZT=YH8faa4_iWfpwOkbxeVDeDNqpJqnOcfnov3s1ianq1w@mail.gmail.com>
+From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
+Date: Tue, 5 May 2015 00:03:30 +0000
+Subject: [PATCH v4 22/24] arm64:ilp32: use compat for stack_t
+In-Reply-To: <09081413bd99e0a04e9783dc44fcd52eaeab1af1.1428953303.git.philipp.tomsich@theobroma-systems.com>
+References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>,
+ <09081413bd99e0a04e9783dc44fcd52eaeab1af1.1428953303.git.philipp.tomsich@theobroma-systems.com>
+Message-ID: <133D58DB-61A4-4BA8-A683-B20C70753E69@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Mon, May 4, 2015 at 3:36 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Fri, May 1, 2015 at 2:59 PM, Loc Ho <lho@apm.com> wrote:
->> Hi Rob,
->>
->>>>>> I think we should first agreed on the DT binding and let's not worry
->>>>>> about APEI. Then, whether we have one file or multiple file. Again,
->>>>>> the HW consist of:
->>>>>>
->>>>>> 1. One top level interrupt and status registers
->>>
->>> For these registers, are there ECC specific functions here or just
->>> normal interrupt control/status bits (mask/unmask/status)? Assuming
->>> the later, then you should make this block an interrupt-controller.
->>> Then this is the interrupt-parent for the rest of the blocks.
->>>
->>
->> This is the only item remain before I generate an patch with just the
->> memory controller. Most of the code that I see are actually an
->> interrupt controller HW. As it is just an interrupt mask and status
->> registers, is there an example in Linux that I can model after? Also,
->> I am not quite convince as to why we can't just share the interrupt
->> and request it by each memory controller?
->
-> Pretty much anything that calls irq_set_chained_handler. If you don't
-> need to touch the shared registers and can set them up once at boot
-> time, then you could just do shared irq handlers. But if you have to
-> clear the interrupt within the PCP, you need a demuxer.
->
+> On Apr 13, 2015, at 1:18 PM, Philipp Tomsich <philipp.tomsich@theobroma-systems.com> wrote:
+> 
+> We use a 'natively sized' stack_t in glibc (i.e. having a 32bit pointer for
+> ss_sp), which requires the invocation of the compat layer for the following
+> functionality:
+> * sigaltstack
+> * saving and restoring uc_stack during signal setup and returns
 
-Thanks Rob. I look through the entire driver. Interrupts are cleared
-at the source. Therefore, the next version will just register for the
-shared interrupt as it is currently.
+Can you explain why you want to use a natively sized stack_t?  My patches for glibc included changing stack_t too.  I would rather keep the same size stack_t between lp64 and ilp32 due easier gdb support. 
 
--Loc
+Thanks,
+Andrew
+
+
+> 
+> As the userspace stack_t is natively sized, we avoid code duplication in the
+> syscall table and can use the compat-functions to zero-extend the pointers
+> involved.
+> 
+> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> ---
+> arch/arm64/kernel/signal.c    | 19 +++++++++++++++++++
+> arch/arm64/kernel/sys_ilp32.c | 44 +------------------------------------------
+> 2 files changed, 20 insertions(+), 43 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index 99e36be..b3f6e52 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -34,6 +34,7 @@
+> #include <asm/fpsimd.h>
+> #include <asm/signal32.h>
+> #include <asm/vdso.h>
+> +#include <asm/syscalls.h>
+> 
+> /*
+>  * Do a signal return; undo the signal stack. These are aligned to 128-bit.
+> @@ -148,9 +149,22 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+>    if (restore_sigframe(regs, frame))
+>        goto badframe;
+> 
+> +
+> +#if defined(CONFIG_ARM64_ILP32)
+> +    if (is_ilp32_compat_task()) {
+> +            /* For ILP32, we have a different stack_t (the ss_sp
+> +           field will be only 32bit sized), which fits into
+> +           the memory area reserved for the (larger) LP64
+> +           stack_t and which we place into uc_stack: this
+> +           implies padding after the ILP32 stack_t. */
+> +            if (compat_restore_altstack((compat_stack_t*)&frame->uc.uc_stack))
+> +                    goto badframe;
+> +    } else
+> +#endif
+>    if (restore_altstack(&frame->uc.uc_stack))
+>        goto badframe;
+> 
+> +
+>    return regs->regs[0];
+> 
+> badframe:
+> @@ -264,6 +278,11 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
+>    __put_user_error(0, &frame->uc.uc_flags, err);
+>    __put_user_error(NULL, &frame->uc.uc_link, err);
+> 
+> +#if defined(CONFIG_ARM64_ILP32)
+> +    if (is_ilp32_compat_task())
+> +        err |= __compat_save_altstack((compat_stack_t*)&frame->uc.uc_stack, regs->sp);
+> +    else
+> +#endif
+>    err |= __save_altstack(&frame->uc.uc_stack, regs->sp);
+>    err |= setup_sigframe(frame, regs, set);
+>    if (err == 0) {
+> diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
+> index 3471f27..31f82ca 100644
+> --- a/arch/arm64/kernel/sys_ilp32.c
+> +++ b/arch/arm64/kernel/sys_ilp32.c
+> @@ -77,6 +77,7 @@
+> 
+> /* Pointer in struct */
+> #define sys_mount               compat_sys_mount
+> +#define sys_sigaltstack         compat_sys_sigaltstack
+> 
+> /* NUMA */
+> /* unsigned long bitmaps */
+> @@ -122,49 +123,6 @@ asmlinkage long ilp32_sys_mq_notify(mqd_t mqdes, const struct sigevent __user *u
+>    but need special handling due to padding for SIGEV_THREAD.  */
+> #define sys_mq_notify        ilp32_sys_mq_notify
+> 
+> -
+> -/* sigaltstack needs some special handling as the
+> -   padding for stack_t might not be non-zero. */
+> -long ilp32_sys_sigaltstack(const stack_t __user *uss_ptr,
+> -               stack_t __user *uoss_ptr)
+> -{
+> -    stack_t uss, uoss;
+> -    int ret;
+> -    mm_segment_t seg;
+> -
+> -    if (uss_ptr) {
+> -        if (!access_ok(VERIFY_READ, uss_ptr, sizeof(*uss_ptr)))
+> -            return -EFAULT;
+> -        if (__get_user(uss.ss_sp, &uss_ptr->ss_sp) |
+> -            __get_user(uss.ss_flags, &uss_ptr->ss_flags) |
+> -            __get_user(uss.ss_size, &uss_ptr->ss_size))
+> -            return -EFAULT;
+> -        /* Zero extend the sp address and the size. */
+> -        uss.ss_sp = (void *)(uintptr_t)(unsigned int)(uintptr_t)uss.ss_sp;
+> -        uss.ss_size = (size_t)(unsigned int)uss.ss_size;
+> -    }
+> -    seg = get_fs();
+> -    set_fs(KERNEL_DS);
+> -    /* Note we need to use uoss as we have changed the segment to the
+> -       kernel one so passing an user one around is wrong. */
+> -    ret = sys_sigaltstack((stack_t __force __user *) (uss_ptr ? &uss : NULL),
+> -                  (stack_t __force __user *) &uoss);
+> -    set_fs(seg);
+> -    if (ret >= 0 && uoss_ptr)  {
+> -        if (!access_ok(VERIFY_WRITE, uoss_ptr, sizeof(stack_t)) ||
+> -            __put_user(uoss.ss_sp, &uoss_ptr->ss_sp) ||
+> -            __put_user(uoss.ss_flags, &uoss_ptr->ss_flags) ||
+> -            __put_user(uoss.ss_size, &uoss_ptr->ss_size))
+> -            ret = -EFAULT;
+> -    }
+> -    return ret;
+> -}
+> -
+> -/* sigaltstack needs some special handling as the padding
+> -   for stack_t might not be non-zero. */
+> -#define sys_sigaltstack        ilp32_sys_sigaltstack
+> -
+> -
+> #include <asm/syscalls.h>
+> 
+> #undef __SYSCALL
+> -- 
+> 1.9.1
+> 
