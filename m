@@ -1,54 +1,31 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Tue, 5 May 2015 12:11:56 +0100
-Subject: [PATCH] serial/amba-pl011: fix minor bugs for pio mode
-In-Reply-To: <1430794825-14367-1-git-send-email-leo.yan@linaro.org>
-References: <1430794825-14367-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <20150505111155.GA16868@e103592.cambridge.arm.com>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Tue, 05 May 2015 19:13:25 +0800
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <9143918.xCQ8d3X4XD@wuerfel>
+References: <55417F5A.4040300@linaro.org> <2490159.r1U8jHTvO3@wuerfel>
+ <CAMJs5B9V_tWxut6LLWDdpN1m9NsaC_JGfR_U_SHN=OOhdHe_Yw@mail.gmail.com>
+ <9143918.xCQ8d3X4XD@wuerfel>
+Message-ID: <5548A5D5.9030107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, May 05, 2015 at 04:00:25AM +0100, Leo Yan wrote:
-> When use pio mode, there have two issues can be observed:
+
+On 2015/5/5 18:55, Arnd Bergmann wrote:
+> On Tuesday 05 May 2015 12:51:57 Christoffer Dall wrote:
+>> On Tue, May 5, 2015 at 11:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Tuesday 05 May 2015 12:27:54 Joel Stanley wrote:
+>>>
+>> Do ARM distributions (Fedora, Ubuntu, Debian, ...) support the
+>> necessary userspace handling so that things work with the input
+>> subsystem?
 > 
-> - In the commit 2240197 "serial/amba-pl011: Leave the TX IRQ alone when
->   the UART is not open", it will skip clearing the TX IRQ across
->   pl011_shutdown() and pl011_startup(); So at the next time after the
->   uart port has been opened, there have chance for the function
->   pl011_tx_chars() will not be executed if the TX IRQ will not be
->   triggered; finally the console cannot output anymore.
+> I think the latest releases all use systemd, so it should work in theory,
+> but I have not tried it, and I don't know if they have something else
+> on older versions.
 > 
->   This is caused by the uart FIFO still keep data rather than
->   the threshold. So revert this patch to make sure every time open the
->   uart port, it will force to call function pl011_tx_chars().
-> 
-> - Sometimes will output the duplicate chars. Function pl011_tx_char()
->   will firstly send char and check if FIFO is full, and if the FIFO is
->   full it will return false; Caller function will consider the char
->   has _NOT_ been send out and resend it again, finally will send the
->   duplicate chars. So change to check FIFO is full or not, if full then
->   return false, otherwise send out char and return true.
-> 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
-[...]
+Thanks, will try to use gpio-keys and check whether systemd works.
 
-Thanks for the fixes, but I already posted patches that probably fix the
-issues you are observing, And Greg took them into his tty-testing branch.
-
-Can you give them a try instead of your patches?
-
-Dave Martin (2):
-      Revert "serial/amba-pl011: Leave the TX IRQ alone when the UART is not open"
-      serial/amba-pl011: Refactor and simplify TX FIFO handling
-
-from
-
-git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
-
-
-It would be good to have some feedback on them.
-
-Cheers
----Dave
+-- 
+Shannon
