@@ -1,48 +1,70 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 5 May 2015 17:05:54 +0200
-Subject: [PATCH v6 00/25] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
-References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20150505150554.GN15736@8bytes.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 May 2015 08:06:38 -0700
+Subject: [PATCH 0/3] Drop more omap3 legacy board-*.c files for v4.2
+In-Reply-To: <20150505145407.GK18002@pali>
+References: <1430769717-4088-1-git-send-email-tony@atomide.com>
+ <2213391.JZ0TJA9KXB@wuerfel> <20150505144308.GA21061@atomide.com>
+ <20150505145407.GK18002@pali>
+Message-ID: <20150505150638.GC21061@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+* Pali Roh?r <pali.rohar@gmail.com> [150505 07:55]:
+> On Tuesday 05 May 2015 07:43:08 Tony Lindgren wrote:
+> > * Arnd Bergmann <arnd@arndb.de> [150505 03:56]:
+> > > On Monday 04 May 2015 13:01:54 Tony Lindgren wrote:
+> > > > 
+> > > > For dropping the remaining omap3 legacy boot support, we still
+> > > > have the following board-*.c files:
+> > > > 
+> > > > BOARD                   REASON NEEDED
+> > > > board-ldp.c             Still used in RMKs boot test system
+> > > > board-omap3logic.c      Getting a .dts file for v4.2
+> > > > board-omap3pandora.c    Got a .dts file for v4.1
+> > > > board-rx51-*.c          Needs /proc/atags support for user space
+> > > > 
+> > > > I'm hoping we can drop those for v4.3 merge window, then keep
+> > > > the platform data around for one more merge window in case of
+> > > > reverting needed, then drop the platform data too for v4.4
+> > > > if no issues needing reverting are found.
+> > > 
+> > > Sounds great. Has there been a conclusion about what to do for the
+> > > rx51 /proc/atags support?
+> > 
+> > I believe we just need to enable /proc/atags also for device tree
+> > based booting if CONFIG_ARM_ATAG_DTB_COMPAT. Pali may have more
+> > info on that.
+> > 
+> > Then looks like Pali's two patches for showing the revision are
+> > still pending in thread "[PATCH v2 0/2] ARM: /proc/cpuinfo: DT:
+> > Add support for Revision":
+> > 
+> > http://www.spinics.net/lists/arm-kernel/msg401535.html
+> 
+> I think I already sent all need patches to ML. But I did not check if
+> you merged them or not. I did not get any new comments for them for a
+> while and right now I do not have time for looking at it again.
 
-On Mon, May 04, 2015 at 10:15:55AM +0200, Marek Szyprowski wrote:
->   iommu: exynos: don't read version register on every tlb operation
+Oh OK, do you have link to the /proc/atags patch somewhere?
 
-Please use 'iommu/exynos:' as prefix for the iommu patches and start
-the remaining subject with a capital letter, like this:
+Maybe Arnd and Nico can pick them up and sort out how we should
+queue them with Russell?
+ 
+> I'm against removing board-rx51*.c files before /proc/cpuinfo and
+> /proc/atags will be available also for DT booted machine...
 
-	iommu/exynos: Don't read version register on every tlb operation
+I agree those should be supported also for DT based booting.
+ 
+> Plus there were some other regression for DT booted N900 (not only /proc
+> files), but I do not remember them now. I sent more emails where I
+> wrote it. Maybe it is fixed, maybe not, just search into archive for my
+> emails.
 
->  Documentation/devicetree/bindings/iommu/iommu.txt |  44 ++
->  arch/arm/boot/dts/exynos3250-rinato.dts           |   1 +
->  arch/arm/boot/dts/exynos3250.dtsi                 |  22 +
->  arch/arm/boot/dts/exynos4.dtsi                    | 118 ++++++
->  arch/arm/boot/dts/exynos4210-trats.dts            |   1 +
->  arch/arm/boot/dts/exynos4210-universal_c210.dts   |   1 +
->  arch/arm/boot/dts/exynos4210.dtsi                 |  23 +
->  arch/arm/boot/dts/exynos4412-trats2.dts           |   1 +
->  arch/arm/boot/dts/exynos4415.dtsi                 |  11 +
->  arch/arm/boot/dts/exynos4x12.dtsi                 |  82 ++++
->  arch/arm/boot/dts/exynos5250-snow.dts             |   1 +
->  arch/arm/boot/dts/exynos5250-spring.dts           |   1 +
->  arch/arm/boot/dts/exynos5250.dtsi                 | 250 +++++++++++
->  arch/arm/boot/dts/exynos5420-peach-pit.dts        |   1 +
->  arch/arm/boot/dts/exynos5420.dtsi                 | 181 ++++++++
->  arch/arm/boot/dts/exynos5800-peach-pi.dts         |   1 +
->  arch/arm/mach-exynos/pm_domains.c                 |  18 +-
->  arch/arm/mm/dma-mapping.c                         | 112 +++++
->  drivers/gpu/drm/exynos/exynos_drm_fimd.c          |  27 +-
->  drivers/gpu/drm/exynos/exynos_drm_iommu.c         |   3 +
->  drivers/iommu/exynos-iommu.c                      | 495 ++++++++++------------
->  21 files changed, 1098 insertions(+), 296 deletions(-)
+OK
+ 
+> I can try to find some time at the weekend (this or next) to test
+> 4.1-rc* kernel on N900 and report what is working...
 
-What is the plan for merging this, should it go through the iommu tree
-or some other path?
+Regards,
 
-
-	Joerg
+Tony
