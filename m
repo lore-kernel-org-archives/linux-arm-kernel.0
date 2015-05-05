@@ -1,149 +1,89 @@
-From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
-Date: Tue, 5 May 2015 00:03:30 +0000
-Subject: [PATCH v4 22/24] arm64:ilp32: use compat for stack_t
-In-Reply-To: <09081413bd99e0a04e9783dc44fcd52eaeab1af1.1428953303.git.philipp.tomsich@theobroma-systems.com>
-References: <cover.1428953303.git.philipp.tomsich@theobroma-systems.com>,
- <09081413bd99e0a04e9783dc44fcd52eaeab1af1.1428953303.git.philipp.tomsich@theobroma-systems.com>
-Message-ID: <133D58DB-61A4-4BA8-A683-B20C70753E69@caviumnetworks.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 04 May 2015 17:07:22 -0700
+Subject: [PATCH] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to
+ SDRAM.
+In-Reply-To: <5547D5BA.5070407@tronnes.org>
+References: <1430768034-12734-1-git-send-email-eric@anholt.net>
+ <5547D5BA.5070407@tronnes.org>
+Message-ID: <878ud3q43p.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Noralf Tr?nnes <noralf@tronnes.org> writes:
 
-> On Apr 13, 2015, at 1:18 PM, Philipp Tomsich <philipp.tomsich@theobroma-systems.com> wrote:
-> 
-> We use a 'natively sized' stack_t in glibc (i.e. having a 32bit pointer for
-> ss_sp), which requires the invocation of the compat layer for the following
-> functionality:
-> * sigaltstack
-> * saving and restoring uc_stack during signal setup and returns
+> Den 04.05.2015 21:33, skrev Eric Anholt:
+>> There exists a tiny MMU, configurable only by the VC (running the
+>> closed firmware), which maps from the ARM's physical addresses to bus
+>> addresses.  These bus addresses determine the caching behavior in the
+>> VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
+>> 2 bits.  The bits in the bus address mean:
+>>
+>>  From the VideoCore processor:
+>> 0x0... L1 and L2 cache allocating and coherent
+>> 0x4... L1 non-allocating, but coherent. L2 allocating and coherent
+>> 0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
+>> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+>>
+>>  From the GPU peripherals (note: all peripherals bypass the L1
+>> cache. The ARM will see this view once through the VC MMU):
+>> 0x0... Do not use
+>> 0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
+>> 0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
+>> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+>>
+>> The 2835 firmware always configures the MMU to turn ARM physical
+>> addresses with 0x0 top bits to 0x4, meaning present in L2 but
+>> incoherent with L1.  However, any bus addresses we were generating in
+>> the kernel to be passed to a device had 0x0 bits.  That would be a
+>> reserved (possibly totally incoherent) value if sent to a GPU
+>> peripheral like USB, or L1 allocating if sent to the VC (like a
+>> firmware property request).  By setting dma-ranges, all of the devices
+>> below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
+>> friends return addresses with 0x4 bits and avoid cache incoherency.
+>>
+>> This matches the behavior in the downstream 2708 kernel (see
+>> BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
+>>
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> Cc: popcornmix at gmail.com
+>> ---
+>>   arch/arm/boot/dts/bcm2835.dtsi | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+>> index 5734650..2df1b5c 100644
+>> --- a/arch/arm/boot/dts/bcm2835.dtsi
+>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+>> @@ -15,6 +15,7 @@
+>>   		#address-cells = <1>;
+>>   		#size-cells = <1>;
+>>   		ranges = <0x7e000000 0x20000000 0x02000000>;
+>> +		dma-ranges = <0x40000000 0x00000000 0x1f000000>;
+>>   
+>>   		timer at 7e003000 {
+>>   			compatible = "brcm,bcm2835-system-timer";
+>
+> This was quite a coincidence. I discovered the need for 'dma-ranges'
+> yesterday while trying to get the downstream bcm2708_fb driver to
+> work with ARCH_BCM2835. The driver is using the mailbox to get info
+> about the framebuffer from the firmware. When it failed I discovered
+> that the bus address was wrong.
+>
+> What I don't understand, is that mmc and spi works fine with a "wrong"
+> bus address. It's only the framebuffer driver and the vchiq driver
+> when using mailbox that fails.
+>
+> Tested-by: Noralf Tr?nnes <noralf@tronnes.org>
 
-Can you explain why you want to use a natively sized stack_t?  My patches for glibc included changing stack_t too.  I would rather keep the same size stack_t between lp64 and ilp32 due easier gdb support. 
-
-Thanks,
-Andrew
-
-
-> 
-> As the userspace stack_t is natively sized, we avoid code duplication in the
-> syscall table and can use the compat-functions to zero-extend the pointers
-> involved.
-> 
-> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-> ---
-> arch/arm64/kernel/signal.c    | 19 +++++++++++++++++++
-> arch/arm64/kernel/sys_ilp32.c | 44 +------------------------------------------
-> 2 files changed, 20 insertions(+), 43 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index 99e36be..b3f6e52 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -34,6 +34,7 @@
-> #include <asm/fpsimd.h>
-> #include <asm/signal32.h>
-> #include <asm/vdso.h>
-> +#include <asm/syscalls.h>
-> 
-> /*
->  * Do a signal return; undo the signal stack. These are aligned to 128-bit.
-> @@ -148,9 +149,22 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
->    if (restore_sigframe(regs, frame))
->        goto badframe;
-> 
-> +
-> +#if defined(CONFIG_ARM64_ILP32)
-> +    if (is_ilp32_compat_task()) {
-> +            /* For ILP32, we have a different stack_t (the ss_sp
-> +           field will be only 32bit sized), which fits into
-> +           the memory area reserved for the (larger) LP64
-> +           stack_t and which we place into uc_stack: this
-> +           implies padding after the ILP32 stack_t. */
-> +            if (compat_restore_altstack((compat_stack_t*)&frame->uc.uc_stack))
-> +                    goto badframe;
-> +    } else
-> +#endif
->    if (restore_altstack(&frame->uc.uc_stack))
->        goto badframe;
-> 
-> +
->    return regs->regs[0];
-> 
-> badframe:
-> @@ -264,6 +278,11 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
->    __put_user_error(0, &frame->uc.uc_flags, err);
->    __put_user_error(NULL, &frame->uc.uc_link, err);
-> 
-> +#if defined(CONFIG_ARM64_ILP32)
-> +    if (is_ilp32_compat_task())
-> +        err |= __compat_save_altstack((compat_stack_t*)&frame->uc.uc_stack, regs->sp);
-> +    else
-> +#endif
->    err |= __save_altstack(&frame->uc.uc_stack, regs->sp);
->    err |= setup_sigframe(frame, regs, set);
->    if (err == 0) {
-> diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-> index 3471f27..31f82ca 100644
-> --- a/arch/arm64/kernel/sys_ilp32.c
-> +++ b/arch/arm64/kernel/sys_ilp32.c
-> @@ -77,6 +77,7 @@
-> 
-> /* Pointer in struct */
-> #define sys_mount               compat_sys_mount
-> +#define sys_sigaltstack         compat_sys_sigaltstack
-> 
-> /* NUMA */
-> /* unsigned long bitmaps */
-> @@ -122,49 +123,6 @@ asmlinkage long ilp32_sys_mq_notify(mqd_t mqdes, const struct sigevent __user *u
->    but need special handling due to padding for SIGEV_THREAD.  */
-> #define sys_mq_notify        ilp32_sys_mq_notify
-> 
-> -
-> -/* sigaltstack needs some special handling as the
-> -   padding for stack_t might not be non-zero. */
-> -long ilp32_sys_sigaltstack(const stack_t __user *uss_ptr,
-> -               stack_t __user *uoss_ptr)
-> -{
-> -    stack_t uss, uoss;
-> -    int ret;
-> -    mm_segment_t seg;
-> -
-> -    if (uss_ptr) {
-> -        if (!access_ok(VERIFY_READ, uss_ptr, sizeof(*uss_ptr)))
-> -            return -EFAULT;
-> -        if (__get_user(uss.ss_sp, &uss_ptr->ss_sp) |
-> -            __get_user(uss.ss_flags, &uss_ptr->ss_flags) |
-> -            __get_user(uss.ss_size, &uss_ptr->ss_size))
-> -            return -EFAULT;
-> -        /* Zero extend the sp address and the size. */
-> -        uss.ss_sp = (void *)(uintptr_t)(unsigned int)(uintptr_t)uss.ss_sp;
-> -        uss.ss_size = (size_t)(unsigned int)uss.ss_size;
-> -    }
-> -    seg = get_fs();
-> -    set_fs(KERNEL_DS);
-> -    /* Note we need to use uoss as we have changed the segment to the
-> -       kernel one so passing an user one around is wrong. */
-> -    ret = sys_sigaltstack((stack_t __force __user *) (uss_ptr ? &uss : NULL),
-> -                  (stack_t __force __user *) &uoss);
-> -    set_fs(seg);
-> -    if (ret >= 0 && uoss_ptr)  {
-> -        if (!access_ok(VERIFY_WRITE, uoss_ptr, sizeof(stack_t)) ||
-> -            __put_user(uoss.ss_sp, &uoss_ptr->ss_sp) ||
-> -            __put_user(uoss.ss_flags, &uoss_ptr->ss_flags) ||
-> -            __put_user(uoss.ss_size, &uoss_ptr->ss_size))
-> -            ret = -EFAULT;
-> -    }
-> -    return ret;
-> -}
-> -
-> -/* sigaltstack needs some special handling as the padding
-> -   for stack_t might not be non-zero. */
-> -#define sys_sigaltstack        ilp32_sys_sigaltstack
-> -
-> -
-> #include <asm/syscalls.h>
-> 
-> #undef __SYSCALL
-> -- 
-> 1.9.1
-> 
+Yeah, it was the mailbox driver I've been trying to merge, on pi2, that
+made me get this patch together.  I'm suspicious that 0x0 works the same
+as 0x4 for GPU peripherals (mmc, spi, vc4) on pi1, though I've had
+occasional instability (something like 3 events per ~5000 tests) that I
+sure hope is due to this.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150504/2db073e0/attachment.sig>
