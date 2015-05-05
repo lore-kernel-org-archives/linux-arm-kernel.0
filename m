@@ -1,81 +1,47 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Tue, 05 May 2015 12:18:07 -0400
-Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <20150505154830.GI1550@arm.com>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
- <55363791.4070706@hitachi.com> <553AB222.50609@redhat.com>
- <553EF74D.8020706@redhat.com> <20150429102346.GK8236@arm.com>
- <55442BFA.50101@redhat.com> <554851CB.2010909@linaro.org>
- <20150505154830.GI1550@arm.com>
-Message-ID: <5548ED3F.8030500@redhat.com>
+From: thomas.lendacky@amd.com (Tom Lendacky)
+Date: Tue, 5 May 2015 11:24:03 -0500
+Subject: [Linaro-acpi] [V2 PATCH 2/5] arm64 : Introduce support for ACPI
+ _CCA object
+In-Reply-To: <5548EC47.3020501@amd.com>
+References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <5126612.k0u2CL2zi5@wuerfel> <5548EB42.5010800@amd.com>
+ <8157862.NJP1L4Rh25@wuerfel> <5548EC47.3020501@amd.com>
+Message-ID: <5548EEA3.8010101@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2015 11:48 AM, Will Deacon wrote:
-> On Tue, May 05, 2015 at 06:14:51AM +0100, David Long wrote:
->> On 05/01/15 21:44, William Cohen wrote:
->>> Dave Long and I did some additional experimentation to better
->>> understand what is condition causes the kernel to sometimes spew:
+On 05/05/2015 11:13 AM, Suravee Suthikulanit wrote:
+> On 5/5/2015 11:12 AM, Arnd Bergmann wrote:
+>> On Tuesday 05 May 2015 11:09:38 Suravee Suthikulanit wrote:
 >>>
->>> Unexpected kernel single-step exception at EL1
+>>> However, codes in several places are making use of dma_map_ops without
+>>> checking if the ops are NULL (i.e.
+>>> include/asm-generic/dma-mapping-common.h and in arch-specific
+>>> implementation). If setting it to NULL is what we are planning to
+>>> support, we would need to scrub the current code to put NULL check.
+>>> Also, would you consider if that is safe to do going forward?
 >>>
->>> The functioncallcount.stp test instruments the entry and return of
->>> every function in the mm files, including kfree.  In most cases the
->>> arm64 trampoline_probe_handler just determines which return probe
->>> instance matches the current conditions, runs the associated handler,
->>> and recycles the return probe instance for another use by placing it
->>> on a hlist.  However, it is possible that a return probe instance has
->>> been set up on function entry and the return probe is unregistered
->>> before the return probe instance fires.  In this case kfree is called
->>> by the trampoline handler to remove the return probe instances related
->>> to the unregistered kretprobe.  This case where the the kprobed kfree
->>> is called within the arm64 trampoline_probe_handler function trigger
->>> the problem.
->>>
->>> The kprobe breakpoint for the kfree call from within the
->>> trampoline_probe_handler is encountered and started, but things go
->>> wrong when attempting the single step on the instruction.
->>>
->>> It took a while to trigger this problem with the sytemtap testsuite.
->>> Dave Long came up with steps that reproduce this more quickly with a
->>> probed function that is always called within the trampoline handler.
->>> Trying the same on x86_64 doesn't trigger the problem.  It appears
->>> that the x86_64 code can handle a single step from within the
->>> trampoline_handler.
 >>>
 >>
->> I'm assuming there are no plans for supporting software breakpoint debug 
->> exceptions during processing of single-step exceptions, any time soon on 
->> arm64.  Given that the only solution that I can come with for this is 
->> instead of making this orphaned kretprobe instance list exist only 
->> temporarily (in the scope of the kretprobe trampoline handler), make it 
->> always exist and kfree any items found on it as part of a periodic 
->> cleanup running outside of the handler context.  I think these changes 
->> would still all be in archiecture-specific code.  This doesn't feel to 
->> me like a bad solution.  Does anyone think there is a simpler way out of 
->> this?
-> 
-> Just to clarify, is the problem here the software breakpoint exception,
-> or trying to step the faulting instruction whilst we were already handling
-> a step?
-> 
-> I think I'd be inclined to keep the code run in debug context to a minimum.
-> We already can't block there, and the more code we add the more black spots
-> we end up with in the kernel itself. The alternative would be to make your
-> kprobes code re-entrant, but that sounds like a nightmare.
-> 
-> You say this works on x86. How do they handle it? Is the nested probe
-> on kfree ignored or handled?
-> 
-> Will
-> 
+>> I mean the dma_mask pointer, not dma_map_ops.
 
-Hi Will,
+Except a lot of drivers will actually set the dma_mask pointer during
+probe (usually by setting dev->dma_mask = &dev->coherent_dma_mask or by
+calling dma_coerce_mask_and_coherent).  So I think the dummy_dma_ops
+might be the safest way to go.
 
-I ran the experiment on the x86_64 machine and the x86_64 was definitely able to do the software breakpoint of the probed function and then do a single step from within the trampoline handler.  It looks like the x86_64 code avoids doing a breakpoint to implement the trampoline:
+Thanks,
+Tom
 
-http://lxr.linux.no/#linux+v3.19.1/arch/x86/kernel/kprobes/core.c#L645
-
-x86_64 saves the registers and then directly calls the trampoline_handler.  Maybe it would be possible implement something similar on aarch64 with some carefully crafted assembly code to save the register state and then directly call the trampoline code.  This would move the trampoline handler out of exception state and make it act more like a normal function.
-
--Will Cohen
+>>
+>>     Arnd
+>>
+>
+> Ah, got it. Sorry for confusion.
+>
+> Suravee
+>
+> _______________________________________________
+> Linaro-acpi mailing list
+> Linaro-acpi at lists.linaro.org
+> https://lists.linaro.org/mailman/listinfo/linaro-acpi
