@@ -1,84 +1,85 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Tue, 05 May 2015 17:02:41 -0400
-Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <20150505154830.GI1550@arm.com>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
- <55363791.4070706@hitachi.com> <553AB222.50609@redhat.com>
- <553EF74D.8020706@redhat.com> <20150429102346.GK8236@arm.com>
- <55442BFA.50101@redhat.com> <554851CB.2010909@linaro.org>
- <20150505154830.GI1550@arm.com>
-Message-ID: <55492FF1.6040907@redhat.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 5 May 2015 17:09:04 -0500
+Subject: [PATCH v3 2/5] PCI: st: Add Device Tree bindings for sti pcie
+In-Reply-To: <1428657168-12495-3-git-send-email-gabriel.fernandez@linaro.org>
+References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1428657168-12495-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20150505220904.GD24643@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2015 11:48 AM, Will Deacon wrote:
-> On Tue, May 05, 2015 at 06:14:51AM +0100, David Long wrote:
->> On 05/01/15 21:44, William Cohen wrote:
->>> Dave Long and I did some additional experimentation to better
->>> understand what is condition causes the kernel to sometimes spew:
->>>
->>> Unexpected kernel single-step exception at EL1
->>>
->>> The functioncallcount.stp test instruments the entry and return of
->>> every function in the mm files, including kfree.  In most cases the
->>> arm64 trampoline_probe_handler just determines which return probe
->>> instance matches the current conditions, runs the associated handler,
->>> and recycles the return probe instance for another use by placing it
->>> on a hlist.  However, it is possible that a return probe instance has
->>> been set up on function entry and the return probe is unregistered
->>> before the return probe instance fires.  In this case kfree is called
->>> by the trampoline handler to remove the return probe instances related
->>> to the unregistered kretprobe.  This case where the the kprobed kfree
->>> is called within the arm64 trampoline_probe_handler function trigger
->>> the problem.
->>>
->>> The kprobe breakpoint for the kfree call from within the
->>> trampoline_probe_handler is encountered and started, but things go
->>> wrong when attempting the single step on the instruction.
->>>
->>> It took a while to trigger this problem with the sytemtap testsuite.
->>> Dave Long came up with steps that reproduce this more quickly with a
->>> probed function that is always called within the trampoline handler.
->>> Trying the same on x86_64 doesn't trigger the problem.  It appears
->>> that the x86_64 code can handle a single step from within the
->>> trampoline_handler.
->>>
->>
->> I'm assuming there are no plans for supporting software breakpoint debug 
->> exceptions during processing of single-step exceptions, any time soon on 
->> arm64.  Given that the only solution that I can come with for this is 
->> instead of making this orphaned kretprobe instance list exist only 
->> temporarily (in the scope of the kretprobe trampoline handler), make it 
->> always exist and kfree any items found on it as part of a periodic 
->> cleanup running outside of the handler context.  I think these changes 
->> would still all be in archiecture-specific code.  This doesn't feel to 
->> me like a bad solution.  Does anyone think there is a simpler way out of 
->> this?
+On Fri, Apr 10, 2015 at 11:12:45AM +0200, Gabriel FERNANDEZ wrote:
+> sti pcie is built around a Synopsis Designware PCIe IP.
 > 
-> Just to clarify, is the problem here the software breakpoint exception,
-> or trying to step the faulting instruction whilst we were already handling
-> a step?
-> 
-> I think I'd be inclined to keep the code run in debug context to a minimum.
-> We already can't block there, and the more code we add the more black spots
-> we end up with in the kernel itself. The alternative would be to make your
-> kprobes code re-entrant, but that sounds like a nightmare.
-> 
-> You say this works on x86. How do they handle it? Is the nested probe
-> on kfree ignored or handled?
-> 
-> Will
-> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 
-Hi Dave and Will,
+Arnd, Rob, can you ack this?
 
-The attached patch attempts to eliminate the need for the breakpoint in the trampoline.  It is modeled after the x86_64 code and just saves the register state, calls the trampoline handler, and then fixes the return address.  The code compiles, but I have NOT verified that it works. It looks feasible to do things this way.  In addition to avoiding the possible issue with a kretprobe on kfree it would also make the kretprobes faster because it would avoid the breakpoint exception and the associated kprobe handling in the trampoline.
-
--Will
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: avoid_bkpt_trampoline.diff
-Type: text/x-patch
-Size: 4465 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/1ebbc086/attachment-0001.bin>
+> ---
+>  Documentation/devicetree/bindings/pci/st-pcie.txt | 53 +++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
+> new file mode 100644
+> index 0000000..25fcab3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
+> @@ -0,0 +1,53 @@
+> +STMicroelectronics STi PCIe controller
+> +
+> +This PCIe host controller is based on the Synopsis Designware PCIe IP
+> +and thus inherits all the common properties defined in designware-pcie.txt.
+> +
+> +Required properties:
+> + - compatible: "st,stih407-pcie"
+> + - reg: base address and length of the pcie controller, mem-window address
+> +   and length available to the controller.
+> + - interrupts: A list of interrupt outputs of the controller. Must contain an
+> +   entry for each entry in the interrupt-names property.
+> + - interrupt-names: Should be "msi". STi interrupt that is asserted when an
+> +   MSI is received.
+> + - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
+> +   offset for IP configuration.
+> + - resets, reset-names: the power-down and soft-reset lines of PCIe IP.
+> +   Associated names must be "powerdown" and "softreset".
+> + - phys, phy-names: the phandle for the PHY device.
+> +   Associated name must be "pcie"
+> +
+> +Optional properties:
+> + - reset-gpio: a GPIO spec to define which pin is connected to the bus reset.
+> +
+> +Example:
+> +
+> +pcie0: pcie at 9b00000 {
+> +	compatible = "st,pcie", "snps,dw-pcie";
+> +	device_type = "pci";
+> +	reg = <0x09b00000 0x4000>,	/* dbi cntrl registers */
+> +	      <0x2fff0000 0x00010000>,	/* configuration space */
+> +	      <0x40000000 0x80000000>;	/* lmi mem window */
+> +	reg-names = "dbi", "config", "mem-window";
+> +	st,syscfg = <&syscfg_core 0xd8 0xe0>;
+> +	#address-cells = <3>;
+> +	#size-cells = <2>;
+> +	ranges = <0x82000000 0 0x20000000 0x20000000 0 0x0FFF0000>; /* non-prefetchable memory */
+> +	num-lanes = <1>;
+> +	interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+> +	interrupt-names = "msi";
+> +	#interrupt-cells = <1>;
+> +	interrupt-map-mask = <0 0 0 7>;
+> +	interrupt-map = <0 0 0 1 &intc GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>, /* INT A */
+> +			<0 0 0 2 &intc GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>, /* INT B */
+> +			<0 0 0 3 &intc GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>, /* INT C */
+> +			<0 0 0 4 &intc GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>; /* INT D */
+> +
+> +	resets = <&powerdown STIH407_PCIE0_POWERDOWN>,
+> +		 <&softreset STIH407_PCIE0_SOFTRESET>;
+> +	reset-names = "powerdown",
+> +		      "softreset";
+> +	phys = <&phy_port0 PHY_TYPE_PCIE>;
+> +	phy-names = "pcie";
+> +};
+> -- 
+> 1.9.1
+> 
