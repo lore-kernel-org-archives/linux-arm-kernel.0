@@ -1,116 +1,94 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 5 May 2015 16:33:05 +0300
-Subject: [PATCH 2/2] ARM: AM33xx+: hwmod: re-use omap4 implementations for
- reset functionality
-In-Reply-To: <1430832785-1976-1-git-send-email-t-kristo@ti.com>
-References: <1430832785-1976-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1430832785-1976-3-git-send-email-t-kristo@ti.com>
+From: noralf@tronnes.org (=?UTF-8?B?Tm9yYWxmIFRyw7hubmVz?=)
+Date: Tue, 05 May 2015 15:33:15 +0200
+Subject: [PATCH] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to
+ SDRAM.
+In-Reply-To: <878ud3q43p.fsf@eliezer.anholt.net>
+References: <1430768034-12734-1-git-send-email-eric@anholt.net>
+ <5547D5BA.5070407@tronnes.org> <878ud3q43p.fsf@eliezer.anholt.net>
+Message-ID: <5548C69B.3080201@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset code functionality is mostly a copy paste between OMAP4+ and
-AM33xx+. Re-use the omap4 code where possible, and just keep the special
-implementation for de-asserting the hardreset lines for AM33xx, as
-AM33xx+ devices have slightly different register layouts compared to
-OMAP4+. This patch also fixes the hardreset issues faced on AM43xx.
+Den 05.05.2015 02:07, skrev Eric Anholt:
+> Noralf Tr?nnes <noralf@tronnes.org> writes:
+>
+>> Den 04.05.2015 21:33, skrev Eric Anholt:
+>>> There exists a tiny MMU, configurable only by the VC (running the
+>>> closed firmware), which maps from the ARM's physical addresses to bus
+>>> addresses.  These bus addresses determine the caching behavior in the
+>>> VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
+>>> 2 bits.  The bits in the bus address mean:
+>>>
+>>>   From the VideoCore processor:
+>>> 0x0... L1 and L2 cache allocating and coherent
+>>> 0x4... L1 non-allocating, but coherent. L2 allocating and coherent
+>>> 0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
+>>> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+>>>
+>>>   From the GPU peripherals (note: all peripherals bypass the L1
+>>> cache. The ARM will see this view once through the VC MMU):
+>>> 0x0... Do not use
+>>> 0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
+>>> 0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
+>>> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+>>>
+>>> The 2835 firmware always configures the MMU to turn ARM physical
+>>> addresses with 0x0 top bits to 0x4, meaning present in L2 but
+>>> incoherent with L1.  However, any bus addresses we were generating in
+>>> the kernel to be passed to a device had 0x0 bits.  That would be a
+>>> reserved (possibly totally incoherent) value if sent to a GPU
+>>> peripheral like USB, or L1 allocating if sent to the VC (like a
+>>> firmware property request).  By setting dma-ranges, all of the devices
+>>> below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
+>>> friends return addresses with 0x4 bits and avoid cache incoherency.
+>>>
+>>> This matches the behavior in the downstream 2708 kernel (see
+>>> BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
+>>>
+>>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>>> Cc: popcornmix at gmail.com
+>>> ---
+>>>    arch/arm/boot/dts/bcm2835.dtsi | 1 +
+>>>    1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+>>> index 5734650..2df1b5c 100644
+>>> --- a/arch/arm/boot/dts/bcm2835.dtsi
+>>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+>>> @@ -15,6 +15,7 @@
+>>>    		#address-cells = <1>;
+>>>    		#size-cells = <1>;
+>>>    		ranges = <0x7e000000 0x20000000 0x02000000>;
+>>> +		dma-ranges = <0x40000000 0x00000000 0x1f000000>;
+>>>    
+>>>    		timer at 7e003000 {
+>>>    			compatible = "brcm,bcm2835-system-timer";
+>> This was quite a coincidence. I discovered the need for 'dma-ranges'
+>> yesterday while trying to get the downstream bcm2708_fb driver to
+>> work with ARCH_BCM2835. The driver is using the mailbox to get info
+>> about the framebuffer from the firmware. When it failed I discovered
+>> that the bus address was wrong.
+>>
+>> What I don't understand, is that mmc and spi works fine with a "wrong"
+>> bus address. It's only the framebuffer driver and the vchiq driver
+>> when using mailbox that fails.
+>>
+>> Tested-by: Noralf Tr?nnes <noralf@tronnes.org>
+> Yeah, it was the mailbox driver I've been trying to merge, on pi2, that
+> made me get this patch together.  I'm suspicious that 0x0 works the same
+> as 0x4 for GPU peripherals (mmc, spi, vc4) on pi1, though I've had
+> occasional instability (something like 3 events per ~5000 tests) that I
+> sure hope is due to this.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Reported-by: Dave Gerlach <d-gerlach@ti.com>
-Reported-by: Anna Suman <s-anna@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   56 +++-----------------------------------
- 1 file changed, 4 insertions(+), 52 deletions(-)
+Since you mention Pi2:
+Dom Cobley made me aware that 0xC is used on MACH_BCM2709.
+The macros in arch/arm/mach-bcm270X/include/mach/memory.h are identical,
+but arch/arm/mach-bcm2709/Kconfig has BCM2708_NOL2CACHE as default (as 
+opposed to 2708/Kconfig).
+This changes the _REAL_BUS_OFFSET macro:
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index e482562..752969f 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -3056,27 +3056,6 @@ static int _omap4_is_hardreset_asserted(struct omap_hwmod *oh,
- }
- 
- /**
-- * _am33xx_assert_hardreset - call AM33XX PRM hardreset fn with hwmod args
-- * @oh: struct omap_hwmod * to assert hardreset
-- * @ohri: hardreset line data
-- *
-- * Call am33xx_prminst_assert_hardreset() with parameters extracted
-- * from the hwmod @oh and the hardreset line data @ohri.  Only
-- * intended for use as an soc_ops function pointer.  Passes along the
-- * return value from am33xx_prminst_assert_hardreset().  XXX This
-- * function is scheduled for removal when the PRM code is moved into
-- * drivers/.
-- */
--static int _am33xx_assert_hardreset(struct omap_hwmod *oh,
--				   struct omap_hwmod_rst_info *ohri)
--
--{
--	return omap_prm_assert_hardreset(ohri->rst_shift, 0,
--					 oh->clkdm->pwrdm.ptr->prcm_offs,
--					 oh->prcm.omap4.rstctrl_offs);
--}
--
--/**
-  * _am33xx_deassert_hardreset - call AM33XX PRM hardreset fn with hwmod args
-  * @oh: struct omap_hwmod * to deassert hardreset
-  * @ohri: hardreset line data
-@@ -3091,32 +3070,13 @@ static int _am33xx_assert_hardreset(struct omap_hwmod *oh,
- static int _am33xx_deassert_hardreset(struct omap_hwmod *oh,
- 				     struct omap_hwmod_rst_info *ohri)
- {
--	return omap_prm_deassert_hardreset(ohri->rst_shift, ohri->st_shift, 0,
-+	return omap_prm_deassert_hardreset(ohri->rst_shift, ohri->st_shift,
-+					   oh->clkdm->pwrdm.ptr->prcm_partition,
- 					   oh->clkdm->pwrdm.ptr->prcm_offs,
- 					   oh->prcm.omap4.rstctrl_offs,
- 					   oh->prcm.omap4.rstst_offs);
- }
- 
--/**
-- * _am33xx_is_hardreset_asserted - call AM33XX PRM hardreset fn with hwmod args
-- * @oh: struct omap_hwmod * to test hardreset
-- * @ohri: hardreset line data
-- *
-- * Call am33xx_prminst_is_hardreset_asserted() with parameters
-- * extracted from the hwmod @oh and the hardreset line data @ohri.
-- * Only intended for use as an soc_ops function pointer.  Passes along
-- * the return value from am33xx_prminst_is_hardreset_asserted().  XXX
-- * This function is scheduled for removal when the PRM code is moved
-- * into drivers/.
-- */
--static int _am33xx_is_hardreset_asserted(struct omap_hwmod *oh,
--					struct omap_hwmod_rst_info *ohri)
--{
--	return omap_prm_is_hardreset_asserted(ohri->rst_shift, 0,
--					      oh->clkdm->pwrdm.ptr->prcm_offs,
--					      oh->prcm.omap4.rstctrl_offs);
--}
--
- /* Public functions */
- 
- u32 omap_hwmod_read(struct omap_hwmod *oh, u16 reg_offs)
-@@ -3916,21 +3876,13 @@ void __init omap_hwmod_init(void)
- 		soc_ops.init_clkdm = _init_clkdm;
- 		soc_ops.update_context_lost = _omap4_update_context_lost;
- 		soc_ops.get_context_lost = _omap4_get_context_lost;
--	} else if (soc_is_am43xx()) {
-+	} else if (cpu_is_ti816x() || soc_is_am33xx() || soc_is_am43xx()) {
- 		soc_ops.enable_module = _omap4_enable_module;
- 		soc_ops.disable_module = _omap4_disable_module;
- 		soc_ops.wait_target_ready = _omap4_wait_target_ready;
- 		soc_ops.assert_hardreset = _omap4_assert_hardreset;
--		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
--		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
--		soc_ops.init_clkdm = _init_clkdm;
--	} else if (cpu_is_ti816x() || soc_is_am33xx()) {
--		soc_ops.enable_module = _omap4_enable_module;
--		soc_ops.disable_module = _omap4_disable_module;
--		soc_ops.wait_target_ready = _omap4_wait_target_ready;
--		soc_ops.assert_hardreset = _am33xx_assert_hardreset;
- 		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
--		soc_ops.is_hardreset_asserted = _am33xx_is_hardreset_asserted;
-+		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
- 		soc_ops.init_clkdm = _init_clkdm;
- 	} else {
- 		WARN(1, "omap_hwmod: unknown SoC type\n");
--- 
-1.7.9.5
+#ifdef CONFIG_BCM2708_NOL2CACHE
+  #define _REAL_BUS_OFFSET UL(0xC0000000)   /* don't use L1 or L2 caches */
+#else
+  #define _REAL_BUS_OFFSET UL(0x40000000)   /* use L2 cache */
+#endif
