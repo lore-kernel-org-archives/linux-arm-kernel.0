@@ -1,184 +1,160 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue,  5 May 2015 21:50:52 +0800
-Subject: [RFC PATCH 4/9] irqchip: gic: ACPI: Use IRQCHIP_ACPI_DECLARE to
- simplify GICv2 init code
+Date: Tue,  5 May 2015 21:50:53 +0800
+Subject: [RFC PATCH 5/9] irqchip / gic: Add stacked irqdomain support for ACPI
+ based GICv2 init
 In-Reply-To: <1430833857-30736-1-git-send-email-hanjun.guo@linaro.org>
 References: <1430833857-30736-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1430833857-30736-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1430833857-30736-6-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the ACPI self-probe infrastructure for irqchip is ready,
-we use the infrastructure and the GIC version to simplify
-GICv2 init code.
-
->From now on, GIC init calls reside in theirs drivers only.
-This means the code becomes cleaner and it is not spread
-outside irqchip driver.
+Introduce acpi_irq_domain for GICv2 core domain instead of referring
+to the irq_default_domain, based on that, pass gsi as the argument and
+get the gsi in gic_irq_domain_alloc() to add stacked irqdomain support
+for ACPI based GICv2 init.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/include/asm/irq.h         | 13 -------------
- arch/arm64/kernel/acpi.c             | 25 -------------------------
- drivers/acpi/irq.c                   |  2 +-
- drivers/irqchip/irq-gic-acpi.c       |  5 +++++
- drivers/irqchip/irq-gic.c            |  6 +++++-
- include/linux/acpi_irq.h             |  4 +++-
- include/linux/irqchip/arm-gic-acpi.h | 10 ++--------
- 7 files changed, 16 insertions(+), 49 deletions(-)
+ drivers/acpi/gsi.c                   | 26 +++++++++++---------------
+ drivers/irqchip/irq-gic.c            | 32 +++++++++++++++++---------------
+ include/linux/irqchip/arm-gic-acpi.h |  2 ++
+ 3 files changed, 30 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index bbb251b..94c5367 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -1,8 +1,6 @@
- #ifndef __ASM_IRQ_H
- #define __ASM_IRQ_H
+diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+index 38208f2..f4110d8 100644
+--- a/drivers/acpi/gsi.c
++++ b/drivers/acpi/gsi.c
+@@ -13,6 +13,7 @@
+ #include <linux/irqdomain.h>
  
--#include <linux/irqchip/arm-gic-acpi.h>
--
- #include <asm-generic/irq.h>
+ enum acpi_irq_model_id acpi_irq_model;
++struct irq_domain *acpi_irq_domain;
  
- struct pt_regs;
-@@ -10,15 +8,4 @@ struct pt_regs;
- extern void migrate_irqs(void);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- 
--static inline void acpi_irq_init(void)
--{
--	/*
--	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
--	 * Proper irqchip infrastructure will be implemented along with
--	 * incoming  GICv2m|GICv3|ITS bits.
--	 */
--	acpi_gic_init();
--}
--#define acpi_irq_init acpi_irq_init
--
- #endif
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 8b83955..69809e7 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -318,28 +318,3 @@ void __init acpi_boot_table_init(void)
- 			disable_acpi();
- 	}
- }
--
--void __init acpi_gic_init(void)
--{
--	struct acpi_table_header *table;
--	acpi_status status;
--	acpi_size tbl_size;
--	int err;
--
--	if (acpi_disabled)
--		return;
--
--	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
--	if (ACPI_FAILURE(status)) {
--		const char *msg = acpi_format_exception(status);
--
--		pr_err("Failed to get MADT table, %s\n", msg);
--		return;
--	}
--
--	err = gic_v2_acpi_init(table);
--	if (err)
--		pr_err("Failed to initialize GIC IRQ controller");
--
--	early_acpi_os_unmap_memory((char *)table, tbl_size);
--}
-diff --git a/drivers/acpi/irq.c b/drivers/acpi/irq.c
-index 855ead9..7bd1ef6 100644
---- a/drivers/acpi/irq.c
-+++ b/drivers/acpi/irq.c
-@@ -25,7 +25,7 @@ irqchip_acpi_match_end __used __section(__irqchip_acpi_table_end);
- 
- extern struct acpi_table_id __irqchip_acpi_table[];
- 
--void __init acpi_irqchip_init(void)
-+void __init acpi_irq_init(void)
+ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
  {
- 	struct acpi_table_id *id;
+@@ -45,12 +46,7 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+  */
+ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+ {
+-	/*
+-	 * Only default domain is supported at present, always find
+-	 * the mapping corresponding to default domain by passing NULL
+-	 * as irq_domain parameter
+-	 */
+-	*irq = irq_find_mapping(NULL, gsi);
++	*irq = irq_find_mapping(acpi_irq_domain, gsi);
+ 	/*
+ 	 * *irq == 0 means no mapping, that should
+ 	 * be reported as a failure
+@@ -72,16 +68,16 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+ 		      int polarity)
+ {
+-	unsigned int irq;
++	int irq;
+ 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
  
-diff --git a/drivers/irqchip/irq-gic-acpi.c b/drivers/irqchip/irq-gic-acpi.c
-index 4796f07..7172ff1 100644
---- a/drivers/irqchip/irq-gic-acpi.c
-+++ b/drivers/irqchip/irq-gic-acpi.c
-@@ -21,6 +21,11 @@ static u8 gic_version __initdata = ACPI_MADT_GIC_VER_UNKNOWN;
- 
- static phys_addr_t dist_phy_base __initdata;
- 
-+u8 __init acpi_gic_version(void)
-+{
-+	return gic_version;
-+}
+-	/*
+-	 * There is no way at present to look-up the IRQ domain on ACPI,
+-	 * hence always create mapping referring to the default domain
+-	 * by passing NULL as irq_domain parameter
+-	 */
+-	irq = irq_create_mapping(NULL, gsi);
+-	if (!irq)
++	irq = irq_find_mapping(acpi_irq_domain, gsi);
++	if (irq > 0)
++		return irq;
 +
- static int __init
- acpi_gic_parse_distributor(struct acpi_subtable_header *header,
- 				const unsigned long end)
++	irq = irq_domain_alloc_irqs(acpi_irq_domain, 1, dev_to_node(dev),
++				    &gsi);
++	if (irq <= 0)
+ 		return -EINVAL;
+ 
+ 	/* Set irq type if specified and different than the current one */
+@@ -98,7 +94,7 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
+  */
+ void acpi_unregister_gsi(u32 gsi)
+ {
+-	int irq = irq_find_mapping(NULL, gsi);
++	int irq = irq_find_mapping(acpi_irq_domain, gsi);
+ 
+ 	irq_dispose_mapping(irq);
+ }
 diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 7b315e3..476dc7b 100644
+index 476dc7b..0b712f8 100644
 --- a/drivers/irqchip/irq-gic.c
 +++ b/drivers/irqchip/irq-gic.c
-@@ -1154,12 +1154,15 @@ gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
- 	return 0;
- }
- 
--int __init
-+static int __init
- gic_v2_acpi_init(struct acpi_table_header *table)
+@@ -919,15 +919,22 @@ static struct notifier_block gic_cpu_notifier = {
+ static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 				unsigned int nr_irqs, void *arg)
  {
- 	void __iomem *cpu_base, *dist_base;
- 	int count;
+-	int i, ret;
++	int i;
+ 	irq_hw_number_t hwirq;
+-	unsigned int type = IRQ_TYPE_NONE;
+-	struct of_phandle_args *irq_data = arg;
  
-+	if (acpi_gic_version() >= ACPI_MADT_GIC_VER_V3)
-+		return -ENODEV;
+-	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
+-				   irq_data->args_count, &hwirq, &type);
+-	if (ret)
+-		return ret;
++	if (domain->of_node) {	/* DT case */
++		int ret;
++		unsigned int type = IRQ_TYPE_NONE;
++		struct of_phandle_args *irq_data = arg;
 +
- 	/* Collect CPU base addresses */
- 	count = acpi_parse_entries(ACPI_SIG_MADT,
- 				   sizeof(struct acpi_table_madt),
-@@ -1210,4 +1213,5 @@ gic_v2_acpi_init(struct acpi_table_header *table)
++		ret = gic_irq_domain_xlate(domain, irq_data->np,
++					irq_data->args,
++					irq_data->args_count, &hwirq, &type);
++		if (ret)
++			return ret;
++	} else {	/* ACPI case */
++		hwirq = (irq_hw_number_t)*(u32 *)arg;
++	}
+ 
+ 	for (i = 0; i < nr_irqs; i++)
+ 		gic_irq_domain_map(domain, virq + i, hwirq + i);
+@@ -1013,11 +1020,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 		gic_irqs = 1020;
+ 	gic->gic_irqs = gic_irqs;
+ 
+-	if (node) {		/* DT case */
++	if (node || !acpi_disabled) {		/* DT or ACPI case */
+ 		gic->domain = irq_domain_add_linear(node, gic_irqs,
+ 						    &gic_irq_domain_hierarchy_ops,
+ 						    gic);
+-	} else {		/* Non-DT case */
++	} else {		/* Non-DT and ACPI case */
+ 		/*
+ 		 * For primary GICs, skip over SGIs.
+ 		 * For secondary GICs, skip over PPIs, too.
+@@ -1202,13 +1209,8 @@ gic_v2_acpi_init(struct acpi_table_header *table)
+ 		return -ENOMEM;
+ 	}
+ 
+-	/*
+-	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
+-	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
+-	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
+-	 */
+ 	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+-	irq_set_default_host(gic_data[0].domain);
++	acpi_irq_domain = gic_data[0].domain;
+ 
  	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
  	return 0;
- }
-+IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_SIG_MADT, gic_v2_acpi_init);
- #endif
-diff --git a/include/linux/acpi_irq.h b/include/linux/acpi_irq.h
-index f10c872..4c0e108 100644
---- a/include/linux/acpi_irq.h
-+++ b/include/linux/acpi_irq.h
-@@ -3,7 +3,9 @@
- 
- #include <linux/irq.h>
- 
--#ifndef acpi_irq_init
-+#ifdef CONFIG_ACPI
-+void acpi_irq_init(void);
-+#else
- static inline void acpi_irq_init(void) { }
- #endif
- 
 diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
-index 0d5f204..021e8e8 100644
+index 021e8e8..245386d 100644
 --- a/include/linux/irqchip/arm-gic-acpi.h
 +++ b/include/linux/irqchip/arm-gic-acpi.h
-@@ -21,13 +21,7 @@
+@@ -21,6 +21,8 @@
  #define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
  #define ACPI_GICV3_DIST_MEM_SIZE	(SZ_64K)
  
--struct acpi_table_header;
--
--int gic_v2_acpi_init(struct acpi_table_header *table);
--void acpi_gic_init(void);
++extern struct irq_domain *acpi_irq_domain;
++
  int acpi_gic_version_init(void);
--#else
--static inline void acpi_gic_init(void) { }
--#endif
--
-+u8 acpi_gic_version(void);
-+#endif /* CONFIG_ACPI */
- #endif /* ARM_GIC_ACPI_H_ */
+ u8 acpi_gic_version(void);
+ #endif /* CONFIG_ACPI */
 -- 
 1.9.1
