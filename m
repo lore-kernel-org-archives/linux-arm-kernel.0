@@ -1,35 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 5 May 2015 18:05:41 +0100
-Subject: [RFC PATCH] iommu: add ARM short descriptor page table allocator.
-In-Reply-To: <20150505161802.GA20611@8bytes.org>
-References: <1430206881-18294-1-git-send-email-yong.wu@mediatek.com>
- <20150505161802.GA20611@8bytes.org>
-Message-ID: <20150505170541.GN1550@arm.com>
+From: nerv@dawncrow.de (=?windows-1252?Q?Andr=E9_Hentschel?=)
+Date: Tue, 05 May 2015 19:09:57 +0200
+Subject: [PATCH] arm64: Preserve the user r/w register tpidr_el0 on context
+ switch and fork in compat mode
+In-Reply-To: <20150505105111.GB1550@arm.com>
+References: <55464BB2.7030401@dawncrow.de> <20150505105111.GB1550@arm.com>
+Message-ID: <5548F965.9070302@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 05, 2015 at 05:18:02PM +0100, Joerg Roedel wrote:
-> On Tue, Apr 28, 2015 at 03:41:21PM +0800, Yong Wu wrote:
-> > This patch is for ARM Short Descriptor Format.It has 2-levels
-> > pagetable and the allocator supports 4K/64K/1M/16M.
-> > 
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > ---
-> >  drivers/iommu/Kconfig                |   7 +
-> >  drivers/iommu/Makefile               |   1 +
-> >  drivers/iommu/io-pgtable-arm-short.c | 489 +++++++++++++++++++++++++++++++++++
-> >  drivers/iommu/io-pgtable.c           |   4 +
-> >  drivers/iommu/io-pgtable.h           |   6 +
-> >  5 files changed, 507 insertions(+)
-> >  create mode 100644 drivers/iommu/io-pgtable-arm-short.c
+Am 05.05.2015 um 12:51 schrieb Will Deacon:
+> On Sun, May 03, 2015 at 05:24:18PM +0100, Andr? Hentschel wrote:
+>> From: Andr? Hentschel <nerv@dawncrow.de>
+>>
+>> Since commit a4780adeefd042482f624f5e0d577bf9cdcbb760 the user writeable TLS
+>> register on ARM is preserved per thread.
+>>
+>> This patch does it analogous to the ARM patch, but for compat mode on ARM64.
+>>
+>> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Jonathan Austin <jonathan.austin@arm.com> 
+>>
+>> ---
+>> This patch is against Linux 4.1-rc1 (b787f68c36d49bb1d9236f403813641efa74a031)
 > 
-> What is the context of this, where will it be used?
+> Curious, but why do you need this? iirc, we added this for arch/arm/ because
+> of some windows rt (?) emulation in wine. Is that still the case here and is
+> anybody actually using that?
 
-I think the MT8173 IOMMU [1] uses this format and, since it's part of
-the ARM architecture, the ARM SMMU can make use of it too if the
-implementation supports it.
+Yes, Windows ARM binaries are the well known use case, but also the compat mode should do
+what the arm kernel is doing I?d think and the code wasn't adjusted yet.
 
-Will
+What i'm curious about is why the main TLS register on arm64 is the user writeable,
+I'm not an security expert but this looks odd. I could easily provoke a crash by writing
+to it...
 
-[1]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
+CCing Catalin Marinas
