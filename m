@@ -1,53 +1,43 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 5 May 2015 16:42:36 +0200
-Subject: [PATCH v8 0/9] Tegra xHCI support
-In-Reply-To: <5548D389.2080609@nvidia.com>
-References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
- <5548D389.2080609@nvidia.com>
-Message-ID: <20150505144234.GA29813@ulmo.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 May 2015 07:43:08 -0700
+Subject: [PATCH 0/3] Drop more omap3 legacy board-*.c files for v4.2
+In-Reply-To: <2213391.JZ0TJA9KXB@wuerfel>
+References: <1430769717-4088-1-git-send-email-tony@atomide.com>
+ <2213391.JZ0TJA9KXB@wuerfel>
+Message-ID: <20150505144308.GA21061@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 05, 2015 at 03:28:25PM +0100, Jon Hunter wrote:
-> Hi Andrew,
-> 
-> On 04/05/15 18:36, Andrew Bresticker wrote:
-> > This series adds support for xHCI on NVIDIA Tegra SoCs.  This includes:
-> >  - patches 1, 2, and 3: minor cleanups for mailbox framework and xHCI,
-> >  - patches 4 and 5: adding an MFD driver for the XUSB cmoplex,
-> >  - patches 6 and 7: adding a driver for the mailbox used to communicate
-> >    with the xHCI controller's firmware, and
-> >  - patches 8 and 9: adding a xHCI host-controller driver.
+* Arnd Bergmann <arnd@arndb.de> [150505 03:56]:
+> On Monday 04 May 2015 13:01:54 Tony Lindgren wrote:
 > > 
-> > The addition of USB PHY support to the XUSB padctl driver has been dropped.
-> > Thierry will be posting those patches later.
+> > For dropping the remaining omap3 legacy boot support, we still
+> > have the following board-*.c files:
 > > 
-> > Given the many compile and run-time dependencies in this series, it is probably
-> > best if the first 3 patches are picked up by the relevant maintainers in topic
-> > branches so that the remainder of the series can go through the Tegra tree.
+> > BOARD                   REASON NEEDED
+> > board-ldp.c             Still used in RMKs boot test system
+> > board-omap3logic.c      Getting a .dts file for v4.2
+> > board-omap3pandora.c    Got a .dts file for v4.1
+> > board-rx51-*.c          Needs /proc/atags support for user space
 > > 
-> > Tested on Jetson TK1 and Nyan-Big with a variety of USB2.0 and USB3.0 memory
-> > sticks and ethernet dongles.  This has also been tested, with additional
-> > out-of-tree patches, on Tegra132 and Tegra210 based boards.
+> > I'm hoping we can drop those for v4.3 merge window, then keep
+> > the platform data around for one more merge window in case of
+> > reverting needed, then drop the platform data too for v4.4
+> > if no issues needing reverting are found.
 > 
-> For the series, you can add my ...
-> 
-> Reviewed-by: Jon Hunter <jonathanh@nvidia.com>
-> Tested-by: Jon Hunter <jonathanh@nvidia.com>
-> 
-> I have tested this on a t124 nyan-big with USB3.0 and USB2.0 devices.
+> Sounds great. Has there been a conclusion about what to do for the
+> rx51 /proc/atags support?
 
-How can this be tested without the corresponding USB PHY patches that
-I'm supposed to be sending out?
+I believe we just need to enable /proc/atags also for device tree
+based booting if CONFIG_ARM_ATAG_DTB_COMPAT. Pali may have more
+info on that.
 
-Also, can anyone point me at patches that add the device tree nodes
-which this driver makes use of?
+Then looks like Pali's two patches for showing the revision are
+still pending in thread "[PATCH v2 0/2] ARM: /proc/cpuinfo: DT:
+Add support for Revision":
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/38fc76be/attachment.sig>
+http://www.spinics.net/lists/arm-kernel/msg401535.html
+
+Regards,
+
+Tony
