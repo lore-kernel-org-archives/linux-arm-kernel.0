@@ -1,30 +1,44 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 5 May 2015 14:18:38 +0200
-Subject: [PATCH 7/9] ARM: tegra: enable HDA in defconfig
-In-Reply-To: <16307b8af5a65c8ba5a2b9cb640b4718142adbca.1428700856.git.marcel.ziswiler@toradex.com>
-References: <cover.1428700856.git.marcel.ziswiler@toradex.com>
- <16307b8af5a65c8ba5a2b9cb640b4718142adbca.1428700856.git.marcel.ziswiler@toradex.com>
-Message-ID: <20150505121837.GF30501@ulmo.nvidia.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 5 May 2015 13:23:10 +0100
+Subject: [PATCH] serial/amba-pl011: fix minor bugs for pio mode
+In-Reply-To: <20150505121112.GC5513@leoy-linaro>
+References: <1430794825-14367-1-git-send-email-leo.yan@linaro.org>
+ <20150505111155.GA16868@e103592.cambridge.arm.com>
+ <20150505120927.GB5513@leoy-linaro>
+ <20150505121112.GC5513@leoy-linaro>
+Message-ID: <20150505122015.GA16870@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:36:02PM +0200, Marcel Ziswiler wrote:
-> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+On Tue, May 05, 2015 at 08:11:12PM +0800, Leo Yan wrote:
+> On Tue, May 05, 2015 at 08:09:27PM +0800, Leo Yan wrote:
+> > On Tue, May 05, 2015 at 12:11:56PM +0100, Dave P Martin wrote:
+> > > On Tue, May 05, 2015 at 04:00:25AM +0100, Leo Yan wrote:
+> > > [...]
+> > > 
+> > > Thanks for the fixes, but I already posted patches that probably fix the
+> > > issues you are observing, And Greg took them into his tty-testing branch.
+> > > 
+> > > Can you give them a try instead of your patches?
+> > > 
+> > > Dave Martin (2):
+> > >       Revert "serial/amba-pl011: Leave the TX IRQ alone when the UART is not open"
+> > >       serial/amba-pl011: Refactor and simplify TX FIFO handling
+> > > 
+> > > from
+> > > 
+> > > git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
+> > > 
+> > > 
+> > > It would be good to have some feedback on them.
+> > 
+> > Tested w/t your two patches, it can fix issues quite well;
+> > Also will back port them into local branch. Thanks u and Daniel
+> > pointing out this.
 > 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> ---
->  arch/arm/configs/tegra_defconfig | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> Sorry, fix typo:
+> 
+> Tested-by: Leo Yan <leo.yan@linaro.org>
 
-I've squashed this into a single commit with the patch that enables
-watchdog support.
-
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/f289d2d2/attachment.sig>
+Thanks
+---Dave
