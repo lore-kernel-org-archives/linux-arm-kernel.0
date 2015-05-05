@@ -1,49 +1,99 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 5 May 2015 11:57:14 +0100
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <20150504121209.GM15510@sirena.org.uk>
- <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
-Message-ID: <20150505105714.GA22845@sirena.org.uk>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 05 May 2015 12:02:10 +0100
+Subject: [PATCH] serial/amba-pl011: fix minor bugs for pio mode
+In-Reply-To: <1430794825-14367-1-git-send-email-leo.yan@linaro.org>
+References: <1430794825-14367-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <5548A332.1090906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 05, 2015 at 04:18:59PM +0530, Viresh Kumar wrote:
-> On 4 May 2015 at 17:42, Mark Brown <broonie@kernel.org> wrote:
-> > On Thu, Apr 30, 2015 at 05:37:59PM +0530, Viresh Kumar wrote:
+On 05/05/15 04:00, Leo Yan wrote:
+> When use pio mode, there have two issues can be observed:
+>
+> - In the commit 2240197 "serial/amba-pl011: Leave the TX IRQ alone when
+>    the UART is not open", it will skip clearing the TX IRQ across
+>    pl011_shutdown() and pl011_startup(); So at the next time after the
+>    uart port has been opened, there have chance for the function
+>    pl011_tx_chars() will not be executed if the TX IRQ will not be
+>    triggered; finally the console cannot output anymore.
+>
+>    This is caused by the uart FIFO still keep data rather than
+>    the threshold. So revert this patch to make sure every time open the
+>    uart port, it will force to call function pl011_tx_chars().
+>
+> - Sometimes will output the duplicate chars. Function pl011_tx_char()
+>    will firstly send char and check if FIFO is full, and if the FIFO is
+>    full it will return false; Caller function will consider the char
+>    has _NOT_ been send out and resend it again, finally will send the
+>    duplicate chars. So change to check FIFO is full or not, if full then
+>    return false, otherwise send out char and return true.
 
-> >> +- opp-microamp: current in micro Amperes. It can contain entries for multiple
-> >> +  regulators.
-> >> +
-> >> +  A single regulator's current is specified with an array of size one or three.
-> >> +  Single entry is for target current and three entries are for <target min max>
-> >> +  currents.
+I was going to comment that this patch should probably be split into two 
+patches...
 
-> > What is this for - are you trying to define OPPs for current regulators?
-> > If you are that's worrying, I can't think of a sensible use case.  If
-> > that's not what's happening then the binding needs to be more specific
-> > about what this is supposed to mean.
+However whilst doing background reading I noticed that for both these 
+issues there are existing patches to address them:
 
-> Its another property of the same voltage regulator we are using in
-> opp-microvolt.
-> I hope that makes sense ?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/334107.html
 
-No, it doesn't - you're not answering the question about what this is
-for.
+Do these fix the issues for you?
 
-> But, perhaps I need to write it with more clarity? Or this field doesn't make
-> sense ?
 
-To know if this makes sense I need to know what you beleive "setting the
-current" does.  If you literally mean setting the current it makes no
-sense at all.  If you mean something else that something else should
-probably be written into the binding.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/d1a290d5/attachment.sig>
+>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>   drivers/tty/serial/amba-pl011.c | 20 +++++++++++---------
+>   1 file changed, 11 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 5a4e9d5..9d9ac76 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -1249,20 +1249,19 @@ __acquires(&uap->port.lock)
+>
+>   /*
+>    * Transmit a character
+> - * There must be at least one free entry in the TX FIFO to accept the char.
+>    *
+> - * Returns true if the FIFO might have space in it afterwards;
+> - * returns false if the FIFO definitely became full.
+> + * Before send character, need check FIFO is full or not;
+> + * If FIFO is full, will not send char and return false,
+> + * otherwise send out character and return ture.
+>    */
+>   static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c)
+>   {
+> +	if (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
+> +		return false;
+> +
+>   	writew(c, uap->port.membase + UART01x_DR);
+>   	uap->port.icount.tx++;
+> -
+> -	if (likely(uap->tx_irq_seen > 1))
+> -		return true;
+> -
+> -	return !(readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF);
+> +	return true;
+>   }
+>
+>   static bool pl011_tx_chars(struct uart_amba_port *uap)
+> @@ -1639,6 +1638,9 @@ static int pl011_startup(struct uart_port *port)
+>
+>   	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+>
+> +	/* Assume that TX IRQ doesn't work until we see one: */
+> +	uap->tx_irq_seen = 0;
+> +
+>   	spin_lock_irq(&uap->port.lock);
+>
+>   	/* restore RTS and DTR */
+> @@ -1702,7 +1704,7 @@ static void pl011_shutdown(struct uart_port *port)
+>   	spin_lock_irq(&uap->port.lock);
+>   	uap->im = 0;
+>   	writew(uap->im, uap->port.membase + UART011_IMSC);
+> -	writew(0xffff & ~UART011_TXIS, uap->port.membase + UART011_ICR);
+> +	writew(0xffff, uap->port.membase + UART011_ICR);
+>   	spin_unlock_irq(&uap->port.lock);
+>
+>   	pl011_dma_shutdown(uap);
+>
