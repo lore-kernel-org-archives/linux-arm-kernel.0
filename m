@@ -1,35 +1,33 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 5 May 2015 17:16:46 -0500
-Subject: [PATCH v3 3/5] PCI: st: Provide support for the sti PCIe
- controller
-In-Reply-To: <1428657168-12495-4-git-send-email-gabriel.fernandez@linaro.org>
-References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
- <1428657168-12495-4-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <20150505221646.GE24643@google.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 5 May 2015 23:35:42 +0100
+Subject: [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
+In-Reply-To: <s5ha8ymy3e2.wl-tiwai@suse.de>
+References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+ <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
+ <s5ha8ymy3e2.wl-tiwai@suse.de>
+Message-ID: <20150505223542.GM15510@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:12:46AM +0200, Gabriel FERNANDEZ wrote:
-> sti pcie is built around a Synopsis Designware PCIe IP.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+On Sun, Apr 05, 2015 at 05:57:09PM +0200, Takashi Iwai wrote:
+> At Thu, 02 Apr 2015 10:22:06 +0100,
+> Russell King wrote:
 
-> +/* ST PCIe driver does not allow module unload */
+> > +config SND_PCM_ELD
+> > +	bool
 
-Is there something that prevents module unload, or is it just untested?
+> I don't mind much adding this one, but a new Kconfig is always a
+> question.  I'd like to hear other's opinion, too.
 
-> +static int __init pcie_init(void)
-> +{
-> +	return platform_driver_probe(&st_pcie_driver, st_pcie_probe);
-> +}
-> +device_initcall(pcie_init);
-
-Can you use module_platform_driver_probe() or module_init() here?
-
-> +MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
-> +MODULE_DESCRIPTION("PCI express Driver for ST SoCs");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 1.9.1
-> 
+One point in favour of this is that there's been some discussion
+recently of IoT applications with very low resource requirements that
+might need audion functionality so it's likely that people will be
+taking a look at trying to minimize code size for the audio stack.  This
+sort of configurability may well be useful for such applications.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/d456c52b/attachment.sig>
