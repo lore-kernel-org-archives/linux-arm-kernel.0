@@ -1,43 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 5 May 2015 18:12:52 +0100
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <20150504121209.GM15510@sirena.org.uk>
- <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
- <20150505105714.GA22845@sirena.org.uk>
- <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
-Message-ID: <20150505171252.GI22845@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 5 May 2015 18:13:49 +0100
+Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
+Message-ID: <20150505171349.GA30215@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 05, 2015 at 05:13:33PM +0530, Viresh Kumar wrote:
-> On 5 May 2015 at 16:27, Mark Brown <broonie@kernel.org> wrote:
+Hi,
 
-> > No, it doesn't - you're not answering the question about what this is
-> > for.
+> +/*Reserved 1MB memory for MCU*/
+> +/memreserve/ 0x05e00000 0x00100000;
 
-> I don't know how this information will be used finally. Probably the
-> platform driver will do the configuration based on the volt-cur pair.
+What exactly is the MCU used for, and what does it use this memory for?
 
-I don't think we should be defining a binding without understanding what
-it is supposed to mean.  
+Can this be carved out from the memory node instead? If the OS doesn't
+need to access this memory to communicate with the MCU, preventing the
+OS from mapping the memory avoids a number of potential issues.
 
->  - opp-microamp: current in micro Amperes. It can contain entries for multiple
-> -  regulators.
-> +  regulators. This can be referenced (along with voltage and freqency) while
-> +  programming the regulator.
+I take it that with UEFI this region is not described to the OS?
 
-This still doesn't say what the value is supposed to mean which means
-it's not possible for someone to write generic code which handles the
-binding - saying that people can reference the value doesn't tell them
-how to interpret it.  A limit?  A nominal constant draw value?  A value
-to regulate to?  Those are all different things expressed as a current.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/6b7a3b0d/attachment.sig>
+[...]
+
+> +	psci {
+> +		compatible = "arm,psci-0.2";
+> +		method = "smc";
+> +	};
+
+Are all the PSCI 0.2 mandatory features implemented?
+
+Can CPU0 be hot unplugged?
+
+[...]
+
+> +		uart0: uart at f8015000 {	/* console */
+> +			compatible = "arm,pl011", "arm,primecell";
+> +			reg = <0x0 0xf8015000 0x0 0x1000>;
+> +			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&ao_ctrl HI6220_UART0_PCLK>, <&ao_ctrl HI6220_UART0_PCLK>;
+> +			clock-names = "uartclk", "apb_pclk";
+> +		};
+
+In a previous discussion [1] the UART on HI6220 was described as not
+fully PL011 compliant, with a number of differences (e.g. the FIFO
+length).
+
+Given that, I feel somewhat uncomfortable with the current compatible
+string list. What exactly are those differences? We may need a more
+specific compatible string (even if in addition to those existing ones),
+or perhaps other properties.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/328978.html
