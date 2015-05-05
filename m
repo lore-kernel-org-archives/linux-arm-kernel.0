@@ -1,36 +1,51 @@
-From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
-Date: Tue, 5 May 2015 13:14:12 +0900
-Subject: [RESEND-PATCH] ARM: dts: Add missing irq pinctrl for max77686 on
- smdk5250
-In-Reply-To: <1430798855-27271-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1430798855-27271-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAJKOXPd2x_DiD8EAq202=scTuK0HHH8evvD_TkLn4oO_6hrRhg@mail.gmail.com>
+From: bintian.wang@huawei.com (Bintian Wang)
+Date: Tue, 5 May 2015 12:30:08 +0800
+Subject: [PATCH v3 1/5] arm64: Enable Hisilicon ARMv8 SoC family in Kconfig
+ and defconfig
+In-Reply-To: <1430800212-6970-1-git-send-email-bintian.wang@huawei.com>
+References: <1430800212-6970-1-git-send-email-bintian.wang@huawei.com>
+Message-ID: <1430800212-6970-2-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-05 13:07 GMT+09:00 Pankaj Dubey <pankaj.dubey@samsung.com>:
-> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
->
-> This patch adds pinctrl configuration for using configuring gpx3-2 as an
-> external interrupt from max77686. Though max77686 RTC is enabled and gets
-> probed by default, it doesnt work as its unable to get interrupt.
->
-> This patch makes max77686 RTC work and also configures it as wakeup source.
->
-> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->
-> Initial version of this patch was part of following series, though
-> they are not dependent on each other, resubmitting after rebasing
-> and detaching second one from first patch in the series [1]
->
-> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303652.html
+This patch introduces ARCH_HISI to enable Hisilicon SoC family in
+Kconfig and defconfig.
 
-Thanks, but now it needs your Signed-off-by because you touched it.
+Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Reviewed-by: Wei Xu <xuwei5@hisilicon.com>
+---
+ arch/arm64/Kconfig           | 5 +++++
+ arch/arm64/configs/defconfig | 1 +
+ 2 files changed, 6 insertions(+)
 
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4269dba..2af5efe 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -180,6 +180,11 @@ config ARCH_FSL_LS2085A
+ 	help
+ 	  This enables support for Freescale LS2085A SOC.
+ 
++config ARCH_HISI
++	bool "Hisilicon SoC Family"
++	help
++	  This enables support for Hisilicon ARMv8 SoC family
++
+ config ARCH_MEDIATEK
+ 	bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
+ 	select ARM_GIC
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 2ed7449..1d293ea 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -33,6 +33,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ CONFIG_ARCH_EXYNOS7=y
+ CONFIG_ARCH_FSL_LS2085A=y
++CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_MEDIATEK=y
+ CONFIG_ARCH_SEATTLE=y
+ CONFIG_ARCH_TEGRA=y
+-- 
+1.9.1
