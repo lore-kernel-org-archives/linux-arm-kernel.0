@@ -1,217 +1,94 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 5 May 2015 14:57:14 +0200
-Subject: [PATCH v3 3/7] mmc: mediatek: Add PM support for MMC driver
-In-Reply-To: <1430214525-19198-4-git-send-email-chaotian.jing@mediatek.com>
-References: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
- <1430214525-19198-4-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFpC5XKOykCBp_JgcP7UAWoS-m5uFvb+QhqrNBwkZNJ6Ow@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 5 May 2015 15:10:08 +0200
+Subject: [PATCH] i2c: rk3x: Increase wait timeout to 1 second
+In-Reply-To: <CAD=FV=VsH2r5w3RNwu4=xD04x=jgf4JO9wCnk6MOVsNFf5vPog@mail.gmail.com>
+References: <1430430247-9632-1-git-send-email-dianders@chromium.org>
+ <20150504083312.GN25193@pengutronix.de>
+ <CAD=FV=W1UMOfVCEYAHmsxQfoyXvGRSd63Sw26zEki+A-7G7eiw@mail.gmail.com>
+ <20150504152415.GS25193@pengutronix.de>
+ <CAD=FV=VsH2r5w3RNwu4=xD04x=jgf4JO9wCnk6MOVsNFf5vPog@mail.gmail.com>
+Message-ID: <20150505131008.GH25193@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 April 2015 at 11:48, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> Add PM support for Mediatek MMC driver
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/host/mtk-sd.c | 58 +++++++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 53 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 30e688d..79177d9 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -22,6 +22,7 @@
->  #include <linux/of_gpio.h>
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/spinlock.h>
->
-> @@ -215,6 +216,7 @@
->  #define MSDC_ASYNC_FLAG (0x1 << 1)
->  #define MSDC_MMAP_FLAG (0x1 << 2)
->
-> +#define MTK_MMC_AUTOSUSPEND_DELAY      500
+Hello,
 
-Most other mmc host drivers use 50ms, any reason to why this driver
-wants a different value?
+On Mon, May 04, 2015 at 09:38:28AM -0700, Doug Anderson wrote:
+> On Mon, May 4, 2015 at 8:24 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> >> Thank you for looking at this!  I will clarify by giving explicit CPU
+> >> numbers (this issue can only happen in SMP, I think):
+> >>
+> >> 1. CPU1 is running rk3x_i2c_xfer()
+> >>
+> >> 2. CPU0 calls vprintk_emit(), which disables all IRQs on CPU0.
+> >>
+> >> 3. I2C interrupt is ready but is set to only run on CPU0, where IRQs
+> >> are disabled.
+> > Why does this irq only trigger on cpu0?
+> 
+> So I've never done the research myself on the interrupt architecture
+> on ARM, but certainly on all ARM boards I've worked on recently all
+> IRQs (except those local to just one core) get routed to CPU0.  I've
+> been told that there are some userspace programs that try to balance
+> things out a little bit, but even in those cases each IRQ is assigned
+> a single CPU and if that CPU has its interrupts off then the IRQ won't
+> be dynamically rerouted.  I think I remember someone telling me that
+> there was also extra complexity around what happens when CPUs get
+> taken offline...
+> 
+> A quick search shows some discussion from 2011 at
+> <http://comments.gmane.org/gmane.linux.ports.arm.kernel/102251>.
+> 
+> Given that lots of smart people have looked at this and our interrupts
+> are still all going to CPU0, it's not something I'm going to try to
+> solve right now...
+researching a bit myself it seems you're right here. It would be nice to
+mention this in the commit log though.
+ 
+> > Assuming this is correct, the
+> > more robust change would be to detect this situation after 200ms instead
+> > of waiting 1s to work around this issue.
+> 
+> Detect in what way?  You mean add code to detect that the CPU that's
+> assigned our interrupt has been stalled for 200ms?  ...and what do I
+> do in that case?
+> 
+> I suppose I could add code that reads the I2C interrupt status and
+> notices that although the I2C controller claims that it should have an
+> interrupt by now but we never saw it go off.  I could then give it
+> more time.  Is that what you're looking for?  We'd still want to
+> timeout eventually since there could be some other bug in the system
+> that's causing the interrupt not to ever go off...
+Hmm, probably that's overkill. (Better spend the time fixing printk not
+to disable irqs that long :-)
 
->  #define CMD_TIMEOUT         (HZ/10 * 5)        /* 100ms x5 */
->  #define DAT_TIMEOUT         (HZ    * 5)        /* 1000ms x5 */
->
-> @@ -706,6 +708,9 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
->         if (mrq->data)
->                 msdc_unprepare_data(host, mrq);
->         mmc_request_done(host->mmc, mrq);
-> +
-> +       pm_runtime_mark_last_busy(host->dev);
-> +       pm_runtime_put_autosuspend(host->dev);
->  }
->
->  /* returns true if command is fully handled; returns false otherwise */
-> @@ -862,6 +867,8 @@ static void msdc_ops_request(struct mmc_host *mmc, struct mmc_request *mrq)
->                 WARN_ON(host->mrq);
->         spin_unlock_irqrestore(&host->lock, flags);
->
-> +       pm_runtime_get_sync(host->dev);
-> +
->         if (mrq->data)
->                 msdc_prepare_data(host, mrq);
->
-> @@ -999,7 +1006,6 @@ static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
->         int ret = 0;
->
->         if (!IS_ERR(mmc->supply.vqmmc)) {
-> -
+> That adds a bunch of extra complexity, though.  Is there a use case
+> where a timeout of 1 second poses a problem for you that would justify
+> the extra code?  I'd presume you're thinking of a case where a timeout
+> would be expected in a case other than a bug in the i2c driver or a
+> hardware bug in the i2c controller where 200ms is an acceptable
+> timeout but 1 second is far too long.  Note: if we are using the
+> timeout to detect a bug of some sort then I'd imagine that 1 second
+> might be actually better (a slightly longer delay makes it more
+> obvious that something bad is happening).
+> 
+> 
+> One other thing occurs to me: having a longer than 200ms delay may
+> actually be a correctness thing anyway.  Technically i2c devices are
+> allowed to clock stretch "indefinitely", so transfers be quite long
+> and still be "legal".  In practice a REALLY long clock stretch signals
+> a problem somewhere so we really do need some timeout, but 200ms may
+> be too short.  For instance, some docs of the bq27541 battery gas
+> gauge claim that it can clock stretch (in extreme cases) for 144ms.
+> While this is still less than 200ms, it does seem prudent to give a
+> little more leeway before seeing a timeout.
+If you rework your commit log to describe the failing situation more
+accurately that should be fine.
 
-White space.
+Best regards
+Uwe
 
->                 if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
->                         min_uv = 3300000;
->                         max_uv = 3300000;
-> @@ -1018,7 +1024,6 @@ static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
->                                         ret, min_uv, max_uv);
->                 }
->         }
-> -
-
-White space.
-
->         return ret;
->  }
->
-> @@ -1176,8 +1181,10 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->         int ret;
->         u32 ddr = 0;
->
-> +       pm_runtime_get_sync(host->dev);
-> +
->         if (ios->timing == MMC_TIMING_UHS_DDR50 ||
-> -               ios->timing == MMC_TIMING_MMC_DDR52)
-> +                       ios->timing == MMC_TIMING_MMC_DDR52)
-
-White space.
-
->                 ddr = 1;
->
->         msdc_set_buswidth(host, ios->bus_width);
-> @@ -1191,7 +1198,7 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->                                         ios->vdd);
->                         if (ret) {
->                                 dev_err(host->dev, "Failed to set vmmc power!\n");
-> -                               return;
-> +                               goto end;
->                         }
->                 }
->                 break;
-> @@ -1227,6 +1234,10 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->
->         if (host->mclk != ios->clock || host->ddr != ddr)
->                 msdc_set_mclk(host, ddr, ios->clock);
-> +
-> +end:
-> +       pm_runtime_mark_last_busy(host->dev);
-> +       pm_runtime_put_autosuspend(host->dev);
->  }
->
->  static struct mmc_host_ops mt_msdc_ops = {
-> @@ -1350,12 +1361,19 @@ static int msdc_drv_probe(struct platform_device *pdev)
->         if (ret)
->                 goto release;
->
-> +       pm_runtime_set_active(host->dev);
-> +       pm_runtime_set_autosuspend_delay(host->dev, MTK_MMC_AUTOSUSPEND_DELAY);
-> +       pm_runtime_use_autosuspend(host->dev);
-> +       pm_runtime_enable(host->dev);
->         ret = mmc_add_host(mmc);
-> +
->         if (ret)
-> -               goto release;
-> +               goto end;
->
->         return 0;
->
-> +end:
-> +       pm_runtime_disable(host->dev);
->  release:
->         platform_set_drvdata(pdev, NULL);
->         msdc_deinit_hw(host);
-> @@ -1368,6 +1386,7 @@ release_mem:
->                 dma_free_coherent(&pdev->dev,
->                         MAX_BD_NUM * sizeof(struct mt_bdma_desc),
->                         host->dma.bd, host->dma.bd_addr);
-> +
-
-White space.
-
->  host_free:
->         mmc_free_host(mmc);
->
-> @@ -1382,10 +1401,14 @@ static int msdc_drv_remove(struct platform_device *pdev)
->         mmc = platform_get_drvdata(pdev);
->         host = mmc_priv(mmc);
->
-> +       pm_runtime_get_sync(host->dev);
-> +
->         platform_set_drvdata(pdev, NULL);
->         mmc_remove_host(host->mmc);
->         msdc_deinit_hw(host);
->
-> +       pm_runtime_disable(host->dev);
-> +       pm_runtime_put_noidle(host->dev);
->         dma_free_coherent(&pdev->dev,
->                         sizeof(struct mt_gpdma_desc),
->                         host->dma.gpd, host->dma.gpd_addr);
-> @@ -1397,6 +1420,30 @@ static int msdc_drv_remove(struct platform_device *pdev)
->         return 0;
->  }
->
-> +#ifdef CONFIG_PM
-> +static int msdc_runtime_suspend(struct device *dev)
-> +{
-> +       struct mmc_host *mmc = dev_get_drvdata(dev);
-> +       struct msdc_host *host = mmc_priv(mmc);
-> +
-> +       msdc_gate_clock(host);
-
-According to comments to patch2, I would think we should be able to
-handle both the "hclk" and the "source" clock from the runtime PM
-callbacks. Let's see.
-
-It should anyway not affect this patch that much. Overall it looks good!
-
-> +       return 0;
-> +}
-> +
-> +static int msdc_runtime_resume(struct device *dev)
-> +{
-> +       struct mmc_host *mmc = dev_get_drvdata(dev);
-> +       struct msdc_host *host = mmc_priv(mmc);
-> +
-> +       msdc_ungate_clock(host);
-> +       return 0;
-> +}
-> +#endif
-> +
-> +static const struct dev_pm_ops msdc_dev_pm_ops = {
-> +       SET_RUNTIME_PM_OPS(msdc_runtime_suspend, msdc_runtime_resume, NULL)
-> +};
-> +
->  static const struct of_device_id msdc_of_ids[] = {
->         {   .compatible = "mediatek,mt8135-mmc", },
->         {}
-> @@ -1408,6 +1455,7 @@ static struct platform_driver mt_msdc_driver = {
->         .driver = {
->                 .name = "mtk-msdc",
->                 .of_match_table = msdc_of_ids,
-> +               .pm = &msdc_dev_pm_ops,
->         },
->  };
->
-> --
-> 1.8.1.1.dirty
->
-
-Kind regards
-Uffe
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
