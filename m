@@ -1,84 +1,32 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 5 May 2015 10:12:09 -0500
-Subject: [V2 PATCH 5/5] amd-xgbe: Unify coherency checking logic with
- device_dma_is_coherent()
-In-Reply-To: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1430838729-21572-6-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 May 2015 17:16:49 +0200
+Subject: [PATCH v3 1/1] pinctrl: at91: Add set_multiple GPIO chip feature
+In-Reply-To: <1427968549-19837-1-git-send-email-alexanders83@web.de>
+References: <1427968549-19837-1-git-send-email-alexanders83@web.de>
+Message-ID: <CACRpkdY-osqmFqq0N9UuLfvBowjoa8cjORuL0GYMntne7AatHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, amd-xgbe driver has separate logic to determine device
-coherency for DT vs. ACPI. This patch simplifies the code with
-a call to device_dma_is_coherent().
+On Thu, Apr 2, 2015 at 11:55 AM, Alexander Stein <alexanders83@web.de> wrote:
 
-CC: David S. Miller <davem@davemloft.net>
-Signed-off-by: Tom Lendacky <thomas.lendacky@amd.com>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
----
- drivers/net/ethernet/amd/xgbe/xgbe-main.c | 27 +--------------------------
- 1 file changed, 1 insertion(+), 26 deletions(-)
+> This adds the callback for set_multiple.
+> As this controller has a separate set and clear register, we can't write
+> directly to PIO_ODSR as this would required a cached variable and would
+> race with at91_gpio_set.
+> So build masks for the PIO_SODR and PIO_CODR registers and write them
+> together.
+>
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> ---
+> I Just realized that some implementations have less than 32 pins. Thus
+> BITS_MASK(chip->ngpio) as suggested by Jean-Christophe is actually required.
+> I missed that, sorry for the noise.
+>
+> Changes in v3:
+> * As not all GPIO controllers have 32 pins take ngpio into account
+>   Mask the set- and clear-mask to the supported GPIO pins
 
-diff --git a/drivers/net/ethernet/amd/xgbe/xgbe-main.c b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-index 7149053..6d2c702 100644
---- a/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-+++ b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-@@ -168,13 +168,8 @@ static void xgbe_init_all_fptrs(struct xgbe_prv_data *pdata)
- #ifdef CONFIG_ACPI
- static int xgbe_acpi_support(struct xgbe_prv_data *pdata)
- {
--	struct acpi_device *adev = pdata->adev;
- 	struct device *dev = pdata->dev;
- 	u32 property;
--	acpi_handle handle;
--	acpi_status status;
--	unsigned long long data;
--	int cca;
- 	int ret;
- 
- 	/* Obtain the system clock setting */
-@@ -195,24 +190,6 @@ static int xgbe_acpi_support(struct xgbe_prv_data *pdata)
- 	}
- 	pdata->ptpclk_rate = property;
- 
--	/* Retrieve the device cache coherency value */
--	handle = adev->handle;
--	do {
--		status = acpi_evaluate_integer(handle, "_CCA", NULL, &data);
--		if (!ACPI_FAILURE(status)) {
--			cca = data;
--			break;
--		}
--
--		status = acpi_get_parent(handle, &handle);
--	} while (!ACPI_FAILURE(status));
--
--	if (ACPI_FAILURE(status)) {
--		dev_err(dev, "error obtaining acpi coherency value\n");
--		return -EINVAL;
--	}
--	pdata->coherent = !!cca;
--
- 	return 0;
- }
- #else   /* CONFIG_ACPI */
-@@ -243,9 +220,6 @@ static int xgbe_of_support(struct xgbe_prv_data *pdata)
- 	}
- 	pdata->ptpclk_rate = clk_get_rate(pdata->ptpclk);
- 
--	/* Retrieve the device cache coherency value */
--	pdata->coherent = of_dma_is_coherent(dev->of_node);
--
- 	return 0;
- }
- #else   /* CONFIG_OF */
-@@ -364,6 +338,7 @@ static int xgbe_probe(struct platform_device *pdev)
- 		goto err_io;
- 
- 	/* Set the DMA coherency values */
-+	pdata->coherent = device_dma_is_coherent(pdata->dev);
- 	if (pdata->coherent) {
- 		pdata->axdomain = XGBE_DMA_OS_AXDOMAIN;
- 		pdata->arcache = XGBE_DMA_OS_ARCACHE;
--- 
-2.1.0
+No more comments on v3 so patch applied for v4.2.
+
+Yours,
+Linus Walleij
