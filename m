@@ -1,59 +1,85 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Tue, 5 May 2015 12:27:54 +0930
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <2953543.GNxjbWV8RC@wuerfel>
-References: <55417F5A.4040300@linaro.org> <10771707.5UNQMOWJlc@wuerfel>
- <5546D4C0.5090105@linaro.org> <2953543.GNxjbWV8RC@wuerfel>
-Message-ID: <CACPK8XfkxU+5Szn6=fdeiqCK5+yVYHZc+iaUb1eqowFQZt20LA@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue,  5 May 2015 11:00:25 +0800
+Subject: [PATCH] serial/amba-pl011: fix minor bugs for pio mode
+Message-ID: <1430794825-14367-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+When use pio mode, there have two issues can be observed:
 
-On Tue, May 5, 2015 at 1:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 04 May 2015 10:09:04 Shannon Zhao wrote:
->> On 2015/4/30 17:56, Arnd Bergmann wrote:
->> > On Thursday 30 April 2015 10:29:53 Mark Rutland wrote:
->
->> > a) have an input device send the KEY_POWEROFF or KEY_REBOOT events to
->> >    user space, and have some process (e.g. desktop environment, or daemon)
->>
->> About this daemon, do we need a doc or spec to standardize it?
->
-> There is probably documentation about this that we just need to locate.
-> On my workstation, the power button device is owned by "systemd-logind",
-> I'd assume something like that to be present elsewhere as well.
->
->> > b) Have a special driver that calls orderly_poweroff or orderly_reboot.
->> >    Only PowerPC (OPAL) uses the orderly_reboot() here, but a few platforms
->> >    (Xen, fsl_hypervisor, and some sparc and powerpc machines) as well
->> >    as some device drivers (thermal management etc) call this as well.
->> >    The effect is to call a user-configured binary (/sbin/reboot and
->> >    /sbin/poweroff by default).
->> >
->>
->> This looks good which reuses existing user space process.
->>
->
-> Joel Stanly wrote that patch for PowerPC, maybe he can explain why
-> this PowerPC is doing it this way instead of having an input device
-> that sends KEY_RESTART. It's probably a good idea to have ARM and
-> PowerPC normally do the same thing here, especially if there are
-> problems with just using a gpio-key device.
+- In the commit 2240197 "serial/amba-pl011: Leave the TX IRQ alone when
+  the UART is not open", it will skip clearing the TX IRQ across
+  pl011_shutdown() and pl011_startup(); So at the next time after the
+  uart port has been opened, there have chance for the function
+  pl011_tx_chars() will not be executed if the TX IRQ will not be
+  triggered; finally the console cannot output anymore.
 
-We wanted to support reboot and poweroff on existing distributions
-without having to rely on new userspace.
+  This is caused by the uart FIFO still keep data rather than
+  the threshold. So revert this patch to make sure every time open the
+  uart port, it will force to call function pl011_tx_chars().
 
-I chatted to a few people at linux.conf.au this year and we came to
-the conclusion that the options were orderly_poweroff() or ACPI for
-doing a graceful shutdown involving userspace. ACPI required acpid or
-a desktop environment listening to the netlink message (plus we aren't
-an ACPI machine) so that was out.
+- Sometimes will output the duplicate chars. Function pl011_tx_char()
+  will firstly send char and check if FIFO is full, and if the FIFO is
+  full it will return false; Caller function will consider the char
+  has _NOT_ been send out and resend it again, finally will send the
+  duplicate chars. So change to check FIFO is full or not, if full then
+  return false, otherwise send out char and return true.
 
-KEY_POWEROFF looks useful, but how would you support userspace that
-does not have a systemd-logind, or anything listening to that input
-event?
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/tty/serial/amba-pl011.c | 20 +++++++++++---------
+ 1 file changed, 11 insertions(+), 9 deletions(-)
 
-Cheers,
-
-Joel
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 5a4e9d5..9d9ac76 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1249,20 +1249,19 @@ __acquires(&uap->port.lock)
+ 
+ /*
+  * Transmit a character
+- * There must be at least one free entry in the TX FIFO to accept the char.
+  *
+- * Returns true if the FIFO might have space in it afterwards;
+- * returns false if the FIFO definitely became full.
++ * Before send character, need check FIFO is full or not;
++ * If FIFO is full, will not send char and return false,
++ * otherwise send out character and return ture.
+  */
+ static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c)
+ {
++	if (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
++		return false;
++
+ 	writew(c, uap->port.membase + UART01x_DR);
+ 	uap->port.icount.tx++;
+-
+-	if (likely(uap->tx_irq_seen > 1))
+-		return true;
+-
+-	return !(readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF);
++	return true;
+ }
+ 
+ static bool pl011_tx_chars(struct uart_amba_port *uap)
+@@ -1639,6 +1638,9 @@ static int pl011_startup(struct uart_port *port)
+ 
+ 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+ 
++	/* Assume that TX IRQ doesn't work until we see one: */
++	uap->tx_irq_seen = 0;
++
+ 	spin_lock_irq(&uap->port.lock);
+ 
+ 	/* restore RTS and DTR */
+@@ -1702,7 +1704,7 @@ static void pl011_shutdown(struct uart_port *port)
+ 	spin_lock_irq(&uap->port.lock);
+ 	uap->im = 0;
+ 	writew(uap->im, uap->port.membase + UART011_IMSC);
+-	writew(0xffff & ~UART011_TXIS, uap->port.membase + UART011_ICR);
++	writew(0xffff, uap->port.membase + UART011_ICR);
+ 	spin_unlock_irq(&uap->port.lock);
+ 
+ 	pl011_dma_shutdown(uap);
+-- 
+1.9.1
