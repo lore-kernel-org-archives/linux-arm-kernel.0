@@ -1,67 +1,226 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 5 May 2015 16:53:46 +0100
-Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
-References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <20150505155346.GJ1550@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 5 May 2015 16:56:15 +0100
+Subject: [RFC PATCH v2 1/1] drivers: cpuidle: cpuidle-arm: heterogeneous
+ systems extension
+In-Reply-To: <554771D3.5010701@linaro.org>
+References: <1429200617-9546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1429200617-9546-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <554771D3.5010701@linaro.org>
+Message-ID: <20150505155615.GA23106@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 05, 2015 at 03:02:12AM +0100, Jayachandran C wrote:
-> The current code in pci-host-generic.c uses pci_common_init_dev()
-> from the arch/arm/ to do a part of the PCI initialization, and this
-> prevents it from being used on arm64.
-> 
-> The initialization done by pci_common_init_dev() that is really
-> needed by pci-host-generic.c can be done in the same file without
-> using the hw_pci API of ARM.
-> 
-> The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
-> this is be handled by setting up 'struct gen_pci' to embed a
-> pci_sys_data variable as the first element on the ARM platform.
-> 
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
-> Here's v2 of the patches, this enables use of pci-host-generic on
-> arm64.
-> 
-> This has been tested on both qemu and fast model for arm64, and on
-> qemu for arm32.
-> 
-> v1->v2
->  - Address comments from Arnd Bergmann and Lorenzo Pieralisi
->     - move contents of gen_pci_init to gen_pci_probe
->     - assign resources only when !probe_only
->  - tested on ARM32 with qemu option -M virt
+On Mon, May 04, 2015 at 02:19:15PM +0100, Daniel Lezcano wrote:
+> On 04/16/2015 06:10 PM, Lorenzo Pieralisi wrote:
 
-I tried this with an arm64 kernel running under kvmtool, but I get the
-following errors (a 32-bit ARM kernel does seem to work):
+<snip>
 
-  PCI host bridge /pci ranges:
-     IO 0x00000000..0x0000ffff -> 0x00000000
-    MEM 0x41000000..0x7fffffff -> 0x41000000
-  pci-host-generic 40000000.pci: PCI host bridge to bus 0000:00
-  pci_bus 0000:00: root bus resource [bus 00-01]
-  pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
-  pci_bus 0000:00: root bus resource [mem 0x41000000-0x7fffffff]
-  pci_bus 0000:00: scanning bus
-  pci 0000:00:00.0: [1af4:1009] type 00 class 0xff0000
-  pci 0000:00:00.0: reg 0x10: [mem 0x41000000-0x410003ff]
-  pci 0000:00:00.0: reg 0x14: [io  0x6200-0x65ff]
-  pci 0000:00:00.0: reg 0x18: [mem 0x41000400-0x410005ff]
-  pci 0000:00:01.0: [1af4:1009] type 00 class 0xff0000
-  pci 0000:00:01.0: reg 0x10: [mem 0x41000800-0x41000bff]
-  pci 0000:00:01.0: reg 0x14: [io  0x6600-0x69ff]
-  pci 0000:00:01.0: reg 0x18: [mem 0x41000c00-0x41000dff]
-  pci_bus 0000:00: fixups for bus
-  pci_bus 0000:00: bus scan returning with max=00
-  pci 0000:00:00.0: fixup irq: got 10
-  pci 0000:00:00.0: assigning IRQ 10
-  pci 0000:00:01.0: fixup irq: got 11
-  pci 0000:00:01.0: assigning IRQ 11
-  virtio-pci 0000:00:00.0: can't enable device: BAR 0 [mem 0x41000000-0x410003ff] not claimed
-  virtio-pci: probe of 0000:00:00.0 failed with error -22
-  virtio-pci 0000:00:01.0: can't enable device: BAR 0 [mem 0x41000800-0x41000bff] not claimed
-  virtio-pci: probe of 0000:00:01.0 failed with error -22
+> >   /*
+> > - * arm_idle_init
+> > + * Compare idle states phandle properties
+> >    *
+> > - * Registers the arm specific cpuidle driver with the cpuidle
+> > - * framework. It relies on core code to parse the idle states
+> > - * and initialize them using driver data structures accordingly.
+> > + * Return true if properties are valid and equal, false otherwise
+> 
+> Just a detail. Would be more consistent to return zero when valid and
+> equal ?
 
-Will
+Consistent with memcmp you mean ? Yes, I can change it.
+
+> >    */
+> > -static int __init arm_idle_init(void)
+> > +static bool __init idle_states_cmp(struct property *states1,
+> > +                                struct property *states2)
+> > +{
+> > +     /*
+> > +      * NB: Implemented through code from drivers/of/unittest.c
+> > +      *     Function is generic and can be moved to generic OF code
+> > +      *     if needed
+> > +      */
+> > +     return states1 && states2 &&
+> > +            (states1->length == states2->length) &&
+> > +            states1->value && states2->value &&
+> > +            !memcmp(states1->value, states2->value, states1->length);
+> > +}
+> > +
+> > +static int __init arm_idle_init_driver(struct cpuidle_driver *drv)
+> >   {
+> > -     int cpu, ret;
+> > -     struct cpuidle_driver *drv = &arm_idle_driver;
+> > +     int ret, cpu;
+> >       struct cpuidle_device *dev;
+> > +     struct property *curr_idle_states, *idle_states = NULL;
+> > +     struct device_node *cpu_node;
+> > +
+> > +     for_each_cpu(cpu, drv->cpumask) {
+> > +             cpu_node = of_cpu_device_node_get(cpu);
+> > +             curr_idle_states = of_find_property(cpu_node,
+> > +                                                 "cpu-idle-states", NULL);
+> > +             of_node_put(cpu_node);
+> > +
+> > +             /*
+> > +              * Stash the first valid idle states phandle in the cpumask.
+> > +              * If curr_idle_states is NULL assigning it to idle_states
+> > +              * is harmless and it is managed by idle states comparison
+> > +              * code. Keep track of first valid phandle so that
+> > +              * subsequent cpus can compare against it.
+> > +              */
+> > +             if (!idle_states)
+> > +                     idle_states = curr_idle_states;
+> > +
+> > +             /*
+> > +              * If idle states phandles are not equal, remove the
+> > +              * cpu from the driver mask since a CPUidle driver
+> > +              * is only capable of managing uniform idle states.
+> > +              *
+> > +              * Comparison works also when idle_states and
+> > +              * curr_idle_states are the same property, since
+> > +              * they can be == NULL so the cpu must be removed from
+> > +              * the driver mask in that case too (ie cpu has no idle
+> > +              * states).
+> > +              */
+> > +             if (!idle_states_cmp(idle_states, curr_idle_states))
+> > +                     cpumask_clear_cpu(cpu, drv->cpumask);
+> > +     }
+> > +
+> > +     /*
+> > +      *  If there are no valid states for this driver we rely on arch
+> > +      *  default idle behaviour, bail out
+> > +      */
+> > +     if (!idle_states)
+> > +             return -ENODEV;
+> >
+> >       /*
+> >        * Initialize idle states data, starting at index 1.
+> > @@ -117,7 +173,7 @@ static int __init arm_idle_init(void)
+> >        * Call arch CPU operations in order to initialize
+> >        * idle states suspend back-end specific data
+> >        */
+> > -     for_each_possible_cpu(cpu) {
+> > +     for_each_cpu(cpu, drv->cpumask) {
+> >               ret = arm_cpuidle_init(cpu);
+> >
+> >               /*
+> > @@ -157,7 +213,77 @@ out_fail:
+> >       }
+> >
+> >       cpuidle_unregister_driver(drv);
+> > +     return ret;
+> > +}
+> > +
+> > +/*
+> > + * arm_idle_init
+> > + *
+> > + * Registers the arm specific cpuidle driver(s) with the cpuidle
+> > + * framework. It relies on core code to parse the idle states
+> > + * and initialize them using driver data structures accordingly.
+> > + */
+> > +static int __init arm_idle_init(void)
+> > +{
+> > +     int i, ret = -ENODEV;
+> > +     struct cpuidle_driver *drv;
+> > +     cpumask_var_t tmpmask;
+> > +
+> > +     /*
+> > +      * These drivers require DT idle states to be present.
+> > +      * If no idle states are detected there is no reason to
+> > +      * proceed any further hence we return early.
+> > +      */
+> > +     if (!of_find_node_by_name(NULL, "idle-states"))
+> > +             return -ENODEV;
+> > +
+> > +     if (!alloc_cpumask_var(&tmpmask, GFP_KERNEL))
+> > +             return -ENOMEM;
+> > +
+> > +     /*
+> > +      * We need to vet idle states to create CPUidle drivers
+> > +      * that share a common set of them. Create a tmp mask
+> > +      * that we use to keep track of initialized cpus.
+> > +      * Start off by initializing the mask with all possible
+> > +      * cpus, we clear it as we go, till either all cpus
+> > +      * have a CPUidle driver initialized or there are some
+> > +      * CPUs that have no idle states or a parsing error
+> > +      * occurs.
+> > +      */
+> > +     cpumask_copy(tmpmask, cpu_possible_mask);
+> > +
+> > +     for (i = 0; !cpumask_empty(tmpmask); i++) {
+> > +             if (i == ARM_CPUIDLE_MAX_DRIVERS) {
+> > +                     pr_warn("number of drivers exceeding static allocation\n");
+> > +                     break;
+> > +             }
+> > +
+> > +             drv = &arm_idle_drivers[i];
+> > +             drv->cpumask = kzalloc(cpumask_size(), GFP_KERNEL);
+> > +             if (!drv->cpumask) {
+> > +                     ret = -ENOMEM;
+> > +                     break;
+> > +             }
+> > +             /*
+> > +              * Force driver mask, arm_idle_init_driver()
+> > +              * will tweak it by vetting idle states.
+> > +              */
+> > +             cpumask_copy(drv->cpumask, tmpmask);
+> 
+> Why do you need to copy tmpmask ? Isn't simpler to have a zero-ed
+> cpumask and let the arm_idle_init_driver function to set a bit instead
+> of clearing it ?
+
+No, because we need to keep track of logical cpus that have been
+already parsed, we need a tmpmask to keep track of that, how could
+we do it otherwise ? We can have more than two cpumask sets.
+
+> 
+> > +             ret = arm_idle_init_driver(drv);
+> > +             if (ret) {
+> > +                     kfree(drv->cpumask);
+> > +                     break;
+> > +             }
+> > +             /*
+> > +              * Remove the cpus that were part of the registered
+> > +              * driver from the mask of cpus to be initialized
+> > +              * and restart.
+> > +              */
+> > +             cpumask_andnot(tmpmask, tmpmask, drv->cpumask);
+> 
+> If there is a DT definition with just a cluster with the cpuidle driver
+> set and another one without any idle state, we will have always a
+> pr_warn because i == ARM_CPUIDLE_MAX_DRIVERS due to tmpmask being never
+> equal to a zero mask. Is it the purpose to detect such cases ?
+
+Not really, because arm_idle_init_driver() would return -ENODEV when
+it detects cpus with no idle states and the loop will break before warning.
+
+If we had two cluster of cpus with an idle-states set per cluster plus
+some cpus with no idle states the warning would be hit, because
+in actual facts we have more cpuidle sets than drivers (I know, a cpu
+set with no idle states falls back to default idle, but I think
+that's a detail that is easy to sort out).
+
+I can create idle drivers dynamically so that the ARM_CPUIDLE_MAX_DRIVERS
+check can be removed or relaxed (but the code becomes slightly more complex).
+
+Thanks for having a look, apart from these comments do we think it is
+a reasonable approach ?
+
+Lorenzo
+
+> 
+> > +     }
+> >
+> > +     free_cpumask_var(tmpmask);
+> >       return ret;
+> >   }
+> >   device_initcall(arm_idle_init);
+> >
+> 
+> 
+> --
+>   <http://www.linaro.org/> Linaro.org ??? Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+> 
