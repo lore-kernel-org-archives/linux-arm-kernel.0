@@ -1,40 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 05 May 2015 20:02:53 +0200
-Subject: [Linaro-acpi] [V2 PATCH 2/5] arm64 : Introduce support for ACPI
- _CCA object
-In-Reply-To: <5548EEA3.8010101@amd.com>
-References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <5548EC47.3020501@amd.com> <5548EEA3.8010101@amd.com>
-Message-ID: <9405327.TMH3y4SfqS@wuerfel>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 5 May 2015 11:13:20 -0700
+Subject: [PATCH v7 3/6] clk: Change bcm clocks build dependency
+In-Reply-To: <1430849603-15849-1-git-send-email-rjui@broadcom.com>
+References: <1430849603-15849-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1430849603-15849-4-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 May 2015 11:24:03 Tom Lendacky wrote:
-> On 05/05/2015 11:13 AM, Suravee Suthikulanit wrote:
-> > On 5/5/2015 11:12 AM, Arnd Bergmann wrote:
-> >> On Tuesday 05 May 2015 11:09:38 Suravee Suthikulanit wrote:
-> >>>
-> >>> However, codes in several places are making use of dma_map_ops without
-> >>> checking if the ops are NULL (i.e.
-> >>> include/asm-generic/dma-mapping-common.h and in arch-specific
-> >>> implementation). If setting it to NULL is what we are planning to
-> >>> support, we would need to scrub the current code to put NULL check.
-> >>> Also, would you consider if that is safe to do going forward?
-> >>>
-> >>>
-> >>
-> >> I mean the dma_mask pointer, not dma_map_ops.
-> 
-> Except a lot of drivers will actually set the dma_mask pointer during
-> probe (usually by setting dev->dma_mask = &dev->coherent_dma_mask or by
-> calling dma_coerce_mask_and_coherent).  So I think the dummy_dma_ops
-> might be the safest way to go.
+The clock code under drivers/clk/bcm now contains code for both the
+Broadcom mobile SoCs and the iProc SoCs. Change the the makefile
+dependency to be under config flag CONFIG_ARCH_BCM that's enabled for
+both families of SoCs
 
-Those drivers are broken already, I don't think we should worry about
-them. Let's just fix them properly when we run into problems with them.
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+---
+ drivers/clk/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Basically any use of dma_coerce_mask_and_coherent() is an annotation
-for a bug where a driver used to set dev->dma_mask = &dev->coherent_dma_mask
-manually.
-
-	Arnd
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 3d00c25..999a25e 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -45,7 +45,7 @@ obj-$(CONFIG_COMMON_CLK_WM831X)		+= clk-wm831x.o
+ obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
+ obj-$(CONFIG_COMMON_CLK_PWM)		+= clk-pwm.o
+ obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
+-obj-$(CONFIG_ARCH_BCM_MOBILE)		+= bcm/
++obj-$(CONFIG_ARCH_BCM)			+= bcm/
+ obj-$(CONFIG_ARCH_BERLIN)		+= berlin/
+ obj-$(CONFIG_ARCH_HI3xxx)		+= hisilicon/
+ obj-$(CONFIG_ARCH_HIP04)		+= hisilicon/
+-- 
+1.7.9.5
