@@ -1,61 +1,71 @@
 From: bintian.wang@huawei.com (Bintian Wang)
-Date: Tue, 5 May 2015 12:30:10 +0800
-Subject: [PATCH v3 3/5] clk: hi6220: Document devicetree bindings for hi6220
- clock
-In-Reply-To: <1430800212-6970-1-git-send-email-bintian.wang@huawei.com>
-References: <1430800212-6970-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <1430800212-6970-4-git-send-email-bintian.wang@huawei.com>
+Date: Tue, 5 May 2015 12:30:07 +0800
+Subject: [PATCH v3 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+Message-ID: <1430800212-6970-1-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document DT files bindings for Hisilicon hi6220 clock.
+Hi6220 is one mobile solution of Hisilicon, this patchset contains
+initial support for Hi6220 SoC and HiKey development board, which
+supports octal ARM Cortex A53 cores. Initial support is minimal and
+includes just the arch configuration, clock driver, device tree
+configuration.
 
-Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
-Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- .../devicetree/bindings/clock/hi6220-clock.txt     | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+PSCI is enabled in device tree and there is no problem to boot all the
+octal cores, and the CPU hotplug is also working now, you can download
+and compile the latest firmware based on the following link to run this
+patch set:
+https://github.com/96boards/documentation/wiki/UEFI 
+
+Changes v3:
+* Verified the CPU hotplug based on the new released firmware
+* Redefined the compatible strings of four system controllers in dts 
+* Setting COMMON_CLK_HI6220 to a bool symbol
+* Keep CONFGI_ARCH_HISI sorted alphabetically
+
+Changes v2:
+* Split the DT bindings documents into earlier patches
+* Change SMP enable method from spin-table to PSCI in device tree
+* Remove "clock-frequency" from armv8-timer device node in device tree
+* Add more description about Hisilicon designed system controllers
+  in DT bindings document
+* Enable high speed clock on UART1 mux
+* Other changes based on the discussion in the mailing list:
+  https://lkml.org/lkml/2015/2/5/147
+
+Bintian Wang (5):
+  arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
+  arm64: hi6220: Document devicetree bindings for Hisilicon hi6220 SoC
+  clk: hi6220: Document devicetree bindings for hi6220 clock
+  clk: hi6220: Clock driver support for Hisilicon hi6220 SoC
+  arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |  87 ++++++
+ .../devicetree/bindings/clock/hi6220-clock.txt     |  34 +++
+ arch/arm64/Kconfig                                 |   5 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/hisilicon/Makefile             |   5 +
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  31 +++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 172 ++++++++++++
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/clk/Kconfig                                |   2 +
+ drivers/clk/Makefile                               |   4 +-
+ drivers/clk/hisilicon/Kconfig                      |   6 +
+ drivers/clk/hisilicon/Makefile                     |   3 +-
+ drivers/clk/hisilicon/clk-hi6220.c                 | 292 +++++++++++++++++++++
+ drivers/clk/hisilicon/clk.c                        |  29 ++
+ drivers/clk/hisilicon/clk.h                        |  17 ++
+ drivers/clk/hisilicon/clkdivider-hi6220.c          | 273 +++++++++++++++++++
+ include/dt-bindings/clock/hi6220-clock.h           | 173 ++++++++++++
+ 17 files changed, 1131 insertions(+), 4 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
+ create mode 100644 arch/arm64/boot/dts/hisilicon/Makefile
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+ create mode 100644 drivers/clk/hisilicon/Kconfig
+ create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
+ create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
+ create mode 100644 include/dt-bindings/clock/hi6220-clock.h
 
-diff --git a/Documentation/devicetree/bindings/clock/hi6220-clock.txt b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
-new file mode 100644
-index 0000000..53ddb19
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
-@@ -0,0 +1,34 @@
-+* Hisilicon Hi6220 Clock Controller
-+
-+Clock control registers reside in different Hi6220 system controllers,
-+please refer the following document to know more about the binding rules
-+for these system controllers:
-+
-+Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+
-+Required Properties:
-+
-+- compatible: the compatible should be one of the following strings to
-+	indicate the clock controller functionality.
-+
-+	- "hisilicon,hi6220-aoctrl"
-+	- "hisilicon,hi6220-sysctrl"
-+	- "hisilicon,hi6220-mediactrl"
-+	- "hisilicon,hi6220-pmctrl"
-+
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+
-+- #clock-cells: should be 1.
-+
-+For example:
-+	sys_ctrl: sys_ctrl {
-+		compatible = "hisilicon,hi6220-sysctrl", "syscon";
-+		reg = <0x0 0xf7030000 0x0 0x2000>;
-+		#clock-cells = <1>;
-+	};
-+
-+Each clock is assigned an identifier and client nodes use this identifier
-+to specify the clock which they consume.
-+
-+All these identifier could be found in <dt-bindings/clock/hi6220-clock.h>.
 -- 
 1.9.1
