@@ -1,49 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  5 May 2015 11:02:21 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix bogus struct clk comparison for timer clock
-Message-ID: <1430848941-27106-1-git-send-email-tony@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 05 May 2015 20:02:53 +0200
+Subject: [Linaro-acpi] [V2 PATCH 2/5] arm64 : Introduce support for ACPI
+ _CCA object
+In-Reply-To: <5548EEA3.8010101@amd.com>
+References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <5548EC47.3020501@amd.com> <5548EEA3.8010101@amd.com>
+Message-ID: <9405327.TMH3y4SfqS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With recent changes to use determine_rate, the comparison of two
-clocks won't work without doing __clk_get_hw on the clocks
-first.
+On Tuesday 05 May 2015 11:24:03 Tom Lendacky wrote:
+> On 05/05/2015 11:13 AM, Suravee Suthikulanit wrote:
+> > On 5/5/2015 11:12 AM, Arnd Bergmann wrote:
+> >> On Tuesday 05 May 2015 11:09:38 Suravee Suthikulanit wrote:
+> >>>
+> >>> However, codes in several places are making use of dma_map_ops without
+> >>> checking if the ops are NULL (i.e.
+> >>> include/asm-generic/dma-mapping-common.h and in arch-specific
+> >>> implementation). If setting it to NULL is what we are planning to
+> >>> support, we would need to scrub the current code to put NULL check.
+> >>> Also, would you consider if that is safe to do going forward?
+> >>>
+> >>>
+> >>
+> >> I mean the dma_mask pointer, not dma_map_ops.
+> 
+> Except a lot of drivers will actually set the dma_mask pointer during
+> probe (usually by setting dev->dma_mask = &dev->coherent_dma_mask or by
+> calling dma_coerce_mask_and_coherent).  So I think the dummy_dma_ops
+> might be the safest way to go.
 
-Cc: Michael Turquette <mturquette@linaro.org>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
+Those drivers are broken already, I don't think we should worry about
+them. Let's just fix them properly when we run into problems with them.
 
-Found one more of these, the coccinelle scripts do not seem
-to match this?
+Basically any use of dma_coerce_mask_and_coherent() is an annotation
+for a bug where a driver used to set dev->dma_mask = &dev->coherent_dma_mask
+manually.
 
----
- arch/arm/mach-omap2/timer.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index cef67af..22c7a8e 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -35,6 +35,7 @@
- #include <linux/irq.h>
- #include <linux/clocksource.h>
- #include <linux/clockchips.h>
-+#include <linux/clk-provider.h>
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -298,7 +299,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	if (IS_ERR(src))
- 		return PTR_ERR(src);
- 
--	if (clk_get_parent(timer->fclk) != src) {
-+	if (__clk_get_hw(clk_get_parent(timer->fclk)) != __clk_get_hw(src)) {
- 		r = clk_set_parent(timer->fclk, src);
- 		if (r < 0) {
- 			pr_warn("%s: %s cannot set source\n", __func__,
--- 
-2.1.4
+	Arnd
