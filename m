@@ -1,71 +1,40 @@
-From: jbe@pengutronix.de (=?utf-8?q?J=C3=BCrgen_Borleis?=)
-Date: Tue, 5 May 2015 10:21:01 +0200
-Subject: [PATCH V2 4/6] DT: add binding for mxs on-chip regulators
-In-Reply-To: <1858103470.878923.1430770850541.JavaMail.open-xchange@oxbaltgw08.schlund.de>
-References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
- <201505041551.26355.jbe@pengutronix.de>
- <1858103470.878923.1430770850541.JavaMail.open-xchange@oxbaltgw08.schlund.de>
-Message-ID: <201505051021.01939.jbe@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 5 May 2015 09:27:54 +0100
+Subject: [PATCH 1/4] video: backlight: da9052: Constify platform_device_id
+In-Reply-To: <1430494721-30793-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430494721-30793-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <20150505082754.GU4047@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Sat, 02 May 2015, Krzysztof Kozlowski wrote:
 
-On Monday 04 May 2015 22:20:50 Stefan Wahren wrote:
-> [...]
-> >
-> > +------------+     VDD5V  +---------+  VDDIO
-> > | DC-DC      |   +--------> LINREG  +--------->+
-> > |            |            | VDDIO   |          |
-> > |            |            +---------+          |
-> > |            |                                 |
-> > | DCDC_VDDIO +->-+-----------------------------+
-> > |            |   |
-> > |            |   | VDDIO  +---------+ VDDMEM
-> > |            |   +--------> LINREG  +--------->
-> > |            |   |        | VDDMEM  |
-> > |            |   |        +---------+
-> > |            |   | VDDIO  +---------+  VDDA
-> > |            |   +--------> LINREG  +--------->+
-> > |            |            | VDDA    |          |
-> > |            |            +---------+          |
-> > | DCDC_VDDA  +->-+-----------------------------+
-> > |            |   |
-> > |            |   | VDDA   +---------+  VDDD
-> > |            |   +--------> LINREG  +--------->+
-> > |            |            | VDDD    |          |
-> > |            |            +---------+          |
-> > | DCDC_VDDD  +->-------------------------------+
-> > +------------+                                 |
-> >                                                v
->
-> damn! I didn't noticed that VDDMEM is powered by VDDIO and VDD1P5 is
-> powered by VDDA. Thank you very much.
->
-> From my understanding VDDMEM and VDD1P5 describe the same regulator
-> function (provides power to external memory such as SDRAM and mDDR which
-> doesn't fit to VDDD, VDDIO or VDDA). But the usage of
-> the name is not consistent across the documentation:
->                   | i.MX23 | i.MX28
-> ------------------------------------
-> Application note  | VDDMEM | VDD1P5
-> Reference manual  | VDDMEM | VDDMEM
-> Data sheet        | -      | VDD1P5
->
-> I would suggest to use VDDMEM, because the registers are always called
-> HW_VDDMEM (for both SoCs).
+> The platform_device_id is not modified by the driver and core uses it as
+> const.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> ---
+>  drivers/video/backlight/da9052_bl.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Ack.
+Applied, thanks.
 
-> I think we have 3 options here:
->
-> a) add the regulator daisy chain for the i.MX23 too
-> b) remove VDD1P5 from the i.MX28 diagram so it would fit for both again
-> c) remove the diagram complete
->
-> I would prefer option b. What's your opinion?
+> diff --git a/drivers/video/backlight/da9052_bl.c b/drivers/video/backlight/da9052_bl.c
+> index b1943e7735a1..fd2be417aa64 100644
+> --- a/drivers/video/backlight/da9052_bl.c
+> +++ b/drivers/video/backlight/da9052_bl.c
+> @@ -152,7 +152,7 @@ static int da9052_backlight_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static struct platform_device_id da9052_wled_ids[] = {
+> +static const struct platform_device_id da9052_wled_ids[] = {
+>  	{
+>  		.name		= "da9052-wled1",
+>  		.driver_data	= DA9052_TYPE_WLED1,
 
-I prefer a) because once the details are known, we should keep them.
-
-Regards,
-Juergen
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
