@@ -1,79 +1,38 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 05 May 2015 22:28:21 +0200
-Subject: [RFC PATCH 0/9] Add self-probe infrastructure and stacked
- irqdomain support for ACPI based GICv2/3 init
-In-Reply-To: <1430833857-30736-1-git-send-email-hanjun.guo@linaro.org>
-References: <1430833857-30736-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <10866239.kAOUxUHTHm@vostro.rjw.lan>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 5 May 2015 22:03:52 +0200
+Subject: [rtc-linux] [PATCH v3 3/3] MAINTAINERS: add Mediatek RTC driver
+In-Reply-To: <1430206556-18254-4-git-send-email-eddie.huang@mediatek.com>
+References: <1430206556-18254-1-git-send-email-eddie.huang@mediatek.com>
+ <1430206556-18254-4-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <20150505200352.GQ4276@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 05, 2015 09:50:48 PM Hanjun Guo wrote:
-> This patch set introduce self-probe infrastructure to init IRQ
-> controllers and stacked irqdomain support for ACPI based GICv2/3
-> init.
-> 
-> The self-probe infrastructure for ACPI GIC init is similar as
-> IRQCHIP_DECLARE() and based on the GIC version support in ACPI
-> MADT table.
-> 
-> We introduce acpi_irq_domain for GICv2/3 core domain to support
-> stacked irqdomain, and pass the gsi (global system interrupt) as
-> the agument (void *arg) for gic_irq_domain_alloc(), then we can
-> alloc virqs via acpi_register_gsi() with stacked irqdomain.
-> 
-> I already compiled this patch set ok with both ACPI=on/off on
-> ARM64 and also compiled ok on x86, tested with GICv2 init on
-> FVP model and it boot successfully.
-> 
-> Next step I would consolidate all the ACPI GIC init into one
-> file -- drivers/irqchip/irq-gic-acpi.c, and introduce ITS and
-> IORT support.
-> 
-> please comment on this patchset to see if we are on the right
-> direction.
-> 
-> Hanjun Guo (6):
->   irqchip / gic: Add GIC version support in ACPI MADT
->   irqchip: gic: ACPI: Use IRQCHIP_ACPI_DECLARE to simplify GICv2 init
->     code
->   irqchip / gic: Add stacked irqdomain support for ACPI based GICv2 init
->   ACPI / gsi: Add gsi_mutex to synchronize
->     acpi_register_gsi()/acpi_unregister_gsi()
->   irqchip / GICv3: Add ACPI support for GICv3+ initialization
->   irqchip / GICv3: Add stacked irqdomain support for ACPI based init
-> 
-> Tomasz Nowicki (3):
->   ACPICA: Introduce GIC version for arm based system
->   ACPI / irqchip: Add self-probe infrastructure to initialize IRQ
->     controller
->   irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
-> 
->  arch/arm64/Kconfig                   |   1 +
->  arch/arm64/include/asm/irq.h         |  13 --
->  arch/arm64/kernel/acpi.c             |  25 ----
->  drivers/acpi/Makefile                |   1 +
->  drivers/acpi/gsi.c                   |  39 ++---
->  drivers/acpi/irq.c                   |  40 ++++++
->  drivers/irqchip/Kconfig              |   3 +
->  drivers/irqchip/Makefile             |   1 +
->  drivers/irqchip/irq-gic-acpi.c       | 116 +++++++++++++++
->  drivers/irqchip/irq-gic-v3.c         | 267 ++++++++++++++++++++++++++++-------
->  drivers/irqchip/irq-gic.c            |  38 ++---
->  drivers/irqchip/irqchip.h            |  12 ++
->  include/acpi/actbl1.h                |  17 ++-
->  include/asm-generic/vmlinux.lds.h    |  13 ++
->  include/linux/acpi.h                 |  14 ++
->  include/linux/acpi_irq.h             |   4 +-
->  include/linux/irqchip/arm-gic-acpi.h |  12 +-
->  include/linux/mod_devicetable.h      |   7 +
->  18 files changed, 489 insertions(+), 134 deletions(-)
->  create mode 100644 drivers/acpi/irq.c
->  create mode 100644 drivers/irqchip/irq-gic-acpi.c
+Hi,
 
-What's the connection between this and the Jiang Liu's patchset?
+On 28/04/2015 at 15:35:56 +0800, Eddie Huang wrote :
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 2e5bbc0..eb80610 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1223,6 +1223,13 @@ W:	http://www.digriz.org.uk/ts78xx/kernel
+>  S:	Maintained
+>  F:	arch/arm/mach-orion5x/ts78xx-*
+>  
+> +ARM/Mediatek RTC DRIVER
+> +M:	Eddie Huang <eddie.huang@mediatek.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	drivers/rtc/rtc-mt*
+
+I feel like this is a bit broad. Unless you want to really maintain
+rtc-mt* which I guess may not be only Mediatek in the future, I would
+use the full filename here. You will probably remember to update it if
+you add more, that may not be the case for other developers.
 
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
