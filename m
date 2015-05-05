@@ -1,74 +1,162 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue,  5 May 2015 21:50:54 +0800
-Subject: [RFC PATCH 6/9] ACPI / gsi: Add gsi_mutex to synchronize
- acpi_register_gsi()/acpi_unregister_gsi()
+Date: Tue,  5 May 2015 21:50:55 +0800
+Subject: [RFC PATCH 7/9] irqchip / GICv3: Refactor gic_of_init() for GICv3
+ driver
 In-Reply-To: <1430833857-30736-1-git-send-email-hanjun.guo@linaro.org>
 References: <1430833857-30736-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1430833857-30736-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1430833857-30736-8-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a mutex for acpi_register_gsi()/acpi_unregister_gsi() to avoid
-concurrency issues.
+From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 
+Isolate hardware abstraction (FDT) code to gic_of_init().
+Rest of the logic goes to gic_init_bases() and expects well
+defined data to initialize GIC properly. The same solution
+is used for GICv2 driver.
+
+This is needed for ACPI initialization later.
+
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/acpi/gsi.c | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 105 +++++++++++++++++++++++++------------------
+ 1 file changed, 61 insertions(+), 44 deletions(-)
 
-diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-index f4110d8..f0f219c 100644
---- a/drivers/acpi/gsi.c
-+++ b/drivers/acpi/gsi.c
-@@ -14,6 +14,7 @@
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 49875ad..87cf81b 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -765,17 +765,69 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.free = gic_irq_domain_free,
+ };
  
- enum acpi_irq_model_id acpi_irq_model;
- struct irq_domain *acpi_irq_domain;
-+static DEFINE_MUTEX(gsi_mutex);
- 
- static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
- {
-@@ -71,20 +72,24 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
- 	int irq;
- 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
- 
-+	mutex_lock(&gsi_mutex);
- 	irq = irq_find_mapping(acpi_irq_domain, gsi);
- 	if (irq > 0)
--		return irq;
-+		goto out;
- 
- 	irq = irq_domain_alloc_irqs(acpi_irq_domain, 1, dev_to_node(dev),
- 				    &gsi);
- 	if (irq <= 0)
--		return -EINVAL;
-+		goto out;
- 
- 	/* Set irq type if specified and different than the current one */
- 	if (irq_type != IRQ_TYPE_NONE &&
- 		irq_type != irq_get_trigger_type(irq))
- 		irq_set_irq_type(irq, irq_type);
--	return irq;
++static int __init gic_init_bases(void __iomem *dist_base,
++			    struct redist_region *rdist_regs,
++			    u32 nr_redist_regions,
++			    u64 redist_stride,
++			    struct device_node *node)
++{
++	u32 typer;
++	int gic_irqs;
++	int err;
 +
-+out:
-+	mutex_unlock(&gsi_mutex);
-+	return irq > 0 ? irq : -EINVAL;
- }
- EXPORT_SYMBOL_GPL(acpi_register_gsi);
- 
-@@ -94,8 +99,12 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
-  */
- void acpi_unregister_gsi(u32 gsi)
- {
--	int irq = irq_find_mapping(acpi_irq_domain, gsi);
-+	int irq;
++	gic_data.dist_base = dist_base;
++	gic_data.redist_regions = rdist_regs;
++	gic_data.nr_redist_regions = nr_redist_regions;
++	gic_data.redist_stride = redist_stride;
 +
-+	mutex_lock(&gsi_mutex);
-+	irq = irq_find_mapping(acpi_irq_domain, gsi);
++	/*
++	 * Find out how many interrupts are supported.
++	 * The GIC only supports up to 1020 interrupt sources (SGI+PPI+SPI)
++	 */
++	typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
++	gic_data.rdists.id_bits = GICD_TYPER_ID_BITS(typer);
++	gic_irqs = GICD_TYPER_IRQS(typer);
++	if (gic_irqs > 1020)
++		gic_irqs = 1020;
++	gic_data.irq_nr = gic_irqs;
++
++	gic_data.domain = irq_domain_add_tree(node, &gic_irq_domain_ops,
++					      &gic_data);
++	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
++
++	if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdists.rdist)) {
++		err = -ENOMEM;
++		goto out_free;
++	}
++
++	set_handle_irq(gic_handle_irq);
++
++	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
++		its_init(node, &gic_data.rdists, gic_data.domain);
++
++	gic_smp_init();
++	gic_dist_init();
++	gic_cpu_init();
++	gic_cpu_pm_init();
++
++	return 0;
++
++out_free:
++	if (gic_data.domain)
++		irq_domain_remove(gic_data.domain);
++	free_percpu(gic_data.rdists.rdist);
++	return err;
++}
++
++#ifdef CONFIG_OF
+ static int __init gic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *dist_base;
+ 	struct redist_region *rdist_regs;
+ 	u64 redist_stride;
+ 	u32 nr_redist_regions;
+-	u32 typer;
+ 	u32 reg;
+-	int gic_irqs;
+-	int err;
+-	int i;
++	int err, i;
  
- 	irq_dispose_mapping(irq);
-+	mutex_unlock(&gsi_mutex);
+ 	dist_base = of_iomap(node, 0);
+ 	if (!dist_base) {
+@@ -819,47 +871,11 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
+ 		redist_stride = 0;
+ 
+-	gic_data.dist_base = dist_base;
+-	gic_data.redist_regions = rdist_regs;
+-	gic_data.nr_redist_regions = nr_redist_regions;
+-	gic_data.redist_stride = redist_stride;
+-
+-	/*
+-	 * Find out how many interrupts are supported.
+-	 * The GIC only supports up to 1020 interrupt sources (SGI+PPI+SPI)
+-	 */
+-	typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
+-	gic_data.rdists.id_bits = GICD_TYPER_ID_BITS(typer);
+-	gic_irqs = GICD_TYPER_IRQS(typer);
+-	if (gic_irqs > 1020)
+-		gic_irqs = 1020;
+-	gic_data.irq_nr = gic_irqs;
++	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
++			     redist_stride, node);
++	if (!err)
++		return 0;
+ 
+-	gic_data.domain = irq_domain_add_tree(node, &gic_irq_domain_ops,
+-					      &gic_data);
+-	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
+-
+-	if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdists.rdist)) {
+-		err = -ENOMEM;
+-		goto out_free;
+-	}
+-
+-	set_handle_irq(gic_handle_irq);
+-
+-	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+-		its_init(node, &gic_data.rdists, gic_data.domain);
+-
+-	gic_smp_init();
+-	gic_dist_init();
+-	gic_cpu_init();
+-	gic_cpu_pm_init();
+-
+-	return 0;
+-
+-out_free:
+-	if (gic_data.domain)
+-		irq_domain_remove(gic_data.domain);
+-	free_percpu(gic_data.rdists.rdist);
+ out_unmap_rdist:
+ 	for (i = 0; i < nr_redist_regions; i++)
+ 		if (rdist_regs[i].redist_base)
+@@ -871,3 +887,4 @@ out_unmap_dist:
  }
- EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+ 
+ IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
++#endif
 -- 
 1.9.1
