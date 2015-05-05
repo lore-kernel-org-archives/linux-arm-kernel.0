@@ -1,61 +1,72 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 5 May 2015 15:50:54 +0200
-Subject: [PATCHv7 0/8] watchdog: Extend kernel API and add
- early_timeout_sec feature
-In-Reply-To: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
-References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <20150505135054.GI25193@pengutronix.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue,  5 May 2015 21:50:48 +0800
+Subject: [RFC PATCH 0/9] Add self-probe infrastructure and stacked irqdomain
+ support for ACPI based GICv2/3 init
+Message-ID: <1430833857-30736-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch set introduce self-probe infrastructure to init IRQ
+controllers and stacked irqdomain support for ACPI based GICv2/3
+init.
 
-I talked to Marc Kleine-Budde about your approach, thought a bit more
-about it and want to share a few thoughts with you.
+The self-probe infrastructure for ACPI GIC init is similar as
+IRQCHIP_DECLARE() and based on the GIC version support in ACPI
+MADT table.
 
-Actually your series addresses three different problems
+We introduce acpi_irq_domain for GICv2/3 core domain to support
+stacked irqdomain, and pass the gsi (global system interrupt) as
+the agument (void *arg) for gic_irq_domain_alloc(), then we can
+alloc virqs via acpi_register_gsi() with stacked irqdomain.
 
- a) some watchdog hardware isn't stoppable;
- b) some watchdog hardware has short maximal timeout;
- c) what to do with a watchdog that is already running at probe time?
+I already compiled this patch set ok with both ACPI=on/off on
+ARM64 and also compiled ok on x86, tested with GICv2 init on
+FVP model and it boot successfully.
 
-The common solution is to add a mid-layer between userspace and the
-driver that bridges the possible hardware limitations when userspace
-wants to stop the watchdog or set a big timeout value. c) is a bit
-different but could make use of the infrastructure that is introduced
-while fixing a+b). The main difference between a+b) and c) is that for
-c) you have to introduce some policy. If the series were mine I'd first
-do three commits that address a), b) and c) each. Then convert drivers
-to it.
+Next step I would consolidate all the ACPI GIC init into one
+file -- drivers/irqchip/irq-gic-acpi.c, and introduce ITS and
+IORT support.
 
-Guenter and I already said something similar, but I will eventually
-repeat it here more explicitly: When introducing a midlayer that
-abstracts between hardware and it's users the IMHO most important thing
-to get right is to be explicit about which side of a midlayer you're
-currently working at. That is, be explicit about watchdog_is_running:
-Does it mean the hardware is running, or does userspace believe the
-watchdog to be active? Same for timeout, stoppable etc.pp.
+please comment on this patchset to see if we are on the right
+direction.
 
-When you consider changing the unit the watchdog core is using, why not
-change to nano seconds and 64 bit variables? You might be able to copy
-some algorithms and ideas from the timer core that uses these.
+Hanjun Guo (6):
+  irqchip / gic: Add GIC version support in ACPI MADT
+  irqchip: gic: ACPI: Use IRQCHIP_ACPI_DECLARE to simplify GICv2 init
+    code
+  irqchip / gic: Add stacked irqdomain support for ACPI based GICv2 init
+  ACPI / gsi: Add gsi_mutex to synchronize
+    acpi_register_gsi()/acpi_unregister_gsi()
+  irqchip / GICv3: Add ACPI support for GICv3+ initialization
+  irqchip / GICv3: Add stacked irqdomain support for ACPI based init
 
-For c), I'd want to have a compile time setting that specifies the
-default value for the policy:
- - disable at probe
- - don't touch a running timer
- - start at probe
-This is friendly to distributions that might want to set "disable at
-probe"-default to be on the safe side. Still make this overridable by a
-kernel parameter. I'm not sure that "start at probe" is a sensible
-feature. (Either you want to start the watchdog early, in this case even
-before Linux starts; or you're not that strict then it doesn't matter
-much if it takes yet another little while until your application that
-pets the watchdog is up.)
+Tomasz Nowicki (3):
+  ACPICA: Introduce GIC version for arm based system
+  ACPI / irqchip: Add self-probe infrastructure to initialize IRQ
+    controller
+  irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
 
-Best regards
-Uwe
+ arch/arm64/Kconfig                   |   1 +
+ arch/arm64/include/asm/irq.h         |  13 --
+ arch/arm64/kernel/acpi.c             |  25 ----
+ drivers/acpi/Makefile                |   1 +
+ drivers/acpi/gsi.c                   |  39 ++---
+ drivers/acpi/irq.c                   |  40 ++++++
+ drivers/irqchip/Kconfig              |   3 +
+ drivers/irqchip/Makefile             |   1 +
+ drivers/irqchip/irq-gic-acpi.c       | 116 +++++++++++++++
+ drivers/irqchip/irq-gic-v3.c         | 267 ++++++++++++++++++++++++++++-------
+ drivers/irqchip/irq-gic.c            |  38 ++---
+ drivers/irqchip/irqchip.h            |  12 ++
+ include/acpi/actbl1.h                |  17 ++-
+ include/asm-generic/vmlinux.lds.h    |  13 ++
+ include/linux/acpi.h                 |  14 ++
+ include/linux/acpi_irq.h             |   4 +-
+ include/linux/irqchip/arm-gic-acpi.h |  12 +-
+ include/linux/mod_devicetable.h      |   7 +
+ 18 files changed, 489 insertions(+), 134 deletions(-)
+ create mode 100644 drivers/acpi/irq.c
+ create mode 100644 drivers/irqchip/irq-gic-acpi.c
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.9.1
