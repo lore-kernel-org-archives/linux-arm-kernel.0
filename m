@@ -1,329 +1,140 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Tue,  5 May 2015 10:46:10 +0800
-Subject: [RFC v2 7/7] ia64/PCI/ACPI: Use common interface to support PCI host
- bridge
+Date: Tue,  5 May 2015 10:46:07 +0800
+Subject: [RFC v2 4/7] x86/PCI: Rename struct pci_sysdata as struct
+ pci_controller
 In-Reply-To: <1430793970-11159-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1430793970-11159-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1430793970-11159-8-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1430793970-11159-5-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use common interface to simplify PCI host bridge implementation.
+Rename struct pci_sysdata as struct pci_controller, so we could share
+common code between IA64 and x86 later.
 
-Tested-by: Tony Luck <tony.luck@intel.com>
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- arch/ia64/pci/pci.c |  246 +++++++++++----------------------------------------
- 1 file changed, 51 insertions(+), 195 deletions(-)
+ arch/x86/include/asm/pci.h    |   13 +++++++------
+ arch/x86/include/asm/pci_64.h |    4 ++--
+ arch/x86/pci/acpi.c           |    8 ++++----
+ arch/x86/pci/common.c         |    2 +-
+ 4 files changed, 14 insertions(+), 13 deletions(-)
 
-diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-index 4af1b52c7a44..0819d6274e82 100644
---- a/arch/ia64/pci/pci.c
-+++ b/arch/ia64/pci/pci.c
-@@ -116,15 +116,11 @@ struct pci_ops pci_root_ops = {
+diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+index 4e370a5d8117..243dafd86f87 100644
+--- a/arch/x86/include/asm/pci.h
++++ b/arch/x86/include/asm/pci.h
+@@ -11,15 +11,15 @@
+ 
+ #ifdef __KERNEL__
+ 
+-struct pci_sysdata {
+-	int		domain;		/* PCI domain */
+-	int		node;		/* NUMA node */
++struct pci_controller {
+ #ifdef CONFIG_ACPI
+ 	struct acpi_device *companion;	/* ACPI companion device */
+ #endif
+ #ifdef CONFIG_X86_64
+ 	void		*iommu;		/* IOMMU private data */
+ #endif
++	int		segment;	/* PCI domain */
++	int		node;		/* NUMA node */
  };
  
+ extern int pci_routeirq;
+@@ -31,8 +31,9 @@ extern int noioapicreroute;
+ #ifdef CONFIG_PCI_DOMAINS
+ static inline int pci_domain_nr(struct pci_bus *bus)
+ {
+-	struct pci_sysdata *sd = bus->sysdata;
+-	return sd->domain;
++	struct pci_controller *sd = bus->sysdata;
++
++	return sd->segment;
+ }
+ 
+ static inline int pci_proc_domain(struct pci_bus *bus)
+@@ -127,7 +128,7 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+ /* Returns the node based on pci bus */
+ static inline int __pcibus_to_node(const struct pci_bus *bus)
+ {
+-	const struct pci_sysdata *sd = bus->sysdata;
++	const struct pci_controller *sd = bus->sysdata;
+ 
+ 	return sd->node;
+ }
+diff --git a/arch/x86/include/asm/pci_64.h b/arch/x86/include/asm/pci_64.h
+index fe15cfb21b9b..dcbb6b52d4fd 100644
+--- a/arch/x86/include/asm/pci_64.h
++++ b/arch/x86/include/asm/pci_64.h
+@@ -6,13 +6,13 @@
+ #ifdef CONFIG_CALGARY_IOMMU
+ static inline void *pci_iommu(struct pci_bus *bus)
+ {
+-	struct pci_sysdata *sd = bus->sysdata;
++	struct pci_controller *sd = bus->sysdata;
+ 	return sd->iommu;
+ }
+ 
+ static inline void set_pci_iommu(struct pci_bus *bus, void *val)
+ {
+-	struct pci_sysdata *sd = bus->sysdata;
++	struct pci_controller *sd = bus->sysdata;
+ 	sd->iommu = val;
+ }
+ #endif /* CONFIG_CALGARY_IOMMU */
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index d93963340c3c..b34a2b660de3 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -10,7 +10,7 @@
  struct pci_root_info {
--	struct pci_controller controller;
--	struct acpi_device *bridge;
--	struct list_head resources;
-+	struct acpi_pci_root_info_common common;
- 	struct list_head io_resources;
--	char name[16];
- };
+ 	struct acpi_device *bridge;
+ 	char name[16];
+-	struct pci_sysdata sd;
++	struct pci_controller sd;
+ #ifdef	CONFIG_PCI_MMCONFIG
+ 	bool mcfg_added;
+ 	u16 segment;
+@@ -384,7 +384,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	LIST_HEAD(crs_res);
+ 	LIST_HEAD(resources);
+ 	struct pci_bus *bus;
+-	struct pci_sysdata *sd;
++	struct pci_controller *sd;
+ 	int node;
  
--static unsigned int
--new_space (u64 phys_base, int sparse)
-+static unsigned int new_space(u64 phys_base, int sparse)
- {
- 	u64 mmio_base;
- 	int i;
-@@ -160,11 +156,11 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
- 	unsigned long base, min, max, base_port;
- 	unsigned int sparse = 0, space_nr, len;
- 
--	len = strlen(info->name) + 32;
-+	len = strlen(info->common.name) + 32;
- 	iospace = resource_list_create_entry(NULL, len);
- 	if (!iospace) {
- 		dev_err(dev, "PCI: No memory for %s I/O port space\n",
--			info->name);
-+			info->common.name);
- 		return -ENOMEM;
+ 	if (pci_ignore_seg)
+@@ -416,7 +416,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
  	}
  
-@@ -179,7 +175,7 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
- 	max = res->end - entry->offset;
- 	base = __pa(io_space[space_nr].mmio_base);
- 	base_port = IO_SPACE_BASE(space_nr);
--	snprintf(name, len, "%s I/O Ports %08lx-%08lx", info->name,
-+	snprintf(name, len, "%s I/O Ports %08lx-%08lx", info->common.name,
- 		 base_port + min, base_port + max);
+ 	sd = &info->sd;
+-	sd->domain = domain;
++	sd->segment = domain;
+ 	sd->node = node;
+ 	sd->companion = device;
  
- 	/*
-@@ -234,217 +230,77 @@ static bool resource_is_pcicfg_ioport(struct resource *res)
- 		res->start == 0xCF8 && res->end == 0xCFF;
- }
- 
--static int
--probe_pci_root_info(struct pci_root_info *info, struct acpi_device *device,
--		    int busnum, int domain)
-+static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info_common *ci,
-+					   int status)
- {
--	int ret;
--	struct list_head *list = &info->resources;
-+	struct device *dev = &ci->bridge->dev;
-+	struct pci_root_info *info;
-+	struct resource *res;
- 	struct resource_entry *entry, *tmp;
- 
--	ret = acpi_dev_get_resources(device, list,
--				     acpi_dev_filter_resource_type_cb,
--				     (void *)(IORESOURCE_IO | IORESOURCE_MEM));
--	if (ret < 0)
--		dev_warn(&device->dev,
--			 "failed to parse _CRS method, error code %d\n", ret);
--	else if (ret == 0)
--		dev_dbg(&device->dev,
--			"no IO and memory resources present in _CRS\n");
--	else
--		resource_list_for_each_entry_safe(entry, tmp, list) {
--			if ((entry->res->flags & IORESOURCE_DISABLED) ||
--			    resource_is_pcicfg_ioport(entry->res))
--				resource_list_destroy_entry(entry);
--			else
--				entry->res->name = info->name;
-+	if (status > 0) {
-+		info = container_of(ci, struct pci_root_info, common);
-+		resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
-+			res = entry->res;
-+			if (res->flags & IORESOURCE_MEM) {
-+				/*
-+				 * HP's firmware has a hack to work around a
-+				 * Windows bug. Ignore these tiny memory ranges.
-+				 */
-+				if (resource_size(res) <= 16) {
-+					resource_list_del(entry);
-+					insert_resource(&iomem_resource,
-+							entry->res);
-+					resource_list_add_tail(entry,
-+							&info->io_resources);
-+				}
-+			} else if (res->flags & IORESOURCE_IO) {
-+				if (resource_is_pcicfg_ioport(entry->res))
-+					resource_list_destroy_entry(entry);
-+				else if (add_io_space(dev, info, entry))
-+					resource_list_destroy_entry(entry);
-+			}
- 		}
-+	}
- 
--	return ret;
-+	return status;
- }
- 
--static void validate_resources(struct device *dev, struct list_head *resources,
--			       unsigned long type)
-+static int pci_acpi_root_init_info(struct acpi_pci_root_info_common *ci)
- {
--	LIST_HEAD(list);
--	struct resource *res1, *res2, *root = NULL;
--	struct resource_entry *tmp, *entry, *entry2;
--
--	BUG_ON((type & (IORESOURCE_MEM | IORESOURCE_IO)) == 0);
--	root = (type & IORESOURCE_MEM) ? &iomem_resource : &ioport_resource;
--
--	list_splice_init(resources, &list);
--	resource_list_for_each_entry_safe(entry, tmp, &list) {
--		bool free = false;
--		resource_size_t end;
--
--		res1 = entry->res;
--		if (!(res1->flags & type))
--			goto next;
--
--		/* Exclude non-addressable range or non-addressable portion */
--		end = min(res1->end, root->end);
--		if (end <= res1->start) {
--			dev_info(dev, "host bridge window %pR (ignored, not CPU addressable)\n",
--				 res1);
--			free = true;
--			goto next;
--		} else if (res1->end != end) {
--			dev_info(dev, "host bridge window %pR ([%#llx-%#llx] ignored, not CPU addressable)\n",
--				 res1, (unsigned long long)end + 1,
--				 (unsigned long long)res1->end);
--			res1->end = end;
--		}
-+	struct pci_root_info *info;
- 
--		resource_list_for_each_entry(entry2, resources) {
--			res2 = entry2->res;
--			if (!(res2->flags & type))
--				continue;
--
--			/*
--			 * I don't like throwing away windows because then
--			 * our resources no longer match the ACPI _CRS, but
--			 * the kernel resource tree doesn't allow overlaps.
--			 */
--			if (resource_overlaps(res1, res2)) {
--				res2->start = min(res1->start, res2->start);
--				res2->end = max(res1->end, res2->end);
--				dev_info(dev, "host bridge window expanded to %pR; %pR ignored\n",
--					 res2, res1);
--				free = true;
--				goto next;
--			}
--		}
-+	info = container_of(ci, struct pci_root_info, common);
-+	INIT_LIST_HEAD(&info->io_resources);
- 
--next:
--		resource_list_del(entry);
--		if (free)
--			resource_list_free_entry(entry);
--		else
--			resource_list_add_tail(entry, resources);
--	}
-+	return 0;
- }
- 
--static void add_resources(struct pci_root_info *info, struct device *dev)
-+static void pci_acpi_root_release_info(struct acpi_pci_root_info_common *ci)
- {
-+	struct pci_root_info *info;
- 	struct resource_entry *entry, *tmp;
--	struct resource *res, *conflict, *root = NULL;
--	struct list_head *list = &info->resources;
--
--	validate_resources(dev, list, IORESOURCE_MEM);
--	validate_resources(dev, list, IORESOURCE_IO);
--
--	resource_list_for_each_entry_safe(entry, tmp, list) {
--		res = entry->res;
--		if (res->flags & IORESOURCE_MEM) {
--			root = &iomem_resource;
--			/*
--			 * HP's firmware has a hack to work around a Windows
--			 * bug. Ignore these tiny memory ranges.
--			 */
--			if (resource_size(res) <= 16) {
--				resource_list_destroy_entry(entry);
--				continue;
--			}
--		} else if (res->flags & IORESOURCE_IO) {
--			root = &ioport_resource;
--			if (add_io_space(&info->bridge->dev, info, entry)) {
--				resource_list_destroy_entry(entry);
--				continue;
--			}
--		} else {
--			BUG_ON(res);
--		}
--
--		conflict = insert_resource_conflict(root, res);
--		if (conflict) {
--			dev_info(dev,
--				 "ignoring host bridge window %pR (conflicts with %s %pR)\n",
--				 res, conflict->name, conflict);
--			resource_list_destroy_entry(entry);
--		}
--	}
--}
- 
--static void __release_pci_root_info(struct pci_root_info *info)
--{
--	struct resource *res;
--	struct resource_entry *entry, *tentry;
--
--	resource_list_for_each_entry_safe(entry, tentry, &info->io_resources) {
-+	info = container_of(ci, struct pci_root_info, common);
-+	resource_list_for_each_entry_safe(entry, tmp, &info->io_resources) {
- 		release_resource(entry->res);
- 		resource_list_destroy_entry(entry);
- 	}
--
--	resource_list_for_each_entry_safe(entry, tentry, &info->resources) {
--		res = entry->res;
--		if (res->parent &&
--		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
--			release_resource(res);
--		resource_list_destroy_entry(entry);
--	}
--
--	kfree(info);
- }
- 
--static void release_pci_root_info(struct pci_host_bridge *bridge)
--{
--	struct pci_root_info *info = bridge->release_data;
--
--	__release_pci_root_info(info);
--}
-+static struct acpi_pci_root_ops pci_acpi_root_ops = {
-+	.pci_ops = &pci_root_ops,
-+	.init_info = pci_acpi_root_init_info,
-+	.release_info = pci_acpi_root_release_info,
-+	.prepare_resources = pci_acpi_root_prepare_resources,
-+};
- 
- struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- {
--	struct acpi_device *device = root->device;
--	int domain = root->segment;
--	int bus = root->secondary.start;
- 	struct pci_root_info *info;
--	struct pci_bus *pbus;
--	int ret;
--
--	info = kzalloc(sizeof(*info), GFP_KERNEL);
--	if (!info) {
--		dev_err(&device->dev,
--			"pci_bus %04x:%02x: ignored (out of memory)\n",
--			domain, bus);
--		return NULL;
--	}
--
--	info->controller.segment = domain;
--	info->controller.companion = device;
--	info->controller.node = acpi_get_node(device->handle);
--	info->bridge = device;
--	INIT_LIST_HEAD(&info->resources);
--	INIT_LIST_HEAD(&info->io_resources);
--	snprintf(info->name, sizeof(info->name),
--		 "PCI Bus %04x:%02x", domain, bus);
--
--	ret = probe_pci_root_info(info, device, bus, domain);
--	if (ret <= 0) {
--		kfree(info);
--		return NULL;
--	}
--	add_resources(info, &info->bridge->dev);
--	pci_add_resource(&info->resources, &root->secondary);
--
--	/*
--	 * See arch/x86/pci/acpi.c.
--	 * The desired pci bus might already be scanned in a quirk. We
--	 * should handle the case here, but it appears that IA64 hasn't
--	 * such quirk. So we just ignore the case now.
--	 */
--	pbus = pci_create_root_bus(NULL, bus, &pci_root_ops,
--				   &info->controller, &info->resources);
--	if (!pbus) {
--		__release_pci_root_info(info);
--		return NULL;
--	}
- 
--	pci_set_host_bridge_release(to_pci_host_bridge(pbus->bridge),
--			release_pci_root_info, info);
--	pci_scan_child_bus(pbus);
--	return pbus;
-+	return acpi_pci_root_create(root, &pci_acpi_root_ops,
-+				    sizeof(*info) - sizeof(info->common));
- }
+@@ -482,7 +482,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
  
  int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ {
+-	struct pci_sysdata *sd = bridge->bus->sysdata;
++	struct pci_controller *sd = bridge->bus->sysdata;
+ 
+ 	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+ 	return 0;
+diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
+index 8fd6f44aee83..10f37d0ce5d8 100644
+--- a/arch/x86/pci/common.c
++++ b/arch/x86/pci/common.c
+@@ -475,7 +475,7 @@ void __init dmi_check_pciprobe(void)
+ void pcibios_scan_root(int busnum)
+ {
+ 	struct pci_bus *bus;
+-	struct pci_sysdata *sd;
++	struct pci_controller *sd;
+ 	LIST_HEAD(resources);
+ 
+ 	sd = kzalloc(sizeof(*sd), GFP_KERNEL);
 -- 
 1.7.10.4
