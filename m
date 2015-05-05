@@ -1,101 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 5 May 2015 11:34:26 -0500
-Subject: [PATCH v3 1/6] ARM: l2c: Add DT support for Shared Override
-In-Reply-To: <20150505142211.GH22384@e104818-lin.cambridge.arm.com>
-References: <1430753072-17145-1-git-send-email-geert+renesas@glider.be>
- <1430753072-17145-2-git-send-email-geert+renesas@glider.be>
- <20150505112145.GG22384@e104818-lin.cambridge.arm.com>
- <CAMuHMdWE3HjGk73gCN3P-bBVEGrMbgfJ=FqvcTtGecs15R=A_g@mail.gmail.com>
- <20150505142211.GH22384@e104818-lin.cambridge.arm.com>
-Message-ID: <CAL_JsqJvRGFUzd8zo990Qz1EQmpAhgy7OC=9tXcDavD5zk5tdQ@mail.gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Tue, 5 May 2015 18:39:36 +0200
+Subject: [PATCH 0/3] Drop more omap3 legacy board-*.c files for v4.2
+In-Reply-To: <20150505150638.GC21061@atomide.com>
+References: <1430769717-4088-1-git-send-email-tony@atomide.com>
+ <20150505145407.GK18002@pali> <20150505150638.GC21061@atomide.com>
+Message-ID: <201505051839.36882@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 5, 2015 at 9:22 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, May 05, 2015 at 01:42:21PM +0200, Geert Uytterhoeven wrote:
->> On Tue, May 5, 2015 at 1:21 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Mon, May 04, 2015 at 05:24:27PM +0200, Geert Uytterhoeven wrote:
->> >> "CoreLink Level 2 Cache Controller L2C-310", p. 2-15, section 2.3.2
->> >> Shareable attribute" states:
->> >>
->> >>     "The default behavior of the cache controller with respect to the
->> >>      shareable attribute is to transform Normal Memory Non-cacheable
->> >>      transactions into:
->> >>         - cacheable no allocate for reads
->> >>         - write through no write allocate for writes."
->> >>
->> >> Depending on the system architecture, this may cause memory corruption
->> >> in the presence of bus mastering devices (e.g. OHCI). To avoid such
->> >> corruption, the default behavior can be disabled by setting the Shared
->> >> Override bit in the Auxiliary Control register.
->> >>
->> >> Currently the Shared Override bit can be set only using C code:
->> >>   - by calling l2x0_init() directly, which is deprecated,
->> >>   - by setting/clearing the bit in the machine_desc.l2c_aux_val/mask
->> >>     fields, but using values differing from 0/~0 is also deprecated.
->> >
->> > Or you can set it in firmware/boot-loader before Linux starts.
->>
->> ... together with all other additional settings cache-l2x0.c does?
->>
->> I'm afraid this is not going to happen...
->
-> It's not that bad but, well, it requires changes elsewhere (U-Boot
-> already does this for some SoCs).
->
->> >> Hence add support for an "arm,shared-override" device tree property for
->> >> the l2c device node. By specifying this property, affected systems can
->> >> indicate that non-cacheable transactions must not be transformed.
->> >>
->> >> If specified, the actual behavior of the kernel depends on whether CMA
->> >> is available or not:
->> >>   - If CMA is available, nothing needs to be done, as there won't be a
->> >>     kernel linear mappings and cacheable aliases for the DMA buffers,
->> >
->> > I don't think this is true. See this thread:
->> >
->> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/329492.html
->>
->> Doh, and I had hoped to please Russell...
->>
->> To bad, will drop this.
->
-> You should only drop the "if (dev_get_cma_area(NULL))" check.
->
->> >>   - If CMA is not available, the "shared attribute override enable" bit
->> >>     will be set.
->> >
->> > IMO, this should always be done, independent of any DT or kernel
->> > configuration. I stated it several times already that I don't see why we
->> > would ever need such bit cleared:
->> >
->> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330573.html
->> >
->> > Personally I don't think this configuration belongs to the DT,
->> > especially as it may depend on how the OS is configured. But since
->>
->> That's why I worded the bindings like "[...] this property must be specified to
->> indicate that such transforms are precluded.", not "[...] this property must be
->> specified if the Shared Override bit must be set by the OS.".
->> It's still up to the OS to decide (e.g. if CMA will get fixed).
->
-> We are kind of stretching this definition if the CMA check is removed.
-> The check could added back if DMA allocations are ever fixed to avoid
-> memory attributes aliases (right now they still exist, even though
-> temporarily). A situation where this bit probably does not need to be
-> set (though it's harmless) is I/O coherent systems ("arm,io-coherent").
+On Tuesday 05 May 2015 17:06:38 Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [150505 07:55]:
+> > On Tuesday 05 May 2015 07:43:08 Tony Lindgren wrote:
+> > > * Arnd Bergmann <arnd@arndb.de> [150505 03:56]:
+> > > > On Monday 04 May 2015 13:01:54 Tony Lindgren wrote:
+> > > > > For dropping the remaining omap3 legacy boot support,
+> > > > > we still have the following board-*.c files:
+> > > > > 
+> > > > > BOARD                   REASON NEEDED
+> > > > > board-ldp.c             Still used in RMKs boot test
+> > > > > system board-omap3logic.c      Getting a .dts file
+> > > > > for v4.2 board-omap3pandora.c    Got a .dts file for
+> > > > > v4.1 board-rx51-*.c          Needs /proc/atags
+> > > > > support for user space
+> > > > > 
+> > > > > I'm hoping we can drop those for v4.3 merge window,
+> > > > > then keep the platform data around for one more merge
+> > > > > window in case of reverting needed, then drop the
+> > > > > platform data too for v4.4 if no issues needing
+> > > > > reverting are found.
+> > > > 
+> > > > Sounds great. Has there been a conclusion about what to
+> > > > do for the rx51 /proc/atags support?
+> > > 
+> > > I believe we just need to enable /proc/atags also for
+> > > device tree based booting if CONFIG_ARM_ATAG_DTB_COMPAT.
+> > > Pali may have more info on that.
+> > > 
+> > > Then looks like Pali's two patches for showing the
+> > > revision are still pending in thread "[PATCH v2 0/2] ARM:
+> > > /proc/cpuinfo: DT: Add support for Revision":
+> > > 
+> > > http://www.spinics.net/lists/arm-kernel/msg401535.html
+> > 
+> > I think I already sent all need patches to ML. But I did not
+> > check if you merged them or not. I did not get any new
+> > comments for them for a while and right now I do not have
+> > time for looking at it again.
+> 
+> Oh OK, do you have link to the /proc/atags patch somewhere?
+> 
+> Maybe Arnd and Nico can pick them up and sort out how we
+> should queue them with Russell?
+> 
 
-IIRC, it still had to be set on highbank even when we had coherent i/o.
+https://lkml.org/lkml/2015/1/26/648
 
-> My view is that we should always set this bit without any additional DT
-> properties but if it's easier to get it accepted this way, I'm fine as
-> well.
-
-+1
-
-> BTW, your patch mentions r2p0. My reading of the PL310 TRM shows this
-> bit as default from r0p0.
-
-I believe the change in behavior was from the L2x0 to PL310.
-
-Rob
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/47e93981/attachment.sig>
