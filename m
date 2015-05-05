@@ -1,301 +1,113 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed,  6 May 2015 00:10:26 +0200
-Subject: [PATCH v3 1/2] reset: add driver for lpc18xx rgu
+Date: Wed,  6 May 2015 00:10:27 +0200
+Subject: [PATCH v3 2/2] doc: dt: add documentation for lpc1850-rgu reset driver
 In-Reply-To: <1430863827-21898-1-git-send-email-manabian@gmail.com>
 References: <1430863827-21898-1-git-send-email-manabian@gmail.com>
-Message-ID: <1430863827-21898-2-git-send-email-manabian@gmail.com>
+Message-ID: <1430863827-21898-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reset driver for the Reset Generation Unit (RGU) found on NXP
-LPC18xx and LPC43xx devies. This reset controller features up to 64
-reset lines connected to different blocks and peripheral in the SoC.
-Most reset lines on the controller are self clearing except for
-those dealing with the Cortex-M0 cores on LPC43xx devices.
+Add device tree binding documentation for the Reset Generation Unit
+(RGU) found on NXP LPC18xx and LPC43xx devies.
 
-This driver also registers a restart handler that can be used to
-reset the entire device.
+This documentation also includes a table which shows the RGU reset
+number and the connected peripheral.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/reset/Makefile        |   1 +
- drivers/reset/reset-lpc18xx.c | 258 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 259 insertions(+)
- create mode 100644 drivers/reset/reset-lpc18xx.c
+ .../devicetree/bindings/reset/nxp,lpc1850-rgu.txt  | 84 ++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt
 
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 157d421f755b..1d41feeb2dce 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -1,4 +1,5 @@
- obj-$(CONFIG_RESET_CONTROLLER) += core.o
-+obj-$(CONFIG_ARCH_LPC18XX) += reset-lpc18xx.o
- obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
- obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
- obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
-diff --git a/drivers/reset/reset-lpc18xx.c b/drivers/reset/reset-lpc18xx.c
+diff --git a/Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt b/Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt
 new file mode 100644
-index 000000000000..70922e9ac27f
+index 000000000000..b4e96a278445
 --- /dev/null
-+++ b/drivers/reset/reset-lpc18xx.c
-@@ -0,0 +1,258 @@
-+/*
-+ * Reset driver for NXP LPC18xx/43xx Reset Generation Unit (RGU).
-+ *
-+ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
++++ b/Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt
+@@ -0,0 +1,84 @@
++NXP LPC1850  Reset Generation Unit (RGU)
++========================================
 +
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/reboot.h>
-+#include <linux/reset-controller.h>
-+#include <linux/spinlock.h>
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
 +
-+/* LPC18xx RGU registers */
-+#define LPC18XX_RGU_CTRL0		0x100
-+#define LPC18XX_RGU_CTRL1		0x104
-+#define LPC18XX_RGU_ACTIVE_STATUS0	0x150
-+#define LPC18XX_RGU_ACTIVE_STATUS1	0x154
++Required properties:
++- compatible: Should be "nxp,lpc1850-rgu"
++- reg: register base and length
++- clocks: phandle and clock specifier to RGU clocks
++- clock-names: should contain "delay" and "reg"
++- #reset-cells: should be 1
 +
-+#define LPC18XX_RGU_RESETS_PER_REG	32
++See table below for valid peripheral reset numbers. Numbers not
++in the table below are either reserved or not applicable for
++normal operation.
 +
-+/* Internal reset outputs */
-+#define LPC18XX_RGU_CORE_RST	0
-+#define LPC43XX_RGU_M0SUB_RST	12
-+#define LPC43XX_RGU_M0APP_RST	56
++Reset	Peripheral
++  9	System control unit (SCU)
++ 12	ARM Cortex-M0 subsystem core (LPC43xx only)
++ 13	CPU core
++ 16	LCD controller
++ 17	USB0
++ 18	USB1
++ 19	DMA
++ 20	SDIO
++ 21	External memory controller (EMC)
++ 22	Ethernet
++ 25	Flash bank A
++ 27	EEPROM
++ 28	GPIO
++ 29	Flash bank B
++ 32	Timer0
++ 33	Timer1
++ 34	Timer2
++ 35	Timer3
++ 36	Repetitive Interrupt timer (RIT)
++ 37	State Configurable Timer (SCT)
++ 38	Motor control PWM (MCPWM)
++ 39	QEI
++ 40	ADC0
++ 41	ADC1
++ 42	DAC
++ 44	USART0
++ 45	UART1
++ 46	USART2
++ 47	USART3
++ 48	I2C0
++ 49	I2C1
++ 50	SSP0
++ 51	SSP1
++ 52	I2S0 and I2S1
++ 53	Serial Flash Interface (SPIFI)
++ 54	C_CAN1
++ 55	C_CAN0
++ 56	ARM Cortex-M0 application core (LPC4370 only)
++ 57	SGPIO (LPC43xx only)
++ 58	SPI (LPC43xx only)
++ 60	ADCHS (12-bit ADC) (LPC4370 only)
 +
-+struct lpc18xx_rgu_data {
-+	struct reset_controller_dev rcdev;
-+	struct clk *clk_delay;
-+	struct clk *clk_reg;
-+	void __iomem *base;
-+	spinlock_t lock;
-+	u32 delay_us;
++Refer to NXP LPC18xx or LPC43xx user manual for more details about
++the reset signals and the connected block/peripheral.
++
++Reset provider example:
++rgu: reset-controller at 40053000 {
++	compatible = "nxp,lpc1850-rgu";
++	reg = <0x40053000 0x1000>;
++	clocks = <&cgu BASE_SAFE_CLK>, <&ccu1 CLK_CPU_BUS>;
++	clock-names = "delay", "reg";
++	#reset-cells = <1>;
 +};
 +
-+#define to_rgu_data(p) container_of(p, struct lpc18xx_rgu_data, rcdev)
-+
-+static void __iomem *rgu_base;
-+
-+static int lpc18xx_rgu_restart(struct notifier_block *this, unsigned long mode,
-+			       void *cmd)
-+{
-+	writel(BIT(LPC18XX_RGU_CORE_RST), rgu_base + LPC18XX_RGU_CTRL0);
-+	mdelay(2000);
-+
-+	pr_emerg("%s: unable to restart system\n", __func__);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block lpc18xx_rgu_restart_nb = {
-+	.notifier_call = lpc18xx_rgu_restart,
-+	.priority = 192,
++Reset consumer example:
++mac: ethernet at 40010000 {
++	compatible = "nxp,lpc1850-dwmac", "snps,dwmac-3.611", "snps,dwmac";
++	reg = <0x40010000 0x2000>;
++	interrupts = <5>;
++	interrupt-names = "macirq";
++	clocks = <&ccu1 CLK_CPU_ETHERNET>;
++	clock-names = "stmmaceth";
++	resets = <&rgu 22>;
++	reset-names = "stmmaceth";
++	status = "disabled";
 +};
-+
-+/*
-+ * The LPC18xx RGU has mostly self-deasserting resets except for the
-+ * two reset lines going to the internal Cortex-M0 cores.
-+ *
-+ * To prevent the M0 core resets from accidentally getting deasserted
-+ * status register must be check and bits in control register set to
-+ * preserve the state.
-+ */
-+static int lpc18xx_rgu_setclear_reset(struct reset_controller_dev *rcdev,
-+				      unsigned long id, bool set)
-+{
-+	struct lpc18xx_rgu_data *rc = to_rgu_data(rcdev);
-+	u32 stat_offset = LPC18XX_RGU_ACTIVE_STATUS0;
-+	u32 ctrl_offset = LPC18XX_RGU_CTRL0;
-+	unsigned long flags;
-+	u32 stat, rst_bit;
-+
-+	stat_offset += (id / LPC18XX_RGU_RESETS_PER_REG) * sizeof(u32);
-+	ctrl_offset += (id / LPC18XX_RGU_RESETS_PER_REG) * sizeof(u32);
-+	rst_bit = 1 << (id % LPC18XX_RGU_RESETS_PER_REG);
-+
-+	spin_lock_irqsave(&rc->lock, flags);
-+	stat = ~readl(rc->base + stat_offset);
-+	if (set)
-+		writel(stat | rst_bit, rc->base + ctrl_offset);
-+	else
-+		writel(stat & ~rst_bit, rc->base + ctrl_offset);
-+	spin_unlock_irqrestore(&rc->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int lpc18xx_rgu_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	return lpc18xx_rgu_setclear_reset(rcdev, id, true);
-+}
-+
-+static int lpc18xx_rgu_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
-+{
-+	return lpc18xx_rgu_setclear_reset(rcdev, id, false);
-+}
-+
-+/* Only M0 cores require explicit reset deassert */
-+static int lpc18xx_rgu_reset(struct reset_controller_dev *rcdev,
-+			     unsigned long id)
-+{
-+	struct lpc18xx_rgu_data *rc = to_rgu_data(rcdev);
-+
-+	lpc18xx_rgu_assert(rcdev, id);
-+	udelay(rc->delay_us);
-+
-+	switch (id) {
-+	case LPC43XX_RGU_M0SUB_RST:
-+	case LPC43XX_RGU_M0APP_RST:
-+		lpc18xx_rgu_setclear_reset(rcdev, id, false);
-+	}
-+
-+	return 0;
-+}
-+
-+static int lpc18xx_rgu_status(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct lpc18xx_rgu_data *rc = to_rgu_data(rcdev);
-+	u32 bit, offset = LPC18XX_RGU_ACTIVE_STATUS0;
-+
-+	offset += (id / LPC18XX_RGU_RESETS_PER_REG) * sizeof(u32);
-+	bit = 1 << (id % LPC18XX_RGU_RESETS_PER_REG);
-+
-+	return !(readl(rc->base + offset) & bit);
-+}
-+
-+static struct reset_control_ops lpc18xx_rgu_ops = {
-+	.reset		= lpc18xx_rgu_reset,
-+	.assert		= lpc18xx_rgu_assert,
-+	.deassert	= lpc18xx_rgu_deassert,
-+	.status		= lpc18xx_rgu_status,
-+};
-+
-+static int lpc18xx_rgu_probe(struct platform_device *pdev)
-+{
-+	struct lpc18xx_rgu_data *rc;
-+	struct resource *res;
-+	u32 fcclk, firc;
-+	int ret;
-+
-+	rc = devm_kzalloc(&pdev->dev, sizeof(*rc), GFP_KERNEL);
-+	if (!rc)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	rc->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(rc->base))
-+		return PTR_ERR(rc->base);
-+
-+	rc->clk_reg = devm_clk_get(&pdev->dev, "reg");
-+	if (IS_ERR(rc->clk_reg)) {
-+		dev_err(&pdev->dev, "reg clock not found\n");
-+		return PTR_ERR(rc->clk_reg);
-+	}
-+
-+	rc->clk_delay = devm_clk_get(&pdev->dev, "delay");
-+	if (IS_ERR(rc->clk_delay)) {
-+		dev_err(&pdev->dev, "delay clock not found\n");
-+		return PTR_ERR(rc->clk_delay);
-+	}
-+
-+	ret = clk_prepare_enable(rc->clk_reg);
-+	if (ret) {
-+		dev_err(&pdev->dev, "unable to enable reg clock\n");
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(rc->clk_delay);
-+	if (ret) {
-+		dev_err(&pdev->dev, "unable to enable delay clock\n");
-+		goto dis_clk_reg;
-+	}
-+
-+	fcclk = clk_get_rate(rc->clk_reg) / USEC_PER_SEC;
-+	firc = clk_get_rate(rc->clk_delay) / USEC_PER_SEC;
-+	if (fcclk == 0 || firc == 0)
-+		rc->delay_us = 2;
-+	else
-+		rc->delay_us = DIV_ROUND_UP(fcclk, firc * firc);
-+
-+	spin_lock_init(&rc->lock);
-+
-+	rc->rcdev.owner = THIS_MODULE;
-+	rc->rcdev.nr_resets = 64;
-+	rc->rcdev.ops = &lpc18xx_rgu_ops;
-+	rc->rcdev.of_node = pdev->dev.of_node;
-+
-+	platform_set_drvdata(pdev, rc);
-+
-+	ret = reset_controller_register(&rc->rcdev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "unable to register device\n");
-+		goto dis_clks;
-+	}
-+
-+	rgu_base = rc->base;
-+	ret = register_restart_handler(&lpc18xx_rgu_restart_nb);
-+	if (ret)
-+		dev_warn(&pdev->dev, "failed to register restart handler\n");
-+
-+	return 0;
-+
-+dis_clks:
-+	clk_disable_unprepare(rc->clk_delay);
-+dis_clk_reg:
-+	clk_disable_unprepare(rc->clk_reg);
-+
-+	return ret;
-+}
-+
-+static int lpc18xx_rgu_remove(struct platform_device *pdev)
-+{
-+	struct lpc18xx_rgu_data *rc = platform_get_drvdata(pdev);
-+	int ret;
-+
-+	ret = unregister_restart_handler(&lpc18xx_rgu_restart_nb);
-+	if (ret)
-+		dev_warn(&pdev->dev, "failed to unregister restart handler\n");
-+
-+	reset_controller_unregister(&rc->rcdev);
-+
-+	clk_disable_unprepare(rc->clk_delay);
-+	clk_disable_unprepare(rc->clk_reg);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id lpc18xx_rgu_match[] = {
-+	{ .compatible = "nxp,lpc1850-rgu" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, lpc18xx_rgu_match);
-+
-+static struct platform_driver lpc18xx_rgu_driver = {
-+	.probe	= lpc18xx_rgu_probe,
-+	.remove	= lpc18xx_rgu_remove,
-+	.driver	= {
-+		.name		= "lpc18xx-reset",
-+		.of_match_table	= lpc18xx_rgu_match,
-+	},
-+};
-+module_platform_driver(lpc18xx_rgu_driver);
-+
-+MODULE_AUTHOR("Joachim Eastwood <manabian@gmail.com>");
-+MODULE_DESCRIPTION("Reset driver for LPC18xx/43xx RGU");
-+MODULE_LICENSE("GPL v2");
 -- 
 1.8.0
