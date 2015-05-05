@@ -1,85 +1,40 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 5 May 2015 17:09:04 -0500
-Subject: [PATCH v3 2/5] PCI: st: Add Device Tree bindings for sti pcie
-In-Reply-To: <1428657168-12495-3-git-send-email-gabriel.fernandez@linaro.org>
-References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
- <1428657168-12495-3-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <20150505220904.GD24643@google.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed,  6 May 2015 00:10:25 +0200
+Subject: [PATCH v3 0/2] reset driver for NXP LPC18xx family
+Message-ID: <1430863827-21898-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:12:45AM +0200, Gabriel FERNANDEZ wrote:
-> sti pcie is built around a Synopsis Designware PCIe IP.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+This patch set adds a reset driver for NXP LPC18xx/43xx devices.
 
-Arnd, Rob, can you ack this?
+Changes in v3:
+* add patch descriptions
+* change parameter name in to_rgu_data macro to avoid a potential
+  issue if code is changed.
 
-> ---
->  Documentation/devicetree/bindings/pci/st-pcie.txt | 53 +++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
-> new file mode 100644
-> index 0000000..25fcab3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
-> @@ -0,0 +1,53 @@
-> +STMicroelectronics STi PCIe controller
-> +
-> +This PCIe host controller is based on the Synopsis Designware PCIe IP
-> +and thus inherits all the common properties defined in designware-pcie.txt.
-> +
-> +Required properties:
-> + - compatible: "st,stih407-pcie"
-> + - reg: base address and length of the pcie controller, mem-window address
-> +   and length available to the controller.
-> + - interrupts: A list of interrupt outputs of the controller. Must contain an
-> +   entry for each entry in the interrupt-names property.
-> + - interrupt-names: Should be "msi". STi interrupt that is asserted when an
-> +   MSI is received.
-> + - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
-> +   offset for IP configuration.
-> + - resets, reset-names: the power-down and soft-reset lines of PCIe IP.
-> +   Associated names must be "powerdown" and "softreset".
-> + - phys, phy-names: the phandle for the PHY device.
-> +   Associated name must be "pcie"
-> +
-> +Optional properties:
-> + - reset-gpio: a GPIO spec to define which pin is connected to the bus reset.
-> +
-> +Example:
-> +
-> +pcie0: pcie at 9b00000 {
-> +	compatible = "st,pcie", "snps,dw-pcie";
-> +	device_type = "pci";
-> +	reg = <0x09b00000 0x4000>,	/* dbi cntrl registers */
-> +	      <0x2fff0000 0x00010000>,	/* configuration space */
-> +	      <0x40000000 0x80000000>;	/* lmi mem window */
-> +	reg-names = "dbi", "config", "mem-window";
-> +	st,syscfg = <&syscfg_core 0xd8 0xe0>;
-> +	#address-cells = <3>;
-> +	#size-cells = <2>;
-> +	ranges = <0x82000000 0 0x20000000 0x20000000 0 0x0FFF0000>; /* non-prefetchable memory */
-> +	num-lanes = <1>;
-> +	interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
-> +	interrupt-names = "msi";
-> +	#interrupt-cells = <1>;
-> +	interrupt-map-mask = <0 0 0 7>;
-> +	interrupt-map = <0 0 0 1 &intc GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>, /* INT A */
-> +			<0 0 0 2 &intc GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>, /* INT B */
-> +			<0 0 0 3 &intc GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>, /* INT C */
-> +			<0 0 0 4 &intc GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>; /* INT D */
-> +
-> +	resets = <&powerdown STIH407_PCIE0_POWERDOWN>,
-> +		 <&softreset STIH407_PCIE0_SOFTRESET>;
-> +	reset-names = "powerdown",
-> +		      "softreset";
-> +	phys = <&phy_port0 PHY_TYPE_PCIE>;
-> +	phy-names = "pcie";
-> +};
-> -- 
-> 1.9.1
-> 
+Changes in v2:
+* clean up header includes
+* prefix M0 reset defines with LPC43XX
+* fix comment about M0 reset lines
+* reorganize reset call chains
+* add reset number table to dt doc
+
+There are no dependencies in this patch set. The DTS changes will
+be sent separately to arm-soc once this patch set goes upstream.
+
+Base support for the NXP LPC18xx family can be found here:
+http://marc.info/?l=linux-arm-kernel&m=143016894704253&w=2
+
+Joachim Eastwood (2):
+  reset: add driver for lpc18xx rgu
+  doc: dt: add documentation for lpc1850-rgu reset driver
+
+ .../devicetree/bindings/reset/nxp,lpc1850-rgu.txt  |  84 +++++++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-lpc18xx.c                      | 258 +++++++++++++++++++++
+ 3 files changed, 343 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt
+ create mode 100644 drivers/reset/reset-lpc18xx.c
+
+-- 
+1.8.0
