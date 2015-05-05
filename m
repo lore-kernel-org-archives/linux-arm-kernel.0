@@ -1,209 +1,94 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 05 May 2015 15:07:30 +0100
-Subject: [PATCH v7 05/15] dt-bindings: Document the STM32 reset bindings
-In-Reply-To: <CALszF6BTb0Ce6jfT5gY4eEtSep6+8XqOxu1LbpUXHmPYX9PmgQ@mail.gmail.com>
-References: <1430410844-16062-1-git-send-email-mcoquelin.stm32@gmail.com>	<1430410844-16062-6-git-send-email-mcoquelin.stm32@gmail.com>	<55433467.2010603@linaro.org>	<CALszF6Bw900E9MtpaVmvkFxsrOODRkNg+RxRXz5V3WghHtsxbw@mail.gmail.com>	<5544A069.5000808@linaro.org>
- <CALszF6BTb0Ce6jfT5gY4eEtSep6+8XqOxu1LbpUXHmPYX9PmgQ@mail.gmail.com>
-Message-ID: <5548CEA2.8020807@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 5 May 2015 15:22:12 +0100
+Subject: [PATCH v3 1/6] ARM: l2c: Add DT support for Shared Override
+In-Reply-To: <CAMuHMdWE3HjGk73gCN3P-bBVEGrMbgfJ=FqvcTtGecs15R=A_g@mail.gmail.com>
+References: <1430753072-17145-1-git-send-email-geert+renesas@glider.be>
+ <1430753072-17145-2-git-send-email-geert+renesas@glider.be>
+ <20150505112145.GG22384@e104818-lin.cambridge.arm.com>
+ <CAMuHMdWE3HjGk73gCN3P-bBVEGrMbgfJ=FqvcTtGecs15R=A_g@mail.gmail.com>
+Message-ID: <20150505142211.GH22384@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/15 12:25, Maxime Coquelin wrote:
-> 2015-05-02 12:01 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
->> On 02/05/15 08:55, Maxime Coquelin wrote:
->>>
->>> 2015-05-01 10:08 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
->>>>
->>>> On 30/04/15 17:20, Maxime Coquelin wrote:
->>>>>
->>>>>
->>>>> This adds documentation of device tree bindings for the
->>>>> STM32 reset controller.
->>>>>
->>>>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
->>>>> Acked-by: Rob Herring <robh@kernel.org>
->>>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>>>> ---
->>>>>     .../devicetree/bindings/reset/st,stm32-rcc.txt     | 107
->>>>> +++++++++++++++++++++
->>>>>     1 file changed, 107 insertions(+)
->>>>>     create mode 100644
->>>>> Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
->>>>> b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
->>>>> new file mode 100644
->>>>> index 0000000..c1b0f8d
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
->>>>> @@ -0,0 +1,107 @@
->>>>> +STMicroelectronics STM32 Peripheral Reset Controller
->>>>> +====================================================
->>>>> +
->>>>> +The RCC IP is both a reset and a clock controller. This documentation
->>>>> only
->>>>> +documents the reset part.
->>>>> +
->>>>> +Please also refer to reset.txt in this directory for common reset
->>>>> +controller binding usage.
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible: Should be "st,stm32-rcc"
->>>>> +- reg: should be register base and length as documented in the
->>>>> +  datasheet
->>>>> +- #reset-cells: 1, see below
->>>>> +
->>>>> +example:
->>>>> +
->>>>> +rcc: reset at 40023800 {
->>>>> +       #reset-cells = <1>;
->>>>> +       compatible = "st,stm32-rcc";
->>>>
->>>>
->>>>
->>>> Do you intend the clock driver to use the same compatible string (given
->>>> it
->>>> is the same bit of hardware).
->>>>
->>>> If so, is it better to use st,stm32f4-rcc here? It seems unlikey to me
->>>> that
->>>> the register layout of the PLLs and dividers can be the same on the f7
->>>> parts
->>>> (and later).
->>>
->>>
->>> I agree we need a compatible dedicate to f4 series for clocks, and
->>> maybe even one for f429 (to be checked).
->>> For the reset part, we don't have this need.
->>>
->>> So either we use only "st,stm32f4" as you suggest, or we can have both
->>> in device tree:
->>>
->>> rcc: reset at 40023800 {
->>>       #reset-cells = <1>;
->>>       compatible = "st,stm32f4-rcc", "st,stm32-rcc";
->>>       reg = <0x40023800 0x400>;
->>> };
->>>
->>> What do you think?
->>
->>
->> Having both makes sense. The reset driver probably doesn't care about
->> differences between F4 and F7 (I know very little about F7 but I can't think
->> of any obvious h/ware evolution that would confuse the current reset
->> driver).
->>
->>
->>>>> +       reg = <0x40023800 0x400>;
->>>>> +};
->>>>> +
->>>>> +Specifying softreset control of devices
->>>>> +=======================================
->>>>> +
->>>>> +Device nodes should specify the reset channel required in their
->>>>> "resets"
->>>>> +property, containing a phandle to the reset device node and an index
->>>>> specifying
->>>>> +which channel to use.
->>>>> +The index is the bit number within the RCC registers bank, starting
->>>>> from
->>>>> RCC
->>>>> +base address.
->>>>> +It is calculated as: index = register_offset / 4 * 32 + bit_offset.
->>>>> +Where bit_offset is the bit offset within the register.
->>>>> +For example, for CRC reset:
->>>>> +  crc = AHB1RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x10 / 4 * 32 +
->>>>> 12
->>>>> = 140
->>>>> +
->>>>> +example:
->>>>> +
->>>>> +       timer2 {
->>>>> +               resets                  = <&rcc 256>;
->>>>> +       };
->>>>> +
->>>>> +List of valid indices for STM32F429:
->>>>> + - gpioa: 128
->>>>> + - gpiob: 129
->>>>> ...
->>>>> <snip>
->>>>> ...
->>>>> + - sai1: 310
->>>>> + - ltdc: 314
->>>>
->>>>
->>>>
->>>> These numbers are stable for all STM32F4 family parts. Should this table
->>>> go
->>>> into a dt-bindings header file?
->>>>
->>>
->>> This has already been discussed with Philipp and Arnd in earlier
->>> versions of this series [0].
->>> I initially created a header file, and we  decided going this way finally.
->>
->>
->> Thanks for the link. I had overlooked that (I only really started paying
->> attention at v5; I should probably have looked further back before
->> commenting).
->>
->> However...
->>
->> Arnd's concerns about mergability of headers can also be met by using h/ware
->> values in the header file can't there. To be honest my comment was pretty
->> heavily influenced after having read a recent patch from Rob Herring (
->> https://lkml.org/lkml/2015/5/1/14 ) which does exactly this.
->>
->> The main reason I got interested in having a header is that the reset bits
->> and the clock gate bits are encoded using the same bit patterns so I
->> wondering it we could express that only once.
->
-> Ok, I understand your need, and it makes sense.
-> The problem is that the values defined today cannot be re-used
-> directly for clocks.
-> Since the calculation is starting from rcc base, there is a 128 offset.
->
-> To re-use the same values, maybe we should create a mfd dt-binding header file.
-> It would contain the bits definition starting from 0, and  define
-> macros for both reset and clocks to add the offsets.
->
-> For example, includes/dt-bindings/mfd/stm32f4-rcc.h would look like:
->
-> #define GPIOA 0
-> #define GPIOB 1
-> ...
-> #define LTDC 186
->
-> #define STM32F4_RESET(x) (x + 128)
-> #define STM32F4_CLOCK(x) (x + 384)
->
-> Then, in DT, a reset would be described like this:
->
-> timer2 {
->      resets = <&rcc STM32F4_RESET(TIM2)>;
-> };
->
-> Phillip, Daniel, does that look acceptable to you?
+On Tue, May 05, 2015 at 01:42:21PM +0200, Geert Uytterhoeven wrote:
+> On Tue, May 5, 2015 at 1:21 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, May 04, 2015 at 05:24:27PM +0200, Geert Uytterhoeven wrote:
+> >> "CoreLink Level 2 Cache Controller L2C-310", p. 2-15, section 2.3.2
+> >> Shareable attribute" states:
+> >>
+> >>     "The default behavior of the cache controller with respect to the
+> >>      shareable attribute is to transform Normal Memory Non-cacheable
+> >>      transactions into:
+> >>         - cacheable no allocate for reads
+> >>         - write through no write allocate for writes."
+> >>
+> >> Depending on the system architecture, this may cause memory corruption
+> >> in the presence of bus mastering devices (e.g. OHCI). To avoid such
+> >> corruption, the default behavior can be disabled by setting the Shared
+> >> Override bit in the Auxiliary Control register.
+> >>
+> >> Currently the Shared Override bit can be set only using C code:
+> >>   - by calling l2x0_init() directly, which is deprecated,
+> >>   - by setting/clearing the bit in the machine_desc.l2c_aux_val/mask
+> >>     fields, but using values differing from 0/~0 is also deprecated.
+> >
+> > Or you can set it in firmware/boot-loader before Linux starts.
+> 
+> ... together with all other additional settings cache-l2x0.c does?
+> 
+> I'm afraid this is not going to happen...
 
-Doesn't look unreasonable.
+It's not that bad but, well, it requires changes elsewhere (U-Boot
+already does this for some SoCs).
 
-I am a little uneasy simply because there are very few similar header 
-files in that directory but I haven't thought of a better idea.
+> >> Hence add support for an "arm,shared-override" device tree property for
+> >> the l2c device node. By specifying this property, affected systems can
+> >> indicate that non-cacheable transactions must not be transformed.
+> >>
+> >> If specified, the actual behavior of the kernel depends on whether CMA
+> >> is available or not:
+> >>   - If CMA is available, nothing needs to be done, as there won't be a
+> >>     kernel linear mappings and cacheable aliases for the DMA buffers,
+> >
+> > I don't think this is true. See this thread:
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/329492.html
+> 
+> Doh, and I had hoped to please Russell...
+> 
+> To bad, will drop this.
 
+You should only drop the "if (dev_get_cma_area(NULL))" check.
 
-Daniel.
+> >>   - If CMA is not available, the "shared attribute override enable" bit
+> >>     will be set.
+> >
+> > IMO, this should always be done, independent of any DT or kernel
+> > configuration. I stated it several times already that I don't see why we
+> > would ever need such bit cleared:
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330573.html
+> >
+> > Personally I don't think this configuration belongs to the DT,
+> > especially as it may depend on how the OS is configured. But since
+> 
+> That's why I worded the bindings like "[...] this property must be specified to
+> indicate that such transforms are precluded.", not "[...] this property must be
+> specified if the Shared Override bit must be set by the OS.".
+> It's still up to the OS to decide (e.g. if CMA will get fixed).
 
+We are kind of stretching this definition if the CMA check is removed.
+The check could added back if DMA allocations are ever fixed to avoid
+memory attributes aliases (right now they still exist, even though
+temporarily). A situation where this bit probably does not need to be
+set (though it's harmless) is I/O coherent systems ("arm,io-coherent").
 
->
-> Kind regards,
-> Maxime
->>
->> I guess it doesn't matter that much, especially given there is only one
->> .dtsi file, and we can add a header later and remain binary compatible.
->> However if the same number set does end up repeated in different .dtsi files
->> I think that would motivate adding a header for F4 family.
->>
->>
->> Daniel.
->>
+My view is that we should always set this bit without any additional DT
+properties but if it's easier to get it accepted this way, I'm fine as
+well.
+
+BTW, your patch mentions r2p0. My reading of the PL310 TRM shows this
+bit as default from r0p0.
+
+-- 
+Catalin
