@@ -1,32 +1,66 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 5 May 2015 22:41:33 +0200
-Subject: [PATCH v2 0/2] gpio driver for NXP LPC18xx family
-In-Reply-To: <CACRpkdZ9oqsh67-J3imL_tsQxiGfr7O_N82N-SUVmju7cmyb9w@mail.gmail.com>
-References: <1430601095-31984-1-git-send-email-manabian@gmail.com>
- <CACRpkdZ9oqsh67-J3imL_tsQxiGfr7O_N82N-SUVmju7cmyb9w@mail.gmail.com>
-Message-ID: <CAGhQ9Vy=VQbRrjO7Cd8HQs3gXj6h-t4gG0hZxTO7YB86GKc=Vg@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 05 May 2015 13:44:21 -0700
+Subject: [rtc-linux] [PATCH v3 2/3] rtc: mediatek: Add MT6397 RTC driver
+In-Reply-To: <20150505200010.GP4276@piout.net>
+References: <1430206556-18254-1-git-send-email-eddie.huang@mediatek.com>
+ <1430206556-18254-3-git-send-email-eddie.huang@mediatek.com>
+ <20150505200010.GP4276@piout.net>
+Message-ID: <1430858661.9365.20.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, 2015-05-05 at 22:00 +0200, Alexandre Belloni wrote:
+> Hi,
+> 
+> This looks mostly good. Could you align the wrapped function parameters
+> to the open parenthesis (use checkpatch --strict)?
+> 
+> On 28/04/2015 at 15:35:55 +0800, Eddie Huang wrote :
+> > +static int mtk_rtc_write_trigger(struct mt6397_rtc *rtc)
+> > +{
+> > +	unsigned long timeout = jiffies + HZ;
+> > +	int ret;
+> > +	u32 data;
+> > +
+> > +	ret = regmap_write(rtc->regmap, rtc->addr_base + RTC_WRTGR, 1);
+> > +	if (ret < 0)
+> > +		return ret;
+> > +
+> > +	do {
+> > +		cpu_relax();
+> > +		ret = regmap_read(rtc->regmap, rtc->addr_base + RTC_BBPU,
+> > +				&data);
+> > +		if (ret < 0)
+> > +			goto exit;
+> > +	} while ((data & RTC_BBPU_CBUSY) && time_after(timeout, jiffies));
+> > +
+> 
+> Shouldn't you return -ETIMEDOUT if the loop breaks because of time_after?
 
-On 5 May 2015 at 17:58, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sat, May 2, 2015 at 11:11 PM, Joachim Eastwood <manabian@gmail.com> wrote:
->
->> This patch set adds a gpio driver for NXP LPC18xx/43xx devices.
->> Patchset is based on Linus master 4.1-rc1.
->>
->> changes in v2:
->>  - use PBYTE register for gpio set/get
->>  - refactor direction setup
->>  - add lock for direction set RMW cycle
->>  - expand doc example
->
-> This v2 version applied.
+Probably yes.
 
-Excellent.
+I believe as written the time_after test is too much
+for my little brain.  I would have used time_before
+and reversed the args.
 
-Thanks Linus.
+I suggest moving the time_after() test into the loop,
+use break; and remove the exit label too.
 
-regards,
-Joachim Eastwood
+Maybe something like:
+
+	while (1) {
+		ret = regmap_read(rtc->regmap, rtc->addr_base + RTC_BBPU,
+				  &data);
+		if (ret < 0)
+			break;
+		if (!(data & RTC_BBPU_CBUSY))
+			break;
+		if (time_after(jiffies, timeout)) {
+			ret = -ETIMEDOUT;
+			break;
+		}
+		cpu_relax();
+	}
+
+	return ret;
+}
