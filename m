@@ -1,54 +1,84 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 05 May 2015 17:42:37 +0200
-Subject: [PATCH v7 05/15] dt-bindings: Document the STM32 reset bindings
-In-Reply-To: <CALszF6DyUA7Wr2qo4sASFBTRwwjhGAkFKRYnY+1UwHmf4nTj5w@mail.gmail.com>
-References: <1430410844-16062-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1430410844-16062-6-git-send-email-mcoquelin.stm32@gmail.com>
- <55433467.2010603@linaro.org>
- <CALszF6Bw900E9MtpaVmvkFxsrOODRkNg+RxRXz5V3WghHtsxbw@mail.gmail.com>
- <5544A069.5000808@linaro.org>
- <CALszF6BTb0Ce6jfT5gY4eEtSep6+8XqOxu1LbpUXHmPYX9PmgQ@mail.gmail.com>
- <5548CEA2.8020807@linaro.org>
- <CALszF6DyUA7Wr2qo4sASFBTRwwjhGAkFKRYnY+1UwHmf4nTj5w@mail.gmail.com>
-Message-ID: <1430840557.3035.60.camel@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 May 2015 08:44:24 -0700
+Subject: [GIT PULL] omap fixes against v4.1-rc1
+Message-ID: <20150505154423.GD21061@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 05.05.2015, 17:19 +0200 schrieb Maxime Coquelin:
-> >> For example, includes/dt-bindings/mfd/stm32f4-rcc.h would look like:
-> >>
-> >> #define GPIOA 0
-> >> #define GPIOB 1
-> >> ...
-> >> #define LTDC 186
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-That looks a bit fragile.
-At least the defines for the indices should be properly namespaced,
-check out include/dt-bindings/gpio/tegra-gpio.h for a similar case.
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-> >> #define STM32F4_RESET(x) (x + 128)
-> >> #define STM32F4_CLOCK(x) (x + 384)
-> >>
-> >> Then, in DT, a reset would be described like this:
-> >>
-> >> timer2 {
-> >>      resets = <&rcc STM32F4_RESET(TIM2)>;
-> >> };
-> >>
-> >> Phillip, Daniel, does that look acceptable to you?
-> >
-> >
-> > Doesn't look unreasonable.
-> >
-> > I am a little uneasy simply because there are very few similar header files
-> > in that directory but I haven't thought of a better idea.
-> 
-> Since this file will be shared by both clock and reset drivers, I
-> don't see better option.
-> I will implement it in v8 if Philipp agrees.
+are available in the git repository at:
 
-Are the device tree maintainers happy with this idiom spreading?
-Except for the point above, I think this is acceptable.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-rc1
 
-regards
-Philipp
+for you to fetch changes up to e7309c2673a389a495fcfad70376d3bae8b9bc89:
+
+  bus: omap_l3_noc: Fix master id address decoding for OMAP5 (2015-05-04 10:21:01 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps, mostly a fix for power power consumption
+creeping up during idle, and two l3-noc device fixes:
+
+- Fix power consumption creeping up with I2C4 staying on
+- Fix n900 microphone bias voltages
+- Fix dra7 l3-noc for host clock
+- Fix omap5 l3-noc id address decoding
+
+The rest are all just minor dts fixes:
+
+- Fix changed EXTCON_USB_GPIO_USB in defconfig
+- Fix missing isp and iva #iommu-cells property
+- Various beagle x15 dts fixes for pre-production changes
+- Fix am437x-sk display dts entries
+
+----------------------------------------------------------------
+Felipe Balbi (2):
+      ARM: dts: am437x-sk: fix for new newhaven display module revision
+      ARM: dts: am437x-sk: reduce col-scan-delay-us
+
+Grygorii Strashko (1):
+      ARM: dts: am57xx-beagle-x15: Fix IRQ type for mcp7941x
+
+Illia Smyrnov (1):
+      bus: omap_l3_noc: Fix offset for DRA7 CLK1_HOST_CLK1_2 instance
+
+Nishanth Menon (4):
+      ARM: dts: am57xx-beagle-x15: Fix RTC aliases
+      ARM: dts: am57xx-beagle-x15: Switch UART mux pins
+      ARM: dts: am57xx-beagle-x15: Switch GPIO fan number
+      ARM: dts: dra7: Fix efuse register size for ABB
+
+Pavel Machek (1):
+      ARM: dts: OMAP3-N900: Add microphone bias voltages
+
+Roger Quadros (1):
+      ARM: omap2plus_defconfig: Enable EXTCON_USB_GPIO
+
+Sebastian Reichel (1):
+      ARM: dts: omap3: Add #iommu-cells to isp and iva iommu
+
+Suman Anna (1):
+      bus: omap_l3_noc: Fix master id address decoding for OMAP5
+
+Tony Lindgren (1):
+      ARM: OMAP2+: Fix omap off idle power consumption creeping up
+
+ .../devicetree/bindings/arm/omap/l3-noc.txt        |  1 +
+ arch/arm/boot/dts/am437x-sk-evm.dts                |  4 +-
+ arch/arm/boot/dts/am57xx-beagle-x15.dts            | 11 +++--
+ arch/arm/boot/dts/dra7.dtsi                        | 10 ++--
+ arch/arm/boot/dts/omap3-n900.dts                   |  4 ++
+ arch/arm/boot/dts/omap3.dtsi                       |  2 +
+ arch/arm/boot/dts/omap5.dtsi                       |  2 +-
+ arch/arm/configs/omap2plus_defconfig               |  2 +-
+ arch/arm/mach-omap2/prm-regbits-34xx.h             |  1 +
+ arch/arm/mach-omap2/prm-regbits-44xx.h             |  1 +
+ arch/arm/mach-omap2/vc.c                           | 12 ++++-
+ arch/arm/mach-omap2/vc.h                           |  2 +
+ arch/arm/mach-omap2/vc3xxx_data.c                  |  1 +
+ arch/arm/mach-omap2/vc44xx_data.c                  |  1 +
+ drivers/bus/omap_l3_noc.c                          |  5 +-
+ drivers/bus/omap_l3_noc.h                          | 54 ++++++++++++++++------
+ 16 files changed, 81 insertions(+), 32 deletions(-)
