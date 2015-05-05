@@ -1,23 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 5 May 2015 11:53:29 +0100
-Subject: [PATCH 4/4] arm64: gicv3: its: Increase FORCE_MAX_ZONEORDER for
- Cavium ThunderX
-In-Reply-To: <1430686172-18222-5-git-send-email-rric@kernel.org>
-References: <1430686172-18222-1-git-send-email-rric@kernel.org>
- <1430686172-18222-5-git-send-email-rric@kernel.org>
-Message-ID: <20150505105329.GC1550@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 05 May 2015 12:54:38 +0200
+Subject: [PATCH 0/3] Drop more omap3 legacy board-*.c files for v4.2
+In-Reply-To: <1430769717-4088-1-git-send-email-tony@atomide.com>
+References: <1430769717-4088-1-git-send-email-tony@atomide.com>
+Message-ID: <2213391.JZ0TJA9KXB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 03, 2015 at 09:49:32PM +0100, Robert Richter wrote:
-> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+On Monday 04 May 2015 13:01:54 Tony Lindgren wrote:
 > 
-> In case of ARCH_THUNDER, there is a need to allocate the GICv3 ITS table
-> which is bigger than the allowed max order. So we are forcing it only in
-> case of 4KB page size.
+> For dropping the remaining omap3 legacy boot support, we still
+> have the following board-*.c files:
+> 
+> BOARD                   REASON NEEDED
+> board-ldp.c             Still used in RMKs boot test system
+> board-omap3logic.c      Getting a .dts file for v4.2
+> board-omap3pandora.c    Got a .dts file for v4.1
+> board-rx51-*.c          Needs /proc/atags support for user space
+> 
+> I'm hoping we can drop those for v4.3 merge window, then keep
+> the platform data around for one more merge window in case of
+> reverting needed, then drop the platform data too for v4.4
+> if no issues needing reverting are found.
 
-Does this problem disappear if the ITS driver uses dma_alloc_coherent
-instead? That would also allow us to remove the __flush_dcache_area abuse
-from the driver.
+Sounds great. Has there been a conclusion about what to do for the
+rx51 /proc/atags support?
 
-Will
+	Arnd
