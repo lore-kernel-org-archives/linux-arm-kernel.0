@@ -1,47 +1,46 @@
-From: thomas.lendacky@amd.com (Tom Lendacky)
-Date: Tue, 5 May 2015 11:24:03 -0500
-Subject: [Linaro-acpi] [V2 PATCH 2/5] arm64 : Introduce support for ACPI
- _CCA object
-In-Reply-To: <5548EC47.3020501@amd.com>
-References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <5126612.k0u2CL2zi5@wuerfel> <5548EB42.5010800@amd.com>
- <8157862.NJP1L4Rh25@wuerfel> <5548EC47.3020501@amd.com>
-Message-ID: <5548EEA3.8010101@amd.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 5 May 2015 11:32:26 -0500
+Subject: [PATCH 0/2] ARM: AM43xx: PRM: fix reset handling issues
+In-Reply-To: <1430832785-1976-1-git-send-email-t-kristo@ti.com>
+References: <1430832785-1976-1-git-send-email-t-kristo@ti.com>
+Message-ID: <5548F09A.10401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2015 11:13 AM, Suravee Suthikulanit wrote:
-> On 5/5/2015 11:12 AM, Arnd Bergmann wrote:
->> On Tuesday 05 May 2015 11:09:38 Suravee Suthikulanit wrote:
->>>
->>> However, codes in several places are making use of dma_map_ops without
->>> checking if the ops are NULL (i.e.
->>> include/asm-generic/dma-mapping-common.h and in arch-specific
->>> implementation). If setting it to NULL is what we are planning to
->>> support, we would need to scrub the current code to put NULL check.
->>> Also, would you consider if that is safe to do going forward?
->>>
->>>
->>
->> I mean the dma_mask pointer, not dma_map_ops.
+Tero,
+On 05/05/2015 08:33 AM, Tero Kristo wrote:
+> Hi,
+> 
+> The work done for consolidating PRM code introduced a reset issue
+> on AM43xx which is visible at least with wkup-m3, and prevents
+> taking the wkup-m3 core out from reset. Fixed by passing all the
+> relevant PRCM data from hwmod data, which was previously partly
+> omitted on OMAP4+ case.
+> 
+> This set also removes some redundant AM33xx hwmod code and just
+> re-uses the OMAP4+ version of the same.
+> 
+> Thanks to Dave Gerlach and Anna Suman for reporting this. Dave, care
+> to give this patch set a try to see if it fixes the problem you see?
+> 
 
-Except a lot of drivers will actually set the dma_mask pointer during
-probe (usually by setting dev->dma_mask = &dev->coherent_dma_mask or by
-calling dma_coerce_mask_and_coherent).  So I think the dummy_dma_ops
-might be the safest way to go.
+Thanks for fixing this up, I swapped these patches for my reset patch on my
+suspend branch [1] and tested the following:
 
-Thanks,
-Tom
+am335x-gp-evm: boot and firmware loaded, suspend/resume multiple cycles
+am437x-gp-evm: boot and firmware loaded, suspend/resume multiple cycles
 
->>
->>     Arnd
->>
->
-> Ah, got it. Sorry for confusion.
->
-> Suravee
->
-> _______________________________________________
-> Linaro-acpi mailing list
-> Linaro-acpi at lists.linaro.org
-> https://lists.linaro.org/mailman/listinfo/linaro-acpi
+Patches look fine to me.
+
+Regards,
+Dave
+
+[1] https://github.com/dgerlach/linux-pm/tree/pm-ds0-v4.1-rc1-WIP
+
+> Testing done:
+> - am335x-bone: boot
+> - am437x-gp-evm: boot
+> - omap4-panda-es: boot, suspend/resume, cpuidle
+> 
+> -Tero
+> 
