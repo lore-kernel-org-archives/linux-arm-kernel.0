@@ -1,92 +1,54 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 5 May 2015 17:41:16 +0200
-Subject: [PATCH 4/4] tty: serial: 8250_mtk: Add support for bus clock
-In-Reply-To: <1430117397-13517-5-git-send-email-s.hauer@pengutronix.de>
-References: <1430117397-13517-1-git-send-email-s.hauer@pengutronix.de>
- <1430117397-13517-5-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CABuKBeLwXZPYLka53sDghMyN_dX0wWUh8XV4vMSanWBhXJjFew@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 05 May 2015 17:42:37 +0200
+Subject: [PATCH v7 05/15] dt-bindings: Document the STM32 reset bindings
+In-Reply-To: <CALszF6DyUA7Wr2qo4sASFBTRwwjhGAkFKRYnY+1UwHmf4nTj5w@mail.gmail.com>
+References: <1430410844-16062-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1430410844-16062-6-git-send-email-mcoquelin.stm32@gmail.com>
+ <55433467.2010603@linaro.org>
+ <CALszF6Bw900E9MtpaVmvkFxsrOODRkNg+RxRXz5V3WghHtsxbw@mail.gmail.com>
+ <5544A069.5000808@linaro.org>
+ <CALszF6BTb0Ce6jfT5gY4eEtSep6+8XqOxu1LbpUXHmPYX9PmgQ@mail.gmail.com>
+ <5548CEA2.8020807@linaro.org>
+ <CALszF6DyUA7Wr2qo4sASFBTRwwjhGAkFKRYnY+1UwHmf4nTj5w@mail.gmail.com>
+Message-ID: <1430840557.3035.60.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-27 8:49 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> The mtk 8250 needs two clocks, one for providing the baudrate and
-> one that needs to be enabled for register accesses. The latter has
-> not been supported, this patch adds support for it. It is optional
-> for now since not all SoCs provide a bus clock.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  .../devicetree/bindings/serial/mtk-uart.txt        | 12 ++++++++--
->  drivers/tty/serial/8250/8250_mtk.c                 | 28 ++++++++++++++++++----
->  2 files changed, 34 insertions(+), 6 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-> index 4415226..8d63f1d 100644
-> --- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
-> +++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-> @@ -14,7 +14,14 @@ Required properties:
->
->  - interrupts: A single interrupt specifier.
->
-> -- clocks: Clock driving the hardware.
-> +- clocks : Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names:
-> +  - "baud": The clock the baudrate is derived from
-> +  - "bus": The bus clock for register accesses (optional)
-> +
-> +For compatibility with older device trees an unnamed clock is used for the
-> +baud clock if the baudclk does not exist. Do not use this for new designs.
->
->  Example:
->
-> @@ -22,5 +29,6 @@ Example:
->                 compatible = "mediatek,mt6589-uart", "mediatek,mt6577-uart";
->                 reg = <0x11006000 0x400>;
->                 interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
-> -               clocks = <&uart_clk>;
-> +               clocks = <&uart_clk>, <&bus_clk>;
-> +               clock-names = "baud", "bus";
->         };
-> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-> index 2f28bd0..8eb3876 100644
-> --- a/drivers/tty/serial/8250/8250_mtk.c
-> +++ b/drivers/tty/serial/8250/8250_mtk.c
-> @@ -34,6 +34,7 @@
->  struct mtk8250_data {
->         int                     line;
->         struct clk              *uart_clk;
-> +       struct clk              *bus_clk;
->  };
+Am Dienstag, den 05.05.2015, 17:19 +0200 schrieb Maxime Coquelin:
+> >> For example, includes/dt-bindings/mfd/stm32f4-rcc.h would look like:
+> >>
+> >> #define GPIOA 0
+> >> #define GPIOB 1
+> >> ...
+> >> #define LTDC 186
 
-Not sure if it would be better to rename the uart_clk to baud_clk
-which reflects the new naming scheme.
+That looks a bit fragile.
+At least the defines for the indices should be properly namespaced,
+check out include/dt-bindings/gpio/tegra-gpio.h for a similar case.
 
->
->  static void
-> @@ -120,6 +121,7 @@ static int mtk8250_runtime_suspend(struct device *dev)
->         struct mtk8250_data *data = dev_get_drvdata(dev);
->
->         clk_disable_unprepare(data->uart_clk);
-> +       clk_disable_unprepare(data->bus_clk);
+> >> #define STM32F4_RESET(x) (x + 128)
+> >> #define STM32F4_CLOCK(x) (x + 384)
+> >>
+> >> Then, in DT, a reset would be described like this:
+> >>
+> >> timer2 {
+> >>      resets = <&rcc STM32F4_RESET(TIM2)>;
+> >> };
+> >>
+> >> Phillip, Daniel, does that look acceptable to you?
+> >
+> >
+> > Doesn't look unreasonable.
+> >
+> > I am a little uneasy simply because there are very few similar header files
+> > in that directory but I haven't thought of a better idea.
+> 
+> Since this file will be shared by both clock and reset drivers, I
+> don't see better option.
+> I will implement it in v8 if Philipp agrees.
 
-bus_clk can be NULL.
+Are the device tree maintainers happy with this idiom spreading?
+Except for the point above, I think this is acceptable.
 
->
->         return 0;
->  }
-> @@ -135,6 +137,12 @@ static int mtk8250_runtime_resume(struct device *dev)
->                 return err;
->         }
->
-> +       err = clk_prepare_enable(data->bus_clk);
-> +       if (err) {
-> +               dev_warn(dev, "Can't enable bus clock\n");
-> +               return err;
-> +       }
-> +
-
-Same here.
-
--- 
-motzblog.wordpress.com
+regards
+Philipp
