@@ -1,44 +1,71 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 5 May 2015 10:11:09 +0200
-Subject: [PATCHv7 6/8] watchdog: imx2_wdt: Convert to use new core
- extensions
-In-Reply-To: <1429701102-22320-7-git-send-email-timo.kokkonen@offcode.fi>
-References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
- <1429701102-22320-7-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <55487B1D.1060108@pengutronix.de>
+From: jbe@pengutronix.de (=?utf-8?q?J=C3=BCrgen_Borleis?=)
+Date: Tue, 5 May 2015 10:21:01 +0200
+Subject: [PATCH V2 4/6] DT: add binding for mxs on-chip regulators
+In-Reply-To: <1858103470.878923.1430770850541.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
+ <201505041551.26355.jbe@pengutronix.de>
+ <1858103470.878923.1430770850541.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+Message-ID: <201505051021.01939.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2015 01:11 PM, Timo Kokkonen wrote:
-> Fill in the HW capabilities in watchdog_device structure and call
-> watchdgog_init_params() to let watchdog core to init itself
-> properly. The watchdog core can then ping stopped watchdog and the
-> timer code in the driver can be removed.
-> 
-> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+Hi Stefan,
 
-This patch changes the default behaviour of the imx watchdog. Without
-the patch: If the system boot with watchdog enabled (by the bootloader),
-the driver sets up a threads to pet the watchdog. With the patch,
-imx2_wdt_ping() is called once during probe but the thread is not
-started. There are no timeout or early_timeout paremters in the DT or in
-the kernel command line.
+On Monday 04 May 2015 22:20:50 Stefan Wahren wrote:
+> [...]
+> >
+> > +------------+     VDD5V  +---------+  VDDIO
+> > | DC-DC      |   +--------> LINREG  +--------->+
+> > |            |            | VDDIO   |          |
+> > |            |            +---------+          |
+> > |            |                                 |
+> > | DCDC_VDDIO +->-+-----------------------------+
+> > |            |   |
+> > |            |   | VDDIO  +---------+ VDDMEM
+> > |            |   +--------> LINREG  +--------->
+> > |            |   |        | VDDMEM  |
+> > |            |   |        +---------+
+> > |            |   | VDDIO  +---------+  VDDA
+> > |            |   +--------> LINREG  +--------->+
+> > |            |            | VDDA    |          |
+> > |            |            +---------+          |
+> > | DCDC_VDDA  +->-+-----------------------------+
+> > |            |   |
+> > |            |   | VDDA   +---------+  VDDD
+> > |            |   +--------> LINREG  +--------->+
+> > |            |            | VDDD    |          |
+> > |            |            +---------+          |
+> > | DCDC_VDDD  +->-------------------------------+
+> > +------------+                                 |
+> >                                                v
+>
+> damn! I didn't noticed that VDDMEM is powered by VDDIO and VDD1P5 is
+> powered by VDDA. Thank you very much.
+>
+> From my understanding VDDMEM and VDD1P5 describe the same regulator
+> function (provides power to external memory such as SDRAM and mDDR which
+> doesn't fit to VDDD, VDDIO or VDDA). But the usage of
+> the name is not consistent across the documentation:
+>                   | i.MX23 | i.MX28
+> ------------------------------------
+> Application note  | VDDMEM | VDD1P5
+> Reference manual  | VDDMEM | VDDMEM
+> Data sheet        | -      | VDD1P5
+>
+> I would suggest to use VDDMEM, because the registers are always called
+> HW_VDDMEM (for both SoCs).
 
-I don't like the old behaviour, but I think there are some setups that
-rely on this feature.
+Ack.
 
-Marc
+> I think we have 3 options here:
+>
+> a) add the regulator daisy chain for the i.MX23 too
+> b) remove VDD1P5 from the i.MX28 diagram so it would fit for both again
+> c) remove the diagram complete
+>
+> I would prefer option b. What's your opinion?
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+I prefer a) because once the details are known, we should keep them.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/168ea742/attachment.sig>
+Regards,
+Juergen
