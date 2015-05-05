@@ -1,71 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 5 May 2015 18:00:06 +0100
-Subject: [PATCH v3 2/2] arm64: perf: Fix callchain parse error with
- kernel tracepoint events
-In-Reply-To: <1430546297-80481-3-git-send-email-houpengyang@huawei.com>
-References: <1430546297-80481-1-git-send-email-houpengyang@huawei.com>
- <1430546297-80481-3-git-send-email-houpengyang@huawei.com>
-Message-ID: <20150505170006.GM1550@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 May 2015 10:00:21 -0700
+Subject: [PATCH 0/3] Drop more omap3 legacy board-*.c files for v4.2
+In-Reply-To: <201505051839.36882@pali>
+References: <1430769717-4088-1-git-send-email-tony@atomide.com>
+ <20150505145407.GK18002@pali> <20150505150638.GC21061@atomide.com>
+ <201505051839.36882@pali>
+Message-ID: <20150505170020.GF21061@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 02, 2015 at 06:58:17AM +0100, Hou Pengyang wrote:
-> For ARM64, when tracing with tracepoint events, the IP and pstate are set
-> to 0, preventing the perf code parsing the callchain and resolving the
-> symbols correctly.
+* Pali Roh?r <pali.rohar@gmail.com> [150505 09:41]:
+> On Tuesday 05 May 2015 17:06:38 Tony Lindgren wrote:
+> > * Pali Roh?r <pali.rohar@gmail.com> [150505 07:55]:
+> > > On Tuesday 05 May 2015 07:43:08 Tony Lindgren wrote:
+> > > > * Arnd Bergmann <arnd@arndb.de> [150505 03:56]:
+> > > > > On Monday 04 May 2015 13:01:54 Tony Lindgren wrote:
+> > > > > > For dropping the remaining omap3 legacy boot support,
+> > > > > > we still have the following board-*.c files:
+> > > > > > 
+> > > > > > BOARD                   REASON NEEDED
+> > > > > > board-ldp.c             Still used in RMKs boot test
+> > > > > > system board-omap3logic.c      Getting a .dts file
+> > > > > > for v4.2 board-omap3pandora.c    Got a .dts file for
+> > > > > > v4.1 board-rx51-*.c          Needs /proc/atags
+> > > > > > support for user space
+> > > > > > 
+> > > > > > I'm hoping we can drop those for v4.3 merge window,
+> > > > > > then keep the platform data around for one more merge
+> > > > > > window in case of reverting needed, then drop the
+> > > > > > platform data too for v4.4 if no issues needing
+> > > > > > reverting are found.
+> > > > > 
+> > > > > Sounds great. Has there been a conclusion about what to
+> > > > > do for the rx51 /proc/atags support?
+> > > > 
+> > > > I believe we just need to enable /proc/atags also for
+> > > > device tree based booting if CONFIG_ARM_ATAG_DTB_COMPAT.
+> > > > Pali may have more info on that.
+> > > > 
+> > > > Then looks like Pali's two patches for showing the
+> > > > revision are still pending in thread "[PATCH v2 0/2] ARM:
+> > > > /proc/cpuinfo: DT: Add support for Revision":
+> > > > 
+> > > > http://www.spinics.net/lists/arm-kernel/msg401535.html
+> > > 
+> > > I think I already sent all need patches to ML. But I did not
+> > > check if you merged them or not. I did not get any new
+> > > comments for them for a while and right now I do not have
+> > > time for looking at it again.
+> > 
+> > Oh OK, do you have link to the /proc/atags patch somewhere?
+> > 
+> > Maybe Arnd and Nico can pick them up and sort out how we
+> > should queue them with Russell?
+> > 
 > 
->  ./perf record -e sched:sched_switch -g --call-graph dwarf ls
->     [ perf record: Captured and wrote 0.146 MB perf.data ]
->  ./perf report -f
->     Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194
->     Children      Self    Command  Shared Object     Symbol
->     100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
-> 
-> The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
-> several necessary registers used for callchain unwinding, including pc,sp,
-> fp and spsr .
-> 
-> With this patch, callchain can be parsed correctly as follows:
-> 
->      ......
-> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
-> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
-> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
-> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
-> -    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
->      pfkey_send_policy_notify
->      pfkey_get
->      v9fs_vfs_rename
->      page_follow_link_light
->      link_path_walk
->      el0_svc_naked
->     .......
-> 
-> Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
-> ---
->  arch/arm64/include/asm/perf_event.h | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-> index d26d1d5..cc92021 100644
-> --- a/arch/arm64/include/asm/perf_event.h
-> +++ b/arch/arm64/include/asm/perf_event.h
-> @@ -24,4 +24,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
->  #define perf_misc_flags(regs)	perf_misc_flags(regs)
->  #endif
->  
-> +#define perf_arch_fetch_caller_regs(regs, __ip) { \
-> +	(regs)->ARM_pc = (__ip);    \
-> +	(regs)->ARM_fp = (unsigned long) __builtin_frame_address(0); \
-> +	(regs)->ARM_sp = current_stack_pointer; \
-> +	(regs)->ARM_cpsr = PSR_MODE_EL1h;	\
-> +}
+> https://lkml.org/lkml/2015/1/26/648
 
-This can't possibly compile, therefore you can't possibly have tested it.
+Hmm looks like you should resend all your pending four patches
+properly with the people mentioned above in Cc to the LAKML
+and linux-omap.. Assuming something will happen to them when
+the patches are buried into a middle of some old threads does
+not work well.. Best to just follow das protokoll und whine and
+follow up until the patches get merged :)
 
-Please fix the code and actually check that you're getting sensible
-callchains before sending a new version of the patch.
+Regards,
 
-Thanks,
-
-Will
+Tony
