@@ -1,66 +1,45 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 5 May 2015 11:10:42 -0700
-Subject: [PATCH] ARM: dts: cros-ec-keyboard: Add support for some Japanese
- keys
-In-Reply-To: <1430791657-28014-1-git-send-email-zyw@rock-chips.com>
-References: <1430791657-28014-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <CAD=FV=VW0s=PHUvATPC_XRPFh=49RcSYxUP56B4KRXDM6F4mnQ@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 5 May 2015 20:49:53 +0200
+Subject: [PATCH 02/12] net: axienet: Handle 0 packet receive gracefully
+In-Reply-To: <1430834264.7191.9.camel@perches.com>
+References: <7fb84f65a61bbe0fdb4b61a871cf4d4f7910955d.1430817941.git.michal.simek@xilinx.com>
+ <55b3c89b3549c61d62b8440636516fd572870842.1430817941.git.michal.simek@xilinx.com>
+ <1430834264.7191.9.camel@perches.com>
+Message-ID: <554910D1.1030706@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris,
+On 05/05/2015 03:57 PM, Joe Perches wrote:
+> On Tue, 2015-05-05 at 11:25 +0200, Michal Simek wrote:
+>> From: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+>>
+>> The AXI-DMA rx-delay interrupt can sometimes be triggered
+>> when there are 0 outstanding packets received. This is due
+>> to the fact that the receive function will greedily consume
+>> as many packets as possible on interrupt. So if two packets
+>> (with a very particular timing) arrive in succession they
+>> will each cause the rx-delay interrupt, but the first interrupt
+>> will consume both packets.
+>> This means the second interrupt is a 0 packet receive.
+>>
+>> This is mostly OK, except that the tail pointer register is
+>> updated unconditionally on receive. Currently the tail pointer
+>> is always set to the current bd-ring descriptor under
+>> the assumption that the hardware has moved onto the next
+>> descriptor. What this means for length 0 recv is the current
+>> descriptor that the hardware is potentially yet to use will
+>> be marked as the tail. This causes the hardware to think
+>> its run out of descriptors deadlocking the whole rx path.
+>>
+>> Fixed by updating the tail pointer to the most recent
+>> successfully consumed descriptor.
+> 
+> I think some of this would be good to have as comments
+> in the code instead of just in the changelog.
 
-On Mon, May 4, 2015 at 7:07 PM, Chris Zhong <zyw@rock-chips.com> wrote:
-> Add support for 4 Japanese keys
->
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
->
-> ---
->
->  arch/arm/boot/dts/cros-ec-keyboard.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/cros-ec-keyboard.dtsi b/arch/arm/boot/dts/cros-ec-keyboard.dtsi
-> index 9c7fb0a..4e42f30c 100644
-> --- a/arch/arm/boot/dts/cros-ec-keyboard.dtsi
-> +++ b/arch/arm/boot/dts/cros-ec-keyboard.dtsi
-> @@ -22,6 +22,7 @@
->                         MATRIX_KEY(0x00, 0x02, KEY_F1)
->                         MATRIX_KEY(0x00, 0x03, KEY_B)
->                         MATRIX_KEY(0x00, 0x04, KEY_F10)
-> +                       MATRIX_KEY(0x00, 0x05, KEY_RO)
->                         MATRIX_KEY(0x00, 0x06, KEY_N)
->                         MATRIX_KEY(0x00, 0x08, KEY_EQUAL)
->                         MATRIX_KEY(0x00, 0x0a, KEY_RIGHTALT)
-> @@ -34,6 +35,7 @@
->                         MATRIX_KEY(0x01, 0x08, KEY_APOSTROPHE)
->                         MATRIX_KEY(0x01, 0x09, KEY_F9)
->                         MATRIX_KEY(0x01, 0x0b, KEY_BACKSPACE)
-> +                       MATRIX_KEY(0x01, 0x0c, KEY_HENKAN)
->
->                         MATRIX_KEY(0x02, 0x00, KEY_LEFTCTRL)
->                         MATRIX_KEY(0x02, 0x01, KEY_TAB)
-> @@ -45,6 +47,7 @@
->                         MATRIX_KEY(0x02, 0x07, KEY_102ND)
->                         MATRIX_KEY(0x02, 0x08, KEY_LEFTBRACE)
->                         MATRIX_KEY(0x02, 0x09, KEY_F8)
-> +                       MATRIX_KEY(0x02, 0x0a, KEY_YEN)
->
->                         MATRIX_KEY(0x03, 0x01, KEY_GRAVE)
->                         MATRIX_KEY(0x03, 0x02, KEY_F2)
-> @@ -53,6 +56,7 @@
->                         MATRIX_KEY(0x03, 0x06, KEY_6)
->                         MATRIX_KEY(0x03, 0x08, KEY_MINUS)
->                         MATRIX_KEY(0x03, 0x0b, KEY_BACKSLASH)
-> +                       MATRIX_KEY(0x03, 0x0c, KEY_MUHENKAN)
->
->                         MATRIX_KEY(0x04, 0x00, KEY_RIGHTCTRL)
->                         MATRIX_KEY(0x04, 0x01, KEY_A)
 
-Since there's no clear architecture here, I'd bet Olof would be the
-one to take this.  I added him to this email, but he might request
-that you resend the patch with him in the "To:" line.
+Is it really needed? If yes, no problem to add it but git blame can
+point you to that.
 
-Other than that:
-
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+Thanks,
+Michal
