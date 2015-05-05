@@ -1,50 +1,24 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 5 May 2015 10:31:23 +0200
-Subject: [PATCHv7 6/8] watchdog: imx2_wdt: Convert to use new core
- extensions
-In-Reply-To: <55487B1D.1060108@pengutronix.de>
-References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
- <1429701102-22320-7-git-send-email-timo.kokkonen@offcode.fi>
- <55487B1D.1060108@pengutronix.de>
-Message-ID: <55487FDB.6060708@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 05 May 2015 10:33:47 +0200
+Subject: [PATCH v2 0/2] reset driver for NXP LPC18xx family
+In-Reply-To: <1430779956-12490-1-git-send-email-manabian@gmail.com>
+References: <1430779956-12490-1-git-send-email-manabian@gmail.com>
+Message-ID: <1430814827.3035.10.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2015 10:11 AM, Marc Kleine-Budde wrote:
-> On 04/22/2015 01:11 PM, Timo Kokkonen wrote:
->> Fill in the HW capabilities in watchdog_device structure and call
->> watchdgog_init_params() to let watchdog core to init itself
->> properly. The watchdog core can then ping stopped watchdog and the
->> timer code in the driver can be removed.
->>
->> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+Am Dienstag, den 05.05.2015, 00:52 +0200 schrieb Joachim Eastwood:
+> This patch set adds a reset driver for NXP LPC18xx/43xx devices.
 > 
-> This patch changes the default behaviour of the imx watchdog. Without
-> the patch: If the system boot with watchdog enabled (by the bootloader),
-> the driver sets up a threads to pet the watchdog. With the patch,
-> imx2_wdt_ping() is called once during probe but the thread is not
-> started. There are no timeout or early_timeout paremters in the DT or in
-> the kernel command line.
-> 
-> I don't like the old behaviour, but I think there are some setups that
-> rely on this feature.
+> Changes in v2:
+> * clean up header includes
+> * prefix M0 reset defines with LPC43XX
+> * fix comment about M0 reset lines
+> * reorganize reset call chains
+> * add reset number table to dt doc
 
-BTW: the start-thread-if-wd-is-active feature was added in:
+I am satisfied with the changes.
+I'd like a short patch description in both patches before applying them.
 
-    faad5de0b104 watchdog: imx2_wdt: convert to watchdog core api
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/394b4816/attachment.sig>
+regards
+Philipp
