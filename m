@@ -1,90 +1,45 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 5 May 2015 11:16:35 +0200
-Subject: [PATCH v3 1/3] iio: adc: add support for Berlin
-In-Reply-To: <55479C77.4070305@kernel.org>
-References: <1430730384-11318-1-git-send-email-antoine.tenart@free-electrons.com>
- <1430730384-11318-2-git-send-email-antoine.tenart@free-electrons.com>
- <55479C77.4070305@kernel.org>
-Message-ID: <20150505091635.GF11312@kwain>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue,  5 May 2015 11:25:54 +0200
+Subject: [PATCH 01/12] net: axienet: Support for RGMII
+Message-ID: <7fb84f65a61bbe0fdb4b61a871cf4d4f7910955d.1430817941.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jonathan,
+From: Srikanth Thokala <srikanth.thokala@xilinx.com>
 
-On Mon, May 04, 2015 at 05:21:11PM +0100, Jonathan Cameron wrote:
-> On 04/05/15 10:06, Antoine Tenart wrote:
+This patch adds support for the RGMII. The h/w configuration
+parameter C_PHY_TYPE, which represents the interface configured in
+the design, is used to differentiate various interfaces supported
+by AXI Ethernet.
 
-[...]
+Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-> Also, I'm travelling and without internet so can't look it up directly.
-> So.. On the basis I'll forget to check later..  What is the status
-> of the two series you say this is based upon?
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-These two series haven't been taken yet, but they should be merged in
-the next merge window (at least that's what we aim). Sebastian may have
-more information on this matter.
-
-> 
-> There are also some overly long lines where spitting them would not
-> significantly hurt readability so clean those up as well to avoid
-> the inevitable code style fix patch from someone with too much time on
-> their hands!
-
-I'll have a look.
-
-> > diff --git a/drivers/iio/adc/berlin2-adc.c b/drivers/iio/adc/berlin2-adc.c
-> > new file mode 100644
-> > index 000000000000..0adfef035d79
-> > --- /dev/null
-> > +++ b/drivers/iio/adc/berlin2-adc.c
-
-[...]
-
-> > +
-> > +struct berlin2_adc_priv {
-> > +	struct regmap		*regmap;
-> > +	struct mutex		lock;
-> > +	wait_queue_head_t	wq;
-> > +	int			irq;
-> > +	int			tsen_irq;
-> tsen_irq and irq are only used in one function I think. If so just use local
-> variables rather than cluttering up this structure.
-
-Sure.
-
-[...]
-
-> > +
-> > +	regmap_update_bits(priv->regmap, BERLIN2_SM_CTRL,
-> > +			BERLIN2_SM_CTRL_ADC_START, 0);
-> > +
-> > +	data = priv->data;
-> > +	priv->data = -1;
-> Is setting data = -1 not overkill with data_available there as well?
-
-It is, we can remove this line.
-
-[...]
-
-> > +
-> > +		temp = berlin2_adc_tsen_read(indio_dev);
-> > +		if (temp < 0)
-> > +			return temp;
-> > +
-> > +		if (temp > 2047)
-> > +			temp = -(4096 - temp);
-> > +
-> > +		/* Convert to Celsius */
-> Just to check... Celsius or milli degrees celsius?
-> (which is the ABI units - matched with hwmon)
-
-Celsuis, I'll update to return milli Celsius.
-
-Thanks!
-
-Antoine
-
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+index 28b7e7d9c272..0ab607732bb4 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+@@ -925,9 +925,16 @@ static int axienet_open(struct net_device *ndev)
+ 		return ret;
+ 
+ 	if (lp->phy_node) {
+-		lp->phy_dev = of_phy_connect(lp->ndev, lp->phy_node,
++		if (lp->phy_type == XAE_PHY_TYPE_GMII) {
++			lp->phy_dev = of_phy_connect(lp->ndev, lp->phy_node,
+ 					     axienet_adjust_link, 0,
+ 					     PHY_INTERFACE_MODE_GMII);
++		} else if (lp->phy_type == XAE_PHY_TYPE_RGMII_2_0) {
++			lp->phy_dev = of_phy_connect(lp->ndev, lp->phy_node,
++					     axienet_adjust_link, 0,
++					     PHY_INTERFACE_MODE_RGMII_ID);
++		}
++
+ 		if (!lp->phy_dev) {
+ 			dev_err(lp->dev, "of_phy_connect() failed\n");
+ 			return -ENODEV;
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.3.5
