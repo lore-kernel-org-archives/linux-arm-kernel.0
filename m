@@ -1,84 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 May 2015 08:44:24 -0700
-Subject: [GIT PULL] omap fixes against v4.1-rc1
-Message-ID: <20150505154423.GD21061@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 05 May 2015 17:44:49 +0200
+Subject: [V2 PATCH 2/5] arm64 : Introduce support for ACPI _CCA object
+In-Reply-To: <1430838729-21572-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1430838729-21572-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <5126612.k0u2CL2zi5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+On Tuesday 05 May 2015 10:12:06 Suravee Suthikulpanit wrote:
+> +struct dma_map_ops dummy_dma_ops = {
+> +       .alloc                  = __dummy_alloc,
+> +       .free                   = __dummy_free,
+> +       .mmap                   = __dummy_mmap,
+> +       .map_page               = __dummy_map_page,
+> +       .unmap_page             = __dummy_unmap_page,
+> +       .map_sg                 = __dummy_map_sg,
+> +       .unmap_sg               = __dummy_unmap_sg,
+> +       .sync_single_for_cpu    = __dummy_sync_single_for_cpu,
+> +       .sync_single_for_device = __dummy_sync_single_for_device,
+> +       .sync_sg_for_cpu        = __dummy_sync_sg_for_cpu,
+> +       .sync_sg_for_device     = __dummy_sync_sg_for_device,
+> +       .mapping_error          = __dummy_mapping_error,
+> +       .dma_supported          = __dummy_dma_supported,
+> +};
+> +EXPORT_SYMBOL(dummy_dma_ops);
+> +
+> 
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+This will clearly work, but I think it's easier to just leave
+the dma_mask pointer as NULL when creating the platform device,
+which should let the normal dma ops fail all the callbacks.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-rc1
-
-for you to fetch changes up to e7309c2673a389a495fcfad70376d3bae8b9bc89:
-
-  bus: omap_l3_noc: Fix master id address decoding for OMAP5 (2015-05-04 10:21:01 -0700)
-
-----------------------------------------------------------------
-Fixes for omaps, mostly a fix for power power consumption
-creeping up during idle, and two l3-noc device fixes:
-
-- Fix power consumption creeping up with I2C4 staying on
-- Fix n900 microphone bias voltages
-- Fix dra7 l3-noc for host clock
-- Fix omap5 l3-noc id address decoding
-
-The rest are all just minor dts fixes:
-
-- Fix changed EXTCON_USB_GPIO_USB in defconfig
-- Fix missing isp and iva #iommu-cells property
-- Various beagle x15 dts fixes for pre-production changes
-- Fix am437x-sk display dts entries
-
-----------------------------------------------------------------
-Felipe Balbi (2):
-      ARM: dts: am437x-sk: fix for new newhaven display module revision
-      ARM: dts: am437x-sk: reduce col-scan-delay-us
-
-Grygorii Strashko (1):
-      ARM: dts: am57xx-beagle-x15: Fix IRQ type for mcp7941x
-
-Illia Smyrnov (1):
-      bus: omap_l3_noc: Fix offset for DRA7 CLK1_HOST_CLK1_2 instance
-
-Nishanth Menon (4):
-      ARM: dts: am57xx-beagle-x15: Fix RTC aliases
-      ARM: dts: am57xx-beagle-x15: Switch UART mux pins
-      ARM: dts: am57xx-beagle-x15: Switch GPIO fan number
-      ARM: dts: dra7: Fix efuse register size for ABB
-
-Pavel Machek (1):
-      ARM: dts: OMAP3-N900: Add microphone bias voltages
-
-Roger Quadros (1):
-      ARM: omap2plus_defconfig: Enable EXTCON_USB_GPIO
-
-Sebastian Reichel (1):
-      ARM: dts: omap3: Add #iommu-cells to isp and iva iommu
-
-Suman Anna (1):
-      bus: omap_l3_noc: Fix master id address decoding for OMAP5
-
-Tony Lindgren (1):
-      ARM: OMAP2+: Fix omap off idle power consumption creeping up
-
- .../devicetree/bindings/arm/omap/l3-noc.txt        |  1 +
- arch/arm/boot/dts/am437x-sk-evm.dts                |  4 +-
- arch/arm/boot/dts/am57xx-beagle-x15.dts            | 11 +++--
- arch/arm/boot/dts/dra7.dtsi                        | 10 ++--
- arch/arm/boot/dts/omap3-n900.dts                   |  4 ++
- arch/arm/boot/dts/omap3.dtsi                       |  2 +
- arch/arm/boot/dts/omap5.dtsi                       |  2 +-
- arch/arm/configs/omap2plus_defconfig               |  2 +-
- arch/arm/mach-omap2/prm-regbits-34xx.h             |  1 +
- arch/arm/mach-omap2/prm-regbits-44xx.h             |  1 +
- arch/arm/mach-omap2/vc.c                           | 12 ++++-
- arch/arm/mach-omap2/vc.h                           |  2 +
- arch/arm/mach-omap2/vc3xxx_data.c                  |  1 +
- arch/arm/mach-omap2/vc44xx_data.c                  |  1 +
- drivers/bus/omap_l3_noc.c                          |  5 +-
- drivers/bus/omap_l3_noc.h                          | 54 ++++++++++++++++------
- 16 files changed, 81 insertions(+), 32 deletions(-)
+	Arnd
