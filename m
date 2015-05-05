@@ -1,27 +1,56 @@
-From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
-Date: Tue, 5 May 2015 14:50:52 +0900
-Subject: [PATCH v6 25/25] ARM: dts: exynos: add iommu reserved regions for
- bootloader's splash screen
-In-Reply-To: <1430727380-10912-26-git-send-email-m.szyprowski@samsung.com>
-References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
- <1430727380-10912-26-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAJKOXPfOChQb11Y1pZTasFWnXoqPnLy32_989dQ2GN1Aiz4HKg@mail.gmail.com>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Tue, 5 May 2015 11:25:14 +0530
+Subject: [PATCH v3 1/2] libahci: Add support to handle HOST_IRQ_STAT as
+ edge trigger latch.
+In-Reply-To: <20150504182618.GG1971@htj.duckdns.org>
+References: <1430667220-23477-1-git-send-email-stripathi@apm.com>
+ <1430667220-23477-2-git-send-email-stripathi@apm.com>
+ <20150504154726.GA1971@htj.duckdns.org>
+ <CAOHikRCZimsE+_-6dqTiCT6qRTFLp9VGt6=WHWA_Z86GBn+WRg@mail.gmail.com>
+ <20150504182618.GG1971@htj.duckdns.org>
+Message-ID: <CAOHikRBeM3MYohDgYgbLL1uhZp+Ch4hS+eduDVbx759321=EHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-04 17:16 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
-> Some bootloaders enable FIMD module and configure it as a simple
-> framebuffer to display boot logo or splash screen before booting the
-> kernel. Such framebuffer stays enabled until proper kernel driver gets
-> probbed. Usually it is configured in such a way, that it performs DMA
-> from the buffer located in system memory. To avoid IOMMU access fault
-> during system boot, additional identity mapping between system memory
-> and IO virtual address space must be created when IOMMU driver gets
-> enabled.
+Hi Tejun,
+
+On Mon, May 4, 2015 at 11:56 PM, Tejun Heo <tj@kernel.org> wrote:
+> Hello,
 >
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> On Mon, May 04, 2015 at 10:13:11PM +0530, Suman Tripathi wrote:
+>> AFAIK clearing host_irq_stat means we have handled port interrupts .
+>> Now for our case we still have interrupts left because it didn't get
+>> detected on
+>> first ahci_port_intr.  So you  mean to handle that residual irq in the
+>> next cycle (i mean next call intr handler ) ??
+>
+> Heh, I think we're talking past each other.  For level triggered IRQs,
+> the latched IRQ bits should be cleared after handling the events;
+> otherwise, the latched bits are gonna get set immediately as the
+> events are still pending.  Also, this doesn't lose any events as
+> they're level triggered latches - if any event is pending, the IRQ is
+> gonna be raised again.
+>
+> Edge triggered latches are the other way around.  You should clear the
+> latches before actually handling and clearing the events.  The pending
+> events won't trigger the latches again as it's edge-triggered and the
+> events which happens after this irq handling starts won't get lost as
+> they'll be latched for the next round.
 
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Yeah it's very simple. The clearing of irq_stat needs to move up.
+That's it. tried and it worked. Thanks a lot !!
+Just a quick question : Why edge trigger handling is not yet present
+in libahci yet? I mean no one has used it yet ??
 
-Best regards,
-Krzysztof
+>
+> Thanks.
+>
+> --
+> tejun
+
+
+
+-- 
+Thanks,
+with regards,
+Suman Tripathi
