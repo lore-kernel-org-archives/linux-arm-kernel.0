@@ -1,78 +1,48 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 05 May 2015 17:07:29 +0100
-Subject: [PATCH v7 05/15] dt-bindings: Document the STM32 reset bindings
-In-Reply-To: <1430840557.3035.60.camel@pengutronix.de>
-References: <1430410844-16062-1-git-send-email-mcoquelin.stm32@gmail.com>	
- <1430410844-16062-6-git-send-email-mcoquelin.stm32@gmail.com>	
- <55433467.2010603@linaro.org>	
- <CALszF6Bw900E9MtpaVmvkFxsrOODRkNg+RxRXz5V3WghHtsxbw@mail.gmail.com>	
- <5544A069.5000808@linaro.org>	
- <CALszF6BTb0Ce6jfT5gY4eEtSep6+8XqOxu1LbpUXHmPYX9PmgQ@mail.gmail.com>	
- <5548CEA2.8020807@linaro.org>	
- <CALszF6DyUA7Wr2qo4sASFBTRwwjhGAkFKRYnY+1UwHmf4nTj5w@mail.gmail.com>
- <1430840557.3035.60.camel@pengutronix.de>
-Message-ID: <5548EAC1.7010002@linaro.org>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Tue, 5 May 2015 11:09:38 -0500
+Subject: [V2 PATCH 2/5] arm64 : Introduce support for ACPI _CCA object
+In-Reply-To: <5126612.k0u2CL2zi5@wuerfel>
+References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1430838729-21572-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <5126612.k0u2CL2zi5@wuerfel>
+Message-ID: <5548EB42.5010800@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/15 16:42, Philipp Zabel wrote:
-> Am Dienstag, den 05.05.2015, 17:19 +0200 schrieb Maxime Coquelin:
->>>> For example, includes/dt-bindings/mfd/stm32f4-rcc.h would look like:
->>>>
->>>> #define GPIOA 0
->>>> #define GPIOB 1
->>>> ...
->>>> #define LTDC 186
->
-> That looks a bit fragile.
-> At least the defines for the indices should be properly namespaced,
-> check out include/dt-bindings/gpio/tegra-gpio.h for a similar case.
-
-Good point.
-
->>>> #define STM32F4_RESET(x) (x + 128)
->>>> #define STM32F4_CLOCK(x) (x + 384)
-
-Thinking more about this point, if we are going to follow hardware if 
-might be better to have:
-
-#define STM32F4_RCC_AHB1_GPIOA 0
-#define STM32F4_RCC_AHB1_GPIOA 1
-...
-#define STM32F4_RCC_APB2_LTDC 26
-
-
-#define STM32F4_AHB1_RESET(x) (STM32F4_RCC_AHB1_##x##_BIT + (0x10 * 8))
-#define STM32F4_AHB2_RESET(x) (STM32F4_RCC_AHB2_##x##_BIT + (0x14 * 8))
-...
-#define STM32F4_APB2_RESET(x) (STM32F4_RCC_APB2_##x##_BIT + (0x24 * 8))
-
-Its more typing (or copy 'n pasting) by at least every number now maps 
-directly to the datasheet.
-
-
->>>>
->>>> Then, in DT, a reset would be described like this:
->>>>
->>>> timer2 {
->>>>       resets = <&rcc STM32F4_RESET(TIM2)>;
->>>> };
->>>>
->>>> Phillip, Daniel, does that look acceptable to you?
->>>
->>>
->>> Doesn't look unreasonable.
->>>
->>> I am a little uneasy simply because there are very few similar header files
->>> in that directory but I haven't thought of a better idea.
+On 5/5/2015 10:44 AM, Arnd Bergmann wrote:
+> On Tuesday 05 May 2015 10:12:06 Suravee Suthikulpanit wrote:
+>> +struct dma_map_ops dummy_dma_ops = {
+>> +       .alloc                  = __dummy_alloc,
+>> +       .free                   = __dummy_free,
+>> +       .mmap                   = __dummy_mmap,
+>> +       .map_page               = __dummy_map_page,
+>> +       .unmap_page             = __dummy_unmap_page,
+>> +       .map_sg                 = __dummy_map_sg,
+>> +       .unmap_sg               = __dummy_unmap_sg,
+>> +       .sync_single_for_cpu    = __dummy_sync_single_for_cpu,
+>> +       .sync_single_for_device = __dummy_sync_single_for_device,
+>> +       .sync_sg_for_cpu        = __dummy_sync_sg_for_cpu,
+>> +       .sync_sg_for_device     = __dummy_sync_sg_for_device,
+>> +       .mapping_error          = __dummy_mapping_error,
+>> +       .dma_supported          = __dummy_dma_supported,
+>> +};
+>> +EXPORT_SYMBOL(dummy_dma_ops);
+>> +
 >>
->> Since this file will be shared by both clock and reset drivers, I
->> don't see better option.
->> I will implement it in v8 if Philipp agrees.
 >
-> Are the device tree maintainers happy with this idiom spreading?
-> Except for the point above, I think this is acceptable.
+> This will clearly work, but I think it's easier to just leave
+> the dma_mask pointer as NULL when creating the platform device,
+> which should let the normal dma ops fail all the callbacks.
 >
-> regards
-> Philipp
+> 	Arnd
 >
+
+However, codes in several places are making use of dma_map_ops without 
+checking if the ops are NULL (i.e. 
+include/asm-generic/dma-mapping-common.h and in arch-specific 
+implementation). If setting it to NULL is what we are planning to 
+support, we would need to scrub the current code to put NULL check. 
+Also, would you consider if that is safe to do going forward?
+
+Thanks,
+Suravee
