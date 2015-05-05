@@ -1,41 +1,69 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 5 May 2015 10:36:21 +0200
-Subject: [PATCH 1/6] mmc: davinci: Constify platform_device_id
-In-Reply-To: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <CAPDyKFrpTiztS1UrMQRXX4o9=s1L7qzX9JTdNNHQUrx5sa5aiA@mail.gmail.com>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Tue, 5 May 2015 14:12:32 +0530
+Subject: [PATCH v4 0/3] Add SDHCI support for APM X-Gene SoC using ARASAN
+ SDHCI controller.
+In-Reply-To: <CAPDyKFqva7jioEpf1qBv+sSo9-ZWU69+wb9qTF1X+4cxOgf2uQ@mail.gmail.com>
+References: <1430746792-32574-1-git-send-email-stripathi@apm.com>
+ <CAPDyKFqva7jioEpf1qBv+sSo9-ZWU69+wb9qTF1X+4cxOgf2uQ@mail.gmail.com>
+Message-ID: <CAOHikRAviwD=kPQpHeR5NCXdANWH8B+DqNW=qJQ0ACpeOppU2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 May 2015 at 17:49, Krzysztof Kozlowski <k.kozlowski.k@gmail.com> wrote:
-> The platform_device_id is not modified by the driver and core uses it as
-> const.
+On Tue, May 5, 2015 at 2:06 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 4 May 2015 at 15:39, Suman Tripathi <stripathi@apm.com> wrote:
+>> This patch adds the SDHCI support for APM X-Gene SoC using ARASAN SDHCI controller.
+>>
+>> v1 change:
+>>  * Use the CONFIG_ARM64_DMA_HAS_IOMMU for dma-mapping.
+>>
+>> v2 change:
+>>  * Drop the IOMMU support and switching to PIO mode for arasan.
+>>    controller integrated inside APM X-Gene SoC.
+>>
+>> v3 change:
+>>  * Change the sdhci-of-arasan.c to support arasan4.9a.
+>>  * Add quirks for arasan4.9a.
+>>
+>> v4 change:
+>>  * Cleanup the Documentation and dts.
+>>
+>> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+>> ---
+>>
+>> Suman Tripathi (3):
+>>   arm64: dts: Add the arasan sdhc nodes in apm-storm.dtsi.
+>>   mmc: host: arasan: Add the support for sdhci-arasan4.9a in
+>>     sdhci-of-arasan.c
+>>   Documentation: mmc: Update Arasan SDHC documentation to support 4.9a
+>>     version of     Arasan SDHC controller.
+>>
+>>  .../devicetree/bindings/mmc/arasan,sdhci.txt       |  3 +-
+>>  arch/arm64/boot/dts/apm-mustang.dts                |  4 ++
+>>  arch/arm64/boot/dts/apm-storm.dtsi                 | 44 ++++++++++++++++++++++
+>>  drivers/mmc/host/sdhci-of-arasan.c                 |  7 ++++
+>>  4 files changed, 57 insertions(+), 1 deletion(-)
+>>
 >
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> Thanks!
+>
+> I have applied patch2 and patch3. Though, I decided to squash them
+> into one patch and changed the commit message header a bit.
+>
+> I couldn't apply patch 1, so I guess that will be taken through arm soc?
 
-Thanks, applied all patches (1->6). The last one I updated the prefix
-in commit message header to "sdhci".
+why it couldn't be applied?? I made it in top of
 
-Kind regards
-Uffe
+git git://git.linaro.org/people/ulf.hansson/mmc.git
 
-> ---
->  drivers/mmc/host/davinci_mmc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Is this not correct ??
+
 >
-> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-> index 1625f908dc70..ea2a2ebc6b91 100644
-> --- a/drivers/mmc/host/davinci_mmc.c
-> +++ b/drivers/mmc/host/davinci_mmc.c
-> @@ -1161,7 +1161,7 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
->         mmc_davinci_reset_ctrl(host, 0);
->  }
->
-> -static struct platform_device_id davinci_mmc_devtype[] = {
-> +static const struct platform_device_id davinci_mmc_devtype[] = {
->         {
->                 .name   = "dm6441-mmc",
->                 .driver_data = MMC_CTLR_VERSION_1,
-> --
-> 2.1.4
->
+> Kind regards
+> Uffe
+
+
+
+-- 
+Thanks,
+with regards,
+Suman Tripathi
