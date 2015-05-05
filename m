@@ -1,167 +1,64 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 05 May 2015 12:46:32 +0100
-Subject: [PATCH v4 04/10] eeprom: Add a simple EEPROM framework for eeprom
- consumers
-In-Reply-To: <20150409144522.GB9663@codeaurora.org>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1427752670-17219-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20150407184533.GA10278@codeaurora.org> <55243982.7020907@linaro.org>
- <20150409144522.GB9663@codeaurora.org>
-Message-ID: <5548AD98.50801@linaro.org>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Tue,  5 May 2015 12:49:01 +0100
+Subject: [PATCH 0/7] ARM CCI-500 PMU driver support
+Message-ID: <1430826548-29960-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Sorry I took so long to reply.
+This series adds the support for CCI-500 PMU,  by
+reusing and rearranging the CCI-400 PMU driver code.
 
+CCI-500 (the new Cache Coherent Interconnect IP) has
+a PMU with 8 independent event counters and supports
+profiling events related to master/slave interfaces
+along with the global events(cci internal events).
 
-On 09/04/15 15:45, Stephen Boyd wrote:
-> On 04/07, Srinivas Kandagatla wrote:
->> On 07/04/15 19:45, Stephen Boyd wrote:
->>> On 03/30, Srinivas Kandagatla wrote:
->>>
->>> Do you have an overview of how to use these APIs? Maybe some
->>> Documentation/ is in order? I'm mostly interested in how the
->>> blocks array is supposed to work and how this hooks up to drivers
->>> that are using DT.
->>
->> Only doc ATM is function level kernel doc in c file.
->> May be I can explain you for now and I will try to add some
->> documentation with some usage examples in next version.
->
-> Thanks.
->
->>
->> eeprom block array is just another way intended to get hold of
->> eeprom content for non-DT providers/consumers, but DT
->> consumers/providers can also use it. As of today SOC/mach level code
->> could use it as well.
->>
->> In eeprom_cell_get() case the lookup of provider is done based on
->> provider name, this provider name is generally supplied by all the
->> providers (both DT/non DT).
->>
->> for example in qfprom case,
->> provider is registered from DT with eeprom config containing a unique name:
->> static struct eeprom_config econfig = {
->> 	.name = "qfprom",
->> 	.id = 0,
->> };
->>
->> In the consumer case, the tsens driver could do some like in non DT way:
->>
->> 	struct eeprom_block blocks[4] ={
->> 		{
->> 		.offset = 0x404,
->> 		.count = 0x4,
->> 		},
->> 		{
->> 		.offset = 0x408,
->> 		.count = 0x4,
->> 		},
->> 		{
->> 		.offset = 0x40c,
->> 		.count = 0x4,
->> 		},
->> 		{
->> 		.offset = 0x410,
->> 		.count = 0x4,
->> 		},
->> 	};
->> 	calib_cell = eeprom_cell_get("qfprom0", blocks, 4);
->>
->>
->> Or in DT way
->> calib_cell  = of_eeprom_cell_get(np, "calib");
->>
->
-> Ok. I guess I was hoping for a more device centric approach like
-> we have for clks/regulators/etc. That way a driver doesn't need
-> to know it's using DT or not to figure out which API to call.
+The series also adds aliases for events for all the
+supported CCI PMUs(CCI_400{r0,r1}, CCI_500).
 
-That would be the best. Its easy to wrap up whats in eeprom core to
-eeprom_get_cell(dev, "cell-name") for both DT and non-dt cases, if I
-remove the nasty global name space thing.
+Patches 1/7 is a fix posted by Mark Salter, which has
+been posted to arm at kernel.org already. I have included
+it in this series, as this series applies on top of it.
 
-Only thing which is limiting it is the existing bindings which are just 
-phandle based. For eeprom to be more of device centric we need more
-generic bindings/property names like
+Patches 2-5 - Creates an abstraction of a CCI PMU and
+makes the CCI-400 driver code to make use of the abstraction.
+Patch 6 - Adds the CCI-500 PMU driver support
+Patch 7 - Adds the aliases for CCI PMU events (specific to chipsets).
 
-nvrom-cell = <&abc>, <&edf>
-nvrom-cell-names = "cell1", "cell2";
+With the series, one can use named events for the CCI pmus.
 
-Also we can have name associated to each eeprom cell which would help 
-for non-dt cases. So they can just lookup by the cell name.
+e.g, CCI-400
 
+ # perf list | grep CCI
+  CCI_400/cycles/                                    [Kernel PMU event]
+  CCI_400/mi_retry_speculative_fetch,source=?/       [Kernel PMU event]
 
-Sacha, Are you ok with such binding?  As this can provide a single 
-interface for dt and non-dt. I remember you requested for changing from 
-generic properties to specific property names.
+e.g, CCI-500
 
+ # perf list |grep CCI
+  CCI_500/cci_rq_stall_address_hazard/               [Kernel PMU event]
+  CCI_500/cci_snoop_access_filter_bank_0_1/          [Kernel PMU event]
 
-> Also the global namespace is sort of worrying (qfprom0 part). How
-> do we know it's qfprom0? What if it's qfprom1 sometimes?
+Testing was performed on a fast model, with perf fuzzer and functional
+tests for the CCI-500 PMU.
 
-I agree this is something which I don't like it in the first place too.
-If we have something like names associated to each eeprom cell like clks
-or regulators we can have some thing like eeprom_get_cell(dev, name);
+Mark Salter (1):
+  drivers: CCI: fix used_mask init in validate_group()
 
->
-> Also, how are we supposed to encode certain bits inside the
-> stream of bytes (blocks)? In some situations (e.g. the qcom CPR
-> stuff) we have quite a few fuse bits we need to read that are
-> packed into different bytes and may cross byte boundaries (i.e.
-> bits 6 to 10 of a 32-bit word). The current API looks to be byte
-> focused when I have bit based/non-byte aligned data.
-Yes, it is more of byte oriented. However we can add some new apis for
-parsers like ones you are working on.
+Suzuki K. Poulose (6):
+  arm-cci: Cleanup PMU driver code
+  arm-cci: Abstract out the PMU counter details
+  arm-cci: Abstract handling for CCI events
+  arm-cci: Sanitise CCI400 PMU driver specific code
+  arm-cci: Add CCI-500 PMU support
+  arm-cci: Add aliases for PMU events
 
-of_eeprom_get_provider_regmap(phandle) just to get handle to regmap from 
-eeprom_core, which would provide most of the apis you would need.
-Am guessing eeprom parsers would need need such interface to eeprom-core 
-in future anyway.
+ Documentation/devicetree/bindings/arm/cci.txt |    4 +-
+ drivers/bus/Kconfig                           |   17 +
+ drivers/bus/arm-cci.c                         |  905 ++++++++++++++++++++-----
+ 3 files changed, 756 insertions(+), 170 deletions(-)
 
->
-> My current feeling is that I don't want to use any of the block
-> stuff at all. I just want a simple byte-based API that allows me
-> to read a number of contiguous bytes from the fuses. Then I'll
-> need to shift that data down by a few bits and mask it with the
-> width of the data I want to read to extract the data needed.
->
-> The only thing after that where I have a problem is figuring out
-> which eeprom is present in the consumer driver. I think I may
-> need to open-code it and look at the phandle for the eeprom and
-> do a compatible check to figure out which bits I want to read.
->
-> The DT would be like this (note I left eeprom-cells/eeproms here
-> because that allows us to generically find eeproms used by a
-> device and find eeprom providers):
-
-I though, having "eeprom-cells" would be make sense only if the bindings 
-have possible arguments to a phandle. In this case it would be none all 
-the time.
-
-For provider lookups currently its generic/easy and fast as its done 
-based on eeprom class. Am not sure what advantage would we get
-Am I missing anything ?
-
-If you are ok I will prepare a v5 with the proposed changes.
-
-
---srini
->
-> 	qfprom: eeprom at 58000 {
-> 		compatible = "qcom,qfprom-msm8916";
-> 		reg = <0x58000 0x7000>;
-> 		#eeprom-cells = <0>;
-> 	};
-> 	
-> 	cpr at b018000 {
-> 		compatible = "qcom,cpr";
-> 		reg = <0xb018000 0x1000>;
-> 		interrupts = <0 15 1>, <0 16 1>, <0 17 1>;
-> 		eeproms = <&qfprom>;
-> 		...
-> 	};
->
+-- 
+1.7.9.5
