@@ -1,48 +1,121 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 5 May 2015 21:31:18 +0800
-Subject: [PATCH v3 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <1430800212-6970-1-git-send-email-bintian.wang@huawei.com>
-References: <1430800212-6970-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <CAD6h2NQ2OCJmQhBG+-zT-dL=YJtpAk5T_1_m8C8SKm0RCg_D0Q@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 5 May 2015 16:33:04 +0300
+Subject: [PATCH 1/2] ARM: OMAP4+: PRM: add support for passing status
+ register/bit info to reset
+In-Reply-To: <1430832785-1976-1-git-send-email-t-kristo@ti.com>
+References: <1430832785-1976-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1430832785-1976-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 May 2015 at 12:30, Bintian Wang <bintian.wang@huawei.com> wrote:
-> Hi6220 is one mobile solution of Hisilicon, this patchset contains
-> initial support for Hi6220 SoC and HiKey development board, which
-> supports octal ARM Cortex A53 cores. Initial support is minimal and
-> includes just the arch configuration, clock driver, device tree
-> configuration.
->
-> PSCI is enabled in device tree and there is no problem to boot all the
-> octal cores, and the CPU hotplug is also working now, you can download
-> and compile the latest firmware based on the following link to run this
-> patch set:
-> https://github.com/96boards/documentation/wiki/UEFI
->
-> Changes v3:
-> * Verified the CPU hotplug based on the new released firmware
-> * Redefined the compatible strings of four system controllers in dts
-> * Setting COMMON_CLK_HI6220 to a bool symbol
-> * Keep CONFGI_ARCH_HISI sorted alphabetically
->
-> Changes v2:
-> * Split the DT bindings documents into earlier patches
-> * Change SMP enable method from spin-table to PSCI in device tree
-> * Remove "clock-frequency" from armv8-timer device node in device tree
-> * Add more description about Hisilicon designed system controllers
->   in DT bindings document
-> * Enable high speed clock on UART1 mux
-> * Other changes based on the discussion in the mailing list:
->   https://lkml.org/lkml/2015/2/5/147
->
-> Bintian Wang (5):
->   arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
->   arm64: hi6220: Document devicetree bindings for Hisilicon hi6220 SoC
->   clk: hi6220: Document devicetree bindings for hi6220 clock
->   clk: hi6220: Clock driver support for Hisilicon hi6220 SoC
->   arm64: dts: Add dts files for Hisilicon Hi6220 SoC
->
->
+AM43xx has slightly different reset register layout compared to OMAP4+,
+with varying status bit shifts and status register offsets. Current
+code assumes static offsets and identical status / reset control bit
+shifts, which is wrong. This patch adds PRM core support for passing
+the actual implementations from hwmod code. AM43xx mappings will be fixed
+in subsequent patch.
 
-Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Reported-by: Dave Gerlach <d-gerlach@ti.com>
+Reported-by: Anna Suman <s-anna@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c  |   12 ++++++++++--
+ arch/arm/mach-omap2/prminst44xx.c |   20 +++++++-------------
+ 2 files changed, 17 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 355b089..e482562 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -171,6 +171,12 @@
+  */
+ #define LINKS_PER_OCP_IF		2
+ 
++/*
++ * Address offset (in bytes) between the reset control and the reset
++ * status registers: 4 bytes on OMAP4
++ */
++#define OMAP4_RST_CTRL_ST_OFFSET	4
++
+ /**
+  * struct omap_hwmod_soc_ops - fn ptrs for some SoC-specific operations
+  * @enable_module: function to enable a module (via MODULEMODE)
+@@ -3016,10 +3022,12 @@ static int _omap4_deassert_hardreset(struct omap_hwmod *oh,
+ 	if (ohri->st_shift)
+ 		pr_err("omap_hwmod: %s: %s: hwmod data error: OMAP4 does not support st_shift\n",
+ 		       oh->name, ohri->name);
+-	return omap_prm_deassert_hardreset(ohri->rst_shift, 0,
++	return omap_prm_deassert_hardreset(ohri->rst_shift, ohri->rst_shift,
+ 					   oh->clkdm->pwrdm.ptr->prcm_partition,
+ 					   oh->clkdm->pwrdm.ptr->prcm_offs,
+-					   oh->prcm.omap4.rstctrl_offs, 0);
++					   oh->prcm.omap4.rstctrl_offs,
++					   oh->prcm.omap4.rstctrl_offs +
++					   OMAP4_RST_CTRL_ST_OFFSET);
+ }
+ 
+ /**
+diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
+index c4859c4..d0b15db 100644
+--- a/arch/arm/mach-omap2/prminst44xx.c
++++ b/arch/arm/mach-omap2/prminst44xx.c
+@@ -87,12 +87,6 @@ u32 omap4_prminst_rmw_inst_reg_bits(u32 mask, u32 bits, u8 part, s16 inst,
+ 	return v;
+ }
+ 
+-/*
+- * Address offset (in bytes) between the reset control and the reset
+- * status registers: 4 bytes on OMAP4
+- */
+-#define OMAP4_RST_CTRL_ST_OFFSET		4
+-
+ /**
+  * omap4_prminst_is_hardreset_asserted - read the HW reset line state of
+  * submodules contained in the hwmod module
+@@ -141,11 +135,11 @@ int omap4_prminst_assert_hardreset(u8 shift, u8 part, s16 inst,
+  * omap4_prminst_deassert_hardreset - deassert a submodule hardreset line and
+  * wait
+  * @shift: register bit shift corresponding to the reset line to deassert
+- * @st_shift: status bit offset, not used for OMAP4+
++ * @st_shift: status bit offset corresponding to the reset line
+  * @part: PRM partition
+  * @inst: PRM instance offset
+  * @rstctrl_offs: reset register offset
+- * @st_offs: reset status register offset, not used for OMAP4+
++ * @rstst_offs: reset status register offset
+  *
+  * Some IPs like dsp, ipu or iva contain processors that require an HW
+  * reset line to be asserted / deasserted in order to fully enable the
+@@ -157,11 +151,11 @@ int omap4_prminst_assert_hardreset(u8 shift, u8 part, s16 inst,
+  * of reset, or -EBUSY if the submodule did not exit reset promptly.
+  */
+ int omap4_prminst_deassert_hardreset(u8 shift, u8 st_shift, u8 part, s16 inst,
+-				     u16 rstctrl_offs, u16 st_offs)
++				     u16 rstctrl_offs, u16 rstst_offs)
+ {
+ 	int c;
+ 	u32 mask = 1 << shift;
+-	u16 rstst_offs = rstctrl_offs + OMAP4_RST_CTRL_ST_OFFSET;
++	u32 st_mask = 1 << st_shift;
+ 
+ 	/* Check the current status to avoid de-asserting the line twice */
+ 	if (omap4_prminst_is_hardreset_asserted(shift, part, inst,
+@@ -169,13 +163,13 @@ int omap4_prminst_deassert_hardreset(u8 shift, u8 st_shift, u8 part, s16 inst,
+ 		return -EEXIST;
+ 
+ 	/* Clear the reset status by writing 1 to the status bit */
+-	omap4_prminst_rmw_inst_reg_bits(0xffffffff, mask, part, inst,
++	omap4_prminst_rmw_inst_reg_bits(0xffffffff, st_mask, part, inst,
+ 					rstst_offs);
+ 	/* de-assert the reset control line */
+ 	omap4_prminst_rmw_inst_reg_bits(mask, 0, part, inst, rstctrl_offs);
+ 	/* wait the status to be set */
+-	omap_test_timeout(omap4_prminst_is_hardreset_asserted(shift, part, inst,
+-							      rstst_offs),
++	omap_test_timeout(omap4_prminst_is_hardreset_asserted(st_shift, part,
++							      inst, rstst_offs),
+ 			  MAX_MODULE_HARDRESET_WAIT, c);
+ 
+ 	return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
+-- 
+1.7.9.5
