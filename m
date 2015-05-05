@@ -1,35 +1,29 @@
-From: ydroneaud@opteya.com (Yann Droneaud)
-Date: Tue, 05 May 2015 12:05:15 +0200
-Subject: Device Tree Blob (DTB) licence
-Message-ID: <1430820315.19516.26.camel@opteya.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 05 May 2015 12:16:04 +0200
+Subject: [PATCH v3 1/3] iio: adc: add support for Berlin
+In-Reply-To: <20150505091635.GF11312@kwain>
+References: <1430730384-11318-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1430730384-11318-2-git-send-email-antoine.tenart@free-electrons.com>
+ <55479C77.4070305@kernel.org> <20150505091635.GF11312@kwain>
+Message-ID: <55489864.1030703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05.05.2015 11:16, Antoine Tenart wrote:
+> On Mon, May 04, 2015 at 05:21:11PM +0100, Jonathan Cameron wrote:
+>> On 04/05/15 10:06, Antoine Tenart wrote:
+> [...]
+>> Also, I'm travelling and without internet so can't look it up directly.
+>> So.. On the basis I'll forget to check later..  What is the status
+>> of the two series you say this is based upon?
+>
+> These two series haven't been taken yet, but they should be merged in
+> the next merge window (at least that's what we aim). Sebastian may have
+> more information on this matter.
 
-I believe Device Tree Blob (.dtb file) built from kernel's Device Tree 
-Sources (.dts, which #include .dtsi, which #include .h) using Device 
-Tree Compiler (dtc) are covered by GNU General Public Licence v2 
-(GPLv2), but cannot find any reference.
+I am awaiting Acked-by's for the series by pinctrl and clk maintainers.
+If this binding, i.e. patches 2 and 3, are fine too, I suggest to take
+the driver and I'll apply the latter patches once the series above are
+worked out.
 
-As most .dtsi in arch/arm/boot/dts/ are covered by GPLv2, and,
-as most .h in include/dt-bindings/ are also covered by GPLv2,
-the source code is likely covered by GPLv2.
-
-Then this source code is translated in a different language (flattened 
-device tree), so the resulting translation is also likely covered by 
-GPLv2.
-
-So, when I'm proposed to download a .dtb file from a random vendor,
-can I require to get the associated source code ?
-
-Anyway, for a .dtb file generated from kernel sources, it's rather 
-painful to look after all .dts, .dtsi, .h, to find what kind of 
-licences are applicables, as some are covered by BSD, dual licensed 
-(any combination of X11, MIT, BSD, GPLv2).
-
-Regards.
-
--- 
-Yann Droneaud
-OPTEYA
+Sebastian
