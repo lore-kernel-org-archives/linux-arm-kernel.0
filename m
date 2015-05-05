@@ -1,30 +1,75 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 5 May 2015 14:04:40 +0200
-Subject: [PATCH 4/9] ARM: tegra: add Tegra30 HDA support
-In-Reply-To: <0fd7107ec51f0a359d4c395c243bcd12f8731cd5.1428700856.git.marcel.ziswiler@toradex.com>
-References: <cover.1428700856.git.marcel.ziswiler@toradex.com>
- <0fd7107ec51f0a359d4c395c243bcd12f8731cd5.1428700856.git.marcel.ziswiler@toradex.com>
-Message-ID: <20150505120439.GD30501@ulmo.nvidia.com>
+From: bintian.wang@huawei.com (Bintian Wang)
+Date: Tue, 5 May 2015 20:06:34 +0800
+Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+Message-ID: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:35:59PM +0200, Marcel Ziswiler wrote:
-> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> 
-> Add a device node for the HDA controller found on Tegra30.
-> 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> ---
->  arch/arm/boot/dts/tegra30.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+Hi6220 is one mobile solution of Hisilicon, this patchset contains
+initial support for Hi6220 SoC and HiKey development board, which
+supports octal ARM Cortex A53 cores. Initial support is minimal and
+includes just the arch configuration, clock driver, device tree
+configuration.
 
-Applied, thanks.
+PSCI is enabled in device tree and there is no problem to boot all the
+octal cores, and the CPU hotplug is also working now, you can download
+and compile the latest firmware based on the following link to run this
+patch set:
+https://github.com/96boards/documentation/wiki/UEFI 
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/ae35d720/attachment.sig>
+Changes v4:
+* Rebase to kernel 4.1-rc1
+* Delete "arm,cortex-a15-gic" from the gic node in dts 
+
+Changes v3:
+* Verified the CPU hotplug based on the new released firmware
+* Redefined the compatible strings of four system controllers in dts 
+* Setting COMMON_CLK_HI6220 to a bool symbol
+* Keep CONFGI_ARCH_HISI sorted alphabetically
+
+Changes v2:
+* Split the DT bindings documents into earlier patches
+* Change SMP enable method from spin-table to PSCI in device tree
+* Remove "clock-frequency" from armv8-timer device node in device tree
+* Add more description about Hisilicon designed system controllers
+  in DT bindings document
+* Enable high speed clock on UART1 mux
+* Other changes based on the discussion in the mailing list:
+  https://lkml.org/lkml/2015/2/5/147
+
+Bintian Wang (5):
+  arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
+  arm64: hi6220: Document devicetree bindings for Hisilicon hi6220 SoC
+  clk: hi6220: Document devicetree bindings for hi6220 clock
+  clk: hi6220: Clock driver support for Hisilicon hi6220 SoC
+  arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |  87 ++++++
+ .../devicetree/bindings/clock/hi6220-clock.txt     |  34 +++
+ arch/arm64/Kconfig                                 |   5 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/hisilicon/Makefile             |   5 +
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  31 +++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 172 ++++++++++++
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/clk/Kconfig                                |   2 +
+ drivers/clk/Makefile                               |   4 +-
+ drivers/clk/hisilicon/Kconfig                      |   6 +
+ drivers/clk/hisilicon/Makefile                     |   3 +-
+ drivers/clk/hisilicon/clk-hi6220.c                 | 292 +++++++++++++++++++++
+ drivers/clk/hisilicon/clk.c                        |  29 ++
+ drivers/clk/hisilicon/clk.h                        |  17 ++
+ drivers/clk/hisilicon/clkdivider-hi6220.c          | 273 +++++++++++++++++++
+ include/dt-bindings/clock/hi6220-clock.h           | 173 ++++++++++++
+ 17 files changed, 1131 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
+ create mode 100644 arch/arm64/boot/dts/hisilicon/Makefile
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+ create mode 100644 drivers/clk/hisilicon/Kconfig
+ create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
+ create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
+ create mode 100644 include/dt-bindings/clock/hi6220-clock.h
+
+-- 
+1.9.1
