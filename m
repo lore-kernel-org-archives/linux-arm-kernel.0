@@ -1,38 +1,69 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 5 May 2015 14:41:21 -0500
-Subject: [PATCH v5 1/1] arm64: dts: Add the arasan sdhc nodes in
- apm-storm.dtsi.
-In-Reply-To: <1430817426-5241-2-git-send-email-stripathi@apm.com>
-References: <1430817426-5241-1-git-send-email-stripathi@apm.com>
- <1430817426-5241-2-git-send-email-stripathi@apm.com>
-Message-ID: <CAL_JsqK0pCtL2pbG7RttYd7BDxQHxdECHN_9X9MpLTuVEOxzsQ@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 05 May 2015 12:53:09 -0700
+Subject: [PATCH] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to
+ SDRAM.
+In-Reply-To: <55491A12.3070608@wwwdotorg.org>
+References: <1430768034-12734-1-git-send-email-eric@anholt.net>
+ <55491A12.3070608@wwwdotorg.org>
+Message-ID: <87wq0mol7e.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 5, 2015 at 4:17 AM, Suman Tripathi <stripathi@apm.com> wrote:
-> This patch adds the arasan sdhc nodes to reuse the of-arasan
-> driver for APM X-Gene SoC.
+Stephen Warren <swarren@wwwdotorg.org> writes:
+
+> On 05/04/2015 01:33 PM, Eric Anholt wrote:
+>> There exists a tiny MMU, configurable only by the VC (running the
+>> closed firmware), which maps from the ARM's physical addresses to bus
+>> addresses.  These bus addresses determine the caching behavior in the
+>> VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
+>> 2 bits.  The bits in the bus address mean:
+>>
+>>  From the VideoCore processor:
+>> 0x0... L1 and L2 cache allocating and coherent
+>> 0x4... L1 non-allocating, but coherent. L2 allocating and coherent
+>> 0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
+>> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+>>
+>>  From the GPU peripherals (note: all peripherals bypass the L1
+>> cache. The ARM will see this view once through the VC MMU):
+>> 0x0... Do not use
+>> 0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
+>> 0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
+>> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+>>
+>> The 2835 firmware always configures the MMU to turn ARM physical
+>> addresses with 0x0 top bits to 0x4, meaning present in L2 but
+>> incoherent with L1.  However, any bus addresses we were generating in
+>> the kernel to be passed to a device had 0x0 bits.  That would be a
+>> reserved (possibly totally incoherent) value if sent to a GPU
+>> peripheral like USB, or L1 allocating if sent to the VC (like a
+>> firmware property request).  By setting dma-ranges, all of the devices
+>> below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
+>> friends return addresses with 0x4 bits and avoid cache incoherency.
+>>
+>> This matches the behavior in the downstream 2708 kernel (see
+>> BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
 >
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->  arch/arm64/boot/dts/apm/apm-mustang.dts |  4 +++
->  arch/arm64/boot/dts/apm/apm-storm.dtsi  | 44 +++++++++++++++++++++++++++++++++
->  2 files changed, 48 insertions(+)
-
-[...]
-
-> @@ -533,6 +567,16 @@
->                         interrupts = <0x0 0x4f 0x4>;
->                 };
+>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
 >
-> +               sdhc0: sdhc at 1c000000 {
-> +                       device_type = "sdhc";
+>>   		#address-cells = <1>;
+>>   		#size-cells = <1>;
+>>   		ranges = <0x7e000000 0x20000000 0x02000000>;
+>> +		dma-ranges = <0x40000000 0x00000000 0x1f000000>;
+>
+> Oh well that's a nice and simple patch; I had been avoiding looking into 
+> fixing the kernel for this since I was worried it'd be rather complex!
+>
+> I'm puzzled why the length cell of ranges and dma-ranges differs though? 
+> Assuming there's a good explanation for that,
 
-device_type generally should not be used (there are a few exceptions).
-
-> +                       compatible = "arasan,sdhci-4.9a";
-
-If you ever have an integration or xgene specific problem, you need a
-chip specific compatible.
-
-Rob
+Nope, you're right, it should be 0x20000000.  '0x1f' came from going
+back from the '0x3f' on the pi2, but pi2 just has a chunk lost to the
+bus mapping.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/67d252b1/attachment.sig>
