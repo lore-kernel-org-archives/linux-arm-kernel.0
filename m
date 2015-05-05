@@ -1,106 +1,70 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 06 May 2015 06:23:35 +0900
-Subject: [GIT PULL] ARM: EXYNOS: Fixes and improvements for v4.2
-In-Reply-To: <1430548284-23827-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430548284-23827-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <554934D7.2030903@kernel.org>
+Date: Wed, 06 May 2015 06:35:34 +0900
+Subject: [RESEND-v2-PATCH] ARM: dts: Add missing irq pinctrl for max77686
+ on smdk5250
+In-Reply-To: <1430800796-30960-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1430800796-30960-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <554937A6.1030906@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/15 15:31, Krzysztof Kozlowski wrote:
-> Dear Kukjin,
+On 05/05/15 13:39, Pankaj Dubey wrote:
+> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
 > 
-Hi Krzysztof,
+> This patch adds pinctrl configuration for using configuring gpx3-2 as an
+> external interrupt from max77686. Though max77686 RTC is enabled and gets
+> probed by default, it doesnt work as its unable to get interrupt.
+> 
+> This patch makes max77686 RTC work and also configures it as wakeup source.
+> 
+> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> [pankaj.dubey: resubmitted after rebasing to latest kgene tree]
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+> Initial version of this patch was part of following series, though
+> they are not dependent on each other, resubmitting after rebasing
+> and detaching second one from first patch in the series [1]
+> 
+> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303652.html
+> 
+> v2:
+>  -Included my Signed-off-by for touching this patch.
+>  -Included Acked-by from Krzysztof Kozlowski.
+> 
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index bc27cc2..4fe186d 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -131,6 +131,9 @@
+>  		reg = <0x09>;
+>  		interrupt-parent = <&gpx3>;
+>  		interrupts = <2 IRQ_TYPE_NONE>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&max77686_irq>;
+> +		wakeup-source;
+>  
+>  		voltage-regulators {
+>  			ldo1_reg: LDO1 {
+> @@ -410,3 +413,12 @@
+>  		};
+>  	};
+>  };
+> +
+> +&pinctrl_0 {
+> +	max77686_irq: max77686-irq {
+> +		samsung,pins = "gpx3-2";
+> +		samsung,pin-function = <0xf>;
+> +		samsung,pin-pud = <0>;
+> +		samsung,pin-drv = <0>;
+> +	};
+> +};
 
-> This groups important fixes and typical improvements for Exynos
-> SoC for next v4.2 merge window.
-> 
-> I hope you will find useful grouping these commits together.
-> 
-> Everything can be also found on github:
-> https://github.com/krzk/linux
-> Branches:
-> 1. fixes-samsung
-> 2. for-next-samsung
-> 
-> 
-> If you have any comments, do not hesitate as I would welcome any feedback.
-> I can also split it into separate fixes and normal updates if you want.
-> 
-Thanks for your kind reminder and I'll take these series after looking
-at them within a couple of days. Sorry for the late response and the
-fixes will be handled before -rc3.
-
-Thanks.
+Applied, thanks.
 
 - Kukjin
-
-> 
-> Description:
-> 1. Fix second suspend to RAM on Trats2 board. This has shown up
->    after enabling L2 cache but actually the "use delayed reset
->    assertion" is to be blamed.
-> 2. Fix imprecise external abort on Exynos5420 boards when exynos-dp
->    driver tries to access the DP controller registers and the PD
->    was turned off.
-> 3. Various fixes for missing return checks in power domain code.
-> 4. Fix RTC alarm on Arndale Octa board.
-> 5. Improvements of reparenting clocks on power domain on/off.
-> 6. Enabling S3C RTC on various boards.
-> 
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> ----------------------------------------------------------------
-> The following changes since commit 5d5443b9c3bac7231ae473c01bcfe4c7650b13c5:
-> 
->   Merge branch 'v4.1-next/mach-samsung' into for-next (2015-03-27 02:36:43 +0900)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/krzk/linux.git for-next-samsung
-> 
-> for you to fetch changes up to c06f3b9943fbea71ad921ea614e331f571d59c02:
-> 
->   ARM: dts: Enable S3C RTC on Trats2 and Arndale Octa (2015-05-02 15:02:50 +0900)
-> 
-> ----------------------------------------------------------------
-> Javier Martinez Canillas (1):
->       ARM: dts: Make DP a consumer of DISP1 power domain on Exynos5420
-> 
-> Krzysztof Kozlowski (11):
->       ARM: EXYNOS: Handle of of_iomap() failure
->       ARM: EXYNOS: Handle of_find_device_by_node and kstrdup failures
->       ARM: EXYNOS: Add missing of_node_put() when parsing power domains
->       ARM: dts: Fix pinctrl settings for S2MPS11 RTC alarm IRQ on Arndale Octa
->       ARM: EXYNOS: Fix failed second suspend on Exynos4
->       ARM: EXYNOS: Get current parent clock for power domain on/off
->       ARM: dts: Use last parent for clocks during power domain on/off
->       ARM: dts: s3c-rtc: Use s3c6410-rtc instead of exynos3250-rtc
->       ARM: dts: Use define for s3c-rtc clock id
->       ARM: dts: Use define for s3c-rtc clock id
->       ARM: dts: Enable S3C RTC on Trats2 and Arndale Octa
-> 
-> Markus Reichl (1):
->       ARM: dts: Add bindings for 32kHz clocks from s2mps11
-> 
->  .../bindings/arm/exynos/power_domain.txt           |  7 ++--
->  Documentation/devicetree/bindings/rtc/s3c-rtc.txt  |  3 +-
->  arch/arm/boot/dts/exynos3250-monk.dts              |  3 +-
->  arch/arm/boot/dts/exynos3250-rinato.dts            |  3 +-
->  arch/arm/boot/dts/exynos3250.dtsi                  |  2 +-
->  arch/arm/boot/dts/exynos4.dtsi                     |  2 +-
->  arch/arm/boot/dts/exynos4412-trats2.dts            |  9 ++++-
->  arch/arm/boot/dts/exynos4415.dtsi                  |  2 +-
->  arch/arm/boot/dts/exynos5420-arndale-octa.dts      | 24 ++++++++++---
->  arch/arm/boot/dts/exynos5420.dtsi                  | 14 +++-----
->  arch/arm/mach-exynos/common.h                      |  2 ++
->  arch/arm/mach-exynos/exynos.c                      | 27 +++++++++++++++
->  arch/arm/mach-exynos/platsmp.c                     | 39 ++--------------------
->  arch/arm/mach-exynos/pm_domains.c                  | 37 ++++++++++++++------
->  arch/arm/mach-exynos/suspend.c                     |  3 ++
->  include/dt-bindings/clock/samsung,s2mps11.h        | 23 +++++++++++++
->  16 files changed, 129 insertions(+), 71 deletions(-)
->  create mode 100644 include/dt-bindings/clock/samsung,s2mps11.h
