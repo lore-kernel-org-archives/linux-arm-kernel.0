@@ -1,38 +1,43 @@
-From: nerv@dawncrow.de (=?windows-1252?Q?Andr=E9_Hentschel?=)
-Date: Tue, 05 May 2015 19:09:57 +0200
-Subject: [PATCH] arm64: Preserve the user r/w register tpidr_el0 on context
- switch and fork in compat mode
-In-Reply-To: <20150505105111.GB1550@arm.com>
-References: <55464BB2.7030401@dawncrow.de> <20150505105111.GB1550@arm.com>
-Message-ID: <5548F965.9070302@dawncrow.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 5 May 2015 18:12:52 +0100
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <20150504121209.GM15510@sirena.org.uk>
+ <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
+ <20150505105714.GA22845@sirena.org.uk>
+ <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
+Message-ID: <20150505171252.GI22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 05.05.2015 um 12:51 schrieb Will Deacon:
-> On Sun, May 03, 2015 at 05:24:18PM +0100, Andr? Hentschel wrote:
->> From: Andr? Hentschel <nerv@dawncrow.de>
->>
->> Since commit a4780adeefd042482f624f5e0d577bf9cdcbb760 the user writeable TLS
->> register on ARM is preserved per thread.
->>
->> This patch does it analogous to the ARM patch, but for compat mode on ARM64.
->>
->> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Jonathan Austin <jonathan.austin@arm.com> 
->>
->> ---
->> This patch is against Linux 4.1-rc1 (b787f68c36d49bb1d9236f403813641efa74a031)
-> 
-> Curious, but why do you need this? iirc, we added this for arch/arm/ because
-> of some windows rt (?) emulation in wine. Is that still the case here and is
-> anybody actually using that?
+On Tue, May 05, 2015 at 05:13:33PM +0530, Viresh Kumar wrote:
+> On 5 May 2015 at 16:27, Mark Brown <broonie@kernel.org> wrote:
 
-Yes, Windows ARM binaries are the well known use case, but also the compat mode should do
-what the arm kernel is doing I?d think and the code wasn't adjusted yet.
+> > No, it doesn't - you're not answering the question about what this is
+> > for.
 
-What i'm curious about is why the main TLS register on arm64 is the user writeable,
-I'm not an security expert but this looks odd. I could easily provoke a crash by writing
-to it...
+> I don't know how this information will be used finally. Probably the
+> platform driver will do the configuration based on the volt-cur pair.
 
-CCing Catalin Marinas
+I don't think we should be defining a binding without understanding what
+it is supposed to mean.  
+
+>  - opp-microamp: current in micro Amperes. It can contain entries for multiple
+> -  regulators.
+> +  regulators. This can be referenced (along with voltage and freqency) while
+> +  programming the regulator.
+
+This still doesn't say what the value is supposed to mean which means
+it's not possible for someone to write generic code which handles the
+binding - saying that people can reference the value doesn't tell them
+how to interpret it.  A limit?  A nominal constant draw value?  A value
+to regulate to?  Those are all different things expressed as a current.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/6b7a3b0d/attachment.sig>
