@@ -1,33 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 5 May 2015 17:45:17 +0200
-Subject: [PATCH v2 0/2] pinctrl for NXP LPC18xx family
-In-Reply-To: <1430172849-3147-1-git-send-email-manabian@gmail.com>
-References: <1430172849-3147-1-git-send-email-manabian@gmail.com>
-Message-ID: <CACRpkda+U=TwtX76G2bL4hEHF0-dhS4NP40TGTXeU6wayarDCA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 5 May 2015 16:48:30 +0100
+Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <554851CB.2010909@linaro.org>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <55363791.4070706@hitachi.com> <553AB222.50609@redhat.com>
+ <553EF74D.8020706@redhat.com> <20150429102346.GK8236@arm.com>
+ <55442BFA.50101@redhat.com> <554851CB.2010909@linaro.org>
+Message-ID: <20150505154830.GI1550@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 28, 2015 at 12:14 AM, Joachim Eastwood <manabian@gmail.com> wrote:
+On Tue, May 05, 2015 at 06:14:51AM +0100, David Long wrote:
+> On 05/01/15 21:44, William Cohen wrote:
+> > Dave Long and I did some additional experimentation to better
+> > understand what is condition causes the kernel to sometimes spew:
+> >
+> > Unexpected kernel single-step exception at EL1
+> >
+> > The functioncallcount.stp test instruments the entry and return of
+> > every function in the mm files, including kfree.  In most cases the
+> > arm64 trampoline_probe_handler just determines which return probe
+> > instance matches the current conditions, runs the associated handler,
+> > and recycles the return probe instance for another use by placing it
+> > on a hlist.  However, it is possible that a return probe instance has
+> > been set up on function entry and the return probe is unregistered
+> > before the return probe instance fires.  In this case kfree is called
+> > by the trampoline handler to remove the return probe instances related
+> > to the unregistered kretprobe.  This case where the the kprobed kfree
+> > is called within the arm64 trampoline_probe_handler function trigger
+> > the problem.
+> >
+> > The kprobe breakpoint for the kfree call from within the
+> > trampoline_probe_handler is encountered and started, but things go
+> > wrong when attempting the single step on the instruction.
+> >
+> > It took a while to trigger this problem with the sytemtap testsuite.
+> > Dave Long came up with steps that reproduce this more quickly with a
+> > probed function that is always called within the trampoline handler.
+> > Trying the same on x86_64 doesn't trigger the problem.  It appears
+> > that the x86_64 code can handle a single step from within the
+> > trampoline_handler.
+> >
+> 
+> I'm assuming there are no plans for supporting software breakpoint debug 
+> exceptions during processing of single-step exceptions, any time soon on 
+> arm64.  Given that the only solution that I can come with for this is 
+> instead of making this orphaned kretprobe instance list exist only 
+> temporarily (in the scope of the kretprobe trampoline handler), make it 
+> always exist and kfree any items found on it as part of a periodic 
+> cleanup running outside of the handler context.  I think these changes 
+> would still all be in archiecture-specific code.  This doesn't feel to 
+> me like a bad solution.  Does anyone think there is a simpler way out of 
+> this?
 
-> This patch set adds a pinctrl driver for NXP LPC18xx/43xx devices.
->
-> The pinctrl driver uses the generic muxing and properties DT bindings as
-> described in pinctrl-bindings.txt. There is still two TODOs left in the
-> pinctrl driver regarding property control of special usb1 pins but I would
-> like it merged regardless of this. Support will be added once I get USB up
-> and running on the MCU.
->
-> Checkpatch complains a lot about the driver but that's what you get when
-> you embedd a large function/pin spec table from the data sheet I guess.
->
-> Changes since v1:
->  - minor white space fixes
->  - split pinctrl/gpio patch set
->  - rebase on v4.1-rc1
+Just to clarify, is the problem here the software breakpoint exception,
+or trying to step the faulting instruction whilst we were already handling
+a step?
 
-Saw this v2 version arrived so took that instead of v1.
+I think I'd be inclined to keep the code run in debug context to a minimum.
+We already can't block there, and the more code we add the more black spots
+we end up with in the kernel itself. The alternative would be to make your
+kprobes code re-entrant, but that sounds like a nightmare.
 
-Applied.
+You say this works on x86. How do they handle it? Is the nested probe
+on kfree ignored or handled?
 
-Yours,
-Linus Walleij
+Will
