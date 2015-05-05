@@ -1,14 +1,14 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 05 May 2015 17:58:31 +0200
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 5 May 2015 17:03:37 +0100
 Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
 In-Reply-To: <20150505155346.GJ1550@arm.com>
 References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
  <20150505155346.GJ1550@arm.com>
-Message-ID: <7101508.6RhN5G3AIR@wuerfel>
+Message-ID: <20150505160337.GB23106@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 May 2015 16:53:46 Will Deacon wrote:
+On Tue, May 05, 2015 at 04:53:46PM +0100, Will Deacon wrote:
 > On Tue, May 05, 2015 at 03:02:12AM +0100, Jayachandran C wrote:
 > > The current code in pci-host-generic.c uses pci_common_init_dev()
 > > from the arch/arm/ to do a part of the PCI initialization, and this
@@ -66,8 +66,17 @@ On Tuesday 05 May 2015 16:53:46 Will Deacon wrote:
 >   virtio-pci 0000:00:01.0: can't enable device: BAR 0 [mem 0x41000800-0x41000bff] not claimed
 >   virtio-pci: probe of 0000:00:01.0 failed with error -22
 
-What do you see in /proc/ioport and /proc/iomem, respectively?
+Yes, I already mentioned on v1 and comment was not taken into account,
+at the moment when we enable devices on arm64 we rely on the generic
 
-It sounds like the memory resource of the host did not get registered right.
+pcibios_enable_device()
 
-	Arnd
+function that by enabling resources trigger that error on PROBE_ONLY
+systems.
+
+We could do what arm does, by checking the PROBE_ONLY flag
+and call pci_enable_resources only if !PROBE_ONLY (and do that in the
+generic drivers/pci/pci.c pcibios_enable_device function) but IIRC Bjorn
+did not like that much.
+
+Lorenzo
