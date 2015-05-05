@@ -1,41 +1,44 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 06 May 2015 06:40:57 +0900
-Subject: [RESEND-PATCH] ARM: dts: Add missing irq pinctrl for max77686
- on smdk5250
-In-Reply-To: <CAJKOXPd2x_DiD8EAq202=scTuK0HHH8evvD_TkLn4oO_6hrRhg@mail.gmail.com>
-References: <1430798855-27271-1-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPd2x_DiD8EAq202=scTuK0HHH8evvD_TkLn4oO_6hrRhg@mail.gmail.com>
-Message-ID: <554938E9.10907@kernel.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 5 May 2015 16:42:25 -0500
+Subject: [PATCH v3 5/5] MAINTAINERS: Add pci-st.c to ARCH/STI architecture
+In-Reply-To: <1428657168-12495-6-git-send-email-gabriel.fernandez@linaro.org>
+References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1428657168-12495-6-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20150505214225.GC24643@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/15 13:14, Krzysztof Koz?owski wrote:
-> 2015-05-05 13:07 GMT+09:00 Pankaj Dubey <pankaj.dubey@samsung.com>:
->> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
->>
->> This patch adds pinctrl configuration for using configuring gpx3-2 as an
->> external interrupt from max77686. Though max77686 RTC is enabled and gets
->> probed by default, it doesnt work as its unable to get interrupt.
->>
->> This patch makes max77686 RTC work and also configures it as wakeup source.
->>
->> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
->> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>
->> Initial version of this patch was part of following series, though
->> they are not dependent on each other, resubmitting after rebasing
->> and detaching second one from first patch in the series [1]
->>
->> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303652.html
+On Fri, Apr 10, 2015 at 11:12:48AM +0200, Gabriel FERNANDEZ wrote:
+> This patch adds the pci-st.c pci driver found on STMicroelectronics
+> SoC's into the STI arch section of the maintainers file.
 > 
-> Thanks, but now it needs your Signed-off-by because you touched it.
-> 
-Just note, to more clarify, Signed-off-by should be added who wants to
-submit anything into mailing-list even no updating and just posting...
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 
-> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+I'd like an ack from the current maintainers:
+
+  ARM/STI ARCHITECTURE
+  M:      Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+  M:      Maxime Coquelin <maxime.coquelin@st.com>
+  M:      Patrice Chotard <patrice.chotard@st.com>
+
+that they're OK with taking on this additional file.
+
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-Thanks,
-Kukjin
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index efbcb50..4639d2d 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1468,6 +1468,7 @@ F:	drivers/clocksource/arm_global_timer.c
+>  F:	drivers/i2c/busses/i2c-st.c
+>  F:	drivers/media/rc/st_rc.c
+>  F:	drivers/mmc/host/sdhci-st.c
+> +F:	drivers/pci/host/pci-st.c
+>  F:	drivers/phy/phy-stih407-usb.c
+>  F:	drivers/phy/phy-stih41x-usb.c
+>  F:	drivers/pinctrl/pinctrl-st.c
+> -- 
+> 1.9.1
+> 
