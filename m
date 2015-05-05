@@ -1,67 +1,45 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Tue, 5 May 2015 18:39:36 +0200
-Subject: [PATCH 0/3] Drop more omap3 legacy board-*.c files for v4.2
-In-Reply-To: <20150505150638.GC21061@atomide.com>
-References: <1430769717-4088-1-git-send-email-tony@atomide.com>
- <20150505145407.GK18002@pali> <20150505150638.GC21061@atomide.com>
-Message-ID: <201505051839.36882@pali>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 5 May 2015 11:41:15 -0500
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <1430820315.19516.26.camel@opteya.com>
+References: <1430820315.19516.26.camel@opteya.com>
+Message-ID: <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 May 2015 17:06:38 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [150505 07:55]:
-> > On Tuesday 05 May 2015 07:43:08 Tony Lindgren wrote:
-> > > * Arnd Bergmann <arnd@arndb.de> [150505 03:56]:
-> > > > On Monday 04 May 2015 13:01:54 Tony Lindgren wrote:
-> > > > > For dropping the remaining omap3 legacy boot support,
-> > > > > we still have the following board-*.c files:
-> > > > > 
-> > > > > BOARD                   REASON NEEDED
-> > > > > board-ldp.c             Still used in RMKs boot test
-> > > > > system board-omap3logic.c      Getting a .dts file
-> > > > > for v4.2 board-omap3pandora.c    Got a .dts file for
-> > > > > v4.1 board-rx51-*.c          Needs /proc/atags
-> > > > > support for user space
-> > > > > 
-> > > > > I'm hoping we can drop those for v4.3 merge window,
-> > > > > then keep the platform data around for one more merge
-> > > > > window in case of reverting needed, then drop the
-> > > > > platform data too for v4.4 if no issues needing
-> > > > > reverting are found.
-> > > > 
-> > > > Sounds great. Has there been a conclusion about what to
-> > > > do for the rx51 /proc/atags support?
-> > > 
-> > > I believe we just need to enable /proc/atags also for
-> > > device tree based booting if CONFIG_ARM_ATAG_DTB_COMPAT.
-> > > Pali may have more info on that.
-> > > 
-> > > Then looks like Pali's two patches for showing the
-> > > revision are still pending in thread "[PATCH v2 0/2] ARM:
-> > > /proc/cpuinfo: DT: Add support for Revision":
-> > > 
-> > > http://www.spinics.net/lists/arm-kernel/msg401535.html
-> > 
-> > I think I already sent all need patches to ML. But I did not
-> > check if you merged them or not. I did not get any new
-> > comments for them for a while and right now I do not have
-> > time for looking at it again.
-> 
-> Oh OK, do you have link to the /proc/atags patch somewhere?
-> 
-> Maybe Arnd and Nico can pick them up and sort out how we
-> should queue them with Russell?
-> 
+On Tue, May 5, 2015 at 5:05 AM, Yann Droneaud <ydroneaud@opteya.com> wrote:
+> Hi,
+>
+> I believe Device Tree Blob (.dtb file) built from kernel's Device Tree
+> Sources (.dts, which #include .dtsi, which #include .h) using Device
+> Tree Compiler (dtc) are covered by GNU General Public Licence v2
+> (GPLv2), but cannot find any reference.
 
-https://lkml.org/lkml/2015/1/26/648
+By default yes, but we've been steering people to dual license them GPL/BSD.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/47e93981/attachment.sig>
+> As most .dtsi in arch/arm/boot/dts/ are covered by GPLv2, and,
+> as most .h in include/dt-bindings/ are also covered by GPLv2,
+> the source code is likely covered by GPLv2.
+>
+> Then this source code is translated in a different language (flattened
+> device tree), so the resulting translation is also likely covered by
+> GPLv2.
+>
+> So, when I'm proposed to download a .dtb file from a random vendor,
+> can I require to get the associated source code ?
+
+I believe so yes. However, you already have the "source" for the most
+part. Just run "dtc -I dtb -O dts <dtb file>". You loose the
+preprocessing and include structure though (not necessarily a bad
+thing IMO).
+
+Then the question is what is the license on that generated dts!
+
+> Anyway, for a .dtb file generated from kernel sources, it's rather
+> painful to look after all .dts, .dtsi, .h, to find what kind of
+> licences are applicables, as some are covered by BSD, dual licensed
+> (any combination of X11, MIT, BSD, GPLv2).
+
+I imagine the includes cause some licensing discrepancies if you dug into it.
+
+Rob
