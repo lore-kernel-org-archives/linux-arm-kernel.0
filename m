@@ -1,68 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 5 May 2015 16:48:30 +0100
-Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <554851CB.2010909@linaro.org>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
- <55363791.4070706@hitachi.com> <553AB222.50609@redhat.com>
- <553EF74D.8020706@redhat.com> <20150429102346.GK8236@arm.com>
- <55442BFA.50101@redhat.com> <554851CB.2010909@linaro.org>
-Message-ID: <20150505154830.GI1550@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 5 May 2015 17:50:30 +0200
+Subject: [PATCH 4/4] tty: serial: 8250_mtk: Add support for bus clock
+In-Reply-To: <CABuKBeLwXZPYLka53sDghMyN_dX0wWUh8XV4vMSanWBhXJjFew@mail.gmail.com>
+References: <1430117397-13517-1-git-send-email-s.hauer@pengutronix.de>
+ <1430117397-13517-5-git-send-email-s.hauer@pengutronix.de>
+ <CABuKBeLwXZPYLka53sDghMyN_dX0wWUh8XV4vMSanWBhXJjFew@mail.gmail.com>
+Message-ID: <20150505155030.GA6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 05, 2015 at 06:14:51AM +0100, David Long wrote:
-> On 05/01/15 21:44, William Cohen wrote:
-> > Dave Long and I did some additional experimentation to better
-> > understand what is condition causes the kernel to sometimes spew:
+On Tue, May 05, 2015 at 05:41:16PM +0200, Matthias Brugger wrote:
+> 2015-04-27 8:49 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> > The mtk 8250 needs two clocks, one for providing the baudrate and
+> > one that needs to be enabled for register accesses. The latter has
+> > not been supported, this patch adds support for it. It is optional
+> > for now since not all SoCs provide a bus clock.
 > >
-> > Unexpected kernel single-step exception at EL1
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  .../devicetree/bindings/serial/mtk-uart.txt        | 12 ++++++++--
+> >  drivers/tty/serial/8250/8250_mtk.c                 | 28 ++++++++++++++++++----
+> >  2 files changed, 34 insertions(+), 6 deletions(-)
 > >
-> > The functioncallcount.stp test instruments the entry and return of
-> > every function in the mm files, including kfree.  In most cases the
-> > arm64 trampoline_probe_handler just determines which return probe
-> > instance matches the current conditions, runs the associated handler,
-> > and recycles the return probe instance for another use by placing it
-> > on a hlist.  However, it is possible that a return probe instance has
-> > been set up on function entry and the return probe is unregistered
-> > before the return probe instance fires.  In this case kfree is called
-> > by the trampoline handler to remove the return probe instances related
-> > to the unregistered kretprobe.  This case where the the kprobed kfree
-> > is called within the arm64 trampoline_probe_handler function trigger
-> > the problem.
+> > diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+> > index 4415226..8d63f1d 100644
+> > --- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
+> > +++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+> > @@ -14,7 +14,14 @@ Required properties:
 > >
-> > The kprobe breakpoint for the kfree call from within the
-> > trampoline_probe_handler is encountered and started, but things go
-> > wrong when attempting the single step on the instruction.
+> >  - interrupts: A single interrupt specifier.
 > >
-> > It took a while to trigger this problem with the sytemtap testsuite.
-> > Dave Long came up with steps that reproduce this more quickly with a
-> > probed function that is always called within the trampoline handler.
-> > Trying the same on x86_64 doesn't trigger the problem.  It appears
-> > that the x86_64 code can handle a single step from within the
-> > trampoline_handler.
+> > -- clocks: Clock driving the hardware.
+> > +- clocks : Must contain an entry for each entry in clock-names.
+> > +  See ../clocks/clock-bindings.txt for details.
+> > +- clock-names:
+> > +  - "baud": The clock the baudrate is derived from
+> > +  - "bus": The bus clock for register accesses (optional)
+> > +
+> > +For compatibility with older device trees an unnamed clock is used for the
+> > +baud clock if the baudclk does not exist. Do not use this for new designs.
 > >
+> >  Example:
+> >
+> > @@ -22,5 +29,6 @@ Example:
+> >                 compatible = "mediatek,mt6589-uart", "mediatek,mt6577-uart";
+> >                 reg = <0x11006000 0x400>;
+> >                 interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
+> > -               clocks = <&uart_clk>;
+> > +               clocks = <&uart_clk>, <&bus_clk>;
+> > +               clock-names = "baud", "bus";
+> >         };
+> > diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+> > index 2f28bd0..8eb3876 100644
+> > --- a/drivers/tty/serial/8250/8250_mtk.c
+> > +++ b/drivers/tty/serial/8250/8250_mtk.c
+> > @@ -34,6 +34,7 @@
+> >  struct mtk8250_data {
+> >         int                     line;
+> >         struct clk              *uart_clk;
+> > +       struct clk              *bus_clk;
+> >  };
 > 
-> I'm assuming there are no plans for supporting software breakpoint debug 
-> exceptions during processing of single-step exceptions, any time soon on 
-> arm64.  Given that the only solution that I can come with for this is 
-> instead of making this orphaned kretprobe instance list exist only 
-> temporarily (in the scope of the kretprobe trampoline handler), make it 
-> always exist and kfree any items found on it as part of a periodic 
-> cleanup running outside of the handler context.  I think these changes 
-> would still all be in archiecture-specific code.  This doesn't feel to 
-> me like a bad solution.  Does anyone think there is a simpler way out of 
-> this?
+> Not sure if it would be better to rename the uart_clk to baud_clk
+> which reflects the new naming scheme.
 
-Just to clarify, is the problem here the software breakpoint exception,
-or trying to step the faulting instruction whilst we were already handling
-a step?
+Can do.
 
-I think I'd be inclined to keep the code run in debug context to a minimum.
-We already can't block there, and the more code we add the more black spots
-we end up with in the kernel itself. The alternative would be to make your
-kprobes code re-entrant, but that sounds like a nightmare.
+> 
+> >
+> >  static void
+> > @@ -120,6 +121,7 @@ static int mtk8250_runtime_suspend(struct device *dev)
+> >         struct mtk8250_data *data = dev_get_drvdata(dev);
+> >
+> >         clk_disable_unprepare(data->uart_clk);
+> > +       clk_disable_unprepare(data->bus_clk);
+> 
+> bus_clk can be NULL.
 
-You say this works on x86. How do they handle it? Is the nested probe
-on kfree ignored or handled?
+The clk core handles NULL clks just fine. They are considered dummy
+clks. You can prepare/enable them, clk_get_rate of course returns
+nothing useful.
 
-Will
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
