@@ -1,69 +1,61 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 5 May 2015 14:02:50 +0200
-Subject: [PATCH 3/9] Documentation: DT bindings: fix hda2codec_2x clock
- name for tegra30-hda
-In-Reply-To: <ee8e9952dfdfd87da52f817fca0a6ad94a137742.1428700856.git.marcel.ziswiler@toradex.com>
-References: <cover.1428700856.git.marcel.ziswiler@toradex.com>
- <ee8e9952dfdfd87da52f817fca0a6ad94a137742.1428700856.git.marcel.ziswiler@toradex.com>
-Message-ID: <20150505120249.GC30501@ulmo.nvidia.com>
+From: bintian.wang@huawei.com (Bintian Wang)
+Date: Tue, 5 May 2015 20:06:37 +0800
+Subject: [PATCH v4 3/5] clk: hi6220: Document devicetree bindings for hi6220
+ clock
+In-Reply-To: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+Message-ID: <1430827599-11560-4-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:35:58PM +0200, Marcel Ziswiler wrote:
-> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> 
-> Fix hda2codec_2x clock name in Tegra30 HDA controller device tree node
-> documentation.
-> While at it also fix coma vs. semicolon issue.
-> 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> ---
->  Documentation/devicetree/bindings/sound/nvidia,tegra30-hda.txt | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+Document DT files bindings for Hisilicon hi6220 clock.
 
-Takashi,
+Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ .../devicetree/bindings/clock/hi6220-clock.txt     | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
 
-This series contains a couple of patches to the Tegra HDA driver and I
-have a couple of outstanding patches myself. Would you be okay with me
-collecting the patches in a branch and send them to you as a pull
-request?
-
-Thierry
-
-> diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra30-hda.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra30-hda.txt
-> index 13e2ef4..5032efa 100644
-> --- a/Documentation/devicetree/bindings/sound/nvidia,tegra30-hda.txt
-> +++ b/Documentation/devicetree/bindings/sound/nvidia,tegra30-hda.txt
-> @@ -8,10 +8,10 @@ Required properties:
->  - interrupts : The interrupt from the HDA controller.
->  - clocks : Must contain an entry for each required entry in clock-names.
->    See ../clocks/clock-bindings.txt for details.
-> -- clock-names : Must include the following entries: hda, hdacodec_2x, hda2hdmi
-> +- clock-names : Must include the following entries: hda, hda2codec_2x, hda2hdmi
->  - resets : Must contain an entry for each entry in reset-names.
->    See ../reset/reset.txt for details.
-> -- reset-names : Must include the following entries: hda, hdacodec_2x, hda2hdmi
-> +- reset-names : Must include the following entries: hda, hda2codec_2x, hda2hdmi
->  
->  Example:
->  
-> @@ -24,7 +24,7 @@ hda at 0,70030000 {
->  		 <&tegra_car TEGRA124_CLK_HDA2CODEC_2X>;
->  	clock-names = "hda", "hda2hdmi", "hda2codec_2x";
->  	resets = <&tegra_car 125>, /* hda */
-> -		 <&tegra_car 128>; /* hda2hdmi */
-> -		 <&tegra_car 111>, /* hda2codec_2x */
-> +		 <&tegra_car 128>, /* hda2hdmi */
-> +		 <&tegra_car 111>; /* hda2codec_2x */
->  	reset-names = "hda", "hda2hdmi", "hda2codec_2x";
->  };
-> -- 
-> 1.9.3
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/1e65e7b8/attachment-0001.sig>
+diff --git a/Documentation/devicetree/bindings/clock/hi6220-clock.txt b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
+new file mode 100644
+index 0000000..53ddb19
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
+@@ -0,0 +1,34 @@
++* Hisilicon Hi6220 Clock Controller
++
++Clock control registers reside in different Hi6220 system controllers,
++please refer the following document to know more about the binding rules
++for these system controllers:
++
++Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++
++Required Properties:
++
++- compatible: the compatible should be one of the following strings to
++	indicate the clock controller functionality.
++
++	- "hisilicon,hi6220-aoctrl"
++	- "hisilicon,hi6220-sysctrl"
++	- "hisilicon,hi6220-mediactrl"
++	- "hisilicon,hi6220-pmctrl"
++
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
++- #clock-cells: should be 1.
++
++For example:
++	sys_ctrl: sys_ctrl {
++		compatible = "hisilicon,hi6220-sysctrl", "syscon";
++		reg = <0x0 0xf7030000 0x0 0x2000>;
++		#clock-cells = <1>;
++	};
++
++Each clock is assigned an identifier and client nodes use this identifier
++to specify the clock which they consume.
++
++All these identifier could be found in <dt-bindings/clock/hi6220-clock.h>.
+-- 
+1.9.1
