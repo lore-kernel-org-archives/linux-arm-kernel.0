@@ -1,126 +1,167 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue,  5 May 2015 11:25:59 +0200
-Subject: [PATCH 06/12] net: axienet: Removed coding style errors and warnings
+Date: Tue,  5 May 2015 11:26:01 +0200
+Subject: [PATCH 08/12] net: axienet: Use pdev instead of op
 In-Reply-To: <7fb84f65a61bbe0fdb4b61a871cf4d4f7910955d.1430817941.git.michal.simek@xilinx.com>
 References: <7fb84f65a61bbe0fdb4b61a871cf4d4f7910955d.1430817941.git.michal.simek@xilinx.com>
-Message-ID: <09779bc3c9caced5840763159e797322ac36d48e.1430817941.git.michal.simek@xilinx.com>
+Message-ID: <ff9d5d134684d649072e1c95e0ddbfbfabc3afef.1430817941.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srikanth Thokala <srikanth.thokala@xilinx.com>
 
-Removed checkpatch.pl errors and warnings.
+Synchronize names with other drivers
 
 Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 20 ++++++++++----------
- drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c | 21 +++++++++++----------
- 2 files changed, 21 insertions(+), 20 deletions(-)
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 47 ++++++++++++-----------
+ 1 file changed, 24 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index c6f2ba056c26..39bb2e93cc65 100644
+index ddaa07a0bf51..757b2dc30cef 100644
 --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
 +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -444,8 +444,8 @@ static void __axienet_device_reset(struct axienet_local *lp,
- 	while (axienet_dma_in32(lp, offset) & XAXIDMA_CR_RESET_MASK) {
- 		udelay(1);
- 		if (--timeout == 0) {
--			dev_err(dev, "axienet_device_reset DMA "
--				"reset timeout!\n");
-+			netdev_err(lp->ndev, "%s: DMA reset timeout!\n",
-+				   __func__);
- 			break;
+@@ -1480,7 +1480,7 @@ static void axienet_dma_err_handler(unsigned long data)
+ 
+ /**
+  * axienet_of_probe - Axi Ethernet probe function.
+- * @op:		Pointer to platform device structure.
++ * @pdev:	Pointer to platform device structure.
+  * @match:	Pointer to device id structure
+  *
+  * returns: 0, on success
+@@ -1491,7 +1491,7 @@ static void axienet_dma_err_handler(unsigned long data)
+  * device. Parses through device tree and populates fields of
+  * axienet_local. It registers the Ethernet device.
+  */
+-static int axienet_of_probe(struct platform_device *op)
++static int axienet_of_probe(struct platform_device *pdev)
+ {
+ 	__be32 *p;
+ 	int size, ret = 0;
+@@ -1504,9 +1504,9 @@ static int axienet_of_probe(struct platform_device *op)
+ 	if (!ndev)
+ 		return -ENOMEM;
+ 
+-	platform_set_drvdata(op, ndev);
++	platform_set_drvdata(pdev, ndev);
+ 
+-	SET_NETDEV_DEV(ndev, &op->dev);
++	SET_NETDEV_DEV(ndev, &pdev->dev);
+ 	ndev->flags &= ~IFF_MULTICAST;  /* clear multicast */
+ 	ndev->features = NETIF_F_SG;
+ 	ndev->netdev_ops = &axienet_netdev_ops;
+@@ -1514,19 +1514,19 @@ static int axienet_of_probe(struct platform_device *op)
+ 
+ 	lp = netdev_priv(ndev);
+ 	lp->ndev = ndev;
+-	lp->dev = &op->dev;
++	lp->dev = &pdev->dev;
+ 	lp->options = XAE_OPTION_DEFAULTS;
+ 	/* Map device registers */
+-	lp->regs = of_iomap(op->dev.of_node, 0);
++	lp->regs = of_iomap(pdev->dev.of_node, 0);
+ 	if (!lp->regs) {
+-		dev_err(&op->dev, "could not map Axi Ethernet regs.\n");
++		dev_err(&pdev->dev, "could not map Axi Ethernet regs.\n");
+ 		ret = -ENOMEM;
+ 		goto nodev;
+ 	}
+ 	/* Setup checksum offload, but default to off if not specified */
+ 	lp->features = 0;
+ 
+-	p = (__be32 *) of_get_property(op->dev.of_node, "xlnx,txcsum", NULL);
++	p = (__be32 *)of_get_property(pdev->dev.of_node, "xlnx,txcsum", NULL);
+ 	if (p) {
+ 		switch (be32_to_cpup(p)) {
+ 		case 1:
+@@ -1547,7 +1547,7 @@ static int axienet_of_probe(struct platform_device *op)
+ 			lp->csum_offload_on_tx_path = XAE_NO_CSUM_OFFLOAD;
  		}
  	}
-@@ -484,8 +484,8 @@ static void axienet_device_reset(struct net_device *ndev)
+-	p = (__be32 *) of_get_property(op->dev.of_node, "xlnx,rxcsum", NULL);
++	p = (__be32 *)of_get_property(pdev->dev.of_node, "xlnx,rxcsum", NULL);
+ 	if (p) {
+ 		switch (be32_to_cpup(p)) {
+ 		case 1:
+@@ -1570,40 +1570,41 @@ static int axienet_of_probe(struct platform_device *op)
+ 	 * Here we check for memory allocated for Rx/Tx in the hardware from
+ 	 * the device-tree and accordingly set flags.
+ 	 */
+-	p = (__be32 *) of_get_property(op->dev.of_node, "xlnx,rxmem", NULL);
++	p = (__be32 *)of_get_property(pdev->dev.of_node, "xlnx,rxmem", NULL);
+ 	if (p)
+ 		lp->rxmem = be32_to_cpup(p);
+-	p = (__be32 *) of_get_property(op->dev.of_node, "xlnx,phy-type", NULL);
++	p = (__be32 *)of_get_property(pdev->dev.of_node,
++				      "xlnx,phy-type", NULL);
+ 	if (p)
+ 		lp->phy_type = be32_to_cpup(p);
+ 
+ 	/* Find the DMA node, map the DMA registers, and decode the DMA IRQs */
+-	np = of_parse_phandle(op->dev.of_node, "axistream-connected", 0);
++	np = of_parse_phandle(pdev->dev.of_node, "axistream-connected", 0);
+ 	if (!np) {
+-		dev_err(&op->dev, "could not find DMA node\n");
++		dev_err(&pdev->dev, "could not find DMA node\n");
+ 		ret = -ENODEV;
+ 		goto err_iounmap;
+ 	}
+ 	lp->dma_regs = of_iomap(np, 0);
+ 	if (lp->dma_regs) {
+-		dev_dbg(&op->dev, "MEM base: %p\n", lp->dma_regs);
++		dev_dbg(&pdev->dev, "MEM base: %p\n", lp->dma_regs);
+ 	} else {
+-		dev_err(&op->dev, "unable to map DMA registers\n");
++		dev_err(&pdev->dev, "unable to map DMA registers\n");
+ 		of_node_put(np);
+ 	}
+ 	lp->rx_irq = irq_of_parse_and_map(np, 1);
+ 	lp->tx_irq = irq_of_parse_and_map(np, 0);
+ 	of_node_put(np);
+ 	if ((lp->rx_irq <= 0) || (lp->tx_irq <= 0)) {
+-		dev_err(&op->dev, "could not determine irqs\n");
++		dev_err(&pdev->dev, "could not determine irqs\n");
+ 		ret = -ENOMEM;
+ 		goto err_iounmap_2;
  	}
  
- 	if (axienet_dma_bd_init(ndev)) {
--		dev_err(&ndev->dev, "axienet_device_reset descriptor "
--			"allocation failed\n");
-+		netdev_err(ndev, "%s: descriptor allocation failed\n",
-+			   __func__);
+ 	/* Retrieve the MAC address */
+-	addr = of_get_property(op->dev.of_node, "local-mac-address", &size);
++	addr = of_get_property(pdev->dev.of_node, "local-mac-address", &size);
+ 	if ((!addr) || (size != 6)) {
+-		dev_err(&op->dev, "could not find MAC address\n");
++		dev_err(&pdev->dev, "could not find MAC address\n");
+ 		ret = -ENODEV;
+ 		goto err_iounmap_2;
  	}
+@@ -1612,11 +1613,11 @@ static int axienet_of_probe(struct platform_device *op)
+ 	lp->coalesce_count_rx = XAXIDMA_DFT_RX_THRESHOLD;
+ 	lp->coalesce_count_tx = XAXIDMA_DFT_TX_THRESHOLD;
  
- 	axienet_status = axienet_ior(lp, XAE_RCW1_OFFSET);
-@@ -560,8 +560,8 @@ static void axienet_adjust_link(struct net_device *ndev)
- 			lp->last_link = link_state;
- 			phy_print_status(phy);
- 		} else {
--			dev_err(&ndev->dev, "Error setting Axi Ethernet "
--				"mac speed\n");
-+			netdev_err(ndev,
-+				   "Error setting Axi Ethernet mac speed\n");
- 		}
- 	}
+-	lp->phy_node = of_parse_phandle(op->dev.of_node, "phy-handle", 0);
++	lp->phy_node = of_parse_phandle(pdev->dev.of_node, "phy-handle", 0);
+ 	if (lp->phy_node)
+-		ret = axienet_mdio_setup(lp, op->dev.of_node);
++		ret = axienet_mdio_setup(lp, pdev->dev.of_node);
+ 	if (ret)
+-		dev_warn(&op->dev, "error registering MDIO bus\n");
++		dev_warn(&pdev->dev, "error registering MDIO bus\n");
+ 
+ 	ret = register_netdev(lp->ndev);
+ 	if (ret) {
+@@ -1637,9 +1638,9 @@ nodev:
+ 	return ret;
  }
-@@ -1238,8 +1238,8 @@ axienet_ethtools_set_pauseparam(struct net_device *ndev,
+ 
+-static int axienet_of_remove(struct platform_device *op)
++static int axienet_of_remove(struct platform_device *pdev)
+ {
+-	struct net_device *ndev = platform_get_drvdata(op);
++	struct net_device *ndev = platform_get_drvdata(pdev);
  	struct axienet_local *lp = netdev_priv(ndev);
  
- 	if (netif_running(ndev)) {
--		printk(KERN_ERR	"%s: Please stop netif before applying "
--		       "configruation\n", ndev->name);
-+		netdev_err(ndev,
-+			   "Please stop netif before applying configuration\n");
- 		return -EFAULT;
- 	}
- 
-@@ -1295,8 +1295,8 @@ static int axienet_ethtools_set_coalesce(struct net_device *ndev,
- 	struct axienet_local *lp = netdev_priv(ndev);
- 
- 	if (netif_running(ndev)) {
--		printk(KERN_ERR	"%s: Please stop netif before applying "
--		       "configruation\n", ndev->name);
-+		netdev_err(ndev,
-+			   "Please stop netif before applying configuration\n");
- 		return -EFAULT;
- 	}
- 
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
-index 3b67d60d4378..fce557518b7d 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
-@@ -161,19 +161,19 @@ int axienet_mdio_setup(struct axienet_local *lp, struct device_node *np)
- 
- 	np1 = of_find_node_by_name(NULL, "cpu");
- 	if (!np1) {
--		printk(KERN_WARNING "%s(): Could not find CPU device node.",
--		       __func__);
--		printk(KERN_WARNING "Setting MDIO clock divisor to "
--		       "default %d\n", DEFAULT_CLOCK_DIVISOR);
-+		netdev_warn(lp->ndev, "Could not find CPU device node.\n");
-+		netdev_warn(lp->ndev,
-+			    "Setting MDIO clock divisor to default %d\n",
-+			    DEFAULT_CLOCK_DIVISOR);
- 		clk_div = DEFAULT_CLOCK_DIVISOR;
- 		goto issue;
- 	}
- 	property_p = (u32 *) of_get_property(np1, "clock-frequency", NULL);
- 	if (!property_p) {
--		printk(KERN_WARNING "%s(): Could not find CPU property: "
--		       "clock-frequency.", __func__);
--		printk(KERN_WARNING "Setting MDIO clock divisor to "
--		       "default %d\n", DEFAULT_CLOCK_DIVISOR);
-+		netdev_warn(lp->ndev, "clock-frequency property not found.\n");
-+		netdev_warn(lp->ndev,
-+			    "Setting MDIO clock divisor to default %d\n",
-+			    DEFAULT_CLOCK_DIVISOR);
- 		clk_div = DEFAULT_CLOCK_DIVISOR;
- 		of_node_put(np1);
- 		goto issue;
-@@ -187,8 +187,9 @@ int axienet_mdio_setup(struct axienet_local *lp, struct device_node *np)
- 	if (host_clock % (MAX_MDIO_FREQ * 2))
- 		clk_div++;
- 
--	printk(KERN_DEBUG "%s(): Setting MDIO clock divisor to %u based "
--	       "on %u Hz host clock.\n", __func__, clk_div, host_clock);
-+	netdev_dbg(lp->ndev,
-+		   "Setting MDIO clock divisor to %u/%u Hz host clock.\n",
-+		   clk_div, host_clock);
- 
- 	of_node_put(np1);
- issue:
+ 	axienet_mdio_teardown(lp);
 -- 
 2.3.5
