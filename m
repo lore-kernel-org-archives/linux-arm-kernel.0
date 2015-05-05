@@ -1,71 +1,51 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 5 May 2015 08:00:01 +0530
-Subject: [PATCH 2/3 v7] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <871tivq1rp.fsf@eliezer.anholt.net>
-References: <1430254460-26754-1-git-send-email-eric@anholt.net>
- <1430327374-6562-1-git-send-email-eric@anholt.net>
- <CABb+yY0+Dd6RMJfmcqWrJfsSkPS8KjtpctJteoTZrj3QttJ71g@mail.gmail.com>
- <871tivq1rp.fsf@eliezer.anholt.net>
-Message-ID: <CABb+yY2V5dXQ5fH3s2T4-j6-z68bOzaeUN9WQoNze2mc-quD+A@mail.gmail.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Tue,  5 May 2015 10:46:03 +0800
+Subject: [RFC v2 0/7] Consolidate ACPI PCI root common code into ACPI core
+Message-ID: <1430793970-11159-1-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 5, 2015 at 6:27 AM, Eric Anholt <eric@anholt.net> wrote:
-> Jassi Brar <jassisinghbrar@gmail.com> writes:
->
->> On Wed, Apr 29, 2015 at 10:39 PM, Eric Anholt <eric@anholt.net> wrote:
->>
->>> +
->>> +struct bcm2835_mbox {
->>> +       struct device *dev;
->>> +       void __iomem *regs;
->>> +       spinlock_t lock;
->>> +       struct mbox_controller controller;
->>> +};
->>> +
->>> +static struct bcm2835_mbox *mbox;
->>> +
->>> +static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
->>> +{
->>> +       struct device *dev = mbox->dev;
->>> +       struct mbox_chan *link = &mbox->controller.chans[0];
->>> +
->> I learn from Stephen's other post that the controller could have
->> multiple channels. In which case this driver is poorly setup. Actually
->> if the driver was designed properly there isn't anything special to be
->> done.
->>  Here you choose to waste 'dev_id' and hard-code dereferencing to channel-0
->
-> There's only the one channel according to the docs.  I wish we wouldn't
-> get derailed by speculation on the list when the documentation is
-> available. :(
->
-Can I have the pointer to the doc please, if its publicly available.
+This patch set consolidates common code to support ACPI PCI root on x86
+and IA64 platforms into ACPI core, to reproduce duplicated code and
+simplify maintenance. The common code should also used to support PCI
+host bridge on ARM64 too, but I'm lacking of knowledge about PCIe host
+bridge implementation details on ARM64, so please help to review whether
+this is suitable for ARM64 too.
 
->>> +       while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
->>> +               u32 msg = readl(mbox->regs + MAIL0_RD);
->>> +               dev_dbg(dev, "Reply 0x%08X\n", msg);
->>> +               mbox_chan_received_data(link, &msg);
->>> +       }
->>> +       return IRQ_HANDLED;
->>> +}
->>> +
->>> +static int bcm2835_send_data(struct mbox_chan *link, void *data)
->>> +{
->>> +       int ret = 0;
->>> +       u32 msg = *(u32 *)data;
->>> +
->>> +       spin_lock(&mbox->lock);
->>> +       writel(msg, mbox->regs + MAIL1_WRT);
->>> +       dev_dbg(mbox->dev, "Request 0x%08X\n", msg);
->>> +end:
->>>
->> Did you compile check the driver for errors and warnings?
->
-> At this point I'm so burned out on repainting this bikeshed that I
-> missed a spot of the current color.
->
-I have just rechecked the thread and I didn't find any revision that
-had only nits picked. Subsystems even dictate how the files are named
-and ordered in Makefile, and you have been insisting on hardcoding
-values.
+It's based on latest mainstream kernel plus the patch to fix a regression
+at: http://lkml.org/lkml/2015/4/30/13
+
+It passes Fengguang's 0day test suite and has been tested on two IA64
+platforms and one x86 platform.
+
+The patch set is available at:
+https://github.com/jiangliu/linux.git acpi_pci_root_v2
+
+Thanks!
+Gerry
+
+Jiang Liu (7):
+  ACPI/PCI: Enhance ACPI core to support sparse IO space
+  ia64/PCI/ACPI: Use common ACPI resource parsing interface for host
+    bridge
+  ia64/PCI: Use common struct resource_entry to replace struct
+    iospace_resource
+  x86/PCI: Rename struct pci_sysdata as struct pci_controller
+  PCI/ACPI: Consolidate common PCI host bridge code into ACPI core
+  x86/PCI/ACPI: Use common interface to support PCI host bridge
+  ia64/PCI/ACPI: Use common interface to support PCI host bridge
+
+ arch/ia64/include/asm/pci.h   |    5 -
+ arch/ia64/pci/pci.c           |  373 +++++++++++------------------------------
+ arch/x86/include/asm/pci.h    |   13 +-
+ arch/x86/include/asm/pci_64.h |    4 +-
+ arch/x86/pci/acpi.c           |  281 +++++++++----------------------
+ arch/x86/pci/common.c         |    2 +-
+ drivers/acpi/pci_root.c       |  214 +++++++++++++++++++++++
+ drivers/acpi/resource.c       |    9 +-
+ include/linux/ioport.h        |    1 +
+ include/linux/pci-acpi.h      |   24 +++
+ 10 files changed, 431 insertions(+), 495 deletions(-)
+
+-- 
+1.7.10.4
