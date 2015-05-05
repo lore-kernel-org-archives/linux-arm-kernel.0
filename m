@@ -1,23 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 05 May 2015 12:55:52 +0200
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <CAMJs5B9V_tWxut6LLWDdpN1m9NsaC_JGfR_U_SHN=OOhdHe_Yw@mail.gmail.com>
-References: <55417F5A.4040300@linaro.org> <2490159.r1U8jHTvO3@wuerfel>
- <CAMJs5B9V_tWxut6LLWDdpN1m9NsaC_JGfR_U_SHN=OOhdHe_Yw@mail.gmail.com>
-Message-ID: <9143918.xCQ8d3X4XD@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 5 May 2015 11:57:14 +0100
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <20150504121209.GM15510@sirena.org.uk>
+ <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
+Message-ID: <20150505105714.GA22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 May 2015 12:51:57 Christoffer Dall wrote:
-> On Tue, May 5, 2015 at 11:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 05 May 2015 12:27:54 Joel Stanley wrote:
-> >
-> Do ARM distributions (Fedora, Ubuntu, Debian, ...) support the
-> necessary userspace handling so that things work with the input
-> subsystem?
+On Tue, May 05, 2015 at 04:18:59PM +0530, Viresh Kumar wrote:
+> On 4 May 2015 at 17:42, Mark Brown <broonie@kernel.org> wrote:
+> > On Thu, Apr 30, 2015 at 05:37:59PM +0530, Viresh Kumar wrote:
 
-I think the latest releases all use systemd, so it should work in theory,
-but I have not tried it, and I don't know if they have something else
-on older versions.
+> >> +- opp-microamp: current in micro Amperes. It can contain entries for multiple
+> >> +  regulators.
+> >> +
+> >> +  A single regulator's current is specified with an array of size one or three.
+> >> +  Single entry is for target current and three entries are for <target min max>
+> >> +  currents.
 
-	Arnd
+> > What is this for - are you trying to define OPPs for current regulators?
+> > If you are that's worrying, I can't think of a sensible use case.  If
+> > that's not what's happening then the binding needs to be more specific
+> > about what this is supposed to mean.
+
+> Its another property of the same voltage regulator we are using in
+> opp-microvolt.
+> I hope that makes sense ?
+
+No, it doesn't - you're not answering the question about what this is
+for.
+
+> But, perhaps I need to write it with more clarity? Or this field doesn't make
+> sense ?
+
+To know if this makes sense I need to know what you beleive "setting the
+current" does.  If you literally mean setting the current it makes no
+sense at all.  If you mean something else that something else should
+probably be written into the binding.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/d1a290d5/attachment.sig>
