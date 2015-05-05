@@ -1,75 +1,51 @@
 From: bintian.wang@huawei.com (Bintian Wang)
-Date: Tue, 5 May 2015 20:06:34 +0800
-Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-Message-ID: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+Date: Tue, 5 May 2015 20:06:35 +0800
+Subject: [PATCH v4 1/5] arm64: Enable Hisilicon ARMv8 SoC family in Kconfig
+ and defconfig
+In-Reply-To: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+Message-ID: <1430827599-11560-2-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi6220 is one mobile solution of Hisilicon, this patchset contains
-initial support for Hi6220 SoC and HiKey development board, which
-supports octal ARM Cortex A53 cores. Initial support is minimal and
-includes just the arch configuration, clock driver, device tree
-configuration.
+This patch introduces ARCH_HISI to enable Hisilicon SoC family in
+Kconfig and defconfig.
 
-PSCI is enabled in device tree and there is no problem to boot all the
-octal cores, and the CPU hotplug is also working now, you can download
-and compile the latest firmware based on the following link to run this
-patch set:
-https://github.com/96boards/documentation/wiki/UEFI 
+Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Reviewed-by: Wei Xu <xuwei5@hisilicon.com>
+---
+ arch/arm64/Kconfig           | 5 +++++
+ arch/arm64/configs/defconfig | 1 +
+ 2 files changed, 6 insertions(+)
 
-Changes v4:
-* Rebase to kernel 4.1-rc1
-* Delete "arm,cortex-a15-gic" from the gic node in dts 
-
-Changes v3:
-* Verified the CPU hotplug based on the new released firmware
-* Redefined the compatible strings of four system controllers in dts 
-* Setting COMMON_CLK_HI6220 to a bool symbol
-* Keep CONFGI_ARCH_HISI sorted alphabetically
-
-Changes v2:
-* Split the DT bindings documents into earlier patches
-* Change SMP enable method from spin-table to PSCI in device tree
-* Remove "clock-frequency" from armv8-timer device node in device tree
-* Add more description about Hisilicon designed system controllers
-  in DT bindings document
-* Enable high speed clock on UART1 mux
-* Other changes based on the discussion in the mailing list:
-  https://lkml.org/lkml/2015/2/5/147
-
-Bintian Wang (5):
-  arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
-  arm64: hi6220: Document devicetree bindings for Hisilicon hi6220 SoC
-  clk: hi6220: Document devicetree bindings for hi6220 clock
-  clk: hi6220: Clock driver support for Hisilicon hi6220 SoC
-  arm64: dts: Add dts files for Hisilicon Hi6220 SoC
-
- .../bindings/arm/hisilicon/hisilicon.txt           |  87 ++++++
- .../devicetree/bindings/clock/hi6220-clock.txt     |  34 +++
- arch/arm64/Kconfig                                 |   5 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/hisilicon/Makefile             |   5 +
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  31 +++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 172 ++++++++++++
- arch/arm64/configs/defconfig                       |   1 +
- drivers/clk/Kconfig                                |   2 +
- drivers/clk/Makefile                               |   4 +-
- drivers/clk/hisilicon/Kconfig                      |   6 +
- drivers/clk/hisilicon/Makefile                     |   3 +-
- drivers/clk/hisilicon/clk-hi6220.c                 | 292 +++++++++++++++++++++
- drivers/clk/hisilicon/clk.c                        |  29 ++
- drivers/clk/hisilicon/clk.h                        |  17 ++
- drivers/clk/hisilicon/clkdivider-hi6220.c          | 273 +++++++++++++++++++
- include/dt-bindings/clock/hi6220-clock.h           | 173 ++++++++++++
- 17 files changed, 1131 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
- create mode 100644 arch/arm64/boot/dts/hisilicon/Makefile
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
- create mode 100644 drivers/clk/hisilicon/Kconfig
- create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
- create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
- create mode 100644 include/dt-bindings/clock/hi6220-clock.h
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4269dba..2af5efe 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -180,6 +180,11 @@ config ARCH_FSL_LS2085A
+ 	help
+ 	  This enables support for Freescale LS2085A SOC.
+ 
++config ARCH_HISI
++	bool "Hisilicon SoC Family"
++	help
++	  This enables support for Hisilicon ARMv8 SoC family
++
+ config ARCH_MEDIATEK
+ 	bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
+ 	select ARM_GIC
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 2ed7449..1d293ea 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -33,6 +33,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ CONFIG_ARCH_EXYNOS7=y
+ CONFIG_ARCH_FSL_LS2085A=y
++CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_MEDIATEK=y
+ CONFIG_ARCH_SEATTLE=y
+ CONFIG_ARCH_TEGRA=y
 -- 
 1.9.1
