@@ -1,34 +1,24 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 5 May 2015 13:56:47 +0200
-Subject: [PATCH 2/9] ARM: tegra: fix hda2codec_2x clock name for Tegra30
-In-Reply-To: <4c052b5a83e74b1571409a0a2cee1cc2832095c2.1428700856.git.marcel.ziswiler@toradex.com>
-References: <cover.1428700856.git.marcel.ziswiler@toradex.com>
- <4c052b5a83e74b1571409a0a2cee1cc2832095c2.1428700856.git.marcel.ziswiler@toradex.com>
-Message-ID: <20150505115645.GB30501@ulmo.nvidia.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 5 May 2015 13:57:07 +0200
+Subject: [PATCH] KVM: arm64: add active register handling to GICv3
+ emulation as well
+In-Reply-To: <1429815713-13684-1-git-send-email-andre.przywara@arm.com>
+References: <1429815713-13684-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150505115707.GA19385@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 10, 2015 at 11:35:57PM +0200, Marcel Ziswiler wrote:
-> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+On Thu, Apr 23, 2015 at 08:01:53PM +0100, Andre Przywara wrote:
+> Commit 47a98b15ba7c ("arm/arm64: KVM: support for un-queuing active
+> IRQs") introduced handling of the GICD_I[SC]ACTIVER registers,
+> but only for the GICv2 emulation. For the sake of completeness and
+> as this is a pre-requisite for save/restore of the GICv3 distributor
+> state, we should also emulate their handling in the distributor and
+> redistributor frames of an emulated GICv3.
 > 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> ---
->  drivers/clk/tegra/clk-tegra30.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-I think this isn't technically required because we're always getting the
-clocks via DT phandles. The whole devclks table should be obsolete since
-a couple of releases now, but might as well keep it correct until we've
-determined that it is safe to remove.
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Added a short commit message and applied this for v4.2.
-
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/71df1047/attachment-0001.sig>
+Applied to queue, thanks!
+-Christoffer
