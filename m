@@ -1,170 +1,211 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 05 May 2015 16:38:19 +0200
-Subject: [REGRESSION?] ARM: 7677/1: LPAE: Fix mapping in alloc_init_section
- for unaligned addresses  (was Re: Memory size unaligned to section boundary)
-In-Reply-To: <20150505142210.GB20402@leverpostej>
-References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
- <553F5B71.8030309@redhat.com> <20150505142210.GB20402@leverpostej>
-Message-ID: <5548D5DB.4020407@redhat.com>
+From: sumit.semwal@linaro.org (Sumit Semwal)
+Date: Tue, 5 May 2015 20:11:25 +0530
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <20150211162312.GR8656@n2100.arm.linux.org.uk>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <54DB12B5.4080000@samsung.com> <20150211111258.GP8656@n2100.arm.linux.org.uk>
+ <54DB4908.10004@samsung.com> <20150211162312.GR8656@n2100.arm.linux.org.uk>
+Message-ID: <CAO_48GHf=Zt7Ju=N=FAVfaudApSV+rSfb+Wou7L1Dh3egULm9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Russell, everyone,
 
-On 05-05-15 16:22, Mark Rutland wrote:
-> [Adding potentially interested parties, those involved in 7677/1]
->
-> On Tue, Apr 28, 2015 at 11:05:37AM +0100, Hans de Goede wrote:
->> Hi all,
+First up, sincere apologies for being awol for sometime; had some
+personal / medical things to take care of, and then I thought I'd wait
+for the merge window to get over before beginning to discuss this
+again.
+
+On 11 February 2015 at 21:53, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Feb 11, 2015 at 01:20:24PM +0100, Marek Szyprowski wrote:
+>> Hello,
 >>
->> On 23-04-15 15:19, Stefan Agner wrote:
->>> Hi,
->>>
->>> It seems to me that I hit an issue in low memory mapping (map_lowmem).
->>> I'm using a custom memory size, which leads to an freeze on Linux 4.0
->>> and also with Linus master on two tested ARMv7-A SoC's (Freescale Vybrid
->>> and NVIDIA Tegra 3):
->>>
->>> With mem=259744K
->>> [    0.000000] Booting Linux on physical CPU 0x0
->>> [    0.000000] Linux version 4.0.0-00189-ga4d2a4c3-dirty
->>> (ags at trochilidae) (gcc version 4.8.3 20140401 (prerelease) (Linaro GCC
->>> 4.8-2014.04) ) #506 Thu Apr 23 14:13:21 CEST 2015
->>> [    0.000000] CPU: ARMv7 Processor [410fc051] revision 1 (ARMv7),
->>> cr=10c5387d
->>> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
->>> instruction cache
->>> [    0.000000] Machine model: Toradex Colibri VF61 on Colibri Evaluation
->>> Board
->>> [    0.000000] bootconsole [earlycon0] enabled
->>> [    0.000000] cma: Reserved 16 MiB at 0x8e400000
->>> [    0.000000] Memory policy: Data cache writeback
->>> <freeze>
->>>
->>> I dug a bit more into that, and it unveiled that when creating the
->>> mapping for the non-kernel_x part (if (kernel_x_end < end) in
->>> map_lowmem), the unaligned section at the end leads to the freeze. In
->>> alloc_init_pmd, if the memory end is section unaligned, alloc_init_pte
->>> gets called which allocates a PTE outside of the initialized region (in
->>> early_alloc_aligned). The system freezes at the call of memset in
->>> early_alloc_aligned function.
->>>
->>> With some debug print, this can be better illustrated:
->>> [    0.000000] pgd 800063f0, addr 8fc00000, end 8fda8000, next 8fda8000
->>> [    0.000000] pud 800063f0, addr 8fc00000, end 8fda8000, next 8fda8000
->>> [    0.000000] pmd 800063f0, addr 8fc00000, next 8fda8000
->>>                            => actual end of memory ^^^^^^^^
->>> [    0.000000] alloc_init_pte
->>> [    0.000000] set_pte_ext, pte 00000000, addr 8fc00000, end 8fda8000
->>> [    0.000000] early_pte_alloc
->>> [    0.000000] early_alloc_aligned, 00001000, ptr 8fcff000, align
->>> 00001000
->>>        => PTE allocated outside of initialized area ^^^^^^^^
->>>
->>> It seems that memory gets allocation in the last section. When the last
->>> section was in the previous PMD, the allocation works, however if the
->>> last section is within the same PMD, the allocation ends up in the
->>> non-initialized area. So:
->>>
->>> In other words, sizes which end in a upper part of the 2MB sized PMD
->>> fail, while sizes in the lower part of a PMD work.
->>> 0xFF80000 => fails (mem=261632K)
->>> 0xFE80000 => works (mem=260608K)
->>> 0xFD80000 => fails (mem=261632K)
->>> ...
->>>
->>> While I understand the reason for the freeze, I don't know to properly
->>> fix it. It looks to me that in alloc_init_pmd, we should use
->>> __map_init_section first to map the last aligned section, before calling
->>> alloc_init_pte on the non aligned section.
->>>
->>> Background: I tried to reuse the boot loader part of the simplefb
->>> implementation for sunxi. It decreases memory size by the size of the
->>> framebuffer. Hence the actually memory size can be unaligned, depending
->>> on the display size used. In the case at hand, a framebuffer of the size
->>> 800x600 worked while 1024x600 did not work... The implementation uses
->>> device tree to report the memory size, but the kernel arguments show the
->>> same behavior.
->>>
->>> Maybe a regression of e651eab0af ("ARM: 7677/1: LPAE: Fix mapping in
->>> alloc_init_section for unaligned addresses"). I currently do not have a
->>> platform at hand which works on that Linux version out of the box.
+>> On 2015-02-11 12:12, Russell King - ARM Linux wrote:
+>> >Which is a damn good reason to NAK it - by that admission, it's a half-baked
+>> >idea.
+>> >
+>> >If all we want to know is whether the importer can accept only contiguous
+>> >memory or not, make a flag to do that, and allow the exporter to test this
+>> >flag.  Don't over-engineer this to make it _seem_ like it can do something
+>> >that it actually totally fails with.
+>> >
+>> >As I've already pointed out, there's a major problem if you have already
+>> >had a less restrictive attachment which has an active mapping, and a new
+>> >more restrictive attachment comes along later.
+>> >
+>> >It seems from Rob's descriptions that we also need another flag in the
+>> >importer to indicate whether it wants to have a valid struct page in the
+>> >scatter list, or whether it (correctly) uses the DMA accessors on the
+>> >scatter list - so that exporters can reject importers which are buggy.
 >>
->> I'm seeing this to an Allwinner Cortex A7 based SoCs, specifically
->> on tablets with a 1024x600 lcd screen it seems that shaving exactly the
->> amount of memory needed for a 32bpp 1024x600 framebuffer of from the
->> top of memory triggers this.
+>> Okay, but flag-based approach also have limitations.
 >
-> I'm able to trigger the issue on TC2 by passing mem=259744K. If I hack
-> sanity_check_meminfo to round the memblock limit down to PMD_SIZE I
-> avoid the immediate freeze, but later things blew up seemingly due to an
-> unmapped DTB (panic below) I'm not entirely sure why that's the case.
-
-Thank you for looking into this.
-
-> I wasn't able to come up with a DTB that would trigger this. Do you have
-> an example set of memory nodes + memreserves? Where are your kernel and
-> DTB loaded in memory?
-
-We've a single memory node/bank from 0x40000000 to end of memory, we
-carve out a framebuffer at the end, and do not report that to Linux, so
-the end becomes 0x40000000 + memory-size - fb-size, and we use no mem
-reserves, because if we do use mem-reserves the mmap of the fbmem by
-the simplefb driver fails as that maps it non cach-able and if it is
-part of the main membank it already is mapped cachable.
-
-We substract exactly the necessary fb-size, one known fb-size which
-triggers this is 1024x600 which means we end up substracting
-1024x600x4 bytes from the end of memory, so effectively we are
-doing the same as passing a mem= argument which is not 2MiB aligned.
-
-As for our kernel location, we have the following in u-boot's
-environment:
-
-         "kernel_addr_r=0x42000000\0" \
-         "fdt_addr_r=0x43000000\0" \
-         "scriptaddr=0x43100000\0" \
-         "pxefile_addr_r=0x43200000\0" \
-         "ramdisk_addr_r=0x43300000\0"
-
-Regards,
-
-Hans
-
-
-> Unable to handle kernel paging request at virtual address 9fee6000
-> pgd = 80004000
-> [9fee6000] *pgd=00000000
-> Internal error: Oops: 5 [#1] SMP ARM
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper Not tainted 4.1.0-rc1+ #17
-> Hardware name: ARM-Versatile Express
-> task: 8065e7a8 ti: 8065a000 task.ti: 8065a000
-> PC is at fdt_check_header+0x0/0x74
-> LR is at __unflatten_device_tree+0x1c/0x128
-> pc : [<80490350>]    lr : [<803a1554>]    psr: a00001d3
-> sp : 8065bf28  ip : 806a7d77  fp : 80000200
-> r10: 8056d84c  r9 : 8069fc9c  r8 : 80635b0c
-> r7 : 80683140  r6 : 9fee6000  r5 : 8063eac4  r4 : 80635b0c
-> r3 : 8069fcb4  r2 : 80635b0c  r1 : 8069fc9c  r0 : 9fee6000
-> Flags: NzCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-> Control: 10c5387d  Table: 8000406a  DAC: 00000015
-> Process swapper (pid: 0, stack limit = 0x8065a210)
-> Stack: (0x8065bf28 to 0x8065c000)
-> bf20:                   ffffffff 00000000 ffffffff 0008fbfd 00000000 00000000
-> bf40: 00000000 80635b0c 8063eac4 8065f79c 80683140 8068d5e4 806650e0 806366e8
-> bf60: 8065c3c8 8061b43c ffffffff 10c5387d 80683000 8fbfb340 80008000 8064aa88
-> bf80: 00000000 00000000 00000000 80058674 8056c3e8 8065bfb4 00000000 00000000
-> bfa0: 80683000 00000001 8065c3c0 ffffffff 00000000 00000000 00000000 8061895c
-> bfc0: 00000000 00000000 00000000 00000000 00000000 8064aa88 80683394 8065c440
-> bfe0: 8064aa84 8065f8bc 8000406a 412fc0f1 00000000 8000807c 00000000 00000000
-> [<80490350>] (fdt_check_header) from [<803a1554>] (__unflatten_device_tree+0x1c/0x128)
-> [<803a1554>] (__unflatten_device_tree) from [<806366e8>] (unflatten_device_tree+0x28/0x34)
-> [<806366e8>] (unflatten_device_tree) from [<8061b43c>] (setup_arch+0x778/0x984)
-> [<8061b43c>] (setup_arch) from [<8061895c>] (start_kernel+0x9c/0x3ac)
-> [<8061895c>] (start_kernel) from [<8000807c>] (0x8000807c)
-> Code: e3e0300d eafd2608 e3e0300d eafd260d (e5903000)
-> ---[ end trace cb88537fdc8fa200 ]---
-> Kernel panic - not syncing: Attempted to kill the idle task!
-> ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
+> Yes, the flag-based approach doesn't let you describe in detail what
+> the importer can accept - which, given the issues that I've raised
+> is a *good* thing.  We won't be misleading anyone into thinking that
+> we can do something that's really half-baked, and which we have no
+> present requirement for.
 >
+> This is precisely what Linus talks about when he says "don't over-
+> engineer" - if we over-engineer this, we end up with something that
+> sort-of works, and that's a bad thing.
+>
+> The Keep It Simple approach here makes total sense - what are our
+> current requirements - to be able to say that an importer can only accept:
+>   - contiguous memory rather than a scatterlist
+>   - scatterlists with struct page pointers
+>
+> Does solving that need us to compare all the constraints of each and
+> every importer, possibly ending up with constraints which can't be
+> satisfied?  No.  Does the flag approach satisfy the requirements?  Yes.
+>
+
+So, for basic constraint-sharing, we'll just go with the flag based
+approach, with a flag (best place for it is still dev->dma_params I
+suppose) for denoting contiguous or scatterlist. Is that agreed, then?
+Also, with this idea, of course, there won't be any helpers for trying
+to calculate constraints; it would be totally the exporter's
+responsibility to handle it via the attach() dma_buf_op if it wishes
+to.
+
+>> Frankly, if we want to make it really portable and sharable between devices,
+>> then IMO we should get rid of struct scatterlist and replace it with simple
+>> array of pfns in dma_buf. This way at least the problem of missing struct
+>> page will be solved and the buffer representation will be also a bit more
+>> compact.
+>
+> ... and move the mapping and unmapping of the PFNs to the importer,
+> which IMHO is where it should already be (so the importer can decide
+> when it should map the buffer itself independently of getting the
+> details of the buffer.)
+>
+>> Such solution however also requires extending dma-mapping API to handle
+>> mapping and unmapping of such pfn arrays. The advantage of this approach
+>> is the fact that it will be completely new API, so it can be designed
+>> well from the beginning.
+>
+> As far as I'm aware, there was no big discussion of the dma_buf API -
+> it's something that just appeared one day (I don't remember seeing it
+> discussed.)  So, that may well be a good thing if it means we can get
+> these kinds of details better hammered out.
+>
+> However, I don't share your view of "completely new API" - that would
+> be far too disruptive.  I think we can modify the existing API, to
+> achieve our goals.
+>
+> I don't think changing the dma-mapping API just for this case is really
+> on though - if we're passed a list of PFNs, they either must be all
+> associated with a struct page - iow, pfn_valid(pfn) returns true for
+> all of them or none of them.  If none of them, then we need to be able
+> to convert those PFNs to a dma_addr_t for the target device (yes, that
+> may need the dma-mapping API augmenting.)
+>
+> However, if they are associated with a struct page, then we should use
+> the established APIs and use a scatterlist, otherwise we're looking
+> at rewriting all IOMMUs and all DMA mapping implementations to handle
+> what would become a special case for dma_buf.
+>
+> I'd rather... Keep It Simple.
+>
++1 for Keep it simple, and the idea overall. Though I suspect more
+dma-buf users (dri / v4l friends?) should comment if this doesn't help
+solve things on some platforms / subsystems that they care about.
+
+> So, maybe, as a first step, let's augment dma_buf with a pair of
+> functions which get the "raw" unmapped scatterlist:
+>
+> struct sg_table *dma_buf_get_scatterlist(struct dma_buf_attachment *attach)
+> {
+>         struct sg_table *sg_table;
+>
+>         might_sleep();
+>
+>         if (!attach->dmabuf->ops->get_scatterlist)
+>                 return ERR_PTR(-EINVAL);
+>
+>         sg_table = attach->dmabuf->ops->get_scatterlist(attach);
+>         if (!sg_table)
+>                 sg_table = ERR_PTR(-ENOMEM);
+>
+>         return sg_table;
+> }
+>
+> void dma_buf_put_scatterlist(struct dma_buf_attachment *attach,
+>                              struct sg_table *sg_table)
+> {
+>         might_sleep();
+>
+>         attach->dmabuf->ops->put_scatterlist(attach, sg_table);
+> }
+>
+> Implementations should arrange for dma_buf_get_scatterlist() to return
+> the EINVAL error pointer if they are unable to provide an unmapped
+> scatterlist (in other words, they are exporting a set of PFNs or
+> already-mapped dma_addr_t's.)  This can be done by either not
+> implementing the get_scatterlist method, or by implementing it and
+> returning that forementioned error pointer value.
+>
+> Where these two are implemented and used, the importer is responsible
+> for calling dma_map_sg() and dma_unmap_sg() on the returned scatterlist
+> table.
+>
+> unsigned long *dma_buf_get_pfns(struct dma_buf_attachment *attach)
+> {
+>         unsigned long *pfns;
+>
+>         might_sleep();
+>
+>         if (!attach->dmabuf->ops->get_pfns)
+>                 return ERR_PTR(-EINVAL);
+>
+>         return attach->dmabuf->ops->get_pfns(attach);
+> }
+>
+> void dma_buf_put_pfns(struct dma_buf_attachment *attach, unsigned long *pfns)
+> {
+>         might_sleep();
+>
+>         attach->dmabuf->ops->put_pfns(attach, pfns);
+> }
+>
+> Similar to the above, but this gets a list of PFNs.  Each PFN entry prior
+> to the last describes a page starting at offset 0 extending to the end of
+> the page.  The last PFN entry describes a page starting at offset 0 and
+> extending to the offset of the attachment size within the page.  Again,
+> if not implemented or it is not possible to represent the buffer as PFNs,
+> it returns -EINVAL.
+>
+> For the time being, we keep the existing dma_buf_map_attachment() and
+> dma_buf_unmap_attachment() while we transition users over to the new
+> interfaces.
+>
+> We may wish to augment struct dma_buf_attachment with a couple of flags
+> to indicate which of these the attached dma_buf supports, so that drivers
+> can deal with these themselves.
+>
+Could I please send a patchset first for the constraint-flags
+addition, and then take this up in a following patch-set, once we have
+agreement from other stake holders as well?
+
+Russell: would it be ok if we discuss it offline more? I am afraid I
+am not as knowledgeable on this topic, and would probably request your
+help / guidance here.
+
+> We may also wish in the longer term to keep dma_buf_map_attachment() but
+> implement it as a wrapper around get_scatterlist() as a helper to provide
+> its existing functionality - providing a mapped scatterlist.  Possibly
+> also including get_pfns() in that as well if we need to.
+>
+> However, I would still like more thought put into Rob's issue to see
+> whether we can solve his problem with using the dma_addr_t in a more
+> elegant way.  (I wish I had some hardware to experiment with for that.)
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
+
+Best regards,
+~Sumit.
