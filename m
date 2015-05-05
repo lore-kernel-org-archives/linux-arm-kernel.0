@@ -1,63 +1,167 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 5 May 2015 17:13:33 +0530
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150505105714.GA22845@sirena.org.uk>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <20150504121209.GM15510@sirena.org.uk>
- <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
- <20150505105714.GA22845@sirena.org.uk>
-Message-ID: <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 05 May 2015 12:46:32 +0100
+Subject: [PATCH v4 04/10] eeprom: Add a simple EEPROM framework for eeprom
+ consumers
+In-Reply-To: <20150409144522.GB9663@codeaurora.org>
+References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427752670-17219-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150407184533.GA10278@codeaurora.org> <55243982.7020907@linaro.org>
+ <20150409144522.GB9663@codeaurora.org>
+Message-ID: <5548AD98.50801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 May 2015 at 16:27, Mark Brown <broonie@kernel.org> wrote:
-> No, it doesn't - you're not answering the question about what this is
-> for.
+Hi Stephen,
 
-I don't know how this information will be used finally. Probably the
-platform driver will do the configuration based on the volt-cur pair.
-
-> To know if this makes sense I need to know what you beleive "setting the
-> current" does.  If you literally mean setting the current it makes no
-> sense at all.  If you mean something else that something else should
-> probably be written into the binding.
-
-Yeah, that was a wrong statement. We can't configure current separately.
-
-Does this diff make it any better ?
+Sorry I took so long to reply.
 
 
-diff --git a/Documentation/devicetree/bindings/power/opp.txt
-b/Documentation/devicetree/bindings/power/opp.txt
-index c96dc77121b7..a57e88ab4554 100644
---- a/Documentation/devicetree/bindings/power/opp.txt
-+++ b/Documentation/devicetree/bindings/power/opp.txt
-@@ -59,16 +59,18 @@ properties.
-   regulators are specified in device's DT node.
+On 09/04/15 15:45, Stephen Boyd wrote:
+> On 04/07, Srinivas Kandagatla wrote:
+>> On 07/04/15 19:45, Stephen Boyd wrote:
+>>> On 03/30, Srinivas Kandagatla wrote:
+>>>
+>>> Do you have an overview of how to use these APIs? Maybe some
+>>> Documentation/ is in order? I'm mostly interested in how the
+>>> blocks array is supposed to work and how this hooks up to drivers
+>>> that are using DT.
+>>
+>> Only doc ATM is function level kernel doc in c file.
+>> May be I can explain you for now and I will try to add some
+>> documentation with some usage examples in next version.
+>
+> Thanks.
+>
+>>
+>> eeprom block array is just another way intended to get hold of
+>> eeprom content for non-DT providers/consumers, but DT
+>> consumers/providers can also use it. As of today SOC/mach level code
+>> could use it as well.
+>>
+>> In eeprom_cell_get() case the lookup of provider is done based on
+>> provider name, this provider name is generally supplied by all the
+>> providers (both DT/non DT).
+>>
+>> for example in qfprom case,
+>> provider is registered from DT with eeprom config containing a unique name:
+>> static struct eeprom_config econfig = {
+>> 	.name = "qfprom",
+>> 	.id = 0,
+>> };
+>>
+>> In the consumer case, the tsens driver could do some like in non DT way:
+>>
+>> 	struct eeprom_block blocks[4] ={
+>> 		{
+>> 		.offset = 0x404,
+>> 		.count = 0x4,
+>> 		},
+>> 		{
+>> 		.offset = 0x408,
+>> 		.count = 0x4,
+>> 		},
+>> 		{
+>> 		.offset = 0x40c,
+>> 		.count = 0x4,
+>> 		},
+>> 		{
+>> 		.offset = 0x410,
+>> 		.count = 0x4,
+>> 		},
+>> 	};
+>> 	calib_cell = eeprom_cell_get("qfprom0", blocks, 4);
+>>
+>>
+>> Or in DT way
+>> calib_cell  = of_eeprom_cell_get(np, "calib");
+>>
+>
+> Ok. I guess I was hoping for a more device centric approach like
+> we have for clks/regulators/etc. That way a driver doesn't need
+> to know it's using DT or not to figure out which API to call.
 
- - opp-microamp: current in micro Amperes. It can contain entries for multiple
--  regulators.
-+  regulators. This can be referenced (along with voltage and freqency) while
-+  programming the regulator.
+That would be the best. Its easy to wrap up whats in eeprom core to
+eeprom_get_cell(dev, "cell-name") for both DT and non-dt cases, if I
+remove the nasty global name space thing.
 
-   A single regulator's current is specified with an array of size one or three.
-   Single entry is for target current and three entries are for <target min max>
-   currents.
+Only thing which is limiting it is the existing bindings which are just 
+phandle based. For eeprom to be more of device centric we need more
+generic bindings/property names like
 
-   Entries for multiple regulators must be present in the same order as
--  regulators are specified in device's DT node. If few regulators don't provide
--  capability to configure current, then values for then should be marked as
--  zero.
-+  regulators are specified in device's DT node. If current value for few
-+  regulators isn't required to be passed, then values for such
-regulators should
-+  be marked as zero. If it isn't required for any regulator, then this property
-+  need not be present.
+nvrom-cell = <&abc>, <&edf>
+nvrom-cell-names = "cell1", "cell2";
 
- - clock-latency-ns: Specifies the maximum possible transition latency (in
-   nanoseconds) for switching to this OPP from any other OPP.
+Also we can have name associated to each eeprom cell which would help 
+for non-dt cases. So they can just lookup by the cell name.
 
 
-(Restoring my laptop after a corrupted disk, and so sending it from gmail,
-might be a bit corrupted)..
+Sacha, Are you ok with such binding?  As this can provide a single 
+interface for dt and non-dt. I remember you requested for changing from 
+generic properties to specific property names.
+
+
+> Also the global namespace is sort of worrying (qfprom0 part). How
+> do we know it's qfprom0? What if it's qfprom1 sometimes?
+
+I agree this is something which I don't like it in the first place too.
+If we have something like names associated to each eeprom cell like clks
+or regulators we can have some thing like eeprom_get_cell(dev, name);
+
+>
+> Also, how are we supposed to encode certain bits inside the
+> stream of bytes (blocks)? In some situations (e.g. the qcom CPR
+> stuff) we have quite a few fuse bits we need to read that are
+> packed into different bytes and may cross byte boundaries (i.e.
+> bits 6 to 10 of a 32-bit word). The current API looks to be byte
+> focused when I have bit based/non-byte aligned data.
+Yes, it is more of byte oriented. However we can add some new apis for
+parsers like ones you are working on.
+
+of_eeprom_get_provider_regmap(phandle) just to get handle to regmap from 
+eeprom_core, which would provide most of the apis you would need.
+Am guessing eeprom parsers would need need such interface to eeprom-core 
+in future anyway.
+
+>
+> My current feeling is that I don't want to use any of the block
+> stuff at all. I just want a simple byte-based API that allows me
+> to read a number of contiguous bytes from the fuses. Then I'll
+> need to shift that data down by a few bits and mask it with the
+> width of the data I want to read to extract the data needed.
+>
+> The only thing after that where I have a problem is figuring out
+> which eeprom is present in the consumer driver. I think I may
+> need to open-code it and look at the phandle for the eeprom and
+> do a compatible check to figure out which bits I want to read.
+>
+> The DT would be like this (note I left eeprom-cells/eeproms here
+> because that allows us to generically find eeproms used by a
+> device and find eeprom providers):
+
+I though, having "eeprom-cells" would be make sense only if the bindings 
+have possible arguments to a phandle. In this case it would be none all 
+the time.
+
+For provider lookups currently its generic/easy and fast as its done 
+based on eeprom class. Am not sure what advantage would we get
+Am I missing anything ?
+
+If you are ok I will prepare a v5 with the proposed changes.
+
+
+--srini
+>
+> 	qfprom: eeprom at 58000 {
+> 		compatible = "qcom,qfprom-msm8916";
+> 		reg = <0x58000 0x7000>;
+> 		#eeprom-cells = <0>;
+> 	};
+> 	
+> 	cpr at b018000 {
+> 		compatible = "qcom,cpr";
+> 		reg = <0xb018000 0x1000>;
+> 		interrupts = <0 15 1>, <0 16 1>, <0 17 1>;
+> 		eeproms = <&qfprom>;
+> 		...
+> 	};
+>
