@@ -1,97 +1,41 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 5 May 2015 10:35:31 +0200
-Subject: [PATCH 2/2] mmc: sdhci-sirf: fake version and capbility registers
-In-Reply-To: <1430122514-6541-2-git-send-email-21cnbao@gmail.com>
-References: <1430122514-6541-1-git-send-email-21cnbao@gmail.com>
- <1430122514-6541-2-git-send-email-21cnbao@gmail.com>
-Message-ID: <CAPDyKFowrRx7gUhP1hZs7qxH7Sw5LomgKnBZzs-zAmcVYzqbjw@mail.gmail.com>
+Date: Tue, 5 May 2015 10:36:21 +0200
+Subject: [PATCH 1/6] mmc: davinci: Constify platform_device_id
+In-Reply-To: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430495362-31506-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <CAPDyKFrpTiztS1UrMQRXX4o9=s1L7qzX9JTdNNHQUrx5sa5aiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 April 2015 at 10:15, Barry Song <21cnbao@gmail.com> wrote:
-> From: Weijun Yang <Weijun.Yang@csr.com>
+On 1 May 2015 at 17:49, Krzysztof Kozlowski <k.kozlowski.k@gmail.com> wrote:
+> The platform_device_id is not modified by the driver and core uses it as
+> const.
 >
-> chips have some issues for version and capbility registers, here we fake
-> them.
->
-> Signed-off-by: Weijun Yang <Weijun.Yang@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 
-Thanks, applied!
+Thanks, applied all patches (1->6). The last one I updated the prefix
+in commit message header to "sdhci".
 
 Kind regards
 Uffe
 
 > ---
->  drivers/mmc/host/Kconfig      |  1 +
->  drivers/mmc/host/sdhci-sirf.c | 35 +++++++++++++++++++++++++++++++++++
->  2 files changed, 36 insertions(+)
+>  drivers/mmc/host/davinci_mmc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index b1f837e..d5e107b 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -219,6 +219,7 @@ config MMC_SDHCI_SIRF
->         tristate "SDHCI support on CSR SiRFprimaII and SiRFmarco SoCs"
->         depends on ARCH_SIRF
->         depends on MMC_SDHCI_PLTFM
-> +       select MMC_SDHCI_IO_ACCESSORS
->         help
->           This selects the SDHCI support for SiRF System-on-Chip devices.
->
-> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-> index 2201f76..0110bae 100644
-> --- a/drivers/mmc/host/sdhci-sirf.c
-> +++ b/drivers/mmc/host/sdhci-sirf.c
-> @@ -43,6 +43,39 @@ static void sdhci_sirf_set_bus_width(struct sdhci_host *host, int width)
->         sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+> index 1625f908dc70..ea2a2ebc6b91 100644
+> --- a/drivers/mmc/host/davinci_mmc.c
+> +++ b/drivers/mmc/host/davinci_mmc.c
+> @@ -1161,7 +1161,7 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
+>         mmc_davinci_reset_ctrl(host, 0);
 >  }
 >
-> +static u32 sdhci_sirf_readl_le(struct sdhci_host *host, int reg)
-> +{
-> +       u32 val = readl(host->ioaddr + reg);
-> +
-> +       if (unlikely((reg == SDHCI_CAPABILITIES_1) &&
-> +                       (host->mmc->caps & MMC_CAP_UHS_SDR50))) {
-> +               /* fake CAP_1 register */
-> +               val = SDHCI_SUPPORT_SDR50 | SDHCI_USE_SDR50_TUNING;
-> +       }
-> +
-> +       if (unlikely(reg == SDHCI_SLOT_INT_STATUS)) {
-> +               u32 prss = val;
-> +               /* fake chips as V3.0 host conreoller */
-> +               prss &= ~(0xFF << 16);
-> +               val = prss | (SDHCI_SPEC_300 << 16);
-> +       }
-> +       return val;
-> +}
-> +
-> +static u16 sdhci_sirf_readw_le(struct sdhci_host *host, int reg)
-> +{
-> +       u16 ret = 0;
-> +
-> +       ret = readw(host->ioaddr + reg);
-> +
-> +       if (unlikely(reg == SDHCI_HOST_VERSION)) {
-> +               ret = readw(host->ioaddr + SDHCI_HOST_VERSION);
-> +               ret |= SDHCI_SPEC_300;
-> +       }
-> +
-> +       return ret;
-> +}
-> +
->  static int sdhci_sirf_execute_tuning(struct sdhci_host *host, u32 opcode)
->  {
->         int tuning_seq_cnt = 3;
-> @@ -113,6 +146,8 @@ retry:
->  }
->
->  static struct sdhci_ops sdhci_sirf_ops = {
-> +       .read_l = sdhci_sirf_readl_le,
-> +       .read_w = sdhci_sirf_readw_le,
->         .platform_execute_tuning = sdhci_sirf_execute_tuning,
->         .set_clock = sdhci_set_clock,
->         .get_max_clock  = sdhci_pltfm_clk_get_max_clock,
+> -static struct platform_device_id davinci_mmc_devtype[] = {
+> +static const struct platform_device_id davinci_mmc_devtype[] = {
+>         {
+>                 .name   = "dm6441-mmc",
+>                 .driver_data = MMC_CTLR_VERSION_1,
 > --
-> 2.3.5
+> 2.1.4
 >
