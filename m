@@ -1,58 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 May 2015 16:44:06 +0100
-Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
-In-Reply-To: <CAAS=xmh=tQRJymDCAevNC_gv+aCQnJH0tPjXX2L0BBhKbhZOYg@mail.gmail.com>
-References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
- <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
- <20150505171349.GA30215@leverpostej> <5549877C.10408@huawei.com>
- <5549B9CC.1040709@huawei.com> <20150506093022.GB31001@leverpostej>
- <5549EE97.3020801@huawei.com> <20150506104856.GC707@leverpostej>
- <CAAS=xmh=tQRJymDCAevNC_gv+aCQnJH0tPjXX2L0BBhKbhZOYg@mail.gmail.com>
-Message-ID: <20150506154406.GB2974@leverpostej>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 May 2015 11:44:54 -0400 (EDT)
+Subject: [PATCH 0/5] Second round of MCPM refactoring
+In-Reply-To: <5549F4E9.9030303@hisilicon.com>
+References: <1430496392-15956-1-git-send-email-nicolas.pitre@linaro.org>
+ <5549F4E9.9030303@hisilicon.com>
+Message-ID: <alpine.LFD.2.11.1505061143190.7750@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 6 May 2015, Wei Xu wrote:
 
-> How about add the following binding rule to my 2/5 patch:
-> ---------------------------
-> *Hisilicon Enhanced ARM AMBA Primecell PL011 serial UART
 > 
-> Required properties:
-> - compatible: must be "hisilicon,hi6220-uart", "arm,primecell", "arm,pl011"
-
-"arm,primecell" should come last.
-
-> - reg: exactly one register range with length 0x1000
-> - interrupts: exactly one interrupt specifier
 > 
-> See also bindings/serial/pl011.txt
+> On 5/1/2015 5:06 PM, Nicolas Pitre wrote:
+> > This is the sequel to the first episode that started here:
+> > 
+> > 	http://article.gmane.org/gmane.linux.ports.arm.kernel/401353
+> > 
+> > Now that most of the first set has been merged upstream, here's the last
+> > set to complete the cleanup. This mainly includes the removal of the
+> > backward compatibility support plus some cosmetic changes.
+> > 
+> > The hisi04 backend, though, is instead converted to raw SMP operations
+> > as it currently doesn't benefit from MCPM at all and doesn't fit well
+> > with the new backend structure.
 > 
-> Example:
+> Tested by: Wei Xu <xuwei5@hisilicon.com>
 > 
-> uart0: uart at f8015000 {
->         compatible = "hisilicon,hi6220-uart", "arm,pl011", "arm,primecell";
->         reg = <0x0 0xf8015000 0x0 0x1000>;
->         interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
->         clocks = <&ao_ctrl HI6220_UART0_PCLK>, <&ao_ctrl HI6220_UART0_PCLK>;
->         clock-names = "uartclk", "apb_pclk";
-> };
+> Built and booted all the 16 cores on D01 board based on v4.1-rc2.
+> And confirmed CPU hotplug works well on D01 board.
 
-How about for the moment we just modify the existing pl011 binding
-document to allow for the hi6220-specific string in addition to its
-existing strings? We can always split it out later if the hi6220 UART
-binding needs to be significantly divergent.
+Thanks for testing.
 
-> > Is UART 0 different from UART1 and UART2?
-> Yes,  but my patch just includes UART0, we do some changements for UART1/2
-> to improve performance.
 
-Sure, but we need to make sure we can choose a sane compatible string
-for them, that won't clash with whatever we choose for UART0.
-
-Are they the same IP as UART0, or fundamentally different?
-
-Are they also PL011 derived?
-
-Thanks,
-Mark.
+Nicolas
