@@ -1,71 +1,203 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 6 May 2015 10:59:01 -0400
-Subject: [PATCH 02/11] arm/mach-keystone: remove legacy __cpuinit
- sections that crept in
-In-Reply-To: <20150506103704.GJ2067@n2100.arm.linux.org.uk>
-References: <1430174880-27958-1-git-send-email-paul.gortmaker@windriver.com>
- <1430174880-27958-3-git-send-email-paul.gortmaker@windriver.com>
- <20150506103704.GJ2067@n2100.arm.linux.org.uk>
-Message-ID: <20150506145901.GB12108@windriver.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Wed, 06 May 2015 17:05:24 +0200
+Subject: [PATCH v2 02/17] leds: port locomo leds driver to new locomo core
+In-Reply-To: <1430178954-11138-3-git-send-email-dbaryshkov@gmail.com>
+References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
+ <1430178954-11138-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <554A2DB4.3020000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH 02/11] arm/mach-keystone: remove legacy __cpuinit sections that crept in] On 06/05/2015 (Wed 11:37) Russell King - ARM Linux wrote:
+On 04/28/2015 01:55 AM, Dmitry Eremin-Solenikov wrote:
+> Adapt locomo leds driver to new locomo core setup.
+>
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>   drivers/leds/Kconfig       |   1 -
+>   drivers/leds/leds-locomo.c | 119 +++++++++++++++++++++++----------------------
+>   2 files changed, 61 insertions(+), 59 deletions(-)
+>
+> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+> index 966b960..4b4650b 100644
+> --- a/drivers/leds/Kconfig
+> +++ b/drivers/leds/Kconfig
+> @@ -79,7 +79,6 @@ config LEDS_LM3642
+>   config LEDS_LOCOMO
+>   	tristate "LED Support for Locomo device"
+>   	depends on LEDS_CLASS
+> -	depends on SHARP_LOCOMO
 
-> On Mon, Apr 27, 2015 at 06:47:51PM -0400, Paul Gortmaker wrote:
-> > We removed __cpuinit support (leaving no-op stubs) quite some time
-> > ago.  However two crept back in as of commit 5eb3da7246a5b2dfac9f38
-> > ("ARM: keystone: Switch over to coherent memory address space")
-> > 
-> > Since we want to clobber the stubs too, get these removed now.
-> > 
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> Santosh's email is now: Santosh Shilimkar <ssantosh@kernel.org>
+Why do you remove this dependency?
 
-Thanks - will fix locally and ensure that is what goes into linux-next
-etc. but won't bother respamming everyone with the whole series for it.
+>   	help
+>   	  This option enables support for the LEDs on Sharp Locomo.
+>   	  Zaurus models SL-5500 and SL-5600.
+> diff --git a/drivers/leds/leds-locomo.c b/drivers/leds/leds-locomo.c
+> index 80ba048..7fde812 100644
+> --- a/drivers/leds/leds-locomo.c
+> +++ b/drivers/leds/leds-locomo.c
+> @@ -9,89 +9,92 @@
+>    */
+>
+>   #include <linux/kernel.h>
+> -#include <linux/init.h>
+> -#include <linux/module.h>
+> -#include <linux/device.h>
+>   #include <linux/leds.h>
+> -
+> -#include <mach/hardware.h>
+> -#include <asm/hardware/locomo.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/locomo.h>
 
-P.
---
+Please keep alphabetical order.
 
-> 
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> > ---
-> >  arch/arm/mach-keystone/platsmp.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
-> > index 5f46a7cf907b..7f99550cad46 100644
-> > --- a/arch/arm/mach-keystone/platsmp.c
-> > +++ b/arch/arm/mach-keystone/platsmp.c
-> > @@ -40,14 +40,14 @@ static int keystone_smp_boot_secondary(unsigned int cpu,
-> >  }
-> >  
-> >  #ifdef CONFIG_ARM_LPAE
-> > -static void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
-> > +static void keystone_smp_secondary_initmem(unsigned int cpu)
-> >  {
-> >  	pgd_t *pgd0 = pgd_offset_k(0);
-> >  	cpu_set_ttbr(1, __pa(pgd0) + TTBR1_OFFSET);
-> >  	local_flush_tlb_all();
-> >  }
-> >  #else
-> > -static inline void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
-> > +static inline void keystone_smp_secondary_initmem(unsigned int cpu)
-> >  {}
-> >  #endif
-> >  
-> > -- 
-> > 2.2.1
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+> +
+> +struct locomo_led {
+> +	struct led_classdev led;
+> +	struct regmap *regmap;
+> +	unsigned int reg;
+> +};
+>
+>   static void locomoled_brightness_set(struct led_classdev *led_cdev,
+> -				enum led_brightness value, int offset)
+> +				enum led_brightness value)
+>   {
+> -	struct locomo_dev *locomo_dev = LOCOMO_DEV(led_cdev->dev->parent);
+> -	unsigned long flags;
+> +	struct locomo_led *led = container_of(led_cdev, struct locomo_led, led);
+>
+> -	local_irq_save(flags);
+> -	if (value)
+> -		locomo_writel(LOCOMO_LPT_TOFH, locomo_dev->mapbase + offset);
+> -	else
+> -		locomo_writel(LOCOMO_LPT_TOFL, locomo_dev->mapbase + offset);
+> -	local_irq_restore(flags);
+> +	regmap_write(led->regmap, led->reg,
+> +			value ? LOCOMO_LPT_TOFH : LOCOMO_LPT_TOFL);
+>   }
+
+Please use work queue for setting brightness. This is required for the
+driver to be compatible with led triggers. You can refer to the
+existing LED drivers on how to implement this.
+
+>
+> -static void locomoled_brightness_set0(struct led_classdev *led_cdev,
+> -				enum led_brightness value)
+> +static int locomo_led_register(
+> +		struct device *dev,
+> +		struct locomo_led *led,
+> +		const char *name,
+> +		const char *trigger,
+> +		struct regmap *regmap,
+> +		unsigned int reg)
+>   {
+> -	locomoled_brightness_set(led_cdev, value, LOCOMO_LPT0);
+> +	led->led.name = name;
+> +	led->led.flags = LED_CORE_SUSPENDRESUME;
+> +	led->led.default_trigger = trigger;
+> +	led->led.brightness_set = locomoled_brightness_set;
+> +	led->regmap = regmap;
+> +	led->reg = reg;
+> +
+> +	return devm_led_classdev_register(dev, &led->led);
+>   }
+>
+> -static void locomoled_brightness_set1(struct led_classdev *led_cdev,
+> -				enum led_brightness value)
+> -{
+> -	locomoled_brightness_set(led_cdev, value, LOCOMO_LPT1);
+> -}
+> -
+> -static struct led_classdev locomo_led0 = {
+> -	.name			= "locomo:amber:charge",
+> -	.default_trigger	= "main-battery-charging",
+> -	.brightness_set		= locomoled_brightness_set0,
+> -};
+> -
+> -static struct led_classdev locomo_led1 = {
+> -	.name			= "locomo:green:mail",
+> -	.default_trigger	= "nand-disk",
+> -	.brightness_set		= locomoled_brightness_set1,
+> -};
+> -
+> -static int locomoled_probe(struct locomo_dev *ldev)
+> +static int locomoled_probe(struct platform_device *pdev)
+>   {
+>   	int ret;
+> -
+> -	ret = led_classdev_register(&ldev->dev, &locomo_led0);
+> +	struct locomo_led *leds;
+> +	struct regmap *regmap;
+> +
+> +	leds = devm_kzalloc(&pdev->dev, 2 * sizeof(*leds), GFP_KERNEL);
+> +	if (!leds)
+> +		return -ENOMEM;
+> +
+> +	regmap = dev_get_regmap(pdev->dev.parent, NULL);
+> +	if (!regmap)
+> +		return -ENODEV;
+> +
+> +	ret = locomo_led_register(
+> +			&pdev->dev,
+> +			leds,
+> +			"locomo:amber:charge",
+> +			"main-battery-charging",
+> +			regmap,
+> +			LOCOMO_LPT0);
+>   	if (ret < 0)
+>   		return ret;
+>
+> -	ret = led_classdev_register(&ldev->dev, &locomo_led1);
+> +	ret = locomo_led_register(
+> +			&pdev->dev,
+> +			leds + 1,
+> +			"locomo:green:mail",
+> +			"mmc0",
+> +			regmap,
+> +			LOCOMO_LPT1);
+>   	if (ret < 0)
+> -		led_classdev_unregister(&locomo_led0);
+> -
+> -	return ret;
+> -}
+> +		return ret;
+>
+> -static int locomoled_remove(struct locomo_dev *dev)
+> -{
+> -	led_classdev_unregister(&locomo_led0);
+> -	led_classdev_unregister(&locomo_led1);
+>   	return 0;
+>   }
+>
+> -static struct locomo_driver locomoled_driver = {
+> -	.drv = {
+> -		.name = "locomoled"
+> +static struct platform_driver locomoled_driver = {
+> +	.driver = {
+> +		.name = "locomo-led"
+>   	},
+> -	.devid	= LOCOMO_DEVID_LED,
+>   	.probe	= locomoled_probe,
+> -	.remove	= locomoled_remove,
+>   };
+>
+> -static int __init locomoled_init(void)
+> -{
+> -	return locomo_driver_register(&locomoled_driver);
+> -}
+> -module_init(locomoled_init);
+> +module_platform_driver(locomoled_driver);
+>
+>   MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
+>   MODULE_DESCRIPTION("Locomo LED driver");
+>   MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:locomo-led");
+>
+
+
+-- 
+Best Regards,
+Jacek Anaszewski
