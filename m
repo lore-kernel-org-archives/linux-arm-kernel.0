@@ -1,84 +1,119 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Wed, 06 May 2015 12:23:49 +0200
-Subject: [PATCH 1/6] ARM: sunxi: Introduce Allwinner H3 support
-In-Reply-To: <20150506100446.GA11057@lukather>
-References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
- <1430904693-1404-2-git-send-email-jenskuske@gmail.com>
- <20150506100446.GA11057@lukather>
-Message-ID: <5549EBB5.8040806@gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 6 May 2015 18:25:55 +0800
+Subject: [PATCH v3 3/3] media: atmel-isi: remove mck back compatiable code as
+ it's not need
+In-Reply-To: <1430907955-28665-1-git-send-email-josh.wu@atmel.com>
+References: <1430907955-28665-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1430907955-28665-4-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/15 12:04, Maxime Ripard wrote:
-> Hi,
-> 
-> On Wed, May 06, 2015 at 11:31:28AM +0200, Jens Kuske wrote:
->> The Allwinner H3 is a quad-core Cortex-A7-based SoC. It is very similar
->> to other sun8i family SoCs like the A23.
->>
->> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->>  arch/arm/mach-sunxi/Kconfig                     | 2 +-
->>  arch/arm/mach-sunxi/sunxi.c                     | 3 ++-
->>  3 files changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
->> index 42941fd..3cb4b94 100644
->> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
->> @@ -9,4 +9,5 @@ using one of the following compatible strings:
->>    allwinner,sun6i-a31
->>    allwinner,sun7i-a20
->>    allwinner,sun8i-a23
->> +  allwinner,sun8i-h3
->>    allwinner,sun9i-a80
->> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
->> index 81502b9..47ac5b4 100644
->> --- a/arch/arm/mach-sunxi/Kconfig
->> +++ b/arch/arm/mach-sunxi/Kconfig
->> @@ -35,7 +35,7 @@ config MACH_SUN7I
->>  	select SUN5I_HSTIMER
->>  
->>  config MACH_SUN8I
->> -	bool "Allwinner A23 (sun8i) SoCs support"
->> +	bool "Allwinner A23 / H3 (sun8i) SoCs support"
-> 
-> I'd prefer that we have something similar to sun9i, just mentionning
-> the family here, instead of an ever-growing list of SoCs.
-> 
-> This used to be easy to maintain, with the new naming scheme, we
-> already have at least 4 SoCs part of sun8i.
+The master clock should handled by sensor itself.
 
-According to Allwinners new naming scheme A20/A31/A31s are also part of
-sun8i (sun8iw[1,2]), but I think we can agree to use sun8i for the new
-SoCs, starting from A23.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
 
-> 
->>  	default ARCH_SUNXI
->>  	select ARM_GIC
->>  	select MFD_SUN6I_PRCM
->> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
->> index 1bc811a..bc63748 100644
->> --- a/arch/arm/mach-sunxi/sunxi.c
->> +++ b/arch/arm/mach-sunxi/sunxi.c
->> @@ -67,10 +67,11 @@ MACHINE_END
->>  
->>  static const char * const sun8i_board_dt_compat[] = {
->>  	"allwinner,sun8i-a23",
->> +	"allwinner,sun8i-h3",
->>  	NULL,
->>  };
->>  
->> -DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
->> +DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23/H3) Family")
-> 
-> Same comment here.
-> 
-> Could you also update Documentation/arm/sunxi/README with these infos
-> (and ideally, updating it with the new SoCs we've heard about) ?
-> 
+Changes in v3:
+- remove useless definition: ISI_DEFAULT_MCLK_FREQ
 
-Will do.
+Changes in v2:
+- totally remove clock_start()/clock_stop() as they are optional.
 
-Jens
+ drivers/media/platform/soc_camera/atmel-isi.c | 46 ---------------------------
+ 1 file changed, 46 deletions(-)
+
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+index 2b05f89..d4989d1 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.c
++++ b/drivers/media/platform/soc_camera/atmel-isi.c
+@@ -35,7 +35,6 @@
+ #define VID_LIMIT_BYTES			(16 * 1024 * 1024)
+ #define MIN_FRAME_RATE			15
+ #define FRAME_INTERVAL_MILLI_SEC	(1000 / MIN_FRAME_RATE)
+-#define ISI_DEFAULT_MCLK_FREQ		25000000
+ 
+ /* Frame buffer descriptor */
+ struct fbd {
+@@ -83,8 +82,6 @@ struct atmel_isi {
+ 	struct completion		complete;
+ 	/* ISI peripherial clock */
+ 	struct clk			*pclk;
+-	/* ISI_MCK, feed to camera sensor to generate pixel clock */
+-	struct clk			*mck;
+ 	unsigned int			irq;
+ 
+ 	struct isi_platform_data	pdata;
+@@ -727,31 +724,6 @@ static void isi_camera_remove_device(struct soc_camera_device *icd)
+ 		 icd->devnum);
+ }
+ 
+-/* Called with .host_lock held */
+-static int isi_camera_clock_start(struct soc_camera_host *ici)
+-{
+-	struct atmel_isi *isi = ici->priv;
+-	int ret;
+-
+-	if (!IS_ERR(isi->mck)) {
+-		ret = clk_prepare_enable(isi->mck);
+-		if (ret) {
+-			return ret;
+-		}
+-	}
+-
+-	return 0;
+-}
+-
+-/* Called with .host_lock held */
+-static void isi_camera_clock_stop(struct soc_camera_host *ici)
+-{
+-	struct atmel_isi *isi = ici->priv;
+-
+-	if (!IS_ERR(isi->mck))
+-		clk_disable_unprepare(isi->mck);
+-}
+-
+ static unsigned int isi_camera_poll(struct file *file, poll_table *pt)
+ {
+ 	struct soc_camera_device *icd = file->private_data;
+@@ -865,8 +837,6 @@ static struct soc_camera_host_ops isi_soc_camera_host_ops = {
+ 	.owner		= THIS_MODULE,
+ 	.add		= isi_camera_add_device,
+ 	.remove		= isi_camera_remove_device,
+-	.clock_start	= isi_camera_clock_start,
+-	.clock_stop	= isi_camera_clock_stop,
+ 	.set_fmt	= isi_camera_set_fmt,
+ 	.try_fmt	= isi_camera_try_fmt,
+ 	.get_formats	= isi_camera_get_formats,
+@@ -904,7 +874,6 @@ static int atmel_isi_probe_dt(struct atmel_isi *isi,
+ 
+ 	/* Default settings for ISI */
+ 	isi->pdata.full_mode = 1;
+-	isi->pdata.mck_hz = ISI_DEFAULT_MCLK_FREQ;
+ 	isi->pdata.frate = ISI_CFG1_FRATE_CAPTURE_ALL;
+ 
+ 	np = of_graph_get_next_endpoint(np, NULL);
+@@ -980,21 +949,6 @@ static int atmel_isi_probe(struct platform_device *pdev)
+ 	INIT_LIST_HEAD(&isi->video_buffer_list);
+ 	INIT_LIST_HEAD(&isi->dma_desc_head);
+ 
+-	/* ISI_MCK is the sensor master clock. It should be handled by the
+-	 * sensor driver directly, as the ISI has no use for that clock. Make
+-	 * the clock optional here while platforms transition to the correct
+-	 * model.
+-	 */
+-	isi->mck = devm_clk_get(dev, "isi_mck");
+-	if (!IS_ERR(isi->mck)) {
+-		/* Set ISI_MCK's frequency, it should be faster than pixel
+-		 * clock.
+-		 */
+-		ret = clk_set_rate(isi->mck, isi->pdata.mck_hz);
+-		if (ret < 0)
+-			return ret;
+-	}
+-
+ 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
+ 				sizeof(struct fbd) * MAX_BUFFER_NUM,
+ 				&isi->fb_descriptors_phys,
+-- 
+1.9.1
