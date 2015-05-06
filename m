@@ -1,30 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 06 May 2015 09:31:42 +0200
-Subject: [PATCH v5 1/1] arm64: dts: Add the arasan sdhc nodes in
- apm-storm.dtsi.
-In-Reply-To: <CAOHikRC1dYd0BqhUCzdeZ8=PhSOj77sQR9kzrM8Gus3AJS1ejw@mail.gmail.com>
-References: <1430817426-5241-1-git-send-email-stripathi@apm.com>
- <CAL_JsqK0pCtL2pbG7RttYd7BDxQHxdECHN_9X9MpLTuVEOxzsQ@mail.gmail.com>
- <CAOHikRC1dYd0BqhUCzdeZ8=PhSOj77sQR9kzrM8Gus3AJS1ejw@mail.gmail.com>
-Message-ID: <4635229.bceBxngCoe@wuerfel>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 06 May 2015 00:44:59 -0700
+Subject: [PATCH v4 2/3] rtc: mediatek: Add MT6397 RTC driver
+In-Reply-To: <1430897022-63357-3-git-send-email-eddie.huang@mediatek.com>
+References: <1430897022-63357-1-git-send-email-eddie.huang@mediatek.com>
+ <1430897022-63357-3-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1430898299.9365.74.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 May 2015 10:41:07 Suman Tripathi wrote:
-> >> @@ -533,6 +567,16 @@
-> >>                         interrupts = <0x0 0x4f 0x4>;
-> >>                 };
-> >>
-> >> +               sdhc0: sdhc at 1c000000 {
-> >> +                       device_type = "sdhc";
-> >
-> > device_type generally should not be used (there are a few exceptions).
-> 
-> Okay !!
-> 
+On Wed, 2015-05-06 at 15:23 +0800, Eddie Huang wrote:
+> From: Tianping Fang <tianping.fang@mediatek.com>
 
-While we're at it, please change sdhc at 1c000000 to mmc at 1c000000.
-Even though Linux does not care, we try to use the standard device
-names for consistency.
+trivia: no need to resend now, maybe in a future patch.
 
-	Arnd
+> diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+[]
+> +static int mtk_rtc_probe(struct platform_device *pdev)
+> +{
+[]
+> +	ret = request_threaded_irq(rtc->irq, NULL,
+> +				   mtk_rtc_irq_handler_thread,
+> +				   IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+> +			"mt6397-rtc", rtc);
+
+It'd be nicer to align all the statement lines
+to that open parenthesis
