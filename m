@@ -1,68 +1,24 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Wed, 6 May 2015 14:50:52 +0800
-Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
-In-Reply-To: <5549877C.10408@huawei.com>
-References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
- <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
- <20150505171349.GA30215@leverpostej> <5549877C.10408@huawei.com>
-Message-ID: <5549B9CC.1040709@huawei.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 6 May 2015 12:23:19 +0530
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <20150505171252.GI22845@sirena.org.uk>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <20150504121209.GM15510@sirena.org.uk>
+ <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
+ <20150505105714.GA22845@sirena.org.uk>
+ <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
+ <20150505171252.GI22845@sirena.org.uk>
+Message-ID: <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+On 5 May 2015 at 22:42, Mark Brown <broonie@kernel.org> wrote:
+> This still doesn't say what the value is supposed to mean which means
+> it's not possible for someone to write generic code which handles the
+> binding - saying that people can reference the value doesn't tell them
+> how to interpret it.  A limit?  A nominal constant draw value?  A value
+> to regulate to?  Those are all different things expressed as a current.
 
-On 2015/5/6 11:16, Bintian wrote:
-> Hello Mark,
->
-> On 2015/5/6 1:13, Mark Rutland wrote:
-[...]
->>> +        uart0: uart at f8015000 {    /* console */
->>> +            compatible = "arm,pl011", "arm,primecell";
->>> +            reg = <0x0 0xf8015000 0x0 0x1000>;
->>> +            interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
->>> +            clocks = <&ao_ctrl HI6220_UART0_PCLK>, <&ao_ctrl
->>> HI6220_UART0_PCLK>;
->>> +            clock-names = "uartclk", "apb_pclk";
->>> +        };
->>
->> In a previous discussion [1] the UART on HI6220 was described as not
->> fully PL011 compliant, with a number of differences (e.g. the FIFO
->> length).
->>
->> Given that, I feel somewhat uncomfortable with the current compatible
->> string list. What exactly are those differences? We may need a more
->> specific compatible string (even if in addition to those existing ones),
->> or perhaps other properties.
-> The small system can be booted and the console also works well without
-> changing any code of driver amba-pl011.c, so I think the compatible
-> string is OK for this patch set.
->
-> Hisilicon do some performance enhancements based on PL011, but the
-> current driver "amba-pl011.c" also works on hi6220 without those
-> enhancements driver code.
-Checked with Hisilicon chip designer, the UART0 is used for DEBUG
-console and compliant with PL011 fully.
-
-Thanks,
-
-Bintian
->
->>
->> Thanks,
->> Mark.
->>
->> [1]
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/328978.html
->>
->>
->> .
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> .
->
+@Stephen: Can you please answer these queries please, so that we
+can get the bindings correctly ?
