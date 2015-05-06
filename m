@@ -1,33 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 May 2015 16:54:16 +0100
-Subject: [PATCH] ARM: dts: cubox-i: add support for Broadcom
- Wifi/Bluetooth devices
-In-Reply-To: <1430923179-25448-1-git-send-email-festevam@gmail.com>
-References: <1430923179-25448-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150506155416.GX2067@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 06 May 2015 09:57:37 -0600
+Subject: How to encode being an I2C slave in DT?
+In-Reply-To: <20150506080951.GS25193@pengutronix.de>
+References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
+ <20150505105513.GA1841@katana> <20150506065928.GP25193@pengutronix.de>
+ <3394114.re5da8pjTi@fb07-iapwap2> <20150506080951.GS25193@pengutronix.de>
+Message-ID: <554A39F1.9060507@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 11:39:39AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Add DT support for the Broadcom Wifi/Bluetooth devices found on the
-> microsom board.
-> 
-> [Modified original Russell King's patch to use mmc-pwrseq]
+On 05/06/2015 02:09 AM, Uwe Kleine-K?nig wrote:
+> Hello Marc,
+>
+> On Wed, May 06, 2015 at 09:53:55AM +0200, Marc Dietrich wrote:
+>> Am Mittwoch, 6. Mai 2015, 08:59:28 schrieb Uwe Kleine-K?nig:
+>>> On Tue, May 05, 2015 at 12:55:13PM +0200, Wolfram Sang wrote:
+>>>> So what about adding a new property "i2c-slave-reg"? This does not only
+>>>> prevent the confusion above, but also makes it very clear that this node
+>>>> is an I2C slave without the need to encode that somehow in the
+>>>> compatible property (although it probably should be described there as
+>>>> well, still).
+>>>
+>>> I admit I didn't follow the discussions referenced in the footnotes, but
+>>> I wonder if the slave part should be added to the device tree at all.
+>>> AFAICT it could (and so should) be completely userspace-defined which
+>>> slave driver is used on which address. I imagine that for most
+>>> controllers the bus addresses to use can be chosen more or less freely.
+>>> So what am I missing?
+>>
+>> if you had read the footnotes you would know :-) Our usecase is connect an
+>> embeedded controller via i2c to the host soc, similar to cros-ec, but here the
+>> ec is the i2c master. The ec connects keyboard, mouse, pwrmngt, and other
+>> stuff, for which the drivers are best implemented in kernel code AFAIK.
+ >
+> Right, the driver might sensibly be implemented in kernel space. But I'd
+> vote that you still need to do the binding of these drivers to your
+> slave controller from userspace. Then there is no need to specify
+> anything in your dtb.
 
-You should also mention that it's a bodge because you're permanently
-enabling the regulators rather than controlling them from the mmc-pwrseq
-stuff.
+I think the set of I2C slave devices that are implemented by the Linux 
+system can reasonably be considered part of the HW definition. Most DT 
+content to date has been a definition of the HW that's available to SW, 
+but at least in this case, this I2C slave device is something that must 
+be implemented (admittedly in conjunction with SW) using the I2C slave 
+HW on the main SoC, in order for the overall HW to work as intended.
 
-I would like to see a proper implementation rather than a bodge -
-especially one which permanently enables the oscillator regulator,
-thus having the oscillator output trying to drive a device which is
-powered down, which will forward-bias the ESD diodes... which is not
-a particularly nice thing to do.
-
-So really that's a NAK on this.  Please do the job properly.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+BTW, I believe devicetree-spec at vger.kernel.org was created to address 
+subsystem-level DT schema questions like this. It's much lower volume, 
+so perhaps the thread would get noticed by the DT maintainers if posted 
+there (or perhaps just CC them)?
