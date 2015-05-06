@@ -1,31 +1,93 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 6 May 2015 08:36:00 -0500
-Subject: [PATCH V7 05/10] pinctrl: add imx7d support
-In-Reply-To: <CACRpkdZ8LA=mT_4cW8AuOXFs3MEB0i2066GMaEfb0HJD8B_7uQ@mail.gmail.com>
-References: <1430317210-18333-1-git-send-email-Frank.Li@freescale.com>
- <1430317210-18333-6-git-send-email-Frank.Li@freescale.com>
- <CACRpkdZ8LA=mT_4cW8AuOXFs3MEB0i2066GMaEfb0HJD8B_7uQ@mail.gmail.com>
-Message-ID: <CAHrpEqSePDmo9iZhxbKJ=C=8bGBq-yC0PVkq6c8Z5HW67gA2zw@mail.gmail.com>
+From: andrew@ncrmnt.org (Andrew)
+Date: Wed, 06 May 2015 16:39:59 +0300
+Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
+ DNS-327L
+In-Reply-To: <554A057D.3050007@free-electrons.com>
+References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
+ <552A6209.9040903@gmail.com>
+ <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
+ <20150412145857.GA14038@lunn.ch>
+ <b172d775afa24cea69a9490f531c6b37@mail.ncrmnt.org>
+ <20150412194735.GA27921@lunn.ch> <552BCFAA.2020109@free-electrons.com>
+ <1ec8906f00468ca5a9fa227f8c83fe69@mail.ncrmnt.org>
+ <55351569.7000307@free-electrons.com>
+ <d28764ea5d0d5f4c2e5d3e9ca1d7217a@mail.ncrmnt.org>
+ <55351898.60604@free-electrons.com>
+ <4e7e91562aac6a260885bf2d12174060@mail.ncrmnt.org>
+ <554A057D.3050007@free-electrons.com>
+Message-ID: <4b2d8ac976bad0cd6b8ea5fa5fa2cd16@mail.ncrmnt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 6, 2015 at 6:55 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Apr 29, 2015 at 4:20 PM,  <Frank.Li@freescale.com> wrote:
->
->> From: Frank Li <Frank.Li@freescale.com>
->>
->> Add i.MX7D pinctrl driver support
->>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->> Signed-off-by: Anson Huang <b20788@freescale.com>
->
-> Tired of waiting for review on this.
->
-> Patch applied. This should be possible to merge orthogonally
-> with the rest so it goes in through pin control GIT tree.
+Gregory CLEMENT ????? 06.05.2015 15:13:
+> Hi Andrew,
+> 
+> 
+>> 
+>> Sorry for the long delay with testing, but here come the results.
+>> I've rebased everything to 4.1-rc1
+>> 
+>> 1. WFI + DeepIdle => freeze after approx:
+>>    * 1 hours and 30 minutes, first test
+>>    * 3 hours and 40 minutes, second test
+>> 2. WFI only (DeepIdle disabled via sysfs) => Still alive after 13 
+>> hours
+>> and counting
+> 
+> Thanks for testing it. So, to sum-up, WFI+DeepIdle makes the board 
+> freeze
+> after a few hours in 4.1-rc1 and 4.0 for sure. Are you aware of any 
+> version
+> that did not freeze? It would help to know if it was a regression or 
+> not.
 
-Thanks.
+I've been observing it since 3.16 or so, when I first got mainline 
+running on
+the box. So my guess would be that it is NOT a regression.
 
->
-> Yours,
-> Linus Walleij
+> Andrew Lunn did not report any issue on his 370RD however I will test
+> it also on an other Armada 370 base board (a Mirabox) using the .config
+> you already sent.
+> 
+> But what I expect is either a hardware issue, or a hardware 
+> configuration
+> issue in U-Boot. We still rely a lot on the bootloader and I fear that
+> we have some implicit assumptions.
+> 
+> By the way do you have access on the bootloader sources or at least 
+> could
+> you give us the U-boot version used?
+
+AFAIK there's no GPL source drop for DNS-327L just yet. I'm using stock 
+uboot:
+
+U-Boot 2009.08-00043-gcfe3b76-dirty (Dec 03 2012 - 15:27:58)
+Marvell version: 1.1.2 NQ.DNS-327.01
+
+Didn't risk to burn upstream u-boot, just in case the hardware required 
+any
+special hacks to work.
+
+> Thanks,
+> 
+> Gregory
+> 
+> 
+> 
+>> 
+>> The proper patchset will follow as soon as I figure out what change
+>> broke
+>> dns320l-daemon (The utility that speaks to weltrend mcu on ttyS1)
+>> It was working on 3.18.6, on 3.19 and up - it writes data to the port
+>> (and mcu acks it),
+>> but can't read any responses.
+>> 
+>> Same thing happens to the python (pyserial inside) implementation of 
+>> the
+>> fan-daemon:
+>> https://github.com/martignlo/DNS-320L
+>> 
+
+-- 
+Regards,
+Andrew
