@@ -1,96 +1,52 @@
-From: mfuzzey@parkeon.com (Fuzzey, Martin)
-Date: Wed, 6 May 2015 19:56:05 +0200
-Subject: [PATCH 0/2] gpio: Allow userspace export from DT
-In-Reply-To: <20150506130615.GB5302@localhost>
-References: <20150413110515.9681.58848.stgit@localhost>
- <20150504084925.GB4047@localhost>
- <CACRpkdbFKs8mALw7q2d0EEDkhxKNLgeiFB5TyZ6ZPpfcW-c+oQ@mail.gmail.com>
- <20150506130615.GB5302@localhost>
-Message-ID: <CANh8Qzy7D=O0C7nw_M0LCvE887uxsCjRmvQ8fcKTcf4dJNm7iA@mail.gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 6 May 2015 11:12:20 -0700
+Subject: [PATCH v8 0/4] edac: Add APM X-Gene SoC memory controller EDAC
+ driver
+In-Reply-To: <2150970.xGYLhDU9BR@wuerfel>
+References: <1430884947-16787-1-git-send-email-lho@apm.com>
+ <2150970.xGYLhDU9BR@wuerfel>
+Message-ID: <CAPw-ZTkuZWNM9D_wJRfQq009KeL1coyYKXhqhWV+FWW6C=xRiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 May 2015 at 15:06, Johan Hovold <johan@kernel.org> wrote:
->
-> On Wed, May 06, 2015 at 09:22:22AM +0200, Linus Walleij wrote:
-> > On Mon, May 4, 2015 at 10:49 AM, Johan Hovold <johan@kernel.org> wrote:
-> > > On Mon, Apr 13, 2015 at 01:05:15PM +0200, Martin Fuzzey wrote:
+Hi Arnd/Borislav/Rob,
+
+> > v8:
+> > * Change ASM_EDAC_H to __ASM_EDAC_H in file edac.h
+> > * Add WARN_ONCE in stub function atomic_scrub
+> > * Update DTS binding documentation (with only memory controller node)
+> > * Temporary remove L1/L2, L3, and SoC driver code and update memory driver
+> >   code accordingly
 > >
-> > >> The above means that, in order to export the GPIO to userspace via
-> > >> /sys/class/gpio/export the userspace code must know the exact hardware and
-> > >> kernel version information.
-> > >
-> > > Not quite. You can still determine the gpio number in the above cases by
-> > > walking the sysfs tree to find the chip and it's base. This is the only
-> > > way to do this for dynamic buses such as USB.
 > >
-
-A problem with that is that the "label" sysfs attribute is not
-necessarilly unique (and is even documented as being non unique).
-Many drivers just use the chip name as the label so if you have more
-than one of them...
-
-Of course if you know the bus and bus address it is possible to find
-the associated GPIO base but why should userspace have to know that?
-Isn't the whole point of the DT to describe such hardware details?
-
-> > Maybe we should start providing something like an
-> > "lsgpio" utility in tools/gpio to do this, just as a hint
-> > to userspace people on how things should be done.
 >
-> I think we should focus on defining a new user-space interface rather
-> than make it easier to use the current one (it should really only be
-> used for development or one-off hacks IMO).
+> I don't see how this is helping. You still use a syscon reference for the
+> pcp node after I told you not to, and you are completely leaving out the
+> other nodes, which makes it impossible to tell what your plan is for those.
 >
-
-Doesn't the ability to name GPIOs, fix their direction, and "pre
-export" them  in the device tree remove most of the warts of the
-current interface? (for GPIOs for which it is used in any case)
-
-While I agree that the sysfs GPIO interface is sometimes abused (such
-as for LEDs and switches which already have proper kernel drivers)
-there are still cases where a full kernel driver doesn't really make
-sense (eg a signal to open a parking barrier) - is anyone suggesting
-this needs a custom driver or that the LED one should be used  -
-setting the heartbeat trigger on that would be interesting .... :)
-
-> > >> This patch series solves both problems by performing the external
-> > >> signal => GPIO mapping in the device tree.
-> > >
-> > > As Rob already mentioned, what we want is some way to declare pin
-> > > functions. These could then be requested from userspace (or used in DT,
-> > > something which should allow for further refactoring there as well)
-> > > unless a driver has already claimed them.
-> >
-> > We have the ability to name the GPIO lines (I usually refer to
-> > lines rather than pins, as pins are physical and not all GPIOs
-> > are, actually) using the array "names" in struct gpio_chip,
-> > however this has no DT binding, so maybe people should
-> > work on that. These names appear as named line files
-> > in sysfs IIRC. Or maybe you're thinking of something else?
 >
-
->
-> Yes, something like that. As you mention above, if it was possibly to
-> define those names in firmware, even the current sysfs interface would
-> expose the pins as
->
->         /sys/class/gpio/<function>
->
-> rather than say /sys/class/gpio/gpio279, thereby solving the gpio-number
-> look-up issue. Well, to actually make the pin available *from* userspace
-> you'd currently still need the number...
->
-Indeed that  doesn't solve the how to export it problem.
-AFAICT nothing is visible in sysfs until the export has been done.
-
-Martin
+> Please come up with a plan that makes it possible to have proper support
+> for all the devices in the future. Leaving out bits because you know that
+> adding them later will be hard is not a good solution: if you screw up
+> the design now, adding them later will be even harder.
 
 
+Okay... Let me summary the issue at hand and let us all agree:
 
--- 
--- 
-Martin Fuzzey | Software Expertise
-Parc La Fayette - 6 rue Isaac Newton - 25075 Besan?on - FR
-+33381546880 | +33677158582
-mfuzzey at parkeon.com | www.parkeon.com
+1. Whether to have an single driver for APM EDAC or multiple instance
+of 4 different drivers. With single driver, it does not scale in the
+future when we add/remove memory controllers and CPU domains. This is
+also agreed by Rob Herring from review of the DTS nodes. For L3 and
+SoC EDAC, they are less of an issue as I don't see a situation that we
+would have multiple instances.
+
+2. With regard to the top level PCP interrupt, they are just for
+status and once configured, it will not be touch. Therefore, I keep
+the current implementation. With an single driver, there is no need to
+worry about read/modify/write as it will be guarded with an lock. For
+multiple instance, I am thinking that the xgene_edac_mc module will
+provide exported lock functions for the other drivers.
+
+If I am missing anything, let me know.
+
+-Loc
