@@ -1,66 +1,110 @@
-From: anssi.hannula@iki.fi (Anssi Hannula)
-Date: Wed, 06 May 2015 20:02:52 +0300
-Subject: [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
-In-Reply-To: <20150405172608.GA12732@n2100.arm.linux.org.uk>
-References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
- <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk> <s5ha8ymy3e2.wl-tiwai@suse.de>
- <20150405162034.GH13898@n2100.arm.linux.org.uk>
- <s5h4mouy14a.wl-tiwai@suse.de>
- <20150405172608.GA12732@n2100.arm.linux.org.uk>
-Message-ID: <554A493C.5080106@iki.fi>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 May 2015 18:05:03 +0100
+Subject: [PATCH] arm64: Preserve the user r/w register tpidr_el0 on
+ context switch and fork in compat mode
+In-Reply-To: <55464BB2.7030401@dawncrow.de>
+References: <55464BB2.7030401@dawncrow.de>
+Message-ID: <20150506170503.GF14922@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-05.04.2015, 20:26, Russell King - ARM Linux kirjoitti:
-> On Sun, Apr 05, 2015 at 06:46:13PM +0200, Takashi Iwai wrote:
->>
->> One another question: don't we need to deal with the sample bits in
->> sad[2]?
+On Sun, May 03, 2015 at 05:24:18PM +0100, Andr? Hentschel wrote:
+> From: Andr? Hentschel <nerv@dawncrow.de>
 > 
-> It should, but I'm very wary about doing that without seeing more
-> examples of real SADs.  Right now, all my examples only support
-> one SAD with either 2 channel or 6 channel audio at the standard
-> (basic) 32, 44.1 and 48kHz rates.
+> Since commit a4780adeefd042482f624f5e0d577bf9cdcbb760 the user writeable TLS
+> register on ARM is preserved per thread.
 > 
-> The HDMI / CEA specs are very loose in their wording about the
-> short audio descriptors.  I've no idea whether a sink can provide
-> (for example) descriptors such as:
+> This patch does it analogous to the ARM patch, but for compat mode on ARM64.
 > 
-> 	LPCM, 6 channel 32, 44.1, 48kHz
-> 	LPCM, 2 channel, 32, 44.1, 48, 96, 192kHz
+> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Jonathan Austin <jonathan.austin@arm.com> 
 > 
-> or whether have to describe that as a single descriptor.  I only
-> have two TVs to test with here.
+> ---
+> This patch is against Linux 4.1-rc1 (b787f68c36d49bb1d9236f403813641efa74a031)
+> 
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 20e9591..cd7b8c9 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -78,7 +78,7 @@ struct cpu_context {
+>  
+>  struct thread_struct {
+>  	struct cpu_context	cpu_context;	/* cpu context */
+> -	unsigned long		tp_value;
+> +	unsigned long		tp_value[2];	/* TLS registers */
 
-For the record, yes, multiple LPCM SADs are relatively common, and I
-think I've seen some that offered more rates on a stereo SAD than on a
-multichannel SAD (like in your example).
+I think I'd rather have a separate field for the user-writable TLS,
+predicated on #ifdef COMPAT. It also removes confusion between the two tls
+registers, which are also present on arm64.
 
+>  	struct fpsimd_state	fpsimd_state;
+>  	unsigned long		fault_address;	/* fault info */
+>  	unsigned long		fault_code;	/* ESR_EL1 value */
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index c6b1f3b..fc7cc6bc 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -218,7 +218,8 @@ static void tls_thread_flush(void)
+>  	asm ("msr tpidr_el0, xzr");
+>  
+>  	if (is_compat_task()) {
+> -		current->thread.tp_value = 0;
+> +		current->thread.tp_value[0] = 0;
+> +		current->thread.tp_value[1] = 0;
+>  
+>  		/*
+>  		 * We need to ensure ordering between the shadow state and the
+> @@ -254,7 +255,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+>  		unsigned long stk_sz, struct task_struct *p)
+>  {
+>  	struct pt_regs *childregs = task_pt_regs(p);
+> -	unsigned long tls = p->thread.tp_value;
+> +	unsigned long tls = p->thread.tp_value[0];
+>  
+>  	memset(&p->thread.cpu_context, 0, sizeof(struct cpu_context));
+>  
+> @@ -283,6 +284,11 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+>  		 */
+>  		if (clone_flags & CLONE_SETTLS)
+>  			tls = childregs->regs[3];
+> +		if (is_compat_thread(task_thread_info(p))) {
+> +			unsigned long tpuser;
+> +			asm("mrs %0, tpidr_el0" : "=r" (tpuser));
+> +			p->thread.tp_value[1] = tpuser;
+> +		}
 
-> What I'm concerned about is that when the ALSA parameter refining
-> starts, we start with (eg) 2-8 channels, 32-192kHz.  Given that,
-> if we invoke the channel restriction before the rate restriction,
-> we would end up limiting to 2 channel at 32-192kHz.  If we apply
-> the restrictions in the opposite order, we'd restrict to 6
-> channel, 32-48kHz.  Neither are obviously correct in this
-> circumstance, and I don't really see a way to solve it given my
-> understanding of the way ALSA's parameter refinement works.
-> 
-> I suspect this is why most HDMI drivers are implemented such that
-> they take the maximum capabilities over all SADs, which would end
-> up restricting audio in the above case to: up to 6 channels, at
-> 32, 44.1, 48, 96 and 192kHz, even though 6 channel @ 192kHz isn't
-> hasn't been indicated as supported.
-> 
-> Most of this is speculation though, based off what is in the
-> documentation.  As I say, I don't have enough real-world examples
-> to get a feel for what manufacturers _actually_ do to give a hint
-> as to how the documentation should be interpreted.
-> 
-> So, maybe I should just copy what everyone else does and take the
-> maximum of all descriptors...
-> 
+Can't this hunk be in the is_compat_thread(...) block slightly earlier
+on in the function? In fact, we're reading tpidr_el0 for both the compat and
+native cases, so really this all be unconditional.
 
+>  	} else {
+>  		memset(childregs, 0, sizeof(struct pt_regs));
+>  		childregs->pstate = PSR_MODE_EL1h;
+> @@ -291,7 +297,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+>  	}
+>  	p->thread.cpu_context.pc = (unsigned long)ret_from_fork;
+>  	p->thread.cpu_context.sp = (unsigned long)childregs;
+> -	p->thread.tp_value = tls;
+> +	p->thread.tp_value[0] = tls;
+>  
+>  	ptrace_hw_copy_thread(p);
+>  
+> @@ -302,16 +308,17 @@ static void tls_thread_switch(struct task_struct *next)
+>  {
+>  	unsigned long tpidr, tpidrro;
+>  
+> -	if (!is_compat_task()) {
+> -		asm("mrs %0, tpidr_el0" : "=r" (tpidr));
+> -		current->thread.tp_value = tpidr;
+> -	}
+> +	asm("mrs %0, tpidr_el0" : "=r" (tpidr));
+> +	if (is_compat_task())
+> +		current->thread.tp_value[1] = tpidr;
+> +	else
+> +		current->thread.tp_value[0] = tpidr;
 
--- 
-Anssi Hannula
+Maybe we could have a macro thread_user_tls(thread) so that we could just
+do thread_user_tls(current->thread) = tpidr;
+
+Will
