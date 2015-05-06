@@ -1,87 +1,73 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 6 May 2015 12:04:46 +0200
-Subject: [PATCH 1/6] ARM: sunxi: Introduce Allwinner H3 support
-In-Reply-To: <1430904693-1404-2-git-send-email-jenskuske@gmail.com>
-References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
- <1430904693-1404-2-git-send-email-jenskuske@gmail.com>
-Message-ID: <20150506100446.GA11057@lukather>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 6 May 2015 13:08:50 +0300
+Subject: [PATCHv3 02/10] ARM: DRA7: hwmod: add DMM hwmod description
+In-Reply-To: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1430906938-26128-3-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add DMM hwmod entries for DRA7. This is identical to DMM on OMAP5.
 
-On Wed, May 06, 2015 at 11:31:28AM +0200, Jens Kuske wrote:
-> The Allwinner H3 is a quad-core Cortex-A7-based SoC. It is very similar
-> to other sun8i family SoCs like the A23.
-> 
-> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> ---
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  arch/arm/mach-sunxi/Kconfig                     | 2 +-
->  arch/arm/mach-sunxi/sunxi.c                     | 3 ++-
->  3 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index 42941fd..3cb4b94 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -9,4 +9,5 @@ using one of the following compatible strings:
->    allwinner,sun6i-a31
->    allwinner,sun7i-a20
->    allwinner,sun8i-a23
-> +  allwinner,sun8i-h3
->    allwinner,sun9i-a80
-> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> index 81502b9..47ac5b4 100644
-> --- a/arch/arm/mach-sunxi/Kconfig
-> +++ b/arch/arm/mach-sunxi/Kconfig
-> @@ -35,7 +35,7 @@ config MACH_SUN7I
->  	select SUN5I_HSTIMER
->  
->  config MACH_SUN8I
-> -	bool "Allwinner A23 (sun8i) SoCs support"
-> +	bool "Allwinner A23 / H3 (sun8i) SoCs support"
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-I'd prefer that we have something similar to sun9i, just mentionning
-the family here, instead of an ever-growing list of SoCs.
-
-This used to be easy to maintain, with the new naming scheme, we
-already have at least 4 SoCs part of sun8i.
-
->  	default ARCH_SUNXI
->  	select ARM_GIC
->  	select MFD_SUN6I_PRCM
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 1bc811a..bc63748 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -67,10 +67,11 @@ MACHINE_END
->  
->  static const char * const sun8i_board_dt_compat[] = {
->  	"allwinner,sun8i-a23",
-> +	"allwinner,sun8i-h3",
->  	NULL,
->  };
->  
-> -DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
-> +DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23/H3) Family")
-
-Same comment here.
-
-Could you also update Documentation/arm/sunxi/README with these infos
-(and ideally, updating it with the new SoCs we've heard about) ?
-
-Thanks,
-Maxime
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 0e64c2fac0b5..71599f27bddc 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -49,6 +49,27 @@
+  */
+ 
+ /*
++ * 'dmm' class
++ * instance(s): dmm
++ */
++static struct omap_hwmod_class dra7xx_dmm_hwmod_class = {
++	.name	= "dmm",
++};
++
++/* dmm */
++static struct omap_hwmod dra7xx_dmm_hwmod = {
++	.name		= "dmm",
++	.class		= &dra7xx_dmm_hwmod_class,
++	.clkdm_name	= "emif_clkdm",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_EMIF_DMM_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_EMIF_DMM_CONTEXT_OFFSET,
++		},
++	},
++};
++
++/*
+  * 'l3' class
+  * instance(s): l3_instr, l3_main_1, l3_main_2
+  */
+@@ -2321,6 +2342,14 @@ static struct omap_hwmod dra7xx_wd_timer2_hwmod = {
+  * Interfaces
+  */
+ 
++/* l3_main_1 -> dmm */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__dmm = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_dmm_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_SDMA,
++};
++
+ /* l3_main_2 -> l3_instr */
+ static struct omap_hwmod_ocp_if dra7xx_l3_main_2__l3_instr = {
+ 	.master		= &dra7xx_l3_main_2_hwmod,
+@@ -3289,6 +3318,7 @@ static struct omap_hwmod_ocp_if dra7xx_l4_wkup__wd_timer2 = {
+ };
+ 
+ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
++	&dra7xx_l3_main_1__dmm,
+ 	&dra7xx_l3_main_2__l3_instr,
+ 	&dra7xx_l4_cfg__l3_main_1,
+ 	&dra7xx_mpu__l3_main_1,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150506/f42da871/attachment.sig>
+2.1.4
