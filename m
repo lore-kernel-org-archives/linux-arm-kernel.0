@@ -1,122 +1,93 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 06 May 2015 11:13:25 +0800
-Subject: [V2 PATCH 1/5] ACPI / scan: Parse _CCA and setup device coherency
-In-Reply-To: <1430838729-21572-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1430838729-21572-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <554986D5.5010102@linaro.org>
+From: wcohen@redhat.com (William Cohen)
+Date: Tue, 05 May 2015 23:14:26 -0400
+Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <55492FF1.6040907@redhat.com>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <55363791.4070706@hitachi.com> <553AB222.50609@redhat.com>
+ <553EF74D.8020706@redhat.com> <20150429102346.GK8236@arm.com>
+ <55442BFA.50101@redhat.com> <554851CB.2010909@linaro.org>
+ <20150505154830.GI1550@arm.com> <55492FF1.6040907@redhat.com>
+Message-ID: <55498712.2060003@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?05? 23:12, Suravee Suthikulpanit wrote:
-> This patch implements support for ACPI _CCA object, which is introduced in
-> ACPIv5.1, can be used for specifying device DMA coherency attribute.
->
-> The parsing logic traverses device namespace to parse coherency
-> information, and stores it in acpi_device_flags. Then uses it to call
-> arch_setup_dma_ops() when creating each device enumerated in DSDT
-> during ACPI scan.
->
-> This patch also introduces acpi_dma_is_coherent(), which provides
-> an interface for device drivers to check the coherency information
-> similarly to the of_dma_is_coherent().
->
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> ---
-> NOTE:
->   * Since there seem to be conflict opinions regarding how
->     architecture should handle _CCA=0. So, I am proposing the
->     CONFIG_ARCH_SUPPORT_CCA_ZERO, which can be specified by
->     for each architecture to define behavior of the ACPI
->     scanning code when _CCA=0. Let me know if this is acceptable.
->
->   drivers/acpi/Kconfig         |  6 +++++
->   drivers/acpi/acpi_platform.c |  4 ++-
->   drivers/acpi/scan.c          | 62 ++++++++++++++++++++++++++++++++++++++++++++
->   include/acpi/acpi_bus.h      | 11 +++++++-
->   include/linux/acpi.h         |  5 ++++
->   5 files changed, 86 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index ab2cbb5..dd386e9 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -54,6 +54,12 @@ config ACPI_GENERIC_GSI
->   config ACPI_SYSTEM_POWER_STATES_SUPPORT
->   	bool
->
-> +config ACPI_MUST_HAVE_CCA
-> +	bool
-> +
-> +config ACPI_SUPPORT_CCA_ZERO
-> +	bool
-> +
->   config ACPI_SLEEP
->   	bool
->   	depends on SUSPEND || HIBERNATION
-> diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
-> index 4bf7559..a6feca4 100644
-> --- a/drivers/acpi/acpi_platform.c
-> +++ b/drivers/acpi/acpi_platform.c
-> @@ -108,9 +108,11 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
->   	if (IS_ERR(pdev))
->   		dev_err(&adev->dev, "platform device creation failed: %ld\n",
->   			PTR_ERR(pdev));
-> -	else
-> +	else {
-> +		acpi_setup_device_dma(adev, &pdev->dev);
->   		dev_dbg(&adev->dev, "created platform device %s\n",
->   			dev_name(&pdev->dev));
-> +	}
->
->   	kfree(resources);
->   	return pdev;
-> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> index 849b699..ac33b29 100644
-> --- a/drivers/acpi/scan.c
-> +++ b/drivers/acpi/scan.c
-> @@ -11,6 +11,7 @@
->   #include <linux/kthread.h>
->   #include <linux/dmi.h>
->   #include <linux/nls.h>
-> +#include <linux/dma-mapping.h>
->
->   #include <asm/pgtable.h>
->
-> @@ -2137,6 +2138,66 @@ void acpi_free_pnp_ids(struct acpi_device_pnp *pnp)
->   	kfree(pnp->unique_id);
->   }
->
-> +void acpi_setup_device_dma(struct acpi_device *adev, struct device *dev)
+On 05/05/2015 05:02 PM, William Cohen wrote:
+> On 05/05/2015 11:48 AM, Will Deacon wrote:
+>> On Tue, May 05, 2015 at 06:14:51AM +0100, David Long wrote:
+>>> On 05/01/15 21:44, William Cohen wrote:
+>>>> Dave Long and I did some additional experimentation to better
+>>>> understand what is condition causes the kernel to sometimes spew:
+>>>>
+>>>> Unexpected kernel single-step exception at EL1
+>>>>
+>>>> The functioncallcount.stp test instruments the entry and return of
+>>>> every function in the mm files, including kfree.  In most cases the
+>>>> arm64 trampoline_probe_handler just determines which return probe
+>>>> instance matches the current conditions, runs the associated handler,
+>>>> and recycles the return probe instance for another use by placing it
+>>>> on a hlist.  However, it is possible that a return probe instance has
+>>>> been set up on function entry and the return probe is unregistered
+>>>> before the return probe instance fires.  In this case kfree is called
+>>>> by the trampoline handler to remove the return probe instances related
+>>>> to the unregistered kretprobe.  This case where the the kprobed kfree
+>>>> is called within the arm64 trampoline_probe_handler function trigger
+>>>> the problem.
+>>>>
+>>>> The kprobe breakpoint for the kfree call from within the
+>>>> trampoline_probe_handler is encountered and started, but things go
+>>>> wrong when attempting the single step on the instruction.
+>>>>
+>>>> It took a while to trigger this problem with the sytemtap testsuite.
+>>>> Dave Long came up with steps that reproduce this more quickly with a
+>>>> probed function that is always called within the trampoline handler.
+>>>> Trying the same on x86_64 doesn't trigger the problem.  It appears
+>>>> that the x86_64 code can handle a single step from within the
+>>>> trampoline_handler.
+>>>>
+>>>
+>>> I'm assuming there are no plans for supporting software breakpoint debug 
+>>> exceptions during processing of single-step exceptions, any time soon on 
+>>> arm64.  Given that the only solution that I can come with for this is 
+>>> instead of making this orphaned kretprobe instance list exist only 
+>>> temporarily (in the scope of the kretprobe trampoline handler), make it 
+>>> always exist and kfree any items found on it as part of a periodic 
+>>> cleanup running outside of the handler context.  I think these changes 
+>>> would still all be in archiecture-specific code.  This doesn't feel to 
+>>> me like a bad solution.  Does anyone think there is a simpler way out of 
+>>> this?
+>>
+>> Just to clarify, is the problem here the software breakpoint exception,
+>> or trying to step the faulting instruction whilst we were already handling
+>> a step?
+>>
+>> I think I'd be inclined to keep the code run in debug context to a minimum.
+>> We already can't block there, and the more code we add the more black spots
+>> we end up with in the kernel itself. The alternative would be to make your
+>> kprobes code re-entrant, but that sounds like a nightmare.
+>>
+>> You say this works on x86. How do they handle it? Is the nested probe
+>> on kfree ignored or handled?
+>>
+>> Will
+>>
+> 
+> Hi Dave and Will,
+> 
+> The attached patch attempts to eliminate the need for the breakpoint in the trampoline.  It is modeled after the x86_64 code and just saves the register state, calls the trampoline handler, and then fixes the return address.  The code compiles, but I have NOT verified that it works. It looks feasible to do things this way.  In addition to avoiding the possible issue with a kretprobe on kfree it would also make the kretprobes faster because it would avoid the breakpoint exception and the associated kprobe handling in the trampoline.
+> 
+> -Will
+> 
 
-I aasume adev->dev in struct *adev is the same as struct device *dev
-passed here, so
 
-> +{
-> +	int coherent = acpi_dma_is_coherent(adev);
-> +
-> +	/**
-> +	 * Currently, we only support DMA for devices that _CCA=1
-> +	 * since this seems to be the case on most ACPI platforms.
-> +	 *
-> +	 * For the case when _CCA=0 (i.e. is_coherent=0 && cca_seen=1),
-> +	 * we would rely on arch-specific cache maintenance for
-> +	 * non-coherence DMA operations if architecture enables
-> +	 * CONFIG_ACPI_SUPPORT_CCA_ZERO.
-> +	 *
-> +	 * For the case when _CCA is missing but platform requires it
-> +	 * (i.e. is_coherent=0 && cca_seen=0), we do not call
-> +	 * arch_setup_dma_ops() and fallback to arch-specific default
-> +	 * handling.
-> +	 */
-> +	if (adev->flags.cca_seen) {
-> +		if (!coherent && !IS_ENABLED(CONFIG_ACPI_SUPPORT_CCA_ZERO))
-> +			return;
-> +		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
+Hi Dave and Will,
 
-how about using &adev->dev here, and just pass struct acpi_device *adev
-for this function?
+Attached is a revised version of the patch to avoid using a kprobe breakpoint in the trampoline.  It shows signs of working, but is still a work in progress.
 
-Thanks
-Hanjun
+-Will Cohen
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: avoid_bkpt_tramp.diff
+Type: text/x-patch
+Size: 4583 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150505/42530767/attachment.bin>
