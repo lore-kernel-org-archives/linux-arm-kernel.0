@@ -1,79 +1,89 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 6 May 2015 13:08:57 +0300
-Subject: [PATCHv3 09/10] arm: dra7: add DESHDCP clock
-In-Reply-To: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1430906938-26128-10-git-send-email-tomi.valkeinen@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 May 2015 11:11:05 +0100
+Subject: Memory size unaligned to section boundary
+In-Reply-To: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
+References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
+Message-ID: <20150506101104.GD2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new Linux clock for DRA7 based SoCs to control DESHDCP clock.
+On Thu, Apr 23, 2015 at 03:19:45PM +0200, Stefan Agner wrote:
+> Hi,
+> 
+> It seems to me that I hit an issue in low memory mapping (map_lowmem).
+> I'm using a custom memory size, which leads to an freeze on Linux 4.0
+> and also with Linus master on two tested ARMv7-A SoC's (Freescale Vybrid
+> and NVIDIA Tegra 3):
+> 
+> With mem=259744K
+> [    0.000000] Booting Linux on physical CPU 0x0
+> [    0.000000] Linux version 4.0.0-00189-ga4d2a4c3-dirty
+> (ags at trochilidae) (gcc version 4.8.3 20140401 (prerelease) (Linaro GCC
+> 4.8-2014.04) ) #506 Thu Apr 23 14:13:21 CEST 2015
+> [    0.000000] CPU: ARMv7 Processor [410fc051] revision 1 (ARMv7),
+> cr=10c5387d
+> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
+> instruction cache
+> [    0.000000] Machine model: Toradex Colibri VF61 on Colibri Evaluation
+> Board
+> [    0.000000] bootconsole [earlycon0] enabled
+> [    0.000000] cma: Reserved 16 MiB at 0x8e400000
+> [    0.000000] Memory policy: Data cache writeback
+> <freeze>
+> 
+> I dug a bit more into that, and it unveiled that when creating the
+> mapping for the non-kernel_x part (if (kernel_x_end < end) in
+> map_lowmem), the unaligned section at the end leads to the freeze. In
+> alloc_init_pmd, if the memory end is section unaligned, alloc_init_pte
+> gets called which allocates a PTE outside of the initialized region (in
+> early_alloc_aligned). The system freezes at the call of memset in
+> early_alloc_aligned function.
+> 
+> With some debug print, this can be better illustrated:
+> [    0.000000] pgd 800063f0, addr 8fc00000, end 8fda8000, next 8fda8000
+> [    0.000000] pud 800063f0, addr 8fc00000, end 8fda8000, next 8fda8000
+> [    0.000000] pmd 800063f0, addr 8fc00000, next 8fda8000
+>                          => actual end of memory ^^^^^^^^
+> [    0.000000] alloc_init_pte
+> [    0.000000] set_pte_ext, pte 00000000, addr 8fc00000, end 8fda8000
+> [    0.000000] early_pte_alloc
+> [    0.000000] early_alloc_aligned, 00001000, ptr 8fcff000, align
+> 00001000
+>      => PTE allocated outside of initialized area ^^^^^^^^
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi               |  5 +++++
- arch/arm/boot/dts/dra7xx-clocks.dtsi      | 10 ++++++++++
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  1 +
- drivers/clk/ti/clk-7xx.c                  |  1 +
- 4 files changed, 17 insertions(+)
+Right, and the question is why does that happen - and the answer is
+this:
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index a319de723851..f3a8237cea39 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -131,6 +131,11 @@
- 							regulator-max-microvolt = <3000000>;
- 						};
- 					};
-+
-+					scm_conf_clocks: clocks {
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+					};
- 				};
+        /*
+         * Round the memblock limit down to a section size.  This
+         * helps to ensure that we will allocate memory from the
+         * last full section, which should be mapped.
+         */
+        if (memblock_limit)
+                memblock_limit = round_down(memblock_limit, SECTION_SIZE);
+
+That should round down by 2x SECTION_SIZE to ensure that we don't start
+allocating the L2 page table in a section which isn't mapped.  Please
+try this patch:
+
+ arch/arm/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4e6ef896c619..387becac5c86 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1142,7 +1142,7 @@ void __init sanity_check_meminfo(void)
+ 	 * last full section, which should be mapped.
+ 	 */
+ 	if (memblock_limit)
+-		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
++		memblock_limit = round_down(memblock_limit, 2 * SECTION_SIZE);
+ 	if (!memblock_limit)
+ 		memblock_limit = arm_lowmem_limit;
  
- 				dra7_pmx_core: pinmux at 1400 {
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 940dc8987adb..357bedeebfac 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -2137,3 +2137,13 @@
- 		clocks = <&dpll_usb_ck>;
- 	};
- };
-+
-+&scm_conf_clocks {
-+	dss_deshdcp_clk: dss_deshdcp_clk {
-+		#clock-cells = <0>;
-+		compatible = "ti,gate-clock";
-+		clocks = <&l3_iclk_div>;
-+		ti,bit-shift = <0>;
-+		reg = <0x558>;
-+	};
-+};
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 178c28ea8b59..9961f95f52ae 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -459,6 +459,7 @@ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
- 	{ .role = "video2_clk", .clk = "dss_video2_clk" },
- 	{ .role = "video1_clk", .clk = "dss_video1_clk" },
- 	{ .role = "hdmi_clk", .clk = "dss_hdmi_clk" },
-+	{ .role = "hdcp_clk", .clk = "dss_deshdcp_clk" },
- };
- 
- static struct omap_hwmod dra7xx_dss_hwmod = {
-diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-index 5d2217ae4478..2dd956b9affa 100644
---- a/drivers/clk/ti/clk-7xx.c
-+++ b/drivers/clk/ti/clk-7xx.c
-@@ -305,6 +305,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
- 	DT_CLK("4882c000.timer", "timer_sys_ck", "timer_sys_clk_div"),
- 	DT_CLK("4882e000.timer", "timer_sys_ck", "timer_sys_clk_div"),
- 	DT_CLK(NULL, "sys_clkin", "sys_clkin1"),
-+	DT_CLK(NULL, "dss_deshdcp_clk", "dss_deshdcp_clk"),
- 	{ .node_name = NULL },
- };
- 
+
+
 -- 
-2.1.4
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
