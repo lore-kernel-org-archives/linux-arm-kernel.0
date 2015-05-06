@@ -1,59 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 May 2015 12:33:13 +0100
-Subject: [PATCH 5/6] ARM: re-implement physical address space switching
-In-Reply-To: <20150506103736.GA707@leverpostej>
-References: <20150408094438.GM12732@n2100.arm.linux.org.uk>
- <E1YfmY6-0006X3-1N@rmk-PC.arm.linux.org.uk>
- <20150408173656.GF5977@leverpostej>
- <20150408175533.GN12732@n2100.arm.linux.org.uk>
- <552C14F0.7020006@oracle.com> <20150415120738.GD2866@leverpostej>
- <552E9F9B.2040400@oracle.com> <20150423112449.GB17361@leverpostej>
- <20150506101850.GE2067@n2100.arm.linux.org.uk>
- <20150506103736.GA707@leverpostej>
-Message-ID: <20150506113313.GS2067@n2100.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 6 May 2015 13:33:55 +0200
+Subject: [PATCH v2 0/8] clk: Minor cleanups
+In-Reply-To: <1430196383-9190-1-git-send-email-k.kozlowski@samsung.com>
+References: <1430196383-9190-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20150506113354.GA9421@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 11:37:37AM +0100, Mark Rutland wrote:
-> Hi Russell,
-> 
-> > > It turns out that I was incorrect in my assertion, and the reordering I
-> > > suggested above can't happen. The ARMv7 ARM states:
-> > > 
-> > > 	Any direct write to a system control register is guaranteed not
-> > > 	to affect any instruction that appears, in program
-> > > 	order, before the instruction that performed the direct write
-> > > 
-> > > Which means that the STMFD cannot be affected by the later cp15 write to
-> > > the SCTLR, and so the DSB does not need to be moved before the MCR.
-> > > 
-> > > I apologise for adding to the confusion there.
-> > 
-> > So does this mean this patch gets an ack now?
-> 
-> I assumed there was going to be a respin for the CR_W change?
-> 
-> There's also the dodginess w.r.t. the page table walkers that I can't
-> see is solvable short of disabling the MMU prior to the flush, though I
-> understand you've NAKed that approach.
+On Tue, Apr 28, 2015 at 01:46:15PM +0900, Krzysztof Kozlowski wrote:
+[...]
+>   clk: tegra: Fix inconsistent indenting
+>   clk: tegra: Fix duplicate const for parent names
 
-Why?  Are you saying that after:
+I've squashed these into the patches that add the EMC driver.
 
-+       mrc     p15, 0, r8, c1, c0, 0           @ read control reg
-+       bic     ip, r8, #CR_M                   @ disable caches and MMU
-+       mcr     p15, 0, ip, c1, c0, 0
-+       dsb
-+       isb
-
-the page table walkers are still actively walking the page table?
-
-That to me sounds like a hardware bug.  The point of this is to shut
-down the MMU, _then_ update the page tables, and _then_ to re-enable
-the MMU to explicitly avoid problems with the page table walkers.
-
->From what you're saying, this is just not possible, and we should
-just throw Keystone SoCs in the bin...
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150506/c3809b3d/attachment.sig>
