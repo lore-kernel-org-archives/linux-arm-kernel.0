@@ -1,275 +1,85 @@
-From: chaotian.jing@mediatek.com (chaotian.jing)
-Date: Wed, 6 May 2015 14:54:59 +0800
-Subject: [PATCH v3 2/7] mmc: mediatek: Add Mediatek MMC driver
-In-Reply-To: <CAPDyKFq=R9B6ZHHgmDcSg-TNSfqQKAUKc2NjACvpwxFpmk954g@mail.gmail.com>
-References: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
- <1430214525-19198-3-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFq=R9B6ZHHgmDcSg-TNSfqQKAUKc2NjACvpwxFpmk954g@mail.gmail.com>
-Message-ID: <1430895299.15154.9.camel@mhfsdcap03>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 6 May 2015 14:56:58 +0800
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <5548A5D5.9030107@linaro.org>
+References: <55417F5A.4040300@linaro.org> <2490159.r1U8jHTvO3@wuerfel>
+ <CAMJs5B9V_tWxut6LLWDdpN1m9NsaC_JGfR_U_SHN=OOhdHe_Yw@mail.gmail.com>
+ <9143918.xCQ8d3X4XD@wuerfel> <5548A5D5.9030107@linaro.org>
+Message-ID: <5549BB3A.6060106@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ulf,
+On 2015/5/5 19:13, Shannon Zhao wrote:
+> 
+> 
+> On 2015/5/5 18:55, Arnd Bergmann wrote:
+>> On Tuesday 05 May 2015 12:51:57 Christoffer Dall wrote:
+>>> On Tue, May 5, 2015 at 11:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> On Tuesday 05 May 2015 12:27:54 Joel Stanley wrote:
+>>>>
+>>> Do ARM distributions (Fedora, Ubuntu, Debian, ...) support the
+>>> necessary userspace handling so that things work with the input
+>>> subsystem?
+>>
+>> I think the latest releases all use systemd, so it should work in theory,
+>> but I have not tried it, and I don't know if they have something else
+>> on older versions.
+>>
+> 
+> Thanks, will try to use gpio-keys and check whether systemd works.
+> 
 
-Thanks for your review.
-I must do a explain of our MMC host:
-Source clock is source clock of the MMC bus, MMC host has a divider to
-get different bus clock frequency. now the runtime suspend is gating
-this clock.
+I've added a PL061 GPIO controller and gpio-keys node in QEMU like
+following format:
 
-Hclk is the power domain of the MMC host, if Hclk is gated, the MMC host
-cannot work(all registers readout is zero). and, all registers would be
-reset to default value if Hclk is gated/ungated.
-At MT8173, MSDC0 and MSDC2 has independent Hclk, MSDC1 and MSDC3's Hclk
-was controlled by "Infra module".
+        pl061 at 9030000 {
+                phandle = <0x8002>;
+                clock-names = "apb_pclk";
+                clocks = <0x8000>;
+                interrupts = <0x0 0x7 0x4>;
+                gpio-controller;
+                #gpio-cells = <0x2>;
+                compatible = "arm,pl061";
+                reg = <0x0 0x9030000 0x0 0x1000>;
+        };
+        gpio-keys {
+                autorepeat;
+                #address-cells = <0x1>;
+                #size-cells = <0x0>;
+                compatible = "gpio-keys";
 
-And, our MMC host has ability to control the gate/ungate of bus clock
-automatically, in MSDC_CFG bit 1, if this bit is set to 0, then "bus
-clock is gated to 0 if no command or data is transmitted".
-So, if the runtime PM do not control the Source clock, Hclk, then the
-runtime PM is needless.
+                poweroff {
+                        gpios = <0x8002 0x3 0x0>;
+                        linux,code = <0x74>;
+                        label = "GPIO Key Poweroff";
+                };
+        };
 
-if runtime PM do gate/ungate Hclk, then need do save/restore the
-registers meanwhile.
-
-So, how about your suggestion ?
-do we still need runtime PM ?
-Thx!
-
-
+Configure kernel to select GPIO Buttons and Polled GPIO buttons. Use a
+Redhat filesystem "Red Hat Enterprise Linux Server for ARM Development
+Preview release 1.5" which has systemd and systemd-logind. Start VM and
+when it starts well type "system_powerdown" on QEMU monitor, the guest
+goes to poweroff. So this way works.
 
 
-On Tue, 2015-05-05 at 14:49 +0200, Ulf Hansson wrote:
-> On 28 April 2015 at 11:48, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > Add Mediatek MMC driver code
-> > Support eMMC/SD/SDIO
-> >
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  drivers/mmc/host/Kconfig  |    8 +
-> >  drivers/mmc/host/Makefile |    1 +
-> >  drivers/mmc/host/mtk-sd.c | 1416 +++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 1425 insertions(+)
-> >  create mode 100644 drivers/mmc/host/mtk-sd.c
-> 
-> [...]
-> 
-> > +static void msdc_init_hw(struct msdc_host *host)
-> > +{
-> > +       u32 val;
-> > +       /* Configure to MMC/SD mode */
-> > +       sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_MODE, MSDC_SDMMC);
-> > +
-> > +       /* Reset */
-> > +       msdc_reset_hw(host);
-> > +
-> > +       /* Disable card detection */
-> > +       sdr_clr_bits(host->base + MSDC_PS, MSDC_PS_CDEN);
-> > +
-> > +       /* Disable and clear all interrupts */
-> > +       writel(0, host->base + MSDC_INTEN);
-> > +       val = readl(host->base + MSDC_INT);
-> > +       writel(val, host->base + MSDC_INT);
-> > +
-> > +       writel(0, host->base + MSDC_PAD_TUNE);
-> > +       writel(0, host->base + MSDC_IOCON);
-> > +       sdr_set_field(host->base + MSDC_IOCON, MSDC_IOCON_DDLSEL, 1);
-> > +       writel(0x403c004f, host->base + MSDC_PATCH_BIT);
-> > +       sdr_set_field(host->base + MSDC_PATCH_BIT, MSDC_CKGEN_MSDC_DLY_SEL, 1);
-> > +       writel(0xffff0089, host->base + MSDC_PATCH_BIT1);
-> > +       /* Configure to enable SDIO mode.
-> > +          it's must otherwise sdio cmd5 failed */
-> > +       sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIO);
-> > +
-> > +       /* disable detect SDIO device interrupt function */
-> > +       sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-> > +
-> > +       /* Configure to default data timeout */
-> > +       sdr_set_field(host->base + SDC_CFG, SDC_CFG_DTOC, 3);
-> > +       msdc_set_buswidth(host, MMC_BUS_WIDTH_1);
-> > +
-> > +       dev_dbg(host->dev, "init hardware done!");
-> > +}
-> > +
-> > +static void msdc_deinit_hw(struct msdc_host *host)
-> > +{
-> > +       u32 val;
-> > +       /* Disable and clear all interrupts */
-> > +       writel(0, host->base + MSDC_INTEN);
-> > +
-> > +       val = readl(host->base + MSDC_INT);
-> > +       writel(val, host->base + MSDC_INT);
-> > +
-> > +       msdc_gate_clock(host);
-> > +
-> > +       if (!IS_ERR(host->h_clk))
-> > +               clk_disable_unprepare(host->h_clk);
-> 
-> To make it clear when clocks are managed, I would move all that stuff
-> outside this function.
-> 
-> That would also follow how msdc_init_hw() is coded.
-> 
-> [...]
-> 
-> > +static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
-> > +{
-> > +       struct msdc_host *host = mmc_priv(mmc);
-> > +       int ret;
-> > +       u32 ddr = 0;
-> > +
-> > +       if (ios->timing == MMC_TIMING_UHS_DDR50 ||
-> > +               ios->timing == MMC_TIMING_MMC_DDR52)
-> > +               ddr = 1;
-> > +
-> > +       msdc_set_buswidth(host, ios->bus_width);
-> > +
-> > +       /* Suspend/Resume will do power off/on */
-> > +       switch (ios->power_mode) {
-> > +       case MMC_POWER_UP:
-> > +               msdc_init_hw(host);
-> 
-> I think you need to move the call to msdc_init_hw() into ->probe().
-> 
-> See more comments in the ->probe() function.
-> 
-> > +               if (!IS_ERR(mmc->supply.vmmc)) {
-> > +                       ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
-> > +                                       ios->vdd);
-> > +                       if (ret) {
-> > +                               dev_err(host->dev, "Failed to set vmmc power!\n");
-> > +                               return;
-> > +                       }
-> > +               }
-> > +               break;
-> > +       case MMC_POWER_ON:
-> > +               if (!IS_ERR(mmc->supply.vqmmc) && !host->vqmmc_enabled) {
-> > +                       ret = regulator_enable(mmc->supply.vqmmc);
-> > +                       if (ret)
-> > +                               dev_err(host->dev, "Failed to set vqmmc power!\n");
-> > +                       else
-> > +                               host->vqmmc_enabled = true;
-> > +               }
-> > +               msdc_ungate_clock(host);
-> 
-> I suggest that clocks that is managed through the clk API, should be
-> enabled during ->probe(). Then leave them enabled until the ->remove()
-> callback gets invoked.
-> 
-> In the ->set_ios() callback you should care about the internal
-> registers of your controller to enable/disable bus clocks.
-> Though, that should be considering of what value the ios->clock has
-> and not due MMC_POWER_ON|OFF|UP.
-> 
-> See more comments in the ->probe() function.
-> 
-> > +               break;
-> > +       case MMC_POWER_OFF:
-> > +               if (!IS_ERR(mmc->supply.vmmc))
-> > +                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-> > +
-> > +               if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled) {
-> > +                       regulator_disable(mmc->supply.vqmmc);
-> > +                       host->vqmmc_enabled = false;
-> > +               }
-> > +               msdc_gate_clock(host);
-> 
-> Same comment as above and see more comments in the ->probe() function.
-> 
-> > +               break;
-> > +       default:
-> > +               break;
-> > +       }
-> > +
-> > +       /* Apply different pinctrl settings for different timing */
-> > +       if (timing_is_uhs(ios))
-> > +               pinctrl_select_state(host->pinctrl, host->pins_uhs);
-> > +       else
-> > +               pinctrl_select_state(host->pinctrl, host->pins_default);
-> > +
-> > +       if (host->mclk != ios->clock || host->ddr != ddr)
-> > +               msdc_set_mclk(host, ddr, ios->clock);
-> > +}
-> > +
-> > +static struct mmc_host_ops mt_msdc_ops = {
-> > +       .post_req = msdc_post_req,
-> > +       .pre_req = msdc_pre_req,
-> > +       .request = msdc_ops_request,
-> > +       .set_ios = msdc_ops_set_ios,
-> > +       .start_signal_voltage_switch = msdc_ops_switch_volt,
-> > +};
-> > +
-> > +static int msdc_drv_probe(struct platform_device *pdev)
-> > +{
-> > +       struct mmc_host *mmc;
-> > +       struct msdc_host *host;
-> > +       struct resource *res;
-> > +       int ret;
-> > +
-> > +       if (!pdev->dev.of_node) {
-> > +               dev_err(&pdev->dev, "No DT found\n");
-> > +               return -EINVAL;
-> > +       }
-> > +       /* Allocate MMC host for this device */
-> > +       mmc = mmc_alloc_host(sizeof(struct msdc_host), &pdev->dev);
-> > +       if (!mmc)
-> > +               return -ENOMEM;
-> > +
-> > +       host = mmc_priv(mmc);
-> > +       ret = mmc_of_parse(mmc);
-> > +       if (ret)
-> > +               goto host_free;
-> > +
-> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +       host->base = devm_ioremap_resource(&pdev->dev, res);
-> > +       if (IS_ERR(host->base)) {
-> > +               ret = PTR_ERR(host->base);
-> > +               goto host_free;
-> > +       }
-> > +
-> > +       ret = mmc_regulator_get_supply(mmc);
-> > +       if (ret == -EPROBE_DEFER)
-> > +               goto host_free;
-> > +
-> > +       host->src_clk = devm_clk_get(&pdev->dev, "source");
-> > +       if (IS_ERR(host->src_clk)) {
-> > +               ret = PTR_ERR(host->src_clk);
-> > +               goto host_free;
-> > +       }
-> > +
-> 
-> I am a bit puzzled over the clock management here and in the
-> ->set_ios() callback, as mentioned.
-> 
-> I would suggest to do clk_prepare_enable() for the "source" clock
-> during probe and leave it on, until the ->remove() callbacks is
-> invoked.
-> 
-> Moreover, it's a good idea to invoke msdc_init_hw() during ->probe(),
-> since it makes sure the controller is properly initiated at this
-> point. You must not rely on the mmc core to invoke your ->set_ios()
-> callback with MMC_POWER_OFF to deal with that.
-> 
-> This should also enable you to manage both "hclk" and "source" clock
-> from the runtime PM callbacks, which you add in patch3. Thus it should
-> enable you to save more power in the runtime PM suspend state.
-> 
-> It would also mean that the "sclk_enabled" member in your host struct
-> can be removed.
-> 
-> > +       host->h_clk = devm_clk_get(&pdev->dev, "hclk");
-> > +       if (IS_ERR(host->h_clk)) {
-> > +               /* host->h_clk is optional, Only for MSDC0/3 at MT8173 */
-> > +               dev_dbg(&pdev->dev,
-> > +                               "Invalied hclk from the device tree!\n");
-> > +       } else {
-> > +               clk_prepare_enable(host->h_clk);
-> > +               dev_dbg(&pdev->dev,
-> > +                               "hclk rate: %ld\n", clk_get_rate(host->h_clk));
-> > +       }
-> > +
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
+Note: we must check the /lib/udev/rules.d/70-power-switch.rules in the
+fs and add one following line in it if it doesn't exist.
+
+SUBSYSTEM=="input", KERNEL=="event*", SUBSYSTEMS=="platform",
+ATTRS{keys}=="116", TAG+="power-switch"
+
+Then when execute journalctl -u systemd-logind in guest, we can see
+something like below:
+
+Jan 01 00:01:02 localhost systemd[1]: Starting Login Service...
+Jan 01 00:01:07 localhost systemd[1]: Started Login Service.
+Jan 01 00:01:07 localhost systemd-logind[927]: Watching system buttons
+on /dev/input/event0 (gpio-keys)
+Jan 01 00:01:07 localhost systemd-logind[927]: New seat seat0.
+Jan 01 00:01:25 localhost systemd-logind[927]: New session c1 of user root.
+
+Visit https://bugs.launchpad.net/ubuntu/+source/systemd/+bug/1347776 for
+details.
+
+-- 
+Shannon
