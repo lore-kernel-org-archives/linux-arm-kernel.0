@@ -1,45 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 06 May 2015 10:40:03 +0200
-Subject: [PATCH v5 1/1] arm64: dts: Add the arasan sdhc nodes in
- apm-storm.dtsi.
-In-Reply-To: <5549C68B.9090602@xilinx.com>
-References: <1430817426-5241-1-git-send-email-stripathi@apm.com>
- <4635229.bceBxngCoe@wuerfel> <5549C68B.9090602@xilinx.com>
-Message-ID: <2568634.iEosTvMJpM@wuerfel>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Wed, 06 May 2015 16:41:40 +0800
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <3443848.jTbkmjUfGI@wuerfel>
+References: <55417F5A.4040300@linaro.org> <2196079.901rMdSZr0@wuerfel>
+ <5549CEAF.1090400@linaro.org> <3443848.jTbkmjUfGI@wuerfel>
+Message-ID: <5549D3C4.4010101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 May 2015 09:45:15 Michal Simek wrote:
-> On 05/06/2015 09:31 AM, Arnd Bergmann wrote:
-> > On Wednesday 06 May 2015 10:41:07 Suman Tripathi wrote:
-> >>>> @@ -533,6 +567,16 @@
-> >>>>                         interrupts = <0x0 0x4f 0x4>;
-> >>>>                 };
-> >>>>
-> >>>> +               sdhc0: sdhc at 1c000000 {
-> >>>> +                       device_type = "sdhc";
-> >>>
-> >>> device_type generally should not be used (there are a few exceptions).
-> >>
-> >> Okay !!
-> >>
-> > 
-> > While we're at it, please change sdhc at 1c000000 to mmc at 1c000000.
-> > Even though Linux does not care, we try to use the standard device
-> > names for consistency.
-> 
-> Do we have a list of these names somewhere?
-> Normally I do use ePARP - generic names recommendation but mmc or sdhci
-> are not listed there.
-> Both combination mmc@ or sdhci@ are used in the kernel.
-> 
-> On zynq and zynqmp we do use shdci at .
-> 
 
-Ah, I thought ePAPR listed mmc already. Using "sdhci" is a little too
-specific here, since a lot of mmc hosts are not sdhci compliant, and
-"sdhc" is completely wrong, because that identifies a specific card
-type, but a host that supports SDHC cards will generally also work
-with SD (less than 4GB) or SDXC (more than 48GB) cards.
+On 2015/5/6 16:37, Arnd Bergmann wrote:
+> On Wednesday 06 May 2015 16:19:59 Shannon Zhao wrote:
+>>> > > How about Ubuntu or Debian releases that do not use systemd?
+>>> > > 
+>>> > > I guess we should check with a Debian Wheezy or Ubuntu Trusty release.
+>>> > > My guess is that it will work fine, but some minor adjustment might
+>>> > > be needed.
+>> > 
+>> > Will check Debian Wheezy and Ubuntu Trusty release later.
+>> > BTW, I don't have them on hand, where can I get these filesystem for ARM?
+>> > 
+> I think these should work for Debian:
+> 
+> https://people.debian.org/~aurel32/qemu/armhf/
+> 
+> but you will have to provide a newer kernel.
+> 
+> The image is a 32-bit user space, but it should work with both 32-bit
+> and 64-bit kernels. It's probably enough to test either ubuntu or
+> debian.
 
-	Arnd
+Ok, thanks. Will have a try.
+
+-- 
+Shannon
