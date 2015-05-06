@@ -1,45 +1,30 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 6 May 2015 15:16:46 +0200
-Subject: [PATCH] mmc: atmel-mci: fix bad variable type for clkdiv
-Message-ID: <1430918206-19911-1-git-send-email-ludovic.desroches@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 May 2015 15:21:10 +0200
+Subject: [PATCH] gpio: omap: Fix regression for MPUIO interrupts
+In-Reply-To: <1429833257-28188-1-git-send-email-tony@atomide.com>
+References: <1429833257-28188-1-git-send-email-tony@atomide.com>
+Message-ID: <CACRpkdZqSEgaVOV1gCQvCLc1-x7eU3WZwAM2QT2HT21xqCHZ2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clkdiv is declared as an u32 but it can be set to a negative value
-causing a huge divisor value. Change its type to int to avoid this case.
+On Fri, Apr 24, 2015 at 1:54 AM, Tony Lindgren <tony@atomide.com> wrote:
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: <stable@vger.kernel.org> # 3.4 and later
----
- drivers/mmc/host/atmel-mci.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+> At some point with all the GPIO clean-up we've broken the
+> MPUIO interrupts. Those are just a little bit different from
+> the GPIO interrupts, so we can fix it up just by setting
+> different irqchip functions for it. And then we can just
+> remove all old code trying to do the same.
+>
+> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 03d7c75..9a39e0b 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -1304,7 +1304,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 
- 	if (ios->clock) {
- 		unsigned int clock_min = ~0U;
--		u32 clkdiv;
-+		int clkdiv;
- 
- 		spin_lock_bh(&host->lock);
- 		if (!host->mode_reg) {
-@@ -1328,7 +1328,12 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		/* Calculate clock divider */
- 		if (host->caps.has_odd_clk_div) {
- 			clkdiv = DIV_ROUND_UP(host->bus_hz, clock_min) - 2;
--			if (clkdiv > 511) {
-+			if (clkdiv < 0) {
-+				dev_warn(&mmc->class_dev,
-+					 "clock %u too fast; using %lu\n",
-+					 clock_min, host->bus_hz / 2);
-+				clkdiv = 0;
-+			} else if (clkdiv > 511) {
- 				dev_warn(&mmc->class_dev,
- 				         "clock %u too slow; using %lu\n",
- 				         clock_min, host->bus_hz / (511 + 2));
--- 
-2.2.0
+Patch applied for fixes with the ACKs etc,
+
+Yours,
+Linus Walleij
