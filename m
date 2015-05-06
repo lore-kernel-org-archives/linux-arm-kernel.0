@@ -1,84 +1,61 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 6 May 2015 15:25:20 +0200
-Subject: [PATCH  0/2] gpio: Allow userspace export from DT
-In-Reply-To: <20150506125707.GV2067@n2100.arm.linux.org.uk>
-References: <20150413110515.9681.58848.stgit@localhost>
- <20150504084925.GB4047@localhost>
- <20150506112449.GQ2067@n2100.arm.linux.org.uk>
- <20150506124354.GA5302@localhost>
- <20150506125707.GV2067@n2100.arm.linux.org.uk>
-Message-ID: <20150506132520.GC5302@localhost>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 6 May 2015 08:26:26 -0500
+Subject: [PATCH v4 1/2] Documentation: devicetree: root node serial-number
+ property documentation
+In-Reply-To: <1430206196-3483-1-git-send-email-contact@paulk.fr>
+References: <1430206196-3483-1-git-send-email-contact@paulk.fr>
+Message-ID: <CAL_JsqKbSgZ4gXVc=FG_RKic-JM4_Mhzdh3Lh26NCa6zrc74dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 01:57:08PM +0100, Russell King - ARM Linux wrote:
-> On Wed, May 06, 2015 at 02:43:54PM +0200, Johan Hovold wrote:
-> > On Wed, May 06, 2015 at 12:24:50PM +0100, Russell King - ARM Linux wrote:
-> > > On Mon, May 04, 2015 at 10:49:25AM +0200, Johan Hovold wrote:
-> > > > Firmware should describe pin directionality and function, and undefined
-> > > > pins should never be allowed to be accessed from userspace.
-> > > 
-> > > No, that's totally wrong if you consider one of the most common use
-> > > cases out there...
-> > > 
-> > > Think about something like a Raspberry Pi, where you have a header with
-> > > GPIOs on it, which can be used for multiple different purposes (and are
-> > > even multiplexed with some on-SoC functions.)
-> > > 
-> > > "Firmware" can't know about all possible configurations of those IO pins.
-> > > 
-> > > That's why Raspberry Pi uses a userspace helper and programs stuff up
-> > > appropriately for the users application.
-> > 
-> > I'm not familiar with exactly how the RPi handles its pin muxing, but
-> > even if it requires userspace interaction that should not prevent having
-> > firmware describe the pins.
-> 
-> How it handles this is... it doesn't.  Userspace does it.
-> 
-> There is *no* "firmware" on these devices.  The only thing you have is a
-> boot loader and a DT blob, and people will hate you if you tell them that
-> they have to change the DT blob and then reboot their systems to change
-> the functionality of a GPIO pin.
+On Tue, Apr 28, 2015 at 2:29 AM, Paul Kocialkowski <contact@paulk.fr> wrote:
+> Open firmware is already using the serial-number property for passing the
+> device's serial number from the bootloader to the kernel. In addition, lshw
+> already has support for scanning this property.
 >
-> It's also entirely reasonable to assume that people are going to want to
-> change the configuration at runtime, given their diverse range of
-> applications.
+> The serial number is a string that somewhat represents the device's serial
+> number. It might come from some form of storage (e.g. an eeprom) and be
+> programmed at factory-time by the manufacturer or come from identification
+> bits available in e.g. the SoC (note that the soc_id property in the SoC bus
+> should hold a full account of those bits).
+>
+> The serial number is taken as-is from the bootloader, so it is up to the
+> bootloader to define where the serial number comes from and what length it
+> should be. Some use cases for the serial number require it to have a maximum
+> length (e.g. for USB serial number) and some other cases imply more restrictions
+> on what the serial number should look like (e.g. in Android, the ro.serialno
+> property is usually a 16-bytes (plus one null byte) representation of a 64 bit
+> number).
+>
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 
-DT can be changed at run-time using overlays.
+Acked-by: Rob Herring <robh@kernel.org>
 
-This way the RPi users could define their i2c-clients, or whatever buses
-they choose to expose on those pins as well.
+What Russell was referring to for submitting is his patch tracker:
 
-> > In general, if the hardware configuration is static we use device trees.
-> > 
-> > If the configuration is dynamic we use device-tree overlays; either
-> > loaded manually or by some service (e.g. Beaglebone capes). Perhaps this
-> > could be handled by the RPi helper.
-> 
-> Yes, that _could_ work, but I bet asking millions of people to change
-> what they're doing is going to be extremely difficult.  Remember the
-> golden rule of the kernel: thou shalt not break userspace.
-> 
-> So, there is _no_ possibility of removing this GPIO exposure to userspace
-> because we _know_ that it will break people.
-> 
-> If you think differently on the "thou shalt not break userspace" please
-> don't discuss it with me, I'm not interested.  Linus isn't interested
-> either, and if you try and discuss it with him, he'll tell you to get
-> out of kernel programming. :)
-> 
-> This is a commonly used API.  You can't change it.
+http://www.arm.linux.org.uk/developer/patches/
 
-I've never suggested that we remove the current API, but *only* exposing
-a totally non-restrictive interface for systems not used by school
-children and hardware hackers is not sane.
+Rob
 
-You also cut out the part in my reply about continuing to allow
-unrestricted access for such cases. That could still continue to be the
-default (e.g. when there are no pin function names defined in DT).
-
-And if those people ever update their DTs they could benefit from the
-deterministic pin naming without loosing any flexibility too.
-
-Johan
+> ---
+>  Documentation/devicetree/booting-without-of.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+> index 7768518..95fc385 100644
+> --- a/Documentation/devicetree/booting-without-of.txt
+> +++ b/Documentation/devicetree/booting-without-of.txt
+> @@ -828,6 +828,10 @@ address which can extend beyond that limit.
+>    name may clash with standard defined ones, you prefix them with your
+>    vendor name and a comma.
+>
+> +  Additional properties for the root node:
+> +
+> +    - serial-number : a string representing the device's serial number
+> +
+>    b) The /cpus node
+>
+>    This node is the parent of all individual CPU nodes. It doesn't
+> --
+> 1.9.1
+>
