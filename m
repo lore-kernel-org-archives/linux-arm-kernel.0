@@ -1,86 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 May 2015 07:42:39 -0700
-Subject: [PATCH 0/3] Drop more omap3 legacy board-*.c files for v4.2
-In-Reply-To: <20150506085204.GE30910@pali>
-References: <1430769717-4088-1-git-send-email-tony@atomide.com>
- <20150505145407.GK18002@pali> <20150505150638.GC21061@atomide.com>
- <201505051839.36882@pali> <20150505170020.GF21061@atomide.com>
- <20150506085204.GE30910@pali>
-Message-ID: <20150506144239.GH21061@atomide.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Wed, 6 May 2015 07:49:27 -0700
+Subject: [PATCH v4 0/7] selftests: fixes for installation and cross
+ compilation
+In-Reply-To: <1429656574-8411-1-git-send-email-tyler.baker@linaro.org>
+References: <1429656574-8411-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <CANMBJr53a0cdJ5yjBu3ADv=x-==X0HXVQDELmuSuLLNCKLzviw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [150506 01:53]:
-> On Tuesday 05 May 2015 10:00:21 Tony Lindgren wrote:
-> > * Pali Roh?r <pali.rohar@gmail.com> [150505 09:41]:
-> > > On Tuesday 05 May 2015 17:06:38 Tony Lindgren wrote:
-> > > > * Pali Roh?r <pali.rohar@gmail.com> [150505 07:55]:
-> > > > > On Tuesday 05 May 2015 07:43:08 Tony Lindgren wrote:
-> > > > > > * Arnd Bergmann <arnd@arndb.de> [150505 03:56]:
-> > > > > > > On Monday 04 May 2015 13:01:54 Tony Lindgren wrote:
-> > > > > > > > For dropping the remaining omap3 legacy boot support,
-> > > > > > > > we still have the following board-*.c files:
-> > > > > > > > 
-> > > > > > > > BOARD                   REASON NEEDED
-> > > > > > > > board-ldp.c             Still used in RMKs boot test
-> > > > > > > > system board-omap3logic.c      Getting a .dts file
-> > > > > > > > for v4.2 board-omap3pandora.c    Got a .dts file for
-> > > > > > > > v4.1 board-rx51-*.c          Needs /proc/atags
-> > > > > > > > support for user space
-> > > > > > > > 
-> > > > > > > > I'm hoping we can drop those for v4.3 merge window,
-> > > > > > > > then keep the platform data around for one more merge
-> > > > > > > > window in case of reverting needed, then drop the
-> > > > > > > > platform data too for v4.4 if no issues needing
-> > > > > > > > reverting are found.
-> > > > > > > 
-> > > > > > > Sounds great. Has there been a conclusion about what to
-> > > > > > > do for the rx51 /proc/atags support?
-> > > > > > 
-> > > > > > I believe we just need to enable /proc/atags also for
-> > > > > > device tree based booting if CONFIG_ARM_ATAG_DTB_COMPAT.
-> > > > > > Pali may have more info on that.
-> > > > > > 
-> > > > > > Then looks like Pali's two patches for showing the
-> > > > > > revision are still pending in thread "[PATCH v2 0/2] ARM:
-> > > > > > /proc/cpuinfo: DT: Add support for Revision":
-> > > > > > 
-> > > > > > http://www.spinics.net/lists/arm-kernel/msg401535.html
-> > > > > 
-> > > > > I think I already sent all need patches to ML. But I did not
-> > > > > check if you merged them or not. I did not get any new
-> > > > > comments for them for a while and right now I do not have
-> > > > > time for looking at it again.
-> > > > 
-> > > > Oh OK, do you have link to the /proc/atags patch somewhere?
-> > > > 
-> > > > Maybe Arnd and Nico can pick them up and sort out how we
-> > > > should queue them with Russell?
-> > > > 
-> > > 
-> > > https://lkml.org/lkml/2015/1/26/648
-> > 
-> > Hmm looks like you should resend all your pending four patches
-> > properly with the people mentioned above in Cc to the LAKML
-> > and linux-omap.. Assuming something will happen to them when
-> > the patches are buried into a middle of some old threads does
-> > not work well.. Best to just follow das protokoll und whine and
-> > follow up until the patches get merged :)
-> > 
-> > Regards,
-> > 
-> > Tony
-> 
-> Now I resent "ARM: /proc/cpuinfo: DT: Add support for Revision" patches
-> to MLs again without in-reply-to header.
+Hi Shuah,
 
-OK thanks.
- 
-> Patches for /proc/atags I do not have currently in git format-patch mbox
-> format, so cannot resent it right now...
+On 21 April 2015 at 15:49, Tyler Baker <tyler.baker@linaro.org> wrote:
+> This patch set fixes various issues observed when cross building and
+> installing selftests.
+>
+> As I began investigating improving the test output format, I performed an
+> audit of the current tests to ensure all tests were able to execute on various
+> target architectures. I found that some tests did not install their binaries
+> and others required directories to be installed to execute properly. There
+> were also cases in which tests were being installed when they were never built.
+> With this series applied all tests compile when appropriate and install their
+> output properly.
+>
+> I have tested this series by building, installing and deploying all selftests
+> to x86, arm and arm64 targets.
+>
+> Changes v3 -> v4:
+> * Planning to send a followup series to address the lib.mk issue so I've
+> dropped the breakpoints and x86 installation workaround.
+> * x86: Removed redundant else logic block.
+> * Applied Andy Lutomirski's ACK to patches 4 and 5.
+> * Rebased onto next-20150421.
 
-Well presumably you'll resend those once you find them then :)
+I believe all comments have been addressed, is there anything else you
+would like to see?
 
-Regards,
+>
+> Changes v2 -> v3:
+> * 5/8: Removed duplicate all_32.
+> * 6/8: Ensure the default rule is all in every case.
+> * 6/8: Fixed commit message wording for better clarity.
+> * Applied Michael Ellerman's ACK to patches 1-4, and 8 as they have not changed.
+> * Rebased onto next-20150420.
+>
+> Changes v1 -> v2:
+> * Have no dependency on all when CROSS_COMPILE is set. (Andy Lutomirski)
+> * Added Andy on CC for all x86 test patches.
+> * Split up the x86 patches for better clarity.
+> * Rebased onto next-20150415.
+>
+> This series is based on next-20150421.
+>
+> Tyler Baker (7):
+>   selftests: copy TEST_DIRS to INSTALL_PATH
+>   selftests/ftrace: install test.d
+>   selftests/kdbus: install kdbus-test
+>   selftest/x86: build both bitnesses
+>   selftest/x86: have no dependency on all when cross building
+>   selftests/x86: install tests
+>   selftests/exec: do not install subdir as it is already created
+>
+>  tools/testing/selftests/exec/Makefile   |  2 +-
+>  tools/testing/selftests/ftrace/Makefile |  1 +
+>  tools/testing/selftests/kdbus/Makefile  |  2 ++
+>  tools/testing/selftests/lib.mk          |  3 +++
+>  tools/testing/selftests/x86/Makefile    | 15 ++++++++++++---
+>  5 files changed, 19 insertions(+), 4 deletions(-)
+>
+> --
+> 2.1.4
+>
 
-Tony
+Thanks,
+
+Tyler
