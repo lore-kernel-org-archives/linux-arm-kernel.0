@@ -1,44 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 06 May 2015 11:39:58 +0200
-Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
-In-Reply-To: <20150501234214.GK12076@piout.net>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <20150501234214.GK12076@piout.net>
-Message-ID: <2694895.MomHLoCaoZ@wuerfel>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 06 May 2015 11:40:59 +0200
+Subject: ARM: EXYNOS: dts: Improvements for 4.2
+In-Reply-To: <1430873981-22902-1-git-send-email-k.kozlowski@samsung.com>
+References: <1430873981-22902-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5549E1AB.8000400@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 02 May 2015 01:42:14 Alexandre Belloni wrote:
-> Hi,
+Hello Krzysztof,
+
+On 05/06/2015 02:59 AM, Krzysztof Kozlowski wrote:
+> Dear Kukjin,
 > 
-> On 14/12/2010 at 16:08:26 +0100, Hans Ulli Kroll wrote :
-> > driver for the rtc device
-> > on Cortina Systems CS3516 or StormlinkSemi SL3516 aka Gemini SoC
-> > 
-> > Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> I gathered various improvements for upcoming 4.2 merge window.
+> Description along with a tag.
 > 
-> This driver has never been merged and the platform doesn't seem to be
-> active anymore. Is there still any interest in getting this driver
-> mainlined?
+> Best regards,
+> Krzysztof
 > 
-> Only tree wide cleanups happened in mach-gemini since end of 2010, the
-> listed git repository (git://git.berlios.de/gemini-board) was on berliOS
-> (closed since 2011) and the sourceforge mirror seems empty. Is there
-> still interest in keeping that platform in the mainline?
+> ----------------------------------------------------------------
+> The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
+> 
+>   Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/krzk/linux.git tags/samsung-dt-for-next-4.2
+> 
+> for you to fetch changes up to 98155ec454a40212434c83c1388c420a61d62854:
+> 
+>   ARM: dts: exynos4: add nodes for jpeg codec (2015-05-05 19:19:18 +0900)
+> 
+> ----------------------------------------------------------------
+> Device Tree improvements for Exynos based boards:
+> 1. Fix PMIC's RTC alarm on Arndale Octa (S2MPS11 PMIC) and SMDK5250 (MAXIM77686
+>    PMIC).
+> 2. Fix suspend on Peach Pit Chromebooks prevented by Marvell mwifiex
+>    driver.
+> 3. Fix hang on Odroid XU3 on MMC card detect.
+> 4. Enable the S3C RTC (the clock present on SoC) on various Exynos boards.
+> 5. Minor improvements to S3C RTC driver.
+> 6. Add nodes for JPEG codec on Exynos4.
+> 
+> ----------------------------------------------------------------
+> Andrzej Hajda (1):
+>       ARM: dts: exynos5422-odroidxu3: add mmc detect gpio
+> 
+> Javier Martinez Canillas (2):
+>       ARM: dts: Make DP a consumer of DISP1 power domain on Exynos5420
 
-As far as I know, the platform is still used by a number of people,
-and is supported by OpenWRT. The reason we haven't seen updates is that
-Ulli has been mostly absent from upstream development, and we haven't
-had any other person step up as maintainer.
+This one is already in your "ARM: EXYNOS: dts: DTS fixes for 4.1" pull
+request so it seems is a left over and should not be in this branch?
 
-I have a patch to convert the platform to ARCH_MULTIPLATFORM, and
-the code doesn't really get in the way otherwise.
+>       ARM: dts: Add keep-power-in-suspend to WiFi SDIO node for Peach Boards
+>
 
-As far as I'm concerned, we should just merge all the patches from
-http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini/patches-3.18
+This patch is also rc material IMHO since the mwifiex driver prevents
+the system to enter into a suspend state and the driver is enabled in
+exynos_defconfig after commit "040464888a1a ("ARM: exynos_defconfig:
+Enable Marvell WiFi-Ex support") which landed in v4.1-rc1.
 
-We should also try to find a maintainer that can respond to patches
-in a timely manner. If Ulli has time for that again, that would be great,
-otherwise I think we should find someone from OpenWRT to take over.
-
-	Arnd
+Best regards,
+Javier
