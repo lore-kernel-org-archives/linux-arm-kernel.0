@@ -1,59 +1,58 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 6 May 2015 18:31:07 +0200
-Subject: [PATCH v3 2/7] mmc: mediatek: Add Mediatek MMC driver
-In-Reply-To: <1430895299.15154.9.camel@mhfsdcap03>
-References: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
- <1430214525-19198-3-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFq=R9B6ZHHgmDcSg-TNSfqQKAUKc2NjACvpwxFpmk954g@mail.gmail.com>
- <1430895299.15154.9.camel@mhfsdcap03>
-Message-ID: <CAPDyKFr+FTXAzYVn3F41dmw2zW01pSbSHPfGJHXbUFLJfvQ5CA@mail.gmail.com>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Wed,  6 May 2015 18:31:56 +0200
+Subject: [PATCH v2] ARM: net fix emit_udiv() for BPF_ALU | BPF_DIV | BPF_K
+ intruction.
+Message-ID: <1430929916-15852-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 May 2015 at 08:54, chaotian.jing <chaotian.jing@mediatek.com> wrote:
-> Dear Ulf,
->
-> Thanks for your review.
-> I must do a explain of our MMC host:
-> Source clock is source clock of the MMC bus, MMC host has a divider to
-> get different bus clock frequency. now the runtime suspend is gating
-> this clock.
->
-> Hclk is the power domain of the MMC host, if Hclk is gated, the MMC host
-> cannot work(all registers readout is zero). and, all registers would be
-> reset to default value if Hclk is gated/ungated.
-> At MT8173, MSDC0 and MSDC2 has independent Hclk, MSDC1 and MSDC3's Hclk
-> was controlled by "Infra module".
+In that case, emit_udiv() will be called with rn == ARM_R0 (r_scratch)
+and loading rm first into ARM_R0 will result in jit_udiv() function
+being called the same dividend and divisor. Fix that by loading rn
+first into ARM_R1 and then rm into ARM_R0.
 
-Thanks for clarifying!
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+Cc: <stable@vger.kernel.org> # v3.13+
+Fixes: aee636c4809f (bpf: do not use reciprocal divide)
+---
+ arch/arm/net/bpf_jit_32.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-I don't have enough knowledge about your SoC to understand the detail,
-but it seems like we are mixing clocks and power domains. I would
-rather keep this separate - if the HW allows it.
+This patch was part of a serie adding support to JITed seccomp filters
+to ARM but as it is an unrelated fix, it is more appropriate to send
+it separately.
 
-I guess the key question I have is the following:
-1) Is it hardware wise possible to gate the hclk, but without gating
-the power domain?
-2) At what level is the reference counting done for each device in the
-power domain? In HW or in sofftware?
+Changes from previous version: add a comment clarifying how
+emit_udiv() is called when translating BPF_ALU | BPF_DIV | BPF_K and
+BPF_ALU | BPF_DIV | BPF_X with respect to the rm and rn parameters.
 
->
-> And, our MMC host has ability to control the gate/ungate of bus clock
-> automatically, in MSDC_CFG bit 1, if this bit is set to 0, then "bus
-> clock is gated to 0 if no command or data is transmitted".
-> So, if the runtime PM do not control the Source clock, Hclk, then the
-> runtime PM is needless.
->
-> if runtime PM do gate/ungate Hclk, then need do save/restore the
-> registers meanwhile.
-
-Yes agree, that's a common thing to deal with from runtime PM callbacks.
-
->
-> So, how about your suggestion ?
-> do we still need runtime PM ?
-
-Yes, I definitely think you need it!
-
-Kind regards
-Uffe
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index e1268f9..f412b53 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -449,10 +449,21 @@ static inline void emit_udiv(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx)
+ 		return;
+ 	}
+ #endif
+-	if (rm != ARM_R0)
+-		emit(ARM_MOV_R(ARM_R0, rm), ctx);
++
++	/*
++	 * For BPF_ALU | BPF_DIV | BPF_K instructions, rm is ARM_R4
++	 * (r_A) and rn is ARM_R0 (r_scratch) so load rn first into
++	 * ARM_R1 to avoid accidentally overwriting ARM_R0 with rm
++	 * before using it as a source for ARM_R1.
++	 *
++	 * For BPF_ALU | BPF_DIV | BPF_X rm is ARM_R4 (r_A) and rn is
++	 * ARM_R5 (r_X) so there is no particular register overlap
++	 * issues.
++	 */
+ 	if (rn != ARM_R1)
+ 		emit(ARM_MOV_R(ARM_R1, rn), ctx);
++	if (rm != ARM_R0)
++		emit(ARM_MOV_R(ARM_R0, rm), ctx);
+ 
+ 	ctx->seen |= SEEN_CALL;
+ 	emit_mov_i(ARM_R3, (u32)jit_udiv, ctx);
+-- 
+1.9.1
