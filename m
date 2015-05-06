@@ -1,40 +1,61 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Wed, 06 May 2015 09:53:55 +0200
-Subject: How to encode being an I2C slave in DT?
-In-Reply-To: <20150506065928.GP25193@pengutronix.de>
-References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
- <20150505105513.GA1841@katana> <20150506065928.GP25193@pengutronix.de>
-Message-ID: <3394114.re5da8pjTi@fb07-iapwap2>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 6 May 2015 15:59:42 +0800
+Subject: [PATCH 0/7] Add SMP bringup support for mt65xx socs
+In-Reply-To: <1430896766.15346.13.camel@mtksdaap41>
+References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
+ <CABuKBeJ406DUFoVs2p3-u6sW58Dm7XDd6uxCc==Mkq3dMhhd5Q@mail.gmail.com>
+ <1430896766.15346.13.camel@mtksdaap41>
+Message-ID: <1430899182.4930.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 6. Mai 2015, 08:59:28 schrieb Uwe Kleine-K?nig:
-> Hello,
+On Wed, 2015-05-06 at 15:19 +0800, Yingjoe Chen wrote:
+> Hi Matthias,
+<...>
+> > I tried on the mt8135 eval board but it fails to bring up the CPU.
+> > 
+> > When booting:
+> > [    1.048588] CPU1: failed to come online
+> > [    2.049914] CPU2: failed to come online
+> > [    3.051245] CPU3: failed to come online
 > 
-> On Tue, May 05, 2015 at 12:55:13PM +0200, Wolfram Sang wrote:
-> > So what about adding a new property "i2c-slave-reg"? This does not only
-> > prevent the confusion above, but also makes it very clear that this node
-> > is an I2C slave without the need to encode that somehow in the
-> > compatible property (although it probably should be described there as
-> > well, still).
 > 
-> I admit I didn't follow the discussions referenced in the footnotes, but
-> I wonder if the slave part should be added to the device tree at all.
-> AFAICT it could (and so should) be completely userspace-defined which
-> slave driver is used on which address. I imagine that for most
-> controllers the bus addresses to use can be chosen more or less freely.
-> So what am I missing?
+> Thanks for testing, and the config file you provided.
+> It seems you are running THUMB2 kernel, unfortunately mt8135 trustzone
+> firmware doesn't support jump to THUMB2 code directly.
+> 
+> I can workaround this with the following patch. I'll include it in my
+> next round.
+> 
+> Joe.C
+> 
+> -----8<----------------
+> diff --git a/arch/arm/mach-mediatek/platsmp.c
+> b/arch/arm/mach-mediatek/platsmp.c
+> index e266b3d..5dea55a 100644
+> --- a/arch/arm/mach-mediatek/platsmp.c
+> +++ b/arch/arm/mach-mediatek/platsmp.c
+> @@ -57,6 +57,18 @@ static const struct of_device_id mtk_smp_boot_infos[]
+> __initconst = {
+>  static void __iomem *mtk_smp_base;
+>  static const struct mtk_smp_boot_info *mtk_smp_info;
+>  
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +__asm__(
+> +	".arm\n"
+> +	"mtk_secondary_startup_fixup:\n"
+> +	"	b secondary_startup\n"
+> +	".thumb\n"
+> +);
+> +
+> +void mtk_secondary_startup_fixup(void);
+> +#define secondary_startup mtk_secondary_startup_fixup
+> +#endif
 
-if you had read the footnotes you would know :-) Our usecase is connect an 
-embeedded controller via i2c to the host soc, similar to cros-ec, but here the 
-ec is the i2c master. The ec connects keyboard, mouse, pwrmngt, and other 
-stuff, for which the drivers are best implemented in kernel code AFAIK. 
 
-Marc
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150506/afbd62ae/attachment-0001.sig>
+Replying myself.
+
+It seems kernel already have secondary_startup_arm which support this
+usage. I'll use that in my next version instead.
+
+Joe.C
