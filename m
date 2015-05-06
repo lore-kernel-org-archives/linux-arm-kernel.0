@@ -1,191 +1,84 @@
-From: anders.roxell@linaro.org (Anders Roxell)
-Date: Wed, 6 May 2015 21:38:03 +0200
-Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
-In-Reply-To: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
-References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
-Message-ID: <20150506193803.GC32577@8074w.roxell.se>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 06 May 2015 21:50:14 +0200
+Subject: [PATCH v8 0/4] edac: Add APM X-Gene SoC memory controller EDAC
+ driver
+In-Reply-To: <CAPw-ZTmJ8C3KmujZJN1z21S3LFQ-TRouUeAjN0Y02HOTKAG1_g@mail.gmail.com>
+References: <1430884947-16787-1-git-send-email-lho@apm.com>
+ <20150506182900.GI22949@pd.tnic>
+ <CAPw-ZTmJ8C3KmujZJN1z21S3LFQ-TRouUeAjN0Y02HOTKAG1_g@mail.gmail.com>
+Message-ID: <2154265.kZOTsisCx2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-01 20:59, Ayyappa Ch wrote:
-> Floating point operations in arm64 should not disable preempt .
+On Wednesday 06 May 2015 11:43:36 Loc Ho wrote:
+> Hi Borislav,
+> 
+> On Wed, May 6, 2015 at 11:29 AM, Borislav Petkov <bp@alien8.de> wrote:
+> > On Wed, May 06, 2015 at 11:12:20AM -0700, Loc Ho wrote:
+> >> 1. Whether to have an single driver for APM EDAC or multiple instance
+> >> of 4 different drivers. With single driver, it does not scale in the
+> >> future when we add/remove memory controllers and CPU domains. This is
+> >
+> > Why doesn't it scale? Please explain this to me more verbosely.
+> 
+> Let me explain a bit more. We have four memory controller today.
+> Therefore, I would like to have 4 DTS node and the same driver probe
+> function called 4 times. If there is only one driver for the entire
+> APM EDAC, I would have to merge all the resource registers into an
+> single DTS node and its probe function called one time. In this one
+> driver design, what would I do in future chip or variant of the chip
+> in which it remove or add an addition memory controller? I would have
+> to change the driver as well as the DTS node. In the four instance
+> probe design, all I need is to add an additional DTS node.
 
-I thought that I would see a problem if I ran a floating point
-workload and cyclictest at the same time but I don't.
+There are lots of possible representations in DT that would solve this.
 
-Can you please provide me some more details on how I can reproduce the
-problem?
+First of all, a device node can be turned into a platform_device but
+does not have to, so you you could have one DT node for the common
+parts (the pcp), and then subnodes underneath it, and have the driver
+attach to the main device but parse the subnodes manually to see
+what registers are there. There is no magic involved here, and this
+would address the concerns that Boris and I have.
 
-Cheers,
-Anders
+Another option would be to have multiple drivers: have one driver
+that handles the common parts here, and make that export a shared
+interface to which the other drivers can register, then create
+five drivers that each do one thing. In my opinion that would work
+just as well, and be a nice abstraction, but I suspect that Boris
+would prefer doing it the other way.
 
-> Activating realtime features with below code.
-> 
-> From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
-> From: Ayyappa Ch <ayyappa.chandolu@amd.com>
-> Date: Tue, 28 Apr 2015 11:53:00 +0530
-> Subject: [PATCH ] floating point realtime fix
-> 
-> ---
->  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 2438497..3dca156 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
->   */
->  void fpsimd_preserve_current_state(void)
->  {
-> - preempt_disable();
-> + migrate_disable();
->   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
->   fpsimd_save_state(&current->thread.fpsimd_state);
-> - preempt_enable();
-> + migrate_enable();
->  }
-> 
->  /*
-> @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
->   */
->  void fpsimd_restore_current_state(void)
->  {
-> - preempt_disable();
-> + migrate_disable();
->   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
->   struct fpsimd_state *st = &current->thread.fpsimd_state;
-> 
-> @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
->   this_cpu_write(fpsimd_last_state, st);
->   st->cpu = smp_processor_id();
->   }
-> - preempt_enable();
-> + migrate_enable();
->  }
-> 
->  /*
-> @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
->   */
->  void fpsimd_update_current_state(struct fpsimd_state *state)
->  {
-> - preempt_disable();
-> + migrate_disable();
->   fpsimd_load_state(state);
->   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
->   struct fpsimd_state *st = &current->thread.fpsimd_state;
-> @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
->   this_cpu_write(fpsimd_last_state, st);
->   st->cpu = smp_processor_id();
->   }
-> - preempt_enable();
-> + migrate_enable();
->  }
-> 
->  /*
-> @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
->   * that there is no longer userland FPSIMD state in the
->   * registers.
->   */
-> - preempt_disable();
-> + migrate_disable();
->   if (current->mm &&
->      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
->   fpsimd_save_state(&current->thread.fpsimd_state);
-> @@ -255,7 +255,7 @@ void kernel_neon_end(void)
->   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
->   fpsimd_load_partial_state(s);
->   } else {
-> - preempt_enable();
-> + migrate_enable();
->   }
->  }
->  EXPORT_SYMBOL(kernel_neon_end);
-> 
-> On Fri, May 1, 2015 at 1:03 PM, Ayyappa Ch <ayyappa.ch.linux@gmail.com> wrote:
-> > Following Anders Roxell  patch on "Enable PREEMPT_RT_FULL" , observed
-> > one issue with Cyclic test while running floating point operations. So
-> > , modified below changes for that.
+
+> >> also agreed by Rob Herring from review of the DTS nodes. For L3 and
+> >> SoC EDAC, they are less of an issue as I don't see a situation that we
+> >> would have multiple instances.
+> >>
+> >> 2. With regard to the top level PCP interrupt, they are just for
+> >> status and once configured, it will not be touch. Therefore, I keep
+> >> the current implementation. With an single driver, there is no need to
+> >> worry about read/modify/write as it will be guarded with an lock. For
+> >> multiple instance, I am thinking that the xgene_edac_mc module will
+> >> provide exported lock functions for the other drivers.
 > >
-> > From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
-> > From: Ayyappa Ch <ayyappa.chandolu@amd.com>
-> > Date: Tue, 28 Apr 2015 11:53:00 +0530
-> > Subject: [PATCH ] floating point realtime fix
-> >
-> > ---
-> >  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
-> >  1 file changed, 8 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > index 2438497..3dca156 100644
-> > --- a/arch/arm64/kernel/fpsimd.c
-> > +++ b/arch/arm64/kernel/fpsimd.c
-> > @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
-> >   */
-> >  void fpsimd_preserve_current_state(void)
-> >  {
-> > - preempt_disable();
-> > + migrate_disable();
-> >   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
-> >   fpsimd_save_state(&current->thread.fpsimd_state);
-> > - preempt_enable();
-> > + migrate_enable();
-> >  }
-> >
-> >  /*
-> > @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
-> >   */
-> >  void fpsimd_restore_current_state(void)
-> >  {
-> > - preempt_disable();
-> > + migrate_disable();
-> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
-> >
-> > @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
-> >   this_cpu_write(fpsimd_last_state, st);
-> >   st->cpu = smp_processor_id();
-> >   }
-> > - preempt_enable();
-> > + migrate_enable();
-> >  }
-> >
-> >  /*
-> > @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
-> >   */
-> >  void fpsimd_update_current_state(struct fpsimd_state *state)
-> >  {
-> > - preempt_disable();
-> > + migrate_disable();
-> >   fpsimd_load_state(state);
-> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
-> > @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
-> >   this_cpu_write(fpsimd_last_state, st);
-> >   st->cpu = smp_processor_id();
-> >   }
-> > - preempt_enable();
-> > + migrate_enable();
-> >  }
-> >
-> >  /*
-> > @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
-> >   * that there is no longer userland FPSIMD state in the
-> >   * registers.
-> >   */
-> > - preempt_disable();
-> > + migrate_disable();
-> >   if (current->mm &&
-> >      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-> >   fpsimd_save_state(&current->thread.fpsimd_state);
-> > @@ -255,7 +255,7 @@ void kernel_neon_end(void)
-> >   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-> >   fpsimd_load_partial_state(s);
-> >   } else {
-> > - preempt_enable();
-> > + migrate_enable();
-> >   }
-> >  }
-> >  EXPORT_SYMBOL(kernel_neon_end);
-> > --
-> > 1.9.1
+> > Doing this would be a very bad design and it would be a homegrown case
+> > only for this driver. Then other ARM drivers will appear which will do
+> > their own locking too. No no no. No ad-hoc hackery.
+
+I don't think there is a huge risk that other ARM drivers would copy a bad
+design, when it's obviously bad. In particular, other chips will most
+likely have other requirements in this area.
+
+> What if I move the locking function into a common module to be
+> included by the EDAC framework? Or would you prefer that I go and
+> write an common driver that all it does is provide locking?
+> 
+> Any suggestion as all I need is an way to share access to an CSR which
+> can't use atomic operations? It isn't an actual interrupt controller
+> either.
+
+If this is something that does not fit into existing categories, you
+probably want to create your own high-level abstraction between the
+accesses to the shared parts of the driver and the parts that can
+exist in multiple instances. This will work for either of the approaches
+I've described above.
+
+	Arnd
