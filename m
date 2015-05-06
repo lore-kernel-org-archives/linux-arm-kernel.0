@@ -1,76 +1,76 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed, 6 May 2015 07:49:27 -0700
-Subject: [PATCH v4 0/7] selftests: fixes for installation and cross
- compilation
-In-Reply-To: <1429656574-8411-1-git-send-email-tyler.baker@linaro.org>
-References: <1429656574-8411-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <CANMBJr53a0cdJ5yjBu3ADv=x-==X0HXVQDELmuSuLLNCKLzviw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 May 2015 07:55:39 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix bogus struct clk comparison for timer
+ clock
+In-Reply-To: <20150506053539.GA10871@codeaurora.org>
+References: <1430848941-27106-1-git-send-email-tony@atomide.com>
+ <20150506053539.GA10871@codeaurora.org>
+Message-ID: <20150506145539.GI21061@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shuah,
+* Stephen Boyd <sboyd@codeaurora.org> [150505 22:36]:
+> On 05/05, Tony Lindgren wrote:
+> > With recent changes to use determine_rate, the comparison of two
+> > clocks won't work without doing __clk_get_hw on the clocks
+> > first.
+> > 
+> > Cc: Michael Turquette <mturquette@linaro.org>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: Tero Kristo <t-kristo@ti.com>
+> > Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> > 
+> > Found one more of these, the coccinelle scripts do not seem
+> > to match this?
+> 
+> I don't think the coccinelle script was ever merged...
 
-On 21 April 2015 at 15:49, Tyler Baker <tyler.baker@linaro.org> wrote:
-> This patch set fixes various issues observed when cross building and
-> installing selftests.
->
-> As I began investigating improving the test output format, I performed an
-> audit of the current tests to ensure all tests were able to execute on various
-> target architectures. I found that some tests did not install their binaries
-> and others required directories to be installed to execute properly. There
-> were also cases in which tests were being installed when they were never built.
-> With this series applied all tests compile when appropriate and install their
-> output properly.
->
-> I have tested this series by building, installing and deploying all selftests
-> to x86, arm and arm64 targets.
->
-> Changes v3 -> v4:
-> * Planning to send a followup series to address the lib.mk issue so I've
-> dropped the breakpoints and x86 installation workaround.
-> * x86: Removed redundant else logic block.
-> * Applied Andy Lutomirski's ACK to patches 4 and 5.
-> * Rebased onto next-20150421.
+Oh OK, but the wrong comparisons in the kernel code got
+fixed, right? 
 
-I believe all comments have been addressed, is there anything else you
-would like to see?
+> > @@ -298,7 +299,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+> >  	if (IS_ERR(src))
+> >  		return PTR_ERR(src);
+> >  
+> > -	if (clk_get_parent(timer->fclk) != src) {
+> > +	if (__clk_get_hw(clk_get_parent(timer->fclk)) != __clk_get_hw(src)) {
+> 
+> Please use clk_is_match() instead so we can find these instances
+> with an easy grep.
 
->
-> Changes v2 -> v3:
-> * 5/8: Removed duplicate all_32.
-> * 6/8: Ensure the default rule is all in every case.
-> * 6/8: Fixed commit message wording for better clarity.
-> * Applied Michael Ellerman's ACK to patches 1-4, and 8 as they have not changed.
-> * Rebased onto next-20150420.
->
-> Changes v1 -> v2:
-> * Have no dependency on all when CROSS_COMPILE is set. (Andy Lutomirski)
-> * Added Andy on CC for all x86 test patches.
-> * Split up the x86 patches for better clarity.
-> * Rebased onto next-20150415.
->
-> This series is based on next-20150421.
->
-> Tyler Baker (7):
->   selftests: copy TEST_DIRS to INSTALL_PATH
->   selftests/ftrace: install test.d
->   selftests/kdbus: install kdbus-test
->   selftest/x86: build both bitnesses
->   selftest/x86: have no dependency on all when cross building
->   selftests/x86: install tests
->   selftests/exec: do not install subdir as it is already created
->
->  tools/testing/selftests/exec/Makefile   |  2 +-
->  tools/testing/selftests/ftrace/Makefile |  1 +
->  tools/testing/selftests/kdbus/Makefile  |  2 ++
->  tools/testing/selftests/lib.mk          |  3 +++
->  tools/testing/selftests/x86/Makefile    | 15 ++++++++++++---
->  5 files changed, 19 insertions(+), 4 deletions(-)
->
-> --
-> 2.1.4
->
+Thanks here's an updated version with that.
 
-Thanks,
+Regards,
 
-Tyler
+Tony
+
+8< -----------------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 5 May 2015 09:03:34 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix bogus struct clk comparison for timer clock
+
+With recent changes to use determine_rate, the comparison of two
+clocks won't work without clk_is_match that does __clk_get_hw
+on the clocks first.
+
+Cc: Michael Turquette <mturquette@linaro.org>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -298,7 +298,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	if (IS_ERR(src))
+ 		return PTR_ERR(src);
+ 
+-	if (clk_get_parent(timer->fclk) != src) {
++	if (!clk_is_match(clk_get_parent(timer->fclk), src)) {
+ 		r = clk_set_parent(timer->fclk, src);
+ 		if (r < 0) {
+ 			pr_warn("%s: %s cannot set source\n", __func__,
