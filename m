@@ -1,55 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 May 2015 10:20:56 +0100
-Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
-In-Reply-To: <20150506035120.GA20852@leoy-linaro>
-References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
- <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
- <20150505171349.GA30215@leverpostej> <5549877C.10408@huawei.com>
- <20150506035120.GA20852@leoy-linaro>
-Message-ID: <20150506092056.GA31001@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 06 May 2015 11:24:58 +0200
+Subject: [PATCH v3 3/5] PCI: st: Provide support for the sti PCIe
+ controller
+In-Reply-To: <CAG374jAv9aHBPGV+x+xs2MyRGz+fw1ymwu78fqNXDPtPqehgZA@mail.gmail.com>
+References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
+ <20150505221646.GE24643@google.com>
+ <CAG374jAv9aHBPGV+x+xs2MyRGz+fw1ymwu78fqNXDPtPqehgZA@mail.gmail.com>
+Message-ID: <2236679.A9NfANRyhD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 04:51:20AM +0100, Leo Yan wrote:
-> On Wed, May 06, 2015 at 11:16:12AM +0800, Bintian Wang wrote:
-> > On 2015/5/6 1:13, Mark Rutland wrote:
-> > >[...]
-> > >
-> > >>+	psci {
-> > >>+		compatible = "arm,psci-0.2";
-> > >>+		method = "smc";
-> > >>+	};
-> > >
-> > >Are all the PSCI 0.2 mandatory features implemented?
+On Wednesday 06 May 2015 11:14:25 Gabriel Fernandez wrote:
+> 
+> >> +static int __init pcie_init(void)
+> >> +{
+> >> +     return platform_driver_probe(&st_pcie_driver, st_pcie_probe);
+> >> +}
+> >> +device_initcall(pcie_init);
 > >
-> > The system off/suspend is under development, and system off will
-> > be released in next months, and system suspend may be released in the
-> > following two months.
+> > Can you use module_platform_driver_probe() or module_init() here?
+> >
 > 
-> Yes; now for mandatory features, except SYSTEM_OFF others have supported.
-
-Ok. Do you mean in the next month, or in a number of months?
-
-> for PSCI 0.2, SYSTEM_SUSPEND even is not supported, right?
-
-SYSTEM_SUSPEND was introduced in PSCI 1.0, and is optional.
-
-So long as PSCI_VERSION reports 0.2 or PSCI_FEATURES reports
-NOT_SUPPORTED for SYSTEM_SUSPEND, it's ok to not implement.
-
-I guess PSCI_VERSION reports PSCI 0.2?
-
-> > So can I keep "arm,psci-0.2" here?
-> > 
-> > >Can CPU0 be hot unplugged?
-> > Yes, CPU0~CPU7 all can be hot unplugged.
+> Yes we can use module_init() here.
 > 
-> Just clarify: now use s/w method to emulate CPU and cluster's low
-> power state; all cores can be hotplugged [1].
+> By the way if figure out i removed __init attribute on st_pcie_probe()
+> in previous version to follow Arnd's remark.
+> But st_pcie_probe calls hook_fault_code() that has __init attribute.
+> So I think we need to keep __init for probe routine ?
+> Also, we have to restrict bind/unbind with "suppress_bind_attrs" in
+> platform_driver structure.
+> This is the main reason to not allow module unload/reload.
+> 
+> If you are ok i will send a v4 ?
+> 
 
-So long as CPUs brought online are reset appropriately, and "offline"
-CPUs can't bring down the system somehow, that should be fine. For now
-the important part is the interface.
+If you mark the probe function as __init, you have to use
+module_platform_driver_probe() or platform_driver_probe() instead,
+to prevent the probe function from being deferred.
 
-Thanks,
-Mark.
+Calling hook_fault_code() also means you need to prevent module
+unloading, by providing only a module_init but not a module_exit
+function, so module_platform_driver_probe() also won't work.
+
+It may be a good idea to work on improving the hook_fault_code()
+infrastructure to make it more usable with loadable device drivers.
+
+	Arnd
