@@ -1,43 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 06 May 2015 11:01:25 -0600
-Subject: How to encode being an I2C slave in DT?
-In-Reply-To: <20150506161712.GA4003@katana>
-References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
- <20150403194635.GC2016@katana> <1549160.njMIY2NVTi@fb07-iapwap2>
- <20150505105513.GA1841@katana> <554922EF.3050906@wwwdotorg.org>
- <20150506161712.GA4003@katana>
-Message-ID: <554A48E5.5010106@wwwdotorg.org>
+From: anssi.hannula@iki.fi (Anssi Hannula)
+Date: Wed, 06 May 2015 20:02:52 +0300
+Subject: [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
+In-Reply-To: <20150405172608.GA12732@n2100.arm.linux.org.uk>
+References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+ <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk> <s5ha8ymy3e2.wl-tiwai@suse.de>
+ <20150405162034.GH13898@n2100.arm.linux.org.uk>
+ <s5h4mouy14a.wl-tiwai@suse.de>
+ <20150405172608.GA12732@n2100.arm.linux.org.uk>
+Message-ID: <554A493C.5080106@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2015 10:17 AM, Wolfram Sang wrote:
->
->> The container node has a #address-cells property for this very reason. It's
->> perfectly well-defined how to split up a property containing a large number
->> of cells into separate values, by using the value of #address-cells. Plus,
->> the canonical formatting (albeit not enforced by the DT compiler) for a
->> property that contains an array of entries, each 2 cells in size, would be:
+05.04.2015, 20:26, Russell King - ARM Linux kirjoitti:
+> On Sun, Apr 05, 2015 at 06:46:13PM +0200, Takashi Iwai wrote:
 >>
->> reg = <0 0x1a>, <0 0x40>, <0 0x48>;
->>
->> rather than:
->>
->> reg = <0 0x1a 0 0x40 0 0x48>;
->>
->> ... so it's quite simple to make it very human-readable too.
->
-> I give in to the flag idea. I also noticed that we'd need another flag
-> anyhow to mark 10 bit addresses. I am still thinking between using two
-> address-cells in that case (clean seperation between address and flags)
-> or to encode the flags as MSB in the current address (all busses will
-> have same address-cells and child description, less code paths and no
-> overhead in dtbs).
->
-> That being said, for the loopback testcase, the I2C slave framework will
-> need updates as well. I think I can cook up something. Will be
-> interesting to see if my hardware can do this. Has the loopback already
-> been tested on Tegra?
+>> One another question: don't we need to deal with the sample bits in
+>> sad[2]?
+> 
+> It should, but I'm very wary about doing that without seeing more
+> examples of real SADs.  Right now, all my examples only support
+> one SAD with either 2 channel or 6 channel audio at the standard
+> (basic) 32, 44.1 and 48kHz rates.
+> 
+> The HDMI / CEA specs are very loose in their wording about the
+> short audio descriptors.  I've no idea whether a sink can provide
+> (for example) descriptors such as:
+> 
+> 	LPCM, 6 channel 32, 44.1, 48kHz
+> 	LPCM, 2 channel, 32, 44.1, 48, 96, 192kHz
+> 
+> or whether have to describe that as a single descriptor.  I only
+> have two TVs to test with here.
 
-I don't believe that loopback has been tested on Tegra, at least with 
-upstream SW. I have no idea whether our downstream SW or Silicon 
-validation team has tested it.
+For the record, yes, multiple LPCM SADs are relatively common, and I
+think I've seen some that offered more rates on a stereo SAD than on a
+multichannel SAD (like in your example).
+
+
+> What I'm concerned about is that when the ALSA parameter refining
+> starts, we start with (eg) 2-8 channels, 32-192kHz.  Given that,
+> if we invoke the channel restriction before the rate restriction,
+> we would end up limiting to 2 channel at 32-192kHz.  If we apply
+> the restrictions in the opposite order, we'd restrict to 6
+> channel, 32-48kHz.  Neither are obviously correct in this
+> circumstance, and I don't really see a way to solve it given my
+> understanding of the way ALSA's parameter refinement works.
+> 
+> I suspect this is why most HDMI drivers are implemented such that
+> they take the maximum capabilities over all SADs, which would end
+> up restricting audio in the above case to: up to 6 channels, at
+> 32, 44.1, 48, 96 and 192kHz, even though 6 channel @ 192kHz isn't
+> hasn't been indicated as supported.
+> 
+> Most of this is speculation though, based off what is in the
+> documentation.  As I say, I don't have enough real-world examples
+> to get a feel for what manufacturers _actually_ do to give a hint
+> as to how the documentation should be interpreted.
+> 
+> So, maybe I should just copy what everyone else does and take the
+> maximum of all descriptors...
+> 
+
+
+-- 
+Anssi Hannula
