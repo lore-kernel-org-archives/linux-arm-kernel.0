@@ -1,33 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 6 May 2015 16:27:48 +0200
-Subject: [RFC v2 0/4] chip/vgic adaptations for forwarded irq
-In-Reply-To: <1423642857-24240-1-git-send-email-eric.auger@linaro.org>
-References: <1423642857-24240-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <20150506142748.GC6796@cbox>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 May 2015 16:28:54 +0200
+Subject: [PATCH v2 05/10] pinctrl: berlin: use the regmap provided by
+ syscon
+In-Reply-To: <1425654328-26298-6-git-send-email-antoine.tenart@free-electrons.com>
+References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1425654328-26298-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <CACRpkdYA2UmLJZ2iC9QJnQtZVq6b+B+HDSMErbVxdN-878Q_Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Fri, Mar 6, 2015 at 4:05 PM, Antoine Tenart
+<antoine.tenart@free-electrons.com> wrote:
 
-On Wed, Feb 11, 2015 at 09:20:53AM +0100, Eric Auger wrote:
-> This series proposes some fixes that appeared to be necessary
-> to integrate IRQ forwarding in KVM/VFIO.
-> 
-> - deactivation of the forwarded IRQ in irq_disabled case
-> - a specific handling of forwarded IRQ into the VGIC state machine.
-> - deactivation of physical IRQ and unforwarding on vgic destruction
-> - rb_tree lock in vgic.c
-> 
-> Integrated pieces can be found at
-> ssh://git.linaro.org/people/eric.auger/linux.git
-> on branch irqfd_integ_v9
-> 
-What are the dependencies for this at this point?
+> The Berlin pin controller nodes are now sub-nodes of the soc-controller
+> and the system-controller nodes. The register bank is managed by syscon,
+> which provides a regmap.
+>
+> Remove the regmap setup from the Berlin pinctrl driver and use the one
+> provided by syscon.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-I assume it relies at least on the split EOI/priority drop changes?
+As requested by Sebastian:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Are you going to respin this when there are newer versions of the
-dependencies out, or what are the plans?
+If there are other substantial changes to this driver in this kernel
+cycle they will also have to be ACKed and funneled through
+Berlin and ARM SoC trees.
 
-Thanks,
--Christoffer
+Yours,
+Linus Walleij
