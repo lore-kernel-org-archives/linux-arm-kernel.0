@@ -1,38 +1,72 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 06 May 2015 09:58:23 +0900
-Subject: ARM: EXYNOS: dts: DTS fixes for 4.1
-Message-ID: <1430873903-22787-1-git-send-email-k.kozlowski@samsung.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 06 May 2015 08:59:13 +0800
+Subject: [PATCH] ARM: dts: cros-ec-keyboard: Add support for some Japanese
+ keys
+In-Reply-To: <CAD=FV=VW0s=PHUvATPC_XRPFh=49RcSYxUP56B4KRXDM6F4mnQ@mail.gmail.com>
+References: <1430791657-28014-1-git-send-email-zyw@rock-chips.com>
+ <CAD=FV=VW0s=PHUvATPC_XRPFh=49RcSYxUP56B4KRXDM6F4mnQ@mail.gmail.com>
+Message-ID: <55496761.7040509@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
 
-This groups important fix for current RC cycle, well tested and
-present on mailing list for some time.
 
-Best regards,
-Krzysztof
-
-----------------------------------------------------------------
-The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
-
-  Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
-
-are available in the git repository at:
-
-  https://github.com/krzk/linux.git tags/samsung-dt-fixes-4.1
-
-for you to fetch changes up to d52ccd7b731f881df051331c92a5c54a94adf516:
-
-  ARM: dts: Make DP a consumer of DISP1 power domain on Exynos5420 (2015-05-05 19:15:57 +0900)
-
-----------------------------------------------------------------
-Fix for imprecise external abort on Exynos5420 boards introduced after adding
-display power domain in DTS.
-
-----------------------------------------------------------------
-Javier Martinez Canillas (1):
-      ARM: dts: Make DP a consumer of DISP1 power domain on Exynos5420
-
- arch/arm/boot/dts/exynos5420.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+On 05/06/2015 02:10 AM, Doug Anderson wrote:
+> Chris,
+>
+> On Mon, May 4, 2015 at 7:07 PM, Chris Zhong <zyw@rock-chips.com> wrote:
+>> Add support for 4 Japanese keys
+>>
+>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>
+>> ---
+>>
+>>   arch/arm/boot/dts/cros-ec-keyboard.dtsi | 4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/cros-ec-keyboard.dtsi b/arch/arm/boot/dts/cros-ec-keyboard.dtsi
+>> index 9c7fb0a..4e42f30c 100644
+>> --- a/arch/arm/boot/dts/cros-ec-keyboard.dtsi
+>> +++ b/arch/arm/boot/dts/cros-ec-keyboard.dtsi
+>> @@ -22,6 +22,7 @@
+>>                          MATRIX_KEY(0x00, 0x02, KEY_F1)
+>>                          MATRIX_KEY(0x00, 0x03, KEY_B)
+>>                          MATRIX_KEY(0x00, 0x04, KEY_F10)
+>> +                       MATRIX_KEY(0x00, 0x05, KEY_RO)
+>>                          MATRIX_KEY(0x00, 0x06, KEY_N)
+>>                          MATRIX_KEY(0x00, 0x08, KEY_EQUAL)
+>>                          MATRIX_KEY(0x00, 0x0a, KEY_RIGHTALT)
+>> @@ -34,6 +35,7 @@
+>>                          MATRIX_KEY(0x01, 0x08, KEY_APOSTROPHE)
+>>                          MATRIX_KEY(0x01, 0x09, KEY_F9)
+>>                          MATRIX_KEY(0x01, 0x0b, KEY_BACKSPACE)
+>> +                       MATRIX_KEY(0x01, 0x0c, KEY_HENKAN)
+>>
+>>                          MATRIX_KEY(0x02, 0x00, KEY_LEFTCTRL)
+>>                          MATRIX_KEY(0x02, 0x01, KEY_TAB)
+>> @@ -45,6 +47,7 @@
+>>                          MATRIX_KEY(0x02, 0x07, KEY_102ND)
+>>                          MATRIX_KEY(0x02, 0x08, KEY_LEFTBRACE)
+>>                          MATRIX_KEY(0x02, 0x09, KEY_F8)
+>> +                       MATRIX_KEY(0x02, 0x0a, KEY_YEN)
+>>
+>>                          MATRIX_KEY(0x03, 0x01, KEY_GRAVE)
+>>                          MATRIX_KEY(0x03, 0x02, KEY_F2)
+>> @@ -53,6 +56,7 @@
+>>                          MATRIX_KEY(0x03, 0x06, KEY_6)
+>>                          MATRIX_KEY(0x03, 0x08, KEY_MINUS)
+>>                          MATRIX_KEY(0x03, 0x0b, KEY_BACKSLASH)
+>> +                       MATRIX_KEY(0x03, 0x0c, KEY_MUHENKAN)
+>>
+>>                          MATRIX_KEY(0x04, 0x00, KEY_RIGHTCTRL)
+>>                          MATRIX_KEY(0x04, 0x01, KEY_A)
+> Since there's no clear architecture here, I'd bet Olof would be the
+> one to take this.  I added him to this email, but he might request
+> that you resend the patch with him in the "To:" line.
+>
+> Other than that:
+>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+>
+Thank you, I'll resend the patch with Olof.
+>
