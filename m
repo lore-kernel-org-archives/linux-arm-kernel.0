@@ -1,57 +1,90 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 6 May 2015 15:06:15 +0200
-Subject: [PATCH 0/2] gpio: Allow userspace export from DT
-In-Reply-To: <CACRpkdbFKs8mALw7q2d0EEDkhxKNLgeiFB5TyZ6ZPpfcW-c+oQ@mail.gmail.com>
-References: <20150413110515.9681.58848.stgit@localhost>
- <20150504084925.GB4047@localhost>
- <CACRpkdbFKs8mALw7q2d0EEDkhxKNLgeiFB5TyZ6ZPpfcW-c+oQ@mail.gmail.com>
-Message-ID: <20150506130615.GB5302@localhost>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 06 May 2015 15:06:29 +0200
+Subject: [PATCH v2 0/5] Add proper support for Compulab CM-A510/SBC-A510
+In-Reply-To: <1430770130-7833-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1430770130-7833-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <554A11D5.9060407@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 09:22:22AM +0200, Linus Walleij wrote:
-> On Mon, May 4, 2015 at 10:49 AM, Johan Hovold <johan@kernel.org> wrote:
-> > On Mon, Apr 13, 2015 at 01:05:15PM +0200, Martin Fuzzey wrote:
+Hi Sebastian,
+
+On 04/05/2015 22:08, Sebastian Hesselbarth wrote:
+> This is v2 of the patch set to improve current mainline support for
+> the Compulab CM-A510 System-on-Module (SoM) and its default Compulab
+> SBC-A510 base board.
 > 
-> >> The above means that, in order to export the GPIO to userspace via
-> >> /sys/class/gpio/export the userspace code must know the exact hardware and
-> >> kernel version information.
-> >
-> > Not quite. You can still determine the gpio number in the above cases by
-> > walking the sysfs tree to find the chip and it's base. This is the only
-> > way to do this for dynamic buses such as USB.
+> Compared to v1 [1] there have been the overall changes:
+> - Drop i2c-mux-pinctrl rework as Wolfram Sang raised concerns with
+>   respect to OF_DYNAMIC. Instead we add i2c-mux-pinctrl node by
+>   default and wait until corresponding driver respects disabled
+>   sub-bus nodes. This will add 3 additional i2c busses to all
+>   Dove based boards, but no functional change with respect to
+>   i2c-0.
+> - Split patches dealing with arch/arm/boot/dts/Makefile to route
+>   them though arm-soc directly.
 > 
-> Maybe we should start providing something like an
-> "lsgpio" utility in tools/gpio to do this, just as a hint
-> to userspace people on how things should be done.
-
-I think we should focus on defining a new user-space interface rather
-than make it easier to use the current one (it should really only be
-used for development or one-off hacks IMO).
-
-> >> This patch series solves both problems by performing the external
-> >> signal => GPIO mapping in the device tree.
-> >
-> > As Rob already mentioned, what we want is some way to declare pin
-> > functions. These could then be requested from userspace (or used in DT,
-> > something which should allow for further refactoring there as well)
-> > unless a driver has already claimed them.
+> Other patches of v1 have already been taken by MVEBU SoC maintainers
+> as fixes.
 > 
-> We have the ability to name the GPIO lines (I usually refer to
-> lines rather than pins, as pins are physical and not all GPIOs
-> are, actually) using the array "names" in struct gpio_chip,
-> however this has no DT binding, so maybe people should
-> work on that. These names appear as named line files
-> in sysfs IIRC. Or maybe you're thinking of something else?
+> Patches are based on v4.1-rc1 and are intended for v4.2. All patches
+> contain appropriate Acked-by's from related maintainers. Patches 3
+> and 5 should go thought arm-soc directly, the rest can go though
+> mvebu tree.
 
-Yes, something like that. As you mention above, if it was possibly to
-define those names in firmware, even the current sysfs interface would
-expose the pins as
+Usually even the change of the arch/arm/boot/dts/Makefile go to
+arm-soc through mvebu. For patch 5 it makes sens because if the series
+is spited then the Makefile could be merged before the new file
+to build.
 
-	/sys/class/gpio/<function>
+So unless, Arnd or Olof really want to pick the patches 3 and 5 I will
+apply the patches 2 to 5 on mvebu/dt.
 
-rather than say /sys/class/gpio/gpio279, thereby solving the gpio-number
-look-up issue. Well, to actually make the pin available *from* userspace
-you'd currently still need the number...
+Arnd, Olof, do you agree?
 
-Johan
+Thanks,
+
+Gregory
+
+
+
+> 
+> Sebastian
+> 
+> [1] http://thread.gmane.org/gmane.linux.drivers.devicetree/110324
+> 
+> Sebastian Hesselbarth (5):
+>   devicetree: vendor-prefixes: Add CompuLab to known vendors
+>   ARM: dts: dove: Add internal i2c multiplexer node
+>   ARM: dts: dove: Remove Compulab CM-A510 from Makefile
+>   ARM: dts: dove: Add proper support for Compulab CM-A510/SBC-A510
+>   ARM: dts: dove: Add Compulab SBC-A510 to Makefile
+> 
+>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>  arch/arm/boot/dts/Makefile                         |   4 +-
+>  arch/arm/boot/dts/dove-cm-a510.dts                 |  38 ----
+>  arch/arm/boot/dts/dove-cm-a510.dtsi                | 195 +++++++++++++++++++++
+>  arch/arm/boot/dts/dove-sbc-a510.dts                | 182 +++++++++++++++++++
+>  arch/arm/boot/dts/dove.dtsi                        |  40 ++++-
+>  6 files changed, 418 insertions(+), 42 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/dove-cm-a510.dts
+>  create mode 100644 arch/arm/boot/dts/dove-cm-a510.dtsi
+>  create mode 100644 arch/arm/boot/dts/dove-sbc-a510.dts
+> 
+> ---
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Gabriel Dobato <dobatog@gmail.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
