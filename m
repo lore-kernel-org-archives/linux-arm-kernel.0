@@ -1,30 +1,159 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 6 May 2015 17:01:11 -0400 (EDT)
-Subject: [GIT PULL] Second round of MCPM refactoring
-Message-ID: <alpine.LFD.2.11.1505061643530.7750@knanqh.ubzr>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 07 May 2015 00:21:44 +0200
+Subject: [V2 PATCH 1/5] ACPI / scan: Parse _CCA and setup device coherency
+In-Reply-To: <55499569.8060403@amd.com>
+References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <3234610.3j3NfP3xpR@vostro.rjw.lan> <55499569.8060403@amd.com>
+Message-ID: <4573209.dHyztuCFMt@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday, May 05, 2015 11:15:37 PM Suravee Suthikulpanit wrote:
+> [RESEND]
+> 
+> On 5/5/15 15:36, Rafael J. Wysocki wrote:
+> > On Tuesday, May 05, 2015 10:12:05 AM Suravee Suthikulpanit wrote:
+> >> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> >> index ab2cbb5..dd386e9 100644
+> >> --- a/drivers/acpi/Kconfig
+> >> +++ b/drivers/acpi/Kconfig
+> >> @@ -54,6 +54,12 @@ config ACPI_GENERIC_GSI
+> >>   config ACPI_SYSTEM_POWER_STATES_SUPPORT
+> >>   	bool
+> >>
+> >> +config ACPI_MUST_HAVE_CCA
+> >
+> > ACPI_CCA_REQUIRED maybe?
+> 
+> Sure.
+> 
+> >
+> >> +	bool
+> >> +
+> >> +config ACPI_SUPPORT_CCA_ZERO
+> >
+> > I guess this means "we support devices that can DMA, but are not coherent".
+> > right?
+> 
+> Yes, basically when _CCA=0.
 
-Russell, please pull the following:
+So what about
 
-	git://git.linaro.org/people/nicolas.pitre/linux mcpm
+	ARCH_SUPPORT_CACHE_INCOHERENT_DMA
 
-This is the same MCPM patches I posted last week with review tags added.
-Except for the hip04 changes that now have been tested, this is all 
-generic changes and your tree should be appropriate for this series.
-No new code going in arm-soc should have a dependency on this either.
+or something similar?
 
-diffstat:
+> >> +	bool
+> >> +
+> >>   config ACPI_SLEEP
+> >>   	bool
+> >>   	depends on SUSPEND || HIBERNATION
+> >> diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
+> >> index 4bf7559..a6feca4 100644
+> >> --- a/drivers/acpi/acpi_platform.c
+> >> +++ b/drivers/acpi/acpi_platform.c
+> >> @@ -108,9 +108,11 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
+> >>   	if (IS_ERR(pdev))
+> >>   		dev_err(&adev->dev, "platform device creation failed: %ld\n",
+> >>   			PTR_ERR(pdev));
+> >> -	else
+> >> +	else {
+> >
+> > Please add braces to both branches when making such changes (as per CodingStyle).
+> >
+> 
+> OK.
+> 
+> >> +		acpi_setup_device_dma(adev, &pdev->dev);
+> >
+> > Why do we need to do that here (for the second time)?
+> 
+> Because we are calling:
+>    acpi_create_platform_device()
+>      |--> platform_device_register_device_full()
+>        |-->platform_device_alloc()
+> 
+> This creates platform_device, which allocate a new platform_device->dev. 
+> This is not the same as the original acpi_device->dev that was created 
+> during acpi_add_single_object(). So, we have to set up the device 
+> coherency again.
 
- arch/arm/common/mcpm_entry.c         | 281 +++++++++++++----------------
- arch/arm/include/asm/mcpm.h          |  73 +++-----
- arch/arm/mach-exynos/suspend.c       |   8 +-
- arch/arm/mach-hisi/platmcpm.c        | 127 +++++--------
- drivers/cpuidle/cpuidle-big_little.c |   8 +-
- 5 files changed, 198 insertions(+), 299 deletions(-)
+Ah, so the second arg is different now.
 
-Thanks
+Well, in that case, why do we need to set it up for the adev's dev member?
+
+> >> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> >> index 849b699..ac33b29 100644
+> >> --- a/drivers/acpi/scan.c
+> >> +++ b/drivers/acpi/scan.c
+> >> @@ -11,6 +11,7 @@
+> >>   #include <linux/kthread.h>
+> >>   #include <linux/dmi.h>
+> >>   #include <linux/nls.h>
+> >> +#include <linux/dma-mapping.h>
+> >>
+> >>   #include <asm/pgtable.h>
+> >>
+> >> @@ -2137,6 +2138,66 @@ void acpi_free_pnp_ids(struct acpi_device_pnp *pnp)
+> >>   	kfree(pnp->unique_id);
+> >>   }
+> >>
+> >> +void acpi_setup_device_dma(struct acpi_device *adev, struct device *dev)
+> >> +{
+> >> +	int coherent = acpi_dma_is_coherent(adev);
+> >> +
+> >> +	/**
+> >> +	 * Currently, we only support DMA for devices that _CCA=1
+> >> +	 * since this seems to be the case on most ACPI platforms.
+> >> +	 *
+> >> +	 * For the case when _CCA=0 (i.e. is_coherent=0 && cca_seen=1),
+> >> +	 * we would rely on arch-specific cache maintenance for
+> >> +	 * non-coherence DMA operations if architecture enables
+> >> +	 * CONFIG_ACPI_SUPPORT_CCA_ZERO.
+> >> +	 *
+> >> +	 * For the case when _CCA is missing but platform requires it
+> >> +	 * (i.e. is_coherent=0 && cca_seen=0), we do not call
+> >> +	 * arch_setup_dma_ops() and fallback to arch-specific default
+> >> +	 * handling.
+> >> +	 */
+> >> +	if (adev->flags.cca_seen) {
+> >> +		if (!coherent && !IS_ENABLED(CONFIG_ACPI_SUPPORT_CCA_ZERO))
+> >> +			return;
+> >> +		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
+> >
+> > Oh dear.
+> 
+> I made a mistake here. This logic should also call arch_setup_dma_ops() 
+> when cca_seen=0 and coherent=1 (e.g. when _CCA is not required and 
+> default to coherent when it is missing). The current logic doesn't do that.
+> 
+> >
+> > What about
+> >
+> > 	if (adev->flags.cca_seen && (coherent || IS_ENABLED(CONFIG_ACPI_SUPPORT_CCA_ZERO)))
+> > 		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
+> 
+> What about:
+> 	if (coherent ||
+> 	    (adev->flags.cca_seen &&
+> 			IS_ENABLED(CONFIG_ACPI_SUPPORT_CCA_ZERO))
+> 		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
+
+Yes, that works.
+
+> > I wonder how this is going to affect x86/ia64 too?
+> >
+> 
+> This should not affect x86 since arch_setup_dma_ops() is currently not 
+> implement for x86, and default to NOP (see include/linux/dma-mapping.h). 
+
+OK
+
+>   Also, on x86, _CCA is not required and default to 1 if missing.
+
+Well, that's the point. :-)
 
 
-Nicolas
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
