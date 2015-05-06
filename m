@@ -1,72 +1,81 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed, 06 May 2015 08:59:13 +0800
-Subject: [PATCH] ARM: dts: cros-ec-keyboard: Add support for some Japanese
- keys
-In-Reply-To: <CAD=FV=VW0s=PHUvATPC_XRPFh=49RcSYxUP56B4KRXDM6F4mnQ@mail.gmail.com>
-References: <1430791657-28014-1-git-send-email-zyw@rock-chips.com>
- <CAD=FV=VW0s=PHUvATPC_XRPFh=49RcSYxUP56B4KRXDM6F4mnQ@mail.gmail.com>
-Message-ID: <55496761.7040509@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 06 May 2015 09:59:41 +0900
+Subject: ARM: EXYNOS: dts: Improvements for 4.2
+Message-ID: <1430873981-22902-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Kukjin,
 
+I gathered various improvements for upcoming 4.2 merge window.
+Description along with a tag.
 
-On 05/06/2015 02:10 AM, Doug Anderson wrote:
-> Chris,
->
-> On Mon, May 4, 2015 at 7:07 PM, Chris Zhong <zyw@rock-chips.com> wrote:
->> Add support for 4 Japanese keys
->>
->> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
->>
->> ---
->>
->>   arch/arm/boot/dts/cros-ec-keyboard.dtsi | 4 ++++
->>   1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/cros-ec-keyboard.dtsi b/arch/arm/boot/dts/cros-ec-keyboard.dtsi
->> index 9c7fb0a..4e42f30c 100644
->> --- a/arch/arm/boot/dts/cros-ec-keyboard.dtsi
->> +++ b/arch/arm/boot/dts/cros-ec-keyboard.dtsi
->> @@ -22,6 +22,7 @@
->>                          MATRIX_KEY(0x00, 0x02, KEY_F1)
->>                          MATRIX_KEY(0x00, 0x03, KEY_B)
->>                          MATRIX_KEY(0x00, 0x04, KEY_F10)
->> +                       MATRIX_KEY(0x00, 0x05, KEY_RO)
->>                          MATRIX_KEY(0x00, 0x06, KEY_N)
->>                          MATRIX_KEY(0x00, 0x08, KEY_EQUAL)
->>                          MATRIX_KEY(0x00, 0x0a, KEY_RIGHTALT)
->> @@ -34,6 +35,7 @@
->>                          MATRIX_KEY(0x01, 0x08, KEY_APOSTROPHE)
->>                          MATRIX_KEY(0x01, 0x09, KEY_F9)
->>                          MATRIX_KEY(0x01, 0x0b, KEY_BACKSPACE)
->> +                       MATRIX_KEY(0x01, 0x0c, KEY_HENKAN)
->>
->>                          MATRIX_KEY(0x02, 0x00, KEY_LEFTCTRL)
->>                          MATRIX_KEY(0x02, 0x01, KEY_TAB)
->> @@ -45,6 +47,7 @@
->>                          MATRIX_KEY(0x02, 0x07, KEY_102ND)
->>                          MATRIX_KEY(0x02, 0x08, KEY_LEFTBRACE)
->>                          MATRIX_KEY(0x02, 0x09, KEY_F8)
->> +                       MATRIX_KEY(0x02, 0x0a, KEY_YEN)
->>
->>                          MATRIX_KEY(0x03, 0x01, KEY_GRAVE)
->>                          MATRIX_KEY(0x03, 0x02, KEY_F2)
->> @@ -53,6 +56,7 @@
->>                          MATRIX_KEY(0x03, 0x06, KEY_6)
->>                          MATRIX_KEY(0x03, 0x08, KEY_MINUS)
->>                          MATRIX_KEY(0x03, 0x0b, KEY_BACKSLASH)
->> +                       MATRIX_KEY(0x03, 0x0c, KEY_MUHENKAN)
->>
->>                          MATRIX_KEY(0x04, 0x00, KEY_RIGHTCTRL)
->>                          MATRIX_KEY(0x04, 0x01, KEY_A)
-> Since there's no clear architecture here, I'd bet Olof would be the
-> one to take this.  I added him to this email, but he might request
-> that you resend the patch with him in the "To:" line.
->
-> Other than that:
->
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
->
-Thank you, I'll resend the patch with Olof.
->
+Best regards,
+Krzysztof
+
+----------------------------------------------------------------
+The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
+
+  Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
+
+are available in the git repository at:
+
+  https://github.com/krzk/linux.git tags/samsung-dt-for-next-4.2
+
+for you to fetch changes up to 98155ec454a40212434c83c1388c420a61d62854:
+
+  ARM: dts: exynos4: add nodes for jpeg codec (2015-05-05 19:19:18 +0900)
+
+----------------------------------------------------------------
+Device Tree improvements for Exynos based boards:
+1. Fix PMIC's RTC alarm on Arndale Octa (S2MPS11 PMIC) and SMDK5250 (MAXIM77686
+   PMIC).
+2. Fix suspend on Peach Pit Chromebooks prevented by Marvell mwifiex
+   driver.
+3. Fix hang on Odroid XU3 on MMC card detect.
+4. Enable the S3C RTC (the clock present on SoC) on various Exynos boards.
+5. Minor improvements to S3C RTC driver.
+6. Add nodes for JPEG codec on Exynos4.
+
+----------------------------------------------------------------
+Andrzej Hajda (1):
+      ARM: dts: exynos5422-odroidxu3: add mmc detect gpio
+
+Javier Martinez Canillas (2):
+      ARM: dts: Make DP a consumer of DISP1 power domain on Exynos5420
+      ARM: dts: Add keep-power-in-suspend to WiFi SDIO node for Peach Boards
+
+Krzysztof Kozlowski (5):
+      ARM: dts: Fix pinctrl settings for S2MPS11 RTC alarm IRQ on Arndale Octa
+      ARM: dts: s3c-rtc: Use s3c6410-rtc instead of exynos3250-rtc
+      ARM: dts: Use define for s3c-rtc clock id
+      ARM: dts: Use define for s3c-rtc clock id
+      ARM: dts: Enable S3C RTC on Trats2 and Arndale Octa
+
+Marek Szyprowski (1):
+      ARM: dts: exynos4: add nodes for jpeg codec
+
+Markus Reichl (2):
+      ARM: dts: Add bindings for 32kHz clocks from s2mps11
+      ARM: dts: exynos5422-odroidxu3: add 'rtc_src' clock to rtc node
+
+Yadwinder Singh Brar (1):
+      ARM: dts: Add missing irq pinctrl for max77686 on smdk5250
+
+ Documentation/devicetree/bindings/rtc/s3c-rtc.txt |  3 ++-
+ arch/arm/boot/dts/exynos3250-monk.dts             |  3 ++-
+ arch/arm/boot/dts/exynos3250-rinato.dts           |  3 ++-
+ arch/arm/boot/dts/exynos3250.dtsi                 |  2 +-
+ arch/arm/boot/dts/exynos4.dtsi                    | 11 ++++++++++-
+ arch/arm/boot/dts/exynos4412-trats2.dts           |  9 ++++++++-
+ arch/arm/boot/dts/exynos4415.dtsi                 |  2 +-
+ arch/arm/boot/dts/exynos4x12.dtsi                 |  4 ++++
+ arch/arm/boot/dts/exynos5250-smdk5250.dts         | 12 ++++++++++++
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts     | 24 ++++++++++++++++++-----
+ arch/arm/boot/dts/exynos5420-peach-pit.dts        |  1 +
+ arch/arm/boot/dts/exynos5420.dtsi                 |  1 +
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts        | 16 +++++++++------
+ arch/arm/boot/dts/exynos5800-peach-pi.dts         |  1 +
+ include/dt-bindings/clock/samsung,s2mps11.h       | 23 ++++++++++++++++++++++
+ 15 files changed, 97 insertions(+), 18 deletions(-)
+ create mode 100644 include/dt-bindings/clock/samsung,s2mps11.h
