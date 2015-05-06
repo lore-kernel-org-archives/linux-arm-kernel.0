@@ -1,78 +1,85 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 06 May 2015 11:19:08 +0900
-Subject: [GIT PULL] ARM: EXYNOS: Improvements for 4.2, try 2
-Message-ID: <1430878748-30149-1-git-send-email-k.kozlowski@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 06 May 2015 11:00:32 +0800
+Subject: [RFC PATCH 0/9] Add self-probe infrastructure and stacked
+ irqdomain support for ACPI based GICv2/3 init
+In-Reply-To: <10866239.kAOUxUHTHm@vostro.rjw.lan>
+References: <1430833857-30736-1-git-send-email-hanjun.guo@linaro.org>
+ <10866239.kAOUxUHTHm@vostro.rjw.lan>
+Message-ID: <554983D0.9030208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+On 2015?05?06? 04:28, Rafael J. Wysocki wrote:
+> On Tuesday, May 05, 2015 09:50:48 PM Hanjun Guo wrote:
+>> This patch set introduce self-probe infrastructure to init IRQ
+>> controllers and stacked irqdomain support for ACPI based GICv2/3
+>> init.
+>>
+>> The self-probe infrastructure for ACPI GIC init is similar as
+>> IRQCHIP_DECLARE() and based on the GIC version support in ACPI
+>> MADT table.
+>>
+>> We introduce acpi_irq_domain for GICv2/3 core domain to support
+>> stacked irqdomain, and pass the gsi (global system interrupt) as
+>> the agument (void *arg) for gic_irq_domain_alloc(), then we can
+>> alloc virqs via acpi_register_gsi() with stacked irqdomain.
+>>
+>> I already compiled this patch set ok with both ACPI=on/off on
+>> ARM64 and also compiled ok on x86, tested with GICv2 init on
+>> FVP model and it boot successfully.
+>>
+>> Next step I would consolidate all the ACPI GIC init into one
+>> file -- drivers/irqchip/irq-gic-acpi.c, and introduce ITS and
+>> IORT support.
+>>
+>> please comment on this patchset to see if we are on the right
+>> direction.
+>>
+>> Hanjun Guo (6):
+>>    irqchip / gic: Add GIC version support in ACPI MADT
+>>    irqchip: gic: ACPI: Use IRQCHIP_ACPI_DECLARE to simplify GICv2 init
+>>      code
+>>    irqchip / gic: Add stacked irqdomain support for ACPI based GICv2 init
+>>    ACPI / gsi: Add gsi_mutex to synchronize
+>>      acpi_register_gsi()/acpi_unregister_gsi()
+>>    irqchip / GICv3: Add ACPI support for GICv3+ initialization
+>>    irqchip / GICv3: Add stacked irqdomain support for ACPI based init
+>>
+>> Tomasz Nowicki (3):
+>>    ACPICA: Introduce GIC version for arm based system
+>>    ACPI / irqchip: Add self-probe infrastructure to initialize IRQ
+>>      controller
+>>    irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
+>>
+>>   arch/arm64/Kconfig                   |   1 +
+>>   arch/arm64/include/asm/irq.h         |  13 --
+>>   arch/arm64/kernel/acpi.c             |  25 ----
+>>   drivers/acpi/Makefile                |   1 +
+>>   drivers/acpi/gsi.c                   |  39 ++---
+>>   drivers/acpi/irq.c                   |  40 ++++++
+>>   drivers/irqchip/Kconfig              |   3 +
+>>   drivers/irqchip/Makefile             |   1 +
+>>   drivers/irqchip/irq-gic-acpi.c       | 116 +++++++++++++++
+>>   drivers/irqchip/irq-gic-v3.c         | 267 ++++++++++++++++++++++++++++-------
+>>   drivers/irqchip/irq-gic.c            |  38 ++---
+>>   drivers/irqchip/irqchip.h            |  12 ++
+>>   include/acpi/actbl1.h                |  17 ++-
+>>   include/asm-generic/vmlinux.lds.h    |  13 ++
+>>   include/linux/acpi.h                 |  14 ++
+>>   include/linux/acpi_irq.h             |   4 +-
+>>   include/linux/irqchip/arm-gic-acpi.h |  12 +-
+>>   include/linux/mod_devicetable.h      |   7 +
+>>   18 files changed, 489 insertions(+), 134 deletions(-)
+>>   create mode 100644 drivers/acpi/irq.c
+>>   create mode 100644 drivers/irqchip/irq-gic-acpi.c
+>
+> What's the connection between this and the Jiang Liu's patchset?
 
-Updated pull request. The first one contained an older version
-of my patch.
+If you are mentioning Jiang Liu's patchset (Consolidate ACPI PCI
+root common code into ACPI core), there is no direct connection
+with my patchset, but this patch set is based on stacked irqdomain
+which was introduced by Jiang Liu, and this is needed to support
+PCI MSI on ARM64 in ACPI way.
 
-This adds coupled cpuidle for Exynos3250 and improves the Exynos
-code in few places. Everything for upcoming 4.2 merge window.
-Description along with a tag.
-
-Best regards,
-Krzysztof
-
-----------------------------------------------------------------
-The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
-
-  Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
-
-are available in the git repository at:
-
-  https://github.com/krzk/linux.git tags/samsung-for-next-4.2
-
-for you to fetch changes up to 182be665abb95fcddd656355ae6208d02533b6b9:
-
-  ARM: plat-samsung: Constify platform_device_id (2015-05-06 11:05:43 +0900)
-
-----------------------------------------------------------------
-Extending cpuidle driver and improvements for Exynos based boards:
-1. Add missing return-value checks and of_node_put() for power domain
-   driver.
-2. Fix missing clk_prepare in S3C24XX ADC driver.
-3. Rework clock handling when switching power domains on/off. Instead
-   of settting fixed parent in DTS we grab the parent clock before
-   turning the domain off.
-4. Add coupled cpuidle support for Exynos3250 to an existing
-   cpuidle-exynos driver. As a result it enables AFTR mode
-   (ARM-Off Top-Running) to be used by default on Exynos3250
-   without the need to hot unplug CPU1 first.
-
-----------------------------------------------------------------
-Bartlomiej Zolnierkiewicz (5):
-      ARM: EXYNOS: fix exynos_boot_secondary() return value on timeout
-      ARM: EXYNOS: make exynos_core_restart() less verbose
-      ARM: EXYNOS: add exynos_set_boot_addr() helper
-      ARM: EXYNOS: add exynos_get_boot_addr() helper
-      cpuidle: exynos: add coupled cpuidle support for Exynos3250
-
-Krzysztof Kozlowski (8):
-      ARM: EXYNOS: Fix failed second suspend on Exynos4
-      ARM: EXYNOS: Handle of of_iomap() failure
-      ARM: EXYNOS: Handle of_find_device_by_node and kstrdup failures
-      ARM: EXYNOS: Add missing of_node_put() when parsing power domains
-      ARM: EXYNOS: Get current parent clock for power domain on/off
-      ARM: dts: Use last parent for clocks during power domain on/off
-      ARM: EXYNOS: Constify irq_domain_ops
-      ARM: plat-samsung: Constify platform_device_id
-
-Sergiy Kibrik (1):
-      ARM: SAMSUNG: fix clk_enable() WARNing in S3C24XX ADC
-
- .../bindings/arm/exynos/power_domain.txt           |   7 +-
- arch/arm/boot/dts/exynos5420.dtsi                  |  13 +--
- arch/arm/include/asm/firmware.h                    |   4 +
- arch/arm/mach-exynos/common.h                      |   6 +-
- arch/arm/mach-exynos/exynos.c                      |  30 ++++-
- arch/arm/mach-exynos/firmware.c                    |  18 +++
- arch/arm/mach-exynos/platsmp.c                     | 123 ++++++++++-----------
- arch/arm/mach-exynos/pm.c                          |  51 +++++++--
- arch/arm/mach-exynos/pm_domains.c                  |  44 ++++++--
- arch/arm/mach-exynos/suspend.c                     |   5 +-
- arch/arm/plat-samsung/adc.c                        |   6 +-
- 11 files changed, 208 insertions(+), 99 deletions(-)
+Thanks
+Hanjun
