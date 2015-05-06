@@ -1,53 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 6 May 2015 11:51:03 +0100
-Subject: Memory size unaligned to section boundary
-In-Reply-To: <20150506101104.GD2067@n2100.arm.linux.org.uk>
-References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
- <20150506101104.GD2067@n2100.arm.linux.org.uk>
-Message-ID: <20150506105102.GB5382@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 May 2015 11:55:58 +0100
+Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <5549EE97.3020801@huawei.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
+ <20150505171349.GA30215@leverpostej> <5549877C.10408@huawei.com>
+ <5549B9CC.1040709@huawei.com> <20150506093022.GB31001@leverpostej>
+ <5549EE97.3020801@huawei.com>
+Message-ID: <20150506104856.GC707@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 11:11:05AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 23, 2015 at 03:19:45PM +0200, Stefan Agner wrote:
-> > I dug a bit more into that, and it unveiled that when creating the
-> > mapping for the non-kernel_x part (if (kernel_x_end < end) in
-> > map_lowmem), the unaligned section at the end leads to the freeze. In
-> > alloc_init_pmd, if the memory end is section unaligned, alloc_init_pte
-> > gets called which allocates a PTE outside of the initialized region (in
-> > early_alloc_aligned). The system freezes at the call of memset in
-> > early_alloc_aligned function.
-[...]
-> Right, and the question is why does that happen - and the answer is
-> this:
-> 
->         /*
->          * Round the memblock limit down to a section size.  This
->          * helps to ensure that we will allocate memory from the
->          * last full section, which should be mapped.
->          */
->         if (memblock_limit)
->                 memblock_limit = round_down(memblock_limit, SECTION_SIZE);
-> 
-> That should round down by 2x SECTION_SIZE to ensure that we don't start
-> allocating the L2 page table in a section which isn't mapped.  Please
-> try this patch:
-> 
->  arch/arm/mm/mmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 4e6ef896c619..387becac5c86 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1142,7 +1142,7 @@ void __init sanity_check_meminfo(void)
->  	 * last full section, which should be mapped.
->  	 */
->  	if (memblock_limit)
-> -		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
-> +		memblock_limit = round_down(memblock_limit, 2 * SECTION_SIZE);
+Hi,
 
-Why not PMD_SIZE? We don't need 4MB round down with LPAE.
+> > I think that given that we know the UART is not quite a PL011 we should
+> > add an additional compatible string just in case some difference crops
+> > up later that is problematic.
+> >
+> > So we'd have something like:
+> >
+> > 	compatible = "hisilicon,hi6220-uart", "arm,pl011", "arm,primecell";
+> >
+> > That way we can add any optimisations or workarounds later as required.
+> I understand and thanks for your suggestion.
+> 
+> Can I do not do this work in this patch set? Because I got the
+> information UART0 is PL011 compatible. Hisilicon uart engineer can do
+> this work in the future, maybe for UART1/UART2.
 
--- 
-Catalin
+I am not asking you to do any driver work for this -- the current driver
+should ignore the "hisilicon,hi6220-uart" string and recognise
+"arm,pl011".
+
+I am only asking you to add the additional string to the DTS, and to
+update the binding document to list the new string. That way if and when
+we need the kernel to distinguish between a regular PL011 and the
+hi6220-specific variant, the DTB does not need to be updated in order to
+do so.
+
+Is UART 0 different from UART1 and UART2?
+
+Thanks,
+Mark.
