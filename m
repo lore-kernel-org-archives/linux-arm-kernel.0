@@ -1,105 +1,90 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 6 May 2015 10:18:00 -0500
-Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150506141859.GC26028@red-moon>
-References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
- <20150505155346.GJ1550@arm.com> <20150506141859.GC26028@red-moon>
-Message-ID: <CAErSpo7z_Sf5QvMa8MBY0f7DQOmwhcpUnCFG=ZsmHuwT2HouQw@mail.gmail.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Wed, 06 May 2015 09:23:32 -0600
+Subject: [PATCH v4 0/7] selftests: fixes for installation and cross
+ compilation
+In-Reply-To: <CANMBJr53a0cdJ5yjBu3ADv=x-==X0HXVQDELmuSuLLNCKLzviw@mail.gmail.com>
+References: <1429656574-8411-1-git-send-email-tyler.baker@linaro.org>
+ <CANMBJr53a0cdJ5yjBu3ADv=x-==X0HXVQDELmuSuLLNCKLzviw@mail.gmail.com>
+Message-ID: <554A31F4.7080200@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 6, 2015 at 9:18 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, May 05, 2015 at 04:53:46PM +0100, Will Deacon wrote:
->> On Tue, May 05, 2015 at 03:02:12AM +0100, Jayachandran C wrote:
->> > The current code in pci-host-generic.c uses pci_common_init_dev()
->> > from the arch/arm/ to do a part of the PCI initialization, and this
->> > prevents it from being used on arm64.
->> >
->> > The initialization done by pci_common_init_dev() that is really
->> > needed by pci-host-generic.c can be done in the same file without
->> > using the hw_pci API of ARM.
->> >
->> > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
->> > this is be handled by setting up 'struct gen_pci' to embed a
->> > pci_sys_data variable as the first element on the ARM platform.
->> >
->> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
->> > ---
->> > Here's v2 of the patches, this enables use of pci-host-generic on
->> > arm64.
->> >
->> > This has been tested on both qemu and fast model for arm64, and on
->> > qemu for arm32.
->> >
->> > v1->v2
->> >  - Address comments from Arnd Bergmann and Lorenzo Pieralisi
->> >     - move contents of gen_pci_init to gen_pci_probe
->> >     - assign resources only when !probe_only
->> >  - tested on ARM32 with qemu option -M virt
+On 05/06/2015 08:49 AM, Tyler Baker wrote:
+> Hi Shuah,
+> 
+> On 21 April 2015 at 15:49, Tyler Baker <tyler.baker@linaro.org> wrote:
+>> This patch set fixes various issues observed when cross building and
+>> installing selftests.
 >>
->> I tried this with an arm64 kernel running under kvmtool, but I get the
->> following errors (a 32-bit ARM kernel does seem to work):
+>> As I began investigating improving the test output format, I performed an
+>> audit of the current tests to ensure all tests were able to execute on various
+>> target architectures. I found that some tests did not install their binaries
+>> and others required directories to be installed to execute properly. There
+>> were also cases in which tests were being installed when they were never built.
+>> With this series applied all tests compile when appropriate and install their
+>> output properly.
 >>
->>   PCI host bridge /pci ranges:
->>      IO 0x00000000..0x0000ffff -> 0x00000000
->>     MEM 0x41000000..0x7fffffff -> 0x41000000
->>   pci-host-generic 40000000.pci: PCI host bridge to bus 0000:00
->>   pci_bus 0000:00: root bus resource [bus 00-01]
->>   pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
->>   pci_bus 0000:00: root bus resource [mem 0x41000000-0x7fffffff]
->>   pci_bus 0000:00: scanning bus
->>   pci 0000:00:00.0: [1af4:1009] type 00 class 0xff0000
->>   pci 0000:00:00.0: reg 0x10: [mem 0x41000000-0x410003ff]
->>   pci 0000:00:00.0: reg 0x14: [io  0x6200-0x65ff]
->>   pci 0000:00:00.0: reg 0x18: [mem 0x41000400-0x410005ff]
->>   pci 0000:00:01.0: [1af4:1009] type 00 class 0xff0000
->>   pci 0000:00:01.0: reg 0x10: [mem 0x41000800-0x41000bff]
->>   pci 0000:00:01.0: reg 0x14: [io  0x6600-0x69ff]
->>   pci 0000:00:01.0: reg 0x18: [mem 0x41000c00-0x41000dff]
->>   pci_bus 0000:00: fixups for bus
->>   pci_bus 0000:00: bus scan returning with max=00
->>   pci 0000:00:00.0: fixup irq: got 10
->>   pci 0000:00:00.0: assigning IRQ 10
->>   pci 0000:00:01.0: fixup irq: got 11
->>   pci 0000:00:01.0: assigning IRQ 11
->>   virtio-pci 0000:00:00.0: can't enable device: BAR 0 [mem 0x41000000-0x410003ff] not claimed
->>   virtio-pci: probe of 0000:00:00.0 failed with error -22
->>   virtio-pci 0000:00:01.0: can't enable device: BAR 0 [mem 0x41000800-0x41000bff] not claimed
->>   virtio-pci: probe of 0000:00:01.0 failed with error -22
->
-> Ok, had a further look.
->
-> Referring to this thread:
->
-> https://lkml.org/lkml/2014/9/29/557
->
-> By looking at other architectures code, resources should be claimed
-> (ie requested) even when PCI_PROBE_ONLY is set. Alpha, Sparc and PowerPC
-> seem to do that, in slightly different fashions.
->
-> I do not think, as Bjorn mentioned, that PCI_PROBE_ONLY should be used
-> to prevent enabling resources through a PCI command, which is what
-> pci_enable_resources does.
->
-> What we can do, is providing a generic PCI layer API that allows claiming
-> resources for a specific PCI bus, something similar if not identical
-> to what is done on alpha:
->
-> arch/alpha/kernel/pci.c pcibios_claim_one_bus()
->
-> that is not alpha specific at all. That way, we can use the API to claim
-> bus resources instead of assigning them on PCI_PROBE_ONLY (I *think*
-> that alpha calls pci_assign_unassigned_resources() even if
-> PCI_PROBE_ONLY is set, it should be safe since resources are claimed
-> first so IIUC the PCI layer would revert to FW BAR configuration on
-> assignment failure).
->
-> Bjorn, any opinion on this ? Putting together a patch is easy when
-> we agree on the solution.
+>> I have tested this series by building, installing and deploying all selftests
+>> to x86, arm and arm64 targets.
+>>
+>> Changes v3 -> v4:
+>> * Planning to send a followup series to address the lib.mk issue so I've
+>> dropped the breakpoints and x86 installation workaround.
+>> * x86: Removed redundant else logic block.
+>> * Applied Andy Lutomirski's ACK to patches 4 and 5.
+>> * Rebased onto next-20150421.
+> 
+> I believe all comments have been addressed, is there anything else you
+> would like to see?
+> 
+>>
+>> Changes v2 -> v3:
+>> * 5/8: Removed duplicate all_32.
+>> * 6/8: Ensure the default rule is all in every case.
+>> * 6/8: Fixed commit message wording for better clarity.
+>> * Applied Michael Ellerman's ACK to patches 1-4, and 8 as they have not changed.
+>> * Rebased onto next-20150420.
+>>
+>> Changes v1 -> v2:
+>> * Have no dependency on all when CROSS_COMPILE is set. (Andy Lutomirski)
+>> * Added Andy on CC for all x86 test patches.
+>> * Split up the x86 patches for better clarity.
+>> * Rebased onto next-20150415.
+>>
+>> This series is based on next-20150421.
+>>
+>> Tyler Baker (7):
+>>   selftests: copy TEST_DIRS to INSTALL_PATH
+>>   selftests/ftrace: install test.d
+>>   selftests/kdbus: install kdbus-test
+>>   selftest/x86: build both bitnesses
+>>   selftest/x86: have no dependency on all when cross building
+>>   selftests/x86: install tests
+>>   selftests/exec: do not install subdir as it is already created
+>>
+>>  tools/testing/selftests/exec/Makefile   |  2 +-
+>>  tools/testing/selftests/ftrace/Makefile |  1 +
+>>  tools/testing/selftests/kdbus/Makefile  |  2 ++
+>>  tools/testing/selftests/lib.mk          |  3 +++
+>>  tools/testing/selftests/x86/Makefile    | 15 ++++++++++++---
+>>  5 files changed, 19 insertions(+), 4 deletions(-)
+>>
+>> --
+>> 2.1.4
+>>
+> 
 
-I would like claiming resources, i.e., pci_claim_resource(), to happen
-in the core instead of in arch code because it's not inherently
-arch-specific.  I don't think it should depend on PCI_PROBE_ONLY.
+Patches are good. I will be applying these to linux-kselftest
+next in a day or two for 4.2
 
-Bjorn
+Thanks for fixing these issues.
+
+-- Shuah
+
+
+-- 
+Shuah Khan
+Sr. Linux Kernel Developer
+Open Source Innovation Group
+Samsung Research America (Silicon Valley)
+shuahkh at osg.samsung.com | (970) 217-8978
