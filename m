@@ -1,53 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 6 May 2015 11:53:12 +0200
-Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
-In-Reply-To: <2694895.MomHLoCaoZ@wuerfel>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <20150501234214.GK12076@piout.net> <2694895.MomHLoCaoZ@wuerfel>
-Message-ID: <20150506095312.GU4276@piout.net>
+From: rbthomas@pobox.com (Rick Thomas)
+Date: Wed, 6 May 2015 03:00:30 -0700
+Subject: Bug#782364: linux-image-3.16.0-4-armmp: please configure drivers
+ for both Cubox i4pro real time clocks
+In-Reply-To: <1430899272.15640.237.camel@debian.org>
+References: <20150410232854.23367.58862.reportbug@cube.rcthomas.org>
+ <1428710930.29665.17.camel@decadent.org.uk>
+ <20150429085705.GG12732@n2100.arm.linux.org.uk>
+ <1430582464.15640.186.camel@hellion.org.uk>
+ <20150502161226.GS12732@n2100.arm.linux.org.uk>
+ <1430583695.15640.190.camel@hellion.org.uk>
+ <1430899272.15640.237.camel@debian.org>
+Message-ID: <64A51823-C50B-48D5-8180-CBC44F691CCB@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2015 at 11:39:58 +0200, Arnd Bergmann wrote :
-> On Saturday 02 May 2015 01:42:14 Alexandre Belloni wrote:
-> > Hi,
-> > 
-> > On 14/12/2010 at 16:08:26 +0100, Hans Ulli Kroll wrote :
-> > > driver for the rtc device
-> > > on Cortina Systems CS3516 or StormlinkSemi SL3516 aka Gemini SoC
-> > > 
-> > > Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> > 
-> > This driver has never been merged and the platform doesn't seem to be
-> > active anymore. Is there still any interest in getting this driver
-> > mainlined?
-> > 
-> > Only tree wide cleanups happened in mach-gemini since end of 2010, the
-> > listed git repository (git://git.berlios.de/gemini-board) was on berliOS
-> > (closed since 2011) and the sourceforge mirror seems empty. Is there
-> > still interest in keeping that platform in the mainline?
-> 
-> As far as I know, the platform is still used by a number of people,
-> and is supported by OpenWRT. The reason we haven't seen updates is that
-> Ulli has been mostly absent from upstream development, and we haven't
-> had any other person step up as maintainer.
-> 
-> I have a patch to convert the platform to ARCH_MULTIPLATFORM, and
-> the code doesn't really get in the way otherwise.
-> 
-> As far as I'm concerned, we should just merge all the patches from
-> http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini/patches-3.18
-> 
-> We should also try to find a maintainer that can respond to patches
-> in a timely manner. If Ulli has time for that again, that would be great,
-> otherwise I think we should find someone from OpenWRT to take over.
-> 
+OK, How will I identify the upload when I see it?  The box is running Debian/Sid and I do regular updates.  So presumably, I?ll see a ?linux-image-3.16.0-4-armmp? package go by sometime soon?  And I?ll know I?ve got it when I see two /dev/rtc* devices?
 
-Thanks to point that, I'll merge that one which seems clean enough:
-http://git.openwrt.org/?p=openwrt.git;a=blob;f=target/linux/gemini/files/drivers/rtc/rtc-gemini.c;h=587d8122b2fbb1230437eadcce4789a53aa60ee5;hb=4c637410a2a1ab45988e8ca6202554a502102039
+As for ?rbthomas at cube.rcthomas.org? ? I?m afraid it?s bogus.  I had exim4 configured wrong when I submitted the original bugreport  /-:.  I?m subscribed to the bugreport with my proper address (?rbthomas at pobox.com?) now; so you can either just send stuff for me to the bugreport directly or to the ?@pobox.com? address, and delete (or simply ignore) ?rbthomas at cube.rcthomas.org? whenever it raises its head.
+
+Thanks!  This has been an interesting and educational discussion!
+Rick
 
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+On May 6, 2015, at 1:01 AM, Ian Campbell <ijc@debian.org> wrote:
+
+> On Sat, 2015-05-02 at 17:21 +0100, Ian Campbell wrote:
+>> We typically build RTCs statically (for this sort of reason) so it seems
+>> like the right thing for us to do here is to build both in.
+> 
+> Which I've now done in SVN. Rick, please test the next upload.
+> 
+> Also, Rick, I'm getting messages from my MTA about not being able to
+> deliver to rbthomas at cube.rcthomas.org, it's been queuing/retrying since
+> the weekend and says I shouldn't worry, but I thought I'd mention it
+> since I was here. Exim logs say:
+> 
+> 2015-05-06 06:48:50 1YoZqj-0002JC-G0 == rbthomas at cube.rcthomas.org R=dnslookup T=remote_smtp defer (-53): retry time not reached for any host
+> 
+> Hopefully you will see this via some other route.
+> 
+> Ian.
+> 
+> -- 
+> To unsubscribe, send mail to 782364-unsubscribe at bugs.debian.org.
+> 
