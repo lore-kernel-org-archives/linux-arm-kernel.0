@@ -1,55 +1,45 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Tue, 5 May 2015 18:17:04 -0600
-Subject: Tegra baseline test results for v4.1-rc2
-Message-ID: <55495D80.2020507@nvidia.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 06 May 2015 09:55:18 +0900
+Subject: ARM: EXYNOS: Fixes for 4.1
+Message-ID: <1430873718-22726-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.1-rc2.
-Logs and other details at:
+Dear Kukjin,
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v4.1-rc2/20150503193103/
+This groups important fix for current RC cycle. The patch was present
+on mailing list for quite long. It was tested. We had some
+disagreements about the solution but during discussion better ways for
+solving the issue were not presented.
 
+Best regards,
+Krzysztof
 
-Test summary
-------------
+----------------------------------------------------------------
 
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
 
-Build: Image:
-     Pass: ( 1/ 1): defconfig
+  Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
 
-Boot to userspace: defconfig:
-     Pass: ( 1/ 1): qemu-vexpress64
+are available in the git repository at:
 
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
+  https://github.com/krzk/linux.git tags/samsung-fixes-4.1
 
-Boot to userspace: tegra_defconfig:
-     Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
+for you to fetch changes up to 23e15018316e949c534cc32e46502f3080dfc970:
 
+  ARM: EXYNOS: Fix failed second suspend on Exynos4 (2015-05-05 19:17:58 +0900)
 
+----------------------------------------------------------------
+Fixes failed second suspend to RAM on Exynos4412 based Trats2 board. This has
+shown up after enabling L2 cache but actually the "use delayed reset assertion"
+feature is to be blamed.
 
-vmlinux object size
-(delta in bytes from test_v4.1-rc1 (b787f68c36d49bb1d9236f403813641efa74a031)):
-    text     data      bss    total  kernel
-   -4094    +4640        0     +546  defconfig
-    -606      +64        0     -542  multi_v7_defconfig
-    -502     +128        0     -374  tegra_defconfig
+----------------------------------------------------------------
+Krzysztof Kozlowski (1):
+      ARM: EXYNOS: Fix failed second suspend on Exynos4
 
-
-Boot-time memory difference
-(delta in bytes from test_v4.1-rc1 (b787f68c36d49bb1d9236f403813641efa74a031))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        .      qemu-vexpress64            defconfig           __internal
-         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-         .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-         .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-         .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+ arch/arm/mach-exynos/common.h  |  2 ++
+ arch/arm/mach-exynos/exynos.c  | 27 +++++++++++++++++++++++++++
+ arch/arm/mach-exynos/platsmp.c | 39 ++-------------------------------------
+ arch/arm/mach-exynos/suspend.c |  3 +++
+ 4 files changed, 34 insertions(+), 37 deletions(-)
