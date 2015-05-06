@@ -1,48 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 May 2015 09:22:22 +0200
-Subject: [PATCH 0/2] gpio: Allow userspace export from DT
-In-Reply-To: <20150504084925.GB4047@localhost>
-References: <20150413110515.9681.58848.stgit@localhost>
- <20150504084925.GB4047@localhost>
-Message-ID: <CACRpkdbFKs8mALw7q2d0EEDkhxKNLgeiFB5TyZ6ZPpfcW-c+oQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 6 May 2015 00:23:02 -0700
+Subject: [PATCH 2/2] clk: mmp: add PXA1928 clock support
+In-Reply-To: <1430455271-20195-2-git-send-email-robh@kernel.org>
+References: <1430455271-20195-1-git-send-email-robh@kernel.org>
+ <1430455271-20195-2-git-send-email-robh@kernel.org>
+Message-ID: <20150506072302.GE27050@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 4, 2015 at 10:49 AM, Johan Hovold <johan@kernel.org> wrote:
-> On Mon, Apr 13, 2015 at 01:05:15PM +0200, Martin Fuzzey wrote:
+On 04/30, Rob Herring wrote:
+> diff --git a/drivers/clk/mmp/clk-of-pxa1928.c b/drivers/clk/mmp/clk-of-pxa1928.c
+> new file mode 100644
+> index 0000000..b7cb540b
+> --- /dev/null
+> +++ b/drivers/clk/mmp/clk-of-pxa1928.c
+> @@ -0,0 +1,265 @@
+> +/*
+> + * pxa1928 clock framework source file
+> + *
+> + * Copyright (C) 2015 Linaro, Ltd.
+> + * Rob Herring <robh@kernel.org>
+> + *
+> + * Based on drivers/clk/mmp/clk-of-mmp2.c:
+> + * Copyright (C) 2012 Marvell
+> + * Chao Xie <xiechao.mail@gmail.com>
+> + *
 
->> The above means that, in order to export the GPIO to userspace via
->> /sys/class/gpio/export the userspace code must know the exact hardware and
->> kernel version information.
->
-> Not quite. You can still determine the gpio number in the above cases by
-> walking the sysfs tree to find the chip and it's base. This is the only
-> way to do this for dynamic buses such as USB.
+Any reason to leave Chao off Cc?
 
-Maybe we should start providing something like an
-"lsgpio" utility in tools/gpio to do this, just as a hint
-to userspace people on how things should be done.
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +#include <linux/module.h>
 
->> This patch series solves both problems by performing the external
->> signal => GPIO mapping in the device tree.
->
-> As Rob already mentioned, what we want is some way to declare pin
-> functions. These could then be requested from userspace (or used in DT,
-> something which should allow for further refactoring there as well)
-> unless a driver has already claimed them.
+This include is unused?
 
-We have the ability to name the GPIO lines (I usually refer to
-lines rather than pins, as pins are physical and not all GPIOs
-are, actually) using the array "names" in struct gpio_chip,
-however this has no DT binding, so maybe people should
-work on that. These names appear as named line files
-in sysfs IIRC. Or maybe you're thinking of something else?
+> +#include <linux/kernel.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/io.h>
+> +#include <linux/of_address.h>
 
-> We don't want to add more dependencies on the current sysfs-based
-> interface, which I hope we'll one day will be able to retire in favour
-> of a more sane one.
+#include <linux/slab.h> ?
 
-Agree.
+> +
+> +#include <dt-bindings/clock/marvell,pxa1928.h>
+> +
 
-Yours,
-Linus Walleij
+Otherwise looks ok to me.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
