@@ -1,42 +1,55 @@
-From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
-Date: Wed, 6 May 2015 08:53:20 +0900
-Subject: [GIT PULL] ARM: EXYNOS: Fixes and improvements for v4.2
-In-Reply-To: <554934D7.2030903@kernel.org>
-References: <1430548284-23827-1-git-send-email-k.kozlowski.k@gmail.com>
- <554934D7.2030903@kernel.org>
-Message-ID: <CAJKOXPcP8tSy4mj+h_fiLvVrFNSv0ppYiNpg1ima2OarEr4D+g@mail.gmail.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Tue, 5 May 2015 18:17:04 -0600
+Subject: Tegra baseline test results for v4.1-rc2
+Message-ID: <55495D80.2020507@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-06 6:23 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
-> On 05/02/15 15:31, Krzysztof Kozlowski wrote:
->> Dear Kukjin,
->>
-> Hi Krzysztof,
->
->> This groups important fixes and typical improvements for Exynos
->> SoC for next v4.2 merge window.
->>
->> I hope you will find useful grouping these commits together.
->>
->> Everything can be also found on github:
->> https://github.com/krzk/linux
->> Branches:
->> 1. fixes-samsung
->> 2. for-next-samsung
->>
->>
->> If you have any comments, do not hesitate as I would welcome any feedback.
->> I can also split it into separate fixes and normal updates if you want.
->>
-> Thanks for your kind reminder and I'll take these series after looking
-> at them within a couple of days. Sorry for the late response and the
-> fixes will be handled before -rc3.
+Here are some basic Tegra test results for Linux v4.1-rc2.
+Logs and other details at:
 
-Great! Actually I grabbed some more patches and organized them in some
-more readable way over the branches so if you don't mind I would like
-to send you another pull requests. This time divided between fixes and
-stuff for 4.2. The fixes are quite important and urgent.
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v4.1-rc2/20150503193103/
 
-Best regards,
-Krzysztof
+
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+     Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+     Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+
+vmlinux object size
+(delta in bytes from test_v4.1-rc1 (b787f68c36d49bb1d9236f403813641efa74a031)):
+    text     data      bss    total  kernel
+   -4094    +4640        0     +546  defconfig
+    -606      +64        0     -542  multi_v7_defconfig
+    -502     +128        0     -374  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.1-rc1 (b787f68c36d49bb1d9236f403813641efa74a031))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        .      qemu-vexpress64            defconfig           __internal
+         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+         .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+         .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+         .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
