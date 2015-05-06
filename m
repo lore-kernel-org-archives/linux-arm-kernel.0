@@ -1,64 +1,61 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Wed,  6 May 2015 11:31:27 +0200
-Subject: [PATCH 0/6] ARM: sunxi: Introduce Allwinner H3 support
-Message-ID: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+Date: Wed,  6 May 2015 11:31:28 +0200
+Subject: [PATCH 1/6] ARM: sunxi: Introduce Allwinner H3 support
+In-Reply-To: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+Message-ID: <1430904693-1404-2-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The Allwinner H3 is a quad-core Cortex-A7-based SoC. It is very similar
+to other sun8i family SoCs like the A23.
 
-This patch series introduces basic kernel support for Allwinner's H3 SoC,
-mainly basic clocks and pinctrl. It also adds interrupts, timers,
-watchdog, RTC, dmaengine, MMC and UARTs, which are mostly compatible to
-those in earlier SoCs like A23 and A31, and can simply be reused.
+Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+---
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ arch/arm/mach-sunxi/Kconfig                     | 2 +-
+ arch/arm/mach-sunxi/sunxi.c                     | 3 ++-
+ 3 files changed, 4 insertions(+), 2 deletions(-)
 
-These patches are based on Maxime's sunxi/for-next branch from
-git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
-
-Patch 1 adds machine support for the H3.
-
-Patch 2 adds support for the basic clocks. The AHB1/AHB2 split could
-need some discussion.
-
-Patch 3 adds the pin sets for the H3 main PIO. 
-
-Patch 4 adds the H3 specific parameters to the sun6i dmaengine driver.
-
-Patch 5 adds the DTSI for the H3.
-
-Patch 6 adds a DT for the Orange Pi Plus SBC, which these patches
-were developed and tested with.
-
-Regards,
-Jens
-
-
-Jens Kuske (6):
-  ARM: sunxi: Introduce Allwinner H3 support
-  clk: sunxi: Add H3 clocks support
-  pinctrl: sunxi: Add H3 PIO controller support
-  dmaengine: sun6i: Add support for Allwinner H3 (sun8i) variant
-  ARM: dts: sunxi: Add Allwinner H3 DTSI
-  ARM: dts: sun8i: Add Orange Pi Plus support
-
- Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
- Documentation/devicetree/bindings/clock/sunxi.txt  |   7 +
- .../devicetree/bindings/dma/sun6i-dma.txt          |   5 +-
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts       |  82 ++++
- arch/arm/boot/dts/sun8i-h3.dtsi                    | 468 ++++++++++++++++++
- arch/arm/mach-sunxi/Kconfig                        |   2 +-
- arch/arm/mach-sunxi/sunxi.c                        |   3 +-
- drivers/clk/sunxi/clk-sunxi.c                      |  46 +-
- drivers/dma/sun6i-dma.c                            |  12 +
- drivers/pinctrl/sunxi/Kconfig                      |   4 +
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c           | 521 +++++++++++++++++++++
- 14 files changed, 1151 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
- create mode 100644 arch/arm/boot/dts/sun8i-h3.dtsi
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index 42941fd..3cb4b94 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -9,4 +9,5 @@ using one of the following compatible strings:
+   allwinner,sun6i-a31
+   allwinner,sun7i-a20
+   allwinner,sun8i-a23
++  allwinner,sun8i-h3
+   allwinner,sun9i-a80
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 81502b9..47ac5b4 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -35,7 +35,7 @@ config MACH_SUN7I
+ 	select SUN5I_HSTIMER
+ 
+ config MACH_SUN8I
+-	bool "Allwinner A23 (sun8i) SoCs support"
++	bool "Allwinner A23 / H3 (sun8i) SoCs support"
+ 	default ARCH_SUNXI
+ 	select ARM_GIC
+ 	select MFD_SUN6I_PRCM
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 1bc811a..bc63748 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -67,10 +67,11 @@ MACHINE_END
+ 
+ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-a23",
++	"allwinner,sun8i-h3",
+ 	NULL,
+ };
+ 
+-DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
++DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23/H3) Family")
+ 	.dt_compat	= sun8i_board_dt_compat,
+ 	.init_late	= sunxi_dt_cpufreq_init,
+ MACHINE_END
 -- 
 2.3.7
