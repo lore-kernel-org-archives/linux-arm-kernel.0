@@ -1,81 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 6 May 2015 09:48:14 +0200
-Subject: [PATCHv7 0/8] watchdog: Extend kernel API and add
- early_timeout_sec feature
-In-Reply-To: <5549C20F.4010605@offcode.fi>
-References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
- <20150505135054.GI25193@pengutronix.de>
- <5549C20F.4010605@offcode.fi>
-Message-ID: <20150506074814.GR25193@pengutronix.de>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Wed, 06 May 2015 09:53:55 +0200
+Subject: How to encode being an I2C slave in DT?
+In-Reply-To: <20150506065928.GP25193@pengutronix.de>
+References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
+ <20150505105513.GA1841@katana> <20150506065928.GP25193@pengutronix.de>
+Message-ID: <3394114.re5da8pjTi@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, May 06, 2015 at 10:26:07AM +0300, Timo Kokkonen wrote:
-> On 05.05.2015 16:50, Uwe Kleine-K?nig wrote:
-> >Hello,
-> >
-> >I talked to Marc Kleine-Budde about your approach, thought a bit more
-> >about it and want to share a few thoughts with you.
-> >
-> >Actually your series addresses three different problems
-> >
-> >  a) some watchdog hardware isn't stoppable;
-> >  b) some watchdog hardware has short maximal timeout;
-> >  c) what to do with a watchdog that is already running at probe time?
-> >
-> >The common solution is to add a mid-layer between userspace and the
-> >driver that bridges the possible hardware limitations when userspace
-> >wants to stop the watchdog or set a big timeout value. c) is a bit
-> >different but could make use of the infrastructure that is introduced
-> >while fixing a+b). The main difference between a+b) and c) is that for
-> >c) you have to introduce some policy. If the series were mine I'd first
-> >do three commits that address a), b) and c) each. Then convert drivers
-> >to it.
+Am Mittwoch, 6. Mai 2015, 08:59:28 schrieb Uwe Kleine-K?nig:
+> Hello,
 > 
-> The infrastructure needed for both a and b is the same, the actual
-> code to implement either a or b is also touching the same functions
-> and quite slim, so I think it may not be feasible to separate those
-> in their own patches. But I'll think about it and see if logical
-> separation makes sense.
-Yeah, probably you have to actually try it to see if it's sensible.
-
-> >Guenter and I already said something similar, but I will eventually
-> >repeat it here more explicitly: When introducing a midlayer that
-> >abstracts between hardware and it's users the IMHO most important thing
-> >to get right is to be explicit about which side of a midlayer you're
-> >currently working at. That is, be explicit about watchdog_is_running:
-> >Does it mean the hardware is running, or does userspace believe the
-> >watchdog to be active? Same for timeout, stoppable etc.pp.
+> On Tue, May 05, 2015 at 12:55:13PM +0200, Wolfram Sang wrote:
+> > So what about adding a new property "i2c-slave-reg"? This does not only
+> > prevent the confusion above, but also makes it very clear that this node
+> > is an I2C slave without the need to encode that somehow in the
+> > compatible property (although it probably should be described there as
+> > well, still).
 > 
-> Yes, I agree. Thanks for clarifying this. I will keep this in mind
-> and try to be explicit when naming functions and variables. The best
-> way would be to also rename the existing variables too, but that
-> would also touch all the existing drivers. Keeping the current
-> naming scheme in place no doubt is less explicit about which side of
-> the new midlayer they are working on. But luckily the logic of the
-> existing driver doesn't change, they are all exposing things
-> directly to userland and they can be documented as is. The new
-> variables and functions add interfaces only between the new midlayer
-> and HW, so they are explicit as well. So I think it is a fair
-> compromise to leave all existing interface towards the user space as
-> is.
-Maybe a good first step before addressing a+b+c) is to cleanup the
-naming? Not sure how well this works though.
+> I admit I didn't follow the discussions referenced in the footnotes, but
+> I wonder if the slave part should be added to the device tree at all.
+> AFAICT it could (and so should) be completely userspace-defined which
+> slave driver is used on which address. I imagine that for most
+> controllers the bus addresses to use can be chosen more or less freely.
+> So what am I missing?
 
-> >When you consider changing the unit the watchdog core is using, why not
-> >change to nano seconds and 64 bit variables? You might be able to copy
-> >some algorithms and ideas from the timer core that uses these.
-> 
-> Yes, sounds like a good idea. I will look into it.
-I wouldn't be surprised if you had to build a parallel watchdog device
-model for that and assert that both work until all drivers are converted
-to the new model. Sounds like fun :-)
+if you had read the footnotes you would know :-) Our usecase is connect an 
+embeedded controller via i2c to the host soc, similar to cros-ec, but here the 
+ec is the i2c master. The ec connects keyboard, mouse, pwrmngt, and other 
+stuff, for which the drivers are best implemented in kernel code AFAIK. 
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Marc
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150506/afbd62ae/attachment-0001.sig>
