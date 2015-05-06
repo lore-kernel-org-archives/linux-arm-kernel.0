@@ -1,48 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 06 May 2015 11:24:58 +0200
-Subject: [PATCH v3 3/5] PCI: st: Provide support for the sti PCIe
- controller
-In-Reply-To: <CAG374jAv9aHBPGV+x+xs2MyRGz+fw1ymwu78fqNXDPtPqehgZA@mail.gmail.com>
-References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
- <20150505221646.GE24643@google.com>
- <CAG374jAv9aHBPGV+x+xs2MyRGz+fw1ymwu78fqNXDPtPqehgZA@mail.gmail.com>
-Message-ID: <2236679.A9NfANRyhD@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 May 2015 10:30:22 +0100
+Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <5549B9CC.1040709@huawei.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
+ <20150505171349.GA30215@leverpostej> <5549877C.10408@huawei.com>
+ <5549B9CC.1040709@huawei.com>
+Message-ID: <20150506093022.GB31001@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 May 2015 11:14:25 Gabriel Fernandez wrote:
+On Wed, May 06, 2015 at 07:50:52AM +0100, Bintian wrote:
+> Hello Mark,
 > 
-> >> +static int __init pcie_init(void)
-> >> +{
-> >> +     return platform_driver_probe(&st_pcie_driver, st_pcie_probe);
-> >> +}
-> >> +device_initcall(pcie_init);
+> On 2015/5/6 11:16, Bintian wrote:
+> > Hello Mark,
 > >
-> > Can you use module_platform_driver_probe() or module_init() here?
+> > On 2015/5/6 1:13, Mark Rutland wrote:
+> [...]
+> >>> +        uart0: uart at f8015000 {    /* console */
+> >>> +            compatible = "arm,pl011", "arm,primecell";
+> >>> +            reg = <0x0 0xf8015000 0x0 0x1000>;
+> >>> +            interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+> >>> +            clocks = <&ao_ctrl HI6220_UART0_PCLK>, <&ao_ctrl
+> >>> HI6220_UART0_PCLK>;
+> >>> +            clock-names = "uartclk", "apb_pclk";
+> >>> +        };
+> >>
+> >> In a previous discussion [1] the UART on HI6220 was described as not
+> >> fully PL011 compliant, with a number of differences (e.g. the FIFO
+> >> length).
+> >>
+> >> Given that, I feel somewhat uncomfortable with the current compatible
+> >> string list. What exactly are those differences? We may need a more
+> >> specific compatible string (even if in addition to those existing ones),
+> >> or perhaps other properties.
+> > The small system can be booted and the console also works well without
+> > changing any code of driver amba-pl011.c, so I think the compatible
+> > string is OK for this patch set.
 > >
-> 
-> Yes we can use module_init() here.
-> 
-> By the way if figure out i removed __init attribute on st_pcie_probe()
-> in previous version to follow Arnd's remark.
-> But st_pcie_probe calls hook_fault_code() that has __init attribute.
-> So I think we need to keep __init for probe routine ?
-> Also, we have to restrict bind/unbind with "suppress_bind_attrs" in
-> platform_driver structure.
-> This is the main reason to not allow module unload/reload.
-> 
-> If you are ok i will send a v4 ?
-> 
+> > Hisilicon do some performance enhancements based on PL011, but the
+> > current driver "amba-pl011.c" also works on hi6220 without those
+> > enhancements driver code.
+> Checked with Hisilicon chip designer, the UART0 is used for DEBUG
+> console and compliant with PL011 fully.
 
-If you mark the probe function as __init, you have to use
-module_platform_driver_probe() or platform_driver_probe() instead,
-to prevent the probe function from being deferred.
+I think that given that we know the UART is not quite a PL011 we should
+add an additional compatible string just in case some difference crops
+up later that is problematic.
 
-Calling hook_fault_code() also means you need to prevent module
-unloading, by providing only a module_init but not a module_exit
-function, so module_platform_driver_probe() also won't work.
+So we'd have something like:
 
-It may be a good idea to work on improving the hook_fault_code()
-infrastructure to make it more usable with loadable device drivers.
+	compatible = "hisilicon,hi6220-uart", "arm,pl011", "arm,primecell";
 
-	Arnd
+That way we can add any optimisations or workarounds later as required.
+
+Thanks,
+Mark.
