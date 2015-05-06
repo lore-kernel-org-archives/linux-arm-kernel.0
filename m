@@ -1,51 +1,65 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 06 May 2015 09:57:37 -0600
-Subject: How to encode being an I2C slave in DT?
-In-Reply-To: <20150506080951.GS25193@pengutronix.de>
-References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
- <20150505105513.GA1841@katana> <20150506065928.GP25193@pengutronix.de>
- <3394114.re5da8pjTi@fb07-iapwap2> <20150506080951.GS25193@pengutronix.de>
-Message-ID: <554A39F1.9060507@wwwdotorg.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 May 2015 17:14:06 +0100
+Subject: [PATCH 5/6] ARM: re-implement physical address space switching
+In-Reply-To: <20150506155004.GW2067@n2100.arm.linux.org.uk>
+References: <20150408175533.GN12732@n2100.arm.linux.org.uk>
+ <552C14F0.7020006@oracle.com> <20150415120738.GD2866@leverpostej>
+ <552E9F9B.2040400@oracle.com> <20150423112449.GB17361@leverpostej>
+ <20150506101850.GE2067@n2100.arm.linux.org.uk>
+ <20150506103736.GA707@leverpostej>
+ <20150506113313.GS2067@n2100.arm.linux.org.uk>
+ <20150506153337.GA2974@leverpostej>
+ <20150506155004.GW2067@n2100.arm.linux.org.uk>
+Message-ID: <20150506161406.GC2974@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2015 02:09 AM, Uwe Kleine-K?nig wrote:
-> Hello Marc,
+Hi Russell,
+
+> > 	cr = get_cr();
+> > 	set_cr(cr & ~(CR_I | CR_C | CR_W));
+> > 	flush_cache_all();
+> > 
+> > With the MMU on at this point the page table walkers can race with the
+> > set/way maintenance. It also relies on the compiler not making stack
+> > accesses between the SCTLR write and the completion of flush_cache_all,
+> > which is likely but not guranteed.
+> 
+> Yes, I suppose you're right, but there's really no other way to do
+> this other than coding up CPU specific code.
+> 
+> What we'd need to do is to code up a specific assembly routine which
+> disables the I and C control register flags, flushes the cache, jumps
+> to the physical alias and then disables the MMU all without touching
+> memory.  That's far too much effort.  Like I say, maybe we should just
+> bin Keystone for this crap...
+> 
+> I'm not interested in trying to "fix" this code any further - as I
+> said earlier, it took quite a while to get this code working on
+> Keystone, which is really all we care about.  Anyone else who copies
+> the abortion that TI made in Keystone should be shot. :)
+> 
+> While the community has the luxury of saying "we don't like it, it's
+> TI's problem" - which is what was done when the problems were first
+> pointed out by Will, the net result is that this problem became my
+> problem to try and sort out.
+> 
+> So, if you have a better idea how to fix this, I'm all ears.
 >
-> On Wed, May 06, 2015 at 09:53:55AM +0200, Marc Dietrich wrote:
->> Am Mittwoch, 6. Mai 2015, 08:59:28 schrieb Uwe Kleine-K?nig:
->>> On Tue, May 05, 2015 at 12:55:13PM +0200, Wolfram Sang wrote:
->>>> So what about adding a new property "i2c-slave-reg"? This does not only
->>>> prevent the confusion above, but also makes it very clear that this node
->>>> is an I2C slave without the need to encode that somehow in the
->>>> compatible property (although it probably should be described there as
->>>> well, still).
->>>
->>> I admit I didn't follow the discussions referenced in the footnotes, but
->>> I wonder if the slave part should be added to the device tree at all.
->>> AFAICT it could (and so should) be completely userspace-defined which
->>> slave driver is used on which address. I imagine that for most
->>> controllers the bus addresses to use can be chosen more or less freely.
->>> So what am I missing?
->>
->> if you had read the footnotes you would know :-) Our usecase is connect an
->> embeedded controller via i2c to the host soc, similar to cros-ec, but here the
->> ec is the i2c master. The ec connects keyboard, mouse, pwrmngt, and other
->> stuff, for which the drivers are best implemented in kernel code AFAIK.
- >
-> Right, the driver might sensibly be implemented in kernel space. But I'd
-> vote that you still need to do the binding of these drivers to your
-> slave controller from userspace. Then there is no need to specify
-> anything in your dtb.
+> What I'm certain of though is that this is an improvement over what's
+> in the kernel today, and so should go in irrespective of whether it's
+> totally bullet-proof or not.
 
-I think the set of I2C slave devices that are implemented by the Linux 
-system can reasonably be considered part of the HW definition. Most DT 
-content to date has been a definition of the HW that's available to SW, 
-but at least in this case, this I2C slave device is something that must 
-be implemented (admittedly in conjunction with SW) using the I2C slave 
-HW on the main SoC, in order for the overall HW to work as intended.
+I don't disagree with that. :)
 
-BTW, I believe devicetree-spec at vger.kernel.org was created to address 
-subsystem-level DT schema questions like this. It's much lower volume, 
-so perhaps the thread would get noticed by the DT maintainers if posted 
-there (or perhaps just CC them)?
+w.r.t. "better" ideas, my initial thought was that we could move the
+SCTLR.{C,M} clearing into lpae_pgtables_remap_asm, along with a call to
+v7_flush_dcache_all (as it should be in the physical mapping). So long
+as the kernel text was initially clean to the PoC I'd expect that to
+work, but I understood from your initial reply you'd tried that and
+something went wrong.
+
+Perhaps we can look into that later.
+
+Thanks,
+Mark.
