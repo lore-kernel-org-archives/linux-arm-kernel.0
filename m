@@ -1,65 +1,66 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Wed, 6 May 2015 12:37:52 +0200
-Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
- revision
-In-Reply-To: <3577431.y872Foi4kj@wuerfel>
-References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
- <1430902142-17035-2-git-send-email-pali.rohar@gmail.com>
- <3577431.y872Foi4kj@wuerfel>
-Message-ID: <20150506103752.GG30910@pali>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 6 May 2015 18:38:43 +0800
+Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <20150506093022.GB31001@leverpostej>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
+ <20150505171349.GA30215@leverpostej> <5549877C.10408@huawei.com>
+ <5549B9CC.1040709@huawei.com> <20150506093022.GB31001@leverpostej>
+Message-ID: <CAD6h2NRtni=+pwkt7ng-gC_iu5B3+0mxbi96Pj01OY+PkfKBYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 May 2015 11:31:15 Arnd Bergmann wrote:
-> On Wednesday 06 May 2015 10:49:01 Pali Roh?r wrote:
-> > With this patch "revision" DT string entry is used to set global system_rev
-> > variable. DT "revision" is expected to be string with one hexadecimal number.
-> > So "Revision" line in /proc/cpuinfo will be same as "revision" DT value.
-> > 
-> > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> > Acked-by: Pavel Machek <pavel@ucw.cz>
-> 
-> +devicetree mailing list
-> 
-> The property needs to be specified in a binding somewhere.
-> 
-> > @@ -246,5 +247,14 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
-> >  	/* Change machine number to match the mdesc we're using */
-> >  	__machine_arch_type = mdesc->nr;
-> >  
-> > +	/* Set system revision from DT */
-> > +	prop = of_get_flat_dt_prop(dt_root, "revision", &size);
-> > +	if (prop && size > 0) {
-> > +		char revision[11];
-> > +		strlcpy(revision, prop, min(size, (int)sizeof(revision)));
-> > +		if (kstrtouint(revision, 16, &system_rev) != 0)
-> > +			system_rev = 0;
-> > +	}
-> > +
-> >  	return mdesc;
-> >  }
-> > 
-> 
-> What is the reason for doing it this early? I think it would be nicer to do
-> it after unflattening the DT.
-> 
+On 6 May 2015 at 17:30, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, May 06, 2015 at 07:50:52AM +0100, Bintian wrote:
+>> Hello Mark,
+>>
+>> On 2015/5/6 11:16, Bintian wrote:
+>> > Hello Mark,
+>> >
+>> > On 2015/5/6 1:13, Mark Rutland wrote:
+>> [...]
+>> >>> +        uart0: uart at f8015000 {    /* console */
+>> >>> +            compatible = "arm,pl011", "arm,primecell";
+>> >>> +            reg = <0x0 0xf8015000 0x0 0x1000>;
+>> >>> +            interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+>> >>> +            clocks = <&ao_ctrl HI6220_UART0_PCLK>, <&ao_ctrl
+>> >>> HI6220_UART0_PCLK>;
+>> >>> +            clock-names = "uartclk", "apb_pclk";
+>> >>> +        };
+>> >>
+>> >> In a previous discussion [1] the UART on HI6220 was described as not
+>> >> fully PL011 compliant, with a number of differences (e.g. the FIFO
+>> >> length).
+>> >>
+>> >> Given that, I feel somewhat uncomfortable with the current compatible
+>> >> string list. What exactly are those differences? We may need a more
+>> >> specific compatible string (even if in addition to those existing ones),
+>> >> or perhaps other properties.
+>> > The small system can be booted and the console also works well without
+>> > changing any code of driver amba-pl011.c, so I think the compatible
+>> > string is OK for this patch set.
+>> >
+>> > Hisilicon do some performance enhancements based on PL011, but the
+>> > current driver "amba-pl011.c" also works on hi6220 without those
+>> > enhancements driver code.
+>> Checked with Hisilicon chip designer, the UART0 is used for DEBUG
+>> console and compliant with PL011 fully.
+>
+> I think that given that we know the UART is not quite a PL011 we should
+> add an additional compatible string just in case some difference crops
+> up later that is problematic.
+>
+> So we'd have something like:
+>
+>         compatible = "hisilicon,hi6220-uart", "arm,pl011", "arm,primecell";
+>
+> That way we can add any optimisations or workarounds later as required.
+>
 
-It needs to be done in this code, so "system_rev" variable is set
-properly...
+There's no code to handle the feature of hi6220 uart in mainline. It's
+meaningless to append "hisilicon,hi6220-uart" at here. I think it's
+only required
+when those uart code are merged into mainline.
 
-> Also, it seems strange to have a string property and then use kstrtouint
-> to convert it into a number. I think it should either be specified in a DT
-> binding to be a string and then have the kernel not assume that it is a number,
-> or we should define it to be binary.
-> 
-> 	Arnd
-
-Variable "system_rev" is number and it always was. So chaning type will
-break more parts.
-
-And it is string DT property to be human readable. Some other developers
-suggested for v2 to change it to string (from number).
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+Regards
+Haojian
