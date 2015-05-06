@@ -1,38 +1,63 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 6 May 2015 13:08:51 +0300
-Subject: [PATCHv3 03/10] ARM: DRA7: hwmod: set DSS submodule parent hwmods
+Date: Wed, 6 May 2015 13:08:52 +0300
+Subject: [PATCHv3 04/10] ARM: OMAP: display: change compat names to array
 In-Reply-To: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1430906938-26128-4-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1430906938-26128-5-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set DSS core hwmod as the parent for all the DSS submodules.
+Simplify the DSS detection logic by creating a list of the omapdss
+compat strings, instead of checking each separately with an 'if'.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-omap2/display.c | 29 ++++++++++++++---------------
+ 1 file changed, 14 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 71599f27bddc..178c28ea8b59 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -521,6 +521,7 @@ static struct omap_hwmod dra7xx_dss_dispc_hwmod = {
- 		},
- 	},
- 	.dev_attr	= &dss_dispc_dev_attr,
-+	.parent_hwmod	= &dra7xx_dss_hwmod,
- };
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index f492ae147c6a..9868d0bc7805 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -568,25 +568,24 @@ void __init omapdss_early_init_of(void)
  
- /*
-@@ -562,6 +563,7 @@ static struct omap_hwmod dra7xx_dss_hdmi_hwmod = {
- 	},
- 	.opt_clks	= dss_hdmi_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(dss_hdmi_opt_clks),
-+	.parent_hwmod	= &dra7xx_dss_hwmod,
- };
+ }
  
- /*
++static const char * const omapdss_compat_names[] __initconst = {
++	"ti,omap2-dss",
++	"ti,omap3-dss",
++	"ti,omap4-dss",
++	"ti,omap5-dss",
++};
++
+ struct device_node * __init omapdss_find_dss_of_node(void)
+ {
+ 	struct device_node *node;
++	int i;
+ 
+-	node = of_find_compatible_node(NULL, NULL, "ti,omap2-dss");
+-	if (node)
+-		return node;
+-
+-	node = of_find_compatible_node(NULL, NULL, "ti,omap3-dss");
+-	if (node)
+-		return node;
+-
+-	node = of_find_compatible_node(NULL, NULL, "ti,omap4-dss");
+-	if (node)
+-		return node;
+-
+-	node = of_find_compatible_node(NULL, NULL, "ti,omap5-dss");
+-	if (node)
+-		return node;
++	for (i = 0; i < ARRAY_SIZE(omapdss_compat_names); ++i) {
++		node = of_find_compatible_node(NULL, NULL,
++			omapdss_compat_names[i]);
++		if (node)
++			return node;
++	}
+ 
+ 	return NULL;
+ }
 -- 
 2.1.4
