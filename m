@@ -1,61 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 May 2015 11:37:04 +0100
-Subject: [PATCH 02/11] arm/mach-keystone: remove legacy __cpuinit
- sections that crept in
-In-Reply-To: <1430174880-27958-3-git-send-email-paul.gortmaker@windriver.com>
-References: <1430174880-27958-1-git-send-email-paul.gortmaker@windriver.com>
- <1430174880-27958-3-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20150506103704.GJ2067@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 May 2015 11:37:37 +0100
+Subject: [PATCH 5/6] ARM: re-implement physical address space switching
+In-Reply-To: <20150506101850.GE2067@n2100.arm.linux.org.uk>
+References: <20150408094438.GM12732@n2100.arm.linux.org.uk>
+ <E1YfmY6-0006X3-1N@rmk-PC.arm.linux.org.uk>
+ <20150408173656.GF5977@leverpostej>
+ <20150408175533.GN12732@n2100.arm.linux.org.uk>
+ <552C14F0.7020006@oracle.com> <20150415120738.GD2866@leverpostej>
+ <552E9F9B.2040400@oracle.com> <20150423112449.GB17361@leverpostej>
+ <20150506101850.GE2067@n2100.arm.linux.org.uk>
+Message-ID: <20150506103736.GA707@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 27, 2015 at 06:47:51PM -0400, Paul Gortmaker wrote:
-> We removed __cpuinit support (leaving no-op stubs) quite some time
-> ago.  However two crept back in as of commit 5eb3da7246a5b2dfac9f38
-> ("ARM: keystone: Switch over to coherent memory address space")
-> 
-> Since we want to clobber the stubs too, get these removed now.
-> 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Hi Russell,
 
-Santosh's email is now: Santosh Shilimkar <ssantosh@kernel.org>
+> > It turns out that I was incorrect in my assertion, and the reordering I
+> > suggested above can't happen. The ARMv7 ARM states:
+> > 
+> > 	Any direct write to a system control register is guaranteed not
+> > 	to affect any instruction that appears, in program
+> > 	order, before the instruction that performed the direct write
+> > 
+> > Which means that the STMFD cannot be affected by the later cp15 write to
+> > the SCTLR, and so the DSB does not need to be moved before the MCR.
+> > 
+> > I apologise for adding to the confusion there.
+> 
+> So does this mean this patch gets an ack now?
 
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
->  arch/arm/mach-keystone/platsmp.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
-> index 5f46a7cf907b..7f99550cad46 100644
-> --- a/arch/arm/mach-keystone/platsmp.c
-> +++ b/arch/arm/mach-keystone/platsmp.c
-> @@ -40,14 +40,14 @@ static int keystone_smp_boot_secondary(unsigned int cpu,
->  }
->  
->  #ifdef CONFIG_ARM_LPAE
-> -static void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
-> +static void keystone_smp_secondary_initmem(unsigned int cpu)
->  {
->  	pgd_t *pgd0 = pgd_offset_k(0);
->  	cpu_set_ttbr(1, __pa(pgd0) + TTBR1_OFFSET);
->  	local_flush_tlb_all();
->  }
->  #else
-> -static inline void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
-> +static inline void keystone_smp_secondary_initmem(unsigned int cpu)
->  {}
->  #endif
->  
-> -- 
-> 2.2.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I assumed there was going to be a respin for the CR_W change?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+There's also the dodginess w.r.t. the page table walkers that I can't
+see is solvable short of disabling the MMU prior to the flush, though I
+understand you've NAKed that approach.
+
+Thanks,
+Mark.
