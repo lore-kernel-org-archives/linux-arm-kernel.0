@@ -1,55 +1,44 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Wed, 06 May 2015 11:37:26 +0200
-Subject: [PATCH v3 2/2] arch: arm: Show the serial number from
- devicetree in cpuinfo
-In-Reply-To: <20150506090105.GC2067@n2100.arm.linux.org.uk>
-References: <1429351135-11842-1-git-send-email-contact@paulk.fr>
- <1429351135-11842-2-git-send-email-contact@paulk.fr>
- <CAL_JsqKkw7n5p1ZH345BeKkyU=GKDrhaLef__0ET7t90Cm0Eog@mail.gmail.com>
- <1430145747.3081.5.camel@collins>
- <20150428160910.GE12732@n2100.arm.linux.org.uk>
- <1430581582.5339.0.camel@collins>
- <20150506090105.GC2067@n2100.arm.linux.org.uk>
-Message-ID: <1430905046.2577.1.camel@collins>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 06 May 2015 11:39:58 +0200
+Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
+In-Reply-To: <20150501234214.GK12076@piout.net>
+References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
+ <20150501234214.GK12076@piout.net>
+Message-ID: <2694895.MomHLoCaoZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi 06 mai 2015 ? 10:01 +0100, Russell King - ARM Linux a
-?crit :
-> On Sat, May 02, 2015 at 05:46:22PM +0200, Paul Kocialkowski wrote:
-> > Le mardi 28 avril 2015 ? 17:09 +0100, Russell King - ARM Linux a ?crit :
-> > > On Mon, Apr 27, 2015 at 04:42:27PM +0200, Paul Kocialkowski wrote:
-> > > > Well, of_property_read_string is only defined when CONFIG_OF is set
-> > > > (base.c is always built in drivers/of but the directory is only included
-> > > > when CONFIG_OF is set).
-> > > > 
-> > > > Of course, on ARM, we now expect that it is the case, but it seems like
-> > > > good practice to check for it, since it could theoretically be disabled.
-> > > 
-> > > That is _not_ "is the case" - there are a number of non-OF platforms...
-> > > including some which will probably never be converted.
+On Saturday 02 May 2015 01:42:14 Alexandre Belloni wrote:
+> Hi,
+> 
+> On 14/12/2010 at 16:08:26 +0100, Hans Ulli Kroll wrote :
+> > driver for the rtc device
+> > on Cortina Systems CS3516 or StormlinkSemi SL3516 aka Gemini SoC
 > > 
-> > Right, so I think v4 should be fine too, given the empty functions in
-> > case CONFIG_OF is not set.
+> > Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
 > 
-> Yes, can you please put them in my patch system so we can get this
-> applied?
-
-What exactly do you mean? 
-
-I sent v4 to linux-arm-kernel at lists.infradead.org and
-devicetree at vger.kernel.org with you and Rob in the CC list, on the 28th
-of April.
-
-> Rob - does your ack apply to the v4 patch?
+> This driver has never been merged and the platform doesn't seem to be
+> active anymore. Is there still any interest in getting this driver
+> mainlined?
 > 
-> Thanks.
-> 
+> Only tree wide cleanups happened in mach-gemini since end of 2010, the
+> listed git repository (git://git.berlios.de/gemini-board) was on berliOS
+> (closed since 2011) and the sourceforge mirror seems empty. Is there
+> still interest in keeping that platform in the mainline?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150506/d301340a/attachment-0001.sig>
+As far as I know, the platform is still used by a number of people,
+and is supported by OpenWRT. The reason we haven't seen updates is that
+Ulli has been mostly absent from upstream development, and we haven't
+had any other person step up as maintainer.
+
+I have a patch to convert the platform to ARCH_MULTIPLATFORM, and
+the code doesn't really get in the way otherwise.
+
+As far as I'm concerned, we should just merge all the patches from
+http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini/patches-3.18
+
+We should also try to find a maintainer that can respond to patches
+in a timely manner. If Ulli has time for that again, that would be great,
+otherwise I think we should find someone from OpenWRT to take over.
+
+	Arnd
