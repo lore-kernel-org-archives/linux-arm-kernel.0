@@ -1,63 +1,111 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Wed, 06 May 2015 16:19:59 +0800
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <2196079.901rMdSZr0@wuerfel>
-References: <55417F5A.4040300@linaro.org> <5548A5D5.9030107@linaro.org>
- <5549BB3A.6060106@huawei.com> <2196079.901rMdSZr0@wuerfel>
-Message-ID: <5549CEAF.1090400@linaro.org>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Wed, 06 May 2015 11:23:59 +0300
+Subject: [PATCHv7 0/8] watchdog: Extend kernel API and add
+ early_timeout_sec feature
+In-Reply-To: <20150506074814.GR25193@pengutronix.de>
+References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
+ <20150505135054.GI25193@pengutronix.de> <5549C20F.4010605@offcode.fi>
+ <20150506074814.GR25193@pengutronix.de>
+Message-ID: <5549CF9F.6020405@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06.05.2015 10:48, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Wed, May 06, 2015 at 10:26:07AM +0300, Timo Kokkonen wrote:
+>> On 05.05.2015 16:50, Uwe Kleine-K?nig wrote:
+>>> Hello,
+>>>
+>>> I talked to Marc Kleine-Budde about your approach, thought a bit more
+>>> about it and want to share a few thoughts with you.
+>>>
+>>> Actually your series addresses three different problems
+>>>
+>>>   a) some watchdog hardware isn't stoppable;
+>>>   b) some watchdog hardware has short maximal timeout;
+>>>   c) what to do with a watchdog that is already running at probe time?
+>>>
+>>> The common solution is to add a mid-layer between userspace and the
+>>> driver that bridges the possible hardware limitations when userspace
+>>> wants to stop the watchdog or set a big timeout value. c) is a bit
+>>> different but could make use of the infrastructure that is introduced
+>>> while fixing a+b). The main difference between a+b) and c) is that for
+>>> c) you have to introduce some policy. If the series were mine I'd first
+>>> do three commits that address a), b) and c) each. Then convert drivers
+>>> to it.
+>>
+>> The infrastructure needed for both a and b is the same, the actual
+>> code to implement either a or b is also touching the same functions
+>> and quite slim, so I think it may not be feasible to separate those
+>> in their own patches. But I'll think about it and see if logical
+>> separation makes sense.
+> Yeah, probably you have to actually try it to see if it's sensible.
+>
+>>> Guenter and I already said something similar, but I will eventually
+>>> repeat it here more explicitly: When introducing a midlayer that
+>>> abstracts between hardware and it's users the IMHO most important thing
+>>> to get right is to be explicit about which side of a midlayer you're
+>>> currently working at. That is, be explicit about watchdog_is_running:
+>>> Does it mean the hardware is running, or does userspace believe the
+>>> watchdog to be active? Same for timeout, stoppable etc.pp.
+>>
+>> Yes, I agree. Thanks for clarifying this. I will keep this in mind
+>> and try to be explicit when naming functions and variables. The best
+>> way would be to also rename the existing variables too, but that
+>> would also touch all the existing drivers. Keeping the current
+>> naming scheme in place no doubt is less explicit about which side of
+>> the new midlayer they are working on. But luckily the logic of the
+>> existing driver doesn't change, they are all exposing things
+>> directly to userland and they can be documented as is. The new
+>> variables and functions add interfaces only between the new midlayer
+>> and HW, so they are explicit as well. So I think it is a fair
+>> compromise to leave all existing interface towards the user space as
+>> is.
+> Maybe a good first step before addressing a+b+c) is to cleanup the
+> naming? Not sure how well this works though.
+>
 
-On 2015/5/6 15:29, Arnd Bergmann wrote:
-> On Wednesday 06 May 2015 14:56:58 Shannon Zhao wrote:
->> > On 2015/5/5 19:13, Shannon Zhao wrote:
->> >         gpio-keys {
->> >                 autorepeat;
->> >                 #address-cells = <0x1>;
->> >                 #size-cells = <0x0>;
->> >                 compatible = "gpio-keys";
->> > 
->> >                 poweroff {
->> >                         gpios = <0x8002 0x3 0x0>;
->> >                         linux,code = <0x74>;
->> >                         label = "GPIO Key Poweroff";
->> >                 };
->> >         };
->> > 
->> > Configure kernel to select GPIO Buttons and Polled GPIO buttons. Use a
->> > Redhat filesystem "Red Hat Enterprise Linux Server for ARM Development
->> > Preview release 1.5" which has systemd and systemd-logind. Start VM and
->> > when it starts well type "system_powerdown" on QEMU monitor, the guest
->> > goes to poweroff. So this way works.
-> Ok, very good.
-> 
->> > Note: we must check the /lib/udev/rules.d/70-power-switch.rules in the
->> > fs and add one following line in it if it doesn't exist.
->> > 
->> > SUBSYSTEM=="input", KERNEL=="event*", SUBSYSTEMS=="platform",
->> > ATTRS{keys}=="116", TAG+="power-switch"
->> > 
->> > Then when execute journalctl -u systemd-logind in guest, we can see
->> > something like below:
->> > 
->> > Jan 01 00:01:02 localhost systemd[1]: Starting Login Service...
->> > Jan 01 00:01:07 localhost systemd[1]: Started Login Service.
->> > Jan 01 00:01:07 localhost systemd-logind[927]: Watching system buttons
->> > on /dev/input/event0 (gpio-keys)
->> > Jan 01 00:01:07 localhost systemd-logind[927]: New seat seat0.
->> > Jan 01 00:01:25 localhost systemd-logind[927]: New session c1 of user root.
->> > 
->> > Visit https://bugs.launchpad.net/ubuntu/+source/systemd/+bug/1347776 for
->> > details.
-> How about Ubuntu or Debian releases that do not use systemd?
-> 
-> I guess we should check with a Debian Wheezy or Ubuntu Trusty release.
-> My guess is that it will work fine, but some minor adjustment might
-> be needed.
+I'm sure it can be done. I'll probably should use coccinelle to get it 
+right as I don't really trust sed alone is good enough.. And I may not 
+be able to compile test all drivers, let alone run any other testing. 
+There are 80+ drivers that I'd probably need to touch.. It is a lot of 
+code churn but still a trivial variable rename. If you are willing to 
+accept such a patch, then I will see how it can be done.
 
-Will check Debian Wheezy and Ubuntu Trusty release later.
-BTW, I don't have them on hand, where can I get these filesystem for ARM?
+Although, are there any other variables besides timeout and min_timeout 
+that we need to change? The timeout would become sw_timeout and 
+min_timeout would be hw_min_timeout. Maybe watchdog_active() could be 
+renamed to watchdog_device_open() and then add new watchdog_hw_running() 
+to check whether the watchdog HW really is running or not.
 
--- 
-Shannon
+So, two existing variable renames and one existing function rename. Or 
+if no rename, then just document thoroughly how they work now and avoid 
+excess code churn.
+
+>>> When you consider changing the unit the watchdog core is using, why not
+>>> change to nano seconds and 64 bit variables? You might be able to copy
+>>> some algorithms and ideas from the timer core that uses these.
+>>
+>> Yes, sounds like a good idea. I will look into it.
+> I wouldn't be surprised if you had to build a parallel watchdog device
+> model for that and assert that both work until all drivers are converted
+> to the new model. Sounds like fun :-)
+
+I just realized that we were talking about changing the time stamp model 
+for the core entirely, not just the new model... Which is much more 
+complicated. Damn.
+
+Well I will think about it. There is not much new that I'm adding here 
+now. I'm hoping it could be done so that we just need to fill couple of 
+new variables in the driver and call a new init function to set up the 
+rest of the parameters and then clean up unneeded functionality. And the 
+core changes are really not that big either.
+
+What I probably should do at least is to mark clearly or maybe factor 
+out the places where we deal with the old drivers and the deprecated 
+variables. Then this code could be removed easily once there no longer 
+is need for it. But I will keep on thinking it as I rework the series..
+
+Thanks,
+-Timo
