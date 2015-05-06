@@ -1,203 +1,105 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Wed, 06 May 2015 17:05:24 +0200
-Subject: [PATCH v2 02/17] leds: port locomo leds driver to new locomo core
-In-Reply-To: <1430178954-11138-3-git-send-email-dbaryshkov@gmail.com>
-References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
- <1430178954-11138-3-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <554A2DB4.3020000@samsung.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 6 May 2015 10:18:00 -0500
+Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150506141859.GC26028@red-moon>
+References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
+ <20150505155346.GJ1550@arm.com> <20150506141859.GC26028@red-moon>
+Message-ID: <CAErSpo7z_Sf5QvMa8MBY0f7DQOmwhcpUnCFG=ZsmHuwT2HouQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2015 01:55 AM, Dmitry Eremin-Solenikov wrote:
-> Adapt locomo leds driver to new locomo core setup.
+On Wed, May 6, 2015 at 9:18 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, May 05, 2015 at 04:53:46PM +0100, Will Deacon wrote:
+>> On Tue, May 05, 2015 at 03:02:12AM +0100, Jayachandran C wrote:
+>> > The current code in pci-host-generic.c uses pci_common_init_dev()
+>> > from the arch/arm/ to do a part of the PCI initialization, and this
+>> > prevents it from being used on arm64.
+>> >
+>> > The initialization done by pci_common_init_dev() that is really
+>> > needed by pci-host-generic.c can be done in the same file without
+>> > using the hw_pci API of ARM.
+>> >
+>> > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
+>> > this is be handled by setting up 'struct gen_pci' to embed a
+>> > pci_sys_data variable as the first element on the ARM platform.
+>> >
+>> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+>> > ---
+>> > Here's v2 of the patches, this enables use of pci-host-generic on
+>> > arm64.
+>> >
+>> > This has been tested on both qemu and fast model for arm64, and on
+>> > qemu for arm32.
+>> >
+>> > v1->v2
+>> >  - Address comments from Arnd Bergmann and Lorenzo Pieralisi
+>> >     - move contents of gen_pci_init to gen_pci_probe
+>> >     - assign resources only when !probe_only
+>> >  - tested on ARM32 with qemu option -M virt
+>>
+>> I tried this with an arm64 kernel running under kvmtool, but I get the
+>> following errors (a 32-bit ARM kernel does seem to work):
+>>
+>>   PCI host bridge /pci ranges:
+>>      IO 0x00000000..0x0000ffff -> 0x00000000
+>>     MEM 0x41000000..0x7fffffff -> 0x41000000
+>>   pci-host-generic 40000000.pci: PCI host bridge to bus 0000:00
+>>   pci_bus 0000:00: root bus resource [bus 00-01]
+>>   pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+>>   pci_bus 0000:00: root bus resource [mem 0x41000000-0x7fffffff]
+>>   pci_bus 0000:00: scanning bus
+>>   pci 0000:00:00.0: [1af4:1009] type 00 class 0xff0000
+>>   pci 0000:00:00.0: reg 0x10: [mem 0x41000000-0x410003ff]
+>>   pci 0000:00:00.0: reg 0x14: [io  0x6200-0x65ff]
+>>   pci 0000:00:00.0: reg 0x18: [mem 0x41000400-0x410005ff]
+>>   pci 0000:00:01.0: [1af4:1009] type 00 class 0xff0000
+>>   pci 0000:00:01.0: reg 0x10: [mem 0x41000800-0x41000bff]
+>>   pci 0000:00:01.0: reg 0x14: [io  0x6600-0x69ff]
+>>   pci 0000:00:01.0: reg 0x18: [mem 0x41000c00-0x41000dff]
+>>   pci_bus 0000:00: fixups for bus
+>>   pci_bus 0000:00: bus scan returning with max=00
+>>   pci 0000:00:00.0: fixup irq: got 10
+>>   pci 0000:00:00.0: assigning IRQ 10
+>>   pci 0000:00:01.0: fixup irq: got 11
+>>   pci 0000:00:01.0: assigning IRQ 11
+>>   virtio-pci 0000:00:00.0: can't enable device: BAR 0 [mem 0x41000000-0x410003ff] not claimed
+>>   virtio-pci: probe of 0000:00:00.0 failed with error -22
+>>   virtio-pci 0000:00:01.0: can't enable device: BAR 0 [mem 0x41000800-0x41000bff] not claimed
+>>   virtio-pci: probe of 0000:00:01.0 failed with error -22
 >
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
->   drivers/leds/Kconfig       |   1 -
->   drivers/leds/leds-locomo.c | 119 +++++++++++++++++++++++----------------------
->   2 files changed, 61 insertions(+), 59 deletions(-)
+> Ok, had a further look.
 >
-> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> index 966b960..4b4650b 100644
-> --- a/drivers/leds/Kconfig
-> +++ b/drivers/leds/Kconfig
-> @@ -79,7 +79,6 @@ config LEDS_LM3642
->   config LEDS_LOCOMO
->   	tristate "LED Support for Locomo device"
->   	depends on LEDS_CLASS
-> -	depends on SHARP_LOCOMO
+> Referring to this thread:
+>
+> https://lkml.org/lkml/2014/9/29/557
+>
+> By looking at other architectures code, resources should be claimed
+> (ie requested) even when PCI_PROBE_ONLY is set. Alpha, Sparc and PowerPC
+> seem to do that, in slightly different fashions.
+>
+> I do not think, as Bjorn mentioned, that PCI_PROBE_ONLY should be used
+> to prevent enabling resources through a PCI command, which is what
+> pci_enable_resources does.
+>
+> What we can do, is providing a generic PCI layer API that allows claiming
+> resources for a specific PCI bus, something similar if not identical
+> to what is done on alpha:
+>
+> arch/alpha/kernel/pci.c pcibios_claim_one_bus()
+>
+> that is not alpha specific at all. That way, we can use the API to claim
+> bus resources instead of assigning them on PCI_PROBE_ONLY (I *think*
+> that alpha calls pci_assign_unassigned_resources() even if
+> PCI_PROBE_ONLY is set, it should be safe since resources are claimed
+> first so IIUC the PCI layer would revert to FW BAR configuration on
+> assignment failure).
+>
+> Bjorn, any opinion on this ? Putting together a patch is easy when
+> we agree on the solution.
 
-Why do you remove this dependency?
+I would like claiming resources, i.e., pci_claim_resource(), to happen
+in the core instead of in arch code because it's not inherently
+arch-specific.  I don't think it should depend on PCI_PROBE_ONLY.
 
->   	help
->   	  This option enables support for the LEDs on Sharp Locomo.
->   	  Zaurus models SL-5500 and SL-5600.
-> diff --git a/drivers/leds/leds-locomo.c b/drivers/leds/leds-locomo.c
-> index 80ba048..7fde812 100644
-> --- a/drivers/leds/leds-locomo.c
-> +++ b/drivers/leds/leds-locomo.c
-> @@ -9,89 +9,92 @@
->    */
->
->   #include <linux/kernel.h>
-> -#include <linux/init.h>
-> -#include <linux/module.h>
-> -#include <linux/device.h>
->   #include <linux/leds.h>
-> -
-> -#include <mach/hardware.h>
-> -#include <asm/hardware/locomo.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/locomo.h>
-
-Please keep alphabetical order.
-
-> +
-> +struct locomo_led {
-> +	struct led_classdev led;
-> +	struct regmap *regmap;
-> +	unsigned int reg;
-> +};
->
->   static void locomoled_brightness_set(struct led_classdev *led_cdev,
-> -				enum led_brightness value, int offset)
-> +				enum led_brightness value)
->   {
-> -	struct locomo_dev *locomo_dev = LOCOMO_DEV(led_cdev->dev->parent);
-> -	unsigned long flags;
-> +	struct locomo_led *led = container_of(led_cdev, struct locomo_led, led);
->
-> -	local_irq_save(flags);
-> -	if (value)
-> -		locomo_writel(LOCOMO_LPT_TOFH, locomo_dev->mapbase + offset);
-> -	else
-> -		locomo_writel(LOCOMO_LPT_TOFL, locomo_dev->mapbase + offset);
-> -	local_irq_restore(flags);
-> +	regmap_write(led->regmap, led->reg,
-> +			value ? LOCOMO_LPT_TOFH : LOCOMO_LPT_TOFL);
->   }
-
-Please use work queue for setting brightness. This is required for the
-driver to be compatible with led triggers. You can refer to the
-existing LED drivers on how to implement this.
-
->
-> -static void locomoled_brightness_set0(struct led_classdev *led_cdev,
-> -				enum led_brightness value)
-> +static int locomo_led_register(
-> +		struct device *dev,
-> +		struct locomo_led *led,
-> +		const char *name,
-> +		const char *trigger,
-> +		struct regmap *regmap,
-> +		unsigned int reg)
->   {
-> -	locomoled_brightness_set(led_cdev, value, LOCOMO_LPT0);
-> +	led->led.name = name;
-> +	led->led.flags = LED_CORE_SUSPENDRESUME;
-> +	led->led.default_trigger = trigger;
-> +	led->led.brightness_set = locomoled_brightness_set;
-> +	led->regmap = regmap;
-> +	led->reg = reg;
-> +
-> +	return devm_led_classdev_register(dev, &led->led);
->   }
->
-> -static void locomoled_brightness_set1(struct led_classdev *led_cdev,
-> -				enum led_brightness value)
-> -{
-> -	locomoled_brightness_set(led_cdev, value, LOCOMO_LPT1);
-> -}
-> -
-> -static struct led_classdev locomo_led0 = {
-> -	.name			= "locomo:amber:charge",
-> -	.default_trigger	= "main-battery-charging",
-> -	.brightness_set		= locomoled_brightness_set0,
-> -};
-> -
-> -static struct led_classdev locomo_led1 = {
-> -	.name			= "locomo:green:mail",
-> -	.default_trigger	= "nand-disk",
-> -	.brightness_set		= locomoled_brightness_set1,
-> -};
-> -
-> -static int locomoled_probe(struct locomo_dev *ldev)
-> +static int locomoled_probe(struct platform_device *pdev)
->   {
->   	int ret;
-> -
-> -	ret = led_classdev_register(&ldev->dev, &locomo_led0);
-> +	struct locomo_led *leds;
-> +	struct regmap *regmap;
-> +
-> +	leds = devm_kzalloc(&pdev->dev, 2 * sizeof(*leds), GFP_KERNEL);
-> +	if (!leds)
-> +		return -ENOMEM;
-> +
-> +	regmap = dev_get_regmap(pdev->dev.parent, NULL);
-> +	if (!regmap)
-> +		return -ENODEV;
-> +
-> +	ret = locomo_led_register(
-> +			&pdev->dev,
-> +			leds,
-> +			"locomo:amber:charge",
-> +			"main-battery-charging",
-> +			regmap,
-> +			LOCOMO_LPT0);
->   	if (ret < 0)
->   		return ret;
->
-> -	ret = led_classdev_register(&ldev->dev, &locomo_led1);
-> +	ret = locomo_led_register(
-> +			&pdev->dev,
-> +			leds + 1,
-> +			"locomo:green:mail",
-> +			"mmc0",
-> +			regmap,
-> +			LOCOMO_LPT1);
->   	if (ret < 0)
-> -		led_classdev_unregister(&locomo_led0);
-> -
-> -	return ret;
-> -}
-> +		return ret;
->
-> -static int locomoled_remove(struct locomo_dev *dev)
-> -{
-> -	led_classdev_unregister(&locomo_led0);
-> -	led_classdev_unregister(&locomo_led1);
->   	return 0;
->   }
->
-> -static struct locomo_driver locomoled_driver = {
-> -	.drv = {
-> -		.name = "locomoled"
-> +static struct platform_driver locomoled_driver = {
-> +	.driver = {
-> +		.name = "locomo-led"
->   	},
-> -	.devid	= LOCOMO_DEVID_LED,
->   	.probe	= locomoled_probe,
-> -	.remove	= locomoled_remove,
->   };
->
-> -static int __init locomoled_init(void)
-> -{
-> -	return locomo_driver_register(&locomoled_driver);
-> -}
-> -module_init(locomoled_init);
-> +module_platform_driver(locomoled_driver);
->
->   MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
->   MODULE_DESCRIPTION("Locomo LED driver");
->   MODULE_LICENSE("GPL");
-> +MODULE_ALIAS("platform:locomo-led");
->
-
-
--- 
-Best Regards,
-Jacek Anaszewski
+Bjorn
