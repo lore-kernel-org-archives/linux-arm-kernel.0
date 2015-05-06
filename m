@@ -1,49 +1,127 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Wed, 6 May 2015 13:05:05 +0100
-Subject: [PATCH 0/5] Second round of MCPM refactoring
-In-Reply-To: <1430496392-15956-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1430496392-15956-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20150506120504.GD3870@e103592.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 6 May 2015 14:07:22 +0200
+Subject: [PATCH v2] mmc: sdhci-esdhc-imx: fix abort due to missing runtime
+ PM
+In-Reply-To: <1427715434-20881-1-git-send-email-stefan@agner.ch>
+References: <1427715434-20881-1-git-send-email-stefan@agner.ch>
+Message-ID: <CAPDyKFo+6mA4aKWfrUWmPvdairJN6KMCD0XTe3HDDB2pirEJXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 01, 2015 at 05:06:27PM +0100, Nicolas Pitre wrote:
-> This is the sequel to the first episode that started here:
-> 
-> 	http://article.gmane.org/gmane.linux.ports.arm.kernel/401353
-> 
-> Now that most of the first set has been merged upstream, here's the last
-> set to complete the cleanup. This mainly includes the removal of the
-> backward compatibility support plus some cosmetic changes.
-> 
-> The hisi04 backend, though, is instead converted to raw SMP operations
-> as it currently doesn't benefit from MCPM at all and doesn't fit well
-> with the new backend structure.
-> 
-> This series can also be obtained from the following Git repository:
-> 
-> 	http://git.linaro.org/people/nicolas.pitre/linux.git mcpm
-> 
-> The diffstat shows more code removal again:
+On 30 March 2015 at 13:37, Stefan Agner <stefan@agner.ch> wrote:
+> When entering suspend while the device is in runtime PM, the
+> sdhci_(suspend|resume)_host function are called with disabled clocks.
+> Since this functions access the SDHC host registers, this leads to an
+> external abort on Vybrid SoC:
+>
+> [   37.772967] Unhandled fault: imprecise external abort (0x1c06) at 0x76f5f000
+> [   37.780304] Internal error: : 1c06 [#1] ARM
+> [   37.784670] Modules linked in:
+> [   37.787908] CPU: 0 PID: 428 Comm: sh Not tainted 3.18.0-rc5-00119-geefd097-dirty #1540
+> [   37.796142] task: 8e246c00 ti: 8ca6c000 task.ti: 8ca6c000
+> [   37.801785] PC is at esdhc_writel_le+0x40/0xec
+> [   37.806431] LR is at sdhci_set_card_detection+0xe0/0xe4
+> [   37.811877] pc : [<803f0584>]    lr : [<803eaaa0>]    psr: 400f0013
+> [   37.811877] sp : 8ca6dd28  ip : 00000001  fp : 8ca6dd3c
+> [   37.823766] r10: 807a233c  r9 : 00000000  r8 : 8e8b7210
+> [   37.829194] r7 : 802d8a08  r6 : 8082e928  r5 : 00000000  r4 : 00000002
+> [   37.835974] r3 : 8ea34e90  r2 : 00000038  r1 : 00000000  r0 : 8ea32ac0
+> ...
+>
+> Clocks need to be enabled to access the registers. Fix the issue by
+> add driver specific implementation of suspend/resume functions which
+> take care of clocks using runtime PM API.
+>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Good stuff.
+Hi Stefan,
 
-FWIW: except for the hip04 patch which I'll leave to the relevant
-maintainer,
+Sorry for the delay.
 
-Acked-by: Dave Martin <Dave.Martin@arm.com>
+Indeed sdhci seems to have some issues when combining runtime PM and system PM.
 
-I have not reviewed this stuff in detail, but it looks like sensible
-cleanup to me.
+> ---
+> The first version of this patch was part of a patchset sent back in
+> december. While the second patch of the patchset back then is invalid,
+> this fix is required to avoid the abort when switching into suspend
+> mode on Vybrid SoC.
+>
+> During review of this patch I realized that my proposed solution to
+> fix this in the suspend/resume functions in sdhci-pltfm.c is not a
+> good idea since a lot of drivers use this functions without using the
+> runtime PM APIs.
+>
+> Changes since v1:
+> - Create new sdhci_esdhc_(suspend|resume) functions in favor of adding a
+>   hard requirement for runtime PM on SDHC platform implementations
+>
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 28 +++++++++++++++++++++++++++-
+>  1 file changed, 27 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 10ef824..84b3365 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -1119,6 +1119,32 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
+>  }
+>
+>  #ifdef CONFIG_PM
+> +static int sdhci_esdhc_suspend(struct device *dev)
+> +{
+> +       int ret;
+> +       struct sdhci_host *host = dev_get_drvdata(dev);
+> +
+> +       pm_runtime_get_sync(dev);
 
-Cheers
----Dave
+This is indeed needed, since else it isn't safe to invoke sdhci_suspend_host().
 
-> 
->  arch/arm/common/mcpm_entry.c         | 281 +++++++++++++----------------
->  arch/arm/include/asm/mcpm.h          |  73 +++-----
->  arch/arm/mach-exynos/suspend.c       |   8 +-
->  arch/arm/mach-hisi/platmcpm.c        | 127 +++++--------
->  drivers/cpuidle/cpuidle-big_little.c |   8 +-
->  5 files changed, 198 insertions(+), 299 deletions(-)
-> 
+> +       ret = sdhci_suspend_host(host);
+> +       pm_runtime_mark_last_busy(dev);
+> +       pm_runtime_put_autosuspend(dev);
+
+The problem is, that this wont do what you think I believe.
+
+The device will be kept runtime PM resumed, since the PM core has
+increased a runtime PM reference count for your device, in the
+->prepare() phase (pm_runtime_get_noresume()).
+
+Potentially pm_runtime_force_suspend() could help you accomplish what you want.
+
+> +
+> +       return ret;
+> +}
+> +
+> +static int sdhci_esdhc_resume(struct device *dev)
+> +{
+> +       int ret;
+> +       struct sdhci_host *host = dev_get_drvdata(dev);
+> +
+> +       pm_runtime_get_sync(dev);
+> +       ret = sdhci_resume_host(host);
+> +       pm_runtime_mark_last_busy(dev);
+> +       pm_runtime_put_autosuspend(dev);
+> +
+
+Similar comments as above.
+
+> +       return ret;
+> +}
+> +
+>  static int sdhci_esdhc_runtime_suspend(struct device *dev)
+>  {
+>         struct sdhci_host *host = dev_get_drvdata(dev);
+> @@ -1154,7 +1180,7 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
+>  #endif
+>
+>  static const struct dev_pm_ops sdhci_esdhc_pmops = {
+> -       SET_SYSTEM_SLEEP_PM_OPS(sdhci_pltfm_suspend, sdhci_pltfm_resume)
+> +       SET_SYSTEM_SLEEP_PM_OPS(sdhci_esdhc_suspend, sdhci_esdhc_resume)
+>         SET_RUNTIME_PM_OPS(sdhci_esdhc_runtime_suspend,
+>                                 sdhci_esdhc_runtime_resume, NULL)
+>  };
+> --
+> 2.3.3
+>
+
+Kind regards
+Uffe
