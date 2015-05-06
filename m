@@ -1,56 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 5 May 2015 22:56:53 -0700
-Subject: [PATCH v2 0/8] clk: Minor cleanups
-In-Reply-To: <1430196383-9190-1-git-send-email-k.kozlowski@samsung.com>
-References: <1430196383-9190-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20150506055653.GF10871@codeaurora.org>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 6 May 2015 08:45:15 +0200
+Subject: [PATCH v3 5/5] MAINTAINERS: Add pci-st.c to ARCH/STI architecture
+In-Reply-To: <20150505214225.GC24643@google.com>
+References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1428657168-12495-6-git-send-email-gabriel.fernandez@linaro.org>
+ <20150505214225.GC24643@google.com>
+Message-ID: <5549B87B.709@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28, Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> 
-> Changes since v1
-> ================
-> 1. Rebase on next-20150427 and Sascha Hauer's:
->    clk: make strings in parent name arrays const [1]
-> 2. Add patch "clk: tegra: Fix inconsistent indenting".
-> 
-> 
-> Description and dependencies
-> ============================
-> Small cleanups for different clock drivers.
-> 
-> The first three patches are independent.
-> 
-> Rest of the patches (these related to constifying parent names,
-> including the change for MIPS) depend on the "clk: make strings in
-> parent name arrays const" from Sascha Hauer [1].
-> 
-> 
-> Tested on Arndale Octa (Exynos5420) and Trats2 (Exynos4412). Other
-> drivers (and MIPS related) only compile tested plus some static
-> checkers.
-> 
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg413763.html
-> 
-> Best regards,
-> Krzysztof
-> 
-> Krzysztof Kozlowski (8):
->   clk: rockchip: Staticize file-scope declarations
->   clk: exynos: Staticize file-scope declarations
->   clk: tegra: Fix inconsistent indenting
->   clk: tegra: Fix duplicate const for parent names
->   clk: cdce706: Constify parent names in clock init data
->   clk: sirf: Constify parent names in clock init data
->   clk: ls1x: Fix duplicate const for parent names
->   MIPS: Alchemy: Remove unneeded cast removing const
+Hello Bjorn,
 
-Applied 1,2,5,6,7 to clk-next
+On 05/05/2015 11:42 PM, Bjorn Helgaas wrote:
+> On Fri, Apr 10, 2015 at 11:12:48AM +0200, Gabriel FERNANDEZ wrote:
+>> This patch adds the pci-st.c pci driver found on STMicroelectronics
+>> SoC's into the STI arch section of the maintainers file.
+>>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> I'd like an ack from the current maintainers:
+>
+>    ARM/STI ARCHITECTURE
+>    M:      Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+>    M:      Maxime Coquelin <maxime.coquelin@st.com>
+>    M:      Patrice Chotard <patrice.chotard@st.com>
+>
+> that they're OK with taking on this additional file.
+Yes, you can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+Maxime
