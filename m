@@ -1,40 +1,88 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 6 May 2015 16:55:47 -0700
-Subject: [PATCH 2/2] input: s3c2410_ts: Constify platform_device_id
-In-Reply-To: <1430495587-31762-2-git-send-email-k.kozlowski.k@gmail.com>
-References: <1430495587-31762-1-git-send-email-k.kozlowski.k@gmail.com>
- <1430495587-31762-2-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <20150506235547.GF5580@dtor-ws>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 7 May 2015 01:58:53 +0200
+Subject: [V2 PATCH 3/5] device property: Introduces
+ device_dma_is_coherent()
+In-Reply-To: <554AA94D.6020503@amd.com>
+References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1430838729-21572-4-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <554AA94D.6020503@amd.com>
+Message-ID: <CAJZ5v0gbSFrjce0oZwxOiGYVwx+bp3hJ+YghgO75dyf3iuiWYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 02, 2015 at 12:53:07AM +0900, Krzysztof Kozlowski wrote:
-> The platform_device_id is not modified by the driver and core uses it as
-> const.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
-> ---
->  drivers/input/touchscreen/s3c2410_ts.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
-> index bdfa27dc097b..a4a103e1d11b 100644
-> --- a/drivers/input/touchscreen/s3c2410_ts.c
-> +++ b/drivers/input/touchscreen/s3c2410_ts.c
-> @@ -411,7 +411,7 @@ static const struct dev_pm_ops s3c_ts_pmops = {
->  };
->  #endif
->  
-> -static struct platform_device_id s3cts_driver_ids[] = {
-> +static const struct platform_device_id s3cts_driver_ids[] = {
->  	{ "s3c2410-ts", 0 },
->  	{ "s3c2440-ts", 0 },
->  	{ "s3c64xx-ts", FEAT_PEN_IRQ },
-> -- 
-> 2.1.4
-> 
+On Thu, May 7, 2015 at 1:52 AM, Suravee Suthikulanit
+<suravee.suthikulpanit@amd.com> wrote:
+> Rafael,
+>
+> Any comments on this patch?
 
-Applied both, thank you.
+Well, as long as acpi_dma_is_coherent() does the right thing on all
+architectures, I have no objections.
 
--- 
-Dmitry
+Thanks,
+Rafael
+
+
+> On 5/5/2015 10:12 AM, Suravee Suthikulpanit wrote:
+>>
+>> Currently, device drivers, which support both OF and ACPI,
+>> need to call two separate APIs, of_dma_is_coherent() and
+>> acpi_dma_is_coherent()) to determine device coherency attribute.
+>>
+>> This patch simplifies this process by introducing a new device
+>> property API, device_dma_is_coherent(), which calls the appropriate
+>> interface based on the booting architecture.
+>>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> ---
+>>   drivers/base/property.c  | 12 ++++++++++++
+>>   include/linux/property.h |  2 ++
+>>   2 files changed, 14 insertions(+)
+>>
+>> diff --git a/drivers/base/property.c b/drivers/base/property.c
+>> index 1d0b116..8123c6e 100644
+>> --- a/drivers/base/property.c
+>> +++ b/drivers/base/property.c
+>> @@ -14,6 +14,7 @@
+>>   #include <linux/export.h>
+>>   #include <linux/kernel.h>
+>>   #include <linux/of.h>
+>> +#include <linux/of_address.h>
+>>   #include <linux/property.h>
+>>
+>>   /**
+>> @@ -519,3 +520,14 @@ unsigned int device_get_child_node_count(struct
+>> device *dev)
+>>         return count;
+>>   }
+>>   EXPORT_SYMBOL_GPL(device_get_child_node_count);
+>> +
+>> +bool device_dma_is_coherent(struct device *dev)
+>> +{
+>> +       if (IS_ENABLED(CONFIG_OF) && dev->of_node)
+>> +               return of_dma_is_coherent(dev->of_node);
+>> +       else if (has_acpi_companion(dev))
+>> +               return acpi_dma_is_coherent(acpi_node(dev->fwnode));
+>> +
+>> +       return false;
+>> +}
+>> +EXPORT_SYMBOL_GPL(device_dma_is_coherent);
+>> diff --git a/include/linux/property.h b/include/linux/property.h
+>> index de8bdf4..76ebde9 100644
+>> --- a/include/linux/property.h
+>> +++ b/include/linux/property.h
+>> @@ -164,4 +164,6 @@ struct property_set {
+>>
+>>   void device_add_property_set(struct device *dev, struct property_set
+>> *pset);
+>>
+>> +bool device_dma_is_coherent(struct device *dev);
+>> +
+>>   #endif /* _LINUX_PROPERTY_H_ */
+>>
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
