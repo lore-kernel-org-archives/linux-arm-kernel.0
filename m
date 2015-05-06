@@ -1,17 +1,15 @@
 From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Wed, 06 May 2015 14:20:40 -0600
-Subject: [PATCH v4 4/7] selftest/x86: build both bitnesses
-In-Reply-To: <1429656693-9937-1-git-send-email-tyler.baker@linaro.org>
-References: <1429656693-9937-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <554A7798.4070502@osg.samsung.com>
+Date: Wed, 06 May 2015 14:21:31 -0600
+Subject: [PATCH v4 5/7] selftest/x86: have no dependency on all when cross
+ building
+In-Reply-To: <1429656705-10016-1-git-send-email-tyler.baker@linaro.org>
+References: <1429656705-10016-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <554A77CB.9080802@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/21/2015 04:51 PM, Tyler Baker wrote:
-> Using uname with the processor flag option in some cases can yield 'unknown'
-> so lets use the machine flag option as it is deterministic. Add a dependency
-> for all_32 when building on a x86 64 bit host so that both bitnesses are
-> built in this case.
+> If the CROSS_COMPILE is set remove all's dependency on all_32 and all_64.
 > 
 > Cc: Andy Lutomirski <luto@amacapital.net>
 > Acked-by: Andy Lutomirski <luto@kernel.org>
@@ -23,6 +21,7 @@ until x86 always build 32 breaking make kselftest target.
 
 thanks,
 -- Shuah
+
 
 -- 
 Shuah Khan
