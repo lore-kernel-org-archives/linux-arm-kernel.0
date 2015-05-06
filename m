@@ -1,63 +1,59 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 06 May 2015 13:31:36 +0200
-Subject: [GIT PULL] ARM: rockchip: some soc-level fixes for 4.1
-In-Reply-To: <1612786.HeTW0LsLmg@diego>
-References: <1612786.HeTW0LsLmg@diego>
-Message-ID: <1557869.mraOU6BI4b@diego>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 May 2015 12:33:13 +0100
+Subject: [PATCH 5/6] ARM: re-implement physical address space switching
+In-Reply-To: <20150506103736.GA707@leverpostej>
+References: <20150408094438.GM12732@n2100.arm.linux.org.uk>
+ <E1YfmY6-0006X3-1N@rmk-PC.arm.linux.org.uk>
+ <20150408173656.GF5977@leverpostej>
+ <20150408175533.GN12732@n2100.arm.linux.org.uk>
+ <552C14F0.7020006@oracle.com> <20150415120738.GD2866@leverpostej>
+ <552E9F9B.2040400@oracle.com> <20150423112449.GB17361@leverpostej>
+ <20150506101850.GE2067@n2100.arm.linux.org.uk>
+ <20150506103736.GA707@leverpostej>
+Message-ID: <20150506113313.GS2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Wed, May 06, 2015 at 11:37:37AM +0100, Mark Rutland wrote:
+> Hi Russell,
+> 
+> > > It turns out that I was incorrect in my assertion, and the reordering I
+> > > suggested above can't happen. The ARMv7 ARM states:
+> > > 
+> > > 	Any direct write to a system control register is guaranteed not
+> > > 	to affect any instruction that appears, in program
+> > > 	order, before the instruction that performed the direct write
+> > > 
+> > > Which means that the STMFD cannot be affected by the later cp15 write to
+> > > the SCTLR, and so the DSB does not need to be moved before the MCR.
+> > > 
+> > > I apologise for adding to the confusion there.
+> > 
+> > So does this mean this patch gets an ack now?
+> 
+> I assumed there was going to be a respin for the CR_W change?
+> 
+> There's also the dodginess w.r.t. the page table walkers that I can't
+> see is solvable short of disabling the MMU prior to the flush, though I
+> understand you've NAKed that approach.
 
-Am Samstag, 25. April 2015, 02:11:14 schrieb Heiko St?bner:
-> I've collected some fixes which might be appropriate for 4.1-rc,
-> so if they're ok, please pull.
+Why?  Are you saying that after:
 
-is somebody doing arm-soc fixes for 4.1?
-I currently don't see any activity at all and this pull is open for two weeks 
-now?
++       mrc     p15, 0, r8, c1, c0, 0           @ read control reg
++       bic     ip, r8, #CR_M                   @ disable caches and MMU
++       mcr     p15, 0, ip, c1, c0, 0
++       dsb
++       isb
 
+the page table walkers are still actively walking the page table?
 
-Heiko
+That to me sounds like a hardware bug.  The point of this is to shut
+down the MMU, _then_ update the page tables, and _then_ to re-enable
+the MMU to explicitly avoid problems with the page table walkers.
 
+>From what you're saying, this is just not possible, and we should
+just throw Keystone SoCs in the bin...
 
-> 
-> Thanks
-> Heiko
-> 
-> 
-> The following changes since commit a0307d186f5015ee3d77e209e5c06190cbf02478:
-> 
->   ARM: rockchip: disable watchdog during suspend (2015-03-11 22:41:02 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git
-> tags/v4.1-rockchip-socfixes1
-> 
-> for you to fetch changes up to 2a9fe3ca84afff6259820c4f62e579f41476becc:
-> 
->   rockchip: make sure timer7 is enabled on rk3288 platforms (2015-04-16
-> 21:22:17 +0200)
-> 
-> ----------------------------------------------------------------
-> Two fixes from Chris Zhong, fixing some suspend oddities.
-> And I've given up on the timer7 issue. While I initially thought
-> devices would either have both the grave mmu issue requiring a uboot
-> update and the timer7 issue or none, it looks like in all units in the
-> field the mmu issue got fixed while the timer7 issue stayed on.
-> So instead of making everybody wanting to use mainline jump through a
-> hoop just make sure timer7 is on on boot before we init the arch-timer.
-> 
-> ----------------------------------------------------------------
-> Chris Zhong (2):
->       ARM: rockchip: disable dapswjdp during suspend
->       ARM: rockchip: fix undefined instruction of reset_ctrl_regs
-> 
-> Heiko Stuebner (1):
->       rockchip: make sure timer7 is enabled on rk3288 platforms
-> 
->  arch/arm/mach-rockchip/pm.c       | 33 +++++++++++++++++++++++++++++++++
->  arch/arm/mach-rockchip/pm.h       |  8 ++++++++
->  arch/arm/mach-rockchip/rockchip.c | 19 +++++++++++++++++++
->  3 files changed, 60 insertions(+)
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
