@@ -1,72 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 6 May 2015 14:22:00 +0200
-Subject: [PATCH 1/6] ARM: sunxi: Introduce Allwinner H3 support
-In-Reply-To: <5549EBB5.8040806@gmail.com>
-References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
- <1430904693-1404-2-git-send-email-jenskuske@gmail.com>
- <20150506100446.GA11057@lukather> <5549EBB5.8040806@gmail.com>
-Message-ID: <20150506122200.GE11057@lukather>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 6 May 2015 14:41:54 +0200
+Subject: [PATCH v5 1/1] arm64: dts: Add the arasan sdhc nodes in
+ apm-storm.dtsi.
+In-Reply-To: <2568634.iEosTvMJpM@wuerfel>
+References: <1430817426-5241-1-git-send-email-stripathi@apm.com>
+ <4635229.bceBxngCoe@wuerfel> <5549C68B.9090602@xilinx.com>
+ <2568634.iEosTvMJpM@wuerfel>
+Message-ID: <554A0C12.7080702@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 12:23:49PM +0200, Jens Kuske wrote:
-> On 06/05/15 12:04, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > On Wed, May 06, 2015 at 11:31:28AM +0200, Jens Kuske wrote:
-> >> The Allwinner H3 is a quad-core Cortex-A7-based SoC. It is very similar
-> >> to other sun8i family SoCs like the A23.
-> >>
-> >> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
-> >>  arch/arm/mach-sunxi/Kconfig                     | 2 +-
-> >>  arch/arm/mach-sunxi/sunxi.c                     | 3 ++-
-> >>  3 files changed, 4 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> >> index 42941fd..3cb4b94 100644
-> >> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> >> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> >> @@ -9,4 +9,5 @@ using one of the following compatible strings:
-> >>    allwinner,sun6i-a31
-> >>    allwinner,sun7i-a20
-> >>    allwinner,sun8i-a23
-> >> +  allwinner,sun8i-h3
-> >>    allwinner,sun9i-a80
-> >> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> >> index 81502b9..47ac5b4 100644
-> >> --- a/arch/arm/mach-sunxi/Kconfig
-> >> +++ b/arch/arm/mach-sunxi/Kconfig
-> >> @@ -35,7 +35,7 @@ config MACH_SUN7I
-> >>  	select SUN5I_HSTIMER
-> >>  
-> >>  config MACH_SUN8I
-> >> -	bool "Allwinner A23 (sun8i) SoCs support"
-> >> +	bool "Allwinner A23 / H3 (sun8i) SoCs support"
-> > 
-> > I'd prefer that we have something similar to sun9i, just mentionning
-> > the family here, instead of an ever-growing list of SoCs.
-> > 
-> > This used to be easy to maintain, with the new naming scheme, we
-> > already have at least 4 SoCs part of sun8i.
+On 05/06/2015 10:40 AM, Arnd Bergmann wrote:
+> On Wednesday 06 May 2015 09:45:15 Michal Simek wrote:
+>> On 05/06/2015 09:31 AM, Arnd Bergmann wrote:
+>>> On Wednesday 06 May 2015 10:41:07 Suman Tripathi wrote:
+>>>>>> @@ -533,6 +567,16 @@
+>>>>>>                         interrupts = <0x0 0x4f 0x4>;
+>>>>>>                 };
+>>>>>>
+>>>>>> +               sdhc0: sdhc at 1c000000 {
+>>>>>> +                       device_type = "sdhc";
+>>>>>
+>>>>> device_type generally should not be used (there are a few exceptions).
+>>>>
+>>>> Okay !!
+>>>>
+>>>
+>>> While we're at it, please change sdhc at 1c000000 to mmc at 1c000000.
+>>> Even though Linux does not care, we try to use the standard device
+>>> names for consistency.
+>>
+>> Do we have a list of these names somewhere?
+>> Normally I do use ePARP - generic names recommendation but mmc or sdhci
+>> are not listed there.
+>> Both combination mmc@ or sdhci@ are used in the kernel.
+>>
+>> On zynq and zynqmp we do use shdci at .
+>>
 > 
-> According to Allwinners new naming scheme A20/A31/A31s are also part of
-> sun8i (sun8iw[1,2]), but I think we can agree to use sun8i for the new
-> SoCs, starting from A23.
+> Ah, I thought ePAPR listed mmc already. Using "sdhci" is a little too
+> specific here, since a lot of mmc hosts are not sdhci compliant, and
+> "sdhc" is completely wrong, because that identifies a specific card
+> type, but a host that supports SDHC cards will generally also work
+> with SD (less than 4GB) or SDXC (more than 48GB) cards.
 
-Yep, we can't really change the family half-way, and using sun8i for
-the newer SoCs (A23, A33, A83, H3, V*, etc.) works just as well.
+Yes "sdhc" is completely wrong.
 
+Based on our datasheet(also version used on Zynq and ZynqMP) this IP is
+compliant with SD HC 3.00, SDIO 3.0, SD MC 3.01 SD MCS 1.01, MMC 4.51.
+Not sure about the version which they use.
+Also not sure which spec the IP should have to be able to say that we
+can use sdhci name. Do you have exact SPEC name?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150506/32569df5/attachment.sig>
+Thanks,
+Michal
