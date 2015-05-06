@@ -1,52 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 May 2015 11:30:00 +0100
-Subject: [PATCH v2 0/7] Fix Keystone 2 physical address switch
-Message-ID: <20150506103000.GF2067@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Wed, 06 May 2015 11:30:40 +0100
+Subject: [PATCH 4/7] ARM: keystone2: rename init_meminfo to pv_fixup
+In-Reply-To: <20150506103000.GF2067@n2100.arm.linux.org.uk>
+References: <20150506103000.GF2067@n2100.arm.linux.org.uk>
+Message-ID: <E1YpwbA-0000wZ-9A@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some time, the Keystone 2 physical address switch has been
-tainting the kernel ever since we decided that it was not safe.
+The init_meminfo() method is not about initialising meminfo - it's about
+fixing up the physical to virtual translation so that we use a different
+physical address space, possibly above the 4GB physical address space.
+Therefore, the name "init_meminfo()" is confusing.
 
-This series re-works the address switch to be compliant architecturally.
+Rename it to pv_fixup() instead.
 
-There's still a niggle in the keystone2 code, where we set the
-arch_virt_to_idmap function pointer in keystone_pv_fixup() - something
-I'd ideally like to avoid.
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/mach/arch.h  | 2 +-
+ arch/arm/mach-keystone/keystone.c | 4 ++--
+ arch/arm/mm/mmu.c                 | 8 ++++----
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-I'm in two minds about how much of this code should be in SoC specific
-code, and how much should be in generic code - on one hand, I don't
-want to give a green light to this kind of sillyness by encouraging
-it, but I'd rather not end up with multiple implementations of this.
-
-I've incorporated my change to the update of the PV offset constants
-into this series, and included the 7th patch in this set which I think
-is worth having - it's quite a large patch which gets rid of the TTBR1
-setting that Keystone has to do.  We basically pass the full 64-bits
-for TTBR0 in the assembly code so that Keystone doesn't have to re-set
-the page table pointer after secondary CPU initialisation.  That needs
-us to juggle around some registers in the assembly code.
-
- arch/arm/include/asm/mach/arch.h  |   2 +-
- arch/arm/include/asm/memory.h     |  16 ----
- arch/arm/include/asm/proc-fns.h   |   7 --
- arch/arm/include/asm/smp.h        |   2 +-
- arch/arm/kernel/head-nommu.S      |   2 +-
- arch/arm/kernel/head.S            |  42 ++++++++---
- arch/arm/kernel/setup.c           |   7 +-
- arch/arm/kernel/smp.c             |  10 ++-
- arch/arm/mach-keystone/keystone.c |  41 +++++-----
- arch/arm/mach-keystone/platsmp.c  |  13 ----
- arch/arm/mm/Kconfig               |   4 +
- arch/arm/mm/Makefile              |   1 +
- arch/arm/mm/mmu.c                 | 153 ++++++++++++++++----------------------
- arch/arm/mm/nommu.c               |   9 ---
- arch/arm/mm/proc-v7-2level.S      |   6 +-
- arch/arm/mm/proc-v7-3level.S      |  14 ++--
- arch/arm/mm/proc-v7.S             |  26 +++----
- arch/arm/mm/pv-fixup-asm.S        |  88 ++++++++++++++++++++++
- 18 files changed, 239 insertions(+), 204 deletions(-)
-
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index e881913f7c3e..cb3a40717edd 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -51,7 +51,7 @@ struct machine_desc {
+ 	bool			(*smp_init)(void);
+ 	void			(*fixup)(struct tag *, char **);
+ 	void			(*dt_fixup)(void);
+-	long long		(*init_meminfo)(void);
++	long long		(*pv_fixup)(void);
+ 	void			(*reserve)(void);/* reserve mem blocks	*/
+ 	void			(*map_io)(void);/* IO mapping function	*/
+ 	void			(*init_early)(void);
+diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+index af8c92bc8188..e288010522f9 100644
+--- a/arch/arm/mach-keystone/keystone.c
++++ b/arch/arm/mach-keystone/keystone.c
+@@ -68,7 +68,7 @@ static phys_addr_t keystone_virt_to_idmap(unsigned long x)
+ 	return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET + KEYSTONE_LOW_PHYS_START;
+ }
+ 
+-static long long __init keystone_init_meminfo(void)
++static long long __init keystone_pv_fixup(void)
+ {
+ 	long long offset;
+ 	phys_addr_t mem_start, mem_end;
+@@ -108,5 +108,5 @@ DT_MACHINE_START(KEYSTONE, "Keystone")
+ 	.smp		= smp_ops(keystone_smp_ops),
+ 	.init_machine	= keystone_init,
+ 	.dt_compat	= keystone_match,
+-	.init_meminfo   = keystone_init_meminfo,
++	.pv_fixup	= keystone_pv_fixup,
+ MACHINE_END
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 91262d28a4c9..0e5ed87221dd 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1404,7 +1404,7 @@ void __init early_paging_init(const struct machine_desc *mdesc,
+ 	phys_addr_t phys;
+ 	int i;
+ 
+-	if (!(mdesc->init_meminfo))
++	if (!mdesc->pv_fixup)
+ 		return;
+ 
+ 	/* remap kernel code and data */
+@@ -1420,7 +1420,7 @@ void __init early_paging_init(const struct machine_desc *mdesc,
+ 	pudk = pud_offset(pgdk, map_start);
+ 	pmdk = pmd_offset(pudk, map_start);
+ 
+-	offset = mdesc->init_meminfo();
++	offset = mdesc->pv_fixup();
+ 	if (offset == 0)
+ 		return;
+ 
+@@ -1514,10 +1514,10 @@ void __init early_paging_init(const struct machine_desc *mdesc,
+ {
+ 	long long offset;
+ 
+-	if (!mdesc->init_meminfo)
++	if (!mdesc->pv_fixup)
+ 		return;
+ 
+-	offset = mdesc->init_meminfo();
++	offset = mdesc->pv_fixup();
+ 	if (offset == 0)
+ 		return;
+ 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.3.1
