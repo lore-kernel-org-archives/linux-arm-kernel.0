@@ -1,31 +1,62 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 6 May 2015 07:29:35 +0200
-Subject: [PATCH 01/12] net: axienet: Support for RGMII
-In-Reply-To: <20150505.193520.1238479814165419495.davem@davemloft.net>
-References: <7fb84f65a61bbe0fdb4b61a871cf4d4f7910955d.1430817941.git.michal.simek@xilinx.com>
- <20150505.193520.1238479814165419495.davem@davemloft.net>
-Message-ID: <5549A6BF.1030205@xilinx.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 5 May 2015 22:35:39 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix bogus struct clk comparison for timer
+ clock
+In-Reply-To: <1430848941-27106-1-git-send-email-tony@atomide.com>
+References: <1430848941-27106-1-git-send-email-tony@atomide.com>
+Message-ID: <20150506053539.GA10871@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-On 05/06/2015 01:35 AM, David Miller wrote:
+On 05/05, Tony Lindgren wrote:
+> With recent changes to use determine_rate, the comparison of two
+> clocks won't work without doing __clk_get_hw on the clocks
+> first.
 > 
-> Series applied to net-next.
+> Cc: Michael Turquette <mturquette@linaro.org>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+> 
+> Found one more of these, the coccinelle scripts do not seem
+> to match this?
 
-Thanks.
+I don't think the coccinelle script was ever merged...
 
 > 
-> Next time, you should give an initial "[PATCH 00/nn] " posting
-> describing overall at a high level what the series is doing.
+> ---
+>  arch/arm/mach-omap2/timer.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> That way I can use that information in the commit message of
-> a merge commit for your series, and also have one posting I
-> can reply to in order to give high level feedback or to simply
-> say I applied everything.
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index cef67af..22c7a8e 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -35,6 +35,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/clockchips.h>
+> +#include <linux/clk-provider.h>
+>  #include <linux/slab.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> @@ -298,7 +299,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+>  	if (IS_ERR(src))
+>  		return PTR_ERR(src);
+>  
+> -	if (clk_get_parent(timer->fclk) != src) {
+> +	if (__clk_get_hw(clk_get_parent(timer->fclk)) != __clk_get_hw(src)) {
 
-Will do.
+Please use clk_is_match() instead so we can find these instances
+with an easy grep.
 
-Thanks,
-Michal
+>  		r = clk_set_parent(timer->fclk, src);
+>  		if (r < 0) {
+>  			pr_warn("%s: %s cannot set source\n", __func__,
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
