@@ -1,66 +1,31 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 6 May 2015 08:29:14 -0500
-Subject: [PATCH v3 3/5] PCI: st: Provide support for the sti PCIe
- controller
-In-Reply-To: <CAG374jAv9aHBPGV+x+xs2MyRGz+fw1ymwu78fqNXDPtPqehgZA@mail.gmail.com>
-References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
- <1428657168-12495-4-git-send-email-gabriel.fernandez@linaro.org>
- <20150505221646.GE24643@google.com>
- <CAG374jAv9aHBPGV+x+xs2MyRGz+fw1ymwu78fqNXDPtPqehgZA@mail.gmail.com>
-Message-ID: <CAErSpo7_ev1oYptvBObK2dS9_LXkU2_W_OMD825POE6L5Yh7Lw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 May 2015 15:31:37 +0200
+Subject: [PATCH v2] pinctrl: imx: Allow parsing DT without function nodes
+In-Reply-To: <1428675758-15335-1-git-send-email-mpa@pengutronix.de>
+References: <1428675758-15335-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <CACRpkdYaCvzCm02one+ghD0ZVLi7TBbnBvMzfjMUnJvKR0s-8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 6, 2015 at 4:14 AM, Gabriel Fernandez
-<gabriel.fernandez@linaro.org> wrote:
-> Hi Bjorn,
->
-> On 6 May 2015 at 00:16, Bjorn Helgaas <bhelgaas@google.com> wrote:
->> On Fri, Apr 10, 2015 at 11:12:46AM +0200, Gabriel FERNANDEZ wrote:
->>> sti pcie is built around a Synopsis Designware PCIe IP.
->>>
->>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->>
->>> +/* ST PCIe driver does not allow module unload */
->>
->> Is there something that prevents module unload, or is it just untested?
->>
-> Yes we haven't tested
->
->>> +static int __init pcie_init(void)
->>> +{
->>> +     return platform_driver_probe(&st_pcie_driver, st_pcie_probe);
->>> +}
->>> +device_initcall(pcie_init);
->>
->> Can you use module_platform_driver_probe() or module_init() here?
->>
->
-> Yes we can use module_init() here.
->
-> By the way if figure out i removed __init attribute on st_pcie_probe()
-> in previous version to follow Arnd's remark.
-> But st_pcie_probe calls hook_fault_code() that has __init attribute.
-> So I think we need to keep __init for probe routine ?
-> Also, we have to restrict bind/unbind with "suppress_bind_attrs" in
-> platform_driver structure.
-> This is the main reason to not allow module unload/reload.
+On Fri, Apr 10, 2015 at 4:22 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
 
-I don't really care which solution you end up with here.  But please
-do take a look at how the other drivers solve the same problem.  Using
-"device_initcall()" is unique in drivers/pci/host, and I don't believe
-the problem is unique.  If several drivers have the same issue, they
-should solve it the same way.
+> The old format to define pinctrl settings for imx in DT has two
+> hierarchy levels. The first level are function device nodes. The second
+> level are pingroups which contain a property fsl,pins. The original
+> intention was to define all pin functions in a single dtsi file and just
+> reference the correct ones in the board files.
+> This idea was rejected some time ago leading to the current design to
+> have all the pinfunctions defined in the board files. So we don't need
+> the function device nodes anymore.
+>
+> This patch changes the pinctrl driver to accept devicetrees which do not
+> have the first hierarchy level, function device nodes. For example
+> karo-tx25 already has such a devicetree. Old devicetrees are still
+> parsed and supported.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-> If you are ok i will send a v4 ?
+Patch applied with Uwe's and Shawn's ACKs.
 
-I think I'll have a few questions about the designware changes, too,
-so you might want to wait a day or two.
-
->>> +MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
->>> +MODULE_DESCRIPTION("PCI express Driver for ST SoCs");
->>> +MODULE_LICENSE("GPL v2");
->>> --
->>> 1.9.1
->>>
+Yours,
+Linus Walleij
