@@ -1,48 +1,29 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 6 May 2015 12:25:33 -0500
-Subject: [PATCH 2/2] ARM: dts: am4372: Add emif node
-In-Reply-To: <1430933133-33412-1-git-send-email-d-gerlach@ti.com>
-References: <1430933133-33412-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1430933133-33412-3-git-send-email-d-gerlach@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 6 May 2015 18:28:46 +0100
+Subject: [PATCH v4 04/10] eeprom: Add a simple EEPROM framework for
+ eeprom consumers
+In-Reply-To: <1427752670-17219-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427752670-17219-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150506172846.GC22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node for TI AM4372 EMIF.
+On Mon, Mar 30, 2015 at 10:57:50PM +0100, Srinivas Kandagatla wrote:
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- Documentation/devicetree/bindings/memory-controllers/ti/emif.txt | 1 +
- arch/arm/boot/dts/am4372.dtsi                                    | 6 ++++++
- 2 files changed, 7 insertions(+)
+> +
+> +	for (i = 0; i < cell->nblocks; i++) {
+> +		rc = regmap_raw_read(eeprom->regmap, cell->blocks[i].offset,
+> +				      buf + offset, cell->blocks[i].count);
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-index 938f8e1..0db6047 100644
---- a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-+++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-@@ -8,6 +8,7 @@ of the EMIF IP and memory parts attached to it.
- Required properties:
- - compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
-   is the IP revision of the specific EMIF instance.
-+		  For am437x should be ti,emif-am4372.
- 
- - phy-type	: <u32> indicating the DDR phy type. Following are the
-   allowed values
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index c80a3e2..9521a38 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -132,6 +132,12 @@
- 			};
- 		};
- 
-+		emif: emif at 4c000000 {
-+			compatible = "ti,emif-am4372";
-+			reg = <0x4c000000 0x1000000>;
-+			ti,hwmods = "emif";
-+		};
-+
- 		edma: edma at 49000000 {
- 			compatible = "ti,edma3";
- 			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
--- 
-2.3.6
+I *think* this is probably OK but please double check that the count
+here is in bytes rather than words, it's a bit confusing since I'd read
+a count as being in words.  Otherwise I think the regmap usage here all
+looks good.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150506/99a5b6e6/attachment.sig>
