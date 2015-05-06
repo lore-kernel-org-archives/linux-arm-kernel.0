@@ -1,36 +1,52 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Wed, 06 May 2015 16:41:40 +0800
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <3443848.jTbkmjUfGI@wuerfel>
-References: <55417F5A.4040300@linaro.org> <2196079.901rMdSZr0@wuerfel>
- <5549CEAF.1090400@linaro.org> <3443848.jTbkmjUfGI@wuerfel>
-Message-ID: <5549D3C4.4010101@linaro.org>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 6 May 2015 10:41:43 +0200
+Subject: [PATCH v8 0/4] edac: Add APM X-Gene SoC memory controller EDAC
+ driver
+In-Reply-To: <1430884947-16787-1-git-send-email-lho@apm.com>
+References: <1430884947-16787-1-git-send-email-lho@apm.com>
+Message-ID: <20150506084143.GA22949@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 05, 2015 at 10:02:22PM -0600, Loc Ho wrote:
+> This patch adds support for the APM X-Gene SoC memory controller EDAC driver
+> for DT.
+> 
+> v8:
+> * Change ASM_EDAC_H to __ASM_EDAC_H in file edac.h
+> * Add WARN_ONCE in stub function atomic_scrub
+> * Update DTS binding documentation (with only memory controller node)
+> * Temporary remove L1/L2, L3, and SoC driver code and update memory driver
+>   code accordingly
 
-On 2015/5/6 16:37, Arnd Bergmann wrote:
-> On Wednesday 06 May 2015 16:19:59 Shannon Zhao wrote:
->>> > > How about Ubuntu or Debian releases that do not use systemd?
->>> > > 
->>> > > I guess we should check with a Debian Wheezy or Ubuntu Trusty release.
->>> > > My guess is that it will work fine, but some minor adjustment might
->>> > > be needed.
->> > 
->> > Will check Debian Wheezy and Ubuntu Trusty release later.
->> > BTW, I don't have them on hand, where can I get these filesystem for ARM?
->> > 
-> I think these should work for Debian:
-> 
-> https://people.debian.org/~aurel32/qemu/armhf/
-> 
-> but you will have to provide a newer kernel.
-> 
-> The image is a 32-bit user space, but it should work with both 32-bit
-> and 64-bit kernels. It's probably enough to test either ubuntu or
-> debian.
+What does that mean exactly? They'll get added later?
 
-Ok, thanks. Will have a try.
+It is called now xgene_edac_mc.c. Am I to expect more
+xgene_edac_<functional_unit>.c submissions? What happened to building
+everything around the shared IRQ handler?
+
+Also, I see this SOB chain in some of the patches:
+
+Signed-off-by: Feng Kan <fkan@apm.com>
+Signed-off-by: Loc Ho <lho@apm.com>
+
+and it is not clear who did what, from looking at the chain.
+
+If you both authored the patches, you can write
+
+Originally-by: Feng
+[ Loc: did this and that]
+Signed-off-by: Loc
+
+for example.
+
+See Documentation/SubmittingPatches for more info.
+
+Thanks.
 
 -- 
-Shannon
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
