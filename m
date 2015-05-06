@@ -1,97 +1,67 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 6 May 2015 23:16:07 +0800
-Subject: [PATCH 1/1] ARM: imx7d: add low level debug uart support
-Message-ID: <1430925367-16887-1-git-send-email-Frank.Li@freescale.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 May 2015 17:24:42 +0100
+Subject: [PATCH 5/6] ARM: re-implement physical address space switching
+In-Reply-To: <20150506161406.GC2974@leverpostej>
+References: <552C14F0.7020006@oracle.com> <20150415120738.GD2866@leverpostej>
+ <552E9F9B.2040400@oracle.com> <20150423112449.GB17361@leverpostej>
+ <20150506101850.GE2067@n2100.arm.linux.org.uk>
+ <20150506103736.GA707@leverpostej>
+ <20150506113313.GS2067@n2100.arm.linux.org.uk>
+ <20150506153337.GA2974@leverpostej>
+ <20150506155004.GW2067@n2100.arm.linux.org.uk>
+ <20150506161406.GC2974@leverpostej>
+Message-ID: <20150506162441.GC14922@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anson Huang <b20788@freescale.com>
+On Wed, May 06, 2015 at 05:14:06PM +0100, Mark Rutland wrote:
+> > > 	cr = get_cr();
+> > > 	set_cr(cr & ~(CR_I | CR_C | CR_W));
+> > > 	flush_cache_all();
+> > > 
+> > > With the MMU on at this point the page table walkers can race with the
+> > > set/way maintenance. It also relies on the compiler not making stack
+> > > accesses between the SCTLR write and the completion of flush_cache_all,
+> > > which is likely but not guranteed.
+> > 
+> > Yes, I suppose you're right, but there's really no other way to do
+> > this other than coding up CPU specific code.
+> > 
+> > What we'd need to do is to code up a specific assembly routine which
+> > disables the I and C control register flags, flushes the cache, jumps
+> > to the physical alias and then disables the MMU all without touching
+> > memory.  That's far too much effort.  Like I say, maybe we should just
+> > bin Keystone for this crap...
+> > 
+> > I'm not interested in trying to "fix" this code any further - as I
+> > said earlier, it took quite a while to get this code working on
+> > Keystone, which is really all we care about.  Anyone else who copies
+> > the abortion that TI made in Keystone should be shot. :)
+> > 
+> > While the community has the luxury of saying "we don't like it, it's
+> > TI's problem" - which is what was done when the problems were first
+> > pointed out by Will, the net result is that this problem became my
+> > problem to try and sort out.
+> > 
+> > So, if you have a better idea how to fix this, I'm all ears.
+> >
+> > What I'm certain of though is that this is an improvement over what's
+> > in the kernel today, and so should go in irrespective of whether it's
+> > totally bullet-proof or not.
+> 
+> I don't disagree with that. :)
+> 
+> w.r.t. "better" ideas, my initial thought was that we could move the
+> SCTLR.{C,M} clearing into lpae_pgtables_remap_asm, along with a call to
+> v7_flush_dcache_all (as it should be in the physical mapping). So long
+> as the kernel text was initially clean to the PoC I'd expect that to
+> work, but I understood from your initial reply you'd tried that and
+> something went wrong.
+> 
+> Perhaps we can look into that later.
 
-Add low level uart debug support for imx7d
+I think a comment summarising the conclusion of this thread above the
+cache flush and rmk's choice of adjective to describe the keystone SoC
+would be sufficient.
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
-Signed-off-by: Bai Ping <b51503@freescale.com>
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/Kconfig.debug            | 13 +++++++++++--
- arch/arm/include/debug/imx-uart.h | 15 ++++++++++++++-
- 2 files changed, 25 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0c12ffb..fe5e1cb 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -410,6 +410,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on i.MX6SX.
- 
-+	config DEBUG_IMX7D_UART
-+		bool "i.MX7D Debug UART"
-+		depends on SOC_IMX7D
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX7D.
-+
- 	config DEBUG_KEYSTONE_UART0
- 		bool "Kernel low-level debugging on KEYSTONE2 using UART0"
- 		depends on ARCH_KEYSTONE
-@@ -1231,7 +1238,8 @@ config DEBUG_IMX_UART_PORT
- 						DEBUG_IMX53_UART || \
- 						DEBUG_IMX6Q_UART || \
- 						DEBUG_IMX6SL_UART || \
--						DEBUG_IMX6SX_UART
-+						DEBUG_IMX6SX_UART || \
-+						DEBUG_IMX7D_UART
- 	default 1
- 	depends on ARCH_MXC
- 	help
-@@ -1281,7 +1289,8 @@ config DEBUG_LL_INCLUDE
- 				 DEBUG_IMX53_UART ||\
- 				 DEBUG_IMX6Q_UART || \
- 				 DEBUG_IMX6SL_UART || \
--				 DEBUG_IMX6SX_UART
-+				 DEBUG_IMX6SX_UART || \
-+				 DEBUG_IMX7D_UART
- 	default "debug/ks8695.S" if DEBUG_KS8695_UART
- 	default "debug/msm.S" if DEBUG_QCOM_UARTDM
- 	default "debug/netx.S" if DEBUG_NETX_UART
-diff --git a/arch/arm/include/debug/imx-uart.h b/arch/arm/include/debug/imx-uart.h
-index 032a316..66f736f 100644
---- a/arch/arm/include/debug/imx-uart.h
-+++ b/arch/arm/include/debug/imx-uart.h
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2012 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2012-2015 Freescale Semiconductor, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -90,6 +90,16 @@
- #define IMX6SX_UART_BASE_ADDR(n) IMX6SX_UART##n##_BASE_ADDR
- #define IMX6SX_UART_BASE(n)	IMX6SX_UART_BASE_ADDR(n)
- 
-+#define IMX7D_UART1_BASE_ADDR	0x30860000
-+#define IMX7D_UART2_BASE_ADDR	0x30890000
-+#define IMX7D_UART3_BASE_ADDR	0x30880000
-+#define IMX7D_UART4_BASE_ADDR	0x30a60000
-+#define IMX7D_UART5_BASE_ADDR	0x30a70000
-+#define IMX7D_UART6_BASE_ADDR	0x30a80000
-+#define IMX7D_UART7_BASE_ADDR	0x30a90000
-+#define IMX7D_UART_BASE_ADDR(n) IMX7D_UART##n##_BASE_ADDR
-+#define IMX7D_UART_BASE(n)	IMX7D_UART_BASE_ADDR(n)
-+
- #define IMX_DEBUG_UART_BASE(soc) soc##_UART_BASE(CONFIG_DEBUG_IMX_UART_PORT)
- 
- #ifdef CONFIG_DEBUG_IMX1_UART
-@@ -114,6 +124,9 @@
- #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SL)
- #elif defined(CONFIG_DEBUG_IMX6SX_UART)
- #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SX)
-+#elif defined(CONFIG_DEBUG_IMX7D_UART)
-+#define UART_PADDR	IMX_DEBUG_UART_BASE(IMX7D)
-+
- #endif
- 
- #endif /* __DEBUG_IMX_UART_H */
--- 
-1.9.1
+Will
