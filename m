@@ -1,39 +1,25 @@
 From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Wed, 06 May 2015 14:18:52 -0600
-Subject: [PATCH v4 3/7] selftests/kdbus: install kdbus-test
-In-Reply-To: <1429656651-9427-1-git-send-email-tyler.baker@linaro.org>
-References: <1429656651-9427-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <554A772C.8000904@osg.samsung.com>
+Date: Wed, 06 May 2015 14:20:40 -0600
+Subject: [PATCH v4 4/7] selftest/x86: build both bitnesses
+In-Reply-To: <1429656693-9937-1-git-send-email-tyler.baker@linaro.org>
+References: <1429656693-9937-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <554A7798.4070502@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2015 04:50 PM, Tyler Baker wrote:
-> Set TEST_PROGS so that kdbus-test is installed.
+On 04/21/2015 04:51 PM, Tyler Baker wrote:
+> Using uname with the processor flag option in some cases can yield 'unknown'
+> so lets use the machine flag option as it is deterministic. Add a dependency
+> for all_32 when building on a x86 64 bit host so that both bitnesses are
+> built in this case.
 > 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Acked-by: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Andy Lutomirski <luto@amacapital.net>
+> Acked-by: Andy Lutomirski <luto@kernel.org>
 > Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
 > ---
->  tools/testing/selftests/kdbus/Makefile | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/tools/testing/selftests/kdbus/Makefile b/tools/testing/selftests/kdbus/Makefile
-> index de8242f..94ea75b 100644
-> --- a/tools/testing/selftests/kdbus/Makefile
-> +++ b/tools/testing/selftests/kdbus/Makefile
-> @@ -41,6 +41,8 @@ include ../lib.mk
->  kdbus-test: $(OBJS)
->  	$(CC) $(CFLAGS) $^ $(LDLIBS) -o $@
->  
-> +TEST_PROGS := kdbus-test
-> +
->  run_tests:
->  	./kdbus-test --tap
->  
-> 
 
-Please hang on to this for a bit until kdbus makes it in.
-For now I can't apply this one.
+I will wait on this patch and other x85 patches in this series
+until x86 always build 32 breaking make kselftest target.
 
 thanks,
 -- Shuah
