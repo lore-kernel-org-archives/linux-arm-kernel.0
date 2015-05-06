@@ -1,174 +1,147 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 May 2015 13:46:29 +0100
-Subject: [PATCH] arm64/perf: add ACPI support
-In-Reply-To: <1430491548-9896-1-git-send-email-msalter@redhat.com>
-References: <1430491548-9896-1-git-send-email-msalter@redhat.com>
-Message-ID: <20150506124628.GB14922@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  6 May 2015 14:48:04 +0200
+Subject: [PATCH] pinctrl: nomadik: assign chips dynamically
+Message-ID: <1430916484-7756-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Assign GPIO chip and irqchip to the GPIO container dynamically,
+so we can set a unique name for each GPIO irqchip and see what
+chip the hwirq offset actually relates to.
 
-On Fri, May 01, 2015 at 03:45:48PM +0100, Mark Salter wrote:
-> When using ACPI, the perf_event irq info needs to be parsed
-> from the MADT and a corresponding platform device needs to
-> be created and registered. The only change to the existing
-> driver is a check to avoid unnecessary devicetree parsing.
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 106 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 106 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 195991d..1e53b26 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -31,6 +31,7 @@
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
->  #include <linux/uaccess.h>
-> +#include <linux/acpi.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/irq.h>
-> @@ -1315,6 +1316,10 @@ static int armpmu_device_probe(struct platform_device *pdev)
->  	if (!cpu_pmu)
->  		return -ENODEV;
->  
-> +	/* skip the devicetree parsing if we're using ACPI */
-> +	if (!acpi_disabled)
-> +		goto done;
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c | 61 +++++++++++++++----------------
+ 1 file changed, 30 insertions(+), 31 deletions(-)
 
-Can we invert the logic here and move the DT parsing into a new function,
-please? That way it's clearer to read the ACPI and DT paths, I think.
-
-> +
->  	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
->  	if (!irqs)
->  		return -ENOMEM;
-> @@ -1350,6 +1355,7 @@ static int armpmu_device_probe(struct platform_device *pdev)
->  	else
->  		kfree(irqs);
->  
-> +done:
->  	cpu_pmu->plat_device = pdev;
->  	return 0;
->  }
-> @@ -1368,6 +1374,106 @@ static int __init register_pmu_driver(void)
->  }
->  device_initcall(register_pmu_driver);
->  
-> +#ifdef CONFIG_ACPI
-> +struct acpi_pmu_irq {
-> +	int gsi;
-> +	int trigger;
-> +};
-> +
-> +static struct acpi_pmu_irq acpi_pmu_irqs[NR_CPUS] __initdata;
-
-Does this have to be allocated statically?
-
-> +static int __init
-> +acpi_parse_pmu_irqs(struct acpi_subtable_header *header,
-> +		    const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_interrupt *gic;
-> +	int cpu;
-> +	u64 mpidr;
-> +
-> +	gic = (struct acpi_madt_generic_interrupt *)header;
-> +	if (BAD_MADT_ENTRY(gic, end))
-> +		return -EINVAL;
-> +
-> +	mpidr = gic->arm_mpidr & MPIDR_HWID_BITMASK;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		if (cpu_logical_map(cpu) != mpidr)
-> +			continue;
-> +
-> +		acpi_pmu_irqs[cpu].gsi = gic->performance_interrupt;
-> +		if (gic->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
-> +			acpi_pmu_irqs[cpu].trigger = ACPI_EDGE_SENSITIVE;
-> +		else
-> +			acpi_pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
-> +		return 0;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static int __init pmu_acpi_init(void)
-> +{
-> +	struct platform_device *pdev;
-> +	struct acpi_pmu_irq *pirq = acpi_pmu_irqs;
-> +	struct resource	*res, *r;
-> +	int err = -ENOMEM;
-> +	int i, count, irq;
-> +
-> +	if (acpi_disabled)
-> +		return 0;
-> +
-> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-> +				      acpi_parse_pmu_irqs, num_possible_cpus());
-
-Now we have three places parsing the MADT:
-
-  - The SMP boot code
-  - The GIC code
-  - The PMU code
-
-The first is called from acpi_init_cpus via setup.c, the second is called
-from acpi_irq_init via irqchip.c and for the third you're proposing an
-initcall...
-
-Given that the acpi_gic_init() invocation from acpi_irq_init has a comment
-making it sound like something better is coming along, is there a chance
-that we could tidy up the MADT parsing so that it's at least called from
-some common place?
-
-
-> +	/* Must have irq for boot boot cpu, at least */
-> +	if (count <= 0 || pirq->gsi == 0)
-> +		return -EINVAL;
-> +
-> +	irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
-> +				ACPI_ACTIVE_HIGH);
-
-Some platforms (unfortunately, this is more common than I'd like) OR all
-of the per-cpu SPIs together and we have to play games to get that working.
-I can imagine that being described in ACPI by having the same interrupt
-number for each core but that interrupt *not* being percpu (i.e. not a PPI).
-
-I don't particularly care for supporting this configuration, but we should
-explicitly reject this case and fail the probe.
-
-> +	if (irq_is_percpu(irq))
-> +		count = 1;
-
-Should we sanity check that all cores have the same interrupt number?
-
-> +
-> +	pdev = platform_device_alloc("arm-pmu", -1);
-> +	if (!pdev)
-> +		goto err_free_gsi;
-
-Won't we end up unregistering too many GSIs in this error case?
-
-> +
-> +	res = kcalloc(count, sizeof(*res), GFP_KERNEL);
-> +	if (!res)
-> +		goto err_free_device;
-
-Likewise.
-
-> +
-> +	for (i = 0, r = res; i < count; i++, pirq++, r++) {
-> +		if (i)
-> +			irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
-> +						ACPI_ACTIVE_HIGH);
-
-Is there no polarity field, like we have in the GTDT for the architected
-timer?
-
-Will
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+index a6a22054c0ba..c37093c8659c 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+@@ -246,6 +246,7 @@ enum nmk_gpio_slpm {
+ 
+ struct nmk_gpio_chip {
+ 	struct gpio_chip chip;
++	struct irq_chip irqchip;
+ 	void __iomem *addr;
+ 	struct clk *clk;
+ 	unsigned int bank;
+@@ -842,18 +843,6 @@ static void nmk_gpio_irq_shutdown(struct irq_data *d)
+ 	clk_disable(nmk_chip->clk);
+ }
+ 
+-static struct irq_chip nmk_gpio_irq_chip = {
+-	.name		= "Nomadik-GPIO",
+-	.irq_ack	= nmk_gpio_irq_ack,
+-	.irq_mask	= nmk_gpio_irq_mask,
+-	.irq_unmask	= nmk_gpio_irq_unmask,
+-	.irq_set_type	= nmk_gpio_irq_set_type,
+-	.irq_set_wake	= nmk_gpio_irq_set_wake,
+-	.irq_startup	= nmk_gpio_irq_startup,
+-	.irq_shutdown	= nmk_gpio_irq_shutdown,
+-	.flags		= IRQCHIP_MASK_ON_SUSPEND,
+-};
+-
+ static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
+ 				   u32 status)
+ {
+@@ -1077,18 +1066,6 @@ static inline void nmk_gpio_dbg_show_one(struct seq_file *s,
+ #define nmk_gpio_dbg_show	NULL
+ #endif
+ 
+-/* This structure is replicated for each GPIO block allocated at probe time */
+-static struct gpio_chip nmk_gpio_template = {
+-	.request		= nmk_gpio_request,
+-	.free			= nmk_gpio_free,
+-	.direction_input	= nmk_gpio_make_input,
+-	.get			= nmk_gpio_get_input,
+-	.direction_output	= nmk_gpio_make_output,
+-	.set			= nmk_gpio_set_output,
+-	.dbg_show		= nmk_gpio_dbg_show,
+-	.can_sleep		= false,
+-};
+-
+ void nmk_gpio_clocks_enable(void)
+ {
+ 	int i;
+@@ -1190,6 +1167,7 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 	struct device_node *np = dev->dev.of_node;
+ 	struct nmk_gpio_chip *nmk_chip;
+ 	struct gpio_chip *chip;
++	struct irq_chip *irqchip;
+ 	struct resource *res;
+ 	struct clk *clk;
+ 	int latent_irq;
+@@ -1236,19 +1214,40 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 	nmk_chip->bank = dev->id;
+ 	nmk_chip->clk = clk;
+ 	nmk_chip->addr = base;
+-	nmk_chip->chip = nmk_gpio_template;
+ 	nmk_chip->parent_irq = irq;
+ 	nmk_chip->latent_parent_irq = latent_irq;
+ 	nmk_chip->sleepmode = supports_sleepmode;
+ 	spin_lock_init(&nmk_chip->lock);
+ 
+ 	chip = &nmk_chip->chip;
++	chip->request = nmk_gpio_request;
++	chip->free = nmk_gpio_free;
++	chip->direction_input = nmk_gpio_make_input;
++	chip->get = nmk_gpio_get_input;
++	chip->direction_output = nmk_gpio_make_output;
++	chip->set = nmk_gpio_set_output;
++	chip->dbg_show = nmk_gpio_dbg_show;
++	chip->can_sleep = false;
+ 	chip->base = dev->id * NMK_GPIO_PER_CHIP;
+ 	chip->ngpio = NMK_GPIO_PER_CHIP;
+ 	chip->label = dev_name(&dev->dev);
+ 	chip->dev = &dev->dev;
+ 	chip->owner = THIS_MODULE;
+ 
++	irqchip = &nmk_chip->irqchip;
++	irqchip->irq_ack = nmk_gpio_irq_ack;
++	irqchip->irq_mask = nmk_gpio_irq_mask;
++	irqchip->irq_unmask = nmk_gpio_irq_unmask;
++	irqchip->irq_set_type = nmk_gpio_irq_set_type;
++	irqchip->irq_set_wake = nmk_gpio_irq_set_wake;
++	irqchip->irq_startup = nmk_gpio_irq_startup;
++	irqchip->irq_shutdown = nmk_gpio_irq_shutdown;
++	irqchip->flags = IRQCHIP_MASK_ON_SUSPEND;
++	irqchip->name = kasprintf(GFP_KERNEL, "nmk%u-%u-%u",
++				  dev->id,
++				  chip->base,
++				  chip->base + chip->ngpio - 1);
++
+ 	clk_enable(nmk_chip->clk);
+ 	nmk_chip->lowemi = readl_relaxed(nmk_chip->addr + NMK_GPIO_LOWEMI);
+ 	clk_disable(nmk_chip->clk);
+@@ -1269,8 +1268,8 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 	 * handler will perform the actual work of handling the parent
+ 	 * interrupt.
+ 	 */
+-	ret = gpiochip_irqchip_add(&nmk_chip->chip,
+-				   &nmk_gpio_irq_chip,
++	ret = gpiochip_irqchip_add(chip,
++				   irqchip,
+ 				   0,
+ 				   handle_edge_irq,
+ 				   IRQ_TYPE_EDGE_FALLING);
+@@ -1280,13 +1279,13 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 		return -ENODEV;
+ 	}
+ 	/* Then register the chain on the parent IRQ */
+-	gpiochip_set_chained_irqchip(&nmk_chip->chip,
+-				     &nmk_gpio_irq_chip,
++	gpiochip_set_chained_irqchip(chip,
++				     irqchip,
+ 				     nmk_chip->parent_irq,
+ 				     nmk_gpio_irq_handler);
+ 	if (nmk_chip->latent_parent_irq > 0)
+-		gpiochip_set_chained_irqchip(&nmk_chip->chip,
+-					     &nmk_gpio_irq_chip,
++		gpiochip_set_chained_irqchip(chip,
++					     irqchip,
+ 					     nmk_chip->latent_parent_irq,
+ 					     nmk_gpio_latent_irq_handler);
+ 
+-- 
+1.9.3
