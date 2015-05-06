@@ -1,31 +1,30 @@
 From: kaloz@openwrt.org (Imre Kaloz)
-Date: Wed,  6 May 2015 15:13:59 +0200
-Subject: [PATCH 1/2] ARM: mvebu: add alias for mdio on Armada 38x
-In-Reply-To: <1430918040-17307-1-git-send-email-kaloz@openwrt.org>
-References: <1430918040-17307-1-git-send-email-kaloz@openwrt.org>
-Message-ID: <1430918040-17307-2-git-send-email-kaloz@openwrt.org>
+Date: Wed,  6 May 2015 15:13:58 +0200
+Subject: [PATCH 0/2] ARM: mvebu: Linksys WRT1200AC and WRT1900AC v2 support
+Message-ID: <1430918040-17307-1-git-send-email-kaloz@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows us to reference it later.
-
-Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
----
- arch/arm/boot/dts/armada-38x.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index ed2dd8b..839e5bf 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -495,7 +495,7 @@
- 				status = "disabled";
- 			};
+The following patches add support for the Linksys WRT1200AC (Caiman) and
+the Linksys WRT1900AC v2 (Cobra).
  
--			mdio at 72004 {
-+			mdio: mdio at 72004 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				compatible = "marvell,orion-mdio";
--- 
-2.1.0
+Both boards have:
+ 
+- 2 Marvell 88W8864 radios
+- 1 USB 3.0 port
+- 1 USB 2.0/eSATAp port
+- 2 Ethernet interfaces connected to a 88E6176 switch (1x WAN + 4x LAN)
+- 128MB NAND flash
+- 512MB RAM
+
+I didn't have much luck getting DSA work in this configuration yet,
+so (for now) we use the bootloader configured layout for the switch.
+ 
+The only difference between the two boards is the radio configuration
+(2x2 vs 3x3), so everything except the leds (to be named properly)
+is in the dtsi file. When the wireless driver will be submitted
+upstream, the powertables (calibration data) will end up in the board
+specific files, tho.
+
+
+Imre
