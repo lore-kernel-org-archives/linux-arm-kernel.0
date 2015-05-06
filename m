@@ -1,31 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 06 May 2015 10:52:26 +0200
-Subject: [PATCH v8 0/4] edac: Add APM X-Gene SoC memory controller EDAC
- driver
-In-Reply-To: <1430884947-16787-1-git-send-email-lho@apm.com>
-References: <1430884947-16787-1-git-send-email-lho@apm.com>
-Message-ID: <2150970.xGYLhDU9BR@wuerfel>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 6 May 2015 16:56:28 +0800
+Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
+In-Reply-To: <20150505115446.GA26467@dragon>
+References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
+ <20150505115446.GA26467@dragon>
+Message-ID: <CAAQ0ZWRyndnoSs5D+AcOZB-7hSnhSULTYVu=TRtcGR-CfB9xGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 May 2015 22:02:22 Loc Ho wrote:
-> 
-> v8:
-> * Change ASM_EDAC_H to __ASM_EDAC_H in file edac.h
-> * Add WARN_ONCE in stub function atomic_scrub
-> * Update DTS binding documentation (with only memory controller node)
-> * Temporary remove L1/L2, L3, and SoC driver code and update memory driver
->   code accordingly
-> 
-> 
+On Tue, May 5, 2015 at 7:54 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Apr 07, 2015 at 12:34:30PM +0900, Masahiro Yamada wrote:
+>> Hello experts,
+>> I hope this is the correct ML to ask this question.
+>>
+>> I am struggling to port Linux-4.0-rc7 onto my SoC/board,
+>> based on ARM cortex-A9 (single CPU), but the kernel fails to boot
+>> with the error:
+>> "not syncing: Attempted to kill init! exitcode=0x00000004"
+>
+> Hi Masahiro,
+>
+> Have you track it down to the cause?  I'm asking because I'm seeing the
+> same issue with v4.0 on a vendor single Cortex-A9 SoC.
 
-I don't see how this is helping. You still use a syscon reference for the
-pcp node after I told you not to, and you are completely leaving out the
-other nodes, which makes it impossible to tell what your plan is for those.
+For record, in my case, it's caused by that the user space is built
+with VFP support while the SoC does not have VFP.
 
-Please come up with a plan that makes it possible to have proper support
-for all the devices in the future. Leaving out bits because you know that
-adding them later will be hard is not a good solution: if you screw up
-the design now, adding them later will be even harder.
+[    0.091938] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.092049] Setting up static identity map for 0x402bf028 - 0x402bf080
+[    0.131141] Brought up 1 CPUs
+[    0.131165] SMP: Total of 1 processors activated (1196.85 BogoMIPS).
+[    0.131180] CPU: All CPU(s) started in SVC mode.
+[    0.132122] devtmpfs: initialized
+[    0.133079] VFP support v0.3: not present
 
-	Arnd
+Shawn
