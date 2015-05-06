@@ -1,49 +1,43 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 06 May 2015 17:32:53 +0200
-Subject: [RFC v2 0/4] chip/vgic adaptations for forwarded irq
-In-Reply-To: <20150506142748.GC6796@cbox>
-References: <1423642857-24240-1-git-send-email-eric.auger@linaro.org>
- <20150506142748.GC6796@cbox>
-Message-ID: <554A3425.7070909@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 May 2015 08:36:56 -0700
+Subject: [PATCH] gpio: omap: Fix regression for MPUIO interrupts
+In-Reply-To: <CACRpkdZqSEgaVOV1gCQvCLc1-x7eU3WZwAM2QT2HT21xqCHZ2Q@mail.gmail.com>
+References: <1429833257-28188-1-git-send-email-tony@atomide.com>
+ <CACRpkdZqSEgaVOV1gCQvCLc1-x7eU3WZwAM2QT2HT21xqCHZ2Q@mail.gmail.com>
+Message-ID: <20150506153656.GJ21061@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2015 04:27 PM, Christoffer Dall wrote:
-> Hi Eric,
+* Linus Walleij <linus.walleij@linaro.org> [150506 06:22]:
+> On Fri, Apr 24, 2015 at 1:54 AM, Tony Lindgren <tony@atomide.com> wrote:
 > 
-> On Wed, Feb 11, 2015 at 09:20:53AM +0100, Eric Auger wrote:
->> This series proposes some fixes that appeared to be necessary
->> to integrate IRQ forwarding in KVM/VFIO.
->>
->> - deactivation of the forwarded IRQ in irq_disabled case
->> - a specific handling of forwarded IRQ into the VGIC state machine.
->> - deactivation of physical IRQ and unforwarding on vgic destruction
->> - rb_tree lock in vgic.c
->>
->> Integrated pieces can be found at
->> ssh://git.linaro.org/people/eric.auger/linux.git
->> on branch irqfd_integ_v9
->>
-> What are the dependencies for this at this point?
+> > At some point with all the GPIO clean-up we've broken the
+> > MPUIO interrupts. Those are just a little bit different from
+> > the GPIO interrupts, so we can fix it up just by setting
+> > different irqchip functions for it. And then we can just
+> > remove all old code trying to do the same.
+> >
+> > Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> > Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
+> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> > Cc: Nishanth Menon <nm@ti.com>
+> > Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> I assume it relies at least on the split EOI/priority drop changes?
+> Patch applied for fixes with the ACKs etc,
 
-Yes it now only depends on split EOI/priority drop changes since
-"genirq: Saving/restoring the irqchip state of an irq line" now is
-upstreamed.
+Thanks. Yes this should go in during the -rc cycle as a regresion
+fix. Sorry I could not exactly pinpoint where we've broken the
+MPUIO interrupts with all the clean-up.
 
-> 
-> Are you going to respin this when there are newer versions of the
-> dependencies out, or what are the plans?
+Also the omap1 SPARSE_IRQ changes I recently posted have a
+dependency to this one so that's another reason to get this
+one out of the way.
 
-Yes I will respin according to new versions. I am currently using a
-rebased version of Marc's original RFC "ARM: Forwarding physical
-interrupts to a guest VM" (http://lwn.net/Articles/603514/) which is a
-superset of [PATCH] genirq: Add support for priority-drop/deactivate
-interrupt controllers.
+No rush with the other ones, those should be OK for v4.2.
 
-- Eric
-> 
-> Thanks,
-> -Christoffer
-> 
+Regards,
+
+Tony
