@@ -1,89 +1,142 @@
-From: houpengyang@huawei.com (Hou Pengyang)
-Date: Wed, 6 May 2015 12:13:26 +0800
-Subject: [PATCH v3 2/2] arm64: perf: Fix callchain parse error with kernel
- tracepoint events
-In-Reply-To: <20150505170006.GM1550@arm.com>
-References: <1430546297-80481-1-git-send-email-houpengyang@huawei.com>
- <1430546297-80481-3-git-send-email-houpengyang@huawei.com>
- <20150505170006.GM1550@arm.com>
-Message-ID: <554994E6.2040900@huawei.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Tue, 5 May 2015 23:15:37 -0500
+Subject: [V2 PATCH 1/5] ACPI / scan: Parse _CCA and setup device coherency
+In-Reply-To: <3234610.3j3NfP3xpR@vostro.rjw.lan>
+References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1430838729-21572-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <3234610.3j3NfP3xpR@vostro.rjw.lan>
+Message-ID: <55499569.8060403@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/5/6 1:00, Will Deacon wrote:
-> On Sat, May 02, 2015 at 06:58:17AM +0100, Hou Pengyang wrote:
->> For ARM64, when tracing with tracepoint events, the IP and pstate are set
->> to 0, preventing the perf code parsing the callchain and resolving the
->> symbols correctly.
->>
->>   ./perf record -e sched:sched_switch -g --call-graph dwarf ls
->>      [ perf record: Captured and wrote 0.146 MB perf.data ]
->>   ./perf report -f
->>      Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194
->>      Children      Self    Command  Shared Object     Symbol
->>      100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
->>
->> The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
->> several necessary registers used for callchain unwinding, including pc,sp,
->> fp and spsr .
->>
->> With this patch, callchain can be parsed correctly as follows:
->>
->>       ......
->> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
->> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
->> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
->> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
->> -    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
->>       pfkey_send_policy_notify
->>       pfkey_get
->>       v9fs_vfs_rename
->>       page_follow_link_light
->>       link_path_walk
->>       el0_svc_naked
->>      .......
->>
->> Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
->> ---
->>   arch/arm64/include/asm/perf_event.h | 7 +++++++
->>   1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
->> index d26d1d5..cc92021 100644
->> --- a/arch/arm64/include/asm/perf_event.h
->> +++ b/arch/arm64/include/asm/perf_event.h
->> @@ -24,4 +24,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
->>   #define perf_misc_flags(regs)	perf_misc_flags(regs)
->>   #endif
->>
->> +#define perf_arch_fetch_caller_regs(regs, __ip) { \
->> +	(regs)->ARM_pc = (__ip);    \
->> +	(regs)->ARM_fp = (unsigned long) __builtin_frame_address(0); \
->> +	(regs)->ARM_sp = current_stack_pointer; \
->> +	(regs)->ARM_cpsr = PSR_MODE_EL1h;	\
->> +}
->
-> This can't possibly compile, therefore you can't possibly have tested it.
->
-I am so sorry. I did test the patch, but on mainline 4.0 +
-David long's patches for ARM64 kprobe which are not included in
-mainline now. In David's patches, there are macros like ARM_pc, ARM_fp, 
-ARM_sp and ARM_cpsr, my patch incorrectly used these macros which
-results in such compile errors if applied to 4.0 directly:
-	error: 'struct pt_regs' has no member named 'ARM_pc'
-	error: 'struct pt_regs' has no member named 'ARM_fp'
-	error: 'struct pt_regs' has no member named 'ARM_sp'
-	error: 'struct pt_regs' has no member named 'ARM_cpsr'
+[RESEND]
 
-I will fix the code and do more test.
+On 5/5/15 15:36, Rafael J. Wysocki wrote:
+> On Tuesday, May 05, 2015 10:12:05 AM Suravee Suthikulpanit wrote:
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index ab2cbb5..dd386e9 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -54,6 +54,12 @@ config ACPI_GENERIC_GSI
+>>   config ACPI_SYSTEM_POWER_STATES_SUPPORT
+>>   	bool
+>>
+>> +config ACPI_MUST_HAVE_CCA
+>
+> ACPI_CCA_REQUIRED maybe?
+
+Sure.
+
+>
+>> +	bool
+>> +
+>> +config ACPI_SUPPORT_CCA_ZERO
+>
+> I guess this means "we support devices that can DMA, but are not coherent".
+> right?
+
+Yes, basically when _CCA=0.
+
+>> +	bool
+>> +
+>>   config ACPI_SLEEP
+>>   	bool
+>>   	depends on SUSPEND || HIBERNATION
+>> diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
+>> index 4bf7559..a6feca4 100644
+>> --- a/drivers/acpi/acpi_platform.c
+>> +++ b/drivers/acpi/acpi_platform.c
+>> @@ -108,9 +108,11 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
+>>   	if (IS_ERR(pdev))
+>>   		dev_err(&adev->dev, "platform device creation failed: %ld\n",
+>>   			PTR_ERR(pdev));
+>> -	else
+>> +	else {
+>
+> Please add braces to both branches when making such changes (as per CodingStyle).
+>
+
+OK.
+
+>> +		acpi_setup_device_dma(adev, &pdev->dev);
+>
+> Why do we need to do that here (for the second time)?
+
+Because we are calling:
+   acpi_create_platform_device()
+     |--> platform_device_register_device_full()
+       |-->platform_device_alloc()
+
+This creates platform_device, which allocate a new platform_device->dev. 
+This is not the same as the original acpi_device->dev that was created 
+during acpi_add_single_object(). So, we have to set up the device 
+coherency again.
 
 
-> Please fix the code and actually check that you're getting sensible
-> callchains before sending a new version of the patch.
+>> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+>> index 849b699..ac33b29 100644
+>> --- a/drivers/acpi/scan.c
+>> +++ b/drivers/acpi/scan.c
+>> @@ -11,6 +11,7 @@
+>>   #include <linux/kthread.h>
+>>   #include <linux/dmi.h>
+>>   #include <linux/nls.h>
+>> +#include <linux/dma-mapping.h>
+>>
+>>   #include <asm/pgtable.h>
+>>
+>> @@ -2137,6 +2138,66 @@ void acpi_free_pnp_ids(struct acpi_device_pnp *pnp)
+>>   	kfree(pnp->unique_id);
+>>   }
+>>
+>> +void acpi_setup_device_dma(struct acpi_device *adev, struct device *dev)
+>> +{
+>> +	int coherent = acpi_dma_is_coherent(adev);
+>> +
+>> +	/**
+>> +	 * Currently, we only support DMA for devices that _CCA=1
+>> +	 * since this seems to be the case on most ACPI platforms.
+>> +	 *
+>> +	 * For the case when _CCA=0 (i.e. is_coherent=0 && cca_seen=1),
+>> +	 * we would rely on arch-specific cache maintenance for
+>> +	 * non-coherence DMA operations if architecture enables
+>> +	 * CONFIG_ACPI_SUPPORT_CCA_ZERO.
+>> +	 *
+>> +	 * For the case when _CCA is missing but platform requires it
+>> +	 * (i.e. is_coherent=0 && cca_seen=0), we do not call
+>> +	 * arch_setup_dma_ops() and fallback to arch-specific default
+>> +	 * handling.
+>> +	 */
+>> +	if (adev->flags.cca_seen) {
+>> +		if (!coherent && !IS_ENABLED(CONFIG_ACPI_SUPPORT_CCA_ZERO))
+>> +			return;
+>> +		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
 >
-> Thanks,
+> Oh dear.
+
+I made a mistake here. This logic should also call arch_setup_dma_ops() 
+when cca_seen=0 and coherent=1 (e.g. when _CCA is not required and 
+default to coherent when it is missing). The current logic doesn't do that.
+
 >
-> Will
+> What about
 >
-> .
+> 	if (adev->flags.cca_seen && (coherent || IS_ENABLED(CONFIG_ACPI_SUPPORT_CCA_ZERO)))
+> 		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
+
+What about:
+	if (coherent ||
+	    (adev->flags.cca_seen &&
+			IS_ENABLED(CONFIG_ACPI_SUPPORT_CCA_ZERO))
+		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
+	
+> I wonder how this is going to affect x86/ia64 too?
 >
+
+This should not affect x86 since arch_setup_dma_ops() is currently not 
+implement for x86, and default to NOP (see include/linux/dma-mapping.h). 
+  Also, on x86, _CCA is not required and default to 1 if missing.
+
+Thanks,
+
+Suravee
