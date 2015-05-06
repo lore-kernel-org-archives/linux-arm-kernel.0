@@ -1,93 +1,81 @@
-From: andrew@ncrmnt.org (Andrew)
-Date: Wed, 06 May 2015 16:39:59 +0300
-Subject: Fwd: Re: [PATCH 2/2] ARM: mvebu: dts: Add dts file for DLink
- DNS-327L
-In-Reply-To: <554A057D.3050007@free-electrons.com>
-References: <b6534b962d2cf9d21cb72d43f19a6574@mail.ncrmnt.org>
- <552A6209.9040903@gmail.com>
- <cd7445f789f1082f464d464f77807f12@mail.ncrmnt.org>
- <20150412145857.GA14038@lunn.ch>
- <b172d775afa24cea69a9490f531c6b37@mail.ncrmnt.org>
- <20150412194735.GA27921@lunn.ch> <552BCFAA.2020109@free-electrons.com>
- <1ec8906f00468ca5a9fa227f8c83fe69@mail.ncrmnt.org>
- <55351569.7000307@free-electrons.com>
- <d28764ea5d0d5f4c2e5d3e9ca1d7217a@mail.ncrmnt.org>
- <55351898.60604@free-electrons.com>
- <4e7e91562aac6a260885bf2d12174060@mail.ncrmnt.org>
- <554A057D.3050007@free-electrons.com>
-Message-ID: <4b2d8ac976bad0cd6b8ea5fa5fa2cd16@mail.ncrmnt.org>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Wed, 6 May 2015 15:40:39 +0200
+Subject: [PATCH v3 3/5] PCI: st: Provide support for the sti PCIe
+ controller
+In-Reply-To: <CAErSpo7_ev1oYptvBObK2dS9_LXkU2_W_OMD825POE6L5Yh7Lw@mail.gmail.com>
+References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1428657168-12495-4-git-send-email-gabriel.fernandez@linaro.org>
+ <20150505221646.GE24643@google.com>
+ <CAG374jAv9aHBPGV+x+xs2MyRGz+fw1ymwu78fqNXDPtPqehgZA@mail.gmail.com>
+ <CAErSpo7_ev1oYptvBObK2dS9_LXkU2_W_OMD825POE6L5Yh7Lw@mail.gmail.com>
+Message-ID: <CAG374jCfo1165cbMrip5SrYigjNkXPyc-dqgmRbTQ0Yaw3wmDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory CLEMENT ????? 06.05.2015 15:13:
-> Hi Andrew,
-> 
-> 
->> 
->> Sorry for the long delay with testing, but here come the results.
->> I've rebased everything to 4.1-rc1
->> 
->> 1. WFI + DeepIdle => freeze after approx:
->>    * 1 hours and 30 minutes, first test
->>    * 3 hours and 40 minutes, second test
->> 2. WFI only (DeepIdle disabled via sysfs) => Still alive after 13 
->> hours
->> and counting
-> 
-> Thanks for testing it. So, to sum-up, WFI+DeepIdle makes the board 
-> freeze
-> after a few hours in 4.1-rc1 and 4.0 for sure. Are you aware of any 
-> version
-> that did not freeze? It would help to know if it was a regression or 
-> not.
+Hi Arnd, Bjorn,
 
-I've been observing it since 3.16 or so, when I first got mainline 
-running on
-the box. So my guess would be that it is NOT a regression.
+I agree with last reply of Arnd.
+ I will mark the probe function as __init and use
+platform_driver_probe() to prevent the probe function from being
+deferred.
+And to prevent module unloading, i will use module_init only.
 
-> Andrew Lunn did not report any issue on his 370RD however I will test
-> it also on an other Armada 370 base board (a Mirabox) using the .config
-> you already sent.
-> 
-> But what I expect is either a hardware issue, or a hardware 
-> configuration
-> issue in U-Boot. We still rely a lot on the bootloader and I fear that
-> we have some implicit assumptions.
-> 
-> By the way do you have access on the bootloader sources or at least 
-> could
-> you give us the U-boot version used?
+Ok i will wait before sending a v4.
 
-AFAIK there's no GPL source drop for DNS-327L just yet. I'm using stock 
-uboot:
+Thanks.
+Gabriel.
 
-U-Boot 2009.08-00043-gcfe3b76-dirty (Dec 03 2012 - 15:27:58)
-Marvell version: 1.1.2 NQ.DNS-327.01
-
-Didn't risk to burn upstream u-boot, just in case the hardware required 
-any
-special hacks to work.
-
-> Thanks,
-> 
-> Gregory
-> 
-> 
-> 
->> 
->> The proper patchset will follow as soon as I figure out what change
->> broke
->> dns320l-daemon (The utility that speaks to weltrend mcu on ttyS1)
->> It was working on 3.18.6, on 3.19 and up - it writes data to the port
->> (and mcu acks it),
->> but can't read any responses.
->> 
->> Same thing happens to the python (pyserial inside) implementation of 
->> the
->> fan-daemon:
->> https://github.com/martignlo/DNS-320L
->> 
-
--- 
-Regards,
-Andrew
+On 6 May 2015 at 15:29, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Wed, May 6, 2015 at 4:14 AM, Gabriel Fernandez
+> <gabriel.fernandez@linaro.org> wrote:
+>> Hi Bjorn,
+>>
+>> On 6 May 2015 at 00:16, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>>> On Fri, Apr 10, 2015 at 11:12:46AM +0200, Gabriel FERNANDEZ wrote:
+>>>> sti pcie is built around a Synopsis Designware PCIe IP.
+>>>>
+>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>>>
+>>>> +/* ST PCIe driver does not allow module unload */
+>>>
+>>> Is there something that prevents module unload, or is it just untested?
+>>>
+>> Yes we haven't tested
+>>
+>>>> +static int __init pcie_init(void)
+>>>> +{
+>>>> +     return platform_driver_probe(&st_pcie_driver, st_pcie_probe);
+>>>> +}
+>>>> +device_initcall(pcie_init);
+>>>
+>>> Can you use module_platform_driver_probe() or module_init() here?
+>>>
+>>
+>> Yes we can use module_init() here.
+>>
+>> By the way if figure out i removed __init attribute on st_pcie_probe()
+>> in previous version to follow Arnd's remark.
+>> But st_pcie_probe calls hook_fault_code() that has __init attribute.
+>> So I think we need to keep __init for probe routine ?
+>> Also, we have to restrict bind/unbind with "suppress_bind_attrs" in
+>> platform_driver structure.
+>> This is the main reason to not allow module unload/reload.
+>
+> I don't really care which solution you end up with here.  But please
+> do take a look at how the other drivers solve the same problem.  Using
+> "device_initcall()" is unique in drivers/pci/host, and I don't believe
+> the problem is unique.  If several drivers have the same issue, they
+> should solve it the same way.
+>
+>> If you are ok i will send a v4 ?
+>
+> I think I'll have a few questions about the designware changes, too,
+> so you might want to wait a day or two.
+>
+>>>> +MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
+>>>> +MODULE_DESCRIPTION("PCI express Driver for ST SoCs");
+>>>> +MODULE_LICENSE("GPL v2");
+>>>> --
+>>>> 1.9.1
+>>>>
