@@ -1,37 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 6 May 2015 16:56:28 +0800
-Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
-In-Reply-To: <20150505115446.GA26467@dragon>
-References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
- <20150505115446.GA26467@dragon>
-Message-ID: <CAAQ0ZWRyndnoSs5D+AcOZB-7hSnhSULTYVu=TRtcGR-CfB9xGQ@mail.gmail.com>
+From: liam.r.girdwood@linux.intel.com (Liam Girdwood)
+Date: Wed, 06 May 2015 09:58:14 +0100
+Subject: [alsa-devel] [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
+In-Reply-To: <20150505223542.GM15510@sirena.org.uk>
+References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+ <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk> <s5ha8ymy3e2.wl-tiwai@suse.de>
+ <20150505223542.GM15510@sirena.org.uk>
+Message-ID: <1430902694.16962.11.camel@loki>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 5, 2015 at 7:54 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Apr 07, 2015 at 12:34:30PM +0900, Masahiro Yamada wrote:
->> Hello experts,
->> I hope this is the correct ML to ask this question.
->>
->> I am struggling to port Linux-4.0-rc7 onto my SoC/board,
->> based on ARM cortex-A9 (single CPU), but the kernel fails to boot
->> with the error:
->> "not syncing: Attempted to kill init! exitcode=0x00000004"
->
-> Hi Masahiro,
->
-> Have you track it down to the cause?  I'm asking because I'm seeing the
-> same issue with v4.0 on a vendor single Cortex-A9 SoC.
+On Tue, 2015-05-05 at 23:35 +0100, Mark Brown wrote:
+> On Sun, Apr 05, 2015 at 05:57:09PM +0200, Takashi Iwai wrote:
+> > At Thu, 02 Apr 2015 10:22:06 +0100,
+> > Russell King wrote:
+> 
+> > > +config SND_PCM_ELD
+> > > +	bool
+> 
+> > I don't mind much adding this one, but a new Kconfig is always a
+> > question.  I'd like to hear other's opinion, too.
+> 
+> One point in favour of this is that there's been some discussion
+> recently of IoT applications with very low resource requirements that
+> might need audion functionality so it's likely that people will be
+> taking a look at trying to minimize code size for the audio stack.  This
+> sort of configurability may well be useful for such applications.
 
-For record, in my case, it's caused by that the user space is built
-with VFP support while the SoC does not have VFP.
 
-[    0.091938] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[    0.092049] Setting up static identity map for 0x402bf028 - 0x402bf080
-[    0.131141] Brought up 1 CPUs
-[    0.131165] SMP: Total of 1 processors activated (1196.85 BogoMIPS).
-[    0.131180] CPU: All CPU(s) started in SVC mode.
-[    0.132122] devtmpfs: initialized
-[    0.133079] VFP support v0.3: not present
+Fwiw, Keyon is looking at reducing runtime audio DRAM usage atm and will
+probably have to add other Kconfig options to the audio kernel config
+e.g. disable DPCM, disable DAPM, disable HW/SW params refinement,
+disable async audio ioctls, etc. Currently the kernel audio core and
+drivers are coming in at between 300k to 500k, which is a lot for a
+device with limited memory and very simple audio requirements.
 
-Shawn
+Liam
