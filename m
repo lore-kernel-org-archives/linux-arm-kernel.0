@@ -1,101 +1,58 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed, 6 May 2015 08:37:04 -0700
-Subject: [PATCH v4 0/7] selftests: fixes for installation and cross
- compilation
-In-Reply-To: <554A31F4.7080200@osg.samsung.com>
-References: <1429656574-8411-1-git-send-email-tyler.baker@linaro.org>
- <CANMBJr53a0cdJ5yjBu3ADv=x-==X0HXVQDELmuSuLLNCKLzviw@mail.gmail.com>
- <554A31F4.7080200@osg.samsung.com>
-Message-ID: <CANMBJr7iP0BkTONSF36V3+F=nEk7guAVVFEi83ifjoKoaM-Mqw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 May 2015 16:44:06 +0100
+Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <CAAS=xmh=tQRJymDCAevNC_gv+aCQnJH0tPjXX2L0BBhKbhZOYg@mail.gmail.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
+ <20150505171349.GA30215@leverpostej> <5549877C.10408@huawei.com>
+ <5549B9CC.1040709@huawei.com> <20150506093022.GB31001@leverpostej>
+ <5549EE97.3020801@huawei.com> <20150506104856.GC707@leverpostej>
+ <CAAS=xmh=tQRJymDCAevNC_gv+aCQnJH0tPjXX2L0BBhKbhZOYg@mail.gmail.com>
+Message-ID: <20150506154406.GB2974@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 May 2015 at 08:23, Shuah Khan <shuahkh@osg.samsung.com> wrote:
-> On 05/06/2015 08:49 AM, Tyler Baker wrote:
->> Hi Shuah,
->>
->> On 21 April 2015 at 15:49, Tyler Baker <tyler.baker@linaro.org> wrote:
->>> This patch set fixes various issues observed when cross building and
->>> installing selftests.
->>>
->>> As I began investigating improving the test output format, I performed an
->>> audit of the current tests to ensure all tests were able to execute on various
->>> target architectures. I found that some tests did not install their binaries
->>> and others required directories to be installed to execute properly. There
->>> were also cases in which tests were being installed when they were never built.
->>> With this series applied all tests compile when appropriate and install their
->>> output properly.
->>>
->>> I have tested this series by building, installing and deploying all selftests
->>> to x86, arm and arm64 targets.
->>>
->>> Changes v3 -> v4:
->>> * Planning to send a followup series to address the lib.mk issue so I've
->>> dropped the breakpoints and x86 installation workaround.
->>> * x86: Removed redundant else logic block.
->>> * Applied Andy Lutomirski's ACK to patches 4 and 5.
->>> * Rebased onto next-20150421.
->>
->> I believe all comments have been addressed, is there anything else you
->> would like to see?
->>
->>>
->>> Changes v2 -> v3:
->>> * 5/8: Removed duplicate all_32.
->>> * 6/8: Ensure the default rule is all in every case.
->>> * 6/8: Fixed commit message wording for better clarity.
->>> * Applied Michael Ellerman's ACK to patches 1-4, and 8 as they have not changed.
->>> * Rebased onto next-20150420.
->>>
->>> Changes v1 -> v2:
->>> * Have no dependency on all when CROSS_COMPILE is set. (Andy Lutomirski)
->>> * Added Andy on CC for all x86 test patches.
->>> * Split up the x86 patches for better clarity.
->>> * Rebased onto next-20150415.
->>>
->>> This series is based on next-20150421.
->>>
->>> Tyler Baker (7):
->>>   selftests: copy TEST_DIRS to INSTALL_PATH
->>>   selftests/ftrace: install test.d
->>>   selftests/kdbus: install kdbus-test
->>>   selftest/x86: build both bitnesses
->>>   selftest/x86: have no dependency on all when cross building
->>>   selftests/x86: install tests
->>>   selftests/exec: do not install subdir as it is already created
->>>
->>>  tools/testing/selftests/exec/Makefile   |  2 +-
->>>  tools/testing/selftests/ftrace/Makefile |  1 +
->>>  tools/testing/selftests/kdbus/Makefile  |  2 ++
->>>  tools/testing/selftests/lib.mk          |  3 +++
->>>  tools/testing/selftests/x86/Makefile    | 15 ++++++++++++---
->>>  5 files changed, 19 insertions(+), 4 deletions(-)
->>>
->>> --
->>> 2.1.4
->>>
->>
->
-> Patches are good. I will be applying these to linux-kselftest
-> next in a day or two for 4.2
+Hi,
 
-Excellent.
+> How about add the following binding rule to my 2/5 patch:
+> ---------------------------
+> *Hisilicon Enhanced ARM AMBA Primecell PL011 serial UART
+> 
+> Required properties:
+> - compatible: must be "hisilicon,hi6220-uart", "arm,primecell", "arm,pl011"
 
->
-> Thanks for fixing these issues.
+"arm,primecell" should come last.
 
-No problem, thanks for your consideration.
+> - reg: exactly one register range with length 0x1000
+> - interrupts: exactly one interrupt specifier
+> 
+> See also bindings/serial/pl011.txt
+> 
+> Example:
+> 
+> uart0: uart at f8015000 {
+>         compatible = "hisilicon,hi6220-uart", "arm,pl011", "arm,primecell";
+>         reg = <0x0 0xf8015000 0x0 0x1000>;
+>         interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+>         clocks = <&ao_ctrl HI6220_UART0_PCLK>, <&ao_ctrl HI6220_UART0_PCLK>;
+>         clock-names = "uartclk", "apb_pclk";
+> };
 
->
-> -- Shuah
->
->
-> --
-> Shuah Khan
-> Sr. Linux Kernel Developer
-> Open Source Innovation Group
-> Samsung Research America (Silicon Valley)
-> shuahkh at osg.samsung.com | (970) 217-8978
+How about for the moment we just modify the existing pl011 binding
+document to allow for the hi6220-specific string in addition to its
+existing strings? We can always split it out later if the hi6220 UART
+binding needs to be significantly divergent.
 
+> > Is UART 0 different from UART1 and UART2?
+> Yes,  but my patch just includes UART0, we do some changements for UART1/2
+> to improve performance.
 
-Tyler
+Sure, but we need to make sure we can choose a sane compatible string
+for them, that won't clash with whatever we choose for UART0.
+
+Are they the same IP as UART0, or fundamentally different?
+
+Are they also PL011 derived?
+
+Thanks,
+Mark.
