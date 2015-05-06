@@ -1,84 +1,57 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 6 May 2015 08:05:11 -0500
-Subject: [PATCH 1/2] dt-bindings: Add pxa1928 clock binding
-In-Reply-To: <20150506071708.GD27050@codeaurora.org>
-References: <1430455271-20195-1-git-send-email-robh@kernel.org>
- <20150506071708.GD27050@codeaurora.org>
-Message-ID: <CAL_JsqJmpLw_iNXz5vZt9qcoR_CSRum3hB4fVYtERBsB=v=H8Q@mail.gmail.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 6 May 2015 15:06:15 +0200
+Subject: [PATCH 0/2] gpio: Allow userspace export from DT
+In-Reply-To: <CACRpkdbFKs8mALw7q2d0EEDkhxKNLgeiFB5TyZ6ZPpfcW-c+oQ@mail.gmail.com>
+References: <20150413110515.9681.58848.stgit@localhost>
+ <20150504084925.GB4047@localhost>
+ <CACRpkdbFKs8mALw7q2d0EEDkhxKNLgeiFB5TyZ6ZPpfcW-c+oQ@mail.gmail.com>
+Message-ID: <20150506130615.GB5302@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 6, 2015 at 2:17 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 04/30, Rob Herring wrote:
->> diff --git a/Documentation/devicetree/bindings/clock/marvell,pxa1928.txt b/Documentation/devicetree/bindings/clock/marvell,pxa1928.txt
->> new file mode 100644
->> index 0000000..809c5a2
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/marvell,pxa1928.txt
->> @@ -0,0 +1,21 @@
->> +* Marvell PXA1928 Clock Controllers
->> +
->> +The PXA1928 clock subsystem generates and supplies clock to various
->> +controllers within the PXA1928 SoC. The PXA1928 contains 3 clock controller
->> +blocks called APMU, MPMU, and APBC roughly corresponding to internal buses.
->> +
->> +Required Properties:
->> +
->> +- compatible: should be one of the following.
->> +  - "marvell,pxa1928-apmu" - APMU controller compatible
->> +  - "marvell,pxa1928-mpmu" - MPMU controller compatible
->> +  - "marvell,pxa1928-apbc" - APBC controller compatible
->> +- reg: physical base address of the clock controller and length of memory mapped
->> +  region.
->> +- #clock-cells: should be 1.
->> +- #reset-cells: should be 1.
->> +
->> +Each clock is assigned an identifier and client nodes use the clock controller
->> +phandle and this identifier to specify the clock which they consume.
->> +
->> +All these identifiers can be found in <dt-bindings/clock/marvell,pxa1928.h>.
->
-> No example?
+On Wed, May 06, 2015 at 09:22:22AM +0200, Linus Walleij wrote:
+> On Mon, May 4, 2015 at 10:49 AM, Johan Hovold <johan@kernel.org> wrote:
+> > On Mon, Apr 13, 2015 at 01:05:15PM +0200, Martin Fuzzey wrote:
+> 
+> >> The above means that, in order to export the GPIO to userspace via
+> >> /sys/class/gpio/export the userspace code must know the exact hardware and
+> >> kernel version information.
+> >
+> > Not quite. You can still determine the gpio number in the above cases by
+> > walking the sysfs tree to find the chip and it's base. This is the only
+> > way to do this for dynamic buses such as USB.
+> 
+> Maybe we should start providing something like an
+> "lsgpio" utility in tools/gpio to do this, just as a hint
+> to userspace people on how things should be done.
 
-There's nothing really special about this binding to show.
+I think we should focus on defining a new user-space interface rather
+than make it easier to use the current one (it should really only be
+used for development or one-off hacks IMO).
 
->> diff --git a/include/dt-bindings/clock/marvell,pxa1928.h b/include/dt-bindings/clock/marvell,pxa1928.h
->> new file mode 100644
->> index 0000000..c393ca2
->> --- /dev/null
->> +++ b/include/dt-bindings/clock/marvell,pxa1928.h
->> @@ -0,0 +1,57 @@
->> +#ifndef __DTS_MARVELL_PXA1928_CLOCK_H
->> +#define __DTS_MARVELL_PXA1928_CLOCK_H
->> +
->> +/*
->> + * Clock ID values here correspond to the control register offset/4.
->> + */
->> +
->> +/* apb periphrals */
->
-> s/periphrals/peripherals/ ?
+> >> This patch series solves both problems by performing the external
+> >> signal => GPIO mapping in the device tree.
+> >
+> > As Rob already mentioned, what we want is some way to declare pin
+> > functions. These could then be requested from userspace (or used in DT,
+> > something which should allow for further refactoring there as well)
+> > unless a driver has already claimed them.
+> 
+> We have the ability to name the GPIO lines (I usually refer to
+> lines rather than pins, as pins are physical and not all GPIOs
+> are, actually) using the array "names" in struct gpio_chip,
+> however this has no DT binding, so maybe people should
+> work on that. These names appear as named line files
+> in sysfs IIRC. Or maybe you're thinking of something else?
 
-Uhh, cut-n-paste from marvell,mmp2.h...
->
->> +#define PXA1928_CLK_RTC                      0
->> +#define PXA1928_CLK_TWSI0            1
->> +#define PXA1928_CLK_TWSI1            2
->> +#define PXA1928_CLK_TWSI2            3
->> +#define PXA1928_CLK_TWSI3            4
->> +#define PXA1928_CLK_OWIRE            5
->> +#define PXA1928_CLK_KPC                      6
->> +#define PXA1928_CLK_TB_ROTARY                7
->> +#define PXA1928_CLK_SW_JTAG          8
->> +#define PXA1928_CLK_TIMER1           9
->
-> This is really nitpicky, but I find the jump from decimal to hex odd.
-> Is there any reason why we don't just use decimal or hex throughout?
-> Perhaps it's related to why there are holes in the number space?
+Yes, something like that. As you mention above, if it was possibly to
+define those names in firmware, even the current sysfs interface would
+expose the pins as
 
-What is 9 in hex? ;) I'll prefix them. It's hard to convert decimal to
-register values.
+	/sys/class/gpio/<function>
 
->> +#define PXA1928_CLK_UART0            0xb
+rather than say /sys/class/gpio/gpio279, thereby solving the gpio-number
+look-up issue. Well, to actually make the pin available *from* userspace
+you'd currently still need the number...
 
-Rob
+Johan
