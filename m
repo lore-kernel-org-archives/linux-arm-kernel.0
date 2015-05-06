@@ -1,86 +1,62 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Wed, 06 May 2015 10:26:07 +0300
-Subject: [PATCHv7 0/8] watchdog: Extend kernel API and add
- early_timeout_sec feature
-In-Reply-To: <20150505135054.GI25193@pengutronix.de>
-References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
- <20150505135054.GI25193@pengutronix.de>
-Message-ID: <5549C20F.4010605@offcode.fi>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 6 May 2015 15:23:39 +0800
+Subject: [PATCH v4 0/3] Add Mediatek SoC RTC driver 
+Message-ID: <1430897022-63357-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+RTC is one submodule of Mediatek MT6397 PMIC chip[1]. This series
+support RTC driver that work with Mediatek SoC like MT8135, MT8173.
+It implements second counter and also provide alarm function.
 
-On 05.05.2015 16:50, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> I talked to Marc Kleine-Budde about your approach, thought a bit more
-> about it and want to share a few thoughts with you.
->
-> Actually your series addresses three different problems
->
->   a) some watchdog hardware isn't stoppable;
->   b) some watchdog hardware has short maximal timeout;
->   c) what to do with a watchdog that is already running at probe time?
->
-> The common solution is to add a mid-layer between userspace and the
-> driver that bridges the possible hardware limitations when userspace
-> wants to stop the watchdog or set a big timeout value. c) is a bit
-> different but could make use of the infrastructure that is introduced
-> while fixing a+b). The main difference between a+b) and c) is that for
-> c) you have to introduce some policy. If the series were mine I'd first
-> do three commits that address a), b) and c) each. Then convert drivers
-> to it.
+This series base on 4.1-rc1, Test ok on MT8173 platform.
 
-The infrastructure needed for both a and b is the same, the actual code 
-to implement either a or b is also touching the same functions and quite 
-slim, so I think it may not be feasible to separate those in their own 
-patches. But I'll think about it and see if logical separation makes sense.
+[1] https://lkml.org/lkml/2015/1/23/325
 
-> Guenter and I already said something similar, but I will eventually
-> repeat it here more explicitly: When introducing a midlayer that
-> abstracts between hardware and it's users the IMHO most important thing
-> to get right is to be explicit about which side of a midlayer you're
-> currently working at. That is, be explicit about watchdog_is_running:
-> Does it mean the hardware is running, or does userspace believe the
-> watchdog to be active? Same for timeout, stoppable etc.pp.
+Change in v4:
+1. Align mt6397-core.c resource in straight lines.
+2. Modify mtk_rtc_write_trigger according Joe Perches and
+   Alexandre Belloni suggestion.
+3. Align function parameters to the open parenthesis.
+4. Modify MAINTAINER to use file full name.
 
-Yes, I agree. Thanks for clarifying this. I will keep this in mind and 
-try to be explicit when naming functions and variables. The best way 
-would be to also rename the existing variables too, but that would also 
-touch all the existing drivers. Keeping the current naming scheme in 
-place no doubt is less explicit about which side of the new midlayer 
-they are working on. But luckily the logic of the existing driver 
-doesn't change, they are all exposing things directly to userland and 
-they can be documented as is. The new variables and functions add 
-interfaces only between the new midlayer and HW, so they are explicit as 
-well. So I think it is a fair compromise to leave all existing interface 
-towards the user space as is.
+Change in v3:
+1. Replace magic number in mt6397-core.c
+2. Add comment for some equation and write trigger.
+3. Use regmap_bulk_read and regmap_bulk_write to avoid muliple regmap_read
+   and regmap_write
+4. Replace devm_request_threaded_irq with request_threaded_irq and add
+   irq_dispose_mapping
+5. Fix Tomasz Figa review comment.
 
-> When you consider changing the unit the watchdog core is using, why not
-> change to nano seconds and 64 bit variables? You might be able to copy
-> some algorithms and ideas from the timer core that uses these.
+Change in v2:
+1. Move RTC address and interrupt to mt6397-core.c, and register
+   these resource in mfd_cell.
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323239.html
+2. Remove dt-binding document due to register resouce in mfd_cell, not from
+   device tree.
+3. Update MAINTAINER file to add Mediatek RTC mainainter.
+4. Add prefix mtk_ to some internal functions.
+5. Fix racy condition
+6. Check return value of regmap_read and regmap_write
+7. Remove some unnecessary register readback, clear, then write.
+8. Add disable alarm in mtk_rtc_set_alarm function
+9. Fix Uwe Kleine-K?nig review comment
 
-Yes, sounds like a good idea. I will look into it.
+Eddie Huang (2):
+  mfd: provide RTC resource in MT6397 MFD
+  MAINTAINERS: add Mediatek RTC driver
 
-> For c), I'd want to have a compile time setting that specifies the
-> default value for the policy:
->   - disable at probe
->   - don't touch a running timer
->   - start at probe
-> This is friendly to distributions that might want to set "disable at
-> probe"-default to be on the safe side. Still make this overridable by a
-> kernel parameter. I'm not sure that "start at probe" is a sensible
-> feature. (Either you want to start the watchdog early, in this case even
-> before Linux starts; or you're not that strict then it doesn't matter
-> much if it takes yet another little while until your application that
-> pets the watchdog is up.)
+Tianping Fang (1):
+  rtc: mediatek: Add MT6397 RTC driver
 
-Yes, this is very simple and sounds like a reasonable thing to have. I 
-will add a Kconfig entry for this kind of build time default.
+ MAINTAINERS               |   7 +
+ drivers/mfd/mt6397-core.c |  18 +++
+ drivers/rtc/Kconfig       |  10 ++
+ drivers/rtc/Makefile      |   1 +
+ drivers/rtc/rtc-mt6397.c  | 394 ++++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 430 insertions(+)
+ create mode 100644 drivers/rtc/rtc-mt6397.c
 
-I will start working on the next version soon before I start forgetting 
-all the good feedback I have received...
-
-Thanks!
--Timo
+--
+1.8.1.1.dirty
