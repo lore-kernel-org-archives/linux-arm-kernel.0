@@ -1,27 +1,55 @@
 From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Wed, 06 May 2015 14:21:31 -0600
-Subject: [PATCH v4 5/7] selftest/x86: have no dependency on all when cross
- building
-In-Reply-To: <1429656705-10016-1-git-send-email-tyler.baker@linaro.org>
-References: <1429656705-10016-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <554A77CB.9080802@osg.samsung.com>
+Date: Wed, 06 May 2015 14:22:47 -0600
+Subject: [PATCH v4 6/7] selftests/x86: install tests
+In-Reply-To: <1429656718-10436-1-git-send-email-tyler.baker@linaro.org>
+References: <1429656718-10436-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <554A7817.4030800@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/21/2015 04:51 PM, Tyler Baker wrote:
-> If the CROSS_COMPILE is set remove all's dependency on all_32 and all_64.
+> Include lib.mk and set TEST_PROGS where appropriate.
 > 
 > Cc: Andy Lutomirski <luto@amacapital.net>
-> Acked-by: Andy Lutomirski <luto@kernel.org>
 > Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
 > ---
+>  tools/testing/selftests/x86/Makefile | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/tools/testing/selftests/x86/Makefile b/tools/testing/selftests/x86/Makefile
+> index ec7b088..4af1e48 100644
+> --- a/tools/testing/selftests/x86/Makefile
+> +++ b/tools/testing/selftests/x86/Makefile
+> @@ -14,9 +14,13 @@ UNAME_M := $(shell uname -m)
+>  ifeq ($(CROSS_COMPILE),)
+>  # Always build 32-bit tests
+>  all: all_32
+> +# Install 32-bit tests
+> +TEST_PROGS += $(BINARIES_32) run_x86_tests.sh
+>  # If we're on a 64-bit host, build 64-bit tests as well
+>  ifeq ($(UNAME_M),x86_64)
+>  all: all_64
+> +# Install 64-bit tests
+> +TEST_PROGS += $(BINARIES_64)
+>  endif
+>  endif
+>  
+> @@ -24,6 +28,8 @@ all_32: check_build32 $(BINARIES_32)
+>  
+>  all_64: $(BINARIES_64)
+>  
+> +include ../lib.mk
+> +
+>  clean:
+>  	$(RM) $(BINARIES_32) $(BINARIES_64)
+>  
+> 
 
-I will wait on this patch and other x85 patches in this series
+I will wait on this patch and other x86 patches in this series
 until x86 always build 32 breaking make kselftest target.
 
 thanks,
 -- Shuah
-
 
 -- 
 Shuah Khan
