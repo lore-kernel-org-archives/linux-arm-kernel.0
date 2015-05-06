@@ -1,170 +1,84 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 6 May 2015 18:25:54 +0800
-Subject: [PATCH v3 2/3] media: atmel-isi: add runtime pm support
-In-Reply-To: <1430907955-28665-1-git-send-email-josh.wu@atmel.com>
-References: <1430907955-28665-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1430907955-28665-3-git-send-email-josh.wu@atmel.com>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Wed, 06 May 2015 12:23:49 +0200
+Subject: [PATCH 1/6] ARM: sunxi: Introduce Allwinner H3 support
+In-Reply-To: <20150506100446.GA11057@lukather>
+References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+ <1430904693-1404-2-git-send-email-jenskuske@gmail.com>
+ <20150506100446.GA11057@lukather>
+Message-ID: <5549EBB5.8040806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The runtime pm resume/suspend will enable/disable pclk (ISI peripheral
-clock).
-And we need to call runtime_pm_get_sync()/runtime_pm_put() when we need
-access ISI registers.
+On 06/05/15 12:04, Maxime Ripard wrote:
+> Hi,
+> 
+> On Wed, May 06, 2015 at 11:31:28AM +0200, Jens Kuske wrote:
+>> The Allwinner H3 is a quad-core Cortex-A7-based SoC. It is very similar
+>> to other sun8i family SoCs like the A23.
+>>
+>> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>>  arch/arm/mach-sunxi/Kconfig                     | 2 +-
+>>  arch/arm/mach-sunxi/sunxi.c                     | 3 ++-
+>>  3 files changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+>> index 42941fd..3cb4b94 100644
+>> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+>> @@ -9,4 +9,5 @@ using one of the following compatible strings:
+>>    allwinner,sun6i-a31
+>>    allwinner,sun7i-a20
+>>    allwinner,sun8i-a23
+>> +  allwinner,sun8i-h3
+>>    allwinner,sun9i-a80
+>> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+>> index 81502b9..47ac5b4 100644
+>> --- a/arch/arm/mach-sunxi/Kconfig
+>> +++ b/arch/arm/mach-sunxi/Kconfig
+>> @@ -35,7 +35,7 @@ config MACH_SUN7I
+>>  	select SUN5I_HSTIMER
+>>  
+>>  config MACH_SUN8I
+>> -	bool "Allwinner A23 (sun8i) SoCs support"
+>> +	bool "Allwinner A23 / H3 (sun8i) SoCs support"
+> 
+> I'd prefer that we have something similar to sun9i, just mentionning
+> the family here, instead of an ever-growing list of SoCs.
+> 
+> This used to be easy to maintain, with the new naming scheme, we
+> already have at least 4 SoCs part of sun8i.
 
-In the meantime, as clock_start()/clock_stop() is used to control the
-mclk not ISI peripheral clock. So move this to start[stop]_streaming()
-function.
+According to Allwinners new naming scheme A20/A31/A31s are also part of
+sun8i (sun8iw[1,2]), but I think we can agree to use sun8i for the new
+SoCs, starting from A23.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
+> 
+>>  	default ARCH_SUNXI
+>>  	select ARM_GIC
+>>  	select MFD_SUN6I_PRCM
+>> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+>> index 1bc811a..bc63748 100644
+>> --- a/arch/arm/mach-sunxi/sunxi.c
+>> +++ b/arch/arm/mach-sunxi/sunxi.c
+>> @@ -67,10 +67,11 @@ MACHINE_END
+>>  
+>>  static const char * const sun8i_board_dt_compat[] = {
+>>  	"allwinner,sun8i-a23",
+>> +	"allwinner,sun8i-h3",
+>>  	NULL,
+>>  };
+>>  
+>> -DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
+>> +DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23/H3) Family")
+> 
+> Same comment here.
+> 
+> Could you also update Documentation/arm/sunxi/README with these infos
+> (and ideally, updating it with the new SoCs we've heard about) ?
+> 
 
-Changes in v3: None
-Changes in v2:
-- merged v1 two patch into one.
-- use runtime_pm_put() instead of runtime_pm_put_sync()
-- enable peripheral clock before access ISI registers.
+Will do.
 
- drivers/media/platform/soc_camera/atmel-isi.c | 51 +++++++++++++++++++++++----
- 1 file changed, 45 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index 31254b4..2b05f89 100644
---- a/drivers/media/platform/soc_camera/atmel-isi.c
-+++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -20,6 +20,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/slab.h>
- 
- #include <media/atmel-isi.h>
-@@ -384,6 +385,8 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
- 	struct atmel_isi *isi = ici->priv;
- 	int ret;
- 
-+	pm_runtime_get_sync(ici->v4l2_dev.dev);
-+
- 	/* Reset ISI */
- 	ret = atmel_isi_wait_status(isi, WAIT_ISI_RESET);
- 	if (ret < 0) {
-@@ -441,6 +444,8 @@ static void stop_streaming(struct vb2_queue *vq)
- 	ret = atmel_isi_wait_status(isi, WAIT_ISI_DISABLE);
- 	if (ret < 0)
- 		dev_err(icd->parent, "Disable ISI timed out\n");
-+
-+	pm_runtime_put(ici->v4l2_dev.dev);
- }
- 
- static struct vb2_ops isi_video_qops = {
-@@ -509,7 +514,13 @@ static int isi_camera_set_fmt(struct soc_camera_device *icd,
- 	if (mf.code != xlate->code)
- 		return -EINVAL;
- 
-+	/* Enable PM and peripheral clock before operate isi registers */
-+	pm_runtime_get_sync(ici->v4l2_dev.dev);
-+
- 	ret = configure_geometry(isi, pix->width, pix->height, xlate->code);
-+
-+	pm_runtime_put(ici->v4l2_dev.dev);
-+
- 	if (ret < 0)
- 		return ret;
- 
-@@ -722,14 +733,9 @@ static int isi_camera_clock_start(struct soc_camera_host *ici)
- 	struct atmel_isi *isi = ici->priv;
- 	int ret;
- 
--	ret = clk_prepare_enable(isi->pclk);
--	if (ret)
--		return ret;
--
- 	if (!IS_ERR(isi->mck)) {
- 		ret = clk_prepare_enable(isi->mck);
- 		if (ret) {
--			clk_disable_unprepare(isi->pclk);
- 			return ret;
- 		}
- 	}
-@@ -744,7 +750,6 @@ static void isi_camera_clock_stop(struct soc_camera_host *ici)
- 
- 	if (!IS_ERR(isi->mck))
- 		clk_disable_unprepare(isi->mck);
--	clk_disable_unprepare(isi->pclk);
- }
- 
- static unsigned int isi_camera_poll(struct file *file, poll_table *pt)
-@@ -841,8 +846,13 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
- 
- 	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
- 
-+	/* Enable PM and peripheral clock before operate isi registers */
-+	pm_runtime_get_sync(ici->v4l2_dev.dev);
-+
- 	isi_writel(isi, ISI_CFG1, cfg1);
- 
-+	pm_runtime_put(ici->v4l2_dev.dev);
-+
- 	return 0;
- }
- 
-@@ -1039,6 +1049,9 @@ static int atmel_isi_probe(struct platform_device *pdev)
- 	soc_host->v4l2_dev.dev	= &pdev->dev;
- 	soc_host->nr		= pdev->id;
- 
-+	pm_suspend_ignore_children(&pdev->dev, true);
-+	pm_runtime_enable(&pdev->dev);
-+
- 	if (isi->pdata.asd_sizes) {
- 		soc_host->asd = isi->pdata.asd;
- 		soc_host->asd_sizes = isi->pdata.asd_sizes;
-@@ -1052,6 +1065,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_register_soc_camera_host:
-+	pm_runtime_disable(&pdev->dev);
- err_req_irq:
- err_ioremap:
- 	vb2_dma_contig_cleanup_ctx(isi->alloc_ctx);
-@@ -1064,6 +1078,30 @@ err_alloc_ctx:
- 	return ret;
- }
- 
-+static int atmel_isi_runtime_suspend(struct device *dev)
-+{
-+	struct soc_camera_host *soc_host = to_soc_camera_host(dev);
-+	struct atmel_isi *isi = container_of(soc_host,
-+					struct atmel_isi, soc_host);
-+
-+	clk_disable_unprepare(isi->pclk);
-+
-+	return 0;
-+}
-+static int atmel_isi_runtime_resume(struct device *dev)
-+{
-+	struct soc_camera_host *soc_host = to_soc_camera_host(dev);
-+	struct atmel_isi *isi = container_of(soc_host,
-+					struct atmel_isi, soc_host);
-+
-+	return clk_prepare_enable(isi->pclk);
-+}
-+
-+static const struct dev_pm_ops atmel_isi_dev_pm_ops = {
-+	SET_RUNTIME_PM_OPS(atmel_isi_runtime_suspend,
-+				atmel_isi_runtime_resume, NULL)
-+};
-+
- static const struct of_device_id atmel_isi_of_match[] = {
- 	{ .compatible = "atmel,at91sam9g45-isi" },
- 	{ }
-@@ -1075,6 +1113,7 @@ static struct platform_driver atmel_isi_driver = {
- 	.driver		= {
- 		.name = "atmel_isi",
- 		.of_match_table = of_match_ptr(atmel_isi_of_match),
-+		.pm	= &atmel_isi_dev_pm_ops,
- 	},
- };
- 
--- 
-1.9.1
+Jens
