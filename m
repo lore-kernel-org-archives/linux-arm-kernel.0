@@ -1,77 +1,49 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Wed, 6 May 2015 17:16:35 -0500
-Subject: [V2 PATCH 1/5] ACPI / scan: Parse _CCA and setup device coherency
-In-Reply-To: <4573209.dHyztuCFMt@vostro.rjw.lan>
-References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <3234610.3j3NfP3xpR@vostro.rjw.lan> <55499569.8060403@amd.com>
- <4573209.dHyztuCFMt@vostro.rjw.lan>
-Message-ID: <554A92C3.7060606@amd.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 6 May 2015 18:57:55 -0400
+Subject: [PATCH 02/11] arm/mach-keystone: remove legacy __cpuinit
+ sections that crept in
+In-Reply-To: <554A4AF6.2060309@oracle.com>
+References: <1430174880-27958-1-git-send-email-paul.gortmaker@windriver.com>
+ <1430174880-27958-3-git-send-email-paul.gortmaker@windriver.com>
+ <20150506103704.GJ2067@n2100.arm.linux.org.uk>
+ <554A4AF6.2060309@oracle.com>
+Message-ID: <20150506225754.GC13001@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/6/2015 5:21 PM, Rafael J. Wysocki wrote:
->>>> > >>+	bool
->>>> > >>+
->>>> > >>+config ACPI_SUPPORT_CCA_ZERO
->>> > >
->>> > >I guess this means "we support devices that can DMA, but are not coherent".
->>> > >right?
->> >
->> >Yes, basically when _CCA=0.
-> So what about
->
-> 	ARCH_SUPPORT_CACHE_INCOHERENT_DMA
+[Re: [PATCH 02/11] arm/mach-keystone: remove legacy __cpuinit sections that crept in] On 06/05/2015 (Wed 10:10) santosh shilimkar wrote:
 
-Since this is specific to ACPI _CCA, I just want to be clear with the 
-naming.
+> On 5/6/2015 3:37 AM, Russell King - ARM Linux wrote:
+> >On Mon, Apr 27, 2015 at 06:47:51PM -0400, Paul Gortmaker wrote:
+> >>We removed __cpuinit support (leaving no-op stubs) quite some time
+> >>ago.  However two crept back in as of commit 5eb3da7246a5b2dfac9f38
+> >>("ARM: keystone: Switch over to coherent memory address space")
+> >>
+> >>Since we want to clobber the stubs too, get these removed now.
+> >>
+> >>Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >
+> >Santosh's email is now: Santosh Shilimkar <ssantosh@kernel.org>
+> >
+> Thanks Russell.
+> 
+> 
+> >>Cc: linux-arm-kernel at lists.infradead.org
+> >>Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> >>---
+> >>  arch/arm/mach-keystone/platsmp.c | 4 ++--
+> >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> >>
+> Paul, Change is fine by me. I can pick this up for 4.2
 
-> or something similar?
->
->>>> > >>+	bool
->>>> > >>+
->>>> > >>   config ACPI_SLEEP
->>>> > >>   	bool
->>>> > >>   	depends on SUSPEND || HIBERNATION
->>>> > >>diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
->>>> > >>index 4bf7559..a6feca4 100644
->>>> > >>--- a/drivers/acpi/acpi_platform.c
->>>> > >>+++ b/drivers/acpi/acpi_platform.c
->>>> > >>@@ -108,9 +108,11 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
->>>> > >>   	if (IS_ERR(pdev))
->>>> > >>   		dev_err(&adev->dev, "platform device creation failed: %ld\n",
->>>> > >>   			PTR_ERR(pdev));
->>>> > >>-	else
->>>> > >>+	else {
->>> > >
->>> > >Please add braces to both branches when making such changes (as per CodingStyle).
->>> > >
->> >
->> >OK.
->> >
->>>> > >>+		acpi_setup_device_dma(adev, &pdev->dev);
->>> > >
->>> > >Why do we need to do that here (for the second time)?
->> >
->> >Because we are calling:
->> >    acpi_create_platform_device()
->> >      |--> platform_device_register_device_full()
->> >        |-->platform_device_alloc()
->> >
->> >This creates platform_device, which allocate a new platform_device->dev.
->> >This is not the same as the original acpi_device->dev that was created
->> >during acpi_add_single_object(). So, we have to set up the device
->> >coherency again.
-> Ah, so the second arg is different now.
->
-> Well, in that case, why do we need to set it up for the adev's dev member?
->
-
-Just for sanity, since I don't know if adev->dev will be referenced 
-anywhere else. This way, it's consistent for all copied of struct device 
-generated.
-
-Lemme know if you think that is unnecessary.
+No need, since I'm forced to keep it here with the actual final stub
+removal so that I don't break bisection for people once it goes to
+Linus eventually.  I'll add an Ack'd by though.
 
 Thanks,
+Paul.
+--
 
-Suravee
+> 
+> Regards,
+> Santosh
