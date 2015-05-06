@@ -1,111 +1,63 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 6 May 2015 16:18:05 +0800
-Subject: [PATCH] clk: sirf: add CSR atlas7 clk and reset support
-In-Reply-To: <20150416215923.19585.62580@quantum>
-References: <1419495845-4345-1-git-send-email-21cnbao@gmail.com>
- <20150411002358.18916.16856@quantum>
- <CAGsJ_4zUcZY2_rTeav521-1j-QGeHWF+ArO_dYoOSOYCJDNvEA@mail.gmail.com>
- <CAGsJ_4wibCzTOkfxz6HzCa86+eYSaaDo3q7h+JRrXfDuifCLxQ@mail.gmail.com>
- <20150416215923.19585.62580@quantum>
-Message-ID: <CAGsJ_4xjDy=zfqL5zTP1oJneMFmBVOQd+o98Z00ATzk1iHdWhw@mail.gmail.com>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Wed, 06 May 2015 16:19:59 +0800
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <2196079.901rMdSZr0@wuerfel>
+References: <55417F5A.4040300@linaro.org> <5548A5D5.9030107@linaro.org>
+ <5549BB3A.6060106@huawei.com> <2196079.901rMdSZr0@wuerfel>
+Message-ID: <5549CEAF.1090400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-17 5:59 GMT+08:00 Michael Turquette <mturquette@linaro.org>:
-> Quoting Barry Song (2015-04-14 04:57:18)
->> 2015-04-12 18:24 GMT+08:00, Barry Song <21cnbao@gmail.com>:
->> > 2015-04-11 8:23 GMT+08:00 Michael Turquette <mturquette@linaro.org>:
->> >> Quoting Barry Song (2014-12-25 00:24:05)
->> >>> From: Zhiwu Song <Zhiwu.Song@csr.com>
->> >>>
->> >>> the hardware node includes both clock and reset support, so it
->> >>> is named as "car".
->> >>> this patch implements Flexible clocks(mux, divider, gate), Selectable
->> >>> clock(mux, divider, gate), root clock(gate),leaf clock(gate), others.
->> >>> it also implements the reset controller functionality.
->> >>>
->> >>> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
->> >>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> >>> ---
->> >>>  .../devicetree/bindings/clock/csr,atlas7-car.txt   |   46 +
->> >>>  drivers/clk/sirf/Makefile                          |    2 +-
->> >>>  drivers/clk/sirf/clk-atlas7.c                      | 1652
->> >>> ++++++++++++++++++++
->> >>>  3 files changed, 1699 insertions(+), 1 deletion(-)
->> >>>  create mode 100644
->> >>> Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
->> >>>  create mode 100644 drivers/clk/sirf/clk-atlas7.c
->> >>>
->> >>> diff --git a/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
->> >>> b/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
->> >>> new file mode 100644
->> >>> index 0000000..a1a9499
->> >>> --- /dev/null
->> >>> +++ b/Documentation/devicetree/bindings/clock/csr,atlas7-car.txt
->> >>> @@ -0,0 +1,46 @@
->> >>> +* Clock and reset bindings for CSR atlas7
->> >>> +
->> >>> +Required properties:
->> >>> +- compatible: Should be "sirf,atlas7-car"
->> >>> +- reg: Address and length of the register set
->> >>> +- #clock-cells: Should be <1>
->> >>> +- #reset-cells: Should be <1>
->> >>> +
->> >>> +The clock consumer should specify the desired clock by having the clock
->> >>> +ID in its "clocks" phandle cell.
->> >>> +The ID list atlas7_clks defined in drivers/clk/sirf/clk-atlas7.c
->> >>> +
->> >>> +The reset consumer should specify the desired reset by having the reset
->> >>> +ID in its "reset" phandle cell.
->> >>> +The ID list atlas7_reset_unit defined in drivers/clk/sirf/clk-atlas7.c
->> >>> +
->> >>> +Examples:
->> >>> +
->> >>> +timer at 10dc0000 {
->> >>> +       compatible = "sirf,macro-tick";
->> >>> +       reg = <0x10dc0000 0x1000>;
->> >>> +       clocks = <&car 54>;
->> >>> +       interrupts = <0 0 0>,
->> >>> +                  <0 1 0>,
->> >>> +                  <0 2 0>,
->> >>> +                  <0 49 0>,
->> >>> +                  <0 50 0>,
->> >>> +                  <0 51 0>;
->> >>> +};
->> >>> +
->> >>> +uart1: uart at 18020000 {
->> >>> +       cell-index = <1>;
->> >>> +       compatible = "sirf,macro-uart";
->> >>> +       reg = <0x18020000 0x1000>;
->> >>> +       clocks = <&clks 95>;
->> >>> +       interrupts = <0 18 0>;
->> >>> +       fifosize = <32>;
->> >>> +};
->> >>> +
->> >>> +vpp at 13110000 {
->> >>> +       compatible = "sirf,prima2-vpp";
->> >>> +       reg = <0x13110000 0x10000>;
->> >>> +       interrupts = <0 31 0>;
->> >>> +       clocks = <&car 85>;
->> >>> +       resets = <&car 29>;
->> >>> +};
->> >>
->> >> It would be nice to provide an example of the clock provider node,
->> >> "sirf,atlas7-car".
->> >
->> > ok. Mike, thanks for reviewing.
->>
->> hi mike,  the example of the clock provider node has been done by the
->> v2 patch sent two days ago.is there enough time to push it to 4.1?
->
-> I'm afraid not. I'll take it after 4.1-rc1 drops.
 
-hi Mike, can you pick up this one to clk-next as the plan? after this,
-i have several incremental patches to rebase against your tree for
-4.1.
+On 2015/5/6 15:29, Arnd Bergmann wrote:
+> On Wednesday 06 May 2015 14:56:58 Shannon Zhao wrote:
+>> > On 2015/5/5 19:13, Shannon Zhao wrote:
+>> >         gpio-keys {
+>> >                 autorepeat;
+>> >                 #address-cells = <0x1>;
+>> >                 #size-cells = <0x0>;
+>> >                 compatible = "gpio-keys";
+>> > 
+>> >                 poweroff {
+>> >                         gpios = <0x8002 0x3 0x0>;
+>> >                         linux,code = <0x74>;
+>> >                         label = "GPIO Key Poweroff";
+>> >                 };
+>> >         };
+>> > 
+>> > Configure kernel to select GPIO Buttons and Polled GPIO buttons. Use a
+>> > Redhat filesystem "Red Hat Enterprise Linux Server for ARM Development
+>> > Preview release 1.5" which has systemd and systemd-logind. Start VM and
+>> > when it starts well type "system_powerdown" on QEMU monitor, the guest
+>> > goes to poweroff. So this way works.
+> Ok, very good.
+> 
+>> > Note: we must check the /lib/udev/rules.d/70-power-switch.rules in the
+>> > fs and add one following line in it if it doesn't exist.
+>> > 
+>> > SUBSYSTEM=="input", KERNEL=="event*", SUBSYSTEMS=="platform",
+>> > ATTRS{keys}=="116", TAG+="power-switch"
+>> > 
+>> > Then when execute journalctl -u systemd-logind in guest, we can see
+>> > something like below:
+>> > 
+>> > Jan 01 00:01:02 localhost systemd[1]: Starting Login Service...
+>> > Jan 01 00:01:07 localhost systemd[1]: Started Login Service.
+>> > Jan 01 00:01:07 localhost systemd-logind[927]: Watching system buttons
+>> > on /dev/input/event0 (gpio-keys)
+>> > Jan 01 00:01:07 localhost systemd-logind[927]: New seat seat0.
+>> > Jan 01 00:01:25 localhost systemd-logind[927]: New session c1 of user root.
+>> > 
+>> > Visit https://bugs.launchpad.net/ubuntu/+source/systemd/+bug/1347776 for
+>> > details.
+> How about Ubuntu or Debian releases that do not use systemd?
+> 
+> I guess we should check with a Debian Wheezy or Ubuntu Trusty release.
+> My guess is that it will work fine, but some minor adjustment might
+> be needed.
 
->
-> Regards,
-> Mike
+Will check Debian Wheezy and Ubuntu Trusty release later.
+BTW, I don't have them on hand, where can I get these filesystem for ARM?
 
--barry
+-- 
+Shannon
