@@ -1,46 +1,87 @@
-From: rbthomas@pobox.com (Rick Thomas)
-Date: Wed, 6 May 2015 03:00:30 -0700
-Subject: Bug#782364: linux-image-3.16.0-4-armmp: please configure drivers
- for both Cubox i4pro real time clocks
-In-Reply-To: <1430899272.15640.237.camel@debian.org>
-References: <20150410232854.23367.58862.reportbug@cube.rcthomas.org>
- <1428710930.29665.17.camel@decadent.org.uk>
- <20150429085705.GG12732@n2100.arm.linux.org.uk>
- <1430582464.15640.186.camel@hellion.org.uk>
- <20150502161226.GS12732@n2100.arm.linux.org.uk>
- <1430583695.15640.190.camel@hellion.org.uk>
- <1430899272.15640.237.camel@debian.org>
-Message-ID: <64A51823-C50B-48D5-8180-CBC44F691CCB@pobox.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 6 May 2015 12:04:46 +0200
+Subject: [PATCH 1/6] ARM: sunxi: Introduce Allwinner H3 support
+In-Reply-To: <1430904693-1404-2-git-send-email-jenskuske@gmail.com>
+References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+ <1430904693-1404-2-git-send-email-jenskuske@gmail.com>
+Message-ID: <20150506100446.GA11057@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK, How will I identify the upload when I see it?  The box is running Debian/Sid and I do regular updates.  So presumably, I?ll see a ?linux-image-3.16.0-4-armmp? package go by sometime soon?  And I?ll know I?ve got it when I see two /dev/rtc* devices?
+Hi,
 
-As for ?rbthomas at cube.rcthomas.org? ? I?m afraid it?s bogus.  I had exim4 configured wrong when I submitted the original bugreport  /-:.  I?m subscribed to the bugreport with my proper address (?rbthomas at pobox.com?) now; so you can either just send stuff for me to the bugreport directly or to the ?@pobox.com? address, and delete (or simply ignore) ?rbthomas at cube.rcthomas.org? whenever it raises its head.
+On Wed, May 06, 2015 at 11:31:28AM +0200, Jens Kuske wrote:
+> The Allwinner H3 is a quad-core Cortex-A7-based SoC. It is very similar
+> to other sun8i family SoCs like the A23.
+> 
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>  arch/arm/mach-sunxi/Kconfig                     | 2 +-
+>  arch/arm/mach-sunxi/sunxi.c                     | 3 ++-
+>  3 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index 42941fd..3cb4b94 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -9,4 +9,5 @@ using one of the following compatible strings:
+>    allwinner,sun6i-a31
+>    allwinner,sun7i-a20
+>    allwinner,sun8i-a23
+> +  allwinner,sun8i-h3
+>    allwinner,sun9i-a80
+> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> index 81502b9..47ac5b4 100644
+> --- a/arch/arm/mach-sunxi/Kconfig
+> +++ b/arch/arm/mach-sunxi/Kconfig
+> @@ -35,7 +35,7 @@ config MACH_SUN7I
+>  	select SUN5I_HSTIMER
+>  
+>  config MACH_SUN8I
+> -	bool "Allwinner A23 (sun8i) SoCs support"
+> +	bool "Allwinner A23 / H3 (sun8i) SoCs support"
 
-Thanks!  This has been an interesting and educational discussion!
-Rick
+I'd prefer that we have something similar to sun9i, just mentionning
+the family here, instead of an ever-growing list of SoCs.
 
+This used to be easy to maintain, with the new naming scheme, we
+already have at least 4 SoCs part of sun8i.
 
-On May 6, 2015, at 1:01 AM, Ian Campbell <ijc@debian.org> wrote:
+>  	default ARCH_SUNXI
+>  	select ARM_GIC
+>  	select MFD_SUN6I_PRCM
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 1bc811a..bc63748 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -67,10 +67,11 @@ MACHINE_END
+>  
+>  static const char * const sun8i_board_dt_compat[] = {
+>  	"allwinner,sun8i-a23",
+> +	"allwinner,sun8i-h3",
+>  	NULL,
+>  };
+>  
+> -DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
+> +DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23/H3) Family")
 
-> On Sat, 2015-05-02 at 17:21 +0100, Ian Campbell wrote:
->> We typically build RTCs statically (for this sort of reason) so it seems
->> like the right thing for us to do here is to build both in.
-> 
-> Which I've now done in SVN. Rick, please test the next upload.
-> 
-> Also, Rick, I'm getting messages from my MTA about not being able to
-> deliver to rbthomas at cube.rcthomas.org, it's been queuing/retrying since
-> the weekend and says I shouldn't worry, but I thought I'd mention it
-> since I was here. Exim logs say:
-> 
-> 2015-05-06 06:48:50 1YoZqj-0002JC-G0 == rbthomas at cube.rcthomas.org R=dnslookup T=remote_smtp defer (-53): retry time not reached for any host
-> 
-> Hopefully you will see this via some other route.
-> 
-> Ian.
-> 
-> -- 
-> To unsubscribe, send mail to 782364-unsubscribe at bugs.debian.org.
-> 
+Same comment here.
+
+Could you also update Documentation/arm/sunxi/README with these infos
+(and ideally, updating it with the new SoCs we've heard about) ?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150506/f42da871/attachment.sig>
