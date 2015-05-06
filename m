@@ -1,76 +1,80 @@
-From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
-Date: Wed,  6 May 2015 10:49:02 +0200
-Subject: [RESEND] [PATCH v2 2/2] arm: boot: convert ATAG_REVISION to DT
- revision field
-In-Reply-To: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
-References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <1430902142-17035-3-git-send-email-pali.rohar@gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Wed, 6 May 2015 10:52:04 +0200
+Subject: [PATCH 0/3] Drop more omap3 legacy board-*.c files for v4.2
+In-Reply-To: <20150505170020.GF21061@atomide.com>
+References: <1430769717-4088-1-git-send-email-tony@atomide.com>
+ <20150505145407.GK18002@pali> <20150505150638.GC21061@atomide.com>
+ <201505051839.36882@pali> <20150505170020.GF21061@atomide.com>
+Message-ID: <20150506085204.GE30910@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ATAG_REVISION is unsigned number and revision in DT is stored as hexadecimal
-string value. It means that it will be correctly parsed by kernel.
+On Tuesday 05 May 2015 10:00:21 Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [150505 09:41]:
+> > On Tuesday 05 May 2015 17:06:38 Tony Lindgren wrote:
+> > > * Pali Roh?r <pali.rohar@gmail.com> [150505 07:55]:
+> > > > On Tuesday 05 May 2015 07:43:08 Tony Lindgren wrote:
+> > > > > * Arnd Bergmann <arnd@arndb.de> [150505 03:56]:
+> > > > > > On Monday 04 May 2015 13:01:54 Tony Lindgren wrote:
+> > > > > > > For dropping the remaining omap3 legacy boot support,
+> > > > > > > we still have the following board-*.c files:
+> > > > > > > 
+> > > > > > > BOARD                   REASON NEEDED
+> > > > > > > board-ldp.c             Still used in RMKs boot test
+> > > > > > > system board-omap3logic.c      Getting a .dts file
+> > > > > > > for v4.2 board-omap3pandora.c    Got a .dts file for
+> > > > > > > v4.1 board-rx51-*.c          Needs /proc/atags
+> > > > > > > support for user space
+> > > > > > > 
+> > > > > > > I'm hoping we can drop those for v4.3 merge window,
+> > > > > > > then keep the platform data around for one more merge
+> > > > > > > window in case of reverting needed, then drop the
+> > > > > > > platform data too for v4.4 if no issues needing
+> > > > > > > reverting are found.
+> > > > > > 
+> > > > > > Sounds great. Has there been a conclusion about what to
+> > > > > > do for the rx51 /proc/atags support?
+> > > > > 
+> > > > > I believe we just need to enable /proc/atags also for
+> > > > > device tree based booting if CONFIG_ARM_ATAG_DTB_COMPAT.
+> > > > > Pali may have more info on that.
+> > > > > 
+> > > > > Then looks like Pali's two patches for showing the
+> > > > > revision are still pending in thread "[PATCH v2 0/2] ARM:
+> > > > > /proc/cpuinfo: DT: Add support for Revision":
+> > > > > 
+> > > > > http://www.spinics.net/lists/arm-kernel/msg401535.html
+> > > > 
+> > > > I think I already sent all need patches to ML. But I did not
+> > > > check if you merged them or not. I did not get any new
+> > > > comments for them for a while and right now I do not have
+> > > > time for looking at it again.
+> > > 
+> > > Oh OK, do you have link to the /proc/atags patch somewhere?
+> > > 
+> > > Maybe Arnd and Nico can pick them up and sort out how we
+> > > should queue them with Russell?
+> > > 
+> > 
+> > https://lkml.org/lkml/2015/1/26/648
+> 
+> Hmm looks like you should resend all your pending four patches
+> properly with the people mentioned above in Cc to the LAKML
+> and linux-omap.. Assuming something will happen to them when
+> the patches are buried into a middle of some old threads does
+> not work well.. Best to just follow das protokoll und whine and
+> follow up until the patches get merged :)
+> 
+> Regards,
+> 
+> Tony
 
-Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-Acked-by: Pavel Machek <pavel@ucw.cz>
----
- arch/arm/boot/compressed/atags_to_fdt.c |   37 +++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+Now I resent "ARM: /proc/cpuinfo: DT: Add support for Revision" patches
+to MLs again without in-reply-to header.
 
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index 9448aa0..b23748e 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -97,6 +97,39 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
- 	setprop_string(fdt, "/chosen", "bootargs", cmdline);
- }
- 
-+static void tohexstr(char * str, int size, unsigned int num)
-+{
-+	int len = 0;
-+	int i, tmp;
-+
-+	if (size < 4) {
-+		if (size > 0)
-+			str[0] = 0;
-+		return;
-+	}
-+
-+	str[len++] = '0';
-+	str[len++] = 'x';
-+
-+	while (len-1 < size && num) {
-+		tmp = num % 16;
-+		if (tmp >= 10)
-+			tmp += 'A';
-+		else
-+			tmp += '0';
-+		str[len++] = tmp;
-+		num /= 16;
-+	}
-+
-+	str[len] = 0;
-+
-+	for (i = 2; i < 2+(len-2)/2; ++i) {
-+		tmp = str[i];
-+		str[i] = str[len-i+1];
-+		str[len-i+1] = tmp;
-+	}
-+}
-+
- /*
-  * Convert and fold provided ATAGs into the provided FDT.
-  *
-@@ -171,6 +204,10 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 					cpu_to_fdt32(atag->u.mem.size);
- 			}
- 
-+		} else if (atag->hdr.tag == ATAG_REVISION) {
-+			char revision[11];
-+			tohexstr(revision, sizeof(revision), atag->u.revision.rev);
-+			setprop_string(fdt, "/", "revision", revision);
- 		} else if (atag->hdr.tag == ATAG_INITRD2) {
- 			uint32_t initrd_start, initrd_size;
- 			initrd_start = atag->u.initrd.start;
+Patches for /proc/atags I do not have currently in git format-patch mbox
+format, so cannot resent it right now...
+
 -- 
-1.7.9.5
+Pali Roh?r
+pali.rohar at gmail.com
