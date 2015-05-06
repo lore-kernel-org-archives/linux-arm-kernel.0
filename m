@@ -1,43 +1,101 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 May 2015 08:36:56 -0700
-Subject: [PATCH] gpio: omap: Fix regression for MPUIO interrupts
-In-Reply-To: <CACRpkdZqSEgaVOV1gCQvCLc1-x7eU3WZwAM2QT2HT21xqCHZ2Q@mail.gmail.com>
-References: <1429833257-28188-1-git-send-email-tony@atomide.com>
- <CACRpkdZqSEgaVOV1gCQvCLc1-x7eU3WZwAM2QT2HT21xqCHZ2Q@mail.gmail.com>
-Message-ID: <20150506153656.GJ21061@atomide.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Wed, 6 May 2015 08:37:04 -0700
+Subject: [PATCH v4 0/7] selftests: fixes for installation and cross
+ compilation
+In-Reply-To: <554A31F4.7080200@osg.samsung.com>
+References: <1429656574-8411-1-git-send-email-tyler.baker@linaro.org>
+ <CANMBJr53a0cdJ5yjBu3ADv=x-==X0HXVQDELmuSuLLNCKLzviw@mail.gmail.com>
+ <554A31F4.7080200@osg.samsung.com>
+Message-ID: <CANMBJr7iP0BkTONSF36V3+F=nEk7guAVVFEi83ifjoKoaM-Mqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [150506 06:22]:
-> On Fri, Apr 24, 2015 at 1:54 AM, Tony Lindgren <tony@atomide.com> wrote:
-> 
-> > At some point with all the GPIO clean-up we've broken the
-> > MPUIO interrupts. Those are just a little bit different from
-> > the GPIO interrupts, so we can fix it up just by setting
-> > different irqchip functions for it. And then we can just
-> > remove all old code trying to do the same.
-> >
-> > Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> > Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
-> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> > Cc: Nishanth Menon <nm@ti.com>
-> > Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> Patch applied for fixes with the ACKs etc,
+On 6 May 2015 at 08:23, Shuah Khan <shuahkh@osg.samsung.com> wrote:
+> On 05/06/2015 08:49 AM, Tyler Baker wrote:
+>> Hi Shuah,
+>>
+>> On 21 April 2015 at 15:49, Tyler Baker <tyler.baker@linaro.org> wrote:
+>>> This patch set fixes various issues observed when cross building and
+>>> installing selftests.
+>>>
+>>> As I began investigating improving the test output format, I performed an
+>>> audit of the current tests to ensure all tests were able to execute on various
+>>> target architectures. I found that some tests did not install their binaries
+>>> and others required directories to be installed to execute properly. There
+>>> were also cases in which tests were being installed when they were never built.
+>>> With this series applied all tests compile when appropriate and install their
+>>> output properly.
+>>>
+>>> I have tested this series by building, installing and deploying all selftests
+>>> to x86, arm and arm64 targets.
+>>>
+>>> Changes v3 -> v4:
+>>> * Planning to send a followup series to address the lib.mk issue so I've
+>>> dropped the breakpoints and x86 installation workaround.
+>>> * x86: Removed redundant else logic block.
+>>> * Applied Andy Lutomirski's ACK to patches 4 and 5.
+>>> * Rebased onto next-20150421.
+>>
+>> I believe all comments have been addressed, is there anything else you
+>> would like to see?
+>>
+>>>
+>>> Changes v2 -> v3:
+>>> * 5/8: Removed duplicate all_32.
+>>> * 6/8: Ensure the default rule is all in every case.
+>>> * 6/8: Fixed commit message wording for better clarity.
+>>> * Applied Michael Ellerman's ACK to patches 1-4, and 8 as they have not changed.
+>>> * Rebased onto next-20150420.
+>>>
+>>> Changes v1 -> v2:
+>>> * Have no dependency on all when CROSS_COMPILE is set. (Andy Lutomirski)
+>>> * Added Andy on CC for all x86 test patches.
+>>> * Split up the x86 patches for better clarity.
+>>> * Rebased onto next-20150415.
+>>>
+>>> This series is based on next-20150421.
+>>>
+>>> Tyler Baker (7):
+>>>   selftests: copy TEST_DIRS to INSTALL_PATH
+>>>   selftests/ftrace: install test.d
+>>>   selftests/kdbus: install kdbus-test
+>>>   selftest/x86: build both bitnesses
+>>>   selftest/x86: have no dependency on all when cross building
+>>>   selftests/x86: install tests
+>>>   selftests/exec: do not install subdir as it is already created
+>>>
+>>>  tools/testing/selftests/exec/Makefile   |  2 +-
+>>>  tools/testing/selftests/ftrace/Makefile |  1 +
+>>>  tools/testing/selftests/kdbus/Makefile  |  2 ++
+>>>  tools/testing/selftests/lib.mk          |  3 +++
+>>>  tools/testing/selftests/x86/Makefile    | 15 ++++++++++++---
+>>>  5 files changed, 19 insertions(+), 4 deletions(-)
+>>>
+>>> --
+>>> 2.1.4
+>>>
+>>
+>
+> Patches are good. I will be applying these to linux-kselftest
+> next in a day or two for 4.2
 
-Thanks. Yes this should go in during the -rc cycle as a regresion
-fix. Sorry I could not exactly pinpoint where we've broken the
-MPUIO interrupts with all the clean-up.
+Excellent.
 
-Also the omap1 SPARSE_IRQ changes I recently posted have a
-dependency to this one so that's another reason to get this
-one out of the way.
+>
+> Thanks for fixing these issues.
 
-No rush with the other ones, those should be OK for v4.2.
+No problem, thanks for your consideration.
 
-Regards,
+>
+> -- Shuah
+>
+>
+> --
+> Shuah Khan
+> Sr. Linux Kernel Developer
+> Open Source Innovation Group
+> Samsung Research America (Silicon Valley)
+> shuahkh at osg.samsung.com | (970) 217-8978
 
-Tony
+
+Tyler
