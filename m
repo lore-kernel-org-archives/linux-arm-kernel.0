@@ -1,40 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 May 2015 15:23:48 +0200
-Subject: [PATCH] gpio: omap: Allow building as a loadable module
-In-Reply-To: <1429833382-28532-1-git-send-email-tony@atomide.com>
-References: <1429833382-28532-1-git-send-email-tony@atomide.com>
-Message-ID: <CACRpkdapSYfA=SniQQJs_r=X25sw+XujH7UxouU3=RUXNoqdMg@mail.gmail.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 6 May 2015 15:25:20 +0200
+Subject: [PATCH  0/2] gpio: Allow userspace export from DT
+In-Reply-To: <20150506125707.GV2067@n2100.arm.linux.org.uk>
+References: <20150413110515.9681.58848.stgit@localhost>
+ <20150504084925.GB4047@localhost>
+ <20150506112449.GQ2067@n2100.arm.linux.org.uk>
+ <20150506124354.GA5302@localhost>
+ <20150506125707.GV2067@n2100.arm.linux.org.uk>
+Message-ID: <20150506132520.GC5302@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 1:56 AM, Tony Lindgren <tony@atomide.com> wrote:
+On Wed, May 06, 2015 at 01:57:08PM +0100, Russell King - ARM Linux wrote:
+> On Wed, May 06, 2015 at 02:43:54PM +0200, Johan Hovold wrote:
+> > On Wed, May 06, 2015 at 12:24:50PM +0100, Russell King - ARM Linux wrote:
+> > > On Mon, May 04, 2015 at 10:49:25AM +0200, Johan Hovold wrote:
+> > > > Firmware should describe pin directionality and function, and undefined
+> > > > pins should never be allowed to be accessed from userspace.
+> > > 
+> > > No, that's totally wrong if you consider one of the most common use
+> > > cases out there...
+> > > 
+> > > Think about something like a Raspberry Pi, where you have a header with
+> > > GPIOs on it, which can be used for multiple different purposes (and are
+> > > even multiplexed with some on-SoC functions.)
+> > > 
+> > > "Firmware" can't know about all possible configurations of those IO pins.
+> > > 
+> > > That's why Raspberry Pi uses a userspace helper and programs stuff up
+> > > appropriately for the users application.
+> > 
+> > I'm not familiar with exactly how the RPi handles its pin muxing, but
+> > even if it requires userspace interaction that should not prevent having
+> > firmware describe the pins.
+> 
+> How it handles this is... it doesn't.  Userspace does it.
+> 
+> There is *no* "firmware" on these devices.  The only thing you have is a
+> boot loader and a DT blob, and people will hate you if you tell them that
+> they have to change the DT blob and then reboot their systems to change
+> the functionality of a GPIO pin.
+>
+> It's also entirely reasonable to assume that people are going to want to
+> change the configuration at runtime, given their diverse range of
+> applications.
 
-> We currently get all kinds of errors building the omap gpio driver
-> as a module starting with:
->
-> undefined reference to `omap2_gpio_resume_after_idle'
-> undefined reference to `omap2_gpio_prepare_for_idle'
-> ...
->
-> Let's fix the issue by adding inline functions to the header.
-> Note that we can now also remove the two unused functions for
-> omap_set_gpio_debounce and omap_set_gpio_debounce_time.
->
-> Then doing rmmod on the module produces further warnings
-> because of missing exit related functions. Let's add those.
->
-> And finally, we can make the Kconfig entry just a tristate
-> option that's selected for omaps.
->
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+DT can be changed at run-time using overlays.
 
-Patch applied for v4.2.
+This way the RPi users could define their i2c-clients, or whatever buses
+they choose to expose on those pins as well.
 
-Yours,
-Linus Walleij
+> > In general, if the hardware configuration is static we use device trees.
+> > 
+> > If the configuration is dynamic we use device-tree overlays; either
+> > loaded manually or by some service (e.g. Beaglebone capes). Perhaps this
+> > could be handled by the RPi helper.
+> 
+> Yes, that _could_ work, but I bet asking millions of people to change
+> what they're doing is going to be extremely difficult.  Remember the
+> golden rule of the kernel: thou shalt not break userspace.
+> 
+> So, there is _no_ possibility of removing this GPIO exposure to userspace
+> because we _know_ that it will break people.
+> 
+> If you think differently on the "thou shalt not break userspace" please
+> don't discuss it with me, I'm not interested.  Linus isn't interested
+> either, and if you try and discuss it with him, he'll tell you to get
+> out of kernel programming. :)
+> 
+> This is a commonly used API.  You can't change it.
+
+I've never suggested that we remove the current API, but *only* exposing
+a totally non-restrictive interface for systems not used by school
+children and hardware hackers is not sane.
+
+You also cut out the part in my reply about continuing to allow
+unrestricted access for such cases. That could still continue to be the
+default (e.g. when there are no pin function names defined in DT).
+
+And if those people ever update their DTs they could benefit from the
+deterministic pin naming without loosing any flexibility too.
+
+Johan
