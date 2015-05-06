@@ -1,52 +1,52 @@
-From: ijc@debian.org (Ian Campbell)
-Date: Wed, 06 May 2015 11:27:03 +0100
-Subject: Bug#782364: linux-image-3.16.0-4-armmp: please configure
- drivers for both Cubox i4pro real time clocks
-In-Reply-To: <64A51823-C50B-48D5-8180-CBC44F691CCB@pobox.com>
-References: <20150410232854.23367.58862.reportbug@cube.rcthomas.org>
- <1428710930.29665.17.camel@decadent.org.uk>
- <20150429085705.GG12732@n2100.arm.linux.org.uk>
- <1430582464.15640.186.camel@hellion.org.uk>
- <20150502161226.GS12732@n2100.arm.linux.org.uk>
- <1430583695.15640.190.camel@hellion.org.uk>
- <1430899272.15640.237.camel@debian.org>
- <64A51823-C50B-48D5-8180-CBC44F691CCB@pobox.com>
-Message-ID: <1430908023.2660.203.camel@debian.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 May 2015 11:30:00 +0100
+Subject: [PATCH v2 0/7] Fix Keystone 2 physical address switch
+Message-ID: <20150506103000.GF2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Control: submitter -1 Rick Thomas <rbthomas@pobox.com>
+For some time, the Keystone 2 physical address switch has been
+tainting the kernel ever since we decided that it was not safe.
 
-On Wed, 2015-05-06 at 03:00 -0700, Rick Thomas wrote:
-> OK, How will I identify the upload when I see it?  The box is running
-> Debian/Sid and I do regular updates.  So presumably, I?ll see a
-> ?linux-image-3.16.0-4-armmp? package go by sometime soon?
+This series re-works the address switch to be compliant architecturally.
 
-I think the next thing to hit Sid will be some 4.0.x per
-https://lists.debian.org/debian-kernel/2015/05/msg00047.html
+There's still a niggle in the keystone2 code, where we set the
+arch_virt_to_idmap function pointer in keystone_pv_fixup() - something
+I'd ideally like to avoid.
 
-I also committed to the Jessie branch so eventually (I don't know when)
-a new 3.16 based thing should appear in jessie-proposed-updates (staging
-area for a point release). I'm not sure if the BTS will say anything
-when this happens nor how else one might get notified.
+I'm in two minds about how much of this code should be in SoC specific
+code, and how much should be in generic code - on one hand, I don't
+want to give a green light to this kind of sillyness by encouraging
+it, but I'd rather not end up with multiple implementations of this.
 
-It would be preferable to test the thing in Sid before the upload to
-jessie-proposed-updates
+I've incorporated my change to the update of the PV offset constants
+into this series, and included the 7th patch in this set which I think
+is worth having - it's quite a large patch which gets rid of the TTBR1
+setting that Keystone has to do.  We basically pass the full 64-bits
+for TTBR0 in the assembly code so that Keystone doesn't have to re-set
+the page table pointer after secondary CPU initialisation.  That needs
+us to juggle around some registers in the assembly code.
 
-> And I?ll know I?ve got it when I see two /dev/rtc* devices?
+ arch/arm/include/asm/mach/arch.h  |   2 +-
+ arch/arm/include/asm/memory.h     |  16 ----
+ arch/arm/include/asm/proc-fns.h   |   7 --
+ arch/arm/include/asm/smp.h        |   2 +-
+ arch/arm/kernel/head-nommu.S      |   2 +-
+ arch/arm/kernel/head.S            |  42 ++++++++---
+ arch/arm/kernel/setup.c           |   7 +-
+ arch/arm/kernel/smp.c             |  10 ++-
+ arch/arm/mach-keystone/keystone.c |  41 +++++-----
+ arch/arm/mach-keystone/platsmp.c  |  13 ----
+ arch/arm/mm/Kconfig               |   4 +
+ arch/arm/mm/Makefile              |   1 +
+ arch/arm/mm/mmu.c                 | 153 ++++++++++++++++----------------------
+ arch/arm/mm/nommu.c               |   9 ---
+ arch/arm/mm/proc-v7-2level.S      |   6 +-
+ arch/arm/mm/proc-v7-3level.S      |  14 ++--
+ arch/arm/mm/proc-v7.S             |  26 +++----
+ arch/arm/mm/pv-fixup-asm.S        |  88 ++++++++++++++++++++++
+ 18 files changed, 239 insertions(+), 204 deletions(-)
 
-Yes, I suppose.
-
-> As for ?rbthomas at cube.rcthomas.org? ? I?m afraid it?s bogus.  I had
-> exim4 configured wrong when I submitted the original bugreport  /-:.
-> I?m subscribed to the bugreport with my proper address
-> (?rbthomas at pobox.com?) now; so you can either just send stuff for me
-> to the bugreport directly or to the ?@pobox.com? address, and delete
-> (or simply ignore) ?rbthomas at cube.rcthomas.org? whenever it raises its
-> head.
-
-I think the line at the top should have reset the submitter to your
-proper address too. If you wanted to do that yourself you could use "!"
-as a shorthand for the address in the From: line.
-
-Ian.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
