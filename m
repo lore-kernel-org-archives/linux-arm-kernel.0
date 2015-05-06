@@ -1,52 +1,20 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 6 May 2015 10:41:43 +0200
-Subject: [PATCH v8 0/4] edac: Add APM X-Gene SoC memory controller EDAC
- driver
-In-Reply-To: <1430884947-16787-1-git-send-email-lho@apm.com>
-References: <1430884947-16787-1-git-send-email-lho@apm.com>
-Message-ID: <20150506084143.GA22949@pd.tnic>
+From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
+Date: Wed,  6 May 2015 10:49:00 +0200
+Subject: [RESEND] [PATCH v2 0/2] ARM: /proc/cpuinfo: DT: Add support for
+ Revision
+Message-ID: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 05, 2015 at 10:02:22PM -0600, Loc Ho wrote:
-> This patch adds support for the APM X-Gene SoC memory controller EDAC driver
-> for DT.
-> 
-> v8:
-> * Change ASM_EDAC_H to __ASM_EDAC_H in file edac.h
-> * Add WARN_ONCE in stub function atomic_scrub
-> * Update DTS binding documentation (with only memory controller node)
-> * Temporary remove L1/L2, L3, and SoC driver code and update memory driver
->   code accordingly
+This patch adds support for DT "/revision" and convert ATAG_REVISION to DT.
 
-What does that mean exactly? They'll get added later?
+Pali Roh?r (2):
+  arm: devtree: Set system_rev from DT revision
+  arm: boot: convert ATAG_REVISION to DT revision field
 
-It is called now xgene_edac_mc.c. Am I to expect more
-xgene_edac_<functional_unit>.c submissions? What happened to building
-everything around the shared IRQ handler?
-
-Also, I see this SOB chain in some of the patches:
-
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Loc Ho <lho@apm.com>
-
-and it is not clear who did what, from looking at the chain.
-
-If you both authored the patches, you can write
-
-Originally-by: Feng
-[ Loc: did this and that]
-Signed-off-by: Loc
-
-for example.
-
-See Documentation/SubmittingPatches for more info.
-
-Thanks.
+ arch/arm/boot/compressed/atags_to_fdt.c |   37 +++++++++++++++++++++++++++++++
+ arch/arm/kernel/devtree.c               |   20 ++++++++++++-----
+ 2 files changed, 52 insertions(+), 5 deletions(-)
 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+1.7.9.5
