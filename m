@@ -1,57 +1,55 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Wed, 6 May 2015 11:14:25 +0200
-Subject: [PATCH v3 3/5] PCI: st: Provide support for the sti PCIe
- controller
-In-Reply-To: <20150505221646.GE24643@google.com>
-References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
- <1428657168-12495-4-git-send-email-gabriel.fernandez@linaro.org>
- <20150505221646.GE24643@google.com>
-Message-ID: <CAG374jAv9aHBPGV+x+xs2MyRGz+fw1ymwu78fqNXDPtPqehgZA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 May 2015 10:20:56 +0100
+Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <20150506035120.GA20852@leoy-linaro>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
+ <20150505171349.GA30215@leverpostej> <5549877C.10408@huawei.com>
+ <20150506035120.GA20852@leoy-linaro>
+Message-ID: <20150506092056.GA31001@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Wed, May 06, 2015 at 04:51:20AM +0100, Leo Yan wrote:
+> On Wed, May 06, 2015 at 11:16:12AM +0800, Bintian Wang wrote:
+> > On 2015/5/6 1:13, Mark Rutland wrote:
+> > >[...]
+> > >
+> > >>+	psci {
+> > >>+		compatible = "arm,psci-0.2";
+> > >>+		method = "smc";
+> > >>+	};
+> > >
+> > >Are all the PSCI 0.2 mandatory features implemented?
+> >
+> > The system off/suspend is under development, and system off will
+> > be released in next months, and system suspend may be released in the
+> > following two months.
+> 
+> Yes; now for mandatory features, except SYSTEM_OFF others have supported.
 
-On 6 May 2015 at 00:16, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Fri, Apr 10, 2015 at 11:12:46AM +0200, Gabriel FERNANDEZ wrote:
->> sti pcie is built around a Synopsis Designware PCIe IP.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->
->> +/* ST PCIe driver does not allow module unload */
->
-> Is there something that prevents module unload, or is it just untested?
->
-Yes we haven't tested
+Ok. Do you mean in the next month, or in a number of months?
 
->> +static int __init pcie_init(void)
->> +{
->> +     return platform_driver_probe(&st_pcie_driver, st_pcie_probe);
->> +}
->> +device_initcall(pcie_init);
->
-> Can you use module_platform_driver_probe() or module_init() here?
->
+> for PSCI 0.2, SYSTEM_SUSPEND even is not supported, right?
 
-Yes we can use module_init() here.
+SYSTEM_SUSPEND was introduced in PSCI 1.0, and is optional.
 
-By the way if figure out i removed __init attribute on st_pcie_probe()
-in previous version to follow Arnd's remark.
-But st_pcie_probe calls hook_fault_code() that has __init attribute.
-So I think we need to keep __init for probe routine ?
-Also, we have to restrict bind/unbind with "suppress_bind_attrs" in
-platform_driver structure.
-This is the main reason to not allow module unload/reload.
+So long as PSCI_VERSION reports 0.2 or PSCI_FEATURES reports
+NOT_SUPPORTED for SYSTEM_SUSPEND, it's ok to not implement.
 
-If you are ok i will send a v4 ?
+I guess PSCI_VERSION reports PSCI 0.2?
 
-BR
-Gabriel
+> > So can I keep "arm,psci-0.2" here?
+> > 
+> > >Can CPU0 be hot unplugged?
+> > Yes, CPU0~CPU7 all can be hot unplugged.
+> 
+> Just clarify: now use s/w method to emulate CPU and cluster's low
+> power state; all cores can be hotplugged [1].
 
->> +MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
->> +MODULE_DESCRIPTION("PCI express Driver for ST SoCs");
->> +MODULE_LICENSE("GPL v2");
->> --
->> 1.9.1
->>
+So long as CPUs brought online are reset appropriately, and "offline"
+CPUs can't bring down the system somehow, that should be fine. For now
+the important part is the interface.
+
+Thanks,
+Mark.
