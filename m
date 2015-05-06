@@ -1,68 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 May 2015 13:57:08 +0100
-Subject: [PATCH  0/2] gpio: Allow userspace export from DT
-In-Reply-To: <20150506124354.GA5302@localhost>
-References: <20150413110515.9681.58848.stgit@localhost>
- <20150504084925.GB4047@localhost>
- <20150506112449.GQ2067@n2100.arm.linux.org.uk>
- <20150506124354.GA5302@localhost>
-Message-ID: <20150506125707.GV2067@n2100.arm.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 6 May 2015 08:05:11 -0500
+Subject: [PATCH 1/2] dt-bindings: Add pxa1928 clock binding
+In-Reply-To: <20150506071708.GD27050@codeaurora.org>
+References: <1430455271-20195-1-git-send-email-robh@kernel.org>
+ <20150506071708.GD27050@codeaurora.org>
+Message-ID: <CAL_JsqJmpLw_iNXz5vZt9qcoR_CSRum3hB4fVYtERBsB=v=H8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 02:43:54PM +0200, Johan Hovold wrote:
-> On Wed, May 06, 2015 at 12:24:50PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, May 04, 2015 at 10:49:25AM +0200, Johan Hovold wrote:
-> > > Firmware should describe pin directionality and function, and undefined
-> > > pins should never be allowed to be accessed from userspace.
-> > 
-> > No, that's totally wrong if you consider one of the most common use
-> > cases out there...
-> > 
-> > Think about something like a Raspberry Pi, where you have a header with
-> > GPIOs on it, which can be used for multiple different purposes (and are
-> > even multiplexed with some on-SoC functions.)
-> > 
-> > "Firmware" can't know about all possible configurations of those IO pins.
-> > 
-> > That's why Raspberry Pi uses a userspace helper and programs stuff up
-> > appropriately for the users application.
-> 
-> I'm not familiar with exactly how the RPi handles its pin muxing, but
-> even if it requires userspace interaction that should not prevent having
-> firmware describe the pins.
+On Wed, May 6, 2015 at 2:17 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 04/30, Rob Herring wrote:
+>> diff --git a/Documentation/devicetree/bindings/clock/marvell,pxa1928.txt b/Documentation/devicetree/bindings/clock/marvell,pxa1928.txt
+>> new file mode 100644
+>> index 0000000..809c5a2
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/marvell,pxa1928.txt
+>> @@ -0,0 +1,21 @@
+>> +* Marvell PXA1928 Clock Controllers
+>> +
+>> +The PXA1928 clock subsystem generates and supplies clock to various
+>> +controllers within the PXA1928 SoC. The PXA1928 contains 3 clock controller
+>> +blocks called APMU, MPMU, and APBC roughly corresponding to internal buses.
+>> +
+>> +Required Properties:
+>> +
+>> +- compatible: should be one of the following.
+>> +  - "marvell,pxa1928-apmu" - APMU controller compatible
+>> +  - "marvell,pxa1928-mpmu" - MPMU controller compatible
+>> +  - "marvell,pxa1928-apbc" - APBC controller compatible
+>> +- reg: physical base address of the clock controller and length of memory mapped
+>> +  region.
+>> +- #clock-cells: should be 1.
+>> +- #reset-cells: should be 1.
+>> +
+>> +Each clock is assigned an identifier and client nodes use the clock controller
+>> +phandle and this identifier to specify the clock which they consume.
+>> +
+>> +All these identifiers can be found in <dt-bindings/clock/marvell,pxa1928.h>.
+>
+> No example?
 
-How it handles this is... it doesn't.  Userspace does it.
+There's nothing really special about this binding to show.
 
-There is *no* "firmware" on these devices.  The only thing you have is a
-boot loader and a DT blob, and people will hate you if you tell them that
-they have to change the DT blob and then reboot their systems to change
-the functionality of a GPIO pin.
+>> diff --git a/include/dt-bindings/clock/marvell,pxa1928.h b/include/dt-bindings/clock/marvell,pxa1928.h
+>> new file mode 100644
+>> index 0000000..c393ca2
+>> --- /dev/null
+>> +++ b/include/dt-bindings/clock/marvell,pxa1928.h
+>> @@ -0,0 +1,57 @@
+>> +#ifndef __DTS_MARVELL_PXA1928_CLOCK_H
+>> +#define __DTS_MARVELL_PXA1928_CLOCK_H
+>> +
+>> +/*
+>> + * Clock ID values here correspond to the control register offset/4.
+>> + */
+>> +
+>> +/* apb periphrals */
+>
+> s/periphrals/peripherals/ ?
 
-It's also entirely reasonable to assume that people are going to want to
-change the configuration at runtime, given their diverse range of
-applications.
+Uhh, cut-n-paste from marvell,mmp2.h...
+>
+>> +#define PXA1928_CLK_RTC                      0
+>> +#define PXA1928_CLK_TWSI0            1
+>> +#define PXA1928_CLK_TWSI1            2
+>> +#define PXA1928_CLK_TWSI2            3
+>> +#define PXA1928_CLK_TWSI3            4
+>> +#define PXA1928_CLK_OWIRE            5
+>> +#define PXA1928_CLK_KPC                      6
+>> +#define PXA1928_CLK_TB_ROTARY                7
+>> +#define PXA1928_CLK_SW_JTAG          8
+>> +#define PXA1928_CLK_TIMER1           9
+>
+> This is really nitpicky, but I find the jump from decimal to hex odd.
+> Is there any reason why we don't just use decimal or hex throughout?
+> Perhaps it's related to why there are holes in the number space?
 
-> In general, if the hardware configuration is static we use device trees.
-> 
-> If the configuration is dynamic we use device-tree overlays; either
-> loaded manually or by some service (e.g. Beaglebone capes). Perhaps this
-> could be handled by the RPi helper.
+What is 9 in hex? ;) I'll prefix them. It's hard to convert decimal to
+register values.
 
-Yes, that _could_ work, but I bet asking millions of people to change
-what they're doing is going to be extremely difficult.  Remember the
-golden rule of the kernel: thou shalt not break userspace.
+>> +#define PXA1928_CLK_UART0            0xb
 
-So, there is _no_ possibility of removing this GPIO exposure to userspace
-because we _know_ that it will break people.
-
-If you think differently on the "thou shalt not break userspace" please
-don't discuss it with me, I'm not interested.  Linus isn't interested
-either, and if you try and discuss it with him, he'll tell you to get
-out of kernel programming. :)
-
-This is a commonly used API.  You can't change it.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Rob
