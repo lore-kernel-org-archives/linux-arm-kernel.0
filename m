@@ -1,90 +1,342 @@
 From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Wed,  6 May 2015 01:37:55 -0700
-Subject: [PATCH 1/3] dt-bindings: add brcmstb-gpio GPIO binding
+Date: Wed,  6 May 2015 01:37:56 -0700
+Subject: [PATCH 2/3] gpio: Add GPIO support for Broadcom STB SoCs
 In-Reply-To: <1430901477-10678-1-git-send-email-gregory.0xf0@gmail.com>
 References: <1430901477-10678-1-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <1430901477-10678-2-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <1430901477-10678-3-git-send-email-gregory.0xf0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding for Broadcom STB "UPG GIO" GPIO controller.
+This adds support for the GPIO IP "UPG GIO" used on Broadcom STB SoCs
+(BCM7XXX and some others).  Uses basic_mmio_gpio to instantiate a
+gpio_chip for each bank.  The driver assumes that it handles the base
+set of GPIOs on the system and that it can start its numbering sequence
+from 0, so any GPIO expanders used with it must dynamically assign GPIO
+numbers after this driver has finished registering its GPIOs.
 
+Does not implement the interrupt-controller portion yet, will be done in a
+future commit.
+
+List-usage-fixed-by: Brian Norris <computersforpeace@gmail.com>
 Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
 ---
- .../devicetree/bindings/gpio/brcm,brcmstb-gpio.txt |   65 ++++++++++++++++++++
- 1 file changed, 65 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
+ MAINTAINERS                 |    7 ++
+ arch/arm/mach-bcm/Kconfig   |    1 +
+ drivers/gpio/Kconfig        |    8 ++
+ drivers/gpio/Makefile       |    1 +
+ drivers/gpio/gpio-brcmstb.c |  243 +++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 260 insertions(+)
+ create mode 100644 drivers/gpio/gpio-brcmstb.c
 
-diff --git a/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt b/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b399b34..781806a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2235,6 +2235,13 @@ N:	bcm9583*
+ N:	bcm583*
+ N:	bcm113*
+ 
++BROADCOM BRCMSTB GPIO DRIVER
++M:	Gregory Fong <gregory.0xf0@gmail.com>
++L:	bcm-kernel-feedback-list at broadcom.com>
++S:	Supported
++F:	drivers/gpio/gpio-brcmstb.c
++F:	Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
++
+ BROADCOM KONA GPIO DRIVER
+ M:	Ray Jui <rjui@broadcom.com>
+ L:	bcm-kernel-feedback-list at broadcom.com
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 8b11f44..0ac9e4b3 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -144,6 +144,7 @@ config ARCH_BRCMSTB
+ 	select BRCMSTB_GISB_ARB
+ 	select BRCMSTB_L2_IRQ
+ 	select BCM7120_L2_IRQ
++	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	help
+ 	  Say Y if you intend to run the kernel on a Broadcom ARM-based STB
+ 	  chipset.
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index caefe80..5f79b7f 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -126,6 +126,14 @@ config GPIO_BCM_KONA
+ 	help
+ 	  Turn on GPIO support for Broadcom "Kona" chips.
+ 
++config GPIO_BRCMSTB
++	tristate "BRCMSTB GPIO support"
++	default y if ARCH_BRCMSTB
++	depends on OF_GPIO && (ARCH_BRCMSTB || COMPILE_TEST)
++	select GPIO_GENERIC
++	help
++	  Say yes here to enable GPIO support for Broadcom STB (BCM7XXX) SoCs.
++
+ config GPIO_CLPS711X
+ 	tristate "CLPS711X GPIO support"
+ 	depends on ARCH_CLPS711X || COMPILE_TEST
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index f71bb97..9bfaaa8 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -21,6 +21,7 @@ obj-$(CONFIG_GPIO_ALTERA)  	+= gpio-altera.o
+ obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
+ obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
+ obj-$(CONFIG_GPIO_BCM_KONA)	+= gpio-bcm-kona.o
++obj-$(CONFIG_GPIO_BRCMSTB)	+= gpio-brcmstb.o
+ obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
+ obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
+ obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
+diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
 new file mode 100644
-index 0000000..435f1bc
+index 0000000..c8f9014
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
-@@ -0,0 +1,65 @@
-+Broadcom STB "UPG GIO" GPIO controller
++++ b/drivers/gpio/gpio-brcmstb.c
+@@ -0,0 +1,243 @@
++/*
++ * Copyright (C) 2015 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+The controller's registers are organized as sets of eight 32-bit
-+registers with each set controlling a bank of up to 32 pins.  A single
-+interrupt is shared for all of the banks handled by the controller.
++#include <linux/bitops.h>
++#include <linux/gpio.h>
++#include <linux/of_device.h>
++#include <linux/of_irq.h>
++#include <linux/module.h>
++#include <linux/basic_mmio_gpio.h>
 +
-+Required properties:
++#define GIO_BANK_SIZE           0x20
++#define GIO_ODEN(bank)          (((bank) * GIO_BANK_SIZE) + 0x00)
++#define GIO_DATA(bank)          (((bank) * GIO_BANK_SIZE) + 0x04)
++#define GIO_IODIR(bank)         (((bank) * GIO_BANK_SIZE) + 0x08)
++#define GIO_EC(bank)            (((bank) * GIO_BANK_SIZE) + 0x0c)
++#define GIO_EI(bank)            (((bank) * GIO_BANK_SIZE) + 0x10)
++#define GIO_MASK(bank)          (((bank) * GIO_BANK_SIZE) + 0x14)
++#define GIO_LEVEL(bank)         (((bank) * GIO_BANK_SIZE) + 0x18)
++#define GIO_STAT(bank)          (((bank) * GIO_BANK_SIZE) + 0x1c)
 +
-+- compatible:
-+    Must be "brcm,brcmstb-gpio"
++struct brcmstb_gpio_bank {
++	struct list_head node;
++	int id;
++	struct bgpio_chip bgc;
++	u32 imask;  /* irq mask shadow register */
++	struct brcmstb_gpio_priv *parent_priv;  /* used in interrupt handler */
++};
 +
-+- reg:
-+    Define the base and range of the I/O address space containing
-+    the brcmstb GPIO controller registers
++struct brcmstb_gpio_priv {
++	struct list_head bank_list;
++	void __iomem *reg_base;
++	int num_banks;
++	struct platform_device *pdev;
++	int gpio_base;
++};
 +
-+- #gpio-cells:
-+    Should be <2>.  The first cell is the pin number (within the controller's
-+    pin space), and the second is used for the following:
-+    bit[0]: polarity (0 for active-high, 1 for active-low)
++#define GPIO_PER_BANK           32
++#define GPIO_BANK(gpio)         ((gpio) >> 5)
++/* assumes GPIO_PER_BANK is a multiple of 2 */
++#define GPIO_BIT(gpio)          ((gpio) & (GPIO_PER_BANK - 1))
 +
-+- gpio-controller:
-+    Specifies that the node is a GPIO controller.
++static inline struct brcmstb_gpio_priv *
++brcmstb_gpio_gc_to_priv(struct gpio_chip *gc)
++{
++	struct bgpio_chip *bgc = to_bgpio_chip(gc);
++	struct brcmstb_gpio_bank *bank =
++		container_of(bgc, struct brcmstb_gpio_bank, bgc);
 +
-+- brcm,gpio-bank-widths:
-+    Number of GPIO lines for each bank.  Number of elements must
-+    correspond to number of banks suggested by the 'reg' property.
++	return bank->parent_priv;
++}
 +
-+Optional properties:
++/* Make sure that the number of banks matches up between properties */
++static int brcmstb_gpio_sanity_check_banks(struct device *dev,
++		struct device_node *np, struct resource *res)
++{
++	int res_num_banks = resource_size(res) / GIO_BANK_SIZE;
++	int num_banks = of_property_count_u32_elems(np, "brcm,gpio-bank-widths");
 +
-+- interrupts:
-+    The interrupt shared by all GPIO lines for this controller.
++	if (res_num_banks != num_banks) {
++		dev_err(dev, "Mismatch in banks: res had %d, bank-widths had %d\n",
++				res_num_banks, num_banks);
++		return -EINVAL;
++	} else {
++		return 0;
++	}
++}
 +
-+- interrupt-parent:
-+    phandle of the parent interrupt controller
++static int brcmstb_gpio_remove(struct platform_device *pdev)
++{
++	struct brcmstb_gpio_priv *priv = platform_get_drvdata(pdev);
++	struct list_head *pos;
++	struct brcmstb_gpio_bank *bank;
++	int ret = 0;
 +
-+- #interrupt-cells:
-+    Should be <2>.  The first cell is the GPIO number, the second should specify
-+    flags.  The following subset of flags is supported:
-+    - bits[3:0] trigger type and level flags
-+        1 = low-to-high edge triggered
-+        2 = high-to-low edge triggered
-+        4 = active high level-sensitive
-+        8 = active low level-sensitive
-+      Valid combinations are 1, 2, 3, 4, 8.
-+    See also Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
++	list_for_each(pos, &priv->bank_list) {
++		bank = list_entry(pos, struct brcmstb_gpio_bank, node);
++		ret = bgpio_remove(&bank->bgc);
++		if (ret)
++			dev_err(&pdev->dev, "gpiochip_remove fail in cleanup");
++	}
++	return ret;
++}
 +
-+- interrupt-controller:
-+    Marks the device node as an interrupt controller
++static int brcmstb_gpio_of_xlate(struct gpio_chip *gc,
++		const struct of_phandle_args *gpiospec, u32 *flags)
++{
++	struct brcmstb_gpio_priv *priv = brcmstb_gpio_gc_to_priv(gc);
++	int offset;
 +
-+- interrupt-names:
-+    The name of the IRQ resource used by this controller
++	if (gc->of_gpio_n_cells != 2) {
++		WARN_ON(1);
++		return -EINVAL;
++	}
 +
-+Example:
-+	upg_gio: gpio at f040a700 {
-+		#gpio-cells = <0x2>;
-+		#interrupt-cells = <0x2>;
-+		compatible = "brcm,bcm7445-gpio", "brcm,brcmstb-gpio";
-+		gpio-controller;
-+		interrupt-controller;
-+		reg = <0xf040a700 0x80>;
-+		interrupt-parent = <0xf>;
-+		interrupts = <0x6>;
-+		interrupt-names = "upg_gio";
-+		brcm,gpio-bank-widths = <0x20 0x20 0x20 0x18>;
-+	};
++	if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
++		return -EINVAL;
++
++	offset = gpiospec->args[0] - (gc->base - priv->gpio_base);
++	if (offset >= gc->ngpio)
++		return -EINVAL;
++
++	if (flags)
++		*flags = gpiospec->args[1];
++
++	return offset;
++}
++
++static int brcmstb_gpio_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	void __iomem *reg_base;
++	struct brcmstb_gpio_priv *priv;
++	struct resource *res;
++	struct property *prop;
++	const __be32 *p;
++	u32 bank_width;
++	int err;
++	static int gpio_base;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	reg_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(reg_base))
++		return PTR_ERR(reg_base);
++
++	priv->gpio_base = gpio_base;
++	priv->reg_base = reg_base;
++	priv->pdev = pdev;
++
++	INIT_LIST_HEAD(&priv->bank_list);
++	if (brcmstb_gpio_sanity_check_banks(dev, np, res))
++		return -EINVAL;
++
++	of_property_for_each_u32(np, "brcm,gpio-bank-widths", prop, p,
++			bank_width) {
++		struct brcmstb_gpio_bank *bank;
++		struct bgpio_chip *bgc;
++		struct gpio_chip *gc;
++
++		bank = devm_kzalloc(dev, sizeof(*bank), GFP_KERNEL);
++		if (!bank) {
++			err = -ENOMEM;
++			goto fail;
++		}
++
++		bank->parent_priv = priv;
++		bank->id = priv->num_banks;
++
++		/*
++		 * Regs are 4 bytes wide, have data reg, no set/clear regs,
++		 * and direction bits have 0 = output and 1 = input
++		 */
++		bgc = &bank->bgc;
++		err = bgpio_init(bgc, dev, 4,
++				reg_base + GIO_DATA(bank->id),
++				NULL, NULL, NULL,
++				reg_base + GIO_IODIR(bank->id), 0);
++		if (err) {
++			dev_err(dev, "bgpio_init() failed\n");
++			goto fail;
++		}
++
++		gc = &bgc->gc;
++		gc->of_node = np;
++		gc->owner = THIS_MODULE;
++		gc->label = np->full_name;
++		gc->base = gpio_base;
++		gc->of_gpio_n_cells = 2;
++		gc->of_xlate = brcmstb_gpio_of_xlate;
++
++		if (bank_width <= 0 || bank_width > GPIO_PER_BANK) {
++			gc->ngpio = GPIO_PER_BANK;
++			dev_warn(dev, "Invalid bank width %d, assume %d\n",
++					bank_width, gc->ngpio);
++		} else {
++			gc->ngpio = bank_width;
++		}
++
++		bank->imask =
++			bgc->read_reg(reg_base + GIO_MASK(bank->id));
++
++		err = gpiochip_add(gc);
++		if (err) {
++			dev_err(dev, "Could not add gpiochip for bank %d\n",
++					bank->id);
++			goto fail;
++		}
++		gpio_base += gc->ngpio;
++		dev_dbg(dev, "bank=%d, base=%d, ngpio=%d\n", bank->id,
++			gc->base, gc->ngpio);
++
++		/* Everything looks good, so add bank to list */
++		list_add(&bank->node, &priv->bank_list);
++
++		priv->num_banks++;
++	}
++
++	dev_info(dev, "Registered %d banks (GPIO(s): %d-%d)\n",
++			priv->num_banks, priv->gpio_base, gpio_base - 1);
++
++	platform_set_drvdata(pdev, priv);
++
++	return 0;
++
++fail:
++	(void) brcmstb_gpio_remove(pdev);
++	return err;
++}
++
++static struct of_device_id brcmstb_gpio_of_match[] = {
++	{ .compatible = "brcm,brcmstb-gpio" },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, brcmstb_gpio_of_match);
++
++static struct platform_driver brcmstb_gpio_driver = {
++	.driver = {
++		.name = "brcmstb-gpio",
++		.of_match_table = brcmstb_gpio_of_match,
++	},
++	.probe = brcmstb_gpio_probe,
++	.remove = brcmstb_gpio_remove,
++};
++module_platform_driver(brcmstb_gpio_driver);
++
++MODULE_AUTHOR("Broadcom");
++MODULE_DESCRIPTION("Driver for BRCMSTB UPG GPIO");
++MODULE_LICENSE("GPL");
 -- 
 1.7.9.5
