@@ -1,23 +1,191 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 06 May 2015 21:22:38 +0200
-Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
-In-Reply-To: <d97c3a8a29aa85c83973daf4a22ca4c9@advem.lv>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <20150506095312.GU4276@piout.net> <d97c3a8a29aa85c83973daf4a22ca4c9@advem.lv>
-Message-ID: <2349062.9v3Zz7HPLu@wuerfel>
+From: anders.roxell@linaro.org (Anders Roxell)
+Date: Wed, 6 May 2015 21:38:03 +0200
+Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
+In-Reply-To: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
+References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
+Message-ID: <20150506193803.GC32577@8074w.roxell.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 May 2015 19:21:21 Roman Yeryomin wrote:
-> 
-> > Thanks to point that, I'll merge that one which seems clean enough:
-> > http://git.openwrt.org/?p=openwrt.git;a=blob;f=target/linux/gemini/files/drivers/rtc/rtc-gemini.c;h=587d8122b2fbb1230437eadcce4789a53aa60ee5;hb=4c637410a2a1ab45988e8ca6202554a502102039
-> 
-> For 3.18 (and up) to work on gemini 160-gemini-timers.patch is vital. 
-> Without that timers are broken and cpu is super slow.
+On 2015-05-01 20:59, Ayyappa Ch wrote:
+> Floating point operations in arm64 should not disable preempt .
 
-Do you know what part of the patch is the actual bug fix? We should probably
-merge that separately and mark it for stable backports, while the bulk of that
-patch seems to just rearrange code.
+I thought that I would see a problem if I ran a floating point
+workload and cyclictest at the same time but I don't.
 
-	Arnd
+Can you please provide me some more details on how I can reproduce the
+problem?
+
+Cheers,
+Anders
+
+> Activating realtime features with below code.
+> 
+> From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+> From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+> Date: Tue, 28 Apr 2015 11:53:00 +0530
+> Subject: [PATCH ] floating point realtime fix
+> 
+> ---
+>  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 2438497..3dca156 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+>   */
+>  void fpsimd_preserve_current_state(void)
+>  {
+> - preempt_disable();
+> + migrate_disable();
+>   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+>   fpsimd_save_state(&current->thread.fpsimd_state);
+> - preempt_enable();
+> + migrate_enable();
+>  }
+> 
+>  /*
+> @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+>   */
+>  void fpsimd_restore_current_state(void)
+>  {
+> - preempt_disable();
+> + migrate_disable();
+>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>   struct fpsimd_state *st = &current->thread.fpsimd_state;
+> 
+> @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+>   this_cpu_write(fpsimd_last_state, st);
+>   st->cpu = smp_processor_id();
+>   }
+> - preempt_enable();
+> + migrate_enable();
+>  }
+> 
+>  /*
+> @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+>   */
+>  void fpsimd_update_current_state(struct fpsimd_state *state)
+>  {
+> - preempt_disable();
+> + migrate_disable();
+>   fpsimd_load_state(state);
+>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>   struct fpsimd_state *st = &current->thread.fpsimd_state;
+> @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+>   this_cpu_write(fpsimd_last_state, st);
+>   st->cpu = smp_processor_id();
+>   }
+> - preempt_enable();
+> + migrate_enable();
+>  }
+> 
+>  /*
+> @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+>   * that there is no longer userland FPSIMD state in the
+>   * registers.
+>   */
+> - preempt_disable();
+> + migrate_disable();
+>   if (current->mm &&
+>      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+>   fpsimd_save_state(&current->thread.fpsimd_state);
+> @@ -255,7 +255,7 @@ void kernel_neon_end(void)
+>   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+>   fpsimd_load_partial_state(s);
+>   } else {
+> - preempt_enable();
+> + migrate_enable();
+>   }
+>  }
+>  EXPORT_SYMBOL(kernel_neon_end);
+> 
+> On Fri, May 1, 2015 at 1:03 PM, Ayyappa Ch <ayyappa.ch.linux@gmail.com> wrote:
+> > Following Anders Roxell  patch on "Enable PREEMPT_RT_FULL" , observed
+> > one issue with Cyclic test while running floating point operations. So
+> > , modified below changes for that.
+> >
+> > From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+> > From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+> > Date: Tue, 28 Apr 2015 11:53:00 +0530
+> > Subject: [PATCH ] floating point realtime fix
+> >
+> > ---
+> >  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+> >  1 file changed, 8 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > index 2438497..3dca156 100644
+> > --- a/arch/arm64/kernel/fpsimd.c
+> > +++ b/arch/arm64/kernel/fpsimd.c
+> > @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+> >   */
+> >  void fpsimd_preserve_current_state(void)
+> >  {
+> > - preempt_disable();
+> > + migrate_disable();
+> >   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+> >   fpsimd_save_state(&current->thread.fpsimd_state);
+> > - preempt_enable();
+> > + migrate_enable();
+> >  }
+> >
+> >  /*
+> > @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+> >   */
+> >  void fpsimd_restore_current_state(void)
+> >  {
+> > - preempt_disable();
+> > + migrate_disable();
+> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
+> >
+> > @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+> >   this_cpu_write(fpsimd_last_state, st);
+> >   st->cpu = smp_processor_id();
+> >   }
+> > - preempt_enable();
+> > + migrate_enable();
+> >  }
+> >
+> >  /*
+> > @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+> >   */
+> >  void fpsimd_update_current_state(struct fpsimd_state *state)
+> >  {
+> > - preempt_disable();
+> > + migrate_disable();
+> >   fpsimd_load_state(state);
+> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
+> > @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+> >   this_cpu_write(fpsimd_last_state, st);
+> >   st->cpu = smp_processor_id();
+> >   }
+> > - preempt_enable();
+> > + migrate_enable();
+> >  }
+> >
+> >  /*
+> > @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+> >   * that there is no longer userland FPSIMD state in the
+> >   * registers.
+> >   */
+> > - preempt_disable();
+> > + migrate_disable();
+> >   if (current->mm &&
+> >      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+> >   fpsimd_save_state(&current->thread.fpsimd_state);
+> > @@ -255,7 +255,7 @@ void kernel_neon_end(void)
+> >   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+> >   fpsimd_load_partial_state(s);
+> >   } else {
+> > - preempt_enable();
+> > + migrate_enable();
+> >   }
+> >  }
+> >  EXPORT_SYMBOL(kernel_neon_end);
+> > --
+> > 1.9.1
