@@ -1,43 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  7 May 2015 11:53:45 +0200
-Subject: [PATCH 2/2] pinctrl: nomadik: activate strict mux mode
-Message-ID: <1430992425-10818-1-git-send-email-linus.walleij@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 7 May 2015 18:00:25 +0800
+Subject: [PATCH 1/2] spi: sirf: replace kmalloc by devm_kzalloc
+In-Reply-To: <20150507094639.GJ22845@sirena.org.uk>
+References: <1430982791-8681-1-git-send-email-21cnbao@gmail.com>
+ <20150507094639.GJ22845@sirena.org.uk>
+Message-ID: <CAGsJ_4ztxLPvbkg8MZJYSKAdu=zeCgGqOSMZo2q4bZkaZjMiyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This activates strict mode muxing for the Nomadik pin controllers,
-as these do not allow GPIO and functions to use the same pin
-simultaneously.
+2015-05-07 17:46 GMT+08:00 Mark Brown <broonie@kernel.org>:
+> On Thu, May 07, 2015 at 07:13:10AM +0000, Barry Song wrote:
+>> From: Qipan Li <Qipan.Li@csr.com>
+>>
+>
+> Applied since it's an improvement but please do update to use the core
+> features like Geert suggested.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/nomadik/pinctrl-abx500.c  | 1 +
- drivers/pinctrl/nomadik/pinctrl-nomadik.c | 1 +
- 2 files changed, 2 insertions(+)
+it looks like a good idea from Geert. we will have an incremental
+patch for this.
 
-diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
-index 23db4c9ac76c..15ccafd74dc6 100644
---- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
-@@ -787,6 +787,7 @@ static const struct pinmux_ops abx500_pinmux_ops = {
- 	.set_mux = abx500_pmx_set,
- 	.gpio_request_enable = abx500_gpio_request_enable,
- 	.gpio_disable_free = abx500_gpio_disable_free,
-+	.strict = true,
- };
- 
- static int abx500_get_groups_cnt(struct pinctrl_dev *pctldev)
-diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-index a6a22054c0ba..0c57edb2b222 100644
---- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-@@ -1803,6 +1803,7 @@ static const struct pinmux_ops nmk_pinmux_ops = {
- 	.set_mux = nmk_pmx_set,
- 	.gpio_request_enable = nmk_gpio_request_enable,
- 	.gpio_disable_free = nmk_gpio_disable_free,
-+	.strict = true,
- };
- 
- static int nmk_pin_config_get(struct pinctrl_dev *pctldev, unsigned pin,
--- 
-1.9.3
+-barry
