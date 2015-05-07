@@ -1,44 +1,35 @@
-From: j.fanguede@virtualopensystems.com (=?UTF-8?B?SsOpcsOpbXkgRmFuZ3XDqGRl?=)
-Date: Thu, 7 May 2015 12:50:50 +0200
-Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
-In-Reply-To: <20150506141249.GA6796@cbox>
-References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
- <20150506141249.GA6796@cbox>
-Message-ID: <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 May 2015 12:02:33 +0100
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <20150507055231.GB32399@codeaurora.org>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <20150504121209.GM15510@sirena.org.uk>
+ <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
+ <20150505105714.GA22845@sirena.org.uk>
+ <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
+ <20150505171252.GI22845@sirena.org.uk>
+ <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
+ <20150507055231.GB32399@codeaurora.org>
+Message-ID: <20150507110233.GR15510@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 6, 2015 at 4:12 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> Hi J?r?my,
->
-> On Tue, May 05, 2015 at 11:13:11AM +0200, J?r?my Fangu?de wrote:
->> To maintain cache coherency on ARM, we may need a mechanism to flush
->> the data cache.
->
-> In addition to generally just making this functionality available (see
-> below), do you have an actual use case in mind for this?  To solve the
-> VGA issue, for example, we already have a patch series from Drew trying
-> to address this.  Does that not work for you?
->
-> There was a long discussion about this here:
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-February/013593.html
->
-> Drew then created a patch set, here:
-> https://lists.nongnu.org/archive/html/qemu-devel/2015-03/msg01254.html
->
-> and replied to himself, here:
-> https://www.marc.info/?l=android-virt&m=142670523929132&w=3
->
-> Which basically says that he doesn't like having to do flushes all over
-> QEMU (IIUC), so he sent this version instead:
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-March/014027.html
->
-> Which he now said he'd respin.
+On Wed, May 06, 2015 at 10:52:31PM -0700, Stephen Boyd wrote:
 
-In fact, I used this ioctl in pairs with this QEMU patch series:
-https://lists.nongnu.org/archive/html/qemu-devel/2015-05/msg00407.html
-My current work doesn't do anything about vga ram, so vga issue
-probably still persists, but it solves others issues with some
-emulated devices (mainly PCI) which were failing before and now work
-fine with this patch.
+> If you look at the cpufreq/clock/pmic code on our codeaurora.org
+> tree you'll see that it's used to pass a value with uA units
+> through the regulator_set_optimum_mode() API. The call to
+> regulator_set_optimum_mode() is here[1], and the place where we
+> parse the OPP table from DT is here[2]. My understanding is that
+
+I'm not looking for anyone to explain this to me in e-mail, what I'm
+looking for is for the binding document to be clear so someone can tell
+what the binding means by reading the documentation for the binding.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150507/3f153afb/attachment.sig>
