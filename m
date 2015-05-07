@@ -1,51 +1,29 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  7 May 2015 14:38:40 +0100
-Subject: [PATCH 08/12] rtc: bindings: Supply knowledge of a third supported
- device - clocksource
+Date: Thu,  7 May 2015 14:38:41 +0100
+Subject: [PATCH 09/12] MAINTAINERS: Add the LPC Clocksource to STi maintained
+ driver list
 In-Reply-To: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
 References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1431005924-21777-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1431005924-21777-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt b/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
-index 73407f50..daf8826 100644
---- a/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
-+++ b/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
-@@ -1,20 +1,23 @@
- STMicroelectronics Low Power Controller (LPC) - RTC
- ===================================================
- 
--LPC currently supports Watchdog OR Real Time Clock functionality.
-+LPC currently supports Watchdog OR Real Time Clock OR Clocksource
-+functionality.
- 
- [See: ../watchdog/st_lpc_wdt.txt for Watchdog options]
-+[See: ../timer/st,stih407-lpc for Clocksource options]
- 
- Required properties
- 
--- compatible 	: Must be one of: "st,stih407-lpc" "st,stih416-lpc"
--				  "st,stih415-lpc" "st,stid127-lpc"
-+- compatible 	: Must be: "st,stih407-lpc"
- - reg		: LPC registers base address + size
- - interrupts    : LPC interrupt line number and associated flags
- - clocks	: Clock used by LPC device (See: ../clock/clock-bindings.txt)
--- st,lpc-mode	: The LPC can run either one of two modes ST_LPC_MODE_RTC [0] or
--		  ST_LPC_MODE_WDT [1].  One (and only one) mode must be
--		  selected.
-+- st,lpc-mode	: The LPC can run either one of three modes:
-+                  ST_LPC_MODE_RTC    [0]
-+                  ST_LPC_MODE_WDT    [1]
-+                  ST_LPC_MODE_CLKSRC [2]
-+		 One (and only one) mode must be selected.
- 
- Example:
- 	lpc at fde05000 {
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2bc71e7..af9e952 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1454,6 +1454,7 @@ S:	Maintained
+ F:	arch/arm/mach-sti/
+ F:	arch/arm/boot/dts/sti*
+ F:	drivers/clocksource/arm_global_timer.c
++F:	drivers/clocksource/clksrc_st_lpc.c
+ F:	drivers/i2c/busses/i2c-st.c
+ F:	drivers/media/rc/st_rc.c
+ F:	drivers/mmc/host/sdhci-st.c
 -- 
 1.9.1
