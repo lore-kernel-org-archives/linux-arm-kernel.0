@@ -1,109 +1,100 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 7 May 2015 09:58:44 +0200
-Subject: [PATCH V2] ARM: imx: correct Audio/Video PLL rate calculation
- formula
-In-Reply-To: <20150507073807.GA2864@shlinux1.ap.freescale.net>
-References: <1431006970-2864-1-git-send-email-b20788@freescale.com>
- <20150507072537.GC12306@pengutronix.de>
- <20150507073807.GA2864@shlinux1.ap.freescale.net>
-Message-ID: <20150507075844.GF12306@pengutronix.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 7 May 2015 10:10:26 +0200
+Subject: [PATCH] dma-buf: add ref counting for module as exporter
+In-Reply-To: <1430983852-19267-1-git-send-email-sumit.semwal@linaro.org>
+References: <1430983852-19267-1-git-send-email-sumit.semwal@linaro.org>
+Message-ID: <20150507081026.GA19773@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, May 07, 2015 at 03:38:10PM +0800, Anson Huang wrote:
-> On Thu, May 07, 2015 at 09:25:37AM +0200, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > On Thu, May 07, 2015 at 09:56:10PM +0800, Anson Huang wrote:
-> > > The audio/video PLL's rate calculation formula is as below in RM:
-> > > 
-> > > Fref * (DIV_SELECT + NUM / DENOM),
-> > > 
-> > > in original clk-pllv3's code, below code is used:
-> > > 
-> > > (parent_rate * div) + ((parent_rate / mfd) * mfn
-> > Here a closing ) is missing
-> > 
+On Thu, May 07, 2015 at 01:00:52PM +0530, Sumit Semwal wrote:
+> Add reference counting on a kernel module that exports dma-buf and
+> implements its operations. This prevents the module from being unloaded
+> while DMABUF file is in use.
 > 
-> Thanks, will fix it later.
+> The original patch [1] was submitted by Tomasz, but he's since shifted
+> jobs and a ping didn't elicit any response.
 > 
-> > > 
-> > > as it does NOT consider the float data using div, so below
-> > > calculation formula should be used as a decent method:
-> > > 
-> > > (parent_rate * div) + ((parent_rate * mfn) / mfd)
-> > > 
-> > > and we also need to consider parent_rate * mfd may exceed
-> > > a 32 bit value, 64 bit value should be used.
-> > > 
-> > > Below is one example of old/new formula's difference:
-> > > 
-> > > On i.MX7D, DRAM PLL is a Audio/Video type PLL, the target freq
-> > > is 1066MHz, the register settings are as below:
-> > > 
-> > > PLL_DDRn: 8060202C   -> div = 0x2C
-> > > DDR_NUM: 06AAAC4D    -> mfn = 0x6AAAC4D
-> > > DDR_DENOM: 100003EC  -> mfd = 0x100003EC
-> > > 
-> > > parent_rate = 24MHz.
-> > > 
-> > > with old formula, the (parent_rate / mfd) * mfn = 0 with new formula,
-> > > the (parent_rate * mfn) / mfd = 10, so old formula gets
-> > That's wrong. (parent_rate * mfn) / mfd == 10000000.
-> > 
+>   [tomasz: Original author]
+> Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
+> Acked-by: Daniel Vetter <daniel@ffwll.ch>
+>   [sumits: updated & rebased as per review comments]
+> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
 > 
-> OK, I forgot to mention the result is 10MHz.
+> [1]: https://lkml.org/lkml/2012/8/8/163
+> ---
+>  drivers/dma-buf/dma-buf.c                      | 9 ++++++++-
+>  drivers/gpu/drm/armada/armada_gem.c            | 1 +
+>  drivers/gpu/drm/drm_prime.c                    | 1 +
+>  drivers/gpu/drm/exynos/exynos_drm_dmabuf.c     | 1 +
+>  drivers/gpu/drm/i915/i915_gem_dmabuf.c         | 1 +
+>  drivers/gpu/drm/omapdrm/omap_gem_dmabuf.c      | 1 +
+>  drivers/gpu/drm/tegra/gem.c                    | 1 +
+>  drivers/gpu/drm/udl/udl_dmabuf.c               | 1 +
+>  drivers/gpu/drm/vmwgfx/vmwgfx_prime.c          | 1 +
+>  drivers/media/v4l2-core/videobuf2-dma-contig.c | 1 +
+>  drivers/media/v4l2-core/videobuf2-dma-sg.c     | 1 +
+>  drivers/media/v4l2-core/videobuf2-vmalloc.c    | 1 +
+>  drivers/staging/android/ion/ion.c              | 1 +
+>  include/linux/dma-buf.h                        | 2 ++
+>  14 files changed, 22 insertions(+), 1 deletion(-)
 > 
-> > > PLL_DDR = 1056MHz, new formuls gets PLL_DDR = 1066MHz.
-> > So which one is better? To see this it would be nice to also point out
-> > the exact value here.
-> 
-> "the target freq is 1066MHz", means 1066MHz should be the correct value.
-I would still write:
+> diff --git a/drivers/dma-buf/dma-buf.c b/drivers/dma-buf/dma-buf.c
+> index c5a9138a6a8d..9583eac0238f 100644
+> --- a/drivers/dma-buf/dma-buf.c
+> +++ b/drivers/dma-buf/dma-buf.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/anon_inodes.h>
+>  #include <linux/export.h>
+>  #include <linux/debugfs.h>
+> +#include <linux/module.h>
+>  #include <linux/seq_file.h>
+>  #include <linux/poll.h>
+>  #include <linux/reservation.h>
+> @@ -64,6 +65,7 @@ static int dma_buf_release(struct inode *inode, struct file *file)
+>  	BUG_ON(dmabuf->cb_shared.active || dmabuf->cb_excl.active);
+>  
+>  	dmabuf->ops->release(dmabuf);
+> +	module_put(dmabuf->ops->owner);
+>  
+>  	mutex_lock(&db_list.lock);
+>  	list_del(&dmabuf->list_node);
+> @@ -302,9 +304,14 @@ struct dma_buf *dma_buf_export(const struct dma_buf_export_info *exp_info)
+>  		return ERR_PTR(-EINVAL);
+>  	}
+>  
+> +	if (!try_module_get(exp_info->ops->owner))
+> +		return ERR_PTR(-ENOENT);
+> +
+>  	dmabuf = kzalloc(alloc_size, GFP_KERNEL);
+> -	if (dmabuf == NULL)
+> +	if (!dmabuf) {
+> +		module_put(exp_info->ops->owner);
+>  		return ERR_PTR(-ENOMEM);
+> +	}
+>  
+>  	dmabuf->priv = exp_info->priv;
+>  	dmabuf->ops = exp_info->ops;
+> diff --git a/drivers/gpu/drm/armada/armada_gem.c b/drivers/gpu/drm/armada/armada_gem.c
+> index 580e10acaa3a..d2c5fc1269b7 100644
+> --- a/drivers/gpu/drm/armada/armada_gem.c
+> +++ b/drivers/gpu/drm/armada/armada_gem.c
+> @@ -524,6 +524,7 @@ armada_gem_dmabuf_mmap(struct dma_buf *buf, struct vm_area_struct *vma)
+>  }
+>  
+>  static const struct dma_buf_ops armada_gem_prime_dmabuf_ops = {
+> +	.owner = THIS_MODULE,
+>  	.map_dma_buf	= armada_gem_prime_map_dma_buf,
+>  	.unmap_dma_buf	= armada_gem_prime_unmap_dma_buf,
+>  	.release	= drm_gem_dmabuf_release,
 
-	So the old formula results in 1056 MHz, while the updated
-	calculation yields 1066 MHz which exactly matches the real rate.
+The "easier" way to do this is change the registration function to add
+the module owner automatically, which keeps you from having to modify
+all of the individual drivers.  Look at how pci and usb do this for
+their driver registration functions.  That should result in a much
+smaller patch, that always works properly for everyone (there's no way
+for driver to get it wrong.)
 
-> > 
-> > Another way to get to a more exact calculation but without a 64 bit
-> > division is using shifted math. The formula gets more difficult though,
-> > so probably not worth the effort.
-> 
-> It is NOT easy to understand if using shift, and in other functions of
-> this file, they all use div, so keeping them aligned is also acceptable?
-sure, I quickly tried to come up with the needed formula that uses
-shifted math, but dropped it after a few minutes. As the calculation
-isn't done in a fast patch probably keeping the 64bit division is the
-way to go.
+thanks,
 
-> > > Signed-off-by: Anson Huang <b20788@freescale.com>
-> > > ---
-> > >  drivers/clk/imx/clk-pllv3.c | 7 ++++++-
-> > >  1 file changed, 6 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-> > > index 641ebc5..b2f8893 100644
-> > > --- a/drivers/clk/imx/clk-pllv3.c
-> > > +++ b/drivers/clk/imx/clk-pllv3.c
-> > > @@ -203,8 +203,13 @@ static unsigned long clk_pllv3_av_recalc_rate(struct clk_hw *hw,
-> > >  	u32 mfn = readl_relaxed(pll->base + PLL_NUM_OFFSET);
-> > >  	u32 mfd = readl_relaxed(pll->base + PLL_DENOM_OFFSET);
-> > >  	u32 div = readl_relaxed(pll->base) & pll->div_mask;
-> > > +	s64 temp64 = parent_rate;
-> > Why are you using a signed type here? do_div used unsigned anyhow IIRC.
-> > 
-> I use u64 before, but when I did V2 patch, I notice that all the div used
-> in this file are using a s64, so I change it to s64 to keep them aligned,
-> so which one is the decent one?
-Looking at the implementation of do_div it used unsigned math. So better
-use u64 and change the other variables to u64, too (in a separate
-patch).
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+greg k-h
