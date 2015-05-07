@@ -1,142 +1,141 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu,  7 May 2015 18:48:31 +0200
-Subject: [PATCH v3 1/7] ARM: lpc18xx: add basic support for NXP LPC18xx/43xx
- SoCs
+Date: Thu,  7 May 2015 18:48:34 +0200
+Subject: [PATCH v3 4/7] ARM: dts: Add base DT for NXP LPC18xx
 In-Reply-To: <1431017317-23740-1-git-send-email-manabian@gmail.com>
 References: <1431017317-23740-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431017317-23740-2-git-send-email-manabian@gmail.com>
+Message-ID: <1431017317-23740-5-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for NXP's LPC18xx (Cortex-M3) and LPC43xx (Cortex-M4)
-SoCs. These SoCs are NXP's high preformance MCU line and can run at
-clock speeds up to 180 MHz for LPC18xx and 204 MHz for LPC43xx.
-
-LPC43xx is more or less a LPC18xx with a Cortex-M4F core and a few
-extra peripherals. The LPC43xx series also features one or two
-Cortex-M0 cores that can be used to offload the main M4 core.
+NXP LPC18xx/43xx SoCs are very similar devices and should be able to
+share a common base (lpc18xx.dtsi). Diffences between the devices are
+put in a dtsi which is specific to that device.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-Reviewed-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 ---
- arch/arm/Kconfig                    | 20 ++++++++++++++++++++
- arch/arm/Kconfig.debug              |  3 ++-
- arch/arm/Makefile                   |  1 +
- arch/arm/mach-lpc18xx/Makefile      |  1 +
- arch/arm/mach-lpc18xx/Makefile.boot |  3 +++
- arch/arm/mach-lpc18xx/board-dt.c    | 22 ++++++++++++++++++++++
- 6 files changed, 49 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-lpc18xx/Makefile
- create mode 100644 arch/arm/mach-lpc18xx/Makefile.boot
- create mode 100644 arch/arm/mach-lpc18xx/board-dt.c
+ arch/arm/boot/dts/lpc18xx.dtsi | 114 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 114 insertions(+)
+ create mode 100644 arch/arm/boot/dts/lpc18xx.dtsi
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 45df48ba0b12..fba149165229 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -586,6 +586,26 @@ config ARCH_W90X900
- 	  <http://www.nuvoton.com/hq/enu/ProductAndSales/ProductLines/
- 		ConsumerElectronicsIC/ARMMicrocontroller/ARMMicrocontroller>
- 
-+config ARCH_LPC18XX
-+	bool "NXP LPC18xx/LPC43xx"
-+	depends on !MMU
-+	select ARCH_HAS_RESET_CONTROLLER
-+	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_AMBA
-+	select ARM_NVIC
-+	select AUTO_ZRELADDR
-+	select CLKSRC_OF
-+	select COMMON_CLK
-+	select CPU_V7M
-+	select GENERIC_CLOCKEVENTS
-+	select NO_IOPORT_MAP
-+	select PINCTRL
-+	select SPARSE_IRQ
-+	select USE_OF
-+	help
-+	  Support for NXP's LPC18xx Cortex-M3 and LPC43xx Cortex-M4
-+	  high performance microcontrollers.
-+
- config ARCH_LPC32XX
- 	bool "NXP LPC32XX"
- 	select ARCH_REQUIRE_GPIOLIB
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0c12ffb155a2..b3b6469350c1 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1359,6 +1359,7 @@ config DEBUG_UART_PHYS
- 	default 0x20201000 if DEBUG_BCM2835
- 	default 0x3e000000 if DEBUG_BCM_KONA_UART
- 	default 0x4000e400 if DEBUG_LL_UART_EFM32
-+	default 0x40081000 if ARCH_LPC18XX
- 	default 0x40090000 if ARCH_LPC32XX
- 	default 0x40100000 if DEBUG_PXA_UART1
- 	default 0x42000000 if ARCH_GEMINI
-@@ -1562,7 +1563,7 @@ config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
- 					PLAT_SAMSUNG || ARCH_EFM32 || \
--					ARCH_SHMOBILE_LEGACY
-+					ARCH_SHMOBILE_LEGACY || ARCH_LPC18XX
- 	default "mach/uncompress.h"
- 
- config EARLY_PRINTK
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 985227cbbd1b..90ddf851aece 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -167,6 +167,7 @@ machine-$(CONFIG_ARCH_IOP33X)		+= iop33x
- machine-$(CONFIG_ARCH_IXP4XX)		+= ixp4xx
- machine-$(CONFIG_ARCH_KEYSTONE)		+= keystone
- machine-$(CONFIG_ARCH_KS8695)		+= ks8695
-+machine-$(CONFIG_ARCH_LPC18XX)		+= lpc18xx
- machine-$(CONFIG_ARCH_LPC32XX)		+= lpc32xx
- machine-$(CONFIG_ARCH_MESON)		+= meson
- machine-$(CONFIG_ARCH_MMP)		+= mmp
-diff --git a/arch/arm/mach-lpc18xx/Makefile b/arch/arm/mach-lpc18xx/Makefile
+diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
 new file mode 100644
-index 000000000000..bd0b7b5d6e9d
+index 000000000000..204da5b52ef9
 --- /dev/null
-+++ b/arch/arm/mach-lpc18xx/Makefile
-@@ -0,0 +1 @@
-+obj-y += board-dt.o
-diff --git a/arch/arm/mach-lpc18xx/Makefile.boot b/arch/arm/mach-lpc18xx/Makefile.boot
-new file mode 100644
-index 000000000000..eacfc3f5c33e
---- /dev/null
-+++ b/arch/arm/mach-lpc18xx/Makefile.boot
-@@ -0,0 +1,3 @@
-+# Empty file waiting for deletion once Makefile.boot isn't needed any more.
-+# Patch waits for application at
-+# http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1 .
-diff --git a/arch/arm/mach-lpc18xx/board-dt.c b/arch/arm/mach-lpc18xx/board-dt.c
-new file mode 100644
-index 000000000000..fdcee78d1bc4
---- /dev/null
-+++ b/arch/arm/mach-lpc18xx/board-dt.c
-@@ -0,0 +1,22 @@
++++ b/arch/arm/boot/dts/lpc18xx.dtsi
+@@ -0,0 +1,114 @@
 +/*
-+ * Device Tree board file for NXP LPC18xx/43xx
++ * Common base for NXP LPC18xx and LPC43xx devices.
 + *
-+ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
++ * Copyright 2015 Joachim Eastwood <manabian@gmail.com>
 + *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ *
 + */
 +
-+#include <asm/mach/arch.h>
++#include "armv7-m.dtsi"
 +
-+static const char *const lpc18xx_43xx_compat[] __initconst = {
-+	"nxp,lpc1850",
-+	"nxp,lpc4350",
-+	"nxp,lpc4370",
-+	NULL
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-m3";
++			device_type = "cpu";
++			reg = <0x0>;
++		};
++	};
++
++	clocks {
++		xtal: xtal {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <12000000>;
++		};
++
++		/* Temporary hardcode PLL1 until clk drivers are merged */
++		pll1: pll1 {
++			compatible = "fixed-factor-clock";
++			clocks = <&xtal>;
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <12>;
++		};
++	};
++
++	soc {
++		uart0: serial at 40081000 {
++			compatible = "ns16550a";
++			reg = <0x40081000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <24>;
++			clocks = <&pll1>;
++			status = "disabled";
++		};
++
++		uart1: serial at 40082000 {
++			compatible = "ns16550a";
++			reg = <0x40082000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <25>;
++			clocks = <&pll1>;
++			status = "disabled";
++		};
++
++		timer0: timer at 40084000 {
++			compatible = "nxp,lpc3220-timer";
++			reg = <0x40084000 0x1000>;
++			interrupts = <12>;
++			clocks = <&pll1>;
++			clock-names = "timerclk";
++		};
++
++		timer1: timer at 40085000 {
++			compatible = "nxp,lpc3220-timer";
++			reg = <0x40085000 0x1000>;
++			interrupts = <13>;
++			clocks = <&pll1>;
++			clock-names = "timerclk";
++		};
++
++		uart2: serial at 400c1000 {
++			compatible = "ns16550a";
++			reg = <0x400c1000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <26>;
++			clocks = <&pll1>;
++			status = "disabled";
++		};
++
++		uart3: serial at 400c2000 {
++			compatible = "ns16550a";
++			reg = <0x400c2000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <27>;
++			clocks = <&pll1>;
++			status = "disabled";
++		};
++
++		timer2: timer at 400c3000 {
++			compatible = "nxp,lpc3220-timer";
++			reg = <0x400c3000 0x1000>;
++			interrupts = <14>;
++			clocks = <&pll1>;
++			clock-names = "timerclk";
++		};
++
++		timer3: timer at 400c4000 {
++			compatible = "nxp,lpc3220-timer";
++			reg = <0x400c4000 0x1000>;
++			interrupts = <15>;
++			clocks = <&pll1>;
++			clock-names = "timerclk";
++		};
++	};
 +};
-+
-+DT_MACHINE_START(LPC18XXDT, "NXP LPC18xx/43xx (Device Tree)")
-+	.dt_compat = lpc18xx_43xx_compat,
-+MACHINE_END
 -- 
 1.8.0
