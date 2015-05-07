@@ -1,53 +1,83 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 7 May 2015 09:18:09 +0200
-Subject: [PATCH v2 2/7] crypto: add new driver for Marvell CESA
-In-Reply-To: <20150507030100.GA29395@gondor.apana.org.au>
-References: <1430742426-21202-1-git-send-email-boris.brezillon@free-electrons.com>
- <1430742426-21202-3-git-send-email-boris.brezillon@free-electrons.com>
- <20150507030100.GA29395@gondor.apana.org.au>
-Message-ID: <20150507091809.2fb5b22e@bbrezillon>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 7 May 2015 09:21:36 +0200
+Subject: [PATCH V2] ARM: imx: correct Audio/Video PLL rate calculation
+ formula
+In-Reply-To: <1431006970-2864-1-git-send-email-b20788@freescale.com>
+References: <1431006970-2864-1-git-send-email-b20788@freescale.com>
+Message-ID: <20150507092136.0f3f583a@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Herbert,
+Hi,
 
-On Thu, 7 May 2015 11:01:00 +0800
-Herbert Xu <herbert@gondor.apana.org.au> wrote:
-
-> On Mon, May 04, 2015 at 02:27:01PM +0200, Boris Brezillon wrote:
-> > The existing mv_cesa driver supports some features of the CESA IP but is
-> > quite limited, and reworking it to support new features (like involving the
-> > TDMA engine to offload the CPU) is almost impossible.
-> > This driver has been rewritten from scratch to take those new features into
-> > account.
-> > 
-> > This new driver adds support for:
-> > - new armada SoCs (up to 38x) while keeping support for older ones (Orion
-> >   and Kirkwood)
-> > - DMA mode to offload the CPU in case of intensive crypto usage
-> > - new algorithms: SHA256, DES and 3DES
-> > 
-> > The existing CESA driver is kept around to ease transition to this new
-> > driver (take some time to audit the code and/or wait for users feedback).
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> The audio/video PLL's rate calculation formula is as below in RM:
 > 
-> This patch is too big for the mailing list.  Please provide a
-> URL for people to download and review.
+> Fref * (DIV_SELECT + NUM / DENOM),
+> 
+> in original clk-pllv3's code, below code is used:
+> 
+> (parent_rate * div) + ((parent_rate / mfd) * mfn
+> 
+> as it does NOT consider the float data using div, so below
+> calculation formula should be used as a decent method:
+> 
+> (parent_rate * div) + ((parent_rate * mfn) / mfd)
+> 
+> and we also need to consider parent_rate * mfd may exceed
+> a 32 bit value, 64 bit value should be used.
+> 
+> Below is one example of old/new formula's difference:
+> 
+> On i.MX7D, DRAM PLL is a Audio/Video type PLL, the target freq
+> is 1066MHz, the register settings are as below:
+> 
+> PLL_DDRn: 8060202C   -> div = 0x2C
+> DDR_NUM: 06AAAC4D    -> mfn = 0x6AAAC4D
+> DDR_DENOM: 100003EC  -> mfd = 0x100003EC
+> 
+> parent_rate = 24MHz.
+> 
+> with old formula, the (parent_rate / mfd) * mfn = 0 with new formula,
+> the (parent_rate * mfn) / mfd = 10, so old formula gets
+> PLL_DDR = 1056MHz, new formuls gets PLL_DDR = 1066MHz.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  drivers/clk/imx/clk-pllv3.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+> index 641ebc5..b2f8893 100644
+> --- a/drivers/clk/imx/clk-pllv3.c
+> +++ b/drivers/clk/imx/clk-pllv3.c
+> @@ -203,8 +203,13 @@ static unsigned long clk_pllv3_av_recalc_rate(struct clk_hw *hw,
+>  	u32 mfn = readl_relaxed(pll->base + PLL_NUM_OFFSET);
+>  	u32 mfd = readl_relaxed(pll->base + PLL_DENOM_OFFSET);
+>  	u32 div = readl_relaxed(pll->base) & pll->div_mask;
+> +	s64 temp64 = parent_rate;
+> +
+> +	temp64 *= mfn;
+> +	do_div(temp64, mfd);
+> +
+> +	return (parent_rate * div) + temp64;
+>  
+> -	return (parent_rate * div) + ((parent_rate / mfd) * mfn);
+>  }
+>  
+>  static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
+>
+This function should be updated too, since it uses the same formula as
+above!
 
-Here [1] is a branch containing the patches submitted in this series.
-I guess I won't have other choices but to split this patch (as
-Sebastian suggested) in my next iteration :-).
 
-Best Regards,
-
-Boris
-
-[1]https://github.com/bbrezillon/linux-marvell/commits/cesa-v2
-
-
+Lothar Wa?mann
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
