@@ -1,73 +1,42 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  7 May 2015 10:14:58 +0200
-Subject: [PATCH] dt-bindings: ARM: Mediatek: use more generic node name in
- examples
-Message-ID: <1430986498-7747-1-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 7 May 2015 10:15:42 +0200
+Subject: [PATCH v12] clk: Add common clock support for Mediatek MT8135
+ and MT8173
+In-Reply-To: <20150506055410.GC10871@codeaurora.org>
+References: <1429778143-2074-1-git-send-email-s.hauer@pengutronix.de>
+ <20150506055410.GC10871@codeaurora.org>
+Message-ID: <20150507081542.GQ6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use 'clock-controller' and 'power-controller' as node names in the
-examples rather than the specific names of the units.
+On Tue, May 05, 2015 at 10:54:10PM -0700, Stephen Boyd wrote:
+> On 04/23, Sascha Hauer wrote:
+> > The following changes since commit 39a8804455fb23f09157341d3ba7db6d7ae6ee76:
+> > 
+> >   Linux 4.0 (2015-04-12 15:12:50 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.pengutronix.de/git/sha/linux-2.6.git tags/v4.0-clk-mediatek-v12
+> > 
+> > for you to fetch changes up to e0ebeaa8a3f4a762cb9c2780170445aad15915d1:
+> > 
+> >   dt-bindings: ARM: Mediatek: Document devicetree bindings for clock/reset controllers (2015-04-23 10:22:34 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > This patchset contains the initial common clock support for Mediatek SoCs.
+> > Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes
+> > and clock gates.
+> 
+> Applied to clk-next.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt | 2 +-
- Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt   | 2 +-
- Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt    | 2 +-
- Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt   | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+Thanks Stephen. I just sent a followup patch for the node names in the
+examples.
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-index 5af6d73..936166f 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-@@ -16,7 +16,7 @@ The available clocks are defined in dt-bindings/clock/mt*-clk.h.
- 
- Example:
- 
--apmixedsys: apmixedsys at 10209000 {
-+apmixedsys: clock-controller at 10209000 {
- 	compatible = "mediatek,mt8173-apmixedsys";
- 	reg = <0 0x10209000 0 0x1000>;
- 	#clock-cells = <1>;
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-index 684da473..f6cd3e4 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-@@ -22,7 +22,7 @@ dt-bindings/reset-controller/mt*-resets.h
- 
- Example:
- 
--infracfg: infracfg at 10001000 {
-+infracfg: power-controller at 10001000 {
- 	compatible = "mediatek,mt8173-infracfg", "syscon";
- 	reg = <0 0x10001000 0 0x1000>;
- 	#clock-cells = <1>;
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-index fdb45c6..f25b854 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-@@ -22,7 +22,7 @@ dt-bindings/reset-controller/mt*-resets.h
- 
- Example:
- 
--pericfg: pericfg at 10003000 {
-+pericfg: power-controller at 10003000 {
- 	compatible = "mediatek,mt8173-pericfg", "syscon";
- 	reg = <0 0x10003000 0 0x1000>;
- 	#clock-cells = <1>;
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-index a425248..f9e9179 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-@@ -16,7 +16,7 @@ The available clocks are defined in dt-bindings/clock/mt*-clk.h.
- 
- Example:
- 
--topckgen: topckgen at 10000000 {
-+topckgen: power-controller at 10000000 {
- 	compatible = "mediatek,mt8173-topckgen";
- 	reg = <0 0x10000000 0 0x1000>;
- 	#clock-cells = <1>;
+Sascha
+
 -- 
-2.1.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
