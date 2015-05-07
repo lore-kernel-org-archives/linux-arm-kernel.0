@@ -1,70 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 May 2015 20:59:03 +0800
-Subject: [PATCH 1/1] ARM: imx: Correct the comments in time.c
-In-Reply-To: <1430343627-60688-1-git-send-email-shenwei.wang@freescale.com>
-References: <1430343627-60688-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <20150507125858.GH3162@dragon>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Thu,  7 May 2015 15:00:13 +0200
+Subject: [PATCH v2] ARM: net: add JIT support for loads from struct
+ seccomp_data.
+Message-ID: <1431003613-16554-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 29, 2015 at 04:40:27PM -0500, Shenwei Wang wrote:
-> The comments were corrected as the following to reflect
-> the real situation of Freescale MXC timer IP block.
-> There are totally 4 version of the timer on Freescale i.MX SoCs.
-> 
-> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
-> ---
->  arch/arm/mach-imx/time.c | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-> index acb1ff5..b1698e1 100644
-> --- a/arch/arm/mach-imx/time.c
-> +++ b/arch/arm/mach-imx/time.c
-> @@ -38,9 +38,11 @@
->  #include "hardware.h"
->  
->  /*
-> - * There are 2 versions of the timer hardware on Freescale MXC hardware.
-> - * Version 1: MX1/MXL, MX21, MX27.
-> - * Version 2: MX25, MX31, MX35, MX37, MX51
-> + * There are 4 versions of the timer hardware on Freescale MXC hardware.
-> + * Version 0: MX1/MXL
-> + * Version 1: MX21, MX27.
-> + * Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q(rev1.0)
-> + * Version 3: MX6DL, MX6SX, MX6Q(rev1.1+)
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+---
 
-This is the problem with version numbers.  Version numbers defined by
-software are too arbitrary and could conflict with the ones defined by
-IP design (i.e. IPUv3) some day.  Just for example, if some day GPTv2
-IP comes with some significant design changes, "v2" will becomes a
-source of confusion between software and hardware.  It's even worse if
-we already defined fsl,gpt-v2 as the device tree compatible.  That's why
-we can only use the version number defined by hardware in device tree
-binding.  If no hardware version is given, the best bet would be use SoC
-name in the bindings to specify the particular programming model of the
-IP block.
+This patch was first sent as part of a serie modifying the core
+seccomp code to allow the use of the classic BPF JIT. As the core
+changes have been submitted to netdev by Daniel Borkmann, it is now
+time to re-submit this patch separately.
 
-I applied patch to drop the version numbers as below.
+While not physically dependent of the core seccomp changes they are
+needed for the code added in this patch to be triggered.
 
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index acb1ff577cda..ab5ee1c445f3 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -38,9 +38,11 @@
- #include "hardware.h"
- 
- /*
-- * There are 2 versions of the timer hardware on Freescale MXC hardware.
-- * Version 1: MX1/MXL, MX21, MX27.
-- * Version 2: MX25, MX31, MX35, MX37, MX51
-+ * There are 4 versions of the timer hardware on Freescale MXC hardware.
-+ *  - MX1/MXL
-+ *  - MX21, MX27.
-+ *  - MX25, MX31, MX35, MX37, MX51, MX6Q(rev1.0)
-+ *  - MX6DL, MX6SX, MX6Q(rev1.1+)
-  */
- 
- /* defines common for all i.MX */
+ arch/arm/net/bpf_jit_32.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Shawn
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index f412b53..6bda637 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -863,6 +863,16 @@ b_epilogue:
+ 			off = offsetof(struct sk_buff, queue_mapping);
+ 			emit(ARM_LDRH_I(r_A, r_skb, off), ctx);
+ 			break;
++		case BPF_LDX | BPF_W | BPF_ABS:
++			/*
++			 * load a 32bit word from struct seccomp_data.
++			 * seccomp_check_filter() will already have checked
++			 * that k is 32bit aligned and lies within the
++			 * struct seccomp_data.
++			 */
++			ctx->seen |= SEEN_SKB;
++			emit(ARM_LDR_I(r_A, r_skb, k), ctx);
++			break;
+ 		default:
+ 			return -1;
+ 		}
+-- 
+1.9.1
