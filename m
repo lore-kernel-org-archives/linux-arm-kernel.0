@@ -1,73 +1,75 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Thu, 07 May 2015 09:34:22 +0800
-Subject: [PATCH v4 0/7] Basic support to ZTE ZX296702
-In-Reply-To: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
-References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
-Message-ID: <554AC11E.2030800@linaro.org>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Thu, 7 May 2015 09:42:36 +0800
+Subject: [PATCH v3 2/7] mmc: mediatek: Add Mediatek MMC driver
+In-Reply-To: <CAPDyKFr+FTXAzYVn3F41dmw2zW01pSbSHPfGJHXbUFLJfvQ5CA@mail.gmail.com>
+References: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
+ <1430214525-19198-3-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFq=R9B6ZHHgmDcSg-TNSfqQKAUKc2NjACvpwxFpmk954g@mail.gmail.com>
+ <1430895299.15154.9.camel@mhfsdcap03>
+ <CAPDyKFr+FTXAzYVn3F41dmw2zW01pSbSHPfGJHXbUFLJfvQ5CA@mail.gmail.com>
+Message-ID: <1430962956.15154.48.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?04?28? 17:18, Jun Nie wrote:
-> Rebase patches of v2 to 4.0-rc1. Ready for merge.
+Dear Ulf,
 
-Hi Arnd,
+Thanks!
+Below is my comment:
 
-Do you see any issue in this patch set? Or could you help drive merge? 
-Thank you very much!
+On Wed, 2015-05-06 at 18:31 +0200, Ulf Hansson wrote:
+> On 6 May 2015 at 08:54, chaotian.jing <chaotian.jing@mediatek.com> wrote:
+> > Dear Ulf,
+> >
+> > Thanks for your review.
+> > I must do a explain of our MMC host:
+> > Source clock is source clock of the MMC bus, MMC host has a divider to
+> > get different bus clock frequency. now the runtime suspend is gating
+> > this clock.
+> >
+> > Hclk is the power domain of the MMC host, if Hclk is gated, the MMC host
+> > cannot work(all registers readout is zero). and, all registers would be
+> > reset to default value if Hclk is gated/ungated.
+> > At MT8173, MSDC0 and MSDC2 has independent Hclk, MSDC1 and MSDC3's Hclk
+> > was controlled by "Infra module".
+Sorry for mistake, MSDC0 and MSDC3 has independent Hclk, MSDC1 and
+MSDC2's Hclk was controlled by "Infra module". the Infra module is a
+"power saving module", when the system go to sleep, Infra module will be
+set and MSDC1 & MSDC2's Hclk will be gated automatically.
+> 
+> Thanks for clarifying!
+> 
+> I don't have enough knowledge about your SoC to understand the detail,
+> but it seems like we are mixing clocks and power domains. I would
+> rather keep this separate - if the HW allows it.
+> 
+> I guess the key question I have is the following:
+> 1) Is it hardware wise possible to gate the hclk, but without gating
+> the power domain?
+> 2) At what level is the reference counting done for each device in the
+> power domain? In HW or in sofftware?
+> 
 
-Jun
-
-> Change in v4 vs v3: Fix minor defconfig issue.
->
-> Jun Nie (7):
->    ARM: zx: add basic support for ZTE ZX296702
->    MAINTAINERS: add entry for ARM ZTE architecture
->    ARM: zx: add low level debug support for zx296702
->    ARM: dts: zx: add an initial zx296702 dts and doc
->    clk: zx: add clock support to zx296702
->    ARM: zx: enable SMP and hotplug for zx296702
->    ARM: zx: Add basic defconfig support for ZX296702
->
->   Documentation/devicetree/bindings/arm/zte.txt      |  15 +
->   .../devicetree/bindings/clock/zx296702-clk.txt     |  35 ++
->   Documentation/devicetree/bindings/serial/pl011.txt |   2 +-
->   .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->   MAINTAINERS                                        |   9 +
->   arch/arm/Kconfig                                   |   2 +
->   arch/arm/Kconfig.debug                             |  14 +
->   arch/arm/Makefile                                  |   1 +
->   arch/arm/boot/dts/Makefile                         |   1 +
->   arch/arm/boot/dts/zx296702-ad1.dts                 |  48 ++
->   arch/arm/boot/dts/zx296702.dtsi                    | 139 +++++
->   arch/arm/configs/zx_defconfig                      | 130 ++++
->   arch/arm/include/debug/pl01x.S                     |   7 +
->   arch/arm/mach-zx/Kconfig                           |  18 +
->   arch/arm/mach-zx/Makefile                          |   2 +
->   arch/arm/mach-zx/core.h                            |  19 +
->   arch/arm/mach-zx/headsmp.S                         |  32 +
->   arch/arm/mach-zx/platsmp.c                         | 189 ++++++
->   arch/arm/mach-zx/zx296702.c                        |  31 +
->   drivers/clk/Makefile                               |   1 +
->   drivers/clk/zte/Makefile                           |   2 +
->   drivers/clk/zte/clk-pll.c                          | 180 ++++++
->   drivers/clk/zte/clk-zx296702.c                     | 658 +++++++++++++++++++++
->   drivers/clk/zte/clk.h                              |  30 +
->   include/dt-bindings/clock/zx296702-clock.h         | 162 +++++
->   25 files changed, 1727 insertions(+), 1 deletion(-)
->   create mode 100644 Documentation/devicetree/bindings/arm/zte.txt
->   create mode 100644 Documentation/devicetree/bindings/clock/zx296702-clk.txt
->   create mode 100644 arch/arm/boot/dts/zx296702-ad1.dts
->   create mode 100644 arch/arm/boot/dts/zx296702.dtsi
->   create mode 100644 arch/arm/configs/zx_defconfig
->   create mode 100644 arch/arm/mach-zx/Kconfig
->   create mode 100644 arch/arm/mach-zx/Makefile
->   create mode 100644 arch/arm/mach-zx/core.h
->   create mode 100644 arch/arm/mach-zx/headsmp.S
->   create mode 100644 arch/arm/mach-zx/platsmp.c
->   create mode 100644 arch/arm/mach-zx/zx296702.c
->   create mode 100644 drivers/clk/zte/Makefile
->   create mode 100644 drivers/clk/zte/clk-pll.c
->   create mode 100644 drivers/clk/zte/clk-zx296702.c
->   create mode 100644 drivers/clk/zte/clk.h
->   create mode 100644 include/dt-bindings/clock/zx296702-clock.h
->
+Actually, Our MMC host do not have power domain, all the control of the
+host is the Hclk.
+> >
+> > And, our MMC host has ability to control the gate/ungate of bus clock
+> > automatically, in MSDC_CFG bit 1, if this bit is set to 0, then "bus
+> > clock is gated to 0 if no command or data is transmitted".
+> > So, if the runtime PM do not control the Source clock, Hclk, then the
+> > runtime PM is needless.
+> >
+> > if runtime PM do gate/ungate Hclk, then need do save/restore the
+> > registers meanwhile.
+> 
+> Yes agree, that's a common thing to deal with from runtime PM callbacks.
+> That means that the runtime PM need gate/ungate source clock and Hclk ?
+If it is, then need do save registers before gate Hclk and restore
+registers after ungate Hclk.
+> >
+> > So, how about your suggestion ?
+> > do we still need runtime PM ?
+> 
+> Yes, I definitely think you need it!
+> 
+> Kind regards
+> Uffe
