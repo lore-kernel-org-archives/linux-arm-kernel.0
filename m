@@ -1,179 +1,461 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Fri, 8 May 2015 01:35:55 +0800
-Subject: [PATCH V8 3/6] ARM: imx: add msl support for imx7d
+Date: Fri, 8 May 2015 01:35:57 +0800
+Subject: [PATCH V8 5/6] arm: dts: add imx7d-sdb support
 In-Reply-To: <1431020158-13789-1-git-send-email-Frank.Li@freescale.com>
 References: <1431020158-13789-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1431020158-13789-4-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1431020158-13789-6-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anson Huang <b20788@freescale.com>
+From: Frank Li <Frank.Li@freescale.com>
 
-Add i.MX7D MSL support.
+add imx7d sdb board support
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
 Signed-off-by: Frank Li <Frank.Li@freescale.com>
 ---
- arch/arm/mach-imx/Kconfig      |  7 +++++++
- arch/arm/mach-imx/Makefile     |  1 +
- arch/arm/mach-imx/anatop.c     |  5 ++++-
- arch/arm/mach-imx/cpu.c        |  3 +++
- arch/arm/mach-imx/mach-imx7d.c | 43 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/mxc.h        |  8 +++++++-
- 6 files changed, 65 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-imx/mach-imx7d.c
+ arch/arm/boot/dts/Makefile      |   2 +
+ arch/arm/boot/dts/imx7d-sdb.dts | 420 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 422 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx7d-sdb.dts
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 3a3d3e9..1d87078 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -582,6 +582,13 @@ config SOC_IMX6SX
- 	help
- 	  This enables support for Freescale i.MX6 SoloX processor.
- 
-+config SOC_IMX7D
-+	bool "i.MX7 Dual support"
-+	select PINCTRL_IMX7D
-+	select ARM_GIC
-+	help
-+		This enables support for Freescale i.MX7 Dual processor.
-+
- config SOC_VF610
- 	bool "Vybrid Family VF610 support"
- 	select IRQ_DOMAIN_HIERARCHY
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 0622ced..40df12a 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -85,6 +85,7 @@ endif
- obj-$(CONFIG_SOC_IMX6Q) += mach-imx6q.o
- obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
- obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
-+obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
- 
- ifeq ($(CONFIG_SUSPEND),y)
- AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
-diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-index 7f262fe..231bb25 100644
---- a/arch/arm/mach-imx/anatop.c
-+++ b/arch/arm/mach-imx/anatop.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
-  *
-  * The code contained herein is licensed under the GNU General Public
-  * License. You may obtain a copy of the GNU General Public License
-@@ -28,6 +28,7 @@
- #define ANADIG_USB2_CHRG_DETECT	0x210
- #define ANADIG_DIGPROG		0x260
- #define ANADIG_DIGPROG_IMX6SL	0x280
-+#define ANADIG_DIGPROG_IMX7D	0x800
- 
- #define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
- #define BM_ANADIG_REG_2P5_ENABLE_PULLDOWN	0x8
-@@ -121,6 +122,8 @@ void __init imx_init_revision_from_anatop(void)
- 	WARN_ON(!anatop_base);
- 	if (of_device_is_compatible(np, "fsl,imx6sl-anatop"))
- 		offset = ANADIG_DIGPROG_IMX6SL;
-+	if (of_device_is_compatible(np, "fsl,imx7d-anatop"))
-+		offset = ANADIG_DIGPROG_IMX7D;
- 	digprog = readl_relaxed(anatop_base + offset);
- 	iounmap(anatop_base);
- 
-diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
-index df42c14..a7fa92a 100644
---- a/arch/arm/mach-imx/cpu.c
-+++ b/arch/arm/mach-imx/cpu.c
-@@ -130,6 +130,9 @@ struct device * __init imx_soc_device_init(void)
- 	case MXC_CPU_IMX6Q:
- 		soc_id = "i.MX6Q";
- 		break;
-+	case MXC_CPU_IMX7D:
-+		soc_id = "i.MX7D";
-+		break;
- 	default:
- 		soc_id = "Unknown";
- 	}
-diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 86217db..c0b6737 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -313,6 +313,8 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
+ 	imx6sx-sabreauto.dtb \
+ 	imx6sx-sdb-reva.dtb \
+ 	imx6sx-sdb.dtb
++dtb-$(CONFIG_SOC_IMX7D) += \
++	imx7d-sdb.dtb
+ dtb-$(CONFIG_SOC_LS1021A) += \
+ 	ls1021a-qds.dtb \
+ 	ls1021a-twr.dtb
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
 new file mode 100644
-index 0000000..4d4a190
+index 0000000..0756013
 --- /dev/null
-+++ b/arch/arm/mach-imx/mach-imx7d.c
-@@ -0,0 +1,43 @@
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -0,0 +1,420 @@
 +/*
 + * Copyright (C) 2015 Freescale Semiconductor, Inc.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+#include <linux/irqchip.h>
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
 +
-+#include "common.h"
++/dts-v1/;
 +
-+static void __init imx7d_init_machine(void)
-+{
-+	struct device *parent;
++#include <dt-bindings/input/input.h>
++#include "imx7d.dtsi"
 +
-+	parent = imx_soc_device_init();
-+	if (parent == NULL)
-+		pr_warn("failed to initialize soc device\n");
++/ {
++	model = "Freescale i.MX7 SabreSD Board";
++	compatible = "fsl,imx7d-sdb", "fsl,imx7d";
 +
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	imx_anatop_init();
-+}
++	memory {
++		reg = <0x80000000 0x80000000>;
++	};
 +
-+static void __init imx7d_init_irq(void)
-+{
-+	imx_init_revision_from_anatop();
-+	imx_src_init();
-+	irqchip_init();
-+}
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+static const char *imx7d_dt_compat[] __initconst = {
-+	"fsl,imx7d",
-+	NULL,
++		reg_usb_otg1_vbus: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "usb_otg1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
++
++		reg_usb_otg2_vbus: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "usb_otg2_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
++
++		reg_can2_3v3: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "can2-3v3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio1 7 GPIO_ACTIVE_LOW>;
++		};
++
++		reg_vref_1v8: regulator at 3 {
++			compatible = "regulator-fixed";
++			regulator-name = "vref-1v8";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++		};
++
++		wlreg_on: fixedregulator at 100 {
++			compatible = "regulator-fixed";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-name = "wlreg_on";
++			gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
++	};
 +};
 +
-+DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
-+	.init_irq	= imx7d_init_irq,
-+	.init_machine	= imx7d_init_machine,
-+	.dt_compat	= imx7d_dt_compat,
-+MACHINE_END
-diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-index 8726051..c4436d4 100644
---- a/arch/arm/mach-imx/mxc.h
-+++ b/arch/arm/mach-imx/mxc.h
-@@ -1,5 +1,5 @@
- /*
-- * Copyright 2004-2007, 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright 2004-2007, 2010-2015 Freescale Semiconductor, Inc.
-  * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
-  *
-  * This program is free software; you can redistribute it and/or
-@@ -38,6 +38,7 @@
- #define MXC_CPU_IMX6DL		0x61
- #define MXC_CPU_IMX6SX		0x62
- #define MXC_CPU_IMX6Q		0x63
-+#define MXC_CPU_IMX7D		0x72
- 
- #define IMX_DDR_TYPE_LPDDR2		1
- 
-@@ -169,6 +170,11 @@ static inline bool cpu_is_imx6q(void)
- 	return __mxc_cpu_type == MXC_CPU_IMX6Q;
- }
- 
-+static inline bool cpu_is_imx7d(void)
-+{
-+	return __mxc_cpu_type == MXC_CPU_IMX7D;
-+}
++&cpu0 {
++	arm-supply = <&sw1a_reg>;
++};
 +
- struct cpu_op {
- 	u32 cpu_rate;
- };
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	pmic: pfuze3000 at 08 {
++		compatible = "fsl,pfuze3000";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1a {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			/* use sw1c_reg to align with pfuze100/pfuze200 */
++			sw1c_reg: sw1b {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <1850000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3 {
++				regulator-min-microvolt = <900000>;
++				regulator-max-microvolt = <1650000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vldo1 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen2_reg: vldo2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vccsd {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen4_reg: v33 {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vldo3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vldo4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
++
++&i2c4 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c4>;
++	status = "okay";
++
++	codec: wm8960 at 1a {
++		compatible = "wlf,wm8960";
++		reg = <0x1a>;
++		clocks = <&clks IMX7D_AUDIO_MCLK_ROOT_CLK>;
++		clock-names = "mclk";
++		wlf,shared-lrclk;
++	};
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog_1>;
++
++	imx7d-sdb {
++		pinctrl_hog_1: hoggrp-1 {
++			fsl,pins = <
++				MX7D_PAD_UART3_CTS_B__GPIO4_IO7	0x14
++				MX7D_PAD_ECSPI2_SS0__GPIO4_IO23	 0x34  /* bt reg on */
++			>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				MX7D_PAD_I2C1_SDA__I2C1_SDA	0x4000007f
++				MX7D_PAD_I2C1_SCL__I2C1_SCL	0x4000007f
++			>;
++		};
++
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX7D_PAD_I2C2_SDA__I2C2_SDA	0x4000007f
++				MX7D_PAD_I2C2_SCL__I2C2_SCL	0x4000007f
++			>;
++		};
++
++		pinctrl_i2c3: i2c3grp {
++			fsl,pins = <
++				MX7D_PAD_I2C3_SDA__I2C3_SDA          0x4000007f
++				MX7D_PAD_I2C3_SCL__I2C3_SCL          0x4000007f
++			>;
++		};
++
++		pinctrl_i2c4: i2c4grp {
++			fsl,pins = <
++				MX7D_PAD_SAI1_RX_BCLK__I2C4_SDA		0x4000007f
++				MX7D_PAD_SAI1_RX_SYNC__I2C4_SCL		0x4000007f
++			>;
++		};
++
++
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX 0x79
++				MX7D_PAD_UART1_RX_DATA__UART1_DCE_RX 0x79
++			>;
++		};
++
++		pinctrl_uart5: uart5grp {
++			fsl,pins = <
++				MX7D_PAD_SAI1_TX_BCLK__UART5_DCE_TX 0x79
++				MX7D_PAD_SAI1_RX_DATA__UART5_DCE_RX 0x79
++				MX7D_PAD_SAI1_TX_SYNC__UART5_DCE_CTS 0x79
++				MX7D_PAD_SAI1_TX_DATA__UART5_DCE_RTS 0x79
++			>;
++		};
++
++		pinctrl_uart6: uart6grp {
++			fsl,pins = <
++				MX7D_PAD_ECSPI1_MOSI__UART6_DCE_TX 0x79
++				MX7D_PAD_ECSPI1_SCLK__UART6_DCE_RX 0x79
++				MX7D_PAD_ECSPI1_SS0__UART6_DCE_CTS 0x79
++				MX7D_PAD_ECSPI1_MISO__UART6_DCE_RTS 0x79
++			>;
++		};
++
++		pinctrl_usdhc1: usdhc1grp {
++			fsl,pins = <
++				MX7D_PAD_SD1_CMD__SD1_CMD	0x59
++				MX7D_PAD_SD1_CLK__SD1_CLK	0x19
++				MX7D_PAD_SD1_DATA0__SD1_DATA0	0x59
++				MX7D_PAD_SD1_DATA1__SD1_DATA1	0x59
++				MX7D_PAD_SD1_DATA2__SD1_DATA2	0x59
++				MX7D_PAD_SD1_DATA3__SD1_DATA3	0x59
++				MX7D_PAD_SD1_CD_B__GPIO5_IO0	0x59 /* CD */
++				MX7D_PAD_SD1_WP__GPIO5_IO1	0x59 /* WP */
++				MX7D_PAD_SD1_RESET_B__GPIO5_IO2	0x59 /* vmmc */
++			>;
++		};
++
++		pinctrl_usdhc2: usdhc2grp {
++			fsl,pins = <
++				MX7D_PAD_SD2_CMD__SD2_CMD       0x59
++				MX7D_PAD_SD2_CLK__SD2_CLK       0x19
++				MX7D_PAD_SD2_DATA0__SD2_DATA0   0x59
++				MX7D_PAD_SD2_DATA1__SD2_DATA1   0x59
++				MX7D_PAD_SD2_DATA2__SD2_DATA2   0x59
++				MX7D_PAD_SD2_DATA3__SD2_DATA3   0x59
++				MX7D_PAD_ECSPI2_MOSI__GPIO4_IO21	0x59 /* WL_REG_ON */
++			>;
++		};
++
++		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
++			fsl,pins = <
++				MX7D_PAD_SD2_CMD__SD2_CMD       0x5a
++				MX7D_PAD_SD2_CLK__SD2_CLK       0x1a
++				MX7D_PAD_SD2_DATA0__SD2_DATA0   0x5a
++				MX7D_PAD_SD2_DATA1__SD2_DATA1   0x5a
++				MX7D_PAD_SD2_DATA2__SD2_DATA2   0x5a
++				MX7D_PAD_SD2_DATA3__SD2_DATA3   0x5a
++			>;
++		};
++
++		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
++			fsl,pins = <
++				MX7D_PAD_SD2_CMD__SD2_CMD       0x5b
++				MX7D_PAD_SD2_CLK__SD2_CLK       0x1b
++				MX7D_PAD_SD2_DATA0__SD2_DATA0   0x5b
++				MX7D_PAD_SD2_DATA1__SD2_DATA1   0x5b
++				MX7D_PAD_SD2_DATA2__SD2_DATA2   0x5b
++				MX7D_PAD_SD2_DATA3__SD2_DATA3   0x5b
++			>;
++		};
++
++
++		pinctrl_usdhc3: usdhc3grp {
++			fsl,pins = <
++				MX7D_PAD_SD3_CMD__SD3_CMD	0x59
++				MX7D_PAD_SD3_CLK__SD3_CLK	0x19
++				MX7D_PAD_SD3_DATA0__SD3_DATA0	0x59
++				MX7D_PAD_SD3_DATA1__SD3_DATA1	0x59
++				MX7D_PAD_SD3_DATA2__SD3_DATA2	0x59
++				MX7D_PAD_SD3_DATA3__SD3_DATA3	0x59
++				MX7D_PAD_SD3_DATA4__SD3_DATA4	0x59
++				MX7D_PAD_SD3_DATA5__SD3_DATA5	0x59
++				MX7D_PAD_SD3_DATA6__SD3_DATA6	0x59
++				MX7D_PAD_SD3_DATA7__SD3_DATA7	0x59
++				MX7D_PAD_SD3_STROBE__SD3_STROBE	0x19
++			>;
++		};
++
++		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
++			fsl,pins = <
++				MX7D_PAD_SD3_CMD__SD3_CMD	0x5a
++				MX7D_PAD_SD3_CLK__SD3_CLK	0x1a
++				MX7D_PAD_SD3_DATA0__SD3_DATA0	0x5a
++				MX7D_PAD_SD3_DATA1__SD3_DATA1	0x5a
++				MX7D_PAD_SD3_DATA2__SD3_DATA2	0x5a
++				MX7D_PAD_SD3_DATA3__SD3_DATA3	0x5a
++				MX7D_PAD_SD3_DATA4__SD3_DATA4	0x5a
++				MX7D_PAD_SD3_DATA5__SD3_DATA5	0x5a
++				MX7D_PAD_SD3_DATA6__SD3_DATA6	0x5a
++				MX7D_PAD_SD3_DATA7__SD3_DATA7	0x5a
++				MX7D_PAD_SD3_STROBE__SD3_STROBE	0x1a
++			>;
++		};
++
++		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
++			fsl,pins = <
++				MX7D_PAD_SD3_CMD__SD3_CMD	0x5b
++				MX7D_PAD_SD3_CLK__SD3_CLK	0x1b
++				MX7D_PAD_SD3_DATA0__SD3_DATA0	0x5b
++				MX7D_PAD_SD3_DATA1__SD3_DATA1	0x5b
++				MX7D_PAD_SD3_DATA2__SD3_DATA2	0x5b
++				MX7D_PAD_SD3_DATA3__SD3_DATA3	0x5b
++				MX7D_PAD_SD3_DATA4__SD3_DATA4	0x5b
++				MX7D_PAD_SD3_DATA5__SD3_DATA5	0x5b
++				MX7D_PAD_SD3_DATA6__SD3_DATA6	0x5b
++				MX7D_PAD_SD3_DATA7__SD3_DATA7	0x5b
++				MX7D_PAD_SD3_STROBE__SD3_STROBE	0x1b
++			>;
++		};
++
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	assigned-clocks = <&clks IMX7D_UART1_ROOT_SRC>;
++	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	cd-gpios = <&gpio5 0 0>;
++	wp-gpios = <&gpio5 1 0>;
++	enable-sdio-wakeup;
++	keep-power-in-suspend;
++	status = "okay";
++};
 -- 
 1.9.1
