@@ -1,108 +1,57 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 07 May 2015 10:46:34 +0200
-Subject: [PATCH v3 1/9] clk: berlin: move to a dedicated sub-node
-In-Reply-To: <553F6FBA.3070908@gmail.com>
-References: <1428417909-27378-1-git-send-email-antoine.tenart@free-electrons.com>
- <1428417909-27378-2-git-send-email-antoine.tenart@free-electrons.com>
- <553F6FBA.3070908@gmail.com>
-Message-ID: <554B266A.8020803@gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 07 May 2015 10:49:11 +0200
+Subject: High-resolution timers not supported when using smp_twd
+ on Cortex A9
+In-Reply-To: <20150506111949.GP2067@n2100.arm.linux.org.uk>
+References: <554727A0.3040601@free.fr>
+ <20150506111949.GP2067@n2100.arm.linux.org.uk>
+Message-ID: <554B2707.6010802@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.04.2015 13:32, Sebastian Hesselbarth wrote:
-> On 07.04.2015 16:45, Antoine Tenart wrote:
->> The Berlin clock driver was sharing a DT node with the pin controller
->> and the reset driver. All these devices are now sub-nodes of the chip
->> controller. This patch rework the Berlin clock driver to allow moving
->> the Berlin clock DT bindings into their own sub-node of the chip
->> controller node.
+On 06/05/2015 13:19, Russell King - ARM Linux wrote:
+> On Mon, May 04, 2015 at 10:02:40AM +0200, Mason wrote:
+>> (The system's clocksource is a 27 MHz 32-bit counter.)
 >>
->> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->
-> Mike, Stephen,
->
-> would you mind to give your Acked-by for this patch and let me take
-> this through Berlin and ARM-SoC tree? The patch only touches berlin-
-> specific subdirectories in clk/ so there should be no merge issues
-> expected.
+>> If I remove the CLOCK_EVT_FEAT_C3STOP flag, then hrtimers are enabled,
+>> but I assume I would then run into problems in low-power mode, going by
+>> Russell's commit message.
+> 
+> It seems that you've done the research, and judging from the question
+> you ask below, you already know the answer:
+> 
+>> Do I have to use a platform-specific clockevent source if I want
+>> high-resolution timers on the system?
+> 
+> Yes - because the TWD stops in low power modes, which makes it unsuitable
+> as a high-resolution timer.  These kinds of issues are annoying, but it's
+> the way things are.
 
-Gentle ping.
+Hello Russell and LAKML readers,
 
-Mike, Stephen,
+I did dig pretty deep while investigating the issue, but there are still
+some aspects of the problem that are not clear to me.
 
-I'd like to see this in v4.2-rc and it has been around for at least
-a cycle.
+The most important is: what exactly is meant by "low power modes".
+Does the idle loop calling wfi send the system into low power mode?
+Are there several low power modes?
+How are these modes entered and exited?
+Is this documented in the ARM reference manual?
+or in the Cortex A9 technical manual?
 
-Sebastian
+The other thing I don't understand is: if the TWD stops in low power
+mode, then that means the system would not even receive the scheduling
+tick anymore? Wouldn't that break even coarse timers?
 
->> ---
->>   drivers/clk/berlin/bg2.c  | 7 +++----
->>   drivers/clk/berlin/bg2q.c | 7 ++++---
->>   2 files changed, 7 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
->> index 515fb133495c..3bfb3aede9f4 100644
->> --- a/drivers/clk/berlin/bg2.c
->> +++ b/drivers/clk/berlin/bg2.c
->> @@ -502,12 +502,13 @@ static const struct berlin2_gate_data
->> bg2_gates[] __initconst = {
->>
->>   static void __init berlin2_clock_setup(struct device_node *np)
->>   {
->> +    struct device_node *parent_np = of_get_parent(np);
->>       const char *parent_names[9];
->>       struct clk *clk;
->>       u8 avpll_flags = 0;
->>       int n;
->>
->> -    gbase = of_iomap(np, 0);
->> +    gbase = of_iomap(parent_np, 0);
->>       if (!gbase)
->>           return;
->>
->> @@ -685,7 +686,5 @@ static void __init berlin2_clock_setup(struct
->> device_node *np)
->>   bg2_fail:
->>       iounmap(gbase);
->>   }
->> -CLK_OF_DECLARE(berlin2_clock, "marvell,berlin2-chip-ctrl",
->> -           berlin2_clock_setup);
->> -CLK_OF_DECLARE(berlin2cd_clock, "marvell,berlin2cd-chip-ctrl",
->> +CLK_OF_DECLARE(berlin2_clock, "marvell,berlin2-clk",
->>              berlin2_clock_setup);
->> diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
->> index 440ef81ab15c..72a50ded145a 100644
->> --- a/drivers/clk/berlin/bg2q.c
->> +++ b/drivers/clk/berlin/bg2q.c
->> @@ -290,18 +290,19 @@ static const struct berlin2_gate_data
->> bg2q_gates[] __initconst = {
->>
->>   static void __init berlin2q_clock_setup(struct device_node *np)
->>   {
->> +    struct device_node *parent_np = of_get_parent(np);
->>       const char *parent_names[9];
->>       struct clk *clk;
->>       int n;
->>
->> -    gbase = of_iomap(np, 0);
->> +    gbase = of_iomap(parent_np, 0);
->>       if (!gbase) {
->>           pr_err("%s: Unable to map global base\n", np->full_name);
->>           return;
->>       }
->>
->>       /* BG2Q CPU PLL is not part of global registers */
->> -    cpupll_base = of_iomap(np, 1);
->> +    cpupll_base = of_iomap(parent_np, 1);
->>       if (!cpupll_base) {
->>           pr_err("%s: Unable to map cpupll base\n", np->full_name);
->>           iounmap(gbase);
->> @@ -384,5 +385,5 @@ bg2q_fail:
->>       iounmap(cpupll_base);
->>       iounmap(gbase);
->>   }
->> -CLK_OF_DECLARE(berlin2q_clock, "marvell,berlin2q-chip-ctrl",
->> +CLK_OF_DECLARE(berlin2q_clock, "marvell,berlin2q-clk",
->>              berlin2q_clock_setup);
->>
->
+Does that mean using TWD as clockevent source is incompatible with
+CONFIG_HZ_PERIODIC=y?
+(So we must pick CONFIG_NO_HZ_IDLE=y or CONFIG_NO_HZ_FULL=y)
+
+https://www.kernel.org/doc/Documentation/timers/NO_HZ.txt
+
+High-resolution timers are a "nice-to-have" feature, but I
+think being able to use vanilla code is an overriding factor.
+I just wish there was a way to get hrtimers while using
+standard vanilla code :-)
+
+Regards.
