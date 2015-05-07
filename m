@@ -1,321 +1,108 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu,  7 May 2015 18:48:32 +0200
-Subject: [PATCH v3 2/7] clocksource: add lpc32xx timer driver
-In-Reply-To: <1431017317-23740-1-git-send-email-manabian@gmail.com>
-References: <1431017317-23740-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431017317-23740-3-git-send-email-manabian@gmail.com>
+From: j.fanguede@virtualopensystems.com (=?UTF-8?B?SsOpcsOpbXkgRmFuZ3XDqGRl?=)
+Date: Thu, 7 May 2015 18:56:24 +0200
+Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
+In-Reply-To: <CAMJs5B9i9q8gJU93B09-uLMF6w1bTft-40DWPFUP6ky=SketSQ@mail.gmail.com>
+References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
+ <20150506141249.GA6796@cbox>
+ <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
+ <20150507112027.GC25885@cbox>
+ <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
+ <CAMJs5B9i9q8gJU93B09-uLMF6w1bTft-40DWPFUP6ky=SketSQ@mail.gmail.com>
+Message-ID: <CAGE1QJoEAg9tAM63MEbpLuqvY_ZwGrHPU1sqo=L_iByKrERUow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for using the NXP LPC timer as clocksource and
-clock event. These timers are present on many NXP devices
-including LPC32xx, LPC17xx, LPC18xx and LPC43xx.
+On Thu, May 7, 2015 at 5:34 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Thu, May 7, 2015 at 4:50 PM, J?r?my Fangu?de
+> <j.fanguede@virtualopensystems.com> wrote:
+>> On Thu, May 7, 2015 at 1:20 PM, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>>> On Thu, May 07, 2015 at 12:50:50PM +0200, J?r?my Fangu?de wrote:
+>>>> On Wed, May 6, 2015 at 4:12 PM, Christoffer Dall
+>>>> <christoffer.dall@linaro.org> wrote:
+>>>> > Hi J?r?my,
+>>>> >
+>>>> > On Tue, May 05, 2015 at 11:13:11AM +0200, J?r?my Fangu?de wrote:
+>>>> >> To maintain cache coherency on ARM, we may need a mechanism to flush
+>>>> >> the data cache.
+>>>> >
+>>>> > In addition to generally just making this functionality available (see
+>>>> > below), do you have an actual use case in mind for this?  To solve the
+>>>> > VGA issue, for example, we already have a patch series from Drew trying
+>>>> > to address this.  Does that not work for you?
+>>>> >
+>>>> > There was a long discussion about this here:
+>>>> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-February/013593.html
+>>>> >
+>>>> > Drew then created a patch set, here:
+>>>> > https://lists.nongnu.org/archive/html/qemu-devel/2015-03/msg01254.html
+>>>> >
+>>>> > and replied to himself, here:
+>>>> > https://www.marc.info/?l=android-virt&m=142670523929132&w=3
+>>>> >
+>>>> > Which basically says that he doesn't like having to do flushes all over
+>>>> > QEMU (IIUC), so he sent this version instead:
+>>>> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-March/014027.html
+>>>> >
+>>>> > Which he now said he'd respin.
+>>>>
+>>>> In fact, I used this ioctl in pairs with this QEMU patch series:
+>>>> https://lists.nongnu.org/archive/html/qemu-devel/2015-05/msg00407.html
+>>>> My current work doesn't do anything about vga ram, so vga issue
+>>>> probably still persists, but it solves others issues with some
+>>>> emulated devices (mainly PCI) which were failing before and now work
+>>>> fine with this patch.
+>>>
+>>> Why does Drew's approach not work and your approach works here?  What is
+>>> the case that we haven't though about yet?
+>>
+>> The first patch from Andrew, (which is for arm64 only) doesn't permit
+>> me to make some emulated PCI devices working with virt, probably
+>> because some flushes/cleans are missing.
+>> As for the second patch, it focuses, for now, only on VGA ram. I
+>> quickly tried to extend the KVM_MEM_UNCACHED flag to the whole guest
+>> memory, but then the guest fails to boot; but even if it was working,
+>> does it make sense to map as uncached all the ram of the guest? Since
+>> we can not guess which region of the guest memory will be accessed.
+>>
+>> Simple PCI devices like e1000 or usb-ehci (with usb-kbd for instance)
+>> are not usable, with or without these patches, but if I flush a
+>> precise memory range, on reads and writes performed by emulated
+>> devices on guest ram, (It's exactly what the QEMU patch series that I
+>> sent does, with this ioctl), emulated PCI devices are now working.
+>
+> I understand all this.  What I'd like for us to find out is why we are
+> having coherency issues.  We knew that for the VGA adapter, the guest
+> maps the memory as uncached (because that's how the real hardware
+> works), and QEMU maps the memory as cached (because it's just normal
+> memory), and unsurprisingly the two views of that memory is not
+> coherent.
+>
+> What are the cases you are seeing with e1000 or usb-ehci?
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- drivers/clocksource/Kconfig        |  10 ++
- drivers/clocksource/Makefile       |   1 +
- drivers/clocksource/time-lpc32xx.c | 259 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 270 insertions(+)
- create mode 100644 drivers/clocksource/time-lpc32xx.c
+USB devices fail with a timeout error, as if the communication between
+the kernel and the devices fail at a certain point:
+usb 1-1: device not accepting address 5, error -110
+usb usb1-port1: unable to enumerate USB device
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 51d7865fdddb..71c532314f1d 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -106,6 +106,16 @@ config CLKSRC_EFM32
- 	  Support to use the timers of EFM32 SoCs as clock source and clock
- 	  event device.
- 
-+config CLKSRC_LPC32XX
-+	bool "Clocksource for NXP's LPC SoC series" if !ARCH_LPC18XX
-+	depends on OF && ARM && (ARCH_LPC18XX || COMPILE_TEST)
-+	select CLKSRC_MMIO
-+	default ARCH_LPC18XX
-+	help
-+	  Support to use the timers of LPC SoCs as clock source and clock
-+	  event device. These timers are present on many NXP devices
-+	  including LPC32xx, LPC17xx, LPC18xx and LPC43xx.
-+
- config ARM_ARCH_TIMER
- 	bool
- 	select CLKSRC_OF if OF
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 5b85f6adb258..5928e35cb64d 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -37,6 +37,7 @@ obj-$(CONFIG_ARCH_BCM_MOBILE)	+= bcm_kona_timer.o
- obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
- obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
- obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
-+obj-$(CONFIG_CLKSRC_LPC32XX)	+= time-lpc32xx.o
- obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
- obj-$(CONFIG_FSL_FTM_TIMER)	+= fsl_ftm_timer.o
- obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
-diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
-new file mode 100644
-index 000000000000..bb94409cf89c
---- /dev/null
-+++ b/drivers/clocksource/time-lpc32xx.c
-@@ -0,0 +1,259 @@
-+/*
-+ * Clocksource driver for NXP LPC32xx/18xx/43xx timer
-+ *
-+ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * Based on:
-+ * time-efm32 Copyright (C) 2013 Pengutronix
-+ * mach-lpc32xx/timer.c Copyright (C) 2009 - 2010 NXP Semiconductors
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ */
-+
-+#define pr_fmt(fmt) "%s: " fmt, __func__
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/sched_clock.h>
-+
-+#define LPC32XX_TIMER_IR		0x000
-+#define  LPC32XX_TIMER_IR_MR0INT	BIT(0)
-+#define LPC32XX_TIMER_TCR		0x004
-+#define  LPC32XX_TIMER_TCR_CEN		BIT(0)
-+#define  LPC32XX_TIMER_TCR_CRST		BIT(1)
-+#define LPC32XX_TIMER_TC		0x008
-+#define LPC32XX_TIMER_PR		0x00c
-+#define LPC32XX_TIMER_MCR		0x014
-+#define  LPC32XX_TIMER_MCR_MR0I		BIT(0)
-+#define  LPC32XX_TIMER_MCR_MR0R		BIT(1)
-+#define  LPC32XX_TIMER_MCR_MR0S		BIT(2)
-+#define LPC32XX_TIMER_MR0		0x018
-+
-+struct lpc32xx_clock_event_ddata {
-+	struct clock_event_device evtdev;
-+	void __iomem *base;
-+};
-+
-+/* Needed for the sched clock */
-+static void __iomem *clocksource_timer_counter;
-+
-+static u64 notrace lpc32xx_read_sched_clock(void)
-+{
-+	return readl(clocksource_timer_counter);
-+}
-+
-+static int lpc32xx_clkevt_next_event(unsigned long delta,
-+				     struct clock_event_device *evtdev)
-+{
-+	struct lpc32xx_clock_event_ddata *ddata =
-+		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
-+
-+	writel_relaxed(LPC32XX_TIMER_TCR_CRST, ddata->base + LPC32XX_TIMER_TCR);
-+	writel_relaxed(delta, ddata->base + LPC32XX_TIMER_PR);
-+	writel_relaxed(LPC32XX_TIMER_TCR_CEN, ddata->base + LPC32XX_TIMER_TCR);
-+
-+	return 0;
-+}
-+
-+static void lpc32xx_clkevt_mode(enum clock_event_mode mode,
-+				struct clock_event_device *evtdev)
-+{
-+	struct lpc32xx_clock_event_ddata *ddata =
-+		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		WARN_ON(1);
-+		break;
-+
-+	case CLOCK_EVT_MODE_ONESHOT:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+		/*
-+		 * Disable the timer. When using oneshot, we must also
-+		 * disable the timer to wait for the first call to
-+		 * set_next_event().
-+		 */
-+		writel_relaxed(0, ddata->base + LPC32XX_TIMER_TCR);
-+		break;
-+
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_RESUME:
-+		break;
-+	}
-+}
-+
-+static irqreturn_t lpc32xx_clock_event_handler(int irq, void *dev_id)
-+{
-+	struct lpc32xx_clock_event_ddata *ddata = dev_id;
-+
-+	/* Clear match */
-+	writel_relaxed(LPC32XX_TIMER_IR_MR0INT, ddata->base + LPC32XX_TIMER_IR);
-+
-+	ddata->evtdev.event_handler(&ddata->evtdev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct lpc32xx_clock_event_ddata lpc32xx_clk_event_ddata = {
-+	.evtdev = {
-+		.name           = "lpc3220 clockevent",
-+		.features       = CLOCK_EVT_FEAT_ONESHOT,
-+		.rating         = 300,
-+		.set_next_event = lpc32xx_clkevt_next_event,
-+		.set_mode       = lpc32xx_clkevt_mode,
-+	},
-+};
-+
-+static int __init lpc32xx_clocksource_init(struct device_node *np)
-+{
-+	void __iomem *base;
-+	unsigned long rate;
-+	struct clk *clk;
-+	int ret;
-+
-+	clk = of_clk_get_by_name(np, "timerclk");
-+	if (IS_ERR(clk)) {
-+		pr_err("clock get failed (%lu)\n", PTR_ERR(clk));
-+		return PTR_ERR(clk);
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		pr_err("clock enable failed (%d)\n", ret);
-+		goto err_clk_enable;
-+	}
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_err("unable to map registers\n");
-+		ret = -EADDRNOTAVAIL;
-+		goto err_iomap;
-+	}
-+
-+	writel_relaxed(LPC32XX_TIMER_TCR_CRST, base + LPC32XX_TIMER_TCR);
-+	writel_relaxed(0, base + LPC32XX_TIMER_PR);
-+	writel_relaxed(0, base + LPC32XX_TIMER_MCR);
-+	writel_relaxed(LPC32XX_TIMER_TCR_CEN, base + LPC32XX_TIMER_TCR);
-+
-+	rate = clk_get_rate(clk);
-+	ret = clocksource_mmio_init(base + LPC32XX_TIMER_TC, "lpc3220 timer",
-+				    rate, 300, 32, clocksource_mmio_readl_up);
-+	if (ret) {
-+		pr_err("failed to init clocksource (%d)\n", ret);
-+		goto err_clocksource_init;
-+	}
-+
-+	clocksource_timer_counter = base + LPC32XX_TIMER_TC;
-+	sched_clock_register(lpc32xx_read_sched_clock, 32, rate);
-+
-+	return 0;
-+
-+err_clocksource_init:
-+	iounmap(base);
-+err_iomap:
-+	clk_disable_unprepare(clk);
-+err_clk_enable:
-+	clk_put(clk);
-+	return ret;
-+}
-+
-+static int __init lpc32xx_clockevent_init(struct device_node *np)
-+{
-+	void __iomem *base;
-+	unsigned long rate;
-+	struct clk *clk;
-+	int ret, irq;
-+
-+	clk = of_clk_get_by_name(np, "timerclk");
-+	if (IS_ERR(clk)) {
-+		pr_err("clock get failed (%lu)\n", PTR_ERR(clk));
-+		return PTR_ERR(clk);
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		pr_err("clock enable failed (%d)\n", ret);
-+		goto err_clk_enable;
-+	}
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_err("unable to map registers\n");
-+		ret = -EADDRNOTAVAIL;
-+		goto err_iomap;
-+	}
-+
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (!irq) {
-+		pr_err("get irq failed\n");
-+		ret = -ENOENT;
-+		goto err_irq;
-+	}
-+
-+	/* Initial timer setup */
-+	writel_relaxed(0, base + LPC32XX_TIMER_TCR);
-+	writel_relaxed(LPC32XX_TIMER_IR_MR0INT, base + LPC32XX_TIMER_IR);
-+	writel_relaxed(1, base + LPC32XX_TIMER_MR0);
-+	writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R |
-+		       LPC32XX_TIMER_MCR_MR0S, base + LPC32XX_TIMER_MCR);
-+
-+	rate = clk_get_rate(clk);
-+	lpc32xx_clk_event_ddata.base = base;
-+	clockevents_config_and_register(&lpc32xx_clk_event_ddata.evtdev,
-+					rate, 1, -1);
-+
-+	ret = request_irq(irq, lpc32xx_clock_event_handler,
-+			  IRQF_TIMER | IRQF_IRQPOLL, "lpc3220 clockevent",
-+			  &lpc32xx_clk_event_ddata);
-+	if (ret) {
-+		pr_err("request irq failed\n");
-+		goto err_irq;
-+	}
-+
-+	return 0;
-+
-+err_irq:
-+	iounmap(base);
-+err_iomap:
-+	clk_disable_unprepare(clk);
-+err_clk_enable:
-+	clk_put(clk);
-+	return ret;
-+}
-+
-+/*
-+ * This function asserts that we have exactly one clocksource and one
-+ * clock_event_device in the end.
-+ */
-+static void __init lpc32xx_timer_init(struct device_node *np)
-+{
-+	static int has_clocksource, has_clockevent;
-+	int ret;
-+
-+	if (!has_clocksource) {
-+		ret = lpc32xx_clocksource_init(np);
-+		if (!ret) {
-+			has_clocksource = 1;
-+			return;
-+		}
-+	}
-+
-+	if (!has_clockevent) {
-+		ret = lpc32xx_clockevent_init(np);
-+		if (!ret) {
-+			has_clockevent = 1;
-+			return;
-+		}
-+	}
-+}
-+CLOCKSOURCE_OF_DECLARE(lpc32xx_timer, "nxp,lpc3220-timer", lpc32xx_timer_init);
--- 
-1.8.0
+e1000 fails when the userspace tries to use it, with these type of
+kernel messages:
+e1000 0000:00:02.0 eth0: Detected Tx Unit Hang
+  Tx Queue             <0>
+  TDH                  <d>
+  TDT                  <d>
+  next_to_use          <d>
+  next_to_clean        <9>
+buffer_info[next_to_clean]
+  time_stamp           <ffff9311>
+  next_to_watch        <a>
+  jiffies              <ffff956a>
+  next_to_watch.status <0>
+
+>
+> Hint: We can make a lot of things work by just sticking cache flushes
+> all over, but it's not a good engineering approach.
+
+Yes, it's probably not the best approach here, but currently it's the
+only solution that I have to make some PCI devices usable on ARM.
