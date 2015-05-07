@@ -1,31 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 May 2015 11:43:15 +0200
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <554B2DF5.4040600@huawei.com>
-References: <55417F5A.4040300@linaro.org> <20501959.OF3FLWO2Eh@wuerfel>
- <554B2DF5.4040600@huawei.com>
-Message-ID: <4412805.fx6caR2qJ7@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 May 2015 10:46:39 +0100
+Subject: [PATCH 1/2] spi: sirf: replace kmalloc by devm_kzalloc
+In-Reply-To: <1430982791-8681-1-git-send-email-21cnbao@gmail.com>
+References: <1430982791-8681-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <20150507094639.GJ22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 May 2015 17:18:45 Shannon Zhao wrote:
-> On 2015/5/7 16:55, Arnd Bergmann wrote:
-> > On Thursday 07 May 2015 10:39:35 Shannon Zhao wrote:
-> >> I tried Ubuntu Trusty from Christoffer, when typing "system_powerdown"
-> >> on QEMU monitor, "cat /dev/input/event0 | hexdump" shows the event is
-> >> triggered but the guest doesn't poweroff.
-> > 
-> > Can you try installing acpid by running 'sudo apt-get install acpid' in
-> > the image? I suspect it should just work by scanning the event devices
-> > even in the absence of ACPI on the platform.
-> > 
+On Thu, May 07, 2015 at 07:13:10AM +0000, Barry Song wrote:
+> From: Qipan Li <Qipan.Li@csr.com>
 > 
-> Cool, I start acpid and the poweroff works.
 
-Ok, great, thanks for confirming this! Have you tried reboot as well?
-
->From looking at the acpid source code, I suspect it does not work unless
-extra configuration files are added, but that would be the same as for the
-ACPI case.
-
-	Arnd
+Applied since it's an improvement but please do update to use the core
+features like Geert suggested.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150507/944ff8c7/attachment.sig>
