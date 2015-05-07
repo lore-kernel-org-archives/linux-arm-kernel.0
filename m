@@ -1,101 +1,99 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 7 May 2015 22:32:47 +0800
-Subject: [PATCH] arm64: dts: Add idle-states for Juno
-In-Reply-To: <20150507124029.GE30328@red-moon>
-References: <1430402268.2868.20.camel@linaro.org>
- <20150501015502.GA4679@leoy-linaro>
- <1430475751.3045.40.camel@linaro.org>
- <20150501104506.GA12330@red-moon>
- <20150501115507.GB16842@leoy-linaro>
- <20150501135811.GW7440@e106497-lin.cambridge.arm.com>
- <20150507124029.GE30328@red-moon>
-Message-ID: <20150507143247.GB15622@leoy-linaro>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 May 2015 07:44:37 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix bogus struct clk comparison for timer
+ clock
+In-Reply-To: <554AB1E3.2000304@codeaurora.org>
+References: <1430848941-27106-1-git-send-email-tony@atomide.com>
+ <20150506053539.GA10871@codeaurora.org>
+ <20150506145539.GI21061@atomide.com>
+ <554AB1E3.2000304@codeaurora.org>
+Message-ID: <20150507144437.GA15563@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 07, 2015 at 01:40:29PM +0100, Lorenzo Pieralisi wrote:
-> On Fri, May 01, 2015 at 02:58:11PM +0100, Liviu Dudau wrote:
-> > On Fri, May 01, 2015 at 12:55:07PM +0100, Leo Yan wrote:
-> > > On Fri, May 01, 2015 at 11:45:06AM +0100, Lorenzo Pieralisi wrote:
-> > > > On Fri, May 01, 2015 at 11:22:31AM +0100, Jon Medhurst (Tixy) wrote:
-> > > > > On Fri, 2015-05-01 at 09:55 +0800, Leo Yan wrote:
-> > > > > [...]
-> > > > > > >  arch/arm64/boot/dts/arm/juno.dts | 28 ++++++++++++++++++++++++++++
-> > > > > > >  1 file changed, 28 insertions(+)
-> > > > > > > 
-> > > > > > > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> > > > > > > index 133ee59..7a9a449 100644
-> > > > > > > --- a/arch/arm64/boot/dts/arm/juno.dts
-> > > > > > > +++ b/arch/arm64/boot/dts/arm/juno.dts
-> > > > > > > @@ -34,12 +34,35 @@
-> > > > > > >  		#address-cells = <2>;
-> > > > > > >  		#size-cells = <0>;
-> > > > > > >  
-> > > > > > > +		idle-states {
-> > > > > > > +			entry-method = "arm,psci";
-> > > > > > > +
-> > > > > > > +			CPU_SLEEP_0: cpu-sleep-0 {
-> > > > > > > +				compatible = "arm,idle-state";
-> > > > > > > +				arm,psci-suspend-param = <0x0010000>;
-> > > > > > > +				local-timer-stop;
-> > > > > > 
-> > > > > > Just want to figure out the best way for big.LITTLE system; so have
-> > > > > > one question: CA53 and CA57 have different power domain for arch
-> > > > > > timer, right?
-> > > > > 
-> > > > > I'm not sure of the answer to that. The documentation I have does seem
-> > > > > to state the timer is lost on cluster power down, which would imply that
-> > > > > it's not when just powering down a cpu, but I'm not at all clear on the
-> > > > > matter.
-> > > > > 
-> > > > > >  If this is the case, should we define two kinds of cpu
-> > > > > > sleep states, one of them will not migrate to broadcast timer and
-> > > > > > keep using arch timer after cpu has been powered down?
-> > > > > 
-> > > > > Do you mean that if the local timer is not lost (and so we should not
-> > > > > have local-timer-stop above), then we should have another identical idle
-> > > > > state except that it _does_ specify local-timer-stop to force the
-> > > > > broadcast time to be used? If so, would that second state ever be more
-> > > > > power efficient than the first? (I don't know the answer to that, this
-> > > > > whole area is pretty new to me).
-> > > > 
-> > > > Ok, to start with, if we want the generic CPUidle driver to work on bL
-> > > > systems, we should get this patch merged:
-> > > > 
-> > > > http://www.spinics.net/lists/arm-kernel/msg412790.html
-> > > 
-> > > Thanks pointing out this.
-> > > 
-> > > > Architected timer is always lost on power down, unless we are talking
-> > > > about a logic retention state (or if we are talking about local timers
-> > > > that are not the architected ones). Anyway, with the patch above, different
-> > > > cpus can have different idle states, so different behaviours when it
-> > > > comes to the local timer behaviour. If, say, on a A53/A57 system, A53
-> > > > cpus lose the local timer on idle state entry and A57 cpus do not
-> > > > (that's a non-existing example though), those cpus will have different
-> > > > idle states so different local-timer-stop flags.
-> > > 
-> > > For A57, not sure if arch timer will be powered off if cpu has been
-> > > powered off.
-> > > 
-> > > From A53's TRM figure 2-1 Cortex-A53 processor block diagram, the arch
-> > > timer is not within CPU power domain, so likey arch timer still will
-> > > work even cpu has been powered off (PDCPU/PDADVSIMD both have been off).
-> > > This looks like is not aligning w/t your upper description. Could u
-> > > confirm this understanding is right?
-> > 
-> > Not quite. Behind the architected timers there is a system shared counter
-> > that is used as a basis for the local CPU's counter. So when a CPU is being
-> > powered off the system counter still counts and the CPU's copy gets updated
-> > on power on by the firmware (hopefully).
+* Stephen Boyd <sboyd@codeaurora.org> [150506 17:30]:
+> On 05/06/15 07:55, Tony Lindgren wrote:
+> >> I don't think the coccinelle script was ever merged...
+>
+> > Oh OK, but the wrong comparisons in the kernel code got
+> > fixed, right? 
 > 
-> There is nothing to be updated (ie CPUidle will never shut off the PDSOC
-> power domain), the system counter still counts on cpu and cluster power off,
-> but the logic implementing the arch timer in the cpu (ie comparators) is lost
-> on power off, so the arch timer has to be offloaded to the broadcast device.
+> Yes the ones that mattered were fixed.
 
-Thanks for confirmation. This will be helpful for later enabling
-cpuidle on hikey board (eight CA53 cores)...
+OK thanks for confirming that.
+ 
+> > Thanks here's an updated version with that.
+> 
+> Are you taking this through arm-soc?
 
-Thanks,
-Leo Yan
+Yes that's the plan.
+ 
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -298,7 +298,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+> >  	if (IS_ERR(src))
+> >  		return PTR_ERR(src);
+> >  
+> > -	if (clk_get_parent(timer->fclk) != src) {
+> > +	if (!clk_is_match(clk_get_parent(timer->fclk), src)) {
+> >  		r = clk_set_parent(timer->fclk, src);
+> 
+> I also wonder why we can't just call clk_set_parent() and skip the "is
+> the parent already src" check?
+> 
+> If there's a good reason for not just calling clk_set_parent() then it
+> makes sense to do the clk_is_match() thing, and you can have my ack
+> 
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Good point. We've been unconditionally calling it anyways and
+nobody has complained of any issues. So let's just remove the
+check.
+
+Regards,
+
+Tony
+
+8< ----------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 5 May 2015 09:03:34 -0700
+Subject: [PATCH] ARM: OMAP2+: Remove bogus struct clk comparison for timer
+ clock
+
+With recent changes to use determine_rate, the comparison of two
+clocks won't work without clk_is_match that does __clk_get_hw
+on the clocks first.
+
+As we've been unconditionally already calling clk_set_parent
+already because of the bogus comparison, let's just remove the
+check as suggested by Stephen Boyd <sboyd@codeaurora.org>.
+
+Cc: Michael Turquette <mturquette@linaro.org>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -298,14 +298,11 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	if (IS_ERR(src))
+ 		return PTR_ERR(src);
+ 
+-	if (clk_get_parent(timer->fclk) != src) {
+-		r = clk_set_parent(timer->fclk, src);
+-		if (r < 0) {
+-			pr_warn("%s: %s cannot set source\n", __func__,
+-				oh->name);
+-			clk_put(src);
+-			return r;
+-		}
++	r = clk_set_parent(timer->fclk, src);
++	if (r < 0) {
++		pr_warn("%s: %s cannot set source\n", __func__, oh->name);
++		clk_put(src);
++		return r;
+ 	}
+ 
+ 	clk_put(src);
