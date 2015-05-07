@@ -1,56 +1,98 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Thu, 7 May 2015 14:07:25 +0200
-Subject: [PATCH] arm/mm/dma-mapping.c: Add arm_coherent_dma_mmap
-In-Reply-To: <1431000019-7483-1-git-send-email-mike.looijmans@topic.nl>
-References: <1431000019-7483-1-git-send-email-mike.looijmans@topic.nl>
-Message-ID: <554B557D.10005@topic.nl>
+From: bintian.wang@huawei.com (Bintian)
+Date: Thu, 7 May 2015 20:01:47 +0800
+Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <20150507112536.GD22115@arm.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <20150507090210.GB22115@arm.com> <554B305F.4080907@huawei.com>
+ <20150507112536.GD22115@arm.com>
+Message-ID: <554B542B.6040006@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?Oops, "arch/arm/boot/dts/topic-dyplo.dtsi" should not have been in there. Will 
-send a v2 patch to correct that.
+Hi Will,
 
-On 07-05-15 14:00, Mike Looijmans wrote:
-> When dma-coherent transfers are enabled, the mmap call must
-> not change the pg_prot flags in the vma struct.
+On 2015/5/7 19:25, Will Deacon wrote:
+> On Thu, May 07, 2015 at 10:29:03AM +0100, Bintian wrote:
+>> On 2015/5/7 17:02, Will Deacon wrote:
+>>> On Tue, May 05, 2015 at 01:06:34PM +0100, Bintian Wang wrote:
+>>>> Hi6220 is one mobile solution of Hisilicon, this patchset contains
+>>>> initial support for Hi6220 SoC and HiKey development board, which
+>>>> supports octal ARM Cortex A53 cores. Initial support is minimal and
+>>>> includes just the arch configuration, clock driver, device tree
+>>>> configuration.
+>>>>
+>>>> PSCI is enabled in device tree and there is no problem to boot all the
+>>>> octal cores, and the CPU hotplug is also working now, you can download
+>>>> and compile the latest firmware based on the following link to run this
+>>>> patch set:
+>>>> https://github.com/96boards/documentation/wiki/UEFI
+>>>>
+>>>> Changes v4:
+>>>> * Rebase to kernel 4.1-rc1
+>>>> * Delete "arm,cortex-a15-gic" from the gic node in dts
+>>>
+>>> I gave these patches a go on top of -rc2 using the ATF and UEFI you link to
+>>> above.
+>>>
+>>> The good news is that the thing booted and all the cores entered at EL2.
+>>> Thanks!
+>> Really thank you very much for testing this patch set.
 >
-> Split the arm_dma_mmap into a common and specific parts,
-> and add a "arm_coherent_dma_mmap" implementation that does
-> not alter the page protection flags.
+> Feel free to add my tested-by if you like.
+Sure, I will add and prepare the next version soon.
+
 >
-> Tested on a topic-miami board (Zynq) using the ACP port
-> to transfer data between FPGA and CPU using the Dyplo
-> framework. Without this patch, byte-wise access to mmapped
-> coherent DMA memory was about 20x slower because of the
-> memory being marked as non-cacheable, and transfer speeds
-> would not exceed 240MB/s.
+>>> The bad news is that running hackbench quickly got the *heatsink*
+>>> temperature to 73 degress C and rising (measured with an infrared
+>>> thermometer).
+>> This patch set is just for booting the small system, if you want to
+>> test the temperature, I think you should using the HiKey released
+>> version (https://www.96boards.org/).
 >
-> After this patch, the mapped memory is cacheable and the
-> transfer speed is again 600MB/s (limited by the FPGA) when
-> the data is in the L2 cache, while data integrity is being
-> maintained.
+> I'm not really interested in the temperature numbers, but I am interested
+> in the board not melting and potentially setting fire to my desk.
 >
-> The patch has no effect on non-coherent DMA.
+>> This patch is just for the small system, and not include those drivers
+>> for adjusting the CPU frequency, thermal control and so on. After this
+>> patch is merged, all those drivers will be submitted later.
 >
-> Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
-> ---
->   arch/arm/boot/dts/topic-dyplo.dtsi |  1 +
->   arch/arm/mm/dma-mapping.c          | 32 +++++++++++++++++++++++++-------
->   2 files changed, 26 insertions(+), 7 deletions(-)
+> Should those drivers *really* exist only in the kernel? What happens if
+> the kernel panics for some other reason? You'll basically have 8 spinning
+> cores and no sensible way to handle the thermal interrupt.
+>
+> Shouldn't there be something in the secure firmware as a last resort?
+>
+>>> So my question is, does this SoC have an automatic thermal cut out? Whilst
+>>> I'm all for merging enabling code into the kernel, if it really relies on
+>>> the kernel to stop it from catching fire, maybe it's not a great idea
+>>> putting these patches into people's hands just yet.
+>> Hikey is a low cost board, I think it doesn't have an automatic thermal
+>> cut out; I always use HiKey to test my patch, in the normal case,
+>> temperature is not a problem.
+>
+> I don't see why the cost has anything to do with this issue; any money I
+> save on the board will quickly be re-invested in my increased insurance
+> premium.
+>
+> All I think we need is for secure software to keep an eye on the temperature
+> and hit the power controller if it goes over some `fatal' threshold.
+> Ideally, you'd be able to use a secure interrupt for this, but I suspect
+> that you don't have the right hardware features for that (please correct me
+> if I'm wrong). An alternative would be to hang something off a secure timer
+> and get the firmware to check the board temperature on some low-frequency
+> periodic tick.
+If there is exception occurred on A core, there are two methods to
+handle it:
+(1) Delay for a period of time, watchdog will trigger the system reset.
+(2) If the temperature is over 105 degree, the CPU will trigger reset(I
+guess it's chip level).
 
+Thanks,
 
+Bintian
 
-Kind regards,
-
-Mike Looijmans
-System Expert
-
-TOPIC Embedded Products
-Eindhovenseweg 32-C, NL-5683 KH Best
-Postbus 440, NL-5680 AK Best
-Telefoon: +31 (0) 499 33 69 79
-Telefax: +31 (0) 499 33 69 70
-E-mail: mike.looijmans at topicproducts.com
-Website: www.topicproducts.com
-
-Please consider the environment before printing this e-mail
+>
+> Will
+>
+> .
+>
