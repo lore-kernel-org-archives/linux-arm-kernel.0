@@ -1,133 +1,88 @@
-From: bintian.wang@huawei.com (Bintian Wang)
-Date: Thu, 7 May 2015 22:00:21 +0800
-Subject: [PATCH v5 2/6] arm64: hi6220: Document devicetree bindings for
- Hisilicon hi6220 SoC
-In-Reply-To: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
-References: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <1431007225-8513-3-git-send-email-bintian.wang@huawei.com>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Thu, 7 May 2015 16:08:54 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <554B6917.40705@topic.nl>
+References: <5538DD02.6050401@topic.nl>	<3382997.5hgfVKmNXP@wuerfel>	<5540D356.50708@topic.nl>	<9622793.RaVBbeJMCx@wuerfel>	<554B49F0.1090100@topic.nl>
+ <CAD8Lp45w6_ck13sG3PQ549AxsgTi96XQAkUEd9DQqt-i=ZXxUQ@mail.gmail.com>
+ <554B6917.40705@topic.nl>
+Message-ID: <554B71F6.5000106@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the devicetree bindings used by the
-DT files of Hisilicon hi6220 SoC mobile platform.
+?On 07-05-15 15:31, Mike Looijmans wrote:
+> On 07-05-15 15:21, Daniel Drake wrote:
+>> On Thu, May 7, 2015 at 5:18 AM, Mike Looijmans <mike.looijmans@topic.nl> wrote:
+>>> I reverted all my patches and workarounds. Indeed, the kernel needs a
+>>> "coherent" version of the dma_mmap routine, as the current version will map
+>>> it as non-cachable, resulting in a big performance hit (and nullifying the
+>>> whole idea behind it).
+>>>
+>>> I'll test it further on my 'hardware' and cook up a patch that correctly
+>>> maps the coherent pages.
+>>
+>> Sorry that I have only read this thread briefly, but I wonder if this
+>> is what you are looking for:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325489.html
+>
+> It's related, but targets another use case. This one does the same in case the
+> driver requested non-consistent memory.
+>
+> My use case was that I have hardware implemented coherency (through ACP) so
+> the CPU's and device's view on memory is already consistent, regardless of the
+> status of the cache.
+>
+> The patches are complimentary, not overlapping.
+>
+> Thanks for the link though, it's something I was also looking into, as I don't
+> always need coherency.
 
-Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- .../bindings/arm/hisilicon/hisilicon.txt           |   87 ++++++++++++++++++++
- 1 file changed, 87 insertions(+)
+I read the rest of the thread, apparently it was never integrated.
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 35b1bd4..f67d0f3 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -1,5 +1,8 @@
- Hisilicon Platforms Device Tree Bindings
- ----------------------------------------------------
-+Hi6220 SoC
-+Required root node properties:
-+	- compatible = "hisilicon,hi6220";
- 
- Hi4511 Board
- Required root node properties:
-@@ -13,6 +16,9 @@ HiP01 ca9x2 Board
- Required root node properties:
- 	- compatible = "hisilicon,hip01-ca9x2";
- 
-+HiKey Board
-+Required root node properties:
-+	- compatible = "hisilicon,hi6220-hikey", "hisilicon,hi6220";
- 
- Hisilicon system controller
- 
-@@ -41,6 +47,87 @@ Example:
- 	};
- 
- -----------------------------------------------------------------------
-+Hisilicon Hi6220 system controller
-+
-+Required properties:
-+- compatible : "hisilicon,hi6220-sysctrl"
-+- reg : Register address and size
-+- #clock-cells: should be set to 1, many clock registers are defined
-+  under this controller and this property must be present.
-+
-+Hisilicon designs this controller as one of the system controllers,
-+its main functions are the same as Hisilicon system controller, but
-+the register offset of some core modules are different.
-+
-+Example:
-+	/*for Hi6220*/
-+	sys_ctrl: sys_ctrl {
-+		compatible = "hisilicon,hi6220-sysctrl", "syscon";
-+		reg = <0x0 0xf7030000 0x0 0x2000>;
-+		#clock-cells = <1>;
-+	};
-+
-+
-+Hisilicon Hi6220 Power Always ON domain controller
-+
-+Required properties:
-+- compatible : "hisilicon,hi6220-aoctrl"
-+- reg : Register address and size
-+- #clock-cells: should be set to 1, many clock registers are defined
-+  under this controller and this property must be present.
-+
-+Hisilicon designs this system controller to control the power always
-+on domain for mobile platform.
-+
-+Example:
-+	/*for Hi6220*/
-+	ao_ctrl: ao_ctrl {
-+		compatible = "hisilicon,hi6220-aoctrl", "syscon";
-+		reg = <0x0 0xf7800000 0x0 0x2000>;
-+		#clock-cells = <1>;
-+	};
-+
-+
-+Hisilicon Hi6220 Media domain controller
-+
-+Required properties:
-+- compatible : "hisilicon,hi6220-mediactrl"
-+- reg : Register address and size
-+- #clock-cells: should be set to 1, many clock registers are defined
-+  under this controller and this property must be present.
-+
-+Hisilicon designs this system controller to control the multimedia
-+domain(e.g. codec, G3D ...) for mobile platform.
-+
-+Example:
-+	/*for Hi6220*/
-+	media_ctrl: media_ctrl {
-+		compatible = "hisilicon,hi6220-mediactrl", "syscon";
-+		reg = <0x0 0xf4410000 0x0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+
-+Hisilicon Hi6220 Power Management domain controller
-+
-+Required properties:
-+- compatible : "hisilicon,hi6220-pmctrl"
-+- reg : Register address and size
-+- #clock-cells: should be set to 1, some clock registers are define
-+  under this controller and this property must be present.
-+
-+Hisilicon designs this system controller to control the power management
-+domain for mobile platform.
-+
-+Example:
-+	/*for Hi6220*/
-+	pm_ctrl: pm_ctrl {
-+		compatible = "hisilicon,hi6220-pmctrl", "syscon";
-+		reg = <0x0 0xf7032000 0x0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+-----------------------------------------------------------------------
- Hisilicon HiP01 system controller
- 
- Required properties:
--- 
-1.7.9.5
+The patch for "non-consistent" is a BUG FIX, not some feature request or so. I 
+was already wondering why my driver had to kalloc pages to get proper caching 
+on it.
+
+ From https://www.kernel.org/doc/Documentation/DMA-attributes.txt:
+"""
+DMA_ATTR_NON_CONSISTENT ... lets the platform to choose to return either
+consistent or non-consistent memory as it sees fit.  By using this API,
+you are guaranteeing to the platform that you have all the correct and
+necessary sync points for this memory in the driver.
+"""
+
+The current ARM implementation is to *always* return memory that is 
+non-cachable, even if the driver promises to do all the right things.
+If the intention was that every implementation could get away with just 
+ignoring the flag, the flag would not have existed. So the implementation 
+should do the best it can do here, and the patch shows that it's just a simple 
+one-liner to make it implement the flag as intended.
+
+As for use cases, IIO is a candidate for this too, as it has explicit 
+interfaces to move buffers to/from userspace without having to remap them over 
+and over again. My usecase here is Dyplo, which uses a similar interface. If 
+you do something as simple as "for (i=0;i<size;++i) sum += (char*)buffer[i]; 
+in userspace on such a buffer, performance will collapse to about 1/20th 
+because of the memory being non-cachable. The whole point of IIO is to prevent 
+having to copy these buffers around.
+
+(I'd rather add this plea to the that thread, but I'd have to figure out how 
+to reply to a thread from the web...)
+
+Mike.
+
+
+Kind regards,
+
+Mike Looijmans
+System Expert
+
+TOPIC Embedded Products
+Eindhovenseweg 32-C, NL-5683 KH Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+Telefax: +31 (0) 499 33 69 70
+E-mail: mike.looijmans@topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
