@@ -1,41 +1,48 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 7 May 2015 08:17:19 -0700
-Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
-In-Reply-To: <55440EDA.4030905@codeaurora.org>
-References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
- <1981330.kGUrTurMy5@diego> <5543E79F.2080400@codeaurora.org>
- <22709390.NTAlubMgNB@diego> <55440EDA.4030905@codeaurora.org>
-Message-ID: <CAMAWPa_n+59+v+x3fKkmdtW1wMJF7kqtTjLLowmv1xwGWprYJw@mail.gmail.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Thu, 7 May 2015 10:11:59 -0500
+Subject: [PATCHv3 0/4] clk: socfpga: Add clock driver for Arria10
+Message-ID: <1431011523-10049-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 1, 2015 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 05/01/15 15:07, Heiko St?bner wrote:
->> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
->>
->>>> Instead I guess we could hook it less deep into clk_get_sys, like in the
->>>> following patch?
->>> It looks like it will work at least, but still I'd prefer to keep the
->>> orphan check contained to clk.c. How about this compile tested only patch?
->> I gave this a spin on my rk3288-firefly board. It still boots, the clock tree
->> looks the same and it also still defers nicely in the scenario I needed it
->> for. The implementation also looks nice - and of course much more compact than
->> my check in two places :-) . I don't know if you want to put this as follow-up
->> on top or fold it into the original orphan-check, so in any case
->>
->> Tested-by: Heiko Stuebner <heiko@sntech.de>
->> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->
-> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it with
-> my patch and a note that it's based on an earlier patch from you.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-It appears this has landed in linux-next in the form of 882667c1fcf1
-clk: prevent orphan clocks from being used.  A bunch of boot failures
-for sunxi in today's linux-next[1] were bisected down to that patch.
+Hi,
 
-I confirmed that reverting that commit on top of next/master gets
-sunxi booting again.
+This patch series add the clock driver for the Arria10 platform. Although the
+Arria10 SoC's clock framework has some similarities the Cyclone/Arria 5, the
+differences are enough to warrant it's own driver, rather than polluting the
+existing driver with platform lookups.
 
-Kevin
+v3:
+- Fix sparse warning of assigning an integer 0 instead of NULL to a pointer.
 
-[1] http://kernelci.org/boot/all/job/next/kernel/next-20150507/
+v2:
+- Update the DTS bindings doucment to have the new Arria10 clocks.
+- Add an l4_sys_free_clk node. The l4_sys_free_clk is similar to the
+  l4_sp_clk, but cannot be gated.
+
+*** BLURB HERE ***
+
+Dinh Nguyen (4):
+  clk: socfpga: update clk.h so for Arria10 platform to use
+  clk: socfpga: add a clock driver for the Arria 10 platform
+  ARM: socfpga: dts: add clocks to the Arria10 platform
+  Documentation: DT bindings: document the clocks for Arria10
+
+ .../devicetree/bindings/clock/altr_socfpga.txt     |  17 +-
+ arch/arm/boot/dts/socfpga_arria10.dtsi             | 309 ++++++++++++++++++++-
+ drivers/clk/socfpga/Makefile                       |   1 +
+ drivers/clk/socfpga/clk-gate-a10.c                 | 187 +++++++++++++
+ drivers/clk/socfpga/clk-gate.c                     |   4 -
+ drivers/clk/socfpga/clk-periph-a10.c               | 131 +++++++++
+ drivers/clk/socfpga/clk-pll-a10.c                  | 132 +++++++++
+ drivers/clk/socfpga/clk.c                          |   7 +-
+ drivers/clk/socfpga/clk.h                          |  10 +-
+ 9 files changed, 782 insertions(+), 16 deletions(-)
+ create mode 100644 drivers/clk/socfpga/clk-gate-a10.c
+ create mode 100644 drivers/clk/socfpga/clk-periph-a10.c
+ create mode 100644 drivers/clk/socfpga/clk-pll-a10.c
+
+-- 
+2.2.1
