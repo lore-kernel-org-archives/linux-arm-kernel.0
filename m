@@ -1,104 +1,31 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Thu, 7 May 2015 17:42:44 +0800
-Subject: [PATCH 1/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <20150424125521.GU6325@pengutronix.de>
-References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
- <1429522047-16675-2-git-send-email-pi-cheng.chen@linaro.org>
- <20150423120152.GM6325@pengutronix.de>
- <CALx668VsT60+kx7o-ZM5Wxk7Nn-rXS21O5SDYr++EeY-zEJ6ew@mail.gmail.com>
- <20150424125521.GU6325@pengutronix.de>
-Message-ID: <CALx668V4Ri_7cEefY8pZW7YkGcnf1JU-VD1bka0Rzc1xjC9dqw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 May 2015 11:43:15 +0200
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <554B2DF5.4040600@huawei.com>
+References: <55417F5A.4040300@linaro.org> <20501959.OF3FLWO2Eh@wuerfel>
+ <554B2DF5.4040600@huawei.com>
+Message-ID: <4412805.fx6caR2qJ7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 24, 2015 at 8:55 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Fri, Apr 24, 2015 at 02:46:25PM +0800, Pi-Cheng Chen wrote:
->> Hi Sascha,
->>
->> Thanks for reviewing.
->>
->> On Thu, Apr 23, 2015 at 8:01 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> > On Mon, Apr 20, 2015 at 05:27:26PM +0800, pi-cheng.chen wrote:
->> >> This patch implements MT8173 specific cpufreq driver with OPP table defined
->> >> in the driver code.
->> >>
->> >> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
->> >> ---
->> >>  drivers/cpufreq/Kconfig.arm      |   6 +
->> >>  drivers/cpufreq/Makefile         |   1 +
->> >>  drivers/cpufreq/mt8173-cpufreq.c | 509 +++++++++++++++++++++++++++++++++++++++
->> >>  3 files changed, 516 insertions(+)
->> >>  create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
->> >>
->> >> +static int mtk_cpufreq_voltage_trace(struct cpu_dvfs_info *info,
->> >> +                                  struct mtk_cpu_opp *opp)
->> >> +{
->> >> +     struct regulator *proc_reg = info->proc_reg;
->> >> +     struct regulator *sram_reg = info->sram_reg;
->> >> +     int old_vproc, new_vproc, old_vsram, new_vsram, vsram, vproc, ret;
->> >> +
->> >> +     old_vproc = regulator_get_voltage(proc_reg);
->> >> +     old_vsram = regulator_get_voltage(sram_reg);
->> >> +
->> >> +     new_vproc = opp->vproc;
->> >> +     new_vsram = opp->vsram;
->> >> +
->> >> +     /*
->> >> +      * In the case the voltage is going to be scaled up, Vsram and Vproc
->> >> +      * need to be scaled up step by step. In each step, Vsram needs to be
->> >> +      * set to (Vproc + 200mV) first, then Vproc is set to (Vsram - 100mV).
->> >> +      * Repeat the step until Vsram and Vproc are set to target voltage.
->> >> +      */
->> >> +     if (old_vproc < new_vproc) {
->> >> +next_up_step:
->> >> +             old_vsram = regulator_get_voltage(sram_reg);
->> >> +
->> >> +             vsram = (new_vsram - old_vproc < MAX_VOLT_SHIFT) ?
->> >> +                     new_vsram : old_vproc + MAX_VOLT_SHIFT;
->> >> +             vsram = get_regulator_voltage_floor(sram_reg, vsram);
->> >> +
->> >> +             ret = regulator_set_voltage(sram_reg, vsram, vsram);
->> >> +             if (ret)
->> >> +                     return ret;
->> >
->> > This introspecting the regulators for possible voltages looks hacky and
->> > unnecessary. regulator_set_voltage() can be passed minimum and maximum
->> > values, why don't you use it to increase the voltage within sensible
->> > limit, like
->> >
->> >         regulator_set_voltage(sram_reg, old_vsram + 100000, old_vsram + 200000);
->> >
->> > or similar?
->>
->> I am sorry I don't understand how could I do it. Would you elaborate?
->
-> You try to set the OPPs to the exact voltages, then next use functions
-> to determine the next exact higher voltage and set the regulator voltage
-> to an exact value. Instead of doing this you can let the ability to
-> specify a voltage range work for you, something like:
->
->         int tolerance = 50000;
->
->         while (vproc < new_vproc) {
->                 int next = min(new_vproc - vproc, 200000);
->                 int next_sram = next + 100000;
->
->                 regulator_set_voltage(sram_reg, next_sram - tolerance, next_sram + tolerance);
->                 regulator_set_voltage(vproc_reg, next - tolerance, next + tolerance);
->                 vproc = regulator_get_voltage(vproc_reg);
->         }
+On Thursday 07 May 2015 17:18:45 Shannon Zhao wrote:
+> On 2015/5/7 16:55, Arnd Bergmann wrote:
+> > On Thursday 07 May 2015 10:39:35 Shannon Zhao wrote:
+> >> I tried Ubuntu Trusty from Christoffer, when typing "system_powerdown"
+> >> on QEMU monitor, "cat /dev/input/event0 | hexdump" shows the event is
+> >> triggered but the guest doesn't poweroff.
+> > 
+> > Can you try installing acpid by running 'sudo apt-get install acpid' in
+> > the image? I suspect it should just work by scanning the event devices
+> > even in the absence of ACPI on the platform.
+> > 
+> 
+> Cool, I start acpid and the poweroff works.
 
-Thanks for your explanation.
-I'll try it to get rid of those functions to find out the exact voltages.
+Ok, great, thanks for confirming this! Have you tried reboot as well?
 
-Best Regards,
-Pi-Cheng
+>From looking at the acpid source code, I suspect it does not work unless
+extra configuration files are added, but that would be the same as for the
+ACPI case.
 
->
-> Sascha
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
