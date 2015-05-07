@@ -1,56 +1,44 @@
-From: roman@advem.lv (Roman Yeryomin)
-Date: Fri, 08 May 2015 00:35:20 +0300
-Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
-In-Reply-To: <alpine.LNX.2.00.1505071936170.19877@T520.local>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <2694895.MomHLoCaoZ@wuerfel>
- <alpine.LNX.2.00.1505070455130.32495@T520.local>
- <5043733.xO9lSCKvly@wuerfel>
- <alpine.LNX.2.00.1505071936170.19877@T520.local>
-Message-ID: <beaeec189608d669a47cac8ad589ee25@advem.lv>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 May 2015 23:18:42 +0100
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <20150507211855.GA2455@codeaurora.org>
+References: <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <20150504121209.GM15510@sirena.org.uk>
+ <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
+ <20150505105714.GA22845@sirena.org.uk>
+ <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
+ <20150505171252.GI22845@sirena.org.uk>
+ <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
+ <20150507055231.GB32399@codeaurora.org>
+ <20150507110233.GR15510@sirena.org.uk>
+ <20150507211855.GA2455@codeaurora.org>
+Message-ID: <20150507221842.GW22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-07 20:46, Hans Ulli Kroll wrote:
-> Hi
-> 
-> On Thu, 7 May 2015, Arnd Bergmann wrote:
-> 
->> On Thursday 07 May 2015 05:00:03 Hans Ulli Kroll wrote:
->> > On Wed, 6 May 2015, Arnd Bergmann wrote:
->> > > As far as I'm concerned, we should just merge all the patches from
->> > > http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini/patches-3.18
->> > >
->> > > We should also try to find a maintainer that can respond to patches
->> > > in a timely manner. If Ulli has time for that again, that would be great,
->> > > otherwise I think we should find someone from OpenWRT to take over.
->> >
->> > I'm back in busyness.
->> > Currently me dev device is right next to me.
->> > I moved some time ago and haav to find it in some 'hidden' box.
->> 
->> Awesome, welcome back!
->> 
->> Are you able to look at the patches I mentioned above and submit them
->> to arm at kernel.org, cc linux-arm-kernel at lists.infradead.org with proper
->> patch descriptions?
->> 
->> 	Arnd
->> 
-> 
-> Already done,
-> RTC driver send.
-> Compilder fix for MACH-RECORD send.
-> Maintainer Update send.
-> 
-> This device is a (very) bad design, to be polite !
-> I think they didn't test this properly.
-> And they fixed some software issues in hardware.
-> To be exact :
-> They switched the IDE channels in hardware, to get around the stupid
-> Sausalito software.
+On Thu, May 07, 2015 at 02:18:55PM -0700, Stephen Boyd wrote:
+> On 05/07, Mark Brown wrote:
 
-AFAIK, ide channels are switchable in the driver.
+> > I'm not looking for anyone to explain this to me in e-mail, what I'm
+> > looking for is for the binding document to be clear so someone can tell
+> > what the binding means by reading the documentation for the binding.
 
-Regards,
-Roman
+> Ok. Perhaps the simplest thing to do then is to reuse wording
+> from the regulator_set_load() API documentation? That's the only
+> usage of this value I'm aware of. Something like:
+
+> 	The current load of the device when using this OPP. Used
+> 	to set the most efficient regulator operating mode.
+
+> We don't need any sort of min/max for this property either, so a
+> single value should be all that's required.
+
+That makes sense to me.  Perhaps "current drawn by the device" rather
+than "current load of the device" since current is sadly overloaded :/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150507/93c081d0/attachment.sig>
