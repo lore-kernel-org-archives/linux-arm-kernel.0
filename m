@@ -1,72 +1,56 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Thu, 07 May 2015 10:39:35 +0800
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <2196079.901rMdSZr0@wuerfel>
-References: <55417F5A.4040300@linaro.org> <5548A5D5.9030107@linaro.org>
- <5549BB3A.6060106@huawei.com> <2196079.901rMdSZr0@wuerfel>
-Message-ID: <554AD067.9090707@linaro.org>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Thu, 7 May 2015 05:00:03 +0200 (CEST)
+Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
+In-Reply-To: <2694895.MomHLoCaoZ@wuerfel>
+References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
+ <20150501234214.GK12076@piout.net> <2694895.MomHLoCaoZ@wuerfel>
+Message-ID: <alpine.LNX.2.00.1505070455130.32495@T520.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello
 
-On 2015/5/6 15:29, Arnd Bergmann wrote:
-> On Wednesday 06 May 2015 14:56:58 Shannon Zhao wrote:
->> On 2015/5/5 19:13, Shannon Zhao wrote:
->>         gpio-keys {
->>                 autorepeat;
->>                 #address-cells = <0x1>;
->>                 #size-cells = <0x0>;
->>                 compatible = "gpio-keys";
->>
->>                 poweroff {
->>                         gpios = <0x8002 0x3 0x0>;
->>                         linux,code = <0x74>;
->>                         label = "GPIO Key Poweroff";
->>                 };
->>         };
->>
->> Configure kernel to select GPIO Buttons and Polled GPIO buttons. Use a
->> Redhat filesystem "Red Hat Enterprise Linux Server for ARM Development
->> Preview release 1.5" which has systemd and systemd-logind. Start VM and
->> when it starts well type "system_powerdown" on QEMU monitor, the guest
->> goes to poweroff. So this way works.
+On Wed, 6 May 2015, Arnd Bergmann wrote:
+
+> On Saturday 02 May 2015 01:42:14 Alexandre Belloni wrote:
+> > Hi,
+> > 
+> > On 14/12/2010 at 16:08:26 +0100, Hans Ulli Kroll wrote :
+> > > driver for the rtc device
+> > > on Cortina Systems CS3516 or StormlinkSemi SL3516 aka Gemini SoC
+> > > 
+> > > Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> > 
+> > This driver has never been merged and the platform doesn't seem to be
+> > active anymore. Is there still any interest in getting this driver
+> > mainlined?
+> > 
+> > Only tree wide cleanups happened in mach-gemini since end of 2010, the
+> > listed git repository (git://git.berlios.de/gemini-board) was on berliOS
+> > (closed since 2011) and the sourceforge mirror seems empty. Is there
+> > still interest in keeping that platform in the mainline?
 > 
-> Ok, very good.
+> As far as I know, the platform is still used by a number of people,
+> and is supported by OpenWRT. The reason we haven't seen updates is that
+> Ulli has been mostly absent from upstream development, and we haven't
+> had any other person step up as maintainer.
 > 
->> Note: we must check the /lib/udev/rules.d/70-power-switch.rules in the
->> fs and add one following line in it if it doesn't exist.
->>
->> SUBSYSTEM=="input", KERNEL=="event*", SUBSYSTEMS=="platform",
->> ATTRS{keys}=="116", TAG+="power-switch"
->>
->> Then when execute journalctl -u systemd-logind in guest, we can see
->> something like below:
->>
->> Jan 01 00:01:02 localhost systemd[1]: Starting Login Service...
->> Jan 01 00:01:07 localhost systemd[1]: Started Login Service.
->> Jan 01 00:01:07 localhost systemd-logind[927]: Watching system buttons
->> on /dev/input/event0 (gpio-keys)
->> Jan 01 00:01:07 localhost systemd-logind[927]: New seat seat0.
->> Jan 01 00:01:25 localhost systemd-logind[927]: New session c1 of user root.
->>
->> Visit https://bugs.launchpad.net/ubuntu/+source/systemd/+bug/1347776 for
->> details.
+> I have a patch to convert the platform to ARCH_MULTIPLATFORM, and
+> the code doesn't really get in the way otherwise.
 > 
-> How about Ubuntu or Debian releases that do not use systemd?
+> As far as I'm concerned, we should just merge all the patches from
+> http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini/patches-3.18
+y> 
+> We should also try to find a maintainer that can respond to patches
+> in a timely manner. If Ulli has time for that again, that would be great,
+> otherwise I think we should find someone from OpenWRT to take over.
 > 
-> I guess we should check with a Debian Wheezy or Ubuntu Trusty release.
-> My guess is that it will work fine, but some minor adjustment might
-> be needed.
+> 	Arnd
 > 
 
-Hi Arnd,
+I'm back in busyness.
+Currently me dev device is right next to me.
+I moved some time ago and haav to find it in some 'hidden' box.
 
-If the Debian Wheezy or Ubuntu Trusty release doesn't use systemd, what
-user space process do they use to handle the input device event?
 
-I tried Ubuntu Trusty from Christoffer, when typing "system_powerdown"
-on QEMU monitor, "cat /dev/input/event0 | hexdump" shows the event is
-triggered but the guest doesn't poweroff.
-
--- 
-Shannon
+Ulli
