@@ -1,131 +1,42 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Thu, 07 May 2015 09:42:44 +0300
-Subject: [PATCHv7 8/8] watchdog: omap_wdt: Convert to use new core
- extensions
-In-Reply-To: <20150504070452.GE25193@pengutronix.de>
-References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
- <1429701102-22320-9-git-send-email-timo.kokkonen@offcode.fi>
- <20150503185601.GD25193@pengutronix.de> <55470AA7.9050605@offcode.fi>
- <20150504070452.GE25193@pengutronix.de>
-Message-ID: <554B0964.9030501@offcode.fi>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 7 May 2015 07:58:03 +0100
+Subject: [PATCH 1/1] mfd: max77686: Remove unused struct
+ max77686_opmode_data
+In-Reply-To: <1430932036-23971-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1430932036-23971-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20150507065803.GA3400@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.05.2015 10:04, Uwe Kleine-K?nig wrote:
-> Hello Timo,
->
-> On Mon, May 04, 2015 at 08:59:03AM +0300, Timo Kokkonen wrote:
->> Hi, 03.05.2015 21:56, Uwe Kleine-K?nig wrote:
->>> On Wed, Apr 22, 2015 at 02:11:42PM +0300, Timo Kokkonen wrote:
->>>> +static int omap_wdt_is_running(struct omap_wdt_dev *wdev)
->>>> +{
->>>> +	void __iomem *base = wdev->base;
->>>> +
->>>> +	return readl_relaxed(base + OMAP_WATCHDOG_SPR) == 0x4444;
->>>> +}
->>> This isn't reliable. The sequence needed to enable the watchdog is
->>> 	writel(0xbbbb, base + OMAP_WATCHDOG_SPR);
->>> 	writel(0x4444, base + OMAP_WATCHDOG_SPR);
->>>
->>> The sequence to stop is:
->>> 	writel(0xaaaa, base + OMAP_WATCHDOG_SPR);
->>> 	writel(0x5555, base + OMAP_WATCHDOG_SPR);
->>>
->>> But:
->>>
->>> barebox at TI AM335x BeagleBone black:/ md 0x44e35048+4
->>> 44e35048: 00005555                                           UU..
->>> barebox at TI AM335x BeagleBone black:/ mw 0x44e35048 0x4444
->>> barebox at TI AM335x BeagleBone black:/ md 0x44e35048+4
->>> 44e35048: 00004444                                           DD..
->>>
->>> So the register contains 0x4444 but the timer doesn't run. So at best
->>> testing for 0x4444 is a good heuristic.
->>
->> Yeah.. I don't think we can get any better than that. Unless we
->> start checking the counter register and see whether it really counts
->> or not, and I think that's a bit overkill.. So I'd say we should be
->> safe when assuming bootloader is doing things correctly. Although,
->> we could add a comment to the code that the test may not be 100%
->> reliable in case the start sequence have not been issued properly.
->>
->> Thanks for pointing this out!
-> It doesn't seem to much overhead to do:
->
-> 	/*
-> 	 * There is no register that tells us if the timer is running,
-> 	 * so we have to resort to sample twice. The minimal frequency
-> 	 * is 256 Hz (32768 Hz prescaled with 2**7).
-> 	 */
-> 	counter1 = readl(base + OMAP_WATCHDOG_CCR);
-> 	mdelay(4);
-> 	counter2 = readl(base + OMAP_WATCHDOG_CCR);
-> 	return counter1 != counter2;
->
-> I'd say it's even worth to do:
->
-> 	cntrl = readl(base + OMAP_WATCHDOG_CNTRL);
-> 	if (cntrl & (1 << 5))
-> 		shift = (cntrl >> 2) & 0x7;
-> 	else
-> 		shift = 0;
-> 	counter1 = readl(base + OMAP_WATCHDOG_CCR);
-> 	udelay(31 << shift);
-> 	counter2 = readl(base + OMAP_WATCHDOG_CCR);
-> 	return counter1 != counter2;
->
-> For some bonus points add some defines for the magic constants.
->
-> This is save as the OMAP_WATCHDOG_CNTRL doesn't seem to accept reads
-> while the counter is running. Maybe even this could be used to detect a
-> running timer?:
+On Wed, 06 May 2015, Javier Martinez Canillas wrote:
 
-Maybe, but you will get a data abort when the HW doesn't accept a read. 
-How do you recover from that?
+> The defined struct max77686_opmode_data isn't used neither by
+> the max77686 mfd driver nor the drivers for its sub-devices.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  include/linux/mfd/max77686.h | 5 -----
+>  1 file changed, 5 deletions(-)
 
-Also, it seems that for some reason the watchdog HW is very picky about 
-which registers can be read in what condition. If I add the code to read 
-watchdog counter register, I will get a data abort later at the end of 
-the probe when the watchdog revision is read. I don't understand why 
-that happens, this does not seem logica. Maybe it has got something to 
-do with the fact that the watchdog is stopped? If I can't read the 
-counter register, I can't really implement the above heuristic.. Any ideas?
+Applied, thanks.
 
--Timo
+> diff --git a/include/linux/mfd/max77686.h b/include/linux/mfd/max77686.h
+> index bb995ab9a575..d4b72d519115 100644
+> --- a/include/linux/mfd/max77686.h
+> +++ b/include/linux/mfd/max77686.h
+> @@ -125,9 +125,4 @@ enum max77686_opmode {
+>  	MAX77686_OPMODE_STANDBY,
+>  };
+>  
+> -struct max77686_opmode_data {
+> -	int id;
+> -	int mode;
+> -};
+> -
+>  #endif /* __LINUX_MFD_MAX77686_H */
 
->
->   - enable timer:
-> 	barebox at TI AM335x BeagleBone black:/ mw 0x44e35048 0xbbbb
-> 	barebox at TI AM335x BeagleBone black:/ mw 0x44e35048 0x4444
->
->   - read out WCLR
-> 	barebox at TI AM335x BeagleBone black:/ md 0x44e35024+4
-> 	44e35024: 00000020                                            ...
->
->   - write to WCLR
-> 	barebox at TI AM335x BeagleBone black:/ mw 0x44e35024 0x0
->
->   - check result; didn't work
-> 	barebox at TI AM335x BeagleBone black:/ md 0x44e35024+4
-> 	44e35024: 00000020                                            ...
->
->   - stop timer
-> 	barebox at TI AM335x BeagleBone black:/ mw 0x44e35048 0xaaaa
-> 	barebox at TI AM335x BeagleBone black:/ mw 0x44e35048 0x5555
->
->   - recheck WCLR
-> 	barebox at TI AM335x BeagleBone black:/ md 0x44e35024+4
-> 	44e35024: 00000020                                            ...
->
->   - write to WCLR
-> 	barebox at TI AM335x BeagleBone black:/ mw 0x44e35024 0x0
->
->   - check result; write succeeded
-> 	barebox at TI AM335x BeagleBone black:/ md 0x44e35024+4
-> 	44e35024: 00000000                                           ....
->
-> (This is was tested on an AM335x.)
->
-> Best regards
-> Uwe
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
