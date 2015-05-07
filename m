@@ -1,129 +1,43 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  7 May 2015 11:53:34 +0200
-Subject: [PATCH 1/2] pinctrl: move strict option to pinmux_ops
-Message-ID: <1430992414-10779-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu,  7 May 2015 11:53:45 +0200
+Subject: [PATCH 2/2] pinctrl: nomadik: activate strict mux mode
+Message-ID: <1430992425-10818-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the pinmux_ops are ideally just a vtable for pin mux
-calls, the "strict" setting belongs so intuitively with the
-pin multiplexing that we should move it here anyway. Putting
-it in the top pinctrl_desc makes no sense.
+This activates strict mode muxing for the Nomadik pin controllers,
+as these do not allow GPIO and functions to use the same pin
+simultaneously.
 
-Cc: Sonic Zhang <sonic.zhang@analog.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/pinctrl.txt       | 2 +-
- drivers/pinctrl/pinctrl-adi2.c  | 2 +-
- drivers/pinctrl/pinmux.c        | 4 ++--
- include/linux/pinctrl/pinctrl.h | 3 ---
- include/linux/pinctrl/pinmux.h  | 4 ++++
- 5 files changed, 8 insertions(+), 7 deletions(-)
+ drivers/pinctrl/nomadik/pinctrl-abx500.c  | 1 +
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index d6b2bed94c43..4976389e432d 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -73,7 +73,6 @@ static struct pinctrl_desc foo_desc = {
- 	.pins = foo_pins,
- 	.npins = ARRAY_SIZE(foo_pins),
- 	.owner = THIS_MODULE,
--	.strict = true,
- };
- 
- int __init foo_probe(void)
-@@ -715,6 +714,7 @@ static struct pinmux_ops foo_pmxops = {
- 	.get_function_name = foo_get_fname,
- 	.get_function_groups = foo_get_groups,
- 	.set_mux = foo_set_mux,
+diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+index 23db4c9ac76c..15ccafd74dc6 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
++++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+@@ -787,6 +787,7 @@ static const struct pinmux_ops abx500_pinmux_ops = {
+ 	.set_mux = abx500_pmx_set,
+ 	.gpio_request_enable = abx500_gpio_request_enable,
+ 	.gpio_disable_free = abx500_gpio_disable_free,
 +	.strict = true,
  };
  
- /* Pinmux operations are handled by some pin controller */
-diff --git a/drivers/pinctrl/pinctrl-adi2.c b/drivers/pinctrl/pinctrl-adi2.c
-index fbd492668da1..49df9037b41e 100644
---- a/drivers/pinctrl/pinctrl-adi2.c
-+++ b/drivers/pinctrl/pinctrl-adi2.c
-@@ -703,6 +703,7 @@ static struct pinmux_ops adi_pinmux_ops = {
- 	.get_function_name = adi_pinmux_get_func_name,
- 	.get_function_groups = adi_pinmux_get_groups,
- 	.gpio_request_enable = adi_pinmux_request_gpio,
+ static int abx500_get_groups_cnt(struct pinctrl_dev *pctldev)
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+index a6a22054c0ba..0c57edb2b222 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+@@ -1803,6 +1803,7 @@ static const struct pinmux_ops nmk_pinmux_ops = {
+ 	.set_mux = nmk_pmx_set,
+ 	.gpio_request_enable = nmk_gpio_request_enable,
+ 	.gpio_disable_free = nmk_gpio_disable_free,
 +	.strict = true,
  };
  
- 
-@@ -710,7 +711,6 @@ static struct pinctrl_desc adi_pinmux_desc = {
- 	.name = DRIVER_NAME,
- 	.pctlops = &adi_pctrl_ops,
- 	.pmxops = &adi_pinmux_ops,
--	.strict = true,
- 	.owner = THIS_MODULE,
- };
- 
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 2546fa783464..c58c168b06c2 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -107,7 +107,7 @@ static int pin_request(struct pinctrl_dev *pctldev,
- 				desc->name, desc->gpio_owner, owner);
- 			goto out;
- 		}
--		if (pctldev->desc->strict && desc->mux_usecount &&
-+		if (ops->strict && desc->mux_usecount &&
- 		    strcmp(desc->mux_owner, owner)) {
- 			dev_err(pctldev->dev,
- 				"pin %s already requested by %s; cannot claim for %s\n",
-@@ -123,7 +123,7 @@ static int pin_request(struct pinctrl_dev *pctldev,
- 				desc->name, desc->mux_owner, owner);
- 			goto out;
- 		}
--		if (pctldev->desc->strict && desc->gpio_owner) {
-+		if (ops->strict && desc->gpio_owner) {
- 			dev_err(pctldev->dev,
- 				"pin %s already requested by %s; cannot claim for %s\n",
- 				desc->name, desc->gpio_owner, owner);
-diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
-index fc6b0348c375..66e4697516de 100644
---- a/include/linux/pinctrl/pinctrl.h
-+++ b/include/linux/pinctrl/pinctrl.h
-@@ -114,8 +114,6 @@ struct pinctrl_ops {
-  *	of the pins field above
-  * @pctlops: pin control operation vtable, to support global concepts like
-  *	grouping of pins, this is optional.
-- * @strict: check both gpio_owner and mux_owner strictly before approving
--	the pin request
-  * @pmxops: pinmux operations vtable, if you support pinmuxing in your driver
-  * @confops: pin config operations vtable, if you support pin configuration in
-  *	your driver
-@@ -134,7 +132,6 @@ struct pinctrl_desc {
- 	const struct pinctrl_ops *pctlops;
- 	const struct pinmux_ops *pmxops;
- 	const struct pinconf_ops *confops;
--	bool strict;
- 	struct module *owner;
- #ifdef CONFIG_GENERIC_PINCONF
- 	unsigned int num_custom_params;
-diff --git a/include/linux/pinctrl/pinmux.h b/include/linux/pinctrl/pinmux.h
-index 511bda9ed4bf..d3740fa7073f 100644
---- a/include/linux/pinctrl/pinmux.h
-+++ b/include/linux/pinctrl/pinmux.h
-@@ -56,6 +56,9 @@ struct pinctrl_dev;
-  *	depending on whether the GPIO is configured as input or output,
-  *	a direction selector function may be implemented as a backing
-  *	to the GPIO controllers that need pin muxing.
-+ * @strict: do not allow simultaneous use of the same pin for GPIO and another
-+ *	function. Check both gpio_owner and mux_owner strictly before approving
-+ *	the pin request.
-  */
- struct pinmux_ops {
- 	int (*request) (struct pinctrl_dev *pctldev, unsigned offset);
-@@ -79,6 +82,7 @@ struct pinmux_ops {
- 				   struct pinctrl_gpio_range *range,
- 				   unsigned offset,
- 				   bool input);
-+	bool strict;
- };
- 
- #endif /* CONFIG_PINMUX */
+ static int nmk_pin_config_get(struct pinctrl_dev *pctldev, unsigned pin,
 -- 
 1.9.3
