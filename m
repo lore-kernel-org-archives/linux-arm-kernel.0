@@ -1,40 +1,67 @@
-From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Thu, 07 May 2015 17:46:47 +0300
-Subject: [PATCH 1/2] coresight: replicator: Add Qualcomm CoreSight
- Replicator driver
-In-Reply-To: <1430427225.2187.15.camel@x220>
-References: <1430310000-10867-1-git-send-email-ivan.ivanov@linaro.org>
- <1430310000-10867-2-git-send-email-ivan.ivanov@linaro.org>
- <1430427225.2187.15.camel@x220>
-Message-ID: <1431010007.21307.10.camel@linaro.org>
+From: j.fanguede@virtualopensystems.com (=?UTF-8?B?SsOpcsOpbXkgRmFuZ3XDqGRl?=)
+Date: Thu, 7 May 2015 16:50:24 +0200
+Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
+In-Reply-To: <20150507112027.GC25885@cbox>
+References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
+ <20150506141249.GA6796@cbox>
+ <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
+ <20150507112027.GC25885@cbox>
+Message-ID: <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 7, 2015 at 1:20 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Thu, May 07, 2015 at 12:50:50PM +0200, J?r?my Fangu?de wrote:
+>> On Wed, May 6, 2015 at 4:12 PM, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>> > Hi J?r?my,
+>> >
+>> > On Tue, May 05, 2015 at 11:13:11AM +0200, J?r?my Fangu?de wrote:
+>> >> To maintain cache coherency on ARM, we may need a mechanism to flush
+>> >> the data cache.
+>> >
+>> > In addition to generally just making this functionality available (see
+>> > below), do you have an actual use case in mind for this?  To solve the
+>> > VGA issue, for example, we already have a patch series from Drew trying
+>> > to address this.  Does that not work for you?
+>> >
+>> > There was a long discussion about this here:
+>> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-February/013593.html
+>> >
+>> > Drew then created a patch set, here:
+>> > https://lists.nongnu.org/archive/html/qemu-devel/2015-03/msg01254.html
+>> >
+>> > and replied to himself, here:
+>> > https://www.marc.info/?l=android-virt&m=142670523929132&w=3
+>> >
+>> > Which basically says that he doesn't like having to do flushes all over
+>> > QEMU (IIUC), so he sent this version instead:
+>> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-March/014027.html
+>> >
+>> > Which he now said he'd respin.
+>>
+>> In fact, I used this ioctl in pairs with this QEMU patch series:
+>> https://lists.nongnu.org/archive/html/qemu-devel/2015-05/msg00407.html
+>> My current work doesn't do anything about vga ram, so vga issue
+>> probably still persists, but it solves others issues with some
+>> emulated devices (mainly PCI) which were failing before and now work
+>> fine with this patch.
+>
+> Why does Drew's approach not work and your approach works here?  What is
+> the case that we haven't though about yet?
 
-On Thu, 2015-04-30 at 22:53 +0200, Paul Bolle wrote:
-> On Wed, 2015-04-29 at 15:19 +0300, Ivan T. Ivanov wrote:
-> 
-> > +config CORESIGHT_QCOM_REPLICATOR
-> > +       bool "Qualcomm CoreSight Replicator driver"
-> > +       help
-> > +                       This enables support for CoreSight link and sink driver that are
-> > +                       responsible for transporting and collecting the trace data
-> > +                       respectively. Link and sinks are dynamically aggregated with a trace
-> > +                       entity at run time to form a complete trace path.
-> 
-> > --- a/drivers/hwtracing/coresight/Makefile
-> > +++ b/drivers/hwtracing/coresight/Makefile
-> 
-> > +obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
-> 
-> CORESIGHT_QCOM_REPLICATOR is a bool symbol. So
-> coresight-replicator-qcom.o will never be part of a module.
-> 
+The first patch from Andrew, (which is for arm64 only) doesn't permit
+me to make some emulated PCI devices working with virt, probably
+because some flushes/cleans are missing.
+As for the second patch, it focuses, for now, only on VGA ram. I
+quickly tried to extend the KVM_MEM_UNCACHED flag to the whole guest
+memory, but then the guest fails to boot; but even if it was working,
+does it make sense to map as uncached all the ram of the guest? Since
+we can not guess which region of the guest memory will be accessed.
 
-Thank you. I am going to fallow approach taken by Mathieu in [1].
-Is this OK with you?
-
-Regards,
-Ivan 
-
-[1] https://lkml.org/lkml/2015/5/6/524
+Simple PCI devices like e1000 or usb-ehci (with usb-kbd for instance)
+are not usable, with or without these patches, but if I flush a
+precise memory range, on reads and writes performed by emulated
+devices on guest ram, (It's exactly what the QEMU patch series that I
+sent does, with this ioctl), emulated PCI devices are now working.
