@@ -1,32 +1,40 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 7 May 2015 16:04:40 +0100
-Subject: [STLinux Kernel] [PATCH 02/12] clocksource: sti: Provide support
- for the ST LPC Clocksource IP
-In-Reply-To: <1431005924-21777-3-git-send-email-lee.jones@linaro.org>
-References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
- <1431005924-21777-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150507150440.GA13336@griffinp-ThinkPad-X1-Carbon-2nd>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Thu, 7 May 2015 23:06:27 +0800
+Subject: [PATCH v4 2/3] rtc: mediatek: Add MT6397 RTC driver
+In-Reply-To: <20150507120601.GH3465@piout.net>
+References: <1430897022-63357-1-git-send-email-eddie.huang@mediatek.com>
+ <1430897022-63357-3-git-send-email-eddie.huang@mediatek.com>
+ <1430898299.9365.74.camel@perches.com> <20150507120601.GH3465@piout.net>
+Message-ID: <1431011187.16884.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Alexandre,
 
-On Thu, 07 May 2015, Lee Jones wrote:
+On Thu, 2015-05-07 at 14:06 +0200, Alexandre Belloni wrote:
+> On 06/05/2015 at 00:44:59 -0700, Joe Perches wrote :
+> > On Wed, 2015-05-06 at 15:23 +0800, Eddie Huang wrote:
+> > > From: Tianping Fang <tianping.fang@mediatek.com>
+> > 
+> > trivia: no need to resend now, maybe in a future patch.
+> > 
+> > > diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+> > []
+> > > +static int mtk_rtc_probe(struct platform_device *pdev)
+> > > +{
+> > []
+> > > +	ret = request_threaded_irq(rtc->irq, NULL,
+> > > +				   mtk_rtc_irq_handler_thread,
+> > > +				   IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+> > > +			"mt6397-rtc", rtc);
+> > 
+> > It'd be nicer to align all the statement lines
+> > to that open parenthesis
+> > 
+> > 
+> 
+> I'll fix it up when applying.
+> 
+Thanks your great help
 
-> This IP is shared with Watchdog and RTC functionality.  Only one of
-> these IPs can be used at the same time.  We use the device-driver
-> model combined with a DT 'mode' property to enforce this.
-
-Which means my previous assertion in V1 that the IP didn't exist on stih415/6
-SoC is most likely wrong, as the watchdog driver has bindings already for those
-platforms.
-
-I did try this before and couldn't get it working (driver failed on clk_get_rate)
-on stih416-b2020.
-
-Did you try and see if you can get this also working for stih415/6 SoCs? It would
-mean we can move away from arm_global_timer for all upstreamed STI platforms.
-
-regards,
-
-Peter.
+Eddie
