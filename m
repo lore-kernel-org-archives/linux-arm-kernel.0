@@ -1,73 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 May 2015 11:41:03 +0100
-Subject: [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
-In-Reply-To: <554A493C.5080106@iki.fi>
-References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
- <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
- <s5ha8ymy3e2.wl-tiwai@suse.de>
- <20150405162034.GH13898@n2100.arm.linux.org.uk>
- <s5h4mouy14a.wl-tiwai@suse.de>
- <20150405172608.GA12732@n2100.arm.linux.org.uk>
- <554A493C.5080106@iki.fi>
-Message-ID: <20150507104102.GA2067@n2100.arm.linux.org.uk>
+From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
+Date: Thu, 07 May 2015 06:44:51 -0400
+Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <CAD6h2NRbzdX8a+D8UUNkmaMpf1uw2nfriCHwY7L20j=VM7NOFQ@mail.gmail.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>	<20150507090210.GB22115@arm.com>
+ <CAD6h2NRbzdX8a+D8UUNkmaMpf1uw2nfriCHwY7L20j=VM7NOFQ@mail.gmail.com>
+Message-ID: <554B4223.7080507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 08:02:52PM +0300, Anssi Hannula wrote:
-> 05.04.2015, 20:26, Russell King - ARM Linux kirjoitti:
-> > On Sun, Apr 05, 2015 at 06:46:13PM +0200, Takashi Iwai wrote:
-> >>
-> >> One another question: don't we need to deal with the sample bits in
-> >> sad[2]?
-> > 
-> > It should, but I'm very wary about doing that without seeing more
-> > examples of real SADs.  Right now, all my examples only support
-> > one SAD with either 2 channel or 6 channel audio at the standard
-> > (basic) 32, 44.1 and 48kHz rates.
-> > 
-> > The HDMI / CEA specs are very loose in their wording about the
-> > short audio descriptors.  I've no idea whether a sink can provide
-> > (for example) descriptors such as:
-> > 
-> > 	LPCM, 6 channel 32, 44.1, 48kHz
-> > 	LPCM, 2 channel, 32, 44.1, 48, 96, 192kHz
-> > 
-> > or whether have to describe that as a single descriptor.  I only
-> > have two TVs to test with here.
-> 
-> For the record, yes, multiple LPCM SADs are relatively common, and I
-> think I've seen some that offered more rates on a stereo SAD than on a
-> multichannel SAD (like in your example).
+On 05/07/2015 05:33 AM, Haojian Zhuang wrote:
+> On 7 May 2015 at 17:02, Will Deacon <will.deacon@arm.com> wrote:
+>> Hi Bintian,
+>>
+>> On Tue, May 05, 2015 at 01:06:34PM +0100, Bintian Wang wrote:
+>>> Hi6220 is one mobile solution of Hisilicon, this patchset contains
+>>> initial support for Hi6220 SoC and HiKey development board, which
+>>> supports octal ARM Cortex A53 cores. Initial support is minimal and
+>>> includes just the arch configuration, clock driver, device tree
+>>> configuration.
+>>>
+>>> PSCI is enabled in device tree and there is no problem to boot all the
+>>> octal cores, and the CPU hotplug is also working now, you can download
+>>> and compile the latest firmware based on the following link to run this
+>>> patch set:
+>>> https://github.com/96boards/documentation/wiki/UEFI
+>>>
+>>> Changes v4:
+>>> * Rebase to kernel 4.1-rc1
+>>> * Delete "arm,cortex-a15-gic" from the gic node in dts
+>> I gave these patches a go on top of -rc2 using the ATF and UEFI you link to
+>> above.
+>>
+>> The good news is that the thing booted and all the cores entered at EL2.
+>> Thanks!
+>>
+>> The bad news is that running hackbench quickly got the *heatsink*
+>> temperature to 73 degress C and rising (measured with an infrared
+>> thermometer).
+> Because you're just testing with minimum patch set. If you can choose
+> our release
+> on v3.10 & v3.18, you can observe lower temperature. Because we have thermal
+> framework and cpufreq driver. We're also upstreaming the thermal driver, but
+> it's not merged yet.
 
-Okay, so we "think" we've seen it in the wild...
+the thermal driver is now on v4 (see below)
+https://lkml.org/lkml/2015/4/24/1
 
-> > What I'm concerned about is that when the ALSA parameter refining
-> > starts, we start with (eg) 2-8 channels, 32-192kHz.  Given that,
-> > if we invoke the channel restriction before the rate restriction,
-> > we would end up limiting to 2 channel at 32-192kHz.  If we apply
-> > the restrictions in the opposite order, we'd restrict to 6
-> > channel, 32-48kHz.  Neither are obviously correct in this
-> > circumstance, and I don't really see a way to solve it given my
-> > understanding of the way ALSA's parameter refinement works.
-> > 
-> > I suspect this is why most HDMI drivers are implemented such that
-> > they take the maximum capabilities over all SADs, which would end
-> > up restricting audio in the above case to: up to 6 channels, at
-> > 32, 44.1, 48, 96 and 192kHz, even though 6 channel @ 192kHz isn't
-> > hasn't been indicated as supported.
-> > 
-> > Most of this is speculation though, based off what is in the
-> > documentation.  As I say, I don't have enough real-world examples
-> > to get a feel for what manufacturers _actually_ do to give a hint
-> > as to how the documentation should be interpreted.
-
-... so this is probably less than speculation.
-
-So, ALSA gurus, how do we handle this?  How do we arrange the parameter
-resolution such that ALSA can permit _either_ 2 channels at 192kHz or 6
-channels at 48kHz, but not 6 channels at 192kHz?  Right now, I don't
-see how that's possible.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+>
+>> So my question is, does this SoC have an automatic thermal cut out?
+> It's a low cost board. This feature is implemente by software. So we
+> need thermal
+> driver and cpufreq driver.
+>
+> Regards
+> Haojian
