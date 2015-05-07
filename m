@@ -1,67 +1,85 @@
-From: j.fanguede@virtualopensystems.com (=?UTF-8?B?SsOpcsOpbXkgRmFuZ3XDqGRl?=)
-Date: Thu, 7 May 2015 16:50:24 +0200
-Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
-In-Reply-To: <20150507112027.GC25885@cbox>
-References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
- <20150506141249.GA6796@cbox>
- <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
- <20150507112027.GC25885@cbox>
-Message-ID: <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Thu, 7 May 2015 15:04:07 +0000
+Subject: [PATCH 1/1] ARM: imx: Correct the comments in time.c
+In-Reply-To: <20150507125858.GH3162@dragon>
+References: <1430343627-60688-1-git-send-email-shenwei.wang@freescale.com>
+ <20150507125858.GH3162@dragon>
+Message-ID: <BL2PR03MB370C59A9B6D5B896BEBA75083DF0@BL2PR03MB370.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 7, 2015 at 1:20 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Thu, May 07, 2015 at 12:50:50PM +0200, J?r?my Fangu?de wrote:
->> On Wed, May 6, 2015 at 4:12 PM, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->> > Hi J?r?my,
->> >
->> > On Tue, May 05, 2015 at 11:13:11AM +0200, J?r?my Fangu?de wrote:
->> >> To maintain cache coherency on ARM, we may need a mechanism to flush
->> >> the data cache.
->> >
->> > In addition to generally just making this functionality available (see
->> > below), do you have an actual use case in mind for this?  To solve the
->> > VGA issue, for example, we already have a patch series from Drew trying
->> > to address this.  Does that not work for you?
->> >
->> > There was a long discussion about this here:
->> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-February/013593.html
->> >
->> > Drew then created a patch set, here:
->> > https://lists.nongnu.org/archive/html/qemu-devel/2015-03/msg01254.html
->> >
->> > and replied to himself, here:
->> > https://www.marc.info/?l=android-virt&m=142670523929132&w=3
->> >
->> > Which basically says that he doesn't like having to do flushes all over
->> > QEMU (IIUC), so he sent this version instead:
->> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-March/014027.html
->> >
->> > Which he now said he'd respin.
->>
->> In fact, I used this ioctl in pairs with this QEMU patch series:
->> https://lists.nongnu.org/archive/html/qemu-devel/2015-05/msg00407.html
->> My current work doesn't do anything about vga ram, so vga issue
->> probably still persists, but it solves others issues with some
->> emulated devices (mainly PCI) which were failing before and now work
->> fine with this patch.
->
-> Why does Drew's approach not work and your approach works here?  What is
-> the case that we haven't though about yet?
+Hi Shawn,
 
-The first patch from Andrew, (which is for arm64 only) doesn't permit
-me to make some emulated PCI devices working with virt, probably
-because some flushes/cleans are missing.
-As for the second patch, it focuses, for now, only on VGA ram. I
-quickly tried to extend the KVM_MEM_UNCACHED flag to the whole guest
-memory, but then the guest fails to boot; but even if it was working,
-does it make sense to map as uncached all the ram of the guest? Since
-we can not guess which region of the guest memory will be accessed.
+Thank you for your time. 
+Your changes are fine. It seems there is no perfect solution for this kind of issue.
 
-Simple PCI devices like e1000 or usb-ehci (with usb-kbd for instance)
-are not usable, with or without these patches, but if I flush a
-precise memory range, on reads and writes performed by emulated
-devices on guest ram, (It's exactly what the QEMU patch series that I
-sent does, with this ioctl), emulated PCI devices are now working.
+Regards,
+Shenwei
+
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawn.guo at linaro.org]
+> Sent: 2015?5?7? 7:59
+> To: Wang Shenwei-B38339
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/1] ARM: imx: Correct the comments in time.c
+> 
+> On Wed, Apr 29, 2015 at 04:40:27PM -0500, Shenwei Wang wrote:
+> > The comments were corrected as the following to reflect the real
+> > situation of Freescale MXC timer IP block.
+> > There are totally 4 version of the timer on Freescale i.MX SoCs.
+> >
+> > Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/time.c | 8 +++++---
+> >  1 file changed, 5 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c index
+> > acb1ff5..b1698e1 100644
+> > --- a/arch/arm/mach-imx/time.c
+> > +++ b/arch/arm/mach-imx/time.c
+> > @@ -38,9 +38,11 @@
+> >  #include "hardware.h"
+> >
+> >  /*
+> > - * There are 2 versions of the timer hardware on Freescale MXC hardware.
+> > - * Version 1: MX1/MXL, MX21, MX27.
+> > - * Version 2: MX25, MX31, MX35, MX37, MX51
+> > + * There are 4 versions of the timer hardware on Freescale MXC hardware.
+> > + * Version 0: MX1/MXL
+> > + * Version 1: MX21, MX27.
+> > + * Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q(rev1.0)
+> > + * Version 3: MX6DL, MX6SX, MX6Q(rev1.1+)
+> 
+> This is the problem with version numbers.  Version numbers defined by software
+> are too arbitrary and could conflict with the ones defined by IP design (i.e. IPUv3)
+> some day.  Just for example, if some day GPTv2 IP comes with some significant
+> design changes, "v2" will becomes a source of confusion between software and
+> hardware.  It's even worse if we already defined fsl,gpt-v2 as the device tree
+> compatible.  That's why we can only use the version number defined by
+> hardware in device tree binding.  If no hardware version is given, the best bet
+> would be use SoC name in the bindings to specify the particular programming
+> model of the IP block.
+> 
+> I applied patch to drop the version numbers as below.
+> 
+> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c index
+> acb1ff577cda..ab5ee1c445f3 100644
+> --- a/arch/arm/mach-imx/time.c
+> +++ b/arch/arm/mach-imx/time.c
+> @@ -38,9 +38,11 @@
+>  #include "hardware.h"
+> 
+>  /*
+> - * There are 2 versions of the timer hardware on Freescale MXC hardware.
+> - * Version 1: MX1/MXL, MX21, MX27.
+> - * Version 2: MX25, MX31, MX35, MX37, MX51
+> + * There are 4 versions of the timer hardware on Freescale MXC hardware.
+> + *  - MX1/MXL
+> + *  - MX21, MX27.
+> + *  - MX25, MX31, MX35, MX37, MX51, MX6Q(rev1.0)
+> + *  - MX6DL, MX6SX, MX6Q(rev1.1+)
+>   */
+> 
+>  /* defines common for all i.MX */
+> 
+> Shawn
