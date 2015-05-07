@@ -1,61 +1,48 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 07 May 2015 12:54:20 -0700
-Subject: [PATCH 2/3 v8] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <554BA0B7.8040600@tronnes.org>
-References: <1430857666-18877-1-git-send-email-eric@anholt.net>
- <1430857666-18877-2-git-send-email-eric@anholt.net>
- <554BA0B7.8040600@tronnes.org>
-Message-ID: <87mw1grwnn.fsf@eliezer.anholt.net>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 7 May 2015 20:55:29 +0100
+Subject: [STLinux Kernel] [PATCH 06/12] watchdog: bindings: Supply
+ knowledge of a third supported device - clocksource
+In-Reply-To: <20150507191909.GC16220@x1>
+References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
+ <1431005924-21777-7-git-send-email-lee.jones@linaro.org>
+ <20150507141805.GC9793@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20150507191909.GC16220@x1>
+Message-ID: <20150507195529.GA28554@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Noralf Tr?nnes <noralf@tronnes.org> writes:
+Hi Lee,
 
-> Den 05.05.2015 22:27, skrev Eric Anholt:
->> From: Lubomir Rintel <lkundrak@v3.sk>
->>
->> This mailbox driver provides a single mailbox channel to write 32-bit
->> values to the VPU and get a 32-bit response.  The Raspberry Pi
->> firmware uses this mailbox channel to implement firmware calls, while
->> Roku 2 (despite being derived from the same firmware tree) doesn't.
->>
->> The driver was originally submitted by Lubomir, based on the
->> out-of-tree 2708 mailbox driver.  Eric Anholt fixed it up for
->> upstreaming, with the major functional change being that it now has no
->> notion of multiple channels (since that is a firmware-dependent
->> concept) and instead the raspberrypi-firmware driver will do that
->> bit-twiddling in its own messages.
-> ...
->> +static struct platform_driver bcm2835_mbox_driver = {
->> +	.driver = {
->> +		.name = "bcm2835-mbox",
->> +		.owner = THIS_MODULE,
->> +		.of_match_table = bcm2835_mbox_of_match,
->> +	},
->> +	.probe		= bcm2835_mbox_probe,
->> +	.remove		= bcm2835_mbox_remove,
->> +};
->> +module_platform_driver(bcm2835_mbox_driver);
->
-> I have tested this driver and the firmware driver booting directly
-> from the VideoCore bootloader (no uboot).
-> The mailbox driver loads too late to turn on USB power:
+On Thu, 07 May 2015, Lee Jones wrote:
 
-Yeah, I have a patch on my branches that returns -EPROBE_DEFER when
-trying to get a power domain and not finding the provider.  It was
-rejected by the maintainers in favor of a proposed solution whose
-description I didn't quite follow.
+<snip>
 
-> This silences the warning:
-> struct raspberrypi_power_domain raspberrypi_power_domain_usb = {
->      .base = {
->          .power_on_latency_ns = 600000000,
+> > >  Required properties
+> > >  
+> > > -- compatible 	: Must be one of: "st,stih407-lpc" "st,stih416-lpc"
+> > > -				  "st,stih415-lpc" "st,stid127-lpc"
+> > > +- compatible 	: Must be one of: "st,stih407-lpc"
+> > 
+> > The same comment as the RTC DT patch, you are removing the compatibles
+> > documentation for the other supported platforms like stih416-lpc.
+> > AFAIK they are required in the driver to get the correct sysconfig register.
+> 
+> That's intentional.  I haven't yet tested any of this IP on
+> STiH41{5,6} & STiH127.  Due to lack of documentation, I'm not even
+> sure if this IP even exists on some of the other platforms.  I will
+> add them back when support is added to both driver and DTB and I've
+> been able to test them.
 
-Oh, nice.  Thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150507/9068aea6/attachment.sig>
+That was kind of my point, the driver code AFAIK already contains support
+for these SoC's.
+
+I would either expect the patch to remove support from the DT docs AND the
+driver, or leave it as is.
+
+It seems odd to only change the DT docs, and become unaligned to the
+code (this assumes I'm looking at the latest patchset here 
+https://lkml.org/lkml/2015/3/4/1088 which includes support for these SoCs).
+
+regards,
+
+Peter.
