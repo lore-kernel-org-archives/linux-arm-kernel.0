@@ -1,63 +1,96 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 7 May 2015 14:40:09 +0200
-Subject: [GIT PULL] STi DT changes for v4.2
-Message-ID: <554B5D29.8070202@st.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 7 May 2015 13:40:29 +0100
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <20150501135811.GW7440@e106497-lin.cambridge.arm.com>
+References: <1430402268.2868.20.camel@linaro.org>
+ <20150501015502.GA4679@leoy-linaro>
+ <1430475751.3045.40.camel@linaro.org>
+ <20150501104506.GA12330@red-moon>
+ <20150501115507.GB16842@leoy-linaro>
+ <20150501135811.GW7440@e106497-lin.cambridge.arm.com>
+Message-ID: <20150507124029.GE30328@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+On Fri, May 01, 2015 at 02:58:11PM +0100, Liviu Dudau wrote:
+> On Fri, May 01, 2015 at 12:55:07PM +0100, Leo Yan wrote:
+> > On Fri, May 01, 2015 at 11:45:06AM +0100, Lorenzo Pieralisi wrote:
+> > > On Fri, May 01, 2015 at 11:22:31AM +0100, Jon Medhurst (Tixy) wrote:
+> > > > On Fri, 2015-05-01 at 09:55 +0800, Leo Yan wrote:
+> > > > [...]
+> > > > > >  arch/arm64/boot/dts/arm/juno.dts | 28 ++++++++++++++++++++++++++++
+> > > > > >  1 file changed, 28 insertions(+)
+> > > > > > 
+> > > > > > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> > > > > > index 133ee59..7a9a449 100644
+> > > > > > --- a/arch/arm64/boot/dts/arm/juno.dts
+> > > > > > +++ b/arch/arm64/boot/dts/arm/juno.dts
+> > > > > > @@ -34,12 +34,35 @@
+> > > > > >  		#address-cells = <2>;
+> > > > > >  		#size-cells = <0>;
+> > > > > >  
+> > > > > > +		idle-states {
+> > > > > > +			entry-method = "arm,psci";
+> > > > > > +
+> > > > > > +			CPU_SLEEP_0: cpu-sleep-0 {
+> > > > > > +				compatible = "arm,idle-state";
+> > > > > > +				arm,psci-suspend-param = <0x0010000>;
+> > > > > > +				local-timer-stop;
+> > > > > 
+> > > > > Just want to figure out the best way for big.LITTLE system; so have
+> > > > > one question: CA53 and CA57 have different power domain for arch
+> > > > > timer, right?
+> > > > 
+> > > > I'm not sure of the answer to that. The documentation I have does seem
+> > > > to state the timer is lost on cluster power down, which would imply that
+> > > > it's not when just powering down a cpu, but I'm not at all clear on the
+> > > > matter.
+> > > > 
+> > > > >  If this is the case, should we define two kinds of cpu
+> > > > > sleep states, one of them will not migrate to broadcast timer and
+> > > > > keep using arch timer after cpu has been powered down?
+> > > > 
+> > > > Do you mean that if the local timer is not lost (and so we should not
+> > > > have local-timer-stop above), then we should have another identical idle
+> > > > state except that it _does_ specify local-timer-stop to force the
+> > > > broadcast time to be used? If so, would that second state ever be more
+> > > > power efficient than the first? (I don't know the answer to that, this
+> > > > whole area is pretty new to me).
+> > > 
+> > > Ok, to start with, if we want the generic CPUidle driver to work on bL
+> > > systems, we should get this patch merged:
+> > > 
+> > > http://www.spinics.net/lists/arm-kernel/msg412790.html
+> > 
+> > Thanks pointing out this.
+> > 
+> > > Architected timer is always lost on power down, unless we are talking
+> > > about a logic retention state (or if we are talking about local timers
+> > > that are not the architected ones). Anyway, with the patch above, different
+> > > cpus can have different idle states, so different behaviours when it
+> > > comes to the local timer behaviour. If, say, on a A53/A57 system, A53
+> > > cpus lose the local timer on idle state entry and A57 cpus do not
+> > > (that's a non-existing example though), those cpus will have different
+> > > idle states so different local-timer-stop flags.
+> > 
+> > For A57, not sure if arch timer will be powered off if cpu has been
+> > powered off.
+> > 
+> > From A53's TRM figure 2-1 Cortex-A53 processor block diagram, the arch
+> > timer is not within CPU power domain, so likey arch timer still will
+> > work even cpu has been powered off (PDCPU/PDADVSIMD both have been off).
+> > This looks like is not aligning w/t your upper description. Could u
+> > confirm this understanding is right?
+> 
+> Not quite. Behind the architected timers there is a system shared counter
+> that is used as a basis for the local CPU's counter. So when a CPU is being
+> powered off the system counter still counts and the CPU's copy gets updated
+> on power on by the firmware (hopefully).
 
-Please consider this first round of STi DT updates for v4.2:
+There is nothing to be updated (ie CPUidle will never shut off the PDSOC
+power domain), the system counter still counts on cpu and cluster power off,
+but the logic implementing the arch timer in the cpu (ie comparators) is lost
+on power off, so the arch timer has to be offloaded to the broadcast device.
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-
-   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git 
-tags/sti-dt-for-v4.2-1
-
-for you to fetch changes up to b3d37f92a79a329c392712da5e71fdd6c0258c3a:
-
-   ARM: DT: STi: STiH407: Add sata DT nodes. (2015-04-30 15:49:26 +0200)
-
-----------------------------------------------------------------
-STi DT updates for v4.2, round 1.
-
-Highlights:
------------
-  - Add DT nodes for SSC on STiH407 family
-  - Add DT nodes for SD/MMC on STiH407 & STiH418
-  - Add DT node for LPC on STiH407
-  - Add Sata DT nodes for STiH407
-  - Fix PIO3 & PIO35 pins retiming on STiH407
-
-----------------------------------------------------------------
-Karim BEN BELGACEM (1):
-       ARM: STi: DT: STiH407: Fix retime pin mask for PIO5 and PIO35
-
-Lee Jones (4):
-       ARM: sti: Provide DT nodes for SSC[0..4]
-       ARM: sti: Provide DT nodes for SBC SSC[0..2]
-       mfd: dt-bindings: Provide human readable defines for LPC mode 
-choosing
-       ARM: STi: DT: STiH407: Add Device Tree node for the LPC
-
-Maxime Coquelin (1):
-       Merge tag 'ib-mfd-arm-4.2' of git://git.kernel.org/.../lee/mfd.git
-
-Peter Griffin (3):
-       ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
-       ARM: STi: DT: STiH418: Add dt nodes for sdhci and emmc.
-       ARM: DT: STi: STiH407: Add sata DT nodes.
-
-  arch/arm/boot/dts/stih407-family.dtsi  | 180 
-+++++++++++++++++++++++++++++++++
-  arch/arm/boot/dts/stih407-pinctrl.dtsi |   2 +
-  arch/arm/boot/dts/stih410-b2120.dts    |  10 ++
-  arch/arm/boot/dts/stih418-b2199.dts    |  12 +++
-  arch/arm/boot/dts/stihxxx-b2120.dtsi   |   8 ++
-  include/dt-bindings/mfd/st-lpc.h       |  15 +++
-  6 files changed, 227 insertions(+)
-  create mode 100644 include/dt-bindings/mfd/st-lpc.h
+HTH,
+Lorenzo
