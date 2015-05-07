@@ -1,39 +1,46 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 07 May 2015 10:49:41 +0900
-Subject: [PATCH 1/1] mfd: max77686: Remove unused struct
- max77686_opmode_data
-In-Reply-To: <1430932036-23971-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1430932036-23971-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <554AC4B5.2070905@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 7 May 2015 11:30:25 +0900
+Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
+In-Reply-To: <CAAQ0ZWRyndnoSs5D+AcOZB-7hSnhSULTYVu=TRtcGR-CfB9xGQ@mail.gmail.com>
+References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
+ <20150505115446.GA26467@dragon>
+ <CAAQ0ZWRyndnoSs5D+AcOZB-7hSnhSULTYVu=TRtcGR-CfB9xGQ@mail.gmail.com>
+Message-ID: <CAK7LNAQmdgowKRLJnf2jcz8BxLoaJKfwTSkNH8R_1Grc9Gt4ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2015 02:07 AM, Javier Martinez Canillas wrote:
-> The defined struct max77686_opmode_data isn't used neither by
-> the max77686 mfd driver nor the drivers for its sub-devices.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  include/linux/mfd/max77686.h | 5 -----
->  1 file changed, 5 deletions(-)
-> 
-> diff --git a/include/linux/mfd/max77686.h b/include/linux/mfd/max77686.h
-> index bb995ab9a575..d4b72d519115 100644
-> --- a/include/linux/mfd/max77686.h
-> +++ b/include/linux/mfd/max77686.h
-> @@ -125,9 +125,4 @@ enum max77686_opmode {
->  	MAX77686_OPMODE_STANDBY,
->  };
->  
-> -struct max77686_opmode_data {
-> -	int id;
-> -	int mode;
-> -};
-> -
->  #endif /* __LINUX_MFD_MAX77686_H */
-> 
+Hi Shawn,
+(Sorry for late reply, I's been a vacation in Japan.)
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-Thanks,
-Chanwoo Choi
+2015-05-06 17:56 GMT+09:00 Shawn Guo <shawn.guo@linaro.org>:
+> On Tue, May 5, 2015 at 7:54 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> On Tue, Apr 07, 2015 at 12:34:30PM +0900, Masahiro Yamada wrote:
+>>> Hello experts,
+>>> I hope this is the correct ML to ask this question.
+>>>
+>>> I am struggling to port Linux-4.0-rc7 onto my SoC/board,
+>>> based on ARM cortex-A9 (single CPU), but the kernel fails to boot
+>>> with the error:
+>>> "not syncing: Attempted to kill init! exitcode=0x00000004"
+>>
+>> Hi Masahiro,
+>>
+>> Have you track it down to the cause?  I'm asking because I'm seeing the
+>> same issue with v4.0 on a vendor single Cortex-A9 SoC.
+
+Yes, I have already solved my problem.
+
+In my case,
+
+ - The interrupt number for the UART device was wrong.  Fixed it.
+ - I regenerated the initramdisk with Buildroot
+
+and then I could boot the kernel successfully.
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
