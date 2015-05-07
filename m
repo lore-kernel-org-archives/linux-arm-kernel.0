@@ -1,56 +1,59 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 7 May 2015 21:02:02 +0800
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <CAFEAcA_EJSm_OHxsGvDfydacHHz=RcvrHHCg_LEFpLCBUxHmtA@mail.gmail.com>
-References: <55417F5A.4040300@linaro.org> <20501959.OF3FLWO2Eh@wuerfel>
- <554B2DF5.4040600@huawei.com> <4412805.fx6caR2qJ7@wuerfel>
- <554B5627.100@huawei.com>
- <CAFEAcA-E=s3fhKAe4XS=rVdqw8HUO7EvqM7_C_oob1Kbg3MDGw@mail.gmail.com>
- <554B5830.2090600@huawei.com>
- <CAFEAcA_EJSm_OHxsGvDfydacHHz=RcvrHHCg_LEFpLCBUxHmtA@mail.gmail.com>
-Message-ID: <554B624A.1010309@huawei.com>
+From: bintian.wang@huawei.com (Bintian)
+Date: Thu, 7 May 2015 21:06:16 +0800
+Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <20150507125752.GE22115@arm.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <20150507090210.GB22115@arm.com> <554B305F.4080907@huawei.com>
+ <20150507112536.GD22115@arm.com> <554B542B.6040006@huawei.com>
+ <20150507125752.GE22115@arm.com>
+Message-ID: <554B6348.3000200@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/5/7 20:34, Peter Maydell wrote:
-> On 7 May 2015 at 13:18, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->> On 2015/5/7 20:12, Peter Maydell wrote:
->>> On 7 May 2015 at 13:10, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->>>> BTW, IIUC QEMU doesn't support the gracefully reboot support. The reboot
->>>> depends on libvirt or other management tools. So the reboot case in
->>>> virtualization is firstly poweroff, then start again.
+Hello Will,
+
+On 2015/5/7 20:57, Will Deacon wrote:
+> On Thu, May 07, 2015 at 01:01:47PM +0100, Bintian wrote:
+>> On 2015/5/7 19:25, Will Deacon wrote:
+>>> On Thu, May 07, 2015 at 10:29:03AM +0100, Bintian wrote:
+>>>> Hikey is a low cost board, I think it doesn't have an automatic thermal
+>>>> cut out; I always use HiKey to test my patch, in the normal case,
+>>>> temperature is not a problem.
 >>>
->>> I'm not sure what you mean by this -- QEMU supports 'reset this
->>> VM' at the machine emulation level, so if we can tell the guest
->>> to reboot then it should as part of this process issue the
->>> PSCI SYSTEM_RESET command, which QEMU/KVM will then handle
->>> to do a reset of the VM.
-> 
->> Yes, QEMU supports reset, but doesn't support (gracefully) reboot.
-> 
-> Isn't that what this ACPI work is about? Tell the guest to initiate
-> a graceful reboot, and then the guest will tell QEMU to reboot
-> the emulated h/w when it's ready.
-> 
+>>> I don't see why the cost has anything to do with this issue; any money I
+>>> save on the board will quickly be re-invested in my increased insurance
+>>> premium.
+>>>
+>>> All I think we need is for secure software to keep an eye on the temperature
+>>> and hit the power controller if it goes over some `fatal' threshold.
+>>> Ideally, you'd be able to use a secure interrupt for this, but I suspect
+>>> that you don't have the right hardware features for that (please correct me
+>>> if I'm wrong). An alternative would be to hang something off a secure timer
+>>> and get the firmware to check the board temperature on some low-frequency
+>>> periodic tick.
+>> If there is exception occurred on A core, there are two methods to
+>> handle it:
+>> (1) Delay for a period of time, watchdog will trigger the system reset.
+>> (2) If the temperature is over 105 degree, the CPU will trigger reset(I
+>> guess it's chip level).
+>
+> Aha, so now you're saying that there *is* a hardware shut-off at 105
+> degrees, regardless of what the kernel is doing?
+Yes!
 
-The ACPI only tells guest to poweroff not reboot. I checked this on x86.
-When using libvirt to start a VM, libvirt pass "-no-shutdown" to QEMU
-that makes sure the QEMU process will not disappear when guest
-poweroffs. When executing "virsh reboot VMname", libvirt send
-"system_powerdown" to QEMU and when guest poweroffs libvirt send
-"system_reset" to QEMU to restart VM.
+> If that's the case, then
+> we're fine and the current patches make sense in isolation.
+Thank you very much and I need your ack in next version :)
+I am preparing the next version and will send out soon.
 
-So there is not a single external reboot command for ACPI.
+Thanks,
 
->> And
->> reset doesn't depends on the guest, it just restart VM forcefully.
->> Reboot likes poweroff and start, while reset likes destroy and start.
-> 
-> I (and QEMU) think there is no visible difference between
-> poweroff-and-restart and destroy-recreate-and-restart...
-> 
+Bintian
 
-It is different to guest.
-
--- 
-Shannon
+>
+> Cheers,
+>
+> Will
+>
+> .
+>
