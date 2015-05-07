@@ -1,7 +1,7 @@
 From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Thu,  7 May 2015 14:00:19 +0200
-Subject: [PATCH] arm/mm/dma-mapping.c: Add arm_coherent_dma_mmap
-Message-ID: <1431000019-7483-1-git-send-email-mike.looijmans@topic.nl>
+Date: Thu,  7 May 2015 14:05:43 +0200
+Subject: [PATCH v2] arm/mm/dma-mapping.c: Add arm_coherent_dma_mmap
+Message-ID: <1431000343-7542-1-git-send-email-mike.looijmans@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,21 +28,11 @@ The patch has no effect on non-coherent DMA.
 
 Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
 ---
- arch/arm/boot/dts/topic-dyplo.dtsi |  1 +
- arch/arm/mm/dma-mapping.c          | 32 +++++++++++++++++++++++++-------
- 2 files changed, 26 insertions(+), 7 deletions(-)
+v2: Mistakenly sent the wrong patch which included a devicetree file, removed it from the patch.
 
-diff --git a/arch/arm/boot/dts/topic-dyplo.dtsi b/arch/arm/boot/dts/topic-dyplo.dtsi
-index 0deedb6..fa5901b 100644
---- a/arch/arm/boot/dts/topic-dyplo.dtsi
-+++ b/arch/arm/boot/dts/topic-dyplo.dtsi
-@@ -6,5 +6,6 @@
- 		reg = <0x64400000 0x200000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 57 0x4>;
-+		dma-coherent;
- 	};
- };
+ arch/arm/mm/dma-mapping.c | 32 +++++++++++++++++++++++++-------
+ 1 file changed, 25 insertions(+), 7 deletions(-)
+
 diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
 index 903dba0..4815259 100644
 --- a/arch/arm/mm/dma-mapping.c
