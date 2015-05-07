@@ -1,44 +1,87 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 07 May 2015 09:04:46 +0900
-Subject: [RFT PATCH v2 3/3] drm/exynos: Consolidate return statements in
- fimd_bind()
-In-Reply-To: <1430957086-25005-1-git-send-email-k.kozlowski@samsung.com>
-References: <1430957086-25005-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1430957086-25005-4-git-send-email-k.kozlowski@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 06 May 2015 17:29:23 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix bogus struct clk comparison for timer
+ clock
+In-Reply-To: <20150506145539.GI21061@atomide.com>
+References: <1430848941-27106-1-git-send-email-tony@atomide.com>
+ <20150506053539.GA10871@codeaurora.org> <20150506145539.GI21061@atomide.com>
+Message-ID: <554AB1E3.2000304@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+On 05/06/15 07:55, Tony Lindgren wrote:
+> * Stephen Boyd <sboyd@codeaurora.org> [150505 22:36]:
+>> On 05/05, Tony Lindgren wrote:
+>>> With recent changes to use determine_rate, the comparison of two
+>>> clocks won't work without doing __clk_get_hw on the clocks
+>>> first.
+>>>
+>>> Cc: Michael Turquette <mturquette@linaro.org>
+>>> Cc: Paul Walmsley <paul@pwsan.com>
+>>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>>> Cc: Tero Kristo <t-kristo@ti.com>
+>>> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>>> ---
+>>>
+>>> Found one more of these, the coccinelle scripts do not seem
+>>> to match this?
+>> I don't think the coccinelle script was ever merged...
+> Oh OK, but the wrong comparisons in the kernel code got
+> fixed, right? 
 
-Simplify the code and remove superfluous return statement. Just return
-the result of fimd_iommu_attach_devices().
+Yes the ones that mattered were fixed.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+>>> @@ -298,7 +299,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+>>>  	if (IS_ERR(src))
+>>>  		return PTR_ERR(src);
+>>>  
+>>> -	if (clk_get_parent(timer->fclk) != src) {
+>>> +	if (__clk_get_hw(clk_get_parent(timer->fclk)) != __clk_get_hw(src)) {
+>> Please use clk_is_match() instead so we can find these instances
+>> with an easy grep.
+> Thanks here's an updated version with that.
 
----
-Changes since v1:
-New patch.
----
- drivers/gpu/drm/exynos/exynos_drm_fimd.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+Are you taking this through arm-soc?
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-index 5c1a148525f8..d704f2ba7179 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-@@ -1042,12 +1042,7 @@ static int fimd_bind(struct device *dev, struct device *master, void *data)
- 	if (ctx->display)
- 		exynos_drm_create_enc_conn(drm_dev, ctx->display);
- 
--	ret = fimd_iommu_attach_devices(ctx, drm_dev);
--	if (ret)
--		return ret;
--
--	return 0;
--
-+	return fimd_iommu_attach_devices(ctx, drm_dev);
- }
- 
- static void fimd_unbind(struct device *dev, struct device *master,
+> Regards,
+>
+> Tony
+>
+> 8< -----------------------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Tue, 5 May 2015 09:03:34 -0700
+> Subject: [PATCH] ARM: OMAP2+: Fix bogus struct clk comparison for timer clock
+>
+> With recent changes to use determine_rate, the comparison of two
+> clocks won't work without clk_is_match that does __clk_get_hw
+> on the clocks first.
+>
+> Cc: Michael Turquette <mturquette@linaro.org>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -298,7 +298,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+>  	if (IS_ERR(src))
+>  		return PTR_ERR(src);
+>  
+> -	if (clk_get_parent(timer->fclk) != src) {
+> +	if (!clk_is_match(clk_get_parent(timer->fclk), src)) {
+>  		r = clk_set_parent(timer->fclk, src);
+
+I also wonder why we can't just call clk_set_parent() and skip the "is
+the parent already src" check?
+
+If there's a good reason for not just calling clk_set_parent() then it
+makes sense to do the clk_is_match() thing, and you can have my ack
+
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+
 -- 
-2.1.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
