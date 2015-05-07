@@ -1,36 +1,32 @@
 From: xander.huff@ni.com (Xander Huff)
-Date: Thu, 7 May 2015 17:32:21 -0500
-Subject: [PATCH 2/6] ARM: Zynq: DT: Enable xadc node in zynq-parallella.dts
-In-Reply-To: <1431037945-40360-1-git-send-email-xander.huff@ni.com>
-References: <1431037945-40360-1-git-send-email-xander.huff@ni.com>
-Message-ID: <1431037945-40360-2-git-send-email-xander.huff@ni.com>
+Date: Thu, 7 May 2015 17:32:20 -0500
+Subject: [PATCH 1/6] ARM: Zynq: DT: Disable xadc node by default in
+ zynq-7000.dtsi
+Message-ID: <1431037945-40360-1-git-send-email-xander.huff@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that zynq-7000 disables xadc by default, enable in zynq-parallella
-to retain existing behavior.
+This is the de-facto practice.
 
 Signed-off-by: Xander Huff <xander.huff@ni.com>
+Reviewed-by: Ben Shelton <ben.shelton@ni.com>
+Reviewed-by: Josh Cartwright <joshc@ni.com>
+Reviewed-by: Joe Hershberger <joe.hershberger@ni.com>
 ---
- arch/arm/boot/dts/zynq-parallella.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/zynq-7000.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-index 1745712..b1a1f7a 100644
---- a/arch/arm/boot/dts/zynq-parallella.dts
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -32,6 +32,12 @@
- 		bootargs = "console=ttyPS0,115200 earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
- 		linux,stdout-path = "/amba/serial at e0001000";
- 	};
-+
-+	amba {
-+		adc: adc at f8007100 {
-+			status = "okay";
-+		};
-+	};
- };
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index a5cd2ed..7640bdc 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -66,6 +66,7 @@
  
- &clkc {
+ 		adc: adc at f8007100 {
+ 			compatible = "xlnx,zynq-xadc-1.00.a";
++			status = "disabled";
+ 			reg = <0xf8007100 0x20>;
+ 			interrupts = <0 7 4>;
+ 			interrupt-parent = <&intc>;
 -- 
 1.9.1
