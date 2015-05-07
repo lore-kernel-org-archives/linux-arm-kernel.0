@@ -1,28 +1,26 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 07 May 2015 18:39:21 +0200
-Subject: [PATCH 1/2] coresight: replicator: Add Qualcomm CoreSight
- Replicator driver
-In-Reply-To: <1431010007.21307.10.camel@linaro.org>
-References: <1430310000-10867-1-git-send-email-ivan.ivanov@linaro.org>
- <1430310000-10867-2-git-send-email-ivan.ivanov@linaro.org>
- <1430427225.2187.15.camel@x220> <1431010007.21307.10.camel@linaro.org>
-Message-ID: <1431016761.8171.79.camel@x220>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri,  8 May 2015 00:43:55 +0800
+Subject: [PATCH 0/2] ARM: sun9i: cubieboard4: Enable USB hosts and LEDs
+Message-ID: <1431017037-28331-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-05-07 at 17:46 +0300, Ivan T. Ivanov wrote:
-> Thank you. I am going to fallow approach taken by Mathieu in [1].
-> Is this OK with you?
+Hi Maxime,
 
-I'm OK with anything that is coherent (ie, anything better than built-in
-only code cross-dressing as modular code). I think Mathieu's approach
-clears that bar. (Please note that macros like module_amba_driver() are
-basically just a pet peeve.)
-
-And, at the end of the day, what matters is what the maintainer of this
-code accepts. I'm not the maintainer here.
-
-Thanks,
+This small series enables USB host and LED support on the Cubieboard4.
+We already support these on the Optimus, so it's just dts stuff.
 
 
-Paul Bolle
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  ARM: dts: sun9i: cubieboard4: Enable USB support
+  ARM: dts: sun9i: cubieboard4: Enable LEDs
+
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 83 +++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
+
+-- 
+2.1.4
