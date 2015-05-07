@@ -1,59 +1,63 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 7 May 2015 14:35:59 +0200 (CEST)
-Subject: Possible regression due to "hrtimer: Get rid of hrtimer softirq"
-In-Reply-To: <20150507111711.GA17448@verge.net.au>
-References: <20150507111711.GA17448@verge.net.au>
-Message-ID: <alpine.DEB.2.11.1505071425520.4225@nanos>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 7 May 2015 14:40:09 +0200
+Subject: [GIT PULL] STi DT changes for v4.2
+Message-ID: <554B5D29.8070202@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 May 2015, Simon Horman wrote:
-> ------------[ cut here ]------------
-> kernel BUG at kernel/irq_work.c:135!
+Hi Olof, Arnd and Kevin,
 
-  BUG_ON(!irqs_disabled());
+Please consider this first round of STi DT updates for v4.2:
 
-So something enables interrupts in the periodic tick handling
-machinery. Seems you have high resolution timers disabled, but nohz
-enabled. And that code path has a local_irq_disable/enable pair which
-causes havoc. Patch below.
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-Thanks,
+   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-	tglx
+are available in the git repository at:
 
-diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index 753c211f6195..812f7a3b9898 100644
---- a/kernel/time/tick-sched.c
-+++ b/kernel/time/tick-sched.c
-@@ -967,11 +967,9 @@ static void tick_nohz_switch_to_nohz(void)
- 	if (!tick_nohz_enabled)
- 		return;
- 
--	local_irq_disable();
--	if (tick_switch_to_oneshot(tick_nohz_handler)) {
--		local_irq_enable();
-+	if (tick_switch_to_oneshot(tick_nohz_handler))
- 		return;
--	}
-+
- 	tick_nohz_active = 1;
- 	ts->nohz_mode = NOHZ_MODE_LOWRES;
- 
-@@ -986,7 +984,6 @@ static void tick_nohz_switch_to_nohz(void)
- 	hrtimer_forward_now(&ts->sched_timer, tick_period);
- 	hrtimer_set_expires(&ts->sched_timer, next);
- 	tick_program_event(next, 1);
--	local_irq_enable();
- }
- 
- /*
-@@ -1171,7 +1168,7 @@ void tick_oneshot_notify(void)
-  * Called cyclic from the hrtimer softirq (driven by the timer
-  * softirq) allow_nohz signals, that we can switch into low-res nohz
-  * mode, because high resolution timers are disabled (either compile
-- * or runtime).
-+ * or runtime). Called with interrupts disabled.
-  */
- int tick_check_oneshot_change(int allow_nohz)
- {
+   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git 
+tags/sti-dt-for-v4.2-1
+
+for you to fetch changes up to b3d37f92a79a329c392712da5e71fdd6c0258c3a:
+
+   ARM: DT: STi: STiH407: Add sata DT nodes. (2015-04-30 15:49:26 +0200)
+
+----------------------------------------------------------------
+STi DT updates for v4.2, round 1.
+
+Highlights:
+-----------
+  - Add DT nodes for SSC on STiH407 family
+  - Add DT nodes for SD/MMC on STiH407 & STiH418
+  - Add DT node for LPC on STiH407
+  - Add Sata DT nodes for STiH407
+  - Fix PIO3 & PIO35 pins retiming on STiH407
+
+----------------------------------------------------------------
+Karim BEN BELGACEM (1):
+       ARM: STi: DT: STiH407: Fix retime pin mask for PIO5 and PIO35
+
+Lee Jones (4):
+       ARM: sti: Provide DT nodes for SSC[0..4]
+       ARM: sti: Provide DT nodes for SBC SSC[0..2]
+       mfd: dt-bindings: Provide human readable defines for LPC mode 
+choosing
+       ARM: STi: DT: STiH407: Add Device Tree node for the LPC
+
+Maxime Coquelin (1):
+       Merge tag 'ib-mfd-arm-4.2' of git://git.kernel.org/.../lee/mfd.git
+
+Peter Griffin (3):
+       ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
+       ARM: STi: DT: STiH418: Add dt nodes for sdhci and emmc.
+       ARM: DT: STi: STiH407: Add sata DT nodes.
+
+  arch/arm/boot/dts/stih407-family.dtsi  | 180 
++++++++++++++++++++++++++++++++++
+  arch/arm/boot/dts/stih407-pinctrl.dtsi |   2 +
+  arch/arm/boot/dts/stih410-b2120.dts    |  10 ++
+  arch/arm/boot/dts/stih418-b2199.dts    |  12 +++
+  arch/arm/boot/dts/stihxxx-b2120.dtsi   |   8 ++
+  include/dt-bindings/mfd/st-lpc.h       |  15 +++
+  6 files changed, 227 insertions(+)
+  create mode 100644 include/dt-bindings/mfd/st-lpc.h
