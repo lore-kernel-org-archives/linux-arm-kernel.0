@@ -1,112 +1,44 @@
-From: sumit.semwal@linaro.org (Sumit Semwal)
-Date: Thu, 7 May 2015 16:16:47 +0530
-Subject: [PATCH] dma-buf: add ref counting for module as exporter
-In-Reply-To: <20150507081026.GA19773@kroah.com>
-References: <1430983852-19267-1-git-send-email-sumit.semwal@linaro.org>
- <20150507081026.GA19773@kroah.com>
-Message-ID: <CAO_48GGjgRP=ab1wjGABguP3BaWPriLou_C-Su2C0kSeMS3Y4Q@mail.gmail.com>
+From: j.fanguede@virtualopensystems.com (=?UTF-8?B?SsOpcsOpbXkgRmFuZ3XDqGRl?=)
+Date: Thu, 7 May 2015 12:50:50 +0200
+Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
+In-Reply-To: <20150506141249.GA6796@cbox>
+References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
+ <20150506141249.GA6796@cbox>
+Message-ID: <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 May 2015 at 13:40, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Thu, May 07, 2015 at 01:00:52PM +0530, Sumit Semwal wrote:
->> Add reference counting on a kernel module that exports dma-buf and
->> implements its operations. This prevents the module from being unloaded
->> while DMABUF file is in use.
->>
->> The original patch [1] was submitted by Tomasz, but he's since shifted
->> jobs and a ping didn't elicit any response.
->>
->>   [tomasz: Original author]
->> Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
->> Acked-by: Daniel Vetter <daniel@ffwll.ch>
->>   [sumits: updated & rebased as per review comments]
->> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
->>
->> [1]: https://lkml.org/lkml/2012/8/8/163
->> ---
->>  drivers/dma-buf/dma-buf.c                      | 9 ++++++++-
->>  drivers/gpu/drm/armada/armada_gem.c            | 1 +
->>  drivers/gpu/drm/drm_prime.c                    | 1 +
->>  drivers/gpu/drm/exynos/exynos_drm_dmabuf.c     | 1 +
->>  drivers/gpu/drm/i915/i915_gem_dmabuf.c         | 1 +
->>  drivers/gpu/drm/omapdrm/omap_gem_dmabuf.c      | 1 +
->>  drivers/gpu/drm/tegra/gem.c                    | 1 +
->>  drivers/gpu/drm/udl/udl_dmabuf.c               | 1 +
->>  drivers/gpu/drm/vmwgfx/vmwgfx_prime.c          | 1 +
->>  drivers/media/v4l2-core/videobuf2-dma-contig.c | 1 +
->>  drivers/media/v4l2-core/videobuf2-dma-sg.c     | 1 +
->>  drivers/media/v4l2-core/videobuf2-vmalloc.c    | 1 +
->>  drivers/staging/android/ion/ion.c              | 1 +
->>  include/linux/dma-buf.h                        | 2 ++
->>  14 files changed, 22 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/dma-buf/dma-buf.c b/drivers/dma-buf/dma-buf.c
->> index c5a9138a6a8d..9583eac0238f 100644
->> --- a/drivers/dma-buf/dma-buf.c
->> +++ b/drivers/dma-buf/dma-buf.c
->> @@ -29,6 +29,7 @@
->>  #include <linux/anon_inodes.h>
->>  #include <linux/export.h>
->>  #include <linux/debugfs.h>
->> +#include <linux/module.h>
->>  #include <linux/seq_file.h>
->>  #include <linux/poll.h>
->>  #include <linux/reservation.h>
->> @@ -64,6 +65,7 @@ static int dma_buf_release(struct inode *inode, struct file *file)
->>       BUG_ON(dmabuf->cb_shared.active || dmabuf->cb_excl.active);
->>
->>       dmabuf->ops->release(dmabuf);
->> +     module_put(dmabuf->ops->owner);
->>
->>       mutex_lock(&db_list.lock);
->>       list_del(&dmabuf->list_node);
->> @@ -302,9 +304,14 @@ struct dma_buf *dma_buf_export(const struct dma_buf_export_info *exp_info)
->>               return ERR_PTR(-EINVAL);
->>       }
->>
->> +     if (!try_module_get(exp_info->ops->owner))
->> +             return ERR_PTR(-ENOENT);
->> +
->>       dmabuf = kzalloc(alloc_size, GFP_KERNEL);
->> -     if (dmabuf == NULL)
->> +     if (!dmabuf) {
->> +             module_put(exp_info->ops->owner);
->>               return ERR_PTR(-ENOMEM);
->> +     }
->>
->>       dmabuf->priv = exp_info->priv;
->>       dmabuf->ops = exp_info->ops;
->> diff --git a/drivers/gpu/drm/armada/armada_gem.c b/drivers/gpu/drm/armada/armada_gem.c
->> index 580e10acaa3a..d2c5fc1269b7 100644
->> --- a/drivers/gpu/drm/armada/armada_gem.c
->> +++ b/drivers/gpu/drm/armada/armada_gem.c
->> @@ -524,6 +524,7 @@ armada_gem_dmabuf_mmap(struct dma_buf *buf, struct vm_area_struct *vma)
->>  }
->>
->>  static const struct dma_buf_ops armada_gem_prime_dmabuf_ops = {
->> +     .owner = THIS_MODULE,
->>       .map_dma_buf    = armada_gem_prime_map_dma_buf,
->>       .unmap_dma_buf  = armada_gem_prime_unmap_dma_buf,
->>       .release        = drm_gem_dmabuf_release,
+On Wed, May 6, 2015 at 4:12 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> Hi J?r?my,
 >
-> The "easier" way to do this is change the registration function to add
-> the module owner automatically, which keeps you from having to modify
-> all of the individual drivers.  Look at how pci and usb do this for
-> their driver registration functions.  That should result in a much
-> smaller patch, that always works properly for everyone (there's no way
-> for driver to get it wrong.)
+> On Tue, May 05, 2015 at 11:13:11AM +0200, J?r?my Fangu?de wrote:
+>> To maintain cache coherency on ARM, we may need a mechanism to flush
+>> the data cache.
 >
-Thanks Greg; but of course, you're right! We already have a
-DEFINE_DMA_BUF_EXPORT_INFO macro, so this is far easier incorporated
-into that.
-
-I will spin up the (much simpler) patch and repost!
-
-> thanks,
+> In addition to generally just making this functionality available (see
+> below), do you have an actual use case in mind for this?  To solve the
+> VGA issue, for example, we already have a patch series from Drew trying
+> to address this.  Does that not work for you?
 >
-> greg k-h
+> There was a long discussion about this here:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-February/013593.html
+>
+> Drew then created a patch set, here:
+> https://lists.nongnu.org/archive/html/qemu-devel/2015-03/msg01254.html
+>
+> and replied to himself, here:
+> https://www.marc.info/?l=android-virt&m=142670523929132&w=3
+>
+> Which basically says that he doesn't like having to do flushes all over
+> QEMU (IIUC), so he sent this version instead:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-March/014027.html
+>
+> Which he now said he'd respin.
 
-
-Best regards,
-Sumit.
+In fact, I used this ioctl in pairs with this QEMU patch series:
+https://lists.nongnu.org/archive/html/qemu-devel/2015-05/msg00407.html
+My current work doesn't do anything about vga ram, so vga issue
+probably still persists, but it solves others issues with some
+emulated devices (mainly PCI) which were failing before and now work
+fine with this patch.
