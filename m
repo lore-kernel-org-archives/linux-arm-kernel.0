@@ -1,88 +1,63 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 7 May 2015 01:58:53 +0200
-Subject: [V2 PATCH 3/5] device property: Introduces
- device_dma_is_coherent()
-In-Reply-To: <554AA94D.6020503@amd.com>
-References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1430838729-21572-4-git-send-email-Suravee.Suthikulpanit@amd.com>
- <554AA94D.6020503@amd.com>
-Message-ID: <CAJZ5v0gbSFrjce0oZwxOiGYVwx+bp3hJ+YghgO75dyf3iuiWYA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 6 May 2015 17:01:54 -0700
+Subject: [PATCH RFC v1 2/5] clk: add missing lock when call
+ clk_core_enable in clk_set_parent
+In-Reply-To: <20150504083549.GC4082@shlinux1.ap.freescale.net>
+References: <1429107999-24413-1-git-send-email-aisheng.dong@freescale.com>
+ <1429107999-24413-3-git-send-email-aisheng.dong@freescale.com>
+ <55427D83.3060900@codeaurora.org>
+ <20150504083549.GC4082@shlinux1.ap.freescale.net>
+Message-ID: <20150507000154.GD21794@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 7, 2015 at 1:52 AM, Suravee Suthikulanit
-<suravee.suthikulpanit@amd.com> wrote:
-> Rafael,
->
-> Any comments on this patch?
+On 05/04, Dong Aisheng wrote:
+> On Thu, Apr 30, 2015 at 12:07:47PM -0700, Stephen Boyd wrote:
+> > On 04/15/15 07:26, Dong Aisheng wrote:
+> > > clk_core_enable is executed without &enable_clock in clk_set_parent function.
+> > > Adding it to avoid potential race condition issue.
+> > >
+> > > Fixes: 035a61c314eb ("clk: Make clk API return per-user struct clk instances")
+> > > Cc: Mike Turquette <mturquette@linaro.org>
+> > > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
+> > > ---
+> > 
+> > Can you please describe the race condition? From what I can tell there
+> > is not a race condition here and we've gone around on this part of the
+> > code before to fix any race conditions.
+> > 
+> 
+> Do you mean we do not need to acquire enable lock when execute clk_core_enable
+> in set_parent function? Can you help explain a bit more why?
+> 
+> The clk doc looks to me says the enable lock should be held across calls to
+> the .enable, .disable and .is_enabled operations.
+> 
+> And before the commit
+> 035a61c314eb ("clk: Make clk API return per-user struct clk instances"),
+> all the clk_enable/disable in set_parent() is executed with lock.
+> 
+> A rough thinking of race condition is assuming Thread A calls
+> clk_set_parent(x, y) while Thread B calls clk_enable(x), clock x is disabled
+> but prepared initially, due to clk_core_enable in set_parent() is not
+> executed with enable clock, the clk_core_enable may be reentrant during
+> the locking time executed by B.
+> Won't this be a race condition?
+> 
 
-Well, as long as acpi_dma_is_coherent() does the right thing on all
-architectures, I have no objections.
+Ah I see now. The commit text could say something like this:
 
-Thanks,
-Rafael
+Before commit 035a61c314eb ("clk: Make clk API return per-user
+struct clk instances") we acquired the enable_lock in
+__clk_set_parent_{before,after}() by means of calling
+clk_enable(). After commit 035a61c314eb we use clk_core_enable()
+in place of the clk_enable(), and clk_core_enable() doesn't
+acquire the enable_lock. This opens up a race condition between
+clk_set_parent() and clk_enable().
 
+I've replaced the commit text and applied it to clk-fixes.
 
-> On 5/5/2015 10:12 AM, Suravee Suthikulpanit wrote:
->>
->> Currently, device drivers, which support both OF and ACPI,
->> need to call two separate APIs, of_dma_is_coherent() and
->> acpi_dma_is_coherent()) to determine device coherency attribute.
->>
->> This patch simplifies this process by introducing a new device
->> property API, device_dma_is_coherent(), which calls the appropriate
->> interface based on the booting architecture.
->>
->> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> ---
->>   drivers/base/property.c  | 12 ++++++++++++
->>   include/linux/property.h |  2 ++
->>   2 files changed, 14 insertions(+)
->>
->> diff --git a/drivers/base/property.c b/drivers/base/property.c
->> index 1d0b116..8123c6e 100644
->> --- a/drivers/base/property.c
->> +++ b/drivers/base/property.c
->> @@ -14,6 +14,7 @@
->>   #include <linux/export.h>
->>   #include <linux/kernel.h>
->>   #include <linux/of.h>
->> +#include <linux/of_address.h>
->>   #include <linux/property.h>
->>
->>   /**
->> @@ -519,3 +520,14 @@ unsigned int device_get_child_node_count(struct
->> device *dev)
->>         return count;
->>   }
->>   EXPORT_SYMBOL_GPL(device_get_child_node_count);
->> +
->> +bool device_dma_is_coherent(struct device *dev)
->> +{
->> +       if (IS_ENABLED(CONFIG_OF) && dev->of_node)
->> +               return of_dma_is_coherent(dev->of_node);
->> +       else if (has_acpi_companion(dev))
->> +               return acpi_dma_is_coherent(acpi_node(dev->fwnode));
->> +
->> +       return false;
->> +}
->> +EXPORT_SYMBOL_GPL(device_dma_is_coherent);
->> diff --git a/include/linux/property.h b/include/linux/property.h
->> index de8bdf4..76ebde9 100644
->> --- a/include/linux/property.h
->> +++ b/include/linux/property.h
->> @@ -164,4 +164,6 @@ struct property_set {
->>
->>   void device_add_property_set(struct device *dev, struct property_set
->> *pset);
->>
->> +bool device_dma_is_coherent(struct device *dev);
->> +
->>   #endif /* _LINUX_PROPERTY_H_ */
->>
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
