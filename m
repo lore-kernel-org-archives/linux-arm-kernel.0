@@ -1,45 +1,49 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Thu, 07 May 2015 14:24:47 +0530
-Subject: [PATCH] ARM: dts: Fix typo in trip point temperature for
- exynos5420/5440
-Message-ID: <1430988887-6743-1-git-send-email-a.kesavan@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 May 2015 10:55:41 +0200
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <554AD067.9090707@linaro.org>
+References: <55417F5A.4040300@linaro.org> <2196079.901rMdSZr0@wuerfel>
+ <554AD067.9090707@linaro.org>
+Message-ID: <20501959.OF3FLWO2Eh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the extra zero in the "cpu-crit-0" trip point for exynos5420
-and exynos5440.
+On Thursday 07 May 2015 10:39:35 Shannon Zhao wrote:
+> On 2015/5/6 15:29, Arnd Bergmann wrote:
+> > On Wednesday 06 May 2015 14:56:58 Shannon Zhao wrote:
+> >> On 2015/5/5 19:13, Shannon Zhao wrote:
+> >>
+> >> Jan 01 00:01:02 localhost systemd[1]: Starting Login Service...
+> >> Jan 01 00:01:07 localhost systemd[1]: Started Login Service.
+> >> Jan 01 00:01:07 localhost systemd-logind[927]: Watching system buttons
+> >> on /dev/input/event0 (gpio-keys)
+> >> Jan 01 00:01:07 localhost systemd-logind[927]: New seat seat0.
+> >> Jan 01 00:01:25 localhost systemd-logind[927]: New session c1 of user root.
+> >>
+> >> Visit https://bugs.launchpad.net/ubuntu/+source/systemd/+bug/1347776 for
+> >> details.
+> > 
+> > How about Ubuntu or Debian releases that do not use systemd?
+> > 
+> > I guess we should check with a Debian Wheezy or Ubuntu Trusty release.
+> > My guess is that it will work fine, but some minor adjustment might
+> > be needed.
+> > 
+> 
+> Hi Arnd,
+> 
+> If the Debian Wheezy or Ubuntu Trusty release doesn't use systemd, what
+> user space process do they use to handle the input device event?
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
- arch/arm/boot/dts/exynos5420-trip-points.dtsi | 2 +-
- arch/arm/boot/dts/exynos5440-trip-points.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+I don't really know, there are probably multiple tools available, but
+they might not be installed by default
+ 
+> I tried Ubuntu Trusty from Christoffer, when typing "system_powerdown"
+> on QEMU monitor, "cat /dev/input/event0 | hexdump" shows the event is
+> triggered but the guest doesn't poweroff.
 
-diff --git a/arch/arm/boot/dts/exynos5420-trip-points.dtsi b/arch/arm/boot/dts/exynos5420-trip-points.dtsi
-index 5d31fc1..2180a01 100644
---- a/arch/arm/boot/dts/exynos5420-trip-points.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-trip-points.dtsi
-@@ -28,7 +28,7 @@ trips {
- 		type = "active";
- 	};
- 	cpu-crit-0 {
--		temperature = <1200000>; /* millicelsius */
-+		temperature = <120000>; /* millicelsius */
- 		hysteresis = <0>; /* millicelsius */
- 		type = "critical";
- 	};
-diff --git a/arch/arm/boot/dts/exynos5440-trip-points.dtsi b/arch/arm/boot/dts/exynos5440-trip-points.dtsi
-index 48adfa8..356e963 100644
---- a/arch/arm/boot/dts/exynos5440-trip-points.dtsi
-+++ b/arch/arm/boot/dts/exynos5440-trip-points.dtsi
-@@ -18,7 +18,7 @@ trips {
- 		type = "active";
- 	};
- 	cpu-crit-0 {
--		temperature = <1050000>; /* millicelsius */
-+		temperature = <105000>; /* millicelsius */
- 		hysteresis = <0>; /* millicelsius */
- 		type = "critical";
- 	};
--- 
-1.9.1
+Can you try installing acpid by running 'sudo apt-get install acpid' in
+the image? I suspect it should just work by scanning the event devices
+even in the absence of ACPI on the platform.
+
+	Arnd
