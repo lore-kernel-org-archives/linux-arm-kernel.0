@@ -1,78 +1,118 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 7 May 2015 22:25:43 +0900
-Subject: Possible regression due to "hrtimer: Get rid of hrtimer softirq"
-In-Reply-To: <alpine.DEB.2.11.1505071425520.4225@nanos>
-References: <20150507111711.GA17448@verge.net.au>
- <alpine.DEB.2.11.1505071425520.4225@nanos>
-Message-ID: <20150507132543.GA14889@verge.net.au>
+From: sumit.semwal@linaro.org (Sumit Semwal)
+Date: Thu,  7 May 2015 18:58:44 +0530
+Subject: [PATCH v2] dma-buf: add ref counting for module as exporter
+Message-ID: <1431005324-22234-1-git-send-email-sumit.semwal@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Add reference counting on a kernel module that exports dma-buf and
+implements its operations. This prevents the module from being unloaded
+while DMABUF file is in use.
 
-On Thu, May 07, 2015 at 02:35:59PM +0200, Thomas Gleixner wrote:
-> On Thu, 7 May 2015, Simon Horman wrote:
-> > ------------[ cut here ]------------
-> > kernel BUG at kernel/irq_work.c:135!
-> 
->   BUG_ON(!irqs_disabled());
-> 
-> So something enables interrupts in the periodic tick handling
-> machinery. Seems you have high resolution timers disabled, but nohz
-> enabled. And that code path has a local_irq_disable/enable pair which
-> causes havoc. Patch below.
+The original patch [1] was submitted by Tomasz Stanislawski, but this
+is a simpler way to do it.
 
-Thanks for your quick response. I have been able to confirm that
-when applied on top of next-20150507 the problem I observed no longer
-manifests. I have successfully tested it on all the boards
-where I previously observed a problem.
+v2: move owner to struct dma_buf, and use DEFINE_DMA_BUF_EXPORT_INFO
+    macro to simplify the change.
 
-If you are planning to formally submit the patch below feel free to add:
+Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
 
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
+[1]: https://lkml.org/lkml/2012/8/8/163
+---
+ drivers/dma-buf/dma-buf.c | 10 +++++++++-
+ include/linux/dma-buf.h   | 10 ++++++++--
+ 2 files changed, 17 insertions(+), 3 deletions(-)
 
-> diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-> index 753c211f6195..812f7a3b9898 100644
-> --- a/kernel/time/tick-sched.c
-> +++ b/kernel/time/tick-sched.c
-> @@ -967,11 +967,9 @@ static void tick_nohz_switch_to_nohz(void)
->  	if (!tick_nohz_enabled)
->  		return;
->  
-> -	local_irq_disable();
-> -	if (tick_switch_to_oneshot(tick_nohz_handler)) {
-> -		local_irq_enable();
-> +	if (tick_switch_to_oneshot(tick_nohz_handler))
->  		return;
-> -	}
-> +
->  	tick_nohz_active = 1;
->  	ts->nohz_mode = NOHZ_MODE_LOWRES;
->  
-> @@ -986,7 +984,6 @@ static void tick_nohz_switch_to_nohz(void)
->  	hrtimer_forward_now(&ts->sched_timer, tick_period);
->  	hrtimer_set_expires(&ts->sched_timer, next);
->  	tick_program_event(next, 1);
-> -	local_irq_enable();
->  }
->  
->  /*
-> @@ -1171,7 +1168,7 @@ void tick_oneshot_notify(void)
->   * Called cyclic from the hrtimer softirq (driven by the timer
->   * softirq) allow_nohz signals, that we can switch into low-res nohz
->   * mode, because high resolution timers are disabled (either compile
-> - * or runtime).
-> + * or runtime). Called with interrupts disabled.
->   */
->  int tick_check_oneshot_change(int allow_nohz)
->  {
-> 
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/drivers/dma-buf/dma-buf.c b/drivers/dma-buf/dma-buf.c
+index c5a9138a6a8d..0eff4bf56ef6 100644
+--- a/drivers/dma-buf/dma-buf.c
++++ b/drivers/dma-buf/dma-buf.c
+@@ -29,6 +29,7 @@
+ #include <linux/anon_inodes.h>
+ #include <linux/export.h>
+ #include <linux/debugfs.h>
++#include <linux/module.h>
+ #include <linux/seq_file.h>
+ #include <linux/poll.h>
+ #include <linux/reservation.h>
+@@ -64,6 +65,7 @@ static int dma_buf_release(struct inode *inode, struct file *file)
+ 	BUG_ON(dmabuf->cb_shared.active || dmabuf->cb_excl.active);
+ 
+ 	dmabuf->ops->release(dmabuf);
++	module_put(dmabuf->owner);
+ 
+ 	mutex_lock(&db_list.lock);
+ 	list_del(&dmabuf->list_node);
+@@ -302,14 +304,20 @@ struct dma_buf *dma_buf_export(const struct dma_buf_export_info *exp_info)
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 
++	if (!try_module_get(exp_info->owner))
++		return ERR_PTR(-ENOENT);
++
+ 	dmabuf = kzalloc(alloc_size, GFP_KERNEL);
+-	if (dmabuf == NULL)
++	if (!dmabuf) {
++		module_put(exp_info->owner);
+ 		return ERR_PTR(-ENOMEM);
++	}
+ 
+ 	dmabuf->priv = exp_info->priv;
+ 	dmabuf->ops = exp_info->ops;
+ 	dmabuf->size = exp_info->size;
+ 	dmabuf->exp_name = exp_info->exp_name;
++	dmabuf->owner = exp_info->owner;
+ 	init_waitqueue_head(&dmabuf->poll);
+ 	dmabuf->cb_excl.poll = dmabuf->cb_shared.poll = &dmabuf->poll;
+ 	dmabuf->cb_excl.active = dmabuf->cb_shared.active = 0;
+diff --git a/include/linux/dma-buf.h b/include/linux/dma-buf.h
+index 2f0b431b73e0..f98bd7068d55 100644
+--- a/include/linux/dma-buf.h
++++ b/include/linux/dma-buf.h
+@@ -115,6 +115,8 @@ struct dma_buf_ops {
+  * @attachments: list of dma_buf_attachment that denotes all devices attached.
+  * @ops: dma_buf_ops associated with this buffer object.
+  * @exp_name: name of the exporter; useful for debugging.
++ * @owner: pointer to exporter module; used for refcounting when exporter is a
++ *         kernel module.
+  * @list_node: node for dma_buf accounting and debugging.
+  * @priv: exporter specific private data for this buffer object.
+  * @resv: reservation object linked to this dma-buf
+@@ -129,6 +131,7 @@ struct dma_buf {
+ 	unsigned vmapping_counter;
+ 	void *vmap_ptr;
+ 	const char *exp_name;
++	struct module *owner;
+ 	struct list_head list_node;
+ 	void *priv;
+ 	struct reservation_object *resv;
+@@ -164,7 +167,8 @@ struct dma_buf_attachment {
+ 
+ /**
+  * struct dma_buf_export_info - holds information needed to export a dma_buf
+- * @exp_name:	name of the exporting module - useful for debugging.
++ * @exp_name:	name of the exporter - useful for debugging.
++ * @owner:	pointer to exporter module - used for refcounting kernel module
+  * @ops:	Attach allocator-defined dma buf ops to the new buffer
+  * @size:	Size of the buffer
+  * @flags:	mode flags for the file
+@@ -176,6 +180,7 @@ struct dma_buf_attachment {
+  */
+ struct dma_buf_export_info {
+ 	const char *exp_name;
++	struct module *owner;
+ 	const struct dma_buf_ops *ops;
+ 	size_t size;
+ 	int flags;
+@@ -187,7 +192,8 @@ struct dma_buf_export_info {
+  * helper macro for exporters; zeros and fills in most common values
+  */
+ #define DEFINE_DMA_BUF_EXPORT_INFO(a)	\
+-	struct dma_buf_export_info a = { .exp_name = KBUILD_MODNAME }
++	struct dma_buf_export_info a = { .exp_name = KBUILD_MODNAME, \
++					 .owner = THIS_MODULE }
+ 
+ /**
+  * get_dma_buf - convenience wrapper for get_file.
+-- 
+1.9.1
