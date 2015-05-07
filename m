@@ -1,62 +1,60 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 7 May 2015 10:12:00 -0500
-Subject: [PATCHv3 1/4] clk: socfpga: update clk.h so for Arria10 platform to
- use
+Date: Thu, 7 May 2015 10:12:03 -0500
+Subject: [PATCHv3 4/4] Documentation: DT bindings: document the clocks for
+ Arria10
 In-Reply-To: <1431011523-10049-1-git-send-email-dinguyen@opensource.altera.com>
 References: <1431011523-10049-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1431011523-10049-2-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1431011523-10049-5-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-There are 5 possible parent clocks for the SoCFPGA Arria10. Move the define
-SYSMGR_SDMMC_CTRL_SET and streq() to clk.h so that the Arria clock driver
-can use.
+Update the bindings document for the clocks on the SoCFPGA Arria10 platform.
+Also fix up a spelling error for the "altr,socfpga-perip-clk".
 
 Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- drivers/clk/socfpga/clk-gate.c | 4 ----
- drivers/clk/socfpga/clk.h      | 6 +++++-
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ .../devicetree/bindings/clock/altr_socfpga.txt          | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/socfpga/clk-gate.c b/drivers/clk/socfpga/clk-gate.c
-index dd3a78c..607ab35 100644
---- a/drivers/clk/socfpga/clk-gate.c
-+++ b/drivers/clk/socfpga/clk-gate.c
-@@ -32,14 +32,10 @@
- #define SOCFPGA_MMC_CLK			"sdmmc_clk"
- #define SOCFPGA_GPIO_DB_CLK_OFFSET	0xA8
- 
--#define streq(a, b) (strcmp((a), (b)) == 0)
+diff --git a/Documentation/devicetree/bindings/clock/altr_socfpga.txt b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+index f72e80e..317e9cc 100644
+--- a/Documentation/devicetree/bindings/clock/altr_socfpga.txt
++++ b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+@@ -7,11 +7,15 @@ This binding uses the common clock binding[1].
+ Required properties:
+ - compatible : shall be one of the following:
+ 	"altr,socfpga-pll-clock" - for a PLL clock
+-	"altr,socfpga-perip-clock" - The peripheral clock divided from the
++	"altr,socfpga-perip-clk" - The peripheral clock divided from the
+ 		PLL clock.
+ 	"altr,socfpga-gate-clk" - Clocks that directly feed peripherals and
+ 		can get gated.
 -
- #define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
++	"altr,socfpga-a10-pll-clock" - for a PLL clock on the Arria10.
++	"altr,socfpga-a10-perip-clk" - The peripheral clock divided from the
++		PLL clock on the Arria10.
++	"altr,socfpga-a10-gate-clk" - Clocks that directly feed peripherals and
++		can be gated.
+ - reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
+ - clocks : shall be the input parent clock phandle for the clock. This is
+ 	either an oscillator or a pll output.
+@@ -19,10 +23,11 @@ Required properties:
  
- /* SDMMC Group for System Manager defines */
- #define SYSMGR_SDMMCGRP_CTRL_OFFSET    0x108
--#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel) \
--	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
- 
- static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
- {
-diff --git a/drivers/clk/socfpga/clk.h b/drivers/clk/socfpga/clk.h
-index d291f60..b09a5d5 100644
---- a/drivers/clk/socfpga/clk.h
-+++ b/drivers/clk/socfpga/clk.h
-@@ -26,9 +26,13 @@
- #define CLKMGR_L4SRC		0x70
- #define CLKMGR_PERPLL_SRC	0xAC
- 
--#define SOCFPGA_MAX_PARENTS		3
-+#define SOCFPGA_MAX_PARENTS		5
- #define div_mask(width) ((1 << (width)) - 1)
- 
-+#define streq(a, b) (strcmp((a), (b)) == 0)
-+#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel) \
-+	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
-+
- extern void __iomem *clk_mgr_base_addr;
- 
- void __init socfpga_pll_init(struct device_node *node);
+ Optional properties:
+ - fixed-divider : If clocks have a fixed divider value, use this property.
+-- clk-gate : For "socfpga-gate-clk", clk-gate contains the gating register
+-        and the bit index.
+-- div-reg : For "socfpga-gate-clk" and "socfpga-periph-clock", div-reg contains
+-	the divider register, bit shift, and width.
++- clk-gate : For "socfpga-gate-clk" and "altr,socfpga-a10-gate-clk", clk-gate
++	contains the gating register and the bit index.
++- div-reg : For "socfpga-gate-clk", "socfpga-perip-clk",
++	"altr,socfpga-a10-gate-clk", and "altr,socfpga-a10-perip-clk", div-reg
++	contains the divider register, bit shift, and width.
+ - clk-phase : For the sdmmc_clk, contains the value of the clock phase that controls
+ 	the SDMMC CIU clock. The first value is the clk_sample(smpsel), and the second
+ 	value is the cclk_in_drv(drvsel). The clk-phase is used to enable the correct
 -- 
 2.2.1
