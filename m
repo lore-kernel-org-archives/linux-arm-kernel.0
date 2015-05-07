@@ -1,56 +1,112 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Thu, 07 May 2015 06:44:51 -0400
-Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <CAD6h2NRbzdX8a+D8UUNkmaMpf1uw2nfriCHwY7L20j=VM7NOFQ@mail.gmail.com>
-References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>	<20150507090210.GB22115@arm.com>
- <CAD6h2NRbzdX8a+D8UUNkmaMpf1uw2nfriCHwY7L20j=VM7NOFQ@mail.gmail.com>
-Message-ID: <554B4223.7080507@linaro.org>
+From: sumit.semwal@linaro.org (Sumit Semwal)
+Date: Thu, 7 May 2015 16:16:47 +0530
+Subject: [PATCH] dma-buf: add ref counting for module as exporter
+In-Reply-To: <20150507081026.GA19773@kroah.com>
+References: <1430983852-19267-1-git-send-email-sumit.semwal@linaro.org>
+ <20150507081026.GA19773@kroah.com>
+Message-ID: <CAO_48GGjgRP=ab1wjGABguP3BaWPriLou_C-Su2C0kSeMS3Y4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2015 05:33 AM, Haojian Zhuang wrote:
-> On 7 May 2015 at 17:02, Will Deacon <will.deacon@arm.com> wrote:
->> Hi Bintian,
+On 7 May 2015 at 13:40, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Thu, May 07, 2015 at 01:00:52PM +0530, Sumit Semwal wrote:
+>> Add reference counting on a kernel module that exports dma-buf and
+>> implements its operations. This prevents the module from being unloaded
+>> while DMABUF file is in use.
 >>
->> On Tue, May 05, 2015 at 01:06:34PM +0100, Bintian Wang wrote:
->>> Hi6220 is one mobile solution of Hisilicon, this patchset contains
->>> initial support for Hi6220 SoC and HiKey development board, which
->>> supports octal ARM Cortex A53 cores. Initial support is minimal and
->>> includes just the arch configuration, clock driver, device tree
->>> configuration.
->>>
->>> PSCI is enabled in device tree and there is no problem to boot all the
->>> octal cores, and the CPU hotplug is also working now, you can download
->>> and compile the latest firmware based on the following link to run this
->>> patch set:
->>> https://github.com/96boards/documentation/wiki/UEFI
->>>
->>> Changes v4:
->>> * Rebase to kernel 4.1-rc1
->>> * Delete "arm,cortex-a15-gic" from the gic node in dts
->> I gave these patches a go on top of -rc2 using the ATF and UEFI you link to
->> above.
+>> The original patch [1] was submitted by Tomasz, but he's since shifted
+>> jobs and a ping didn't elicit any response.
 >>
->> The good news is that the thing booted and all the cores entered at EL2.
->> Thanks!
+>>   [tomasz: Original author]
+>> Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
+>> Acked-by: Daniel Vetter <daniel@ffwll.ch>
+>>   [sumits: updated & rebased as per review comments]
+>> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
 >>
->> The bad news is that running hackbench quickly got the *heatsink*
->> temperature to 73 degress C and rising (measured with an infrared
->> thermometer).
-> Because you're just testing with minimum patch set. If you can choose
-> our release
-> on v3.10 & v3.18, you can observe lower temperature. Because we have thermal
-> framework and cpufreq driver. We're also upstreaming the thermal driver, but
-> it's not merged yet.
-
-the thermal driver is now on v4 (see below)
-https://lkml.org/lkml/2015/4/24/1
-
+>> [1]: https://lkml.org/lkml/2012/8/8/163
+>> ---
+>>  drivers/dma-buf/dma-buf.c                      | 9 ++++++++-
+>>  drivers/gpu/drm/armada/armada_gem.c            | 1 +
+>>  drivers/gpu/drm/drm_prime.c                    | 1 +
+>>  drivers/gpu/drm/exynos/exynos_drm_dmabuf.c     | 1 +
+>>  drivers/gpu/drm/i915/i915_gem_dmabuf.c         | 1 +
+>>  drivers/gpu/drm/omapdrm/omap_gem_dmabuf.c      | 1 +
+>>  drivers/gpu/drm/tegra/gem.c                    | 1 +
+>>  drivers/gpu/drm/udl/udl_dmabuf.c               | 1 +
+>>  drivers/gpu/drm/vmwgfx/vmwgfx_prime.c          | 1 +
+>>  drivers/media/v4l2-core/videobuf2-dma-contig.c | 1 +
+>>  drivers/media/v4l2-core/videobuf2-dma-sg.c     | 1 +
+>>  drivers/media/v4l2-core/videobuf2-vmalloc.c    | 1 +
+>>  drivers/staging/android/ion/ion.c              | 1 +
+>>  include/linux/dma-buf.h                        | 2 ++
+>>  14 files changed, 22 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/dma-buf/dma-buf.c b/drivers/dma-buf/dma-buf.c
+>> index c5a9138a6a8d..9583eac0238f 100644
+>> --- a/drivers/dma-buf/dma-buf.c
+>> +++ b/drivers/dma-buf/dma-buf.c
+>> @@ -29,6 +29,7 @@
+>>  #include <linux/anon_inodes.h>
+>>  #include <linux/export.h>
+>>  #include <linux/debugfs.h>
+>> +#include <linux/module.h>
+>>  #include <linux/seq_file.h>
+>>  #include <linux/poll.h>
+>>  #include <linux/reservation.h>
+>> @@ -64,6 +65,7 @@ static int dma_buf_release(struct inode *inode, struct file *file)
+>>       BUG_ON(dmabuf->cb_shared.active || dmabuf->cb_excl.active);
+>>
+>>       dmabuf->ops->release(dmabuf);
+>> +     module_put(dmabuf->ops->owner);
+>>
+>>       mutex_lock(&db_list.lock);
+>>       list_del(&dmabuf->list_node);
+>> @@ -302,9 +304,14 @@ struct dma_buf *dma_buf_export(const struct dma_buf_export_info *exp_info)
+>>               return ERR_PTR(-EINVAL);
+>>       }
+>>
+>> +     if (!try_module_get(exp_info->ops->owner))
+>> +             return ERR_PTR(-ENOENT);
+>> +
+>>       dmabuf = kzalloc(alloc_size, GFP_KERNEL);
+>> -     if (dmabuf == NULL)
+>> +     if (!dmabuf) {
+>> +             module_put(exp_info->ops->owner);
+>>               return ERR_PTR(-ENOMEM);
+>> +     }
+>>
+>>       dmabuf->priv = exp_info->priv;
+>>       dmabuf->ops = exp_info->ops;
+>> diff --git a/drivers/gpu/drm/armada/armada_gem.c b/drivers/gpu/drm/armada/armada_gem.c
+>> index 580e10acaa3a..d2c5fc1269b7 100644
+>> --- a/drivers/gpu/drm/armada/armada_gem.c
+>> +++ b/drivers/gpu/drm/armada/armada_gem.c
+>> @@ -524,6 +524,7 @@ armada_gem_dmabuf_mmap(struct dma_buf *buf, struct vm_area_struct *vma)
+>>  }
+>>
+>>  static const struct dma_buf_ops armada_gem_prime_dmabuf_ops = {
+>> +     .owner = THIS_MODULE,
+>>       .map_dma_buf    = armada_gem_prime_map_dma_buf,
+>>       .unmap_dma_buf  = armada_gem_prime_unmap_dma_buf,
+>>       .release        = drm_gem_dmabuf_release,
 >
->> So my question is, does this SoC have an automatic thermal cut out?
-> It's a low cost board. This feature is implemente by software. So we
-> need thermal
-> driver and cpufreq driver.
+> The "easier" way to do this is change the registration function to add
+> the module owner automatically, which keeps you from having to modify
+> all of the individual drivers.  Look at how pci and usb do this for
+> their driver registration functions.  That should result in a much
+> smaller patch, that always works properly for everyone (there's no way
+> for driver to get it wrong.)
 >
-> Regards
-> Haojian
+Thanks Greg; but of course, you're right! We already have a
+DEFINE_DMA_BUF_EXPORT_INFO macro, so this is far easier incorporated
+into that.
+
+I will spin up the (much simpler) patch and repost!
+
+> thanks,
+>
+> greg k-h
+
+
+Best regards,
+Sumit.
