@@ -1,51 +1,45 @@
 From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Thu,  7 May 2015 19:34:28 +0200
-Subject: [PATCH] ARM:Gemini:fix compiler waring
-Message-ID: <1431020068-19821-1-git-send-email-ulli.kroll@googlemail.com>
+Date: Thu, 7 May 2015 19:35:52 +0200 (CEST)
+Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
+In-Reply-To: <0701f75c1c42f74fd58845bc0ed41c38@advem.lv>
+References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
+ <20150506095312.GU4276@piout.net> <d97c3a8a29aa85c83973daf4a22ca4c9@advem.lv>
+ <2349062.9v3Zz7HPLu@wuerfel> <0701f75c1c42f74fd58845bc0ed41c38@advem.lv>
+Message-ID: <alpine.LNX.2.00.1505071935100.19877@T520.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
----
- arch/arm/mach-gemini/common.h | 4 +++-
- arch/arm/mach-gemini/reset.c  | 4 +++-
- 2 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-gemini/common.h b/arch/arm/mach-gemini/common.h
-index 38a4526..dd88369 100644
---- a/arch/arm/mach-gemini/common.h
-+++ b/arch/arm/mach-gemini/common.h
-@@ -12,6 +12,8 @@
- #ifndef __GEMINI_COMMON_H__
- #define __GEMINI_COMMON_H__
- 
-+#include <linux/reboot.h>
-+
- struct mtd_partition;
- 
- extern void gemini_map_io(void);
-@@ -26,6 +28,6 @@ extern int platform_register_pflash(unsigned int size,
- 				    struct mtd_partition *parts,
- 				    unsigned int nr_parts);
- 
--extern void gemini_restart(char mode, const char *cmd);
-+extern void gemini_restart(enum reboot_mode mode, const char *cmd);
- 
- #endif /* __GEMINI_COMMON_H__ */
-diff --git a/arch/arm/mach-gemini/reset.c b/arch/arm/mach-gemini/reset.c
-index b266597..21a6d6d 100644
---- a/arch/arm/mach-gemini/reset.c
-+++ b/arch/arm/mach-gemini/reset.c
-@@ -14,7 +14,9 @@
- #include <mach/hardware.h>
- #include <mach/global_reg.h>
- 
--void gemini_restart(char mode, const char *cmd)
-+#include "common.h"
-+
-+void gemini_restart(enum reboot_mode mode, const char *cmd)
- {
- 	__raw_writel(RESET_GLOBAL | RESET_CPU1,
- 		     IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_RESET);
--- 
-2.3.5
+Hi
+
+On Thu, 7 May 2015, Roman Yeryomin wrote:
+
+> On 2015-05-06 22:22, Arnd Bergmann wrote:
+> > On Wednesday 06 May 2015 19:21:21 Roman Yeryomin wrote:
+> > > 
+> > > > Thanks to point that, I'll merge that one which seems clean enough:
+> > > > http://git.openwrt.org/?p=openwrt.git;a=blob;f=target/linux/gemini/files/drivers/rtc/rtc-gemini.c;h=587d8122b2fbb1230437eadcce4789a53aa60ee5;hb=4c637410a2a1ab45988e8ca6202554a502102039
+> > > 
+> > > For 3.18 (and up) to work on gemini 160-gemini-timers.patch is vital.
+> > > Without that timers are broken and cpu is super slow.
+> > 
+> > Do you know what part of the patch is the actual bug fix? We should probably
+> > merge that separately and mark it for stable backports, while the bulk of
+> > that
+> > patch seems to just rearrange code.
+> > 
+> >  Arnd
+> 
+> Sorry, didn't try to extract the exact lines it but I guess it's that part
+> which touches the scheduler clock code.
+> Because without that patch sched clock runs at 100Hz instead of 25MHz.
+> I can dive into this deeper if you want, I just didn't see the need.
+> 
+> Regards,
+> Roman
+> 
+> 
+
+I've send the RTC driver for Gemini SoC upstream-
+
+Ulli 
