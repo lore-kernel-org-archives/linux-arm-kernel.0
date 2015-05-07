@@ -1,41 +1,31 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu,  7 May 2015 15:45:03 +0100
-Subject: [PATCH 2/4] ARM: vexpress/ca9: Add unified-cache property to l2 cache
- node
-In-Reply-To: <1431009905-29265-1-git-send-email-sudeep.holla@arm.com>
-References: <1431009905-29265-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1431009905-29265-3-git-send-email-sudeep.holla@arm.com>
+Date: Thu,  7 May 2015 15:45:01 +0100
+Subject: [PATCH 0/4] ARM/ARM64: vexpress: fixes for v4.1
+Message-ID: <1431009905-29265-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Schwebel <r.schwebel@pengutronix.de>
+Hi Arnd/Olof,
 
-Commit d9d1f3e2d711 ("ARM: l2c: check that DT files specify the required
-"cache-unified" property") mandates to specify this required property.
-Without this property, we get this boot warning:
+Here are few fixes posted on the list and are scattered around.
+So I am sending them as a series so that you can pick them up easily.
+Let me know if you prefer a pull request.
 
-"L2C: device tree omits to specify unified cache"
+Regards,
+Sudeep
 
-This patch adds "cache-unified" property to L2 cache node in vexpress
-CA9 device tree.
+Robert Schwebel (2):
+  ARM: vexpress/ca9: Add unified-cache property to l2 cache node
+  ARM: vexpress/ca9: Add interrupt-affinity to the PMU node
 
-Signed-off-by: Robert Schwebel <r.schwebel@pengutronix.de>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/boot/dts/vexpress-v2p-ca9.dts | 1 +
- 1 file changed, 1 insertion(+)
+Sudeep Holla (2):
+  ARM64: juno: add sp810 support and fix sp804 clock frequency
+  ARM: vexpress/tc2: Add interrupt-affinity to the PMU node
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-index 23662b5a5e9d..a411274e8b6b 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-@@ -170,6 +170,7 @@
- 		compatible = "arm,pl310-cache";
- 		reg = <0x1e00a000 0x1000>;
- 		interrupts = <0 43 4>;
-+		cache-unified;
- 		cache-level = <2>;
- 		arm,data-latency = <1 1 1>;
- 		arm,tag-latency = <1 1 1>;
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts    |  1 +
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts        | 11 ++++++----
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 31 +++++++++++++++++++++++----
+ 3 files changed, 35 insertions(+), 8 deletions(-)
+
 -- 
 1.9.1
