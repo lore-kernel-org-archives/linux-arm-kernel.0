@@ -1,31 +1,93 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 7 May 2015 16:13:58 +0100
-Subject: [PATCH v3 3/6] usb: dwc3: dwc3-st: Update the incorrect DT dwc3
- example.
-In-Reply-To: <1430400652-3366-4-git-send-email-peter.griffin@linaro.org>
-References: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
- <1430400652-3366-4-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150507151358.GA14123@griffinp-ThinkPad-X1-Carbon-2nd>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Thu,  7 May 2015 17:14:21 +0200
+Subject: [PATCH] ARM: net: delegate filter to kernel interpreter when
+ imm_offset() return value can't fit into 12bits.
+Message-ID: <1431011661-10277-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+The ARM JIT code emits "ldr rX, [pc, #offset]" to access the literal
+pool. #offset maximum value is 4095 and if the generated code is too
+large, the #offset value can overflow and not point to the expected
+slot in the literal pool. Additionally, when overflow occurs, bits of
+the overflow can end up changing the destination register of the ldr
+instruction.
 
-On Thu, 30 Apr 2015, Peter Griffin wrote:
+Fix that by detecting the overflow in imm_offset() and setting a flag
+that is checked for each BPF instructions converted in
+build_body(). As of now it can only be detected in the second pass. As
+a result the second build_body() call can now fail, so add the
+corresponding cleanup code in that case.
 
-> There is a subtle typo phys-names should be phy-names. Using the
-> current example means you don't have working usb (as you fail to
-> obtain the phys). Also update the example to use the generic phy
-> type constants which are now used for miphy28.
-> 
-> Additionally also remove the unnecessary new line in the example.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+Using multiple literal pools in the JITed code is going to require
+lots of intrusive changes to the JIT code (which would better be done
+as a feature instead of fix), just delegating to the kernel BPF
+interpreter in that case is a more straight forward, minimal fix and
+easy to backport.
 
-Can you take this dwc3 DT doc update patch via your tree?
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+---
+ arch/arm/net/bpf_jit_32.c | 27 ++++++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
-regards,
-
-Peter.
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index 6bda637..bb8ffcd 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -54,6 +54,7 @@
+ #define SEEN_DATA		(1 << (BPF_MEMWORDS + 3))
+ 
+ #define FLAG_NEED_X_RESET	(1 << 0)
++#define FLAG_IMM_OVERFLOW	(1 << 1)
+ 
+ struct jit_ctx {
+ 	const struct bpf_prog *skf;
+@@ -293,6 +294,15 @@ static u16 imm_offset(u32 k, struct jit_ctx *ctx)
+ 	/* PC in ARM mode == address of the instruction + 8 */
+ 	imm = offset - (8 + ctx->idx * 4);
+ 
++	if (imm & ~0xfff) {
++		/*
++		 * literal pool is too far, signal it into flags. we
++		 * can only detect it on the second pass unfortunately.
++		 */
++		ctx->flags |= FLAG_IMM_OVERFLOW;
++		return 0;
++	}
++
+ 	return imm;
+ }
+ 
+@@ -876,6 +886,14 @@ b_epilogue:
+ 		default:
+ 			return -1;
+ 		}
++
++		if (ctx->flags & FLAG_IMM_OVERFLOW)
++			/*
++			 * this instruction generated an overflow when
++			 * trying to access the literal pool, so
++			 * delegate this filter to the kernel interpreter.
++			 */
++			return -1;
+ 	}
+ 
+ 	/* compute offsets only during the first pass */
+@@ -938,7 +956,14 @@ void bpf_jit_compile(struct bpf_prog *fp)
+ 	ctx.idx = 0;
+ 
+ 	build_prologue(&ctx);
+-	build_body(&ctx);
++	if (build_body(&ctx) < 0) {
++#if __LINUX_ARM_ARCH__ < 7
++		if (ctx.imm_count)
++			kfree(ctx.imms);
++#endif
++		bpf_jit_binary_free(header);
++		goto out;
++	}
+ 	build_epilogue(&ctx);
+ 
+ 	flush_icache_range((u32)ctx.target, (u32)(ctx.target + ctx.idx));
+-- 
+1.9.1
