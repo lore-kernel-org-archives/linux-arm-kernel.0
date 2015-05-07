@@ -1,45 +1,49 @@
 From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Thu, 7 May 2015 19:35:52 +0200 (CEST)
+Date: Thu, 7 May 2015 19:46:02 +0200 (CEST)
 Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
-In-Reply-To: <0701f75c1c42f74fd58845bc0ed41c38@advem.lv>
+In-Reply-To: <5043733.xO9lSCKvly@wuerfel>
 References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <20150506095312.GU4276@piout.net> <d97c3a8a29aa85c83973daf4a22ca4c9@advem.lv>
- <2349062.9v3Zz7HPLu@wuerfel> <0701f75c1c42f74fd58845bc0ed41c38@advem.lv>
-Message-ID: <alpine.LNX.2.00.1505071935100.19877@T520.local>
+ <2694895.MomHLoCaoZ@wuerfel> <alpine.LNX.2.00.1505070455130.32495@T520.local>
+ <5043733.xO9lSCKvly@wuerfel>
+Message-ID: <alpine.LNX.2.00.1505071936170.19877@T520.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi
 
-On Thu, 7 May 2015, Roman Yeryomin wrote:
+On Thu, 7 May 2015, Arnd Bergmann wrote:
 
-> On 2015-05-06 22:22, Arnd Bergmann wrote:
-> > On Wednesday 06 May 2015 19:21:21 Roman Yeryomin wrote:
+> On Thursday 07 May 2015 05:00:03 Hans Ulli Kroll wrote:
+> > On Wed, 6 May 2015, Arnd Bergmann wrote:
+> > > As far as I'm concerned, we should just merge all the patches from
+> > > http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini/patches-3.18
 > > > 
-> > > > Thanks to point that, I'll merge that one which seems clean enough:
-> > > > http://git.openwrt.org/?p=openwrt.git;a=blob;f=target/linux/gemini/files/drivers/rtc/rtc-gemini.c;h=587d8122b2fbb1230437eadcce4789a53aa60ee5;hb=4c637410a2a1ab45988e8ca6202554a502102039
-> > > 
-> > > For 3.18 (and up) to work on gemini 160-gemini-timers.patch is vital.
-> > > Without that timers are broken and cpu is super slow.
+> > > We should also try to find a maintainer that can respond to patches
+> > > in a timely manner. If Ulli has time for that again, that would be great,
+> > > otherwise I think we should find someone from OpenWRT to take over.
 > > 
-> > Do you know what part of the patch is the actual bug fix? We should probably
-> > merge that separately and mark it for stable backports, while the bulk of
-> > that
-> > patch seems to just rearrange code.
-> > 
-> >  Arnd
+> > I'm back in busyness.
+> > Currently me dev device is right next to me.
+> > I moved some time ago and haav to find it in some 'hidden' box.
 > 
-> Sorry, didn't try to extract the exact lines it but I guess it's that part
-> which touches the scheduler clock code.
-> Because without that patch sched clock runs at 100Hz instead of 25MHz.
-> I can dive into this deeper if you want, I just didn't see the need.
+> Awesome, welcome back!
 > 
-> Regards,
-> Roman
+> Are you able to look at the patches I mentioned above and submit them
+> to arm at kernel.org, cc linux-arm-kernel at lists.infradead.org with proper
+> patch descriptions?
 > 
+> 	Arnd
 > 
 
-I've send the RTC driver for Gemini SoC upstream-
+Already done,
+RTC driver send.
+Compilder fix for MACH-RECORD send.
+Maintainer Update send.
 
-Ulli 
+This device is a (very) bad design, to be polite !
+I think they didn't test this properly.
+And they fixed some software issues in hardware.
+To be exact :
+They switched the IDE channels in hardware, to get around the stupid 
+Sausalito software.
