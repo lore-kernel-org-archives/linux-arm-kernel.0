@@ -1,95 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 7 May 2015 23:20:52 +0200
-Subject: [PATCH v6 4/4] clk: dt: Introduce binding for always-on clock
- support
-In-Reply-To: <20150501064405.GB4047@x1>
-References: <20150408094349.GC26727@lukather> <20150408103832.GG5162@x1>
- <20150408155705.GF26727@lukather> <20150408172344.GH5162@x1>
- <20150422093446.GA28007@lukather> <20150429141751.GR9169@x1>
- <20150429202332.GG6062@lukather> <20150430095722.GB1815@x1>
- <20150501053406.GI4946@pengutronix.de> <20150501064405.GB4047@x1>
-Message-ID: <20150507212052.GM11057@lukather>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 7 May 2015 14:30:16 -0700
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <CAKohpomYQw67KuX29PLawmd1dSXHx7pMt7+8BzmLPfHSqhMB2g@mail.gmail.com>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <20150504121209.GM15510@sirena.org.uk>
+ <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
+ <20150505105714.GA22845@sirena.org.uk>
+ <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
+ <20150505171252.GI22845@sirena.org.uk>
+ <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
+ <20150507055231.GB32399@codeaurora.org>
+ <CAKohpomYQw67KuX29PLawmd1dSXHx7pMt7+8BzmLPfHSqhMB2g@mail.gmail.com>
+Message-ID: <20150507213015.GB2455@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 01, 2015 at 07:44:05AM +0100, Lee Jones wrote:
-> > > Does Sascha's antidote patch change your opinion?  We can use DT to
-> > > declare critical clocks, and in the rare case of the introduction of a
-> > > new DDRFreq-like feature, which doesn't adapt the DT will still be
-> > > able to unlock the criticalness of the clock and use it as expected?
-> > 
-> > Honestly I'm not very fond of declaring these in the device tree, but
+On 05/07, Viresh Kumar wrote:
+> On 7 May 2015 at 11:22, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > If you look at the cpufreq/clock/pmic code on our codeaurora.org
+> > tree you'll see that it's used to pass a value with uA units
+> > through the regulator_set_optimum_mode() API. The call to
+> > regulator_set_optimum_mode() is here[1], and the place where we
+> > parse the OPP table from DT is here[2]. My understanding is that
+> > with recent changes to the regulator framework, we would do a
+> > s/regulator_set_optimum_mode/regulator_set_load/ and things would
+> > otherwise be the same on the consumer side. On the regulator
+> > side, we would move the .get_optimum_mode op to .set_load instead
+> > of the hack where we write to the hardware in
+> > .get_optimum_mode[3].
+> >
+> > So does that mean it corresponds to a limit, or a nominal
+> > constant draw value, or a value to regulator to? From what I can
+> > tell it's used to figure out how many phases to enable[4]. I
+> > suspect that means it's being used to figure out what value it
+> > should regulate to. In newer PMICs this is all done
+> > automatically, but at least for some of the PMICs we need to do
+> > it manually.
 > 
-> I know why you guys are saying that, but I'd like you to understand
-> the reasons for me pushing for this.  Rather than be being deliberately
-> obtuse, I'm thinking of the mess that not having this stuff in DT will
-> cause for clock implementations like ours, which describe more of a
-> framework than a description.
-
-The DT should dictate our implementation, not the other way around. I
-know that we are pretty bad at doing this, and that there's some clear
-abstraction violations already widely used, but really, using this
-kind of argument is pretty bad.
-
-The DT can (and is) shared between several OS and bootloaders, what if
-the *BSDs or barebox, or whatever, guys come up with the exact same
-argument to make a completely different binding?
-
-We'd end up either in a deadlock, or forcing our solution down the
-throat to some other system. I'm not sure any of these outcomes is
-something we want.
-
-> The providers in drivers/clock/st are blissfully ignorant of platform
-> specifics.  Per-platform configuration is described in DT.
-
-Maybe they just need a small amount of education then.
-
-> So we'd have 2 options to use a C-only based API; 1) duplicate
-> platform information in drivers/clk/st, or 2) supply a vendor
-> specific st,critical-clocks binding, pull out those references then
-> run them though the aforementioned framework.  It is my opinion that
-> neither of those methods are desirable.
-
-3) have a generic solution for this in the clock framework, like Mike
-suggested.
-
-> As an aside, we also have 9 add_provider() and 9 clock_register()
-> calls, where we would need to consider calling the new
-> critical_clock() API from/after.
+> By current phases, you probably meant [1], right ?
 > 
-> Please tell me that you understand and agree, or please provide me
-> with a suggestion to combat the issues I currently face.
-
-I do understand that it is convenient for you, and agree that
-duplicating the clock protection code across platforms is not the best
-solution.
-
-> > naming them 'critical-clocks' rather than 'always-on' seems more
-> > acceptable for me. It leaves a way out for the user to turn the clock
-> > off later as it only means "you may turn them off when you know what you
-> > are doing".
+> Also what I couldn't understand is how are you controlling the
+> current here?
 > 
-> With the introduction of your latest patch we are no longer in the
-> peril previously described, thus if a platform does separate their
-> DT from its associated kernel, it won't be the end of the world (or
-> cost a couple mWh) if a clock becomes controllable in a subsequent
-> kernel version.
+> - Is this a current only regulator ? Probably not as your code has
+> a uv value as well..
 
-If that critical clock definition comes with a special meaning and a
-matching API in the CCF as well (ie, would not be disabled by a
-clk_disable_unprepare, but would be by a clk_critical_disable or
-something alike), I think we should be fine.
+No.
 
-Maxime
+> 
+> - Now if uV is fixed, how is the target current controlled separately ?
 
+uV is not fixed
+
+> 
+> - Should we have a min/max/target value of this current ? Like what
+> we are doing for voltage. Or is this just the 'target' current ?
+
+I don't think so. It's just about setting the load through the
+regulator_set_load() API when this OPP is used.
+
+> 
+> - And finally how exactly should we write this in bindings to make
+> it clear to all users ?
+> 
+
+Let's take this up on my reply to Mark.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150507/1c79e9ff/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
