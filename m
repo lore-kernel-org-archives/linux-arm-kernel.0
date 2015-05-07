@@ -1,42 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 7 May 2015 07:58:03 +0100
-Subject: [PATCH 1/1] mfd: max77686: Remove unused struct
- max77686_opmode_data
-In-Reply-To: <1430932036-23971-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1430932036-23971-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20150507065803.GA3400@x1>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 7 May 2015 15:03:51 +0800
+Subject: [PATCH] ARM: alignment: Use is_wide_instruction() to check wide
+ instruction
+In-Reply-To: <1428674741-5409-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1428674741-5409-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1430982231.4930.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 06 May 2015, Javier Martinez Canillas wrote:
-
-> The defined struct max77686_opmode_data isn't used neither by
-> the max77686 mfd driver nor the drivers for its sub-devices.
+On Fri, 2015-04-10 at 22:05 +0800, Yingjoe Chen wrote:
+> I first notice the comment is incorrect, then I realize there's another
+> macro which do exactly the same thing.
+> Tested with hand written userspace program with a few wide instructions
+> to make sure this still work as expect.
 > 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> 8<-------------------------------------------------
+> do_alignment() is using locally added IS_T32() macro to check if an
+> instruction is a Thumb-2 32 bit instruction. The macro
+> is_wide_instruction() is doing the same thing, with slightly faster
+> implementation.
+> Change to use is_wide_instruction() in do_alignment() and remove
+> IS_T32().
+> 
+
+
+Hi Russell,
+
+Any suggestion about this patch?
+Should I put this into your patch system?
+
+Joe.C
+
+
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 > ---
->  include/linux/mfd/max77686.h | 5 -----
->  1 file changed, 5 deletions(-)
-
-Applied, thanks.
-
-> diff --git a/include/linux/mfd/max77686.h b/include/linux/mfd/max77686.h
-> index bb995ab9a575..d4b72d519115 100644
-> --- a/include/linux/mfd/max77686.h
-> +++ b/include/linux/mfd/max77686.h
-> @@ -125,9 +125,4 @@ enum max77686_opmode {
->  	MAX77686_OPMODE_STANDBY,
->  };
+>  arch/arm/mm/alignment.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+> index 2c0c541..f8e82f5 100644
+> --- a/arch/arm/mm/alignment.c
+> +++ b/arch/arm/mm/alignment.c
+> @@ -71,10 +71,6 @@
 >  
-> -struct max77686_opmode_data {
-> -	int id;
-> -	int mode;
-> -};
+>  #define BAD_INSTR 	0xdeadc0de
+>  
+> -/* Thumb-2 32 bit format per ARMv7 DDI0406A A6.3, either f800h,e800h,f800h */
+> -#define IS_T32(hi16) \
+> -	(((hi16) & 0xe000) == 0xe000 && ((hi16) & 0x1800))
 > -
->  #endif /* __LINUX_MFD_MAX77686_H */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>  static unsigned long ai_user;
+>  static unsigned long ai_sys;
+>  static void *ai_sys_last_pc;
+> @@ -770,7 +766,7 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  		tinstr = __mem_to_opcode_thumb16(tinstr);
+>  		if (!fault) {
+>  			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
+> -			    IS_T32(tinstr)) {
+> +			    is_wide_instruction(tinstr)) {
+>  				/* Thumb-2 32-bit */
+>  				u16 tinst2 = 0;
+>  				fault = probe_kernel_address(ptr + 1, tinst2);
