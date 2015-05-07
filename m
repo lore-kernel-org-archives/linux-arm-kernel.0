@@ -1,489 +1,217 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 May 2015 19:14:43 +0800
-Subject: [PATCH] ARM: imx53: Set DDR pins to high impedance when in
- suspend to RAM.
-In-Reply-To: <20150428154458.1520.55593.stgit@localhost>
-References: <20150428154458.1520.55593.stgit@localhost>
-Message-ID: <20150507111429.GB3162@dragon>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 7 May 2015 20:17:17 +0900
+Subject: Possible regression due to "hrtimer: Get rid of hrtimer softirq"
+Message-ID: <20150507111711.GA17448@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 28, 2015 at 05:44:58PM +0200, Martin Fuzzey wrote:
-> In order to save power the DDR pins should be put into high
-> impedance when in suspend to RAM.
-> 
-> This requires manually requesting self refresh (rather than using the
-> automatic mode implemented by the CCM / ESDCTL), followed by
-> reconfiguring the IOMUXC.
-> 
-> Of course the code to do this cannot itself run from DDR so the
-> code is copied to and executed from internal memory.
-> 
-> In my tests using a custom i.MX53 board with LPDDR2 RAM
-> this reduced the suspend power consumption from 200mW to 60mW.
-> 
-> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+Hi,
 
-Nice patch.  I tested it on my i.mx51 and i.mx53 boards and suspend
-still works.  A couple of comments below though.
+I have observed what appears to be a regression while testing next-20150507
+which seems to be caused by c6eb3f70d4482 ("hrtimer: Get rid of hrtimer
+softirq").
 
-> ---
->  arch/arm/mach-imx/Makefile        |    1 
->  arch/arm/mach-imx/common.h        |    4 +
->  arch/arm/mach-imx/pm-imx5.c       |  205 +++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-imx/suspend-imx53.S |  139 +++++++++++++++++++++++++
->  4 files changed, 348 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/mach-imx/suspend-imx53.S
-> 
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index f5ac685..984bee2 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -101,6 +101,7 @@ obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o mach-imx6sx.o
->  ifeq ($(CONFIG_SUSPEND),y)
->  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
->  obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
-> +obj-$(CONFIG_SOC_IMX53) += suspend-imx53.o
->  endif
->  obj-$(CONFIG_SOC_IMX6) += pm-imx6.o
->  
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index cfcdb62..0bd9d82 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -122,9 +122,13 @@ int imx_cpu_kill(unsigned int cpu);
->  
->  #ifdef CONFIG_SUSPEND
->  void v7_cpu_resume(void);
-> +void imx53_suspend(void __iomem *ocram_vbase);
-> +extern const u32 imx53_suspend_sz;
->  void imx6_suspend(void __iomem *ocram_vbase);
->  #else
->  static inline void v7_cpu_resume(void) {}
-> +static inline void imx53_suspend(void __iomem *ocram_vbase) {}
-> +static const u32 imx53_suspend_sz;
->  static inline void imx6_suspend(void __iomem *ocram_vbase) {}
->  #endif
->  
-> diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
-> index f1f80ab..9572f3b 100644
-> --- a/arch/arm/mach-imx/pm-imx5.c
-> +++ b/arch/arm/mach-imx/pm-imx5.c
-> @@ -13,7 +13,14 @@
->  #include <linux/io.h>
->  #include <linux/err.h>
->  #include <linux/export.h>
-> +
-> +#include <linux/genalloc.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
-> +
->  #include <asm/cacheflush.h>
-> +#include <asm/fncpy.h>
->  #include <asm/system_misc.h>
->  #include <asm/tlbflush.h>
->  
-> @@ -49,9 +56,48 @@
->   */
->  #define IMX5_DEFAULT_CPU_IDLE_STATE WAIT_UNCLOCKED_POWER_OFF
->  
-> +struct imx5_suspend_io_config {
-> +	u32	offset;
-> +	u32	clear;
-> +	u32	set;
-> +};
-> +
->  struct imx5_pm_data {
->  	phys_addr_t cortex_addr;
->  	phys_addr_t gpc_addr;
-> +	phys_addr_t m4if_addr;
-> +	phys_addr_t iomuxc_addr;
-> +	void (*suspend_asm)(void __iomem *ocram_vbase);
-> +	const u32 *suspend_asm_sz;
-> +	const struct imx5_suspend_io_config *suspend_io_config;
-> +	int suspend_io_count;
-> +};
-> +
-> +static const struct imx5_suspend_io_config imx53_suspend_io_config[] = {
-> +#define MX53_DSE_HIGHZ_MASK (0x7 << 19)
-> +	{.offset = 0x584, .clear = MX53_DSE_HIGHZ_MASK}, /* DQM0 */
-> +	{.offset = 0x594, .clear = MX53_DSE_HIGHZ_MASK}, /* DQM1 */
-> +	{.offset = 0x560, .clear = MX53_DSE_HIGHZ_MASK}, /* DQM2 */
-> +	{.offset = 0x554, .clear = MX53_DSE_HIGHZ_MASK}, /* DQM3 */
-> +	{.offset = 0x574, .clear = MX53_DSE_HIGHZ_MASK}, /* CAS */
-> +	{.offset = 0x588, .clear = MX53_DSE_HIGHZ_MASK}, /* RAS */
-> +	{.offset = 0x578, .clear = MX53_DSE_HIGHZ_MASK}, /* SDCLK_0 */
-> +	{.offset = 0x570, .clear = MX53_DSE_HIGHZ_MASK}, /* SDCLK_1 */
-> +
-> +	{.offset = 0x580, .clear = MX53_DSE_HIGHZ_MASK}, /* SDODT0 */
-> +	{.offset = 0x564, .clear = MX53_DSE_HIGHZ_MASK}, /* SDODT1 */
-> +	{.offset = 0x57c, .clear = MX53_DSE_HIGHZ_MASK}, /* SDQS0 */
-> +	{.offset = 0x590, .clear = MX53_DSE_HIGHZ_MASK}, /* SDQS1 */
-> +	{.offset = 0x568, .clear = MX53_DSE_HIGHZ_MASK}, /* SDQS2 */
-> +	{.offset = 0x558, .clear = MX53_DSE_HIGHZ_MASK}, /* SDSQ3 */
-> +	{.offset = 0x6f0, .clear = MX53_DSE_HIGHZ_MASK}, /* GRP_ADDS */
-> +	{.offset = 0x718, .clear = MX53_DSE_HIGHZ_MASK}, /* GRP_BODS */
-> +	{.offset = 0x71c, .clear = MX53_DSE_HIGHZ_MASK}, /* GRP_B1DS */
-> +	{.offset = 0x728, .clear = MX53_DSE_HIGHZ_MASK}, /* GRP_B2DS */
-> +	{.offset = 0x72c, .clear = MX53_DSE_HIGHZ_MASK}, /* GRP_B3DS */
-> +
-> +	/* Controls the CKE signal which is required to leave self refresh */
-> +	{.offset = 0x720, .clear = MX53_DSE_HIGHZ_MASK, .set = 1 << 19}, /* CTLDS */
->  };
->  
->  static const struct imx5_pm_data imx51_pm_data __initconst = {
-> @@ -62,11 +108,42 @@ static const struct imx5_pm_data imx51_pm_data __initconst = {
->  static const struct imx5_pm_data imx53_pm_data __initconst = {
->  	.cortex_addr = 0x63fa0000,
->  	.gpc_addr = 0x53fd8000,
-> +	.m4if_addr = 0x63fd8000,
-> +	.iomuxc_addr = 0x53fa8000,
-> +	.suspend_asm = &imx53_suspend,
-> +	.suspend_asm_sz = &imx53_suspend_sz,
-> +	.suspend_io_config = imx53_suspend_io_config,
-> +	.suspend_io_count = ARRAY_SIZE(imx53_suspend_io_config),
-> +};
-> +
-> +#define MX5_MAX_SUSPEND_IOCONFIG ARRAY_SIZE(imx53_suspend_io_config)
-> +
-> +struct imx5_suspend_io_state {
-> +	u32	offset;
-> +	u32	clear;
-> +	u32	set;
-> +	u32	saved_value;
->  };
+The problem manifests on the Koelsch board which is based on the
+Renesas ARM r8a7791 SoC as per the boot log below which was obtained
+after enabling DEBUG_LL and related options to enable early printk.
 
-imx5_suspend_io_config and imx5_suspend_io_state are a bit redundant.
-Can we drop imx5_suspend_io_config structure and define these static
-offset/clear/set date as an array of imx5_suspend_io_state directly?
-The bonus points are that we can save one data structure, and the
-suspend_info->io_state array in IRAM can be assigned with a simple
-memcpy() call.
+Without those options enabled the console produced no output whatsoever.
 
->  
-> +/*
-> + * This structure is for passing necessary data for low level ocram
-> + * suspend code(arch/arm/mach-imx/suspend-imx53.S), if this struct
-> + * definition is changed, the offset definition in that file
-> + * must be also changed accordingly otherwise, the suspend to ocram
-> + * function will be broken!
-> + */
-> +struct imx5_cpu_suspend_info {
-> +	void __iomem	*m4if_base;
-> +	void __iomem	*iomuxc_base;
-> +	u32		io_count;
-> +	struct imx5_suspend_io_state io_state[MX5_MAX_SUSPEND_IOCONFIG];
-> +} __aligned(8);
-> +
->  static void __iomem *ccm_base;
->  static void __iomem *cortex_base;
->  static void __iomem *gpc_base;
-> +static void __iomem *suspend_ocram_base;
-> +static void (*imx5_suspend_in_ocram_fn)(void __iomem *ocram_vbase);
->  
->  void __init imx5_pm_set_ccm_base(void __iomem *base)
->  {
-> @@ -161,8 +238,15 @@ static int mx5_suspend_enter(suspend_state_t state)
->  		/*clear the EMPGC0/1 bits */
->  		__raw_writel(0, gpc_base + MXC_SRPG_EMPGC0_SRPGCR);
->  		__raw_writel(0, gpc_base + MXC_SRPG_EMPGC1_SRPGCR);
-> +
-> +		if (imx5_suspend_in_ocram_fn)
-> +			imx5_suspend_in_ocram_fn(suspend_ocram_base);
-> +		else
-> +			cpu_do_idle();
-> +
-> +	} else {
-> +		cpu_do_idle();
->  	}
-> -	cpu_do_idle();
->  
->  	/* return registers to default idle state */
->  	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
-> @@ -194,6 +278,120 @@ static void imx5_pm_idle(void)
->  	imx5_cpu_do_idle();
->  }
->  
-> +static int __init imx_suspend_alloc_ocram(
-> +				size_t size,
-> +				void __iomem **virt_out,
-> +				phys_addr_t *phys_out)
-> +{
-> +	struct device_node *node;
-> +	struct platform_device *pdev;
-> +	struct gen_pool *ocram_pool;
-> +	unsigned long ocram_base;
-> +	void __iomem *virt;
-> +	phys_addr_t phys;
-> +	int ret = 0;
-> +
-> +	/* Copied from imx6: TODO factorize */
+The problem manifests when booting using the shmobile_defconfig,
+which uses multiplatform and enables all devices using DT.
 
-I'm not asking you to do it, but just reminding that this function has
-nothing specific to i.MX.  So consolidation should be done in sram core
-level.
+I see the same problem - no console  output - on all Renesas ARM
+boards which I have access to and for which multiplatform is supported.
+It does not seem to manifest when booting non-multiplatform configurations.
 
-Shawn
+In particular the following boards seem to be effected when using
+shmobile_defconfig:
 
-> +	node = of_find_compatible_node(NULL, NULL, "mmio-sram");
-> +	if (!node) {
-> +		pr_warn("%s: failed to find ocram node!\n", __func__);
-> +		return -ENODEV;
-> +	}
-> +
-> +	pdev = of_find_device_by_node(node);
-> +	if (!pdev) {
-> +		pr_warn("%s: failed to find ocram device!\n", __func__);
-> +		ret = -ENODEV;
-> +		goto put_node;
-> +	}
-> +
-> +	ocram_pool = dev_get_gen_pool(&pdev->dev);
-> +	if (!ocram_pool) {
-> +		pr_warn("%s: ocram pool unavailable!\n", __func__);
-> +		ret = -ENODEV;
-> +		goto put_node;
-> +	}
-> +
-> +	ocram_base = gen_pool_alloc(ocram_pool, size);
-> +	if (!ocram_base) {
-> +		pr_warn("%s: unable to alloc ocram!\n", __func__);
-> +		ret = -ENOMEM;
-> +		goto put_node;
-> +	}
-> +
-> +	phys = gen_pool_virt_to_phys(ocram_pool, ocram_base);
-> +	virt = __arm_ioremap_exec(phys, size, false);
-> +	if (phys_out)
-> +		*phys_out = phys;
-> +	if (virt_out)
-> +		*virt_out = virt;
-> +
-> +put_node:
-> +	of_node_put(node);
-> +
-> +	return ret;
-> +}
-> +
-> +static int __init imx5_suspend_init(const struct imx5_pm_data *soc_data)
-> +{
-> +	struct imx5_cpu_suspend_info *suspend_info;
-> +	const struct imx5_suspend_io_config *io_config;
-> +	struct imx5_suspend_io_state *io_state;
-> +	int i;
-> +	int ret;
-> +	/* Need this to avoid compile error due to const typeof in fncpy.h */
-> +	void (*suspend_asm)(void __iomem *) = soc_data->suspend_asm;
-> +
-> +	if (!suspend_asm)
-> +		return 0;
-> +
-> +	if (!soc_data->suspend_asm_sz || !*soc_data->suspend_asm_sz)
-> +		return -EINVAL;
-> +
-> +	ret = imx_suspend_alloc_ocram(
-> +		*soc_data->suspend_asm_sz + sizeof(*suspend_info),
-> +		&suspend_ocram_base, NULL);
-> +	if (ret)
-> +		return ret;
-> +
-> +	suspend_info = suspend_ocram_base;
-> +
-> +	suspend_info->io_count = soc_data->suspend_io_count;
-> +	io_config = soc_data->suspend_io_config;
-> +	io_state = suspend_info->io_state;
-> +	for (i = 0; i < soc_data->suspend_io_count;
-> +	     i++, io_config++, io_state++) {
-> +		io_state->offset = io_config->offset;
-> +		io_state->clear = io_config->clear;
-> +		io_state->set = io_config->set;
-> +	}
-> +
-> +	suspend_info->m4if_base = ioremap(soc_data->m4if_addr, SZ_16K);
-> +	if (!suspend_info->m4if_base) {
-> +		ret = -ENOMEM;
-> +		goto failed_map_m4if;
-> +	}
-> +
-> +	suspend_info->iomuxc_base = ioremap(soc_data->iomuxc_addr, SZ_16K);
-> +	if (!suspend_info->iomuxc_base) {
-> +		ret = -ENOMEM;
-> +		goto failed_map_iomuxc;
-> +	}
-> +
-> +	imx5_suspend_in_ocram_fn = fncpy(
-> +		suspend_ocram_base + sizeof(*suspend_info),
-> +		suspend_asm,
-> +		*soc_data->suspend_asm_sz);
-> +
-> +	return 0;
-> +
-> +failed_map_iomuxc:
-> +	iounmap(suspend_info->m4if_base);
-> +
-> +failed_map_m4if:
-> +	return ret;
-> +}
-> +
->  static int __init imx5_pm_common_init(const struct imx5_pm_data *data)
->  {
->  	int ret;
-> @@ -219,6 +417,11 @@ static int __init imx5_pm_common_init(const struct imx5_pm_data *data)
->  	if (ret)
->  		pr_warn("%s: cpuidle init failed %d\n", __func__, ret);
->  
-> +	ret = imx5_suspend_init(data);
-> +	if (ret)
-> +		pr_warn("%s: No DDR LPM support with suspend %d!\n",
-> +			__func__, ret);
-> +
->  	suspend_set_ops(&mx5_suspend_ops);
->  
->  	return 0;
-> diff --git a/arch/arm/mach-imx/suspend-imx53.S b/arch/arm/mach-imx/suspend-imx53.S
-> new file mode 100644
-> index 0000000..5ed078a
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/suspend-imx53.S
-> @@ -0,0 +1,139 @@
-> +/*
-> + * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
-> + */
-> +/*
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/linkage.h>
-> +
-> +#define M4IF_MCR0_OFFSET			(0x008C)
-> +#define M4IF_MCR0_FDVFS				(0x1 << 11)
-> +#define M4IF_MCR0_FDVACK			(0x1 << 27)
-> +
-> +	.align 3
-> +
-> +/*
-> + * ==================== low level suspend ====================
-> + *
-> + * On entry
-> + * r0: pm_info structure address;
-> + *
-> + * suspend ocram space layout:
-> + * ======================== high address ======================
-> + *                              .
-> + *                              .
-> + *                              .
-> + *                              ^
-> + *                              ^
-> + *                              ^
-> + *                      imx53_suspend code
-> + *              PM_INFO structure(imx53_suspend_info)
-> + * ======================== low address =======================
-> + */
-> +
-> +/* Offsets of members of struct imx53_suspend_info */
-> +#define SUSPEND_INFO_MX53_M4IF_V_OFFSET		0x0
-> +#define SUSPEND_INFO_MX53_IOMUXC_V_OFFSET	0x4
-> +#define SUSPEND_INFO_MX53_IO_COUNT_OFFSET	0x8
-> +#define SUSPEND_INFO_MX53_IO_STATE_OFFSET	0xc
-> +
-> +ENTRY(imx53_suspend)
-> +	stmfd	sp!, {r4,r5,r6,r7}
-> +
-> +	/* Save pad config */
-> +	ldr	r1, [r0, #SUSPEND_INFO_MX53_IO_COUNT_OFFSET]
-> +	cmp	r1, #0
-> +	beq	skip_pad_conf_1
-> +
-> +	add	r2, r0, #SUSPEND_INFO_MX53_IO_STATE_OFFSET
-> +	ldr	r3, [r0, #SUSPEND_INFO_MX53_IOMUXC_V_OFFSET]
-> +
-> +1:
-> +	ldr	r5, [r2], #12	/* IOMUXC register offset */
-> +	ldr	r6, [r3, r5]	/* current value */
-> +	str	r6, [r2], #4	/* save area */
-> +	subs	r1, r1, #1
-> +	bne	1b
-> +
-> +skip_pad_conf_1:
-> +	/* Set FDVFS bit of M4IF_MCR0 to request DDR to enter self-refresh */
-> +	ldr	r1, [r0, #SUSPEND_INFO_MX53_M4IF_V_OFFSET]
-> +	ldr	r2,[r1, #M4IF_MCR0_OFFSET]
-> +	orr	r2, r2, #M4IF_MCR0_FDVFS
-> +	str	r2,[r1, #M4IF_MCR0_OFFSET]
-> +
-> +	/* Poll FDVACK bit of M4IF_MCR to wait for DDR to enter self-refresh */
-> +wait_sr_ack:
-> +	ldr	r2,[r1, #M4IF_MCR0_OFFSET]
-> +	ands	r2, r2, #M4IF_MCR0_FDVACK
-> +	beq	wait_sr_ack
-> +
-> +	/* Set pad config */
-> +	ldr	r1, [r0, #SUSPEND_INFO_MX53_IO_COUNT_OFFSET]
-> +	cmp	r1, #0
-> +	beq	skip_pad_conf_2
-> +
-> +	add	r2, r0, #SUSPEND_INFO_MX53_IO_STATE_OFFSET
-> +	ldr	r3, [r0, #SUSPEND_INFO_MX53_IOMUXC_V_OFFSET]
-> +
-> +2:
-> +	ldr	r5, [r2], #4	/* IOMUXC register offset */
-> +	ldr	r6, [r2], #4	/* clear */
-> +	ldr	r7, [r3, r5]
-> +	bic	r7, r7, r6
-> +	ldr	r6, [r2], #8	/* set */
-> +	orr	r7, r7, r6
-> +	str	r7, [r3, r5]
-> +	subs	r1, r1, #1
-> +	bne	2b
-> +
-> +skip_pad_conf_2:
-> +	/* Zzz, enter stop mode */
-> +	wfi
-> +	nop
-> +	nop
-> +	nop
-> +	nop
-> +
-> +	/* Restore pad config */
-> +	ldr	r1, [r0, #SUSPEND_INFO_MX53_IO_COUNT_OFFSET]
-> +	cmp	r1, #0
-> +	beq	skip_pad_conf_3
-> +
-> +	add	r2, r0, #SUSPEND_INFO_MX53_IO_STATE_OFFSET
-> +	ldr	r3, [r0, #SUSPEND_INFO_MX53_IOMUXC_V_OFFSET]
-> +
-> +3:
-> +	ldr	r5, [r2], #12	/* IOMUXC register offset */
-> +	ldr	r6, [r2], #4	/* saved value */
-> +	str	r6, [r3, r5]
-> +	subs	r1, r1, #1
-> +	bne	3b
-> +
-> +skip_pad_conf_3:
-> +	/* Clear FDVFS bit of M4IF_MCR0 to request DDR to exit self-refresh */
-> +	ldr	r1, [r0, #SUSPEND_INFO_MX53_M4IF_V_OFFSET]
-> +	ldr	r2,[r1, #M4IF_MCR0_OFFSET]
-> +	bic	r2, r2, #M4IF_MCR0_FDVFS
-> +	str	r2,[r1, #M4IF_MCR0_OFFSET]
-> +
-> +	/* Poll FDVACK bit of M4IF_MCR to wait for DDR to exit self-refresh */
-> +wait_ar_ack:
-> +	ldr	r2,[r1, #M4IF_MCR0_OFFSET]
-> +	ands	r2, r2, #M4IF_MCR0_FDVACK
-> +	bne	wait_ar_ack
-> +
-> +	/* Restore registers */
-> +	ldmfd	sp!, {r4,r5,r6,r7}
-> +	mov	pc, lr
-> +
-> +ENDPROC(imx53_suspend)
-> +
-> +ENTRY(imx53_suspend_sz)
-> +        .word   . - imx53_suspend
-> 
+* emev2/kzm9d
+* r8a73a4/ape6evm
+* r8a7740/armadillo
+* r8a7790/lager
+* r8a7791/koelsch (as noted above)
+* r8a7794/alt
+
+The one board that supports multiplatform that does not appear to
+be affected is the r7s7210/genmai. I suspect this is because booting it
+does not currently enable many devices.
+
+
+
+Booting Linux on physical CPU 0x0
+Linux version 4.0.0-09020-gc6eb3f70d448-dirty (horms at ayumi.isobedori.kobe.vergenet.net) (gcc version 4.6.3 (GCC) ) #160 SMP Thu May 7 20:15:46 JST 2015
+CPU: ARMv7 Processor [413fc0f2] revision 2 (ARMv7), cr=10c5307d
+CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+Machine model: Koelsch
+Ignoring memory block 0x200000000 - 0x240000000
+bootconsole [earlycon0] enabled
+debug: ignoring loglevel setting.
+Memory policy: Data cache writealloc
+On node 0 totalpages: 262144
+free_area_init_node: node 0, pgdat c0658200, node_mem_map eeff8000
+  Normal zone: 1520 pages used for memmap
+  Normal zone: 0 pages reserved
+  Normal zone: 194560 pages, LIFO batch:31
+  HighMem zone: 67584 pages, LIFO batch:15
+PERCPU: Embedded 9 pages/cpu @eefc7000 s15808 r0 d21056 u36864
+pcpu-alloc: s15808 r0 d21056 u36864 alloc=9*4096
+pcpu-alloc: [0] 0 [0] 1 
+Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 260624
+Kernel command line: earlyprintk console=ttySC6,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp
+PID hash table entries: 4096 (order: 2, 16384 bytes)
+Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
+Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
+Memory: 1032656K/1048576K available (4740K kernel code, 230K rwdata, 1216K rodata, 276K init, 192K bss, 15920K reserved, 0K cma-reserved, 270336K highmem)
+Virtual kernel memory layout:
+    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+    fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+    vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
+    lowmem  : 0xc0000000 - 0xef800000   ( 760 MB)
+    pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+      .text : 0xc0008000 - 0xc05da044   (5961 kB)
+      .init : 0xc05db000 - 0xc0620000   ( 276 kB)
+      .data : 0xc0620000 - 0xc0659b00   ( 231 kB)
+       .bss : 0xc065c000 - 0xc068c30c   ( 193 kB)
+Hierarchical RCU implementation.
+        Additional per-CPU info printed with stalls.
+        RCU restricting CPUs from NR_CPUS=8 to nr_cpu_ids=2.
+RCU: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=2
+NR_IRQS:16 nr_irqs:16 16
+Architected cp15 timer(s) running at 10.00MHz (virt).
+clocksource arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x24e6a1710, max_idle_ns: 440795202120 ns
+sched_clock: 56 bits at 10MHz, resolution 100ns, wraps every 4398046511100ns
+Switching to timer-based delay loop, resolution 100ns
+Console: colour dummy device 80x30
+Calibrating delay loop (skipped), value calculated using timer frequency.. 20.00 BogoMIPS (lpj=100000)
+pid_max: default: 32768 minimum: 301
+Mount-cache hash table entries: 2048 (order: 1, 8192 bytes)
+Mountpoint-cache hash table entries: 2048 (order: 1, 8192 bytes)
+CPU: Testing write buffer coherency: ok
+CPU0: update cpu_capacity 1024
+CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+Setting up static identity map for 0x40009000 - 0x40009058
+Unable to boot CPU1 when MD21 is set
+CPU1: failed to boot: -524
+Brought up 1 CPUs
+SMP: Total of 1 processors activated (20.00 BogoMIPS).
+CPU: All CPU(s) started in SVC mode.
+devtmpfs: initialized
+VFP support v0.3: implementor 41 architecture 4 part 30 variant f rev 0
+clocksource jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
+pinctrl core: initialized pinctrl subsystem
+NET: Registered protocol family 16
+DMA: preallocated 256 KiB pool for atomic coherent allocations
+renesas_irqc e61c0000.interrupt-controller: unable to get clock
+renesas_irqc e61c0000.interrupt-controller: driving 10 irqs
+sh-pfc e6060000.pfc: r8a77910_pfc support registered
+No ATAGs?
+hw-breakpoint: found 5 (+1 reserved) breakpoint and 4 watchpoint registers.
+hw-breakpoint: maximum watchpoint size is 8 bytes.
+gpio-regulator regulator at 1: Could not obtain regulator setting GPIOs: -517
+gpio-regulator regulator at 3: Could not obtain regulator setting GPIOs: -517
+gpio-regulator regulator at 5: Could not obtain regulator setting GPIOs: -517
+vgaarb: loaded
+SCSI subsystem initialized
+libata version 3.00 loaded.
+usbcore: registered new interface driver usbfs
+usbcore: registered new interface driver hub
+usbcore: registered new device driver usb
+i2c-sh_mobile e60b0000.i2c: I2C adapter 6, bus speed 100000 Hz
+media: Linux media interface: v0.10
+Linux video capture interface: v2.00
+sh_cmt ffca0000.timer: ch0: used for clock events
+sh_cmt ffca0000.timer: ch1: used as clock source
+clocksource ffca0000.timer: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000000 ns
+Advanced Linux Sound Architecture Driver Initialized.
+Switched to clocksource arch_sys_counter
+------------[ cut here ]------------
+kernel BUG at kernel/irq_work.c:135!
+Internal error: Oops - BUG: 0 [#1] SMP ARM
+CPU: 0 PID: 17 Comm: kworker/u4:1 Not tainted 4.0.0-09020-gc6eb3f70d448-dirty #160
+Hardware name: Generic R8A7791 (Flattened Device Tree)
+Workqueue: khelper __call_usermodehelper
+task: ee877180 ti: ee89c000 task.ti: ee89c000
+PC is at irq_work_run_list+0x18/0xd0
+LR is at irq_work_tick+0x48/0x58
+pc : [<c0081160>]    lr : [<c00814dc>]    psr: 60000153
+sp : ee89dc90  ip : ee89dcb0  fp : ee89dcac
+r10: 00000000  r9 : 00000000  r8 : 0ee6b280
+r7 : ee819c80  r6 : 00000012  r5 : 00000000  r4 : ee877180
+r3 : 60000153  r2 : 2e9ac000  r1 : 00000202  r0 : eefc86c8
+Flags: nZCv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+Control: 10c5307d  Table: 4000406a  DAC: 00000015
+Process kworker/u4:1 (pid: 17, stack limit = 0xee89c210)
+Stack: (0xee89dc90 to 0xee89e000)
+dc80:                                     c061c6c8 ee877180 00000000 00000012
+dca0: ee89dcbc ee89dcb0 c00814dc c0081154 ee89dcd4 ee89dcc0 c006b314 c00814a0
+dcc0: c0622140 00000000 ee89dcec ee89dcd8 c0076f1c c006b2cc ee89c000 eefcafc0
+dce0: ee89dd1c ee89dcf0 c0076f64 c0076e84 00000000 c0658c80 ee803dc0 c0636280
+dd00: 00000012 ee819c80 eefcafc0 00000000 ee89dd2c ee89dd20 c036886c c0076f40
+dd20: ee89dd54 ee89dd30 c0062038 c0368848 c0061fc8 00000012 00000000 ee805000
+dd40: 00000001 00800111 ee89dd6c ee89dd58 c005e6a8 c0061fd4 0000007d 00000000
+dd60: ee89dd8c ee89dd70 c005e744 c005e68c f0002000 ee89ddb0 c0622788 ee89dde4
+dd80: ee89ddac ee89dd90 c000a3a8 c005e6c4 c0025590 c00f1ef8 40000153 ffffffff
+dda0: ee89de7c ee89ddb0 c0013740 c000a374 c0631f68 ee89ddf8 00000020 ee877180
+ddc0: ee1cf180 c0631f68 ee1fa000 ee877180 00800111 00000000 00000000 ee89de7c
+dde0: ee01344c ee89ddf8 c0025590 c00f1ef8 40000153 ffffffff ee89de2c ee877b48
+de00: ee877b50 eefca4c0 ee01a3c0 c00378a8 00000000 c01b0a4c eefca480 0000b416
+de20: ee89dea4 ee89de30 eefca480 00000000 ee1cf3a0 00000001 ee89de6c ee89de48
+de40: 0ee696c4 00000000 00000021 00000000 00000001 00000000 00800111 ee837e00
+de60: 00000000 ee01a3c0 00000088 00000000 ee89debc ee89de80 c0026500 c0025120
+de80: 00000000 00000000 ee89debc ee89de98 c003fe64 c000b418 ee01a3c0 ee82e400
+dea0: ee837e00 00000000 ee01a3c0 00000000 ee89ded4 ee89dec0 c0026790 c0026490
+dec0: 00000000 2e9ac000 ee89deec ee89ded8 c0037888 c0026768 c0037854 ee87d400
+dee0: ee89df2c ee89def0 c0039cf4 c0037860 00000000 ee87d400 ee82e400 00000000
+df00: ee82e414 ee87d400 ee82e400 ee87d418 ee82e414 ee82e400 00000088 00000000
+df20: ee89df5c ee89df30 c003a188 c0039b14 ee877180 ee87ec80 00000000 ee87d400
+df40: c0039e60 00000000 00000000 00000000 ee89dfac ee89df60 c003ef30 c0039e6c
+df60: 7da43d78 00000000 ffffffff ee87d400 00000000 00000000 ee89df78 ee89df78
+df80: 00000000 00000000 ee89df88 ee89df88 ee87ec80 c003ee40 00000000 00000000
+dfa0: 00000000 ee89dfb0 c000fd20 c003ee4c 00000000 00000000 00000000 00000000
+dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+dfe0: 00000000 00000000 00000000 00000000 00000013 00000000 9d585d40 bead4278
+Backtrace: 
+[<c0081148>] (irq_work_run_list) from [<c00814dc>] (irq_work_tick+0x48/0x58)
+ r6:00000012 r5:00000000 r4:ee877180 r3:c061c6c8
+[<c0081494>] (irq_work_tick) from [<c006b314>] (update_process_times+0x54/0x64)
+[<c006b2c0>] (update_process_times) from [<c0076f1c>] (tick_periodic+0xa4/0xbc)
+ r5:00000000 r4:c0622140
+[<c0076e78>] (tick_periodic) from [<c0076f64>] (tick_handle_periodic+0x30/0xa4)
+ r4:eefcafc0 r3:ee89c000
+[<c0076f34>] (tick_handle_periodic) from [<c036886c>] (arch_timer_handler_virt+0x30/0x38)
+ r9:00000000 r8:eefcafc0 r7:ee819c80 r6:00000012 r5:c0636280 r4:ee803dc0
+[<c036883c>] (arch_timer_handler_virt) from [<c0062038>] (handle_percpu_devid_irq+0x70/0x8c)
+[<c0061fc8>] (handle_percpu_devid_irq) from [<c005e6a8>] (generic_handle_irq+0x28/0x38)
+ r8:00800111 r7:00000001 r6:ee805000 r5:00000000 r4:00000012 r3:c0061fc8
+[<c005e680>] (generic_handle_irq) from [<c005e744>] (__handle_domain_irq+0x8c/0xb4)
+ r4:00000000 r3:0000007d
+[<c005e6b8>] (__handle_domain_irq) from [<c000a3a8>] (gic_handle_irq+0x40/0x64)
+ r7:ee89dde4 r6:c0622788 r5:ee89ddb0 r4:f0002000
+[<c000a368>] (gic_handle_irq) from [<c0013740>] (__irq_svc+0x40/0x54)
+Exception stack(0xee89ddb0 to 0xee89ddf8)
+dda0:                                     c0631f68 ee89ddf8 00000020 ee877180
+ddc0: ee1cf180 c0631f68 ee1fa000 ee877180 00800111 00000000 00000000 ee89de7c
+dde0: ee01344c ee89ddf8 c0025590 c00f1ef8 40000153 ffffffff
+ r6:ffffffff r5:40000153 r4:c00f1ef8 r3:c0025590
+[<c0025114>] (copy_process) from [<c0026500>] (do_fork+0x7c/0x2d8)
+ r10:00000000 r9:00000088 r8:ee01a3c0 r7:00000000 r6:ee837e00 r5:00800111
+ r4:00000000
+[<c0026484>] (do_fork) from [<c0026790>] (kernel_thread+0x34/0x3c)
+ r10:00000000 r8:ee01a3c0 r7:00000000 r6:ee837e00 r5:ee82e400 r4:ee01a3c0
+[<c002675c>] (kernel_thread) from [<c0037888>] (__call_usermodehelper+0x34/0x54)
+[<c0037854>] (__call_usermodehelper) from [<c0039cf4>] (process_one_work+0x1ec/0x324)
+ r4:ee87d400 r3:c0037854
+[<c0039b08>] (process_one_work) from [<c003a188>] (worker_thread+0x328/0x444)
+ r10:00000000 r9:00000088 r8:ee82e400 r7:ee82e414 r6:ee87d418 r5:ee82e400
+ r4:ee87d400
+[<c0039e60>] (worker_thread) from [<c003ef30>] (kthread+0xf0/0x104)
+ r10:00000000 r9:00000000 r8:00000000 r7:c0039e60 r6:ee87d400 r5:00000000
+ r4:ee87ec80 r3:ee877180
+[<c003ee40>] (kthread) from [<c000fd20>] (ret_from_fork+0x14/0x34)
+ r7:00000000 r6:00000000 r5:c003ee40 r4:ee87ec80
+Code: e24cb004 e10f3000 e3130080 1a000000 (e7f001f2) 
+---[ end trace c5cac49db7d153b1 ]---
+Kernel panic - not syncing: Fatal exception in interrupt
+---[ end Kernel panic - not syncing: Fatal exception in interrupt
