@@ -1,55 +1,52 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 07 May 2015 11:18:50 -0700
-Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
-In-Reply-To: <554B20B4.3040003@ti.com>
-References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
- <1981330.kGUrTurMy5@diego> <5543E79F.2080400@codeaurora.org>
- <22709390.NTAlubMgNB@diego> <55440EDA.4030905@codeaurora.org>
- <554B20B4.3040003@ti.com>
-Message-ID: <554BAC8A.1010307@codeaurora.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu,  7 May 2015 20:19:23 +0200
+Subject: [PATCH RFC 0/2] stmmac: stand alone platform drivers
+Message-ID: <1431022765-30715-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/15 01:22, Tero Kristo wrote:
-> On 05/02/2015 02:40 AM, Stephen Boyd wrote:
->> On 05/01/15 15:07, Heiko St?bner wrote:
->>> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
->>>
->>>>> Instead I guess we could hook it less deep into clk_get_sys, like
->>>>> in the
->>>>> following patch?
->>>> It looks like it will work at least, but still I'd prefer to keep the
->>>> orphan check contained to clk.c. How about this compile tested only
->>>> patch?
->>> I gave this a spin on my rk3288-firefly board. It still boots, the
->>> clock tree
->>> looks the same and it also still defers nicely in the scenario I
->>> needed it
->>> for. The implementation also looks nice - and of course much more
->>> compact than
->>> my check in two places :-) . I don't know if you want to put this as
->>> follow-up
->>> on top or fold it into the original orphan-check, so in any case
->>>
->>> Tested-by: Heiko Stuebner <heiko@sntech.de>
->>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->>
->> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it with
->> my patch and a note that it's based on an earlier patch from you.
->
-> FWIW, just gave a try for these two patches on all TI boards I have
-> access to.
->
-> Tested-by: Tero Kristo <t-kristo@ti.com>
->
-> I didn't try your evolved patch though, as you don't seem to have made
-> your mind yet.
->
+Hi Arnd,
 
-Thanks. Can you try the evolved patch? It's in linux-next now as commit
-882667c1fcf1, and it seems to at least break sunxi boot. I'd be
-interested if it broke TI boards.
+I ran into some issue using a separate platform driver[1] for lpc1850-dwmac.
+
+My dts files looks like this.
+mac: ethernet at 40010000 {
+	compatible = "nxp,lpc1850-dwmac", "snps,dwmac-3.611", "snps,dwmac";
+	...
+}
+
+On boot the generic driver in stmmac_platform.c would grab the
+device, matching on one of generic compat strings and thus blocking
+the lpc1850-dwmac driver.
+
+By changing the build order in the Makefile (see patch 1) I managed
+to get it working, but I am not sure that is a good solution(?).
+
+Another fix would be to remove the generic compat strings from the
+match table in stmmac_platform but there are some dts-files that
+only have these compat strings.
+See abilis_tb10x.dtsi and exynos5440.dtsi.
+
+I could also remove the generic compat strings from my dts file but
+I am not sure that is good solution either. If more glue is
+converted this would then be need in those dts files also.
+
+
+Any advice on how to handle this situation?
+
+
+[1] http://marc.info/?l=linux-arm-kernel&m=143076781409270&w=2
+
+Joachim Eastwood (2):
+  stmac: support standalone platform drivers
+  stmac: add dwmac glue for NXP 18xx/43xx family
+
+ drivers/net/ethernet/stmicro/stmmac/Makefile       | 11 ++-
+ .../net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c    | 98 ++++++++++++++++++++++
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  | 14 ++--
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.h  |  4 +
+ 4 files changed, 120 insertions(+), 7 deletions(-)
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.8.0
