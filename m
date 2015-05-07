@@ -1,48 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 7 May 2015 20:32:36 +0100
-Subject: [PATCH V2 5/6] regulator: add mxs on-chip regulator driver
-In-Reply-To: <535744342.64563.1431026719818.JavaMail.open-xchange@oxbsltgw09.schlund.de>
-References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
- <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
- <20150504123648.GU15510@sirena.org.uk>
- <1693367404.879766.1430771695242.JavaMail.open-xchange@oxbaltgw08.schlund.de>
- <1875749167.82542.1431023838932.JavaMail.open-xchange@oxbsltgw04.schlund.de>
- <20150507185216.GP22845@sirena.org.uk>
- <535744342.64563.1431026719818.JavaMail.open-xchange@oxbsltgw09.schlund.de>
-Message-ID: <20150507193236.GS22845@sirena.org.uk>
+From: marek@goldelico.com (Marek Belisko)
+Date: Thu,  7 May 2015 21:35:05 +0200
+Subject: [PATCH] ARM: dts: omap3-gta04: Add GSM audio support
+Message-ID: <1431027305-17627-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 07, 2015 at 09:25:19PM +0200, Stefan Wahren wrote:
-> > Mark Brown <broonie@kernel.org> hat am 7. Mai 2015 um 20:52 geschrieben:
+Add voice audio card which is used for telephony on gta04 board.
+gtm601 codec is UMTS modem with pcm interface which get samples from
+microphone and provide data from other party side. Use simple audio card
+to describe audio card.
 
-> > > In the bootloader code enabling the DC-DC is critical. There is a known
-> > > issue
-> > > which falsely triggers the brownout detection.
+Signed-off-by: Marek Belisko <marek@goldelico.com>
+---
+ arch/arm/boot/dts/omap3-gta04.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-> > Why would the driver not provide these operations?
-
-> I didn't implement this operation because the suggested workaround for the
-> hardware issue isn't very nice 
-> (disable brownout detection during enabling DC-DC). I was afraid of the
-> implementation.
-
-That doesn't sound too complicated?
-
-> > If the devices aren't sharing code then they should be separate drivers.
-
-> Okay. 
-
-> mxs-regulator-ldo.c
-> mxs-regulator-dcdc.c
-
-> What do you think of?
-
-Sure.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150507/8ce42fec/attachment.sig>
+diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+index b9f6881..a3a4156 100644
+--- a/arch/arm/boot/dts/omap3-gta04.dtsi
++++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+@@ -48,6 +48,28 @@
+ 		ti,mcbsp = <&mcbsp2>;
+ 	};
+ 
++	 /* GSM audio */
++	sound_telephony {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "GTA04 voice";
++		simple-audio-card,bitclock-master = <&telephony_link_master>;
++		simple-audio-card,frame-master = <&telephony_link_master>;
++		simple-audio-card,format = "i2s";
++
++		simple-audio-card,cpu {
++			sound-dai = <&mcbsp4>;
++		};
++
++		telephony_link_master: simple-audio-card,codec {
++			sound-dai = <&gtm601_codec>;
++		};
++	};
++
++	gtm601_codec: gsm_codec {
++		compatible = "option,gtm601";
++		#sound-dai-cells = <0>;
++	};
++
+ 	spi_lcd {
+ 		compatible = "spi-gpio";
+ 		#address-cells = <0x1>;
+@@ -517,3 +539,7 @@
+ &mcbsp2 {
+ 	status = "okay";
+ };
++
++&mcbsp4 {
++	status = "okay";
++};
+-- 
+1.9.1
