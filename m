@@ -1,43 +1,41 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 7 May 2015 18:14:43 +0900
-Subject: [PATCH] serial: xuartps: add __init to earlycon write method
-In-Reply-To: <5630573.8B6nn9XCXJ@wuerfel>
-References: <1430989359-4364-1-git-send-email-yamada.masahiro@socionext.com>
- <5630573.8B6nn9XCXJ@wuerfel>
-Message-ID: <CAK7LNATxom6m-sP_hx19qVy8waTZ=-ypGSz64pZ0QHRw9=mDjw@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 07 May 2015 11:16:58 +0200
+Subject: [RFT PATCH v2 0/3] drm/exynos: Fix build breakage on
+ !DRM_EXYNOS_FIMD
+In-Reply-To: <1430957086-25005-1-git-send-email-k.kozlowski@samsung.com>
+References: <1430957086-25005-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <554B2D8A.6070209@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello Krzysztof,
 
-2015-05-07 18:08 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 07 May 2015 18:02:39 Masahiro Yamada wrote:
->> @@ -1075,7 +1075,8 @@ static void cdns_uart_console_putchar(struct uart_port *port, int ch)
->>         writel(ch, port->membase + CDNS_UART_FIFO_OFFSET);
->>  }
->>
->> -static void cdns_early_write(struct console *con, const char *s, unsigned n)
->> +static void __init cdns_early_write(struct console *con, const char *s,
->> +                                   unsigned n)
->>  {
->>         struct earlycon_device *dev = con->data;
->>
->>
->
-> Why?
->
+On 05/07/2015 02:04 AM, Krzysztof Kozlowski wrote:
+> From: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> 
+> Hi,
+> 
+> This is second try to fix the build breakage introduced in 1c363c7cccf6
+> ("drm/exynos: Enable DP clock to fix display on Exynos5250 and other").
+> 
+> The fix is not trivial so I am kindly asking for testing on Chromebook
+> and other DP-enabled boards (I don't have Chromebook right now).
+> 
 
-I thought this function is used during the early boot stage.
+For all the series:
 
-I am seeing drivers/tty/serial/8250/8250_early.c
-for reference.
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-All the functions in this file are marked as __init.
+> Tested on Exynos4412 Trats2 board.
+> 
 
-Perhaps, am I misunderstanding?
+On Exynos5250 Snow, Exynos5420 Peach Pit and Exynos5800 Peach Pi Chromebooks:
 
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
+> Best regards,
+> Krzysztof
+> 
 
--- 
-Best Regards
-Masahiro Yamada
+Best regards,
+Javier
