@@ -1,45 +1,41 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Thu, 07 May 2015 19:26:08 +0300
-Subject: [PATCH 4/5] dmaengine: hsu: Fix memory leak when stopping a
- running transfer
-In-Reply-To: <1427456155-28990-5-git-send-email-peter.ujfalusi@ti.com>
-References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
- <1427456155-28990-5-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1431015968.28073.15.camel@linux.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 7 May 2015 18:26:29 +0200
+Subject: [GIT PULL] omap fixes against v4.1-rc1
+In-Reply-To: <20150505154423.GD21061@atomide.com>
+References: <20150505154423.GD21061@atomide.com>
+Message-ID: <201505071826.29224.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-03-27 at 13:35 +0200, Peter Ujfalusi wrote:
-> The vd->node is removed from the lists when the transfer started so the
-> vchan_get_all_descriptors() will not find it. This results memory leak.
+On Tuesday 05 May 2015, Tony Lindgren wrote:
+> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> CC: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> ---
->  drivers/dma/hsu/hsu.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 > 
-> diff --git a/drivers/dma/hsu/hsu.c b/drivers/dma/hsu/hsu.c
-> index 683ba9b62795..d1864bda008f 100644
-> --- a/drivers/dma/hsu/hsu.c
-> +++ b/drivers/dma/hsu/hsu.c
-> @@ -387,7 +387,10 @@ static int hsu_dma_terminate_all(struct dma_chan *chan)
->  	spin_lock_irqsave(&hsuc->vchan.lock, flags);
->  
->  	hsu_dma_stop_channel(hsuc);
-> -	hsuc->desc = NULL;
-> +	if (hsuc->desc) {
-> +		hsu_dma_desc_free(&hsuc->desc->vchan);
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-rc1
+> 
+> for you to fetch changes up to e7309c2673a389a495fcfad70376d3bae8b9bc89:
+> 
+>   bus: omap_l3_noc: Fix master id address decoding for OMAP5 (2015-05-04 10:21:01 -0700)
+> 
+> ----------------------------------------------------------------
+> Fixes for omaps, mostly a fix for power power consumption
+> creeping up during idle, and two l3-noc device fixes:
+> 
+> - Fix power consumption creeping up with I2C4 staying on
+> - Fix n900 microphone bias voltages
+> - Fix dra7 l3-noc for host clock
+> - Fix omap5 l3-noc id address decoding
+> 
+> The rest are all just minor dts fixes:
+> 
+> - Fix changed EXTCON_USB_GPIO_USB in defconfig
+> - Fix missing isp and iva #iommu-cells property
+> - Various beagle x15 dts fixes for pre-production changes
+> - Fix am437x-sk display dts entries
 
-By the way, it should be 'vdesc);' at the end.
+Pulled into fixes branch, thanks!
 
-> +		hsuc->desc = NULL;
-> +	}
->  
->  	vchan_get_all_descriptors(&hsuc->vchan, &head);
->  	spin_unlock_irqrestore(&hsuc->vchan.lock, flags);
-
-
--- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
+	Arnd
