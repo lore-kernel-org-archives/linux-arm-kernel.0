@@ -1,44 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 May 2015 10:02:11 +0100
-Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
-References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <20150507090210.GB22115@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 7 May 2015 11:02:41 +0200
+Subject: [PATCH V3] ARM: imx: correct Audio/Video PLL rate calculation
+ formula
+In-Reply-To: <1431015264-8320-1-git-send-email-b20788@freescale.com>
+References: <1431015264-8320-1-git-send-email-b20788@freescale.com>
+Message-ID: <20150507090241.GI12306@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bintian,
+Hello,
 
-On Tue, May 05, 2015 at 01:06:34PM +0100, Bintian Wang wrote:
-> Hi6220 is one mobile solution of Hisilicon, this patchset contains
-> initial support for Hi6220 SoC and HiKey development board, which
-> supports octal ARM Cortex A53 cores. Initial support is minimal and
-> includes just the arch configuration, clock driver, device tree
-> configuration.
+apart from a few minor issues regarding the wording of the commit log
+I'm happy now. See below.
+
+On Fri, May 08, 2015 at 12:14:24AM +0800, Anson Huang wrote:
+> The audio/video PLL's rate calculation formula is as below in RM:
 > 
-> PSCI is enabled in device tree and there is no problem to boot all the
-> octal cores, and the CPU hotplug is also working now, you can download
-> and compile the latest firmware based on the following link to run this
-> patch set:
-> https://github.com/96boards/documentation/wiki/UEFI 
+> Fref * (DIV_SELECT + NUM / DENOM),
 > 
-> Changes v4:
-> * Rebase to kernel 4.1-rc1
-> * Delete "arm,cortex-a15-gic" from the gic node in dts 
+> in original clk-pllv3's code, below code is used:
+> 
+> (parent_rate * div) + ((parent_rate / mfd) * mfn)
+> 
+> as it does NOT consider the float data using div, so below
+s/float data using div/non-integer part of the division/
 
-I gave these patches a go on top of -rc2 using the ATF and UEFI you link to
-above.
+> calculation formula should be used as a decent method:
+"decent" sounds strange to my (German) ears. Maybe better write:
 
-The good news is that the thing booted and all the cores entered at EL2.
-Thanks!
+	.. should be better used instead:
 
-The bad news is that running hackbench quickly got the *heatsink*
-temperature to 73 degress C and rising (measured with an infrared
-thermometer).
+> 
+> (parent_rate * div) + ((parent_rate * mfn) / mfd)
+> 
+> and we also need to consider parent_rate * mfd may exceed
+s/exceed/overflow/
 
-So my question is, does this SoC have an automatic thermal cut out? Whilst
-I'm all for merging enabling code into the kernel, if it really relies on
-the kernel to stop it from catching fire, maybe it's not a great idea
-putting these patches into people's hands just yet.
+> a 32 bit value, 64 bit value should be used.
+> 
+> Below is one example of old/new formula's difference:
+> 
+> On i.MX7D, DRAM PLL is a Audio/Video type PLL, the target freq
+> is 1066MHz, the register settings are as below:
+> 
+> PLL_DDRn: 8060202C   -> div = 0x2C
+> DDR_NUM: 06AAAC4D    -> mfn = 0x6AAAC4D
+> DDR_DENOM: 100003EC  -> mfd = 0x100003EC
+> 
+> parent_rate = 24MHz.
+> 
+> with old formula, the (parent_rate / mfd) * mfn = 0, with new formula,
+> the (parent_rate * mfn) / mfd = 10MHz, so old formula gets
+> PLL_DDR = 1056MHz, while the updated formuls gets PLL_DDR = 1066MHz
+s/formuls/formula/
 
-Will
+> which exactly matches the real rate.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
