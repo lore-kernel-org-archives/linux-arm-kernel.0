@@ -1,49 +1,51 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Thu, 7 May 2015 17:30:52 +0200 (CEST)
-Subject: [PATCH] net: ll_temac: Use one return statement instead of two
-In-Reply-To: <b10b8e1e696a09152b9df535a8bd37e6500ac1c7.1431005352.git.michal.simek@xilinx.com>
-References: <b10b8e1e696a09152b9df535a8bd37e6500ac1c7.1431005352.git.michal.simek@xilinx.com>
-Message-ID: <alpine.DEB.2.10.1505071730090.2462@hadrien>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 7 May 2015 17:02:57 +0100
+Subject: [PATCH v2] ARM: l2c: Add support for the "arm, shared-override"
+ property
+In-Reply-To: <1430990831-23825-1-git-send-email-geert+renesas@glider.be>
+References: <1430990831-23825-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150507160257.GA11067@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 May 2015, Michal Simek wrote:
-
-> From: Michal Simek <monstr@monstr.eu>
->
-> Use one return statement instead of two to simplify the code.
-> Both are returning the same value.
->
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-
-The from should be the same as the signed off.  You need From if you want
-something different than what is naturally put by your mailer.  But that
-doesn't see to be the case.
-
-julia
-
-> ---
->
->  drivers/net/ethernet/xilinx/ll_temac_main.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
->
-> diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-> index 690a4c36b316..ca640d04fd93 100644
-> --- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-> +++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-> @@ -688,10 +688,8 @@ static int temac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->  	cur_p = &lp->tx_bd_v[lp->tx_bd_tail];
->
->  	if (temac_check_tx_bd_space(lp, num_frag)) {
-> -		if (!netif_queue_stopped(ndev)) {
-> +		if (!netif_queue_stopped(ndev))
->  			netif_stop_queue(ndev);
-> -			return NETDEV_TX_BUSY;
-> -		}
->  		return NETDEV_TX_BUSY;
+On Thu, May 07, 2015 at 11:27:11AM +0200, Geert Uytterhoeven wrote:
+> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+> index 0dbabe9a6b0abb91..2484aed78c86546d 100644
+> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> @@ -67,6 +67,12 @@ Optional properties:
+>    disable if zero.
+>  - arm,prefetch-offset : Override prefetch offset value. Valid values are
+>    0-7, 15, 23, and 31.
+> +- arm,shared-override : The default behavior of the pl310 cache controller with
+> +  respect to the shareable attribute is to transform "normal memory
+> +  non-cacheable transactions" into "cacheable no allocate" (for reads) or
+> +  "write through no write allocate" (for writes).
+> +  On systems where this may cause DMA buffer corruption, this property must be
+> +  specified to indicate that such transforms are precluded.
+>  
+>  Example:
+>  
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index e309c8f35af5af61..86d0e7461e5b0b18 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -1149,6 +1149,11 @@ static void __init l2c310_of_parse(const struct device_node *np,
+>  		}
 >  	}
->
-> --
-> 2.3.5
->
->
+>  
+> +	if (of_property_read_bool(np, "arm,shared-override")) {
+> +		*aux_val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
+> +		*aux_mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
+> +	}
+> +
+>  	prefetch = l2x0_saved_regs.prefetch_ctrl;
+>  
+>  	ret = of_property_read_u32(np, "arm,double-linefill", &val);
+
+It looks fine to me.
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+(even better if a subsequent patch adds this property to all the dts
+files containing "arm,pl310" ;))
