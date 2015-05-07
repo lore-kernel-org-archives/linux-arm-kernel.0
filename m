@@ -1,106 +1,42 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Thu,  7 May 2015 14:54:17 +0200
-Subject: [PATCH v3] arm/mm/dma-mapping.c: Add arm_coherent_dma_mmap
-Message-ID: <1431003257-7794-1-git-send-email-mike.looijmans@topic.nl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 May 2015 13:57:53 +0100
+Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <554B542B.6040006@huawei.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <20150507090210.GB22115@arm.com> <554B305F.4080907@huawei.com>
+ <20150507112536.GD22115@arm.com> <554B542B.6040006@huawei.com>
+Message-ID: <20150507125752.GE22115@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When dma-coherent transfers are enabled, the mmap call must
-not change the pg_prot flags in the vma struct.
+On Thu, May 07, 2015 at 01:01:47PM +0100, Bintian wrote:
+> On 2015/5/7 19:25, Will Deacon wrote:
+> > On Thu, May 07, 2015 at 10:29:03AM +0100, Bintian wrote:
+> >> Hikey is a low cost board, I think it doesn't have an automatic thermal
+> >> cut out; I always use HiKey to test my patch, in the normal case,
+> >> temperature is not a problem.
+> >
+> > I don't see why the cost has anything to do with this issue; any money I
+> > save on the board will quickly be re-invested in my increased insurance
+> > premium.
+> >
+> > All I think we need is for secure software to keep an eye on the temperature
+> > and hit the power controller if it goes over some `fatal' threshold.
+> > Ideally, you'd be able to use a secure interrupt for this, but I suspect
+> > that you don't have the right hardware features for that (please correct me
+> > if I'm wrong). An alternative would be to hang something off a secure timer
+> > and get the firmware to check the board temperature on some low-frequency
+> > periodic tick.
+> If there is exception occurred on A core, there are two methods to
+> handle it:
+> (1) Delay for a period of time, watchdog will trigger the system reset.
+> (2) If the temperature is over 105 degree, the CPU will trigger reset(I
+> guess it's chip level).
 
-Split the arm_dma_mmap into a common and specific parts,
-and add a "arm_coherent_dma_mmap" implementation that does
-not alter the page protection flags.
+Aha, so now you're saying that there *is* a hardware shut-off at 105
+degrees, regardless of what the kernel is doing? If that's the case, then
+we're fine and the current patches make sense in isolation.
 
-Tested on a topic-miami board (Zynq) using the ACP port
-to transfer data between FPGA and CPU using the Dyplo
-framework. Without this patch, byte-wise access to mmapped
-coherent DMA memory was about 20x slower because of the
-memory being marked as non-cacheable, and transfer speeds
-would not exceed 240MB/s.
+Cheers,
 
-After this patch, the mapped memory is cacheable and the
-transfer speed is again 600MB/s (limited by the FPGA) when
-the data is in the L2 cache, while data integrity is being
-maintained.
-
-The patch has no effect on non-coherent DMA.
-
-Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
----
-v2: Mistakenly sent the wrong patch which included a devicetree file, removed it from the patch.
-v3: Rebased on current linux master because the patch was made on 3.19 and did not apply cleanly.
-
- arch/arm/mm/dma-mapping.c | 32 +++++++++++++++++++++++++-------
- 1 file changed, 25 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 09c5fe3..d6f5256 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -148,11 +148,14 @@ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
- 	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs);
- static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
- 				  dma_addr_t handle, struct dma_attrs *attrs);
-+static int arm_coherent_dma_mmap(struct device *dev, struct vm_area_struct *vma,
-+		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+		 struct dma_attrs *attrs);
- 
- struct dma_map_ops arm_coherent_dma_ops = {
- 	.alloc			= arm_coherent_dma_alloc,
- 	.free			= arm_coherent_dma_free,
--	.mmap			= arm_dma_mmap,
-+	.mmap			= arm_coherent_dma_mmap,
- 	.get_sgtable		= arm_dma_get_sgtable,
- 	.map_page		= arm_coherent_dma_map_page,
- 	.map_sg			= arm_dma_map_sg,
-@@ -690,10 +693,7 @@ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
- 			   attrs, __builtin_return_address(0));
- }
- 
--/*
-- * Create userspace mapping for the DMA-coherent memory.
-- */
--int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
-+static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		 struct dma_attrs *attrs)
- {
-@@ -704,8 +704,6 @@ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
- 	unsigned long off = vma->vm_pgoff;
- 
--	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
--
- 	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
- 		return ret;
- 
-@@ -721,6 +719,26 @@ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- }
- 
- /*
-+ * Create userspace mapping for the DMA-coherent memory.
-+ */
-+static int arm_coherent_dma_mmap(struct device *dev, struct vm_area_struct *vma,
-+		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+		 struct dma_attrs *attrs)
-+{
-+	return __arm_dma_mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
-+}
-+
-+int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
-+		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+		 struct dma_attrs *attrs)
-+{
-+#ifdef CONFIG_MMU
-+	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
-+#endif	/* CONFIG_MMU */
-+	return __arm_dma_mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
-+}
-+
-+/*
-  * Free a buffer as defined by the above mapping.
-  */
- static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
--- 
-1.9.1
+Will
