@@ -1,24 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 May 2015 18:30:36 +0200
-Subject: [PATCH v2] MAINTAINERS: replace an AT91 maintainer
-In-Reply-To: <1430301438-11839-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1430293252-9167-1-git-send-email-nicolas.ferre@atmel.com>
- <1430301438-11839-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201505071830.36288.arnd@arndb.de>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 07 May 2015 18:39:21 +0200
+Subject: [PATCH 1/2] coresight: replicator: Add Qualcomm CoreSight
+ Replicator driver
+In-Reply-To: <1431010007.21307.10.camel@linaro.org>
+References: <1430310000-10867-1-git-send-email-ivan.ivanov@linaro.org>
+ <1430310000-10867-2-git-send-email-ivan.ivanov@linaro.org>
+ <1430427225.2187.15.camel@x220> <1431010007.21307.10.camel@linaro.org>
+Message-ID: <1431016761.8171.79.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 April 2015, Nicolas Ferre wrote:
-> As some help is needed from an active maintainer, replace Andrew Victor
-> by Alexandre Belloni in the ARM/Atmel MAINTAINERS' entry (aka AT91).
-> Add an entry to the CREDITS file.
-> 
-> Thanks Andrew for the great role you played during the early days of this
-> product family.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Andrew Victor <linux@maxim.org.za>
+On Thu, 2015-05-07 at 17:46 +0300, Ivan T. Ivanov wrote:
+> Thank you. I am going to fallow approach taken by Mathieu in [1].
+> Is this OK with you?
 
-Applied to fixes branch with both Acks, thanks!
+I'm OK with anything that is coherent (ie, anything better than built-in
+only code cross-dressing as modular code). I think Mathieu's approach
+clears that bar. (Please note that macros like module_amba_driver() are
+basically just a pet peeve.)
 
-	Arnd
+And, at the end of the day, what matters is what the maintainer of this
+code accepts. I'm not the maintainer here.
+
+Thanks,
+
+
+Paul Bolle
