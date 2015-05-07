@@ -1,71 +1,51 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  7 May 2015 14:38:35 +0100
-Subject: [PATCH 03/12] clocksource: sti: Provide 'use timer as sched clock'
- capability
+Date: Thu,  7 May 2015 14:38:38 +0100
+Subject: [PATCH 06/12] watchdog: bindings: Supply knowledge of a third
+ supported device - clocksource
 In-Reply-To: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
 References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1431005924-21777-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1431005924-21777-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/clocksource/Kconfig         |  8 ++++++++
- drivers/clocksource/clksrc_st_lpc.c | 11 +++++++++++
- 2 files changed, 19 insertions(+)
+ Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index ac424cf..218daf8 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -258,4 +258,12 @@ config CLKSRC_ST_LPC
- 	help
- 	  Enable this option to use the Low Power controller timer
- 	  as clocksource.
-+
-+config CLKSRC_ST_LPC_TIMER_SCHED_CLOCK
-+	bool
-+	depends on CLKSRC_ST_LPC
-+	default y
-+	help
-+	  Use Low Power controller timer clock source as sched_clock
-+
- endmenu
-diff --git a/drivers/clocksource/clksrc_st_lpc.c b/drivers/clocksource/clksrc_st_lpc.c
-index 18a7dcd0..3d92b26 100644
---- a/drivers/clocksource/clksrc_st_lpc.c
-+++ b/drivers/clocksource/clksrc_st_lpc.c
-@@ -16,6 +16,7 @@
- #include <linux/clocksource.h>
- #include <linux/init.h>
- #include <linux/of_address.h>
-+#include <linux/sched_clock.h>
- #include <linux/slab.h>
+diff --git a/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt b/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+index 388c88a..0b1a784 100644
+--- a/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+@@ -1,20 +1,23 @@
+ STMicroelectronics Low Power Controller (LPC) - Watchdog
+ ========================================================
  
- #include <dt-bindings/mfd/st-lpc.h>
-@@ -38,6 +39,13 @@ static void st_clksrc_reset(void)
- 	writel_relaxed(1, ddata.base + LPC_LPT_START_OFF);
- }
+-LPC currently supports Watchdog OR Real Time Clock functionality.
++LPC currently supports Watchdog OR Real Time Clock OR Clocksource
++functionality.
  
-+#ifdef CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK
-+static u64 notrace st_clksrc_sched_clock_read(void)
-+{
-+	return (u64)readl_relaxed(ddata.base + LPC_LPT_LSB_OFF);
-+}
-+#endif
-+
- static int __init st_clksrc_init(void)
- {
- 	unsigned long rate;
-@@ -47,6 +55,9 @@ static int __init st_clksrc_init(void)
+ [See: ../rtc/rtc-st-lpc.txt for RTC options]
++[See: ../timer/st,stih407-lpc for Clocksource options]
  
- 	rate = clk_get_rate(ddata.clk);
+ Required properties
  
-+#ifdef CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK
-+	sched_clock_register(st_clksrc_sched_clock_read, 32, rate);
-+#endif
- 	ret = clocksource_mmio_init(ddata.base + LPC_LPT_LSB_OFF,
- 				    "clksrc-st-lpc", rate, 300, 32,
- 				    clocksource_mmio_readl_up);
+-- compatible 	: Must be one of: "st,stih407-lpc" "st,stih416-lpc"
+-				  "st,stih415-lpc" "st,stid127-lpc"
++- compatible 	: Must be one of: "st,stih407-lpc"
+ - reg		: LPC registers base address + size
+ - interrupts    : LPC interrupt line number and associated flags
+ - clocks	: Clock used by LPC device (See: ../clock/clock-bindings.txt)
+-- st,lpc-mode	: The LPC can run either one of two modes ST_LPC_MODE_RTC [0] or
+-		  ST_LPC_MODE_WDT [1].  One (and only one) mode must be
+-		  selected.
++- st,lpc-mode	: The LPC can run either one of three modes:
++                  ST_LPC_MODE_RTC    [0]
++                  ST_LPC_MODE_WDT    [1]
++                  ST_LPC_MODE_CLKSRC [2]
++		 One (and only one) mode must be selected.
+ 
+ Required properties [watchdog mode]
+ 
 -- 
 1.9.1
