@@ -1,66 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 07 May 2015 12:01:58 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix bogus struct clk comparison for timer
- clock
-In-Reply-To: <20150507144437.GA15563@atomide.com>
-References: <1430848941-27106-1-git-send-email-tony@atomide.com>
- <20150506053539.GA10871@codeaurora.org> <20150506145539.GI21061@atomide.com>
- <554AB1E3.2000304@codeaurora.org> <20150507144437.GA15563@atomide.com>
-Message-ID: <554BB6A6.1060600@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 7 May 2015 20:13:24 +0100
+Subject: [STLinux Kernel] [PATCH 02/12] clocksource: sti: Provide support
+ for the ST LPC Clocksource IP
+In-Reply-To: <20150507150440.GA13336@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
+ <1431005924-21777-3-git-send-email-lee.jones@linaro.org>
+ <20150507150440.GA13336@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20150507191324.GB16220@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/15 07:44, Tony Lindgren wrote:
-> * Stephen Boyd <sboyd@codeaurora.org> [150506 17:30]:
->> On 05/06/15 07:55, Tony Lindgren wrote:
->>
->>> --- a/arch/arm/mach-omap2/timer.c
->>> +++ b/arch/arm/mach-omap2/timer.c
->>> @@ -298,7 +298,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
->>>  	if (IS_ERR(src))
->>>  		return PTR_ERR(src);
->>>  
->>> -	if (clk_get_parent(timer->fclk) != src) {
->>> +	if (!clk_is_match(clk_get_parent(timer->fclk), src)) {
->>>  		r = clk_set_parent(timer->fclk, src);
->> I also wonder why we can't just call clk_set_parent() and skip the "is
->> the parent already src" check?
->>
->> If there's a good reason for not just calling clk_set_parent() then it
->> makes sense to do the clk_is_match() thing, and you can have my ack
->>
->> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> Good point. We've been unconditionally calling it anyways and
-> nobody has complained of any issues. So let's just remove the
-> check.
->
-> Regards,
->
-> Tony
->
-> 8< ----------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Tue, 5 May 2015 09:03:34 -0700
-> Subject: [PATCH] ARM: OMAP2+: Remove bogus struct clk comparison for timer
->  clock
->
-> With recent changes to use determine_rate, the comparison of two
-> clocks won't work without clk_is_match that does __clk_get_hw
-> on the clocks first.
->
-> As we've been unconditionally already calling clk_set_parent
-> already because of the bogus comparison, let's just remove the
-> check as suggested by Stephen Boyd <sboyd@codeaurora.org>.
->
-> Cc: Michael Turquette <mturquette@linaro.org>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > This IP is shared with Watchdog and RTC functionality.  Only one of
+> > these IPs can be used at the same time.  We use the device-driver
+> > model combined with a DT 'mode' property to enforce this.
+> 
+> Which means my previous assertion in V1 that the IP didn't exist on stih415/6
+> SoC is most likely wrong, as the watchdog driver has bindings already for those
+> platforms.
+> 
+> I did try this before and couldn't get it working (driver failed on clk_get_rate)
+> on stih416-b2020.
+> 
+> Did you try and see if you can get this also working for stih415/6 SoCs? It would
+> mean we can move away from arm_global_timer for all upstreamed STI platforms.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+This patch-set only supports STiH4{07,10}, which is the only platform
+it's been tested on until this point.  I can investigate porting it to
+Orly/Orly2 as a subsequent piece of work if it's going to be useful
+for ST.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
