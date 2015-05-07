@@ -1,41 +1,134 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 07 May 2015 19:01:36 +0200
-Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
-In-Reply-To: <CAGE1QJoEAg9tAM63MEbpLuqvY_ZwGrHPU1sqo=L_iByKrERUow@mail.gmail.com>
-References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
- <20150506141249.GA6796@cbox>
- <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
- <20150507112027.GC25885@cbox>
- <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
- <CAMJs5B9i9q8gJU93B09-uLMF6w1bTft-40DWPFUP6ky=SketSQ@mail.gmail.com>
- <CAGE1QJoEAg9tAM63MEbpLuqvY_ZwGrHPU1sqo=L_iByKrERUow@mail.gmail.com>
-Message-ID: <554B9A70.6020309@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 7 May 2015 17:54:16 +0100
+Subject: [PATCH v4 09/13] arm64: mm: explicitly bootstrap the linear
+ mapping
+In-Reply-To: <1429112064-19952-10-git-send-email-ard.biesheuvel@linaro.org>
+References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1429112064-19952-10-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150507165416.GB11067@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 15, 2015 at 05:34:20PM +0200, Ard Biesheuvel wrote:
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index ceec4def354b..338eaa7bcbfd 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -68,6 +68,17 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+>  #define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(min);
+>  #endif
+>  
+> +/*
+> + * The pgdir region needs to be mappable using a single PMD or PUD sized region,
+> + * so it should not cross a 512 MB or 1 GB alignment boundary, respectively
+> + * (depending on page size). So align to an upper bound of its size.
+> + */
+> +#if CONFIG_ARM64_PGTABLE_LEVELS == 2
+> +#define PGDIR_ALIGN	(8 * PAGE_SIZE)
+> +#else
+> +#define PGDIR_ALIGN	(16 * PAGE_SIZE)
+> +#endif
 
+Isn't 8 pages sufficient in both cases? Unless some other patch changes
+the idmap and swapper, I can count maximum 7 pages in total.
 
-On 07/05/2015 18:56, J?r?my Fangu?de wrote:
-> USB devices fail with a timeout error, as if the communication between
-> the kernel and the devices fail at a certain point:
-> usb 1-1: device not accepting address 5, error -110
-> usb usb1-port1: unable to enumerate USB device
-> 
-> e1000 fails when the userspace tries to use it, with these type of
-> kernel messages:
-> e1000 0000:00:02.0 eth0: Detected Tx Unit Hang
->   Tx Queue             <0>
->   TDH                  <d>
->   TDT                  <d>
->   next_to_use          <d>
->   next_to_clean        <9>
-> buffer_info[next_to_clean]
->   time_stamp           <ffff9311>
->   next_to_watch        <a>
->   jiffies              <ffff956a>
->   next_to_watch.status <0>
+> +
+>  SECTIONS
+>  {
+>  	/*
+> @@ -160,7 +171,7 @@ SECTIONS
+>  
+>  	BSS_SECTION(0, 0, 0)
+>  
+> -	.pgdir (NOLOAD) : ALIGN(PAGE_SIZE) {
+> +	.pgdir (NOLOAD) : ALIGN(PGDIR_ALIGN) {
+>  		idmap_pg_dir = .;
+>  		. += IDMAP_DIR_SIZE;
+>  		swapper_pg_dir = .;
+> @@ -185,6 +196,11 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
+>  	"ID map text too big or misaligned")
+>  
+>  /*
+> + * Check that the chosen PGDIR_ALIGN value if sufficient.
+> + */
+> +ASSERT(SIZEOF(.pgdir) < ALIGNOF(.pgdir), ".pgdir size exceeds its alignment")
+> +
+> +/*
+>   * If padding is applied before .head.text, virt<->phys conversions will fail.
+>   */
+>  ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index c27ab20a5ba9..93e5a2497f01 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -380,26 +380,68 @@ static void __init bootstrap_early_mapping(unsigned long addr,
+>  	}
+>  }
+>  
+> +static void __init bootstrap_linear_mapping(unsigned long va_offset)
+> +{
+> +	/*
+> +	 * Bootstrap the linear range that covers swapper_pg_dir so that the
+> +	 * statically allocated page tables as well as newly allocated ones
+> +	 * are accessible via the linear mapping.
+> +	 */
 
-Can you find out what memory attributes the guest is using for the
-memory---and if it's uncached, why?
+Just move the comment outside the function.
 
-Paolo
+> +	static struct bootstrap_pgtables linear_bs_pgtables __pgdir;
+> +	const phys_addr_t swapper_phys = __pa(swapper_pg_dir);
+> +	unsigned long swapper_virt = __phys_to_virt(swapper_phys) + va_offset;
+> +	struct memblock_region *reg;
+> +
+> +	bootstrap_early_mapping(swapper_virt, &linear_bs_pgtables,
+> +				IS_ENABLED(CONFIG_ARM64_64K_PAGES));
+> +
+> +	/* now find the memblock that covers swapper_pg_dir, and clip */
+> +	for_each_memblock(memory, reg) {
+> +		phys_addr_t start = reg->base;
+> +		phys_addr_t end = start + reg->size;
+> +		unsigned long vstart, vend;
+> +
+> +		if (start > swapper_phys || end <= swapper_phys)
+> +			continue;
+> +
+> +#ifdef CONFIG_ARM64_64K_PAGES
+> +		/* clip the region to PMD size */
+> +		vstart = max(swapper_virt & PMD_MASK,
+> +			     round_up(__phys_to_virt(start + va_offset),
+> +				      PAGE_SIZE));
+> +		vend = min(round_up(swapper_virt, PMD_SIZE),
+> +			   round_down(__phys_to_virt(end + va_offset),
+> +				      PAGE_SIZE));
+> +#else
+> +		/* clip the region to PUD size */
+> +		vstart = max(swapper_virt & PUD_MASK,
+> +			     round_up(__phys_to_virt(start + va_offset),
+> +				      PMD_SIZE));
+> +		vend = min(round_up(swapper_virt, PUD_SIZE),
+> +			   round_down(__phys_to_virt(end + va_offset),
+> +				      PMD_SIZE));
+> +#endif
+> +
+> +		create_mapping(__pa(vstart - va_offset), vstart, vend - vstart,
+> +			       PAGE_KERNEL_EXEC);
+> +
+> +		/*
+> +		 * Temporarily limit the memblock range. We need to do this as
+> +		 * create_mapping requires puds, pmds and ptes to be allocated
+> +		 * from memory addressable from the early linear mapping.
+> +		 */
+> +		memblock_set_current_limit(__pa(vend - va_offset));
+> +
+> +		return;
+> +	}
+> +	BUG();
+> +}
+
+I'll probably revisit this function after I see the whole series. But in
+the meantime, if the kernel is not loaded in the first memblock (in
+address order), isn't there a risk that we allocate memory from the
+first memblock which is not mapped yet?
+
+-- 
+Catalin
