@@ -1,53 +1,85 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 7 May 2015 08:21:19 -0700
-Subject: [PATCH] ARM: dts: Gateworks GW5510 support (i.MX6)
-In-Reply-To: <CAOMZO5Aa67XvmgBU0ABVZSE36V_=Hj2PMsW=TDbxzNr4Ka_GsA@mail.gmail.com>
-References: <1430409691-15963-1-git-send-email-tharvey@gateworks.com>
- <CAOMZO5Aa67XvmgBU0ABVZSE36V_=Hj2PMsW=TDbxzNr4Ka_GsA@mail.gmail.com>
-Message-ID: <CAJ+vNU2shCeyfOPYHJUb3CxFAQzHsLoR7STL_y_3uscu1Ag8Jg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 7 May 2015 17:34:53 +0200
+Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
+In-Reply-To: <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
+References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
+ <20150506141249.GA6796@cbox>
+ <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
+ <20150507112027.GC25885@cbox>
+ <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
+Message-ID: <CAMJs5B9i9q8gJU93B09-uLMF6w1bTft-40DWPFUP6ky=SketSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 9:46 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Tim,
+On Thu, May 7, 2015 at 4:50 PM, J?r?my Fangu?de
+<j.fanguede@virtualopensystems.com> wrote:
+> On Thu, May 7, 2015 at 1:20 PM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+>> On Thu, May 07, 2015 at 12:50:50PM +0200, J?r?my Fangu?de wrote:
+>>> On Wed, May 6, 2015 at 4:12 PM, Christoffer Dall
+>>> <christoffer.dall@linaro.org> wrote:
+>>> > Hi J?r?my,
+>>> >
+>>> > On Tue, May 05, 2015 at 11:13:11AM +0200, J?r?my Fangu?de wrote:
+>>> >> To maintain cache coherency on ARM, we may need a mechanism to flush
+>>> >> the data cache.
+>>> >
+>>> > In addition to generally just making this functionality available (see
+>>> > below), do you have an actual use case in mind for this?  To solve the
+>>> > VGA issue, for example, we already have a patch series from Drew trying
+>>> > to address this.  Does that not work for you?
+>>> >
+>>> > There was a long discussion about this here:
+>>> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-February/013593.html
+>>> >
+>>> > Drew then created a patch set, here:
+>>> > https://lists.nongnu.org/archive/html/qemu-devel/2015-03/msg01254.html
+>>> >
+>>> > and replied to himself, here:
+>>> > https://www.marc.info/?l=android-virt&m=142670523929132&w=3
+>>> >
+>>> > Which basically says that he doesn't like having to do flushes all over
+>>> > QEMU (IIUC), so he sent this version instead:
+>>> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-March/014027.html
+>>> >
+>>> > Which he now said he'd respin.
+>>>
+>>> In fact, I used this ioctl in pairs with this QEMU patch series:
+>>> https://lists.nongnu.org/archive/html/qemu-devel/2015-05/msg00407.html
+>>> My current work doesn't do anything about vga ram, so vga issue
+>>> probably still persists, but it solves others issues with some
+>>> emulated devices (mainly PCI) which were failing before and now work
+>>> fine with this patch.
+>>
+>> Why does Drew's approach not work and your approach works here?  What is
+>> the case that we haven't though about yet?
 >
-> On Thu, Apr 30, 2015 at 1:01 PM, Tim Harvey <tharvey@gateworks.com> wrote:
+> The first patch from Andrew, (which is for arm64 only) doesn't permit
+> me to make some emulated PCI devices working with virt, probably
+> because some flushes/cleans are missing.
+> As for the second patch, it focuses, for now, only on VGA ram. I
+> quickly tried to extend the KVM_MEM_UNCACHED flag to the whole guest
+> memory, but then the guest fails to boot; but even if it was working,
+> does it make sense to map as uncached all the ram of the guest? Since
+> we can not guess which region of the guest memory will be accessed.
 >
->> +++ b/arch/arm/boot/dts/imx6dl-gw551x.dts
->> @@ -0,0 +1,19 @@
->> +/*
->> + * Copyright 2014 Gateworks Corporation
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->
-> The recommendation for new dts files is to use a dual-license type scheme.
->
-> Please check imx6sl-warp for an example.
->
->> +       regulators {
->> +               compatible = "simple-bus";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +
->> +               reg_5p0v: regulator at 0 {
->> +                       compatible = "regulator-fixed";
->> +                       reg = <0>;
->> +                       regulator-name = "5P0V";
->> +                       regulator-min-microvolt = <5000000>;
->> +                       regulator-max-microvolt = <5000000>;
->> +                       regulator-always-on;
->
-> This ' regulator-always-on' can be removed. Same applies to the other
-> occurrences.
+> Simple PCI devices like e1000 or usb-ehci (with usb-kbd for instance)
+> are not usable, with or without these patches, but if I flush a
+> precise memory range, on reads and writes performed by emulated
+> devices on guest ram, (It's exactly what the QEMU patch series that I
+> sent does, with this ioctl), emulated PCI devices are now working.
 
-Fabio,
+I understand all this.  What I'd like for us to find out is why we are
+having coherency issues.  We knew that for the VGA adapter, the guest
+maps the memory as uncached (because that's how the real hardware
+works), and QEMU maps the memory as cached (because it's just normal
+memory), and unsurprisingly the two views of that memory is not
+coherent.
 
-Thanks for the review. I'll post a v2 with these changes.
+What are the cases you are seeing with e1000 or usb-ehci?
 
-Tim
+Hint: We can make a lot of things work by just sticking cache flushes
+all over, but it's not a good engineering approach.
+
+Thanks,
+-Christoffer
