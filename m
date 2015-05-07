@@ -1,41 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 May 2015 18:26:29 +0200
-Subject: [GIT PULL] omap fixes against v4.1-rc1
-In-Reply-To: <20150505154423.GD21061@atomide.com>
-References: <20150505154423.GD21061@atomide.com>
-Message-ID: <201505071826.29224.arnd@arndb.de>
+Date: Thu, 7 May 2015 18:27:22 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.1
+In-Reply-To: <cover.1430977471.git.horms+renesas@verge.net.au>
+References: <cover.1430977471.git.horms+renesas@verge.net.au>
+Message-ID: <201505071827.22255.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 May 2015, Tony Lindgren wrote:
+On Thursday 07 May 2015, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC fixes for v4.1.
+> 
+> This addresses a short-coming which was introduced when
+> the adv7511 was enabled on the koelsch board.
+> 
+> 
 > The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 > 
 >   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-rc1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.1
 > 
-> for you to fetch changes up to e7309c2673a389a495fcfad70376d3bae8b9bc89:
+> for you to fetch changes up to 12392f5896c9affc03c1ddd95a83c32238862a58:
 > 
->   bus: omap_l3_noc: Fix master id address decoding for OMAP5 (2015-05-04 10:21:01 -0700)
+>   ARM: shmobile: koelsch: Fix adv7511 IRQ sensing (2015-05-01 09:13:03 +0900)
 > 
 > ----------------------------------------------------------------
-> Fixes for omaps, mostly a fix for power power consumption
-> creeping up during idle, and two l3-noc device fixes:
+> Renesas ARM Based SoC Fixes for v4.1
 > 
-> - Fix power consumption creeping up with I2C4 staying on
-> - Fix n900 microphone bias voltages
-> - Fix dra7 l3-noc for host clock
-> - Fix omap5 l3-noc id address decoding
+> * Fix adv7511 IRQ sensing on koelsch board
 > 
-> The rest are all just minor dts fixes:
-> 
-> - Fix changed EXTCON_USB_GPIO_USB in defconfig
-> - Fix missing isp and iva #iommu-cells property
-> - Various beagle x15 dts fixes for pre-production changes
-> - Fix am437x-sk display dts entries
 
-Pulled into fixes branch, thanks!
+Merged into the fixes branch, thanks!
 
 	Arnd
