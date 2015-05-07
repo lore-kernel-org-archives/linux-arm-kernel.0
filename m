@@ -1,49 +1,40 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Thu, 7 May 2015 19:46:02 +0200 (CEST)
-Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
-In-Reply-To: <5043733.xO9lSCKvly@wuerfel>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <2694895.MomHLoCaoZ@wuerfel> <alpine.LNX.2.00.1505070455130.32495@T520.local>
- <5043733.xO9lSCKvly@wuerfel>
-Message-ID: <alpine.LNX.2.00.1505071936170.19877@T520.local>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Fri,  8 May 2015 03:18:55 +0930
+Subject: [PATCH] clk samsung exynos5420 add CLK_RECALC_NEW_RATES flag to
+ mout_apll and mout_kpll clock.
+Message-ID: <1431020935-5025-1-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Addition of CLK_RECALC_NEW_RATES flag to support Exynos5 cpu clk so that
+correct divider values are re-calculated after both pre/post
+clock notifiers had run for for mout_apll clock and mout_kpll clock.
 
-Hi
+Depend on https://lkml.org/lkml/2015/4/3/388
 
-On Thu, 7 May 2015, Arnd Bergmann wrote:
+Tested on OdroidXU3 Board.
 
-> On Thursday 07 May 2015 05:00:03 Hans Ulli Kroll wrote:
-> > On Wed, 6 May 2015, Arnd Bergmann wrote:
-> > > As far as I'm concerned, we should just merge all the patches from
-> > > http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini/patches-3.18
-> > > 
-> > > We should also try to find a maintainer that can respond to patches
-> > > in a timely manner. If Ulli has time for that again, that would be great,
-> > > otherwise I think we should find someone from OpenWRT to take over.
-> > 
-> > I'm back in busyness.
-> > Currently me dev device is right next to me.
-> > I moved some time ago and haav to find it in some 'hidden' box.
-> 
-> Awesome, welcome back!
-> 
-> Are you able to look at the patches I mentioned above and submit them
-> to arm at kernel.org, cc linux-arm-kernel at lists.infradead.org with proper
-> patch descriptions?
-> 
-> 	Arnd
-> 
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+---
+ drivers/clk/samsung/clk-exynos5420.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Already done,
-RTC driver send.
-Compilder fix for MACH-RECORD send.
-Maintainer Update send.
-
-This device is a (very) bad design, to be polite !
-I think they didn't test this properly.
-And they fixed some software issues in hardware.
-To be exact :
-They switched the IDE channels in hardware, to get around the stupid 
-Sausalito software.
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 462aaee..6c7458c 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -618,10 +618,10 @@ static struct samsung_mux_clock exynos5x_mux_clks[] __initdata = {
+ 	MUX(0, "mout_mspll_cpu", mout_mspll_cpu_p, SRC_TOP7, 12, 2),
+ 
+ 	MUX_F(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1,
+-	      CLK_SET_RATE_PARENT, 0),
++	      CLK_SET_RATE_PARENT | CLK_RECALC_NEW_RATES, 0),
+ 	MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
+ 	MUX_F(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1,
+-	      CLK_SET_RATE_PARENT, 0),
++	      CLK_SET_RATE_PARENT | CLK_RECALC_NEW_RATES, 0),
+ 	MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
+ 
+ 	MUX(0, "mout_aclk200", mout_group1_p, SRC_TOP0, 8, 2),
+-- 
+1.9.1
