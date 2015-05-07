@@ -1,36 +1,46 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Thu, 07 May 2015 18:18:08 +0200
-Subject: [PATCH] ARM: net: delegate filter to kernel interpreter when
- imm_offset() return value can't fit into 12bits.
-In-Reply-To: <1431011661-10277-1-git-send-email-nschichan@freebox.fr>
-References: <1431011661-10277-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <554B9040.50802@iogearbox.net>
+From: orca.chen@gmail.com (Min-Hua Chen)
+Date: Fri, 8 May 2015 00:20:32 +0800
+Subject: [PATCH v2] arm: improve non-section-aligned low memory mapping
+In-Reply-To: <20150506103249.GG2067@n2100.arm.linux.org.uk>
+References: <1430038028-22625-1-git-send-email-orca.chen@gmail.com>
+ <20150506103249.GG2067@n2100.arm.linux.org.uk>
+Message-ID: <20150507162032.GB6188@debian777.Home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2015 05:14 PM, Nicolas Schichan wrote:
-> The ARM JIT code emits "ldr rX, [pc, #offset]" to access the literal
-> pool. #offset maximum value is 4095 and if the generated code is too
-> large, the #offset value can overflow and not point to the expected
-> slot in the literal pool. Additionally, when overflow occurs, bits of
-> the overflow can end up changing the destination register of the ldr
-> instruction.
->
-> Fix that by detecting the overflow in imm_offset() and setting a flag
-> that is checked for each BPF instructions converted in
-> build_body(). As of now it can only be detected in the second pass. As
-> a result the second build_body() call can now fail, so add the
-> corresponding cleanup code in that case.
->
-> Using multiple literal pools in the JITed code is going to require
-> lots of intrusive changes to the JIT code (which would better be done
-> as a feature instead of fix), just delegating to the kernel BPF
-> interpreter in that case is a more straight forward, minimal fix and
-> easy to backport.
->
-> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+On Wed, May 06, 2015 at 11:32:49AM +0100, Russell King - ARM Linux wrote:
+> On Sun, Apr 26, 2015 at 04:47:08PM +0800, Min-Hua Chen wrote:
+> > @@ -1384,6 +1351,15 @@ static void __init map_lowmem(void)
+> >  				create_mapping(&map);
+> >  			}
+> >  		}
+> > +
+> > +		/*
+> > +		 * Find the first section-aligned memblock and set
+> > +		 * memblock_limit at it.
+> > +		 */
+> > +		if (!section_memblock_limit && !(end & ~SECTION_MASK)) {
+> > +			section_memblock_limit = end;
+> > +			memblock_set_current_limit(section_memblock_limit);
+> > +		}
+> 
+> I've suggested an alternative solution to this (which just means changing
+> the alignment of the memblock limit to 2x SECTION_SIZE).
 
-Fix looks good to me.
+Sorry I do not understand your suggestion very well. Do you mean the 
+alignment check should be 2X SECTION_SIZE?
 
-Fixes: ddecdfcea0ae ("ARM: 7259/3: net: JIT compiler for packet filters")
-Acked-by: Daniel Borkmann <daniel@iogearbox.net>
+	if (!section_memblock_limit && !(end & (2 * SECTION_SIZE - 1))) {
+
+I found that this solution is based on the fact that the first memory block is 
+always SECTION_SIZE-aligned. So we do not have to check the
+alignment of the first memblock:
+
+	if (!section_memblock_limit)) {
+		section_memblock_limit = end;
+		memblock_set_current_limit(section_memblock_limit);
+	}
+ 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
