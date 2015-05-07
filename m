@@ -1,60 +1,36 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Thu,  7 May 2015 21:35:05 +0200
-Subject: [PATCH] ARM: dts: omap3-gta04: Add GSM audio support
-Message-ID: <1431027305-17627-1-git-send-email-marek@goldelico.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 07 May 2015 22:18:44 +0200
+Subject: [Linaro-acpi] [V2 PATCH 1/5] ACPI / scan: Parse _CCA and setup
+ device coherency
+In-Reply-To: <2842267.oTDe4myPcU@wuerfel>
+References: <1430838729-21572-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <554A92C3.7060606@amd.com> <2842267.oTDe4myPcU@wuerfel>
+Message-ID: <4260574.bvpyYkBNGq@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add voice audio card which is used for telephony on gta04 board.
-gtm601 codec is UMTS modem with pcm interface which get samples from
-microphone and provide data from other party side. Use simple audio card
-to describe audio card.
+On Thursday, May 07, 2015 11:07:08 AM Arnd Bergmann wrote:
+> On Wednesday 06 May 2015 17:16:35 Suravee Suthikulanit wrote:
+> > On 5/6/2015 5:21 PM, Rafael J. Wysocki wrote:
+> > >>>> > >>+      bool
+> > >>>> > >>+
+> > >>>> > >>+config ACPI_SUPPORT_CCA_ZERO
+> > >>> > >
+> > >>> > >I guess this means "we support devices that can DMA, but are not coherent".
+> > >>> > >right?
+> > >> >
+> > >> >Yes, basically when _CCA=0.
+> > > So what about
+> > >
+> > >       ARCH_SUPPORT_CACHE_INCOHERENT_DMA
+> > 
+> > Since this is specific to ACPI _CCA, I just want to be clear with the 
+> > naming.
+> 
+> How about directly using the architecture names here, this is inherently
+> architecture specific, and it's more likely that if another architecture
+> gets added in the future that it will have other requirements.
 
-Signed-off-by: Marek Belisko <marek@goldelico.com>
----
- arch/arm/boot/dts/omap3-gta04.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+Sounds reasonable to me.
 
-diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index b9f6881..a3a4156 100644
---- a/arch/arm/boot/dts/omap3-gta04.dtsi
-+++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -48,6 +48,28 @@
- 		ti,mcbsp = <&mcbsp2>;
- 	};
- 
-+	 /* GSM audio */
-+	sound_telephony {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "GTA04 voice";
-+		simple-audio-card,bitclock-master = <&telephony_link_master>;
-+		simple-audio-card,frame-master = <&telephony_link_master>;
-+		simple-audio-card,format = "i2s";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&mcbsp4>;
-+		};
-+
-+		telephony_link_master: simple-audio-card,codec {
-+			sound-dai = <&gtm601_codec>;
-+		};
-+	};
-+
-+	gtm601_codec: gsm_codec {
-+		compatible = "option,gtm601";
-+		#sound-dai-cells = <0>;
-+	};
-+
- 	spi_lcd {
- 		compatible = "spi-gpio";
- 		#address-cells = <0x1>;
-@@ -517,3 +539,7 @@
- &mcbsp2 {
- 	status = "okay";
- };
-+
-+&mcbsp4 {
-+	status = "okay";
-+};
--- 
-1.9.1
+Rafael
