@@ -1,71 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 7 May 2015 14:30:16 -0700
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <CAKohpomYQw67KuX29PLawmd1dSXHx7pMt7+8BzmLPfHSqhMB2g@mail.gmail.com>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <20150504121209.GM15510@sirena.org.uk>
- <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
- <20150505105714.GA22845@sirena.org.uk>
- <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
- <20150505171252.GI22845@sirena.org.uk>
- <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
- <20150507055231.GB32399@codeaurora.org>
- <CAKohpomYQw67KuX29PLawmd1dSXHx7pMt7+8BzmLPfHSqhMB2g@mail.gmail.com>
-Message-ID: <20150507213015.GB2455@codeaurora.org>
+From: roman@advem.lv (Roman Yeryomin)
+Date: Fri, 08 May 2015 00:31:20 +0300
+Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
+In-Reply-To: <alpine.LNX.2.00.1505071935100.19877@T520.local>
+References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
+ <20150506095312.GU4276@piout.net>
+ <d97c3a8a29aa85c83973daf4a22ca4c9@advem.lv> <2349062.9v3Zz7HPLu@wuerfel>
+ <0701f75c1c42f74fd58845bc0ed41c38@advem.lv>
+ <alpine.LNX.2.00.1505071935100.19877@T520.local>
+Message-ID: <a16bb259b9275c2da43fdb586da93bc4@advem.lv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07, Viresh Kumar wrote:
-> On 7 May 2015 at 11:22, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > If you look at the cpufreq/clock/pmic code on our codeaurora.org
-> > tree you'll see that it's used to pass a value with uA units
-> > through the regulator_set_optimum_mode() API. The call to
-> > regulator_set_optimum_mode() is here[1], and the place where we
-> > parse the OPP table from DT is here[2]. My understanding is that
-> > with recent changes to the regulator framework, we would do a
-> > s/regulator_set_optimum_mode/regulator_set_load/ and things would
-> > otherwise be the same on the consumer side. On the regulator
-> > side, we would move the .get_optimum_mode op to .set_load instead
-> > of the hack where we write to the hardware in
-> > .get_optimum_mode[3].
-> >
-> > So does that mean it corresponds to a limit, or a nominal
-> > constant draw value, or a value to regulator to? From what I can
-> > tell it's used to figure out how many phases to enable[4]. I
-> > suspect that means it's being used to figure out what value it
-> > should regulate to. In newer PMICs this is all done
-> > automatically, but at least for some of the PMICs we need to do
-> > it manually.
+On 2015-05-07 20:35, Hans Ulli Kroll wrote:
+> Hi
 > 
-> By current phases, you probably meant [1], right ?
+> On Thu, 7 May 2015, Roman Yeryomin wrote:
 > 
-> Also what I couldn't understand is how are you controlling the
-> current here?
+>> On 2015-05-06 22:22, Arnd Bergmann wrote:
+>> > On Wednesday 06 May 2015 19:21:21 Roman Yeryomin wrote:
+>> > >
+>> > > > Thanks to point that, I'll merge that one which seems clean enough:
+>> > > > http://git.openwrt.org/?p=openwrt.git;a=blob;f=target/linux/gemini/files/drivers/rtc/rtc-gemini.c;h=587d8122b2fbb1230437eadcce4789a53aa60ee5;hb=4c637410a2a1ab45988e8ca6202554a502102039
+>> > >
+>> > > For 3.18 (and up) to work on gemini 160-gemini-timers.patch is vital.
+>> > > Without that timers are broken and cpu is super slow.
+>> >
+>> > Do you know what part of the patch is the actual bug fix? We should probably
+>> > merge that separately and mark it for stable backports, while the bulk of
+>> > that
+>> > patch seems to just rearrange code.
+>> >
+>> >  Arnd
+>> 
+>> Sorry, didn't try to extract the exact lines it but I guess it's that 
+>> part
+>> which touches the scheduler clock code.
+>> Because without that patch sched clock runs at 100Hz instead of 25MHz.
+>> I can dive into this deeper if you want, I just didn't see the need.
+>> 
+>> Regards,
+>> Roman
+>> 
+>> 
 > 
-> - Is this a current only regulator ? Probably not as your code has
-> a uv value as well..
+> I've send the RTC driver for Gemini SoC upstream-
 
-No.
+I was talking about 160-gemini-timers.patch, not rtc driver.
 
-> 
-> - Now if uV is fixed, how is the target current controlled separately ?
-
-uV is not fixed
-
-> 
-> - Should we have a min/max/target value of this current ? Like what
-> we are doing for voltage. Or is this just the 'target' current ?
-
-I don't think so. It's just about setting the load through the
-regulator_set_load() API when this OPP is used.
-
-> 
-> - And finally how exactly should we write this in bindings to make
-> it clear to all users ?
-> 
-
-Let's take this up on my reply to Mark.
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Roman
