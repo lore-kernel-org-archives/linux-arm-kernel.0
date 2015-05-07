@@ -1,66 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  7 May 2015 16:14:59 +0100
-Subject: [PATCH RESEND] arm64: dts: kill skeleton.dtsi
-Message-ID: <1431011699-15455-1-git-send-email-mark.rutland@arm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 7 May 2015 08:17:19 -0700
+Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
+In-Reply-To: <55440EDA.4030905@codeaurora.org>
+References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
+ <1981330.kGUrTurMy5@diego> <5543E79F.2080400@codeaurora.org>
+ <22709390.NTAlubMgNB@diego> <55440EDA.4030905@codeaurora.org>
+Message-ID: <CAMAWPa_n+59+v+x3fKkmdtW1wMJF7kqtTjLLowmv1xwGWprYJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While skeleton.dtsi was initially conceived as a simple way to bootstrap
-writing a dts, it has proven to be problematic:
+On Fri, May 1, 2015 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 05/01/15 15:07, Heiko St?bner wrote:
+>> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
+>>
+>>>> Instead I guess we could hook it less deep into clk_get_sys, like in the
+>>>> following patch?
+>>> It looks like it will work at least, but still I'd prefer to keep the
+>>> orphan check contained to clk.c. How about this compile tested only patch?
+>> I gave this a spin on my rk3288-firefly board. It still boots, the clock tree
+>> looks the same and it also still defers nicely in the scenario I needed it
+>> for. The implementation also looks nice - and of course much more compact than
+>> my check in two places :-) . I don't know if you want to put this as follow-up
+>> on top or fold it into the original orphan-check, so in any case
+>>
+>> Tested-by: Heiko Stuebner <heiko@sntech.de>
+>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+>
+> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it with
+> my patch and a note that it's based on an earlier patch from you.
 
-* The #address-cells and #size-cells values used in skeleton.dtsi may
-  not match what a user wants (e.g. when they need to describe a range
-  larger than 4GB).
+It appears this has landed in linux-next in the form of 882667c1fcf1
+clk: prevent orphan clocks from being used.  A bunch of boot failures
+for sunxi in today's linux-next[1] were bisected down to that patch.
 
-* For dts files where memory nodes have unit-addresses, it adds a
-  redundant /memory node, for which the reg entry may not be
-  appropriately sized (e.g. where #size-cells has been overridden).
+I confirmed that reverting that commit on top of next/master gets
+sunxi booting again.
 
-* For dts files which assume that a bootloader will fill in the memory
-  node(s), no node is present in the dts (and hence there is no attached
-  comment), making it hard to distinguish these cases from bad dts
-  files, and masking any warnings dtc may produce w.r.t. missing nodes.
+Kevin
 
-* The default empty /chosen and /aliases are somewhat useless, and it
-  would be preferable for dts to fill these in (e.g. for
-  /aliases/serial0 and /chosen/stdout-path).
-
-This patch removes skeleton.dtsi from arm64. There are currently no
-users, so we can remove it before any appear.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Rob Herring <rob.herring@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/boot/dts/skeleton.dtsi | 13 -------------
- 1 file changed, 13 deletions(-)
- delete mode 100644 arch/arm64/boot/dts/skeleton.dtsi
-
-Arnd, Olof, are you happy to pick this up for v4.2?
-
-Mark.
-
-diff --git a/arch/arm64/boot/dts/skeleton.dtsi b/arch/arm64/boot/dts/skeleton.dtsi
-deleted file mode 100644
-index 38ead82..0000000
---- a/arch/arm64/boot/dts/skeleton.dtsi
-+++ /dev/null
-@@ -1,13 +0,0 @@
--/*
-- * Skeleton device tree; the bare minimum needed to boot; just include and
-- * add a compatible value.  The bootloader will typically populate the memory
-- * node.
-- */
--
--/ {
--	#address-cells = <2>;
--	#size-cells = <1>;
--	chosen { };
--	aliases { };
--	memory { device_type = "memory"; reg = <0 0 0>; };
--};
--- 
-1.9.1
+[1] http://kernelci.org/boot/all/job/next/kernel/next-20150507/
