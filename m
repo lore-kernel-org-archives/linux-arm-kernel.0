@@ -1,85 +1,32 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Thu, 7 May 2015 15:04:07 +0000
-Subject: [PATCH 1/1] ARM: imx: Correct the comments in time.c
-In-Reply-To: <20150507125858.GH3162@dragon>
-References: <1430343627-60688-1-git-send-email-shenwei.wang@freescale.com>
- <20150507125858.GH3162@dragon>
-Message-ID: <BL2PR03MB370C59A9B6D5B896BEBA75083DF0@BL2PR03MB370.namprd03.prod.outlook.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 7 May 2015 16:04:40 +0100
+Subject: [STLinux Kernel] [PATCH 02/12] clocksource: sti: Provide support
+ for the ST LPC Clocksource IP
+In-Reply-To: <1431005924-21777-3-git-send-email-lee.jones@linaro.org>
+References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
+ <1431005924-21777-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150507150440.GA13336@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Lee,
 
-Thank you for your time. 
-Your changes are fine. It seems there is no perfect solution for this kind of issue.
+On Thu, 07 May 2015, Lee Jones wrote:
 
-Regards,
-Shenwei
+> This IP is shared with Watchdog and RTC functionality.  Only one of
+> these IPs can be used at the same time.  We use the device-driver
+> model combined with a DT 'mode' property to enforce this.
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawn.guo at linaro.org]
-> Sent: 2015?5?7? 7:59
-> To: Wang Shenwei-B38339
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/1] ARM: imx: Correct the comments in time.c
-> 
-> On Wed, Apr 29, 2015 at 04:40:27PM -0500, Shenwei Wang wrote:
-> > The comments were corrected as the following to reflect the real
-> > situation of Freescale MXC timer IP block.
-> > There are totally 4 version of the timer on Freescale i.MX SoCs.
-> >
-> > Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/time.c | 8 +++++---
-> >  1 file changed, 5 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c index
-> > acb1ff5..b1698e1 100644
-> > --- a/arch/arm/mach-imx/time.c
-> > +++ b/arch/arm/mach-imx/time.c
-> > @@ -38,9 +38,11 @@
-> >  #include "hardware.h"
-> >
-> >  /*
-> > - * There are 2 versions of the timer hardware on Freescale MXC hardware.
-> > - * Version 1: MX1/MXL, MX21, MX27.
-> > - * Version 2: MX25, MX31, MX35, MX37, MX51
-> > + * There are 4 versions of the timer hardware on Freescale MXC hardware.
-> > + * Version 0: MX1/MXL
-> > + * Version 1: MX21, MX27.
-> > + * Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q(rev1.0)
-> > + * Version 3: MX6DL, MX6SX, MX6Q(rev1.1+)
-> 
-> This is the problem with version numbers.  Version numbers defined by software
-> are too arbitrary and could conflict with the ones defined by IP design (i.e. IPUv3)
-> some day.  Just for example, if some day GPTv2 IP comes with some significant
-> design changes, "v2" will becomes a source of confusion between software and
-> hardware.  It's even worse if we already defined fsl,gpt-v2 as the device tree
-> compatible.  That's why we can only use the version number defined by
-> hardware in device tree binding.  If no hardware version is given, the best bet
-> would be use SoC name in the bindings to specify the particular programming
-> model of the IP block.
-> 
-> I applied patch to drop the version numbers as below.
-> 
-> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c index
-> acb1ff577cda..ab5ee1c445f3 100644
-> --- a/arch/arm/mach-imx/time.c
-> +++ b/arch/arm/mach-imx/time.c
-> @@ -38,9 +38,11 @@
->  #include "hardware.h"
-> 
->  /*
-> - * There are 2 versions of the timer hardware on Freescale MXC hardware.
-> - * Version 1: MX1/MXL, MX21, MX27.
-> - * Version 2: MX25, MX31, MX35, MX37, MX51
-> + * There are 4 versions of the timer hardware on Freescale MXC hardware.
-> + *  - MX1/MXL
-> + *  - MX21, MX27.
-> + *  - MX25, MX31, MX35, MX37, MX51, MX6Q(rev1.0)
-> + *  - MX6DL, MX6SX, MX6Q(rev1.1+)
->   */
-> 
->  /* defines common for all i.MX */
-> 
-> Shawn
+Which means my previous assertion in V1 that the IP didn't exist on stih415/6
+SoC is most likely wrong, as the watchdog driver has bindings already for those
+platforms.
+
+I did try this before and couldn't get it working (driver failed on clk_get_rate)
+on stih416-b2020.
+
+Did you try and see if you can get this also working for stih415/6 SoCs? It would
+mean we can move away from arm_global_timer for all upstreamed STI platforms.
+
+regards,
+
+Peter.
