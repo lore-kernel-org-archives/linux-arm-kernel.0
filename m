@@ -1,38 +1,19 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 07 May 2015 15:01:05 +0200
-Subject: [PATCH v3 0/2] reset driver for NXP LPC18xx family
-In-Reply-To: <1430863827-21898-1-git-send-email-manabian@gmail.com>
-References: <1430863827-21898-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431003665.3014.36.camel@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 7 May 2015 21:00:58 +0800
+Subject: [PATCH v2] clk: imx: clk-cpu: Include "clk.h" header file
+In-Reply-To: <1430343282-13739-1-git-send-email-festevam@gmail.com>
+References: <1430343282-13739-1-git-send-email-festevam@gmail.com>
+Message-ID: <20150507130056.GI3162@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 06.05.2015, 00:10 +0200 schrieb Joachim Eastwood:
-> This patch set adds a reset driver for NXP LPC18xx/43xx devices.
+On Wed, Apr 29, 2015 at 06:34:42PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Changes in v3:
-> * add patch descriptions
-> * change parameter name in to_rgu_data macro to avoid a potential
->   issue if code is changed.
+> Include the "clk.h" header file to fix the following sparse warning:
 > 
-> Changes in v2:
-> * clean up header includes
-> * prefix M0 reset defines with LPC43XX
-> * fix comment about M0 reset lines
-> * reorganize reset call chains
-> * add reset number table to dt doc
+> drivers/clk/imx/clk-cpu.c:77:12: warning: symbol 'imx_clk_cpu' was not declared. Should it be static?
 > 
-> There are no dependencies in this patch set. The DTS changes will
-> be sent separately to arm-soc once this patch set goes upstream.
-> 
-> Base support for the NXP LPC18xx family can be found here:
-> http://marc.info/?l=linux-arm-kernel&m=143016894704253&w=2
-> 
-> Joachim Eastwood (2):
->   reset: add driver for lpc18xx rgu
->   doc: dt: add documentation for lpc1850-rgu reset driver
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Applied both, thanks.
-
-regards
-Philipp
+Applied, thanks.
