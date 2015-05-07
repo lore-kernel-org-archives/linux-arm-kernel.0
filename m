@@ -1,51 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 7 May 2015 17:02:57 +0100
-Subject: [PATCH v2] ARM: l2c: Add support for the "arm, shared-override"
- property
-In-Reply-To: <1430990831-23825-1-git-send-email-geert+renesas@glider.be>
-References: <1430990831-23825-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150507160257.GA11067@e104818-lin.cambridge.arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 7 May 2015 11:15:55 -0500
+Subject: [PATCH v3 3/6] usb: dwc3: dwc3-st: Update the incorrect DT dwc3
+ example.
+In-Reply-To: <20150507151358.GA14123@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
+ <1430400652-3366-4-git-send-email-peter.griffin@linaro.org>
+ <20150507151358.GA14123@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20150507161555.GA29183@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 07, 2015 at 11:27:11AM +0200, Geert Uytterhoeven wrote:
-> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> index 0dbabe9a6b0abb91..2484aed78c86546d 100644
-> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> @@ -67,6 +67,12 @@ Optional properties:
->    disable if zero.
->  - arm,prefetch-offset : Override prefetch offset value. Valid values are
->    0-7, 15, 23, and 31.
-> +- arm,shared-override : The default behavior of the pl310 cache controller with
-> +  respect to the shareable attribute is to transform "normal memory
-> +  non-cacheable transactions" into "cacheable no allocate" (for reads) or
-> +  "write through no write allocate" (for writes).
-> +  On systems where this may cause DMA buffer corruption, this property must be
-> +  specified to indicate that such transforms are precluded.
->  
->  Example:
->  
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index e309c8f35af5af61..86d0e7461e5b0b18 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -1149,6 +1149,11 @@ static void __init l2c310_of_parse(const struct device_node *np,
->  		}
->  	}
->  
-> +	if (of_property_read_bool(np, "arm,shared-override")) {
-> +		*aux_val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
-> +		*aux_mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
-> +	}
-> +
->  	prefetch = l2x0_saved_regs.prefetch_ctrl;
->  
->  	ret = of_property_read_u32(np, "arm,double-linefill", &val);
+On Thu, May 07, 2015 at 04:13:58PM +0100, Peter Griffin wrote:
+> Hi Felipe,
+> 
+> On Thu, 30 Apr 2015, Peter Griffin wrote:
+> 
+> > There is a subtle typo phys-names should be phy-names. Using the
+> > current example means you don't have working usb (as you fail to
+> > obtain the phys). Also update the example to use the generic phy
+> > type constants which are now used for miphy28.
+> > 
+> > Additionally also remove the unnecessary new line in the example.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+> 
+> Can you take this dwc3 DT doc update patch via your tree?
 
-It looks fine to me.
+only this patch ? Sure. Just post on linux-usb and I'll fetch it from
+there.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-(even better if a subsequent patch adds this property to all the dts
-files containing "arm,pl310" ;))
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150507/96d789a9/attachment.sig>
