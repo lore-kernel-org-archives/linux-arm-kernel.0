@@ -1,288 +1,505 @@
-From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Thu,  7 May 2015 18:36:08 +0300
-Subject: [PATCH v2 1/2] coresight: replicator: Add Qualcomm CoreSight
- Replicator driver
-In-Reply-To: <1431012969-16338-1-git-send-email-ivan.ivanov@linaro.org>
-References: <1431012969-16338-1-git-send-email-ivan.ivanov@linaro.org>
-Message-ID: <1431012969-16338-2-git-send-email-ivan.ivanov@linaro.org>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu,  7 May 2015 08:38:00 -0700
+Subject: [PATCH v2] ARM: dts: Gateworks GW5510 support (i.MX6)
+Message-ID: <1431013080-13536-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratik Patel <pratikp@codeaurora.org>
+Add support for the Gateworks GW5510 board featuring:
+ * i.MX6 SoC
+ * up to 512MB DDR3
+ * up to 2GB NAND flash
+ * 1x miniPCIe socket (with USB)
+ * HDMI out (micro-HDMI)
+ * HDMI in (micro-HDMI) (currently supported by only vendor kernel)
+ * TTL level I/O (supported by GW16111 breakout board):
+  * I2C
+  * 2x UART
+  * CAN
+  * 2x DIO (GPIO/PWM)
+  * USB OTG
 
-This driver manages Qualcomm CoreSight Replicator device, which
-resides on the AMBA bus. Replicator has been made programmable to
-allow software to turn of the replicator branch to sink that is not
-being used. This avoids trace traffic to the unused/non-current sink
-from causing back pressure that results in overflows at the source.
+For more details see:
+ http://www.gateworks.com/product/item/ventana-gw5510-single-board-computer
 
-Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- .../devicetree/bindings/arm/coresight.txt          |   1 +
- drivers/hwtracing/coresight/Kconfig                |   8 +
- drivers/hwtracing/coresight/Makefile               |   1 +
- .../coresight/coresight-replicator-qcom.c          | 214 +++++++++++++++++++++
- 4 files changed, 224 insertions(+)
- create mode 100644 drivers/hwtracing/coresight/coresight-replicator-qcom.c
+v2:
+ - updated license to dual-license
+ - removed unneeded 'regulator-always-on'
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index f4d6a86..661a1be 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -18,6 +18,7 @@ its hardware characteristcs.
- 		- "arm,coresight-funnel", "arm,primecell";
- 		- "arm,coresight-etm3x", "arm,primecell";
- 		- "arm,coresight-etm4x", "arm,primecell";
-+		- "qcom,coresight-replicator1x", "arm,primecell";
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ arch/arm/boot/dts/Makefile            |   2 +
+ arch/arm/boot/dts/imx6dl-gw551x.dts   |  55 ++++++
+ arch/arm/boot/dts/imx6q-gw551x.dts    |  55 ++++++
+ arch/arm/boot/dts/imx6qdl-gw551x.dtsi | 314 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 426 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-gw551x.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-gw551x.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-gw551x.dtsi
 
- 	* reg: physical base address and length of the register
- 	  set(s) of the component.
-diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-index 6b331d4..a57a51d 100644
---- a/drivers/hwtracing/coresight/Kconfig
-+++ b/drivers/hwtracing/coresight/Kconfig
-@@ -68,4 +68,12 @@ config CORESIGHT_SOURCE_ETM4X
- 	  instructions that a processor is executing. This is primarily useful
- 	  for instruction level tracing. Depending on the implemented version
- 	  data tracing may also be available.
-+
-+config CORESIGHT_QCOM_REPLICATOR
-+	bool "Qualcomm CoreSight Replicator driver"
-+	help
-+	  This enables support for Qualcomm CoreSight link driver. The programmable
-+	  ATB replicator sends the ATB trace stream from the ETB/ETF to the TPIU
-+	  and ETR.
-+
- endif
-diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-index 0af28d4..99f8e5f 100644
---- a/drivers/hwtracing/coresight/Makefile
-+++ b/drivers/hwtracing/coresight/Makefile
-@@ -10,3 +10,4 @@ obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-funnel.o \
- 					   coresight-replicator.o
- obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x.o coresight-etm-cp14.o
- obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o
-+obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
-diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a1c776b..1b17f2e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -254,6 +254,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-gw52xx.dtb \
+ 	imx6dl-gw53xx.dtb \
+ 	imx6dl-gw54xx.dtb \
++	imx6dl-gw551x.dtb \
+ 	imx6dl-gw552x.dtb \
+ 	imx6dl-hummingboard.dtb \
+ 	imx6dl-nitrogen6x.dtb \
+@@ -280,6 +281,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-gw53xx.dtb \
+ 	imx6q-gw5400-a.dtb \
+ 	imx6q-gw54xx.dtb \
++	imx6q-gw551x.dtb \
+ 	imx6q-gw552x.dtb \
+ 	imx6q-hummingboard.dtb \
+ 	imx6q-nitrogen6x.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-gw551x.dts b/arch/arm/boot/dts/imx6dl-gw551x.dts
 new file mode 100644
-index 0000000..deacea4
+index 0000000..82d5f85
 --- /dev/null
-+++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-@@ -0,0 +1,214 @@
++++ b/arch/arm/boot/dts/imx6dl-gw551x.dts
+@@ -0,0 +1,55 @@
 +/*
-+ * Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
++ * Copyright 2014 Gateworks Corporation
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of
++ *     the License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include <linux/amba/bus.h>
-+#include <linux/clk.h>
-+#include <linux/coresight.h>
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/slab.h>
++/dts-v1/;
++#include "imx6dl.dtsi"
++#include "imx6qdl-gw551x.dtsi"
 +
-+#include "coresight-priv.h"
-+
-+#define REPLICATOR_IDFILTER0		0x000
-+#define REPLICATOR_IDFILTER1		0x004
-+
-+/**
-+ * struct replicator_state - specifics associated to a replicator component
-+ * @base:	memory mapped base address for this component.
-+ * @dev:	the device entity associated with this component
-+ * @atclk:	optional clock for the core parts of the replicator.
-+ * @csdev:	component vitals needed by the framework
++/ {
++	model = "Gateworks Ventana i.MX6 DualLite/Solo GW551X";
++	compatible = "gw,imx6dl-gw551x", "gw,ventana", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6q-gw551x.dts b/arch/arm/boot/dts/imx6q-gw551x.dts
+new file mode 100644
+index 0000000..2c7feee
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-gw551x.dts
+@@ -0,0 +1,55 @@
++/*
++ * Copyright 2014 Gateworks Corporation
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of
++ *     the License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+struct replicator_state {
-+	void __iomem		*base;
-+	struct device		*dev;
-+	struct clk		*atclk;
-+	struct coresight_device	*csdev;
++
++/dts-v1/;
++#include "imx6q.dtsi"
++#include "imx6qdl-gw551x.dtsi"
++
++/ {
++	model = "Gateworks Ventana i.MX6 Dual/Quad GW551X";
++	compatible = "gw,imx6q-gw551x", "gw,ventana", "fsl,imx6q";
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
+new file mode 100644
+index 0000000..d1866a0
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
+@@ -0,0 +1,314 @@
++/*
++ * Copyright 2014 Gateworks Corporation
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of
++ *     the License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	/* these are used by bootloader for disabling nodes */
++	aliases {
++		led0 = &led0;
++		nand = &gpmi;
++		ssi0 = &ssi1;
++		usb0 = &usbh1;
++		usb1 = &usbotg;
++	};
++
++	chosen {
++		bootargs = "console=ttymxc1,115200";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_leds>;
++
++		led0: user1 {
++			label = "user1";
++			gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;
++			default-state = "on";
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	memory {
++		reg = <0x10000000 0x20000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_5p0v: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "5P0V";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++		};
++
++		reg_usb_h1_vbus: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "usb_h1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++		};
++
++		reg_usb_otg_vbus: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "usb_otg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++		};
++	};
 +};
 +
-+static int replicator_enable(struct coresight_device *csdev, int inport,
-+			      int outport)
-+{
-+	struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	pm_runtime_get_sync(drvdata->dev);
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	/*
-+	 * Ensure that the other port is disabled
-+	 * 0x00 - passing through the replicator unimpeded
-+	 * 0xff - disable (or impede) the flow of ATB data
-+	 */
-+	if (outport == 0) {
-+		writel_relaxed(0x00, drvdata->base + REPLICATOR_IDFILTER0);
-+		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
-+	} else {
-+		writel_relaxed(0x00, drvdata->base + REPLICATOR_IDFILTER1);
-+		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
-+	}
-+
-+	CS_LOCK(drvdata->base);
-+
-+	dev_info(drvdata->dev, "REPLICATOR enabled\n");
-+	return 0;
-+}
-+
-+static void replicator_disable(struct coresight_device *csdev, int inport,
-+				int outport)
-+{
-+	struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	/* disable the flow of ATB data through port */
-+	if (outport == 0)
-+		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
-+	else
-+		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
-+
-+	CS_LOCK(drvdata->base);
-+
-+	pm_runtime_put(drvdata->dev);
-+
-+	dev_info(drvdata->dev, "REPLICATOR disabled\n");
-+}
-+
-+static const struct coresight_ops_link replicator_link_ops = {
-+	.enable		= replicator_enable,
-+	.disable	= replicator_disable,
++&can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	status = "okay";
 +};
 +
-+static const struct coresight_ops replicator_cs_ops = {
-+	.link_ops	= &replicator_link_ops,
++&gpmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gpmi_nand>;
++	status = "okay";
 +};
 +
-+static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
-+{
-+	int ret;
-+	struct device *dev = &adev->dev;
-+	struct resource *res = &adev->res;
-+	struct coresight_platform_data *pdata = NULL;
-+	struct replicator_state *drvdata;
-+	struct coresight_desc *desc;
-+	struct device_node *np = adev->dev.of_node;
-+	void __iomem *base;
-+
-+	if (np) {
-+		pdata = of_get_coresight_platform_data(dev, np);
-+		if (IS_ERR(pdata))
-+			return PTR_ERR(pdata);
-+		adev->dev.platform_data = pdata;
-+	}
-+
-+	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
-+	if (!drvdata)
-+		return -ENOMEM;
-+
-+	drvdata->dev = &adev->dev;
-+	drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
-+	if (!IS_ERR(drvdata->atclk)) {
-+		ret = clk_prepare_enable(drvdata->atclk);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* Validity for the resource is already checked by the AMBA core */
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	drvdata->base = base;
-+	dev_set_drvdata(dev, drvdata);
-+	pm_runtime_put(&adev->dev);
-+
-+	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
-+	if (!desc)
-+		return -ENOMEM;
-+
-+	desc->type = CORESIGHT_DEV_TYPE_LINK;
-+	desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
-+	desc->ops = &replicator_cs_ops;
-+	desc->pdata = adev->dev.platform_data;
-+	desc->dev = &adev->dev;
-+	drvdata->csdev = coresight_register(desc);
-+	if (IS_ERR(drvdata->csdev))
-+		return PTR_ERR(drvdata->csdev);
-+
-+	dev_info(dev, "%s initialized\n", (char *)id->data);
-+	return 0;
-+}
-+
-+static int replicator_remove(struct amba_device *adev)
-+{
-+	struct replicator_state *drvdata = amba_get_drvdata(adev);
-+
-+	pm_runtime_disable(&adev->dev);
-+	coresight_unregister(drvdata->csdev);
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int replicator_runtime_suspend(struct device *dev)
-+{
-+	struct replicator_state *drvdata = dev_get_drvdata(dev);
-+
-+	if (drvdata && !IS_ERR(drvdata->atclk))
-+		clk_disable_unprepare(drvdata->atclk);
-+
-+	return 0;
-+}
-+
-+static int replicator_runtime_resume(struct device *dev)
-+{
-+	struct replicator_state *drvdata = dev_get_drvdata(dev);
-+
-+	if (drvdata && !IS_ERR(drvdata->atclk))
-+		clk_prepare_enable(drvdata->atclk);
-+
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops replicator_dev_pm_ops = {
-+	SET_RUNTIME_PM_OPS(replicator_runtime_suspend,
-+			   replicator_runtime_resume,
-+			   NULL)
++&hdmi {
++	ddc-i2c-bus = <&i2c3>;
++	status = "okay";
 +};
 +
-+static struct amba_id replicator_ids[] = {
-+	{
-+		.id     = 0x0003b909,
-+		.mask   = 0x0003ffff,
-+		.data	= "REPLICATOR 1.0",
-+	},
-+	{ 0, 0 },
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	eeprom1: eeprom at 50 {
++		compatible = "atmel,24c02";
++		reg = <0x50>;
++		pagesize = <16>;
++	};
++
++	eeprom2: eeprom at 51 {
++		compatible = "atmel,24c02";
++		reg = <0x51>;
++		pagesize = <16>;
++	};
++
++	eeprom3: eeprom at 52 {
++		compatible = "atmel,24c02";
++		reg = <0x52>;
++		pagesize = <16>;
++	};
++
++	eeprom4: eeprom at 53 {
++		compatible = "atmel,24c02";
++		reg = <0x53>;
++		pagesize = <16>;
++	};
++
++	gpio: pca9555 at 23 {
++		compatible = "nxp,pca9555";
++		reg = <0x23>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++
++	rtc: ds1672 at 68 {
++		compatible = "dallas,ds1672";
++		reg = <0x68>;
++	};
 +};
 +
-+static struct amba_driver replicator_driver = {
-+	.drv = {
-+		.name	= "coresight-replicator-qcom",
-+		.pm	= &replicator_dev_pm_ops,
-+	},
-+	.probe		= replicator_probe,
-+	.remove		= replicator_remove,
-+	.id_table	= replicator_ids,
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
 +};
 +
-+module_amba_driver(replicator_driver);
---
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++
++	gpio_exp: pca9555 at 24 {
++		compatible = "nxp,pca9555";
++		reg = <0x24>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++
++};
++
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie>;
++	reset-gpio = <&gpio1 0 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
++&ssi1 {
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	disable-over-current;
++	status = "okay";
++};
++
++&usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
++	status = "okay";
++};
++
++&iomuxc {
++	imx6qdl-gw51xx {
++		pinctrl_flexcan1: flexcan1grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX	0x1b0b1
++				MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX	0x1b0b1
++				MX6QDL_PAD_GPIO_9__GPIO1_IO09		0x4001b0b0 /* CAN_STBY */
++			>;
++		};
++
++		pinctrl_gpio_leds: gpioledsgrp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_ROW0__GPIO4_IO07   0x1b0b0
++			>;
++		};
++
++		pinctrl_gpmi_nand: gpminandgrp {
++			fsl,pins = <
++				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
++				MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
++				MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
++				MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
++				MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
++				MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
++				MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
++				MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
++				MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
++				MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
++				MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
++				MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
++				MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
++				MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
++				MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
++				MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
++			>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
++				MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
++			>;
++		};
++
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++			>;
++		};
++
++		pinctrl_i2c3: i2c3grp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
++				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
++			>;
++		};
++
++		pinctrl_pcie: pciegrp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_0__GPIO1_IO00		0x1b0b0 /* PCIE RST */
++			>;
++		};
++
++		pinctrl_uart2: uart2grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
++				MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
++			>;
++		};
++
++		pinctrl_uart3: uart3grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
++				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
++			>;
++		};
++
++		pinctrl_usbotg: usbotggrp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
++			>;
++		};
++	};
++};
+-- 
 1.9.1
