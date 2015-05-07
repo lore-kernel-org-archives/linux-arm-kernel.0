@@ -1,40 +1,41 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 7 May 2015 14:44:06 +0200
-Subject: [GIT PULL] STi defconfig changes for v4.2
-Message-ID: <554B5E16.4060502@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 May 2015 14:48:39 +0200
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <CAFEAcA_EJSm_OHxsGvDfydacHHz=RcvrHHCg_LEFpLCBUxHmtA@mail.gmail.com>
+References: <55417F5A.4040300@linaro.org> <554B5830.2090600@huawei.com>
+ <CAFEAcA_EJSm_OHxsGvDfydacHHz=RcvrHHCg_LEFpLCBUxHmtA@mail.gmail.com>
+Message-ID: <2710086.QZJtQiM3YX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+On Thursday 07 May 2015 13:34:10 Peter Maydell wrote:
+> On 7 May 2015 at 13:18, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> > On 2015/5/7 20:12, Peter Maydell wrote:
+> >> On 7 May 2015 at 13:10, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> >>> BTW, IIUC QEMU doesn't support the gracefully reboot support. The reboot
+> >>> depends on libvirt or other management tools. So the reboot case in
+> >>> virtualization is firstly poweroff, then start again.
+> >>
+> >> I'm not sure what you mean by this -- QEMU supports 'reset this
+> >> VM' at the machine emulation level, so if we can tell the guest
+> >> to reboot then it should as part of this process issue the
+> >> PSCI SYSTEM_RESET command, which QEMU/KVM will then handle
+> >> to do a reset of the VM.
+> 
+> > Yes, QEMU supports reset, but doesn't support (gracefully) reboot.
+> 
+> Isn't that what this ACPI work is about? Tell the guest to initiate
+> a graceful reboot, and then the guest will tell QEMU to reboot
+> the emulated h/w when it's ready.
+> 
 
-Please consider this first round of STi defconfig updates for v4.2:
+The problem here is user space: acpid only listens for KEY_POWER
+events, not KEY_RESTART. This means graceful shutdown works as
+expected, but graceful reboot requires a process that listens
+to the input device and calls /sbin/reboot if it KEY_RESTART
+appears. I think that can be done by adding a configuration file
+in /etc/acpi/events/, but it's not there by default because PCs
+only have a power button and no reset button (they use CTRL+ALT+DEL
+on the keyboard for that).
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-
-   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git 
-tags/sti-defconfig-for-v4.2-1
-
-for you to fetch changes up to cb6a7a9e00fda1d51880ac0e93ad54a87034e822:
-
-   ARM: multi_v7_defconfig: Enable support for ST's LPC RTC (2015-04-30 
-13:16:05 +0200)
-
-----------------------------------------------------------------
-STi defconfig for v4.2, round 1.
-
-Highlights:
------------
-  - Enable ST's LPC Watchdog driver
-  - Enable ST's LPC RTC driver
-
-----------------------------------------------------------------
-Lee Jones (2):
-       ARM: multi_v7_defconfig: Enable support for ST's LPC Watchdog
-       ARM: multi_v7_defconfig: Enable support for ST's LPC RTC
-
-  arch/arm/configs/multi_v7_defconfig | 2 ++
-  1 file changed, 2 insertions(+)
+	Arnd
