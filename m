@@ -1,46 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 7 May 2015 19:52:16 +0100
-Subject: [PATCH V2 5/6] regulator: add mxs on-chip regulator driver
-In-Reply-To: <1875749167.82542.1431023838932.JavaMail.open-xchange@oxbsltgw04.schlund.de>
-References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
- <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
- <20150504123648.GU15510@sirena.org.uk>
- <1693367404.879766.1430771695242.JavaMail.open-xchange@oxbaltgw08.schlund.de>
- <1875749167.82542.1431023838932.JavaMail.open-xchange@oxbsltgw04.schlund.de>
-Message-ID: <20150507185216.GP22845@sirena.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 07 May 2015 12:01:58 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix bogus struct clk comparison for timer
+ clock
+In-Reply-To: <20150507144437.GA15563@atomide.com>
+References: <1430848941-27106-1-git-send-email-tony@atomide.com>
+ <20150506053539.GA10871@codeaurora.org> <20150506145539.GI21061@atomide.com>
+ <554AB1E3.2000304@codeaurora.org> <20150507144437.GA15563@atomide.com>
+Message-ID: <554BB6A6.1060600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 07, 2015 at 08:37:18PM +0200, Stefan Wahren wrote:
-> > Stefan Wahren <stefan.wahren@i2se.com> hat am 4. Mai 2015 um 22:34
+On 05/07/15 07:44, Tony Lindgren wrote:
+> * Stephen Boyd <sboyd@codeaurora.org> [150506 17:30]:
+>> On 05/06/15 07:55, Tony Lindgren wrote:
+>>
+>>> --- a/arch/arm/mach-omap2/timer.c
+>>> +++ b/arch/arm/mach-omap2/timer.c
+>>> @@ -298,7 +298,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+>>>  	if (IS_ERR(src))
+>>>  		return PTR_ERR(src);
+>>>  
+>>> -	if (clk_get_parent(timer->fclk) != src) {
+>>> +	if (!clk_is_match(clk_get_parent(timer->fclk), src)) {
+>>>  		r = clk_set_parent(timer->fclk, src);
+>> I also wonder why we can't just call clk_set_parent() and skip the "is
+>> the parent already src" check?
+>>
+>> If there's a good reason for not just calling clk_set_parent() then it
+>> makes sense to do the clk_is_match() thing, and you can have my ack
+>>
+>> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> Good point. We've been unconditionally calling it anyways and
+> nobody has complained of any issues. So let's just remove the
+> check.
+>
+> Regards,
+>
+> Tony
+>
+> 8< ----------------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Tue, 5 May 2015 09:03:34 -0700
+> Subject: [PATCH] ARM: OMAP2+: Remove bogus struct clk comparison for timer
+>  clock
+>
+> With recent changes to use determine_rate, the comparison of two
+> clocks won't work without clk_is_match that does __clk_get_hw
+> on the clocks first.
+>
+> As we've been unconditionally already calling clk_set_parent
+> already because of the bogus comparison, let's just remove the
+> check as suggested by Stephen Boyd <sboyd@codeaurora.org>.
+>
+> Cc: Michael Turquette <mturquette@linaro.org>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-> > i'm sorry, i forgot the following point in the changelog:
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-> > - move dcdc handling from mxs_power to mxs-regulator
-
-> > I hope the change is okay. I implemented only is_enabled() to have at least 1
-> > operation.
-> > But it's not really necessary.
-
-> do we need enable / disable operation?
-
-> In the bootloader code enabling the DC-DC is critical. There is a known issue
-> which falsely triggers the brownout detection.
-
-Why would the driver not provide these operations?
-
-> > > I'm also not 100% clear what code the DCDCs and LDOs are
-> > > sharing here...
-
-> > Actually only probing and the regulator info structure.
-
-> How can i improve that?
-
-If the devices aren't sharing code then they should be separate drivers.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150507/3fcf8b63/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
