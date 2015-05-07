@@ -1,97 +1,87 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 7 May 2015 09:37:02 +0200
-Subject: [PATCH v2 1/2] clk: change clk_ops' ->round_rate() prototype
-In-Reply-To: <20150507063953.GC32399@codeaurora.org>
-References: <1430407809-31147-1-git-send-email-boris.brezillon@free-electrons.com>
- <1430407809-31147-2-git-send-email-boris.brezillon@free-electrons.com>
- <20150507063953.GC32399@codeaurora.org>
-Message-ID: <20150507093702.0b58753d@bbrezillon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 7 May 2015 08:39:00 +0100
+Subject: [PATCH v7 0/3] ARM: mediatek: Add driver for Mediatek I2C
+In-Reply-To: <1430901427-65146-1-git-send-email-eddie.huang@mediatek.com>
+References: <1430901427-65146-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <20150507073900.GC12484@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Wed, 06 May 2015, Eddie Huang wrote:
 
-On Wed, 6 May 2015 23:39:53 -0700
-Stephen Boyd <sboyd@codeaurora.org> wrote:
-
-> On 04/30, Boris Brezillon wrote:
-> > Clock rates are stored in an unsigned long field, but ->round_rate()
-> > (which returns a rounded rate from a requested one) returns a long
-> > value (errors are reported using negative error codes), which can lead
-> > to long overflow if the clock rate exceed 2Ghz.
-> > 
-> > Change ->round_rate() prototype to return 0 or an error code, and pass the
-> > requested rate as a pointer so that it can be adjusted depending on
-> > hardware capabilities.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > Tested-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> This series is for Mediatek SoCs I2C controller common bus driver.
 > 
-> This patch is fairly invasive, and it probably doesn't even
-> matter for most of these clock providers to be able to round a
-> rate above 2GHz.
-
-Fair enough.
-
-> I've been trying to remove the .round_rate op
-> from the framework by encouraging new features via the
-> .determine_rate op.
-
-Oh, I wasn't aware of that (BTW, that's a good thing).
-Maybe this should be clearly stated (both in the struct clk_ops
-kerneldoc header and in Documentation/clk.txt).
-
-> Sadly, we still have to do a flag day and
-> change all the .determine_rate ops when we want to add things.
-
-Yes, but the number of clk drivers implementing ->determine_rate() is
-still quite limited compared to those implementing ->round_rate().
-
+> Earlier MTK SoC ((for example, MT6589, MT8135)) I2C HW has some limitationes.
+> New generation SoC like MT8173 fix following limitations:
 > 
-> What if we changed determine_rate ops to take a struct
-> clk_determine_info (or some better named structure) instead of
-> the current list of arguments that it currently takes? Then when
-> we want to make these sorts of framework wide changes we can just
-> throw a new member into that structure and be done.
-
-I really like this idea, especially since I was wondering if we could
-pass other 'clk rate requirements' like the rounding policy (down,
-closest, up), or the maximum clk inaccuracy.
-
+> 1. Only support one i2c_msg number. One exception is WRRD (write then read)
+> mode. WRRD can have two i2c_msg numbers.
 > 
-> It doesn't solve the unsigned long to int return value problem
-> though. We can solve that by gradually introducing a new op and
-> handling another case in the rounding path. If we can come up
-> with some good name for that new op like .decide_rate or
-> something then it makes things nicer in the long run. I like the
-> name .determine_rate though :/
-
-Why not changing the ->determine_rate() prototype. As said above, the
-number of clk drivers implementing this function is still quite
-limited, and I guess we can have an ack for all of them.
-
+> 2. Mediatek I2C controller support WRRD(write then read) mode, in WRRD
+> mode the Repeat Start will be issued between 2 messages.
+> In this driver if 2 messages is first write then read, the driver will
+> combine 2 messages using Write-Read mode so the RS will be issued between
+> the 2 messages.
 > 
-> The benefit of all this is that we don't have to worry about
-> finding the random clk providers that get added into other
-> subsystems and fixing them up. If drivers actually care about
-> this problem then they'll be fixed to use the proper op. FYI,
-> last time we updated the function signature of .determine_rate we
-> broke a couple drivers along the way.
+> 3. The max transfer data length is 255 in one message. In WRRD mode, the
+> max data length of second msg is 31.
 > 
+> MT8135 and MT6589 can control I2C pins on PMIC(MT6397) by setting the i2c
+> registers in MT8135 side. In this case, driver should set OFFSET_PATH_DIR
+> bit first, the operation on other registers are still the same.
+> For now MT6589/MT8135 support this, MT6577/MT6595/MT8127 do not support.
+> For example, If want to use I2C4/5/6 pins on MT8135 just need to enable
+> the pinmux, else if want to use I2C pins on PMIC(MT6397) need to add
+> "mediatek,have-pmic" property in the .dts file of each platform.
+> 
+> This driver is based on 4.1-rc1.
+> 
+> Change in v7:
+> Fix mtk_i2c_of_match in wrong patch bug.
+> 
+> Change in v6:
+> 1. Update binding document not use default clock-frequency as example.
+> 2. Add mtk_i2c_compatible struct and pass hardware capabilities
+>    through of_device_id
+> 3. Remove some hardware setting in mtk_i2c_do_transfer to mtk_i2c_init_hw
+>    so just init one time.
+> 4. Correct mtk_i2c_parse_dt don't set default clock bug.
+> 
+> Change in v5:
+> Apply new i2c_adapter_quirks patch [2]. Change to use dam_map_single to map
+> dma buffer. Add spinlock to fix race condition. Check of_property_read_u32
+> return value. Remove I2C_FUNC_10BIT_ADDR capability due to driver not implement.
+> Add MT8173 I2C driver.
+> 
+> Change in v4:
+> Modify to support i2c_adapter_quirks base on Wolfram's patch [1].
+> Remove check transfer size and WRRD combine code. Instead, fill quirk
+> property and let i2c_check_for_quirks to do the filter.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314804.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325744.html
+> 
+> Eddie Huang (1):
+>   I2C: mediatek: Add driver for MediaTek MT8173 I2C controller
+> 
+> Xudong Chen (2):
+>   dt-bindings: Add I2C bindings for mt65xx/mt81xx.
+>   I2C: mediatek: Add driver for MediaTek I2C controller
+> 
+>  .../devicetree/bindings/i2c/i2c-mt6577.txt         |  41 ++
+>  drivers/i2c/busses/Kconfig                         |   9 +
+>  drivers/i2c/busses/Makefile                        |   1 +
+>  drivers/i2c/busses/i2c-mt65xx.c                    | 748 +++++++++++++++++++++
+>  4 files changed, 799 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+>  create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
 
-Hm, IMHO, adding a new op is not a good thing. I agree that it eases
-the transition, but ITOH you'll have to live with old/deprecated ops in
-your clk_ops structure with people introducing new drivers still using
-the old ops (see the number of clk drivers implementing ->round_rate()
-instead of ->determine_rate()).
-
-Best Regards,
-
-Boris
+Again, you've sent me a patch-set that has absolutely nothing to do
+with me.  Can you please stop doing that, my inbox is full enough
+already!
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
