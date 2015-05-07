@@ -1,35 +1,216 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 7 May 2015 12:02:33 +0100
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150507055231.GB32399@codeaurora.org>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <20150504121209.GM15510@sirena.org.uk>
- <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
- <20150505105714.GA22845@sirena.org.uk>
- <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
- <20150505171252.GI22845@sirena.org.uk>
- <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
- <20150507055231.GB32399@codeaurora.org>
-Message-ID: <20150507110233.GR15510@sirena.org.uk>
+From: ayyappa.ch.linux@gmail.com (Ayyappa Ch)
+Date: Thu, 7 May 2015 16:39:45 +0530
+Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
+In-Reply-To: <20150506193803.GC32577@8074w.roxell.se>
+References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
+ <20150506193803.GC32577@8074w.roxell.se>
+Message-ID: <CAPyr0y+OYikc2Euh++2nTWnVb-aZ4i-tifLLk3XUiRahtHKjCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 10:52:31PM -0700, Stephen Boyd wrote:
+./cyclictest -p 80 -t5 -n  => Cyclic test is failing after 6Lack iterations
+T: 0 ( 1364) P:99 I:1000 C: 668664 Min:      3 Act:    5 Avg:   11 Max:  100116
 
-> If you look at the cpufreq/clock/pmic code on our codeaurora.org
-> tree you'll see that it's used to pass a value with uA units
-> through the regulator_set_optimum_mode() API. The call to
-> regulator_set_optimum_mode() is here[1], and the place where we
-> parse the OPP table from DT is here[2]. My understanding is that
+After analyzing the trace log , we observed the sudden change in
+latency due to calling of fpsimd_preserve_current_state function.
 
-I'm not looking for anyone to explain this to me in e-mail, what I'm
-looking for is for the binding document to be clear so someone can tell
-what the binding means by reading the documentation for the binding.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150507/3f153afb/attachment.sig>
+Line 149766:     ntpd-925     1....1.. 512046976us :
+fpsimd_preserve_current_state <-do_signal
+Line 149768:     ntpd-925     1....1.. 512046977us : preempt_count_add
+<-fpsimd_preserve_current_state
+Line 149770:     ntpd-925     1....2.. 512046978us : preempt_count_sub
+<-fpsimd_preserve_current_state
+
+.......
+Line 163170: cyclicte-964     0.....11 512065181us :
+tracing_mark_write: hit latency threshold (98383 > 500)
+
+
+Thanks and regards,
+Ayyappa.Ch
+
+...
+
+On Thu, May 7, 2015 at 1:08 AM, Anders Roxell <anders.roxell@linaro.org> wrote:
+> On 2015-05-01 20:59, Ayyappa Ch wrote:
+>> Floating point operations in arm64 should not disable preempt .
+>
+> I thought that I would see a problem if I ran a floating point
+> workload and cyclictest at the same time but I don't.
+>
+> Can you please provide me some more details on how I can reproduce the
+> problem?
+>
+> Cheers,
+> Anders
+>
+>> Activating realtime features with below code.
+>>
+>> From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+>> From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+>> Date: Tue, 28 Apr 2015 11:53:00 +0530
+>> Subject: [PATCH ] floating point realtime fix
+>>
+>> ---
+>>  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+>>  1 file changed, 8 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>> index 2438497..3dca156 100644
+>> --- a/arch/arm64/kernel/fpsimd.c
+>> +++ b/arch/arm64/kernel/fpsimd.c
+>> @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+>>   */
+>>  void fpsimd_preserve_current_state(void)
+>>  {
+>> - preempt_disable();
+>> + migrate_disable();
+>>   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+>>   fpsimd_save_state(&current->thread.fpsimd_state);
+>> - preempt_enable();
+>> + migrate_enable();
+>>  }
+>>
+>>  /*
+>> @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+>>   */
+>>  void fpsimd_restore_current_state(void)
+>>  {
+>> - preempt_disable();
+>> + migrate_disable();
+>>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>>   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>>
+>> @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+>>   this_cpu_write(fpsimd_last_state, st);
+>>   st->cpu = smp_processor_id();
+>>   }
+>> - preempt_enable();
+>> + migrate_enable();
+>>  }
+>>
+>>  /*
+>> @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+>>   */
+>>  void fpsimd_update_current_state(struct fpsimd_state *state)
+>>  {
+>> - preempt_disable();
+>> + migrate_disable();
+>>   fpsimd_load_state(state);
+>>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>>   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>> @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+>>   this_cpu_write(fpsimd_last_state, st);
+>>   st->cpu = smp_processor_id();
+>>   }
+>> - preempt_enable();
+>> + migrate_enable();
+>>  }
+>>
+>>  /*
+>> @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+>>   * that there is no longer userland FPSIMD state in the
+>>   * registers.
+>>   */
+>> - preempt_disable();
+>> + migrate_disable();
+>>   if (current->mm &&
+>>      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+>>   fpsimd_save_state(&current->thread.fpsimd_state);
+>> @@ -255,7 +255,7 @@ void kernel_neon_end(void)
+>>   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+>>   fpsimd_load_partial_state(s);
+>>   } else {
+>> - preempt_enable();
+>> + migrate_enable();
+>>   }
+>>  }
+>>  EXPORT_SYMBOL(kernel_neon_end);
+>>
+>> On Fri, May 1, 2015 at 1:03 PM, Ayyappa Ch <ayyappa.ch.linux@gmail.com> wrote:
+>> > Following Anders Roxell  patch on "Enable PREEMPT_RT_FULL" , observed
+>> > one issue with Cyclic test while running floating point operations. So
+>> > , modified below changes for that.
+>> >
+>> > From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+>> > From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+>> > Date: Tue, 28 Apr 2015 11:53:00 +0530
+>> > Subject: [PATCH ] floating point realtime fix
+>> >
+>> > ---
+>> >  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+>> >  1 file changed, 8 insertions(+), 8 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>> > index 2438497..3dca156 100644
+>> > --- a/arch/arm64/kernel/fpsimd.c
+>> > +++ b/arch/arm64/kernel/fpsimd.c
+>> > @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+>> >   */
+>> >  void fpsimd_preserve_current_state(void)
+>> >  {
+>> > - preempt_disable();
+>> > + migrate_disable();
+>> >   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+>> >   fpsimd_save_state(&current->thread.fpsimd_state);
+>> > - preempt_enable();
+>> > + migrate_enable();
+>> >  }
+>> >
+>> >  /*
+>> > @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+>> >   */
+>> >  void fpsimd_restore_current_state(void)
+>> >  {
+>> > - preempt_disable();
+>> > + migrate_disable();
+>> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>> >
+>> > @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+>> >   this_cpu_write(fpsimd_last_state, st);
+>> >   st->cpu = smp_processor_id();
+>> >   }
+>> > - preempt_enable();
+>> > + migrate_enable();
+>> >  }
+>> >
+>> >  /*
+>> > @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+>> >   */
+>> >  void fpsimd_update_current_state(struct fpsimd_state *state)
+>> >  {
+>> > - preempt_disable();
+>> > + migrate_disable();
+>> >   fpsimd_load_state(state);
+>> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>> > @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+>> >   this_cpu_write(fpsimd_last_state, st);
+>> >   st->cpu = smp_processor_id();
+>> >   }
+>> > - preempt_enable();
+>> > + migrate_enable();
+>> >  }
+>> >
+>> >  /*
+>> > @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+>> >   * that there is no longer userland FPSIMD state in the
+>> >   * registers.
+>> >   */
+>> > - preempt_disable();
+>> > + migrate_disable();
+>> >   if (current->mm &&
+>> >      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+>> >   fpsimd_save_state(&current->thread.fpsimd_state);
+>> > @@ -255,7 +255,7 @@ void kernel_neon_end(void)
+>> >   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+>> >   fpsimd_load_partial_state(s);
+>> >   } else {
+>> > - preempt_enable();
+>> > + migrate_enable();
+>> >   }
+>> >  }
+>> >  EXPORT_SYMBOL(kernel_neon_end);
+>> > --
+>> > 1.9.1
