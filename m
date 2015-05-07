@@ -1,41 +1,50 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 07 May 2015 11:16:58 +0200
-Subject: [RFT PATCH v2 0/3] drm/exynos: Fix build breakage on
- !DRM_EXYNOS_FIMD
-In-Reply-To: <1430957086-25005-1-git-send-email-k.kozlowski@samsung.com>
-References: <1430957086-25005-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <554B2D8A.6070209@collabora.co.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 7 May 2015 11:17:48 +0200
+Subject: [RFC v2 0/4] chip/vgic adaptations for forwarded irq
+In-Reply-To: <554A3425.7070909@linaro.org>
+References: <1423642857-24240-1-git-send-email-eric.auger@linaro.org>
+ <20150506142748.GC6796@cbox> <554A3425.7070909@linaro.org>
+Message-ID: <20150507091748.GA25885@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 05/07/2015 02:04 AM, Krzysztof Kozlowski wrote:
-> From: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+On Wed, May 06, 2015 at 05:32:53PM +0200, Eric Auger wrote:
+> On 05/06/2015 04:27 PM, Christoffer Dall wrote:
+> > Hi Eric,
+> > 
+> > On Wed, Feb 11, 2015 at 09:20:53AM +0100, Eric Auger wrote:
+> >> This series proposes some fixes that appeared to be necessary
+> >> to integrate IRQ forwarding in KVM/VFIO.
+> >>
+> >> - deactivation of the forwarded IRQ in irq_disabled case
+> >> - a specific handling of forwarded IRQ into the VGIC state machine.
+> >> - deactivation of physical IRQ and unforwarding on vgic destruction
+> >> - rb_tree lock in vgic.c
+> >>
+> >> Integrated pieces can be found at
+> >> ssh://git.linaro.org/people/eric.auger/linux.git
+> >> on branch irqfd_integ_v9
+> >>
+> > What are the dependencies for this at this point?
+> > 
+> > I assume it relies at least on the split EOI/priority drop changes?
 > 
-> Hi,
+> Yes it now only depends on split EOI/priority drop changes since
+> "genirq: Saving/restoring the irqchip state of an irq line" now is
+> upstreamed.
 > 
-> This is second try to fix the build breakage introduced in 1c363c7cccf6
-> ("drm/exynos: Enable DP clock to fix display on Exynos5250 and other").
+> > 
+> > Are you going to respin this when there are newer versions of the
+> > dependencies out, or what are the plans?
 > 
-> The fix is not trivial so I am kindly asking for testing on Chromebook
-> and other DP-enabled boards (I don't have Chromebook right now).
-> 
-
-For all the series:
-
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-> Tested on Exynos4412 Trats2 board.
-> 
-
-On Exynos5250 Snow, Exynos5420 Peach Pit and Exynos5800 Peach Pi Chromebooks:
-
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-> Best regards,
-> Krzysztof
+> Yes I will respin according to new versions. I am currently using a
+> rebased version of Marc's original RFC "ARM: Forwarding physical
+> interrupts to a guest VM" (http://lwn.net/Articles/603514/) which is a
+> superset of [PATCH] genirq: Add support for priority-drop/deactivate
+> interrupt controllers.
 > 
 
-Best regards,
-Javier
+ok, once there's movement on the dependency and you respin, I'll review
+the rest of this in detail.
+
+-Christoffer
