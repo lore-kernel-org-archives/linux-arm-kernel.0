@@ -1,36 +1,105 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu,  7 May 2015 15:29:17 +0200
-Subject: [PATCH] net: ll_temac: Use one return statement instead of two
-Message-ID: <b10b8e1e696a09152b9df535a8bd37e6500ac1c7.1431005352.git.michal.simek@xilinx.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 7 May 2015 21:30:35 +0800
+Subject: [PATCH V7 03/10] Document: dt: binding: imx: update document for
+ imx7d support
+In-Reply-To: <1430317210-18333-4-git-send-email-Frank.Li@freescale.com>
+References: <1430317210-18333-1-git-send-email-Frank.Li@freescale.com>
+ <1430317210-18333-4-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20150507133033.GL3162@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Simek <monstr@monstr.eu>
+On Wed, Apr 29, 2015 at 10:20:03PM +0800, Frank.Li at freescale.com wrote:
+> From: Frank Li <Frank.Li@freescale.com>
+> 
+> This part just add necessary change to boot imx7d.
+> Update clock, pinctrl and gpt for imx7d
+> 
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> ---
+>  .../devicetree/bindings/clock/imx7d-clock.txt      | 13 +++++++++++
+>  .../bindings/pinctrl/fsl,imx7d-pinctrl.txt         | 27 ++++++++++++++++++++++
+>  .../devicetree/bindings/timer/fsl,imxgpt.txt       |  3 +++
+>  3 files changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx7d-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/imx7d-clock.txt b/Documentation/devicetree/bindings/clock/imx7d-clock.txt
+> new file mode 100644
+> index 0000000..3db0076
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/imx7d-clock.txt
+> @@ -0,0 +1,13 @@
+> +* Clock bindings for Freescale i.MX7 Dual
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx7d-ccm"
+> +- reg: Address and length of the register set
+> +- #clock-cells: Should be <1>
+> +- clocks: list of clock specifiers, must contain an entry for each required
+> +  entry in clock-names
+> +- clock-names: should include entries "ckil", "osc", "ipp_di0" and "ipp_di1"
+> +
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx7d-clock.h
+> +for the full list of i.MX7 Dual clock IDs.
+> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+> new file mode 100644
+> index 0000000..3c9d8ed
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+> @@ -0,0 +1,27 @@
+> +* Freescale i.MX7 Dual IOMUX Controller
+> +
+> +Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
+> +and usage.
+> +
+> +Required properties:
+> +- compatible: "fsl,imx7d-iomuxc"
+> +- fsl,pins: each entry consists of 6 integers and represents the mux and config
+> +  setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
+> +  input_val> are specified using a PIN_FUNC_ID macro, which can be found in
+> +  imx6sx-pinfunc.h under device tree source folder.  The last integer CONFIG is
 
-Use one return statement instead of two to simplify the code.
-Both are returning the same value.
+s/imx6sx/imx7d
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+> +  the pad setting value like pull-up on this pin.  Please refer to i.MX7 Dual
+> +  Reference Manual for detailed CONFIG settings.
+> +
+> +CONFIG bits definition:
+> +PAD_CTL_PUS_100K_DOWN           (0 << 5)
+> +PAD_CTL_PUS_5K_UP               (1 << 5)
+> +PAD_CTL_PUS_47K_UP              (2 << 5)
+> +PAD_CTL_PUS_100K_UP             (3 << 5)
+> +PAD_CTL_PUE                     (1 << 4)
+> +PAD_CTL_HYS                     (1 << 3)
+> +PAD_CTL_SRE_SLOW                (1 << 2)
+> +PAD_CTL_SRE_FAST                (0 << 2)
+> +PAD_CTL_DSE_X1                  (0 << 0)
+> +PAD_CTL_DSE_X2                  (1 << 0)
+> +PAD_CTL_DSE_X3                  (2 << 0)
+> +PAD_CTL_DSE_X4                  (3 << 0)
+> diff --git a/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt b/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
+> index 9809b11..c14843b 100644
+> --- a/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
+> +++ b/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
+> @@ -7,6 +7,9 @@ Required properties:
+>  - interrupts : A list of 4 interrupts; one per timer channel.
+>  - clocks : The clocks provided by the SoC to drive the timer.
+>  
+> +Supported <soc>:
+> +	imx1,imx27,imx51,imx53,imx6q,imx6dl,imx6sl,imx6sx,imx7d.
+> +
 
- drivers/net/ethernet/xilinx/ll_temac_main.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Shenwei is trying to clean up gpt driver and the compatible, so I
+suggest you skip fsl,imxgpt.txt and leave it to be handled by Shenwei's
+patch series.
 
-diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-index 690a4c36b316..ca640d04fd93 100644
---- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-+++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-@@ -688,10 +688,8 @@ static int temac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	cur_p = &lp->tx_bd_v[lp->tx_bd_tail];
- 
- 	if (temac_check_tx_bd_space(lp, num_frag)) {
--		if (!netif_queue_stopped(ndev)) {
-+		if (!netif_queue_stopped(ndev))
- 			netif_stop_queue(ndev);
--			return NETDEV_TX_BUSY;
--		}
- 		return NETDEV_TX_BUSY;
- 	}
- 
--- 
-2.3.5
+Shawn
+
+>  Example:
+>  
+>  gpt1: timer at 10003000 {
+> -- 
+> 1.9.1
+> 
