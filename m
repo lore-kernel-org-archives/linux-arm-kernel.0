@@ -1,39 +1,40 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu,  7 May 2015 15:45:05 +0100
-Subject: [PATCH 4/4] ARM: vexpress/tc2: Add interrupt-affinity to the PMU node
-In-Reply-To: <1431009905-29265-1-git-send-email-sudeep.holla@arm.com>
-References: <1431009905-29265-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1431009905-29265-5-git-send-email-sudeep.holla@arm.com>
+From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
+Date: Thu, 07 May 2015 17:46:47 +0300
+Subject: [PATCH 1/2] coresight: replicator: Add Qualcomm CoreSight
+ Replicator driver
+In-Reply-To: <1430427225.2187.15.camel@x220>
+References: <1430310000-10867-1-git-send-email-ivan.ivanov@linaro.org>
+ <1430310000-10867-2-git-send-email-ivan.ivanov@linaro.org>
+ <1430427225.2187.15.camel@x220>
+Message-ID: <1431010007.21307.10.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9fd85eb502a7 ("ARM: pmu: add support for interrupt-affinity
-property") added an optional "interrupt-affinity" property, to specify
-the CPU affinity for each SPI listed in the interrupts property.
 
-Without this property, we get this boot warning:
+On Thu, 2015-04-30 at 22:53 +0200, Paul Bolle wrote:
+> On Wed, 2015-04-29 at 15:19 +0300, Ivan T. Ivanov wrote:
+> 
+> > +config CORESIGHT_QCOM_REPLICATOR
+> > +       bool "Qualcomm CoreSight Replicator driver"
+> > +       help
+> > +                       This enables support for CoreSight link and sink driver that are
+> > +                       responsible for transporting and collecting the trace data
+> > +                       respectively. Link and sinks are dynamically aggregated with a trace
+> > +                       entity at run time to form a complete trace path.
+> 
+> > --- a/drivers/hwtracing/coresight/Makefile
+> > +++ b/drivers/hwtracing/coresight/Makefile
+> 
+> > +obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
+> 
+> CORESIGHT_QCOM_REPLICATOR is a bool symbol. So
+> coresight-replicator-qcom.o will never be part of a module.
+> 
 
-  CPU PMU: Failed to parse <no-node>/interrupt-affinity[0]
+Thank you. I am going to fallow approach taken by Mathieu in [1].
+Is this OK with you?
 
-This patch adds interrupt-affinity to the PMU node in the
-vexpress-ca15_a7(a.k.a TC2) device tree.
+Regards,
+Ivan 
 
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index 7a2aeacd62c0..107395c32d82 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -191,6 +191,7 @@
- 		compatible = "arm,cortex-a15-pmu";
- 		interrupts = <0 68 4>,
- 			     <0 69 4>;
-+		interrupt-affinity = <&cpu0>, <&cpu1>;
- 	};
- 
- 	oscclk6a: oscclk6a {
--- 
-1.9.1
+[1] https://lkml.org/lkml/2015/5/6/524
