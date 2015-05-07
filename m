@@ -1,30 +1,28 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Thu,  7 May 2015 19:29:03 +0200
-Subject: [PATCH] ARM:Gemini:Maintainers update
-Message-ID: <1431019743-19556-1-git-send-email-ulli.kroll@googlemail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 7 May 2015 14:31:18 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select LS1021A
+Message-ID: <1431019878-32311-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Back in business.
-New place for my repo on github
+Enable CONFIG_SOC_LS1021A by default.
 
-Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1622775..c2781eb 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -975,7 +975,7 @@ S:	Maintained
- ARM/CORTINA SYSTEMS GEMINI ARM ARCHITECTURE
- M:	Hans Ulli Kroll <ulli.kroll@googlemail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--T:	git git://git.berlios.de/gemini-board
-+T:	git git://github.com/ulli-kroll/linux.git
- S:	Maintained
- F:	arch/arm/mach-gemini/
- 
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index fdeb1c8..6204a04 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -39,6 +39,7 @@ CONFIG_SOC_IMX6Q=y
+ CONFIG_SOC_IMX6SL=y
+ CONFIG_SOC_IMX6SX=y
+ CONFIG_SOC_VF610=y
++CONFIG_SOC_LS1021A=y
+ CONFIG_PCI=y
+ CONFIG_PCI_IMX6=y
+ CONFIG_SMP=y
 -- 
-2.3.5
+1.9.1
