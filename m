@@ -1,16 +1,14 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Thu, 7 May 2015 17:29:03 +0800
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Thu, 7 May 2015 17:33:36 +0800
 Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
 In-Reply-To: <20150507090210.GB22115@arm.com>
 References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
  <20150507090210.GB22115@arm.com>
-Message-ID: <554B305F.4080907@huawei.com>
+Message-ID: <CAD6h2NRbzdX8a+D8UUNkmaMpf1uw2nfriCHwY7L20j=VM7NOFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 2015/5/7 17:02, Will Deacon wrote:
+On 7 May 2015 at 17:02, Will Deacon <will.deacon@arm.com> wrote:
 > Hi Bintian,
 >
 > On Tue, May 05, 2015 at 01:06:34PM +0100, Bintian Wang wrote:
@@ -35,34 +33,23 @@ On 2015/5/7 17:02, Will Deacon wrote:
 >
 > The good news is that the thing booted and all the cores entered at EL2.
 > Thanks!
-Really thank you very much for testing this patch set.
-
 >
 > The bad news is that running hackbench quickly got the *heatsink*
 > temperature to 73 degress C and rising (measured with an infrared
 > thermometer).
-This patch set is just for booting the small system, if you want to
-test the temperature, I think you should using the HiKey released
-version (https://www.96boards.org/).
 
-This patch is just for the small system, and not include those drivers
-for adjusting the CPU frequency, thermal control and so on. After this
-patch is merged, all those drivers will be submitted later.
+Because you're just testing with minimum patch set. If you can choose
+our release
+on v3.10 & v3.18, you can observe lower temperature. Because we have thermal
+framework and cpufreq driver. We're also upstreaming the thermal driver, but
+it's not merged yet.
 
 >
-> So my question is, does this SoC have an automatic thermal cut out? Whilst
-> I'm all for merging enabling code into the kernel, if it really relies on
-> the kernel to stop it from catching fire, maybe it's not a great idea
-> putting these patches into people's hands just yet.
-Hikey is a low cost board, I think it doesn't have an automatic thermal
-cut out; I always use HiKey to test my patch, in the normal case, 
-temperature is not a problem.
+> So my question is, does this SoC have an automatic thermal cut out?
 
-Thanks,
+It's a low cost board. This feature is implemente by software. So we
+need thermal
+driver and cpufreq driver.
 
-Bintian
->
-> Will
->
-> .
->
+Regards
+Haojian
