@@ -1,46 +1,72 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 7 May 2015 11:30:25 +0900
-Subject: not syncing: Attempted to kill init! exitcode=0x00000004 ?
-In-Reply-To: <CAAQ0ZWRyndnoSs5D+AcOZB-7hSnhSULTYVu=TRtcGR-CfB9xGQ@mail.gmail.com>
-References: <CAK7LNATT8cJoQh+7ZEyUXgMtL0OSYg+69t8wcuNSk+SN+Rwf2g@mail.gmail.com>
- <20150505115446.GA26467@dragon>
- <CAAQ0ZWRyndnoSs5D+AcOZB-7hSnhSULTYVu=TRtcGR-CfB9xGQ@mail.gmail.com>
-Message-ID: <CAK7LNAQmdgowKRLJnf2jcz8BxLoaJKfwTSkNH8R_1Grc9Gt4ng@mail.gmail.com>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Thu, 07 May 2015 10:39:35 +0800
+Subject: [Discussion] how to implement external power down for ARM
+In-Reply-To: <2196079.901rMdSZr0@wuerfel>
+References: <55417F5A.4040300@linaro.org> <5548A5D5.9030107@linaro.org>
+ <5549BB3A.6060106@huawei.com> <2196079.901rMdSZr0@wuerfel>
+Message-ID: <554AD067.9090707@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-(Sorry for late reply, I's been a vacation in Japan.)
 
-
-2015-05-06 17:56 GMT+09:00 Shawn Guo <shawn.guo@linaro.org>:
-> On Tue, May 5, 2015 at 7:54 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
->> On Tue, Apr 07, 2015 at 12:34:30PM +0900, Masahiro Yamada wrote:
->>> Hello experts,
->>> I hope this is the correct ML to ask this question.
->>>
->>> I am struggling to port Linux-4.0-rc7 onto my SoC/board,
->>> based on ARM cortex-A9 (single CPU), but the kernel fails to boot
->>> with the error:
->>> "not syncing: Attempted to kill init! exitcode=0x00000004"
+On 2015/5/6 15:29, Arnd Bergmann wrote:
+> On Wednesday 06 May 2015 14:56:58 Shannon Zhao wrote:
+>> On 2015/5/5 19:13, Shannon Zhao wrote:
+>>         gpio-keys {
+>>                 autorepeat;
+>>                 #address-cells = <0x1>;
+>>                 #size-cells = <0x0>;
+>>                 compatible = "gpio-keys";
 >>
->> Hi Masahiro,
+>>                 poweroff {
+>>                         gpios = <0x8002 0x3 0x0>;
+>>                         linux,code = <0x74>;
+>>                         label = "GPIO Key Poweroff";
+>>                 };
+>>         };
 >>
->> Have you track it down to the cause?  I'm asking because I'm seeing the
->> same issue with v4.0 on a vendor single Cortex-A9 SoC.
+>> Configure kernel to select GPIO Buttons and Polled GPIO buttons. Use a
+>> Redhat filesystem "Red Hat Enterprise Linux Server for ARM Development
+>> Preview release 1.5" which has systemd and systemd-logind. Start VM and
+>> when it starts well type "system_powerdown" on QEMU monitor, the guest
+>> goes to poweroff. So this way works.
+> 
+> Ok, very good.
+> 
+>> Note: we must check the /lib/udev/rules.d/70-power-switch.rules in the
+>> fs and add one following line in it if it doesn't exist.
+>>
+>> SUBSYSTEM=="input", KERNEL=="event*", SUBSYSTEMS=="platform",
+>> ATTRS{keys}=="116", TAG+="power-switch"
+>>
+>> Then when execute journalctl -u systemd-logind in guest, we can see
+>> something like below:
+>>
+>> Jan 01 00:01:02 localhost systemd[1]: Starting Login Service...
+>> Jan 01 00:01:07 localhost systemd[1]: Started Login Service.
+>> Jan 01 00:01:07 localhost systemd-logind[927]: Watching system buttons
+>> on /dev/input/event0 (gpio-keys)
+>> Jan 01 00:01:07 localhost systemd-logind[927]: New seat seat0.
+>> Jan 01 00:01:25 localhost systemd-logind[927]: New session c1 of user root.
+>>
+>> Visit https://bugs.launchpad.net/ubuntu/+source/systemd/+bug/1347776 for
+>> details.
+> 
+> How about Ubuntu or Debian releases that do not use systemd?
+> 
+> I guess we should check with a Debian Wheezy or Ubuntu Trusty release.
+> My guess is that it will work fine, but some minor adjustment might
+> be needed.
+> 
 
-Yes, I have already solved my problem.
+Hi Arnd,
 
-In my case,
+If the Debian Wheezy or Ubuntu Trusty release doesn't use systemd, what
+user space process do they use to handle the input device event?
 
- - The interrupt number for the UART device was wrong.  Fixed it.
- - I regenerated the initramdisk with Buildroot
-
-and then I could boot the kernel successfully.
-
-
-
+I tried Ubuntu Trusty from Christoffer, when typing "system_powerdown"
+on QEMU monitor, "cat /dev/input/event0 | hexdump" shows the event is
+triggered but the guest doesn't poweroff.
 
 -- 
-Best Regards
-Masahiro Yamada
+Shannon
