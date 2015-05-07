@@ -1,37 +1,54 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu,  7 May 2015 13:32:36 +0900
-Subject: [PATCH v6 2/4] ARM: multi_v7_defconfig: enable UniPhier SoC family
-In-Reply-To: <1430973158-12264-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1430973158-12264-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1430973158-12264-3-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu,  7 May 2015 13:32:34 +0900
+Subject: [PATCH v6 0/4] ARM: SoC: add a new platform,
+ UniPhier (arch/arm/mach-uniphier)
+Message-ID: <1430973158-12264-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add UniPhier, a new citizen in the ARM multi platform.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+This is an initial series for supporting Socionext UniPhier SoCs,
+based on ARM Cortex-A9, mainly used for digital TVs, video recorders, etc.
 
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Masahiro Yamada (4):
+  ARM: UniPhier: add basic support for UniPhier architecture
+  ARM: multi_v7_defconfig: enable UniPhier SoC family
+  ARM: dts: UniPhier: add support for UniPhier SoCs and boards
+  MAINTAINERS: add myself as ARM/UniPhier maintainer
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index dca6983..a80ed4e 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -83,6 +83,7 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
- CONFIG_ARCH_TEGRA_114_SOC=y
- CONFIG_ARCH_TEGRA_124_SOC=y
- CONFIG_TEGRA_EMC_SCALING_ENABLE=y
-+CONFIG_ARCH_UNIPHIER=y
- CONFIG_ARCH_U8500=y
- CONFIG_MACH_HREFV60=y
- CONFIG_MACH_SNOWBALL=y
+ MAINTAINERS                                  |   7 ++
+ arch/arm/Kconfig                             |   2 +
+ arch/arm/Makefile                            |   1 +
+ arch/arm/boot/dts/Makefile                   |   5 ++
+ arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts   |  79 ++++++++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-ld4.dtsi      | 110 +++++++++++++++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts  |  79 ++++++++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-pro4.dtsi     | 117 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts  |  80 ++++++++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-sld3.dtsi     | 117 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts  |  79 ++++++++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-sld8.dtsi     | 110 +++++++++++++++++++++++++
+ arch/arm/boot/dts/uniphier-support-card.dtsi |  66 +++++++++++++++
+ arch/arm/configs/multi_v7_defconfig          |   1 +
+ arch/arm/mach-uniphier/Kconfig               |  11 +++
+ arch/arm/mach-uniphier/Makefile              |   2 +
+ arch/arm/mach-uniphier/platsmp.c             |  90 +++++++++++++++++++++
+ arch/arm/mach-uniphier/uniphier.c            |  30 +++++++
+ 18 files changed, 986 insertions(+)
+ create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
+ create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
+ create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
+ create mode 100644 arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
+ create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
+ create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
+ create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
+ create mode 100644 arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
+ create mode 100644 arch/arm/boot/dts/uniphier-support-card.dtsi
+ create mode 100644 arch/arm/mach-uniphier/Kconfig
+ create mode 100644 arch/arm/mach-uniphier/Makefile
+ create mode 100644 arch/arm/mach-uniphier/platsmp.c
+ create mode 100644 arch/arm/mach-uniphier/uniphier.c
+
 -- 
 1.9.1
