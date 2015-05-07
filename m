@@ -1,48 +1,32 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu,  7 May 2015 19:16:53 +0100
-Subject: [PATCH v3 3/6] usb: dwc3: dwc3-st: Update the incorrect DT dwc3
- example.
-Message-ID: <1431022613-26018-1-git-send-email-peter.griffin@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 7 May 2015 15:18:27 -0300
+Subject: [PATCH v2] ARM: dts: Gateworks GW5510 support (i.MX6)
+In-Reply-To: <1431013080-13536-1-git-send-email-tharvey@gateworks.com>
+References: <1431013080-13536-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <CAOMZO5B6qFzp7sAtycF_BuzPfsp=PxF0+OG3ZjbHepp0AFnrpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a subtle typo phys-names should be phy-names. Using the
-current example means you don't have working usb (as you fail to
-obtain the phys). Also update the example to use the generic phy
-type constants which are now used for miphy28.
+On Thu, May 7, 2015 at 12:38 PM, Tim Harvey <tharvey@gateworks.com> wrote:
+> Add support for the Gateworks GW5510 board featuring:
+>  * i.MX6 SoC
+>  * up to 512MB DDR3
+>  * up to 2GB NAND flash
+>  * 1x miniPCIe socket (with USB)
+>  * HDMI out (micro-HDMI)
+>  * HDMI in (micro-HDMI) (currently supported by only vendor kernel)
+>  * TTL level I/O (supported by GW16111 breakout board):
+>   * I2C
+>   * 2x UART
+>   * CAN
+>   * 2x DIO (GPIO/PWM)
+>   * USB OTG
+>
+> For more details see:
+>  http://www.gateworks.com/product/item/ventana-gw5510-single-board-computer
+>
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 
-Additionally also remove the unnecessary new line in the example.
+Looks good:
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
----
- Documentation/devicetree/bindings/usb/dwc3-st.txt | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/usb/dwc3-st.txt b/Documentation/devicetree/bindings/usb/dwc3-st.txt
-index f9d7025..01c71b1 100644
---- a/Documentation/devicetree/bindings/usb/dwc3-st.txt
-+++ b/Documentation/devicetree/bindings/usb/dwc3-st.txt
-@@ -49,8 +49,7 @@ st_dwc3: dwc3 at 8f94000 {
- 	st,syscfg	= <&syscfg_core>;
- 	resets		= <&powerdown STIH407_USB3_POWERDOWN>,
- 			  <&softreset STIH407_MIPHY2_SOFTRESET>;
--	reset-names	= "powerdown",
--			  "softreset";
-+	reset-names	= "powerdown", "softreset";
- 	#address-cells	= <1>;
- 	#size-cells	= <1>;
- 	pinctrl-names	= "default";
-@@ -62,7 +61,7 @@ st_dwc3: dwc3 at 8f94000 {
- 		reg		= <0x09900000 0x100000>;
- 		interrupts	= <GIC_SPI 155 IRQ_TYPE_NONE>;
- 		dr_mode		= "host";
--		phys-names      = "usb2-phy", "usb3-phy";
--		phys            = <&usb2_picophy2>, <&phy_port2 MIPHY_TYPE_USB>;
-+		phy-names	= "usb2-phy", "usb3-phy";
-+		phys		= <&usb2_picophy2>, <&phy_port2 PHY_TYPE_USB3>;
- 	};
- };
--- 
-1.9.1
+Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
