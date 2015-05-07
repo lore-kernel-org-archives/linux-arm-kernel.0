@@ -1,85 +1,73 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 06 May 2015 17:30:45 -0700
-Subject: [PATCH 1/2] dt-bindings: Add pxa1928 clock binding
-In-Reply-To: <CAL_JsqJmpLw_iNXz5vZt9qcoR_CSRum3hB4fVYtERBsB=v=H8Q@mail.gmail.com>
-References: <1430455271-20195-1-git-send-email-robh@kernel.org>
- <20150506071708.GD27050@codeaurora.org>
- <CAL_JsqJmpLw_iNXz5vZt9qcoR_CSRum3hB4fVYtERBsB=v=H8Q@mail.gmail.com>
-Message-ID: <554AB235.5030300@codeaurora.org>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Thu, 07 May 2015 09:34:22 +0800
+Subject: [PATCH v4 0/7] Basic support to ZTE ZX296702
+In-Reply-To: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
+References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
+Message-ID: <554AC11E.2030800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/15 06:05, Rob Herring wrote:
-> On Wed, May 6, 2015 at 2:17 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 04/30, Rob Herring wrote:
->>> diff --git a/Documentation/devicetree/bindings/clock/marvell,pxa1928.txt b/Documentation/devicetree/bindings/clock/marvell,pxa1928.txt
->>> new file mode 100644
->>> index 0000000..809c5a2
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/clock/marvell,pxa1928.txt
->>> @@ -0,0 +1,21 @@
->>> +* Marvell PXA1928 Clock Controllers
->>> +
->>> +The PXA1928 clock subsystem generates and supplies clock to various
->>> +controllers within the PXA1928 SoC. The PXA1928 contains 3 clock controller
->>> +blocks called APMU, MPMU, and APBC roughly corresponding to internal buses.
->>> +
->>> +Required Properties:
->>> +
->>> +- compatible: should be one of the following.
->>> +  - "marvell,pxa1928-apmu" - APMU controller compatible
->>> +  - "marvell,pxa1928-mpmu" - MPMU controller compatible
->>> +  - "marvell,pxa1928-apbc" - APBC controller compatible
->>> +- reg: physical base address of the clock controller and length of memory mapped
->>> +  region.
->>> +- #clock-cells: should be 1.
->>> +- #reset-cells: should be 1.
->>> +
->>> +Each clock is assigned an identifier and client nodes use the clock controller
->>> +phandle and this identifier to specify the clock which they consume.
->>> +
->>> +All these identifiers can be found in <dt-bindings/clock/marvell,pxa1928.h>.
->> No example?
-> There's nothing really special about this binding to show.
+On 2015?04?28? 17:18, Jun Nie wrote:
+> Rebase patches of v2 to 4.0-rc1. Ready for merge.
 
-Ok.
+Hi Arnd,
 
+Do you see any issue in this patch set? Or could you help drive merge? 
+Thank you very much!
+
+Jun
+
+> Change in v4 vs v3: Fix minor defconfig issue.
 >
->>> diff --git a/include/dt-bindings/clock/marvell,pxa1928.h b/include/dt-bindings/clock/marvell,pxa1928.h
->>> new file mode 100644
->>> index 0000000..c393ca2
->>> --- /dev/null
->>> +++ b/include/dt-bindings/clock/marvell,pxa1928.h
->>> @@ -0,0 +1,57 @@
->>> +#ifndef __DTS_MARVELL_PXA1928_CLOCK_H
->>> +#define __DTS_MARVELL_PXA1928_CLOCK_H
->>> +
->>> +/*
->>> + * Clock ID values here correspond to the control register offset/4.
->>> + */
->>> +
->>> +/* apb periphrals */
->> s/periphrals/peripherals/ ?
-> Uhh, cut-n-paste from marvell,mmp2.h...
->>> +#define PXA1928_CLK_RTC                      0
->>> +#define PXA1928_CLK_TWSI0            1
->>> +#define PXA1928_CLK_TWSI1            2
->>> +#define PXA1928_CLK_TWSI2            3
->>> +#define PXA1928_CLK_TWSI3            4
->>> +#define PXA1928_CLK_OWIRE            5
->>> +#define PXA1928_CLK_KPC                      6
->>> +#define PXA1928_CLK_TB_ROTARY                7
->>> +#define PXA1928_CLK_SW_JTAG          8
->>> +#define PXA1928_CLK_TIMER1           9
->> This is really nitpicky, but I find the jump from decimal to hex odd.
->> Is there any reason why we don't just use decimal or hex throughout?
->> Perhaps it's related to why there are holes in the number space?
-> What is 9 in hex? ;) I'll prefix them. It's hard to convert decimal to
-> register values.
+> Jun Nie (7):
+>    ARM: zx: add basic support for ZTE ZX296702
+>    MAINTAINERS: add entry for ARM ZTE architecture
+>    ARM: zx: add low level debug support for zx296702
+>    ARM: dts: zx: add an initial zx296702 dts and doc
+>    clk: zx: add clock support to zx296702
+>    ARM: zx: enable SMP and hotplug for zx296702
+>    ARM: zx: Add basic defconfig support for ZX296702
 >
-
-:) Thanks.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>   Documentation/devicetree/bindings/arm/zte.txt      |  15 +
+>   .../devicetree/bindings/clock/zx296702-clk.txt     |  35 ++
+>   Documentation/devicetree/bindings/serial/pl011.txt |   2 +-
+>   .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>   MAINTAINERS                                        |   9 +
+>   arch/arm/Kconfig                                   |   2 +
+>   arch/arm/Kconfig.debug                             |  14 +
+>   arch/arm/Makefile                                  |   1 +
+>   arch/arm/boot/dts/Makefile                         |   1 +
+>   arch/arm/boot/dts/zx296702-ad1.dts                 |  48 ++
+>   arch/arm/boot/dts/zx296702.dtsi                    | 139 +++++
+>   arch/arm/configs/zx_defconfig                      | 130 ++++
+>   arch/arm/include/debug/pl01x.S                     |   7 +
+>   arch/arm/mach-zx/Kconfig                           |  18 +
+>   arch/arm/mach-zx/Makefile                          |   2 +
+>   arch/arm/mach-zx/core.h                            |  19 +
+>   arch/arm/mach-zx/headsmp.S                         |  32 +
+>   arch/arm/mach-zx/platsmp.c                         | 189 ++++++
+>   arch/arm/mach-zx/zx296702.c                        |  31 +
+>   drivers/clk/Makefile                               |   1 +
+>   drivers/clk/zte/Makefile                           |   2 +
+>   drivers/clk/zte/clk-pll.c                          | 180 ++++++
+>   drivers/clk/zte/clk-zx296702.c                     | 658 +++++++++++++++++++++
+>   drivers/clk/zte/clk.h                              |  30 +
+>   include/dt-bindings/clock/zx296702-clock.h         | 162 +++++
+>   25 files changed, 1727 insertions(+), 1 deletion(-)
+>   create mode 100644 Documentation/devicetree/bindings/arm/zte.txt
+>   create mode 100644 Documentation/devicetree/bindings/clock/zx296702-clk.txt
+>   create mode 100644 arch/arm/boot/dts/zx296702-ad1.dts
+>   create mode 100644 arch/arm/boot/dts/zx296702.dtsi
+>   create mode 100644 arch/arm/configs/zx_defconfig
+>   create mode 100644 arch/arm/mach-zx/Kconfig
+>   create mode 100644 arch/arm/mach-zx/Makefile
+>   create mode 100644 arch/arm/mach-zx/core.h
+>   create mode 100644 arch/arm/mach-zx/headsmp.S
+>   create mode 100644 arch/arm/mach-zx/platsmp.c
+>   create mode 100644 arch/arm/mach-zx/zx296702.c
+>   create mode 100644 drivers/clk/zte/Makefile
+>   create mode 100644 drivers/clk/zte/clk-pll.c
+>   create mode 100644 drivers/clk/zte/clk-zx296702.c
+>   create mode 100644 drivers/clk/zte/clk.h
+>   create mode 100644 include/dt-bindings/clock/zx296702-clock.h
+>
