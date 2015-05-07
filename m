@@ -1,55 +1,64 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 6 May 2015 22:52:31 -0700
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <20150504121209.GM15510@sirena.org.uk>
- <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
- <20150505105714.GA22845@sirena.org.uk>
- <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
- <20150505171252.GI22845@sirena.org.uk>
- <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
-Message-ID: <20150507055231.GB32399@codeaurora.org>
+From: b20788@freescale.com (Anson Huang)
+Date: Thu, 7 May 2015 21:56:10 +0800
+Subject: [PATCH V2] ARM: imx: correct Audio/Video PLL rate calculation formula
+Message-ID: <1431006970-2864-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06, Viresh Kumar wrote:
-> On 5 May 2015 at 22:42, Mark Brown <broonie@kernel.org> wrote:
-> > This still doesn't say what the value is supposed to mean which means
-> > it's not possible for someone to write generic code which handles the
-> > binding - saying that people can reference the value doesn't tell them
-> > how to interpret it.  A limit?  A nominal constant draw value?  A value
-> > to regulate to?  Those are all different things expressed as a current.
-> 
-> @Stephen: Can you please answer these queries please, so that we
-> can get the bindings correctly ?
+The audio/video PLL's rate calculation formula is as below in RM:
 
-If you look at the cpufreq/clock/pmic code on our codeaurora.org
-tree you'll see that it's used to pass a value with uA units
-through the regulator_set_optimum_mode() API. The call to
-regulator_set_optimum_mode() is here[1], and the place where we
-parse the OPP table from DT is here[2]. My understanding is that
-with recent changes to the regulator framework, we would do a
-s/regulator_set_optimum_mode/regulator_set_load/ and things would
-otherwise be the same on the consumer side. On the regulator
-side, we would move the .get_optimum_mode op to .set_load instead
-of the hack where we write to the hardware in
-.get_optimum_mode[3].
+Fref * (DIV_SELECT + NUM / DENOM),
 
-So does that mean it corresponds to a limit, or a nominal
-constant draw value, or a value to regulator to? From what I can
-tell it's used to figure out how many phases to enable[4]. I
-suspect that means it's being used to figure out what value it
-should regulate to. In newer PMICs this is all done
-automatically, but at least for some of the PMICs we need to do
-it manually.
+in original clk-pllv3's code, below code is used:
 
-[1] https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/tree/drivers/clk/qcom/clock.c?h=msm-3.10#n96
-[2] https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/tree/drivers/clk/qcom/clock-krait-8974.c?h=msm-3.10#n584
-[3] https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/tree/arch/arm/mach-msm/krait-regulator.c?h=msm-3.10#n610
-[4] https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/tree/arch/arm/mach-msm/krait-regulator.c?h=msm-3.10#n486
+(parent_rate * div) + ((parent_rate / mfd) * mfn
 
+as it does NOT consider the float data using div, so below
+calculation formula should be used as a decent method:
+
+(parent_rate * div) + ((parent_rate * mfn) / mfd)
+
+and we also need to consider parent_rate * mfd may exceed
+a 32 bit value, 64 bit value should be used.
+
+Below is one example of old/new formula's difference:
+
+On i.MX7D, DRAM PLL is a Audio/Video type PLL, the target freq
+is 1066MHz, the register settings are as below:
+
+PLL_DDRn: 8060202C   -> div = 0x2C
+DDR_NUM: 06AAAC4D    -> mfn = 0x6AAAC4D
+DDR_DENOM: 100003EC  -> mfd = 0x100003EC
+
+parent_rate = 24MHz.
+
+with old formula, the (parent_rate / mfd) * mfn = 0 with new formula,
+the (parent_rate * mfn) / mfd = 10, so old formula gets
+PLL_DDR = 1056MHz, new formuls gets PLL_DDR = 1066MHz.
+
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ drivers/clk/imx/clk-pllv3.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+index 641ebc5..b2f8893 100644
+--- a/drivers/clk/imx/clk-pllv3.c
++++ b/drivers/clk/imx/clk-pllv3.c
+@@ -203,8 +203,13 @@ static unsigned long clk_pllv3_av_recalc_rate(struct clk_hw *hw,
+ 	u32 mfn = readl_relaxed(pll->base + PLL_NUM_OFFSET);
+ 	u32 mfd = readl_relaxed(pll->base + PLL_DENOM_OFFSET);
+ 	u32 div = readl_relaxed(pll->base) & pll->div_mask;
++	s64 temp64 = parent_rate;
++
++	temp64 *= mfn;
++	do_div(temp64, mfd);
++
++	return (parent_rate * div) + temp64;
+ 
+-	return (parent_rate * div) + ((parent_rate / mfd) * mfn);
+ }
+ 
+ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
