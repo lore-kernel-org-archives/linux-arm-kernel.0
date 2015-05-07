@@ -1,40 +1,59 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 7 May 2015 13:34:10 +0100
-Subject: [Discussion] how to implement external power down for ARM
-In-Reply-To: <554B5830.2090600@huawei.com>
-References: <55417F5A.4040300@linaro.org> <20501959.OF3FLWO2Eh@wuerfel>
- <554B2DF5.4040600@huawei.com> <4412805.fx6caR2qJ7@wuerfel>
- <554B5627.100@huawei.com>
- <CAFEAcA-E=s3fhKAe4XS=rVdqw8HUO7EvqM7_C_oob1Kbg3MDGw@mail.gmail.com>
- <554B5830.2090600@huawei.com>
-Message-ID: <CAFEAcA_EJSm_OHxsGvDfydacHHz=RcvrHHCg_LEFpLCBUxHmtA@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 7 May 2015 14:35:59 +0200 (CEST)
+Subject: Possible regression due to "hrtimer: Get rid of hrtimer softirq"
+In-Reply-To: <20150507111711.GA17448@verge.net.au>
+References: <20150507111711.GA17448@verge.net.au>
+Message-ID: <alpine.DEB.2.11.1505071425520.4225@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 May 2015 at 13:18, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> On 2015/5/7 20:12, Peter Maydell wrote:
->> On 7 May 2015 at 13:10, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->>> BTW, IIUC QEMU doesn't support the gracefully reboot support. The reboot
->>> depends on libvirt or other management tools. So the reboot case in
->>> virtualization is firstly poweroff, then start again.
->>
->> I'm not sure what you mean by this -- QEMU supports 'reset this
->> VM' at the machine emulation level, so if we can tell the guest
->> to reboot then it should as part of this process issue the
->> PSCI SYSTEM_RESET command, which QEMU/KVM will then handle
->> to do a reset of the VM.
+On Thu, 7 May 2015, Simon Horman wrote:
+> ------------[ cut here ]------------
+> kernel BUG at kernel/irq_work.c:135!
 
-> Yes, QEMU supports reset, but doesn't support (gracefully) reboot.
+  BUG_ON(!irqs_disabled());
 
-Isn't that what this ACPI work is about? Tell the guest to initiate
-a graceful reboot, and then the guest will tell QEMU to reboot
-the emulated h/w when it's ready.
+So something enables interrupts in the periodic tick handling
+machinery. Seems you have high resolution timers disabled, but nohz
+enabled. And that code path has a local_irq_disable/enable pair which
+causes havoc. Patch below.
 
-> And
-> reset doesn't depends on the guest, it just restart VM forcefully.
-> Reboot likes poweroff and start, while reset likes destroy and start.
+Thanks,
 
-I (and QEMU) think there is no visible difference between
-poweroff-and-restart and destroy-recreate-and-restart...
+	tglx
 
--- PMM
+diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+index 753c211f6195..812f7a3b9898 100644
+--- a/kernel/time/tick-sched.c
++++ b/kernel/time/tick-sched.c
+@@ -967,11 +967,9 @@ static void tick_nohz_switch_to_nohz(void)
+ 	if (!tick_nohz_enabled)
+ 		return;
+ 
+-	local_irq_disable();
+-	if (tick_switch_to_oneshot(tick_nohz_handler)) {
+-		local_irq_enable();
++	if (tick_switch_to_oneshot(tick_nohz_handler))
+ 		return;
+-	}
++
+ 	tick_nohz_active = 1;
+ 	ts->nohz_mode = NOHZ_MODE_LOWRES;
+ 
+@@ -986,7 +984,6 @@ static void tick_nohz_switch_to_nohz(void)
+ 	hrtimer_forward_now(&ts->sched_timer, tick_period);
+ 	hrtimer_set_expires(&ts->sched_timer, next);
+ 	tick_program_event(next, 1);
+-	local_irq_enable();
+ }
+ 
+ /*
+@@ -1171,7 +1168,7 @@ void tick_oneshot_notify(void)
+  * Called cyclic from the hrtimer softirq (driven by the timer
+  * softirq) allow_nohz signals, that we can switch into low-res nohz
+  * mode, because high resolution timers are disabled (either compile
+- * or runtime).
++ * or runtime). Called with interrupts disabled.
+  */
+ int tick_check_oneshot_change(int allow_nohz)
+ {
