@@ -1,98 +1,76 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu,  7 May 2015 15:45:02 +0100
-Subject: [PATCH 1/4] ARM64: juno: add sp810 support and fix sp804 clock
- frequency
+Date: Thu,  7 May 2015 15:45:04 +0100
+Subject: [PATCH 3/4] ARM: vexpress/ca9: Add interrupt-affinity to the PMU node
 In-Reply-To: <1431009905-29265-1-git-send-email-sudeep.holla@arm.com>
 References: <1431009905-29265-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1431009905-29265-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1431009905-29265-4-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock generator in IOFPGA generates the two source clocks: 32kHz and
-1MHz for the SP810 System Controller.
+From: Robert Schwebel <r.schwebel@pengutronix.de>
 
-The SP810 System Controller selects 32kHz or 1MHz as the sources for
-TIM_CLK[3:0], the SP804 timer clocks. The powerup default is 32kHz but
-the maximum of "refclk" and "timclk" is chosen by the SP810 driver.
+Commit 9fd85eb502a7 ("ARM: pmu: add support for interrupt-affinity
+property") added an optional "interrupt-affinity" property, to specify
+the CPU affinity for each SPI listed in the interrupts property.
 
-This patch adds support for SP810 system controller and also fixes the
-SP804 timer clock frequency.
+Without this property, we get this boot warning:
 
-However the SP804 driver needs to be enabled on ARM64 to test this,
-which requires SP804 driver to be moved out of arch/arm.
+  CPU PMU: Failed to parse <no-node>/interrupt-affinity[0]
 
-Fixes: 71f867ec130e ("arm64: Add Juno board device tree.")
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+This patch adds interrupt-affinity to the PMU node in the
+vexpress-v2p-ca9 device tree.
+
+Signed-off-by: Robert Schwebel <r.schwebel@pengutronix.de>
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 31 +++++++++++++++++++++++----
- 1 file changed, 27 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-index c138b95a8356..351c95bda89e 100644
---- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-@@ -21,6 +21,20 @@
- 			clock-output-names = "juno_mb:clk25mhz";
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index a411274e8b6b..d949facba376 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -33,28 +33,28 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		cpu at 0 {
++		A9_0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
  		};
  
-+		v2m_refclk1mhz: refclk1mhz {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <1000000>;
-+			clock-output-names = "juno_mb:refclk1mhz";
-+		};
-+
-+		v2m_refclk32khz: refclk32khz {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+			clock-output-names = "juno_mb:refclk32khz";
-+		};
-+
- 		motherboard {
- 			compatible = "arm,vexpress,v2p-p1", "simple-bus";
- 			#address-cells = <2>;  /* SMB chipselect number and offset */
-@@ -66,6 +80,15 @@
- 				#size-cells = <1>;
- 				ranges = <0 3 0 0x200000>;
+-		cpu at 1 {
++		A9_1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
+ 		};
  
-+				v2m_sysctl: sysctl at 020000 {
-+					compatible = "arm,sp810", "arm,primecell";
-+					reg = <0x020000 0x1000>;
-+					clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&mb_clk24mhz>;
-+					clock-names = "refclk", "timclk", "apb_pclk";
-+					#clock-cells = <1>;
-+					clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
-+				};
+-		cpu at 2 {
++		A9_2: cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <2>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+-		cpu at 3 {
++		A9_3: cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <3>;
+@@ -182,6 +182,8 @@
+ 			     <0 61 4>,
+ 			     <0 62 4>,
+ 			     <0 63 4>;
++		interrupt-affinity = <&A9_0>, <&A9_1>, <&A9_2>, <&A9_3>;
 +
- 				mmci at 050000 {
- 					compatible = "arm,pl180", "arm,primecell";
- 					reg = <0x050000 0x1000>;
-@@ -106,16 +129,16 @@
- 					compatible = "arm,sp804", "arm,primecell";
- 					reg = <0x110000 0x10000>;
- 					interrupts = <9>;
--					clocks = <&mb_clk24mhz>, <&soc_smc50mhz>;
--					clock-names = "timclken1", "apb_pclk";
-+					clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&mb_clk24mhz>;
-+					clock-names = "timclken1", "timclken2", "apb_pclk";
- 				};
+ 	};
  
- 				v2m_timer23: timer at 120000 {
- 					compatible = "arm,sp804", "arm,primecell";
- 					reg = <0x120000 0x10000>;
- 					interrupts = <9>;
--					clocks = <&mb_clk24mhz>, <&soc_smc50mhz>;
--					clock-names = "timclken1", "apb_pclk";
-+					clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&mb_clk24mhz>;
-+					clock-names = "timclken1", "timclken2", "apb_pclk";
- 				};
- 
- 				rtc at 170000 {
+ 	dcc {
 -- 
 1.9.1
