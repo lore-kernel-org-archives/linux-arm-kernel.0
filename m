@@ -1,78 +1,51 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Thu, 7 May 2015 13:18:08 +0200
-Subject: dma_alloc_coherent versus streaming DMA,
- neither works satisfactory
-In-Reply-To: <9622793.RaVBbeJMCx@wuerfel>
-References: <5538DD02.6050401@topic.nl> <3382997.5hgfVKmNXP@wuerfel>
- <5540D356.50708@topic.nl> <9622793.RaVBbeJMCx@wuerfel>
-Message-ID: <554B49F0.1090100@topic.nl>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 7 May 2015 13:20:27 +0200
+Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
+In-Reply-To: <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
+References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
+ <20150506141249.GA6796@cbox>
+ <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
+Message-ID: <20150507112027.GC25885@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?On 29-04-15 15:13, Arnd Bergmann wrote:
-> On Wednesday 29 April 2015 14:49:26 Mike Looijmans wrote:
->> On 29-04-15 12:41, Arnd Bergmann wrote:
->>> On Wednesday 29 April 2015 12:33:00 Mike Looijmans wrote:
->>>> On 29-04-15 12:07, Arnd Bergmann wrote:
->>>>> On Wednesday 29 April 2015 11:47:37 Mike Looijmans wrote:
->>>>>> On 29-04-15 11:17, Russell King - ARM Linux wrote:
->>>>>>> The buffer should also be mapped into userspace with the same memory
->>>>>>> type and cache attributes as the kernel side mapping.  If using ACP,
->>>>>>> then you probably want "normal memory, cacheable, writeback, read
->>>>>>> allocate" or in the case of SMP, the same but "read/write allocate".
->>>>>
->>>>> If my suspicion is correct, we should either change arm_coherent_dma_ops()
->>>>> to refer to a different mmap() callback that does the right thing for
->>>>> coherent devices, or change arm_dma_mmap() to look at dev->is_coherent.
->>>>
->>>> Following the route, arch/arm/mm/dma-mapping.c uses pgprot_dmacoherent() which
->>>> is defined in arch/arm/include/asm/pgtable.h and that just returns uncached
->>>> memory.
->>>>
->>>> If you can give me some hints as to what the correct flags would be, I can
->>>> patch my kernel and test it.
->>>
->>> Use the flags that Russell listed above.
->>
->> I would if I had a clue how to do that. For one thing, I don't understand all
->> the L_PTE_... flag juggling that happens here.
->>
->> I also tried just using kmalloc() to allocate the buffer, and then
->> dma_map_single that. This is what the DMA documentation told me to do for
->> non-coherent mappings. This works fine for the streaming-dma mode using the
->> HP, but using dma-coherent this not only fails to work, it tends to completely
->> lock the system.
->>
->> Avoiding the streaming mapping and using only the coherent modes prevents the
->> system locking up, it then doesn't do more harm than just corrupting data in
->> the buffers.
->
-> If I understand it right, you basically just skip the 'vma->vm_page_prot =
-> __get_dma_pgprot(attrs, vma->vm_page_prot);' step and get the right mapping
-> here, i.e. the pgprot value we use for all normal memory.
+On Thu, May 07, 2015 at 12:50:50PM +0200, J?r?my Fangu?de wrote:
+> On Wed, May 6, 2015 at 4:12 PM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > Hi J?r?my,
+> >
+> > On Tue, May 05, 2015 at 11:13:11AM +0200, J?r?my Fangu?de wrote:
+> >> To maintain cache coherency on ARM, we may need a mechanism to flush
+> >> the data cache.
+> >
+> > In addition to generally just making this functionality available (see
+> > below), do you have an actual use case in mind for this?  To solve the
+> > VGA issue, for example, we already have a patch series from Drew trying
+> > to address this.  Does that not work for you?
+> >
+> > There was a long discussion about this here:
+> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-February/013593.html
+> >
+> > Drew then created a patch set, here:
+> > https://lists.nongnu.org/archive/html/qemu-devel/2015-03/msg01254.html
+> >
+> > and replied to himself, here:
+> > https://www.marc.info/?l=android-virt&m=142670523929132&w=3
+> >
+> > Which basically says that he doesn't like having to do flushes all over
+> > QEMU (IIUC), so he sent this version instead:
+> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-March/014027.html
+> >
+> > Which he now said he'd respin.
+> 
+> In fact, I used this ioctl in pairs with this QEMU patch series:
+> https://lists.nongnu.org/archive/html/qemu-devel/2015-05/msg00407.html
+> My current work doesn't do anything about vga ram, so vga issue
+> probably still persists, but it solves others issues with some
+> emulated devices (mainly PCI) which were failing before and now work
+> fine with this patch.
 
-I reverted all my patches and workarounds. Indeed, the kernel needs a 
-"coherent" version of the dma_mmap routine, as the current version will map it 
-as non-cachable, resulting in a big performance hit (and nullifying the whole 
-idea behind it).
+Why does Drew's approach not work and your approach works here?  What is
+the case that we haven't though about yet?
 
-I'll test it further on my 'hardware' and cook up a patch that correctly maps 
-the coherent pages.
-
-M.
-
-
-Kind regards,
-
-Mike Looijmans
-System Expert
-
-TOPIC Embedded Products
-Eindhovenseweg 32-C, NL-5683 KH Best
-Postbus 440, NL-5680 AK Best
-Telefoon: +31 (0) 499 33 69 79
-Telefax: +31 (0) 499 33 69 70
-E-mail: mike.looijmans at topicproducts.com
-Website: www.topicproducts.com
-
-Please consider the environment before printing this e-mail
+-Christoffer
