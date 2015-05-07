@@ -1,85 +1,35 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 7 May 2015 12:08:35 +0200
-Subject: [PATCH V4] ARM: imx: correct Audio/Video PLL rate calculation
- formula
-In-Reply-To: <1431018077-3443-1-git-send-email-b20788@freescale.com>
-References: <1431018077-3443-1-git-send-email-b20788@freescale.com>
-Message-ID: <20150507120835.3424b412@ipc1.ka-ro>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu,  7 May 2015 18:55:40 +0900
+Subject: [PATCH v2] serial: xuartps: add __init to earlycon write method
+Message-ID: <1430992540-14109-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Early console functions are only used during the early boot stage.
+This change just saves a small amount of memory footprint.
 
-> The audio/video PLL's rate calculation formula is as below in RM:
-> 
-> Fref * (DIV_SELECT + NUM / DENOM),
-> 
-> in original clk-pllv3's code, below code is used:
-> 
-> (parent_rate * div) + ((parent_rate / mfd) * mfn)
-> 
-> as it does NOT consider the float data using div, so below
-> calculation formula should be better used instead:
-> 
-> (parent_rate * div) + ((parent_rate * mfn) / mfd)
-> 
-> and we also need to consider parent_rate * mfd may exceed
-> a 32 bit value, 64 bit value should be used.
-> 
-> Below is one example of old/new formula's difference:
-> 
-> On i.MX7D, DRAM PLL is a Audio/Video type PLL, the target freq
-> is 1066MHz, the register settings are as below:
-> 
-> PLL_DDRn: 8060202C   -> div = 0x2C
-> DDR_NUM: 06AAAC4D    -> mfn = 0x6AAAC4D
-> DDR_DENOM: 100003EC  -> mfd = 0x100003EC
-> 
-> parent_rate = 24MHz.
-> 
-> with old formula, the (parent_rate / mfd) * mfn = 0, with new formula,
-> the (parent_rate * mfn) / mfd = 10MHz, so old formula gets
-> PLL_DDR = 1056MHz, while the updated formula gets PLL_DDR = 1066MHz
-> which exactly matches the real rate.
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
->  drivers/clk/imx/clk-pllv3.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-> index 641ebc5..e34a925 100644
-> --- a/drivers/clk/imx/clk-pllv3.c
-> +++ b/drivers/clk/imx/clk-pllv3.c
-> @@ -203,8 +203,13 @@ static unsigned long clk_pllv3_av_recalc_rate(struct clk_hw *hw,
->  	u32 mfn = readl_relaxed(pll->base + PLL_NUM_OFFSET);
->  	u32 mfd = readl_relaxed(pll->base + PLL_DENOM_OFFSET);
->  	u32 div = readl_relaxed(pll->base) & pll->div_mask;
-> +	u64 temp64 = parent_rate;
-> +
-> +	temp64 *= mfn;
-> +	do_div(temp64, mfd);
-> +
-> +	return (parent_rate * div) + temp64;
->  
-> -	return (parent_rate * div) + ((parent_rate / mfd) * mfn);
->  }
->  
->  static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
->
-What about clk_pllv3_av_round_rate() which also has:
-|	return parent_rate * div + parent_rate / mfd * mfn;
-as already stated in: <20150507092136.0f3f583a@ipc1.ka-ro>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
+Changes in v2:
+  -  Add a little explanation in the git log.
 
-Lothar Wa?mann
+ drivers/tty/serial/xilinx_uartps.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 3ddbac7..009e0db 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1075,7 +1075,8 @@ static void cdns_uart_console_putchar(struct uart_port *port, int ch)
+ 	writel(ch, port->membase + CDNS_UART_FIFO_OFFSET);
+ }
+ 
+-static void cdns_early_write(struct console *con, const char *s, unsigned n)
++static void __init cdns_early_write(struct console *con, const char *s,
++				    unsigned n)
+ {
+ 	struct earlycon_device *dev = con->data;
+ 
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.9.1
