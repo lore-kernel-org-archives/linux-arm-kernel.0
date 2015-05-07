@@ -1,216 +1,48 @@
-From: ayyappa.ch.linux@gmail.com (Ayyappa Ch)
-Date: Thu, 7 May 2015 16:39:45 +0530
-Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
-In-Reply-To: <20150506193803.GC32577@8074w.roxell.se>
-References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
- <20150506193803.GC32577@8074w.roxell.se>
-Message-ID: <CAPyr0y+OYikc2Euh++2nTWnVb-aZ4i-tifLLk3XUiRahtHKjCA@mail.gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 07 May 2015 13:11:16 +0200
+Subject: [alsa-devel] [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
+In-Reply-To: <20150507104102.GA2067@n2100.arm.linux.org.uk>
+References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+ <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk> <s5ha8ymy3e2.wl-tiwai@suse.de>
+ <20150405162034.GH13898@n2100.arm.linux.org.uk>
+ <s5h4mouy14a.wl-tiwai@suse.de>
+ <20150405172608.GA12732@n2100.arm.linux.org.uk> <554A493C.5080106@iki.fi>
+ <20150507104102.GA2067@n2100.arm.linux.org.uk>
+Message-ID: <554B4854.7090209@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-./cyclictest -p 80 -t5 -n  => Cyclic test is failing after 6Lack iterations
-T: 0 ( 1364) P:99 I:1000 C: 668664 Min:      3 Act:    5 Avg:   11 Max:  100116
-
-After analyzing the trace log , we observed the sudden change in
-latency due to calling of fpsimd_preserve_current_state function.
-
-Line 149766:     ntpd-925     1....1.. 512046976us :
-fpsimd_preserve_current_state <-do_signal
-Line 149768:     ntpd-925     1....1.. 512046977us : preempt_count_add
-<-fpsimd_preserve_current_state
-Line 149770:     ntpd-925     1....2.. 512046978us : preempt_count_sub
-<-fpsimd_preserve_current_state
-
-.......
-Line 163170: cyclicte-964     0.....11 512065181us :
-tracing_mark_write: hit latency threshold (98383 > 500)
-
-
-Thanks and regards,
-Ayyappa.Ch
-
-...
-
-On Thu, May 7, 2015 at 1:08 AM, Anders Roxell <anders.roxell@linaro.org> wrote:
-> On 2015-05-01 20:59, Ayyappa Ch wrote:
->> Floating point operations in arm64 should not disable preempt .
+On 05/07/2015 12:41 PM, Russell King - ARM Linux wrote:
+[...]
+>>> What I'm concerned about is that when the ALSA parameter refining
+>>> starts, we start with (eg) 2-8 channels, 32-192kHz.  Given that,
+>>> if we invoke the channel restriction before the rate restriction,
+>>> we would end up limiting to 2 channel at 32-192kHz.  If we apply
+>>> the restrictions in the opposite order, we'd restrict to 6
+>>> channel, 32-48kHz.  Neither are obviously correct in this
+>>> circumstance, and I don't really see a way to solve it given my
+>>> understanding of the way ALSA's parameter refinement works.
+>>>
+>>> I suspect this is why most HDMI drivers are implemented such that
+>>> they take the maximum capabilities over all SADs, which would end
+>>> up restricting audio in the above case to: up to 6 channels, at
+>>> 32, 44.1, 48, 96 and 192kHz, even though 6 channel @ 192kHz isn't
+>>> hasn't been indicated as supported.
+>>>
+>>> Most of this is speculation though, based off what is in the
+>>> documentation.  As I say, I don't have enough real-world examples
+>>> to get a feel for what manufacturers _actually_ do to give a hint
+>>> as to how the documentation should be interpreted.
 >
-> I thought that I would see a problem if I ran a floating point
-> workload and cyclictest at the same time but I don't.
+> ... so this is probably less than speculation.
 >
-> Can you please provide me some more details on how I can reproduce the
-> problem?
->
-> Cheers,
-> Anders
->
->> Activating realtime features with below code.
->>
->> From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
->> From: Ayyappa Ch <ayyappa.chandolu@amd.com>
->> Date: Tue, 28 Apr 2015 11:53:00 +0530
->> Subject: [PATCH ] floating point realtime fix
->>
->> ---
->>  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
->>  1 file changed, 8 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->> index 2438497..3dca156 100644
->> --- a/arch/arm64/kernel/fpsimd.c
->> +++ b/arch/arm64/kernel/fpsimd.c
->> @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
->>   */
->>  void fpsimd_preserve_current_state(void)
->>  {
->> - preempt_disable();
->> + migrate_disable();
->>   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
->>   fpsimd_save_state(&current->thread.fpsimd_state);
->> - preempt_enable();
->> + migrate_enable();
->>  }
->>
->>  /*
->> @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
->>   */
->>  void fpsimd_restore_current_state(void)
->>  {
->> - preempt_disable();
->> + migrate_disable();
->>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
->>   struct fpsimd_state *st = &current->thread.fpsimd_state;
->>
->> @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
->>   this_cpu_write(fpsimd_last_state, st);
->>   st->cpu = smp_processor_id();
->>   }
->> - preempt_enable();
->> + migrate_enable();
->>  }
->>
->>  /*
->> @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
->>   */
->>  void fpsimd_update_current_state(struct fpsimd_state *state)
->>  {
->> - preempt_disable();
->> + migrate_disable();
->>   fpsimd_load_state(state);
->>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
->>   struct fpsimd_state *st = &current->thread.fpsimd_state;
->> @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
->>   this_cpu_write(fpsimd_last_state, st);
->>   st->cpu = smp_processor_id();
->>   }
->> - preempt_enable();
->> + migrate_enable();
->>  }
->>
->>  /*
->> @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
->>   * that there is no longer userland FPSIMD state in the
->>   * registers.
->>   */
->> - preempt_disable();
->> + migrate_disable();
->>   if (current->mm &&
->>      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
->>   fpsimd_save_state(&current->thread.fpsimd_state);
->> @@ -255,7 +255,7 @@ void kernel_neon_end(void)
->>   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
->>   fpsimd_load_partial_state(s);
->>   } else {
->> - preempt_enable();
->> + migrate_enable();
->>   }
->>  }
->>  EXPORT_SYMBOL(kernel_neon_end);
->>
->> On Fri, May 1, 2015 at 1:03 PM, Ayyappa Ch <ayyappa.ch.linux@gmail.com> wrote:
->> > Following Anders Roxell  patch on "Enable PREEMPT_RT_FULL" , observed
->> > one issue with Cyclic test while running floating point operations. So
->> > , modified below changes for that.
->> >
->> > From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
->> > From: Ayyappa Ch <ayyappa.chandolu@amd.com>
->> > Date: Tue, 28 Apr 2015 11:53:00 +0530
->> > Subject: [PATCH ] floating point realtime fix
->> >
->> > ---
->> >  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
->> >  1 file changed, 8 insertions(+), 8 deletions(-)
->> >
->> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->> > index 2438497..3dca156 100644
->> > --- a/arch/arm64/kernel/fpsimd.c
->> > +++ b/arch/arm64/kernel/fpsimd.c
->> > @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
->> >   */
->> >  void fpsimd_preserve_current_state(void)
->> >  {
->> > - preempt_disable();
->> > + migrate_disable();
->> >   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
->> >   fpsimd_save_state(&current->thread.fpsimd_state);
->> > - preempt_enable();
->> > + migrate_enable();
->> >  }
->> >
->> >  /*
->> > @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
->> >   */
->> >  void fpsimd_restore_current_state(void)
->> >  {
->> > - preempt_disable();
->> > + migrate_disable();
->> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
->> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
->> >
->> > @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
->> >   this_cpu_write(fpsimd_last_state, st);
->> >   st->cpu = smp_processor_id();
->> >   }
->> > - preempt_enable();
->> > + migrate_enable();
->> >  }
->> >
->> >  /*
->> > @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
->> >   */
->> >  void fpsimd_update_current_state(struct fpsimd_state *state)
->> >  {
->> > - preempt_disable();
->> > + migrate_disable();
->> >   fpsimd_load_state(state);
->> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
->> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
->> > @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
->> >   this_cpu_write(fpsimd_last_state, st);
->> >   st->cpu = smp_processor_id();
->> >   }
->> > - preempt_enable();
->> > + migrate_enable();
->> >  }
->> >
->> >  /*
->> > @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
->> >   * that there is no longer userland FPSIMD state in the
->> >   * registers.
->> >   */
->> > - preempt_disable();
->> > + migrate_disable();
->> >   if (current->mm &&
->> >      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
->> >   fpsimd_save_state(&current->thread.fpsimd_state);
->> > @@ -255,7 +255,7 @@ void kernel_neon_end(void)
->> >   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
->> >   fpsimd_load_partial_state(s);
->> >   } else {
->> > - preempt_enable();
->> > + migrate_enable();
->> >   }
->> >  }
->> >  EXPORT_SYMBOL(kernel_neon_end);
->> > --
->> > 1.9.1
+> So, ALSA gurus, how do we handle this?  How do we arrange the parameter
+> resolution such that ALSA can permit _either_ 2 channels at 192kHz or 6
+> channels at 48kHz, but not 6 channels at 192kHz?  Right now, I don't
+> see how that's possible.
+
+That's pretty straight forward and can be done using custom rules linking 
+the number of channels to the sample rate. Have a look at 
+snd_ac97_pcm_double_rate_rules() this is pretty much the same constraint.
+
+- Lars
