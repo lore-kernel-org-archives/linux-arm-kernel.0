@@ -1,41 +1,109 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Thu, 7 May 2015 15:54:44 +0800
-Subject: [PATCH v7 0/3] ARM: mediatek: Add driver for Mediatek I2C
-In-Reply-To: <20150507073900.GC12484@x1>
-References: <1430901427-65146-1-git-send-email-eddie.huang@mediatek.com>
- <20150507073900.GC12484@x1>
-Message-ID: <1430985284.22615.3.camel@mtksdaap41>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 7 May 2015 09:58:44 +0200
+Subject: [PATCH V2] ARM: imx: correct Audio/Video PLL rate calculation
+ formula
+In-Reply-To: <20150507073807.GA2864@shlinux1.ap.freescale.net>
+References: <1431006970-2864-1-git-send-email-b20788@freescale.com>
+ <20150507072537.GC12306@pengutronix.de>
+ <20150507073807.GA2864@shlinux1.ap.freescale.net>
+Message-ID: <20150507075844.GF12306@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hello,
 
-On Thu, 2015-05-07 at 08:39 +0100, Lee Jones wrote:
-> On Wed, 06 May 2015, Eddie Huang wrote:
-> 
+On Thu, May 07, 2015 at 03:38:10PM +0800, Anson Huang wrote:
+> On Thu, May 07, 2015 at 09:25:37AM +0200, Uwe Kleine-K?nig wrote:
+> > Hello,
 > > 
-> > Eddie Huang (1):
-> >   I2C: mediatek: Add driver for MediaTek MT8173 I2C controller
+> > On Thu, May 07, 2015 at 09:56:10PM +0800, Anson Huang wrote:
+> > > The audio/video PLL's rate calculation formula is as below in RM:
+> > > 
+> > > Fref * (DIV_SELECT + NUM / DENOM),
+> > > 
+> > > in original clk-pllv3's code, below code is used:
+> > > 
+> > > (parent_rate * div) + ((parent_rate / mfd) * mfn
+> > Here a closing ) is missing
 > > 
-> > Xudong Chen (2):
-> >   dt-bindings: Add I2C bindings for mt65xx/mt81xx.
-> >   I2C: mediatek: Add driver for MediaTek I2C controller
+> 
+> Thanks, will fix it later.
+> 
+> > > 
+> > > as it does NOT consider the float data using div, so below
+> > > calculation formula should be used as a decent method:
+> > > 
+> > > (parent_rate * div) + ((parent_rate * mfn) / mfd)
+> > > 
+> > > and we also need to consider parent_rate * mfd may exceed
+> > > a 32 bit value, 64 bit value should be used.
+> > > 
+> > > Below is one example of old/new formula's difference:
+> > > 
+> > > On i.MX7D, DRAM PLL is a Audio/Video type PLL, the target freq
+> > > is 1066MHz, the register settings are as below:
+> > > 
+> > > PLL_DDRn: 8060202C   -> div = 0x2C
+> > > DDR_NUM: 06AAAC4D    -> mfn = 0x6AAAC4D
+> > > DDR_DENOM: 100003EC  -> mfd = 0x100003EC
+> > > 
+> > > parent_rate = 24MHz.
+> > > 
+> > > with old formula, the (parent_rate / mfd) * mfn = 0 with new formula,
+> > > the (parent_rate * mfn) / mfd = 10, so old formula gets
+> > That's wrong. (parent_rate * mfn) / mfd == 10000000.
 > > 
-> >  .../devicetree/bindings/i2c/i2c-mt6577.txt         |  41 ++
-> >  drivers/i2c/busses/Kconfig                         |   9 +
-> >  drivers/i2c/busses/Makefile                        |   1 +
-> >  drivers/i2c/busses/i2c-mt65xx.c                    | 748 +++++++++++++++++++++
-> >  4 files changed, 799 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> >  create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
 > 
-> Again, you've sent me a patch-set that has absolutely nothing to do
-> with me.  Can you please stop doing that, my inbox is full enough
-> already!
+> OK, I forgot to mention the result is 10MHz.
 > 
+> > > PLL_DDR = 1056MHz, new formuls gets PLL_DDR = 1066MHz.
+> > So which one is better? To see this it would be nice to also point out
+> > the exact value here.
+> 
+> "the target freq is 1066MHz", means 1066MHz should be the correct value.
+I would still write:
 
-Sorry, I use "scripts/get_maintainer.pl" to get mail receiver, and you
-are on list.
-I will narrow down receiver next time.
+	So the old formula results in 1056 MHz, while the updated
+	calculation yields 1066 MHz which exactly matches the real rate.
 
-Eddie
+> > 
+> > Another way to get to a more exact calculation but without a 64 bit
+> > division is using shifted math. The formula gets more difficult though,
+> > so probably not worth the effort.
+> 
+> It is NOT easy to understand if using shift, and in other functions of
+> this file, they all use div, so keeping them aligned is also acceptable?
+sure, I quickly tried to come up with the needed formula that uses
+shifted math, but dropped it after a few minutes. As the calculation
+isn't done in a fast patch probably keeping the 64bit division is the
+way to go.
+
+> > > Signed-off-by: Anson Huang <b20788@freescale.com>
+> > > ---
+> > >  drivers/clk/imx/clk-pllv3.c | 7 ++++++-
+> > >  1 file changed, 6 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+> > > index 641ebc5..b2f8893 100644
+> > > --- a/drivers/clk/imx/clk-pllv3.c
+> > > +++ b/drivers/clk/imx/clk-pllv3.c
+> > > @@ -203,8 +203,13 @@ static unsigned long clk_pllv3_av_recalc_rate(struct clk_hw *hw,
+> > >  	u32 mfn = readl_relaxed(pll->base + PLL_NUM_OFFSET);
+> > >  	u32 mfd = readl_relaxed(pll->base + PLL_DENOM_OFFSET);
+> > >  	u32 div = readl_relaxed(pll->base) & pll->div_mask;
+> > > +	s64 temp64 = parent_rate;
+> > Why are you using a signed type here? do_div used unsigned anyhow IIRC.
+> > 
+> I use u64 before, but when I did V2 patch, I notice that all the div used
+> in this file are using a s64, so I change it to s64 to keep them aligned,
+> so which one is the decent one?
+Looking at the implementation of do_div it used unsigned math. So better
+use u64 and change the other variables to u64, too (in a separate
+patch).
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
