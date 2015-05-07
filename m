@@ -1,85 +1,49 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 7 May 2015 17:34:53 +0200
-Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
-In-Reply-To: <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
-References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
- <20150506141249.GA6796@cbox>
- <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
- <20150507112027.GC25885@cbox>
- <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
-Message-ID: <CAMJs5B9i9q8gJU93B09-uLMF6w1bTft-40DWPFUP6ky=SketSQ@mail.gmail.com>
+From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
+Date: Thu,  7 May 2015 18:36:07 +0300
+Subject: [PATCH v2 0/2] Add initial CoreSight support for the Qualcomm 8x16
+ chipsets
+Message-ID: <1431012969-16338-1-git-send-email-ivan.ivanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 7, 2015 at 4:50 PM, J?r?my Fangu?de
-<j.fanguede@virtualopensystems.com> wrote:
-> On Thu, May 7, 2015 at 1:20 PM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
->> On Thu, May 07, 2015 at 12:50:50PM +0200, J?r?my Fangu?de wrote:
->>> On Wed, May 6, 2015 at 4:12 PM, Christoffer Dall
->>> <christoffer.dall@linaro.org> wrote:
->>> > Hi J?r?my,
->>> >
->>> > On Tue, May 05, 2015 at 11:13:11AM +0200, J?r?my Fangu?de wrote:
->>> >> To maintain cache coherency on ARM, we may need a mechanism to flush
->>> >> the data cache.
->>> >
->>> > In addition to generally just making this functionality available (see
->>> > below), do you have an actual use case in mind for this?  To solve the
->>> > VGA issue, for example, we already have a patch series from Drew trying
->>> > to address this.  Does that not work for you?
->>> >
->>> > There was a long discussion about this here:
->>> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-February/013593.html
->>> >
->>> > Drew then created a patch set, here:
->>> > https://lists.nongnu.org/archive/html/qemu-devel/2015-03/msg01254.html
->>> >
->>> > and replied to himself, here:
->>> > https://www.marc.info/?l=android-virt&m=142670523929132&w=3
->>> >
->>> > Which basically says that he doesn't like having to do flushes all over
->>> > QEMU (IIUC), so he sent this version instead:
->>> > https://lists.cs.columbia.edu/pipermail/kvmarm/2015-March/014027.html
->>> >
->>> > Which he now said he'd respin.
->>>
->>> In fact, I used this ioctl in pairs with this QEMU patch series:
->>> https://lists.nongnu.org/archive/html/qemu-devel/2015-05/msg00407.html
->>> My current work doesn't do anything about vga ram, so vga issue
->>> probably still persists, but it solves others issues with some
->>> emulated devices (mainly PCI) which were failing before and now work
->>> fine with this patch.
->>
->> Why does Drew's approach not work and your approach works here?  What is
->> the case that we haven't though about yet?
->
-> The first patch from Andrew, (which is for arm64 only) doesn't permit
-> me to make some emulated PCI devices working with virt, probably
-> because some flushes/cleans are missing.
-> As for the second patch, it focuses, for now, only on VGA ram. I
-> quickly tried to extend the KVM_MEM_UNCACHED flag to the whole guest
-> memory, but then the guest fails to boot; but even if it was working,
-> does it make sense to map as uncached all the ram of the guest? Since
-> we can not guess which region of the guest memory will be accessed.
->
-> Simple PCI devices like e1000 or usb-ehci (with usb-kbd for instance)
-> are not usable, with or without these patches, but if I flush a
-> precise memory range, on reads and writes performed by emulated
-> devices on guest ram, (It's exactly what the QEMU patch series that I
-> sent does, with this ioctl), emulated PCI devices are now working.
+Add initial CoreSight support for the Qualcomm 8x16 chipsets
 
-I understand all this.  What I'd like for us to find out is why we are
-having coherency issues.  We knew that for the VGA adapter, the guest
-maps the memory as uncached (because that's how the real hardware
-works), and QEMU maps the memory as cached (because it's just normal
-memory), and unsurprisingly the two views of that memory is not
-coherent.
+This patch series add initial set of CoreSight components for the
+8x16 chipsets.
 
-What are the cases you are seeing with e1000 or usb-ehci?
+Components will not be functional, because of missing clock controller
+driver, which is under internal testing.
 
-Hint: We can make a lot of things work by just sticking cache flushes
-all over, but it's not a good engineering approach.
+Patches are based on "Enable CoreSight for the Ux500 "[1] and
+"Support for coresight ETMv4 tracer" [2]
 
-Thanks,
--Christoffer
+Changes since first version [3]:
+
+* Added comments about not described funnels ports in DT files.
+* Removed MODULE_ macros.
+* Print replicator version at probe time.
+* Fixed Kconfig driver description.
+* Added "1x" suffix to compatible string, to reflect supported replicator version
+* Add comment how replicator output port is disabled.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg412873.html
+[2] https://lwn.net/Articles/641585/
+[3] https://lkml.org/lkml/2015/4/29/241
+
+Ivan T. Ivanov (1):
+  arm64: dts: qcom: Add msm8916 CoreSight components
+
+Pratik Patel (1):
+  coresight: replicator: Add Qualcomm CoreSight Replicator driver
+
+ .../devicetree/bindings/arm/coresight.txt          |   1 +
+ arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi    | 254 +++++++++++++++++++++
+ drivers/hwtracing/coresight/Kconfig                |   8 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ .../coresight/coresight-replicator-qcom.c          | 214 +++++++++++++++++
+ 5 files changed, 478 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
+ create mode 100644 drivers/hwtracing/coresight/coresight-replicator-qcom.c
+
+--
+1.9.1
