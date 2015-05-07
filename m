@@ -1,95 +1,81 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Thu, 7 May 2015 22:20:50 +0800
-Subject: [PATCH v5 0/6] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
-References: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <554B74C2.2090709@huawei.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu,  7 May 2015 16:27:18 +0200
+Subject: [PATCH 0/5] VFIO platform reset
+Message-ID: <1431008843-28411-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mike,
+In situations where the userspace driver is stopped abnormally and the
+VFIO platform device is released, the assigned HW device currently is
+left running. As a consequence the HW device might continue issuing IRQs
+and performing DMA accesses.
 
-Could you help to review the patch set especially the clock drivers?
-if there is no problem, please help ack the clock parts :)
+On release, no physical IRQ handler is setup anymore. Also the DMA buffers
+are unmapped leading to IOMMU aborts. So there is no serious consequence.
 
-Thanks,
+However when assigning that HW device again to another userspace driver,
+this latter might face some unexpected IRQs and DMA accesses, which are
+the result of the previous assignment.
 
-Bintian
+In virtualization use-case, a VM newly granted with that HW device may be
+impacted by the assignment of that device to a previous VM:
+- IRQs may be injected very early when booting the new guest, even before
+  the guest driver has initialized leading to possible driver state
+  inconsistency.
+- DMA accesses may hit the newly mapped VM address space at addresses that
+  may jeopardize the integrity of the newly installed VM.
 
-On 2015/5/7 22:00, Bintian Wang wrote:
-> Hi6220 is one mobile solution of Hisilicon, this patchset contains
-> initial support for Hi6220 SoC and HiKey development board, which
-> supports octal ARM Cortex A53 cores. Initial support is minimal and
-> includes just the arch configuration, clock driver, device tree
-> configuration.
->
-> PSCI is enabled in device tree and there is no problem to boot all the
-> octal cores, and the CPU hotplug is also working now, you can download
-> and compile the latest firmware based on the following link to run this
-> patch set:
-> https://github.com/96boards/documentation/wiki/UEFI
->
-> Changes v5:
-> * Rebase to kernel 4.1-rc2
-> * Add compatible string "hisilicon,hi6220-pl011" for Hisilicon designed
->    UART
-> * clk-hi6220.c: use __initdata for non-const arrays based on the commit
->    692d8328e8c039f9497eb862c6cf835de922c061
->
-> Changes v4:
-> * Rebase to kernel 4.1-rc1
-> * Delete "arm,cortex-a15-gic" from the gic node in dts
->
-> Changes v3:
-> * Verified the CPU hotplug based on the new released firmware
-> * Redefined the compatible strings of four system controllers in dts
-> * Setting COMMON_CLK_HI6220 to a bool symbol
-> * Keep CONFGI_ARCH_HISI sorted alphabetically
->
-> Changes v2:
-> * Split the DT bindings documents into earlier patches
-> * Change SMP enable method from spin-table to PSCI in device tree
-> * Remove "clock-frequency" from armv8-timer device node in device tree
-> * Add more description about Hisilicon designed system controllers
->    in DT bindings document
-> * Enable high speed clock on UART1 mux
-> * Other changes based on the discussion in the mailing list:
->    https://lkml.org/lkml/2015/2/5/147
->
-> Bintian Wang (6):
->    arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
->    arm64: hi6220: Document devicetree bindings for Hisilicon hi6220 SoC
->    clk: hi6220: Document devicetree bindings for hi6220 clock
->    Documentation: DT: PL011: hi6220: add compatible string for Hisilicon
->          designed UART
->    clk: hi6220: Clock driver support for Hisilicon hi6220 SoC
->    arm64: dts: Add dts files for Hisilicon Hi6220 SoC
->
->   .../bindings/arm/hisilicon/hisilicon.txt           |   87 ++++++
->   .../devicetree/bindings/clock/hi6220-clock.txt     |   34 +++
->   Documentation/devicetree/bindings/serial/pl011.txt |    4 +-
->   arch/arm64/Kconfig                                 |    5 +
->   arch/arm64/boot/dts/Makefile                       |    1 +
->   arch/arm64/boot/dts/hisilicon/Makefile             |    5 +
->   arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   31 +++
->   arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  172 ++++++++++++
->   arch/arm64/configs/defconfig                       |    1 +
->   drivers/clk/Kconfig                                |    2 +
->   drivers/clk/Makefile                               |    4 +-
->   drivers/clk/hisilicon/Kconfig                      |    6 +
->   drivers/clk/hisilicon/Makefile                     |    3 +-
->   drivers/clk/hisilicon/clk-hi6220.c                 |  292 ++++++++++++++++++++
->   drivers/clk/hisilicon/clk.c                        |   29 ++
->   drivers/clk/hisilicon/clk.h                        |   17 ++
->   drivers/clk/hisilicon/clkdivider-hi6220.c          |  273 ++++++++++++++++++
->   include/dt-bindings/clock/hi6220-clock.h           |  173 ++++++++++++
->   18 files changed, 1134 insertions(+), 5 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
->   create mode 100644 arch/arm64/boot/dts/hisilicon/Makefile
->   create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
->   create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->   create mode 100644 drivers/clk/hisilicon/Kconfig
->   create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
->   create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
->   create mode 100644 include/dt-bindings/clock/hi6220-clock.h
->
+Obviously the criticity depends on the assigned HW devcie.
+
+As opposed to PCI, there is no standard mechanism to reset the platform
+device.
+
+This series proposes to implement device specific reset functions in
+separate vfio modules (in-kernel or external). The reset module only
+registers/unregisters a reset function to the vfio platform driver using
+a dedicated API, paired with the device compatibility string.
+
+The platform driver then look for the reset function that matches the
+compatibility string of the device. In case of match the device specific
+reset can be applied on release and on VFIO_DEVICE_GET_INFO and
+VFIO_DEVICE_RESET ioctls.
+
+A first reset module is provided: the vfio-platform-calxedaxgmac
+module. It implements a basic reset for the Calxeda xgmac.
+
+Amba device reset is not tested.
+
+Best Regards
+
+Eric
+
+The series can be found at
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-rc2-reset
+
+RFC -> PATCH v1:
+- solution now based on a lookup list instead of specialized driver
+
+
+Eric Auger (5):
+  VFIO: platform: add reset_list and register/unregister functions
+  VFIO: platform: add get_device callback
+  VFIO: platform: add reset callback
+  VFIO: platform: populate reset function according to compat
+  VFIO: platform: VFIO platform Calxeda xgmac reset module
+
+ drivers/vfio/platform/Kconfig                      |   2 +
+ drivers/vfio/platform/Makefile                     |   2 +
+ drivers/vfio/platform/reset/Kconfig                |   7 ++
+ drivers/vfio/platform/reset/Makefile               |   5 +
+ .../platform/reset/vfio_platform_calxedaxgmac.c    | 121 ++++++++++++++++++++
+ drivers/vfio/platform/vfio_amba.c                  |   9 ++
+ drivers/vfio/platform/vfio_platform.c              |  10 ++
+ drivers/vfio/platform/vfio_platform_common.c       | 125 ++++++++++++++++++++-
+ drivers/vfio/platform/vfio_platform_private.h      |  15 +++
+ 9 files changed, 294 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/vfio/platform/reset/Kconfig
+ create mode 100644 drivers/vfio/platform/reset/Makefile
+ create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+
+-- 
+1.9.1
