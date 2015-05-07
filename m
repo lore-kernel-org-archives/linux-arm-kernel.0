@@ -1,151 +1,176 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu,  7 May 2015 18:48:36 +0200
-Subject: [PATCH v3 6/7] ARM: dts: Add DT for Hitex LPC4350 Evaluation Board
+Date: Thu,  7 May 2015 18:48:37 +0200
+Subject: [PATCH v3 7/7] ARM: lpc18xx: add kernel config
 In-Reply-To: <1431017317-23740-1-git-send-email-manabian@gmail.com>
 References: <1431017317-23740-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431017317-23740-7-git-send-email-manabian@gmail.com>
+Message-ID: <1431017317-23740-8-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ariel D'Alessandro <ariel.dalessandro@gmail.com>
+Kernel configuration for NXP LPC18xx and LPC43xx devices.
 
-Add basic support for Hitex LPC4350 Evaluation Board. Board
-features a LPC4350 Soc, 8 MB SDRAM, 8 MB SPI Flash, USB and
-Ethernet.
-
-More information can be found on:
-http://www.hitex.com/index.php?id=3212
-
-Signed-off-by: Ariel D'Alessandro <ariel.dalessandro@gmail.com>
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/lpc4350-hitex-eval.dts           | 45 ++++++++++++++++++++++
- arch/arm/boot/dts/lpc4350.dtsi                     | 39 +++++++++++++++++++
- 4 files changed, 86 insertions(+)
- create mode 100644 arch/arm/boot/dts/lpc4350-hitex-eval.dts
- create mode 100644 arch/arm/boot/dts/lpc4350.dtsi
+ arch/arm/configs/lpc18xx_defconfig | 151 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 151 insertions(+)
+ create mode 100644 arch/arm/configs/lpc18xx_defconfig
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index ae3460c0e5fd..7e7d7a7cae2c 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -94,6 +94,7 @@ haoyu	Haoyu Microelectronic Co. Ltd.
- himax	Himax Technologies, Inc.
- hisilicon	Hisilicon Limited.
- hit	Hitachi Ltd.
-+hitex	Hitex Development Tools
- honeywell	Honeywell
- hp	Hewlett Packard
- i2se	I2SE GmbH
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b95d8a6a1e36..1e5b2ea02aad 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -202,6 +202,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-ts419-6281.dtb \
- 	kirkwood-ts419-6282.dtb
- dtb-$(CONFIG_ARCH_LPC18XX) += \
-+	lpc4350-hitex-eval.dtb \
- 	lpc4357-ea4357-devkit.dtb
- dtb-$(CONFIG_ARCH_LPC32XX) += \
- 	ea3250.dtb phy3250.dtb
-diff --git a/arch/arm/boot/dts/lpc4350-hitex-eval.dts b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
 new file mode 100644
-index 000000000000..d04072f40817
+index 000000000000..caf7b5248943
 --- /dev/null
-+++ b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Hitex LPC4350 Evaluation Board
-+ *
-+ * Copyright 2015 Ariel D'Alessandro <ariel.dalessandro@gmail.com>
-+ *
-+ * This code is released using a dual license strategy: BSD/GPL
-+ * You can choose the licence that better fits your requirements.
-+ *
-+ * Released under the terms of 3-clause BSD License
-+ * Released under the terms of GNU General Public License Version 2.0
-+ *
-+ */
-+/dts-v1/;
-+
-+#include "lpc18xx.dtsi"
-+#include "lpc4350.dtsi"
-+
-+/ {
-+	model = "Hitex LPC4350 Evaluation Board";
-+	compatible = "hitex,lpc4350-eval-board", "nxp,lpc4350";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x28000000 0x800000>; /* 8 MB */
-+	};
-+};
-+
-+&pll1 {
-+	clock-mult = <15>;
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/lpc4350.dtsi b/arch/arm/boot/dts/lpc4350.dtsi
-new file mode 100644
-index 000000000000..c4422f587055
---- /dev/null
-+++ b/arch/arm/boot/dts/lpc4350.dtsi
-@@ -0,0 +1,39 @@
-+/*
-+ * NXP LPC4350 and LPC4330 SoC
-+ *
-+ * Copyright 2015 Ariel D'Alessandro <ariel.dalessandro@gmail.com>
-+ *
-+ * This code is released using a dual license strategy: BSD/GPL
-+ * You can choose the licence that better fits your requirements.
-+ *
-+ * Released under the terms of 3-clause BSD License
-+ * Released under the terms of GNU General Public License Version 2.0
-+ *
-+ */
-+
-+/ {
-+	compatible = "nxp,lpc4350", "nxp,lpc4330";
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-m4";
-+		};
-+	};
-+
-+	soc {
-+		sram0: sram at 10000000 {
-+			compatible = "mmio-sram";
-+			reg = <0x10000000 0x20000>; /* 96 + 32 KiB local SRAM */
-+		};
-+
-+		sram1: sram at 10080000 {
-+			compatible = "mmio-sram";
-+			reg = <0x10080000 0x12000>; /* 64 + 8 KiB local SRAM */
-+		};
-+
-+		sram2: sram at 20000000 {
-+			compatible = "mmio-sram";
-+			reg = <0x20000000 0x10000>; /* 4 x 16 KiB AHB SRAM */
-+		};
-+	};
-+};
++++ b/arch/arm/configs/lpc18xx_defconfig
+@@ -0,0 +1,151 @@
++CONFIG_CROSS_COMPILE="arm-linux-gnueabihf-"
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BLK_DEV_INITRD=y
++# CONFIG_RD_BZIP2 is not set
++# CONFIG_RD_LZMA is not set
++# CONFIG_RD_XZ is not set
++# CONFIG_RD_LZO is not set
++# CONFIG_RD_LZ4 is not set
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++# CONFIG_UID16 is not set
++# CONFIG_BASE_FULL is not set
++# CONFIG_FUTEX is not set
++# CONFIG_EPOLL is not set
++# CONFIG_SIGNALFD is not set
++# CONFIG_EVENTFD is not set
++# CONFIG_AIO is not set
++CONFIG_EMBEDDED=y
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_SLUB_DEBUG is not set
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++# CONFIG_MMU is not set
++CONFIG_ARCH_LPC18XX=y
++CONFIG_SET_MEM_PARAM=y
++CONFIG_DRAM_BASE=0x28000000
++CONFIG_DRAM_SIZE=0x02000000
++CONFIG_FLASH_MEM_BASE=0x1b000000
++CONFIG_FLASH_SIZE=0x00080000
++CONFIG_PREEMPT=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_BINFMT_FLAT=y
++CONFIG_BINFMT_ZFLAT=y
++CONFIG_BINFMT_SHARED_FLAT=y
++# CONFIG_COREDUMP is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_FW_LOADER is not set
++CONFIG_MTD=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_SRAM=y
++CONFIG_EEPROM_AT24=y
++CONFIG_NETDEVICES=y
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_HISILICON is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_MICROCHIP is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_QUALCOMM is not set
++# CONFIG_NET_VENDOR_ROCKER is not set
++# CONFIG_NET_VENDOR_SAMSUNG is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++CONFIG_STMMAC_ETH=y
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++CONFIG_SMSC_PHY=y
++# CONFIG_USB_NET_DRIVERS is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
++CONFIG_KEYBOARD_GPIO_POLLED=y
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_UNIX98_PTYS is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_NONSTANDARD=y
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_74XX_MMIO=y
++CONFIG_SENSORS_LM75=y
++CONFIG_WATCHDOG=y
++CONFIG_WATCHDOG_CORE=y
++CONFIG_MFD_SYSCON=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_FB=y
++CONFIG_FB_ARMCLCD=y
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_ROOT_HUB_TT=y
++CONFIG_MMC=y
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_IDMAC=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_PCA9532=y
++CONFIG_LEDS_PCA9532_GPIO=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_RTC_CLASS=y
++CONFIG_DMADEVICES=y
++CONFIG_AMBA_PL08X=y
++CONFIG_EXT2_FS=y
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++# CONFIG_NETWORK_FILESYSTEMS is not set
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_RCU_CPU_STALL_INFO is not set
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_LL_UART_8250=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_CRC_ITU_T=y
++CONFIG_CRC7=y
 -- 
 1.8.0
