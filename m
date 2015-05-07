@@ -1,87 +1,150 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 7 May 2015 08:39:00 +0100
-Subject: [PATCH v7 0/3] ARM: mediatek: Add driver for Mediatek I2C
-In-Reply-To: <1430901427-65146-1-git-send-email-eddie.huang@mediatek.com>
-References: <1430901427-65146-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <20150507073900.GC12484@x1>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Thu, 07 May 2015 10:39:17 +0300
+Subject: [PATCHv7 8/8] watchdog: omap_wdt: Convert to use new core
+ extensions
+In-Reply-To: <20150507073029.GD12306@pengutronix.de>
+References: <1429701102-22320-1-git-send-email-timo.kokkonen@offcode.fi>
+ <1429701102-22320-9-git-send-email-timo.kokkonen@offcode.fi>
+ <20150503185601.GD25193@pengutronix.de> <55470AA7.9050605@offcode.fi>
+ <20150504070452.GE25193@pengutronix.de> <554B0964.9030501@offcode.fi>
+ <20150507073029.GD12306@pengutronix.de>
+Message-ID: <554B16A5.1040205@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 06 May 2015, Eddie Huang wrote:
+On 07.05.2015 10:30, Uwe Kleine-K?nig wrote:
+> Hello Timo,
+>
+> On Thu, May 07, 2015 at 09:42:44AM +0300, Timo Kokkonen wrote:
+>> On 04.05.2015 10:04, Uwe Kleine-K?nig wrote:
+>>> On Mon, May 04, 2015 at 08:59:03AM +0300, Timo Kokkonen wrote:
+>>>> Hi, 03.05.2015 21:56, Uwe Kleine-K?nig wrote:
+>>>>> On Wed, Apr 22, 2015 at 02:11:42PM +0300, Timo Kokkonen wrote:
+>>>>>> +static int omap_wdt_is_running(struct omap_wdt_dev *wdev)
+>>>>>> +{
+>>>>>> +	void __iomem *base = wdev->base;
+>>>>>> +
+>>>>>> +	return readl_relaxed(base + OMAP_WATCHDOG_SPR) == 0x4444;
+>>>>>> +}
+>>>>> This isn't reliable. The sequence needed to enable the watchdog is
+>>>>> 	writel(0xbbbb, base + OMAP_WATCHDOG_SPR);
+>>>>> 	writel(0x4444, base + OMAP_WATCHDOG_SPR);
+>>>>>
+>>>>> The sequence to stop is:
+>>>>> 	writel(0xaaaa, base + OMAP_WATCHDOG_SPR);
+>>>>> 	writel(0x5555, base + OMAP_WATCHDOG_SPR);
+>>>>>
+>>>>> But:
+>>>>>
+>>>>> barebox at TI AM335x BeagleBone black:/ md 0x44e35048+4
+>>>>> 44e35048: 00005555                                           UU..
+>>>>> barebox at TI AM335x BeagleBone black:/ mw 0x44e35048 0x4444
+>>>>> barebox at TI AM335x BeagleBone black:/ md 0x44e35048+4
+>>>>> 44e35048: 00004444                                           DD..
+>>>>>
+>>>>> So the register contains 0x4444 but the timer doesn't run. So at best
+>>>>> testing for 0x4444 is a good heuristic.
+>>>>
+>>>> Yeah.. I don't think we can get any better than that. Unless we
+>>>> start checking the counter register and see whether it really counts
+>>>> or not, and I think that's a bit overkill.. So I'd say we should be
+>>>> safe when assuming bootloader is doing things correctly. Although,
+>>>> we could add a comment to the code that the test may not be 100%
+>>>> reliable in case the start sequence have not been issued properly.
+>>>>
+>>>> Thanks for pointing this out!
+>>> It doesn't seem to much overhead to do:
+>>>
+>>> 	/*
+>>> 	 * There is no register that tells us if the timer is running,
+>>> 	 * so we have to resort to sample twice. The minimal frequency
+>>> 	 * is 256 Hz (32768 Hz prescaled with 2**7).
+>>> 	 */
+>>> 	counter1 = readl(base + OMAP_WATCHDOG_CCR);
+>>> 	mdelay(4);
+>>> 	counter2 = readl(base + OMAP_WATCHDOG_CCR);
+>>> 	return counter1 != counter2;
+>>>
+>>> I'd say it's even worth to do:
+>>>
+>>> 	cntrl = readl(base + OMAP_WATCHDOG_CNTRL);
+>>> 	if (cntrl & (1 << 5))
+>>> 		shift = (cntrl >> 2) & 0x7;
+>>> 	else
+>>> 		shift = 0;
+>>> 	counter1 = readl(base + OMAP_WATCHDOG_CCR);
+>>> 	udelay(31 << shift);
+>>> 	counter2 = readl(base + OMAP_WATCHDOG_CCR);
+>>> 	return counter1 != counter2;
+>>>
+>>> For some bonus points add some defines for the magic constants.
+>>>
+>>> This is save as the OMAP_WATCHDOG_CNTRL doesn't seem to accept reads
+> s/reads/writes/ in the above line.
+>
+>>> while the counter is running. Maybe even this could be used to detect a
+>>> running timer?:
+>>
+>> Maybe, but you will get a data abort when the HW doesn't accept a
+>> read. How do you recover from that?
+>>
+>> Also, it seems that for some reason the watchdog HW is very picky
+>> about which registers can be read in what condition. If I add the
+>> code to read watchdog counter register, I will get a data abort
+>> later at the end of the probe when the watchdog revision is read. I
+>> don't understand why that happens, this does not seem logica. Maybe
+>> it has got something to do with the fact that the watchdog is
+>> stopped? If I can't read the counter register, I can't really
+>> implement the above heuristic.. Any ideas?
+> Which SoC do you use for your tests? Sounds strange. If you provide me
+> your wip patch I can take a look.
+>
 
-> This series is for Mediatek SoCs I2C controller common bus driver.
-> 
-> Earlier MTK SoC ((for example, MT6589, MT8135)) I2C HW has some limitationes.
-> New generation SoC like MT8173 fix following limitations:
-> 
-> 1. Only support one i2c_msg number. One exception is WRRD (write then read)
-> mode. WRRD can have two i2c_msg numbers.
-> 
-> 2. Mediatek I2C controller support WRRD(write then read) mode, in WRRD
-> mode the Repeat Start will be issued between 2 messages.
-> In this driver if 2 messages is first write then read, the driver will
-> combine 2 messages using Write-Read mode so the RS will be issued between
-> the 2 messages.
-> 
-> 3. The max transfer data length is 255 in one message. In WRRD mode, the
-> max data length of second msg is 31.
-> 
-> MT8135 and MT6589 can control I2C pins on PMIC(MT6397) by setting the i2c
-> registers in MT8135 side. In this case, driver should set OFFSET_PATH_DIR
-> bit first, the operation on other registers are still the same.
-> For now MT6589/MT8135 support this, MT6577/MT6595/MT8127 do not support.
-> For example, If want to use I2C4/5/6 pins on MT8135 just need to enable
-> the pinmux, else if want to use I2C pins on PMIC(MT6397) need to add
-> "mediatek,have-pmic" property in the .dts file of each platform.
-> 
-> This driver is based on 4.1-rc1.
-> 
-> Change in v7:
-> Fix mtk_i2c_of_match in wrong patch bug.
-> 
-> Change in v6:
-> 1. Update binding document not use default clock-frequency as example.
-> 2. Add mtk_i2c_compatible struct and pass hardware capabilities
->    through of_device_id
-> 3. Remove some hardware setting in mtk_i2c_do_transfer to mtk_i2c_init_hw
->    so just init one time.
-> 4. Correct mtk_i2c_parse_dt don't set default clock bug.
-> 
-> Change in v5:
-> Apply new i2c_adapter_quirks patch [2]. Change to use dam_map_single to map
-> dma buffer. Add spinlock to fix race condition. Check of_property_read_u32
-> return value. Remove I2C_FUNC_10BIT_ADDR capability due to driver not implement.
-> Add MT8173 I2C driver.
-> 
-> Change in v4:
-> Modify to support i2c_adapter_quirks base on Wolfram's patch [1].
-> Remove check transfer size and WRRD combine code. Instead, fill quirk
-> property and let i2c_check_for_quirks to do the filter.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314804.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325744.html
-> 
-> Eddie Huang (1):
->   I2C: mediatek: Add driver for MediaTek MT8173 I2C controller
-> 
-> Xudong Chen (2):
->   dt-bindings: Add I2C bindings for mt65xx/mt81xx.
->   I2C: mediatek: Add driver for MediaTek I2C controller
-> 
->  .../devicetree/bindings/i2c/i2c-mt6577.txt         |  41 ++
->  drivers/i2c/busses/Kconfig                         |   9 +
->  drivers/i2c/busses/Makefile                        |   1 +
->  drivers/i2c/busses/i2c-mt65xx.c                    | 748 +++++++++++++++++++++
->  4 files changed, 799 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
->  create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
+I tried it on BeagleBone which has am35xx
 
-Again, you've sent me a patch-set that has absolutely nothing to do
-with me.  Can you please stop doing that, my inbox is full enough
-already!
+I tried both approaches and neither were working:
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+index f86775e..b929c83 100644
+--- a/drivers/watchdog/omap_wdt.c
++++ b/drivers/watchdog/omap_wdt.c
+@@ -41,6 +41,7 @@
+  #include <linux/slab.h>
+  #include <linux/pm_runtime.h>
+  #include <linux/platform_data/omap-wd-timer.h>
++#include <linux/delay.h>
+
+  #include "omap_wdt.h"
+
+@@ -81,6 +82,31 @@ static void omap_wdt_reload(struct omap_wdt_dev *wdev)
+  static int omap_wdt_is_running(struct omap_wdt_dev *wdev)
+  {
+  	void __iomem *base = wdev->base;
++	unsigned long cntrl, counter1, counter2, shift;
++       /*
++	* There is no register that tells us if the timer is running,
++	* so we have to resort to sample twice. Use shortest delay
++	* depending on the actual prescaling value.
++	*
++	* Note! If bootloader configured a very large prescaler
++	* value, we might delay up to 4ms here. If that happens, you
++	* are better to fix your bootloader anyway!
++	*/
++
++	/*
++	cntrl = readl_relaxed(base + OMAP_WATCHDOG_CNTRL);
++	if (cntrl & (1 << 5))
++		shift = (cntrl >> 2) & 0x7;
++	else
++		shift = 0;
++	*/
++
++	counter1 = readl_relaxed(base + OMAP_WATCHDOG_CRR);
++	/*udelay(31 << shift);*/
++	msleep(4);
++	counter2 = readl_relaxed(base + OMAP_WATCHDOG_CRR);
++
++	return counter1 != counter2;
+
+  	return readl_relaxed(base + OMAP_WATCHDOG_SPR) == 0x4444;
+  }
