@@ -1,57 +1,23 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 07 May 2015 11:39:06 +0200
-Subject: [RFC v2 0/4] chip/vgic adaptations for forwarded irq
-In-Reply-To: <20150507091748.GA25885@cbox>
-References: <1423642857-24240-1-git-send-email-eric.auger@linaro.org>
- <20150506142748.GC6796@cbox> <554A3425.7070909@linaro.org>
- <20150507091748.GA25885@cbox>
-Message-ID: <554B32BA.2000107@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 May 2015 10:41:51 +0100
+Subject: [PATCH 1/2] spi: sirf: replace kmalloc by devm_kzalloc
+In-Reply-To: <CAMuHMdVcKHxasYAF07Cj=EshjOpKhQJnm9crfFPdUb01WzZsWg@mail.gmail.com>
+References: <1430982791-8681-1-git-send-email-21cnbao@gmail.com>
+ <CAMuHMdVcKHxasYAF07Cj=EshjOpKhQJnm9crfFPdUb01WzZsWg@mail.gmail.com>
+Message-ID: <20150507094151.GI22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2015 11:17 AM, Christoffer Dall wrote:
-> On Wed, May 06, 2015 at 05:32:53PM +0200, Eric Auger wrote:
->> On 05/06/2015 04:27 PM, Christoffer Dall wrote:
->>> Hi Eric,
->>>
->>> On Wed, Feb 11, 2015 at 09:20:53AM +0100, Eric Auger wrote:
->>>> This series proposes some fixes that appeared to be necessary
->>>> to integrate IRQ forwarding in KVM/VFIO.
->>>>
->>>> - deactivation of the forwarded IRQ in irq_disabled case
->>>> - a specific handling of forwarded IRQ into the VGIC state machine.
->>>> - deactivation of physical IRQ and unforwarding on vgic destruction
->>>> - rb_tree lock in vgic.c
->>>>
->>>> Integrated pieces can be found at
->>>> ssh://git.linaro.org/people/eric.auger/linux.git
->>>> on branch irqfd_integ_v9
->>>>
->>> What are the dependencies for this at this point?
->>>
->>> I assume it relies at least on the split EOI/priority drop changes?
->>
->> Yes it now only depends on split EOI/priority drop changes since
->> "genirq: Saving/restoring the irqchip state of an irq line" now is
->> upstreamed.
->>
->>>
->>> Are you going to respin this when there are newer versions of the
->>> dependencies out, or what are the plans?
->>
->> Yes I will respin according to new versions. I am currently using a
->> rebased version of Marc's original RFC "ARM: Forwarding physical
->> interrupts to a guest VM" (http://lwn.net/Articles/603514/) which is a
->> superset of [PATCH] genirq: Add support for priority-drop/deactivate
->> interrupt controllers.
->>
-> 
-> ok, once there's movement on the dependency and you respin, I'll review
-> the rest of this in detail.
+On Thu, May 07, 2015 at 09:25:02AM +0200, Geert Uytterhoeven wrote:
 
-OK thanks
+> What about setting SPI_MASTER_MUST_RX and/or SPI_MASTER_MUST_TX,
+> and removing the dummy page instead, so the spi core will handle it for you?
 
-Eric
-> 
-> -Christoffer
-> 
+Yes, that's what it's there for.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150507/74ac5c30/attachment.sig>
