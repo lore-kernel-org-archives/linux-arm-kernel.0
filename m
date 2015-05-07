@@ -1,93 +1,66 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Thu,  7 May 2015 17:14:21 +0200
-Subject: [PATCH] ARM: net: delegate filter to kernel interpreter when
- imm_offset() return value can't fit into 12bits.
-Message-ID: <1431011661-10277-1-git-send-email-nschichan@freebox.fr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  7 May 2015 16:14:59 +0100
+Subject: [PATCH RESEND] arm64: dts: kill skeleton.dtsi
+Message-ID: <1431011699-15455-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM JIT code emits "ldr rX, [pc, #offset]" to access the literal
-pool. #offset maximum value is 4095 and if the generated code is too
-large, the #offset value can overflow and not point to the expected
-slot in the literal pool. Additionally, when overflow occurs, bits of
-the overflow can end up changing the destination register of the ldr
-instruction.
+While skeleton.dtsi was initially conceived as a simple way to bootstrap
+writing a dts, it has proven to be problematic:
 
-Fix that by detecting the overflow in imm_offset() and setting a flag
-that is checked for each BPF instructions converted in
-build_body(). As of now it can only be detected in the second pass. As
-a result the second build_body() call can now fail, so add the
-corresponding cleanup code in that case.
+* The #address-cells and #size-cells values used in skeleton.dtsi may
+  not match what a user wants (e.g. when they need to describe a range
+  larger than 4GB).
 
-Using multiple literal pools in the JITed code is going to require
-lots of intrusive changes to the JIT code (which would better be done
-as a feature instead of fix), just delegating to the kernel BPF
-interpreter in that case is a more straight forward, minimal fix and
-easy to backport.
+* For dts files where memory nodes have unit-addresses, it adds a
+  redundant /memory node, for which the reg entry may not be
+  appropriately sized (e.g. where #size-cells has been overridden).
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+* For dts files which assume that a bootloader will fill in the memory
+  node(s), no node is present in the dts (and hence there is no attached
+  comment), making it hard to distinguish these cases from bad dts
+  files, and masking any warnings dtc may produce w.r.t. missing nodes.
+
+* The default empty /chosen and /aliases are somewhat useless, and it
+  would be preferable for dts to fill these in (e.g. for
+  /aliases/serial0 and /chosen/stdout-path).
+
+This patch removes skeleton.dtsi from arm64. There are currently no
+users, so we can remove it before any appear.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Rob Herring <rob.herring@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/net/bpf_jit_32.c | 27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/skeleton.dtsi | 13 -------------
+ 1 file changed, 13 deletions(-)
+ delete mode 100644 arch/arm64/boot/dts/skeleton.dtsi
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 6bda637..bb8ffcd 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -54,6 +54,7 @@
- #define SEEN_DATA		(1 << (BPF_MEMWORDS + 3))
- 
- #define FLAG_NEED_X_RESET	(1 << 0)
-+#define FLAG_IMM_OVERFLOW	(1 << 1)
- 
- struct jit_ctx {
- 	const struct bpf_prog *skf;
-@@ -293,6 +294,15 @@ static u16 imm_offset(u32 k, struct jit_ctx *ctx)
- 	/* PC in ARM mode == address of the instruction + 8 */
- 	imm = offset - (8 + ctx->idx * 4);
- 
-+	if (imm & ~0xfff) {
-+		/*
-+		 * literal pool is too far, signal it into flags. we
-+		 * can only detect it on the second pass unfortunately.
-+		 */
-+		ctx->flags |= FLAG_IMM_OVERFLOW;
-+		return 0;
-+	}
-+
- 	return imm;
- }
- 
-@@ -876,6 +886,14 @@ b_epilogue:
- 		default:
- 			return -1;
- 		}
-+
-+		if (ctx->flags & FLAG_IMM_OVERFLOW)
-+			/*
-+			 * this instruction generated an overflow when
-+			 * trying to access the literal pool, so
-+			 * delegate this filter to the kernel interpreter.
-+			 */
-+			return -1;
- 	}
- 
- 	/* compute offsets only during the first pass */
-@@ -938,7 +956,14 @@ void bpf_jit_compile(struct bpf_prog *fp)
- 	ctx.idx = 0;
- 
- 	build_prologue(&ctx);
--	build_body(&ctx);
-+	if (build_body(&ctx) < 0) {
-+#if __LINUX_ARM_ARCH__ < 7
-+		if (ctx.imm_count)
-+			kfree(ctx.imms);
-+#endif
-+		bpf_jit_binary_free(header);
-+		goto out;
-+	}
- 	build_epilogue(&ctx);
- 
- 	flush_icache_range((u32)ctx.target, (u32)(ctx.target + ctx.idx));
+Arnd, Olof, are you happy to pick this up for v4.2?
+
+Mark.
+
+diff --git a/arch/arm64/boot/dts/skeleton.dtsi b/arch/arm64/boot/dts/skeleton.dtsi
+deleted file mode 100644
+index 38ead82..0000000
+--- a/arch/arm64/boot/dts/skeleton.dtsi
++++ /dev/null
+@@ -1,13 +0,0 @@
+-/*
+- * Skeleton device tree; the bare minimum needed to boot; just include and
+- * add a compatible value.  The bootloader will typically populate the memory
+- * node.
+- */
+-
+-/ {
+-	#address-cells = <2>;
+-	#size-cells = <1>;
+-	chosen { };
+-	aliases { };
+-	memory { device_type = "memory"; reg = <0 0 0>; };
+-};
 -- 
 1.9.1
