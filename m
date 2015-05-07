@@ -1,20 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 May 2015 18:27:22 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.1
-In-Reply-To: <cover.1430977471.git.horms+renesas@verge.net.au>
-References: <cover.1430977471.git.horms+renesas@verge.net.au>
-Message-ID: <201505071827.22255.arnd@arndb.de>
+Date: Thu, 7 May 2015 18:29:04 +0200
+Subject: [GIT PULL] Ux500 fixes
+In-Reply-To: <CACRpkdZMCaCgJ89xPPy9pMRYDinuWwvBrXm+uKF12Ls4cNxvNQ@mail.gmail.com>
+References: <CACRpkdZMCaCgJ89xPPy9pMRYDinuWwvBrXm+uKF12Ls4cNxvNQ@mail.gmail.com>
+Message-ID: <201505071829.05147.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 May 2015, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Tuesday 28 April 2015, Linus Walleij wrote:
+> Hi ARM SoC guys,
 > 
-> Please consider these Renesas ARM based SoC fixes for v4.1.
+> this are three patches fixing an issue in the Ux500 with SD/MMC
+> GPIO regulators. All DTS fixes. Please pull it in for fixes.
 > 
-> This addresses a short-coming which was introduced when
-> the adv7511 was enabled on the koelsch board.
-> 
+> Yours,
+> Linus Walleij
 > 
 > The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 > 
@@ -22,18 +22,19 @@ On Thursday 07 May 2015, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/stericsson-fixes-v4.1
 > 
-> for you to fetch changes up to 12392f5896c9affc03c1ddd95a83c32238862a58:
+> for you to fetch changes up to 11133db7a836b0cb411faa048f07a38e994d1382:
 > 
->   ARM: shmobile: koelsch: Fix adv7511 IRQ sensing (2015-05-01 09:13:03 +0900)
+>   ARM: ux500: Enable GPIO regulator for SD-card for snowball
+> (2015-04-27 09:01:02 +0200)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM Based SoC Fixes for v4.1
-> 
-> * Fix adv7511 IRQ sensing on koelsch board
+> This fixes an MMC/SD configuration issue present for some time
+> in the Ux500 DT but triggered by proper error handling in v4.1-rc1.
 > 
 
-Merged into the fixes branch, thanks!
+Pulled into the fixes branch, thanks!
 
 	Arnd
