@@ -1,52 +1,38 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Thu, 07 May 2015 21:12:00 -0700
-Subject: [V3 PATCH 3/5] device property: Introduces
- device_dma_is_coherent()
-In-Reply-To: <1431045436-8690-4-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1431045436-8690-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1431045436-8690-4-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <554C3790.4010407@oracle.com>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Thu, 7 May 2015 21:19:21 -0700
+Subject: [PATCH 2/3] gpio: Add GPIO support for Broadcom STB SoCs
+In-Reply-To: <1430986729.8171.41.camel@x220>
+References: <1430901477-10678-1-git-send-email-gregory.0xf0@gmail.com>
+ <1430901477-10678-3-git-send-email-gregory.0xf0@gmail.com>
+ <1430986729.8171.41.camel@x220>
+Message-ID: <20150508041921.GA26702@corellia.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/7/15 5:37 PM, Suravee Suthikulpanit wrote:
-> Currently, device drivers, which support both OF and ACPI,
-> need to call two separate APIs, of_dma_is_coherent() and
-> acpi_dma_is_coherent()) to determine device coherency attribute.
->
-> This patch simplifies this process by introducing a new device
-> property API, device_dma_is_coherent(), which calls the appropriate
-> interface based on the booting architecture.
->
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> ---
->   drivers/base/property.c  | 12 ++++++++++++
->   include/linux/property.h |  2 ++
->   2 files changed, 14 insertions(+)
->
-> diff --git a/drivers/base/property.c b/drivers/base/property.c
-> index 1d0b116..8123c6e 100644
-> --- a/drivers/base/property.c
-> +++ b/drivers/base/property.c
-> @@ -14,6 +14,7 @@
->   #include <linux/export.h>
->   #include <linux/kernel.h>
->   #include <linux/of.h>
-> +#include <linux/of_address.h>
->   #include <linux/property.h>
->
->   /**
-> @@ -519,3 +520,14 @@ unsigned int device_get_child_node_count(struct device *dev)
->   	return count;
->   }
->   EXPORT_SYMBOL_GPL(device_get_child_node_count);
-> +
-> +bool device_dma_is_coherent(struct device *dev)
-> +{
-> +	if (IS_ENABLED(CONFIG_OF) && dev->of_node)
+On Thu, May 07, 2015 at 10:18:49AM +0200, Paul Bolle wrote:
+> Just a nit: a license mismatch.
+> 
+> On Wed, 2015-05-06 at 01:37 -0700, Gregory Fong wrote:
+> > --- /dev/null
+> > +++ b/drivers/gpio/gpio-brcmstb.c
+> 
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation version 2.
+> > + *
+> > + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> > + * kind, whether express or implied; without even the implied warranty
+> > + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> 
+> This states the license is GPL v2.
+> 
+> > +MODULE_LICENSE("GPL");
+> 
+> And, according to include/linux/module.h, this states the license is GPL
+> v2 or later. So I think either the comment at the top of this file or
+> the ident used in the MODULE_LICENSE() macro needs to change.
 
-Do you really need that IS_ENABLED(CONFIG_OF) ?
-In other words, dev->of_node should be null for !CONFIG_OF
+Will fix that, thanks.
 
-Regards,
-Santosh
+Gregory
