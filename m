@@ -1,65 +1,31 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 8 May 2015 07:49:18 +0100
-Subject: [STLinux Kernel] [PATCH 06/12] watchdog: bindings: Supply
- knowledge of a third supported device - clocksource
-In-Reply-To: <20150507195529.GA28554@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
- <1431005924-21777-7-git-send-email-lee.jones@linaro.org>
- <20150507141805.GC9793@griffinp-ThinkPad-X1-Carbon-2nd>
- <20150507191909.GC16220@x1>
- <20150507195529.GA28554@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20150508064918.GF16220@x1>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 8 May 2015 12:19:40 +0530
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <20150507213015.GB2455@codeaurora.org>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <20150504121209.GM15510@sirena.org.uk>
+ <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
+ <20150505105714.GA22845@sirena.org.uk>
+ <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
+ <20150505171252.GI22845@sirena.org.uk>
+ <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
+ <20150507055231.GB32399@codeaurora.org>
+ <CAKohpomYQw67KuX29PLawmd1dSXHx7pMt7+8BzmLPfHSqhMB2g@mail.gmail.com>
+ <20150507213015.GB2455@codeaurora.org>
+Message-ID: <CAKohpo=Eq=Eno6PThDkNFm_tDKv47mTPWhjb_JHPs7+78x3Q-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 07 May 2015, Peter Griffin wrote:
+On 8 May 2015 at 03:00, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 05/07, Viresh Kumar wrote:
 
-> Hi Lee,
-> 
-> On Thu, 07 May 2015, Lee Jones wrote:
-> 
-> <snip>
-> 
-> > > >  Required properties
-> > > >  
-> > > > -- compatible 	: Must be one of: "st,stih407-lpc" "st,stih416-lpc"
-> > > > -				  "st,stih415-lpc" "st,stid127-lpc"
-> > > > +- compatible 	: Must be one of: "st,stih407-lpc"
-> > > 
-> > > The same comment as the RTC DT patch, you are removing the compatibles
-> > > documentation for the other supported platforms like stih416-lpc.
-> > > AFAIK they are required in the driver to get the correct sysconfig register.
-> > 
-> > That's intentional.  I haven't yet tested any of this IP on
-> > STiH41{5,6} & STiH127.  Due to lack of documentation, I'm not even
-> > sure if this IP even exists on some of the other platforms.  I will
-> > add them back when support is added to both driver and DTB and I've
-> > been able to test them.
-> 
-> That was kind of my point, the driver code AFAIK already contains support
-> for these SoC's.
-> 
-> I would either expect the patch to remove support from the DT docs AND the
-> driver, or leave it as is.
-> 
-> It seems odd to only change the DT docs, and become unaligned to the
-> code (this assumes I'm looking at the latest patchset here 
-> https://lkml.org/lkml/2015/3/4/1088 which includes support for these SoCs).
+>> - Now if uV is fixed, how is the target current controlled separately ?
+>
+> uV is not fixed
 
-The decision to remove these 'supported' platforms was made on the RTC
-side, where there is only support for "st,stih407-lpc" in the driver.
-I thought it best to mirror that thought over to the Watchdog LPC
-bindings, but thought it not really worth ripping out existing support
-from the driver.  If others wish to test/use the Watchdog on other
-platforms and can read C code, they'll know what to do.
+I meant uV is fixed for this particular OPP, i.e. min/tar/max value.
 
-Hopefully all of this will be a non-issue anyway, as I plan to test
-this on the other boards I have in my farm and make the necessary
-changes in the upcoming weeks.  All should be squared away by the next
-merge-window.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+What about the other changes? Does these fix the use cases you shared
+earlier ? I will send a new updated version then..
