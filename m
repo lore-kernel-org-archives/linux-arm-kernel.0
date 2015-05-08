@@ -1,49 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 May 2015 15:30:50 +0200
-Subject: [PATCH RFC 0/2] stmmac: stand alone platform drivers
-In-Reply-To: <1431022765-30715-1-git-send-email-manabian@gmail.com>
-References: <1431022765-30715-1-git-send-email-manabian@gmail.com>
-Message-ID: <5987007.lq0DjS0tE0@wuerfel>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Fri, 8 May 2015 16:37:29 +0300
+Subject: [alsa-devel] [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
+In-Reply-To: <20150508132701.GJ2067@n2100.arm.linux.org.uk>
+References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+ <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
+ <34627ba55428fd0dd821d99a5326e451@kapsi.fi>
+ <20150508132701.GJ2067@n2100.arm.linux.org.uk>
+Message-ID: <554CBC19.6000701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 May 2015 20:19:23 Joachim Eastwood wrote:
-> Hi Arnd,
-> 
-> I ran into some issue using a separate platform driver[1] for lpc1850-dwmac.
-> 
-> My dts files looks like this.
-> mac: ethernet at 40010000 {
->         compatible = "nxp,lpc1850-dwmac", "snps,dwmac-3.611", "snps,dwmac";
->         ...
-> }
-> 
-> On boot the generic driver in stmmac_platform.c would grab the
-> device, matching on one of generic compat strings and thus blocking
-> the lpc1850-dwmac driver.
-> 
-> By changing the build order in the Makefile (see patch 1) I managed
-> to get it working, but I am not sure that is a good solution(?).
+On 05/08/15 16:27, Russell King - ARM Linux wrote:
+> On Fri, May 08, 2015 at 04:16:08PM +0300, Jyri Sarha wrote:
+>> On 2015-04-02 12:22, Russell King wrote:
+...
+>> For what I can see, you are setting the cross dependency between
+>> the sample rate and channels incorrectly.
+>
+> There is a dependency between sample rate and channels.
+>
+>> You should look for the
+>> currently tested channel count directly from hw params.
+>
+> I'm not so sure that's right after looking at snd_ac97_pcm_double_rate_rules().
+> That's pretty much the same problem - AC'97 codecs can operate at a
+> sample rate of either the bus frame frequency or twice the bus frame
+> frequency.
+>
 
-Changing the link order in the Makefile is an acceptable solution
-for managing initialization order in general, but I think it won't
-work here, because if your driver is a loadable module, the base
-driver would always be attached first.
- 
-> Another fix would be to remove the generic compat strings from the
-> match table in stmmac_platform but there are some dts-files that
-> only have these compat strings.
-> See abilis_tb10x.dtsi and exynos5440.dtsi.
-
-Yes, that has a high risk of causing regressions.
-
-> I could also remove the generic compat strings from my dts file but
-> I am not sure that is good solution either. If more glue is
-> converted this would then be need in those dts files also.
-
-I think it would work if you move the generic strings into a separate
-module that is not the one providing the base support. In that case,
-the kernel should first try to use the driver that matches the first
-compatible string. Can you try that?
-
-	Arnd
+Maybe digging the channels from intervals works too, I have just never
+used that myself. The param_channels() works too and it is slightly simpler.
