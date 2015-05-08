@@ -1,93 +1,98 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 8 May 2015 11:28:44 +0200
-Subject: [PATCH v3 03/12] KVM: arm64: guest debug, define API headers
-In-Reply-To: <1430929407-3487-4-git-send-email-alex.bennee@linaro.org>
-References: <1430929407-3487-1-git-send-email-alex.bennee@linaro.org>
- <1430929407-3487-4-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150508092844.GC24744@cbox>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 8 May 2015 11:31:53 +0200
+Subject: [PATCH 0/2] gpio: Allow userspace export from DT
+In-Reply-To: <CANh8Qzy7D=O0C7nw_M0LCvE887uxsCjRmvQ8fcKTcf4dJNm7iA@mail.gmail.com>
+References: <20150413110515.9681.58848.stgit@localhost>
+ <20150504084925.GB4047@localhost>
+ <CACRpkdbFKs8mALw7q2d0EEDkhxKNLgeiFB5TyZ6ZPpfcW-c+oQ@mail.gmail.com>
+ <20150506130615.GB5302@localhost>
+ <CANh8Qzy7D=O0C7nw_M0LCvE887uxsCjRmvQ8fcKTcf4dJNm7iA@mail.gmail.com>
+Message-ID: <20150508093153.GD1942@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 05:23:18PM +0100, Alex Benn?e wrote:
-> This commit defines the API headers for guest debugging. There are two
-> architecture specific debug structures:
+On Wed, May 06, 2015 at 07:56:05PM +0200, Fuzzey, Martin wrote:
+> On 6 May 2015 at 15:06, Johan Hovold <johan@kernel.org> wrote:
+> > On Wed, May 06, 2015 at 09:22:22AM +0200, Linus Walleij wrote:
+> > > On Mon, May 4, 2015 at 10:49 AM, Johan Hovold <johan@kernel.org> wrote:
+> > > > On Mon, Apr 13, 2015 at 01:05:15PM +0200, Martin Fuzzey wrote:
+> > >
+> > > >> The above means that, in order to export the GPIO to userspace via
+> > > >> /sys/class/gpio/export the userspace code must know the exact hardware and
+> > > >> kernel version information.
+> > > >
+> > > > Not quite. You can still determine the gpio number in the above cases by
+> > > > walking the sysfs tree to find the chip and it's base. This is the only
+> > > > way to do this for dynamic buses such as USB.
+> > >
 > 
->   - kvm_guest_debug_arch, allows us to pass in HW debug registers
->   - kvm_debug_exit_arch, signals exception and possible faulting address
+> A problem with that is that the "label" sysfs attribute is not
+> necessarilly unique (and is even documented as being non unique).
+> Many drivers just use the chip name as the label so if you have more
+> than one of them...
 > 
-> The type of debugging being used is controlled by the architecture
-> specific control bits of the kvm_guest_debug->control flags in the ioctl
-> structure.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> Reviewed-by: David Hildenbrand <dahi@linux.vnet.ibm.com>
-> Reviewed-by: Andrew Jones <drjones@redhat.com>
-> 
-> ---
-> v2
->    - expose hsr and pc directly to user-space
-> v3
->    - s/control/controlled/ in commit message
->    - add v8 to ARM ARM comment (ARM Architecture Reference Manual)
->    - add rb tag
->    - rm pc, add far
->    - re-word comments on alignment
->    - rename KVM_ARM_NDBG_REGS -> KVM_ARM_MAX_DBG_REGS
-> 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index d268320..04957d7 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -100,10 +100,28 @@ struct kvm_sregs {
->  struct kvm_fpu {
->  };
->  
-> +/*
-> + * See v8 ARM ARM D7.3: Debug Registers
-> + *
-> + * The control registers are architecturally defined as 32 bits but are
-> + * stored as 64 bit values alongside the value registers. This is done
-> + * to keep the copying of these values into the vcpu context simple as
-> + * everything is 64 bit aligned (see DBGBCR0_EL1 onwards in kvm_asm.h).
-> + *
-> + * The architectural limit is 16 debug registers of each type although
-> + * in practice there are usually less (see ID_AA64DFR0_EL1).
-> + */
-> +#define KVM_ARM_MAX_DBG_REGS 16
->  struct kvm_guest_debug_arch {
-> +	__u64 dbg_bcr[KVM_ARM_MAX_DBG_REGS];
-> +	__u64 dbg_bvr[KVM_ARM_MAX_DBG_REGS];
-> +	__u64 dbg_wcr[KVM_ARM_MAX_DBG_REGS];
-> +	__u64 dbg_wvr[KVM_ARM_MAX_DBG_REGS];
->  };
->  
->  struct kvm_debug_exit_arch {
-> +	__u32 hsr;
-> +	__u64 far;
->  };
->  
->  struct kvm_sync_regs {
-> @@ -216,4 +234,11 @@ struct kvm_arch_memory_slot {
->  
->  #endif
->  
-> +/*
-> + * Architecture related debug defines - upper 16 bits of
+> Of course if you know the bus and bus address it is possible to find
+> the associated GPIO base but why should userspace have to know that?
+> Isn't the whole point of the DT to describe such hardware details?
 
-"Architecture specific debug control flags" seems more accurate.
+Yes, eventually, but the current gpio sysfs-interface does not allow for
+that information to be confined to DT. It has always required knowledge
+of the hardware (e.g. the pin numbers), but people eventually discovered
+that those numbers may actually change.
 
-> + * kvm_guest_debug->control
-> + */
-> +#define KVM_GUESTDBG_USE_SW_BP	        __KVM_GUESTDBG_USE_SW_BP
-> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
-> +
->  #endif /* __ARM_KVM_H__ */
-> -- 
-> 2.3.5
-> 
+I'm only pointing out that *that* particular quirk can be worked around
+by providing different information about the hardware (e.g. the bus
+topology).
 
-Otherwise:
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+IMO, the current interface should remain to be a pain to use so that
+people either fix the drivers or start working on a replacement
+user-space interface.
 
-Thanks,
--Christoffer
+> > > Maybe we should start providing something like an
+> > > "lsgpio" utility in tools/gpio to do this, just as a hint
+> > > to userspace people on how things should be done.
+> >
+> > I think we should focus on defining a new user-space interface rather
+> > than make it easier to use the current one (it should really only be
+> > used for development or one-off hacks IMO).
+> >
+> Doesn't the ability to name GPIOs, fix their direction, and "pre
+> export" them  in the device tree remove most of the warts of the
+> current interface? (for GPIOs for which it is used in any case)
+
+I agree with you that such properties (e.g. direction and function)
+should be defined in DT. A gpio should not be exported until requested
+by userspace though. This allow for the case where a userspace driver
+can be used as a fall back if a kernel driver isn't available or loaded.
+
+> > > >> This patch series solves both problems by performing the external
+> > > >> signal => GPIO mapping in the device tree.
+> > > >
+> > > > As Rob already mentioned, what we want is some way to declare pin
+> > > > functions. These could then be requested from userspace (or used in DT,
+> > > > something which should allow for further refactoring there as well)
+> > > > unless a driver has already claimed them.
+> > >
+> > > We have the ability to name the GPIO lines (I usually refer to
+> > > lines rather than pins, as pins are physical and not all GPIOs
+> > > are, actually) using the array "names" in struct gpio_chip,
+> > > however this has no DT binding, so maybe people should
+> > > work on that. These names appear as named line files
+> > > in sysfs IIRC. Or maybe you're thinking of something else?
+> >
+> > Yes, something like that. As you mention above, if it was possibly to
+> > define those names in firmware, even the current sysfs interface would
+> > expose the pins as
+> >
+> >         /sys/class/gpio/<function>
+> >
+> > rather than say /sys/class/gpio/gpio279, thereby solving the gpio-number
+> > look-up issue. Well, to actually make the pin available *from* userspace
+> > you'd currently still need the number...
+> >
+> Indeed that  doesn't solve the how to export it problem.
+> AFAICT nothing is visible in sysfs until the export has been done.
+
+That will be solved by the new userspace interface. ;)
+
+Johan
