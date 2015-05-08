@@ -1,77 +1,16 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 09 May 2015 02:32:56 +0900
-Subject: [PATCH 1/1] ARM: dts: Make DP a consumer of DISP1 power domain
- on Exynos5420
-In-Reply-To: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1428870659-5525-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <554CF348.30803@kernel.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 May 2015 18:35:05 +0100
+Subject: [PATCH 0/3] Three cleanup patches for proc-v7 code
+Message-ID: <20150508173505.GL2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/15 05:30, Javier Martinez Canillas wrote:
-> Commit ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
-> added a device node for the Exynos5420 DISP1 power domain but dit not
-> make the DP controller a consumer of that power domain.
-> 
-> This causes an "Unhandled fault: imprecise external abort" error if the
-> exynos-dp driver tries to access the DP controller registers and the PD
-> was turned off. This lead to a kernel panic and a complete system hang.
-> 
-> Make the DP controller device node a consumer of the DISP1 power domain
-> to ensure that the PD is turned on when the exynos-dp driver is probed.
-> 
-> Fixes: ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
-> 
-> Hello,
-> 
-> This latent bug was not exposed before since drivers for other devices
-> marked as DISP1 power domain consumers were probed before exynos-dp so
-> the PD was already on which made possible to access the DP registers.
-> 
-> But "regulator: Defer lookup of supply to regulator_get" [0] that is in
-> linux-next from a couple of days now, changed the order on which the
-> drivers' probes succeed so the PD was disabled during exynos-dp probe.
-> 
-> Exynos5420 machines with a display such as the Exynos5420 Peach Pit and
-> Exynos5800 Peach Pi were failing to boot due this issue, i.e: [1].
-> 
-> Olof,
-> 
-> Could you please confirm $subject fixes the issue catched by your farm?
-> 
-> Krzysztof,
-> 
-> This patch conflicts with your Exynos5 phandle notation cleanup [2] but
-> I preferred to send it on top of linux-next instead of making your series
-> a dependency since it fixes a very important bug that had caused -next to
-> be broken on these matchines for days now.
-> 
-> Thanks a lot and best regards,
-> Javier
-> 
-> [0]: https://lkml.org/lkml/2015/3/24/1167
-> [1]: http://arm-soc.lixom.net/bootlogs/next/next-20150409/pi-arm-exynos_defconfig.html
-> [2]: https://lkml.org/lkml/2015/4/12/49
-> 
->  arch/arm/boot/dts/exynos5420.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index f67b23f303c3..45317538bbae 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -536,6 +536,7 @@
->  		clock-names = "dp";
->  		phys = <&dp_phy>;
->  		phy-names = "dp";
-> +		power-domains = <&disp_pd>;
->  	};
->  
->  	mipi_phy: video-phy at 10040714 {
+Here's three cleanup patches for the proc-v7 code which hopefully
+improve the readability and add some additional documentation.
 
-Sorry for the late response. I've applied in -fixes and will be sent to
-arm-soc soon. Thanks.
+ arch/arm/mm/proc-v7.S | 162 ++++++++++++++++++++++++++++----------------------
+ 1 file changed, 91 insertions(+), 71 deletions(-)
 
-- Kukjin
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
