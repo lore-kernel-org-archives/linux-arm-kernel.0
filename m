@@ -1,71 +1,120 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 8 May 2015 08:16:04 +0100
-Subject: [STLinux Kernel] [PATCH 06/12] watchdog: bindings: Supply
- knowledge of a third supported device - clocksource
-In-Reply-To: <20150508064918.GF16220@x1>
-References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
- <1431005924-21777-7-git-send-email-lee.jones@linaro.org>
- <20150507141805.GC9793@griffinp-ThinkPad-X1-Carbon-2nd>
- <20150507191909.GC16220@x1>
- <20150507195529.GA28554@griffinp-ThinkPad-X1-Carbon-2nd>
- <20150508064918.GF16220@x1>
-Message-ID: <20150508071604.GA2232@griffinp-ThinkPad-X1-Carbon-2nd>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 8 May 2015 09:18:11 +0200
+Subject: [PATCH V5] ARM: imx: correct Audio/Video PLL rate calculation
+ formula
+In-Reply-To: <1431084329-10579-1-git-send-email-b20788@freescale.com>
+References: <1431084329-10579-1-git-send-email-b20788@freescale.com>
+Message-ID: <20150508071811.GH12671@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hello,
 
-<snip>
-
-On Fri, 08 May 2015, Lee Jones wrote:
-> > > > >  
-> > > > > -- compatible 	: Must be one of: "st,stih407-lpc" "st,stih416-lpc"
-> > > > > -				  "st,stih415-lpc" "st,stid127-lpc"
-> > > > > +- compatible 	: Must be one of: "st,stih407-lpc"
-> > > > 
-> > > > The same comment as the RTC DT patch, you are removing the compatibles
-> > > > documentation for the other supported platforms like stih416-lpc.
-> > > > AFAIK they are required in the driver to get the correct sysconfig register.
-> > > 
-> > > That's intentional.  I haven't yet tested any of this IP on
-> > > STiH41{5,6} & STiH127.  Due to lack of documentation, I'm not even
-> > > sure if this IP even exists on some of the other platforms.  I will
-> > > add them back when support is added to both driver and DTB and I've
-> > > been able to test them.
-> > 
-> > That was kind of my point, the driver code AFAIK already contains support
-> > for these SoC's.
-> > 
-> > I would either expect the patch to remove support from the DT docs AND the
-> > driver, or leave it as is.
-> > 
-> > It seems odd to only change the DT docs, and become unaligned to the
-> > code (this assumes I'm looking at the latest patchset here 
-> > https://lkml.org/lkml/2015/3/4/1088 which includes support for these SoCs).
+On Fri, May 08, 2015 at 07:25:29PM +0800, Anson Huang wrote:
+> The audio/video PLL's rate calculation formula is as below in RM:
 > 
-> The decision to remove these 'supported' platforms was made on the RTC
-> side, where there is only support for "st,stih407-lpc" in the driver.
+> Fref * (DIV_SELECT + NUM / DENOM),
+> 
+> in original clk-pllv3's code, below code is used:
+> 
+> (parent_rate * div) + ((parent_rate / mfd) * mfn)
+> 
+> as it does NOT consider the non-integer part of division,
+> so below calculation formula should be better used instead:
+> 
+> (parent_rate * div) + ((parent_rate * mfn) / mfd)
+> 
+> and we also need to consider parent_rate * mfd may overflow
+> a 32 bit value, 64 bit value should be used.
+> 
+> Below is one example of old/new formula's difference:
+> 
+> On i.MX7D, DRAM PLL is a Audio/Video type PLL, the target freq
+> is 1066MHz, the register settings are as below:
+> 
+> PLL_DDRn: 8060202C   -> div = 0x2C
+> DDR_NUM: 06AAAC4D    -> mfn = 0x6AAAC4D
+> DDR_DENOM: 100003EC  -> mfd = 0x100003EC
+> 
+> parent_rate = 24MHz.
+> 
+> with old formula, the (parent_rate / mfd) * mfn = 0, with new formula,
+> the (parent_rate * mfn) / mfd = 10MHz, so old formula gets
+> PLL_DDR = 1056MHz, while the updated formula gets PLL_DDR = 1066MHz
+> which exactly matches the real rate.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  drivers/clk/imx/clk-pllv3.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+> index 641ebc5..652af4d 100644
+> --- a/drivers/clk/imx/clk-pllv3.c
+> +++ b/drivers/clk/imx/clk-pllv3.c
+> @@ -203,8 +203,13 @@ static unsigned long clk_pllv3_av_recalc_rate(struct clk_hw *hw,
+>  	u32 mfn = readl_relaxed(pll->base + PLL_NUM_OFFSET);
+>  	u32 mfd = readl_relaxed(pll->base + PLL_DENOM_OFFSET);
+>  	u32 div = readl_relaxed(pll->base) & pll->div_mask;
+> +	u64 temp64 = parent_rate;
+> +
+> +	temp64 *= mfn;
+> +	do_div(temp64, mfd);
+> +
+> +	return (parent_rate * div) + temp64;
+unnecessary parenthesis
 
-The change makes sense in the RTC case then.
+>  
+Please drop this empty line.
 
-> I thought it best to mirror that thought over to the Watchdog LPC
-> bindings,
+> -	return (parent_rate * div) + ((parent_rate / mfd) * mfn);
+>  }
+>  
+>  static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
+> @@ -228,7 +233,10 @@ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
+>  	do_div(temp64, parent_rate);
+>  	mfn = temp64;
+Shawn, also what is above here is suboptimal (quoted using }):
 
-Why? This is the bit I disagree with, the wdt DT docs IMHO should match the wdt
-driver code.
+}        div = rate / parent_rate;
+}        temp64 = (u64) (rate - div * parent_rate);
+That's equivalent to:
+	temp64 = rate % parent_rate;
 
-> but thought it not really worth ripping out existing support
-> from the driver.  
+If you want to save the possible additional division, at least point
+this out in a comment.
 
-I agree it is not worth ripping out existing support only to add it back in. Equally
-I can't see the point in doing this with the DT documentation either.
+}        temp64 *= mfd;
+}        do_div(temp64, parent_rate);
+}        mfn = temp64;
+For the example from Anson's commit log (rate = 1066000000, parent_rate
+= 24000000) you calculate
 
-> If others wish to test/use the Watchdog on other
-> platforms and can read C code, they'll know what to do.
+	div = 0x2c
+	mfn = 416666
+	mfd = 1000000
 
-Yes, and without this change they could also read the documentation. Your doing a
-v2 anyway, it seems trivial to fix this at the same time.
+yielding a rate of 1065999984 Hz. Using
+do_div(temp64 + parent_rate / 2, parent_rate) instead would make mfn
+bigger by one yielding 1066000008.0 which results in a better
+approximation. I guess using rational_best_approximation would result in
+a still better approximation, probably even finding the optimal match.
 
-regards,
+>  
+> -	return parent_rate * div + parent_rate / mfd * mfn;
+> +	temp64 = parent_rate * mfn;
+This is wrong, both parent_rate and mfn are 32 bit unsigned integers
+(unsigned long and u32) respectively. So this might well overflow.
 
-Peter.
+
+> +	do_div(temp64, mfd);
+> +
+> +	return parent_rate * div + temp64;
+>  }
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
