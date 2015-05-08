@@ -1,61 +1,67 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Fri, 08 May 2015 10:33:53 +0200
-Subject: [PATCH 2/3 v8] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <87mw1grwnn.fsf@eliezer.anholt.net>
-References: <1430857666-18877-1-git-send-email-eric@anholt.net>
- <554BA0B7.8040600@tronnes.org> <87mw1grwnn.fsf@eliezer.anholt.net>
-Message-ID: <2464203.68HkYCAlx7@kongar>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 8 May 2015 09:38:57 +0100
+Subject: [PATCH] arm64: bpf: fix signedness bug in loading 64-bit immediate
+In-Reply-To: <1431063591-16668-1-git-send-email-xi.wang@gmail.com>
+References: <1431063591-16668-1-git-send-email-xi.wang@gmail.com>
+Message-ID: <20150508083856.GA2125@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 May 2015, 12:54:20 wrote Eric Anholt:
-> Noralf Tr?nnes <noralf@tronnes.org> writes:
+On Fri, May 08, 2015 at 06:39:51AM +0100, Xi Wang wrote:
+> Consider "(u64)insn1.imm << 32 | imm" in the arm64 JIT.  Since imm is
+> signed 32-bit, it is sign-extended to 64-bit, losing the high 32 bits.
+> The fix is to convert imm to u32 first and zero-extend it to u64.
 > 
-> > Den 05.05.2015 22:27, skrev Eric Anholt:
-> >> From: Lubomir Rintel <lkundrak@v3.sk>
-> >>
-> >> This mailbox driver provides a single mailbox channel to write 32-bit
-> >> values to the VPU and get a 32-bit response.  The Raspberry Pi
-> >> firmware uses this mailbox channel to implement firmware calls, while
-> >> Roku 2 (despite being derived from the same firmware tree) doesn't.
-> >>
-> >> The driver was originally submitted by Lubomir, based on the
-> >> out-of-tree 2708 mailbox driver.  Eric Anholt fixed it up for
-> >> upstreaming, with the major functional change being that it now has no
-> >> notion of multiple channels (since that is a firmware-dependent
-> >> concept) and instead the raspberrypi-firmware driver will do that
-> >> bit-twiddling in its own messages.
-> > ...
-> >> +static struct platform_driver bcm2835_mbox_driver = {
-> >> +	.driver = {
-> >> +		.name = "bcm2835-mbox",
-> >> +		.owner = THIS_MODULE,
-> >> +		.of_match_table = bcm2835_mbox_of_match,
-> >> +	},
-> >> +	.probe		= bcm2835_mbox_probe,
-> >> +	.remove		= bcm2835_mbox_remove,
-> >> +};
-> >> +module_platform_driver(bcm2835_mbox_driver);
-> >
-> > I have tested this driver and the firmware driver booting directly
-> > from the VideoCore bootloader (no uboot).
-> > The mailbox driver loads too late to turn on USB power:
+> Also extend test_bpf to catch this JIT bug; the interpreter is correct.
 > 
-> Yeah, I have a patch on my branches that returns -EPROBE_DEFER when
-> trying to get a power domain and not finding the provider.  It was
-> rejected by the maintainers in favor of a proposed solution whose
-> description I didn't quite follow.
-
-Do you have a link for this thread?
-
-> > This silences the warning:
-> > struct raspberrypi_power_domain raspberrypi_power_domain_usb = {
-> >      .base = {
-> >          .power_on_latency_ns = 600000000,
+> Before:
+> test_bpf: #58 load 64-bit immediate ret -1 != 1 FAIL (1 times)
 > 
-> Oh, nice.  Thanks!
+> After:
+> test_bpf: #58 load 64-bit immediate 74 PASS
+> 
+> Fixes: 30d3d94cc3d5 ("arm64: bpf: add 'load 64-bit immediate' instruction")
+> Cc: Zi Shen Lim <zlim.lnx@gmail.com>
+> Cc: Alexei Starovoitov <ast@plumgrid.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Xi Wang <xi.wang@gmail.com>
+> ---
+>  arch/arm64/net/bpf_jit_comp.c | 2 +-
+>  lib/test_bpf.c                | 3 ++-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> index edba042b2325..14cdc099fda0 100644
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -487,7 +487,7 @@ emit_cond_jmp:
+>  			return -EINVAL;
+>  		}
+>  
+> -		imm64 = (u64)insn1.imm << 32 | imm;
+> +		imm64 = ((u64)(u32)insn1.imm) << 32 | (u64)(u32)imm;
 
-Well, Using a timeout for dependencies seems odd to me.
+This seems a bit convoluted to me. Don't you just need to add a (u32)
+cast to imm and that's it? The (u64)(u32) looks redundant.
 
-Regards,
-Alexander
+>  		emit_a64_mov_i64(dst, imm64, ctx);
+>  
+>  		return 1;
+> diff --git a/lib/test_bpf.c b/lib/test_bpf.c
+> index 80d78c51f65f..9f6849891b5f 100644
+> --- a/lib/test_bpf.c
+> +++ b/lib/test_bpf.c
+> @@ -1755,7 +1755,8 @@ static struct bpf_test tests[] = {
+>  			BPF_EXIT_INSN(),
+>  			BPF_JMP_IMM(BPF_JEQ, R3, 0x1234, 1),
+>  			BPF_EXIT_INSN(),
+> -			BPF_ALU64_IMM(BPF_MOV, R0, 1),
+> +			BPF_LD_IMM64(R0, 0x1ffffffffLL),
+> +			BPF_ALU64_IMM(BPF_RSH, R0, 32), /* R0 = 1 */
+>  			BPF_EXIT_INSN(),
+
+This hunk should probably be a separate patch, unless you get Alexei's ack
+for me to take it via the arm64 tree too.
+
+Will
