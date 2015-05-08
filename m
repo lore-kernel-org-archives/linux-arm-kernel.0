@@ -1,52 +1,62 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 08 May 2015 17:31:14 +0800
-Subject: [PATCH] drm/rockchip: Add BGR formats to VOP
-In-Reply-To: <CAAFQd5CK2eqXKix4rmg2bLm41EFZjK40JFWcYy=h7eyW4Wn6-w@mail.gmail.com>
-References: <1431072968-12696-1-git-send-email-tfiga@chromium.org>
- <554C766A.8070103@rock-chips.com>
- <CAAFQd5CK2eqXKix4rmg2bLm41EFZjK40JFWcYy=h7eyW4Wn6-w@mail.gmail.com>
-Message-ID: <554C8262.3090605@rock-chips.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Fri, 8 May 2015 17:33:15 +0800
+Subject: Question about checking rate_spi in pwrap_init_reg_clock
+In-Reply-To: <CABuKBeJMKpmkVZQvjZOuEtZmVaby6wxhr-i7w6eoHLjqTNNRig@mail.gmail.com>
+References: <1429581487.5994.1.camel@ingics.com>
+ <20150421103155.GX6325@pengutronix.de>
+ <CABuKBeJqgWHWNYaFXS-BwEayHEtiYGt+56LLXs3QaO3MHUk0bQ@mail.gmail.com>
+ <20150421125223.GB6325@pengutronix.de>
+ <CABuKBeJMKpmkVZQvjZOuEtZmVaby6wxhr-i7w6eoHLjqTNNRig@mail.gmail.com>
+Message-ID: <CAFRkauCbpDfT0V6pEcUf=_amcwa4E_t4taA3YzU5dYMmRxGRXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?08? 16:49, Tomasz Figa wrote:
-> Hi Mark,
->
-> Thanks for review.
->
-> On Fri, May 8, 2015 at 5:40 PM, Mark yao <mark.yao@rock-chips.com> wrote:
->>> @@ -233,6 +243,7 @@ static const struct vop_win_phy win23_data = {
->>>          .nformats = ARRAY_SIZE(formats_234),
->>>          .enable = VOP_REG(WIN2_CTRL0, 0x1, 0),
->>>          .format = VOP_REG(WIN2_CTRL0, 0x7, 1),
->>> +       .rb_swap = VOP_REG(WIN0_CTRL0, 0x1, 12),
->> Should be:
->>
->>          .rb_swap = VOP_REG(VOP_WIN2_CTRL0, 0x1, 12),
->>
-> Right, good catch.
->
->>>          .dsp_info = VOP_REG(WIN2_DSP_INFO0, 0x0fff0fff, 0),
->>>          .dsp_st = VOP_REG(WIN2_DSP_ST0, 0x1fff1fff, 0),
->>>          .yrgb_mst = VOP_REG(WIN2_MST0, 0xffffffff, 0),
->>> @@ -246,6 +257,7 @@ static const struct vop_win_phy cursor_data = {
->>>          .nformats = ARRAY_SIZE(formats_234),
->>>          .enable = VOP_REG(HWC_CTRL0, 0x1, 0),
->>>          .format = VOP_REG(HWC_CTRL0, 0x7, 1),
->>> +       .rb_swap = VOP_REG(WIN0_CTRL0, 0x1, 12),
->> cursor win not support rb_swap, remove it.
->>
-> Hmm, according to the datasheet of RK3288 I have (0.7, October 2014),
-> there is a field called hwc_rb_swap at bit 12 of HWC_CTRL0 register.
-> Is it an error in the datasheet?
->
-> Best regards,
-> Tomasz
->
->
->
-Oh, yes, I find it, rb_swap at HWC_CTRL0 bit 12. you are right.
-Thanks :-)
+CC Leilk Liu
 
--- 
-?ark Yao
+2015-04-21 23:42 GMT+08:00 Matthias Brugger <matthias.bgg@gmail.com>:
+> 2015-04-21 14:52 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+>> On Tue, Apr 21, 2015 at 01:43:19PM +0200, Matthias Brugger wrote:
+>>> 2015-04-21 12:31 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
+>>> > On Tue, Apr 21, 2015 at 09:58:07AM +0800, Axel Lin wrote:
+>>> >> hi,
+>>> >> The implementation in pwrap_init_reg_clock seems has off-by-one bug.
+>>> >> If rate_spi is 26000000, current code set ck_mhz to 18 rather than 26.
+>>> >>
+>>> >> I guess it needs below fix, but I'm not 100% sure as I don't have the datasheet.
+>>> >> Can someone confirm if this is a bug or not?
+>>> >
+>>> > Yes, seems to be a bug. Thanks for noting. Will you send a formal patch
+>>> > or should I do it?
+>>>
+>>> Did you have a look on both datasheets/reference kernels, mt8135 and mt8173?
+>>> Reading the datasheet and reference kernel code for mt6589 this SPI
+>>> waveform configuration looks like magic.
+>>>
+>>> But reading the clock frequency which can have clk_spi in mt8135, they
+>>> are 0 MHz, 26 MHz and bigger then 26 MHz, which leads me to the
+>>> conclusion that the code is correct. Otherwise the check for bigger
+>>> then 18 MHz is useless and should be deleted, if we have a similar
+>>> clock distribution in mt8173.
+>>
+>> The CSHEXT and CSLEXT registers extend the time the chipselect stays
+>> high after a SPI transfer or low before a new transfer by the given
+>> number of spi clk cycles.
+>> Looking at the code maybe the real question is not whether the border is
+>> at 25999999Hz or at 26000000Hz, but why the transfers are throttled with
+>> slower clock frequencies. I would assume the other way round makes
+>> sense.
+>
+> After re-reading the data sheet and the reference kernel
+> implementation, it seems as if three clocks exist. clk_wrap and
+> clk_spi and "pmic reg_clk". And some how depending on the three clocks
+> you have to calculate the values for CSHEXT, CSLEXT etc.
+>
+> I think we need some clarification here from Mediatek to really
+> understand what is going on.
+
+Hi Leilk,
+I found you are working on mtk's spi driver.
+Any comment about this discussion?
+
+Regards,
+Axel
