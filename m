@@ -1,58 +1,53 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 8 May 2015 11:36:13 -0500
-Subject: [PATCH v3 3/6] usb: dwc3: dwc3-st: Update the incorrect DT dwc3
- example.
-In-Reply-To: <20150508103140.GA15502@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
- <1430400652-3366-4-git-send-email-peter.griffin@linaro.org>
- <20150507151358.GA14123@griffinp-ThinkPad-X1-Carbon-2nd>
- <20150507161555.GA29183@saruman.tx.rr.com>
- <20150508103140.GA15502@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20150508163613.GH16571@saruman.tx.rr.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 8 May 2015 18:38:53 +0200
+Subject: [PATCH] ARM: dts: Add syscon property to the MIPI phy in
+ exynos5420
+In-Reply-To: <1431091805-11451-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1431091805-11451-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CABxcv=kMY6hLWqG93FjOhsjJc9AKg93T3MWDOjr+1Puv3KS0gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 11:31:40AM +0100, Peter Griffin wrote:
-> Hi Felipe,
-> 
-> On Thu, 07 May 2015, Felipe Balbi wrote:
-> 
-> > On Thu, May 07, 2015 at 04:13:58PM +0100, Peter Griffin wrote:
-> > > Hi Felipe,
-> > > 
-> > > On Thu, 30 Apr 2015, Peter Griffin wrote:
-> > > 
-> > > > There is a subtle typo phys-names should be phy-names. Using the
-> > > > current example means you don't have working usb (as you fail to
-> > > > obtain the phys). Also update the example to use the generic phy
-> > > > type constants which are now used for miphy28.
-> > > > 
-> > > > Additionally also remove the unnecessary new line in the example.
-> > > > 
-> > > > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > > > Acked-by: Rob Herring <robh@kernel.org>
-> > > > Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-> > > 
-> > > Can you take this dwc3 DT doc update patch via your tree?
-> > 
-> > only this patch ?
-> 
-> Yes, I think the test will go via Maximes STI tree
-> 
-> > Sure. Just post on linux-usb and I'll fetch it from
-> > there.
-> 
-> Brilliant, thanks. I've sent it see here https://lkml.org/lkml/2015/5/7/809
-> with linux-usb on CC (sorry for missing that off the first time round)
+Hello Tomeu,
 
-it's in my testing/next now.
+I'm adding Krzysztof to the cc list since he is queuing Exynos patches
+for Kukjin so is aware of this patch as well.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150508/d3d1021d/attachment.sig>
+On Fri, May 8, 2015 at 3:30 PM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+> Since e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression by
+> adding support for PMU regmap") the syscon property is required in
+> samsung,s5pv210-mipi-video-phy nodes, but this DTS hadn't been updated
+> yet.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5420.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index f67b23f..72a56f1 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -541,6 +541,7 @@
+>         mipi_phy: video-phy at 10040714 {
+>                 compatible = "samsung,s5pv210-mipi-video-phy";
+>                 reg = <0x10040714 12>;
+
+Shouldn't you remove the reg property too? the commit you mention
+removes that property from the DT binding so it shouldn't be there.
+
+> +               syscon = <&pmu_system_controller>;
+>                 #phy-cells = <1>;
+>         };
+>
+> --
+> 2.4.0
+>
+
+With that change the patch looks good to me.
+
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Best regards,
+Javier
