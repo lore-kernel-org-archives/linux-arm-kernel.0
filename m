@@ -1,41 +1,198 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 8 May 2015 07:12:48 -0600
-Subject: [PATCH v3 01/11] coresight-etm4x: Adding CoreSight ETM4x driver
-In-Reply-To: <1431073649.21307.12.camel@mm-sol.com>
-References: <1430926047-9125-1-git-send-email-mathieu.poirier@linaro.org>
- <1430926047-9125-2-git-send-email-mathieu.poirier@linaro.org>
- <1431073649.21307.12.camel@mm-sol.com>
-Message-ID: <CANLsYkxoZ62qeS91NbQZYwz-fx2qNdY+Ygw6NLbLgxcoqmkc-g@mail.gmail.com>
+From: jyri.sarha@iki.fi (Jyri Sarha)
+Date: Fri, 08 May 2015 16:16:08 +0300
+Subject: [alsa-devel] [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
+In-Reply-To: <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
+References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+ <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
+Message-ID: <34627ba55428fd0dd821d99a5326e451@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2015 at 02:27, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
->
-> Hi Mathieu,
->
-> On Wed, 2015-05-06 at 09:27 -0600, Mathieu Poirier wrote:
->>
->> +static struct amba_id etm4_ids[] = {
->> +       {       /* ETM 4.0 - Juno board */
->> +               .id     = 0x000bb95e,
->> +               .mask   = 0x000fffff,
->> +               .data   = "ETM 4.0",
->> +       },
->> +       { 0, 0},
->> +};
->> +
->>
->
-> Any particular reason to remove device ID for the
-> Hi6220 board? It happens to be the same ID used in
-> Qualcomm 8x16 ETM components.
+On 2015-04-02 12:22, Russell King wrote:
+> Add a helper for the EDID like data structure, which is typically 
+> passed
+> from a HDMI adapter to its associated audio driver.  This informs the
+> audio driver of the capabilities of the attached HDMI sink.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  include/sound/pcm_drm_eld.h |  6 +++
+>  sound/core/Kconfig          |  3 ++
+>  sound/core/Makefile         |  1 +
+>  sound/core/pcm_drm_eld.c    | 92 
+> +++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 102 insertions(+)
+>  create mode 100644 include/sound/pcm_drm_eld.h
+>  create mode 100644 sound/core/pcm_drm_eld.c
+> 
+> diff --git a/include/sound/pcm_drm_eld.h b/include/sound/pcm_drm_eld.h
+> new file mode 100644
+> index 000000000000..93357b25d2e2
+> --- /dev/null
+> +++ b/include/sound/pcm_drm_eld.h
+> @@ -0,0 +1,6 @@
+> +#ifndef __SOUND_PCM_DRM_ELD_H
+> +#define __SOUND_PCM_DRM_ELD_H
+> +
+> +int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void 
+> *eld);
+> +
+> +#endif
+> diff --git a/sound/core/Kconfig b/sound/core/Kconfig
+> index 313f22e9d929..b534c8a6046b 100644
+> --- a/sound/core/Kconfig
+> +++ b/sound/core/Kconfig
+> @@ -6,6 +6,9 @@ config SND_PCM
+>  	tristate
+>  	select SND_TIMER
+> 
+> +config SND_PCM_ELD
+> +	bool
+> +
+>  config SND_DMAENGINE_PCM
+>  	tristate
+> 
+> diff --git a/sound/core/Makefile b/sound/core/Makefile
+> index 4daf2f58261c..591b49157b4d 100644
+> --- a/sound/core/Makefile
+> +++ b/sound/core/Makefile
+> @@ -13,6 +13,7 @@ snd-$(CONFIG_SND_JACK)	  += jack.o
+>  snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
+>  		pcm_memory.o memalloc.o
+>  snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
+> +snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
+> 
+>  # for trace-points
+>  CFLAGS_pcm_lib.o := -I$(src)
+> diff --git a/sound/core/pcm_drm_eld.c b/sound/core/pcm_drm_eld.c
+> new file mode 100644
+> index 000000000000..47d9b60435fe
+> --- /dev/null
+> +++ b/sound/core/pcm_drm_eld.c
+> @@ -0,0 +1,92 @@
+> +/*
+> + *  PCM DRM helpers
+> + *
+> + *   This program is free software; you can redistribute it and/or 
+> modify
+> + *   it under the terms of the GNU General Public License version 2 as
+> + *   published by the Free Software Foundation.
+> + */
+> +#include <linux/export.h>
+> +#include <drm/drm_edid.h>
+> +#include <sound/pcm.h>
+> +#include <sound/pcm_drm_eld.h>
+> +
+> +static const unsigned int eld_rates[] = {
+> +	32000,
+> +	44100,
+> +	48000,
+> +	88200,
+> +	96000,
+> +	176400,
+> +	192000,
+> +};
+> +
 
-Efforts to push support for the Hi6220 board upstream have been
-abandoned, hence the decision to remove the entry.  Apologies for the
-inconvenience, I will add it back.
+For what I can see, you are setting the cross dependency between
+the sample rate and channels incorrectly. You should look for the
+currently tested channel count directly from hw params.
 
-Mathieu
+> +static int eld_limit_rates(struct snd_pcm_hw_params *params,
+> +			   struct snd_pcm_hw_rule *rule)
+> +{
+> +	struct snd_interval *r = hw_param_interval(params, rule->var);
+> +	struct snd_interval *c;
+> +	unsigned int rate_mask = 7, i;
+> +	const u8 *sad, *eld = rule->private;
+> +
+> +	sad = drm_eld_sad(eld);
+> +	if (sad) {
+> +		c = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+-               c = hw_param_interval(params, 
+SNDRV_PCM_HW_PARAM_CHANNELS);
++               uint pchannels = params_channels(params);
+> +
+> +		for (i = drm_eld_sad_count(eld); i > 0; i--, sad += 3) {
+> +			unsigned channels = 1 + (sad[0] & 7);
+> +
+> +			/*
+> +			 * Exclude SADs which do not include the
+> +			 * requested number of channels.
+> +			 */
+> +			if (pchannels <= channels)
+> +				rate_mask |= sad[1];
+> +		}
+> +printk("%s: r %d-%d c %d-%d m %x\n", __func__, r->min, r->max,
+> c->min, c->max, rate_mask);
+> +	}
+> +
+> +	return snd_interval_list(r, ARRAY_SIZE(eld_rates), eld_rates,
+> +				 rate_mask);
+> +}
+> +
 
->
-> Regards,
-> Ivan
+ From this side the dependency is missing all together.
+
+> +static int eld_limit_channels(struct snd_pcm_hw_params *params,
+> +			      struct snd_pcm_hw_rule *rule)
+> +{
+> +	struct snd_interval *var = hw_param_interval(params, rule->var);
+> +	struct snd_interval t = { .min = 1, .max = 2, .integer = 1, };
+> +	unsigned int i;
+
++       unsigned int j;
+
+> +	const u8 *sad, *eld = rule->private;
+
++	int rate = params_rate(params);
+
+> +
+> +	sad = drm_eld_sad(eld);
+> +	if (sad) {
+> +		for (i = drm_eld_sad_count(eld); i > 0; i--, sad += 3) {
+
++                for (j = 0; j < ARRAY_SIZE(eld_rates); j++)
++                        if ((sad[1] & (1<<j)) && rate == eld_rates[j]) 
+{
+
+> +			 switch (sad[0] & 0x78) {
+> +			 case 0x08:
+> +				t.max = max(t.max, (sad[0] & 7) + 1u);
+> +				break;
+> +			}
+
++               }
+
+> +		}
+> +	}
+> +
+> +	return snd_interval_refine(var, &t);
+> +}
+> +
+
+The code is completely untested, but I am sure you got the idea.
+
+Best regards,
+Jyri
+
+> +int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void 
+> *eld)
+> +{
+> +	int ret;
+> +
+> +	ret = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+> +				  eld_limit_rates, eld,
+> +				  SNDRV_PCM_HW_PARAM_RATE,
+> +				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+> +				  eld_limit_channels, eld,
+> +				  SNDRV_PCM_HW_PARAM_CHANNELS,
+> +				  SNDRV_PCM_HW_PARAM_RATE, -1);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(snd_pcm_hw_constraint_eld);
