@@ -1,198 +1,100 @@
-From: jyri.sarha@iki.fi (Jyri Sarha)
-Date: Fri, 08 May 2015 16:16:08 +0300
-Subject: [alsa-devel] [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
-In-Reply-To: <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
-References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
- <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
-Message-ID: <34627ba55428fd0dd821d99a5326e451@kapsi.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 May 2015 15:19:46 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <554C7479.3050306@topic.nl>
+References: <5538DD02.6050401@topic.nl> <8321046.lcCOUd7NLp@wuerfel>
+ <554C7479.3050306@topic.nl>
+Message-ID: <2808654.KNfBIY3tVp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-04-02 12:22, Russell King wrote:
-> Add a helper for the EDID like data structure, which is typically 
-> passed
-> from a HDMI adapter to its associated audio driver.  This informs the
-> audio driver of the capabilities of the attached HDMI sink.
+On Friday 08 May 2015 10:31:53 Mike Looijmans wrote:
+> On 08-05-15 09:54, Arnd Bergmann wrote:
+> > On Friday 08 May 2015 07:55:26 Mike Looijmans wrote:
+> >> On 07-05-15 16:30, Russell King - ARM Linux wrote:
+> >>> On Thu, May 07, 2015 at 04:08:54PM +0200, Mike Looijmans wrote:
+> >>>> I read the rest of the thread, apparently it was never integrated.
+> >>>>
+> >>>> The patch for "non-consistent" is a BUG FIX, not some feature request or so.
+> >>>> I was already wondering why my driver had to kalloc pages to get proper
+> >>>> caching on it.
+> >>>
+> >>> I disagree.
+> >>>
+> >>>>   From https://www.kernel.org/doc/Documentation/DMA-attributes.txt:
+> >>>> """
+> >>>> DMA_ATTR_NON_CONSISTENT ... lets the platform to choose to return either
+> >>>> consistent or non-consistent memory as it sees fit.  By using this API,
+> >>>> you are guaranteeing to the platform that you have all the correct and
+> >>>> necessary sync points for this memory in the driver.
+> >>>> """
+> >>>
+> >>> DMA attributes are something that came in _after_ the DMA API had been
+> >>> around for many years.  It's a "new feature" that was added to an
+> >>> existing subsystem, and because there have been no need for it to be
+> >>> implemented on ARM, the new feature was never implemented.
+> >>>
+> >>> More than that, the vast majority of ARM hardware can't provide this
+> >>> kind of memory, and there are _no_ kernel APIs to ensure that if
+> >>
+> >> By "non-coherent" memory I thought it meant the same kind of memory that
+> >> kalloc would return. But from your answer it seems I am mistaken and
+> >> this is something different?
+> >
+> > It depends: on a device that is actually cache-coherent,
+> > dma_alloc_coherent() and dma_alloc_noncoherent() both return normal
+> > memory.
+> >
+> > On some architectures (not ARM) that are not fully coherent,
+> > dma_alloc_coherent() has to return uncached memory, while
+> > dma_alloc_noncoherent() is allowed to return cached memory but
+> > requires a dma_cache_sync() operation.
+> >
+> > dma_alloc_attrs() with DMA_ATTR_NON_CONSISTENT is a variant of that,
+> > but I assume the idea is that you use dma_sync_single_fo_{cpu,device}()
+> > on that memory, which can actually work on  ARM, unlike dma_cache_sync().
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  include/sound/pcm_drm_eld.h |  6 +++
->  sound/core/Kconfig          |  3 ++
->  sound/core/Makefile         |  1 +
->  sound/core/pcm_drm_eld.c    | 92 
-> +++++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 102 insertions(+)
->  create mode 100644 include/sound/pcm_drm_eld.h
->  create mode 100644 sound/core/pcm_drm_eld.c
+> Ah, okay, I was misled by the names. I was under the impression that memory 
+> would be either "coherent" or "non-coherent". But what is called 
+> "non-coherent" here is actually something like "less-coherent", it isn't 
+> normal memory as alloc_pages would return, but it also isn't completely 
+> coherent. Is that a correct summary?
 > 
-> diff --git a/include/sound/pcm_drm_eld.h b/include/sound/pcm_drm_eld.h
-> new file mode 100644
-> index 000000000000..93357b25d2e2
-> --- /dev/null
-> +++ b/include/sound/pcm_drm_eld.h
-> @@ -0,0 +1,6 @@
-> +#ifndef __SOUND_PCM_DRM_ELD_H
-> +#define __SOUND_PCM_DRM_ELD_H
-> +
-> +int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void 
-> *eld);
-> +
-> +#endif
-> diff --git a/sound/core/Kconfig b/sound/core/Kconfig
-> index 313f22e9d929..b534c8a6046b 100644
-> --- a/sound/core/Kconfig
-> +++ b/sound/core/Kconfig
-> @@ -6,6 +6,9 @@ config SND_PCM
->  	tristate
->  	select SND_TIMER
+> In that case, I stand corrected.
+
+Almost. I think the part that you are still missing is that memory
+itself it not coherent or non-coherent. It's the device access to
+that memory that can be coherent or not with regard to the CPU.
+
+The memory that is returned by alloc_pages can be coherent with one
+device but non-coherent with another.
+
+> I was looking for an interface that would allocate memory for access by my 
+> device, but that would be just alloc_pages style memory. If my DMA controller 
+> is limited to say only the first GB of RAM, I'd set the DMA mask to "30 bits". 
+> If I just allocate memory using alloc_pages, the kernel doesn't know that I'd 
+> want it to be in the lower 1GB range, and could allocate it in a spot my 
+> device could not map.
+
+If you have that low-memory restriction, you also need to ensure that there
+is a ZONE_DMA that is large enough. ZONE_DMA should be sized to match the
+common subset that all devices can access, so a GFP_DMA request returns
+memory that is guaranteed to be accessible by all devices.
+
+> Hence I'd expect there to be some "dma_alloc_pages(struct device* ...)" style 
+> of call to get memory that my device could access (and I was under the false 
+> impression that dma_alloc_noncoherent was the one I was looking for).
 > 
-> +config SND_PCM_ELD
-> +	bool
-> +
->  config SND_DMAENGINE_PCM
->  	tristate
-> 
-> diff --git a/sound/core/Makefile b/sound/core/Makefile
-> index 4daf2f58261c..591b49157b4d 100644
-> --- a/sound/core/Makefile
-> +++ b/sound/core/Makefile
-> @@ -13,6 +13,7 @@ snd-$(CONFIG_SND_JACK)	  += jack.o
->  snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
->  		pcm_memory.o memalloc.o
->  snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
-> +snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
-> 
->  # for trace-points
->  CFLAGS_pcm_lib.o := -I$(src)
-> diff --git a/sound/core/pcm_drm_eld.c b/sound/core/pcm_drm_eld.c
-> new file mode 100644
-> index 000000000000..47d9b60435fe
-> --- /dev/null
-> +++ b/sound/core/pcm_drm_eld.c
-> @@ -0,0 +1,92 @@
-> +/*
-> + *  PCM DRM helpers
-> + *
-> + *   This program is free software; you can redistribute it and/or 
-> modify
-> + *   it under the terms of the GNU General Public License version 2 as
-> + *   published by the Free Software Foundation.
-> + */
-> +#include <linux/export.h>
-> +#include <drm/drm_edid.h>
-> +#include <sound/pcm.h>
-> +#include <sound/pcm_drm_eld.h>
-> +
-> +static const unsigned int eld_rates[] = {
-> +	32000,
-> +	44100,
-> +	48000,
-> +	88200,
-> +	96000,
-> +	176400,
-> +	192000,
-> +};
-> +
+> Currently I can get away with just using alloc_pages or kmalloc since my DMA 
+> controller happens to be able to access all memory. But I also want my device 
+> driver to work on 64-bit platforms (e.g. arm64 for the MPSOC and x86-64 for 
+> the PCIe version of the board).
 
-For what I can see, you are setting the cross dependency between
-the sample rate and channels incorrectly. You should look for the
-currently tested channel count directly from hw params.
+Those machines will have ZONE_DMA32, which refers to the first 4GB of memory,
+so that should work fine. Alternatively you can use the iommu to get
+all memory mapped into the space that is accessible by the device.
+Also, on 64-bit x86 or ARM machines, all memory tends to be coherent, so
+dma_sync_* will turn into a nop.
 
-> +static int eld_limit_rates(struct snd_pcm_hw_params *params,
-> +			   struct snd_pcm_hw_rule *rule)
-> +{
-> +	struct snd_interval *r = hw_param_interval(params, rule->var);
-> +	struct snd_interval *c;
-> +	unsigned int rate_mask = 7, i;
-> +	const u8 *sad, *eld = rule->private;
-> +
-> +	sad = drm_eld_sad(eld);
-> +	if (sad) {
-> +		c = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
--               c = hw_param_interval(params, 
-SNDRV_PCM_HW_PARAM_CHANNELS);
-+               uint pchannels = params_channels(params);
-> +
-> +		for (i = drm_eld_sad_count(eld); i > 0; i--, sad += 3) {
-> +			unsigned channels = 1 + (sad[0] & 7);
-> +
-> +			/*
-> +			 * Exclude SADs which do not include the
-> +			 * requested number of channels.
-> +			 */
-> +			if (pchannels <= channels)
-> +				rate_mask |= sad[1];
-> +		}
-> +printk("%s: r %d-%d c %d-%d m %x\n", __func__, r->min, r->max,
-> c->min, c->max, rate_mask);
-> +	}
-> +
-> +	return snd_interval_list(r, ARRAY_SIZE(eld_rates), eld_rates,
-> +				 rate_mask);
-> +}
-> +
-
- From this side the dependency is missing all together.
-
-> +static int eld_limit_channels(struct snd_pcm_hw_params *params,
-> +			      struct snd_pcm_hw_rule *rule)
-> +{
-> +	struct snd_interval *var = hw_param_interval(params, rule->var);
-> +	struct snd_interval t = { .min = 1, .max = 2, .integer = 1, };
-> +	unsigned int i;
-
-+       unsigned int j;
-
-> +	const u8 *sad, *eld = rule->private;
-
-+	int rate = params_rate(params);
-
-> +
-> +	sad = drm_eld_sad(eld);
-> +	if (sad) {
-> +		for (i = drm_eld_sad_count(eld); i > 0; i--, sad += 3) {
-
-+                for (j = 0; j < ARRAY_SIZE(eld_rates); j++)
-+                        if ((sad[1] & (1<<j)) && rate == eld_rates[j]) 
-{
-
-> +			 switch (sad[0] & 0x78) {
-> +			 case 0x08:
-> +				t.max = max(t.max, (sad[0] & 7) + 1u);
-> +				break;
-> +			}
-
-+               }
-
-> +		}
-> +	}
-> +
-> +	return snd_interval_refine(var, &t);
-> +}
-> +
-
-The code is completely untested, but I am sure you got the idea.
-
-Best regards,
-Jyri
-
-> +int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void 
-> *eld)
-> +{
-> +	int ret;
-> +
-> +	ret = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-> +				  eld_limit_rates, eld,
-> +				  SNDRV_PCM_HW_PARAM_RATE,
-> +				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	ret = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-> +				  eld_limit_channels, eld,
-> +				  SNDRV_PCM_HW_PARAM_CHANNELS,
-> +				  SNDRV_PCM_HW_PARAM_RATE, -1);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(snd_pcm_hw_constraint_eld);
+	Arnd
