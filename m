@@ -1,28 +1,62 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 8 May 2015 14:33:30 +0530
-Subject: [PATCH v5 3/8] dmaengine: Add driver for TI DMA crossbar on DRA7x
-In-Reply-To: <554C6034.4020004@ti.com>
-References: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
- <1428572154-3548-4-git-send-email-peter.ujfalusi@ti.com>
- <20150504053851.GY3521@localhost> <554B34F2.5050306@ti.com>
- <20150508034110.GW3521@localhost> <554C6034.4020004@ti.com>
-Message-ID: <20150508090330.GB3521@localhost>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 8 May 2015 11:04:44 +0200
+Subject: [PATCH 1/2] crypto: arm/sha512 - accelerated SHA-512 using ARM
+ generic ASM and NEON
+In-Reply-To: <1431074782-22141-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1431074782-22141-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu9KE25a7b3g=cTzhfckSQ9JuvW17MR_8c9HKWPBQdh4zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 10:05:24AM +0300, Peter Ujfalusi wrote:
-> On 05/08/2015 06:41 AM, Vinod Koul wrote:
-> > Now as far as this series is concerned, rest of it looks good so I am
-> > willing to merge to if you plan to work on defered probe :) I think its a
-> > fair bargain!
-> 
-> Deal ;)
-Wonderful :)
+On 8 May 2015 at 10:46, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> This replaces the SHA-512 NEON module with the faster and more
+> versatile implementation from the OpenSSL project. It consists
+> of both a NEON and a generic ASM version of the core SHA-512
+> transform, where the NEON version reverts to the ASM version
+> when invoked in non-process context.
+>
+> This patch is based on the OpenSSL upstream version b1a5d1c65208
+> of sha512-armv4.pl, which can be found here:
+>
+>   https://git.openssl.org/gitweb/?p=openssl.git;h=b1a5d1c65208
+>
+> Performance relative to the generic implementation (measured
+> using tcrypt.ko mode=306 sec=1 running on a Cortex-A57 under
+> KVM):
+>
+>   input size    block size      asm     neon    old neon
+>
+>   16            16              1.39    2.54    2.21
+>   64            16              1.32    2.33    2.09
+>   64            64              1.38    2.53    2.19
+>   256           16              1.31    2.28    2.06
+>   256           64              1.38    2.54    2.25
+>   256           256             1.40    2.77    2.39
+>   1024          16              1.29    2.22    2.01
+>   1024          256             1.40    2.82    2.45
+>   1024          1024            1.41    2.93    2.53
+>   2048          16              1.33    2.21    2.00
+>   2048          256             1.40    2.84    2.46
+>   2048          1024            1.41    2.96    2.55
+>   2048          2048            1.41    2.98    2.56
+>   4096          16              1.34    2.20    1.99
+>   4096          256             1.40    2.84    2.46
+>   4096          1024            1.41    2.97    2.56
+>   4096          4096            1.41    3.01    2.58
+>   8192          16              1.34    2.19    1.99
+>   8192          256             1.40    2.85    2.47
+>   8192          1024            1.41    2.98    2.56
+>   8192          4096            1.41    2.71    2.59
+>   8192          8192            1.51    3.51    2.69
+>
+> Acked-by: Jussi Kivilinna <jussi.kivilinna@iki.fi>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>
+> As agreed, I am resending this now for the next merge window.
+>
 
-> 
-> I'll take care of the OMAP/daVinci drivers for omap-dma and edma.
-Okay, I had asked for ACK on last patch as its ARM one, or do you want me to
-go ahead and apply it.. will wait till today
+In case the patch size is a concern again:
+https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm-crypto
 
--- 
-~Vinod
+[...]
