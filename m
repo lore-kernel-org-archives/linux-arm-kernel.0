@@ -1,80 +1,89 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 8 May 2015 14:51:02 +0200
-Subject: [PATCH 2/4] soc: Mediatek: Add SCPSYS power domain driver
-In-Reply-To: <CABuKBeJ=HrwNMvV5N+6pnBgbB9k7e=8UPi3WWBTnpRFeEbTWvA@mail.gmail.com>
-References: <1426002063-25713-1-git-send-email-s.hauer@pengutronix.de>
- <1426002063-25713-3-git-send-email-s.hauer@pengutronix.de>
- <CABuKBeLvBfeXw+b+SxAEjGA2dzPhYBs-SiJUyP5dUA28R=Rjkg@mail.gmail.com>
- <20150508121944.GD6325@pengutronix.de>
- <CABuKBeJ=HrwNMvV5N+6pnBgbB9k7e=8UPi3WWBTnpRFeEbTWvA@mail.gmail.com>
-Message-ID: <20150508125102.GE6325@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 08 May 2015 14:52:46 +0200
+Subject: [PATCH v2 1/5] Documentation: dmaengine: pxa-dma design
+In-Reply-To: <20150508043616.GY3521@localhost> (Vinod Koul's message of "Fri,
+ 8 May 2015 10:06:16 +0530")
+References: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
+ <1428781236-25806-2-git-send-email-robert.jarzmik@free.fr>
+ <20150508043616.GY3521@localhost>
+Message-ID: <87y4kzten5.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 02:28:37PM +0200, Matthias Brugger wrote:
-> 2015-05-08 14:19 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> > On Fri, May 08, 2015 at 02:16:06PM +0200, Matthias Brugger wrote:
-> >> 2015-03-10 16:41 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> >> > +static int scpsys_power_on(struct generic_pm_domain *genpd)
-> >> > +{
-> >> > +       struct scp_domain *scpd = container_of(genpd, struct scp_domain, pmd);
-> >> > +       struct scp *scp = scpd->scp;
-> >> > +       struct scp_domain_data *data = scpd->data;
-> >> > +       unsigned long expired;
-> >> > +       void __iomem *ctl_addr = scpd->scp->base + data->ctl_offs;
-> >> > +       u32 sram_pdn_ack = data->sram_pdn_ack_bits;
-> >> > +       u32 val;
-> >> > +       int ret;
-> >> > +
-> >> > +       val = readl(ctl_addr);
-> >> > +       val |= PWR_ON_BIT;
-> >> > +       writel(val, ctl_addr);
-> >> > +       val |= PWR_ON_2ND_BIT;
-> >> > +       writel(val, ctl_addr);
-> >> > +
-> >> > +       /* wait until PWR_ACK = 1 */
-> >> > +       expired = jiffies + HZ;
-> >> > +       while (!(readl(scp->base + SPM_PWR_STATUS) & data->sta_mask) ||
-> >> > +                       !(readl(scp->base + SPM_PWR_STATUS_2ND) & data->sta_mask)) {
-> >> > +               cpu_relax();
-> >> > +               if (time_after(jiffies, expired)) {
-> >> > +                       ret = -EIO;
-> >> > +                       goto out;
-> >> > +               }
-> >> > +       }
-> >> > +
-> >> > +       val &= ~PWR_CLK_DIS_BIT;
-> >> > +       writel(val, ctl_addr);
-> >> > +
-> >> > +       val &= ~PWR_ISO_BIT;
-> >> > +       writel(val, ctl_addr);
-> >> > +
-> >> > +       val |= PWR_RST_B_BIT;
-> >> > +       writel(val, ctl_addr);
-> >> > +
-> >> > +       val &= ~data->sram_pdn_bits;
-> >> > +       writel(val, ctl_addr);
-> >> > +
-> >> > +       /* wait until SRAM_PDN_ACK all 0 */
-> >> > +       expired = jiffies + HZ;
-> >> > +       while (sram_pdn_ack && (readl(ctl_addr) & sram_pdn_ack)) {
-> >>
-> >> I think "sram_pdn_ack &&" was added accidently here. It is always
-> >> bigger then zero.
-> >
-> > Nope, it's zero for MT8173_POWER_DOMAIN_MFG_ASYNC.
-> 
-> In probe you turn on all power domains defined in scp_domain_data[].
-> So all but MT8173_POWER_DOMAIN_MFG_ASYNC will fail.
-> Does this make sense?
+Vinod Koul <vinod.koul@intel.com> writes:
 
-What makes you think that enabling the domains will fail? That doesn't
-happen.
+> On Sat, Apr 11, 2015 at 09:40:32PM +0200, Robert Jarzmik wrote:
+>> Document the new design of the pxa dma driver.
+>> +  a) Transfers hot queuing
+>> +     A driver submitting a transfer and issuing it should be granted the transfer
+>> +     is queued even on a running DMA channel.
+> this is bit confusing, esp latter part.. do you mean "A driver submitting a
+> transfer and issuing it should be granted the transfer queue even on a
+> running DMA channel" ??
 
-Sascha
+Euh no, I meant that a transfer which is submitted and issued on a _phy_
+doesn't wait for a _phy_ to stop and restart, but is submitted on a "running
+channel". The other drivers, especially mmp_pdma waited for the phy to stop
+before relaunching a new transfer.
+
+I don't have a clear idea on a better wording yet ...
+
+>> +     This implies that the queuing doesn't wait for the previous transfer end,
+>> +     and that the descriptor chaining is not only done in the irq/tasklet code
+>> +     triggered by the end of the transfer.
+> how is it differenat than current dmaengine semantics where you say
+> issue_pending() is invoked when current transfer finished? Here is you have
+> to do descriptor chaining so bit it.
+Your sentence is a bit difficult for me to understand.
+
+>> +  c) Channel residue calculation
+>> +     A channel should be able to report how much advanced is a transfer. The
+> in a							    ^^^^
+For v3.
+
+>> +     granularity is still descriptor based.
+> This is not pxa specfic
+True. Do you want me to remove the (c) from the document ?
+
+>> +
+>> +  d) Channel running state
+>> +     A driver should be able to query if a channel is running or not. For the
+>> +     multimedia case, such as video capture, if a transfer is submitted and then
+>> +     a check of the DMA channel reports a "stopped channel", the transfer should
+>> +     not be issued until the next "start of frame interrupt", hence the need to
+>> +     know if a channel is in running or stopped state.
+> How do you query that?
+With dma_async_is_tx_complete() giving :
+ - dma_cookie_t last_submitted
+ - dma_cookie_t last_issued
+
+The channel is still running if (last_submitted < last_issued).
+
+>
+>> +
+>> +  e) Bandwidth guarantee
+>> +     The PXA architecture has 4 levels of DMAs priorities : high, normal, low.
+>> +     The high prorities get twice as much bandwidth as the normal, which get twice
+>> +     as much as the low priorities.
+>> +     A driver should be able to request a priority, especially the real-time
+>> +     ones such as pxa_camera with (big) throughputs.
+> and how..?
+By passing this information :
+ - in a devicetree environment, check pxad_dma_xlate()
+ - in a platform device environment, check pxad_filter_fn()
+
+>> +  f) Transfer reusability
+>> +     An issued and finished transfer should be "reusable". The choice of
+>> +     "DMA_CTRL_ACK" should be left to the client, not the dma driver.
+> again how is this pxa specfic, if not documented we should move this to
+> dmaengine documentation
+
+Yes, I agree. I should move this to dmaengine slave documentation, in
+Documentation/dmaengine/provider.txt (in the Misc notes section). Do you want me
+to submit a patch to change the "Undocumented feature" into a properly
+documented feature ?
+
+Cheers.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Robert
