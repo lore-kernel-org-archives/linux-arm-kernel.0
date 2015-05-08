@@ -1,47 +1,58 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 8 May 2015 18:33:05 +0200
-Subject: [PATCH v3 00/12] KVM Guest Debug support for arm64
-In-Reply-To: <1430929407-3487-1-git-send-email-alex.bennee@linaro.org>
-References: <1430929407-3487-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150508163305.GJ24744@cbox>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 8 May 2015 11:36:13 -0500
+Subject: [PATCH v3 3/6] usb: dwc3: dwc3-st: Update the incorrect DT dwc3
+ example.
+In-Reply-To: <20150508103140.GA15502@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
+ <1430400652-3366-4-git-send-email-peter.griffin@linaro.org>
+ <20150507151358.GA14123@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20150507161555.GA29183@saruman.tx.rr.com>
+ <20150508103140.GA15502@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20150508163613.GH16571@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 05:23:15PM +0100, Alex Benn?e wrote:
-> Hi,
+On Fri, May 08, 2015 at 11:31:40AM +0100, Peter Griffin wrote:
+> Hi Felipe,
 > 
-> Here is V3 of the KVM Guest Debug support for arm64.
+> On Thu, 07 May 2015, Felipe Balbi wrote:
 > 
-> This sees the return of hyp.S re-factoring code which has been
-> expanded to handle both the save and restore legs. The HW debug patch
-> then adds a simple indirection to enable switching between the guest
-> context debug registers and the active debugging context.
+> > On Thu, May 07, 2015 at 04:13:58PM +0100, Peter Griffin wrote:
+> > > Hi Felipe,
+> > > 
+> > > On Thu, 30 Apr 2015, Peter Griffin wrote:
+> > > 
+> > > > There is a subtle typo phys-names should be phy-names. Using the
+> > > > current example means you don't have working usb (as you fail to
+> > > > obtain the phys). Also update the example to use the generic phy
+> > > > type constants which are now used for miphy28.
+> > > > 
+> > > > Additionally also remove the unnecessary new line in the example.
+> > > > 
+> > > > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > > > Acked-by: Rob Herring <robh@kernel.org>
+> > > > Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+> > > 
+> > > Can you take this dwc3 DT doc update patch via your tree?
+> > 
+> > only this patch ?
 > 
-> The API has been further simplified to remove the PC (as that is
-> already available by the GET_ONE_REG ioctl). The responsibility for
-> handling re-injection is now explicitly that of userspace.
+> Yes, I think the test will go via Maximes STI tree
 > 
-> The setup/clear debug code has gained an init function to be called at
-> start-up and save useful values (currently only mdcr_el2.HPMN).
+> > Sure. Just post on linux-usb and I'll fetch it from
+> > there.
 > 
-> For full details see the changelog on each of the patches.
-> 
-> As before there are a few checkpatch violations for white space. Some
-> in existing code (asm-offsets) and a couple in the handle_exit code
-> where adding a whole extra tab seemed excessive.
-> 
-> Reviewed-by tags have been added to the earlier patches as
-> appropriate.
-> 
-> GIT Repos:
-> 
-> The patches for this series are based off v4.1-rc1 and can be found
-> at:
-> 
-> https://git.linaro.org/people/alex.bennee/linux.git
-> branch: guest-debug/4.1-rc1-v3
-> 
+> Brilliant, thanks. I've sent it see here https://lkml.org/lkml/2015/5/7/809
+> with linux-usb on CC (sorry for missing that off the first time round)
 
-This doesn't seem to build for 32-bit ARM :(
+it's in my testing/next now.
 
--Christoffer
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150508/d3d1021d/attachment.sig>
