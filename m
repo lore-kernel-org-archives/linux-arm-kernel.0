@@ -1,46 +1,79 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 08 May 2015 13:47:05 +0200
-Subject: [PATCH 03/12] clocksource: sti: Provide 'use timer as sched
- clock' capability
-In-Reply-To: <20150508102938.GD29044@x1>
-References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
- <1431005924-21777-4-git-send-email-lee.jones@linaro.org>
- <1431074699.13593.4.camel@x220> <20150508093603.GB29044@x1>
- <1431078730.13593.14.camel@x220> <20150508102938.GD29044@x1>
-Message-ID: <1431085625.13593.39.camel@x220>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 8 May 2015 13:52:17 +0200
+Subject: [PATCH v3 04/12] KVM: arm: guest debug, add stub
+ KVM_SET_GUEST_DEBUG ioctl
+In-Reply-To: <1430929407-3487-5-git-send-email-alex.bennee@linaro.org>
+References: <1430929407-3487-1-git-send-email-alex.bennee@linaro.org>
+ <1430929407-3487-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150508115217.GD24744@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-05-08 at 11:29 +0100, Lee Jones wrote:
-> Ah, you mean from menuconfig.  I almost forgot what that was. ;)
+On Wed, May 06, 2015 at 05:23:19PM +0100, Alex Benn?e wrote:
+> This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
+> ioctl. Any unsupported flag will return -EINVAL. For now, only
+> KVM_GUESTDBG_ENABLE is supported, although it won't have any effects.
 > 
-> I can add a menu option, no problem.
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
+> 
+> ---
+> v2
+>   - simplified form of the ioctl (stuff will go into setup_debug)
+> v3
+>  - KVM_GUESTDBG_VALID->KVM_GUESTDBG_VALID_MASK
+>  - move mask check to the top of function
+>  - add ioctl doc header
+>  - split capability into separate patch
+>  - tweaked commit wording w.r.t return of -EINVAL
+> 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index cb90025..4b0132f 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2645,7 +2645,7 @@ handled.
+>  4.87 KVM_SET_GUEST_DEBUG
+>  
+>  Capability: KVM_CAP_SET_GUEST_DEBUG
+> -Architectures: x86, s390, ppc
+> +Architectures: x86, s390, ppc, arm64
+>  Type: vcpu ioctl
+>  Parameters: struct kvm_guest_debug (in)
+>  Returns: 0 on success; -1 on error
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index d9631ec..52a1d4d38 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -302,10 +302,31 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>  	kvm_arm_set_running_vcpu(NULL);
+>  }
+>  
+> +#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE)
+> +
+> +/**
+> + * kvm_arch_vcpu_ioctl_set_guest_debug - set up guest debugging
+> + * @kvm:	pointer to the KVM struct
+> + * @kvm_guest_debug: the ioctl data buffer
+> + *
+> + * This sets up and enables the VM for guest debugging. Userspace
+> + * passes in a control flag to enable different debug types and
+> + * potentially other architecture specific information in the rest of
+> + * the structure.
+> + */
+>  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+>  					struct kvm_guest_debug *dbg)
+>  {
+> -	return -EINVAL;
+> +	if (dbg->control & ~KVM_GUESTDBG_VALID_MASK)
+> +		return -EINVAL;
+> +
+> +	if (dbg->control & KVM_GUESTDBG_ENABLE) {
+> +		vcpu->guest_debug = dbg->control;
+> +	} else {
+> +		/* If not enabled clear all flags */
+> +		vcpu->guest_debug = 0;
+> +	}
+> +	return 0;
+>  }
+>  
 
-It's not just menuconfig:
-    $ grep -e CONFIG_ARCH_STI -e CONFIG_CLKSRC_ST_LPC .config 
-    CONFIG_ARCH_STI=y
-    CONFIG_CLKSRC_ST_LPC=y
-    CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK=y
-    $ vim .config 
-    $ grep -e CONFIG_ARCH_STI -e CONFIG_CLKSRC_ST_LPC .config 
-    CONFIG_ARCH_STI=y
-    # CONFIG_CLKSRC_ST_LPC is not set
-    # CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK is not set
-    $ make ARCH=arm silentoldconfig
-    scripts/kconfig/conf  --silentoldconfig Kconfig
-    #
-    # configuration written to .config
-    #
-    $ grep -e CONFIG_ARCH_STI -e CONFIG_CLKSRC_ST_LPC .config 
-    CONFIG_ARCH_STI=y
-    CONFIG_CLKSRC_ST_LPC=y
-    CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK=y
-
-So I think that, if you want to be able to set
-CLKSRC_ST_LPC_TIMER_SCHED_CLOCK to 'n' even though CLKSRC_ST_LPC is 'y',
-you need to add a prompt. Or have you found a way around this?
-
-Thanks,
-
-
-Paul Bolle
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
