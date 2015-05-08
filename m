@@ -1,37 +1,36 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 8 May 2015 09:14:34 +0900
-Subject: [PATCH] clk samsung exynos5420 add CLK_RECALC_NEW_RATES flag to
- mout_apll and mout_kpll clock.
-In-Reply-To: <1431020935-5025-1-git-send-email-linux.amoon@gmail.com>
-References: <1431020935-5025-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <CAJKOXPcCc8j=i5FPdF62bGKar74+4U=C9BPN9ar2j52Y8dSMwA@mail.gmail.com>
+Date: Fri, 8 May 2015 09:18:20 +0900
+Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator
+ supply property
+In-Reply-To: <1428079429-4252-5-git-send-email-b.zolnierkie@samsung.com>
+References: <'@samsung.com>
+ <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
+ <1428079429-4252-5-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <CAJKOXPfR5JS546YS3M-8orxO7+SxnzE06h2cyesExyt8Y9fVKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-08 2:48 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
-> Addition of CLK_RECALC_NEW_RATES flag to support Exynos5 cpu clk so that
-> correct divider values are re-calculated after both pre/post
-> clock notifiers had run for for mout_apll clock and mout_kpll clock.
-s/for for/for/
-
-Could you precise in commit message the observational effects
-*without* this patch? In other words: what is fixed? The divider will
-have incorrect values?
-
+2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> From: Thomas Abraham <thomas.ab@samsung.com>
 >
-> Depend on https://lkml.org/lkml/2015/4/3/388
+> For Exynos4210 platforms, add CPU operating points and CPU
+> regulator supply properties for migrating from Exynos specific
+> cpufreq driver to using generic cpufreq driver.
 >
-> Tested on OdroidXU3 Board.
+> Changes by Bartlomiej:
+> - removed Exynos5250 and Exynos5420 support for now
+>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Cc: Andreas Faerber <afaerber@suse.de>
+> Cc: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Andreas Farber <afaerber@suse.de>
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Thanks for providing this information. However
-1. Patch dependency should not be part of commit message, It simply
-won't provide any meaningful information when they are merged.
-2. Similarly testing platform also is not always put in commit message.
-
-So just put them after separator (triple-dash).
-
-After fixing the commit message:
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
 Krzysztof
