@@ -1,89 +1,116 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 08 May 2015 14:52:46 +0200
-Subject: [PATCH v2 1/5] Documentation: dmaengine: pxa-dma design
-In-Reply-To: <20150508043616.GY3521@localhost> (Vinod Koul's message of "Fri,
- 8 May 2015 10:06:16 +0530")
-References: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
- <1428781236-25806-2-git-send-email-robert.jarzmik@free.fr>
- <20150508043616.GY3521@localhost>
-Message-ID: <87y4kzten5.fsf@belgarion.home>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 08 May 2015 14:57:02 +0200
+Subject: [PATCH 03/18] media controller: use MEDIA_ENT_T_AV_DMA for A/V
+ DMA engines
+In-Reply-To: <20150508093239.28644ad4@recife.lan>
+References: <cover.1431046915.git.mchehab@osg.samsung.com>	<afb84e3d80fc4f6f2465a123012f161b8c29f1c4.1431046915.git.mchehab@osg.samsung.com>	<554CA3DF.9030700@xs4all.nl>
+ <20150508093239.28644ad4@recife.lan>
+Message-ID: <554CB29E.7090509@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul <vinod.koul@intel.com> writes:
+Hi Mauro,
 
-> On Sat, Apr 11, 2015 at 09:40:32PM +0200, Robert Jarzmik wrote:
->> Document the new design of the pxa dma driver.
->> +  a) Transfers hot queuing
->> +     A driver submitting a transfer and issuing it should be granted the transfer
->> +     is queued even on a running DMA channel.
-> this is bit confusing, esp latter part.. do you mean "A driver submitting a
-> transfer and issuing it should be granted the transfer queue even on a
-> running DMA channel" ??
+On 05/08/2015 02:32 PM, Mauro Carvalho Chehab wrote:
+>>> and may also not be true on embedded devices
+>>> that, due to DRM reasons, don't allow writing unencrypted
+>>> data on a memory that could be seen by the CPU.
+>>
+>> This actually might still work by using opaque DMABUF handles. But that's
+>> under discussion right now in the Secure Data Path thread.
+> 
+> Well, a DMABUF opaque handler like that actually refers to either a
+> buffer that is shared only between 2 devices or to a device-to-device
+> DMA transfer.
+> 
+> Such dataflow is different than the usual meaning of the video devnode,
+> where the devnode is used to do I/O transfers. So, it may actually 
+> be mapped as a different type of entity.
+> 
+> We'll need to discuss further when we start mapping this via MC.
 
-Euh no, I meant that a transfer which is submitted and issued on a _phy_
-doesn't wait for a _phy_ to stop and restart, but is submitted on a "running
-channel". The other drivers, especially mmp_pdma waited for the phy to stop
-before relaunching a new transfer.
+Yes, this is quite theoretical at the moment.
 
-I don't have a clear idea on a better wording yet ...
+>>> So, we'll eventually need to add another entity for such
+>>> bridge chipsets that have a video/vbi/radio device node
+>>> associated, but don't have DMA engines on (some) devnodes.
+>>>
+>>> As, currently, we don't have any such case,
+>>
+>> ??? Radio devices are exactly that.
+> 
+> I actually meant to say:
+> 
+> 	"As, currently, no driver uses Media Controller on such cases,"
 
->> +     This implies that the queuing doesn't wait for the previous transfer end,
->> +     and that the descriptor chaining is not only done in the irq/tasklet code
->> +     triggered by the end of the transfer.
-> how is it differenat than current dmaengine semantics where you say
-> issue_pending() is invoked when current transfer finished? Here is you have
-> to do descriptor chaining so bit it.
-Your sentence is a bit difficult for me to understand.
+Ah, OK. That makes more sense :-)
 
->> +  c) Channel residue calculation
->> +     A channel should be able to report how much advanced is a transfer. The
-> in a							    ^^^^
-For v3.
+> 
+>>> let's for now
+>>> just rename the device nodes that are associated with a
+>>> DMA engine as MEDIA_ENT_T_AV_DMA.
+>>>
+>>> So,
+>>> 	MEDIA_ENT_T_DEVNODE_V4L -> MEDIA_ENT_T_AV_DMA
+>>>
+>>> PS.: This is not actually true for USB devices, as the
+>>> DMA engine is an internal component, as it is up to the
+>>> Kernel to strip the stream payload from the URB packages.
+>>
+>> How about MEDIA_ENT_T_DATA_STREAMING? Or perhaps DATA_IO? Perhaps even just
+>> "IO"?
+> 
+> Almost entities do I/O and data streaming (exceptions are flash controller,
+> SEC and similar control subdevices). So, DATA_STREAMING, DATA_IO or IO
+> are a way too generic.
 
->> +     granularity is still descriptor based.
-> This is not pxa specfic
-True. Do you want me to remove the (c) from the document ?
+For some of our products we have lots of video nodes that just control the
+receiver or transmitter (and possibly other related blocks), but leave the
+streaming to vendor code where we are forced to use that. So this can be
+a lot more common than you might think, although you won't see that appearing
+in the kernel.
 
->> +
->> +  d) Channel running state
->> +     A driver should be able to query if a channel is running or not. For the
->> +     multimedia case, such as video capture, if a transfer is submitted and then
->> +     a check of the DMA channel reports a "stopped channel", the transfer should
->> +     not be issued until the next "start of frame interrupt", hence the need to
->> +     know if a channel is in running or stopped state.
-> How do you query that?
-With dma_async_is_tx_complete() giving :
- - dma_cookie_t last_submitted
- - dma_cookie_t last_issued
+> 
+> DMA is a little bit more restrictive than we wanted.
+> 
+> Actually, I originally named those as MEDIA_ENT_T_AV_BRIDGE, because
+> the hardware component that implements the device->CPU I/O is typically
+> a bridge. But then I went into the drivers, and I noticed that several
+> devices with just one bridge have several different entities for I/O.
+> 
+> So, I ran this script:
+> 	$ git filter-branch -f --msg-filter 'cat && sed s,MEDIA_ENT_T_AV_BRIDGE,MEDIA_ENT_T_AV_DMA,g' origin/patchwork..
+> 	$ git filter-branch -f --tree-filter 'for i in $(git grep -l MEDIA_ENT_T_AV_BRIDGE); do sed s,MEDIA_ENT_T_AV_BRIDGE,MEDIA_ENT_T_AV_DMA,g $i >a && mv a $i; done' origin/patchwork..
+> 
+> To replace the name everywere. Provided that we decide a better name,
+> this can be easily fixable by doing the above scripting.
+> 
+> Perhaps MEDIA_ENT_T_DEV_CPU_AV_IO would be a better name?
+> 
+>> That would cover USB as well, and I dislike the use of "AV", since the
+>> data might contain other things besides audio and/or video.
+> 
+> True, but how to distinguish such device from an ALSA DEV/CPU IO?
+> 
+> Answering myself, I see one alternative for that... we could use
+> MEDIA_ENT_T_DEV_CPU_IO for all device->CPU I/O devices, and use
+> properties to tell what APIs are valid on such entity. The bad thing
+> is that someone could add multiple "incompatible" APIs at the same
+> device (like ALSA, V4L and DVB - all on the dame sevnode).
+> 
+> I'm running out of ideas here ;)
+> 
+> In the lack of a better name, I would keep MEDIA_ENT_T_AV_DMA, as
+> it is the closest one to what's provided by such entities (or the
+> less wrong one).
 
-The channel is still running if (last_submitted < last_issued).
+See my reply to patch 10/18: I see whether streaming is supported or not as a
+function (or feature) of the entity, just like a subdev entity can be both
+a tuner and a video decoder. I.e. these are properties.
 
->
->> +
->> +  e) Bandwidth guarantee
->> +     The PXA architecture has 4 levels of DMAs priorities : high, normal, low.
->> +     The high prorities get twice as much bandwidth as the normal, which get twice
->> +     as much as the low priorities.
->> +     A driver should be able to request a priority, especially the real-time
->> +     ones such as pxa_camera with (big) throughputs.
-> and how..?
-By passing this information :
- - in a devicetree environment, check pxad_dma_xlate()
- - in a platform device environment, check pxad_filter_fn()
+I think the naming issue here shows the problem with your approach. Whereas
+having a 'streaming' property simplifies this IMHO.
 
->> +  f) Transfer reusability
->> +     An issued and finished transfer should be "reusable". The choice of
->> +     "DMA_CTRL_ACK" should be left to the client, not the dma driver.
-> again how is this pxa specfic, if not documented we should move this to
-> dmaengine documentation
+Regards,
 
-Yes, I agree. I should move this to dmaengine slave documentation, in
-Documentation/dmaengine/provider.txt (in the Misc notes section). Do you want me
-to submit a patch to change the "Undocumented feature" into a properly
-documented feature ?
-
-Cheers.
-
--- 
-Robert
+	Hans
