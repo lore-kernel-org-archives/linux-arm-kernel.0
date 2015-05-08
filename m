@@ -1,70 +1,69 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Fri, 8 May 2015 16:15:25 -0500
-Subject: Bulid regression with VDSO enabled
-In-Reply-To: <983cc33a8e5704f4281a7d30bbc9d1d2@agner.ch>
-References: <391d6fc127b78ef4cbc5443557f0665a@agner.ch>
- <554CD5F8.10901@mentor.com> <983cc33a8e5704f4281a7d30bbc9d1d2@agner.ch>
-Message-ID: <554D276D.9040205@mentor.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 8 May 2015 14:34:14 -0700
+Subject: [PATCH] ARM: tegra: add "nor-jedec" flash compatible binding
+In-Reply-To: <554D24DA.8060601@wwwdotorg.org>
+References: <1431066098-19821-1-git-send-email-zajec5@gmail.com>
+ <554CDD8C.7050000@wwwdotorg.org>
+ <20150508184317.GZ32500@ld-irv-0074>
+ <CAMuHMdXeen3cU2bb8TXxxtdDjgMCU_FS1Yxdu1b-Tq2xE+x0ZA@mail.gmail.com>
+ <554D24DA.8060601@wwwdotorg.org>
+Message-ID: <20150508213414.GE32500@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2015 11:08 AM, Stefan Agner wrote:
-> On 2015-05-08 17:27, Nathan Lynch wrote:
->> On 05/08/2015 06:13 AM, Stefan Agner wrote:
->>> Also, I used the BFD linker by adding LD=${CROSS_COMPILE}ld.bfd to the
->>> build command. Interestingly thought, I had the same issue when using
->>> gold linker...
->>
->> When I try this, ld.gold is used regardless.
->>
->> You can tell by doing and checking for a NT_GNU_GOLD_VERSION note:
->>
->> $ readelf -n arch/arm/vdso/vdso.so.raw                            
->>
->> Displaying notes found at file offset 0x000001bc with length 0x00000040:
->>   Owner                 Data size       Description
->>   GNU                  0x00000009       NT_GNU_GOLD_VERSION (gold version)
->>   GNU                  0x00000014       NT_GNU_BUILD_ID (unique build
->> ID bitstring)
->>     Build ID: f025409550acb7f955c61d95691291da078e6688
+On Fri, May 08, 2015 at 03:04:26PM -0600, Stephen Warren wrote:
+> On 05/08/2015 02:57 PM, Geert Uytterhoeven wrote:
+> >On Fri, May 8, 2015 at 8:43 PM, Brian Norris
+> ><computersforpeace@gmail.com> wrote:
+> >>On Fri, May 08, 2015 at 10:00:12AM -0600, Stephen Warren wrote:
+> >>>On 05/08/2015 12:21 AM, Rafa? Mi?ecki wrote:
+> >>>>Starting with commits
+> >>>>8ff16cf ("Documentation: devicetree: m25p80: add "nor-jedec" binding")
+> >>>>1103b85 ("mtd: m25p80: bind to "nor-jedec" ID, for auto-detection")
+> >>>>we have "nor-jedec" binding indicating support for JEDEC identification.
+> >>>
+> >>>The documentation looks quite incomplete. "nor-jedec" sounds like
+> >>>it's intended to be something generic. As such, it should be
+> >>>documented in e.g.
+> >>>Documentation/devicetree/bindings/mtd/nor-jedec.txt, not buried in
+> >>>one particular flash device's binding. If it's not intended to be
+> >>>generic, why isn't the existing "winbond,w25q32dw" enough?
+> >>
+> >>It is generic, though there are plenty of additional manufacturer/device
+> >>pairs that could go on top of it. m25p80 was (one of?) the first
+> >>supported, so the naming has been based on legacy, and we're in the
+> >>process of unwinding a bit of that. If it helps, we could move the doc
+> >>to .../mtd/spi-nor,nor-jedec.txt or something like that.
+> >>
+> >>>Equally, "nor-jedec" doesn't sound like the right name. It doesn't
+> >>>differentiate between SPI and parallel NOR flash, which presumably
+> >>>need different compatible values, since the programming model is
+> >>>quite different, and the compatible value is supposed to
+> >>>define/imply the SW-visible programming model.
+> >>
+> >>It's definitely for SPI only. There was much discussion about this a
+> >>few months back. Somewhere along the way, it was mentioned that the
+> >>context (SPI slave is a child of SPI master) would make this clear. I'm
+> >>still not sure why we didn't end up with something more descriptive,
+> >>though, like "spi-nor,nor-jedec".
+> >
+> >What about "jedec,spi-nor"?
 > 
-> Hm, you are right. When deleting moving ld.bfd to ld, which makes the
-> BFD linker as default, compiling works flawless.
-> 
-> However, so far LD=${CROSS_COMPILE}ld.bfc seems to work for other build
-> objects, at least those do not have this note. For instance time.o does
-> not return anything:
-> 
-> $ readelf -n arch/arm/kernel/time.o
+> That seems unique enough to me, or the options below if they're
+> actually applicable.
 
-This is just an object file that hasn't been linked, but your general
-point stands -- LD is honored by other parts of the build.
+That could be OK with me. If I can get the magic blessing from the DT
+folks, then I'll send patches to update everything.
 
+> >Is this "SERIAL FLASH DISCOVERABLE PARAMETERS (SFDP)"?
+> >https://www.jedec.org/standards-documents/docs/jesd216b
+> >(Don't have time to register with jedec now...)
+> >
+> >If yes, "jedec,sfdp"? "jedec,jesd216b"?
 
-> So it seems to be a vdso.so.raw specific problem not using the specified
-> linker...?
+It's not SFDP. We're looking at SPI flash that are detected simply by
+the READ ID (9Fh) opcode. SFDP is on newer SPI flash which support the
+5Ah opcode, for reading a parameter table. (I'd like to support this
+soon, actually, and one of those sorts of strings might work.)
 
-Yes, since it's produced by an invocation of $(CC) which is expected
-to call the linker implicitly, and this is how the toolchain's default
-linker ends up getting used even when you set LD on the command line.  
-
-If I'm not mistaken, implicitly performing a link through the compiler
-seems to be 1) conventional for all VDSOs, not just ARM's, but 2) unusual
-for other parts of the kernel build.
-
-I suppose it's possible to make arch/arm/vdso/Makefile honor LD, but it
-would basically entail a rewrite.  In the meantime, using -fuse-ld=bfd
-may suffice:
-
-diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
-index 8aa791051029..da0ce897edde 100644
---- a/arch/arm/vdso/Makefile
-+++ b/arch/arm/vdso/Makefile
-@@ -43,6 +43,7 @@ quiet_cmd_vdsold = VDSO    $@
-       cmd_vdsold = $(CC) $(c_flags) -Wl,-T $(filter %.lds,$^) $(filter %.o,$^) \
-                    $(call cc-ldoption, -Wl$(comma)--build-id) \
-                    -Wl,-Bsymbolic -Wl,-z,max-page-size=4096 \
-+                   $(call cc-option, -fuse-ld=bfd) \
-                    -Wl,-z,common-page-size=4096 -o $@
- 
- quiet_cmd_vdsomunge = MUNGE   $@
+Brian
