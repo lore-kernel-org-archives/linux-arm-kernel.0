@@ -1,67 +1,158 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 May 2015 09:38:57 +0100
-Subject: [PATCH] arm64: bpf: fix signedness bug in loading 64-bit immediate
-In-Reply-To: <1431063591-16668-1-git-send-email-xi.wang@gmail.com>
-References: <1431063591-16668-1-git-send-email-xi.wang@gmail.com>
-Message-ID: <20150508083856.GA2125@arm.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Fri, 08 May 2015 16:40:10 +0800
+Subject: [PATCH] drm/rockchip: Add BGR formats to VOP
+In-Reply-To: <1431072968-12696-1-git-send-email-tfiga@chromium.org>
+References: <1431072968-12696-1-git-send-email-tfiga@chromium.org>
+Message-ID: <554C766A.8070103@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 06:39:51AM +0100, Xi Wang wrote:
-> Consider "(u64)insn1.imm << 32 | imm" in the arm64 JIT.  Since imm is
-> signed 32-bit, it is sign-extended to 64-bit, losing the high 32 bits.
-> The fix is to convert imm to u32 first and zero-extend it to u64.
-> 
-> Also extend test_bpf to catch this JIT bug; the interpreter is correct.
-> 
-> Before:
-> test_bpf: #58 load 64-bit immediate ret -1 != 1 FAIL (1 times)
-> 
-> After:
-> test_bpf: #58 load 64-bit immediate 74 PASS
-> 
-> Fixes: 30d3d94cc3d5 ("arm64: bpf: add 'load 64-bit immediate' instruction")
-> Cc: Zi Shen Lim <zlim.lnx@gmail.com>
-> Cc: Alexei Starovoitov <ast@plumgrid.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Xi Wang <xi.wang@gmail.com>
+Hi Tomasz
+     Thanks for the fix, but some register is wrong.
+
+On 2015?05?08? 16:16, Tomasz Figa wrote:
+> VOP can support BGR formats in all windows thanks to red/blue swap option
+> provided in WINx_CTRL0 registers. This patch enables support for
+> ABGR8888, XBGR8888, BGR888 and BGR565 formats by using this feature.
+>
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 > ---
->  arch/arm64/net/bpf_jit_comp.c | 2 +-
->  lib/test_bpf.c                | 3 ++-
->  2 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> index edba042b2325..14cdc099fda0 100644
-> --- a/arch/arm64/net/bpf_jit_comp.c
-> +++ b/arch/arm64/net/bpf_jit_comp.c
-> @@ -487,7 +487,7 @@ emit_cond_jmp:
->  			return -EINVAL;
->  		}
->  
-> -		imm64 = (u64)insn1.imm << 32 | imm;
-> +		imm64 = ((u64)(u32)insn1.imm) << 32 | (u64)(u32)imm;
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 33 +++++++++++++++++++++++++++++
+>   1 file changed, 33 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 4557f33..45fa11c 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -169,6 +169,7 @@ struct vop_win_phy {
+>   
+>   	struct vop_reg enable;
+>   	struct vop_reg format;
+> +	struct vop_reg rb_swap;
+>   	struct vop_reg act_info;
+>   	struct vop_reg dsp_info;
+>   	struct vop_reg dsp_st;
+> @@ -198,8 +199,12 @@ struct vop_data {
+>   static const uint32_t formats_01[] = {
+>   	DRM_FORMAT_XRGB8888,
+>   	DRM_FORMAT_ARGB8888,
+> +	DRM_FORMAT_XBGR8888,
+> +	DRM_FORMAT_ABGR8888,
+>   	DRM_FORMAT_RGB888,
+> +	DRM_FORMAT_BGR888,
+>   	DRM_FORMAT_RGB565,
+> +	DRM_FORMAT_BGR565,
+>   	DRM_FORMAT_NV12,
+>   	DRM_FORMAT_NV16,
+>   	DRM_FORMAT_NV24,
+> @@ -208,8 +213,12 @@ static const uint32_t formats_01[] = {
+>   static const uint32_t formats_234[] = {
+>   	DRM_FORMAT_XRGB8888,
+>   	DRM_FORMAT_ARGB8888,
+> +	DRM_FORMAT_XBGR8888,
+> +	DRM_FORMAT_ABGR8888,
+>   	DRM_FORMAT_RGB888,
+> +	DRM_FORMAT_BGR888,
+>   	DRM_FORMAT_RGB565,
+> +	DRM_FORMAT_BGR565,
+>   };
+>   
+>   static const struct vop_win_phy win01_data = {
+> @@ -217,6 +226,7 @@ static const struct vop_win_phy win01_data = {
+>   	.nformats = ARRAY_SIZE(formats_01),
+>   	.enable = VOP_REG(WIN0_CTRL0, 0x1, 0),
+>   	.format = VOP_REG(WIN0_CTRL0, 0x7, 1),
+> +	.rb_swap = VOP_REG(WIN0_CTRL0, 0x1, 12),
+>   	.act_info = VOP_REG(WIN0_ACT_INFO, 0x1fff1fff, 0),
+>   	.dsp_info = VOP_REG(WIN0_DSP_INFO, 0x0fff0fff, 0),
+>   	.dsp_st = VOP_REG(WIN0_DSP_ST, 0x1fff1fff, 0),
+> @@ -233,6 +243,7 @@ static const struct vop_win_phy win23_data = {
+>   	.nformats = ARRAY_SIZE(formats_234),
+>   	.enable = VOP_REG(WIN2_CTRL0, 0x1, 0),
+>   	.format = VOP_REG(WIN2_CTRL0, 0x7, 1),
+> +	.rb_swap = VOP_REG(WIN0_CTRL0, 0x1, 12),
+Should be:
 
-This seems a bit convoluted to me. Don't you just need to add a (u32)
-cast to imm and that's it? The (u64)(u32) looks redundant.
+	.rb_swap = VOP_REG(VOP_WIN2_CTRL0, 0x1, 12),
 
->  		emit_a64_mov_i64(dst, imm64, ctx);
->  
->  		return 1;
-> diff --git a/lib/test_bpf.c b/lib/test_bpf.c
-> index 80d78c51f65f..9f6849891b5f 100644
-> --- a/lib/test_bpf.c
-> +++ b/lib/test_bpf.c
-> @@ -1755,7 +1755,8 @@ static struct bpf_test tests[] = {
->  			BPF_EXIT_INSN(),
->  			BPF_JMP_IMM(BPF_JEQ, R3, 0x1234, 1),
->  			BPF_EXIT_INSN(),
-> -			BPF_ALU64_IMM(BPF_MOV, R0, 1),
-> +			BPF_LD_IMM64(R0, 0x1ffffffffLL),
-> +			BPF_ALU64_IMM(BPF_RSH, R0, 32), /* R0 = 1 */
->  			BPF_EXIT_INSN(),
+>   	.dsp_info = VOP_REG(WIN2_DSP_INFO0, 0x0fff0fff, 0),
+>   	.dsp_st = VOP_REG(WIN2_DSP_ST0, 0x1fff1fff, 0),
+>   	.yrgb_mst = VOP_REG(WIN2_MST0, 0xffffffff, 0),
+> @@ -246,6 +257,7 @@ static const struct vop_win_phy cursor_data = {
+>   	.nformats = ARRAY_SIZE(formats_234),
+>   	.enable = VOP_REG(HWC_CTRL0, 0x1, 0),
+>   	.format = VOP_REG(HWC_CTRL0, 0x7, 1),
+> +	.rb_swap = VOP_REG(WIN0_CTRL0, 0x1, 12),
+cursor win not support rb_swap, remove it.
+>   	.dsp_st = VOP_REG(HWC_DSP_ST, 0x1fff1fff, 0),
+>   	.yrgb_mst = VOP_REG(HWC_MST, 0xffffffff, 0),
+>   };
+> @@ -351,15 +363,32 @@ static inline void vop_mask_write_relaxed(struct vop *vop, uint32_t offset,
+>   	}
+>   }
+>   
+> +static bool has_rb_swapped(uint32_t format)
+> +{
+> +	switch (format) {
+> +	case DRM_FORMAT_XBGR8888:
+> +	case DRM_FORMAT_ABGR8888:
+> +	case DRM_FORMAT_BGR888:
+> +	case DRM_FORMAT_BGR565:
+> +		return true;
+> +	default:
+> +		return false;
+> +	}
+> +}
+> +
+>   static enum vop_data_format vop_convert_format(uint32_t format)
+>   {
+>   	switch (format) {
+>   	case DRM_FORMAT_XRGB8888:
+>   	case DRM_FORMAT_ARGB8888:
+> +	case DRM_FORMAT_XBGR8888:
+> +	case DRM_FORMAT_ABGR8888:
+>   		return VOP_FMT_ARGB8888;
+>   	case DRM_FORMAT_RGB888:
+> +	case DRM_FORMAT_BGR888:
+>   		return VOP_FMT_RGB888;
+>   	case DRM_FORMAT_RGB565:
+> +	case DRM_FORMAT_BGR565:
+>   		return VOP_FMT_RGB565;
+>   	case DRM_FORMAT_NV12:
+>   		return VOP_FMT_YUV420SP;
+> @@ -377,6 +406,7 @@ static bool is_alpha_support(uint32_t format)
+>   {
+>   	switch (format) {
+>   	case DRM_FORMAT_ARGB8888:
+> +	case DRM_FORMAT_ABGR8888:
+>   		return true;
+>   	default:
+>   		return false;
+> @@ -587,6 +617,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+>   	enum vop_data_format format;
+>   	uint32_t val;
+>   	bool is_alpha;
+> +	bool rb_swap;
+>   	bool visible;
+>   	int ret;
+>   	struct drm_rect dest = {
+> @@ -620,6 +651,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+>   		return 0;
+>   
+>   	is_alpha = is_alpha_support(fb->pixel_format);
+> +	rb_swap = has_rb_swapped(fb->pixel_format);
+>   	format = vop_convert_format(fb->pixel_format);
+>   	if (format < 0)
+>   		return format;
+> @@ -688,6 +720,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+>   	val = (dsp_sty - 1) << 16;
+>   	val |= (dsp_stx - 1) & 0xffff;
+>   	VOP_WIN_SET(vop, win, dsp_st, val);
+> +	VOP_WIN_SET(vop, win, rb_swap, rb_swap);
+>   
+>   	if (is_alpha) {
+>   		VOP_WIN_SET(vop, win, dst_alpha_ctl,
 
-This hunk should probably be a separate patch, unless you get Alexei's ack
-for me to take it via the arm64 tree too.
 
-Will
+-- 
+?ark Yao
