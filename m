@@ -1,62 +1,37 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Fri, 8 May 2015 17:33:15 +0800
-Subject: Question about checking rate_spi in pwrap_init_reg_clock
-In-Reply-To: <CABuKBeJMKpmkVZQvjZOuEtZmVaby6wxhr-i7w6eoHLjqTNNRig@mail.gmail.com>
-References: <1429581487.5994.1.camel@ingics.com>
- <20150421103155.GX6325@pengutronix.de>
- <CABuKBeJqgWHWNYaFXS-BwEayHEtiYGt+56LLXs3QaO3MHUk0bQ@mail.gmail.com>
- <20150421125223.GB6325@pengutronix.de>
- <CABuKBeJMKpmkVZQvjZOuEtZmVaby6wxhr-i7w6eoHLjqTNNRig@mail.gmail.com>
-Message-ID: <CAFRkauCbpDfT0V6pEcUf=_amcwa4E_t4taA3YzU5dYMmRxGRXA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 8 May 2015 10:36:03 +0100
+Subject: [PATCH 03/12] clocksource: sti: Provide 'use timer as sched
+ clock' capability
+In-Reply-To: <1431074699.13593.4.camel@x220>
+References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
+ <1431005924-21777-4-git-send-email-lee.jones@linaro.org>
+ <1431074699.13593.4.camel@x220>
+Message-ID: <20150508093603.GB29044@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC Leilk Liu
+On Fri, 08 May 2015, Paul Bolle wrote:
+> On Thu, 2015-05-07 at 14:38 +0100, Lee Jones wrote:
+> > --- a/drivers/clocksource/Kconfig
+> > +++ b/drivers/clocksource/Kconfig
+> 
+> > +config CLKSRC_ST_LPC_TIMER_SCHED_CLOCK
+> > +	bool
+> > +	depends on CLKSRC_ST_LPC
+> > +	default y
+> > +	help
+> > +	  Use Low Power controller timer clock source as sched_clock
+> 
+> This adds, as far as I can see, a Kconfig symbol that will always be in
+> lockstep with CLKSRC_ST_LPC. Ie, CLKSRC_ST_LPC and
+> CLKSRC_ST_LPC_TIMER_SCHED_CLOCK will always both be 'n' or both be 'y'.
+> 
+> Are there plans to break that lockstep in the future?
 
-2015-04-21 23:42 GMT+08:00 Matthias Brugger <matthias.bgg@gmail.com>:
-> 2015-04-21 14:52 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
->> On Tue, Apr 21, 2015 at 01:43:19PM +0200, Matthias Brugger wrote:
->>> 2015-04-21 12:31 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
->>> > On Tue, Apr 21, 2015 at 09:58:07AM +0800, Axel Lin wrote:
->>> >> hi,
->>> >> The implementation in pwrap_init_reg_clock seems has off-by-one bug.
->>> >> If rate_spi is 26000000, current code set ck_mhz to 18 rather than 26.
->>> >>
->>> >> I guess it needs below fix, but I'm not 100% sure as I don't have the datasheet.
->>> >> Can someone confirm if this is a bug or not?
->>> >
->>> > Yes, seems to be a bug. Thanks for noting. Will you send a formal patch
->>> > or should I do it?
->>>
->>> Did you have a look on both datasheets/reference kernels, mt8135 and mt8173?
->>> Reading the datasheet and reference kernel code for mt6589 this SPI
->>> waveform configuration looks like magic.
->>>
->>> But reading the clock frequency which can have clk_spi in mt8135, they
->>> are 0 MHz, 26 MHz and bigger then 26 MHz, which leads me to the
->>> conclusion that the code is correct. Otherwise the check for bigger
->>> then 18 MHz is useless and should be deleted, if we have a similar
->>> clock distribution in mt8173.
->>
->> The CSHEXT and CSLEXT registers extend the time the chipselect stays
->> high after a SPI transfer or low before a new transfer by the given
->> number of spi clk cycles.
->> Looking at the code maybe the real question is not whether the border is
->> at 25999999Hz or at 26000000Hz, but why the transfers are throttled with
->> slower clock frequencies. I would assume the other way round makes
->> sense.
->
-> After re-reading the data sheet and the reference kernel
-> implementation, it seems as if three clocks exist. clk_wrap and
-> clk_spi and "pmic reg_clk". And some how depending on the three clocks
-> you have to calculate the values for CSHEXT, CSLEXT etc.
->
-> I think we need some clarification here from Mediatek to really
-> understand what is going on.
+What's stopping CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK=n?
 
-Hi Leilk,
-I found you are working on mtk's spi driver.
-Any comment about this discussion?
-
-Regards,
-Axel
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
