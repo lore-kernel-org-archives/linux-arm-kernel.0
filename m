@@ -1,82 +1,122 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 8 May 2015 15:22:54 +0800
-Subject: [PATCH Part3 v11 4/9] PCI: Introduce pci_host_assign_domain_nr() to
- assign domain
+Date: Fri, 8 May 2015 15:22:59 +0800
+Subject: [PATCH Part3 v11 9/9] PCI: Remove pci_bus_assign_domain_nr()
 In-Reply-To: <1431069779-29346-1-git-send-email-wangyijing@huawei.com>
 References: <1431069779-29346-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1431069779-29346-5-git-send-email-wangyijing@huawei.com>
+Message-ID: <1431069779-29346-10-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce pci_host_assign_domain_nr() to save domain number
-in pci_host_bridge.
+Now we save the domain number in pci_host_bridge,
+we could remove pci_bus_assign_domain_nr() and
+clean the domain member in pci_bus.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/pci.c |   24 +++++++++++++++++++-----
- drivers/pci/pci.h |    1 +
- 2 files changed, 20 insertions(+), 5 deletions(-)
+ drivers/pci/pci.c   |    5 -----
+ drivers/pci/pci.h   |    9 ---------
+ drivers/pci/probe.c |   11 +++--------
+ include/linux/pci.h |    3 ---
+ 4 files changed, 3 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 7bf27e8..46a0240 100644
+index 2e2f429..a3cb571 100644
 --- a/drivers/pci/pci.c
 +++ b/drivers/pci/pci.c
-@@ -4506,10 +4506,10 @@ static int pci_get_new_domain_nr(void)
- 	return atomic_inc_return(&__domain_nr);
- }
+@@ -4558,11 +4558,6 @@ static int pci_assign_domain_nr(struct device *dev)
  
+ 	return domain;
+ }
+-
 -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-+static int pci_assign_domain_nr(struct device *dev)
- {
- 	static int use_dt_domains = -1;
--	int domain = of_get_pci_domain_nr(parent->of_node);
-+	int domain = of_get_pci_domain_nr(dev->of_node);
- 
- 	/*
- 	 * Check DT domain and use_dt_domains values.
-@@ -4543,16 +4543,30 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
- 		use_dt_domains = 0;
- 		domain = pci_get_new_domain_nr();
- 	} else {
--		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
--			parent->of_node->full_name);
-+		dev_err(dev, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
-+			dev->of_node->full_name);
- 		domain = -1;
- 	}
- 
--	bus->domain_nr = domain;
-+	return domain;
-+}
-+
-+void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-+{
-+	bus->domain_nr = pci_assign_domain_nr(parent);
- }
+-{
+-	bus->domain_nr = pci_assign_domain_nr(parent);
+-}
  #endif
  #endif
  
-+void pci_host_assign_domain_nr(struct pci_host_bridge *host, int domain)
-+{
-+#ifdef CONFIG_PCI_DOMAINS_GENERIC
-+	host->domain = pci_assign_domain_nr(host->dev.parent);
-+#else
-+	host->domain = domain;
-+#endif
-+}
-+
- /**
-  * pci_ext_cfg_avail - can we access extended PCI config space?
-  *
 diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index bc3e79a..c2e1a6b 100644
+index c2e1a6b..d8a4238 100644
 --- a/drivers/pci/pci.h
 +++ b/drivers/pci/pci.h
-@@ -334,4 +334,5 @@ static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
- }
- #endif
+@@ -325,14 +325,5 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
  
-+void pci_host_assign_domain_nr(struct pci_host_bridge *host, int domain);
+ struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus);
+ 
+-#ifdef CONFIG_PCI_DOMAINS_GENERIC
+-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
+-#else
+-static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
+-					struct device *parent)
+-{
+-}
+-#endif
+-
+ void pci_host_assign_domain_nr(struct pci_host_bridge *host, int domain);
  #endif /* DRIVERS_PCI_H */
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index e4ef791..be60074 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -481,7 +481,7 @@ void pci_read_bridge_bases(struct pci_bus *child)
+ 	}
+ }
+ 
+-static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
++static struct pci_bus *pci_alloc_bus(void)
+ {
+ 	struct pci_bus *b;
+ 
+@@ -496,10 +496,6 @@ static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
+ 	INIT_LIST_HEAD(&b->resources);
+ 	b->max_bus_speed = PCI_SPEED_UNKNOWN;
+ 	b->cur_bus_speed = PCI_SPEED_UNKNOWN;
+-#ifdef CONFIG_PCI_DOMAINS_GENERIC
+-	if (parent)
+-		b->domain_nr = parent->domain_nr;
+-#endif
+ 	return b;
+ }
+ 
+@@ -670,7 +666,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 	/*
+ 	 * Allocate a new bus, and inherit stuff from the parent..
+ 	 */
+-	child = pci_alloc_bus(parent);
++	child = pci_alloc_bus();
+ 	if (!child)
+ 		return NULL;
+ 
+@@ -1936,7 +1932,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int domain,
+ 		goto unregister_host;
+ 	}
+ 
+-	b = pci_alloc_bus(NULL);
++	b = pci_alloc_bus();
+ 	if (!b)
+ 		goto unregister_host;
+ 
+@@ -1944,7 +1940,6 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int domain,
+ 	b->sysdata = sysdata;
+ 	b->ops = ops;
+ 	b->number = b->busn_res.start = bus;
+-	pci_bus_assign_domain_nr(b, parent);
+ 
+ 	b->bridge = get_device(&bridge->dev);
+ 	device_enable_async_suspend(b->bridge);
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 13ed681..f010042 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -460,9 +460,6 @@ struct pci_bus {
+ 	unsigned char	primary;	/* number of primary bridge */
+ 	unsigned char	max_bus_speed;	/* enum pci_bus_speed */
+ 	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
+-#ifdef CONFIG_PCI_DOMAINS_GENERIC
+-	int		domain_nr;
+-#endif
+ 
+ 	char		name[48];
+ 
 -- 
 1.7.1
