@@ -1,109 +1,154 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  8 May 2015 12:36:37 +0100
-Subject: [PATCH 05/12] arm64: psci: support unsigned return values
+Date: Fri,  8 May 2015 12:36:38 +0100
+Subject: [PATCH 06/12] arm64: psci: account for Trusted OS instances
 In-Reply-To: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
 References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1431085004-32743-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1431085004-32743-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PSCI_VERSION and MIGRATE_INFO_TYPE_UP_CPU return unsigned values, with
-the latter returning a 64-bit value. However, the PSCI invocation
-functions have prototypes returning int.
+Software resident in the secure world (a "Trusted OS") may cause CPU_OFF
+calls for the CPU it is resident on to be denied. Such a denial would be
+fatal for the kernel, and so we must detect when this can happen before
+the point of no return.
 
-This patch upgrades the invocation functions to return unsigned long,
-with a new typedef to keep things legible. As PSCI_VERSION cannot return
-a negative value, the erroneous check against PSCI_RET_NOT_SUPPORTED is
-also removed. The unrelated psci_initcall_t typedef is moved closer to
-its first user, to avoid confusion with the invocation functions.
+This patch implements Trusted OS detection for PSCI 0.2+ systems, using
+MIGRATE_INFO_TYPE and MIGRATE_INFO_UP_CPU. When a trusted OS is detected
+as resident on a particular CPU, attempts to hot unplug that CPU will be
+denied early, before they can prove fatal.
 
-In preparation for sharing the code with ARM, unsigned long is used in
-preference of u64. In the SMC32 calling convention, the relevant fields
-will be 32 bits wide.
+Trusted OS migration is not implemented by this patch. Implementation of
+migratable UP trusted OSs seems unlikely, and the right policy for
+migration is unclear (and will likely differ across implementations). As
+such, it is likely that migration will require cooperation with Trusted
+OS drivers.
+
+PSCI implementations prior to 0.1 do not provide the facility to detect
+the presence of a Trusted OS, nor the CPU any such OS is resident on, so
+without additional information it is not possible to handle Trusted OSs
+with PSCI 0.1.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/psci.c | 43 ++++++++++++++++---------------------------
- 1 file changed, 16 insertions(+), 27 deletions(-)
+ arch/arm64/kernel/psci.c | 61 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
 diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 66b5b75..7324db9 100644
+index 7324db9..25e2610 100644
 --- a/arch/arm64/kernel/psci.c
 +++ b/arch/arm64/kernel/psci.c
-@@ -56,11 +56,11 @@ struct psci_operations {
+@@ -43,6 +43,19 @@ struct psci_power_state {
+ 	u8	affinity_level;
+ };
+ 
++/*
++ * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
++ * calls to its resident CPU, so we must avoid issuing those. We never migrate
++ * a Trusted OS even if it claims to be capable of migration -- doing so will
++ * require cooperation with a Trusted OS driver.
++ */
++static int resident_cpu = -1;
++
++static bool psci_tos_resident_on(int cpu)
++{
++	return cpu == resident_cpu;
++}
++
+ struct psci_operations {
+ 	int (*cpu_suspend)(struct psci_power_state state,
+ 			   unsigned long entry_point);
+@@ -52,6 +65,7 @@ struct psci_operations {
+ 	int (*affinity_info)(unsigned long target_affinity,
+ 			unsigned long lowest_affinity_level);
+ 	int (*migrate_info_type)(void);
++	unsigned long (*migrate_info_up_cpu)(void);
+ };
  
  static struct psci_operations psci_ops;
- 
--static int (*invoke_psci_fn)(u64, u64, u64, u64);
--typedef int (*psci_initcall_t)(const struct device_node *);
--
--asmlinkage int __invoke_psci_fn_hvc(u64, u64, u64, u64);
--asmlinkage int __invoke_psci_fn_smc(u64, u64, u64, u64);
-+typedef unsigned long (psci_fn)(unsigned long, unsigned long,
-+				unsigned long, unsigned long);
-+asmlinkage psci_fn __invoke_psci_fn_hvc;
-+asmlinkage psci_fn __invoke_psci_fn_smc;
-+static psci_fn *invoke_psci_fn;
- 
- enum psci_function {
- 	PSCI_FN_CPU_SUSPEND,
-@@ -112,12 +112,9 @@ static void psci_power_state_unpack(u32 power_state,
- 			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
+@@ -172,6 +186,11 @@ static int psci_migrate_info_type(void)
+ 	return invoke_psci_fn(PSCI_0_2_FN_MIGRATE_INFO_TYPE, 0, 0, 0);
  }
  
--static int psci_get_version(void)
-+static u32 psci_get_version(void)
- {
--	int err;
--
--	err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
--	return err;
-+	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
- }
- 
- static int psci_cpu_suspend(struct psci_power_state state,
-@@ -295,23 +292,13 @@ static int __init psci_probe(void)
- {
- 	int ver = psci_get_version();
- 
--	if (ver == PSCI_RET_NOT_SUPPORTED) {
--		/*
--		 * PSCI versions >=0.2 mandates implementation of
--		 * PSCI_VERSION.
--		 */
--		pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
--		return -EOPNOTSUPP;
--	} else {
--		pr_info("PSCIv%d.%d detected in firmware.\n",
--				PSCI_VERSION_MAJOR(ver),
--				PSCI_VERSION_MINOR(ver));
--
--		if (PSCI_VERSION_MAJOR(ver) == 0 &&
--				PSCI_VERSION_MINOR(ver) < 2) {
--			pr_err("Conflicting PSCI version detected.\n");
--			return -EINVAL;
--		}
-+	pr_info("PSCIv%d.%d detected in firmware.\n",
-+			PSCI_VERSION_MAJOR(ver),
-+			PSCI_VERSION_MINOR(ver));
++static unsigned long psci_migrate_info_up_cpu(void)
++{
++	return invoke_psci_fn(PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU, 0, 0, 0);
++}
 +
-+	if (PSCI_VERSION_MAJOR(ver) == 0 && PSCI_VERSION_MINOR(ver) < 2) {
-+		pr_err("Conflicting PSCI version detected.\n");
-+		return -EINVAL;
- 	}
+ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
+ 						 unsigned int cpu)
+ {
+@@ -261,6 +280,40 @@ static void psci_sys_poweroff(void)
+ 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+ }
+ 
++/*
++ * Detect the presence of a resident Trusted OS which may cause CPU_OFF to
++ * return DENIED (which would be fatal).
++ */
++static void __init psci_init_migrate(void)
++{
++	unsigned long cpuid;
++	int type, cpu = -1;
++
++	type = psci_ops.migrate_info_type();
++
++	if (type == PSCI_0_2_TOS_MP) {
++		pr_info("Trusted OS migration not required\n");
++		return;
++	}
++
++	if (type == PSCI_RET_NOT_SUPPORTED) {
++		pr_info("MIGRATE_INFO_TYPE not supported.\n");
++		return;
++	}
++
++	if (type != PSCI_0_2_TOS_UP_MIGRATE &&
++	    type != PSCI_0_2_TOS_UP_NO_MIGRATE) {
++		pr_err("MIGRATE_INFO_TYPE returned unknown type (%d)\n", type);
++		return;
++	}
++
++	cpuid = psci_ops.migrate_info_up_cpu();
++	cpu = get_logical_index(cpuid);
++	resident_cpu = cpu >= 0 ? cpu : -1;
++
++	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
++}
++
+ static void __init psci_0_2_set_functions(void)
+ {
+ 	pr_info("Using standard PSCI v0.2 function IDs\n");
+@@ -279,6 +332,7 @@ static void __init psci_0_2_set_functions(void)
+ 	psci_ops.affinity_info = psci_affinity_info;
+ 
+ 	psci_ops.migrate_info_type = psci_migrate_info_type;
++	psci_ops.migrate_info_up_cpu = psci_migrate_info_up_cpu;
+ 
+ 	arm_pm_restart = psci_sys_reset;
+ 
+@@ -303,6 +357,8 @@ static int __init psci_probe(void)
  
  	psci_0_2_set_functions();
-@@ -319,6 +306,8 @@ static int __init psci_probe(void)
+ 
++	psci_init_migrate();
++
  	return 0;
  }
  
-+typedef int (*psci_initcall_t)(const struct device_node *);
+@@ -449,6 +505,11 @@ static int cpu_psci_cpu_disable(unsigned int cpu)
+ 	/* Fail early if we don't have CPU_OFF support */
+ 	if (!psci_ops.cpu_off)
+ 		return -EOPNOTSUPP;
 +
- /*
-  * PSCI init function for PSCI versions >=0.2
-  *
++	/* Trusted OS will deny CPU_OFF */
++	if (psci_tos_resident_on(cpu))
++		return -EPERM;
++
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
