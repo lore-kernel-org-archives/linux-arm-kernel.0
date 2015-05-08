@@ -1,196 +1,61 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Sat, 9 May 2015 00:44:45 +0530
-Subject: [PATCH v5 3/3] ata: ahci_xgene: Add AHCI Support for 2nd HW
- version of APM X-Gene SoC AHCI SATA Host controller.
-In-Reply-To: <1430853672-6227-4-git-send-email-stripathi@apm.com>
-References: <1430853672-6227-1-git-send-email-stripathi@apm.com>
- <1430853672-6227-4-git-send-email-stripathi@apm.com>
-Message-ID: <CAOHikRBHy_u+Yur1oujFE5Szz13Aej=1KMFeN=za-WpXNYQ7tw@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 08 May 2015 12:19:46 -0700
+Subject: [PATCH 2/3 v8] mailbox: Enable BCM2835 mailbox support
+In-Reply-To: <2464203.68HkYCAlx7@kongar>
+References: <1430857666-18877-1-git-send-email-eric@anholt.net>
+ <554BA0B7.8040600@tronnes.org> <87mw1grwnn.fsf@eliezer.anholt.net>
+ <2464203.68HkYCAlx7@kongar>
+Message-ID: <87a8xenagd.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 6, 2015 at 12:51 AM, Suman Tripathi <stripathi@apm.com> wrote:
-> This patch enables full AHCI feature support for APM X-Gene SoC SATA
-> host controller. The following errata's are removed:
->
-> 1. 2a0bdff6b95 ("ahci-xgene: fix the dma state machine lockup for the
->                  IDENTIFY DEVICE PIO mode command")
-> 2. 09c32aaa368 ("ahci_xgene: Fix the dma state machine lockup for the
->                  ATA_CMD_SMART PIO mode command")
-> 3. 1540035da71 ("ahci_xgene: Implement the xgene_ahci_poll_reg_val to
->                  support PMP")
-> 4. a3a84bc7c88 ("ahci_xgene: Implement the workaround to support PMP
->                  enumeration and discovery")
-> 5. 1102407bb71 ("ahci_xgene: Fix the DMA state machine lockup for the
->                  ATA_CMD_PACKET PIO mode command")
-> 6. 72f79f9e35b ("ahci_xgene: Removing NCQ support from the APM X-Gene
->                 SoC AHCI SATA Host Controller driver")
->
-> In addition, enable PMP support for APM X-Gene SoC and enable FBS
-> support for second generation APM X-Gene SoC.
->
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->  drivers/ata/ahci_xgene.c | 90 ++++++++++++++++++++++++++++++++++++++----------
->  1 file changed, 72 insertions(+), 18 deletions(-)
->
-> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-> index 2b78510..88a0988 100644
-> --- a/drivers/ata/ahci_xgene.c
-> +++ b/drivers/ata/ahci_xgene.c
-> @@ -27,6 +27,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/ahci_platform.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_irq.h>
->  #include <linux/phy/phy.h>
->  #include "ahci.h"
-> @@ -84,6 +85,11 @@
->  /* Max retry for link down */
->  #define MAX_LINK_DOWN_RETRY 3
->
-> +enum xgene_ahci_version {
-> +       XGENE_AHCI_V1 = 1,
-> +       XGENE_AHCI_V2,
-> +};
-> +
->  struct xgene_ahci_context {
->         struct ahci_host_priv *hpriv;
->         struct device *dev;
-> @@ -547,9 +553,6 @@ static struct ata_port_operations xgene_ahci_ops = {
->         .host_stop = xgene_ahci_host_stop,
->         .hardreset = xgene_ahci_hardreset,
->         .read_id = xgene_ahci_read_id,
-> -       .qc_issue = xgene_ahci_qc_issue,
-> -       .softreset = xgene_ahci_softreset,
-> -       .pmp_softreset = xgene_ahci_pmp_softreset
->  };
->
->  static const struct ata_port_info xgene_ahci_port_info = {
-> @@ -629,12 +632,30 @@ static struct scsi_host_template ahci_platform_sht = {
->         AHCI_SHT(DRV_NAME),
->  };
->
-> +#ifdef CONFIG_ACPI
-> +static const struct acpi_device_id xgene_ahci_acpi_match[] = {
-> +       { "APMC0D0D", XGENE_AHCI_V1},
-> +       { "APMC0D32", XGENE_AHCI_V2},
-> +       {},
-> +};
-> +MODULE_DEVICE_TABLE(acpi, xgene_ahci_acpi_match);
-> +#endif
-> +
-> +static const struct of_device_id xgene_ahci_of_match[] = {
-> +       {.compatible = "apm,xgene-ahci", .data = (void *) XGENE_AHCI_V1},
-> +       {.compatible = "apm,xgene-ahci-v2", .data = (void *) XGENE_AHCI_V2},
-> +       {},
-> +};
-> +MODULE_DEVICE_TABLE(of, xgene_ahci_of_match);
-> +
->  static int xgene_ahci_probe(struct platform_device *pdev)
->  {
->         struct device *dev = &pdev->dev;
->         struct ahci_host_priv *hpriv;
->         struct xgene_ahci_context *ctx;
->         struct resource *res;
-> +       const struct of_device_id *of_devid;
-> +       enum xgene_ahci_version version = XGENE_AHCI_V1;
->         int rc;
->
->         hpriv = ahci_platform_get_resources(pdev);
-> @@ -677,6 +698,37 @@ static int xgene_ahci_probe(struct platform_device *pdev)
->                 ctx->csr_mux = csr;
->         }
->
-> +       of_devid = of_match_device(xgene_ahci_of_match, dev);
-> +       if (of_devid) {
-> +               if (of_devid->data)
-> +                       version = (enum xgene_ahci_version) of_devid->data;
-> +       }
-> +#ifdef CONFIG_ACPI
-> +       else {
-> +               const struct acpi_device_id *acpi_id;
-> +               struct acpi_device_info *info;
-> +               acpi_status status;
-> +
-> +               acpi_id = acpi_match_device(xgene_ahci_acpi_match, &pdev->dev);
-> +               if (!acpi_id) {
-> +                       dev_warn(&pdev->dev, "No node entry in ACPI table. Assume version1\n");
-> +                       version = XGENE_AHCI_V1;
-> +               }
-> +
-> +               if (acpi_id->driver_data) {
-> +                       version = (enum xgene_ahci_version) acpi_id->driver_data;
-> +                       status = acpi_get_object_info(ACPI_HANDLE(&pdev->dev), &info);
-> +                       if (ACPI_FAILURE(status)) {
-> +                               dev_warn(&pdev->dev, "%s: Error reading device info. Assume version1\n",
-> +                                       __func__);
-> +                               version = XGENE_AHCI_V1;
-> +                       }
-> +                       if (info->valid & ACPI_VALID_CID)
-> +                               version = XGENE_AHCI_V2;
-> +               }
-> +       }
-> +#endif
-> +
->         dev_dbg(dev, "VAddr 0x%p Mmio VAddr 0x%p\n", ctx->csr_core,
->                 hpriv->mmio);
->
-> @@ -704,7 +756,23 @@ static int xgene_ahci_probe(struct platform_device *pdev)
->         /* Configure the host controller */
->         xgene_ahci_hw_init(hpriv);
->  skip_clk_phy:
-> -       hpriv->flags = AHCI_HFLAG_NO_PMP | AHCI_HFLAG_NO_NCQ;
-> +
-> +       switch (version) {
-> +       case XGENE_AHCI_V1:
-> +               hpriv->flags = AHCI_HFLAG_NO_NCQ;
-> +               /*
-> +                * Override the callbacks for storm ERRATA
-> +                */
-> +               xgene_ahci_ops.qc_issue = xgene_ahci_qc_issue;
-> +               xgene_ahci_ops.softreset = xgene_ahci_softreset;
-> +               xgene_ahci_ops.pmp_softreset = xgene_ahci_pmp_softreset;
-> +               break;
-> +       case XGENE_AHCI_V2:
-> +               hpriv->flags |= AHCI_HFLAG_YES_FBS | AHCI_HFLAG_EDGE_IRQ;
-> +               break;
-> +       default:
-> +               break;
-> +       }
->
->         rc = ahci_platform_init_host(pdev, hpriv, &xgene_ahci_port_info,
->                                      &ahci_platform_sht);
-> @@ -719,20 +787,6 @@ disable_resources:
->         return rc;
->  }
->
-> -#ifdef CONFIG_ACPI
-> -static const struct acpi_device_id xgene_ahci_acpi_match[] = {
-> -       { "APMC0D0D", },
-> -       { }
-> -};
-> -MODULE_DEVICE_TABLE(acpi, xgene_ahci_acpi_match);
-> -#endif
-> -
-> -static const struct of_device_id xgene_ahci_of_match[] = {
-> -       {.compatible = "apm,xgene-ahci"},
-> -       {},
-> -};
-> -MODULE_DEVICE_TABLE(of, xgene_ahci_of_match);
-> -
->  static struct platform_driver xgene_ahci_driver = {
->         .probe = xgene_ahci_probe,
->         .remove = ata_platform_remove_one,
-> --
-> 1.8.2.1
->
+Alexander Stein <alexanders83@web.de> writes:
 
-Any comments on this version ??
+> On Thursday 07 May 2015, 12:54:20 wrote Eric Anholt:
+>> Noralf Tr?nnes <noralf@tronnes.org> writes:
+>> 
+>> > Den 05.05.2015 22:27, skrev Eric Anholt:
+>> >> From: Lubomir Rintel <lkundrak@v3.sk>
+>> >>
+>> >> This mailbox driver provides a single mailbox channel to write 32-bit
+>> >> values to the VPU and get a 32-bit response.  The Raspberry Pi
+>> >> firmware uses this mailbox channel to implement firmware calls, while
+>> >> Roku 2 (despite being derived from the same firmware tree) doesn't.
+>> >>
+>> >> The driver was originally submitted by Lubomir, based on the
+>> >> out-of-tree 2708 mailbox driver.  Eric Anholt fixed it up for
+>> >> upstreaming, with the major functional change being that it now has no
+>> >> notion of multiple channels (since that is a firmware-dependent
+>> >> concept) and instead the raspberrypi-firmware driver will do that
+>> >> bit-twiddling in its own messages.
+>> > ...
+>> >> +static struct platform_driver bcm2835_mbox_driver = {
+>> >> +	.driver = {
+>> >> +		.name = "bcm2835-mbox",
+>> >> +		.owner = THIS_MODULE,
+>> >> +		.of_match_table = bcm2835_mbox_of_match,
+>> >> +	},
+>> >> +	.probe		= bcm2835_mbox_probe,
+>> >> +	.remove		= bcm2835_mbox_remove,
+>> >> +};
+>> >> +module_platform_driver(bcm2835_mbox_driver);
+>> >
+>> > I have tested this driver and the firmware driver booting directly
+>> > from the VideoCore bootloader (no uboot).
+>> > The mailbox driver loads too late to turn on USB power:
+>> 
+>> Yeah, I have a patch on my branches that returns -EPROBE_DEFER when
+>> trying to get a power domain and not finding the provider.  It was
+>> rejected by the maintainers in favor of a proposed solution whose
+>> description I didn't quite follow.
+>
+> Do you have a link for this thread?
 
-
--- 
-Thanks,
-with regards,
-Suman Tripathi
+https://lkml.org/lkml/2015/3/11/483
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150508/4b533b38/attachment.sig>
