@@ -1,214 +1,161 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 8 May 2015 13:52:42 +0200
-Subject: [PATCH v3 07/12] KVM: arm64: guest debug, add support for
- single-step
-In-Reply-To: <1430929407-3487-8-git-send-email-alex.bennee@linaro.org>
-References: <1430929407-3487-1-git-send-email-alex.bennee@linaro.org>
- <1430929407-3487-8-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150508115242.GG24744@cbox>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 08 May 2015 13:54:07 +0200
+Subject: [PATCH 03/18] media controller: use MEDIA_ENT_T_AV_DMA for A/V
+ DMA engines
+In-Reply-To: <afb84e3d80fc4f6f2465a123012f161b8c29f1c4.1431046915.git.mchehab@osg.samsung.com>
+References: <cover.1431046915.git.mchehab@osg.samsung.com>
+ <afb84e3d80fc4f6f2465a123012f161b8c29f1c4.1431046915.git.mchehab@osg.samsung.com>
+Message-ID: <554CA3DF.9030700@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 05:23:22PM +0100, Alex Benn?e wrote:
-> This adds support for single-stepping the guest. To do this we need to
-> manipulate the guests PSTATE.SS and MDSCR_EL1.SS bits which we do in the
-> kvm_arm_setup/clear_debug() so we don't affect the apparent state of the
-> guest. Additionally while the host is debugging the guest we suppress
-> the ability of the guest to single-step itself.
+On 05/08/2015 03:12 AM, Mauro Carvalho Chehab wrote:
+> At the Video4Linux API, the /dev/video?, /dev/vbi? and
+> /dev/radio? device nodes are used for the chipset that
+
+You should add /dev/swradio? for SDR devices.
+
+> provides the bridge between video/radio streams and the
+> USB, PCI or CPU buses.
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> Such bridge is also typically used to control the V4L2 device
+> as a hole.
+
+hole -> whole
+
 > 
-> ---
-> v2
->   - Move pstate/mdscr manipulation into C
->   - don't export guest_debug to assembly
->   - add accessor for saved_debug regs
->   - tweak save/restore of mdscr_el1
-> v3
->   - don't save PC in debug information struct
->   - rename debug_saved_regs->guest_debug_state
->   - save whole value, only use bits in restore
->   - add save/restore_guest-debug_regs helper functions
->   - simplify commit message for clarity
->   - rm vcpu_debug_saved_reg access fn
+> For video streaming devices and SDR radio devices, they're
+> also associated with the DMA engines that transfer the
+> video stream (or SDR stream) to the CPU's memory.
 > 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 064c105..9b3ed6d 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -302,7 +302,9 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->  	kvm_arm_set_running_vcpu(NULL);
->  }
->  
-> -#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP)
-> +#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE |    \
-> +			    KVM_GUESTDBG_USE_SW_BP | \
-> +			    KVM_GUESTDBG_SINGLESTEP)
->  
->  /**
->   * kvm_arch_vcpu_ioctl_set_guest_debug - set up guest debugging
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 7cb99b5..b60fa7a 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -123,6 +123,12 @@ struct kvm_vcpu_arch {
->  	 * here.
->  	 */
->  
-> +	/* Guest registers we preserve during guest debugging */
-> +	struct {
-> +		u32	pstate;
+> It should be noticed, however, this is not true on non-SDR
+> radio devices,
 
-This could do a with a comment: /* preserve SPSR_DEBUG_MASK bits */
+I think you forgot that SDR devices are not using /dev/radio
+but /dev/swradio. They have different names. Radio devices never
+stream (OK, I think there are one or two exceptions, but that's really
+because nobody bothered to make an alsa driver. Those boards are
+in practice out of spec.)
 
-> +		u32	mdscr_el1;
-> +	} guest_debug_state;
-> +
->  	/* Don't run the guest */
->  	bool pause;
->  
-> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-> index 5bee676..19346e8 100644
-> --- a/arch/arm64/kvm/debug.c
-> +++ b/arch/arm64/kvm/debug.c
-> @@ -19,11 +19,42 @@
->  
->  #include <linux/kvm_host.h>
->  
-> +#include <asm/debug-monitors.h>
-> +#include <asm/kvm_asm.h>
->  #include <asm/kvm_arm.h>
-> +#include <asm/kvm_emulate.h>
-> +
-> +/* These are the bits of MDSCR_EL1 we may manipulate */
-> +#define MDSCR_EL1_DEBUG_MASK	(DBG_MDSCR_SS | \
-> +				DBG_MDSCR_KDE | \
-> +				DBG_MDSCR_MDE)
-> +
-> +#define SPSR_DEBUG_MASK DBG_SPSR_SS
->  
->  static DEFINE_PER_CPU(u32, mdcr_el2);
->  
->  /**
-> + * save/restore_guest_debug_regs
-> + *
-> + * For some debug operations we need to tweak some guest registers. As
-> + * a result we need to save the state of those registers before we
-> + * make those modifications.
-> + */
-> +static void save_guest_debug_regs(struct kvm_vcpu *vcpu)
-> +{
-> +	vcpu->arch.guest_debug_state.pstate = *vcpu_cpsr(vcpu);
-> +	vcpu->arch.guest_debug_state.mdscr_el1 = vcpu_sys_reg(vcpu, MDSCR_EL1);
-> +}
-> +
-> +static void restore_guest_debug_regs(struct kvm_vcpu *vcpu)
-> +{
-> +	*vcpu_cpsr(vcpu) |=
-> +		(vcpu->arch.guest_debug_state.pstate & SPSR_DEBUG_MASK);
-> +	vcpu_sys_reg(vcpu, MDSCR_EL1) |=
-> +		(vcpu->arch.guest_debug_state.mdscr_el1 & MDSCR_EL1_DEBUG_MASK);
+> and may also not be true on embedded devices
+> that, due to DRM reasons, don't allow writing unencrypted
+> data on a memory that could be seen by the CPU.
 
-This doesn't look right.  Don't you need to also clear the values if
-they were set by us for single-stepping the guest?  At least for the
-MDSCR_EL1.SS bit.
+This actually might still work by using opaque DMABUF handles. But that's
+under discussion right now in the Secure Data Path thread.
 
-What if we're single-stepping through guest code that modifies the SS bits
-of these register for the guest state?  Is that possible and do we capture
-this somehow?
+Another reason can also be that the SoC vendor re-invented the wheel
+and made there own DMA streaming solution. You can still make V4L drivers
+that control the video receivers/transmitters, but for the actual streaming
+you are forced to use the vendor's crap code (hello TI!).
 
-> +}
-> +
-> +/**
->   * kvm_arm_init_debug - grab what we need for debug
->   *
->   * Currently the sole task of this function is to retrieve the initial
-> @@ -38,7 +69,6 @@ void kvm_arm_init_debug(void)
->  	__this_cpu_write(mdcr_el2, kvm_call_hyp(__kvm_get_mdcr_el2));
->  }
->  
-> -
->  /**
->   * kvm_arm_setup_debug - set up debug related stuff
->   *
-> @@ -75,15 +105,37 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
->  	else
->  		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
->  
-> -	/* Trap breakpoints? */
-> -	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
-> +	/* Is Guest debugging in effect? */
-> +	if (vcpu->guest_debug) {
-
-you could have just checked the field like this in the original patch,
-but ok.
-
->  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
-> -	else
-> -		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
-
-
->  
-> +		/* Save guest debug state */
-> +		save_guest_debug_regs(vcpu);
-> +
-> +		/*
-> +		 * Single Step (ARM ARM D2.12.3 The software step state
-> +		 * machine)
-> +		 *
-> +		 * If we are doing Single Step we need to manipulate
-> +		 * MDSCR_EL1.SS and PSTATE.SS. If not we need to
-> +		 * suppress the guests ability to trigger single step itself.
-> +		 */
-> +		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-> +			*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
-> +			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
-> +		} else {
-> +			*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
-
-why must we clear PSTATE.SS when we have MDSCR_EL1.SS == 0 ?
-
-> +			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
-> +		}
-> +
-> +	} else {
-> +		/* Debug operations can go straight to the guest */
-> +		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
-
-still don't think you need this.
-
-> +	}
->  }
->  
->  void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
->  {
-> -	/* Nothing to do yet */
-> +	if (vcpu->guest_debug)
-> +		restore_guest_debug_regs(vcpu);
->  }
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index 27f38a9..e9de13e 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -103,6 +103,7 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	run->debug.arch.hsr = hsr;
->  
->  	switch (hsr >> ESR_ELx_EC_SHIFT) {
-> +	case ESR_ELx_EC_SOFTSTP_LOW:
->  	case ESR_ELx_EC_BKPT32:
->  	case ESR_ELx_EC_BRK64:
->  		break;
-> @@ -130,6 +131,7 @@ static exit_handle_fn arm_exit_handlers[] = {
->  	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
->  	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
->  	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
-> +	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
->  	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
->  	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
->  };
-> -- 
-> 2.3.5
+I've bitter experiences with that :-(
+ 
+> So, we'll eventually need to add another entity for such
+> bridge chipsets that have a video/vbi/radio device node
+> associated, but don't have DMA engines on (some) devnodes.
 > 
+> As, currently, we don't have any such case,
 
-Thanks,
--Christoffer
+??? Radio devices are exactly that.
+
+> let's for now
+> just rename the device nodes that are associated with a
+> DMA engine as MEDIA_ENT_T_AV_DMA.
+> 
+> So,
+> 	MEDIA_ENT_T_DEVNODE_V4L -> MEDIA_ENT_T_AV_DMA
+> 
+> PS.: This is not actually true for USB devices, as the
+> DMA engine is an internal component, as it is up to the
+> Kernel to strip the stream payload from the URB packages.
+
+How about MEDIA_ENT_T_DATA_STREAMING? Or perhaps DATA_IO? Perhaps even just
+"IO"?
+
+That would cover USB as well, and I dislike the use of "AV", since the
+data might contain other things besides audio and/or video.
+
+Regards,
+
+	Hans
+
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> 
+> diff --git a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
+> index 5872f8bbf774..5b8147629159 100644
+> --- a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
+> +++ b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
+> @@ -183,7 +183,7 @@
+>  	    <entry>Unknown device node</entry>
+>  	  </row>
+>  	  <row>
+> -	    <entry><constant>MEDIA_ENT_T_DEVNODE_V4L</constant></entry>
+> +	    <entry><constant>MEDIA_ENT_T_AV_DMA</constant></entry>
+>  	    <entry>V4L video, radio or vbi device node</entry>
+>  	  </row>
+>  	  <row>
+> diff --git a/drivers/media/platform/xilinx/xilinx-dma.c b/drivers/media/platform/xilinx/xilinx-dma.c
+> index efde88adf624..7fa0cc0f08f0 100644
+> --- a/drivers/media/platform/xilinx/xilinx-dma.c
+> +++ b/drivers/media/platform/xilinx/xilinx-dma.c
+> @@ -193,7 +193,7 @@ static int xvip_pipeline_validate(struct xvip_pipeline *pipe,
+>  	while ((entity = media_entity_graph_walk_next(&graph))) {
+>  		struct xvip_dma *dma;
+>  
+> -		if (entity->type != MEDIA_ENT_T_DEVNODE_V4L)
+> +		if (entity->type != MEDIA_ENT_T_AV_DMA)
+>  			continue;
+>  
+>  		dma = to_xvip_dma(media_entity_to_video_device(entity));
+> diff --git a/drivers/media/v4l2-core/v4l2-dev.c b/drivers/media/v4l2-core/v4l2-dev.c
+> index 71a1b93b0790..9ef920221b5a 100644
+> --- a/drivers/media/v4l2-core/v4l2-dev.c
+> +++ b/drivers/media/v4l2-core/v4l2-dev.c
+> @@ -912,7 +912,7 @@ int __video_register_device(struct video_device *vdev, int type, int nr,
+>  	/* Part 5: Register the entity. */
+>  	if (vdev->v4l2_dev->mdev &&
+>  	    vdev->vfl_type != VFL_TYPE_SUBDEV) {
+> -		vdev->entity.type = MEDIA_ENT_T_DEVNODE_V4L;
+> +		vdev->entity.type = MEDIA_ENT_T_AV_DMA;
+>  		vdev->entity.name = vdev->name;
+>  		vdev->entity.info.dev.major = VIDEO_MAJOR;
+>  		vdev->entity.info.dev.minor = vdev->minor;
+> diff --git a/drivers/media/v4l2-core/v4l2-subdev.c b/drivers/media/v4l2-core/v4l2-subdev.c
+> index 63596063b213..9f8fc8330b3e 100644
+> --- a/drivers/media/v4l2-core/v4l2-subdev.c
+> +++ b/drivers/media/v4l2-core/v4l2-subdev.c
+> @@ -535,7 +535,7 @@ v4l2_subdev_link_validate_get_format(struct media_pad *pad,
+>  		return v4l2_subdev_call(sd, pad, get_fmt, NULL, fmt);
+>  	}
+>  
+> -	WARN(pad->entity->type != MEDIA_ENT_T_DEVNODE_V4L,
+> +	WARN(pad->entity->type != MEDIA_ENT_T_AV_DMA,
+>  	     "Driver bug! Wrong media entity type 0x%08x, entity %s\n",
+>  	     pad->entity->type, pad->entity->name);
+>  
+> diff --git a/include/uapi/linux/media.h b/include/uapi/linux/media.h
+> index 775c11c6b173..a7aa2aac9c23 100644
+> --- a/include/uapi/linux/media.h
+> +++ b/include/uapi/linux/media.h
+> @@ -44,12 +44,12 @@ struct media_device_info {
+>  
+>  /* Used values for media_entity_desc::type */
+>  
+> -#define MEDIA_ENT_T_DEVNODE_V4L		(((1 << 16)) + 1)
+> -#define MEDIA_ENT_T_DEVNODE_DVB_FE	(MEDIA_ENT_T_DEVNODE_V4L + 3)
+> -#define MEDIA_ENT_T_DEVNODE_DVB_DEMUX	(MEDIA_ENT_T_DEVNODE_V4L + 4)
+> -#define MEDIA_ENT_T_DEVNODE_DVB_DVR	(MEDIA_ENT_T_DEVNODE_V4L + 5)
+> -#define MEDIA_ENT_T_DEVNODE_DVB_CA	(MEDIA_ENT_T_DEVNODE_V4L + 6)
+> -#define MEDIA_ENT_T_DEVNODE_DVB_NET	(MEDIA_ENT_T_DEVNODE_V4L + 7)
+> +#define MEDIA_ENT_T_AV_DMA		(((1 << 16)) + 1)
+> +#define MEDIA_ENT_T_DEVNODE_DVB_FE	(MEDIA_ENT_T_AV_DMA + 3)
+> +#define MEDIA_ENT_T_DEVNODE_DVB_DEMUX	(MEDIA_ENT_T_AV_DMA + 4)
+> +#define MEDIA_ENT_T_DEVNODE_DVB_DVR	(MEDIA_ENT_T_AV_DMA + 5)
+> +#define MEDIA_ENT_T_DEVNODE_DVB_CA	(MEDIA_ENT_T_AV_DMA + 6)
+> +#define MEDIA_ENT_T_DEVNODE_DVB_NET	(MEDIA_ENT_T_AV_DMA + 7)
+>  
+>  #define MEDIA_ENT_T_V4L2_SUBDEV_SENSOR	((2 << 16) + 1)
+>  #define MEDIA_ENT_T_V4L2_SUBDEV_FLASH	(MEDIA_ENT_T_V4L2_SUBDEV_SENSOR + 1)
+> 
