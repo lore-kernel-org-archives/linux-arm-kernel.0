@@ -1,126 +1,98 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 8 May 2015 17:43:28 +0100
-Subject: [PATCH v4 09/13] arm64: mm: explicitly bootstrap the linear
- mapping
-In-Reply-To: <CAKv+Gu9RFNpg8nTYzCNc2hE0kE2Cn8HEHebJ0AYXEyT08QC=Kw@mail.gmail.com>
-References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
- <1429112064-19952-10-git-send-email-ard.biesheuvel@linaro.org>
- <20150507165416.GB11067@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-26A1pawUoeY28mXb1WzhPv4O0Rh433Yj9uBjxFh0MWg@mail.gmail.com>
- <20150508144448.GE12601@e104818-lin.cambridge.arm.com>
- <CAKv+Gu9RFNpg8nTYzCNc2hE0kE2Cn8HEHebJ0AYXEyT08QC=Kw@mail.gmail.com>
-Message-ID: <20150508164327.GF12601@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  8 May 2015 17:44:22 +0100
+Subject: [PATCH] iommu/arm-smmu: Fix sign-extension of upstream bus addresses
+ at stage 1
+Message-ID: <1431103462-8153-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 05:03:37PM +0200, Ard Biesheuvel wrote:
-> On 8 May 2015 at 16:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Thu, May 07, 2015 at 09:21:28PM +0200, Ard Biesheuvel wrote:
-> >> On 7 May 2015 at 18:54, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > On Wed, Apr 15, 2015 at 05:34:20PM +0200, Ard Biesheuvel wrote:
-> >> >> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> >> >> index ceec4def354b..338eaa7bcbfd 100644
-> >> >> --- a/arch/arm64/kernel/vmlinux.lds.S
-> >> >> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> >> >> @@ -68,6 +68,17 @@ PECOFF_FILE_ALIGNMENT = 0x200;
-> >> >>  #define ALIGN_DEBUG_RO_MIN(min)              . = ALIGN(min);
-> >> >>  #endif
-> >> >>
-> >> >> +/*
-> >> >> + * The pgdir region needs to be mappable using a single PMD or PUD sized region,
-> >> >> + * so it should not cross a 512 MB or 1 GB alignment boundary, respectively
-> >> >> + * (depending on page size). So align to an upper bound of its size.
-> >> >> + */
-> >> >> +#if CONFIG_ARM64_PGTABLE_LEVELS == 2
-> >> >> +#define PGDIR_ALIGN  (8 * PAGE_SIZE)
-> >> >> +#else
-> >> >> +#define PGDIR_ALIGN  (16 * PAGE_SIZE)
-> >> >> +#endif
-> >> >
-> >> > Isn't 8 pages sufficient in both cases? Unless some other patch changes
-> >> > the idmap and swapper, I can count maximum 7 pages in total.
-> >>
-> >> The preceding patch moves the fixmap page tables to this region as well.
-> >> But the logic is still incorrect -> we only need 16x for 4 levels (7 +
-> >> 3 == 10), the remaining ones are all <= 8
-> >
-> > You should improve the comment here to include the maths, "upper bound
-> > of its size" is not very clear ;).
-> 
-> Yes, you are right, it should read 'power-of-2 upper bound'
+Stage 1 translation is controlled by two sets of page tables (TTBR0 and
+TTBR1) which grow up and down from zero respectively in the ARMv8
+translation regime. For the SMMU, we only care about TTBR0 and, in the
+case of a 48-bit virtual space, we expect to map virtual addresses 0x0
+through to 0xffff_ffff_ffff.
 
-And the number of pages required for the initial page tables (I figured
-out it's a power of two already ;)).
+Given that some masters may be incapable of emitting virtual addresses
+targetting TTBR1 (e.g. because they sit on a 48-bit bus), the SMMU
+architecture allows bit 47 to be sign-extended, halving the virtual
+range of TTBR0 but allowing TTBR1 to be used. This is controlled by the
+SEP field in TTBCR2.
 
-> >> >> +     static struct bootstrap_pgtables linear_bs_pgtables __pgdir;
-> >> >> +     const phys_addr_t swapper_phys = __pa(swapper_pg_dir);
-> >> >> +     unsigned long swapper_virt = __phys_to_virt(swapper_phys) + va_offset;
-> >> >> +     struct memblock_region *reg;
-> >> >> +
-> >> >> +     bootstrap_early_mapping(swapper_virt, &linear_bs_pgtables,
-> >> >> +                             IS_ENABLED(CONFIG_ARM64_64K_PAGES));
-> >> >> +
-> >> >> +     /* now find the memblock that covers swapper_pg_dir, and clip */
-> >> >> +     for_each_memblock(memory, reg) {
-> >> >> +             phys_addr_t start = reg->base;
-> >> >> +             phys_addr_t end = start + reg->size;
-> >> >> +             unsigned long vstart, vend;
-> >> >> +
-> >> >> +             if (start > swapper_phys || end <= swapper_phys)
-> >> >> +                     continue;
-> >> >> +
-> >> >> +#ifdef CONFIG_ARM64_64K_PAGES
-> >> >> +             /* clip the region to PMD size */
-> >> >> +             vstart = max(swapper_virt & PMD_MASK,
-> >> >> +                          round_up(__phys_to_virt(start + va_offset),
-> >> >> +                                   PAGE_SIZE));
-> >> >> +             vend = min(round_up(swapper_virt, PMD_SIZE),
-> >> >> +                        round_down(__phys_to_virt(end + va_offset),
-> >> >> +                                   PAGE_SIZE));
-> >> >> +#else
-> >> >> +             /* clip the region to PUD size */
-> >> >> +             vstart = max(swapper_virt & PUD_MASK,
-> >> >> +                          round_up(__phys_to_virt(start + va_offset),
-> >> >> +                                   PMD_SIZE));
-> >> >> +             vend = min(round_up(swapper_virt, PUD_SIZE),
-> >> >> +                        round_down(__phys_to_virt(end + va_offset),
-> >> >> +                                   PMD_SIZE));
-> >> >> +#endif
-> >> >> +
-> >> >> +             create_mapping(__pa(vstart - va_offset), vstart, vend - vstart,
-> >> >> +                            PAGE_KERNEL_EXEC);
-> >> >> +
-> >> >> +             /*
-> >> >> +              * Temporarily limit the memblock range. We need to do this as
-> >> >> +              * create_mapping requires puds, pmds and ptes to be allocated
-> >> >> +              * from memory addressable from the early linear mapping.
-> >> >> +              */
-> >> >> +             memblock_set_current_limit(__pa(vend - va_offset));
-> >> >> +
-> >> >> +             return;
-> >> >> +     }
-> >> >> +     BUG();
-> >> >> +}
-> >> >
-> >> > I'll probably revisit this function after I see the whole series. But in
-> >> > the meantime, if the kernel is not loaded in the first memblock (in
-> >> > address order), isn't there a risk that we allocate memory from the
-> >> > first memblock which is not mapped yet?
-> >>
-> >> memblock allocates top down, so it should only allocate from this
-> >> region, unless the remaining room is completely reserved.
-> >
-> > I don't like to rely on this, it's not guaranteed behaviour.
-> 
-> Actually, it is. Allocation is always top-down unless you call
-> memblock_set_bottom_up(), which is a NOP  unless CONFIG_MOVABLE_NODE
-> is selected.
-> That is why the memblock limit only limits at the top afaict
+The SMMU driver incorrectly enables this sign-extension feature, which
+causes problems when userspace addresses are programmed into a master
+device with the SMMU expecting to map the incoming transactions via
+TTBR0; if the top bit of address is set, we will instead get a
+translation fault since TTBR1 walks are disabled in the TTBCR.
 
-It currently works like this but I'm not sure it is guaranteed to always
-behave this way (e.g. someone "improves" the memblock allocator in the
-future). And you never know, we may need memory hotplug on arm64 at some
-point in the future (together with CONFIG_MOVABLE_NODE).
+This patch fixes the issue by disabling sign-extension of a fixed
+virtual address bit and instead basing the behaviour on the upstream bus
+size: the incoming address is zero extended unless the upstream bus is
+only 49 bits wide, in which case bit 48 is used as the sign bit and is
+replicated to the upper bits.
 
+Cc: <stable@vger.kernel.org> # v4.0+
+Reported-by: Varun Sethi <varun.sethi@freescale.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+Hi Joerg,
+
+I only have this one fix pending for arm-smmu, so please could you pick
+it up for 4.1? I can send a pull if you'd prefer, but it feels a bit
+OTT.
+
+Will
+
+ drivers/iommu/arm-smmu.c | 30 ++----------------------------
+ 1 file changed, 2 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 9f7e1d34a32b..66a803b9dd3a 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -224,14 +224,7 @@
+ #define RESUME_TERMINATE		(1 << 0)
+ 
+ #define TTBCR2_SEP_SHIFT		15
+-#define TTBCR2_SEP_MASK			0x7
+-
+-#define TTBCR2_ADDR_32			0
+-#define TTBCR2_ADDR_36			1
+-#define TTBCR2_ADDR_40			2
+-#define TTBCR2_ADDR_42			3
+-#define TTBCR2_ADDR_44			4
+-#define TTBCR2_ADDR_48			5
++#define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
+ 
+ #define TTBRn_HI_ASID_SHIFT            16
+ 
+@@ -793,26 +786,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBCR);
+ 		if (smmu->version > ARM_SMMU_V1) {
+ 			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
+-			switch (smmu->va_size) {
+-			case 32:
+-				reg |= (TTBCR2_ADDR_32 << TTBCR2_SEP_SHIFT);
+-				break;
+-			case 36:
+-				reg |= (TTBCR2_ADDR_36 << TTBCR2_SEP_SHIFT);
+-				break;
+-			case 40:
+-				reg |= (TTBCR2_ADDR_40 << TTBCR2_SEP_SHIFT);
+-				break;
+-			case 42:
+-				reg |= (TTBCR2_ADDR_42 << TTBCR2_SEP_SHIFT);
+-				break;
+-			case 44:
+-				reg |= (TTBCR2_ADDR_44 << TTBCR2_SEP_SHIFT);
+-				break;
+-			case 48:
+-				reg |= (TTBCR2_ADDR_48 << TTBCR2_SEP_SHIFT);
+-				break;
+-			}
++			reg |= TTBCR2_SEP_UPSTREAM;
+ 			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBCR2);
+ 		}
+ 	} else {
 -- 
-Catalin
+2.1.4
