@@ -1,41 +1,88 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  8 May 2015 12:36:44 +0100
-Subject: [PATCH 12/12] MAINTAINERS: add PSCI entry
+Date: Fri,  8 May 2015 12:36:42 +0100
+Subject: [PATCH 10/12] drivers: psci: support native SMC{32,64} calls
 In-Reply-To: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
 References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1431085004-32743-13-git-send-email-mark.rutland@arm.com>
+Message-ID: <1431085004-32743-11-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself and Lorenzo as maintainers of the PSCI client code.
+A 32-bit OS cannot make calls with SMC64 IDs, while a 64-bit OS must
+invoke some PSCI functions with SMC64 IDs.
+
+This patch introduces and makes use of a new macro to choose the
+appropriate IDs based on the register width of the OS, which will allow
+32-bit callers to use the PSCI client code.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 ---
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/firmware/psci.c | 25 +++++++++++++++++++------
+ 1 file changed, 19 insertions(+), 6 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 781e099..ff8e577 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7761,6 +7761,15 @@ S:	Maintained
- F:	include/linux/power_supply.h
- F:	drivers/power/
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 1eaa5d7..88e2249 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -27,6 +27,18 @@
+ #include <asm/smp_plat.h>
  
-+POWER STATE COORDINATION INTERFACE (PSCI)
-+M:	Mark Rutland <mark.rutland@arm.com>
-+M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-+L:	linux-arm-kernel at lists.infradead.org
-+S:	Maintained
-+F:	drivers/firmware/psci.c
-+F:	include/linux/psci.h
-+F:	include/uapi/linux/psci.h
+ /*
++ * While a 64-bit OS can make calls with SMC32 calling conventions, for some
++ * calls it is necessary to use SMC64 to pass or return 64-bit values. For such
++ * calls PSCI_0_2_FN_NATIVE(x) will choose the appropriate (native-width)
++ * function ID.
++ */
++#ifdef CONFIG_64BIT
++#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN_##name
++#else
++#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN64_##name
++#endif
 +
- PNP SUPPORT
- M:	Rafael J. Wysocki <rafael.j.wysocki@intel.com>
- S:	Maintained
++/*
+  * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
+  * calls to its resident CPU, so we must avoid issuing those. We never migrate
+  * a Trusted OS even if it claims to be capable of migration -- doing so will
+@@ -121,8 +133,8 @@ static int psci_migrate(unsigned long cpuid)
+ static int psci_affinity_info(unsigned long target_affinity,
+ 		unsigned long lowest_affinity_level)
+ {
+-	return invoke_psci_fn(PSCI_0_2_FN64_AFFINITY_INFO, target_affinity,
+-			      lowest_affinity_level, 0);
++	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(AFFINITY_INFO),
++			      target_affinity, lowest_affinity_level, 0);
+ }
+ 
+ static int psci_migrate_info_type(void)
+@@ -132,7 +144,8 @@ static int psci_migrate_info_type(void)
+ 
+ static unsigned long psci_migrate_info_up_cpu(void)
+ {
+-	return invoke_psci_fn(PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU, 0, 0, 0);
++	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(MIGRATE_INFO_UP_CPU),
++			      0, 0, 0);
+ }
+ 
+ static int get_set_conduit_method(struct device_node *np)
+@@ -204,16 +217,16 @@ static void __init psci_init_migrate(void)
+ static void __init psci_0_2_set_functions(void)
+ {
+ 	pr_info("Using standard PSCI v0.2 function IDs\n");
+-	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
++	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN_NATIVE(CPU_SUSPEND);
+ 	psci_ops.cpu_suspend = psci_cpu_suspend;
+ 
+ 	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+ 	psci_ops.cpu_off = psci_cpu_off;
+ 
+-	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
++	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN_NATIVE(CPU_ON);
+ 	psci_ops.cpu_on = psci_cpu_on;
+ 
+-	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
++	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN_NATIVE(MIGRATE);
+ 	psci_ops.migrate = psci_migrate;
+ 
+ 	psci_ops.affinity_info = psci_affinity_info;
 -- 
 1.9.1
