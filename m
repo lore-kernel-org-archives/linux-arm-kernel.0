@@ -1,78 +1,67 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 8 May 2015 15:22:50 +0800
-Subject: [PATCH Part3 v11 0/9] Remove platform pci_domain_nr()
-Message-ID: <1431069779-29346-1-git-send-email-wangyijing@huawei.com>
+Date: Fri, 8 May 2015 15:22:53 +0800
+Subject: [PATCH Part3 v11 3/9] PCI: Remove declaration for
+ pci_get_new_domain_nr()
+In-Reply-To: <1431069779-29346-1-git-send-email-wangyijing@huawei.com>
+References: <1431069779-29346-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1431069779-29346-4-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is splitted out from previous patchset
-"Refine PCI scan interfaces and make generic pci host bridge".
-It try to clean up all platform pci_domain_nr(), save domain
-in pci_host_bridge, so we could get domain number from the
-common interface.
+pci_get_new_domain_nr() is only used in drivers/pci/pci.c,
+remove the declaration in include/linux/pci.h.
 
-You could pull it from https://github.com/YijingWang/linux-pci.git enumer11
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ drivers/pci/pci.c   |    4 ++--
+ include/linux/pci.h |    3 ---
+ 2 files changed, 2 insertions(+), 5 deletions(-)
 
-Yijing Wang (9):
-  PCI: Save domain in pci_host_bridge
-  PCI: Move pci_bus_assign_domain_nr() declaration into
-    drivers/pci/pci.h
-  PCI: Remove declaration for pci_get_new_domain_nr()
-  PCI: Introduce pci_host_assign_domain_nr() to assign domain
-  powerpc/PCI: Rename pcibios_root_bridge_prepare() to
-    pcibios_root_bus_prepare()
-  PCI: Make pci_host_bridge hold sysdata in drvdata
-  PCI: Create pci host bridge prior to root bus
-  PCI: Remove platform specific pci_domain_nr()
-  PCI: Remove pci_bus_assign_domain_nr()
-
- arch/alpha/include/asm/pci.h             |    2 -
- arch/alpha/kernel/pci.c                  |    4 +-
- arch/alpha/kernel/sys_nautilus.c         |    2 +-
- arch/arm/kernel/bios32.c                 |    2 +-
- arch/arm/mach-dove/pcie.c                |    2 +-
- arch/arm/mach-iop13xx/pci.c              |    4 +-
- arch/arm/mach-mv78xx0/pcie.c             |    2 +-
- arch/arm/mach-orion5x/pci.c              |    4 +-
- arch/frv/mb93090-mb00/pci-vdk.c          |    3 +-
- arch/ia64/include/asm/pci.h              |    1 -
- arch/ia64/pci/pci.c                      |    6 +-
- arch/ia64/sn/kernel/io_init.c            |    4 +-
- arch/m68k/coldfire/pci.c                 |    2 +-
- arch/microblaze/pci/pci-common.c         |   15 +----
- arch/mips/include/asm/pci.h              |    2 -
- arch/mips/pci/pci.c                      |    4 +-
- arch/mn10300/unit-asb2305/pci.c          |    3 +-
- arch/powerpc/include/asm/machdep.h       |    2 +-
- arch/powerpc/kernel/pci-common.c         |   21 ++-----
- arch/powerpc/platforms/pseries/pci.c     |    2 +-
- arch/powerpc/platforms/pseries/pseries.h |    2 +-
- arch/powerpc/platforms/pseries/setup.c   |    2 +-
- arch/s390/pci/pci.c                      |   10 +---
- arch/sh/drivers/pci/pci.c                |    4 +-
- arch/sh/include/asm/pci.h                |    2 -
- arch/sparc/kernel/leon_pci.c             |    2 +-
- arch/sparc/kernel/pci.c                  |   21 +------
- arch/sparc/kernel/pcic.c                 |    2 +-
- arch/tile/include/asm/pci.h              |    2 -
- arch/tile/kernel/pci.c                   |    4 +-
- arch/tile/kernel/pci_gx.c                |    4 +-
- arch/unicore32/kernel/pci.c              |    2 +-
- arch/x86/include/asm/pci.h               |    6 --
- arch/x86/pci/acpi.c                      |    6 +-
- arch/x86/pci/common.c                    |    2 +-
- arch/xtensa/kernel/pci.c                 |    2 +-
- drivers/parisc/dino.c                    |    2 +-
- drivers/parisc/lba_pci.c                 |    2 +-
- drivers/pci/host/pci-versatile.c         |    3 +-
- drivers/pci/host/pci-xgene.c             |    2 +-
- drivers/pci/host/pcie-designware.c       |    2 +-
- drivers/pci/host/pcie-iproc.c            |    2 +-
- drivers/pci/host/pcie-xilinx.c           |    2 +-
- drivers/pci/hotplug/ibmphp_core.c        |    2 +-
- drivers/pci/pci.c                        |   31 ++++++++--
- drivers/pci/pci.h                        |    1 +
- drivers/pci/probe.c                      |   94 +++++++++++++++++-------------
- drivers/pci/xen-pcifront.c               |    2 +-
- include/linux/pci.h                      |   27 ++-------
- 49 files changed, 145 insertions(+), 187 deletions(-)
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index acc4b6e..7bf27e8 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4498,14 +4498,14 @@ static void pci_no_domains(void)
+ }
+ 
+ #ifdef CONFIG_PCI_DOMAINS
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
+ static atomic_t __domain_nr = ATOMIC_INIT(-1);
+ 
+-int pci_get_new_domain_nr(void)
++static int pci_get_new_domain_nr(void)
+ {
+ 	return atomic_inc_return(&__domain_nr);
+ }
+ 
+-#ifdef CONFIG_PCI_DOMAINS_GENERIC
+ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ {
+ 	static int use_dt_domains = -1;
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 5ff35cb..636c0a9 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1314,12 +1314,10 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
+  */
+ #ifdef CONFIG_PCI_DOMAINS
+ extern int pci_domains_supported;
+-int pci_get_new_domain_nr(void);
+ #else
+ enum { pci_domains_supported = 0 };
+ static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+ static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
+-static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
+ #endif /* CONFIG_PCI_DOMAINS */
+ 
+ /*
+@@ -1442,7 +1440,6 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
+ 
+ static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+ static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
+-static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
+ 
+ #define dev_is_pci(d) (false)
+ #define dev_is_pf(d) (false)
+-- 
+1.7.1
