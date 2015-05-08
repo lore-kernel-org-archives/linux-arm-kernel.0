@@ -1,38 +1,110 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 8 May 2015 07:15:38 +0200
-Subject: [PATCH v2 0/4] mtd: mxc_nand: fix 8 bit ECC and large oob
-In-Reply-To: <cover.1430636819.git.baruch@tkos.co.il>
-References: <cover.1430636819.git.baruch@tkos.co.il>
-Message-ID: <20150508051538.GW6325@pengutronix.de>
+Date: Fri, 8 May 2015 07:23:18 +0200
+Subject: [PATCH v4 04/10] eeprom: Add a simple EEPROM framework for
+ eeprom consumers
+In-Reply-To: <5548AD98.50801@linaro.org>
+References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427752670-17219-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150407184533.GA10278@codeaurora.org>
+ <55243982.7020907@linaro.org>
+ <20150409144522.GB9663@codeaurora.org> <5548AD98.50801@linaro.org>
+Message-ID: <20150508052318.GZ6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 03, 2015 at 10:18:50AM +0300, Baruch Siach wrote:
-> This patch series fixes mxc_nand bugs that I encountered while trying to use 8
-> bit ECC mode on i.MX25 with the Micron MT29F8G08ABABA flash chip.
+On Tue, May 05, 2015 at 12:46:32PM +0100, Srinivas Kandagatla wrote:
+> Hi Stephen,
 > 
-> Many thanks to Uwe Kleine-K?nig for guiding me through the process of
-> debugging and fixing, and for contributing a clean-up patch to this series.
+> Sorry I took so long to reply.
 > 
-> This series applies and tested on v4.1-rc1.
 > 
-> This is version 2 of the patch series, addressing the comments and suggestion
-> of Uwe Kleine-K?nig on the first series
-> (http://thread.gmane.org/gmane.linux.ports.arm.kernel/408635). See each patch
-> for detailed per-patch changelog.
+> On 09/04/15 15:45, Stephen Boyd wrote:
+> >On 04/07, Srinivas Kandagatla wrote:
+> >>On 07/04/15 19:45, Stephen Boyd wrote:
+> >>>On 03/30, Srinivas Kandagatla wrote:
+> >>>
+> >>>Do you have an overview of how to use these APIs? Maybe some
+> >>>Documentation/ is in order? I'm mostly interested in how the
+> >>>blocks array is supposed to work and how this hooks up to drivers
+> >>>that are using DT.
+> >>
+> >>Only doc ATM is function level kernel doc in c file.
+> >>May be I can explain you for now and I will try to add some
+> >>documentation with some usage examples in next version.
+> >
+> >Thanks.
+> >
+> >>
+> >>eeprom block array is just another way intended to get hold of
+> >>eeprom content for non-DT providers/consumers, but DT
+> >>consumers/providers can also use it. As of today SOC/mach level code
+> >>could use it as well.
+> >>
+> >>In eeprom_cell_get() case the lookup of provider is done based on
+> >>provider name, this provider name is generally supplied by all the
+> >>providers (both DT/non DT).
+> >>
+> >>for example in qfprom case,
+> >>provider is registered from DT with eeprom config containing a unique name:
+> >>static struct eeprom_config econfig = {
+> >>	.name = "qfprom",
+> >>	.id = 0,
+> >>};
+> >>
+> >>In the consumer case, the tsens driver could do some like in non DT way:
+> >>
+> >>	struct eeprom_block blocks[4] ={
+> >>		{
+> >>		.offset = 0x404,
+> >>		.count = 0x4,
+> >>		},
+> >>		{
+> >>		.offset = 0x408,
+> >>		.count = 0x4,
+> >>		},
+> >>		{
+> >>		.offset = 0x40c,
+> >>		.count = 0x4,
+> >>		},
+> >>		{
+> >>		.offset = 0x410,
+> >>		.count = 0x4,
+> >>		},
+> >>	};
+> >>	calib_cell = eeprom_cell_get("qfprom0", blocks, 4);
+> >>
+> >>
+> >>Or in DT way
+> >>calib_cell  = of_eeprom_cell_get(np, "calib");
+> >>
+> >
+> >Ok. I guess I was hoping for a more device centric approach like
+> >we have for clks/regulators/etc. That way a driver doesn't need
+> >to know it's using DT or not to figure out which API to call.
 > 
-> Baruch Siach (3):
->   mtd: mxc_nand: limit the size of used oob
->   mtd: mxc_nand: fix truncate of unaligned oob copying
->   mtd: mxc_nand: generate nand_ecclayout for 8 bit ECC
+> That would be the best. Its easy to wrap up whats in eeprom core to
+> eeprom_get_cell(dev, "cell-name") for both DT and non-dt cases, if I
+> remove the nasty global name space thing.
 > 
-> Uwe Kleine-K?nig (1):
->   mtd: nand: mxc_nand: cleanup copy_spare function
+> Only thing which is limiting it is the existing bindings which are
+> just phandle based. For eeprom to be more of device centric we need
+> more
+> generic bindings/property names like
+> 
+> nvrom-cell = <&abc>, <&edf>
+> nvrom-cell-names = "cell1", "cell2";
+> 
+> Also we can have name associated to each eeprom cell which would
+> help for non-dt cases. So they can just lookup by the cell name.
+> 
+> 
+> Sacha, Are you ok with such binding?  As this can provide a single
+> interface for dt and non-dt. I remember you requested for changing
+> from generic properties to specific property names.
 
-I looked at this version and have only found some minor coding style
-violations (spaces missing on both sides of operators).
-
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+Yes, I am fine with such a binding. The same type of binding is used for
+clocks and other stuff already, so it has proven good and people are
+famliar with it.
 
 Sascha
 
