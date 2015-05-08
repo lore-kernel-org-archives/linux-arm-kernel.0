@@ -1,47 +1,27 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 8 May 2015 15:26:09 +0100
-Subject: [GIT PULL]Hisilicon hip04 soc and D01 board DT updates for v4.2
-Message-ID: <554CC781.9010705@hisilicon.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 May 2015 16:27:25 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <554CC5A3.7020607@topic.nl>
+References: <5538DD02.6050401@topic.nl> <2808654.KNfBIY3tVp@wuerfel>
+ <554CC5A3.7020607@topic.nl>
+Message-ID: <5199302.Bhr0olLJXQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+On Friday 08 May 2015 16:18:11 Mike Looijmans wrote:
+> >
+> > If you have that low-memory restriction, you also need to ensure that there
+> > is a ZONE_DMA that is large enough. ZONE_DMA should be sized to match the
+> > common subset that all devices can access, so a GFP_DMA request returns
+> > memory that is guaranteed to be accessible by all devices.
+> 
+> GFP_DMA still carries that scary remark: "on x86, GFP_DMA guarantees to be 
+> within the first 16MB of available bus addresses". Which is really scary if 
+> you want to allocate multimegabyte buffers.
 
-Please help to merge pull request for hisilicon hip04 soc and
-D01 board DT updates for v4.2.
+Don't worry about that on ARM: the size of the dma zone is platform specific,
+so you can set it to whatever you want. The 16MB limit is only relevant
+on systems that use ISA DMA (floppy, soundblaster, ...)
 
-Thanks!
-
-Best Regards,
-Wei
-
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hip04-dt-for-4.2
-
-for you to fetch changes up to 9fac45c16c33f9f822ed7f9b9660890f68f16d8b:
-
-  ARM: dts: add HiSilicon hip04 ethernet controller resource (2015-05-08 01:57:51 +0100)
-
-----------------------------------------------------------------
-ARM: DT: Hisilicon hip04 soc and D01 board updates for 4.2
-
-- Add hip04 GPIO nodes
-- Add NANDC nodes for hip04 and D01 board
-- Add hip04 ethernet related nodes
-
-----------------------------------------------------------------
-Fathi Boudra (1):
-      ARM: dts: add HiSilicon hip04 ethernet controller resource
-
-Zhou Wang (2):
-      ARM: dts: hip04: add GPIO pieces
-      mtd: hisilicon: add device tree node for NAND controller
-
- arch/arm/boot/dts/hip04-d01.dts |  27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/hip04.dtsi    | 133 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 160 insertions(+)
+	Arnd
