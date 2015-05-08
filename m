@@ -1,368 +1,420 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Fri, 8 May 2015 17:31:28 +0100
-Subject: [PATCH 2/2] ARM: replace BSYM() with badr assembly macro
-In-Reply-To: <E1YqkpT-0006zF-Vj@rmk-PC.arm.linux.org.uk>
-References: <E1YqkpT-0006zF-Vj@rmk-PC.arm.linux.org.uk>
-Message-ID: <20150508163127.GC17900@e103592.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 8 May 2015 18:32:46 +0200
+Subject: [PATCH v3 09/12] KVM: arm64: guest debug, HW assisted debug
+ support
+In-Reply-To: <1430989647-22501-2-git-send-email-alex.bennee@linaro.org>
+References: <1430929407-3487-1-git-send-email-alex.bennee@linaro.org>
+ <1430989647-22501-2-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150508163246.GI24744@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 05:08:47PM +0100, Russell King wrote:
-> BSYM() was invented to allow us to work around a problem with the
-> assembler, where local symbols resolved by the assembler for the 'adr'
-> instruction did not take account of their ISA.
+On Thu, May 07, 2015 at 10:07:12AM +0100, Alex Benn?e wrote:
+> This adds support for userspace to control the HW debug registers for
+> guest debug. In the debug ioctl we copy the IMPDEF defined number of
+> registers into a new register set called host_debug_state. There is now
+> a new vcpu parameter called debug_ptr which selects which register set
+> is to copied into the real registers when world switch occurs.
 > 
-> Since we don't want BSYM() used elsewhere, replace BSYM() with a new
-> macro 'badr', which is like the 'adr' pseudo-op, but with the BSYM()
-> mechanics integrated into it.  This ensures that the BSYM()-ification
-> is only used in conjunction with 'adr'.
+> I've moved some helper functions into the hw_breakpoint.h header for
+> re-use.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-Looks OK to me.
-
-Acked-by: Dave Martin <Dave.Martin@arm.com>
-
+> As with single step we need to tweak the guest registers to enable the
+> exceptions so we need to save and restore those bits.
+> 
+> Two new capabilities have been added to the KVM_EXTENSION ioctl to allow
+> userspace to query the number of hardware break and watch points
+> available on the host hardware.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
 > ---
->  arch/arm/boot/compressed/head.S          |  4 ++--
->  arch/arm/common/mcpm_head.S              |  2 +-
->  arch/arm/include/asm/assembler.h         | 17 ++++++++++++++++-
->  arch/arm/include/asm/entry-macro-multi.S |  4 ++--
->  arch/arm/include/asm/unified.h           |  2 --
->  arch/arm/kernel/entry-armv.S             | 12 ++++++------
->  arch/arm/kernel/entry-common.S           |  6 +++---
->  arch/arm/kernel/entry-ftrace.S           |  2 +-
->  arch/arm/kernel/head-nommu.S             |  6 +++---
->  arch/arm/kernel/head.S                   |  8 ++++----
->  arch/arm/kernel/sleep.S                  |  2 +-
->  arch/arm/lib/call_with_stack.S           |  2 +-
->  arch/arm/mm/proc-v7m.S                   |  2 +-
->  13 files changed, 41 insertions(+), 28 deletions(-)
+> v2
+>    - switched to C setup
+>    - replace host debug registers directly into context
+>    - minor tweak to api docs
+>    - setup right register for debug
+>    - add FAR_EL2 to debug exit structure
+>    - add support for trapping debug register access
+> v3
+>    - remove stray trace statement
+>    - fix spacing around operators (various)
+>    - clean-up usage of trap_debug
+>    - introduce debug_ptr, replace excessive memcpy stuff
+>    - don't use memcpy in ioctl, just assign
+>    - update cap ioctl documentation
+>    - reword a number comments
+>    - rename host_debug_state->external_debug_state
 > 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 2c45b5709fa4..06e983f59980 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -130,7 +130,7 @@ start:
->  		.endr
->     ARM(		mov	r0, r0		)
->     ARM(		b	1f		)
-> - THUMB(		adr	r12, BSYM(1f)	)
-> + THUMB(		badr	r12, 1f		)
->   THUMB(		bx	r12		)
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 5ef937c..419f7a8 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2668,7 +2668,7 @@ The top 16 bits of the control field are architecture specific control
+>  flags which can include the following:
 >  
->  		.word	_magic_sig	@ Magic numbers to help the loader
-> @@ -447,7 +447,7 @@ dtb_check_done:
+>    - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86, arm64]
+> -  - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390]
+> +  - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390, arm64]
+>    - KVM_GUESTDBG_INJECT_DB:     inject DB type exception [x86]
+>    - KVM_GUESTDBG_INJECT_BP:     inject BP type exception [x86]
+>    - KVM_GUESTDBG_EXIT_PENDING:  trigger an immediate guest exit [s390]
+> @@ -2683,6 +2683,11 @@ updated to the correct (supplied) values.
+>  The second part of the structure is architecture specific and
+>  typically contains a set of debug registers.
 >  
->  		bl	cache_clean_flush
->  
-> -		adr	r0, BSYM(restart)
-> +		badr	r0, restart
->  		add	r0, r0, r6
->  		mov	pc, r0
->  
-> diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
-> index e02db4b81a66..08b3bb9bc6a2 100644
-> --- a/arch/arm/common/mcpm_head.S
-> +++ b/arch/arm/common/mcpm_head.S
-> @@ -49,7 +49,7 @@
->  ENTRY(mcpm_entry_point)
->  
->   ARM_BE8(setend        be)
-> - THUMB(	adr	r12, BSYM(1f)	)
-> + THUMB(	badr	r12, 1f		)
->   THUMB(	bx	r12		)
->   THUMB(	.thumb			)
->  1:
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index 186270b3e194..4abe57279c66 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -178,6 +178,21 @@
->  	.endm
->  
->  /*
-> + * Assembly version of "adr rd, BSYM(sym)".  This should only be used to
-> + * reference local symbols in the same assembly file which are to be
-> + * resolved by the assembler.  Other usage is undefined.
-> + */
-> +	.irp	c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
-> +	.macro	badr\c, rd, sym
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +	adr\c	\rd, \sym + 1
-> +#else
-> +	adr\c	\rd, \sym
-> +#endif
-> +	.endm
-> +	.endr
+> +For arm64 the number of debug registers is implementation defined and
+> +can be determined by querying the KVM_CAP_GUEST_DEBUG_HW_BPS and
+> +KVM_CAP_GUEST_DEBUG_HW_WPS capabilities which returns a +ve number
+
+s/returns/return/
+s/+ve/positive/
+
+> +indicating the number of supported registers.
 > +
-> +/*
->   * Get current thread_info.
->   */
->  	.macro	get_thread_info, rd
-> @@ -326,7 +341,7 @@
->  THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
->  	bne	1f
->  	orr	\reg, \reg, #PSR_A_BIT
-> -	adr	lr, BSYM(2f)
-> +	badr	lr, 2f
->  	msr	spsr_cxsf, \reg
->  	__MSR_ELR_HYP(14)
->  	__ERET
-> diff --git a/arch/arm/include/asm/entry-macro-multi.S b/arch/arm/include/asm/entry-macro-multi.S
-> index 469a2b30fa27..609184f522ee 100644
-> --- a/arch/arm/include/asm/entry-macro-multi.S
-> +++ b/arch/arm/include/asm/entry-macro-multi.S
-> @@ -10,7 +10,7 @@
->  	@
->  	@ routine called with r0 = irq number, r1 = struct pt_regs *
->  	@
-> -	adrne	lr, BSYM(1b)
-> +	badrne	lr, 1b
->  	bne	asm_do_IRQ
+>  When debug events exit the main run loop with the reason
+>  KVM_EXIT_DEBUG with the kvm_debug_exit_arch part of the kvm_run
+>  structure containing architecture specific debug information.
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 9b3ed6d..2920185 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -279,6 +279,10 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>  	/* Set up the timer */
+>  	kvm_timer_vcpu_init(vcpu);
 >  
->  #ifdef CONFIG_SMP
-> @@ -23,7 +23,7 @@
->  	ALT_SMP(test_for_ipi r0, r2, r6, lr)
->  	ALT_UP_B(9997f)
->  	movne	r1, sp
-> -	adrne	lr, BSYM(1b)
-> +	badrne	lr, 1b
->  	bne	do_IPI
->  #endif
->  9997:
-> diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
-> index 200f9a7cd623..a91ae499614c 100644
-> --- a/arch/arm/include/asm/unified.h
-> +++ b/arch/arm/include/asm/unified.h
-> @@ -45,7 +45,6 @@
->  #define THUMB(x...)	x
->  #ifdef __ASSEMBLY__
->  #define W(instr)	instr.w
-> -#define BSYM(sym)	sym + 1
->  #else
->  #define WASM(instr)	#instr ".w"
->  #endif
-> @@ -59,7 +58,6 @@
->  #define THUMB(x...)
->  #ifdef __ASSEMBLY__
->  #define W(instr)	instr
-> -#define BSYM(sym)	sym
->  #else
->  #define WASM(instr)	#instr
->  #endif
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 570306c49406..f8f7398c74c2 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -40,7 +40,7 @@
->  #ifdef CONFIG_MULTI_IRQ_HANDLER
->  	ldr	r1, =handle_arch_irq
->  	mov	r0, sp
-> -	adr	lr, BSYM(9997f)
-> +	badr	lr, 9997f
->  	ldr	pc, [r1]
->  #else
->  	arch_irq_handler_default
-> @@ -273,7 +273,7 @@ __und_svc:
->  	str	r4, [sp, #S_PC]
->  	orr	r0, r9, r0, lsl #16
->  #endif
-> -	adr	r9, BSYM(__und_svc_finish)
-> +	badr	r9, __und_svc_finish
->  	mov	r2, r4
->  	bl	call_fpe
+> +	/* Set the debug registers to be the guests */
+> +	vcpu->arch.debug_ptr = (struct kvm_guest_debug_arch *)
+> +				&vcpu_sys_reg(vcpu, DBGBCR0_EL1);
+> +
+
+yikes, I don't like this cast, how bad is it to get rid of the debug
+registers in the sys_regs array ?
+
+Also, pretty sure this is part of the breakage for the 32-bit build...
+
+>  	return 0;
+>  }
 >  
-> @@ -469,7 +469,7 @@ __und_usr:
->  	@ instruction, or the more conventional lr if we are to treat
->  	@ this as a real undefined instruction
->  	@
-> -	adr	r9, BSYM(ret_from_exception)
-> +	badr	r9, ret_from_exception
+> @@ -304,6 +308,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 >  
->  	@ IRQs must be enabled before attempting to read the instruction from
->  	@ user space since that could cause a page/translation fault if the
-> @@ -486,7 +486,7 @@ __und_usr:
->  	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
->  	@ r4 = PC value for the faulting instruction
->  	@ lr = 32-bit undefined instruction function
-> -	adr	lr, BSYM(__und_usr_fault_32)
-> +	badr	lr, __und_usr_fault_32
->  	b	call_fpe
+>  #define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE |    \
+>  			    KVM_GUESTDBG_USE_SW_BP | \
+> +			    KVM_GUESTDBG_USE_HW_BP | \
+>  			    KVM_GUESTDBG_SINGLESTEP)
 >  
->  __und_usr_thumb:
-> @@ -522,7 +522,7 @@ ARM_BE8(rev16	r0, r0)				@ little endian instruction
->  	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
->  	str	r2, [sp, #S_PC]			@ it's a 2x16bit instr, update
->  	orr	r0, r0, r5, lsl #16
-> -	adr	lr, BSYM(__und_usr_fault_32)
-> +	badr	lr, __und_usr_fault_32
->  	@ r0 = the two 16-bit Thumb instructions which caused the exception
->  	@ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc)
->  	@ r4 = PC value for the first 16-bit Thumb instruction
-> @@ -716,7 +716,7 @@ __und_usr_fault_32:
->  __und_usr_fault_16:
->  	mov	r1, #2
->  1:	mov	r0, sp
-> -	adr	lr, BSYM(ret_from_exception)
-> +	badr	lr, ret_from_exception
->  	b	__und_fault
->  ENDPROC(__und_usr_fault_32)
->  ENDPROC(__und_usr_fault_16)
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index f8ccc21fa032..6ab159384667 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -88,7 +88,7 @@ ENTRY(ret_from_fork)
->  	bl	schedule_tail
->  	cmp	r5, #0
->  	movne	r0, r4
-> -	adrne	lr, BSYM(1f)
-> +	badrne	lr, 1f
->  	retne	r5
->  1:	get_thread_info tsk
->  	b	ret_slow_syscall
-> @@ -196,7 +196,7 @@ local_restart:
->  	bne	__sys_trace
+>  /**
+> @@ -324,6 +329,12 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
 >  
->  	cmp	scno, #NR_syscalls		@ check upper syscall limit
-> -	adr	lr, BSYM(ret_fast_syscall)	@ return address
-> +	badr	lr, ret_fast_syscall		@ return address
->  	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
->  
->  	add	r1, sp, #S_OFF
-> @@ -231,7 +231,7 @@ __sys_trace:
->  	add	r0, sp, #S_OFF
->  	bl	syscall_trace_enter
->  
-> -	adr	lr, BSYM(__sys_trace_return)	@ return address
-> +	badr	lr, __sys_trace_return		@ return address
->  	mov	scno, r0			@ syscall number (possibly new)
->  	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
->  	cmp	scno, #NR_syscalls		@ check upper syscall limit
-> diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
-> index fe57c73e70a4..c73c4030ca5d 100644
-> --- a/arch/arm/kernel/entry-ftrace.S
-> +++ b/arch/arm/kernel/entry-ftrace.S
-> @@ -87,7 +87,7 @@
->  
->  1: 	mcount_get_lr	r1			@ lr of instrumented func
->  	mcount_adjust_addr	r0, lr		@ instrumented function
-> -	adr	lr, BSYM(2f)
-> +	badr	lr, 2f
->  	mov	pc, r2
->  2:	mcount_exit
->  .endm
-> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> index 84da14b7cd04..c9660167ef1a 100644
-> --- a/arch/arm/kernel/head-nommu.S
-> +++ b/arch/arm/kernel/head-nommu.S
-> @@ -46,7 +46,7 @@ ENTRY(stext)
->  	.arm
->  ENTRY(stext)
->  
-> - THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
-> + THUMB(	badr	r9, 1f		)	@ Kernel is always entered in ARM.
->   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
->   THUMB(	.thumb			)	@ switch to Thumb now.
->   THUMB(1:			)
-> @@ -79,7 +79,7 @@ ENTRY(stext)
->  #endif
->  	ldr	r13, =__mmap_switched		@ address to jump to after
->  						@ initialising sctlr
-> -	adr	lr, BSYM(1f)			@ return (PIC) address
-> +	badr	lr, 1f				@ return (PIC) address
->  	ldr	r12, [r10, #PROCINFO_INITFUNC]
->  	add	r12, r12, r10
->  	ret	r12
-> @@ -115,7 +115,7 @@ ENTRY(secondary_startup)
->  	bl      __setup_mpu			@ Initialize the MPU
+>  	if (dbg->control & KVM_GUESTDBG_ENABLE) {
+>  		vcpu->guest_debug = dbg->control;
+> +
+> +		/* Hardware assisted Break and Watch points */
+> +		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
+
+is this only breakpoints or breakpoints and watch points?
+
+> +			vcpu->arch.external_debug_state = dbg->arch;
+> +		}
+> +
+>  	} else {
+>  		/* If not enabled clear all flags */
+>  		vcpu->guest_debug = 0;
+> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+> index 52b484b..c450552 100644
+> --- a/arch/arm64/include/asm/hw_breakpoint.h
+> +++ b/arch/arm64/include/asm/hw_breakpoint.h
+> @@ -130,6 +130,18 @@ static inline void ptrace_hw_copy_thread(struct task_struct *task)
+>  }
 >  #endif
 >  
-> -	adr	lr, BSYM(__after_proc_init)	@ return address
-> +	badr	lr, __after_proc_init		@ return address
->  	mov	r13, r12			@ __secondary_switched address
->  	ldr	r12, [r10, #PROCINFO_INITFUNC]
->  	add	r12, r12, r10
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 7304b4c44b52..1eecd57453be 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -80,7 +80,7 @@
->  ENTRY(stext)
->   ARM_BE8(setend	be )			@ ensure we are in BE8 mode
+> +/* Determine number of BRP registers available. */
+> +static inline int get_num_brps(void)
+> +{
+> +	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
+> +}
+> +
+> +/* Determine number of WRP registers available. */
+> +static inline int get_num_wrps(void)
+> +{
+> +	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
+> +}
+> +
+
+I will need an ack from Catalin/Will to merge this.  It may be better to
+move these functions in a separate patch.
+
+>  extern struct pmu perf_ops_bp;
 >  
-> - THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
-> + THUMB(	badr	r9, 1f		)	@ Kernel is always entered in ARM.
->   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
->   THUMB(	.thumb			)	@ switch to Thumb now.
->   THUMB(1:			)
-> @@ -148,7 +148,7 @@ ENTRY(stext)
->  	 */
->  	ldr	r13, =__mmap_switched		@ address to jump to after
->  						@ mmu has been enabled
-> -	adr	lr, BSYM(1f)			@ return (PIC) address
-> +	badr	lr, 1f				@ return (PIC) address
->  #ifdef CONFIG_ARM_LPAE
->  	mov	r5, #0				@ high TTBR0
->  	mov	r8, r4, lsr #12			@ TTBR1 is swapper_pg_dir pfn
-> @@ -364,7 +364,7 @@ __turn_mmu_on_loc:
->  	.text
->  ENTRY(secondary_startup_arm)
->  	.arm
-> - THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is entered in ARM.
-> + THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
->   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
->   THUMB(	.thumb			)	@ switch to Thumb now.
->   THUMB(1:			)
-> @@ -400,7 +400,7 @@ ENTRY(secondary_startup)
->  	add	r3, r7, lr
->  	ldrd	r4, [r3, #0]			@ get secondary_data.pgdir
->  	ldr	r8, [r3, #8]			@ get secondary_data.swapper_pg_dir
-> -	adr	lr, BSYM(__enable_mmu)		@ return address
-> +	badr	lr, __enable_mmu		@ return address
->  	mov	r13, r12			@ __secondary_switched address
->  	ldr	r12, [r10, #PROCINFO_INITFUNC]
->  	add	r12, r12, r10			@ initialise processor
-> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> index 7d37bfc50830..76bb3128e135 100644
-> --- a/arch/arm/kernel/sleep.S
-> +++ b/arch/arm/kernel/sleep.S
-> @@ -81,7 +81,7 @@ ENTRY(__cpu_suspend)
->  	mov	r1, r4			@ size of save block
->  	add	r0, sp, #8		@ pointer to save block
->  	bl	__cpu_suspend_save
-> -	adr	lr, BSYM(cpu_suspend_abort)
-> +	badr	lr, cpu_suspend_abort
->  	ldmfd	sp!, {r0, pc}		@ call suspend fn
->  ENDPROC(__cpu_suspend)
->  	.ltorg
-> diff --git a/arch/arm/lib/call_with_stack.S b/arch/arm/lib/call_with_stack.S
-> index ed1a421813cb..bf3a40889205 100644
-> --- a/arch/arm/lib/call_with_stack.S
-> +++ b/arch/arm/lib/call_with_stack.S
-> @@ -35,7 +35,7 @@ ENTRY(call_with_stack)
->  	mov	r2, r0
->  	mov	r0, r1
+>  #endif	/* __KERNEL__ */
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index b60fa7a..a44fb32 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -108,9 +108,18 @@ struct kvm_vcpu_arch {
+>  	/* Exception Information */
+>  	struct kvm_vcpu_fault_info fault;
 >  
-> -	adr	lr, BSYM(1f)
-> +	badr	lr, 1f
->  	ret	r2
+> -	/* Debug state */
+> +	/* Guest debug state */
+>  	u64 debug_flags;
 >  
->  1:	ldr	lr, [sp]
-> diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-> index e08e1f2bab76..67d9209077c6 100644
-> --- a/arch/arm/mm/proc-v7m.S
-> +++ b/arch/arm/mm/proc-v7m.S
-> @@ -98,7 +98,7 @@ __v7m_setup:
->  	str	r5, [r0, V7M_SCB_SHPR3]	@ set PendSV priority
+> +	/*
+> +	 * For debugging the guest we need to keep a set of debug
+> +	 * registers which can override the guests own debug state
+
+s/guests/guest's/
+
+> +	 * while being used. These are set via the KVM_SET_GUEST_DEBUG
+> +	 * ioctl.
+> +	 */
+> +	struct kvm_guest_debug_arch *debug_ptr;
+> +	struct kvm_guest_debug_arch external_debug_state;
+> +
+>  	/* Pointer to host CPU context */
+>  	kvm_cpu_context_t *host_cpu_context;
 >  
->  	@ SVC to run the kernel in this mode
-> -	adr	r1, BSYM(1f)
-> +	badr	r1, 1f
->  	ldr	r5, [r12, #11 * 4]	@ read the SVC vector entry
->  	str	r1, [r12, #11 * 4]	@ write the temporary SVC vector entry
->  	mov	r6, lr			@ save LR
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 04957d7..98e82ef 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -121,7 +121,7 @@ struct kvm_guest_debug_arch {
+>  
+>  struct kvm_debug_exit_arch {
+>  	__u32 hsr;
+> -	__u64 far;
+> +	__u64 far;	/* used for watchpoints */
+
+seems strange to amend this now?
+
+>  };
+>  
+>  struct kvm_sync_regs {
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index ce7b7dd..671ab13 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -116,6 +116,7 @@ int main(void)
+>    DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
+>    DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
+>    DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
+> +  DEFINE(VCPU_DEBUG_PTR,	offsetof(struct kvm_vcpu, arch.debug_ptr));
+>    DEFINE(DEBUG_BCR, 		offsetof(struct kvm_guest_debug_arch, dbg_bcr));
+>    DEFINE(DEBUG_BVR, 		offsetof(struct kvm_guest_debug_arch, dbg_bvr));
+>    DEFINE(DEBUG_WCR, 		offsetof(struct kvm_guest_debug_arch, dbg_wcr));
+> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+> index e7d934d..3a41bbf 100644
+> --- a/arch/arm64/kernel/hw_breakpoint.c
+> +++ b/arch/arm64/kernel/hw_breakpoint.c
+> @@ -49,18 +49,6 @@ static DEFINE_PER_CPU(int, stepping_kernel_bp);
+>  static int core_num_brps;
+>  static int core_num_wrps;
+>  
+> -/* Determine number of BRP registers available. */
+> -static int get_num_brps(void)
+> -{
+> -	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
+> -}
+> -
+> -/* Determine number of WRP registers available. */
+> -static int get_num_wrps(void)
+> -{
+> -	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
+> -}
+> -
+>  int hw_breakpoint_slots(int type)
+>  {
+>  	/*
+> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> index 19346e8..1ab63dd 100644
+> --- a/arch/arm64/kvm/debug.c
+> +++ b/arch/arm64/kvm/debug.c
+> @@ -99,12 +99,6 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+>  				MDCR_EL2_TDRA |
+>  				MDCR_EL2_TDOSA);
+>  
+> -	/* Trap on access to debug registers? */
+> -	if (trap_debug)
+> -		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
+> -	else
+> -		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
+> -
+>  	/* Is Guest debugging in effect? */
+>  	if (vcpu->guest_debug) {
+>  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
+> @@ -128,14 +122,54 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+>  			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
+>  		}
+>  
+> +		/*
+> +		 * HW Break/Watch points
+> +		 *
+> +		 * We simply switch the debug_ptr to point to our new
+> +		 * external_debug_state which has been populated by the
+> +		 * debug ioctl. The existing KVM_ARM64_DEBUG_DIRTY
+> +		 * mechanism ensures the registers are updated on the
+> +		 * world switch.
+> +		 */
+> +		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
+> +
+> +			vcpu_sys_reg(vcpu, MDSCR_EL1) |=
+> +				(DBG_MDSCR_KDE | DBG_MDSCR_MDE);
+
+Why do we need to set these two bits?  Is it obvious or does it deserve
+a comment?
+
+> +
+> +			vcpu->arch.debug_ptr = &vcpu->arch.external_debug_state;
+> +			vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+> +			trap_debug = true;
+> +		}
+> +
+>  	} else {
+>  		/* Debug operations can go straight to the guest */
+>  		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
+>  	}
+> +
+> +	/*
+> +	 * If the guest debug register state is dirty (the guest is
+> +	 * actively accessing them), then we context-switch the
+> +	 * registers in EL2. Otherwise, we trap-and-emulate all guest
+> +	 * accesses to them.
+> +	 */
+
+I think this comment now feels strange, because it was explaining why we
+would set the trap_debug variable when the dirty flag was set, but the
+code just sets TDA when trap_debug is set.  So you should either move
+this comment to the top of the function and have it above a separate
+line that sets trap_debug based on KVM_ARM64_DEBUG_DIRTY (instead of
+initializing at declaration), or you should explain which conditions set
+trap_debug (guest is using the regs or we are debugging the guest), or
+just get rid of the comment.
+
+> +	if (trap_debug)
+> +		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
+> +	else
+> +		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
+
+still don't need the else.
+
+>  }
+>  
+>  void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
+>  {
+> -	if (vcpu->guest_debug)
+> +	if (vcpu->guest_debug) {
+>  		restore_guest_debug_regs(vcpu);
+> +
+> +		/*
+> +		 * If we were using HW debug we need to restore the
+> +		 * debug_ptr to the guest debug state.
+> +		 */
+> +		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
+> +			vcpu->arch.debug_ptr = (struct kvm_guest_debug_arch *)
+> +				&vcpu_sys_reg(vcpu, DBGBCR0_EL1);
+> +		}
+
+I would find it easier to follow the code if you only configure the
+debug_ptr in kvm_arm_setup_debug() because it feels like you're setting
+up state here which will not be used before in a very long time (after
+handle_exit, exit to userspace etc.).
+
+> +	}
+>  }
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index e9de13e..68a0759 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -103,7 +103,11 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	run->debug.arch.hsr = hsr;
+>  
+>  	switch (hsr >> ESR_ELx_EC_SHIFT) {
+> +	case ESR_ELx_EC_WATCHPT_LOW:
+> +		run->debug.arch.far = vcpu->arch.fault.far_el2;
+> +		/* fall through */
+>  	case ESR_ELx_EC_SOFTSTP_LOW:
+> +	case ESR_ELx_EC_BREAKPT_LOW:
+>  	case ESR_ELx_EC_BKPT32:
+>  	case ESR_ELx_EC_BRK64:
+>  		break;
+> @@ -132,6 +136,8 @@ static exit_handle_fn arm_exit_handlers[] = {
+>  	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
+>  	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
+>  	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
+> +	[ESR_ELx_EC_WATCHPT_LOW]= kvm_handle_guest_debug,
+> +	[ESR_ELx_EC_BREAKPT_LOW]= kvm_handle_guest_debug,
+>  	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
+>  	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
+>  };
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index dd51fb1..921d248 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -706,7 +706,8 @@ ENTRY(__kvm_vcpu_run)
+>  	bl __restore_fpsimd
+>  
+>  	skip_debug_state x3, 1f
+> -	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
+> +	ldr	x3, [x0, #VCPU_DEBUG_PTR]
+> +	kern_hyp_va x3
+>  	bl	__restore_debug
+>  1:
+>  	restore_guest_32bit_state
+> @@ -727,7 +728,8 @@ __kvm_vcpu_return:
+>  	bl __save_sysregs
+>  
+>  	skip_debug_state x3, 1f
+> -	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
+> +	ldr	x3, [x0, #VCPU_DEBUG_PTR]
+> +	kern_hyp_va x3
+>  	bl	__save_debug
+>  1:
+>  	save_guest_32bit_state
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index 0b43265..21d5a62 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -56,6 +56,12 @@ static bool cpu_has_32bit_el1(void)
+>  	return !!(pfr0 & 0x20);
+>  }
+>  
+> +/**
+> + * kvm_arch_dev_ioctl_check_extension
+> + *
+> + * We currently assume that the number of HW registers is uniform
+> + * across all CPUs (see cpuinfo_sanity_check).
+> + */
+>  int kvm_arch_dev_ioctl_check_extension(long ext)
+>  {
+>  	int r;
+> @@ -64,6 +70,12 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
+>  	case KVM_CAP_ARM_EL1_32BIT:
+>  		r = cpu_has_32bit_el1();
+>  		break;
+> +	case KVM_CAP_GUEST_DEBUG_HW_BPS:
+> +		r = get_num_brps();
+> +		break;
+> +	case KVM_CAP_GUEST_DEBUG_HW_WPS:
+> +		r  = get_num_wrps();
+> +		break;
+>  	default:
+>  		r = 0;
+>  	}
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 3b6252e..923c2aa 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -825,6 +825,8 @@ struct kvm_ppc_smmu_info {
+>  #define KVM_CAP_S390_INJECT_IRQ 113
+>  #define KVM_CAP_S390_IRQ_STATE 114
+>  #define KVM_CAP_PPC_HWRNG 115
+> +#define KVM_CAP_GUEST_DEBUG_HW_BPS 116
+> +#define KVM_CAP_GUEST_DEBUG_HW_WPS 117
+>  
+>  #ifdef KVM_CAP_IRQ_ROUTING
+>  
 > -- 
-> 1.8.3.1
+> 2.3.5
 > 
+Thanks,
+-Christoffer
