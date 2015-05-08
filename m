@@ -1,91 +1,145 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 8 May 2015 10:13:55 +0200
-Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
-In-Reply-To: <20150508065318.GA5690@codeaurora.org>
-References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
- <1981330.kGUrTurMy5@diego> <5543E79F.2080400@codeaurora.org>
- <22709390.NTAlubMgNB@diego> <55440EDA.4030905@codeaurora.org>
- <CAMAWPa_n+59+v+x3fKkmdtW1wMJF7kqtTjLLowmv1xwGWprYJw@mail.gmail.com>
- <554BD33D.7050907@codeaurora.org>
- <CAMAWPa-ZtEzdzcO3c2D3k3JAvi+8zVzb0s1xSqUA-LQDz-EB4w@mail.gmail.com>
- <20150508065318.GA5690@codeaurora.org>
-Message-ID: <20150508081355.GB6325@pengutronix.de>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri,  8 May 2015 17:16:08 +0900
+Subject: [PATCH] drm/rockchip: Add BGR formats to VOP
+Message-ID: <1431072968-12696-1-git-send-email-tfiga@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 07, 2015 at 11:53:18PM -0700, Stephen Boyd wrote:
-> On 05/07, Kevin Hilman wrote:
-> > On Thu, May 7, 2015 at 2:03 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > > On 05/07/15 08:17, Kevin Hilman wrote:
-> > >> On Fri, May 1, 2015 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > >>> On 05/01/15 15:07, Heiko St?bner wrote:
-> > >>>> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
-> > >>>>
-> > >>>>>> Instead I guess we could hook it less deep into clk_get_sys, like in the
-> > >>>>>> following patch?
-> > >>>>> It looks like it will work at least, but still I'd prefer to keep the
-> > >>>>> orphan check contained to clk.c. How about this compile tested only patch?
-> > >>>> I gave this a spin on my rk3288-firefly board. It still boots, the clock tree
-> > >>>> looks the same and it also still defers nicely in the scenario I needed it
-> > >>>> for. The implementation also looks nice - and of course much more compact than
-> > >>>> my check in two places :-) . I don't know if you want to put this as follow-up
-> > >>>> on top or fold it into the original orphan-check, so in any case
-> > >>>>
-> > >>>> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > >>>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > >>> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it with
-> > >>> my patch and a note that it's based on an earlier patch from you.
-> > >> It appears this has landed in linux-next in the form of 882667c1fcf1
-> > >> clk: prevent orphan clocks from being used.  A bunch of boot failures
-> > >> for sunxi in today's linux-next[1] were bisected down to that patch.
-> > >>
-> > >> I confirmed that reverting that commit on top of next/master gets
-> > >> sunxi booting again.
-> > >>
-> > >>
-> > >
-> > > Thanks for the report. I've removed the two clk orphan patches from
-> > > clk-next. Would it be possible to try with next-20150507 and
-> > > clk_ignore_unused on the command line?
-> > 
-> > That doesn't help.  I tried on cubieboard2 and bananapi.
-> 
-> Thanks for trying.
-> 
-> > 
-> > > Also we can try to see if
-> > > critical clocks aren't being forced on by applying this patch and
-> > > looking for clk_get() failures
-> > 
-> > From cubieboard2, there's a few that look rather important:
-> > 
-> > [    0.000000] Additional per-CPU info printed with stalls.
-> > [    0.000000] Build-time adjustment of leaf fanout to 32.
-> > [    0.000000] RCU restricting CPUs from NR_CPUS=16 to nr_cpu_ids=2.
-> > [    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=32, nr_cpu_ids=2
-> > [    0.000000] NR_IRQS:16 nr_irqs:16 16
-> > [    0.000000] clk: couldn't get parent clock 0 for /clocks/ahb at 01c20054
-> > [    0.000000] Failed to enable critical clock cpu
-> > [    0.000000] Failed to enable critical clock pll5_ddr
-> > [    0.000000] Failed to enable critical clock ahb_sdram
-> > [    0.000000] Architected cp15 timer(s) running at 24.00MHz (virt).
-> 
-> Ok. So it seems we need to come up with some solution to the
-> "critical clocks" problem that doesn't require the individual
-> clock drivers to call clk_prepare_enable().
+VOP can support BGR formats in all windows thanks to red/blue swap option
+provided in WINx_CTRL0 registers. This patch enables support for
+ABGR8888, XBGR8888, BGR888 and BGR565 formats by using this feature.
 
-I'm getting more and more unsure if we can really handle the complexity
-we get by allowing to register orphaned clocks. On one hand we can't
-handle the orphaned clocks properly when we do a clk_prepare/enable on
-them, on the other hand we run into trouble when we forbid to
-prepare/enable them. The fact that clocks can become orphans by
-reparenting them makes it even more complicated.
-Maybe allowing orphans is something that has to be revisited.
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 33 +++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-Sascha
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 4557f33..45fa11c 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -169,6 +169,7 @@ struct vop_win_phy {
+ 
+ 	struct vop_reg enable;
+ 	struct vop_reg format;
++	struct vop_reg rb_swap;
+ 	struct vop_reg act_info;
+ 	struct vop_reg dsp_info;
+ 	struct vop_reg dsp_st;
+@@ -198,8 +199,12 @@ struct vop_data {
+ static const uint32_t formats_01[] = {
+ 	DRM_FORMAT_XRGB8888,
+ 	DRM_FORMAT_ARGB8888,
++	DRM_FORMAT_XBGR8888,
++	DRM_FORMAT_ABGR8888,
+ 	DRM_FORMAT_RGB888,
++	DRM_FORMAT_BGR888,
+ 	DRM_FORMAT_RGB565,
++	DRM_FORMAT_BGR565,
+ 	DRM_FORMAT_NV12,
+ 	DRM_FORMAT_NV16,
+ 	DRM_FORMAT_NV24,
+@@ -208,8 +213,12 @@ static const uint32_t formats_01[] = {
+ static const uint32_t formats_234[] = {
+ 	DRM_FORMAT_XRGB8888,
+ 	DRM_FORMAT_ARGB8888,
++	DRM_FORMAT_XBGR8888,
++	DRM_FORMAT_ABGR8888,
+ 	DRM_FORMAT_RGB888,
++	DRM_FORMAT_BGR888,
+ 	DRM_FORMAT_RGB565,
++	DRM_FORMAT_BGR565,
+ };
+ 
+ static const struct vop_win_phy win01_data = {
+@@ -217,6 +226,7 @@ static const struct vop_win_phy win01_data = {
+ 	.nformats = ARRAY_SIZE(formats_01),
+ 	.enable = VOP_REG(WIN0_CTRL0, 0x1, 0),
+ 	.format = VOP_REG(WIN0_CTRL0, 0x7, 1),
++	.rb_swap = VOP_REG(WIN0_CTRL0, 0x1, 12),
+ 	.act_info = VOP_REG(WIN0_ACT_INFO, 0x1fff1fff, 0),
+ 	.dsp_info = VOP_REG(WIN0_DSP_INFO, 0x0fff0fff, 0),
+ 	.dsp_st = VOP_REG(WIN0_DSP_ST, 0x1fff1fff, 0),
+@@ -233,6 +243,7 @@ static const struct vop_win_phy win23_data = {
+ 	.nformats = ARRAY_SIZE(formats_234),
+ 	.enable = VOP_REG(WIN2_CTRL0, 0x1, 0),
+ 	.format = VOP_REG(WIN2_CTRL0, 0x7, 1),
++	.rb_swap = VOP_REG(WIN0_CTRL0, 0x1, 12),
+ 	.dsp_info = VOP_REG(WIN2_DSP_INFO0, 0x0fff0fff, 0),
+ 	.dsp_st = VOP_REG(WIN2_DSP_ST0, 0x1fff1fff, 0),
+ 	.yrgb_mst = VOP_REG(WIN2_MST0, 0xffffffff, 0),
+@@ -246,6 +257,7 @@ static const struct vop_win_phy cursor_data = {
+ 	.nformats = ARRAY_SIZE(formats_234),
+ 	.enable = VOP_REG(HWC_CTRL0, 0x1, 0),
+ 	.format = VOP_REG(HWC_CTRL0, 0x7, 1),
++	.rb_swap = VOP_REG(WIN0_CTRL0, 0x1, 12),
+ 	.dsp_st = VOP_REG(HWC_DSP_ST, 0x1fff1fff, 0),
+ 	.yrgb_mst = VOP_REG(HWC_MST, 0xffffffff, 0),
+ };
+@@ -351,15 +363,32 @@ static inline void vop_mask_write_relaxed(struct vop *vop, uint32_t offset,
+ 	}
+ }
+ 
++static bool has_rb_swapped(uint32_t format)
++{
++	switch (format) {
++	case DRM_FORMAT_XBGR8888:
++	case DRM_FORMAT_ABGR8888:
++	case DRM_FORMAT_BGR888:
++	case DRM_FORMAT_BGR565:
++		return true;
++	default:
++		return false;
++	}
++}
++
+ static enum vop_data_format vop_convert_format(uint32_t format)
+ {
+ 	switch (format) {
+ 	case DRM_FORMAT_XRGB8888:
+ 	case DRM_FORMAT_ARGB8888:
++	case DRM_FORMAT_XBGR8888:
++	case DRM_FORMAT_ABGR8888:
+ 		return VOP_FMT_ARGB8888;
+ 	case DRM_FORMAT_RGB888:
++	case DRM_FORMAT_BGR888:
+ 		return VOP_FMT_RGB888;
+ 	case DRM_FORMAT_RGB565:
++	case DRM_FORMAT_BGR565:
+ 		return VOP_FMT_RGB565;
+ 	case DRM_FORMAT_NV12:
+ 		return VOP_FMT_YUV420SP;
+@@ -377,6 +406,7 @@ static bool is_alpha_support(uint32_t format)
+ {
+ 	switch (format) {
+ 	case DRM_FORMAT_ARGB8888:
++	case DRM_FORMAT_ABGR8888:
+ 		return true;
+ 	default:
+ 		return false;
+@@ -587,6 +617,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+ 	enum vop_data_format format;
+ 	uint32_t val;
+ 	bool is_alpha;
++	bool rb_swap;
+ 	bool visible;
+ 	int ret;
+ 	struct drm_rect dest = {
+@@ -620,6 +651,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+ 		return 0;
+ 
+ 	is_alpha = is_alpha_support(fb->pixel_format);
++	rb_swap = has_rb_swapped(fb->pixel_format);
+ 	format = vop_convert_format(fb->pixel_format);
+ 	if (format < 0)
+ 		return format;
+@@ -688,6 +720,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+ 	val = (dsp_sty - 1) << 16;
+ 	val |= (dsp_stx - 1) & 0xffff;
+ 	VOP_WIN_SET(vop, win, dsp_st, val);
++	VOP_WIN_SET(vop, win, rb_swap, rb_swap);
+ 
+ 	if (is_alpha) {
+ 		VOP_WIN_SET(vop, win, dst_alpha_ctl,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.2.0.rc0.207.ga3a616c
