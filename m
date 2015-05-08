@@ -1,84 +1,45 @@
-From: jonathar@broadcom.com (Jonathan Richardson)
-Date: Fri, 8 May 2015 13:02:17 -0700
-Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
- for cygnus
-In-Reply-To: <9193036.7UYD2OGJHk@wuerfel>
-References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
- <5543CD73.2030902@broadcom.com> <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
- <9193036.7UYD2OGJHk@wuerfel>
-Message-ID: <554D1649.2030106@broadcom.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 8 May 2015 15:09:23 -0500
+Subject: [PATCH 1/2] arm: boot: dts: am4372: add operating points
+In-Reply-To: <1431115050-23693-1-git-send-email-balbi@ti.com>
+References: <1431115050-23693-1-git-send-email-balbi@ti.com>
+Message-ID: <554D17F3.7090008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-05-01 12:40 PM, Arnd Bergmann wrote:
-> On Friday 01 May 2015 20:30:04 One Thousand Gnomes wrote:
->>
->>> channel control, unless I'm missing something. If people are flexible
->>> with extending that I could propose something. Let me know which way you
->>> prefer to go. Thanks.
->>
->> I would strongly favour fixing PTP to do this right. Otherwise we will
->> have 2 or 3 adhoc drivers, then end up moving them to PTP and then end up
->> dealing with the compat mess.
+On 05/08/2015 02:57 PM, Felipe Balbi wrote:
+> By adding operating points, cpufreq-dt has a
+> chance of running and doing something useful.
 > 
-> Agreed. I was hoping that there was already a subsystem in the kernel that
-> could be extended to work with this driver. If all that is needed is to
-> pass more fields of the existing timex to ptp drivers, that should be
-> fairly easy to do.
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/boot/dts/am4372.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> We also have some padding bytes available in struct timex in case some
-> extra data needs to be passed, or we could add another clock_* system call
-> if it's absolutely required to have another entry into the driver, and
-> connect that through struct k_clock and posix_clock_operations(). I would
-> hope we don't even need that.
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index c80a3e233792..ea1db20f64fc 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -38,6 +38,15 @@
+>  			clocks = <&dpll_mpu_ck>;
+>  			clock-names = "cpu";
+>  
+> +			operating-points = <
+> +				/* kHz		uV */
+> +				1000000		1325000 /* OPP_NITRO */
+> +				 800000		1260000 /* OPP_TURBO */
+> +				 720000		1200000 /* OPP_120 */
+> +				 600000		1100000 /* OPP_100 */
+> +				 300000		 950000 /* OPP_50 */
+> +			>;
+> +
+>  			clock-latency = <300000>; /* From omap-cpufreq driver */
+>  		};
+>  	};
 > 
-> 	Arnd
-> 
+which of these OPPs need AVS? which of these are dependent on Efuse bit
+dependent?
 
-Thanks Arnd/Alan for the feedback. I looked into PTP further to see what
-exactly would need changing.
-
-For the clock functions I think we can use the existing framework
-unchanged with one exception: ptp_clock_adjtime() doesn't allow negative
-time adjustments and we would like to allow this.
-
-The other client events (set IRQ interval, enable client, set client
-divider, get client timestamp) could be handled as follows:
-
-IRQ interval: I mentioned before that we may be able to calculate the
-isochronous interrupt rate automatically but this isn't possible because
-the DTE doesn't know the frequency of the clients. One solution is to
-use the 'PTP_PEROUT_REQUEST' ioctl to set a periodic timer frequency.
-Not really a timer but good enough for our purposes.
-
-Enable Client: The external timestamping channel handling in PTP allows
-channels to be enabled so we can re-use this (PTP_EXTTS_REQUEST ioctl).
-
-Set divider: There is no ability to set a frequency or do anything to a
-channel. We could re-use the PTP_EXTTS_REQUEST ioctl but extend 'struct
-ptp_extts_request' by using the reserved field rsv to allow setting an
-integer value representing either a frequency or divider value in our
-case - some value to configure a channel. A new flag would have to be
-added to the existing PTP_ENABLE_FEATURE, RISING and FALLING EDGE.
-
-Get timestamp: This is a bit more complicated. Currently the PTP driver
-does list management for timestamps from external timestamp channels.
-Timestamps from all channels go into the same list. In our driver we
-have a s/w FIFO for each client and it closely matches the h/w FIFO and
-handles any overflow. We would like to keep it this way because it also
-allows multiple user space processes to only fetch timestamps for the
-client it's handling. We could add a new ioctl to get a timestamp from
-the driver instead of doing it through ptp_read() but it would be nice
-if we could let ptp_read() allow the driver to do timestamp management
-instead of PTP. Maybe provide an option to obtain the timestamps from a
-container in the driver instead of the one managed by PTP. I like being
-able to use read/poll to obtain data instead of polling the kernel with
-ioctls as we are currently doing. Also, avoiding the kmalloc in ptp_read
-would be nice because this of the frequency it would be called at. Do
-you have any preference on how to handle this?
-
-I've tried to minimize the changes to PTP.
-
-Alan, what is IIO? I'm not familiar.
-
-Thanks.
+-- 
+Regards,
+Nishanth Menon
