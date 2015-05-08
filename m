@@ -1,84 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 8 May 2015 18:53:06 +0100
-Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
-In-Reply-To: <1431075343-7887-3-git-send-email-leilk.liu@mediatek.com>
-References: <1431075343-7887-1-git-send-email-leilk.liu@mediatek.com>
- <1431075343-7887-3-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20150508175306.GG2761@sirena.org.uk>
+From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
+Date: Fri, 8 May 2015 20:57:49 +0300
+Subject: [PATCH v2 2/2] arm64: dts: qcom: Add msm8916 CoreSight components
+In-Reply-To: <CANLsYkxFzQPCWXb0w8BddtuJB_cXUtUHBTapYFDF9zqhDBQHrw@mail.gmail.com>
+References: <1431012969-16338-1-git-send-email-ivan.ivanov@linaro.org>
+ <1431012969-16338-3-git-send-email-ivan.ivanov@linaro.org>
+ <CANLsYkzNXBH0d6v1Ny_JwpW6NcKr9v0oAi9K3YfipwDgHWfMMA@mail.gmail.com>
+ <1431092877.21307.18.camel@linaro.org>
+ <CANLsYkyNYQf80c+8uMbZDr=kQ2YEOqy2aS8muEJsLsanDRGLOQ@mail.gmail.com>
+ <1431094640.21307.23.camel@linaro.org>
+ <CANLsYkxFzQPCWXb0w8BddtuJB_cXUtUHBTapYFDF9zqhDBQHrw@mail.gmail.com>
+Message-ID: <7DD9F545-FA01-427B-BB6E-9A54F1DFF94E@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 04:55:42PM +0800, leilk.liu at mediatek.com wrote:
-> From: Leilk Liu <leilk.liu@mediatek.com>
+
+> On May 8, 2015, at 7:17 PM, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
 > 
-> This patch adds basic spi bus for MT8173.
+> On 8 May 2015 at 08:17, Ivan T. Ivanov <ivan.ivanov@linaro.org> wrote:
+>> 
+>> On Fri, 2015-05-08 at 08:13 -0600, Mathieu Poirier wrote:
+>>> On 8 May 2015 at 07:47, Ivan T. Ivanov ivanov at linaro.org> wrote:
+>>>> On Fri, 2015-05-08 at 07:38 -0600, Mathieu Poirier wrote:
+>>>>> On 7 May 2015 at 09:36, Ivan T. Ivanov ivanov at linaro.org> wrote:
+>>>>>> Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
+>>>>>> 
+>>>>>> 
+>>>>>> +       replicator at 824000 {
+>>>>>> +               compatible = "qcom,coresight-replicator", "arm,primecell";
+>>>>> 
+>>>>> Shouldn't it be "qcom,coresight-replicator1x" ?
+>>>>> 
+>>>> 
+>>>> 
+>>>> 
+>>>> True, I still wonder, why we have to have this compatible string?
+>>>> Drivers are probed by amba_id and "arm,primecell", after all.
+>>>> 
+>>> 
+>>> Drivers have their own compatible strings for historical reasons,
+>>> something I've been meaning to fix for a long time now...
+>>> 
+>> 
+>> Yep, I see that they have been platform drivers in the past, but now
+>> they are not, except coresight-replicator driver. IMHO, having
+>> additional compatible string could lead just to confusion.
+> 
+> I did a little more research on this and based on what I found in the
+> kernel it may not need "fixing" after all.  The majority of drivers
+> that do specify "arm,primecell" also specify a device-specific
+> compatible string.  And in the case of CoreSight devices were
+> implementers can do pretty much whatever they  want with the ID
+> strings, it is only a matter of time before we need to call something
+> like of_device_is_compatible() to fix a quirk.
+> 
+> Unless someone heavy asks to remove the device-specific compatible
+> strings I'd prefer keeping the current trend set forth by other
+> drivers and as such, will ask you to add the "1x" in this bindings.
 
-Please try to only CC relevant people on patches, you've got a very
-broad CC list here and I'm not sure I understand why everyone is on it.
-Sending people irrelevant patches adds to the volume of mail people have
-to handle which takes time away from other things.
 
-> +config SPI_MT65XX
-> +	tristate "MediaTek SPI controller"
-> +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> +	select SPI_BITBANG
+Well, I don?t strongly object against this ?1x?, I will add it. 
+My point is that if we can dynamically detect device version, 
+which we can do in this case, it will be more robust to do it
+in this way. 
 
-Unless your controller is geniunely bitbanging you shouldn't be using
-the bitbang framework, modern drivers should implement set_cs() and
-transfer_one() instead.  You should also be using the core helpers for
-DMA mapping.
+If there are not issues with patch 1/2, I will like to fix and 
+resend only this patch.
 
-The driver looks basically good other than this, it shouldn't be too
-much work (and ought to save you some code) to refactor to the modern
-interfaces.
+Regards,
+Ivan
 
-> +#define IDLE 0
-> +#define INPROGRESS 1
-> +#define PAUSED 2
-> +
-> +#define PACKET_SIZE 1024
-
-You should namespace the constants you're using to avoid clashes with
-headers.
-
-> +static const struct of_device_id mtk_spi_of_match[] = {
-> +	{ .compatible = "mediatek,mt6589-spi", .data = (void *)COMPAT_MT6589},
-> +	{ .compatible = "mediatek,mt8173-spi", .data = (void *)COMPAT_MT8173},
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, mtk_spi_of_match);
-
-There were three compatible strings listed in the DT binding but only
-two here.
-
-> +	/*set the software reset bit in SPI_CMD_REG.*/
-
-/* Spaces please */
-
-> +static unsigned long mtk_get_device_prop(struct platform_device *pdev)
-> +{
-> +	const struct of_device_id *match;
-> +
-> +	match = of_match_node(mtk_spi_of_match, pdev->dev.of_node);
-> +	return (unsigned long)match->data;
-> +}
-
-This wrapper doesn't seem to be doing a lot and will crash if we somehow
-manage to get the driver loaded without a match (eg, if someone tries to
-instantiate as a regular platform device).
-
-> +	ret = clk_prepare_enable(mdata->clk);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to enable clock (%d)\n", ret);
-> +		goto err;
-> +	}
-
-I'd expect to see runtime PM callbacks to enable and disable this clock
-in order to minimise power consumption.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150508/301f2a2f/attachment-0001.sig>
+  
