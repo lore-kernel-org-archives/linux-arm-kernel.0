@@ -1,36 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 May 2015 18:08:16 +0200
-Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
-In-Reply-To: <0701f75c1c42f74fd58845bc0ed41c38@advem.lv>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <2349062.9v3Zz7HPLu@wuerfel> <0701f75c1c42f74fd58845bc0ed41c38@advem.lv>
-Message-ID: <2131951.l0j0CIttAZ@wuerfel>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 08 May 2015 17:08:42 +0100
+Subject: [PATCH 1/2] ARM: kvm: fix a bad BSYM() usage
+Message-ID: <E1YqkpO-0006zB-QJ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 May 2015 12:03:25 Roman Yeryomin wrote:
-> On 2015-05-06 22:22, Arnd Bergmann wrote:
-> > On Wednesday 06 May 2015 19:21:21 Roman Yeryomin wrote:
-> >> 
-> >> > Thanks to point that, I'll merge that one which seems clean enough:
-> >> > http://git.openwrt.org/?p=openwrt.git;a=blob;f=target/linux/gemini/files/drivers/rtc/rtc-gemini.c;h=587d8122b2fbb1230437eadcce4789a53aa60ee5;hb=4c637410a2a1ab45988e8ca6202554a502102039
-> >> 
-> >> For 3.18 (and up) to work on gemini 160-gemini-timers.patch is vital.
-> >> Without that timers are broken and cpu is super slow.
-> > 
-> > Do you know what part of the patch is the actual bug fix? We should 
-> > probably
-> > merge that separately and mark it for stable backports, while the bulk 
-> > of that
-> > patch seems to just rearrange code.
-> > 
-> >       Arnd
-> 
-> Sorry, didn't try to extract the exact lines it but I guess it's that 
-> part which touches the scheduler clock code.
-> Because without that patch sched clock runs at 100Hz instead of 25MHz.
-> I can dive into this deeper if you want, I just didn't see the need.
+BSYM() should only be used when refering to local symbols in the same
+assembly file which are resolved by the assembler, and not for
+linker-fixed up symbols.  The use of BSYM() with panic is incorrect as
+the linker is involved in fixing up this relocation, and it knows
+whether panic() is ARM or Thumb.
 
-I think that would be helpful, yes.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kvm/interrupts.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	Arnd
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 79caf79b304a..87847d2c5f99 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -309,7 +309,7 @@ ENTRY(kvm_call_hyp)
+ THUMB(	orr	r2, r2, #PSR_T_BIT	)
+ 	msr	spsr_cxsf, r2
+ 	mrs	r1, ELR_hyp
+-	ldr	r2, =BSYM(panic)
++	ldr	r2, =panic
+ 	msr	ELR_hyp, r2
+ 	ldr	r0, =\panic_str
+ 	clrex				@ Clear exclusive monitor
+-- 
+1.8.3.1
