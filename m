@@ -1,94 +1,77 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  8 May 2015 10:18:04 +0900
-Subject: [v4 4/4] arm: kvm: add stub implementation for kvm_cpu_reset()
-In-Reply-To: <1431047884-5637-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1431047884-5637-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1431047884-5637-5-git-send-email-takahiro.akashi@linaro.org>
+From: b20788@freescale.com (Anson Huang)
+Date: Fri, 8 May 2015 19:25:29 +0800
+Subject: [PATCH V5] ARM: imx: correct Audio/Video PLL rate calculation formula
+Message-ID: <1431084329-10579-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just to avoid compiling errors on arm.
+The audio/video PLL's rate calculation formula is as below in RM:
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Fref * (DIV_SELECT + NUM / DENOM),
+
+in original clk-pllv3's code, below code is used:
+
+(parent_rate * div) + ((parent_rate / mfd) * mfn)
+
+as it does NOT consider the non-integer part of division,
+so below calculation formula should be better used instead:
+
+(parent_rate * div) + ((parent_rate * mfn) / mfd)
+
+and we also need to consider parent_rate * mfd may overflow
+a 32 bit value, 64 bit value should be used.
+
+Below is one example of old/new formula's difference:
+
+On i.MX7D, DRAM PLL is a Audio/Video type PLL, the target freq
+is 1066MHz, the register settings are as below:
+
+PLL_DDRn: 8060202C   -> div = 0x2C
+DDR_NUM: 06AAAC4D    -> mfn = 0x6AAAC4D
+DDR_DENOM: 100003EC  -> mfd = 0x100003EC
+
+parent_rate = 24MHz.
+
+with old formula, the (parent_rate / mfd) * mfn = 0, with new formula,
+the (parent_rate * mfn) / mfd = 10MHz, so old formula gets
+PLL_DDR = 1056MHz, while the updated formula gets PLL_DDR = 1066MHz
+which exactly matches the real rate.
+
+Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/include/asm/kvm_asm.h  |    1 +
- arch/arm/include/asm/kvm_host.h |   12 ++++++++++++
- arch/arm/include/asm/kvm_mmu.h  |    5 +++++
- arch/arm/kvm/init.S             |    6 ++++++
- 4 files changed, 24 insertions(+)
+ drivers/clk/imx/clk-pllv3.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 25410b2..462babf 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -85,6 +85,7 @@ struct kvm_vcpu;
+diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+index 641ebc5..652af4d 100644
+--- a/drivers/clk/imx/clk-pllv3.c
++++ b/drivers/clk/imx/clk-pllv3.c
+@@ -203,8 +203,13 @@ static unsigned long clk_pllv3_av_recalc_rate(struct clk_hw *hw,
+ 	u32 mfn = readl_relaxed(pll->base + PLL_NUM_OFFSET);
+ 	u32 mfd = readl_relaxed(pll->base + PLL_DENOM_OFFSET);
+ 	u32 div = readl_relaxed(pll->base) & pll->div_mask;
++	u64 temp64 = parent_rate;
++
++	temp64 *= mfn;
++	do_div(temp64, mfd);
++
++	return (parent_rate * div) + temp64;
  
- extern char __kvm_hyp_init[];
- extern char __kvm_hyp_init_end[];
-+extern char __kvm_hyp_reset[];
- 
- extern char __kvm_hyp_exit[];
- extern char __kvm_hyp_exit_end[];
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index ca97764..6d38134 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -220,6 +220,18 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+-	return (parent_rate * div) + ((parent_rate / mfd) * mfn);
  }
  
-+static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-+					phys_addr_t phys_idmap_start,
-+					unsigned long stub_vector_ptr,
-+					unsigned long reset_func)
-+{
-+	/*
-+	 * TODO
-+	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start, stub_vector_ptr,
-+	 *		  reset_func);
-+	 */
-+}
-+
- static inline int kvm_arch_dev_ioctl_check_extension(long ext)
- {
- 	return 0;
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 37ca2a4..d85bcd1 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -66,6 +66,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- phys_addr_t kvm_mmu_get_httbr(void);
- phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
-+phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
+ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
+@@ -228,7 +233,10 @@ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	do_div(temp64, parent_rate);
+ 	mfn = temp64;
  
-@@ -270,6 +271,10 @@ static inline void __kvm_flush_dcache_pud(pud_t pud)
- void kvm_set_way_flush(struct kvm_vcpu *vcpu);
- void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled);
- 
-+extern char __hyp_idmap_text_start[];
-+#define kvm_virt_to_trampoline(x)       \
-+			(TRAMPOLINE_VA + ((x) - __hyp_idmap_text_start))
+-	return parent_rate * div + parent_rate / mfd * mfn;
++	temp64 = parent_rate * mfn;
++	do_div(temp64, mfd);
 +
- #endif	/* !__ASSEMBLY__ */
++	return parent_rate * div + temp64;
+ }
  
- #endif /* __ARM_KVM_MMU_H__ */
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 3988e72..9178c9a 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -156,4 +156,10 @@ target:	@ We're now in the trampoline code, switch page tables
- 	.globl __kvm_hyp_init_end
- __kvm_hyp_init_end:
- 
-+	.globl __kvm_hyp_reset
-+__kvm_hyp_reset:
-+	@ TODO
-+
-+	eret
-+
- 	.popsection
+ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
 -- 
-1.7.9.5
+1.9.1
