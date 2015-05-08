@@ -1,77 +1,23 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 7 May 2015 23:53:18 -0700
-Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
-In-Reply-To: <CAMAWPa-ZtEzdzcO3c2D3k3JAvi+8zVzb0s1xSqUA-LQDz-EB4w@mail.gmail.com>
-References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
- <1981330.kGUrTurMy5@diego> <5543E79F.2080400@codeaurora.org>
- <22709390.NTAlubMgNB@diego> <55440EDA.4030905@codeaurora.org>
- <CAMAWPa_n+59+v+x3fKkmdtW1wMJF7kqtTjLLowmv1xwGWprYJw@mail.gmail.com>
- <554BD33D.7050907@codeaurora.org>
- <CAMAWPa-ZtEzdzcO3c2D3k3JAvi+8zVzb0s1xSqUA-LQDz-EB4w@mail.gmail.com>
-Message-ID: <20150508065318.GA5690@codeaurora.org>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 8 May 2015 10:05:24 +0300
+Subject: [PATCH v5 3/8] dmaengine: Add driver for TI DMA crossbar on DRA7x
+In-Reply-To: <20150508034110.GW3521@localhost>
+References: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
+ <1428572154-3548-4-git-send-email-peter.ujfalusi@ti.com>
+ <20150504053851.GY3521@localhost> <554B34F2.5050306@ti.com>
+ <20150508034110.GW3521@localhost>
+Message-ID: <554C6034.4020004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07, Kevin Hilman wrote:
-> On Thu, May 7, 2015 at 2:03 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 05/07/15 08:17, Kevin Hilman wrote:
-> >> On Fri, May 1, 2015 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >>> On 05/01/15 15:07, Heiko St?bner wrote:
-> >>>> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
-> >>>>
-> >>>>>> Instead I guess we could hook it less deep into clk_get_sys, like in the
-> >>>>>> following patch?
-> >>>>> It looks like it will work at least, but still I'd prefer to keep the
-> >>>>> orphan check contained to clk.c. How about this compile tested only patch?
-> >>>> I gave this a spin on my rk3288-firefly board. It still boots, the clock tree
-> >>>> looks the same and it also still defers nicely in the scenario I needed it
-> >>>> for. The implementation also looks nice - and of course much more compact than
-> >>>> my check in two places :-) . I don't know if you want to put this as follow-up
-> >>>> on top or fold it into the original orphan-check, so in any case
-> >>>>
-> >>>> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> >>>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> >>> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it with
-> >>> my patch and a note that it's based on an earlier patch from you.
-> >> It appears this has landed in linux-next in the form of 882667c1fcf1
-> >> clk: prevent orphan clocks from being used.  A bunch of boot failures
-> >> for sunxi in today's linux-next[1] were bisected down to that patch.
-> >>
-> >> I confirmed that reverting that commit on top of next/master gets
-> >> sunxi booting again.
-> >>
-> >>
-> >
-> > Thanks for the report. I've removed the two clk orphan patches from
-> > clk-next. Would it be possible to try with next-20150507 and
-> > clk_ignore_unused on the command line?
-> 
-> That doesn't help.  I tried on cubieboard2 and bananapi.
+On 05/08/2015 06:41 AM, Vinod Koul wrote:
+> Now as far as this series is concerned, rest of it looks good so I am
+> willing to merge to if you plan to work on defered probe :) I think its a
+> fair bargain!
 
-Thanks for trying.
+Deal ;)
 
-> 
-> > Also we can try to see if
-> > critical clocks aren't being forced on by applying this patch and
-> > looking for clk_get() failures
-> 
-> From cubieboard2, there's a few that look rather important:
-> 
-> [    0.000000] Additional per-CPU info printed with stalls.
-> [    0.000000] Build-time adjustment of leaf fanout to 32.
-> [    0.000000] RCU restricting CPUs from NR_CPUS=16 to nr_cpu_ids=2.
-> [    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=32, nr_cpu_ids=2
-> [    0.000000] NR_IRQS:16 nr_irqs:16 16
-> [    0.000000] clk: couldn't get parent clock 0 for /clocks/ahb at 01c20054
-> [    0.000000] Failed to enable critical clock cpu
-> [    0.000000] Failed to enable critical clock pll5_ddr
-> [    0.000000] Failed to enable critical clock ahb_sdram
-> [    0.000000] Architected cp15 timer(s) running at 24.00MHz (virt).
-
-Ok. So it seems we need to come up with some solution to the
-"critical clocks" problem that doesn't require the individual
-clock drivers to call clk_prepare_enable().
+I'll take care of the OMAP/daVinci drivers for omap-dma and edma.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+P?ter
