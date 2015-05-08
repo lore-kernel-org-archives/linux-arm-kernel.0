@@ -1,54 +1,84 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 08 May 2015 14:01:40 -0600
-Subject: [PATCH] ARM: tegra: add "nor-jedec" flash compatible binding
-In-Reply-To: <20150508184317.GZ32500@ld-irv-0074>
-References: <1431066098-19821-1-git-send-email-zajec5@gmail.com>
- <554CDD8C.7050000@wwwdotorg.org> <20150508184317.GZ32500@ld-irv-0074>
-Message-ID: <554D1624.5030608@wwwdotorg.org>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Fri, 8 May 2015 13:02:17 -0700
+Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
+ for cygnus
+In-Reply-To: <9193036.7UYD2OGJHk@wuerfel>
+References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
+ <5543CD73.2030902@broadcom.com> <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
+ <9193036.7UYD2OGJHk@wuerfel>
+Message-ID: <554D1649.2030106@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2015 12:43 PM, Brian Norris wrote:
-> On Fri, May 08, 2015 at 10:00:12AM -0600, Stephen Warren wrote:
->> On 05/08/2015 12:21 AM, Rafa? Mi?ecki wrote:
->>> Starting with commits
->>> 8ff16cf ("Documentation: devicetree: m25p80: add "nor-jedec" binding")
->>> 1103b85 ("mtd: m25p80: bind to "nor-jedec" ID, for auto-detection")
->>> we have "nor-jedec" binding indicating support for JEDEC identification.
+On 15-05-01 12:40 PM, Arnd Bergmann wrote:
+> On Friday 01 May 2015 20:30:04 One Thousand Gnomes wrote:
 >>
->> The documentation looks quite incomplete. "nor-jedec" sounds like
->> it's intended to be something generic. As such, it should be
->> documented in e.g.
->> Documentation/devicetree/bindings/mtd/nor-jedec.txt, not buried in
->> one particular flash device's binding. If it's not intended to be
->> generic, why isn't the existing "winbond,w25q32dw" enough?
->
-> It is generic, though there are plenty of additional manufacturer/device
-> pairs that could go on top of it. m25p80 was (one of?) the first
-> supported, so the naming has been based on legacy, and we're in the
-> process of unwinding a bit of that. If it helps, we could move the doc
-> to .../mtd/spi-nor,nor-jedec.txt or something like that.
+>>> channel control, unless I'm missing something. If people are flexible
+>>> with extending that I could propose something. Let me know which way you
+>>> prefer to go. Thanks.
+>>
+>> I would strongly favour fixing PTP to do this right. Otherwise we will
+>> have 2 or 3 adhoc drivers, then end up moving them to PTP and then end up
+>> dealing with the compat mess.
+> 
+> Agreed. I was hoping that there was already a subsystem in the kernel that
+> could be extended to work with this driver. If all that is needed is to
+> pass more fields of the existing timex to ptp drivers, that should be
+> fairly easy to do.
+> 
+> We also have some padding bytes available in struct timex in case some
+> extra data needs to be passed, or we could add another clock_* system call
+> if it's absolutely required to have another entry into the driver, and
+> connect that through struct k_clock and posix_clock_operations(). I would
+> hope we don't even need that.
+> 
+> 	Arnd
+> 
 
-Yes, moving the documentation to a generic location would be appropriate 
-in my opinion.
+Thanks Arnd/Alan for the feedback. I looked into PTP further to see what
+exactly would need changing.
 
->> Equally, "nor-jedec" doesn't sound like the right name. It doesn't
->> differentiate between SPI and parallel NOR flash, which presumably
->> need different compatible values, since the programming model is
->> quite different, and the compatible value is supposed to
->> define/imply the SW-visible programming model.
->
-> It's definitely for SPI only. There was much discussion about this a
-> few months back. Somewhere along the way, it was mentioned that the
-> context (SPI slave is a child of SPI master) would make this clear. I'm
-> still not sure why we didn't end up with something more descriptive,
-> though, like "spi-nor,nor-jedec".
->
-> I'm open to change, as this binding is new in 4.1-rc1.
+For the clock functions I think we can use the existing framework
+unchanged with one exception: ptp_clock_adjtime() doesn't allow negative
+time adjustments and we would like to allow this.
 
-I don't believe compatible values should be interpreted according to 
-context; compatible value matching isn't implemented that way AFAIK, and 
-I'm not aware of any precedent for it to work that way.
+The other client events (set IRQ interval, enable client, set client
+divider, get client timestamp) could be handled as follows:
 
-Did the discussion involve the core DT maintainers? If so, whatever they 
-decided can stick. Otherwise, the discussion should be rubn by them.
+IRQ interval: I mentioned before that we may be able to calculate the
+isochronous interrupt rate automatically but this isn't possible because
+the DTE doesn't know the frequency of the clients. One solution is to
+use the 'PTP_PEROUT_REQUEST' ioctl to set a periodic timer frequency.
+Not really a timer but good enough for our purposes.
+
+Enable Client: The external timestamping channel handling in PTP allows
+channels to be enabled so we can re-use this (PTP_EXTTS_REQUEST ioctl).
+
+Set divider: There is no ability to set a frequency or do anything to a
+channel. We could re-use the PTP_EXTTS_REQUEST ioctl but extend 'struct
+ptp_extts_request' by using the reserved field rsv to allow setting an
+integer value representing either a frequency or divider value in our
+case - some value to configure a channel. A new flag would have to be
+added to the existing PTP_ENABLE_FEATURE, RISING and FALLING EDGE.
+
+Get timestamp: This is a bit more complicated. Currently the PTP driver
+does list management for timestamps from external timestamp channels.
+Timestamps from all channels go into the same list. In our driver we
+have a s/w FIFO for each client and it closely matches the h/w FIFO and
+handles any overflow. We would like to keep it this way because it also
+allows multiple user space processes to only fetch timestamps for the
+client it's handling. We could add a new ioctl to get a timestamp from
+the driver instead of doing it through ptp_read() but it would be nice
+if we could let ptp_read() allow the driver to do timestamp management
+instead of PTP. Maybe provide an option to obtain the timestamps from a
+container in the driver instead of the one managed by PTP. I like being
+able to use read/poll to obtain data instead of polling the kernel with
+ioctls as we are currently doing. Also, avoiding the kmalloc in ptp_read
+would be nice because this of the frequency it would be called at. Do
+you have any preference on how to handle this?
+
+I've tried to minimize the changes to PTP.
+
+Alan, what is IIO? I'm not familiar.
+
+Thanks.
